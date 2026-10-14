@@ -37128,7 +37128,7 @@ int func_2285()
 
         if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-                PostureModule(0x5); //Reverse Facing Direction
+                //PostureModule(0x5); //removed: turning here made the back kick travel away from the stick
 
          //func_33(); //turn character?
         
@@ -37194,7 +37194,7 @@ int func_2287()
             {
 if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-        func_33(); //flip character?
+        //func_33(); //removed: this turned Corrin toward the stick, so the back kick went the other way
         func_16(0x160, 0); //change to back kick
                 return 0x1;
 
