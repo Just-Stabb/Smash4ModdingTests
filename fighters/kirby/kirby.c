@@ -69955,15 +69955,18 @@ int func_4122(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int ar
 // ===================================================================
 
 // [Inhale aim] SETTINGS - edit these
+// Bones are indices in Kirby's model.vbn (see fighters/kirby/model/bones.md).
+// The arms rotate around each shoulder's local Y axis, which swings the arm up/down.
 float inhale_aim_max_up()   { return 40.0f; }  // degrees above straight ahead
 float inhale_aim_max_down() { return 40.0f; }  // degrees below straight ahead
 float inhale_aim_speed()    { return 2.0f; }   // degrees per frame at full stick
 float inhale_aim_deadzone() { return 0.2f; }   // stick Y below this does nothing (Charizard uses 0.5)
-float inhale_aim_sign()     { return -1.0f; }  // -1 like Fire Breath; use 1.0f if the bone turns the wrong way
-int   inhale_aim_bone1()    { return 0x13; }   // bone index; 0x13 is the bone Kirby's Fire Breath copy aims
-int   inhale_aim_bone2()    { return 0; }      // second bone (e.g. the other arm); 0 = not used
-float inhale_aim_offset1()  { return 0.0f; }   // fixed Z rotation added to bone 1 (Fire Breath uses -45)
-float inhale_aim_offset2()  { return 0.0f; }   // fixed Z rotation added to bone 2
+int   inhale_aim_bone1()    { return 0xe; }    // 0xE = LShoulderJ (left arm + hand follow); 0 = not used
+int   inhale_aim_bone2()    { return 0x12; }   // 0x12 = RShoulderJ (right arm + hand follow); 0 = not used
+float inhale_aim_sign1()    { return 1.0f; }   // + raises the left arm; flip to -1.0f if it goes the wrong way
+float inhale_aim_sign2()    { return -1.0f; }  // the right shoulder is mirrored, so - raises it
+float inhale_aim_offset1()  { return 0.0f; }   // fixed extra rotation for bone 1 (degrees)
+float inhale_aim_offset2()  { return 0.0f; }   // fixed extra rotation for bone 2 (degrees)
 
 // [Inhale aim] status 0x157 main: start pointing straight ahead
 void inhale_aim_init()
@@ -69998,26 +70001,30 @@ void inhale_aim_update()
     inhale_aim_apply(angle);
 }
 
-// [Inhale aim] rotate the bone(s) around Z by the aim angle
+// [Inhale aim] rotate the shoulder bones by the aim angle
 void inhale_aim_apply(float angle)
 {
     int bone;
     float sign;
     float offset;
     float rot;
-    sign = inhale_aim_sign();
-    rot = sign * angle;
+    // ModelModule(0x1, bone, x, y, z): extra bone rotation in degrees.
+    // The angle goes in Y (the shoulder's up/down swing axis).
     bone = inhale_aim_bone1();
     if (bone != 0)
     {
+        sign = inhale_aim_sign1();
         offset = inhale_aim_offset1();
-        ModelModule(0x1, bone, 0.0f, 0.0f, rot + offset);
+        rot = sign * angle + offset;
+        ModelModule(0x1, bone, 0.0f, rot, 0.0f);
     }
     bone = inhale_aim_bone2();
     if (bone != 0)
     {
+        sign = inhale_aim_sign2();
         offset = inhale_aim_offset2();
-        ModelModule(0x1, bone, 0.0f, 0.0f, rot + offset);
+        rot = sign * angle + offset;
+        ModelModule(0x1, bone, 0.0f, rot, 0.0f);
     }
 }
 

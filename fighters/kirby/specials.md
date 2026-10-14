@@ -191,8 +191,8 @@ into:
 - `func_2357` (0x157 loop): `inhale_aim_update()` runs every frame. When
   |stick Y| is above the deadzone, `angle += speed × stickY`, clamped to
   `[-max_down, max_up]` and stored in status float `0x1000006`. Then
-  `ModelModule(0x1, bone, 0, 0, sign × angle + offset)` rotates each bone
-  around Z.
+  `ModelModule(0x1, shoulder, 0, sign × angle + offset, 0)` swings both
+  arms up or down.
 - `func_2359` (0x157 end): `inhale_aim_reset()` puts the bones back to 0.
 
 **Settings** (the small functions under `// [Inhale aim] SETTINGS`):
@@ -202,19 +202,26 @@ into:
 | `inhale_aim_max_up` / `_max_down` | 40 / 40 | Angle limits in degrees |
 | `inhale_aim_speed` | 2.0 | Degrees per frame at full stick |
 | `inhale_aim_deadzone` | 0.2 | Stick Y needed to move (Charizard uses 0.5) |
-| `inhale_aim_sign` | -1.0 | Rotation direction (Fire Breath uses -1). Flip if it aims the wrong way |
-| `inhale_aim_bone1` | `0x13` | Bone to rotate. `0x13` is the bone Kirby's Fire Breath copy aims |
-| `inhale_aim_bone2` | `0` (off) | Optional second bone, e.g. the other arm |
-| `inhale_aim_offset1` / `2` | 0 | Fixed extra Z rotation (Fire Breath uses -45) |
+| `inhale_aim_bone1` | `0xE` | `LShoulderJ`, left arm (the arm and hand follow) |
+| `inhale_aim_bone2` | `0x12` | `RShoulderJ`, right arm |
+| `inhale_aim_sign1` / `_sign2` | 1 / -1 | The shoulders are mirrored, so the right one needs the opposite sign. Flip one if that arm goes the wrong way |
+| `inhale_aim_offset1` / `2` | 0 | Fixed extra rotation in degrees |
 
-**Aiming the arms:** `ModelModule(0x1, B, x, y, z)` sets bone index `B`'s
-rotation in degrees (sheet: Complex CMDs, "Set Bone Attributes"). To rotate
-the arms, put Kirby's arm (shoulder) bone indices in `inhale_aim_bone1` and
-`inhale_aim_bone2`. The index is the bone's position in Kirby's skeleton
-(`model.vbn`), which Smash Forge shows. The hands are children of the arms,
-so they follow. If an arm swings sideways instead of up and down, its local
-axis differs: move the angle from the Z argument to X or Y in
-`inhale_aim_apply`.
+**Why these bones and this axis:** the bone number is the bone's position in
+Kirby's `model.vbn` (list: `fighters/kirby/model/bones.md`). The game's own
+code confirms this: Greninja's Hydro Pump tilts bone `0x2` = `HipN`.
+
+At rest, each shoulder's local X runs along the arm, local Z is vertical and
+local Y points forward. Rotating around local **Y** therefore swings the arm
+up and down. That still holds after the inhale animation turns the arm
+forward, as long as the turn is around the vertical axis.
+
+`inhale_aim_apply` passes the angle as the Y argument of
+`ModelModule(0x1, bone, x, y, z)`. If an arm moves sideways or twists
+instead, the animation posed it differently: try the angle as Z.
+
+Correction to my earlier note: bone `0x13`, which Kirby's Fire Breath copy
+rotates, is `RArmJ` (the right forearm), not a head or body bone.
 
 **Making it a ranged attack:** the hitboxes and inhale grab box come from
 Kirby's ACMD, not MSC. Attach them to the hand bones (or a child of the
