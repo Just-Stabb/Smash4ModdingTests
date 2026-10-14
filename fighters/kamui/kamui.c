@@ -37737,19 +37737,21 @@ void func_2320()
 
 void func_2321()
 {
+    float facing;
+    func_22(0x229, 0, 1.0f);
     // Side-B back kick (not the vanilla wall-jump one, which comes from 0x15D):
-    // if the stick is held behind Corrin, turn around before the kick starts and
+    // if the stick is held behind Corrin, turn around as the kick starts and
     // remember it in status flag 0x21000020 so the kick's own turn (func_2322) is skipped.
     if (global5 != 0x15d)
     {
-        if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f))
+        facing = PostureModuleF(0);
+        if ((global48 < -0.4f && facing == 1.0f) || (global48 > 0.4f && facing == -1.0f))
         {
-            PostureModule(0x2710); //reverse facing direction
+            PostureModule(0, -facing); //set facing to the other side (like Greninja's Hydro Pump start)
             PostureModule(0x2); //update model rotation
             WorkModule(0x2710, 0x21000020);
         }
     }
-    func_22(0x229, 0, 1.0f);
     func_78(func_2322);
     
 }
