@@ -70060,18 +70060,19 @@ void inhale_aim_reset()
 // Runs every frame of status 0x157 (from func_2358, so not during hitlag).
 // Fires on frame 0, 8, 16, ... alternating left hand, right hand.
 // Article IDs: github gist BenHall-7 FighterArticles.xml (kirby: 23 = starmissile).
-// NOTE: the game allows only ONE starmissile at a time (Count="1" in that list,
-// stored in the game's executable at 0x10136C58), so with the default settings
-// a new star only appears once the previous one is gone. See starmissile_replace_old().
+// The game's max count for starmissile is 1 unless cross_f.rpx is patched
+// (0x10136C58; build/cross_f.rpx sets it to 3). starmissile_max() should match it.
 // ===================================================================
 
 // [Star missile] SETTINGS - edit these
-int starmissile_interval()     { return 8; }    // frames between shots
-int starmissile_article()      { return 0x17; } // 23 = starmissile
-int starmissile_bone_left()    { return 0x18; } // LHaveN (left hand hold point); LHandN is 0x10
-int starmissile_bone_right()   { return 0x17; } // RHaveN (right hand hold point); RHandN is 0x14
-int starmissile_replace_old()  { return 0; }    // 1 = remove the star that's out so every shot fires
-int starmissile_shoot()        { return 0; }    // 1 = also call ArticleModule "shoot" (release) after spawning
+int starmissile_interval()     { return 8; }      // frames between shots
+int starmissile_max()          { return 3; }      // max stars out at once (= the count patched into cross_f.rpx)
+int starmissile_article()      { return 0x17; }   // 23 = starmissile
+int starmissile_bone_left()    { return 0x18; }   // LHaveN (left hand hold point); LHandN is 0x10
+int starmissile_bone_right()   { return 0x17; }   // RHaveN (right hand hold point); RHandN is 0x14
+int starmissile_generate_cmd() { return 0x2718; } // 0x2718 = generate, the call Charizard uses to spawn many flames; 0x2710 = the other generate
+int starmissile_move_to_hand() { return 1; }      // 1 = move the new star to the hand bone; 0 = leave it where the game spawns it
+int starmissile_shoot()        { return 0; }      // 1 = also call ArticleModule "shoot" (release) after spawning
 
 // [Star missile] per frame: fire every interval frames, alternating hands
 void starmissile_update()
@@ -70098,36 +70099,38 @@ void starmissile_update()
     WorkModule(0x7, counter + 1, 0x11000005);
 }
 
-// [Star missile] spawn one star missile at a bone's world position
+// [Star missile] spawn one star missile, at a bone's world position
 void starmissile_fire(int bone)
 {
     int article;
-    int replace;
+    int active;
+    int max;
+    int cmd;
+    int move;
     int shoot;
     float x;
     float y;
     float z;
     article = starmissile_article();
-    replace = starmissile_replace_old();
-    if (replace != 0)
+    active = ArticleModule(0x1, article); // number of this article currently out (same call Ryu uses)
+    max = starmissile_max();
+    if (active >= max)
     {
-        if (ArticleModule(0x2717, article)) // a star is already out
-        {
-            ArticleModule(0x2712, article); // remove it
-        }
+        return; // all slots in use: skip this shot
     }
-    else if (ArticleModule(0x2727, article) == 0) // can't create another one yet
+    cmd = starmissile_generate_cmd();
+    ArticleModule(cmd, article); // create a new star
+    move = starmissile_move_to_hand();
+    if (move != 0)
     {
-        return;
+        x = ModelModuleF(0, bone);   // bone world X
+        y = ModelModuleF(0x1, bone); // bone world Y
+        z = ModelModuleF(0x2, bone); // bone world Z
+        ArticleModule(0x272b, article, x, y, z); // move it to the hand (world position)
     }
-    x = ModelModuleF(0, bone);   // bone world X
-    y = ModelModuleF(0x1, bone); // bone world Y
-    z = ModelModuleF(0x2, bone); // bone world Z
-    ArticleModule(0x2710, article);          // create the article
-    ArticleModule(0x272b, article, x, y, z); // move it to the hand (world position)
     shoot = starmissile_shoot();
     if (shoot != 0)
     {
-        ArticleModule(0x2719, article);      // release it from Kirby
+        ArticleModule(0x2719, article); // release it from Kirby
     }
 }

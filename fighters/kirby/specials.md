@@ -250,30 +250,35 @@ hitlag.
 
 1. A frame counter in status int `0x11000005` picks the hand:
    `(frame / 8) % 2`.
-2. If a star can't be created yet (`ArticleModule(0x2727, 0x17)` returns
-   0), the shot is skipped.
-3. The hand bone's world position is read with `ModelModuleF(0/1/2, bone)`.
-4. `ArticleModule(0x2710, 0x17)` creates the star, and
-   `ArticleModule(0x272B, 0x17, x, y, z)` moves it to that position.
+2. `ArticleModule(0x1, 0x17)` counts the star missiles currently out (the
+   same call Ryu uses for his Hadoken). If `starmissile_max()` are already
+   out, the shot is skipped.
+3. `ArticleModule(0x2718, 0x17)` creates a new star. That's the generate
+   call Charizard's Flamethrower uses to spawn many flames (breath, max 6).
+4. The star is moved to the hand bone's world position (from
+   `ModelModuleF(0/1/2, bone)`) with `ArticleModule(0x272B, 0x17, x, y, z)`.
 
 | Setting | Default | |
 |---|---|---|
 | `starmissile_interval` | 8 | Frames between shots |
+| `starmissile_max` | 3 | Keep equal to the count patched into `cross_f.rpx` |
 | `starmissile_article` | `0x17` | starmissile (`reference/FighterArticles.xml`) |
 | `starmissile_bone_left` / `_right` | `0x18` / `0x17` | `LHaveN` / `RHaveN`, the hand hold points (`LHandN` 0x10 / `RHandN` 0x14 also work) |
-| `starmissile_replace_old` | 0 | 1 = remove the star that's out so every shot fires |
+| `starmissile_generate_cmd` | `0x2718` | Generate command; `0x2710` is the other generate |
+| `starmissile_move_to_hand` | 1 | 0 = leave the star where the game spawns it |
 | `starmissile_shoot` | 0 | 1 = also call ArticleModule "shoot" (`0x2719`) if the star stays attached to Kirby |
 
-**One star at a time:** the article list gives `starmissile` `Count="1"`, so
-the game only allows one on screen. With the defaults, a new star appears
-only once the previous one is gone. With `starmissile_replace_old` = 1, every
-8 frames the old star disappears and a new one appears at the other hand.
-To get several stars out at once, raise the count at the game's address
-`0x10136C58`. `tools/rpx_patch.py` does this on `cross_f.rpx`:
-`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=3`
-gives 3 star missiles.
+**Max count:** the game's limit for `starmissile` is 1 (`Count="1"` in the
+article list) unless the executable is patched. `tools/rpx_patch.py`
+raises it:
+`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=3`.
+The spit star uses the same article, so it shares the limit.
+
+**Uncertain:** the move and shoot commands take the article ID, not a
+specific star. With several stars out, it's untested whether they affect
+the newest star or all of them. If older stars jump back to Kirby's hands,
+set `starmissile_move_to_hand` to 0.
 
 **Direction:** the star missile's flight is controlled by its own script
 (Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
-it normally does when spat out. Aiming it with the inhale aim angle would
-need that weapon's script.
+it normally does when spat out.
