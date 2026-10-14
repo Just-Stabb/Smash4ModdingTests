@@ -37130,6 +37130,7 @@ int func_2285()
     {
                 PostureModule(0x2710); //turn around: stick is held behind Corrin
                 PostureModule(0x2); //update model rotation after the turn
+                WorkModule(0x2710, 0x2000009f); //remember we already turned, so the back kick doesn't turn back
 
          //func_33(); //turn character?
         
@@ -37197,6 +37198,7 @@ if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && Postu
     {
         PostureModule(0x2710); //turn around: stick is held behind Corrin
         PostureModule(0x2); //update model rotation after the turn
+        WorkModule(0x2710, 0x2000009f); //remember we already turned, so the back kick doesn't turn back
         func_16(0x160, 0); //change to back kick
                 return 0x1;
 
@@ -37797,7 +37799,10 @@ int func_2322()
         }
         if (WorkModule(0x10, 0x21000015))
         {
-            PostureModule(0x2710);
+            if (!WorkModule(0x10, 0x2000009f)) //side-B already turned Corrin: don't turn back
+            {
+                PostureModule(0x2710);
+            }
             WorkModule(0x2711, 0x21000015);
         }
     }
@@ -37806,6 +37811,7 @@ int func_2322()
 
 void func_2323()
 {
+    WorkModule(0x2711, 0x2000009f); //clear the side-B turn marker when the back kick ends
     if (global6 != 0x10f)
     {
         func_2338();
