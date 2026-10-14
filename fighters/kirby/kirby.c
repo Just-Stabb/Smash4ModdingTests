@@ -40210,8 +40210,6 @@ void func_2429()
 void func_2430()
 {
     float facing;
-    int homing;
-    float homing_frame;
 
     // Move forward on ground
     // (KineticModuleF only reads speeds; KineticModule(0x11, ...) is what sets them)
@@ -40245,19 +40243,7 @@ void func_2430()
         return; // skip the ground/air swap at the bottom this frame, it would reset these speeds
     }
 
-    // Tracking (added): once airborne, switch to the Sonic copy's homing movement (kinetic type 0x68),
-    // which flies at the target found by the search box in the air side-B ACMD. Done once per side-B
-    // (status flag 0x21000020). See sideb_homing_* settings at the end of the file.
-    homing = sideb_homing_enabled();
-    if (homing != 0 && global18 == 0x2 && WorkModule(0x10, 0x21000020) == 0)
-    {
-        homing_frame = sideb_homing_frame();
-        if (MotionModuleF(0x1) >= homing_frame)
-        {
-            KineticModule(0, 0x68); // Kirby's kinetic type 0x68 = Sonic copy homing (used by status 0x193)
-            WorkModule(0x2710, 0x21000020);
-        }
-    }
+    sideb_homing_update(); // tracking (added), see the end of the file
 
     // Hitbox connected with hurtbox
     if (AttackModule(0x2727, 0x2))
@@ -40739,6 +40725,7 @@ void func_2458()
 // [SpecialSHoldFall 0x16F] loop: release -> Swing; land -> HoldLanding
 void func_2459()
 {
+    sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -40853,6 +40840,7 @@ void func_2466()
 // [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
+    sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70162,4 +70150,44 @@ void starmissile_fire(int bone)
 // Side-B tracking (added). Used by func_2430.
 // ===================================================================
 int   sideb_homing_enabled() { return 1; }     // 0 = off
-float sideb_homing_frame()   { return 12.0f; } // animation frame to start homing (the hop is at frame 10)
+float sideb_homing_frame()   { return 12.0f; } // in the start status (0x153) only: frame to start homing (the hop is at frame 10)
+int   sideb_homing_debug()   { return 1; }     // 1 = small camera shake when homing switches on (to check it runs); 0 = off
+
+// [Side-B tracking] called every frame from the side-B start (0x153), hold fall (0x16F)
+// and swing (0x171) loops. Once per status, when Kirby is airborne, switch to the Sonic
+// copy's homing movement (kinetic type 0x68, used by the Sonic copy's status 0x193), which
+// flies at the target found by the search box in the side-B ACMD.
+void sideb_homing_update()
+{
+    int enabled;
+    int debug;
+    float frame_gate;
+    enabled = sideb_homing_enabled();
+    if (enabled == 0)
+    {
+        return;
+    }
+    if (global18 != 0x2) // only in the air
+    {
+        return;
+    }
+    if (WorkModule(0x10, 0x21000020)) // already switched in this status
+    {
+        return;
+    }
+    if (global4 == 0x153) // start status: wait for the hop
+    {
+        frame_gate = sideb_homing_frame();
+        if (MotionModuleF(0x1) < frame_gate)
+        {
+            return;
+        }
+    }
+    KineticModule(0, 0x68); // Kirby's kinetic type 0x68 = Sonic copy homing
+    WorkModule(0x2710, 0x21000020);
+    debug = sideb_homing_debug();
+    if (debug != 0)
+    {
+        CameraModule(0x3, 0x2); // camera quake (sheet: Camera Quake, sys_D 0x3)
+    }
+}

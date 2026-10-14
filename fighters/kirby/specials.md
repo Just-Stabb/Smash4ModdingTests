@@ -291,17 +291,27 @@ file comes from the Sonic copy's Homing Attack (status `0x193`). Its pre
 sets kinetic type `0x68`, and the game's native movement for that type flies
 at the target found by a search box in ACMD.
 
-Side B now does the same. In `func_2430`, once Kirby is airborne and the
-animation reaches `sideb_homing_frame()` (12, two frames after the frame-10
-hop), it calls `KineticModule(0, 0x68)` once. Status flag `0x21000020`
-records that it started. The search box is in the air side-B ACMD (added by
-hand).
+Side B now does the same. `sideb_homing_update()` (end of `kirby.c`) runs
+every frame from three loops:
 
-Settings at the end of `kirby.c`: `sideb_homing_enabled()` (1, 0 = off) and
-`sideb_homing_frame()`.
+- the start status (`0x153`, `func_2430`), waiting until animation frame
+  `sideb_homing_frame()` (12, after the frame-10 hop);
+- the charging fall (`0x16F`, `func_2459`);
+- the swing (`0x171`, `func_2467`).
+
+Once per status, while Kirby is airborne, it calls `KineticModule(0, 0x68)`.
+Status flag `0x21000020` records that it already switched. The search box is
+in the side-B ACMD (added by hand).
+
+Settings: `sideb_homing_enabled()` (1, 0 = off), `sideb_homing_frame()`, and
+`sideb_homing_debug()`. With debug on (1), the camera shakes
+(`CameraModule(0x3, 0x2)`) at the moment homing switches on, so you can see
+whether the code ran.
 
 **Untested:** whether the native homing movement picks up the search box's
-target outside the Sonic statuses. What you see in-game decides the next
+target outside the Sonic statuses. First version: only the start status
+had the switch, gated on frame 12, so air side B that went into the hold or
+swing statuses never switched. What you see in-game decides the next
 step:
 - **Kirby homes in:** done. Tune the start frame and the search box size.
 - **Kirby stops dead or drifts straight:** the movement didn't get a target.
