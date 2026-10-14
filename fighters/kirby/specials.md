@@ -74,32 +74,32 @@ release B from any of them --> SpecialSSwing 0x171
 
 ### Your edits in `func_2430` (SpecialS loop)
 
-I left your code exactly as it is. Three things in it probably don't do what
-you want:
+What your code does: Kirby slides forward on the ground, hops into the air
+on frame 10, and goes straight to the swing (`0x171`) when the hammer hits
+someone (`AttackModule(0x2727, 0x2)`, "hitbox connected with a hurtbox").
 
-1. **`KineticModuleF(0x0, facing * 1.2f);` doesn't set speed.** `KineticModuleF`
-   is `sys_11`, the float *getter*. `KineticModuleF(0, 1)` reads the current
-   X speed, and the return value is thrown away here. The same goes for the
-   `KineticModuleF(0x1, 1.2f)` line. To set speed, use the pattern from
-   Kirby's other moves:
-   ```c
-   KineticModule(0xe, 0x3, 0x6, 0, 0, 0, 0, 0);    // reset horizontal energy
-   KineticModule(0x11, 0x3, facing * 1.2f, 0);     // set X speed (world units, so multiply by facing)
-   KineticModule(0xb, 0x3);                        // enable it
-   KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);      // reset vertical energy
-   KineticModule(0x11, 0x1, 1.2f);                 // set Y speed
-   KineticModule(0xb, 0x1);
-   ```
-   Also, `KineticModule(0, 0x6)` sets the kinetic type to GROUND_STOP every
-   frame on the ground, and that cancels horizontal movement. Use a moving
-   type, or set the speed after it.
-2. **`func_22(0x290, 0, 1.0f)` after `func_16(0x171, 0x1)` gets
-   overwritten.** The Swing status's main (`func_2466` → `func_2468`) picks
-   its own motion as soon as it starts. To use animation `0x290`, change it
-   inside `func_2468`.
-3. **The hit check is correct.** `AttackModule(0x2727, 0x2)` is "hitbox has
-   connected with a hurtbox" (sheet: Complex CMDs). It stays true for the
-   rest of the status.
+**Momentum fix:** the original used `KineticModuleF(...)` to set speeds, but
+`KineticModuleF` (`sys_11`) only *reads* speeds, so it did nothing. Now:
+
+- **Ground:** every frame, `KineticModule(0x11, 0x3, facing * 1.2f, 0)` sets
+  the X speed, with braking set to 0 and the energy enabled. I removed the
+  per-frame `KineticModule(0, 0x6)`; the move already sets that kinetic type
+  when it starts.
+- **Hop (frame 10):**
+  1. Sets the kinetic type to AIR_STOP first, because changing the type
+     resets speeds.
+  2. Sets X speed `facing * 0.8f` and Y speed `1.2f`.
+  3. Applies Kirby's own gravity (`0x3000018`) and max fall speed
+     (`0x3000019`).
+  4. Ends the frame early (`return`). Otherwise the ground/air swap at the
+     bottom of the loop (`func_2431`) would set the kinetic type again on
+     the same frame and wipe those speeds.
+
+The numbers (1.2, 0.8, 1.2) are yours. Tune them in the file.
+
+**Still there:** `func_22(0x290, 0, 1.0f)` after `func_16(0x171, 0x1)` is
+overwritten when the Swing status starts (`func_2466` → `func_2468` picks its
+own motion). To use animation `0x290`, change it inside `func_2468`.
 
 ## Up B: Final Cutter (0x154, 0x172–0x174)
 

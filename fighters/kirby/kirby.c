@@ -40202,17 +40202,19 @@ void func_2429()
     func_78(func_2430);
 }
 
-// [SpecialS 0x153] loop: YOUR MODIFIED CODE (see specials.md); release B -> Swing 0x171
+// [SpecialS 0x153] loop: YOUR MODIFIED CODE (forward slide, hop at frame 10, swing on hit; see specials.md); release B -> Swing 0x171
 void func_2430()
 {
     float facing;
 
     // Move forward on ground
+    // (KineticModuleF only reads speeds; KineticModule(0x11, ...) is what sets them)
     if (global18 == 0)
     {
         facing = PostureModuleF(0);
-        KineticModule(0, 0x6);
-        KineticModuleF(0x0, facing * 1.2f);
+        KineticModule(0x11, 0x3, facing * 1.2f, 0); // set X speed (world direction, so times facing)
+        KineticModule(0x10, 0x3, 0, 0);             // no braking
+        KineticModule(0xb, 0x3);                    // enable horizontal energy
     }
 
     // Leave ground
@@ -40222,12 +40224,19 @@ void func_2430()
 
         func_20(0x2);              // set state AIR
         GroundModule(0x2710, 0x5);
-        KineticModule(0, 0xa);
+        KineticModule(0, 0xa);     // kinetic type AIR_STOP (set before the speeds, it resets them)
 
-        KineticModuleF(0x0, facing * 0.8f);
-        KineticModuleF(0x1, 1.2f);
+        KineticModule(0xe, 0x3, 0x6, 0, 0, 0, 0, 0);          // reset horizontal energy (air)
+        KineticModule(0x11, 0x3, facing * 0.8f, 0);           // X speed
+        KineticModule(0xb, 0x3);
+        KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);            // reset vertical energy
+        KineticModule(0x11, 0x1, 1.2f);                       // Y speed (hop)
+        KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+        KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+        KineticModule(0xb, 0x1);
 
         func_22(0x28d, MotionModuleF(0x1), 1.0f);
+        return; // skip the ground/air swap at the bottom this frame, it would reset these speeds
     }
 
     // Hitbox connected with hurtbox
