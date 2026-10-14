@@ -66706,6 +66706,16 @@ void func_3937()
 // [Kirby helper] used by Kirby's own moves
 int func_3938()
 {
+    // Command specials only with the special button (same rule as Ryu's func_2293):
+    // ignore the command bits unless Special was pressed more recently than Attack.
+    // ControlModule(0x2722, button) = frames since that button was last pressed (0 = this frame).
+    if (global45 & 0x3)
+    {
+        if (ControlModule(0x2722, 0x1) >= ControlModule(0x2722, 0)) // 0x1 = special, 0 = attack
+        {
+            return 0;
+        }
+    }
     if (global45 & 0x2)
     {
         if (WorkModule(0x15, 0x1e000067))

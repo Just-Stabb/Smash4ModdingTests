@@ -230,3 +230,12 @@ rotated bone) so they follow the aim.
 **Not tested in-game.** It compiles, and decompiling the result shows only
 the three hook calls and the new functions changed; all other scripts keep
 their numbers and code.
+
+## Added: Ryu copy commands only with the special button
+
+Kirby's Ryu copy (kind `0x34`) gets its command specials from `func_3938`,
+which the `global37` hook `func_2287` calls. The commands are Hadoken
+(`global45 & 0x1` → `0x23C`) and Shakunetsu (`& 0x2` → `0x23D`). As with
+Ryu (`fighters/ryu/README.md`), they're now ignored unless Special was
+pressed more recently than Attack (`ControlModule(0x2722, 0x1) <
+ControlModule(0x2722, 0)`).
