@@ -36682,6 +36682,10 @@ void func_2280()
 {
     int var0;
     int var1;
+    if (func_56()) //grab the ledge if touching one (vanilla ledge-catch check)
+    {
+        return 0x1;
+    }
     if (MotionModule(0x2712))
     {
         func_16(0x157, 0);
@@ -36773,6 +36777,10 @@ void func_2285()
     int var0;
     int var1;
     printf("status_SpecialNSpin_Main");
+    if (func_56()) //grab the ledge if touching one (vanilla ledge-catch check)
+    {
+        return 0x1;
+    }
     GroundModule(0x2711, 0x2); //Set Ledgegrab state? Was 0x4
     if (MotionModuleF(0x9) <= WorkModuleF(0, 0x5000012))
     {
@@ -36954,6 +36962,7 @@ void func_2290()
     WorkModule(0x7, WorkModule(0x6, 0x15000014), 0x1100000c);
     WorkModule(0x2711, 0x21000010);
     GroundModule(0x2711, 0x2); //Set Ledgegrab state? Was 0x4
+    func_100(0x2); //enable the ledge-grab transition group (0x1F000009) so func_56 can catch
     func_106();
     func_78(func_2291);
 }
@@ -36963,6 +36972,10 @@ void func_2291()
     int var0;
     int var1;
     printf("status_SpecialNEnd_Main");
+    if (func_56()) //grab the ledge if touching one (vanilla ledge-catch check)
+    {
+        return 0x1;
+    }
     GroundModule(0x2711, 0x2); //Set Ledgegrab state? Was 0x4
     if (WorkModule(0x10, 0x21000010) == 0)
     {
