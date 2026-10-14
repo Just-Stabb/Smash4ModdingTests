@@ -36242,6 +36242,7 @@ void func_2241()
     BattleObject(0x32, 0x2f, 0x10000083, 0x20000078);
 }
 
+// Greninja init: action count, registers scripts, installs hooks (global23/35/56/57/59/60/61)
 void func_2242()
 {
     global7 = 0x169;
@@ -36259,6 +36260,7 @@ void func_2242()
     global61 = func_2377;
 }
 
+// Registers status scripts (keys 0/1/2) for specials + overrides of common actions
 void func_2243()
 {
     sv_set_mem(0x1, 0, 0x152, func_2261);
@@ -36353,6 +36355,7 @@ void func_2243()
     sv_set_mem(0x1, 0x1, 0x33, func_2387);
 }
 
+// Registers status scripts (keys 3-8) for specials
 void func_2244()
 {
     sv_set_mem(0x1, 0x3, 0x154, func_2317);
@@ -36435,6 +36438,7 @@ void func_2244()
     sv_set_mem(0x1, 0x8, 0x153, func_2245);
 }
 
+// Empty placeholder used for unused keys
 void func_2245()
 {
     
@@ -36566,12 +36570,14 @@ void func_2258()
     func_2105();
 }
 
+// Refresh per-airtime flags on landing/ledge/etc: shuriken air boost (0x2000007a), up-B used (0x20000080)
 void func_2259()
 {
     WorkModule(0x2711, 0x2000007a);
     WorkModule(0x2711, 0x20000080);
 }
 
+// First ACMD subaction of each special: N 0x211, S 0x239, Hi 0x25D, Lw 0x271, Final 0x295
 void func_2260()
 {
     global51 = 0x211;
@@ -36581,6 +36587,7 @@ void func_2260()
     global55 = 0x295;
 }
 
+// [SpecialN 0x152] pre: status settings (B-reverse via func_69)
 int func_2261()
 {
     printf("Gekkouga status_pre_SpecialN");
@@ -36590,6 +36597,7 @@ int func_2261()
     return 0;
 }
 
+// [SpecialN 0x152] main: start charge; stored full charge -> SpecialNMaxStart; else motion 0x211/0x225
 void func_2262()
 {
     float var0;
@@ -36614,6 +36622,7 @@ void func_2262()
     func_78(func_2263);
 }
 
+// [SpecialN 0x152] loop: motion end -> SpecialNHold
 void func_2263()
 {
     if (MotionModule(0x2712))
@@ -36628,6 +36637,7 @@ void func_2263()
     func_2283();
 }
 
+// [SpecialN 0x152] end: remove shuriken article unless going to Hold
 void func_2264()
 {
     if (global6 != 0x157)
@@ -36637,6 +36647,7 @@ void func_2264()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNHold 0x157] pre
 int func_2265()
 {
     printf("Gekkouga status_pre_SpecialNHold");
@@ -36645,6 +36656,7 @@ int func_2265()
     return 0;
 }
 
+// [SpecialNHold 0x157] main: charge motion 0x215/0x229, speed scaled to max-charge param 0x5000000
 void func_2266()
 {
     float var0;
@@ -36669,6 +36681,7 @@ void func_2266()
     func_78(func_2267);
 }
 
+// [SpecialNHold 0x157] loop: charge rate -> 0x2f; release -> SpecialNShot; full -> MaxShot or store charge
 void func_2267()
 {
     float var0;
@@ -36733,6 +36746,7 @@ void func_2267()
     func_2283();
 }
 
+// [SpecialNHold 0x157] end: remove shuriken article unless shooting
 void func_2268()
 {
     float var0;
@@ -36748,6 +36762,7 @@ void func_2268()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNShot 0x158] pre
 int func_2269()
 {
     printf("status_pre_SpecialNShot");
@@ -36756,6 +36771,7 @@ int func_2269()
     return 0;
 }
 
+// [SpecialNShot 0x158] main: shot motion 0x219/0x22D
 void func_2270()
 {
     float var0;
@@ -36772,6 +36788,7 @@ void func_2270()
     func_78(func_2271);
 }
 
+// [SpecialNShot 0x158] loop: IASA cancels; ACMD flag 0x2100000d -> throw article; motion end -> Wait/Fall
 void func_2271()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -36799,6 +36816,7 @@ void func_2271()
     func_2283();
 }
 
+// [SpecialNShot 0x158] end: reset charge, mark air boost used (0x2000007a)
 void func_2272()
 {
     func_2284();
@@ -36813,6 +36831,7 @@ void func_2272()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNMaxStart 0x159] pre
 int func_2273()
 {
     printf("Gekkouga status_pre_SpecialNMaxStart");
@@ -36821,6 +36840,7 @@ int func_2273()
     return 0;
 }
 
+// [SpecialNMaxStart 0x159] main: motion 0x21D/0x231
 void func_2274()
 {
     printf("Gekkouga status_SpecialNMaxStart");
@@ -36832,6 +36852,7 @@ void func_2274()
     func_78(func_2275);
 }
 
+// [SpecialNMaxStart 0x159] loop: motion end -> SpecialNMaxShot
 void func_2275()
 {
     if (MotionModule(0x2712))
@@ -36842,6 +36863,7 @@ void func_2275()
     func_2283();
 }
 
+// [SpecialNMaxStart 0x159] end: remove article unless MaxShot
 void func_2276()
 {
     if (global6 != 0x15a)
@@ -36851,6 +36873,7 @@ void func_2276()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNMaxShot 0x15A] pre
 int func_2277()
 {
     printf("Gekkouga status_pre_SpecialNMaxShot");
@@ -36859,6 +36882,7 @@ int func_2277()
     return 0;
 }
 
+// [SpecialNMaxShot 0x15A] main: motion 0x221/0x235
 void func_2278()
 {
     printf("status_SpecialNMaxShot");
@@ -36870,6 +36894,7 @@ void func_2278()
     func_78(func_2279);
 }
 
+// [SpecialNMaxShot 0x15A] loop: same as SpecialNShot loop
 void func_2279()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -36897,6 +36922,7 @@ void func_2279()
     func_2283();
 }
 
+// [SpecialNMaxShot 0x15A] end: same as SpecialNShot end
 void func_2280()
 {
     func_2284();
@@ -36911,6 +36937,7 @@ void func_2280()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNShot/MaxShot] init: aerial recoil, backward 0x5000001 + upward 0x5000002 (once per airtime)
 void func_2281()
 {
     float var0;
@@ -36938,6 +36965,7 @@ void func_2281()
     }
 }
 
+// [SpecialN helper] set ground/air kinetic + motion from 0x11000002/0x11000003
 void func_2282()
 {
     if (global18 == 0)
@@ -36954,6 +36982,7 @@ void func_2282()
     }
 }
 
+// [SpecialN helper] swap ground<->air motion mid-move keeping the frame
 void func_2283()
 {
     if (global19 == 0)
@@ -36973,22 +37002,26 @@ void func_2283()
     }
 }
 
+// [SpecialN helper] reset stored charge (0x2f) and stored-charge flag
 void func_2284()
 {
     WorkModule(0, 0 + 0, 0x2f);
     WorkModule(0x2711, 0x20000078);
 }
 
+// Unused (overwritten by func_2244)
 void func_2285()
 {
     
 }
 
+// Unused (overwritten by func_2244)
 void func_2286()
 {
     
 }
 
+// [SpecialS 0x153] pre
 int func_2287()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -36996,6 +37029,7 @@ int func_2287()
     return 0;
 }
 
+// [SpecialS 0x153] init: kinetic, aerial vertical speed 0x6000004 / gravity 0x6000005
 void func_2288()
 {
     float var0;
@@ -37022,6 +37056,7 @@ void func_2288()
     }
 }
 
+// [SpecialS 0x153] main: motion 0x239 scaled to 0x16000006 frames; install frame counter
 void func_2289()
 {
     int var0;
@@ -37053,6 +37088,7 @@ void func_2289()
     func_78(func_2290);
 }
 
+// [SpecialS 0x153] loop: ground/air swap; read stick fwd/back -> 0x2000007e (attack direction)
 void func_2290()
 {
     float var0;
@@ -37103,6 +37139,7 @@ void func_2290()
     }
 }
 
+// [SpecialS 0x153] per-frame: after startup go invisible+intangible for 0x16000007 frames, then warp to shadow (0x31/0x32) -> SpecialSAttack
 void func_2291()
 {
     int var0;
@@ -37137,6 +37174,7 @@ void func_2291()
     }
 }
 
+// [SpecialS 0x153] end: make visible/hittable again
 void func_2292()
 {
     VisibilityModule(0x2710, 0x1);
@@ -37144,6 +37182,7 @@ void func_2292()
     AreaModule(0x2710, 0x1);
 }
 
+// [SpecialSAttack 0x15B] pre
 int func_2293()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -37151,6 +37190,7 @@ int func_2293()
     return 0;
 }
 
+// [SpecialSAttack 0x15B] main: pick front attack (0x23D/0x24D) or turn-around attack (0x241/0x251)
 void func_2294()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -37206,6 +37246,7 @@ void func_2294()
     func_78(func_2295);
 }
 
+// [SpecialSAttack 0x15B] loop: ground/air swap; motion end -> SpecialSEnd
 void func_2295()
 {
     if (!StatusModule(0x6))
@@ -37231,11 +37272,13 @@ void func_2295()
     }
 }
 
+// [SpecialSAttack 0x15B] end (empty)
 void func_2296()
 {
     
 }
 
+// [SpecialSEnd 0x15C] pre
 int func_2297()
 {
     StatusModule(0x5, 0xffffffff, 0xa, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -37243,6 +37286,7 @@ int func_2297()
     return 0;
 }
 
+// [SpecialSEnd 0x15C] main: end motion 0x245/0x255, or 0x249/0x259 + turn around
 void func_2298()
 {
     if (func_31(0x23d) || func_31(0x24d))
@@ -37279,6 +37323,7 @@ void func_2298()
     func_78(func_2299);
 }
 
+// [SpecialSEnd 0x15C] loop: IASA cancels; ground/air swap; motion end -> Wait/Fall
 void func_2299()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -37331,11 +37376,13 @@ void func_2299()
     }
 }
 
+// [SpecialSEnd 0x15C] end (empty)
 void func_2300()
 {
     
 }
 
+// [SpecialHi 0x154] pre
 int func_2301()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -37343,6 +37390,7 @@ int func_2301()
     return 0;
 }
 
+// [SpecialHi 0x154] main: startup motion 0x25D/0x261 scaled to 0x17000000 frames; mark up-B used (0x20000080)
 void func_2302()
 {
     int var0;
@@ -37371,6 +37419,7 @@ void func_2302()
     func_78(func_2303);
 }
 
+// [SpecialHi 0x154] loop: on frame 0x17000001 read stick -> jet direction (0x1000006/7); tilt body toward it
 void func_2303()
 {
     int var0;
@@ -37445,16 +37494,19 @@ void func_2303()
     }
 }
 
+// [SpecialHi 0x154] per-frame: frame counter 0x11000002
 void func_2304()
 {
     WorkModule(0x9, 0x11000002);
 }
 
+// [SpecialHi 0x154] end (empty)
 void func_2305()
 {
     
 }
 
+// [SpecialHi 0x154] key 8: keep body tilt applied
 void func_2306()
 {
     int var0;
@@ -37471,6 +37523,7 @@ void func_2306()
     }
 }
 
+// [SpecialHiJet 0x15D] pre (forces air)
 int func_2307()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0x2, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -37478,6 +37531,7 @@ int func_2307()
     return 0;
 }
 
+// [SpecialHiJet 0x15D] main: jet length 0x17000004 frames, motion 0x269
 void func_2308()
 {
     if (func_56())
@@ -37501,6 +37555,7 @@ void func_2308()
     func_78(func_2309);
 }
 
+// [SpecialHiJet 0x15D] loop: surface checks; timer out or landed -> SpecialHiEnd; per-frame jet effect
 void func_2309()
 {
     if (func_56())
@@ -37528,6 +37583,7 @@ void func_2309()
     }
 }
 
+// [SpecialHiJet helper] jet 1 effect (ground 0x3ED / air 0x3EE)
 void func_2310()
 {
     if (global18 == 0)
@@ -37541,6 +37597,7 @@ void func_2310()
     return;
 }
 
+// [SpecialHiJet helper] jet 2 effect (ground 0x3EF / air 0x3F0)
 void func_2311()
 {
     if (global18 == 0)
@@ -37554,11 +37611,13 @@ void func_2311()
     return;
 }
 
+// [SpecialHiJet 0x15D] end (empty)
 void func_2312()
 {
     
 }
 
+// [SpecialHiEnd 0x15F] pre: start untilting the body over 10 frames
 int func_2313()
 {
     float var0;
@@ -37582,6 +37641,7 @@ int func_2313()
     return 0;
 }
 
+// [SpecialHiEnd 0x15F] main: motion 0x26D
 void func_2314()
 {
     if (!(WorkModule(0x6, 0x11000003) & 0x1))
@@ -37595,6 +37655,7 @@ void func_2314()
     func_78(func_2315);
 }
 
+// [SpecialHiEnd 0x15F] loop: IASA cancels; landed -> LandingFallSpecial; motion end -> SpecialFall
 void func_2315()
 {
     int var0;
@@ -37634,11 +37695,13 @@ void func_2315()
     }
 }
 
+// [SpecialHiEnd 0x15F] end (empty)
 void func_2316()
 {
     
 }
 
+// [SpecialHi 0x154] init: stop all energies
 void func_2317()
 {
     KineticModule(0xc, 0);
@@ -37647,6 +37710,7 @@ void func_2317()
     KineticModule(0xc, 0x3);
 }
 
+// [SpecialHi 0x154] exec: hold vertical speed at 0 in the air
 void func_2318()
 {
     if (global18 != 0)
@@ -37656,6 +37720,7 @@ void func_2318()
     }
 }
 
+// [SpecialHiJet 0x15D] init: final direction (straight up if stick weak), speed 0x7000003 (x0x7000007 for jet 2)
 void func_2319()
 {
     int var0;
@@ -37773,6 +37838,7 @@ void func_2319()
     WorkModule(0, var13 + 0, 0x100000a);
 }
 
+// Unused helper: motion 0x261 from frame 12
 void func_2320()
 {
     int var0;
@@ -37780,6 +37846,7 @@ void func_2320()
     func_22(var0, 12.0f, 0);
 }
 
+// [SpecialHiJet 0x15D] per-frame: count down jet timer 0x11000004 (not in hitlag)
 void func_2321()
 {
     if (!global3)
@@ -37788,6 +37855,7 @@ void func_2321()
     }
 }
 
+// [SpecialHiJet helper] steep ceiling hit -> SpecialHiEnd; steep wall hit -> SpecialHiWallDamage
 void func_2322()
 {
     float var0;
@@ -37834,11 +37902,13 @@ void func_2322()
     }
 }
 
+// [SpecialHiJet 0x15D] exec: update body tilt
 void func_2323()
 {
     func_2324();
 }
 
+// [SpecialHiJet helper] tilt body to slope (ground) or velocity (air)
 void func_2324()
 {
     float var0;
@@ -37875,6 +37945,7 @@ void func_2324()
     ModelModule(0x1, 0x2, var0, var1, var2);
 }
 
+// [SpecialHiJet 0x15D] key 5: keep body tilt during hitlag
 void func_2325()
 {
     float var0;
@@ -37886,6 +37957,7 @@ void func_2325()
     ModelModule(0x1, 0x2, var0, var1, var2);
 }
 
+// [SpecialHiEnd 0x15F] init: damp speed (0x7000008/9), jet count +1
 void func_2326()
 {
     float var0;
@@ -37912,6 +37984,7 @@ void func_2326()
     WorkModule(0x7, 0, 0x11000007);
 }
 
+// [SpecialHiEnd 0x15F] exec: untilt; within 10 frames allow 2nd jet; air gravity/drift
 void func_2327()
 {
     int var0;
@@ -37973,6 +38046,7 @@ void func_2327()
     }
 }
 
+// [SpecialHiEnd helper] 2nd jet check: <2 jets, stick held, angle change >= 0x17000006 deg
 int func_2328()
 {
     int var0;
@@ -38012,6 +38086,7 @@ int func_2328()
     return 0;
 }
 
+// [SpecialHiEnd 0x15F] key 6: landing lag 0x700000E, air speed 0x700000B, enable RCO lag
 void func_2329()
 {
     WorkModule(0, WorkModuleF(0, 0x700000b) + 0, 0x1);
@@ -38019,6 +38094,7 @@ void func_2329()
     WorkModule(0x2710, 0x20000003);
 }
 
+// [SpecialHiWallDamage 0x15E] pre
 int func_2330()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0x2, 0x1, 0, 0, 0, 0);
@@ -38026,6 +38102,7 @@ int func_2330()
     return 0;
 }
 
+// [SpecialHiWallDamage 0x15E] init: bounce speeds 0x700000C (back) / 0x700000D (up)
 void func_2331()
 {
     float var0;
@@ -38046,6 +38123,7 @@ void func_2331()
     KineticModule(0xc, 0);
 }
 
+// [SpecialHiWallDamage 0x15E] main: camera + effects, motion 0x265
 void func_2332()
 {
     printf("status_SpecialHiWallDamage");
@@ -38056,6 +38134,7 @@ void func_2332()
     func_78(func_2333);
 }
 
+// [SpecialHiWallDamage 0x15E] loop: motion end -> DamageFall; landed -> LandingHeavy
 void func_2333()
 {
     if (func_56())
@@ -38074,11 +38153,13 @@ void func_2333()
     }
 }
 
+// [SpecialHiWallDamage 0x15E] end (empty)
 void func_2334()
 {
     
 }
 
+// [SpecialLw 0x155] pre
 int func_2335()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -38086,6 +38167,7 @@ int func_2335()
     return 0;
 }
 
+// [SpecialLw 0x155] main: counter stance motion 0x271/0x289
 void func_2336()
 {
     printf("status_SpecialLw");
@@ -38106,6 +38188,7 @@ void func_2336()
     func_78(func_2337);
 }
 
+// [SpecialLw 0x155] loop: IASA cancels; ground/air swap; anim speed 0x8000026 during counter window
 void func_2337()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -38149,11 +38232,13 @@ void func_2337()
     func_2339();
 }
 
+// [SpecialLw 0x155] end: make visible
 void func_2338()
 {
     VisibilityModule(0x2710, 0x1);
 }
 
+// [SpecialLw helper] update counter shield (not in hitlag)
 int func_2339()
 {
     if (global3 == 0)
@@ -38166,6 +38251,7 @@ int func_2339()
     return 0;
 }
 
+// [SpecialLw 0x155] init: air fall speed 0x8000001/0x8000002; keep vertical speed once per airtime (0x20000081)
 void func_2340()
 {
     float var0;
@@ -38195,6 +38281,7 @@ void func_2340()
     KineticModule(0xc, 0);
 }
 
+// [SpecialLw helper] horizontal momentum (x0x8000000 on init)
 void func_2341(int arg0)
 {
     float var1;
@@ -38214,11 +38301,13 @@ void func_2341(int arg0)
     KineticModule(0xb, 0x3);
 }
 
+// [SpecialLw 0x155] exec (empty)
 void func_2342()
 {
     
 }
 
+// [SpecialLw 0x155] key 6: turn counter shield off
 void func_2343()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -38227,6 +38316,7 @@ void func_2343()
     }
 }
 
+// [SpecialLw helper] counter shield on/off from ACMD window flag 0x2100000d
 void func_2344()
 {
     if (!WorkModule(0x10, 0x2100000e))
@@ -38244,6 +38334,7 @@ void func_2344()
     }
 }
 
+// [SpecialLwHit 0x160] pre
 int func_2345()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -38251,6 +38342,7 @@ int func_2345()
     return 0;
 }
 
+// [SpecialLwHit 0x160] main: motion 0x275; roll 0x8000003% for the rare substitute
 void func_2346()
 {
     float var0;
@@ -38266,6 +38358,7 @@ void func_2346()
     func_78(func_2347);
 }
 
+// [SpecialLwHit 0x160] loop: spawn substitute (0x3F7 normal / 0x3F8 rare); after 0x8000004 frames -> SpecialLwAttack
 void func_2347()
 {
     if (global9 >= WorkModuleF(0, 0x8000004))
@@ -38287,6 +38380,7 @@ void func_2347()
     }
 }
 
+// [SpecialLwHit 0x160] end: make visible unless attacking
 void func_2348()
 {
     if (global6 != 0x161)
@@ -38295,6 +38389,7 @@ void func_2348()
     }
 }
 
+// [SpecialLwHit 0x160] init: freeze in place
 void func_2349()
 {
     KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);
@@ -38307,11 +38402,13 @@ void func_2349()
     KineticModule(0xb, 0x3);
 }
 
+// [SpecialLwHit 0x160] key 6: counter shield off
 void func_2350()
 {
     func_2343();
 }
 
+// [SpecialLwAttack 0x161] pre
 int func_2351()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -38319,6 +38416,7 @@ int func_2351()
     return 0;
 }
 
+// [SpecialLwAttack 0x161] main: motion 0x28D, clear direction flags, install frame counter
 void func_2352()
 {
     int var0;
@@ -38342,6 +38440,7 @@ void func_2352()
     func_78(func_2354);
 }
 
+// [SpecialLwAttack 0x161] per-frame: timer 0x11000003; end after per-direction duration -> flag 0x21000011
 void func_2353()
 {
     int var0;
@@ -38382,6 +38481,7 @@ void func_2353()
     }
 }
 
+// [SpecialLwAttack 0x161] loop: rush toward target, slide along walls/floors, reappear; timer -> SpecialLwEnd
 void func_2354()
 {
     int var0;
@@ -38618,11 +38718,13 @@ void func_2354()
     func_2356();
 }
 
+// [SpecialLwAttack 0x161] end: make visible
 void func_2355()
 {
     VisibilityModule(0x2710, 0x1);
 }
 
+// [SpecialLwAttack helper] wrapper for func_2357
 int func_2356()
 {
     if (global3 == 0)
@@ -38635,11 +38737,13 @@ int func_2356()
     return 0;
 }
 
+// Empty
 void func_2357()
 {
     
 }
 
+// [SpecialLwAttack 0x161] init: stick -> 8 sectors / 5 direction bands (0x2100001B-1F), warp to start point, set rush velocity + rotation
 void func_2358()
 {
     int var0;
@@ -38818,6 +38922,7 @@ void func_2358()
     func_94();
 }
 
+// [SpecialLwAttack 0x161] exec: hold rotation; steep surface hit -> SpecialLwBound
 void func_2359()
 {
     float var0;
@@ -38875,6 +38980,7 @@ void func_2359()
     }
 }
 
+// [SpecialLwAttack 0x161] key 5: hold rotation during hitlag
 void func_2360()
 {
     float var0;
@@ -38883,6 +38989,7 @@ void func_2360()
     WorkModule(0, var0 + 0, 0x100000b);
 }
 
+// [SpecialLwEnd 0x162] pre
 int func_2361()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x5, 0x4, 0x1, 0, 0, 0x800, 0);
@@ -38890,6 +38997,7 @@ int func_2361()
     return 0;
 }
 
+// [SpecialLwEnd 0x162] main: motion 0x291; work out how to rotate back upright over 10 frames
 void func_2362()
 {
     float var0;
@@ -38914,6 +39022,7 @@ void func_2362()
     func_78(func_2363);
 }
 
+// [SpecialLwEnd 0x162] loop: after 0x1800001D frames on ground -> SpecialLwLanding; motion end -> Fall
 void func_2363()
 {
     if (func_56())
@@ -38933,11 +39042,13 @@ void func_2363()
     }
 }
 
+// [SpecialLwEnd 0x162] end (empty)
 void func_2364()
 {
     
 }
 
+// [SpecialLwEnd 0x162] init: end speed 0x800001B with brake 0x800001C along rush direction
 void func_2365()
 {
     float var0;
@@ -38971,6 +39082,7 @@ void func_2365()
     KineticModule(0xf, 0x1, -var11);
 }
 
+// [SpecialLwEnd 0x162] exec: rotate back upright; ground snap test
 void func_2366()
 {
     float var0;
@@ -38998,6 +39110,7 @@ void func_2366()
     }
 }
 
+// [SpecialLwLanding 0x163] pre
 int func_2367()
 {
     StatusModule(0x5, 0, 0x32, 0x2, 0x4, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39005,6 +39118,7 @@ int func_2367()
     return 0;
 }
 
+// [SpecialLwLanding 0x163] init: slide x0x800001E
 void func_2368()
 {
     float var0;
@@ -39016,6 +39130,7 @@ void func_2368()
     KineticModule(0xf, 0x1, 0);
 }
 
+// [SpecialLwLanding 0x163] main: motion 0x285
 void func_2369()
 {
     printf("status_SpecialLwLanding");
@@ -39023,6 +39138,7 @@ void func_2369()
     func_78(func_2370);
 }
 
+// [SpecialLwLanding 0x163] loop: motion end -> Wait; left ground -> Fall
 void func_2370()
 {
     if (func_56())
@@ -39041,11 +39157,13 @@ void func_2370()
     }
 }
 
+// [SpecialLwLanding 0x163] end (empty)
 void func_2371()
 {
     
 }
 
+// [SpecialLwBound 0x164] pre
 int func_2372()
 {
     StatusModule(0x5, 0x2, 0x32, 0, 0x4, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39053,6 +39171,7 @@ int func_2372()
     return 0;
 }
 
+// [SpecialLwBound 0x164] init: bounce speeds 0x800001F (back) / 0x8000020 (up)
 void func_2373()
 {
     float var0;
@@ -39082,6 +39201,7 @@ void func_2373()
     KineticModule(0xb, 0x1);
 }
 
+// [SpecialLwBound 0x164] main: camera, motion 0x281
 void func_2374()
 {
     printf("status_SpecialLwBound");
@@ -39092,6 +39212,7 @@ void func_2374()
     func_78(func_2375);
 }
 
+// [SpecialLwBound 0x164] loop: IASA cancels; motion end -> Fall; landing -> LandingHeavy
 void func_2375()
 {
     float var0;
@@ -39162,16 +39283,19 @@ void func_2375()
     }
 }
 
+// [SpecialLwBound 0x164] end (empty)
 void func_2376()
 {
     
 }
 
+// Hook (global23/56/57/59/60/61): runs func_2379 before the common ground-action checks
 int func_2377()
 {
     return func_2379();
 }
 
+// Hook (global35): no 2nd up-B until refreshed (0x20000080), then func_2379
 int func_2378()
 {
     if (WorkModule(0x10, 0x20000080))
@@ -39182,6 +39306,7 @@ int func_2378()
     return 0;
 }
 
+// Side-B input hook (see specials.md: not fully explained)
 int func_2379()
 {
     int var0;
@@ -39294,18 +39419,21 @@ int func_2379()
     return var0;
 }
 
+// Unused? common-style status main with global23 hook
 void func_2380()
 {
     func_728();
     func_78(func_2381);
 }
 
+// Loop for func_2380
 void func_2381()
 {
     func_71(global23);
     func_730();
 }
 
+// [AttackAir 0x34] main: 3-frame timer for the dair bounce
 void func_2382()
 {
     WorkModule(0x7, 0x3, 0x1000008a);
@@ -39313,6 +39441,7 @@ void func_2382()
     func_78(func_2383);
 }
 
+// [AttackAir 0x34] loop: dair connected (0x20000082) -> after 3 frames go to JumpAerial (bounce)
 void func_2383()
 {
     if (func_56())
@@ -39338,6 +39467,7 @@ void func_2383()
     func_319();
 }
 
+// [JumpAerial 0xC] main: after dair hit use bounce jump, block specials/aerials/footstool
 void func_2384()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -39354,6 +39484,7 @@ void func_2384()
     func_78(func_2385);
 }
 
+// [JumpAerial 0xC] loop: re-enable those once the bounce flag clears
 void func_2385()
 {
     if (func_497())
@@ -39368,18 +39499,21 @@ void func_2385()
     }
 }
 
+// [AttackLw4 0x30] main: ItemModule(0xF) then common dsmash
 void func_2386()
 {
     ItemModule(0xf, 0);
     func_307();
 }
 
+// [AttackHi4 0x33] main: ItemModule(0xF) then common usmash
 void func_2387()
 {
     ItemModule(0xf, 0);
     func_301();
 }
 
+// [Final 0x156] pre
 int func_2388()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0, 0, 0, 0, 0);
@@ -39387,6 +39521,7 @@ int func_2388()
     return 0;
 }
 
+// [Final 0x156] main: enter Final Smash state (BattleObject 0x25), motion 0x29B
 void func_2389()
 {
     BattleObject(0x25);
@@ -39398,6 +39533,7 @@ void func_2389()
     func_78(func_2390);
 }
 
+// [Final 0x156] loop: hit confirmed (0x2100000E+0x2100000F) -> 0x165; whiff -> motion 0x295 -> Wait/Fall
 void func_2390()
 {
     int var0;
@@ -39435,6 +39571,7 @@ void func_2390()
     }
 }
 
+// [Final helper] ground/air + start/continue motion 0x29B
 void func_2391()
 {
     int var0;
@@ -39462,11 +39599,13 @@ void func_2391()
     }
 }
 
+// [Final 0x156] end
 void func_2392()
 {
     func_2393();
 }
 
+// [Final helper] clean up (remove article 2, leave FS state) unless continuing to 0x165-0x168
 void func_2393()
 {
     if (global6 == 0x165 || global6 == 0x166 || global6 == 0x167 || global6 == 0x168)
@@ -39481,6 +39620,7 @@ void func_2393()
     }
 }
 
+// [FinalHit 0x165] pre
 int func_2394()
 {
     StatusModule(0x5, 0xffffffff, 0x33, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x20);
@@ -39488,6 +39628,7 @@ int func_2394()
     return 0;
 }
 
+// [FinalHit 0x165] main: motion 0x295
 void func_2395()
 {
     AreaModule(0x2710, 0);
@@ -39500,6 +39641,7 @@ void func_2395()
     func_78(func_2396);
 }
 
+// [FinalHit 0x165] loop: IASA cancels; ground/air swap
 void func_2396()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -39512,6 +39654,7 @@ void func_2396()
     }
 }
 
+// [FinalHit helper] ground/air + motion 0x295
 void func_2397()
 {
     if (global18 == 0)
@@ -39542,6 +39685,7 @@ void func_2397()
     }
 }
 
+// [FinalHit 0x165] end
 void func_2398()
 {
     func_2393();
@@ -39551,6 +39695,7 @@ void func_2398()
     }
 }
 
+// [FinalScene 0x166] pre
 int func_2399()
 {
     StatusModule(0x5, 0x2, 0x33, 0, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39558,6 +39703,7 @@ int func_2399()
     return 0;
 }
 
+// [FinalScene 0x166] main: create article 3, motion 0x299, start fade timer
 void func_2400()
 {
     ArticleModule(0x2710, 0x3);
@@ -39568,6 +39714,7 @@ void func_2400()
     func_78(func_2401);
 }
 
+// [FinalScene 0x166] loop: fade to black
 void func_2401()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -39577,6 +39724,7 @@ void func_2401()
     func_2412();
 }
 
+// [FinalScene 0x166] end: cleanup, save position
 void func_2402()
 {
     float var0;
@@ -39587,6 +39735,7 @@ void func_2402()
     GroundModule(0x1a, var0, var1);
 }
 
+// [FinalAttack 0x167] pre
 int func_2403()
 {
     StatusModule(0x5, 0x2, 0x32, 0, 0, 0, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x200);
@@ -39594,6 +39743,7 @@ int func_2403()
     return 0;
 }
 
+// [FinalAttack 0x167] main: create article 5, set camera, motion 0x297
 void func_2404()
 {
     float var0;
@@ -39616,6 +39766,7 @@ void func_2404()
     func_78(func_2405);
 }
 
+// [FinalAttack 0x167] loop: fade; frame 170 lock camera; motion end -> FinalEnd
 void func_2405()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -39634,6 +39785,7 @@ void func_2405()
     }
 }
 
+// [FinalAttack 0x167] end: remove article 5
 void func_2406()
 {
     func_2393();
@@ -39644,6 +39796,7 @@ void func_2406()
     WorkModule(0x2711, 0x20000001);
 }
 
+// [FinalEnd 0x168] pre
 int func_2407()
 {
     StatusModule(0x5, 0xffffffff, 0x33, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39651,6 +39804,7 @@ int func_2407()
     return 0;
 }
 
+// [FinalEnd 0x168] main: motion 0x298, start fade-back timer
 void func_2408()
 {
     WorkModule(0, 20.0f + 0, 0x1000014);
@@ -39661,6 +39815,7 @@ void func_2408()
     func_78(func_2409);
 }
 
+// [FinalEnd 0x168] loop: motion end -> Wait/Fall; fade back in
 void func_2409()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -39687,6 +39842,7 @@ void func_2409()
     func_2413();
 }
 
+// [FinalEnd helper] ground/air
 void func_2410()
 {
     if (global18 == 0)
@@ -39699,6 +39855,7 @@ void func_2410()
     }
 }
 
+// [FinalEnd 0x168] end: remove article 3, leave Final Smash state
 void func_2411()
 {
     if (ArticleModule(0x2717, 0x3))
@@ -39708,6 +39865,7 @@ void func_2411()
     BattleObject(0x26);
 }
 
+// [Final helper] fade to black (timer up)
 void func_2412()
 {
     float var0;
@@ -39722,6 +39880,7 @@ void func_2412()
     WorkModule(0x9, 0x1000008c);
 }
 
+// [Final helper] fade back (timer down)
 void func_2413()
 {
     float var0;

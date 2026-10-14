@@ -1,6 +1,6 @@
 # Greninja (`gekkouga`) MSC
 
-`gekkouga.c` is Greninja's decompiled MSC with named syscalls. It has 62
+`gekkouga.c` is Greninja's decompiled MSC (special-move scripts are labelled with `//` comments; see [specials.md](specials.md)) with named syscalls. It has 62
 globals and 2,414 functions.
 
 ## Build

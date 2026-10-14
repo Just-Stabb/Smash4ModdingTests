@@ -8,3 +8,4 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - `tools/mscinfo.xml`: syscall names (`WorkModule`, `StatusModule`, ...). Pass `-x tools/mscinfo.xml` to both tools
 - `tools/action_table.py`: lists which function handles each action/key in a decompiled fighter
 - [`fighters/gekkouga/`](fighters/gekkouga/): Greninja's decompiled MSC, with a map of its action scripts
+- [`fighters/gekkouga/specials.md`](fighters/gekkouga/specials.md): how Greninja's special moves work, script by script
