@@ -2,3 +2,5 @@ tools/mscdec/
 tools/msclang/
 *.mscsb
 __pycache__/
+build/
+*.rpx

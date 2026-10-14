@@ -269,7 +269,9 @@ the game only allows one on screen. With the defaults, a new star appears
 only once the previous one is gone. With `starmissile_replace_old` = 1, every
 8 frames the old star disappears and a new one appears at the other hand.
 To get several stars out at once, raise the count at the game's address
-`0x10136C58` with a code patch (outside MSC).
+`0x10136C58`. `tools/rpx_patch.py` does this on `cross_f.rpx`:
+`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=3`
+gives 3 star missiles.
 
 **Direction:** the star missile's flight is controlled by its own script
 (Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
