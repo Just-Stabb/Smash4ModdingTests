@@ -11,3 +11,4 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - [`fighters/gekkouga/specials.md`](fighters/gekkouga/specials.md): how Greninja's special moves work, script by script
 - [`fighters/kirby/specials.md`](fighters/kirby/specials.md): Kirby's specials and copy abilities (all Kirby scripts labelled in `kirby.c`)
 - `tools/vbn_bones.py`: lists the bones in a `model.vbn` (index = the bone number `ModelModule` takes)
+- [`fighters/ryu/README.md`](fighters/ryu/README.md): Ryu Focus Attack shield-dash cancel

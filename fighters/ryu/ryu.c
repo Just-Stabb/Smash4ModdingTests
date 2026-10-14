@@ -38473,6 +38473,7 @@ void func_2368()
 
 void func_2369()
 {
+    int dash;
     if (ControlModule(0x2712, 0x1) && WorkModule(0x10, 0x2100000f) == 0)
     {
         WorkModule(0x9, 0x11000004);
@@ -38492,6 +38493,12 @@ void func_2369()
     }
     if (global9 + 1.0f > WorkModuleF(0, 0x8000011))
     {
+        dash = focus_shield_dash(); // shield = focus dash (back dash if holding backward)
+        if (dash != 0)
+        {
+            func_16(dash, 0);
+            return;
+        }
         if (global45 & 0x10)
         {
             func_16(0x163, 0);
@@ -38674,6 +38681,7 @@ void func_2376()
 
 void func_2377()
 {
+    int dash;
     if (!WorkModule(0x10, 0x21000010) && AttackModule(0x2727, 0x6))
     {
         WorkModule(0, global9 + 0, 0x1000006);
@@ -38683,6 +38691,7 @@ void func_2377()
     {
         if (WorkModule(0x6, 0x11000006) == 0)
         {
+            dash = focus_shield_dash(); // shield = focus dash (back dash if holding backward)
             if (global45 & 0x10)
             {
                 WorkModule(0x7, 0x163, 0x11000006);
@@ -38690,6 +38699,10 @@ void func_2377()
             else if (global45 & 0x20)
             {
                 WorkModule(0x7, 0x164, 0x11000006);
+            }
+            else if (dash != 0)
+            {
+                WorkModule(0x7, dash, 0x11000006);
             }
         }
     }
@@ -39391,3 +39404,26 @@ void func_2424()
     func_111();
 }
 
+// ===================================================================
+// Shield-cancel into Focus Attack dash (added)
+// Returns 0x164 (back dash) if shield was pressed this frame while the stick
+// is held away from the facing direction, 0x163 (forward dash) if shield was
+// pressed otherwise, or 0 if shield wasn't pressed. The back dash moves
+// backward, so Ryu dashes the way the stick is held.
+// ===================================================================
+int focus_shield_dash()
+{
+    float stick_fwd;
+    float back_threshold;
+    if (!ControlModule(0x2710, 0x3)) // shield button pressed this frame
+    {
+        return 0;
+    }
+    stick_fwd = func_88();                     // stick X toward the facing direction
+    back_threshold = WorkModuleF(0, 0x2000006); // the game's "stick held back" threshold (used for turnarounds)
+    if (stick_fwd <= back_threshold)
+    {
+        return 0x164; // back dash
+    }
+    return 0x163; // forward dash
+}
