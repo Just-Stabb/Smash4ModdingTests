@@ -37128,7 +37128,8 @@ int func_2285()
 
         if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-                //PostureModule(0x5); //removed: turning here made the back kick travel away from the stick
+                PostureModule(0x2710); //turn around: stick is held behind Corrin
+                PostureModule(0x2); //update model rotation after the turn
 
          //func_33(); //turn character?
         
@@ -37194,7 +37195,8 @@ int func_2287()
             {
 if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-        //func_33(); //removed: this turned Corrin toward the stick, so the back kick went the other way
+        PostureModule(0x2710); //turn around: stick is held behind Corrin
+        PostureModule(0x2); //update model rotation after the turn
         func_16(0x160, 0); //change to back kick
                 return 0x1;
 
