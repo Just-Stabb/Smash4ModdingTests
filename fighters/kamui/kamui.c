@@ -37128,7 +37128,6 @@ int func_2285()
 
         if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-                WorkModule(0x2710, 0x2000009f); //stick is held behind Corrin: the back kick turns around as it starts
 
          //func_33(); //turn character?
         
@@ -37194,7 +37193,6 @@ int func_2287()
             {
 if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-        WorkModule(0x2710, 0x2000009f); //stick is held behind Corrin: the back kick turns around as it starts
         func_16(0x160, 0); //change to back kick
                 return 0x1;
 
@@ -37739,9 +37737,17 @@ void func_2320()
 
 void func_2321()
 {
-    if (WorkModule(0x10, 0x2000009f)) //side-B with the stick held back: turn around before the kick starts
+    // Side-B back kick (not the vanilla wall-jump one, which comes from 0x15D):
+    // if the stick is held behind Corrin, turn around before the kick starts and
+    // remember it in status flag 0x21000020 so the kick's own turn (func_2322) is skipped.
+    if (global5 != 0x15d)
     {
-        func_33(); //instant turn toward the stick, same call side-B uses to turn at the start of the lunge
+        if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f))
+        {
+            PostureModule(0x2710); //reverse facing direction
+            PostureModule(0x2); //update model rotation
+            WorkModule(0x2710, 0x21000020);
+        }
     }
     func_22(0x229, 0, 1.0f);
     func_78(func_2322);
@@ -37789,7 +37795,7 @@ int func_2322()
         }
         if (WorkModule(0x10, 0x21000015))
         {
-            if (!WorkModule(0x10, 0x2000009f)) //side-B already turned Corrin at the start: don't turn back
+            if (!WorkModule(0x10, 0x21000020)) //side-B already turned Corrin at the start: don't turn back
             {
                 PostureModule(0x2710);
             }
@@ -37801,7 +37807,6 @@ int func_2322()
 
 void func_2323()
 {
-    WorkModule(0x2711, 0x2000009f); //clear the side-B turn marker when the back kick ends
     if (global6 != 0x10f)
     {
         func_2338();
