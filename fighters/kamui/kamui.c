@@ -37121,7 +37121,6 @@ void func_2284()
 
 int func_2285()
 {
-    global17 = 0; //side-B turn marker off
     if (global18 == 0x2) //if doing side b in air
     {
         WorkModule(0x2710, 0x2000007a);
@@ -37134,8 +37133,7 @@ int func_2285()
         
         PostureModule(0x2710); //turn around: stick is held behind Corrin
         PostureModule(0x2); //update model rotation
-        global17 = 1; //tell the back kick not to turn back (global17 is otherwise unused)
-        func_16(0x160, 0); //change to back kick
+        StatusModule(0x2711, 0x15f); //forward kick, now toward the stick
                 return 0x1;
 
     }
@@ -37153,7 +37151,6 @@ int func_2285()
 
 void func_2286()
 {
-    global17 = 0; //side-B turn marker off
     func_33();
     WorkModule(0x2711, 0x2100000d);
     WorkModule(0x2711, 0x2000007c);
@@ -37200,8 +37197,7 @@ if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && Postu
     {
         PostureModule(0x2710); //turn around: stick is held behind Corrin
         PostureModule(0x2); //update model rotation
-        global17 = 1; //tell the back kick not to turn back (global17 is otherwise unused)
-        func_16(0x160, 0); //change to back kick
+        func_16(0x15f, 0); //forward kick, now toward the stick
                 return 0x1;
 
     }
@@ -37791,10 +37787,7 @@ int func_2322()
         }
         if (WorkModule(0x10, 0x21000015))
         {
-            if (global17 == 0) //side-B already turned Corrin before the kick: don't turn back
-            {
-                PostureModule(0x2710);
-            }
+            PostureModule(0x2710);
             WorkModule(0x2711, 0x21000015);
         }
     }
@@ -37803,7 +37796,6 @@ int func_2322()
 
 void func_2323()
 {
-    global17 = 0; //side-B turn marker off
     if (global6 != 0x10f)
     {
         func_2338();
