@@ -283,3 +283,28 @@ set `starmissile_move_to_hand` to 0.
 **Direction:** the star missile's flight is controlled by its own script
 (Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
 it normally does when spat out.
+
+## Added: side-B tracking (experimental)
+
+There's no documented MSC call for an opponent's position. Homing in Kirby's
+file comes from the Sonic copy's Homing Attack (status `0x193`). Its pre
+sets kinetic type `0x68`, and the game's native movement for that type flies
+at the target found by a search box in ACMD.
+
+Side B now does the same. In `func_2430`, once Kirby is airborne and the
+animation reaches `sideb_homing_frame()` (12, two frames after the frame-10
+hop), it calls `KineticModule(0, 0x68)` once. Status flag `0x21000020`
+records that it started. The search box is in the air side-B ACMD (added by
+hand).
+
+Settings at the end of `kirby.c`: `sideb_homing_enabled()` (1, 0 = off) and
+`sideb_homing_frame()`.
+
+**Untested:** whether the native homing movement picks up the search box's
+target outside the Sonic statuses. What you see in-game decides the next
+step:
+- **Kirby homes in:** done. Tune the start frame and the search box size.
+- **Kirby stops dead or drifts straight:** the movement didn't get a target.
+  The fallback is to switch into the Sonic copy's homing statuses
+  (`0x194` → `0x193`). That's proven to home, but it uses the Sonic copy's
+  animation and hitboxes.
