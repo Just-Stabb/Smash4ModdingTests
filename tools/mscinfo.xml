@@ -61,5 +61,8 @@
     <syscall id="0x49" name="SlowModule"/>
     <syscall id="0x4A" name="ShadowModule"/>
     <syscall id="0x4C" name="SlowModuleF"/>
+    <syscall id="0x19" name="SlopeModule"/>
+    <syscall id="0x31" name="SearchModule"/>
+    <syscall id="0x4B" name="MotionAnimcmdModule"/>
   </syscalls>
 </labels>

@@ -104,9 +104,10 @@ func_16(0x10, 0);               // change action to SpecialFall
 | `WorkModule` | 16 | `AreaModule` | 29 | `BattleObjectF` | 45 |
 | `WorkModuleF` | 17 | `LinkModule` / `F` | 2A / 2B | `AudienceManager` | 46 |
 | | | `StageData` | 2C | `JostleModule` | 47 |
-| | | `HitModule` | 2D | `ShakeModule` | 48 |
+| `SlopeModule` | 19 | `HitModule` | 2D | `ShakeModule` | 48 |
 | | | `AttackModule` / `F` | 2E / 2F | `SlowModule` / `F` | 49 / 4C |
-| | | | | `ShadowModule` | 4A |
+| `SearchModule` | 31 | | | `ShadowModule` | 4A |
+| | | | | `MotionAnimcmdModule` | 4B |
 
 The `F` versions return floats. Everything in this guide written as `sys_XX`
 works with either spelling. For example, `sys_16(0x7, 1, v)` is the same call as

@@ -36290,6 +36290,7 @@ void func_2241()
     BattleObject(0x32, 0x2f, 0x10000083, 0x20000078);
 }
 
+// Kirby init: action count, hooks (global23/35/57/59 = func_2348/2350, global28 = func_2349, global37 = func_2287), registers scripts
 void func_2242()
 {
     global7 = 0x251;
@@ -36306,6 +36307,7 @@ void func_2242()
     global37 = func_2287;
 }
 
+// Registers Kirby's own status scripts (keys 0/1/2) + overrides of common actions
 void func_2243()
 {
     sv_set_mem(0x1, 0, 0x152, func_2351);
@@ -36440,6 +36442,7 @@ void func_2243()
     func_2246();
 }
 
+// Registers status scripts (keys 3-8)
 void func_2244()
 {
     sv_set_mem(0x1, 0x3, 0x153, func_2475);
@@ -36553,6 +36556,7 @@ void func_2244()
     sv_set_mem(0x1, 0x6, 0x3a, func_2247);
 }
 
+// First ACMD subaction of each special: N 0x211, S 0x289, Hi 0x2CD, Lw 0x2E5, Final 0x2FD
 void func_2245()
 {
     global51 = 0x211;
@@ -36562,6 +36566,7 @@ void func_2245()
     global55 = 0x2fd;
 }
 
+// Registers every copy ability's status scripts (Kirby's version of each fighter's neutral B)
 void func_2246()
 {
     sv_set_mem(0x1, 0, 0x17c, func_2487);
@@ -37478,26 +37483,31 @@ void func_2246()
     sv_set_mem(0x1, 0x2, 0x250, func_4118);
 }
 
+// Empty placeholder used for unused keys
 void func_2247()
 {
     
 }
 
+// Empty
 void func_2248()
 {
     
 }
 
+// Empty
 void func_2249()
 {
     
 }
 
+// Empty
 void func_2250()
 {
     
 }
 
+// [Final 0x156] pre
 int func_2251()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x5, 0, 0, 0, 0, 0, 0);
@@ -37505,6 +37515,7 @@ int func_2251()
     return 0;
 }
 
+// [Final 0x156] main: enter Final Smash state (BattleObject 0x25), camera, motion 0x2FD/0x2FF
 void func_2252()
 {
     BattleObject(0x25);
@@ -37529,6 +37540,7 @@ void func_2252()
     func_78(func_2253);
 }
 
+// [Final 0x156] loop: hit confirmed (0x2100000D) by frame 80 -> FinalAttack 0x179; else end -> Wait/Fall
 void func_2253()
 {
     float var0;
@@ -37565,6 +37577,7 @@ void func_2253()
     }
 }
 
+// [Final 0x156] end: remove sword articles 0x1C/0x1D, leave Final Smash state unless attacking
 void func_2254()
 {
     int var0;
@@ -37579,6 +37592,7 @@ void func_2254()
     }
 }
 
+// [FinalAttack 0x179] pre
 int func_2255()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0, 0, 0, 0, 0, 0, 0);
@@ -37586,6 +37600,7 @@ int func_2255()
     return 0;
 }
 
+// [FinalAttack 0x179] main: sword combo motion 0x2FE/0x300
 void func_2256()
 {
     BattleObject(0xa, 0);
@@ -37602,6 +37617,7 @@ void func_2256()
     func_78(func_2257);
 }
 
+// [FinalAttack 0x179] loop: motion end -> Wait/Fall
 void func_2257()
 {
     if (MotionModule(0x2712))
@@ -37619,6 +37635,7 @@ void func_2257()
     }
 }
 
+// [FinalAttack 0x179] end: remove articles, leave Final Smash state
 void func_2258()
 {
     ArticleModule(0x2711, 0x1c);
@@ -37631,6 +37648,7 @@ void func_2258()
     func_111();
 }
 
+// [helper] clear ground/air-change flags 0x200000A1-A3
 void func_2259()
 {
     WorkModule(0x2711, 0x200000a1);
@@ -37638,6 +37656,7 @@ void func_2259()
     WorkModule(0x2711, 0x200000a3);
 }
 
+// [helper] ground/air change already handled this status?
 int func_2260()
 {
     if (WorkModule(0x10, 0x200000a1) || WorkModule(0x10, 0x200000a2) || WorkModule(0x10, 0x200000a3))
@@ -37647,6 +37666,7 @@ int func_2260()
     return 0;
 }
 
+// [helper] ground/air change finished?
 int func_2261()
 {
     if (WorkModule(0x10, 0x200000a1) && global18 == 0x2 || WorkModule(0x10, 0x200000a2) && global18 == 0 || WorkModule(0x10, 0x200000a3) && MotionModule(0x2712))
@@ -37656,6 +37676,7 @@ int func_2261()
     return 0;
 }
 
+// [helper] set ground/air motion from 0x100000A1/0x100000A2 (keeps frame after first time)
 void func_2262()
 {
     if (global18 == 0)
@@ -37681,6 +37702,7 @@ void func_2262()
     }
 }
 
+// [helper] set ground/air motion from 0x11000002/0x11000003
 void func_2263()
 {
     if (global18 == 0)
@@ -37706,6 +37728,7 @@ void func_2263()
     }
 }
 
+// [SpecialN helper] ground<->air swap with motion + mouthful transitions
 void func_2264()
 {
     if (!func_2260())
@@ -37751,6 +37774,7 @@ void func_2264()
     }
 }
 
+// [Mouthful helper] ground<->air swap without motion change
 void func_2265()
 {
     if (!func_2260())
@@ -37777,6 +37801,7 @@ void func_2265()
     }
 }
 
+// [Mouthful helper] A or B+flag 0x21000018 -> Spit 0x168; B or stick down -> Swallow 0x167
 void func_2266()
 {
     if (ControlModule(0x2710, 0))
@@ -37806,6 +37831,7 @@ void func_2266()
     }
 }
 
+// [Mouthful helper] jump button / tap jump on ground -> EatJumpSquat 0x15F
 void func_2267()
 {
     if (ControlModule(0x2710, 0x2) && global18 == 0)
@@ -37823,11 +37849,13 @@ void func_2267()
     }
 }
 
+// Empty
 void func_2268()
 {
     
 }
 
+// [Grab helper] pummel (A) or forward/back/up throw (0xDC) or down throw (0x3E) from CatchWait
 void func_2269()
 {
     if (global38 & 0x1 && global18 == 0)
@@ -37862,22 +37890,26 @@ void func_2269()
     }
 }
 
+// Empty
 void func_2270()
 {
     
 }
 
+// Empty
 void func_2271()
 {
     
 }
 
+// [CatchWait 0x3A] main: motion 0x75
 void func_2272()
 {
     func_22(0x75, 0, 1.0f);
     func_78(func_2273);
 }
 
+// [CatchWait 0x3A] loop: airborne -> Fall; throw/pummel inputs
 void func_2273()
 {
     if (global18 == 0x2)
@@ -37890,6 +37922,7 @@ void func_2273()
     }
 }
 
+// [CatchWait 0x3A] end: release opponent unless pummelling/throwing
 void func_2274()
 {
     if (global6 != 0x3a && global6 != 0x3b && global6 != 0x3c && global6 != 0x3e && global6 != 0xdc)
@@ -37898,17 +37931,20 @@ void func_2274()
     }
 }
 
+// Empty
 void func_2275()
 {
     
 }
 
+// [CatchAttack 0x3B] main: pummel motion 0x76
 void func_2276()
 {
     func_22(0x76, 0, 1.0f);
     func_78(func_2277);
 }
 
+// [CatchAttack 0x3B] loop: motion end -> CatchWait; throw inputs after ACMD flag
 void func_2277()
 {
     if (global18 == 0x2)
@@ -37922,6 +37958,7 @@ void func_2277()
     func_2278();
 }
 
+// [CatchAttack helper] allow throw inputs once 0x2100000D is set
 void func_2278()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -37930,6 +37967,7 @@ void func_2278()
     }
 }
 
+// [CatchAttack 0x3B] end: release opponent unless pummelling/throwing
 void func_2279()
 {
     if (global6 != 0x3a && global6 != 0x3b && global6 != 0x3c && global6 != 0x3e && global6 != 0xdc)
@@ -37938,6 +37976,7 @@ void func_2279()
     }
 }
 
+// [LandingHeavy 0x16] init: remember bow motion/frame for Link/Toon Link copy
 void func_2280()
 {
     int var0;
@@ -37958,6 +37997,7 @@ void func_2280()
     func_586();
 }
 
+// [LandingHeavy 0x16] main: Link/Toon Link copy arrow landing lag; Sonic copy flag reset; else common
 void func_2281()
 {
     int var0;
@@ -38023,6 +38063,7 @@ void func_2281()
     func_507();
 }
 
+// [LandingLight 0x17] main: Sonic copy flag reset, then common
 void func_2282()
 {
     int var0;
@@ -38037,6 +38078,7 @@ void func_2282()
     func_513();
 }
 
+// [LandingAir 0x18] main: Sonic copy flag reset, then common
 void func_2283()
 {
     int var0;
@@ -38051,6 +38093,7 @@ void func_2283()
     func_517();
 }
 
+// [LandingFallSpecial 0x19] main: Sonic copy flag reset, then common
 void func_2284()
 {
     int var0;
@@ -38065,6 +38108,7 @@ void func_2284()
     func_981();
 }
 
+// [CliffCatch 0x73] main: Sonic copy flag reset, then common
 void func_2285()
 {
     int var0;
@@ -38079,6 +38123,7 @@ void func_2285()
     func_161();
 }
 
+// [Dead 0xB1] main: Sonic copy flag reset, then common
 void func_2286()
 {
     int var0;
@@ -38093,6 +38138,7 @@ void func_2286()
     func_213();
 }
 
+// Hook (global37): Ryu copy (kind 0x34) extra check, else 0
 int func_2287()
 {
     int var0;
@@ -38107,6 +38153,7 @@ int func_2287()
     return 0;
 }
 
+// [LadderCatch 0x105] main: Ryu copy version, else common
 void func_2288()
 {
     int var0;
@@ -38122,6 +38169,7 @@ void func_2288()
     func_1997();
 }
 
+// [SpecialHi 0x154] pre
 int func_2289()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0x4, 0x1, 0, 0, 0, 0);
@@ -38129,6 +38177,7 @@ int func_2289()
     return 0;
 }
 
+// [SpecialHi 0x154] main: rising slash motion 0x2CD/0x2DD
 void func_2290()
 {
     func_2259();
@@ -38140,6 +38189,7 @@ void func_2290()
     func_78(func_2291);
 }
 
+// [SpecialHi 0x154] loop: motion end -> SpecialHiFall 0x172; ground/air swap
 void func_2291()
 {
     if (func_56())
@@ -38173,11 +38223,13 @@ void func_2291()
     }
 }
 
+// [SpecialHi 0x154] end (empty)
 void func_2292()
 {
     
 }
 
+// [SpecialHiFall 0x172] pre (air)
 int func_2293()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0x3, 0x1, 0xffffe000, 0xfffffffc, 0xffffffd0, 0);
@@ -38185,6 +38237,7 @@ int func_2293()
     return 0;
 }
 
+// [SpecialHiFall 0x172] main: drop motion 0x2D1/0x2E1
 void func_2294()
 {
     func_2259();
@@ -38195,6 +38248,7 @@ void func_2294()
     func_78(func_2295);
 }
 
+// [SpecialHiFall 0x172] loop: ACMD 0x2100000F -> SpecialFall; end -> 0x173; landed -> SpecialHiLanding 0x174
 void func_2295()
 {
     if (func_56())
@@ -38218,6 +38272,7 @@ void func_2295()
     }
 }
 
+// [SpecialHiFall 0x172] end: stop effect unless continuing
 void func_2296()
 {
     if (global6 != 0x173)
@@ -38226,6 +38281,7 @@ void func_2296()
     }
 }
 
+// [SpecialHiFall2 0x173] pre (air)
 int func_2297()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0x3, 0x1, 0xffffe000, 0xfffffffc, 0xffffffd0, 0x2);
@@ -38233,6 +38289,7 @@ int func_2297()
     return 0;
 }
 
+// [SpecialHiFall2 0x173] main: falling slash motion 0x2D5
 void func_2298()
 {
     func_2259();
@@ -38243,6 +38300,7 @@ void func_2298()
     func_78(func_2299);
 }
 
+// [SpecialHiFall2 0x173] loop: landed -> SpecialHiLanding 0x174
 void func_2299()
 {
     if (func_56())
@@ -38256,6 +38314,7 @@ void func_2299()
     }
 }
 
+// [SpecialHiFall2 0x173] end: stop effect unless landing
 void func_2300()
 {
     if (global6 != 0x174)
@@ -38264,6 +38323,7 @@ void func_2300()
     }
 }
 
+// [SpecialHiLanding 0x174] pre (ground)
 int func_2301()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffd0, 0);
@@ -38271,6 +38331,7 @@ int func_2301()
     return 0;
 }
 
+// [SpecialHiLanding 0x174] main: landing slash motion 0x2D9 (shockwave)
 void func_2302()
 {
     func_2259();
@@ -38281,6 +38342,7 @@ void func_2302()
     func_78(func_2303);
 }
 
+// [SpecialHiLanding 0x174] loop: IASA; end -> Wait; walked off -> SpecialFall
 void func_2303()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -38299,12 +38361,14 @@ void func_2303()
     }
 }
 
+// [SpecialHiLanding 0x174] end: landing lag 0x7000005, stop effect
 void func_2304()
 {
     WorkModule(0, WorkModuleF(0, 0x7000005) + 0, 0);
     EffectModule(0x271d, 0x5);
 }
 
+// [SpecialHi 0x154] init: remember situation, set rising speed (gravity 0x3000014 x 0x7000001)
 void func_2305()
 {
     int var0;
@@ -38321,11 +38385,13 @@ void func_2305()
     KineticModule(0x15, 0x2, WorkModuleF(0, 0x3000016), 100.0f);
 }
 
+// [SpecialHi 0x154] exec (empty)
 void func_2306()
 {
     
 }
 
+// [SpecialHi 0x154] exit: stop effect unless going to 0x172
 void func_2307()
 {
     if (global6 == 0x172)
@@ -38338,6 +38404,7 @@ void func_2307()
     }
 }
 
+// [SpecialHiFall 0x172] init: fall kinetic, gravity
 void func_2308()
 {
     KineticModule(0, 0x13);
@@ -38347,6 +38414,7 @@ void func_2308()
     KineticModule(0x15, 0x2, WorkModuleF(0, 0x3000016), 100.0f);
 }
 
+// [SpecialHiFall 0x172] exec: started on ground -> scale upward speed by 0x7000000 x 0x7000006
 void func_2309()
 {
     int var0;
@@ -38366,6 +38434,7 @@ void func_2309()
     }
 }
 
+// [SpecialHiFall 0x172] exit: stop effect unless 0x173/0x174
 void func_2310()
 {
     if (global6 == 0x173 || global6 == 0x174)
@@ -38378,16 +38447,19 @@ void func_2310()
     }
 }
 
+// Empty
 void func_2311()
 {
     
 }
 
+// Empty
 void func_2312()
 {
     
 }
 
+// [SpecialHiFall2 0x173] exit: stop effect unless landing
 void func_2313()
 {
     if (global6 == 0x174)
@@ -38400,6 +38472,7 @@ void func_2313()
     }
 }
 
+// [SpecialHiLanding 0x174] init: stop all energies
 void func_2314()
 {
     KineticModule(0x3);
@@ -38409,16 +38482,19 @@ void func_2314()
     KineticModule(0xc, 0x3);
 }
 
+// Empty
 void func_2315()
 {
     
 }
 
+// Empty
 void func_2316()
 {
     
 }
 
+// [SpecialLw 0x155] pre
 int func_2317()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -38426,6 +38502,7 @@ int func_2317()
     return 0;
 }
 
+// [SpecialLw 0x155] main: transform start (motion 0x2E5/0x2F5), create stone article 0x18
 void func_2318()
 {
     func_2259();
@@ -38449,6 +38526,7 @@ void func_2318()
     func_78(func_2319);
 }
 
+// [SpecialLw 0x155] loop: ground/air swap; motion end -> SpecialLwHold 0x175
 void func_2319()
 {
     if (!func_2260())
@@ -38479,11 +38557,13 @@ void func_2319()
     }
 }
 
+// [SpecialLw 0x155] end (empty)
 void func_2320()
 {
     
 }
 
+// [SpecialLwHold 0x175] pre
 int func_2321()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -38491,6 +38571,7 @@ int func_2321()
     return 0;
 }
 
+// [SpecialLwHold 0x175] main: stone hold (motion 0x2ED/0x2F1), reset timers
 void func_2322()
 {
     func_2259();
@@ -38505,6 +38586,7 @@ void func_2322()
     func_78(func_2323);
 }
 
+// [SpecialLwHold 0x175] loop: B after min 0x18000001 frames or ground max 0x18000000 frames -> SpecialLwEnd 0x176
 void func_2323()
 {
     func_2324();
@@ -38550,6 +38632,7 @@ void func_2323()
     }
 }
 
+// [SpecialLwHold helper] count frames (0x11000003 total, 0x11000002 on ground)
 void func_2324()
 {
     WorkModule(0x9, 0x11000003);
@@ -38559,6 +38642,7 @@ void func_2324()
     }
 }
 
+// [SpecialLwHold helper] remember situation (0x11000004)
 void func_2325()
 {
     if (global18 == 0)
@@ -38571,6 +38655,7 @@ void func_2325()
     }
 }
 
+// [SpecialLwHold 0x175] end: restore Wait/Fall motion unless reverting
 void func_2326()
 {
     if (global6 != 0x176)
@@ -38586,6 +38671,7 @@ void func_2326()
     }
 }
 
+// [SpecialLwEnd 0x176] pre
 int func_2327()
 {
     StatusModule(0x5, 0x2, 0, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -38593,6 +38679,7 @@ int func_2327()
     return 0;
 }
 
+// [SpecialLwEnd 0x176] main: revert motion 0x2E9/0x2F9, remove stone, visible
 void func_2328()
 {
     func_2259();
@@ -38610,6 +38697,7 @@ void func_2328()
     func_78(func_2329);
 }
 
+// [SpecialLwEnd 0x176] loop: IASA; motion end -> Fall; ground/air swap
 void func_2329()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -38642,11 +38730,13 @@ void func_2329()
     }
 }
 
+// [SpecialLwEnd 0x176] end: re-enable gravity
 void func_2330()
 {
     KineticModule(0xb, 0x1);
 }
 
+// [SpecialLw 0x155] init: pick a random stone form (0x100000A3, never the same twice), effect
 void func_2331()
 {
     int var0;
@@ -38662,12 +38752,14 @@ void func_2331()
 
 }
 
+// [SpecialLw 0x155] exec: stone appearance + visibility
 void func_2332()
 {
     func_2335();
     func_2336();
 }
 
+// [SpecialLw helper] heavy-armor effect on/off from ACMD flag 0x21000010
 void func_2333()
 {
     int var0;
@@ -38715,6 +38807,7 @@ void func_2333()
     }
 }
 
+// [SpecialLw 0x155] exit: stop effect; remove stone unless holding
 void func_2334()
 {
     int var0;
@@ -38731,6 +38824,7 @@ void func_2334()
     }
 }
 
+// [SpecialLw helper] reset blink counter when the stone appears
 void func_2335()
 {
     int var0;
@@ -38759,6 +38853,7 @@ void func_2335()
     }
 }
 
+// [SpecialLw helper] blink between Kirby and stone (0x11000005 counter)
 void func_2336()
 {
     int var0;
@@ -38794,6 +38889,7 @@ void func_2336()
     }
 }
 
+// [SpecialLw helper] show stone (arg 1) or Kirby (arg 0)
 void func_2337(int arg0)
 {
     int var1;
@@ -38814,6 +38910,7 @@ void func_2337(int arg0)
     }
 }
 
+// [SpecialLw 0x155] key 7: ground shockwave (0x3FD/0x3FE) or air effect (0x3FC)
 void func_2338()
 {
     if (global18 == 0)
@@ -38827,16 +38924,19 @@ void func_2338()
     }
 }
 
+// [SpecialLwHold 0x175] init: show stone
 void func_2339()
 {
     func_2337(0x1);
 }
 
+// [SpecialLwHold 0x175] exec (empty)
 void func_2340()
 {
     
 }
 
+// [SpecialLwHold 0x175] key 7: on ground effects; in air fall at 0x8000006
 void func_2341()
 {
     float var0;
@@ -38863,6 +38963,7 @@ void func_2341()
     }
 }
 
+// [SpecialLwHold 0x175] exit: reset rotation, visible, remove stone unless reverting
 void func_2342()
 {
     PostureModule(0x4, 0, 0, 0);
@@ -38877,26 +38978,31 @@ void func_2342()
     }
 }
 
+// Empty
 void func_2343()
 {
     
 }
 
+// Empty
 void func_2344()
 {
     
 }
 
+// [SpecialLwEnd 0x176] exec (empty)
 void func_2345()
 {
     
 }
 
+// [SpecialLwEnd 0x176] exit (empty)
 void func_2346()
 {
     
 }
 
+// [SpecialLw helper] set X/Y speed with no gravity (speed, limit, max)
 void func_2347(int arg0, int arg1)
 {
     KineticModule(0xb, 0x3);
@@ -38911,6 +39017,7 @@ void func_2347(int arg0, int arg1)
     KineticModule(0x15, 0x1, arg1);
 }
 
+// Hook (global23/57/59): copy-ability input limits (Pit/Dark Pit, Rosalina Luma, Villager, Shulk)
 int func_2348()
 {
     int var0;
@@ -38960,6 +39067,7 @@ int func_2348()
     return 0;
 }
 
+// Hook (global28 neutral-B condition): copy abilities that can't be used right now (Rosalina, Pit)
 int func_2349()
 {
     int var0;
@@ -38992,6 +39100,7 @@ int func_2349()
     return 0x1;
 }
 
+// Hook (global35): Sonic copy one-per-airtime (0x20000079), else func_2348
 int func_2350()
 {
     int var0;
@@ -39013,6 +39122,7 @@ int func_2350()
     return 0;
 }
 
+// [SpecialN 0x152] pre: with a copy ability (0x2000009A) jump to that fighter's neutral-B status (kind 0x100000A4); else inhale
 int func_2351()
 {
     int var0;
@@ -39270,6 +39380,7 @@ int func_2351()
     return 0;
 }
 
+// [SpecialN 0x152] main: inhale start motion 0x211/0x239
 void func_2352()
 {
     func_2259();
@@ -39280,6 +39391,7 @@ void func_2352()
     func_78(func_2353);
 }
 
+// [SpecialN 0x152] loop: motion end -> SpecialNLoop 0x157
 void func_2353()
 {
     func_2264();
@@ -39290,11 +39402,13 @@ void func_2353()
     }
 }
 
+// [SpecialN 0x152] end
 void func_2354()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNLoop 0x157] pre
 int func_2355()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39302,6 +39416,7 @@ int func_2355()
     return 0;
 }
 
+// [SpecialNLoop 0x157] main: inhale loop motion 0x215/0x23D, min time 0x15000000
 void func_2356()
 {
     func_2259();
@@ -39319,6 +39434,7 @@ void func_2356()
     func_78(func_2357);
 }
 
+// [SpecialNLoop 0x157] loop: B released after min time -> SpecialNEnd 0x158
 void func_2357()
 {
     if (ControlModule(0x2713, 0x1) && WorkModule(0x10, 0x2100000e))
@@ -39329,6 +39445,7 @@ void func_2357()
     func_2264();
 }
 
+// [SpecialNLoop 0x157] per-frame: min-time countdown
 void func_2358()
 {
     WorkModule(0xa, 0x11000004);
@@ -39338,11 +39455,13 @@ void func_2358()
     }
 }
 
+// [SpecialNLoop 0x157] end
 void func_2359()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNEnd 0x158] pre
 int func_2360()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39350,6 +39469,7 @@ int func_2360()
     return 0;
 }
 
+// [SpecialNEnd 0x158] main: inhale end motion 0x219/0x241
 void func_2361()
 {
     func_2259();
@@ -39360,6 +39480,7 @@ void func_2361()
     func_78(func_2362);
 }
 
+// [SpecialNEnd 0x158] loop: IASA; motion end -> Wait/Fall
 void func_2362()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -39379,11 +39500,13 @@ void func_2362()
     func_2264();
 }
 
+// [SpecialNEnd 0x158] end
 void func_2363()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [SpecialNCapture 0x159] pre (guess: opponent being pulled in)
 int func_2364()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39391,6 +39514,7 @@ int func_2364()
     return 0;
 }
 
+// [SpecialNCapture 0x159] main: motion 0x21D/0x245
 void func_2365()
 {
     func_2259();
@@ -39400,16 +39524,19 @@ void func_2365()
     func_78(func_2366);
 }
 
+// [SpecialNCapture 0x159] loop: ground/air swap only (exit comes from outside MSC)
 void func_2366()
 {
     func_2264();
 }
 
+// Empty
 void func_2367()
 {
     
 }
 
+// [SpecialNEat 0x15A] pre
 int func_2368()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39417,6 +39544,7 @@ int func_2368()
     return 0;
 }
 
+// [SpecialNEat 0x15A] main: mouth closes on opponent, motion 0x221/0x249
 void func_2369()
 {
     func_2259();
@@ -39427,6 +39555,7 @@ void func_2369()
     func_78(func_2370);
 }
 
+// [SpecialNEat 0x15A] loop: motion end -> EatWait 0x15B (ground) / EatFall 0x161 (air)
 void func_2370()
 {
     if (MotionModule(0x2712) && global18 == 0)
@@ -39442,11 +39571,13 @@ void func_2370()
     func_2264();
 }
 
+// Empty
 void func_2371()
 {
     
 }
 
+// [EatWait 0x15B] pre
 int func_2372()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39454,6 +39585,7 @@ int func_2372()
     return 0;
 }
 
+// [EatWait 0x15B] main: mouthful idle motion 0x261
 void func_2373()
 {
     func_2259();
@@ -39462,6 +39594,7 @@ void func_2373()
     func_78(func_2374);
 }
 
+// [EatWait 0x15B] loop: spit/swallow, jump, turn (0x164), walk (0x15E), fall (0x161)
 void func_2374()
 {
     if (global18 == 0x2)
@@ -39489,11 +39622,13 @@ void func_2374()
     }
 }
 
+// [EatWait 0x15B] end
 void func_2375()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatWaitAir 0x15C] pre (air) (guess)
 int func_2376()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39501,6 +39636,7 @@ int func_2376()
     return 0;
 }
 
+// [EatWaitAir 0x15C] main: motion 0x261
 void func_2377()
 {
     func_2259();
@@ -39509,6 +39645,7 @@ void func_2377()
     func_78(func_2378);
 }
 
+// [EatWaitAir 0x15C] loop: landed -> EatLanding 0x163; spit/swallow; stick back -> EatTurnAir 0x165
 void func_2378()
 {
     if (global18 == 0)
@@ -39527,11 +39664,13 @@ void func_2378()
     }
 }
 
+// [EatWaitAir 0x15C] end
 void func_2379()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [0x15D] pre (air mouthful state, guess)
 int func_2380()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39539,6 +39678,7 @@ int func_2380()
     return 0;
 }
 
+// [0x15D] main: reuses 0x15C main, then installs an empty loop
 void func_2381()
 {
     func_2259();
@@ -39547,16 +39687,19 @@ void func_2381()
     func_78(func_2382);
 }
 
+// [0x15D] loop (empty)
 void func_2382()
 {
     
 }
 
+// [0x15D] end
 void func_2383()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatWalk 0x15E] pre
 int func_2384()
 {
     StatusModule(0x5, 0, 0xe, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39564,6 +39707,7 @@ int func_2384()
     return 0;
 }
 
+// [EatWalk 0x15E] main
 void func_2385()
 {
     func_2259();
@@ -39571,6 +39715,7 @@ void func_2385()
     func_78(func_2386);
 }
 
+// [EatWalk 0x15E] loop: spit/swallow, jump; stick released or back -> EatWait
 void func_2386()
 {
     if (global18 == 0x2)
@@ -39598,11 +39743,13 @@ void func_2386()
     }
 }
 
+// [EatWalk 0x15E] end
 void func_2387()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatJumpSquat 0x15F] pre
 int func_2388()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39610,6 +39757,7 @@ int func_2388()
     return 0;
 }
 
+// [EatJumpSquat 0x15F] main: motion 0x271
 void func_2389()
 {
     func_2259();
@@ -39618,6 +39766,7 @@ void func_2389()
     func_78(func_2390);
 }
 
+// [EatJumpSquat 0x15F] loop: motion end -> EatJump 0x160
 void func_2390()
 {
     if (global18 == 0x2)
@@ -39632,11 +39781,13 @@ void func_2390()
     }
 }
 
+// [EatJumpSquat 0x15F] end
 void func_2391()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatJump 0x160] pre (air)
 int func_2392()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39644,6 +39795,7 @@ int func_2392()
     return 0;
 }
 
+// [EatJump 0x160] main: motion 0x275
 void func_2393()
 {
     func_2259();
@@ -39652,6 +39804,7 @@ void func_2393()
     func_78(func_2394);
 }
 
+// [EatJump 0x160] loop: landed -> EatLanding; spit/swallow
 void func_2394()
 {
     if (global18 == 0)
@@ -39665,11 +39818,13 @@ void func_2394()
     }
 }
 
+// [EatJump 0x160] end
 void func_2395()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatFall 0x161] pre (air)
 int func_2396()
 {
     StatusModule(0x5, 0x2, 0, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39677,6 +39832,7 @@ int func_2396()
     return 0;
 }
 
+// [EatFall 0x161] main: motion 0x279
 void func_2397()
 {
     func_2259();
@@ -39685,6 +39841,7 @@ void func_2397()
     func_78(func_2398);
 }
 
+// [EatFall 0x161] loop: landed -> EatLanding; spit/swallow
 void func_2398()
 {
     if (global18 == 0)
@@ -39698,11 +39855,13 @@ void func_2398()
     }
 }
 
+// [EatFall 0x161] end
 void func_2399()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatPass 0x162] pre
 int func_2400()
 {
     StatusModule(0x5, 0xffffffff, 0xa, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39710,6 +39869,7 @@ int func_2400()
     return 0;
 }
 
+// [EatPass 0x162] main: drop through platform with a mouthful
 void func_2401()
 {
     func_2259();
@@ -39724,6 +39884,7 @@ void func_2401()
     func_78(func_2402);
 }
 
+// [EatPass 0x162] loop: landed -> EatLanding; air -> 0x15D
 void func_2402()
 {
     if (WorkModule(0x15, 0x1e00009a) && global18 == 0)
@@ -39743,11 +39904,13 @@ void func_2402()
     }
 }
 
+// [EatPass 0x162] end
 void func_2403()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatLanding 0x163] pre
 int func_2404()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39755,6 +39918,7 @@ int func_2404()
     return 0;
 }
 
+// [EatLanding 0x163] main: motion 0x27D
 void func_2405()
 {
     func_2259();
@@ -39764,6 +39928,7 @@ void func_2405()
     func_78(func_2406);
 }
 
+// [EatLanding 0x163] loop: motion end -> EatWait
 void func_2406()
 {
     if (global18 == 0x2)
@@ -39778,11 +39943,13 @@ void func_2406()
     }
 }
 
+// [EatLanding 0x163] end
 void func_2407()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatTurn 0x164] pre
 int func_2408()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39790,6 +39957,7 @@ int func_2408()
     return 0;
 }
 
+// [EatTurn 0x164] main: turn motion 0x281
 void func_2409()
 {
     func_2259();
@@ -39800,6 +39968,7 @@ void func_2409()
     func_78(func_2410);
 }
 
+// [EatTurn 0x164] loop: motion end -> EatWait
 void func_2410()
 {
     if (global18 == 0x2)
@@ -39814,11 +39983,13 @@ void func_2410()
     }
 }
 
+// [EatTurn 0x164] end
 void func_2411()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [EatTurnAir 0x165] pre (air)
 int func_2412()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39826,6 +39997,7 @@ int func_2412()
     return 0;
 }
 
+// [EatTurnAir 0x165] main: turn motion 0x281
 void func_2413()
 {
     func_2259();
@@ -39834,6 +40006,7 @@ void func_2413()
     func_78(func_2414);
 }
 
+// [EatTurnAir 0x165] loop: landed -> EatLanding; end -> 0x15D
 void func_2414()
 {
     if (global18 == 0)
@@ -39848,11 +40021,13 @@ void func_2414()
     }
 }
 
+// [EatTurnAir 0x165] end
 void func_2415()
 {
     BattleObject(0x40c, 0x1);
 }
 
+// [0x166] pre (guess: eat without copy; motion picked elsewhere)
 int func_2416()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39860,6 +40035,7 @@ int func_2416()
     return 0;
 }
 
+// [0x166] main
 void func_2417()
 {
     func_2259();
@@ -39867,6 +40043,7 @@ void func_2417()
     func_78(func_2418);
 }
 
+// [0x166] loop: motion end -> Wait/Fall
 void func_2418()
 {
     if (MotionModule(0x2712) && global18 == 0)
@@ -39882,11 +40059,13 @@ void func_2418()
     func_2264();
 }
 
+// Empty
 void func_2419()
 {
     
 }
 
+// [Swallow 0x167] pre
 int func_2420()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39894,6 +40073,7 @@ int func_2420()
     return 0;
 }
 
+// [Swallow 0x167] main: swallow motion 0x285
 void func_2421()
 {
     func_2259();
@@ -39904,6 +40084,7 @@ void func_2421()
     func_78(func_2422);
 }
 
+// [Swallow 0x167] loop: motion end -> Wait/Fall
 void func_2422()
 {
     if (MotionModule(0x2712) && global18 == 0)
@@ -39919,11 +40100,13 @@ void func_2422()
     func_2265();
 }
 
+// Empty
 void func_2423()
 {
     
 }
 
+// [Spit 0x168] pre
 int func_2424()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -39931,6 +40114,7 @@ int func_2424()
     return 0;
 }
 
+// [Spit 0x168] main: spit (star)
 void func_2425()
 {
     func_2259();
@@ -39939,6 +40123,7 @@ void func_2425()
     func_78(func_2426);
 }
 
+// [Spit 0x168] loop: motion 0x235/0x25D; end -> Wait/Fall
 void func_2426()
 {
     if (WorkModule(0x15, 0x1e00009a) && MotionModule(0x2712))
@@ -39994,11 +40179,13 @@ void func_2426()
     }
 }
 
+// Empty
 void func_2427()
 {
     
 }
 
+// [SpecialS 0x153] pre
 int func_2428()
 { //Side B Pre-Action
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -40006,6 +40193,7 @@ int func_2428()
     return 0;
 }
 
+// [SpecialS 0x153] main: hammer start
 void func_2429()
 { //Side B Looping Script
     WorkModule(0x2711, 0x2100000d);
@@ -40014,6 +40202,7 @@ void func_2429()
     func_78(func_2430);
 }
 
+// [SpecialS 0x153] loop: YOUR MODIFIED CODE (see specials.md); release B -> Swing 0x171
 void func_2430()
 {
     float facing;
@@ -40080,6 +40269,7 @@ void func_2430()
     }
 }
 
+// [SpecialS helper] ground/air motion 0x289/0x28D
 void func_2431()
 {
     if (global18 == 0)
@@ -40112,11 +40302,13 @@ void func_2431()
     }
 }
 
+// [SpecialS 0x153] end (empty)
 void func_2432()
 { //Side B Post-Action
     
 }
 
+// [SpecialSHoldWait 0x169] pre
 int func_2433()
 {
     StatusModule(0x5, 0, 0x32, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -40124,6 +40316,7 @@ int func_2433()
     return 0;
 }
 
+// [SpecialSHoldWait 0x169] main: charge sound, install charge counter
 void func_2434()
 {
     WorkModule(0x2711, 0x21000010);
@@ -40151,6 +40344,7 @@ void func_2434()
     func_78(func_2435);
 }
 
+// [SpecialSHoldWait 0x169] loop: release -> Swing; jump/pass/walk/turn while charging
 void func_2435()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40181,11 +40375,13 @@ void func_2435()
     }
 }
 
+// Empty
 void func_2436()
 {
     
 }
 
+// [SpecialSHoldWalk 0x16A] pre
 int func_2437()
 {
     StatusModule(0x5, 0, 0x32, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -40193,6 +40389,7 @@ int func_2437()
     return 0;
 }
 
+// [SpecialSHoldWalk 0x16A] main: motion 0x29D
 void func_2438()
 {
     if (!StopModule(0x1))
@@ -40205,6 +40402,7 @@ void func_2438()
     func_78(func_2439);
 }
 
+// [SpecialSHoldWalk 0x16A] loop: release -> Swing; stop -> HoldWait; back -> HoldTurn
 void func_2439()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40235,11 +40433,13 @@ void func_2439()
     }
 }
 
+// Empty
 void func_2440()
 {
     
 }
 
+// [SpecialSHoldTurn 0x16B] pre
 int func_2441()
 {
     StatusModule(0x5, 0, 0x32, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -40247,6 +40447,7 @@ int func_2441()
     return 0;
 }
 
+// [SpecialSHoldTurn 0x16B] main: motion 0x2A1
 void func_2442()
 {
     if (!StopModule(0x1))
@@ -40260,6 +40461,7 @@ void func_2442()
     func_78(func_2443);
 }
 
+// [SpecialSHoldTurn 0x16B] loop: release -> Swing; end -> HoldWalk/HoldWait
 void func_2443()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40288,11 +40490,13 @@ void func_2443()
     }
 }
 
+// Empty
 void func_2444()
 {
     
 }
 
+// [SpecialSHoldJumpSquat 0x16C] pre
 int func_2445()
 {
     StatusModule(0x5, 0, 0x32, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40300,6 +40504,7 @@ int func_2445()
     return 0;
 }
 
+// [SpecialSHoldJumpSquat 0x16C] main: motion 0x2A5
 void func_2446()
 {
     if (!StopModule(0x1))
@@ -40313,6 +40518,7 @@ void func_2446()
     func_78(func_2447);
 }
 
+// [SpecialSHoldJumpSquat 0x16C] loop: release -> Swing; end -> HoldJump
 void func_2447()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40339,11 +40545,13 @@ void func_2447()
     }
 }
 
+// Empty
 void func_2448()
 {
     
 }
 
+// [SpecialSHoldJump 0x16D] pre (air)
 int func_2449()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40351,6 +40559,7 @@ int func_2449()
     return 0;
 }
 
+// [SpecialSHoldJump 0x16D] main: motion 0x2A9
 void func_2450()
 {
     if (!StopModule(0x1))
@@ -40364,6 +40573,7 @@ void func_2450()
     func_78(func_2451);
 }
 
+// [SpecialSHoldJump 0x16D] loop: release -> Swing; land -> HoldLanding; end -> HoldFall
 void func_2451()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40387,11 +40597,13 @@ void func_2451()
     }
 }
 
+// Empty
 void func_2452()
 {
     
 }
 
+// [SpecialSHoldPass 0x16E] pre
 int func_2453()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40399,6 +40611,7 @@ int func_2453()
     return 0;
 }
 
+// [SpecialSHoldPass 0x16E] main: drop through platform while charging
 void func_2454()
 {
     WorkModule(0x17, 0x1e00009d);
@@ -40412,6 +40625,7 @@ void func_2454()
     func_78(func_2455);
 }
 
+// [SpecialSHoldPass 0x16E] loop: release -> Swing; land/fall
 void func_2455()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40446,11 +40660,13 @@ void func_2455()
     }
 }
 
+// Empty
 void func_2456()
 {
     
 }
 
+// [SpecialSHoldFall 0x16F] pre (air)
 int func_2457()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40458,6 +40674,7 @@ int func_2457()
     return 0;
 }
 
+// [SpecialSHoldFall 0x16F] main: charging fall motion 0x2AD
 void func_2458()
 {
     ItemModule(0xf, 0);
@@ -40490,6 +40707,7 @@ void func_2458()
     func_78(func_2459);
 }
 
+// [SpecialSHoldFall 0x16F] loop: release -> Swing; land -> HoldLanding
 void func_2459()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40508,11 +40726,13 @@ void func_2459()
     }
 }
 
+// Empty
 void func_2460()
 {
     
 }
 
+// [SpecialSHoldLanding 0x170] pre
 int func_2461()
 {
     StatusModule(0x5, 0, 0x32, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40520,6 +40740,7 @@ int func_2461()
     return 0;
 }
 
+// [SpecialSHoldLanding 0x170] main: motion 0x2B1
 void func_2462()
 {
     if (!StopModule(0x1))
@@ -40533,6 +40754,7 @@ void func_2462()
     func_78(func_2463);
 }
 
+// [SpecialSHoldLanding 0x170] loop: release -> Swing; end -> wait/walk/turn
 void func_2463()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40572,11 +40794,13 @@ void func_2463()
     }
 }
 
+// Empty
 void func_2464()
 {
     
 }
 
+// [SpecialSSwing 0x171] pre
 int func_2465()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -40584,6 +40808,7 @@ int func_2465()
     return 0;
 }
 
+// [SpecialSSwing 0x171] main: swing
 void func_2466()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -40596,6 +40821,7 @@ void func_2466()
     func_78(func_2467);
 }
 
+// [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -40625,6 +40851,7 @@ void func_2467()
     }
 }
 
+// [SpecialSSwing helper] pick swing motion: max 0x2C5/0x2C9, low charge 0x2B5/0x2B9, else 0x2BD/0x2C1
 void func_2468()
 {
     int var0;
@@ -40707,11 +40934,13 @@ void func_2468()
     }
 }
 
+// Empty
 void func_2469()
 {
     
 }
 
+// [Hammer helper] jump while charging -> HoldJumpSquat 0x16C
 void func_2470()
 {
     if (ControlModule(0x2710, 0x2))
@@ -40732,6 +40961,7 @@ void func_2470()
     }
 }
 
+// [Hammer helper] stick down on a platform -> HoldPass 0x16E
 void func_2471()
 {
     if (global32 <= WorkModuleF(0, 0x2000066))
@@ -40747,6 +40977,7 @@ void func_2471()
     }
 }
 
+// [SpecialS 0x153] per-frame: charge + switch to charged/uncharged hold motion
 void func_2472()
 {
     int var0;
@@ -40805,11 +41036,13 @@ void func_2472()
     }
 }
 
+// [Hammer hold] per-frame: charge
 void func_2473()
 {
     func_2474();
 }
 
+// [Hammer helper] charge counter 0x11000003 += 0x16000008 up to 0x6000004 -> full (0x21000010) + sound
 void func_2474()
 {
     if ((float)WorkModule(0x6, 0x11000003) < WorkModuleF(0, 0x6000004))
@@ -40846,6 +41079,7 @@ void func_2474()
     }
 }
 
+// [Hammer, all states] init: per-state setup; swing damage scales with charge (0x6000005)
 void func_2475()
 {
     float var0;
@@ -40909,6 +41143,7 @@ void func_2475()
     }
 }
 
+// [Hammer, all states] exec: full charge hurts Kirby 1% every 0x6000006 frames (below 0x6000007%)
 void func_2476()
 {
     if (global4 == 0x171)
@@ -40945,6 +41180,7 @@ void func_2476()
     func_2479();
 }
 
+// [Hammer, all states] exit: cleanup unless still in a hammer state
 void func_2477()
 {
     if (global6 == 0x169 || global6 == 0x16a || global6 == 0x16b || global6 == 0x16c || global6 == 0x16d || global6 == 0x16e || global6 == 0x16f || global6 == 0x170)
@@ -40965,6 +41201,7 @@ void func_2477()
     }
 }
 
+// [Kirby helper] used by Kirby's own moves
 void func_2478(int arg0, int arg1)
 {
     int var2;
@@ -41005,6 +41242,7 @@ void func_2478(int arg0, int arg1)
     }
 }
 
+// [Kirby helper] used by Kirby's own moves
 void func_2479()
 {
     if (WorkModule(0x10, 0x21000010) == 0x1)
@@ -41017,6 +41255,7 @@ void func_2479()
     }
 }
 
+// [Kirby helper] used by Kirby's own moves
 void func_2480()
 {
     int var0;
@@ -41027,6 +41266,7 @@ void func_2480()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "super_jump_punch_uniq x abs:"
 void func_2481()
 {
     float var0;
@@ -41070,6 +41310,7 @@ void func_2481()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2482()
 {
     float var0;
@@ -41098,6 +41339,7 @@ void func_2482()
     global16 = func_2481;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2483()
 {
     if (func_56() == 0x1)
@@ -41127,6 +41369,7 @@ void func_2483()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Brawler
 int func_2484(int arg0)
 {
     if (0)
@@ -41144,6 +41387,7 @@ int func_2484(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Brawler
 void func_2485(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -41155,6 +41399,7 @@ void func_2485(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Brawler
 void func_2486(int arg0)
 {
     int var1;
@@ -41174,6 +41419,7 @@ void func_2486(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mii Brawler 0x17C] pre
 int func_2487()
 {
     func_69();
@@ -41182,11 +41428,13 @@ int func_2487()
     return 0;
 }
 
+// [Copy: Mii Brawler 0x17C] main
 void func_2488()
 {
     func_78(func_2489);
 }
 
+// [Copy: Mii Brawler 0x17C] loop
 void func_2489()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -41219,11 +41467,13 @@ void func_2489()
     }
 }
 
+// [Copy: Mii Brawler 0x17C] end
 void func_2490()
 {
     ArticleModule(0x2712, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Brawler
 void func_2491()
 {
     if (global18 == 0)
@@ -41259,24 +41509,28 @@ void func_2491()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2492()
 {
     func_20(0);
     GroundModule(0x2710, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2493()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2494()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2495()
 {
     if (global18 == 0)
@@ -41289,6 +41543,7 @@ void func_2495()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2496()
 {
     int var0;
@@ -41304,6 +41559,7 @@ void func_2496()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2497()
 {
     int var0;
@@ -41319,11 +41575,13 @@ void func_2497()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2498()
 {
     WorkModule(0x2711, 0x20000079);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2499()
 {
     WorkModule(0x2711, 0x2000007a);
@@ -41332,6 +41590,7 @@ void func_2499()
     WorkModule(0x2711, 0x2000007d);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2500()
 {
     if (WorkModule(0x10, 0x2000007a) || WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c) || WorkModule(0x10, 0x2000007d))
@@ -41341,6 +41600,7 @@ int func_2500()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2501()
 {
     if (WorkModule(0x10, 0x2000007a) && global18 == 0x2 || WorkModule(0x10, 0x2000007b) && global18 == 0 || WorkModule(0x10, 0x2000007c) && MotionModule(0x2712))
@@ -41354,6 +41614,7 @@ int func_2501()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 int func_2502(int arg0)
 {
     if (0)
@@ -41371,6 +41632,7 @@ int func_2502(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 void func_2503(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -41382,6 +41644,7 @@ void func_2503(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 void func_2504(int arg0)
 {
     int var1;
@@ -41401,6 +41664,7 @@ void func_2504(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mii Swordfighter 0x181] pre
 int func_2505()
 {
     func_69();
@@ -41409,6 +41673,7 @@ int func_2505()
     return 0;
 }
 
+// [Copy: Mii Swordfighter 0x181] main
 void func_2506()
 {
     int var0;
@@ -41423,6 +41688,7 @@ void func_2506()
     func_78(func_2507);
 }
 
+// [Copy: Mii Swordfighter 0x181] loop
 int func_2507()
 {
     int var0;
@@ -41481,11 +41747,13 @@ int func_2507()
     return 0x1;
 }
 
+// [Copy: Mii Swordfighter 0x181] end
 void func_2508()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2509()
 {
     if (StatusModule(0x1) == 0x2)
@@ -41498,6 +41766,7 @@ void func_2509()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2510()
 {
     if (global18 == 0x2)
@@ -41510,24 +41779,28 @@ void func_2510()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2511()
 {
     func_20(0);
     GroundModule(0x2710, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2512()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2513()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2514()
 {
     if (global18 == 0)
@@ -41540,6 +41813,7 @@ void func_2514()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 void func_2515()
 {
     int var0;
@@ -41555,6 +41829,7 @@ void func_2515()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 void func_2516()
 {
     int var0;
@@ -41570,11 +41845,13 @@ void func_2516()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2517()
 {
     WorkModule(0x2711, 0x20000078);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 void func_2518()
 {
     WorkModule(0x2711, 0x20000079);
@@ -41583,6 +41860,7 @@ void func_2518()
     WorkModule(0x2711, 0x2000007c);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 int func_2519()
 {
     if (WorkModule(0x10, 0x20000079) || WorkModule(0x10, 0x2000007a) || WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c))
@@ -41592,6 +41870,7 @@ int func_2519()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Swordfighter
 int func_2520()
 {
     if (WorkModule(0x10, 0x20000079) && global18 == 0x2 || WorkModule(0x10, 0x2000007a) && global18 == 0 || WorkModule(0x10, 0x2000007b) && MotionModule(0x2712))
@@ -41605,6 +41884,7 @@ int func_2520()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2521(int arg0)
 {
     if (0)
@@ -41646,6 +41926,7 @@ int func_2521(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 void func_2522(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -41657,6 +41938,7 @@ void func_2522(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 void func_2523(int arg0)
 {
     int var1;
@@ -41676,6 +41958,7 @@ void func_2523(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mii Gunner 0x185] pre
 int func_2524()
 {
     func_70();
@@ -41693,6 +41976,7 @@ int func_2524()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x186] pre
 int func_2525()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -41700,6 +41984,7 @@ int func_2525()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x187] pre
 int func_2526()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -41707,6 +41992,7 @@ int func_2526()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x188] pre
 int func_2527()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -41714,6 +42000,7 @@ int func_2527()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x189] pre
 int func_2528()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -41721,6 +42008,7 @@ int func_2528()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x18A] pre
 int func_2529()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -41728,6 +42016,7 @@ int func_2529()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x18B] pre
 int func_2530()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -41735,16 +42024,19 @@ int func_2530()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x185] main
 void func_2531()
 {
     func_78(func_2532);
 }
 
+// [Copy: Mii Gunner 0x185] loop
 void func_2532()
 {
     
 }
 
+// [Copy: Mii Gunner 0x186] main
 void func_2533()
 {
     if (WorkModule(0x10, 0x2100000d) != 0)
@@ -41762,6 +42054,7 @@ void func_2533()
     func_78(func_2534);
 }
 
+// [Copy: Mii Gunner 0x186] loop
 int func_2534()
 {
     if (WorkModule(0x15, 0x1e00009a) != 0 && global18 == 0x2)
@@ -41777,6 +42070,7 @@ int func_2534()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2535()
 {
     int var0;
@@ -41802,6 +42096,7 @@ int func_2535()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x187] main
 void func_2536()
 {
     func_2522(0x214, 0, 1.0f);
@@ -41811,6 +42106,7 @@ void func_2536()
     func_78(func_2537);
 }
 
+// [Copy: Mii Gunner 0x187] loop
 int func_2537()
 {
     if (global18 == 0)
@@ -41843,6 +42139,7 @@ int func_2537()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x188] main
 void func_2538()
 {
     func_2522(0x215, 0, 1.0f);
@@ -41851,6 +42148,7 @@ void func_2538()
     func_78(func_2539);
 }
 
+// [Copy: Mii Gunner 0x188] loop
 int func_2539()
 {
     if (WorkModule(0x15, 0x1e00009a) != 0 && global18 == 0x2)
@@ -41866,6 +42164,7 @@ int func_2539()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2540()
 {
     if (MotionModule(0x2712) != 0)
@@ -41884,6 +42183,7 @@ int func_2540()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x189] main
 void func_2541()
 {
     int var0;
@@ -41907,6 +42207,7 @@ void func_2541()
     func_78(func_2542);
 }
 
+// [Copy: Mii Gunner 0x189] loop
 void func_2542()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -41925,6 +42226,7 @@ void func_2542()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 void func_2543()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -41944,6 +42246,7 @@ void func_2543()
     }
 }
 
+// [Copy: Mii Gunner 0x18A] main
 void func_2544()
 {
     if (WorkModule(0x10, 0x2100000d) != 0)
@@ -41961,6 +42264,7 @@ void func_2544()
     func_78(func_2545);
 }
 
+// [Copy: Mii Gunner 0x18A] loop
 int func_2545()
 {
     if (WorkModule(0x15, 0x1e00009b) != 0 && global18 == 0)
@@ -41976,6 +42280,7 @@ int func_2545()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2546()
 {
     WorkModule(0x11, 0x2100000d);
@@ -41983,6 +42288,7 @@ int func_2546()
     return 0x1;
 }
 
+// [Copy: Mii Gunner 0x18B] main
 void func_2547()
 {
     int var0;
@@ -42007,6 +42313,7 @@ void func_2547()
     func_78(func_2548);
 }
 
+// [Copy: Mii Gunner 0x18B] loop
 int func_2548()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -42026,6 +42333,7 @@ int func_2548()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2549()
 {
     float var0;
@@ -42048,59 +42356,70 @@ int func_2549()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x185] end
 void func_2550()
 {
     
 }
 
+// [Copy: Mii Gunner 0x186] end
 void func_2551()
 {
     
 }
 
+// [Copy: Mii Gunner 0x187] end
 void func_2552()
 {
     
 }
 
+// [Copy: Mii Gunner 0x188] end
 void func_2553()
 {
     
 }
 
+// [Copy: Mii Gunner 0x189] end
 void func_2554()
 {
     
 }
 
+// [Copy: Mii Gunner 0x18A] end
 void func_2555()
 {
     
 }
 
+// [Copy: Mii Gunner 0x18B] end
 void func_2556()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2557()
 {
     func_20(0);
     GroundModule(0x2710, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2558()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2559()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2560()
 {
     if (global18 == 0)
@@ -42113,6 +42432,7 @@ void func_2560()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2561()
 {
     int var0;
@@ -42128,6 +42448,7 @@ void func_2561()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2562()
 {
     int var0;
@@ -42143,11 +42464,13 @@ void func_2562()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2563()
 {
     WorkModule(0x2711, 0x20000078);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2564()
 {
     WorkModule(0x2711, 0x2000007a);
@@ -42156,6 +42479,7 @@ void func_2564()
     WorkModule(0x2711, 0x2000007d);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2565()
 {
     if (WorkModule(0x10, 0x2000007a) || WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c) || WorkModule(0x10, 0x2000007d))
@@ -42165,6 +42489,7 @@ int func_2565()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2566()
 {
     if (WorkModule(0x10, 0x2000007a) && global18 == 0x2 || WorkModule(0x10, 0x2000007b) && global18 == 0 || WorkModule(0x10, 0x2000007c) && MotionModule(0x2712))
@@ -42178,6 +42503,7 @@ int func_2566()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x186] init
 void func_2567()
 {
     if (WorkModule(0x10, 0x20000079) != 0)
@@ -42187,6 +42513,7 @@ void func_2567()
     }
 }
 
+// [Copy: Mii Gunner 0x186] exit
 void func_2568()
 {
     int var0;
@@ -42205,6 +42532,7 @@ void func_2568()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 void func_2569()
 {
     WorkModule(0x18, 0x1);
@@ -42220,11 +42548,13 @@ void func_2569()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2570(int arg0)
 {
     return arg0;
 }
 
+// [Copy: Mii Gunner 0x18A] init
 void func_2571()
 {
     if (WorkModule(0x10, 0x20000079) != 0)
@@ -42234,6 +42564,7 @@ void func_2571()
     }
 }
 
+// [Copy: Mii Gunner 0x18A, 0x18B] exit
 void func_2572()
 {
     int var0;
@@ -42252,6 +42583,7 @@ void func_2572()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2573()
 {
     if (global3 == 0)
@@ -42268,6 +42600,7 @@ int func_2573()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2574()
 {
     int var0;
@@ -42275,6 +42608,7 @@ int func_2574()
     return var0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2575()
 {
     int var0;
@@ -42306,6 +42640,7 @@ int func_2575()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mii Gunner
 int func_2576()
 {
     float var0;
@@ -42318,6 +42653,7 @@ int func_2576()
     return 0;
 }
 
+// [Copy: Mii Gunner 0x187] exit
 void func_2577()
 {
     int var0;
@@ -42351,6 +42687,7 @@ void func_2577()
     }
 }
 
+// [Copy: Mii Gunner 0x189] init
 void func_2578()
 {
     int var0;
@@ -42369,6 +42706,7 @@ void func_2578()
     }
 }
 
+// [Copy: Mii Gunner 0x189] exec
 void func_2579()
 {
     if (WorkModule(0x10, 0x2100000f) != 0)
@@ -42377,6 +42715,7 @@ void func_2579()
     }
 }
 
+// [Copy: Mii Gunner 0x189] exit
 void func_2580()
 {
     int var0;
@@ -42396,6 +42735,7 @@ void func_2580()
     }
 }
 
+// [Copy: Mii Gunner 0x18B] init
 void func_2581()
 {
     int var0;
@@ -42414,6 +42754,7 @@ void func_2581()
     }
 }
 
+// [Copy: Mii Gunner 0x18B] exec
 void func_2582()
 {
     float var0;
@@ -42441,6 +42782,7 @@ void func_2582()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2583()
 {
     int var0;
@@ -42459,6 +42801,7 @@ void func_2583()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mario
 int func_2584(int arg0)
 {
     if (0)
@@ -42476,6 +42819,7 @@ int func_2584(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mario
 void func_2585(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -42487,6 +42831,7 @@ void func_2585(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mario
 void func_2586(int arg0)
 {
     int var1;
@@ -42506,6 +42851,7 @@ void func_2586(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mario 0x19A] pre
 int func_2587()
 {
     func_69();
@@ -42514,6 +42860,7 @@ int func_2587()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2588()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -42521,6 +42868,7 @@ int func_2588()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2589()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -42528,6 +42876,7 @@ int func_2589()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2590()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -42535,6 +42884,7 @@ int func_2590()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2591()
 {
     int var0;
@@ -42550,6 +42900,7 @@ int func_2591()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2592()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0, 0, 0, 0, 0);
@@ -42557,11 +42908,13 @@ int func_2592()
     return 0;
 }
 
+// [Copy: Mario 0x19A] main
 void func_2593()
 {
     func_78(func_2594);
 }
 
+// [Copy: Mario 0x19A] loop
 void func_2594()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -42594,6 +42947,7 @@ void func_2594()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mario
 void func_2595()
 {
     if (global18 == 0)
@@ -42626,12 +42980,14 @@ void func_2595()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2596()
 {
     func_33();
     func_78(func_2597);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2597()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -42668,6 +43024,7 @@ void func_2597()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2598()
 {
     if (global18 == 0)
@@ -42702,6 +43059,7 @@ void func_2598()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2599()
 {
     int var0;
@@ -42724,6 +43082,7 @@ void func_2599()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2600()
 {
     float var0;
@@ -42740,6 +43099,7 @@ void func_2600()
     sys_35(0x1, 0);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2601()
 {
     float var0;
@@ -42781,6 +43141,7 @@ void func_2601()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2602()
 {
     int var0;
@@ -42795,6 +43156,7 @@ void func_2602()
     func_78(func_2603);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2603()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -42827,6 +43189,7 @@ void func_2603()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2604()
 {
     if (global18 == 0)
@@ -42859,6 +43222,7 @@ void func_2604()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2605()
 {
     int var0;
@@ -42873,6 +43237,7 @@ void func_2605()
     func_78(func_2606);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2606()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -42928,6 +43293,7 @@ void func_2606()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2607()
 {
     if (global18 == 0)
@@ -42964,6 +43330,7 @@ void func_2607()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2608()
 {
     if (WorkModule(0x6, 0x10000083) < WorkModule(0x6, 0x18000000))
@@ -42978,6 +43345,7 @@ void func_2608()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2609()
 {
     int var0;
@@ -42999,6 +43367,7 @@ void func_2609()
     func_78(func_2610);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2610()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43031,6 +43400,7 @@ void func_2610()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2611()
 {
     int var0;
@@ -43070,6 +43440,7 @@ void func_2611()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2612()
 {
     float var0;
@@ -43084,6 +43455,7 @@ void func_2612()
     KineticModule(0x2710, -var3, 0, 0);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2613()
 {
     BattleObject(0x25);
@@ -43093,6 +43465,7 @@ void func_2613()
     func_78(func_2614);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2614()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43121,6 +43494,7 @@ void func_2614()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2615()
 {
     if (global18 == 0)
@@ -43153,21 +43527,25 @@ void func_2615()
     }
 }
 
+// [Copy: Mario 0x19A] end
 void func_2616()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2617()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2618()
 {
     ArticleModule(0x2712, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2619()
 {
     int var0;
@@ -43186,6 +43564,7 @@ void func_2619()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2620()
 {
     int var0;
@@ -43216,6 +43595,7 @@ void func_2620()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2621()
 {
     WorkModule(0x7, 0, 0x10000083);
@@ -43223,6 +43603,7 @@ void func_2621()
     ArticleModule(0x2713, 0x2, 0);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2622()
 {
     ArticleModule(0x2719, 0x3);
@@ -43230,6 +43611,7 @@ void func_2622()
     func_111();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2623()
 {
     int var0;
@@ -43245,6 +43627,7 @@ int func_2623()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "parameter test landing frame:"
 void func_2624()
 {
     int var0;
@@ -43274,22 +43657,26 @@ void func_2624()
     func_78(func_2625);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2625()
 {
     func_2483();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2626()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2627()
 {
     EffectModule(0x2733, 0x1e, 0x1);
     func_691();
 }
 
+// [Copy: shared] helper used by Donkey Kong, Kirby
 int func_2628(int arg0)
 {
     if (0)
@@ -43339,6 +43726,7 @@ int func_2628(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Donkey Kong, Kirby
 void func_2629(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -43350,6 +43738,7 @@ void func_2629(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Donkey Kong, Kirby
 void func_2630(int arg0)
 {
     int var1;
@@ -43369,6 +43758,7 @@ void func_2630(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Donkey Kong 0x1BA] init
 void func_2631()
 {
     float var0;
@@ -43384,6 +43774,7 @@ void func_2631()
     WorkModule(0x7, var2, 0x11000005);
 }
 
+// [Copy: Donkey Kong 0x1BA] exit
 void func_2632()
 {
     WorkModule(0, 0 + 0, 0x2f);
@@ -43391,6 +43782,7 @@ void func_2632()
     DamageModule(0x6, 0);
 }
 
+// [Copy: Donkey Kong 0x1B7] pre
 int func_2633()
 {
     func_69();
@@ -43401,12 +43793,14 @@ int func_2633()
     return 0;
 }
 
+// [Copy: Donkey Kong 0x1B7] main
 void func_2634()
 {
     WorkModule(0x2710, 0x2100000d);
     func_78(func_2635);
 }
 
+// [Copy: Donkey Kong 0x1B7] loop
 void func_2635()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43433,6 +43827,7 @@ void func_2635()
     }
 }
 
+// [Copy: shared] helper used by Donkey Kong, Kirby
 void func_2636(int arg0, int arg1)
 {
     if (global18 == 0)
@@ -43466,6 +43861,7 @@ void func_2636(int arg0, int arg1)
     WorkModule(0x2711, 0x2100000d);
 }
 
+// [Copy: Donkey Kong 0x1B7] end
 void func_2637()
 {
     int var0;
@@ -43476,6 +43872,7 @@ void func_2637()
     }
 }
 
+// [Copy: Donkey Kong 0x1B8] pre
 int func_2638()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -43483,6 +43880,7 @@ int func_2638()
     return 0;
 }
 
+// [Copy: Donkey Kong 0x1B8] main
 void func_2639()
 {
     WorkModule(0x2710, 0x2100000d);
@@ -43494,6 +43892,7 @@ void func_2639()
     func_78(func_2640);
 }
 
+// [Copy: Donkey Kong 0x1B8] loop
 void func_2640()
 {
     float var0;
@@ -43547,6 +43946,7 @@ void func_2640()
     }
 }
 
+// [Copy: Donkey Kong 0x1B8] per-frame
 void func_2641()
 {
     if (global38 & 0x40)
@@ -43560,6 +43960,7 @@ void func_2641()
     }
 }
 
+// [Copy: Donkey Kong 0x1B8] end
 void func_2642()
 {
     int var0;
@@ -43570,6 +43971,7 @@ void func_2642()
     }
 }
 
+// [Copy: Donkey Kong 0x1B9] pre
 int func_2643()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -43577,12 +43979,14 @@ int func_2643()
     return 0;
 }
 
+// [Copy: Donkey Kong 0x1B9] main
 void func_2644()
 {
     WorkModule(0x2710, 0x2100000d);
     func_78(func_2645);
 }
 
+// [Copy: Donkey Kong 0x1B9] loop
 void func_2645()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43608,11 +44012,13 @@ void func_2645()
     }
 }
 
+// [Copy: Donkey Kong 0x1B9] end
 void func_2646()
 {
     
 }
 
+// [Copy: Donkey Kong 0x1BA] pre
 int func_2647()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -43620,6 +44026,7 @@ int func_2647()
     return 0;
 }
 
+// [Copy: Donkey Kong 0x1BA] main
 void func_2648()
 {
     WorkModule(0x2710, 0x2100000d);
@@ -43632,6 +44039,7 @@ void func_2648()
     func_78(func_2649);
 }
 
+// [Copy: Donkey Kong 0x1BA] loop
 void func_2649()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43658,6 +44066,7 @@ void func_2649()
     }
 }
 
+// [Copy: shared] helper used by Donkey Kong, Kirby
 void func_2650()
 {
     if (global18 == 0)
@@ -43720,11 +44129,13 @@ void func_2650()
     }
 }
 
+// [Copy: Donkey Kong 0x1BA] end
 void func_2651()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Link
 int func_2652(int arg0)
 {
     if (0)
@@ -43758,6 +44169,7 @@ int func_2652(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Link
 void func_2653(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -43769,6 +44181,7 @@ void func_2653(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Link
 void func_2654(int arg0)
 {
     int var1;
@@ -43788,6 +44201,7 @@ void func_2654(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Link
 int func_2655()
 {
     if (StatusModule(0x6) != 0 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -43797,6 +44211,7 @@ int func_2655()
     return 0;
 }
 
+// [Copy: Link 0x1E9] pre
 int func_2656()
 {
     func_69();
@@ -43805,6 +44220,7 @@ int func_2656()
     return 0;
 }
 
+// [Copy: Link 0x1E9] main  "status_special_n"
 void func_2657()
 {
     printf("status_special_n");
@@ -43818,6 +44234,7 @@ void func_2657()
     func_78(func_2668);
 }
 
+// [Copy: shared] helper used by Kirby, Link
 int func_2658()
 {
     if (StatusModule(0x6) == 0x1)
@@ -43847,6 +44264,7 @@ int func_2658()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_change_step"
 void func_2659()
 {
     int var0;
@@ -43883,6 +44301,7 @@ void func_2659()
     callFunc3(func_2668);
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_ground_start"
 void func_2660(int arg0)
 {
     printf("sub_special_n_wait_ground_start");
@@ -43896,6 +44315,7 @@ void func_2660(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_ground_hold"
 void func_2661(int arg0)
 {
     printf("sub_special_n_wait_ground_hold");
@@ -43909,6 +44329,7 @@ void func_2661(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_ground_end"
 void func_2662(int arg0)
 {
     printf("sub_special_n_wait_ground_end");
@@ -43930,6 +44351,7 @@ void func_2662(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_air_start"
 void func_2663(int arg0)
 {
     printf("sub_special_n_wait_air_start");
@@ -43943,6 +44365,7 @@ void func_2663(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_air_hold"
 void func_2664(int arg0)
 {
     printf("sub_special_n_wait_air_hold");
@@ -43956,6 +44379,7 @@ void func_2664(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "sub_special_n_wait_air_end"
 void func_2665(int arg0)
 {
     printf("sub_special_n_wait_air_end");
@@ -43977,6 +44401,7 @@ void func_2665(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "status_special_n_ground_main"
 void func_2666()
 {
     int var0;
@@ -44042,6 +44467,7 @@ void func_2666()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link  "status_special_n_air_main"
 void func_2667()
 {
     int var0;
@@ -44107,6 +44533,7 @@ void func_2667()
     }
 }
 
+// [Copy: Link 0x1E9] loop  "status_special_n_main"
 void func_2668()
 {
     printf("status_special_n_main");
@@ -44133,6 +44560,7 @@ void func_2668()
     func_2673();
 }
 
+// [Copy: shared] helper used by Kirby, Link  "status_special_n_main_loop"
 void func_2669()
 {
     printf("status_special_n_main_loop");
@@ -44147,6 +44575,7 @@ void func_2669()
     func_2673();
 }
 
+// [Copy: Link 0x1E9] end
 void func_2670()
 {
     int var0;
@@ -44160,6 +44589,7 @@ void func_2670()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Link
 void func_2671()
 {
     ArticleModule(0x271c, 0, 0x1);
@@ -44168,6 +44598,7 @@ void func_2671()
     BattleObject(0x55, 0x1, 0x1c);
 }
 
+// [Copy: Link 0x1E9] init
 void func_2672()
 {
     float var0;
@@ -44175,6 +44606,7 @@ void func_2672()
     MotionModule(0x4, var0);
 }
 
+// [Copy: shared] helper used by Kirby, Link
 void func_2673()
 {
     int var0;
@@ -44193,6 +44625,7 @@ void func_2673()
     }
 }
 
+// [Copy: Link 0x1E9] exec
 void func_2674()
 {
     int var0;
@@ -44227,6 +44660,7 @@ void func_2674()
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Link
 void func_2675()
 {
     int var0;
@@ -44238,6 +44672,7 @@ void func_2675()
     KineticModule(0xe, 0, var0, 0, 0, 0, 0, 0);
 }
 
+// [Copy: Link 0x1E9] exit
 void func_2676()
 {
     int var0;
@@ -44253,6 +44688,7 @@ void func_2676()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2677(int arg0)
 {
     if (0)
@@ -44294,6 +44730,7 @@ int func_2677(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 void func_2678(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -44305,6 +44742,7 @@ void func_2678(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, 1.0f);
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 void func_2679(int arg0)
 {
     int var1;
@@ -44324,6 +44762,7 @@ void func_2679(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Samus 0x1EF] pre
 void func_2680()
 {
     func_70();
@@ -44340,6 +44779,7 @@ void func_2680()
     }
 }
 
+// [Copy: Samus 0x1F0] pre
 int func_2681()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -44347,6 +44787,7 @@ int func_2681()
     return 0;
 }
 
+// [Copy: Samus 0x1F1] pre
 int func_2682()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -44354,6 +44795,7 @@ int func_2682()
     return 0;
 }
 
+// [Copy: Samus 0x1F2] pre
 int func_2683()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -44361,6 +44803,7 @@ int func_2683()
     return 0;
 }
 
+// [Copy: Samus 0x1F3] pre
 int func_2684()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -44368,6 +44811,7 @@ int func_2684()
     return 0;
 }
 
+// [Copy: Samus 0x1F4] pre
 int func_2685()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -44375,6 +44819,7 @@ int func_2685()
     return 0;
 }
 
+// [Copy: Samus 0x1F5] pre
 int func_2686()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -44382,16 +44827,19 @@ int func_2686()
     return 0;
 }
 
+// [Copy: Samus 0x1EF] main
 void func_2687()
 {
     func_78(func_2688);
 }
 
+// [Copy: Samus 0x1EF] loop
 void func_2688()
 {
     
 }
 
+// [Copy: Samus 0x1F0] main
 void func_2689()
 {
     if (WorkModule(0x10, 0x2100000d) != 0)
@@ -44409,6 +44857,7 @@ void func_2689()
     func_78(func_2690);
 }
 
+// [Copy: Samus 0x1F0] loop
 int func_2690()
 {
     if (WorkModule(0x15, 0x1e00009a) != 0 && global18 == 0x2)
@@ -44424,6 +44873,7 @@ int func_2690()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2691()
 {
     int var0;
@@ -44449,6 +44899,7 @@ int func_2691()
     return 0;
 }
 
+// [Copy: Samus 0x1F1] main
 void func_2692()
 {
     func_2678(0x21d, 0, 1.0f);
@@ -44458,6 +44909,7 @@ void func_2692()
     func_78(func_2693);
 }
 
+// [Copy: Samus 0x1F1] loop
 int func_2693()
 {
     if (global18 == 0)
@@ -44490,6 +44942,7 @@ int func_2693()
     return 0;
 }
 
+// [Copy: Samus 0x1F2] main
 void func_2694()
 {
     func_2678(0x219, 0, 1.0f);
@@ -44498,6 +44951,7 @@ void func_2694()
     func_78(func_2695);
 }
 
+// [Copy: Samus 0x1F2] loop
 int func_2695()
 {
     if (WorkModule(0x15, 0x1e00009a) != 0 && global18 == 0x2)
@@ -44513,6 +44967,7 @@ int func_2695()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2696()
 {
     if (MotionModule(0x2712) != 0)
@@ -44531,6 +44986,7 @@ int func_2696()
     return 0;
 }
 
+// [Copy: Samus 0x1F3] main
 void func_2697()
 {
     int var0;
@@ -44555,6 +45011,7 @@ void func_2697()
     func_78(func_2698);
 }
 
+// [Copy: Samus 0x1F3] loop
 void func_2698()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -44573,6 +45030,7 @@ void func_2698()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 void func_2699()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -44592,6 +45050,7 @@ void func_2699()
     }
 }
 
+// [Copy: Samus 0x1F4] main
 void func_2700()
 {
     if (WorkModule(0x10, 0x2100000d) != 0)
@@ -44609,6 +45068,7 @@ void func_2700()
     func_78(func_2701);
 }
 
+// [Copy: Samus 0x1F4] loop
 int func_2701()
 {
     if (WorkModule(0x15, 0x1e00009b) != 0 && global18 == 0)
@@ -44624,6 +45084,7 @@ int func_2701()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2702()
 {
     WorkModule(0x11, 0x2100000d);
@@ -44631,6 +45092,7 @@ int func_2702()
     return 0x1;
 }
 
+// [Copy: Samus 0x1F5] main
 void func_2703()
 {
     int var0;
@@ -44655,6 +45117,7 @@ void func_2703()
     func_78(func_2704);
 }
 
+// [Copy: Samus 0x1F5] loop
 int func_2704()
 {
     if (WorkModule(0x15, 0x1e00009b) != 0 && global18 == 0)
@@ -44670,6 +45133,7 @@ int func_2704()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2705()
 {
     float var0;
@@ -44692,41 +45156,49 @@ int func_2705()
     return 0;
 }
 
+// [Copy: Samus 0x1EF] end
 void func_2706()
 {
     
 }
 
+// [Copy: Samus 0x1F0] end
 void func_2707()
 {
     
 }
 
+// [Copy: Samus 0x1F1] end
 void func_2708()
 {
     
 }
 
+// [Copy: Samus 0x1F2] end
 void func_2709()
 {
     
 }
 
+// [Copy: Samus 0x1F3] end
 void func_2710()
 {
     
 }
 
+// [Copy: Samus 0x1F4] end
 void func_2711()
 {
     
 }
 
+// [Copy: Samus 0x1F5] end
 void func_2712()
 {
     
 }
 
+// [Copy: Samus 0x1F3] init
 void func_2713()
 {
     int var0;
@@ -44742,6 +45214,7 @@ void func_2713()
     EffectModule(0x6, var1);
 }
 
+// [Copy: Samus 0x1F3] exec
 void func_2714()
 {
     float var0;
@@ -44768,6 +45241,7 @@ void func_2714()
     }
 }
 
+// [Copy: Samus 0x1F3] exit
 void func_2715()
 {
     int var0;
@@ -44783,6 +45257,7 @@ void func_2715()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2716()
 {
     if (global3 == 0)
@@ -44799,6 +45274,7 @@ int func_2716()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2717()
 {
     int var0;
@@ -44806,6 +45282,7 @@ int func_2717()
     return var0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2718()
 {
     int var0;
@@ -44837,6 +45314,7 @@ int func_2718()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 int func_2719()
 {
     float var0;
@@ -44849,6 +45327,7 @@ int func_2719()
     return 0;
 }
 
+// [Copy: Samus 0x1F1] exit
 void func_2720()
 {
     int var0;
@@ -44879,6 +45358,7 @@ void func_2720()
     }
 }
 
+// [Copy: Samus 0x1F0] init
 void func_2721()
 {
     if (WorkModule(0x10, 0x20000079) != 0)
@@ -44888,6 +45368,7 @@ void func_2721()
     }
 }
 
+// [Copy: Samus 0x1F0] exit
 void func_2722()
 {
     int var0;
@@ -44903,6 +45384,7 @@ void func_2722()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Samus
 void func_2723()
 {
     WorkModule(0x18, 0x1);
@@ -44918,6 +45400,7 @@ void func_2723()
     }
 }
 
+// [Copy: Samus 0x1F4] init  "-sub_special_air_n_start_uniq_process_init"
 void func_2724()
 {
     printf("-sub_special_air_n_start_uniq_process_init");
@@ -44928,6 +45411,7 @@ void func_2724()
     }
 }
 
+// [Copy: Samus 0x1F4] exit
 void func_2725()
 {
     int var0;
@@ -44943,6 +45427,7 @@ void func_2725()
     }
 }
 
+// [Copy: Samus 0x1F5] init
 void func_2726()
 {
     int var0;
@@ -44958,6 +45443,7 @@ void func_2726()
     EffectModule(0x6, var1);
 }
 
+// [Copy: Samus 0x1F5] exec
 void func_2727()
 {
     float var0;
@@ -44984,6 +45470,7 @@ void func_2727()
     }
 }
 
+// [Copy: Samus 0x1F5] exit
 void func_2728()
 {
     int var0;
@@ -44999,6 +45486,7 @@ void func_2728()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 int func_2729(int arg0)
 {
     if (0)
@@ -45032,6 +45520,7 @@ int func_2729(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 void func_2730(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -45043,6 +45532,7 @@ void func_2730(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 void func_2731(int arg0)
 {
     int var1;
@@ -45062,6 +45552,7 @@ void func_2731(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Yoshi 0x1AB] pre
 int func_2732()
 {
     func_69();
@@ -45070,6 +45561,7 @@ int func_2732()
     return 0;
 }
 
+// [Copy: Yoshi 0x1AB] main
 void func_2733()
 {
     WorkModule(0x7, 0x211, 0x11000002);
@@ -45080,6 +45572,7 @@ void func_2733()
     func_78(func_2734);
 }
 
+// [Copy: Yoshi 0x1AB] loop
 void func_2734()
 {
     int var0;
@@ -45115,11 +45608,13 @@ void func_2734()
     }
 }
 
+// [Copy: Yoshi 0x1AB] end
 void func_2735()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 void func_2736()
 {
     int var0;
@@ -45155,6 +45650,7 @@ void func_2736()
     }
 }
 
+// [Copy: Yoshi 0x1AC] pre
 int func_2737()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -45162,6 +45658,7 @@ int func_2737()
     return 0;
 }
 
+// [Copy: Yoshi 0x1AC] main
 void func_2738()
 {
     WorkModule(0x7, 0x215, 0x11000002);
@@ -45172,6 +45669,7 @@ void func_2738()
     func_78(func_2739);
 }
 
+// [Copy: Yoshi 0x1AC] loop
 void func_2739()
 {
     int var0;
@@ -45208,11 +45706,13 @@ void func_2739()
     }
 }
 
+// [Copy: Yoshi 0x1AC] end
 void func_2740()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 void func_2741()
 {
     int var0;
@@ -45248,6 +45748,7 @@ void func_2741()
     }
 }
 
+// [Copy: Yoshi 0x1AD] pre
 int func_2742()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -45255,6 +45756,7 @@ int func_2742()
     return 0;
 }
 
+// [Copy: Yoshi 0x1AD] main
 void func_2743()
 {
     WorkModule(0x7, 0x219, 0x11000002);
@@ -45265,6 +45767,7 @@ void func_2743()
     func_78(func_2744);
 }
 
+// [Copy: Yoshi 0x1AD] loop
 void func_2744()
 {
     float var0;
@@ -45303,11 +45806,13 @@ void func_2744()
     }
 }
 
+// [Copy: Yoshi 0x1AD] end
 void func_2745()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Yoshi
 void func_2746()
 {
     int var0;
@@ -45343,6 +45848,7 @@ void func_2746()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 int func_2747(int arg0)
 {
     if (0)
@@ -45376,6 +45882,7 @@ int func_2747(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2748(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -45387,6 +45894,7 @@ void func_2748(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2749(int arg0)
 {
     int var1;
@@ -45406,6 +45914,7 @@ void func_2749(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Fox 0x19B] pre
 int func_2750()
 {
     func_69();
@@ -45414,6 +45923,7 @@ int func_2750()
     return 0;
 }
 
+// [Copy: Fox 0x19B] main  "fox status_SpecialN"
 void func_2751()
 {
     printf("fox status_SpecialN");
@@ -45436,6 +45946,7 @@ void func_2751()
     func_78(func_2752);
 }
 
+// [Copy: Fox 0x19B] loop
 void func_2752()
 {
     int var0;
@@ -45589,6 +46100,7 @@ void func_2752()
     }
 }
 
+// [Copy: Fox 0x19B] per-frame
 void func_2753()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -45600,6 +46112,7 @@ void func_2753()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2754()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45613,6 +46126,7 @@ void func_2754()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2755()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45626,6 +46140,7 @@ void func_2755()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2756()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45639,6 +46154,7 @@ void func_2756()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2757()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45652,6 +46168,7 @@ void func_2757()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2758()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45665,6 +46182,7 @@ void func_2758()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 void func_2759()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -45678,6 +46196,7 @@ void func_2759()
     }
 }
 
+// [Copy: shared] helper used by Fox, Kirby
 int func_2760()
 {
     int var0;
@@ -45709,6 +46228,7 @@ int func_2760()
     return 0;
 }
 
+// [Copy: Fox 0x19B] end
 void func_2761()
 {
     if (ArticleModule(0x2717, 0))
@@ -45717,6 +46237,7 @@ void func_2761()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 int func_2762(int arg0)
 {
     if (0)
@@ -45734,6 +46255,7 @@ int func_2762(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2763(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -45745,6 +46267,7 @@ void func_2763(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2764(int arg0)
 {
     int var1;
@@ -45764,6 +46287,7 @@ void func_2764(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Pikachu 0x18E] pre
 int func_2765()
 {
     int var0;
@@ -45778,6 +46302,7 @@ int func_2765()
     return 0;
 }
 
+// [Copy: Pikachu 0x18E] main
 void func_2766()
 {
     func_2773();
@@ -45789,6 +46314,7 @@ void func_2766()
     func_78(func_2767);
 }
 
+// [Copy: Pikachu 0x18E] loop
 int func_2767()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -45839,16 +46365,19 @@ int func_2767()
     return 0x1;
 }
 
+// [Copy: Pikachu 0x18E] end
 void func_2768()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2769()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2770()
 {
     if (global18 == 0)
@@ -45861,6 +46390,7 @@ void func_2770()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2771()
 {
     if (!WorkModule(0x10, 0x20000078))
@@ -45874,6 +46404,7 @@ void func_2771()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2772()
 {
     if (!WorkModule(0x10, 0x20000078))
@@ -45887,6 +46418,7 @@ void func_2772()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 void func_2773()
 {
     WorkModule(0x2711, 0x20000079);
@@ -45895,6 +46427,7 @@ void func_2773()
     WorkModule(0x2711, 0x2000007c);
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 int func_2774()
 {
     if (WorkModule(0x10, 0x20000079) || WorkModule(0x10, 0x2000007a) || WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c))
@@ -45904,6 +46437,7 @@ int func_2774()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Pikachu
 int func_2775()
 {
     if (WorkModule(0x10, 0x20000079) && global18 == 0x2 || WorkModule(0x10, 0x2000007a) && global18 == 0 || WorkModule(0x10, 0x2000007b) && MotionModule(0x2712))
@@ -45917,6 +46451,7 @@ int func_2775()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Luigi
 int func_2776(int arg0)
 {
     if (0)
@@ -45934,6 +46469,7 @@ int func_2776(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Luigi
 void func_2777(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -45945,6 +46481,7 @@ void func_2777(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Luigi
 void func_2778(int arg0)
 {
     int var1;
@@ -45964,6 +46501,7 @@ void func_2778(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Luigi 0x1BB] pre
 int func_2779()
 {
     func_69();
@@ -45972,12 +46510,14 @@ int func_2779()
     return 0;
 }
 
+// [Copy: Luigi 0x1BB] main
 void func_2780()
 {
     func_2782();
     func_78(func_2781);
 }
 
+// [Copy: Luigi 0x1BB] loop
 void func_2781()
 {
     int var0;
@@ -46021,6 +46561,7 @@ void func_2781()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Luigi
 void func_2782(int arg0)
 {
     if (global18 == 0)
@@ -46055,11 +46596,13 @@ void func_2782(int arg0)
     }
 }
 
+// [Copy: Luigi 0x1BB] end
 void func_2783()
 {
     
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 int func_2784(int arg0)
 {
     if (0)
@@ -46085,6 +46628,7 @@ int func_2784(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2785(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -46096,6 +46640,7 @@ void func_2785(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2786(int arg0)
 {
     int var1;
@@ -46115,18 +46660,21 @@ void func_2786(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2787()
 {
     func_20(0);
     GroundModule(0x2710, 0x1);
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2788()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2789()
 {
     int var0;
@@ -46142,12 +46690,14 @@ void func_2789()
     }
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2790()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2791()
 {
     int var0;
@@ -46163,11 +46713,13 @@ void func_2791()
     }
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2792()
 {
     WorkModule(0x2711, 0x20000078);
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2793()
 {
     if (global18 == 0)
@@ -46184,6 +46736,7 @@ void func_2793()
     }
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2794()
 {
     float var0;
@@ -46215,6 +46768,7 @@ void func_2794()
     }
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 void func_2795()
 {
     int var0;
@@ -46244,6 +46798,7 @@ void func_2795()
     }
 }
 
+// [Copy: shared] helper used by Captain Falcon, Kirby
 float func_2796(float arg0)
 {
     float var1;
@@ -46274,6 +46829,7 @@ float func_2796(float arg0)
     return var6;
 }
 
+// [Copy: Captain Falcon 0x18C] pre
 int func_2797()
 {
     func_69();
@@ -46282,6 +46838,7 @@ int func_2797()
     return 0;
 }
 
+// [Copy: Captain Falcon 0x18C] main
 void func_2798()
 {
     WorkModule(0x7, 0x211, 0x10000083);
@@ -46297,6 +46854,7 @@ void func_2798()
     func_78(func_2799);
 }
 
+// [Copy: Captain Falcon 0x18C] loop
 void func_2799()
 {
     int var0;
@@ -46325,6 +46883,7 @@ void func_2799()
     }
 }
 
+// [Copy: Captain Falcon 0x18C] per-frame
 void func_2800()
 {
     if (WorkModule(0x10, 0x2100000d))
@@ -46341,16 +46900,19 @@ void func_2800()
     }
 }
 
+// [Copy: Captain Falcon 0x18C] end
 void func_2801()
 {
     
 }
 
+// [Copy: Captain Falcon 0x18C] init
 void func_2802()
 {
     WorkModule(0, PostureModuleF(0) + 0, 0x1000006);
 }
 
+// [Copy: Captain Falcon 0x18C] exec
 void func_2803()
 {
     if (global18 == 0x2)
@@ -46359,6 +46921,7 @@ void func_2803()
     }
 }
 
+// [Copy: Captain Falcon 0x18D] pre
 int func_2804()
 {
     StatusModule(0x5, 0xffffffff, 0, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -46366,6 +46929,7 @@ int func_2804()
     return 0;
 }
 
+// [Copy: Captain Falcon 0x18D] main
 void func_2805()
 {
     WorkModule(0x7, 0x215, 0x10000083);
@@ -46374,6 +46938,7 @@ void func_2805()
     func_78(func_2806);
 }
 
+// [Copy: Captain Falcon 0x18D] loop
 void func_2806()
 {
     int var0;
@@ -46402,11 +46967,13 @@ void func_2806()
     }
 }
 
+// [Copy: Captain Falcon 0x18D] end
 void func_2807()
 {
     
 }
 
+// [Copy: Captain Falcon 0x18D] exec
 void func_2808()
 {
     int var0;
@@ -46422,6 +46989,7 @@ void func_2808()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 int func_2809(int arg0)
 {
     if (0)
@@ -46463,6 +47031,7 @@ int func_2809(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2810(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -46474,6 +47043,7 @@ void func_2810(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2811(int arg0)
 {
     int var1;
@@ -46493,6 +47063,7 @@ void func_2811(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2812(int arg0)
 {
     if (global18 == WorkModule(0x6, arg0))
@@ -46505,6 +47076,7 @@ void func_2812(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2813(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     if (global18 == 0)
@@ -46538,6 +47110,7 @@ void func_2813(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int a
     WorkModule(0x2710, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2814(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     if (global18 == 0)
@@ -46575,6 +47148,7 @@ void func_2814(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int a
     WorkModule(0x2710, arg1);
 }
 
+// [Copy: Ness 0x1B3] pre
 int func_2815()
 {
     func_69();
@@ -46583,6 +47157,7 @@ int func_2815()
     return 0;
 }
 
+// [Copy: Ness 0x1B3] main
 void func_2816()
 {
     WorkModule(0x7, WorkModule(0x6, 0x15000000), 0x11000004);
@@ -46596,6 +47171,7 @@ void func_2816()
     func_78(func_2817);
 }
 
+// [Copy: Ness 0x1B3] loop
 void func_2817()
 {
     int var0;
@@ -46638,6 +47214,7 @@ void func_2817()
     func_2838();
 }
 
+// [Copy: Ness 0x1B3] per-frame
 void func_2818()
 {
     func_2820();
@@ -46648,11 +47225,13 @@ void func_2818()
     func_2821();
 }
 
+// [Copy: Ness 0x1B3] end
 void func_2819()
 {
     func_2822();
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2820()
 {
     if (WorkModule(0x10, 0x2100000e) && !WorkModule(0x10, 0x2100000f))
@@ -46676,6 +47255,7 @@ void func_2820()
     }
 }
 
+// [Copy: Ness 0x1B5] per-frame
 void func_2821()
 {
     if (global18 != 0)
@@ -46692,6 +47272,7 @@ void func_2821()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2822()
 {
     if (global6 != 0x1b4 && global6 != 0x1b5 && global6 != 0x1b6)
@@ -46703,6 +47284,7 @@ void func_2822()
     }
 }
 
+// [Copy: Ness 0x1B5] pre
 int func_2823()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -46710,6 +47292,7 @@ int func_2823()
     return 0;
 }
 
+// [Copy: Ness 0x1B5] main
 void func_2824()
 {
     if (WorkModuleF(0, 0x5000004) > 0)
@@ -46729,6 +47312,7 @@ void func_2824()
     func_78(func_2825);
 }
 
+// [Copy: Ness 0x1B5] loop
 void func_2825()
 {
     int var0;
@@ -46759,11 +47343,13 @@ void func_2825()
     func_2838();
 }
 
+// [Copy: Ness 0x1B5] end
 void func_2826()
 {
     func_2822();
 }
 
+// [Copy: Ness 0x1B4] pre
 int func_2827()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -46771,6 +47357,7 @@ int func_2827()
     return 0;
 }
 
+// [Copy: Ness 0x1B4] main
 void func_2828()
 {
     int var0;
@@ -46788,6 +47375,7 @@ void func_2828()
     func_78(func_2829);
 }
 
+// [Copy: Ness 0x1B4] loop
 void func_2829()
 {
     int var0;
@@ -46804,23 +47392,27 @@ void func_2829()
     func_2838();
 }
 
+// [Copy: Ness 0x1B4] per-frame
 void func_2830()
 {
     func_2820();
     func_2821();
 }
 
+// [Copy: Ness 0x1B4] end
 void func_2831()
 {
     func_2822();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2832()
 {
     func_2820();
     func_2821();
 }
 
+// [Copy: Ness 0x1B6] pre
 int func_2833()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -46828,6 +47420,7 @@ int func_2833()
     return 0;
 }
 
+// [Copy: Ness 0x1B6] main
 void func_2834()
 {
     if (WorkModuleF(0, 0x5000004) > 0)
@@ -46847,6 +47440,7 @@ void func_2834()
     func_78(func_2835);
 }
 
+// [Copy: Ness 0x1B6] loop
 void func_2835()
 {
     int var0;
@@ -46877,16 +47471,19 @@ void func_2835()
     func_2838();
 }
 
+// [Copy: Ness 0x1B6] end
 void func_2836()
 {
     func_2822();
 }
 
+// [Copy: Ness 0x1B3, 0x1B4, 0x1B5, 0x1B6] init
 void func_2837()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2838()
 {
     if (global3 == 0)
@@ -46895,21 +47492,25 @@ void func_2838()
     }
 }
 
+// [Copy: Ness 0x1B3, 0x1B4, 0x1B5, 0x1B6] exec
 void func_2839()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Ness
 void func_2840()
 {
     
 }
 
+// [Copy: Ness 0x1B3, 0x1B4, 0x1B5, 0x1B6] exec (hitlag)
 void func_2841()
 {
     
 }
 
+// [Copy: Ness 0x1B3, 0x1B4, 0x1B5, 0x1B6] exit
 void func_2842()
 {
     float var0;
@@ -46923,6 +47524,7 @@ void func_2842()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 int func_2843(int arg0)
 {
     if (0)
@@ -46948,6 +47550,7 @@ int func_2843(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 void func_2844(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -46959,6 +47562,7 @@ void func_2844(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 void func_2845(int arg0)
 {
     int var1;
@@ -46978,6 +47582,7 @@ void func_2845(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Peach 0x1A9] pre
 int func_2846()
 {
     func_69();
@@ -46986,6 +47591,7 @@ int func_2846()
     return 0;
 }
 
+// [Copy: Peach 0x1A9] main
 void func_2847()
 {
     WorkModule(0x7, 0x211, 0x11000002);
@@ -46997,6 +47603,7 @@ void func_2847()
     func_78(func_2848);
 }
 
+// [Copy: Peach 0x1A9] loop
 void func_2848()
 {
     if (func_56())
@@ -47029,6 +47636,7 @@ void func_2848()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 void func_2849()
 {
     if (global18 == 0)
@@ -47069,11 +47677,13 @@ void func_2849()
     }
 }
 
+// [Copy: Peach 0x1A9] end
 void func_2850()
 {
     func_2856();
 }
 
+// [Copy: Peach 0x1AA] pre
 int func_2851()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0x40, 0);
@@ -47081,6 +47691,7 @@ int func_2851()
     return 0;
 }
 
+// [Copy: Peach 0x1AA] main
 void func_2852()
 {
     WorkModule(0x16, 0x1e000000);
@@ -47090,6 +47701,7 @@ void func_2852()
     func_78(func_2853);
 }
 
+// [Copy: Peach 0x1AA] loop
 void func_2853()
 {
     if (func_56())
@@ -47122,6 +47734,7 @@ void func_2853()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 void func_2854()
 {
     if (global18 == 0)
@@ -47162,11 +47775,13 @@ void func_2854()
     }
 }
 
+// [Copy: Peach 0x1AA] end
 void func_2855()
 {
     func_2856();
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 void func_2856()
 {
     if (global6 == 0x1aa)
@@ -47179,6 +47794,7 @@ void func_2856()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2857()
 {
     if (global6 == 0 || global6 == 0 || global6 == 0 || global6 == 0x10 || global6 == 0x19)
@@ -47191,6 +47807,7 @@ void func_2857()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2858()
 {
     KineticModule(0, 0x6);
@@ -47198,6 +47815,7 @@ void func_2858()
     GroundModule(0x2710, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2859()
 {
     KineticModule(0, 0);
@@ -47205,6 +47823,7 @@ void func_2859()
     GroundModule(0x2710, 0x5);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2860()
 {
     if (WorkModule(0x15, 0x1e00001c))
@@ -47228,6 +47847,7 @@ void func_2860()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Peach
 int func_2861(int arg0)
 {
     int var1;
@@ -47248,6 +47868,7 @@ int func_2861(int arg0)
     return var1;
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 int func_2862(int arg0)
 {
     if (0)
@@ -47281,6 +47902,7 @@ int func_2862(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 void func_2863(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -47292,6 +47914,7 @@ void func_2863(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 void func_2864(int arg0)
 {
     int var1;
@@ -47311,6 +47934,7 @@ void func_2864(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 void func_2865()
 {
     WorkModule(0x2711, 0x2000007b);
@@ -47319,6 +47943,7 @@ void func_2865()
     WorkModule(0x2711, 0x2000007e);
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 int func_2866()
 {
     if (WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c) || WorkModule(0x10, 0x2000007d) || WorkModule(0x10, 0x2000007e))
@@ -47328,6 +47953,7 @@ int func_2866()
     return 0;
 }
 
+// [Copy: shared] helper used by Bowser, Kirby
 int func_2867()
 {
     if (WorkModule(0x10, 0x2000007b) && global18 == 0x2 || WorkModule(0x10, 0x2000007c) && global18 == 0 || WorkModule(0x10, 0x2000007d) && MotionModule(0x2712))
@@ -47344,6 +47970,7 @@ int func_2867()
     return 0;
 }
 
+// [Copy: Bowser 0x1F6] pre
 int func_2868()
 {
     func_69();
@@ -47352,6 +47979,7 @@ int func_2868()
     return 0;
 }
 
+// [Copy: Bowser 0x1F6] main
 void func_2869()
 {
     func_2865();
@@ -47369,6 +47997,7 @@ void func_2869()
     func_78(func_2870);
 }
 
+// [Copy: Bowser 0x1F6] loop
 void func_2870()
 {
     if (func_2867())
@@ -47504,6 +48133,7 @@ void func_2870()
     }
 }
 
+// [Copy: Bowser 0x1F6] per-frame
 void func_2871()
 {
     if (WorkModule(0x10, 0x21000010))
@@ -47513,6 +48143,7 @@ void func_2871()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2872()
 {
     int var0;
@@ -47538,11 +48169,13 @@ void func_2872()
     }
 }
 
+// [Copy: Bowser 0x1F6] end
 void func_2873()
 {
     
 }
 
+// [Copy: Bowser 0x1F6] init
 void func_2874()
 {
     int var0;
@@ -47566,6 +48199,7 @@ void func_2874()
     }
 }
 
+// [Copy: Bowser 0x1F6] exec  "se id:"
 void func_2875()
 {
     int var0;
@@ -47673,11 +48307,13 @@ void func_2875()
     }
 }
 
+// [Copy: Bowser 0x1F6] exit
 void func_2876()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Zelda
 int func_2877(int arg0)
 {
     if (0)
@@ -47695,6 +48331,7 @@ int func_2877(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Zelda
 void func_2878(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -47706,6 +48343,7 @@ void func_2878(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Zelda
 void func_2879(int arg0)
 {
     int var1;
@@ -47725,6 +48363,7 @@ void func_2879(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Zelda 0x1AE] pre
 int func_2880()
 {
     func_69();
@@ -47733,6 +48372,7 @@ int func_2880()
     return 0;
 }
 
+// [Copy: Zelda 0x1AE] main
 void func_2881()
 {
     WorkModule(0x7, WorkModule(0x6, 0x15000000), 0x11000002);
@@ -47744,6 +48384,7 @@ void func_2881()
     func_78(func_2882);
 }
 
+// [Copy: Zelda 0x1AE] loop
 void func_2882()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -47796,6 +48437,7 @@ void func_2882()
     }
 }
 
+// [Copy: Zelda 0x1AE] per-frame
 void func_2883()
 {
     if (global18 != 0)
@@ -47812,11 +48454,13 @@ void func_2883()
     }
 }
 
+// [Copy: Zelda 0x1AE] end
 void func_2884()
 {
     
 }
 
+// [Copy: Zelda 0x1AE] init
 void func_2885()
 {
     float var0;
@@ -47831,6 +48475,7 @@ void func_2885()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2886()
 {
     if (global3 == 0)
@@ -47847,6 +48492,7 @@ int func_2886()
     return 0;
 }
 
+// [Copy: Zelda 0x1AE] exec
 void func_2887()
 {
     int var0;
@@ -47863,26 +48509,31 @@ void func_2887()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2888()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_2889()
 {
     return 0;
 }
 
+// [Copy: Zelda 0x1AE] exec (hitlag)
 void func_2890()
 {
     
 }
 
+// [Copy: Zelda 0x1AE] exit
 void func_2891()
 {
     ShieldModule(0, 0x3, 0, 0x1, 0x3);
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 int func_2892(int arg0)
 {
     if (0)
@@ -47924,6 +48575,7 @@ int func_2892(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2893(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -47935,6 +48587,7 @@ void func_2893(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_2894(int arg0)
 {
     int var1;
@@ -47954,6 +48607,7 @@ void func_2894(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Sheik 0x1AF] pre
 int func_2895()
 {
     func_69();
@@ -47962,6 +48616,7 @@ int func_2895()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2896()
 {
     if (ArticleModule(0x2717, 0x1))
@@ -47997,6 +48652,7 @@ void func_2896()
     }
 }
 
+// [Copy: Sheik 0x1AF] main
 void func_2897()
 {
     ArticleModule(0x2710, 0x1);
@@ -48009,6 +48665,7 @@ void func_2897()
     func_78(func_2898);
 }
 
+// [Copy: Sheik 0x1AF] loop
 void func_2898()
 {
     if (global18 == 0)
@@ -48043,6 +48700,7 @@ void func_2898()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2899()
 {
     if (MotionModule(0x2712) && WorkModule(0x6, 0x10000083) >= WorkModule(0x6, 0x15000006))
@@ -48061,6 +48719,7 @@ void func_2899()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2900()
 {
     if (MotionModule(0x2712) && WorkModule(0x6, 0x10000083) >= WorkModule(0x6, 0x15000006))
@@ -48079,6 +48738,7 @@ void func_2900()
     }
 }
 
+// [Copy: Sheik 0x1AF] end
 void func_2901()
 {
     if (global6 != 0x1b0 && global6 != 0x1b1)
@@ -48087,6 +48747,7 @@ void func_2901()
     }
 }
 
+// [Copy: Sheik 0x1B2] pre
 int func_2902()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48094,6 +48755,7 @@ int func_2902()
     return 0;
 }
 
+// [Copy: Sheik 0x1B2] main
 void func_2903()
 {
     WorkModule(0x2711, 0x20000079);
@@ -48107,6 +48769,7 @@ void func_2903()
     func_78(func_2904);
 }
 
+// [Copy: Sheik 0x1B2] loop
 void func_2904()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -48165,11 +48828,13 @@ void func_2904()
     }
 }
 
+// [Copy: Sheik 0x1B2] end
 void func_2905()
 {
     
 }
 
+// [Copy: Sheik 0x1B0] pre
 int func_2906()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48177,6 +48842,7 @@ int func_2906()
     return 0;
 }
 
+// [Copy: Sheik 0x1B0] main
 void func_2907()
 {
     WorkModule(0x2711, 0x20000079);
@@ -48185,6 +48851,7 @@ void func_2907()
     func_78(func_2908);
 }
 
+// [Copy: Sheik 0x1B0] loop
 void func_2908()
 {
     float var0;
@@ -48258,6 +48925,7 @@ void func_2908()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2909()
 {
     if (MotionModule(0xb))
@@ -48271,6 +48939,7 @@ void func_2909()
     }
 }
 
+// [Copy: Sheik 0x1B0] end
 void func_2910()
 {
     if (global6 != 0x20 && global6 != 0x21 && global6 != 0x1b1 && global6 != 0x1b2)
@@ -48279,6 +48948,7 @@ void func_2910()
     }
 }
 
+// [Copy: Sheik 0x1B1] pre
 int func_2911()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48286,6 +48956,7 @@ int func_2911()
     return 0;
 }
 
+// [Copy: Sheik 0x1B1] main
 void func_2912()
 {
     ArticleModule(0x2712, 0x1);
@@ -48309,6 +48980,7 @@ void func_2912()
     func_78(func_2913);
 }
 
+// [Copy: Sheik 0x1B1] loop
 void func_2913()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -48363,6 +49035,7 @@ void func_2913()
     }
 }
 
+// [Copy: Sheik 0x1B1] end
 void func_2914()
 {
     if (global6 == 0x16)
@@ -48371,6 +49044,7 @@ void func_2914()
     }
 }
 
+// [Copy: Sheik 0x1B0, 0x1B2] exit
 void func_2915()
 {
     if (global6 == 0x152 || global6 == 0x1b0 || global6 == 0x1b1 || global6 == 0x1b2)
@@ -48380,6 +49054,7 @@ void func_2915()
     ArticleModule(0x2712, 0x1);
 }
 
+// [Copy: Sheik 0x1B1] exec
 void func_2916()
 {
     if (WorkModule(0x6, 0x11000002) % 0x3 == 0x2)
@@ -48389,6 +49064,7 @@ void func_2916()
     WorkModule(0x9, 0x11000002);
 }
 
+// [Copy: shared] helper used by Kirby, Sheik
 void func_2917()
 {
     int var0;
@@ -48404,6 +49080,7 @@ void func_2917()
     }
 }
 
+// [Copy: Sheik 0x1B1] exit
 void func_2918()
 {
     float var0;
@@ -48418,6 +49095,7 @@ void func_2918()
     WorkModule(0x7, 0, 0x10000083);
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 int func_2919(int arg0)
 {
     if (0)
@@ -48459,6 +49137,7 @@ int func_2919(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2920(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -48470,6 +49149,7 @@ void func_2920(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2921(int arg0)
 {
     int var1;
@@ -48489,6 +49169,7 @@ void func_2921(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Marth 0x1C1] pre  "status_pre_SpecialN"
 int func_2922()
 {
     printf("status_pre_SpecialN");
@@ -48498,6 +49179,7 @@ int func_2922()
     return 0;
 }
 
+// [Copy: Marth 0x1C1] main
 void func_2923()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -48505,6 +49187,7 @@ void func_2923()
     func_78(func_2924);
 }
 
+// [Copy: Marth 0x1C1] loop
 void func_2924()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -48526,6 +49209,7 @@ void func_2924()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2925()
 {
     if (global18 == 0)
@@ -48556,11 +49240,13 @@ void func_2925()
     }
 }
 
+// [Copy: Marth 0x1C1] end
 void func_2926()
 {
     
 }
 
+// [Copy: Marth 0x1C3] pre
 int func_2927()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48568,12 +49254,14 @@ int func_2927()
     return 0;
 }
 
+// [Copy: Marth 0x1C3] main
 void func_2928()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_2929);
 }
 
+// [Copy: Marth 0x1C3] loop
 void func_2929()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -48599,6 +49287,7 @@ void func_2929()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2930()
 {
     float var0;
@@ -48636,11 +49325,13 @@ void func_2930()
     }
 }
 
+// [Copy: Marth 0x1C3] end
 void func_2931()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: Marth 0x1C4] pre
 int func_2932()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48648,12 +49339,14 @@ int func_2932()
     return 0;
 }
 
+// [Copy: Marth 0x1C4] main
 void func_2933()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_2934);
 }
 
+// [Copy: Marth 0x1C4] loop
 void func_2934()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -48679,6 +49372,7 @@ void func_2934()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2935()
 {
     float var0;
@@ -48716,11 +49410,13 @@ void func_2935()
     }
 }
 
+// [Copy: Marth 0x1C4] end
 void func_2936()
 {
     
 }
 
+// [Copy: Marth 0x1C2] pre
 int func_2937()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -48728,6 +49424,7 @@ int func_2937()
     return 0;
 }
 
+// [Copy: Marth 0x1C2] main
 void func_2938()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -48739,6 +49436,7 @@ void func_2938()
     func_78(func_2939);
 }
 
+// [Copy: Marth 0x1C2] loop
 void func_2939()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -48757,6 +49455,7 @@ void func_2939()
     }
 }
 
+// [Copy: Marth 0x1C2] per-frame
 void func_2940()
 {
     int var0;
@@ -48770,6 +49469,7 @@ void func_2940()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Marth
 void func_2941()
 {
     float var0;
@@ -48809,11 +49509,13 @@ void func_2941()
     }
 }
 
+// [Copy: Marth 0x1C2] end
 void func_2942()
 {
     ColorBlendModule(0x7, 1.0f);
 }
 
+// [Copy: shared] helper used by Kirby, Mr. Game & Watch
 int func_2943(int arg0)
 {
     if (0)
@@ -48831,6 +49533,7 @@ int func_2943(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mr. Game & Watch
 int func_2944(int arg0)
 {
     if (0)
@@ -48848,6 +49551,7 @@ int func_2944(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mr. Game & Watch
 void func_2945(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -48859,6 +49563,7 @@ void func_2945(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mr. Game & Watch
 void func_2946(int arg0)
 {
     int var1;
@@ -48874,6 +49579,7 @@ void func_2946(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Mr. Game & Watch
 void func_2947(int arg0)
 {
     int var1;
@@ -48893,6 +49599,7 @@ void func_2947(int arg0)
     MotionAnimcmdModule(0x1, arg0, 0x1);
 }
 
+// [Copy: Mr. Game & Watch 0x1FC] pre
 int func_2948()
 {
     int var0;
@@ -48907,6 +49614,7 @@ int func_2948()
     return 0;
 }
 
+// [Copy: Mr. Game & Watch 0x1FC] main
 void func_2949()
 {
     if (!StopModule(0x1))
@@ -48917,6 +49625,7 @@ void func_2949()
     func_78(func_2950);
 }
 
+// [Copy: Mr. Game & Watch 0x1FC] loop
 void func_2950()
 {
     int var0;
@@ -48977,6 +49686,7 @@ void func_2950()
     }
 }
 
+// [Copy: Mr. Game & Watch 0x1FC] per-frame
 void func_2951()
 {
     int var0;
@@ -49024,11 +49734,13 @@ void func_2951()
     }
 }
 
+// [Copy: Mr. Game & Watch 0x1FC] end
 void func_2952()
 {
     
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 int func_2953(int arg0)
 {
     if (0)
@@ -49054,6 +49766,7 @@ int func_2953(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2954(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -49065,6 +49778,7 @@ void func_2954(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2955(int arg0)
 {
     int var1;
@@ -49084,6 +49798,7 @@ void func_2955(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Ganondorf 0x1E7] pre
 int func_2956()
 {
     func_69();
@@ -49092,6 +49807,7 @@ int func_2956()
     return 0;
 }
 
+// [Copy: Ganondorf 0x1E7] main
 void func_2957()
 {
     WorkModule(0x7, 0x211, 0x10000083);
@@ -49108,6 +49824,7 @@ void func_2957()
     func_78(func_2958);
 }
 
+// [Copy: Ganondorf 0x1E7] loop
 void func_2958()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -49131,11 +49848,13 @@ void func_2958()
     func_2970();
 }
 
+// [Copy: Ganondorf 0x1E7] end
 void func_2959()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E7] per-frame
 void func_2960()
 {
     if (WorkModule(0x2712, 0x2100000d))
@@ -49152,6 +49871,7 @@ void func_2960()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2961()
 {
     if (global18 == 0)
@@ -49174,6 +49894,7 @@ void func_2961()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2962()
 {
     if (global19 != global18)
@@ -49182,6 +49903,7 @@ void func_2962()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2963()
 {
     int var0;
@@ -49197,6 +49919,7 @@ void func_2963()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2964()
 {
     int var0;
@@ -49212,6 +49935,7 @@ void func_2964()
     }
 }
 
+// [Copy: Ganondorf 0x1E8] pre
 int func_2965()
 {
     StatusModule(0x5, 0xffffffff, 0, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -49219,6 +49943,7 @@ int func_2965()
     return 0;
 }
 
+// [Copy: Ganondorf 0x1E8] main
 void func_2966()
 {
     WorkModule(0x7, 0x215, 0x10000083);
@@ -49228,6 +49953,7 @@ void func_2966()
     func_78(func_2967);
 }
 
+// [Copy: Ganondorf 0x1E8] loop
 void func_2967()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -49251,11 +49977,13 @@ void func_2967()
     func_2979();
 }
 
+// [Copy: Ganondorf 0x1E8] end
 void func_2968()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E7] init
 void func_2969()
 {
     float var0;
@@ -49263,6 +49991,7 @@ void func_2969()
     WorkModule(0, var0, 0x1000006);
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2970()
 {
     if (global3 == 0)
@@ -49271,6 +50000,7 @@ void func_2970()
     }
 }
 
+// [Copy: Ganondorf 0x1E7] exec
 void func_2971()
 {
     if (global18 == 0x2)
@@ -49279,21 +50009,25 @@ void func_2971()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2972()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E7] exec (hitlag)
 void func_2973()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E7] exit
 void func_2974()
 {
     
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2975()
 {
     int var0;
@@ -49323,6 +50057,7 @@ void func_2975()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2976()
 {
     float var0;
@@ -49353,6 +50088,7 @@ void func_2976()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 float func_2977(float arg0)
 {
     float var1;
@@ -49383,11 +50119,13 @@ float func_2977(float arg0)
     return var6;
 }
 
+// [Copy: Ganondorf 0x1E8] init
 void func_2978()
 {
     
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2979()
 {
     if (global3 == 0)
@@ -49396,6 +50134,7 @@ void func_2979()
     }
 }
 
+// [Copy: Ganondorf 0x1E8] exec
 void func_2980()
 {
     float var0;
@@ -49410,21 +50149,25 @@ void func_2980()
     }
 }
 
+// [Copy: shared] helper used by Ganondorf, Kirby
 void func_2981()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E8] exit
 void func_2982()
 {
     
 }
 
+// [Copy: Ganondorf 0x1E8] exec (hitlag)
 void func_2983()
 {
     
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 int func_2984(int arg0)
 {
     if (0)
@@ -49458,6 +50201,7 @@ int func_2984(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2985(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -49469,6 +50213,7 @@ void func_2985(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2986(int arg0)
 {
     int var1;
@@ -49488,6 +50233,7 @@ void func_2986(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Falco 0x19C] pre
 int func_2987()
 {
     int var0;
@@ -49504,6 +50250,7 @@ int func_2987()
     return 0;
 }
 
+// [Copy: Falco 0x19C] main  "falco status_SpecialN"
 void func_2988()
 {
     printf("falco status_SpecialN");
@@ -49526,6 +50273,7 @@ void func_2988()
     func_78(func_2989);
 }
 
+// [Copy: Falco 0x19C] loop
 void func_2989()
 {
     int var0;
@@ -49682,6 +50430,7 @@ void func_2989()
     }
 }
 
+// [Copy: Falco 0x19C] per-frame
 void func_2990()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -49693,6 +50442,7 @@ void func_2990()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2991()
 {
     MotionModule(0x35, 1.0f);
@@ -49707,6 +50457,7 @@ void func_2991()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2992()
 {
     MotionModule(0x35, 1.0f);
@@ -49721,6 +50472,7 @@ void func_2992()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2993()
 {
     MotionModule(0x35, 1.0f);
@@ -49735,6 +50487,7 @@ void func_2993()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2994()
 {
     MotionModule(0x35, 1.0f);
@@ -49749,6 +50502,7 @@ void func_2994()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2995()
 {
     MotionModule(0x35, 1.0f);
@@ -49763,6 +50517,7 @@ void func_2995()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 void func_2996()
 {
     MotionModule(0x35, 1.0f);
@@ -49777,6 +50532,7 @@ void func_2996()
     }
 }
 
+// [Copy: shared] helper used by Falco, Kirby
 int func_2997()
 {
     int var0;
@@ -49808,6 +50564,7 @@ int func_2997()
     return 0;
 }
 
+// [Copy: Falco 0x19C] end
 void func_2998()
 {
     if (ArticleModule(0x2717, 0))
@@ -49816,6 +50573,7 @@ void func_2998()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_2999(int arg0)
 {
     if (0)
@@ -49905,6 +50663,7 @@ int func_2999(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3000(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -49916,6 +50675,7 @@ void func_3000(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3001(int arg0)
 {
     int var1;
@@ -49935,6 +50695,7 @@ void func_3001(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Wario 0x19E] pre
 int func_3002()
 {
     func_69();
@@ -49943,6 +50704,7 @@ int func_3002()
     return 0;
 }
 
+// [Copy: Wario 0x19E] main
 void func_3003()
 {
     WorkModule(0x7, 0x211, 0x11000002);
@@ -49952,6 +50714,7 @@ void func_3003()
     func_78(func_3004);
 }
 
+// [Copy: Wario 0x19E] loop
 void func_3004()
 {
     if (MotionModule(0x2712))
@@ -49963,16 +50726,19 @@ void func_3004()
     func_3098();
 }
 
+// [Copy: Wario 0x19E] end
 void func_3005()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3006()
 {
     func_3008();
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3007()
 {
     if (!StatusModule(0x6))
@@ -49991,6 +50757,7 @@ void func_3007()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3008()
 {
     if (global18 == 0)
@@ -50022,6 +50789,7 @@ void func_3008()
     WorkModule(0x2710, 0x2100000d);
 }
 
+// [Copy: Wario 0x1A2] pre
 int func_3009()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -50029,6 +50797,7 @@ int func_3009()
     return 0;
 }
 
+// [Copy: Wario 0x1A2] main
 void func_3010()
 {
     WorkModule(0x7, 0x221, 0x11000002);
@@ -50038,17 +50807,20 @@ void func_3010()
     func_78(func_3011);
 }
 
+// [Copy: Wario 0x1A2] loop
 void func_3011()
 {
     func_3007();
     func_3054();
 }
 
+// [Copy: Wario 0x1A2] end
 void func_3012()
 {
     
 }
 
+// [Copy: Wario 0x1A3] pre
 int func_3013()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -50056,6 +50828,7 @@ int func_3013()
     return 0;
 }
 
+// [Copy: Wario 0x1A3] main
 void func_3014()
 {
     WorkModule(0x7, 0x225, 0x11000002);
@@ -50065,6 +50838,7 @@ void func_3014()
     func_78(func_3015);
 }
 
+// [Copy: Wario 0x1A3] loop
 void func_3015()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -50091,11 +50865,13 @@ void func_3015()
     func_3065();
 }
 
+// [Copy: Wario 0x1A3] end
 void func_3016()
 {
     
 }
 
+// [Copy: Wario 0x1A1] pre
 int func_3017()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -50103,6 +50879,7 @@ int func_3017()
     return 0;
 }
 
+// [Copy: Wario 0x1A1] main
 void func_3018()
 {
     WorkModule(0x7, 0x21d, 0x11000002);
@@ -50112,6 +50889,7 @@ void func_3018()
     func_78(func_3019);
 }
 
+// [Copy: Wario 0x1A1] loop
 void func_3019()
 {
     if (MotionModule(0x2712))
@@ -50123,11 +50901,13 @@ void func_3019()
     func_3054();
 }
 
+// [Copy: Wario 0x1A1] end
 void func_3020()
 {
     
 }
 
+// [Copy: Wario 0x1A6] pre
 int func_3021()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50135,6 +50915,7 @@ int func_3021()
     return 0;
 }
 
+// [Copy: Wario 0x1A6] main
 void func_3022()
 {
     WorkModule(0x7, 0x22d, 0x11000002);
@@ -50144,6 +50925,7 @@ void func_3022()
     func_78(func_3023);
 }
 
+// [Copy: Wario 0x1A6] loop
 void func_3023()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -50170,11 +50952,13 @@ void func_3023()
     func_3076();
 }
 
+// [Copy: Wario 0x1A6] end
 void func_3024()
 {
     
 }
 
+// [Copy: Wario 0x1A8] pre
 int func_3025()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50182,6 +50966,7 @@ int func_3025()
     return 0;
 }
 
+// [Copy: Wario 0x1A8] main
 void func_3026()
 {
     WorkModule(0x7, 0x235, 0x11000002);
@@ -50192,6 +50977,7 @@ void func_3026()
     func_78(func_3027);
 }
 
+// [Copy: Wario 0x1A8] loop
 void func_3027()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -50218,11 +51004,13 @@ void func_3027()
     func_3076();
 }
 
+// [Copy: Wario 0x1A8] end
 void func_3028()
 {
     
 }
 
+// [Copy: Wario 0x1A0] pre
 int func_3029()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50230,6 +51018,7 @@ int func_3029()
     return 0;
 }
 
+// [Copy: Wario 0x1A0] main
 void func_3030()
 {
     WorkModule(0x7, 0x219, 0x11000002);
@@ -50239,6 +51028,7 @@ void func_3030()
     func_78(func_3031);
 }
 
+// [Copy: Wario 0x1A0] loop
 void func_3031()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -50264,16 +51054,19 @@ void func_3031()
     func_3034();
 }
 
+// [Copy: Wario 0x1A0] end
 void func_3032()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3033()
 {
     func_3035();
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3034()
 {
     if (ControlModule(0x2712, 0x1))
@@ -50300,6 +51093,7 @@ void func_3034()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 void func_3035()
 {
     if (global18 == 0)
@@ -50331,6 +51125,7 @@ void func_3035()
     WorkModule(0x2710, 0x2100000d);
 }
 
+// [Copy: Wario 0x1A5] pre
 int func_3036()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50338,6 +51133,7 @@ int func_3036()
     return 0;
 }
 
+// [Copy: Wario 0x1A5] main
 void func_3037()
 {
     WorkModule(0x7, 0x229, 0x11000002);
@@ -50347,6 +51143,7 @@ void func_3037()
     func_78(func_3038);
 }
 
+// [Copy: Wario 0x1A5] loop
 void func_3038()
 {
     if (MotionModule(0x2712))
@@ -50369,11 +51166,13 @@ void func_3038()
     func_3076();
 }
 
+// [Copy: Wario 0x1A5] end
 void func_3039()
 {
     
 }
 
+// [Copy: Wario 0x1A4] pre
 int func_3040()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50381,6 +51180,7 @@ int func_3040()
     return 0;
 }
 
+// [Copy: Wario 0x1A4] main
 void func_3041()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -50388,6 +51188,7 @@ void func_3041()
     func_78(func_3042);
 }
 
+// [Copy: Wario 0x1A4] loop
 void func_3042()
 {
     if (MotionModule(0x2712))
@@ -50399,11 +51200,13 @@ void func_3042()
     func_3087();
 }
 
+// [Copy: Wario 0x1A4] end
 void func_3043()
 {
     
 }
 
+// [Copy: Wario 0x1A7] pre
 int func_3044()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -50411,6 +51214,7 @@ int func_3044()
     return 0;
 }
 
+// [Copy: Wario 0x1A7] main
 void func_3045()
 {
     WorkModule(0x7, 0x231, 0x11000002);
@@ -50420,6 +51224,7 @@ void func_3045()
     func_78(func_3046);
 }
 
+// [Copy: Wario 0x1A7] loop
 void func_3046()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -50446,11 +51251,13 @@ void func_3046()
     func_3076();
 }
 
+// [Copy: Wario 0x1A7] end
 void func_3047()
 {
     
 }
 
+// [Copy: Wario 0x19F] pre
 int func_3048()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x4);
@@ -50458,6 +51265,7 @@ int func_3048()
     return 0;
 }
 
+// [Copy: Wario 0x19F] main
 void func_3049()
 {
     WorkModule(0x7, WorkModule(0x6, 0x15000000), 0x11000004);
@@ -50475,6 +51283,7 @@ void func_3049()
     func_78(func_3050);
 }
 
+// [Copy: Wario 0x19F] loop
 void func_3050()
 {
     if (WorkModule(0x6, 0x11000005) <= 0)
@@ -50494,22 +51303,26 @@ void func_3050()
     func_3098();
 }
 
+// [Copy: Wario 0x19F] end
 void func_3051()
 {
     
 }
 
+// [Copy: Wario 0x19F] per-frame
 void func_3052()
 {
     WorkModule(0xa, 0x11000004);
     WorkModule(0xa, 0x11000005);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3053()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3054()
 {
     if (global3 == 0)
@@ -50526,56 +51339,67 @@ int func_3054()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3055()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3056()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3057()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3058()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3059()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3060()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3061()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3062()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3063()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3064()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3065()
 {
     if (global3 == 0)
@@ -50592,56 +51416,67 @@ int func_3065()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3066()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3067()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3068()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3069()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3070()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3071()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3072()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3073()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3074()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3075()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3076()
 {
     if (global3 == 0)
@@ -50658,56 +51493,67 @@ int func_3076()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3077()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3078()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3079()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3080()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3081()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3082()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3083()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3084()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3085()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3086()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3087()
 {
     if (global3 == 0)
@@ -50724,56 +51570,67 @@ int func_3087()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3088()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3089()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3090()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3091()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3092()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3093()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3094()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3095()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3096()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3097()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3098()
 {
     if (global3 == 0)
@@ -50790,51 +51647,61 @@ int func_3098()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3099()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3100()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3101()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3102()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wario
 int func_3103()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3104()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3105()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3106()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3107()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight
 int func_3108(int arg0)
 {
     if (0)
@@ -50864,6 +51731,7 @@ int func_3108(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight
 void func_3109(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -50875,6 +51743,7 @@ void func_3109(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight
 void func_3110(int arg0)
 {
     int var1;
@@ -50894,6 +51763,7 @@ void func_3110(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight
 void func_3111()
 {
     int var0;
@@ -50937,6 +51807,7 @@ void func_3111()
     }
 }
 
+// [Copy: Meta Knight 0x18F] pre
 int func_3112()
 {
     func_69();
@@ -50945,6 +51816,7 @@ int func_3112()
     return 0;
 }
 
+// [Copy: Meta Knight 0x18F] main
 void func_3113()
 {
     WorkModule(0x7, 0x211, 0x11000002);
@@ -50954,6 +51826,7 @@ void func_3113()
     func_78(func_3114);
 }
 
+// [Copy: Meta Knight 0x18F] loop
 void func_3114()
 {
     int var0;
@@ -50984,6 +51857,7 @@ void func_3114()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight
 void func_3115()
 {
     if (global18 == 0)
@@ -51014,11 +51888,13 @@ void func_3115()
     }
 }
 
+// [Copy: Meta Knight 0x18F] end
 void func_3116()
 {
     
 }
 
+// [Copy: Meta Knight 0x190] pre
 int func_3117()
 {
     StatusModule(0x5, 0x2, 0x65, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -51026,6 +51902,7 @@ int func_3117()
     return 0;
 }
 
+// [Copy: Meta Knight 0x190] main
 void func_3118()
 {
     WorkModule(0x7, WorkModule(0x6, 0x15000010), 0x11000005);
@@ -51040,6 +51917,7 @@ void func_3118()
     func_78(func_3119);
 }
 
+// [Copy: Meta Knight 0x190] loop  "status_SpecialNSpin_Main"
 void func_3119()
 {
     int var0;
@@ -51071,6 +51949,7 @@ void func_3119()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight  "_sub_mtrans_special_n_spin"
 void func_3120()
 {
     printf("_sub_mtrans_special_n_spin");
@@ -51087,11 +51966,13 @@ void func_3120()
     }
 }
 
+// [Copy: Meta Knight 0x190] end
 void func_3121()
 {
     
 }
 
+// [Copy: Meta Knight 0x190] per-frame  "GROUND_EFFECT_COUNTER:"
 void func_3122()
 {
     int var0;
@@ -51205,6 +52086,7 @@ void func_3122()
     }
 }
 
+// [Copy: Meta Knight 0x191] pre
 int func_3123()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -51212,6 +52094,7 @@ int func_3123()
     return 0;
 }
 
+// [Copy: Meta Knight 0x191] main  "status_SpecialNEnd"
 void func_3124()
 {
     printf("status_SpecialNEnd");
@@ -51227,6 +52110,7 @@ void func_3124()
     func_78(func_3125);
 }
 
+// [Copy: Meta Knight 0x191] loop  "status_SpecialNEnd_Main"
 void func_3125()
 {
     int var0;
@@ -51278,11 +52162,13 @@ void func_3125()
     WorkModule(0x9, 0x1100000b);
 }
 
+// [Copy: Meta Knight 0x191] end
 void func_3126()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Meta Knight  "wait_mtrans"
 int func_3127(int arg0)
 {
     int var1;
@@ -51304,6 +52190,7 @@ int func_3127(int arg0)
     return var1;
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 int func_3128(int arg0)
 {
     if (0)
@@ -51377,6 +52264,7 @@ int func_3128(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3129(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -51388,6 +52276,7 @@ void func_3129(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3130(int arg0)
 {
     int var1;
@@ -51407,6 +52296,7 @@ void func_3130(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Pit 0x1F7] pre
 int func_3131()
 {
     func_69();
@@ -51415,6 +52305,7 @@ int func_3131()
     return 0;
 }
 
+// [Copy: Pit 0x1F7] main
 void func_3132()
 {
     WorkModule(0x2710, 0x2100000e);
@@ -51423,6 +52314,7 @@ void func_3132()
     func_78(func_3133);
 }
 
+// [Copy: Pit 0x1F7] loop
 void func_3133()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -51436,6 +52328,7 @@ void func_3133()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3134()
 {
     if (global18 == 0)
@@ -51472,6 +52365,7 @@ void func_3134()
     }
 }
 
+// [Copy: Pit 0x1F7] end
 void func_3135()
 {
     int var0;
@@ -51488,6 +52382,7 @@ void func_3135()
     }
 }
 
+// [Copy: Pit 0x1F8] pre
 int func_3136()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -51495,11 +52390,13 @@ int func_3136()
     return 0;
 }
 
+// [Copy: Pit 0x1F8] per-frame
 void func_3137()
 {
     WorkModule(0x9, 0x11000002);
 }
 
+// [Copy: Pit 0x1F8] main
 void func_3138()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -51524,6 +52421,7 @@ void func_3138()
     func_78(func_3139);
 }
 
+// [Copy: Pit 0x1F8] loop
 void func_3139()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -51560,6 +52458,7 @@ void func_3139()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3140()
 {
     if (global18 == 0)
@@ -51596,11 +52495,13 @@ void func_3140()
     }
 }
 
+// [Copy: Pit 0x1F8] end
 void func_3141()
 {
     func_3135();
 }
 
+// [Copy: Pit 0x1F9] pre
 int func_3142()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -51608,6 +52509,7 @@ int func_3142()
     return 0;
 }
 
+// [Copy: Pit 0x1F9] main
 void func_3143()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -51627,6 +52529,7 @@ void func_3143()
     func_78(func_3144);
 }
 
+// [Copy: Pit 0x1F9] loop
 void func_3144()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -51645,6 +52548,7 @@ void func_3144()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3145()
 {
     if (global18 == 0)
@@ -51681,6 +52585,7 @@ void func_3145()
     }
 }
 
+// [Copy: Pit 0x1F9] end
 void func_3146()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -51694,6 +52599,7 @@ void func_3146()
     func_3135();
 }
 
+// [Copy: Pit 0x1FA] pre
 int func_3147()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -51701,12 +52607,14 @@ int func_3147()
     return 0;
 }
 
+// [Copy: Pit 0x1FA] main
 void func_3148()
 {
     PostureModule(0x2710);
     func_78(func_3149);
 }
 
+// [Copy: Pit 0x1FA] loop
 void func_3149()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -51720,6 +52628,7 @@ void func_3149()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3150()
 {
     if (global18 == 0)
@@ -51760,11 +52669,13 @@ void func_3150()
     }
 }
 
+// [Copy: Pit 0x1FA] end
 void func_3151()
 {
     func_3135();
 }
 
+// [Copy: Pit 0x1FB] pre
 int func_3152()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0);
@@ -51772,6 +52683,7 @@ int func_3152()
     return 0;
 }
 
+// [Copy: Pit 0x1FB] main
 void func_3153()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -51791,6 +52703,7 @@ void func_3153()
     func_78(func_3154);
 }
 
+// [Copy: Pit 0x1FB] loop
 void func_3154()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -51816,6 +52729,7 @@ void func_3154()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Pit
 void func_3155()
 {
     if (global18 == 0)
@@ -51856,11 +52770,13 @@ void func_3155()
     }
 }
 
+// [Copy: Pit 0x1FB] end
 void func_3156()
 {
     func_3135();
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 int func_3157(int arg0)
 {
     if (0)
@@ -51898,6 +52814,7 @@ int func_3157(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 void func_3158(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -51909,6 +52826,7 @@ void func_3158(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 void func_3159(int arg0)
 {
     int var1;
@@ -51928,6 +52846,7 @@ void func_3159(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Zero Suit Samus 0x1FD] pre
 int func_3160()
 {
     func_69();
@@ -51936,6 +52855,7 @@ int func_3160()
     return 0;
 }
 
+// [Copy: Zero Suit Samus 0x1FD] main  "SZeroSuit status_SpecialN"
 void func_3161()
 {
     printf("SZeroSuit status_SpecialN");
@@ -51954,6 +52874,7 @@ void func_3161()
     func_78(func_3162);
 }
 
+// [Copy: Zero Suit Samus 0x1FD] loop  "SZeroSuit status_SpecialN_Main"
 void func_3162()
 {
     printf("SZeroSuit status_SpecialN_Main");
@@ -51976,6 +52897,7 @@ void func_3162()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 void func_3163()
 {
     if (global18 == 0)
@@ -51992,11 +52914,13 @@ void func_3163()
     }
 }
 
+// [Copy: Zero Suit Samus 0x1FD] end  "SZeroSuit status_end_SpecialN"
 void func_3164()
 {
     printf("SZeroSuit status_end_SpecialN");
 }
 
+// [Copy: Zero Suit Samus 0x200] pre
 int func_3165()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0, 0, 0, 0);
@@ -52004,6 +52928,7 @@ int func_3165()
     return 0;
 }
 
+// [Copy: Zero Suit Samus 0x200] main  "SZeroSuit status_SpecialNLanding_Main"
 void func_3166()
 {
     printf("SZeroSuit status_SpecialNLanding_Main");
@@ -52011,6 +52936,7 @@ void func_3166()
     func_78(func_3167);
 }
 
+// [Copy: Zero Suit Samus 0x200] loop
 void func_3167()
 {
     if (MotionModule(0x2712))
@@ -52028,11 +52954,13 @@ void func_3167()
     }
 }
 
+// [Copy: Zero Suit Samus 0x200] end  "SZeroSuit status_end_SpecialNLanding"
 void func_3168()
 {
     printf("SZeroSuit status_end_SpecialNLanding");
 }
 
+// [Copy: Zero Suit Samus 0x1FE] pre
 int func_3169()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0, 0, 0);
@@ -52040,6 +52968,7 @@ int func_3169()
     return 0;
 }
 
+// [Copy: Zero Suit Samus 0x1FE] main  "SZeroSuit status_SpecialNShoot"
 void func_3170()
 {
     printf("SZeroSuit status_SpecialNShoot");
@@ -52058,6 +52987,7 @@ void func_3170()
     func_78(func_3171);
 }
 
+// [Copy: Zero Suit Samus 0x1FE] loop  "SZeroSuit status_SpecialNShoot_Main"
 void func_3171()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -52084,6 +53014,7 @@ void func_3171()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 void func_3172()
 {
     if (global18 == 0)
@@ -52108,11 +53039,13 @@ void func_3172()
     }
 }
 
+// [Copy: Zero Suit Samus 0x1FE] end  "SZeroSuit status_end_SpecialNShoot"
 void func_3173()
 {
     printf("SZeroSuit status_end_SpecialNShoot");
 }
 
+// [Copy: Zero Suit Samus 0x1FF] pre
 int func_3174()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -52120,6 +53053,7 @@ int func_3174()
     return 0;
 }
 
+// [Copy: Zero Suit Samus 0x1FF] main  "SZeroSuit status_SpecialNShootH"
 void func_3175()
 {
     float var0;
@@ -52140,6 +53074,7 @@ void func_3175()
     func_78(func_3176);
 }
 
+// [Copy: Zero Suit Samus 0x1FF] loop  "SZeroSuit status_SpecialNShootH_Main"
 void func_3176()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -52164,6 +53099,7 @@ void func_3176()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Zero Suit Samus
 void func_3177()
 {
     if (global18 == 0)
@@ -52188,16 +53124,19 @@ void func_3177()
     }
 }
 
+// [Copy: Zero Suit Samus 0x1FF] end  "SZeroSuit status_end_SpecialNShootH"
 void func_3178()
 {
     printf("SZeroSuit status_end_SpecialNShootH");
 }
 
+// [Copy: shared] helper used by Kirby, Olimar
 int func_3179(int arg0)
 {
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Olimar
 void func_3180(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -52208,6 +53147,7 @@ void func_3180(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3181(int arg0)
 {
     int var1;
@@ -52226,6 +53166,7 @@ void func_3181(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Olimar 0x1E6] pre
 int func_3182()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x2, 0, 0x1, 0, 0, 0, 0);
@@ -52233,6 +53174,7 @@ int func_3182()
     return 0;
 }
 
+// [Copy: Olimar 0x1E6] main
 void func_3183()
 {
     if (global18 == 0)
@@ -52250,6 +53192,7 @@ void func_3183()
     func_78(func_3184);
 }
 
+// [Copy: Olimar 0x1E6] loop
 void func_3184()
 {
     if (MotionModule(0x2712))
@@ -52272,11 +53215,13 @@ void func_3184()
     }
 }
 
+// [Copy: Olimar 0x1E6] end
 void func_3185()
 {
     ArticleModule(0x2712, 0);
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 int func_3186(int arg0)
 {
     if (0)
@@ -52326,6 +53271,7 @@ int func_3186(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3187(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -52337,6 +53283,7 @@ void func_3187(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3188(int arg0)
 {
     int var1;
@@ -52357,6 +53304,7 @@ void func_3188(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Diddy Kong 0x1CD] pre
 void func_3189()
 {
     func_69();
@@ -52364,6 +53312,7 @@ void func_3189()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1192, 0x1000, 0x80, 0x1000);
 }
 
+// [Copy: Diddy Kong 0x1CD] main
 void func_3190()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52371,6 +53320,7 @@ void func_3190()
     func_78(func_3191);
 }
 
+// [Copy: Diddy Kong 0x1CD] loop
 void func_3191()
 {
     if (func_56())
@@ -52397,6 +53347,7 @@ void func_3191()
     }
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3192()
 {
     if (global18 == 0)
@@ -52429,11 +53380,13 @@ void func_3192()
     }
 }
 
+// [Copy: Diddy Kong 0x1CD] end
 void func_3193()
 {
     
 }
 
+// [Copy: Diddy Kong 0x1CE] pre
 int func_3194()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -52441,6 +53394,7 @@ int func_3194()
     return 0;
 }
 
+// [Copy: Diddy Kong 0x1CE] main
 void func_3195()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52448,6 +53402,7 @@ void func_3195()
     func_78(func_3196);
 }
 
+// [Copy: Diddy Kong 0x1CE] loop
 void func_3196()
 {
     float var0;
@@ -52483,6 +53438,7 @@ void func_3196()
     }
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3197()
 {
     if (global18 == 0)
@@ -52515,11 +53471,13 @@ void func_3197()
     }
 }
 
+// [Copy: Diddy Kong 0x1CE] end
 void func_3198()
 {
     
 }
 
+// [Copy: Diddy Kong 0x1CF] pre
 int func_3199()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -52527,6 +53485,7 @@ int func_3199()
     return 0;
 }
 
+// [Copy: Diddy Kong 0x1CF] main
 void func_3200()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52534,6 +53493,7 @@ void func_3200()
     func_78(func_3201);
 }
 
+// [Copy: Diddy Kong 0x1CF] loop
 void func_3201()
 {
     if (func_56())
@@ -52560,6 +53520,7 @@ void func_3201()
     }
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3202()
 {
     if (global18 == 0)
@@ -52592,11 +53553,13 @@ void func_3202()
     }
 }
 
+// [Copy: Diddy Kong 0x1CF] end
 void func_3203()
 {
     
 }
 
+// [Copy: Diddy Kong 0x1D0] pre
 int func_3204()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -52604,6 +53567,7 @@ int func_3204()
     return 0;
 }
 
+// [Copy: Diddy Kong 0x1D0] main
 void func_3205()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52612,6 +53576,7 @@ void func_3205()
     func_78(func_3206);
 }
 
+// [Copy: Diddy Kong 0x1D0] loop
 void func_3206()
 {
     float var0;
@@ -52637,6 +53602,7 @@ void func_3206()
     }
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3207()
 {
     if (global18 == 0)
@@ -52669,11 +53635,13 @@ void func_3207()
     }
 }
 
+// [Copy: Diddy Kong 0x1D0] end
 void func_3208()
 {
     
 }
 
+// [Copy: Diddy Kong 0x1D1] pre
 int func_3209()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -52681,6 +53649,7 @@ int func_3209()
     return 0;
 }
 
+// [Copy: Diddy Kong 0x1D1] main
 void func_3210()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52688,6 +53657,7 @@ void func_3210()
     func_78(func_3211);
 }
 
+// [Copy: Diddy Kong 0x1D1] loop
 void func_3211()
 {
     if (func_56())
@@ -52714,6 +53684,7 @@ void func_3211()
     }
 }
 
+// [Copy: shared] helper used by Diddy Kong, Kirby
 void func_3212()
 {
     if (global18 == 0)
@@ -52746,11 +53717,13 @@ void func_3212()
     }
 }
 
+// [Copy: Diddy Kong 0x1D1] end
 void func_3213()
 {
     
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 int func_3214(int arg0)
 {
     if (0)
@@ -52876,6 +53849,7 @@ int func_3214(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3215(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -52887,6 +53861,7 @@ void func_3215(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3216(int arg0)
 {
     int var1;
@@ -52906,6 +53881,7 @@ void func_3216(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3217()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -52914,6 +53890,7 @@ void func_3217()
     }
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3218()
 {
     if (global18 == 0)
@@ -52950,6 +53927,7 @@ void func_3218()
     }
 }
 
+// [Copy: King Dedede 0x1D3] pre
 int func_3219()
 {
     func_69();
@@ -52958,6 +53936,7 @@ int func_3219()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D3] main
 void func_3220()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -52968,6 +53947,7 @@ void func_3220()
     func_78(func_3221);
 }
 
+// [Copy: King Dedede 0x1D3] loop
 void func_3221()
 {
     if (MotionModule(0x2712))
@@ -52978,11 +53958,13 @@ void func_3221()
     func_3217();
 }
 
+// [Copy: King Dedede 0x1D3] end
 void func_3222()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: King Dedede 0x1D4] pre
 int func_3223()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x800000, 0x100, 0, 0);
@@ -52990,6 +53972,7 @@ int func_3223()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D4] main
 void func_3224()
 {
     float var0;
@@ -53016,6 +53999,7 @@ void func_3224()
     func_78(func_3225);
 }
 
+// [Copy: King Dedede 0x1D4] loop
 void func_3225()
 {
     int var0;
@@ -53058,6 +54042,7 @@ void func_3225()
     }
 }
 
+// [Copy: King Dedede 0x1D4] per-frame
 void func_3226()
 {
     WorkModule(0xa, 0x11000004);
@@ -53067,11 +54052,13 @@ void func_3226()
     }
 }
 
+// [Copy: King Dedede 0x1D4] end
 void func_3227()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: King Dedede 0x1D5] pre
 int func_3228()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53079,6 +54066,7 @@ int func_3228()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D5] main
 void func_3229()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -53089,6 +54077,7 @@ void func_3229()
     func_78(func_3230);
 }
 
+// [Copy: King Dedede 0x1D5] loop
 void func_3230()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -53117,11 +54106,13 @@ void func_3230()
     }
 }
 
+// [Copy: King Dedede 0x1D5] end
 void func_3231()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: King Dedede 0x1D6] pre
 int func_3232()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53129,6 +54120,7 @@ int func_3232()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D6] main
 void func_3233()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -53138,16 +54130,19 @@ void func_3233()
     func_78(func_3234);
 }
 
+// [Copy: King Dedede 0x1D6] loop
 void func_3234()
 {
     func_3217();
 }
 
+// [Copy: King Dedede 0x1D6] end
 void func_3235()
 {
     
 }
 
+// [Copy: King Dedede 0x1D7] pre
 int func_3236()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53155,6 +54150,7 @@ int func_3236()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D7] main
 void func_3237()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -53165,6 +54161,7 @@ void func_3237()
     func_78(func_3238);
 }
 
+// [Copy: King Dedede 0x1D7] loop
 void func_3238()
 {
     if (MotionModule(0x2712))
@@ -53189,11 +54186,13 @@ void func_3238()
     }
 }
 
+// [Copy: King Dedede 0x1D7] end
 void func_3239()
 {
     
 }
 
+// [Copy: King Dedede 0x1D8] pre
 int func_3240()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53201,11 +54200,13 @@ int func_3240()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D8] per-frame
 void func_3241()
 {
     WorkModule(0xa, 0x11000007);
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3242()
 {
     if (ControlModule(0x2710, 0x2))
@@ -53232,6 +54233,7 @@ void func_3242()
     }
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3243()
 {
     if (global32 <= WorkModuleF(0, 0x2000066))
@@ -53247,6 +54249,7 @@ void func_3243()
     }
 }
 
+// [Copy: King Dedede 0x1D8] main
 void func_3244()
 {
     BattleObject(0x3ea, 0);
@@ -53259,6 +54262,7 @@ void func_3244()
     func_78(func_3245);
 }
 
+// [Copy: King Dedede 0x1D8] loop
 void func_3245()
 {
     if (global18 == 0x2)
@@ -53304,11 +54308,13 @@ void func_3245()
     }
 }
 
+// [Copy: King Dedede 0x1D8] end
 void func_3246()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1D9] pre
 int func_3247()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53316,6 +54322,7 @@ int func_3247()
     return 0;
 }
 
+// [Copy: King Dedede 0x1D9] main
 void func_3248()
 {
     BattleObject(0x3ea, 0);
@@ -53328,6 +54335,7 @@ void func_3248()
     func_78(func_3249);
 }
 
+// [Copy: King Dedede 0x1D9] loop
 void func_3249()
 {
     if (global18 == 0)
@@ -53357,11 +54365,13 @@ void func_3249()
     }
 }
 
+// [Copy: King Dedede 0x1D9] end
 void func_3250()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DA] pre
 int func_3251()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53369,6 +54379,7 @@ int func_3251()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DA] main
 void func_3252()
 {
     BattleObject(0x3ea, 0);
@@ -53381,6 +54392,7 @@ void func_3252()
     func_78(func_3253);
 }
 
+// [Copy: King Dedede 0x1DA] loop
 void func_3253()
 {
     if (global18 == 0)
@@ -53405,11 +54417,13 @@ void func_3253()
     }
 }
 
+// [Copy: King Dedede 0x1DA] end
 void func_3254()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DB] pre
 int func_3255()
 {
     StatusModule(0x5, 0, 0xe, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53417,6 +54431,7 @@ int func_3255()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DB] main
 void func_3256()
 {
     BattleObject(0x3ea, 0);
@@ -53428,6 +54443,7 @@ void func_3256()
     func_78(func_3257);
 }
 
+// [Copy: King Dedede 0x1DB] loop
 void func_3257()
 {
     if (global18 == 0x2)
@@ -53470,11 +54486,13 @@ void func_3257()
     }
 }
 
+// [Copy: King Dedede 0x1DB] end
 void func_3258()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DC] pre
 int func_3259()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53482,6 +54500,7 @@ int func_3259()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DC] main
 void func_3260()
 {
     BattleObject(0x3ea, 0);
@@ -53494,6 +54513,7 @@ void func_3260()
     func_78(func_3261);
 }
 
+// [Copy: King Dedede 0x1DC] loop
 void func_3261()
 {
     if (global18 == 0x2)
@@ -53516,11 +54536,13 @@ void func_3261()
     }
 }
 
+// [Copy: King Dedede 0x1DC] end
 void func_3262()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DD] pre
 int func_3263()
 {
     StatusModule(0x5, 0x2, 0x32, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53528,6 +54550,7 @@ int func_3263()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DD] main
 void func_3264()
 {
     BattleObject(0x3ea, 0);
@@ -53540,6 +54563,7 @@ void func_3264()
     func_78(func_3265);
 }
 
+// [Copy: King Dedede 0x1DD] loop
 void func_3265()
 {
     if (MotionModule(0x2712))
@@ -53572,11 +54596,13 @@ void func_3265()
     }
 }
 
+// [Copy: King Dedede 0x1DD] end
 void func_3266()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DE] pre
 int func_3267()
 {
     StatusModule(0x5, 0x2, 0, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53584,6 +54610,7 @@ int func_3267()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DE] main
 void func_3268()
 {
     BattleObject(0x3ea, 0);
@@ -53596,6 +54623,7 @@ void func_3268()
     func_78(func_3269);
 }
 
+// [Copy: King Dedede 0x1DE] loop
 void func_3269()
 {
     if (global18 == 0)
@@ -53620,11 +54648,13 @@ void func_3269()
     }
 }
 
+// [Copy: King Dedede 0x1DE] end
 void func_3270()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1DF] pre
 int func_3271()
 {
     StatusModule(0x5, 0xffffffff, 0xa, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53632,6 +54662,7 @@ int func_3271()
     return 0;
 }
 
+// [Copy: King Dedede 0x1DF] main
 void func_3272()
 {
     BattleObject(0x3ea, 0);
@@ -53650,6 +54681,7 @@ void func_3272()
     func_78(func_3273);
 }
 
+// [Copy: King Dedede 0x1DF] loop
 void func_3273()
 {
     if (WorkModule(0x15, 0x1e00009a))
@@ -53675,11 +54707,13 @@ void func_3273()
     }
 }
 
+// [Copy: King Dedede 0x1DF] end
 void func_3274()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1E0] pre
 int func_3275()
 {
     StatusModule(0x5, 0xffffffff, 0xa, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53687,6 +54721,7 @@ int func_3275()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E0] main
 void func_3276()
 {
     BattleObject(0x3ea, 0);
@@ -53705,6 +54740,7 @@ void func_3276()
     func_78(func_3277);
 }
 
+// [Copy: King Dedede 0x1E0] loop
 void func_3277()
 {
     if (WorkModule(0x15, 0x1e00009a))
@@ -53730,11 +54766,13 @@ void func_3277()
     }
 }
 
+// [Copy: King Dedede 0x1E0] end
 void func_3278()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1E1] pre
 int func_3279()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53742,6 +54780,7 @@ int func_3279()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E1] main
 void func_3280()
 {
     BattleObject(0x3ea, 0);
@@ -53755,6 +54794,7 @@ void func_3280()
     func_78(func_3281);
 }
 
+// [Copy: King Dedede 0x1E1] loop
 void func_3281()
 {
     if (global18 == 0x2)
@@ -53772,11 +54812,13 @@ void func_3281()
     }
 }
 
+// [Copy: King Dedede 0x1E1] end
 void func_3282()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1E2] pre
 int func_3283()
 {
     StatusModule(0x5, 0, 0x6, 0x1, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53784,6 +54826,7 @@ int func_3283()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E2] main
 void func_3284()
 {
     BattleObject(0x3ea, 0);
@@ -53798,6 +54841,7 @@ void func_3284()
     func_78(func_3285);
 }
 
+// [Copy: King Dedede 0x1E2] loop
 void func_3285()
 {
     if (global18 == 0x2)
@@ -53812,11 +54856,13 @@ void func_3285()
     }
 }
 
+// [Copy: King Dedede 0x1E2] end
 void func_3286()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1E3] pre
 int func_3287()
 {
     StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53824,6 +54870,7 @@ int func_3287()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E3] main
 void func_3288()
 {
     BattleObject(0x3ea, 0);
@@ -53836,6 +54883,7 @@ void func_3288()
     func_78(func_3289);
 }
 
+// [Copy: King Dedede 0x1E3] loop
 void func_3289()
 {
     if (global18 == 0)
@@ -53850,11 +54898,13 @@ void func_3289()
     }
 }
 
+// [Copy: King Dedede 0x1E3] end
 void func_3290()
 {
     BattleObject(0x3ea, 0x1);
 }
 
+// [Copy: King Dedede 0x1E4] pre
 int func_3291()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x800000, 0x100, 0, 0x20);
@@ -53862,12 +54912,14 @@ int func_3291()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E4] main
 void func_3292()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_3293);
 }
 
+// [Copy: King Dedede 0x1E4] loop
 void func_3293()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -53893,11 +54945,13 @@ void func_3293()
     func_3217();
 }
 
+// [Copy: King Dedede 0x1E4] end
 void func_3294()
 {
     
 }
 
+// [Copy: King Dedede 0x1E5] pre
 int func_3295()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -53905,6 +54959,7 @@ int func_3295()
     return 0;
 }
 
+// [Copy: King Dedede 0x1E5] main
 void func_3296()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -53913,6 +54968,7 @@ void func_3296()
     func_78(func_3297);
 }
 
+// [Copy: King Dedede 0x1E5] loop
 void func_3297()
 {
     int var0;
@@ -53959,6 +55015,7 @@ void func_3297()
     }
 }
 
+// [Copy: shared] helper used by King Dedede, Kirby
 void func_3298()
 {
     if (global18 == 0)
@@ -53994,11 +55051,13 @@ void func_3298()
     }
 }
 
+// [Copy: King Dedede 0x1E5] end
 void func_3299()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3300(int arg0)
 {
     if (0)
@@ -54048,6 +55107,7 @@ int func_3300(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3301(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -54059,6 +55119,7 @@ void func_3301(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3302(int arg0)
 {
     int var1;
@@ -54078,6 +55139,7 @@ void func_3302(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Ike 0x1BC] pre
 int func_3303()
 {
     func_69();
@@ -54086,6 +55148,7 @@ int func_3303()
     return 0;
 }
 
+// [Copy: Ike 0x1BD] pre
 int func_3304()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -54093,6 +55156,7 @@ int func_3304()
     return 0;
 }
 
+// [Copy: Ike 0x1BE] pre
 int func_3305()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -54100,6 +55164,7 @@ int func_3305()
     return 0;
 }
 
+// [Copy: Ike 0x1BF] pre
 int func_3306()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -54107,6 +55172,7 @@ int func_3306()
     return 0;
 }
 
+// [Copy: Ike 0x1C0] pre
 int func_3307()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -54114,6 +55180,7 @@ int func_3307()
     return 0;
 }
 
+// [Copy: Ike 0x1BC] main
 void func_3308()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -54122,6 +55189,7 @@ void func_3308()
     func_78(func_3309);
 }
 
+// [Copy: Ike 0x1BC] loop
 void func_3309()
 {
     if (MotionModule(0x2712))
@@ -54147,6 +55215,7 @@ void func_3309()
     func_3330();
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3310()
 {
     if (global18 == 0)
@@ -54177,6 +55246,7 @@ void func_3310()
     }
 }
 
+// [Copy: Ike 0x1BD] main
 void func_3311()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -54189,6 +55259,7 @@ void func_3311()
     func_78(func_3312);
 }
 
+// [Copy: Ike 0x1BD] loop
 void func_3312()
 {
     float var0;
@@ -54235,6 +55306,7 @@ void func_3312()
     func_3342();
 }
 
+// [Copy: Ike 0x1BD] per-frame
 void func_3313()
 {
     float var0;
@@ -54248,6 +55320,7 @@ void func_3313()
     }
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3314()
 {
     float var0;
@@ -54282,6 +55355,7 @@ void func_3314()
     }
 }
 
+// [Copy: Ike 0x1BE] main
 void func_3315()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -54289,6 +55363,7 @@ void func_3315()
     func_78(func_3316);
 }
 
+// [Copy: Ike 0x1BE] loop
 void func_3316()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -54318,6 +55393,7 @@ void func_3316()
     func_3353();
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3317()
 {
     if (global18 == 0)
@@ -54350,6 +55426,7 @@ void func_3317()
     }
 }
 
+// [Copy: Ike 0x1BF] main
 void func_3318()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -54357,6 +55434,7 @@ void func_3318()
     func_78(func_3319);
 }
 
+// [Copy: Ike 0x1BF] loop
 void func_3319()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -54386,6 +55464,7 @@ void func_3319()
     func_3364();
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3320()
 {
     if (global18 == 0)
@@ -54418,6 +55497,7 @@ void func_3320()
     }
 }
 
+// [Copy: Ike 0x1C0] main
 void func_3321()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -54425,6 +55505,7 @@ void func_3321()
     func_78(func_3322);
 }
 
+// [Copy: Ike 0x1C0] loop
 void func_3322()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -54454,6 +55535,7 @@ void func_3322()
     func_3375();
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 void func_3323()
 {
     if (global18 == 0)
@@ -54486,31 +55568,37 @@ void func_3323()
     }
 }
 
+// [Copy: Ike 0x1BC] end
 void func_3324()
 {
     
 }
 
+// [Copy: Ike 0x1BD] end
 void func_3325()
 {
     
 }
 
+// [Copy: Ike 0x1BE] end
 void func_3326()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: Ike 0x1BF] end
 void func_3327()
 {
     
 }
 
+// [Copy: Ike 0x1C0] end
 void func_3328()
 {
     
 }
 
+// [Copy: Ike 0x1BC] init
 void func_3329()
 {
     float var0;
@@ -54551,6 +55639,7 @@ void func_3329()
     sys_35(0x1, 0);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3330()
 {
     if (global3 == 0)
@@ -54567,6 +55656,7 @@ int func_3330()
     return 0;
 }
 
+// [Copy: Ike 0x1BC] exec
 void func_3331()
 {
     int var0;
@@ -54601,46 +55691,55 @@ void func_3331()
     }
 }
 
+// [Copy: Ike 0x1BC] exec (hitlag)
 void func_3332()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3333()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3334()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3335()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3336()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3337()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3338()
 {
     
 }
 
+// [Copy: Ike 0x1BC] exit
 void func_3339()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3340()
 {
     int var0;
@@ -54652,6 +55751,7 @@ int func_3340()
     return var0;
 }
 
+// [Copy: Ike 0x1BD] init
 void func_3341()
 {
     int var0;
@@ -54668,6 +55768,7 @@ void func_3341()
     SoundModule(0x2717, var2);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3342()
 {
     if (global3 == 0)
@@ -54684,6 +55785,7 @@ int func_3342()
     return 0;
 }
 
+// [Copy: Ike 0x1BD] exec
 void func_3343()
 {
     int var0;
@@ -54732,41 +55834,49 @@ void func_3343()
     }
 }
 
+// [Copy: Ike 0x1BD] exec (hitlag)
 void func_3344()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3345()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3346()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3347()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3348()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3349()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3350()
 {
     
 }
 
+// [Copy: Ike 0x1BD] exit
 void func_3351()
 {
     int var0;
@@ -54777,11 +55887,13 @@ void func_3351()
     }
 }
 
+// [Copy: Ike 0x1BE] init
 void func_3352()
 {
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3353()
 {
     if (global3 == 0)
@@ -54798,26 +55910,31 @@ int func_3353()
     return 0;
 }
 
+// [Copy: Ike 0x1BE] exec
 void func_3354()
 {
     
 }
 
+// [Copy: Ike 0x1BE] exec (hitlag)
 void func_3355()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3356()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3357()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3358()
 {
     int var0;
@@ -54844,31 +55961,37 @@ int func_3358()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3359()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3360()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3361()
 {
     
 }
 
+// [Copy: Ike 0x1BE] exit
 void func_3362()
 {
     
 }
 
+// [Copy: Ike 0x1BF] init
 void func_3363()
 {
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3364()
 {
     if (global3 == 0)
@@ -54885,26 +56008,31 @@ int func_3364()
     return 0;
 }
 
+// [Copy: Ike 0x1BF] exec
 void func_3365()
 {
     
 }
 
+// [Copy: Ike 0x1BF] exec (hitlag)
 void func_3366()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3367()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3368()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3369()
 {
     float var0;
@@ -54920,31 +56048,37 @@ int func_3369()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3370()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3371()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3372()
 {
     
 }
 
+// [Copy: Ike 0x1BF] exit
 void func_3373()
 {
     
 }
 
+// [Copy: Ike 0x1C0] init
 void func_3374()
 {
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3375()
 {
     if (global3 == 0)
@@ -54961,26 +56095,31 @@ int func_3375()
     return 0;
 }
 
+// [Copy: Ike 0x1C0] exec
 void func_3376()
 {
     
 }
 
+// [Copy: Ike 0x1C0] exec (hitlag)
 void func_3377()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3378()
 {
     
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3379()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Ike, Kirby
 int func_3380()
 {
     float var0;
@@ -54996,26 +56135,31 @@ int func_3380()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3381()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3382()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3383()
 {
     
 }
 
+// [Copy: Ike 0x1C0] exit
 void func_3384()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 int func_3385(int arg0)
 {
     if (0)
@@ -55057,6 +56201,7 @@ int func_3385(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3386(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -55068,6 +56213,7 @@ void func_3386(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3387(int arg0)
 {
     int var1;
@@ -55087,24 +56233,28 @@ void func_3387(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3388()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3389()
 {
     func_20(0);
     GroundModule(0x2710, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3390()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3391()
 {
     if (!WorkModule(0x10, 0x20000079))
@@ -55118,6 +56268,7 @@ void func_3391()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3392()
 {
     if (!WorkModule(0x10, 0x20000079))
@@ -55131,6 +56282,7 @@ void func_3392()
     }
 }
 
+// [Copy: Lucario 0x1EB] pre
 int func_3393()
 {
     func_69();
@@ -55139,6 +56291,7 @@ int func_3393()
     return 0;
 }
 
+// [Copy: Lucario 0x1EB] main
 void func_3394()
 {
     int var0;
@@ -55164,6 +56317,7 @@ void func_3394()
     func_78(func_3395);
 }
 
+// [Copy: Lucario 0x1EB] loop
 void func_3395()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -55205,6 +56359,7 @@ void func_3395()
     }
 }
 
+// [Copy: Lucario 0x1EB] per-frame
 void func_3396()
 {
     if (MotionModuleF(0x1) > 0 && ControlModule(0x2710, 0x1))
@@ -55214,6 +56369,7 @@ void func_3396()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3397()
 {
     if (global18 == 0)
@@ -55230,17 +56386,20 @@ void func_3397()
     }
 }
 
+// [Copy: Lucario 0x1EB] end
 void func_3398()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3399()
 {
     WorkModule(0x16, 0x1e000027);
     WorkModule(0x16, 0x1e000028);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 int func_3400()
 {
     if (global18 == 0)
@@ -55265,6 +56424,7 @@ int func_3400()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3401()
 {
     WorkModule(0x19, 0x1f000005);
@@ -55273,6 +56433,7 @@ void func_3401()
     WorkModule(0x1a, 0x1f00000d);
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3402()
 {
     WorkModule(0x1a, 0x1f000005);
@@ -55281,6 +56442,7 @@ void func_3402()
     WorkModule(0x19, 0x1f00000d);
 }
 
+// [Copy: Lucario 0x1EC] pre
 int func_3403()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -55288,6 +56450,7 @@ int func_3403()
     return 0;
 }
 
+// [Copy: Lucario 0x1EC] main
 void func_3404()
 {
     float var0;
@@ -55326,6 +56489,7 @@ void func_3404()
     func_78(func_3405);
 }
 
+// [Copy: Lucario 0x1EC] loop
 void func_3405()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -55367,6 +56531,7 @@ void func_3405()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3406()
 {
     if (global18 == 0)
@@ -55385,11 +56550,13 @@ void func_3406()
     }
 }
 
+// [Copy: Lucario 0x1EC] end
 void func_3407()
 {
     
 }
 
+// [Copy: Lucario 0x1ED] pre
 int func_3408()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -55397,6 +56564,7 @@ int func_3408()
     return 0;
 }
 
+// [Copy: Lucario 0x1ED] main
 void func_3409()
 {
     WorkModule(0x2711, 0x20000079);
@@ -55408,6 +56576,7 @@ void func_3409()
     func_78(func_3410);
 }
 
+// [Copy: Lucario 0x1ED] loop
 void func_3410()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -55444,6 +56613,7 @@ void func_3410()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3411()
 {
     if (global18 == 0)
@@ -55462,11 +56632,13 @@ void func_3411()
     }
 }
 
+// [Copy: Lucario 0x1ED] end
 void func_3412()
 {
     
 }
 
+// [Copy: Lucario 0x1EE] pre
 int func_3413()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -55474,6 +56646,7 @@ int func_3413()
     return 0;
 }
 
+// [Copy: Lucario 0x1EE] main
 void func_3414()
 {
     WorkModule(0x2711, 0x20000079);
@@ -55483,6 +56656,7 @@ void func_3414()
     func_78(func_3415);
 }
 
+// [Copy: Lucario 0x1EE] loop
 void func_3415()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -55515,6 +56689,7 @@ void func_3415()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucario
 void func_3416()
 {
     if (global18 == 0)
@@ -55531,11 +56706,13 @@ void func_3416()
     }
 }
 
+// [Copy: Lucario 0x1EE] end
 void func_3417()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, R.O.B.
 int func_3418(int arg0)
 {
     if (0)
@@ -55553,6 +56730,7 @@ int func_3418(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, R.O.B.
 void func_3419(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -55564,6 +56742,7 @@ void func_3419(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, R.O.B.
 void func_3420(int arg0)
 {
     int var1;
@@ -55583,6 +56762,7 @@ void func_3420(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: R.O.B. 0x1D2] pre
 int func_3421()
 {
     func_69();
@@ -55591,6 +56771,7 @@ int func_3421()
     return 0;
 }
 
+// [Copy: R.O.B. 0x1D2] main
 void func_3422()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -55604,6 +56785,7 @@ void func_3422()
     func_78(func_3423);
 }
 
+// [Copy: R.O.B. 0x1D2] loop
 void func_3423()
 {
     int var0;
@@ -55665,6 +56847,7 @@ void func_3423()
     }
 }
 
+// [Copy: R.O.B. 0x1D2] per-frame
 void func_3424()
 {
     if (WorkModule(0x10, 0x21000010))
@@ -55684,11 +56867,13 @@ void func_3424()
     }
 }
 
+// [Copy: R.O.B. 0x1D2] end
 void func_3425()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 int func_3426(int arg0)
 {
     if (0)
@@ -55722,6 +56907,7 @@ int func_3426(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 void func_3427(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -55733,6 +56919,7 @@ void func_3427(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 void func_3428(int arg0)
 {
     int var1;
@@ -55752,6 +56939,7 @@ void func_3428(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 int func_3429()
 {
     if (StatusModule(0x6) != 0 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -55761,6 +56949,7 @@ int func_3429()
     return 0;
 }
 
+// [Copy: Toon Link 0x1EA] pre
 int func_3430()
 {
     func_69();
@@ -55769,6 +56958,7 @@ int func_3430()
     return 0;
 }
 
+// [Copy: Toon Link 0x1EA] main  "status_special_n"
 void func_3431()
 {
     printf("status_special_n");
@@ -55782,6 +56972,7 @@ void func_3431()
     func_78(func_3442);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 int func_3432()
 {
     if (StatusModule(0x6) == 0x1)
@@ -55811,6 +57002,7 @@ int func_3432()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_change_step"
 void func_3433()
 {
     int var0;
@@ -55847,6 +57039,7 @@ void func_3433()
     callFunc3(func_3442);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_ground_start"
 void func_3434(int arg0)
 {
     printf("sub_special_n_wait_ground_start");
@@ -55860,6 +57053,7 @@ void func_3434(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_ground_hold"
 void func_3435(int arg0)
 {
     printf("sub_special_n_wait_ground_hold");
@@ -55873,6 +57067,7 @@ void func_3435(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_ground_end"
 void func_3436(int arg0)
 {
     printf("sub_special_n_wait_ground_end");
@@ -55894,6 +57089,7 @@ void func_3436(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_air_start"
 void func_3437(int arg0)
 {
     printf("sub_special_n_wait_air_start");
@@ -55907,6 +57103,7 @@ void func_3437(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_air_hold"
 void func_3438(int arg0)
 {
     printf("sub_special_n_wait_air_hold");
@@ -55920,6 +57117,7 @@ void func_3438(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "sub_special_n_wait_air_end"
 void func_3439(int arg0)
 {
     printf("sub_special_n_wait_air_end");
@@ -55941,6 +57139,7 @@ void func_3439(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "status_special_n_ground_main"
 void func_3440()
 {
     int var0;
@@ -56006,6 +57205,7 @@ void func_3440()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "status_special_n_air_main"
 void func_3441()
 {
     int var0;
@@ -56071,6 +57271,7 @@ void func_3441()
     }
 }
 
+// [Copy: Toon Link 0x1EA] loop  "status_special_n_main"
 void func_3442()
 {
     printf("status_special_n_main");
@@ -56097,6 +57298,7 @@ void func_3442()
     func_3447();
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link  "status_special_n_main_loop"
 void func_3443()
 {
     printf("status_special_n_main_loop");
@@ -56111,6 +57313,7 @@ void func_3443()
     func_3447();
 }
 
+// [Copy: Toon Link 0x1EA] end
 void func_3444()
 {
     int var0;
@@ -56124,6 +57327,7 @@ void func_3444()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 void func_3445()
 {
     ArticleModule(0x271c, 0, 0x1);
@@ -56132,6 +57336,7 @@ void func_3445()
     BattleObject(0x55, 0x1, 0x1c);
 }
 
+// [Copy: Toon Link 0x1EA] init
 void func_3446()
 {
     float var0;
@@ -56139,6 +57344,7 @@ void func_3446()
     MotionModule(0x4, var0);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 void func_3447()
 {
     int var0;
@@ -56157,6 +57363,7 @@ void func_3447()
     }
 }
 
+// [Copy: Toon Link 0x1EA] exec
 void func_3448()
 {
     int var0;
@@ -56191,6 +57398,7 @@ void func_3448()
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Toon Link
 void func_3449()
 {
     int var0;
@@ -56202,6 +57410,7 @@ void func_3449()
     KineticModule(0xe, 0, var0, 0, 0, 0, 0, 0);
 }
 
+// [Copy: Toon Link 0x1EA] exit
 void func_3450()
 {
     int var0;
@@ -56217,6 +57426,7 @@ void func_3450()
     }
 }
 
+// [Copy: shared] helper used by Charizard, Kirby
 int func_3451(int arg0)
 {
     if (0)
@@ -56250,6 +57460,7 @@ int func_3451(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Charizard, Kirby
 void func_3452(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -56261,6 +57472,7 @@ void func_3452(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Charizard, Kirby
 void func_3453(int arg0)
 {
     int var1;
@@ -56280,6 +57492,7 @@ void func_3453(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Charizard 0x19D] pre
 int func_3454()
 {
     int var0;
@@ -56296,6 +57509,7 @@ int func_3454()
     return 0;
 }
 
+// [Copy: Charizard 0x19D] main
 void func_3455()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -56314,6 +57528,7 @@ void func_3455()
     func_78(func_3456);
 }
 
+// [Copy: Charizard 0x19D] loop
 void func_3456()
 {
     int var0;
@@ -56399,11 +57614,13 @@ void func_3456()
     }
 }
 
+// [Copy: Charizard 0x19D] end
 void func_3457()
 {
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: shared] helper used by Charizard, Kirby
 int func_3458()
 {
     int var0;
@@ -56446,6 +57663,7 @@ int func_3458()
     return 0;
 }
 
+// [Copy: shared] helper used by Charizard, Kirby
 void func_3459()
 {
     int var0;
@@ -56536,6 +57754,7 @@ void func_3459()
     }
 }
 
+// [Copy: Charizard 0x19D] per-frame
 void func_3460()
 {
     if (MotionModule(0xb))
@@ -56549,6 +57768,7 @@ void func_3460()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sonic
 int func_3461(int arg0)
 {
     if (0)
@@ -56594,6 +57814,7 @@ int func_3461(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Sonic
 void func_3462(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -56605,6 +57826,7 @@ void func_3462(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3463(int arg0)
 {
     int var1;
@@ -56624,6 +57846,7 @@ void func_3463(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Sonic 0x192] pre
 int func_3464()
 {
     func_69();
@@ -56632,6 +57855,7 @@ int func_3464()
     return 0;
 }
 
+// [Copy: Sonic 0x192] main
 void func_3465()
 {
     float var0;
@@ -56659,6 +57883,7 @@ void func_3465()
     func_78(func_3466);
 }
 
+// [Copy: Sonic 0x192] loop
 void func_3466()
 {
     if (MotionModule(0x2712))
@@ -56668,6 +57893,7 @@ void func_3466()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sonic
 void func_3467()
 {
     float var0;
@@ -56726,6 +57952,7 @@ void func_3467()
     }
 }
 
+// [Copy: Sonic 0x192] end
 void func_3468()
 {
     if (global4 != 0x194)
@@ -56734,6 +57961,7 @@ void func_3468()
     }
 }
 
+// [Copy: Sonic 0x192] per-frame
 void func_3469()
 {
     float var0;
@@ -56752,6 +57980,7 @@ void func_3469()
     }
 }
 
+// [Copy: Sonic 0x198] pre
 int func_3470()
 {
     StatusModule(0x5, 0x2, 0, 0x5, 0, 0x1, 0, 0, 0, 0);
@@ -56759,6 +57988,7 @@ int func_3470()
     return 0;
 }
 
+// [Copy: Sonic 0x198] main
 void func_3471()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -56766,6 +57996,7 @@ void func_3471()
     func_78(func_3472);
 }
 
+// [Copy: Sonic 0x198] loop
 void func_3472()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -56784,11 +58015,13 @@ void func_3472()
     }
 }
 
+// [Copy: Sonic 0x198] end
 void func_3473()
 {
     
 }
 
+// [Copy: Sonic 0x195] pre
 int func_3474()
 {
     StatusModule(0x5, 0x2, 0x65, 0x5, 0, 0x1, 0x10000, 0, 0, 0);
@@ -56796,6 +58029,7 @@ int func_3474()
     return 0;
 }
 
+// [Copy: Sonic 0x195] main
 void func_3475()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -56811,6 +58045,7 @@ void func_3475()
     func_78(func_3476);
 }
 
+// [Copy: Sonic 0x195] loop
 void func_3476()
 {
     if (GroundModule(0x2722, 0xff))
@@ -56830,11 +58065,13 @@ void func_3476()
     }
 }
 
+// [Copy: Sonic 0x195] end
 void func_3477()
 {
     
 }
 
+// [Copy: Sonic 0x195] per-frame
 void func_3478()
 {
     WorkModule(0xa, 0x11000004);
@@ -56844,6 +58081,7 @@ void func_3478()
     }
 }
 
+// [Copy: Sonic 0x199] pre
 int func_3479()
 {
     StatusModule(0x5, 0x2, 0x67, 0x5, 0, 0x1, 0, 0, 0, 0);
@@ -56851,6 +58089,7 @@ int func_3479()
     return 0;
 }
 
+// [Copy: Sonic 0x199] main
 void func_3480()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -56865,6 +58104,7 @@ void func_3480()
     func_78(func_3481);
 }
 
+// [Copy: Sonic 0x199] loop
 void func_3481()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -56883,11 +58123,13 @@ void func_3481()
     }
 }
 
+// [Copy: Sonic 0x199] end
 void func_3482()
 {
     
 }
 
+// [Copy: Sonic 0x199] per-frame
 void func_3483()
 {
     WorkModule(0xa, 0x11000004);
@@ -56897,6 +58139,7 @@ void func_3483()
     }
 }
 
+// [Copy: Sonic 0x193] pre
 int func_3484()
 {
     StatusModule(0x5, 0x2, 0x68, 0x5, 0, 0x1, 0x10000, 0x10, 0xc0, 0);
@@ -56904,6 +58147,7 @@ int func_3484()
     return 0;
 }
 
+// [Copy: Sonic 0x193] main
 void func_3485()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -56918,6 +58162,7 @@ void func_3485()
     func_78(func_3486);
 }
 
+// [Copy: Sonic 0x193] loop
 void func_3486()
 {
     if (GroundModule(0x2722, 0xff))
@@ -56937,11 +58182,13 @@ void func_3486()
     }
 }
 
+// [Copy: Sonic 0x193] end
 void func_3487()
 {
     
 }
 
+// [Copy: Sonic 0x193] per-frame
 void func_3488()
 {
     WorkModule(0xa, 0x11000004);
@@ -56955,6 +58202,7 @@ void func_3488()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Sonic
 void func_3489()
 {
     WorkModule(0xa, 0x11000005);
@@ -56964,6 +58212,7 @@ void func_3489()
     }
 }
 
+// [Copy: Sonic 0x194] pre
 int func_3490()
 {
     StatusModule(0x5, 0x2, 0x33, 0x5, 0, 0x1, 0x10000, 0x10, 0xc0, 0);
@@ -56971,6 +58220,7 @@ int func_3490()
     return 0;
 }
 
+// [Copy: Sonic 0x194] main
 void func_3491()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -56979,6 +58229,7 @@ void func_3491()
     func_78(func_3492);
 }
 
+// [Copy: Sonic 0x194] loop
 void func_3492()
 {
     int var0;
@@ -56990,11 +58241,13 @@ void func_3492()
     }
 }
 
+// [Copy: Sonic 0x194] end
 void func_3493()
 {
     
 }
 
+// [Copy: Sonic 0x197] pre
 int func_3494()
 {
     StatusModule(0x5, 0, 0xf, 0x1, 0, 0x1, 0, 0, 0, 0);
@@ -57002,6 +58255,7 @@ int func_3494()
     return 0;
 }
 
+// [Copy: Sonic 0x197] main
 void func_3495()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -57010,6 +58264,7 @@ void func_3495()
     func_78(func_3496);
 }
 
+// [Copy: Sonic 0x197] loop
 void func_3496()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -57028,11 +58283,13 @@ void func_3496()
     }
 }
 
+// [Copy: Sonic 0x197] end
 void func_3497()
 {
     
 }
 
+// [Copy: Sonic 0x196] pre
 int func_3498()
 {
     StatusModule(0x5, 0xffffffff, 0x66, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -57040,6 +58297,7 @@ int func_3498()
     return 0;
 }
 
+// [Copy: Sonic 0x196] main
 void func_3499()
 {
     WorkModule(0x2710, 0x2000003f);
@@ -57049,6 +58307,7 @@ void func_3499()
     func_78(func_3500);
 }
 
+// [Copy: Sonic 0x196] loop
 void func_3500()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -57067,51 +58326,61 @@ void func_3500()
     }
 }
 
+// [Copy: Sonic 0x196] end
 void func_3501()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1C5] end
 void func_3502()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1C6] end
 void func_3503()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1C7] end
 void func_3504()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1C8] end
 void func_3505()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1C9] end
 void func_3506()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1CA] end
 void func_3507()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1CB] end
 void func_3508()
 {
     
 }
 
+// [Copy: Jigglypuff 0x1CC] end
 void func_3509()
 {
     
 }
 
+// [Copy: shared] helper used by Jigglypuff, Kirby
 int func_3510(int arg0)
 {
     if (0)
@@ -57197,6 +58466,7 @@ int func_3510(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Jigglypuff, Kirby
 void func_3511(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -57208,6 +58478,7 @@ void func_3511(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3512(int arg0)
 {
     int var1;
@@ -57227,6 +58498,7 @@ void func_3512(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Jigglypuff, Kirby
 void func_3513()
 {
     if (global18 == 0)
@@ -57261,6 +58533,7 @@ void func_3513()
     }
 }
 
+// [Copy: Jigglypuff 0x1C5] pre  "status_pre_special_n"
 void func_3514()
 {
     printf("status_pre_special_n");
@@ -57269,6 +58542,7 @@ void func_3514()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1192, 0x2, 0x80, 0x1000);
 }
 
+// [Copy: Jigglypuff 0x1C5] main  "status_special_n"
 void func_3515()
 {
     printf("status_special_n");
@@ -57287,6 +58561,7 @@ void func_3515()
     func_78(func_3516);
 }
 
+// [Copy: Jigglypuff 0x1C5] loop  "status_special_n_main"
 void func_3516()
 {
     printf("status_special_n_main");
@@ -57305,6 +58580,7 @@ void func_3516()
     }
 }
 
+// [Copy: Jigglypuff 0x1C6] pre  "status_pre_special_n_hold"
 void func_3517()
 {
     printf("status_pre_special_n_hold");
@@ -57312,6 +58588,7 @@ void func_3517()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1C6] main  "status_special_n_hold"
 void func_3518()
 {
     printf("status_special_n_hold");
@@ -57322,6 +58599,7 @@ void func_3518()
     func_78(func_3519);
 }
 
+// [Copy: Jigglypuff 0x1C6] loop  "status_special_n_hold_main"
 void func_3519()
 {
     printf("status_special_n_hold_main");
@@ -57342,6 +58620,7 @@ void func_3519()
     }
 }
 
+// [Copy: Jigglypuff 0x1C7] pre  "status_pre_special_n_hold_max"
 void func_3520()
 {
     printf("status_pre_special_n_hold_max");
@@ -57349,6 +58628,7 @@ void func_3520()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1C7] main  "status_special_n_hold_max"
 void func_3521()
 {
     printf("status_special_n_hold_max");
@@ -57359,6 +58639,7 @@ void func_3521()
     func_78(func_3522);
 }
 
+// [Copy: Jigglypuff 0x1C7] loop  "status_special_n_hold_max_main"
 void func_3522()
 {
     printf("status_special_n_hold_max_main");
@@ -57379,6 +58660,7 @@ void func_3522()
     }
 }
 
+// [Copy: Jigglypuff 0x1C8] pre  "status_pre_special_n_roll"
 void func_3523()
 {
     printf("status_pre_special_n_roll");
@@ -57386,6 +58668,7 @@ void func_3523()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1C8] main  "status_special_n_roll"
 void func_3524()
 {
     printf("status_special_n_roll");
@@ -57396,6 +58679,7 @@ void func_3524()
     func_78(func_3525);
 }
 
+// [Copy: Jigglypuff 0x1C8] loop  "status_special_n_roll_main"
 void func_3525()
 {
     printf("status_special_n_roll_main");
@@ -57409,6 +58693,7 @@ void func_3525()
     }
 }
 
+// [Copy: Jigglypuff 0x1C9] pre  "status_pre_special_n_roll_air"
 void func_3526()
 {
     printf("status_pre_special_n_roll_air");
@@ -57416,6 +58701,7 @@ void func_3526()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1C9] main  "status_special_n_roll_air"
 void func_3527()
 {
     printf("status_special_n_roll_air");
@@ -57427,6 +58713,7 @@ void func_3527()
     func_78(func_3528);
 }
 
+// [Copy: Jigglypuff 0x1C9] loop  "status_special_n_roll_air_main"
 void func_3528()
 {
     printf("status_special_n_roll_air_main");
@@ -57446,6 +58733,7 @@ void func_3528()
     }
 }
 
+// [Copy: Jigglypuff 0x1CA] pre  "status_pre_special_n_turn"
 void func_3529()
 {
     printf("status_pre_special_n_turn");
@@ -57453,6 +58741,7 @@ void func_3529()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1CA] main  "status_special_n_turn"
 void func_3530()
 {
     printf("status_special_n_turn");
@@ -57466,6 +58755,7 @@ void func_3530()
     }
 }
 
+// [Copy: Jigglypuff 0x1CB] pre  "status_pre_special_n_end"
 void func_3531()
 {
     printf("status_pre_special_n_end");
@@ -57473,6 +58763,7 @@ void func_3531()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1CB] main  "status_special_n_end"
 void func_3532()
 {
     printf("status_special_n_end");
@@ -57491,6 +58782,7 @@ void func_3532()
     func_78(func_3533);
 }
 
+// [Copy: Jigglypuff 0x1CB] loop  "status_special_n_end_main"
 void func_3533()
 {
     printf("status_special_n_end_main");
@@ -57515,6 +58807,7 @@ void func_3533()
     }
 }
 
+// [Copy: Jigglypuff 0x1CC] pre  "status_pre_special_n_hit_end"
 void func_3534()
 {
     printf("status_pre_special_n_hit_end");
@@ -57522,6 +58815,7 @@ void func_3534()
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x192, 0, 0x80, 0);
 }
 
+// [Copy: Jigglypuff 0x1CC] main  "status_special_n_hit_end"
 void func_3535()
 {
     printf("status_special_n_hit_end");
@@ -57530,6 +58824,7 @@ void func_3535()
     func_78(func_3536);
 }
 
+// [Copy: Jigglypuff 0x1CC] loop
 void func_3536()
 {
     if (func_56())
@@ -57542,6 +58837,7 @@ void func_3536()
     }
 }
 
+// [Copy: shared] helper used by Dr. Mario, Kirby
 int func_3537(int arg0)
 {
     if (0)
@@ -57559,6 +58855,7 @@ int func_3537(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Dr. Mario, Kirby
 void func_3538(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -57570,6 +58867,7 @@ void func_3538(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Dr. Mario, Kirby
 void func_3539(int arg0)
 {
     int var1;
@@ -57589,6 +58887,7 @@ void func_3539(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Dr. Mario 0x201] pre
 int func_3540()
 {
     func_69();
@@ -57597,6 +58896,7 @@ int func_3540()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3541()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -57604,11 +58904,13 @@ int func_3541()
     return 0;
 }
 
+// [Copy: Dr. Mario 0x201] main
 void func_3542()
 {
     func_78(func_3543);
 }
 
+// [Copy: Dr. Mario 0x201] loop
 void func_3543()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -57641,6 +58943,7 @@ void func_3543()
     }
 }
 
+// [Copy: shared] helper used by Dr. Mario, Kirby
 void func_3544()
 {
     if (global18 == 0)
@@ -57673,12 +58976,14 @@ void func_3544()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3545()
 {
     func_33();
     func_78(func_3546);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3546()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -57715,6 +59020,7 @@ void func_3546()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3547()
 {
     if (global18 == 0)
@@ -57749,6 +59055,7 @@ void func_3547()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3548()
 {
     int var0;
@@ -57782,6 +59089,7 @@ void func_3548()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3549()
 {
     float var0;
@@ -57823,21 +59131,25 @@ void func_3549()
     }
 }
 
+// [Copy: Dr. Mario 0x201] end
 void func_3550()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3551()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3552()
 {
     ArticleModule(0x2712, 0x2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3553()
 {
     int var0;
@@ -57853,6 +59165,7 @@ int func_3553()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "parameter test landing frame:"
 void func_3554()
 {
     int var0;
@@ -57882,16 +59195,19 @@ void func_3554()
     func_78(func_3555);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3555()
 {
     func_2483();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3556()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 int func_3557(int arg0)
 {
     if (0)
@@ -57933,6 +59249,7 @@ int func_3557(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3558(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -57944,6 +59261,7 @@ void func_3558(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3559(int arg0)
 {
     int var1;
@@ -57963,6 +59281,7 @@ void func_3559(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Lucina 0x202] pre  "status_pre_SpecialN"
 int func_3560()
 {
     printf("status_pre_SpecialN");
@@ -57972,6 +59291,7 @@ int func_3560()
     return 0;
 }
 
+// [Copy: Lucina 0x202] main
 void func_3561()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -57979,6 +59299,7 @@ void func_3561()
     func_78(func_3562);
 }
 
+// [Copy: Lucina 0x202] loop
 void func_3562()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58000,6 +59321,7 @@ void func_3562()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3563()
 {
     if (global18 == 0)
@@ -58030,11 +59352,13 @@ void func_3563()
     }
 }
 
+// [Copy: Lucina 0x202] end
 void func_3564()
 {
     
 }
 
+// [Copy: Lucina 0x204] pre
 int func_3565()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -58042,12 +59366,14 @@ int func_3565()
     return 0;
 }
 
+// [Copy: Lucina 0x204] main
 void func_3566()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_3567);
 }
 
+// [Copy: Lucina 0x204] loop
 void func_3567()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -58073,6 +59399,7 @@ void func_3567()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3568()
 {
     float var0;
@@ -58110,11 +59437,13 @@ void func_3568()
     }
 }
 
+// [Copy: Lucina 0x204] end
 void func_3569()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: Lucina 0x205] pre
 int func_3570()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -58122,12 +59451,14 @@ int func_3570()
     return 0;
 }
 
+// [Copy: Lucina 0x205] main
 void func_3571()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_3572);
 }
 
+// [Copy: Lucina 0x205] loop
 void func_3572()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -58153,6 +59484,7 @@ void func_3572()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3573()
 {
     float var0;
@@ -58190,11 +59522,13 @@ void func_3573()
     }
 }
 
+// [Copy: Lucina 0x205] end
 void func_3574()
 {
     
 }
 
+// [Copy: Lucina 0x203] pre
 int func_3575()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -58202,6 +59536,7 @@ int func_3575()
     return 0;
 }
 
+// [Copy: Lucina 0x203] main
 void func_3576()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -58213,6 +59548,7 @@ void func_3576()
     func_78(func_3577);
 }
 
+// [Copy: Lucina 0x203] loop
 void func_3577()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58231,6 +59567,7 @@ void func_3577()
     }
 }
 
+// [Copy: Lucina 0x203] per-frame
 void func_3578()
 {
     int var0;
@@ -58244,6 +59581,7 @@ void func_3578()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucina
 void func_3579()
 {
     float var0;
@@ -58283,11 +59621,13 @@ void func_3579()
     }
 }
 
+// [Copy: Lucina 0x203] end
 void func_3580()
 {
     ColorBlendModule(0x7, 1.0f);
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 int func_3581(int arg0)
 {
     if (0)
@@ -58361,6 +59701,7 @@ int func_3581(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3582(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -58372,6 +59713,7 @@ void func_3582(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3583(int arg0)
 {
     int var1;
@@ -58391,6 +59733,7 @@ void func_3583(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Dark Pit 0x206] pre
 int func_3584()
 {
     func_69();
@@ -58399,6 +59742,7 @@ int func_3584()
     return 0;
 }
 
+// [Copy: Dark Pit 0x206] main
 void func_3585()
 {
     WorkModule(0x2710, 0x2100000e);
@@ -58407,6 +59751,7 @@ void func_3585()
     func_78(func_3586);
 }
 
+// [Copy: Dark Pit 0x206] loop
 void func_3586()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58420,6 +59765,7 @@ void func_3586()
     }
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3587()
 {
     if (global18 == 0)
@@ -58456,6 +59802,7 @@ void func_3587()
     }
 }
 
+// [Copy: Dark Pit 0x206] end
 void func_3588()
 {
     int var0;
@@ -58472,6 +59819,7 @@ void func_3588()
     }
 }
 
+// [Copy: Dark Pit 0x207] pre
 int func_3589()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -58479,11 +59827,13 @@ int func_3589()
     return 0;
 }
 
+// [Copy: Dark Pit 0x207] per-frame
 void func_3590()
 {
     WorkModule(0x9, 0x11000002);
 }
 
+// [Copy: Dark Pit 0x207] main
 void func_3591()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -58508,6 +59858,7 @@ void func_3591()
     func_78(func_3592);
 }
 
+// [Copy: Dark Pit 0x207] loop
 void func_3592()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58544,6 +59895,7 @@ void func_3592()
     }
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3593()
 {
     if (global18 == 0)
@@ -58580,11 +59932,13 @@ void func_3593()
     }
 }
 
+// [Copy: Dark Pit 0x207] end
 void func_3594()
 {
     func_3588();
 }
 
+// [Copy: Dark Pit 0x208] pre
 int func_3595()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -58592,6 +59946,7 @@ int func_3595()
     return 0;
 }
 
+// [Copy: Dark Pit 0x208] main
 void func_3596()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -58611,6 +59966,7 @@ void func_3596()
     func_78(func_3597);
 }
 
+// [Copy: Dark Pit 0x208] loop
 void func_3597()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58629,6 +59985,7 @@ void func_3597()
     }
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3598()
 {
     if (global18 == 0)
@@ -58665,6 +60022,7 @@ void func_3598()
     }
 }
 
+// [Copy: Dark Pit 0x208] end
 void func_3599()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -58678,6 +60036,7 @@ void func_3599()
     func_3588();
 }
 
+// [Copy: Dark Pit 0x209] pre
 int func_3600()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0x100);
@@ -58685,12 +60044,14 @@ int func_3600()
     return 0;
 }
 
+// [Copy: Dark Pit 0x209] main
 void func_3601()
 {
     PostureModule(0x2710);
     func_78(func_3602);
 }
 
+// [Copy: Dark Pit 0x209] loop
 void func_3602()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58704,6 +60065,7 @@ void func_3602()
     }
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3603()
 {
     if (global18 == 0)
@@ -58744,11 +60106,13 @@ void func_3603()
     }
 }
 
+// [Copy: Dark Pit 0x209] end
 void func_3604()
 {
     func_3588();
 }
 
+// [Copy: Dark Pit 0x20A] pre
 int func_3605()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x4000, 0x4, 0, 0);
@@ -58756,6 +60120,7 @@ int func_3605()
     return 0;
 }
 
+// [Copy: Dark Pit 0x20A] main
 void func_3606()
 {
     if (WorkModule(0x10, 0x2100000e))
@@ -58775,6 +60140,7 @@ void func_3606()
     func_78(func_3607);
 }
 
+// [Copy: Dark Pit 0x20A] loop
 void func_3607()
 {
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -58800,6 +60166,7 @@ void func_3607()
     }
 }
 
+// [Copy: shared] helper used by Dark Pit, Kirby
 void func_3608()
 {
     if (global18 == 0)
@@ -58840,11 +60207,13 @@ void func_3608()
     }
 }
 
+// [Copy: Dark Pit 0x20A] end
 void func_3609()
 {
     func_3588();
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 int func_3610(int arg0)
 {
     if (0)
@@ -58886,6 +60255,7 @@ int func_3610(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 void func_3611(int arg0, int arg1, float arg2)
 {
     int var3;
@@ -58898,6 +60268,7 @@ void func_3611(int arg0, int arg1, float arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 void func_3612(int arg0)
 {
     int var1;
@@ -58913,6 +60284,7 @@ void func_3612(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 void func_3613(int arg0, int arg1, float arg2)
 {
     int var3;
@@ -58930,6 +60302,7 @@ void func_3613(int arg0, int arg1, float arg2)
     MotionAnimcmdModule(0x1, arg1, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 void func_3614(int arg0, int arg1, int arg2, int arg3, int arg4, float arg5, float arg6)
 {
     int var7;
@@ -58964,6 +60337,7 @@ void func_3614(int arg0, int arg1, int arg2, int arg3, int arg4, float arg5, flo
     }
 }
 
+// [Copy: Rosalina 0x20B] pre
 int func_3615()
 {
     float var0;
@@ -58985,12 +60359,14 @@ int func_3615()
     return 0;
 }
 
+// [Copy: Rosalina 0x20B] main
 void func_3616()
 {
     WorkModule(0x2711, 0x2100000d);
     func_78(func_3617);
 }
 
+// [Copy: Rosalina 0x20B] loop
 void func_3617()
 {
     int var0;
@@ -59008,6 +60384,7 @@ void func_3617()
     func_3614(var0, 0x211, 0x221, 0x64, 0x65, 0, 1.0f);
 }
 
+// [Copy: Rosalina 0x20B] end
 void func_3618()
 {
     if (global6 == 0x20c)
@@ -59020,6 +60397,7 @@ void func_3618()
     }
 }
 
+// [Copy: Rosalina 0x20C] pre
 int func_3619()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -59027,6 +60405,7 @@ int func_3619()
     return 0;
 }
 
+// [Copy: Rosalina 0x20C] main
 void func_3620()
 {
     WorkModule(0x7, 0x215, 0x11000002);
@@ -59040,6 +60419,7 @@ void func_3620()
     func_78(func_3621);
 }
 
+// [Copy: Rosalina 0x20C] loop
 void func_3621()
 {
     int var0;
@@ -59062,11 +60442,13 @@ void func_3621()
     func_3614(var0, WorkModule(0x6, 0x11000002), WorkModule(0x6, 0x11000003), 0x6, 0xa, 0, WorkModuleF(0, 0x2f));
 }
 
+// [Copy: Rosalina 0x20C] per-frame
 void func_3622()
 {
     WorkModule(0x2, 1.0f, 0x1000007);
 }
 
+// [Copy: Rosalina 0x20C] end
 void func_3623()
 {
     if (global6 != 0x20d)
@@ -59076,6 +60458,7 @@ void func_3623()
     PhysicsModule(0x8);
 }
 
+// [Copy: Rosalina 0x20D] pre
 int func_3624()
 {
     StatusModule(0x5, 0xffffffff, 0xffffffff, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -59083,11 +60466,13 @@ int func_3624()
     return 0;
 }
 
+// [Copy: Rosalina 0x20D] main
 void func_3625()
 {
     func_78(func_3626);
 }
 
+// [Copy: Rosalina 0x20D] loop
 void func_3626()
 {
     int var0;
@@ -59118,6 +60503,7 @@ void func_3626()
     func_3614(var0, 0x211, 0x221, 0x64, 0x65, WorkModuleF(0, 0x1000006), 1.0f);
 }
 
+// [Copy: Rosalina 0x20D] end
 void func_3627()
 {
     if (WorkModule(0x10, 0x21000010) == 0)
@@ -59126,6 +60512,7 @@ void func_3627()
     }
 }
 
+// [Copy: Rosalina 0x20E] pre
 int func_3628()
 {
     StatusModule(0x5, 0xffffffff, 0xffffffff, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -59133,11 +60520,13 @@ int func_3628()
     return 0;
 }
 
+// [Copy: Rosalina 0x20E] main
 void func_3629()
 {
     func_78(func_3630);
 }
 
+// [Copy: Rosalina 0x20E] loop
 void func_3630()
 {
     int var0;
@@ -59149,11 +60538,13 @@ void func_3630()
     func_3614(var0, 0x21d, 0x22d, 0x6, 0xa, 0, 1.0f);
 }
 
+// [Copy: Rosalina 0x20E] end
 void func_3631()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3632(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
 {
     int var6;
@@ -59184,6 +60575,7 @@ void func_3632(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Rosalina
 int func_3633()
 {
     int var0;
@@ -59220,6 +60612,7 @@ int func_3633()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Wii Fit Trainer
 int func_3634(int arg0)
 {
     if (0)
@@ -59261,6 +60654,7 @@ int func_3634(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Wii Fit Trainer
 void func_3635(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -59272,6 +60666,7 @@ void func_3635(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Wii Fit Trainer
 void func_3636(int arg0)
 {
     int var1;
@@ -59291,6 +60686,7 @@ void func_3636(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Wii Fit Trainer 0x20F] pre
 int func_3637()
 {
     func_69();
@@ -59299,6 +60695,7 @@ int func_3637()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3638()
 {
     func_3639();
@@ -59309,6 +60706,7 @@ void func_3638()
     KineticModule(0xc, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Wii Fit Trainer
 void func_3639()
 {
     float var0;
@@ -59324,6 +60722,7 @@ void func_3639()
     KineticModule(0xb, 0x3);
 }
 
+// [Copy: shared] helper used by Kirby, Wii Fit Trainer
 void func_3640()
 {
     int var0;
@@ -59345,6 +60744,7 @@ void func_3640()
     }
 }
 
+// [Copy: Wii Fit Trainer 0x20F] main  "WiiFit status_SpecialN"
 void func_3641()
 {
     printf("WiiFit status_SpecialN");
@@ -59364,6 +60764,7 @@ void func_3641()
     func_78(func_3642);
 }
 
+// [Copy: Wii Fit Trainer 0x20F] loop  "status_SpecialN_Main level ratio:"
 void func_3642()
 {
     if (MotionModule(0x2712))
@@ -59401,11 +60802,13 @@ void func_3642()
     }
 }
 
+// [Copy: Wii Fit Trainer 0x20F] end
 void func_3643()
 {
     
 }
 
+// [Copy: Wii Fit Trainer 0x210] pre
 int func_3644()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -59413,6 +60816,7 @@ int func_3644()
     return 0;
 }
 
+// [Copy: Wii Fit Trainer 0x210] main  "WiiFit status_SpecialNHold"
 void func_3645()
 {
     printf("WiiFit status_SpecialNHold");
@@ -59435,6 +60839,7 @@ void func_3645()
     func_78(func_3646);
 }
 
+// [Copy: Wii Fit Trainer 0x210] loop  "status_SpecialNHold_Main level ratio bak:"
 void func_3646()
 {
     float var0;
@@ -59555,6 +60960,7 @@ void func_3646()
     }
 }
 
+// [Copy: Wii Fit Trainer 0x210] end
 void func_3647()
 {
     int var0;
@@ -59579,6 +60985,7 @@ void func_3647()
     }
 }
 
+// [Copy: Wii Fit Trainer 0x211] pre
 int func_3648()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -59586,6 +60993,7 @@ int func_3648()
     return 0;
 }
 
+// [Copy: Wii Fit Trainer 0x211] main  "WiiFit status_SpecialNShoot"
 void func_3649()
 {
     int var0;
@@ -59639,6 +61047,7 @@ void func_3649()
     func_78(func_3650);
 }
 
+// [Copy: Wii Fit Trainer 0x211] loop
 void func_3650()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -59682,6 +61091,7 @@ void func_3650()
     }
 }
 
+// [Copy: Wii Fit Trainer 0x211] end
 void func_3651()
 {
     int var0;
@@ -59707,6 +61117,7 @@ void func_3651()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Little Mac
 int func_3652(int arg0)
 {
     if (0)
@@ -59764,6 +61175,7 @@ int func_3652(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Little Mac
 void func_3653(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -59775,6 +61187,7 @@ void func_3653(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Little Mac
 void func_3654(int arg0)
 {
     int var1;
@@ -59794,6 +61207,7 @@ void func_3654(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Little Mac 0x212] pre
 int func_3655()
 {
     func_69();
@@ -59802,6 +61216,7 @@ int func_3655()
     return 0;
 }
 
+// [Copy: Little Mac 0x212] main
 int func_3656()
 {
     if (global18 == 0)
@@ -59823,16 +61238,19 @@ int func_3656()
     return 0x1;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3657()
 {
     
 }
 
+// [Copy: Little Mac 0x212] end
 void func_3658()
 {
     
 }
 
+// [Copy: Little Mac 0x213] pre
 int func_3659()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -59840,6 +61258,7 @@ int func_3659()
     return 0;
 }
 
+// [Copy: Little Mac 0x213] main
 void func_3660()
 {
     float var0;
@@ -59882,11 +61301,13 @@ void func_3660()
     func_78(func_3662);
 }
 
+// [Copy: Little Mac 0x213] per-frame
 void func_3661()
 {
     WorkModule(0x9, 0x11000002);
 }
 
+// [Copy: Little Mac 0x213] loop
 void func_3662()
 {
     float var0;
@@ -59930,11 +61351,13 @@ void func_3662()
     }
 }
 
+// [Copy: Little Mac 0x213] end
 void func_3663()
 {
     
 }
 
+// [Copy: Little Mac 0x214] pre
 int func_3664()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -59942,6 +61365,7 @@ int func_3664()
     return 0;
 }
 
+// [Copy: Little Mac 0x214] main
 void func_3665()
 {
     float var0;
@@ -59988,6 +61412,7 @@ void func_3665()
     func_78(func_3666);
 }
 
+// [Copy: Little Mac 0x214] loop
 void func_3666()
 {
     if (MotionModule(0x2712))
@@ -60009,11 +61434,13 @@ void func_3666()
     }
 }
 
+// [Copy: Little Mac 0x214] end
 void func_3667()
 {
     WorkModule(0x2711, 0x20000073);
 }
 
+// [Copy: Little Mac 0x216] pre
 int func_3668()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -60021,6 +61448,7 @@ int func_3668()
     return 0;
 }
 
+// [Copy: Little Mac 0x216] main
 void func_3669()
 {
     float var0;
@@ -60067,6 +61495,7 @@ void func_3669()
     func_78(func_3670);
 }
 
+// [Copy: Little Mac 0x216] loop
 void func_3670()
 {
     if (MotionModule(0x2712))
@@ -60097,11 +61526,13 @@ void func_3670()
     }
 }
 
+// [Copy: Little Mac 0x216] end
 void func_3671()
 {
     
 }
 
+// [Copy: Little Mac 0x217] pre
 int func_3672()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -60109,6 +61540,7 @@ int func_3672()
     return 0;
 }
 
+// [Copy: Little Mac 0x217] main
 void func_3673()
 {
     float var0;
@@ -60185,6 +61617,7 @@ void func_3673()
     func_78(func_3674);
 }
 
+// [Copy: Little Mac 0x217] loop
 void func_3674()
 {
     float var0;
@@ -60229,11 +61662,13 @@ void func_3674()
     }
 }
 
+// [Copy: Little Mac 0x217] end
 void func_3675()
 {
     
 }
 
+// [Copy: Little Mac 0x219] pre
 int func_3676()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
@@ -60241,6 +61676,7 @@ int func_3676()
     return 0;
 }
 
+// [Copy: Little Mac 0x219] main
 void func_3677()
 {
     float var0;
@@ -60282,6 +61718,7 @@ void func_3677()
     func_78(func_3678);
 }
 
+// [Copy: Little Mac 0x219] loop
 void func_3678()
 {
     float var0;
@@ -60324,12 +61761,14 @@ void func_3678()
     }
 }
 
+// [Copy: Little Mac 0x219] end
 void func_3679()
 {
     WorkModule(0, 0 + 0, 0x2f);
     WorkModule(0x7, 0, 0x10000083);
 }
 
+// [Copy: shared] helper used by Kirby, Little Mac
 void func_3680()
 {
     WorkModule(0x2711, 0x20000079);
@@ -60338,6 +61777,7 @@ void func_3680()
     WorkModule(0x2711, 0x2000007c);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3681()
 {
     if (WorkModule(0x10, 0x20000079) || WorkModule(0x10, 0x2000007a) || WorkModule(0x10, 0x2000007b) || WorkModule(0x10, 0x2000007c))
@@ -60347,6 +61787,7 @@ int func_3681()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3682()
 {
     if (WorkModule(0x10, 0x20000079) && global18 == 0x2 || WorkModule(0x10, 0x2000007a) && global18 == 0 || WorkModule(0x10, 0x2000007b) && MotionModule(0x2712))
@@ -60360,6 +61801,7 @@ int func_3682()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 int func_3683(int arg0)
 {
     if (0)
@@ -60425,6 +61867,7 @@ int func_3683(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 void func_3684(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -60436,6 +61879,7 @@ void func_3684(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 void func_3685(int arg0)
 {
     int var1;
@@ -60455,6 +61899,7 @@ void func_3685(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 int func_3686(int arg0)
 {
     if (WorkModule(0x6, 0x10000048) != 0x1)
@@ -60468,6 +61913,7 @@ int func_3686(int arg0)
     return 0x192;
 }
 
+// [Copy: Villager 0x21A] pre
 int func_3687()
 {
     func_69();
@@ -60476,6 +61922,7 @@ int func_3687()
     return 0;
 }
 
+// [Copy: Villager 0x21A] main
 int func_3688()
 {
     WorkModule(0x7, 0x50000000, 0x11000003);
@@ -60496,11 +61943,13 @@ int func_3688()
     return 0x1;
 }
 
+// [Copy: Villager 0x21A] end
 void func_3689()
 {
     
 }
 
+// [Copy: Villager 0x21B] pre
 int func_3690()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -60508,6 +61957,7 @@ int func_3690()
     return 0;
 }
 
+// [Copy: Villager 0x21B] main
 void func_3691()
 {
     WorkModule(0x7, 0, 0x11000009);
@@ -60520,6 +61970,7 @@ void func_3691()
     func_78(func_3692);
 }
 
+// [Copy: Villager 0x21B] loop
 void func_3692()
 {
     float var0;
@@ -60605,11 +62056,13 @@ void func_3692()
     }
 }
 
+// [Copy: Villager 0x21B] per-frame
 void func_3693()
 {
     
 }
 
+// [Copy: Villager 0x21B] end
 void func_3694()
 {
     MotionModule(0x4, 1.0f);
@@ -60619,6 +62072,7 @@ void func_3694()
     }
 }
 
+// [Copy: Villager 0x21C] pre
 int func_3695()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -60626,6 +62080,7 @@ int func_3695()
     return 0;
 }
 
+// [Copy: Villager 0x21C] main
 void func_3696()
 {
     float var0;
@@ -60643,6 +62098,7 @@ void func_3696()
     func_78(func_3697);
 }
 
+// [Copy: Villager 0x21C] loop
 void func_3697()
 {
     int var0;
@@ -60710,6 +62166,7 @@ void func_3697()
     func_3708(var0, var2, var3, 0x6, 0, 0x9, 0x5);
 }
 
+// [Copy: Villager 0x21C] end
 void func_3698()
 {
     if (WorkModule(0x10, 0x21000012) == 0 && WorkModule(0x6, 0x11000003) != 0x50000000)
@@ -60719,6 +62176,7 @@ void func_3698()
     }
 }
 
+// [Copy: Villager 0x21D] pre
 int func_3699()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -60726,11 +62184,13 @@ int func_3699()
     return 0;
 }
 
+// [Copy: Villager 0x21D] main
 void func_3700()
 {
     func_78(func_3701);
 }
 
+// [Copy: Villager 0x21D] loop
 void func_3701()
 {
     int var0;
@@ -60759,11 +62219,13 @@ void func_3701()
     func_3708(var0, 0x219, 0x235, 0x6, 0, 0x9, 0x5);
 }
 
+// [Copy: Villager 0x21D] end
 void func_3702()
 {
     
 }
 
+// [Copy: Villager 0x21E] pre
 int func_3703()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -60771,6 +62233,7 @@ int func_3703()
     return 0;
 }
 
+// [Copy: Villager 0x21E] main
 void func_3704()
 {
     int var0;
@@ -60804,6 +62267,7 @@ void func_3704()
     func_78(func_3705);
 }
 
+// [Copy: Villager 0x21E] loop
 void func_3705()
 {
     int var0;
@@ -60839,12 +62303,14 @@ void func_3705()
     }
 }
 
+// [Copy: Villager 0x21E] end
 void func_3706()
 {
     BattleObject(0x3f1, 0x100000b);
     BattleObject(0x3ed, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 void func_3707(int arg0, int arg1)
 {
     int var2;
@@ -60872,6 +62338,7 @@ void func_3707(int arg0, int arg1)
     func_3708(arg0, var2, var3, 0x6, 0, 0x9, 0x5);
 }
 
+// [Copy: shared] helper used by Kirby, Villager
 int func_3708(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     int var7;
@@ -60907,6 +62374,7 @@ int func_3708(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int ar
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 int func_3709(int arg0)
 {
     if (0)
@@ -60924,6 +62392,7 @@ int func_3709(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 void func_3710(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -60935,6 +62404,7 @@ void func_3710(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 void func_3711(int arg0)
 {
     int var1;
@@ -60954,6 +62424,7 @@ void func_3711(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Palutena 0x21F] pre
 int func_3712()
 {
     func_69();
@@ -60962,6 +62433,7 @@ int func_3712()
     return 0;
 }
 
+// [Copy: Palutena 0x21F] init
 void func_3713()
 {
     float var0;
@@ -60989,6 +62461,7 @@ void func_3713()
     KineticModule(0xc, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Palutena  "sub_status_special_n1_change_kinetic_stop"
 void func_3714(int arg0)
 {
     float var1;
@@ -61019,6 +62492,7 @@ void func_3714(int arg0)
     }
 }
 
+// [Copy: Palutena 0x21F] main
 void func_3715()
 {
     if (sys_7(0xe))
@@ -61039,6 +62513,7 @@ void func_3715()
     func_78(func_3716);
 }
 
+// [Copy: Palutena 0x21F] loop  "@FL_g_motion_frame_current_:"
 void func_3716()
 {
     float var0;
@@ -61113,6 +62588,7 @@ void func_3716()
     }
 }
 
+// [Copy: Palutena 0x21F] end
 void func_3717()
 {
     if (global18 == 0)
@@ -61128,6 +62604,7 @@ void func_3717()
     WorkModule(0, 0 + 0, 0x1000008);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3718()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61137,6 +62614,7 @@ int func_3718()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3719()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61146,6 +62624,7 @@ int func_3719()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3720()
 {
     if (WorkModule(0x6, 0x10000087) > 0)
@@ -61155,6 +62634,7 @@ int func_3720()
     return 0x1;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3721()
 {
     if (WorkModule(0x6, 0x1000008d) > 0)
@@ -61164,6 +62644,7 @@ int func_3721()
     return 0x1;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3722()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61173,6 +62654,7 @@ int func_3722()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3723()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61182,6 +62664,7 @@ int func_3723()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3724()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61191,6 +62674,7 @@ int func_3724()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3725()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61200,6 +62684,7 @@ int func_3725()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3726()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61209,6 +62694,7 @@ int func_3726()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3727()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61218,6 +62704,7 @@ int func_3727()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3728()
 {
     if (WorkModule(0x10, 0x20000082))
@@ -61227,6 +62714,7 @@ int func_3728()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_pre_palutena_AttackDash"
 int func_3729()
 {
     printf("status_pre_palutena_AttackDash");
@@ -61243,6 +62731,7 @@ int func_3729()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_AttackDash_init_status"
 void func_3730()
 {
     float var0;
@@ -61261,6 +62750,7 @@ void func_3730()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_AttackDash"
 void func_3731()
 {
     int var0;
@@ -61277,6 +62767,7 @@ void func_3731()
     callFunc3(func_272);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3732()
 {
     WorkModule(0x2711, 0x2000007e);
@@ -61289,6 +62780,7 @@ void func_3732()
     func_321();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3733()
 {
     if (WorkModule(0x10, 0x2000007e))
@@ -61300,11 +62792,13 @@ void func_3733()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3734()
 {
     func_3733();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_end_palutena_AttackAir off flag no limit status next:"
 void func_3735()
 {
     WorkModule(0x2711, 0x2000007e);
@@ -61325,6 +62819,7 @@ void func_3735()
     func_334();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_end_palutena_ItemShootAir off flag no limit status ne"
 void func_3736()
 {
     if (global6 != 0xe && global6 != 0x10)
@@ -61343,6 +62838,7 @@ void func_3736()
     func_1359();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3737()
 {
     WorkModule(0x16, 0x1e00001e);
@@ -61355,6 +62851,7 @@ void func_3737()
     func_78(func_980);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_pre_palutena_JumpSquat"
 int func_3738()
 {
     printf("status_pre_palutena_JumpSquat");
@@ -61371,6 +62868,7 @@ int func_3738()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_JumpSquat_init_status"
 void func_3739()
 {
     float var0;
@@ -61394,6 +62892,7 @@ void func_3739()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_pre_palutena_JumpSquat"
 void func_3740()
 {
     printf("status_pre_palutena_JumpSquat");
@@ -61404,6 +62903,7 @@ void func_3740()
     callFunc3(func_487);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_end_palutena_JumpSquat"
 void func_3741()
 {
     printf("status_end_palutena_JumpSquat");
@@ -61417,6 +62917,7 @@ void func_3741()
     func_531();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3742()
 {
     int var0;
@@ -61428,6 +62929,7 @@ void func_3742()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_pre_palutena_EscapeF"
 int func_3743()
 {
     printf("status_pre_palutena_EscapeF");
@@ -61444,6 +62946,7 @@ int func_3743()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_EscapeF_init_status"
 void func_3744()
 {
     float var0;
@@ -61464,6 +62967,7 @@ void func_3744()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3745()
 {
     WorkModule(0x2711, 0x2000007e);
@@ -61476,6 +62980,7 @@ void func_3745()
     func_381();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_EscapeAir_init_status"
 void func_3746()
 {
     float var0;
@@ -61494,6 +62999,7 @@ void func_3746()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_Jump"
 void func_3747()
 {
     int var0;
@@ -61507,6 +63013,7 @@ void func_3747()
     func_78(func_493);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_JumpAerial"
 void func_3748()
 {
     int var0;
@@ -61520,6 +63027,7 @@ void func_3748()
     func_78(func_497);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_Fall"
 void func_3749()
 {
     printf("status_palutena_Fall");
@@ -61530,6 +63038,7 @@ void func_3749()
     callFunc3(func_501);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_FallAerial"
 void func_3750()
 {
     printf("status_palutena_FallAerial");
@@ -61540,6 +63049,7 @@ void func_3750()
     callFunc3(func_504);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_Landing"
 void func_3751()
 {
     printf("status_palutena_Landing");
@@ -61548,6 +63058,7 @@ void func_3751()
     func_507();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_LandingLight"
 void func_3752()
 {
     printf("status_palutena_LandingLight");
@@ -61556,6 +63067,7 @@ void func_3752()
     func_513();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_LandingAttackAir"
 void func_3753()
 {
     printf("status_palutena_LandingAttackAir");
@@ -61564,6 +63076,7 @@ void func_3753()
     func_517();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_LandingFallSpecial"
 void func_3754()
 {
     printf("status_palutena_LandingFallSpecial");
@@ -61572,6 +63085,7 @@ void func_3754()
     func_981();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_CliffCatch"
 void func_3755()
 {
     printf("status_palutena_CliffCatch");
@@ -61580,6 +63094,7 @@ void func_3755()
     func_161();
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 void func_3756()
 {
     WorkModule(0x2711, 0x2000007e);
@@ -61588,6 +63103,7 @@ void func_3756()
     func_3757();
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 void func_3757()
 {
     int var0;
@@ -61600,6 +63116,7 @@ void func_3757()
     func_3758();
 }
 
+// [Copy: shared] helper used by Kirby, Palutena
 void func_3758()
 {
     int var0;
@@ -61611,6 +63128,7 @@ void func_3758()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_SwimDive"
 void func_3759()
 {
     printf("status_palutena_SwimDive");
@@ -61619,6 +63137,7 @@ void func_3759()
     func_2105();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_pre_palutena_RunBrake"
 int func_3760()
 {
     printf("status_pre_palutena_RunBrake");
@@ -61635,6 +63154,7 @@ int func_3760()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_RunBrake_init_status"
 void func_3761()
 {
     float var0;
@@ -61658,6 +63178,7 @@ void func_3761()
     func_753();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_RunBrake"
 void func_3762()
 {
     float var0;
@@ -61688,6 +63209,7 @@ void func_3762()
     func_78(func_722);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_end_palutena_RunBrake"
 void func_3763()
 {
     printf("status_end_palutena_RunBrake");
@@ -61699,6 +63221,7 @@ void func_3763()
     func_737();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "sub_uniq_process_RunBrake_exec_status"
 void func_3764()
 {
     printf("sub_uniq_process_RunBrake_exec_status");
@@ -61724,6 +63247,7 @@ void func_3764()
     }
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)  "status_palutena_GimmickTornado"
 void func_3765()
 {
     printf("status_palutena_GimmickTornado");
@@ -61732,6 +63256,7 @@ void func_3765()
     func_1844();
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 int func_3766(int arg0)
 {
     if (0)
@@ -61797,6 +63322,7 @@ int func_3766(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 int func_3767(int arg0)
 {
     if (0)
@@ -61862,6 +63388,7 @@ int func_3767(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 void func_3768(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -61873,6 +63400,7 @@ void func_3768(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 void func_3769(int arg0)
 {
     int var1;
@@ -61892,6 +63420,7 @@ void func_3769(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 int func_3770(int arg0)
 {
     if (0 == arg0)
@@ -61913,6 +63442,7 @@ int func_3770(int arg0)
     return 0;
 }
 
+// [Copy: Robin 0x222] pre  "status_pre_SpecialN"
 int func_3771()
 {
     printf("status_pre_SpecialN");
@@ -61928,6 +63458,7 @@ int func_3771()
     return 0;
 }
 
+// [Copy: Robin 0x222] main  "status_SpecialN"
 void func_3772()
 {
     printf("status_SpecialN");
@@ -61941,6 +63472,7 @@ void func_3772()
     func_78(func_3773);
 }
 
+// [Copy: Robin 0x222] loop  "sub_SpecialN"
 void func_3773()
 {
     int var0;
@@ -61954,11 +63486,13 @@ void func_3773()
     func_3796(var0);
 }
 
+// [Copy: Robin 0x222] end
 void func_3774()
 {
     
 }
 
+// [Copy: Robin 0x223] pre  "status_pre_SpecialNHold"
 int func_3775()
 {
     printf("status_pre_SpecialNHold");
@@ -61967,6 +63501,7 @@ int func_3775()
     return 0;
 }
 
+// [Copy: Robin 0x223] main  "status_SpecialNHold"
 void func_3776()
 {
     int var0;
@@ -62002,6 +63537,7 @@ void func_3776()
     func_78(func_3777);
 }
 
+// [Copy: Robin 0x223] loop  "sub_SpecialNHold"
 void func_3777()
 {
     int var0;
@@ -62044,6 +63580,7 @@ void func_3777()
     MotionModule(0x4, WorkModuleF(0, 0x30));
 }
 
+// [Copy: Robin 0x223] end
 void func_3778()
 {
     if (WorkModule(0x6, 0x10000085) == 0x3)
@@ -62052,6 +63589,7 @@ void func_3778()
     }
 }
 
+// [Copy: Robin 0x224] pre  "status_pre_SpecialNShoot"
 int func_3779()
 {
     printf("status_pre_SpecialNShoot");
@@ -62060,6 +63598,7 @@ int func_3779()
     return 0;
 }
 
+// [Copy: Robin 0x224] main  "status_SpecialNShoot"
 void func_3780()
 {
     int var0;
@@ -62106,6 +63645,7 @@ void func_3780()
     func_78(func_3781);
 }
 
+// [Copy: Robin 0x224] loop  "sub_SpecialNShoot"
 void func_3781()
 {
     int var0;
@@ -62168,11 +63708,13 @@ void func_3781()
     func_3796(var0);
 }
 
+// [Copy: Robin 0x224] end
 void func_3782()
 {
     WorkModule(0x7, 0, 0x10000085);
 }
 
+// [Copy: Robin 0x225] pre  "status_pre_SpecialNTronStart"
 int func_3783()
 {
     printf("status_pre_SpecialNTronStart");
@@ -62182,6 +63724,7 @@ int func_3783()
     return 0;
 }
 
+// [Copy: Robin 0x225] main  "status_SpecialNTronStart"
 void func_3784()
 {
     int var0;
@@ -62206,6 +63749,7 @@ void func_3784()
     func_78(func_3785);
 }
 
+// [Copy: Robin 0x225] loop  "sub_SpecialNTronStart"
 void func_3785()
 {
     int var0;
@@ -62219,6 +63763,7 @@ void func_3785()
     func_3796(var0);
 }
 
+// [Copy: Robin 0x225] end
 void func_3786()
 {
     EffectModule(0x20, 0x1a);
@@ -62229,6 +63774,7 @@ void func_3786()
     }
 }
 
+// [Copy: Robin 0x226] pre  "status_pre_SpecialNTronHold"
 int func_3787()
 {
     printf("status_pre_SpecialNTronHold");
@@ -62237,6 +63783,7 @@ int func_3787()
     return 0;
 }
 
+// [Copy: Robin 0x226] main  "status_SpecialNTronHold"
 void func_3788()
 {
     printf("status_SpecialNTronHold");
@@ -62256,11 +63803,13 @@ void func_3788()
     func_78(func_3789);
 }
 
+// [Copy: Robin 0x226] loop
 void func_3789()
 {
     
 }
 
+// [Copy: Robin 0x226] per-frame  "sub_SpecialNTronHold"
 void func_3790()
 {
     int var0;
@@ -62286,6 +63835,7 @@ void func_3790()
     WorkModule(0x9, 0x11000008);
 }
 
+// [Copy: Robin 0x226] end
 void func_3791()
 {
     if (0x227 != global6)
@@ -62294,6 +63844,7 @@ void func_3791()
     }
 }
 
+// [Copy: Robin 0x227] pre  "status_pre_SpecialNTronEnd"
 int func_3792()
 {
     printf("status_pre_SpecialNTronEnd");
@@ -62302,6 +63853,7 @@ int func_3792()
     return 0;
 }
 
+// [Copy: Robin 0x227] main  "status_SpecialNTronEnd"
 void func_3793()
 {
     printf("status_SpecialNTronEnd");
@@ -62314,6 +63866,7 @@ void func_3793()
     func_78(func_3794);
 }
 
+// [Copy: Robin 0x227] loop  "sub_SpecialNTronEnd"
 void func_3794()
 {
     int var0;
@@ -62326,6 +63879,7 @@ void func_3794()
     func_3796(var0);
 }
 
+// [Copy: Robin 0x227] end
 void func_3795()
 {
     WorkModule(0x7, 0, 0x10000085);
@@ -62339,6 +63893,7 @@ void func_3795()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 void func_3796(int arg0)
 {
     int var1;
@@ -62406,6 +63961,7 @@ void func_3796(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Robin
 int func_3797()
 {
     int var0;
@@ -62429,6 +63985,7 @@ int func_3797()
     return 0;
 }
 
+// [Copy: shared] helper used by Duck Hunt, Kirby
 int func_3798(int arg0)
 {
     if (0)
@@ -62446,6 +64003,7 @@ int func_3798(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Duck Hunt, Kirby
 void func_3799(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -62457,6 +64015,7 @@ void func_3799(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Duck Hunt, Kirby
 void func_3800(int arg0)
 {
     int var1;
@@ -62476,6 +64035,7 @@ void func_3800(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Duck Hunt 0x228] pre
 int func_3801()
 {
     func_69();
@@ -62484,6 +64044,7 @@ int func_3801()
     return 0;
 }
 
+// [Copy: Duck Hunt 0x228] main  "status_SpecialN"
 void func_3802()
 {
     printf("status_SpecialN");
@@ -62513,6 +64074,7 @@ void func_3802()
     func_78(func_3803);
 }
 
+// [Copy: Duck Hunt 0x228] loop  "status_SpecialN_Main"
 void func_3803()
 {
     int var0;
@@ -62557,11 +64119,13 @@ void func_3803()
     }
 }
 
+// [Copy: Duck Hunt 0x228] end
 void func_3804()
 {
     WorkModule(0x2710, 0x2000007a);
 }
 
+// [Copy: shared] helper used by Bowser Jr., Kirby
 int func_3805(int arg0)
 {
     if (0)
@@ -62595,6 +64159,7 @@ int func_3805(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Bowser Jr., Kirby
 void func_3806(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -62606,6 +64171,7 @@ void func_3806(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Bowser Jr., Kirby
 void func_3807(int arg0)
 {
     int var1;
@@ -62625,6 +64191,7 @@ void func_3807(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Bowser Jr. 0x229] pre
 int func_3808()
 {
     func_69();
@@ -62633,6 +64200,7 @@ int func_3808()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x229] main
 void func_3809()
 {
     VisibilityModule(0x2711, 0x2, 0x7);
@@ -62640,6 +64208,7 @@ void func_3809()
     func_78(func_3810);
 }
 
+// [Copy: Bowser Jr. 0x229] loop
 int func_3810()
 {
     int var0;
@@ -62673,11 +64242,13 @@ int func_3810()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x229] end
 void func_3811()
 {
     
 }
 
+// [Copy: Bowser Jr. 0x22A] pre
 int func_3812()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x40);
@@ -62685,6 +64256,7 @@ int func_3812()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x22A] main
 void func_3813()
 {
     if (!StopModule(0x1))
@@ -62695,6 +64267,7 @@ void func_3813()
     func_78(func_3814);
 }
 
+// [Copy: Bowser Jr. 0x22A] loop
 int func_3814()
 {
     int var0;
@@ -62711,16 +64284,19 @@ int func_3814()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x22A] per-frame
 void func_3815()
 {
     WorkModule(0x2, 1.0f, 0x1000006);
 }
 
+// [Copy: Bowser Jr. 0x22A] end
 void func_3816()
 {
     
 }
 
+// [Copy: Bowser Jr. 0x22B] pre
 int func_3817()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0x2, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x40);
@@ -62728,11 +64304,13 @@ int func_3817()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x22B] main
 void func_3818()
 {
     func_78(func_3819);
 }
 
+// [Copy: Bowser Jr. 0x22B] loop
 int func_3819()
 {
     int var0;
@@ -62794,11 +64372,13 @@ int func_3819()
     return 0;
 }
 
+// [Copy: Bowser Jr. 0x22B] end
 void func_3820()
 {
     
 }
 
+// [Copy: shared] helper used by Bowser Jr., Kirby
 int func_3821(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     int var7;
@@ -62834,6 +64414,7 @@ int func_3821(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int ar
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Shulk
 int func_3822(int arg0)
 {
     if (0)
@@ -62883,6 +64464,7 @@ int func_3822(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Shulk
 void func_3823(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -62894,6 +64476,7 @@ void func_3823(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Shulk
 void func_3824(int arg0)
 {
     int var1;
@@ -62913,6 +64496,7 @@ void func_3824(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3825()
 {
     WorkModule(0x17, 0x1e000062);
@@ -62925,6 +64509,7 @@ int func_3825()
     return 0;
 }
 
+// [Copy: Shulk 0x22C] pre
 int func_3826()
 {
     func_69();
@@ -62933,6 +64518,7 @@ int func_3826()
     return 0;
 }
 
+// [Copy: Shulk 0x22C] main
 void func_3827()
 {
     float var0;
@@ -63020,6 +64606,7 @@ void func_3827()
     func_78(func_3828);
 }
 
+// [Copy: Shulk 0x22C] loop
 void func_3828()
 {
     float var0;
@@ -63094,11 +64681,13 @@ void func_3828()
     }
 }
 
+// [Copy: Shulk 0x22C] end
 void func_3829()
 {
     
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 int func_3830(int arg0)
 {
     if (0)
@@ -63148,6 +64737,7 @@ int func_3830(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 void func_3831(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -63159,6 +64749,7 @@ void func_3831(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 void func_3832(int arg0)
 {
     int var1;
@@ -63178,6 +64769,7 @@ void func_3832(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Greninja 0x22D] pre  "Gekkouga status_pre_SpecialN"
 int func_3833()
 {
     printf("Gekkouga status_pre_SpecialN");
@@ -63187,6 +64779,7 @@ int func_3833()
     return 0;
 }
 
+// [Copy: Greninja 0x22D] main  "Gekkouga status_SpecialN"
 void func_3834()
 {
     float var0;
@@ -63211,6 +64804,7 @@ void func_3834()
     func_78(func_3835);
 }
 
+// [Copy: Greninja 0x22D] loop
 void func_3835()
 {
     if (MotionModule(0x2712))
@@ -63225,6 +64819,7 @@ void func_3835()
     func_3855();
 }
 
+// [Copy: Greninja 0x22D] end
 void func_3836()
 {
     if (global6 != 0x22e)
@@ -63234,6 +64829,7 @@ void func_3836()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: Greninja 0x22E] pre  "Gekkouga status_pre_SpecialNHold"
 int func_3837()
 {
     printf("Gekkouga status_pre_SpecialNHold");
@@ -63242,6 +64838,7 @@ int func_3837()
     return 0;
 }
 
+// [Copy: Greninja 0x22E] main  "Gekkouga status_SpecialNHold"
 void func_3838()
 {
     float var0;
@@ -63266,6 +64863,7 @@ void func_3838()
     func_78(func_3839);
 }
 
+// [Copy: Greninja 0x22E] loop  "status_SpecialNHold_Main FL_charge_rate:"
 void func_3839()
 {
     float var0;
@@ -63330,6 +64928,7 @@ void func_3839()
     func_3855();
 }
 
+// [Copy: Greninja 0x22E] end  "Gekkouga status_end_SpecialNHold ChargeRate:"
 void func_3840()
 {
     float var0;
@@ -63345,6 +64944,7 @@ void func_3840()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: Greninja 0x22F] pre  "status_pre_SpecialNShot"
 int func_3841()
 {
     printf("status_pre_SpecialNShot");
@@ -63353,6 +64953,7 @@ int func_3841()
     return 0;
 }
 
+// [Copy: Greninja 0x22F] main  "Gekkouga status_SpecialNShot"
 void func_3842()
 {
     float var0;
@@ -63369,6 +64970,7 @@ void func_3842()
     func_78(func_3843);
 }
 
+// [Copy: Greninja 0x22F] loop  "Gekkouga status_SpecialNShoot_Main ShootAarticle"
 void func_3843()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -63396,6 +64998,7 @@ void func_3843()
     func_3855();
 }
 
+// [Copy: Greninja 0x22F] end
 void func_3844()
 {
     func_3856();
@@ -63410,6 +65013,7 @@ void func_3844()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: Greninja 0x230] pre  "Gekkouga status_pre_SpecialNMaxStart"
 int func_3845()
 {
     printf("Gekkouga status_pre_SpecialNMaxStart");
@@ -63418,6 +65022,7 @@ int func_3845()
     return 0;
 }
 
+// [Copy: Greninja 0x230] main  "Gekkouga status_SpecialNMaxStart"
 void func_3846()
 {
     printf("Gekkouga status_SpecialNMaxStart");
@@ -63429,6 +65034,7 @@ void func_3846()
     func_78(func_3847);
 }
 
+// [Copy: Greninja 0x230] loop
 void func_3847()
 {
     if (MotionModule(0x2712))
@@ -63439,6 +65045,7 @@ void func_3847()
     func_3855();
 }
 
+// [Copy: Greninja 0x230] end
 void func_3848()
 {
     if (global6 != 0x231)
@@ -63448,6 +65055,7 @@ void func_3848()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: Greninja 0x231] pre  "Gekkouga status_pre_SpecialNMaxShot"
 int func_3849()
 {
     printf("Gekkouga status_pre_SpecialNMaxShot");
@@ -63456,6 +65064,7 @@ int func_3849()
     return 0;
 }
 
+// [Copy: Greninja 0x231] main  "status_SpecialNMaxShot"
 void func_3850()
 {
     printf("status_SpecialNMaxShot");
@@ -63467,6 +65076,7 @@ void func_3850()
     func_78(func_3851);
 }
 
+// [Copy: Greninja 0x231] loop  "Gekkouga status_SpecialNShot_Main ShootAarticle"
 void func_3851()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -63494,6 +65104,7 @@ void func_3851()
     func_3855();
 }
 
+// [Copy: Greninja 0x231] end
 void func_3852()
 {
     func_3856();
@@ -63508,6 +65119,7 @@ void func_3852()
     GroundModule(0x1f, 0xffffffff);
 }
 
+// [Copy: Greninja 0x22F, 0x231] init
 void func_3853()
 {
     float var0;
@@ -63535,6 +65147,7 @@ void func_3853()
     }
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 void func_3854()
 {
     if (global18 == 0)
@@ -63551,6 +65164,7 @@ void func_3854()
     }
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 void func_3855()
 {
     if (global19 == 0)
@@ -63570,22 +65184,26 @@ void func_3855()
     }
 }
 
+// [Copy: shared] helper used by Greninja, Kirby
 void func_3856()
 {
     WorkModule(0, 0 + 0, 0x2f);
     WorkModule(0x2711, 0x20000078);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3857()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3858()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Pac-Man
 int func_3859(int arg0)
 {
     if (0)
@@ -63627,6 +65245,7 @@ int func_3859(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Pac-Man
 void func_3860(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -63638,6 +65257,7 @@ void func_3860(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Pac-Man
 void func_3861(int arg0)
 {
     int var1;
@@ -63657,6 +65277,7 @@ void func_3861(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Pac-Man 0x232] pre
 int func_3862()
 {
     func_69();
@@ -63665,6 +65286,7 @@ int func_3862()
     return 0;
 }
 
+// [Copy: Pac-Man 0x232] main  "Pacman status_SpecialN"
 void func_3863()
 {
     int var0;
@@ -63690,6 +65312,7 @@ void func_3863()
     func_78(func_3864);
 }
 
+// [Copy: Pac-Man 0x232] loop  "target_num ="
 void func_3864()
 {
     int var0;
@@ -63726,11 +65349,13 @@ void func_3864()
     }
 }
 
+// [Copy: Pac-Man 0x232] end
 void func_3865()
 {
     
 }
 
+// [Copy: Pac-Man 0x233] pre
 int func_3866()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -63738,6 +65363,7 @@ int func_3866()
     return 0;
 }
 
+// [Copy: Pac-Man 0x233] main  "Pacman status_SpecialNHold"
 void func_3867()
 {
     printf("Pacman status_SpecialNHold");
@@ -63761,6 +65387,7 @@ void func_3867()
     func_78(func_3868);
 }
 
+// [Copy: Pac-Man 0x233] loop
 void func_3868()
 {
     if (global19 == 0 && global18 == 0x2)
@@ -63775,6 +65402,7 @@ void func_3868()
     }
 }
 
+// [Copy: Pac-Man 0x233] per-frame  "Pacman status_SpecialN ChargeRank:"
 void func_3869()
 {
     int var0;
@@ -63849,6 +65477,7 @@ void func_3869()
     }
 }
 
+// [Copy: Pac-Man 0x233] end
 void func_3870()
 {
     if (global6 != 0x234 && global6 != 0x235 && global6 != 0x20 && global6 != 0x21)
@@ -63859,6 +65488,7 @@ void func_3870()
     }
 }
 
+// [Copy: Pac-Man 0x234] pre
 int func_3871()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -63866,6 +65496,7 @@ int func_3871()
     return 0;
 }
 
+// [Copy: Pac-Man 0x234] main  "Pacman status_SpecialNShoot"
 void func_3872()
 {
     printf("Pacman status_SpecialNShoot");
@@ -63889,6 +65520,7 @@ void func_3872()
     func_78(func_3873);
 }
 
+// [Copy: Pac-Man 0x234] loop
 void func_3873()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -63926,6 +65558,7 @@ void func_3873()
     }
 }
 
+// [Copy: Pac-Man 0x234] end
 void func_3874()
 {
     if (global6 != 0 && global6 != 0xe)
@@ -63935,6 +65568,7 @@ void func_3874()
     }
 }
 
+// [Copy: Pac-Man 0x235] pre
 int func_3875()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -63942,6 +65576,7 @@ int func_3875()
     return 0;
 }
 
+// [Copy: Pac-Man 0x235] main  "Pacman status_SpecialNCancel"
 void func_3876()
 {
     printf("Pacman status_SpecialNCancel");
@@ -63958,6 +65593,7 @@ void func_3876()
     func_78(func_3877);
 }
 
+// [Copy: Pac-Man 0x235] loop
 void func_3877()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -63979,11 +65615,13 @@ void func_3877()
     }
 }
 
+// [Copy: Pac-Man 0x235] end
 void func_3878()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Pac-Man
 void func_3879()
 {
     float var0;
@@ -64010,6 +65648,7 @@ void func_3879()
     KineticModule(0xc, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Pac-Man
 void func_3880()
 {
     float var0;
@@ -64038,6 +65677,7 @@ void func_3880()
     func_3879();
 }
 
+// [Copy: shared] helper used by Kirby, Mega Man
 int func_3881(int arg0)
 {
     if (0)
@@ -64063,6 +65703,7 @@ int func_3881(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mega Man
 void func_3882(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -64074,6 +65715,7 @@ void func_3882(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mega Man
 void func_3883(int arg0)
 {
     int var1;
@@ -64093,6 +65735,7 @@ void func_3883(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mega Man 0x236] pre
 int func_3884()
 {
     int var0;
@@ -64107,6 +65750,7 @@ int func_3884()
     return 0;
 }
 
+// [Copy: Mega Man 0x236] main
 void func_3885()
 {
     if (ArticleModule(0x2717, 0xf) == 0x1)
@@ -64117,6 +65761,7 @@ void func_3885()
     func_78(func_3886);
 }
 
+// [Copy: Mega Man 0x236] loop
 void func_3886()
 {
     int var0;
@@ -64181,6 +65826,7 @@ void func_3886()
     }
 }
 
+// [Copy: Mega Man 0x236] end
 void func_3887()
 {
     if (WorkModule(0x6, 0x11000002) != 0)
@@ -64189,11 +65835,13 @@ void func_3887()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mega Man
 int func_3888()
 {
     return StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mega Man
 void func_3889(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
 {
     if (global18 == 0)
@@ -64226,6 +65874,7 @@ void func_3889(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 int func_3890(int arg0)
 {
     if (0)
@@ -64267,6 +65916,7 @@ int func_3890(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3891(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -64278,6 +65928,7 @@ void func_3891(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3892(int arg0)
 {
     int var1;
@@ -64297,6 +65948,7 @@ void func_3892(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Mewtwo 0x237] pre
 int func_3893()
 {
     func_69();
@@ -64305,12 +65957,14 @@ int func_3893()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3894()
 {
     func_20(0);
     GroundModule(0x2710, 0x2);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3895()
 {
     if (!WorkModule(0x10, 0x20000079))
@@ -64324,12 +65978,14 @@ void func_3895()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3896()
 {
     func_20(0x2);
     GroundModule(0x2710, 0x5);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3897()
 {
     if (!WorkModule(0x10, 0x20000079))
@@ -64343,6 +65999,7 @@ void func_3897()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3898()
 {
     if (global18 == 0)
@@ -64359,6 +66016,7 @@ void func_3898()
     }
 }
 
+// [Copy: Mewtwo 0x237] per-frame
 void func_3899()
 {
     if (MotionModuleF(0x1) > 0 && ControlModule(0x2710, 0x1))
@@ -64368,6 +66026,7 @@ void func_3899()
     }
 }
 
+// [Copy: Mewtwo 0x237] main
 void func_3900()
 {
     int var0;
@@ -64393,6 +66052,7 @@ void func_3900()
     func_78(func_3901);
 }
 
+// [Copy: Mewtwo 0x237] loop
 void func_3901()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -64434,11 +66094,13 @@ void func_3901()
     }
 }
 
+// [Copy: Mewtwo 0x237] end
 void func_3902()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 int func_3903()
 {
     if (global18 == 0)
@@ -64463,6 +66125,7 @@ int func_3903()
     return 0;
 }
 
+// [Copy: Mewtwo 0x238] pre
 int func_3904()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -64470,12 +66133,14 @@ int func_3904()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3905()
 {
     WorkModule(0x16, 0x1e000027);
     WorkModule(0x16, 0x1e000028);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3906()
 {
     WorkModule(0x19, 0x1f000005);
@@ -64484,6 +66149,7 @@ void func_3906()
     WorkModule(0x1a, 0x1f00000d);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3907()
 {
     WorkModule(0x1a, 0x1f000005);
@@ -64492,6 +66158,7 @@ void func_3907()
     WorkModule(0x19, 0x1f00000d);
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3908()
 {
     if (global18 == 0)
@@ -64510,6 +66177,7 @@ void func_3908()
     }
 }
 
+// [Copy: Mewtwo 0x238] main
 void func_3909()
 {
     float var0;
@@ -64548,6 +66216,7 @@ void func_3909()
     func_78(func_3910);
 }
 
+// [Copy: Mewtwo 0x238] loop
 void func_3910()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -64589,11 +66258,13 @@ void func_3910()
     }
 }
 
+// [Copy: Mewtwo 0x238] end
 void func_3911()
 {
     
 }
 
+// [Copy: Mewtwo 0x239] pre
 int func_3912()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x100);
@@ -64601,6 +66272,7 @@ int func_3912()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3913()
 {
     if (global18 == 0)
@@ -64619,6 +66291,7 @@ void func_3913()
     }
 }
 
+// [Copy: Mewtwo 0x239] main
 void func_3914()
 {
     WorkModule(0x2711, 0x20000079);
@@ -64630,6 +66303,7 @@ void func_3914()
     func_78(func_3915);
 }
 
+// [Copy: Mewtwo 0x239] loop
 void func_3915()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -64666,11 +66340,13 @@ void func_3915()
     }
 }
 
+// [Copy: Mewtwo 0x239] end
 void func_3916()
 {
     
 }
 
+// [Copy: Mewtwo 0x23A] pre
 int func_3917()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -64678,6 +66354,7 @@ int func_3917()
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Mewtwo
 void func_3918()
 {
     if (global18 == 0)
@@ -64695,6 +66372,7 @@ void func_3918()
     }
 }
 
+// [Copy: Mewtwo 0x23A] main
 void func_3919()
 {
     WorkModule(0x2711, 0x20000079);
@@ -64704,6 +66382,7 @@ void func_3919()
     func_78(func_3920);
 }
 
+// [Copy: Mewtwo 0x23A] loop
 void func_3920()
 {
     if (StatusModule(0x6) == 0 && global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
@@ -64736,11 +66415,13 @@ void func_3920()
     }
 }
 
+// [Copy: Mewtwo 0x23A] end
 void func_3921()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Ryu
 int func_3922(int arg0)
 {
     if (0)
@@ -64758,6 +66439,7 @@ int func_3922(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Ryu
 void func_3923(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -64769,6 +66451,7 @@ void func_3923(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Ryu
 void func_3924(int arg0)
 {
     int var1;
@@ -64788,6 +66471,7 @@ void func_3924(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Ryu
 void func_3925()
 {
     if (WorkModule(0x10, 0x2100000f))
@@ -64801,6 +66485,7 @@ void func_3925()
     }
 }
 
+// [Copy: Ryu 0x23B, 0x23C] pre
 int func_3926()
 {
     func_69();
@@ -64809,6 +66494,7 @@ int func_3926()
     return 0;
 }
 
+// [Copy: Ryu 0x23B] main
 void func_3927()
 {
     if (!StopModule(0x1))
@@ -64819,6 +66505,7 @@ void func_3927()
     func_78(func_3928);
 }
 
+// [Copy: Ryu 0x23B] loop
 void func_3928()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -64844,11 +66531,13 @@ void func_3928()
     }
 }
 
+// [Copy: Ryu 0x23B, 0x23C, 0x23D] end
 void func_3929()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Ryu
 void func_3930()
 {
     if (global18 == 0)
@@ -64888,12 +66577,14 @@ void func_3930()
     }
 }
 
+// [Copy: Ryu 0x23B] per-frame
 void func_3931()
 {
     func_3925();
     WorkModule(0x9, 0x11000003);
 }
 
+// [Copy: Ryu 0x23B] init
 void func_3932()
 {
     float var0;
@@ -64933,6 +66624,7 @@ void func_3932()
     }
 }
 
+// [Copy: Ryu 0x23B, 0x23C, 0x23D] exec
 void func_3933()
 {
     float var0;
@@ -64964,17 +66656,20 @@ void func_3933()
     }
 }
 
+// [Copy: Ryu 0x23C] main
 void func_3934()
 {
     func_3927();
 }
 
+// [Copy: Ryu 0x23C, 0x23D] init
 void func_3935()
 {
     WorkModule(0x2710, 0x2100000d);
     func_3932();
 }
 
+// [Copy: Ryu 0x23D] pre
 int func_3936()
 {
     func_69();
@@ -64983,6 +66678,7 @@ int func_3936()
     return 0;
 }
 
+// [Copy: Ryu 0x23D] main
 void func_3937()
 {
     WorkModule(0x7, 0, 0x11000002);
@@ -64995,6 +66691,7 @@ void func_3937()
     func_78(func_3928);
 }
 
+// [Kirby helper] used by Kirby's own moves
 int func_3938()
 {
     if (global45 & 0x2)
@@ -65022,6 +66719,7 @@ int func_3938()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 int func_3939(int arg0)
 {
     int var1;
@@ -65100,6 +66798,7 @@ int func_3939(int arg0)
     return var11;
 }
 
+// [Kirby helper] used by Kirby's own moves
 int func_3940()
 {
     int var0;
@@ -65135,12 +66834,14 @@ int func_3940()
     return var4;
 }
 
+// [Kirby helper] used by Kirby's own moves
 void func_3941()
 {
     func_1998();
     func_78(func_3942);
 }
 
+// [Kirby helper] used by Kirby's own moves
 void func_3942()
 {
     if (CancelModule(0x2713) == 0)
@@ -65153,6 +66854,7 @@ void func_3942()
     func_1999();
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 int func_3943(int arg0)
 {
     if (0)
@@ -65194,6 +66896,7 @@ int func_3943(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3944(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -65205,6 +66908,7 @@ void func_3944(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3945(int arg0)
 {
     int var1;
@@ -65224,6 +66928,7 @@ void func_3945(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3946(int arg0)
 {
     if (global18 == WorkModule(0x6, arg0))
@@ -65236,6 +66941,7 @@ void func_3946(int arg0)
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3947(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     if (global18 == 0)
@@ -65269,6 +66975,7 @@ void func_3947(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int a
     WorkModule(0x2710, arg1);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3948(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
 {
     int var6;
@@ -65308,6 +67015,7 @@ void func_3948(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5)
     WorkModule(0x2710, arg1);
 }
 
+// [Copy: Lucas 0x23E] pre
 int func_3949()
 {
     func_69();
@@ -65316,6 +67024,7 @@ int func_3949()
     return 0;
 }
 
+// [Copy: Lucas 0x23E] main
 void func_3950()
 {
     WorkModule(0x7, WorkModule(0x6, 0x15000000), 0x11000004);
@@ -65329,6 +67038,7 @@ void func_3950()
     func_78(func_3951);
 }
 
+// [Copy: Lucas 0x23E] loop
 void func_3951()
 {
     int var0;
@@ -65371,6 +67081,7 @@ void func_3951()
     func_3972();
 }
 
+// [Copy: Lucas 0x23E] per-frame
 void func_3952()
 {
     func_3954();
@@ -65381,11 +67092,13 @@ void func_3952()
     func_3955();
 }
 
+// [Copy: Lucas 0x23E] end
 void func_3953()
 {
     func_3956();
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3954()
 {
     if (WorkModule(0x10, 0x2100000e) && !WorkModule(0x10, 0x2100000f))
@@ -65409,6 +67122,7 @@ void func_3954()
     }
 }
 
+// [Copy: Lucas 0x240] per-frame
 void func_3955()
 {
     if (global18 != 0)
@@ -65425,6 +67139,7 @@ void func_3955()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3956()
 {
     if (global6 != 0x23f && global6 != 0x240 && global6 != 0x241)
@@ -65436,6 +67151,7 @@ void func_3956()
     }
 }
 
+// [Copy: Lucas 0x240] pre
 int func_3957()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -65443,6 +67159,7 @@ int func_3957()
     return 0;
 }
 
+// [Copy: Lucas 0x240] main
 void func_3958()
 {
     if (WorkModuleF(0, 0x5000004) > 0)
@@ -65462,6 +67179,7 @@ void func_3958()
     func_78(func_3959);
 }
 
+// [Copy: Lucas 0x240] loop
 void func_3959()
 {
     int var0;
@@ -65492,11 +67210,13 @@ void func_3959()
     func_3972();
 }
 
+// [Copy: Lucas 0x240] end
 void func_3960()
 {
     func_3956();
 }
 
+// [Copy: Lucas 0x23F] pre
 int func_3961()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -65504,6 +67224,7 @@ int func_3961()
     return 0;
 }
 
+// [Copy: Lucas 0x23F] main
 void func_3962()
 {
     int var0;
@@ -65521,6 +67242,7 @@ void func_3962()
     func_78(func_3963);
 }
 
+// [Copy: Lucas 0x23F] loop
 void func_3963()
 {
     int var0;
@@ -65537,23 +67259,27 @@ void func_3963()
     func_3972();
 }
 
+// [Copy: Lucas 0x23F] per-frame
 void func_3964()
 {
     func_3954();
     func_3955();
 }
 
+// [Copy: Lucas 0x23F] end
 void func_3965()
 {
     func_3956();
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_3966()
 {
     func_3954();
     func_3955();
 }
 
+// [Copy: Lucas 0x241] pre
 int func_3967()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -65561,6 +67287,7 @@ int func_3967()
     return 0;
 }
 
+// [Copy: Lucas 0x241] main
 void func_3968()
 {
     if (WorkModuleF(0, 0x5000004) > 0)
@@ -65580,6 +67307,7 @@ void func_3968()
     func_78(func_3969);
 }
 
+// [Copy: Lucas 0x241] loop
 void func_3969()
 {
     int var0;
@@ -65610,16 +67338,19 @@ void func_3969()
     func_3972();
 }
 
+// [Copy: Lucas 0x241] end
 void func_3970()
 {
     func_3956();
 }
 
+// [Copy: Lucas 0x23E, 0x23F, 0x240, 0x241] init
 void func_3971()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3972()
 {
     if (global3 == 0)
@@ -65628,21 +67359,25 @@ void func_3972()
     }
 }
 
+// [Copy: Lucas 0x23E, 0x23F, 0x240, 0x241] exec
 void func_3973()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Lucas
 void func_3974()
 {
     
 }
 
+// [Copy: Lucas 0x23E, 0x23F, 0x240, 0x241] exec (hitlag)
 void func_3975()
 {
     
 }
 
+// [Copy: Lucas 0x23E, 0x23F, 0x240, 0x241] exit
 void func_3976()
 {
     float var0;
@@ -65656,6 +67391,7 @@ void func_3976()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_3977(int arg0)
 {
     if (0)
@@ -65713,6 +67449,7 @@ int func_3977(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_3978(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -65724,6 +67461,7 @@ void func_3978(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_3979(int arg0)
 {
     int var1;
@@ -65743,6 +67481,7 @@ void func_3979(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Roy 0x242] pre
 int func_3980()
 {
     func_69();
@@ -65751,6 +67490,7 @@ int func_3980()
     return 0;
 }
 
+// [Copy: Roy 0x243] pre
 int func_3981()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -65758,6 +67498,7 @@ int func_3981()
     return 0;
 }
 
+// [Copy: Roy 0x242] main
 void func_3982()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -65766,6 +67507,7 @@ void func_3982()
     func_78(func_3983);
 }
 
+// [Copy: Roy 0x242] loop
 void func_3983()
 {
     if (MotionModule(0x2712))
@@ -65791,6 +67533,7 @@ void func_3983()
     func_3997();
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_3984()
 {
     if (global18 == 0)
@@ -65821,6 +67564,7 @@ void func_3984()
     }
 }
 
+// [Copy: Roy 0x243] main
 void func_3985()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -65833,6 +67577,7 @@ void func_3985()
     func_78(func_3986);
 }
 
+// [Copy: Roy 0x243] loop
 void func_3986()
 {
     float var0;
@@ -65886,6 +67631,7 @@ void func_3986()
     func_4009();
 }
 
+// [Copy: Roy 0x243] per-frame
 void func_3987()
 {
     float var0;
@@ -65899,6 +67645,7 @@ void func_3987()
     }
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_3988()
 {
     float var0;
@@ -65933,16 +67680,19 @@ void func_3988()
     }
 }
 
+// [Copy: Roy 0x242] end
 void func_3989()
 {
     
 }
 
+// [Copy: Roy 0x243] end
 void func_3990()
 {
     
 }
 
+// [Copy: Roy 0x247] pre
 int func_3991()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -65950,6 +67700,7 @@ int func_3991()
     return 0;
 }
 
+// [Copy: Roy 0x247] main
 void func_3992()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -65957,6 +67708,7 @@ void func_3992()
     func_78(func_3993);
 }
 
+// [Copy: Roy 0x247] loop
 void func_3993()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -65986,6 +67738,7 @@ void func_3993()
     func_4031();
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_3994()
 {
     if (global18 == 0)
@@ -66018,11 +67771,13 @@ void func_3994()
     }
 }
 
+// [Copy: Roy 0x247] end
 void func_3995()
 {
     
 }
 
+// [Copy: Roy 0x242] init
 void func_3996()
 {
     float var0;
@@ -66063,6 +67818,7 @@ void func_3996()
     sys_35(0x1, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_3997()
 {
     if (global3 == 0)
@@ -66079,6 +67835,7 @@ int func_3997()
     return 0;
 }
 
+// [Copy: Roy 0x242] exec
 void func_3998()
 {
     int var0;
@@ -66113,46 +67870,55 @@ void func_3998()
     }
 }
 
+// [Copy: Roy 0x242] exec (hitlag)
 void func_3999()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4000()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4001()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4002()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4003()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4004()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4005()
 {
     
 }
 
+// [Copy: Roy 0x242] exit
 void func_4006()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4007()
 {
     int var0;
@@ -66164,6 +67930,7 @@ int func_4007()
     return var0;
 }
 
+// [Copy: Roy 0x243] init
 void func_4008()
 {
     int var0;
@@ -66176,6 +67943,7 @@ void func_4008()
     SoundModule(0x2717, var2);
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4009()
 {
     if (global3 == 0)
@@ -66192,6 +67960,7 @@ int func_4009()
     return 0;
 }
 
+// [Copy: Roy 0x243] exec
 void func_4010()
 {
     int var0;
@@ -66224,41 +67993,49 @@ void func_4010()
     }
 }
 
+// [Copy: Roy 0x243] exec (hitlag)
 void func_4011()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4012()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4013()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4014()
 {
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4015()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4016()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4017()
 {
     
 }
 
+// [Copy: Roy 0x243] exit
 void func_4018()
 {
     int var0;
@@ -66269,11 +68046,13 @@ void func_4018()
     }
 }
 
+// [Copy: Roy 0x244, 0x245, 0x246] init
 void func_4019()
 {
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4020()
 {
     if (global3 == 0)
@@ -66290,26 +68069,31 @@ int func_4020()
     return 0;
 }
 
+// [Copy: Roy 0x244, 0x245, 0x246] exec
 void func_4021()
 {
     
 }
 
+// [Copy: Roy 0x244, 0x245, 0x246] exec (hitlag)
 void func_4022()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4023()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4024()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4025()
 {
     int var0;
@@ -66336,31 +68120,37 @@ int func_4025()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4026()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4027()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4028()
 {
     
 }
 
+// [Copy: Roy 0x244, 0x245, 0x246] exit
 void func_4029()
 {
     
 }
 
+// [Copy: Roy 0x247] init
 void func_4030()
 {
     KineticModule(0xb, 0);
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4031()
 {
     if (global3 == 0)
@@ -66377,26 +68167,31 @@ int func_4031()
     return 0;
 }
 
+// [Copy: Roy 0x247] exec
 void func_4032()
 {
     
 }
 
+// [Copy: Roy 0x247] exec (hitlag)
 void func_4033()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4034()
 {
     
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4035()
 {
     return 0;
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 int func_4036()
 {
     float var0;
@@ -66412,26 +68207,31 @@ int func_4036()
     return 0;
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4037()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4038()
 {
     
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4039()
 {
     
 }
 
+// [Copy: Roy 0x247] exit
 void func_4040()
 {
     
 }
 
+// [Copy: Roy 0x244] pre
 int func_4041()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -66439,6 +68239,7 @@ int func_4041()
     return 0;
 }
 
+// [Copy: Roy 0x244] main
 void func_4042()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -66446,6 +68247,7 @@ void func_4042()
     func_78(func_4043);
 }
 
+// [Copy: Roy 0x244] loop
 void func_4043()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -66475,6 +68277,7 @@ void func_4043()
     func_4020();
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_4044()
 {
     if (global18 == 0)
@@ -66507,11 +68310,13 @@ void func_4044()
     }
 }
 
+// [Copy: Roy 0x244] end
 void func_4045()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: Roy 0x245] pre
 int func_4046()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -66519,6 +68324,7 @@ int func_4046()
     return 0;
 }
 
+// [Copy: Roy 0x245] main
 void func_4047()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -66526,6 +68332,7 @@ void func_4047()
     func_78(func_4048);
 }
 
+// [Copy: Roy 0x245] loop
 void func_4048()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -66555,6 +68362,7 @@ void func_4048()
     func_4020();
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_4049()
 {
     if (global18 == 0)
@@ -66587,11 +68395,13 @@ void func_4049()
     }
 }
 
+// [Copy: Roy 0x245] end
 void func_4050()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: Roy 0x246] pre
 int func_4051()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
@@ -66599,6 +68409,7 @@ int func_4051()
     return 0;
 }
 
+// [Copy: Roy 0x246] main
 void func_4052()
 {
     WorkModule(0x2711, 0x2100000d);
@@ -66606,6 +68417,7 @@ void func_4052()
     func_78(func_4053);
 }
 
+// [Copy: Roy 0x246] loop
 void func_4053()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -66635,6 +68447,7 @@ void func_4053()
     func_4020();
 }
 
+// [Copy: shared] helper used by Kirby, Roy
 void func_4054()
 {
     if (global18 == 0)
@@ -66667,11 +68480,13 @@ void func_4054()
     }
 }
 
+// [Copy: Roy 0x246] end
 void func_4055()
 {
     DamageModule(0xb, 0, (float)0 + 0);
 }
 
+// [Copy: shared] helper used by Cloud, Kirby
 int func_4056(int arg0)
 {
     if (0)
@@ -66689,6 +68504,7 @@ int func_4056(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Cloud, Kirby
 void func_4057(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -66700,6 +68516,7 @@ void func_4057(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Cloud, Kirby
 void func_4058(int arg0)
 {
     int var1;
@@ -66719,6 +68536,7 @@ void func_4058(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Cloud 0x248] pre
 int func_4059()
 {
     func_69();
@@ -66727,6 +68545,7 @@ int func_4059()
     return 0;
 }
 
+// [Copy: shared] helper used by Cloud, Kirby
 void func_4060(int arg0)
 {
     if (global18 == 0)
@@ -66758,6 +68577,7 @@ void func_4060(int arg0)
     }
 }
 
+// [Copy: Cloud 0x248] init
 void func_4061()
 {
     float var0;
@@ -66790,12 +68610,14 @@ void func_4061()
     }
 }
 
+// [Copy: Cloud 0x248] main
 void func_4062()
 {
     func_4060(0x1);
     func_78(func_4063);
 }
 
+// [Copy: Cloud 0x248] loop
 void func_4063()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -66821,6 +68643,7 @@ void func_4063()
     }
 }
 
+// [Copy: Cloud 0x248] exec
 void func_4064()
 {
     if (global18 == 0x2)
@@ -66843,11 +68666,13 @@ void func_4064()
     }
 }
 
+// [Copy: Cloud 0x248] end
 void func_4065()
 {
     
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 int func_4066(int arg0)
 {
     if (0)
@@ -66937,6 +68762,7 @@ int func_4066(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4067(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -66948,6 +68774,7 @@ void func_4067(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4068(int arg0)
 {
     int var1;
@@ -66967,6 +68794,7 @@ void func_4068(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 int func_4069(int arg0, int arg1)
 {
     if (WorkModule(0x10, 0x2100000e) == 0)
@@ -66976,6 +68804,7 @@ int func_4069(int arg0, int arg1)
     return arg1;
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 int func_4070()
 {
     if (global18 == 0)
@@ -67012,6 +68841,7 @@ int func_4070()
     return 0;
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4071()
 {
     if (WorkModule(0x10, 0x21000011) == 0)
@@ -67023,6 +68853,7 @@ void func_4071()
     }
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4072()
 {
     if (global6 != 0x24a && global6 != 0x24b && global6 != 0x24c)
@@ -67031,6 +68862,7 @@ void func_4072()
     }
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 int func_4073()
 {
     if (global18 == 0 && WorkModuleF(0, 0x1000007))
@@ -67040,6 +68872,7 @@ int func_4073()
     return 0;
 }
 
+// [Copy: Bayonetta 0x249] pre
 int func_4074()
 {
     func_69();
@@ -67048,6 +68881,7 @@ int func_4074()
     return 0;
 }
 
+// [Copy: Bayonetta 0x249] main
 void func_4075()
 {
     WorkModule(0x7, func_4069(0x21f, 0x229), 0x11000002);
@@ -67061,6 +68895,7 @@ void func_4075()
     func_78(func_4076);
 }
 
+// [Copy: Bayonetta 0x249] loop
 void func_4076()
 {
     if (func_4070())
@@ -67086,11 +68921,13 @@ void func_4076()
     }
 }
 
+// [Copy: Bayonetta 0x249] end
 void func_4077()
 {
     func_4072();
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4078()
 {
     if (global18 == 0)
@@ -67116,6 +68953,7 @@ void func_4078()
     }
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4079()
 {
     func_4078();
@@ -67140,6 +68978,7 @@ void func_4079()
     }
 }
 
+// [Copy: Bayonetta 0x249] per-frame
 void func_4080()
 {
     func_4071();
@@ -67153,6 +68992,7 @@ void func_4080()
     }
 }
 
+// [Copy: Bayonetta 0x249] init
 void func_4081()
 {
     float var0;
@@ -67194,6 +69034,7 @@ void func_4081()
     WorkModule(0, WorkModuleF(0, 0x33) + 0, 0x1000007);
 }
 
+// [Copy: Bayonetta 0x24A] pre
 int func_4082()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x14000, 0, 0x80, 0);
@@ -67201,6 +69042,7 @@ int func_4082()
     return 0;
 }
 
+// [Copy: Bayonetta 0x24A] main
 void func_4083()
 {
     WorkModule(0x7, func_4069(0x220, 0x22a), 0x11000002);
@@ -67218,6 +69060,7 @@ void func_4083()
     func_78(func_4084);
 }
 
+// [Copy: Bayonetta 0x24A] loop
 void func_4084()
 {
     if (func_4070())
@@ -67255,16 +69098,19 @@ void func_4084()
     }
 }
 
+// [Copy: Bayonetta 0x24A] end
 void func_4085()
 {
     func_4072();
 }
 
+// [Copy: Bayonetta 0x24A] per-frame
 void func_4086()
 {
     func_4071();
 }
 
+// [Copy: Bayonetta 0x24A] init
 void func_4087()
 {
     if (global18 == 0)
@@ -67280,6 +69126,7 @@ void func_4087()
     }
 }
 
+// [Copy: Bayonetta 0x24B] pre
 int func_4088()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x14000, 0, 0x80, 0);
@@ -67287,6 +69134,7 @@ int func_4088()
     return 0;
 }
 
+// [Copy: Bayonetta 0x24B] main
 void func_4089()
 {
     WorkModule(0x7, func_4069(0x222, 0x22c), 0x11000002);
@@ -67301,6 +69149,7 @@ void func_4089()
     func_78(func_4090);
 }
 
+// [Copy: Bayonetta 0x24B] loop
 void func_4090()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -67343,11 +69192,13 @@ void func_4090()
     }
 }
 
+// [Copy: Bayonetta 0x24B] end
 void func_4091()
 {
     func_4072();
 }
 
+// [Copy: shared] helper used by Bayonetta, Kirby
 void func_4092()
 {
     func_4078();
@@ -67372,6 +69223,7 @@ void func_4092()
     }
 }
 
+// [Copy: Bayonetta 0x24B] per-frame
 void func_4093()
 {
     if (WorkModule(0x6, 0x11000004) > 0)
@@ -67383,6 +69235,7 @@ void func_4093()
     }
 }
 
+// [Copy: Bayonetta 0x24B] init
 void func_4094()
 {
     float var0;
@@ -67411,6 +69264,7 @@ void func_4094()
     }
 }
 
+// [Copy: Bayonetta 0x24C] pre
 int func_4095()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0x14000, 0, 0x80, 0);
@@ -67418,6 +69272,7 @@ int func_4095()
     return 0;
 }
 
+// [Copy: Bayonetta 0x24C] main
 void func_4096()
 {
     WorkModule(0x7, func_4069(0x223, 0x22d), 0x11000002);
@@ -67426,6 +69281,7 @@ void func_4096()
     func_78(func_4097);
 }
 
+// [Copy: Bayonetta 0x24C] loop
 void func_4097()
 {
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -67451,12 +69307,14 @@ void func_4097()
     }
 }
 
+// [Copy: Bayonetta 0x24C] end
 void func_4098()
 {
     EffectModule(0x2723, 0x3380021, 0x1, 0x1);
     EffectModule(0x2723, 0x3380024, 0x1, 0x1);
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 int func_4099(int arg0)
 {
     if (0)
@@ -67506,6 +69364,7 @@ int func_4099(int arg0)
     return arg0;
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 void func_4100(int arg0, int arg1, int arg2)
 {
     int var3;
@@ -67517,6 +69376,7 @@ void func_4100(int arg0, int arg1, int arg2)
     MotionAnimcmdModule(0x1, arg1);
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 void func_4101(int arg0)
 {
     int var1;
@@ -67536,6 +69396,7 @@ void func_4101(int arg0)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
+// [Copy: Corrin 0x24D] pre
 int func_4102()
 {
     func_69();
@@ -67544,12 +69405,14 @@ int func_4102()
     return 0;
 }
 
+// [Copy: Corrin 0x24D] main
 void func_4103()
 {
     ArticleModule(0x2710, 0x1);
     func_78(func_4104);
 }
 
+// [Copy: Corrin 0x24D] loop
 int func_4104()
 {
     int var0;
@@ -67603,6 +69466,7 @@ int func_4104()
     return 0;
 }
 
+// [Copy: Corrin 0x24D] end
 void func_4105()
 {
     if (global6 != 0x24f && global6 != 0x24e)
@@ -67614,6 +69478,7 @@ void func_4105()
     }
 }
 
+// [Copy: Corrin 0x24E] pre
 int func_4106()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x40);
@@ -67621,6 +69486,7 @@ int func_4106()
     return 0;
 }
 
+// [Copy: Corrin 0x24E] main
 void func_4107()
 {
     if (!StopModule(0x1))
@@ -67631,6 +69497,7 @@ void func_4107()
     func_78(func_4108);
 }
 
+// [Copy: Corrin 0x24E] loop
 int func_4108()
 {
     int var0;
@@ -67673,6 +69540,7 @@ int func_4108()
     return 0;
 }
 
+// [Copy: Corrin 0x24E] per-frame
 void func_4109()
 {
     float var0;
@@ -67681,6 +69549,7 @@ void func_4109()
     WorkModule(0, var0 + 0, 0x1000006);
 }
 
+// [Copy: Corrin 0x24E] end
 void func_4110()
 {
     if (global6 != 0x24f)
@@ -67692,6 +69561,7 @@ void func_4110()
     }
 }
 
+// [Copy: Corrin 0x24F] pre
 int func_4111()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x40);
@@ -67699,6 +69569,7 @@ int func_4111()
     return 0;
 }
 
+// [Copy: Corrin 0x24F] main
 void func_4112()
 {
     WorkModule(0x7, 0, 0x11000002);
@@ -67706,6 +69577,7 @@ void func_4112()
     func_78(func_4113);
 }
 
+// [Copy: Corrin 0x24F] loop
 int func_4113()
 {
     int var0;
@@ -67806,6 +69678,7 @@ int func_4113()
     return 0;
 }
 
+// [Copy: Corrin 0x24F] end
 void func_4114()
 {
     if (global6 != 0x250)
@@ -67817,6 +69690,7 @@ void func_4114()
     }
 }
 
+// [Copy: Corrin 0x250] pre
 int func_4115()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0x40);
@@ -67824,11 +69698,13 @@ int func_4115()
     return 0;
 }
 
+// [Copy: Corrin 0x250] main
 void func_4116()
 {
     func_78(func_4117);
 }
 
+// [Copy: Corrin 0x250] loop
 int func_4117()
 {
     int var0;
@@ -67944,6 +69820,7 @@ int func_4117()
     return 0;
 }
 
+// [Copy: Corrin 0x250] end
 void func_4118()
 {
     if (ArticleModule(0x2717, 0x1))
@@ -67952,6 +69829,7 @@ void func_4118()
     }
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 int func_4119(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
     int var7;
@@ -67987,6 +69865,7 @@ int func_4119(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int ar
     return 0;
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 void func_4120(int arg0, int arg1)
 {
     float var2;
@@ -68003,6 +69882,7 @@ void func_4120(int arg0, int arg1)
     func_4100(arg0, 0, var2);
 }
 
+// [unused] nothing that runs references this (leftover from the original fighter script)
 void func_4121(int arg0, int arg1)
 {
     float var2;
@@ -68018,6 +69898,7 @@ void func_4121(int arg0, int arg1)
     func_4100(arg0, 0, var2);
 }
 
+// [Copy: shared] helper used by Corrin, Kirby
 int func_4122(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7)
 {
     int var8;

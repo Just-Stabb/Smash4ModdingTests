@@ -9,3 +9,4 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - `tools/action_table.py`: lists which function handles each action/key in a decompiled fighter
 - [`fighters/gekkouga/`](fighters/gekkouga/): Greninja's decompiled MSC, with a map of its action scripts
 - [`fighters/gekkouga/specials.md`](fighters/gekkouga/specials.md): how Greninja's special moves work, script by script
+- [`fighters/kirby/specials.md`](fighters/kirby/specials.md): Kirby's specials and copy abilities (all Kirby scripts labelled in `kirby.c`)
