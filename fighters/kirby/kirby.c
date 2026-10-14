@@ -39431,12 +39431,14 @@ void func_2356()
     }
     global16 = func_2358;
     GroundModule(0x1f, 0x4);
+    inhale_aim_init(); // aimable inhale: start pointing straight ahead
     func_78(func_2357);
 }
 
 // [SpecialNLoop 0x157] loop: B released after min time -> SpecialNEnd 0x158
 void func_2357()
 {
+    inhale_aim_update(); // aimable inhale: stick up/down rotates the aim bone(s)
     if (ControlModule(0x2713, 0x1) && WorkModule(0x10, 0x2100000e))
     {
         func_16(0x158, 0);
@@ -39459,6 +39461,7 @@ void func_2358()
 void func_2359()
 {
     GroundModule(0x1f, 0xffffffff);
+    inhale_aim_reset(); // aimable inhale: put the bone(s) back
 }
 
 // [SpecialNEnd 0x158] pre
@@ -69943,3 +69946,93 @@ int func_4122(int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int ar
     return 0;
 }
 
+// ===================================================================
+// Aimable inhale (added). Modelled on Charizard's Flamethrower
+// (lizardon func_2262) and Kirby's own Fire Breath copy (func_2875):
+// stick Y moves an aim angle, clamped, and the angle is applied to bone
+// rotations every frame with ModelModule(0x1, bone, x, y, z).
+// Only the inhale loop (status 0x157) aims.
+// ===================================================================
+
+// [Inhale aim] SETTINGS - edit these
+float inhale_aim_max_up()   { return 40.0f; }  // degrees above straight ahead
+float inhale_aim_max_down() { return 40.0f; }  // degrees below straight ahead
+float inhale_aim_speed()    { return 2.0f; }   // degrees per frame at full stick
+float inhale_aim_deadzone() { return 0.2f; }   // stick Y below this does nothing (Charizard uses 0.5)
+float inhale_aim_sign()     { return -1.0f; }  // -1 like Fire Breath; use 1.0f if the bone turns the wrong way
+int   inhale_aim_bone1()    { return 0x13; }   // bone index; 0x13 is the bone Kirby's Fire Breath copy aims
+int   inhale_aim_bone2()    { return 0; }      // second bone (e.g. the other arm); 0 = not used
+float inhale_aim_offset1()  { return 0.0f; }   // fixed Z rotation added to bone 1 (Fire Breath uses -45)
+float inhale_aim_offset2()  { return 0.0f; }   // fixed Z rotation added to bone 2
+
+// [Inhale aim] status 0x157 main: start pointing straight ahead
+void inhale_aim_init()
+{
+    WorkModule(0, 0.0f, 0x1000006); // aim angle in degrees, + = up (status float, resets on status change)
+    inhale_aim_apply(0.0f);
+}
+
+// [Inhale aim] status 0x157 loop: read stick Y, move and clamp the angle, apply it
+void inhale_aim_update()
+{
+    float angle;
+    float stick;
+    float stick_abs;
+    float deadzone;
+    float speed;
+    float lo;
+    float hi;
+    angle = WorkModuleF(0, 0x1000006);
+    stick = ControlModuleF(0x1); // stick Y, -1 (down) to 1 (up)
+    stick_abs = func_13(stick);
+    deadzone = inhale_aim_deadzone();
+    if (stick_abs > deadzone)
+    {
+        speed = inhale_aim_speed();
+        lo = inhale_aim_max_down();
+        hi = inhale_aim_max_up();
+        angle += speed * stick;
+        angle = func_15(angle, -lo, hi); // clamp between -max_down and max_up
+        WorkModule(0, angle, 0x1000006);
+    }
+    inhale_aim_apply(angle);
+}
+
+// [Inhale aim] rotate the bone(s) around Z by the aim angle
+void inhale_aim_apply(float angle)
+{
+    int bone;
+    float sign;
+    float offset;
+    float rot;
+    sign = inhale_aim_sign();
+    rot = sign * angle;
+    bone = inhale_aim_bone1();
+    if (bone != 0)
+    {
+        offset = inhale_aim_offset1();
+        ModelModule(0x1, bone, 0.0f, 0.0f, rot + offset);
+    }
+    bone = inhale_aim_bone2();
+    if (bone != 0)
+    {
+        offset = inhale_aim_offset2();
+        ModelModule(0x1, bone, 0.0f, 0.0f, rot + offset);
+    }
+}
+
+// [Inhale aim] status 0x157 end: clear the extra rotation
+void inhale_aim_reset()
+{
+    int bone;
+    bone = inhale_aim_bone1();
+    if (bone != 0)
+    {
+        ModelModule(0x1, bone, 0.0f, 0.0f, 0.0f);
+    }
+    bone = inhale_aim_bone2();
+    if (bone != 0)
+    {
+        ModelModule(0x1, bone, 0.0f, 0.0f, 0.0f);
+    }
+}

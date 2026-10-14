@@ -177,3 +177,49 @@ articles (`0x1C`, `0x1D`) and leave the Final Smash state.
 
 Kind `0x7` (Yoshi, `0x1AB`) isn't in the sheet's Kirby tab; it comes from
 this table. Any unknown kind falls back to SpecialFall (`0x10`).
+
+## Added: aimable inhale (stick rotates the aim)
+
+During the inhale loop (status `0x157`), holding up or down rotates bones,
+modelled on Charizard's Flamethrower and Kirby's own Fire Breath copy (see
+`fighters/lizardon/README.md`). The new functions are at the end of
+`kirby.c` (`inhale_aim_*`, compiled as `func_4123`–`func_4135`), hooked
+into:
+
+- `func_2356` (0x157 main): `inhale_aim_init()` sets the angle to 0
+  (straight ahead).
+- `func_2357` (0x157 loop): `inhale_aim_update()` runs every frame. When
+  |stick Y| is above the deadzone, `angle += speed × stickY`, clamped to
+  `[-max_down, max_up]` and stored in status float `0x1000006`. Then
+  `ModelModule(0x1, bone, 0, 0, sign × angle + offset)` rotates each bone
+  around Z.
+- `func_2359` (0x157 end): `inhale_aim_reset()` puts the bones back to 0.
+
+**Settings** (the small functions under `// [Inhale aim] SETTINGS`):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `inhale_aim_max_up` / `_max_down` | 40 / 40 | Angle limits in degrees |
+| `inhale_aim_speed` | 2.0 | Degrees per frame at full stick |
+| `inhale_aim_deadzone` | 0.2 | Stick Y needed to move (Charizard uses 0.5) |
+| `inhale_aim_sign` | -1.0 | Rotation direction (Fire Breath uses -1). Flip if it aims the wrong way |
+| `inhale_aim_bone1` | `0x13` | Bone to rotate. `0x13` is the bone Kirby's Fire Breath copy aims |
+| `inhale_aim_bone2` | `0` (off) | Optional second bone, e.g. the other arm |
+| `inhale_aim_offset1` / `2` | 0 | Fixed extra Z rotation (Fire Breath uses -45) |
+
+**Aiming the arms:** `ModelModule(0x1, B, x, y, z)` sets bone index `B`'s
+rotation in degrees (sheet: Complex CMDs, "Set Bone Attributes"). To rotate
+the arms, put Kirby's arm (shoulder) bone indices in `inhale_aim_bone1` and
+`inhale_aim_bone2`. The index is the bone's position in Kirby's skeleton
+(`model.vbn`), which Smash Forge shows. The hands are children of the arms,
+so they follow. If an arm swings sideways instead of up and down, its local
+axis differs: move the angle from the Z argument to X or Y in
+`inhale_aim_apply`.
+
+**Making it a ranged attack:** the hitboxes and inhale grab box come from
+Kirby's ACMD, not MSC. Attach them to the hand bones (or a child of the
+rotated bone) so they follow the aim.
+
+**Not tested in-game.** It compiles, and decompiling the result shows only
+the three hook calls and the new functions changed; all other scripts keep
+their numbers and code.
