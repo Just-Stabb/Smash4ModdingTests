@@ -266,6 +266,7 @@ hitlag.
 | `starmissile_bone_left` / `_right` | `0x18` / `0x17` | `LHaveN` / `RHaveN`, the hand hold points (`LHandN` 0x10 / `RHandN` 0x14 also work) |
 | `starmissile_generate_cmd` | `0x2718` | Generate command; `0x2710` is the other generate |
 | `starmissile_move_to_hand` | 1 | 0 = leave the star where the game spawns it |
+| `starmissile_fly_status` | 1 | After spawning, switch the star to this status with `ArticleModule(0x2713, 0x17, status)`. Status 1 is flying, the one with the lifetime (`fighters/kirby/weapons/`). -1 = don't switch |
 | `starmissile_shoot` | 0 | 1 = also call ArticleModule "shoot" (`0x2719`) if the star stays attached to Kirby |
 
 **Max count:** the game's limit for `starmissile` is 1 (`Count="1"` in the

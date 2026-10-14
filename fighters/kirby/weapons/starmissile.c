@@ -663,6 +663,7 @@ void func_56()
     
 }
 
+// [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
     WorkModule(0xa, 0x11000002);
@@ -681,6 +682,7 @@ void func_58()
     
 }
 
+// [starmissile init, both statuses] status 1 (flying) sets the lifetime
 void func_59()
 {
     WorkModule(0x2711, 0x21000000);
@@ -690,7 +692,9 @@ void func_59()
     }
     else if (global4 == 0x1)
     {
-        WorkModule(0x7, WorkModule(0x6, 0x12000013), 0x11000002);
+        // Lifetime of the flying star in frames (counted down in func_57; at 0 the star is removed).
+        // Was WorkModule(0x6, 0x12000013), the weapon parameter.
+        WorkModule(0x7, 24, 0x11000002);
     }
 }
 

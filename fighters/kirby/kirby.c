@@ -70073,6 +70073,7 @@ int starmissile_bone_right()   { return 0x17; }   // RHaveN (right hand hold poi
 int starmissile_generate_cmd() { return 0x2718; } // 0x2718 = generate, the call Charizard uses to spawn many flames; 0x2710 = the other generate
 int starmissile_move_to_hand() { return 1; }      // 1 = move the new star to the hand bone; 0 = leave it where the game spawns it
 int starmissile_shoot()        { return 0; }      // 1 = also call ArticleModule "shoot" (release) after spawning
+int starmissile_fly_status()   { return 1; }      // star status to switch to after spawning: 1 = flying (has the lifetime); -1 = don't switch
 
 // [Star missile] per frame: fire every interval frames, alternating hands
 void starmissile_update()
@@ -70108,6 +70109,7 @@ void starmissile_fire(int bone)
     int cmd;
     int move;
     int shoot;
+    int fly;
     float x;
     float y;
     float z;
@@ -70120,6 +70122,11 @@ void starmissile_fire(int bone)
     }
     cmd = starmissile_generate_cmd();
     ArticleModule(cmd, article); // create a new star
+    fly = starmissile_fly_status();
+    if (fly >= 0)
+    {
+        ArticleModule(0x2713, article, fly); // change the star's status (starmissile.c: status 1 = flying, with lifetime)
+    }
     move = starmissile_move_to_hand();
     if (move != 0)
     {
