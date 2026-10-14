@@ -37128,9 +37128,7 @@ int func_2285()
 
         if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-                PostureModule(0x2710); //turn around: stick is held behind Corrin
-                PostureModule(0x2); //update model rotation after the turn
-                WorkModule(0x2710, 0x2000009f); //remember we already turned, so the back kick doesn't turn back
+                WorkModule(0x2710, 0x2000009f); //stick is held behind Corrin: the back kick turns around as it starts
 
          //func_33(); //turn character?
         
@@ -37196,9 +37194,7 @@ int func_2287()
             {
 if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
     {
-        PostureModule(0x2710); //turn around: stick is held behind Corrin
-        PostureModule(0x2); //update model rotation after the turn
-        WorkModule(0x2710, 0x2000009f); //remember we already turned, so the back kick doesn't turn back
+        WorkModule(0x2710, 0x2000009f); //stick is held behind Corrin: the back kick turns around as it starts
         func_16(0x160, 0); //change to back kick
                 return 0x1;
 
@@ -37742,17 +37738,12 @@ void func_2320()
 }
 
 void func_2321()
-{///
-    if (StatusModule(0x7) == 0x160 && MotionModuleF(0x1) < 2.0f)
 {
-    if ((global48 < -0.4f && PostureModuleF(0) == 1.0f) || (global48 > 0.4f && PostureModuleF(0) == -1.0f)) //left right was global32
+    if (WorkModule(0x10, 0x2000009f)) //side-B with the stick held back: turn around before the kick starts
     {
-
-        
-        //PostureModule(0x2710)
+        PostureModule(0x2710); //reverse facing direction
+        PostureModule(0x2); //update model rotation
     }
-        }
-        ///
     func_22(0x229, 0, 1.0f);
     func_78(func_2322);
     
@@ -37799,7 +37790,7 @@ int func_2322()
         }
         if (WorkModule(0x10, 0x21000015))
         {
-            if (!WorkModule(0x10, 0x2000009f)) //side-B already turned Corrin: don't turn back
+            if (!WorkModule(0x10, 0x2000009f)) //side-B already turned Corrin at the start: don't turn back
             {
                 PostureModule(0x2710);
             }
