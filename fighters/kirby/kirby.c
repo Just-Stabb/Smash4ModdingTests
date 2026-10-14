@@ -39450,6 +39450,7 @@ void func_2357()
 // [SpecialNLoop 0x157] per-frame: min-time countdown
 void func_2358()
 {
+    starmissile_update(); // added: star missiles from alternating hands during the inhale
     WorkModule(0xa, 0x11000004);
     if (WorkModule(0x6, 0x11000004) <= 0)
     {
@@ -70051,5 +70052,82 @@ void inhale_aim_reset()
     if (bone != 0)
     {
         ModelModule(0x1, bone, 0.0f, 0.0f, 0.0f);
+    }
+}
+
+// ===================================================================
+// Star missiles from the hands during the inhale loop (added)
+// Runs every frame of status 0x157 (from func_2358, so not during hitlag).
+// Fires on frame 0, 8, 16, ... alternating left hand, right hand.
+// Article IDs: github gist BenHall-7 FighterArticles.xml (kirby: 23 = starmissile).
+// NOTE: the game allows only ONE starmissile at a time (Count="1" in that list,
+// stored in the game's executable at 0x10136C58), so with the default settings
+// a new star only appears once the previous one is gone. See starmissile_replace_old().
+// ===================================================================
+
+// [Star missile] SETTINGS - edit these
+int starmissile_interval()     { return 8; }    // frames between shots
+int starmissile_article()      { return 0x17; } // 23 = starmissile
+int starmissile_bone_left()    { return 0x18; } // LHaveN (left hand hold point); LHandN is 0x10
+int starmissile_bone_right()   { return 0x17; } // RHaveN (right hand hold point); RHandN is 0x14
+int starmissile_replace_old()  { return 0; }    // 1 = remove the star that's out so every shot fires
+int starmissile_shoot()        { return 0; }    // 1 = also call ArticleModule "shoot" (release) after spawning
+
+// [Star missile] per frame: fire every interval frames, alternating hands
+void starmissile_update()
+{
+    int counter;
+    int interval;
+    int shot;
+    int bone;
+    counter = WorkModule(0x6, 0x11000005); // frame counter (status int, starts at 0 each inhale)
+    interval = starmissile_interval();
+    if (counter % interval == 0)
+    {
+        shot = counter / interval;
+        if (shot % 2 == 0)
+        {
+            bone = starmissile_bone_left();
+        }
+        else
+        {
+            bone = starmissile_bone_right();
+        }
+        starmissile_fire(bone);
+    }
+    WorkModule(0x7, counter + 1, 0x11000005);
+}
+
+// [Star missile] spawn one star missile at a bone's world position
+void starmissile_fire(int bone)
+{
+    int article;
+    int replace;
+    int shoot;
+    float x;
+    float y;
+    float z;
+    article = starmissile_article();
+    replace = starmissile_replace_old();
+    if (replace != 0)
+    {
+        if (ArticleModule(0x2717, article)) // a star is already out
+        {
+            ArticleModule(0x2712, article); // remove it
+        }
+    }
+    else if (ArticleModule(0x2727, article) == 0) // can't create another one yet
+    {
+        return;
+    }
+    x = ModelModuleF(0, bone);   // bone world X
+    y = ModelModuleF(0x1, bone); // bone world Y
+    z = ModelModuleF(0x2, bone); // bone world Z
+    ArticleModule(0x2710, article);          // create the article
+    ArticleModule(0x272b, article, x, y, z); // move it to the hand (world position)
+    shoot = starmissile_shoot();
+    if (shoot != 0)
+    {
+        ArticleModule(0x2719, article);      // release it from Kirby
     }
 }

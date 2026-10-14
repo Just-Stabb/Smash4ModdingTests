@@ -239,3 +239,39 @@ which the `global37` hook `func_2287` calls. The commands are Hadoken
 Ryu (`fighters/ryu/README.md`), they're now ignored unless Special was
 pressed more recently than Attack (`ControlModule(0x2722, 0x1) <
 ControlModule(0x2722, 0)`).
+
+## Added: star missiles from alternating hands during the inhale
+
+During the inhale loop (status `0x157`), a star missile (article `0x17`)
+fires on frame 0, 8, 16, …, alternating left hand, right hand, left hand…
+The code is at the end of `kirby.c` (`starmissile_*`), called from
+`func_2358`, the inhale loop's per-frame function, so it pauses during
+hitlag.
+
+1. A frame counter in status int `0x11000005` picks the hand:
+   `(frame / 8) % 2`.
+2. If a star can't be created yet (`ArticleModule(0x2727, 0x17)` returns
+   0), the shot is skipped.
+3. The hand bone's world position is read with `ModelModuleF(0/1/2, bone)`.
+4. `ArticleModule(0x2710, 0x17)` creates the star, and
+   `ArticleModule(0x272B, 0x17, x, y, z)` moves it to that position.
+
+| Setting | Default | |
+|---|---|---|
+| `starmissile_interval` | 8 | Frames between shots |
+| `starmissile_article` | `0x17` | starmissile (`reference/FighterArticles.xml`) |
+| `starmissile_bone_left` / `_right` | `0x18` / `0x17` | `LHaveN` / `RHaveN`, the hand hold points (`LHandN` 0x10 / `RHandN` 0x14 also work) |
+| `starmissile_replace_old` | 0 | 1 = remove the star that's out so every shot fires |
+| `starmissile_shoot` | 0 | 1 = also call ArticleModule "shoot" (`0x2719`) if the star stays attached to Kirby |
+
+**One star at a time:** the article list gives `starmissile` `Count="1"`, so
+the game only allows one on screen. With the defaults, a new star appears
+only once the previous one is gone. With `starmissile_replace_old` = 1, every
+8 frames the old star disappears and a new one appears at the other hand.
+To get several stars out at once, raise the count at the game's address
+`0x10136C58` with a code patch (outside MSC).
+
+**Direction:** the star missile's flight is controlled by its own script
+(Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
+it normally does when spat out. Aiming it with the inhale aim angle would
+need that weapon's script.

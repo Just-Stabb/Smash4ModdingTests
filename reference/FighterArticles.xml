@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Data>
+  <Fighter Name="miifighter">
+    <Article Type="weapon" ID="0" Name="hat" Count="1" CountAddr="0x1013c8d0" />
+    <Article Type="weapon" ID="1" Name="ironball" Count="3" CountAddr="0x1013c8e0" />
+  </Fighter>
+  <Fighter Name="miiswordsman">
+    <Article Type="weapon" ID="0" Name="hat" Count="1" CountAddr="0x1013d210" />
+    <Article Type="weapon" ID="1" Name="chakram" Count="3" CountAddr="0x1013d220" />
+    <Article Type="weapon" ID="2" Name="lightshuriken" Count="3" CountAddr="0x1013d230" />
+    <Article Type="weapon" ID="3" Name="tornadoshot" Count="3" CountAddr="0x1013d240" />
+  </Fighter>
+  <Fighter Name="miigunner">
+    <Article Type="weapon" ID="0" Name="hat" Count="1" CountAddr="0x1013cce4" />
+    <Article Type="weapon" ID="1" Name="attackairf_bullet" Count="1" CountAddr="0x1013ccf4" />
+    <Article Type="weapon" ID="2" Name="rapidshot_bullet" Count="4" CountAddr="0x1013cd04" />
+    <Article Type="weapon" ID="3" Name="gunnercharge" Count="4" CountAddr="0x1013cd14" />
+    <Article Type="weapon" ID="4" Name="miimissile" Count="3" CountAddr="0x1013cd24" />
+    <Article Type="weapon" ID="5" Name="supermissile" Count="2" CountAddr="0x1013cd34" />
+    <Article Type="weapon" ID="6" Name="grenadelauncher" Count="2" CountAddr="0x1013cd44" />
+    <Article Type="weapon" ID="7" Name="flamepillar" Count="2" CountAddr="0x1013cd54" />
+    <Article Type="weapon" ID="8" Name="stealthbomb" Count="1" CountAddr="0x1013cd64" />
+    <Article Type="weapon" ID="9" Name="stealthbomb_s" Count="1" CountAddr="0x1013cd74" />
+    <Article Type="weapon" ID="10" Name="bottomshoot" Count="1" CountAddr="0x1013cd84" />
+    <Article Type="weapon" ID="11" Name="groundbomb" Count="2" CountAddr="0x1013cd94" />
+    <Article Type="weapon" ID="12" Name="laser" Count="1" CountAddr="0x1013cda4" />
+    <Article Type="weapon" ID="13" Name="fullthrottle" Count="1" CountAddr="0x1013cdb4" />
+  </Fighter>
+  <Fighter Name="mario">
+    <Article Type="weapon" ID="0" Name="fireball" Count="5" CountAddr="0x1013b1e8" />
+    <Article Type="weapon" ID="1" Name="mantle" Count="1" CountAddr="0x1013b1f8" />
+    <Article Type="weapon" ID="2" Name="pump" Count="1" CountAddr="0x1013b208" />
+    <Article Type="weapon" ID="3" Name="hugeflame" Count="1" CountAddr="0x1013b218" />
+    <Article Type="weapon" ID="4" Name="dokan" Count="1" CountAddr="0x1013b228" />
+  </Fighter>
+  <Fighter Name="donkey">
+    <Article Type="weapon" ID="0" Name="barrelconga" Count="1" CountAddr="0x10131d6c" />
+    <Article Type="weapon" ID="1" Name="soundeffect" Count="4" CountAddr="0x10131d7c" />
+    <Article Type="weapon" ID="2" Name="dkbarrel" Count="1" CountAddr="0x10131d8c" />
+  </Fighter>
+  <Fighter Name="link">
+    <Article Type="weapon" ID="0" Name="bow" Count="1" CountAddr="0x10137e30" />
+    <Article Type="weapon" ID="1" Name="bowarrow" Count="4" CountAddr="0x10137e40" />
+    <Article Type="weapon" ID="2" Name="boomerang" Count="1" CountAddr="0x10137e50" />
+    <Article Type="weapon" ID="3" Name="clawshot" Count="1" CountAddr="0x10137e60" />
+    <Article Type="weapon" ID="4" Name="clawshothand" Count="1" CountAddr="0x10137e70" />
+    <Article Type="weapon" ID="5" Name="clawshotall" Count="1" CountAddr="0x10137e80" />
+    <Article Type="weapon" ID="6" Name="navy" Count="1" CountAddr="0x10137e90" />
+    <Article Type="item" ID="7" Name="linkbomb" Count="2" CountAddr="0x10137ea0" />
+  </Fighter>
+  <Fighter Name="samus">
+    <Article Type="weapon" ID="0" Name="cshot" Count="4" CountAddr="0x1014392c" />
+    <Article Type="weapon" ID="1" Name="bomb" Count="3" CountAddr="0x1014393c" />
+    <Article Type="weapon" ID="2" Name="missile" Count="3" CountAddr="0x1014394c" />
+    <Article Type="weapon" ID="3" Name="laser" Count="1" CountAddr="0x1014395c" />
+    <Article Type="weapon" ID="4" Name="laser2" Count="4" CountAddr="0x1014396c" />
+    <Article Type="weapon" ID="5" Name="gun" Count="1" CountAddr="0x1014397c" />
+    <Article Type="weapon" ID="6" Name="supermissile" Count="2" CountAddr="0x1014398c" />
+    <Article Type="weapon" ID="7" Name="gbeam" Count="1" CountAddr="0x1014399c" />
+    <Article Type="weapon" ID="8" Name="transportation" Count="1" CountAddr="0x101439ac" />
+    <Article Type="weapon" ID="9" Name="gbeam" Count="1" CountAddr="0x101439bc" />
+  </Fighter>
+  <Fighter Name="yoshi">
+    <Article Type="weapon" ID="0" Name="star" Count="2" CountAddr="0x10147234" />
+    <Article Type="weapon" ID="1" Name="tamago" Count="4" CountAddr="0x10147244" />
+    <Article Type="weapon" ID="2" Name="wing" Count="1" CountAddr="0x10147254" />
+    <Article Type="weapon" ID="3" Name="firebreath" Count="4" CountAddr="0x10147264" />
+    <Article Type="weapon" ID="4" Name="firecannon" Count="2" CountAddr="0x10147274" />
+  </Fighter>
+  <Fighter Name="kirby">
+    <Article Type="weapon" ID="0" Name="reserve" Count="0" CountAddr="0x10136ae8" />
+    <Article Type="weapon" ID="1" Name="reserve" Count="0" CountAddr="0x10136af8" />
+    <Article Type="weapon" ID="2" Name="reserve" Count="0" CountAddr="0x10136b08" />
+    <Article Type="weapon" ID="3" Name="reserve" Count="0" CountAddr="0x10136b18" />
+    <Article Type="weapon" ID="4" Name="reserve" Count="0" CountAddr="0x10136b28" />
+    <Article Type="weapon" ID="5" Name="reserve" Count="0" CountAddr="0x10136b38" />
+    <Article Type="weapon" ID="6" Name="reserve" Count="0" CountAddr="0x10136b48" />
+    <Article Type="weapon" ID="7" Name="reserve" Count="0" CountAddr="0x10136b58" />
+    <Article Type="weapon" ID="8" Name="reserve" Count="0" CountAddr="0x10136b68" />
+    <Article Type="weapon" ID="9" Name="reserve" Count="0" CountAddr="0x10136b78" />
+    <Article Type="weapon" ID="10" Name="reserve" Count="0" CountAddr="0x10136b88" />
+    <Article Type="weapon" ID="11" Name="reserve" Count="0" CountAddr="0x10136b98" />
+    <Article Type="weapon" ID="12" Name="reserve" Count="0" CountAddr="0x10136ba8" />
+    <Article Type="weapon" ID="13" Name="reserve" Count="0" CountAddr="0x10136bb8" />
+    <Article Type="weapon" ID="14" Name="reserve" Count="0" CountAddr="0x10136bc8" />
+    <Article Type="weapon" ID="15" Name="reserve" Count="0" CountAddr="0x10136bd8" />
+    <Article Type="weapon" ID="16" Name="reserve" Count="0" CountAddr="0x10136be8" />
+    <Article Type="weapon" ID="17" Name="reserve" Count="0" CountAddr="0x10136bf8" />
+    <Article Type="weapon" ID="18" Name="reserve" Count="0" CountAddr="0x10136c08" />
+    <Article Type="weapon" ID="19" Name="reserve" Count="0" CountAddr="0x10136c18" />
+    <Article Type="weapon" ID="20" Name="reserve" Count="0" CountAddr="0x10136c28" />
+    <Article Type="weapon" ID="21" Name="hammer" Count="1" CountAddr="0x10136c38" />
+    <Article Type="weapon" ID="22" Name="finalcutter" Count="1" CountAddr="0x10136c48" />
+    <Article Type="weapon" ID="23" Name="starmissile" Count="1" CountAddr="0x10136c58" />
+    <Article Type="weapon" ID="24" Name="stone" Count="1" CountAddr="0x10136c68" />
+    <Article Type="weapon" ID="25" Name="hat" Count="1" CountAddr="0x10136c78" />
+    <Article Type="weapon" ID="26" Name="simple" Count="1" CountAddr="0x10136c88" />
+    <Article Type="weapon" ID="27" Name="miipartshead" Count="1" CountAddr="0x10136c98" />
+    <Article Type="weapon" ID="28" Name="ultrasword" Count="1" CountAddr="0x10136ca8" />
+    <Article Type="weapon" ID="29" Name="ultraswordhat" Count="1" CountAddr="0x10136cb8" />
+    <Article Type="weapon" ID="30" Name="rosettaticomissile" Count="1" CountAddr="0x10136cc8" />
+    <Article Type="weapon" ID="31" Name="warpstar" Count="1" CountAddr="0x10136cd8" />
+    <Article Type="weapon" ID="32" Name="simple2r" Count="1" CountAddr="0x10136ce8" />
+    <Article Type="weapon" ID="33" Name="simple2l" Count="1" CountAddr="0x10136cf8" />
+  </Fighter>
+  <Fighter Name="fox">
+    <Article Type="weapon" ID="0" Name="blaster" Count="1" CountAddr="0x10132c8c" />
+    <Article Type="weapon" ID="1" Name="blaster_bullet" Count="5" CountAddr="0x10132c9c" />
+    <Article Type="weapon" ID="2" Name="illusion" Count="2" CountAddr="0x10132cac" />
+    <Article Type="weapon" ID="3" Name="landmaster" Count="1" CountAddr="0x10132cbc" />
+    <Article Type="weapon" ID="4" Name="arwing" Count="1" CountAddr="0x10132ccc" />
+  </Fighter>
+  <Fighter Name="pikachu">
+    <Article Type="weapon" ID="0" Name="dengekidama" Count="3" CountAddr="0x1013f50c" />
+    <Article Type="weapon" ID="1" Name="cloud" Count="2" CountAddr="0x1013f51c" />
+    <Article Type="weapon" ID="2" Name="vortex" Count="1" CountAddr="0x1013f52c" />
+    <Article Type="weapon" ID="3" Name="dengeki" Count="3" CountAddr="0x1013f53c" />
+    <Article Type="weapon" ID="4" Name="monsterball" Count="1" CountAddr="0x1013f54c" />
+  </Fighter>
+  <Fighter Name="luigi">
+    <Article Type="weapon" ID="0" Name="fireball" Count="2" CountAddr="0x10139d74" />
+    <Article Type="weapon" ID="1" Name="dokan" Count="1" CountAddr="0x10139d84" />
+    <Article Type="weapon" ID="2" Name="obakyumu" Count="1" CountAddr="0x10139d94" />
+  </Fighter>
+  <Fighter Name="captain">
+    <Article Type="weapon" ID="0" Name="bluefalcon" Count="1" CountAddr="0x1012fbd8" />
+    <Article Type="weapon" ID="1" Name="finalbg" Count="1" CountAddr="0x1012fbe8" />
+  </Fighter>
+  <Fighter Name="ness">
+    <Article Type="weapon" ID="0" Name="pkflash" Count="2" CountAddr="0x1013e074" />
+    <Article Type="weapon" ID="1" Name="pkfire" Count="2" CountAddr="0x1013e084" />
+    <Article Type="weapon" ID="2" Name="pkthunder" Count="2" CountAddr="0x1013e094" />
+    <Article Type="weapon" ID="3" Name="pkstarstorm" Count="1" CountAddr="0x1013e0a4" />
+    <Article Type="weapon" ID="4" Name="yoyo" Count="1" CountAddr="0x1013e0b4" />
+    <Article Type="weapon" ID="5" Name="yoyohead" Count="1" CountAddr="0x1013e0c4" />
+  </Fighter>
+  <Fighter Name="peach">
+    <Article Type="weapon" ID="0" Name="kassar" Count="1" CountAddr="0x1013ef84" />
+    <Article Type="weapon" ID="1" Name="kinopio" Count="1" CountAddr="0x1013ef94" />
+    <Article Type="item" ID="2" Name="peachdaikon" Count="-1" CountAddr="0x1013efa4" />
+  </Fighter>
+  <Fighter Name="koopa">
+    <Article Type="weapon" ID="0" Name="breath" Count="6" CountAddr="0x1013792c" />
+  </Fighter>
+  <Fighter Name="zelda">
+    <Article Type="weapon" ID="0" Name="dein" Count="3" CountAddr="0x101482a8" />
+    <Article Type="weapon" ID="1" Name="dein_s" Count="3" CountAddr="0x101482b8" />
+    <Article Type="weapon" ID="2" Name="phantom" Count="1" CountAddr="0x101482c8" />
+    <Article Type="weapon" ID="3" Name="lightingbow" Count="1" CountAddr="0x101482d8" />
+    <Article Type="weapon" ID="4" Name="lightingbowarrow" Count="1" CountAddr="0x101482e8" />
+  </Fighter>
+  <Fighter Name="sheik">
+    <Article Type="weapon" ID="0" Name="needle" Count="8" CountAddr="0x10143d64" />
+    <Article Type="weapon" ID="1" Name="needlehave" Count="1" CountAddr="0x10143d74" />
+    <Article Type="weapon" ID="2" Name="fusin" Count="1" CountAddr="0x10143d84" />
+    <Article Type="weapon" ID="3" Name="lightingbow" Count="1" CountAddr="0x10143d94" />
+    <Article Type="weapon" ID="4" Name="lightingbowarrow" Count="1" CountAddr="0x10143da4" />
+    <Article Type="item" ID="5" Name="explosionbomb" Count="1" CountAddr="0x10143db4" />
+  </Fighter>
+  <Fighter Name="marth" />
+  <Fighter Name="gamewatch">
+    <Article Type="weapon" ID="0" Name="food" Count="5" CountAddr="0x10133184" />
+    <Article Type="weapon" ID="1" Name="rescue" Count="1" CountAddr="0x10133194" />
+    <Article Type="weapon" ID="2" Name="parachute" Count="1" CountAddr="0x101331a4" />
+    <Article Type="weapon" ID="3" Name="panel" Count="1" CountAddr="0x101331b4" />
+    <Article Type="weapon" ID="4" Name="oil" Count="1" CountAddr="0x101331c4" />
+    <Article Type="weapon" ID="5" Name="octopus" Count="1" CountAddr="0x101331d4" />
+    <Article Type="weapon" ID="6" Name="normal_weapon" Count="1" CountAddr="0x101331e4" />
+    <Article Type="weapon" ID="7" Name="entry" Count="1" CountAddr="0x101331f4" />
+  </Fighter>
+  <Fighter Name="ganon">
+    <Article Type="weapon" ID="0" Name="beast" Count="1" CountAddr="0x101343b4" />
+    <Article Type="weapon" ID="1" Name="sword" Count="1" CountAddr="0x101343c4" />
+  </Fighter>
+  <Fighter Name="falco">
+    <Article Type="weapon" ID="0" Name="blaster" Count="1" CountAddr="0x10132868" />
+    <Article Type="weapon" ID="1" Name="blaster_bullet" Count="5" CountAddr="0x10132878" />
+    <Article Type="weapon" ID="2" Name="illusion" Count="2" CountAddr="0x10132888" />
+    <Article Type="weapon" ID="3" Name="landmaster" Count="1" CountAddr="0x10132898" />
+    <Article Type="weapon" ID="4" Name="arwing" Count="1" CountAddr="0x101328a8" />
+  </Fighter>
+  <Fighter Name="wario">
+    <Article Type="weapon" ID="0" Name="wariobike" Count="1" CountAddr="0x10145c3c" />
+    <Article Type="weapon" ID="1" Name="garlic" Count="1" CountAddr="0x10145c4c" />
+  </Fighter>
+  <Fighter Name="metaknight">
+    <Article Type="weapon" ID="0" Name="mantle" Count="1" CountAddr="0x1013bed4" />
+  </Fighter>
+  <Fighter Name="pit">
+    <Article Type="weapon" ID="0" Name="bow" Count="1" CountAddr="0x101409c0" />
+    <Article Type="weapon" ID="1" Name="bowarrow" Count="1" CountAddr="0x101409d0" />
+    <Article Type="weapon" ID="2" Name="three" Count="1" CountAddr="0x101409e0" />
+  </Fighter>
+  <Fighter Name="szerosuit">
+    <Article Type="weapon" ID="0" Name="paralyzer" Count="1" CountAddr="0x10145160" />
+    <Article Type="weapon" ID="1" Name="paralyzer_bullet" Count="2" CountAddr="0x10145170" />
+    <Article Type="weapon" ID="2" Name="whip" Count="1" CountAddr="0x10145180" />
+    <Article Type="weapon" ID="3" Name="cockpit" Count="1" CountAddr="0x10145190" />
+    <Article Type="weapon" ID="4" Name="gunship" Count="1" CountAddr="0x101451a0" />
+    <Article Type="weapon" ID="5" Name="laser" Count="1" CountAddr="0x101451b0" />
+  </Fighter>
+  <Fighter Name="pikmin">
+    <Article Type="weapon" ID="0" Name="pikmin" Count="3" CountAddr="0x1013fc94" />
+    <Article Type="weapon" ID="1" Name="dolfin" Count="1" CountAddr="0x1013fca4" />
+    <Article Type="weapon" ID="2" Name="win1" Count="1" CountAddr="0x1013fcb4" />
+    <Article Type="weapon" ID="3" Name="win2" Count="1" CountAddr="0x1013fcc4" />
+    <Article Type="weapon" ID="4" Name="win3" Count="1" CountAddr="0x1013fcd4" />
+  </Fighter>
+  <Fighter Name="diddy">
+    <Article Type="weapon" ID="0" Name="gun" Count="2" CountAddr="0x10130fa4" />
+    <Article Type="weapon" ID="1" Name="barreljet" Count="2" CountAddr="0x10130fb4" />
+    <Article Type="weapon" ID="2" Name="peanuts" Count="10" CountAddr="0x10130fc4" />
+    <Article Type="weapon" ID="3" Name="explosion" Count="1" CountAddr="0x10130fd4" />
+    <Article Type="weapon" ID="4" Name="dkbarrel" Count="1" CountAddr="0x10130fe4" />
+  </Fighter>
+  <Fighter Name="dedede">
+    <Article Type="weapon" ID="0" Name="jethammer" Count="1" CountAddr="0x1013012c" />
+    <Article Type="weapon" ID="1" Name="starmissile" Count="1" CountAddr="0x1013013c" />
+    <Article Type="weapon" ID="2" Name="star" Count="2" CountAddr="0x1013014c" />
+    <Article Type="weapon" ID="3" Name="gordo" Count="1" CountAddr="0x1013015c" />
+    <Article Type="weapon" ID="4" Name="bomb" Count="1" CountAddr="0x1013016c" />
+    <Article Type="weapon" ID="5" Name="bombhammer" Count="1" CountAddr="0x1013017c" />
+    <Article Type="weapon" ID="6" Name="shrine" Count="1" CountAddr="0x1013018c" />
+    <Article Type="weapon" ID="7" Name="waddledee" Count="1" CountAddr="0x1013019c" />
+  </Fighter>
+  <Fighter Name="ike">
+    <Article Type="weapon" ID="0" Name="sword" Count="1" CountAddr="0x10134f70" />
+  </Fighter>
+  <Fighter Name="lucario">
+    <Article Type="weapon" ID="0" Name="auraball" Count="3" CountAddr="0x10138e2c" />
+    <Article Type="weapon" ID="1" Name="qigong" Count="1" CountAddr="0x10138e3c" />
+  </Fighter>
+  <Fighter Name="robot">
+    <Article Type="weapon" ID="0" Name="gyro" Count="1" CountAddr="0x1014221c" />
+    <Article Type="weapon" ID="1" Name="gyroholder" Count="1" CountAddr="0x1014222c" />
+    <Article Type="weapon" ID="2" Name="beam" Count="2" CountAddr="0x1014223c" />
+    <Article Type="weapon" ID="3" Name="finalbeam" Count="1" CountAddr="0x1014224c" />
+    <Article Type="weapon" ID="4" Name="hugebeam" Count="1" CountAddr="0x1014225c" />
+    <Article Type="weapon" ID="5" Name="narrowbeam" Count="4" CountAddr="0x1014226c" />
+    <Article Type="weapon" ID="6" Name="widebeam" Count="1" CountAddr="0x1014227c" />
+  </Fighter>
+  <Fighter Name="toonlink">
+    <Article Type="weapon" ID="0" Name="bow" Count="1" CountAddr="0x101456d0" />
+    <Article Type="weapon" ID="1" Name="bowarrow" Count="4" CountAddr="0x101456e0" />
+    <Article Type="weapon" ID="2" Name="boomerang" Count="1" CountAddr="0x101456f0" />
+    <Article Type="weapon" ID="3" Name="hookshot" Count="1" CountAddr="0x10145700" />
+    <Article Type="weapon" ID="4" Name="hookshothand" Count="1" CountAddr="0x10145710" />
+    <Article Type="weapon" ID="5" Name="hookshotall" Count="1" CountAddr="0x10145720" />
+    <Article Type="weapon" ID="6" Name="fairy" Count="1" CountAddr="0x10145730" />
+    <Article Type="weapon" ID="7" Name="takt" Count="1" CountAddr="0x10145740" />
+    <Article Type="weapon" ID="8" Name="pig" Count="1" CountAddr="0x10145750" />
+    <Article Type="item" ID="9" Name="toonlinkbomb" Count="2" CountAddr="0x10145760" />
+  </Fighter>
+  <Fighter Name="lizardon">
+    <Article Type="weapon" ID="0" Name="breath" Count="6" CountAddr="0x10138888" />
+    <Article Type="weapon" ID="1" Name="rock" Count="2" CountAddr="0x10138898" />
+    <Article Type="weapon" ID="2" Name="explosion" Count="1" CountAddr="0x101388a8" />
+    <Article Type="weapon" ID="3" Name="lizardonm" Count="1" CountAddr="0x101388b8" />
+    <Article Type="weapon" ID="4" Name="monsterball" Count="1" CountAddr="0x101388c8" />
+  </Fighter>
+  <Fighter Name="sonic">
+    <Article Type="weapon" ID="0" Name="gimmickjump" Count="1" CountAddr="0x10144ac0" />
+    <Article Type="weapon" ID="1" Name="supersonic" Count="1" CountAddr="0x10144ad0" />
+    <Article Type="weapon" ID="2" Name="chaosemerald" Count="1" CountAddr="0x10144ae0" />
+  </Fighter>
+  <Fighter Name="purin">
+    <Article Type="weapon" ID="0" Name="cap" Count="1" CountAddr="0x10140dcc" />
+    <Article Type="weapon" ID="1" Name="monsterball" Count="1" CountAddr="0x10140ddc" />
+  </Fighter>
+  <Fighter Name="mariod">
+    <Article Type="weapon" ID="0" Name="drcapsule" Count="5" CountAddr="0x100996b0" />
+    <Article Type="weapon" ID="1" Name="capsuleblock" Count="1" CountAddr="0x100996c0" />
+    <Article Type="weapon" ID="2" Name="drmantle" Count="1" CountAddr="0x100996d0" />
+    <Article Type="weapon" ID="3" Name="stethoscope" Count="1" CountAddr="0x100996e0" />
+    <Article Type="weapon" ID="4" Name="hugecapsule" Count="1" CountAddr="0x100996f0" />
+  </Fighter>
+  <Fighter Name="lucina">
+    <Article Type="weapon" ID="0" Name="mask" Count="1" CountAddr="0x101399b0" />
+  </Fighter>
+  <Fighter Name="pitb">
+    <Article Type="weapon" ID="0" Name="bow" Count="1" CountAddr="0x1009bbb8" />
+    <Article Type="weapon" ID="1" Name="bowarrow" Count="1" CountAddr="0x1009bbc8" />
+  </Fighter>
+  <Fighter Name="rosetta">
+    <Article Type="weapon" ID="0" Name="tico" Count="1" CountAddr="0x101434d4" />
+    <Article Type="weapon" ID="1" Name="pointer" Count="1" CountAddr="0x101434e4" />
+    <Article Type="weapon" ID="2" Name="ring" Count="3" CountAddr="0x101434f4" />
+    <Article Type="weapon" ID="3" Name="powerstar" Count="1" CountAddr="0x10143504" />
+  </Fighter>
+  <Fighter Name="wiifit">
+    <Article Type="weapon" ID="0" Name="hulahoop" Count="2" CountAddr="0x10146d48" />
+    <Article Type="weapon" ID="1" Name="sunbullet" Count="3" CountAddr="0x10146d58" />
+    <Article Type="weapon" ID="2" Name="balanceboard" Count="1" CountAddr="0x10146d68" />
+    <Article Type="weapon" ID="3" Name="wiibo" Count="1" CountAddr="0x10146d78" />
+    <Article Type="weapon" ID="4" Name="towel" Count="1" CountAddr="0x10146d88" />
+    <Article Type="item" ID="5" Name="wiifitball" Count="1" CountAddr="0x10146d98" />
+  </Fighter>
+  <Fighter Name="littlemac">
+    <Article Type="weapon" ID="0" Name="doclouis" Count="1" CountAddr="0x1013837c" />
+    <Article Type="weapon" ID="1" Name="sweatlittlemac" Count="1" CountAddr="0x1013838c" />
+    <Article Type="weapon" ID="2" Name="throwsweat" Count="1" CountAddr="0x1013839c" />
+    <Article Type="weapon" ID="3" Name="championbelt" Count="1" CountAddr="0x101383ac" />
+  </Fighter>
+  <Fighter Name="murabito">
+    <Article Type="weapon" ID="0" Name="flowerpot" Count="2" CountAddr="0x1013d6ac" />
+    <Article Type="weapon" ID="1" Name="umbrella" Count="1" CountAddr="0x1013d6bc" />
+    <Article Type="weapon" ID="2" Name="bowlingball" Count="2" CountAddr="0x1013d6cc" />
+    <Article Type="weapon" ID="3" Name="firework" Count="1" CountAddr="0x1013d6dc" />
+    <Article Type="weapon" ID="4" Name="slingshot" Count="1" CountAddr="0x1013d6ec" />
+    <Article Type="weapon" ID="5" Name="weeds" Count="1" CountAddr="0x1013d6fc" />
+    <Article Type="weapon" ID="6" Name="balloon" Count="4" CountAddr="0x1013d70c" />
+    <Article Type="weapon" ID="7" Name="clayrocket" Count="1" CountAddr="0x1013d71c" />
+    <Article Type="weapon" ID="8" Name="seed" Count="1" CountAddr="0x1013d72c" />
+    <Article Type="weapon" ID="9" Name="sprout" Count="1" CountAddr="0x1013d73c" />
+    <Article Type="weapon" ID="10" Name="tree" Count="1" CountAddr="0x1013d74c" />
+    <Article Type="weapon" ID="11" Name="sprinkling_water" Count="5" CountAddr="0x1013d75c" />
+    <Article Type="weapon" ID="12" Name="helmet" Count="1" CountAddr="0x1013d76c" />
+    <Article Type="weapon" ID="13" Name="butterflynet" Count="1" CountAddr="0x1013d77c" />
+    <Article Type="weapon" ID="14" Name="tomnook" Count="1" CountAddr="0x1013d78c" />
+    <Article Type="weapon" ID="15" Name="moneybag" Count="1" CountAddr="0x1013d79c" />
+    <Article Type="weapon" ID="16" Name="house" Count="1" CountAddr="0x1013d7ac" />
+    <Article Type="weapon" ID="17" Name="beetle" Count="1" CountAddr="0x1013d7bc" />
+    <Article Type="weapon" ID="18" Name="furniture" Count="1" CountAddr="0x1013d7cc" />
+    <Article Type="item" ID="19" Name="wood" Count="2" CountAddr="0x1013d7dc" />
+    <Article Type="item" ID="20" Name="murabitofruit" Count="2" CountAddr="0x1013d7ec" />
+  </Fighter>
+  <Fighter Name="palutena">
+    <Article Type="weapon" ID="0" Name="godwing" Count="1" CountAddr="0x1013eb0c" />
+    <Article Type="weapon" ID="1" Name="explosiveflame" Count="2" CountAddr="0x1013eb1c" />
+    <Article Type="weapon" ID="2" Name="explosiveflame_reserve" Count="2" CountAddr="0x1013eb2c" />
+    <Article Type="weapon" ID="3" Name="fireworks" Count="2" CountAddr="0x1013eb3c" />
+    <Article Type="weapon" ID="4" Name="autoaimbullet" Count="3" CountAddr="0x1013eb4c" />
+    <Article Type="weapon" ID="5" Name="autoreticle" Count="1" CountAddr="0x1013eb5c" />
+    <Article Type="weapon" ID="6" Name="reflectionboard" Count="1" CountAddr="0x1013eb6c" />
+    <Article Type="weapon" ID="7" Name="blackhole" Count="1" CountAddr="0x1013eb7c" />
+    <Article Type="weapon" ID="8" Name="beam" Count="1" CountAddr="0x1013eb8c" />
+    <Article Type="weapon" ID="9" Name="gate" Count="1" CountAddr="0x1013eb9c" />
+  </Fighter>
+  <Fighter Name="reflet">
+    <Article Type="weapon" ID="0" Name="book" Count="1" CountAddr="0x10141b1c" />
+    <Article Type="weapon" ID="1" Name="window" Count="1" CountAddr="0x10141b2c" />
+    <Article Type="weapon" ID="2" Name="thunder" Count="5" CountAddr="0x10141b3c" />
+    <Article Type="weapon" ID="3" Name="elwind" Count="3" CountAddr="0x10141b4c" />
+    <Article Type="weapon" ID="4" Name="gigafire" Count="2" CountAddr="0x10141b5c" />
+    <Article Type="weapon" ID="5" Name="chrom" Count="1" CountAddr="0x10141b6c" />
+    <Article Type="item" ID="6" Name="thundersword" Count="1" CountAddr="0x10141b7c" />
+  </Fighter>
+  <Fighter Name="duckhunt">
+    <Article Type="weapon" ID="0" Name="gunman" Count="2" CountAddr="0x101323ec" />
+    <Article Type="weapon" ID="1" Name="clay" Count="1" CountAddr="0x101323fc" />
+    <Article Type="weapon" ID="2" Name="can" Count="1" CountAddr="0x1013240c" />
+    <Article Type="weapon" ID="3" Name="reticle" Count="1" CountAddr="0x1013241c" />
+    <Article Type="weapon" ID="4" Name="finalduck" Count="1" CountAddr="0x1013242c" />
+    <Article Type="weapon" ID="5" Name="finalbg" Count="1" CountAddr="0x1013243c" />
+    <Article Type="weapon" ID="6" Name="finalgunman" Count="1" CountAddr="0x1013244c" />
+    <Article Type="weapon" ID="7" Name="finalenemy" Count="4" CountAddr="0x1013245c" />
+    <Article Type="weapon" ID="8" Name="finaldog" Count="1" CountAddr="0x1013246c" />
+    <Article Type="weapon" ID="9" Name="finalbird" Count="1" CountAddr="0x1013247c" />
+    <Article Type="weapon" ID="10" Name="finalcan" Count="1" CountAddr="0x1013248c" />
+    <Article Type="weapon" ID="11" Name="finalgrass" Count="1" CountAddr="0x1013249c" />
+    <Article Type="weapon" ID="12" Name="grass" Count="1" CountAddr="0x101324ac" />
+  </Fighter>
+  <Fighter Name="koopajr">
+    <Article Type="weapon" ID="0" Name="hammer" Count="1" CountAddr="0x10096f00" />
+    <Article Type="weapon" ID="1" Name="picopicohammer" Count="1" CountAddr="0x10096f10" />
+    <Article Type="weapon" ID="2" Name="magichand" Count="1" CountAddr="0x10096f20" />
+    <Article Type="weapon" ID="3" Name="cannonball" Count="1" CountAddr="0x10096f30" />
+    <Article Type="weapon" ID="4" Name="kart" Count="1" CountAddr="0x10096f40" />
+    <Article Type="weapon" ID="5" Name="remainclown" Count="1" CountAddr="0x10096f50" />
+    <Article Type="weapon" ID="6" Name="shadowmario" Count="1" CountAddr="0x10096f60" />
+    <Article Type="weapon" ID="7" Name="batten" Count="1" CountAddr="0x10096f70" />
+    <Article Type="item" ID="8" Name="mechakoopa" Count="1" CountAddr="0x10096f80" />
+  </Fighter>
+  <Fighter Name="shulk">
+    <Article Type="weapon" ID="0" Name="dunban" Count="1" CountAddr="0x101445c4" />
+    <Article Type="weapon" ID="1" Name="riki" Count="1" CountAddr="0x101445d4" />
+    <Article Type="weapon" ID="2" Name="finalbg" Count="2" CountAddr="0x101445e4" />
+  </Fighter>
+  <Fighter Name="gekkouga">
+    <Article Type="weapon" ID="0" Name="shuriken" Count="3" CountAddr="0x10134ad8" />
+    <Article Type="weapon" ID="1" Name="water" Count="4" CountAddr="0x10134ae8" />
+    <Article Type="weapon" ID="2" Name="tatami" Count="1" CountAddr="0x10134af8" />
+    <Article Type="weapon" ID="3" Name="moon" Count="1" CountAddr="0x10134b08" />
+    <Article Type="weapon" ID="4" Name="monsterball" Count="1" CountAddr="0x10134b18" />
+    <Article Type="weapon" ID="5" Name="bunshin" Count="1" CountAddr="0x10134b28" />
+  </Fighter>
+  <Fighter Name="pacman">
+    <Article Type="weapon" ID="0" Name="esa" Count="1" CountAddr="0x1013e62c" />
+    <Article Type="weapon" ID="1" Name="trampoline" Count="1" CountAddr="0x1013e63c" />
+    <Article Type="weapon" ID="2" Name="firehydrant" Count="1" CountAddr="0x1013e64c" />
+    <Article Type="weapon" ID="3" Name="bigpacman" Count="1" CountAddr="0x1013e65c" />
+    <Article Type="weapon" ID="4" Name="artisticpoint" Count="1" CountAddr="0x1013e66c" />
+  </Fighter>
+  <Fighter Name="rockman">
+    <Article Type="weapon" ID="0" Name="rockbuster" Count="3" CountAddr="0x10142d64" />
+    <Article Type="weapon" ID="1" Name="crashbomb" Count="2" CountAddr="0x10142d74" />
+    <Article Type="weapon" ID="2" Name="rushcoil" Count="2" CountAddr="0x10142d84" />
+    <Article Type="weapon" ID="3" Name="leafshield" Count="1" CountAddr="0x10142d94" />
+    <Article Type="weapon" ID="4" Name="chargeshot" Count="1" CountAddr="0x10142da4" />
+    <Article Type="weapon" ID="5" Name="hardknuckle" Count="1" CountAddr="0x10142db4" />
+    <Article Type="weapon" ID="6" Name="leftarm" Count="1" CountAddr="0x10142dc4" />
+    <Article Type="weapon" ID="7" Name="rightarm" Count="1" CountAddr="0x10142dd4" />
+    <Article Type="weapon" ID="8" Name="airshooter" Count="1" CountAddr="0x10142de4" />
+    <Article Type="weapon" ID="9" Name="blackhole" Count="1" CountAddr="0x10142df4" />
+    <Article Type="weapon" ID="10" Name="finalbg" Count="1" CountAddr="0x10142e04" />
+    <Article Type="weapon" ID="11" Name="rockmanx" Count="1" CountAddr="0x10142e14" />
+    <Article Type="weapon" ID="12" Name="rockmandash" Count="1" CountAddr="0x10142e24" />
+    <Article Type="weapon" ID="13" Name="rockmanexe" Count="1" CountAddr="0x10142e34" />
+    <Article Type="weapon" ID="14" Name="shootingstarrockman" Count="1" CountAddr="0x10142e44" />
+    <Article Type="item" ID="15" Name="metalblade" Count="1" CountAddr="0x10142e54" />
+  </Fighter>
+  <Fighter Name="mewtwo">
+    <Article Type="weapon" ID="0" Name="shadowball" Count="8" CountAddr="0x10099d08" />
+    <Article Type="weapon" ID="1" Name="bindball" Count="1" CountAddr="0x10099d18" />
+    <Article Type="weapon" ID="2" Name="mewtwom" Count="1" CountAddr="0x10099d28" />
+  </Fighter>
+  <Fighter Name="ryu">
+    <Article Type="weapon" ID="0" Name="hadoken" Count="1" CountAddr="0x1009cb98" />
+    <Article Type="weapon" ID="1" Name="shinkuhadoken" Count="1" CountAddr="0x1009cba8" />
+    <Article Type="weapon" ID="2" Name="sack" Count="1" CountAddr="0x1009cbb8" />
+  </Fighter>
+  <Fighter Name="lucas">
+    <Article Type="weapon" ID="0" Name="pkfreeze" Count="2" CountAddr="0x10098a9c" />
+    <Article Type="weapon" ID="1" Name="pkfire" Count="2" CountAddr="0x10098aac" />
+    <Article Type="weapon" ID="2" Name="pkthunder" Count="2" CountAddr="0x10098abc" />
+    <Article Type="weapon" ID="3" Name="pkstarstorm" Count="1" CountAddr="0x10098acc" />
+    <Article Type="weapon" ID="4" Name="himohebi" Count="1" CountAddr="0x10098adc" />
+    <Article Type="weapon" ID="5" Name="himohebi" Count="1" CountAddr="0x10098aec" />
+    <Article Type="weapon" ID="6" Name="doseitable" Count="1" CountAddr="0x10098afc" />
+    <Article Type="weapon" ID="7" Name="needle" Count="1" CountAddr="0x10098b0c" />
+  </Fighter>
+  <Fighter Name="roy">
+    <Article Type="weapon" ID="0" Name="roysword" Count="1" CountAddr="0x1009c48c" />
+  </Fighter>
+  <Fighter Name="cloud">
+    <Article Type="weapon" ID="0" Name="wave" Count="2" CountAddr="0x100954a4" />
+  </Fighter>
+  <Fighter Name="bayonetta">
+    <Article Type="weapon" ID="0" Name="specialn_bullet" Count="4" CountAddr="0x100948b0" />
+    <Article Type="weapon" ID="1" Name="wickedweavearm" Count="1" CountAddr="0x100948c0" />
+    <Article Type="weapon" ID="2" Name="wickedweaveleg" Count="1" CountAddr="0x100948d0" />
+    <Article Type="weapon" ID="3" Name="bat" Count="1" CountAddr="0x100948e0" />
+    <Article Type="weapon" ID="4" Name="finalbg" Count="1" CountAddr="0x100948f0" />
+    <Article Type="weapon" ID="5" Name="gomorrah" Count="1" CountAddr="0x10094900" />
+    <Article Type="weapon" ID="6" Name="hair" Count="1" CountAddr="0x10094910" />
+  </Fighter>
+  <Fighter Name="kamui">
+    <Article Type="weapon" ID="0" Name="ryusensya" Count="2" CountAddr="0x10095f8c" />
+    <Article Type="weapon" ID="1" Name="dragonhand" Count="1" CountAddr="0x10095f9c" />
+    <Article Type="weapon" ID="2" Name="spearhand" Count="1" CountAddr="0x10095fac" />
+    <Article Type="weapon" ID="3" Name="waterdragon" Count="1" CountAddr="0x10095fbc" />
+    <Article Type="weapon" ID="4" Name="finalbg" Count="1" CountAddr="0x10095fcc" />
+    <Article Type="weapon" ID="5" Name="waterstream" Count="1" CountAddr="0x10095fdc" />
+  </Fighter>
+  <Fighter Name="koopag">
+    <Article Type="weapon" ID="0" Name="breath" Count="6" CountAddr="0x10137248" />
+  </Fighter>
+  <Fighter Name="warioman">
+    <Article Type="weapon" ID="0" Name="wariobike" Count="1" CountAddr="0x1009d834" />
+  </Fighter>
+  <Fighter Name="littlemacg" />
+  <Fighter Name="lucariom">
+    <Article Type="weapon" ID="0" Name="auraball" Count="3" CountAddr="0x10097ae8" />
+    <Article Type="weapon" ID="1" Name="qigong" Count="1" CountAddr="0x10097af8" />
+  </Fighter>
+  <Fighter Name="miienemyf" />
+  <Fighter Name="miienemys" />
+  <Fighter Name="miienemyg">
+    <Article Type="weapon" ID="0" Name="attackairf_bullet" Count="5" CountAddr="0x1009a510" />
+    <Article Type="weapon" ID="1" Name="rapidshot_bullet" Count="5" CountAddr="0x1009a520" />
+  </Fighter>
+</Data>
