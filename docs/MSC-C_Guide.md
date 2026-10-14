@@ -14,10 +14,15 @@ how to write the same thing in MSC-C.
 
 ```sh
 ./tools/setup_toolchain.sh                         # once: clones mscdec + msclang, installs pycparser
-python3 tools/mscdec/mscdec.py fighter.mscsb -o fighter.c
+python3 tools/mscdec/mscdec.py -x tools/mscinfo.xml fighter.mscsb -o fighter.c
 # ...edit fighter.c...
-python3 tools/msclang/msclang.py fighter.c -o fighter.mscsb
+python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighter.c -o fighter.mscsb
 ```
+
+`tools/mscinfo.xml` gives syscalls readable names (`WorkModule(...)` instead of
+`sys_16(...)`). Pass `-x tools/mscinfo.xml` to **both** tools. Without it, the
+compiler rejects a file that uses the names ("function StatusModule does not
+exist"). Syscalls with no name stay as `sys_XX`.
 
 Rules for editing decompiled files:
 
@@ -81,6 +86,32 @@ func_16(0x10, 0);               // change action to SpecialFall
 | `script_16` | `func_16` (same index, decimal) |
 | `GlobalVar26` / `pushVar. 0x1, 0x26` (hex) | `global38` (decimal) |
 | `pushVar. 0x0, 0x3` (local variable) | `var3` / `argN` |
+
+### Syscall names (`tools/mscinfo.xml`)
+
+| Name | sys | Name | sys | Name | sys |
+|---|---|---|---|---|---|
+| `sv_get_mem` | 2 | `StatusModule` | 18 | `StopModule` | 30 |
+| `sv_set_mem` | 3 | `GroundModule` / `F` | 1A / 1B | `BattleObjectParamFloat` | 34 |
+| `randi` | 9 | `EffectModule` / `F` | 1C / 1D | `ShieldModule` | 36 |
+| `MathF` | A | `SoundModule` | 1E | `TurnModule` | 37 |
+| `FighterUtil` | C | `ArticleModule` | 20 | `VisibilityModule` | 39 |
+| `CameraModule` | D | `BattleObject` | 21 | `CatchModule` | 3B |
+| `ControlModule` / `F` | E / F | `CancelModule` | 23 | `CaptureModule` / `F` | 3C / 3D |
+| `KineticModule` / `F` | 10 / 11 | `DamageModule` / `F` | 24 / 25 | `ItemModule` / `F` | 3E / 3F |
+| `MotionModule` / `F` | 12 / 13 | `ComboModule` | 26 | `ColorBlendModule` | 42 |
+| `PostureModule` / `F` | 14 / 15 | `ModelModule` / `F` | 27 / 28 | `PhysicsModule` | 44 |
+| `WorkModule` | 16 | `AreaModule` | 29 | `BattleObjectF` | 45 |
+| `WorkModuleF` | 17 | `LinkModule` / `F` | 2A / 2B | `AudienceManager` | 46 |
+| | | `StageData` | 2C | `JostleModule` | 47 |
+| | | `HitModule` | 2D | `ShakeModule` | 48 |
+| | | `AttackModule` / `F` | 2E / 2F | `SlowModule` / `F` | 49 / 4C |
+| | | | | `ShadowModule` | 4A |
+
+The `F` versions return floats. Everything in this guide written as `sys_XX`
+works with either spelling. For example, `sys_16(0x7, 1, v)` is the same call as
+`WorkModule(0x7, 1, v)`, and `sv_set_mem(0x1, key, action, func)` is
+`sys_3(...)`.
 
 ## 4. Fighter globals (GlobalVars tab)
 

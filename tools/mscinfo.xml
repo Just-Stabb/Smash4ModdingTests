@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Syscall names used by the decompiled fighter files (e.g. fighters/gekkouga).
+     IDs from the MSC Note Sheet "Syscalls" and "Complex CMDs" tabs. -->
+<labels>
+  <functions/>
+  <globals/>
+  <syscalls>
+    <syscall id="0x2" name="sv_get_mem"/>
+    <syscall id="0x3" name="sv_set_mem"/>
+    <syscall id="0x9" name="randi"/>
+    <syscall id="0xA" name="MathF"/>
+    <syscall id="0xC" name="FighterUtil"/>
+    <syscall id="0xD" name="CameraModule"/>
+    <syscall id="0xE" name="ControlModule"/>
+    <syscall id="0xF" name="ControlModuleF"/>
+    <syscall id="0x10" name="KineticModule"/>
+    <syscall id="0x11" name="KineticModuleF"/>
+    <syscall id="0x12" name="MotionModule"/>
+    <syscall id="0x13" name="MotionModuleF"/>
+    <syscall id="0x14" name="PostureModule"/>
+    <syscall id="0x15" name="PostureModuleF"/>
+    <syscall id="0x16" name="WorkModule"/>
+    <syscall id="0x17" name="WorkModuleF"/>
+    <syscall id="0x18" name="StatusModule"/>
+    <syscall id="0x1A" name="GroundModule"/>
+    <syscall id="0x1B" name="GroundModuleF"/>
+    <syscall id="0x1C" name="EffectModule"/>
+    <syscall id="0x1D" name="EffectModuleF"/>
+    <syscall id="0x1E" name="SoundModule"/>
+    <syscall id="0x20" name="ArticleModule"/>
+    <syscall id="0x21" name="BattleObject"/>
+    <syscall id="0x23" name="CancelModule"/>
+    <syscall id="0x24" name="DamageModule"/>
+    <syscall id="0x25" name="DamageModuleF"/>
+    <syscall id="0x26" name="ComboModule"/>
+    <syscall id="0x27" name="ModelModule"/>
+    <syscall id="0x28" name="ModelModuleF"/>
+    <syscall id="0x29" name="AreaModule"/>
+    <syscall id="0x2A" name="LinkModule"/>
+    <syscall id="0x2B" name="LinkModuleF"/>
+    <syscall id="0x2C" name="StageData"/>
+    <syscall id="0x2D" name="HitModule"/>
+    <syscall id="0x2E" name="AttackModule"/>
+    <syscall id="0x2F" name="AttackModuleF"/>
+    <syscall id="0x30" name="StopModule"/>
+    <syscall id="0x34" name="BattleObjectParamFloat"/>
+    <syscall id="0x36" name="ShieldModule"/>
+    <syscall id="0x37" name="TurnModule"/>
+    <syscall id="0x39" name="VisibilityModule"/>
+    <syscall id="0x3B" name="CatchModule"/>
+    <syscall id="0x3C" name="CaptureModule"/>
+    <syscall id="0x3D" name="CaptureModuleF"/>
+    <syscall id="0x3E" name="ItemModule"/>
+    <syscall id="0x3F" name="ItemModuleF"/>
+    <syscall id="0x42" name="ColorBlendModule"/>
+    <syscall id="0x44" name="PhysicsModule"/>
+    <syscall id="0x45" name="BattleObjectF"/>
+    <syscall id="0x46" name="AudienceManager"/>
+    <syscall id="0x47" name="JostleModule"/>
+    <syscall id="0x48" name="ShakeModule"/>
+    <syscall id="0x49" name="SlowModule"/>
+    <syscall id="0x4A" name="ShadowModule"/>
+    <syscall id="0x4C" name="SlowModuleF"/>
+  </syscalls>
+</labels>
