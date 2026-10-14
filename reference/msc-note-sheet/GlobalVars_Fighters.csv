@@ -1,0 +1,74 @@
+Variable,Usage or Value,Usage or Value,Found By,Comment
+GlobalVar0,Fighter / Weapon indicator?,Integer,Ben Hall,"0 for fighters, 1 for weapons. Never pushed?"
+GlobalVar1,Character ID,Integer,Ben Hall,"For weapons, Article ID"
+GlobalVar2,Current Key3 script,Function Pointer,Ben Hall,Called on action start
+GlobalVar3,Is in hitlag,Bit,shinyquagsire23,per-frame scripts are run when set 0
+GlobalVar4,Current Action,Integer,,
+GlobalVar5,Previous Action,Integer,,
+GlobalVar6,Next Action,Integer,,Useful inside Key 2 scripts
+GlobalVar7,Action Count,Integer,,
+GlobalVar8,unknown,Integer,shinyquagsire23,Set 0 after calling per-frame scripts on 3DS
+GlobalVar9,Action Timer,Float,Sammi Husky,
+GlobalVarA,Action Timer (duplicate),Float,Ben Hall,only use is for incrementing the value of GlobalVar9
+GlobalVarB,script_79 sub_fighter_change_status,Function Pointer,u,
+GlobalVarC,script_80,Function Pointer,Sammi Husky,
+GlobalVarD,script_81,Function Pointer,Sammi Husky,
+GlobalVarE,script_82 sub_fighter_line_status_system,Function Pointer,Sammi Husky,
+GlobalVarF,Same as GlobalVar10,Function Pointer,Ben Hall,
+GlobalVar10,Additional per-frame script (if not set to 0),Function Pointer,Ben Hall,"Set in many action scripts
+In script_11, called in order:
+GlobalVarF -> GlobalVar10"
+GlobalVar11,"Always 0, never pushed, so probably unused",,Ben Hall,
+GlobalVar12,"SituationKind
+0 = ground
+1 = cliff
+2 = air
+3 = water
+4 = restraint
+5 = outfield (dead)
+6 = ladder",Integer,Sammi Husky,
+GlobalVar13,SituationKind of last frame,Integer,Ben Hall,
+GlobalVar14,Animation Frame,Float,,
+GlobalVar15,script_107 sub_fighter_change_motion_customize,Function Pointer,Sammi Husky,adjusts acmd index to correct index for custom specials
+GlobalVar16,"(unknown) Dr Mario, Fox, Falco, Miis, and Palutena",Function Pointer,,
+GlobalVar17,(unknown) Set in 13 fighters,Function Pointer,,Pushed in script_43 and script_1999
+GlobalVar18,Inputs,Integer (Bitfield),,
+GlobalVar19,"Side-B condition script (Bayo, Corrin, Palutena)",Function Pointer,Ben Hall,
+GlobalVar1A,"Up-B condition script (Bayo, Lucario, Mega Man)",Function Pointer,Ben Hall,
+GlobalVar1B,"Down-B condition script (Palutena, Peach)",Function Pointer,Ben Hall,
+GlobalVar1C,"Neutral-B condition script (Diddy, Kirby, Pit, Wario)",Function Pointer,Ben Hall,
+GlobalVar1D,Inputs,Integer (Bitfield),,
+GlobalVar1E,"(unknown) Link, Palutena, Peach, Toon link",Function Pointer,,
+GlobalVar1F,Inputs,Integer (Bitfield),,
+GlobalVar20,Stick Y coordinate (up/down),Float,,
+GlobalVar21,Always 0,Function Pointer,,
+GlobalVar22,(unknown) Pacman script_2257,Function Pointer,,Pushed only in script_56 (ledge grab)
+GlobalVar23,(unknown) Set in 23 fighters,Function Pointer,,
+GlobalVar24,"(unknown) Link, Palutena, Peach, Toon link",Function Pointer,,
+GlobalVar25,"(unknown) Kirby script_2287, Ryu script_2293",Function Pointer,,pushed in script_60
+GlobalVar26,Inputs,Integer (Bitfield),,
+GlobalVar27,(unknown) Palutena script_2254,Function Pointer,,
+GlobalVar28,(unknown) Palutena script_2252,Function Pointer,,
+GlobalVar29,(unknown) Palutena script_2255,Function Pointer,,
+GlobalVar2A,(unknown) Palutena script_2256,Function Pointer,,
+GlobalVar2B,"(unknown) Pacman, Palutena, Peach, Sonic",Function Pointer,,
+GlobalVar2C,(unknown) Peach script_2311,Function Pointer,,
+GlobalVar2D,Inputs,Integer (Bitfield),,
+GlobalVar2E,Frames where stickX != 0,Integer,Ben Hall,Used for certain input windows
+GlobalVar2F,Frames where stickY != 0,Integer,Ben Hall,
+GlobalVar30,Stick X coordinate (left/right),Float,,
+GlobalVar31,Stick Y digital coordinate (up/down),Integer,shinyquagsire23,
+GlobalVar32,Fastfall frames,Float,Ben Hall,
+GlobalVar33,ACMDIndex for SpecialN starting subaction,Integer,Ben Hall,"Pushed only in script_107.
+
+May also be set to -1, but not sure what this means"
+GlobalVar34,AMCDindex for SpecialS starting subaction,Integer,Ben Hall,
+GlobalVar35,ACMDIndex for SpecialHi starting subaction,Integer,Ben Hall,
+GlobalVar36,ACMDIndex for SpecialLw starting subaction,Integer,Ben Hall,
+GlobalVar37,ACMDIndex for Final starting subaction,Integer,Ben Hall,
+GlobalVar38,(unknown) gekkouga script_2377,Function Pointer,,
+GlobalVar39,"(unknown) gekkouga, kirby, shulk",Function Pointer,,
+GlobalVar3a,(unknown) koopajr script_2270,Function Pointer,,
+GlobalVar3b,"(unknown) gekkouga, kirby, palutena, shulk",Function Pointer,,
+GlobalVar3c,(unknown) gekkouga script_2377,Function Pointer,,
+GlobalVar3d,(unknown) gekkouga script_2377,Function Pointer,,

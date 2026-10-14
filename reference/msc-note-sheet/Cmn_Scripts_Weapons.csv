@@ -1,0 +1,21 @@
+Script,Fighter Equivalent,Associated Action(s),Comments
+0,0,Initialize global variables (0x0 to 0x15) to 0,
+1,73,Declare the loop for every frame,
+2,74,"Per-frame loop (""main"")",
+3,1,"not sure, end_status scripts?","Set NextAction, Call Key = 2 and Key = 6 scripts"
+7,5,"not sure, init_status scripts?","Set PrevAction, set CurrentAction, deals with Key = 0, 1, 3, and resets ActionTimer"
+9,11,Calls Key = 0 script for the CurrentAction,Returns the value at the end of Key = 0 scripts
+12,10,"not sure, exec_status scripts?","Increments ActionTimer, calls Globals 0xe, 0xf and 0x10"
+14,12,Get absolute value of passed int variable,
+15,13,Get absolute value of passed float variable,
+16,14,Get sign of passed float,"If variable < 0, return -1. Else, return 1"
+17,15,Constrain passed float to range,"args: {value, min, max}"
+18,16,Change action,Changes action 
+19,79,Global_b,Checks if Global_b is set
+24,22,Change subaction,Changes current ACMD subaction (this changes animation)
+25,23,"Change subaction, pass frame","Same as above, but passes current frame as frame to start on"
+32,30,Get result of 1 in N chance,"N = passed integer. Returns 1 if chance is met, 0 otherwise"
+33,?,Get if CurrentSubaction is a custom of the given subaction index,"e.g. Returns 1 if (passedInt ≤ CurrentSubaction ≤ passedInt + 3), 0 otherwise"
+40,107,Used to call ACMD of custom moves,
+41,usually 2239,Entrypoint (usually),
+43,usually 2242,syscall_3 registration scripts (usually),

@@ -1,0 +1,43 @@
+           vvvv,,,
+Variable,Desc,Location Found,Found By
+"global_1A(air/ground,0x?)","First value 0x1 = On ground, 0x5 = In air",Final Smash Activation,Foxsky
+func_78(0x303FA),"Integrated with specialfall? Removing code keeps fallspecial, even after landing.","979 only, All Chars",Foxsky
+"global_16(0x1E00001E, 0x16)","Integrated with specialfall? Removing code keeps fallspecial, even after landing.","979 only, All Chars",Foxsky
+,Greninja Dair on-hit action change (JumpAerial),Greninja script_2383,Stinny
+Action script Keys,,,
+0 -> 3 -> 1,"Called at start of action, once",,
+4 / 7 (w/o hitlag) or 5 (w/ hitlag) or 8 (both),Called every frame,,
+2 / 6,Called at action change/end,Called in script_3,
+,,,
+,,,
+"MSC fighter ""Main()"" decompilation",,,
+"globalVar13 = globalVar12
+globalVar12 = sys_18(0x1)
+try{
+    script_77()
+}
+globalVar26 = sys_E(0x9)
+globalVar18 = sys_E(0xA, 0x0)
+globalVar1f = sys_E(0xA, 0x1)
+globalVar1d = sys_E(0xA, 0x2)
+globalVar2d = sys_E(0xA, 0x3)
+
+localVar0 = sys_18(0x0) //GetStatusKind (current action)
+if(localVar0 != 0xFFFFFFFF){
+    if(!sys_30(0x1) && !sys_49(0x3)){
+        localVar1 = sys_2(0x1, 0x4, localVar0)
+        if(localVar1 != 0x0){
+            try{
+                localVar1()
+            }
+        }
+    }
+    else{
+        localVar1 = sys_2(0x1, 0x5, localVar0)
+        if(localVar1 != 0x0){
+            try{
+                localVar1()
+            }
+        }
+    }
+}",,,

@@ -1,0 +1,4 @@
+tools/mscdec/
+tools/msclang/
+*.mscsb
+__pycache__/

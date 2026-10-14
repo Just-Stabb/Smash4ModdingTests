@@ -1,0 +1,115 @@
+Input type,Variable ID,AND Mask,Input on controller (Gamecube),"Found in (Script, Character [if unique script])",Found by,Comments
+,0x18,,,,jugeeya,list of masks used with globalVar18  https://imgur.com/Dv9nc5g
+Unknown,0x18,0x1,Use item?/A?,47/63,Stinny,"Condition for using S Flag, Aerials"
+C-stick (Attack)?,0x18,0x2,Side,,Meshima,
+C-stick (Attack)?,0x18,0x4,Up,,Meshima,
+C-stick (Attack)?,0x18,0x8,Down,,Meshima,
+C-stick (Smash)?,0x18,0x10,Side,,Meshima,
+C-stick (Smash)?,0x18,0x20,Up,,Meshima,
+C-stick (Smash)?,0x18,0x40,Down,,Meshima,
+C-stick (Special)?,0x18,0x1000,Diagonal?,,Meshima,Used for Final Smash
+C-stick (Special)?,0x18,0x2000,Side,,Meshima,
+C-stick (Special)?,0x18,0x4000,Up,,Meshima,
+C-stick (Special)?,0x18,0x8000,Down,,Meshima,
+Analog Stick,0x18,0x20000,Forward,52,Ben Hall,
+Analog Stick,0x18,0x40000,Backward,52,Ben Hall,Used to call Turn1
+Analog Stick,0x18,0x80000,Unknown (backward?),52,Ben Hall,Used to call Turn2
+Analog Stick,0x18,0x100000,Jump (Tap Jump),"2352, Fox",Stinny,
+Button,0x18,0x200000,Jump (Button),,Meshima,
+C-stick (Shield)?,0x18,0x400000,,,Meshima,Air dodge
+,0x18,0x1000000,,,Meshima,Spotdodge
+C-stick (Shield)?,0x18,0x2000000,,,Meshima,Forward roll
+C-stick (Shield)?,0x18,0x4000000,,,Meshima,Backward roll
+,0x18,0x8000000,,,Meshima,
+,0x18,0x10000000,Walljump?,,Meshima,
+"Button, C-stick (Grab)?",0x18,0x20000000,Grab (Z),,Stinny,
+Analog Stick,0x1d,0x1,Smash forward,,Meshima,Forward Item throw (with Smash input)
+Analog Stick,0x1d,0x2,Smash backward,,Meshima,Backward Item throw (with Smash input)
+Analog Stick,0x1d,0x4,Smash upward,,Meshima,Upward Item throw (with Smash input)
+Analog Stick,0x1d,0x8,Smash downward,,Meshima,Downward Item throw (with Smash input)
+Analog Stick,0x1d,0x10,Up,,Meshima,Upward Item throw
+Analog Stick,0x1d,0x20,Down,,Meshima,Downward Item throw
+Button,0x1d,0x40,Z,,Meshima,ItemThrowDrop
+Analog Stick,0x1d,0x80,Forward,,Meshima,LightThrowF
+Analog Stick,0x1d,0x100,Backward,,Meshima,LightThrowB
+Analog Stick,0x1d,0x200,Forward,,Meshima,LightThrowF
+Analog Stick,0x1d,0x400,Smash forward,,Meshima,LightThrowF (with Smash input)
+Analog Stick,0x1d,0x800,Backward,,Meshima,LightThrowB
+Analog Stick,0x1d,0x1000,Smash backward,,Meshima,LightThrowB (with Smash input)
+Analog Stick,0x1d,0x2000,Up,,Meshima,LightThrowU
+Analog Stick,0x1d,0x4000,Smash upward,,Meshima,LightThrowU (with Smash input)
+Analog Stick,0x1d,0x8000,Down,,Meshima,LightThrowD
+,0x1d,0x20000,,,Meshima,
+Analog Stick,0x1d,0x80000,Backward,,Meshima,
+,0x1d,0x100000,,,Meshima,
+,0x1d,0xf,,,Meshima,
+Button,0x1d,0x1bf,A Button?,,Meshima,
+Unknown(C-Stick?),0x1d,0x600,,,Stinny,
+,0x1d,0x15400,,,Meshima,
+Button,0x1d,0x1fe00,A Button?,,Meshima,
+D-Pad,0x1f,0x1,Side,689,jugeeya,
+D-Pad,0x1f,0x2,Up,689,jugeeya,
+D-Pad,0x1f,0x4,Down,689,jugeeya,
+Analog Stick,0x1f,0x10,Smash Up or Down,,Ben Hall,Only active for a few frames after up/down input
+Analog Stick,0x1f,0x20,Dash Attack/Smash Attack,,shinyquagsire23,Activates only when stick is active + A
+Analog Stick,0x1f,0x40,Smash Left or Right,,shinyquagsire23,Only active for a few frames after left/right input
+Analog Stick,0x1f,0x80,Sideways Momentum,,Ben Hall,
+Analog Stick,0x1f,0x100,Up,,Ben Hall,
+Analog Stick,0x1f,0x200,Down slightly (plat/shield drop),402,jugeeya,
+Analog Stick,0x1f,0x400,Down-Forward,619,Stinny,Used for crawling
+Analog Stick,0x1f,0x800,Down-Backward,621,Stinny,Used for crawling
+Analog Stick,0x1f,0x4000,Forward Acceleration,"402; 2352, Fox",Stinny,"When pivoting, both forward and backward acceleration are active. Bit is dropped at peak running velocity"
+Analog Stick,0x1f,0x8000,Backward Acceleration,"402; 2352, Fox",Stinny,
+Analog Stick,0x1f,0x10000,Downward Acceleration,"2352, Fox",Stinny,
+Analog Stick,0x1f,0x20000,Unknown,script_69 (B-reverse?),Ben Hall,
+Button,0x26,0x1,Attack (A) Down,166,Takumi,Grab will trigger attack inputs for throwing
+Button,0x26,0x2,Attack (A) Released,,shinyquagsire23,
+Button,0x26,0x4,Special Move (B) Down,1806,Takumi,
+Button,0x26,0x8,Special Move (B) Released,,shinyquagsire23,
+Button,0x26,0x10,Jump (X/Y) Down,"2352, Fox",Stinny,
+Button,0x26,0x20,Jump (X/Y) Released,,shinyquagsire23,
+Button,0x26,0x40,Shield (L/R) Down,166,Takumi,
+Button,0x26,0x80,Shield (L/R) Released,,shinyquagsire23,
+Unknown(C-Stick?),0x26,"0x2, 0x6",Unknown,,Stinny,Only activates when C-stick returns to neutral position
+Analog Stick,0x2d,0x1,,,Meshima,Ryu related
+Analog Stick,0x2d,0x2,,,Meshima,Ryu related
+Analog Stick,0x2d,0x4,,,Meshima,Ryu related
+Analog Stick,0x2d,0x8,,,Meshima,Ryu related
+Analog Stick,0x2d,0x10,,,Meshima,Ryu related
+Analog Stick,0x2d,0x20,,,Meshima,Ryu related
+Analog Stick,0x2e,0x6,Frames Left/Right Stick Held,"2325, Ness","Stinny, shinyquagsire23","Paired with a variable? (0x1200002e), u8, 0xfe when stick is not active"
+Analog Stick,0x2f,0x6,Frames Up/Down Stick Held,"2325, Ness","Stinny, shinyquagsire23","Paired with a variable? (0x1200002c, 0x12000020), u8, 0xfe when stick is not active"
+Analog Stick,?,?,Stick angle,"2293, Fox",Raytwo,Stick angle on a circle(?) are shown in register f6 and f8
+Analog Stick Y,0x20,,,,Ben Hall,
+Analog Stick X,0x30,,,,Ben Hall,
+Button,0x31,?,?,77,Sammi Husky,
+Complex Inputs,,,,,,
+Input type,Code,,,,,
+Down Special,"pushVar. 0x1, 0x26
+pushInt. 0x4
+bitAnd. 
+if loc_XX
+pushVar. 0x1, 0x20
+negf. 
+pushInt. 0x0
+pushInt. 0x2000063
+sys. 0x2, 0x17
+floatGreaterOrEqual. ",,,,,
+Check for crouch input,"pushVar. 0x1, 0x20
+pushInt. 0x0
+pushInt. 0x200001a
+sys. 0x2, 0x17
+floatNotEqual. ",,"says ""if stickY != -0.66 (crouch/tether drop sensitivity)""
+Note that the float comparisons might not be properly named, 
+and this is likely actually floatLessOrEqual.",,,
+up angled Forward Tilt,"pushVar. 0x1, 0x26
+pushInt. 0x1
+bitAnd. 
+if loc_XX
+pushInt. 0x10
+pushInt. 0x2100000f
+sys. 0x2, 0x16
+pushInt. 0x1
+equals. ",,"It could be possible that the 10
+can be changed to any other analog
+direction.",,,

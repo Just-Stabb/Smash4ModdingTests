@@ -1,0 +1,1817 @@
+Command,Syntax,Usage / Notes,,Function Definition
+"Get power shield
+subaction ID","pushInt. 0x22
+sys. 0x1, 0xc",,Used for Ryu's unique subaction,
+Change Action,"pushInt. 0xX
+pushInt. 0xY
+pushInt. script_16
+callFunc 0x2","X = Action ID
+Y = unknown (0 or 1)","pushInt. 0x10 #change action to SpecialFall
+pushInt. 0x0
+pushInt. script_16
+callFunc 0x2",
+"Input detection
+(If button pressed)","pushVar. 0xX
+pushInt. 0xY
+bitAnd. ","X = Input Variable ID
+Y = Input AND Mask","pushVar. 0x1, 0x26 #GlobalVar26 (input type = button)
+pushInt. 0x4
+bitAnd.  #Special Move input (Neutral B)",
+Ground/Ledge/Air detection,"pushVar. 0x1, 0x12
+pushInt. 0xX
+equals. ","X = State, where
+0 = Ground
+1 = Ledge
+2 = Air
+5 = Dead","pushVar. 0x1, 0x12
+pushInt. 0x0 #If fighter is on ground
+equals.",
+Call subaction,"pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. script_22
+callFunc 0x3","X = Subaction ID
+Y = Starting Animation frame
+Z = Animation Speed","pushInt. 0x105 #Uses CliffAttackQuick animation
+pushInt. 0x0 #Animation Frame to start on
+pushInt. 0x3f800000 #Animation speed
+pushInt. script_22
+callFunc 0x3","script_22(ACMDIndex, AnimFrame, AnimSpeed)"
+"Call subaction
+(pass frame)","pushInt. 0xX
+pushInt. script_23
+callFunc 0x1",X = Subaction ID,"pushInt. 0x4E #Uses EscapeAir animation
+pushInt. script_23 #Current frame of animation is passed on
+callFunc 0x1",script_23(ACMDIndex)
+Allow Fastfall,"pushInt. script_550
+callFunc 0x0",---,"unk_2E loc_1C
+pushInt. script_550 #Script for Fastfall
+callFunc 0x0",
+Allow/Disallow Ledgegrab,"pushInt. 0xX
+pushInt. script_100
+callFunc 0x1","X = Mode, where
+0 = Can't grab ledge
+1 = Can snap to ledge while facing it
+2 = Can snap to ledge
+3 = Can grab ledge while falling and facing it
+4 = Can grab ledge while falling","pushInt. 0x2 #Snaps to the ledge
+pushInt. script_100
+callFunc 0x1",
+Set Ground/Ledge/Air State,"pushInt. 0xX
+pushInt. script_20
+callFunc 0x1","X = State, where
+0 = Ground, 1 = Ledge,
+2 = Air",,
+If Current Action,"pushVar. 0x1, 0x4
+pushInt. 0xXX
+equals. ",X = Action ID,"pushVar. 0x1, 0x4
+pushInt. 0x22 #If the current action is EscapeAir
+equals. ",
+If Previous Action,"pushVar. 0x1, 0x5
+pushInt. 0xXX
+equals. ",X = Action ID,"pushVar. 0x1, 0x5
+pushInt. 0x4 #If the previous action was Run
+equals. ",
+If Next Action,"pushVar. 0x1, 0x6
+pushInt. 0xXX
+equals. ",X = Action ID,"pushVar. 0x1, 0x6
+pushInt. 0x35 #If the next action is Catch
+equals. ", 
+Get Character ID,"pushInt. 0x1
+sys. 0x1, 0x7","used to set GlobalVar 1, so it's preferred to use that",,
+Get Stage ID,"pushInt. 0x3
+sys. 0x1, 0x7",,,
+If screen KOs are enabled,"pushInt. 0x9
+sys. 0x1, 0x7",,,
+Random integer,"pushInt. 0xX
+pushInt. 0xY
+sys. 0x2, 0x9","Range = [X to Y)
+(does not include Y)",,
+Square Root,"pushInt. 0x0
+pushInt. 0xX
+sys. 0x2, 0xa","X = float
+if X < 0, returns 0",,sqrt(x)
+Calculate Angle (atan2),"pushInt. 0x1
+pushInt. 0xY
+pushInt. 0xX
+sys. 0x3, 0xa","Returns the angle of (X,Y) in radians. Range=(-π,π].
+(0,0) returns 0 and positive X axis is where it measures 0",,"atan2(Y,X)"
+Exponentiation,"pushInt. 0x2
+pushInt. 0xX
+pushInt. 0xN
+sys. 0x3, 0xa","X = float
+N = int, exponent
+Returns float
+(N = 0 is untested)",,X^Y
+Magnitude of vector 3D,"pushInt. 0x3
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys. 0x4, 0xa","Vector <X, Y, Z>
+
+Returns sqrt(X^2+Y^2+Z^2)",,"||<X,Y,Z>||"
+Cosine,"pushInt. 0x4
+pushInt. 0xX
+sys. 0x2, 0xa",X = float (radians),,cos(x)
+Sine,"pushInt. 0x5
+pushInt. 0xX
+sys. 0x2, 0xa",X = float (radians),,sin(x)
+Random float,"pushInt. 0x6
+sys. 0x1, 0xa",Range = 0 to 1,,randf
+Random float 2,"pushInt. 0x6
+pushInt. 0xX
+sys. 0x2, 0xa",Range = 0 to X (float),,
+Calculate Angle Difference,"pushInt. 0x7
+pushInt. 0xB
+pushInt. 0xA
+pushInt. 0xY
+pushInt. 0xX
+sys. 0x5, 0xa","equivalent to
+abs(atan2(B,A) - atan2(Y,X))",,
+Y component of unit vector set with opcode 0xa,"pushInt. 0x8
+sys. 0x1, 0xa",,,
+X component of unit vector,"pushInt. 0xa
+pushInt. 0xX
+pushInt. 0xY
+sys. 0x3, 0xa","Vector <X,Y>, returns X divided by the magnitude",,
+unknown,"pushInt. 0xb
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys. 0x4, 0xa",,,
+Magnitude of vector 2D,"pushInt. 0xc
+pushInt. 0xX
+pushInt. 0xY
+sys. 0x3, 0xa",,,
+Get if lying down facing up,"pushInt. 0x0
+sys. 0x1, 0xc",,,
+checkCloudThroughOut,"pushInt. 0x2
+sys. 0x1, 0xc",Checks if you passed through a cloud downward(?),clouds on Skyworld,
+Get Angle Difference between Wall?,"pushInt. 0x3
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x1
+sys. 0x5, 0xc","X = X axis (radians)
+Y = Y axis (radians)
+Z = Z axis (radians)","(Luigi script_2341, wall stick)",
+Get Angle Difference between Floor?,"pushInt. 0x6
+pushInt. 0xX
+sys. 0x2, 0xc",X = X axis (radians),,
+If Subaction exists,"pushInt. 0xc
+pushInt. 0xX
+sys. 0x2, 0x12",X = Subaction ID,,
+Get if alternate subaction will be performed?,"pushInt. 0x10
+pushInt. 0xX
+sys. 0x2, 0xc",X = Subaction ID,"pushInt. 0x10
+pushInt. 0x34 #Subaction ID for SquatWait
+sys. 0x2, 0xc
+(script_604, SquatWait)",
+Get Star/Screen KO odds?,"pushInt. 0x15
+sys. 0x1, 0xc",,"script_220
+(Always? returns 40 in float)",
+Get Jab Subaction,"pushInt. 0x1e
+sys. 0x1, 0xc",,,
+Get If Hammer Action,"pushInt. 0x1e
+pushInt. 0xX
+sys. 0x2, 0xc","X = Action ID
+Checks if action ID is in the set of hammer actions",Hammer init_status script stuff,
+Get Forward Tilt Subaction,"pushInt. 0x1f
+sys. 0x1, 0xc",,,
+Get Up Tilt Subaction,"pushInt. 0x20
+sys. 0x1, 0xc",,,
+Get Down Tilt Subaction,"pushInt. 0x21
+sys. 0x1, 0xc",,,
+CameraModuleImpl.setRun,"pushInt. 0x0
+sys 0x1, 0xd",usage unknown,turn init_status; script_756,
+Enable/Disable Camera Focus,"pushInt. 0x2
+pushInt. 0xX
+sys 0x2, 0xd","X = Mode
+0 = Disable
+1 = Enable",,
+Camera Quake,"pushInt. 0x3
+pushInt. 0xX
+sys 0x2, 0xd",X = Intensity,,
+Move camera boundaries,"pushInt. 0x2713
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0xd","W: Front
+X: Back
+Y: Top
+Z: Bottom",Moves the camera by the specified value,
+Enable/Disable Camera Focus,"pushInt. 0x2717
+pushInt. 0xX
+sys 0x2, 0xd","X = Mode
+0 = Disable
+1 = Enable",,
+Set Camera Focus frames,"pushInt. 0x271e
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x4, 0xd","X: Player ID
+Y: Facing Direction
+Z: Frames until camera disables focus",script_220,
+Lock Camera Position,"pushInt. 0x2720
+pushInt. 0x0
+sys 0x2, 0xd",,,
+Enable Camera Zoom,"pushInt. 0x2721
+pushInt. 0xX
+sys 0x2, 0xd","X = Mode
+0 = Enable
+1 = Disable",,
+Get stick Y digital coordinate,"pushInt. 0x0
+sys. 0x1, 0xe",,"(Script_77, set as global var 0x31)",
+Get stick X digital coordinate,"pushInt. 0x1
+sys. 0x1, 0xe",,,
+"Get frames where
+stickX != 0","pushInt. 0x2
+sys. 0x1, 0xe",,,
+"Get frames where
+stickY != 0","pushInt. 0x3
+sys. 0x1, 0xe",,"(Script_77, set as global var 0x2E)",
+"Get frames where
+stickX != 0","pushInt. 0x4
+sys. 0x1, 0xe",,(Reflet Script_2252),
+"Get frames where
+stickX != 0","pushInt. 0x5
+sys. 0x1, 0xe",,(Reflet Script_2252),
+"Set Clatter
+(button mash)","pushInt. 0x6
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x1
+sys 0x5, 0xe","X: Duration
+Y: Time reduced per frame
+Z: Time reduced per input",,
+Get Button press,"pushInt. 0x9
+sys. 0x1, 0xe",,"(Script_74, set as global var 0x26)",
+Get Stick Inputs,"pushInt. 0xa
+pushInt. 0xX
+sys. 0x2, 0xe","X = 
+0: C-stick? (GlobalVar 0x18)
+1: Analog Stick/D-Pad (0x1F)
+2: Item related (0x1D)
+3: Ryu related (0x2D)",,
+Get Aerial Button,"pushInt. 0x10
+sys. 0x1, 0xe","Returns an int in the range [1,5]",(Script_311),
+Get input buffer,"pushInt. 0x15
+sys. 0x1, 0xe",Returns input buffer (int) + 0x1,"(To set input buffer, use Set Int [opcode 0x7] and set variable 0x12000000 to desired value)",
+Set controller rumble,"pushInt. 0x19
+pushInt. 0x2
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x1
+sys 0x5, 0xe","0x2 = unk
+0x0 = unk
+0x0 = unk (flag = 0 or 1)
+0x1 = unk",,
+Get Button pressed,"pushInt. 0x2710
+pushInt. 0xX
+sys. 0x2, 0xe","X = Button Type 
+0 = Attack
+1 = Special
+2 = Jump
+3 = Shield
+4 = A+B/C-stick Smash
+5 = Up D-pad
+6 = Down D-pad
+7 = Left D-pad
+8 = Right D-pad
+9 = Grab (button only [Z])
+A = C-stick input (any direction)
+B = C-stick input (any direction)
+C = A+B Smash
+D = A+B Smash
+E = Attack",These button presses are not factored into the buffer system,
+Get Button released,"pushInt. 0x
+pushInt. 0xX
+sys. 0x2, 0xe",X = Button Type (as above),Only true the frame the button is released,
+Get Button held,"pushInt. 0x2712
+pushInt. 0xX
+sys. 0x2, 0xe",X = Button Type (as above),(Peach script_2311 as a condition for floating with arg 0x2),
+Get Button not held,"pushInt. 0x2713
+pushInt. 0xX
+sys. 0x2, 0xe",X = Button Type (as above),(script_406 for dropping shield during Guard),
+"Clear ""frames where
+stickY != 0"" ?","pushInt. 0x271a
+sys 0x1, 0xe",,(script_76),
+Something with clearing button inputs?,"pushInt. 0x271b
+sys 0x1, 0xe",,(script_103),
+Get if Tap Jump is enabled,"pushInt. 0x271c
+sys. 0x1, 0xe",,(Fox script_2352 for jump-cancelling Reflector on reflect),
+Number of frames since last ???,"pushInt. 0x271c
+sys. 0x1, 0xe",,,
+Number of frames since last Button press,"pushInt. 0x2722
+pushInt. 0xX
+sys. 0x2, 0xe","X = Button Type (as above)
+Stored as int in [0, 254]",script_801 for tech input window,
+Number of frames since 2nd-to-last Button press,"pushInt. 0x2723
+pushInt. 0xX
+sys. 0x2, 0xe","X = Button Type (as above)
+Stored as int in [0, 254]",script_801 for tech-disabled window when tapping shield twice,
+???,"pushInt. 0x2726
+sys. 0x1, 0xe",Returns 0x1,,
+Get stick value,"pushInt. 0xX
+sys. 0x1, 0xf","where X is:
+0 = stickX [-1,1]
+1 = stickY [-1,1]
+2 = stickPrevX
+3 = stickPrevY
+4 = stick angle (radians, + / -)
+measured away from X axis
+5 = Clatter
+6 = ?
+7 = stickXNoBound
+8 = stickYNoBound","pushInt. 0x4
+sys. 0x1, 0xf
+pushInt. 0x0
+pushInt. 0x2000032 #u-angled ftilt sensitivity
+sys. 0x2, 0x17
+floatGreater.
+---------------------
+control stick values are determined by a grid of points from [-127,127]. stickX and stickY are determined by coordinate values / 118. 0x0 and 0x1 are limited to range [-1, 1] while 0x7 and 0x8 are not.
+
+Clatter = amount of mashing left",
+Get Clatter (indexed),"pushInt. 0x5
+pushInt. 0xX
+sys. 0x2, 0xf",X = index,"I guess you can have multiple at once, by default it uses index 0",
+Set Kinetic Handler,"pushInt. 0x0
+pushInt. 0xX
+sys 0x2, 0x10",Kinetic Handlers,"pushInt. 0x0
+pushInt. 0xd #Undefined (13 in hex)
+sys 0x2, 0x10",
+Enable Energy,"pushInt. 0xb
+pushInt. 0xW
+sys 0x2, 0x10",W = Kinetic Energy Type,,
+Disable Energy,"pushInt. 0xc
+pushInt. 0xW
+sys 0x2, 0x10",W = Kinetic Energy Type,,
+Set Launch Speed,"pushInt. 0xd
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x10","X = Horizontal
+Y = Vertical",,
+Set gravity,"pushInt. 0xf
+pushInt. 0x1
+pushInt. 0xX
+sys 0x3, 0x10","X = New gravity value
+(Float, down is negative)","pushInt. 0xf
+pushInt. 0x1
+pushInt. 0x0 #Disables gravity
+sys 0x3, 0x10",
+Set ground friction,"pushInt. 0x10
+pushInt. 0xW
+pushInt. 0xX
+sys 0x3, 0x10",X = New friction value,,
+Set aerial velocity,"pushInt. 0x11
+pushInt. 0xW
+pushInt. 0xX
+sys 0x3, 0x10","Where W is:
+1 = Vertical velocity
+2 = Horizontal velocity
+X = Velocity value",,
+Set Velocity multiplier,"pushInt. 0x12
+pushInt. 0xW
+pushInt. 0xX
+sys 0x3, 0x10",X = Velocity,,
+Set max fall speed,"pushInt. 0x14
+pushInt. 0x1
+pushInt. 0xX
+sys 0x3, 0x10",X = Max fall speed,,
+Set speed,"pushInt. 0x14
+pushInt. 0x1
+pushInt. 0xX
+sys 0x3, 0x10","X = Horizontal speed
+V = Vertical speed","Relative to facing direction, adds momentum",
+Add Momentum?,"pushInt. 0x1
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x4, 0x10","X = Horizontal
+Y = Vertical
+Z = Diagonal?",,
+Multiply Max H airspeed,"pushInt. 0x6
+pushInt. 0x2
+pushInt. 0xX
+sys 0x3, 0x10",X = Multiplier,"SpecialFall, RCO air-speed (script_581)",
+Set acceleration,"pushInt. 0xf
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x4, 0x10","X = Air accel
+Y = Gravity",,
+Set deceleration,"pushInt. 0x10
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x4, 0x10","X = New friction value
+can be both ground/air
+Y = V decel (negative gravity)",,
+Set speed to be added,"pushInt. 0x11
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x4, 0x10","W = from 0x0 to 0x4?
+Not sure what this does.
+
+X = Horizontal speed
+Y = Vertical speed",,
+Set max speed,"pushInt. 0x14
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x4, 0x10","W = from 0x0 to 0x4?
+should be same as above
+
+X = Max horizontal speed
+Y = Max veritcal speed",,
+Set max air speed,"pushInt. 0x15
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x4, 0x10","W = from 0x0 to 0x4?
+should be same as above
+
+X = Max horizontal air speed
+Y = Max fall speed",,
+Set speed,"pushInt. 0xe
+pushInt. 0xA
+pushInt. 0xB
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x8, 0x10","A = from 0x0 to 0x4?
+should be same as above
+B = from 0x0 to 0x16?
+
+X = Horizontal Velocity
+Y = Vertical Velocity",,
+Get character speed,"pushInt. 0xX
+pushInt. 0xY
+sys. 0x2, 0x11",sys_11,,
+Get animation end frame,"pushInt. 0x0
+pushInt. 0xX
+sys. 0x2, 0x12","X = Subaction ID
+return value is 0-indexed",,
+Set animation,"pushInt. 0x1
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x12","W = Subaction ID
+X = Starting animation frame
+Y = Frame speed multiplier
+Z = Transition frames","Note: Values for first parameter range from 0x1, 0x3, 0x26, 0x2B, 0x38
+Exact purpose of each is unknown",
+Set animation speed,"pushInt. 0x4
+pushInt. 0xX
+sys 0x2, 0x12",X = Frame speed multiplier,,
+Get current animation ID,"pushInt. 0x7
+sys. 0x1, 0x12",,"pushInt. 0x7
+sys. 0x1, 0x12
+pushInt. 0x2e
+notEqual.  #(Script_815) If subaction is not DamageFall",
+Add 2nd animation,"pushInt. 0x8
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x12","W = Animation ID
+X = Bone?
+Y = Starting frame (float)
+Z = Frame speed multiplier",(Animation blending between Fall and FallF/B animations),
+Remove 2nd animation,"pushInt. 0x9
+sys 0x1, 0x12",,(Animation blending between Fall and FallF/B animations),
+Set Weight Rate,"pushInt. 0xa
+pushInt. 0xX
+sys 0x2, 0x12","Used for 2nd animations
+X = ""Weight Rate"" (float)","(Animation blending between Fall and FallF/B animations, shield tilting)
+Controls how fast the weighting of animations tends toward the 2nd animation per frame. To control exact weight, subtract PrevWeight from the amount",
+If animation exists,"pushInt. 0xc
+pushInt. 0xX
+sys. 0x2, 0x12",X = Subaction ID,"pushInt. 0xc
+pushInt. 0x57 #subaction ID for up-angled ftilt, before calling the animation
+sys. 0x2, 0x12",
+2nd Animation blending amount?,"pushInt. 0x13
+pushInt. 0xX
+sys 0x2, 0x12",X = blending amount? (float),,
+unknown,"pushInt. 0x14
+sys. 0x1, 0x12",,,
+Disables upper body animation,"pushInt. 0x17
+pushInt. 0x1
+sys 0x2, 0x12",,,
+Related to the above CMD?,"pushInt. 0x18
+pushInt. 0x1
+sys 0x2, 0x12",,,
+Enable/Disable flipping animation left to right,"pushInt. 0x1b
+pushInt. 0xX
+sys 0x2, 0x12","X is:
+0 = Disabled
+1 = Enabled",Inverts animation left to right instead of rotating when the character faces opposite direction,
+Get something???,"pushInt. 0xX
+sys. 0x1, 0x12","X: 0x20, 0x22, 0x25",,
+Set Thrown Animation,"pushInt. 0x29
+pushInt. 0xX
+sys 0x2, 0x12","X is:
+0 = default?
+4 = ThrownDx
+8 = ThrownGirl","(Script_1129, uses 0x13000120 to determine Thrown subaction)",
+Something to do with expressions?,"pushInt. 0x2f
+pushInt. 0xX
+sys 0x2, 0x12","X is:
+0 = Normal
+1 = Damaged expression?",,
+Set 2nd animation frame,"pushInt. 0x34
+pushInt. 0xX
+sys 0x2, 0x12","For animation blending
+Used in shield tilting
+X = frame (float)",,
+Stop animation,"pushInt. 0x35
+pushInt. 0xX
+sys 0x2, 0x12","X is:
+0 = Disabled
+1 = Enabled",,
+Play animation in reverse,"pushInt. 0x36
+pushInt. 0xX
+sys 0x2, 0x12","X is:
+0 = Disabled
+1 = Enabled",,
+If animation ended,"pushInt. 0x2712
+sys. 0x1, 0x12",,,
+Set animation frame,"pushInt. 0x2713
+pushInt. 0xX
+sys 0x2, 0x12",X = frame (float),,
+Get TransN translate end frame,"pushInt. 0x0
+pushInt. 0xX
+sys. 0x2, 0x13","Gets the Z location of transN (of subaction ID ""X"") on the last frame of animation",,
+Get animation frame,"pushInt. 0x1
+sys. 0x1, 0x13",Gets frame of current animation (float),,
+"""Get previous Weight""","pushInt. 0x2
+sys. 0x1, 0x13",related to 2nd animations; animation blending,(Animation blending between Fall and FallF/B animations),
+Get frame speed,"pushInt. 0x9
+sys. 0x1, 0x13",,,
+SetLr,"pushInt. 0x0
+pushInt. 0xX
+sys 0x2, 0x14","X = 0x3f800000 or 1f (right)
+or
+X = 0xbf800000 or -1f (left)",CliffCatch,
+ReverseLr,"pushInt. 0x1
+sys 0x1, 0x14",,Turn,
+UpdateRotYLr,"pushInt. 0x2
+sys 0x1, 0x14",Usually used for after using SetLr or ReverseLr,,
+Set position,"pushInt. 0x3
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x4, 0x14","Absolute position (X,Y,Z)",,
+Set rotation,"pushInt. 0x4
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x4, 0x14","X rotation (deg, float)
+Y rotation (deg, float)
+Z rotation (deg, float)","Values are relative to facing direction:
+Higher values of X cause it to tilt forward
+Higher values of Y cause it to tilt left
+
+Ex: Pikachu's thunderjolt uses this to crawl along stage walls (dengeki, script_54)",
+SetStickLr,"pushInt. 0x5
+sys 0x1, 0x14","If stick is backwards when called, reverses direction","Pikachu/Greninja/Fox/Falco up-B, etc",
+Reverse Direction?,"pushInt. 0x2710
+sys 0x1, 0x14",,,
+Multiply Model Size,"pushInt. 0x2713
+pushInt. 0xX
+sys 0x2, 0x14",X = Multiplier,,
+unknown,"pushInt. 0x2719
+sys 0x1, 0x14",usually seen after 0x2710,,
+Get posture data,"pushInt. 0xX
+sys. 0x1, 0x15","X = attribute, where
+0 = Get LR (-1 or 1)
+1 = X position
+2 = Y position
+3 = Z position
+4 = X axis rot? (degrees)
+5 = Y axis rot? (degrees)
+6 = Z axis rot? (degrees)
+7 = Model scale
+c = ?",,
+"GetStatusKind
+(Get Action)","pushInt. 0x0
+sys. 0x1, 0x18",In most cases it is preferred to use GlobalVar4,,
+Get Ground/Ledge/Air status,"pushInt. 0x1
+sys. 0x1, 0x18","0 = Ground
+1 = Ledge
+2 = Air
+5 = Dead",,
+Set Ground/Ledge/Air State,"pushInt. 0x2
+pushInt. 0xX
+sys 0x2, 0x18",X = State (see above),,
+Change Action,"pushInt. 0x3
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x18","X = Action ID
+Y = Carry over status variables (0 = no, 1 = yes)",,
+Get next Action ID?,"pushInt. 0xa
+pushInt. 0x3
+sys. 0x2, 0x18",,,
+Get Action onStart,"pushInt. 0x6
+sys. 0x1, 0x18","Returns 1 on the first frame of an action, 0 otherwise",,
+Change Action (pre_status),"pushInt. 0x
+pushInt. 0xX
+sys 0x2, 0x18",X = Action ID,(Only use on pre_status scripts),
+Pre-Action Stuff,"pushInt. 0x5
+pushInt. 0xV
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0xa, 0x18","V: Ground/Ledge/Air State
+W: Kinetic Handler
+X: Edge Slide Type
+Y: Ledgegrab Type
+Z: Player Collision
+Enabled(1)/Disabled(0)",,
+set_fighter_status_data,"pushInt. 0x2713
+pushInt. 0xV
+pushInt. 0xW
+pushInt. 0x0
+pushInt. 0xX
+pushInt. 0x0
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x1
+pushInt. 0x0
+sys 0xa, 0x18","V: Knockdown state: Normal(0), Knocked down(1) [hitboxes with 0x80000000 flag will not hit]
+W: Can be: Footstooled(0), Phantom Footstooled(1), Can't be Footstooled(2)
+X: Grab immunity Enabled(1)/Disabled(0)
+Y: Stale move negation Enabled(1422[Bitfield?])/Disabled(0)
+Z: B-reverse Enabled(1000)/Disabled(not 1000)",,
+Get Collision Bitfield,"pushInt. 0xa
+sys. 0x1, 0x1a","0xff = Any part of stage
+0b00000001 = Ceiling
+0b00000010 = Right Wall 
+0b00000100 = Left Wall
+0b00001000 = Floor
+Next bits are untested",,
+Get Down Correct Position,"pushInt. 0xc
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0x0XXXXXXX
+pushInt. 0x0YYYYYYY
+sys. 0x5, 0x1a","X coordinate
+Y coordinate
+1st Float var ID
+2nd Float var ID","Takes the coordinate (X,Y) and finds a point on the stage floor by taking a projection with constant X, given the floor's horizontal limits. The resulting X coordinate is stored in the 1st Float and the Y coordinate of which is stored in the 2nd Float. This function also returns an unknown bool.
+Used in DK down-b, script_2276",
+If standing on drop-through platform,"pushInt. 0xd
+sys. 0x1, 0x1a",,(Script_34) requirement for Pass action change,
+Get if wall-jump enabled,"pushInt. 0xf
+pushInt. 0xX
+sys. 0x2, 0x1a",X = Collision bitfield,"(script_97 and script_98, conditions for wall cling/wall jump)",
+Set Ledge ownership,"pushInt. 0x11
+sys 0x1, 0x1a",,"(Script_204) When two characters grab the ledge, the one who grabs it last will own the ledge",
+Set Ledge ownership (Tether),"pushInt. 0x12
+sys 0x1, 0x1a",,(Script_165),
+Clear Ledge ownership,"pushInt. 0x13
+sys 0x1, 0x1a",,(Script_206),
+Shift/Stretch ECB,"pushInt. 0x1a
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x1a","X = Absolute X coordinate
+Y = Absolute Y coordinate","(script_1763, only for one frame then goes back to normal, affects landing detection as well)",
+Set Edge Slide,"pushInt. 0x2710
+pushInt. 0xX
+sys 0x2, 0x1a","X = State, where
+1 = Can slide off of edge
+2 = Can't slide off of edge
+5 = In Air
+9 = On ground","pushInt. 0x2710
+pushInt. 0x1 #Can slide off edge
+sys 0x2, 0x1a",
+Set Ledgegrab type,"pushInt. 0x
+pushInt. 0xX
+sys 0x2, 0x1a",Same as Allow/Disallow Ledgegrab command,"pushInt. 0x
+pushInt. 0x3 #Can grab ledge while falling and facing it
+sys 0x2, 0x1a",
+Attach to surface,"pushInt. 0x2719
+pushInt. 0xX
+sys 0x2, 0x1a",X = Collision Bitfield,Wall cling,
+If Stage collision,"pushInt. 0x2722
+pushInt. 0xX
+sys. 0x2, 0x1a",X = Collision Bitfield,"0x1 = Ceiling
+0x2 = Right facing wall
+0x4 = Left facing wall
+0x6 = 0b00000110 = Right Wall or Left Wall
+0x8 = Floor",
+If Ledgegrab box collision (ledgegrab mode 0x3 or 0x4 enabled),"pushInt. 0x2724
+sys. 0x1, 0x1a",,,
+If Ledgegrab box collision (ledgegrab mode 0x1 or 0x2 enabled),"pushInt. 0x2725
+sys. 0x1, 0x1a",,,
+"If within distance from edge (in front, not behind)","pushInt. 0x2726
+pushInt. 0xX
+sys. 0x2, 0x1a","X = Distance
+effects the minimum distance from edge you can wait",(Ottotto scripts),
+Has slid off the edge (backwards)?,"pushInt. 0x2727
+sys. 0x1, 0x1a",,(Used as condition for MissFoot action),
+If on a wall-clingable surface,"pushInt. 0x2728
+sys. 0x1, 0x1a",,,
+Get floor material friction multiplier,"pushInt. 0x0
+sys. 0x1, 0x1b",,,
+X coordinate of ledge,"pushInt. 0x1
+sys. 0x1, 0x1b",,,
+Y coordinate of ledge,"pushInt. 0x2
+sys. 0x1, 0x1b",(Script_172),,
+Get touch pos X,"pushInt. 0x3
+pushInt. 0xX
+sys. 0x2, 0x1b",X = Collision Bitfield,"(script_1720, wall jump/wall cling/etc Actions, key 3)",
+Get touch pos Y,"pushInt. 0x4
+pushInt. 0xX
+sys. 0x2, 0x1b",X = Collision Bitfield,"(script_1720, wall jump/wall cling/etc Actions, key 3)",
+Get touch Normal X component,"pushInt. 0x5
+pushInt. 0xX
+sys. 0x2, 0x1b",X = Collision Bitfield,,
+Get touch Normal Y component,"pushInt. 0x6
+pushInt. 0xX
+sys. 0x2, 0x1b",X = Collision Bitfield,,
+GetCliffLr,"pushInt. 0x7
+sys. 0x1, 0x1b","Left cliff = -1f (0xbf800000)
+Right cliff = 1f (0x3f800000)","(CliffCatch, used to set character direction)",
+Get touch pos X?,"pushInt. 0x8
+sys. 0x1, 0x1b","represents an X value, but doesn't seem to be exact?",,
+Get touch pos Y?,"pushInt. 0x9
+sys. 0x1, 0x1b","represents a Y value, but doesn't seem to be exact?",,
+Current X coordinate,"pushInt. 0xa
+sys. 0x1, 0x1b",(script_1804),,
+Current Y coordinate,"pushInt. 0xb
+sys. 0x1, 0x1b",(script_1804),,
+Current Z coordinate,"pushInt. 0xc
+sys. 0x1, 0x1b",,,
+unknown,"pushInt. 0x11
+sys. 0x1, 0x1b",something relating to Y position and the ledge,(CliffCatch 2-frame script_159),
+Set Screen Tint,"pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0xff
+sys 0x9, 0x1c","Unk
+Terminate
+Transition frames
+Red
+Green
+Blue
+Alpha
+Unk
+Unk",,
+Generate Graphic Effect (stage),"pushInt. 0x3
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0xb, 0x1c","
+Unk
+GFX ID
+X
+Y
+Z
+RotationX
+RotationY
+RotationZ
+Size
+Unk
+Terminate","pushInt. 0x3
+pushInt. 0x1000069 # star KO effect
+pushVar. 0x0, 0x4 # set to character's x pos
+pushVar. 0x0, 0x5 # "" y pos
+pushVar. 0x0, 0x6 # "" z pos
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 1.0 # size
+pushInt. 0x0
+pushInt. 0x0
+sys 0xb, 0x1c",
+"Generate Graphic Effect (character, attached)","pushInt. 0x2717
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0xb, 0x1c","
+Unk
+GFX ID
+Bone
+X
+Y
+Z
+RotationX
+RotationY
+RotationZ
+Size
+Terminate",,
+Generate Graphic Effect (character),"pushInt. 0x272e
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0xc, 0x1c","
+GFX ID
+Bone
+X
+Y
+Z
+RotationX
+RotationY
+RotationZ
+Size
+Terminate
+Unk (float)",,
+Generate Graphic Effect (character),"pushInt. 0x2710
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x11, 0x1c","
+GFX ID
+Bone
+X
+Y
+Z
+RotationX
+RotationY
+RotationZ
+Size
+RandomX
+RandomY
+RandomZ
+RanRotX
+RanRotY
+RanRotZ
+Terminate","pushInt. 0x2710
+pushInt. 0x100000F #ID for large star
+pushInt. 0x3 #HipN
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x3f800000 #Size = 1
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x11, 0x1c",
+Generate Colored Graphic Effect (character),"pushInt. 0x2730
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0xe, 0x1c","
+GFX ID
+Bone
+Z
+Y
+X
+RotationZ
+RotationY
+RotationX
+Size
+Terminate
+R
+G
+B","pushInt. 0x2730
+pushInt. 0x100000F #ID for large star
+pushInt. 0x3 #HipN
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x3f800000 #Size = 1
+pushInt. 0x0
+pushInt. 255.0f
+pushInt. 255.0f
+pushInt. 255.0f
+sys 0xe, 0x1c",
+Terminate Graphic Effect,"pushInt. 0x2723
+pushInt. 0x10000XX
+pushInt. 0x0
+pushInt. 0x0
+sys 0x4, 0x1c","
+GFX ID
+unknown
+unknown
+",,
+Play SFX,"pushInt. 0x2710
+pushInt. 0x35XXXX
+sys 0x2, 0x1e",X = SFX ID,"pushInt. 0x2710
+pushInt. 0x350065 #Play the item pickup sound
+sys 0x2, 0x1e",
+Play SFX 2,"pushInt. 0x2718
+pushInt. 0xXXXXXX
+sys 0x2, 0x1e",X = SFX ID,"pushInt. 0x2718
+pushInt. 0x47 #Play the blast KO sfx (script_220)
+sys 0x2, 0x1e",
+Set volume,"pushInt. 0x271d
+pushInt. 0xX
+sys 0x2, 0x1e",X = Volume,,app::SoundModuleImpl::set_se_vol
+Has Smash Taunt,"pushInt. 0x1
+sys. 0x1, 0x1f","Fox/Falco on Lylat
+(Dark) Pit on Palutena's",,
+Has used Smash Taunt,"pushInt. 0x2
+sys. 0x1, 0x1f",,,
+Get number of active weapon instances,"pushInt. 0x1
+pushInt. 0xX
+sys. 0x2, 0x20",X = Article ID,Samus script_2358,
+Generate Article,"pushInt. 0x2710
+pushInt. 0xX
+sys 0x2, 0x20",X = Article (sub) ID,"pikachu\cloud: spawns kaminari (thunder)
+bayo script_2343, generates 0x4(finalbg), 0x6(hair), 0x5(gomorrah)
+requires smashball",
+Terminate Article,"pushInt. 0x2712
+pushInt. 0xX
+sys 0x2, 0x20",X = Article (sub) ID,,
+Change Article Action,"pushInt. 0x2713
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Action ID",,
+Change Article Action (non-anchored?),"pushInt. 0x2714
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Action ID",,
+If weapon exists,"pushInt. 0x2717
+pushInt. 0xX
+sys. 0x2, 0x20",X = Article (sub) ID,"(Yoshi script_2251, Mega Man script_2254)",
+Generate Article,"pushInt. 0x2718
+pushInt. 0xX
+sys 0x2, 0x20",X = Article (sub) ID,,
+Shoot Article,"pushInt. 0x2719
+pushInt. 0xX
+sys 0x2, 0x20",X = Article (sub) ID,Greninja water shuriken,
+Change Article Animation?,"pushInt. 0x271a
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Motion ID","Haven't fully tested this yet (crashed, index out of range?)",
+Change Article Animation? (non-anchored?),"pushInt. 0x271b
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Motion ID","Haven't fully tested this yet (crashed, index out of range?)",
+Set Article Frame Speed,"pushInt. 0x2720
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Animation speed (float)",Sets the animation speed of the article,
+Set Article Frame Speed,"pushInt. 0x2720
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Animation speed (float)",Sets the animation speed of the article,
+Is Article Generatable,"pushInt. 0x2727
+pushInt. 0x0
+sys. 0x2, 0x20",0 = Article (sub) ID? (pikmin),,
+???,"pushInt. 0x2728
+pushInt. 0xX
+sys 0x2, 0x20",X = Article (sub) ID,Crashed,
+Set Article Position (relative to character?),"pushInt. 0x2729
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x20","W = Article ID
+X = X pos
+Y = Y pos
+Z = Z pos",,
+Set Article Rotation,"pushInt. 0x272a
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x20","W = Article ID
+X = X rot
+Y = Y rot
+Z = Z rot",,
+Set Article Position (global?),"pushInt. 0x272b
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x20","W = Article ID
+X = X pos
+Y = Y pos
+Z = Z pos",Spawns the article relative to the map center,
+Set Article Visibility,"pushInt. 0x272c
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x20","X = Article ID
+Y = Visibility State",,
+Terminate weapon,"pushInt. 0x9
+sys 0x1, 0x21",,Various weapons scripts,
+Terminate weapon 2,"pushInt. 0xd
+sys 0x1, 0x21",,Not sure what's different about this one,
+Detach weapon,"pushInt. 0xe
+sys 0x1, 0x21",,Zelda Dein script_56,
+If within footstool range?,"pushInt. 0x18
+sys. 0x1, 0x21",,script_65,
+Something to do with hand animation when holding item?,"pushInt. 0x24
+pushInt. 0xX
+sys 0x2, 0x21","0: Big item?
+1: Small item?",,
+Enable Final Smash state,"pushInt. 0x25
+sys 0x1, 0x21",,(Stage darkens and character size is reverted to normal),
+Disable Final Smash state,"pushInt. 0x26
+sys 0x1, 0x21",,,
+Get weapon position,"pushInt. 0xW
+pushInt. 0x4
+sys. 0x2, 0x21","where W =
+3: X position
+4: Y position",,
+Slow Fighter?,"pushInt. 0x4f
+sys 0x1, 0x21",,Seems to slow the character's animation speed by half,
+Get if causes Deadly Blow,"pushInt. 0x57
+sys. 0x1, 0x21",,"(script_796, generates Deadly Blow)",
+Has Smash Ball,"pushInt. 0x61
+sys. 0x1, 0x21",,,
+Add Point or Stock,"pushInt. 0x62
+sys 0x1, 0x21",,"(script_1322, using S Flag)",
+Has Shocking Taunt (Smash Run item),"pushInt. 0x80
+sys. 0x1, 0x21",,,
+Subtract damage,"pushInt. 0x1a
+pushInt. 0xX
+sys 0x2, 0x21",,"Used in WFT Sun Salutation and Deep Breathing, auto-generates a graphic effect and SFX",
+Has equipment,"pushInt. 0x6e
+pushInt. 0xX
+sys. 0x2, 0x21",X =  Equipment ID,"(script_344, used for No-Flinch Smasher)",
+Get equipment stage,"pushInt. 0x77
+pushInt. 0xX
+sys. 0x2, 0x21",X =  Equipment ID,Decides what variable in fighter_param_equipment_ability will be used,
+Has Smash Tour item,"pushInt. 0x86
+pushInt. 0xX
+sys. 0x2, 0x21",X =  Smash Tour item ID,,
+Set opponent position?,"pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x21","W = Bone ID
+X = X offset
+Y = Y offset",,
+Set weapon position,"pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x7, 0x21","Bone ID?
+X offset
+Y offset
+Z offset
+X rotation (radians)
+Y rotation (radians)
+Z rotation (radians)",,
+Allow Interrupt,"pushInt. 0x2710
+sys 0x1, 0x23",Enables action interrupts,(script_411),
+Disallow Interrupt,"pushInt. 0x
+sys 0x1, 0x23",Disables action interrupts,(script_269),
+If Interrupt Allowed,"pushInt. 0x2713
+sys. 0x1, 0x23",Checks if the animation frame has reached it's FAF (frame which the fighter can act out of an action) OR interrupts have been enabled by Allow Interrupt cmd,Pushed nearly everytime before script_39 or 41 is pushed,
+Get Damage info (int),"pushInt. 0xX
+sys. 0x1, 0x24","X = Return value
+0: Damaged stage (battle_object params 12-14)
+3: Damaged region (upper body, middle, lower body)
+5: Knockback?
+7: Hitbox element
+8: Hitlag frames
+d: Is on wall",,
+Add self-Damage,"pushInt. 0x9
+pushInt. 0xX
+sys 0x2, 0x24",X = Damage,"pushInt. 0x9
+pushInt. -1f #heals 1 damage
+sys 0x2, 0x24",
+Multiply Knockback Taken,"pushInt. 0xa
+pushInt. 0xX
+sys 0x2, 0x24",X = Multiplier,"pushInt. 0xA
+pushInt. 0x3f000000 # 0.5, take half knockback
+sys 0x2, 0x24",
+Set Armor State,"pushInt. 0xb
+pushInt. 0xW
+pushInt. 0xX
+sys 0x3, 0x24","W=0: No Armor
+W=1: Super Armor
+W=2: Knockback based
+W=3: Damage based
+X = Threshold (only non-0 for KB and Damage based)",,
+Set Damage,"pushInt. 0xc
+pushInt. 0xX
+sys 0x2, 0x24",X = Damage,"pushInt. 0xc
+pushInt. 0x42700000 #sets damage to 60% (doesn't change damage counter until hit for some reason)
+sys 0x2, 0x24",
+Multiply Damage Taken,"pushInt. 0x10
+pushInt. 0xX
+sys 0x2, 0x24",X = Multiplier,,
+Set Damage-based super armor?,"pushInt. 0x11
+pushInt. 0xX
+sys 0x2, 0x24",X = Damage,,
+Get damage info,"pushInt. 0xX
+sys. 0x1, 0x25","X = Return value
+0x0: Current percentage
+0x1: Hitstun frames
+0x2: H Launch speed
+0x3: V Launch speed (note, before gravity boost)
+0x4: SDI Multiplier
+0x5: always 0?
+0x6: ? (0 in midair?)
+0x7: Knockback (1st frame)
+0x8: Knockback
+0x9: Launch angle (rad)
+0xa: ?
+0xb: ?
+0xc: Damage multiplier?",,
+Get next jab/ftilt etc.,"pushInt. 0x0
+sys. 0x1, 0x26",,,
+Set Bone Attributes,"pushInt. 0xA
+pushInt. 0xB
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x27","A = Attribute:
+0 = Scale
+1 = Rotation (deg, float)
+7 = Position
+
+B = Bone Index
+X, Y, Z",,
+Set Scale,"pushInt. 0xa
+pushInt. 0xX
+sys 0x2, 0x27",X = Scale,,
+Get Bone Attributes,"pushInt. 0xX
+pushInt. 0xB
+sys. 0x2, 0x28","X = Attribute:
+0: X global position
+1: Y global position
+2: Z global position
+6: X rotation
+7: Y rotation
+8: Z rotation
+B = Bone Index",,
+get 'Animation Origin' global pos from node,"pushInt. 0xA
+pushInt. 0xB
+pushInt. 0xX
+sys. 0x3, 0x28","A = Type of global position
+3: X
+4: Y
+5: probably Z
+B = Bone Index
+X = glbl position of bone 0xB",(CliffCatch),
+Enable/Disable Area (All),"pushInt. 0x2710
+pushInt. 0xX
+sys 0x2, 0x29","X = Collision state
+0: Disabled
+1: Enabled","(Disables jostle, item grab box, footstool, and cannon interactions)",
+Something with Area?,"pushInt. 0x
+pushInt. 0xX
+pushInt. 0x1
+sys 0x3, 0x29",X = Area type?,,
+Enable/Disable Area,"pushInt. 0x2712
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x29","X = Area type
+0: Jostle & Cannon
+1: ???
+2: ???
+3: Footstool
+4: Ground item grab box
+5: Air item grab box
+Y = Collision state
+0: Disabled
+1: Enabled",(I.E. disabling footstool will prevent footstool interactions all together),
+GET_NODE_OBJECT_ID,"pushInt. 0x1
+pushInt. 0x0
+sys 0x2, 0x2a",,,
+Link to character(?),"pushInt. 0x2
+pushInt. 0x1
+sys 0x2, 0x2a",,,
+link_module_impl::link,"pushInt. 0x5
+pushInt. 0xX
+pushInt. 0xY
+sys. 0x3, 0x2a","X = ""LinkConnection"" Index
+Y = Object ID
+also returns bool","X is usually 3. Every object in the Scene has an ID, players are 0x00XX0000, items are 0x40XXYYYY (X is current index, Y is index since beginning of match). LinkConnection list stores the link between each object's LinkModule",
+Grabbed by opponents?,"pushInt. 0x2716
+pushInt. 0x0
+pushInt. 0x3
+sys 0x3, 0x2a",,"Character movement is ""linked"" to opponents",
+"link_module_impl::
+sendEventNodes
+
+(this example sets grabbed character Thrown anim)","pushInt. 0x271b
+pushInt. 0xb
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0x11000006
+pushInt. 0x11000007
+pushInt. 0x01000006
+sys 0x7, 0x2a","0xb = ?
+0xX = ThrownX animation ID
+0xY = not-wgt-dependent flag
+shared variables?",,
+"LinkModuleImpl::
+getParentModelNodeGlobalPosition","pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xB
+pushInt. 0xZ
+sys. 0x4, 0x2b","X = 
+4: X offset
+5: Y offset
+6: Z offset
+Y = LinkConnection index
+B = Bone Index
+Z = unused bool?","(boomerang script_74)
+Calculates homing angle by getting (Toon)Link's offset",
+"LinkModuleImpl::
+getParentLr","pushInt. 0x7
+pushInt. 0xX
+sys. 0x2, 0x2b",X = LinkConnection index,,
+"LinkModuleImpl::
+getParentSlopeRotation","pushInt. 0x8
+pushInt. 0xX
+sys. 0x2, 0x2b",X = LinkConnection index,,
+"LinkModuleImpl::
+getParentMotionFrame","pushInt. 0x9
+pushInt. 0xX
+sys. 0x2, 0x2b",X = LinkConnection index,,
+"LinkModuleImpl::
+getParentRot ??","pushInt. 0xa
+pushInt. 0xX
+sys. 0x2, 0x2b",X = LinkConnection index,,
+Get stage info,"pushInt. 0xX
+sys. 0x1, 0x2c","X = stage info, where
+0 = -X death boundary
+1 = +X death boundary
+2 = +Y death boundary
+3 = -Y death boundary
+4 = Camera X offset
+5 = Camera Y offset
+6 = Camera Z offset
+7 = Camera X rotation(rad)
+8 = Camera Y rotation(rad)
+9 = Camera Z rotation(rad)
+a = -X camera boundary
+b = +X camera boundary
+c = +Y camera boundary
+d = -Y camera boundary
+e = Always 0
+f = Always 1
+10 = Camera FOV
+11 = Camera horizontal angle
+12 = Camera vertical angle",,
+Set Body State,"pushInt. 0x2710 OR 0x0
+pushInt. 0xX
+sys 0x2, 0x2d","X = State, where
+0 = Normal
+1 = Invincible
+2 = Intangilble
+3 = Intangible (no flash)
+4 = Intangible (flashing red)",0x3: Immune to all hitboxes (including those with ignore intangible flags),
+Set Invincible Frames,"pushInt. 0x1
+pushInt. 0xX
+pushInt. 0x0
+sys 0x3, 0x2d",X = Frames,,
+Set Intangible Frames,"pushInt. 0x2
+pushInt. 0xX
+sys 0x2, 0x2d",X = Frames,"pushInt. 0x2
+pushInt. 0xf #15 frames of intangibility
+sys 0x2, 0x2d",
+???,"pushInt. 0x4
+sys 0x1, 0x2d",,(Bayonetta script_2433 [SpecialLw]),
+Set Bone State (All),"pushInt. 0x
+pushInt. 0xX
+sys 0x2, 0x2d","X= State, where
+0 = Normal
+1 = Invincible
+2 = Intangilble
+3 = Intangible (no flash)",,
+Set Hurtbox State,"pushInt. 0x2712
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2d","X = Hurtbox index
+Y = State, where
+0 = Normal
+1 = Invincible
+2 = Intangilble
+3 = Intangible (no flash)",,
+Set Bone State,"pushInt. 0x2713
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2d","X = Bone Index
+Y = State, where
+0 = Normal
+1 = Invincible
+2 = Intangilble
+3 = Intangible (no flash)",goes through hurtbox list and applies the bone state to each hurtbox with the specified bone,
+Set Bone State??,"pushInt. 0x2714
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2d","X = Bone Index
+Y = State, where
+0 = Normal
+1 = Invincible
+2 = Intangilble
+3 = Intangible (no flash)","goes through hurtbox list and applies the bone state to each hurtbox with the specified bone, but stores the state at offset 0x4 instead of 0x0?",
+(Returns 0x1),"pushInt. 0x2715
+sys. 0x1, 0x2d",,,
+Enable/Disable hurtbox collisions,"pushInt. 0x271a
+pushInt. 0xX
+sys 0x2, 0x2d","X = State, where
+0 = Can be hit
+1 = Cannot be hit","(Doesn't flash white and is immune to all hitbox types, even those with ignore invincibility attributes. Doesn't reset on action changes)",
+Multiply Damage Taken,"pushInt. 0x271b
+pushInt. 0xX
+pushInt. 0x3
+pushInt. 0xY
+sys 0x4, 0x2d","X = Hitlag multiplier
+Y = Damage-taken multiplier",Ryu Focus Attack scripts,
+Multiply Damage Taken,"pushInt. 0x271c
+pushInt. 0xX
+sys 0x2, 0x2d",X = Damage-taken multiplier,Ryu Focus Attack scripts,
+Get if Hitbox exists,"pushInt. 0x0
+pushInt. 0xX
+sys. 0x2, 0x2e",X = Hitbox ID,,app::AttackModuleImpl::is_attack
+Set hitbox offsets,"pushInt. 0x1
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x2e","W: Hitbox ID
+X: X offset
+Y: Y offset
+Z: Z offset",,
+Remove hitbox,"pushInt. 0x2718
+pushInt. 0xX
+sys 0x2, 0x2e",X = Hitbox ID,"action 0x127 when launch speed < 2.3 (Luigi final, tumble hitbox)",app::AttackModuleImpl::clear
+Remove all hitboxes,"pushInt. 0x2719
+sys 0x1, 0x2e",,murabito\flowerpot after bouncing,app::AttackModuleImpl::clear_all
+Set damage,"pushInt. 0x271a
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2e","X = Hitbox ID
+Y = Damage (float)",,
+Set size,"pushInt. 0x271b
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2e","X = Hitbox ID
+Y = Size (float)",,
+Get Hitbox array size,"pushInt. 0x271c
+sys. 0x1, 0x2e",,,
+Throw Applier,"pushInt. 0x271d
+pushInt. 0x0
+pushInt. 0x1a
+pushInt. 0x11000005
+pushInt. 0x11000006
+pushInt. 0x11000007
+sys 0x6, 0x2e",,,
+Add hitbox damage,"pushInt. 0x271e
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2e","X = Hitbox ID
+Y = Damage (float)",,
+Multiply hitbox damage,"pushInt. 0x271f
+pushInt. 0xX
+sys 0x2, 0x2e",X = Base damage,,
+Set hitbox offsets,"pushInt. 0x2720
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x6, 0x2e","X: X offset
+Y: Y offset
+Z: Z offset",,
+Set hit bits,"pushInt. 0x2725
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2e","X = Hitbox ID
+Y = Hit bits",(Bitfield controlling what the hitbox can interact with),
+If hitbox connects,"pushInt. 0x2726
+sys. 0x1, 0x2e",Only true the very moment the hitbox connects,,
+If hitbox has connected,"pushInt. 0x2727
+sys. 0x1, 0x2e",Remains true until the end of action,,
+If hitbox has connected,"pushInt. 0x2727
+pushInt. 0xX
+sys. 0x2, 0x2e",Remains true until the end of action,"X = Hit Requirement: 
+1 - Hitbox
+2 - Hurtbox
+4 - Shield.
+
+To combine requirments, bitwise OR them together together. i.e hurtbox/hitbox = 3
+
+Used for Ryu's weakjab / utilt / dtilt to Specials",
+Multiply Damage Dealt,"pushInt. 0x2728
+pushInt. 0xX
+sys 0x2, 0x2e",X = Damage-dealt multiplier,,
+Add Damage Dealt,"pushInt. 0x272d
+pushInt. 0xX
+sys 0x2, 0x2e",X = Added damage,,
+Multiply Knockback Dealt,"pushInt. 0x272e
+pushInt. 0xX
+sys 0x2, 0x2e",X = Knockback multiplier,,
+Set angle,"pushInt. 0x2739
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x2e","X = Hitbox ID
+Y = Value (degrees, int)",,
+Enable/Disable ATTACK_SET_CHECK event?,"pushInt. 0x273c
+pushInt. 0x0
+pushInt. 0xX
+sys 0x3, 0x2e","X = 
+0: Disable
+1: Enable",Used in Shulk's Back Slash,
+Get previous hitbox info,"pushInt. 0xX
+pushInt. 0xY
+pushInt. 0x0
+sys. 0x3, 0x2f","X =
+1: Hitbox damage
+6: Max X position
+7: Max Y position
+8: Max Z position
+
+Y = Hitbox ID",,
+If in hitlag (as victim),"pushInt. 0x0
+sys. 0x1, 0x30",doesn't count shield hitlag,,
+"If in ""non-moving"" hitlag","pushInt. 0x1
+sys. 0x1, 0x30","Animation During Hitlag param must = 1, or being hit",(Also true when hitting a shield),
+Set hitlag frames,"pushInt. 0x2
+pushInt. 0xX
+sys 0x2, 0x30",X = Frames (int),Stops the character for X amount of frames,
+Search Collision (absorb?),"pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x12, 0x31","0x0
+0x0
+0x0
+Bone ID
+Size
+X offset
+Y offset
+Z offset
+Disable/Enable
+15(Villager), 1d(Rosalina)
+0x3
+0x0
+0xf
+0xf
+0x0
+0x1
+0x0, 0x1(Sprout)
+0x0",,
+SET_SEARCH_OPPONENT,"pushInt. 0x5
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x5
+pushInt. 0x2
+sys 0x5, 0x31",,Only detects projectiles?,
+Counter collision bubble,"pushInt. 0x0
+pushInt. 0x2
+pushInt. 0x0
+pushInt. 0xX
+pushInt. 0x1
+sys 0x5, 0x36","X =
+0: Remove collision
+1: Generate collision",(Palutena script_2446),
+Reflect bubble,"pushInt. 0x0
+pushInt. 0x3
+pushInt. 0x0
+pushInt. 0xX
+pushInt. 0x3
+sys 0x5, 0x36","X =
+0: Remove collision
+1: Generate collision",(Ness script_2274),
+Create shield collision,"pushInt. 0x2710
+pushInt. 0x2
+pushInt. 0x0
+sys 0x3, 0x36",,,
+Remove shield collision,"pushInt. 0x
+pushInt. 0x2
+pushInt. 0x0
+sys 0x3, 0x36",,,
+Something to do with changing direction?,"pushInt. 0x2716
+sys. 0x1, 0x36",,,
+Reflector,"pushInt. 0x2717
+pushInt. 0x3
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x0
+sys 0x11, 0x36","
+
+ID
+Bone
+Size
+X
+Y
+Z
+X2
+Y2
+Z2
+Damage multiplier
+Speed multiplier
+Threshold
+unknown
+Lifetime multiplier
+Type (0x1 or 0x2)
+","Type 0x1 = Franklin Badge SFX upon reflection
+Type 0x2 = No SFX
+
+Set damage, speed, lifetime, and threshold to 0 = Projectile intangibility (projectiles will pass through user rather than being reflected)",
+Set Whole Visibility State,"pushInt. 0x2710
+pushInt. 0xX
+sys 0x2, 0x39","X =
+0: Invisible
+1: Visible",,
+Set Model Part Visibility State (status),"pushInt. 0x
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x39","X = Article (sub) ID
+Y = State","Used for Gamewatch Oil Panic ""oil"" article (and Bayo BatWithin ""bat"" article)
+Y changes from 0x0 to 0x3 depending on its charging stage
+Also used for Duck Hunt Gunman. Reverts to default upon action change",
+Set Model Part Visibility State (always),"pushInt. 0x2712
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x39","X = Model Part ID
+Y = State",Sets as a new default (does not change back upon action change),
+Set Bone Visibility State,"pushInt. 0x2716
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x39","X = Bone?
+Y =
+0: Invisible
+1: Visible",,
+Release captured opponent?,"pushInt. 0x
+sys 0x1, 0x3b",,,
+If grabbing opponent,"pushInt. 0x2712
+sys. 0x1, 0x3b",,,
+Get grabbed condition,"pushInt. 0x0
+sys. 0x1, 0x3c",,"Returns 0x0(CapturePulledHi), 0x1(CaptureWaitHi), 0x2 (CaptureDamageHi)",
+Released by grabbing opponent,"pushInt. 0x1
+sys 0x1, 0x3c",,,
+Thrown by grabbing opponent,"pushInt. 0x2
+sys 0x1, 0x3c",,,
+ThrownCut,"pushInt. 0x4
+sys 0x1, 0x3c",,,
+Disable Grab Immunity?,"pushInt. 0x5
+pushInt. 0x0
+sys 0x2, 0x3c",,"(script_1637, grabbed by Ganon Side-B)",
+Enable grab break,"pushInt. 0x9
+sys 0x1, 0x3c",,Opponent will escape grab when animation is CaptureWait,
+Get grabbed condition,"pushInt. 0xb
+sys. 0x1, 0x3c",,"Returns 0x0(CapturePulledLw), 0x1(CaptureWaitLw), 0x2 (CaptureDamageLw)",
+Enable Grab Immunity from object ID,"pushInt. 0xc
+pushInt. 0xX
+sys 0x2, 0x3c","X = Object ID, where
+0x00000 = Player 1
+0x10000 = Player 2
+0x20000 = Player 3
+0x30000 = Player 4",,
+Get X distance between grabbed opponent,"pushInt. 0x1
+sys. 0x1, 0x3d",,"capture_wait_uniq_process_fix_pos dist_x
+(mentioned in Grab break script of 3DS 1.0.0/1.0.4)",
+Get Y distance between grabbed opponent,"pushInt. 0x2
+sys. 0x1, 0x3d",,"capture_wait_uniq_process_fix_pos dist_y
+(mentioned in Grab break script of 3DS 1.0.0/1.0.4)",
+Get opponent variable (as grabbed fighter),"pushInt. 0x3
+pushInt. 0xXXXXXXXX
+sys. 0x2, 0x3d","XXXXXXXX =
+Variable ID","script_1089, calls 0x30000f1 (grab duration multiplier)",
+Delete Held Item,"pushInt. 0x10
+sys 0x1, 0x3e",Includes body items,,
+If item can be picked up,"pushInt. 0x1
+sys. 0x1, 0x3e",,,
+If Item Type,"pushInt. 0x5
+pushInt. 0xX
+sys. 0x2, 0x3e","X = Item Type
+2 = Shooting item
+4 = Swinging item
+8 = Throwing item","pushInt. 0x5
+pushInt. 0x4 # swinging item
+sys. 0x2, 0x3e",
+Disable/Enable item visibility,"pushInt. 0xf
+pushInt. 0xX
+sys 0x2, 0x3e","X =
+0: Disable
+1: Enable",,
+Disable/Enable body item visibility,"pushInt. 0x16
+pushInt. 0xX
+sys 0x2, 0x3e","X =
+0: Disable
+1: Enable","Applies to items like Screw Attack, Franklin Badge, Smoke Ball, etc.",
+Get shooting item ammo,"pushInt. 0x1a
+sys. 0x1, 0x3e",,,
+Set Held Item Animation,"pushInt. 0x1c
+pushInt. 0xX
+sys 0x2, 0x3e",X = Animation ID,,
+Set Held Item Action,"pushInt. 0x1d
+pushInt. 0xX
+sys 0x2, 0x3e",X = Action ID,,
+Get Held Item item_common_param (int),"pushInt. 0x1e
+pushInt. 0xX
+sys. 0x2, 0x3e",X = Param index relative to ints (ints begin at index 44),,
+Generate Item,"pushInt. 0xe
+pushInt. 0xX
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0xY
+sys 0x5, 0x3e","X = Item ID
+Y = Disabled item SFX",,
+Set item status,"pushInt. 0x7
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x4, 0x3e","X = Launch angle (degrees)
+Y = Launch speed
+Z = Item toss damage mult.",,
+Set item status,"pushInt. 0x7
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+pushInt. 0x3
+pushInt. 0xW
+sys 0x6, 0x3e","X = Launch angle (degrees)
+Y = Launch speed
+Z = Item toss damage mult.
+W = Disabled item SFX",,
+Get held item ID,"pushInt. 0x11
+sys. 0x1, 0x3e
+pushInt. 0xXX
+equals. ",X = Item ID,"pushInt. 0x11
+sys. 0x1, 0x3e
+pushInt. 0x6f #ID for S flag
+equals. ",
+unknown,"pushInt. 0x1
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x40","X = Item Type
+0: Beam Sword
+1: Homerun Bat
+3: Star Rod
+4: Lip's Stick
+5: Fire Rod
+6: Ore Club
+
+Y = Action Type
+0: Jab
+1: Ftilt
+2: Fsmash
+4: Dash attack",,
+Color Overlay,"pushInt. 0x
+pushInt. 0xW
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZ
+sys 0x5, 0x42","W = Red
+X = Green
+Y = Blue
+Z = Alpha","pushInt. 0x
+pushInt. 0x437f0000
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0x437f0000
+sys 0x5, 0x42 #Solid red color overlay",
+Clear Overlays,"pushInt. 0x2713
+sys 0x1, 0x42",,,
+Cover Overlay remain,"pushInt. 0x271a
+pushInt. 0x65
+sys 0x2, 0x42",,Color overlays will remain even when game is paused,
+Stop character shaking,"pushInt. 0x8
+sys 0x1, 0x44",,Stops the visual shaking of the character when charging a smash attack (script_326),
+Enable physics?,"pushInt. 0xb
+pushInt. 0x1
+sys 0x2, 0x44",,,
+Get RunBrake cancelable frame,"pushInt. 0x63
+sys. 0x1, 0x45",,"Used in Palutena Super Speed
+printf(""FIGHTER_STATUS_RUN_BRAKE_FLAG_STOP_START motion frame: %f, cancel frame: %f"", global20, sys_45(0x63))",
+"(AudienceImpl)
+checkTumultFallSpecial","pushInt. 0x1
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x46","X = int value output from variable 0x10000000
+Y = Vertical Position","I don't know what the value of X means but it seems to be constant. it doesn't affect whether the audience gasps, but is used in the function, so probably don't change it.
+SpecialFall key3, decides whether audience gasps",
+Unknown (Something with Jostle?),"pushInt. 0x0
+pushInt. 0xX
+sys 0x2, 0x47",,(script_1085),
+Set Jostle State,"pushInt. 0x1
+pushInt. 0xX
+sys 0x2, 0x47","X = State, where
+0 = Enabled
+1 = Disabled","If disabled, no jostle (player collision) occurs. Does not reset on action change.
+Use this as well to disable Jostle movement or else weird things will happen:
+pushInt. 0xc
+pushInt. 0x7
+sys 0x2, 0x10",
+Set Shaking frames,"pushInt. 0x0
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0x0
+pushInt. 0x0
+pushInt. 0xZ
+sys 0x6, 0x48","X = Mode, where
+0: Vertical shaking
+1: Horizontal shaking
+Y = Shaking frames (int)
+Z = Shaking intensity (float)",The character model will shake similar to hitlag shaking frames,
+Slow All Fighters,"pushInt. 0x0
+pushInt. 0xX
+pushInt. 0xY
+sys 0x3, 0x49","X = Amount (int)
+Y = Duration (frames)",,
+If in hitlag (as attacker),"pushInt. 0x2
+sys. 0x1, 0x49",Animation During Hitlag param must = 0,(Cannot be hitting a shield),
+Enable/Disable fighter shadow,"pushInt. 0xX
+sys 0x1, 0x4a","X = Mode
+0 = Enable
+1 = Disable",,

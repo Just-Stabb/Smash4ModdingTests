@@ -1,0 +1,159 @@
+Operation #,Operation,Syntax,Usage,Example,
+0x0,Set Float,"pushInt. 0x0
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = float value
+Y = variable",,
+0x1,Set Rand Float,"pushInt. 0x1
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZZZZZZZZ
+sys 0x4, 0x16","X = Min float value
+Y = Max float value
+Z = variable",,
+0x2,Add Float,"pushInt. 0x2
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = float value
+Y = variable",,
+0x3,Subtract Float,"pushInt. 0x3
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = float value
+Y = variable",,
+0x4,Multiply Float,"pushInt. 0x4
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = float value
+Y = variable",,
+0x5,Divide Float,"pushInt. 0x5
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = float value
+Y = variable",,
+0x6,Get Variable,"pushInt. 0x6
+pushInt. 0xXXXXXXXX
+sys. 0x2, 0x16
+
+OR
+
+pushInt. 0x0
+pushInt. 0xXXXXXXXX
+sys. 0x2, 0x17",X = variable,"pushInt. 0x6
+pushInt. 0x2100000E #Gets the variable ready for an operation
+sys. 0x2, 0x16
+
+OR
+
+pushInt. 0x0
+pushInt. 0x1000006 #Gets the float variable ready for an operation
+sys. 0x2, 0x17",
+0x7,Set Int,"pushInt. 0x7
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = value
+Y = variable","pushInt. 0x7
+pushInt. 0x1 #Set the variable below to 1
+pushInt. 0x10000001 #Number of jumps used
+sys. 0x3, 0x16",
+0x8,Set Rand Int,"pushInt. 0x8
+pushInt. 0xX
+pushInt. 0xY
+pushInt. 0xZZZZZZZZ
+sys 0x4, 0x16","X = RangeStart
+Y = RangeEnd
+Z = variable","assuming range is [Start, End) but not completely sure if right side is open ended",
+0x9,Increment Int,"pushInt. 0x9
+pushInt. 0xXXXXXXXX
+sys 0x2, 0x16",X = variable,"pushInt. 0x9
+pushInt. 0x10000001 #Increases number of jumps used by 1
+sys. 0x2, 0x16",
+0xA,Decrement Int,"pushInt. 0xa
+pushInt. 0xXXXXXXXX
+sys 0x2, 0x16",X = variable,"pushInt. 0xa
+pushInt. 0x11000004 #frequently used for Weapon lifetime
+sys 0x2, 0x16",
+0xB,Add Int,"pushInt. 0xb
+pushInt. 0xY
+pushInt. 0xXXXXXXXX
+sys 0x3, 0x16","X = variable
+Y = value",,
+0xC,Subtract Int,"pushInt. 0xc
+pushInt. 0xY
+pushInt. 0xXXXXXXXX
+sys 0x3, 0x16","X = variable
+Y = value",,
+0xD,Multiply Int,"pushInt. 0xd
+pushInt. 0xY
+pushInt. 0xXXXXXXXX
+sys 0x3, 0x16","X = variable
+Y = value",,
+0xE,Divide Int,"pushInt. 0xe
+pushInt. 0xY
+pushInt. 0xXXXXXXXX
+sys 0x3, 0x16","X = variable
+Y = value",,
+0xF,Count Down Int,"pushInt. 0xf
+pushInt. 0xXXXXXXXX
+pushInt. 0xY
+sys. 0x3, 0x16","X = variable
+Y = amount to count to","Stops counting down when it reaches Y.
+Returns 1 once it reaches Y but 0 otherwise.",
+0x10 / 0x2712,If Flag is set,"pushInt. 0x10
+pushInt. 0xXXXXXXXX
+sys. 0x2, 0x16",X = variable,"pushInt. 0x10
+pushInt. 0x20000044 #Checks if this var is set (= true)
+sys. 0x2, 0x16",
+0x11 / 0x2710,On Flag,"pushInt. 0x11
+pushInt. 0xXXXXXXXX
+sys 0x2, 0x16",X = variable,,
+0x12 / 0x2711,Off Flag,"pushInt. 0x12
+pushInt. 0xXXXXXXXX
+sys 0x2, 0x16",X = variable,,
+0x13,Set Flag,"pushInt. 0x13
+pushInt. 0xX
+pushInt. 0xYYYYYYYY
+sys 0x3, 0x16","X = bool (on/off)
+Y = variable",,
+0x14,Is Flag and Off Flag,"pushInt. 0x14
+pushInt. 0xXXXXXXXX
+sys 0x2, 0x16","X = variable
+Gets whether the flag is set and then clears it",,
+0x15,If Status Transition On,"pushInt. 0x15
+pushInt. 0x1eXXXXXX
+sys. 0x2, 0x16",X = STrans ID,,"Checks that 0x8 flag is not set, and if either the STrans is On or the STransGroup is On"
+0x16,Status Transition On,"pushInt. 0x16
+pushInt. 0x1eXXXXXX
+sys 0x2, 0x16",X = STrans ID,,
+0x17,Status Transition Off,"pushInt. 0x17
+pushInt. 0x1eXXXXXX
+sys 0x2, 0x16",X = STrans ID,,
+0x18,Clear variable group,"pushInt. 0x18
+pushInt. 0xX
+sys 0x2, 0x16","X = variable group
+(0 = LA, 1 = RA, 2 = param common, etc)",,
+0x19,Status Transition Group On,"pushInt. 0x19
+pushInt. 0x1fXXXXXX
+sys 0x2, 0x16",X = STransGroup ID,,
+0x1a,Status Transition Group Off,"pushInt. 0x1a
+pushInt. 0x1fXXXXXX
+sys 0x2, 0x16",X = STransGroup ID,,
+0x1b,Status Transition Off?,"pushInt. 0x1b
+pushInt. 0x1eXXXXXX
+sys 0x2, 0x16",X = STrans ID,"Ness script_2257 (dtilt)
+status IDs for Crouch and Turn1","Clears the 0x4 flag, not sure where this is used"
+0x1c,If Status Transition Group On,"pushInt. 0x1c
+pushInt. 0x1fXXXXXX
+sys. 0x2, 0x16",X = STransGroup ID,,
+0x1d,Disable Status Transition?,"pushInt. 0x1d
+pushInt. 0x1eXXXXXX
+sys 0x2, 0x16",X = STrans ID,,Sets the 0x8 flag
+0x1e,Enable Status Transition?,"pushInt. 0x1e
+pushInt. 0x1eXXXXXX
+sys 0x2, 0x16",X = STrans ID,,Clears the 0x8 flag
+0x1f,Disable Status Transition Group?,"pushInt. 0x1f
+pushInt. 0x1fXXXXXX
+sys 0x2, 0x16",X = STransGroup ID,,Sets the 0x8 flag for every STrans in the group
+0x20,Enable Status Transition Group?,"pushInt. 0x20
+pushInt. 0x1fXXXXXX
+sys 0x2, 0x16",X = STransGroup ID,,Clears the 0x8 flag for every STrans in the group

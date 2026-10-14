@@ -1,0 +1,161 @@
+ Status Trans ID,Associated Actions,FIGHTER_STATUS_TRANSITION_TERM,Found by,
+0x1e000000,Wait,WAIT,Sammi Husky,
+0x1e000001,,WAIT_FROM_RUN_BRAKE,,Unused?
+0x1e000002,Fall,FALL,Sammi Husky,
+0x1e000003,,FALL_AERIAL,,Unused?
+0x1e000004,SpecialFall,FALL_SPECIAL,Meshima,"Link, ToonLink, Mii Sword upb"
+0x1e000005,DamageFall,DAMAGE_FALL,Takumi,
+0x1e000006,"WallDamage (aerial, right wall)",DAMAGE_FLY_REFLECT_L,Ben Hall,
+0x1e000007,"WallDamage (aerial, left wall)",DAMAGE_FLY_REFLECT_R,Ben Hall,
+0x1e000008,CeilingDamage,DAMAGE_FLY_REFLECT_U,Ben Hall,
+0x1e000009,DamageFlyTop? (Action 0x4b),DAMAGE_FLY_REFLECT_D,Ben Hall,
+0x1e00000a,Run,DASH_TO_RUN,Ben Hall,
+0x1e00000b,,SLIP,Meshima,"516, 560, 562, 709, 713, 742, Megaman2276"
+0x1e00000c,,RUN,Meshima,"G&W2373, 2448"
+0x1e00000d,DownBound,DOWN,Takumi,"Diddy2393, 2393"
+0x1e00000e,DownWait,DOWN_WAIT,Ben Hall,
+0x1e00000f,DownStand,DOWN_STAND,Takumi,
+0x1e000010,,DOWN_DAMAGE_FALL,,Unused?
+0x1e000011,"WallDamage (grounded, right wall)",DOWN_DAMAGE_REFLECT_L,Ben Hall,
+0x1e000012,"WallDamage (grounded, left wall)",DOWN_DAMAGE_REFLECT_R,Ben Hall,
+0x1e000013,Passive,PASSIVE,jugeeya,
+0x1e000014,PassiveStandF/B,PASSIVE_FB,jugeeya,
+0x1e000015,PassiveWall,PASSIVE_WALL,Ben Hall,
+0x1e000016,PassiveWallJump (holding up),PASSIVE_WALL_JUMP,Ben Hall,
+0x1e000017,PassiveWallJump (jump input),PASSIVE_WALL_JUMP_BUTTON,Ben Hall,
+0x1e000018,PassiveCeiling,PASSIVE_CEIL,Ben Hall,
+0x1e000019,,STOP_WALL,,Unused?
+0x1e00001a,Action 0x6a,STOP_CEIL,Meshima,
+0x1e00001b,LandingHeavy,LANDING,Takumi,
+0x1e00001c,LandingLight,LANDING_LIGHT,FruitMage,
+0x1e00001d,,LANDING_ATTACK_AIR,,Unused?
+0x1e00001e,LandingFallSpecial,LANDING_FALL_SPECIAL,Takumi,
+0x1e00001f,CliffCatch,CLIFF_CATCH,Ben Hall,
+0x1e000020,Glide (unused),GLIDE,Ben Hall,
+0x1e000021,GlideLanding (unused),GLIDE_LANDING,Ben Hall,
+0x1e000022,,SQUAT_WAIT,,Unused?
+0x1e000023,,CATCH_WAIT,,Unused?
+0x1e000024,CaptureWait,CAPTURE_WAIT,Takumi,
+0x1e000025,CaptureCut,CAPTURE_CUT,Takumi,
+0x1e000026,EscapeN,CONT_ESCAPE,Sammi Husky,
+0x1e000027,EscapeF,CONT_ESCAPE_F,Sammi Husky,
+0x1e000028,EscapeB,CONT_ESCAPE_B,Sammi Husky,
+0x1e000029,GuardOn,CONT_GUARD_ON,Sammi Husky,
+0x1e00002a,Guard,CONT_GUARD,Ben Hall,
+0x1e00002b,JumpSquat (Tap Jump),CONT_JUMP_SQUAT,FruitMage,
+0x1e00002c,JumpSquat (Button Input),CONT_JUMP_SQUAT_BUTTON,FruitMage,
+0x1e00002d,Dash,CONT_DASH,Sammi Husky,
+0x1e00002e,,CONT_RUN_BRAKE,Meshima,"G&W2357, 2432"
+0x1e00002f,Turn1,CONT_TURN,Sammi Husky,
+0x1e000030,TurnRun,CONT_TURN_RUN,Meshima,
+0x1e000031,Turn2,CONT_TURN_DASH,Sammi Husky,
+0x1e000032,Dash,CONT_TURN_DASH_DASH,Meshima,
+0x1e000033,,CONT_SLIP_TURN,,Unused?
+0x1e000034,"Squat, SquatWait",CONT_SQUAT,Sammi Husky,
+0x1e000035,SquatRv,CONT_SQUAT_RV,Meshima,
+0x1e000036,SquatWait,CONT_SQUAT_WAIT,Meshima,
+0x1e000037,SquatF,CONT_SQUAT_F,Meshima,
+0x1e000038,SquatB,CONT_SQUAT_B,Meshima,
+0x1e000039,AppealHi,CONT_APPEAL_U,Sammi Husky,
+0x1e00003a,AppealS,CONT_APPEAL_S,Sammi Husky,
+0x1e00003b,AppealLw,CONT_APPEAL_LW,Sammi Husky,
+0x1e00003c,Walk,CONT_WALK,Sammi Husky,
+0x1e00003d,EscapeAir,CONT_ESCAPE_AIR,FruitMage,
+0x1e00003e,JumpAerial (Tap Jump),CONT_JUMP_AERIAL,Ben Hall,
+0x1e00003f,JumpAerial (Button Input),CONT_JUMP_AERIAL_BUTTON,Ben Hall,
+0x1e000040,StepJump (Tap Jump),CONT_TREAD_JUMP,Meshima,
+0x1e000041,StepJump (Button Input),CONT_TREAD_JUMP_BUTTON,Meshima,
+0x1e000042,StepJump,CONT_TREAD_JUMP_NO_TRIGGER,Meshima,
+0x1e000043,JumpAerial2 (Tap Jump),CONT_FLY,Meshima,
+0x1e000044,JumpAerial2 (Button Input),CONT_FLY_BUTTON,Meshima,
+0x1e000045,JumpAerial2,CONT_FLY_NEXT,Meshima,
+0x1e000046,CliffAttackQuick (A down),CONT_CLIFF_ATTACK,Sammi Husky,
+0x1e000047,CliffAttackQuick (B down),CONT_CLIFF_SPEICAL,Sammi Husky,
+0x1e000048,CliffEscapeQuick,CONT_CLIFF_ESCAPE,Meshima,
+0x1e000049,CliffClimbQuick,CONT_CLIFF_CLIMB,Sammi Husky,
+0x1e00004a,,CONT_CLIFF_FALL,,Unused?
+0x1e00004b,"CliffJumpQuick1, LedgeTrump",CONT_CLIFF_JUMP,Sammi Husky,
+0x1e00004c,CliffJumpQuick1 (Jump down),CONT_CLIFF_JUMP_BUTTON,Sammi Husky,
+0x1e00004d,,CONT_GLIDE_START,,Unused?
+0x1e00004e,,CONT_GLIDE_END,,
+0x1e00004f,GlideAttack (unused),CONT_GLIDE_ATTACK,Ben Hall,
+0x1e000050,,CONT_PASS,,Unused?
+0x1e000051,AirCatch,CONT_AIR_LASSO,Meshima,
+0x1e000052,Attack11,CONT_ATTACK,Sammi Husky,
+0x1e000053,Attack100,CONT_ATTACK_100,Sammi Husky,
+0x1e000054,AttackDash,CONT_ATTACK_DASH,Ben Hall,
+0x1e000055,AttackS3,CONT_ATTACK_S3,Sammi Husky,
+0x1e000056,AttackHi3,CONT_ATTACK_HI3,Sammi Husky,
+0x1e000057,AttackLw3,CONT_ATTACK_LW3,Ben Hall,"Ness, Lucas"
+0x1e000058,AttackS4,CONT_ATTACK_S4,Meshima,
+0x1e000059,AttackS4Start,CONT_ATTACK_S4_START,Sammi Husky,
+0x1e00005a,AttackS4Hold,CONT_ATTACK_S4_HOLD,Meshima,
+0x1e00005b,AttackHi4,CONT_ATTACK_HI4,Meshima,
+0x1e00005c,AttackHi4Start,CONT_ATTACK_HI4_START,Sammi Husky,Ryu2287
+0x1e00005d,AttackHi4Hold,CONT_ATTACK_HI4_HOLD,Meshima,
+0x1e00005e,AttackLw4,CONT_ATTACK_LW4,Meshima,Pac2287
+0x1e00005f,AttackLw4Start,CONT_ATTACK_LW4_START,Sammi Husky,
+0x1e000060,AttackLw4Hold,CONT_ATTACK_LW4_HOLD,Meshima,Pac2287
+0x1e000061,AttackAirF/B/Lw/Hi,CONT_ATTACK_AIR,Sammi Husky,
+0x1e000062,SpecialN,CONT_SPECIAL_N,Sammi Husky,
+0x1e000063,SpecialS,CONT_SPECIAL_S,Sammi Husky,
+0x1e000064,SpecialHi,CONT_SPECIAL_HI,Sammi Husky,
+0x1e000065,SpecialLw,CONT_SPECIAL_LW,Sammi Husky,
+0x1e000066,"Dash, TurnRun",CONT_SPECIAL_N_COMMAND,Meshima,"713, 728"
+0x1e000067,"Dash, TurnRun",CONT_SPECIAL_N2_COMMAND,Meshima,"713, 728"
+0x1e000068,"Dash, TurnRun",CONT_SPECIAL_S_COMMAND,Meshima,"713, 728"
+0x1e000069,"Dash, TurnRun",CONT_SPECIAL_HI_COMMAND,Meshima,"713, 728"
+0x1e00006a,ThrowF/B,CONT_THROW_FB,Ben Hall,
+0x1e00006b,ThrowHi,CONT_THROW_HI,Ben Hall,
+0x1e00006c,ThrowLw,CONT_THROW_LW,Ben Hall,
+0x1e00006d,Catch,CONT_CATCH,Ben Hall,
+0x1e00006e,CatchDash,CONT_CATCH_DASH,Takumi,Ryu2287
+0x1e00006f,CatchTurn,CONT_CATCH_TURN,Takumi,Ryu2287
+0x1e000070,,CONT_CAPTURE_JUMP_BUTTON,,Unused?
+0x1e000071,,CONT_CAPTURE_JUMP,,Unused?
+0x1e000072,LightGet,CONT_ITEM_PICKUP_LIGHT,Sammi Husky,
+0x1e000073,HeavyGet,CONT_ITEM_PICKUP_HEAVY,Sammi Husky,
+0x1e000074,LightThrow (A button),CONT_ITEM_THROW,Sammi Husky,
+0x1e000075,LightThrow,CONT_ITEM_THROW_GUARD,Meshima,
+0x1e000076,LightThrow (Z button),CONT_ITEM_THROW_FORCE,Takumi,
+0x1e000077,Action 0x8d (Z button),CONT_ITEM_THROW_FORCE_DASH,Meshima,
+0x1e000078,Action 0x8d (A button),CONT_ITEM_THROW_DASH,Meshima,
+0x1e000079,,CONT_ITEM_THROW_DASH_CLACKER,,Unused?
+0x1e00007a,,CONT_ITEM_SWING_BAT_4,,Unused?
+0x1e00007b,Swing1,CONT_ITEM_SWING_4,Sammi Husky,
+0x1e00007c,SwingS4Hold,CONT_ITEM_SWING_4_HOLD,Meshima,
+0x1e00007d,Swing3,CONT_ITEM_SWING_3,Sammi Husky,
+0x1e00007e,Swing1,CONT_ITEM_SWING,Sammi Husky,
+0x1e00007f,SwingDash,CONT_ITEM_SWING_DASH,Ben Hall,
+0x1e000080,ItemFire,CONT_ITEM_SHOOT,Sammi Husky,
+0x1e000081,ItemFire,CONT_ITEM_SHOOT_S3,Sammi Husky,
+0x1e000082,ItemFire (A button),CONT_ITEM_SHOOT_S4,Sammi Husky,
+0x1e000083,Item related,CONT_ITEM_SHOOT_WAIT,Meshima,
+0x1e000084,"LightThrow, ItemFire",CONT_ITEM_SHOOT_WALK_F,Sammi Husky,
+0x1e000085,,CONT_ITEM_SHOOT_WALK_F_BRAKE,,Unused?
+0x1e000086,Item related,CONT_ITEM_SHOOT_WALK_B,Meshima,
+0x1e000087,,CONT_ITEM_SHOOT_WALK_B_BRAKE,,Unused?
+0x1e000088,"LightThrow, ItemFire",CONT_ITEM_SHOOT_DASH_F,Sammi Husky,
+0x1e000089,Item related,CONT_ITEM_SHOOT_DASH_B,Meshima,
+0x1e00008a,ItemFire (Landing),CONT_ITEM_SHOOT_AIR,Meshima,
+0x1e00008b,Item related,CONT_ITEM_SHOOT_JUMP_BUTTON,Meshima,
+0x1e00008c,Item related,CONT_ITEM_SHOOT_JUMP,Meshima,
+0x1e00008d,Item related,CONT_ITEM_SHOOT_TURN_DASH,Meshima,
+0x1e00008e,Item related,CONT_ITEM_SHOOT_TURN,Meshima,"1465, 1466"
+0x1e00008f,Item related,CONT_ITEM_SHOOT_LANDING,Meshima,"1391, 1392"
+0x1e000090,,ITEM_GEKIKARA_WAIT,,Unused?
+0x1e000091,,ITEM_GEKIKARA_RUN,,Unused?
+0x1e000092,RunBrake,CONT_ITEM_GEKIKARA_RUN_BRAKE,Meshima,
+0x1e000093,Fall (thrown by opponents?),THROW_KIRBY_GROUND,Meshima,"1137, Rob2251, 2252, 2253"
+0x1e000094,Final,FINAL,Sammi Husky,
+0x1e000095,Cargo,,Meshima,
+0x1e000096,,,,Unused?
+0x1e000097,,,,Unused?
+0x1e000098,,,,Unused?
+0x1e000099,"JumpSquat, JumpF/B",,Meshima,"487, Captain2320, 2352"
+0x1e00009a,SpecialHi (grounded),,Meshima,
+0x1e00009b,SpecialHi (aerial),,Meshima,
+0x1e00009c,SpecialHi?,,Meshima,
+0x1e00009d,SpecialHi?,,Meshima,
+0x1e00009e,Fuwafuwa (Peach's float),,Meshima,
+0x1e00009f,Fuwafuwa (Peach's float),,Meshima,

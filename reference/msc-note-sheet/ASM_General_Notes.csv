@@ -1,0 +1,16 @@
+Name,Memory Offset,RPX Offset,Notes
+MSC Interpreter function,0xD37b364,0x337b364,"r0 - MSC command offset (from r12)
+r6 - MSC file location
+r10 - command w/o bits set
+r12 - MSC file location + 0x30
+r19 - command w/ bits set
+r21 - MSC file location + 0x34
+r25 - MSC file location + 0x33
+r26 - MSC file location + 0x32
+r27 - MSC file location + 0x31
+r28 - Global var array offset
+r29 - Local var array offset
+r30 - MSC comand offset (from r12)
+r31 - MSC stack, 0x200(r31) - stack index"
+MSC syscall table,0x1091B7A0,0x104187A0,
+?,,0x337B130,this was accidentally written as the interpreter function offset

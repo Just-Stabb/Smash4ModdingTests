@@ -1,0 +1,345 @@
+ ,Name,Description
+0x0,Wait,Idle animation
+0x1,Walk,
+0x2,WalkBrake,
+0x3,Dash,
+0x4,Run,
+0x5,RunBrake,
+0x6,Turn,Turning while standing
+0x7,Turn (2),Turning while dashing
+0x8,TurnRun,
+0x9,TurnRunBrake,
+0xa,Jumpsquat,
+0xb,JumpF/JumpB,
+0xc,JumpAerial,
+0xd,JumpAerial2,Multi-jump (if applicable)
+0xe,Fall,Falling
+0xf,FallAerial,Fall after an aerial jump
+0x10,SpecialFall,Helpless state
+0x11,Squat,Going into crouch
+0x12,SquatWait,Crouching idle animation
+0x13,SquatF,Crawl forwards
+0x14,SquatB,Crawl backwards
+0x15,SquatRv,Standing back up
+0x16,LandingHeavy,Hard landing
+0x17,LandingLight,Soft landing
+0x18,LandingAirN/F/B/Hi/Lw,Aerial attack landing
+0x19,LandingFallSpecial,Landing during a helpless state
+0x1a,LandingHeavy?,Landing from action 0x46 [Damage] or 0x22 [EscapeAir]
+0x1b,GuardOn,Putting shield up
+0x1c,Guard,Shielding
+0x1d,GuardOff,Putting away shield
+0x1e,GuardDamage,Shieldstun
+0x1f,EscapeN,Spot dodge
+0x20,EscapeF,Forward roll
+0x21,EscapeB,Backward roll
+0x22,EscapeAir,EscapeAir
+0x23,Rebound (initial),Transitions to 0x24 - Rebound after hitlag ends
+0x24,Rebound,Clang animation (when two grounded attacks collide)
+0x25,Attack11,Jab
+0x26,Attack100,Rapid Jab
+0x27,AttackDash,Dash Attack
+0x28,AttackS3,Forward Tilt
+0x29,AttackHi3,Up Tilt
+0x2a,AttackLw3,Down Tilt
+0x2b,AttackS4Start,Forward Smash Windup
+0x2c,AttackS4Hold,Forward Smash Charge
+0x2d,AttackS4,Forward Smash
+0x2e,AttackLw4Start,Down Smash Windup
+0x2f,AttackLw4Hold,Down Smash Charge
+0x30,AttackLw4,Down Smash
+0x31,AttackHi4Start,Up Smash Windup
+0x32,AttackHi4Hold,Up Smash Charge
+0x33,AttackHi4,Up Smash
+0x34,AttackAirN/F/B/Hi/Lw,Aerial Attack
+0x35,Catch,Standing grab
+0x36,CatchPull,"Grabbed an opponent (for 1 frame, changes to 0x3a)"
+0x37,CatchDash,Dash grab
+0x38,CatchDashPull,"Grabbed an opponent via CatchDash (for 1 frame, changes to 0x3a)"
+0x39,CatchTurn,Pivot grab
+0x3a,CatchWait,"Grabbed an opponent, idle animation"
+0x3b,CatchAttack,Pummel
+0x3c,CatchCut,Opponent escapes grab
+0x3d,CatchCutJump,Opponent escapes grab (jump)
+0x3e,Throw,Throwing an opponent
+0x3f,CapturePull,Grabbed by opponent
+0x40,CaptureWait,"Grabbed by opponent, idle animation"
+0x41,CaptureDamage,Damaged while being grabbed
+0x42,CaptureCut,Escaped grab
+0x43,CaptureJump,Escaped grab (jump)
+0x44,Thrown,Being thrown by an opponent
+0x45,Damage(Ground only),Normal grounded hitstun
+0x46,Damage,Normal hitstun
+0x47,DamageFly,Launched hitstun (tumble)
+0x48,DamageFlyRoll,Launched hitstun (untechable spin)
+0x49,WallDamage,Bouncing off a wall in tumble
+0x4a,CeilingDamage,Bouncing off a ceiling in tumble
+0x4b,DamageFlyTop?,Air to ground floor bounce
+0x4c,DamageFall,Tumble
+0x4d,DownBound,Hitting the ground during tumble
+0x4e,DownSpot,Crumpling to the ground
+0x4f,DownBound,Duplicate?
+0x50,DownWait,Lying down after missing tech
+0x51,DownWait,Duplicate? Possibly used after being damaged in prone
+0x52,DownEat,Eating food while prone
+0x53,DownWait,Duplicate?
+0x54,DownStand,Standing up from prone
+0x55,DownForward/Back,Standing up from prone by rolling
+0x56,DownAttack,Standing up from prone by attacking (getup attack)
+0x57,DownDamage,Damaged while prone
+0x58,,
+0x59,,Shieldbreak initial
+0x5a,,Shieldbreak tumble
+0x5b,DownFuraFura,Hitting the ground after Shieldbreak
+0x5c,FuraFuraStart,Shieldbreak standup
+0x5d,FuraFura,Shieldbreak dizzy animation
+0x5e,FuraFuraEnd,Shieldbreak/stun/disabled recover
+0x5f,FuraSleepStart,
+0x60,FuraSleepLoop,Sleeping
+0x61,,Something to do with being hit by Sleep element while airbourne? (Goes into tumble then into FuraSleepLoop when grounded)
+0x62,FuraSleepEnd,Waking up from sleep
+0x63,,Stun/Disabled
+0x64,,Tech in place
+0x65,,Tech roll forward or backward
+0x66,PassiveWall,Wall tech
+0x67,PassiveWallJump,Tech wall jump
+0x68,PassiveCeil,Ceiling tech
+0x69,StopWall,Running into a wall
+0x6a,StopCeil,Hitting head on ceiling
+0x6b,WallJump,Wall jump
+0x6c,WallCling,Wall cling start
+0x6d,,Wall cling wait
+0x6e,,Wall cling -> Wall jump
+0x6f,,Wall cling -> Air jump with button press
+0x70,,Wall cling -> Air jump with stick input
+0x71,Pass,Drop through platform
+0x72,CliffCatchMove,Snapping to ledge (2 frame)
+0x73,CliffCatch,Grabbing ledge
+0x74,CliffWait,Hanging on ledge
+0x75,CliffAttackQuick,Ledge attack
+0x76,CliffClimbQuick,Ledge neutral getup
+0x77,CliffEscapeQuick,Ledge roll
+0x78,CliffJumpQuick1,Jumping from ledge
+0x79,CliffJumpQuick2,Ledge jump
+0x7a,CliffJumpQuick2?,
+0x7b,Ottotto,Ledge teeter startup
+0x7c,OttottoWait,teetering over ledge
+0x7d,MissFoot,"Sliding off edge when shielding or getting hit, edge slip"
+0x7e,GlideStart,Starting glide (unused)
+0x7f,Glide,Gliding (unused)
+0x80,GlideLanding,"Hitting the ground while gliding (transitions to DownWait, unused)"
+0x81,GlideAttack,Attacking out of Glide (unused)
+0x82,GlideEnd,Ending Glide in the air (unused)
+0x83,Slip,Trip
+0x84,SlipDown,Trip damage
+0x85,SlipAttack,Trip attack
+0x86,SlipStand,Trip neutral getup
+0x87,SlipAttack,Trip attack
+0x88,SlipEscapeF,Trip dodge forward
+0x89,SlipEscapeB,Trip dodge backward
+0x8a,LightGet,Picking up an item
+0x8b,HeavyGet,Picking up a heavy item
+0x8c,LightThrow,Throwing an item
+0x8d,LightThrowDash,
+0x8e,HeavyWait,Holding heavy item
+0x8f,HeavyTurn,Turning around while carrying a heavy item
+0x90,HeavyWalk,
+0x91,HeavyThrow,Throwing a heavy item
+0x92,Swing1,Swinging item Jab
+0x93,Swing3,Swinging item Ftilt
+0x94,Swing4Start,Item Fsmash windup
+0x95,Swing4,Swinging item Fsmash
+0x96,Swing4Charge,Holding item Fsmash
+0x97,SwingDash,Swinging item Dash Attack
+0x98,ItemFire,"Shooting an item, also holding Daybreak"
+0x99,,ItemFire walk-forward
+0x9a,,
+0x9b,,ItemFire walk-backward
+0x9c,,
+0x9d,,ItemFire dash-forward
+0x9e,,ItemFire dash-backward
+0x9f,,ItemFire jumpsquat
+0xa0,,ItemFire aerial (shorthop)
+0xa1,,ItemFire aerial (full jump/in air)
+0xa2,,ItemFire landing
+0xa3,ItemScrew,Screw Attack jump
+0xa4,ItemScrew2,Screw Attack aerial jump
+0xa5,ItemScrewFall,Screw Attack fall
+0xa6,,Assist Trophy
+0xa7,,Sinking in water (upon first entering)
+0xa8,SwimRise,
+0xa9,SwimUp/SwimUpDamage,
+0xaa,Swim,
+0xab,SwimF,
+0xac,SwimEnd,
+0xad,SwimTurn,
+0xae,,Jumping from water
+0xaf,SwimDrown,
+0xb0,SwimDrownOut,
+0xb1,Dead,KO'd
+0xb2,Rebirth,Respawning
+0xb3,StepJump,Footstool jumping off an opponent
+0xb4,StepPose,Being footstooled by an opponent
+0xb5,,Ending footstooled animation
+0xb6,,Being footstooled by an opponent (aerial)
+0xb7,StepFall,Footstooled tumble animation
+0xb8,,Grabbed by Ganondorf up-b
+0xb9,,
+0xba,,Grabbed by Ganondorf side-b in aerial
+0xbb,,Grabbed by Ganondorf side-b in aerial
+0xbc,,Grabbed by Ganondorf side-b on ground
+0xbd,,Grabbed by Captain Falcon up-b
+0xbe,,Grabbed by Bowser side-b
+0xbf,,Grabbed by DK cargo throw (initial)
+0xc0,,Grabbed by DK cargo throw (wait)
+0xc1,,Thrown by DK cargo throw
+0xc2,,Buried (initial)
+0xc3,,Buried
+0xc4,,Bury escape
+0xc5,,Frozen
+0xc6,,Freeze escape
+0xc7,,
+0xc8,Cannon,Shooting out of a cannon
+0xc9,,Spring jump start
+0xca,,Spring jump ascent
+0xcb,,Grounded-sideways Spring launch
+0xcc,,
+0xcd,,Trapped in Tornado
+0xce,,
+0xcf,,
+0xd0,,Warp Star
+0xd1,,Warp Star hit
+0xd2,,Dragoon (the entire sequence)
+0xd3,,Hammer (item) wait
+0xd4,,Hammer walk
+0xd5,,Hammer turn
+0xd6,,Hammer jumpsquat
+0xd7,,Hammer air
+0xd8,,Also hammer air?
+0xd9,,Hammer landing
+0xda,,Stuck in (Toon) Link Final Smash
+0xdb,,Plunge (hitbox element 0x16)
+0xdc,,"Aerial Throw (Kirby F/B/U, MK U, Charizard U throws)"
+0xdd,,Super Mushroom start/end
+0xde,,Poison Mushroom/Lightning shrink start/end
+0xdf,,"Grabbed from Inhale (Kirby, Dedede neutral B)"
+0xe0,,x
+0xe1,,
+0xe2,,Inhaled
+0xe3,,Eaten from Inhale (happens in between 0xdf and 0xe2)
+0xe4,,Inhale star exit
+0xe5,,Inhale exit (in Star)
+0xe6,,Bitten by Wario Neutral B (start)
+0xe7,,Bitten by Wario Neutral B (main)
+0xe8,,Bitten by Wario Neutral B (end)
+0xe9,,Held by Diddy Kong Side-B
+0xea,,Released by jump break of Diddy Kong Side-B
+0xeb,,
+0xec,,Grabbed by Yoshi Neutral B
+0xed,,Stuck in Egg
+0xee,,Grabbed by Yoshi (start)
+0xef,,Grabbed by Yoshi
+0xf0,,Pummeled by Yoshi
+0xf1,AirCatch,"Aerial tether grab, crashes the game if attempting action change for fighter that doesn't have one"
+0xf2,AirCatchPose,
+0xf3,AirCatchHit,Tether grabbed a ledge
+0xf4,AirCatchHang,Grabbing a ledge from tether
+0xf5,,Tether homing in on ledge (before grabbing it)
+0xf6,,Grabbed by Robin's Nosferatu
+0xf7,,Grabbed by Midna or Master Hand
+0xf8,Bullet Bill,Starting up and moving
+0xf9,GrassPull,
+0xfa,,
+0xfb,,Daybreak Firing start
+0xfc,,Daybreak Firing main
+0xfd,,Daybreak Firing end
+0xfe,,Daybreak Assemble
+0xff,,
+0x100,,Captured from Beetle
+0x101,,Stuck in Mega Man Final Smash
+0x102,,
+0x103,,
+0x104,LadderCatch,Grabbing onto ladder
+0x105,LadderCatch(Down),Grabbing ladder from above
+0x106,LadderWait,
+0x107,LadderCatchEnd,Climbed on top of ladder
+0x108,Ledge Trump,Getting bumped from the ledge
+0x109,,Hit by Meta Knight Final Smash
+0x10a,,Rocket Belt
+0x10b,,
+0x10c,,
+0x10d,ItemAssist,Using S Flag
+0x10e,Bullet Bill exit,Uses DamageFlyRoll animation
+0x10f,,
+0x110,,Hit by Captain Falcon Final Smash
+0x111,,Is in Captain Falcon Final Smash VisualScene02
+0x112,,Is in Captain Falcon Final Smash VisualScene03
+0x113,,
+0x114,,Captured from Galaga
+0x115,,Is in Mega Man Final Smash VisualScene01
+0x116,,Is in Mega Man Final Smash VisualScene02
+0x117,,
+0x118,,Hit by Duck Hunt Final Smash
+0x119,,Is in Duck Hunt Final Smash VisualScene
+0x11a,,
+0x11b,,Hit by PAC-MAN Final Smash
+0x11c,,Hit by Shulk Final Smash
+0x11d,,Is in Shulk Final Smash VisualScene
+0x11e,,
+0x11f,,Trapped in Villager Final Smash
+0x120,,Hit by King Dedede Final Smash
+0x121,,Trapped in Palutena Black Hole
+0x122,,Trapped in Kirby Final Smash
+0x123,,
+0x124,,Captured from Nabbit
+0x125,,
+0x126,,Stuck in Luigi Final Smash
+0x127,DamageFly?,Launched from Luigi Final Smash
+0x128,,Hit by Ike Final Smash
+0x129,,Stuck in Ike Final Smash (Multi hit)
+0x12a,,Stuck in Ike Final Smash (Final hit)
+0x12b,,Hit by Zoroark
+0x12c,,Stuck in Zoroake (Multi hit)
+0x12d,,Stuck in Zoroake (Final hit)
+0x12e,,Hit by Mii Brawler Final Smash
+0x12f,,Stuck in Mii Brawler Final Smash (Multi hit)
+0x130,,Stuck in Mii Brawler Final Smash (Final hit)
+0x131,,Hit by Greninja Final Smash
+0x132,,Stuck in Greninja Final Smash (Multi hit)
+0x133,,Stuck in Greninja Final Smash (Final hit)
+0x134,,Hit by Robin Final Smash
+0x135,,Stuck in Robin Final Smash (Multi hit)
+0x136,,Stuck in Robin Final Smash (Final hit)
+0x137,,Hit by Mewtwo Side B
+0x138,,Hit by Mewtwo Side B after / Hit by Mewtwo Final Smash
+0x139,,Hit by Ryu Down B on ground
+0x13a,,Hit by Ryu Down B in airborne
+0x13b,,Ryu Final Smash
+0x13c,,Ryu Final Smash
+0x13d,,
+0x13e,,Hit by Cloud Final Smash
+0x13f,,Stuck in Cloud Final Smash (Multi hit)
+0x140,,Stuck in Cloud Final Smash (Final hit)
+0x141,,
+0x142,,Bayonetta Final Smash
+0x143,,Is in Bayonetta Final Smash VisualScene
+0x144,,
+0x145,,
+0x146,,
+0x147,,Pinned by Corrin Side B
+0x148,,Hit by Corrin Final Smash
+0x149,,Is in Corrin Final Smash VisualScene
+0x14a,,
+0x14b,,
+0x14c,,"""Limbo""; waiting for respawn after death"
+0x14d,Appeal,Taunt
+0x14e,,Smash Taunt
+0x14f,Entry,Beginning match entrance animations
+0x150,Win,
+0x151,Lose,
+0x152,SpecialN,Neutral B
+0x153,SpecialS,Side B
+0x154,SpecialHi,Up B
+0x155,SpecialLw,Down B
+0x156,Final,Final Smash
+globalVar7,MAX ACTION ID,The maximum action ID is stored in globalVar7 (see script_2242)
