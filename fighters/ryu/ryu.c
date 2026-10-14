@@ -37227,6 +37227,17 @@ void func_2292()
 
 int func_2293()
 {
+    // Command specials only with the special button: the game sets the command bits
+    // (global45 & 0xF) whether the motion was finished with A or B, so ignore them
+    // unless Special was pressed more recently than Attack.
+    // ControlModule(0x2722, button) = frames since that button was last pressed (0 = this frame).
+    if (global45 & 0xf)
+    {
+        if (ControlModule(0x2722, 0x1) >= ControlModule(0x2722, 0)) // 0x1 = special, 0 = attack
+        {
+            return 0;
+        }
+    }
     if (global45 & 0x8)
     {
         if (WorkModule(0x15, 0x1e000069))

@@ -31,3 +31,27 @@ double-tap, `global45 & 0x10 / 0x20`). Pressing shield now does the same:
 To allow the shield dash earlier in the charge, move the `dash =
 focus_shield_dash();` check above the `if (global9 + 1.0f > WorkModuleF(0,
 0x8000011))` line in `func_2369`.
+
+## Added: command inputs only with the special button
+
+`func_2293` (installed as `global37`) is where Ryu's command specials start,
+from the command bits the game puts in `global45`:
+
+| Bit | Command | Status |
+|---|---|---|
+| `0x1` | `SPECIAL_N_COMMAND` (Hadoken) | 0x157 |
+| `0x2` | `SPECIAL_N2_COMMAND` (Shakunetsu) | 0x158 |
+| `0x4` | `SPECIAL_S_COMMAND` (Tatsumaki) | 0x15B |
+| `0x8` | `SPECIAL_HI_COMMAND` (Shoryuken) | 0x160 |
+
+The game sets these bits whether the motion was finished with A or B. The
+hook now returns early when any of them is set but Attack was pressed more
+recently than Special. It compares `ControlModule(0x2722, 0x1)` (frames since
+Special was pressed) with `ControlModule(0x2722, 0)` (frames since Attack was
+pressed). A command finished with A then does nothing special, and the A
+press goes on to the normal attack checks. Normal B specials without a
+command input are unaffected.
+
+The focus dash commands (`0x10`/`0x20`, double-tap forward/back) are stick
+only and unchanged. Kirby's Ryu copy ability has its own code in `kirby.c`
+and isn't affected.
