@@ -37741,8 +37741,7 @@ void func_2321()
 {
     if (WorkModule(0x10, 0x2000009f)) //side-B with the stick held back: turn around before the kick starts
     {
-        PostureModule(0x2710); //reverse facing direction
-        PostureModule(0x2); //update model rotation
+        func_33(); //instant turn toward the stick, same call side-B uses to turn at the start of the lunge
     }
     func_22(0x229, 0, 1.0f);
     func_78(func_2322);
