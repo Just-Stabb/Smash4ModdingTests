@@ -313,6 +313,16 @@ What this mod does:
    an exact copy of Sonic's `specialnsearch` box:
    `Search_Collision(0, 0, 0, size 75, 0, 10, 10, 2, 3, 3, 0, 9, 1, 0, 1, 0, 0)`.
    No ACMD change is needed.
+
+   **Use search ID 0 only.** Three boxes with IDs 0, 1, 2 made the game
+   crash as soon as side B started, even with no opponent. Every vanilla
+   search box (Sonic's homing, Kirby's inhale) uses only ID 0, so Kirby most
+   likely has room for one search box. To cover several areas, swap one ID-0
+   box between shapes on alternate frames:
+   frames 0-5 cycle `size 28 @ (10, 10, 21)` → `size 15 @ (-2, 40, 12)` →
+   `size 15 @ (-2, -20, 12)` (`WAIT(1)` between them), then
+   `SEARCH_CLR_ALL()` (homing only reads the target in frames 1-5). Re-issuing
+   `Search_Collision` with the same ID replaces the box.
 3. **MSC** (end of `kirby.c`):
    - `sideb_homing_init()`, called at the top of the swing main `func_2466`
      (before the motion and search box start), sets the target to a far-away
