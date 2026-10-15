@@ -70675,6 +70675,8 @@ int throw_finish_update()
 {
     int kind;
     float release;
+    float land;
+    float lift;
     if (global4 != 0xdc)
     {
         return 0;
@@ -70683,10 +70685,14 @@ int throw_finish_update()
     if (kind == 0x78)
     {
         release = throw_release_f();
+        land = throw_drop_frame_f();
+        lift = 9.0f;
     }
     else if (kind == 0x7a)
     {
         release = throw_release_hi();
+        land = throw_drop_frame_hi();
+        lift = 6.0f;
     }
     else
     {
@@ -70709,9 +70715,26 @@ int throw_finish_update()
         }
         return 0;
     }
-    if (global18 != 0x2) // only once Kirby is in the air
+    // Only while airborne, before landing: the status counts as "air" the whole time, so
+    // use the animation instead: before the landing frame, or while dragging the opponent down.
+    if (global18 != 0x2)
     {
         return 0;
+    }
+    if (!(global17 & 0x1000)) // not dropping
+    {
+        if (global17 & 0x2000) // already landed after a drop
+        {
+            return 0;
+        }
+        if (MotionModuleF(0x1) < lift) // not lifted off yet (ACMD lifts Kirby at frame 9 / 6)
+        {
+            return 0;
+        }
+        if (MotionModuleF(0x1) >= land) // landing frame reached: too late
+        {
+            return 0;
+        }
     }
     if (!ControlModule(0x2710, 0) && !ControlModule(0x2710, 0x1)) // attack or special pressed
     {
@@ -70721,9 +70744,15 @@ int throw_finish_update()
     if (global17 & 0x1000) // was dropping: stop
     {
         global17 = global17 - 0x1000;
-        global17 = global17 | 0x2000;
-        MotionModule(0x4, 1.0f);
     }
+    global17 = global17 | 0x2000; // no drop from here on (throw_drop_update would pause the animation again)
+    // Hold Kirby where he is: with the throw's motion kinetic, skipping animation frames would
+    // also apply the animation's movement (the up throw would snap back down to its start height).
+    KineticModule(0, 0xa);
+    KineticModule(0xe, 0x3, 0x6, 0, 0, 0, 0, 0);
+    KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);
+    KineticModule(0xf, 0x1, 0);
+    MotionModule(0x4, 1.0f);
     MotionModule(0x2713, release - 1.0f); // the ACMD releases on the next frame
     return 0;
 }

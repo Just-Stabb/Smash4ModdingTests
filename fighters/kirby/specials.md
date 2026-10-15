@@ -493,5 +493,14 @@ Damage and knockback are the same as the normal throw.
   running, and jumps the animation to one frame before the release. Once
   `CatchModule(0x2712)` reports the opponent is gone, it ends the throw:
   Fall (`0xE`) in the air, Wait (`0`) on the ground.
+- Only **before landing**: the throw status counts as "air" the whole time,
+  so the check uses the animation instead. It's allowed after lift-off
+  (frame 9 / 6) and before the landing frame (35 / 45), or while dragging
+  the opponent down, but not after the drag has landed.
+- Before skipping frames it switches to kinetic AIR_STOP (`0xA`) with the
+  speeds zeroed. With the throw's motion kinetic, skipping animation frames
+  also applies the animation's movement, so the up throw snapped back down to
+  its start height. It also marks the drag as done (`global17` `0x2000`) so
+  `throw_drop_update()` doesn't pause the animation again.
 - If the ACMD doesn't follow the frame jump, the throw just plays on to its
   normal release frame and still uses the finisher angle.
