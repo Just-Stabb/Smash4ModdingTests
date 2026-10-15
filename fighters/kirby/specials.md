@@ -544,3 +544,15 @@ Damage and knockback are the same as the normal throw.
   Kirby goes into Fall (animation end in the air).
 - The count is kept in bits `0xFF0000` of `global17`. It's cleared when the
   throw starts and when the loop starts. Up throw has no timer.
+
+### Down throw slide
+
+- Down throw is the common Throw status `0x3E` with kind `0x7B`.
+  `throwlw_slide_update()`, called at the top of its loop `func_1084`, sets
+  energy 3's X speed to stick X (`global48`) × `throwlw_slide_speed()` (4.0)
+  every frame while Kirby is on the ground, with no braking. The opponent
+  stays attached, so they slide with him. The status's ground correction
+  stops him at ledges.
+- From `throwlw_final_frame()` (56, the final hit in the `throwlw` ACMD;
+  the release is frame 58) the speed is set to 0 every frame, so Kirby stops
+  dead on the final hit.

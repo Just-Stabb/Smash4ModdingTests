@@ -21260,6 +21260,7 @@ void func_1083()
 
 void func_1084()
 {
+    throwlw_slide_update(); // down throw: stick slide (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70811,4 +70812,41 @@ void throw_eat_inputs()
     global29 = 0;
     global45 = 0;
     global38 = 0;
+}
+
+// ===================================================================
+// Down throw slide (added). Down throw is the common Throw status 0x3E with throw kind
+// 0x7B (int 0x11000002). While on the ground, the stick's left/right input slides Kirby
+// (and the opponent under him). From the final hit (throwlw ACMD frame 56) his speed is
+// set to 0, so the throw ends where he is.
+// ===================================================================
+float throwlw_slide_speed()   { return 4.0f; }  // slide speed at full stick
+float throwlw_final_frame()   { return 56.0f; } // final hit of the down throw (ACMD FRAME 56): stop here
+
+// throw loop (func_1084), every frame
+void throwlw_slide_update()
+{
+    float vx;
+    if (global4 != 0x3e)
+    {
+        return;
+    }
+    if (WorkModule(0x6, 0x11000002) != 0x7b)
+    {
+        return;
+    }
+    if (global18 != 0) // ground only
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) >= throwlw_final_frame()) // final hit: kill the momentum
+    {
+        KineticModule(0x11, 0x3, 0, 0);
+        KineticModule(0x10, 0x3, 0, 0);
+        return;
+    }
+    vx = global48 * throwlw_slide_speed(); // stick X (left -1 .. right 1), world direction
+    KineticModule(0x11, 0x3, vx, 0);
+    KineticModule(0x10, 0x3, 0, 0);  // no braking
+    KineticModule(0xb, 0x3);         // make sure the energy is on
 }
