@@ -21315,6 +21315,7 @@ void func_1084()
     {
         return;
     }
+    throwlw_air_update(); // down throw from an air grab: low gravity fall (added)
     throwlw_slide_update(); // down throw: stick slide (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
@@ -21341,6 +21342,7 @@ void func_1084()
 
 void func_1085()
 {
+    throwlw_air_end(); // (added) normal gravity back after an air down throw
     JostleModule(0, 0x50000000);
     if (global6 != 0 && global6 != 0x3c)
     {
@@ -71016,4 +71018,46 @@ int airgrab_update()
         return 0x1;
     }
     return 0;
+}
+
+// ===================================================================
+// Air down throw (added). Down throw (0x3E, kind 0x7B) started from an air grab: Kirby falls
+// during the animation with throwlw_air_gravity() of his normal gravity and max fall speed.
+// global17 bit 0x40 = low gravity applied (put back when the status ends, func_1085).
+// ===================================================================
+float throwlw_air_gravity() { return 0.4f; } // fraction of Kirby's gravity and max fall speed
+
+// throw loop (func_1084), every frame
+void throwlw_air_update()
+{
+    float scale;
+    if (global4 != 0x3e)
+    {
+        return;
+    }
+    if (WorkModule(0x6, 0x11000002) != 0x7b)
+    {
+        return;
+    }
+    if (!airgrab_on())
+    {
+        return;
+    }
+    scale = throwlw_air_gravity();
+    global17 = global17 | 0x40;
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018) * scale); // gravity
+    KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019) * scale); // max fall speed
+    KineticModule(0xb, 0x1);
+}
+
+// throw end (func_1085)
+void throwlw_air_end()
+{
+    if (!(global17 & 0x40))
+    {
+        return;
+    }
+    global17 = global17 - 0x40;
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+    KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
 }

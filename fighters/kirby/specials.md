@@ -592,3 +592,10 @@ status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
 - **Untested risk**: the grabbed opponent's own capture statuses are in
   their fighter's MSC. If their side forces them out when the grabber is
   airborne, that needs a different fix.
+- **Air down throw**: a down throw (`0x3E`, kind `0x7B`) from an air grab
+  falls during the animation with `throwlw_air_gravity()` (0.4) × Kirby's
+  gravity (`0x3000018`) and max fall speed (`0x3000019`). This is set every
+  frame by `throwlw_air_update()` in `func_1084` and put back by
+  `throwlw_air_end()` in the status end `func_1085` (bit `0x40` of
+  `global17`). If he lands during it, the down throw carries on on the
+  ground (with the stick slide).
