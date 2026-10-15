@@ -70182,6 +70182,7 @@ float sideb_bounce_cancel()    { return 6.0f; }  // frames after the bounce unti
 // Slowdown near the end of the swing (only after homing, not after a bounce).
 float sideb_slow_frame()       { return 35.0f; } // swing frame where Kirby starts losing speed
 float sideb_slow_factor()      { return 0.9f; }  // speed is multiplied by this every frame from then on
+int   sideb_slow_enabled()     { return 1; }     // 0 = no slowdown
 
 // [Side-B bounce] swing loop (func_2467), every frame, before the steering. Once per swing.
 void sideb_bounce_update()
@@ -70391,6 +70392,10 @@ void sideb_slow_update()
         return;
     }
     if (WorkModule(0x10, 0x21000021)) // bounced
+    {
+        return;
+    }
+    if (sideb_slow_enabled() == 0)
     {
         return;
     }
