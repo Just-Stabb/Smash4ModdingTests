@@ -70289,7 +70289,7 @@ void sideb_homing_update()
         return;
     }
     tx = WorkModuleF(0, 0x1000006);
-    if (tx > 90000.0f) // no search hit yet
+    if (tx > 90000.0f) // no search hit (no opponent in range)
     {
         debug = sideb_homing_debug();
         if (debug == 0x1) // debug: freeze in the air so you can see this code runs
@@ -70299,7 +70299,19 @@ void sideb_homing_update()
             KineticModule(0x11, 0x1, 0);
             KineticModule(0xf, 0x1, 0);
             KineticModule(0xb, 0x1);
+            return;
         }
+        // no target: fly straight forward at the homing speed, gravity off
+        facing = PostureModuleF(0);
+        speed = sideb_homing_speed();
+        vx = facing * speed;
+        KineticModule(0x11, 0x3, vx, 0); // X speed (world direction)
+        KineticModule(0x10, 0x3, 0, 0);  // no braking
+        KineticModule(0xb, 0x3);
+        KineticModule(0x11, 0x1, 0);     // no vertical speed
+        KineticModule(0xf, 0x1, 0);      // no gravity
+        KineticModule(0xb, 0x1);
+        WorkModule(0x2710, 0x21000022);  // flew: slow down near the end of the swing
         return;
     }
     ty = WorkModuleF(0, 0x1000007);

@@ -326,6 +326,10 @@ What this mod does:
      stored (X < 90000), it turns Kirby to face it and sets his speed toward it
      (atan2 → cos/sin × `sideb_homing_speed()`, 2.0), with no gravity.
 
+   - With no opponent found (no target stored), during the same frames Kirby
+     flies **straight forward** at `sideb_homing_speed()`, with no vertical
+     speed and no gravity. If a target turns up within the window, he steers
+     at it from then on.
    - `sideb_bounce_update()`, also called from `func_2467` (before the
      steering): the first time the air swing hits a hurtbox
      (`AttackModule(0x2727, 0x2)`), Kirby gets `sideb_bounce_back()` (0.8)
