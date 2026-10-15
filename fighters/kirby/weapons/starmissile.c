@@ -673,8 +673,8 @@ void func_57()
         return;
     }
     // Damage (added): the game sets the star's hitbox power itself (vanilla ACMD damage is 0),
-    // which leaves inhale stars at 0, so set hitbox 0's damage every frame.
-    AttackModule(0x271e, 0, starmissile_damage());
+    // which leaves inhale stars at 0, so set hitbox 0's damage every frame (sheet: 0x271A = Set damage).
+    AttackModule(0x271a, 0, starmissile_damage()); // set hitbox 0's damage (0x271E would ADD it every frame)
     WorkModule(0xa, 0x11000002);
     if (WorkModule(0x6, 0x11000002) <= 0)
     {

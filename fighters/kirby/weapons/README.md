@@ -52,6 +52,7 @@ Lifetime: 32 frames (`WorkModule(0x7, 32, 0x11000002)` in `func_59`).
 The ACMD damage (1.8) didn't apply in-game. Vanilla star hitboxes all have 0
 damage in ACMD, so the game sets the power natively when Kirby spits
 something, and that leaves inhale stars at 0. `func_57` now calls
-`AttackModule(0x271E, 0, starmissile_damage())` every frame. That's the same
-call Kirby's Sonic copy uses to set its hitbox damage, and
-`starmissile_damage()` is 1.8.
+`AttackModule(0x271A, 0, starmissile_damage())` every frame (sheet: "Set
+damage", hitbox ID, float), with `starmissile_damage()` = 1.8. The
+first version used `0x271E`, which the sheet lists as "Add hitbox damage",
+so every frame added another 1.8.
