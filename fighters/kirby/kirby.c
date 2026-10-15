@@ -40838,6 +40838,7 @@ void func_2466()
 // [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
+    sideb_bounce_update(); // on-hit bounce (added), see the end of the file
     sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
@@ -70153,7 +70154,7 @@ void starmissile_fire(int bone)
 // ===================================================================
 int   sideb_homing_enabled()   { return 1; }     // 0 = off
 float sideb_homing_frame()     { return 1.0f; }  // first frame of the swing to steer on
-float sideb_homing_end_frame() { return 5.0f; }  // last frame to steer on (frames 1-5 = 5 frames)
+float sideb_homing_end_frame() { return 5.0f; }  // last frame to steer on (frames 1-5 = 5 frames); gravity stays off after
 float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
 // Debug (uses only speed calls, which are known to work from the side-B hop):
 //   0 = off
@@ -70163,6 +70164,51 @@ float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
 //   2 = fake target: a point 40 units ahead and 20 up from where the swing started.
 //       Kirby should fly there. Tests the steering without the search box / RPX patch.
 int   sideb_homing_debug()     { return 0; }
+
+// On-hit bounce (air swing): when the swing hits an opponent, push Kirby up and backwards.
+float sideb_bounce_back()      { return 0.8f; }  // backwards speed (away from where he faces)
+float sideb_bounce_up()        { return 1.5f; }  // upwards speed
+int   sideb_bounce_gravity()   { return 1; }     // 1 = give back Kirby's gravity on the bounce (so it arcs); 0 = keep it off
+
+// [Side-B bounce] swing loop (func_2467), every frame, before the steering. Once per swing.
+void sideb_bounce_update()
+{
+    float facing;
+    float vx;
+    float vy;
+    int gravity;
+    if (global4 != 0x171)
+    {
+        return;
+    }
+    if (global18 != 0x2) // air only
+    {
+        return;
+    }
+    if (WorkModule(0x10, 0x21000021)) // already bounced
+    {
+        return;
+    }
+    if (!AttackModule(0x2727, 0x2)) // hitbox connected with a hurtbox
+    {
+        return;
+    }
+    WorkModule(0x2710, 0x21000021);
+    facing = PostureModuleF(0);
+    vx = sideb_bounce_back();
+    vx = -facing * vx;
+    vy = sideb_bounce_up();
+    KineticModule(0x11, 0x3, vx, 0); // X speed (world direction)
+    KineticModule(0xb, 0x3);
+    KineticModule(0x11, 0x1, vy);    // Y speed
+    KineticModule(0xb, 0x1);
+    gravity = sideb_bounce_gravity();
+    if (gravity != 0)
+    {
+        KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+        KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+    }
+}
 
 // [Side-B tracking] swing main (func_2466): "no target yet" = a point far away. The search
 // code keeps whichever hit is nearer than the stored point, so any real hit replaces it.
@@ -70218,15 +70264,12 @@ void sideb_homing_update()
     {
         return;
     }
-    if (frame > sideb_homing_end_frame())
+    if (frame > sideb_homing_end_frame()) // steering over (gravity stays off)
     {
-        // steering over: give back Kirby's normal gravity and fall speed (once)
-        if (WorkModule(0x10, 0x21000020))
-        {
-            WorkModule(0x2711, 0x21000020);
-            KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
-            KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
-        }
+        return;
+    }
+    if (WorkModule(0x10, 0x21000021)) // bounced off a hit: no more steering
+    {
         return;
     }
     tx = WorkModuleF(0, 0x1000006);
@@ -70240,7 +70283,6 @@ void sideb_homing_update()
             KineticModule(0x11, 0x1, 0);
             KineticModule(0xf, 0x1, 0);
             KineticModule(0xb, 0x1);
-            WorkModule(0x2710, 0x21000020);
         }
         return;
     }
@@ -70267,5 +70309,4 @@ void sideb_homing_update()
     KineticModule(0xf, 0x1, 0);      // no gravity while steering
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
-    WorkModule(0x2710, 0x21000020); // steered: restore gravity when steering ends
 }

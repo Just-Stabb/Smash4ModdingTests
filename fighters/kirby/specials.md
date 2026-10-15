@@ -321,10 +321,18 @@ What this mod does:
      started", so that flag can't mean "target found".
    - `sideb_homing_update()`, called from the swing loop `func_2467`, runs in
      the air from frame `sideb_homing_frame()` (1) to
-     `sideb_homing_end_frame()` (5, so 5 frames of steering; afterwards
-     Kirby's gravity and max fall speed are restored). If a target is
+     `sideb_homing_end_frame()` (5, so 5 frames of steering; gravity stays
+     off afterwards, so Kirby keeps flying in that direction). If a target is
      stored (X < 90000), it turns Kirby to face it and sets his speed toward it
      (atan2 → cos/sin × `sideb_homing_speed()`, 2.0), with no gravity.
+
+   - `sideb_bounce_update()`, also called from `func_2467` (before the
+     steering): the first time the air swing hits a hurtbox
+     (`AttackModule(0x2727, 0x2)`), Kirby gets `sideb_bounce_back()` (0.8)
+     speed backwards (away from where he faces) and `sideb_bounce_up()` (1.5)
+     upwards. Steering stops for the rest of the swing (flag `0x21000021`).
+     With `sideb_bounce_gravity()` = 1, his gravity and max fall speed come
+     back on the bounce so it arcs. Set it to 0 to keep gravity off.
 
 Earlier versions used the start status `0x153`. That was wrong: the search
 box isn't in the start animation (`specialairsstart`, `0x28D`), so nothing
