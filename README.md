@@ -14,3 +14,4 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - [`fighters/ryu/README.md`](fighters/ryu/README.md): Ryu Focus Attack shield-dash cancel
 - `tools/rpx_patch.py`: patches 32-bit values in the game executable (`cross_f.rpx`), e.g. article max counts from `reference/FighterArticles.xml`. Writes a new file; patched executables go in `build/` (git-ignored)
 - [`fighters/metaknight/README.md`](fighters/metaknight/README.md): Meta Knight ledge grab during Mach Tornado
+- [`docs/native-notes.md`](docs/native-notes.md): notes from reading the game executable (Kirby BattleObject commands, homing investigation)
