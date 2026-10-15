@@ -66,7 +66,10 @@ BLR = 0x4E800020
 COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1)}
 
 
-def build():
+def build(stage=4):
+    """stage (for crash bisecting): 1 = return right after the command check,
+    2 = stop after reading/resolving the target, 3 = stop after finding the owner Kirby,
+    4 = full."""
     code = []   # entries: int word, or (kind, arg) to resolve
     labels = {}
 
@@ -75,6 +78,8 @@ def build():
 
     emit(lwz(6, 8, 5)); emit(lwz(6, 0, 6)); emit(lwz(6, 0, 6))  # command value
     emit(cmplwi(6, MAGIC)); emit(("bne", "ret0"))
+    if stage == 1:
+        emit(("b", "ret0"))
     emit(stwu(1, -0x60, 1)); emit(MFLR_R0); emit(stw(0, 0x64, 1)); emit(stmw(26, 0x40, 1))
     emit(mr(31, 4))                                   # r31 = weapon
     emit(lwz(3, 0x28, 31)); emit(lwz(3, 0x50, 3))     # AttackModule
@@ -89,6 +94,8 @@ def build():
     emit(addi(3, 1, 0x10)); emit(("bl", CATEGORY)); emit(cmpwi(3, 0)); emit(("bne", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", KIND)); emit(mr(29, 3))
     emit(addi(3, 1, 0x10)); emit(("bl", COSTUME)); emit(mr(28, 3))
+    if stage == 2:
+        emit(("b", "out"))
     # owner Kirby
     emit(lwz(5, 0x1BF8, 31))
     emit(lis(3, 0x102F)); emit(lwz(3, 0x6C30, 3))
@@ -96,6 +103,8 @@ def build():
     emit(addi(3, 1, 0x20)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", KIND)); emit(cmpwi(3, 8)); emit(("bne", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", ACCESSOR)); emit(mr(27, 3))
+    if stage == 3:
+        emit(("b", "out"))
     # count = get_int(COUNTER) + 1
     emit(lwz(3, 0x28, 27)); emit(lwz(12, 0, 3)); emit(lwz(12, 0x84, 12)); emit(mtctr(12))
     emit(lis(4, COUNTER >> 16)); emit(ori(4, 4, COUNTER & 0xFFFF)); emit(BCTRL)
@@ -125,6 +134,9 @@ def build():
                 off = arg - pc
                 assert -0x2000000 <= off < 0x2000000
                 words.append((18 << 26) | (off & 0x3FFFFFC) | 1)
+            elif kind == "b":
+                off = 4 * labels[arg] - 4 * i
+                words.append((18 << 26) | (off & 0x3FFFFFC))
             else:
                 off = 4 * labels[arg] - 4 * i
                 assert -0x8000 <= off < 0x8000
@@ -137,9 +149,15 @@ def build():
 
 
 def main():
-    words = build()
+    stage = 4
+    if "--stage" in sys.argv:
+        stage = int(sys.argv[sys.argv.index("--stage") + 1])
+    words = build(stage)
     hook_off = CAVE - HOOK
     hook = (18 << 26) | (hook_off & 0x3FFFFFC)
+    # Zero the rest of the dead function: never executed, and zeros compress well, so the
+    # recompressed .text section still fits in its original space in the RPX.
+    words = words + [0] * (CAVE_MAX // 4 - len(words))
     out = ["0x%08X=0x%08X" % (HOOK, hook)]
     out += ["0x%08X=0x%08X" % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     if "--list" in sys.argv:
