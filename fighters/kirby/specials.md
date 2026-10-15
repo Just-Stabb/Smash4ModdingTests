@@ -318,3 +318,17 @@ step:
   The fallback is to switch into the Sonic copy's homing statuses
   (`0x194` → `0x193`). That's proven to home, but it uses the Sonic copy's
   animation and hitboxes.
+
+**Test 1 result:** the camera shake showed, so the code ran, but no homing.
+Switching kinetic type `0x68` in the middle of a status doesn't home.
+
+**Test 2 (current):** the air swing (`0x171`) now sets kinetic `0x68` in its
+**pre** script (`func_2465`), with the same `StatusModule(0x5, 0x2, 0x68,
+0x5, 0, 0x1, 0x10000, 0x10, 0xC0, 0)` line as the Sonic copy's homing status
+pre (`func_3484`). That's the step where the game initialises a movement
+type.
+
+The swing main (`func_2466`) sets `0x21000020` (and shakes the camera if
+debug is on). With that flag set, the air branch of `func_2468` no longer
+replaces the movement with AIR_STOP (`0xA`). Ground swings and swings with
+tracking off are unchanged.

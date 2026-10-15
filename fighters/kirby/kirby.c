@@ -40819,6 +40819,17 @@ void func_2464()
 // [SpecialSSwing 0x171] pre
 int func_2465()
 {
+    int homing;
+    homing = sideb_homing_enabled();
+    if (homing != 0 && global18 == 0x2)
+    {
+        // Air swing with tracking (added): start the status with Kirby's Sonic-copy homing kinetic
+        // type 0x68, set up exactly like the Sonic copy's homing status 0x193 pre (func_3484),
+        // so the game initialises the homing when the status starts.
+        StatusModule(0x5, 0x2, 0x68, 0x5, 0, 0x1, 0x10000, 0x10, 0xc0, 0);
+        StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x412, 0, 0x200, 0);
+        return 0;
+    }
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x412, 0, 0x200, 0);
     return 0;
@@ -40827,7 +40838,19 @@ int func_2465()
 // [SpecialSSwing 0x171] main: swing
 void func_2466()
 {
+    int homing;
+    int debug;
     WorkModule(0x2711, 0x2100000d);
+    homing = sideb_homing_enabled();
+    if (homing != 0 && global18 == 0x2)
+    {
+        WorkModule(0x2710, 0x21000020); // tracking swing (pre used kinetic 0x68): keep that kinetic type
+        debug = sideb_homing_debug();
+        if (debug != 0)
+        {
+            CameraModule(0x3, 0x2); // debug: camera quake when the tracking swing starts
+        }
+    }
     func_2468();
     if (global18 == 0)
     {
@@ -40915,9 +40938,12 @@ void func_2468()
     }
     else
     {
-        KineticModule(0, 0xa);
+        if (!(global4 == 0x171 && WorkModule(0x10, 0x21000020))) // tracking swing: don't replace the homing kinetic
+        {
+            KineticModule(0, 0xa);
+            KineticModule(0xe, 0, 0x4, 0, 0, 0, 0, 0);
+        }
         GroundModule(0x2710, 0x5);
-        KineticModule(0xe, 0, 0x4, 0, 0, 0, 0, 0);
         if (WorkModule(0x10, 0x21000010))
         {
             if (WorkModule(0x10, 0x2100000d))
