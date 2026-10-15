@@ -468,3 +468,30 @@ When he touches the floor, the animation resumes, and the slam and the
 release play there. Off stage, he carries the opponent to the bottom blast
 zone. State bits in `global17`: `0x1000` falling, `0x2000` done (reset in
 the throw main `func_1136`).
+
+Fix: when the drop reaches the floor, the throw's motion kinetic type
+(`0x12`) is restored. Otherwise the animation's bounce after the slam
+doesn't move Kirby. This also happened on stage, because the drop check
+fires one frame before the floor.
+
+### Forward/up throw: attack/special finisher
+
+While airborne in forward or up throw, pressing attack or special releases
+the opponent right away:
+- forward throw: at **60°**;
+- up throw: as a **spike** (270°).
+
+Damage and knockback are the same as the normal throw.
+
+- **ACMD** (`build/acmd/game.bin`; `throwf` / `throwhi`): before the release
+  (`Throw_Applier` at frame 45 / 51), `IS_FLAG(0x21000012)` → `True` →
+  re-specify throw 0 with the new angle. Without the flag the throw is
+  unchanged. ACMD branch offsets count words from the branch command
+  itself; `True(o)` runs the next `o-2` words only when the condition holds.
+- **MSC** `throw_finish_update()` (top of the throw loop `func_1137`): on
+  `ControlModule(0x2710, 0/1)` it sets `0x21000012`, stops a drop if one is
+  running, and jumps the animation to one frame before the release. Once
+  `CatchModule(0x2712)` reports the opponent is gone, it ends the throw:
+  Fall (`0xE`) in the air, Wait (`0`) on the ground.
+- If the ACMD doesn't follow the frame jump, the throw just plays on to its
+  normal release frame and still uses the finisher angle.

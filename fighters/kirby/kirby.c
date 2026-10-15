@@ -22130,6 +22130,12 @@ void func_1136()
 
 void func_1137()
 {
+    int throw_done;
+    throw_done = throw_finish_update(); // attack/special finisher (added), see the end of the file
+    if (throw_done != 0)
+    {
+        return;
+    }
     throw_drift_update(); // stick drift in forward/up throw (added), see the end of the file
     throw_drop_update();  // keep falling below the start height until the floor (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
@@ -70613,6 +70619,8 @@ void throw_drop_update()
             global17 = global17 - 0x1000;
             global17 = global17 | 0x2000;
             KineticModule(0x11, 0x1, 0);
+            KineticModule(0x11, 0x3, 0, 0);
+            KineticModule(0, 0x12);  // back to the throw's motion kinetic, so the animation's bounce moves Kirby
             MotionModule(0x4, 1.0f); // animation runs again
             return;
         }
@@ -70650,4 +70658,72 @@ void throw_drop_update()
     KineticModule(0x11, 0x1, -down);
     KineticModule(0xf, 0x1, 0);
     KineticModule(0xb, 0x1);
+}
+
+// ===================================================================
+// Throw finisher (added). While airborne in forward / up throw, pressing attack or special
+// releases the opponent right away: forward throw at 60 degrees, up throw as a spike
+// (270 degrees). The ACMD (throwf / throwhi in game.bin) checks status flag 0x21000012 at
+// the release frame and swaps throw 0's angle when it's set; this sets the flag and jumps
+// the animation to just before the release, then ends the throw once the opponent is gone.
+// ===================================================================
+float throw_release_f()  { return 45.0f; } // forward throw release frame (Throw_Applier in throwf)
+float throw_release_hi() { return 51.0f; } // up throw release frame (Throw_Applier in throwhi)
+
+// throw loop (func_1137). Returns 1 when it changed status.
+int throw_finish_update()
+{
+    int kind;
+    float release;
+    if (global4 != 0xdc)
+    {
+        return 0;
+    }
+    kind = WorkModule(0x6, 0x11000002);
+    if (kind == 0x78)
+    {
+        release = throw_release_f();
+    }
+    else if (kind == 0x7a)
+    {
+        release = throw_release_hi();
+    }
+    else
+    {
+        return 0;
+    }
+    if (WorkModule(0x10, 0x21000012)) // finisher requested
+    {
+        if (CatchModule(0x2712) == 0) // opponent released: end the throw
+        {
+            if (global18 == 0x2)
+            {
+                KineticModule(0, 0x13);
+                func_16(0xe, 0); // fall
+            }
+            else
+            {
+                func_16(0, 0); // wait
+            }
+            return 0x1;
+        }
+        return 0;
+    }
+    if (global18 != 0x2) // only once Kirby is in the air
+    {
+        return 0;
+    }
+    if (!ControlModule(0x2710, 0) && !ControlModule(0x2710, 0x1)) // attack or special pressed
+    {
+        return 0;
+    }
+    WorkModule(0x2710, 0x21000012);
+    if (global17 & 0x1000) // was dropping: stop
+    {
+        global17 = global17 - 0x1000;
+        global17 = global17 | 0x2000;
+        MotionModule(0x4, 1.0f);
+    }
+    MotionModule(0x2713, release - 1.0f); // the ACMD releases on the next frame
+    return 0;
 }
