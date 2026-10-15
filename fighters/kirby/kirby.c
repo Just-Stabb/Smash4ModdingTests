@@ -22129,6 +22129,7 @@ void func_1136()
 
 void func_1137()
 {
+    throw_drift_update(); // stick drift in forward/up throw (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70411,4 +70412,45 @@ void sideb_slow_update()
     vy = KineticModuleF(0x1, 0x1) * factor; // current Y speed
     KineticModule(0x11, 0x3, vx, 0);
     KineticModule(0x11, 0x1, vy);
+}
+
+// ===================================================================
+// Throw drift (added). Kirby's forward/back/up throws are status 0xDC; the throw kind is
+// int 0x11000002 (0x78 forward, 0x79 back, 0x7A up). While airborne in a forward or up
+// throw, the stick's left/right input moves Kirby (and the opponent he's holding).
+// ===================================================================
+float throw_drift_speed_f()  { return 0.8f; }  // forward throw: drift speed at full stick
+float throw_drift_speed_hi() { return 0.4f; }  // up throw: 50% of the forward throw's speed
+
+// [Throw drift] throw loop (func_1137), every frame.
+void throw_drift_update()
+{
+    int kind;
+    float speed;
+    float vx;
+    if (global4 != 0xdc)
+    {
+        return;
+    }
+    if (global18 != 0x2) // only once Kirby has left the ground
+    {
+        return;
+    }
+    kind = WorkModule(0x6, 0x11000002);
+    if (kind == 0x78)
+    {
+        speed = throw_drift_speed_f();
+    }
+    else if (kind == 0x7a)
+    {
+        speed = throw_drift_speed_hi();
+    }
+    else
+    {
+        return;
+    }
+    vx = global48 * speed;          // stick X (left -1 .. right 1), world direction
+    KineticModule(0x11, 0x3, vx, 0); // X speed of energy 3 (added on top of the throw's motion)
+    KineticModule(0x10, 0x3, 0, 0);  // no braking
+    KineticModule(0xb, 0x3);         // make sure the energy is on
 }

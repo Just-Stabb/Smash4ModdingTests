@@ -409,3 +409,21 @@ python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
 
 To use a different status than `0x171`, change the `-0x171` in
 `0x2F7E560` (`0x3808` followed by the 16-bit negative status).
+
+## Added: stick drift in forward and up throw
+
+Kirby's forward, back and up throws are status `0xDC`; the throw kind is int
+`0x11000002` (`0x78` forward, `0x79` back, `0x7A` up; down throw is the
+common `0x3E`). The throws move by animation (kinetic `0xF`, then `0x12` once
+the ACMD flag `0x2100000D` lifts Kirby off the ground, in `func_1138`).
+
+`throw_drift_update()` (end of `kirby.c`), called at the top of the throw loop
+`func_1137`: while airborne in a forward or up throw, it sets energy 3's X
+speed to stick X (`global48`) × the drift speed, with no braking, on top of
+the animation's movement. The held opponent moves with Kirby.
+
+Settings: `throw_drift_speed_f()` (0.8) for forward throw and
+`throw_drift_speed_hi()` (0.4, half) for up throw.
+
+Untested: if the throw's motion kinetic type ignores energy 3, the drift will
+do nothing. The fallback is moving Kirby's position directly each frame.
