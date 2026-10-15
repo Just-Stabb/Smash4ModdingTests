@@ -533,3 +533,14 @@ Damage and knockback are the same as the normal throw.
   raised max fall speed, then goes into Fall. If Fall clamps it back to his
   normal max fall speed, the effect is weaker than intended. Report it and
   it can be held for a few frames instead.
+
+### Forward throw loop timer
+
+- When the forward throw's loop starts (frame 32, dropping), a timer starts.
+  After `throw_loop_time_f()` (120) loop frames without landing or a
+  finisher, the throw ends normally where Kirby is: the drop stops, the
+  throw's motion kinetic comes back and the animation resumes, so the
+  opponent is released by the normal forward throw (frame 45). Afterwards
+  Kirby goes into Fall (animation end in the air).
+- The count is kept in bits `0xFF0000` of `global17`. It's cleared when the
+  throw starts and when the loop starts. Up throw has no timer.

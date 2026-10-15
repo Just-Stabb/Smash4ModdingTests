@@ -70598,6 +70598,7 @@ float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the 
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
 float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
+int   throw_loop_time_f()   { return 120; }   // forward throw: loop frames before the throw ends normally (in the air too)
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -70610,6 +70611,7 @@ void throw_drop_reset()
     {
         global17 = global17 - 0x2000;
     }
+    global17 = global17 - (global17 & 0xff0000); // forward throw loop timer
 }
 
 // throw loop (func_1137), every frame
@@ -70647,6 +70649,23 @@ void throw_drop_update()
             MotionModule(0x4, 1.0f); // animation runs again
             return;
         }
+        // forward throw: loop timer (frames in bits 0xFF0000 of global17). When it runs out the
+        // throw ends normally where Kirby is: the animation resumes and releases the opponent.
+        if (kind == 0x78)
+        {
+            global17 = global17 + 0x10000;
+            if ((global17 & 0xff0000) >= throw_loop_time_f() * 0x10000)
+            {
+                global17 = global17 - 0x1000;
+                global17 = global17 | 0x2000; // don't pause again
+                global17 = global17 - (global17 & 0xff0000);
+                KineticModule(0x11, 0x1, 0);
+                KineticModule(0x11, 0x3, 0, 0);
+                KineticModule(0, 0x12);  // back to the throw's motion kinetic
+                MotionModule(0x4, 1.0f); // animation runs again
+                return;
+            }
+        }
         // accelerate: current fall speed + throw_drop_accel(), at least the start speed, capped
         down = -KineticModuleF(0x1, 0x1) + throw_drop_accel();
         if (down < throw_drop_speed())
@@ -70681,6 +70700,7 @@ void throw_drop_update()
     }
     // still in the air at the landing frame: pause the animation and fall
     global17 = global17 | 0x1000;
+    global17 = global17 - (global17 & 0xff0000); // loop timer starts at 0
     MotionModule(0x2713, hold);
     MotionModule(0x4, 0);    // animation speed 0
     KineticModule(0, 0xa);   // kinetic type AIR_STOP (speeds below drive Kirby)
