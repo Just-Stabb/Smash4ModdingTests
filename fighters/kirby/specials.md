@@ -322,8 +322,24 @@ The search box must be active **in the side-B start animation** (status
 normal movement takes over.
 
 Settings: `sideb_homing_enabled()`, `sideb_homing_frame()`,
-`sideb_homing_speed()`, `sideb_homing_debug()`. With debug on (1), the
-camera shakes once, on the first frame Kirby steers at a target.
+`sideb_homing_speed()`, `sideb_homing_debug()`.
+
+Debug modes use only speed calls (proven by the side-B hop). The earlier
+camera-shake signal was never confirmed: the shake the user saw came from
+another move.
+
+- `1`: from the steering frame, Kirby **freezes** in the air while no target
+  is stored. Freezes = the code runs but nothing was captured (search box or
+  RPX side). Flies at an opponent = everything works. Neither = the code
+  isn't reached.
+- `2`: **fake target**, 40 units ahead and 20 up from where side B started.
+  Kirby should fly there. This tests the steering alone, without the
+  search box or the RPX patch.
+
+If mode 1 freezes, compare the hand-made search box with the one the
+vanilla Sonic copy uses: Kirby's ACMD script `SpecialNSearch` (started by
+`BattleObject(0x405)` in `func_3469`). Its target/collision settings decide
+whether opponents are found at all.
 
 Known limits:
 - Copy abilities with their own search code (kinds `0x16`, `0x1C`, `0x2A`,

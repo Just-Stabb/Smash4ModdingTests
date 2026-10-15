@@ -70154,7 +70154,14 @@ void starmissile_fire(int bone)
 int   sideb_homing_enabled() { return 1; }     // 0 = off
 float sideb_homing_frame()   { return 12.0f; } // frame of 0x153 to start steering (the hop is at frame 10)
 float sideb_homing_speed()   { return 2.0f; }  // flight speed while steering
-int   sideb_homing_debug()   { return 1; }     // 1 = small camera shake when a target is first steered at; 0 = off
+// Debug (uses only speed calls, which are known to work from the side-B hop):
+//   0 = off
+//   1 = from the steering frame, Kirby FREEZES in the air while no target is stored.
+//       Freezes = this code runs but the search box stored nothing. Flies at someone = works.
+//       Neither = this code isn't reached.
+//   2 = fake target: a point 40 units ahead and 20 up from where side B started.
+//       Kirby should fly there. Tests the steering without the search box / RPX patch.
+int   sideb_homing_debug()   { return 1; }
 
 // [Side-B tracking] called every frame from the side-B start loop (func_2430).
 void sideb_homing_update()
@@ -70186,6 +70193,15 @@ void sideb_homing_update()
     {
         WorkModule(0, 99999.0f, 0x1000006);
         WorkModule(0, 99999.0f, 0x1000007);
+        debug = sideb_homing_debug();
+        if (debug == 0x2)
+        {
+            facing = PostureModuleF(0);
+            tx = PostureModuleF(0x1) + facing * 40.0f;
+            ty = PostureModuleF(0x2) + 20.0f;
+            WorkModule(0, tx, 0x1000006);
+            WorkModule(0, ty, 0x1000007);
+        }
         WorkModule(0x2710, 0x21000020);
         return;
     }
@@ -70201,6 +70217,15 @@ void sideb_homing_update()
     tx = WorkModuleF(0, 0x1000006);
     if (tx > 90000.0f) // no search hit yet
     {
+        debug = sideb_homing_debug();
+        if (debug == 0x1) // debug: freeze in the air so you can see this code runs
+        {
+            KineticModule(0x11, 0x3, 0, 0);
+            KineticModule(0xb, 0x3);
+            KineticModule(0x11, 0x1, 0);
+            KineticModule(0xf, 0x1, 0);
+            KineticModule(0xb, 0x1);
+        }
         return;
     }
     ty = WorkModuleF(0, 0x1000007);
@@ -70227,13 +70252,4 @@ void sideb_homing_update()
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
 
-    if (!WorkModule(0x10, 0x21000021))
-    {
-        WorkModule(0x2710, 0x21000021);
-        debug = sideb_homing_debug();
-        if (debug != 0)
-        {
-            CameraModule(0x3, 0x2); // camera quake (sheet: Camera Quake, sys_D 0x3)
-        }
-    }
 }
