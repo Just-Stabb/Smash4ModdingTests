@@ -20,5 +20,5 @@ Shared by both statuses: init `func_59` (status 1 sets the lifetime), exec
 `func_60` (spin, plus speed decay unless `0x11000001 == 2`), and key 5
 `func_61`.
 
-**Changed:** the lifetime is 24 frames. `func_59` used to read it from
-weapon parameter `0x12000013`; it now sets `WorkModule(0x7, 24, 0x11000002)`.
+**Changed:** the lifetime is 48 frames. `func_59` used to read it from
+weapon parameter `0x12000013`; it now sets `WorkModule(0x7, 48, 0x11000002)`.

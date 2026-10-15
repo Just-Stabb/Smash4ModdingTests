@@ -243,13 +243,13 @@ ControlModule(0x2722, 0)`).
 ## Added: star missiles from alternating hands during the inhale
 
 During the inhale loop (status `0x157`), a star missile (article `0x17`)
-fires on frame 0, 8, 16, …, alternating left hand, right hand, left hand…
+fires on frame 0, 12, 24, …, alternating left hand, right hand, left hand…
 The code is at the end of `kirby.c` (`starmissile_*`), called from
 `func_2358`, the inhale loop's per-frame function, so it pauses during
 hitlag.
 
 1. A frame counter in status int `0x11000005` picks the hand:
-   `(frame / 8) % 2`.
+   `(frame / 12) % 2`.
 2. `ArticleModule(0x1, 0x17)` counts the star missiles currently out (the
    same call Ryu uses for his Hadoken). If `starmissile_max()` are already
    out, the shot is skipped.
@@ -260,8 +260,8 @@ hitlag.
 
 | Setting | Default | |
 |---|---|---|
-| `starmissile_interval` | 8 | Frames between shots |
-| `starmissile_max` | 3 | Keep equal to the count patched into `cross_f.rpx` |
+| `starmissile_interval` | 12 | Frames between shots |
+| `starmissile_max` | 5 | Keep equal to the count patched into `cross_f.rpx` |
 | `starmissile_article` | `0x17` | starmissile (`reference/FighterArticles.xml`) |
 | `starmissile_bone_left` / `_right` | `0x18` / `0x17` | `LHaveN` / `RHaveN`, the hand hold points (`LHandN` 0x10 / `RHandN` 0x14 also work) |
 | `starmissile_generate_cmd` | `0x2718` | Generate command; `0x2710` is the other generate |
@@ -272,7 +272,7 @@ hitlag.
 **Max count:** the game's limit for `starmissile` is 1 (`Count="1"` in the
 article list) unless the executable is patched. `tools/rpx_patch.py`
 raises it:
-`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=3`.
+`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=5` (current build: 5).
 The spit star uses the same article, so it shares the limit.
 
 **Uncertain:** the move and shoot commands take the article ID, not a

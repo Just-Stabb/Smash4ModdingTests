@@ -694,7 +694,7 @@ void func_59()
     {
         // Lifetime of the flying star in frames (counted down in func_57; at 0 the star is removed).
         // Was WorkModule(0x6, 0x12000013), the weapon parameter.
-        WorkModule(0x7, 24, 0x11000002);
+        WorkModule(0x7, 48, 0x11000002);
     }
 }
 
