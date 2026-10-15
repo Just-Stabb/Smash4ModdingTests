@@ -155,3 +155,61 @@ in `fighters/kirby/specials.md`.
 Side B now gets its target from this code through a 10-word RPX patch. MSC
 steers toward `0x1000006`/`0x1000007` itself, so kinetic `0x68` isn't needed.
 See `fighters/kirby/specials.md`.
+
+## Kirby copy abilities: how the game grants one (traced)
+
+MSC never sets the copy variables. All of this is native.
+
+### `copy_grant` = `0x02EFCD8C` (Kirby specializer code)
+
+Arguments: `r3` = Kirby's specializer object (`0x02E669F0(8)`), `r4` = Kirby's
+module accessor, `r5` = a value stored in int `0x100000A5` (costume/colour of
+the copied fighter, probably), `r6` = **fighter kind to copy**, `r7` = 1.
+
+1. Returns if kind == 8 (Kirby) or kind ≥ `0x3A`.
+2. Clears copy flags `0x20000078`–`0x20000095` (30), zeroes copy ints
+   `0x10000083`–`0x100000A0`, and sets copy floats `0x2F`–`0x4C` to a default.
+3. Writes `r5` to int `0x100000A5` (store at `+0x294`). If int `0x100000AD`
+   is non-zero, it calls `0x02EFDB88(spec, kind)` and
+   `0x02EFDDFC(spec, kind, r5)`.
+4. Calls `0x02EFC940(r3, r4, kind)` (copy setup).
+5. Writes kind to **int `0x100000A4`** (copy kind; inlined store
+   `stw kind, 0x290(ints)`).
+6. Sets flags **`0x2000009A`** (has copy) and `0x2000009C` (`oris 0x1400` on
+   flag word 4). Kind `0x1C` sets an extra bit; kind `0x10` does extra setup.
+
+"Lose copy" stores -1 to `0x100000A4` and clears `0x2000009A`
+(`0x02EF5CC8`, `0x02EF5FDC`).
+
+### Its only caller: Swallow status handler `0x0279666C`
+
+Kirby's setup (`0x02EF5940`…) fills a per-status table at `(obj+0x44)+4*status`.
+The object with vtable `0x1009664C` goes in slot `0x167` (Swallow), and
+`0x0279666C` is that vtable's `+0x34` entry. What it does:
+
+1. Gets Kirby's specializer: `0x02E669F0(8)`.
+2. Returns unless **status flag `0x21000012`** is set (the swallow ACMD sets
+   it). Then it clears it and sets `0x21000013`.
+3. Reads ints `0x11000008`–`0x1100000A` and plays something via module
+   `+0x50` vtable `+0x74`.
+4. **Target**: module `+0x68` vtable `+0xA4`, argument 0 → the captured
+   object's ID. `0x02BF2108` resolves it. `0x02BEF5F4` tests "not a fighter".
+   `0x02BEF604` gives the **fighter kind**. `0x02BEF610` gives a value passed as
+   `r5` (costume/colour). The kind becomes -1 for non-fighters or when the
+   target has flag `0x20000058`.
+5. If the target is a Kirby: kind = that Kirby's copy (`0x02EFD128`), and the
+   value from `0x02EFB624`.
+6. `copy_grant(spec, kirby, r5, kind, 1)`.
+
+### What this means for "copy on the 12th star hit"
+
+Granting is one call with four inputs we can produce natively: the
+specializer (`0x02E669F0(8)`), Kirby's accessor, the target's kind (and
+costume value), and 1. What's missing:
+
+- Native code that runs at the right moment with the target. For example, a
+  code cave hooked into an unused Kirby `BattleObject` command (dispatcher
+  `0x02EF90D8`, cmd `0x3E8`–`0x40C`) that calls `copy_grant` with a kind MSC
+  passes in.
+- A way for the star (weapon) to know which fighter it hit, and to tell Kirby
+  (hit count + target kind). Not found yet.
