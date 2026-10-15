@@ -70154,6 +70154,8 @@ void starmissile_fire(int bone)
 
 // ===================================================================
 // Side-B tracking (added). Air swing (0x171): init from func_2466, steering from func_2467.
+// State is kept in global17 (unused by every fighter; the game never reads MSC globals), not in
+// status flags: the game's native code may read status flags of status 0x171.
 // Needs build/cross_f.rpx (see fighters/kirby/specials.md): with that RPX, a search box
 // hit while Kirby is in status 0x171 runs the Sonic copy's search code, which stores the
 // hit opponent's position in status floats 0x1000006 (X) / 0x1000007 (Y) and keeps the
@@ -70200,7 +70202,7 @@ void sideb_bounce_update()
     {
         return;
     }
-    if (WorkModule(0x10, 0x21000021)) // already bounced
+    if ((global17 & 0x2)) // already bounced
     {
         return;
     }
@@ -70208,7 +70210,7 @@ void sideb_bounce_update()
     {
         return;
     }
-    WorkModule(0x2710, 0x21000021);
+    global17 = global17 | 0x2;
     frame = sideb_bounce_frame();
     MotionModule(0x2713, frame); // jump the animation (and its ACMD) to the bounce frame
     facing = PostureModuleF(0);
@@ -70235,6 +70237,7 @@ void sideb_homing_init()
     float facing;
     float tx;
     float ty;
+    global17 = 0; // side-B state bits: 0x1 = flew (homed or straight), 0x2 = bounced
     WorkModule(0, 99999.0f, 0x1000006);
     WorkModule(0, 99999.0f, 0x1000007);
     debug = sideb_homing_debug();
@@ -70285,7 +70288,7 @@ void sideb_homing_update()
     {
         return;
     }
-    if (WorkModule(0x10, 0x21000021)) // bounced off a hit: no more steering
+    if ((global17 & 0x2)) // bounced off a hit: no more steering
     {
         return;
     }
@@ -70312,7 +70315,7 @@ void sideb_homing_update()
         KineticModule(0x11, 0x1, 0);     // no vertical speed
         KineticModule(0xf, 0x1, 0);      // no gravity
         KineticModule(0xb, 0x1);
-        WorkModule(0x2710, 0x21000022);  // flew: slow down near the end of the swing
+        global17 = global17 | 0x1;  // flew: slow down near the end of the swing
         return;
     }
     ty = WorkModuleF(0, 0x1000007);
@@ -70338,7 +70341,7 @@ void sideb_homing_update()
     KineticModule(0xf, 0x1, 0);      // no gravity while steering
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
-    WorkModule(0x2710, 0x21000022); // homed: slow down near the end of the swing
+    global17 = global17 | 0x1; // homed: slow down near the end of the swing
 }
 
 // [Side-B bounce cancel] swing loop (func_2467). From sideb_bounce_cancel() frames after the
@@ -70350,7 +70353,7 @@ int sideb_bounce_cancel_update()
     {
         return 0;
     }
-    if (!WorkModule(0x10, 0x21000021)) // only after a bounce
+    if (!(global17 & 0x2)) // only after a bounce
     {
         return 0;
     }
@@ -70387,11 +70390,11 @@ void sideb_slow_update()
     {
         return;
     }
-    if (!WorkModule(0x10, 0x21000022)) // didn't home
+    if (!(global17 & 0x1)) // didn't home
     {
         return;
     }
-    if (WorkModule(0x10, 0x21000021)) // bounced
+    if ((global17 & 0x2)) // bounced
     {
         return;
     }
