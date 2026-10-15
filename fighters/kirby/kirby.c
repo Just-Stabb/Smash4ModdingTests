@@ -70185,6 +70185,7 @@ int   sideb_homing_enabled()   { return 1; }     // 0 = off
 float sideb_homing_frame()     { return 1.0f; }  // first frame of the swing to steer on
 float sideb_homing_end_frame() { return 5.0f; }  // last frame to steer on (frames 1-5 = 5 frames); gravity stays off after
 float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
+float sideb_stick_deadzone()   { return 0.3f; }  // no target: stick tilt needed to aim the flight (less = straight forward)
 // Debug (uses only speed calls, which are known to work from the side-B hop):
 //   0 = off
 //   1 = while steering frames run, Kirby FREEZES in the air if no target is stored.
@@ -70327,15 +70328,34 @@ void sideb_homing_update()
             KineticModule(0xb, 0x1);
             return;
         }
-        // no target: fly straight forward at the homing speed, gravity off
+        // no target: fly in the stick's direction at the homing speed, gravity off.
+        // Stick in the dead zone: fly straight forward.
         facing = PostureModuleF(0);
         speed = sideb_homing_speed();
-        vx = facing * speed;
+        dx = global48; // stick X (world: -1 left .. 1 right)
+        dy = global32; // stick Y (-1 down .. 1 up)
+        if (dx * dx + dy * dy < sideb_stick_deadzone() * sideb_stick_deadzone())
+        {
+            vx = facing * speed;
+            vy = 0;
+        }
+        else
+        {
+            ang = MathF(0x1, dy, dx); // atan2(dy, dx)
+            vx = MathF(0x4, ang) * speed; // cos
+            vy = MathF(0x5, ang) * speed; // sin
+            if (vx * facing < 0) // stick held backwards: turn around
+            {
+                PostureModule(0x2710);
+                PostureModule(0x2);
+            }
+        }
         KineticModule(0x11, 0x3, vx, 0); // X speed (world direction)
         KineticModule(0x10, 0x3, 0, 0);  // no braking
         KineticModule(0xb, 0x3);
-        KineticModule(0x11, 0x1, 0);     // no vertical speed
+        KineticModule(0x11, 0x1, vy);    // Y speed
         KineticModule(0xf, 0x1, 0);      // no gravity
+        KineticModule(0x14, 0x1, speed); // max fall speed = flight speed (for stick down)
         KineticModule(0xb, 0x1);
         global17 = global17 | 0x1;  // flew: slow down near the end of the swing
         return;

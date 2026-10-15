@@ -337,9 +337,12 @@ What this mod does:
      (atan2 → cos/sin × `sideb_homing_speed()`, 2.0), with no gravity.
 
    - With no opponent found (no target stored), during the same frames Kirby
-     flies **straight forward** at `sideb_homing_speed()`, with no vertical
-     speed and no gravity. If a target turns up within the window, he steers
-     at it from then on.
+     flies in the **direction the stick is held** at `sideb_homing_speed()`
+     (any angle; he turns around if it's held backwards), with no gravity.
+     The direction is read every frame of the window, so the stick at frame 5
+     sets the final direction. Stick inside `sideb_stick_deadzone()` (0.3):
+     he flies **straight forward** with no vertical speed. If a target turns
+     up within the window, he steers at it from then on.
    - `sideb_bounce_update()`, also called from `func_2467` (before the
      steering): the first time the air swing hits a hurtbox
      (`AttackModule(0x2727, 0x2)`), Kirby gets `sideb_bounce_back()` (0.8)
