@@ -70574,7 +70574,10 @@ void sideb_air_reset()
 // ===================================================================
 float throw_drop_frame_f()  { return 32.0f; } // forward throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
 float throw_drop_frame_hi() { return 30.0f; } // up throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
-float throw_drop_speed()    { return 3.0f; }  // fall speed while dropping
+float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the drop
+float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
+float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
+float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -70624,9 +70627,19 @@ void throw_drop_update()
             MotionModule(0x4, 1.0f); // animation runs again
             return;
         }
-        down = throw_drop_speed();
+        // accelerate: current fall speed + throw_drop_accel(), at least the start speed, capped
+        down = -KineticModuleF(0x1, 0x1) + throw_drop_accel();
+        if (down < throw_drop_speed())
+        {
+            down = throw_drop_speed();
+        }
+        if (down > throw_drop_max())
+        {
+            down = throw_drop_max();
+        }
         KineticModule(0x11, 0x1, -down);
         KineticModule(0xf, 0x1, 0);
+        KineticModule(0x14, 0x1, down); // let the speed go past Kirby's normal max fall speed
         KineticModule(0xb, 0x1);
         return;
     }
@@ -70675,6 +70688,7 @@ int throw_finish_update()
 {
     int kind;
     float release;
+    float down;
     if (global4 != 0xdc)
     {
         return 0;
@@ -70700,6 +70714,16 @@ int throw_finish_update()
             if (global18 == 0x2)
             {
                 KineticModule(0, 0x13);
+                if (kind == 0x7a) // up throw spike: send Kirby down hard after the hitbox
+                {
+                    down = throw_finish_down_hi();
+                    KineticModule(0, 0xa);
+                    KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);
+                    KineticModule(0x11, 0x1, -down);
+                    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // normal gravity
+                    KineticModule(0x14, 0x1, down);                      // allow falling faster than usual
+                    KineticModule(0xb, 0x1);
+                }
                 func_16(0xe, 0); // fall
             }
             else

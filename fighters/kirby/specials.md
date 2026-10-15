@@ -518,3 +518,15 @@ Damage and knockback are the same as the normal throw.
   uses to consume an A press: `ControlModule(0x271B)`,
   `ControlModule(0x271F)`, and zeroing `global24/31/29/45/38`. This stops the
   press from also starting an aerial or special in the following Fall.
+
+### Throw drop acceleration and up-throw spike momentum
+
+- While dropping in the loop, Kirby's fall speed grows by
+  `throw_drop_accel()` (0.3) each frame, starting at `throw_drop_speed()`
+  (3.0) and capped at `throw_drop_max()` (12). The max fall speed limit is
+  raised to match while dropping.
+- Up throw finisher (spike): once the opponent is released, Kirby gets
+  `throw_finish_down_hi()` (7.0) downward speed, with normal gravity and a
+  raised max fall speed, then goes into Fall. If Fall clamps it back to his
+  normal max fall speed, the effect is weaker than intended. Report it and
+  it can be held for a few frames instead.
