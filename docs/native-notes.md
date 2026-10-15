@@ -139,7 +139,7 @@ switches on the copy kind cached in the specializer (`+0xB9CC`):
 - anything else returns.
 
 So a search box only produces a homing target for Kirby with the Sonic copy
-in status `0x192`. The patch that opens this up to side B (`0x153`) is listed
+in status `0x192`. The patch that opens this up to side B (air swing `0x171`) is listed
 in `fighters/kirby/specials.md`.
 
 ### 4. Status flow of Kirby's Sonic copy (MSC side, for reference)

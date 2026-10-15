@@ -302,51 +302,50 @@ What this mod does:
 
 1. **RPX patch** (in `build/cross_f.rpx`, together with the star missile
    count) sends search hits to that Sonic search code for Kirby with no copy
-   (or a copy without its own search code). It also lets Kirby's side-B
-   start status `0x153` capture targets, as well as `0x192`. Sonic and
-   Kirby's real Sonic copy behave as before.
-2. **MSC** (`sideb_homing_update()`, end of `kirby.c`, called from the
-   side-B start loop `func_2430`):
-   - On the first frame of `0x153`, it sets the target floats to a far-away
+   (or a copy without its own search code). It also lets Kirby's air side-B
+   swing status `0x171` capture targets, as well as `0x192`. Sonic and Kirby's
+   real Sonic copy behave as before.
+2. **ACMD:** the search box is in the air swing animation `specialairs`
+   (motion `0x2C1`, played by `func_2468` in status `0x171`) at frame 0. It's
+   an exact copy of Sonic's `specialnsearch` box:
+   `Search_Collision(0, 0, 0, size 75, 0, 10, 10, 2, 3, 3, 0, 9, 1, 0, 1, 0, 0)`.
+   No ACMD change is needed.
+3. **MSC** (end of `kirby.c`):
+   - `sideb_homing_init()`, called at the top of the swing main `func_2466`
+     (before the motion and search box start), sets the target to a far-away
      point (99999). The search code keeps whichever hit is nearer, so the
-     first real hit replaces it. Side B already uses `0x2100000D` as
-     "motion started", so that flag can't mean "target found" here.
-   - In the air, from frame `sideb_homing_frame()` (12): if a target is
-     stored (X < 90000), it turns Kirby to face it. It then sets his speed
-     toward it (atan2 → cos/sin × `sideb_homing_speed()`, 2.0) with no
-     gravity.
+     first real hit replaces it. Side B uses `0x2100000D` as "motion
+     started", so that flag can't mean "target found".
+   - `sideb_homing_update()`, called from the swing loop `func_2467`, runs in
+     the air from frame `sideb_homing_frame()` (1) to
+     `sideb_homing_end_frame()` (27, end of the 2nd hitbox). If a target is
+     stored (X < 90000), it turns Kirby to face it and sets his speed toward it
+     (atan2 → cos/sin × `sideb_homing_speed()`, 2.0), with no gravity.
 
-The search box must be active **in the side-B start animation** (status
-`0x153`). Hits in other statuses are ignored. Steering only happens in
-`0x153`; once Kirby goes into the hold-fall (`0x16F`) or swing (`0x171`),
-normal movement takes over.
+Earlier versions used the start status `0x153`. That was wrong: the search
+box isn't in the start animation (`specialairsstart`, `0x28D`), so nothing
+was ever captured.
 
-Settings: `sideb_homing_enabled()`, `sideb_homing_frame()`,
-`sideb_homing_speed()`, `sideb_homing_debug()`.
+Debug modes (`sideb_homing_debug()`) use only speed calls (proven by the
+side-B hop). The earlier camera-shake signal was never real.
 
-Debug modes use only speed calls (proven by the side-B hop). The earlier
-camera-shake signal was never confirmed: the shake the user saw came from
-another move.
-
-- `1`: from the steering frame, Kirby **freezes** in the air while no target
-  is stored. Freezes = the code runs but nothing was captured (search box or
-  RPX side). Flies at an opponent = everything works. Neither = the code
-  isn't reached.
-- `2`: **fake target**, 40 units ahead and 20 up from where side B started.
-  Kirby should fly there. This tests the steering alone, without the
-  search box or the RPX patch.
-
-If mode 1 freezes, compare the hand-made search box with the one the
-vanilla Sonic copy uses: Kirby's ACMD script `SpecialNSearch` (started by
-`BattleObject(0x405)` in `func_3469`). Its target/collision settings decide
-whether opponents are found at all.
+- `1`: during the steering frames, Kirby **freezes** in the air while no
+  target is stored. Freezes = the code runs but nothing was captured.
+  Flies at an opponent = everything works. Neither = the code isn't reached.
+- `2`: **fake target**, 40 units ahead and 20 up from where the swing
+  started. Tests the steering alone.
 
 Known limits:
 - Copy abilities with their own search code (kinds `0x16`, `0x1C`, `0x2A`,
   `0x2B`) still use theirs, so side B won't capture with those copies.
-- With the patch, a search box hit in Kirby's neutral-B status `0x152` also
-  stores a target (Sonic's code accepts `0x152` for anyone). It's harmless
-  unless a neutral-B script uses those floats or `0x2100000D`.
+- With the patch, inhale's own search boxes (motions `0x211`–`0x217`) now
+  also reach the Sonic code in status `0x152`, which Sonic's code accepts for
+  anyone. There it writes `0x1000006`/`7` and sets `0x2100000D`. Inhale's
+  scripts use `0x2100000D` only as "motion started" and set it on the first
+  frame anyway, so this should be harmless.
+
+To read or check ACMD: `python3 tools/acmd.py dump game.bin specialairs`, or
+`python3 tools/acmd.py find game.bin Search_Collision`.
 
 ### RPX patch (apply to the original `cross_f.rpx`)
 
@@ -354,7 +353,7 @@ Known limits:
 python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
   0x10136C58=5 \
   0x2EFB518=0x60000000 0x2F00194=0x38800022 0x2F00198=0x48000034 0x2F001C8=0x4082FFCC \
-  0x2F7E550=0x38000001 0x2F7E560=0x3808FEAD 0x2F7E564=0x3908FE6E 0x2F7E568=0x7C0041D6 \
+  0x2F7E550=0x38000001 0x2F7E560=0x3808FE8F 0x2F7E564=0x3908FE6E 0x2F7E568=0x7C0041D6 \
   0x2F7E574=0x60000000 0x2F7E590=0x408201EC
 ```
 
@@ -365,11 +364,11 @@ python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
 | `0x02F00198` | `lfs` | `b 0x02F001CC` | …and call Sonic's search-hit code |
 | `0x02F001C8` | `bne 0x02F00430` | `bne 0x02F00194` | unhandled copies above `0x22` too |
 | `0x02F7E550` | `li r0, 0` | `li r0, 1` | r0 = 0 now means "status matches" |
-| `0x02F7E560` | `cmpwi r8, 0x192` | `addi r0, r8, -0x153` | |
+| `0x02F7E560` | `cmpwi r8, 0x192` | `addi r0, r8, -0x171` | |
 | `0x02F7E564` | `bne` | `addi r8, r8, -0x192` | |
-| `0x02F7E568` | `li r0, 1` | `mullw r0, r0, r8` | r0 = (status-0x153)·(status-0x192) |
+| `0x02F7E568` | `li r0, 1` | `mullw r0, r0, r8` | r0 = (status-0x171)·(status-0x192) |
 | `0x02F7E574` | `clrlwi r0, r0, 24` | `nop` | test the whole product |
 | `0x02F7E590` | `beq` | `bne` | skip unless the product is 0 |
 
-To use a different status than `0x153`, change the `-0x153` in
+To use a different status than `0x171`, change the `-0x171` in
 `0x2F7E560` (`0x3808` followed by the 16-bit negative status).

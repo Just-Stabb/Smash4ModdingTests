@@ -40243,8 +40243,6 @@ void func_2430()
         return; // skip the ground/air swap at the bottom this frame, it would reset these speeds
     }
 
-    sideb_homing_update(); // tracking (added), see the end of the file
-
     // Hitbox connected with hurtbox
     if (AttackModule(0x2727, 0x2))
     {
@@ -40826,6 +40824,7 @@ int func_2465()
 // [SpecialSSwing 0x171] main: swing
 void func_2466()
 {
+    sideb_homing_init(); // tracking (added): reset the target before the search box can hit
     WorkModule(0x2711, 0x2100000d);
     func_2468();
     if (global18 == 0)
@@ -40839,6 +40838,7 @@ void func_2466()
 // [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
+    sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70145,30 +70145,52 @@ void starmissile_fire(int bone)
 }
 
 // ===================================================================
-// Side-B tracking (added). Used by func_2430 (side-B start, 0x153).
-// Needs build/cross_f.rpx (see fighters/kirby/README.md): with that RPX, a search box
-// hit while Kirby is in status 0x153 runs the Sonic copy's search code, which stores the
+// Side-B tracking (added). Air swing (0x171): init from func_2466, steering from func_2467.
+// Needs build/cross_f.rpx (see fighters/kirby/specials.md): with that RPX, a search box
+// hit while Kirby is in status 0x171 runs the Sonic copy's search code, which stores the
 // hit opponent's position in status floats 0x1000006 (X) / 0x1000007 (Y) and keeps the
-// nearest one. This code then steers Kirby at that point.
+// nearest one. The search box is in the ACMD of the air swing animation (specialairs, 0x2C1).
 // ===================================================================
-int   sideb_homing_enabled() { return 1; }     // 0 = off
-float sideb_homing_frame()   { return 12.0f; } // frame of 0x153 to start steering (the hop is at frame 10)
-float sideb_homing_speed()   { return 2.0f; }  // flight speed while steering
+int   sideb_homing_enabled()   { return 1; }     // 0 = off
+float sideb_homing_frame()     { return 1.0f; }  // first frame of the swing to steer on
+float sideb_homing_end_frame() { return 27.0f; } // stop steering after this frame (2nd hitbox ends at 27)
+float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
 // Debug (uses only speed calls, which are known to work from the side-B hop):
 //   0 = off
-//   1 = from the steering frame, Kirby FREEZES in the air while no target is stored.
+//   1 = while steering frames run, Kirby FREEZES in the air if no target is stored.
 //       Freezes = this code runs but the search box stored nothing. Flies at someone = works.
 //       Neither = this code isn't reached.
-//   2 = fake target: a point 40 units ahead and 20 up from where side B started.
+//   2 = fake target: a point 40 units ahead and 20 up from where the swing started.
 //       Kirby should fly there. Tests the steering without the search box / RPX patch.
-int   sideb_homing_debug()   { return 1; }
+int   sideb_homing_debug()     { return 1; }
 
-// [Side-B tracking] called every frame from the side-B start loop (func_2430).
+// [Side-B tracking] swing main (func_2466): "no target yet" = a point far away. The search
+// code keeps whichever hit is nearer than the stored point, so any real hit replaces it.
+void sideb_homing_init()
+{
+    int debug;
+    float facing;
+    float tx;
+    float ty;
+    WorkModule(0, 99999.0f, 0x1000006);
+    WorkModule(0, 99999.0f, 0x1000007);
+    debug = sideb_homing_debug();
+    if (debug == 0x2)
+    {
+        facing = PostureModuleF(0);
+        tx = PostureModuleF(0x1) + facing * 40.0f;
+        ty = PostureModuleF(0x2) + 20.0f;
+        WorkModule(0, tx, 0x1000006);
+        WorkModule(0, ty, 0x1000007);
+    }
+}
+
+// [Side-B tracking] swing loop (func_2467), every frame.
 void sideb_homing_update()
 {
     int enabled;
     int debug;
-    float frame_gate;
+    float frame;
     float tx;
     float ty;
     float dx;
@@ -70183,34 +70205,20 @@ void sideb_homing_update()
     {
         return;
     }
-    if (global4 != 0x153)
+    if (global4 != 0x171)
     {
-        return;
-    }
-    // First frame of the status: "no target yet" = a point far away. The search code keeps
-    // whichever hit is nearer than the stored point, so any real hit replaces it.
-    if (!WorkModule(0x10, 0x21000020))
-    {
-        WorkModule(0, 99999.0f, 0x1000006);
-        WorkModule(0, 99999.0f, 0x1000007);
-        debug = sideb_homing_debug();
-        if (debug == 0x2)
-        {
-            facing = PostureModuleF(0);
-            tx = PostureModuleF(0x1) + facing * 40.0f;
-            ty = PostureModuleF(0x2) + 20.0f;
-            WorkModule(0, tx, 0x1000006);
-            WorkModule(0, ty, 0x1000007);
-        }
-        WorkModule(0x2710, 0x21000020);
         return;
     }
     if (global18 != 0x2) // only steer in the air
     {
         return;
     }
-    frame_gate = sideb_homing_frame();
-    if (MotionModuleF(0x1) < frame_gate)
+    frame = MotionModuleF(0x1);
+    if (frame < sideb_homing_frame())
+    {
+        return;
+    }
+    if (frame > sideb_homing_end_frame())
     {
         return;
     }
@@ -70251,5 +70259,4 @@ void sideb_homing_update()
     KineticModule(0xf, 0x1, 0);      // no gravity while steering
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
-
 }

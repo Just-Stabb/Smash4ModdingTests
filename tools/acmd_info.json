@@ -1,0 +1,9935 @@
+{
+"_source": "Generated from SALT (Sammi Husky, MIT license) Scripting/AnimCMD/CMD_INFO.cs",
+"commands": {
+"99CF7BE6": {
+"size": 1,
+"name": "NOP",
+"format": [],
+"syntax": []
+},
+"37784F8D": {
+"size": 1,
+"name": "ADD_FLOAT",
+"format": [],
+"syntax": []
+},
+"A873499D": {
+"size": 3,
+"name": "ADD_INT",
+"format": [
+0,
+3
+],
+"syntax": [
+"Value",
+"Variable"
+]
+},
+"3CFB7580": {
+"size": 4,
+"name": "ADD_POS",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F1FBEFEE": {
+"size": 3,
+"name": "Add_Momentum",
+"format": [
+1,
+1
+],
+"syntax": [
+"Horizontal",
+"Vertical"
+]
+},
+"663DE182": {
+"size": 3,
+"name": "ADD_SPEED_NO_LIMIT",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"6F4AACA8": {
+"size": 24,
+"name": "AFTER_IMAGE2_ON",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E07CF8BB": {
+"size": 24,
+"name": "AFTER_IMAGE2_ON_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D7F6CBCD": {
+"size": 27,
+"name": "Sword_Glow",
+"format": [
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Color",
+"unknown",
+"BlurLength",
+"Bone1",
+"X",
+"Y",
+"Z",
+"Bone2",
+"X",
+"Y",
+"Z",
+"Anchored",
+"Graphic",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"11097635": {
+"size": 27,
+"name": "AFTER_IMAGE3_ON_ATTACH_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"73E2040C": {
+"size": 28,
+"name": "unk_73E2040C",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F707ECF8": {
+"size": 27,
+"name": "AFTER_IMAGE3_ON_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2953BFDE": {
+"size": 28,
+"name": "unk_2953BFDE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"6539137D": {
+"size": 2,
+"name": "Terminate_Sword_Glow",
+"format": [
+0
+],
+"syntax": [
+"FadeTime"
+]
+},
+"887B430A": {
+"size": 21,
+"name": "Sword_Trace",
+"format": [
+0,
+1,
+0,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1
+],
+"syntax": [
+"TraceID",
+"BlurLen",
+"Bone1",
+"X",
+"Y",
+"Z",
+"Bone2",
+"X",
+"Y",
+"Z",
+"Anchored",
+"Graphic",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Length"
+]
+},
+"50118FAF": {
+"size": 21,
+"name": "AFTER_IMAGE_ON_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"79380B43": {
+"size": 10,
+"name": "AREA_WIND_2ND",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FE73ACAA": {
+"size": 9,
+"name": "AREA_WIND_2ND_RAD",
+"format": [
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3C95CD87": {
+"size": 10,
+"name": "Aesthetic_Wind_Effect2",
+"format": [
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"14C10D92": {
+"size": 11,
+"name": "Aesthetic_Wind_Effect",
+"format": [
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D5D67F56": {
+"size": 2,
+"name": "Terminate_Wind_Effect",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"7698BB42": {
+"size": 3,
+"name": "ATK_CATEGORY",
+"format": [
+0,
+0
+],
+"syntax": [
+"ID",
+"HitBits"
+]
+},
+"FF379EB6": {
+"size": 2,
+"name": "Remove_Hitbox",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"9245E1A8": {
+"size": 1,
+"name": "Remove_All_Hitboxes",
+"format": [],
+"syntax": []
+},
+"5C44F13A": {
+"size": 6,
+"name": "Intensity_Throw_Applier",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"A3A28BE3": {
+"size": 6,
+"name": "ATK_HIT_ABS_VV",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D7645E49": {
+"size": 6,
+"name": "ATK_HIT_ABS_WC",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"BAB9BAA2": {
+"size": 6,
+"name": "ATK_HIT_ABS_WV",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"CDBE8A34": {
+"size": 6,
+"name": "Special_Throw_Applier",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"E634F701": {
+"size": 2,
+"name": "ATK_KEEP_RUMBLE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"CC26B487": {
+"size": 3,
+"name": "ATK_LERP",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"7A128321": {
+"size": 2,
+"name": "ATK_LERP_RATIO",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"1AFDA8E6": {
+"size": 6,
+"name": "Move_Hitbox",
+"format": [
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"NewBone",
+"X",
+"Y",
+"Z"
+]
+},
+"FC1C2985": {
+"size": 2,
+"name": "unk_FC1C2985",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"8B925A6C": {
+"size": 2,
+"name": "unk_8B925A6C",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"DD526C98": {
+"size": 3,
+"name": "unk_DD526C98",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"DFA4517A": {
+"size": 3,
+"name": "Change_Hitbox_Damage",
+"format": [
+0,
+1
+],
+"syntax": [
+"ID",
+"Damage"
+]
+},
+"932D9A40": {
+"size": 3,
+"name": "ATK_POWER_ADD",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"C735C806": {
+"size": 2,
+"name": "ATK_POWER_MUL",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"6EFB0DB3": {
+"size": 2,
+"name": "ATK_POWER_MUL_STATUS",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AC811479": {
+"size": 3,
+"name": "ATK_REFERENCE_NODE",
+"format": [
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown"
+]
+},
+"A1B6E607": {
+"size": 6,
+"name": "ATK_RESERVE",
+"format": [
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"Bone",
+"X",
+"Y",
+"Z"
+]
+},
+"684264C9": {
+"size": 3,
+"name": "Change_Hitbox_Size",
+"format": [
+0,
+1
+],
+"syntax": [
+"ID",
+"Size"
+]
+},
+"7B1D9276": {
+"size": 2,
+"name": "ATK_SLEEP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"B0777995": {
+"size": 3,
+"name": "ATK_WHOLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"B738EABD": {
+"size": 25,
+"name": "Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFX",
+"Ground/Air",
+"Direct/Indirect",
+"Type"
+]
+},
+"FAA85333": {
+"size": 18,
+"name": "Throw_Specifier2",
+"format": [
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Effect",
+"Unknown",
+"Hitlag",
+"Unknown",
+"SFXLevel",
+"SFXType",
+"FacingRestriction",
+"DisableHitlag",
+"Unknown",
+"Type"
+]
+},
+"321297B0": {
+"size": 24,
+"name": "Intensity_Throw_Specifier",
+"format": [
+0,
+0,
+1,
+1,
+0,
+0,
+1,
+0,
+1,
+0,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Damage",
+"Damage2",
+"Angle",
+"KBG",
+"KBG2",
+"WBKB",
+"WBKB2",
+"BKB",
+"BKB2",
+"Effect?",
+"Unknown",
+"Hitlag",
+"Unknown",
+"SFXLevel",
+"SFXType",
+"FacingRestriction",
+"DisableHitlag",
+"Type",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"2988D50F": {
+"size": 28,
+"name": "Extended_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"X2",
+"Y2",
+"Z2"
+]
+},
+"ED67D5DA": {
+"size": 28,
+"name": "Extended_Collateral_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"X2",
+"Y2",
+"Z2"
+]
+},
+"14FCC7E4": {
+"size": 42,
+"name": "Special_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"StretchToggle"
+]
+},
+"7640AEEB": {
+"size": 42,
+"name": "ATTACK_FP_ATKW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"StretchToggle"
+]
+},
+"7075DC5A": {
+"size": 44,
+"name": "Extended_Special_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"X2",
+"Y2",
+"Z2"
+]
+},
+"633DECC0": {
+"size": 44,
+"name": "ATTACK_FP_CAPSULE_IGNORE_THROW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3DF66202": {
+"size": 50,
+"name": "Intensity_Extended_Special_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+1,
+0,
+0,
+1,
+0,
+1,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Damage2",
+"Angle",
+"KBG",
+"KBG2",
+"WBKB",
+"WBKB2",
+"BKB",
+"BKB2",
+"Size",
+"Size2",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"X2",
+"Y2",
+"Z2",
+"Unknown"
+]
+},
+"97E2CEAA": {
+"size": 42,
+"name": "ATTACK_FP_IGNORE_THROW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"BD04BDC3": {
+"size": 42,
+"name": "ATTACK_FP_IND",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"C93DA32A": {
+"size": 42,
+"name": "Special_Hitbox2",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"StretchToggle"
+]
+},
+"126AB61D": {
+"size": 48,
+"name": "Intensity_Special_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+1,
+0,
+0,
+1,
+0,
+1,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Damage2",
+"Angle",
+"KBG",
+"KBG2",
+"WBKB",
+"WBKB2",
+"BKB",
+"BKB2",
+"Size",
+"Size2",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"Unknown"
+]
+},
+"CC7CC705": {
+"size": 25,
+"name": "Collateral_Hitbox",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits"
+]
+},
+"DBDDC840": {
+"size": 25,
+"name": "ATTACK_IND",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"4E94C51B": {
+"size": 1,
+"name": "ATTACK_SE",
+"format": [],
+"syntax": []
+},
+"AEAE97FF": {
+"size": 3,
+"name": "ATTACK_SET_ATTACK_LEVEL",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"7D1058C3": {
+"size": 2,
+"name": "ATTACK_SET_CHECK_BACK",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"7F55AAA2": {
+"size": 2,
+"name": "ATTACK_SET_CHECK_FRONT",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"D41DF827": {
+"size": 2,
+"name": "ATTACK_SET_CHECK_FRONT_LR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"B09F03B2": {
+"size": 3,
+"name": "unk_B09F03B2",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"37CA2121": {
+"size": 2,
+"name": "unk_37CA2121",
+"format": [
+1
+],
+"syntax": [
+"Unknown"
+]
+},
+"83197B9A": {
+"size": 3,
+"name": "Set_Weight_Hitbox",
+"format": [
+0,
+0
+],
+"syntax": [
+"ID",
+"Flag"
+]
+},
+"853CD75E": {
+"size": 2,
+"name": "Set_Weight_All_Hitboxes",
+"format": [
+0
+],
+"syntax": [
+"Flag"
+]
+},
+"34094BD6": {
+"size": 3,
+"name": "Set_Weight_Gravity_Fallspeed_Hitbox",
+"format": [
+0,
+0
+],
+"syntax": [
+"ID",
+"Frames"
+]
+},
+"6F52E135": {
+"size": 2,
+"name": "Set_Weight_Gravity_Fallspeed_All_Hitboxes",
+"format": [
+0
+],
+"syntax": [
+"Frames"
+]
+},
+"F615B1D5": {
+"size": 1,
+"name": "ATTACK_SE_2",
+"format": [],
+"syntax": []
+},
+"81128143": {
+"size": 1,
+"name": "ATTACK_SE_3",
+"format": [],
+"syntax": []
+},
+"0932EE6F": {
+"size": 1,
+"name": "ATTACK_STRENGTH",
+"format": [],
+"syntax": []
+},
+"D5413340": {
+"size": 1,
+"name": "BORN_ITEM",
+"format": [],
+"syntax": []
+},
+"FA1BC28A": {
+"size": 2,
+"name": "CALL",
+"format": [
+0
+],
+"syntax": [
+"Hash"
+]
+},
+"4E761504": {
+"size": 2,
+"name": "CAMERA_SET_UPDATE_POS",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"20DB2106": {
+"size": 3,
+"name": "CAM_OFFSET",
+"format": [
+0,
+1
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"89CE242B": {
+"size": 5,
+"name": "Set_Camera_Boundaries",
+"format": [
+1,
+1,
+1,
+1
+],
+"syntax": [
+"Front",
+"Back",
+"Top",
+"Bottom"
+]
+},
+"5DCECD64": {
+"size": 1,
+"name": "CAM_RESET",
+"format": [],
+"syntax": []
+},
+"EBC717C8": {
+"size": 2,
+"name": "CAM_ZOOM_IN",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"F0EF4C5F": {
+"size": 12,
+"name": "CAM_ZOOM_IN_FINAL",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+3,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E940DCC2": {
+"size": 6,
+"name": "Camera_Closeup",
+"format": [
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ZoomTime",
+"Unknown",
+"Distance",
+"XRot",
+"YRot"
+]
+},
+"70498D78": {
+"size": 7,
+"name": "unk_70498D78",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"86EB40DD": {
+"size": 1,
+"name": "Normal_Camera",
+"format": [],
+"syntax": []
+},
+"C565EF20": {
+"size": 3,
+"name": "End_Screen_Tint",
+"format": [
+0,
+0
+],
+"syntax": [
+"ID",
+"TransitionOutTime"
+]
+},
+"4E9D74B0": {
+"size": 1,
+"name": "CASE",
+"format": [],
+"syntax": []
+},
+"323FB9D4": {
+"size": 11,
+"name": "Grab_Collision3",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Part",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"HitBits",
+"Air/Ground",
+"unknown",
+"unknown"
+]
+},
+"B0AF39A6": {
+"size": 1,
+"name": "Terminate_Instance",
+"format": [],
+"syntax": []
+},
+"8EB98BE7": {
+"size": 1,
+"name": "Terminate_Time_Manipulation",
+"format": [],
+"syntax": []
+},
+"08E67529": {
+"size": 2,
+"name": "Disallow_Vertical_Movement",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"692BBCFA": {
+"size": 1,
+"name": "CLR_SPEED_ALL",
+"format": [],
+"syntax": []
+},
+"5C3C583E": {
+"size": 1,
+"name": "Terminate_Overlays",
+"format": [],
+"syntax": []
+},
+"F3DD4ACD": {
+"size": 2,
+"name": "COL_PRI",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"F45595A1": {
+"size": 2,
+"name": "Set_Edge_Slide",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"950AEFC5": {
+"size": 2,
+"name": "Generate_Item",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"2F08F54F": {
+"size": 2,
+"name": "Remove_Grab_Collision",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"F3A464AC": {
+"size": 1,
+"name": "Remove_All_Grab_Collisions",
+"format": [],
+"syntax": []
+},
+"ACF3111A": {
+"size": 1,
+"name": "CTH_SIZE",
+"format": [],
+"syntax": []
+},
+"CA7748A5": {
+"size": 1,
+"name": "DAMAGEFLY_SE",
+"format": [],
+"syntax": []
+},
+"55205F20": {
+"size": 2,
+"name": "unk_55205F20",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"D741B7F5": {
+"size": 1,
+"name": "DAMAGE_SE",
+"format": [],
+"syntax": []
+},
+"DC1BFEC5": {
+"size": 1,
+"name": "DEFAULT",
+"format": [],
+"syntax": []
+},
+"237C9486": {
+"size": 1,
+"name": "DETACH",
+"format": [],
+"syntax": []
+},
+"96FDA1F0": {
+"size": 1,
+"name": "unk_96FDA1F0",
+"format": [],
+"syntax": []
+},
+"887C2271": {
+"size": 1,
+"name": "DISABLE_GOLD_EYE",
+"format": [],
+"syntax": []
+},
+"6A441545": {
+"size": 17,
+"name": "DOWN_EFFECT",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"EE1BAF5F": {
+"size": 19,
+"name": "DOWN_EFFECT_FLIP",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7B105723": {
+"size": 1,
+"name": "DROP_ATTACH_ITEM_GROUP",
+"format": [],
+"syntax": []
+},
+"7E30F0D5": {
+"size": 1,
+"name": "DROP_ITEM",
+"format": [],
+"syntax": []
+},
+"3F6B0175": {
+"size": 1,
+"name": "EAT_SE",
+"format": [],
+"syntax": []
+},
+"46985674": {
+"size": 17,
+"name": "Graphic_Effect2",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
+]
+},
+"868F5AC3": {
+"size": 18,
+"name": "Graphic_Effect7",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"Unknown"
+]
+},
+"D8D9A901": {
+"size": 18,
+"name": "EFFECT_ATTR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"30392B40": {
+"size": 20,
+"name": "EFFECT_COLOR",
+"format": [
+0,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"Graphic",
+"Bone",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E3C26DB5": {
+"size": 20,
+"name": "EFFECT_COLOR_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"C81F667E": {
+"size": 5,
+"name": "EFFECT_CONTINUAL",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"6F2F2212": {
+"size": 2,
+"name": "EFFECT_CONTINUAL_OFF",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"29BC5960": {
+"size": 3,
+"name": "EFFECT_DETACH_KIND",
+"format": [
+0,
+0
+],
+"syntax": [
+"Graphic",
+"unknown"
+]
+},
+"9FCB5AD5": {
+"size": 3,
+"name": "EFFECT_DETACH_KIND_WORK",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"46596E40": {
+"size": 19,
+"name": "EFFECT_FLIP",
+"format": [
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"46C4655C": {
+"size": 20,
+"name": "EFFECT_FLIP_ALPHA",
+"format": [
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+1
+],
+"syntax": [
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F07214DF": {
+"size": 22,
+"name": "EFFECT_FLIP_COLOR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"089EBF6C": {
+"size": 11,
+"name": "External_Graphic_Effect2",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
+]
+},
+"51BF42D5": {
+"size": 11,
+"name": "unk_51BF42D5",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D98926B9": {
+"size": 11,
+"name": "unk_D98926B9",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D86F0143": {
+"size": 13,
+"name": "unk_D86F0143",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"524EF3F5": {
+"size": 11,
+"name": "unk_524EF3F5",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D4FC6AC3": {
+"size": 11,
+"name": "unk_D4FC6AC3",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FC061097": {
+"size": 11,
+"name": "External_Graphic",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
+]
+},
+"54BA7357": {
+"size": 12,
+"name": "Graphic_Effect6",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"Unknown"
+]
+},
+"E20C02D4": {
+"size": 14,
+"name": "EFFECT_FOLLOW_COLOR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7EF50766": {
+"size": 13,
+"name": "EFFECT_FOLLOW_FLIP",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"unknown"
+]
+},
+"2ED684DE": {
+"size": 14,
+"name": "EFFECT_FOLLOW_FLIP_ALPHA",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"9860F55D": {
+"size": 16,
+"name": "EFFECT_FOLLOW_FLIP_COLOR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"072D2AAD": {
+"size": 19,
+"name": "EFFECT_FOLLOW_FLIP_RND",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"9E3105F2": {
+"size": 14,
+"name": "unk_9E3105F2",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"00559051": {
+"size": 15,
+"name": "unk_00559051",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"EF4016CA": {
+"size": 18,
+"name": "EFFECT_FOLLOW_LIGHT",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"0EDC8BFD": {
+"size": 11,
+"name": "Graphic_Effect4",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
+]
+},
+"61A23DF6": {
+"size": 13,
+"name": "EFFECT_FOLLOW_NO_STOP_FLIP",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"99CC9AF2": {
+"size": 11,
+"name": "EFFECT_FOLLOW_NO_STOP_SLOW_ALL",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D5FC182B": {
+"size": 14,
+"name": "EFFECT_FOLLOW_NO_STOP_WITH_HANDLE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FA435729": {
+"size": 12,
+"name": "unk_FA435729",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"1CB9BEE8": {
+"size": 17,
+"name": "Graphic_Effect5",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
+]
+},
+"F10FD85A": {
+"size": 17,
+"name": "EFFECT_FOLLOW_RND_WORK",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"59829B55": {
+"size": 11,
+"name": "EFFECT_FOLLOW_STR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"ED85CA70": {
+"size": 13,
+"name": "EFFECT_FOLLOW_STRENGTH",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"4261788B": {
+"size": 12,
+"name": "EFFECT_FOLLOW_SYNC_PARENT",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FC4BE069": {
+"size": 11,
+"name": "EFFECT_FOLLOW_UNSYNC_VIS_WHOLE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"1D9C1ECE": {
+"size": 12,
+"name": "EFFECT_FOLLOW_WITH_HANDLE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"B7458BB3": {
+"size": 11,
+"name": "EFFECT_FOLLOW_WORK",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"unknown"
+]
+},
+"0A539357": {
+"size": 12,
+"name": "unk_0A539357",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"935AC2ED": {
+"size": 13,
+"name": "unk_935AC2ED",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7C37DF64": {
+"size": 9,
+"name": "EFFECT_GLOBAL",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"CF86D9CB": {
+"size": 9,
+"name": "EFFECT_GLOBAL_FOLLOW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3D753F5E": {
+"size": 24,
+"name": "EFFECT_LIGHT",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D5F5735F": {
+"size": 3,
+"name": "EFFECT_LIGHT_END",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"5A3B874D": {
+"size": 3,
+"name": "EFFECT_OFF",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"CC635654": {
+"size": 1,
+"name": "EFFECT_OFF_HANDLE",
+"format": [],
+"syntax": []
+},
+"E8F38CA3": {
+"size": 4,
+"name": "Terminate_Graphic_Effect",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Graphic",
+"unknown",
+"unknown"
+]
+},
+"89D3AD87": {
+"size": 4,
+"name": "EFFECT_OFF_KIND_WORK",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"12ABD222": {
+"size": 5,
+"name": "unk_12ABD222",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"81F5F144": {
+"size": 1,
+"name": "Pause_Graphic_Effect_Animation",
+"format": [],
+"syntax": []
+},
+"CCD48E8A": {
+"size": 2,
+"name": "EFFECT_REMOVE_ATTR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"51FA432A": {
+"size": 3,
+"name": "unk_51FA432A",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"0CA3C450": {
+"size": 2,
+"name": "EFFECT_REMOVE_COMMON",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"C31ABACD": {
+"size": 3,
+"name": "EFFECT_REMOVE_LINE_CIRCLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"36FA6671": {
+"size": 5,
+"name": "EFFECT_REQ_LINE_CIRCLE",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"13B7328C": {
+"size": 8,
+"name": "EFFECT_REQ_LINE_CIRCLE_OFFSET",
+"format": [
+0,
+0,
+1,
+1,
+0,
+1,
+1
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3B31D521": {
+"size": 10,
+"name": "unk_3B31D521",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F4F38447": {
+"size": 1,
+"name": "EFFECT_RESUME",
+"format": [],
+"syntax": []
+},
+"FA6CE96E": {
+"size": 17,
+"name": "EFFECT_ROTW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"056A8146": {
+"size": 19,
+"name": "EFFECT_STRENGTH",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"0141BB6A": {
+"size": 2,
+"name": "EFFECT_SYNC_SCALE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"1E42EE23": {
+"size": 18,
+"name": "EFFECT_WITH_HANDLE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"8FE9E295": {
+"size": 17,
+"name": "EFFECT_WORK",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+1,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E9396C35": {
+"size": 17,
+"name": "EFFECT_WORK_PR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"BBAD115E": {
+"size": 17,
+"name": "EFFECT_WORK_R",
+"format": [
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"31051FF6": {
+"size": 18,
+"name": "unk_31051FF6",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"4A0A135E": {
+"size": 1,
+"name": "ELIF",
+"format": [],
+"syntax": []
+},
+"632EB83F": {
+"size": 1,
+"name": "ELSE",
+"format": [],
+"syntax": []
+},
+"16945ACC": {
+"size": 42,
+"name": "unk_16945ACC",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2440EFE2": {
+"size": 16,
+"name": "EM_EFFECT_CENTER",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"332DB456": {
+"size": 16,
+"name": "EM_EFFECT_DAMAGE_CENTER",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"8E3DBED5": {
+"size": 2,
+"name": "unk_8E3DBED5",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"2C5DE016": {
+"size": 2,
+"name": "EM_STOP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4882328E": {
+"size": 2,
+"name": "ENABLE_AREA",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"606717F5": {
+"size": 1,
+"name": "ENABLE_CANCEL",
+"format": [],
+"syntax": []
+},
+"9CCFB728": {
+"size": 1,
+"name": "unk_9CCFB728",
+"format": [],
+"syntax": []
+},
+"A160AB16": {
+"size": 2,
+"name": "Disallow_Horizontal_Movement",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"965B713B": {
+"size": 1,
+"name": "END",
+"format": [],
+"syntax": []
+},
+"E46D3ADF": {
+"size": 1,
+"name": "ENDIF",
+"format": [],
+"syntax": []
+},
+"D08CFE6E": {
+"size": 1,
+"name": "ENDSWITCH",
+"format": [],
+"syntax": []
+},
+"03AA897D": {
+"size": 1,
+"name": "END_TRACE",
+"format": [],
+"syntax": []
+},
+"C026EEC4": {
+"size": 2,
+"name": "EXECUTE",
+"format": [
+1
+],
+"syntax": [
+"Unknown"
+]
+},
+"34BCD3F7": {
+"size": 4,
+"name": "Float_Compare",
+"format": [
+0,
+0,
+1
+],
+"syntax": [
+"Type",
+"Method",
+"Value"
+]
+},
+"5961371C": {
+"size": 4,
+"name": "unk_5961371C",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2E66078A": {
+"size": 4,
+"name": "unk_2E66078A",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2DA7E2B6": {
+"size": 4,
+"name": "Float_Var_Compare",
+"format": [
+3,
+0,
+1
+],
+"syntax": [
+"Variable",
+"Method",
+"Value"
+]
+},
+"407A065D": {
+"size": 4,
+"name": "unk_407A065D",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"377D36CB": {
+"size": 4,
+"name": "unk_377D36CB",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"5E6C3483": {
+"size": 4,
+"name": "Int_Compare",
+"format": [
+0,
+0,
+2
+],
+"syntax": [
+"Type",
+"Method",
+"Value"
+]
+},
+"33B1D068": {
+"size": 4,
+"name": "unk_33B1D068",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"44B6E0FE": {
+"size": 4,
+"name": "unk_44B6E0FE",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"477705C2": {
+"size": 4,
+"name": "Int_Var_Compare",
+"format": [
+3,
+0,
+0
+],
+"syntax": [
+"Variable",
+"Method",
+"Value"
+]
+},
+"2AAAE129": {
+"size": 4,
+"name": "unk_2AAAE129",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"5DADD1BF": {
+"size": 4,
+"name": "unk_5DADD1BF",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D97D2806": {
+"size": 4,
+"name": "unk_D97D2806",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A0FA2515": {
+"size": 4,
+"name": "unk_A0FA2515",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"5121D3C3": {
+"size": 4,
+"name": "unk_5121D3C3",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7FCE1BCF": {
+"size": 4,
+"name": "unk_7FCE1BCF",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"ED4B60E1": {
+"size": 2,
+"name": "unk_ED4B60E1",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"E3212177": {
+"size": 1,
+"name": "unk_E3212177",
+"format": [],
+"syntax": []
+},
+"895B9275": {
+"size": 2,
+"name": "Else",
+"format": [
+0
+],
+"syntax": [
+"Offset"
+]
+},
+"C31DF569": {
+"size": 3,
+"name": "Is_Not_Bool",
+"format": [
+0,
+0
+],
+"syntax": [
+"Offset",
+"Bool"
+]
+},
+"47810508": {
+"size": 3,
+"name": "Is_Bool",
+"format": [
+0,
+0
+],
+"syntax": [
+"Offset",
+"Bool"
+]
+},
+"870CF021": {
+"size": 2,
+"name": "False",
+"format": [
+0
+],
+"syntax": [
+"Offset"
+]
+},
+"A5BD4F32": {
+"size": 2,
+"name": "True",
+"format": [
+0
+],
+"syntax": [
+"Offset"
+]
+},
+"38A3EC78": {
+"size": 2,
+"name": "Goto",
+"format": [
+2
+],
+"syntax": [
+"Offset"
+]
+},
+"0EB375E3": {
+"size": 2,
+"name": "Set_Loop",
+"format": [
+2
+],
+"syntax": [
+"Iterations"
+]
+},
+"0F39EC70": {
+"size": 2,
+"name": "Allow/Disallow_Ledgegrab",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"3AAAF7D0": {
+"size": 9,
+"name": "Screen_Tint",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"TransitionTime",
+"Red",
+"Green",
+"Blue",
+"Alpha",
+"Duration",
+"unknown",
+"TransitionOutTime"
+]
+},
+"FE6B9F2F": {
+"size": 14,
+"name": "unk_FE6B9F2F",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"8E016BA0": {
+"size": 17,
+"name": "unk_8E016BA0",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2E8ABC2E": {
+"size": 7,
+"name": "unk_2E8ABC2E",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"598D8CB8": {
+"size": 8,
+"name": "Limited_Screen_Tint",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"TransitionInTime",
+"Red",
+"Blue",
+"Green",
+"Alpha",
+"Duration",
+"TransitionOutTime"
+]
+},
+"589A9DB3": {
+"size": 5,
+"name": "Color_Overlay",
+"format": [
+1,
+1,
+1,
+1
+],
+"syntax": [
+"Red",
+"Green",
+"Blue",
+"Alpha"
+]
+},
+"52CF42E0": {
+"size": 6,
+"name": "Change_Overlay",
+"format": [
+1,
+1,
+1,
+1,
+1
+],
+"syntax": [
+"Transition",
+"Red",
+"Green",
+"Blue",
+"Alpha"
+]
+},
+"7522830D": {
+"size": 5,
+"name": "FLASH_NO_STOP",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E46277B2": {
+"size": 1,
+"name": "FLASH_OFF",
+"format": [],
+"syntax": []
+},
+"FFF80BC2": {
+"size": 1,
+"name": "FLIP_HAVE_ITEM",
+"format": [],
+"syntax": []
+},
+"C84B610E": {
+"size": 17,
+"name": "Graphic_Effect",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
+]
+},
+"B208689A": {
+"size": 19,
+"name": "FOOT_EFFECT_FLIP",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"42ACFE7D": {
+"size": 2,
+"name": "FRAME",
+"format": [
+1
+],
+"syntax": [
+"Frames"
+]
+},
+"A5303662": {
+"size": 1,
+"name": "FRAME_CLR",
+"format": [],
+"syntax": []
+},
+"675F9D03": {
+"size": 1,
+"name": "FRAME_END",
+"format": [],
+"syntax": []
+},
+"2FD378C7": {
+"size": 1,
+"name": "FRAME_IF",
+"format": [],
+"syntax": []
+},
+"49610D3F": {
+"size": 2,
+"name": "FRAME_W",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"F7B97AC1": {
+"size": 6,
+"name": "unk_F7B97AC1",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D8DF1DCC": {
+"size": 6,
+"name": "Throw_Applier",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"DF057B20": {
+"size": 18,
+"name": "Throw_Specifier",
+"format": [
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Effect",
+"Unknown",
+"Hitlag",
+"Unknown",
+"SFXLevel",
+"SFXType",
+"FacingRestriction",
+"DisableHitlag",
+"Unknown",
+"Type"
+]
+},
+"227B36A1": {
+"size": 3,
+"name": "FT_ATTACK_ABS_CAMERA_QUAKE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"F6218798": {
+"size": 4,
+"name": "unk_F6218798",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"548F2D4C": {
+"size": 9,
+"name": "Grab_Collision",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"Action",
+"Ground/Air"
+]
+},
+"7B48FE1C": {
+"size": 12,
+"name": "Extended_Grab_Collision",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+1,
+1,
+1
+],
+"syntax": [
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"Action",
+"Ground/Air",
+"X2",
+"Y2",
+"Z2"
+]
+},
+"EF787D43": {
+"size": 13,
+"name": "Extended_Grab_Collision2",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"Action",
+"Ground/Air",
+"X2",
+"Y2",
+"Z2",
+"unknown"
+]
+},
+"46F15F52": {
+"size": 9,
+"name": "FT_CATCH_SP",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"1EAF840C": {
+"size": 10,
+"name": "Grab_Collision2",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"Action",
+"Ground/Air",
+"Unknown"
+]
+},
+"1B26C673": {
+"size": 11,
+"name": "unk_1B26C673",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E74D94EE": {
+"size": 2,
+"name": "Set_Kinetic_Handler",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"AA02262F": {
+"size": 2,
+"name": "Set_Kinetic_Handler_Aerial",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"67E8E687": {
+"size": 1,
+"name": "unk_67E8E687",
+"format": [],
+"syntax": []
+},
+"7002E722": {
+"size": 2,
+"name": "unk_7002E722",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"D014D5A8": {
+"size": 4,
+"name": "unk_D014D5A8",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D2B4D575": {
+"size": 3,
+"name": "unk_D2B4D575",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"2E9BD610": {
+"size": 3,
+"name": "FT_MOTION_ANGLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"7172A764": {
+"size": 2,
+"name": "Set_Frame_Duration",
+"format": [
+1
+],
+"syntax": [
+"Speed"
+]
+},
+"CD0C1CC9": {
+"size": 2,
+"name": "unk_CD0C1CC9",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"E2E96674": {
+"size": 4,
+"name": "unk_E2E96674",
+"format": [
+0,
+1,
+1
+],
+"syntax": [
+"ID",
+"unknown",
+"unknown"
+]
+},
+"6A5DB458": {
+"size": 1,
+"name": "unk_6A5DB458",
+"format": [],
+"syntax": []
+},
+"B2E91D0C": {
+"size": 2,
+"name": "unk_B2E91D0C",
+"format": [
+1
+],
+"syntax": [
+"unknown"
+]
+},
+"467A5ED5": {
+"size": 2,
+"name": "unk_467A5ED5",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"1B41048C": {
+"size": 10,
+"name": "unk_1B41048C",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"23A9AC4B": {
+"size": 2,
+"name": "GENERATE_ARTICLE",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"1D09E516": {
+"size": 2,
+"name": "GENERATE_ARTICLE_ENABLE",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"B459AB04": {
+"size": 3,
+"name": "unk_B459AB04",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"C35E9B92": {
+"size": 4,
+"name": "unk_C35E9B92",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"BFCBE5FF": {
+"size": 3,
+"name": "unk_BFCBE5FF",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"0A7BF1D4": {
+"size": 3,
+"name": "unk_0A7BF1D4",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"C4AF2746": {
+"size": 2,
+"name": "unk_C4AF2746",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"012C4A1B": {
+"size": 2,
+"name": "GET_PITCH",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"C7429968": {
+"size": 4,
+"name": "GET_TRACE_TARGET_POSTURE_POS",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3D29000F": {
+"size": 5,
+"name": "unk_3D29000F",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FAC3816A": {
+"size": 4,
+"name": "GET_TRACE_TARGET_VEC",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"585B1516": {
+"size": 5,
+"name": "unk_585B1516",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F7B8FD7E": {
+"size": 2,
+"name": "GET_VOLUME",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"14712DA5": {
+"size": 2,
+"name": "GROUND_COLLISION",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"8B298D04": {
+"size": 3,
+"name": "GROUND_SHAPE_FLAG",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"CEDC237E": {
+"size": 2,
+"name": "Undo_Bone_Collision",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"F13BFE8D": {
+"size": 3,
+"name": "Set_Bone_Intangibility",
+"format": [
+0,
+0
+],
+"syntax": [
+"Bone",
+"Mode"
+]
+},
+"640F63A0": {
+"size": 3,
+"name": "HIT_STOP_MUL",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"FFDD0216": {
+"size": 1,
+"name": "IF",
+"format": [],
+"syntax": []
+},
+"CE8ABAED": {
+"size": 2,
+"name": "IGNORE_BOX2D_GROUND",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AECB846B": {
+"size": 2,
+"name": "IGNORE_BOX2D_SHAPE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"8827F88C": {
+"size": 2,
+"name": "INC_INT",
+"format": [
+3
+],
+"syntax": [
+"Variable"
+]
+},
+"37852CD5": {
+"size": 1,
+"name": "INFLICTION_OFF",
+"format": [],
+"syntax": []
+},
+"D85158E4": {
+"size": 1,
+"name": "INIT_POS",
+"format": [],
+"syntax": []
+},
+"CA9052EB": {
+"size": 4,
+"name": "unk_CA9052EB",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F0B8437F": {
+"size": 2,
+"name": "INTERRUPT_BGM",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"979D8828": {
+"size": 2,
+"name": "IS_EXIST_ARTICLE",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"A21BC6EA": {
+"size": 2,
+"name": "IS_FLAG",
+"format": [
+3
+],
+"syntax": [
+"Variable"
+]
+},
+"9A5C9C1D": {
+"size": 2,
+"name": "IS_GENERATABLE_ARTICLE",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"372CCA43": {
+"size": 1,
+"name": "IS_PLAYING",
+"format": [],
+"syntax": []
+},
+"DE961532": {
+"size": 1,
+"name": "IS_PLAYING_STATUS",
+"format": [],
+"syntax": []
+},
+"CD0D7079": {
+"size": 2,
+"name": "IS_RANDOM",
+"format": [
+0
+],
+"syntax": [
+"Chance"
+]
+},
+"838B5229": {
+"size": 2,
+"name": "ITEM_ACTION",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"C3D1C317": {
+"size": 1,
+"name": "ITEM_CONSTRAINT_NODE",
+"format": [],
+"syntax": []
+},
+"A8D82049": {
+"size": 3,
+"name": "ITEM_EMPTY_SE",
+"format": [
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown"
+]
+},
+"F6D9DCF6": {
+"size": 3,
+"name": "Item_Property",
+"format": [
+0,
+1
+],
+"syntax": [
+"Unknown",
+"Unknown"
+]
+},
+"C7AF54A0": {
+"size": 2,
+"name": "IT_AI_DIR_FACTOR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"6E417C5C": {
+"size": 2,
+"name": "IT_AI_DIR_ROT_MODE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"EA4A168D": {
+"size": 2,
+"name": "IT_AI_DISTANCE_FACTOR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AA1ACDAF": {
+"size": 11,
+"name": "IT_AI_MOVE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"79CAF3BB": {
+"size": 3,
+"name": "IT_AI_MOVE_BRAKE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"ACE34E4C": {
+"size": 4,
+"name": "unk_ACE34E4C",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"B8725CDD": {
+"size": 1,
+"name": "IT_AI_MOVE_PAUSE",
+"format": [],
+"syntax": []
+},
+"50FAE2A8": {
+"size": 1,
+"name": "IT_AI_MOVE_TARGET_DIR",
+"format": [],
+"syntax": []
+},
+"E1E1175A": {
+"size": 12,
+"name": "unk_E1E1175A",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"78E846E0": {
+"size": 13,
+"name": "unk_78E846E0",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"0FEF7676": {
+"size": 14,
+"name": "unk_0FEF7676",
+"format": [
+1,
+1,
+1,
+1,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E69F056C": {
+"size": 4,
+"name": "IT_AI_ROT",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"36F14B53": {
+"size": 5,
+"name": "unk_36F14B53",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"41F67BC5": {
+"size": 6,
+"name": "unk_41F67BC5",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D8FF2A7F": {
+"size": 7,
+"name": "unk_D8FF2A7F",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"C9FAADFE": {
+"size": 2,
+"name": "IT_AI_TYPE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"A08B9A5A": {
+"size": 3,
+"name": "unk_A08B9A5A",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"D78CAACC": {
+"size": 4,
+"name": "unk_D78CAACC",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"49E83F6F": {
+"size": 5,
+"name": "unk_49E83F6F",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3EEF0FF9": {
+"size": 6,
+"name": "unk_3EEF0FF9",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A728E2C6": {
+"size": 2,
+"name": "unk_A728E2C6",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AFEA0B23": {
+"size": 4,
+"name": "IT_BASE_ROT",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D0344D95": {
+"size": 3,
+"name": "IT_CAMERA_OFFSET",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"5E25434E": {
+"size": 9,
+"name": "IT_CREATE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A6227E16": {
+"size": 8,
+"name": "IT_CREATE_ANGLE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+1,
+1
+],
+"syntax": [
+"ItemID",
+"unknown",
+"Variable1",
+"Variable2",
+"Variable3",
+"RotX",
+"RotY"
+]
+},
+"C6C035C6": {
+"size": 8,
+"name": "IT_CREATE_ANGLE_WITH_GRAVITY",
+"format": [
+0,
+0,
+0,
+0,
+0,
+1,
+1
+],
+"syntax": [
+"ItemID",
+"unknown",
+"Variable1",
+"Variable2",
+"Variable3",
+"RotX",
+"RotY"
+]
+},
+"C03BF7D9": {
+"size": 2,
+"name": "IT_DAMAGE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"9A8D6A8E": {
+"size": 2,
+"name": "IT_ENABLE_AREA",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"ED72E95A": {
+"size": 3,
+"name": "IT_FINAL_RIGHT",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"7114F253": {
+"size": 9,
+"name": "IT_GET_DIR",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"B6C47C1B": {
+"size": 11,
+"name": "unk_B6C47C1B",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A3E0DE1B": {
+"size": 10,
+"name": "unk_A3E0DE1B",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7528A2BC": {
+"size": 5,
+"name": "IT_GET_NODE_POS",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"6BA1B159": {
+"size": 4,
+"name": "unk_6BA1B159",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"6CCC7540": {
+"size": 8,
+"name": "unk_6CCC7540",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E8C8E371": {
+"size": 4,
+"name": "IT_GET_NODE_ROT",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"AAE5133F": {
+"size": 5,
+"name": "unk_AAE5133F",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F8B7B2B5": {
+"size": 6,
+"name": "IT_HIT_ABSOLUTE",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A6BCC330": {
+"size": 5,
+"name": "IT_IS_EXIST_GROUND_NO_CLIFF",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"42FAC19A": {
+"size": 2,
+"name": "IT_IS_EXIST_PERCENT",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4A606461": {
+"size": 2,
+"name": "IT_IS_RND_PERCENT",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AEE75C14": {
+"size": 1,
+"name": "IT_LOT_CREATE",
+"format": [],
+"syntax": []
+},
+"B570C933": {
+"size": 4,
+"name": "unk_B570C933",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"994CF8FF": {
+"size": 2,
+"name": "IT_MOVE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"046B0422": {
+"size": 4,
+"name": "IT_MOVE_CAMERA",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"C76174F3": {
+"size": 2,
+"name": "unk_C76174F3",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"0C89CF7B": {
+"size": 1,
+"name": "unk_0C89CF7B",
+"format": [],
+"syntax": []
+},
+"B973BE85": {
+"size": 1,
+"name": "IT_REMOVE",
+"format": [],
+"syntax": []
+},
+"CC5C3995": {
+"size": 1,
+"name": "IT_REMOVE_TARGET_ITEM",
+"format": [],
+"syntax": []
+},
+"A4826100": {
+"size": 2,
+"name": "IT_SCALE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"A75BDF91": {
+"size": 2,
+"name": "IT_SCALE_ANIM",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"B078C69A": {
+"size": 5,
+"name": "unk_B078C69A",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"65037812": {
+"size": 2,
+"name": "IT_SEARCH",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"E4824295": {
+"size": 3,
+"name": "unk_E4824295",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"93857203": {
+"size": 4,
+"name": "unk_93857203",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"0DE1E7A0": {
+"size": 5,
+"name": "unk_0DE1E7A0",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E0F4DA21": {
+"size": 2,
+"name": "IT_SET_COUNTER",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"131E5816": {
+"size": 3,
+"name": "unk_131E5816",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"451797FF": {
+"size": 3,
+"name": "IT_SET_ROT",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"43760F0D": {
+"size": 4,
+"name": "unk_43760F0D",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3E6F2200": {
+"size": 2,
+"name": "IT_SET_SE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4290DF6A": {
+"size": 3,
+"name": "unk_4290DF6A",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"FB4AE8F4": {
+"size": 3,
+"name": "SET_TEAM_OWNER",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"3880B83A": {
+"size": 4,
+"name": "IT_SHOOT",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2663C7BA": {
+"size": 2,
+"name": "IT_SLOPE_TYPE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4375BE5A": {
+"size": 3,
+"name": "Item_Time_Manipulation",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"95EAF9B0": {
+"size": 2,
+"name": "Item_Time_Manipulation_Whole",
+"format": [
+0
+],
+"syntax": [
+"Duration"
+]
+},
+"9ACCB9C8": {
+"size": 1,
+"name": "Terminate_Item_Time_Manipulation_Whole",
+"format": [],
+"syntax": []
+},
+"347BAE45": {
+"size": 2,
+"name": "IT_UNABLE_AREA",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4DFB84C9": {
+"size": 1,
+"name": "IT_UNABLE_ENERGY_ALL",
+"format": [],
+"syntax": []
+},
+"C9F899A2": {
+"size": 2,
+"name": "IT_UPDATE_TARGET",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"56A2339E": {
+"size": 4,
+"name": "unk_56A2339E",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"0E3842F2": {
+"size": 2,
+"name": "IT_WAIT_LOST",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"5A175A68": {
+"size": 8,
+"name": "IT_WINDOW",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"9126EBA2": {
+"size": 2,
+"name": "JUMP",
+"format": [
+0
+],
+"syntax": [
+"Hash"
+]
+},
+"B89F681C": {
+"size": 3,
+"name": "unk_B89F681C",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"104F0834": {
+"size": 17,
+"name": "Graphic_Effect3",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
+]
+},
+"515F97FF": {
+"size": 19,
+"name": "LANDING_EFFECT_FLIP",
+"format": [
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0
+],
+"syntax": [
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"unknown"
+]
+},
+"9D7F5D71": {
+"size": 1,
+"name": "unk_9D7F5D71",
+"format": [],
+"syntax": []
+},
+"BF72BDCA": {
+"size": 2,
+"name": "LAST_EFFECT_SET_ALPHA",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"09C4CC49": {
+"size": 4,
+"name": "LAST_EFFECT_SET_COLOR",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E6181A6B": {
+"size": 2,
+"name": "unk_E6181A6B",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"E59FB667": {
+"size": 2,
+"name": "unk_E59FB667",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"E1D78BFB": {
+"size": 2,
+"name": "unk_E1D78BFB",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"FD1F7ECF": {
+"size": 2,
+"name": "LAST_EFFECT_SET_RATE",
+"format": [
+1
+],
+"syntax": [
+"unknown"
+]
+},
+"6E332637": {
+"size": 2,
+"name": "LAST_EFFECT_SET_RATE_WORK",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"83D4A124": {
+"size": 4,
+"name": "LAST_EFFECT_SET_SCALE",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"D9CC663F": {
+"size": 4,
+"name": "LAST_EFFECT_SET_SCALE_W",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"8F27D612": {
+"size": 4,
+"name": "unk_8F27D612",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FE036C47": {
+"size": 15,
+"name": "LIGHT_AXIS",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"70FBED79": {
+"size": 5,
+"name": "LIGHT_AXIS_FRM",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2558D7F3": {
+"size": 6,
+"name": "Change_Flash_Light_Color",
+"format": [
+1,
+1,
+1,
+1,
+1
+],
+"syntax": [
+"TransitionFrames",
+"Red",
+"Blue",
+"Green",
+"Alpha"
+]
+},
+"967D4EA9": {
+"size": 1,
+"name": "LIGHT_OFF",
+"format": [],
+"syntax": []
+},
+"89A772AC": {
+"size": 7,
+"name": "Flash_Light_Effect",
+"format": [
+1,
+1,
+1,
+1,
+1,
+1
+],
+"syntax": [
+"Red",
+"Blue",
+"Green",
+"Alpha",
+"SourceX",
+"SourceY"
+]
+},
+"448BBF07": {
+"size": 1,
+"name": "unk_448BBF07",
+"format": [],
+"syntax": []
+},
+"97CAF05A": {
+"size": 1,
+"name": "LOOP",
+"format": [],
+"syntax": []
+},
+"84730CC5": {
+"size": 2,
+"name": "MATERIAL_ANIM_SET_FRAME",
+"format": [
+1
+],
+"syntax": [
+"unknown"
+]
+},
+"3A52D8B7": {
+"size": 2,
+"name": "MATERIAL_ANIM_SET_RATE",
+"format": [
+1
+],
+"syntax": [
+"unknown"
+]
+},
+"5143DD2A": {
+"size": 1,
+"name": "MII_ENABLE_RATE",
+"format": [],
+"syntax": []
+},
+"C7B586AF": {
+"size": 4,
+"name": "unk_C7B586AF",
+"format": [
+1,
+1,
+1
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"FFB519E1": {
+"size": 1,
+"name": "MII_UNABLE_RATE",
+"format": [],
+"syntax": []
+},
+"401ABFA0": {
+"size": 4,
+"name": "MODIFY_RHOMBUS",
+"format": [
+1,
+1,
+1
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"A3B1A56D": {
+"size": 2,
+"name": "MODIFY_RHOMBUS_DOWN",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"73415E57": {
+"size": 2,
+"name": "MODIFY_RHOMBUS_UP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"35C3DF13": {
+"size": 2,
+"name": "MODIFY_RHOMBUS_WIDTH",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"8C79D4D7": {
+"size": 1,
+"name": "MOT_CHANGE",
+"format": [],
+"syntax": []
+},
+"425848C8": {
+"size": 3,
+"name": "Set_Anchored_Article_Action",
+"format": [
+0,
+0
+],
+"syntax": [
+"Article",
+"Action"
+]
+},
+"AA8826A7": {
+"size": 3,
+"name": "MOT_CHANGE_EXIST_ARTICLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"AE994DAF": {
+"size": 2,
+"name": "unk_AE994DAF",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"A546845C": {
+"size": 2,
+"name": "Set_Frame_Speed",
+"format": [
+1
+],
+"syntax": [
+"Multiplier"
+]
+},
+"752E6714": {
+"size": 2,
+"name": "MOT_SET_RATE_W",
+"format": [
+3
+],
+"syntax": [
+"unknown"
+]
+},
+"2A25155D": {
+"size": 3,
+"name": "Set_Armor",
+"format": [
+0,
+1
+],
+"syntax": [
+"State",
+"Threshold"
+]
+},
+"17232732": {
+"size": 2,
+"name": "OFF_FLAG",
+"format": [
+3
+],
+"syntax": [
+"Variable"
+]
+},
+"661B30DA": {
+"size": 2,
+"name": "ON_FLAG",
+"format": [
+3
+],
+"syntax": [
+"Variable"
+]
+},
+"252F2052": {
+"size": 2,
+"name": "PASSABLE_CHECK",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"22E2E4C6": {
+"size": 2,
+"name": "unk_22E2E4C6",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"58E8478D": {
+"size": 2,
+"name": "unk_58E8478D",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"65590360": {
+"size": 1,
+"name": "unk_65590360",
+"format": [],
+"syntax": []
+},
+"8A4021E4": {
+"size": 1,
+"name": "unk_8A4021E4",
+"format": [],
+"syntax": []
+},
+"A82038A0": {
+"size": 1,
+"name": "unk_A82038A0",
+"format": [],
+"syntax": []
+},
+"46560DFF": {
+"size": 1,
+"name": "unk_46560DFF",
+"format": [],
+"syntax": []
+},
+"BBB819D9": {
+"size": 2,
+"name": "unk_BBB819D9",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"140B3778": {
+"size": 1,
+"name": "unk_140B3778",
+"format": [],
+"syntax": []
+},
+"2D942090": {
+"size": 2,
+"name": "Pickup_Item",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"E1E1ED52": {
+"size": 3,
+"name": "Pickup_Item2",
+"format": [
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown"
+]
+},
+"96E6DDC4": {
+"size": 4,
+"name": "unk_96E6DDC4",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"08824867": {
+"size": 5,
+"name": "unk_08824867",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"3A1C50C4": {
+"size": 2,
+"name": "PLAY_DAMAGESTOP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"F7016A91": {
+"size": 2,
+"name": "Sound_Effect4",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"7F0F890E": {
+"size": 3,
+"name": "PLAY_FLY_VOICE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"E022FE8A": {
+"size": 2,
+"name": "Sound_Effect3",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"82A2F998": {
+"size": 1,
+"name": "PLAY_LANDING_SE_REG",
+"format": [],
+"syntax": []
+},
+"E5751F0A": {
+"size": 2,
+"name": "Sound_Effect",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"3D2CFA86": {
+"size": 2,
+"name": "Low_Voice_Clip",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"40639C05": {
+"size": 2,
+"name": "PLAY_SEQUENCE_DAMAGESTOP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"3A775D26": {
+"size": 2,
+"name": "PLAY_SE_NO_3D",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"B73EF69C": {
+"size": 2,
+"name": "PLAY_SE_REMAIN",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"FB98EE28": {
+"size": 2,
+"name": "Transient_Sound_Effect",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"CDBF3106": {
+"size": 2,
+"name": "Sound_Effect2",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"01A5A27C": {
+"size": 3,
+"name": "unk_01A5A27C",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"99044432": {
+"size": 1,
+"name": "POOL",
+"format": [],
+"syntax": []
+},
+"5BE12AD0": {
+"size": 2,
+"name": "QUAKE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"65F38512": {
+"size": 2,
+"name": "QUAKE_STOP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"0412FE17": {
+"size": 16,
+"name": "REFLECTOR",
+"format": [
+0,
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+1,
+0
+],
+"syntax": [
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"X2",
+"Y2",
+"Z2",
+"ReflectDmgMul",
+"ReflectSpdMul",
+"Threshold",
+"Unknown",
+"ReflectLifetimeMul",
+"Type"
+]
+},
+"E06A5D00": {
+"size": 2,
+"name": "REG_LANDING_SE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"501A7157": {
+"size": 2,
+"name": "Article_Event",
+"format": [
+0
+],
+"syntax": [
+"Value"
+]
+},
+"C436BF6E": {
+"size": 2,
+"name": "Remove_Article",
+"format": [
+0
+],
+"syntax": [
+"Article"
+]
+},
+"41BF2502": {
+"size": 1,
+"name": "REMOVE_ITEM",
+"format": [],
+"syntax": []
+},
+"5F6C80E6": {
+"size": 5,
+"name": "RENEW_TRACE",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"E2A24D87": {
+"size": 6,
+"name": "unk_E2A24D87",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"14DA2640": {
+"size": 2,
+"name": "RESUME_BGM",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"3D155C42": {
+"size": 2,
+"name": "Enable_Certain_Movements",
+"format": [
+0
+],
+"syntax": [
+"Type"
+]
+},
+"5766F889": {
+"size": 1,
+"name": "Script_End",
+"format": [],
+"syntax": []
+},
+"63623560": {
+"size": 1,
+"name": "Reverse_Direction",
+"format": [],
+"syntax": []
+},
+"1A019B6B": {
+"size": 1,
+"name": "REVERSE_ROT",
+"format": [],
+"syntax": []
+},
+"B3480157": {
+"size": 3,
+"name": "unk_B3480157",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"BE0C4A94": {
+"size": 4,
+"name": "unk_BE0C4A94",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2068DF37": {
+"size": 5,
+"name": "unk_2068DF37",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"406D24BC": {
+"size": 3,
+"name": "Rumble",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"F395CC2C": {
+"size": 3,
+"name": "Rumble_Loop",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"42D70BB3": {
+"size": 2,
+"name": "SA_SET",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"56055BA2": {
+"size": 2,
+"name": "SCH_CLR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"98203AF6": {
+"size": 1,
+"name": "SCH_CLR_ALL",
+"format": [],
+"syntax": []
+},
+"72318271": {
+"size": 1,
+"name": "SCH_SIZE",
+"format": [],
+"syntax": []
+},
+"30EBC1AE": {
+"size": 1,
+"name": "SCROLL_SLOW",
+"format": [],
+"syntax": []
+},
+"44081C21": {
+"size": 18,
+"name": "Search_Collision",
+"format": [
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"ID",
+"Part",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"Unknown",
+"Unknown",
+"Ground/Air",
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown",
+"RehitRate",
+"SelfAffectionToggle",
+"Unknown"
+]
+},
+"B39C1A7C": {
+"size": 1,
+"name": "SEARCH_CLR_ALL",
+"format": [],
+"syntax": []
+},
+"5BBFE217": {
+"size": 1,
+"name": "SET_AIR",
+"format": [],
+"syntax": []
+},
+"05B66D19": {
+"size": 2,
+"name": "SET_ATTACK_HIT_STOP",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"A5187BBC": {
+"size": 2,
+"name": "SET_CURSOR",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"1E3AB92A": {
+"size": 3,
+"name": "SET_FLOAT",
+"format": [
+1,
+3
+],
+"syntax": [
+"Value",
+"Variable"
+]
+},
+"F885CB9C": {
+"size": 3,
+"name": "SET_FRAME_ARTICLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"F38E805D": {
+"size": 3,
+"name": "SET_INT",
+"format": [
+0,
+3
+],
+"syntax": [
+"Value",
+"Variable"
+]
+},
+"D5E769C4": {
+"size": 2,
+"name": "unk_D5E769C4",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"21FDA8DF": {
+"size": 2,
+"name": "SET_LIGHT_LENGTH",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"1BFC5837": {
+"size": 2,
+"name": "SET_LIGHT_RADIUS",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"95794508": {
+"size": 3,
+"name": "SET_LIMIT_SPEED_EX",
+"format": [
+1,
+1
+],
+"syntax": [
+"Horizontal",
+"Vertical"
+]
+},
+"E0CF6FF1": {
+"size": 2,
+"name": "Tag_Visibility",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"395DA2D1": {
+"size": 5,
+"name": "SET_OFFSET_ARTICLE",
+"format": [
+0,
+0,
+0,
+1
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"F0005966": {
+"size": 3,
+"name": "SET_PITCH",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"374A735E": {
+"size": 2,
+"name": "SET_PITCH_STATUS",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"19A86DA9": {
+"size": 3,
+"name": "SET_PITCH_STATUS_HANDLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"687F9320": {
+"size": 3,
+"name": "unk_687F9320",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"6706BC40": {
+"size": 1,
+"name": "SET_POS",
+"format": [],
+"syntax": []
+},
+"7A34BE78": {
+"size": 5,
+"name": "SET_POS_ARTICLE",
+"format": [
+0,
+0,
+1,
+1
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"1C843790": {
+"size": 4,
+"name": "unk_1C843790",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"2B62F859": {
+"size": 3,
+"name": "SET_RATE_ARTICLE",
+"format": [
+0,
+1
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"26ED10F4": {
+"size": 3,
+"name": "SET_RATE_ARTICLE_V",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"51EA2062": {
+"size": 3,
+"name": "SET_RATE_ARTICLE_W",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"3B8D1838": {
+"size": 3,
+"name": "unk_3B8D1838",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"DE950B48": {
+"size": 2,
+"name": "unk_DE950B48",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"FAE6FD8D": {
+"size": 4,
+"name": "SET_ROT",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"46396A70": {
+"size": 5,
+"name": "SET_ROT_ARTICLE",
+"format": [
+0,
+0,
+1,
+1
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"3BD9C23B": {
+"size": 2,
+"name": "Set_Model_Scale",
+"format": [
+1
+],
+"syntax": [
+"Scale"
+]
+},
+"8965B9D6": {
+"size": 5,
+"name": "SET_SEARCH_OPPONENT",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"1511931F": {
+"size": 2,
+"name": "SET_SHADOW",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"D8B91949": {
+"size": 3,
+"name": "Add/Subtract_Momentum",
+"format": [
+1,
+1
+],
+"syntax": [
+"Horizontal",
+"Vertical"
+]
+},
+"26E9C6BE": {
+"size": 5,
+"name": "Add/Set_Momentum2",
+"format": [
+1,
+1,
+0,
+0
+],
+"syntax": [
+"Horizontal",
+"Vertical",
+"Add/SetHorizontal",
+"Add/SetVertical"
+]
+},
+"D3D9401B": {
+"size": 3,
+"name": "unk_D3D9401B",
+"format": [
+1,
+1
+],
+"syntax": [
+"Unknown",
+"Unknown"
+]
+},
+"A4DE708D": {
+"size": 4,
+"name": "Add/Set_Momentum",
+"format": [
+1,
+1,
+0
+],
+"syntax": [
+"Horizontal",
+"Vertical",
+"Mode"
+]
+},
+"5FC8FA49": {
+"size": 2,
+"name": "unk_5FC8FA49",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"5D5AF322": {
+"size": 2,
+"name": "unk_5D5AF322",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"D9FDDCEC": {
+"size": 3,
+"name": "SET_VOLUME",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"51A2AD03": {
+"size": 4,
+"name": "unk_51A2AD03",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"F0DF9A8B": {
+"size": 3,
+"name": "SHIELD_OFF",
+"format": [
+0,
+0
+],
+"syntax": [
+"Unused",
+"ID"
+]
+},
+"BB400CDA": {
+"size": 4,
+"name": "Shield_Off2",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Unused",
+"ID",
+"Type"
+]
+},
+"D1B837C2": {
+"size": 4,
+"name": "SHIELD_ON",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Unused",
+"ID",
+"Type"
+]
+},
+"A4F1B325": {
+"size": 2,
+"name": "SHOOT_ARTICLE",
+"format": [
+0
+],
+"syntax": [
+"Value"
+]
+},
+"326E0EB5": {
+"size": 3,
+"name": "Set_ExAnchored_Article_Action",
+"format": [
+0,
+0
+],
+"syntax": [
+"Article",
+"Action"
+]
+},
+"A2BAB52A": {
+"size": 2,
+"name": "SHOOT_EXIST_ARTICLE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"BFC0031F": {
+"size": 3,
+"name": "unk_BFC0031F",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"965E035A": {
+"size": 1,
+"name": "Fire_Weapon",
+"format": [],
+"syntax": []
+},
+"451486B7": {
+"size": 2,
+"name": "SHOOT_ITEM_BULLET_ANGLE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"42998FB4": {
+"size": 2,
+"name": "Fire_Item_Projectile",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"745B20A7": {
+"size": 2,
+"name": "Fire_Item_Projectile2",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"F2C328A7": {
+"size": 2,
+"name": "unk_F2C328A7",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AF988735": {
+"size": 2,
+"name": "SLOPE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"961521C4": {
+"size": 3,
+"name": "Slope_Full",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"040FD56E": {
+"size": 4,
+"name": "unk_040FD56E",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"74B61BAC": {
+"size": 3,
+"name": "SLOPE_TOE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"5DD6C56C": {
+"size": 2,
+"name": "unk_5DD6C56C",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"37ED7029": {
+"size": 3,
+"name": "Time_Manipulation",
+"format": [
+0,
+0
+],
+"syntax": [
+"Amount",
+"Duration"
+]
+},
+"97370496": {
+"size": 3,
+"name": "Time_Manipulation_Whole",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"C52B4328": {
+"size": 8,
+"name": "START_CHARGE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"7E977FAA": {
+"size": 13,
+"name": "unk_7E977FAA",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"50B5DFBD": {
+"size": 9,
+"name": "unk_50B5DFBD",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"EE37008F": {
+"size": 1,
+"name": "unk_EE37008F",
+"format": [],
+"syntax": []
+},
+"CEA1588E": {
+"size": 9,
+"name": "START_TRACE",
+"format": [
+0,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"AF41E94E": {
+"size": 3,
+"name": "Set_Remote_Article_Action",
+"format": [
+0,
+0
+],
+"syntax": [
+"Article",
+"Action"
+]
+},
+"A30D3CA2": {
+"size": 3,
+"name": "Set_Remote_Article_Action2",
+"format": [
+0,
+0
+],
+"syntax": [
+"Article",
+"Action"
+]
+},
+"AC4919B5": {
+"size": 1,
+"name": "STICK_LR",
+"format": [],
+"syntax": []
+},
+"9524BAAC": {
+"size": 1,
+"name": "STICK_LR_UPDATE",
+"format": [],
+"syntax": []
+},
+"5B23A4DE": {
+"size": 2,
+"name": "unk_5B23A4DE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"AFE548A4": {
+"size": 1,
+"name": "STOP_CHARGE",
+"format": [],
+"syntax": []
+},
+"10C4D4C8": {
+"size": 1,
+"name": "unk_10C4D4C8",
+"format": [],
+"syntax": []
+},
+"F920748A": {
+"size": 2,
+"name": "Stop_Sound_Effect",
+"format": [
+0
+],
+"syntax": [
+"SFX"
+]
+},
+"602DD264": {
+"size": 1,
+"name": "STOP_SE_ALL",
+"format": [],
+"syntax": []
+},
+"666B608E": {
+"size": 2,
+"name": "unk_666B608E",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"F4B1C95B": {
+"size": 1,
+"name": "STOP_SE_STATUS",
+"format": [],
+"syntax": []
+},
+"A8DDAC53": {
+"size": 3,
+"name": "unk_A8DDAC53",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"1CF1A390": {
+"size": 2,
+"name": "STRANS_GROUP_ON",
+"format": [
+3
+],
+"syntax": [
+"STransGroup"
+]
+},
+"F0BDC819": {
+"size": 2,
+"name": "STRANS_OFF",
+"format": [
+3
+],
+"syntax": [
+"STransID"
+]
+},
+"B3EAA5C2": {
+"size": 2,
+"name": "STRANS_ON",
+"format": [
+3
+],
+"syntax": [
+"STransID"
+]
+},
+"918F61CD": {
+"size": 3,
+"name": "SUB_FLOAT_2",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"6D8D18B7": {
+"size": 2,
+"name": "Disallow_Certain_Movements",
+"format": [
+0
+],
+"syntax": [
+"Type"
+]
+},
+"9F118C9E": {
+"size": 1,
+"name": "SWITCH",
+"format": [],
+"syntax": []
+},
+"032C73B5": {
+"size": 2,
+"name": "SYNC_POS_NODE",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"72982F32": {
+"size": 1,
+"name": "TEST_GROUND",
+"format": [],
+"syntax": []
+},
+"307D6993": {
+"size": 3,
+"name": "THROW_ITEM",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"50730439": {
+"size": 6,
+"name": "THROW_ITEM_OFFSET",
+"format": [
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"2F20B6C7": {
+"size": 4,
+"name": "THROW_ITEM_OFFSET_MOTION",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"6CD94C77": {
+"size": 5,
+"name": "unk_6CD94C77",
+"format": [
+1,
+1,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"BFE18BE1": {
+"size": 1,
+"name": "THROW_ITEM_REFLET",
+"format": [],
+"syntax": []
+},
+"6E053790": {
+"size": 4,
+"name": "Throw_Item2",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Unknown",
+"Unknown",
+"Unknown"
+]
+},
+"F061A233": {
+"size": 5,
+"name": "unk_F061A233",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"8F67803A": {
+"size": 1,
+"name": "TURN_L",
+"format": [],
+"syntax": []
+},
+"7568BD59": {
+"size": 1,
+"name": "TURN_R",
+"format": [],
+"syntax": []
+},
+"E674F645": {
+"size": 2,
+"name": "UNABLE_AREA",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"15670DCC": {
+"size": 2,
+"name": "UNABLE_ENERGY",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"4DD83EFF": {
+"size": 1,
+"name": "UPDATE_GROUND",
+"format": [],
+"syntax": []
+},
+"61F36803": {
+"size": 1,
+"name": "UPDATE_ROT",
+"format": [],
+"syntax": []
+},
+"87C50592": {
+"size": 2,
+"name": "Consume_Item",
+"format": [
+0
+],
+"syntax": [
+"Unknown"
+]
+},
+"27213F09": {
+"size": 2,
+"name": "Morph_Model_Event",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"315E8C48": {
+"size": 3,
+"name": "VIS_ATTACH_ITEM_GROUP",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"91CF842D": {
+"size": 2,
+"name": "VIS_BACK_DEFAULT",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"5BC50AA6": {
+"size": 3,
+"name": "VIS_BACK_DEFAULT_ARTICLE",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"8FF62E3D": {
+"size": 2,
+"name": "Item_Visibility",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"83A45688": {
+"size": 2,
+"name": "VIS_RESET_DEFAULT",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"96114CFC": {
+"size": 3,
+"name": "Model_Changer",
+"format": [
+0,
+0
+],
+"syntax": [
+"ChangerID",
+"ChangerState"
+]
+},
+"F4940C87": {
+"size": 4,
+"name": "VIS_SET_ARTICLE",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"15F0023E": {
+"size": 3,
+"name": "VIS_SET_DEFAULT",
+"format": [
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown"
+]
+},
+"CB59A07E": {
+"size": 2,
+"name": "Visibility",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"0202C138": {
+"size": 3,
+"name": "Article_Visibility",
+"format": [
+0,
+0
+],
+"syntax": [
+"Article",
+"State"
+]
+},
+"53F0D3E1": {
+"size": 4,
+"name": "unk_53F0D3E1",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"unknown",
+"unknown",
+"unknown"
+]
+},
+"4B7B6E51": {
+"size": 2,
+"name": "WAIT",
+"format": [
+1
+],
+"syntax": [
+"Frames"
+]
+},
+"5F4CF775": {
+"size": 1,
+"name": "WAIT_LOOP",
+"format": [],
+"syntax": []
+},
+"522DBA37": {
+"size": 1,
+"name": "WAIT_LOOP_CLR",
+"format": [],
+"syntax": []
+},
+"CD25726B": {
+"size": 1,
+"name": "Loop_Rest",
+"format": [],
+"syntax": []
+},
+"314839A7": {
+"size": 1,
+"name": "unk_314839A7",
+"format": [],
+"syntax": []
+},
+"F0D25BDA": {
+"size": 2,
+"name": "Body_Collision",
+"format": [
+0
+],
+"syntax": [
+"State"
+]
+},
+"3341CBFE": {
+"size": 1,
+"name": "unk_3341CBFE",
+"format": [],
+"syntax": []
+},
+"92A88908": {
+"size": 2,
+"name": "unk_92A88908",
+"format": [
+0
+],
+"syntax": [
+"unknown"
+]
+},
+"300A0A85": {
+"size": 1,
+"name": "unk_300A0A85",
+"format": [],
+"syntax": []
+}
+}
+}
