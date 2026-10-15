@@ -22115,6 +22115,7 @@ int func_1135()
 
 void func_1136()
 {
+    throw_drop_reset(); // (added)
     KineticModule(0xc, 0x5);
     func_22(WorkModule(0x6, 0x11000002), 0, 1.0f);
     WorkModule(0x16, 0x1e000093);
@@ -22130,6 +22131,7 @@ void func_1136()
 void func_1137()
 {
     throw_drift_update(); // stick drift in forward/up throw (added), see the end of the file
+    throw_drop_update();  // keep falling below the start height until the floor (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -36306,6 +36308,7 @@ void func_2242()
     func_2245();
     global28 = func_2349;
     global37 = func_2287;
+    global25 = sideb_air_condition; // side-B condition script (added): max 2 air side Bs per airtime
 }
 
 // Registers Kirby's own status scripts (keys 0/1/2) + overrides of common actions
@@ -37487,7 +37490,10 @@ void func_2246()
 // Empty placeholder used for unused keys
 void func_2247()
 {
-    
+    if (global18 == 0) // on the ground in a special: air side Bs available again (added)
+    {
+        sideb_air_reset();
+    }
 }
 
 // Empty
@@ -38007,6 +38013,7 @@ void func_2281()
     int var3;
     int var4;
     float var5;
+    sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -38068,6 +38075,7 @@ void func_2281()
 void func_2282()
 {
     int var0;
+    sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -38083,6 +38091,7 @@ void func_2282()
 void func_2283()
 {
     int var0;
+    sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -38098,6 +38107,7 @@ void func_2283()
 void func_2284()
 {
     int var0;
+    sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -38113,6 +38123,7 @@ void func_2284()
 void func_2285()
 {
     int var0;
+    sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -40201,6 +40212,7 @@ int func_2428()
 // [SpecialS 0x153] main: hammer start
 void func_2429()
 { //Side B Looping Script
+    sideb_air_count(); // count air side Bs (added)
     WorkModule(0x2711, 0x2100000d);
     WorkModule(0x2711, 0x200000a0);
     func_2431();
@@ -40847,6 +40859,7 @@ void func_2467()
         return;
     }
     sideb_homing_update(); // tracking (added), see the end of the file
+    sideb_gravity_update(); // gravity back from frame 29 (added)
     sideb_slow_update();   // slowdown near the end (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
@@ -70183,7 +70196,9 @@ float sideb_bounce_frame()     { return 40.0f; } // animation frame to jump to o
 float sideb_bounce_cancel()    { return 6.0f; }  // frames after the bounce until any attack can cancel it
 
 // Slowdown near the end of the swing (only after homing, not after a bounce).
-float sideb_slow_frame()       { return 35.0f; } // swing frame where Kirby starts losing speed
+float sideb_slow_frame()       { return 35.0f; } // swing frame where Kirby starts losing (horizontal) speed
+float sideb_gravity_frame()    { return 29.0f; } // swing frame where Kirby's gravity comes back after flying
+int   sideb_air_max()          { return 2; }     // air side Bs allowed before landing / grabbing a ledge (1 or 2)
 float sideb_slow_factor()      { return 0.9f; }  // speed is multiplied by this every frame from then on
 int   sideb_slow_enabled()     { return 1; }     // 0 = no slowdown
 
@@ -70238,7 +70253,7 @@ void sideb_homing_init()
     float facing;
     float tx;
     float ty;
-    global17 = 0; // side-B state bits: 0x1 = flew (homed or straight), 0x2 = bounced
+    global17 = global17 & 0x300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200)
     WorkModule(0, 99999.0f, 0x1000006);
     WorkModule(0, 99999.0f, 0x1000007);
     debug = sideb_homing_debug();
@@ -70382,7 +70397,6 @@ void sideb_slow_update()
 {
     float factor;
     float vx;
-    float vy;
     if (global4 != 0x171)
     {
         return;
@@ -70409,9 +70423,7 @@ void sideb_slow_update()
     }
     factor = sideb_slow_factor();
     vx = KineticModuleF(0, 0x1) * factor;   // current X speed (world direction)
-    vy = KineticModuleF(0x1, 0x1) * factor; // current Y speed
-    KineticModule(0x11, 0x3, vx, 0);
-    KineticModule(0x11, 0x1, vy);
+    KineticModule(0x11, 0x3, vx, 0);        // horizontal only: gravity handles the vertical from sideb_gravity_frame()
 }
 
 // ===================================================================
@@ -70453,4 +70465,189 @@ void throw_drift_update()
     KineticModule(0x11, 0x3, vx, 0); // X speed of energy 3 (added on top of the throw's motion)
     KineticModule(0x10, 0x3, 0, 0);  // no braking
     KineticModule(0xb, 0x3);         // make sure the energy is on
+}
+
+// [Side-B gravity] swing loop (func_2467). After flying (homing or straight), Kirby's gravity
+// and max fall speed come back from swing frame sideb_gravity_frame(). Not after a bounce
+// (the bounce has its own gravity setting).
+void sideb_gravity_update()
+{
+    if (global4 != 0x171)
+    {
+        return;
+    }
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (!(global17 & 0x1)) // didn't fly
+    {
+        return;
+    }
+    if (global17 & 0x2) // bounced
+    {
+        return;
+    }
+    if (global17 & 0x4) // already back
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) < sideb_gravity_frame())
+    {
+        return;
+    }
+    global17 = global17 | 0x4;
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+    KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+}
+
+// ===================================================================
+// Air side-B limit (added). global25 is the side-B condition script (func_72(global25) in the
+// side-B checks; Corrin uses the same hook). Count bits in global17: 0x100 = one air side B,
+// 0x200 = two. Reset when Kirby lands (landing mains func_2281-2284), grabs a ledge (func_2285)
+// or is on the ground in any special status (func_2247).
+// ===================================================================
+int sideb_air_condition()
+{
+    int max;
+    if (global18 != 0x2) // ground side B: always allowed
+    {
+        sideb_air_reset();
+        return 0x1;
+    }
+    max = sideb_air_max();
+    if (max >= 0x2)
+    {
+        if (global17 & 0x200)
+        {
+            return 0;
+        }
+        return 0x1;
+    }
+    if (global17 & 0x100)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+// side-B main (func_2429): count an air side B
+void sideb_air_count()
+{
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (global17 & 0x100)
+    {
+        global17 = global17 | 0x200;
+        return;
+    }
+    global17 = global17 | 0x100;
+}
+
+void sideb_air_reset()
+{
+    if (global17 & 0x100)
+    {
+        global17 = global17 - 0x100;
+    }
+    if (global17 & 0x200)
+    {
+        global17 = global17 - 0x200;
+    }
+}
+
+// ===================================================================
+// Throw drop (added). Forward / up throw normally land back at the height they started at.
+// If Kirby is still in the air one frame before the animation's landing (frame 35 forward,
+// 45 up), the animation is paused there and Kirby (holding the opponent) keeps falling at
+// throw_drop_speed() until he touches the floor, then the throw finishes. Off stage he
+// carries the opponent down to the blast zone. State bits in global17: 0x1000 = falling,
+// 0x2000 = already landed this throw.
+// ===================================================================
+float throw_drop_frame_f()  { return 35.0f; } // forward throw: last frame before the landing (impact effect at 36)
+float throw_drop_frame_hi() { return 45.0f; } // up throw: last frame before the landing (impact effect at 46)
+float throw_drop_speed()    { return 3.0f; }  // fall speed while dropping
+
+// throw main (func_1136)
+void throw_drop_reset()
+{
+    if (global17 & 0x1000)
+    {
+        global17 = global17 - 0x1000;
+    }
+    if (global17 & 0x2000)
+    {
+        global17 = global17 - 0x2000;
+    }
+}
+
+// throw loop (func_1137), every frame
+void throw_drop_update()
+{
+    int kind;
+    float hold;
+    float down;
+    if (global4 != 0xdc)
+    {
+        return;
+    }
+    kind = WorkModule(0x6, 0x11000002);
+    if (kind == 0x78)
+    {
+        hold = throw_drop_frame_f();
+    }
+    else if (kind == 0x7a)
+    {
+        hold = throw_drop_frame_hi();
+    }
+    else
+    {
+        return;
+    }
+    if (global17 & 0x1000) // falling
+    {
+        if (GroundModule(0x2722, 0x8)) // touched the floor: finish the throw
+        {
+            global17 = global17 - 0x1000;
+            global17 = global17 | 0x2000;
+            KineticModule(0x11, 0x1, 0);
+            MotionModule(0x4, 1.0f); // animation runs again
+            return;
+        }
+        down = throw_drop_speed();
+        KineticModule(0x11, 0x1, -down);
+        KineticModule(0xf, 0x1, 0);
+        KineticModule(0xb, 0x1);
+        return;
+    }
+    if (global17 & 0x2000) // already landed once
+    {
+        return;
+    }
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) < hold)
+    {
+        return;
+    }
+    if (GroundModule(0x2722, 0x8)) // on the floor at the normal height: nothing to do
+    {
+        return;
+    }
+    // still in the air at the landing frame: pause the animation and fall
+    global17 = global17 | 0x1000;
+    MotionModule(0x2713, hold);
+    MotionModule(0x4, 0);    // animation speed 0
+    KineticModule(0, 0xa);   // kinetic type AIR_STOP (speeds below drive Kirby)
+    KineticModule(0xe, 0x3, 0x6, 0, 0, 0, 0, 0); // reset horizontal energy (air)
+    KineticModule(0xb, 0x3);
+    KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);   // reset vertical energy
+    down = throw_drop_speed();
+    KineticModule(0x11, 0x1, -down);
+    KineticModule(0xf, 0x1, 0);
+    KineticModule(0xb, 0x1);
 }

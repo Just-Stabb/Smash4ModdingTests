@@ -354,10 +354,31 @@ What this mod does:
      transition groups (`0x1F00000A`, `0x1F00000E`) and checks the aerial
      (`func_63`) and air-special (`func_58`) inputs, so any attack cancels the
      swing.
-   - `sideb_slow_update()`: if Kirby homed and didn't bounce, from swing frame
-     `sideb_slow_frame()` (35) his speed is multiplied by
-     `sideb_slow_factor()` (0.9) every frame (read with `KineticModuleF(0/1,
-     0x1)`, set on energies 3/1).
+   - `sideb_gravity_update()`: after flying (homing or straight) and without
+     a bounce, Kirby's gravity and max fall speed come back at swing frame
+     `sideb_gravity_frame()` (29).
+   - `sideb_slow_update()`: if Kirby flew and didn't bounce, from swing frame
+     `sideb_slow_frame()` (35) his **horizontal** speed is multiplied by
+     `sideb_slow_factor()` (0.9) every frame (read with `KineticModuleF(0,
+     0x1)`, set on energy 3). Gravity handles the vertical.
+   - Side-B state lives in `global17` bits: `0x1` flew, `0x2` bounced, `0x4`
+     gravity back (reset at the start of each swing).
+
+### Air side-B limit (2 per airtime)
+
+`global25` is the fighter's side-B condition script: every side-B check calls
+`func_72(global25)` and only starts side B if it returns non-zero (Corrin uses
+the same hook). Kirby's init `func_2242` now sets it to `sideb_air_condition()`:
+
+- On the ground: always allowed (and the count resets).
+- In the air: blocked once `sideb_air_max()` (2) air side Bs were used.
+
+The count is bits `0x100` / `0x200` of `global17`, added in the side-B main
+`func_2429` when it starts in the air. It resets in Kirby's landing mains
+(`func_2281`–`func_2284`, statuses `0x16`–`0x19`), the ledge-catch main
+(`func_2285`, `0x73`), and in `func_2247` (every frame of every special
+status) whenever Kirby is on the ground. That covers side B landing inside
+its own statuses.
 
 Earlier versions used the start status `0x153`. That was wrong: the search
 box isn't in the start animation (`specialairsstart`, `0x28D`), so nothing
@@ -426,4 +447,24 @@ Settings: `throw_drift_speed_f()` (0.8) for forward throw and
 `throw_drift_speed_hi()` (0.4, half) for up throw.
 
 Untested: if the throw's motion kinetic type ignores energy 3, the drift will
-do nothing. The fallback is moving Kirby's position directly each frame.
+do nothing before the drop phase below. The fallback is moving Kirby's
+position directly each frame.
+
+### Forward/up throw: falling below the start height
+
+The throw animations bring Kirby back to his starting height. The landing
+impact effect plays at frame 36 (forward) / 46 (up), and the opponent is
+released at 45 / 51. `throw_drop_update()` (throw loop `func_1137`): if Kirby
+is still airborne and not touching the floor (`GroundModule(0x2722, 0x8)`) at
+frame `throw_drop_frame_f()` (35) / `throw_drop_frame_hi()` (45), it:
+
+1. pauses the animation there (`MotionModule(0x2713, frame)`,
+   `MotionModule(0x4, 0)`);
+2. switches to kinetic AIR_STOP (`0xA`);
+3. makes Kirby fall at `throw_drop_speed()` (3.0) with the opponent still
+   held. Stick drift still works.
+
+When he touches the floor, the animation resumes, and the slam and the
+release play there. Off stage, he carries the opponent to the bottom blast
+zone. State bits in `global17`: `0x1000` falling, `0x2000` done (reset in
+the throw main `func_1136`).
