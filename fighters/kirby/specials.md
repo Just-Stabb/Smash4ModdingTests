@@ -556,3 +556,39 @@ Damage and knockback are the same as the normal throw.
 - From `throwlw_final_frame()` (56, the final hit in the `throwlw` ACMD;
   the release is frame 58) the speed is set to 0 every frame, so Kirby stops
   dead on the final hit.
+
+## Added: air grab
+
+Pressing grab in the air starts Kirby's normal grab (Catch `0x35`) as an air
+status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
+`airgrab_update`). State bits in `global17`: `0x4000` = air grab active,
+`0x8000` = used this airtime.
+
+- **Trigger**: `airgrab_check()` in the air transition checks `func_41`,
+  right after the item-throw check `func_59`. It runs when the grab command
+  (`global24 & 0x20000000`) is pressed and all of these hold: Kirby is
+  airborne, the air grab is unused this airtime, he isn't holding an item
+  (grab still throws items), and the aerial transition `0x1E000061` is
+  enabled.
+- **Air setup**: the setup functions of Catch `func_1032`, CatchPull
+  `func_1037`, CatchWait `func_1059`, CatchAttack `func_1066`, Throw `0x3E`
+  `func_1080` and throws `0xDC` `func_1135` use situation air, ground
+  correction `0x5` and kinetic `0x13` (motion + gravity, like the aerials)
+  while `airgrab_on()`. The `0xDC` throws use `0x12` instead, the same air
+  kinetic they switch to on their own after lifting off. Kirby has his normal
+  gravity while grabbing, holding and pummelling.
+- **No forced breakaway**: the loops that normally send an airborne grabber
+  to Fall or CatchCut (`0x3D`) skip that while `airgrab_on()`. Those loops
+  are `func_1035`, `func_1040`, `func_1063`, `func_2273`, `func_2277` and
+  `func_1084`. The pummel/throw selectors `func_2269` and `func_1062` also
+  accept the air, so pummel and all four throws work in the air.
+- **Missed grab**: when the grab animation ends in the air, Kirby goes into
+  Fall.
+- **Landing mid-grab**: on touching the floor, `airgrab_update()` switches
+  Kirby to the ground with kinetic `0xF` and the grab carries on as a normal
+  ground grab. `0xDC` throws keep their own landing code.
+- **Once per airtime**: `sideb_air_reset()` (landing statuses and ledge
+  grab) clears both bits. The side-B init keeps them.
+- **Untested risk**: the grabbed opponent's own capture statuses are in
+  their fighter's MSC. If their side forces them out when the grabber is
+  airborne, that needs a different fix.

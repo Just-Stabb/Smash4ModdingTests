@@ -641,6 +641,10 @@ int func_41()
     {
         return 0x1;
     }
+    if (airgrab_check()) // air grab (added), see the end of the file
+    {
+        return 0x1;
+    }
     if (func_61())
     {
         return 0x1;
@@ -20669,7 +20673,14 @@ void func_1031()
 
 int func_1032()
 {
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0x1, 0, 0, 0, 0);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0);
+    }
     StatusModule(0x2713, 0, 0, 0, 0, 0, 0x5, 0x4000000, 0, 0x20000);
     return 0;
 }
@@ -20693,7 +20704,11 @@ void func_1035()
     {
         return;
     }
-    if (global18 == 0x2)
+    if (airgrab_update())
+    {
+        return 0x1;
+    }
+    if (global18 == 0x2 && !airgrab_on())
     {
         func_16(0xe, 0);
         return 0x1;
@@ -20712,7 +20727,14 @@ void func_1036()
 
 int func_1037()
 {
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0x1, 0, 0, 0, 0x4);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    }
     StatusModule(0x2713, 0, 0, 0, 0x1, 0, 0, 0x4000002, 0, 0);
     return 0;
 }
@@ -20735,7 +20757,11 @@ void func_1040()
     {
         return 0x1;
     }
-    if (global18 == 0x2)
+    if (airgrab_update())
+    {
+        return 0x1;
+    }
+    if (global18 == 0x2 && !airgrab_on())
     {
         func_16(0x3d, 0);
         return;
@@ -20929,7 +20955,14 @@ void func_1058()
 
 int func_1059()
 {
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0x1, 0, 0, 0, 0x4);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    }
     StatusModule(0x2713, 0, 0x1, 0, 0x1, 0, 0, 0x4000002, 0, 0);
     return 0;
 }
@@ -20954,24 +20987,24 @@ void func_1061()
 
 int func_1062()
 {
-    if (global38 & 0x1 && global18 == 0)
+    if (global38 & 0x1 && (global18 == 0 || airgrab_on()))
     {
         func_16(0x3b, 0x1);
         return 0x1;
     }
-    if (WorkModule(0x15, 0x1e00006a) == 0x1 && func_86() < WorkModuleF(0, 0x2000007) && func_84() >= WorkModuleF(0, 0x2000007) && global18 == 0)
+    if (WorkModule(0x15, 0x1e00006a) == 0x1 && func_86() < WorkModuleF(0, 0x2000007) && func_84() >= WorkModuleF(0, 0x2000007) && (global18 == 0 || airgrab_on()))
     {
         WorkModule(0x7, 0x1e00006a, 0x11000003);
         func_16(0x3e, 0x1);
         return 0x1;
     }
-    if (WorkModule(0x15, 0x1e00006b) == 0x1 && ControlModuleF(0x3) < WorkModuleF(0, 0x200003a) && global32 >= WorkModuleF(0, 0x200003a) && global18 == 0)
+    if (WorkModule(0x15, 0x1e00006b) == 0x1 && ControlModuleF(0x3) < WorkModuleF(0, 0x200003a) && global32 >= WorkModuleF(0, 0x200003a) && (global18 == 0 || airgrab_on()))
     {
         WorkModule(0x7, 0x1e00006b, 0x11000003);
         func_16(0x3e, 0x1);
         return 0x1;
     }
-    if (WorkModule(0x15, 0x1e00006c) == 0x1 && ControlModuleF(0x3) > WorkModuleF(0, 0x200003c) && global32 <= WorkModuleF(0, 0x200003c) && global18 == 0)
+    if (WorkModule(0x15, 0x1e00006c) == 0x1 && ControlModuleF(0x3) > WorkModuleF(0, 0x200003c) && global32 <= WorkModuleF(0, 0x200003c) && (global18 == 0 || airgrab_on()))
     {
         WorkModule(0x7, 0x1e00006c, 0x11000003);
         func_16(0x3e, 0x1);
@@ -20982,7 +21015,11 @@ int func_1062()
 
 void func_1063()
 {
-    if (global18 == 0x2)
+    if (airgrab_update())
+    {
+        return;
+    }
+    if (global18 == 0x2 && !airgrab_on())
     {
         func_16(0x3d, 0);
         return;
@@ -21056,7 +21093,14 @@ void func_1065()
 
 int func_1066()
 {
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0x1, 0, 0, 0, 0x4);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0x4);
+    }
     StatusModule(0x2713, 0, 0x1, 0, 0x1, 0, 0x482, 0x4000002, 0x1000, 0x40000);
     return 0;
 }
@@ -21206,7 +21250,14 @@ void func_1079()
 int func_1080()
 {
     int var0;
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0x4, 0, 0);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0x1, 0, 0x4, 0, 0);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0x4, 0, 0);
+    }
     var0 = 0x80000;
     if (WorkModule(0x6, 0x11000002) == 0x7b)
     {
@@ -21260,12 +21311,16 @@ void func_1083()
 
 void func_1084()
 {
+    if (airgrab_update()) // air grab landing (added)
+    {
+        return;
+    }
     throwlw_slide_update(); // down throw: stick slide (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
     }
-    if (global18 == 0x2)
+    if (global18 == 0x2 && (CatchModule(0x2712) == 0 || !airgrab_on())) // air grab: keep holding
     {
         if (CatchModule(0x2712) == 0)
         {
@@ -22104,7 +22159,14 @@ void func_1134()
 int func_1135()
 {
     int var0;
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x4, 0, 0);
+    if (airgrab_on()) // air grab (added): air situation, gravity, air ground correction
+    {
+        StatusModule(0x5, 0x2, 0x12, 0x5, 0, 0, 0, 0x4, 0, 0);
+    }
+    else
+    {
+        StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x4, 0, 0);
+    }
     var0 = 0x80000;
     if (WorkModule(0x6, 0x11000002) == 0x7b)
     {
@@ -22132,6 +22194,7 @@ void func_1136()
 void func_1137()
 {
     int throw_done;
+    airgrab_update(); // air grab: clears its bits once on the ground (added)
     throw_done = throw_finish_update(); // attack/special finisher (added), see the end of the file
     if (throw_done != 0)
     {
@@ -37872,12 +37935,12 @@ void func_2268()
 // [Grab helper] pummel (A) or forward/back/up throw (0xDC) or down throw (0x3E) from CatchWait
 void func_2269()
 {
-    if (global38 & 0x1 && global18 == 0)
+    if (global38 & 0x1 && (global18 == 0 || airgrab_on()))
     {
         func_16(0x3b, 0x1);
         return 0x1;
     }
-    if (func_86() < WorkModuleF(0, 0x2000031) && func_84() >= WorkModuleF(0, 0x2000031) && global18 == 0)
+    if (func_86() < WorkModuleF(0, 0x2000031) && func_84() >= WorkModuleF(0, 0x2000031) && (global18 == 0 || airgrab_on()))
     {
         if (func_88() < (float)0)
         {
@@ -37890,13 +37953,13 @@ void func_2269()
         func_16(0xdc, 0);
         return 0x1;
     }
-    if (ControlModuleF(0x3) < WorkModuleF(0, 0x2000032) && ControlModuleF(0x1) >= WorkModuleF(0, 0x2000032) && global18 == 0)
+    if (ControlModuleF(0x3) < WorkModuleF(0, 0x2000032) && ControlModuleF(0x1) >= WorkModuleF(0, 0x2000032) && (global18 == 0 || airgrab_on()))
     {
         WorkModule(0x7, 0x7a, 0x11000002);
         func_16(0xdc, 0);
         return 0x1;
     }
-    if (ControlModuleF(0x3) > WorkModuleF(0, 0x2000033) && ControlModuleF(0x1) <= WorkModuleF(0, 0x2000033) && global18 == 0)
+    if (ControlModuleF(0x3) > WorkModuleF(0, 0x2000033) && ControlModuleF(0x1) <= WorkModuleF(0, 0x2000033) && (global18 == 0 || airgrab_on()))
     {
         WorkModule(0x7, 0x7b, 0x11000002);
         func_16(0x3e, 0);
@@ -37926,9 +37989,14 @@ void func_2272()
 // [CatchWait 0x3A] loop: airborne -> Fall; throw/pummel inputs
 void func_2273()
 {
-    if (global18 == 0x2)
+    if (airgrab_update())
+    {
+        return 0x1;
+    }
+    if (global18 == 0x2 && !airgrab_on())
     {
         func_16(0xe, 0);
+        return 0x1;
     }
     if (func_2269())
     {
@@ -37961,11 +38029,16 @@ void func_2276()
 // [CatchAttack 0x3B] loop: motion end -> CatchWait; throw inputs after ACMD flag
 void func_2277()
 {
-    if (global18 == 0x2)
+    if (airgrab_update())
+    {
+        return;
+    }
+    if (global18 == 0x2 && !airgrab_on())
     {
         func_16(0xe, 0);
+        return;
     }
-    if (MotionModule(0x2712) && global18 == 0)
+    if (MotionModule(0x2712) && (global18 == 0 || airgrab_on()))
     {
         func_16(0x3a, 0);
     }
@@ -70261,7 +70334,7 @@ void sideb_homing_init()
     float facing;
     float tx;
     float ty;
-    global17 = global17 & 0x300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200)
+    global17 = global17 & 0xc300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200) and air grab bits (0x4000, 0x8000)
     WorkModule(0, 99999.0f, 0x1000006);
     WorkModule(0, 99999.0f, 0x1000007);
     debug = sideb_homing_debug();
@@ -70583,6 +70656,14 @@ void sideb_air_reset()
     {
         global17 = global17 - 0x200;
     }
+    if (global17 & 0x8000) // air grab used
+    {
+        global17 = global17 - 0x8000;
+    }
+    if (global17 & 0x4000) // air grab active
+    {
+        global17 = global17 - 0x4000;
+    }
 }
 
 // ===================================================================
@@ -70849,4 +70930,90 @@ void throwlw_slide_update()
     KineticModule(0x11, 0x3, vx, 0);
     KineticModule(0x10, 0x3, 0, 0);  // no braking
     KineticModule(0xb, 0x3);         // make sure the energy is on
+}
+
+// ===================================================================
+// Air grab (added). Pressing grab in the air starts Kirby's normal grab (Catch 0x35) as an air
+// status with gravity (kinetic 0x13, like the aerials). If it catches, the whole grab chain
+// (CatchPull 0x36, CatchWait 0x3A, CatchAttack 0x3B, Throw 0x3E / 0xDC) runs in the air
+// instead of forcing the breakaway (0x3D) or Fall; pummel and all four throws work.
+// Once per airtime: reset on landing or grabbing a ledge (sideb_air_reset).
+// global17 bits: 0x4000 = air grab active, 0x8000 = air grab used this airtime.
+// ===================================================================
+
+// 1 while an air grab is going on and Kirby is still airborne.
+int airgrab_on()
+{
+    if (!(global17 & 0x4000))
+    {
+        return 0;
+    }
+    if (global18 != 0x2)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+// air transition checks (func_41). Returns 1 when it started the grab.
+int airgrab_check()
+{
+    if (global18 != 0x2)
+    {
+        return 0;
+    }
+    if (!(global24 & 0x20000000)) // grab
+    {
+        return 0;
+    }
+    if (global17 & 0x8000) // already used this airtime
+    {
+        return 0;
+    }
+    if (ItemModule(0x4) == 0x1) // holding an item: grab throws it instead (func_59)
+    {
+        return 0;
+    }
+    if (WorkModule(0x15, 0x1e000061) == 0) // only where an aerial could come out
+    {
+        return 0;
+    }
+    global17 = global17 | 0xc000;
+    func_16(0x35, 0x1);
+    return 0x1;
+}
+
+// Grab chain loops, every frame. Lands Kirby when he touches the floor (the grab carries on
+// on the ground) and ends a missed air grab with Fall. Returns 1 when it changed status.
+int airgrab_update()
+{
+    if (!(global17 & 0x4000))
+    {
+        return 0;
+    }
+    if (global18 == 0x2 && global4 != 0xdc && GroundModule(0x2722, 0x8)) // touched the floor
+    {
+        func_20(0);
+        GroundModule(0x2710, 0x2);
+    }
+    if (global18 == 0) // on the ground: normal grab from here on
+    {
+        global17 = global17 - 0x4000;
+        if (global17 & 0x8000)
+        {
+            global17 = global17 - 0x8000;
+        }
+        if (global4 != 0xdc) // throws 0xDC handle their own landing
+        {
+            KineticModule(0, 0xf);
+        }
+        return 0;
+    }
+    if (global4 == 0x35 && MotionModule(0x2712)) // missed: the grab animation ended in the air
+    {
+        global17 = global17 - 0x4000; // still used until landing (0x8000)
+        func_16(0xe, 0);
+        return 0x1;
+    }
+    return 0;
 }
