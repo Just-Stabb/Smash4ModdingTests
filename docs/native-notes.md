@@ -286,3 +286,33 @@ The star's MSC calls it on the hit frame (`AttackModule(0x2726)`), just
 before it deletes itself. Still to find: a spare weapon-side command (or
 Kirby-side `BattleObject` case) to hook, the weapon → owner link, and free
 code space in the RPX.
+
+## Implemented: copy ability on the 12th star missile hit
+
+Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
+`tools/rpx_patch.py`; `--list` prints one per line).
+
+- **Weapon command path**: MSC `BattleObject(cmd)` on a weapon → message
+  (kind 6) → `obj vtable(+0x24)[+0x21C]` = `0x02B88030`. `cmd ≤ 8` →
+  `0x02B938E0`; `9…0x15` → switch (`9` = remove); anything else →
+  `0x02B89180` → **specializer `+0x54`** `(spec, weapon, msg)`, command at
+  `***(msg+8)`. For Kirby's star that's `0x02B037B0` (`li r3,0; blr`), which
+  only the star's vtable references (`0x100E0C2C`). The vanilla star calls
+  `BattleObject(0x19)`, which also lands here.
+- **Owner**: `weapon+0x1BF8` (base weapon vtable `+0x254`). At creation the
+  star stores its own ID in the owner's int `0x100000A6` (`0x02B03174`).
+- **Handle helpers**: `0x02BF2108(*(0x102F6C30), &h, id, 0)`. From the handle:
+  `0x02BEF61C` valid, `0x02BEF5F4` category (0 = fighter), `0x02BEF604` kind,
+  `0x02BEF610` costume value, `0x02BEF5DC` module accessor. `0x02BF05C8(h,
+  value, id)` sets an int on the target. WorkModule: `+0x84` get_int(id),
+  `+0x8C` set_int(value, id).
+- **Patch**: `0x02B037B0` = `b 0x037ED898`. The cave overwrites an
+  unreferenced Havok function (`TtrcCapsule`, `0x037ED898`, 0xEA8 bytes; no
+  relocations or outside branches into it; the only export is `0x03374E7C`).
+  It handles command `0x1F4` only: newest collision record of hitbox 0 →
+  target. It must be a fighter, and the owner must be Kirby. Kirby int
+  `0x1000009D` (unused by MSC and native code) counts the hits; at 12 it calls
+  `copy_grant(0x02E669F0(8), kirby, costume, kind, 1)` (not for Kirby
+  targets) and resets the count. It returns 0 like the stub.
+- **MSC**: `starmissile.c` `func_57` calls `BattleObject(0x1F4)` when the
+  hitbox connects, just before `BattleObject(0x9)`.

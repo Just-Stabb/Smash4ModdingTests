@@ -13,6 +13,7 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - `tools/vbn_bones.py`: lists the bones in a `model.vbn` (index = the bone number `ModelModule` takes)
 - [`fighters/ryu/README.md`](fighters/ryu/README.md): Ryu Focus Attack shield-dash cancel
 - `tools/rpx_patch.py`: patches 32-bit values in the game executable (`cross_f.rpx`), e.g. article max counts from `reference/FighterArticles.xml`. Writes a new file; patched executables go in `build/` (git-ignored)
+- `tools/starcopy_cave.py`: builds the native code patch for "Kirby gets a copy ability after 12 star missile hits" (prints words for `rpx_patch.py`)
 - `tools/acmd.py`: reads/edits ACMD files (`animcmd/body/game.bin` etc., the format FITX uses). `dump game.bin specialairs` prints a script by animation name, `find game.bin Search_Collision` lists scripts using a command. Command table in `tools/acmd_info.json`, generated from Sammi Husky's [SALT](https://github.com/Sammi-Husky/SALT) (MIT)
 - [`fighters/metaknight/README.md`](fighters/metaknight/README.md): Meta Knight ledge grab during Mach Tornado
 - [`docs/native-notes.md`](docs/native-notes.md): notes from reading the game executable (Kirby BattleObject commands, homing investigation)

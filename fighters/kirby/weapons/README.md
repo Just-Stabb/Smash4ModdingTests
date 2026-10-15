@@ -56,3 +56,19 @@ something, and that leaves inhale stars at 0. `func_57` now calls
 damage", hitbox ID, float), with `starmissile_damage()` = 1.8. The
 first version used `0x271E`, which the sheet lists as "Add hitbox damage",
 so every frame added another 1.8.
+
+## Copy ability after 12 star hits (needs the patched `cross_f.rpx`)
+
+When the star's hitbox connects, `func_57` calls `BattleObject(0x1F4)` before
+removing the star. New native code in the patched executable picks this up
+(see `docs/native-notes.md` and `tools/starcopy_cave.py`). It reads which
+fighter the star hit and counts the hit on the Kirby that owns the star (int
+`0x1000009D`). On the **12th** hit, Kirby gets that fighter's copy ability
+(the same function swallowing uses), and the count starts over. Hits on
+non-fighters and on other Kirbys don't give a copy. Getting a copy any other
+way also resets the count, because the copy setup clears that int.
+
+To change the number of hits, edit `THRESHOLD` in `tools/starcopy_cave.py`
+and re-patch:
+`python3 tools/rpx_patch.py cross_f.rpx out.rpx $(python3 tools/starcopy_cave.py)`
+(on top of the other patches).

@@ -669,6 +669,10 @@ void func_57()
     // Disappear when the hitbox connects (added).
     if (AttackModule(0x2726) || AttackModule(0x2727, 0x2))
     {
+        // Copy-ability counter (added, needs the patched cross_f.rpx): native code reads this
+        // star's newest hit target and counts the hit on the owner Kirby; on the 12th it gives
+        // Kirby that fighter's copy ability. Without the RPX patch this command does nothing.
+        BattleObject(0x1f4);
         BattleObject(0x9);
         return;
     }
