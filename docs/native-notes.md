@@ -213,3 +213,76 @@ costume value), and 1. What's missing:
   passes in.
 - A way for the star (weapon) to know which fighter it hit, and to tell Kirby
   (hit count + target kind). Not found yet.
+
+## Star missile hits: where the hit target lives (traced)
+
+### The star missile's native code
+
+- **Weapon kind `0x0B`**: index in the weapon-name table at `0x10419604`
+  (`fireball` = 0). The second `starmissile` (`0x28`) is presumably King
+  Dedede's.
+- Weapon-kind switches (`cmplwi 0x184`) at `0x02B650EC`, `0x02B68944`,
+  `0x02B6B794`, …, `0x0320D77C`, `0x0321099C` dispatch per weapon. Case `0x0B`
+  returns two star singletons: `0x10342F08`, and `0x10550148` (vtable
+  `0x100E0BD8`, the star's specializer). A weapon keeps its specializer
+  pointer at `weapon+0x1BF0`.
+- Specializer vtable entries are `(0, fn)` pairs, so a slot is the printed
+  offset + 4. Star-specific slots:
+  - `+0x5C` → `0x02B037B8`: event handler. Acts on event `0x1A`: sets
+    `0x21000000`, calls `0x02BEED58`, sets `0x20000004`.
+  - `+0xAC` → `0x02B03C34`: hit-result callback. Gets `(weapon, result
+    bits)`, not the target.
+- The base weapon class vtable is `0x100F78F8`. Its `+0x374` is
+  `0x02B89C38` (calls the specializer's `+0xAC`) and `+0x30C` is
+  `0x02B894C4` (calls `+0x5C`; event kind at `+8`).
+
+### MSC `AttackModule` (syscall `0x2E`)
+
+`0x030B50F0` calls `AttackModule(+0x50 of the module accessor)` vtable
+`+0x334` = `0x02C0ACFC`, a switch over commands `0x2710`–`0x2740` (49
+cases). It confirms `0x271A` = set damage and `0x271E` = add damage.
+`0x2726` reads `AttackModule+0xC4` (hit this frame) and `0x2727` reads
+`+0xC8` (hit since start; `0x2724` clears it). There's no command that
+returns the hit target.
+
+### Collision records (the hit target)
+
+`0x02C09C0C` (sets `+0xC4`/`+0xC8`) walks the attack module's **per-hitbox
+collision records**:
+
+```
+count  = *(u32*)(AM + 0x18)                 // hitboxes
+array  = *(u8**)(AM + 0x14)                 // stride 0x174 per hitbox
+for each hitbox h:
+    sentinel = array + h*0x174 + 0x124
+    node     = *(array + h*0x174 + 0x128)   // first node; node+4 = next
+    while node != sentinel:
+        target_id = *(u32*)(node + 0x18)    // object that was hit (resolve: 0x02BF2108)
+        type      = *(u8*)(node + 0x1C)     // 0 = hurtbox, 2 = …
+        state     = *(u8*)(node + 0x23)
+        hitbox_id = *(u8*)(node + 0x27)
+        node = *(node + 4)
+```
+
+These records are the "don't hit the same target twice" log, so they're
+still there right after the hit.
+
+### Step 2 plan (copy on the 12th star hit)
+
+A small code cave (new PPC code in unused space), reached from a spare
+command:
+
+1. Gets the star's attack module and reads hitbox 0's newest record →
+   `target_id`.
+2. Resolves the target (`0x02BF2108`). It skips non-fighters
+   (`0x02BEF5F4`) and reads the target's kind (`0x02BEF604`) and costume
+   value (`0x02BEF610`).
+3. Finds the owner Kirby (weapon owner/link), adds 1 to a counter in Kirby's
+   work memory, and on the 12th calls
+   `copy_grant(0x02E669F0(8), kirby, costume, kind, 1)`, then resets the
+   counter.
+
+The star's MSC calls it on the hit frame (`AttackModule(0x2726)`), just
+before it deletes itself. Still to find: a spare weapon-side command (or
+Kirby-side `BattleObject` case) to hook, the weapon → owner link, and free
+code space in the RPX.
