@@ -333,6 +333,17 @@ What this mod does:
      upwards. Steering stops for the rest of the swing (flag `0x21000021`).
      With `sideb_bounce_gravity()` = 1, his gravity and max fall speed come
      back on the bounce so it arcs. Set it to 0 to keep gravity off.
+     The bounce also jumps the animation (and its ACMD) to frame
+     `sideb_bounce_frame()` (40) with `MotionModule(0x2713, frame)`.
+   - `sideb_bounce_cancel_update()`: from `sideb_bounce_cancel()` (6) frames
+     after the bounce (frame 46), it enables the air-special and aerial
+     transition groups (`0x1F00000A`, `0x1F00000E`) and checks the aerial
+     (`func_63`) and air-special (`func_58`) inputs, so any attack cancels the
+     swing.
+   - `sideb_slow_update()`: if Kirby homed and didn't bounce, from swing frame
+     `sideb_slow_frame()` (35) his speed is multiplied by
+     `sideb_slow_factor()` (0.9) every frame (read with `KineticModuleF(0/1,
+     0x1)`, set on energies 3/1).
 
 Earlier versions used the start status `0x153`. That was wrong: the search
 box isn't in the start animation (`specialairsstart`, `0x28D`), so nothing

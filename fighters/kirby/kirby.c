@@ -40838,8 +40838,15 @@ void func_2466()
 // [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
+    int sideb_cancel;
     sideb_bounce_update(); // on-hit bounce (added), see the end of the file
+    sideb_cancel = sideb_bounce_cancel_update(); // cancel after the bounce (added)
+    if (sideb_cancel != 0)
+    {
+        return;
+    }
     sideb_homing_update(); // tracking (added), see the end of the file
+    sideb_slow_update();   // slowdown near the end (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70169,10 +70176,17 @@ int   sideb_homing_debug()     { return 0; }
 float sideb_bounce_back()      { return 0.8f; }  // backwards speed (away from where he faces)
 float sideb_bounce_up()        { return 1.5f; }  // upwards speed
 int   sideb_bounce_gravity()   { return 1; }     // 1 = give back Kirby's gravity on the bounce (so it arcs); 0 = keep it off
+float sideb_bounce_frame()     { return 40.0f; } // animation frame to jump to on the bounce
+float sideb_bounce_cancel()    { return 6.0f; }  // frames after the bounce until any attack can cancel it
+
+// Slowdown near the end of the swing (only after homing, not after a bounce).
+float sideb_slow_frame()       { return 35.0f; } // swing frame where Kirby starts losing speed
+float sideb_slow_factor()      { return 0.9f; }  // speed is multiplied by this every frame from then on
 
 // [Side-B bounce] swing loop (func_2467), every frame, before the steering. Once per swing.
 void sideb_bounce_update()
 {
+    float frame;
     float facing;
     float vx;
     float vy;
@@ -70194,6 +70208,8 @@ void sideb_bounce_update()
         return;
     }
     WorkModule(0x2710, 0x21000021);
+    frame = sideb_bounce_frame();
+    MotionModule(0x2713, frame); // jump the animation (and its ACMD) to the bounce frame
     facing = PostureModuleF(0);
     vx = sideb_bounce_back();
     vx = -facing * vx;
@@ -70309,4 +70325,70 @@ void sideb_homing_update()
     KineticModule(0xf, 0x1, 0);      // no gravity while steering
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
+    WorkModule(0x2710, 0x21000022); // homed: slow down near the end of the swing
+}
+
+// [Side-B bounce cancel] swing loop (func_2467). From sideb_bounce_cancel() frames after the
+// bounce, any aerial or air special cancels the swing. Returns 1 when it changed status.
+int sideb_bounce_cancel_update()
+{
+    float frame;
+    if (global4 != 0x171)
+    {
+        return 0;
+    }
+    if (!WorkModule(0x10, 0x21000021)) // only after a bounce
+    {
+        return 0;
+    }
+    frame = sideb_bounce_frame() + sideb_bounce_cancel();
+    if (MotionModuleF(0x1) < frame)
+    {
+        return 0;
+    }
+    WorkModule(0x19, 0x1f00000a); // allow air specials
+    WorkModule(0x19, 0x1f00000e); // allow aerials
+    if (func_63()) // aerial (or item shoot)
+    {
+        return 0x1;
+    }
+    if (func_58()) // special
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// [Side-B slowdown] swing loop (func_2467). After homing (and no bounce), from
+// sideb_slow_frame() on, Kirby's speed shrinks by sideb_slow_factor() every frame.
+void sideb_slow_update()
+{
+    float factor;
+    float vx;
+    float vy;
+    if (global4 != 0x171)
+    {
+        return;
+    }
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (!WorkModule(0x10, 0x21000022)) // didn't home
+    {
+        return;
+    }
+    if (WorkModule(0x10, 0x21000021)) // bounced
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) < sideb_slow_frame())
+    {
+        return;
+    }
+    factor = sideb_slow_factor();
+    vx = KineticModuleF(0, 0x1) * factor;   // current X speed (world direction)
+    vy = KineticModuleF(0x1, 0x1) * factor; // current Y speed
+    KineticModule(0x11, 0x3, vx, 0);
+    KineticModule(0x11, 0x1, vy);
 }
