@@ -54,17 +54,85 @@ plays a named animation or effect, so `BattleObject(0x405)` (called once by
 the Sonic copy's charge, `func_3469` in `kirby.c`) is probably the lock-on
 visual, **not** the target search.
 
-## Still to find: homing (kinetic type 0x68)
+## Homing (kinetic type 0x68): traced
 
-Kinetic types `0x64`+ are character-specific. For Kirby, `0x68` is the Sonic
-copy's homing (set in the pre of Sonic-copy status `0x193`). Setting it from
-side B (mid-status, or in the pre) doesn't home, so the target must come
-from somewhere tied to the Sonic-copy statuses. Next steps:
+### 1. Kirby's custom kinetic types follow the current copy ability
 
-1. In `fighter_kinetic_module_impl.cpp` / Kirby's specializer, find where the
-   kinetic type is turned into energies (a switch over type values
-   `0x64`+), and follow the `0x68` case.
-2. See what that homing energy reads for its target (a search hit stored on
-   the fighter, an opponent ID in work memory, …).
-3. If the target is stored in a work variable or set by a `BattleObject`
-   command, side B can supply it from MSC.
+Kirby's kinetic-type setup is `0x02F03AC8`. Types `<= 0x63` go to the common
+setup (`0x02E7EE14`). For `0x64`+ it reads the **copy ability** (work int
+`0x100000A4`) and jumps to that copy's helper object:
+
+| Copy | Helper (global pointer) |
+|---|---|
+| `0x0D` | `*0x105544E4` |
+| `0x0E` | `*0x1055453C` |
+| `0x10` | `*0x105566E0` |
+| `0x17` | `*0x10554438` |
+| `0x18` | `*0x105545DC` |
+| `0x22` (**Sonic**) | `*0x1056B3EC` |
+| `0x26`, `0x27`, `0x2E`, `0x35` | other helpers |
+| anything else | **returns without setting any energy** |
+
+The per-frame kinetic update `0x02F03DD8` reads `0x100000A4` the same way.
+
+**So `KineticModule(0, 0x68)` on Kirby only does something while Kirby has
+the Sonic copy.** With no copy (or a different one), the type changes but
+no energy is set up or updated. That is why side B with `0x68` never homed.
+
+### 2. The Sonic homing helper (shared by Sonic and Kirby's Sonic copy)
+
+`0x1056B3EC` is set at startup (`0x032158E4`) to a static object whose
+vtable is `0x1018B2A0`. Sonic stores the same pointer at `module+0x1A8`
+(`0x02F7D7E0`). Vtable entries:
+
+- `+0x1C` → `0x03214020`: kinetic setup. For `0x64`+ it jumps through a
+  table over `type - 0x64`; type `0x68` → `0x0321230C`.
+- `+0x24` → `0x032155A0`: per-frame update (the homing step is `0x03215314`).
+
+### 3. What the homing aims at
+
+The setup at `0x0321230C` and the update at `0x03215314` both do the same
+thing (the accessor's `+0x28` is WorkModule, `+0x18` is the position):
+
+```
+target_x = WorkModuleF(0, 0x1000006)
+target_y = WorkModuleF(0, 0x1000007)
+dir = normalize(target - my_position)
+```
+
+Then they add a random angle spread (RNG at `0x105659C0`), scaled by param
+floats `0x5000006`/`0x5000007`, and set the speed along `dir`. The update
+also counts down work int `0x11000005`, which the Sonic copy's main sets
+from param `0x1500000C`.
+
+**The "target" is just a point in two status work floats**, `0x1000006`
+(X) and `0x1000007` (Y). Something writes those before the switch to
+status `0x193`; that writer (search hit to work floats) is not found yet.
+It isn't in Kirby's event handler `0x02EF96A8`. That handler's event `0x4C4`
+sets flag `0x2100000D` only for status `0x210` (the Wii Fit copy).
+
+### 4. Status flow of Kirby's Sonic copy (MSC side, for reference)
+
+- `0x192` charge: at the release frame `func_3469` calls `BattleObject(0x405)`,
+  which starts `"SpecialNSearch"` for kind `0x22`.
+- `func_3467`: if flag `0x2100000D` is set, next = `0x193` (homing, kinetic
+  `0x68`); otherwise next = `0x195` (straight, kinetic `0x65`). It goes
+  through `0x194` (4 frames, kinetic `0x33`) first.
+
+### What this means for side-B homing
+
+- `0x68` cannot work unless `0x100000A4 == 0x22`.
+- Even then it needs a target point in `0x1000006`/`0x1000007`. If they are 0,
+  Kirby would home toward the stage origin.
+- Options:
+  - **(a)** Write the homing in MSC: each frame, compute the direction to a
+    point and set the air speed with `KineticModule(0x11, …)`. This doesn't
+    depend on copy abilities. The open question is how MSC gets an
+    opponent's position.
+  - **(b)** Experiment: while the move runs, set `0x100000A4 = 0x22`, write
+    the point into `0x1000006`/`0x1000007`, use type `0x68`, and restore the
+    real copy in the end script. This is hacky: other native code also
+    reads the copy ability.
+  - **(c)** Keep tracing the writer of `0x1000006`/`0x1000007` (Sonic's search
+    hit). If it fills them from the search box hit, the ACMD search box
+    could supply the opponent position.
