@@ -106,10 +106,41 @@ also counts down work int `0x11000005`, which the Sonic copy's main sets
 from param `0x1500000C`.
 
 **The "target" is just a point in two status work floats**, `0x1000006`
-(X) and `0x1000007` (Y). Something writes those before the switch to
-status `0x193`; that writer (search hit to work floats) is not found yet.
-It isn't in Kirby's event handler `0x02EF96A8`. That handler's event `0x4C4`
-sets flag `0x2100000D` only for status `0x210` (the Wii Fit copy).
+(X) and `0x1000007` (Y).
+
+### 3b. Who writes the target: Sonic's search-hit code
+
+Work memory layout (from the inlined accessors): `work+8` → group table.
+In a group: `+0x04` = floats, `+0x0C` = ints, `+0x14` = flag words.
+`0x1000006`/`7` are group 1 floats at `+0x18`/`+0x1C`. Searching for paired
+`stfs …,0x18/0x1C` found the writer: **`0x02F7E4D8`**, slot `+0x14C` of
+Sonic's specializer vtable (`0x1014479C`; the object is `0x105564FC`).
+
+```
+ok_kirby = (kind == 8 /*Kirby*/ && status == 0x192)
+if (event has a hit object && (status == 0x152 || ok_kirby)):
+    obj = hit object (ID at event+0x18), skipped if invalid
+    (x, y, z) = obj's node position (vtable 0x19C, node from event+0x24/0x26)
+    (some fighter kinds use another point, via 0x02BF00E4(…, 0xD))
+    if !flag 0x2100000D:      write (x, y) to 0x1000006/7, set 0x2100000D
+    elif flag 0x2100000E:     clear 0x2100000E, write
+    else:                     write only if nearer than the stored point
+                              (own position from obj+0x72F0)
+```
+
+How Kirby gets there: Kirby's slot `+0x14C` is `0x02EFB4FC`. It returns
+unless int `0x100000AD` is non-zero, then calls `0x02F00140`. That function
+switches on the copy kind cached in the specializer (`+0xB9CC`):
+
+- `0x16`, `0x1C` → that copy's vtable `+0xEC`;
+- `0x2A` → its own code;
+- `0x22`, `0x2B` → `0x02E669F0(kind)` (fighter kind → specializer;
+  `0x22` → `0x105564FC`), then vtable `+0x14C`;
+- anything else returns.
+
+So a search box only produces a homing target for Kirby with the Sonic copy
+in status `0x192`. The patch that opens this up to side B (`0x153`) is listed
+in `fighters/kirby/specials.md`.
 
 ### 4. Status flow of Kirby's Sonic copy (MSC side, for reference)
 
@@ -119,20 +150,8 @@ sets flag `0x2100000D` only for status `0x210` (the Wii Fit copy).
   `0x68`); otherwise next = `0x195` (straight, kinetic `0x65`). It goes
   through `0x194` (4 frames, kinetic `0x33`) first.
 
-### What this means for side-B homing
+### What we did with it
 
-- `0x68` cannot work unless `0x100000A4 == 0x22`.
-- Even then it needs a target point in `0x1000006`/`0x1000007`. If they are 0,
-  Kirby would home toward the stage origin.
-- Options:
-  - **(a)** Write the homing in MSC: each frame, compute the direction to a
-    point and set the air speed with `KineticModule(0x11, …)`. This doesn't
-    depend on copy abilities. The open question is how MSC gets an
-    opponent's position.
-  - **(b)** Experiment: while the move runs, set `0x100000A4 = 0x22`, write
-    the point into `0x1000006`/`0x1000007`, use type `0x68`, and restore the
-    real copy in the end script. This is hacky: other native code also
-    reads the copy ability.
-  - **(c)** Keep tracing the writer of `0x1000006`/`0x1000007` (Sonic's search
-    hit). If it fills them from the search box hit, the ACMD search box
-    could supply the opponent position.
+Side B now gets its target from this code through a 10-word RPX patch. MSC
+steers toward `0x1000006`/`0x1000007` itself, so kinetic `0x68` isn't needed.
+See `fighters/kirby/specials.md`.

@@ -40725,7 +40725,6 @@ void func_2458()
 // [SpecialSHoldFall 0x16F] loop: release -> Swing; land -> HoldLanding
 void func_2459()
 {
-    sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -40819,17 +40818,6 @@ void func_2464()
 // [SpecialSSwing 0x171] pre
 int func_2465()
 {
-    int homing;
-    homing = sideb_homing_enabled();
-    if (homing != 0 && global18 == 0x2)
-    {
-        // Air swing with tracking (added): start the status with Kirby's Sonic-copy homing kinetic
-        // type 0x68, set up exactly like the Sonic copy's homing status 0x193 pre (func_3484),
-        // so the game initialises the homing when the status starts.
-        StatusModule(0x5, 0x2, 0x68, 0x5, 0, 0x1, 0x10000, 0x10, 0xc0, 0);
-        StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x412, 0, 0x200, 0);
-        return 0;
-    }
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x412, 0, 0x200, 0);
     return 0;
@@ -40838,19 +40826,7 @@ int func_2465()
 // [SpecialSSwing 0x171] main: swing
 void func_2466()
 {
-    int homing;
-    int debug;
     WorkModule(0x2711, 0x2100000d);
-    homing = sideb_homing_enabled();
-    if (homing != 0 && global18 == 0x2)
-    {
-        WorkModule(0x2710, 0x21000020); // tracking swing (pre used kinetic 0x68): keep that kinetic type
-        debug = sideb_homing_debug();
-        if (debug != 0)
-        {
-            CameraModule(0x3, 0x2); // debug: camera quake when the tracking swing starts
-        }
-    }
     func_2468();
     if (global18 == 0)
     {
@@ -40863,7 +40839,6 @@ void func_2466()
 // [SpecialSSwing 0x171] loop: IASA; end -> Wait/Fall
 void func_2467()
 {
-    sideb_homing_update(); // tracking (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -40938,12 +40913,9 @@ void func_2468()
     }
     else
     {
-        if (!(global4 == 0x171 && WorkModule(0x10, 0x21000020))) // tracking swing: don't replace the homing kinetic
-        {
-            KineticModule(0, 0xa);
-            KineticModule(0xe, 0, 0x4, 0, 0, 0, 0, 0);
-        }
+        KineticModule(0, 0xa);
         GroundModule(0x2710, 0x5);
+        KineticModule(0xe, 0, 0x4, 0, 0, 0, 0, 0);
         if (WorkModule(0x10, 0x21000010))
         {
             if (WorkModule(0x10, 0x2100000d))
@@ -70173,47 +70145,95 @@ void starmissile_fire(int bone)
 }
 
 // ===================================================================
-// Side-B tracking (added). Used by func_2430.
+// Side-B tracking (added). Used by func_2430 (side-B start, 0x153).
+// Needs build/cross_f.rpx (see fighters/kirby/README.md): with that RPX, a search box
+// hit while Kirby is in status 0x153 runs the Sonic copy's search code, which stores the
+// hit opponent's position in status floats 0x1000006 (X) / 0x1000007 (Y) and keeps the
+// nearest one. This code then steers Kirby at that point.
 // ===================================================================
 int   sideb_homing_enabled() { return 1; }     // 0 = off
-float sideb_homing_frame()   { return 12.0f; } // in the start status (0x153) only: frame to start homing (the hop is at frame 10)
-int   sideb_homing_debug()   { return 1; }     // 1 = small camera shake when homing switches on (to check it runs); 0 = off
+float sideb_homing_frame()   { return 12.0f; } // frame of 0x153 to start steering (the hop is at frame 10)
+float sideb_homing_speed()   { return 2.0f; }  // flight speed while steering
+int   sideb_homing_debug()   { return 1; }     // 1 = small camera shake when a target is first steered at; 0 = off
 
-// [Side-B tracking] called every frame from the side-B start (0x153), hold fall (0x16F)
-// and swing (0x171) loops. Once per status, when Kirby is airborne, switch to the Sonic
-// copy's homing movement (kinetic type 0x68, used by the Sonic copy's status 0x193), which
-// flies at the target found by the search box in the side-B ACMD.
+// [Side-B tracking] called every frame from the side-B start loop (func_2430).
 void sideb_homing_update()
 {
     int enabled;
     int debug;
     float frame_gate;
+    float tx;
+    float ty;
+    float dx;
+    float dy;
+    float ang;
+    float speed;
+    float vx;
+    float vy;
+    float facing;
     enabled = sideb_homing_enabled();
     if (enabled == 0)
     {
         return;
     }
-    if (global18 != 0x2) // only in the air
+    if (global4 != 0x153)
     {
         return;
     }
-    if (WorkModule(0x10, 0x21000020)) // already switched in this status
+    // First frame of the status: "no target yet" = a point far away. The search code keeps
+    // whichever hit is nearer than the stored point, so any real hit replaces it.
+    if (!WorkModule(0x10, 0x21000020))
+    {
+        WorkModule(0, 99999.0f, 0x1000006);
+        WorkModule(0, 99999.0f, 0x1000007);
+        WorkModule(0x2710, 0x21000020);
+        return;
+    }
+    if (global18 != 0x2) // only steer in the air
     {
         return;
     }
-    if (global4 == 0x153) // start status: wait for the hop
+    frame_gate = sideb_homing_frame();
+    if (MotionModuleF(0x1) < frame_gate)
     {
-        frame_gate = sideb_homing_frame();
-        if (MotionModuleF(0x1) < frame_gate)
+        return;
+    }
+    tx = WorkModuleF(0, 0x1000006);
+    if (tx > 90000.0f) // no search hit yet
+    {
+        return;
+    }
+    ty = WorkModuleF(0, 0x1000007);
+    dx = tx - PostureModuleF(0x1);
+    dy = ty - PostureModuleF(0x2);
+    ang = MathF(0x1, dy, dx); // atan2(dy, dx)
+    speed = sideb_homing_speed();
+    vx = MathF(0x4, ang) * speed; // cos
+    vy = MathF(0x5, ang) * speed; // sin
+
+    // face the target
+    facing = PostureModuleF(0);
+    if (dx * facing < 0)
+    {
+        PostureModule(0x2710);
+        PostureModule(0x2);
+    }
+
+    KineticModule(0x11, 0x3, vx, 0); // X speed (world direction)
+    KineticModule(0x10, 0x3, 0, 0);  // no braking
+    KineticModule(0xb, 0x3);
+    KineticModule(0x11, 0x1, vy);    // Y speed
+    KineticModule(0xf, 0x1, 0);      // no gravity while steering
+    KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
+    KineticModule(0xb, 0x1);
+
+    if (!WorkModule(0x10, 0x21000021))
+    {
+        WorkModule(0x2710, 0x21000021);
+        debug = sideb_homing_debug();
+        if (debug != 0)
         {
-            return;
+            CameraModule(0x3, 0x2); // camera quake (sheet: Camera Quake, sys_D 0x3)
         }
-    }
-    KineticModule(0, 0x68); // Kirby's kinetic type 0x68 = Sonic copy homing
-    WorkModule(0x2710, 0x21000020);
-    debug = sideb_homing_debug();
-    if (debug != 0)
-    {
-        CameraModule(0x3, 0x2); // camera quake (sheet: Camera Quake, sys_D 0x3)
     }
 }

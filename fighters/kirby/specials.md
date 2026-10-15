@@ -284,51 +284,76 @@ set `starmissile_move_to_hand` to 0.
 (Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
 it normally does when spat out.
 
-## Added: side-B tracking (experimental)
+## Added: side-B tracking (experimental, needs the patched RPX)
 
-There's no documented MSC call for an opponent's position. Homing in Kirby's
-file comes from the Sonic copy's Homing Attack (status `0x193`). Its pre
-sets kinetic type `0x68`, and the game's native movement for that type flies
-at the target found by a search box in ACMD.
+How the game does it (traced in `cross_f.rpx`, details in
+`docs/native-notes.md`):
 
-Side B now does the same. `sideb_homing_update()` (end of `kirby.c`) runs
-every frame from three loops:
+- A search box hit on Kirby goes to Kirby's specializer, which hands it to
+  the current copy ability's code. For the Sonic copy it reaches Sonic's
+  search-hit code (`0x02F7E4D8`). That code only acts for Sonic in `0x152`,
+  or for Kirby in `0x192`. It stores the opponent's position in status floats
+  `0x1000006` (X) / `0x1000007` (Y), sets `0x2100000D`, and keeps the
+  nearest hit.
+- Kinetic type `0x68` (Sonic-copy homing) flies at that point, but only while
+  the copy ability is Sonic. That's why the earlier `0x68` tests did nothing.
 
-- the start status (`0x153`, `func_2430`), waiting until animation frame
-  `sideb_homing_frame()` (12, after the frame-10 hop);
-- the charging fall (`0x16F`, `func_2459`);
-- the swing (`0x171`, `func_2467`).
+What this mod does:
 
-Once per status, while Kirby is airborne, it calls `KineticModule(0, 0x68)`.
-Status flag `0x21000020` records that it already switched. The search box is
-in the side-B ACMD (added by hand).
+1. **RPX patch** (in `build/cross_f.rpx`, together with the star missile
+   count) sends search hits to that Sonic search code for Kirby with no copy
+   (or a copy without its own search code). It also lets Kirby's side-B
+   start status `0x153` capture targets, as well as `0x192`. Sonic and
+   Kirby's real Sonic copy behave as before.
+2. **MSC** (`sideb_homing_update()`, end of `kirby.c`, called from the
+   side-B start loop `func_2430`):
+   - On the first frame of `0x153`, it sets the target floats to a far-away
+     point (99999). The search code keeps whichever hit is nearer, so the
+     first real hit replaces it. Side B already uses `0x2100000D` as
+     "motion started", so that flag can't mean "target found" here.
+   - In the air, from frame `sideb_homing_frame()` (12): if a target is
+     stored (X < 90000), it turns Kirby to face it. It then sets his speed
+     toward it (atan2 → cos/sin × `sideb_homing_speed()`, 2.0) with no
+     gravity.
 
-Settings: `sideb_homing_enabled()` (1, 0 = off), `sideb_homing_frame()`, and
-`sideb_homing_debug()`. With debug on (1), the camera shakes
-(`CameraModule(0x3, 0x2)`) at the moment homing switches on, so you can see
-whether the code ran.
+The search box must be active **in the side-B start animation** (status
+`0x153`). Hits in other statuses are ignored. Steering only happens in
+`0x153`; once Kirby goes into the hold-fall (`0x16F`) or swing (`0x171`),
+normal movement takes over.
 
-**Untested:** whether the native homing movement picks up the search box's
-target outside the Sonic statuses. First version: only the start status
-had the switch, gated on frame 12, so air side B that went into the hold or
-swing statuses never switched. What you see in-game decides the next
-step:
-- **Kirby homes in:** done. Tune the start frame and the search box size.
-- **Kirby stops dead or drifts straight:** the movement didn't get a target.
-  The fallback is to switch into the Sonic copy's homing statuses
-  (`0x194` → `0x193`). That's proven to home, but it uses the Sonic copy's
-  animation and hitboxes.
+Settings: `sideb_homing_enabled()`, `sideb_homing_frame()`,
+`sideb_homing_speed()`, `sideb_homing_debug()`. With debug on (1), the
+camera shakes once, on the first frame Kirby steers at a target.
 
-**Test 1 result:** the camera shake showed, so the code ran, but no homing.
-Switching kinetic type `0x68` in the middle of a status doesn't home.
+Known limits:
+- Copy abilities with their own search code (kinds `0x16`, `0x1C`, `0x2A`,
+  `0x2B`) still use theirs, so side B won't capture with those copies.
+- With the patch, a search box hit in Kirby's neutral-B status `0x152` also
+  stores a target (Sonic's code accepts `0x152` for anyone). It's harmless
+  unless a neutral-B script uses those floats or `0x2100000D`.
 
-**Test 2 (current):** the air swing (`0x171`) now sets kinetic `0x68` in its
-**pre** script (`func_2465`), with the same `StatusModule(0x5, 0x2, 0x68,
-0x5, 0, 0x1, 0x10000, 0x10, 0xC0, 0)` line as the Sonic copy's homing status
-pre (`func_3484`). That's the step where the game initialises a movement
-type.
+### RPX patch (apply to the original `cross_f.rpx`)
 
-The swing main (`func_2466`) sets `0x21000020` (and shakes the camera if
-debug is on). With that flag set, the air branch of `func_2468` no longer
-replaces the movement with AIR_STOP (`0xA`). Ground swings and swings with
-tracking off are unchanged.
+```
+python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
+  0x10136C58=5 \
+  0x2EFB518=0x60000000 0x2F00194=0x38800022 0x2F00198=0x48000034 0x2F001C8=0x4082FFCC \
+  0x2F7E550=0x38000001 0x2F7E560=0x3808FEAD 0x2F7E564=0x3908FE6E 0x2F7E568=0x7C0041D6 \
+  0x2F7E574=0x60000000 0x2F7E590=0x408201EC
+```
+
+| Address | Was | Now | Why |
+|---|---|---|---|
+| `0x02EFB518` | `beq` (skip when int `0x100000AD` is 0) | `nop` | always hand the hit to the copy dispatcher |
+| `0x02F00194` | `lmw` (return, unhandled copy) | `li r4, 0x22` | treat it as Sonic… |
+| `0x02F00198` | `lfs` | `b 0x02F001CC` | …and call Sonic's search-hit code |
+| `0x02F001C8` | `bne 0x02F00430` | `bne 0x02F00194` | unhandled copies above `0x22` too |
+| `0x02F7E550` | `li r0, 0` | `li r0, 1` | r0 = 0 now means "status matches" |
+| `0x02F7E560` | `cmpwi r8, 0x192` | `addi r0, r8, -0x153` | |
+| `0x02F7E564` | `bne` | `addi r8, r8, -0x192` | |
+| `0x02F7E568` | `li r0, 1` | `mullw r0, r0, r8` | r0 = (status-0x153)·(status-0x192) |
+| `0x02F7E574` | `clrlwi r0, r0, 24` | `nop` | test the whole product |
+| `0x02F7E590` | `beq` | `bne` | skip unless the product is 0 |
+
+To use a different status than `0x153`, change the `-0x153` in
+`0x2F7E560` (`0x3808` followed by the 16-bit negative status).
