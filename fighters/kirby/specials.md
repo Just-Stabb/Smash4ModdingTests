@@ -284,7 +284,10 @@ set `starmissile_move_to_hand` to 0.
 (Kirby's `starmissile` weapon MSC/ACMD), not by Kirby. It will fly the way
 it normally does when spat out.
 
-## Added: side-B tracking (experimental, needs the patched RPX)
+## Added: side-B tracking (needs the patched RPX)
+
+**Tested in-game: works.** Kirby homes in on the opponent during the air
+swing, and inhale is unaffected. Debug is off (`sideb_homing_debug()` = 0).
 
 How the game does it (traced in `cross_f.rpx`, details in
 `docs/native-notes.md`):

@@ -70162,7 +70162,7 @@ float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
 //       Neither = this code isn't reached.
 //   2 = fake target: a point 40 units ahead and 20 up from where the swing started.
 //       Kirby should fly there. Tests the steering without the search box / RPX patch.
-int   sideb_homing_debug()     { return 1; }
+int   sideb_homing_debug()     { return 0; }
 
 // [Side-B tracking] swing main (func_2466): "no target yet" = a point far away. The search
 // code keeps whichever hit is nearer than the stored point, so any real hit replaces it.
