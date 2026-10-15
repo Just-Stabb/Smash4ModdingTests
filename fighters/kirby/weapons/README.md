@@ -32,9 +32,17 @@ is hash `0x92008FA0` in its `motion.mtable`, so those stars had no hitbox.
 The only scripts are for animations 0 and 2, and their `Special_Hitbox` has
 0 damage (vanilla presumably sets the spit star's damage natively).
 
-`build/acmd/weapon/starmissile/game.bin` adds a script for `0x92008FA0` with a
-copy of the vanilla star's `Special_Hitbox`, with **Damage 5**: angle 45,
-KBG 78, BKB 70, size 2.5, indirect, reflectable, hits each target once.
-Change the damage in FITX if needed.
+`build/acmd/weapon/starmissile/game.bin` adds a script for `0x92008FA0`
+with a **weak windbox**: a copy of the vanilla star's `Special_Hitbox` with:
+- damage 1.8, angle 20, KBG 20, BKB 35;
+- **Flinchless = 1**: it pushes, no hitstun;
+- hitlag 0, SDI 0;
+- indirect, reflectable, hits each target once.
+
+Tune it in FITX: BKB/KBG for push strength, angle for direction.
+
+The star disappears when it hits: `func_57` (status 1's per-frame script)
+calls `BattleObject(0x9)` (the same removal the lifetime timer uses) when
+`AttackModule(0x2726)` or `AttackModule(0x2727, 0x2)` reports a hit.
 
 Lifetime: 32 frames (`WorkModule(0x7, 32, 0x11000002)` in `func_59`).

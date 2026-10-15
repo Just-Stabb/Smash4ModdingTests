@@ -666,6 +666,12 @@ void func_56()
 // [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
+    // Disappear when the hitbox connects (added).
+    if (AttackModule(0x2726) || AttackModule(0x2727, 0x2))
+    {
+        BattleObject(0x9);
+        return;
+    }
     WorkModule(0xa, 0x11000002);
     if (WorkModule(0x6, 0x11000002) <= 0)
     {
