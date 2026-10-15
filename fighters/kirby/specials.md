@@ -504,3 +504,17 @@ Damage and knockback are the same as the normal throw.
   `throw_drop_update()` doesn't pause the animation again.
 - If the ACMD doesn't follow the frame jump, the throw just plays on to its
   normal release frame and still uses the finisher angle.
+
+### Throw loop points and finisher window (update)
+
+- The loop (pause + fall) frames are now **32** for forward throw
+  (`throw_drop_frame_f()`) and **30** for up throw
+  (`throw_drop_frame_hi()`).
+- The attack/special finisher only works **inside the loop**: while Kirby is
+  paused at the loop frame and falling (`global17` `0x1000`). It doesn't work
+  before the loop or after landing.
+- `throw_eat_inputs()` clears the buffered press when the finisher triggers
+  and again when the throw ends. It uses the same calls Kirby's item pickup
+  uses to consume an A press: `ControlModule(0x271B)`,
+  `ControlModule(0x271F)`, and zeroing `global24/31/29/45/38`. This stops the
+  press from also starting an aerial or special in the following Fall.

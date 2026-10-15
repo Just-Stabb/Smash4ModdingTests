@@ -70572,8 +70572,8 @@ void sideb_air_reset()
 // carries the opponent down to the blast zone. State bits in global17: 0x1000 = falling,
 // 0x2000 = already landed this throw.
 // ===================================================================
-float throw_drop_frame_f()  { return 35.0f; } // forward throw: last frame before the landing (impact effect at 36)
-float throw_drop_frame_hi() { return 45.0f; } // up throw: last frame before the landing (impact effect at 46)
+float throw_drop_frame_f()  { return 32.0f; } // forward throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
+float throw_drop_frame_hi() { return 30.0f; } // up throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
 float throw_drop_speed()    { return 3.0f; }  // fall speed while dropping
 
 // throw main (func_1136)
@@ -70675,8 +70675,6 @@ int throw_finish_update()
 {
     int kind;
     float release;
-    float land;
-    float lift;
     if (global4 != 0xdc)
     {
         return 0;
@@ -70685,14 +70683,10 @@ int throw_finish_update()
     if (kind == 0x78)
     {
         release = throw_release_f();
-        land = throw_drop_frame_f();
-        lift = 9.0f;
     }
     else if (kind == 0x7a)
     {
         release = throw_release_hi();
-        land = throw_drop_frame_hi();
-        lift = 6.0f;
     }
     else
     {
@@ -70702,6 +70696,7 @@ int throw_finish_update()
     {
         if (CatchModule(0x2712) == 0) // opponent released: end the throw
         {
+            throw_eat_inputs(); // drop buffered presses so the fall/wait doesn't start a move
             if (global18 == 0x2)
             {
                 KineticModule(0, 0x13);
@@ -70715,32 +70710,17 @@ int throw_finish_update()
         }
         return 0;
     }
-    // Only while airborne, before landing: the status counts as "air" the whole time, so
-    // use the animation instead: before the landing frame, or while dragging the opponent down.
-    if (global18 != 0x2)
+    // Only in the loop: while Kirby is paused at the loop frame and falling (before landing).
+    if (!(global17 & 0x1000))
     {
         return 0;
-    }
-    if (!(global17 & 0x1000)) // not dropping
-    {
-        if (global17 & 0x2000) // already landed after a drop
-        {
-            return 0;
-        }
-        if (MotionModuleF(0x1) < lift) // not lifted off yet (ACMD lifts Kirby at frame 9 / 6)
-        {
-            return 0;
-        }
-        if (MotionModuleF(0x1) >= land) // landing frame reached: too late
-        {
-            return 0;
-        }
     }
     if (!ControlModule(0x2710, 0) && !ControlModule(0x2710, 0x1)) // attack or special pressed
     {
         return 0;
     }
     WorkModule(0x2710, 0x21000012);
+    throw_eat_inputs(); // so the press doesn't also start another move
     if (global17 & 0x1000) // was dropping: stop
     {
         global17 = global17 - 0x1000;
@@ -70755,4 +70735,16 @@ int throw_finish_update()
     MotionModule(0x4, 1.0f);
     MotionModule(0x2713, release - 1.0f); // the ACMD releases on the next frame
     return 0;
+}
+
+// Clears buffered button inputs (same calls Kirby's item pickup uses to consume the A press).
+void throw_eat_inputs()
+{
+    ControlModule(0x271b);
+    ControlModule(0x271f);
+    global24 = 0;
+    global31 = 0;
+    global29 = 0;
+    global45 = 0;
+    global38 = 0;
 }
