@@ -70153,7 +70153,7 @@ void starmissile_fire(int bone)
 // ===================================================================
 int   sideb_homing_enabled()   { return 1; }     // 0 = off
 float sideb_homing_frame()     { return 1.0f; }  // first frame of the swing to steer on
-float sideb_homing_end_frame() { return 27.0f; } // stop steering after this frame (2nd hitbox ends at 27)
+float sideb_homing_end_frame() { return 5.0f; }  // last frame to steer on (frames 1-5 = 5 frames)
 float sideb_homing_speed()     { return 2.0f; }  // flight speed while steering
 // Debug (uses only speed calls, which are known to work from the side-B hop):
 //   0 = off
@@ -70220,6 +70220,13 @@ void sideb_homing_update()
     }
     if (frame > sideb_homing_end_frame())
     {
+        // steering over: give back Kirby's normal gravity and fall speed (once)
+        if (WorkModule(0x10, 0x21000020))
+        {
+            WorkModule(0x2711, 0x21000020);
+            KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+            KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+        }
         return;
     }
     tx = WorkModuleF(0, 0x1000006);
@@ -70233,6 +70240,7 @@ void sideb_homing_update()
             KineticModule(0x11, 0x1, 0);
             KineticModule(0xf, 0x1, 0);
             KineticModule(0xb, 0x1);
+            WorkModule(0x2710, 0x21000020);
         }
         return;
     }
@@ -70259,4 +70267,5 @@ void sideb_homing_update()
     KineticModule(0xf, 0x1, 0);      // no gravity while steering
     KineticModule(0x14, 0x1, speed); // max fall speed = flight speed
     KineticModule(0xb, 0x1);
+    WorkModule(0x2710, 0x21000020); // steered: restore gravity when steering ends
 }

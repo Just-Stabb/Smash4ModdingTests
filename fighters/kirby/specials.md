@@ -321,7 +321,8 @@ What this mod does:
      started", so that flag can't mean "target found".
    - `sideb_homing_update()`, called from the swing loop `func_2467`, runs in
      the air from frame `sideb_homing_frame()` (1) to
-     `sideb_homing_end_frame()` (27, end of the 2nd hitbox). If a target is
+     `sideb_homing_end_frame()` (5, so 5 frames of steering; afterwards
+     Kirby's gravity and max fall speed are restored). If a target is
      stored (X < 90000), it turns Kirby to face it and sets his speed toward it
      (atan2 → cos/sin × `sideb_homing_speed()`, 2.0), with no gravity.
 
