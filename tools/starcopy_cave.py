@@ -38,6 +38,13 @@ ACCESSOR = 0x02BEF5DC  # (&handle) -> module accessor
 GETSPEC = 0x02E669F0   # (r3, kind) -> fighter specializer
 COPYGRANT = 0x02EFCD8C # (spec, kirby accessor, costume, kind, 1)
 
+# Data addresses are NOT hard-coded: the loader relocates them, so the cave rebuilds each one
+# from an existing (already relocated) lis + lwz/addi instruction pair in the game's code,
+# found relative to the cave's own position (bl +4; mflr).
+ADDR_MANAGER = (0x02C09C5C, 0x02C09D5C)  # lis r30,0x102f / lwz r3,0x6c30(r30) -> &object manager ptr
+ADDR_GUARD = (0x02796680, 0x02796684)    # lis r10,0x1049 / lwzu r0,0x3140(r10) -> static guard word
+ADDR_SPECARG = (0x02796698, 0x027966A0)  # lis r3,0x104d / addi r3,r3,0x1632 -> r3 for GETSPEC
+
 
 def D(op, rd, ra, imm):
     return (op << 26) | (rd << 21) | (ra << 16) | (imm & 0xFFFF)
@@ -57,6 +64,11 @@ def cmplwi(ra, v): return D(10, 0, ra, v)
 def cmplw(ra, rb): return (31 << 26) | (ra << 16) | (rb << 11) | (32 << 1)
 def mr(ra, rs): return (31 << 26) | (rs << 21) | (ra << 16) | (rs << 11) | (444 << 1)
 def mtctr(rs): return (31 << 26) | (rs << 21) | (0x120 << 11) | (467 << 1)
+def mflr(rd): return (31 << 26) | (rd << 21) | (0x100 << 11) | (339 << 1)
+def addis(rd, ra, v): return D(15, rd, ra, v)
+def rlwinm(ra, rs, sh, mb, me): return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1)
+def extsh(ra, rs): return (31 << 26) | (rs << 21) | (ra << 16) | (922 << 1)
+def add(rd, ra, rb): return (31 << 26) | (rd << 21) | (ra << 16) | (rb << 11) | (266 << 1)
 
 
 MFLR_R0 = 0x7C0802A6
@@ -76,6 +88,20 @@ def build(stage=4):
     def emit(x): code.append(x)
     def label(n): labels[n] = len(code)
 
+    def load_addr(rd, pair):
+        """rd = address encoded by the (relocated) lis/low instruction pair. Clobbers r9-r11, LR."""
+        hi_insn, lo_insn = pair
+        emit(0x48000005)                       # bl +4
+        pc = CAVE + 4 * len(code)              # address of the mflr
+        emit(mflr(9))
+        for reg, target in ((10, hi_insn), (11, lo_insn)):
+            d = target - pc
+            ha = ((d + 0x8000) >> 16) & 0xFFFF
+            emit(addis(reg, 9, ha)); emit(lwz(reg, d & 0xFFFF, reg))
+        emit(rlwinm(10, 10, 16, 0, 15))        # lis immediate << 16
+        emit(extsh(11, 11))                    # low 16 bits, sign-extended
+        emit(add(rd, 10, 11))
+
     emit(lwz(6, 8, 5)); emit(lwz(6, 0, 6)); emit(lwz(6, 0, 6))  # command value
     emit(cmplwi(6, MAGIC)); emit(("bne", "ret0"))
     if stage == 1:
@@ -88,7 +114,7 @@ def build(stage=4):
     emit(lwz(5, 0x128, 4)); emit(addi(6, 4, 0x124)); emit(cmplw(5, 6)); emit(("beq", "out"))
     emit(lwz(30, 0x18, 5))                            # r30 = target id
     # resolve target
-    emit(lis(3, 0x102F)); emit(lwz(3, 0x6C30, 3))
+    load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
     emit(addi(4, 1, 0x10)); emit(mr(5, 30)); emit(li(6, 0)); emit(("bl", RESOLVE))
     emit(addi(3, 1, 0x10)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", CATEGORY)); emit(cmpwi(3, 0)); emit(("bne", "out"))
@@ -98,7 +124,9 @@ def build(stage=4):
         emit(("b", "out"))
     # owner Kirby
     emit(lwz(5, 0x1BF8, 31))
-    emit(lis(3, 0x102F)); emit(lwz(3, 0x6C30, 3))
+    emit(stw(5, 0x30, 1))                             # owner id (load_addr clobbers r9-r11 only)
+    load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
+    emit(lwz(5, 0x30, 1))
     emit(addi(4, 1, 0x20)); emit(li(6, 0)); emit(("bl", RESOLVE))
     emit(addi(3, 1, 0x20)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", KIND)); emit(cmpwi(3, 8)); emit(("bne", "out"))
@@ -112,10 +140,11 @@ def build(stage=4):
     emit(cmpwi(26, THRESHOLD)); emit(("blt", "store"))
     emit(li(26, 0))
     emit(cmpwi(29, 8)); emit(("beq", "store"))         # target is a Kirby: no copy
-    emit(lis(10, 0x1049)); emit(lwz(0, 0x3140, 10)); emit(cmpwi(0, 0)); emit(("bne", "g1"))
-    emit(li(0, 1)); emit(stw(0, 0x3140, 10))           # same static guard as the swallow code
+    load_addr(12, ADDR_GUARD)
+    emit(lwz(0, 0, 12)); emit(cmpwi(0, 0)); emit(("bne", "g1"))
+    emit(li(0, 1)); emit(stw(0, 0, 12))                # same static guard as the swallow code
     label("g1")
-    emit(lis(3, 0x104D)); emit(addi(3, 3, 0x1632)); emit(li(4, 8)); emit(("bl", GETSPEC))
+    load_addr(3, ADDR_SPECARG); emit(li(4, 8)); emit(("bl", GETSPEC))
     emit(mr(4, 27)); emit(mr(5, 28)); emit(mr(6, 29)); emit(li(7, 1)); emit(("bl", COPYGRANT))
     label("store")
     emit(lwz(3, 0x28, 27)); emit(lwz(12, 0, 3)); emit(lwz(12, 0x8C, 12)); emit(mtctr(12))

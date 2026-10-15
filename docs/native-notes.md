@@ -316,3 +316,13 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   targets) and resets the count. It returns 0 like the stub.
 - **MSC**: `starmissile.c` `func_57` calls `BattleObject(0x1F4)` when the
   hitbox connects, just before `BattleObject(0x9)`.
+- **Data addresses are relocated at load.** The first cave build used
+  absolute addresses (`0x102F6C30` manager pointer, `0x10493140` guard,
+  `0x104D1632` spec argument) and crashed on the first hit (stage 2, the first
+  data access). The game's own `lis`/`lwz` pairs for those addresses carry
+  HA/LO relocations, so the real address differs at runtime. The cave now
+  rebuilds each address from those already-relocated instructions
+  (`0x02C09C5C`/`0x02C09D5C`, `0x02796680`/`0x02796684`,
+  `0x02796698`/`0x027966A0`): `bl +4; mflr` for its own position, load both
+  instruction words, then `(hi << 16) + (s16)lo`. Never hardcode a
+  `0x10xxxxxx` address in cave code.
