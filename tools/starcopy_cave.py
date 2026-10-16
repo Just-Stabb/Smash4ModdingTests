@@ -20,7 +20,8 @@ For command MAGIC only:
   4. count = Kirby int COUNTER + 1. At THRESHOLD (and the target isn't a Kirby): store
      PEND_KIND = kind + 1 and PEND_COSTUME = costume in Kirby's ints, count = 0. Store count.
   It does NOT grant the copy: copy_grant crashed when called from the star's update.
-  Returns a progress code to the star's MSC (BattleObject's return value), for debugging:
+  Reports a progress code to the star's MSC as BattleObject's return value (written to
+  message+0xC, which is where the syscall 0x030B2E48 reads the result), for debugging:
   1 no attack module / records off, 2 no hit record, 3 target doesn't exist, 4 target isn't a
   valid fighter, 5 owner doesn't exist, 6 owner isn't Kirby, 7 hit counted,
   8 copy handed over (12th hit). 0 for any other command (like the stub it replaces).
@@ -180,6 +181,7 @@ def build_star(stage="4"):
     if upto == 0:
         e(("b", "ret0"))
     e(stwu(1, -0x60, 1)); e(MFLR_R0); e(stw(0, 0x64, 1)); e(stmw(26, 0x40, 1))
+    e(stw(5, 0x30, 1))                                # message (result goes to message+0xC)
     e(mr(31, 4))                                      # r31 = weapon
     if upto == 1:
         e(li(3, 0)); e(("b", "out"))
@@ -235,6 +237,8 @@ def build_star(stage="4"):
         a.label("f%d" % code)
         e(li(3, code)); e(("b", "out"))
     a.label("out")                                    # r3 = progress code
+    # MSC gets BattleObject's result from message+0xC, not r3 (syscall 0x030B2E48 reads 0x18(r1))
+    e(lwz(5, 0x30, 1)); e(stw(3, 0xC, 5))
     e(lmw(26, 0x40, 1)); e(lwz(0, 0x64, 1)); e(MTLR_R0); e(addi(1, 1, 0x60))
     e(BLR)
     a.label("ret0")
