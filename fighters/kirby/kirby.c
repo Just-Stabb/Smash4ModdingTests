@@ -70186,12 +70186,15 @@ int starmissile_fly_status()   { return 1; }      // star status to switch to af
 int   starmissile_mode()      { return 0; }    // Kirby int 0x100000A7 -> star mode 0x11000001: 0 = straight, 1 = lobbed, 2 = spinning
 float starmissile_scale()     { return 1.0f; } // Kirby float 0x4D -> star size/speed multiplier (the game's default is 1.0)
 float starmissile_power()     { return 2.0f; } // Kirby float 0x4E -> star damage (int 0x11000000, whole numbers only: 1.8 would be 1)
-// Aiming: Kirby stores the stick angle in int 0x10000097 (1000 + degrees + 90, 0 = no aim) before
-// each spawn; the star copies it on its first flying frame with BattleObject(0x1F5) (patched
+// Aiming (like Bowser's flame breath): holding up / down turns the aim angle gradually, at
+// starmissile_aim_speed() degrees per frame at full tilt; it stays where it is when the stick is
+// let go and starts straight each inhale (Kirby int 0x10000096, tenths of a degree). Kirby stores
+// it in int 0x10000097 (1000 + degrees + 90, 0 = straight) before each spawn; the star copies it on its first flying frame with BattleObject(0x1F5) (patched
 // cross_f.rpx, tools/starcopy_cave.py) and turns its speed that way.
 int   starmissile_aim_enabled()  { return 1; }     // 0 = no aiming
 float starmissile_aim_deadzone() { return 0.3f; }  // stick tilt needed to aim
 float starmissile_aim_limit()    { return 60.0f; } // max degrees above / below forward (Smash angles 300..60)
+float starmissile_aim_speed()    { return 4.0f; }  // degrees per frame at full stick tilt
 
 // [Star missile] per frame: fire every interval frames, alternating hands
 void starmissile_update()
@@ -70201,6 +70204,7 @@ void starmissile_update()
     int shot;
     int bone;
     counter = WorkModule(0x6, 0x11000005); // frame counter (status int, starts at 0 each inhale)
+    starmissile_aim_update(counter);
     interval = starmissile_interval();
     if (counter % interval == 0)
     {
@@ -70694,6 +70698,10 @@ void sideb_air_reset()
     {
         global17 = global17 - 0x4000;
     }
+    if (global17 & 0x400) // air grab landed
+    {
+        global17 = global17 - 0x400;
+    }
 }
 
 // ===================================================================
@@ -70710,7 +70718,7 @@ float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the 
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
 float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
-int   throw_loop_time_f()   { return 16; }    // forward throw: loop frames before the throw ends normally (in the air too)
+int   throw_loop_time_f()   { return 8; }     // forward throw: loop frames before the throw ends normally (in the air too)
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -70724,6 +70732,10 @@ void throw_drop_reset()
         global17 = global17 - 0x2000;
     }
     global17 = global17 - (global17 & 0xff0000); // forward throw loop timer
+    if (WorkModule(0x6, 0x11000002) == 0x78) // forward throw: no air grab until Kirby lands
+    {
+        global17 = global17 | 0x8000;
+    }
 }
 
 // throw loop (func_1137), every frame
@@ -71011,6 +71023,10 @@ int airgrab_check()
         return 0;
     }
     global17 = global17 | 0xc000;
+    if (global17 & 0x400)
+    {
+        global17 = global17 - 0x400;
+    }
     global17 = global17 - (global17 & 0xff0000); // hold timer (bits 0xFF0000, shared with the forward throw timer)
     func_16(0x35, 0x1);
     return 0x1;
@@ -71024,22 +71040,24 @@ int airgrab_update()
     {
         return 0;
     }
-    // Down throw (0x3E) keeps the air situation when it touches the floor (switching to the
-    // ground mid-throw released the opponent); it ends with Fall and lands normally.
-    if (global18 == 0x2 && global4 != 0xdc && global4 != 0x3e && GroundModule(0x2722, 0x8)) // touched the floor
+    if (global18 == 0x2 && global4 != 0xdc && GroundModule(0x2722, 0x8)) // touched the floor
     {
         func_20(0);
         GroundModule(0x2710, 0x2);
     }
-    if (global18 == 0) // on the ground: normal grab from here on
+    // On the ground: normal grab from here on. 0x4000 stays set until the next landing reset /
+    // air grab: clearing it here let a one-frame air flicker hit the grab statuses' own
+    // "in the air and not an air grab -> let go" checks, which broke the opponent free.
+    // 0x400 = already landed (switch the kinetic type once).
+    if (global18 == 0)
     {
-        global17 = global17 - 0x4000;
         if (global17 & 0x8000)
         {
             global17 = global17 - 0x8000;
         }
-        if (global4 != 0xdc && global4 != 0x3e) // throws handle their own landing
+        if (global4 != 0xdc && !(global17 & 0x400)) // forward / back / up throws handle their own landing
         {
+            global17 = global17 | 0x400;
             KineticModule(0, 0xf);
         }
         return 0;
@@ -71166,31 +71184,28 @@ void starcopy_update()
     }
 }
 
-// Aim code for Kirby int 0x10000097: 0 = no aim, else 1000 + (stick angle in degrees, relative
-// to forward, clamped) + 90.
-int starmissile_aim_code()
+// Gradual aim, every inhale frame: stick Y turns Kirby int 0x10000096 (tenths of a degree,
+// up +), clamped to +-starmissile_aim_limit(). Reset to straight on the inhale's first frame.
+void starmissile_aim_update(int counter)
 {
-    float sx;
-    float sy;
-    float dz;
+    int tenths;
     float deg;
-    int code;
+    float sy;
+    if (counter == 0)
+    {
+        WorkModule(0x7, 0, 0x10000096);
+    }
     if (starmissile_aim_enabled() == 0)
     {
-        return 0;
+        return;
     }
-    sx = global48 * PostureModuleF(0); // stick X towards where Kirby faces
-    sy = global32;                     // stick Y (up +)
-    dz = starmissile_aim_deadzone();
-    if (sx * sx + sy * sy < dz * dz)
+    sy = global32; // stick Y (up +)
+    if (sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
     {
-        return 0;
+        return;
     }
-    if (sx < 0 && sy * sy < dz * dz) // straight back: no aim
-    {
-        return 0;
-    }
-    deg = MathF(0x1, sy, sx) * 57.29578f; // atan2, degrees
+    tenths = WorkModule(0x6, 0x10000096);
+    deg = (float)tenths / 10.0f + sy * starmissile_aim_speed();
     if (deg > starmissile_aim_limit())
     {
         deg = starmissile_aim_limit();
@@ -71199,6 +71214,35 @@ int starmissile_aim_code()
     {
         deg = -starmissile_aim_limit();
     }
-    code = (int)(deg + 1090.5f); // 1000 + deg + 90, rounded
-    return code;
+    if (deg >= 0)
+    {
+        tenths = (int)(deg * 10.0f + 0.5f);
+    }
+    else
+    {
+        tenths = -(int)(-deg * 10.0f + 0.5f);
+    }
+    WorkModule(0x7, tenths, 0x10000096);
+}
+
+// Aim code for Kirby int 0x10000097: 0 = straight, else 1000 + (aim degrees, relative to
+// forward) + 90.
+int starmissile_aim_code()
+{
+    int tenths;
+    int deg;
+    tenths = WorkModule(0x6, 0x10000096);
+    if (tenths >= 0)
+    {
+        deg = (tenths + 5) / 10;
+    }
+    else
+    {
+        deg = -((5 - tenths) / 10);
+    }
+    if (deg == 0)
+    {
+        return 0;
+    }
+    return 1000 + deg + 90;
 }

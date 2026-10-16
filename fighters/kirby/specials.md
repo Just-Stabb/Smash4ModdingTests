@@ -537,13 +537,16 @@ Damage and knockback are the same as the normal throw.
 ### Forward throw loop timer
 
 - When the forward throw's loop starts (frame 32, dropping), a timer starts.
-  After `throw_loop_time_f()` (16) loop frames without landing or a
+  After `throw_loop_time_f()` (8) loop frames without landing or a
   finisher, the throw ends normally where Kirby is: the drop stops, the
   throw's motion kinetic comes back and the animation resumes, so the
   opponent is released by the normal forward throw (frame 45). Afterwards
   Kirby goes into Fall (animation end in the air).
 - The count is kept in bits `0xFF0000` of `global17`. It's cleared when the
   throw starts and when the loop starts. Up throw has no timer.
+- A forward throw marks the air grab as used (`0x8000`, set in
+  `throw_drop_reset()`), so Kirby can't air grab again until he lands or
+  grabs a ledge.
 
 ### Down throw slide
 
@@ -594,10 +597,15 @@ status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
   throw lifts off (`func_1138`). An air throw is airborne from its first
   frame, so it was cancelled at once. The check is skipped while
   `airgrab_on()`. Down throw is status `0x3E`, which has no such check.
-- **Down throw landing**: switching Kirby to the ground mid-throw
-  (`func_20(0)` in `airgrab_update`) released the opponent. For `0x3E` he
-  now keeps the air situation on the floor, finishes the throw, and ends in
-  Fall.
+- **Landing breakaway**: landing during the hold, a pummel or down throw
+  used to free the opponent. `airgrab_update()` cleared `0x4000` on the
+  first ground frame. If the situation flickered back to air for a frame,
+  the grab loops' own "airborne and not an air grab → Fall / CatchCut"
+  checks ran and let go. `0x4000` now stays set after landing and is only
+  cleared by `sideb_air_reset()` or the next air grab (`airgrab_on()` also
+  needs the air, so it's off on the ground anyway). Bit `0x400` of
+  `global17` means "already landed", so kinetic `0xF` is set once. Down
+  throw (`0x3E`) lands like the others again.
 - **Hold timer**: opponents can't escape an air grab normally. After
   `airgrab_hold_time()` (68) frames of CatchPull, CatchWait or CatchAttack
   in the air, Kirby goes into Fall, and the grab statuses' end scripts

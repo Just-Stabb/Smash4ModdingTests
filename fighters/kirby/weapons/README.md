@@ -79,11 +79,14 @@ Two earlier attempts didn't work in game:
 
 Now:
 
-1. **Kirby:** before each spawn, `starmissile_fire` stores
-   `starmissile_aim_code()` in his int `0x10000097`. That's 0 with the stick
-   neutral or straight back. Otherwise it's `1000 + angle + 90`, where the
-   angle is in degrees from Kirby's facing (+ up) and clamped to
-   ±`starmissile_aim_limit()` (60, i.e. Smash angles 300°–60°).
+1. **Kirby:** the aim works like Bowser's flame breath. Every inhale frame
+   `starmissile_aim_update()` turns the angle (Kirby int `0x10000096`, in
+   tenths of a degree, + up) by stick Y × `starmissile_aim_speed()` (4°
+   per frame at full tilt), past the 0.3 deadzone. It stays put when the
+   stick is let go, is clamped to ±`starmissile_aim_limit()` (60, i.e.
+   Smash angles 300°–60°) and starts straight each inhale. Before each
+   spawn, `starmissile_fire` stores `starmissile_aim_code()` in his int
+   `0x10000097`: 0 when straight, otherwise `1000 + angle + 90`.
 2. **Star, first flying frame (`func_57`):** it calls `BattleObject(0x1F5)`.
    The patched executable's star cave (`AIM_CMD` in
    `tools/starcopy_cave.py`) finds the owner Kirby and copies that int into
