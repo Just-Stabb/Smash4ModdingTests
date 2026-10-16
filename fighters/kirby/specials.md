@@ -344,8 +344,8 @@ What this mod does:
      he flies **straight forward** with no vertical speed. If a target turns
      up within the window, he steers at it from then on.
    - `sideb_bounce_update()`, also called from `func_2467` (before the
-     steering): the first time the air swing hits a hurtbox
-     (`AttackModule(0x2727, 0x2)`), Kirby gets `sideb_bounce_back()` (0.8)
+     steering): the first time the air swing hits a hurtbox or a shield
+     (`AttackModule(0x2727, 0x6)`: `0x2` hurtbox | `0x4` shield), Kirby gets `sideb_bounce_back()` (0.8)
      speed backwards (away from where he faces) and `sideb_bounce_up()` (1.5)
      upwards. Steering stops for the rest of the swing (flag `0x21000021`).
      With `sideb_bounce_gravity()` = 1, his gravity and max fall speed come
@@ -537,7 +537,7 @@ Damage and knockback are the same as the normal throw.
 ### Forward throw loop timer
 
 - When the forward throw's loop starts (frame 32, dropping), a timer starts.
-  After `throw_loop_time_f()` (12) loop frames without landing or a
+  After `throw_loop_time_f()` (10) loop frames without landing or a
   finisher, the throw ends normally where Kirby is: the drop stops, the
   throw's motion kinetic comes back and the animation resumes, so the
   opponent is released by the normal forward throw (frame 45). Afterwards
@@ -550,6 +550,12 @@ Damage and knockback are the same as the normal throw.
   throw, which is grounded until its lift-off. Otherwise a ground forward
   throw (after an air grab had landed) gave the air grab back and could loop
   into itself.
+- Forward throw lock (`global17` `0x80`): it's set when a forward throw
+  starts, and `airgrab_check()` refuses while it's set. The landing that
+  clears it (`sideb_air_reset()`) only counts once Kirby has been airborne in
+  something other than the throw or Fall (`0x8`, set by `fthrow_lock_update()`
+  in `func_74`). So the throw's own landing, or the Fall straight out of it,
+  doesn't give the air grab back. Kirby needs a real airtime and landing.
 
 ### Back throw: drift, drop, height damage, bury
 
@@ -557,7 +563,8 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
 (`throwb_*`) plus additions to `throw_drift_update` and `throw_drop_update`.
 
 - **Drift and drop**: like forward throw. The drift speed is
-  `throw_drift_scale_b()` (0.8) × the forward throw's (0.8). The loop frame is
+  `throw_drift_scale_b()` (0.8) × the forward throw's (0.8), backwards only
+  (stick input towards where Kirby faces is ignored). The loop frame is
   `throw_drop_frame_b()` (29), and the fall speed, acceleration and cap are the
   same. Right after lift-off (frame 13), energy 3 gets an extra upward
   speed of `throwb_lift_speed()` (2.0), fading to 0 by `throwb_lift_end()`
@@ -584,21 +591,25 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   There's one block per tier: `Int_Var_Compare(0x10000095, 0, t)` → `True`
   → the hitbox with damage 8 × (1 + t/10), up to 24. Tiers above 10 use
   hitlag 3.0 (3× hitstop) instead of 1.0.
-- **Above 2.0×** (tier > `throwb_big_tier()` = 10), once the opponent is
-  released and the animation reaches the slam (`throwb_hit_frame()` 42):
-  - a screen shake `CameraModule(0x2710, throwb_quake_kind())` (4; Kirby's
-    own moves use 2 and 3);
-  - the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`. It lasts
-    `throwb_zoom_time()` (20) frames, then `throwb_camera_update()` in
-    `func_74` resets it with `CameraModule(0x2718)`, so it still resets if
-    the throw is cancelled;
-  - from `throwb_cancel_frame()` (44, after the slam, because cancelling
+- **2.5× and up** (tier ≥ `throwb_zoom_tier()` = 15):
+  - **Zoom**: the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`
+    starts as soon as the drop so far is worth 2.5×, already during the fall
+    (`throwb_tier()` from the current height). It stays on until
+    `throwb_zoom_time()` (20) frames after the release. Kirby int
+    `0x10000093` counts down and is refreshed while the opponent is held.
+    `throwb_camera_update()` in `func_74` then resets it with
+    `CameraModule(0x2718)`, so it also resets if the throw is cancelled or
+    Kirby is KO'd.
+  - **Shake**: `CameraModule(0x2710, throwb_quake_kind())` (4; Kirby's own
+    moves use 2 and 3) once the opponent is released and the animation
+    reaches the slam (`throwb_hit_frame()` 42).
+- **Above 2.0×** (tier > `throwb_big_tier()` = 10): 3× hitstop (ACMD), and
+  from `throwb_cancel_frame()` (44, after the slam, because cancelling
     stops the ACMD), every frame runs `func_38()` (enable the ground groups)
     + `func_39()` (ground transitions), so any ground action cancels the
     throw.
-- **Untested**: whether the slam hitbox buries (the opponent has to be on
-  the ground when it hits). Quake kind 4: if it crashes or does nothing, use
-  3.
+- The slam hitbox buries (tested). Quake kind 4: if it crashes or does
+  nothing, use 3.
 
 ### Down throw slide
 
@@ -611,6 +622,15 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
 - From `throwlw_final_frame()` (56, the final hit in the `throwlw` ACMD;
   the release is frame 58) the speed is set to 0 every frame, so Kirby stops
   dead on the final hit.
+- **Air down throw landing loop** (`throwlw_land_*`, end of `kirby.c`): if
+  Kirby lands during a down throw started from an air grab, the animation
+  runs at `throwlw_land_speed()` (2×) its rate (`0x1000006`). It jumps from
+  `throwlw_loop_end()` (43) back to `throwlw_loop_start()` (6)
+  `throwlw_land_loops()` (9) times, and the ACMD's stomps play again each
+  time. Then the rest plays at the normal rate. State is in Kirby int
+  `0x10000098`: -1 = off, 0 = air and not landed yet, n = landed with n − 1
+  jumps left. It's set in the down throw main `func_1082` and run from its
+  loop `func_1084`.
 
 ## Added: air grab
 
