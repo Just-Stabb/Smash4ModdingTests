@@ -1709,6 +1709,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
         }
     }
     starcopy_update(); // copy ability from the 12th star missile hit (added), see the end of the file
+    throwb_camera_update(); // back throw: ends the big-hit camera zoom (added)
 }
 
 void func_75()
@@ -22205,6 +22206,10 @@ void func_1137()
     }
     throw_drift_update(); // stick drift in forward/up throw (added), see the end of the file
     throw_drop_update();  // keep falling below the start height until the floor (added)
+    if (throwb_update())  // back throw: grounded landing, big hit, cancel (added)
+    {
+        return 0x1;
+    }
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -70567,6 +70572,7 @@ void sideb_slow_update()
 // ===================================================================
 float throw_drift_speed_f()  { return 0.8f; }  // forward throw: drift speed at full stick
 float throw_drift_speed_hi() { return 0.4f; }  // up throw: 50% of the forward throw's speed
+float throw_drift_scale_b()  { return 0.8f; }  // back throw: 80% of the forward throw's speed
 
 // [Throw drift] throw loop (func_1137), every frame.
 void throw_drift_update()
@@ -70590,6 +70596,14 @@ void throw_drift_update()
     else if (kind == 0x7a)
     {
         speed = throw_drift_speed_hi();
+    }
+    else if (kind == 0x79)
+    {
+        if (global17 & 0x2000) // landed: no drift
+        {
+            return;
+        }
+        speed = throw_drift_speed_f() * throw_drift_scale_b();
     }
     else
     {
@@ -70714,6 +70728,7 @@ void sideb_air_reset()
 // ===================================================================
 float throw_drop_frame_f()  { return 32.0f; } // forward throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
 float throw_drop_frame_hi() { return 30.0f; } // up throw: loop frame (Kirby falls here until the floor; finishers only in this loop)
+float throw_drop_frame_b()  { return 29.0f; } // back throw: loop frame (Kirby falls here until the floor)
 float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the drop
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
@@ -70736,6 +70751,7 @@ void throw_drop_reset()
     {
         global17 = global17 | 0x8000;
     }
+    throwb_start();
 }
 
 // throw loop (func_1137), every frame
@@ -70757,6 +70773,10 @@ void throw_drop_update()
     {
         hold = throw_drop_frame_hi();
     }
+    else if (kind == 0x79)
+    {
+        hold = throw_drop_frame_b();
+    }
     else
     {
         return;
@@ -70767,6 +70787,11 @@ void throw_drop_update()
         {
             global17 = global17 - 0x1000;
             global17 = global17 | 0x2000;
+            if (kind == 0x79) // back throw: lands grounded with no momentum
+            {
+                throwb_land();
+                return;
+            }
             KineticModule(0x11, 0x1, 0);
             KineticModule(0x11, 0x3, 0, 0);
             KineticModule(0, 0x12);  // back to the throw's motion kinetic, so the animation's bounce moves Kirby
@@ -70820,6 +70845,11 @@ void throw_drop_update()
     }
     if (GroundModule(0x2722, 0x8)) // on the floor at the normal height: nothing to do
     {
+        if (kind == 0x79) // back throw: still land grounded
+        {
+            global17 = global17 | 0x2000;
+            throwb_land();
+        }
         return;
     }
     // still in the air at the landing frame: pause the animation and fall
@@ -71296,4 +71326,135 @@ int starmissile_aim_code()
         return 0;
     }
     return 1000 + deg + 90;
+}
+
+// ===================================================================
+// Back throw (added). Back throw is status 0xDC with kind 0x79 (int 0x11000002). Like forward /
+// up throw it drifts (throw_drift_update, 80% of the forward throw's speed) and pauses at its
+// loop frame (throw_drop_frame_b(), 29) to fall with the opponent until the floor
+// (throw_drop_update, same fall speeds as forward throw; off stage down to the blast zone).
+// On landing (throwb_land) Kirby is put on the ground with all his speed killed.
+// Damage: the further he fell from where the throw started, the stronger the release:
+// 1.0x at no drop up to throwb_mult_max() (2.4x) at throwb_height_max() units. The tier
+// (0 = 1.0x, 1 = 1.1x ... 14 = 2.4x) goes in Kirby int 0x10000095; the throwb ACMD picks the
+// matching throw 0 damage. Above 2.0x (tier > throwb_big_tier()): a strong screen shake, a camera
+// zoom at Kirby and, from the release on, any ground action cancels the throw.
+// Kirby ints: 0x10000094 = start height (tenths, + 100000), 0x10000095 = damage tier,
+// 0x10000093 = zoom frames left. global17 bit 0x10 = big-hit effects done.
+// ===================================================================
+float throwb_height_max()  { return 100.0f; } // drop (units) that gives the max multiplier
+float throwb_mult_max()    { return 2.4f; }   // max damage multiplier
+int   throwb_big_tier()    { return 10; }     // tier above this (more than 2.0x): shake, zoom, cancel
+int   throwb_quake_kind()  { return 0x4; }    // screen shake strength (CameraModule 0x2710; Kirby's own moves use 2 / 3)
+int   throwb_zoom_in()     { return 0xa; }    // zoom-in frames (same call as Kirby's Final Smash)
+float throwb_zoom_amount() { return 2.0f; }   // zoom (Final Smash uses 2.0)
+int   throwb_zoom_time()   { return 40; }     // frames before the camera goes back to normal
+
+// throw main (func_1136, via throw_drop_reset): remember the height the throw starts at
+void throwb_start()
+{
+    if (global17 & 0x10)
+    {
+        global17 = global17 - 0x10;
+    }
+    WorkModule(0x7, 0, 0x10000095);
+    if (WorkModule(0x6, 0x11000002) != 0x79)
+    {
+        return;
+    }
+    WorkModule(0x7, (int)(PostureModuleF(0x2) * 10.0f + 100000.5f), 0x10000094);
+}
+
+// throw loop: first floor contact of the back throw
+void throwb_land()
+{
+    float start;
+    float drop;
+    float mult;
+    int tier;
+    start = (float)(WorkModule(0x6, 0x10000094) - 100000) / 10.0f;
+    drop = start - PostureModuleF(0x2);
+    if (drop < 0)
+    {
+        drop = 0;
+    }
+    if (drop > throwb_height_max())
+    {
+        drop = throwb_height_max();
+    }
+    mult = 1.0f + (throwb_mult_max() - 1.0f) * drop / throwb_height_max();
+    tier = (int)((mult - 1.0f) * 10.0f + 0.5f);
+    WorkModule(0x7, tier, 0x10000095);
+    // grounded, no momentum
+    func_20(0);
+    GroundModule(0x2710, 0x2);
+    KineticModule(0, 0xf);
+    KineticModule(0x11, 0x1, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x10, 0x3, 0, 0);
+    MotionModule(0x4, 1.0f); // animation runs again: the release comes at frame 41
+}
+
+// throw loop (func_1137), every frame. Returns 1 when it changed status.
+int throwb_update()
+{
+    if (global4 != 0xdc)
+    {
+        return 0;
+    }
+    if (WorkModule(0x6, 0x11000002) != 0x79)
+    {
+        return 0;
+    }
+    if (!(global17 & 0x2000)) // not landed yet
+    {
+        return 0;
+    }
+    if (global18 != 0)
+    {
+        return 0;
+    }
+    KineticModule(0x11, 0x1, 0);    // keep the momentum dead
+    KineticModule(0x11, 0x3, 0, 0);
+    if (CatchModule(0x2712) == 0) // opponent released: the throw hitbox is out
+    {
+        if (WorkModule(0x6, 0x10000095) > throwb_big_tier())
+        {
+            if (!(global17 & 0x10))
+            {
+                global17 = global17 | 0x10;
+                CameraModule(0x2710, throwb_quake_kind());
+                CameraModule(0x2714, throwb_zoom_in(), 0, throwb_zoom_amount());
+                WorkModule(0x7, throwb_zoom_time(), 0x10000093);
+            }
+            func_38(); // ground actions
+            if (func_39())
+            {
+                return 0x1;
+            }
+        }
+    }
+    if (MotionModule(0x2712)) // animation end: stay on the ground
+    {
+        func_16(0, 0);
+        return 0x1;
+    }
+    return 0;
+}
+
+// every frame (func_74): camera back to normal after the big-hit zoom
+void throwb_camera_update()
+{
+    int t;
+    t = WorkModule(0x6, 0x10000093);
+    if (t <= 0)
+    {
+        return;
+    }
+    t = t - 1;
+    WorkModule(0x7, t, 0x10000093);
+    if (t == 0)
+    {
+        CameraModule(0x2718);
+    }
 }

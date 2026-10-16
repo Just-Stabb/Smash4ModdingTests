@@ -548,7 +548,44 @@ Damage and knockback are the same as the normal throw.
   `throw_drop_reset()`), so Kirby can't air grab again until he lands or
   grabs a ledge.
 
-### Down throw slide
+### Back throw: drift, drop, height damage, bury
+
+Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
+(`throwb_*`) plus additions to `throw_drift_update` and `throw_drop_update`.
+
+- **Drift and drop**: like forward throw. The drift speed is
+  `throw_drift_scale_b()` (0.8) × the forward throw's (0.8). The loop frame is
+  `throw_drop_frame_b()` (29), and the fall speed, acceleration and cap are the
+  same. There's no loop timer and no finisher, so off stage Kirby carries the
+  opponent down to the blast zone.
+- **Landing** (`throwb_land`, on the first floor contact at or after the
+  loop frame): Kirby is put on the ground (`func_20(0)`, ground correction,
+  kinetic `0xF`). All his speeds are zeroed, and they stay zeroed every frame
+  until the throw ends. The animation then resumes to the release at frame 41.
+  At the animation's end he goes to Wait instead of Fall.
+- **Height damage**: `throwb_start()` (throw main) stores Kirby's Y in int
+  `0x10000094` (tenths + 100000). On landing, the drop (start Y − landing Y)
+  gives a multiplier from 1.0× (no drop) to `throwb_mult_max()` (2.4×) at
+  `throwb_height_max()` (100 units). The multiplier is rounded to 0.1 steps,
+  and the tier (0–14) goes in int `0x10000095`.
+- **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`): throw 0 gets the bury effect
+  (`0xB`). Before the `Throw_Applier` there's one block per tier:
+  `Int_Var_Compare(0x10000095, 0, t)` → `True` → throw 0 re-specified with
+  damage 8 × (1 + t/10), up to 19.2.
+- **Above 2.0×** (tier > `throwb_big_tier()` = 10), once the opponent has
+  been released:
+  - a screen shake `CameraModule(0x2710, throwb_quake_kind())` (4; Kirby's
+    own moves use 2 and 3);
+  - the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`, reset with
+    `CameraModule(0x2718)` after `throwb_zoom_time()` (40) frames by
+    `throwb_camera_update()` in `func_74` (so it still resets if the throw
+    is cancelled);
+  - every frame, `func_38()` (enable the ground groups) + `func_39()` (ground
+    transitions), so any ground action cancels the throw.
+- **Untested**: the bury effect id `0xB` (from the Smash 4 effect list), and
+  whether bury works on a thrown opponent. Quake kind 4: if it crashes or
+  does nothing, use 3.
+
 
 - Down throw is the common Throw status `0x3E` with kind `0x7B`.
   `throwlw_slide_update()`, called at the top of its loop `func_1084`, sets
