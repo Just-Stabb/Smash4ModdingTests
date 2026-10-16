@@ -79,7 +79,7 @@ BLR = 0x4E800020
 COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1)}
 
 
-STAGES = ["1", "1a", "1b", "1c", "2", "3", "4"]
+STAGES = ["1", "1a", "1b", "1c", "2", "3", "4a", "4b", "4"]
 
 
 def build(stage="4"):
@@ -90,6 +90,8 @@ def build(stage="4"):
     1c = also resolve the target (one call)
     2  = also check / read the target (valid, fighter, kind, costume)
     3  = also find the owner Kirby
+    4a = also count the hit (read + write Kirby's counter), never grant a copy
+    4b = also get the copy specializer at the 12th hit, but don't grant the copy
     4  = full."""
     stage = str(stage)
     upto = STAGES.index(stage)
@@ -159,6 +161,8 @@ def build(stage="4"):
     emit(lwz(3, 0x28, 27)); emit(lwz(12, 0, 3)); emit(lwz(12, 0x84, 12)); emit(mtctr(12))
     emit(lis(4, COUNTER >> 16)); emit(ori(4, 4, COUNTER & 0xFFFF)); emit(BCTRL)
     emit(addi(26, 3, 1))
+    if upto == 6:
+        emit(("b", "store"))
     emit(cmpwi(26, THRESHOLD)); emit(("blt", "store"))
     emit(li(26, 0))
     emit(cmpwi(29, 8)); emit(("beq", "store"))         # target is a Kirby: no copy
@@ -167,6 +171,8 @@ def build(stage="4"):
     emit(li(0, 1)); emit(stw(0, 0, 12))                # same static guard as the swallow code
     label("g1")
     load_addr(3, ADDR_SPECARG); emit(li(4, 8)); emit(("bl", GETSPEC))
+    if upto == 7:
+        emit(("b", "store"))
     emit(mr(4, 27)); emit(mr(5, 28)); emit(mr(6, 29)); emit(li(7, 1)); emit(("bl", COPYGRANT))
     label("store")
     emit(lwz(3, 0x28, 27)); emit(lwz(12, 0, 3)); emit(lwz(12, 0x8C, 12)); emit(mtctr(12))
