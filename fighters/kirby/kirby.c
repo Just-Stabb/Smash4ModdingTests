@@ -70337,7 +70337,7 @@ void sideb_homing_init()
     float facing;
     float tx;
     float ty;
-    global17 = global17 & 0xc300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200) and air grab bits (0x4000, 0x8000)
+    global17 = global17 & 0xf00c300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200), air grab bits (0x4000, 0x8000) and star copy debug (0xF000000)
     WorkModule(0, 99999.0f, 0x1000006);
     WorkModule(0, 99999.0f, 0x1000007);
     debug = sideb_homing_debug();
@@ -71070,10 +71070,48 @@ void throwlw_air_end()
 // granted from Kirby's own update, so the main loop calls BattleObject(0x409) while one is
 // pending; the patched command clears 0x100000AA and grants the copy.
 // ===================================================================
+int starcopy_debug() { return 1; } // 1 = show progress as damage on Kirby (see below), 0 = off
+
+// Debug (starcopy_debug() == 1), shown as damage added to Kirby:
+//   +1%  every time the star code counts a hit (int 0x100000A8 changes)
+//   +10% when a copy is handed over on the 12th hit (Kirby's MSC sees 0x100000AA)
+//   +30% right after, if the patched BattleObject(0x409) didn't take it (hook not reached)
+//   +5%  right after, if Kirby's copy ability int (0x100000A4) changed (copy granted)
+// The last seen count is kept in bits 0x0F000000 of global17.
 void starcopy_update()
 {
+    int count;
+    int seen;
+    int before;
+    if (starcopy_debug())
+    {
+        count = WorkModule(0x6, 0x100000a8) & 0xf;
+        seen = (global17 & 0xf000000) / 0x1000000;
+        if (count != seen)
+        {
+            global17 = global17 - (global17 & 0xf000000) + count * 0x1000000;
+            DamageModule(0x9, 1.0f);
+        }
+    }
     if (WorkModule(0x6, 0x100000aa) > 0)
     {
+        if (starcopy_debug())
+        {
+            DamageModule(0x9, 10.0f);
+        }
+        before = WorkModule(0x6, 0x100000a4);
         BattleObject(0x409);
+        if (starcopy_debug() && WorkModule(0x6, 0x100000a4) != before)
+        {
+            DamageModule(0x9, 5.0f);
+        }
+        if (WorkModule(0x6, 0x100000aa) > 0) // not taken: the 0x409 patch isn't in this cross_f.rpx
+        {
+            WorkModule(0x7, 0, 0x100000aa);
+            if (starcopy_debug())
+            {
+                DamageModule(0x9, 30.0f);
+            }
+        }
     }
 }
