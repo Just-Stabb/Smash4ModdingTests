@@ -71070,20 +71070,22 @@ void throwlw_air_end()
 // granted from Kirby's own update, so the main loop calls BattleObject(0x409) while one is
 // pending; the patched command clears 0x1000009E and grants the copy.
 // ===================================================================
-int starcopy_debug() { return 1; } // 1 = show progress with Kirby's actions (see below), 0 = off
+int starcopy_debug() { return 1; } // 1 = show progress with Kirby's hops (see below), 0 = off
 
-// Debug (starcopy_debug() == 1), shown when Kirby stands idle (Wait) on the ground:
-//   he HOPS N times in a row after a star hit, N = the star code's result (int 0x1000009C):
-//     1 star's attack module missing / hit records off, 2 no hit record, 3 target doesn't
-//     exist, 4 target isn't a fighter, 5 hit counted, 6 copy handed over (12th hit).
-//     No hops = the star code couldn't find its owner Kirby (or didn't run).
-//   he TAUNTS (first) after a copy was handed over (0x1000009E seen here).
-//   Self-test: he hops once the first time he stands idle in a match.
-// global17 bits: 0x20000000 taunt pending, 0x40000000 self-test done.
+// Debug (starcopy_debug() == 1): Kirby HOPS N times in a row when he stands idle on the ground.
+//   After a star hit, N = the star code's result (int 0x1000009C): 1 accessor bad, 2 attack
+//   module bad, 3 hit records off, 4 record array bad, 5 no record, 6 record node bad,
+//   8 target doesn't exist, 9 target isn't a fighter, 10 hit counted, 11 copy handed over.
+//   Right after the copy hand-over (12th hit) it's replaced by: 1 = the BattleObject(0x409)
+//   patch didn't run, 2 = it ran but the copy ability (int 0x100000A4) didn't change,
+//   3 = the copy ability changed.
+//   Self-test: one hop the first time he stands idle in a match.
+// global17 bit 0x40000000 = self-test done.
 // Runs at the end of the main loop (func_74), after the status script.
 void starcopy_update()
 {
     int hops;
+    int before;
     if (starcopy_debug() && !(global17 & 0x40000000))
     {
         global17 = global17 | 0x40000000;
@@ -71091,22 +71093,27 @@ void starcopy_update()
     }
     if (WorkModule(0x6, 0x1000009e) > 0)
     {
-        global17 = global17 | 0x20000000;
+        before = WorkModule(0x6, 0x100000a4);
         BattleObject(0x409);
         if (WorkModule(0x6, 0x1000009e) > 0) // not taken: the 0x409 patch isn't in this cross_f.rpx
         {
             WorkModule(0x7, 0, 0x1000009e);
+            WorkModule(0x7, 0x1, 0x1000009c);
+        }
+        else if (WorkModule(0x6, 0x100000a4) != before)
+        {
+            WorkModule(0x2710, 0x2000009a); // Kirby has a copy ability (neutral B uses it)
+            WorkModule(0x7, 0x3, 0x1000009c);
+        }
+        else
+        {
+            WorkModule(0x7, 0x2, 0x1000009c);
         }
     }
     if (starcopy_debug() && global4 == 0 && global18 == 0)
     {
         hops = WorkModule(0x6, 0x1000009c);
-        if (global17 & 0x20000000)
-        {
-            global17 = global17 - 0x20000000;
-            func_16(0x14d, 0); // taunt
-        }
-        else if (hops > 0)
+        if (hops > 0)
         {
             WorkModule(0x7, hops - 1, 0x1000009c);
             func_16(0xa, 0); // hop
