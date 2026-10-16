@@ -6,6 +6,10 @@ The transformation finals keep it set the whole time. These caves ignore the bit
 kinds 0x3A-0x3D (koopag, warioman, littlemacg, lucariom) unless the current status kind is in
 the special common range 0x139-0x151 (entry / rebirth / final / dead), so the transformation
 itself stays ungrabbable.
+
+Site 2 (status change) also requires flags +4 bit 0x20000, which only the post-respawn timer
+(fighter update, [..+0xC]+0x160) sets; the transformations never run that timer, so for them
+the cave jumps straight to 0x02E28D78 (catch = !(status data & 0x800)).
 """
 CAVE = 0x037EE600
 KIND_LO, KIND_HI = 0x3A, 0x3D
@@ -72,33 +76,29 @@ def patches():
     # site 1: fighter update, r31 = fighter, r0 = flags word, r5 dead (next: addic r5,r0,-1)
     s1, end = stub(CAVE, 0, 0, 31, 5, 0x02E25290)
     p += s1 + [(0x02E2528C, b(0x02E2528C, CAVE))]
-    # site 2: r30 = fighter, r8 = flags word, result in r6; r0 dead (next: addic r0,r6,-1)
-    # r0 can't be a base register, so use r6 as scratch and restore the bit when keeping it.
+    # site 2 (status change): r30 = fighter, r8 = flags word, result in r6; r0 dead.
+    # For the transformations outside the special statuses, skip both the 0x08000000 check and
+    # the +4 bit 0x20000 check and go straight to catch = !(status data & 0x800).
     c2 = end
-    lbl_keep = None
-    s2 = [
-        rlwinm(6, 8, 0, 4, 4, 1),
-        None,                                # beq done
-        lwz(6, 4, 30), cmpwi(6, KIND_LO), None, cmpwi(6, KIND_HI), None,   # blt/bgt keep
-        lwz(6, 0x7494, 30), lwz(6, 0x48, 6),
-        cmpwi(6, ST_LO), None,               # blt clear
-        cmpwi(6, ST_HI), None,               # ble keep
-        li(6, 0), None,                      # clear: li r6,0; b done
-        lis(6, 0x0800),                      # keep: r6 = 0x08000000
-        None,                                # done: b 0x02E28D54
-    ]
     A = lambda i: c2 + 4 * i
-    keep, clear, done = A(15), A(13), A(16)
-    s2[1] = bc(*BEQ, A(1), done)
-    s2[4] = bc(*BLT, A(4), keep)
-    s2[6] = bc(*BGT, A(6), keep)
-    s2[10] = bc(*BLT, A(10), clear)
-    s2[12] = bc(*BLE, A(12), keep)
-    s2[14] = b(A(14), done)
-    s2[16] = b(A(16), 0x02E28D54)
+    s2 = [
+        lwz(6, 4, 30), cmpwi(6, KIND_LO), None, cmpwi(6, KIND_HI), None,   # blt/bgt orig
+        lwz(6, 0x7494, 30), lwz(6, 0x48, 6),
+        cmpwi(6, ST_LO), None,               # blt open
+        cmpwi(6, ST_HI), None,               # ble orig
+        lwz(3, 0x74B8, 30), None,            # open: r3 = HitModule; b 0x02E28D78
+        rlwinm(6, 8, 0, 4, 4), None,         # orig: original instruction; b 0x02E28D54
+    ]
+    opn, orig = A(11), A(13)
+    s2[2] = bc(*BLT, A(2), orig)
+    s2[4] = bc(*BGT, A(4), orig)
+    s2[8] = bc(*BLT, A(8), opn)
+    s2[10] = bc(*BLE, A(10), orig)
+    s2[12] = b(A(12), 0x02E28D78)
+    s2[14] = b(A(14), 0x02E28D54)
     p += [(A(i), w) for i, w in enumerate(s2)]
     p += [(0x02E28D50, b(0x02E28D50, c2))]
-    assert A(17) <= 0x037EE740
+    assert A(15) <= 0x037EE740
     return p
 
 

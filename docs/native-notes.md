@@ -602,3 +602,12 @@ rebirth, final, dead). Everyone else is unchanged.
 
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/grab_fix/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py)
+
+**Result:** no freeze, but Mega Lucario still couldn't be grabbed. Site 2 (`0x02E28D50`, in the
+status-change function) also needs flags `+4` bit `0x20000`, which only the post-respawn timer
+(site 1, `[..+0xC]+0x160` counting down) sets. The transformations never run that timer.
+
+**Third try:** for kinds `0x3A`–`0x3D` outside statuses `0x139`–`0x151`, the site 2 cave now
+skips both checks (whatever the 0x08000000 bit is) and jumps to `0x02E28D78`
+(catch = !(status data & `0x800`)). The catch state is set on every status change, so they
+become grabbable from their first normal status after the transformation.
