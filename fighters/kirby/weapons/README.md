@@ -47,15 +47,27 @@ calls `BattleObject(0x9)` (the same removal the lifetime timer uses) when
 
 Lifetime: 32 frames (`WorkModule(0x7, 32, 0x11000002)` in `func_59`).
 
-### Damage set from MSC
+### Damage, flight mode and size (set by Kirby before each spawn)
 
-The ACMD damage (1.8) didn't apply in-game. Vanilla star hitboxes all have 0
-damage in ACMD, so the game sets the power natively when Kirby spits
-something, and that leaves inhale stars at 0. `func_57` now calls
-`AttackModule(0x271A, 0, starmissile_damage())` every frame (sheet: "Set
-damage", hitbox ID, float), with `starmissile_damage()` = 1.8. The
-first version used `0x271E`, which the sheet lists as "Add hitbox damage",
-so every frame added another 1.8.
+The star's native setup (`0x02B031DC`, run when the star is created) copies
+three of **Kirby's** values into the star:
+
+| Kirby value | Star value | What it does |
+|---|---|---|
+| int `0x100000A7` | mode `0x11000001` | 0 = straight, 1 = lobbed (angle + gravity), 2 = spinning |
+| float `0x4D` | float `0x1000001` | size and speed multiplier (≤ 0 means 1.0) |
+| float `0x4E` | int `0x11000000` | **damage** (converted to a whole number) |
+
+The swallow/spit code sets these, so inhale stars used to inherit whatever
+the last spit or landing left. That made them lob after Kirby landed, and
+gave them 0 damage when nothing had been swallowed. The star's code
+(`0x02B03888`) sets every hitbox's power from `0x11000000`, which overrode
+the earlier `AttackModule(0x271A, …)` damage set in `func_57` (now removed).
+
+`starmissile_fire` in `kirby.c` now sets them right before
+`ArticleModule(0x2718, 0x17)`, from `starmissile_mode()` (0),
+`starmissile_scale()` (1.0) and `starmissile_power()` (2.0). Damage can only
+be a whole number this way (1.8 would become 1).
 
 ## Copy ability after 12 star hits (needs the patched `cross_f.rpx` and Kirby's MSC)
 

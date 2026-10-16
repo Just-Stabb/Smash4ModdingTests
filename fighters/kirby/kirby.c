@@ -70181,6 +70181,11 @@ int starmissile_generate_cmd() { return 0x2718; } // 0x2718 = generate, the call
 int starmissile_move_to_hand() { return 1; }      // 1 = move the new star to the hand bone; 0 = leave it where the game spawns it
 int starmissile_shoot()        { return 0; }      // 1 = also call ArticleModule "shoot" (release) after spawning
 int starmissile_fly_status()   { return 1; }      // star status to switch to after spawning: 1 = flying (has the lifetime); -1 = don't switch
+// The star's native setup (0x02B031DC) copies three of Kirby's values into each new star; the
+// swallow/spit sets them, so without these the inhale stars inherit the last spit's values:
+int   starmissile_mode()      { return 0; }    // Kirby int 0x100000A7 -> star mode 0x11000001: 0 = straight, 1 = lobbed, 2 = spinning
+float starmissile_scale()     { return 1.0f; } // Kirby float 0x4D -> star size/speed multiplier (the game's default is 1.0)
+float starmissile_power()     { return 2.0f; } // Kirby float 0x4E -> star damage (int 0x11000000, whole numbers only: 1.8 would be 1)
 
 // [Star missile] per frame: fire every interval frames, alternating hands
 void starmissile_update()
@@ -70227,6 +70232,10 @@ void starmissile_fire(int bone)
     {
         return; // all slots in use: skip this shot
     }
+    // straight flight and this damage for the new star (read once by the star's native setup)
+    WorkModule(0x7, starmissile_mode(), 0x100000a7);
+    WorkModule(0, starmissile_scale(), 0x4d);
+    WorkModule(0, starmissile_power(), 0x4e);
     cmd = starmissile_generate_cmd();
     ArticleModule(cmd, article); // create a new star
     fly = starmissile_fly_status();

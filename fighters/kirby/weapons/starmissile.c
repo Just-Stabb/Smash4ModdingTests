@@ -709,9 +709,8 @@ void func_57()
         BattleObject(0x9);
         return;
     }
-    // Damage (added): the game sets the star's hitbox power itself (vanilla ACMD damage is 0),
-    // which leaves inhale stars at 0, so set hitbox 0's damage every frame (sheet: 0x271A = Set damage).
-    AttackModule(0x271a, 0, starmissile_damage()); // set hitbox 0's damage (0x271E would ADD it every frame)
+    // Damage: the game sets the hitbox power from int 0x11000000 itself (0x02B03888), which
+    // overrode an AttackModule set here. Kirby's MSC sets it at spawn (starmissile_power in kirby.c).
     WorkModule(0xa, 0x11000002);
     if (WorkModule(0x6, 0x11000002) <= 0)
     {
@@ -825,6 +824,5 @@ void func_62()
     }
 }
 
-float starmissile_damage() { return 1.8f; } // inhale star damage (added; also set in the ACMD)
 
 int starcopy_debug() { return 0; } // 1 = after a hit, the star bobs (progress code) times; 0 = off
