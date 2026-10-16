@@ -403,3 +403,28 @@ Other kind helpers found along the way:
 - `0x03058B6C`: returns 0 for `0x3A` / `0x3C`. Called from `0x02E159E8` and
   `0x034FC03C`.
 - `0x030BF9C0` / `0x030C1FDC`: transform kind → base kind.
+
+**Tested: the `0x02704F44` patch did NOT remove Mega Lucario's armor or grab immunity.** Go back
+to the normal build.
+
+### Armor ("no reaction") in the DamageModule
+
+- DamageModule vtable around `0x10105B88` (8-byte entries: function, 0). The MSC `DamageModule`
+  syscall (`0x030B2F8C`) goes through the module accessor's `+0x54` (DamageModule) and its
+  vtable `+0x1E4`.
+- `0x02C24AB0`: set armor (the MSC `DamageModule(0xB, mode, value)`). It calls
+  `0x02C24D34(this+0x10, slot 0, mode, f1, f2, r6)`. `0x02C24AC4` resets it (`0x02C24D68`).
+- `0x02C24D34(container, slot, mode, f1, f2, r6)`: the armor container has 16-byte slots at
+  `+4 + slot*16` (mode, two floats, int). Slot 0 is the status armor that MSC sets. Slot 1 is
+  set natively:
+  - `0x02F05E6C` (`fighter_koopag.cpp` area): Giga Bowser, slot 1, mode 2 (knockback-based) with a
+    param value.
+  - `0x02F07270` (`fighter_koopa.cpp` area): Bowser's Tough Guy, slot 1, mode 2.
+  - `0x02E1A170(fighter, on, r5, f1)`: slot 1, mode 1 (super armor), and bit `0x20000` in a
+    status flag word. It's turned on through `0x02E47828` ← `0x02E51410` ← `0x036343F4`
+    (looks like item / state code, not the transformations).
+- Fighter object: `+0x74C0` = DamageModule (its armor container at `+0x10`), `+0x74D8` = effect
+  module?, `+0x75A8` = a kind number used by `0x02E1A338`. `0x02E1A338` is called for kind
+  `0x3C` / `0x3D` from `0x02E1B3F8` and looks scale / size related, not armor.
+- The Mega Lucario specializer vtable is at `0x100977D0` (96 entries, functions around
+  `0x027A1CB4`–`0x027A3xxx`). No direct armor or capture setter calls were found in it.

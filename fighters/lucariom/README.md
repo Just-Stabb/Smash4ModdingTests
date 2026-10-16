@@ -36,3 +36,6 @@ never in that check. See `docs/native-notes.md`.
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02704FC4=0x2C007FFF 0x02704FCC=0x2C007FFF 0x02704FD4=0x2C007FFF
 
 (The first test only patched `0x02704FD4`, Mega Lucario.)
+
+**Result:** the `0x02704F44` test patch didn't remove the armor or the grab immunity. Use the
+normal `cross_f.rpx`. More notes are in `docs/native-notes.md` (DamageModule armor slots).
