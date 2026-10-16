@@ -655,7 +655,8 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   loop `func_1084`.
 - **Landing loop zoom**: when the loop starts, a slight zoom on Kirby
   (`CameraModule(0x2714, throwlw_zoom_in() 10, 0, throwlw_zoom_amount()
-  1.4)`; the back throw's big hit uses 2.0). `throwlw_zoom_update()` keeps
+  4.0)`). The value works backwards: higher is farther. The back throw's
+  big hit uses 2.0, and 1.4 was much closer than that. `throwlw_zoom_update()` keeps
   the shared countdown (Kirby int `0x10000093`) at `throwlw_zoom_after()`
   (12) until the final hit (frame 56). Then `throwb_camera_update()` resets
   the camera 12 frames later, or 12 frames after the throw ends early.

@@ -71584,7 +71584,7 @@ float throwlw_loop_start() { return 6.0f; }  // loop start frame
 float throwlw_loop_end()   { return 43.0f; } // loop end frame
 int   throwlw_land_loops() { return 9; }     // loops
 int   throwlw_zoom_in()     { return 0xa; }  // landing loop zoom: zoom-in frames
-float throwlw_zoom_amount() { return 1.4f; } // landing loop zoom (back throw's big hit uses 2.0)
+float throwlw_zoom_amount() { return 4.0f; } // landing loop zoom: higher = farther (back throw's big hit uses 2.0; 1.4 was much closer)
 int   throwlw_zoom_after()  { return 12; }   // frames after the final hit before the camera goes back
 float throwlw_land_speed() { return 2.0f; }  // animation speed while looping
 
