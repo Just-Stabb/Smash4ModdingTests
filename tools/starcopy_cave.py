@@ -150,12 +150,13 @@ class Asm:
         return out
 
 
-STAGES = ["o", "r", "4a", "4"]
+STAGES = ["o", "n", "r", "4a", "4"]
 DEBUG_INT = 0x1000009C  # Kirby int: the star cave's last result (Kirby's MSC hops that many times)
 
 
 def build_star(stage="4"):
-    """Star cave. stage o = find the owner Kirby and report 7, nothing else; r = also read the
+    """Star cave. stage o = find the owner Kirby and report 7, nothing else; n = also walk to
+    the newest hit record but don't read it (report 1-6, or 7); r = also read the
     hit record (report 1/2, or 7 when a record is there); 4a = count the hits but never hand
     over a copy; 4 = full.
     Finds the owner Kirby first, then reports its result to Kirby's DEBUG_INT:
@@ -201,8 +202,10 @@ def build_star(stage="4"):
     e(lwz(4, 0x14, 3)); check_ptr(4, "f4")             # per-hitbox array
     e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f5"))  # empty list
     check_ptr(5, "f6")                                # node
+    if upto == 1:                                     # stage n: stop before reading the node
+        e(li(26, 7)); e(("b", "report"))
     e(lwz(30, 0x18, 5))                               # r30 = target id
-    if upto == 1:
+    if upto == 2:
         e(li(26, 7)); e(("b", "report"))
     lookup(30, 0x10, "f8")
     e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f9"))
@@ -216,7 +219,7 @@ def build_star(stage="4"):
     a.label("pos")
     e(cmpwi(26, THRESHOLD)); e(("blt", "store"))
     e(li(26, 0))
-    if upto == 2:
+    if upto == 3:
         e(("b", "store"))
     e(cmpwi(29, 8)); e(("beq", "store"))              # target is a Kirby: no copy
     # hand the copy over to Kirby: PEND_KIND = kind + 1, PEND_COSTUME = costume
