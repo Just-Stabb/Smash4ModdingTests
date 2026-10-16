@@ -71072,30 +71072,22 @@ void throwlw_air_end()
 // ===================================================================
 int starcopy_debug() { return 1; } // 1 = show progress with Kirby's actions (see below), 0 = off
 
-// Debug (starcopy_debug() == 1), shown the next time Kirby stands idle (Wait) on the ground:
-//   he HOPS (jump squat) after the star code counted a hit (int 0x1000009D changed);
-//   he TAUNTS after a copy was handed over on the 12th hit (0x1000009E seen here).
-//   Self-test: he also hops once the first time he stands idle in a match (proves the hop works).
-// global17 bits: 0x0F000000 last seen count, 0x10000000 hop pending, 0x20000000 taunt pending,
-// 0x40000000 self-test done.
+// Debug (starcopy_debug() == 1), shown when Kirby stands idle (Wait) on the ground:
+//   he HOPS N times in a row after a star hit, N = the star code's result (int 0x1000009C):
+//     1 star's attack module missing / hit records off, 2 no hit record, 3 target doesn't
+//     exist, 4 target isn't a fighter, 5 hit counted, 6 copy handed over (12th hit).
+//     No hops = the star code couldn't find its owner Kirby (or didn't run).
+//   he TAUNTS (first) after a copy was handed over (0x1000009E seen here).
+//   Self-test: he hops once the first time he stands idle in a match.
+// global17 bits: 0x20000000 taunt pending, 0x40000000 self-test done.
 // Runs at the end of the main loop (func_74), after the status script.
 void starcopy_update()
 {
-    int count;
-    int seen;
+    int hops;
     if (starcopy_debug() && !(global17 & 0x40000000))
     {
-        global17 = global17 | 0x50000000; // self-test hop
-    }
-    if (starcopy_debug())
-    {
-        count = WorkModule(0x6, 0x1000009d) & 0xf;
-        seen = (global17 & 0xf000000) / 0x1000000;
-        if (count != seen)
-        {
-            global17 = global17 - (global17 & 0xf000000) + count * 0x1000000;
-            global17 = global17 | 0x10000000;
-        }
+        global17 = global17 | 0x40000000;
+        WorkModule(0x7, 0x1, 0x1000009c); // self-test hop
     }
     if (WorkModule(0x6, 0x1000009e) > 0)
     {
@@ -71108,14 +71100,15 @@ void starcopy_update()
     }
     if (starcopy_debug() && global4 == 0 && global18 == 0)
     {
+        hops = WorkModule(0x6, 0x1000009c);
         if (global17 & 0x20000000)
         {
-            global17 = global17 - (global17 & 0x30000000);
+            global17 = global17 - 0x20000000;
             func_16(0x14d, 0); // taunt
         }
-        else if (global17 & 0x10000000)
+        else if (hops > 0)
         {
-            global17 = global17 - 0x10000000;
+            WorkModule(0x7, hops - 1, 0x1000009c);
             func_16(0xa, 0); // hop
         }
     }

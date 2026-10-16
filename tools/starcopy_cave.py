@@ -10,21 +10,18 @@ STAR CAVE (CAVE1), runs in the star's update. Hook: the star specializer's custo
 BattleObject command handler (vtable +0x54, 0x02B037B0, only used by Kirby's star; it was
 `li r3,0; blr`) becomes `b CAVE1`. A star's MSC `BattleObject(cmd)` with cmd > 0x15 lands
 there with r3 = specializer, r4 = weapon, r5 = message (command value = ***(msg+8)).
-For command MAGIC only:
-  1. target = newest collision record of the star's hitbox 0:
+For command MAGIC only (see build_star):
+  1. owner = *(weapon+0x1BF8); must exist and resolve to Kirby (kind 8) -> Kirby's accessor
+  2. target = newest collision record of the star's hitbox 0:
      AM = *(*(weapon+0xC)+0x50); node = *(*(AM+0x14)+0x128); id = *(node+0x18)
      (BattleObject: +0 id, +4 kind, +0xC module accessor; accessor +0x28 WorkModule,
-     +0x50 AttackModule)
-  2. target must exist (EXISTS) and resolve to a valid fighter -> kind, costume value
-  3. owner = *(weapon+0x1BF8); must exist and resolve to Kirby (kind 8) -> Kirby's accessor
-  4. count = Kirby int COUNTER + 1. At THRESHOLD (and the target isn't a Kirby): store
+     +0x50 AttackModule); it must exist and resolve to a valid fighter -> kind, costume
+  3. count = Kirby int COUNTER + 1. At THRESHOLD (and the target isn't a Kirby): store
      PEND_KIND = kind + 1 and PEND_COSTUME = costume in Kirby's ints, count = 0. Store count.
+  4. Report the result to Kirby's DEBUG_INT (Kirby's MSC shows it in debug mode).
   It does NOT grant the copy: copy_grant crashed when called from the star's update.
-  Leaves a progress code in r3 (not visible to MSC: the syscall returns message+0xC, and
-  writing that crashed the game):
-  1 no attack module / records off, 2 no hit record, 3 target doesn't exist, 4 target isn't a
-  valid fighter, 5 owner doesn't exist, 6 owner isn't Kirby, 7 hit counted,
-  8 copy handed over (12th hit). 0 for any other command (like the stub it replaces).
+  Returns 0 (like the stub it replaces). Writing a result to message+0xC (what MSC's
+  BattleObject returns) crashed the game, so results go through Kirby's ints instead.
 
 KIRBY CAVE (CAVE2), runs in Kirby's own update. Hook: case 0x409 of Kirby's BattleObject
 command dispatcher (0x02EF90D8; 0x409 is unused by Kirby's MSC) becomes `b CAVE2`. There
@@ -152,19 +149,16 @@ class Asm:
         return out
 
 
-STAGES = ["1", "1a", "1b", "1c", "2", "3", "4a", "4"]
+STAGES = ["4a", "4"]
+DEBUG_INT = 0x1000009C  # Kirby int: the star cave's last result (Kirby's MSC hops that many times)
 
 
 def build_star(stage="4"):
-    """Star cave. stage (for crash bisecting), each one runs a bit more than the one before:
-    1  = return right after the command check
-    1a = also set up / tear down the stack frame (no reads, no calls)
-    1b = also read the target id from the star's hit records (no calls)
-    1c = also resolve the target
-    2  = also check / read the target (valid, fighter, kind, costume)
-    3  = also find the owner Kirby
-    4a = also count the hits, never hand over a copy
-    4  = full (hands the copy over to Kirby at the 12th hit)."""
+    """Star cave. stage 4a = count the hits but never hand over a copy; 4 = full.
+    Finds the owner Kirby first, then reports its result to Kirby's DEBUG_INT:
+    1 star's attack module missing / hit records off, 2 no hit record, 3 target doesn't
+    exist, 4 target isn't a valid fighter, 5 hit counted, 6 copy handed over (12th hit).
+    If the owner Kirby can't be found nothing is reported."""
     upto = STAGES.index(str(stage))
     a = Asm(CAVE1)
     e = a.emit
@@ -179,12 +173,16 @@ def build_star(stage="4"):
 
     e(lwz(6, 8, 5)); e(lwz(6, 0, 6)); e(lwz(6, 0, 6))  # command value
     e(cmplwi(6, MAGIC)); e(("bne", "ret0"))
-    if upto == 0:
-        e(("b", "ret0"))
     e(stwu(1, -0x60, 1)); e(MFLR_R0); e(stw(0, 0x64, 1)); e(stmw(26, 0x40, 1))
     e(mr(31, 4))                                      # r31 = weapon
-    if upto == 1:
-        e(li(3, 0)); e(("b", "out"))
+    # 1. owner Kirby -> r27 = Kirby's accessor
+    e(lwz(30, 0x1BF8, 31))                            # r30 = owner id
+    lookup(30, 0x20, "out")
+    e(addi(3, 1, 0x20)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "out"))
+    e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "out"))
+    e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
+    e(cmpwi(27, 0)); e(("beq", "out"))
+    # 2. target = newest hit record of the star's hitbox 0
     e(lwz(3, 0xC, 31))                                # module accessor (BattleObject +0xC, see 0x02BEF5DC)
     e(cmpwi(3, 0)); e(("beq", "f1"))
     e(lwz(3, 0x50, 3))                                # AttackModule (accessor +0x50)
@@ -195,50 +193,37 @@ def build_star(stage="4"):
     e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f2"))
     e(cmpwi(5, 0)); e(("beq", "f2"))                  # null node (0x02C09C94)
     e(lwz(30, 0x18, 5))                               # r30 = target id
-    if upto == 2:
-        e(li(3, 0)); e(("b", "out"))
     lookup(30, 0x10, "f3")
-    if upto == 3:
-        e(li(3, 0)); e(("b", "out"))
     e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f4"))
     e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "f4"))
     e(addi(3, 1, 0x10)); e(("bl", KIND)); e(mr(29, 3))
     e(addi(3, 1, 0x10)); e(("bl", COSTUME)); e(mr(28, 3))
-    if upto == 4:
-        e(li(3, 0)); e(("b", "out"))
-    # owner Kirby
-    e(lwz(30, 0x1BF8, 31))                            # r30 = owner id (target id no longer needed)
-    lookup(30, 0x20, "f5")
-    e(addi(3, 1, 0x20)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f6"))
-    e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "f6"))
-    e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
-    if upto == 5:
-        e(li(3, 0)); e(("b", "out"))
-    # count = get_int(COUNTER) + 1
+    # 3. count = get_int(COUNTER) + 1
     a.get_int(27, COUNTER)
     e(addi(26, 3, 1))
     e(cmpwi(26, 0)); e(("bge", "pos")); e(li(26, 1))  # a negative leftover counts as 0
     a.label("pos")
-    if upto == 6:
-        e(cmpwi(26, THRESHOLD)); e(("blt", "store")); e(li(26, 0)); e(("b", "store"))
     e(cmpwi(26, THRESHOLD)); e(("blt", "store"))
     e(li(26, 0))
+    if upto == 0:
+        e(("b", "store"))
     e(cmpwi(29, 8)); e(("beq", "store"))              # target is a Kirby: no copy
     # hand the copy over to Kirby: PEND_KIND = kind + 1, PEND_COSTUME = costume
     e(addi(29, 29, 1))
     a.set_int(27, 29, PEND_KIND)
     a.set_int(27, 28, PEND_COSTUME)
     a.set_int(27, 26, COUNTER)
-    e(li(3, 8)); e(("b", "out"))
+    e(li(26, 6)); e(("b", "report"))
     a.label("store")
     a.set_int(27, 26, COUNTER)
-    e(li(3, 7)); e(("b", "out"))
-    for code in range(1, 7):
+    e(li(26, 5)); e(("b", "report"))
+    for code in range(1, 5):
         a.label("f%d" % code)
-        e(li(3, code)); e(("b", "out"))
-    a.label("out")                                    # r3 = progress code
+        e(li(26, code)); e(("b", "report"))
+    a.label("report")                                 # r26 = result code -> Kirby's DEBUG_INT
+    a.set_int(27, 26, DEBUG_INT)
+    a.label("out")
     e(lmw(26, 0x40, 1)); e(lwz(0, 0x64, 1)); e(MTLR_R0); e(addi(1, 1, 0x60))
-    e(BLR)
     a.label("ret0")
     e(li(3, 0)); e(BLR)
     return a.words()
