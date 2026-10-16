@@ -536,3 +536,14 @@ Also ruled out for grabs:
   state.
 
 Grab immunity is still unknown. The standard build stays build A (armor fix only).
+
+### Grab debug build (Cemu breakpoint)
+
+- Fighter StatusModule vtable `+0x2C` = `0x02E88810` "change status to `r4`" (it also stores the
+  request at `+0x54`). MSC `StatusModule(3, kind, …)` → base handler `0x0200D8FC` stores `+0x54`.
+  CapturePull = status `0x3F`; CatchPull = `0x36`.
+- `build/grab_debug/cross_f.rpx` = build A + a hook. `0x02E88810` → `b 0x037EE6A0` (free space
+  at the end of the star cave):
+  `cmpwi r4, 0x3F; bne +8; nop (breakpoint 0x037EE6A8); stwu r1, -0x30(r1); b 0x02E88814`.
+  The patch list is in `docs/grab_debug_patch.txt`. On a normal grab the breakpoint hits with
+  LR = the code that requested CapturePull; the stack back chain gives the callers above it.
