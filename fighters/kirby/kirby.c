@@ -71574,7 +71574,7 @@ void throwb_camera_update()
 // throwlw_loop_end() back to throwlw_loop_start() throwlw_land_loops() times, restarting the
 // motion there (throwlw_restart), which restarts the ACMD too, so the stomps play again. After that the rest of the animation plays at the normal rate.
 // In the air the animation plays normally; the loop only starts if he lands before the final
-// hit (throwlw_final_frame(), 56).
+// hit (throwlw_final_frame(), 56). Ground detection starts on frame throwlw_land_check() (4).
 // Kirby int 0x10000098: -1 = off (ground down throw / done), 0 = air down throw not landed yet,
 // n > 0 = landed with n - 1 jumps back left. Kirby int 0x10000099: 0 = normal, 1 = looping (the
 // throwlw ACMD uses the loop stomp damage, tools/kirby_throwlw_acmd.py), 2 = loop done. From the
@@ -71587,6 +71587,7 @@ int   throwlw_zoom_in()     { return 0xa; }  // landing loop zoom: zoom-in frame
 float throwlw_zoom_amount() { return 4.0f; } // landing loop zoom: higher = farther (back throw's big hit uses 2.0; 1.4 was much closer)
 int   throwlw_zoom_after()  { return 12; }   // frames after the final hit before the camera goes back
 float throwlw_land_speed() { return 2.0f; }  // animation speed while looping
+float throwlw_land_check() { return 4.0f; }  // ground detection starts on this frame
 
 // down throw main (func_1082)
 void throwlw_land_init()
@@ -71618,6 +71619,10 @@ void throwlw_land_update()
     if (state == 0)
     {
         if (global18 != 0) // still in the air: the animation plays normally
+        {
+            return;
+        }
+        if (MotionModuleF(0x1) < throwlw_land_check()) // no ground detection before frame 4
         {
             return;
         }
