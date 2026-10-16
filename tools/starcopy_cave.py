@@ -20,7 +20,10 @@ For command MAGIC only:
   4. count = Kirby int COUNTER + 1. At THRESHOLD (and the target isn't a Kirby): store
      PEND_KIND = kind + 1 and PEND_COSTUME = costume in Kirby's ints, count = 0. Store count.
   It does NOT grant the copy: copy_grant crashed when called from the star's update.
-  Always returns 0 (like the stub it replaces).
+  Returns a progress code to the star's MSC (BattleObject's return value), for debugging:
+  1 no attack module / records off, 2 no hit record, 3 target doesn't exist, 4 target isn't a
+  valid fighter, 5 owner doesn't exist, 6 owner isn't Kirby, 7 hit counted,
+  8 copy handed over (12th hit). 0 for any other command (like the stub it replaces).
 
 KIRBY CAVE (CAVE2), runs in Kirby's own update. Hook: case 0x409 of Kirby's BattleObject
 command dispatcher (0x02EF90D8; 0x409 is unused by Kirby's MSC) becomes `b CAVE2`. There
@@ -164,11 +167,11 @@ def build_star(stage="4"):
     a = Asm(CAVE1)
     e = a.emit
 
-    def lookup(id_reg, handle_off):
+    def lookup(id_reg, handle_off, fail):
         """Resolve object id_reg into the handle at handle_off(r1), only if it exists
         (the game's callers check with EXISTS first). Uses r3-r6."""
         a.load_addr(3, ADDR_MANAGER); e(lwz(3, 0, 3))
-        e(mr(4, id_reg)); e(("bl", EXISTS)); e(cmpwi(3, 0)); e(("beq", "out"))
+        e(mr(4, id_reg)); e(("bl", EXISTS)); e(cmpwi(3, 0)); e(("beq", fail))
         a.load_addr(3, ADDR_MANAGER); e(lwz(3, 0, 3))
         e(addi(4, 1, handle_off)); e(mr(5, id_reg)); e(li(6, 0)); e(("bl", RESOLVE))
 
@@ -179,36 +182,36 @@ def build_star(stage="4"):
     e(stwu(1, -0x60, 1)); e(MFLR_R0); e(stw(0, 0x64, 1)); e(stmw(26, 0x40, 1))
     e(mr(31, 4))                                      # r31 = weapon
     if upto == 1:
-        e(("b", "out"))
+        e(li(3, 0)); e(("b", "out"))
     e(lwz(3, 0xC, 31))                                # module accessor (BattleObject +0xC, see 0x02BEF5DC)
-    e(cmpwi(3, 0)); e(("beq", "out"))
+    e(cmpwi(3, 0)); e(("beq", "f1"))
     e(lwz(3, 0x50, 3))                                # AttackModule (accessor +0x50)
-    e(cmpwi(3, 0)); e(("beq", "out"))
-    e(lwz(4, 0x4C, 3)); e(cmpwi(4, 0)); e(("beq", "out"))   # records in use (0x02C09C38)
-    e(lwz(4, 0x14, 3)); e(cmpwi(4, 0)); e(("beq", "out"))
-    e(lwz(6, 0x18, 3)); e(cmpwi(6, 0)); e(("ble", "out"))
-    e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "out"))
-    e(cmpwi(5, 0)); e(("beq", "out"))                 # null node (0x02C09C94)
+    e(cmpwi(3, 0)); e(("beq", "f1"))
+    e(lwz(4, 0x4C, 3)); e(cmpwi(4, 0)); e(("beq", "f1"))   # records in use (0x02C09C38)
+    e(lwz(4, 0x14, 3)); e(cmpwi(4, 0)); e(("beq", "f2"))
+    e(lwz(6, 0x18, 3)); e(cmpwi(6, 0)); e(("ble", "f2"))
+    e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f2"))
+    e(cmpwi(5, 0)); e(("beq", "f2"))                  # null node (0x02C09C94)
     e(lwz(30, 0x18, 5))                               # r30 = target id
     if upto == 2:
-        e(("b", "out"))
-    lookup(30, 0x10)
+        e(li(3, 0)); e(("b", "out"))
+    lookup(30, 0x10, "f3")
     if upto == 3:
-        e(("b", "out"))
-    e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "out"))
-    e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "out"))
+        e(li(3, 0)); e(("b", "out"))
+    e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f4"))
+    e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "f4"))
     e(addi(3, 1, 0x10)); e(("bl", KIND)); e(mr(29, 3))
     e(addi(3, 1, 0x10)); e(("bl", COSTUME)); e(mr(28, 3))
     if upto == 4:
-        e(("b", "out"))
+        e(li(3, 0)); e(("b", "out"))
     # owner Kirby
     e(lwz(30, 0x1BF8, 31))                            # r30 = owner id (target id no longer needed)
-    lookup(30, 0x20)
-    e(addi(3, 1, 0x20)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "out"))
-    e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "out"))
+    lookup(30, 0x20, "f5")
+    e(addi(3, 1, 0x20)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f6"))
+    e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "f6"))
     e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
     if upto == 5:
-        e(("b", "out"))
+        e(li(3, 0)); e(("b", "out"))
     # count = get_int(COUNTER) + 1
     a.get_int(27, COUNTER)
     e(addi(26, 3, 1))
@@ -223,10 +226,17 @@ def build_star(stage="4"):
     e(addi(29, 29, 1))
     a.set_int(27, 29, PEND_KIND)
     a.set_int(27, 28, PEND_COSTUME)
+    a.set_int(27, 26, COUNTER)
+    e(li(3, 8)); e(("b", "out"))
     a.label("store")
     a.set_int(27, 26, COUNTER)
-    a.label("out")
+    e(li(3, 7)); e(("b", "out"))
+    for code in range(1, 7):
+        a.label("f%d" % code)
+        e(li(3, code)); e(("b", "out"))
+    a.label("out")                                    # r3 = progress code
     e(lmw(26, 0x40, 1)); e(lwz(0, 0x64, 1)); e(MTLR_R0); e(addi(1, 1, 0x60))
+    e(BLR)
     a.label("ret0")
     e(li(3, 0)); e(BLR)
     return a.words()

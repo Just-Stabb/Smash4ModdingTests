@@ -666,13 +666,35 @@ void func_56()
 // [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
+    int code;
+    // Copy debug (starcopy_debug() == 1): after a hit the star hovers in place for
+    // (progress code) seconds before it disappears. global17 = frames left (unused otherwise).
+    if (global17 > 0)
+    {
+        global17 = global17 - 1;
+        KineticModule(0x11, 0, 0, 0); // stand still
+        if (global17 == 0)
+        {
+            BattleObject(0x9);
+        }
+        return;
+    }
     // Disappear when the hitbox connects (added).
     if (AttackModule(0x2726) || AttackModule(0x2727, 0x2))
     {
         // Copy-ability counter (added, needs the patched cross_f.rpx): native code reads this
-        // star's newest hit target and counts the hit on the owner Kirby; on the 12th it gives
+        // star's newest hit target and counts the hit on the owner Kirby; on the 12th it hands
         // Kirby that fighter's copy ability. Without the RPX patch this command does nothing.
-        BattleObject(0x1f4);
+        // It returns a progress code (tools/starcopy_cave.py): 1 no attack module / records off,
+        // 2 no hit record, 3 target doesn't exist, 4 target isn't a fighter, 5 owner doesn't
+        // exist, 6 owner isn't Kirby, 7 hit counted, 8 copy handed over. 0 = no patch.
+        code = BattleObject(0x1f4);
+        if (starcopy_debug() && code > 0)
+        {
+            global17 = code * 60;
+            KineticModule(0x11, 0, 0, 0);
+            return;
+        }
         BattleObject(0x9);
         return;
     }
@@ -793,3 +815,5 @@ void func_62()
 }
 
 float starmissile_damage() { return 1.8f; } // inhale star damage (added; also set in the ACMD)
+
+int starcopy_debug() { return 1; } // 1 = after a hit, hover (progress code) seconds; 0 = off
