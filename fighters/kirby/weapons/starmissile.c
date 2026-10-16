@@ -829,6 +829,16 @@ void starmissile_aim()
     {
         return;
     }
+    // Never behind Kirby: the star launches forward, so a stick X against its horizontal speed
+    // is dropped (the most it can turn is straight up / down).
+    if (sx * vx < 0)
+    {
+        sx = 0;
+        if (sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
+        {
+            return;
+        }
+    }
     ang = MathF(0x1, sy, sx);      // atan2(sy, sx)
     KineticModule(0x11, 0, MathF(0x4, ang) * speed, MathF(0x5, ang) * speed);
 }
