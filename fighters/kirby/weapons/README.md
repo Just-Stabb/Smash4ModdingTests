@@ -77,8 +77,10 @@ the weapon reads its owner's controller. It keeps the star's current speed
 (energy 0, `KineticModuleF(0xA/0xB, 0)`) and points it at the stick's angle.
 
 - Stick inside `starmissile_aim_deadzone()` (0.3): the star flies as spawned.
-- It can't aim behind Kirby. A stick X against the star's horizontal speed
-  is dropped, so the most it can turn is straight up or down.
+- The angle is clamped to `starmissile_aim_limit()` (60) degrees above or
+  below forward (Smash angles 300°–60°), so it never points behind Kirby.
+  Forward is the sign of the star's horizontal speed. Stick straight back:
+  the star flies as spawned.
 - `starmissile_aim_enabled()` = 0 turns aiming off.
 - The old copy-debug code (bobbing) is removed.
 
