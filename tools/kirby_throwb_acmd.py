@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Kirby back throw (throwb) ACMD edit: weak release + bury slam hitbox with height damage tiers.
+"""Kirby back throw (throwb) ACMD edit: height damage tiers; bury slam only from 2.5x.
 
   python3 tools/kirby_throwb_acmd.py IN_game.bin OUT_game.bin
 
-The throw itself can't bury (tested), so:
-- Throw 0 (the release, Throw_Applier at frame 41) becomes a weak downward release:
-  0 damage, 270 degrees, small fixed knockback, so the opponent stays on the ground.
-- At frame HIT_FRAME a Special_Hitbox with the bury effect (0xB, the same effect Kirby's
-  Stone uses) hits them, spiking (270). One block per damage tier: if Kirby int 0x10000095
-  == t (set by throwb_land() in kirby.c), damage = the throw's old damage x (1 + t/10),
-  t = 0..20 (1.0x .. 3.0x). Tiers above BIG_TIER (more than 2.0x) get HITLAG_BIG x hitstop.
+Kirby int 0x10000095 = damage tier t (set by throwb_land() in kirby.c): 0 = 1.0x .. 20 = 3.0x,
+damage = the throw's original damage (8) x (1 + t/10).
+- t < BURY_TIER (below 2.5x): the normal back throw release (throw 0 at frame 41, original angle,
+  BKB), knockback growth x KBG_SCALE, no bury. Tiers above BIG_TIER (more than 2.0x) get
+  HITLAG_BIG x hitstop.
+- t >= BURY_TIER (2.5x and up): a weak release (0 damage, 270 degrees, fixed knockback
+  RELEASE_WBKB, so the opponent stays on the ground), then at HIT_FRAME a Special_Hitbox with the
+  bury effect (0xB, copied from Kirby's Stone), 270 degrees, the throw's original knockback,
+  HITLAG_BIG x hitstop, for HIT_FRAMES frames.
 Run it on an unedited throwb (it refuses a script that already has the tiers).
 """
 import os
@@ -19,14 +21,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import acmd  # noqa: E402
 
 TIER_VAR = 0x10000095
+TIERS = 20
+BURY_TIER = 15       # 2.5x
+BIG_TIER = 10        # above: 3x hitstop
+HITLAG_BIG = 3.0
+KBG_SCALE = 0.6
 BURY = 0xB
 SPIKE = 270
-TIERS = 20
-BIG_TIER = 10
-HITLAG_BIG = 3.0
-HIT_FRAME = 42       # one frame after the release
-HIT_FRAMES = 2       # active frames
-RELEASE_WBKB = 10    # weak fixed knockback of the release
+HIT_FRAME = 42
+HIT_FRAMES = 2
+RELEASE_WBKB = 10
 SIZE = 12.0
 
 IVC = acmd.BY_NAME["int_var_compare"]
@@ -39,27 +43,12 @@ WAIT = acmd.BY_NAME["wait"]
 REMOVE = acmd.BY_NAME["remove_all_hitboxes"]
 
 
-def hitbox(stone, base, damage, hitlag):
-    syn = stone.info["syntax"]
-    h = acmd.Command(HITBOX, list(stone.params))
-    p = h.params
-    def put(name, v):
-        p[syn.index(name)] = v
-    put("ID", 0)
-    put("Bone", 0)
-    put("Damage", damage)
-    put("Angle", SPIKE)
-    put("KBG", base.params[4])
-    put("WBKB", base.params[5])
-    put("BKB", base.params[6])
-    put("Size", SIZE)
-    put("X", 0.0)
-    put("Y", 3.0)
-    put("Z", 0.0)
-    put("Effect", BURY)
-    put("Hitlag", hitlag)
-    put("Ground/Air", 3)
-    return h
+def when(t, cmd):
+    return [acmd.Command(IVC, [TIER_VAR, 0, t]), acmd.Command(TRUE, [2 + cmd.info["size"]]), cmd]
+
+
+def damage(base, t):
+    return round(base * (1 + t / 10.0), 2)
 
 
 def main():
@@ -70,25 +59,43 @@ def main():
         sys.exit("throwb already edited")
     stone = next(c for c in f.script(0xBD5B3ADE) if c.ident == HITBOX)  # Kirby's Stone (bury effect 0xB)
     base = next(c for c in s if c.ident == SPEC and c.params[0] == 0)
-    dmg = float(base.params[2])
-    old = list(base.params)
-    base.params[2] = 0.0           # damage
-    base.params[3] = SPIKE         # angle
-    base.params[4] = 0             # KBG
-    base.params[5] = RELEASE_WBKB  # WBKB
-    base.params[6] = 0             # BKB
-    base.params[7] = 0             # effect
-    old_spec = acmd.Command(SPEC, old)
+    orig = list(base.params)  # ID, Bone, Damage, Angle, KBG, WBKB, BKB, Effect, ?, Hitlag, ...
+    dmg = float(orig[2])
+
+    def normal(t):
+        p = list(orig)
+        p[2] = damage(dmg, t)
+        p[4] = int(round(orig[4] * KBG_SCALE))
+        if t > BIG_TIER:
+            p[9] = HITLAG_BIG
+        return acmd.Command(SPEC, p)
+
+    def weak():
+        p = list(orig)
+        p[2], p[3], p[4], p[5], p[6], p[7] = 0.0, SPIKE, 0, RELEASE_WBKB, 0, 0
+        return acmd.Command(SPEC, p)
+
+    def slam(t):
+        syn = stone.info["syntax"]
+        h = acmd.Command(HITBOX, list(stone.params))
+        for name, v in (("ID", 0), ("Bone", 0), ("Damage", damage(dmg, t)), ("Angle", SPIKE),
+                        ("KBG", orig[4]), ("WBKB", orig[5]), ("BKB", orig[6]), ("Size", SIZE),
+                        ("X", 0.0), ("Y", 3.0), ("Z", 0.0), ("Effect", BURY),
+                        ("Hitlag", HITLAG_BIG if t > BIG_TIER else 1.0), ("Ground/Air", 3)):
+            h.params[syn.index(name)] = v
+        return h
+
+    base.params = normal(0).params  # tier 0
     i = next(i for i, c in enumerate(s) if c.ident == APPLY and c.params[0] == 0)
-    block = [acmd.Command(FRAME, [float(HIT_FRAME)])]
-    for t in range(0, TIERS + 1):
-        h = hitbox(stone, old_spec, round(dmg * (1 + t / 10.0), 2), HITLAG_BIG if t > BIG_TIER else 1.0)
-        block.append(acmd.Command(IVC, [TIER_VAR, 0, t]))
-        block.append(acmd.Command(TRUE, [2 + h.info["size"]]))
-        block.append(h)
-    block.append(acmd.Command(WAIT, [float(HIT_FRAMES)]))
-    block.append(acmd.Command(REMOVE, []))
-    s[i + 1:i + 1] = block
+    before = []
+    for t in range(1, TIERS + 1):
+        before += when(t, normal(t) if t < BURY_TIER else weak())
+    after = [acmd.Command(FRAME, [float(HIT_FRAME)])]
+    for t in range(BURY_TIER, TIERS + 1):
+        after += when(t, slam(t))
+    after += [acmd.Command(WAIT, [float(HIT_FRAMES)]), acmd.Command(REMOVE, [])]
+    s[i + 1:i + 1] = after
+    s[i:i] = before
     f.save(dst)
 
 

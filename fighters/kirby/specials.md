@@ -582,15 +582,17 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   drop) to `throwb_mult_max()` (3.0×) at `throwb_height_max()` (115 units).
   The multiplier is rounded to 0.1 steps, and the tier (0–20) goes in int
   `0x10000095`.
-- **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`): the throw itself didn't
-  bury, so the release (throw 0, frame 41) is now weak: 0 damage, 270°, fixed
-  knockback 10, so the opponent stays on the ground. At frame 42 a
-  `Special_Hitbox` slams them for 2 frames. It's copied from Kirby's Stone,
-  whose original hitbox uses effect `0xB`. It uses bury (`0xB`), 270°, the
-  throw's old knockback (KBG 120, BKB 30), size 12 on bone 0, ground and air.
-  There's one block per tier: `Int_Var_Compare(0x10000095, 0, t)` → `True`
-  → the hitbox with damage 8 × (1 + t/10), up to 24. Tiers above 10 use
-  hitlag 3.0 (3× hitstop) instead of 1.0.
+- **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`, run on an unedited throwb).
+  There's one block per tier (`Int_Var_Compare(0x10000095, 0, t)` → `True`
+  → command), and damage is 8 × (1 + t/10):
+  - **Below 2.5×** (tiers 0–14): the normal back throw release, throw 0 at
+    frame 41. It keeps the original angle 130° and BKB 30, with knockback
+    growth at 60% (120 → 72) and no bury. Tiers above 10 use hitlag 3.0.
+  - **2.5× and up** (tiers 15–20): a weak release (0 damage, 270°, fixed
+    knockback 10) so the opponent stays on the ground. Then at frame 42 a
+    `Special_Hitbox` slams them for 2 frames. It's copied from Kirby's Stone
+    and uses bury (`0xB`), 270°, the original knockback (KBG 120, BKB 30),
+    size 12 on bone 0, ground and air, and hitlag 3.0. This buries (tested).
 - **2.5× and up** (tier ≥ `throwb_zoom_tier()` = 15):
   - **Zoom**: the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`
     starts as soon as the drop so far is worth 2.5×, already during the fall
@@ -651,6 +653,12 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   `0x10000098`: -1 = off, 0 = air and not landed yet, n = landed with n − 1
   jumps left. It's set in the down throw main `func_1082` and run from its
   loop `func_1084`.
+- **Landing loop zoom**: when the loop starts, a slight zoom on Kirby
+  (`CameraModule(0x2714, throwlw_zoom_in() 10, 0, throwlw_zoom_amount()
+  1.4)`; the back throw's big hit uses 2.0). `throwlw_zoom_update()` keeps
+  the shared countdown (Kirby int `0x10000093`) at `throwlw_zoom_after()`
+  (12) until the final hit (frame 56). Then `throwb_camera_update()` resets
+  the camera 12 frames later, or 12 frames after the throw ends early.
 
 ## Added: air grab
 

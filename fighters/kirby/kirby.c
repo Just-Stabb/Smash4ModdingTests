@@ -21333,6 +21333,7 @@ void func_1084()
     }
     throwlw_air_update(); // down throw from an air grab: low gravity fall (added)
     throwlw_land_update(); // air down throw landed: fast stomp loop (added)
+    throwlw_zoom_update(); // landing loop zoom (added)
     throwlw_slide_update(); // down throw: stick slide (added), see the end of the file
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
@@ -71582,6 +71583,9 @@ void throwb_camera_update()
 float throwlw_loop_start() { return 6.0f; }  // loop start frame
 float throwlw_loop_end()   { return 43.0f; } // loop end frame
 int   throwlw_land_loops() { return 9; }     // loops
+int   throwlw_zoom_in()     { return 0xa; }  // landing loop zoom: zoom-in frames
+float throwlw_zoom_amount() { return 1.4f; } // landing loop zoom (back throw's big hit uses 2.0)
+int   throwlw_zoom_after()  { return 12; }   // frames after the final hit before the camera goes back
 float throwlw_land_speed() { return 2.0f; }  // animation speed while looping
 
 // down throw main (func_1082)
@@ -71625,6 +71629,7 @@ void throwlw_land_update()
         state = throwlw_land_loops() + 1;
         WorkModule(0x7, state, 0x10000098);
         WorkModule(0x7, 1, 0x10000099); // throwlw ACMD: loop stomp damage
+        CameraModule(0x2714, throwlw_zoom_in(), 0, throwlw_zoom_amount()); // slight zoom on Kirby
         MotionModule(0x4, WorkModuleF(0, 0x1000006) * throwlw_land_speed());
     }
     throwlw_land_hold(); // no movement, stays on the ground
@@ -71677,4 +71682,24 @@ void throwlw_restart(float frame, float rate)
     }
     MotionModule(0x1, motion, frame, rate);
     global20 = frame;
+}
+
+// down throw loop (func_1084), every frame: keeps the landing loop zoom on (Kirby int 0x10000093,
+// counted down and reset by throwb_camera_update in func_74) until throwlw_zoom_after() frames
+// after the final hit (throwlw_final_frame()), or after the throw ends early.
+void throwlw_zoom_update()
+{
+    if (global4 != 0x3e)
+    {
+        return;
+    }
+    if (WorkModule(0x6, 0x10000099) == 0) // no landing loop this throw
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) >= throwlw_final_frame() && WorkModule(0x6, 0x10000099) == 2)
+    {
+        return; // final hit done: the countdown runs out
+    }
+    WorkModule(0x7, throwlw_zoom_after(), 0x10000093);
 }
