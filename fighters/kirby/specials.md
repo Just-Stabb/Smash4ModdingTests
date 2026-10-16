@@ -559,7 +559,7 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   same. Right after lift-off (frame 13), energy 3 gets an extra upward
   speed of `throwb_lift_speed()` (2.0), fading to 0 by `throwb_lift_end()`
   (frame 25), so he goes about 13 units higher. That extra rise is added to the
-  recorded start height, so it counts towards the damage (about +0.18×). There's no loop timer and no finisher, so off stage Kirby carries the
+  recorded start height, so it counts towards the damage (about +0.26×, i.e. 1.3× on the ground). There's no loop timer and no finisher, so off stage Kirby carries the
   opponent down to the blast zone.
 - **Landing** (`throwb_land`, on the first floor contact at or after the
   loop frame): Kirby is put on the ground (`func_20(0)`, ground correction,
