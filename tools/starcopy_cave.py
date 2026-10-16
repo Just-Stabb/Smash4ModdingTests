@@ -87,6 +87,7 @@ def cmplwi(ra, v): return D(10, 0, ra, v)
 def cmplw(ra, rb): return (31 << 26) | (ra << 16) | (rb << 11) | (32 << 1)
 def mr(ra, rs): return (31 << 26) | (rs << 21) | (ra << 16) | (rs << 11) | (444 << 1)
 def mtctr(rs): return (31 << 26) | (rs << 21) | (0x120 << 11) | (467 << 1)
+def andi_(ra, rs, v): return D(28, rs, ra, v)
 
 
 MFLR_R0 = 0x7C0802A6
@@ -158,8 +159,9 @@ def build_star(stage="4"):
     hit record (report 1/2, or 7 when a record is there); 4a = count the hits but never hand
     over a copy; 4 = full.
     Finds the owner Kirby first, then reports its result to Kirby's DEBUG_INT:
-    1 star's attack module missing / hit records off, 2 no hit record, 3 target doesn't
-    exist, 4 target isn't a valid fighter, 5 hit counted, 6 copy handed over (12th hit).
+    1 star's accessor bad, 2 attack module bad, 3 hit records off, 4 record array bad,
+    5 no record, 6 record node bad, 7 record found (stage r), 8 target doesn't exist,
+    9 target isn't a valid fighter, 10 hit counted, 11 copy handed over (12th hit).
     If the owner Kirby can't be found nothing is reported."""
     upto = STAGES.index(str(stage))
     a = Asm(CAVE1)
@@ -186,22 +188,25 @@ def build_star(stage="4"):
     e(cmpwi(27, 0)); e(("beq", "out"))
     if upto == 0:
         e(li(26, 7)); e(("b", "report"))
-    # 2. target = newest hit record of the star's hitbox 0
-    e(lwz(3, 0xC, 31))                                # module accessor (BattleObject +0xC, see 0x02BEF5DC)
-    e(cmpwi(3, 0)); e(("beq", "f1"))
-    e(lwz(3, 0x50, 3))                                # AttackModule (accessor +0x50)
-    e(cmpwi(3, 0)); e(("beq", "f1"))
-    e(lwz(4, 0x4C, 3)); e(cmpwi(4, 0)); e(("beq", "f1"))   # records in use (0x02C09C38)
-    e(lwz(4, 0x14, 3)); e(cmpwi(4, 0)); e(("beq", "f2"))
-    e(lwz(6, 0x18, 3)); e(cmpwi(6, 0)); e(("ble", "f2"))
-    e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f2"))
-    e(cmpwi(5, 0)); e(("beq", "f2"))                  # null node (0x02C09C94)
+    # 2. target = newest hit record of the star's hitbox 0. Every pointer is range-checked
+    #    (heap 0x10000000-0x50000000, 4-aligned) before it's read through.
+    def check_ptr(reg, fail):
+        e(lis(0, 0x1000)); e(cmplw(reg, 0)); e(("blt", fail))
+        e(lis(0, 0x5000)); e(cmplw(reg, 0)); e(("bge", fail))
+        e(andi_(0, reg, 3)); e(("bne", fail))
+    e(lwz(3, 0xC, 31)); check_ptr(3, "f1")             # module accessor (BattleObject +0xC, 0x02BEF5DC)
+    e(lwz(3, 0x50, 3)); check_ptr(3, "f2")             # AttackModule (accessor +0x50)
+    e(lwz(4, 0x4C, 3)); e(cmpwi(4, 0)); e(("beq", "f3"))   # records in use (0x02C09C38)
+    e(lwz(6, 0x18, 3)); e(cmpwi(6, 0)); e(("ble", "f4"))   # hitbox count
+    e(lwz(4, 0x14, 3)); check_ptr(4, "f4")             # per-hitbox array
+    e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f5"))  # empty list
+    check_ptr(5, "f6")                                # node
     e(lwz(30, 0x18, 5))                               # r30 = target id
     if upto == 1:
         e(li(26, 7)); e(("b", "report"))
-    lookup(30, 0x10, "f3")
-    e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f4"))
-    e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "f4"))
+    lookup(30, 0x10, "f8")
+    e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f9"))
+    e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "f9"))
     e(addi(3, 1, 0x10)); e(("bl", KIND)); e(mr(29, 3))
     e(addi(3, 1, 0x10)); e(("bl", COSTUME)); e(mr(28, 3))
     # 3. count = get_int(COUNTER) + 1
@@ -219,11 +224,11 @@ def build_star(stage="4"):
     a.set_int(27, 29, PEND_KIND)
     a.set_int(27, 28, PEND_COSTUME)
     a.set_int(27, 26, COUNTER)
-    e(li(26, 6)); e(("b", "report"))
+    e(li(26, 11)); e(("b", "report"))
     a.label("store")
     a.set_int(27, 26, COUNTER)
-    e(li(26, 5)); e(("b", "report"))
-    for code in range(1, 5):
+    e(li(26, 10)); e(("b", "report"))
+    for code in (1, 2, 3, 4, 5, 6, 8, 9):
         a.label("f%d" % code)
         e(li(26, code)); e(("b", "report"))
     a.label("report")                                 # r26 = result code -> Kirby's DEBUG_INT
