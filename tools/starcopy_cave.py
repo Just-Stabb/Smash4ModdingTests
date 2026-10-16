@@ -44,9 +44,10 @@ CAVE_MAX = 0xEA8
 CAVE1 = CAVE
 CAVE2 = CAVE + 0x800
 MAGIC = 0x1F4          # star MSC: BattleObject(0x1F4) on hit
-COUNTER = 0x100000A8   # Kirby ints: unused by Kirby's MSC and not referenced by native code,
-PEND_KIND = 0x100000AA # below 0x100000AD (which copy_grant reads), outside the copy ints
-PEND_COSTUME = 0x100000AC  # 0x83-0xA0 that copy_grant clears
+COUNTER = 0x1000009D   # Kirby ints in the copy range 0x83-0xA0 (copy_grant clears them when it
+PEND_KIND = 0x1000009E # grants; the pending copy is read before that). 0x93-0xA0 aren't used by
+PEND_COSTUME = 0x1000009B  # Kirby's MSC. 0xA8/0xAA/0xAC didn't work: writes there were lost, so
+                       # Kirby's int table probably ends at 0xA6 (the star's ID is stored there).
 THRESHOLD = 12
 
 RESOLVE = 0x02BF2108   # (manager, &handle, object id, 0)

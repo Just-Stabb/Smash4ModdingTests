@@ -347,17 +347,18 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   while Kirby is the object being updated (from his own command handler),
   and it does more setup with him first. So the star cave now only hands the
   copy over:
-  - on the 12th hit it stores kind + 1 in Kirby's int `0x100000AA` and the
-    costume value in `0x100000AC`;
-  - the counter moved to `0x100000A8`, outside the copy ints
-    `0x83`–`0xA0` that `copy_grant` clears;
-  - none of the three ints is used by Kirby's MSC or referenced by native
-    code, and they're below `0x100000AD`, which `copy_grant` reads.
+  - on the 12th hit it stores kind + 1 in Kirby's int `0x1000009E` and the
+    costume value in `0x1000009B`; the counter is `0x1000009D`;
+  - these are copy ints (`0x83`–`0xA0`, cleared by `copy_grant` when it
+    grants; the pending copy is read before that), unused by Kirby's MSC;
+  - `0x100000A8`/`AA`/`AC` were tried first and didn't work: the writes were
+    lost, so Kirby's int table probably ends at `0xA6` (the star's ID is
+    stored there). Reads past the end seem to return 0 silently.
 
   Kirby's MSC main loop (`func_74` → `starcopy_update`) calls
-  `BattleObject(0x409)` while `0x100000AA > 0`. Case `0x409` of Kirby's
+  `BattleObject(0x409)` while `0x1000009E > 0`. Case `0x409` of Kirby's
   command dispatcher (`0x02EF94E4`, unused by his MSC) is patched to
   `b CAVE2` (`CAVE + 0x800`). In that case `r31` is Kirby's module accessor,
-  the same object `copy_grant` takes. The cave clears `0x100000AA`, then
+  the same object `copy_grant` takes. The cave clears `0x1000009E`, then
   calls `copy_grant(GETSPEC(0x104D1632, 8), accessor, costume, kind, 1)` and
   branches to the dispatcher epilogue (`0x02EF9688`).

@@ -70337,7 +70337,7 @@ void sideb_homing_init()
     float facing;
     float tx;
     float ty;
-    global17 = global17 & 0x3f00c300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200), air grab bits (0x4000, 0x8000) and star copy debug (0x3F000000)
+    global17 = global17 & 0x7f00c300; // reset swing bits (0x1 flew, 0x2 bounced, 0x4 gravity back); keep the air-use count (0x100, 0x200), air grab bits (0x4000, 0x8000) and star copy debug (0x7F000000)
     WorkModule(0, 99999.0f, 0x1000006);
     WorkModule(0, 99999.0f, 0x1000007);
     debug = sideb_homing_debug();
@@ -71066,24 +71066,30 @@ void throwlw_air_end()
 // ===================================================================
 // Star missile copy (added, needs the patched cross_f.rpx: tools/starcopy_cave.py).
 // On the 12th star missile hit the star's native code stores the hit fighter's kind + 1 in
-// Kirby's int 0x100000AA (and its costume value in 0x100000AC). The copy itself has to be
+// Kirby's int 0x1000009E (and its costume value in 0x1000009B). The copy itself has to be
 // granted from Kirby's own update, so the main loop calls BattleObject(0x409) while one is
-// pending; the patched command clears 0x100000AA and grants the copy.
+// pending; the patched command clears 0x1000009E and grants the copy.
 // ===================================================================
 int starcopy_debug() { return 1; } // 1 = show progress with Kirby's actions (see below), 0 = off
 
 // Debug (starcopy_debug() == 1), shown the next time Kirby stands idle (Wait) on the ground:
-//   he HOPS (jump squat) after the star code counted a hit (int 0x100000A8 changed);
-//   he TAUNTS after a copy was handed over on the 12th hit (0x100000AA seen here).
-// global17 bits: 0x0F000000 last seen count, 0x10000000 hop pending, 0x20000000 taunt pending.
+//   he HOPS (jump squat) after the star code counted a hit (int 0x1000009D changed);
+//   he TAUNTS after a copy was handed over on the 12th hit (0x1000009E seen here).
+//   Self-test: he also hops once the first time he stands idle in a match (proves the hop works).
+// global17 bits: 0x0F000000 last seen count, 0x10000000 hop pending, 0x20000000 taunt pending,
+// 0x40000000 self-test done.
 // Runs at the end of the main loop (func_74), after the status script.
 void starcopy_update()
 {
     int count;
     int seen;
+    if (starcopy_debug() && !(global17 & 0x40000000))
+    {
+        global17 = global17 | 0x50000000; // self-test hop
+    }
     if (starcopy_debug())
     {
-        count = WorkModule(0x6, 0x100000a8) & 0xf;
+        count = WorkModule(0x6, 0x1000009d) & 0xf;
         seen = (global17 & 0xf000000) / 0x1000000;
         if (count != seen)
         {
@@ -71091,13 +71097,13 @@ void starcopy_update()
             global17 = global17 | 0x10000000;
         }
     }
-    if (WorkModule(0x6, 0x100000aa) > 0)
+    if (WorkModule(0x6, 0x1000009e) > 0)
     {
         global17 = global17 | 0x20000000;
         BattleObject(0x409);
-        if (WorkModule(0x6, 0x100000aa) > 0) // not taken: the 0x409 patch isn't in this cross_f.rpx
+        if (WorkModule(0x6, 0x1000009e) > 0) // not taken: the 0x409 patch isn't in this cross_f.rpx
         {
-            WorkModule(0x7, 0, 0x100000aa);
+            WorkModule(0x7, 0, 0x1000009e);
         }
     }
     if (starcopy_debug() && global4 == 0 && global18 == 0)
