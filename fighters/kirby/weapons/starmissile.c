@@ -667,12 +667,23 @@ void func_56()
 void func_57()
 {
     int code;
-    // Copy debug (starcopy_debug() == 1): after a hit the star hovers in place for
-    // (progress code) seconds before it disappears. global17 = frames left (unused otherwise).
+    int t;
+    // Copy debug (starcopy_debug() == 1): after a hit the star stops and flashes (progress code)
+    // times: hidden 20 frames, shown 20 frames, repeated, then it's removed.
+    // global17 = frames left (unused otherwise).
     if (global17 > 0)
     {
         global17 = global17 - 1;
         KineticModule(0x11, 0, 0, 0); // stand still
+        t = global17 - (global17 / 40) * 40; // frames left in this flash, 39 .. 0
+        if (t >= 20)
+        {
+            VisibilityModule(0x2710, 0); // hidden
+        }
+        else
+        {
+            VisibilityModule(0x2710, 0x1); // shown
+        }
         if (global17 == 0)
         {
             BattleObject(0x9);
@@ -691,7 +702,7 @@ void func_57()
         code = BattleObject(0x1f4);
         if (starcopy_debug() && code > 0)
         {
-            global17 = code * 60;
+            global17 = code * 40;
             KineticModule(0x11, 0, 0, 0);
             return;
         }
@@ -816,4 +827,4 @@ void func_62()
 
 float starmissile_damage() { return 1.8f; } // inhale star damage (added; also set in the ACMD)
 
-int starcopy_debug() { return 1; } // 1 = after a hit, hover (progress code) seconds; 0 = off
+int starcopy_debug() { return 1; } // 1 = after a hit, the star flashes (progress code) times; 0 = off
