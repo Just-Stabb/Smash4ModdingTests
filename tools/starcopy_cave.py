@@ -290,6 +290,10 @@ def main():
     out = ["0x%08X=0x%08X" % (HOOK1, branch(HOOK1, CAVE1)),
            "0x%08X=0x%08X" % (HOOK2, branch(HOOK2, CAVE2))]
     out += ["0x%08X=0x%08X" % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    # The dead function has 38 relocations inside it (.rela.text); the loader would rewrite
+    # those spots in the cave code at load time (a REL24 turned a beq into a jump to garbage).
+    # Move them all onto the cave's last word, which is never executed.
+    out.append("reloc:0x%08X-0x%08X=0x%08X" % (CAVE, CAVE + CAVE_MAX, CAVE + CAVE_MAX - 4))
     if "--list" in sys.argv:
         for line in out:
             print(line)

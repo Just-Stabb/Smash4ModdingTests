@@ -338,6 +338,18 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   4 (see the docstring). Each one runs a bit more of the cave than the one
   before it. Results: everything up to counting the hits works.
   `copy_grant` called from the star's update crashed.
+- **Root cause of the cave crashes: relocations inside the cave.** The dead
+  function used for the cave (`0x037ED898`, 0xEA8 bytes) has **38 entries in
+  `.rela.text`** (section 9) located inside it: `ADDR16_HA`/`LO` (types 6/4)
+  and `REL24` (type 10). The loader applies them at load time and rewrites
+  those spots in the cave code. For example, a `beq` at `0x037ED9C0` became a
+  branch to garbage, and Cemu crashed executing `0x40E104C2` (`bca` to
+  `0x4C0`). The earlier "no relocations" check only looked at relocations
+  pointing *to* the function. Fix: `rpx_patch.py` argument
+  `reloc:LO-HI=DUMMY` moves every relocation located in the cave onto its last
+  word (`0x037EE73C`/`+2`), which is never executed. `starcopy_cave.py` emits
+  it. Several earlier theories (`bl +4`, data relocation, Cemu register
+  mix-up, `message+0xC`) were probably this same problem at different spots.
 - **BattleObject return values**: the syscall (`0x030B2E48`) builds a message
   on its stack (`+4` kind 6, `+8` args, `+0xC` result = 0) and returns
   `message+0xC` to the MSC, not `r3`. Storing a value there from the star

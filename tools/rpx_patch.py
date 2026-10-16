@@ -8,6 +8,11 @@ Usage:
 Example (Kirby's starmissile max count, 1 -> 3):
   python3 tools/rpx_patch.py cross_f.rpx cross_f_patched.rpx 0x10136C58=3
 
+Relocations: an argument `reloc:LO-HI=DUMMY` moves every relocation whose target address is in
+[LO, HI) to DUMMY (halfword relocations to DUMMY+2), so the loader doesn't rewrite code put
+there (e.g. a code cave in a dead function: its relocations would otherwise patch the new code
+at load time). DUMMY must be a dead word.
+
 Addresses are memory addresses (e.g. 0x10136C58 is in .rodata). The section
 holding each address is decompressed (RPX zlib sections), patched, recompressed
 into the same space, and its CRC in the RPX CRC table is updated, so no other
@@ -51,7 +56,13 @@ def main():
     src, dst = sys.argv[1], sys.argv[2]
     d, shoff, shentsize, secs = load(src)
     patches = {}
+    reloc_moves = []
     for p in sys.argv[3:]:
+        if p.startswith('reloc:'):
+            rng, dummy = p[6:].split('=')
+            lo, hi = rng.split('-')
+            reloc_moves.append((int(lo, 0), int(hi, 0), int(dummy, 0)))
+            continue
         a, v = p.split('=')
         patches[int(a, 0)] = int(v, 0)
 
@@ -63,6 +74,22 @@ def main():
 
     crc_idx = next(i for i, s in enumerate(secs) if s[1] == SHT_RPL_CRCS)
     crc_off = secs[crc_idx][4]
+
+    for lo, hi, dummy in reloc_moves:
+        for idx, sec in enumerate(secs):
+            if sec[1] != 4:  # SHT_RELA
+                continue
+            data = section_data(d, sec)
+            moved = 0
+            for o in range(0, len(data), 12):
+                off, = struct.unpack('>I', data[o:o + 4])
+                if lo <= off < hi and off not in (dummy, dummy + 2):
+                    struct.pack_into('>I', data, o, dummy + (off & 3))
+                    moved += 1
+            if moved:
+                print("moved %d relocations in section %d from [%s, %s) to %s"
+                      % (moved, idx, hex(lo), hex(hi), hex(dummy)))
+                by_section.setdefault(idx, (data, []))
 
     for idx, (data, items) in by_section.items():
         sec = secs[idx]
