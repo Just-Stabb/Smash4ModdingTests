@@ -70746,7 +70746,7 @@ float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the 
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
 float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
-int   throw_loop_time_f()   { return 8; }     // forward throw: loop frames before the throw ends normally (in the air too)
+int   throw_loop_time_f()   { return 12; }    // forward throw: loop frames before the throw ends normally (in the air too)
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -71094,7 +71094,9 @@ int airgrab_update()
     // 0x400 = already landed (switch the kinetic type once).
     if (global18 == 0)
     {
-        if (global17 & 0x8000)
+        // forward throw keeps the air grab used (set when it starts) until a real landing, so
+        // a forward throw from the ground (grounded until its lift-off) can't loop into itself
+        if ((global17 & 0x8000) && !(global4 == 0xdc && WorkModule(0x6, 0x11000002) == 0x78))
         {
             global17 = global17 - 0x8000;
         }
@@ -71355,15 +71357,17 @@ int starmissile_aim_code()
 // Kirby ints: 0x10000094 = start height (tenths, + 100000), 0x10000095 = damage tier,
 // 0x10000093 = zoom frames left. global17 bit 0x10 = big-hit effects done.
 // ===================================================================
-float throwb_height_max()  { return 100.0f; } // drop (units) that gives the max multiplier
+float throwb_height_max()  { return 115.0f; } // drop (units) that gives the max multiplier
 float throwb_mult_max()    { return 3.0f; }   // max damage multiplier
 int   throwb_big_tier()    { return 10; }     // tier above this (more than 2.0x): shake, zoom, cancel
 float throwb_lift_speed()  { return 2.0f; }   // extra upward speed right after lift-off (frame 13)...
 float throwb_lift_end()    { return 25.0f; }  // ...fading to 0 by this frame (about 13 units higher)
+float throwb_hit_frame()   { return 42.0f; }  // bury slam hitbox (throwb ACMD, one frame after the release)
+float throwb_cancel_frame() { return 44.0f; } // big hit: ground actions cancel from here (after the slam hitbox)
 int   throwb_quake_kind()  { return 0x4; }    // screen shake strength (CameraModule 0x2710; Kirby's own moves use 2 / 3)
 int   throwb_zoom_in()     { return 0xa; }    // zoom-in frames (same call as Kirby's Final Smash)
 float throwb_zoom_amount() { return 2.0f; }   // zoom (Final Smash uses 2.0)
-int   throwb_zoom_time()   { return 6; }      // frames after the release before the camera goes back to normal
+int   throwb_zoom_time()   { return 20; }     // frames the zoom lasts before the camera goes back to normal
 
 // throw main (func_1136, via throw_drop_reset): remember the height the throw starts at
 void throwb_start()
@@ -71431,7 +71435,8 @@ int throwb_update()
     }
     KineticModule(0x11, 0x1, 0);    // keep the momentum dead
     KineticModule(0x11, 0x3, 0, 0);
-    if (CatchModule(0x2712) == 0) // opponent released: the throw hitbox is out
+    // opponent released and the bury slam hitbox is out
+    if (CatchModule(0x2712) == 0 && MotionModuleF(0x1) >= throwb_hit_frame())
     {
         if (WorkModule(0x6, 0x10000095) > throwb_big_tier())
         {
@@ -71442,10 +71447,13 @@ int throwb_update()
                 CameraModule(0x2714, throwb_zoom_in(), 0, throwb_zoom_amount());
                 WorkModule(0x7, throwb_zoom_time(), 0x10000093);
             }
-            func_38(); // ground actions
-            if (func_39())
+            if (MotionModuleF(0x1) >= throwb_cancel_frame()) // after the slam (cancelling stops the ACMD)
             {
-                return 0x1;
+                func_38(); // ground actions
+                if (func_39())
+                {
+                    return 0x1;
+                }
             }
         }
     }
