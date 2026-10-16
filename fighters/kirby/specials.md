@@ -537,7 +537,7 @@ Damage and knockback are the same as the normal throw.
 ### Forward throw loop timer
 
 - When the forward throw's loop starts (frame 32, dropping), a timer starts.
-  After `throw_loop_time_f()` (50) loop frames without landing or a
+  After `throw_loop_time_f()` (24) loop frames without landing or a
   finisher, the throw ends normally where Kirby is: the drop stops, the
   throw's motion kinetic comes back and the animation resumes, so the
   opponent is released by the normal forward throw (frame 45). Afterwards
@@ -589,8 +589,17 @@ status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
   and its other exit waits for the end of a looping animation. So in the air
   Kirby stayed in CatchPull, where pummel and throw inputs aren't read. It
   now also changes over while `airgrab_on()`.
+- **Air throws**: the throw loop `func_1137` sends an airborne throw to Fall
+  while transition `0x1E000093` is on. That transition stays on until the
+  throw lifts off (`func_1138`). An air throw is airborne from its first
+  frame, so it was cancelled at once. The check is skipped while
+  `airgrab_on()`. Down throw is status `0x3E`, which has no such check.
+- **Down throw landing**: switching Kirby to the ground mid-throw
+  (`func_20(0)` in `airgrab_update`) released the opponent. For `0x3E` he
+  now keeps the air situation on the floor, finishes the throw, and ends in
+  Fall.
 - **Hold timer**: opponents can't escape an air grab normally. After
-  `airgrab_hold_time()` (40) frames of CatchPull, CatchWait or CatchAttack
+  `airgrab_hold_time()` (98) frames of CatchPull, CatchWait or CatchAttack
   in the air, Kirby goes into Fall, and the grab statuses' end scripts
   release the opponent. The count is kept in bits `0xFF0000` of `global17`
   (shared with the forward throw timer, which resets it when a throw
