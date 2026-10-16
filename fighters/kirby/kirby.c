@@ -70620,6 +70620,8 @@ void throw_drift_update()
         {
             vy = throwb_lift_speed();
         }
+        // the extra rise counts towards the damage: raise the recorded start height by it (tenths)
+        WorkModule(0x7, WorkModule(0x6, 0x10000094) + (int)(vy * 10.0f + 0.5f), 0x10000094);
     }
     KineticModule(0x11, 0x3, vx, vy); // speed of energy 3 (added on top of the throw's motion)
     KineticModule(0x10, 0x3, 0, 0);  // no braking
