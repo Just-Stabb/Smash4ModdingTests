@@ -561,3 +561,30 @@ This hits while the grabbed fighter's CapturePull setup script runs. Sanity brea
 Debug build 3 moves trap B to `0x037EE600`. On `r3 == 0x3F` it walks the stack back chain (16
 frames) and copies each frame's saved LR (`[frame+4]`) to `0x037EE6E0`–`0x037EE71F`. Breakpoint
 after the walk: `0x037EE63C`. Trap A is unchanged.
+
+## Grab-immunity fix test (build/grab_fix/cross_f.rpx)
+
+Fighter update 0x02E25710 sets HitModule catch-enable every frame (bl 0x2C42F50 with r4):
+
+```
+0x02E25288 lwz   r0,0(r7)          ; fighter flags word
+0x02E2528C rlwinm r0,r0,0,4,4      ; test 0x08000000 ("forced not catchable")
+0x02E25290 addic r5,r0,-1
+0x02E25294 subfe. r9,r5,r0         ; CR0 = (bit set)
+0x02E25298 li    r4,0
+0x02E2529C bne   skip              ; bit set -> catch disabled
+0x02E252A0 ... r4 = !(status data & 0x800)   ; normal grab-immunity bit
+```
+
+The 0x08000000 bit is set by 0x02E1CD54 (`oris r6,r9,0x800` at 0x02E1CE84)
+when its mode argument is > 3, which the transformation finals use.
+
+Patch: `0x02E2528C=0x38000000` (`li r0,0`), so catchability always follows the
+status-data grab-immunity bit. Build = starcopy cave + patch A + this patch:
+
+```
+python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/grab_fix/cross_f.rpx \
+  $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 0x02E2528C=0x38000000
+```
+
+Fallback if this doesn't work: `0x02E1CE84=0x61260000` (`ori r6,r9,0`) so the bit is never set.
