@@ -627,7 +627,9 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   runs at `throwlw_land_speed()` (2×) its rate (`0x1000006`). It jumps from
   `throwlw_loop_end()` (43) back to `throwlw_loop_start()` (6)
   `throwlw_land_loops()` (9) times, and the ACMD's stomps play again each
-  time. Then the rest plays at the normal rate. State is in Kirby int
+  time. Then the rest plays at the normal rate. While he's still in the air, the
+  animation pauses at frame 43 until he lands. Otherwise a long fall reached
+  the final hit and the release (56 / 58) before the loop could start. State is in Kirby int
   `0x10000098`: -1 = off, 0 = air and not landed yet, n = landed with n − 1
   jumps left. It's set in the down throw main `func_1082` and run from its
   loop `func_1084`.
