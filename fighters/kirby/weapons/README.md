@@ -57,18 +57,34 @@ damage", hitbox ID, float), with `starmissile_damage()` = 1.8. The
 first version used `0x271E`, which the sheet lists as "Add hitbox damage",
 so every frame added another 1.8.
 
-## Copy ability after 12 star hits (needs the patched `cross_f.rpx`)
+## Copy ability after 12 star hits (needs the patched `cross_f.rpx` and Kirby's MSC)
 
-When the star's hitbox connects, `func_57` calls `BattleObject(0x1F4)` before
-removing the star. New native code in the patched executable picks this up
-(see `docs/native-notes.md` and `tools/starcopy_cave.py`). It reads which
-fighter the star hit and counts the hit on the Kirby that owns the star (int
-`0x1000009D`). On the **12th** hit, Kirby gets that fighter's copy ability
-(the same function swallowing uses), and the count starts over. Hits on
-non-fighters and on other Kirbys don't give a copy. Getting a copy any other
-way also resets the count, because the copy setup clears that int.
+Status: works in game (tested on Cemu).
+
+1. **Star:** when its hitbox connects, `func_57` calls `BattleObject(0x1F4)`
+   before removing the star. The patched executable's star cave
+   (`tools/starcopy_cave.py`) runs from that call. It:
+   - finds the Kirby that owns the star;
+   - reads which fighter the star hit;
+   - counts the hit in Kirby's int `0x1000009D`.
+
+   On the **12th** hit it hands the copy over: kind + 1 goes to `0x1000009E`
+   and the costume value to `0x1000009B`. Then the count starts over. Hits on
+   non-fighters and on other Kirbys don't count toward a copy.
+2. **Kirby:** his MSC main loop (`func_74` → `starcopy_update` in
+   `kirby.c`) sees `0x1000009E`. It calls `BattleObject(0x40A)`, which the
+   patched executable sends to the Kirby cave, and that grants the copy with
+   the same function swallowing uses. If the copy ability (`0x100000A4`)
+   changed, the MSC also sets the "has a copy" flag `0x2000009A`.
+
+The grant has to happen in Kirby's own update. Calling it from the star's
+update crashed the game.
+
+Debugging: `starcopy_debug()` in `kirby.c` (1 = Kirby hops N times when
+idle, N = the star code's result; see the comment there).
 
 To change the number of hits, edit `THRESHOLD` in `tools/starcopy_cave.py`
 and re-patch:
 `python3 tools/rpx_patch.py cross_f.rpx out.rpx $(python3 tools/starcopy_cave.py)`
-(on top of the other patches).
+(on top of the other patches; the output also moves the relocations that sit
+inside the cave, see `docs/native-notes.md`).

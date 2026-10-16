@@ -71070,7 +71070,7 @@ void throwlw_air_end()
 // granted from Kirby's own update, so the main loop calls BattleObject(0x40A) while one is
 // pending; the patched command clears 0x1000009E and grants the copy.
 // ===================================================================
-int starcopy_debug() { return 1; } // 1 = show progress with Kirby's hops (see below), 0 = off
+int starcopy_debug() { return 0; } // 1 = show progress with Kirby's hops (see below), 0 = off
 
 // Debug (starcopy_debug() == 1): Kirby HOPS N times in a row when he stands idle on the ground.
 //   After a star hit, N = the star code's result (int 0x1000009C): 1 accessor bad, 2 attack
