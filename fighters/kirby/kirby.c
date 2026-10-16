@@ -70580,6 +70580,7 @@ void throw_drift_update()
     int kind;
     float speed;
     float vx;
+    float vy;
     if (global4 != 0xdc)
     {
         return;
@@ -70610,7 +70611,17 @@ void throw_drift_update()
         return;
     }
     vx = global48 * speed;          // stick X (left -1 .. right 1), world direction
-    KineticModule(0x11, 0x3, vx, 0); // X speed of energy 3 (added on top of the throw's motion)
+    vy = 0;
+    if (kind == 0x79 && !(global17 & 0x1000) && MotionModuleF(0x1) < throwb_lift_end())
+    {
+        // back throw: extra lift after lift-off (frame 13), fading out by throwb_lift_end()
+        vy = throwb_lift_speed() * (throwb_lift_end() - MotionModuleF(0x1)) / (throwb_lift_end() - 13.0f);
+        if (vy > throwb_lift_speed())
+        {
+            vy = throwb_lift_speed();
+        }
+    }
+    KineticModule(0x11, 0x3, vx, vy); // speed of energy 3 (added on top of the throw's motion)
     KineticModule(0x10, 0x3, 0, 0);  // no braking
     KineticModule(0xb, 0x3);         // make sure the energy is on
 }
@@ -71335,20 +71346,22 @@ int starmissile_aim_code()
 // (throw_drop_update, same fall speeds as forward throw; off stage down to the blast zone).
 // On landing (throwb_land) Kirby is put on the ground with all his speed killed.
 // Damage: the further he fell from where the throw started, the stronger the release:
-// 1.0x at no drop up to throwb_mult_max() (2.4x) at throwb_height_max() units. The tier
-// (0 = 1.0x, 1 = 1.1x ... 14 = 2.4x) goes in Kirby int 0x10000095; the throwb ACMD picks the
+// 1.0x at no drop up to throwb_mult_max() (3.0x) at throwb_height_max() units. The tier
+// (0 = 1.0x, 1 = 1.1x ... 20 = 3.0x) goes in Kirby int 0x10000095; the throwb ACMD picks the
 // matching throw 0 damage. Above 2.0x (tier > throwb_big_tier()): a strong screen shake, a camera
 // zoom at Kirby and, from the release on, any ground action cancels the throw.
 // Kirby ints: 0x10000094 = start height (tenths, + 100000), 0x10000095 = damage tier,
 // 0x10000093 = zoom frames left. global17 bit 0x10 = big-hit effects done.
 // ===================================================================
 float throwb_height_max()  { return 100.0f; } // drop (units) that gives the max multiplier
-float throwb_mult_max()    { return 2.4f; }   // max damage multiplier
+float throwb_mult_max()    { return 3.0f; }   // max damage multiplier
 int   throwb_big_tier()    { return 10; }     // tier above this (more than 2.0x): shake, zoom, cancel
+float throwb_lift_speed()  { return 2.0f; }   // extra upward speed right after lift-off (frame 13)...
+float throwb_lift_end()    { return 25.0f; }  // ...fading to 0 by this frame (about 13 units higher)
 int   throwb_quake_kind()  { return 0x4; }    // screen shake strength (CameraModule 0x2710; Kirby's own moves use 2 / 3)
 int   throwb_zoom_in()     { return 0xa; }    // zoom-in frames (same call as Kirby's Final Smash)
 float throwb_zoom_amount() { return 2.0f; }   // zoom (Final Smash uses 2.0)
-int   throwb_zoom_time()   { return 40; }     // frames before the camera goes back to normal
+int   throwb_zoom_time()   { return 6; }      // frames after the release before the camera goes back to normal
 
 // throw main (func_1136, via throw_drop_reset): remember the height the throw starts at
 void throwb_start()

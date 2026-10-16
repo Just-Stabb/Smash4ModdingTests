@@ -3,10 +3,10 @@
 
   python3 tools/kirby_throwb_acmd.py IN_game.bin OUT_game.bin
 
-- Throw 0 (the release) gets the bury effect (0xB).
+- Throw 0 (the release) gets the bury effect (0xB) and a spike angle (270).
 - Before the Throw_Applier, one block per damage tier: if Kirby int 0x10000095 == t
   (set by throwb_land() in kirby.c), throw 0 is re-specified with damage x (1 + t/10),
-  t = 1..14 (1.1x .. 2.4x). Tier 0 keeps the normal damage.
+  t = 1..20 (1.1x .. 3.0x). Tier 0 keeps the normal damage.
 Run it on an unedited throwb (it refuses a script that already has the tiers).
 """
 import os
@@ -17,7 +17,8 @@ import acmd  # noqa: E402
 
 TIER_VAR = 0x10000095
 BURY = 0xB
-TIERS = 14
+TIERS = 20
+SPIKE = 270  # bury needs a downward angle
 
 IVC = acmd.BY_NAME["int_var_compare"]
 TRUE = acmd.BY_NAME["true"]
@@ -33,6 +34,7 @@ def main():
         sys.exit("throwb already has the damage tiers")
     base = next(c for c in s if c.ident == SPEC and c.params[0] == 0)
     base.params[7] = BURY
+    base.params[3] = SPIKE
     dmg = float(base.params[2])
     i = next(i for i, c in enumerate(s) if c.ident == APPLY and c.params[0] == 0)
     block = []

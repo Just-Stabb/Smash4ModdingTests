@@ -556,7 +556,9 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
 - **Drift and drop**: like forward throw. The drift speed is
   `throw_drift_scale_b()` (0.8) × the forward throw's (0.8). The loop frame is
   `throw_drop_frame_b()` (29), and the fall speed, acceleration and cap are the
-  same. There's no loop timer and no finisher, so off stage Kirby carries the
+  same. Right after lift-off (frame 13), energy 3 gets an extra upward
+  speed of `throwb_lift_speed()` (2.0), fading to 0 by `throwb_lift_end()`
+  (frame 25), so he goes about 13 units higher. There's no loop timer and no finisher, so off stage Kirby carries the
   opponent down to the blast zone.
 - **Landing** (`throwb_land`, on the first floor contact at or after the
   loop frame): Kirby is put on the ground (`func_20(0)`, ground correction,
@@ -565,19 +567,19 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   At the animation's end he goes to Wait instead of Fall.
 - **Height damage**: `throwb_start()` (throw main) stores Kirby's Y in int
   `0x10000094` (tenths + 100000). On landing, the drop (start Y − landing Y)
-  gives a multiplier from 1.0× (no drop) to `throwb_mult_max()` (2.4×) at
+  gives a multiplier from 1.0× (no drop) to `throwb_mult_max()` (3.0×) at
   `throwb_height_max()` (100 units). The multiplier is rounded to 0.1 steps,
-  and the tier (0–14) goes in int `0x10000095`.
+  and the tier (0–20) goes in int `0x10000095`.
 - **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`): throw 0 gets the bury effect
-  (`0xB`). Before the `Throw_Applier` there's one block per tier:
+  (`0xB`) and a spike angle (270°), since burying needs a downward hit. Before the `Throw_Applier` there's one block per tier:
   `Int_Var_Compare(0x10000095, 0, t)` → `True` → throw 0 re-specified with
-  damage 8 × (1 + t/10), up to 19.2.
+  damage 8 × (1 + t/10), up to 24.
 - **Above 2.0×** (tier > `throwb_big_tier()` = 10), once the opponent has
   been released:
   - a screen shake `CameraModule(0x2710, throwb_quake_kind())` (4; Kirby's
     own moves use 2 and 3);
   - the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`, reset with
-    `CameraModule(0x2718)` after `throwb_zoom_time()` (40) frames by
+    `CameraModule(0x2718)` `throwb_zoom_time()` (6) frames after the release by
     `throwb_camera_update()` in `func_74` (so it still resets if the throw
     is cancelled);
   - every frame, `func_38()` (enable the ground groups) + `func_39()` (ground
