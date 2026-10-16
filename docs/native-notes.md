@@ -522,3 +522,17 @@ shows:
 - Slot 74 returns a fighter-specific code (`0x7FAD` etc.), slot 93 is 4 for warioman.
 
 Test `build/grab_test2/cross_f.rpx` = build A + slot 70 → `li r3, 1` (`0x38600001`) for all four.
+
+**Result:** slot 70 → 1 did NOT remove the grab immunity. Slot 70 is the specializer hook called
+from `0x02E15E28` (inside `0x02E15DE4`). The specializer hooks are called one per fighter method,
+via `[fighter+0x7538]` vtable `+0xC + 8*slot` (list from the call scan: `0xC` at `0x02E137D0` …
+`0x30C` at `0x02E281F8`).
+
+Also ruled out for grabs:
+- lucariom's per-status grab-immunity flag (`StatusModule(0x2713)` 4th value) matches Meta
+  Knight's for every common status;
+- `0x02715D04` (kind `0x3A`–`0x3D` range check) is AI code (called from `0x02DF4F06`);
+- the bit-`0x800` testers on the fighter flags word (`0x02E24378`, `0x02E2A008`) are a timed
+  state.
+
+Grab immunity is still unknown. The standard build stays build A (armor fix only).
