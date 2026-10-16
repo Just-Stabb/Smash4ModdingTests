@@ -556,3 +556,8 @@ requested through that function. Second debug build adds trap B: the fighter sta
 This hits while the grabbed fighter's CapturePull setup script runs. Sanity breakpoint:
 `0x037EE6C0` runs on every status change of every fighter. Patch list:
 `docs/grab_debug_patch.txt`.
+
+**Result:** trap B hit on a normal grab (LR was just `0x02E88358`, the vtable call's return).
+Debug build 3 moves trap B to `0x037EE600`. On `r3 == 0x3F` it walks the stack back chain (16
+frames) and copies each frame's saved LR (`[frame+4]`) to `0x037EE6E0`–`0x037EE71F`. Breakpoint
+after the walk: `0x037EE63C`. Trap A is unchanged.
