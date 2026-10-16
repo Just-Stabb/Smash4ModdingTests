@@ -70703,7 +70703,7 @@ float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the 
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
 float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
-int   throw_loop_time_f()   { return 24; }    // forward throw: loop frames before the throw ends normally (in the air too)
+int   throw_loop_time_f()   { return 16; }    // forward throw: loop frames before the throw ends normally (in the air too)
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -70964,7 +70964,7 @@ void throwlw_slide_update()
 // global17 bits: 0x4000 = air grab active, 0x8000 = air grab used this airtime.
 // ===================================================================
 
-int airgrab_hold_time() { return 98; } // air grab: frames Kirby can hold / pummel before he drops the opponent
+int airgrab_hold_time() { return 68; } // air grab: frames Kirby can hold / pummel before he drops the opponent
 
 // 1 while an air grab is going on and Kirby is still airborne.
 int airgrab_on()
