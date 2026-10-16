@@ -71555,8 +71555,8 @@ void throwb_camera_update()
 // grab, the animation runs at throwlw_land_speed() x its rate and jumps from
 // throwlw_loop_end() back to throwlw_loop_start() throwlw_land_loops() times (the ACMD's stomps
 // play again each time). After that the rest of the animation plays at the normal rate.
-// While still in the air the animation waits at throwlw_loop_end(), so the final hit and the
-// release (frames 56 / 58) can't happen before he lands.
+// In the air the animation plays normally; the loop only starts if he lands before the final
+// hit (throwlw_final_frame(), 56).
 // Kirby int 0x10000098: -1 = off (ground down throw / done), 0 = air down throw not landed yet,
 // n > 0 = landed with n - 1 jumps back left.
 // ===================================================================
@@ -71593,13 +71593,13 @@ void throwlw_land_update()
     }
     if (state == 0)
     {
-        if (global18 != 0) // still in the air: wait at the loop end, before the final hit / release
+        if (global18 != 0) // still in the air: the animation plays normally
         {
-            if (MotionModuleF(0x1) >= throwlw_loop_end())
-            {
-                MotionModule(0x2713, throwlw_loop_end());
-                MotionModule(0x4, 0); // paused until he lands
-            }
+            return;
+        }
+        if (MotionModuleF(0x1) >= throwlw_final_frame()) // landed at / after the final hit: no loop
+        {
+            WorkModule(0x7, -1, 0x10000098);
             return;
         }
         state = throwlw_land_loops() + 1;
