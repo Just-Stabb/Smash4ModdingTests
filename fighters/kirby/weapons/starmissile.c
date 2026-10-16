@@ -666,29 +666,13 @@ void func_56()
 // [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
-    int code;
-    int t;
-    // Copy debug (starcopy_debug() == 1): after a hit the star stops and bobs (progress code)
-    // times: up for 20 frames, down for 20 frames, repeated, then it's removed. Only uses the
-    // speed call the star already uses (VisibilityModule may not exist on weapons).
-    // global17 = frames left (unused otherwise).
-    if (global17 > 0)
+    // Aim (added): on the first frame of flight, point the star's speed in the direction the
+    // stick is held (the weapon reads its owner's controller). Neutral stick: unchanged.
+    // global17 = 1 once aimed (it was unused).
+    if (global17 == 0)
     {
-        global17 = global17 - 1;
-        t = global17 - (global17 / 40) * 40; // frames left in this bob, 39 .. 0
-        if (t >= 20)
-        {
-            KineticModule(0x11, 0, 0, 1.5f);  // up
-        }
-        else
-        {
-            KineticModule(0x11, 0, 0, -1.5f); // down
-        }
-        if (global17 == 0)
-        {
-            BattleObject(0x9);
-        }
-        return;
+        global17 = 0x1;
+        starmissile_aim();
     }
     // Disappear when the hitbox connects (added).
     if (AttackModule(0x2726) || AttackModule(0x2727, 0x2))
@@ -696,16 +680,7 @@ void func_57()
         // Copy-ability counter (added, needs the patched cross_f.rpx): native code reads this
         // star's newest hit target and counts the hit on the owner Kirby; on the 12th it hands
         // Kirby that fighter's copy ability. Without the RPX patch this command does nothing.
-        // It returns a progress code (tools/starcopy_cave.py): 1 no attack module / records off,
-        // 2 no hit record, 3 target doesn't exist, 4 target isn't a fighter, 5 owner doesn't
-        // exist, 6 owner isn't Kirby, 7 hit counted, 8 copy handed over. 0 = no patch.
-        code = BattleObject(0x1f4);
-        if (starcopy_debug() && code > 0)
-        {
-            global17 = code * 40;
-            KineticModule(0x11, 0, 0, 0);
-            return;
-        }
+        BattleObject(0x1f4);
         BattleObject(0x9);
         return;
     }
@@ -739,7 +714,7 @@ void func_59()
     {
         // Lifetime of the flying star in frames (counted down in func_57; at 0 the star is removed).
         // Was WorkModule(0x6, 0x12000013), the weapon parameter.
-        WorkModule(0x7, 32, 0x11000002);
+        WorkModule(0x7, 24, 0x11000002);
     }
 }
 
@@ -825,4 +800,35 @@ void func_62()
 }
 
 
-int starcopy_debug() { return 0; } // 1 = after a hit, the star bobs (progress code) times; 0 = off
+float starmissile_aim_deadzone() { return 0.3f; } // stick tilt needed to aim (less = fly as spawned)
+int   starmissile_aim_enabled()  { return 1; }    // 0 = no aiming
+
+// Re-point the star's current speed (energy 0) in the stick's direction, keeping its speed.
+void starmissile_aim()
+{
+    float sx;
+    float sy;
+    float vx;
+    float vy;
+    float speed;
+    float ang;
+    if (starmissile_aim_enabled() == 0)
+    {
+        return;
+    }
+    sx = ControlModuleF(0);    // stick X (left -1 .. right 1)
+    sy = ControlModuleF(0x1);  // stick Y (down -1 .. up 1)
+    if (sx * sx + sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
+    {
+        return;
+    }
+    vx = KineticModuleF(0xa, 0);
+    vy = KineticModuleF(0xb, 0);
+    speed = MathF(0x3, vx, vy, 0); // length of (vx, vy)
+    if (speed < 0.01f) // no speed yet: nothing to aim
+    {
+        return;
+    }
+    ang = MathF(0x1, sy, sx);      // atan2(sy, sx)
+    KineticModule(0x11, 0, MathF(0x4, ang) * speed, MathF(0x5, ang) * speed);
+}

@@ -20,8 +20,8 @@ Shared by both statuses: init `func_59` (status 1 sets the lifetime), exec
 `func_60` (spin, plus speed decay unless `0x11000001 == 2`), and key 5
 `func_61`.
 
-**Changed:** the lifetime is 32 frames. `func_59` used to read it from
-weapon parameter `0x12000013`; it now sets `WorkModule(0x7, 32, 0x11000002)`.
+**Changed:** the lifetime is 24 frames. `func_59` used to read it from
+weapon parameter `0x12000013`; it now sets `WorkModule(0x7, 24, 0x11000002)`.
 
 ## Hitboxes for the inhale stars (ACMD)
 
@@ -45,7 +45,7 @@ The star disappears when it hits: `func_57` (status 1's per-frame script)
 calls `BattleObject(0x9)` (the same removal the lifetime timer uses) when
 `AttackModule(0x2726)` or `AttackModule(0x2727, 0x2)` reports a hit.
 
-Lifetime: 32 frames (`WorkModule(0x7, 32, 0x11000002)` in `func_59`).
+Lifetime: 24 frames (`WorkModule(0x7, 24, 0x11000002)` in `func_59`).
 
 ### Damage, flight mode and size (set by Kirby before each spawn)
 
@@ -68,6 +68,17 @@ the earlier `AttackModule(0x271A, …)` damage set in `func_57` (now removed).
 `ArticleModule(0x2718, 0x17)`, from `starmissile_mode()` (0),
 `starmissile_scale()` (1.0) and `starmissile_power()` (2.0). Damage can only
 be a whole number this way (1.8 would become 1).
+
+### Aiming with the stick
+
+On its first flying frame (`func_57`, `global17` marks it done), the star
+calls `starmissile_aim()`. That reads the stick with `ControlModuleF(0/1)`;
+the weapon reads its owner's controller. It keeps the star's current speed
+(energy 0, `KineticModuleF(0xA/0xB, 0)`) and points it at the stick's angle.
+
+- Stick inside `starmissile_aim_deadzone()` (0.3): the star flies as spawned.
+- `starmissile_aim_enabled()` = 0 turns aiming off.
+- The old copy-debug code (bobbing) is removed.
 
 ## Copy ability after 12 star hits (needs the patched `cross_f.rpx` and Kirby's MSC)
 

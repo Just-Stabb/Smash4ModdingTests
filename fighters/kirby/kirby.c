@@ -70287,6 +70287,7 @@ float sideb_bounce_up()        { return 1.5f; }  // upwards speed
 int   sideb_bounce_gravity()   { return 1; }     // 1 = give back Kirby's gravity on the bounce (so it arcs); 0 = keep it off
 float sideb_bounce_frame()     { return 40.0f; } // animation frame to jump to on the bounce
 float sideb_bounce_cancel()    { return 6.0f; }  // frames after the bounce until any attack can cancel it
+float sideb_bounce_nb_cancel() { return 1.0f; }  // frames after the bounce until neutral B (only) can cancel it
 
 // Slowdown near the end of the swing (only after homing, not after a bounce).
 float sideb_slow_frame()       { return 35.0f; } // swing frame where Kirby starts losing (horizontal) speed
@@ -70484,6 +70485,16 @@ int sideb_bounce_cancel_update()
     if (!(global17 & 0x2)) // only after a bounce
     {
         return 0;
+    }
+    // neutral B early: special pressed with no side/up/down special bits
+    frame = sideb_bounce_frame() + sideb_bounce_nb_cancel();
+    if (MotionModuleF(0x1) >= frame && (global24 & 0x1000) && !(global24 & 0xe000))
+    {
+        WorkModule(0x19, 0x1f00000a); // allow air specials
+        if (func_58()) // neutral special
+        {
+            return 0x1;
+        }
     }
     frame = sideb_bounce_frame() + sideb_bounce_cancel();
     if (MotionModuleF(0x1) < frame)

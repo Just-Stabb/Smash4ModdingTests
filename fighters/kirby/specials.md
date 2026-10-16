@@ -619,3 +619,11 @@ status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
   `throwlw_air_end()` in the status end `func_1085` (bit `0x40` of
   `global17`). If he lands during it, the down throw carries on on the
   ground (with the stick slide).
+
+### Side-B bounce: neutral B cancel
+
+After the on-hit bounce (animation jumps to `sideb_bounce_frame()` = 40),
+neutral B can cancel it from `sideb_bounce_nb_cancel()` (1) frame later. It
+must be a neutral special press: `global24 & 0x1000` with none of the
+side/up/down special bits (`0xE000`). Everything else still waits for
+`sideb_bounce_cancel()` (6). Code: `sideb_bounce_cancel_update()`.
