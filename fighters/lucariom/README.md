@@ -39,3 +39,8 @@ never in that check. See `docs/native-notes.md`.
 
 **Result:** the `0x02704F44` test patch didn't remove the armor or the grab immunity. Use the
 normal `cross_f.rpx`. More notes are in `docs/native-notes.md` (DamageModule armor slots).
+
+**Third try:** Mega Lucario comes from Lucario's Final Smash (the user's up-taunt code). The
+Final Smash state is the likely source, so `megalucario_update()` now calls `BattleObject(0x26)`
+(disable Final Smash state) every frame instead of only while flag `0x20000007` is on. Risk: it
+may end the Mega Evolution early or affect its timer. If so, set `megalucario_grabbable()` to 0.

@@ -37752,9 +37752,9 @@ void func_2346()
 // common code (func_344) manages itself.
 // Also every frame: DamageModule(0x11, 0) (damage-based super armor threshold) and
 // DamageModule(0xA, 1.0) (knockback taken multiplier).
-// Grabs: fighters in the Final Smash state can't be grabbed, so BattleObject(0x26) (disable Final
-// Smash state, the call Kirby's final uses to end it) runs whenever flag 0x20000007 (Final Smash
-// state enabled) is on.
+// Grabs: Mega Lucario comes from Lucario's Final Smash, and fighters in the Final Smash state
+// can't be grabbed, so BattleObject(0x26) (disable Final Smash state, the call Kirby's final uses
+// to end it) runs every frame. (Gating it on flag 0x20000007 changed nothing in game.)
 // ===================================================================
 int megalucario_no_armor()   { return 1; } // 0 = keep the armor
 int megalucario_grabbable()  { return 1; } // 0 = keep the Final Smash state (and its grab immunity)
@@ -37781,7 +37781,7 @@ void megalucario_update()
         DamageModule(0x11, 0);      // damage-based super armor threshold 0
         DamageModule(0xa, 1.0f);    // knockback taken x1
     }
-    if (megalucario_grabbable() && WorkModule(0x10, 0x20000007))
+    if (megalucario_grabbable()) // every frame: flag 0x20000007 turned out not to be a reliable check
     {
         BattleObject(0x26);
     }
