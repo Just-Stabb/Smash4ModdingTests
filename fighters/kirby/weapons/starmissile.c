@@ -827,4 +827,4 @@ void func_62()
 
 float starmissile_damage() { return 1.8f; } // inhale star damage (added; also set in the ACMD)
 
-int starcopy_debug() { return 1; } // 1 = after a hit, the star bobs (progress code) times; 0 = off
+int starcopy_debug() { return 0; } // 1 = after a hit, the star bobs (progress code) times; 0 = off

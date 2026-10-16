@@ -340,8 +340,9 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   `copy_grant` called from the star's update crashed.
 - **BattleObject return values**: the syscall (`0x030B2E48`) builds a message
   on its stack (`+4` kind 6, `+8` args, `+0xC` result = 0) and returns
-  `message+0xC` to the MSC, not `r3`. A handler that wants to return
-  something to MSC must store it at `message+0xC` (the cave's `r5`).
+  `message+0xC` to the MSC, not `r3`. Storing a value there from the star
+  cave crashed the game on the first hit (cause not found), so the cave
+  doesn't do that.
 - **Grant from Kirby's own update.** The swallow code calls `copy_grant`
   while Kirby is the object being updated (from his own command handler),
   and it does more setup with him first. So the star cave now only hands the
