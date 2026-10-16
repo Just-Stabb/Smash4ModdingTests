@@ -479,3 +479,13 @@ non-fighter objects (`0x02B57054`, `0x031FDE6C`, `0x03437858`).
 Grab immunity is still unknown. It isn't the Final Smash state (`BattleObject(0x26)` every frame
 didn't help), and the readers of bit `0x80000` checked so far (`0x0278BA48`: a sound choice,
 `0x02E22930`: the state timer) aren't a grab check.
+
+**Result:** `0x02E176A0` alone did NOT remove the armor, so something else also sets DamageModule
+`+0x35` for Mega Lucario (probably a vtable `+0xCC` call my search didn't match; there are 36
+`+0xCC` virtual calls in fighter code). **Use build A as the fix:** `0x02C24CA8=0x60000000`, so
+the no-reaction check ignores byte `+0x35`. Slot armor (MSC `DamageModule(0xB)`, smash-charge
+armor, Bowser's Tough Guy, Giga Bowser's slot 1) still works. What loses its armor: anything else
+that used the `+0x35` byte (this fighter state, and the non-fighter objects at `0x02B57054`,
+`0x031FDE6C`, `0x03437858`).
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000
