@@ -149,12 +149,14 @@ class Asm:
         return out
 
 
-STAGES = ["4a", "4"]
+STAGES = ["o", "r", "4a", "4"]
 DEBUG_INT = 0x1000009C  # Kirby int: the star cave's last result (Kirby's MSC hops that many times)
 
 
 def build_star(stage="4"):
-    """Star cave. stage 4a = count the hits but never hand over a copy; 4 = full.
+    """Star cave. stage o = find the owner Kirby and report 7, nothing else; r = also read the
+    hit record (report 1/2, or 7 when a record is there); 4a = count the hits but never hand
+    over a copy; 4 = full.
     Finds the owner Kirby first, then reports its result to Kirby's DEBUG_INT:
     1 star's attack module missing / hit records off, 2 no hit record, 3 target doesn't
     exist, 4 target isn't a valid fighter, 5 hit counted, 6 copy handed over (12th hit).
@@ -182,6 +184,8 @@ def build_star(stage="4"):
     e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "out"))
     e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
     e(cmpwi(27, 0)); e(("beq", "out"))
+    if upto == 0:
+        e(li(26, 7)); e(("b", "report"))
     # 2. target = newest hit record of the star's hitbox 0
     e(lwz(3, 0xC, 31))                                # module accessor (BattleObject +0xC, see 0x02BEF5DC)
     e(cmpwi(3, 0)); e(("beq", "f1"))
@@ -193,6 +197,8 @@ def build_star(stage="4"):
     e(lwz(5, 0x128, 4)); e(addi(6, 4, 0x124)); e(cmplw(5, 6)); e(("beq", "f2"))
     e(cmpwi(5, 0)); e(("beq", "f2"))                  # null node (0x02C09C94)
     e(lwz(30, 0x18, 5))                               # r30 = target id
+    if upto == 1:
+        e(li(26, 7)); e(("b", "report"))
     lookup(30, 0x10, "f3")
     e(addi(3, 1, 0x10)); e(("bl", VALID)); e(cmpwi(3, 0)); e(("beq", "f4"))
     e(addi(3, 1, 0x10)); e(("bl", CATEGORY)); e(cmpwi(3, 0)); e(("bne", "f4"))
@@ -205,7 +211,7 @@ def build_star(stage="4"):
     a.label("pos")
     e(cmpwi(26, THRESHOLD)); e(("blt", "store"))
     e(li(26, 0))
-    if upto == 0:
+    if upto == 2:
         e(("b", "store"))
     e(cmpwi(29, 8)); e(("beq", "store"))              # target is a Kirby: no copy
     # hand the copy over to Kirby: PEND_KIND = kind + 1, PEND_COSTUME = costume
