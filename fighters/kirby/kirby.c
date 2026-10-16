@@ -71553,8 +71553,8 @@ void throwb_camera_update()
 // ===================================================================
 // Air down throw landing loop (added). If Kirby lands during a down throw started from an air
 // grab, the animation runs at throwlw_land_speed() x its rate and jumps from
-// throwlw_loop_end() back to throwlw_loop_start() throwlw_land_loops() times (the ACMD's stomps
-// play again each time). After that the rest of the animation plays at the normal rate.
+// throwlw_loop_end() back to throwlw_loop_start() throwlw_land_loops() times, restarting the
+// motion there (throwlw_restart), which restarts the ACMD too, so the stomps play again. After that the rest of the animation plays at the normal rate.
 // In the air the animation plays normally; the loop only starts if he lands before the final
 // hit (throwlw_final_frame(), 56).
 // Kirby int 0x10000098: -1 = off (ground down throw / done), 0 = air down throw not landed yet,
@@ -71613,9 +71613,24 @@ void throwlw_land_update()
     if (state > 1) // jump back
     {
         WorkModule(0x7, state - 1, 0x10000098);
-        MotionModule(0x2713, throwlw_loop_start());
+        throwlw_restart(throwlw_loop_start(), WorkModuleF(0, 0x1000006) * throwlw_land_speed());
         return;
     }
     WorkModule(0x7, -1, 0x10000098); // done: the rest at the normal rate
     MotionModule(0x4, WorkModuleF(0, 0x1000006));
+}
+
+// Restarts the down throw motion at a frame (like func_22, with a float rate). Unlike jumping the
+// frame (MotionModule 0x2713), a motion change also restarts the throwlw ACMD, so the stomps play
+// again and the final hit / release stay in sync with the animation.
+void throwlw_restart(float frame, float rate)
+{
+    int motion;
+    motion = WorkModule(0x6, 0x11000002);
+    if (global21)
+    {
+        motion = (*global21)(motion);
+    }
+    MotionModule(0x1, motion, frame, rate);
+    global20 = frame;
 }

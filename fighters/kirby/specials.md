@@ -626,8 +626,11 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   Kirby lands during a down throw started from an air grab, the animation
   runs at `throwlw_land_speed()` (2×) its rate (`0x1000006`). It jumps from
   `throwlw_loop_end()` (43) back to `throwlw_loop_start()` (6)
-  `throwlw_land_loops()` (9) times, and the ACMD's stomps play again each
-  time. Then the rest plays at the normal rate. In the air the animation plays
+  `throwlw_land_loops()` (9) times. Each jump back is a motion change
+  at frame 6 (`throwlw_restart`, `MotionModule(0x1, motion, frame, rate)`),
+  which restarts the ACMD too, so the stomps play again. Just setting the
+  frame (`MotionModule(0x2713)`) doesn't rewind the ACMD: its final hit and
+  release then came while the animation looped without the opponent. Then the rest plays at the normal rate. In the air the animation plays
   normally. The loop only starts if he lands before the final hit
   (`throwlw_final_frame()`, 56). Landing at or after it plays the throw out
   as usual. State is in Kirby int
