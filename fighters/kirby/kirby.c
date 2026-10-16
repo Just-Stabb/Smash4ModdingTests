@@ -1689,6 +1689,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C1), 0x0200033F); //Common Param Name 83
 WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 832
 }
 
+    starcopy_update(); // copy ability from the 12th star missile hit (added), see the end of the file
     if (var0 != 0xffffffff)
     {
         if (!(StopModule(0x1) || SlowModule(0x3)))
@@ -71060,4 +71061,19 @@ void throwlw_air_end()
     global17 = global17 - 0x40;
     KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
     KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+}
+
+// ===================================================================
+// Star missile copy (added, needs the patched cross_f.rpx: tools/starcopy_cave.py).
+// On the 12th star missile hit the star's native code stores the hit fighter's kind + 1 in
+// Kirby's int 0x100000AA (and its costume value in 0x100000AC). The copy itself has to be
+// granted from Kirby's own update, so the main loop calls BattleObject(0x409) while one is
+// pending; the patched command clears 0x100000AA and grants the copy.
+// ===================================================================
+void starcopy_update()
+{
+    if (WorkModule(0x6, 0x100000aa) > 0)
+    {
+        BattleObject(0x409);
+    }
 }
