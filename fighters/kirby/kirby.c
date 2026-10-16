@@ -21348,6 +21348,7 @@ void func_1084()
 void func_1085()
 {
     throwlw_air_end(); // (added) normal gravity back after an air down throw
+    throwlw_land_end(); // (added) landing loop damage flag off
     JostleModule(0, 0x50000000);
     if (global6 != 0 && global6 != 0x3c)
     {
@@ -71037,6 +71038,10 @@ void throwlw_slide_update()
     {
         return;
     }
+    if (WorkModule(0x6, 0x10000099) != 0) // air down throw landing loop: no slide
+    {
+        return;
+    }
     if (MotionModuleF(0x1) >= throwlw_final_frame()) // final hit: kill the momentum
     {
         KineticModule(0x11, 0x3, 0, 0);
@@ -71558,7 +71563,9 @@ void throwb_camera_update()
 // In the air the animation plays normally; the loop only starts if he lands before the final
 // hit (throwlw_final_frame(), 56).
 // Kirby int 0x10000098: -1 = off (ground down throw / done), 0 = air down throw not landed yet,
-// n > 0 = landed with n - 1 jumps back left.
+// n > 0 = landed with n - 1 jumps back left. Kirby int 0x10000099: 0 = normal, 1 = looping (the
+// throwlw ACMD uses the loop stomp damage, tools/kirby_throwlw_acmd.py), 2 = loop done. From the
+// landing Kirby can't move (no slide, kinetic GROUND_STOP) or leave the ground.
 // ===================================================================
 float throwlw_loop_start() { return 6.0f; }  // loop start frame
 float throwlw_loop_end()   { return 43.0f; } // loop end frame
@@ -71568,6 +71575,7 @@ float throwlw_land_speed() { return 2.0f; }  // animation speed while looping
 // down throw main (func_1082)
 void throwlw_land_init()
 {
+    WorkModule(0x7, 0, 0x10000099);
     if (WorkModule(0x6, 0x11000002) == 0x7b && airgrab_on())
     {
         WorkModule(0x7, 0, 0x10000098);
@@ -71604,8 +71612,10 @@ void throwlw_land_update()
         }
         state = throwlw_land_loops() + 1;
         WorkModule(0x7, state, 0x10000098);
+        WorkModule(0x7, 1, 0x10000099); // throwlw ACMD: loop stomp damage
         MotionModule(0x4, WorkModuleF(0, 0x1000006) * throwlw_land_speed());
     }
+    throwlw_land_hold(); // no movement, stays on the ground
     if (MotionModuleF(0x1) < throwlw_loop_end())
     {
         return;
@@ -71617,7 +71627,29 @@ void throwlw_land_update()
         return;
     }
     WorkModule(0x7, -1, 0x10000098); // done: the rest at the normal rate
+    WorkModule(0x7, 2, 0x10000099);   // normal damage again; still no slide
     MotionModule(0x4, WorkModuleF(0, 0x1000006));
+}
+
+// During the landing loop: kinetic GROUND_STOP (no movement, no animation movement), speeds 0,
+// and put back on the ground if anything lifts him.
+void throwlw_land_hold()
+{
+    if (global18 != 0)
+    {
+        func_20(0);
+        GroundModule(0x2710, 0x2);
+    }
+    KineticModule(0, 0x6);
+    KineticModule(0x11, 0x1, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x10, 0x3, 0, 0);
+}
+
+// down throw end (func_1085)
+void throwlw_land_end()
+{
+    WorkModule(0x7, 0, 0x10000099);
 }
 
 // Restarts the down throw motion at a frame (like func_22, with a float rate). Unlike jumping the

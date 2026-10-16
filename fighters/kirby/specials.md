@@ -630,7 +630,15 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   at frame 6 (`throwlw_restart`, `MotionModule(0x1, motion, frame, rate)`),
   which restarts the ACMD too, so the stomps play again. Just setting the
   frame (`MotionModule(0x2713)`) doesn't rewind the ACMD: its final hit and
-  release then came while the animation looped without the opponent. Then the rest plays at the normal rate. In the air the animation plays
+  release then came while the animation looped without the opponent.
+  From the landing, `throwlw_land_hold()` keeps Kirby in place each frame
+  while looping: kinetic GROUND_STOP (`0x6`, no movement and no animation
+  movement), speeds zeroed, and he's put back on the ground (`func_20(0)`)
+  if anything lifts him. The stick slide is off for the rest of the throw.
+  Loop damage: Kirby int `0x10000099` = 1 while looping (0 normal, 2 done).
+  The `throwlw` ACMD (`tools/kirby_throwlw_acmd.py IN OUT`) then uses a
+  0.27-damage stomp instead of 0.8. That's 9 stomps per pass × 9 passes plus
+  the partial first pass, about 22–24 total. Then the rest plays at the normal rate. In the air the animation plays
   normally. The loop only starts if he lands before the final hit
   (`throwlw_final_frame()`, 56). Landing at or after it plays the throw out
   as usual. State is in Kirby int
