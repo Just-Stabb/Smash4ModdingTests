@@ -537,7 +537,7 @@ Damage and knockback are the same as the normal throw.
 ### Forward throw loop timer
 
 - When the forward throw's loop starts (frame 32, dropping), a timer starts.
-  After `throw_loop_time_f()` (8) loop frames without landing or a
+  After `throw_loop_time_f()` (12) loop frames without landing or a
   finisher, the throw ends normally where Kirby is: the drop stops, the
   throw's motion kinetic comes back and the animation resumes, so the
   opponent is released by the normal forward throw (frame 45). Afterwards
@@ -546,7 +546,10 @@ Damage and knockback are the same as the normal throw.
   throw starts and when the loop starts. Up throw has no timer.
 - A forward throw marks the air grab as used (`0x8000`, set in
   `throw_drop_reset()`), so Kirby can't air grab again until he lands or
-  grabs a ledge.
+  grabs a ledge. `airgrab_update()` doesn't clear `0x8000` during a forward
+  throw, which is grounded until its lift-off. Otherwise a ground forward
+  throw (after an air grab had landed) gave the air grab back and could loop
+  into itself.
 
 ### Back throw: drift, drop, height damage, bury
 
@@ -567,28 +570,37 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   until the throw ends. The animation then resumes to the release at frame 41.
   At the animation's end he goes to Wait instead of Fall.
 - **Height damage**: `throwb_start()` (throw main) stores Kirby's Y in int
-  `0x10000094` (tenths + 100000). On landing, the drop (start Y − landing Y)
-  gives a multiplier from 1.0× (no drop) to `throwb_mult_max()` (3.0×) at
-  `throwb_height_max()` (100 units). The multiplier is rounded to 0.1 steps,
-  and the tier (0–20) goes in int `0x10000095`.
-- **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`): throw 0 gets the bury effect
-  (`0xB`) and a spike angle (270°), since burying needs a downward hit. Before the `Throw_Applier` there's one block per tier:
-  `Int_Var_Compare(0x10000095, 0, t)` → `True` → throw 0 re-specified with
-  damage 8 × (1 + t/10), up to 24.
-- **Above 2.0×** (tier > `throwb_big_tier()` = 10), once the opponent has
-  been released:
+  `0x10000094` (tenths + 100000), and the extra lift is added to it. On
+  landing, the drop (start Y − landing Y) gives a multiplier from 1.0× (no
+  drop) to `throwb_mult_max()` (3.0×) at `throwb_height_max()` (115 units).
+  The multiplier is rounded to 0.1 steps, and the tier (0–20) goes in int
+  `0x10000095`.
+- **ACMD** (`tools/kirby_throwb_acmd.py IN OUT`): the throw itself didn't
+  bury, so the release (throw 0, frame 41) is now weak: 0 damage, 270°, fixed
+  knockback 10, so the opponent stays on the ground. At frame 42 a
+  `Special_Hitbox` slams them for 2 frames. It's copied from Kirby's Stone,
+  whose original hitbox uses effect `0xB`. It uses bury (`0xB`), 270°, the
+  throw's old knockback (KBG 120, BKB 30), size 12 on bone 0, ground and air.
+  There's one block per tier: `Int_Var_Compare(0x10000095, 0, t)` → `True`
+  → the hitbox with damage 8 × (1 + t/10), up to 24. Tiers above 10 use
+  hitlag 3.0 (3× hitstop) instead of 1.0.
+- **Above 2.0×** (tier > `throwb_big_tier()` = 10), once the opponent is
+  released and the animation reaches the slam (`throwb_hit_frame()` 42):
   - a screen shake `CameraModule(0x2710, throwb_quake_kind())` (4; Kirby's
     own moves use 2 and 3);
-  - the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`, reset with
-    `CameraModule(0x2718)` `throwb_zoom_time()` (6) frames after the release by
-    `throwb_camera_update()` in `func_74` (so it still resets if the throw
-    is cancelled);
-  - every frame, `func_38()` (enable the ground groups) + `func_39()` (ground
-    transitions), so any ground action cancels the throw.
-- **Untested**: the bury effect id `0xB` (from the Smash 4 effect list), and
-  whether bury works on a thrown opponent. Quake kind 4: if it crashes or
-  does nothing, use 3.
+  - the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`. It lasts
+    `throwb_zoom_time()` (20) frames, then `throwb_camera_update()` in
+    `func_74` resets it with `CameraModule(0x2718)`, so it still resets if
+    the throw is cancelled;
+  - from `throwb_cancel_frame()` (44, after the slam, because cancelling
+    stops the ACMD), every frame runs `func_38()` (enable the ground groups)
+    + `func_39()` (ground transitions), so any ground action cancels the
+    throw.
+- **Untested**: whether the slam hitbox buries (the opponent has to be on
+  the ground when it hits). Quake kind 4: if it crashes or does nothing, use
+  3.
 
+### Down throw slide
 
 - Down throw is the common Throw status `0x3E` with kind `0x7B`.
   `throwlw_slide_update()`, called at the top of its loop `func_1084`, sets
