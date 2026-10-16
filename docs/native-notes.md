@@ -615,3 +615,7 @@ become grabbable from their first normal status after the transformation.
 **Result:** confirmed, Mega Lucario can be grabbed (and doesn't freeze). This is now the
 standard build (`build/cross_f.rpx` = starcopy cave + patch A + `transform_grab_cave.py`).
 Giga Mac, Giga Bowser and Wario-Man use the same kind range but are untested.
+
+**Known issue (won't fix):** with armor and grab immunity gone, the game can crash if a
+transformation detransforms during some hit states, and Giga Mac / Giga Bowser sometimes handle
+hit states oddly. In the user's setup these characters never detransform, so this is left as is.
