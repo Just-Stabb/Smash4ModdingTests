@@ -611,3 +611,7 @@ status-change function) also needs flags `+4` bit `0x20000`, which only the post
 skips both checks (whatever the 0x08000000 bit is) and jumps to `0x02E28D78`
 (catch = !(status data & `0x800`)). The catch state is set on every status change, so they
 become grabbable from their first normal status after the transformation.
+
+**Result:** confirmed, Mega Lucario can be grabbed (and doesn't freeze). This is now the
+standard build (`build/cross_f.rpx` = starcopy cave + patch A + `transform_grab_cave.py`).
+Giga Mac, Giga Bowser and Wario-Man use the same kind range but are untested.

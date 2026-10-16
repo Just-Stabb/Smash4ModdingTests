@@ -52,3 +52,10 @@ disabling the Final Smash state removed the grab immunity. The armor is native a
 **Armor fixed** natively with build A: `0x02C24CA8=0x60000000` in `cross_f.rpx` (`0x02E176A0`
 alone wasn't enough; see `docs/native-notes.md`).
 Grab immunity: still there with the Final Smash state disabled every frame; not found yet.
+
+## Resolved
+
+- Armor: native patch A (`0x02C24CA8=0x60000000`), confirmed.
+- Grab immunity: native caves from `tools/transform_grab_cave.py` (fighter kinds 0x3A-0x3D
+  are grabbable outside the special common statuses 0x139-0x151), confirmed for Mega Lucario.
+  See `docs/native-notes.md`.
