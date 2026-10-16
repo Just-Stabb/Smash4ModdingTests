@@ -56,8 +56,9 @@ def main():
         patches[int(a, 0)] = int(v, 0)
 
     by_section = {}
+    cache = {}
     for addr, value in patches.items():
-        idx, data = locate(d, secs, addr)
+        idx, data = locate(d, secs, addr, cache)
         by_section.setdefault(idx, (data, []))[1].append((addr, value))
 
     crc_idx = next(i for i, s in enumerate(secs) if s[1] == SHT_RPL_CRCS)
@@ -69,18 +70,23 @@ def main():
             o = addr - sec[3]
             old, = struct.unpack('>I', data[o:o + 4])
             data[o:o + 4] = struct.pack('>I', value)
-            print("patched %s: 0x%X -> 0x%X" % (hex(addr), old, value))
+            if old != value:
+                print("patched %s: 0x%X -> 0x%X" % (hex(addr), old, value))
         flags, off, size = sec[2], sec[4], sec[5]
         if flags & SHF_RPL_ZLIB:
+            # Room = up to the next section's data (the original space; an earlier patch may have
+            # shrunk the recorded size and zero-padded the rest), never into the header table.
+            nxt = [s[4] for s in secs if s[4] > off and s[5]] + ([shoff] if shoff > off else [])
+            room = min(nxt) - off if nxt else size
             new = None
             for level in (6, 9, 8, 7, 5, 4, 3, 2, 1):
                 comp = struct.pack('>I', len(data)) + zlib.compress(bytes(data), level)
-                if len(comp) <= size:
+                if len(comp) <= room:
                     new = comp
                     break
             if new is None:
                 sys.exit("recompressed section %d doesn't fit in its original space" % idx)
-            d[off:off + size] = new + b'\0' * (size - len(new))
+            d[off:off + room] = new + b'\0' * (room - len(new))
             sec[5] = len(new)
             struct.pack_into('>10I', d, shoff + idx * shentsize, *sec)
         else:
@@ -91,8 +97,9 @@ def main():
 
     # verify
     d2, _s, _e, secs2 = load(dst)
+    cache2 = {}
     for addr, value in patches.items():
-        got = read_u32(d2, secs2, addr)
+        got = read_u32(d2, secs2, addr, cache2)
         assert got == value, (hex(addr), got, value)
     for i, s in enumerate(secs2):
         if s[1] == 1 and s[5]:
@@ -101,18 +108,23 @@ def main():
     print("wrote %s (verified)" % dst)
 
 
-def locate(d, secs, addr):
+def locate(d, secs, addr, cache=None):
     for i, s in enumerate(secs):
         if s[1] != 1 or s[3] == 0 or s[5] == 0:
             continue
-        data = section_data(d, s)
+        if cache is not None and i in cache:
+            data = cache[i]
+        else:
+            data = section_data(d, s)
+            if cache is not None:
+                cache[i] = data
         if s[3] <= addr < s[3] + len(data):
             return i, data
     sys.exit("address %s is not in any loadable section" % hex(addr))
 
 
-def read_u32(d, secs, addr):
-    i, data = locate(d, secs, addr)
+def read_u32(d, secs, addr, cache=None):
+    i, data = locate(d, secs, addr, cache)
     o = addr - secs[i][3]
     return struct.unpack('>I', data[o:o + 4])[0]
 
