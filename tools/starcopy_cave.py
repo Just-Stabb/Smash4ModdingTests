@@ -12,7 +12,8 @@ How it works (see docs/native-notes.md, "Star missile hits" / "Kirby copy abilit
 - CAVE (overwrites an unreferenced Havok function, 0x037ED898 "TtrcCapsule", 0xEA8 bytes):
   for command MAGIC only:
     1. target = newest collision record of the star's hitbox 0:
-       AM = *(*(weapon+0x28)+0x50); node = *(*(AM+0x14)+0x128); id = *(node+0x18)
+       AM = *(*(weapon+0xC)+0x50); node = *(*(AM+0x14)+0x128); id = *(node+0x18)
+       (BattleObject: +0 id, +4 kind, +0xC module accessor; accessor +0x28 WorkModule, +0x50 AttackModule)
     2. resolve the target; must be a valid fighter -> kind, costume value
     3. owner = *(weapon+0x1BF8); must resolve to Kirby (kind 8) -> Kirby's accessor
     4. count = Kirby int COUNTER + 1; at THRESHOLD: copy_grant(spec(8), kirby, costume, kind, 1)
@@ -38,9 +39,9 @@ ACCESSOR = 0x02BEF5DC  # (&handle) -> module accessor
 GETSPEC = 0x02E669F0   # (r3, kind) -> fighter specializer
 COPYGRANT = 0x02EFCD8C # (spec, kirby accessor, costume, kind, 1)
 
-# Data addresses are NOT hard-coded: the loader relocates them, so the cave rebuilds each one
-# from an existing (already relocated) lis + lwz/addi instruction pair in the game's code,
-# found relative to the cave's own position (bl +4; mflr).
+# Data addresses are rebuilt from an existing lis + lwz/addi instruction pair in the game's
+# code, found relative to the cave's own position (bl +4; mflr). The game itself hard-codes
+# these addresses (data sits at its link address), so this is only belt and braces.
 ADDR_MANAGER = (0x02C09C5C, 0x02C09D5C)  # lis r30,0x102f / lwz r3,0x6c30(r30) -> &object manager ptr
 ADDR_GUARD = (0x02796680, 0x02796684)    # lis r10,0x1049 / lwzu r0,0x3140(r10) -> static guard word
 ADDR_SPECARG = (0x02796698, 0x027966A0)  # lis r3,0x104d / addi r3,r3,0x1632 -> r3 for GETSPEC
@@ -108,7 +109,10 @@ def build(stage=4):
         emit(("b", "ret0"))
     emit(stwu(1, -0x60, 1)); emit(MFLR_R0); emit(stw(0, 0x64, 1)); emit(stmw(26, 0x40, 1))
     emit(mr(31, 4))                                   # r31 = weapon
-    emit(lwz(3, 0x28, 31)); emit(lwz(3, 0x50, 3))     # AttackModule
+    emit(lwz(3, 0xC, 31))                             # module accessor (BattleObject +0xC, see 0x02BEF5DC)
+    emit(cmpwi(3, 0)); emit(("beq", "out"))
+    emit(lwz(3, 0x50, 3))                             # AttackModule (accessor +0x50)
+    emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(lwz(4, 0x14, 3)); emit(cmpwi(4, 0)); emit(("beq", "out"))
     emit(lwz(6, 0x18, 3)); emit(cmpwi(6, 0)); emit(("ble", "out"))
     emit(lwz(5, 0x128, 4)); emit(addi(6, 4, 0x124)); emit(cmplw(5, 6)); emit(("beq", "out"))

@@ -316,13 +316,16 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   targets) and resets the count. It returns 0 like the stub.
 - **MSC**: `starmissile.c` `func_57` calls `BattleObject(0x1F4)` when the
   hitbox connects, just before `BattleObject(0x9)`.
-- **Data addresses are relocated at load.** The first cave build used
-  absolute addresses (`0x102F6C30` manager pointer, `0x10493140` guard,
-  `0x104D1632` spec argument) and crashed on the first hit (stage 2, the first
-  data access). The game's own `lis`/`lwz` pairs for those addresses carry
-  HA/LO relocations, so the real address differs at runtime. The cave now
-  rebuilds each address from those already-relocated instructions
-  (`0x02C09C5C`/`0x02C09D5C`, `0x02796680`/`0x02796684`,
-  `0x02796698`/`0x027966A0`): `bl +4; mflr` for its own position, load both
-  instruction words, then `(hi << 16) + (s16)lo`. Never hardcode a
-  `0x10xxxxxx` address in cave code.
+- **Crash on the first star hit (fixed).** The first cave read the attack
+  module as `*(*(weapon+0x28)+0x50)`. The weapon passed to the hook is the
+  weapon table entry itself (`0x02BF4B24`: `0x1E20`-byte entries, ID at
+  `+0`, vtable at `+0x24`, specializer `+0x1BF0`, owner `+0x1BF8`). Its
+  module accessor is at `+0xC`, the same field the handle getter
+  `0x02BEF5DC` reads, so the attack module is `*(*(weapon+0xC)+0x50)`.
+  `+0x28` is something else, so the old chain read a garbage pointer.
+- **Data addresses**: an intermediate fix rebuilt `0x102F6C30` and the
+  other two data addresses from the game's relocated `lis`/`lwz` pairs. That
+  wasn't the cause: the game's own code also hard-codes data addresses
+  (e.g. `lis r12,0x1035; lwz 0x184C(r12)` in `0x02BF205C`), so data sits at
+  its link address. The cave keeps rebuilding them; either way gives the
+  same value.
