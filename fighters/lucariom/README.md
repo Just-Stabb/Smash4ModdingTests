@@ -24,3 +24,12 @@ fighter's (Meta Knight). So both come from outside the MSC (native code / the Fi
 - **Untested**: if the native armor isn't the armor state, the first part does nothing. If the
   flag doesn't mean what the notes say, the second part never runs. If disabling the Final
   Smash state also ends Mega Evolution, set `megalucario_grabbable()` to 0.
+
+## Native (cross_f.rpx) test patch
+
+The MSC resets didn't remove the armor or the grab immunity, so they come from the executable.
+Test build: `build/megalucario_test/cross_f.rpx` = the usual build plus `0x02704FD4=0x2C007FFF`,
+which takes Mega Lucario (kind `0x3D`) out of the transform-fighter check in the hit result
+builder `0x02704F44` (see `docs/native-notes.md`):
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02704FD4=0x2C007FFF

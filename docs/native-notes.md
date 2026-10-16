@@ -376,3 +376,29 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   the same object `copy_grant` takes. The cave clears `0x1000009E`, then
   calls `copy_grant(GETSPEC(0x104D1632, 8), accessor, costume, kind, 1)` and
   branches to the dispatcher epilogue (`0x02EF9688`).
+
+## Transformation fighters (Mega Lucario armor / grab immunity)
+
+Fighter kinds come from the name table at `0x102FF484` (kind = index from
+`miifighter` = 0): Kirby `0x08`, Lucario `0x1E`, Giga Bowser (`koopag`)
+`0x3A`, Wario-Man `0x3B`, Giga Mac (`littlemacg`) `0x3C`, Mega Lucario
+(`lucariom`) `0x3D`.
+
+Mega Lucario's MSC has no armor or grab code of its own. Its module calls
+match a normal fighter's, and resetting the armor state from MSC didn't help.
+So the behaviour is native.
+
+Candidate: `0x02704F44`, a hit/collision result builder. It's called for
+collision events `0x6010` (`0x0270A9A8`) and `0x6030` (`0x0270B368`), and from
+`0x0270F00C`. It sets bit `0x800` in the result flags (`+0x10C`) when the
+target's kind (`+0x18`) is `0x3A`, `0x3C` or `0x3D`. It skips Wario-Man,
+who isn't armored. It also sets the bit when `+0x4C` == 4 or `+0x30` has bit
+`0x2000`. The test patch `0x02704FD4: 2C00003D -> 2C007FFF` (`cmpwi r0, 0x3D`
+→ `cmpwi r0, 0x7FFF`) takes Mega Lucario out of that check.
+
+Other kind helpers found along the way:
+- `0x03058B8C`: returns 0 for kinds `0x3A`–`0x3D`, else 1. Called from
+  `0x0275EC94`.
+- `0x03058B6C`: returns 0 for `0x3A` / `0x3C`. Called from `0x02E159E8` and
+  `0x034FC03C`.
+- `0x030BF9C0` / `0x030C1FDC`: transform kind → base kind.
