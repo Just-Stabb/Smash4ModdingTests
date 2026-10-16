@@ -666,13 +666,25 @@ void func_56()
 // [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
-    // Aim (added): on the first frame of flight, point the star's speed in the direction the
-    // stick is held (the weapon reads its owner's controller). Neutral stick: unchanged.
-    // global17 = 1 once aimed (it was unused).
+    // Aim (added): Kirby passes the stick angle in int 0x11000000 (1000 + degrees + 90, see
+    // starmissile_aim_code in kirby.c); that int is also the damage the game applies, so put
+    // the real damage back on the first frame and keep the angle in global17 (unused before):
+    // 0 = not read yet, -1 = done / no aim, 1000+ = angle code still to apply.
     if (global17 == 0)
     {
-        global17 = 0x1;
-        starmissile_aim();
+        global17 = WorkModule(0x6, 0x11000000);
+        if (global17 >= 1000)
+        {
+            WorkModule(0x7, starmissile_damage(), 0x11000000);
+        }
+        else
+        {
+            global17 = -1;
+        }
+    }
+    if (global17 >= 1000 && starmissile_aim(global17 - 1090))
+    {
+        global17 = -1;
     }
     // Disappear when the hitbox connects (added).
     if (AttackModule(0x2726) || AttackModule(0x2727, 0x2))
@@ -800,59 +812,30 @@ void func_62()
 }
 
 
-float starmissile_aim_deadzone() { return 0.3f; } // stick tilt needed to aim (less = fly as spawned)
-int   starmissile_aim_enabled()  { return 1; }    // 0 = no aiming
-float starmissile_aim_limit()    { return 60.0f; } // max degrees above / below forward (Smash angles 300..60)
+int starmissile_damage() { return 2; } // keep equal to starmissile_power() in kirby.c (whole numbers)
 
-// Re-point the star's current speed (energy 0) in the stick's direction, keeping its speed.
-void starmissile_aim()
+// Turn the star's current speed (energy 0) to deg degrees above (+) / below (-) forward, keeping
+// its speed. Forward = the sign of its horizontal speed. Returns 0 while it has no speed yet.
+int starmissile_aim(int deg)
 {
-    float sx;
-    float sy;
     float vx;
     float vy;
     float speed;
     float ang;
     float fwd;
-    float limit;
-    if (starmissile_aim_enabled() == 0)
-    {
-        return;
-    }
-    sx = ControlModuleF(0);    // stick X (left -1 .. right 1)
-    sy = ControlModuleF(0x1);  // stick Y (down -1 .. up 1)
-    if (sx * sx + sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
-    {
-        return;
-    }
     vx = KineticModuleF(0xa, 0);
     vy = KineticModuleF(0xb, 0);
     speed = MathF(0x3, vx, vy, 0); // length of (vx, vy)
-    if (speed < 0.01f) // no speed yet: nothing to aim
+    if (speed < 0.01f)
     {
-        return;
+        return 0;
     }
-    // Angle relative to forward (the star launches forward, so forward = the sign of its
-    // horizontal speed): 0 = forward, + = up, - = down. Clamped to +-starmissile_aim_limit()
-    // degrees (60: Smash angles 300..0..60), so it can never point behind Kirby.
     fwd = 1.0f;
     if (vx < 0)
     {
         fwd = -1.0f;
     }
-    if (sx * fwd < 0 && sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
-    {
-        return; // stick straight back: fly as spawned
-    }
-    ang = MathF(0x1, sy, sx * fwd); // atan2(up, forward), radians
-    limit = starmissile_aim_limit() * 0.017453292f;
-    if (ang > limit)
-    {
-        ang = limit;
-    }
-    if (ang < -limit)
-    {
-        ang = -limit;
-    }
+    ang = (float)deg * 0.017453292f;
     KineticModule(0x11, 0, MathF(0x4, ang) * speed * fwd, MathF(0x5, ang) * speed);
+    return 0x1;
 }

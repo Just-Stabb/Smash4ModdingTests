@@ -71,18 +71,23 @@ be a whole number this way (1.8 would become 1).
 
 ### Aiming with the stick
 
-On its first flying frame (`func_57`, `global17` marks it done), the star
-calls `starmissile_aim()`. That reads the stick with `ControlModuleF(0/1)`;
-the weapon reads its owner's controller. It keeps the star's current speed
-(energy 0, `KineticModuleF(0xA/0xB, 0)`) and points it at the stick's angle.
+The first version had the star read the stick itself
+(`ControlModuleF(0/1)`), and it didn't work in game. Now Kirby passes the
+angle in the value that becomes the star's damage int:
 
-- Stick inside `starmissile_aim_deadzone()` (0.3): the star flies as spawned.
-- The angle is clamped to `starmissile_aim_limit()` (60) degrees above or
-  below forward (Smash angles 300°–60°), so it never points behind Kirby.
-  Forward is the sign of the star's horizontal speed. Stick straight back:
-  the star flies as spawned.
-- `starmissile_aim_enabled()` = 0 turns aiming off.
-- The old copy-debug code (bobbing) is removed.
+1. **Kirby:** `starmissile_aim_code()` in `kirby.c` is set into float
+   `0x4E` before each spawn. It's the damage (`starmissile_power()`, 2) with
+   the stick neutral or held straight back. Otherwise it's `1000 + angle +
+   90`, where the angle is in degrees from Kirby's facing (+ up) and clamped
+   to ±`starmissile_aim_limit()` (60, i.e. Smash angles 300°–60°).
+2. **Star, first flying frame (`func_57`):** if int `0x11000000` is 1000 or
+   more, it puts the real damage back (`starmissile_damage()`, 2; keep it
+   equal to `starmissile_power()`). It keeps the code in `global17`, then
+   `starmissile_aim(code - 1090)` turns its current speed to that angle.
+   Forward is the sign of its horizontal speed, and it retries on later
+   frames while the star has no speed yet.
+
+`starmissile_aim_enabled()` = 0 (in `kirby.c`) turns aiming off.
 
 ## Copy ability after 12 star hits (needs the patched `cross_f.rpx` and Kirby's MSC)
 
