@@ -547,3 +547,12 @@ Grab immunity is still unknown. The standard build stays build A (armor fix only
   `cmpwi r4, 0x3F; bne +8; nop (breakpoint 0x037EE6A8); stwu r1, -0x30(r1); b 0x02E88814`.
   The patch list is in `docs/grab_debug_patch.txt`. On a normal grab the breakpoint hits with
   LR = the code that requested CapturePull; the stack back chain gives the callers above it.
+
+**Result:** trap A (`0x02E88810` with `r4 == 0x3F`) did not hit on a normal grab, so CapturePull isn't
+requested through that function. Second debug build adds trap B: the fighter status setup handler
+(MSC `StatusModule(0x2713)`, `0x02E882AC`) gets the new status kind from vtable `+0x8C` at
+`0x02E88354`. The hook at `0x02E88358` → `0x037EE6C0`:
+`cmpwi r3, 0x3F; bne +8; nop (breakpoint 0x037EE6C8); lwz r4, 0(r30); b 0x02E8835C`.
+This hits while the grabbed fighter's CapturePull setup script runs. Sanity breakpoint:
+`0x037EE6C0` runs on every status change of every fighter. Patch list:
+`docs/grab_debug_patch.txt`.
