@@ -447,3 +447,10 @@ to the normal build.
   `0x02C24CA8=0x60000000` (ignore byte `+0x25`), `0x02C24CBC=0x60000000` (ignore byte `+0x24`),
   `0x02C24CC8=0x48000018` (ignore flag `+0`). Slots are untouched, so MSC armor and Bowser's
   Tough Guy still work.
+
+**Result:** the diagnostic build removes Mega Lucario's armor, so his armor is one of the three
+override flags, not a slot. Single-flag builds to narrow it down:
+`build/armor_test_a` (only `0x02C24CA8`, byte `+0x25`), `build/armor_test_b` (only `0x02C24CBC`,
+byte `+0x24`), `build/armor_test_c` (only `0x02C24CC8`, word flag `+0`). The word flag is
+recomputed every frame in the fighter update (`0x02E25E3C`): on while the global battle state
+(`[0x102F7024]+0x80`, `0x02E50320`) is 0 and `0x02C15EB8([fighter+0x74A4], 1)` returns 0.
