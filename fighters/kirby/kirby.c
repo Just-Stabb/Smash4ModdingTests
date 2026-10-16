@@ -20777,7 +20777,7 @@ void func_1040()
 void func_1041()
 {
     func_1040();
-    if (global9 >= 1.0f && global18 == 0)
+    if (global9 >= 1.0f && (global18 == 0 || airgrab_on())) // air grab (added): CatchPull lasts 1 frame in the air too
     {
         func_16(0x3a, 0);
     }
@@ -70692,7 +70692,7 @@ float throw_drop_speed()    { return 3.0f; }  // fall speed at the start of the 
 float throw_drop_accel()    { return 0.3f; }  // extra fall speed added every frame of the drop
 float throw_drop_max()      { return 12.0f; } // fall speed cap (too fast could skip through thin floors)
 float throw_finish_down_hi() { return 7.0f; } // up throw finisher: Kirby's downward speed after the spike
-int   throw_loop_time_f()   { return 120; }   // forward throw: loop frames before the throw ends normally (in the air too)
+int   throw_loop_time_f()   { return 50; }    // forward throw: loop frames before the throw ends normally (in the air too)
 
 // throw main (func_1136)
 void throw_drop_reset()
@@ -70953,6 +70953,8 @@ void throwlw_slide_update()
 // global17 bits: 0x4000 = air grab active, 0x8000 = air grab used this airtime.
 // ===================================================================
 
+int airgrab_hold_time() { return 40; } // air grab: frames Kirby can hold / pummel before he drops the opponent
+
 // 1 while an air grab is going on and Kirby is still airborne.
 int airgrab_on()
 {
@@ -70991,6 +70993,7 @@ int airgrab_check()
         return 0;
     }
     global17 = global17 | 0xc000;
+    global17 = global17 - (global17 & 0xff0000); // hold timer (bits 0xFF0000, shared with the forward throw timer)
     func_16(0x35, 0x1);
     return 0x1;
 }
@@ -71020,6 +71023,19 @@ int airgrab_update()
             KineticModule(0, 0xf);
         }
         return 0;
+    }
+    // Holding / pummelling in the air: opponents can't escape normally, so drop them after
+    // airgrab_hold_time() frames (Fall; the grab statuses' end scripts release the opponent).
+    if (global4 == 0x36 || global4 == 0x3a || global4 == 0x3b)
+    {
+        global17 = global17 + 0x10000;
+        if ((global17 & 0xff0000) >= airgrab_hold_time() * 0x10000)
+        {
+            global17 = global17 - (global17 & 0xff0000);
+            global17 = global17 - 0x4000; // still used until landing (0x8000)
+            func_16(0xe, 0);
+            return 0x1;
+        }
     }
     if (global4 == 0x35 && MotionModule(0x2712)) // missed: the grab animation ended in the air
     {
