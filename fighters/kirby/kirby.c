@@ -71184,13 +71184,22 @@ void starcopy_update()
     }
 }
 
-// Gradual aim, every inhale frame: stick Y turns Kirby int 0x10000096 (tenths of a degree,
-// up +), clamped to +-starmissile_aim_limit(). Reset to straight on the inhale's first frame.
+// Gradual aim, every inhale frame: Kirby int 0x10000096 (tenths of a degree, up +) turns
+// towards the stick's direction (X and Y, relative to facing; clamped to
+// +-starmissile_aim_limit(), so back-up aims fully up and back-down fully down) by up to
+// starmissile_aim_speed() x tilt degrees per frame. Stick neutral or straight back: no change.
+// Reset to straight on the inhale's first frame.
 void starmissile_aim_update(int counter)
 {
     int tenths;
     float deg;
+    float target;
+    float step;
+    float sx;
     float sy;
+    float ax;
+    float ay;
+    float dz;
     if (counter == 0)
     {
         WorkModule(0x7, 0, 0x10000096);
@@ -71199,20 +71208,62 @@ void starmissile_aim_update(int counter)
     {
         return;
     }
-    sy = global32; // stick Y (up +)
-    if (sy * sy < starmissile_aim_deadzone() * starmissile_aim_deadzone())
+    sx = global48 * PostureModuleF(0); // stick X towards where Kirby faces
+    sy = global32;                     // stick Y (up +)
+    dz = starmissile_aim_deadzone();
+    if (sx * sx + sy * sy < dz * dz)
     {
         return;
     }
-    tenths = WorkModule(0x6, 0x10000096);
-    deg = (float)tenths / 10.0f + sy * starmissile_aim_speed();
-    if (deg > starmissile_aim_limit())
+    if (sx < 0 && sy * sy < dz * dz) // straight back: no change
     {
-        deg = starmissile_aim_limit();
+        return;
     }
-    if (deg < -starmissile_aim_limit())
+    target = MathF(0x1, sy, sx) * 57.29578f; // atan2, degrees
+    if (target > starmissile_aim_limit())
     {
-        deg = -starmissile_aim_limit();
+        target = starmissile_aim_limit();
+    }
+    if (target < -starmissile_aim_limit())
+    {
+        target = -starmissile_aim_limit();
+    }
+    ax = sx;
+    if (ax < 0)
+    {
+        ax = -ax;
+    }
+    ay = sy;
+    if (ay < 0)
+    {
+        ay = -ay;
+    }
+    if (ay > ax)
+    {
+        ax = ay;
+    }
+    if (ax > 1.0f)
+    {
+        ax = 1.0f;
+    }
+    step = starmissile_aim_speed() * ax; // tilt
+    tenths = WorkModule(0x6, 0x10000096);
+    deg = (float)tenths / 10.0f;
+    if (deg < target)
+    {
+        deg = deg + step;
+        if (deg > target)
+        {
+            deg = target;
+        }
+    }
+    else
+    {
+        deg = deg - step;
+        if (deg < target)
+        {
+            deg = target;
+        }
     }
     if (deg >= 0)
     {

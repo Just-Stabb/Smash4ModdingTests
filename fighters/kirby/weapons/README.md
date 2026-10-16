@@ -81,9 +81,11 @@ Now:
 
 1. **Kirby:** the aim works like Bowser's flame breath. Every inhale frame
    `starmissile_aim_update()` turns the angle (Kirby int `0x10000096`, in
-   tenths of a degree, + up) by stick Y × `starmissile_aim_speed()` (4°
-   per frame at full tilt), past the 0.3 deadzone. It stays put when the
-   stick is let go, is clamped to ±`starmissile_aim_limit()` (60, i.e.
+   tenths of a degree, + up) towards the stick's direction (X and Y, from
+   Kirby's facing) by up to `starmissile_aim_speed()` × tilt (4° per frame
+   at full tilt), past the 0.3 deadzone. Forward brings it back to
+   straight, diagonals settle at 45°, and back-up / back-down go to the
+   limit. It stays put when the stick is let go or held straight back, is clamped to ±`starmissile_aim_limit()` (60, i.e.
    Smash angles 300°–60°) and starts straight each inhale. Before each
    spawn, `starmissile_fire` stores `starmissile_aim_code()` in his int
    `0x10000097`: 0 when straight, otherwise `1000 + angle + 90`.
