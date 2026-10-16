@@ -428,3 +428,22 @@ to the normal build.
   `0x3C` / `0x3D` from `0x02E1B3F8` and looks scale / size related, not armor.
 - The Mega Lucario specializer vtable is at `0x100977D0` (96 entries, functions around
   `0x027A1CB4`–`0x027A3xxx`). No direct armor or capture setter calls were found in it.
+
+### Armor check (`0x02C24C88`) and the DamageModule command handler
+
+- `0x02C24C88(container, r4, f1, f2)` = "no reaction?" It returns 1 if:
+  - byte `container+0x25` is set (DamageModule `+0x35`; set by vtable `+0xCC` = `0x02C24ACC`),
+  - or, with `r4 == 0`: byte `+0x24` is set, or word `+0` == 1 (flag; vtable `+0x10C` on /
+    `+0x114` off; also `0x02C24DA4` directly from the fighter update `0x02E25710`),
+  - or either slot (`+4`, `+0x14`; checked by `0x02C24BF4`) matches: mode 1 always, mode 2 when
+    knockback < threshold, mode 3 when damage < threshold.
+- DamageModule vtable base `0x10105B7C`. `+0x1E4` = MSC `DamageModule` handler (`0x02C2366C`,
+  jump table for commands 0–0x13), `+0x1EC` = MSC float handler (`0x02C23C38`). MSC command 0xB
+  only ever writes slot 0. Slot 1 is set natively (Bowser / Giga Bowser `0x02F07270` /
+  `0x02F05E6C`, `0x02E1A170`). So MSC can't clear slot 1 or the override flags.
+- Callers found: vtable `+0xCC` from `0x02B57054`, `0x031FDE6C`, `0x03437858`; `+0x10C` from
+  `0x02C26188` (in `0x02C25F78`); `+0x114` from `0x02C75518`.
+- **Diagnostic build** `build/armor_test/cross_f.rpx` (normal build plus):
+  `0x02C24CA8=0x60000000` (ignore byte `+0x25`), `0x02C24CBC=0x60000000` (ignore byte `+0x24`),
+  `0x02C24CC8=0x48000018` (ignore flag `+0`). Slots are untouched, so MSC armor and Bowser's
+  Tough Guy still work.

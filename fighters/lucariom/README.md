@@ -44,3 +44,7 @@ normal `cross_f.rpx`. More notes are in `docs/native-notes.md` (DamageModule arm
 Final Smash state is the likely source, so `megalucario_update()` now calls `BattleObject(0x26)`
 (disable Final Smash state) every frame instead of only while flag `0x20000007` is on. Risk: it
 may end the Mega Evolution early or affect its timer. If so, set `megalucario_grabbable()` to 0.
+
+**Result of the third try:** grabs work now (the Final Smash state was the grab immunity), but the
+armor stays. The armor is native and outside what MSC can clear (see `docs/native-notes.md`,
+"Armor check"). Diagnostic RPX: `build/armor_test/cross_f.rpx`.
