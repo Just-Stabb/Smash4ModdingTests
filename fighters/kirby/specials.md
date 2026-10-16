@@ -46,10 +46,11 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
 - **The catch** (when Kirby grabs someone with the inhale) is started from
   outside MSC. `0x159`'s loop only handles ground/air swaps, which is why its
   label says "guess".
-- **No catching (added):** `tools/kirby_inhale_acmd.py` removes the
-  `Grab_Collision2` boxes from the `SpecialNStart` / `SpecialNLoop` ACMD (the
-  air versions JUMP to them), so the inhale never catches an opponent. The
-  search box, the `Throw_Specifier` and the 0-damage pull windbox stay.
+- **No catching, no pull (added):** `tools/kirby_inhale_acmd.py` removes the
+  `Grab_Collision2` boxes and the `Special_Hitbox` pull windbox (0 damage,
+  flinchless, 160°) from the `SpecialNStart` / `SpecialNLoop` ACMD (the air
+  versions JUMP to them), so the inhale neither catches nor pulls in
+  opponents. The search box and the `Throw_Specifier` stay.
 - **Less end lag (added):** SpecialNEnd's loop (`func_2362`) sets the motion
   rate to `inhale_end_speed()` (3×) every frame, including after a ground/air
   motion swap.
@@ -671,6 +672,16 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   the shared countdown (Kirby int `0x10000093`) at `throwlw_zoom_after()`
   (12) until the final hit (frame 56). Then `throwb_camera_update()` resets
   the camera 12 frames later, or 12 frames after the throw ends early.
+
+## Added: forward throw finisher explosion
+
+When the forward throw finisher (attack or special while falling in the loop,
+`throw_finish_update()`) is used, `throw_finish_effect_f()` spawns common
+graphic `0x17` "Bomb Explosion" (`EffectModule(0x3, 0x1000017, ...)`)
+`throw_finish_gfx_x()` (10) units in front of Kirby and `throw_finish_gfx_y()`
+(6) above his position, size `throw_finish_gfx_size()` (1.0). IDs come from the
+global GFX list (`0x1000000` + list index; e.g. `0x39` small explosion, `0x91`
+X Bomb explosion).
 
 ## Added: air grab
 

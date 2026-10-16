@@ -71004,6 +71004,10 @@ int throw_finish_update()
     }
     WorkModule(0x2710, 0x21000012);
     throw_eat_inputs(); // so the press doesn't also start another move
+    if (kind == 0x78) // forward throw finisher: explosion in front of Kirby
+    {
+        throw_finish_effect_f();
+    }
     if (global17 & 0x1000) // was dropping: stop
     {
         global17 = global17 - 0x1000;
@@ -71018,6 +71022,20 @@ int throw_finish_update()
     MotionModule(0x4, 1.0f);
     MotionModule(0x2713, release - 1.0f); // the ACMD releases on the next frame
     return 0;
+}
+
+// Forward throw finisher explosion (common graphic 0x17 "Bomb Explosion" = effect 0x1000017).
+int   throw_finish_gfx_f()   { return 0x1000017; }
+float throw_finish_gfx_x()   { return 10.0f; }  // in front of Kirby
+float throw_finish_gfx_y()   { return 6.0f; }   // above his position (his feet)
+float throw_finish_gfx_size() { return 1.0f; }
+
+void throw_finish_effect_f()
+{
+    EffectModule(0x3, throw_finish_gfx_f(),
+        PostureModuleF(0x1) + PostureModuleF(0) * throw_finish_gfx_x(),
+        PostureModuleF(0x2) + throw_finish_gfx_y(),
+        PostureModuleF(0x3), 0, 0, 0, throw_finish_gfx_size(), 0, 0xffffffff);
 }
 
 // Clears buffered button inputs (same calls Kirby's item pickup uses to consume the A press).
