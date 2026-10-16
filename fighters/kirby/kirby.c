@@ -39605,6 +39605,7 @@ void func_2361()
 // [SpecialNEnd 0x158] loop: IASA; motion end -> Wait/Fall
 void func_2362()
 {
+    MotionModule(0x4, inhale_end_speed()); // less end lag (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return 0x1;
@@ -39620,7 +39621,11 @@ void func_2362()
         return 0x1;
     }
     func_2264();
+    MotionModule(0x4, inhale_end_speed()); // again after a ground/air motion swap
 }
+
+// Inhale end (SpecialNEnd 0x158) animation speed: 3x = about a third of the end lag (added).
+float inhale_end_speed() { return 3.0f; }
 
 // [SpecialNEnd 0x158] end
 void func_2363()

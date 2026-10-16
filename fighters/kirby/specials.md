@@ -46,6 +46,15 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
 - **The catch** (when Kirby grabs someone with the inhale) is started from
   outside MSC. `0x159`'s loop only handles ground/air swaps, which is why its
   label says "guess".
+- **No catching (added):** `tools/kirby_inhale_acmd.py` removes the
+  `Grab_Collision2` boxes from the `SpecialNStart` / `SpecialNLoop` ACMD (the
+  air versions JUMP to them), so the inhale never catches an opponent. The
+  search box, the `Throw_Specifier` and the 0-damage pull windbox stay.
+- **Less end lag (added):** SpecialNEnd's loop (`func_2362`) sets the motion
+  rate to `inhale_end_speed()` (3×) every frame, including after a ground/air
+  motion swap.
+- **game.bin build:** `python3 tools/kirby_throwb_acmd.py build/acmd_in/game.bin g1;
+  python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 build/game.bin`
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
 - **Not fully sure:** `0x15C`, `0x15D` and `0x166` are mouthful states whose
