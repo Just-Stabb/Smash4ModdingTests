@@ -489,3 +489,19 @@ that used the `+0x35` byte (this fighter state, and the non-fighter objects at `
 `0x031FDE6C`, `0x03437858`).
 
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000
+
+### Grab immunity (in progress)
+
+- StatusModule: accessor `+0x20`, vtable base `0x1012D42C`. `+0x144` = MSC handler (`0x02E882AC`).
+  `StatusModule(0x2713, a, b, c, d, e, ...)` packs its args into the status data word at
+  StatusModule `+0xA0` (upper half = status kind). Bits: a → `0x8000`, b → `0x6000`,
+  c → `0x1000`, d (grab immunity per the notes) → `0x800`, e → `0x400`. vtable `+0x104`
+  (`0x02E885E8`) stores the data pointer at StatusModule `+0x58`. No direct reader of bit `0x800`
+  was found (plain loads via `+0xA0` / `+0x58` / getter results).
+- `0x02E175D0` is an item-style timed state. `0x02E44770` turns all such states off for a
+  player (`0x02E441D4(player, 0)`). It isn't the transformation, so patching `0x02E176A0` didn't
+  help.
+- Test `build/grab_test/cross_f.rpx` = build A + the transform-kind patch in `0x02704F44`
+  (`0x02704FC4` / `FCC` / `FD4` → `cmpwi r0, 0x7FFF`). The kind patch was first tested with the
+  older `lucariom.mscsb` that didn't disable the Final Smash state every frame, so the two
+  together are untested.
