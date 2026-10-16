@@ -48,3 +48,6 @@ may end the Mega Evolution early or affect its timer. If so, set `megalucario_gr
 **Result of the third try:** the armor stays. Grabs weren't tested yet, so it's unknown whether
 disabling the Final Smash state removed the grab immunity. The armor is native and outside what MSC can clear (see `docs/native-notes.md`,
 "Armor check"). Diagnostic RPX: `build/armor_test/cross_f.rpx`.
+
+**Armor fixed** natively: `0x02E176A0=0x60000000` in `cross_f.rpx` (see `docs/native-notes.md`).
+Grab immunity: still there with the Final Smash state disabled every frame; not found yet.

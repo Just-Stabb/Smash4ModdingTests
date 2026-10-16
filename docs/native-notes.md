@@ -454,3 +454,28 @@ override flags, not a slot. Single-flag builds to narrow it down:
 byte `+0x24`), `build/armor_test_c` (only `0x02C24CC8`, word flag `+0`). The word flag is
 recomputed every frame in the fighter update (`0x02E25E3C`): on while the global battle state
 (`[0x102F7024]+0x80`, `0x02E50320`) is 0 and `0x02C15EB8([fighter+0x74A4], 1)` returns 0.
+
+**Result:** build A (ignore byte `+0x25`, i.e. DamageModule `+0x35`) removes Mega Lucario's
+armor. The only fighter code that writes DamageModule `+0x35` is `0x02E175D0`, a timed fighter
+state toggle (`r4` = on). Turning it on:
+- sets `+0x35` = 1 (`0x02E176A0`, the armor);
+- sets `[fighter+0x7520]+0x6E` = 1 (visual? module `0x020078D4`);
+- sets status word bit `0x80000`;
+- sets `[+0x74BC]+0x11F`;
+- plays effect / sound `0x045F0008`;
+- sends event `0x59` (`0x02C55B04`);
+- starts a timer: 780 frames × a param, kept at `[..]+0xA0`. It's counted down in
+  `0x02E22930`, and `0x02E441D4(player, 0)` turns the state off when it runs out.
+
+`0x02E441D4` / `0x02E44770` turn it on per player. `0x02E17A60` restores it from saved state
+bits (e.g. respawn).
+
+**Fix:** `0x02E176A0=0x60000000` (don't set the no-reaction byte when the state turns on).
+Build: `build/armor_fix/cross_f.rpx`. It's narrower than build A, which also ignored the byte for
+non-fighter objects (`0x02B57054`, `0x031FDE6C`, `0x03437858`).
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02E176A0=0x60000000
+
+Grab immunity is still unknown. It isn't the Final Smash state (`BattleObject(0x26)` every frame
+didn't help), and the readers of bit `0x80000` checked so far (`0x0278BA48`: a sound choice,
+`0x02E22930`: the state timer) aren't a grab check.
