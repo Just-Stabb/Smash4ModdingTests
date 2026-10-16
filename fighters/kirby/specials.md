@@ -690,6 +690,13 @@ status. Code is at the end of `kirby.c` (`airgrab_check`, `airgrab_on`,
   accept the air, so pummel and all four throws work in the air.
 - **Missed grab**: when the grab animation ends in the air, Kirby goes into
   Fall.
+- **Slower grab**: from frame `airgrab_slow_frame()` (14) the air grab's
+  animation (and so its ACMD) runs `airgrab_slow()` (1.4×) slower
+  (`airgrab_slow_update()` in the Catch loop `func_1035`, rate 1/1.4), also
+  after landing. Kirby int `0x1000009A` = 1 when the grab started in the air
+  (set by `airgrab_check()`); a grab that starts on the ground clears it,
+  because `0x4000` can still be left over from an earlier air grab that
+  landed.
 - **CatchPull in the air**: CatchPull (`0x36`) normally lasts one frame and
   then becomes CatchWait. Its loop (`func_1041`) only did that on the ground,
   and its other exit waits for the end of a looping animation. So in the air

@@ -20703,6 +20703,7 @@ void func_1034()
 
 void func_1035()
 {
+    airgrab_slow_update(); // air grab: 1.4x slower from frame 14 (added)
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return;
@@ -71077,6 +71078,31 @@ void throwlw_slide_update()
 // ===================================================================
 
 int airgrab_hold_time() { return 68; } // air grab: frames Kirby can hold / pummel before he drops the opponent
+float airgrab_slow_frame() { return 14.0f; } // air grab: slower from this frame
+float airgrab_slow() { return 1.4f; }        // air grab: x slower (animation and its ACMD)
+
+// Catch (0x35) loop, every frame: an air grab runs 1.4x slower from frame 14 (also after landing).
+// Kirby int 0x1000009A = 1 when this grab started in the air (set by airgrab_check). 0x4000 can
+// still be set from an earlier air grab that landed, so a grab that starts on the ground clears it.
+void airgrab_slow_update()
+{
+    if (global4 != 0x35)
+    {
+        return;
+    }
+    if (global18 == 0 && MotionModuleF(0x1) < 1.0f)
+    {
+        WorkModule(0x7, 0, 0x1000009a);
+    }
+    if (WorkModule(0x6, 0x1000009a) == 0)
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) >= airgrab_slow_frame())
+    {
+        MotionModule(0x4, 1.0f / airgrab_slow());
+    }
+}
 
 // 1 while an air grab is going on and Kirby is still airborne.
 int airgrab_on()
@@ -71125,6 +71151,7 @@ int airgrab_check()
         global17 = global17 - 0x400;
     }
     global17 = global17 - (global17 & 0xff0000); // hold timer (bits 0xFF0000, shared with the forward throw timer)
+    WorkModule(0x7, 0x1, 0x1000009a); // air grab: slower from frame 14 (airgrab_slow_update)
     func_16(0x35, 0x1);
     return 0x1;
 }
