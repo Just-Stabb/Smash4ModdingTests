@@ -71067,7 +71067,7 @@ void throwlw_air_end()
 // Star missile copy (added, needs the patched cross_f.rpx: tools/starcopy_cave.py).
 // On the 12th star missile hit the star's native code stores the hit fighter's kind + 1 in
 // Kirby's int 0x1000009E (and its costume value in 0x1000009B). The copy itself has to be
-// granted from Kirby's own update, so the main loop calls BattleObject(0x409) while one is
+// granted from Kirby's own update, so the main loop calls BattleObject(0x40A) while one is
 // pending; the patched command clears 0x1000009E and grants the copy.
 // ===================================================================
 int starcopy_debug() { return 1; } // 1 = show progress with Kirby's hops (see below), 0 = off
@@ -71076,7 +71076,7 @@ int starcopy_debug() { return 1; } // 1 = show progress with Kirby's hops (see b
 //   After a star hit, N = the star code's result (int 0x1000009C): 1 accessor bad, 2 attack
 //   module bad, 3 hit records off, 4 record array bad, 5 no record, 6 record node bad,
 //   8 target doesn't exist, 9 target isn't a fighter, 10 hit counted, 11 copy handed over.
-//   Right after the copy hand-over (12th hit) it's replaced by: 1 = the BattleObject(0x409)
+//   Right after the copy hand-over (12th hit) it's replaced by: 1 = the BattleObject(0x40A)
 //   patch didn't run, 2 = it ran but the copy ability (int 0x100000A4) didn't change,
 //   3 = the copy ability changed.
 //   Self-test: one hop the first time he stands idle in a match.
@@ -71094,8 +71094,8 @@ void starcopy_update()
     if (WorkModule(0x6, 0x1000009e) > 0)
     {
         before = WorkModule(0x6, 0x100000a4);
-        BattleObject(0x409);
-        if (WorkModule(0x6, 0x1000009e) > 0) // not taken: the 0x409 patch isn't in this cross_f.rpx
+        BattleObject(0x40a); // patched case (0x02EF94E4) of Kirby's command dispatcher
+        if (WorkModule(0x6, 0x1000009e) > 0) // not taken: the 0x40A patch isn't in this cross_f.rpx
         {
             WorkModule(0x7, 0, 0x1000009e);
             WorkModule(0x7, 0x1, 0x1000009c);

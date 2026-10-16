@@ -368,8 +368,10 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
     stored there). Reads past the end seem to return 0 silently.
 
   Kirby's MSC main loop (`func_74` → `starcopy_update`) calls
-  `BattleObject(0x409)` while `0x1000009E > 0`. Case `0x409` of Kirby's
-  command dispatcher (`0x02EF94E4`, unused by his MSC) is patched to
+  `BattleObject(0x40A)` while `0x1000009E > 0`. Case `0x40A` of Kirby's
+  command dispatcher (`0x02EF94E4` = jump table `0x02EF912C` + `0x22`×4; it
+  was first mislabelled as `0x409`, whose case is `0x02EF949C`; neither is
+  used by his MSC) is patched to
   `b CAVE2` (`CAVE + 0x800`). In that case `r31` is Kirby's module accessor,
   the same object `copy_grant` takes. The cave clears `0x1000009E`, then
   calls `copy_grant(GETSPEC(0x104D1632, 8), accessor, costume, kind, 1)` and

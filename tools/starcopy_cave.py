@@ -23,18 +23,18 @@ For command MAGIC only (see build_star):
   Returns 0 (like the stub it replaces). Writing a result to message+0xC (what MSC's
   BattleObject returns) crashed the game, so results go through Kirby's ints instead.
 
-KIRBY CAVE (CAVE2), runs in Kirby's own update. Hook: case 0x409 of Kirby's BattleObject
-command dispatcher (0x02EF90D8; 0x409 is unused by Kirby's MSC) becomes `b CAVE2`. There
+KIRBY CAVE (CAVE2), runs in Kirby's own update. Hook: case 0x40A of Kirby's BattleObject
+command dispatcher (0x02EF90D8; 0x40A is unused by Kirby's MSC) becomes `b CAVE2`. There
 r31 = Kirby's module accessor. If PEND_KIND > 0: clear it and
 copy_grant(spec(8), kirby, PEND_COSTUME, PEND_KIND - 1, 1), like the swallow code
 (0x0279666C). Then the dispatcher's normal epilogue. Kirby's MSC main loop calls
-BattleObject(0x409) while PEND_KIND > 0.
+BattleObject(0x40A) while PEND_KIND > 0.
 """
 import struct
 import sys
 
 HOOK1 = 0x02B037B0     # star specializer custom command handler (vtable +0x54)
-HOOK2 = 0x02EF94E4     # Kirby command dispatcher, case 0x409
+HOOK2 = 0x02EF94E4     # Kirby command dispatcher, case 0x40A (table 0x02EF912C + 0x22*4)
 HOOK2_RET = 0x02EF9688 # dispatcher epilogue
 CAVE = 0x037ED898
 CAVE_MAX = 0xEA8
@@ -248,7 +248,7 @@ def build_star(stage="4"):
 
 
 def build_kirby():
-    """Kirby cave: dispatcher case 0x409, r31 = Kirby's accessor. Ends in the epilogue."""
+    """Kirby cave: dispatcher case 0x40A, r31 = Kirby's accessor. Ends in the epilogue."""
     a = Asm(CAVE2)
     e = a.emit
     e(stwu(1, -0x30, 1)); e(stmw(28, 0x20, 1))
