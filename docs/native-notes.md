@@ -505,3 +505,20 @@ that used the `+0x35` byte (this fighter state, and the non-fighter objects at `
   (`0x02704FC4` / `FCC` / `FD4` → `cmpwi r0, 0x7FFF`). The kind patch was first tested with the
   older `lucariom.mscsb` that didn't disable the Final Smash state every frame, so the two
   together are untested.
+
+**Result:** `grab_test` (build A + the kind patch, with the per-frame `BattleObject(0x26)`) did
+NOT remove the grab immunity.
+
+### Fighter specializer vtables (98 entries, 8-byte stride)
+
+These are per-fighter tables, e.g. lucariom `0x100977D0`, littlemacg `0x1009710C`, koopag
+`0x10136F30`, warioman `0x1009D484`. Fighter kind table: name list at `0x102FF484`, kind =
+index − 2 (Kirby 8, koopag `0x3A`, warioman `0x3B`, littlemacg `0x3C`, lucariom `0x3D`). Each
+fighter has its own stub functions, so comparing stub bodies slot by slot across all 62 tables
+shows:
+- **Slot 70** (`+0x230`): `li r3, 1; blr` for 58 fighters, `li r3, 0; blr` for exactly the
+  four transformations (`0x027A4570` lucariom, `0x0279EE90` littlemacg, `0x02F05B14` koopag,
+  `0x027DCA40` warioman). Candidate for "can be grabbed".
+- Slot 74 returns a fighter-specific code (`0x7FAD` etc.), slot 93 is 4 for warioman.
+
+Test `build/grab_test2/cross_f.rpx` = build A + slot 70 → `li r3, 1` (`0x38600001`) for all four.
