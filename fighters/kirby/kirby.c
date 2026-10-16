@@ -21266,8 +21266,20 @@ int func_1080()
     {
         var0 = 0x100000;
     }
-    StatusModule(0x2713, 0, 0x1, 0, 0x1, 0, 0x40001, 0x4000002, 0x2000, var0);
+    // (added) 7th value = stale-move negation bitfield (0 = off): the down throw and its landing
+    // loop don't stale (reference/msc-note-sheet/Complex_CMDs.csv, set_fighter_status_data)
+    StatusModule(0x2713, 0, 0x1, 0, 0x1, 0, throwlw_stale_bits(), 0x4000002, 0x2000, var0);
     return 0;
+}
+
+// down throw stale-move negation bits (normally 0x40001); 0 = never stales
+int throwlw_stale_bits()
+{
+    if (WorkModule(0x6, 0x11000002) == 0x7b)
+    {
+        return 0;
+    }
+    return 0x40001;
 }
 
 void func_1081()

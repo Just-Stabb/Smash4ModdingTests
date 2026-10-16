@@ -638,7 +638,13 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   Loop damage: Kirby int `0x10000099` = 1 while looping (0 normal, 2 done).
   The `throwlw` ACMD (`tools/kirby_throwlw_acmd.py IN OUT`) then uses a
   0.27-damage stomp instead of 0.8. That's 9 stomps per pass × 9 passes plus
-  the partial first pass, about 22–24 total. Then the rest plays at the normal rate. In the air the animation plays
+  the partial first pass, about 22–24 total.
+- **No staling**: the 7th value of the Throw status setup
+  (`StatusModule(0x2713, ...)` in `func_1080`) is the stale-move negation
+  bitfield, per `set_fighter_status_data` in
+  `reference/msc-note-sheet/Complex_CMDs.csv`. It's normally `0x40001`.
+  `throwlw_stale_bits()` makes it 0 for the down throw (kind `0x7B`), so the
+  down throw, its stomps, the landing loop and the final hit don't stale. Then the rest plays at the normal rate. In the air the animation plays
   normally. The loop only starts if he lands before the final hit
   (`throwlw_final_frame()`, 56). Landing at or after it plays the throw out
   as usual. State is in Kirby int

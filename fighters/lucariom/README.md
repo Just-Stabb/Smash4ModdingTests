@@ -17,6 +17,9 @@ fighter's (Meta Knight). So both come from outside the MSC (native code / the Fi
 - **Grabs**: fighters in the Final Smash state can't be grabbed. While flag `0x20000007`
   ("Final Smash state enabled?") is on, it calls `BattleObject(0x26)` (disable Final Smash
   state, which Kirby's final uses to end it).
+- Also every frame (second try, since the first left the armor): `DamageModule(0x11, 0)`
+  (damage-based super armor threshold) and `DamageModule(0xA, 1.0)` (knockback taken x1).
+  The first version did make Mega Lucario grabbable.
 - Settings: `megalucario_no_armor()` and `megalucario_grabbable()` (1 = on, 0 = off).
 - **Untested**: if the native armor isn't the armor state, the first part does nothing. If the
   flag doesn't mean what the notes say, the second part never runs. If disabling the Final

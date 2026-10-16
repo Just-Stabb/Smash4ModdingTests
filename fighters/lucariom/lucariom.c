@@ -37750,6 +37750,8 @@ void func_2346()
 // based, 3 damage based). It's set to none every frame, except in the smash attack statuses
 // (0x2B-0x33 / 0x94-0x96) when the fighter has smash-charge armor (float 0x25 > 0), which the
 // common code (func_344) manages itself.
+// Also every frame: DamageModule(0x11, 0) (damage-based super armor threshold) and
+// DamageModule(0xA, 1.0) (knockback taken multiplier).
 // Grabs: fighters in the Final Smash state can't be grabbed, so BattleObject(0x26) (disable Final
 // Smash state, the call Kirby's final uses to end it) runs whenever flag 0x20000007 (Final Smash
 // state enabled) is on.
@@ -37776,6 +37778,8 @@ void megalucario_update()
     if (megalucario_no_armor() && !(megalucario_smash_charge() && WorkModuleF(0, 0x25) > 0))
     {
         DamageModule(0xb, 0, 0);
+        DamageModule(0x11, 0);      // damage-based super armor threshold 0
+        DamageModule(0xa, 1.0f);    // knockback taken x1
     }
     if (megalucario_grabbable() && WorkModule(0x10, 0x20000007))
     {
