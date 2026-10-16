@@ -394,7 +394,8 @@ collision events `0x6010` (`0x0270A9A8`) and `0x6030` (`0x0270B368`), and from
 target's kind (`+0x18`) is `0x3A`, `0x3C` or `0x3D`. It skips Wario-Man,
 who isn't armored. It also sets the bit when `+0x4C` == 4 or `+0x30` has bit
 `0x2000`. The test patch `0x02704FD4: 2C00003D -> 2C007FFF` (`cmpwi r0, 0x3D`
-→ `cmpwi r0, 0x7FFF`) takes Mega Lucario out of that check.
+→ `cmpwi r0, 0x7FFF`) takes Mega Lucario out of that check. The all-transformations version also patches
+`0x02704FC4` (`0x3A`) and `0x02704FCC` (`0x3C`) the same way, so the check never matches.
 
 Other kind helpers found along the way:
 - `0x03058B8C`: returns 0 for kinds `0x3A`–`0x3D`, else 1. Called from

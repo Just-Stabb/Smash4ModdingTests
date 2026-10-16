@@ -28,8 +28,11 @@ fighter's (Meta Knight). So both come from outside the MSC (native code / the Fi
 ## Native (cross_f.rpx) test patch
 
 The MSC resets didn't remove the armor or the grab immunity, so they come from the executable.
-Test build: `build/megalucario_test/cross_f.rpx` = the usual build plus `0x02704FD4=0x2C007FFF`,
-which takes Mega Lucario (kind `0x3D`) out of the transform-fighter check in the hit result
-builder `0x02704F44` (see `docs/native-notes.md`):
+Test build: `build/transform_test/cross_f.rpx` = the usual build with the transform-fighter check
+in the hit result builder `0x02704F44` disabled for Giga Bowser (`0x3A`), Giga Mac (`0x3C`) and
+Mega Lucario (`0x3D`). Each `cmpwi r0, kind` becomes `cmpwi r0, 0x7FFF`. Wario-Man (`0x3B`) was
+never in that check. See `docs/native-notes.md`.
 
-    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02704FD4=0x2C007FFF
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx $(python3 tools/starcopy_cave.py) 0x02704FC4=0x2C007FFF 0x02704FCC=0x2C007FFF 0x02704FD4=0x2C007FFF
+
+(The first test only patched `0x02704FD4`, Mega Lucario.)
