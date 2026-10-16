@@ -79,10 +79,20 @@ BLR = 0x4E800020
 COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1)}
 
 
-def build(stage=4):
-    """stage (for crash bisecting): 1 = return right after the command check,
-    2 = stop after reading/resolving the target, 3 = stop after finding the owner Kirby,
-    4 = full."""
+STAGES = ["1", "1a", "1b", "1c", "2", "3", "4"]
+
+
+def build(stage="4"):
+    """stage (for crash bisecting), each one runs a bit more than the one before:
+    1  = return right after the command check
+    1a = also set up / tear down the stack frame (no reads, no calls)
+    1b = also read the target id from the star's hit records (no calls)
+    1c = also resolve the target (one call)
+    2  = also check / read the target (valid, fighter, kind, costume)
+    3  = also find the owner Kirby
+    4  = full."""
+    stage = str(stage)
+    upto = STAGES.index(stage)
     code = []   # entries: int word, or (kind, arg) to resolve
     labels = {}
 
@@ -105,26 +115,34 @@ def build(stage=4):
 
     emit(lwz(6, 8, 5)); emit(lwz(6, 0, 6)); emit(lwz(6, 0, 6))  # command value
     emit(cmplwi(6, MAGIC)); emit(("bne", "ret0"))
-    if stage == 1:
+    if upto == 0:
         emit(("b", "ret0"))
     emit(stwu(1, -0x60, 1)); emit(MFLR_R0); emit(stw(0, 0x64, 1)); emit(stmw(26, 0x40, 1))
     emit(mr(31, 4))                                   # r31 = weapon
+    if upto == 1:
+        emit(("b", "out"))
     emit(lwz(3, 0xC, 31))                             # module accessor (BattleObject +0xC, see 0x02BEF5DC)
     emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(lwz(3, 0x50, 3))                             # AttackModule (accessor +0x50)
     emit(cmpwi(3, 0)); emit(("beq", "out"))
+    emit(lwz(4, 0x4C, 3)); emit(cmpwi(4, 0)); emit(("beq", "out"))   # records in use (0x02C09C38)
     emit(lwz(4, 0x14, 3)); emit(cmpwi(4, 0)); emit(("beq", "out"))
     emit(lwz(6, 0x18, 3)); emit(cmpwi(6, 0)); emit(("ble", "out"))
     emit(lwz(5, 0x128, 4)); emit(addi(6, 4, 0x124)); emit(cmplw(5, 6)); emit(("beq", "out"))
+    emit(cmpwi(5, 0)); emit(("beq", "out"))           # null node (0x02C09C94)
     emit(lwz(30, 0x18, 5))                            # r30 = target id
+    if upto == 2:
+        emit(("b", "out"))
     # resolve target
     load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
     emit(addi(4, 1, 0x10)); emit(mr(5, 30)); emit(li(6, 0)); emit(("bl", RESOLVE))
+    if upto == 3:
+        emit(("b", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", CATEGORY)); emit(cmpwi(3, 0)); emit(("bne", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", KIND)); emit(mr(29, 3))
     emit(addi(3, 1, 0x10)); emit(("bl", COSTUME)); emit(mr(28, 3))
-    if stage == 2:
+    if upto == 4:
         emit(("b", "out"))
     # owner Kirby
     emit(lwz(5, 0x1BF8, 31))
@@ -135,7 +153,7 @@ def build(stage=4):
     emit(addi(3, 1, 0x20)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", KIND)); emit(cmpwi(3, 8)); emit(("bne", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", ACCESSOR)); emit(mr(27, 3))
-    if stage == 3:
+    if upto == 5:
         emit(("b", "out"))
     # count = get_int(COUNTER) + 1
     emit(lwz(3, 0x28, 27)); emit(lwz(12, 0, 3)); emit(lwz(12, 0x84, 12)); emit(mtctr(12))
@@ -182,9 +200,9 @@ def build(stage=4):
 
 
 def main():
-    stage = 4
+    stage = "4"
     if "--stage" in sys.argv:
-        stage = int(sys.argv[sys.argv.index("--stage") + 1])
+        stage = sys.argv[sys.argv.index("--stage") + 1]
     words = build(stage)
     hook_off = CAVE - HOOK
     hook = (18 << 26) | (hook_off & 0x3FFFFFC)
