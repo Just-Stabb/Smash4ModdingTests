@@ -187,14 +187,15 @@ def build_star(stage="4"):
     e(addi(3, 1, 0x20)); e(("bl", KIND)); e(cmpwi(3, 8)); e(("bne", "out"))
     e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
     e(cmpwi(27, 0)); e(("beq", "out"))
+    e(stw(27, 0x30, 1))                               # keep Kirby's accessor in the frame too
     if upto == 0:
         e(li(26, 7)); e(("b", "report"))
     # 2. target = newest hit record of the star's hitbox 0. Every pointer is range-checked
     #    (heap 0x10000000-0x50000000, 4-aligned) before it's read through.
     def check_ptr(reg, fail):
-        e(lis(0, 0x1000)); e(cmplw(reg, 0)); e(("blt", fail))
-        e(lis(0, 0x5000)); e(cmplw(reg, 0)); e(("bge", fail))
-        e(andi_(0, reg, 3)); e(("bne", fail))
+        e(lis(7, 0x1000)); e(cmplw(reg, 7)); e(("blt", fail))
+        e(lis(7, 0x5000)); e(cmplw(reg, 7)); e(("bge", fail))
+        e(andi_(7, reg, 3)); e(("bne", fail))
     e(lwz(3, 0xC, 31)); check_ptr(3, "f1")             # module accessor (BattleObject +0xC, 0x02BEF5DC)
     e(lwz(3, 0x50, 3)); check_ptr(3, "f2")             # AttackModule (accessor +0x50)
     e(lwz(4, 0x4C, 3)); e(cmpwi(4, 0)); e(("beq", "f3"))   # records in use (0x02C09C38)
@@ -213,6 +214,7 @@ def build_star(stage="4"):
     e(addi(3, 1, 0x10)); e(("bl", KIND)); e(mr(29, 3))
     e(addi(3, 1, 0x10)); e(("bl", COSTUME)); e(mr(28, 3))
     # 3. count = get_int(COUNTER) + 1
+    e(lwz(27, 0x30, 1))
     a.get_int(27, COUNTER)
     e(addi(26, 3, 1))
     e(cmpwi(26, 0)); e(("bge", "pos")); e(li(26, 1))  # a negative leftover counts as 0
@@ -229,12 +231,14 @@ def build_star(stage="4"):
     a.set_int(27, 26, COUNTER)
     e(li(26, 11)); e(("b", "report"))
     a.label("store")
+    e(lwz(27, 0x30, 1))
     a.set_int(27, 26, COUNTER)
     e(li(26, 10)); e(("b", "report"))
     for code in (1, 2, 3, 4, 5, 6, 8, 9):
         a.label("f%d" % code)
         e(li(26, code)); e(("b", "report"))
     a.label("report")                                 # r26 = result code -> Kirby's DEBUG_INT
+    e(lwz(27, 0x30, 1))                               # reload Kirby's accessor (Cemu crash: r27 looked wrong here)
     a.set_int(27, 26, DEBUG_INT)
     a.label("out")
     e(lmw(26, 0x40, 1)); e(lwz(0, 0x64, 1)); e(MTLR_R0); e(addi(1, 1, 0x60))
