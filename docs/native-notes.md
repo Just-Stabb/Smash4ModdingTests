@@ -323,9 +323,17 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   module accessor is at `+0xC`, the same field the handle getter
   `0x02BEF5DC` reads, so the attack module is `*(*(weapon+0xC)+0x50)`.
   `+0x28` is something else, so the old chain read a garbage pointer.
-- **Data addresses**: an intermediate fix rebuilt `0x102F6C30` and the
-  other two data addresses from the game's relocated `lis`/`lwz` pairs. That
-  wasn't the cause: the game's own code also hard-codes data addresses
-  (e.g. `lis r12,0x1035; lwz 0x184C(r12)` in `0x02BF205C`), so data sits at
-  its link address. The cave keeps rebuilding them; either way gives the
-  same value.
+- **Data addresses**: absolute, like the game's own code uses them
+  (`lis r12,0x1035; lwz 0x184C(r12)` in `0x02BF205C`); data sits at its link
+  address. An intermediate build rebuilt them position-independently with
+  `bl +4; mflr`. That froze and then crashed Cemu as soon as it ran twice
+  (crash-bisect stage 3; host access violation at `0x2C8`). Cemu's
+  recompiler treats `bl` as a call that must return. Don't use `bl +4`
+  tricks in cave code.
+- **Lookups**: before resolving an ID, the game's callers check
+  `0x02BF3D8C(manager, id)` (object exists and is alive). The cave does the
+  same for the target and for the owner. A failed resolve hands back a static
+  placeholder (`*(0x10496740)` = `0x10496748`), which reads as not valid.
+- **Crash bisecting**: `starcopy_cave.py --stage` 1, 1a, 1b, 1c, 2, 3, 4a, 4b,
+  4 (see the docstring). Each one runs a bit more of the cave than the one
+  before it.

@@ -39,12 +39,14 @@ ACCESSOR = 0x02BEF5DC  # (&handle) -> module accessor
 GETSPEC = 0x02E669F0   # (r3, kind) -> fighter specializer
 COPYGRANT = 0x02EFCD8C # (spec, kirby accessor, costume, kind, 1)
 
-# Data addresses are rebuilt from an existing lis + lwz/addi instruction pair in the game's
-# code, found relative to the cave's own position (bl +4; mflr). The game itself hard-codes
-# these addresses (data sits at its link address), so this is only belt and braces.
-ADDR_MANAGER = (0x02C09C5C, 0x02C09D5C)  # lis r30,0x102f / lwz r3,0x6c30(r30) -> &object manager ptr
-ADDR_GUARD = (0x02796680, 0x02796684)    # lis r10,0x1049 / lwzu r0,0x3140(r10) -> static guard word
-ADDR_SPECARG = (0x02796698, 0x027966A0)  # lis r3,0x104d / addi r3,r3,0x1632 -> r3 for GETSPEC
+EXISTS = 0x02BF3D8C    # (manager, object id) -> 1 if the object exists and is alive
+
+# Data addresses are absolute, as the game's own code uses them (lis + lwz/addi; data sits at
+# its link address). No `bl +4; mflr` position tricks: Cemu's recompiler treats bl as a call
+# that must return, and an unbalanced one froze/crashed the emulator.
+ADDR_MANAGER = 0x102F6C30  # object manager pointer (0x02C09C5C: lis r30,0x102f / lwz r3,0x6c30(r30))
+ADDR_GUARD = 0x10493140    # static guard word (0x02796680)
+ADDR_SPECARG = 0x104D1632  # r3 for GETSPEC (0x02796698)
 
 
 def D(op, rd, ra, imm):
@@ -101,19 +103,17 @@ def build(stage="4"):
     def emit(x): code.append(x)
     def label(n): labels[n] = len(code)
 
-    def load_addr(rd, pair):
-        """rd = address encoded by the (relocated) lis/low instruction pair. Clobbers r9-r11, LR."""
-        hi_insn, lo_insn = pair
-        emit(0x48000005)                       # bl +4
-        pc = CAVE + 4 * len(code)              # address of the mflr
-        emit(mflr(9))
-        for reg, target in ((10, hi_insn), (11, lo_insn)):
-            d = target - pc
-            ha = ((d + 0x8000) >> 16) & 0xFFFF
-            emit(addis(reg, 9, ha)); emit(lwz(reg, d & 0xFFFF, reg))
-        emit(rlwinm(10, 10, 16, 0, 15))        # lis immediate << 16
-        emit(extsh(11, 11))                    # low 16 bits, sign-extended
-        emit(add(rd, 10, 11))
+    def load_addr(rd, addr):
+        """rd = addr (absolute)."""
+        emit(lis(rd, ((addr + 0x8000) >> 16) & 0xFFFF)); emit(addi(rd, rd, addr & 0xFFFF))
+
+    def lookup(id_reg, handle_off):
+        """Resolve object id_reg (r30/r31-safe) into the handle at handle_off(r1), only if it
+        exists (the game's callers check with EXISTS first). Uses r3-r6."""
+        load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
+        emit(mr(4, id_reg)); emit(("bl", EXISTS)); emit(cmpwi(3, 0)); emit(("beq", "out"))
+        load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
+        emit(addi(4, 1, handle_off)); emit(mr(5, id_reg)); emit(li(6, 0)); emit(("bl", RESOLVE))
 
     emit(lwz(6, 8, 5)); emit(lwz(6, 0, 6)); emit(lwz(6, 0, 6))  # command value
     emit(cmplwi(6, MAGIC)); emit(("bne", "ret0"))
@@ -135,9 +135,8 @@ def build(stage="4"):
     emit(lwz(30, 0x18, 5))                            # r30 = target id
     if upto == 2:
         emit(("b", "out"))
-    # resolve target
-    load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
-    emit(addi(4, 1, 0x10)); emit(mr(5, 30)); emit(li(6, 0)); emit(("bl", RESOLVE))
+    # resolve target (exists check first)
+    lookup(30, 0x10)
     if upto == 3:
         emit(("b", "out"))
     emit(addi(3, 1, 0x10)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
@@ -147,11 +146,8 @@ def build(stage="4"):
     if upto == 4:
         emit(("b", "out"))
     # owner Kirby
-    emit(lwz(5, 0x1BF8, 31))
-    emit(stw(5, 0x30, 1))                             # owner id (load_addr clobbers r9-r11 only)
-    load_addr(3, ADDR_MANAGER); emit(lwz(3, 0, 3))
-    emit(lwz(5, 0x30, 1))
-    emit(addi(4, 1, 0x20)); emit(li(6, 0)); emit(("bl", RESOLVE))
+    emit(lwz(30, 0x1BF8, 31))                         # r30 = owner id (target id no longer needed)
+    lookup(30, 0x20)
     emit(addi(3, 1, 0x20)); emit(("bl", VALID)); emit(cmpwi(3, 0)); emit(("beq", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", KIND)); emit(cmpwi(3, 8)); emit(("bne", "out"))
     emit(addi(3, 1, 0x20)); emit(("bl", ACCESSOR)); emit(mr(27, 3))
