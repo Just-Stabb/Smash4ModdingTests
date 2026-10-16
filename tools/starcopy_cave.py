@@ -41,6 +41,9 @@ CAVE_MAX = 0xEA8
 CAVE1 = CAVE
 CAVE2 = CAVE + 0x800
 MAGIC = 0x1F4          # star MSC: BattleObject(0x1F4) on hit
+AIM_CMD = 0x1F5        # star MSC: BattleObject(0x1F5) on its first flying frame
+AIM_INT = 0x10000097   # Kirby int: aim code for the next star (copy range, unused by MSC)
+STAR_AIM_INT = 0x11000000  # star int the aim code is copied into (the star's MSC reads it at once)
 COUNTER = 0x1000009D   # Kirby ints in the copy range 0x83-0xA0 (copy_grant clears them when it
 PEND_KIND = 0x1000009E # grants; the pending copy is read before that). 0x93-0xA0 aren't used by
 PEND_COSTUME = 0x1000009B  # Kirby's MSC. 0xA8/0xAA/0xAC didn't work: writes there were lost, so
@@ -177,8 +180,11 @@ def build_star(stage="4"):
         e(addi(4, 1, handle_off)); e(mr(5, id_reg)); e(li(6, 0)); e(("bl", RESOLVE))
 
     e(lwz(6, 8, 5)); e(lwz(6, 0, 6)); e(lwz(6, 0, 6))  # command value
-    e(cmplwi(6, MAGIC)); e(("bne", "ret0"))
+    e(cmplwi(6, MAGIC)); e(("beq", "start"))
+    e(cmplwi(6, AIM_CMD)); e(("bne", "ret0"))
+    a.label("start")
     e(stwu(1, -0x60, 1)); e(MFLR_R0); e(stw(0, 0x64, 1)); e(stmw(26, 0x40, 1))
+    e(stw(6, 0x34, 1))                                # command
     e(mr(31, 4))                                      # r31 = weapon
     # 1. owner Kirby -> r27 = Kirby's accessor
     e(lwz(30, 0x1BF8, 31))                            # r30 = owner id
@@ -188,6 +194,13 @@ def build_star(stage="4"):
     e(addi(3, 1, 0x20)); e(("bl", ACCESSOR)); e(mr(27, 3))
     e(cmpwi(27, 0)); e(("beq", "out"))
     e(stw(27, 0x30, 1))                               # keep Kirby's accessor in the frame too
+    # AIM_CMD: copy Kirby's AIM_INT into the star's STAR_AIM_INT, nothing else
+    e(lwz(6, 0x34, 1)); e(cmplwi(6, AIM_CMD)); e(("bne", "hit"))
+    a.get_int(27, AIM_INT); e(mr(26, 3))
+    e(lwz(28, 0xC, 31)); e(cmpwi(28, 0)); e(("beq", "out"))   # the star's own accessor
+    a.set_int(28, 26, STAR_AIM_INT)
+    e(("b", "out"))
+    a.label("hit")
     if upto == 0:
         e(li(26, 7)); e(("b", "report"))
     # 2. target = newest hit record of the star's hitbox 0. Every pointer is range-checked

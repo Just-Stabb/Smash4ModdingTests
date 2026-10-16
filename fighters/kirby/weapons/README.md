@@ -64,30 +64,39 @@ gave them 0 damage when nothing had been swallowed. The star's code
 (`0x02B03888`) sets every hitbox's power from `0x11000000`, which overrode
 the earlier `AttackModule(0x271A, …)` damage set in `func_57` (now removed).
 
-`starmissile_fire` in `kirby.c` now sets them right before
+`starmissile_fire` in `kirby.c` still sets them right before
 `ArticleModule(0x2718, 0x17)`, from `starmissile_mode()` (0),
-`starmissile_scale()` (1.0) and `starmissile_power()` (2.0). Damage can only
-be a whole number this way (1.8 would become 1).
+`starmissile_scale()` (1.0) and `starmissile_power()` (2.0). In game the
+damage stayed 0 this way, so the star now sets its own damage int (below).
 
-### Aiming with the stick
+### Aiming with the stick (needs the patched `cross_f.rpx`)
 
-The first version had the star read the stick itself
-(`ControlModuleF(0/1)`), and it didn't work in game. Now Kirby passes the
-angle in the value that becomes the star's damage int:
+Two earlier attempts didn't work in game:
+- the star reading the stick itself (`ControlModuleF`);
+- passing the angle through Kirby's spawn values (float `0x4E` → star
+  `0x11000000`). That copy doesn't take for these stars, which is also why
+  the damage stayed 0.
 
-1. **Kirby:** `starmissile_aim_code()` in `kirby.c` is set into float
-   `0x4E` before each spawn. It's the damage (`starmissile_power()`, 2) with
-   the stick neutral or held straight back. Otherwise it's `1000 + angle +
-   90`, where the angle is in degrees from Kirby's facing (+ up) and clamped
-   to ±`starmissile_aim_limit()` (60, i.e. Smash angles 300°–60°).
-2. **Star, first flying frame (`func_57`):** if int `0x11000000` is 1000 or
-   more, it puts the real damage back (`starmissile_damage()`, 2; keep it
-   equal to `starmissile_power()`). It keeps the code in `global17`, then
+Now:
+
+1. **Kirby:** before each spawn, `starmissile_fire` stores
+   `starmissile_aim_code()` in his int `0x10000097`. That's 0 with the stick
+   neutral or straight back. Otherwise it's `1000 + angle + 90`, where the
+   angle is in degrees from Kirby's facing (+ up) and clamped to
+   ±`starmissile_aim_limit()` (60, i.e. Smash angles 300°–60°).
+2. **Star, first flying frame (`func_57`):** it calls `BattleObject(0x1F5)`.
+   The patched executable's star cave (`AIM_CMD` in
+   `tools/starcopy_cave.py`) finds the owner Kirby and copies that int into
+   the star's int `0x11000000`. The star keeps the code in `global17`, then
    `starmissile_aim(code - 1090)` turns its current speed to that angle.
    Forward is the sign of its horizontal speed, and it retries on later
    frames while the star has no speed yet.
 
-`starmissile_aim_enabled()` = 0 (in `kirby.c`) turns aiming off.
+### Damage
+
+The star's code (`0x02B03888`) sets every hitbox's power from its int
+`0x11000000`. So `func_57` sets that int to `starmissile_damage()` (2) every
+frame. It's a whole number only.
 
 ## Copy ability after 12 star hits (needs the patched `cross_f.rpx` and Kirby's MSC)
 

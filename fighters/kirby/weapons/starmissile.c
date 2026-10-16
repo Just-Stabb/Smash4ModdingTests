@@ -666,22 +666,23 @@ void func_56()
 // [starmissile status 1 per-frame] count down lifetime 0x11000002; remove the star at 0 or on touching ground
 void func_57()
 {
-    // Aim (added): Kirby passes the stick angle in int 0x11000000 (1000 + degrees + 90, see
-    // starmissile_aim_code in kirby.c); that int is also the damage the game applies, so put
-    // the real damage back on the first frame and keep the angle in global17 (unused before):
-    // 0 = not read yet, -1 = done / no aim, 1000+ = angle code still to apply.
+    // Aim (added): on the first flying frame, BattleObject(0x1F5) has the patched cross_f.rpx
+    // copy Kirby's aim code (int 0x10000097, see starmissile_aim_code in kirby.c) into this
+    // star's int 0x11000000. global17 (unused before): 0 = not fetched yet, -1 = done / no aim,
+    // 1000+ = aim code still to apply (waits until the star has speed).
     if (global17 == 0)
     {
+        WorkModule(0x7, 0, 0x11000000);
+        BattleObject(0x1f5);
         global17 = WorkModule(0x6, 0x11000000);
-        if (global17 >= 1000)
-        {
-            WorkModule(0x7, starmissile_damage(), 0x11000000);
-        }
-        else
+        if (global17 < 1000)
         {
             global17 = -1;
         }
     }
+    // Damage (added): the game sets every hitbox's power from int 0x11000000 itself
+    // (0x02B03888), so keep that int at the damage.
+    WorkModule(0x7, starmissile_damage(), 0x11000000);
     if (global17 >= 1000 && starmissile_aim(global17 - 1090))
     {
         global17 = -1;
@@ -696,8 +697,6 @@ void func_57()
         BattleObject(0x9);
         return;
     }
-    // Damage: the game sets the hitbox power from int 0x11000000 itself (0x02B03888), which
-    // overrode an AttackModule set here. Kirby's MSC sets it at spawn (starmissile_power in kirby.c).
     WorkModule(0xa, 0x11000002);
     if (WorkModule(0x6, 0x11000002) <= 0)
     {
@@ -812,7 +811,7 @@ void func_62()
 }
 
 
-int starmissile_damage() { return 2; } // keep equal to starmissile_power() in kirby.c (whole numbers)
+int starmissile_damage() { return 2; } // star damage (whole numbers; the game uses an int)
 
 // Turn the star's current speed (energy 0) to deg degrees above (+) / below (-) forward, keeping
 // its speed. Forward = the sign of its horizontal speed. Returns 0 while it has no speed yet.

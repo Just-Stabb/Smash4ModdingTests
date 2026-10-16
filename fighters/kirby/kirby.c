@@ -70186,8 +70186,9 @@ int starmissile_fly_status()   { return 1; }      // star status to switch to af
 int   starmissile_mode()      { return 0; }    // Kirby int 0x100000A7 -> star mode 0x11000001: 0 = straight, 1 = lobbed, 2 = spinning
 float starmissile_scale()     { return 1.0f; } // Kirby float 0x4D -> star size/speed multiplier (the game's default is 1.0)
 float starmissile_power()     { return 2.0f; } // Kirby float 0x4E -> star damage (int 0x11000000, whole numbers only: 1.8 would be 1)
-// Aiming: the stick angle rides along in the same value (1000 + degrees + 90); the star's MSC
-// reads it on its first flying frame, puts the real damage back and turns its speed that way.
+// Aiming: Kirby stores the stick angle in int 0x10000097 (1000 + degrees + 90, 0 = no aim) before
+// each spawn; the star copies it on its first flying frame with BattleObject(0x1F5) (patched
+// cross_f.rpx, tools/starcopy_cave.py) and turns its speed that way.
 int   starmissile_aim_enabled()  { return 1; }     // 0 = no aiming
 float starmissile_aim_deadzone() { return 0.3f; }  // stick tilt needed to aim
 float starmissile_aim_limit()    { return 60.0f; } // max degrees above / below forward (Smash angles 300..60)
@@ -70240,7 +70241,8 @@ void starmissile_fire(int bone)
     // straight flight and this damage for the new star (read once by the star's native setup)
     WorkModule(0x7, starmissile_mode(), 0x100000a7);
     WorkModule(0, starmissile_scale(), 0x4d);
-    WorkModule(0, starmissile_aim_code(), 0x4e);
+    WorkModule(0, starmissile_power(), 0x4e);
+    WorkModule(0x7, starmissile_aim_code(), 0x10000097); // aim code; the star fetches it (BattleObject(0x1F5), patched cross_f.rpx)
     cmd = starmissile_generate_cmd();
     ArticleModule(cmd, article); // create a new star
     fly = starmissile_fly_status();
@@ -71164,28 +71166,29 @@ void starcopy_update()
     }
 }
 
-// Value for Kirby float 0x4E (-> the new star's int 0x11000000): the damage when not aiming,
-// else 1000 + (stick angle in degrees, relative to forward, clamped) + 90.
-float starmissile_aim_code()
+// Aim code for Kirby int 0x10000097: 0 = no aim, else 1000 + (stick angle in degrees, relative
+// to forward, clamped) + 90.
+int starmissile_aim_code()
 {
     float sx;
     float sy;
     float dz;
     float deg;
+    int code;
     if (starmissile_aim_enabled() == 0)
     {
-        return starmissile_power();
+        return 0;
     }
     sx = global48 * PostureModuleF(0); // stick X towards where Kirby faces
     sy = global32;                     // stick Y (up +)
     dz = starmissile_aim_deadzone();
     if (sx * sx + sy * sy < dz * dz)
     {
-        return starmissile_power();
+        return 0;
     }
     if (sx < 0 && sy * sy < dz * dz) // straight back: no aim
     {
-        return starmissile_power();
+        return 0;
     }
     deg = MathF(0x1, sy, sx) * 57.29578f; // atan2, degrees
     if (deg > starmissile_aim_limit())
@@ -71196,5 +71199,6 @@ float starmissile_aim_code()
     {
         deg = -starmissile_aim_limit();
     }
-    return 1000.0f + deg + 90.0f + 0.5f; // + 0.5: the game cuts it to a whole number
+    code = (int)(deg + 1090.5f); // 1000 + deg + 90, rounded
+    return code;
 }
