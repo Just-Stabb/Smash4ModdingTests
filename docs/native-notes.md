@@ -588,3 +588,17 @@ python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/grab_fix/cross_f.
 ```
 
 Fallback if this doesn't work: `0x02E1CE84=0x61260000` (`ori r6,r9,0`) so the bit is never set.
+
+**Result:** `0x02E2528C=0x38000000` made Mega Lucario freeze permanently during his
+transformation. The bit is also set by the dead/rebirth-style code (`0x02E1CA64`, together with
+catch off), so the transformation probably goes through that path, and being catchable during
+it breaks the sequence.
+
+**Second try (narrow):** `tools/transform_grab_cave.py` hooks both readers of the bit
+(`0x02E2528C` → cave `0x037EE600`, `0x02E28D50` → cave `0x037EE63C`). The bit is ignored only when
+the fighter kind (`[fighter+4]`) is `0x3A`–`0x3D` AND the current status kind
+(`[[fighter+0x7494]+0x48]`) is outside `0x139`–`0x151` (the special common statuses: entry,
+rebirth, final, dead). Everyone else is unchanged.
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/grab_fix/cross_f.rpx \
+      $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py)
