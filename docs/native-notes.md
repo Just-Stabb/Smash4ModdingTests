@@ -660,3 +660,14 @@ hit states oddly. In the user's setup these characters never detransform, so thi
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/copy_custom/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py)
+
+**Result (v5):** confirmed: Kirby's Bowser copy matches the swallowed Bowser's custom Fire Breath
+(params, projectile lifetime, hitboxes, effects). This is now the standard build:
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx \
+      $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
+      $(python3 tools/copy_custom_cave.py)
+
+Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
+only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
+or reads the custom slot itself.
