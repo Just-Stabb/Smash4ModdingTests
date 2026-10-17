@@ -72141,8 +72141,9 @@ void falconpunch_hold_update()
 // - Neutral air (AttackAirN, motion 0x68) plays rapid jab's loop motion 0x54 (its ACMD calls
 //   the rapid jab hit 0xDCD907DA every 4 frames and loops forever) while attack is held, and
 //   after at least one loop, letting go plays the finisher 0x55 (nair_rapid_update). Status int
-//   0x11000002 keeps 0x68, so landing lag is still neutral air's (flag 0x2100000D on for the whole
-//   move). Once the finisher's hit is out (frame rapidjab_final_frame()), global75 = 1 and the
+//   0x11000002 keeps 0x68, so landing lag is still neutral air's. Landing always goes straight to
+//   LandingAir 0x18 (nair_rapid_update), without depending on flag 0x2100000D (with the flag
+//   alone it landed with almost no lag). Once the finisher's hit is out (frame rapidjab_final_frame()), global75 = 1 and the
 //   landing (func_586 -> nair_rapid_landing) plays at nair_rapid_landing_mult() (half) the lag.
 //   Neutral air sets nair_rapid_air_flag() so the ACMD uses the air hitboxes: loop hits at 60%
 //   damage, finisher at 65% knockback (tools/kirby_rapid_air_acmd.py). After one loop and before the final
@@ -72245,6 +72246,11 @@ int nair_rapid_update()
     motion = MotionModule(0x7);
     if (motion == 0x54 || motion == 0x55)
     {
+        if (global18 == 0) // landed: always LandingAir (neutral air's lag; half after the final hit)
+        {
+            func_16(0x18, 0);
+            return 0x1;
+        }
         nair_rapid_drift();
     }
     if (motion == 0x54)

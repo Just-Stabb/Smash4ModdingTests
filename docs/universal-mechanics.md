@@ -56,4 +56,8 @@ History: v1 (mine) used an ACMD shield flag; v2 set the speed every frame (const
 user's first version cleared the air speed flag at the start of Fall and only checked shield in
 the roll's end; its `0x208000e0` / `0x1000004` save / restore is gone.
 
+**Default speed: 2.2** for any character without a specified roll-off speed (`--add` with no
+number uses it). The user confirmed the current version (v3 minus the Fall speed boost) is
+right as-is.
+
 Done: Captain Falcon (2.4), Kirby (2.1).

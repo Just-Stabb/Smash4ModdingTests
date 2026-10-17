@@ -8,7 +8,8 @@
 Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0, 0, 1) at END
 (27); EscapeB (the back roll, which moves away from the facing direction) gets -SPEED. A missing
 script is created (EscapeB often has none). A Set_Edge_Slide in the script is removed (the
-original roll's edge stop). Usually: --add SPEED EscapeF EscapeB.
+original roll's edge stop). Usually: --add SPEED EscapeF EscapeB. With no SPEED, --add uses
+DEFAULT_SPEED (2.2), the default for any character without a specified roll-off speed.
 
 --hold SPEED [START END] (the current roll-off, docs/universal-mechanics.md): replaces the
 roll's speed commands (and any Set_Edge_Slide) with a constant speed: Add/Set_Momentum(0, 0, 1)
@@ -42,6 +43,7 @@ import acmd  # noqa: E402
 FLAG = 0x21000014
 FRAME = acmd.BY_NAME["frame"]
 WAIT = acmd.BY_NAME["wait"]
+DEFAULT_SPEED = 2.2  # roll-off speed for a character without its own (--add with no SPEED)
 MOM = acmd.BY_NAME["add/set_momentum"]
 IS_FLAG = acmd.BY_NAME["is_flag"]
 TRUE = acmd.BY_NAME["true"]
@@ -161,6 +163,8 @@ def main():
         rest = rest[1:]
         while rest and rest[0].replace(".", "", 1).isdigit():
             nums.append(float(rest.pop(0)))
+        if not nums:
+            nums = [DEFAULT_SPEED]
         add = (nums + [5.0, 27.0])[:3] if len(nums) == 1 else nums
     names = rest or ["EscapeF"]
     f = acmd.ACMDFile.load(src)

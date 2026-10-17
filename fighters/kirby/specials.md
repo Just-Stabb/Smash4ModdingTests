@@ -136,6 +136,12 @@ own motion). To use animation `0x290`, change it inside `func_2468`.
   low-charge `0x2B5` swing) gets a third strong hitbox (ID 2, copy of ID 0) at Z 17, size 4.5,
   for opponents who still drift a little. This extra reach applies to every non-max-charge
   ground swing.
+- **Windbox:** the same tool adds a weak windbox to the ground swing (`specials`) on frames
+  1–10: `Special_Hitbox` ID 3, hit group Part 1 (so it can't use up the strong hit's hit log),
+  0 damage, angle 0 (forward, FacingRestrict 3), fixed knockback 20, rehit every 2 frames,
+  flinchless / no hitlag / no effect, size 8 at Y 8 / Z 1 (over and around Kirby).
+  `Remove_Hitbox(3)` on frame 11, right before the strong hit. It keeps opponents that are too
+  close from crossing over Kirby. Bowser's windboxes are the template (they use 40 / angle 10).
 
 ## Up B: Final Cutter (0x154, 0x172–0x174)
 
@@ -860,6 +866,9 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   landing has neutral air's full lag; from that frame on, `global75` = 1 and LandingAir's init
   (`func_586`) calls `nair_rapid_landing()`, which plays the landing at
   `nair_rapid_landing_mult()` (0.5) times the lag.
+  Landing goes straight to LandingAir (`0x18`) from `nair_rapid_update()` whenever Kirby touches
+  the ground in the loop or finisher, instead of relying on flag `0x2100000D` (with only the
+  flag, it landed with almost no lag in-game).
 - **Air rapid jab cancel (`nair_rapid_cancel()`):** after one loop and before the final hit:
   grab → Kirby's air grab (`airgrab_try()`, same once-per-airtime / item / after-forward-throw
   limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
