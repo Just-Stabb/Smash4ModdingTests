@@ -59,6 +59,37 @@ namespace Sm4shCommand
             }
         }
 
+        // ---------------------------------------------------------- variable names
+        //
+        // VarNames.txt, next to the exe: "0xVARIABLE = Name | description" per line. Hovering a
+        // variable in a script shows its name and description (e.g. the common position variables
+        // 0x0F0000xx from tools/position_vars_cave.py).
+
+        public static readonly Dictionary<uint, KeyValuePair<string, string>> VarNames = new Dictionary<uint, KeyValuePair<string, string>>();
+        public static string VarNamesPath { get { return Path.Combine(Application.StartupPath, "VarNames.txt"); } }
+
+        public static void LoadVarNames()
+        {
+            VarNames.Clear();
+            if (!File.Exists(VarNamesPath))
+                return;
+            foreach (var raw in File.ReadAllLines(VarNamesPath))
+            {
+                var line = raw.Trim();
+                int eq = line.IndexOf('=');
+                if (eq < 0 || !line.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                uint id;
+                if (!uint.TryParse(line.Substring(2, eq - 2).Trim(), System.Globalization.NumberStyles.HexNumber, null, out id))
+                    continue;
+                string rest = line.Substring(eq + 1);
+                int bar = rest.IndexOf('|');
+                string name = (bar < 0 ? rest : rest.Substring(0, bar)).Trim();
+                string desc = bar < 0 ? "" : rest.Substring(bar + 1).Trim().Replace("\\n", "\n");
+                VarNames[id] = new KeyValuePair<string, string>(name, desc);
+            }
+        }
+
         /// <summary>
         /// Adds names to AnimNames.txt (and the loaded list). A name whose CRC32 isn't
         /// <paramref name="crc"/> is stored as a label: "0xHASH = name".

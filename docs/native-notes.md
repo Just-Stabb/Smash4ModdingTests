@@ -671,8 +671,9 @@ Star missile max count: `0x10136C58=9` is added to that command (the base `cave_
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py)
 
-(Current standard build adds `0x10136C58=9 $(python3 tools/kirby_stat_cave.py)` at the end; see
-"WorkModule stat reads" below.)
+(Current standard build adds `0x10136C58=9 $(python3 tools/kirby_stat_cave.py)
+$(python3 tools/position_vars_cave.py)` at the end; see "WorkModule stat reads" and "Position
+variables" below.)
 
 Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
 only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
@@ -706,3 +707,30 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
   Tested in an emulator (Unicorn) against fake WorkModules; not yet in game.
 - Stat names: `reference/fighter_param_attributes.csv` (Sammi Husky's sheet from
   `docs/resources.md`, tab "706249581").
+
+## Position variables (WorkModule float category F)
+
+`tools/position_vars_cave.py`; user docs in `docs/position-variables.md`.
+
+- Float IDs `0x0F0000xx` (category F; the game's MSC uses float categories 0–9 only, and ints in
+  category F) are answered by the cave instead of the WorkModule tables. Hooks on the first
+  instruction of WorkModuleImpl get_float `0x0200F628` (other IDs → the stat cave), set_float
+  `0x0200F648`, and add / sub / mul / div float `0x0200F73C` / `0x0200F764` / `0x0200F78C` /
+  `0x0200F7B4` (vtable `+0x64`/`+0x6C`/`+0x74`/`+0x7C`; these edit the tables in place, so for these
+  IDs they become a read plus a write). Only index < 0x100 is taken; other category F floats go to
+  the original code.
+- MSC `WorkModule(op, value, id)` (syscall 0x16 → WM vtable `+0x1CC`, handler `0x0200E898`): op 0 =
+  set float (`+0x4C`), 1 = random (`+0x5C`, calls set_float), 2 add, 3 sub, 4 mul, 5 div, 6 get int
+  (`+0x84`), 7 set int (`+0x8C`)... `WorkModuleF(0, id)` = get float.
+- Fighter table: `[[0x1035184C] + 0]` (the object resolver `0x02BF205C` uses `[0x1035184C] + cat*4`):
+  `+0` entries, `+8` count; entry = entries + slot × `0x76B0` (`0x02BF4A88`), `+0` object ID, byte
+  `+0x1E` ≥ 4 = live (`0x02BEF61C`), `+0xC` module accessor (`0x02BEF5DC` reads `[handle]+0xC`).
+- Accessor `+0x18` PostureModule, `+0x28` WorkModule. The WorkModule has no owner pointer, so
+  "self" = the live entry whose accessor's WorkModule is the one being read.
+- PostureModule: position `+0x10`/`+0x14`/`+0x18`, facing `+0x60`; vtable `+0x4C` set_pos(this,
+  vec3*) (fighter version `0x02E5CDD8` stores the three floats, then updates when they changed).
+- Code at `0x037EDC78` (reads/writes) and `0x037EE280` (add/sub/mul/div). Tested in Unicorn with
+  fake fighter tables and the game's own WorkModule code for the other IDs. The ACMD SET_FLOAT
+  handler wasn't found statically (index `0x1D7`); it's assumed to use the WorkModule vtable like
+  everything else that was checked.
+

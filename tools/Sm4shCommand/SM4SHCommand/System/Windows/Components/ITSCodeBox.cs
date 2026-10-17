@@ -228,7 +228,7 @@ namespace Sm4shCommand
                     e.ToolTipTitle = $"{ACMD_INFO.CMD_NAMES[crc]} \u2192 {pname}";
                     string pdesc = ACMD_INFO.GetParamDescription(crc, pname);
                     e.ToolTipText = $"Parameter {index + 1} of {syntax.Length}, {TypeName(types[index])}" +
-                        (pdesc.Length > 0 ? "\n" + pdesc : "");
+                        (pdesc.Length > 0 ? "\n" + pdesc : "") + VariableNote(line, col);
                     return;
                 }
             }
@@ -238,6 +238,24 @@ namespace Sm4shCommand
             string sig = syntax.Length == 0 ? "No parameters" :
                 string.Join(", ", syntax.Select((s, i) => $"{s}: {TypeName(i < types.Length ? types[i] : "0")}").ToArray());
             e.ToolTipText = (desc.Length > 0 ? desc + "\n\n" : "") + sig;
+        }
+
+        // The name and description of a VarNames.txt variable written under the mouse (0x........).
+        static string VariableNote(string line, int col)
+        {
+            int start = col, end = col;
+            while (start > 0 && Uri.IsHexDigit(line[start - 1]) || start > 0 && (line[start - 1] == 'x' || line[start - 1] == 'X'))
+                start--;
+            while (end < line.Length && (Uri.IsHexDigit(line[end]) || line[end] == 'x' || line[end] == 'X'))
+                end++;
+            string word = line.Substring(start, end - start);
+            uint id;
+            KeyValuePair<string, string> info;
+            if (word.Length < 3 || !word.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
+                !uint.TryParse(word.Substring(2), global::System.Globalization.NumberStyles.HexNumber, null, out id) ||
+                !Runtime.VarNames.TryGetValue(id, out info))
+                return "";
+            return $"\n\n{word}: {info.Key}" + (info.Value.Length > 0 ? "\n" + info.Value : "");
         }
 
         static string TypeName(string type)

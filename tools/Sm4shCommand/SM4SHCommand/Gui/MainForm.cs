@@ -92,6 +92,7 @@ namespace Sm4shCommand
         {
             Runtime.LoadAnimNames();
             LogMessage($"AnimNames.txt: {Runtime.AnimNames.Count} script names.");
+            Runtime.LoadVarNames();
             Runtime.LoadCommandDefinitions();
         }
         private void tabControl1_DrawItem(object sender, DrawItemEventArgs e)

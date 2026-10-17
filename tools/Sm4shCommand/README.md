@@ -16,7 +16,7 @@ line) to open it. If anything goes wrong, the error and its details are written 
 `Sm4shCommand_errors.log` next to the exe.
 
 **Build:** open `Sm4shCommand.sln` in Visual Studio (Windows, .NET Framework 4.0 or later) and build.
-`Events.cfg` and `AnimNames.txt` are copied next to the exe. (The FastColoredTextBox reference used to
+`Events.cfg`, `AnimNames.txt` and `VarNames.txt` are copied next to the exe. (The FastColoredTextBox reference used to
 point at the original author's desktop; it now uses the bundled DLL.)
 
 ## What changed
@@ -30,6 +30,7 @@ point at the original author's desktop; it now uses the bundled DLL.)
 | Scripts named by hash | `AnimNames.txt` (next to the exe) lists standard animation names (about half of a fighter's `game.bin` scripts on Kirby, Captain Falcon and Bowser). Tools > Parse Animations now saves the names it finds there, and right-click > **Set Name** names a script (or labels a hash whose real name isn't known), so names only need finding once. Names show in file, fighter and project mode. |
 | JUMP/CALL targets couldn't be opened | The hash in `JUMP(Hash=0x...)` / `CALL(Hash=0x...)` is underlined; **Ctrl+click** it to open that script. Hovering it shows the script's name. |
 | Couldn't add scripts | Right-click > **Add Script..**: an animation name or `0xHASH`. In a fighter folder it's added to game/effect/sound/expression, and you choose whether it also goes into `motion.mtable` (a new motion) or stays unlisted (a JUMP/CALL target). |
+| Variable names | `VarNames.txt` (next to the exe), `0xVARIABLE = Name \| description` per line: hovering a variable in a parameter shows its name and description. Ships with the common position variables `0x0F0000xx` (`docs/position-variables.md`). |
 | Command definitions / descriptions | Tools > **Command Definitions..** edits names, parameter names and types, and descriptions, and adds new commands; Save writes `Events.cfg`. Hovering a command in the editor shows its description and parameters; hovering a parameter shows its name, type and description. |
 
 Also:
