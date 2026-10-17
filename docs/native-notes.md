@@ -662,6 +662,8 @@ hit states oddly. In the user's setup these characters never detransform, so thi
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py)
 
+Star missile max count: `0x10136C58=6` is added to that command (the base `cave_fix_s4` has 5).
+
 **Result (v5):** confirmed: Kirby's Bowser copy matches the swallowed Bowser's custom Fire Breath
 (params, projectile lifetime, hitboxes, effects). This is now the standard build:
 

@@ -138,7 +138,8 @@ inside the cave, see `docs/native-notes.md`).
 ## Speed and slowdown (added)
 
 `func_60` (exec): in the flying status (1), the first frame the star has speed its velocity is
-multiplied by `starmissile_speed_mult()` (1.5; `global22` = done). The per-frame slowdown
+multiplied by `starmissile_speed_mult()` (1.65; `global22` = done). The per-frame slowdown
 (`WorkModuleF(0, 0x1000000)` subtracted from the speed) is skipped while the lifetime
-`0x11000002` is above `starmissile_decel_frames()` (4), so the star only slows down in its last
-4 frames. The spinning mode (`0x11000001 == 2`) never had the slowdown.
+`0x11000002` is above `starmissile_decel_frames()`, now 0, so the star never slows down (it's
+removed when the lifetime reaches 0). The spinning mode (`0x11000001 == 2`) never had the
+slowdown.

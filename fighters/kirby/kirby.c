@@ -70237,15 +70237,15 @@ void inhale_aim_reset()
 // ===================================================================
 // Star missiles from the hands during the inhale loop (added)
 // Runs every frame of status 0x157 (from func_2358, so not during hitlag).
-// Fires on frame 0, 12, 24, ... alternating left hand, right hand.
+// Fires on frame 0, 10, 20, ... alternating left hand, right hand.
 // Article IDs: github gist BenHall-7 FighterArticles.xml (kirby: 23 = starmissile).
 // The game's max count for starmissile is 1 unless cross_f.rpx is patched
-// (0x10136C58; build/cross_f.rpx sets it to 5). starmissile_max() should match it.
+// (0x10136C58; build/cross_f.rpx sets it to 6). starmissile_max() should match it.
 // ===================================================================
 
 // [Star missile] SETTINGS - edit these
-int starmissile_interval()     { return 12; }     // frames between shots
-int starmissile_max()          { return 5; }      // max stars out at once (= the count patched into cross_f.rpx)
+int starmissile_interval()     { return 10; }     // frames between shots (was 12)
+int starmissile_max()          { return 6; }      // max stars out at once (= the count patched into cross_f.rpx, 0x10136C58=6)
 int starmissile_article()      { return 0x17; }   // 23 = starmissile
 int starmissile_bone_left()    { return 0x18; }   // LHaveN (left hand hold point); LHandN is 0x10
 int starmissile_bone_right()   { return 0x17; }   // RHaveN (right hand hold point); RHandN is 0x14

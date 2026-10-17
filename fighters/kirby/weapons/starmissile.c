@@ -856,5 +856,5 @@ int starmissile_aim(int deg)
     return 0x1;
 }
 
-float starmissile_speed_mult() { return 1.5f; } // flying star speed x (once, when it first has speed)
-int   starmissile_decel_frames() { return 4; }  // it only slows down in its last this many frames
+float starmissile_speed_mult() { return 1.65f; } // flying star speed x (once, when it first has speed; was 1.5, +10%)
+int   starmissile_decel_frames() { return 0; }  // it only slows down in its last this many frames (0 = never; the lifetime count is > 0 while it flies)

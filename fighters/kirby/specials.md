@@ -285,7 +285,7 @@ hitlag.
 **Max count:** the game's limit for `starmissile` is 1 (`Count="1"` in the
 article list) unless the executable is patched. `tools/rpx_patch.py`
 raises it:
-`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=5` (current build: 5).
+`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=6` (current build: 6).
 The spit star uses the same article, so it shares the limit.
 
 **Uncertain:** the move and shoot commands take the article ID, not a
@@ -425,7 +425,7 @@ To read or check ACMD: `python3 tools/acmd.py dump game.bin specialairs`, or
 
 ```
 python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
-  0x10136C58=5 \
+  0x10136C58=6 \
   0x2EFB518=0x60000000 0x2F00194=0x38800022 0x2F00198=0x48000034 0x2F001C8=0x4082FFCC \
   0x2F7E550=0x38000001 0x2F7E560=0x3808FE8F 0x2F7E564=0x3908FE6E 0x2F7E568=0x7C0041D6 \
   0x2F7E574=0x60000000 0x2F7E590=0x408201EC
