@@ -59,7 +59,8 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
   python3 tools/kirby_sideb_reflect_acmd.py g3 g4;
   python3 tools/rolloff_acmd.py g4 g5 --plain --add 2.1 EscapeF EscapeB` (roll-off, see
   `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 g6`;
-  `python3 tools/kirby_sideb_link_acmd.py g6 build/game.bin` (ground side B link)
+  `python3 tools/kirby_sideb_link_acmd.py g6 g7` (ground side B link);
+  `python3 tools/kirby_rapid_air_acmd.py g7 build/game.bin` (air rapid jab finisher at 65% knockback)
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
 - **Not fully sure:** `0x15C`, `0x15D` and `0x166` are mouthful states whose
@@ -845,13 +846,24 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   `rapidjab_final_frame()` = 5), `rapidjab_cancel()` (top of the loop `func_337`) goes into any
   attack from the command bits in `global24`: tilts `0x2`/`0x4`/`0x8` → `0x28`/`0x29`/`0x2A`,
   smashes `0x10`/`0x20`/`0x40` → `0x2B`/`0x31`/`0x2E`, specials `0x2000`/`0x4000`/`0x8000`/`0x1000`
-  → `0x153`/`0x154`/`0x155`/`0x152`. Plain jab and grab aren't included (mashing A keeps it
-  going).
+  → `0x153`/`0x154`/`0x155`/`0x152`, grab `0x20000000` → Catch `0x35` (checked first).
+  Plain jab isn't included (mashing A keeps it going).
 - **Neutral air = rapid jab:** `func_310` plays rapid jab's loop motion `0x54` (animation and its
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
   It loops while attack is held; letting go after at least one loop plays the finisher `0x55`
   (`nair_rapid_update()` in `func_317`), then Fall.
-  `0x11000002` keeps `0x68` (neutral air's landing lag); flag `0x2100000D` (landing lag) is set
-  for the whole move.
+  `0x11000002` keeps `0x68` (neutral air's landing lag). Flag `0x2100000D` (full landing lag)
+  stays on until the finisher's hit comes out (frame `rapidjab_final_frame()` = 5), then goes
+  off, so landing after that is autocanceled.
+- **Air rapid jab cancel (`nair_rapid_cancel()`):** after one loop and before the final hit:
+  grab → Kirby's air grab (`airgrab_try()`, same once-per-airtime / item / after-forward-throw
+  limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
+  (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
+  → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
+  restart neutral air.
+- **Air finisher knockback 65%:** before playing `0x55`, the air version sets status flag
+  `0x21000024` (`nair_rapid_air_flag()`). `tools/kirby_rapid_air_acmd.py` turns each hitbox of
+  `attack100end` into `IS_FLAG(0x21000024)` True → the hitbox with KBG/BKB/WBKB × 0.65
+  (120/80 → 78/52), False → the original. Ground rapid jab never sets the flag.
 - **Forward air autolink:** `tools/kirby_fair_autolink_acmd.py` gives the first hit's hitboxes
   (frame 10) the second hit's Angle 366 / KBG 30 / WBKB 0 / BKB 28.

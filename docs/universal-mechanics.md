@@ -43,10 +43,11 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    `rolloff_start_frame()` (5) or while the shield button is held (`ControlModule(0x2712, 3)`),
    ground correction `0x2` (stops at edges, like crouching / shielding); otherwise `0x1` (can
    slide off, like a rebound).
-4. **The speed at the edge carries over.** `rolloff_update()` also stores the fighter's current
-   horizontal speed every roll frame (X position change that frame, a new float global). Sliding
-   off sends the roll to Fall (`func_374`); Fall's main (`func_501` → `rolloff_fall_start()`)
-   gives the fighter that stored speed (control energy `0x3`) when it came from a roll.
+4. **The speed at the edge carries over on its own.** Sliding off sends the roll to Fall
+   (`func_374`), and the fighter keeps the roll's current speed into the fall with no extra code.
+   (v3 also stored the speed every roll frame and gave it again in Fall's main; that doubled the
+   speed on top of the carried momentum, with no air cap, and could fling fighters to the blast
+   zone, so it was removed.)
 5. **No air speed cap while falling from it.** The roll end (key 2: `func_381` / `func_382`) sets
    flag `0x20000044` (lifts the max horizontal air speed) when the next status (`global6`) is
    Fall (`0xE`); Fall's end (key 2, `func_535`) clears it.

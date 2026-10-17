@@ -10418,7 +10418,6 @@ void func_500()
 void func_501()
 {
     func_502();
-    rolloff_fall_start(); // roll-off: the roll's speed carries into the fall (added)
     func_78(func_503);
 }
 
@@ -38084,31 +38083,18 @@ void func_2360()
 // ===================================================================
 // Roll-off (docs/universal-mechanics.md). The rolls' ACMD gives them their speed (EscapeF +S /
 // EscapeB -S added at frame rolloff_start_frame(), 0 at frame 27); kinetic 0x6 so the animation
-// doesn't move the fighter. Every roll frame:
-// - before the speed frame, or while shield is held (ControlModule(0x2712, 3)), ground
-//   correction 0x2 (stops at edges, like crouching / shielding); from the speed frame on, 0x1
-//   (can slide off, like a rebound);
-// - the fighter's current horizontal speed (X position change this frame) is stored in
-//   global62 (global63 = last X).
-// Sliding off goes to Fall (func_374): the roll end (func_381 / func_382) sets flag 0x20000044
-// (no max air speed) when the next status is Fall; Fall's main (func_501) gives the fighter the
-// stored speed when it came from a roll; Fall's end (func_535) clears the flag.
+// doesn't move the fighter. Every roll frame: before the speed frame, or while shield is held
+// (ControlModule(0x2712, 3)), ground correction 0x2 (stops at edges, like crouching /
+// shielding); from the speed frame on, 0x1 (can slide off, like a rebound).
+// Sliding off goes to Fall (func_374), which keeps the roll's current speed on its own: the roll
+// end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is
+// Fall, and Fall's end (func_535) clears it. (The stored-speed boost Fall's main used to add on
+// top doubled the speed, so it's gone; global62 / global63 are unused now.)
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 
 void rolloff_update()
 {
-    float x;
-    x = PostureModuleF(0x1);
-    if (MotionModuleF(0x1) < 1.0f)
-    {
-        global62 = 0;
-    }
-    else
-    {
-        global62 = x - global63;
-    }
-    global63 = x;
     if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3))
     {
         GroundModule(0x2710, 0x1);
@@ -38116,15 +38102,5 @@ void rolloff_update()
     else
     {
         GroundModule(0x2710, 0x2);
-    }
-}
-
-// Fall main (func_501), coming from a roll: keep the roll's speed from the edge.
-void rolloff_fall_start()
-{
-    if (global5 == 0x20 || global5 == 0x21)
-    {
-        KineticModule(0x11, 0x3, global62, 0);
-        KineticModule(0xb, 0x3);
     }
 }

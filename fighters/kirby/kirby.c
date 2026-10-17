@@ -7538,7 +7538,7 @@ void func_316()
 
 void func_317()
 {
-    if (nair_rapid_update()) // neutral air rapid jab: ends after nair_rapid_frames() (added)
+    if (nair_rapid_update()) // neutral air rapid jab: finisher, landing lag, cancels (added)
     {
         return 0x1;
     }
@@ -10405,7 +10405,6 @@ void func_500()
 void func_501()
 {
     func_502();
-    rolloff_fall_start(); // roll-off: the roll's speed carries into the fall (added)
     func_78(func_503);
 }
 
@@ -71228,6 +71227,34 @@ int airgrab_check()
     {
         return 0;
     }
+    return airgrab_start();
+}
+
+// air grab without the aerial-transition check (air rapid jab cancel, nair_rapid_cancel).
+// Same limits otherwise: once per airtime, not after a forward throw, not holding an item.
+int airgrab_try()
+{
+    if (global18 != 0x2)
+    {
+        return 0;
+    }
+    if (global17 & 0x8000)
+    {
+        return 0;
+    }
+    if (global17 & 0x80)
+    {
+        return 0;
+    }
+    if (ItemModule(0x4) == 0x1)
+    {
+        return 0;
+    }
+    return airgrab_start();
+}
+
+int airgrab_start()
+{
     global17 = global17 | 0xc000;
     if (global17 & 0x400)
     {
@@ -72099,16 +72126,21 @@ void falconpunch_hold_update()
 // - After one full loop (global71 >= the loop motion's length, MotionModule(0, 0x54), else
 //   rapidjab_loop_frames()), rapid jab can be cancelled into any attack before its final hit: tilts, smashes and
 //   specials (from the command bits in global24: 0x2/0x4/0x8 tilts, 0x10/0x20/0x40 smashes,
-//   0x1000-0x8000 specials). Plain jab (0x1) and grab aren't included, so mashing A keeps the
-//   rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
+//   0x1000-0x8000 specials) and grab (0x20000000 -> Catch 0x35). Plain jab (0x1) isn't
+//   included, so mashing A keeps the rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
 //   ACMD 0x8427B6B7: FRAME 1 + WAIT 4).
 // - Neutral air (AttackAirN, motion 0x68) plays rapid jab's loop motion 0x54 (its ACMD calls
 //   the rapid jab hit 0xDCD907DA every 4 frames and loops forever) while attack is held, and
-//   after at least one loop, letting go plays the finisher 0x55 (nair_rapid_update). Status int 0x11000002 keeps 0x68, so landing lag is still
-//   neutral air's; status flag 0x2100000D (landing with air lag) is set for the whole move.
-//   global70 = neutral air frame count.
+//   after at least one loop, letting go plays the finisher 0x55 (nair_rapid_update). Status int
+//   0x11000002 keeps 0x68, so landing lag is still neutral air's. Status flag 0x2100000D (full
+//   landing lag) is on until the finisher's hit comes out (frame rapidjab_final_frame()), then
+//   off (autocanceled landing). The air finisher sets nair_rapid_air_flag() so its ACMD uses
+//   65% knockback hitboxes (tools/kirby_rapid_air_acmd.py). After one loop and before the final
+//   hit, air rapid jab cancels into the air grab, air specials and the other aerials
+//   (nair_rapid_cancel). global70 = neutral air frame count.
 // ===================================================================
 float rapidjab_final_frame() { return 5.0f; }
+int   nair_rapid_air_flag()  { return 0x21000024; } // status flag the finisher ACMD (attack100end) checks for its air hitboxes
 int   rapidjab_loop_frames() { return 16; } // fallback loop length (its ACMD repeats every 16 frames)
 
 // Rapid jab loop length in frames: the loop motion's length, else rapidjab_loop_frames().
@@ -72160,7 +72192,8 @@ int rapidjab_cancel()
         return 0;
     }
     st = 0;
-    if (global24 & 0x2000) { st = 0x153; }
+    if (global24 & 0x20000000) { st = 0x35; } // grab
+    else if (global24 & 0x2000) { st = 0x153; }
     else if (global24 & 0x4000) { st = 0x154; }
     else if (global24 & 0x8000) { st = 0x155; }
     else if (global24 & 0x1000) { st = 0x152; }
@@ -72190,14 +72223,68 @@ void nair_rapid_start()
 // sends Kirby to Fall.
 int nair_rapid_update()
 {
-    if (global4 != 0x34 || MotionModule(0x7) != 0x54)
+    int motion;
+    if (global4 != 0x34)
     {
         return 0;
     }
-    global70++;
-    if (global70 >= rapidjab_loop() && ControlModule(0x2713, 0))
+    motion = MotionModule(0x7);
+    if (motion == 0x54)
     {
-        func_22(0x55, 0, 1.0f);
+        global70++;
+        if (global70 >= rapidjab_loop() && ControlModule(0x2713, 0))
+        {
+            WorkModule(0x2710, nair_rapid_air_flag()); // finisher ACMD uses the 65% knockback hitboxes
+            func_22(0x55, 0, 1.0f);
+            return 0;
+        }
+    }
+    else if (motion == 0x55)
+    {
+        if (MotionModuleF(0x1) >= rapidjab_final_frame())
+        {
+            WorkModule(0x2711, 0x2100000d); // final hit out: autocanceled landing from here
+            return 0;
+        }
+    }
+    else
+    {
+        return 0;
+    }
+    if (global70 < rapidjab_loop()) // cancels only after one full loop
+    {
+        return 0;
+    }
+    return nair_rapid_cancel();
+}
+
+// Air rapid jab cancel: air grab, air specials, and the other aerials (attack with a direction,
+// command bits 0x2-0x40; plain attack would just restart neutral air). Returns 1 when it changed
+// status.
+int nair_rapid_cancel()
+{
+    if (global24 & 0x20000000) // grab
+    {
+        if (airgrab_try())
+        {
+            return 0x1;
+        }
+    }
+    if (global24 & 0xf000) // specials
+    {
+        WorkModule(0x19, 0x1f00000a); // allow air specials
+        if (func_58())
+        {
+            return 0x1;
+        }
+    }
+    if (global24 & 0x7e) // directional attack
+    {
+        WorkModule(0x19, 0x1f00000e); // allow aerials
+        if (func_63())
+        {
+            return 0x1;
+        }
     }
     return 0;
 }
@@ -72205,31 +72292,18 @@ int nair_rapid_update()
 // ===================================================================
 // Roll-off (docs/universal-mechanics.md). The rolls' ACMD gives them their speed (EscapeF +S /
 // EscapeB -S added at frame rolloff_start_frame(), 0 at frame 27); kinetic 0x6 so the animation
-// doesn't move the fighter. Every roll frame:
-// - before the speed frame, or while shield is held (ControlModule(0x2712, 3)), ground
-//   correction 0x2 (stops at edges, like crouching / shielding); from the speed frame on, 0x1
-//   (can slide off, like a rebound);
-// - the fighter's current horizontal speed (X position change this frame) is stored in
-//   global72 (global73 = last X).
-// Sliding off goes to Fall (func_374): the roll end (func_381 / func_382) sets flag 0x20000044
-// (no max air speed) when the next status is Fall; Fall's main (func_501) gives the fighter the
-// stored speed when it came from a roll; Fall's end (func_535) clears the flag.
+// doesn't move the fighter. Every roll frame: before the speed frame, or while shield is held
+// (ControlModule(0x2712, 3)), ground correction 0x2 (stops at edges, like crouching /
+// shielding); from the speed frame on, 0x1 (can slide off, like a rebound).
+// Sliding off goes to Fall (func_374), which keeps the roll's current speed on its own: the roll
+// end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is
+// Fall, and Fall's end (func_535) clears it. (The stored-speed boost Fall's main used to add on
+// top doubled the speed, so it's gone; global72 / global73 are unused now.)
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 
 void rolloff_update()
 {
-    float x;
-    x = PostureModuleF(0x1);
-    if (MotionModuleF(0x1) < 1.0f)
-    {
-        global72 = 0;
-    }
-    else
-    {
-        global72 = x - global73;
-    }
-    global73 = x;
     if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3))
     {
         GroundModule(0x2710, 0x1);
@@ -72237,16 +72311,6 @@ void rolloff_update()
     else
     {
         GroundModule(0x2710, 0x2);
-    }
-}
-
-// Fall main (func_501), coming from a roll: keep the roll's speed from the edge.
-void rolloff_fall_start()
-{
-    if (global5 == 0x20 || global5 == 0x21)
-    {
-        KineticModule(0x11, 0x3, global72, 0);
-        KineticModule(0xb, 0x3);
     }
 }
 
