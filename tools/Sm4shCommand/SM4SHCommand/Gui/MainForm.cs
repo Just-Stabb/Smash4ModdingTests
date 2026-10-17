@@ -23,6 +23,35 @@ namespace Sm4shCommand
             this.Text = $"{Program.Title} - ";
             Manager = new WorkspaceManager();
             ScriptFiles = new SortedList<string, IScriptCollection>();
+
+            // The toolbar buttons had no handlers.
+            saveToolStripButton.Click += saveToolStripMenuItem_Click;
+            saveToolStripButton.ToolTipText = "Save all (Ctrl+S)";
+            openToolStripButton.Click += fOpen_Click;
+
+            var defs = new ToolStripMenuItem("Command Definitions..", null, commandDefinitions_Click);
+            toolsToolStripMenuItem.DropDownItems.Add(defs);
+            var varNames = new ToolStripMenuItem("Show variables as LA-Int[1] style") { CheckOnClick = true };
+            varNames.CheckedChanged += (o, e) =>
+            {
+                FighterVariable.ShowDescriptiveNames = varNames.Checked;
+                LogMessage("Reopen a script to see the change.");
+            };
+            viewToolStripMenuItem.DropDownItems.Add(varNames);
+
+            var treeMenu = new ContextMenuStrip();
+            treeMenu.Items.Add(new ToolStripMenuItem("Open", null, (o, e) => { if (FileTree.SelectedNode != null) OpenNode(FileTree.SelectedNode); }));
+            treeMenu.Items.Add(new ToolStripMenuItem("Add Script..", null, addScript_Click));
+            treeMenu.Items.Add(new ToolStripMenuItem("Set Name..", null, setName_Click));
+            treeMenu.Items.Add(new ToolStripMenuItem("Copy Hash", null, (o, e) =>
+            {
+                var sn = FileTree.SelectedNode as ScriptNode;
+                if (sn != null)
+                    Clipboard.SetText($"0x{sn.Identifier:X8}");
+            }));
+            FileTree.ContextMenuStrip = treeMenu;
+
+            ITS_EDITOR.OpenScriptRequested += OpenScriptByHash;
         }
 
         public const string FileFilter =
@@ -61,28 +90,9 @@ namespace Sm4shCommand
 
         private void ACMDMain_Load(object sender, EventArgs e)
         {
-            Runtime.LogMessage("Checking for external event dictionary..");
-            if (File.Exists(Path.Combine(Application.StartupPath, "Events.cfg")))
-            {
-                Runtime.LogMessage("Event dictionary found, applying overrides..");
-                Runtime.LogMessage("============================================");
-                Action<object, DoWorkEventArgs> work = (object snd, DoWorkEventArgs arg) =>
-                {
-                    ACMD_INFO.OverrideInfo(Path.Combine(Application.StartupPath, "Events.cfg"));
-                };
-                Action<object, RunWorkerCompletedEventArgs> workDone = (object snd, RunWorkerCompletedEventArgs arg) =>
-                {
-                    Runtime.LogMessage("============================================\n");
-                    Runtime.LogMessage("Done.");
-                };
-                using (BackgroundWorker wrk = new BackgroundWorker())
-                {
-                    wrk.DoWork += new DoWorkEventHandler(work);
-                    wrk.RunWorkerCompleted += new RunWorkerCompletedEventHandler(workDone);
-                    wrk.RunWorkerAsync();
-                }
-            }
-
+            Runtime.LoadAnimNames();
+            LogMessage($"AnimNames.txt: {Runtime.AnimNames.Count} script names.");
+            Runtime.LoadCommandDefinitions();
         }
         private void tabControl1_DrawItem(object sender, DrawItemEventArgs e)
         {
@@ -130,7 +140,11 @@ namespace Sm4shCommand
                         ScriptFiles.Add(ofDlg.FileName, f);
                         var node = new TreeNode("ACMD") { Name = "nACMD" };
                         foreach (var keypair in f.Scripts)
-                            node.Nodes.Add(new ScriptNode(keypair.Key, $"{keypair.Key:X8}", keypair.Value));
+                        {
+                            var sn = new ScriptNode(keypair.Key, "", keypair.Value);
+                            sn.UpdateText();
+                            node.Nodes.Add(sn);
+                        }
                         FileTree.Nodes.Add(node);
                     }
                     else if (*(buint*)source.Address == 0xFFFF0000)
@@ -177,25 +191,62 @@ namespace Sm4shCommand
                         ScriptFiles.Add(p, acmd);
                         Runtime.WorkingEndian = acmd.Endian;
                     }
-                    else if (p.EndsWith(".mtable"))
-                        MotionTable = new MTable(p, Runtime.WorkingEndian);
                 }
-                var acmdnode = new TreeNode("ACMD") { Name = "nACMD" };
-
-                for (int i = 0; i < MotionTable.Count; i++)
+                var mtable = Path.Combine(fsDlg.SelectedPath, "motion.mtable");
+                if (File.Exists(mtable))
+                    MotionTable = new MTable(mtable, Runtime.WorkingEndian);
+                else
                 {
-                    var node = new ScriptNode(MotionTable[i], $"{i:X} - [{MotionTable[i]:X8}]");
-                    foreach (var keypair in ScriptFiles)
-                    {
-                        if (keypair.Value.Scripts.Keys.Contains(MotionTable[i]))
-                            node.Scripts.Add(Path.GetFileNameWithoutExtension(keypair.Key), keypair.Value.Scripts[MotionTable[i]]);
-                    }
-                    acmdnode.Nodes.Add(node);
+                    MotionTable = new MTable(new List<uint>(), Runtime.WorkingEndian);
+                    LogMessage("No motion.mtable in this folder; every script is listed as unlisted.");
                 }
+
+                var acmdnode = new TreeNode("ACMD") { Name = "nACMD" };
                 FileTree.Nodes.Add(acmdnode);
+                PopulateFighterScripts();
                 IDEMode = IDE_MODE.Fighter;
                 this.Text += fsDlg.SelectedPath;
             }
+        }
+
+        /// <summary>
+        /// Lists a fighter's scripts: one node per motion.mtable entry, then every script that isn't in
+        /// the motion table ("unlisted": subroutines reached through JUMP/CALL, and unused ones).
+        /// </summary>
+        void PopulateFighterScripts()
+        {
+            var acmdnode = FileTree.Nodes.Find("nACMD", false).FirstOrDefault();
+            if (acmdnode == null)
+                return;
+            FileTree.BeginUpdate();
+            acmdnode.Nodes.Clear();
+            for (int i = 0; i < MotionTable.Count; i++)
+                acmdnode.Nodes.Add(MakeFighterNode(MotionTable[i], i, false));
+
+            var listed = new HashSet<uint>(MotionTable.ToList());
+            var unlisted = new SortedSet<uint>();
+            foreach (var file in ScriptFiles.Values)
+                foreach (var crc in file.Scripts.Keys)
+                    if (!listed.Contains(crc))
+                        unlisted.Add(crc);
+            foreach (var crc in unlisted.OrderBy(x => Runtime.ScriptLabel(x), StringComparer.OrdinalIgnoreCase))
+                acmdnode.Nodes.Add(MakeFighterNode(crc, -1, true));
+            FileTree.EndUpdate();
+            _nodeCache = null;
+        }
+
+        ScriptNode MakeFighterNode(uint crc, int motionIndex, bool unlisted)
+        {
+            var node = new ScriptNode(crc, "") { MotionIndex = motionIndex, Unlisted = unlisted };
+            foreach (var keypair in ScriptFiles)
+            {
+                if (keypair.Value.Scripts.Keys.Contains(crc))
+                    node.Scripts.Add(Path.GetFileNameWithoutExtension(keypair.Key), keypair.Value.Scripts[crc]);
+            }
+            if (unlisted)
+                node.ForeColor = Color.DimGray;
+            node.UpdateText();
+            return node;
         }
         private void projOpen_Click(object sender, EventArgs e)
         {
@@ -209,6 +260,11 @@ namespace Sm4shCommand
         }
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            // Scripts open in tabs only reach the file when they're compiled, which used to happen
+            // only when their tab was closed, so saving with tabs open saved nothing new.
+            if (!ApplyOpenEditors())
+                return;
+
             if (IDEMode == IDE_MODE.Project)
             {
                 if (Manager.Projects.Count > 0)
@@ -217,9 +273,10 @@ namespace Sm4shCommand
             }
             else if (IDEMode == IDE_MODE.Fighter)
             {
+                // Each file goes back where it was opened from (this used to write to the working directory).
                 foreach (var keypair in ScriptFiles)
                 {
-                    keypair.Value.Export(Path.GetFileName(keypair.Key));
+                    keypair.Value.Export(keypair.Key);
                 }
                 MotionTable.Export(
                     Path.Combine(Path.GetDirectoryName(ScriptFiles.Keys[0]), "motion.mtable"));
@@ -233,9 +290,45 @@ namespace Sm4shCommand
                     ParamFile.Export(ParamFile.Filepath);
                 }
             }
+            else
+                return;
+            LogMessage("Saved.");
+        }
+
+        /// <summary>
+        /// Compiles every open script tab into its script. On an error, shows that tab and the line
+        /// and returns false (nothing should be saved then).
+        /// </summary>
+        bool ApplyOpenEditors()
+        {
+            foreach (TabPage page in Viewport.TabPages)
+            {
+                var editor = page as CodeEditor;
+                if (editor == null)
+                    continue;
+                TabControl tabs = (TabControl)editor.Controls[0];
+                foreach (TabPage sub in tabs.TabPages)
+                {
+                    var box = sub.Controls[0] as ITS_EDITOR;
+                    string error;
+                    if (box != null && !box.TryApplyChanges(out error))
+                    {
+                        Viewport.SelectedTab = page;
+                        tabs.SelectedTab = sub;
+                        box.Focus();
+                        MessageBox.Show(this, $"{page.Text} ({sub.Text}) doesn't compile, so nothing was saved.\n\n{error}",
+                            "Script error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
         private void saveAsToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (!ApplyOpenEditors())
+                return;
+
             if (IDEMode == IDE_MODE.Project)
             {
                 if (fsDlg.ShowDialog() == DialogResult.OK)
@@ -287,28 +380,36 @@ namespace Sm4shCommand
 
         private void FileTree_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
+            OpenNode(e.Node);
+        }
+
+        /// <summary>
+        /// Opens a script or parameter node in a tab (or switches to its tab).
+        /// </summary>
+        public void OpenNode(TreeNode node)
+        {
             TabPage p = null;
-            if (e.Node is ScriptNode)
+            if (node is ScriptNode)
             {
-                TreeNode root = e.Node.Parent;
+                TreeNode root = node;
                 while (root.Parent != null)
                     root = root.Parent;
 
                 if (root?.Name == "nACMD")
-                    p = new CodeEditor(e.Node as ScriptNode, ACMD_INFO.CMD_NAMES.Values.ToArray());
+                    p = new CodeEditor(node as ScriptNode, ACMD_INFO.CMD_NAMES.Values.ToArray());
                 else if (root?.Name == "nMSC")
-                    p = new CodeEditor(e.Node as ScriptNode, MSC_INFO.NAMES.Values.ToArray());
+                    p = new CodeEditor(node as ScriptNode, MSC_INFO.NAMES.Values.ToArray());
                 else
-                    p = new CodeEditor(e.Node as ScriptNode);
+                    p = new CodeEditor(node as ScriptNode);
 
             }
-            else if (e.Node is ParamListNode)
-                p = new ParamEditor(e.Node as ParamListNode);
+            else if (node is ParamListNode)
+                p = new ParamEditor(node as ParamListNode);
 
             if (p != null)
             {
-                p.Name = e.Node.Text + e.Node.Index;
-                p.Text = e.Node.Text;
+                p.Name = (node is ScriptNode) ? $"script_{((ScriptNode)node).Identifier:X8}" : node.Text + node.Index;
+                p.Text = node.Text;
                 if (Viewport.TabPages.ContainsKey(p.Name))
                 {
                     Viewport.SelectTab(p.Name);
@@ -320,6 +421,43 @@ namespace Sm4shCommand
                     Viewport.SelectTab(0);
                 }
             }
+        }
+
+        /// <summary>
+        /// An ACMD script node (file, fighter or project mode), as opposed to an MSC one.
+        /// </summary>
+        static bool IsAcmdNode(ScriptNode node)
+        {
+            return node.Parent != null && node.Parent.Text == "ACMD";
+        }
+
+        IEnumerable<TreeNode> AllNodes(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode n in nodes)
+            {
+                yield return n;
+                foreach (var c in AllNodes(n.Nodes))
+                    yield return c;
+            }
+        }
+
+        /// <summary>
+        /// Opens the script with this hash (Ctrl+click on a JUMP/CALL target).
+        /// </summary>
+        public void OpenScriptByHash(uint crc)
+        {
+            if (textBox1.Text.Length > 0)
+                textBox1.Text = ""; // the filter may be hiding it
+            var node = AllNodes(FileTree.Nodes).OfType<ScriptNode>().FirstOrDefault(x => x.Identifier == crc && IsAcmdNode(x));
+            if (node == null)
+            {
+                MessageBox.Show(this, $"There's no script 0x{crc:X8} ({Runtime.ScriptLabel(crc)}) in the open files.",
+                    "Open script", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            FileTree.SelectedNode = node;
+            node.EnsureVisible();
+            OpenNode(node);
         }
         private void FileTree_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
         {
@@ -342,7 +480,16 @@ namespace Sm4shCommand
                         for (int x = 0; x < tmp.TabCount; x++)
                         {
                             ITS_EDITOR box = (ITS_EDITOR)tmp.TabPages[x].Controls[0];
-                            box.ApplyChanges();
+                            string error;
+                            if (!box.TryApplyChanges(out error))
+                            {
+                                tmp.SelectedIndex = x;
+                                var answer = MessageBox.Show(this,
+                                    $"{p.Text} ({tmp.TabPages[x].Text}) doesn't compile:\n\n{error}\n\nClose it anyway and lose these changes?",
+                                    "Script error", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                                if (answer != DialogResult.Yes)
+                                    return;
+                            }
                         }
                     }
                     else if (Viewport.TabPages[i] is ParamEditor)
@@ -369,21 +516,140 @@ namespace Sm4shCommand
         {
             if (fsDlg.ShowDialog() == DialogResult.OK)
             {
-                FileTree.BeginUpdate();
-
                 var dict = Runtime.ParseAnimations(fsDlg.SelectedPath);
-                TreeNode n;
-                if ((n = FileTree.Nodes.Find("nACMD", false).FirstOrDefault()) != null)
-                {
-                    foreach (ScriptNode node in n.Nodes)
-                    {
-                        if (dict.ContainsKey(node.Identifier))
-                            node.Text = $"{node.Index:X} - {dict[node.Identifier]}";
-                    }
-                }
-
-                FileTree.EndUpdate();
+                int before = Runtime.AnimNames.Count;
+                Runtime.SaveAnimNames(dict); // remembered in AnimNames.txt for next time
+                LogMessage($"Parse Animations: {dict.Count} names found, {Runtime.AnimNames.Count - before} new (saved to AnimNames.txt).");
+                RefreshScriptNames();
             }
+        }
+
+        void RefreshScriptNames()
+        {
+            FileTree.BeginUpdate();
+            foreach (var node in AllNodes(FileTree.Nodes).OfType<ScriptNode>())
+            {
+                if (IsAcmdNode(node))
+                    node.UpdateText();
+            }
+            if (_nodeCache != null && _childCache != null) // filtered: also the hidden ACMD nodes
+            {
+                for (int r = 0; r < _nodeCache.Length; r++)
+                    if (_nodeCache[r].Text == "ACMD")
+                        foreach (var node in _childCache[r].OfType<ScriptNode>())
+                            node.UpdateText();
+            }
+            FileTree.EndUpdate();
+        }
+
+        // ------------------------------------------------------------- tree menu
+
+        private void setName_Click(object sender, EventArgs e)
+        {
+            var node = FileTree.SelectedNode as ScriptNode;
+            if (node == null)
+                return;
+            using (var dlg = new RenameForm(Runtime.AnimNames.ContainsKey(node.Identifier) ? Runtime.AnimNames[node.Identifier] : ""))
+            {
+                dlg.Text = $"Name for 0x{node.Identifier:X8}";
+                if (dlg.ShowDialog(this) != DialogResult.OK || dlg.NewName.Trim().Length == 0)
+                    return;
+                string name = dlg.NewName.Trim();
+                if (System.Security.Cryptography.Crc32.Compute(name.ToLower()) != node.Identifier)
+                {
+                    var answer = MessageBox.Show(this,
+                        $"\"{name}\" isn't this script's animation name (its CRC32 is 0x{System.Security.Cryptography.Crc32.Compute(name.ToLower()):X8}, not 0x{node.Identifier:X8}).\n\nUse it as a label for this script anyway?",
+                        "Set name", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (answer != DialogResult.Yes)
+                        return;
+                }
+                Runtime.SaveAnimName(node.Identifier, name);
+                RefreshScriptNames();
+            }
+        }
+
+        private void addScript_Click(object sender, EventArgs e)
+        {
+            var acmdFiles = ScriptFiles.Where(x => x.Value is ACMDFile).ToList();
+            var acmdnode = FileTree.Nodes.Find("nACMD", false).FirstOrDefault();
+            if (acmdFiles.Count == 0 || acmdnode == null || (IDEMode != IDE_MODE.File && IDEMode != IDE_MODE.Fighter))
+            {
+                MessageBox.Show(this, "Open an ACMD file (File > Open > File..) or a fighter folder (File > Open > Fighter..) first.",
+                    "Add script", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            uint crc;
+            string name;
+            using (var dlg = new RenameForm(""))
+            {
+                dlg.Text = "Add script: animation name or 0xHASH";
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+                name = dlg.NewName.Trim();
+            }
+            if (name.Length == 0)
+                return;
+            if (name.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!uint.TryParse(name.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out crc))
+                {
+                    MessageBox.Show(this, $"\"{name}\" isn't a hex hash.", "Add script", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+            else
+            {
+                crc = System.Security.Cryptography.Crc32.Compute(name.ToLower());
+                if (!Runtime.AnimNames.ContainsKey(crc))
+                    Runtime.SaveAnimName(crc, name);
+            }
+
+            if (acmdFiles.All(x => x.Value.Scripts.ContainsKey(crc)))
+            {
+                MessageBox.Show(this, $"0x{crc:X8} ({Runtime.ScriptLabel(crc)}) already has a script.", "Add script", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                OpenScriptByHash(crc);
+                return;
+            }
+
+            if (textBox1.Text.Length > 0)
+                textBox1.Text = "";
+
+            // A new script (just Script_End) in every ACMD file that doesn't have one yet
+            // (in a fighter folder: game, effect, sound and expression).
+            foreach (var pair in acmdFiles)
+                if (!pair.Value.Scripts.ContainsKey(crc))
+                    pair.Value.Scripts.Add(crc, ACMDScript.CreateEmpty(crc));
+
+            if (IDEMode == IDE_MODE.Fighter)
+            {
+                if (!MotionTable.Contains(crc))
+                {
+                    var answer = MessageBox.Show(this,
+                        "Also add it to motion.mtable?\n\nYes for an animation the game plays (a new motion).\n" +
+                        "No for a script only reached through JUMP/CALL (it's listed as [unlisted]).",
+                        "Add script", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (answer == DialogResult.Yes)
+                        MotionTable.Add(crc);
+                }
+                PopulateFighterScripts();
+            }
+            else
+            {
+                var file = acmdFiles[0].Value;
+                var sn = new ScriptNode(crc, "", file.Scripts[crc]);
+                sn.UpdateText();
+                acmdnode.Nodes.Add(sn);
+                _nodeCache = null;
+            }
+            LogMessage($"Added script 0x{crc:X8} ({Runtime.ScriptLabel(crc)}). Save to write it to the file.");
+            OpenScriptByHash(crc);
+        }
+
+        private void commandDefinitions_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new CommandDefinitionsForm())
+                dlg.ShowDialog(this);
         }
 
         public void PopulateParams()
@@ -453,28 +719,27 @@ namespace Sm4shCommand
             {
                 _nodeCache = new TreeNode[FileTree.Nodes.Count];
                 FileTree.Nodes.CopyTo(_nodeCache, 0);
+                _childCache = _nodeCache.Select(x => x.Nodes.Cast<TreeNode>().ToArray()).ToArray();
             }
             bool addAll = string.IsNullOrEmpty(textBox1.Text);
 
             FileTree.BeginUpdate();
-            FileTree.Nodes.Clear();
-
-            foreach (TreeNode root in _nodeCache)
+            for (int r = 0; r < _nodeCache.Length; r++)
             {
-                TreeNode n = (TreeNode)root.Clone();
-                n.Nodes.Clear();
-                foreach (TreeNode leaf in root.Nodes)
+                TreeNode root = _nodeCache[r];
+                root.Nodes.Clear();
+                foreach (TreeNode leaf in _childCache[r])
                 {
                     if (addAll || leaf.Text.Contains(textBox1.Text, StringComparison.OrdinalIgnoreCase))
-                    {
-                        n.Nodes.Add(leaf);
-                    }
+                        root.Nodes.Add(leaf);
                 }
-                FileTree.Nodes.Add(n);
             }
-            FileTree.ExpandAll();
+            if (!addAll)
+                FileTree.ExpandAll();
             FileTree.EndUpdate();
-
+            if (addAll)
+                _nodeCache = null; // everything is back in place; later tree changes rebuild the cache
         }
+        TreeNode[][] _childCache;
     }
 }

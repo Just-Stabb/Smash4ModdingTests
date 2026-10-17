@@ -784,7 +784,7 @@ namespace SALT.Moveset.AnimCMD
             {0x97E2CEAA,"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
             {0xBD04BDC3,"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
             {0xC93DA32A,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
-            {0x126AB61D,"0,0,0,1,1,0,0,1,0,1,0,1,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
+            {0x126AB61D,"0,0,0,1,1,0,0,1,0,1,0,1,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
             {0xCC7CC705, "0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0" },
             {0xDBDDC840,"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"},
             {0x4E94C51B,String.Empty},
@@ -1373,7 +1373,7 @@ namespace SALT.Moveset.AnimCMD
             {0x97E2CEAA,"unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown"},
             {0xBD04BDC3,"unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown"},
             {0xC93DA32A,"ID,Part,Bone,Damage,Angle,KBG,WBKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unknown,Unknown,Unknown,Blockability,Reflectable,Absorbable,Rehit,IgnoreInvuln,Unknown,FacingRestrict,Unknown,TeamDamage,DisableHitlag,NoGFX,Flinchless,StretchToggle" },
-            {0x126AB61D,"ID,Part,Bone,Damage,Damage2,Angle,KBG,KBG2,WBKB,WBKB2,BKB,BKB2,Size,Size2,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unknown,Unknown,Unknown,Blockability,Reflectable,Absorbable,Rehit,IgnoreInvuln,Unknown,FacingRestrict,Unknown,TeamDamage,DisableHitlag,NoGFX,Flinchless,Unknown"},
+            {0x126AB61D,"ID,Part,Bone,Damage,Damage2,Angle,KBG,KBG2,WBKB,WBKB2,BKB,BKB2,Size,Size2,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unknown,Unknown,Unknown,Blockability,Reflectable,Absorbable,Rehit,IgnoreInvuln,Unknown,FacingRestrict,Unknown,TeamDamage,DisableHitlag,NoGFX,Flinchless,Unknown,Unknown"},
             {0xCC7CC705,"ID,Part,Bone,Damage,Angle,KBG,WBKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits" },
             {0xDBDDC840,"unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown,unknown"},
             {0x4E94C51B,String.Empty},
@@ -2492,6 +2492,54 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,"NONE"},
         };
         #endregion
+        /// <summary>
+        /// Optional per-parameter descriptions, by command and parameter name (shown in tooltips).
+        /// </summary>
+        public static Dictionary<uint, Dictionary<string, string>> PARAM_DESC = new Dictionary<uint, Dictionary<string, string>>();
+
+        /// <summary>
+        /// Looks a command up by name. An exact match wins (some names differ only by case, e.g. Else and
+        /// ELSE are different commands); otherwise a case-insensitive match is used if there's only one.
+        /// Returns false if there's no such command.
+        /// </summary>
+        public static bool TryGetIdent(string name, out uint ident)
+        {
+            uint found = 0;
+            int matches = 0;
+            foreach (var pair in CMD_NAMES)
+            {
+                if (pair.Value.Equals(name, StringComparison.Ordinal))
+                {
+                    ident = pair.Key;
+                    return true;
+                }
+                if (pair.Value.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = pair.Key;
+                    matches++;
+                }
+            }
+            ident = found;
+            return matches == 1;
+        }
+
+        public static string GetDescription(uint crc)
+        {
+            string desc;
+            if (CMD_DESC.TryGetValue(crc, out desc) && desc != "NONE")
+                return desc;
+            return string.Empty;
+        }
+
+        public static string GetParamDescription(uint crc, string param)
+        {
+            Dictionary<string, string> descs;
+            string desc;
+            if (PARAM_DESC.TryGetValue(crc, out descs) && descs.TryGetValue(param, out desc))
+                return desc;
+            return string.Empty;
+        }
+
         public static void SetCMDInfo(uint crc, int size, string name, int[] param, string[] syntax)
         {
             if (!CMD_SIZES.ContainsKey(crc))
@@ -2514,24 +2562,160 @@ namespace SALT.Moveset.AnimCMD
             else
                 PARAM_SYNTAX[crc] = string.Join(",", syntax);
         }
-        public static void OverrideInfo(string path)
+
+        public static void SetCMDInfo(uint crc, int size, string name, int[] param, string[] syntax, string description, Dictionary<string, string> paramDescriptions)
         {
-            using (StreamReader stream = new StreamReader(path))
+            SetCMDInfo(crc, size, name, param, syntax);
+            CMD_DESC[crc] = string.IsNullOrEmpty(description) ? "NONE" : description;
+            if (paramDescriptions != null && paramDescriptions.Count > 0)
+                PARAM_DESC[crc] = paramDescriptions;
+            else
+                PARAM_DESC.Remove(crc);
+        }
+
+        /// <summary>
+        /// Loads command definitions from a text file (Events.cfg) on top of the built-in ones.
+        /// Each definition is a block of lines, blocks separated by a blank line:
+        ///   identifier (hex CRC)
+        ///   name
+        ///   parameter types, comma separated (0 int, 1 float, 2 decimal, 3 variable) or NONE
+        ///   parameter names, comma separated, or NONE
+        ///   description (optional, NONE = none)
+        ///   "Param: Name = description" lines (optional, one per parameter)
+        /// Lines starting with // are comments. Returns the number of definitions read;
+        /// problems are added to <paramref name="errors"/> and that block is skipped.
+        /// </summary>
+        public static int OverrideInfo(string path, List<string> errors)
+        {
+            var blocks = new List<List<string>>();
+            var cur = new List<string>();
+            int lineNo = 0, blockStart = 0;
+            var starts = new List<int>();
+            foreach (var rawLine in File.ReadAllLines(path))
             {
-                List<string> raw = stream.ReadToEnd().Split('\n').Select(x => x.Trim('\r')).ToList();
-                raw.RemoveAll(x => String.IsNullOrEmpty(x) || String.IsNullOrWhiteSpace(x) || x.Contains("//"));
-
-                for (int i = 0; i < raw.Count; i += 5)
+                lineNo++;
+                var line = rawLine.Trim();
+                if (line.StartsWith("//"))
+                    continue;
+                if (line.Length == 0)
                 {
-                    var crc = uint.Parse(raw[i], System.Globalization.NumberStyles.HexNumber);
-                    var Name = raw[i + 1];
+                    if (cur.Count > 0)
+                    {
+                        blocks.Add(cur);
+                        starts.Add(blockStart);
+                        cur = new List<string>();
+                    }
+                    continue;
+                }
+                if (cur.Count == 0)
+                    blockStart = lineNo;
+                cur.Add(line);
+            }
+            if (cur.Count > 0)
+            {
+                blocks.Add(cur);
+                starts.Add(blockStart);
+            }
 
-                    string[] paramList = raw[i + 2].Split(',').Where(x => x != "NONE").ToArray();
-                    string[] paramSyntax = raw[i + 3].Split(',').Where(x => x != "NONE").ToArray();
-                    ACMD_INFO.SetCMDInfo(crc, paramList.Length + 1, Name, paramList.Select(x => int.Parse(x)).ToArray(), paramSyntax);
+            int count = 0;
+            for (int b = 0; b < blocks.Count; b++)
+            {
+                var block = blocks[b];
+                try
+                {
+                    if (block.Count < 4)
+                        throw new FormatException("needs at least 4 lines (identifier, name, parameter types, parameter names)");
 
+                    var ident = block[0];
+                    if (ident.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                        ident = ident.Substring(2);
+                    var crc = uint.Parse(ident, System.Globalization.NumberStyles.HexNumber);
+                    var name = block[1];
+
+                    int[] types = block[2] == "NONE" ? new int[0] :
+                        block[2].Split(',').Select(x => int.Parse(x.Trim())).ToArray();
+                    string[] syntax = block[3] == "NONE" ? new string[0] :
+                        block[3].Split(',').Select(x => x.Trim()).ToArray();
+                    if (types.Any(x => x < 0 || x > 3))
+                        throw new FormatException("parameter types must be 0 (int), 1 (float), 2 (decimal) or 3 (variable)");
+                    if (syntax.Length != types.Length)
+                        throw new FormatException($"{types.Length} parameter types but {syntax.Length} parameter names");
+
+                    string desc = null;
+                    var paramDesc = new Dictionary<string, string>();
+                    for (int i = 4; i < block.Count; i++)
+                    {
+                        var line = block[i];
+                        if (line.StartsWith("Param:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var body = line.Substring(6);
+                            int eq = body.IndexOf('=');
+                            if (eq < 0)
+                                throw new FormatException("parameter description lines look like \"Param: Name = description\"");
+                            paramDesc[body.Substring(0, eq).Trim()] = body.Substring(eq + 1).Trim();
+                        }
+                        else if (desc == null)
+                            desc = line == "NONE" ? string.Empty : line;
+                        else
+                            desc += Environment.NewLine + line;
+                    }
+
+                    SetCMDInfo(crc, types.Length + 1, name, types, syntax, desc, paramDesc);
+                    count++;
+                }
+                catch (Exception e)
+                {
+                    errors?.Add($"{Path.GetFileName(path)} line {starts[b]} ({(block.Count > 1 ? block[1] : block[0])}): {e.Message}");
                 }
             }
+            return count;
+        }
+
+        public static void OverrideInfo(string path)
+        {
+            OverrideInfo(path, null);
+        }
+
+        /// <summary>
+        /// Writes every command definition in the format <see cref="OverrideInfo(string, List{string})"/> reads,
+        /// sorted by name.
+        /// </summary>
+        public static void SaveInfo(string path)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("// Sm4shCommand ACMD command definitions. Read at startup on top of the built-in ones.");
+            sb.AppendLine("// One block per command, blocks separated by a blank line:");
+            sb.AppendLine("//   identifier (hex CRC32 of the command)");
+            sb.AppendLine("//   name");
+            sb.AppendLine("//   parameter types, comma separated: 0 int, 1 float, 2 decimal, 3 variable (or NONE)");
+            sb.AppendLine("//   parameter names, comma separated (or NONE)");
+            sb.AppendLine("//   description shown in tooltips (optional; NONE = no description)");
+            sb.AppendLine("//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)");
+            sb.AppendLine("// Lines starting with // are comments. Tools > Command Definitions edits this file.");
+            foreach (var pair in CMD_NAMES.OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase))
+            {
+                uint crc = pair.Key;
+                string format, syntax;
+                PARAM_FORMAT.TryGetValue(crc, out format);
+                PARAM_SYNTAX.TryGetValue(crc, out syntax);
+                if (string.IsNullOrEmpty(format) || format == "NONE")
+                    format = "NONE";
+                if (string.IsNullOrEmpty(syntax) || syntax == "NONE" || format == "NONE")
+                    syntax = "NONE";
+
+                sb.AppendLine();
+                sb.AppendLine(crc.ToString("X8"));
+                sb.AppendLine(pair.Value);
+                sb.AppendLine(format);
+                sb.AppendLine(syntax);
+                var desc = GetDescription(crc);
+                sb.AppendLine(string.IsNullOrEmpty(desc) ? "NONE" : desc.Replace("\r", "").Replace("\n", " "));
+                Dictionary<string, string> pd;
+                if (PARAM_DESC.TryGetValue(crc, out pd))
+                    foreach (var p in pd)
+                        sb.AppendLine($"Param: {p.Key} = {p.Value}");
+            }
+            File.WriteAllText(path, sb.ToString());
         }
     }
 }

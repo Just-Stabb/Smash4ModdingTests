@@ -133,7 +133,24 @@ namespace SALT.Moveset.AnimCMD
         }
         public void Serialize(List<string> lines)
         {
-            this.Commands = ACMDCompiler.CompileCommands(lines.ToArray()).Cast<ICommand>().ToList();
+            var commands = ACMDCompiler.CompileCommands(lines.ToArray()).Cast<ICommand>().ToList();
+            // Every script ends with Script_End; the game reads past the end of a script without it.
+            if (commands.Count == 0 || commands[commands.Count - 1].Ident != ScriptEnd)
+                commands.Add(new ACMDCommand(ScriptEnd));
+            this.Commands = commands;
+        }
+
+        public const uint ScriptEnd = 0x5766F889;
+
+        /// <summary>
+        /// A new script with nothing but Script_End.
+        /// </summary>
+        public static ACMDScript CreateEmpty(uint crc)
+        {
+            var script = new ACMDScript(crc);
+            script.Add(new ACMDCommand(ScriptEnd));
+            script.Initialize();
+            return script;
         }
 
         public string Deserialize()

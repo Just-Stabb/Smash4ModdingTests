@@ -47,7 +47,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FastColoredTextBox">
-      <HintPath>C:\Users\Husky\Desktop\FastColoredTextBox-master\FastColoredTextBox\bin\Debug\FastColoredTextBox.dll</HintPath>
+      <HintPath>FastColoredTextBox.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -71,6 +71,9 @@
     <Compile Include="Classes\Nodes\BaseNode.cs" />
     <Compile Include="Classes\Nodes\ScriptNode.cs" />
     <Compile Include="Classes\Nodes\DataNode.cs" />
+    <Compile Include="GUI\CommandDefinitionsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="GUI\CodeEditor.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -166,8 +169,11 @@
     <EmbeddedResource Include="System\Windows\Components\ITSCodeBox.resx">
       <DependentUpon>ITSCodeBox.cs</DependentUpon>
     </EmbeddedResource>
+    <None Include="AnimNames.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Events.cfg">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

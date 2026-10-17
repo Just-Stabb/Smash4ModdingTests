@@ -54,18 +54,29 @@ namespace SALT.Moveset
                 Raw |= value;
             }
         }
+        /// <summary>
+        /// When false (the default), variables are shown as their raw value (0x2100000D), the way
+        /// FITX and the game's own code refer to them. When true, the old "RA-Flag[13]" form.
+        /// Both forms are accepted when compiling.
+        /// </summary>
+        public static bool ShowDescriptiveNames { get; set; }
+
         public override string ToString()
         {
-            try
+            if (ShowDescriptiveNames)
             {
                 var s1 = Enum.GetName(typeof(VarSourceType), SourceType);
                 var s2 = Enum.GetName(typeof(VarDataType), DataType);
-                return $"{s1}-{s2}[{VariableID}]";
+                if (s1 != null && s2 != null)
+                    return $"{s1}-{s2}[{VariableID}]";
             }
-            catch { return "0x" + Raw.ToString("X8"); }
+            return "0x" + Raw.ToString("X8");
         }
         public void ParseFromText(string text)
         {
+            text = text.Trim();
+            if (text.StartsWith("var ", StringComparison.InvariantCultureIgnoreCase)) // FITX style
+                text = text.Substring(4).Trim();
             if (text.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
             {
                 Raw = uint.Parse(text.Substring(2), NumberStyles.HexNumber);

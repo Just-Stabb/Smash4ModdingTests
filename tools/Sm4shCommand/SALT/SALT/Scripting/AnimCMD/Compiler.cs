@@ -118,48 +118,81 @@ namespace SALT.Moveset.AnimCMD
         }
 
         /// <summary>
-        /// Compile a single ACMD command from plaintext.
+        /// Compile a single ACMD command from plaintext. Throws an <see cref="ACMDCompileException"/>
+        /// that names the problem (unknown command, wrong number of parameters, bad value).
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>
         public static ACMDCommand CompileSingleCommand(string line)
         {
-            string s = line.TrimStart();
-            s = s.Substring(0, s.IndexOf(')'));
-            var name = s.Substring(0, s.IndexOf('('));
-            var parameters = s.Substring(s.IndexOf('(') + 1).TrimEnd(')').Split(',');
+            string s = line.Trim();
+            if (s.EndsWith("{"))
+                s = s.Substring(0, s.Length - 1).TrimEnd();
+            int open = s.IndexOf('(');
+            int close = s.LastIndexOf(')');
+            if (open < 0 || close < open)
+                throw new ACMDCompileException(line, "expected a command like Name(parameters)");
+            if (close != s.Length - 1)
+                throw new ACMDCompileException(line, $"unexpected text after ')': \"{s.Substring(close + 1)}\"");
+
+            var name = s.Substring(0, open).Trim();
+            var inner = s.Substring(open + 1, close - open - 1);
+            var parameters = inner.Trim().Length == 0 ? new string[0] : inner.Split(',');
             for (int i = 0; i < parameters.Length; i++)
             {
                 string param = parameters[i];
                 if (param.Contains("="))
-                    parameters[i] = param.Remove(0, param.IndexOf("=") + 1).Trim();
+                    parameters[i] = param.Remove(0, param.IndexOf("=") + 1);
+                parameters[i] = parameters[i].Trim();
             }
 
-            var crc = ACMD_INFO.CMD_NAMES.Single(x => x.Value.Equals(name, StringComparison.InvariantCulture)).Key;
-            ACMDCommand cmd = new ACMDCommand(crc);
-            for (int i = 0; i < cmd.ParamSpecifiers.Length; i++)
+            uint crc;
+            if (!ACMD_INFO.TryGetIdent(name, out crc))
             {
-                switch (cmd.ParamSpecifiers[i])
+                // unk_XXXXXXXX also works for a known command written by its identifier
+                if (!(name.StartsWith("unk_", StringComparison.OrdinalIgnoreCase) &&
+                    uint.TryParse(name.Substring(4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out crc) &&
+                    ACMD_INFO.CMD_NAMES.ContainsKey(crc)))
+                    throw new ACMDCompileException(line, $"unknown command \"{name}\" (add it in Tools > Command Definitions)");
+            }
+
+            ACMDCommand cmd = new ACMDCommand(crc);
+            var specs = cmd.ParamSpecifiers;
+            if (parameters.Length != specs.Length)
+                throw new ACMDCompileException(line, $"{cmd.Name} takes {specs.Length} parameter{(specs.Length == 1 ? "" : "s")} but {parameters.Length} {(parameters.Length == 1 ? "was" : "were")} given");
+
+            for (int i = 0; i < specs.Length; i++)
+            {
+                string p = parameters[i];
+                try
                 {
-                    case 0:
-                        if (parameters[i].StartsWith("0x"))
-                        {
-                            cmd.Parameters.Add(int.Parse(parameters[i].Substring(2), NumberStyles.HexNumber));
-                        }
-                        else
-                        {
-                            cmd.Parameters.Add(int.Parse(parameters[i]));
-                        }
-                        break;
-                    case 1:
-                        cmd.Parameters.Add(float.Parse(parameters[i], CultureInfo.InvariantCulture));
-                        break;
-                    case 2:
-                        cmd.Parameters.Add(decimal.Parse(parameters[i], CultureInfo.InvariantCulture));
-                        break;
-                    case 3:
-                        cmd.Parameters.Add(new FighterVariable(parameters[i]));
-                        break;
+                    switch (specs[i])
+                    {
+                        case 0:
+                            if (p.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                                cmd.Parameters.Add((int)uint.Parse(p.Substring(2), NumberStyles.HexNumber));
+                            else if (p.StartsWith("-"))
+                                cmd.Parameters.Add(int.Parse(p, CultureInfo.InvariantCulture));
+                            else
+                                cmd.Parameters.Add((int)uint.Parse(p, CultureInfo.InvariantCulture));
+                            break;
+                        case 1:
+                            cmd.Parameters.Add(float.Parse(p.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture));
+                            break;
+                        case 2:
+                            cmd.Parameters.Add(decimal.Parse(p, NumberStyles.Float, CultureInfo.InvariantCulture));
+                            break;
+                        case 3:
+                            cmd.Parameters.Add(new FighterVariable(p));
+                            break;
+                    }
+                }
+                catch (Exception e) when (!(e is ACMDCompileException))
+                {
+                    string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A)" :
+                                  specs[i] == 3 ? "a variable (e.g. 0x2100000D)" : "a number";
+                    string pname = i < cmd.ParamSyntax.Length ? cmd.ParamSyntax[i] : $"#{i + 1}";
+                    throw new ACMDCompileException(line, $"{cmd.Name} parameter {pname} must be {kind}, not \"{p}\"");
                 }
             }
 
@@ -172,6 +205,18 @@ namespace SALT.Moveset.AnimCMD
         /// <returns></returns>
         public static ACMDCommand[] CompileCommands(string[] lines)
         {
+            try
+            {
+                return CompileCommandsUnchecked(lines);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                throw new ACMDCompileException("", "a '{' block isn't closed with '}' (or a Set_Loop has no Goto)");
+            }
+        }
+
+        private static ACMDCommand[] CompileCommandsUnchecked(string[] lines)
+        {
             var tmpList = lines.ToList().Select(x => x.Trim()).ToList();
             tmpList.RemoveAll(x => string.IsNullOrWhiteSpace(x));
             Commands.Clear();
@@ -182,6 +227,8 @@ namespace SALT.Moveset.AnimCMD
                 // Handle comments
                 if (lineText.StartsWith("//"))
                     continue;
+                if (lineText == "}")
+                    throw new ACMDCompileException(lineText, "'}' without a matching '{'");
 
                 if (lineText.StartsWith("/*"))
                 {
@@ -250,7 +297,8 @@ namespace SALT.Moveset.AnimCMD
 
             //check for Else statement. If the next command is Else, set True/False size parameter (current len + Else len)
             //if the True/False statements don't have an Else afterward then just set their size to current len
-            if (lines[Index + 1] != "}"
+            if (Index + 1 < lines.Count && lines[Index + 1] != "}"
+                && !lines[Index + 1].StartsWith("//")
                 && CompileSingleCommand(lines[Index + 1]).Ident == 0x895B9275
                 && IsCmdCondition(cmd.Ident))
             {
@@ -302,7 +350,7 @@ namespace SALT.Moveset.AnimCMD
             endLoop.Parameters[0] = len / -1;
             Commands.Add(endLoop);
 
-            if (lines[Index + 1].Trim() == "}")
+            if (Index + 1 < lines.Count && lines[Index + 1].Trim() == "}")
                 Index++;
 
             // Next line should be closing bracket, ignore and skip it
@@ -339,6 +387,22 @@ namespace SALT.Moveset.AnimCMD
 
             return false;
         }
+    }
+
+    /// <summary>
+    /// A line of ACMD text that couldn't be compiled. <see cref="LineText"/> is the line as written.
+    /// </summary>
+    public class ACMDCompileException : Exception
+    {
+        public ACMDCompileException(string lineText, string message)
+            : base($"{message}\n    {lineText.Trim()}")
+        {
+            this.LineText = lineText;
+            this.Reason = message;
+        }
+
+        public string LineText { get; private set; }
+        public string Reason { get; private set; }
     }
 
     public class MoveDef

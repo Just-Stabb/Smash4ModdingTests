@@ -43,23 +43,30 @@ namespace SALT.Moveset.AnimCMD
         public List<object> Parameters { get; set; }
         public override string ToString()
         {
-            string param = string.Empty;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var syntax = this.ParamSyntax;
+            var parts = new List<string>(this.Parameters.Count);
             for (int i = 0; i < this.Parameters.Count; i++)
             {
-                if (this.ParamSpecifiers.Length > 0)
-                    param += $"{this.ParamSyntax[i]}=";
+                string value;
+                object p = this.Parameters[i];
+                if (p is int | p is bint)
+                    value = string.Format(inv, "0x{0:X}", p);
+                else if (p is float)
+                    value = ((float)p).ToString("R", inv); // exact round trip
+                else if (p is bfloat)
+                    value = ((float)(bfloat)p).ToString("R", inv);
+                else if (p is decimal)
+                    value = ((decimal)p).ToString(inv);
+                else
+                    value = Convert.ToString(p, inv);
 
-                if (this.Parameters[i] is int | this.Parameters[i] is bint)
-                    param += string.Format("0x{0:X}{1}", this.Parameters[i], i + 1 != this.Parameters.Count ? ", " : string.Empty);
-                else if (this.Parameters[i] is float | this.Parameters[i] is bfloat)
-                    param += string.Format("{0}{1}", this.Parameters[i], i + 1 != this.Parameters.Count ? ", " : string.Empty);
-                else if (this.Parameters[i] is decimal)
-                    param += string.Format("{0}{1}", this.Parameters[i], i + 1 != this.Parameters.Count ? ", " : string.Empty);
-                else if (this.Parameters[i] is FighterVariable)
-                    param += $"{this.Parameters[i]}{(i + 1 != this.Parameters.Count ? ", " : string.Empty)}";
+                if (this.ParamSpecifiers.Length > 0 && i < syntax.Length && syntax[i].Length > 0)
+                    value = $"{syntax[i]}={value}";
+                parts.Add(value);
             }
 
-            return $"{this.Name}({param})";
+            return $"{this.Name}({string.Join(", ", parts.ToArray())})";
         }
 
         public virtual byte[] GetBytes(Endianness endian)

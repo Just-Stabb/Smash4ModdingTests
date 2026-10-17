@@ -35,5 +35,31 @@ namespace Sm4shCommand.Nodes
 
         public Dictionary<string, IScript> Scripts { get; set; }
         public uint Identifier { get; set; }
+
+        /// <summary>
+        /// Index in motion.mtable, or -1 for a script that isn't in it (an "unlisted" script, e.g. one
+        /// only reached through JUMP/CALL) or when there's no motion table (single-file mode).
+        /// </summary>
+        public int MotionIndex { get; set; } = -1;
+
+        /// <summary>
+        /// Shows the script's name (or hash) the way its mode lists it.
+        /// </summary>
+        public void UpdateText()
+        {
+            string label = Runtime.ScriptLabel(Identifier);
+            if (MotionIndex >= 0)
+                Text = $"{MotionIndex:X} - {label}";
+            else if (Unlisted)
+                Text = $"[unlisted] {label}";
+            else
+                Text = label;
+            ToolTipText = $"0x{Identifier:X8}" + (Unlisted ? " - not in motion.mtable (reached through JUMP/CALL, or unused)" : "");
+        }
+
+        /// <summary>
+        /// True for a fighter's script that isn't in motion.mtable.
+        /// </summary>
+        public bool Unlisted { get; set; }
     }
 }

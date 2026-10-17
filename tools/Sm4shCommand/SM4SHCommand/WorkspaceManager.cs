@@ -306,28 +306,45 @@ namespace Sm4shCommand
         public void PopulateACMD()
         {
             ACMDNode.Nodes.Clear();
-            foreach (uint u in MotionTable)
-            {
-                ScriptNode snode = new ScriptNode(u, $"{MotionTable.IndexOf(u)} - {u.ToString("X8")}");
+            // Names found in the project's animations count as known names.
+            foreach (var pair in AnimationHashes)
+                if (!Runtime.AnimNames.ContainsKey(pair.Key))
+                    Runtime.AnimNames[pair.Key] = pair.Value;
 
-                if (AnimationHashes.ContainsKey(u))
-                    snode.Text = $"{MotionTable.IndexOf(u)} - {AnimationHashes[u]}";
+            for (int i = 0; i < MotionTable.Count; i++)
+                ACMDNode.Nodes.Add(MakeNode(MotionTable[i], i, false));
 
-                if (ACMD_FILES.ContainsKey("game"))
-                    if (ACMD_FILES["game"].Scripts.ContainsKey(u))
-                        snode.Scripts.Add("Game", ACMD_FILES["game"].Scripts[u]);
-                if (ACMD_FILES.ContainsKey("effect"))
-                    if (ACMD_FILES["effect"].Scripts.ContainsKey(u))
-                        snode.Scripts.Add("Effect", ACMD_FILES["effect"].Scripts[u]);
-                if (ACMD_FILES.ContainsKey("sound"))
-                    if (ACMD_FILES["sound"].Scripts.ContainsKey(u))
-                        snode.Scripts.Add("Sound", ACMD_FILES["sound"].Scripts[u]);
-                if (ACMD_FILES.ContainsKey("expression"))
-                    if (ACMD_FILES["expression"].Scripts.ContainsKey(u))
-                        snode.Scripts.Add("Expression", ACMD_FILES["expression"].Scripts[u]);
+            // Scripts that aren't in motion.mtable (reached through JUMP/CALL, or unused).
+            var listed = new HashSet<uint>(MotionTable.ToList());
+            var unlisted = new SortedSet<uint>();
+            foreach (var file in ACMD_FILES.Values)
+                foreach (var crc in file.Scripts.Keys)
+                    if (!listed.Contains(crc))
+                        unlisted.Add(crc);
+            foreach (var crc in unlisted.OrderBy(x => Runtime.ScriptLabel(x), StringComparer.OrdinalIgnoreCase))
+                ACMDNode.Nodes.Add(MakeNode(crc, -1, true));
+        }
 
-                ACMDNode.Nodes.Add(snode);
-            }
+        ScriptNode MakeNode(uint u, int motionIndex, bool unlisted)
+        {
+            ScriptNode snode = new ScriptNode(u, "") { MotionIndex = motionIndex, Unlisted = unlisted };
+            if (unlisted)
+                snode.ForeColor = System.Drawing.Color.DimGray;
+            snode.UpdateText();
+
+            if (ACMD_FILES.ContainsKey("game"))
+                if (ACMD_FILES["game"].Scripts.ContainsKey(u))
+                    snode.Scripts.Add("Game", ACMD_FILES["game"].Scripts[u]);
+            if (ACMD_FILES.ContainsKey("effect"))
+                if (ACMD_FILES["effect"].Scripts.ContainsKey(u))
+                    snode.Scripts.Add("Effect", ACMD_FILES["effect"].Scripts[u]);
+            if (ACMD_FILES.ContainsKey("sound"))
+                if (ACMD_FILES["sound"].Scripts.ContainsKey(u))
+                    snode.Scripts.Add("Sound", ACMD_FILES["sound"].Scripts[u]);
+            if (ACMD_FILES.ContainsKey("expression"))
+                if (ACMD_FILES["expression"].Scripts.ContainsKey(u))
+                    snode.Scripts.Add("Expression", ACMD_FILES["expression"].Scripts[u]);
+            return snode;
         }
         public void PopulateMSC()
         {
