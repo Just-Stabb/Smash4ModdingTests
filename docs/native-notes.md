@@ -635,18 +635,22 @@ hit states oddly. In the user's setup these characters never detransform, so thi
 - `copy_grant` (`0x02EFCD8C`) clears Kirby ints `0x83`–`0xA0`, writes the copied costume to int
   `0xA5` (`stw r27, 0x294`) and the copy kind to `0xA4` (`stw r28, 0x290`, after the clear).
   **First test used `0xA5` for the slot and got the costume → always a "custom" variant.**
-- `tools/copy_custom_cave.py`: CAVE_A (`0x037EE680`, the `bl copy_grant` at `0x02796914` jumps
-  there) calls copy_grant, then stores the victim's `0x10000048` (a swallowed Kirby: its
-  `0x1000009F`) in Kirby's int `0x1000009F` (cleared range, so it's written after the clear);
-  CAVE_B (`0x037EE6E0`, hook `0x02F1B910`) adds slot * size to the copy loader's source. The
-  params are loaded after copy_grant (the loader needs the copy kind, which copy_grant writes
-  last; wrappers `0x02F1D898` / `0x02F1D97C` are called from many fighter methods).
+- `tools/copy_custom_cave.py`: CAVE_A (`0x037EE680`, hook `0x02796900`) stores the victim's
+  `0x10000048` (a swallowed Kirby: its `0x1000009F`) in Kirby's int `0x1000009F` before
+  copy_grant; copy_grant's clear count (`0x02EFCE14`, `li r11, 0x1E`) becomes `0x1C`, so it clears
+  `0x83`–`0x9E` and `0x9F`/`0xA0` survive. CAVE_B (`0x037EE6E0`, hook `0x02F1B910`) adds
+  slot * size to the copy loader's source.
+- **Second test** wrote `0x9F` after copy_grant returned: hitboxes matched, params didn't, so
+  the params are loaded inside copy_grant (after the clear and the kind write).
 - Weapon hitboxes: the copied weapon (e.g. Bowser's `breath`) picks its ACMD by motion index +
   weapon int `0x10000005` (not set from Kirby's slot). Kirby's MSC switches the spawned article's
   motion to the slot (`copy_custom_article`, `ArticleModule(0x2715, article, slot, 1)`).
 - Not handled: a copy from the star missile path (`starcopy_cave.py`) gets slot 0 (copy_grant
   clears `0x9F`).
-- Effects: the copied move's body effects come from Kirby's own effect.bin (default only).
+- Effects / sounds: Kirby's Bowser copy runs Bowser's own ACMD (`MotionAnimcmdModule(0, 0, motion,
+  0xF)`, kind `0xF` = koopa) for motions `0x211`/`0x215`/…; each has 4 slots, so Kirby's MSC uses
+  motion + slot (`copy_custom_motion`, in `func_2863` / `func_2864`).
+- Star-missile copies keep the last swallow's slot in `0x9F` (it's no longer cleared).
 
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/copy_custom/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \

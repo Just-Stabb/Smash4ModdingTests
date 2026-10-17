@@ -48058,7 +48058,7 @@ void func_2863(int arg0, int arg1, int arg2)
     var3 = 0xf;
     var4 = func_2862(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0), var3); // Bowser's ACMD for the custom (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -48074,7 +48074,7 @@ void func_2864(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0), var1); // Bowser's ACMD for the custom (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -71787,4 +71787,16 @@ void copy_custom_article(int article)
     {
         ArticleModule(0x2715, article, copy_custom_slot(), 0x1);
     }
+}
+
+// Bowser copy: Kirby runs Bowser's own ACMD (game/effect/sound, MotionAnimcmdModule with fighter
+// kind 0xF) for motions 0x211 / 0x215 / ... Each neutral-B motion has 4 slots (default +
+// customs), so the custom's scripts (its effects) are at motion + slot.
+int copy_custom_motion(int motion)
+{
+    if (motion >= 0x211 && motion < 0x229)
+    {
+        return motion + copy_custom_slot();
+    }
+    return motion;
 }
