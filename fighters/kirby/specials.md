@@ -649,6 +649,9 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
   if anything lifts him. The stick slide is off for the rest of the throw.
   Ground detection starts on frame `throwlw_land_check()` (4), so being on the
   ground during frames 0–3 doesn't start the loop yet.
+  The loop is only armed when the throw starts off the floor
+  (`!GroundModule(0x2722, 0x8)` in `throwlw_land_init`): an air grab or
+  pummel can still have situation air while Kirby stands on the floor.
   Loop damage: Kirby int `0x10000099` = 1 while looping (0 normal, 2 done).
   The `throwlw` ACMD (`tools/kirby_throwlw_acmd.py IN OUT`) then uses a
   0.27-damage stomp instead of 0.8. That's 9 stomps per pass × 9 passes plus

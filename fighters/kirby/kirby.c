@@ -71626,6 +71626,7 @@ void throwb_camera_update()
 // motion there (throwlw_restart), which restarts the ACMD too, so the stomps play again. After that the rest of the animation plays at the normal rate.
 // In the air the animation plays normally; the loop only starts if he lands before the final
 // hit (throwlw_final_frame(), 56). Ground detection starts on frame throwlw_land_check() (4).
+// The throw must start off the floor (not touching it), not just with situation air.
 // Kirby int 0x10000098: -1 = off (ground down throw / done), 0 = air down throw not landed yet,
 // n > 0 = landed with n - 1 jumps back left. Kirby int 0x10000099: 0 = normal, 1 = looping (the
 // throwlw ACMD uses the loop stomp damage, tools/kirby_throwlw_acmd.py), 2 = loop done. From the
@@ -71644,7 +71645,9 @@ float throwlw_land_check() { return 4.0f; }  // ground detection starts on this 
 void throwlw_land_init()
 {
     WorkModule(0x7, 0, 0x10000099);
-    if (WorkModule(0x6, 0x11000002) == 0x7b && airgrab_on())
+    // only when the throw starts really in the air: an air grab / pummel can still count as
+    // airborne (situation air) while Kirby stands on the floor, so also check the floor
+    if (WorkModule(0x6, 0x11000002) == 0x7b && airgrab_on() && !GroundModule(0x2722, 0x8))
     {
         WorkModule(0x7, 0, 0x10000098);
     }
