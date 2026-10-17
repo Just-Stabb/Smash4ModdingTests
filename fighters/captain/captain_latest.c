@@ -5711,8 +5711,7 @@ void func_220()
         var74 = var53;
         var75 = -30.0f - var69;
         var76 = (float)WorkModule(0x6, 0x12000138);
-        printf("*****************************$FL_end_x:%f
-        *******************************", var73);
+        printf("*****************************$FL_end_x:%f\n*******************************", var73);
         var77 = (var73 - var70) / var76;
         var78 = (var74 - var71) / var76;
         var79 = (var75 - var72) / var76;
@@ -8156,7 +8155,7 @@ int func_362()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0x6, 0x1, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0); // roll-off system: original kinetic 0xF / ground 0x2 (was 0x6 / 0x1)
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8168,7 +8167,7 @@ int func_363()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off system: original kinetic 0xF (was 0x6)
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8264,6 +8263,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_guard_check(); // shield held: no roll-off (roll-off system)
     if (func_374())
     {
         return;
@@ -8295,6 +8295,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_guard_check(); // shield held: no roll-off (roll-off system)
     if (func_374())
     {
         return;
@@ -8567,14 +8568,7 @@ void func_381()
     float var0;
     var0 = WorkModuleF(0x6, 0x1000004);
     WorkModule(0, var0, 0x208000e0);
-    if (ControlModule(0x2712, 0x3) == 0x1)
-    {
-        GroundModule(0x2710, 0x5);
-    }
-    if (ControlModule(0x2713, 0x3))
-    {
-        GroundModule(0x2710, 0x9);
-    }
+    // roll-off system: the shield-button GroundModule(0x2710, 0x5 / 0x9) settings were removed (rolloff_guard_check)
     if (global6 == 0xe)
     {
         WorkModule(0x13, 0x1, 0x20000044);
@@ -8587,14 +8581,7 @@ void func_382()
     float var0;
     var0 = WorkModuleF(0x6, 0x1000004);
     WorkModule(0, var0, 0x208000e0);
-    if (ControlModule(0x2712, 0x3))
-    {
-        GroundModule(0x2710, 0x2);
-    }
-    if (ControlModule(0x2713, 0x3))
-    {
-        GroundModule(0x2710, 0x1);
-    }
+    // roll-off system: the shield-button GroundModule(0x2710, 0x2 / 0x1) settings were removed (rolloff_guard_check)
     if (global6 == 0xe)
     {
         WorkModule(0x13, 0x1, 0x20000044);
@@ -12727,8 +12714,7 @@ int func_629()
     }
     else
     {
-        printf("ASSERT :: FL_get_max_speed() - MA_MSC_STATUS_GET_STATUS_KIND
-        ");
+        printf("ASSERT :: FL_get_max_speed() - MA_MSC_STATUS_GET_STATUS_KIND\n");
     }
     return 0;
 }
@@ -12745,8 +12731,7 @@ int func_630()
     }
     else
     {
-        printf("ASSERT :: get_motion_kind() - MA_MSC_STATUS_GET_STATUS_KIND
-        ");
+        printf("ASSERT :: get_motion_kind() - MA_MSC_STATUS_GET_STATUS_KIND\n");
     }
     return 0xffffffff;
 }
@@ -12790,8 +12775,7 @@ float func_631()
     }
     else
     {
-        printf("ASSERT :: FL_get_stick_x_rate() - MA_MSC_STATUS_GET_STATUS_KIND
-        ");
+        printf("ASSERT :: FL_get_stick_x_rate() - MA_MSC_STATUS_GET_STATUS_KIND\n");
     }
     var4 = var2 - var1;
     if (func_13(var4) > 0)
@@ -38103,3 +38087,17 @@ void func_2360()
     }
 }
 
+// ===================================================================
+// Roll-off (docs/universal-mechanics.md): the rolls' ACMD (EscapeF 2.4 / EscapeB -2.4 at frame 5,
+// tools/rolloff_acmd.py) carries the roll off a ledge. Holding shield at any point before he
+// slides off stops that: roll status flag 0x21000014 is set every roll frame the shield button
+// is held (ControlModule(0x2712, 3); 0x2713 would be "not held"), and the ACMD then skips the
+// speed / sets it back to 0, so the roll moves like the original one and stops at the ledge.
+// ===================================================================
+void rolloff_guard_check()
+{
+    if (ControlModule(0x2712, 0x3))
+    {
+        WorkModule(0x2710, 0x21000014);
+    }
+}
