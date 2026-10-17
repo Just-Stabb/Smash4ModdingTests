@@ -123,6 +123,12 @@ Status: works in game (tested on Cemu).
    the same function swallowing uses. If the copy ability (`0x100000A4`)
    changed, the MSC also sets the "has a copy" flag `0x2000009A`.
 
+**Only without a copy:** while Kirby has a copy ability (flag `0x2000009A`), `starcopy_update`
+clears any pending grant (`0x1000009E`) and the hit count (`0x1000009D`) every frame. The grant
+skips the old copy's removal that swallowing does, so stars still flying (or more stars from a
+held neutral B) after a copy used to stack a second copy on top, and Kirby kept the hat for good.
+Star hits start counting again once Kirby loses the copy.
+
 The grant has to happen in Kirby's own update. Calling it from the star's
 update crashed the game.
 

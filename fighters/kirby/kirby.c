@@ -71399,6 +71399,11 @@ void starcopy_update()
         global17 = global17 | 0x40000000;
         WorkModule(0x7, 0x1, 0x1000009c); // self-test hop
     }
+    if (WorkModule(0x10, 0x2000009a)) // already has a copy: the grant would stack a 2nd copy on top
+    {                                     // (it skips the old copy's removal), so star hits don't count
+        WorkModule(0x7, 0, 0x1000009e);   // drop a pending grant
+        WorkModule(0x7, 0, 0x1000009d);   // and the hit count
+    }
     if (WorkModule(0x6, 0x1000009e) > 0)
     {
         before = WorkModule(0x6, 0x100000a4);
