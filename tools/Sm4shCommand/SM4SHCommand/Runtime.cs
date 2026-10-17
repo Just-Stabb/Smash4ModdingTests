@@ -18,6 +18,11 @@ namespace Sm4shCommand
         public static AcmdMain Instance { get { return _instance; } }
         private static readonly AcmdMain _instance = new AcmdMain();
 
+        // An explicit static constructor makes the main window get created on first use of Runtime
+        // (in Program.Main, after the error handlers are set up), not whenever .NET decides to run the
+        // field initializers early (before Main's first line, on .NET Framework).
+        static Runtime() { }
+
         // ------------------------------------------------------------ script names
         //
         // Scripts are stored by the CRC32 of their (lower-case) animation name. AnimNames.txt, next

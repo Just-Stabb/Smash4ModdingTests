@@ -50,7 +50,8 @@ namespace Sm4shCommand
         {
             // Any crash is written (with its stack trace) to Sm4shCommand_errors.log next to the exe.
             AppDomain.CurrentDomain.UnhandledException += (o, e) => ReportError(e.ExceptionObject as Exception, false);
-            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            // (No SetUnhandledExceptionMode: it throws once any control exists, and the default mode
+            // already routes UI-thread exceptions to ThreadException.)
             Application.ThreadException += (o, e) => ReportError(e.Exception, true);
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
             AcmdMain main;
