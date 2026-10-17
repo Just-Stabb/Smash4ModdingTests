@@ -24,10 +24,13 @@ older upload with my roll-off shield check). Its own changes include:
   hitboxes 0–2 get the angle via `AttackModule(0x2739, id, angle)`; release jumps to frame 46;
   rotation resets at 79), `func_2262` (end: rotation reset). Ported to Kirby's Captain Falcon
   copy (status `0x18C`, `falconpunch_hold_*` in `kirby.c`).
-- **Roll-off:** the improved version (`docs/universal-mechanics.md`): roll pre `func_362`/`363`,
-  `rolloff_update()` in the roll loops `func_370`/`372`, roll ends `func_381`/`382` (air speed cap
-  flag), Fall main `func_501` back to the original, Fall end `func_535` clears the flag. ACMD:
-  `tools/rolloff_acmd.py <upload>/body/game.bin build/captain/game.bin --hold 2.4 EscapeF EscapeB`.
+- **Roll-off:** see `docs/universal-mechanics.md`: roll pre `func_362`/`363`, `rolloff_update()`
+  in the roll loops `func_370`/`372` (edge sliding + stored speed, globals 62/63), roll ends
+  `func_381`/`382` (air speed cap flag), Fall main `func_501` → `rolloff_fall_start()`, Fall end
+  `func_535` clears the flag. ACMD: `tools/rolloff_acmd.py <upload>/body/game.bin
+  build/captain/game.bin --plain --add 2.4 EscapeF EscapeB`.
+- **Falcon Punch:** landing while holding goes on with the punch (frame 46) instead of staying
+  frozen.
 - **Falcon Punch rotation swapped:** stick up now rotates up (angle −3/frame), down rotates down
   (+3); it was the other way round. That's the only change from the upload.
 - The decompiler wrote four `printf` strings with real line breaks; they're `\n` again so the

@@ -27,34 +27,32 @@ Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
 
 ## Roll-off
 
-Both rolls keep their speed off a ledge instead of stopping at it ("roll-off"). How it works
-(the user's design; this implementation improves the user's first version from Captain
-Falcon's `captain.mscsb`):
+Both rolls keep their speed off a ledge instead of stopping at it ("roll-off"). The user's
+design, implemented on top of the user's first version from Captain Falcon's `captain.mscsb`:
 
-1. **The roll's animation doesn't move the fighter; ACMD sets the speed.** Roll pre (EscapeF
+1. **The roll's animation doesn't move the fighter; ACMD gives it its speed.** Roll pre (EscapeF
    `0x20` = common `func_362`, EscapeB `0x21` = `func_363`): `StatusModule(0x5, 0, 0x6, 0x2, …)`,
    kinetic `0x6` (the originals use `0xF`, motion movement).
-2. **Constant speed from a set frame to a set frame.** ACMD (`EscapeF`, `EscapeB`):
-   `Add/Set_Momentum(0, 0, 1)` at frame 0, `(SPEED, 0, 1)` on every frame from 5, `(0, 0, 1)` at
-   27. The back roll gets −SPEED. Mode 1 sets the speed, so setting it every frame keeps it
-   constant. The forward roll turns around (`Reverse_Direction`, frame 20 / 21); the speed is only
-   set up to that frame and the last setting carries on to 27.
-   `tools/rolloff_acmd.py IN OUT --hold SPEED EscapeF EscapeB` (Captain Falcon 2.4, Kirby 2.1).
-3. **Sliding off from the speed frame.** Every roll frame (`rolloff_update()`, first in the roll
-   loops `func_370` / `func_372`): before `rolloff_start_frame()` (5, = the ACMD's speed frame)
-   ground correction `0x2` (stops at edges, like crouching / shielding), from then on `0x1` (can
+2. **ACMD speed** (`EscapeF`, `EscapeB`): `Add/Set_Momentum(0, 0, 1)` at frame 0,
+   `(SPEED, 0, 0)` at frame 5 (added once; the speed then changes however the game changes it),
+   `(0, 0, 1)` at 27. The back roll gets −SPEED.
+   `tools/rolloff_acmd.py IN OUT --plain --add SPEED EscapeF EscapeB` (Captain Falcon 2.4, Kirby
+   2.1; a roll that already has its own speed keeps it).
+3. **Sliding off from the speed frame, not while shielding.** Every roll frame
+   (`rolloff_update()`, first in the roll loops `func_370` / `func_372`): before
+   `rolloff_start_frame()` (5) or while the shield button is held (`ControlModule(0x2712, 3)`),
+   ground correction `0x2` (stops at edges, like crouching / shielding); otherwise `0x1` (can
    slide off, like a rebound).
-4. **Shield held → no sliding off.** While the shield button is held
-   (`ControlModule(0x2712, 3)`) it stays `0x2`.
-5. **No air speed cap while falling from it.** Sliding off sends the roll to Fall (`func_374`).
-   The roll end (key 2: `func_381` / `func_382`) sets flag `0x20000044` (lifts the max horizontal
-   air speed) when the next status (`global6`) is Fall (`0xE`); Fall's end (key 2, `func_535`,
-   empty before) clears it, so it lasts until the fighter leaves that Fall.
+4. **The speed at the edge carries over.** `rolloff_update()` also stores the fighter's current
+   horizontal speed every roll frame (X position change that frame, a new float global). Sliding
+   off sends the roll to Fall (`func_374`); Fall's main (`func_501` → `rolloff_fall_start()`)
+   gives the fighter that stored speed (control energy `0x3`) when it came from a roll.
+5. **No air speed cap while falling from it.** The roll end (key 2: `func_381` / `func_382`) sets
+   flag `0x20000044` (lifts the max horizontal air speed) when the next status (`global6`) is
+   Fall (`0xE`); Fall's end (key 2, `func_535`) clears it.
 
-Changes from the user's first version: the back roll has a speed script and slides off too;
-the speed is set every frame instead of added once; edge sliding is decided every roll frame
-(it was only set in the roll's end script); the flag is cleared when Fall ends (it was cleared
-at the start of Fall); the `0x208000e0` / `0x1000004` save / restore is gone (Fall main wrote the
-ID `0x208000e0` itself into `0x1000004`).
+History: v1 (mine) used an ACMD shield flag; v2 set the speed every frame (constant speed). The
+user's first version cleared the air speed flag at the start of Fall and only checked shield in
+the roll's end; its `0x208000e0` / `0x1000004` save / restore is gone.
 
 Done: Captain Falcon (2.4), Kirby (2.1).

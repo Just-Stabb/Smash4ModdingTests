@@ -57,7 +57,7 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
 - **game.bin build:** `python3 tools/kirby_throwb_acmd.py build/acmd_in/game.bin g1;
   python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 g3;
   python3 tools/kirby_sideb_reflect_acmd.py g3 g4;
-  python3 tools/rolloff_acmd.py g4 g5 --hold 2.1 EscapeF EscapeB` (roll-off, see
+  python3 tools/rolloff_acmd.py g4 g5 --plain --add 2.1 EscapeF EscapeB` (roll-off, see
   `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 build/game.bin`
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
@@ -285,7 +285,7 @@ hitlag.
 **Max count:** the game's limit for `starmissile` is 1 (`Count="1"` in the
 article list) unless the executable is patched. `tools/rpx_patch.py`
 raises it:
-`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=6` (current build: 6).
+`python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx 0x10136C58=9` (current build: 9).
 The spit star uses the same article, so it shares the limit.
 
 **Uncertain:** the move and shoot commands take the article ID, not a
@@ -425,7 +425,7 @@ To read or check ACMD: `python3 tools/acmd.py dump game.bin specialairs`, or
 
 ```
 python3 tools/rpx_patch.py cross_f.rpx build/cross_f.rpx \
-  0x10136C58=6 \
+  0x10136C58=9 \
   0x2EFB518=0x60000000 0x2F00194=0x38800022 0x2F00198=0x48000034 0x2F001C8=0x4082FFCC \
   0x2F7E550=0x38000001 0x2F7E560=0x3808FE8F 0x2F7E564=0x3908FE6E 0x2F7E568=0x7C0041D6 \
   0x2F7E574=0x60000000 0x2F7E590=0x408201EC
@@ -685,7 +685,8 @@ When the forward throw finisher (attack or special while falling in the loop,
 `throw_finish_update()`) is used, `throw_finish_effect_f()` spawns common
 graphic `0x17` "Bomb Explosion" (`EffectModule(0x3, 0x1000017, ...)`)
 `throw_finish_gfx_x()` (10) units in front of Kirby and `throw_finish_gfx_y()`
-(6) above his position, size `throw_finish_gfx_size()` (1.0). IDs come from the
+(6) above his position, size `throw_finish_gfx_size()` (1.0), with sound
+`throw_finish_sfx_f()` (common `0x5E`, the sound of Kirby's forward throw landing impact). IDs come from the
 global GFX list (`0x1000000` + list index; e.g. `0x39` small explosion, `0x91`
 X Bomb explosion).
 
@@ -776,7 +777,8 @@ side/up/down special bits (`0xE000`). Everything else still waits for
 
 Jumping while crouching or crawling (Squat `0x11`–`0x14` → JumpSquat `0xA` → Jump `0xB`;
 standing back up, SquatRv `0x15`, doesn't count), or buffering the jump out of an aerial's
-landing (LandingHeavy `0x16` / LandingAir `0x18`) while holding down (stick Y ≤
+landing, running (Dash / Run / RunBrake / TurnRun / TurnRunBrake), a tilt or a smash attack
+(`crouchjump_bufferable()`) while holding down on any jump squat frame (stick Y ≤
 `crouchjump_buffer_stick()`, −0.5), is a superjump, `crouchjump_update()` (end of the main
 loop `func_74`):
 
@@ -816,8 +818,9 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
 
 - **Jab 1 → rapid jab:** Attack11 (`0x25`, main `func_263`) goes straight to Attack100 (`0x26`)
   (`jab_to_rapid()`).
-- **Rapid jab hold:** it loops while the attack button is held; releasing it plays the
-  finisher right away (`rapidjab_cancel()` turns flag `0x21000015` off).
+- **Rapid jab hold:** it loops while the attack button is held; releasing it after at least one
+  full loop (`rapidjab_loop()`) plays the finisher (`rapidjab_cancel()` keeps flag `0x21000015`
+  on for the first loop and turns it off on release after that).
 - **Rapid jab cancel:** after one full loop (`global71` frames in the loop ≥ the loop motion's
   length) and before the final hit (finisher motion `0x55`, its hitbox at frame
   `rapidjab_final_frame()` = 5), `rapidjab_cancel()` (top of the loop `func_337`) goes into any
@@ -827,7 +830,8 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   going).
 - **Neutral air = rapid jab:** `func_310` plays rapid jab's loop motion `0x54` (animation and its
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
-  `nair_rapid_update()` (`func_317`) ends it after `nair_rapid_frames()` (24 = 6 hits) with Fall.
+  It loops while attack is held; letting go after at least one loop plays the finisher `0x55`
+  (`nair_rapid_update()` in `func_317`), then Fall.
   `0x11000002` keeps `0x68` (neutral air's landing lag); flag `0x2100000D` (landing lag) is set
   for the whole move.
 - **Forward air autolink:** `tools/kirby_fair_autolink_acmd.py` gives the first hit's hitboxes

@@ -70,6 +70,8 @@ int global68;
 int global69;
 int global70;
 int global71;
+float global72;
+float global73;
 
 void func_0()
 {
@@ -10402,6 +10404,7 @@ void func_500()
 void func_501()
 {
     func_502();
+    rolloff_fall_start(); // roll-off: the roll's speed carries into the fall (added)
     func_78(func_503);
 }
 
@@ -70240,12 +70243,12 @@ void inhale_aim_reset()
 // Fires on frame 0, 10, 20, ... alternating left hand, right hand.
 // Article IDs: github gist BenHall-7 FighterArticles.xml (kirby: 23 = starmissile).
 // The game's max count for starmissile is 1 unless cross_f.rpx is patched
-// (0x10136C58; build/cross_f.rpx sets it to 6). starmissile_max() should match it.
+// (0x10136C58; build/cross_f.rpx sets it to 9). starmissile_max() should match it.
 // ===================================================================
 
 // [Star missile] SETTINGS - edit these
 int starmissile_interval()     { return 10; }     // frames between shots (was 12)
-int starmissile_max()          { return 6; }      // max stars out at once (= the count patched into cross_f.rpx, 0x10136C58=6)
+int starmissile_max()          { return 9; }      // max stars out at once (= the count patched into cross_f.rpx, 0x10136C58=9)
 int starmissile_article()      { return 0x17; }   // 23 = starmissile
 int starmissile_bone_left()    { return 0x18; }   // LHaveN (left hand hold point); LHandN is 0x10
 int starmissile_bone_right()   { return 0x17; }   // RHaveN (right hand hold point); RHandN is 0x14
@@ -71074,8 +71077,14 @@ float throw_finish_gfx_x()   { return 10.0f; }  // in front of Kirby
 float throw_finish_gfx_y()   { return 6.0f; }   // above his position (his feet)
 float throw_finish_gfx_size() { return 1.0f; }
 
+int throw_finish_sfx_f() { return 0x5e; } // common sound 0x5E (plays with Kirby's forward throw landing impact, ThrowF sound.bin); 0 = none
+
 void throw_finish_effect_f()
 {
+    if (throw_finish_sfx_f() != 0)
+    {
+        SoundModule(0x2710, throw_finish_sfx_f());
+    }
     EffectModule(0x3, throw_finish_gfx_f(),
         PostureModuleF(0x1) + PostureModuleF(0) * throw_finish_gfx_x(),
         PostureModuleF(0x2) + throw_finish_gfx_y(),
@@ -71848,7 +71857,8 @@ int copy_custom_motion(int motion)
 // ===================================================================
 // Crouch jump (added). Jumping while crouching (Squat 0x11 / SquatWait 0x12 / SquatF 0x13 /
 // SquatB 0x14 -> JumpSquat 0xA -> Jump 0xB; standing back up, SquatRv 0x15, doesn't count),
-// or buffering the jump out of an aerial's landing (0x16 / 0x18) while holding down,
+// or buffering the jump (stick down on any jump squat frame) out of an aerial's landing,
+// running, a tilt or a smash attack (crouchjump_bufferable; state 3 = waiting for down),
 // is a superjump: crouchjump_height_mult() (2.4) x the full hop's height. Height goes with
 // the square of the takeoff speed, so the upward speed is the full hop's takeoff speed x
 // crouchjump_speed_mult() (sqrt 2.4). The full hop's speed is the one the game's jump uses
@@ -71865,12 +71875,31 @@ int copy_custom_motion(int motion)
 // ===================================================================
 float crouchjump_height_mult() { return 2.4f; }        // x full hop height (documentation; the speed below is its square root)
 float crouchjump_speed_mult()  { return 1.5491933f; }  // sqrt(2.4): x full hop takeoff speed
-float crouchjump_buffer_stick() { return -0.5f; }      // stick Y at or below this counts as crouching when buffered from a landing
+float crouchjump_buffer_stick() { return -0.5f; }      // stick Y at or below this counts as crouching when buffered (crouchjump_bufferable)
 int   crouchjump_hold()        { return 3; }            // frames the boosted speed is set again
 float crouchjump_momentum() { return 0.8f; }  // x ground speed carried into the jump
 int   crouchjump_gfx()      { return 0x1000010; } // common GFX 0x10 "Small star (fastfall)" (was 0x94, the white knockback streak)
 float crouchjump_gfx_size() { return 1.0f; }
 int   crouchjump_gfx_every() { return 3; }    // frames between trail effects
+
+// Statuses a superjump can be buffered out of (jump squat straight from them, stick held down on
+// any jump squat frame): aerial landings, running, tilts and smash attacks.
+int crouchjump_bufferable(int st)
+{
+    if (st == 0x16 || st == 0x18) // LandingHeavy, LandingAir
+    {
+        return 0x1;
+    }
+    if (st == 0x3 || st == 0x4 || st == 0x5 || st == 0x8 || st == 0x9) // Dash, Run, RunBrake, TurnRun, TurnRunBrake
+    {
+        return 0x1;
+    }
+    if (st >= 0x28 && st <= 0x33) // AttackS3 / Hi3 / Lw3, all smash attack statuses (start, hold, attack)
+    {
+        return 0x1;
+    }
+    return 0;
+}
 
 void crouchjump_update()
 {
@@ -71884,26 +71913,31 @@ void crouchjump_update()
     x = PostureModuleF(0x1);
     if (global4 == 0xa) // jump squat
     {
-        if (global62 >= 0x11 && global62 <= 0x14)
+        if (global62 != 0xa) // first jump squat frame: where did it come from?
         {
-            state = 1;
             global64 = 0;
+            state = 0;
+            if (global62 >= 0x11 && global62 <= 0x14) // crouching / crawling
+            {
+                state = 1;
+            }
+            else if (crouchjump_bufferable(global62))
+            {
+                state = 3; // superjump if down is held on any jump squat frame
+            }
         }
-        else if ((global62 == 0x16 || global62 == 0x18) && global32 <= crouchjump_buffer_stick())
-        {
-            // buffered from an aerial's landing (LandingHeavy 0x16 / LandingAir 0x18) while
-            // holding down
-            state = 1;
-            global64 = 0;
-        }
-        else if (state == 1 && global62 == 0xa)
+        else if (state == 1)
         {
             global64 = x - global65; // ground speed per frame while squatting to jump
         }
-        else if (global62 != 0xa)
+        if (state == 3 && global32 <= crouchjump_buffer_stick())
         {
-            state = 0;
+            state = 1;
         }
+    }
+    else if (state == 3)
+    {
+        state = 0;
     }
     else if (state == 1)
     {
@@ -71997,6 +72031,13 @@ void falconpunch_hold_reset()
 
 void falconpunch_hold_update()
 {
+    // landed while holding: the hold only works in the air, so go on with the punch
+    if (global18 != 0x2 && MotionModuleF(0x1) >= 42.5f && MotionModuleF(0x1) < 46.0f)
+    {
+        MotionModule(0x2713, 46.0f);
+        MotionModule(0x4, 1.0f);
+        global68 = 0;
+    }
     if (MotionModuleF(0x1) >= 42.5f && MotionModuleF(0x1) <= 45.5f && global18 == 0x2)
     {
         if (ControlModule(0x2712, 0x1) == 0x1) // special held
@@ -72055,14 +72096,25 @@ void falconpunch_hold_update()
 //   rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
 //   ACMD 0x8427B6B7: FRAME 1 + WAIT 4).
 // - Neutral air (AttackAirN, motion 0x68) plays rapid jab's loop motion 0x54 (its ACMD calls
-//   the rapid jab hit 0xDCD907DA every 4 frames and loops forever), so it ends after
-//   nair_rapid_frames() frames. Status int 0x11000002 keeps 0x68, so landing lag is still
+//   the rapid jab hit 0xDCD907DA every 4 frames and loops forever) while attack is held, and
+//   after at least one loop, letting go plays the finisher 0x55 (nair_rapid_update). Status int 0x11000002 keeps 0x68, so landing lag is still
 //   neutral air's; status flag 0x2100000D (landing with air lag) is set for the whole move.
 //   global70 = neutral air frame count.
 // ===================================================================
 float rapidjab_final_frame() { return 5.0f; }
 int   rapidjab_loop_frames() { return 16; } // fallback loop length (its ACMD repeats every 16 frames)
-int   nair_rapid_frames()    { return 24; }  // 6 rapid jab hits
+
+// Rapid jab loop length in frames: the loop motion's length, else rapidjab_loop_frames().
+int rapidjab_loop()
+{
+    int loop;
+    loop = MotionModule(0, 0x54);
+    if (loop <= 0)
+    {
+        loop = rapidjab_loop_frames();
+    }
+    return loop;
+}
 
 int jab_to_rapid()
 {
@@ -72076,22 +72128,22 @@ int rapidjab_cancel()
     int state;
     int loop;
     state = WorkModule(0x6, 0x11000007);
+    loop = rapidjab_loop();
     if (state == 0x1)
     {
         global71++;
-        // hold attack to keep looping; letting go goes to the finisher right away (func_337
-        // plays it when flag 0x21000015 is off)
-        if (ControlModule(0x2713, 0))
+        if (global71 < loop)
         {
+            WorkModule(0x2710, 0x21000015); // at least one full loop before the finisher
+        }
+        else if (ControlModule(0x2713, 0))
+        {
+            // hold attack to keep looping; letting go goes to the finisher (func_337 plays it
+            // when flag 0x21000015 is off)
             WorkModule(0x2711, 0x21000015);
         }
     }
     // cancels only after one full loop, and not once the finisher's hit is out
-    loop = MotionModule(0, 0x54);
-    if (loop <= 0)
-    {
-        loop = rapidjab_loop_frames();
-    }
     if (global71 < loop)
     {
         return 0;
@@ -72126,6 +72178,9 @@ void nair_rapid_start()
     WorkModule(0x2710, 0x2100000d);
 }
 
+// Neutral air works like rapid jab: it loops (motion 0x54) while attack is held, and letting
+// go after at least one full loop plays the finisher (motion 0x55); when that ends, func_317
+// sends Kirby to Fall.
 int nair_rapid_update()
 {
     if (global4 != 0x34 || MotionModule(0x7) != 0x54)
@@ -72133,28 +72188,41 @@ int nair_rapid_update()
         return 0;
     }
     global70++;
-    if (global70 >= nair_rapid_frames() && global18 == 0x2)
+    if (global70 >= rapidjab_loop() && ControlModule(0x2713, 0))
     {
-        func_16(0xe, 0);
-        return 0x1;
+        func_22(0x55, 0, 1.0f);
     }
     return 0;
 }
 
 // ===================================================================
-// Roll-off (docs/universal-mechanics.md). The rolls' ACMD sets their speed (EscapeF +S /
-// EscapeB -S from frame rolloff_start_frame(), set again every frame so it stays the same,
-// 0 at frame 27); kinetic 0x6 so the animation doesn't move the fighter. Every roll frame:
-// before the speed frame, or while shield is held (ControlModule(0x2712, 3)), ground
-// correction 0x2 (stops at edges, like crouching / shielding); from the speed frame on,
-// 0x1 (can slide off, like a rebound). Sliding off goes to Fall (func_374): the roll end
-// (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is Fall,
-// and Fall's end (func_535) clears it.
+// Roll-off (docs/universal-mechanics.md). The rolls' ACMD gives them their speed (EscapeF +S /
+// EscapeB -S added at frame rolloff_start_frame(), 0 at frame 27); kinetic 0x6 so the animation
+// doesn't move the fighter. Every roll frame:
+// - before the speed frame, or while shield is held (ControlModule(0x2712, 3)), ground
+//   correction 0x2 (stops at edges, like crouching / shielding); from the speed frame on, 0x1
+//   (can slide off, like a rebound);
+// - the fighter's current horizontal speed (X position change this frame) is stored in
+//   global72 (global73 = last X).
+// Sliding off goes to Fall (func_374): the roll end (func_381 / func_382) sets flag 0x20000044
+// (no max air speed) when the next status is Fall; Fall's main (func_501) gives the fighter the
+// stored speed when it came from a roll; Fall's end (func_535) clears the flag.
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 
 void rolloff_update()
 {
+    float x;
+    x = PostureModuleF(0x1);
+    if (MotionModuleF(0x1) < 1.0f)
+    {
+        global72 = 0;
+    }
+    else
+    {
+        global72 = x - global73;
+    }
+    global73 = x;
     if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3))
     {
         GroundModule(0x2710, 0x1);
@@ -72162,5 +72230,15 @@ void rolloff_update()
     else
     {
         GroundModule(0x2710, 0x2);
+    }
+}
+
+// Fall main (func_501), coming from a roll: keep the roll's speed from the edge.
+void rolloff_fall_start()
+{
+    if (global5 == 0x20 || global5 == 0x21)
+    {
+        KineticModule(0x11, 0x3, global72, 0);
+        KineticModule(0xb, 0x3);
     }
 }
