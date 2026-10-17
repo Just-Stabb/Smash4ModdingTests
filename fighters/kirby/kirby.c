@@ -38307,6 +38307,8 @@ void func_2286()
             WorkModule(0x2711, 0x20000079);
         }
     }
+    WorkModule(0x7, 0, 0x1000009d); // lost a stock: star copy hit count starts over (added)
+    WorkModule(0x7, 0, 0x1000009e); // and no pending star copy
     func_213();
 }
 

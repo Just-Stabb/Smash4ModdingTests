@@ -129,6 +129,9 @@ skips the old copy's removal that swallowing does, so stars still flying (or mor
 held neutral B) after a copy used to stack a second copy on top, and Kirby kept the hat for good.
 Star hits start counting again once Kirby loses the copy.
 
+**Reset on a lost stock:** Kirby's Dead main (`func_2286`, status `0xB1`) sets the hit count
+(`0x1000009D`) and any pending grant (`0x1000009E`) to 0, so each stock starts from 0 hits.
+
 The grant has to happen in Kirby's own update. Calling it from the star's
 update crashed the game.
 
