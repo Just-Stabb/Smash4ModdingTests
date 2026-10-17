@@ -10,6 +10,10 @@ Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0,
 script is created (EscapeB often has none). A Set_Edge_Slide in the script is removed (the
 original roll's edge stop). Usually: --add SPEED EscapeF EscapeB.
 
+--plain (with --add): only add the speed, no shield-flag checks. That's the user's roll-off
+(Captain Falcon's latest MSC does the shield part itself, in the roll end scripts; see
+docs/universal-mechanics.md): e.g. --plain --add 2.1 EscapeF.
+
 Roll-off (the user's change, see docs/universal-mechanics.md): the roll's ACMD sets a speed
 (Add/Set_Momentum with Horizontal != 0, Captain Falcon: 2.4 at frame 5) and the original
 Set_Edge_Slide(5) is removed, so the roll keeps going off a ledge. The fighter's MSC sets roll
@@ -102,6 +106,10 @@ def main():
     args = sys.argv[1:]
     src, dst = args[0], args[1]
     rest = args[2:]
+    plain = False
+    if rest and rest[0] == "--plain":
+        plain = True
+        rest = rest[1:]
     add = None
     if rest and rest[0] == "--add":
         nums = []
@@ -122,7 +130,8 @@ def main():
         if add and not has_speed:
             speed = -add[0] if n.lower() == "escapeb" else add[0]
             add_speed(sc, speed, *add[1:])
-        edit(sc)
+        if not plain:
+            edit(sc)
     f.save(dst)
 
 

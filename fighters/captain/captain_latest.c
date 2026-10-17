@@ -8155,7 +8155,7 @@ int func_362()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0); // roll-off system: original kinetic 0xF / ground 0x2 (was 0x6 / 0x1)
+    StatusModule(0x5, 0, 0x6, 0x1, 0, 0, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8167,7 +8167,7 @@ int func_363()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off system: original kinetic 0xF (was 0x6)
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8263,7 +8263,6 @@ void func_369()
 
 void func_370()
 {
-    rolloff_guard_check(); // shield held: no roll-off (roll-off system)
     if (func_374())
     {
         return;
@@ -8295,7 +8294,6 @@ void func_371()
 
 void func_372()
 {
-    rolloff_guard_check(); // shield held: no roll-off (roll-off system)
     if (func_374())
     {
         return;
@@ -8568,7 +8566,14 @@ void func_381()
     float var0;
     var0 = WorkModuleF(0x6, 0x1000004);
     WorkModule(0, var0, 0x208000e0);
-    // roll-off system: the shield-button GroundModule(0x2710, 0x5 / 0x9) settings were removed (rolloff_guard_check)
+    if (ControlModule(0x2712, 0x3) == 0x1)
+    {
+        GroundModule(0x2710, 0x5);
+    }
+    if (ControlModule(0x2713, 0x3))
+    {
+        GroundModule(0x2710, 0x9);
+    }
     if (global6 == 0xe)
     {
         WorkModule(0x13, 0x1, 0x20000044);
@@ -8581,7 +8586,14 @@ void func_382()
     float var0;
     var0 = WorkModuleF(0x6, 0x1000004);
     WorkModule(0, var0, 0x208000e0);
-    // roll-off system: the shield-button GroundModule(0x2710, 0x2 / 0x1) settings were removed (rolloff_guard_check)
+    if (ControlModule(0x2712, 0x3))
+    {
+        GroundModule(0x2710, 0x2);
+    }
+    if (ControlModule(0x2713, 0x3))
+    {
+        GroundModule(0x2710, 0x1);
+    }
     if (global6 == 0xe)
     {
         WorkModule(0x13, 0x1, 0x20000044);
@@ -36712,17 +36724,17 @@ void func_2261()
         if (ControlModule(0x2712, 0x1) == 0x1)
         {
             MotionModule(0x4, 0.0010000000474974513f);
-            if (global32 >= 0.4000000059604645f)
+            if (global32 >= 0.4000000059604645f) // stick up: rotate up (swapped)
             {
-                var0 += 3.0f;
+                var0 -= 3.0f;
                 WorkModule(0x7, var0, 0x208000b6);
                 var2 = var0;
                 PostureModule(0x4, var0, 0, 0);
                 WorkModule(0x7, var2, 0x208000b8);
             }
-            if (global32 <= -0.4000000059604645f)
+            if (global32 <= -0.4000000059604645f) // stick down: rotate down (swapped)
             {
-                var0 -= 3.0f;
+                var0 += 3.0f;
                 WorkModule(0x7, var0, 0x208000b6);
                 var2 = var0;
                 PostureModule(0x4, var0, 0, 0);
@@ -38087,17 +38099,3 @@ void func_2360()
     }
 }
 
-// ===================================================================
-// Roll-off (docs/universal-mechanics.md): the rolls' ACMD (EscapeF 2.4 / EscapeB -2.4 at frame 5,
-// tools/rolloff_acmd.py) carries the roll off a ledge. Holding shield at any point before he
-// slides off stops that: roll status flag 0x21000014 is set every roll frame the shield button
-// is held (ControlModule(0x2712, 3); 0x2713 would be "not held"), and the ACMD then skips the
-// speed / sets it back to 0, so the roll moves like the original one and stops at the ledge.
-// ===================================================================
-void rolloff_guard_check()
-{
-    if (ControlModule(0x2712, 0x3))
-    {
-        WorkModule(0x2710, 0x21000014);
-    }
-}

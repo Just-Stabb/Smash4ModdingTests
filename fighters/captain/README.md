@@ -24,18 +24,12 @@ older upload with my roll-off shield check). Its own changes include:
   hitboxes 0–2 get the angle via `AttackModule(0x2739, id, angle)`; release jumps to frame 46;
   rotation resets at 79), `func_2262` (end: rotation reset). Ported to Kirby's Captain Falcon
   copy (status `0x18C`, `falconpunch_hold_*` in `kirby.c`).
-- **Its own roll edge handling (replaced):** the roll exec scripts `func_381` / `func_382` set
-  the ground correction from the shield button every frame (forward roll: held `0x5`, not held
-  `0x9`; back roll: held `0x2`, not held `0x1`), and the roll pre scripts used kinetic `0x6`.
-  At the user's request this now uses the roll-off system instead (`docs/universal-mechanics.md`):
-  `rolloff_guard_check()` in `func_370` / `func_372`, the shield `GroundModule` blocks removed from
-  `func_381` / `func_382` (their other lines stay), and `func_362` / `func_363` back to kinetic
-  `0xF` / ground `0x2` (with `0x6` the roll wouldn't move once the ACMD speed is cleared).
-- The decompiler wrote four `printf` strings with real line breaks; they're `\n` again so the file
-  compiles.
-
-**`captain_latest.c` is the current source** (`captain.c` is the older upload). Build:
-
-    python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/captain/captain_latest.c -o build/captain/captain.mscsb
+- **Its own roll-off** (roll pre `func_362`/`363`, roll end `func_381`/`382`, Fall main
+  `func_501`): this is the reference version, see `docs/universal-mechanics.md`. An earlier
+  build replaced it with my ACMD-flag system; that's undone, the roll code is the user's again.
+- **Falcon Punch rotation swapped:** stick up now rotates up (angle −3/frame), down rotates down
+  (+3); it was the other way round. That's the only change from the upload.
+- The decompiler wrote four `printf` strings with real line breaks; they're `\n` again so the
+  file compiles.
 - Reverse forward tilt (`func_246`), stick-dependent up/down tilt variants (`func_278`/`281`),
   reverse up/down tilts (`func_247`/`248`), position tracking in `func_74`, and more.

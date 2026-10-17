@@ -27,33 +27,39 @@ Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
 
 ## Roll-off
 
-Rolls keep their speed off a ledge instead of stopping at it ("roll-off"), unless the shield
-button is held at any point during the roll before the fighter slides off the edge.
+Rolls keep their speed off a ledge instead of stopping at it ("roll-off"). Holding the shield
+button changes how the roll's end sets the edge handling. This is the user's own version (from
+Captain Falcon's latest `captain.mscsb`); an earlier ACMD-flag version of mine didn't work as
+intended and was removed.
 
-- **ACMD (user's change):** the roll script (`EscapeF`) sets a speed with
-  `Add/Set_Momentum` (Captain Falcon: `(0, 0, 1)` at frame 0, `(2.4, 0, 0)` at frame 5,
-  `(0, 0, 1)` at frame 27) and the original `Set_Edge_Slide(State=5)` is removed. The roll
-  then carries the fighter off the ledge, and the fall keeps the speed.
-- **Shield held → no roll-off:** the fighter's MSC sets roll status flag `0x21000014` on every
-  roll frame the shield button is held (`rolloff_guard_check()`, `ControlModule(0x2712, 3)` =
-  button 3 held; `0x2713` means "not held",
-  called first in the EscapeF/EscapeB loops, common `func_370` / `func_372`), and
-  `tools/rolloff_acmd.py` makes the roll's ACMD skip the speed while the flag is set (and set it
-  back to 0 on later frames). The roll then moves like the original one, which stops at the
-  ledge.
+- **ACMD:** the forward roll (`EscapeF`) sets a speed with `Add/Set_Momentum`: `(0, 0, 1)` at
+  frame 0, `(SPEED, 0, 0)` at frame 5, `(0, 0, 1)` at frame 27 (Captain Falcon 2.4, Kirby 2.1),
+  and the original `Set_Edge_Slide(5)` is removed. The back roll (`EscapeB`) has no script.
+  `tools/rolloff_acmd.py IN OUT --plain --add SPEED EscapeF` adds that to a roll without it.
+- **MSC, roll pre** (EscapeF `0x20` = common `func_362`, EscapeB `0x21` = `func_363`):
+  `WorkModule(0, 0, 0x208000e0)` first, and `StatusModule(0x5, 0, 0x6, 0x1, …)` (forward) /
+  `StatusModule(0x5, 0, 0x6, 0x2, …)` (back): kinetic `0x6`, ground correction `0x1` / `0x2`
+  (the originals are `0xF`, `0x2`).
+- **MSC, roll end** (key 2: `func_381` forward, `func_382` back):
 
-Per fighter: the roll's own speed value and frames come from that fighter's ACMD;
-`tools/rolloff_acmd.py IN OUT [scripts]` finds them itself (the first `Add/Set_Momentum` with
-a horizontal speed, until the next zero-speed one).
+```c
+float var0;
+var0 = WorkModuleF(0x6, 0x1000004);
+WorkModule(0, var0, 0x208000e0);
+if (ControlModule(0x2712, 0x3) == 0x1) { GroundModule(0x2710, 0x5); } // shield held (back roll: 0x2)
+if (ControlModule(0x2713, 0x3))        { GroundModule(0x2710, 0x9); } // shield not held (back roll: 0x1)
+if (global6 == 0xe) { WorkModule(0x13, 0x1, 0x20000044); }           // next status Fall: lift the air speed cap
+func_383();
+```
 
-For a roll that doesn't have its own roll-off speed yet, `--add SPEED [START END]` adds
-Captain Falcon's pattern first (speed 0 at frame 0, SPEED at START (5), 0 at END (27)) and
-removes any `Set_Edge_Slide`.
+- **MSC, Fall main** (`0xE` key 1, common `func_501`), first:
 
-Both rolls get it: the back roll (`EscapeB`) usually has no script, so `--add` creates one with
-the speed reversed (it moves away from the facing direction). Run it as
-`--add SPEED EscapeF EscapeB`; a roll that already has its own speed (Captain Falcon's
-`EscapeF`) keeps it.
+```c
+if (global5 == 0x20 || global5 == 0x21) { WorkModule(0, 0x208000e0, 0x1000004); } // came from a roll
+WorkModule(0x14, 0x20000044);
+```
 
-Done: Captain Falcon (user's `EscapeF`, speed 2.4; `EscapeB` added with −2.4; + shield check);
-Kirby (`--add 2.1 EscapeF EscapeB`, + `rolloff_guard_check()` in `kirby.c`).
+`global5` = previous status, `global6` = next status. `ControlModule(0x2712, b)` = button held,
+`0x2713` = not held (button 3 = shield). Flag `0x20000044` lifts the max horizontal air speed.
+
+Done: Captain Falcon (user); Kirby (ported, speed 2.1).

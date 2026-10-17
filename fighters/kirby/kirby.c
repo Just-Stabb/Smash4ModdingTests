@@ -69,6 +69,7 @@ float global67;
 int global68;
 int global69;
 int global70;
+int global71;
 
 void func_0()
 {
@@ -7674,6 +7675,7 @@ int func_335()
 
 void func_336()
 {
+    global71 = 0; // rapid jab loop frame count (added, rapidjab_cancel)
     if (MotionModule(0xc, 0x53))
     {
         func_22(0x53, 0, 1.0f);
@@ -8142,22 +8144,24 @@ int func_361()
 
 int func_362()
 {
+    WorkModule(0, 0, 0x208000e0); // roll-off (user's Captain Falcon version)
     if (func_364())
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x1, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6, ground correct 0x1 (was 0xF, 0x2)
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
 
 int func_363()
 {
+    WorkModule(0, 0, 0x208000e0); // roll-off (user's Captain Falcon version)
     if (func_364())
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (was 0xF)
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8253,7 +8257,6 @@ void func_369()
 
 void func_370()
 {
-    rolloff_guard_check(); // shield held: no roll-off (added)
     if (func_374())
     {
         return;
@@ -8285,7 +8288,6 @@ void func_371()
 
 void func_372()
 {
-    rolloff_guard_check(); // shield held: no roll-off (added)
     if (func_374())
     {
         return;
@@ -8555,11 +8557,43 @@ void func_380()
 
 void func_381()
 {
+    // roll-off (user's Captain Falcon version): forward roll end
+    float var0;
+    var0 = WorkModuleF(0x6, 0x1000004);
+    WorkModule(0, var0, 0x208000e0);
+    if (ControlModule(0x2712, 0x3) == 0x1)
+    {
+        GroundModule(0x2710, 0x5);
+    }
+    if (ControlModule(0x2713, 0x3))
+    {
+        GroundModule(0x2710, 0x9);
+    }
+    if (global6 == 0xe)
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+    }
     func_383();
 }
 
 void func_382()
 {
+    // roll-off (user's Captain Falcon version): back roll end
+    float var0;
+    var0 = WorkModuleF(0x6, 0x1000004);
+    WorkModule(0, var0, 0x208000e0);
+    if (ControlModule(0x2712, 0x3))
+    {
+        GroundModule(0x2710, 0x2);
+    }
+    if (ControlModule(0x2713, 0x3))
+    {
+        GroundModule(0x2710, 0x1);
+    }
+    if (global6 == 0xe)
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+    }
     func_383();
 }
 
@@ -10391,6 +10425,11 @@ void func_500()
 
 void func_501()
 {
+    if (global5 == 0x20 || global5 == 0x21) // roll-off (user's Captain Falcon version): after a roll
+    {
+        WorkModule(0, 0x208000e0, 0x1000004);
+    }
+    WorkModule(0x14, 0x20000044);
     func_502();
     func_78(func_503);
 }
@@ -71837,10 +71876,11 @@ int copy_custom_motion(int motion)
 
 // ===================================================================
 // Crouch jump (added). Jumping while crouching (Squat 0x11 / SquatWait 0x12 / SquatF 0x13 /
-// SquatB 0x14 -> JumpSquat 0xA -> Jump 0xB; standing back up, SquatRv 0x15, doesn't count)
-// is a superjump: crouchjump_height_mult() (2.2) x the full hop's height. Height goes with
+// SquatB 0x14 -> JumpSquat 0xA -> Jump 0xB; standing back up, SquatRv 0x15, doesn't count),
+// or buffering the jump out of an aerial's landing (0x16 / 0x18) while holding down,
+// is a superjump: crouchjump_height_mult() (2.4) x the full hop's height. Height goes with
 // the square of the takeoff speed, so the upward speed is the full hop's takeoff speed x
-// crouchjump_speed_mult() (sqrt 2.2). The full hop's speed is the one the game's jump uses
+// crouchjump_speed_mult() (sqrt 2.4). The full hop's speed is the one the game's jump uses
 // (native jump init 0x02E79940): attribute 0x300015F (full hop; 0x3000160 is the short hop)
 // x work float 0x1000006. A short hop (status flag 0x21000005, which also picks the JumpMini
 // motions) is never a superjump. The boosted speed is set again for crouchjump_hold() frames so
@@ -71852,13 +71892,14 @@ int copy_custom_motion(int motion)
 // and rising; frame count in bits 0xFF00), global64 = ground speed in the jump squat,
 // global65 = last X position, global67 = boosted takeoff speed (global66 is unused).
 // ===================================================================
-float crouchjump_height_mult() { return 2.2f; }        // x full hop height (documentation; the speed below is its square root)
-float crouchjump_speed_mult()  { return 1.4832397f; }  // sqrt(2.2): x full hop takeoff speed
+float crouchjump_height_mult() { return 2.4f; }        // x full hop height (documentation; the speed below is its square root)
+float crouchjump_speed_mult()  { return 1.5491933f; }  // sqrt(2.4): x full hop takeoff speed
+float crouchjump_buffer_stick() { return -0.5f; }      // stick Y at or below this counts as crouching when buffered from a landing
 int   crouchjump_hold()        { return 3; }            // frames the boosted speed is set again
 float crouchjump_momentum() { return 0.8f; }  // x ground speed carried into the jump
-int   crouchjump_gfx()      { return 0x1000094; } // common GFX 0x94 "Far knockback streak (large white)"
-float crouchjump_gfx_size() { return 0.6f; }
-int   crouchjump_gfx_every() { return 2; }    // frames between trail effects
+int   crouchjump_gfx()      { return 0x1000010; } // common GFX 0x10 "Small star (fastfall)" (was 0x94, the white knockback streak)
+float crouchjump_gfx_size() { return 1.0f; }
+int   crouchjump_gfx_every() { return 3; }    // frames between trail effects
 
 void crouchjump_update()
 {
@@ -71874,6 +71915,13 @@ void crouchjump_update()
     {
         if (global62 >= 0x11 && global62 <= 0x14)
         {
+            state = 1;
+            global64 = 0;
+        }
+        else if ((global62 == 0x16 || global62 == 0x18) && global32 <= crouchjump_buffer_stick())
+        {
+            // buffered from an aerial's landing (LandingHeavy 0x16 / LandingAir 0x18) while
+            // holding down
             state = 1;
             global64 = 0;
         }
@@ -71956,24 +72004,13 @@ void sideb_reflect_off()
     }
 }
 
-// Roll-off (added, docs/universal-mechanics.md): Kirby's forward roll ACMD sets a speed of 2.1 at
-// frame 5 (tools/rolloff_acmd.py --add 2.1), so the roll keeps going off a ledge. Holding shield
-// at any point before he slides off stops that: roll status flag 0x21000014 is set every roll
-// frame the shield button is held (ControlModule(0x2712, 3); 0x2713 would be "not held"), and
-// the ACMD then skips the speed / sets it back to 0, so the roll stops at the ledge.
-void rolloff_guard_check()
-{
-    if (ControlModule(0x2712, 0x3))
-    {
-        WorkModule(0x2710, 0x21000014);
-    }
-}
 
 // ===================================================================
 // Holdable, rotating Falcon Punch (added; ported from the user's captain.mscsb, SpecialN 0x152
 // func_2258 / func_2261 / func_2262, to Kirby's Captain Falcon copy, status 0x18C).
 // In the air between motion frames 42.5 and 45.5, holding special freezes the animation
-// (rate 0.001) and stick up / down rotates Kirby 3 degrees per frame (PostureModule(0x4, angle,
+// (rate 0.001) and stick up / down rotates Kirby up / down 3 degrees per frame (angle -3 / +3,
+// swapped from the first port, which turned the wrong way) (PostureModule(0x4, angle,
 // 0, 0)); the punch's hitboxes 0-2 get that angle (AttackModule(0x2739, id, angle)). Releasing
 // special jumps to frame 46. At frame 46 the animation runs again, at 79 the rotation resets.
 // Falcon keeps the angle in his ints 0x208000B6 / 0x208000B8; Kirby's int table may not reach
@@ -71994,15 +72031,15 @@ void falconpunch_hold_update()
         if (ControlModule(0x2712, 0x1) == 0x1) // special held
         {
             MotionModule(0x4, 0.001f);
-            if (global32 >= 0.4f)
+            if (global32 >= 0.4f) // stick up: rotate up
             {
-                global68 = global68 + 3;
+                global68 = global68 - 3;
                 global69 = global68;
                 PostureModule(0x4, (float)global68, 0, 0);
             }
-            if (global32 <= -0.4f)
+            if (global32 <= -0.4f) // stick down: rotate down
             {
-                global68 = global68 - 3;
+                global68 = global68 + 3;
                 global69 = global68;
                 PostureModule(0x4, (float)global68, 0, 0);
             }
@@ -72038,7 +72075,10 @@ void falconpunch_hold_update()
 // Jab / rapid jab / neutral air (added).
 // - Jab 1 (Attack11 0x25) goes straight to rapid jab (Attack100 0x26: start motion 0x53, loop
 //   0x54 while attack is held / mashed, finisher 0x55; state in status int 0x11000007 = 0/1/2).
-// - Rapid jab can be cancelled into any attack before its final hit: tilts, smashes and
+// - Rapid jab loops while the attack button is held; releasing it goes straight to the finisher.
+//   global71 = frames spent looping (reset in the Attack100 main func_336).
+// - After one full loop (global71 >= the loop motion's length, MotionModule(0, 0x54), else
+//   rapidjab_loop_frames()), rapid jab can be cancelled into any attack before its final hit: tilts, smashes and
 //   specials (from the command bits in global24: 0x2/0x4/0x8 tilts, 0x10/0x20/0x40 smashes,
 //   0x1000-0x8000 specials). Plain jab (0x1) and grab aren't included, so mashing A keeps the
 //   rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
@@ -72050,6 +72090,7 @@ void falconpunch_hold_update()
 //   global70 = neutral air frame count.
 // ===================================================================
 float rapidjab_final_frame() { return 5.0f; }
+int   rapidjab_loop_frames() { return 16; } // fallback loop length (its ACMD repeats every 16 frames)
 int   nair_rapid_frames()    { return 24; }  // 6 rapid jab hits
 
 int jab_to_rapid()
@@ -72061,7 +72102,30 @@ int jab_to_rapid()
 int rapidjab_cancel()
 {
     int st;
-    if (WorkModule(0x6, 0x11000007) == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame())
+    int state;
+    int loop;
+    state = WorkModule(0x6, 0x11000007);
+    if (state == 0x1)
+    {
+        global71++;
+        // hold attack to keep looping; letting go goes to the finisher right away (func_337
+        // plays it when flag 0x21000015 is off)
+        if (ControlModule(0x2713, 0))
+        {
+            WorkModule(0x2711, 0x21000015);
+        }
+    }
+    // cancels only after one full loop, and not once the finisher's hit is out
+    loop = MotionModule(0, 0x54);
+    if (loop <= 0)
+    {
+        loop = rapidjab_loop_frames();
+    }
+    if (global71 < loop)
+    {
+        return 0;
+    }
+    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame())
     {
         return 0;
     }

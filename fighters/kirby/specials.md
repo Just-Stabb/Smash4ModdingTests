@@ -57,7 +57,7 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
 - **game.bin build:** `python3 tools/kirby_throwb_acmd.py build/acmd_in/game.bin g1;
   python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 g3;
   python3 tools/kirby_sideb_reflect_acmd.py g3 g4;
-  python3 tools/rolloff_acmd.py g4 g5 --add 2.1 EscapeF EscapeB` (roll-off, see
+  python3 tools/rolloff_acmd.py g4 g5 --plain --add 2.1 EscapeF` (roll-off, see
   `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 build/game.bin`
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
@@ -778,9 +778,9 @@ Jumping while crouching or crawling (Squat `0x11`–`0x14` → JumpSquat `0xA` �
 standing back up, SquatRv `0x15`, doesn't count) is a superjump, `crouchjump_update()` (end
 of the main loop `func_74`):
 
-- **Height:** `crouchjump_height_mult()` (2.2) × the full hop's height. Height goes with the
+- **Height:** `crouchjump_height_mult()` (2.4) × the full hop's height. Height goes with the
   square of the takeoff speed, so the upward speed (gravity energy `0x1`) is set to the full
-  hop's takeoff speed × `crouchjump_speed_mult()` (√2.2 ≈ 1.483). The full hop speed is the
+  hop's takeoff speed × `crouchjump_speed_mult()` (√2.4 ≈ 1.549). The full hop speed is the
   one the game's jump uses (native jump init `0x02E79940`): attribute `0x300015F` × work float
   `0x1000006` (`0x3000160` is the short hop's).
 - **No short hop superjump:** status flag `0x21000005` (short hop; it also picks the JumpMini
@@ -789,9 +789,9 @@ of the main loop `func_74`):
   speed (minus gravity `0x3000018` per frame) is set again if the jump lowered it.
 - **Momentum:** Kirby's ground speed during the jump squat (X change per frame) ×
   `crouchjump_momentum()` (0.8) is added to his horizontal air speed (energy `0x3`).
-- **Trail:** while airborne and still rising, common GFX `0x94` ("Far knockback streak
-  (large white)", `crouchjump_gfx()`) spawns at his position every `crouchjump_gfx_every()`
-  (2) frames, size `crouchjump_gfx_size()` (0.6). Smash 4 has no body-afterimage effect; the
+- **Trail:** while airborne and still rising, common GFX `0x10` ("Small star (fastfall)",
+  `crouchjump_gfx()`) spawns at his position every `crouchjump_gfx_every()` (3) frames, size
+  `crouchjump_gfx_size()` (1.0). (The first version used `0x94`, the white knockback streak.) Smash 4 has no body-afterimage effect; the
   `AFTER_IMAGE*` ACMD commands are sword trails. Other IDs to try: `0x1000010` small star,
   `0x100002F` aura particle, `0x100008C` transparent dash.
 - State (new globals): `global62` previous status, `global63` state / frame count, `global64`
@@ -814,7 +814,10 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
 
 - **Jab 1 → rapid jab:** Attack11 (`0x25`, main `func_263`) goes straight to Attack100 (`0x26`)
   (`jab_to_rapid()`).
-- **Rapid jab cancel:** before the final hit (finisher motion `0x55`, its hitbox at frame
+- **Rapid jab hold:** it loops while the attack button is held; releasing it plays the
+  finisher right away (`rapidjab_cancel()` turns flag `0x21000015` off).
+- **Rapid jab cancel:** after one full loop (`global71` frames in the loop ≥ the loop motion's
+  length) and before the final hit (finisher motion `0x55`, its hitbox at frame
   `rapidjab_final_frame()` = 5), `rapidjab_cancel()` (top of the loop `func_337`) goes into any
   attack from the command bits in `global24`: tilts `0x2`/`0x4`/`0x8` → `0x28`/`0x29`/`0x2A`,
   smashes `0x10`/`0x20`/`0x40` → `0x2B`/`0x31`/`0x2E`, specials `0x2000`/`0x4000`/`0x8000`/`0x1000`
