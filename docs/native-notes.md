@@ -655,7 +655,8 @@ hit states oddly. In the user's setup these characters never detransform, so thi
 - Effects / sounds: Kirby's Bowser copy runs Bowser's own ACMD (`MotionAnimcmdModule(0, 0, motion,
   0xF)`, kind `0xF` = koopa) for motions `0x211`/`0x215`/…; each has 4 slots, so Kirby's MSC uses
   motion + slot (`copy_custom_motion`, in `func_2863` / `func_2864`).
-- Star-missile copies keep the last swallow's slot in `0x9F` (it's no longer cleared).
+- Star-missile copies: the star cave (`starcopy_cave.py`, 12th hit) writes the hit fighter's
+  `0x10000048` to Kirby's `0x9F` before it hands the copy over.
 
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/copy_custom/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \

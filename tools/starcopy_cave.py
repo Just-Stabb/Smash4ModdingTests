@@ -17,7 +17,9 @@ For command MAGIC only (see build_star):
      (BattleObject: +0 id, +4 kind, +0xC module accessor; accessor +0x28 WorkModule,
      +0x50 AttackModule); it must exist and resolve to a valid fighter -> kind, costume
   3. count = Kirby int COUNTER + 1. At THRESHOLD (and the target isn't a Kirby): store
-     PEND_KIND = kind + 1 and PEND_COSTUME = costume in Kirby's ints, count = 0. Store count.
+     the target's custom neutral-B slot (0x10000048) in Kirby's COPY_SLOT (0x1000009F, see
+     copy_custom_cave.py), PEND_KIND = kind + 1 and PEND_COSTUME = costume in Kirby's ints,
+     count = 0. Store count.
   4. Report the result to Kirby's DEBUG_INT (Kirby's MSC shows it in debug mode).
   It does NOT grant the copy: copy_grant crashed when called from the star's update.
   Returns 0 (like the stub it replaces). Writing a result to message+0xC (what MSC's
@@ -49,6 +51,8 @@ PEND_KIND = 0x1000009E # grants; the pending copy is read before that). 0x93-0xA
 PEND_COSTUME = 0x1000009B  # Kirby's MSC. 0xA8/0xAA/0xAC didn't work: writes there were lost, so
                        # Kirby's int table probably ends at 0xA6 (the star's ID is stored there).
 THRESHOLD = 12
+CUSTOM_N = 0x10000048   # a fighter's custom neutral-B slot
+COPY_SLOT = 0x1000009F  # Kirby: the copy's custom slot (tools/copy_custom_cave.py)
 
 RESOLVE = 0x02BF2108   # (manager, &handle, object id, 0)
 EXISTS = 0x02BF3D8C    # (manager, object id) -> 1 if the object exists and is alive
@@ -237,6 +241,16 @@ def build_star(stage="4"):
     if upto == 3:
         e(("b", "store"))
     e(cmpwi(29, 8)); e(("beq", "store"))              # target is a Kirby: no copy
+    # copy custom slot (tools/copy_custom_cave.py): Kirby's COPY_SLOT = the target's custom
+    # neutral-B slot, written before the grant (copy_grant no longer clears 0x9F; the params
+    # are loaded inside it and Kirby's generated weapons read it)
+    e(addi(3, 1, 0x10)); e(("bl", ACCESSOR)); e(mr(30, 3))
+    e(cmpwi(30, 0)); e(("beq", "noslot"))
+    a.get_int(30, CUSTOM_N); e(mr(30, 3))
+    e(lwz(27, 0x30, 1))
+    a.set_int(27, 30, COPY_SLOT)
+    a.label("noslot")
+    e(lwz(27, 0x30, 1))
     # hand the copy over to Kirby: PEND_KIND = kind + 1, PEND_COSTUME = costume
     e(addi(29, 29, 1))
     a.set_int(27, 29, PEND_KIND)
