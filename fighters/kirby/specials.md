@@ -775,8 +775,10 @@ side/up/down special bits (`0xE000`). Everything else still waits for
 ## Added: crouch jump (superjump)
 
 Jumping while crouching or crawling (Squat `0x11`–`0x14` → JumpSquat `0xA` → Jump `0xB`;
-standing back up, SquatRv `0x15`, doesn't count) is a superjump, `crouchjump_update()` (end
-of the main loop `func_74`):
+standing back up, SquatRv `0x15`, doesn't count), or buffering the jump out of an aerial's
+landing (LandingHeavy `0x16` / LandingAir `0x18`) while holding down (stick Y ≤
+`crouchjump_buffer_stick()`, −0.5), is a superjump, `crouchjump_update()` (end of the main
+loop `func_74`):
 
 - **Height:** `crouchjump_height_mult()` (2.4) × the full hop's height. Height goes with the
   square of the takeoff speed, so the upward speed (gravity energy `0x1`) is set to the full
