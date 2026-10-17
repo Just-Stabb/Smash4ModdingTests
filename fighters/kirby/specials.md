@@ -418,8 +418,10 @@ the same hook). Kirby's init `func_2242` now sets it to `sideb_air_condition()`:
 - On the ground: always allowed (and the count resets).
 - In the air: blocked once `sideb_air_max()` (2) air side Bs were used.
 
-The count is bits `0x100` / `0x200` of `global17`, added in the side-B main
-`func_2429` when it starts in the air. It resets in Kirby's landing mains
+The count is bits `0x100` / `0x200` of `global17`. An air side B only uses one up once it's past
+frame `sideb_count_frame()` (5) (`sideb_count_update()` in the side-B loop `func_2430` and the
+swing loop `func_2467`; `global80` frame count, `global81` counted). Being KO'd (Dead main
+`func_2286`) also resets the count. It resets in Kirby's landing mains
 (`func_2281`–`func_2284`, statuses `0x16`–`0x19`), the ledge-catch main
 (`func_2285`, `0x73`), and in `func_2247` (every frame of every special
 status) whenever Kirby is on the ground. That covers side B landing inside
@@ -901,3 +903,20 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   the air rapid jab (`kirby_rapid_nair()` in `func_310`).
 - Without a copy, or with a non-Rush copy, neutral air is Kirby's normal neutral air
   (`kirby_rapid_nair_without_copy()` = 1 brings the rapid jab back for plain Kirby).
+
+## Added: up B once per airtime, neutral-special cancel with a copy
+
+- **Once per airtime:** up B sets `global77` when it starts (`upb_start()` in the main `func_2290`);
+  `upb_air_condition()` (hooked as `global26`, the up-B condition script) blocks up B in the air while
+  it's set. It clears on the ground (any grounded status except up B itself), when hit (Damage
+  statuses `0x45`–`0x4C`, CaptureDamage `0x41`, DownDamage `0x57`), on ledge grab (`func_2285`) and
+  when KO'd (`func_2286`) (`upb_air_update()` in the main loop `func_74`). A ground up B counts too:
+  Kirby can't up B again until one of those happens.
+- **Cancel:** with a copy ability (flag `0x2000009A`), from `upb_cancel_delay()` (3) frames after up
+  B's first hitbox appears (`AttackModule(0, 0)`, hitbox ID 0, checked every frame), neutral special
+  (B with no direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral
+  special (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /
+  `func_2299`). `global78` = up-B frames, `global79` = frame the first hitbox appeared.
+- Note: Kirby's ground up-B rise script (`specialhi`) isn't in this `game.bin` (air up B `JUMP`s to it),
+  so the first hitbox may be the fall's (`0x2D1`, frame 1 of `0x172`). The cancel goes by whatever
+  hitbox actually comes out first.

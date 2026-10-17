@@ -75,6 +75,11 @@ float global73;
 int global74;
 int global75;
 int global76;
+int global77;
+int global78;
+int global79;
+int global80;
+int global81;
 
 void func_0()
 {
@@ -1729,6 +1734,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     sideb_reflect_off();    // air side B reflector off if the swing ended early (added, before crouchjump_update)
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
     kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
+    upb_air_update();       // up B available again on the ground / when hit (added)
 }
 
 void func_75()
@@ -36463,6 +36469,7 @@ void func_2242()
     global28 = func_2349;
     global37 = func_2287;
     global25 = sideb_air_condition; // side-B condition script (added): max 2 air side Bs per airtime
+    global26 = upb_air_condition;   // up-B condition script (added): one up B per airtime
 }
 
 // Registers Kirby's own status scripts (keys 0/1/2) + overrides of common actions
@@ -38288,6 +38295,7 @@ void func_2285()
 {
     int var0;
     sideb_air_reset(); // landed / grabbed the ledge: air side Bs available again (added)
+    global77 = 0;      // and up B (added)
     if (WorkModule(0x10, 0x2000009a))
     {
         var0 = WorkModule(0x6, 0x100000a4);
@@ -38311,6 +38319,8 @@ void func_2286()
             WorkModule(0x2711, 0x20000079);
         }
     }
+    sideb_air_reset(); // KO'd: air side Bs available again (added)
+    global77 = 0;      // and up B
     WorkModule(0x7, 0, 0x1000009d); // lost a stock: star copy hit count starts over (added)
     WorkModule(0x7, 0, 0x1000009e); // and no pending star copy
     func_213();
@@ -38358,6 +38368,7 @@ int func_2289()
 // [SpecialHi 0x154] main: rising slash motion 0x2CD/0x2DD
 void func_2290()
 {
+    upb_start(); // one up B per airtime; neutral-special cancel tracking (added)
     func_2259();
     WorkModule(0, WorkModuleF(0, 0x7000006) + 0, 0x1000004);
     WorkModule(0x2711, 0x2100000d);
@@ -38370,6 +38381,10 @@ void func_2290()
 // [SpecialHi 0x154] loop: motion end -> SpecialHiFall 0x172; ground/air swap
 void func_2291()
 {
+    if (upb_cancel_update()) // copy ability: neutral special cancel (added)
+    {
+        return 0x1;
+    }
     if (func_56())
     {
         return 0x1;
@@ -38429,6 +38444,10 @@ void func_2294()
 // [SpecialHiFall 0x172] loop: ACMD 0x2100000F -> SpecialFall; end -> 0x173; landed -> SpecialHiLanding 0x174
 void func_2295()
 {
+    if (upb_cancel_update()) // copy ability: neutral special cancel (added)
+    {
+        return 0x1;
+    }
     if (func_56())
     {
         return 0x1;
@@ -38481,6 +38500,10 @@ void func_2298()
 // [SpecialHiFall2 0x173] loop: landed -> SpecialHiLanding 0x174
 void func_2299()
 {
+    if (upb_cancel_update()) // copy ability: neutral special cancel (added)
+    {
+        return 0x1;
+    }
     if (func_56())
     {
         return 0x1;
@@ -40383,7 +40406,8 @@ int func_2428()
 // [SpecialS 0x153] main: hammer start
 void func_2429()
 { //Side B Looping Script
-    sideb_air_count(); // count air side Bs (added)
+    global80 = 0; // side-B frames (added): an air side B is counted after frame sideb_count_frame()
+    global81 = 0;
     WorkModule(0x2711, 0x2100000d);
     WorkModule(0x2711, 0x200000a0);
     func_2431();
@@ -40394,6 +40418,7 @@ void func_2429()
 // [SpecialS 0x153] loop: YOUR MODIFIED CODE (forward slide, hop at frame 10, swing on hit; see specials.md); release B -> Swing 0x171
 void func_2430()
 {
+    sideb_count_update(); // count this air side B once it's past frame 5 (added)
     float facing;
 
     // Move forward on ground
@@ -41024,6 +41049,7 @@ void func_2466()
 void func_2467()
 {
     int sideb_cancel;
+    sideb_count_update(); // count this air side B once it's past frame 5 (added)
     sideb_bounce_update(); // on-hit bounce (added), see the end of the file
     sideb_cancel = sideb_bounce_cancel_update(); // cancel after the bounce (added)
     if (sideb_cancel != 0)
@@ -72523,6 +72549,118 @@ int kirby_rapid_nair()
         return 0x1;
     }
     if (global76 == trait_none() && kirby_rapid_nair_without_copy())
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// ===================================================================
+// Air side B counted after frame 5, up B once per airtime, up B -> neutral special cancel (added).
+//   global80 / global81: side-B frame count / "this side B was counted" (reset in func_2429).
+//   global77: up B used this airtime (1). Reset on the ground (except during up B itself), when
+//             hit (damage statuses), on ledge grab (func_2285) and when KO'd (func_2286).
+//   global78 / global79: up-B frame count / frame its first hitbox (ID 0) appeared (-1 = not yet).
+// ===================================================================
+int sideb_count_frame()   { return 5; } // an air side B uses up one of the air side Bs after this frame
+int upb_cancel_delay()    { return 3; } // frames after up B's first hitbox before neutral special can cancel it
+
+// side-B loops (func_2430 SpecialS, func_2467 swing), every frame
+void sideb_count_update()
+{
+    if (global4 != 0x153 && global4 != 0x171)
+    {
+        return;
+    }
+    if (global81)
+    {
+        return;
+    }
+    global80++;
+    if (global80 <= sideb_count_frame())
+    {
+        return;
+    }
+    global81 = 0x1;
+    sideb_air_count(); // only counts in the air
+}
+
+int upb_air_condition()
+{
+    if (global18 == 0x2 && global77)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+// up-B main (func_2290)
+void upb_start()
+{
+    global77 = 0x1;
+    global78 = 0;
+    global79 = -1;
+}
+
+// main loop (func_74), every frame
+void upb_air_update()
+{
+    if (global18 == 0 && global4 != 0x154)
+    {
+        global77 = 0; // on the ground
+        return;
+    }
+    if (global4 >= 0x45 && global4 <= 0x4c) // Damage .. DamageFall
+    {
+        global77 = 0;
+        return;
+    }
+    if (global4 == 0x41 || global4 == 0x57) // CaptureDamage, DownDamage
+    {
+        global77 = 0;
+    }
+}
+
+// up-B loops (func_2291 rise, func_2295 / func_2299 falls), every frame. With a copy ability,
+// from upb_cancel_delay() frames after the first hitbox, neutral special cancels up B.
+// Returns 1 when it changed status.
+int upb_cancel_update()
+{
+    if (global4 != 0x154 && global4 != 0x172 && global4 != 0x173)
+    {
+        return 0;
+    }
+    global78++;
+    if (global79 < 0)
+    {
+        if (AttackModule(0, 0)) // hitbox ID 0 exists
+        {
+            global79 = global78;
+        }
+        return 0;
+    }
+    if (!WorkModule(0x10, 0x2000009a)) // no copy ability
+    {
+        return 0;
+    }
+    if (global78 < global79 + upb_cancel_delay())
+    {
+        return 0;
+    }
+    if (!(global24 & 0x1000) || (global24 & 0xe000)) // neutral special only
+    {
+        return 0;
+    }
+    if (global18 == 0x2)
+    {
+        WorkModule(0x19, 0x1f00000a); // allow air specials
+        if (func_58())
+        {
+            return 0x1;
+        }
+        return 0;
+    }
+    if (func_43())
     {
         return 0x1;
     }
