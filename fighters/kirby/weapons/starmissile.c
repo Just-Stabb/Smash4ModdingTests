@@ -20,6 +20,7 @@ int global18;
 int global19;
 float global20;
 int global21;
+int global22;
 
 void func_0()
 {
@@ -44,6 +45,7 @@ void func_0()
     global19 = 0;
     global20 = 0;
     global21 = 0;
+    global22 = 0;
 }
 
 void func_1()
@@ -760,6 +762,21 @@ void func_60()
         var3 = KineticModuleF(0xa, 0);
         var4 = KineticModuleF(0xb, 0);
         var5 = WorkModuleF(0, 0x1000000);
+        // Flying star (added): faster (starmissile_speed_up, once), and no slowing down until the
+        // last starmissile_decel_frames() frames of its lifetime (0x11000002, see func_57).
+        if (global4 == 0x1)
+        {
+            if (global22 == 0 && MathF(0x3, var3, var4, 0) > 0.01f)
+            {
+                var3 = var3 * starmissile_speed_mult();
+                var4 = var4 * starmissile_speed_mult();
+                global22 = 0x1;
+            }
+            if (WorkModule(0x6, 0x11000002) > starmissile_decel_frames())
+            {
+                var5 = 0;
+            }
+        }
         var6 = PostureModuleF(0);
         var7 = MathF(0x3, var3, var4, 0);
         if (var7 > var5)
@@ -838,3 +855,6 @@ int starmissile_aim(int deg)
     KineticModule(0x11, 0, MathF(0x4, ang) * speed * fwd, MathF(0x5, ang) * speed);
     return 0x1;
 }
+
+float starmissile_speed_mult() { return 1.5f; } // flying star speed x (once, when it first has speed)
+int   starmissile_decel_frames() { return 4; }  // it only slows down in its last this many frames
