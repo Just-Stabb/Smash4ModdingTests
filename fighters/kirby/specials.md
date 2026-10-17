@@ -872,6 +872,10 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   `IS_FLAG(0x21000024)` True → air version, False → the original. Air loop hits: Damage × 0.6
   (1 → 0.6). Air finisher: KBG/BKB/WBKB × 0.65 (120/80 → 78/52). Ground rapid jab never sets
   the flag.
+- **Air drift 70%:** every frame of the air loop and finisher, `nair_rapid_drift()` sets the
+  control energy's (energy 2, stick drift) max speed to Kirby's air speed (`0x3000016`) ×
+  `nair_rapid_drift_mult()` (0.7): `KineticModule(0x15, 0x2, x, 100)`, as the Ryu copy and Final
+  Cutter's fall do. Air acceleration is unchanged.
 - **Air jumps:** `tools/kirby_jump_articles_acmd.py` removes the test `GENERATE_ARTICLE`s from
   `jumpaerialf3`–`f5` (six each).
 - **Forward air autolink:** `tools/kirby_fair_autolink_acmd.py` gives the first hit's hitboxes

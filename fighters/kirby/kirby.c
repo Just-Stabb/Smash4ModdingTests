@@ -72152,6 +72152,7 @@ void falconpunch_hold_update()
 float rapidjab_final_frame() { return 5.0f; }
 int   nair_rapid_air_flag()  { return 0x21000024; } // status flag the loop / finisher ACMD check for their air hitboxes
 float nair_rapid_landing_mult() { return 0.5f; }  // landing lag after the air final hit, times neutral air's
+float nair_rapid_drift_mult()   { return 0.7f; }  // air drift (max stick air speed) during air rapid jab, times normal
 int   rapidjab_loop_frames() { return 16; } // fallback loop length (its ACMD repeats every 16 frames)
 
 // Rapid jab loop length in frames: the loop motion's length, else rapidjab_loop_frames().
@@ -72242,6 +72243,10 @@ int nair_rapid_update()
         return 0;
     }
     motion = MotionModule(0x7);
+    if (motion == 0x54 || motion == 0x55)
+    {
+        nair_rapid_drift();
+    }
     if (motion == 0x54)
     {
         global70++;
@@ -72410,4 +72415,12 @@ void nair_rapid_landing(int motion, int param)
         rate = (float)MotionModule(0, motion) / lag;
     }
     func_22(motion, 0, rate);
+}
+
+// Air rapid jab (loop and finisher), every frame: the control energy (2, stick drift) gets a max
+// speed of Kirby's air speed (0x3000016) x nair_rapid_drift_mult(), the way the Ryu copy and
+// Final Cutter's fall limit it (KineticModule(0x15, 0x2, x, 100)).
+void nair_rapid_drift()
+{
+    KineticModule(0x15, 0x2, WorkModuleF(0, 0x3000016) * nair_rapid_drift_mult(), 100.0f);
 }
