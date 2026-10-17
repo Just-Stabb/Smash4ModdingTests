@@ -21,12 +21,25 @@ namespace Sm4shCommand
         static Program()
         {
             Application.EnableVisualStyles();
-            
-            Title = ((AssemblyTitleAttribute)Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyTitleAttribute), false)[0]).Title;
-            Description = ((AssemblyDescriptionAttribute)Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyDescriptionAttribute), false)[0]).Description;
-            Copyright = ((AssemblyCopyrightAttribute)Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyCopyrightAttribute), false)[0]).Copyright;
-            InformationalVersion = ((AssemblyInformationalVersionAttribute)Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)[0]).InformationalVersion;
+            // Missing assembly attributes must not stop the program from starting.
+            Title = Attr<AssemblyTitleAttribute>(a => a.Title) ?? "SM4SHCommand";
+            Description = Attr<AssemblyDescriptionAttribute>(a => a.Description) ?? "";
+            Copyright = Attr<AssemblyCopyrightAttribute>(a => a.Copyright) ?? "";
+            InformationalVersion = Attr<AssemblyInformationalVersionAttribute>(a => a.InformationalVersion) ?? Version;
             Title = $"{Title} {Version}";
+        }
+
+        static string Attr<T>(Func<T, string> get) where T : Attribute
+        {
+            try
+            {
+                var attrs = Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(T), false);
+                return attrs.Length > 0 ? get((T)attrs[0]) : null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>
@@ -35,19 +48,31 @@ namespace Sm4shCommand
         [STAThread]
         static void Main(string[] args)
         {
-            Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
             // Any crash is written (with its stack trace) to Sm4shCommand_errors.log next to the exe.
+            AppDomain.CurrentDomain.UnhandledException += (o, e) => ReportError(e.ExceptionObject as Exception, false);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (o, e) => ReportError(e.Exception, true);
-            AppDomain.CurrentDomain.UnhandledException += (o, e) => ReportError(e.ExceptionObject as Exception, false);
+            Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
+            AcmdMain main;
+            try
+            {
+                main = Runtime.Instance; // creates the main window
+            }
+            catch (Exception e)
+            {
+                ReportError(e is TypeInitializationException && e.InnerException != null ? e.InnerException : e, false);
+                return;
+            }
             if (args.Length > 0) // a file or fighter folder given on the command line / dropped on the exe
-                Runtime.Instance.Shown += (o, e) => Runtime.Instance.OpenPath(args[0]);
-            Application.Run(Runtime.Instance);
+                main.Shown += (o, e) => main.OpenPath(args[0]);
+            Application.Run(main);
         }
 
         static void ReportError(Exception e, bool canContinue)
         {
-            string log = System.IO.Path.Combine(Application.StartupPath, "Sm4shCommand_errors.log");
+            string log;
+            try { log = System.IO.Path.Combine(Application.StartupPath, "Sm4shCommand_errors.log"); }
+            catch { log = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Sm4shCommand_errors.log"); }
             try
             {
                 System.IO.File.AppendAllText(log, $"==== {DateTime.Now:yyyy-MM-dd HH:mm:ss} {Title}{Environment.NewLine}{e}{Environment.NewLine}{Environment.NewLine}");

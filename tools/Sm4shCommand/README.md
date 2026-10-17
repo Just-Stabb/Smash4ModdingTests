@@ -46,6 +46,9 @@ Also:
   word; it now has 47.
 - The tree filter box no longer throws when narrowing the list.
 - Empty motion.mtable slots show as `(empty)`.
+- The toolbar/window images are embedded as plain PNG/ICO files (`SM4SHCommand/Resources/`) and loaded
+  by `Images.cs`, instead of being serialized into the forms' .resx; a startup failure is logged and shown
+  instead of the program silently not opening.
 - The folder picker falls back to the standard folder dialog if the Vista-style one can't be created.
 
 ## Events.cfg format

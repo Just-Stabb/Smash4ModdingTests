@@ -124,6 +124,7 @@
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
+    <Compile Include="Images.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="System\Windows\Components\FolderSelectDialog.cs">
       <SubType>Component</SubType>
@@ -196,7 +197,21 @@
     <Content Include="LICENSE.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <None Include="Resources\play.png" />
+    <EmbeddedResource Include="Resources\new.png">
+      <LogicalName>Sm4shCommand.Images.new.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\open.png">
+      <LogicalName>Sm4shCommand.Images.open.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\save.png">
+      <LogicalName>Sm4shCommand.Images.save.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\play.png">
+      <LogicalName>Sm4shCommand.Images.play.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\app.ico">
+      <LogicalName>Sm4shCommand.Images.app.ico</LogicalName>
+    </EmbeddedResource>
     <Content Include="s4.ico" />
   </ItemGroup>
   <ItemGroup>
