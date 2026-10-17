@@ -19,3 +19,10 @@ Decompiled from the user's upload: `koopa.c` (`script/msc/koopa.mscsb`) and `bre
   script above.
 - Kirby's Bowser copy (`kirby.c`, statuses `0x1F6`, exec at "se id:") is the same code and
   reads Kirby's own `0x10000048` the same way.
+
+## Kirby copy with Bowser's customs (test)
+
+Bowser's neutral-B param group (vl group 12, 24 values per variant) differs a lot per custom
+(e.g. values 1-4, 6-13, 14, 17-19). See `docs/native-notes.md` "Kirby copy abilities: custom
+neutral specials": `cross_f.rpx` loads the variant for the swallowed Bowser's slot, and Kirby's
+MSC (`func_2871` → `copy_custom_article(0)`) switches each breath article to motion = slot.

@@ -619,3 +619,28 @@ Giga Mac, Giga Bowser and Wario-Man use the same kind range but are untested.
 **Known issue (won't fix):** with armor and grab immunity gone, the game can crash if a
 transformation detransforms during some hit states, and Giga Mac / Giga Bowser sometimes handle
 hit states oddly. In the user's setup these characters never detransform, so this is left as is.
+
+## Kirby copy abilities: custom neutral specials (test build build/copy_custom/cross_f.rpx)
+
+- WorkModule special-param loader `0x02F1BF88(WM, r4)`: for each special it copies the param
+  block of the fighter's custom slot, e.g. N: src = `[[mgr+kind*4+0x111C]+0xFC]` +
+  custom(`0x10000048`) * `[WM+0x1578]`*4 → `WM+0xD30` (S: `+0x110`, `0x10000049`, `+0x1594`, …).
+  `WM+0x18` = fighter kind, param manager = `[0x102FF448]` (`lis 0x1030; lwz -0xBB8`).
+- For Kirby it then calls `0x02F1B8B0`: if copy kind (`0x100000A4`, = the copied fighter's kind)
+  < `0x3A`, it overwrites `WM+0xD30` with the copied fighter's N block, always variant 0:
+  src = `[[mgr+copy*4+0x111C]+0xFC]`, size = byte table `0x02EA9104(copy)` (`0x1012F6BC+kind`:
+  Bowser 96 = 24 values, Kirby 136). Variants follow each other with that stride.
+- Swallow → copy: `0x0279666C`; at `0x02796900` (just before `copy_grant 0x02EFCD8C`) r24 =
+  victim's module accessor, r26 = copy kind, r25 = costume, r31 = Kirby's accessor.
+- `tools/copy_custom_cave.py`: CAVE_A (`0x037EE680`, hook `0x02796900`) stores the victim's
+  `0x10000048` (a swallowed Kirby: its `0x100000A5`) in Kirby's int `0x100000A5`; CAVE_B
+  (`0x037EE6E0`, hook `0x02F1B910`) adds slot * size to the copy loader's source.
+- Weapon hitboxes: the copied weapon (e.g. Bowser's `breath`) picks its ACMD by motion index +
+  weapon int `0x10000005` (not set from Kirby's slot). Kirby's MSC switches the spawned article's
+  motion to the slot (`copy_custom_article`, `ArticleModule(0x2715, article, slot, 1)`).
+- Not handled: a copy from the star missile path (`starcopy_cave.py`) keeps the last swallow's
+  slot in `0x100000A5`.
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/copy_custom/cross_f.rpx \
+      $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
+      $(python3 tools/copy_custom_cave.py)
