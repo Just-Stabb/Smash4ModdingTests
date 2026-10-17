@@ -672,3 +672,11 @@ hit states oddly. In the user's setup these characters never detransform, so thi
 Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
 only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
 or reads the custom slot itself.
+
+## Fighter jump init (0x02E79940)
+
+Horizontal: `0x300000D`/`0x300000E`/`0x300000F` (jump x speed, ×, max). Vertical speed:
+attribute `0x300015F` (full hop) or `0x3000160` (short hop, when status flag `0x21000005` is
+set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the JumpMini motions
+`0x1A`/`0x1C` from it), × work float `0x1000006`. Flag `0x21000012` picks a different getter
+(`0x02F1D940`). Used by Kirby's superjump (`crouchjump_update`).

@@ -777,9 +777,11 @@ of the main loop `func_74`):
 
 - **Height:** `crouchjump_height_mult()` (2.2) × the full hop's height. Height goes with the
   square of the takeoff speed, so the upward speed (gravity energy `0x1`) is set to the full
-  hop's takeoff speed × `crouchjump_speed_mult()` (√2.2 ≈ 1.483). The full hop speed is
-  learned from Kirby's plain jumps (`global66`, the highest takeoff speed seen); a short-hop
-  superjump also uses the full-hop speed once one has been seen.
+  hop's takeoff speed × `crouchjump_speed_mult()` (√2.2 ≈ 1.483). The full hop speed is the
+  one the game's jump uses (native jump init `0x02E79940`): attribute `0x300015F` × work float
+  `0x1000006` (`0x3000160` is the short hop's).
+- **No short hop superjump:** status flag `0x21000005` (short hop; it also picks the JumpMini
+  motions `0x1A`/`0x1C`) → a normal short hop.
 - **Keeps the vertical speed:** for `crouchjump_hold()` (3) frames after takeoff the boosted
   speed (minus gravity `0x3000018` per frame) is set again if the jump lowered it.
 - **Momentum:** Kirby's ground speed during the jump squat (X change per frame) ×
@@ -790,5 +792,5 @@ of the main loop `func_74`):
   `AFTER_IMAGE*` ACMD commands are sword trails. Other IDs to try: `0x1000010` small star,
   `0x100002F` aura particle, `0x100008C` transparent dash.
 - State (new globals): `global62` previous status, `global63` state / frame count, `global64`
-  jump-squat ground speed, `global65` last X position, `global66` learned full hop speed,
-  `global67` boosted takeoff speed.
+  jump-squat ground speed, `global65` last X position, `global67` boosted takeoff speed
+  (`global66` unused).
