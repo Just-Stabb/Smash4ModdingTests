@@ -50,5 +50,10 @@ For a roll that doesn't have its own roll-off speed yet, `--add SPEED [START END
 Captain Falcon's pattern first (speed 0 at frame 0, SPEED at START (5), 0 at END (27)) and
 removes any `Set_Edge_Slide`.
 
-Done: Captain Falcon (user's ACMD, speed 2.4, + shield check); Kirby (`--add 2.1` on `EscapeF`,
-+ `rolloff_guard_check()` in `kirby.c`).
+Both rolls get it: the back roll (`EscapeB`) usually has no script, so `--add` creates one with
+the speed reversed (it moves away from the facing direction). Run it as
+`--add SPEED EscapeF EscapeB`; a roll that already has its own speed (Captain Falcon's
+`EscapeF`) keeps it.
+
+Done: Captain Falcon (user's `EscapeF`, speed 2.4; `EscapeB` added with −2.4; + shield check);
+Kirby (`--add 2.1 EscapeF EscapeB`, + `rolloff_guard_check()` in `kirby.c`).

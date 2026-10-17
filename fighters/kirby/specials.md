@@ -57,7 +57,7 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
 - **game.bin build:** `python3 tools/kirby_throwb_acmd.py build/acmd_in/game.bin g1;
   python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 g3;
   python3 tools/kirby_sideb_reflect_acmd.py g3 g4;
-  python3 tools/rolloff_acmd.py g4 build/game.bin --add 2.1` (roll-off, see
+  python3 tools/rolloff_acmd.py g4 build/game.bin --add 2.1 EscapeF EscapeB` (roll-off, see
   `docs/universal-mechanics.md`)
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.

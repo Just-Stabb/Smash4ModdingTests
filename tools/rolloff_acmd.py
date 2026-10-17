@@ -4,9 +4,11 @@
   python3 tools/rolloff_acmd.py IN_game.bin OUT_game.bin [--add SPEED [START END]] [script ...]
                                                                        (default script: EscapeF)
 
---add gives a roll without its own roll-off speed one first (like Captain Falcon's):
-Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0, 0, 1) at END (27).
-A Set_Edge_Slide in the script is removed (the original roll's edge stop).
+--add gives each listed roll that doesn't have its own roll-off speed one first (like Captain
+Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0, 0, 1) at END
+(27); EscapeB (the back roll, which moves away from the facing direction) gets -SPEED. A missing
+script is created (EscapeB often has none). A Set_Edge_Slide in the script is removed (the
+original roll's edge stop). Usually: --add SPEED EscapeF EscapeB.
 
 Roll-off (the user's change, see docs/universal-mechanics.md): the roll's ACMD sets a speed
 (Add/Set_Momentum with Horizontal != 0, Captain Falcon: 2.4 at frame 5) and the original
@@ -74,7 +76,7 @@ def edit(script):
         if f > 0:
             out.append(acmd.Command(FRAME, [f]))
         out.extend(events[f])
-    script[:] = out + [c for c in script if c.name == "Script_End"]
+    script[:] = out + [acmd.Command(acmd.END)]
 
 
 EDGE = acmd.BY_NAME["set_edge_slide"]
@@ -93,7 +95,7 @@ def add_speed(script, speed, start, end):
             out.append(acmd.Command(FRAME, [f]))
             cur = f
         out.append(c)
-    script[:] = out + [c for c in script if c.name == "Script_End"]
+    script[:] = out + [acmd.Command(acmd.END)]
 
 
 def main():
@@ -110,9 +112,16 @@ def main():
     names = rest or ["EscapeF"]
     f = acmd.ACMDFile.load(src)
     for n in names:
-        sc = f.script(int(n, 16) if n.startswith("0x") else n)
-        if add:
-            add_speed(sc, *add)
+        key = int(n, 16) if n.startswith("0x") else acmd.crc(n)
+        sc = f.scripts.get(key)
+        if sc is None:
+            if not add:
+                raise SystemExit("%s has no script (use --add)" % n)
+            sc = f.scripts[key] = []
+        has_speed = any(c.ident == MOM and float(c.params[0]) != 0 for _, c in timeline(sc))
+        if add and not has_speed:
+            speed = -add[0] if n.lower() == "escapeb" else add[0]
+            add_speed(sc, speed, *add[1:])
         edit(sc)
     f.save(dst)
 
