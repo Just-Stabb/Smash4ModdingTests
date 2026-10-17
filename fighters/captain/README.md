@@ -24,9 +24,10 @@ older upload with my roll-off shield check). Its own changes include:
   hitboxes 0–2 get the angle via `AttackModule(0x2739, id, angle)`; release jumps to frame 46;
   rotation resets at 79), `func_2262` (end: rotation reset). Ported to Kirby's Captain Falcon
   copy (status `0x18C`, `falconpunch_hold_*` in `kirby.c`).
-- **Its own roll-off** (roll pre `func_362`/`363`, roll end `func_381`/`382`, Fall main
-  `func_501`): this is the reference version, see `docs/universal-mechanics.md`. An earlier
-  build replaced it with my ACMD-flag system; that's undone, the roll code is the user's again.
+- **Roll-off:** the improved version (`docs/universal-mechanics.md`): roll pre `func_362`/`363`,
+  `rolloff_update()` in the roll loops `func_370`/`372`, roll ends `func_381`/`382` (air speed cap
+  flag), Fall main `func_501` back to the original, Fall end `func_535` clears the flag. ACMD:
+  `tools/rolloff_acmd.py <upload>/body/game.bin build/captain/game.bin --hold 2.4 EscapeF EscapeB`.
 - **Falcon Punch rotation swapped:** stick up now rotates up (angle −3/frame), down rotates down
   (+3); it was the other way round. That's the only change from the upload.
 - The decompiler wrote four `printf` strings with real line breaks; they're `\n` again so the

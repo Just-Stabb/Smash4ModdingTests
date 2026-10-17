@@ -8150,24 +8150,22 @@ int func_361()
 
 int func_362()
 {
-    WorkModule(0, 0, 0x208000e0);
     if (func_364())
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0x6, 0x1, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
 
 int func_363()
 {
-    WorkModule(0, 0, 0x208000e0);
     if (func_364())
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8263,6 +8261,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8294,6 +8293,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8563,18 +8563,7 @@ void func_380()
 
 void func_381()
 {
-    float var0;
-    var0 = WorkModuleF(0x6, 0x1000004);
-    WorkModule(0, var0, 0x208000e0);
-    if (ControlModule(0x2712, 0x3) == 0x1)
-    {
-        GroundModule(0x2710, 0x5);
-    }
-    if (ControlModule(0x2713, 0x3))
-    {
-        GroundModule(0x2710, 0x9);
-    }
-    if (global6 == 0xe)
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
     }
@@ -8583,18 +8572,7 @@ void func_381()
 
 void func_382()
 {
-    float var0;
-    var0 = WorkModuleF(0x6, 0x1000004);
-    WorkModule(0, var0, 0x208000e0);
-    if (ControlModule(0x2712, 0x3))
-    {
-        GroundModule(0x2710, 0x2);
-    }
-    if (ControlModule(0x2713, 0x3))
-    {
-        GroundModule(0x2710, 0x1);
-    }
-    if (global6 == 0xe)
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
     }
@@ -10437,11 +10415,6 @@ void func_500()
 
 void func_501()
 {
-    if (global5 == 0x20 || global5 == 0x21)
-    {
-        WorkModule(0, 0x208000e0, 0x1000004);
-    }
-    WorkModule(0x14, 0x20000044);
     func_502();
     func_78(func_503);
 }
@@ -11114,7 +11087,7 @@ void func_534()
 
 void func_535()
 {
-    
+    WorkModule(0x14, 0x20000044); // roll-off: leaving Fall puts the air speed cap back
 }
 
 void func_536()
@@ -38099,3 +38072,26 @@ void func_2360()
     }
 }
 
+// ===================================================================
+// Roll-off (docs/universal-mechanics.md). The rolls' ACMD sets their speed (EscapeF +S /
+// EscapeB -S from frame rolloff_start_frame(), set again every frame so it stays the same,
+// 0 at frame 27); kinetic 0x6 so the animation doesn't move the fighter. Every roll frame:
+// before the speed frame, or while shield is held (ControlModule(0x2712, 3)), ground
+// correction 0x2 (stops at edges, like crouching / shielding); from the speed frame on,
+// 0x1 (can slide off, like a rebound). Sliding off goes to Fall (func_374): the roll end
+// (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is Fall,
+// and Fall's end (func_535) clears it.
+// ===================================================================
+float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+
+void rolloff_update()
+{
+    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3))
+    {
+        GroundModule(0x2710, 0x1);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x2);
+    }
+}

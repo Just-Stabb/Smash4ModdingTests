@@ -10,6 +10,15 @@ Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0,
 script is created (EscapeB often has none). A Set_Edge_Slide in the script is removed (the
 original roll's edge stop). Usually: --add SPEED EscapeF EscapeB.
 
+--hold SPEED [START END] (the current roll-off, docs/universal-mechanics.md): replaces the
+roll's speed commands (and any Set_Edge_Slide) with a constant speed: Add/Set_Momentum(0, 0, 1)
+at frame 0, (SPEED, 0, 1) on every frame from START (5), (0, 0, 1) at END (27). Mode 1 sets the
+speed (the rolls' own (0, 0, 1) stop shows that), so setting it every frame keeps it constant.
+EscapeB gets -SPEED. If the roll turns around (Reverse_Direction, the forward roll at frame
+20 / 21) the speed is only set up to that frame, so the turn can't flip it; the last setting
+carries on to END. A missing script is created. No shield-flag checks: the fighter's MSC
+handles edges (rolloff_update).
+
 --plain (with --add): only add the speed, no shield-flag checks. That's the user's roll-off
 (Captain Falcon's latest MSC does the shield part itself, in the roll end scripts; see
 docs/universal-mechanics.md): e.g. --plain --add 2.1 EscapeF.
@@ -102,10 +111,46 @@ def add_speed(script, speed, start, end):
     script[:] = out + [acmd.Command(acmd.END)]
 
 
+REVERSE = acmd.BY_NAME["reverse_direction"]
+
+
+def hold_speed(script, speed, start=5.0, end=27.0):
+    tl = [(f, c) for f, c in timeline(script) if c.ident not in (MOM, EDGE)]
+    rev = [f for f, c in tl if c.ident == REVERSE and f > start]
+    last = min(rev[0], end) if rev else end
+    tl.append((0.0, acmd.Command(MOM, [0.0, 0.0, 1])))
+    f = float(start)
+    while f < last:
+        tl.append((f, acmd.Command(MOM, [speed, 0.0, 1])))
+        f += 1
+    tl.append((float(end), acmd.Command(MOM, [0.0, 0.0, 1])))
+    tl.sort(key=lambda x: x[0])
+    out, cur = [], 0.0
+    for fr, c in tl:
+        if fr != cur:
+            out.append(acmd.Command(FRAME, [fr]))
+            cur = fr
+        out.append(c)
+    script[:] = out + [acmd.Command(acmd.END)]
+
+
 def main():
     args = sys.argv[1:]
     src, dst = args[0], args[1]
     rest = args[2:]
+    if rest and rest[0] == "--hold":
+        rest = rest[1:]
+        nums = []
+        while rest and rest[0].replace(".", "", 1).isdigit():
+            nums.append(float(rest.pop(0)))
+        f = acmd.ACMDFile.load(src)
+        for n in rest or ["EscapeF", "EscapeB"]:
+            key = int(n, 16) if n.startswith("0x") else acmd.crc(n)
+            sc = f.scripts.setdefault(key, [])
+            sp = -nums[0] if n.lower() == "escapeb" else nums[0]
+            hold_speed(sc, sp, *nums[1:])
+        f.save(dst)
+        return
     plain = False
     if rest and rest[0] == "--plain":
         plain = True

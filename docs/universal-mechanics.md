@@ -27,39 +27,34 @@ Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
 
 ## Roll-off
 
-Rolls keep their speed off a ledge instead of stopping at it ("roll-off"). Holding the shield
-button changes how the roll's end sets the edge handling. This is the user's own version (from
-Captain Falcon's latest `captain.mscsb`); an earlier ACMD-flag version of mine didn't work as
-intended and was removed.
+Both rolls keep their speed off a ledge instead of stopping at it ("roll-off"). How it works
+(the user's design; this implementation improves the user's first version from Captain
+Falcon's `captain.mscsb`):
 
-- **ACMD:** the forward roll (`EscapeF`) sets a speed with `Add/Set_Momentum`: `(0, 0, 1)` at
-  frame 0, `(SPEED, 0, 0)` at frame 5, `(0, 0, 1)` at frame 27 (Captain Falcon 2.4, Kirby 2.1),
-  and the original `Set_Edge_Slide(5)` is removed. The back roll (`EscapeB`) has no script.
-  `tools/rolloff_acmd.py IN OUT --plain --add SPEED EscapeF` adds that to a roll without it.
-- **MSC, roll pre** (EscapeF `0x20` = common `func_362`, EscapeB `0x21` = `func_363`):
-  `WorkModule(0, 0, 0x208000e0)` first, and `StatusModule(0x5, 0, 0x6, 0x1, …)` (forward) /
-  `StatusModule(0x5, 0, 0x6, 0x2, …)` (back): kinetic `0x6`, ground correction `0x1` / `0x2`
-  (the originals are `0xF`, `0x2`).
-- **MSC, roll end** (key 2: `func_381` forward, `func_382` back):
+1. **The roll's animation doesn't move the fighter; ACMD sets the speed.** Roll pre (EscapeF
+   `0x20` = common `func_362`, EscapeB `0x21` = `func_363`): `StatusModule(0x5, 0, 0x6, 0x2, …)`,
+   kinetic `0x6` (the originals use `0xF`, motion movement).
+2. **Constant speed from a set frame to a set frame.** ACMD (`EscapeF`, `EscapeB`):
+   `Add/Set_Momentum(0, 0, 1)` at frame 0, `(SPEED, 0, 1)` on every frame from 5, `(0, 0, 1)` at
+   27. The back roll gets −SPEED. Mode 1 sets the speed, so setting it every frame keeps it
+   constant. The forward roll turns around (`Reverse_Direction`, frame 20 / 21); the speed is only
+   set up to that frame and the last setting carries on to 27.
+   `tools/rolloff_acmd.py IN OUT --hold SPEED EscapeF EscapeB` (Captain Falcon 2.4, Kirby 2.1).
+3. **Sliding off from the speed frame.** Every roll frame (`rolloff_update()`, first in the roll
+   loops `func_370` / `func_372`): before `rolloff_start_frame()` (5, = the ACMD's speed frame)
+   ground correction `0x2` (stops at edges, like crouching / shielding), from then on `0x1` (can
+   slide off, like a rebound).
+4. **Shield held → no sliding off.** While the shield button is held
+   (`ControlModule(0x2712, 3)`) it stays `0x2`.
+5. **No air speed cap while falling from it.** Sliding off sends the roll to Fall (`func_374`).
+   The roll end (key 2: `func_381` / `func_382`) sets flag `0x20000044` (lifts the max horizontal
+   air speed) when the next status (`global6`) is Fall (`0xE`); Fall's end (key 2, `func_535`,
+   empty before) clears it, so it lasts until the fighter leaves that Fall.
 
-```c
-float var0;
-var0 = WorkModuleF(0x6, 0x1000004);
-WorkModule(0, var0, 0x208000e0);
-if (ControlModule(0x2712, 0x3) == 0x1) { GroundModule(0x2710, 0x5); } // shield held (back roll: 0x2)
-if (ControlModule(0x2713, 0x3))        { GroundModule(0x2710, 0x9); } // shield not held (back roll: 0x1)
-if (global6 == 0xe) { WorkModule(0x13, 0x1, 0x20000044); }           // next status Fall: lift the air speed cap
-func_383();
-```
+Changes from the user's first version: the back roll has a speed script and slides off too;
+the speed is set every frame instead of added once; edge sliding is decided every roll frame
+(it was only set in the roll's end script); the flag is cleared when Fall ends (it was cleared
+at the start of Fall); the `0x208000e0` / `0x1000004` save / restore is gone (Fall main wrote the
+ID `0x208000e0` itself into `0x1000004`).
 
-- **MSC, Fall main** (`0xE` key 1, common `func_501`), first:
-
-```c
-if (global5 == 0x20 || global5 == 0x21) { WorkModule(0, 0x208000e0, 0x1000004); } // came from a roll
-WorkModule(0x14, 0x20000044);
-```
-
-`global5` = previous status, `global6` = next status. `ControlModule(0x2712, b)` = button held,
-`0x2713` = not held (button 3 = shield). Flag `0x20000044` lifts the max horizontal air speed.
-
-Done: Captain Falcon (user); Kirby (ported, speed 2.1).
+Done: Captain Falcon (2.4), Kirby (2.1).
