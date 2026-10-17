@@ -12,7 +12,10 @@ damage = the throw's original damage (8) x (1 + t/10).
   RELEASE_WBKB, so the opponent stays on the ground), then at HIT_FRAME a Special_Hitbox with the
   bury effect (0xB, copied from Kirby's Stone), 270 degrees, the throw's original knockback,
   HITLAG_BIG x hitstop, for HIT_FRAMES frames.
-Run it on an unedited throwb (it refuses a script that already has the tiers).
+Run it on an unedited throwb (it refuses a script that already has the tiers). With
+`--retune` on an edited throwb, it only sets the bury slams' Size (SIZE) and SDI (SDI).
+
+  python3 tools/kirby_throwb_acmd.py IN OUT --retune
 """
 import os
 import sys
@@ -31,7 +34,8 @@ SPIKE = 270
 HIT_FRAME = 42
 HIT_FRAMES = 2
 RELEASE_WBKB = 10
-SIZE = 12.0
+SIZE = 18.0         # bury slam size (was 12; bigger so it catches opponents still slightly airborne)
+SDI = 0.0
 
 IVC = acmd.BY_NAME["int_var_compare"]
 TRUE = acmd.BY_NAME["true"]
@@ -56,7 +60,14 @@ def main():
     f = acmd.ACMDFile.load(src)
     s = f.script("throwb")
     if any(c.ident in (IVC, HITBOX) for c in s):
-        sys.exit("throwb already edited")
+        if "--retune" not in sys.argv[3:]:
+            sys.exit("throwb already edited (use --retune to only update the slam's Size / SDI)")
+        for c in s:
+            if c.ident == HITBOX and c.params[c.info["syntax"].index("Effect")] == BURY:
+                c.params[c.info["syntax"].index("Size")] = SIZE
+                c.params[c.info["syntax"].index("SDI")] = SDI
+        f.save(dst)
+        return
     stone = next(c for c in f.script(0xBD5B3ADE) if c.ident == HITBOX)  # Kirby's Stone (bury effect 0xB)
     base = next(c for c in s if c.ident == SPEC and c.params[0] == 0)
     orig = list(base.params)  # ID, Bone, Damage, Angle, KBG, WBKB, BKB, Effect, ?, Hitlag, ...
@@ -80,7 +91,7 @@ def main():
         h = acmd.Command(HITBOX, list(stone.params))
         for name, v in (("ID", 0), ("Bone", 0), ("Damage", damage(dmg, t)), ("Angle", SPIKE),
                         ("KBG", orig[4]), ("WBKB", orig[5]), ("BKB", orig[6]), ("Size", SIZE),
-                        ("X", 0.0), ("Y", 3.0), ("Z", 0.0), ("Effect", BURY),
+                        ("X", 0.0), ("Y", 3.0), ("Z", 0.0), ("Effect", BURY), ("SDI", SDI),
                         ("Hitlag", HITLAG_BIG if t > BIG_TIER else 1.0), ("Ground/Air", 3)):
             h.params[syn.index(name)] = v
         return h

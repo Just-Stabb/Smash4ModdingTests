@@ -73,6 +73,7 @@ int global71;
 float global72;
 float global73;
 int global74;
+int global75;
 
 void func_0()
 {
@@ -11822,7 +11823,15 @@ void func_586()
     {
         var3 = WorkModule(0x6, 0x11000002) - 0x68;
         var4 = 0x6d + var3;
-        func_587(var4, 0x300001c + var3);
+        if (global5 == 0x34 && global75 == 0x1) // air rapid jab after its final hit (added)
+        {
+            nair_rapid_landing(var4, 0x300001c + var3);
+        }
+        else
+        {
+            func_587(var4, 0x300001c + var3);
+        }
+        global75 = 0;
     }
     else if (global4 == 0x19)
     {
@@ -72132,15 +72141,17 @@ void falconpunch_hold_update()
 // - Neutral air (AttackAirN, motion 0x68) plays rapid jab's loop motion 0x54 (its ACMD calls
 //   the rapid jab hit 0xDCD907DA every 4 frames and loops forever) while attack is held, and
 //   after at least one loop, letting go plays the finisher 0x55 (nair_rapid_update). Status int
-//   0x11000002 keeps 0x68, so landing lag is still neutral air's. Status flag 0x2100000D (full
-//   landing lag) is on until the finisher's hit comes out (frame rapidjab_final_frame()), then
-//   off (autocanceled landing). The air finisher sets nair_rapid_air_flag() so its ACMD uses
-//   65% knockback hitboxes (tools/kirby_rapid_air_acmd.py). After one loop and before the final
+//   0x11000002 keeps 0x68, so landing lag is still neutral air's (flag 0x2100000D on for the whole
+//   move). Once the finisher's hit is out (frame rapidjab_final_frame()), global75 = 1 and the
+//   landing (func_586 -> nair_rapid_landing) plays at nair_rapid_landing_mult() (half) the lag.
+//   Neutral air sets nair_rapid_air_flag() so the ACMD uses the air hitboxes: loop hits at 60%
+//   damage, finisher at 65% knockback (tools/kirby_rapid_air_acmd.py). After one loop and before the final
 //   hit, air rapid jab cancels into the air grab, air specials and the other aerials
 //   (nair_rapid_cancel). global70 = neutral air frame count.
 // ===================================================================
 float rapidjab_final_frame() { return 5.0f; }
-int   nair_rapid_air_flag()  { return 0x21000024; } // status flag the finisher ACMD (attack100end) checks for its air hitboxes
+int   nair_rapid_air_flag()  { return 0x21000024; } // status flag the loop / finisher ACMD check for their air hitboxes
+float nair_rapid_landing_mult() { return 0.5f; }  // landing lag after the air final hit, times neutral air's
 int   rapidjab_loop_frames() { return 16; } // fallback loop length (its ACMD repeats every 16 frames)
 
 // Rapid jab loop length in frames: the loop motion's length, else rapidjab_loop_frames().
@@ -72213,8 +72224,10 @@ int rapidjab_cancel()
 
 void nair_rapid_start()
 {
+    WorkModule(0x2710, nair_rapid_air_flag()); // loop / finisher ACMD use the air hitboxes
     func_22(0x54, 0, 1.0f);
     global70 = 0;
+    global75 = 0;
     WorkModule(0x2710, 0x2100000d);
 }
 
@@ -72234,7 +72247,6 @@ int nair_rapid_update()
         global70++;
         if (global70 >= rapidjab_loop() && ControlModule(0x2713, 0))
         {
-            WorkModule(0x2710, nair_rapid_air_flag()); // finisher ACMD uses the 65% knockback hitboxes
             func_22(0x55, 0, 1.0f);
             return 0;
         }
@@ -72243,7 +72255,7 @@ int nair_rapid_update()
     {
         if (MotionModuleF(0x1) >= rapidjab_final_frame())
         {
-            WorkModule(0x2711, 0x2100000d); // final hit out: autocanceled landing from here
+            global75 = 0x1; // final hit out: half landing lag from here (nair_rapid_landing)
             return 0;
         }
     }
@@ -72382,4 +72394,20 @@ void sideb_cancel_hop()
     KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
     KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
     KineticModule(0xb, 0x1);
+}
+
+// LandingAir init (func_586): neutral air's landing (as func_587) with the lag times
+// nair_rapid_landing_mult(), when air rapid jab landed after its final hit (global75).
+void nair_rapid_landing(int motion, int param)
+{
+    float lag;
+    float rate;
+    lag = WorkModuleF(0, param);
+    rate = 1.0f;
+    if (lag != (float)0)
+    {
+        lag = (lag + lag * WorkModuleF(0, 0x20000be)) * nair_rapid_landing_mult();
+        rate = (float)MotionModule(0, motion) / lag;
+    }
+    func_22(motion, 0, rate);
 }

@@ -60,7 +60,10 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
   python3 tools/rolloff_acmd.py g4 g5 --plain --add 2.1 EscapeF EscapeB` (roll-off, see
   `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 g6`;
   `python3 tools/kirby_sideb_link_acmd.py g6 g7` (ground side B link);
-  `python3 tools/kirby_rapid_air_acmd.py g7 build/game.bin` (air rapid jab finisher at 65% knockback)
+  `python3 tools/kirby_rapid_air_acmd.py g7 g8` (air rapid jab: loop 60% damage, finisher 65% knockback);
+  `python3 tools/kirby_jump_articles_acmd.py g8 build/game.bin` (no test articles in the air jumps).
+  The current `build/game.bin` also had `kirby_throwb_acmd.py IN OUT --retune` run on it (bury
+  slam size 18, SDI 0); a fresh `kirby_throwb_acmd.py` run already uses those values
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
 - **Not fully sure:** `0x15C`, `0x15D` and `0x166` are mouthful states whose
@@ -625,7 +628,7 @@ Back throw is status `0xDC` with kind `0x79`. Code is at the end of `kirby.c`
     knockback 10) so the opponent stays on the ground. Then at frame 42 a
     `Special_Hitbox` slams them for 2 frames. It's copied from Kirby's Stone
     and uses bury (`0xB`), 270°, the original knockback (KBG 120, BKB 30),
-    size 12 on bone 0, ground and air, and hitlag 3.0. This buries (tested).
+    size 18 (was 12) with SDI 0 on bone 0, ground and air, and hitlag 3.0. This buries (tested at size 12; enlarged so it reaches opponents still slightly airborne).
 - **2.5× and up** (tier ≥ `throwb_zoom_tier()` = 15):
   - **Zoom**: the Final Smash zoom `CameraModule(0x2714, 10, 0, 2.0)`
     starts as soon as the drop so far is worth 2.5×, already during the fall
@@ -852,18 +855,24 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
   It loops while attack is held; letting go after at least one loop plays the finisher `0x55`
   (`nair_rapid_update()` in `func_317`), then Fall.
-  `0x11000002` keeps `0x68` (neutral air's landing lag). Flag `0x2100000D` (full landing lag)
-  stays on until the finisher's hit comes out (frame `rapidjab_final_frame()` = 5), then goes
-  off, so landing after that is autocanceled.
+  `0x11000002` keeps `0x68` (neutral air's landing lag), and flag `0x2100000D` (landing lag)
+  stays on for the whole move. Before the finisher's hit (frame `rapidjab_final_frame()` = 5)
+  landing has neutral air's full lag; from that frame on, `global75` = 1 and LandingAir's init
+  (`func_586`) calls `nair_rapid_landing()`, which plays the landing at
+  `nair_rapid_landing_mult()` (0.5) times the lag.
 - **Air rapid jab cancel (`nair_rapid_cancel()`):** after one loop and before the final hit:
   grab → Kirby's air grab (`airgrab_try()`, same once-per-airtime / item / after-forward-throw
   limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
   (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
   → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
   restart neutral air.
-- **Air finisher knockback 65%:** before playing `0x55`, the air version sets status flag
-  `0x21000024` (`nair_rapid_air_flag()`). `tools/kirby_rapid_air_acmd.py` turns each hitbox of
-  `attack100end` into `IS_FLAG(0x21000024)` True → the hitbox with KBG/BKB/WBKB × 0.65
-  (120/80 → 78/52), False → the original. Ground rapid jab never sets the flag.
+- **Air hitboxes (loop 60% damage, finisher 65% knockback):** neutral air sets status flag
+  `0x21000024` (`nair_rapid_air_flag()`) when it starts. `tools/kirby_rapid_air_acmd.py` turns
+  each hitbox of the loop hit `0xDCD907DA` and the finisher `attack100end` into
+  `IS_FLAG(0x21000024)` True → air version, False → the original. Air loop hits: Damage × 0.6
+  (1 → 0.6). Air finisher: KBG/BKB/WBKB × 0.65 (120/80 → 78/52). Ground rapid jab never sets
+  the flag.
+- **Air jumps:** `tools/kirby_jump_articles_acmd.py` removes the test `GENERATE_ARTICLE`s from
+  `jumpaerialf3`–`f5` (six each).
 - **Forward air autolink:** `tools/kirby_fair_autolink_acmd.py` gives the first hit's hitboxes
   (frame 10) the second hit's Angle 366 / KBG 30 / WBKB 0 / BKB 28.
