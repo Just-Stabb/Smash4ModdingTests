@@ -1717,6 +1717,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     starcopy_update(); // copy ability from the 12th star missile hit (added), see the end of the file
     throwb_camera_update(); // back throw: ends the big-hit camera zoom (added)
     fthrow_lock_update();   // forward throw: no air grab until a real landing (added)
+    sideb_reflect_off();    // air side B reflector off if the swing ended early (added, before crouchjump_update)
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
 }
 
@@ -71915,4 +71916,16 @@ void crouchjump_update()
     global63 = state | (frames << 8);
     global62 = global4;
     global65 = x;
+}
+
+// Air side B reflector (added). The air swing ACMD (tools/kirby_sideb_reflect_acmd.py) turns a
+// reflector on (kind 3, ID 0, group 3, like the Zelda copy's Nayru's Love) 2 frames before its
+// hitboxes and off when they're removed. If the swing status (0x171) ends before that (landing,
+// getting hit), turn it off here. global62 = last frame's status (crouchjump_update sets it).
+void sideb_reflect_off()
+{
+    if (global62 == 0x171 && global4 != 0x171)
+    {
+        ShieldModule(0, 0x3, 0, 0x1, 0x3);
+    }
 }

@@ -55,7 +55,8 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
   rate to `inhale_end_speed()` (3×) every frame, including after a ground/air
   motion swap.
 - **game.bin build:** `python3 tools/kirby_throwb_acmd.py build/acmd_in/game.bin g1;
-  python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 build/game.bin`
+  python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 g3;
+  python3 tools/kirby_sideb_reflect_acmd.py g3 build/game.bin`
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
 - **Not fully sure:** `0x15C`, `0x15D` and `0x166` are mouthful states whose
@@ -794,3 +795,15 @@ of the main loop `func_74`):
 - State (new globals): `global62` previous status, `global63` state / frame count, `global64`
   jump-squat ground speed, `global65` last X position, `global67` boosted takeoff speed
   (`global66` unused).
+
+## Added: air side B reflector
+
+`tools/kirby_sideb_reflect_acmd.py` adds a reflector to the air swings (status `0x171`):
+`SpecialAirS` (motion `0x2C1`, hitboxes frames 11–29; the low-charge `0x2B9` JUMPs to it) and
+the max-charge air swing (`0x2C9`, hash `0xFFBD29D0`, hitboxes frames 11–13). At frame 9
+(2 frames before the hitboxes) `REFLECTOR` + `SHIELD_ON(3, 0, 3)`; right after the first
+`Remove_All_Hitboxes`, `Shield_Off2(3, 0, 3)`. Kind 3 = reflector, ID 0, group 3, the same as
+Kirby's Zelda copy (Nayru's Love, `ShieldModule(0, 0x3, 0, on/off, 0x3)` in `func_2887`).
+Box: capsule on bone 0 from (0, 5, −3) to (0, 5, 12), size 8; reflected projectiles ×1.5
+damage, ×1.2 speed, up to 50 damage, ×1.0 lifetime. If the swing status ends early,
+`sideb_reflect_off()` (main loop) turns it off.
