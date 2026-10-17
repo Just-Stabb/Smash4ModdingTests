@@ -36,7 +36,29 @@ namespace Sm4shCommand
         static void Main(string[] args)
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
+            // Any crash is written (with its stack trace) to Sm4shCommand_errors.log next to the exe.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (o, e) => ReportError(e.Exception, true);
+            AppDomain.CurrentDomain.UnhandledException += (o, e) => ReportError(e.ExceptionObject as Exception, false);
+            if (args.Length > 0) // a file or fighter folder given on the command line / dropped on the exe
+                Runtime.Instance.Shown += (o, e) => Runtime.Instance.OpenPath(args[0]);
             Application.Run(Runtime.Instance);
+        }
+
+        static void ReportError(Exception e, bool canContinue)
+        {
+            string log = System.IO.Path.Combine(Application.StartupPath, "Sm4shCommand_errors.log");
+            try
+            {
+                System.IO.File.AppendAllText(log, $"==== {DateTime.Now:yyyy-MM-dd HH:mm:ss} {Title}{Environment.NewLine}{e}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch { }
+            string msg = $"{e?.GetType().Name}: {e?.Message}\n\nDetails were written to {log}.";
+            if (canContinue)
+                msg += "\n\nContinue? (No closes the program.)";
+            var answer = MessageBox.Show(msg, "Sm4shCommand error", canContinue ? MessageBoxButtons.YesNo : MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (canContinue && answer == DialogResult.No)
+                Application.Exit();
         }
 
         private static void RegisterFileAssociations()

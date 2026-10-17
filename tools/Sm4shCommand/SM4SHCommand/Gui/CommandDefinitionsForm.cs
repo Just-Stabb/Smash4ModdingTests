@@ -48,7 +48,7 @@ namespace Sm4shCommand
             RowHeadersWidth = 30,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         };
-        readonly Label lblInfo = new Label { AutoSize = true, ForeColor = Color.DimGray };
+        readonly Label lblInfo = new Label { AutoSize = true, MaximumSize = new Size(420, 0), ForeColor = Color.DimGray, Margin = new Padding(3, 6, 12, 0) };
         Def current;
         bool loading;
         bool dirty;
@@ -61,7 +61,7 @@ namespace Sm4shCommand
             MinimizeBox = false;
 
             foreach (var pair in ACMD_INFO.CMD_NAMES)
-                defs.Add(Load(pair.Key));
+                defs.Add(LoadDef(pair.Key));
             defs.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
             // left: filter + list
@@ -103,6 +103,7 @@ namespace Sm4shCommand
             var btnClose = new Button { Text = "Close", Width = 90 };
             var btnSave = new Button { Text = "Save to Events.cfg", Width = 140 };
             btnClose.Click += (o, e) => Close();
+            CancelButton = btnClose; // Esc closes
             btnSave.Click += (o, e) => Save();
             bottom.Controls.Add(btnClose);
             bottom.Controls.Add(btnSave);
@@ -151,7 +152,7 @@ namespace Sm4shCommand
             };
         }
 
-        static Def Load(uint crc)
+        static Def LoadDef(uint crc)
         {
             var d = new Def { Ident = crc, Name = ACMD_INFO.CMD_NAMES[crc], Description = ACMD_INFO.GetDescription(crc) };
             string format, syntax;
@@ -276,7 +277,7 @@ namespace Sm4shCommand
             }
             dirty = false;
             Select(current);
-            lblInfo.Text = $"Saved to {path}. Reopen script tabs to see renamed commands.";
+            lblInfo.Text = "Saved to Events.cfg. Reopen script tabs to see renamed commands.";
             return true;
         }
 

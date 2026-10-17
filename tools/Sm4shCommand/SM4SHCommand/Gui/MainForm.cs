@@ -121,14 +121,33 @@ namespace Sm4shCommand
             abtBox.ShowDialog();
         }
 
-        private unsafe void fOpen_Click(object sender, EventArgs e)
+        private void fOpen_Click(object sender, EventArgs e)
         {
             if (ofDlg.ShowDialog() == DialogResult.OK)
+                OpenFile(ofDlg.FileName);
+        }
+
+        /// <summary>
+        /// Opens a path given on the command line (or dropped on the exe): a folder opens as a
+        /// fighter, a file as a single file.
+        /// </summary>
+        public void OpenPath(string path)
+        {
+            if (Directory.Exists(path))
+                OpenFighter(path);
+            else if (File.Exists(path))
+                OpenFile(path);
+            else
+                LogMessage($"Not found: {path}");
+        }
+
+        public unsafe void OpenFile(string fileName)
+        {
             {
                 this.Reset();
-                if (ofDlg.FileName.EndsWith(".bin"))
+                if (fileName.EndsWith(".bin"))
                 {
-                    DataSource source = new DataSource(FileMap.FromFile(ofDlg.FileName));
+                    DataSource source = new DataSource(FileMap.FromFile(fileName));
                     if (*(buint*)source.Address == 0x41434D44) // ACMD
                     {
                         if (*(byte*)(source.Address + 0x04) == 0x02)
@@ -137,7 +156,7 @@ namespace Sm4shCommand
                             Runtime.WorkingEndian = Endianness.Big;
 
                         var f = new ACMDFile(source);
-                        ScriptFiles.Add(ofDlg.FileName, f);
+                        ScriptFiles.Add(fileName, f);
                         var node = new TreeNode("ACMD") { Name = "nACMD" };
                         foreach (var keypair in f.Scripts)
                         {
@@ -150,16 +169,16 @@ namespace Sm4shCommand
                     else if (*(buint*)source.Address == 0xFFFF0000)
                     {
                         source.Close();
-                        ParamFile = new ParamFile(ofDlg.FileName);
+                        ParamFile = new ParamFile(fileName);
                         var node = new TreeNode("PARAMS") { Name = "nPARAMS" };
                         FileTree.Nodes.Add(node);
                         PopulateParams();
                     }
                 }
-                else if (ofDlg.FileName.EndsWith(".mscsb")) // MSC
+                else if (fileName.EndsWith(".mscsb")) // MSC
                 {
-                    var f = new MSCFile(ofDlg.FileName);
-                    ScriptFiles.Add(ofDlg.FileName, f);
+                    var f = new MSCFile(fileName);
+                    ScriptFiles.Add(fileName, f);
 
                     var node = new TreeNode("MSC") { Name = "nMSC" };
                     for (int i = 0; i < f.Scripts.Count; i++)
@@ -175,15 +194,20 @@ namespace Sm4shCommand
                     FileTree.Nodes.Add(node);
                 }
                 IDEMode = IDE_MODE.File;
-                this.Text += ofDlg.FileName;
+                this.Text += fileName;
             }
         }
         private void fitOpen_Click(object sender, EventArgs e)
         {
             if (fsDlg.ShowDialog() == DialogResult.OK)
+                OpenFighter(fsDlg.SelectedPath);
+        }
+
+        public void OpenFighter(string folder)
+        {
             {
                 this.Reset();
-                foreach (var p in Directory.EnumerateFiles(fsDlg.SelectedPath))
+                foreach (var p in Directory.EnumerateFiles(folder))
                 {
                     if (p.EndsWith(".bin"))
                     {
@@ -192,7 +216,7 @@ namespace Sm4shCommand
                         Runtime.WorkingEndian = acmd.Endian;
                     }
                 }
-                var mtable = Path.Combine(fsDlg.SelectedPath, "motion.mtable");
+                var mtable = Path.Combine(folder, "motion.mtable");
                 if (File.Exists(mtable))
                     MotionTable = new MTable(mtable, Runtime.WorkingEndian);
                 else
@@ -205,7 +229,7 @@ namespace Sm4shCommand
                 FileTree.Nodes.Add(acmdnode);
                 PopulateFighterScripts();
                 IDEMode = IDE_MODE.Fighter;
-                this.Text += fsDlg.SelectedPath;
+                this.Text += folder;
             }
         }
 

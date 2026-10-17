@@ -9,6 +9,12 @@ Sm4shCommand and the SALT library it builds on, copied from Sammi Husky's reposi
 Both are by Sammi Husky; see `SM4SHCommand/LICENSE.txt`, `SM4SHCommand/COPYING.txt` and
 `SALT/LICENSE`. Sm4shCommand uses FastColoredTextBox (LGPLv3), included as `FastColoredTextBox.dll`.
 
+**Run:** needs .NET Framework 4 (built into Windows 10/11). Windows may warn that the exe is from an
+unknown publisher ("More info" > "Run anyway"); if the zip was downloaded, right-click it > Properties >
+Unblock before extracting. A file or fighter folder can be dragged onto the exe (or given on the command
+line) to open it. If anything goes wrong, the error and its details are written to
+`Sm4shCommand_errors.log` next to the exe.
+
 **Build:** open `Sm4shCommand.sln` in Visual Studio (Windows, .NET Framework 4.0 or later) and build.
 `Events.cfg` and `AnimNames.txt` are copied next to the exe. (The FastColoredTextBox reference used to
 point at the original author's desktop; it now uses the bundled DLL.)
@@ -39,6 +45,8 @@ Also:
 - **Intensity_Special_Hitbox** listed 46 parameters for a 48-word command, so saving zeroed its last
   word; it now has 47.
 - The tree filter box no longer throws when narrowing the list.
+- Empty motion.mtable slots show as `(empty)`.
+- The folder picker falls back to the standard folder dialog if the Vista-style one can't be created.
 
 ## Events.cfg format
 
@@ -57,7 +65,10 @@ A block with a problem is skipped and reported in the log at startup.
 
 ## Checked
 
-- Built against .NET Framework 4.0 reference assemblies (compile only; the UI itself was not run).
+- Run under Wine (wine-mono): opens a fighter folder, names and unlisted scripts in the tree, filter,
+  editor with tooltips, Ctrl+click on CALL, edit + Ctrl+S saving in place (only the edited script
+  changes), the compile-error dialog, Command Definitions (edit + save), Add Script (all four files +
+  motion.mtable). Not run on Windows itself.
 - SALT: every script of Kirby's game/sound/expression.bin and Captain Falcon's game.bin
   (2,000+ scripts) prints to text and compiles back to identical bytes. In effect.bin, 470 of 475 do; the
   other 5 are else-if chains that SALT writes as nested Else blocks (same behaviour, different offsets;

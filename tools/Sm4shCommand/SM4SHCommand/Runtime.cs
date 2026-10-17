@@ -88,6 +88,8 @@ namespace Sm4shCommand
         /// </summary>
         public static string ScriptLabel(uint crc)
         {
+            if (crc == 0)
+                return "(empty)"; // unused motion.mtable slot
             string name;
             return AnimNames.TryGetValue(crc, out name) ? name : crc.ToString("X8");
         }
