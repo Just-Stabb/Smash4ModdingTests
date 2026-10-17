@@ -48288,7 +48288,6 @@ void func_2871()
     {
         WorkModule(0x2711, 0x21000010);
         ArticleModule(0x2710, 0);
-        copy_custom_article(0); // Bowser's custom Fire Breath hitboxes (added)
     }
 }
 
@@ -71766,9 +71765,10 @@ void throwlw_zoom_update()
 // ===================================================================
 // Copy abilities with the swallowed fighter's custom neutral special (added).
 // cross_f.rpx (tools/copy_custom_cave.py) stores the victim's custom N slot (0 = default, 1-3)
-// in Kirby's int 0x1000009F when he swallows, and loads the copied move's params for that
-// slot. The copied weapon's hitboxes come from its motion (motion index = custom slot for
-// Bowser's breath), so after spawning it Kirby switches the article to that motion.
+// in Kirby's int 0x1000009F when he swallows, loads the copied move's params for that slot, and
+// gives Kirby's generated weapons that custom number (their params and hitbox motion follow).
+// copy_custom_article (switching a spawned article's motion by hand) isn't used any more: the
+// weapon's own motion hook already adds its custom number.
 // ===================================================================
 int copy_custom_slot()
 {

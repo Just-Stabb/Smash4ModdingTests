@@ -16,7 +16,12 @@ and writes the copied costume to 0xA5 (the first version used 0xA5 and got the c
 count becomes 0x1C, so 0x9F/0xA0 survive (unused by Kirby's MSC and the star copy cave).
 Writing the slot after copy_grant returned was too late: the params were already loaded.
 CAVE_B (copy loader, 0x02F1B910-0x02F1B928): source += Kirby's 0x1000009F * size (0-3).
-Kirby's MSC also reads 0x1000009F to pick the copied move's weapon motion (hitbox variant).
+CAVE_C (article generation, hook 0x02F062C0 `lwz r0, 0x120(r9)`): a fighter's generated
+weapon gets its custom number (init struct +0x5C, the weapon's 0x10000005: its param block via
+the weapon's getter, e.g. Bowser breath 0x031ABB8C, and its motion = ACMD variant) from the
+owner's int 0x10000048 ([int array]+0x120). For Kirby (kind 8) with a copy (int 0xA4 < 0x3A)
+it uses 0x1000009F instead. Found with a Cemu breakpoint on the breath getter: LR 0x02BCC414
+(0x02BCC3BC, r5 = custom) <- 0x02B61A94 (custom = (s8)[init+0x5C]) <- 0x02C073DC <- 0x02F062D8.
 """
 CAVE_A = 0x037EE680
 SLOT = 0x1000009F
@@ -26,7 +31,9 @@ CLEAR_COUNT = 0x02EFCE14  # li r11, 0x1E -> 0x1C
 HOOK_B, RET_B = 0x02F1B910, 0x02F1B92C
 SIZE_FN = 0x02EA9104
 WM_GET, WM_SET = 0x84, 0x8C
-LIMIT = 0x037EE73C  # last word of the Havok cave takes moved relocations (starcopy_cave.py)
+LIMIT = 0x037EE73C
+CAVE_C = 0x037EE400  # free (zero) part of the Havok cave
+HOOK_C, RET_C = 0x02F062C0, 0x02F062C4  # last word of the Havok cave takes moved relocations (starcopy_cave.py)
 
 
 def D(op, rd, ra, imm): return (op << 26) | (rd << 21) | (ra << 16) | (imm & 0xFFFF)
@@ -120,6 +127,18 @@ def patches():
     p = cave_a + cave_b
     p.append((HOOK_A, b(HOOK_A, CAVE_A)))
     p.append((CLEAR_COUNT, li(11, 0x1C)))
+    # r9 = owner's int array, r26 = owner fighter object (kind at +4); r11/r12 are free here.
+    cave_c, end3 = assemble(CAVE_C, [
+        lwz(0, 0x120, 9),                             # replaced: owner's 0x10000048
+        lwz(12, 4, 26), cmpwi(12, 8), ('bc', BNE, 'done'),
+        lwz(12, 0x290, 9), cmplwi(12, 0x3A), ('bc', BGE, 'done'),
+        lwz(0, (SLOT & 0xFFFF) * 4, 9),               # Kirby with a copy: the copied custom slot
+        'done',
+        ('b', RET_C),
+    ])
+    assert end3 <= 0x037EE600
+    p += cave_c
+    p.append((HOOK_C, b(HOOK_C, CAVE_C)))
     p.append((HOOK_B, b(HOOK_B, end)))
     return p
 

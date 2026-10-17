@@ -642,11 +642,14 @@ hit states oddly. In the user's setup these characters never detransform, so thi
   slot * size to the copy loader's source.
 - **Second test** wrote `0x9F` after copy_grant returned: hitboxes matched, params didn't, so
   the params are loaded inside copy_grant (after the clear and the kind write).
-- Weapon hitboxes: the copied weapon (e.g. Bowser's `breath`) picks its ACMD by motion index +
-  weapon int `0x10000005` (not set from Kirby's slot). Kirby's MSC switches the spawned article's
-  motion to the slot (`copy_custom_article`, `ArticleModule(0x2715, article, slot, 1)`).
-- Not handled: a copy from the star missile path (`starcopy_cave.py`) gets slot 0 (copy_grant
-  clears `0x9F`).
+- Weapon custom number: generated weapons take it from the init struct (+0x5C, filled at
+  `0x02F062C0` from the owner's int `0x10000048` = `[int array]+0x120`). It picks the weapon's
+  param block (getter per weapon, e.g. Bowser breath `0x031ABB8C`: `[koopa]+0x150` + custom*0x14 =
+  life / hit frames / speeds) and its motion (ACMD variant, via the weapon's `0x10000005`).
+  Found with a Cemu breakpoint on `0x031ABB8C`: LR `0x02BCC414` (`0x02BCC3BC`, r5 = custom) ←
+  `0x02B61A94` (`(s8)[init+0x5C]`) ← `0x02C073DC` ← `0x02F062D8`. CAVE_C (`0x037EE400`) uses
+  Kirby's `0x9F` there when Kirby (kind 8) has a copy. (The first MSC fix, switching the
+  breath article's motion with `ArticleModule(0x2715)`, only fixed the hitboxes.)
 - Effects / sounds: Kirby's Bowser copy runs Bowser's own ACMD (`MotionAnimcmdModule(0, 0, motion,
   0xF)`, kind `0xF` = koopa) for motions `0x211`/`0x215`/…; each has 4 slots, so Kirby's MSC uses
   motion + slot (`copy_custom_motion`, in `func_2863` / `func_2864`).
