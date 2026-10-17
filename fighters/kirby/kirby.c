@@ -68,6 +68,7 @@ float global66;
 float global67;
 int global68;
 int global69;
+int global70;
 
 void func_0()
 {
@@ -6457,6 +6458,10 @@ void func_262()
 void func_263()
 {
     int var0;
+    if (jab_to_rapid()) // jab 1 goes straight to rapid jab (added)
+    {
+        return;
+    }
     func_262();
     var0 = WorkModule(0x6, 0x13000106);
     if (!StopModule(0x1))
@@ -7438,7 +7443,14 @@ void func_310()
     int var0;
     var0 = 0x68;
     var0 = func_311();
-    func_22(var0, 0, 1.0f);
+    if (var0 == 0x68) // neutral air: rapid jab's animation and ACMD (added, nair_rapid_*)
+    {
+        nair_rapid_start();
+    }
+    else
+    {
+        func_22(var0, 0, 1.0f);
+    }
     WorkModule(0x7, var0, 0x11000002);
 }
 
@@ -7522,6 +7534,10 @@ void func_316()
 
 void func_317()
 {
+    if (nair_rapid_update()) // neutral air rapid jab: ends after nair_rapid_frames() (added)
+    {
+        return 0x1;
+    }
     if (global18 == 0)
     {
         if (WorkModule(0x10, 0x2100000d) == 0x1)
@@ -7671,6 +7687,10 @@ void func_337()
     int var0;
     int var1;
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
+    {
+        return;
+    }
+    if (rapidjab_cancel()) // any attack before the final hit (added)
     {
         return;
     }
@@ -72012,4 +72032,76 @@ void falconpunch_hold_update()
         // with values his main loop (func_74) writes from his position each frame; Kirby's
         // main loop doesn't write them, so that call is left out.
     }
+}
+
+// ===================================================================
+// Jab / rapid jab / neutral air (added).
+// - Jab 1 (Attack11 0x25) goes straight to rapid jab (Attack100 0x26: start motion 0x53, loop
+//   0x54 while attack is held / mashed, finisher 0x55; state in status int 0x11000007 = 0/1/2).
+// - Rapid jab can be cancelled into any attack before its final hit: tilts, smashes and
+//   specials (from the command bits in global24: 0x2/0x4/0x8 tilts, 0x10/0x20/0x40 smashes,
+//   0x1000-0x8000 specials). Plain jab (0x1) and grab aren't included, so mashing A keeps the
+//   rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
+//   ACMD 0x8427B6B7: FRAME 1 + WAIT 4).
+// - Neutral air (AttackAirN, motion 0x68) plays rapid jab's loop motion 0x54 (its ACMD calls
+//   the rapid jab hit 0xDCD907DA every 4 frames and loops forever), so it ends after
+//   nair_rapid_frames() frames. Status int 0x11000002 keeps 0x68, so landing lag is still
+//   neutral air's; status flag 0x2100000D (landing with air lag) is set for the whole move.
+//   global70 = neutral air frame count.
+// ===================================================================
+float rapidjab_final_frame() { return 5.0f; }
+int   nair_rapid_frames()    { return 24; }  // 6 rapid jab hits
+
+int jab_to_rapid()
+{
+    func_16(0x26, 0x1);
+    return 0x1;
+}
+
+int rapidjab_cancel()
+{
+    int st;
+    if (WorkModule(0x6, 0x11000007) == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame())
+    {
+        return 0;
+    }
+    st = 0;
+    if (global24 & 0x2000) { st = 0x153; }
+    else if (global24 & 0x4000) { st = 0x154; }
+    else if (global24 & 0x8000) { st = 0x155; }
+    else if (global24 & 0x1000) { st = 0x152; }
+    else if (global24 & 0x10) { st = 0x2b; }
+    else if (global24 & 0x20) { st = 0x31; }
+    else if (global24 & 0x40) { st = 0x2e; }
+    else if (global24 & 0x4) { st = 0x29; }
+    else if (global24 & 0x8) { st = 0x2a; }
+    else if (global24 & 0x2) { st = 0x28; }
+    if (st == 0)
+    {
+        return 0;
+    }
+    func_16(st, 0x1);
+    return 0x1;
+}
+
+void nair_rapid_start()
+{
+    func_22(0x54, 0, 1.0f);
+    global70 = 0;
+    WorkModule(0x2710, 0x2100000d);
+}
+
+int nair_rapid_update()
+{
+    if (global4 != 0x34 || MotionModule(0x7) != 0x54)
+    {
+        return 0;
+    }
+    global70++;
+    if (global70 >= nair_rapid_frames() && global18 == 0x2)
+    {
+        func_16(0xe, 0);
+        return 0x1;
+    }
+    return 0;
 }
