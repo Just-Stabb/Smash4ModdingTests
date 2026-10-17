@@ -43,6 +43,10 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    `rolloff_start_frame()` (5) or while the shield button is held (`ControlModule(0x2712, 3)`),
    ground correction `0x2` (stops at edges, like crouching / shielding); otherwise `0x1` (can
    slide off, like a rebound).
+   **Shield lock:** once shield has been held `rolloff_lock_frames()` (10) frames in a row during
+   the roll, the roll can't slide off for the rest of it, even after shield is let go. The count
+   (an int global: Kirby `global72`, Captain Falcon `global62`) is reset in the roll pre scripts
+   and goes back to 0 whenever shield is released before reaching 10.
 4. **The speed at the edge carries over on its own.** Sliding off sends the roll to Fall
    (`func_374`), and the fighter keeps the roll's current speed into the fall with no extra code.
    (v3 also stored the speed every roll frame and gave it again in Fall's main; that doubled the

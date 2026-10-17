@@ -60,7 +60,7 @@ int global58;
 int global59;
 int global60;
 int global61;
-float global62;
+int global62;
 float global63;
 
 void func_0()
@@ -8157,6 +8157,7 @@ int func_362()
         return 0x1;
     }
     StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8168,6 +8169,7 @@ int func_363()
         return 0x1;
     }
     StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -38089,13 +38091,32 @@ void func_2360()
 // Sliding off goes to Fall (func_374), which keeps the roll's current speed on its own: the roll
 // end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is
 // Fall, and Fall's end (func_535) clears it. (The stored-speed boost Fall's main used to add on
-// top doubled the speed, so it's gone; global62 / global63 are unused now.)
+// top doubled the speed, so it's gone; global63 is unused now.)
+// Lock: global62 counts the frames in a row shield has been held this roll (reset when the roll
+// starts); once it reaches rolloff_lock_frames() (10) the roll can't slide off for the rest of
+// the roll, even after shield is let go.
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
 
 void rolloff_update()
 {
-    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3))
+    if (MotionModuleF(0x1) < 1.0f)
+    {
+        global62 = 0; // new roll
+    }
+    if (global62 < rolloff_lock_frames())
+    {
+        if (ControlModule(0x2712, 0x3))
+        {
+            global62++;
+        }
+        else
+        {
+            global62 = 0;
+        }
+    }
+    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3) && global62 < rolloff_lock_frames())
     {
         GroundModule(0x2710, 0x1);
     }
