@@ -60,6 +60,10 @@ int global58;
 int global59;
 int global60;
 int global61;
+int global62;
+int global63;
+float global64;
+float global65;
 
 void func_0()
 {
@@ -1711,6 +1715,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     starcopy_update(); // copy ability from the 12th star missile hit (added), see the end of the file
     throwb_camera_update(); // back throw: ends the big-hit camera zoom (added)
     fthrow_lock_update();   // forward throw: no air grab until a real landing (added)
+    crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
 }
 
 void func_75()
@@ -71799,4 +71804,90 @@ int copy_custom_motion(int motion)
         return motion + copy_custom_slot();
     }
     return motion;
+}
+
+// ===================================================================
+// Crouch jump (added). Jumping out of a crouch (Squat 0x11 / SquatWait 0x12 / SquatF 0x13 /
+// SquatB 0x14 / SquatRv 0x15 -> JumpSquat 0xA -> Jump 0xB) multiplies the jump's upward speed
+// by crouchjump_height() and adds crouchjump_momentum() of Kirby's ground speed from the
+// jump squat. While he's still moving up in the air, a trail effect spawns behind him every
+// crouchjump_gfx_every() frames (Smash 4 has no body-afterimage effect; the "AFTER_IMAGE"
+// ACMD commands are sword trails).
+// global62 = previous status, global63 = state (0 off, 1 jump squat from a crouch, 2 boosted
+// and rising; frame count in bits 0xFF00), global64 = ground speed in the jump squat,
+// global65 = last X position.
+// ===================================================================
+float crouchjump_height()   { return 1.4f; }  // x upward jump speed
+float crouchjump_momentum() { return 0.8f; }  // x ground speed carried into the jump
+int   crouchjump_gfx()      { return 0x1000094; } // common GFX 0x94 "Far knockback streak (large white)"
+float crouchjump_gfx_size() { return 0.6f; }
+int   crouchjump_gfx_every() { return 2; }    // frames between trail effects
+
+void crouchjump_update()
+{
+    int state;
+    int frames;
+    float vy;
+    float vx;
+    float x;
+    state = global63 & 0xff;
+    frames = (global63 >> 8) & 0xff;
+    x = PostureModuleF(0x1);
+    if (global4 == 0xa) // jump squat
+    {
+        if (global62 >= 0x11 && global62 <= 0x15)
+        {
+            state = 1;
+        }
+        if (state == 1 && global62 == 0xa)
+        {
+            global64 = x - global65; // ground speed per frame while squatting to jump
+        }
+        if (state == 1 && global62 != 0xa)
+        {
+            global64 = 0;
+        }
+    }
+    else if (state == 1)
+    {
+        if (global4 == 0xb && global18 == 0x2) // took off: boost once
+        {
+            vy = KineticModuleF(0x1, 0x1);
+            if (vy > 0)
+            {
+                KineticModule(0x11, 0x1, vy * crouchjump_height());
+            }
+            vx = KineticModuleF(0, 0x3) + global64 * crouchjump_momentum();
+            KineticModule(0x11, 0x3, vx, 0);
+            state = 2;
+            frames = 0;
+        }
+        else
+        {
+            state = 0;
+        }
+    }
+    if (state == 2)
+    {
+        if (global18 != 0x2 || KineticModuleF(0x1, 0x1) <= 0) // landed or stopped rising
+        {
+            state = 0;
+        }
+        else
+        {
+            if (frames % crouchjump_gfx_every() == 0)
+            {
+                EffectModule(0x3, crouchjump_gfx(), x, PostureModuleF(0x2) + 5.0f, PostureModuleF(0x3),
+                    0, 0, 0, crouchjump_gfx_size(), 0, 0xffffffff);
+            }
+            frames++;
+            if (frames > 0xff)
+            {
+                frames = 0xff;
+            }
+        }
+    }
+    global63 = state | (frames << 8);
+    global62 = global4;
+    global65 = x;
 }

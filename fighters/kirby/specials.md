@@ -768,3 +768,20 @@ neutral B can cancel it from `sideb_bounce_nb_cancel()` (1) frame later. It
 must be a neutral special press: `global24 & 0x1000` with none of the
 side/up/down special bits (`0xE000`). Everything else still waits for
 `sideb_bounce_cancel()` (6). Code: `sideb_bounce_cancel_update()`.
+
+## Added: crouch jump
+
+Jumping out of a crouch (Squat `0x11`–`0x14` or SquatRv `0x15` → JumpSquat `0xA` →
+Jump `0xB`) is boosted by `crouchjump_update()` (end of the main loop `func_74`):
+
+- **Height:** on the first airborne Jump frame the upward speed (gravity energy `0x1`) is
+  multiplied by `crouchjump_height()` (1.4).
+- **Momentum:** Kirby's ground speed during the jump squat (X position change per frame)
+  times `crouchjump_momentum()` (0.8) is added to his horizontal air speed (energy `0x3`).
+- **Trail:** while he's airborne and still rising, common GFX `0x94` ("Far knockback streak
+  (large white)", `crouchjump_gfx()`) spawns at his position every `crouchjump_gfx_every()`
+  (2) frames, size `crouchjump_gfx_size()` (0.6). Smash 4 has no body-afterimage effect; the
+  `AFTER_IMAGE*` ACMD commands are sword trails. Other IDs to try: `0x1000010` small star,
+  `0x100002F` aura particle, `0x100008C` transparent dash.
+- State: `global62` previous status, `global63` state / frame count, `global64` jump-squat
+  ground speed, `global65` last X position (new globals).
