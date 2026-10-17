@@ -37887,14 +37887,15 @@ void func_2360()
 
 // ===================================================================
 // Roll-off (added): the rolls' ACMD (EscapeF) adds speed at frame 5, so a roll keeps going off
-// a ledge. Holding shield during the roll stops that: this sets roll status flag 0x21000014
-// every frame the shield button (ControlModule(0x2713, 3), held) is down, and the ACMD
+// a ledge. Holding shield at any point before he slides off stops that: this sets roll status
+// flag 0x21000014
+// every roll frame the shield button is held (ControlModule(0x2712, 3)), and the ACMD
 // (tools/rolloff_acmd.py) then skips the frame-5 speed / sets the speed back to 0, so the roll
 // moves like the original one, which stops at the ledge.
 // ===================================================================
 void rolloff_guard_check()
 {
-    if (ControlModule(0x2713, 0x3))
+    if (ControlModule(0x2712, 0x3)) // shield held (0x2712 = held; 0x2713 would be "not held")
     {
         WorkModule(0x2710, 0x21000014);
     }

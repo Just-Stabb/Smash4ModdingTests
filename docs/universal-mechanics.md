@@ -28,14 +28,15 @@ Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
 ## Roll-off
 
 Rolls keep their speed off a ledge instead of stopping at it ("roll-off"), unless the shield
-button is held during the roll.
+button is held at any point during the roll before the fighter slides off the edge.
 
 - **ACMD (user's change):** the roll script (`EscapeF`) sets a speed with
   `Add/Set_Momentum` (Captain Falcon: `(0, 0, 1)` at frame 0, `(2.4, 0, 0)` at frame 5,
   `(0, 0, 1)` at frame 27) and the original `Set_Edge_Slide(State=5)` is removed. The roll
   then carries the fighter off the ledge, and the fall keeps the speed.
 - **Shield held → no roll-off:** the fighter's MSC sets roll status flag `0x21000014` on every
-  roll frame the shield button is held (`rolloff_guard_check()`, `ControlModule(0x2713, 3)`,
+  roll frame the shield button is held (`rolloff_guard_check()`, `ControlModule(0x2712, 3)` =
+  button 3 held; `0x2713` means "not held",
   called first in the EscapeF/EscapeB loops, common `func_370` / `func_372`), and
   `tools/rolloff_acmd.py` makes the roll's ACMD skip the speed while the flag is set (and set it
   back to 0 on later frames). The roll then moves like the original one, which stops at the
