@@ -74,6 +74,7 @@ int global72;
 float global73;
 int global74;
 int global75;
+int global76;
 
 void func_0()
 {
@@ -1727,6 +1728,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     fthrow_lock_update();   // forward throw: no air grab until a real landing (added)
     sideb_reflect_off();    // air side B reflector off if the swing ended early (added, before crouchjump_update)
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
+    kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
 }
 
 void func_75()
@@ -7448,7 +7450,7 @@ void func_310()
     int var0;
     var0 = 0x68;
     var0 = func_311();
-    if (var0 == 0x68) // neutral air: rapid jab's animation and ACMD (added, nair_rapid_*)
+    if (var0 == 0x68 && kirby_rapid_nair()) // neutral air: rapid jab's animation and ACMD (added, nair_rapid_*)
     {
         nair_rapid_start();
     }
@@ -72457,4 +72459,72 @@ void nair_rapid_landing(int motion, int param)
 void nair_rapid_drift()
 {
     KineticModule(0x15, 0x2, WorkModuleF(0, 0x3000016) * nair_rapid_drift_mult(), 100.0f);
+}
+
+// ===================================================================
+// Copy ability traits (added). docs/character-traits.md lists every character's trait; while
+// Kirby has a copy ability (flag 0x2000009A, copied fighter kind in int 0x100000A4) he gets that
+// trait's changes. global76 = current trait (0 = no copy).
+//   Rush: x1.25 movement stats (walk, dash, run, jump horizontal speed, air speed / acceleration,
+//         fall / fast fall speed; not jump height), and neutral air is the air rapid jab.
+//   Zoning, Strike, Juggernaut, Normal, Technical: no changes yet.
+// Stat boosts need the patched cross_f.rpx (tools/kirby_stat_cave.py): the stats are shared data,
+// so the executable scales them when they're read, for an object whose int 0x1000008E holds
+// 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile()).
+// ===================================================================
+int trait_none()       { return 0; }
+int trait_normal()     { return 1; }
+int trait_rush()       { return 2; }
+int trait_zoning()     { return 3; }
+int trait_strike()     { return 4; }
+int trait_juggernaut() { return 5; }
+int trait_technical()  { return 6; }
+
+int kirby_rapid_nair_without_copy() { return 0; } // 1 = Kirby's own neutral air is the rapid jab too
+
+// Trait of a fighter kind (the copied fighter). Keep in sync with docs/character-traits.md.
+int kirby_copy_trait(int kind)
+{
+    if (kind == 0xc)  { return trait_rush(); }   // Captain Falcon
+    if (kind == 0x22) { return trait_rush(); }   // Sonic
+    if (kind == 0x39) { return trait_rush(); }   // Corrin
+    if (kind == 0xf)  { return trait_strike(); } // Bowser
+    return trait_normal();                       // not listed yet
+}
+
+// Stat profile for the executable's stat scaling (tools/kirby_stat_cave.py PROFILES).
+int kirby_trait_profile(int trait)
+{
+    if (trait == trait_rush())
+    {
+        return 1;
+    }
+    return 0;
+}
+
+// main loop (func_74), every frame
+void kirby_trait_update()
+{
+    int trait;
+    trait = trait_none();
+    if (WorkModule(0x10, 0x2000009a))
+    {
+        trait = kirby_copy_trait(WorkModule(0x6, 0x100000a4));
+    }
+    global76 = trait;
+    WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait), 0x1000008e);
+}
+
+// neutral air uses the air rapid jab (nair_rapid_*)
+int kirby_rapid_nair()
+{
+    if (global76 == trait_rush())
+    {
+        return 0x1;
+    }
+    if (global76 == trait_none() && kirby_rapid_nair_without_copy())
+    {
+        return 0x1;
+    }
+    return 0;
 }

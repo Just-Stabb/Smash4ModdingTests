@@ -671,6 +671,9 @@ Star missile max count: `0x10136C58=9` is added to that command (the base `cave_
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py)
 
+(Current standard build adds `0x10136C58=9 $(python3 tools/kirby_stat_cave.py)` at the end; see
+"WorkModule stat reads" below.)
+
 Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
 only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
 or reads the custom slot itself.
@@ -682,3 +685,24 @@ attribute `0x300015F` (full hop) or `0x3000160` (short hop, when status flag `0x
 set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the JumpMini motions
 `0x1A`/`0x1C` from it), × work float `0x1000006`. Flag `0x21000012` picks a different getter
 (`0x02F1D940`). Used by Kirby's superjump (`crouchjump_update`).
+
+## WorkModule stat reads (copy-ability trait boosts)
+
+- `WorkModuleImpl` (`app\battle_object\modules\work\work_module_impl.cpp`, code around
+  `0x0200E500`–`0x02010600`) is the only WorkModule class; its vtable is `0x10003224` (entries every 8
+  bytes, function at `+4+8k`): `+0x44` get_float `0x0200F628`, `+0x4C` set_float `0x0200F648`,
+  `+0x84` get_int `0x0200F7F0`, `+0x8C` set_int `0x0200F810`, `+0xE4` is_flag `0x0200FA38`.
+  Constructor `0x0200E520` (0x1C bytes); init (`+0x14`, `0x0200E5C0`) takes the category table.
+- Values: `[WM+8]` = table of category containers, index = `id >> 24 & 0xF` (0/1 = instance/status
+  work, 2 = fighter_param_common, 3 = fighter_param, 5–8 = specials...). A container is
+  `+0` float count, `+4` floats, `+8` int count, `+0xC` ints, `+0x10` flag count, `+0x14` flags (counts
+  in entries, top 2 bits are flags; cleared by `0x0200FD9C` → memset-like `0x04AE0B14`). get_float is
+  `[[container]+4][(id & 0xFFFFFF)*4]` with no checks; set_float writes the same way.
+- Native movement code reads stats through vtable `+0x44` too (e.g. jump init `0x02E79940` reads
+  `0x0300000D`/`E`/`F`), so hooking get_float covers native and MSC reads.
+- Category 3 (`fighter_param`) is the character's entry of the shared table (one per kind, per the
+  MSC note sheet), so it isn't rewritten per Kirby; `tools/kirby_stat_cave.py` scales on read instead
+  (`docs/character-traits.md`). Cave at `0x037EE160`, table after it; hook `0x0200F628 = b cave`.
+  Tested in an emulator (Unicorn) against fake WorkModules; not yet in game.
+- Stat names: `reference/fighter_param_attributes.csv` (Sammi Husky's sheet from
+  `docs/resources.md`, tab "706249581").

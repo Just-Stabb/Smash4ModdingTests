@@ -889,3 +889,15 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   `jumpaerialf3`–`f5` (six each).
 - **Forward air autolink:** `tools/kirby_fair_autolink_acmd.py` gives the first hit's hitboxes
   (frame 10) the second hit's Angle 366 / KBG 30 / WBKB 0 / BKB 28.
+
+## Added: copy ability traits
+
+See `docs/character-traits.md`. While Kirby has a copy, `kirby_trait_update()` (main loop
+`func_74`) looks up the copied fighter's trait (`kirby_copy_trait()`), keeps it in `global76`, and
+writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scaling
+(`tools/kirby_stat_cave.py`; needs the current `build/cross_f.rpx`).
+
+- **Rush** (Captain Falcon, Sonic, Corrin): ×1.25 movement stats (not jump height); neutral air is
+  the air rapid jab (`kirby_rapid_nair()` in `func_310`).
+- Without a copy, or with a non-Rush copy, neutral air is Kirby's normal neutral air
+  (`kirby_rapid_nair_without_copy()` = 1 brings the rapid jab back for plain Kirby).
