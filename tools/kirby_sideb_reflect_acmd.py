@@ -25,7 +25,7 @@ HIT_FRAME = 11
 REFLECT_FRAME = HIT_FRAME - 2
 KIND, ID, GROUP = 3, 0, 3
 # ID, Bone, Size, X, Y, Z, X2, Y2, Z2, DmgMul, SpdMul, Threshold, Unknown, LifetimeMul, Type(group)
-REFLECTOR = [ID, 0, 8.0, 0.0, 5.0, -3.0, 0.0, 5.0, 12.0, 1.5, 1.2, 50.0, 0, 1.0, GROUP]
+REFLECTOR = [ID, 0, 8.0, 0.0, 5.0, -3.0, 0.0, 5.0, 12.0, 1.5, 1.2, 999.0, 0, 1.2, GROUP]
 
 FRAME = acmd.BY_NAME["frame"]
 HITBOX = acmd.BY_NAME["hitbox"]

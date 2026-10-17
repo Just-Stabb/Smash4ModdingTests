@@ -805,5 +805,5 @@ the max-charge air swing (`0x2C9`, hash `0xFFBD29D0`, hitboxes frames 11–13). 
 `Remove_All_Hitboxes`, `Shield_Off2(3, 0, 3)`. Kind 3 = reflector, ID 0, group 3, the same as
 Kirby's Zelda copy (Nayru's Love, `ShieldModule(0, 0x3, 0, on/off, 0x3)` in `func_2887`).
 Box: capsule on bone 0 from (0, 5, −3) to (0, 5, 12), size 8; reflected projectiles ×1.5
-damage, ×1.2 speed, up to 50 damage, ×1.0 lifetime. If the swing status ends early,
+damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends early,
 `sideb_reflect_off()` (main loop) turns it off.
