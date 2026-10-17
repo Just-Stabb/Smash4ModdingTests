@@ -58,7 +58,8 @@ SpecialN 0x152 -> SpecialNLoop 0x157 --B released--> SpecialNEnd 0x158
   python3 tools/kirby_throwlw_acmd.py g1 g2; python3 tools/kirby_inhale_acmd.py g2 g3;
   python3 tools/kirby_sideb_reflect_acmd.py g3 g4;
   python3 tools/rolloff_acmd.py g4 g5 --plain --add 2.1 EscapeF EscapeB` (roll-off, see
-  `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 build/game.bin`
+  `docs/universal-mechanics.md`); `python3 tools/kirby_fair_autolink_acmd.py g5 g6`;
+  `python3 tools/kirby_sideb_link_acmd.py g6 build/game.bin` (ground side B link)
 - **Mouthful (`func_2266`):** A, or B while flag `0x21000018` is set, spits.
   B or holding down below `0x5000011` swallows.
 - **Not fully sure:** `0x15C`, `0x15D` and `0x166` are mouthful states whose
@@ -113,6 +114,24 @@ The numbers (1.2, 0.8, 1.2) are yours. Tune them in the file.
 **Still there:** `func_22(0x290, 0, 1.0f)` after `func_16(0x171, 0x1)` is
 overwritten when the Swing status starts (`func_2466` → `func_2468` picks its
 own motion). To use animation `0x290`, change it inside `func_2468`.
+
+### Added: ground swing → air side B cancel, and a better link
+
+- **Cancel (`sideb_ground_cancel_update()`, end of `kirby.c`, called from the swing loop
+  `func_2467`):** in the ground swing (`0x171` on the ground), once the strong hit (from frame
+  `sideb_cancel_hit_frame()` = 11) has hit a hurtbox or shield (`AttackModule(0x2727, 0x6)`),
+  a side-special input (`global24 & 0x2000`) puts Kirby in the air and starts air side B
+  (`0x153`). It goes through the air side-B limit (`func_72(global25)`) and counts as one air
+  side B. The side-B main `func_2429` then applies a hop (`sideb_cancel_hop()`:
+  `sideb_cancel_hop_x()` 0.8 forward, `sideb_cancel_hop_y()` 1.5 up, Kirby's gravity) after it
+  sets the air kinetic type, so the speeds aren't wiped. `global74` marks the pending hop.
+- **Link (`tools/kirby_sideb_link_acmd.py`):** the weak start hit (`specialsstart`, frame 3)
+  launched at 58° (KBG 30, BKB 30), which carried opponents out of the swing's frame-11 strong
+  hit. It now uses autolink angle 366 with KBG 30 / BKB 28 (forward air's linking values), so
+  opponents travel with Kirby's slide. The ground swing (`specials`, also used by the
+  low-charge `0x2B5` swing) gets a third strong hitbox (ID 2, copy of ID 0) at Z 17, size 4.5,
+  for opponents who still drift a little. This extra reach applies to every non-max-charge
+  ground swing.
 
 ## Up B: Final Cutter (0x154, 0x172–0x174)
 

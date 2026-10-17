@@ -72,6 +72,7 @@ int global70;
 int global71;
 float global72;
 float global73;
+int global74;
 
 void func_0()
 {
@@ -40372,6 +40373,7 @@ void func_2429()
     WorkModule(0x2711, 0x2100000d);
     WorkModule(0x2711, 0x200000a0);
     func_2431();
+    sideb_cancel_hop(); // hop after a ground-swing cancel (added)
     func_78(func_2430);
 }
 
@@ -41010,6 +41012,11 @@ void func_2467()
     int sideb_cancel;
     sideb_bounce_update(); // on-hit bounce (added), see the end of the file
     sideb_cancel = sideb_bounce_cancel_update(); // cancel after the bounce (added)
+    if (sideb_cancel != 0)
+    {
+        return;
+    }
+    sideb_cancel = sideb_ground_cancel_update(); // ground swing hit -> air side B (added)
     if (sideb_cancel != 0)
     {
         return;
@@ -72241,4 +72248,74 @@ void rolloff_fall_start()
         KineticModule(0x11, 0x3, global72, 0);
         KineticModule(0xb, 0x3);
     }
+}
+
+// ===================================================================
+// Ground side-B cancel (added). Once the ground swing's strong hit (frame 11+) has touched a
+// hurtbox or a shield, a side-special input lifts Kirby off the ground and starts air side B
+// (SpecialS 0x153 in the air), which counts as one of the air side Bs. global74 = 1 while the
+// hop is pending: the side-B main (func_2429) applies it after it sets the air kinetic type,
+// so the type change can't wipe the speeds.
+// ===================================================================
+float sideb_cancel_hit_frame() { return 11.0f; } // ground swing frame the strong hit starts
+float sideb_cancel_hop_x()     { return 0.8f; }  // forward speed of the hop (times facing)
+float sideb_cancel_hop_y()     { return 1.5f; }  // upward speed of the hop
+
+int sideb_ground_cancel_update()
+{
+    if (global4 != 0x171)
+    {
+        return 0;
+    }
+    if (global18 != 0) // ground swing only
+    {
+        return 0;
+    }
+    if (MotionModuleF(0x1) < sideb_cancel_hit_frame())
+    {
+        return 0;
+    }
+    if (!AttackModule(0x2727, 0x6)) // hit a hurtbox (0x2) or a shield (0x4)
+    {
+        return 0;
+    }
+    if (!(global24 & 0x2000)) // side special input
+    {
+        return 0;
+    }
+    func_20(0x2); // air
+    GroundModule(0x2710, 0x5);
+    if (!func_72(global25)) // air side-B limit
+    {
+        func_20(0);
+        GroundModule(0x2710, 0x2);
+        return 0;
+    }
+    global74 = 0x1;
+    func_16(0x153, 0x1);
+    return 0x1;
+}
+
+// side-B main (func_2429), after func_2431 set the air kinetic type
+void sideb_cancel_hop()
+{
+    float facing;
+    if (global74 == 0)
+    {
+        return;
+    }
+    global74 = 0;
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    facing = PostureModuleF(0);
+    KineticModule(0xe, 0x3, 0x6, 0, 0, 0, 0, 0);          // reset horizontal energy (air)
+    KineticModule(0x11, 0x3, facing * sideb_cancel_hop_x(), 0);
+    KineticModule(0xb, 0x3);
+    KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);            // reset vertical energy
+    KineticModule(0x11, 0x1, sideb_cancel_hop_y());
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018)); // Kirby's gravity
+    KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019)); // Kirby's max fall speed
+    KineticModule(0xb, 0x1);
 }
