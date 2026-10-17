@@ -66,6 +66,8 @@ float global64;
 float global65;
 float global66;
 float global67;
+int global68;
+int global69;
 
 void func_0()
 {
@@ -46990,6 +46992,7 @@ float func_2796(float arg0)
 // [Copy: Captain Falcon 0x18C] pre
 int func_2797()
 {
+    falconpunch_hold_reset(); // holdable, rotating Falcon Punch (added, from captain.mscsb)
     func_69();
     StatusModule(0x5, 0xffffffff, 0, 0x7, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1192, 0, 0x80, 0x1000);
@@ -47044,6 +47047,7 @@ void func_2799()
 // [Copy: Captain Falcon 0x18C] per-frame
 void func_2800()
 {
+    falconpunch_hold_update(); // holdable, rotating Falcon Punch (added, from captain.mscsb)
     if (WorkModule(0x10, 0x2100000d))
     {
         if (!WorkModule(0x10, 0x2100000e))
@@ -47061,7 +47065,7 @@ void func_2800()
 // [Copy: Captain Falcon 0x18C] end
 void func_2801()
 {
-    
+    PostureModule(0x4, 0, 0, 0); // undo the Falcon Punch rotation (added)
 }
 
 // [Copy: Captain Falcon 0x18C] init
@@ -71942,5 +71946,70 @@ void rolloff_guard_check()
     if (ControlModule(0x2712, 0x3))
     {
         WorkModule(0x2710, 0x21000014);
+    }
+}
+
+// ===================================================================
+// Holdable, rotating Falcon Punch (added; ported from the user's captain.mscsb, SpecialN 0x152
+// func_2258 / func_2261 / func_2262, to Kirby's Captain Falcon copy, status 0x18C).
+// In the air between motion frames 42.5 and 45.5, holding special freezes the animation
+// (rate 0.001) and stick up / down rotates Kirby 3 degrees per frame (PostureModule(0x4, angle,
+// 0, 0)); the punch's hitboxes 0-2 get that angle (AttackModule(0x2739, id, angle)). Releasing
+// special jumps to frame 46. At frame 46 the animation runs again, at 79 the rotation resets.
+// Falcon keeps the angle in his ints 0x208000B6 / 0x208000B8; Kirby's int table may not reach
+// those (writes past 0xA7 were lost before), so global68 (current angle) / global69 (angle
+// given to the hitboxes) are used instead.
+// ===================================================================
+void falconpunch_hold_reset()
+{
+    global68 = 0;
+    global69 = 0;
+    PostureModule(0x4, 0, 0, 0);
+}
+
+void falconpunch_hold_update()
+{
+    if (MotionModuleF(0x1) >= 42.5f && MotionModuleF(0x1) <= 45.5f && global18 == 0x2)
+    {
+        if (ControlModule(0x2712, 0x1) == 0x1) // special held
+        {
+            MotionModule(0x4, 0.001f);
+            if (global32 >= 0.4f)
+            {
+                global68 = global68 + 3;
+                global69 = global68;
+                PostureModule(0x4, (float)global68, 0, 0);
+            }
+            if (global32 <= -0.4f)
+            {
+                global68 = global68 - 3;
+                global69 = global68;
+                PostureModule(0x4, (float)global68, 0, 0);
+            }
+        }
+        if (ControlModule(0x2713, 0x1)) // special not held: go on
+        {
+            global68 = 0;
+            MotionModule(0x2713, 46.0f);
+        }
+    }
+    if (MotionModuleF(0x1) >= 46.0f)
+    {
+        MotionModule(0x4, 1.0f);
+        global68 = 0;
+    }
+    if (MotionModuleF(0x1) >= 79.0f)
+    {
+        PostureModule(0x4, 0, 0, 0);
+        global69 = 0;
+    }
+    if (global69 != 0)
+    {
+        AttackModule(0x2739, 0, global69);
+        AttackModule(0x2739, 0x1, global69);
+        AttackModule(0x2739, 0x2, global69);
+        // Falcon also calls AttackModule(0x1, 0, WorkModule(0x6, 0x2000335), WorkModule(0x6, 0x2000336), 0)
+        // with values his main loop (func_74) writes from his position each frame; Kirby's
+        // main loop doesn't write them, so that call is left out.
     }
 }
