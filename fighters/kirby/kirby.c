@@ -64,6 +64,8 @@ int global62;
 int global63;
 float global64;
 float global65;
+float global66;
+float global67;
 
 void func_0()
 {
@@ -71807,17 +71809,25 @@ int copy_custom_motion(int motion)
 }
 
 // ===================================================================
-// Crouch jump (added). Jumping out of a crouch (Squat 0x11 / SquatWait 0x12 / SquatF 0x13 /
-// SquatB 0x14 / SquatRv 0x15 -> JumpSquat 0xA -> Jump 0xB) multiplies the jump's upward speed
-// by crouchjump_height() and adds crouchjump_momentum() of Kirby's ground speed from the
-// jump squat. While he's still moving up in the air, a trail effect spawns behind him every
-// crouchjump_gfx_every() frames (Smash 4 has no body-afterimage effect; the "AFTER_IMAGE"
-// ACMD commands are sword trails).
+// Crouch jump (added). Jumping while crouching (Squat 0x11 / SquatWait 0x12 / SquatF 0x13 /
+// SquatB 0x14 -> JumpSquat 0xA -> Jump 0xB; standing back up, SquatRv 0x15, doesn't count)
+// is a superjump: crouchjump_height_mult() (2.2) x the full hop's height. Height goes with
+// the square of the takeoff speed, so the upward speed is the full hop's takeoff speed x
+// crouchjump_speed_mult() (sqrt 2.2). The full hop's speed is learned from Kirby's plain
+// jumps (the highest takeoff speed seen, global66); a short hop superjump before any full
+// hop uses its own speed. The boosted speed is set again for crouchjump_hold() frames so the
+// jump can't replace it. crouchjump_momentum() of the ground speed in the jump squat carries
+// into the horizontal air speed. While he's still moving up in the air, a trail effect
+// spawns behind him every crouchjump_gfx_every() frames (Smash 4 has no body-afterimage
+// effect; the "AFTER_IMAGE" ACMD commands are sword trails).
 // global62 = previous status, global63 = state (0 off, 1 jump squat from a crouch, 2 boosted
 // and rising; frame count in bits 0xFF00), global64 = ground speed in the jump squat,
-// global65 = last X position.
+// global65 = last X position, global66 = learned full hop takeoff speed, global67 = boosted
+// takeoff speed.
 // ===================================================================
-float crouchjump_height()   { return 1.4f; }  // x upward jump speed
+float crouchjump_height_mult() { return 2.2f; }        // x full hop height (documentation; the speed below is its square root)
+float crouchjump_speed_mult()  { return 1.4832397f; }  // sqrt(2.2): x full hop takeoff speed
+int   crouchjump_hold()        { return 3; }            // frames the boosted speed is set again
 float crouchjump_momentum() { return 0.8f; }  // x ground speed carried into the jump
 int   crouchjump_gfx()      { return 0x1000094; } // common GFX 0x94 "Far knockback streak (large white)"
 float crouchjump_gfx_size() { return 0.6f; }
@@ -71833,30 +71843,42 @@ void crouchjump_update()
     state = global63 & 0xff;
     frames = (global63 >> 8) & 0xff;
     x = PostureModuleF(0x1);
+    // learn the full hop takeoff speed from any plain ground jump (first frame of Jump)
+    if (global4 == 0xb && global62 == 0xa && global18 == 0x2 && state != 1)
+    {
+        vy = KineticModuleF(0x1, 0x1);
+        if (vy > global66)
+        {
+            global66 = vy;
+        }
+    }
     if (global4 == 0xa) // jump squat
     {
-        if (global62 >= 0x11 && global62 <= 0x15)
+        if (global62 >= 0x11 && global62 <= 0x14)
         {
             state = 1;
+            global64 = 0;
         }
-        if (state == 1 && global62 == 0xa)
+        else if (state == 1 && global62 == 0xa)
         {
             global64 = x - global65; // ground speed per frame while squatting to jump
         }
-        if (state == 1 && global62 != 0xa)
+        else if (global62 != 0xa)
         {
-            global64 = 0;
+            state = 0;
         }
     }
     else if (state == 1)
     {
-        if (global4 == 0xb && global18 == 0x2) // took off: boost once
+        if (global4 == 0xb && global18 == 0x2) // took off: boost
         {
             vy = KineticModuleF(0x1, 0x1);
-            if (vy > 0)
+            if (vy > global66) // a full hop's own speed is the best reference
             {
-                KineticModule(0x11, 0x1, vy * crouchjump_height());
+                global66 = vy;
             }
+            global67 = global66 * crouchjump_speed_mult();
+            KineticModule(0x11, 0x1, global67);
             vx = KineticModuleF(0, 0x3) + global64 * crouchjump_momentum();
             KineticModule(0x11, 0x3, vx, 0);
             state = 2;
@@ -71869,12 +71891,20 @@ void crouchjump_update()
     }
     if (state == 2)
     {
-        if (global18 != 0x2 || KineticModuleF(0x1, 0x1) <= 0) // landed or stopped rising
+        if (global18 != 0x2 || (frames >= crouchjump_hold() && KineticModuleF(0x1, 0x1) <= 0)) // landed or stopped rising
         {
             state = 0;
         }
         else
         {
+            if (frames > 0 && frames < crouchjump_hold()) // keep the boost: the jump can't replace it
+            {
+                vy = global67 - WorkModuleF(0, 0x3000018) * (float)frames;
+                if (KineticModuleF(0x1, 0x1) < vy)
+                {
+                    KineticModule(0x11, 0x1, vy);
+                }
+            }
             if (frames % crouchjump_gfx_every() == 0)
             {
                 EffectModule(0x3, crouchjump_gfx(), x, PostureModuleF(0x2) + 5.0f, PostureModuleF(0x3),
