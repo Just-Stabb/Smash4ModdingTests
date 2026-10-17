@@ -8231,6 +8231,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_guard_check(); // shield held: no roll-off (added)
     if (func_374())
     {
         return;
@@ -8262,6 +8263,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_guard_check(); // shield held: no roll-off (added)
     if (func_374())
     {
         return;
@@ -71927,5 +71929,18 @@ void sideb_reflect_off()
     if (global62 == 0x171 && global4 != 0x171)
     {
         ShieldModule(0, 0x3, 0, 0x1, 0x3);
+    }
+}
+
+// Roll-off (added, docs/universal-mechanics.md): Kirby's forward roll ACMD sets a speed of 2.1 at
+// frame 5 (tools/rolloff_acmd.py --add 2.1), so the roll keeps going off a ledge. Holding shield
+// at any point before he slides off stops that: roll status flag 0x21000014 is set every roll
+// frame the shield button is held (ControlModule(0x2712, 3); 0x2713 would be "not held"), and
+// the ACMD then skips the speed / sets it back to 0, so the roll stops at the ledge.
+void rolloff_guard_check()
+{
+    if (ControlModule(0x2712, 0x3))
+    {
+        WorkModule(0x2710, 0x21000014);
     }
 }

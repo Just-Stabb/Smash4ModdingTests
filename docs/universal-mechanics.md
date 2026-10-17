@@ -46,4 +46,9 @@ Per fighter: the roll's own speed value and frames come from that fighter's ACMD
 `tools/rolloff_acmd.py IN OUT [scripts]` finds them itself (the first `Add/Set_Momentum` with
 a horizontal speed, until the next zero-speed one).
 
-Done: Captain Falcon (user's ACMD + shield check). Kirby's roll has no roll-off ACMD yet.
+For a roll that doesn't have its own roll-off speed yet, `--add SPEED [START END]` adds
+Captain Falcon's pattern first (speed 0 at frame 0, SPEED at START (5), 0 at END (27)) and
+removes any `Set_Edge_Slide`.
+
+Done: Captain Falcon (user's ACMD, speed 2.4, + shield check); Kirby (`--add 2.1` on `EscapeF`,
++ `rolloff_guard_check()` in `kirby.c`).

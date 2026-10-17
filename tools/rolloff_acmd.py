@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Roll-off ACMD edit: holding shield during a roll keeps the fighter from rolling off a ledge.
 
-  python3 tools/rolloff_acmd.py IN_game.bin OUT_game.bin [script ...]   (default: EscapeF)
+  python3 tools/rolloff_acmd.py IN_game.bin OUT_game.bin [--add SPEED [START END]] [script ...]
+                                                                       (default script: EscapeF)
+
+--add gives a roll without its own roll-off speed one first (like Captain Falcon's):
+Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0, 0, 1) at END (27).
+A Set_Edge_Slide in the script is removed (the original roll's edge stop).
 
 Roll-off (the user's change, see docs/universal-mechanics.md): the roll's ACMD sets a speed
 (Add/Set_Momentum with Horizontal != 0, Captain Falcon: 2.4 at frame 5) and the original
@@ -72,12 +77,43 @@ def edit(script):
     script[:] = out + [c for c in script if c.name == "Script_End"]
 
 
+EDGE = acmd.BY_NAME["set_edge_slide"]
+
+
+def add_speed(script, speed, start, end):
+    """Give the roll a roll-off speed (Captain Falcon's pattern) and drop Set_Edge_Slide."""
+    tl = [(f, c) for f, c in timeline(script) if c.ident != EDGE]
+    tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [speed, 0.0, 0])),
+           (float(end), acmd.Command(MOM, [0.0, 0.0, 1]))]
+    tl.sort(key=lambda x: x[0])
+    out = []
+    cur = 0.0
+    for f, c in tl:
+        if f != cur:
+            out.append(acmd.Command(FRAME, [f]))
+            cur = f
+        out.append(c)
+    script[:] = out + [c for c in script if c.name == "Script_End"]
+
+
 def main():
-    src, dst = sys.argv[1], sys.argv[2]
-    names = sys.argv[3:] or ["EscapeF"]
+    args = sys.argv[1:]
+    src, dst = args[0], args[1]
+    rest = args[2:]
+    add = None
+    if rest and rest[0] == "--add":
+        nums = []
+        rest = rest[1:]
+        while rest and rest[0].replace(".", "", 1).isdigit():
+            nums.append(float(rest.pop(0)))
+        add = (nums + [5.0, 27.0])[:3] if len(nums) == 1 else nums
+    names = rest or ["EscapeF"]
     f = acmd.ACMDFile.load(src)
     for n in names:
-        edit(f.script(int(n, 16) if n.startswith("0x") else n))
+        sc = f.script(int(n, 16) if n.startswith("0x") else n)
+        if add:
+            add_speed(sc, *add)
+        edit(sc)
     f.save(dst)
 
 
