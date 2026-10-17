@@ -648,7 +648,9 @@ hit states oddly. In the user's setup these characters never detransform, so thi
   life / hit frames / speeds) and its motion (ACMD variant, via the weapon's `0x10000005`).
   Found with a Cemu breakpoint on `0x031ABB8C`: LR `0x02BCC414` (`0x02BCC3BC`, r5 = custom) ←
   `0x02B61A94` (`(s8)[init+0x5C]`) ← `0x02C073DC` ← `0x02F062D8`. CAVE_C (`0x037EE400`) uses
-  Kirby's `0x9F` there when Kirby (kind 8) has a copy. (The first MSC fix, switching the
+  Kirby's `0x9F` there when Kirby (kind 8) has a copy. In that function r26 is not the fighter
+  base (its WorkModule is at `r26+0x726C`), so the kind comes from `[[r26+0x726C]+0x18]`; v4
+  read `[r26+4]` and never fired (the user saw base hitboxes / lifetime with custom params). (The first MSC fix, switching the
   breath article's motion with `ArticleModule(0x2715)`, only fixed the hitboxes.)
 - Effects / sounds: Kirby's Bowser copy runs Bowser's own ACMD (`MotionAnimcmdModule(0, 0, motion,
   0xF)`, kind `0xF` = koopa) for motions `0x211`/`0x215`/…; each has 4 slots, so Kirby's MSC uses

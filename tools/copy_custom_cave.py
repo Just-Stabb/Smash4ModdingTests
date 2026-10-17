@@ -127,10 +127,11 @@ def patches():
     p = cave_a + cave_b
     p.append((HOOK_A, b(HOOK_A, CAVE_A)))
     p.append((CLEAR_COUNT, li(11, 0x1C)))
-    # r9 = owner's int array, r26 = owner fighter object (kind at +4); r11/r12 are free here.
+    # r9 = owner's int array, r26 = owner (its WorkModule at +0x726C; r26 is NOT the fighter
+    # base, so [r26+4] isn't the kind: v4 checked that and never fired). WM+0x18 = fighter kind.
     cave_c, end3 = assemble(CAVE_C, [
         lwz(0, 0x120, 9),                             # replaced: owner's 0x10000048
-        lwz(12, 4, 26), cmpwi(12, 8), ('bc', BNE, 'done'),
+        lwz(12, 0x726C, 26), lwz(12, 0x18, 12), cmpwi(12, 8), ('bc', BNE, 'done'),
         lwz(12, 0x290, 9), cmplwi(12, 0x3A), ('bc', BGE, 'done'),
         lwz(0, (SLOT & 0xFFFF) * 4, 9),               # Kirby with a copy: the copied custom slot
         'done',
