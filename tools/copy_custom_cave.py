@@ -9,15 +9,18 @@ For Kirby with a copy it then calls 0x02F1B8B0, which overwrites WM+0xD30 with t
 fighter's neutral-B block, always the DEFAULT variant: [params[copy]+0xFC], size = byte table
 0x02EA9104(copy) (96 for Bowser = 24 values). The variants follow each other with that stride.
 
-CAVE_A (swallow, 0x02796900, just before copy_grant 0x02EFCD8C): reads the victim's custom N
-slot (0x10000048; for a swallowed Kirby its copy slot 0x100000A5) and stores it in Kirby's int
-0x100000A5 (outside the 0x83-0xA0 range copy_grant clears; unused by Kirby's MSC).
-CAVE_B (copy loader, 0x02F1B910-0x02F1B928): source += Kirby's 0x100000A5 * size (0-3).
-Kirby's MSC also reads 0x100000A5 to pick the copied move's weapon motion (hitbox variant).
+CAVE_A (swallow: the `bl copy_grant` at 0x02796914 jumps here): calls copy_grant
+(0x02EFCD8C), then reads the victim's custom N slot (0x10000048; for a swallowed Kirby its copy
+slot) and stores it in Kirby's int 0x1000009F. copy_grant clears ints 0x83-0xA0 and writes the
+copied costume to 0xA5 (the first version used 0xA5 and got the costume), so the slot is
+written after it returns. 0x9F is unused by Kirby's MSC and the star copy cave.
+CAVE_B (copy loader, 0x02F1B910-0x02F1B928): source += Kirby's 0x1000009F * size (0-3).
+Kirby's MSC also reads 0x1000009F to pick the copied move's weapon motion (hitbox variant).
 """
 CAVE_A = 0x037EE680
-SLOT = 0x100000A5
-HOOK_A, RET_A = 0x02796900, 0x02796904
+SLOT = 0x1000009F
+HOOK_A, RET_A = 0x02796914, 0x02796918
+COPY_GRANT = 0x02EFCD8C
 HOOK_B, RET_B = 0x02F1B910, 0x02F1B92C
 SIZE_FN = 0x02EA9104
 WM_GET, WM_SET = 0x84, 0x8C
@@ -72,8 +75,9 @@ def assemble(start, prog):
 
 
 def patches():
-    # r24 = victim's module accessor, r26 = copy kind, r31 = Kirby's accessor, r28 = 1.
+    # r24 = victim's module accessor, r26 = copy kind, r31 = Kirby's accessor (all callee-saved).
     cave_a, end = assemble(CAVE_A, [
+        ('bl', COPY_GRANT),                           # replaced instruction (args already set)
         cmplwi(26, 0x3A), ('bc', BGE, 'done'),        # no copy (-1) / not a fighter kind
         lwz(3, 0x28, 24),                             # victim WorkModule
         lwz(12, 0, 3),
@@ -91,7 +95,6 @@ def patches():
         mr(4, 5), lis(5, 0x1000), addi(5, 5, SLOT & 0xFFFF),
         BCTRL,
         'done',
-        mr(7, 28),                                    # replaced instruction
         ('b', RET_A),
     ])
     # r29 = Kirby WorkModule, r30 = copy kind, r31 = param manager; r3/r4 set for SIZE_FN.

@@ -71766,14 +71766,14 @@ void throwlw_zoom_update()
 // ===================================================================
 // Copy abilities with the swallowed fighter's custom neutral special (added).
 // cross_f.rpx (tools/copy_custom_cave.py) stores the victim's custom N slot (0 = default, 1-3)
-// in Kirby's int 0x100000A5 when he swallows, and loads the copied move's params for that
+// in Kirby's int 0x1000009F when he swallows, and loads the copied move's params for that
 // slot. The copied weapon's hitboxes come from its motion (motion index = custom slot for
 // Bowser's breath), so after spawning it Kirby switches the article to that motion.
 // ===================================================================
 int copy_custom_slot()
 {
     int slot;
-    slot = WorkModule(0x6, 0x100000a5);
+    slot = WorkModule(0x6, 0x1000009f);
     if (slot < 0 || slot > 3)
     {
         return 0;
