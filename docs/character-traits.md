@@ -42,7 +42,23 @@ writes that), it multiplies the stats of profile `xxxx & 0xF`:
 |---|---|---|---|
 | 0 | anything else | none | — |
 | 1 | Rush | the Rush list above | 1.25 |
+| 2 | Overdrive (below) | the Rush list | 1.25 × 1.2 = 1.5 |
 
 Kirby's MSC writes the int every frame (`kirby_trait_profile()`). A new trait with stat changes
 needs a profile in `PROFILES` in `tools/kirby_stat_cave.py` and in `kirby_trait_profile()`.
 Moveset changes (like Rush's neutral air) are MSC only (`global76` = current trait).
+
+## Overdrive (Kirby's Corrin copy)
+
+With Corrin's copy ability (kind `0x39`), Kirby's 3rd pummel (each CatchAttack counts) puts him
+in **Overdrive** until he's KO'd or loses the copy; both also reset the pummel count.
+
+- Movement stats ×1.2 on top of Rush (stat profile 2, ×1.5 of the base stats).
+- Every animation ×1.2 (float ID `0x0F000098`, MotionModule's second rate; ACMD timing speeds
+  up with it, and moves keep their own rate changes on top).
+- The blue glow `0x10000C7` on the head (`HeadN` `0x16`), both arms (`LArmJ` `0xF`, `RArmJ`
+  `0x13`) and the left leg (`LLegJ` `0x3`), removed and made again every frame.
+
+MSC: `overdrive_*()` in `fighters/kirby/kirby.c` (`global82` pummel count, `global83` on). Needs
+the patched `cross_f.rpx` (stat profile 2 and ID `0x0F000098`; the game crashes on that ID
+without it, but it's only written once Overdrive starts).

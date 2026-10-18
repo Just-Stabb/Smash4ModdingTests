@@ -80,6 +80,8 @@ int global78;
 int global79;
 int global80;
 int global81;
+int global82;
+int global83;
 
 void func_0()
 {
@@ -14379,6 +14381,7 @@ void func_716()
     WorkModule(0x16, 0x1e000054);
     WorkModule(0x16, 0x1e000056); // up tilt out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000057); // down tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e00005f); // down smash out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {
@@ -38118,6 +38121,7 @@ void func_2275()
 // [CatchAttack 0x3B] main: pummel motion 0x76
 void func_2276()
 {
+    overdrive_pummel(); // Corrin copy: count pummels toward Overdrive (added)
     func_22(0x76, 0, 1.0f);
     func_78(func_2277);
 }
@@ -38328,6 +38332,7 @@ void func_2286()
     global77 = 0;      // and up B
     WorkModule(0x7, 0, 0x1000009d); // lost a stock: star copy hit count starts over (added)
     WorkModule(0x7, 0, 0x1000009e); // and no pending star copy
+    overdrive_reset(); // and Overdrive ends, pummel count starts over
     func_213();
 }
 
@@ -72547,6 +72552,10 @@ int kirby_copy_trait(int kind)
 // Stat profile for the executable's stat scaling (tools/kirby_stat_cave.py PROFILES).
 int kirby_trait_profile(int trait)
 {
+    if (global83)
+    {
+        return 2; // Overdrive: Rush x1.2 (tools/kirby_stat_cave.py)
+    }
     if (trait == trait_rush())
     {
         return 1;
@@ -72564,7 +72573,92 @@ void kirby_trait_update()
         trait = kirby_copy_trait(WorkModule(0x6, 0x100000a4));
     }
     global76 = trait;
+    overdrive_update();
     WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait), 0x1000008e);
+}
+
+// ===================================================================
+// Overdrive (added): with Corrin's copy ability, landing overdrive_pummels() pummels (3) puts Kirby
+// in Overdrive until he's KO'd or loses the copy:
+//   - movement stats x1.2 on top of Rush (stat profile 2 = x1.5 of the base stats,
+//     tools/kirby_stat_cave.py);
+//   - every animation x1.2: MotionModule's second rate multiplier (the one Mii Fighters' ACMD
+//     MII_ENABLE_RATE sets), written through float ID 0x0F000098 (patched cross_f.rpx,
+//     tools/position_vars_cave.py; the game crashes on that ID without the patch);
+//   - the blue glow 0x10000C7 on the head, both arms and the left leg, removed and made again
+//     every frame.
+//   global82: pummels landed with the Corrin copy (back to 0 when KO'd or the copy is lost).
+//   global83: Overdrive on.
+// ===================================================================
+int overdrive_kind()     { return 0x39; }      // Corrin
+int overdrive_pummels()  { return 3; }
+float overdrive_rate()   { return 1.2f; }      // animation speed (stats: kirby_stat_cave.py profile 2)
+int overdrive_gfx()      { return 0x10000c7; } // blue glow
+float overdrive_gfx_size() { return 1.0f; }
+
+int overdrive_copy()
+{
+    if (WorkModule(0x10, 0x2000009a) && WorkModule(0x6, 0x100000a4) == overdrive_kind())
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// CatchAttack main (func_2276): one pummel
+void overdrive_pummel()
+{
+    if (!overdrive_copy() || global83)
+    {
+        return;
+    }
+    global82++;
+    if (global82 >= overdrive_pummels())
+    {
+        global83 = 0x1;
+    }
+}
+
+void overdrive_off()
+{
+    if (global83)
+    {
+        WorkModule(0, 1.0f, 0x0f000098);              // animations back to normal speed
+        EffectModule(0x2723, overdrive_gfx(), 0x1, 0x1);
+    }
+    global83 = 0;
+    global82 = 0;
+}
+
+// KO'd (Dead main, func_2286)
+void overdrive_reset()
+{
+    overdrive_off();
+}
+
+void overdrive_gfx_on(int bone)
+{
+    EffectModule(0x2717, overdrive_gfx(), bone, 0, 0, 0, 0, 0, 0, overdrive_gfx_size(), 0x1);
+}
+
+// every frame (kirby_trait_update)
+void overdrive_update()
+{
+    if (!overdrive_copy())
+    {
+        overdrive_off();
+        return;
+    }
+    if (!global83)
+    {
+        return;
+    }
+    WorkModule(0, overdrive_rate(), 0x0f000098);
+    EffectModule(0x2723, overdrive_gfx(), 0x1, 0x1);
+    overdrive_gfx_on(0x16); // HeadN
+    overdrive_gfx_on(0xf);  // LArmJ
+    overdrive_gfx_on(0x13); // RArmJ
+    overdrive_gfx_on(0x3);  // LLegJ
 }
 
 // neutral air uses the air rapid jab (nair_rapid_*)
@@ -72589,7 +72683,7 @@ int kirby_rapid_nair()
 //   global78 / global79: up-B frame count / frame its first hitbox (ID 0) appeared (-1 = not yet).
 // ===================================================================
 int sideb_count_frame()   { return 5; } // an air side B uses up one of the air side Bs after this frame
-int upb_cancel_delay()    { return 3; } // frames after up B's first hitbox before neutral special can cancel it
+int upb_cancel_delay()    { return 6; } // frames after up B's first hitbox before neutral special can cancel it
 
 // side-B loops (func_2430 SpecialS, func_2467 swing), every frame
 void sideb_count_update()

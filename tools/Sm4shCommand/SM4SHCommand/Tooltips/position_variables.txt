@@ -109,6 +109,7 @@
 0x0F000095 = Slot 8 offset X (fwd) | Target: player slot 8.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
 0x0F000096 = Slot 8 offset Y | Target: player slot 8.\nRead: its Y - this fighter's Y.\nWrite: put it at this fighter's Y + value.
 0x0F000097 = Slot 8 offset Z | Target: player slot 8.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
+0x0F000098 = Self animation rate x | Read: this fighter's animation rate multiplier (1.0 normally).\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)
 0x0F000020 = Slot 1 X | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000021 = Slot 1 Y | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000022 = Slot 1 Z | Player slot 1 (fighter table entry 0). Read / write.

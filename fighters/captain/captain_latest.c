@@ -14383,6 +14383,7 @@ void func_716()
     WorkModule(0x16, 0x1e000054);
     WorkModule(0x16, 0x1e000056); // up tilt out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000057); // down tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e00005f); // down smash out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {

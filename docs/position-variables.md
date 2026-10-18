@@ -89,6 +89,22 @@ last hit), `StopModule(1)` / `StopModule(2, frames)` (in hitstop / set hitstop) 
 `ShakeModule(0, 0, frames, 0, 0, 1.0)` (the shake). Player slot numbers and "last attacker" are
 assumed to be the same numbering (player 1 = slot 1).
 
+## Animation rate
+
+`0x0F000098`, self only.
+
+| read | write |
+|---|---|
+| this fighter's animation rate multiplier (1.0 normally) | set it: every animation, and the ACMD timed to it, runs that many times faster until it's set back to 1.0 |
+
+It's MotionModule's second rate (`+0xF4`), multiplied with each move's own rate
+(`Set_Frame_Speed` / `Set_Frame_Duration` / MSC `MotionModule(0x4, …)`), so moves keep their own
+speed changes on top. Mii Fighters' ACMD `MII_ENABLE_RATE` / `MII_UNABLE_RATE` set the same value.
+Used by Kirby's Overdrive (`fighters/kirby/kirby.c`).
+
+    SET_FLOAT(Value=1.2, Variable=0x0F000098)  // everything 1.2x faster
+    SET_FLOAT(Value=1, Variable=0x0F000098)    // back to normal
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:

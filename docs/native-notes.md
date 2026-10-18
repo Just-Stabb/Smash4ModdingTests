@@ -181,6 +181,15 @@ the copied fighter, probably), `r6` = **fighter kind to copy**, `r7` = 1.
 "Lose copy" stores -1 to `0x100000A4` and clears `0x2000009A`
 (`0x02EF5CC8`, `0x02EF5FDC`).
 
+**Losing the copy when hit (removed).** Kirby's specializer vtable (`0x10135440`) points its
+on-damage handler at `0x02EF7360`: when Kirby has a copy (flag word bit 5 set, bit 4 clear) and the
+hit isn't type 7, it rolls the game's xorshift RNG (`0x105759C0`) `% 100` against
+`(int)(rate × damage)` (rate from the per-kind table `[[0x102FF448]+0x113C]+0xFC` + kind × 0x88,
+`+0x24`), and below it calls `0x02EF6F2C` (lose the copy with the star) at **`0x02EF74A8`**.
+`0x02EF74A8=0x60000000` (in the standard build) skips that call, so damage never removes the copy;
+the RNG still advances as before. Other ways of losing it (`0x02EF6F2C` from `0x02EFB6D8`, KO,
+the copy-discard taunt) are separate and untouched.
+
 ### Its only caller: Swallow status handler `0x0279666C`
 
 Kirby's setup (`0x02EF5940`…) fills a per-status table at `(obj+0x44)+4*status`.
@@ -672,8 +681,13 @@ Star missile max count: `0x10136C58=9` is added to that command (the base `cave_
       $(python3 tools/copy_custom_cave.py)
 
 (Current standard build adds `0x10136C58=9 $(python3 tools/kirby_stat_cave.py)
-$(python3 tools/position_vars_cave.py)` at the end; see "WorkModule stat reads" and "Position
-variables" below.)
+$(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000` at the end; see "WorkModule stat
+reads", "Position variables" and "Losing the copy when hit" above.)
+
+    python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx \
+      $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
+      $(python3 tools/copy_custom_cave.py) 0x10136C58=9 $(python3 tools/kirby_stat_cave.py) \
+      $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000
 
 Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
 only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
@@ -791,4 +805,22 @@ indices < 0x40 in the position code and sends the rest to `ext`.
   (`(int)DamageModuleF(1)`, what the Damage status init writes; later rescales like Kirby `func_888`
   don't match), the attacker is the fighter whose attack's hit records hold the victim, and if its
   multiplier is set and it's still in the same status, the value is multiplied; a stale one is cleared.
+
+## MotionModule rates (animation speed)
+
+MotionModuleImpl (`app\battle_object\modules\motion\motion_module_impl.cpp`, code
+`0x02C5B000`–`0x02C66000`), vtable `0x1010A3EC` (functions at `+4+8k`), accessor `+0x44`:
+
+| field | get / set (vtable) | set by |
+|---|---|---|
+| `+0x48` | `+0x9C` / `+0xA4` | the motion's own rate: MSC `MotionModule(0x4, rate)`, ACMD `Set_Frame_Speed` (`0x02BDA5E8`, through the MSC handler) |
+| `+0xF0` | `+0x2EC` / `+0x2F4` | ACMD `Set_Frame_Duration` (FT_MOTION_RATE, 1/x, `0x02BE7EC4`), MSC `MotionModule(0x35, rate)` |
+| `+0xF4` | `+0x2FC` / `+0x304` | ACMD `MII_ENABLE_RATE` (`0x02BE83E4`, WorkModuleF `0x1E` if > threshold) / `MII_UNABLE_RATE` (1.0); no MSC op |
+
+MSC handlers: int `+0x2D4` (`0x02C6164C`, ops 0–`0x38`, `0x2710`+), float `+0x2DC`
+(`0x02C63118`, ops 0–`0xF`). `MotionModuleF(0xA)` is the effective speed = `+0x48` × `+0xF0` ×
+`+0xF4` × another object rate. `+0xF0` / `+0xF4` are only written by the module's init / reset
+(`0x02C5B30C`, `0x02C5BAEC`) besides the commands above, so `+0xF4` stays put across motions:
+`tools/position_vars_cave.py` exposes it as float ID `0x0F000098` (self), used by Kirby's
+Overdrive (×1.2 animations).
 

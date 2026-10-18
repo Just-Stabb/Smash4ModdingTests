@@ -309,5 +309,22 @@ wint(mu, 1, HS, 15)                                      # (the stand-in WorkMod
 call(mu, FSET, w0, cid(2, 2), 2.0)                       # during the hit: x2 now and for later hits
 check('written after the hit: x2 now', rint(mu, 1, HS), 30)
 set_int(mu, w1, 15, 0x1000003E); check('and for the next hit of the move', hs1(), 30)
+# 0x0F000098: self animation rate multiplier (MotionModule +0xF4 through vtable +0x2FC / +0x304)
+MM, MVT, MFN = acc_of(0) + 0xD00, 0x10385000, 0x037FF200
+f = Asm(MFN); f.asm('''
+ lfs f1, 0xF4(r3)
+ blr
+ stfs f1, 0xF4(r3)
+ blr''')
+mu.mem_write(MFN, b''.join(struct.pack('>I', w) for w in f.words()))
+mu.mem_write(MVT + 0x2FC, struct.pack('>II', MFN, 0)); mu.mem_write(MVT + 0x304, struct.pack('>I', MFN + 8))
+mu.mem_write(MM, struct.pack('>I', MVT)); mu.mem_write(MM + 0xF4, struct.pack('>f', 1.0))
+mu.mem_write(acc_of(0) + 0x44, struct.pack('>I', 0))
+check('rate x: no MotionModule reads 0', call(mu, FGET, w0, 0x0F000098), 0)
+mu.mem_write(acc_of(0) + 0x44, struct.pack('>I', MM))
+check('rate x: reads 1.0', call(mu, FGET, w0, 0x0F000098), 1.0)
+call(mu, FSET, w0, 0x0F000098, 1.2)
+check('rate x: set 1.2', round(struct.unpack('>f', mu.mem_read(MM + 0xF4, 4))[0], 5), 1.2)
+check('rate x: other fighter untouched', call(mu, FGET, w1, 0x0F000098), 0)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

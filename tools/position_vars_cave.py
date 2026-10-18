@@ -45,6 +45,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
   0x0F000040-0x0F000097      hitstun / hitstop / offsets for self, the nearest opponent, the last
                             fighter hit and each slot (see "Combat variables" below and
                             docs/position-variables.md)
+  0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
+              (1.0 normally)                      multiplies every animation, ACMD timing too)
 
 Reads with no such fighter (no opponent, empty slot, or called from a non-fighter such as an
 article, for self IDs) give 0 and writes do nothing.
@@ -486,6 +488,7 @@ ext:
         mr r29, r5
         bl find_self
         cmplwi r30, 0x98
+        beq ext_mrate
         bge ext_zero
         addi r3, r30, -0x40
         clrlwi r0, r3, 29
@@ -922,6 +925,27 @@ hs_pending:                             # per player slot: hitstun multiplier, s
         .word 0
 """, False),
 ("""
+ext_mrate:                              # 0x98: self's animation rate multiplier = MotionModule +0xF4
+        cmpwi r28, 0                    # (the Mii rate: x every motion's own rate; vt +0x2FC get,
+        beq ext_zero                    # +0x304 set, as ACMD MII_ENABLE_RATE does)
+        lwz r3, 0x44(r27)
+%(CHK_R3)s
+        lwz r12, 0(r3)
+%(CHK_VT)s
+        cmpwi r29, 0
+        bne ext_mrate_set
+        lwz r12, 0x2FC(r12)
+        mtctr r12
+        bctrl
+        b ext_ret
+ext_mrate_set:
+        lwz r12, 0x304(r12)
+        lfs f1, 0x10(r1)
+        mtctr r12
+        bctrl
+        b ext_zero
+""", False),
+("""
 ext_ret_int:                            # f1 = (float) r3
         bl ext_i2f
         b ext_ret
@@ -1020,7 +1044,7 @@ ext_magic:
         SET_STOP=msc(MSC_STOP, 2, "r22"),
         SHAKE=msc(MSC_SHAKE, 0, 0, "r22", 0, 0, 0x3F800000),
         LAST_ATTACKER=msc(MSC_WORK, 6, LAST_ATTACKER),
-        CHK_VT=chk("r12", "ext_zero"), CHK_R6=chk("r6", "ext_last_fb"), CHK_R7=chk("r7", "ext_last_next"),
+        CHK_VT=chk("r12", "ext_zero"), CHK_R3=chk("r3", "ext_zero"), CHK_R6=chk("r6", "ext_last_fb"), CHK_R7=chk("r7", "ext_last_next"),
         HS_HI=hex(HITSTUN >> 16), HS_LO=hex(HITSTUN & 0xFFFF),
         WK_HI=hex(MSC_WORK >> 16), WK_LO=hex(MSC_WORK & 0xFFFF))
 

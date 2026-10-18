@@ -20,6 +20,7 @@ multiplied. Kirby's MSC writes the int every frame from the trait of his current
 Profiles (keep in sync with kirby_trait_profile() in fighters/kirby/kirby.c):
   1 = Rush: x1.25 on walk, dash, run, jump horizontal, air speed / acceleration, fall and fast fall
       speed. Not jump height, gravity, traction or landing lag.
+  2 = Overdrive (Kirby's Corrin copy after 3 pummels): the Rush stats x1.25 x1.2 = x1.5.
 
 The cave sits in the free part of the dead Havok function used by the other Kirby caves
 (starcopy_cave.py zero-fills 0x037ED898-0x037EE740 and moves its relocations away, so this must come
@@ -44,6 +45,7 @@ FALL = (0x19, 0x1B)                    # max fall speed, fast fall speed
 
 PROFILES = {
     1: (WALK + DASH_RUN + JUMP_H + AIR + FALL, 1.25),   # Rush
+    2: (WALK + DASH_RUN + JUMP_H + AIR + FALL, 1.25 * 1.2),   # Overdrive (Corrin copy): Rush x1.2
 }
 TABLE_ENTRIES = 8          # profiles 0-7 (the profile is masked to 3 bits); position_vars_cave.py uses the space after
 

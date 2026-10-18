@@ -178,6 +178,7 @@ def _position_lines():
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(quantities):
             out.append((0x0F000040 + 8 * t + q, "%s %s" % (tn, qn), "Target: %s.\\n%s" % (td, qd)))
+    out.append((0x0F000098, "Self animation rate x", "Read: this fighter's animation rate multiplier (1.0 normally).\\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)"))
     for slot in range(8):
         for n, axis in enumerate(("X", "Y", "Z", "facing")):
             rw = "Read only (1 right, -1 left)." if axis == "facing" else "Read / write."
