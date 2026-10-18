@@ -135,3 +135,15 @@ MSC: read positions:
 - A grounded fighter moved upward is still in a grounded status. The game's ground checks may snap
   it back or switch it to a fall on the next frame, the same as MSC's `PostureModule(3, ...)`.
 - Native details: `docs/native-notes.md`, "Position variables".
+
+## Names in Sm4shCommand
+
+Sm4shCommand shows and accepts names for all of these (`tools/Sm4shCommand/SM4SHCommand/Aliases/variables.txt`):
+`POS_SELF_X`, `POS_OPP_OFFSET_X`, `POS_SLOT3_Y`, ...; the combat variables as `TARGET_QUANTITY`
+(`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`, `HITSTUN_DEALT`, `HITSTUN_MUL`,
+`HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`), e.g. `LASTHIT_HITSTUN_MUL` =
+`0x0F000052`; and `SELF_ANIM_RATE` = `0x0F000098`.
+
+    SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)
+    SET_FLOAT(Value=12, Variable=POS_OPP_OFFSET_X)
+

@@ -41,6 +41,16 @@ namespace Sm4shCommand
                 LogMessage("Reopen a script to see the change.");
             };
             viewToolStripMenuItem.DropDownItems.Add(varNames);
+            var aliases = new ToolStripMenuItem("Show Variable Aliases (e.g. OPP_HITSTUN)") { CheckOnClick = true };
+            aliases.Checked = FighterVariable.ShowAliases = Runtime.GetSetting("VariableAliases", true);
+            aliases.ToolTipText = "Variables with a name in the Aliases folder are shown by it. Names always compile.";
+            aliases.CheckedChanged += (o, e) =>
+            {
+                FighterVariable.ShowAliases = aliases.Checked;
+                Runtime.SetSetting("VariableAliases", aliases.Checked);
+                LogMessage("Reopen a script to see the change (names and numbers both compile).");
+            };
+            viewToolStripMenuItem.DropDownItems.Add(aliases);
 
             // Int parameters as decimal / floats instead of hex (ACMDCommand.FormatInt); they compile
             // back to the same values either way.
@@ -122,6 +132,16 @@ namespace Sm4shCommand
                 }
                 catch (Exception ex) { LogMessage($"Couldn't open {Tooltips.Folder}: {ex.Message}"); }
             }));
+            toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Reload Variable Aliases", null, (o, e) => LoadAliases()));
+            toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Open Aliases Folder", null, (o, e) =>
+            {
+                try
+                {
+                    System.IO.Directory.CreateDirectory(VariableAliases.Folder);
+                    System.Diagnostics.Process.Start(VariableAliases.Folder);
+                }
+                catch (Exception ex) { LogMessage($"Couldn't open {VariableAliases.Folder}: {ex.Message}"); }
+            }));
 
             var treeMenu = new ContextMenuStrip();
             treeMenu.Items.Add(new ToolStripMenuItem("Open", null, (o, e) => { if (FileTree.SelectedNode != null) OpenNode(FileTree.SelectedNode); }));
@@ -178,7 +198,14 @@ namespace Sm4shCommand
             LogMessage($"AnimNames.txt: {Runtime.AnimNames.Count} script names.");
             Tooltips.Load();
             LogMessage($"Tooltips: {Tooltips.Entries.Count} value tooltips from {Tooltips.Folder}.");
+            LoadAliases();
             Runtime.LoadCommandDefinitions();
+        }
+        private void LoadAliases()
+        {
+            var problems = VariableAliases.Load();
+            LogMessage($"Variable aliases: {FighterVariable.AliasCount} from {VariableAliases.Folder}." +
+                (problems.Count > 0 ? $" Skipped {problems.Count} bad line(s): " + string.Join("; ", problems.Take(5).ToArray()) : ""));
         }
         private void tabControl1_DrawItem(object sender, DrawItemEventArgs e)
         {

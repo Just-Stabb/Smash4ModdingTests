@@ -258,6 +258,17 @@ namespace Sm4shCommand
         /// <summary>The integer (0x hex or decimal) written at a column, or null.</summary>
         static string NumberAt(string line, int col)
         {
+            // a variable alias (OPP_HITSTUN): letters, digits and _
+            Func<char, bool> nameChar = c => char.IsLetterOrDigit(c) || c == '_';
+            int ws = Math.Min(col, line.Length), we = ws;
+            while (ws > 0 && nameChar(line[ws - 1]))
+                ws--;
+            while (we < line.Length && nameChar(line[we]))
+                we++;
+            uint aliased;
+            if (we > ws && SALT.Moveset.FighterVariable.TryParseAlias(line.Substring(ws, we - ws), out aliased))
+                return line.Substring(ws, we - ws);
+
             Func<char, bool> part = c => Uri.IsHexDigit(c) || c == 'x' || c == 'X' || c == '-';
             int start = Math.Min(col, line.Length), end = start;
             while (start > 0 && part(line[start - 1]))
@@ -340,7 +351,7 @@ namespace Sm4shCommand
             if (spot.Token == null)
                 return;
             uint value;
-            Tooltips.TryParseValue(spot.Token, out value);
+            bool alias = !Tooltips.TryParseValue(spot.Token, out value) && SALT.Moveset.FighterVariable.TryParseAlias(spot.Token, out value);
             var existing = Tooltips.Find(value, spot.Command, spot.Param, spot.Type, spot.ParamIndex + 1).FirstOrDefault();
 
             using (var f = new Form())
@@ -371,7 +382,7 @@ namespace Sm4shCommand
                     Tooltips.SaveCustom(value, nameBox.Text.Trim(), descBox.Text.Trim(),
                         inCommand.Checked ? spot.Command : null, inParam.Checked ? spot.Param : null,
                         inCommand.Checked || inParam.Checked ? null : spot.Type,
-                        inFighter.Checked, spot.Token.StartsWith("0x", StringComparison.OrdinalIgnoreCase));
+                        inFighter.Checked, alias || spot.Token.StartsWith("0x", StringComparison.OrdinalIgnoreCase));
                 }
                 catch (Exception ex)
                 {

@@ -99,6 +99,7 @@
     </Compile>
     <Compile Include="Runtime.cs" />
     <Compile Include="Classes\Tooltips.cs" />
+    <Compile Include="Classes\VariableAliases.cs" />
     <Compile Include="Classes\ScriptComments.cs" />
     <Compile Include="GUI\Rename.cs">
       <SubType>Form</SubType>
@@ -176,6 +177,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Tooltips\**\*.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Aliases\**\*.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Events.cfg">

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SALT.Moveset
 {
@@ -61,8 +62,58 @@ namespace SALT.Moveset
         /// </summary>
         public static bool ShowDescriptiveNames { get; set; }
 
+        // ------------------------------------------------------------ aliases
+        // Names for variables (e.g. OPP_HITSTUN for 0x0F000048), loaded by the editor from its Aliases
+        // folder. Shown instead of the number when ShowAliases is on; always accepted when compiling.
+        static readonly Dictionary<string, uint> aliasToRaw = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<uint, string> rawToAlias = new Dictionary<uint, string>();
+        static readonly Regex aliasName = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$");
+
+        public static bool ShowAliases { get; set; } = true;
+        public static int AliasCount { get { return aliasToRaw.Count; } }
+
+        public static void ClearAliases()
+        {
+            aliasToRaw.Clear();
+            rawToAlias.Clear();
+        }
+
+        /// <summary>A name made of letters, digits and _ (not starting with a digit).</summary>
+        public static bool IsAliasName(string name)
+        {
+            return name != null && aliasName.IsMatch(name);
+        }
+
+        /// <summary>Adds or replaces an alias; the last name given for a value is the one shown.</summary>
+        public static bool AddAlias(string name, uint raw)
+        {
+            if (!IsAliasName(name))
+                return false;
+            uint old;
+            if (aliasToRaw.TryGetValue(name, out old) && rawToAlias.ContainsKey(old) &&
+                string.Equals(rawToAlias[old], name, StringComparison.OrdinalIgnoreCase))
+                rawToAlias.Remove(old);
+            aliasToRaw[name] = raw;
+            rawToAlias[raw] = name;
+            return true;
+        }
+
+        public static bool TryGetAlias(uint raw, out string name)
+        {
+            return rawToAlias.TryGetValue(raw, out name);
+        }
+
+        public static bool TryParseAlias(string name, out uint raw)
+        {
+            raw = 0;
+            return name != null && aliasToRaw.TryGetValue(name.Trim(), out raw);
+        }
+
         public override string ToString()
         {
+            string alias;
+            if (ShowAliases && rawToAlias.TryGetValue(Raw, out alias))
+                return alias;
             if (ShowDescriptiveNames)
             {
                 var s1 = Enum.GetName(typeof(VarSourceType), SourceType);
@@ -77,9 +128,18 @@ namespace SALT.Moveset
             text = text.Trim();
             if (text.StartsWith("var ", StringComparison.InvariantCultureIgnoreCase)) // FITX style
                 text = text.Substring(4).Trim();
-            if (text.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
+            uint aliased;
+            if (aliasToRaw.TryGetValue(text, out aliased))
+            {
+                Raw = aliased;
+            }
+            else if (text.StartsWith("0x", StringComparison.InvariantCultureIgnoreCase))
             {
                 Raw = uint.Parse(text.Substring(2), NumberStyles.HexNumber);
+            }
+            else if (text.IndexOf('-') < 0 || text.IndexOf('[') < 0)
+            {
+                throw new FormatException($"unknown variable or alias \"{text}\"");
             }
             else
             {

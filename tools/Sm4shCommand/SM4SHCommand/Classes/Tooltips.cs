@@ -157,7 +157,7 @@ namespace Sm4shCommand.Classes
         public static string Describe(string token, string command, string param, string type, int index = 0)
         {
             uint value;
-            if (!TryParseValue(token, out value))
+            if (!TryParseValue(token, out value) && !SALT.Moveset.FighterVariable.TryParseAlias(token, out value))
                 return "";
             var found = Find(value, command, param, type, index);
             if (found.Count == 0)
