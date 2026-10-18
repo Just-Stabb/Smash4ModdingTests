@@ -8570,6 +8570,7 @@ void func_381()
     if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1.0f; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
     }
     func_383();
 }
@@ -8579,6 +8580,7 @@ void func_382()
     if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1.0f; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
     }
     func_383();
 }
@@ -10420,6 +10422,7 @@ void func_500()
 void func_501()
 {
     func_502();
+    rolloff_fall_speed(); // roll-off: speed carried off the ledge x rolloff_air_speed_mult()
     func_78(func_503);
 }
 
@@ -38091,13 +38094,34 @@ void func_2360()
 // Sliding off goes to Fall (func_374), which keeps the roll's current speed on its own: the roll
 // end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next status is
 // Fall, and Fall's end (func_535) clears it. (The stored-speed boost Fall's main used to add on
-// top doubled the speed, so it's gone; global63 is unused now.)
+// top doubled the speed, so it's gone.) rolloff_fall_speed() can scale the carried speed once.
 // Lock: global62 counts the frames in a row shield has been held this roll (reset when the roll
 // starts); once it reaches rolloff_lock_frames() (10) the roll can't slide off for the rest of
 // the roll, even after shield is let go.
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
+float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+
+// Fall main (func_501), right after a roll slid off a ledge (the roll end set global63): the roll's
+// horizontal speed, which carries into the fall in kinetic energy 3, x rolloff_air_speed_mult(). Done
+// once, the way the game scales energy 3 itself (KineticModuleF(0xa / 0xb, 3) = its X / Y speed,
+// KineticModule(0x11, 3, x, y) sets them); after that the fall changes the speed as usual.
+void rolloff_fall_speed()
+{
+    float x;
+    float y;
+    if (global63 != 0)
+    {
+        global63 = 0;
+        if (rolloff_air_speed_mult() != 1.0f)
+        {
+            x = KineticModuleF(0xa, 0x3);
+            y = KineticModuleF(0xb, 0x3);
+            KineticModule(0x11, 0x3, x * rolloff_air_speed_mult(), y);
+        }
+    }
+}
 
 void rolloff_update()
 {

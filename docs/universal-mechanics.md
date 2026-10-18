@@ -52,6 +52,13 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    (v3 also stored the speed every roll frame and gave it again in Fall's main; that doubled the
    speed on top of the carried momentum, with no air cap, and could fling fighters to the blast
    zone, so it was removed.)
+   **Air speed multiplier:** `rolloff_air_speed_mult()` (default **1.0** = unchanged) scales that
+   carried speed. The roll end (`func_381` / `func_382`) marks the slide-off (Kirby `global73`,
+   Captain Falcon `global63`), and Fall's main (`func_501`) calls `rolloff_fall_speed()` once:
+   kinetic energy 3's X speed (`KineticModuleF(0xa, 0x3)`, the speed the air speed cap applies to)
+   × the multiplier, Y kept (`KineticModule(0x11, 0x3, x, y)`, the same way the game scales it, e.g.
+   Kirby's `func_1072`). Only once, so the fall then slows it as usual (v3 set the speed every
+   frame, which is what flung fighters).
 5. **No air speed cap while falling from it.** The roll end (key 2: `func_381` / `func_382`) sets
    flag `0x20000044` (lifts the max horizontal air speed) when the next status (`global6`) is
    Fall (`0xE`); Fall's end (key 2, `func_535`) clears it.
@@ -61,7 +68,7 @@ user's first version cleared the air speed flag at the start of Fall and only ch
 the roll's end; its `0x208000e0` / `0x1000004` save / restore is gone.
 
 **Default speed: 2.2** for any character without a specified roll-off speed (`--add` with no
-number uses it). The user confirmed the current version (v3 minus the Fall speed boost) is
+number uses it). **Default air speed multiplier: 1.0** (`rolloff_air_speed_mult()`). The user confirmed the current version (v3 minus the Fall speed boost) is
 right as-is.
 
-Done: Captain Falcon (2.4), Kirby (2.1).
+Done: Captain Falcon (2.4, air ×1.0), Kirby (2.1, air ×1.0).
