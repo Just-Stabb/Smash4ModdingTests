@@ -421,15 +421,15 @@ def check_code(reg, fail):
 # object ID; fighter ID: category (id >> 28) 0, slot (id >> 16) & 0xFFF). When the records are gone
 # (the attack ended), the fighter whose last attacker (int 0x10000065, a player number) is self's
 # slot, preferring one still in hitstun.
-EXT_REGIONS = [               # (start, end) free code for the combat variables
-    (0x04AE6258, 0x04AE648C),  # unreferenced function (no calls, relocations or exports)
-    (0x04AD2164, 0x04AD22F8),  # unreferenced function
-    (0x037EE858, 0x037EE97C),  # unreferenced function after the Havok one
-    (0x037EE3B0, 0x037EE400),  # after the arith stubs, before copy_custom_cave.py's CAVE_C
-    (0x037EE240, 0x037EE280),  # after the stat cave's table (8 entries, kirby_stat_cave.py)
+# The combat variables live in new code space after the game's own: .text ends at 0x04B77E1C, but the
+# RPL file info's text region (textRegionSize 0x2BB8670 from 0x02000000) goes on to 0x04BB8670, and
+# Cemu allocates and maps all of it as code. rpx_patch.py's grow: extends .text into it. (An earlier
+# version reused "unreferenced" functions; one of them was the RPX entry point, 0x04AD2164, and the
+# game wouldn't start.)
+GROW_END = 0x04B79000
+EXT_REGIONS = [
+    (0x04B78000, GROW_END),
 ]
-RELOC_REGIONS = EXT_REGIONS[:3]  # their old relocations must not patch the new code
-RELOC_DUMMY = 0x037EE73C   # dead word starcopy_cave.py already points moved relocations at
 MSC_WORK = 0x030B2B28      # MSC syscall wrappers (ctx, args): 0x16 WorkModule
 MSC_DAMAGE = 0x030B2F8C    # 0x24 DamageModule
 MSC_DAMAGE_F = 0x030B2FC4  # 0x25 DamageModuleF
@@ -998,7 +998,7 @@ def main():
                 print("  %08x  %-8s %s" % (ins.address, ins.mnemonic, ins.op_str))
             print("end 0x%08X" % (a.base + len(code)))
         return
-    out = ["reloc:0x%08X-0x%08X=0x%08X" % (lo, hi, RELOC_DUMMY) for lo, hi in RELOC_REGIONS]
+    out = ["grow:0x%08X" % GROW_END]
     out += ["0x%08X=0x%08X" % (a, v) for a, v in sorted(words().items())]
     print(" ".join(out))
 

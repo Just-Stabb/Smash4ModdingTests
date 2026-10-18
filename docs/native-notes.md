@@ -773,10 +773,15 @@ indices < 0x40 in the position code and sends the rest to `ext`.
   hitbox list, a fighter ID other than self (`id >> 28 == 0`, slot `(id >> 16) & 0xFFF`). With the
   records off (`AM+0x4C == 0`): a fighter whose int `0x10000065` (last attacker's player number,
   used for the hit effects' colour) equals self's fighter-table slot.
-- **Code space:** besides the Havok function, three more functions nothing calls or references
-  (no branches, relocations or exports; found by scanning every branch and relocation target):
-  `0x04AE6258` (0x234), `0x04AD2164` (0x194), `0x037EE858` (0x124). Their relocations are moved to
-  the dummy word `0x037EE73C` (`reloc:` arguments). Plus the tail of the first cave, the end of the
-  arith cave, and the stat cave's table (now 8 profiles). `pack()` spreads the code blocks over
-  these and turns branches between regions into `.far` (inverted short branch + `b`).
+- **Code space: grow `.text`.** `.text` (section 2) ends at `0x04B77E1C`, but the RPL file info's
+  text region (`textRegionSize` 0x2BB8670 from `0x02000000`) reaches `0x04BB8670`, and Cemu
+  (`rpl.cpp`) allocates, maps and recompiles the whole region (trampolines live elsewhere, in the
+  lower code area). `rpx_patch.py grow:0x04B79000` extends `.text` with zeros up to there (it still
+  recompresses into its slot in the file; otherwise the section is moved to the end of the file),
+  and the combat variables' code sits at `0x04B78000`. `pack()` spreads the code blocks over the free
+  regions and turns branches between blocks into `.far` (inverted short branch + `b`).
+- **Not dead: `0x04AD2164` is the RPX entry point** (ELF `e_entry`), run by the loader at startup;
+  the first version of the combat variables wrote code there and the game crashed on launch at
+  `0x04AD2178`. A function with no calls or relocations can still be the entry point (check
+  `e_entry`). `0x04AE6258` (0x234) and `0x037EE858` (0x124) do look unused but aren't used now.
 

@@ -13,6 +13,10 @@ Relocations: an argument `reloc:LO-HI=DUMMY` moves every relocation whose target
 there (e.g. a code cave in a dead function: its relocations would otherwise patch the new code
 at load time). DUMMY must be a dead word.
 
+`grow:END` extends the code section below END with zeros up to END (room for new code after the
+game's own; END must stay below the text region's end in the RPL file info). A section that no
+longer fits in its place in the file is moved to the end of the file.
+
 Addresses are memory addresses (e.g. 0x10136C58 is in .rodata). The section
 holding each address is decompressed (RPX zlib sections), patched, recompressed
 into the same space, and its CRC in the RPX CRC table is updated, so no other
@@ -57,7 +61,11 @@ def main():
     d, shoff, shentsize, secs = load(src)
     patches = {}
     reloc_moves = []
+    grows = []
     for p in sys.argv[3:]:
+        if p.startswith('grow:'):
+            grows.append(int(p[5:], 0))
+            continue
         if p.startswith('reloc:'):
             rng, dummy = p[6:].split('=')
             lo, hi = rng.split('-')
@@ -68,6 +76,19 @@ def main():
 
     by_section = {}
     cache = {}
+    for end in grows:
+        # the code section that ends below END grows (zero-filled) up to it; the loader maps the
+        # whole text region (textRegionSize in the file info), so this stays inside allocated code
+        # memory as long as END is below the region's end
+        idx = max((i for i, s in enumerate(secs) if s[1] == 1 and s[2] & 4 and 0 < s[3] < end),
+                  key=lambda i: secs[i][3])
+        data = section_data(d, secs[idx])
+        need = end - secs[idx][3]
+        if len(data) < need:
+            print("grew section %d from %s to %s" % (idx, hex(secs[idx][3] + len(data)), hex(end)))
+            data += b'\0' * (need - len(data))
+        cache[idx] = data
+        by_section.setdefault(idx, (data, []))
     for addr, value in patches.items():
         idx, data = locate(d, secs, addr, cache)
         by_section.setdefault(idx, (data, []))[1].append((addr, value))
@@ -112,7 +133,14 @@ def main():
                     new = comp
                     break
             if new is None:
-                sys.exit("recompressed section %d doesn't fit in its original space" % idx)
+                # doesn't fit any more (a grown section): move it to the end of the file
+                new = struct.pack('>I', len(data)) + zlib.compress(bytes(data), 9)
+                d[off:off + room] = b'\0' * room
+                off = (len(d) + 63) & ~63
+                d += b'\0' * (off - len(d)) + new
+                sec[4] = off
+                room = len(new)
+                print("section %d moved to file offset %s" % (idx, hex(off)))
             d[off:off + room] = new + b'\0' * (room - len(new))
             sec[5] = len(new)
             struct.pack_into('>10I', d, shoff + idx * shentsize, *sec)
