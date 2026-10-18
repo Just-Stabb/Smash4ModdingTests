@@ -14153,6 +14153,7 @@ void func_713()
     WorkModule(0x16, 0x1e000072);
     WorkModule(0x16, 0x1e000073);
     WorkModule(0x16, 0x1e000054);
+    WorkModule(0x16, 0x1e000056); // up tilt out of dash (added, universal: run up tilt / shield)
     WorkModule(0x16, 0x1e000031);
     WorkModule(0x16, 0x1e000066);
     WorkModule(0x16, 0x1e000067);
@@ -14285,6 +14286,11 @@ void func_715()
             return;
         }
     }
+    if (global24 & 0x4 && WorkModule(0x15, 0x1e000056)) // up tilt out of dash (added)
+    {
+        func_16(0x29, 0x1);
+        return;
+    }
     if (WorkModule(0x15, 0x1e000054))
     {
         if (global38 & 0x1)
@@ -14337,7 +14343,7 @@ void func_715()
     }
     if (ControlModule(0x2712, 0x3) == 0x1 && WorkModule(0x2712, 0x2100000e) == 0)
     {
-        func_16(0x20, 0x1);
+        func_16(0x1b, 0x1); // shield out of dash (added): GuardOn instead of EscapeF (0x20)
         return;
     }
     if (func_51())
@@ -14381,6 +14387,7 @@ void func_716()
     WorkModule(0x16, 0x1e00007f);
     WorkModule(0x16, 0x1e00005c);
     WorkModule(0x16, 0x1e000054);
+    WorkModule(0x16, 0x1e000056); // up tilt out of run (added, universal: run up tilt / shield)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {
