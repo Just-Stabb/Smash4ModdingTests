@@ -101,27 +101,25 @@ set_other:
 slot:
         lis r12, {FIGHTERS_HA}
         lwz r12, {FIGHTERS_LO}(r12)
-        cmpwi r12, 0
-        beq slot_none
+{DATA_r12_slot_none}
         lwz r12, 0(r12)
-        cmpwi r12, 0
-        beq slot_none
+{DATA_r12_slot_none}
         lwz r11, 8(r12)                 # entry count
         cmplw r3, r11
         bge slot_none
         lwz r12, 0(r12)                 # entries
-        cmpwi r12, 0
-        beq slot_none
+{DATA_r12_slot_none}
         mulli r11, r3, {ENTRY_SIZE}
         add r12, r12, r11
         lbz r11, 0x1E(r12)              # live when >= 4 (as 0x02BEF61C checks)
         cmplwi r11, 4
         blt slot_none
         lwz r12, 0xC(r12)               # module accessor
-        cmpwi r12, 0
-        beq slot_none
+{DATA_r12_slot_none}
         lwz r4, 0x28(r12)
         lwz r3, 0x18(r12)
+{DATA_r4_slot_none}
+{DATA_r3_slot_none}
         blr
 slot_none:
         li r3, 0
@@ -327,10 +325,12 @@ set_comp:                               # posture r25, component r27 = f1, via i
         slwi r12, r27, 2
         add r12, r12, r1
         stfs f1, 0x8(r12)
+        lwz r12, 0(r25)                 # its vtable and set_pos must look like real ones
+{DATA_r12_ret_zero}
+        lwz r12, 0x4C(r12)
+{CODE_r12_ret_zero}
         mr r3, r25
         addi r4, r1, 8
-        lwz r12, 0(r25)
-        lwz r12, 0x4C(r12)
         mtctr r12
         bctrl
 ret_zero:
@@ -413,8 +413,35 @@ arith_done:
 """
 
 
+def check_data(reg, fail):
+    """Branch to fail unless reg is a word-aligned pointer in 0x10000000-0x4FFFFFFF (data / heap)."""
+    return ("        addis r0, %s, -0x1000\n"
+            "        rlwinm. r0, r0, 0, 0, 1\n"
+            "        bne %s\n"
+            "        andi. r0, %s, 3\n"
+            "        bne %s" % (reg, fail, reg, fail))
+
+
+def check_code(reg, fail):
+    """Branch to fail unless reg is a word-aligned address in 0x02000000-0x09FFFFFF (code)."""
+    return ("        addis r0, %s, -0x200\n"
+            "        rlwinm. r0, r0, 0, 0, 4\n"
+            "        bne %s\n"
+            "        andi. r0, %s, 3\n"
+            "        bne %s" % (reg, fail, reg, fail))
+
+
+CHECKS = {
+    "DATA_r12_slot_none": check_data("r12", "slot_none"),
+    "DATA_r4_slot_none": check_data("r4", "slot_none"),
+    "DATA_r3_slot_none": check_data("r3", "slot_none"),
+    "DATA_r12_ret_zero": check_data("r12", "ret_zero"),
+    "CODE_r12_ret_zero": check_code("r12", "ret_zero"),
+}
+
+
 def assemble():
-    src = SOURCE.format(STAT_CAVE=STAT_CAVE, SET_RESUME=SET_RESUME, SLOTS=SLOTS,
+    src = SOURCE.format(**CHECKS, STAT_CAVE=STAT_CAVE, SET_RESUME=SET_RESUME, SLOTS=SLOTS,
                         ENTRY_SIZE=ENTRY_SIZE, FIGHTERS_HA=((FIGHTERS + 0x8000) >> 16) & 0xFFFF,
                         FIGHTERS_LO=FIGHTERS & 0xFFFF if FIGHTERS & 0x8000 == 0 else (FIGHTERS & 0xFFFF) - 0x10000)
     src2 = SOURCE2 + "".join(ARITH_STUB.format(n=n, first=first, resume=hook + 4)

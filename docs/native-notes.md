@@ -730,7 +730,17 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
 - PostureModule: position `+0x10`/`+0x14`/`+0x18`, facing `+0x60`; vtable `+0x4C` set_pos(this,
   vec3*) (fighter version `0x02E5CDD8` stores the three floats, then updates when they changed).
 - Code at `0x037EDC78` (reads/writes) and `0x037EE280` (add/sub/mul/div). Tested in Unicorn with
-  fake fighter tables and the game's own WorkModule code for the other IDs. The ACMD SET_FLOAT
-  handler wasn't found statically (index `0x1D7`); it's assumed to use the WorkModule vtable like
-  everything else that was checked.
+  fake fighter tables and the game's own WorkModule code for the other IDs. Every pointer the cave
+  follows is range-checked (data 0x10000000–0x4FFFFFFF, code 0x02000000–0x09FFFFFF, word aligned);
+  a bad one reads 0 / skips the write instead of crashing.
+- **ACMD handlers:** table of function pointers at `0x10350ED8`, indexed by the command index the
+  loader puts in place of the CRC (`0x02BEE154`, CRC → index table `0x100FAAB8`; the executor
+  near `0x02BEE6F0` reads the table). Handlers get r3 = module accessor, r5 = script state,
+  r6 = flags (`lbz 8(r6)`), r7 = the command's parameters. SET_FLOAT (`0x1D7`, `0x02BDA054`)
+  builds `WorkModule(0, value, var)` and calls the WorkModule MSC handler (vtable `+0x1CC`) →
+  set_float, and Float_Var_Compare (`0xC8`, `0x02BE6730`) calls get_float, so both reach the
+  position hooks. Some other handlers read float variables **inline** from the WorkModule tables
+  (e.g. IT_CREATE `0x02BE97A0`, IT_CREATE_ANGLE `0x02BE9880`), which the hooks don't see: don't
+  pass `0x0F0000xx` to those. ADD_FLOAT `0x02BE6E80`, SUB_FLOAT_2 `0x02BDA100`,
+  Add/Set_Momentum `0x02BD7FA4`.
 
