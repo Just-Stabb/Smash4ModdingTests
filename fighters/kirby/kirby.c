@@ -41645,7 +41645,7 @@ void func_2485(int arg0, int arg1, int arg2)
     var3 = 0;
     var4 = func_2484(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -41661,7 +41661,7 @@ void func_2486(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -41890,7 +41890,7 @@ void func_2503(int arg0, int arg1, int arg2)
     var3 = 0x1;
     var4 = func_2502(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -41906,7 +41906,7 @@ void func_2504(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -42184,7 +42184,7 @@ void func_2522(int arg0, int arg1, int arg2)
     var3 = 0x2;
     var4 = func_2521(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -42200,7 +42200,7 @@ void func_2523(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -43077,7 +43077,7 @@ void func_2585(int arg0, int arg1, int arg2)
     var3 = 0x3;
     var4 = func_2584(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -43093,7 +43093,7 @@ void func_2586(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -43984,7 +43984,7 @@ void func_2629(int arg0, int arg1, int arg2)
     var3 = 0x4;
     var4 = func_2628(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -44000,7 +44000,7 @@ void func_2630(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -44427,7 +44427,7 @@ void func_2653(int arg0, int arg1, int arg2)
     var3 = 0x5;
     var4 = func_2652(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -44443,7 +44443,7 @@ void func_2654(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -44988,7 +44988,7 @@ void func_2678(int arg0, int arg1, int arg2)
     var3 = 0x6;
     var4 = func_2677(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, 1.0f);
 }
 
@@ -45004,7 +45004,7 @@ void func_2679(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -45778,7 +45778,7 @@ void func_2730(int arg0, int arg1, int arg2)
     var3 = 0x7;
     var4 = func_2729(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -45794,7 +45794,7 @@ void func_2731(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -46140,7 +46140,7 @@ void func_2748(int arg0, int arg1, int arg2)
     var3 = 0x9;
     var4 = func_2747(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -46156,7 +46156,7 @@ void func_2749(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -46513,7 +46513,7 @@ void func_2763(int arg0, int arg1, int arg2)
     var3 = 0xa;
     var4 = func_2762(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -46529,7 +46529,7 @@ void func_2764(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -46727,7 +46727,7 @@ void func_2777(int arg0, int arg1, int arg2)
     var3 = 0xb;
     var4 = func_2776(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -46743,7 +46743,7 @@ void func_2778(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -46886,7 +46886,7 @@ void func_2785(int arg0, int arg1, int arg2)
     var3 = 0xc;
     var4 = func_2784(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -46902,7 +46902,7 @@ void func_2786(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -47291,7 +47291,7 @@ void func_2810(int arg0, int arg1, int arg2)
     var3 = 0xd;
     var4 = func_2809(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -47307,7 +47307,7 @@ void func_2811(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -47810,7 +47810,7 @@ void func_2844(int arg0, int arg1, int arg2)
     var3 = 0xe;
     var4 = func_2843(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -47826,7 +47826,7 @@ void func_2845(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -48162,7 +48162,7 @@ void func_2863(int arg0, int arg1, int arg2)
     var3 = 0xf;
     var4 = func_2862(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0), var3); // Bowser's ACMD for the custom (added)
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -48178,7 +48178,7 @@ void func_2864(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0), var1); // Bowser's ACMD for the custom (added)
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -48591,7 +48591,7 @@ void func_2878(int arg0, int arg1, int arg2)
     var3 = 0x10;
     var4 = func_2877(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -48607,7 +48607,7 @@ void func_2879(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -48835,7 +48835,7 @@ void func_2893(int arg0, int arg1, int arg2)
     var3 = 0x11;
     var4 = func_2892(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -48851,7 +48851,7 @@ void func_2894(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -49397,7 +49397,7 @@ void func_2920(int arg0, int arg1, int arg2)
     var3 = 0x12;
     var4 = func_2919(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -49413,7 +49413,7 @@ void func_2921(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -49811,7 +49811,7 @@ void func_2945(int arg0, int arg1, int arg2)
     var3 = 0x13;
     var4 = func_2943(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -49827,7 +49827,7 @@ void func_2946(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
@@ -49843,7 +49843,7 @@ void func_2947(int arg0)
     var3 = func_2944(var2);
     printf("%d %d", var2, var3);
     MotionModule(0x2711, arg0);
-    MotionAnimcmdModule(0, 0, var3, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(var3, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var4 += 1.0f;
@@ -50026,7 +50026,7 @@ void func_2954(int arg0, int arg1, int arg2)
     var3 = 0x14;
     var4 = func_2953(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -50042,7 +50042,7 @@ void func_2955(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -50461,7 +50461,7 @@ void func_2985(int arg0, int arg1, int arg2)
     var3 = 0x15;
     var4 = func_2984(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -50477,7 +50477,7 @@ void func_2986(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -50923,7 +50923,7 @@ void func_3000(int arg0, int arg1, int arg2)
     var3 = 0x16;
     var4 = func_2999(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -50939,7 +50939,7 @@ void func_3001(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -51991,7 +51991,7 @@ void func_3109(int arg0, int arg1, int arg2)
     var3 = 0x17;
     var4 = func_3108(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -52007,7 +52007,7 @@ void func_3110(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -52524,7 +52524,7 @@ void func_3129(int arg0, int arg1, int arg2)
     var3 = 0x18;
     var4 = func_3128(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -52540,7 +52540,7 @@ void func_3130(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -53074,7 +53074,7 @@ void func_3158(int arg0, int arg1, int arg2)
     var3 = 0x19;
     var4 = func_3157(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -53090,7 +53090,7 @@ void func_3159(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -53531,7 +53531,7 @@ void func_3187(int arg0, int arg1, int arg2)
     var3 = 0x1b;
     var4 = func_3186(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -53547,7 +53547,7 @@ void func_3188(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     MotionAnimcmdModule(0, 0x1, arg0, var1);
     if (MotionModule(0x20))
     {
@@ -54109,7 +54109,7 @@ void func_3215(int arg0, int arg1, int arg2)
     var3 = 0x1c;
     var4 = func_3214(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -54125,7 +54125,7 @@ void func_3216(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -55367,7 +55367,7 @@ void func_3301(int arg0, int arg1, int arg2)
     var3 = 0x1d;
     var4 = func_3300(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -55383,7 +55383,7 @@ void func_3302(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -56461,7 +56461,7 @@ void func_3386(int arg0, int arg1, int arg2)
     var3 = 0x1e;
     var4 = func_3385(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -56477,7 +56477,7 @@ void func_3387(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -56990,7 +56990,7 @@ void func_3419(int arg0, int arg1, int arg2)
     var3 = 0x1f;
     var4 = func_3418(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -57006,7 +57006,7 @@ void func_3420(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -57167,7 +57167,7 @@ void func_3427(int arg0, int arg1, int arg2)
     var3 = 0x20;
     var4 = func_3426(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -57183,7 +57183,7 @@ void func_3428(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -57720,7 +57720,7 @@ void func_3452(int arg0, int arg1, int arg2)
     var3 = 0x21;
     var4 = func_3451(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -57736,7 +57736,7 @@ void func_3453(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -58074,7 +58074,7 @@ void func_3462(int arg0, int arg1, int arg2)
     var3 = 0x22;
     var4 = func_3461(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -58090,7 +58090,7 @@ void func_3463(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -58726,7 +58726,7 @@ void func_3511(int arg0, int arg1, int arg2)
     var3 = 0x23;
     var4 = func_3510(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -58742,7 +58742,7 @@ void func_3512(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -59115,7 +59115,7 @@ void func_3538(int arg0, int arg1, int arg2)
     var3 = 0x24;
     var4 = func_3537(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -59131,7 +59131,7 @@ void func_3539(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -59509,7 +59509,7 @@ void func_3558(int arg0, int arg1, int arg2)
     var3 = 0x25;
     var4 = func_3557(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -59525,7 +59525,7 @@ void func_3559(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -59961,7 +59961,7 @@ void func_3582(int arg0, int arg1, int arg2)
     var3 = 0x26;
     var4 = func_3581(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -59977,7 +59977,7 @@ void func_3583(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -60516,7 +60516,7 @@ void func_3611(int arg0, int arg1, float arg2)
     var3 = 0x27;
     var4 = func_3610(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -60532,7 +60532,7 @@ void func_3612(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = 1.0f;
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, var3, 0x1);
 }
 
@@ -60546,7 +60546,7 @@ void func_3613(int arg0, int arg1, float arg2)
     var3 = 0x27;
     var4 = func_3610(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var5 += 1.0f;
@@ -60914,7 +60914,7 @@ void func_3635(int arg0, int arg1, int arg2)
     var3 = 0x28;
     var4 = func_3634(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -60930,7 +60930,7 @@ void func_3636(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -61435,7 +61435,7 @@ void func_3653(int arg0, int arg1, int arg2)
     var3 = 0x29;
     var4 = func_3652(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -61451,7 +61451,7 @@ void func_3654(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -62127,7 +62127,7 @@ void func_3684(int arg0, int arg1, int arg2)
     var3 = 0x2a;
     var4 = func_3683(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -62143,7 +62143,7 @@ void func_3685(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -62652,7 +62652,7 @@ void func_3710(int arg0, int arg1, int arg2)
     var3 = 0x2b;
     var4 = func_3709(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -62668,7 +62668,7 @@ void func_3711(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -63648,7 +63648,7 @@ void func_3768(int arg0, int arg1, int arg2)
     var3 = 0x2c;
     var4 = func_3766(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -63664,7 +63664,7 @@ void func_3769(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -64263,7 +64263,7 @@ void func_3799(int arg0, int arg1, int arg2)
     var3 = 0x2d;
     var4 = func_3798(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -64279,7 +64279,7 @@ void func_3800(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -64419,7 +64419,7 @@ void func_3806(int arg0, int arg1, int arg2)
     var3 = 0x2e;
     var4 = func_3805(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -64435,7 +64435,7 @@ void func_3807(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -64724,7 +64724,7 @@ void func_3823(int arg0, int arg1, int arg2)
     var3 = 0x2f;
     var4 = func_3822(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -64740,7 +64740,7 @@ void func_3824(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -64997,7 +64997,7 @@ void func_3831(int arg0, int arg1, int arg2)
     var3 = 0x30;
     var4 = func_3830(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -65013,7 +65013,7 @@ void func_3832(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -65505,7 +65505,7 @@ void func_3860(int arg0, int arg1, int arg2)
     var3 = 0x31;
     var4 = func_3859(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -65521,7 +65521,7 @@ void func_3861(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -65963,7 +65963,7 @@ void func_3882(int arg0, int arg1, int arg2)
     var3 = 0x32;
     var4 = func_3881(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -65979,7 +65979,7 @@ void func_3883(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -66176,7 +66176,7 @@ void func_3891(int arg0, int arg1, int arg2)
     var3 = 0x33;
     var4 = func_3890(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -66192,7 +66192,7 @@ void func_3892(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -66699,7 +66699,7 @@ void func_3923(int arg0, int arg1, int arg2)
     var3 = 0x34;
     var4 = func_3922(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -66715,7 +66715,7 @@ void func_3924(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -67166,7 +67166,7 @@ void func_3944(int arg0, int arg1, int arg2)
     var3 = 0x35;
     var4 = func_3943(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -67182,7 +67182,7 @@ void func_3945(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -67719,7 +67719,7 @@ void func_3978(int arg0, int arg1, int arg2)
     var3 = 0x36;
     var4 = func_3977(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -67735,7 +67735,7 @@ void func_3979(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -68774,7 +68774,7 @@ void func_4057(int arg0, int arg1, int arg2)
     var3 = 0x37;
     var4 = func_4056(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -68790,7 +68790,7 @@ void func_4058(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -69032,7 +69032,7 @@ void func_4067(int arg0, int arg1, int arg2)
     var3 = 0x38;
     var4 = func_4066(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -69048,7 +69048,7 @@ void func_4068(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -69634,7 +69634,7 @@ void func_4100(int arg0, int arg1, int arg2)
     var3 = 0x39;
     var4 = func_4099(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, arg0, var3);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -69650,7 +69650,7 @@ void func_4101(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, arg0, var1);
+    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -71932,16 +71932,19 @@ void copy_custom_article(int article)
     }
 }
 
-// Bowser copy: Kirby runs Bowser's own ACMD (game/effect/sound, MotionAnimcmdModule with fighter
-// kind 0xF) for motions 0x211 / 0x215 / ... Each neutral-B motion has 4 slots (default +
-// customs), so the custom's scripts (its effects) are at motion + slot.
-int copy_custom_motion(int motion)
+// Copy neutral specials run the copied fighter's own ACMD (game/effect/sound, MotionAnimcmdModule
+// with the copied fighter's kind) by its motion number. Every special motion in a fighter's motion
+// list has 4 entries in a row: the default, the _c2 and _c3 customs, and one more (e.g. Captain
+// Falcon 0x211 specialn, 0x212 specialn_c2, 0x213 specialn_c3), so the custom's scripts are at
+// motion + copy_custom_slot() (the swallowed fighter's custom number, 0 = default). Mii Fighters
+// (kinds 0-2) are left alone: their number picks a different move, not a variant.
+int copy_custom_motion(int motion, int kind)
 {
-    if (motion >= 0x211 && motion < 0x229)
+    if (kind <= 0x2)
     {
-        return motion + copy_custom_slot();
+        return motion;
     }
-    return motion;
+    return motion + copy_custom_slot();
 }
 
 // ===================================================================

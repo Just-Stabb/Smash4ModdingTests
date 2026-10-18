@@ -663,7 +663,8 @@ hit states oddly. In the user's setup these characters never detransform, so thi
   breath article's motion with `ArticleModule(0x2715)`, only fixed the hitboxes.)
 - Effects / sounds: Kirby's Bowser copy runs Bowser's own ACMD (`MotionAnimcmdModule(0, 0, motion,
   0xF)`, kind `0xF` = koopa) for motions `0x211`/`0x215`/…; each has 4 slots, so Kirby's MSC uses
-  motion + slot (`copy_custom_motion`, in `func_2863` / `func_2864`).
+  motion + slot (`copy_custom_motion`, in `func_2863` / `func_2864`). Now every copy does this
+  (below).
 - Star-missile copies: the star cave (`starcopy_cave.py`, 12th hit) writes the hit fighter's
   `0x10000048` to Kirby's `0x9F` before it hands the copy over. Confirmed working.
 
@@ -689,9 +690,17 @@ reads", "Position variables" and "Losing the copy when hit" above.)
       $(python3 tools/copy_custom_cave.py) 0x10136C58=9 $(python3 tools/kirby_stat_cave.py) \
       $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000
 
-Other copies: the native part (params, weapon custom number) is generic. What's per fighter is
-only MSC code that picks body ACMD by motion (Bowser: `copy_custom_motion` in `func_2863`/`2864`)
-or reads the custom slot itself.
+Other copies: the native part (params, weapon custom number) is generic. The body ACMD is picked
+by MSC: every copy's pair of motion helpers (`[Copy: shared] helper`, e.g. Captain Falcon
+`func_2785`/`2786`, Little Mac `func_3653`/`3654`) calls `MotionAnimcmdModule(0, 0, motion, kind)`
+with the copied fighter's own motion number, and all of them now go through
+`copy_custom_motion(motion, kind)` = motion + custom slot (except the Mii Fighters, kinds 0-2).
+That relies on the motion list layout: each special motion has 4 entries in a row, default /
+`_c2` / `_c3` / one more. Checked in Captain Falcon's `motion.mtable` (`0x211` specialn, `0x212`
+specialn_c2, `0x213` specialn_c3, `0x215` specialnturn, ...; also side / up / down B), and it
+matches Bowser's (confirmed in game) and Little Mac's motion numbers (`0x22D`, `0x231`, ... step 4).
+Fighters without customs (DLC) always have slot 0. Copies that read the custom slot themselves
+(weapon articles: `copy_custom_article`) are separate.
 
 ## Fighter jump init (0x02E79940)
 
