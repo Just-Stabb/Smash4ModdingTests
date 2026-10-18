@@ -688,7 +688,7 @@ reads", "Position variables" and "Losing the copy when hit" above.)
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py) 0x10136C58=9 $(python3 tools/kirby_stat_cave.py) \
-      $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000
+      $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000 $(python3 tools/strike_cave.py)
 
 Other copies: the native part (params, weapon custom number) is generic. The body ACMD is picked
 by MSC: every copy's pair of motion helpers (`[Copy: shared] helper`, e.g. Captain Falcon
@@ -832,4 +832,29 @@ MSC handlers: int `+0x2D4` (`0x02C6164C`, ops 0–`0x38`, `0x2710`+), float `+0x
 (`0x02C5B30C`, `0x02C5BAEC`) besides the commands above, so `+0xF4` stays put across motions:
 `tools/position_vars_cave.py` exposes it as float ID `0x0F000098` (self), used by Kirby's
 Overdrive (×1.2 animations).
+
+## Hitboxes and hitstop (Kirby's Strike trait)
+
+- **Hitbox creation:** every hitbox command (ACMD `Hitbox` `0x02BDB0EC`, `Special_Hitbox`, ...,
+  table at `0x10350ED8`) builds 0x68 bytes of attack data and calls AttackModule (accessor `+0x50`)
+  vtable `+0x54` = `AttackModuleImpl::set_attack` `0x02C086A8(this, id, part, data)` (vtable
+  `0x10103524`, the only AttackModule class). It copies the data to slot `[this+0x40] + id*0x84`.
+  Data: `+0x18` damage, `+0x1C` size, `+0x30` trip, `+0x34` hitlag multiplier, `+0x38` SDI,
+  `+0x43` effect. AttackModule `+4` = the owning battle object (constructor `0x02C077F4`); a
+  battle object's `+0` is its ID (category = ID >> 28, 0 = fighter) and a fighter's `+0xC` its
+  module accessor.
+- **Hitstop:** `0x02C26724(f1 damage, f2 0.3846154, f3 5, f4 multiplier, f5 30)` =
+  floor(min((damage × 0.3846154 + 5) × multiplier, 30)). `0x02C2678C(r3, r4 hitbox data, f1
+  damage, f2 multiplier, r5 side, r6 use the hitbox's multiplier)` multiplies by the data's `+0x34`
+  (and an electric factor for effect 3, ...), constants from the common params `[0x102FDC70]`
+  `+0x90`/`+0x94`/`+0x8C`. Every battle object's hit handling goes through its vtable `+0x1B4`
+  (fighters: `0x02E77930`, special values for reaction kinds `0x18`/`0x19`, else) the generic
+  `0x02C27638(this, r4 accessor, r5 hit info, r6 side, r7, f1 multiplier)`: damage = hit info
+  `+0xC`, hitbox data = hit info `+0x44`. The victim side calls it from `0x02C25318` with `r6 = 0`,
+  the attacker side from `0x02C2639C` with `r6 = 1`; both then scale by a rate (accessor `+0x58`
+  vtable `+0x17C`) and set StopModule (accessor `+0x48`) vtable `+0x8C(frames, 1)`
+  (= `0x0200DDB4`: `+4` frames, `+0x11` in hitstop).
+- `tools/strike_cave.py` (cave `0x04B78E00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
+  (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2) and `0x02C27638`
+  (attacker side, Strike Kirby: damage / 1.15, multiplier / 1.2, so his own hitstop is vanilla).
 

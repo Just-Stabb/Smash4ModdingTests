@@ -912,11 +912,12 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   statuses `0x45`–`0x4C`, CaptureDamage `0x41`, DownDamage `0x57`), on ledge grab (`func_2285`) and
   when KO'd (`func_2286`) (`upb_air_update()` in the main loop `func_74`). A ground up B counts too:
   Kirby can't up B again until one of those happens.
-- **Cancel:** with a copy ability (flag `0x2000009A`), from `upb_cancel_delay()` (3) frames after up
-  B's first hitbox appears (`AttackModule(0, 0)`, hitbox ID 0, checked every frame), neutral special
-  (B with no direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral
-  special (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /
-  `func_2299`). `global78` = up-B frames, `global79` = frame the first hitbox appeared.
+- **Cancel:** with a copy ability (flag `0x2000009A`), from frame `upb_cancel_frame()` (14) of
+  up B (counted from its start, across the rise and fall statuses), neutral special (B with no
+  direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral special
+  (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /
+  `func_2299`). `global78` = up-B frames. (Before: 3, then 6 frames after the first hitbox;
+  `global79` still records the frame the first hitbox appeared.)
 - Note: Kirby's ground up-B rise script (`specialhi`) isn't in this `game.bin` (air up B `JUMP`s to it),
   so the first hitbox may be the fall's (`0x2D1`, frame 1 of `0x172`). The cancel goes by whatever
   hitbox actually comes out first.

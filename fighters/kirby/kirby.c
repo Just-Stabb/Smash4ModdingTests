@@ -72527,7 +72527,9 @@ void nair_rapid_drift()
 // trait's changes. global76 = current trait (0 = no copy).
 //   Rush: x1.25 movement stats (walk, dash, run, jump horizontal speed, air speed / acceleration,
 //         fall / fast fall speed; not jump height), and neutral air is the air rapid jab.
-//   Zoning, Strike, Juggernaut, Normal, Technical: no changes yet.
+//   Strike: x1.15 damage on Kirby's own hitboxes (not projectiles), x1.2 hitstop for the opponent,
+//         his own hitstop unchanged (tools/strike_cave.py, marker bit 0x8).
+//   Zoning, Juggernaut, Normal, Technical: no changes yet.
 // Stat boosts need the patched cross_f.rpx (tools/kirby_stat_cave.py): the stats are shared data,
 // so the executable scales them when they're read, for an object whose int 0x1000008E holds
 // 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile()).
@@ -72566,6 +72568,18 @@ int kirby_trait_profile(int trait)
     return 0;
 }
 
+// Trait bits for the executable, added to the marker (bits 0-2 are the stat profile):
+//   0x8 = Strike: Kirby's hitboxes (not projectiles) do x1.15 damage and x1.2 hitlag, and his own
+//         hitstop stays as without it (tools/strike_cave.py).
+int kirby_trait_flags(int trait)
+{
+    if (trait == trait_strike())
+    {
+        return 0x8;
+    }
+    return 0;
+}
+
 // main loop (func_74), every frame
 void kirby_trait_update()
 {
@@ -72577,7 +72591,7 @@ void kirby_trait_update()
     }
     global76 = trait;
     overdrive_update();
-    WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait), 0x1000008e);
+    WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait) + kirby_trait_flags(trait), 0x1000008e);
 }
 
 // ===================================================================
@@ -72686,7 +72700,7 @@ int kirby_rapid_nair()
 //   global78 / global79: up-B frame count / frame its first hitbox (ID 0) appeared (-1 = not yet).
 // ===================================================================
 int sideb_count_frame()   { return 5; } // an air side B uses up one of the air side Bs after this frame
-int upb_cancel_delay()    { return 6; } // frames after up B's first hitbox before neutral special can cancel it
+int upb_cancel_frame()    { return 14; } // copy ability: neutral special can cancel up B from this frame of it
 
 // side-B loops (func_2430 SpecialS, func_2467 swing), every frame
 void sideb_count_update()
@@ -72745,7 +72759,7 @@ void upb_air_update()
 }
 
 // up-B loops (func_2291 rise, func_2295 / func_2299 falls), every frame. With a copy ability,
-// from upb_cancel_delay() frames after the first hitbox, neutral special cancels up B.
+// from frame upb_cancel_frame() (14) of up B, neutral special cancels it (with a copy ability).
 // Returns 1 when it changed status.
 int upb_cancel_update()
 {
@@ -72754,19 +72768,15 @@ int upb_cancel_update()
         return 0;
     }
     global78++;
-    if (global79 < 0)
+    if (global79 < 0 && AttackModule(0, 0)) // hitbox ID 0 exists (kept for reference)
     {
-        if (AttackModule(0, 0)) // hitbox ID 0 exists
-        {
-            global79 = global78;
-        }
-        return 0;
+        global79 = global78;
     }
     if (!WorkModule(0x10, 0x2000009a)) // no copy ability
     {
         return 0;
     }
-    if (global78 < global79 + upb_cancel_delay())
+    if (global78 < upb_cancel_frame())
     {
         return 0;
     }
