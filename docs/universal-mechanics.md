@@ -25,34 +25,29 @@ Forward tilt doesn't need it (back + A already turns it around).
 
 Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
 
-## Up tilt and shield out of dash / run
+## Tilts and shield out of run
 
-Up tilt (AttackHi3 `0x29`) and shield (GuardOn `0x1B`) can be done straight out of the initial
-dash (Dash `0x3`) and the run (Run `0x4`). MSC, in the common Dash / Run scripts (same function
-numbers in Kirby and Captain Falcon; check `sv_set_mem(0x1, 0x1, 0x3/0x4, func_N)` per fighter):
+Up tilt (AttackHi3 `0x29`), down tilt (AttackLw3 `0x2A`) and shield (GuardOn `0x1B`) can be done
+straight out of a run (Run `0x4`). **Not out of the initial dash** (Dash `0x3`) for now: there,
+shield still does a forward roll (EscapeF `0x20`) and A is a dash attack, as in the game.
+MSC, in the common Run scripts (same function numbers in Kirby and Captain Falcon; check
+`sv_set_mem(0x1, 0x1, 0x4, func_N)` per fighter):
 
-- **Dash main** (`func_713`) and **Run main** (`func_716`): turn the up tilt transition on,
-  `WorkModule(0x16, 0x1e000056);` (CONT_ATTACK_HI3), after the `0x1e000054` (dash attack) line.
-- **Dash loop** (`func_715`), before the dash attack check:
+- **Run main** (`func_716`): turn the tilt transitions on, after the `0x1e000054` (dash attack) line:
 
 ```c
-if (global24 & 0x4 && WorkModule(0x15, 0x1e000056)) // up tilt command
-{
-    func_16(0x29, 0x1);
-    return;
-}
+WorkModule(0x16, 0x1e000056); // up tilt (CONT_ATTACK_HI3)
+WorkModule(0x16, 0x1e000057); // down tilt (CONT_ATTACK_LW3)
 ```
 
-  and the shield check (`ControlModule(0x2712, 0x3) == 0x1 && WorkModule(0x2712, 0x2100000e) == 0`)
-  goes to GuardOn, `func_16(0x1b, 0x1)`, instead of a forward roll (EscapeF `0x20`, what shield
-  did out of a dash before). Rolls are still done from the shield.
-- **Run loop** (`func_717`): nothing to add. It already calls `func_43` (which checks the up tilt
-  command with `0x1e000056`, now on) before the dash attack check, and `func_49` (shield,
-  `0x1e000029`, on through the Shield group `0x1f000005` that Run main already turns on).
+- **Run loop** (`func_717`): nothing to add. It already calls `func_43`, which checks the up tilt
+  command (`global24 & 0x4`, `0x1e000056`) and the down tilt command (`global24 & 0x8`,
+  `0x1e000057`) before the dash attack check, and `func_49` (shield, `0x1e000029`, on through the
+  Shield group `0x1f000005` that Run main already turns on).
 
-Up tilt is checked before dash attack, so A with the stick held up-forward (the up tilt
-command's region) gives up tilt; A with the stick forward is still a dash attack. Up smash
-(`0x1e00005c`) is checked before both.
+The tilts are checked before dash attack, so A with the stick held up-forward / down-forward (the
+tilt commands' regions) gives the tilt; A with the stick forward is still a dash attack. Up smash
+(`0x1e00005c`) is checked before them.
 
 Done: Kirby, Captain Falcon.
 
