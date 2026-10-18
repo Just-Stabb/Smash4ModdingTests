@@ -860,7 +860,8 @@ Overdrive (×1.2 animations).
   (damage first, from argument 3) and passes it to vtable `+0x64` at `0x02C0B790`.
 - `tools/strike_cave.py` (cave `0x04B78C00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
   (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2; crit bit `0x10`:
-  ×2 more each), `0x02C27638` (attacker side, Strike Kirby: damage / 1.15 (crit / 2.3),
-  multiplier / 1.2, so his own hitstop is vanilla, or 2× on a crit) and `0x02C0B77C` (throw data:
+  damage ×2 more, hitlag ×2 × (s·k + 5) / (2s·k + 5) so the opponent's hitstop is exactly 2× the
+  Strike one), `0x02C27638` (attacker side, Strike Kirby: damage / 1.15 (crit / 2.3 and the
+  crit ratio undone), multiplier / 1.2, so his own hitstop is vanilla, or 2× on a crit) and `0x02C0B77C` (throw data:
   damage ×1.15).
 

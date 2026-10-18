@@ -127,13 +127,18 @@ for dmg in (1.0, 3.0, 7.0, 10.0, 13.0, 20.0, 26.0):
 CRIT = STRIKE | 0x10
 mu = fresh()
 fighter(mu, kirby, 3, CRIT)
-check("crit hitbox: damage 10 -> 23", tuple(round(x, 4) for x in run_atk(mu, kirby, 10.0, 1.0)), (23.0, 2.4))
+K = 0.3846154
+for dmg, par in ((10.0, 1.0), (4.0, 1.5), (18.0, 1.0)):
+    fighter(mu, kirby, 3, CRIT)
+    d, h = run_atk(mu, kirby, dmg, par)
+    sd = dmg * 1.15
+    check("crit hitbox %g dmg: damage x2.3" % dmg, round(d, 3), round(sd * 2, 3))
+    check("  opponent hitstop = 2x the Strike one", round((d * K + 5) * h, 3), round(2 * (sd * K + 5) * 1.2 * par, 3))
 fighter(mu, kirby, 3, 0x4B490010)
 check("crit bit without Strike: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
 for dmg in (3.0, 10.0, 14.0, 18.0):
-    scaled = struct.unpack(">f", struct.pack(">f", struct.unpack(">f", struct.pack(">f", dmg * 1.15))[0] * 2))[0]
-    mult = struct.unpack(">f", struct.pack(">f", struct.unpack(">f", struct.pack(">f", 1.2))[0] * 2))[0]
     acc = fighter(mu, kirby, 3, CRIT)
+    scaled, mult = run_atk(mu, kirby, dmg, 1.0)          # the crit hitbox's damage / multiplier
     r = run_hs(mu, acc, 1, scaled, 1.0)
     f = lambda x: struct.unpack(">f", struct.pack(">f", x))[0]
     own = int(min(f(f(r[1] * f(0.3846154)) + 5) * f(r[2] * mult), 30))

@@ -16,14 +16,16 @@ set by the MSC for the whole of a smash attack that rolled a critical hit. Then:
    (+0x34) x HITSTOP_MULT (1.2), for hitboxes owned by Strike Kirby. AttackModule +4 is the owning
    battle object; only fighters (object ID >> 28 == 0) are looked at, so projectiles and other
    articles (weapons, their own objects) are never changed. Every hitbox command (ACMD Hitbox,
-   Special_Hitbox, ..., MSC) goes through set_attack. Critical hit: damage and hitlag multiplier
-   x CRIT_MULT (2) more.
+   Special_Hitbox, ..., MSC) goes through set_attack. Critical hit: damage x CRIT_MULT (2) more,
+   and the multiplier x2 x (s k + 5) / (2s k + 5) (s = the Strike damage, k = 0.3846154) so that
+   the opponent's hitstop is exactly 2x the Strike hit's.
 2. Hitstop (HOOK_HS, the generic hitstop calculation 0x02C27638, called for both sides of a hit:
    r4 = accessor of the fighter being stopped, r5 = hit info, r6 = 1 for the attacker, 0 for the
    victim): when Strike Kirby is the attacker, his own hitstop is computed with damage / 1.15 and
-   multiplier / 1.2, i.e. exactly as without Strike (critical hit: damage / 2.3, multiplier / 1.2,
-   so his hitstop is 2x the normal one). The victim's isn't touched, so it gets the hitbox's x1.2
-   (critical: x2.4) multiplier, on top of the extra damage's own share of hitstop.
+   multiplier / 1.2, i.e. exactly as without Strike (critical hit: damage / 2.3 and the crit's
+   ratio undone, so his hitstop is 2x his Strike one, which is the normal one). The victim's isn't
+   touched, so it gets the hitbox's x1.2 multiplier (on top of the extra damage's own share of
+   hitstop); on a crit, 2x that.
 3. Throws (HOOK_THROW, in AttackModule's MSC handler 0x02C0ACFC, case 0x2716 / 0x2717, which every
    throw command (ACMD Throw_Specifier, Throw_Specifier2, Intensity_Throw_Specifier) goes
    through, just before it hands the throw's attack data (at 0x78(r1), damage first) to vtable
@@ -115,7 +117,14 @@ strike_atk:                             # r26 = the new hitbox's slot, r28 = Att
         fmuls f12, f12, f13
         andi. r0, r11, %(CRIT)d
         beq atk_store
-        lfs f13, 0x10(r12)              # critical hit: both x2 more
+        lfs f13, 0x18(r12)              # critical hit (s = Strike damage): damage x2, and the
+        lfs f11, 0x1C(r12)              # multiplier x2 x (s k + 5) / (2s k + 5), so the opponent's
+        fmadds f10, f0, f13, f11        # hitstop (2s k + 5) x multiplier is 2x the Strike one
+        fadds f9, f0, f0
+        fmadds f9, f9, f13, f11
+        fdivs f10, f10, f9
+        fmuls f12, f12, f10
+        lfs f13, 0x10(r12)
         fmuls f0, f0, f13
         fmuls f12, f12, f13
 atk_store:
@@ -141,13 +150,23 @@ strike_hs:                              # r4 accessor, r5 hit info, r6 1 = attac
         addi r12, r12, consts@l
         lfs f0, 0xC(r12)
         fmuls f2, f1, f0                # multiplier / 1.2 (the hitbox's was x1.2)
+        lfs f9, 0xC(r5)                 # the hit's damage D
         lfs f0, 8(r12)
         andi. r0, r11, %(CRIT)d
         beq hs_damage
-        lfs f0, 0x14(r12)               # critical hit: damage / 2.3 (hitstop stays x2)
+        lfs f13, 0x18(r12)              # critical hit: multiplier also x (D k + 5) / (D/2 k + 5)
+        lfs f11, 0x1C(r12)              # (undoes the crit's ratio, keeps its x2) and damage / 2.3:
+        lfs f8, 0x20(r12)               # Kirby's hitstop = 2x the normal one
+        fmadds f10, f9, f13, f11
+        fmuls f7, f9, f8
+        fmadds f7, f7, f13, f11
+        fdivs f10, f10, f7
+        fmuls f2, f2, f10
+        lfs f8, 0x24(r12)
+        fmuls f2, f2, f8
+        lfs f0, 0x14(r12)
 hs_damage:
-        lfs f1, 0xC(r5)
-        fmuls f1, f1, f0                # damage / 1.15
+        fmuls f1, f9, f0                # damage / 1.15
         mr r3, r4
         addi r4, r5, 0x44               # hitbox data
         mr r5, r6
@@ -176,6 +195,10 @@ consts:
         .float %(IHM)r
         .float %(CM)r
         .float %(ICM)r
+        .float 0.3846154                # hitstop per damage (common params +0x90)
+        .float 5.0                      # hitstop base (+0x94)
+        .float 0.5
+        .float %(BIAS)r
 """
 
 
@@ -184,7 +207,7 @@ def assemble():
     a.asm(SOURCE % dict(
         o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
         o_throw=owner_wm("r30", "throw_done"), m12_throw=marker("r12", "throw_done"), CRIT=CRIT_BIT,
-        THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT),
+        THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
         c4_hs=chk("r4", "hs_orig"), m12_hs=marker("r12", "hs_orig"),
         ATK_BACK="0x%08X" % (HOOK_ATK + 4), HS_BACK="0x%08X" % (HOOK_HS + 4), CALC="0x%08X" % CALC_HITLAG,
         DM=DAMAGE_MULT, HM=HITSTOP_MULT, IDM=BIAS / DAMAGE_MULT, IHM=1.0 / HITSTOP_MULT))
