@@ -210,32 +210,55 @@ namespace SALT.Moveset.AnimCMD
             }
         }
 
+        /// <summary>
+        /// The code without comments: "// ..." (a whole line, or after a command) and "/* ... */"
+        /// (anywhere, over several lines) are removed, then blank lines. Comments never reach the
+        /// binary; Sm4shCommand keeps them in a .comments file next to it.
+        /// </summary>
+        public static List<string> StripComments(IEnumerable<string> lines)
+        {
+            var output = new List<string>();
+            bool inBlock = false;
+            foreach (var raw in lines)
+            {
+                string line = raw ?? "";
+                var sb = new StringBuilder();
+                int i = 0;
+                while (i < line.Length)
+                {
+                    if (inBlock)
+                    {
+                        int end = line.IndexOf("*/", i, StringComparison.Ordinal);
+                        if (end < 0) { i = line.Length; break; }
+                        inBlock = false;
+                        i = end + 2;
+                    }
+                    else if (string.CompareOrdinal(line, i, "/*", 0, 2) == 0)
+                    {
+                        inBlock = true;
+                        i += 2;
+                    }
+                    else if (string.CompareOrdinal(line, i, "//", 0, 2) == 0)
+                        break;
+                    else
+                        sb.Append(line[i++]);
+                }
+                string code = sb.ToString().Trim();
+                if (code.Length > 0)
+                    output.Add(code);
+            }
+            return output;
+        }
+
         private static ACMDCommand[] CompileCommandsUnchecked(string[] lines)
         {
-            var tmpList = lines.ToList().Select(x => x.Trim()).ToList();
-            tmpList.RemoveAll(x => string.IsNullOrWhiteSpace(x));
+            var tmpList = StripComments(lines);
             Commands.Clear();
             for (int i = 0; i < tmpList.Count; i++)
             {
-                string lineText = tmpList[i].Trim();
-
-                // Handle comments
-                if (lineText.StartsWith("//"))
-                    continue;
+                string lineText = tmpList[i];
                 if (lineText == "}")
                     throw new ACMDCompileException(lineText, "'}' without a matching '{'");
-
-                if (lineText.StartsWith("/*"))
-                {
-                    while (tmpList[i].Trim() != "*/")
-                    {
-                        i++;
-                    }
-                    if (++i < tmpList.Count)
-                        lineText = tmpList[i].Trim();
-                    else
-                        break;
-                }
 
                 ACMDCommand cmd = CompileSingleCommand(tmpList[i]);
                 uint ident = cmd.Ident;
@@ -293,7 +316,6 @@ namespace SALT.Moveset.AnimCMD
             //check for Else statement. If the next command is Else, set True/False size parameter (current len + Else len)
             //if the True/False statements don't have an Else afterward then just set their size to current len
             if (Index + 1 < lines.Count && lines[Index + 1] != "}"
-                && !lines[Index + 1].StartsWith("//")
                 && CompileSingleCommand(lines[Index + 1]).Ident == 0x895B9275
                 && IsCmdCondition(cmd.Ident))
             {

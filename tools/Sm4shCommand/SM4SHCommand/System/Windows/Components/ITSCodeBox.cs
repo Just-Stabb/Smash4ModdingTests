@@ -46,13 +46,13 @@ namespace Sm4shCommand
         public ITS_EDITOR(IScript script) : this()
         {
             Script = script;
-            Text = script.Deserialize();
+            Text = ScriptComments.TextFor(script);  // with its comments (.comments file), if any
             IsChanged = false;
         }
         public ITS_EDITOR(IScript script, string[] autocomplete) : this()
         {
             Script = script;
-            Text = script.Deserialize();
+            Text = ScriptComments.TextFor(script);
             IsChanged = false;
             if (autocomplete != null)
             {
@@ -80,6 +80,7 @@ namespace Sm4shCommand
         public void ApplyChanges()
         {
             Script.Serialize(Text);
+            ScriptComments.Remember(Script, Text);  // the .bin has no room for comments
             IsChanged = false;
         }
 
@@ -121,8 +122,11 @@ namespace Sm4shCommand
                 return -1;
             var want = lineText.Trim();
             for (int i = 0; i < LinesCount; i++)
-                if (Lines[i].Trim() == want)
+            {
+                var code = ACMDCompiler.StripComments(new[] { Lines[i] });
+                if (Lines[i].Trim() == want || code.Count == 1 && code[0] == want)
                     return i;
+            }
             return -1;
         }
 
@@ -132,6 +136,7 @@ namespace Sm4shCommand
             e.ChangedRange.ClearStyle(StyleIndex.All);
             //highlight tags
             e.ChangedRange.SetStyle(CommentStyle, @"//.*$", RegexOptions.Multiline);
+            Range.SetStyle(CommentStyle, @"/\*[\s\S]*?\*/", RegexOptions.Multiline);
             e.ChangedRange.SetStyle(LinkStyle, @"(?<=\b(?:JUMP|CALL)\s*\(\s*(?:Hash\s*=\s*)?)0x[0-9A-Fa-f]+", RegexOptions.IgnoreCase);
             e.ChangedRange.SetStyle(keywordStyle, @"\b(if|else|try|catch)\b");
             //e.ChangedRange.SetStyle(keywordStyle, @"(?<=[\(,])+[^=)]+(?==)\b");

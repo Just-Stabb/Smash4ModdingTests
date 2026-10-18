@@ -243,6 +243,7 @@ namespace Sm4shCommand
 
                         var f = new ACMDFile(source);
                         ScriptFiles.Add(fileName, f);
+                        ScriptComments.Load(fileName, f);
                         var node = new TreeNode("ACMD") { Name = "nACMD" };
                         foreach (var keypair in f.Scripts)
                         {
@@ -300,6 +301,7 @@ namespace Sm4shCommand
                     {
                         var acmd = new ACMDFile(p);
                         ScriptFiles.Add(p, acmd);
+                        ScriptComments.Load(p, acmd);
                         Runtime.WorkingEndian = acmd.Endian;
                     }
                 }
@@ -390,6 +392,7 @@ namespace Sm4shCommand
                 foreach (var keypair in ScriptFiles)
                 {
                     keypair.Value.Export(keypair.Key);
+                    ScriptComments.Save(keypair.Key, keypair.Value);
                 }
                 MotionTable.Export(
                     Path.Combine(Path.GetDirectoryName(ScriptFiles.Keys[0]), "motion.mtable"));
@@ -397,7 +400,10 @@ namespace Sm4shCommand
             else if (IDEMode == IDE_MODE.File)
             {
                 if (ScriptFiles.Count > 0)
+                {
                     ScriptFiles.Values[0].Export(ScriptFiles.Keys[0]);
+                    ScriptComments.Save(ScriptFiles.Keys[0], ScriptFiles.Values[0]);
+                }
                 else if (ParamFile != null)
                 {
                     ParamFile.Export(ParamFile.Filepath);
@@ -460,6 +466,7 @@ namespace Sm4shCommand
                     foreach (var keypair in ScriptFiles)
                     {
                         keypair.Value.Export(Path.Combine(fsDlg.SelectedPath, Path.GetFileName(keypair.Key)));
+                        ScriptComments.Save(Path.Combine(fsDlg.SelectedPath, Path.GetFileName(keypair.Key)), keypair.Value);
                     }
                     MotionTable.Export(Path.Combine(fsDlg.SelectedPath, "motion.mtable"));
                 }
@@ -470,7 +477,10 @@ namespace Sm4shCommand
                 {
                     sfDlg.FileName = Path.GetFileNameWithoutExtension(ScriptFiles.Keys[0]);
                     if (sfDlg.ShowDialog() == DialogResult.OK)
+                    {
                         ScriptFiles.Values[0].Export(sfDlg.FileName);
+                        ScriptComments.Save(sfDlg.FileName, ScriptFiles.Values[0]);
+                    }
                 }
                 else if (ParamFile != null)
                 {

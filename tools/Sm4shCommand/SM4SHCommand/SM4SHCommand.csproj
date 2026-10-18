@@ -99,6 +99,7 @@
     </Compile>
     <Compile Include="Runtime.cs" />
     <Compile Include="Classes\Tooltips.cs" />
+    <Compile Include="Classes\ScriptComments.cs" />
     <Compile Include="GUI\Rename.cs">
       <SubType>Form</SubType>
     </Compile>
