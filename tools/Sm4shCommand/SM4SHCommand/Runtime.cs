@@ -59,6 +59,71 @@ namespace Sm4shCommand
             }
         }
 
+        // ---------------------------------------------------------------- settings
+        //
+        // Sm4shCommand.ini, next to the exe: "key = value" per line, written when a setting changes.
+
+        static Dictionary<string, string> _settings;
+        public static string SettingsPath { get { return Path.Combine(Application.StartupPath, "Sm4shCommand.ini"); } }
+
+        static Dictionary<string, string> Settings
+        {
+            get
+            {
+                if (_settings != null)
+                    return _settings;
+                _settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    if (File.Exists(SettingsPath))
+                        foreach (var raw in File.ReadAllLines(SettingsPath))
+                        {
+                            int eq = raw.IndexOf('=');
+                            if (eq > 0 && !raw.TrimStart().StartsWith("#"))
+                                _settings[raw.Substring(0, eq).Trim()] = raw.Substring(eq + 1).Trim();
+                        }
+                }
+                catch (Exception) { }
+                return _settings;
+            }
+        }
+
+        public static bool GetSetting(string key, bool fallback)
+        {
+            string v;
+            return Settings.TryGetValue(key, out v) ? v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase) : fallback;
+        }
+
+        public static void SetSetting(string key, bool value)
+        {
+            Settings[key] = value ? "true" : "false";
+            try { File.WriteAllLines(SettingsPath, Settings.Select(x => $"{x.Key} = {x.Value}").ToArray()); }
+            catch (Exception) { } // read-only folder: the setting lasts until the app closes
+        }
+
+        /// <summary>
+        /// The fighter's animation folder for an opened file or folder: the nearest "motion" folder
+        /// next to it or next to one of its parents (data/fighter/NAME/motion for
+        /// data/fighter/NAME/script/animcmd/body/game.bin). Null if there isn't one.
+        /// </summary>
+        public static string FindMotionFolder(string path)
+        {
+            try
+            {
+                var dir = Directory.Exists(path) ? new DirectoryInfo(path) : new FileInfo(path).Directory;
+                for (int i = 0; dir != null && i < 6; i++, dir = dir.Parent)
+                {
+                    if (dir.Name.Equals("motion", StringComparison.OrdinalIgnoreCase))
+                        return dir.FullName;
+                    var m = Path.Combine(dir.FullName, "motion");
+                    if (Directory.Exists(m))
+                        return m;
+                }
+            }
+            catch (Exception) { }
+            return null;
+        }
+
         // ---------------------------------------------------------- variable names
         //
         // VarNames.txt, next to the exe: "0xVARIABLE = Name | description" per line. Hovering a

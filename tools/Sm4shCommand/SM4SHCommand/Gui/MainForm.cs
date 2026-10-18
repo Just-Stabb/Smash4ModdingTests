@@ -32,12 +32,26 @@ namespace Sm4shCommand
             var defs = new ToolStripMenuItem("Command Definitions..", null, commandDefinitions_Click);
             toolsToolStripMenuItem.DropDownItems.Add(defs);
             var varNames = new ToolStripMenuItem("Show variables as LA-Int[1] style") { CheckOnClick = true };
+            varNames.Checked = FighterVariable.ShowDescriptiveNames = Runtime.GetSetting("DescriptiveVariableNames", false);
             varNames.CheckedChanged += (o, e) =>
             {
                 FighterVariable.ShowDescriptiveNames = varNames.Checked;
+                Runtime.SetSetting("DescriptiveVariableNames", varNames.Checked);
                 LogMessage("Reopen a script to see the change.");
             };
             viewToolStripMenuItem.DropDownItems.Add(varNames);
+
+            var autoParse = new ToolStripMenuItem("Auto-Parse Animations on Open") { CheckOnClick = true };
+            autoParse.Checked = Runtime.GetSetting("AutoParseAnimations", true);
+            autoParse.ToolTipText = "When a file, fighter folder or project is opened, parse the fighter's motion folder\n" +
+                "(found next to the opened folder or one of its parents) to name its scripts.";
+            autoParse.CheckedChanged += (o, e) =>
+            {
+                Runtime.SetSetting("AutoParseAnimations", autoParse.Checked);
+                if (autoParse.Checked && _lastOpened != null)
+                    AutoParseAnimations(_lastOpened, true);
+            };
+            toolsToolStripMenuItem.DropDownItems.Insert(toolsToolStripMenuItem.DropDownItems.IndexOf(parseAnimationsToolStripMenuItem) + 1, autoParse);
 
             var treeMenu = new ContextMenuStrip();
             treeMenu.Items.Add(new ToolStripMenuItem("Open", null, (o, e) => { if (FileTree.SelectedNode != null) OpenNode(FileTree.SelectedNode); }));
@@ -197,6 +211,7 @@ namespace Sm4shCommand
                 IDEMode = IDE_MODE.File;
                 this.Text += fileName;
             }
+            AutoParseAnimations(fileName);
         }
         private void fitOpen_Click(object sender, EventArgs e)
         {
@@ -232,6 +247,7 @@ namespace Sm4shCommand
                 IDEMode = IDE_MODE.Fighter;
                 this.Text += folder;
             }
+            AutoParseAnimations(folder);
         }
 
         /// <summary>
@@ -281,6 +297,7 @@ namespace Sm4shCommand
             {
                 Manager.OpenProject(dlg.Project.ProjPath);
                 IDEMode = IDE_MODE.Project;
+                AutoParseAnimations(dlg.Project.ProjPath);
             }
         }
         private void saveToolStripMenuItem_Click(object sender, EventArgs e)
@@ -399,7 +416,10 @@ namespace Sm4shCommand
             {
                 dlg.Filter = "All Files (*.*)|*.*|Project (*.fitproj)|*.fitproj";
                 if (dlg.ShowDialog() == DialogResult.OK)
+                {
                     Manager.OpenProject(dlg.FileName);
+                    AutoParseAnimations(dlg.FileName);
+                }
             }
         }
 
@@ -537,6 +557,48 @@ namespace Sm4shCommand
                 }
             }
         }
+        // ------------------------------------------------------ automatic parsing
+
+        string _lastOpened;
+        readonly HashSet<string> _parsedMotionFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Tools > Parse Animations, done automatically on the fighter's motion folder when something
+        /// is opened (when the setting is on). Each folder is parsed once per session unless forced.
+        /// </summary>
+        void AutoParseAnimations(string openedPath, bool force = false)
+        {
+            _lastOpened = openedPath;
+            if (!Runtime.GetSetting("AutoParseAnimations", true))
+                return;
+            string motion = Runtime.FindMotionFolder(openedPath);
+            if (motion == null)
+            {
+                LogMessage("Auto-parse: no motion folder found next to this path; use Tools > Parse Animations.. to pick one.");
+                return;
+            }
+            if (!force && _parsedMotionFolders.Contains(motion))
+                return;
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                var dict = Runtime.ParseAnimations(motion);
+                int before = Runtime.AnimNames.Count;
+                Runtime.SaveAnimNames(dict);
+                _parsedMotionFolders.Add(motion);
+                LogMessage($"Auto-parse: {motion}: {dict.Count} names found, {Runtime.AnimNames.Count - before} new.");
+                RefreshScriptNames();
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Auto-parse failed ({motion}): {ex.Message}");
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+            }
+        }
+
         private void parseAnimationsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (fsDlg.ShowDialog() == DialogResult.OK)
