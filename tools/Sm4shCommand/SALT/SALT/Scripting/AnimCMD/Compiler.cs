@@ -168,13 +168,8 @@ namespace SALT.Moveset.AnimCMD
                 {
                     switch (specs[i])
                     {
-                        case 0:
-                            if (p.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-                                cmd.Parameters.Add((int)uint.Parse(p.Substring(2), NumberStyles.HexNumber));
-                            else if (p.StartsWith("-"))
-                                cmd.Parameters.Add(int.Parse(p, CultureInfo.InvariantCulture));
-                            else
-                                cmd.Parameters.Add((int)uint.Parse(p, CultureInfo.InvariantCulture));
+                        case 0: // 0x1A, 26, or a float stored as its bits (1.5f)
+                            cmd.Parameters.Add(ACMDCommand.ParseInt(p));
                             break;
                         case 1:
                             cmd.Parameters.Add(float.Parse(p.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture));
@@ -189,7 +184,7 @@ namespace SALT.Moveset.AnimCMD
                 }
                 catch (Exception e) when (!(e is ACMDCompileException))
                 {
-                    string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A)" :
+                    string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A) or a float stored in an int (e.g. 1.5f)" :
                                   specs[i] == 3 ? "a variable (e.g. 0x2100000D)" : "a number";
                     string pname = i < cmd.ParamSyntax.Length ? cmd.ParamSyntax[i] : $"#{i + 1}";
                     throw new ACMDCompileException(line, $"{cmd.Name} parameter {pname} must be {kind}, not \"{p}\"");

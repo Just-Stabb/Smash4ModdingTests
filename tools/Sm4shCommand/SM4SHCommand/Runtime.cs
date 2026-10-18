@@ -94,6 +94,19 @@ namespace Sm4shCommand
             return Settings.TryGetValue(key, out v) ? v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase) : fallback;
         }
 
+        public static string GetSettingText(string key, string fallback)
+        {
+            string v;
+            return Settings.TryGetValue(key, out v) ? v : fallback;
+        }
+
+        public static void SetSettingText(string key, string value)
+        {
+            Settings[key] = value;
+            try { File.WriteAllLines(SettingsPath, Settings.Select(x => $"{x.Key} = {x.Value}").ToArray()); }
+            catch (Exception) { }
+        }
+
         public static void SetSetting(string key, bool value)
         {
             Settings[key] = value ? "true" : "false";

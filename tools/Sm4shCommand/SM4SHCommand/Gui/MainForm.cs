@@ -42,6 +42,59 @@ namespace Sm4shCommand
             };
             viewToolStripMenuItem.DropDownItems.Add(varNames);
 
+            // Int parameters as decimal / floats instead of hex (ACMDCommand.FormatInt); they compile
+            // back to the same values either way.
+            var decimalInts = new ToolStripMenuItem("Show Numbers as Decimal (e.g. Angle=361)") { CheckOnClick = true };
+            var floatBits = new ToolStripMenuItem("Show Float Values in Int Parameters as Floats (1.5f)") { CheckOnClick = true };
+            var hexParams = new ToolStripMenuItem("Parameters Always in Hex..");
+            ACMDCommand.DecimalInts = decimalInts.Checked = Runtime.GetSetting("DecimalNumbers", false);
+            ACMDCommand.FloatBitsAsFloats = floatBits.Checked = Runtime.GetSetting("FloatBitsAsFloats", true);
+            floatBits.Enabled = decimalInts.Checked;
+            string savedHex = Runtime.GetSettingText("HexParameters", null);
+            if (savedHex != null)
+                SetHexParams(savedHex);
+            decimalInts.CheckedChanged += (o, e) =>
+            {
+                ACMDCommand.DecimalInts = decimalInts.Checked;
+                floatBits.Enabled = decimalInts.Checked;
+                Runtime.SetSetting("DecimalNumbers", decimalInts.Checked);
+                LogMessage("Reopen a script to see the change (both forms compile).");
+            };
+            floatBits.CheckedChanged += (o, e) =>
+            {
+                ACMDCommand.FloatBitsAsFloats = floatBits.Checked;
+                Runtime.SetSetting("FloatBitsAsFloats", floatBits.Checked);
+                LogMessage("Reopen a script to see the change (both forms compile).");
+            };
+            hexParams.Click += (o, e) =>
+            {
+                string current = string.Join(", ", ACMDCommand.HexParams.OrderBy(x => x).ToArray());
+                using (var dlg = new Form())
+                {
+                    dlg.Text = "Parameters Always in Hex";
+                    dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    dlg.MinimizeBox = dlg.MaximizeBox = false;
+                    dlg.StartPosition = FormStartPosition.CenterParent;
+                    dlg.ClientSize = new Size(440, 130);
+                    var label = new Label { Left = 12, Top = 10, Width = 416, Height = 30, Text = "Parameter names (comma separated) shown in hex even with decimal numbers on, e.g. hashes and IDs:" };
+                    var box = new TextBox { Left = 12, Top = 46, Width = 416, Text = current };
+                    var ok = new Button { Text = "OK", Left = 272, Top = 92, Width = 75, DialogResult = DialogResult.OK };
+                    var cancel = new Button { Text = "Cancel", Left = 353, Top = 92, Width = 75, DialogResult = DialogResult.Cancel };
+                    dlg.Controls.AddRange(new Control[] { label, box, ok, cancel });
+                    dlg.AcceptButton = ok;
+                    dlg.CancelButton = cancel;
+                    if (dlg.ShowDialog(this) != DialogResult.OK)
+                        return;
+                    SetHexParams(box.Text);
+                    Runtime.SetSettingText("HexParameters", string.Join(", ", ACMDCommand.HexParams.ToArray()));
+                    LogMessage("Reopen a script to see the change.");
+                }
+            };
+            viewToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            viewToolStripMenuItem.DropDownItems.Add(decimalInts);
+            viewToolStripMenuItem.DropDownItems.Add(floatBits);
+            viewToolStripMenuItem.DropDownItems.Add(hexParams);
+
             var autoParse = new ToolStripMenuItem("Auto-Parse Animations on Open") { CheckOnClick = true };
             autoParse.Checked = Runtime.GetSetting("AutoParseAnimations", true);
             autoParse.ToolTipText = "When a file, fighter folder or project is opened, parse the fighter's motion folder\n" +
@@ -575,6 +628,14 @@ namespace Sm4shCommand
                 }
             }
         }
+        static void SetHexParams(string list)
+        {
+            ACMDCommand.HexParams.Clear();
+            foreach (var name in list.Split(','))
+                if (name.Trim().Length > 0)
+                    ACMDCommand.HexParams.Add(name.Trim());
+        }
+
         // ------------------------------------------------------ automatic parsing
 
         string _lastOpened;
