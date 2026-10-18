@@ -53,6 +53,42 @@ Adding to one of these works as you'd expect: it is a read, the change, then a w
 `WorkModule(2, 5.0f, 0x0F000005)` moves up 5, and `WorkModule(2, 1.0f, 0x0F00000C)` moves the
 opponent 1 unit further forward.
 
+## Hitstun, hitstop and the last fighter hit
+
+`0x0F000040 + 8 × target + quantity`, same rules (SET_FLOAT / Float_Var_Compare, MSC).
+
+| target | IDs | |
+|---|---|---|
+| 0 self | `0x0F000040`–`47` | |
+| 1 nearest opponent | `0x0F000048`–`4F` | |
+| 2 last fighter hit | `0x0F000050`–`57` | the newest hit of self's current attack; once the attack is over, the fighter whose last attacker was self |
+| 3–10 player slot 1–8 | `0x0F000058`–`97` | slot 1 `58`–`5F`, slot 2 `60`–`67`, … slot 8 `90`–`97` |
+
+| quantity | read | write |
+|---|---|---|
+| +0 hitstun left | frames of hitstun left | set them (only matters while in a hit status) |
+| +1 hitstun dealt | hitstun frames of the last hit taken | ignored |
+| +2 hitstun × | 0 | multiply the hitstun left by the value |
+| +3 hitstop (shake) | 1 while in hitstop, else 0 | hitstop for N frames, shaking like a hit |
+| +4 hitstop (no shake) | hitstop frames of the last hit taken | hitstop for N frames, no shake |
+| +5 offset X (fwd) | target X − self X, along self's facing | put the target that far in front of self |
+| +6 offset Y | target Y − self Y | put the target at self Y + value |
+| +7 offset Z | target Z − self Z | put the target at self Z + value |
+
+Examples:
+
+    SET_FLOAT(Value=8, Variable=0x0F000053)    // last fighter hit: 8 frames of hitstop, shaking
+    SET_FLOAT(Value=0, Variable=0x0F000050)    // last fighter hit: end their hitstun now
+    SET_FLOAT(Value=1.5, Variable=0x0F000052)  // last fighter hit: 1.5x the hitstun left
+    SET_FLOAT(Value=6, Variable=0x0F000044)    // self: 6 frames of hitstop, no shake
+    SET_FLOAT(Value=12, Variable=0x0F000055)   // put the last fighter hit 12 in front of self
+
+The work is done by the game's own MSC commands, run on the target: `WorkModule` int
+`0x1000003E` (hitstun left), `DamageModuleF(1)` / `DamageModule(8)` (hitstun / hitstop of the
+last hit), `StopModule(1)` / `StopModule(2, frames)` (in hitstop / set hitstop) and
+`ShakeModule(0, 0, frames, 0, 0, 1.0)` (the shake). Player slot numbers and "last attacker" are
+assumed to be the same numbering (player 1 = slot 1).
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:

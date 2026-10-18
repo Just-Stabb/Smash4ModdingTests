@@ -751,3 +751,32 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
   pass `0x0F0000xx` to those. ADD_FLOAT `0x02BE6E80`, SUB_FLOAT_2 `0x02BDA100`,
   Add/Set_Momentum `0x02BD7FA4`.
 
+## Combat variables (hitstun / hitstop / last fighter hit)
+
+`tools/position_vars_cave.py` (IDs `0x0F000040`–`0x0F000097`, user docs in
+`docs/position-variables.md`). The hooks send every `0x0F0000xx` to `var_entry`, which keeps
+indices < 0x40 in the position code and sends the rest to `ext`.
+
+- **Running MSC commands on another fighter:** every MSC module syscall wrapper (table
+  `0x104187A0`) is `wrapper(ctx, args)`, reading only `ctx+4` = module accessor, then calling the
+  module's MSC handler with `args` = `{u32* words, count}`; the result is in r3 (float bits for the
+  `F` variants: e.g. WorkModuleF's handler `stfs f1, 0xC(r1); lwz r3, 0xC(r1)`). So a fake
+  context whose +4 is another fighter's accessor runs that command on that fighter
+  (`ext_msc`). Wrappers used: WorkModule `0x030B2B28`, DamageModule `0x030B2F8C`, DamageModuleF
+  `0x030B2FC4`, StopModule `0x030B5160` (accessor `+0x48`, handler `+0xAC`), ShakeModule
+  `0x030B5C50`.
+- Hitstun left = int `0x1000003E` (the Damage statuses count it down; the game itself rescales it,
+  e.g. Kirby `func_888` / `func_905`); hitstun of the last hit = `DamageModuleF(1)`; hitstop of the
+  last hit = `DamageModule(8)`; `StopModule(1)` = in (non-moving) hitlag; `StopModule(2, n)` =
+  hitlag for n frames; `ShakeModule(0, mode, frames, 0, 0, intensity)` = hit shake.
+- Last fighter hit: the attack module's hit records (see "Collision records"), first non-empty
+  hitbox list, a fighter ID other than self (`id >> 28 == 0`, slot `(id >> 16) & 0xFFF`). With the
+  records off (`AM+0x4C == 0`): a fighter whose int `0x10000065` (last attacker's player number,
+  used for the hit effects' colour) equals self's fighter-table slot.
+- **Code space:** besides the Havok function, three more functions nothing calls or references
+  (no branches, relocations or exports; found by scanning every branch and relocation target):
+  `0x04AE6258` (0x234), `0x04AD2164` (0x194), `0x037EE858` (0x124). Their relocations are moved to
+  the dummy word `0x037EE73C` (`reloc:` arguments). Plus the tail of the first cave, the end of the
+  arith cave, and the stat cave's table (now 8 profiles). `pack()` spreads the code blocks over
+  these and turns branches between regions into `.far` (inverted short branch + `b`).
+

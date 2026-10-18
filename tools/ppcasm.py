@@ -11,7 +11,8 @@
     ''')
     words = a.words()           # list of 32-bit words, a.labels has label -> address
 
-Comments start with '#' or ';'. `.float X` and `.word X` emit data. Branch targets that parse as
+Comments start with '#' or ';'. `beq.far LABEL` (any condition) is an inverted short branch over a
+plain `b`, for targets beyond the 32 KB reach of a conditional branch; `$+8` is pc + 8. `.float X` and `.word X` emit data. Branch targets that parse as
 numbers are absolute addresses; anything else is a label. Conditional branches compare cr0 unless a
 `crN,` operand comes first. Checked against capstone in tests (see position_vars_cave.py --check).
 """
@@ -20,13 +21,14 @@ import struct
 
 D_OPS = {"lwz": 32, "lbz": 34, "stw": 36, "stwu": 37, "stb": 38, "lmw": 46, "stmw": 47,
          "lfs": 48, "stfs": 52, "lfd": 50, "stfd": 54}
-IMM_OPS = {"addi": 14, "addis": 15, "mulli": 7, "ori": 24, "andi.": 28, "cmpwi": 11, "cmplwi": 10}
+IMM_OPS = {"addi": 14, "addis": 15, "mulli": 7, "ori": 24, "oris": 25, "xori": 26, "xoris": 27,
+           "andi.": 28, "cmpwi": 11, "cmplwi": 10}
 X_OPS = {"add": 266, "subf": 40, "mullw": 235, "and": 28, "or": 444, "xor": 316, "slw": 24,
          "srw": 536, "lwzx": 23, "stwx": 151, "lfsx": 535, "stfsx": 663}
 FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59, 18),
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),
           "fmul": (63, 25), "fmadd": (63, 29)}
-FX_OPS = {"fmr": 72, "fneg": 40, "fabs": 264, "frsp": 12}
+FX_OPS = {"fmr": 72, "fneg": 40, "fabs": 264, "frsp": 12, "fctiwz": 15}
 COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1)}
 FIXED = {"blr": 0x4E800020, "bctr": 0x4E800420, "bctrl": 0x4E800421, "nop": 0x60000000}
 
@@ -77,13 +79,21 @@ class Asm:
                 self.labels[m.group(1)] = self.pc
                 line = line[m.end():]
             if line:
-                self.items.append(line)
+                m = re.fullmatch(r"(b(?:eq|ne|lt|ge|le|gt))\.far\s+(\w+)", line)
+                if m:      # long conditional branch: inverted short branch over a plain b
+                    inv = {"beq": "bne", "bne": "beq", "blt": "bge", "bge": "blt", "ble": "bgt", "bgt": "ble"}
+                    self.items.append("%s $+8" % inv[m.group(1)])
+                    self.items.append("b %s" % m.group(2))
+                else:
+                    self.items.append(line)
 
     def addr(self, label):
         return self.labels[label]
 
-    def target(self, s):
+    def target(self, s, pc=None):
         s = s.strip()
+        if s.startswith("$+"):
+            return pc + num(s[2:])
         if is_num(s):
             return num(s)
         if "@" in s:
@@ -116,7 +126,7 @@ class Asm:
             if len(args) == 3:
                 crf = reg(args.pop(0))
             return (IMM_OPS[op] << 26) | (crf << 23) | (reg(args[0]) << 16) | (self.value(args[1]) & 0xFFFF)
-        if op in ("ori", "andi."):
+        if op in ("ori", "oris", "xori", "xoris", "andi."):
             return (IMM_OPS[op] << 26) | (reg(args[1]) << 21) | (reg(args[0]) << 16) | (self.value(args[2]) & 0xFFFF)
         if op in IMM_OPS:
             return (IMM_OPS[op] << 26) | (reg(args[0]) << 21) | (reg(args[1]) << 16) | (self.value(args[2]) & 0xFFFF)
@@ -142,7 +152,7 @@ class Asm:
         if op in ("rlwinm", "rlwinm."):
             ra, rs, sh, mb, me = reg(args[0]), reg(args[1]), num(args[2]), num(args[3]), num(args[4])
             return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | (op == "rlwinm.")
-        if op in ("slwi", "srwi", "clrlwi", "clrlwi."):
+        if op in ("slwi", "srwi", "srwi.", "clrlwi", "clrlwi."):
             ra, rs, n = reg(args[0]), reg(args[1]), num(args[2])
             sh, mb, me = {"slwi": (n, 0, 31 - n), "srwi": ((32 - n) % 32, n, 31)}.get(op.rstrip("."), (0, n, 31))
             return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | op.endswith(".")
@@ -165,7 +175,7 @@ class Asm:
         if op == "fcmpu":
             return (63 << 26) | (reg(args[0]) << 23) | (reg(args[1]) << 16) | (reg(args[2]) << 11)
         if op in ("b", "bl"):
-            off = self.target(args[0]) - pc
+            off = self.target(args[0], pc) - pc
             assert -0x2000000 <= off < 0x2000000 and off % 4 == 0, line
             return (18 << 26) | (off & 0x3FFFFFC) | (op == "bl")
         if op in COND or op.rstrip("lr") in COND and op.endswith("lr"):
@@ -176,7 +186,7 @@ class Asm:
                 bo, bi = COND[op[:-2]]
                 return (19 << 26) | (bo << 21) | ((crf * 4 + bi) << 16) | (16 << 1)
             bo, bi = COND[op]
-            off = self.target(args[0]) - pc
+            off = self.target(args[0], pc) - pc
             assert -0x8000 <= off < 0x8000, line
             return (16 << 26) | (bo << 21) | ((crf * 4 + bi) << 16) | (off & 0xFFFC)
         raise ValueError("unknown instruction %r" % line)

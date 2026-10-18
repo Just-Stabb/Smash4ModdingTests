@@ -161,6 +161,23 @@ def _position_lines():
         (0x0F000011, "Self offset Y", "Read: self Y - opponent Y.\\nWrite: put this fighter at opponent Y + value."),
         (0x0F000012, "Self offset Z", "Read: self Z - opponent Z.\\nWrite: put this fighter at opponent Z + value."),
     ]
+    targets = ["Self", "Nearest opponent", "Last fighter hit"] + ["Slot %d" % k for k in range(1, 9)]
+    tdesc = ["this fighter", "the nearest other fighter", "the last fighter this one hit (its attack's "
+             "newest hit; after the attack, the fighter whose last attacker was this one)"] + \
+            ["player slot %d" % k for k in range(1, 9)]
+    quantities = [
+        ("hitstun left", "Read: frames of hitstun left.\\nWrite: set them (only lasts while in a hit status)."),
+        ("hitstun dealt", "Read: hitstun frames of the last hit taken. Writes are ignored."),
+        ("hitstun x", "Write: multiply the hitstun left by the value. Reads 0."),
+        ("hitstop (shake)", "Read: 1 while in hitstop, else 0.\\nWrite: hitstop for N frames, shaking like a hit."),
+        ("hitstop (no shake)", "Read: hitstop frames of the last hit taken.\\nWrite: hitstop for N frames, no shake."),
+        ("offset X (fwd)", "Read: its X - this fighter's X, along this fighter's facing.\\nWrite: put it that far in front."),
+        ("offset Y", "Read: its Y - this fighter's Y.\\nWrite: put it at this fighter's Y + value."),
+        ("offset Z", "Read: its Z - this fighter's Z.\\nWrite: put it at this fighter's Z + value."),
+    ]
+    for t, (tn, td) in enumerate(zip(targets, tdesc)):
+        for q, (qn, qd) in enumerate(quantities):
+            out.append((0x0F000040 + 8 * t + q, "%s %s" % (tn, qn), "Target: %s.\\n%s" % (td, qd)))
     for slot in range(8):
         for n, axis in enumerate(("X", "Y", "Z", "facing")):
             rw = "Read only (1 right, -1 left)." if axis == "facing" else "Read / write."

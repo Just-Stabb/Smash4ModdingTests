@@ -26,6 +26,53 @@ fake = Asm(SETPOS); fake.asm('''
  addi r12,r12,1
  stw r12,0x70(r3)
  blr''')
+# Stand-ins for the game's MSC module wrappers (ctx +4 = accessor, args {ptr, count}); their state
+# lives in the fake accessor: +0x800 + 4 * (ID & 0xFF) WorkModule ints, +0xA00 DamageModuleF(1),
+# +0xA04 DamageModule(8), +0xA08 StopModule(1), +0xA0C StopModule(2) frames, +0xA10 / +0xA14 / +0xA18
+# ShakeModule frames / intensity / argument count.
+FAKES = {
+    0x030B2B28: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ lwz r7, 4(r5)
+ cmpwi r6, 6
+ bne w7
+ clrlwi r7, r7, 24
+ slwi r7, r7, 2
+ add r7, r7, r12
+ lwz r3, 0x800(r7)
+ blr
+w7: lwz r8, 8(r5)
+ clrlwi r8, r8, 24
+ slwi r8, r8, 2
+ add r8, r8, r12
+ stw r7, 0x800(r8)
+ li r3, 0
+ blr""",
+    0x030B2FC4: "lwz r12, 4(r3)\n lwz r3, 0xA00(r12)\n blr",
+    0x030B2F8C: "lwz r12, 4(r3)\n lwz r3, 0xA04(r12)\n blr",
+    0x030B5160: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 2
+ beq s2
+ lwz r3, 0xA08(r12)
+ blr
+s2: lwz r7, 4(r5)
+ stw r7, 0xA0C(r12)
+ li r3, 0
+ blr""",
+    0x030B5C50: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r7, 8(r5)
+ stw r7, 0xA10(r12)
+ lwz r7, 0x14(r5)
+ stw r7, 0xA14(r12)
+ lwz r7, 4(r4)
+ stw r7, 0xA18(r12)
+ li r3, 0
+ blr""",
+}
 ENTRIES = 0x10400000
 VT = 0x10380000
 def setup(fighters, count=8):
@@ -35,6 +82,11 @@ def setup(fighters, count=8):
     mu.mem_map(0x02F10000, 0x20000); mu.mem_write(0x02F10000, mem(0x02F10000, 0x20000))  # fighters' WorkModule copies
     mu.mem_map(0x037E0000, 0x20000); mu.mem_write(0x037E0000, mem(0x037E0000, 0x20000))
     mu.mem_write(SETPOS, b''.join(struct.pack('>I', w) for w in fake.words()))
+    mu.mem_map(0x04AD0000, 0x20000); mu.mem_write(0x04AD0000, mem(0x04AD0000, 0x20000))  # combat variables
+    mu.mem_map(0x030B0000, 0x10000)
+    for addr, src in FAKES.items():
+        f = Asm(addr); f.asm(src)
+        mu.mem_write(addr, b''.join(struct.pack('>I', w) for w in f.words()))
     mu.mem_map(0x10300000, 0x200000)
     mu.mem_map(0x10000000, 0x10000); mu.mem_write(0x10000000, mem(0x10000000, 0x10000))
     mu.mem_write(0x1035184C, struct.pack('>I', 0x10360000))
@@ -50,6 +102,7 @@ def setup(fighters, count=8):
         mu.mem_write(acc + 0x18, struct.pack('>I', post)); mu.mem_write(acc + 0x28, struct.pack('>I', wm))
         mu.mem_write(post, struct.pack('>I', VT))
         mu.mem_write(post + 0x10, struct.pack('>fff', x, y, z)); mu.mem_write(post + 0x60, struct.pack('>f', lr))
+        mu.mem_write(e, struct.pack('>I', slot << 16))          # object ID: fighter, slot
         objs[slot] = (wm, post)
     return mu, objs
 
@@ -60,11 +113,11 @@ def call(mu, fn, wm, ident, val=0.0):
     mu.reg_write(UC_PPC_REG_5, 0xDEAD)
     mu.reg_write(UC_PPC_REG_FPR1, struct.unpack('>Q', struct.pack('>d', val))[0])
     mu.reg_write(UC_PPC_REG_1, 0x10480000)
-    for r in range(25, 32): mu.reg_write(getattr(sys.modules['unicorn.ppc_const'], 'UC_PPC_REG_%d' % r), 0x1000 + r)
+    for r in range(14, 32): mu.reg_write(getattr(sys.modules['unicorn.ppc_const'], 'UC_PPC_REG_%d' % r), 0x1000 + r)
     mu.reg_write(UC_PPC_REG_LR, RET)
     mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
     mu.emu_start(fn, RET)
-    for r in range(25, 32):
+    for r in range(14, 32):
         assert mu.reg_read(getattr(sys.modules['unicorn.ppc_const'], 'UC_PPC_REG_%d' % r)) == 0x1000 + r, 'r%d clobbered' % r
     assert mu.reg_read(UC_PPC_REG_1) == 0x10480000
     return struct.unpack('>d', struct.pack('>Q', mu.reg_read(UC_PPC_REG_FPR1)))[0]
@@ -169,5 +222,50 @@ mu.mem_write(WMX + 0x300 + 0x10 * 4, struct.pack('>f', 6.0))
 check('fighter copy: normal get', call(mu, FGET, WMX, 0x03000010), 6)
 call(mu, FSET, WMX, 0x03000010, 9.0); check('fighter copy: normal set', call(mu, FGET, WMX, 0x03000010), 9)
 call(mu, FDIV, WMX, 0x03000010, 3.0); check('fighter copy: normal div', call(mu, FGET, WMX, 0x03000010), 3)
+# --- combat variables (0x0F000040 + 8 * target + quantity) ---------------------------------------
+def acc_of(slot): return 0x10370000 + slot * 0x1000
+def wint(mu, slot, off, v): mu.mem_write(acc_of(slot) + off, struct.pack('>i', v))
+def rint(mu, slot, off): return struct.unpack('>i', mu.mem_read(acc_of(slot) + off, 4))[0]
+HS, LA = 0x800 + 0x3E * 4, 0x800 + 0x65 * 4
+def cid(target, q): return 0x0F000040 + 8 * target + q
+mu, O = setup([(0, 0.0, 0.0, 0.0, 1.0, True), (1, 30.0, 0.0, 0.0, -1.0, True), (2, 5.0, 2.0, 0.0, 1.0, True)])
+w0 = O[0][0]
+for sl, hs in ((0, 12), (1, 20), (2, 30)): wint(mu, sl, HS, hs)
+check('self hitstun left', call(mu, FGET, w0, cid(0, 0)), 12)
+check('nearest opp (slot 2) hitstun', call(mu, FGET, w0, cid(1, 0)), 30)
+check('slot 2 hitstun (target 4)', call(mu, FGET, w0, cid(4, 0)), 20)
+call(mu, FSET, w0, cid(1, 0), 45.0); check('set opp hitstun', rint(mu, 2, HS), 45)
+mu.mem_write(acc_of(2) + 0xA00, struct.pack('>f', 33.5))
+check('opp hitstun dealt', call(mu, FGET, w0, cid(1, 1)), 33.5)
+call(mu, FSET, w0, cid(1, 2), 1.5); check('opp hitstun x1.5 (45 -> 67)', rint(mu, 2, HS), 67)
+check('hitstun x reads 0', call(mu, FGET, w0, cid(1, 2)), 0)
+wint(mu, 2, 0xA08, 1); check('opp in hitstop', call(mu, FGET, w0, cid(1, 3)), 1)
+wint(mu, 2, 0xA04, 9); check('opp hitstop dealt', call(mu, FGET, w0, cid(1, 4)), 9)
+call(mu, FSET, w0, cid(1, 3), 7.0)
+check('hitstop+shake: frames', rint(mu, 2, 0xA0C), 7); check('hitstop+shake: shake frames', rint(mu, 2, 0xA10), 7)
+check('hitstop+shake: intensity 1.0', struct.unpack('>f', mu.mem_read(acc_of(2) + 0xA14, 4))[0], 1.0)
+check('hitstop+shake: 6 args', rint(mu, 2, 0xA18), 6)
+wint(mu, 2, 0xA10, 0); call(mu, FSET, w0, cid(1, 4), 5.0)
+check('hitstop no shake: frames', rint(mu, 2, 0xA0C), 5); check('hitstop no shake: no shake', rint(mu, 2, 0xA10), 0)
+call(mu, FADD, w0, cid(0, 0), 3.0); check('ADD to self hitstun (12 -> 15)', rint(mu, 0, HS), 15)
+check('opp offset X (fwd)', call(mu, FGET, w0, cid(1, 5)), 5)
+check('opp offset Y', call(mu, FGET, w0, cid(1, 6)), 2)
+# last fighter hit: hit records of self's AttackModule (slot 1 was hit)
+AM, ARR, NODE = acc_of(0) + 0xC00, 0x10398000, 0x10399000
+mu.mem_write(acc_of(0) + 0x50, struct.pack('>I', AM))
+mu.mem_write(AM + 0x4C, struct.pack('>I', 1)); mu.mem_write(AM + 0x18, struct.pack('>I', 2))
+mu.mem_write(AM + 0x14, struct.pack('>I', ARR))
+mu.mem_write(ARR + 0x124 + 4, struct.pack('>I', NODE))                 # hitbox 0: one record
+mu.mem_write(ARR + 0x174 + 0x128, struct.pack('>I', ARR + 0x174 + 0x124))   # hitbox 1: empty
+mu.mem_write(NODE + 0x18, struct.pack('>I', 1 << 16))
+check('last hit (record) hitstun', call(mu, FGET, w0, cid(2, 0)), 20)
+call(mu, FSET, w0, cid(2, 5), 10.0); check('put last hit 10 in front', pos(mu, O[1][1]), (10, 0, 0))
+mu.mem_write(AM + 0x4C, struct.pack('>I', 0))                           # attack over: records off
+wint(mu, 1, LA, 3); wint(mu, 2, LA, 0)                                  # slot 2's last attacker = slot 0
+check('last hit (fallback) hitstun', call(mu, FGET, w0, cid(2, 0)), 67)
+wint(mu, 2, LA, 1)
+check('last hit: nobody', call(mu, FGET, w0, cid(2, 0)), 0)
+check('index past the end', call(mu, FGET, w0, 0x0F0000A0), 0)
+check('position IDs still work: opp X', call(mu, FGET, w0, 0x0F000008), 5)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

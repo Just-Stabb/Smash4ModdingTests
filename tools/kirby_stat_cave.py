@@ -12,7 +12,7 @@ The first instruction of get_float (every copy: fighters have their own, HOOKS) 
 category-3 stat with index < 32, looks at the object's instance int INT_INDEX (0x1000008E):
   - the int array must exist and hold more than INT_INDEX entries (other fighters, weapons, items);
   - the value must be 0x4B49xxxx ("KI", written only by Kirby's MSC, kirby_trait_update);
-  - its low 4 bits are a profile number; profile 0 = no change.
+  - its low 3 bits are a profile number; profile 0 = no change.
 The profile picks a (stat mask, multiplier) pair from TABLE; a stat whose bit is set in the mask is
 multiplied. Kirby's MSC writes the int every frame from the trait of his current copy ability
 (docs/character-traits.md).
@@ -45,7 +45,7 @@ FALL = (0x19, 0x1B)                    # max fall speed, fast fall speed
 PROFILES = {
     1: (WALK + DASH_RUN + JUMP_H + AIR + FALL, 1.25),   # Rush
 }
-TABLE_ENTRIES = 16
+TABLE_ENTRIES = 8          # profiles 0-7 (the profile is masked to 3 bits); position_vars_cave.py uses the space after
 
 
 def rlwinm(ra, rs, sh, mb, me, rc=0):
@@ -112,7 +112,7 @@ def code(table):
         lwz(11, INT_INDEX * 4, 11),     # r11 = value
         rlwinm(10, 11, 16, 16, 31),     # r10 = value >> 16
         cmplwi(10, MAGIC), BNELR,
-        andi_(11, 11, 0xF),             # r11 = profile
+        andi_(11, 11, 0x7),             # r11 = profile (0-7)
         BEQLR,
         lis(10, ha(table)),
         addi(10, 10, lo(table)),
