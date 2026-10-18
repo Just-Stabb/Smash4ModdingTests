@@ -1,5 +1,6 @@
 ﻿using Sm4shCommand.GUI;
 using Sm4shCommand.Nodes;
+using Sm4shCommand.Classes;
 using System;
 using System.Drawing;
 using System.Collections.Generic;
@@ -52,6 +53,22 @@ namespace Sm4shCommand
                     AutoParseAnimations(_lastOpened, true);
             };
             toolsToolStripMenuItem.DropDownItems.Insert(toolsToolStripMenuItem.DropDownItems.IndexOf(parseAnimationsToolStripMenuItem) + 1, autoParse);
+
+            toolsToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Reload Tooltips", null, (o, e) =>
+            {
+                Tooltips.Load();
+                LogMessage($"Tooltips: {Tooltips.Entries.Count} value tooltips.");
+            }));
+            toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Open Tooltips Folder", null, (o, e) =>
+            {
+                try
+                {
+                    System.IO.Directory.CreateDirectory(Tooltips.Folder);
+                    System.Diagnostics.Process.Start(Tooltips.Folder);
+                }
+                catch (Exception ex) { LogMessage($"Couldn't open {Tooltips.Folder}: {ex.Message}"); }
+            }));
 
             var treeMenu = new ContextMenuStrip();
             treeMenu.Items.Add(new ToolStripMenuItem("Open", null, (o, e) => { if (FileTree.SelectedNode != null) OpenNode(FileTree.SelectedNode); }));
@@ -106,7 +123,8 @@ namespace Sm4shCommand
         {
             Runtime.LoadAnimNames();
             LogMessage($"AnimNames.txt: {Runtime.AnimNames.Count} script names.");
-            Runtime.LoadVarNames();
+            Tooltips.Load();
+            LogMessage($"Tooltips: {Tooltips.Entries.Count} value tooltips from {Tooltips.Folder}.");
             Runtime.LoadCommandDefinitions();
         }
         private void tabControl1_DrawItem(object sender, DrawItemEventArgs e)
@@ -569,6 +587,7 @@ namespace Sm4shCommand
         void AutoParseAnimations(string openedPath, bool force = false)
         {
             _lastOpened = openedPath;
+            Tooltips.Fighter = Tooltips.FighterFromPath(openedPath);
             if (!Runtime.GetSetting("AutoParseAnimations", true))
                 return;
             string motion = Runtime.FindMotionFolder(openedPath);

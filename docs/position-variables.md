@@ -7,7 +7,7 @@ each read looks the position up, and each write moves the fighter through the ga
 `set_pos`.
 
 Needs the executable patch `tools/position_vars_cave.py` (in the standard `build/cross_f.rpx`).
-Sm4shCommand shows each ID's name and description when you hover it (`VarNames.txt`).
+Sm4shCommand shows each ID's name and description when you hover it (`Tooltips/position_variables.txt`).
 
 Terms used below:
 

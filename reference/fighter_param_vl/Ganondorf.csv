@@ -1,0 +1,50 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Description,Comment
+13,0,Neutral B,0x05000000,45,45,45,Max angle of Name1 speed from holding up/down (degrees),
+,1,,0x05000001,0.8,0.8,0.8,Momentum forward in air (with RA-Bit 15 set),
+,2,,0x05000002,0.92,0.92,0.92,Momentum from holding up (used with RA-Basic 2 set to 1),
+14,0,Side B,0x06000000,1,1,1,Flame Choke grab slide,
+,1,,0x06000001,0.05,0.05,0.05,Aerial flame choke miss gravity,
+,2,,0x06000002,3.18,3.18,3.18,Aerial flame choke miss gravity related,
+,3,,0x06000003,20,20,20,Landing lag (frames),
+,4,,0x06000004,0.1,0.1,0.1,Involves movement on aerial grab,
+,5,,0x06000005,1,0.8,1,V speed on dragging down,Name4 plays role as well
+,6,,0x06000006,1,0.6,1,Grab plummet speed multiplier,
+,7,,0x06000007,5,4,5,Grab plummet acceleration multiplier,
+,8,,0x06000008,1,0.95,1,Special fall max air speed multiplier,
+15,0,Up B,0x07000000,0,0.05,0,,cannot control if negative
+,1,,0x07000001,0.5,0.6,0,Leaping H acceleration multiplier,
+,2,,0x07000002,0.72,1,0.72,Special fall max air speed multiplier,
+,3,,0x07000003,30,26,36,Landing lag (frames),read once on leap
+,4,,0x07000004,5,5,5,,read once on leap
+,5,,0x07000005,8,8,8,Something to do with height traveled ,read once on leap
+,6,,0x07000006,0.225,0.225,0.225,B-reverse sensitivity,read once on leap
+,7,,0x07000007,0.33,0.33,0.33,Post-release gravity multiplier,
+,8,,0x07000008,1,1,1,Height multiplier,
+16,0,Down B,0x08000000,0.75,1,0.95,Speed multiplier on hit,
+,1,,0x18000001,0x4,0x4,0x4,,reads on startup and at start of ground-ground ending
+,2,,0x08000002,0.58,1,0.58,Ground to ground lag duration multiplier,
+,3,,0x08000003,1,1,0.85,Air to ground landing lag duration multiplier,
+,4,,0x08000004,0.5,0.7,0.5,,aerial-landing related
+,5,,,1,,,Grounded speed multiplier?,
+,0,,0x04000000,0,,,,
+17,0,Final Smash?,0x02000000,15,,,,Name0 + Name3 = 35 = possibly frames before ending?
+,1,,0x02000001,0,,,,
+,2,,0x02000002,9.8,,,H speed?,
+,3,,0x02000003,20,,,,
+,4,,0x02000004,50,,,Camera?,
+,5,,0x02000005,-40,,,Camera?,
+,6,,0x02000006,30,,,Camera?,
+,7,,0x02000007,-20,,,Camera?,
+18,0,"Final Smash
+Hurtbox",,,,,X offset,Entry[0] to Entry[17]
+,1,,,,,,Y offset,
+,2,,,,,,Z offset,
+,3,,,,,,X2 offset,
+,4,,,,,,Y2 offset,
+,5,,,,,,Z2 offset,
+,6,,,,,,Size,
+,7,,,,,,Bone,
+,8,,,,,, ,
+,9,,,,,, ,
+,10,,,,,, ,
+,11,,,,,, ,

@@ -1,0 +1,95 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Description,Comment
+13,0,Neutral B,0x05000000,6.5,6.5,6.5,Grounded X offset,
+,1,,0x05000001,1,1,6,Grounded Y offset,
+,2,,0x05000002,6.5,6.5,6.5,Aerial X offset,
+,3,,0x05000003,1,1,1,Aerial Y offset,
+,4,,0x05000004,100,64,25,Aerial lifetime (frames),"Only names 0-3 affect Thunderjolt.
+Names 4-8 are unused; Thunderjolt uses Group 18 for these"
+,5,,0x05000005,-58,-58,-7,Aerial jolt angle (degrees),
+,6,,0x05000006,2,1.9,3,Aerial jolt speed,
+,7,,0x05000007,84,33,5,Grounded lifetime (frames),
+,8,,0x05000008,0.9,1,0,Grounded jolt frame speed multiplier,
+14,0,Side B,0x06000000,7,5,3,Minimum charge damage multiplier (this / 7),"Formula for charge damage multiplier:
+(1/7) * (Name0 + (Name1 - Name0) * (charge frames+1) / (Name2))
+
+charge frames+1 cannot exceed Name2"
+,1,,0x06000001,25,10,15,Maximum charge damage multiplier (this / 7),
+,2,,0x06000002,90,90,60,Charge time (frames),
+,3,,0x06000003,20,20,20,Initial charged frames of smash input,
+,4,,0x06000004,0.8,0.8,0.8,H speed multiplier on startup ,
+,5,,0x06000005,0.02,0.02,0.02,H air friction during startup/charge,
+,6,,0x06000006,0.04,0.04,0.04,Gravity during startup/charge,
+,7,,0x16000007,0xC,0xC,0xC,Affects the amount of time after button release before Pikachu fires ,
+,8,,0x06000008,1.6,1.4,4.2,Base H firing speed,"H firing speed
+ = Name8 + (Name9 - Name8) * ((charge frames + 1) / Name2)"
+,9,,0x06000009,3.2,2.5,4.2,Full charge H firing speed,
+,10,,0x0600000a,0.4,0.2,0.5,Base V firing speed,"Initial V firing speed
+ = Name10 + (Name11 - Name10) * ((charge frames + 1) / Name2)"
+,11,,0x0600000b,0.7,0.3,0.5,Full charge V firing speed,
+,12,,0x0600000c,0.024,0.01,0.024,Gravity when firing,
+,13,,0x0600000d,1.1,0.02,1,Max fall speed when firing,
+,14,,0x0600000e,0.7,0.6,1,H speed multiplier for SpecialSEnd and SpecialAirSEnd,
+,15,,0x0600000f,0.02,0.02,0.03,Base friction of SpecialSEnd,"Friction of SpecialSEnd
+ = Name15 + Name16 * ((charge frames + 1) / Name2)"
+,16,,0x06000010,0.08,0.1,0.03,Max additional friction for SpecialSEnd,
+,17,,0x06000011,0.1,0.1,0.1,Gravity during SpecialAirSEnd,
+15,0,Up B,0x17000000,0xA,0x8,0xA,Delay before SpecialAirHiStart uses vertical acceleration (frames),"True = this + 1, V acceleration = 0.08 / 30, given in MSC"
+,1,,0x07000001,0.5,0.5,0.5,Sensitivity for choosing an angle,Detailed description by Ben Hall is here:
+,2,,0x07000002,11,10.5,15,Base Segment speed,
+,3,,0x07000003,0,0,0,Max additional Segment speed,This * control stick distance added to Base speed
+,4,,0x17000004,0x5,0x4,0x6,Segment length duration (frames),
+,5,,0x17000005,0x37,0x37,0x37,Max angle difference between segment and wall/ceiling to slide along it (degrees),"when set to 90 you can aim directly into a wall without stopping, but when set to 0, aiming anywhere into a wall stops the segment motion"
+,6,,0x17000006,0x23,0x23,0x168,Min angle change requirement for second segment (degrees),"must be >, not ≥"
+,7,,0x07000007,0.9,0.9,0.9,Second segment speed multiplier,
+,8,,0x07000008,0.6,0.6,0.6,H momentum preservation,
+,9,,0x07000009,0.4,0.4,0.4,Air mobility,read when landing from air -> ground
+,10,,0x0700000a,24,24,24,Landing lag (frames),
+16,0,Down B,0x08000000,1,0.8,0.8,Grounded H speed multiplier on startup,
+,1,,0x08000001,0.85,0.6,0.8,Aerial H speed multiplier on startup,
+,2,,0x08000002,10.5,0,15,Cloud height (this * 10),
+,3,,0x08000003,0.66,0,0.66,Initial V speed and max fall speed after aerial thunder hit,
+,4,,0x08000004,0.016,0,0.016,Gravity on aerial thunder hit,
+,0,Final Smash,0x04000000,12,,,Number of seconds of Final Smash,
+,1,,0x04000001,3.6,,,Max H speed of Final Smash center point,
+,2,,0x04000002,3.4,,,Max V speed of Final Smash center point,
+,3,,0x14000003,0xB4,,,Slowed down duration at end of Final Smash (frames),
+,4,,0x14000004,0x3C,,,Minimum time between attacks during Final Smash (frames),
+17,0,Crawl,,0.7,,,Crawl forward speed,
+,1,,,0.5,,,Crawl backward speed,
+18,0,"Thunder Jolt
+(Projectile)",0x02000000,100,64,25,Aerial lifetime (frames),Actual value is 2 frames less
+,1,,0x02000001,-1.012291,-1.012291,-0.122173,Aerial jolt angle (radians),"Equal to -58, -58, -7 degrees."
+,2,,0x02000002,2,1.9,3,Aerial jolt speed,
+,3,,0x02000003,84,33,5,Grounded lifetime (frames),Actual value is 2 frames less
+,4,,0x02000004,0.9,1,0,Grounded jolt frame speed multiplier,
+19,0,"Thunder
+(Projectile)",0x02000000,-4,0,-5,Vertical speed of thunder,A 2nd thunder spawns when after abs(int(speed / 32)) frames
+,1,,0x02000001,30,0,30,Distance thunder travels to disappear (this * 10),
+,2,,0x02000002,8,0,9,Distance thunder travels before it can collide with ground (this * 10),
+,3,,0x02000003,1.7,0,1.7,Collision-detection-box size (this * 10),0 passes through Pikachu. Is this a sphere? Rectangle?
+20,0,Final Smash,0x02000000,1.3,,,Affects damage of Vortex (final smash electric ball),"""setPowerAddStatus"" (Brawl)"
+,1,,0x02000001,-0.4,,,,"""setPowerSpeedStatus"" (Brawl)"
+,2,,0x02000002,0.5,,,H/V Acceleration of Vortex toward center point (1st phase),
+,3,,0x02000003,3.8,,,Max H/V speed of Vortex (1st phase),
+,4,,0x02000004,0.2,,,H/V Acceleration of Vortex toward center point (2nd phase),
+,5,,0x02000005,0.08,,,H/V Deceleration to new max air speed (2nd phase),
+,6,,0x02000006,2.2,,,Max H/V speed of Vortex (2nd phase),
+,7,,0x02000007,0.7,,,Vertical acceleration/speed multiplier (both phases),
+,8,,0x12000008,0x32,,,,"""status Discharge"" frames before entering ""status_Normal""?"
+,9,,0x02000009,0,,,,
+,10,,0x0200000a,20,,,Affects horizontal camera view area,"Set to 120, camera zooms out; more focused on left stage"
+,11,,0x0200000b,-20,,,Affects horizontal camera view area,"Set to -120, camera zooms out; more focused on right stage"
+,12,,0x0200000c,20,,,Affects vertical camera view area,"Set to 120, camera zooms out; more focused on top of stage"
+,13,,0x0200000d,-20,,,Affects vertical camera view area,"Set to -120, camera zooms out; more focused on bottom of stage"
+24,0,,,0x02000000,,,Thunderjolt weapon param Name0?,
+,1,,,1,,,,
+,2,,,1.5,,,Multiplier?,
+,3,,,0,,,,
+,4,,,1,,,,
+,5,,,0,,,,
+,0,,,0x02000003,,,Thunderjolt weapon param Name3?,
+,1,,,1,,,,
+,2,,,1.5,,,Multiplier?,
+,3,,,0,,,,
+,4,,,1,,,,
+,5,,,0,,,,

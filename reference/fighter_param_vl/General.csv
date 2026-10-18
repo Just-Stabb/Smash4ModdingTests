@@ -1,0 +1,37 @@
+ ,Entry,Description,Name 0,Name 1,Name 2,Name 3,Name 4,Name 5,Name 6,Name 7,Name 8,Name 9,Name 10,Name 11
+1,0 - ?,Subaction,"Animation
+Loop","Transition
+Frame","Interrupt
+Frame","Intangiblity
+Start Frame","Intangiblity
+End Frame",Disable Hitlag Animation,,,,,,
+2,0,Idle animation odds,Subaction ID,Odds,,,,,,,,,,
+,1,,Subaction ID,Odds,,,,,,,,,,
+,2,,Subaction ID,Odds,,,,,,,,,,
+,3,,Subaction ID,Odds,,,,,,,,,,
+,4,,Subaction ID,Odds,,,,,,,,,,
+,5,,0xFFFFFFFF,0xFFFFFFFF,,,,,,,,,,
+3,0,Crouching idle animation odds,Subaction ID,Odds,,,,,,,,,,
+,1,,Subaction ID,Odds,,,,,,,,,,
+,2,,0xFFFFFFFF,0xFFFFFFFF,,,,,,,,,,
+4,0 - 5,Environmental Collision Box (ECB),Bone,X,Y,Z,,,,,,,,
+5,0 - ?,Hurtbubble,X,Y,Z,Stretchy X,Stretchy Y,Stretchy Z,Size,Bone,Region,Zone,"Intangible
+/Invincible",Unknown
+6,0,Unknown,Unknown,,,,,,,,,,,
+,1,,Unknown,,,,,,,,,,,
+,2,,Unknown,,,,,,,,,,,
+7,0,Ledge-Grabbox (Usual),X1,Y1,X2,Y2,,,,,,,,
+,1,Ledge-Grabbox (After Tumble),X1,Y1,X2,Y2,,,,,,,,
+,2,Ledge-Grabbox (Unknown usage),X1,Y1,X2,Y2,,,,,,,,
+,3,Ledge-Grabbox (Tether 1),X1,Y1,X2,Y2,,,,,,,,
+,4,Ledge-Grabbox (Tether 2),X1,Y1,X2,Y2,,,,,,,,
+8,0 - ?,Final Smash Aura Bones,Bone,X,Y,Height,Width,,,,,,,
+9,0 - ?,Item Placement,Bone,X,Y,Z,X Rotation,Y Rotation,Z Rotation,,,,,
+10,0 - ?,Gooey Bomb(and Pikmins?) Placement,Bone,X,Y,Z,X Rotation,Y Rotation,Z Rotation,,,,,
+11,0,Unknown,X?,Y?,Z?,Rot X?,Rot Y?,Rot Z?,Size?,,,,,
+,1,Unknown,X?,Y?,Z?,Rot X?,Rot Y?,Rot Z?,Size?,,,,,
+12,0 - ?,"Mulitipliers for Smash Tour ""Special"" stat",Variable ID,Unknown,Multiplier,Unknown,Unknown,Unknown,,,,,,
+13,0 - 3,Parameters for Neutral B,,,,,,,,,,,,
+14,0 - 3,Parameters for Side B,,,,,,,,,,,,
+15,0 - 3,Parameters for Up B,,,,,,,,,,,,
+16,0 - 3,Parameters for Down B,,,,,,,,,,,,

@@ -1,0 +1,84 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Description,Comment
+13,0,Neutral B,0x05000000,2,2,2,H speed divisor,
+,1,,0x05000001,0.0025,0.0025,0.0025,H deceleration,
+,2,,0x05000002,0.7,0.5,0.7,Initial V speed,
+,3,,0x05000003,0.025,0.035,0.025,Gravity,
+,4,,0x05000004,0.7,1,0.7,Max fall speed,
+,5,,0x15000005,0xD,0x10,0xD,Freeze frames on hit,
+14,0,Side B,0x06000000,1.1,0.5,1.1,Initial V speed on startup,
+,1,,0x06000001,2.9,3.4,3.6,H initial speed on ground startup,
+,2,,0x06000002,3.3,3.8,4,H initial speed on aerial startup,
+,3,,0x06000003,0.15,0.3,0.5,V speed received after launching,
+,4,,0x06000004,0.04,0.04,-0.15,Gravity on startup,
+,5,,0x06000005,1,1,1.6,Some sort of transition ratio between post-launch and ending gravities?,higher = more of the second?
+,6,,0x06000006,0.1,0.4,0.3,H deceleration after launching,
+,7,,0x06000007,0.05,0.06,0.09,Gravity after launching,
+,8,,0x06000008,-1.2,-1.5,-1.2,Recoil initial H speed,"read on hit, controls direction of recoil"
+,9,,0x06000009,1.4,0.7,1.4,Recoil initial V speed,
+,10,,0x0600000a,1,1,2,something to do with ending,
+,11,,0x0600000b,2,1,2,something to do with ending,"when set low causes massive fall speed, when set high casues momentary floating"
+,12,,0x0600000c,1,1,1,,
+,13,,0x0600000d,1,1,1,,
+,14,,0x0600000e,1,1,1,,
+15,0,Up B,0x07000000,0.625,0.625,0.625,Sensitivity,larger = harder
+,1,,0x07000001,18,12,18,Ability to angle (degrees),larger = significantly more control
+,2,,0x07000002,0.95,0.95,0.95,Grounded height multiplier,
+,3,,0x07000003,0.6666,0.5,0.8,,read 1-3 times per frame during launch
+,4,,0x07000004,0.5,0.068,0.5,,read twice on aerial launch
+,5,,0x07000005,1.2,1,1.3,Floating max H speed multiplier,
+,6,,0x07000006,0.3,1,0.65,Floating fall speed,
+,7,,0x07000007,0.6,0.5,0.7,Falling max H speed multiplier,
+,8,,0x17000008,0x28,0x30,0x24,Landing lag (frames),
+,9,,0x17000009,0x1E0,0x0,0x69,Max parasol opening frames,
+,10,,0x0700000a,1,1.35,0.5,Aerial height multiplier,
+16,0,Down B,0x18000000,0x64,0x0,0x0,Odds of getting an item,
+,1,,0x18000001,0x2,0x0,0x0,Relative odds of getting a Bob-bomb,
+,2,,0x18000002,0x3,0x0,0x0,Relative odds of getting a Mr. Saturn,
+,3,,0x18000003,0x0,0x0,0x0,Relative odds of getting a Beam Sword,
+,4,,0x18000004,0xA,0x3,0x3,Max # of turnips on the screen,
+,0,Float,0x14000000,0x96,,,Maximum duration (frames),
+,1,Final Smash?,0x04000001,1,,,,
+,2,,0x04000002,1,,,,
+,3,,0x04000003,10,,,,
+,4,,0x04000004,0,,,,
+,5,,0x04000005,0,,,,
+,6,,0x04000006,0,,,,
+,7,,0x14000007,0x3,,,,
+,8,,0x14000008,0x8,,,,
+,9,,0x14000009,0x258,,,,
+17,0,,,0,0,0,,
+18,0,Neutral B,,0,0,0,X offset,
+,1,,,-1,-1,-1,Y offset,
+,2,,,4,4,4,Z offset,
+,3,,,0,0,0,X2 offset,
+,4,,,-1,-1,-1,Y2 offset,
+,5,,,4,4,4,Z2 offset,
+,6,,,9,9,9,Counter trigger bubble size?,
+,7,,,0x2,0x2,0x2,,
+,8,,,0x2,0x2,0x2,,
+19,0,Turnip,0x02000000,1.1,0.81,1,Initial speed multiplier,
+,1,,0x02000001,0.08,0.014,0.15,Gravity,
+,2,,0x02000002,1.4,1.3,3.5,Max fall speed,
+,3,,0x02000003,-0.4,-0.4,-0.4,Added base damage,"Damage = (Base dmg + Name3) + Speed * Name4
+overwrite item_common_param Name38 and 39"
+,4,,0x02000004,3,1.5,2.4,Multiplier to speed added to damage,
+,5,,0x02000005,0.15,0.7,0.15,BOUND_REFSPEED_THROW_MUL,
+,6,,0x02000006,1.6,0.33,1.6,BOUND_REFSPEED_THROW_ADD_Y,
+,7,,0x02000007,180,180,180,Lifetime (frames),Does not reset when caught/thrown again
+,8,,0x02000008,35,35,35,Odds for grin turnip,equal to 60.3%
+,9,,0x02000009,6,6,6,Odds for stare turnip,equal to 10.3%
+,10,,0x0200000a,5,5,5,Odds for closed eyes turnip,equal to 8.62%
+,11,,0x0200000b,3,3,3,Odds for surprised turnip,equal to 5.17%
+,12,,0x0200000c,3,3,3,Odds for happy turnip,equal to 5.17%
+,13,,0x0200000d,4,4,4,Odds for winking turnip,equal to 6.90%
+,14,,0x0200000e,1,1,1,Odds for dot-eyes turnip,equal to 1.72%
+,15,,0x0200000f,1,1,1,Odds for stitchface turnip,equal to 1.72%
+,16,,0x02000010,2,2,6,Base damage for grin turnip,
+,17,,0x02000011,2,2,6,Base damage for stare turnip,
+,18,,0x02000012,2,2,6,Base damage for closed eyes turnip,
+,19,,0x02000013,2,2,6,Base damage for surprised turnip,
+,20,,0x02000014,2,2,6,Base damage for happy turnip,
+,21,,0x02000015,6,5,9,Base damage for winking turnip,
+,22,,0x02000016,12,10,15,Base damage for dot-eyes turnip,
+,23,,0x02000017,23,20,28,Base damage for stitchface turnip,
+20,0 to 40,Turnip Hitbox,,,,,,

@@ -98,6 +98,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="Runtime.cs" />
+    <Compile Include="Classes\Tooltips.cs" />
     <Compile Include="GUI\Rename.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -173,7 +174,7 @@
     <None Include="AnimNames.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="VarNames.txt">
+    <None Include="Tooltips\**\*.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Events.cfg">

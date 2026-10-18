@@ -1,0 +1,40 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Description,Comment
+13,0,Neutral B,0x05000000,60,60,66,Time to fully charge (frames),
+,1,,0x05000001,2.2,2.2,2,Max multiplier,
+,2,,0x05000002,0.8,0.8,0.8,Aerial H speed multiplier,
+,3,,0x05000003,0.02,0.02,0.02,Aerial H deceleration,
+,4,,0x05000004,1,1,1,,read once on initial pullback
+14,0,Side B,0x06000000,0.5,0.5,0.5,Aerial H speed multiplier,
+,1,,0x06000001,1.4,1.4,1.4,Initial V speed on aerial startup,
+,2,,0x16000002,0x1,0x0,0x1,Can use up/down variants,
+15,0,Up B,0x07000000,0.4,1,0.4,Aerial H mobility multiplier on special fall,
+,1,,0x07000001,19,33,39,Landing lag (frames),
+,2,,0x07000002,0.5,0.5,0.5,,read throughout entire move
+,3,,0x07000003,20,5,20,Ability to angle (degrees),
+,4,,0x07000004,0.6666,0.6666,0.6666,Directionalized pre-jump displacement,has a low max
+,5,,0x07000005,1.1,1.1,1.1,Aerial height multiplier,relative to ground version
+,6,,0x07000006,0.06,0.12,0.06,Gravity after flying,
+,7,,0x07000007,1.8,1.58,1.8,Max fall speed after falling,
+,8,,0x07000008,1,1,1,,read once post-jump
+16,0,Down B,0x08000000,0.5,0.45,0.5,Aerial H speed multiplier,
+,1,,0x08000001,0.0025,0.003,0.0025,H air friction,
+,2,,0x08000002,0.04,0.025,0.04,Counter gravity,
+,3,,0x08000003,1.2,1.1,1.2,Counter max fall speed,
+,4,,0x08000004,1.2,0.7,1.3,Damage multiplier,
+,5,,0x18000005,0x10,0x10,0x5,Freeze frames on activation,
+,6,,0x08000006,8,4,6,Min damage,
+,7,,0x08000007,50,50,50,Max damage,
+,8,,0x08000008,50,50,50,,"read on activation, only difference from Marth"
+,9,,0x18000009,0x0,0x0,0x0,,
+,10,,0x0800000a,0,0,0,Counter trigger bubble X offset,
+,11,,0x0800000b,9.3,9.3,9.3,Counter trigger bubble Y offset,
+,12,,0x0800000c,0,0,0,Counter trigger bubble Z offset,
+,13,,0x0800000d,9.2,9.2,9.2,Counter trigger bubble size,
+,14,,0x0800000e,1,1,1,,
+,0,Final smash,0x04000000,9,,,H speed,
+,1,,0x14000001,0x1E,,,Travel time (frames),
+,2,,0x04000002,10,,,,
+,3,,0x04000003,20,,,,
+,4,,0x04000004,0.05,,,,
+,5,,0x14000005,0x28,,,,
+,6,,0x14000006,0x5A,,,,
