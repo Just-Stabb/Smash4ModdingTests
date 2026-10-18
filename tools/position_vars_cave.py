@@ -8,10 +8,11 @@
 the stat cave; after starcopy_cave.py, which clears the dead Havok function the caves live in.)
 
 WorkModule float IDs 0x0F0000xx (category F, unused for floats by the game) are handled here
-instead of the WorkModule tables, by hooks on WorkModuleImpl::get_float (0x0200F628) and
-set_float (0x0200F648). Every reader and writer of WorkModule floats goes through those two
-functions, so the IDs work from MSC (WorkModuleF / WorkModule) and from ACMD (SET_FLOAT,
-Float_Var_Compare), on any fighter. Other IDs are untouched.
+instead of the WorkModule tables, by hooks on get / set / add / sub / mul / div float of
+WorkModuleImpl and all four of its subclasses (fighters use their own copies at 0x02F1DBE4..., see
+CLASSES; hooking only the base class left fighters writing these IDs into a table that doesn't
+exist, which crashed). MSC (WorkModuleF / WorkModule) and ACMD (SET_FLOAT, Float_Var_Compare) go
+through these functions, so the IDs work from both, on any fighter. Other IDs are untouched.
 
 "Self" is the fighter that owns the WorkModule being read. "Opponent" is the nearest other fighter
 (by X/Y distance; teams are not considered). Slots are the game's fighter table entries 0-7, in
@@ -57,6 +58,18 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
+# WorkModuleImpl and its four subclasses each have their own (identical) copy of get / set / add /
+# sub / mul / div float: vtables 0x10003224 (base), 0x100F93CC, 0x1012132C, 0x1013A1C0 / 0x1013AFFC
+# (fighters), 0x10153184. Every copy's first instruction branches to the same stubs; IDs that
+# aren't ours continue in the base copy (same code), so one set of stubs covers them all.
+# (get, set, add, sub, mul, div) per class:
+CLASSES = [
+    (0x0200F628, 0x0200F648, 0x0200F73C, 0x0200F764, 0x0200F78C, 0x0200F7B4),  # base
+    (0x02BCD8A0, 0x02BCD8C0, 0x02BCD9B4, 0x02BCD9DC, 0x02BCDA04, 0x02BCDA2C),
+    (0x02DA6020, 0x02DA6040, 0x02DA6134, 0x02DA615C, 0x02DA6184, 0x02DA61AC),
+    (0x02F1DBE4, 0x02F1DC04, 0x02F1DCF8, 0x02F1DD20, 0x02F1DD48, 0x02F1DD70),  # fighters
+    (0x03060880, 0x030608A0, 0x03060994, 0x030609BC, 0x030609E4, 0x03060A0C),
+]
 GET_HOOK = 0x0200F628      # WorkModuleImpl::get_float (vtable 0x10003224 +0x44)
 SET_HOOK = 0x0200F648      # WorkModuleImpl::set_float (+0x4C)
 SET_RESUME = 0x0200F64C    # set_float after its first instruction
@@ -477,10 +490,11 @@ def words():
     for a in parts:
         out.update({a.base + 4 * i: v for i, v in enumerate(a.words())})
     labels = parts[0].labels
-    out[GET_HOOK] = branch(GET_HOOK, labels["get_hook"])
-    out[SET_HOOK] = branch(SET_HOOK, labels["set_hook"])
-    for n, (hook, _) in enumerate(ARITH):
-        out[hook] = branch(hook, labels["arith_hook%d" % n])
+    for get, set_, *arith in CLASSES:
+        out[get] = branch(get, labels["get_hook"])
+        out[set_] = branch(set_, labels["set_hook"])
+        for n, hook in enumerate(arith):
+            out[hook] = branch(hook, labels["arith_hook%d" % n])
     return out
 
 

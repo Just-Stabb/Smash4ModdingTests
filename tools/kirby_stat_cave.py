@@ -8,7 +8,7 @@ through WorkModuleImpl::get_float (0x0200F628, vtable 0x10003224 +0x44), by the 
 (walk/run/jump/air kinetics) and by MSC alike. The stats are the character's shared fighter_param
 entry, so they can't be changed in place for one Kirby; instead the read is scaled.
 
-The first instruction of get_float branches to CAVE, which does the original read and then, for a
+The first instruction of get_float (every copy: fighters have their own, HOOKS) branches to CAVE, which does the original read and then, for a
 category-3 stat with index < 32, looks at the object's instance int INT_INDEX (0x1000008E):
   - the int array must exist and hold more than INT_INDEX entries (other fighters, weapons, items);
   - the value must be 0x4B49xxxx ("KI", written only by Kirby's MSC, kirby_trait_update);
@@ -28,6 +28,8 @@ after it on the command line).
 import struct
 
 HOOK = 0x0200F628          # WorkModuleImpl::get_float
+# get_float of the WorkModuleImpl subclasses (identical code; fighters use 0x02F1DBE4), all hooked
+HOOKS = [HOOK, 0x02BCD8A0, 0x02DA6020, 0x02F1DBE4, 0x03060880]
 CAVE = 0x037EE160          # free: 0x037EE15C-0x037EE400 (star cave ends at 0x037EE15C)
 LIMIT = 0x037EE400         # CAVE_C (copy_custom_cave.py) starts here
 INT_INDEX = 0x8E           # Kirby instance int 0x1000008E (unused by Kirby's MSC; copy_grant clears it)
@@ -142,7 +144,8 @@ def words():
         out[table + p * 8] = mask
         out[table + p * 8 + 4] = struct.unpack('>I', struct.pack('>f', mult))[0]
     assert max(out) + 4 <= LIMIT, "cave too long"
-    out[HOOK] = b(HOOK, CAVE)
+    for hook in HOOKS:
+        out[hook] = b(hook, CAVE)
     return out
 
 

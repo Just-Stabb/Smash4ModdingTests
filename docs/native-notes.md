@@ -700,7 +700,8 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
   in entries, top 2 bits are flags; cleared by `0x0200FD9C` → memset-like `0x04AE0B14`). get_float is
   `[[container]+4][(id & 0xFFFFFF)*4]` with no checks; set_float writes the same way.
 - Native movement code reads stats through vtable `+0x44` too (e.g. jump init `0x02E79940` reads
-  `0x0300000D`/`E`/`F`), so hooking get_float covers native and MSC reads.
+  `0x0300000D`/`E`/`F`), so hooking get_float covers native and MSC reads, as long as every
+  class's copy is hooked (fighters: `0x02F1DBE4`; see "Position variables").
 - Category 3 (`fighter_param`) is the character's entry of the shared table (one per kind, per the
   MSC note sheet), so it isn't rewritten per Kirby; `tools/kirby_stat_cave.py` scales on read instead
   (`docs/character-traits.md`). Cave at `0x037EE160`, table after it; hook `0x0200F628 = b cave`.
@@ -712,11 +713,17 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
 
 `tools/position_vars_cave.py`; user docs in `docs/position-variables.md`.
 
+- **WorkModuleImpl has four subclasses with their own copies** of get / set / add / sub / mul / div
+  float (identical code): vtables `0x10003224` (base), `0x100F93CC`, `0x1012132C`, `0x1013A1C0` /
+  `0x1013AFFC` (**fighters**: get `0x02F1DBE4`, set `0x02F1DC04`), `0x10153184` (all share the MSC
+  handler `+0x1CC` `0x0200E898`). Hooking only the base copies did nothing for fighters: the stat
+  cave never ran for them, and SET_FLOAT on `0x0F00000C` wrote into the missing category-F float
+  table and crashed. Both caves now hook every copy (`CLASSES` / `HOOKS`).
 - Float IDs `0x0F0000xx` (category F; the game's MSC uses float categories 0–9 only, and ints in
   category F) are answered by the cave instead of the WorkModule tables. Hooks on the first
-  instruction of WorkModuleImpl get_float `0x0200F628` (other IDs → the stat cave), set_float
-  `0x0200F648`, and add / sub / mul / div float `0x0200F73C` / `0x0200F764` / `0x0200F78C` /
-  `0x0200F7B4` (vtable `+0x64`/`+0x6C`/`+0x74`/`+0x7C`; these edit the tables in place, so for these
+  instruction of each copy of get_float (base `0x0200F628`; other IDs → the stat cave), set_float
+  (`0x0200F648`), and add / sub / mul / div float (`0x0200F73C` / `0x0200F764` / `0x0200F78C` /
+  `0x0200F7B4`) (vtable `+0x64`/`+0x6C`/`+0x74`/`+0x7C`; these edit the tables in place, so for these
   IDs they become a read plus a write). Only index < 0x100 is taken; other category F floats go to
   the original code.
 - MSC `WorkModule(op, value, id)` (syscall 0x16 → WM vtable `+0x1CC`, handler `0x0200E898`): op 0 =

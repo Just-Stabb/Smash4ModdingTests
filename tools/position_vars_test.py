@@ -32,6 +32,7 @@ def setup(fighters, count=8):
     """fighters: list of (slot, x, y, z, lr, live)"""
     mu = Uc(UC_ARCH_PPC, UC_MODE_PPC32 | UC_MODE_BIG_ENDIAN)
     mu.mem_map(0x02000000, 0x20000); mu.mem_write(0x02000020, mem(0x02000020, 0x1FFE0))
+    mu.mem_map(0x02F10000, 0x20000); mu.mem_write(0x02F10000, mem(0x02F10000, 0x20000))  # fighters' WorkModule copies
     mu.mem_map(0x037E0000, 0x20000); mu.mem_write(0x037E0000, mem(0x037E0000, 0x20000))
     mu.mem_write(SETPOS, b''.join(struct.pack('>I', w) for w in fake.words()))
     mu.mem_map(0x10300000, 0x200000)
@@ -153,5 +154,20 @@ call(mu, SUB, WMX, 0x03000010, 3.0); check('normal sub', call(mu, GET, WMX, 0x03
 call(mu, MUL, WMX, 0x03000010, 3.0); check('normal mul', call(mu, GET, WMX, 0x03000010), 12)
 call(mu, DIV, WMX, 0x03000010, 4.0); check('normal div', call(mu, GET, WMX, 0x03000010), 3)
 call(mu, DIV, WMX, 0x03000010, 0.0); check('normal div 0', call(mu, GET, WMX, 0x03000010), 3)
+# fighters use their own copies of the WorkModule functions (0x02F1DBE4...): same results through them
+FGET, FSET, FADD, FDIV = 0x02F1DBE4, 0x02F1DC04, 0x02F1DCF8, 0x02F1DD70
+mu, O = setup([(0, 10.0, 5.0, 0.0, 1.0, True), (1, 13.0, 9.0, 0.0, 1.0, True)])
+w0, p0 = O[0]; w1, p1 = O[1]
+check('fighter copy: self X', call(mu, FGET, w0, 0x0F000000), 10)
+check('fighter copy: opp rel X', call(mu, FGET, w0, 0x0F00000C), 3)
+call(mu, FSET, w0, 0x0F00000C, 12.0); check('fighter copy: SET_FLOAT opp 12 in front', pos(mu, p1), (22, 9, 0))
+call(mu, FADD, w0, 0x0F000005, 2.0); check('fighter copy: add self Y', pos(mu, p0), (10, 7, 0))
+WMX = 0x10390000; mu.mem_write(WMX + 8, struct.pack('>I', WMX + 0x100))
+mu.mem_write(WMX + 0x100 + 0x0C, struct.pack('>I', WMX + 0x200))
+mu.mem_write(WMX + 0x200 + 4, struct.pack('>I', WMX + 0x300))
+mu.mem_write(WMX + 0x300 + 0x10 * 4, struct.pack('>f', 6.0))
+check('fighter copy: normal get', call(mu, FGET, WMX, 0x03000010), 6)
+call(mu, FSET, WMX, 0x03000010, 9.0); check('fighter copy: normal set', call(mu, FGET, WMX, 0x03000010), 9)
+call(mu, FDIV, WMX, 0x03000010, 3.0); check('fighter copy: normal div', call(mu, FGET, WMX, 0x03000010), 3)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)
