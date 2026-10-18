@@ -168,7 +168,7 @@ def _position_lines():
     quantities = [
         ("hitstun left", "Read: frames of hitstun left.\\nWrite: set them (only lasts while in a hit status)."),
         ("hitstun dealt", "Read: hitstun frames of the last hit taken. Writes are ignored."),
-        ("hitstun x", "Write: multiply the hitstun left by the value. Reads 0."),
+        ("hitstun x", "Write: multiply the hitstun left by the value. Reads 0.\\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit)."),
         ("hitstop (shake)", "Read: 1 while in hitstop, else 0.\\nWrite: hitstop for N frames, shaking like a hit."),
         ("hitstop (no shake)", "Read: hitstop frames of the last hit taken.\\nWrite: hitstop for N frames, no shake."),
         ("offset X (fwd)", "Read: its X - this fighter's X, along this fighter's facing.\\nWrite: put it that far in front."),

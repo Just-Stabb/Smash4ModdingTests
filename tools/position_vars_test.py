@@ -62,6 +62,7 @@ s2: lwz r7, 4(r5)
  stw r7, 0xA0C(r12)
  li r3, 0
  blr""",
+    0x030B2B98: "lwz r12, 4(r3)\n lwz r3, 0xA1C(r12)\n blr",           # StatusModule(0)
     0x030B5C50: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r7, 8(r5)
@@ -267,5 +268,46 @@ wint(mu, 2, LA, 1)
 check('last hit: nobody', call(mu, FGET, w0, cid(2, 0)), 0)
 check('index past the end', call(mu, FGET, w0, 0x0F0000A0), 0)
 check('position IDs still work: opp X', call(mu, FGET, w0, 0x0F000008), 5)
+# hitstun x for the hits of the current move (written before the hit lands)
+FSETI = 0x02F1DDCC
+def int_table(mu, slot):
+    """a WorkModule int table for the fighter in slot (category 0), so set_int's own code works"""
+    wm = acc_of(slot) + 0x400; tbl = 0x103A0000 + slot * 0x1000
+    mu.mem_write(wm + 8, struct.pack('>I', tbl)); mu.mem_write(tbl, struct.pack('>I', tbl + 0x100))
+    mu.mem_write(tbl + 0x100 + 0xC, struct.pack('>I', tbl + 0x200))
+    return tbl + 0x200
+def seti(mu, slot, value, ident=0x1000003E):
+    call(mu, FSETI, acc_of(slot) + 0x400, ident, 0.0)  # r4 is set below
+mu, O = setup([(0, 0.0, 0.0, 0.0, 1.0, True), (1, 30.0, 0.0, 0.0, -1.0, True)])
+w0, w1 = O[0][0], O[1][0]
+ints1 = int_table(mu, 1)
+wint(mu, 0, 0xA1C, 0x30)                                 # Kirby's status
+AM, ARR, NODE = acc_of(0) + 0xC00, 0x10398000, 0x10399000
+mu.mem_write(acc_of(0) + 0x50, struct.pack('>I', AM))
+mu.mem_write(AM + 0x4C, struct.pack('>I', 0)); mu.mem_write(AM + 0x18, struct.pack('>I', 1))
+mu.mem_write(AM + 0x14, struct.pack('>I', ARR)); mu.mem_write(ARR + 0x128, struct.pack('>I', ARR + 0x124))
+call(mu, FSET, w0, cid(2, 2), 10.0)                      # before the hit: no target yet, remembered
+def set_int(mu, wm, value, ident):
+    mu.mem_write(RET, struct.pack('>I', 0x60000000))
+    mu.reg_write(UC_PPC_REG_3, wm); mu.reg_write(UC_PPC_REG_4, value & 0xFFFFFFFF); mu.reg_write(UC_PPC_REG_5, ident)
+    mu.reg_write(UC_PPC_REG_1, 0x10480000); mu.reg_write(UC_PPC_REG_LR, RET)
+    mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+    mu.emu_start(FSETI, RET)
+def hs1(): return struct.unpack('>i', mu.mem_read(ints1 + 0x3E * 4, 4))[0]
+# the hit lands: Kirby's attack records the victim; the victim's MSC sets its hitstun = DamageModuleF(1)
+mu.mem_write(AM + 0x4C, struct.pack('>I', 1)); mu.mem_write(ARR + 0x128, struct.pack('>I', NODE))
+mu.mem_write(NODE + 0x18, struct.pack('>I', 1 << 16))
+mu.mem_write(acc_of(1) + 0xA00, struct.pack('>f', 15.0))
+set_int(mu, w1, 15, 0x1000003E); check('hit lands: hitstun 15 x 10', hs1(), 150)
+set_int(mu, w1, 20, 0x1000003E); check('later rescale (not the raw hitstun) left alone', hs1(), 20)
+set_int(mu, w1, 7, 0x10000040); check('other int IDs untouched', struct.unpack('>i', mu.mem_read(ints1 + 0x40 * 4, 4))[0], 7)
+wint(mu, 0, 0xA1C, 0x31)                                 # Kirby is in another move now
+set_int(mu, w1, 15, 0x1000003E); check('next move: no multiplier', hs1(), 15)
+wint(mu, 0, 0xA1C, 0x30)
+set_int(mu, w1, 15, 0x1000003E); check('multiplier was forgotten', hs1(), 15)
+wint(mu, 1, HS, 15)                                      # (the stand-in WorkModule's copy of it)
+call(mu, FSET, w0, cid(2, 2), 2.0)                       # during the hit: x2 now and for later hits
+check('written after the hit: x2 now', rint(mu, 1, HS), 30)
+set_int(mu, w1, 15, 0x1000003E); check('and for the next hit of the move', hs1(), 30)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

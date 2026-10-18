@@ -435,6 +435,10 @@ MSC_DAMAGE = 0x030B2F8C    # 0x24 DamageModule
 MSC_DAMAGE_F = 0x030B2FC4  # 0x25 DamageModuleF
 MSC_STOP = 0x030B5160      # 0x30 StopModule
 MSC_SHAKE = 0x030B5C50     # 0x48 ShakeModule
+MSC_STATUS = 0x030B2B98    # 0x18 StatusModule
+# set_int of each WorkModule class (identical code; other IDs continue in the base copy)
+SET_INT_HOOKS = [0x0200F810, 0x02BCDA88, 0x02DA6208, 0x02F1DDCC, 0x03060A68]
+SET_INT_RESUME = 0x0200F814
 HITSTUN = 0x1000003E
 LAST_ATTACKER = 0x10000065
 
@@ -492,7 +496,7 @@ ext:
         cmpwi r22, 1
         blt ext_t_self
         beq ext_t_opp
-        b ext_t_last
+        b ext_t_last_pre
 """, False),
 ("""
 ext_t_self:
@@ -770,6 +774,154 @@ find_done:
         blr
 """, False),
 ("""
+ext_t_last_pre:                         # last fighter hit, hitstun x: also remember it for this move
+        lwz r0, 0x14(r1)
+        cmpwi r0, 2
+        bne ext_t_last
+        cmpwi r29, 0
+        beq ext_t_last
+        cmpwi r28, 0
+        beq ext_t_last
+        mr r24, r27                     # self's StatusModule(0) = the move it's for
+%(STATUS)s
+        lis r12, hs_pending@ha
+        addi r12, r12, hs_pending@l
+        slwi r0, r26, 3
+        add r12, r12, r0
+        lfs f0, 0x10(r1)
+        stfs f0, 0(r12)
+        stw r3, 4(r12)
+        b ext_t_last
+""", False),
+("""
+seti_hook:                              # @near: set_int(r3 WM, r4 value, r5 ID) of every WorkModule class
+        lis r12, %(HS_HI)s
+        ori r12, r12, %(HS_LO)s
+        cmplw r5, r12
+        bne seti_other
+        cmpwi r4, 0
+        bgt seti_adjust
+seti_other:
+        rlwinm r11, r5, 8, 28, 31       # set_int's own first instruction
+        b %(SETI_RESUME)s
+""", False),
+("""
+seti_adjust:                            # a fighter's hitstun is being set: x the attacker's pending
+        mflr r0                         # multiplier (hs_pending) if this is the hit's own hitstun and
+        stwu r1, -0x80(r1)              # the attacker is still in the move that set it
+        stw r0, 0x84(r1)
+        stmw r22, 0x50(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        bl find_self                    # the victim: r28 posture, r27 accessor, r26 slot
+        cmpwi r28, 0
+        beq seti_done
+        mr r24, r27
+%(DEALT)s
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)
+        fctiwz f0, f1
+        stfd f0, 0x8(r1)
+        lwz r0, 0xC(r1)
+        cmpw r0, r30                    # only the hit's own hitstun (DamageModuleF(1))
+        bne seti_done
+        li r23, 0
+seti_att_loop:                          # the attacker: a fighter whose hit records hold the victim
+        cmpw r23, r26
+        beq seti_att_next
+        mr r3, r23
+        bl slot
+        cmpwi r3, 0
+        beq seti_att_next
+        mr r24, r12
+        lwz r6, 0x50(r12)
+%(CHK_R6_NEXT)s
+        lwz r0, 0x4C(r6)
+        cmpwi r0, 0
+        beq seti_att_next
+        lwz r5, 0x18(r6)
+        lwz r6, 0x14(r6)
+%(CHK_R6_NEXT)s
+seti_rec_loop:
+        cmpwi r5, 0
+        ble seti_att_next
+        lwz r7, 0x128(r6)
+        addi r8, r6, 0x124
+        cmplw r7, r8
+        beq seti_rec_next
+%(CHK_R7_RECNEXT)s
+        lwz r8, 0x18(r7)
+        srwi. r0, r8, 28
+        bne seti_rec_next
+        rlwinm r8, r8, 16, 20, 31
+        cmplw r8, r26
+        beq seti_found
+seti_rec_next:
+        addi r6, r6, 0x174
+        addi r5, r5, -1
+        b seti_rec_loop
+seti_att_next:
+        addi r23, r23, 1
+        cmpwi r23, %(S)d
+        blt seti_att_loop
+        b seti_done
+seti_found:                             # r23 attacker slot, r24 its accessor
+        lis r22, hs_pending@ha
+        addi r22, r22, hs_pending@l
+        slwi r0, r23, 3
+        add r22, r22, r0
+        lfs f0, 0(r22)
+        lis r12, consts@ha
+        lfs f1, consts@l(r12)
+        fcmpu cr0, f0, f1
+        beq seti_done                   # no multiplier
+%(STATUS)s
+        lwz r0, 4(r22)
+        cmpw r3, r0
+        bne seti_stale
+        mr r3, r30
+        bl ext_i2f                      # (uses f0)
+        lfs f0, 0(r22)
+        fmul f1, f1, f0
+        fctiwz f0, f1
+        stfd f0, 0x8(r1)
+        lwz r30, 0xC(r1)
+        b seti_done
+seti_stale:                             # the attacker is in another move now: forget it
+        lis r12, consts@ha
+        lfs f1, consts@l(r12)
+        stfs f1, 0(r22)
+seti_done:
+        mr r3, r31
+        mr r4, r30
+        mr r5, r29
+        lmw r22, 0x50(r1)
+        lwz r0, 0x84(r1)
+        mtlr r0
+        addi r1, r1, 0x80
+        b seti_other
+""", False),
+("""
+hs_pending:                             # per player slot: hitstun multiplier, status it was set in
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+""", False),
+("""
 ext_ret_int:                            # f1 = (float) r3
         bl ext_i2f
         b ext_ret
@@ -861,6 +1013,9 @@ ext_magic:
         S=SLOTS, SETPOS=SETPOS_CALL,
         DEALT=msc(MSC_DAMAGE_F, 1),
         IN_STOP=msc(MSC_STOP, 1),
+        STATUS=msc(MSC_STATUS, 0),
+        SETI_RESUME="0x%08X" % SET_INT_RESUME,
+        CHK_R6_NEXT=chk("r6", "seti_att_next"), CHK_R7_RECNEXT=chk("r7", "seti_rec_next"),
         STOP_DEALT=msc(MSC_DAMAGE, 8),
         SET_STOP=msc(MSC_STOP, 2, "r22"),
         SHAKE=msc(MSC_SHAKE, 0, 0, "r22", 0, 0, 0x3F800000),
@@ -897,8 +1052,10 @@ def pack(extra=()):
     regions = list(EXT_REGIONS) + list(extra)
     free = [e - s for s, e in regions]
     where = {}
-    for k in sorted(range(len(blocks)), key=lambda k: -size[k]):
-        fits = [ri for ri in range(len(free)) if free[ri] >= size[k]]
+    for k in sorted(range(len(blocks)), key=lambda k: ("@near" not in blocks[k][0], -size[k])):
+        near = "@near" in blocks[k][0]   # must be within a branch of the game's code: the first cave
+        fits = [ri for ri in range(len(free)) if free[ri] >= size[k]
+                and (not near or ri >= len(EXT_REGIONS))]
         if not fits:
             raise AssertionError("combat variables don't fit (block %d)" % k)
         ri = min(fits, key=lambda ri: free[ri])
@@ -973,6 +1130,8 @@ def words():
     for a in parts:
         out.update({a.base + 4 * i: v for i, v in enumerate(a.words())})
     labels = parts[0].labels
+    for hook in SET_INT_HOOKS:
+        out[hook] = branch(hook, labels["seti_hook"])
     for get, set_, *arith in CLASSES:
         out[get] = branch(get, labels["get_hook"])
         out[set_] = branch(set_, labels["set_hook"])

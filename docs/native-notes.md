@@ -784,4 +784,11 @@ indices < 0x40 in the position code and sends the rest to `ext`.
   the first version of the combat variables wrote code there and the game crashed on launch at
   `0x04AD2178`. A function with no calls or relocations can still be the entry point (check
   `e_entry`). `0x04AE6258` (0x234) and `0x037EE858` (0x124) do look unused but aren't used now.
+- **Hitstun × for a move's hits** (`0x0F000052`): writing it stores (multiplier, StatusModule(0)) for
+  the writer's slot in `hs_pending` (in the grown `.text`, zero at load). `set_int` of every WorkModule
+  class (`0x0200F810`, `0x02BCDA88`, `0x02DA6208`, `0x02F1DDCC` fighters, `0x03060A68`; `set_int(this,
+  value, id)`) is hooked: when a fighter's int `0x1000003E` is set to the hit's own hitstun
+  (`(int)DamageModuleF(1)`, what the Damage status init writes; later rescales like Kirby `func_888`
+  don't match), the attacker is the fighter whose attack's hit records hold the victim, and if its
+  multiplier is set and it's still in the same status, the value is multiplied; a stale one is cleared.
 

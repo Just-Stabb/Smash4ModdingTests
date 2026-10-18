@@ -68,7 +68,7 @@ opponent 1 unit further forward.
 |---|---|---|
 | +0 hitstun left | frames of hitstun left | set them (only matters while in a hit status) |
 | +1 hitstun dealt | hitstun frames of the last hit taken | ignored |
-| +2 hitstun × | 0 | multiply the hitstun left by the value |
+| +2 hitstun × | 0 | multiply the hitstun left by the value. For the **last fighter hit** (`0x0F000052`) it is also remembered for the rest of the move: every hit of the move that lands afterwards gets that much hitstun (so it can go before the hit, e.g. right after the `Hitbox` lines); it's forgotten when the move ends |
 | +3 hitstop (shake) | 1 while in hitstop, else 0 | hitstop for N frames, shaking like a hit |
 | +4 hitstop (no shake) | hitstop frames of the last hit taken | hitstop for N frames, no shake |
 | +5 offset X (fwd) | target X − self X, along self's facing | put the target that far in front of self |
@@ -79,7 +79,7 @@ Examples:
 
     SET_FLOAT(Value=8, Variable=0x0F000053)    // last fighter hit: 8 frames of hitstop, shaking
     SET_FLOAT(Value=0, Variable=0x0F000050)    // last fighter hit: end their hitstun now
-    SET_FLOAT(Value=1.5, Variable=0x0F000052)  // last fighter hit: 1.5x the hitstun left
+    SET_FLOAT(Value=1.5, Variable=0x0F000052)  // this move's hits: 1.5x hitstun (before or after the hit)
     SET_FLOAT(Value=6, Variable=0x0F000044)    // self: 6 frames of hitstop, no shake
     SET_FLOAT(Value=12, Variable=0x0F000055)   // put the last fighter hit 12 in front of self
 

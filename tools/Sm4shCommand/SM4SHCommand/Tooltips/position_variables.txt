@@ -23,7 +23,7 @@
 0x0F000012 = Self offset Z | Read: self Z - opponent Z.\nWrite: put this fighter at opponent Z + value.
 0x0F000040 = Self hitstun left | Target: this fighter.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000041 = Self hitstun dealt | Target: this fighter.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000042 = Self hitstun x | Target: this fighter.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000042 = Self hitstun x | Target: this fighter.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000043 = Self hitstop (shake) | Target: this fighter.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000044 = Self hitstop (no shake) | Target: this fighter.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000045 = Self offset X (fwd) | Target: this fighter.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -31,7 +31,7 @@
 0x0F000047 = Self offset Z | Target: this fighter.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000048 = Nearest opponent hitstun left | Target: the nearest other fighter.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000049 = Nearest opponent hitstun dealt | Target: the nearest other fighter.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F00004A = Nearest opponent hitstun x | Target: the nearest other fighter.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F00004A = Nearest opponent hitstun x | Target: the nearest other fighter.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F00004B = Nearest opponent hitstop (shake) | Target: the nearest other fighter.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F00004C = Nearest opponent hitstop (no shake) | Target: the nearest other fighter.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F00004D = Nearest opponent offset X (fwd) | Target: the nearest other fighter.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -39,7 +39,7 @@
 0x0F00004F = Nearest opponent offset Z | Target: the nearest other fighter.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000050 = Last fighter hit hitstun left | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000051 = Last fighter hit hitstun dealt | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000052 = Last fighter hit hitstun x | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000052 = Last fighter hit hitstun x | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000053 = Last fighter hit hitstop (shake) | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000054 = Last fighter hit hitstop (no shake) | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000055 = Last fighter hit offset X (fwd) | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -47,7 +47,7 @@
 0x0F000057 = Last fighter hit offset Z | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000058 = Slot 1 hitstun left | Target: player slot 1.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000059 = Slot 1 hitstun dealt | Target: player slot 1.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F00005A = Slot 1 hitstun x | Target: player slot 1.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F00005A = Slot 1 hitstun x | Target: player slot 1.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F00005B = Slot 1 hitstop (shake) | Target: player slot 1.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F00005C = Slot 1 hitstop (no shake) | Target: player slot 1.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F00005D = Slot 1 offset X (fwd) | Target: player slot 1.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -55,7 +55,7 @@
 0x0F00005F = Slot 1 offset Z | Target: player slot 1.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000060 = Slot 2 hitstun left | Target: player slot 2.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000061 = Slot 2 hitstun dealt | Target: player slot 2.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000062 = Slot 2 hitstun x | Target: player slot 2.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000062 = Slot 2 hitstun x | Target: player slot 2.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000063 = Slot 2 hitstop (shake) | Target: player slot 2.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000064 = Slot 2 hitstop (no shake) | Target: player slot 2.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000065 = Slot 2 offset X (fwd) | Target: player slot 2.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -63,7 +63,7 @@
 0x0F000067 = Slot 2 offset Z | Target: player slot 2.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000068 = Slot 3 hitstun left | Target: player slot 3.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000069 = Slot 3 hitstun dealt | Target: player slot 3.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F00006A = Slot 3 hitstun x | Target: player slot 3.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F00006A = Slot 3 hitstun x | Target: player slot 3.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F00006B = Slot 3 hitstop (shake) | Target: player slot 3.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F00006C = Slot 3 hitstop (no shake) | Target: player slot 3.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F00006D = Slot 3 offset X (fwd) | Target: player slot 3.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -71,7 +71,7 @@
 0x0F00006F = Slot 3 offset Z | Target: player slot 3.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000070 = Slot 4 hitstun left | Target: player slot 4.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000071 = Slot 4 hitstun dealt | Target: player slot 4.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000072 = Slot 4 hitstun x | Target: player slot 4.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000072 = Slot 4 hitstun x | Target: player slot 4.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000073 = Slot 4 hitstop (shake) | Target: player slot 4.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000074 = Slot 4 hitstop (no shake) | Target: player slot 4.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000075 = Slot 4 offset X (fwd) | Target: player slot 4.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -79,7 +79,7 @@
 0x0F000077 = Slot 4 offset Z | Target: player slot 4.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000078 = Slot 5 hitstun left | Target: player slot 5.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000079 = Slot 5 hitstun dealt | Target: player slot 5.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F00007A = Slot 5 hitstun x | Target: player slot 5.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F00007A = Slot 5 hitstun x | Target: player slot 5.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F00007B = Slot 5 hitstop (shake) | Target: player slot 5.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F00007C = Slot 5 hitstop (no shake) | Target: player slot 5.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F00007D = Slot 5 offset X (fwd) | Target: player slot 5.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -87,7 +87,7 @@
 0x0F00007F = Slot 5 offset Z | Target: player slot 5.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000080 = Slot 6 hitstun left | Target: player slot 6.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000081 = Slot 6 hitstun dealt | Target: player slot 6.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000082 = Slot 6 hitstun x | Target: player slot 6.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000082 = Slot 6 hitstun x | Target: player slot 6.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000083 = Slot 6 hitstop (shake) | Target: player slot 6.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000084 = Slot 6 hitstop (no shake) | Target: player slot 6.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000085 = Slot 6 offset X (fwd) | Target: player slot 6.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -95,7 +95,7 @@
 0x0F000087 = Slot 6 offset Z | Target: player slot 6.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000088 = Slot 7 hitstun left | Target: player slot 7.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000089 = Slot 7 hitstun dealt | Target: player slot 7.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F00008A = Slot 7 hitstun x | Target: player slot 7.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F00008A = Slot 7 hitstun x | Target: player slot 7.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F00008B = Slot 7 hitstop (shake) | Target: player slot 7.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F00008C = Slot 7 hitstop (no shake) | Target: player slot 7.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F00008D = Slot 7 offset X (fwd) | Target: player slot 7.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
@@ -103,7 +103,7 @@
 0x0F00008F = Slot 7 offset Z | Target: player slot 7.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000090 = Slot 8 hitstun left | Target: player slot 8.\nRead: frames of hitstun left.\nWrite: set them (only lasts while in a hit status).
 0x0F000091 = Slot 8 hitstun dealt | Target: player slot 8.\nRead: hitstun frames of the last hit taken. Writes are ignored.
-0x0F000092 = Slot 8 hitstun x | Target: player slot 8.\nWrite: multiply the hitstun left by the value. Reads 0.
+0x0F000092 = Slot 8 hitstun x | Target: player slot 8.\nWrite: multiply the hitstun left by the value. Reads 0.\nFor the last fighter hit it also applies to every later hit of the current move (it can go before the hit).
 0x0F000093 = Slot 8 hitstop (shake) | Target: player slot 8.\nRead: 1 while in hitstop, else 0.\nWrite: hitstop for N frames, shaking like a hit.
 0x0F000094 = Slot 8 hitstop (no shake) | Target: player slot 8.\nRead: hitstop frames of the last hit taken.\nWrite: hitstop for N frames, no shake.
 0x0F000095 = Slot 8 offset X (fwd) | Target: player slot 8.\nRead: its X - this fighter's X, along this fighter's facing.\nWrite: put it that far in front.
