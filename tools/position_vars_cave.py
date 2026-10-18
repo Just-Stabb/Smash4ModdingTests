@@ -82,7 +82,7 @@ get_hook:
         rlwinm. r12, r4, 0, 8, 23       # index must be < 0x100
         bne get_other
         li r5, 0
-        b posvar
+        {GET_GO}
 get_other:
         b {STAT_CAVE}
 
@@ -93,7 +93,7 @@ set_hook:
         rlwinm. r12, r4, 0, 8, 23
         bne set_other
         li r5, 1
-        b posvar
+        {SET_GO}
 set_other:
         b {SET_RESUME}
 
@@ -332,7 +332,7 @@ set_comp:                               # posture r25, component r27 = f1, via i
         mr r3, r25
         addi r4, r1, 8
         mtctr r12
-        bctrl
+        {SETPOS_CALL}
 ret_zero:
         lis r12, consts@ha
         lfs f1, consts@l(r12)
@@ -440,8 +440,17 @@ CHECKS = {
 }
 
 
+# Diagnostic builds (python3 tools/position_vars_cave.py --debug-noop / --debug-nowrite): noop = the
+# IDs are recognised but nothing else runs (reads give whatever f1 held, writes do nothing);
+# nowrite = everything runs except the final set_pos call.
+DEBUG = "noop" if "--debug-noop" in sys.argv else "nowrite" if "--debug-nowrite" in sys.argv else None
+
+
 def assemble():
-    src = SOURCE.format(**CHECKS, STAT_CAVE=STAT_CAVE, SET_RESUME=SET_RESUME, SLOTS=SLOTS,
+    src = SOURCE.format(**CHECKS,
+                        GET_GO="blr" if DEBUG == "noop" else "b posvar",
+                        SET_GO="blr" if DEBUG == "noop" else "b posvar",
+                        SETPOS_CALL="nop" if DEBUG == "nowrite" else "bctrl", STAT_CAVE=STAT_CAVE, SET_RESUME=SET_RESUME, SLOTS=SLOTS,
                         ENTRY_SIZE=ENTRY_SIZE, FIGHTERS_HA=((FIGHTERS + 0x8000) >> 16) & 0xFFFF,
                         FIGHTERS_LO=FIGHTERS & 0xFFFF if FIGHTERS & 0x8000 == 0 else (FIGHTERS & 0xFFFF) - 0x10000)
     src2 = SOURCE2 + "".join(ARITH_STUB.format(n=n, first=first, resume=hook + 4)
