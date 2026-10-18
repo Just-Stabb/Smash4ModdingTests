@@ -854,7 +854,13 @@ Overdrive (×1.2 animations).
   the attacker side from `0x02C2639C` with `r6 = 1`; both then scale by a rate (accessor `+0x58`
   vtable `+0x17C`) and set StopModule (accessor `+0x48`) vtable `+0x8C(frames, 1)`
   (= `0x0200DDB4`: `+4` frames, `+0x11` in hitstop).
-- `tools/strike_cave.py` (cave `0x04B78E00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
-  (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2) and `0x02C27638`
-  (attacker side, Strike Kirby: damage / 1.15, multiplier / 1.2, so his own hitstop is vanilla).
+- **Throws:** `Throw_Specifier` (`0x02BE6E88`), `Throw_Specifier2`, `Intensity_Throw_Specifier`
+  pack their parameters as MSC arguments and call AttackModule's MSC handler (vtable `+0x334`,
+  `0x02C0ACFC`) with op `0x2716` / `0x2717`; that case builds the throw's attack data at `0x78(r1)`
+  (damage first, from argument 3) and passes it to vtable `+0x64` at `0x02C0B790`.
+- `tools/strike_cave.py` (cave `0x04B78C00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
+  (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2; crit bit `0x10`:
+  ×2 more each), `0x02C27638` (attacker side, Strike Kirby: damage / 1.15 (crit / 2.3),
+  multiplier / 1.2, so his own hitstop is vanilla, or 2× on a crit) and `0x02C0B77C` (throw data:
+  damage ×1.15).
 

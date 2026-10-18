@@ -82,6 +82,9 @@ int global80;
 int global81;
 int global82;
 int global83;
+int global84;
+int global85;
+int global86;
 
 void func_0()
 {
@@ -72571,13 +72574,60 @@ int kirby_trait_profile(int trait)
 // Trait bits for the executable, added to the marker (bits 0-2 are the stat profile):
 //   0x8 = Strike: Kirby's hitboxes (not projectiles) do x1.15 damage and x1.2 hitlag, and his own
 //         hitstop stays as without it (tools/strike_cave.py).
+//   0x10 = Strike critical hit: this smash attack's hitboxes do x2 damage and x2 hitstop (Kirby's
+//          too) on top of Strike (strike_crit_update()).
 int kirby_trait_flags(int trait)
 {
-    if (trait == trait_strike())
+    if (trait != trait_strike())
     {
-        return 0x8;
+        return 0;
     }
-    return 0;
+    if (global84)
+    {
+        return 0x18;
+    }
+    return 0x8;
+}
+
+// ===================================================================
+// Strike critical hits (added): with the Strike trait, each smash attack (forward / up / down,
+// statuses 0x2B-0x33 from the windup on) has a 1 in strike_crit_chance() (8) chance, rolled when it
+// starts, to be a critical hit: x2 damage and x2 hitstop for Kirby and the opponent (the
+// executable, tools/strike_cave.py, marker bit 0x10), and a close camera zoom on Kirby when it
+// connects (the shared zoom countdown, Kirby int 0x10000093, reset by throwb_camera_update).
+//   global84: this smash attack is a crit. global85: rolled for this smash attack.
+//   global86: its zoom has played.
+// ===================================================================
+int   strike_crit_chance()    { return 8; }    // 1 in this many smash attacks
+int   strike_crit_zoom_in()   { return 3; }    // zoom-in frames
+float strike_crit_zoom_amount() { return 1.4f; } // higher = farther (the back throw's big hit uses 2.0)
+int   strike_crit_zoom_time() { return 18; }   // frames before the camera goes back
+
+// kirby_trait_update, every frame, before the marker is written
+void strike_crit_update(int trait)
+{
+    if (global4 < 0x2b || global4 > 0x33) // not in a smash attack
+    {
+        global84 = 0;
+        global85 = 0;
+        global86 = 0;
+        return;
+    }
+    if (!global85)
+    {
+        global85 = 0x1;
+        global84 = 0;
+        if (trait == trait_strike() && randi(0, strike_crit_chance()) == 0)
+        {
+            global84 = 0x1;
+        }
+    }
+    if (global84 && !global86 && AttackModule(0x2727)) // the crit connected
+    {
+        global86 = 0x1;
+        CameraModule(0x2714, strike_crit_zoom_in(), 0, strike_crit_zoom_amount());
+        WorkModule(0x7, strike_crit_zoom_time(), 0x10000093);
+    }
 }
 
 // main loop (func_74), every frame
@@ -72591,6 +72641,7 @@ void kirby_trait_update()
     }
     global76 = trait;
     overdrive_update();
+    strike_crit_update(trait);
     WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait) + kirby_trait_flags(trait), 0x1000008e);
 }
 

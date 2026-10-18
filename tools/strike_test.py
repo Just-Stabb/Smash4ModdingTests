@@ -123,5 +123,47 @@ for dmg in (1.0, 3.0, 7.0, 10.0, 13.0, 20.0, 26.0):
     f = lambda x: struct.unpack(">f", struct.pack(">f", x))[0]
     own = int(min(f(f(r[1] * f(0.3846154)) + 5) * f(r[2] * mult), 30))
     check("self hitstop, %g dmg: vanilla frames" % dmg, own, int(min((dmg * 0.3846154 + 5), 30)))
+# --- critical hits (marker bit 0x10, set by the MSC during a smash attack that rolled a crit) ---
+CRIT = STRIKE | 0x10
+mu = fresh()
+fighter(mu, kirby, 3, CRIT)
+check("crit hitbox: damage 10 -> 23", tuple(round(x, 4) for x in run_atk(mu, kirby, 10.0, 1.0)), (23.0, 2.4))
+fighter(mu, kirby, 3, 0x4B490010)
+check("crit bit without Strike: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
+for dmg in (3.0, 10.0, 14.0, 18.0):
+    scaled = struct.unpack(">f", struct.pack(">f", struct.unpack(">f", struct.pack(">f", dmg * 1.15))[0] * 2))[0]
+    mult = struct.unpack(">f", struct.pack(">f", struct.unpack(">f", struct.pack(">f", 1.2))[0] * 2))[0]
+    acc = fighter(mu, kirby, 3, CRIT)
+    r = run_hs(mu, acc, 1, scaled, 1.0)
+    f = lambda x: struct.unpack(">f", struct.pack(">f", x))[0]
+    own = int(min(f(f(r[1] * f(0.3846154)) + 5) * f(r[2] * mult), 30))
+    check("crit self hitstop, %g dmg: 2x the normal" % dmg, own, int(min((dmg * 0.3846154 + 5) * 2, 30)))
+
+
+# --- throws ---
+def run_throw(mu, obj, damage):
+    am, sp = 0x10480000, 0x104E0000
+    mu.mem_write(am, struct.pack(">I", 0x5678))
+    mu.mem_write(am + 4, struct.pack(">I", obj))
+    mu.mem_write(sp + 0x78, struct.pack(">f", damage))
+    mu.reg_write(UC_PPC_REG_30, am)
+    mu.reg_write(UC_PPC_REG_1, sp)
+    mu.reg_write(UC_PPC_REG_4, 0x44)
+    mu.reg_write(UC_PPC_REG_5, 0x55)
+    mu.emu_start(a.labels["strike_throw"], S.HOOK_THROW + 4)
+    check("  (handler's own lwz r12, 0(r30); r4 / r5 kept)", (mu.reg_read(UC_PPC_REG_12), mu.reg_read(UC_PPC_REG_4), mu.reg_read(UC_PPC_REG_5)), (0x5678, 0x44, 0x55))
+    return round(struct.unpack(">f", mu.mem_read(sp + 0x78, 4))[0], 4)
+
+
+mu = fresh()
+fighter(mu, kirby, 3, STRIKE)
+check("Strike Kirby throw: 10 -> 11.5", run_throw(mu, kirby, 10.0), 11.5)
+fighter(mu, kirby, 3, CRIT)
+check("throw during a crit: x1.15 only", run_throw(mu, kirby, 8.0), 9.2)
+fighter(mu, kirby, 3, RUSH)
+check("Rush Kirby throw: unchanged", run_throw(mu, kirby, 10.0), 10.0)
+fighter(mu, kirby, 0x10000003, STRIKE)
+check("weapon throw data: unchanged", run_throw(mu, kirby, 10.0), 10.0)
+check("bad owner: unchanged", run_throw(mu, 0x7, 10.0), 10.0)
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

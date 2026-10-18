@@ -22,7 +22,7 @@ Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy k
 | Trait | Changes |
 |---|---|
 | Rush | ×1.25 movement stats: walk (`0x01`–`0x03`), dash / run (`0x08`–`0x0B`), jump horizontal speed (`0x0D`, `0x0F`, `0x10`), air acceleration and max air speed (`0x14`–`0x16`), max fall and fast fall speed (`0x19`, `0x1B`). Not jump height (`0x11`–`0x13`), gravity (`0x18`, it would change jump height), traction or landing lag. Neutral air is the air rapid jab. |
-| Strike | ×1.15 damage on Kirby's own hitboxes (anything that isn't a projectile / article: those are separate objects), ×1.2 hitstop for the opponent, Kirby's own hitstop unchanged. Native (`tools/strike_cave.py`, marker bit `0x8` from `kirby_trait_flags()`). Knockback goes up with the damage, as it does for any harder hit. Not throws (their damage isn't a hitbox) or `Change_Hitbox_Damage`. |
+| Strike | ×1.15 damage on Kirby's own hitboxes (anything that isn't a projectile / article: those are separate objects), ×1.2 hitstop for the opponent, Kirby's own hitstop unchanged. Native (`tools/strike_cave.py`, marker bit `0x8` from `kirby_trait_flags()`). Throws ×1.15 too. Knockback goes up with the damage, as it does for any harder hit. Not `Change_Hitbox_Damage`. **Critical hits:** each smash attack has a 1 in 8 chance (rolled at the windup, `strike_crit_*()`) to do ×2 damage and ×2 hitstop for Kirby and the opponent (marker bit `0x10`), with a close camera zoom on Kirby when it connects. |
 | Zoning | none yet |
 | Juggernaut | none yet |
 | Normal | none yet |
