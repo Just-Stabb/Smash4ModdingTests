@@ -60,6 +60,9 @@ int global58;
 int global59;
 int global60;
 int global61;
+int global62;
+int global63;
+int global64;
 
 void func_0()
 {
@@ -1649,6 +1652,7 @@ void func_74()
     global31 = ControlModule(0xa, 0x1);
     global29 = ControlModule(0xa, 0x2);
     global45 = ControlModule(0xa, 0x3);
+    rolloff_momentum_update(); // roll-off: no air speed cap until grounded (added)
     var0 = StatusModule(0);
     if (var0 != 0xffffffff)
     {
@@ -6280,6 +6284,10 @@ int func_247()
     }
     StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, var0, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts)
+    }
     return 0;
 }
 
@@ -6287,6 +6295,10 @@ int func_248()
 {
     StatusModule(0x5, 0, 0xf, 0x9, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x10a2, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts)
+    }
     return 0;
 }
 
@@ -8061,7 +8073,8 @@ int func_362()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8072,7 +8085,8 @@ int func_363()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8168,6 +8182,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8199,6 +8214,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8471,11 +8487,23 @@ void func_380()
 
 void func_381()
 {
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        global64 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
+    }
     func_383();
 }
 
 void func_382()
 {
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        global64 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
+    }
     func_383();
 }
 
@@ -10308,6 +10336,7 @@ void func_500()
 void func_501()
 {
     func_502();
+    rolloff_fall_speed(); // roll-off: speed carried off the ledge x rolloff_air_speed_mult()
     func_78(func_503);
 }
 
@@ -10971,7 +11000,10 @@ void func_534()
 
 void func_535()
 {
-    
+    if (!global64) // (a roll-off keeps it until Sonic is grounded: rolloff_momentum_update)
+    {
+        WorkModule(0x2711, 0x20000044); // roll-off: Fall over, the air speed cap is back
+    }
 }
 
 void func_536()
@@ -14070,6 +14102,10 @@ void func_715()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of the initial dash too (added; no shield)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -14258,6 +14294,9 @@ void func_716()
     WorkModule(0x16, 0x1e00007f);
     WorkModule(0x16, 0x1e00005c);
     WorkModule(0x16, 0x1e000054);
+    WorkModule(0x16, 0x1e000056); // up tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e000057); // down tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e00005f); // down smash out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {
@@ -14280,6 +14319,10 @@ void func_717()
     if (global18 == 0x2)
     {
         func_16(0xe, 0);
+        return;
+    }
+    if (run_attack_update()) // tilts / down smash out of run (added)
+    {
         return;
     }
     if (func_43())
@@ -14476,6 +14519,10 @@ void func_722()
     {
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run: turning the stick up / down from a run
+    {                             // ends it in RunBrake, so the check is here too (added)
+        return;
+    }
     if (func_43())
     {
         return;
@@ -14575,6 +14622,10 @@ void func_724()
     {
         return 0x1;
     }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
+    {
+        return 0x1;
+    }
     if (func_704())
     {
         return 0x1;
@@ -14607,6 +14658,10 @@ void func_726()
 {
     float var0;
     if (func_71(global61))
+    {
+        return 0x1;
+    }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
     {
         return 0x1;
     }
@@ -38275,3 +38330,126 @@ void func_2392()
     func_1844();
 }
 
+// ===================================================================
+// Roll-off (docs/universal-mechanics.md), same as Captain Falcon's / Luigi's. The rolls' ACMD gives them their
+// speed (EscapeF +S / EscapeB -S added at frame rolloff_start_frame(), 0 at frame 27); kinetic 0x6
+// so the animation doesn't move the fighter. Every roll frame: before the speed frame, or while
+// shield is held (ControlModule(0x2712, 3)), ground correction 0x2 (stops at edges); from the
+// speed frame on, 0x1 (can slide off). Sliding off goes to Fall (func_374), which keeps the roll's
+// speed: the roll end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next
+// status is Fall, and Fall's end (func_535) clears it. rolloff_fall_speed() can scale the carried
+// speed once. Lock: global62 counts the frames in a row shield has been held this roll; at
+// rolloff_lock_frames() (10) the roll can't slide off for the rest of it. global63: slid off.
+// Momentum (user): after sliding off, the speed carries into the next action too (aerial, special,
+// air dodge, double jump): global64 keeps flag 0x20000044 (no air speed cap) on, past Fall's end,
+// until Sonic is on the ground or a ledge (rolloff_momentum_update, main loop func_74); air
+// friction still slows it as usual.
+// ===================================================================
+float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
+float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+
+void rolloff_fall_speed()
+{
+    float x;
+    float y;
+    if (global63 != 0)
+    {
+        global63 = 0;
+        if (rolloff_air_speed_mult() != 1.0f)
+        {
+            x = KineticModuleF(0xa, 0x3);
+            y = KineticModuleF(0xb, 0x3);
+            KineticModule(0x11, 0x3, x * rolloff_air_speed_mult(), y);
+        }
+    }
+}
+
+void rolloff_momentum_update()
+{
+    if (!global64)
+    {
+        return;
+    }
+    if (global18 != 0x2)
+    {
+        global64 = 0;
+        WorkModule(0x2711, 0x20000044);
+        return;
+    }
+    WorkModule(0x2710, 0x20000044);
+}
+
+void rolloff_update()
+{
+    if (MotionModuleF(0x1) < 1.0f)
+    {
+        global62 = 0; // new roll
+    }
+    if (global62 < rolloff_lock_frames())
+    {
+        if (ControlModule(0x2712, 0x3))
+        {
+            global62++;
+        }
+        else
+        {
+            global62 = 0;
+        }
+    }
+    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3) && global62 < rolloff_lock_frames())
+    {
+        GroundModule(0x2710, 0x1);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x2);
+    }
+}
+
+// ===================================================================
+// Tilts / down smash out of run, dash, and a turn out of a dash (universal mechanic,
+// docs/universal-mechanics.md), same as Kirby's / Captain Falcon's / Luigi's: when attack is pressed,
+// stick Y <= -run_tilt_y() (0.5): down smash if flicked down in the last run_smash_flick() (4)
+// frames or the down smash command is set, else down tilt; stick Y >= run_tilt_y(): up tilt.
+// ===================================================================
+float run_tilt_y()      { return 0.5f; }
+int   run_smash_flick() { return 4; }
+
+int run_attack_update()
+{
+    if (!(global38 & 0x1)) // attack pressed this frame
+    {
+        return 0;
+    }
+    if (global24 & 0x20) // up smash: the loops' own check
+    {
+        return 0;
+    }
+    if (global24 & 0x40 || global32 <= -run_tilt_y() && global47 < run_smash_flick())
+    {
+        func_16(0x2e, 0x1); // AttackLw4Start
+        return 0x1;
+    }
+    if (global32 <= -run_tilt_y())
+    {
+        func_16(0x2a, 0x1); // AttackLw3
+        return 0x1;
+    }
+    if (global32 >= run_tilt_y())
+    {
+        func_16(0x29, 0x1); // AttackHi3
+        return 0x1;
+    }
+    return 0;
+}
+
+// Turn (0x6) / TurnDash (0x7) loops: tilts / down smash when the turn came out of a Dash (0x3).
+int dash_turn_attack_update()
+{
+    if (global5 != 0x3 || global18 != 0)
+    {
+        return 0;
+    }
+    return run_attack_update();
+}
