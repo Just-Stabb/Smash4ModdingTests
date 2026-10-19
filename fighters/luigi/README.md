@@ -77,6 +77,9 @@ pieces below are ported from that decompile (and the bytecode where it still fai
   shield-held check `func_50` (used by `func_49`, the only way into GuardOn `0x1B`) ignores the held
   shield in a dodge / wavedash landing (Landing `0x16` / `0x17` after EscapeAir or with
   `0x200000B5`, `wavedash_shield_blocked()`). A new press shields as usual.
+- **No roll out of a wavedash landing** (user: a reverse buffered wavedash always rolled; the shield
+  press with the stick held also makes a roll / spot dodge command): `func_48` does nothing in a
+  dodge / wavedash landing (`wavedash_escape_blocked()`). Kirby's Luigi copy too.
 - **A new walk input after a wavedash** (user: holding the stick, the walk came right away and
   stopped the slide): every dodge sets `global67` (`melee_airdodge_xy`), cleared once the stick is
   back to neutral (|X| < `wavedash_walk_reset_x()` 0.2, `wavedash_shield_update()`); while it's set,

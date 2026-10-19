@@ -981,6 +981,10 @@ int func_48()
     {
         return 0;
     }
+    if (wavedash_escape_blocked()) // (Melee air dodge) no roll / spot dodge out of a wavedash landing
+    {
+        return 0;
+    }
     if (global24 & 0x1000000)
     {
         if (WorkModule(0x15, 0x1e000026))
@@ -38373,4 +38377,18 @@ void momentum_decay_only()
     {
         global69 = a;
     }
+}
+
+// Wavedash and rolls: a buffered wavedash's shield press with the stick held makes a roll / spot
+// dodge command too (global24 0x1000000 / 0x2000000 / 0x4000000), and once the wavedash's landing
+// could act, func_48 rolled (user: a reverse buffered wavedash always rolled). In a dodge /
+// wavedash landing (Landing 0x16 / 0x17 after EscapeAir or with flag 0x200000B5) func_48 does
+// nothing; afterwards rolls work as usual.
+int wavedash_escape_blocked()
+{
+    if ((global4 == 0x16 || global4 == 0x17) && (WorkModule(0x10, 0x200000b5) || global5 == 0x22))
+    {
+        return 0x1;
+    }
+    return 0;
 }
