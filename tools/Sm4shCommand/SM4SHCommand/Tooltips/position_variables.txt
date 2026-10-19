@@ -110,6 +110,61 @@
 0x0F000096 = Slot 8 offset Y | Target: player slot 8.\nRead: its Y - this fighter's Y.\nWrite: put it at this fighter's Y + value.
 0x0F000097 = Slot 8 offset Z | Target: player slot 8.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000098 = Self animation rate x | Read: this fighter's animation rate multiplier (1.0 normally).\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)
+0x0F0000A0 = Self hit | Target: this fighter.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000A1 = Self hit now | Target: this fighter.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000A2 = Self status | Target: this fighter.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000A3 = Self motion | Target: this fighter.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000A4 = Self motion frame | Target: this fighter.\nRead: its current motion frame. Writes are ignored.
+0x0F0000A8 = Nearest opponent hit | Target: the nearest other fighter.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000A9 = Nearest opponent hit now | Target: the nearest other fighter.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000AA = Nearest opponent status | Target: the nearest other fighter.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000AB = Nearest opponent motion | Target: the nearest other fighter.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000AC = Nearest opponent motion frame | Target: the nearest other fighter.\nRead: its current motion frame. Writes are ignored.
+0x0F0000B0 = Last fighter hit hit | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000B1 = Last fighter hit hit now | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000B2 = Last fighter hit status | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000B3 = Last fighter hit motion | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000B4 = Last fighter hit motion frame | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: its current motion frame. Writes are ignored.
+0x0F0000B8 = Slot 1 hit | Target: player slot 1.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000B9 = Slot 1 hit now | Target: player slot 1.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000BA = Slot 1 status | Target: player slot 1.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000BB = Slot 1 motion | Target: player slot 1.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000BC = Slot 1 motion frame | Target: player slot 1.\nRead: its current motion frame. Writes are ignored.
+0x0F0000C0 = Slot 2 hit | Target: player slot 2.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000C1 = Slot 2 hit now | Target: player slot 2.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000C2 = Slot 2 status | Target: player slot 2.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000C3 = Slot 2 motion | Target: player slot 2.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000C4 = Slot 2 motion frame | Target: player slot 2.\nRead: its current motion frame. Writes are ignored.
+0x0F0000C8 = Slot 3 hit | Target: player slot 3.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000C9 = Slot 3 hit now | Target: player slot 3.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000CA = Slot 3 status | Target: player slot 3.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000CB = Slot 3 motion | Target: player slot 3.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000CC = Slot 3 motion frame | Target: player slot 3.\nRead: its current motion frame. Writes are ignored.
+0x0F0000D0 = Slot 4 hit | Target: player slot 4.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000D1 = Slot 4 hit now | Target: player slot 4.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000D2 = Slot 4 status | Target: player slot 4.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000D3 = Slot 4 motion | Target: player slot 4.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000D4 = Slot 4 motion frame | Target: player slot 4.\nRead: its current motion frame. Writes are ignored.
+0x0F0000D8 = Slot 5 hit | Target: player slot 5.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000D9 = Slot 5 hit now | Target: player slot 5.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000DA = Slot 5 status | Target: player slot 5.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000DB = Slot 5 motion | Target: player slot 5.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000DC = Slot 5 motion frame | Target: player slot 5.\nRead: its current motion frame. Writes are ignored.
+0x0F0000E0 = Slot 6 hit | Target: player slot 6.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000E1 = Slot 6 hit now | Target: player slot 6.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000E2 = Slot 6 status | Target: player slot 6.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000E3 = Slot 6 motion | Target: player slot 6.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000E4 = Slot 6 motion frame | Target: player slot 6.\nRead: its current motion frame. Writes are ignored.
+0x0F0000E8 = Slot 7 hit | Target: player slot 7.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000E9 = Slot 7 hit now | Target: player slot 7.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000EA = Slot 7 status | Target: player slot 7.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000EB = Slot 7 motion | Target: player slot 7.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000EC = Slot 7 motion frame | Target: player slot 7.\nRead: its current motion frame. Writes are ignored.
+0x0F0000F0 = Slot 8 hit | Target: player slot 8.\nRead: 1 once its current attack has connected (until the move ends), else 0.
+0x0F0000F1 = Slot 8 hit now | Target: player slot 8.\nRead: 1 only on the frame its attack connects, else 0.
+0x0F0000F2 = Slot 8 status | Target: player slot 8.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
+0x0F0000F3 = Slot 8 motion | Target: player slot 8.\nRead: its motion kind (its own motion list's number).\nWrite: play that motion from frame 0 (the motion number is per fighter).
+0x0F0000F4 = Slot 8 motion frame | Target: player slot 8.\nRead: its current motion frame. Writes are ignored.
 0x0F000020 = Slot 1 X | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000021 = Slot 1 Y | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000022 = Slot 1 Z | Player slot 1 (fighter table entry 0). Read / write.

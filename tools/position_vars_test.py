@@ -62,7 +62,46 @@ s2: lwz r7, 4(r5)
  stw r7, 0xA0C(r12)
  li r3, 0
  blr""",
-    0x030B2B98: "lwz r12, 4(r3)\n lwz r3, 0xA1C(r12)\n blr",           # StatusModule(0)
+    0x030B2B98: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 3
+ beq st3
+ lwz r3, 0xA1C(r12)
+ blr
+st3: lwz r7, 4(r5)
+ stw r7, 0xA1C(r12)
+ lwz r7, 8(r5)
+ stw r7, 0xA20(r12)
+ lwz r7, 4(r4)
+ stw r7, 0xA40(r12)
+ li r3, 0
+ blr""",                                       # StatusModule(0) / (3, status, keep)
+    0x030B2A48: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 1
+ beq mo1
+ lwz r3, 0xA24(r12)
+ blr
+mo1: lwz r7, 4(r5)
+ stw r7, 0xA24(r12)
+ lwz r7, 8(r5)
+ stw r7, 0xA28(r12)
+ lwz r7, 0xC(r5)
+ stw r7, 0xA2C(r12)
+ li r3, 0
+ blr""",                                       # MotionModule(7) / (1, motion, frame, rate)
+    0x030B2A80: "lwz r12, 4(r3)\n lwz r3, 0xA30(r12)\n blr",          # MotionModuleF(1)
+    0x030B50F0: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 0x2727
+ bne at6
+ lwz r3, 0xA34(r12)
+ blr
+at6: lwz r3, 0xA38(r12)
+ blr""",                                       # AttackModule(0x2727) / (0x2726)
     0x030B5C50: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r7, 8(r5)
@@ -85,9 +124,11 @@ def setup(fighters, count=8):
     mu.mem_write(SETPOS, b''.join(struct.pack('>I', w) for w in fake.words()))
     mu.mem_map(0x04B70000, 0x10000); mu.mem_write(0x04B70000, mem(0x04B70000, 0x9000))  # combat variables (grown .text)
     mu.mem_map(0x030B0000, 0x10000)
-    for addr, src in FAKES.items():
-        f = Asm(addr); f.asm(src)
-        mu.mem_write(addr, b''.join(struct.pack('>I', w) for w in f.words()))
+    for k, (addr, src) in enumerate(FAKES.items()):    # each in its own space, a branch at the wrapper
+        body = 0x030B8000 + 0x100 * k
+        f = Asm(body); f.asm(src)
+        mu.mem_write(body, b''.join(struct.pack('>I', w) for w in f.words()))
+        mu.mem_write(addr, struct.pack('>I', (18 << 26) | ((body - addr) & 0x3FFFFFC)))
     mu.mem_map(0x10300000, 0x200000)
     mu.mem_map(0x10000000, 0x10000); mu.mem_write(0x10000000, mem(0x10000000, 0x10000))
     mu.mem_write(0x1035184C, struct.pack('>I', 0x10360000))
@@ -223,6 +264,37 @@ mu.mem_write(WMX + 0x300 + 0x10 * 4, struct.pack('>f', 6.0))
 check('fighter copy: normal get', call(mu, FGET, WMX, 0x03000010), 6)
 call(mu, FSET, WMX, 0x03000010, 9.0); check('fighter copy: normal set', call(mu, FGET, WMX, 0x03000010), 9)
 call(mu, FDIV, WMX, 0x03000010, 3.0); check('fighter copy: normal div', call(mu, FGET, WMX, 0x03000010), 3)
+# --- hit / status / motion (0x0F0000A0 + 8 * target + quantity) -----------------------------------
+def hid(target, q): return 0x0F0000A0 + 8 * target + q
+def wf(mu, slot, off, v): mu.mem_write(0x10370000 + slot * 0x1000 + off, struct.pack('>f', v))
+def ri(mu, slot, off): return struct.unpack('>i', mu.mem_read(0x10370000 + slot * 0x1000 + off, 4))[0]
+def wi(mu, slot, off, v): mu.mem_write(0x10370000 + slot * 0x1000 + off, struct.pack('>i', v))
+mu, O = setup([(0, 0.0, 0.0, 0.0, 1.0, True), (1, 30.0, 0.0, 0.0, -1.0, True), (2, 5.0, 2.0, 0.0, 1.0, True)])
+w0 = O[0][0]
+FGET2, FSET2 = 0x02F1DBE4, 0x02F1DC04
+wi(mu, 0, 0xA34, 1); wi(mu, 0, 0xA38, 0)
+check('self: attack has connected', call(mu, FGET2, w0, hid(0, 0)), 1)
+check('self: connected this frame', call(mu, FGET2, w0, hid(0, 1)), 0)
+wi(mu, 2, 0xA34, 0)
+check('opp (slot 2): attack has connected', call(mu, FGET2, w0, hid(1, 0)), 0)
+check('has connected: writes ignored', (call(mu, FSET2, w0, hid(0, 0), 5.0), ri(mu, 0, 0xA34)), (0, 1))
+wi(mu, 2, 0xA1C, 0x45)
+check('opp status read', call(mu, FGET2, w0, hid(1, 2)), 0x45)
+call(mu, FSET2, w0, hid(1, 2), float(0x59))
+check('opp status set (shield break 0x59)', (ri(mu, 2, 0xA1C), ri(mu, 2, 0xA20), ri(mu, 2, 0xA40)), (0x59, 0, 3))
+check('  self untouched', ri(mu, 0, 0xA1C), 0)
+call(mu, FSET2, w0, hid(4, 2), float(0x1B))
+check('slot 2 (target 4) status set', ri(mu, 1, 0xA1C), 0x1B)
+wi(mu, 0, 0xA24, 0x211)
+check('self motion read', call(mu, FGET2, w0, hid(0, 3)), 0x211)
+call(mu, FSET2, w0, hid(1, 3), float(0x7A))
+check('opp motion set: kind, frame 0, rate 1', (ri(mu, 2, 0xA24), ri(mu, 2, 0xA28), ri(mu, 2, 0xA2C)), (0x7A, 0, 0x3F800000))
+wf(mu, 2, 0xA30, 12.5)
+check('opp motion frame read', call(mu, FGET2, w0, hid(1, 4)), 12.5)
+check('frame: writes ignored', call(mu, FSET2, w0, hid(1, 4), 3.0), 0)
+check('q5-7 read 0', call(mu, FGET2, w0, hid(1, 6)), 0)
+check('past the block (0xF8) reads 0', call(mu, FGET2, w0, 0x0F0000F8), 0)
+check('combat IDs still work: opp offset Y', call(mu, FGET2, w0, 0x0F00004E), 2)
 # --- combat variables (0x0F000040 + 8 * target + quantity) ---------------------------------------
 def acc_of(slot): return 0x10370000 + slot * 0x1000
 def wint(mu, slot, off, v): mu.mem_write(acc_of(slot) + off, struct.pack('>i', v))

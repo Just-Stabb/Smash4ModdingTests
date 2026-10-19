@@ -89,6 +89,38 @@ last hit), `StopModule(1)` / `StopModule(2, frames)` (in hitstop / set hitstop) 
 `ShakeModule(0, 0, frames, 0, 0, 1.0)` (the shake). Player slot numbers and "last attacker" are
 assumed to be the same numbering (player 1 = slot 1).
 
+## Hit detection, status and motion
+
+`0x0F0000A0 + 8 × target + quantity`, same targets as above (0 self, 1 nearest opponent, 2 last
+fighter hit, 3–10 player slots 1–8), so `0x0F0000A0`–`0x0F0000F7`.
+
+| quantity | read | write |
+|---|---|---|
+| +0 hit | 1 once its current attack has connected (stays 1 until the move ends), else 0 | ignored |
+| +1 hit now | 1 only on the frame its attack connects | ignored |
+| +2 status | its status kind | change its status (`StatusModule(3, status, 0)`), e.g. `0x59` shield break, `0x5D` dizzy |
+| +3 motion | its motion kind | play that motion from frame 0 at rate 1 (`MotionModule(1, ...)`; motion numbers are per fighter) |
+| +4 motion frame | its motion's current frame | ignored |
+| +5 to +7 | 0 | ignored |
+
+Use **`Float_Var_Compare`** to test them in ACMD (`Int_Var_Compare` reads ints, which these aren't):
+`Method=0` is "equal". Example, Donkey Kong's side special: if it has hit someone by frame 20, a
+second hitbox comes out and the fighter it hit goes into shield break (status `0x59` = 89):
+
+    FRAME(Frames=20)
+    Float_Var_Compare(Variable=SELF_HIT, Method=0, Value=1)
+    True(Offset=0){
+        Hitbox(ID=0, Part=0, Bone=0, Damage=8, Angle=361, KBG=100, WBKB=0, BKB=40, Size=5, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
+        SET_FLOAT(Value=89, Variable=LASTHIT_STATUS)
+    }
+    WAIT(Frames=2)
+    Remove_All_Hitboxes()
+
+(Sm4shCommand works out `True`'s offset from the braces.) `SELF_HIT` = `0x0F0000A0`,
+`LASTHIT_STATUS` = `0x0F0000B2`. Status numbers: `reference/msc-note-sheet/Actions_Fighters.csv`
+(shield break: `0x59` launch, `0x5A` tumble, `0x5B` landing, `0x5C`–`0x5E` dizzy). A status
+change takes effect on the fighter's next frame.
+
 ## Animation rate
 
 `0x0F000098`, self only.
@@ -139,10 +171,11 @@ MSC: read positions:
 ## Names in Sm4shCommand
 
 Sm4shCommand shows and accepts names for all of these (`tools/Sm4shCommand/SM4SHCommand/Aliases/variables.txt`):
-`POS_SELF_X`, `POS_OPP_OFFSET_X`, `POS_SLOT3_Y`, ...; the combat variables as `TARGET_QUANTITY`
-(`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`, `HITSTUN_DEALT`, `HITSTUN_MUL`,
-`HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`), e.g. `LASTHIT_HITSTUN_MUL` =
-`0x0F000052`; and `SELF_ANIM_RATE` = `0x0F000098`.
+`POS_SELF_X`, `POS_OPP_OFFSET_X`, `POS_SLOT3_Y`, ...; the combat and hit / status / motion
+variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`,
+`HITSTUN_DEALT`, `HITSTUN_MUL`, `HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`,
+`HIT`, `HIT_NOW`, `STATUS`, `MOTION`, `MOTION_FRAME`), e.g. `LASTHIT_HITSTUN_MUL` = `0x0F000052`,
+`OPP_STATUS` = `0x0F0000AA`; and `SELF_ANIM_RATE` = `0x0F000098`.
 
     SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)
     SET_FLOAT(Value=12, Variable=POS_OPP_OFFSET_X)

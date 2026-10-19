@@ -45,6 +45,9 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
   0x0F000040-0x0F000097      hitstun / hitstop / offsets for self, the nearest opponent, the last
                             fighter hit and each slot (see "Combat variables" below and
                             docs/position-variables.md)
+  0x0F0000A0 + 8*target + q   hit / status / motion (q 0 attack has connected, 1 connected this
+              frame, 2 status (write: change status), 3 motion (write: play it), 4 motion frame);
+              targets as for the combat variables (0x0F0000A0-0x0F0000F7)
   0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
               (1.0 normally)                      multiplies every animation, ACMD timing too)
 
@@ -438,6 +441,9 @@ MSC_DAMAGE_F = 0x030B2FC4  # 0x25 DamageModuleF
 MSC_STOP = 0x030B5160      # 0x30 StopModule
 MSC_SHAKE = 0x030B5C50     # 0x48 ShakeModule
 MSC_STATUS = 0x030B2B98    # 0x18 StatusModule
+MSC_MOTION = 0x030B2A48    # 0x12 MotionModule
+MSC_MOTION_F = 0x030B2A80  # 0x13 MotionModuleF
+MSC_ATTACK = 0x030B50F0    # 0x2E AttackModule
 # set_int of each WorkModule class (identical code; other IDs continue in the base copy)
 SET_INT_HOOKS = [0x0200F810, 0x02BCDA88, 0x02DA6208, 0x02F1DDCC, 0x03060A68]
 SET_INT_RESUME = 0x0200F814
@@ -487,6 +493,8 @@ ext:
         clrlwi r30, r4, 24
         mr r29, r5
         bl find_self
+        cmplwi r30, 0xA0
+        bge ext_b2
         cmplwi r30, 0x98
         beq ext_mrate
         bge ext_zero
@@ -494,6 +502,7 @@ ext:
         clrlwi r0, r3, 29
         stw r0, 0x14(r1)                # quantity
         srwi r22, r3, 3                 # target
+ext_target:
         cmpwi r22, 3
         bge ext_t_slot
         cmpwi r22, 1
@@ -530,6 +539,8 @@ ext_t_opp:                              # nearest other fighter by X/Y distance
 ("""
 ext_have:                               # r25 posture, r24 accessor, r23 WorkModule of the target
         lwz r22, 0x14(r1)
+        cmpwi r22, 8
+        bge ext_q2
         cmpwi r22, 5
         bge ext_q_offset
         cmpwi r22, 1
@@ -946,6 +957,66 @@ ext_mrate_set:
         b ext_zero
 """, False),
 ("""
+ext_b2:                                 # 0xA0 + 8 * target + q: hit / status / motion (quantity q + 8)
+        cmplwi r30, 0xF8
+        bge ext_zero
+        addi r3, r30, -0xA0
+        clrlwi r11, r3, 29              # (not r0: addi r0, r0 would add to 0)
+        addi r11, r11, 8
+        stw r11, 0x14(r1)
+        srwi r22, r3, 3
+        b ext_target
+""", False),
+("""
+ext_q2:                                 # r22 = q + 8, r24 = the target's accessor
+        cmpwi r22, 0xA
+        bge ext_q2_sm
+        cmpwi r29, 0                    # q0 / q1: its attack has connected (this move / this frame)
+        bne ext_zero
+        li r0, 0x272F                   # AttackModule(0x2727) / AttackModule(0x2726)
+        subf r0, r22, r0
+        stw r0, 0x20(r1)
+        li r4, 1
+        lis r5, %(AT_HI)s
+        ori r5, r5, %(AT_LO)s
+        bl ext_msc
+        b ext_ret_int
+ext_q2_sm:
+        cmpwi r22, 0xB
+        beq ext_q_motion
+        bgt ext_q_frame
+        cmpwi r29, 0                    # q2: status kind; write = change status
+        bne ext_status_set
+%(STATUS)s
+        b ext_ret_int
+ext_status_set:
+        bl ext_value_int
+        mr r22, r3
+%(SET_STATUS)s
+        b ext_zero
+""", False),
+("""
+ext_q_motion:                           # q3: motion kind; write = play that motion from frame 0
+        cmpwi r29, 0
+        bne ext_motion_set
+%(MOTION)s
+        b ext_ret_int
+ext_motion_set:
+        bl ext_value_int
+        mr r22, r3
+%(SET_MOTION)s
+        b ext_zero
+ext_q_frame:                            # q4: the motion's frame (read only); q5-7: 0
+        cmpwi r22, 0xC
+        bne ext_zero
+        cmpwi r29, 0
+        bne ext_zero
+%(FRAME)s
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)
+        b ext_ret
+""", False),
+("""
 ext_ret_int:                            # f1 = (float) r3
         bl ext_i2f
         b ext_ret
@@ -1038,6 +1109,11 @@ ext_magic:
         DEALT=msc(MSC_DAMAGE_F, 1),
         IN_STOP=msc(MSC_STOP, 1),
         STATUS=msc(MSC_STATUS, 0),
+        SET_STATUS=msc(MSC_STATUS, 3, "r22", 0),
+        MOTION=msc(MSC_MOTION, 7),
+        SET_MOTION=msc(MSC_MOTION, 1, "r22", 0, 0x3F800000),
+        FRAME=msc(MSC_MOTION_F, 1),
+        AT_HI=hex(MSC_ATTACK >> 16), AT_LO=hex(MSC_ATTACK & 0xFFFF),
         SETI_RESUME="0x%08X" % SET_INT_RESUME,
         CHK_R6_NEXT=chk("r6", "seti_att_next"), CHK_R7_RECNEXT=chk("r7", "seti_rec_next"),
         STOP_DEALT=msc(MSC_DAMAGE, 8),
