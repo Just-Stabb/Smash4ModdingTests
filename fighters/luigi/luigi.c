@@ -65,6 +65,7 @@ int global63;
 int global64;
 int global65;
 int global66;
+int global67;
 
 void func_0()
 {
@@ -1128,6 +1129,10 @@ int func_52(int arg0)
             }
             return 0x1;
         }
+    }
+    if (wavedash_walk_blocked()) // (Melee air dodge) buffered wavedash: no turn / walk until its landing ends
+    {
+        return 0;
     }
     if (global24 & 0x40000)
     {
@@ -38222,6 +38227,7 @@ int jumpsquat_airdodge()
         return 0;
     }
     global65 = 0;
+    global67 = 1; // buffered wavedash: its landing doesn't turn / walk (wavedash_walk_blocked)
     func_16(0x22, 0);
     WorkModule(0x2710, 0x200000b5);
     WorkModule(0x2710, 0x20000044);
@@ -38258,6 +38264,23 @@ void wavedash_shield_update()
     {
         global66 = 0;
     }
+    if (global67 && global4 != 0xa && global4 != 0x22 && global4 != 0x16 && global4 != 0x17)
+    {
+        global67 = 0; // the buffered wavedash (jumpsquat -> EscapeAir -> landing) is over
+    }
+}
+
+// Buffered wavedash (global67, set by jumpsquat_airdodge): during its landing (Landing 0x16 /
+// 0x17), the ground movement check func_52 doesn't turn (0x6) or walk (0x1), so holding the stick
+// doesn't stop the slide (user: the walk came right away); dash, crouch and everything else still
+// can. After the landing, walking works as usual.
+int wavedash_walk_blocked()
+{
+    if (global67 && (global4 == 0x16 || global4 == 0x17))
+    {
+        return 0x1;
+    }
+    return 0;
 }
 
 int wavedash_shield_blocked()
