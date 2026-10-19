@@ -3,12 +3,12 @@
 after the standard build's (it uses the free words after tools/copy_fx_cave.py's cave).
 
 MotionModule 0x02C5D4EC(this, motion) returns the animation for a motion (from change motion
-0x02C5D730): record = [this+0x1C] + motion * 8 (u32 animation, u16, u16 flags); flag 0x8 =
-borrowed from the module at accessor +0x68 (vtable +0x204, motion + [this+0x100]); otherwise the
-record's own word. The hook at its first instruction stores, for every motion above 0x30A (Kirby's
-copy motions), the debug words (DBG, printed by main):
-  +0x00 calls  +0x04 this  +0x08 motion  +0x0C [this+0x1C] (record table)
-  +0x10 record word 0  +0x14 record word 1 (u16, u16 flags)  +0x18 [this+0x100]
+0x02C5D730): v1 (record = [this+0x1C] + motion * 8) showed those records only hold a face (material
+animation) key. The body animation comes from 0x02C5D5C0: S = [this+0x18], group lists
+[S+0x10] (list, count), entries [S+8] + i*8 = (per-motion array, part bit), animation =
+array[motion]. v2 stores, for every motion above 0x30A (Kirby's copy motions), the debug words:
+  +0x00 calls  +0x04 motion  +0x08 S  +0x0C group 0 count  +0x10 its first entry
+  +0x14 entry part  +0x18 entry array  +0x1C &array[motion]  +0x20 array[motion]
 """
 import os
 import sys
@@ -29,24 +29,37 @@ mdbg:
         lwz r12, 0(r11)
         addi r12, r12, 1
         stw r12, 0(r11)
-        stw r3, 4(r11)
-        stw r4, 8(r11)
-        lwz r12, 0x1C(r3)
-        stw r12, 0xC(r11)
-        lwz r9, 0x100(r3)
-        stw r9, 0x18(r11)
+        stw r4, 4(r11)
+        lwz r12, 0x18(r3)               # S
+        stw r12, 8(r11)
         cmpwi r12, 0
         beq mdbg_out
-        slwi r10, r4, 3
-        add r10, r12, r10
-        lwz r9, 0(r10)
+        lwz r10, 0x10(r12)              # group lists
+        lwz r9, 0(r10)                  # group 0 list
+        lwz r10, 4(r10)                 # its count
+        stw r10, 0xC(r11)
+        lwz r9, 0(r9)                   # first entry index
         stw r9, 0x10(r11)
-        lwz r9, 4(r10)
+        lwz r10, 8(r12)                 # entries
+        slwi r9, r9, 3
+        add r10, r10, r9
+        lwz r9, 4(r10)                  # part
         stw r9, 0x14(r11)
+        lwz r10, 0(r10)                 # per-motion array
+        stw r10, 0x18(r11)
+        cmpwi r10, 0
+        beq mdbg_out
+        slwi r9, r4, 2
+        add r10, r10, r9                # its slot for this motion
+        stw r10, 0x1C(r11)
+        lwz r9, 0(r10)
+        stw r9, 0x20(r11)
 mdbg_out:
         mflr r0
         b %(BACK)s
 dbg:
+        .word 0
+        .word 0
         .word 0
         .word 0
         .word 0
