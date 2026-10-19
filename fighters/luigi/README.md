@@ -64,12 +64,11 @@ pieces below are ported from that decompile (and the bytecode where it still fai
   shield-held check `func_50` (used by `func_49`, the only way into GuardOn `0x1B`) ignores the held
   shield in a dodge / wavedash landing (Landing `0x16` / `0x17` after EscapeAir or with
   `0x200000B5`, `wavedash_shield_blocked()`). A new press shields as usual.
-- **Buffered wavedash: no turn / walk in its landing** (user: holding the stick, the walk came
-  right away and stopped the slide): `global67` (set by `jumpsquat_airdodge()`, cleared once the
-  jumpsquat → EscapeAir → landing sequence is over, in `wavedash_shield_update()`) makes the ground
-  movement check `func_52` skip turn (`0x6`) and walk (`0x1`) during Landing `0x16` / `0x17`
-  (`wavedash_walk_blocked()`); dash, crouch and the rest still work. After the landing, walking is
-  as usual.
+- **A new walk input after a wavedash** (user: holding the stick, the walk came right away and
+  stopped the slide): every dodge sets `global67` (`melee_airdodge_xy`), cleared once the stick is
+  back to neutral (|X| < `wavedash_walk_reset_x()` 0.2, `wavedash_shield_update()`); while it's set,
+  the ground movement check `func_52` doesn't turn (`0x6`) or walk (`0x1`)
+  (`wavedash_walk_blocked()`). Dash, crouch and the rest still work.
 - **Dodge / wavedash landing** (flag `0x200000B5`): normal landing lag (`func_509`, attribute
   `0x3000028`) and the dodge landing's motion rate (`func_586`), A / Z item catch while wavedashing
   (`func_511`); a helpless fall after the dodge lands the same way (SpecialFall pre `func_977`,

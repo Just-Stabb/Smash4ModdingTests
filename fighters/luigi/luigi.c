@@ -38179,6 +38179,7 @@ void melee_airdodge_xy(float x, float y)
     func_100(0);
     global64 = 1;
     global66 = 1; // the shield press that made this dodge doesn't shield the landing (wavedash_shield_blocked)
+    global67 = 1; // no turn / walk until the stick goes back to neutral (wavedash_walk_blocked)
     len = MathF(0, x * x + y * y);
     if (len >= 0.125f)
     {
@@ -38227,7 +38228,6 @@ int jumpsquat_airdodge()
         return 0;
     }
     global65 = 0;
-    global67 = 1; // buffered wavedash: its landing doesn't turn / walk (wavedash_walk_blocked)
     func_16(0x22, 0);
     WorkModule(0x2710, 0x200000b5);
     WorkModule(0x2710, 0x20000044);
@@ -38264,23 +38264,21 @@ void wavedash_shield_update()
     {
         global66 = 0;
     }
-    if (global67 && global4 != 0xa && global4 != 0x22 && global4 != 0x16 && global4 != 0x17)
+    if (global67 && func_13(global48) < wavedash_walk_reset_x())
     {
-        global67 = 0; // the buffered wavedash (jumpsquat -> EscapeAir -> landing) is over
+        global67 = 0; // stick back to neutral: the next tilt is a new walk input
     }
 }
 
-// Buffered wavedash (global67, set by jumpsquat_airdodge): during its landing (Landing 0x16 /
-// 0x17), the ground movement check func_52 doesn't turn (0x6) or walk (0x1), so holding the stick
-// doesn't stop the slide (user: the walk came right away); dash, crouch and everything else still
-// can. After the landing, walking works as usual.
+// After a dodge (global67, set by melee_airdodge_xy: every air dodge / wavedash), the ground
+// movement check func_52 doesn't turn (0x6) or walk (0x1) until the stick has gone back to neutral
+// (|X| < wavedash_walk_reset_x(), wavedash_shield_update): walking after a wavedash needs a new walk
+// input (user: the walk came right away and stopped the slide). Dash, crouch and the rest still work.
+float wavedash_walk_reset_x() { return 0.2f; }
+
 int wavedash_walk_blocked()
 {
-    if (global67 && (global4 == 0x16 || global4 == 0x17))
-    {
-        return 0x1;
-    }
-    return 0;
+    return global67;
 }
 
 int wavedash_shield_blocked()
