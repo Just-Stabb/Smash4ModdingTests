@@ -58,6 +58,12 @@ pieces below are ported from that decompile (and the bytecode where it still fai
   `melee_airdodge_xy(±sin 89°, −cos 89°)`), a perfect wavedash, without the mod's 0.1 raise so it
   lands at once. Other directions: the stick's, as in the mod. (The mod only did it on a press
   exactly on the last frame, and only for a jumpsquat of 6+ frames: Luigi's is 5.)
+- **No shield from the dodge's own press** (user: a buffered wavedash went into shield unless shield
+  was let go at once, which stopped the slide): `global66` is set when a dodge starts and cleared
+  when shield is released (`wavedash_shield_update()`, main loop `func_74`); while it's set, the
+  shield-held check `func_50` (used by `func_49`, the only way into GuardOn `0x1B`) ignores the held
+  shield in a dodge / wavedash landing (Landing `0x16` / `0x17` after EscapeAir or with
+  `0x200000B5`, `wavedash_shield_blocked()`). A new press shields as usual.
 - **Dodge / wavedash landing** (flag `0x200000B5`): normal landing lag (`func_509`, attribute
   `0x3000028`) and the dodge landing's motion rate (`func_586`), A / Z item catch while wavedashing
   (`func_511`); a helpless fall after the dodge lands the same way (SpecialFall pre `func_977`,

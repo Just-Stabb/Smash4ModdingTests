@@ -64,6 +64,7 @@ int global62;
 int global63;
 int global64;
 int global65;
+int global66;
 
 void func_0()
 {
@@ -1025,6 +1026,10 @@ int func_50()
 {
     if (ControlModule(0x2712, 0x3))
     {
+        if (wavedash_shield_blocked()) // (Melee air dodge) still the dodge's shield press: keep sliding
+        {
+            return 0;
+        }
         return 0x1;
     }
     return 0;
@@ -1681,6 +1686,7 @@ void func_74()
     global31 = ControlModule(0xa, 0x1);
     global29 = ControlModule(0xa, 0x2);
     global45 = ControlModule(0xa, 0x3);
+    wavedash_shield_update(); // (Melee air dodge) shield held since the dodge: released yet? (added)
     var0 = StatusModule(0);
     if (var0 != 0xffffffff)
     {
@@ -38167,6 +38173,7 @@ void melee_airdodge_xy(float x, float y)
     WorkModule(0x2711, 0x2100000f);
     func_100(0);
     global64 = 1;
+    global66 = 1; // the shield press that made this dodge doesn't shield the landing (wavedash_shield_blocked)
     len = MathF(0, x * x + y * y);
     if (len >= 0.125f)
     {
@@ -38237,4 +38244,31 @@ int jumpsquat_airdodge()
     }
     GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
     return 0x1;
+}
+
+// Wavedash and shield: the dodge comes from a shield press, and if shield was still held when the
+// wavedash's landing could act, Landing went into shield (func_49 / func_50) and the slide
+// stopped (user). global66 = shield held since the last dodge started; it clears when shield is
+// let go (wavedash_shield_update(), main loop func_74). While it's set, a dodge / wavedash
+// landing (Landing 0x16 / 0x17 after EscapeAir or with flag 0x200000B5) ignores the held shield; a new press
+// shields as usual.
+void wavedash_shield_update()
+{
+    if (global66 && !ControlModule(0x2712, 0x3))
+    {
+        global66 = 0;
+    }
+}
+
+int wavedash_shield_blocked()
+{
+    if (!global66)
+    {
+        return 0;
+    }
+    if ((global4 == 0x16 || global4 == 0x17) && (WorkModule(0x10, 0x200000b5) || global5 == 0x22))
+    {
+        return 0x1;
+    }
+    return 0;
 }
