@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air.
 
-  python3 tools/kirby_marth_sword.py KIRBY_DIR VL_BIN RPX OUT_DIR
+  python3 tools/kirby_marth_sword.py KIRBY_DIR ANIMCMD_DIR VL_BIN RPX OUT_DIR
 
 KIRBY_DIR   the fighter/kirby folder (model/body/c00/model.vbn, motion/body, motion/marthbody)
+ANIMCMD_DIR script/animcmd/body (motion.mtable, effect.bin, sound.bin, expression.bin)
 VL_BIN      fighter_param_vl_kirby.bin
 RPX         the RPX the motion tables are read from (build/cave_fix_s4/cross_f.rpx)
-OUT_DIR     gets motion/marthbody/{main,kirbypt1,kirbypt2}.pac, fighter_param_vl_kirby.bin and
+OUT_DIR     gets motion/marthbody/{main,kirbypt1,kirbypt2}.pac, script/animcmd/body/
+            {motion.mtable,effect.bin,sound.bin,expression.bin}, fighter_param_vl_kirby.bin and
             rpx_args.txt (rpx_patch.py args for the motion tables)
 
 (fighters/kirby/specials.md "Marth copy sword".) The copy's sword (model marthsword on Kirby's
@@ -22,8 +24,16 @@ instead, which already had the same animations for the full-charge ends (and the
 the air charge), and binds the full-charge effects itself. The slots get the hashes of
 FitKirbyMarthBody<part>D00<Name> (Kirby's own animations with LHaveN moved and scaled each frame)
 and the original moves' flags; fighter_param_vl_kirby group 1 (6 bytes a motion; the first is 0
-on loop motions) gets the original moves' values. The MSC binds the original moves' game /
-effect / sound scripts after the motion change (marth_sword_play()).
+on loop motions) gets the original moves' values. The MSC binds the original moves' game
+scripts after the motion change (marth_sword_play()).
+
+The sword itself is switched on by the copy's effect script (in game: the slots' animations alone
+didn't show it, Strike nair with the full-charge end's effects did): Sword_Trace on LHaveN
+(Marth's, from MarthSpecialNEndMax) from the appear frame to Terminate_Sword_Glow at the gone
+frame. So effect.bin / sound.bin get the moves' own scripts plus those two commands under the
+names of the empty slots 0x301-0x303 (FX, motion.mtable), which the MSC binds as the effect /
+sound set (copy_fx set 0x10). The slots' expression scripts (the MSC can't rebind those) become
+the moves' own (the air charge loop's rumbled on in up air).
 """
 import math
 import os
@@ -33,6 +43,9 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import omo  # noqa: E402
 
+import acmd  # noqa: E402
+import copy  # noqa: E402
+import struct  # noqa: E402
 import rpx_patch  # noqa: E402
 
 EPS = 0.001          # "nothing": a zero scale would make a degenerate bone matrix
@@ -47,7 +60,48 @@ MOVES = [
     (0x384, None, 'AttackAirB', 'C05', 'legs', 7, 17, 27, 0x6A),
     (0x382, None, 'AttackAirHi', 'C05', 'lleg', 4, 16, 28, 0x6B),
 ]
+FX = {0x380: (0x301, 'MarthSwordAttack12'), 0x384: (0x302, 'MarthSwordAttackAirB'),
+      0x382: (0x303, 'MarthSwordAttackAirHi')}
+SLOT_NAMES = {0x380: 'MarthSpecialNEndMax', 0x384: 'MarthSpecialAirNEndMax', 0x382: 'MarthSpecialAirNLoop'}
+SWORD_FROM = 'marthspecialnendmax'      # the effect script whose Sword_Trace is used
+FORWARD = (0.0, 0.0, 1.0)  # model +Z: where Kirby faces
 DEPTH = (1.0, 0.0, 0.0)   # model X: toward / away from the camera (Kirby faces +Z)
+
+
+def crc(name):
+    return zlib.crc32(name.lower().encode()) & 0xFFFFFFFF
+
+
+def timeline(cmds):
+    """[(frame, command)] of a script with only FRAME / WAIT timing"""
+    t = 0.0
+    out = []
+    for c in cmds:
+        if c.ident == acmd.END:
+            continue
+        assert c.name not in ('Set_Loop', 'Goto'), 'loops in the script'
+        if c.ident == acmd.BY_NAME['frame']:
+            t = float(c.params[0])
+        elif c.ident == acmd.BY_NAME['wait']:
+            t += float(c.params[0])
+        else:
+            out.append((t, c))
+    return out
+
+
+def merge(cmds, extra):
+    """the script with extra [(frame, command)] added, as FRAME-timed commands"""
+    items = timeline(cmds) + extra
+    items.sort(key=lambda x: x[0])        # stable: the script's own first at the same frame
+    out = []
+    t = 0.0
+    for when, c in items:
+        if when > t:
+            out.append(acmd.Command(acmd.BY_NAME['frame'], [when]))
+            t = when
+        out.append(c)
+    out.append(acmd.Command(acmd.END))
+    return out
 
 
 def anim_hash(name):
@@ -108,9 +162,12 @@ def sword_track(anim, bones, place, appear, shrink, gone):
     for fr in range(anim.frames):
         s = scale_at(fr, appear, shrink, gone)
         lp, lq, ls = anim.sample(have, fr)
-        if place != 'hand' and appear <= fr + 1 < gone:
+        if appear <= fr + 1 < gone:
             w = omo.world(anim, bones, fr)
-            if place == 'legs':      # between the legs: grip between the knees, blade toward the feet
+            if place == 'hand':      # in the left hand, blade straight forward
+                g = pos(w['LHaveN'])
+                root, tip = (0.0, 0.0, 0.0), FORWARD
+            elif place == 'legs':      # between the legs: grip between the knees, blade toward the feet
                 g = mid(pos(w['LKneeJ']), pos(w['RKneeJ']))
                 tip = mid(pos(w['LFootJ']), pos(w['RFootJ']))
                 root = mid(pos(w['LLegJ']), pos(w['RLegJ']))
@@ -127,12 +184,14 @@ def sword_track(anim, bones, place, appear, shrink, gone):
 
 
 def main():
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         sys.exit(__doc__)
-    kdir, vl_in, rpx, out = sys.argv[1:]
+    kdir, adir, vl_in, rpx, out = sys.argv[1:]
     bones = omo.vbn_read(os.path.join(kdir, 'model/body/c00/model.vbn'))
     mdir = os.path.join(out, 'motion/marthbody')
+    sdir = os.path.join(out, 'script/animcmd/body')
     os.makedirs(mdir, exist_ok=True)
+    os.makedirs(sdir, exist_ok=True)
 
     # animations
     for part in ('Main', 'Kirbypt1', 'Kirbypt2'):
@@ -149,6 +208,29 @@ def main():
                 data = anim.encode()
             marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, src), data))
         omo.pac_write(os.path.join(mdir, fn), marth)
+
+    # ACMD: effect / sound sets with the sword under the FX slots' names, the slots' expressions
+    mt = open(os.path.join(adir, 'motion.mtable'), 'rb').read()
+    table = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
+    for slot, (fx, name) in FX.items():
+        assert table[fx] in (0, crc(name)), 'motion 0x%X is in use (0x%08X)' % (fx, table[fx])
+        table[fx] = crc(name)
+        assert table[slot] == crc(SLOT_NAMES[slot]), hex(slot)
+    open(os.path.join(sdir, 'motion.mtable'), 'wb').write(struct.pack('>%dI' % len(table), *table))
+    eff = acmd.ACMDFile.load(os.path.join(adir, 'effect.bin'))
+    trace = [c for c in eff.script(SWORD_FROM) if c.name == 'Sword_Trace'][0]
+    stop = [c for c in eff.script(SWORD_FROM) if c.name == 'Terminate_Sword_Glow'][0]
+    snd = acmd.ACMDFile.load(os.path.join(adir, 'sound.bin'))
+    exp = acmd.ACMDFile.load(os.path.join(adir, 'expression.bin'))
+    for slot, new, src, code, place, a, s, g, orig in MOVES:
+        fx, name = FX[slot]
+        eff.scripts[crc(name)] = merge(eff.script(src) or [], [(float(a - 1), copy.deepcopy(trace)),
+                                                              (float(g - 1), copy.deepcopy(stop))])
+        snd.scripts[crc(name)] = copy.deepcopy(snd.script(src) or [acmd.Command(acmd.END)])
+        exp.scripts[crc(SLOT_NAMES[slot])] = copy.deepcopy(exp.script(src) or [acmd.Command(acmd.END)])
+    eff.save(os.path.join(sdir, 'effect.bin'))
+    snd.save(os.path.join(sdir, 'sound.bin'))
+    exp.save(os.path.join(sdir, 'expression.bin'))
 
     # the RPX motion tables
     d, _shoff, _ent, secs = rpx_patch.load(rpx)

@@ -1000,6 +1000,20 @@ So the sword shows only in the Marth copy's own motions, `0x37D`–`0x384` (the 
 `0x30A` in the code is the copy-change one; Shield Breaker's charge loop `0x37E` shows the sword
 with no sword-trace effect).
 
+**What shows the sword (tested):** with the v3 RPX, Strike nair keeping the slot's own effect
+script (the full-charge end's) showed the sword; bair / up air with their own effects didn't. So the
+Marth copy's **effect script** switches it on: `Sword_Trace` on `LHaveN` (from frame 3 in
+`MarthSpecialNEndMax`) to `Terminate_Sword_Glow`. (The v3 "no sword" test had the old RPX.)
+
+**v4 (now):** v3's slots, plus effect / sound scripts for the three aerials: their own scripts with
+Marth's `Sword_Trace` added at the appear frame − 1 and `Terminate_Sword_Glow` at the gone frame − 1,
+named `MarthSwordAttack12` / `MarthSwordAttackAirB` / `MarthSwordAttackAirHi` in the empty slots
+`0x301`–`0x303` (`motion.mtable`); `marth_sword_play()` binds them as the effect / sound set (`0x10`)
+and the move's own game script. The slots' expression scripts (`MarthSpecialNEndMax`,
+`MarthSpecialAirNEndMax`, `MarthSpecialAirNLoop`; the MSC can't rebind expressions) are the aerials'
+own: up air had the air charge loop's endless rumble. Nair's blade points straight forward (model
++Z) from the hand (user: it was rotated oddly).
+
 **v3 result (user): no sword either**, with Marth's own slots and Shield Breaker unchanged in look,
 so it isn't the motion slot. Not in the animations' own data either (OMO header field `0x08` is a
 per-pack date stamp; the body's `material_anime_face` / `_eyelid` MTAs for the Marth animations only
@@ -1020,8 +1034,8 @@ The RPX tables get the sword animations' hashes and the original moves' flags in
 (`MotionAnimcmdModule(0, 0, motion, 8)`) and effects / sounds (set `0x10`). No `motion.mtable` or
 ACMD changes.
 
-Build: `python3 tools/kirby_marth_sword.py <kirby folder> <fighter_param_vl_kirby.bin>
-build/cave_fix_s4/cross_f.rpx build/marthsword`, then the standard RPX command with
+Build: `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body>
+<fighter_param_vl_kirby.bin> build/cave_fix_s4/cross_f.rpx build/marthsword`, then the standard RPX command with
 `$(cat build/marthsword/rpx_args.txt)` added at the end.
 
 With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)

@@ -73688,8 +73688,9 @@ int wavedash_escape_blocked()
 // motions (0x37D-0x384), so its slots 0x380 (Strike nair = air jab 2), 0x384 (back air) and
 // 0x382 (up air) play sword versions of the animations, and Shield Breaker uses 0x37F / 0x383 /
 // 0x37E for its full-charge ends / air charge instead (func_2919); tools/kirby_marth_sword.py
-// makes the animations and patches the RPX's motion tables (animation file hashes) and
-// fighter_param_vl_kirby. Int 0x11000002 keeps the vanilla aerial kind. No function call is
+// makes the animations, patches the RPX's motion tables (animation file hashes) and
+// fighter_param_vl_kirby, and makes the effect / sound scripts (the sword shows while the
+// copy's Sword_Trace is on) and the slots' expression scripts. Int 0x11000002 keeps the vanilla aerial kind. No function call is
 // passed straight into another function's arguments here (that broke the aerials once).
 // ===================================================================
 int marth_sword_motion(int motion)
@@ -73714,16 +73715,27 @@ int marth_sword_motion(int motion)
 }
 
 // plays the motion (the Marth copy's sword slot for it if there is one) with the motion's own
-// game / effect / sound scripts (Kirby's, kind 8; set 0x10 = copy_fx_all(): effects and sounds)
+// game script (Kirby's, kind 8) and its effects / sounds with the sword's Sword_Trace (the
+// scripts of slot 0x301-0x303, tools/kirby_marth_sword.py; set 0x10 = copy_fx_all())
 void marth_sword_play(int motion)
 {
     int m;
+    int fx;
     m = marth_sword_motion(motion);
     func_22(m, 0, 1.0f);
     if (m != motion)
     {
+        fx = 0x301;
+        if (m == 0x384)
+        {
+            fx = 0x302;
+        }
+        else if (m == 0x382)
+        {
+            fx = 0x303;
+        }
         MotionAnimcmdModule(0, 0, motion, 0x8);
-        MotionAnimcmdModule(0, 0x10, motion, 0x8);
+        MotionAnimcmdModule(0, 0x10, fx, 0x8);
         MotionAnimcmdModule(0x1, 0);
     }
 }
