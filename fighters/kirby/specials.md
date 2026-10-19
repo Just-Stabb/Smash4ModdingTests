@@ -977,7 +977,8 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 
 ## Added: Marth copy sword in Strike neutral air, back air and up air
 
-**Status: switched off (`marth_sword_on()` = 0).** In game the three new slots T-posed and the
+**Status: removed from the MSC** (aerials still broke in game with it switched off, so the MSC
+is back to the vanilla calls; `marth_sword_motion()` is gone). In game the three new slots T-posed and the
 moves never ended (Kirby slid along the ground and didn't respawn after a KO): a copy's animations
 are only found for that copy's own motion slots (Marth's are `0x37D`–`0x384`, all used by Shield
 Breaker), not by name alone as assumed below. Also, `fighter_param_vl_kirby` group 1 is a
@@ -1003,7 +1004,7 @@ motion's when the name is `<Copy><Name>` (`MarthSpecialNStart` = `FitKirbyMarthB
 `0x300` and `CaptainSpecialN` `0x30B`) and unused by the MSC.
 
 - **Motions:** `0x301` `MarthAttack12` (Strike nair), `0x302` `MarthAttackAirB`, `0x303`
-  `MarthAttackAirHi`. MSC `marth_sword_motion()` (end of `kirby.c`) picks them with the Marth copy in
+  `MarthAttackAirHi`. MSC `marth_sword_motion()` (removed) picked them with the Marth copy in
   `strike_nair_start()` / `strike_nair_update()` and the AttackAir main (`func_310`); int
   `0x11000002` still holds the vanilla aerial kind (landing lag etc.).
 - **Animations / ACMD:** `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body>
