@@ -47,9 +47,13 @@ WorkModule(0x16, 0x1e00005f); // down smash (CONT_ATTACK_LW4_START)
   attack check, and `func_49` (shield, `0x1e000029`, on through the
   Shield group `0x1f000005` that Run main already turns on).
 
-The tilts are checked before dash attack, so A with the stick held up-forward / down-forward (the
-tilt commands' regions) gives the tilt; A with the stick forward is still a dash attack. Up smash
-(`0x1e00005c`) is checked before them.
+**In game the commands didn't come out while running** (dash attack won), so the Run loop also
+reads the stick itself: `run_attack_update()`, called in `func_717` before `func_43` and the dash
+attack check. When attack is pressed (`global38 & 0x1`): stick Y (`global32`) ≤ −`run_tilt_y()`
+(0.5) → down smash if the stick was flicked down within `run_smash_flick()` (4) frames
+(`global47`) or the down smash command (`global24 & 0x40`) is set, else down tilt; stick Y ≥ 0.5 →
+up tilt; otherwise nothing (dash attack). The up smash command (`global24 & 0x20`) is left to the
+run loop's own up smash check.
 
 Done: Kirby, Captain Falcon.
 

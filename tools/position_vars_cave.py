@@ -433,7 +433,7 @@ def check_code(reg, fail):
 # game wouldn't start.)
 GROW_END = 0x04B79000
 EXT_REGIONS = [
-    (0x04B78000, 0x04B78C00),           # 0x04B78C00-GROW_END: tools/strike_cave.py
+    (0x04B78000, 0x04B78A00),           # 0x04B78A00-GROW_END: tools/strike_cave.py
 ]
 MSC_WORK = 0x030B2B28      # MSC syscall wrappers (ctx, args): 0x16 WorkModule
 MSC_DAMAGE = 0x030B2F8C    # 0x24 DamageModule

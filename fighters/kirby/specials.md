@@ -858,7 +858,8 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   attack from the command bits in `global24`: tilts `0x2`/`0x4`/`0x8` → `0x28`/`0x29`/`0x2A`,
   smashes `0x10`/`0x20`/`0x40` → `0x2B`/`0x31`/`0x2E`, specials `0x2000`/`0x4000`/`0x8000`/`0x1000`
   → `0x153`/`0x154`/`0x155`/`0x152`, grab `0x20000000` → Catch `0x35` (checked first).
-  Plain jab isn't included (mashing A keeps it going).
+  Plain jab isn't included (mashing A keeps it going). With the **Rush** trait the finisher
+  can be cancelled too, during and after its hit.
 - **Neutral air = rapid jab:** `func_310` plays rapid jab's loop motion `0x54` (animation and its
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
   It loops while attack is held; letting go after at least one loop plays the finisher `0x55`
@@ -876,7 +877,8 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
   (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
   → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
-  restart neutral air.
+  restart neutral air. With the **Rush** trait the finisher can be cancelled too, during and
+  after its hit.
 - **Air hitboxes (loop 60% damage, finisher 65% knockback):** neutral air sets status flag
   `0x21000024` (`nair_rapid_air_flag()`) when it starts. `tools/kirby_rapid_air_acmd.py` turns
   each hitbox of the loop hit `0xDCD907DA` and the finisher `attack100end` into
@@ -912,7 +914,7 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   statuses `0x45`–`0x4C`, CaptureDamage `0x41`, DownDamage `0x57`), on ledge grab (`func_2285`) and
   when KO'd (`func_2286`) (`upb_air_update()` in the main loop `func_74`). A ground up B counts too:
   Kirby can't up B again until one of those happens.
-- **Cancel:** with a copy ability (flag `0x2000009A`), from frame `upb_cancel_frame()` (14) of
+- **Cancel:** with a copy ability (flag `0x2000009A`), from frame `upb_cancel_frame()` (20) of
   up B (counted from its start, across the rise and fall statuses), neutral special (B with no
   direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral special
   (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /

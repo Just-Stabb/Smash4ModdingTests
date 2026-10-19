@@ -41,7 +41,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
-CAVE = 0x04B78C00           # grown .text (position_vars_cave.py GROW_END); its own blocks end before
+CAVE = 0x04B78A00           # grown .text (position_vars_cave.py GROW_END); its own blocks end before
 LIMIT = 0x04B79000
 HOOK_ATK = 0x02C08730       # set_attack, after the copy loop: lwz r8, 0(r28)
 HOOK_HS = 0x02C27638        # hitstop calc: mr r11, r5
@@ -90,21 +90,71 @@ def marker(wm, fail):
                                n=INT_INDEX + 1, off=INT_INDEX * 4, magic=MAGIC, bit=STRIKE_BIT)
 
 
+def inc(k):
+    """counters[k] += 1 (uses r0, r12)"""
+    return """        lis r12, counters@ha
+        addi r12, r12, counters@l
+        lwz r0, %d(r12)
+        addi r0, r0, 1
+        stw r0, %d(r12)""" % (4 * k, 4 * k)
+
+
 def owner_wm(am, fail):
-    """r12 = the WorkModule of AttackModule am's owner if it's a fighter, else branch to fail."""
+    """r12 = the WorkModule of the fighter whose AttackModule is am, else branch to fail (owner_scan).
+    Uses r0, r3, r6-r12; keeps r4 / r5."""
     return """
-        lwz r12, 4(%(am)s)              # owner battle object
-%(c)s
-        lwz r11, 0(r12)                 # object ID: fighters have category 0
-        srwi. r0, r11, 28
-        bne %(fail)s
-        lwz r12, 0xC(r12)               # module accessor
-%(c)s
-        lwz r12, 0x28(r12)              # WorkModule""" % dict(am=am, fail=fail, c=chk("r12", fail))
+        mr r3, %(am)s
+        bl owner_scan
+        cmpwi r12, 0
+        beq %(fail)s""" % dict(am=am, fail=fail)
+
+
+# The fighter that owns an AttackModule: the live fighter-table entry whose module accessor (+0xC)
+# has it at +0x50 (the same table and accessor the position variables use in game). An earlier
+# version went through AttackModule +4 (the owning object) and object +0xC, which didn't work in
+# game.
+OWNER_SCAN = """
+owner_scan:                             # r3 = AttackModule -> r12 = its fighter's WorkModule, or 0
+        lis r12, 0x1035
+        lwz r12, 0x184C(r12)            # [0x1035184C] -> fighter table
+%(c12)s
+        lwz r12, 0(r12)
+%(c12)s
+        lwz r11, 8(r12)                 # count
+        lwz r12, 0(r12)                 # entries
+%(c12)s
+        cmplwi r11, 8
+        ble scan_count
+        li r11, 8
+scan_count:
+        li r10, 0
+scan_loop:
+        cmpw r10, r11
+        bge scan_none
+        mulli r9, r10, 0x76B0
+        add r9, r9, r12
+        lbz r0, 0x1E(r9)                # live
+        cmplwi r0, 4
+        blt scan_next
+        lwz r9, 0xC(r9)                 # module accessor
+%(c9)s
+        lwz r0, 0x50(r9)                # its AttackModule
+        cmplw r0, r3
+        bne scan_next
+        lwz r12, 0x28(r9)               # WorkModule
+        blr
+scan_next:
+        addi r10, r10, 1
+        b scan_loop
+scan_none:
+        li r12, 0
+        blr
+""" % dict(c12=chk("r12", "scan_none"), c9=chk("r9", "scan_next"))
 
 
 SOURCE = """
 strike_atk:                             # r26 = the new hitbox's slot, r28 = AttackModule
+%(INC0)s
 %(o_atk)s
 %(m12_atk)s
         lis r12, consts@ha
@@ -130,6 +180,7 @@ strike_atk:                             # r26 = the new hitbox's slot, r28 = Att
 atk_store:
         stfs f0, 0x18(r26)
         stfs f12, 0x34(r26)
+%(INC1)s
 atk_done:
         lwz r8, 0(r28)                  # set_attack's own instruction
         b %(ATK_BACK)s
@@ -167,6 +218,7 @@ strike_hs:                              # r4 accessor, r5 hit info, r6 1 = attac
         lfs f0, 0x14(r12)
 hs_damage:
         fmuls f1, f9, f0                # damage / 1.15
+%(INC2)s
         mr r3, r4
         addi r4, r5, 0x44               # hitbox data
         mr r5, r6
@@ -176,6 +228,7 @@ hs_orig:
         mr r11, r5                      # the hitstop calc's own instruction
         b %(HS_BACK)s
 
+%(OWNER_SCAN)s
 strike_throw:                           # r30 = AttackModule, throw attack data at 0x78(r1)
 %(o_throw)s
 %(m12_throw)s
@@ -184,10 +237,16 @@ strike_throw:                           # r30 = AttackModule, throw attack data 
         lfs f0, 0x78(r1)                # damage x 1.15
         fmuls f0, f0, f13
         stfs f0, 0x78(r1)
+%(INC3)s
 throw_done:
         lwz r12, 0(r30)                 # the handler's own instruction
         b %(THROW_BACK)s
 
+counters:                               # debug counts (see docs/native-notes.md): hitboxes seen, hitboxes
+        .word 0                         # scaled, own-hitstop adjustments, throws scaled
+        .word 0
+        .word 0
+        .word 0
 consts:
         .float %(DM)r
         .float %(HM)r
@@ -205,7 +264,8 @@ consts:
 def assemble():
     a = Asm(CAVE)
     a.asm(SOURCE % dict(
-        o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
+        INC0=inc(0), INC1=inc(1), INC2=inc(2), INC3=inc(3),
+        OWNER_SCAN=OWNER_SCAN, o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
         o_throw=owner_wm("r30", "throw_done"), m12_throw=marker("r12", "throw_done"), CRIT=CRIT_BIT,
         THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
         c4_hs=chk("r4", "hs_orig"), m12_hs=marker("r12", "hs_orig"),

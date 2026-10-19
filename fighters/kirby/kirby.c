@@ -14409,6 +14409,10 @@ void func_717()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run (added)
+    {
+        return;
+    }
     if (func_43())
     {
         return;
@@ -53551,7 +53555,7 @@ void func_3188(int arg0)
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
     MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
-    MotionAnimcmdModule(0, 0x1, arg0, var1);
+    MotionAnimcmdModule(0, 0x1, copy_custom_index(arg0, var1), var1);
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -71941,13 +71945,28 @@ void copy_custom_article(int article)
 // Falcon 0x211 specialn, 0x212 specialn_c2, 0x213 specialn_c3), so the custom's scripts are at
 // motion + copy_custom_slot() (the swallowed fighter's custom number, 0 = default). Mii Fighters
 // (kinds 0-2) are left alone: their number picks a different move, not a variant.
-int copy_custom_motion(int motion, int kind)
+int copy_custom_index(int motion, int kind)
 {
     if (kind <= 0x2)
     {
         return motion;
     }
     return motion + copy_custom_slot();
+}
+
+// The game ACMD is script set 0. For a custom, script set 1 (the one the game's own Diddy Kong copy
+// points at Diddy, MotionAnimcmdModule(0, 1, ...)) is pointed at the copied fighter's custom too,
+// so its effects / sounds come from the copied fighter's files instead of Kirby's own copy scripts
+// (which only have the default move's). Defaults keep Kirby's own. (Experimental.)
+int copy_custom_motion(int motion, int kind)
+{
+    int m;
+    m = copy_custom_index(motion, kind);
+    if (m != motion)
+    {
+        MotionAnimcmdModule(0, 0x1, m, kind);
+    }
+    return m;
 }
 
 // ===================================================================
@@ -72253,9 +72272,9 @@ int rapidjab_cancel()
     {
         return 0;
     }
-    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame())
+    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame() && global76 != trait_rush())
     {
-        return 0;
+        return 0; // (Rush: the finisher can be cancelled too, during and after its hit)
     }
     st = 0;
     if (global24 & 0x20000000) { st = 0x35; } // grab
@@ -72320,7 +72339,10 @@ int nair_rapid_update()
         if (MotionModuleF(0x1) >= rapidjab_final_frame())
         {
             global75 = 0x1; // final hit out: half landing lag from here (nair_rapid_landing)
-            return 0;
+            if (global76 != trait_rush())
+            {
+                return 0; // (Rush: the finisher can be cancelled too, during and after its hit)
+            }
         }
     }
     else
@@ -72751,7 +72773,7 @@ int kirby_rapid_nair()
 //   global78 / global79: up-B frame count / frame its first hitbox (ID 0) appeared (-1 = not yet).
 // ===================================================================
 int sideb_count_frame()   { return 5; } // an air side B uses up one of the air side Bs after this frame
-int upb_cancel_frame()    { return 14; } // copy ability: neutral special can cancel up B from this frame of it
+int upb_cancel_frame()    { return 20; } // copy ability: neutral special can cancel up B from this frame of it
 
 // side-B loops (func_2430 SpecialS, func_2467 swing), every frame
 void sideb_count_update()
@@ -72846,6 +72868,46 @@ int upb_cancel_update()
     }
     if (func_43())
     {
+        return 0x1;
+    }
+    return 0;
+}
+
+// ===================================================================
+// Tilts / down smash out of run (universal mechanic, docs/universal-mechanics.md). While running
+// the stick is held forward, so the game's tilt and smash commands don't come out and A gave a dash
+// attack; the Run loop (func_717) reads the stick itself when attack is pressed, before the dash
+// attack check:
+//   stick Y <= -run_tilt_y() (0.5): down smash if the stick was flicked down in the last
+//   run_smash_flick() (4) frames or the down smash command is set, else down tilt;
+//   stick Y >= run_tilt_y(): up tilt (up smash keeps its own check, which comes first).
+// ===================================================================
+float run_tilt_y()      { return 0.5f; }
+int   run_smash_flick() { return 4; }
+
+int run_attack_update()
+{
+    if (!(global38 & 0x1)) // attack pressed this frame
+    {
+        return 0;
+    }
+    if (global24 & 0x20) // up smash: the run loop's own check
+    {
+        return 0;
+    }
+    if (global24 & 0x40 || global32 <= -run_tilt_y() && global47 < run_smash_flick())
+    {
+        func_16(0x2e, 0x1); // AttackLw4Start
+        return 0x1;
+    }
+    if (global32 <= -run_tilt_y())
+    {
+        func_16(0x2a, 0x1); // AttackLw3
+        return 0x1;
+    }
+    if (global32 >= run_tilt_y())
+    {
+        func_16(0x29, 0x1); // AttackHi3
         return 0x1;
     }
     return 0;

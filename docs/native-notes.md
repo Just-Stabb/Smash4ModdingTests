@@ -865,3 +865,29 @@ Overdrive (×1.2 animations).
   crit ratio undone), multiplier / 1.2, so his own hitstop is vanilla, or 2× on a crit) and `0x02C0B77C` (throw data:
   damage ×1.15).
 
+### Strike: owner lookup and debug counters
+
+The first in-game test showed no Strike effect at all. The hitbox / throw hooks used to find the
+owner through AttackModule `+4` (the owning object, as the fighter's constructor `0x02E538B4`
+passes it) and object `+0xC`; that path was never confirmed in game. They now scan the fighter
+table instead (`owner_scan`: `[[0x1035184C]+0]`, entries `0x76B0` apart, live byte `+0x1E`,
+accessor `+0xC`, the entry whose accessor `+0x50` is this AttackModule; the same path the position
+variables use in game). The cave keeps four counters (words at the `counters` label, printed by
+`python3 -c "import sys; sys.path.insert(0, 'tools'); import strike_cave as S; a, w = S.assemble(); print(hex(a.labels['counters']))"`,
+currently `0x04B78DD4`): hitboxes seen by the set_attack hook, hitboxes scaled, own-hitstop
+adjustments, throws scaled. In Cemu's memory viewer: seen counting up but scaled at 0 = the
+marker / owner check fails; seen at 0 = the hook isn't reached.
+
+## Copy abilities: ACMD script sets
+
+`MotionAnimcmdModule(0, set, motion, kind)` (MSC handler `0x02760F4C`, FighterMotionAnimcmdModuleImpl
+vtable `0x10093B80`): op 0 calls vtable `+0x6C` (`0x02760CE4`), which stores the fighter kind for
+script set `set` (0 or 1, `[this+8+4*set]`). The copy helpers set set 0 (game) to the copied
+fighter with the copied fighter's own motion number; Kirby's own copy motions have their own
+names (e.g. `0x30B` hash `0x04961C1F` for Captain Falcon's `specialn` `0x211`), so effects / sounds
+come from Kirby's files. The game's own Diddy Kong copy also points set 1 at Diddy. For customs,
+`copy_custom_motion()` now does that too (experimental: set 1 → the copied fighter's custom).
+
+`0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
+breakpoint, user).
+

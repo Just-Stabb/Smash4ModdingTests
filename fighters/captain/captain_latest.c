@@ -14408,6 +14408,10 @@ void func_717()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run (added)
+    {
+        return;
+    }
     if (func_43())
     {
         return;
@@ -38151,4 +38155,44 @@ void rolloff_update()
     {
         GroundModule(0x2710, 0x2);
     }
+}
+
+// ===================================================================
+// Tilts / down smash out of run (universal mechanic, docs/universal-mechanics.md). While running
+// the stick is held forward, so the game's tilt and smash commands don't come out and A gave a dash
+// attack; the Run loop (func_717) reads the stick itself when attack is pressed, before the dash
+// attack check:
+//   stick Y <= -run_tilt_y() (0.5): down smash if the stick was flicked down in the last
+//   run_smash_flick() (4) frames or the down smash command is set, else down tilt;
+//   stick Y >= run_tilt_y(): up tilt (up smash keeps its own check, which comes first).
+// ===================================================================
+float run_tilt_y()      { return 0.5f; }
+int   run_smash_flick() { return 4; }
+
+int run_attack_update()
+{
+    if (!(global38 & 0x1)) // attack pressed this frame
+    {
+        return 0;
+    }
+    if (global24 & 0x20) // up smash: the run loop's own check
+    {
+        return 0;
+    }
+    if (global24 & 0x40 || global32 <= -run_tilt_y() && global47 < run_smash_flick())
+    {
+        func_16(0x2e, 0x1); // AttackLw4Start
+        return 0x1;
+    }
+    if (global32 <= -run_tilt_y())
+    {
+        func_16(0x2a, 0x1); // AttackLw3
+        return 0x1;
+    }
+    if (global32 >= run_tilt_y())
+    {
+        func_16(0x29, 0x1); // AttackHi3
+        return 0x1;
+    }
+    return 0;
 }
