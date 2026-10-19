@@ -7504,7 +7504,7 @@ void func_310()
     }
     else
     {
-        func_22(var0, 0, 1.0f);
+        marth_sword_play(var0); // Marth copy: back / up air with the sword (added)
     }
     WorkModule(0x7, var0, 0x11000002);
 }
@@ -72957,14 +72957,16 @@ int kirby_strike_nair()
 void strike_nair_start()
 {
     WorkModule(0x2710, strike_nair_flag()); // attack12's ACMD uses the air version
-    func_22(strike_nair_motion(), 0, 1.0f);
+    marth_sword_play(0x51);                 // strike_nair_motion(); Marth copy: with the sword
     WorkModule(0x2710, 0x2100000d);         // landing lag on for the whole move
 }
 
 // neutral air loop (func_317), every frame. Returns 1 when it changed status.
 int strike_nair_update()
 {
-    if (global4 != 0x34 || MotionModule(0x7) != strike_nair_motion())
+    int m;
+    m = marth_sword_motion(0x51); // strike_nair_motion(), or the Marth copy's slot
+    if (global4 != 0x34 || MotionModule(0x7) != m)
     {
         return 0;
     }
@@ -73678,3 +73680,39 @@ int wavedash_escape_blocked()
     return 0;
 }
 
+// ===================================================================
+// Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air (user;
+// fighters/kirby/specials.md "Marth copy sword"). Motion slots 0x301 MarthAttack12 (Strike nair =
+// air jab 2), 0x302 MarthAttackAirB, 0x303 MarthAttackAirHi play Marth-copy versions of the
+// animations (the sword shows with animations from motion/marthbody); tools/kirby_marth_sword.py
+// makes them and patches the RPX's motion tables (animation file hashes) and
+// fighter_param_vl_kirby. Int 0x11000002 keeps the vanilla aerial kind. No function call is
+// passed straight into another function's arguments here (that broke the aerials once).
+// ===================================================================
+int marth_sword_motion(int motion)
+{
+    if (kirby_copy_kind() != 0x12)
+    {
+        return motion;
+    }
+    if (motion == 0x51)
+    {
+        return 0x301;
+    }
+    if (motion == 0x6a)
+    {
+        return 0x302;
+    }
+    if (motion == 0x6b)
+    {
+        return 0x303;
+    }
+    return motion;
+}
+
+void marth_sword_play(int motion)
+{
+    int m;
+    m = marth_sword_motion(motion);
+    func_22(m, 0, 1.0f);
+}
