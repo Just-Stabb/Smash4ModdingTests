@@ -862,8 +862,9 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   attack from the command bits in `global24`: tilts `0x2`/`0x4`/`0x8` → `0x28`/`0x29`/`0x2A`,
   smashes `0x10`/`0x20`/`0x40` → `0x2B`/`0x31`/`0x2E`, specials `0x2000`/`0x4000`/`0x8000`/`0x1000`
   → `0x153`/`0x154`/`0x155`/`0x152`, grab `0x20000000` → Catch `0x35` (checked first).
-  Plain jab isn't included (mashing A keeps it going). With the **Rush** trait the finisher
-  can be cancelled too, during and after its hit.
+  Plain jab isn't included (mashing A keeps it going). Not from the finisher's hit frame
+  (`rapidjab_final_frame()`, 5) on, except with **Overdrive** (`global83`): then the finisher can be
+  cancelled too, during and after its hit (that was the whole Rush trait's before; user).
 - **Neutral air = rapid jab:** `func_310` plays rapid jab's loop motion `0x54` (animation and its
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
   It loops while attack is held; letting go after at least one loop plays the finisher `0x55`
@@ -882,8 +883,8 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
   → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
   restart neutral air. The finisher can't be cancelled from its hit's frame
-  (`rapidjab_final_frame()`, 5) on, with the **Rush** trait too (user; it used to be cancellable
-  during and after its hit with Rush). The grounded rapid jab's Rush finisher cancel is unchanged.
+  (`rapidjab_final_frame()`, 5) on, except with **Overdrive** (`global83`), where it can be
+  cancelled during and after its hit (that was the whole Rush trait's before; user).
 - **Air hitboxes (loop 60% damage, finisher 65% knockback):** neutral air sets status flag
   `0x21000024` (`nair_rapid_air_flag()`) when it starts. `tools/kirby_rapid_air_acmd.py` turns
   each hitbox of the loop hit `0xDCD907DA` and the finisher `attack100end` into

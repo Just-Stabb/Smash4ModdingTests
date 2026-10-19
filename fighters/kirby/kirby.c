@@ -72305,9 +72305,9 @@ int rapidjab_cancel()
     {
         return 0;
     }
-    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame() && global76 != trait_rush())
+    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame() && !global83)
     {
-        return 0; // (Rush: the finisher can be cancelled too, during and after its hit)
+        return 0; // (Overdrive: the finisher can be cancelled too, during and after its hit)
     }
     st = 0;
     if (global24 & 0x20000000) { st = 0x35; } // grab
@@ -72372,7 +72372,10 @@ int nair_rapid_update()
         if (MotionModuleF(0x1) >= rapidjab_final_frame())
         {
             global75 = 0x1; // final hit out: half landing lag from here (nair_rapid_landing)
-            return 0; // no cancel from the final hit's frame on (Rush too: user)
+            if (!global83)
+            {
+                return 0; // (Overdrive: the finisher can be cancelled too, during and after its hit)
+            }
         }
     }
     else
