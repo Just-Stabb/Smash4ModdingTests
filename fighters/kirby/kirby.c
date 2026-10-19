@@ -49549,7 +49549,7 @@ int func_2919(int arg0)
     }
     else if (arg0 == 0x21d)
     {
-        return 0x380;
+        return 0x37f; // full-charge end: the end's animation (it was the same); 0x380 is the Marth sword's (added)
     }
     else if (arg0 == 0x221)
     {
@@ -49557,7 +49557,7 @@ int func_2919(int arg0)
     }
     else if (arg0 == 0x225)
     {
-        return 0x382;
+        return 0x37e; // air charge: the ground charge's animation; 0x382 is the Marth sword's (added)
     }
     else if (arg0 == 0x229)
     {
@@ -49565,7 +49565,7 @@ int func_2919(int arg0)
     }
     else if (arg0 == 0x22d)
     {
-        return 0x384;
+        return 0x383; // air full-charge end: the air end's animation (it was the same); 0x384 is the Marth sword's (added)
     }
     return arg0;
 }
@@ -49578,6 +49578,7 @@ void func_2920(int arg0, int arg1, int arg2)
     var3 = 0x12;
     var4 = func_2919(arg0);
     func_28(var4, arg1, arg2);
+    marth_full_charge_fx(arg0); // (added)
     MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
     MotionAnimcmdModule(0x1, arg1);
 }
@@ -49594,6 +49595,7 @@ void func_2921(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
+    marth_full_charge_fx(arg0); // (added)
     MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
     if (MotionModule(0x20))
     {
@@ -73682,10 +73684,11 @@ int wavedash_escape_blocked()
 
 // ===================================================================
 // Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air (user;
-// fighters/kirby/specials.md "Marth copy sword"). Motion slots 0x301 MarthAttack12 (Strike nair =
-// air jab 2), 0x302 MarthAttackAirB, 0x303 MarthAttackAirHi play Marth-copy versions of the
-// animations (the sword shows with animations from motion/marthbody); tools/kirby_marth_sword.py
-// makes them and patches the RPX's motion tables (animation file hashes) and
+// fighters/kirby/specials.md "Marth copy sword"). The sword only shows in the Marth copy's own
+// motions (0x37D-0x384), so its slots 0x380 (Strike nair = air jab 2), 0x384 (back air) and
+// 0x382 (up air) play sword versions of the animations, and Shield Breaker uses 0x37F / 0x383 /
+// 0x37E for its full-charge ends / air charge instead (func_2919); tools/kirby_marth_sword.py
+// makes the animations and patches the RPX's motion tables (animation file hashes) and
 // fighter_param_vl_kirby. Int 0x11000002 keeps the vanilla aerial kind. No function call is
 // passed straight into another function's arguments here (that broke the aerials once).
 // ===================================================================
@@ -73697,22 +73700,44 @@ int marth_sword_motion(int motion)
     }
     if (motion == 0x51)
     {
-        return 0x301;
+        return 0x380;
     }
     if (motion == 0x6a)
     {
-        return 0x302;
+        return 0x384;
     }
     if (motion == 0x6b)
     {
-        return 0x303;
+        return 0x382;
     }
     return motion;
 }
 
+// plays the motion (the Marth copy's sword slot for it if there is one) with the motion's own
+// game / effect / sound scripts (Kirby's, kind 8; set 0x10 = copy_fx_all(): effects and sounds)
 void marth_sword_play(int motion)
 {
     int m;
     m = marth_sword_motion(motion);
     func_22(m, 0, 1.0f);
+    if (m != motion)
+    {
+        MotionAnimcmdModule(0, 0, motion, 0x8);
+        MotionAnimcmdModule(0, 0x10, motion, 0x8);
+        MotionAnimcmdModule(0x1, 0);
+    }
+}
+
+// Shield Breaker's full-charge ends play the ends' animation slots (func_2919); their own
+// effects and sounds (Kirby's scripts for 0x380 / 0x384) are bound here
+void marth_full_charge_fx(int sub)
+{
+    if (sub == 0x21d)
+    {
+        MotionAnimcmdModule(0, 0x10, 0x380, 0x8);
+    }
+    else if (sub == 0x22d)
+    {
+        MotionAnimcmdModule(0, 0x10, 0x384, 0x8);
+    }
 }

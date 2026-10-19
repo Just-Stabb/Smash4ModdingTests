@@ -995,16 +995,28 @@ of the full name without `.omo`, case kept; the pack loader `0x03326740` keys fi
   animation, which is why the EndMax test changed nothing. Motions above `0x30A` are copy
   motions (the copy-change code `0x02EFE138` checks the current motion against `0x30A`).
 
-**Now:** the three slots get the hashes of `FitKirbyMarthBody{Main,Kirbypt1,Kirbypt2}D00<Name>`
-and the original moves' flags (RPX patch, `rpx_args.txt`), their per-motion params in
-`fighter_param_vl_kirby` group 1 (6 bytes a motion; the first is 0 on loop motions, and `0x303`'s
-was 0) are the original moves' (jab 2 / bair / up air), and the MSC plays them with the Marth copy
-(`marth_sword_play()` / `marth_sword_motion()`, end of `kirby.c`). Untested in game: whether a
-slot at or below `0x30A` finds an animation in the copy's `marthbody` pack.
+**v2 (slots `0x301`–`0x303` with patched tables): the aerials animated, without the sword** (user).
+So the sword shows only in the Marth copy's own motions, `0x37D`–`0x384` (the only check against
+`0x30A` in the code is the copy-change one; Shield Breaker's charge loop `0x37E` shows the sword
+with no sword-trace effect).
 
-Build: `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body> build/game.bin
-<fighter_param_vl_kirby.bin> build/cave_fix_s4/cross_f.rpx build/marthsword`, then the standard RPX
-command with `$(cat build/marthsword/rpx_args.txt)` added at the end.
+**Now (v3):** three of Marth's slots carry the sword animations: `0x380` (was the full-charge
+ground end) → Strike nair, `0x384` (full-charge air end) → back air, `0x382` (air charge loop) →
+up air. Shield Breaker's animation slots come from `func_2919` (MSC): the full-charge ends now
+play `0x37F` / `0x383` (they had the same animations already) and the air charge plays the ground
+charge `0x37E` (the legs are bent as on the ground; up to ~2 units off). Its hitboxes don't depend
+on the slot: `func_2920` / `func_2921` bind Marth's scripts by special number
+(`copy_custom_motion(arg0, 0x12)`), and `marth_full_charge_fx()` binds the full-charge ends' own
+effects and sounds (Kirby's scripts for `0x380` / `0x384`, set `0x10`, `tools/copy_fx_cave.py`).
+The RPX tables get the sword animations' hashes and the original moves' flags in those slots,
+`fighter_param_vl_kirby` group 1 the original moves' values, and `marth_sword_play()` (end of
+`kirby.c`) plays the slot with the Marth copy, then binds the original move's game script
+(`MotionAnimcmdModule(0, 0, motion, 8)`) and effects / sounds (set `0x10`). No `motion.mtable` or
+ACMD changes.
+
+Build: `python3 tools/kirby_marth_sword.py <kirby folder> <fighter_param_vl_kirby.bin>
+build/cave_fix_s4/cross_f.rpx build/marthsword`, then the standard RPX command with
+`$(cat build/marthsword/rpx_args.txt)` added at the end.
 
 With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)
 in the left hand from frame 3, shrinking from frame 7 to nothing at 15; **back air** between the legs
@@ -1022,8 +1034,8 @@ Motion names: a `motion.mtable` entry is the CRC32 of the motion's name (ACMD sc
 it; e.g. `MarthSpecialNStart` for `0x37D`). Animations aren't found by it (see above). Slots
 `0x301`–`0x30A` are empty (between Final `0x300` and `CaptainSpecialN` `0x30B`) and unused by the MSC.
 
-- **Motions:** `0x301` `MarthAttack12` (Strike nair), `0x302` `MarthAttackAirB`, `0x303`
-  `MarthAttackAirHi`. MSC `marth_sword_motion()` picks them with the Marth copy in
+- **Motions (v3):** `0x380` (Strike nair), `0x384` (back air), `0x382` (up air).
+  MSC `marth_sword_motion()` picks them with the Marth copy in
   `strike_nair_start()` / `strike_nair_update()` and the AttackAir main (`func_310`); int
   `0x11000002` still holds the vanilla aerial kind (landing lag etc.).
 - **Animations / ACMD:** `tools/kirby_marth_sword.py` (command above) copies Kirby's `Attack12` / `AttackAirB` / `AttackAirHi`
@@ -1032,12 +1044,10 @@ it; e.g. `MarthSpecialNStart` for `0x37D`). Animations aren't found by it (see a
   `LHaveN` +Y; its X faces the camera, model X; "nothing" is scale 0.001). The bone math
   (`tools/omo.py`, forward kinematics from the animation) matches the game's hitboxes (jab 2's fist
   at Z ~18, its hitbox at Z 17.5). Kirby's arms stretch unevenly, so on a few frames the sword can
-  look up to ~30% longer. The tool also names the motion slots and copies the moves' game / effect
-  / sound / expression scripts to the new names.
+  look up to ~30% longer.
 - **Files:** `build/marthsword/motion/marthbody/{main,kirbypt1,kirbypt2}.pac` →
-  `fighter/kirby/motion/marthbody/`; `build/marthsword/script/animcmd/body/*` →
-  `fighter/kirby/script/animcmd/body/` (`build/game.bin` = that game.bin);
-  `build/marthsword/fighter_param_vl_kirby.bin`; the RPX with `rpx_args.txt`.
+  `fighter/kirby/motion/marthbody/`; `build/marthsword/fighter_param_vl_kirby.bin`; the RPX
+  with `rpx_args.txt`.
 - **Format notes** (`tools/omo.py` docstring): OMO tracks per bone, position / rotation / scale,
   constant, interpolated (min + range × u16 / 65535) or raw per frame; KCAP packs name-sorted. All
   of Kirby's 188 packs and the 2185 animations with known track types read and write back byte

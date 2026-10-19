@@ -1,62 +1,53 @@
 #!/usr/bin/env python3
 """Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air.
 
-  python3 tools/kirby_marth_sword.py KIRBY_DIR ANIMCMD_DIR GAME_BIN VL_BIN RPX OUT_DIR
+  python3 tools/kirby_marth_sword.py KIRBY_DIR VL_BIN RPX OUT_DIR
 
 KIRBY_DIR   the fighter/kirby folder (model/body/c00/model.vbn, motion/body, motion/marthbody)
-ANIMCMD_DIR script/animcmd/body (motion.mtable, effect.bin, sound.bin, expression.bin)
-GAME_BIN    the game.bin to add to (build/game.bin)
 VL_BIN      fighter_param_vl_kirby.bin
 RPX         the RPX the motion tables are read from (build/cave_fix_s4/cross_f.rpx)
-OUT_DIR     gets motion/marthbody/{main,kirbypt1,kirbypt2}.pac, script/animcmd/body/
-            {motion.mtable,game.bin,effect.bin,sound.bin,expression.bin},
-            fighter_param_vl_kirby.bin and rpx_args.txt (rpx_patch.py args for the motion tables)
+OUT_DIR     gets motion/marthbody/{main,kirbypt1,kirbypt2}.pac, fighter_param_vl_kirby.bin and
+            rpx_args.txt (rpx_patch.py args for the motion tables)
 
-Which animation a motion plays (traced in game, tools/motion_debug_cave.py): Kirby's motions have
-static tables in the RPX's data, 1222 entries each, of hashes of animation file names (CRC32 from
-0 of the full name without .omo, case kept): MAIN_TABLE (8 bytes a motion: hash, flags word) for
-the main body, PT1_TABLE / PT2_TABLE (4 bytes) for Kirbypt1 / Kirbypt2. The three slots get the
-hashes of the Marth-copy files and the original moves' flags. fighter_param_vl_kirby group 1
-(6 bytes a motion; the first is 0 on loop motions) gets the original moves' values too.
+(fighters/kirby/specials.md "Marth copy sword".) The copy's sword (model marthsword on Kirby's
+LHaveN) shows only in the Marth copy's own motions, 0x37D-0x384 (in game: Kirby's own slots
+0x301-0x303 played the sword animations without it). Which animation a motion plays: Kirby's
+static motion tables in the RPX's data, 1222 entries each, of animation file-name hashes (CRC32
+from 0 of the full name without .omo, case kept): MAIN_TABLE (8 bytes a motion: hash, flags word)
+for the main body, PT1_TABLE / PT2_TABLE (4 bytes) for Kirbypt1 / Kirbypt2.
 
-How the copy's sword shows (fighters/kirby/specials.md "Marth copy sword"): the held model
-(model/marthsword, root bone HaveN on Kirby's LHaveN) shows while Kirby plays an animation from
-the copy's motion folder (motion/marthbody). A motion's name is its motion.mtable hash, and an
-animation FitKirby<Copy>Body<Main|Kirbypt1|Kirbypt2><3 chars><Name>.omo in motion/<copy>body is
-found under the name <Copy><Name> (MarthSpecialNStart = FitKirbyMarthBodyMainD00SpecialNStart).
-So three empty motion slots get Marth names, marthbody gets those animations (Kirby's own, with
-LHaveN moved and scaled each frame) and the ACMD gets the moves' scripts under the new names.
+So three Marth slots get the sword animations: 0x380 (full-charge ground end), 0x384 (full-charge
+air end) and 0x382 (air charge loop); Shield Breaker (MSC func_2919) plays 0x37F / 0x383 / 0x37E
+instead, which already had the same animations for the full-charge ends (and the ground loop for
+the air charge), and binds the full-charge effects itself. The slots get the hashes of
+FitKirbyMarthBody<part>D00<Name> (Kirby's own animations with LHaveN moved and scaled each frame)
+and the original moves' flags; fighter_param_vl_kirby group 1 (6 bytes a motion; the first is 0
+on loop motions) gets the original moves' values. The MSC binds the original moves' game /
+effect / sound scripts after the motion change (marth_sword_play()).
 """
-import copy
 import math
 import os
-import struct
 import sys
 import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import acmd  # noqa: E402
 import omo  # noqa: E402
 
 import rpx_patch  # noqa: E402
 
-EPS = 0.001
+EPS = 0.001          # "nothing": a zero scale would make a degenerate bone matrix
 MAIN_TABLE = 0x103850A4
 PT1_TABLE = 0x10382A0C
-PT2_TABLE = 0x10383D24          # "nothing": a zero scale would make a degenerate bone matrix
+PT2_TABLE = 0x10383D24
 
-# motion slot, new name, Kirby's animation (name, code), placement, frames (1 = the first):
+# Marth copy slot, (unused), Kirby's animation (name, code), placement, frames (1 = the first):
 # appears, starts shrinking, gone; the original motion
 MOVES = [
-    (0x301, 'MarthAttack12', 'Attack12', 'C00', 'hand', 3, 7, 15, 0x51),     # Strike nair (air jab 2)
-    (0x302, 'MarthAttackAirB', 'AttackAirB', 'C05', 'legs', 7, 17, 27, 0x6A),
-    (0x303, 'MarthAttackAirHi', 'AttackAirHi', 'C05', 'lleg', 4, 16, 28, 0x6B),
+    (0x380, None, 'Attack12', 'C00', 'hand', 3, 7, 15, 0x51),     # Strike nair (air jab 2)
+    (0x384, None, 'AttackAirB', 'C05', 'legs', 7, 17, 27, 0x6A),
+    (0x382, None, 'AttackAirHi', 'C05', 'lleg', 4, 16, 28, 0x6B),
 ]
 DEPTH = (1.0, 0.0, 0.0)   # model X: toward / away from the camera (Kirby faces +Z)
-
-
-def crc(name):
-    return zlib.crc32(name.lower().encode()) & 0xFFFFFFFF
 
 
 def anim_hash(name):
@@ -136,14 +127,12 @@ def sword_track(anim, bones, place, appear, shrink, gone):
 
 
 def main():
-    if len(sys.argv) != 7:
+    if len(sys.argv) != 5:
         sys.exit(__doc__)
-    kdir, adir, game_in, vl_in, rpx, out = sys.argv[1:]
+    kdir, vl_in, rpx, out = sys.argv[1:]
     bones = omo.vbn_read(os.path.join(kdir, 'model/body/c00/model.vbn'))
     mdir = os.path.join(out, 'motion/marthbody')
-    sdir = os.path.join(out, 'script/animcmd/body')
     os.makedirs(mdir, exist_ok=True)
-    os.makedirs(sdir, exist_ok=True)
 
     # animations
     for part in ('Main', 'Kirbypt1', 'Kirbypt2'):
@@ -161,21 +150,6 @@ def main():
             marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, src), data))
         omo.pac_write(os.path.join(mdir, fn), marth)
 
-    # motion slots
-    mt = open(os.path.join(adir, 'motion.mtable'), 'rb').read()
-    table = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
-    for slot, new, *_ in MOVES:
-        assert table[slot] in (0, crc(new)), 'motion 0x%X is in use (0x%08X)' % (slot, table[slot])
-        table[slot] = crc(new)
-    open(os.path.join(sdir, 'motion.mtable'), 'wb').write(struct.pack('>%dI' % len(table), *table))
-
-    # ACMD: the moves' scripts under the new names
-    for fn, path in (('game.bin', game_in), ('effect.bin', None), ('sound.bin', None), ('expression.bin', None)):
-        f = acmd.ACMDFile.load(path or os.path.join(adir, fn))
-        for slot, new, src, *_ in MOVES:
-            if crc(src) in f.scripts:
-                f.scripts[crc(new)] = copy.deepcopy(f.scripts[crc(src)])
-        f.save(os.path.join(sdir, fn))
     # the RPX motion tables
     d, _shoff, _ent, secs = rpx_patch.load(rpx)
     args = []
@@ -196,7 +170,7 @@ def main():
     open(os.path.join(out, 'fighter_param_vl_kirby.bin'), 'wb').write(vl)
 
     for slot, new, src, code, place, a, s, g, orig in MOVES:
-        print('motion 0x%X %s (%s): sword %s, frames %d / %d / %d' % (slot, new, src, place, a, s, g))
+        print('motion 0x%X (for 0x%X %s): sword %s, frames %d / %d / %d' % (slot, orig, src, place, a, s, g))
 
 
 if __name__ == '__main__':
