@@ -60,6 +60,9 @@ int global58;
 int global59;
 int global60;
 int global61;
+int global62;
+int global63;
+int global64;
 
 void func_0()
 {
@@ -1378,10 +1381,38 @@ int func_62()
     }
     if (global24 & 0x400000)
     {
-        if (WorkModule(0x15, 0x1e00003d))
+        if (global6 != 0x46 && global6 != 0x47) // (Melee air dodge)
         {
-            func_16(0x22, 0x1);
-            return 0x1;
+            if (WorkModule(0x15, 0x1e00003d))
+            {
+                WorkModule(0x2710, 0x20000044); // no air speed cap during the dodge
+                func_16(0x22, 0x1);
+                if (global32 < 0.01f && global5 != 0x57)
+                {
+                    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+                }
+                if (global32 < -0.18f)
+                {
+                    // just after a jump with the stick down: move Luigi down to the ground (wavedash)
+                    if (global4 == 0xb && global9 <= 4.0f)
+                    {
+                        if (KineticModuleF(0x1, 0x1) >= WorkModuleF(0, 0x3000159))
+                        {
+                            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - WorkModuleF(0, 0x3000158), PostureModuleF(0x3));
+                        }
+                        if (KineticModuleF(0x1, 0x1) < WorkModuleF(0, 0x3000159))
+                        {
+                            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - (WorkModuleF(0, 0x3000159) + KineticModuleF(0x1, 0x1)), PostureModuleF(0x3));
+                        }
+                    }
+                    if (KineticModuleF(0x1, 0x1) < 0)
+                    {
+                        PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - func_13(KineticModuleF(0x1, 0x1)), PostureModuleF(0x3));
+                    }
+                }
+                melee_airdodge_dir();
+                return 0x1;
+            }
         }
     }
     return 0;
@@ -3973,6 +4004,10 @@ void func_141()
 {
     ArticleModule(0x2712, WorkModule(0x6, 0x11000002));
     PostureModule(0x4, 0, 0, 0);
+    if (global6 == 0x74)
+    {
+        WorkModule(0x2711, 0x200000b5); // (Melee air dodge)
+    }
 }
 
 int func_142()
@@ -4025,6 +4060,7 @@ void func_146()
 
 int func_147()
 {
+    WorkModule(0x2711, 0x200000b5); // (Melee air dodge)
     StatusModule(0x5, 0x1, 0x14, 0x4, 0, 0, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x4002, 0, 0);
     return 0;
@@ -5079,6 +5115,7 @@ int func_212()
 
 void func_213()
 {
+    WorkModule(0x2711, 0x200000b5); // (Melee air dodge)
     func_214();
     func_78(func_215);
 }
@@ -6280,6 +6317,10 @@ int func_247()
     }
     StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, var0, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts)
+    }
     return 0;
 }
 
@@ -6287,6 +6328,10 @@ int func_248()
 {
     StatusModule(0x5, 0, 0xf, 0x9, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x10a2, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts)
+    }
     return 0;
 }
 
@@ -8061,7 +8106,8 @@ int func_362()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8072,7 +8118,8 @@ int func_363()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed), stops at edges until rolloff_update allows sliding
+    global62 = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8095,8 +8142,11 @@ int func_364()
 
 int func_365()
 {
-    StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0, 0, 0, 0, 0);
-    StatusModule(0x2713, 0, 0x2, 0, 0, 0, 0, 0, 0, 0x400002);
+    KineticModule(0xf, 0x1, 0);   // (Melee air dodge) no gravity
+    KineticModule(0x10, 0x3, 0, 0);
+    WorkModule(0x2711, 0x2100000f);
+    StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0, 0, 0, 0, 0, 0, 0, 0x400002);
     return 0;
 }
 
@@ -8168,6 +8218,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8199,6 +8250,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
     if (func_374())
     {
         return;
@@ -8262,7 +8314,12 @@ void func_374()
 
 void func_375()
 {
+    WorkModule(0x2710, 0x2100001f); // (Melee air dodge) slow the dodge down until frame 30
     func_376();
+    if (func_55())
+    {
+        return;
+    }
     func_22(0x4e, 0, 1.0f);
     func_78(func_377);
 }
@@ -8300,9 +8357,24 @@ void func_377()
 void func_378()
 {
     int var0;
-    if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
+    float vx;
+    float vy;
+    if (WorkModule(0x10, 0x2100001f)) // (Melee air dodge) 10% of the speed off every frame
     {
-        return 0x1;
+        vx = func_13(KineticModuleF(0, 0xffffffff)) * 0.1f;
+        KineticModule(0x10, 0x3, vx, 0);
+        vy = -KineticModuleF(0x1, 0xffffffff) * 0.1f;
+        KineticModule(0xf, 0x1, vy);
+        if (global20 >= 30.0f) // frame 30: normal air control and gravity again
+        {
+            func_550();
+            KineticModule(0, 0);
+            WorkModule(0x2711, 0x2100001f);
+        }
+    }
+    if (!StopModule(0x1))
+    {
+        func_550();
     }
     if (WorkModule(0x15, 0x1e000074))
     {
@@ -8315,6 +8387,7 @@ void func_378()
                     if (WorkModule(0x6, 0x11000002) <= WorkModule(0x6, 0x120001f5))
                     {
                         func_16(0x8c, 0);
+                        WorkModule(0x2711, 0x20000044);
                         return 0x1;
                     }
                 }
@@ -8333,6 +8406,7 @@ void func_378()
                     if (!var0)
                     {
                         func_16(0xf1, 0x1);
+                        WorkModule(0x2711, 0x20000044);
                         return 0x1;
                     }
                 }
@@ -8424,9 +8498,13 @@ void func_378()
     {
         return 0x1;
     }
+    if (func_56()) // (Melee air dodge) can grab a ledge
+    {
+        return 0x1;
+    }
     if (MotionModule(0x2712))
     {
-        func_16(0xe, 0);
+        func_16(0x10, 0); // (Melee air dodge) helpless (SpecialFall) after the dodge
         return 0x1;
     }
 }
@@ -8434,9 +8512,12 @@ void func_378()
 void func_379()
 {
     WorkModule(0x9, 0x11000002);
-    if (WorkModule(0x6, 0x11000002) <= WorkModule(0x6, 0x120001f1))
+    if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x9)) // (Melee air dodge) item catch on A / Z
     {
-        func_103();
+        if (ControlModule(0x2723, 0) >= 0x10 && ControlModule(0x2723, 0x9) >= 0x10)
+        {
+            func_103();
+        }
     }
     if (ItemModule(0x4) == 0x1)
     {
@@ -8468,17 +8549,41 @@ void func_380()
 
 void func_381()
 {
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+    }
     func_383();
 }
 
 void func_382()
 {
+    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+    }
     func_383();
 }
 
 void func_383()
 {
-    KineticModule(0x11, 0, 0, 0);
+    if (global6 == 0x8c) // Melee momentum: roll -> item throw keeps the roll's speed (max run speed)
+    {
+        if (KineticModuleF(0, 0x1) > WorkModuleF(0, 0x300000b))
+        {
+            KineticModule(0x11, 0, WorkModuleF(0, 0x300000b), 0);
+        }
+        else if (KineticModuleF(0, 0x1) < -WorkModuleF(0, 0x300000b))
+        {
+            KineticModule(0x11, 0, -WorkModuleF(0, 0x300000b), 0);
+        }
+    }
+    else
+    {
+        KineticModule(0x11, 0, 0, 0);
+    }
 }
 
 void func_384()
@@ -9769,16 +9874,42 @@ void func_471()
 
 int func_472()
 {
+    float var0;
     if (func_470() != 0)
     {
         return 0x1;
     }
     func_471();
+    // Melee momentum: the jump's horizontal speed comes from the ground speed (x attribute 0x0E)
+    // plus the stick (x 0x0D), capped at the max jump speed (0x0F); pulling back can't push past 0
+    KineticModule(0x11, 0x2, KineticModuleF(0, 0x1) * WorkModuleF(0, 0x300000e));
+    var0 = WorkModuleF(0, 0x300000d) * ControlModuleF(0x2) + KineticModuleF(0, 0x1);
+    if (func_13(var0) > WorkModuleF(0, 0x300000f))
+    {
+        var0 = func_14(KineticModuleF(0, 0x1)) * WorkModuleF(0, 0x300000f);
+    }
+    if (func_88() < 0)
+    {
+        if (PostureModuleF(0) > 0 && var0 > 0)
+        {
+            var0 = 0;
+        }
+        else if (PostureModuleF(0) < 0 && var0 < 0)
+        {
+            var0 = 0;
+        }
+    }
+    KineticModule(0x11, 0x2, var0);
     return 0;
 }
 
 int func_473()
 {
+    if (WorkModule(0x10, 0x20000044)) // (Melee air dodge) double jump: the no-air-speed-cap flag off
+    {
+        WorkModule(0x2711, 0x20000044);
+    }
+    global64 = 0;
     if (WorkModule(0x2712, 0x2000000b))
     {
         StatusModule(0x2711, 0xd7);
@@ -9857,6 +9988,11 @@ int func_477()
 
 int func_478()
 {
+    KineticModule(0x11, 0x1, 0); // (Melee air dodge) no vertical speed into the landing
+    if (wavedash_landing())
+    {
+        return 0x1;
+    }
     if (func_558())
     {
         return 0x1;
@@ -9868,6 +10004,11 @@ int func_478()
 
 int func_479()
 {
+    KineticModule(0x11, 0x1, 0); // (Melee air dodge) no vertical speed into the landing
+    if (wavedash_landing())
+    {
+        return 0x1;
+    }
     if (func_558())
     {
         return 0x1;
@@ -9993,6 +10134,10 @@ void func_488()
                 return;
             }
         }
+    }
+    if (jumpsquat_airdodge()) // (Melee air dodge) wavedash out of jumpsquat
+    {
+        return;
     }
 }
 
@@ -10305,6 +10450,7 @@ void func_500()
 void func_501()
 {
     func_502();
+    rolloff_fall_speed(); // roll-off: speed carried off the ledge x rolloff_air_speed_mult()
     func_78(func_503);
 }
 
@@ -10315,6 +10461,12 @@ void func_502()
     float var2;
     float var3;
     float var4;
+    if (global64) // (Melee air dodge) Fall after the dodge: its air speed flag off, normal kinetics
+    {
+        global64 = 0;
+        WorkModule(0x2711, 0x20000044);
+        KineticModule(0, 0);
+    }
     func_40();
     var0 = 0x24;
     var1 = MotionModule(0x7);
@@ -10516,17 +10668,10 @@ float func_509()
     float var1;
     float var2;
     float var3;
-    if (global5 == 0x22)
+    if (global5 == 0x22 || WorkModule(0x10, 0x200000b5)) // (Melee air dodge) wavedash / dodge landing: normal landing lag
     {
-        var0 = WorkModuleF(0, 0);
-        if (var0 != 0)
-        {
-            var1 = (float)WorkModule(0x6, 0x120000bf) * MotionModuleF(0x9) - 0.009999999776482582f;
-        }
-        else
-        {
-            var1 = WorkModuleF(0, 0x3000028);
-        }
+        WorkModule(0x2710, 0x200000b5);
+        var1 = WorkModuleF(0, 0x3000028);
     }
     else if (global5 == 0x46 || global5 == 0x13d)
     {
@@ -10561,6 +10706,13 @@ void func_510()
 
 void func_511()
 {
+    if (WorkModule(0x10, 0x200000b5) && ControlModule(0x2712, 0x3) && (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x9)))
+    {
+        if (ControlModule(0x2723, 0) >= 0x10 && ControlModule(0x2723, 0x9) >= 0x10)
+        {
+            func_103(); // (Melee air dodge) item catch while wavedashing
+        }
+    }
     if (func_512())
     {
         return;
@@ -10968,7 +11120,7 @@ void func_534()
 
 void func_535()
 {
-    
+    WorkModule(0x2711, 0x20000044); // roll-off / air dodge: Fall over, the air speed cap is back
 }
 
 void func_536()
@@ -10978,7 +11130,7 @@ void func_536()
 
 void func_537()
 {
-    
+    WorkModule(0x2711, 0x200000b5); // (Melee air dodge) wavedash landing over
 }
 
 void func_538()
@@ -11694,7 +11846,7 @@ void func_586()
             EffectModule(0x2f, 0x1);
         }
         var0 = 1.0f;
-        if (global5 == 0x22)
+        if (global5 == 0x22 || WorkModule(0x10, 0x200000b5)) // (Melee air dodge) wavedash landing too
         {
             var1 = WorkModuleF(0, 0);
             if (var1 != 0)
@@ -14067,6 +14219,10 @@ void func_715()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of the initial dash too (added; no shield)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -14255,6 +14411,9 @@ void func_716()
     WorkModule(0x16, 0x1e00007f);
     WorkModule(0x16, 0x1e00005c);
     WorkModule(0x16, 0x1e000054);
+    WorkModule(0x16, 0x1e000056); // up tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e000057); // down tilt out of run (added, universal: run tilts / shield)
+    WorkModule(0x16, 0x1e00005f); // down smash out of run (added, universal: run tilts / shield)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {
@@ -14277,6 +14436,10 @@ void func_717()
     if (global18 == 0x2)
     {
         func_16(0xe, 0);
+        return;
+    }
+    if (run_attack_update()) // tilts / down smash out of run (added)
+    {
         return;
     }
     if (func_43())
@@ -14473,6 +14636,10 @@ void func_722()
     {
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run: turning the stick up / down from a run
+    {                             // ends it in RunBrake, so the check is here too (added)
+        return;
+    }
     if (func_43())
     {
         return;
@@ -14572,6 +14739,10 @@ void func_724()
     {
         return 0x1;
     }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
+    {
+        return 0x1;
+    }
     if (func_704())
     {
         return 0x1;
@@ -14604,6 +14775,10 @@ void func_726()
 {
     float var0;
     if (func_71(global61))
+    {
+        return 0x1;
+    }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
     {
         return 0x1;
     }
@@ -19747,6 +19922,10 @@ int func_977()
     {
         return 0x1;
     }
+    if (global5 == 0x22)
+    {
+        WorkModule(0x2710, 0x200000b5); // (Melee air dodge) helpless after the dodge: dodge landing
+    }
     StatusModule(0x5, 0x2, 0x13, 0x5, 0x4, 0x1, 0x82, 0, 0, 0);
     StatusModule(0x2713, 0, 0, 0x1, 0, 0x1, 0, 0x10, 0, 0);
     return 0;
@@ -19858,7 +20037,12 @@ void func_987()
 
 void func_988()
 {
-    
+    float var0;
+    if (global6 == 0x16 && WorkModule(0x10, 0x200000b5)) // (Melee air dodge)
+    {
+        var0 = (float)WorkModule(0x6, 0x120000bf) / WorkModuleF(0, 0x20000c0);
+        WorkModule(0, var0, 0);
+    }
 }
 
 void func_989()
@@ -37843,3 +38027,183 @@ void func_2347()
     }
 }
 
+// ===================================================================
+// Roll-off (docs/universal-mechanics.md), same as Captain Falcon's. The rolls' ACMD gives them their
+// speed (EscapeF +S / EscapeB -S added at frame rolloff_start_frame(), 0 at frame 27); kinetic 0x6
+// so the animation doesn't move the fighter. Every roll frame: before the speed frame, or while
+// shield is held (ControlModule(0x2712, 3)), ground correction 0x2 (stops at edges); from the
+// speed frame on, 0x1 (can slide off). Sliding off goes to Fall (func_374), which keeps the roll's
+// speed: the roll end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next
+// status is Fall, and Fall's end (func_535) clears it. rolloff_fall_speed() can scale the carried
+// speed once. Lock: global62 counts the frames in a row shield has been held this roll; at
+// rolloff_lock_frames() (10) the roll can't slide off for the rest of it. global63: slid off.
+// ===================================================================
+float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
+float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+
+void rolloff_fall_speed()
+{
+    float x;
+    float y;
+    if (global63 != 0)
+    {
+        global63 = 0;
+        if (rolloff_air_speed_mult() != 1.0f)
+        {
+            x = KineticModuleF(0xa, 0x3);
+            y = KineticModuleF(0xb, 0x3);
+            KineticModule(0x11, 0x3, x * rolloff_air_speed_mult(), y);
+        }
+    }
+}
+
+void rolloff_update()
+{
+    if (MotionModuleF(0x1) < 1.0f)
+    {
+        global62 = 0; // new roll
+    }
+    if (global62 < rolloff_lock_frames())
+    {
+        if (ControlModule(0x2712, 0x3))
+        {
+            global62++;
+        }
+        else
+        {
+            global62 = 0;
+        }
+    }
+    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3) && global62 < rolloff_lock_frames())
+    {
+        GroundModule(0x2710, 0x1);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x2);
+    }
+}
+
+// ===================================================================
+// Tilts / down smash out of run, dash, and a turn out of a dash (universal mechanic,
+// docs/universal-mechanics.md), same as Kirby's / Captain Falcon's: when attack is pressed,
+// stick Y <= -run_tilt_y() (0.5): down smash if flicked down in the last run_smash_flick() (4)
+// frames or the down smash command is set, else down tilt; stick Y >= run_tilt_y(): up tilt.
+// ===================================================================
+float run_tilt_y()      { return 0.5f; }
+int   run_smash_flick() { return 4; }
+
+int run_attack_update()
+{
+    if (!(global38 & 0x1)) // attack pressed this frame
+    {
+        return 0;
+    }
+    if (global24 & 0x20) // up smash: the loops' own check
+    {
+        return 0;
+    }
+    if (global24 & 0x40 || global32 <= -run_tilt_y() && global47 < run_smash_flick())
+    {
+        func_16(0x2e, 0x1); // AttackLw4Start
+        return 0x1;
+    }
+    if (global32 <= -run_tilt_y())
+    {
+        func_16(0x2a, 0x1); // AttackLw3
+        return 0x1;
+    }
+    if (global32 >= run_tilt_y())
+    {
+        func_16(0x29, 0x1); // AttackHi3
+        return 0x1;
+    }
+    return 0;
+}
+
+// Turn (0x6) / TurnDash (0x7) loops: tilts / down smash when the turn came out of a Dash (0x3).
+int dash_turn_attack_update()
+{
+    if (global5 != 0x3 || global18 != 0)
+    {
+        return 0;
+    }
+    return run_attack_update();
+}
+
+// ===================================================================
+// Melee air dodge / wavedash, ported from the modded Luigi MSC (fighters/luigi/README.md).
+// The dodge: kinetic type 0xA, gravity and brake off, speed melee_airdodge_speed() (3.1) in the
+// stick's direction (none with the stick under 0.125), no air speed cap (flag 0x20000044); the
+// EscapeAir loop takes 10% of the speed off every frame until frame 30, then normal air control
+// and gravity; the animation ending gives helpless (SpecialFall 0x10); the dodge can grab a ledge.
+// Wavedash: landing from a jump / fall (0xB-0xF) with the air dodge input, no grab and the stick
+// down turns into a grounded dodge with the same speed (wavedash_landing(), Landing pres), and
+// on the last jumpsquat frame (jumpsquat_airdodge()); flag 0x200000B5 marks a wavedash / dodge
+// landing (normal landing lag, func_509). global64: the dodge's kinetics still need resetting if it
+// goes to Fall (func_502).
+// ===================================================================
+float melee_airdodge_speed() { return 3.1f; }
+int   jumpsquat_airdodge_min_frames() { return 6; } // the mod's: jumpsquats shorter than this have no last-frame dodge (Luigi's is 5)
+
+// (the modded MSC's func_819)
+void melee_airdodge_dir()
+{
+    float len;
+    float k;
+    KineticModule(0, 0xa);
+    KineticModule(0xf, 0x1, 0);
+    KineticModule(0x10, 0x3, 0, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x11, 0x1, 0);
+    WorkModule(0x2711, 0x2100000f);
+    func_100(0);
+    global64 = 1;
+    len = MathF(0, global32 * global32 + global48 * global48); // stick length
+    if (len >= 0.125f)
+    {
+        k = melee_airdodge_speed() / len;
+        KineticModule(0x11, 0x3, global48 * k, 0);
+        KineticModule(0x11, 0x1, global32 * k);
+    }
+}
+
+// Landing pre (func_478 / func_479)
+int wavedash_landing()
+{
+    if (global5 >= 0xb && global5 <= 0xf && global24 & 0x400000 && !(global24 & 0x20000000) && global32 < 0)
+    {
+        melee_airdodge_dir();
+        StatusModule(0x2711, 0x22); // EscapeAir instead of the landing
+        return 0x1;
+    }
+    return 0;
+}
+
+// JumpSquat loop (func_488): shield on the jumpsquat's last frame -> air dodge.
+int jumpsquat_airdodge()
+{
+    if (!(global38 & 0x40))
+    {
+        return 0;
+    }
+    if (WorkModule(0x6, 0x1300000c) < jumpsquat_airdodge_min_frames())
+    {
+        return 0;
+    }
+    if (global9 < (float)(WorkModule(0x6, 0x1300000c) - 0x1))
+    {
+        return 0;
+    }
+    func_16(0x22, 0);
+    if (global32 >= -0.15f)
+    {
+        PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + 0.1f, PostureModuleF(0x3));
+    }
+    WorkModule(0x2710, 0x200000b5);
+    WorkModule(0x2710, 0x20000044);
+    melee_airdodge_dir();
+    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+    return 0x1;
+}

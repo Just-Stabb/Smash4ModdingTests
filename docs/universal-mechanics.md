@@ -23,7 +23,7 @@ fighter checked so far (Kirby, Captain Falcon, Bowser, Meta Knight, Charizard, G
 Corrin...), but check the status table (`sv_set_mem(0x1, 0, 0x29/0x2A, func_N)`) per fighter.
 Forward tilt doesn't need it (back + A already turns it around).
 
-Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's).
+Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's); Luigi.
 
 ## Tilts, down smash and shield out of run
 
@@ -67,7 +67,7 @@ check), and `dash_turn_attack_update()` (= `run_attack_update()` when `global5 =
 ground) in the Turn (`func_724`) and TurnDash (`func_726`) loops. Up smash (`global24 & 0x20`) is
 still the loops' own.
 
-Done: Kirby, Captain Falcon.
+Done: Kirby, Captain Falcon, Luigi.
 
 ## Roll-off
 
@@ -115,4 +115,4 @@ the roll's end; its `0x208000e0` / `0x1000004` save / restore is gone.
 number uses it). **Default air speed multiplier: 1.0** (`rolloff_air_speed_mult()`). The user confirmed the current version (v3 minus the Fall speed boost) is
 right as-is.
 
-Done: Captain Falcon (2.4, air ×1.0), Kirby (2.1, air ×1.0).
+Done: Captain Falcon (2.4, air ×1.0), Kirby (2.1, air ×1.0), Luigi (2.2, air ×1.0).

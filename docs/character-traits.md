@@ -16,6 +16,7 @@ Traits: **Rush**, **Zoning**, **Strike**, **Juggernaut**, **Normal**, **Technica
 | Bowser | `0x0F` | Strike |
 | Marth | `0x12` | Strike |
 | Donkey Kong | `0x04` | Strike |
+| Luigi | `0x0B` | Technical |
 
 Kirby himself (no copy) has no trait. A copied character that isn't listed counts as Normal.
 Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy kind int `0x100000A4`.
