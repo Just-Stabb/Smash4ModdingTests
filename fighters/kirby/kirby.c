@@ -72372,10 +72372,7 @@ int nair_rapid_update()
         if (MotionModuleF(0x1) >= rapidjab_final_frame())
         {
             global75 = 0x1; // final hit out: half landing lag from here (nair_rapid_landing)
-            if (global76 != trait_rush())
-            {
-                return 0; // (Rush: the finisher can be cancelled too, during and after its hit)
-            }
+            return 0; // no cancel from the final hit's frame on (Rush too: user)
         }
     }
     else

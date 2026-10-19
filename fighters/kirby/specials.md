@@ -881,8 +881,9 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
   (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
   → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
-  restart neutral air. With the **Rush** trait the finisher can be cancelled too, during and
-  after its hit.
+  restart neutral air. The finisher can't be cancelled from its hit's frame
+  (`rapidjab_final_frame()`, 5) on, with the **Rush** trait too (user; it used to be cancellable
+  during and after its hit with Rush). The grounded rapid jab's Rush finisher cancel is unchanged.
 - **Air hitboxes (loop 60% damage, finisher 65% knockback):** neutral air sets status flag
   `0x21000024` (`nair_rapid_air_flag()`) when it starts. `tools/kirby_rapid_air_acmd.py` turns
   each hitbox of the loop hit `0xDCD907DA` and the finisher `attack100end` into
