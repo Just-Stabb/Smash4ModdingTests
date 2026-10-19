@@ -1000,6 +1000,12 @@ So the sword shows only in the Marth copy's own motions, `0x37D`–`0x384` (the 
 `0x30A` in the code is the copy-change one; Shield Breaker's charge loop `0x37E` shows the sword
 with no sword-trace effect).
 
+**v3 result (user): no sword either**, with Marth's own slots and Shield Breaker unchanged in look,
+so it isn't the motion slot. Not in the animations' own data either (OMO header field `0x08` is a
+per-pack date stamp; the body's `material_anime_face` / `_eyelid` MTAs for the Marth animations only
+have face meshes; `marthsword`'s `model.mta` is empty). Next test: whether the copy's effect script
+(`Sword_Trace` on bone `0x18` in the End scripts) is what shows it.
+
 **Now (v3):** three of Marth's slots carry the sword animations: `0x380` (was the full-charge
 ground end) → Strike nair, `0x384` (full-charge air end) → back air, `0x382` (air charge loop) →
 up air. Shield Breaker's animation slots come from `func_2919` (MSC): the full-charge ends now
