@@ -52,7 +52,11 @@ Rules for editing decompiled files:
 - **Write floats as float literals (`1.0f`, `-0.5f`).** The sheet shows floats
   as raw bits, e.g. `pushInt. 0x3f800000` is `1.0f` and `0xbf800000` is `-1.0f`.
   An int literal is passed as an int, not converted.
-
+- **Don't pass a call to a function that itself calls functions as an argument of another
+  script function** (`func_22(f(x), 0, 1.0f)` where `f` calls other functions). It compiled to
+  normal-looking bytecode but broke Kirby's aerials in game (user); store the result in a local
+  first. One-line `return` functions (`func_22(strike_nair_motion(), …)`) and syscall arguments
+  are fine.
 ## 3. Translating the sheet's assembly into MSC-C
 
 Arguments are pushed in order, then `sys N, M` calls syscall `M` with `N` args:
