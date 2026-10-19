@@ -65,6 +65,8 @@ FX = {0x380: (0x301, 'MarthSwordAttack12'), 0x384: (0x302, 'MarthSwordAttackAirB
 SLOT_NAMES = {0x380: 'MarthSpecialNEndMax', 0x384: 'MarthSpecialAirNEndMax', 0x382: 'MarthSpecialAirNLoop'}
 SWORD_FROM = 'marthspecialnendmax'      # the effect script whose Sword_Trace is used
 FORWARD = (0.0, 0.0, 1.0)  # model +Z: where Kirby faces
+BACK = (0.0, 0.0, -1.0)
+SIZE = 2.0                 # the sword's size (user: double)
 DEPTH = (1.0, 0.0, 0.0)   # model X: toward / away from the camera (Kirby faces +Z)
 
 
@@ -156,6 +158,28 @@ def frame_with_y(origin, y):
     return [[x[i], y[i], z[i], origin[i]] for i in range(3)] + [[0, 0, 0, 1]]
 
 
+def apply3(m, v):
+    return tuple(sum(m[i][k] * v[k] for k in range(3)) for i in range(3))
+
+
+def local_for(parent, origin, blade, length):
+    """LHaveN local (pos, quat, scale) putting the grip at origin and the blade (+Y) along blade
+    with world length `length`, exactly even when the parent's matrix is squashed (Kirby's body
+    scales unevenly): the local axes are the parent-space images of the wanted ones, each scaled
+    to the wanted world length (the cross-section may skew a little)."""
+    ip = omo.inv(parent)
+    p = tuple(ip[i][3] + sum(ip[i][k] * origin[k] for k in range(3)) for i in range(3))
+    want = frame_with_y((0.0, 0.0, 0.0), blade)
+    axes = [tuple(want[i][j] for i in range(3)) for j in range(3)]     # world X, Y, Z of the sword
+    loc = [norm(apply3(ip, a)) for a in axes]
+    y = loc[1]
+    x = norm(tuple(loc[0][i] - sum(loc[0][k] * y[k] for k in range(3)) * y[i] for i in range(3)))
+    z = (x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0])
+    rot = [[x[i], y[i], z[i]] for i in range(3)]
+    scale = tuple(length / math.sqrt(sum(c * c for c in apply3(parent, ax))) for ax in (x, y, z))
+    return p, omo.mat2q(rot), scale
+
+
 def sword_track(anim, bones, place, appear, shrink, gone):
     have = next(h for n, p, h in bones if n == 'LHaveN')
     P, R, S = [], [], []
@@ -167,19 +191,19 @@ def sword_track(anim, bones, place, appear, shrink, gone):
             if place == 'hand':      # in the left hand, blade straight forward
                 g = pos(w['LHaveN'])
                 root, tip = (0.0, 0.0, 0.0), FORWARD
-            elif place == 'legs':      # between the legs: grip between the knees, blade toward the feet
+            elif place == 'legs':      # between the legs: grip between the knees, blade straight back
                 g = mid(pos(w['LKneeJ']), pos(w['RKneeJ']))
-                tip = mid(pos(w['LFootJ']), pos(w['RFootJ']))
-                root = mid(pos(w['LLegJ']), pos(w['RLegJ']))
+                root, tip = (0.0, 0.0, 0.0), BACK
             else:                    # left leg: grip at the knee, blade along the leg past the foot
                 g = pos(w['LKneeJ'])
                 tip = pos(w['LFootJ'])
                 root = pos(w['LLegJ'])
-            want = frame_with_y(g, tuple(tip[i] - root[i] for i in range(3)))
-            lp, lq, ls = omo.decompose(omo.mul(omo.inv(w['LHandN']), want))
+            lp, lq, ls = local_for(w['LHandN'], g, tuple(tip[i] - root[i] for i in range(3)), SIZE * s)
+        else:
+            ls = tuple(c * s * SIZE for c in ls)
         P.append(lp)
         R.append(lq)
-        S.append(tuple(c * s for c in ls))
+        S.append(ls)
     return have, P, R, S
 
 

@@ -1014,6 +1014,12 @@ and the move's own game script. The slots' expression scripts (`MarthSpecialNEnd
 own: up air had the air charge loop's endless rumble. Nair's blade points straight forward (model
 +Z) from the hand (user: it was rotated oddly).
 
+**v5 (user):** the sword is **twice the size** (`SIZE`), bair's blade points **straight back** (model
+−Z, grip still between the knees). The bone's local transform is now solved so the blade's world
+direction and length are exact even where Kirby's body squashes unevenly (the parent matrix
+isn't a plain rotation × scale there): local axes = the parent-space images of the wanted ones,
+each scaled to the wanted world length (`local_for()`); only the blade's cross-section can skew.
+
 **v3 result (user): no sword either**, with Marth's own slots and Shield Breaker unchanged in look,
 so it isn't the motion slot. Not in the animations' own data either (OMO header field `0x08` is a
 per-pack date stamp; the body's `material_anime_face` / `_eyelid` MTAs for the Marth animations only
