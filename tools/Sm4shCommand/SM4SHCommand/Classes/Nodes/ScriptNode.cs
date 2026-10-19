@@ -43,18 +43,24 @@ namespace Sm4shCommand.Nodes
         public int MotionIndex { get; set; } = -1;
 
         /// <summary>
+        /// View > Show Animation IDs: list scripts with their animation (motion) ID, the motion.mtable
+        /// index the game's code uses (e.g. 0x5F for AttackS4: MotionModule / func_22(0x5f, ...) in MSC).
+        /// </summary>
+        public static bool ShowAnimationIds = true;
+
+        /// <summary>
         /// Shows the script's name (or hash) the way its mode lists it.
         /// </summary>
         public void UpdateText()
         {
             string label = Runtime.ScriptLabel(Identifier);
             if (MotionIndex >= 0)
-                Text = $"{MotionIndex:X} - {label}";
+                Text = ShowAnimationIds ? $"0x{MotionIndex:X} - {label}" : label;
             else if (Unlisted)
                 Text = $"[unlisted] {label}";
             else
                 Text = label;
-            ToolTipText = $"0x{Identifier:X8}" + (Unlisted ? " - not in motion.mtable (reached through JUMP/CALL, or unused)" : "");
+            ToolTipText = $"0x{Identifier:X8}" + (MotionIndex >= 0 ? $" - animation ID 0x{MotionIndex:X} ({MotionIndex})" : "") + (Unlisted ? " - not in motion.mtable (reached through JUMP/CALL, or unused)" : "");
         }
 
         /// <summary>

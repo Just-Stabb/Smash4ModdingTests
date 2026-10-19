@@ -100,6 +100,17 @@ namespace Sm4shCommand
                     LogMessage("Reopen a script to see the change.");
                 }
             };
+            var animIds = new ToolStripMenuItem("Show Animation IDs (e.g. 0x5F - AttackS4)") { CheckOnClick = true };
+            animIds.Checked = ScriptNode.ShowAnimationIds = Runtime.GetSetting("AnimationIds", true);
+            animIds.ToolTipText = "List scripts with their animation (motion) ID: the motion.mtable index the game's code\n" +
+                "(MSC MotionModule calls) uses. Needs motion.mtable (fighter / project mode, or next to an opened .bin).";
+            animIds.CheckedChanged += (o, e) =>
+            {
+                ScriptNode.ShowAnimationIds = animIds.Checked;
+                Runtime.SetSetting("AnimationIds", animIds.Checked);
+                RefreshScriptNames();
+            };
+            viewToolStripMenuItem.DropDownItems.Add(animIds);
             viewToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
             viewToolStripMenuItem.DropDownItems.Add(decimalInts);
             viewToolStripMenuItem.DropDownItems.Add(floatBits);
@@ -116,6 +127,10 @@ namespace Sm4shCommand
                     AutoParseAnimations(_lastOpened, true);
             };
             toolsToolStripMenuItem.DropDownItems.Insert(toolsToolStripMenuItem.DropDownItems.IndexOf(parseAnimationsToolStripMenuItem) + 1, autoParse);
+
+            var gotoId = new ToolStripMenuItem("Go to Animation ID..", null, gotoAnimationId_Click);
+            gotoId.ShortcutKeys = Keys.Control | Keys.Shift | Keys.G; // Ctrl+G is the editor's Go to line
+            toolsToolStripMenuItem.DropDownItems.Add(gotoId);
 
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Reload Tooltips", null, (o, e) =>
@@ -272,12 +287,27 @@ namespace Sm4shCommand
                         ScriptFiles.Add(fileName, f);
                         ScriptComments.Load(fileName, f);
                         var node = new TreeNode("ACMD") { Name = "nACMD" };
+                        var ids = MotionIndexesNextTo(fileName);
+                        var nodes = new List<ScriptNode>();
                         foreach (var keypair in f.Scripts)
                         {
                             var sn = new ScriptNode(keypair.Key, "", keypair.Value);
+                            int id;
+                            if (ids != null)
+                            {
+                                if (ids.TryGetValue(keypair.Key, out id))
+                                    sn.MotionIndex = id;
+                                else
+                                    sn.Unlisted = true;
+                            }
                             sn.UpdateText();
-                            node.Nodes.Add(sn);
+                            nodes.Add(sn);
                         }
+                        // With motion.mtable: in animation ID order, then the unlisted scripts (as in fighter mode).
+                        if (ids != null)
+                            nodes = nodes.OrderBy(x => x.MotionIndex < 0 ? int.MaxValue : x.MotionIndex)
+                                .ThenBy(x => Runtime.ScriptLabel(x.Identifier), StringComparer.OrdinalIgnoreCase).ToList();
+                        node.Nodes.AddRange(nodes.ToArray());
                         FileTree.Nodes.Add(node);
                     }
                     else if (*(buint*)source.Address == 0xFFFF0000)
@@ -848,6 +878,72 @@ namespace Sm4shCommand
             }
             LogMessage($"Added script 0x{crc:X8} ({Runtime.ScriptLabel(crc)}). Save to write it to the file.");
             OpenScriptByHash(crc);
+        }
+
+        /// <summary>
+        /// {script hash: animation ID (first motion.mtable index)} from the motion.mtable in a file's
+        /// folder, or null when there isn't one.
+        /// </summary>
+        static Dictionary<uint, int> MotionIndexesNextTo(string fileName)
+        {
+            var path = Path.Combine(Path.GetDirectoryName(fileName), "motion.mtable");
+            if (!File.Exists(path))
+                return null;
+            try
+            {
+                var table = new MTable(path, Runtime.WorkingEndian);
+                var ids = new Dictionary<uint, int>();
+                for (int i = 0; i < table.Count; i++)
+                    if (table[i] != 0 && !ids.ContainsKey(table[i]))
+                        ids.Add(table[i], i);
+                return ids;
+            }
+            catch (Exception ex)
+            {
+                Runtime.LogMessage($"Couldn't read {path}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Tools > Go to Animation ID: opens the script with that animation (motion.mtable) ID, in hex
+        /// as in MSC (0x5F or 5F).
+        /// </summary>
+        private void gotoAnimationId_Click(object sender, EventArgs e)
+        {
+            string text;
+            using (var dlg = new RenameForm(""))
+            {
+                dlg.Text = "Go to animation ID (hex, e.g. 0x5F)";
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+                text = dlg.NewName.Trim();
+            }
+            if (text.Length == 0)
+                return;
+            if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                text = text.Substring(2);
+            int id;
+            if (!int.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out id) || id < 0)
+            {
+                MessageBox.Show(this, $"\"{text}\" isn't a hex number.", "Go to animation ID", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (textBox1.Text.Length > 0)
+                textBox1.Text = ""; // the filter could hide it
+            var nodes = AllNodes(FileTree.Nodes).OfType<ScriptNode>().Where(IsAcmdNode).ToList();
+            var node = nodes.FirstOrDefault(x => x.MotionIndex == id);
+            if (node != null)
+            {
+                FileTree.SelectedNode = node;
+                OpenNode(node);
+            }
+            else if (!nodes.Any(x => x.MotionIndex >= 0))
+                MessageBox.Show(this, "No animation IDs: open a fighter folder or project, or a .bin with motion.mtable next to it.",
+                    "Go to animation ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else
+                MessageBox.Show(this, $"No animation 0x{id:X} (the motion table has {nodes.Max(x => x.MotionIndex) + 1} entries; empty slots have no script).",
+                    "Go to animation ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void commandDefinitions_Click(object sender, EventArgs e)
