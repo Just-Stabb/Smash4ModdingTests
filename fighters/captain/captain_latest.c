@@ -14606,6 +14606,10 @@ void func_722()
     {
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run: turning the stick up / down from a run
+    {                             // ends it in RunBrake, so the check is here too (added)
+        return;
+    }
     if (func_43())
     {
         return;
@@ -38161,7 +38165,9 @@ void rolloff_update()
 // Tilts / down smash out of run (universal mechanic, docs/universal-mechanics.md). While running
 // the stick is held forward, so the game's tilt and smash commands don't come out and A gave a dash
 // attack; the Run loop (func_717) reads the stick itself when attack is pressed, before the dash
-// attack check:
+// attack check. Moving the stick up / down from a run drops its X below the run threshold, which
+// ends the run in RunBrake (0x5) the same frame, and RunBrake allowed a dash attack, so its loop
+// (func_722) runs the same check:
 //   stick Y <= -run_tilt_y() (0.5): down smash if the stick was flicked down in the last
 //   run_smash_flick() (4) frames or the down smash command is set, else down tilt;
 //   stick Y >= run_tilt_y(): up tilt (up smash keeps its own check, which comes first).

@@ -13,9 +13,9 @@ set by the MSC for the whole of a smash attack that rolled a critical hit. Then:
 
 1. Hitboxes (HOOK_ATK, in AttackModuleImpl::set_attack 0x02C086A8 right after the attack data is
    copied into its slot): damage (+0x18) x DAMAGE_MULT (1.15) and the hitbox's hitlag multiplier
-   (+0x34) x HITSTOP_MULT (1.2), for hitboxes owned by Strike Kirby. AttackModule +4 is the owning
-   battle object; only fighters (object ID >> 28 == 0) are looked at, so projectiles and other
-   articles (weapons, their own objects) are never changed. Every hitbox command (ACMD Hitbox,
+   (+0x34) x HITSTOP_MULT (1.2), for hitboxes owned by Strike Kirby. AttackModule +4 is the owner's
+   module accessor, whose WorkModule (+0x28) holds the marker; projectiles and other articles have
+   their own accessor and WorkModule (no marker), so they're never changed. Every hitbox command (ACMD Hitbox,
    Special_Hitbox, ..., MSC) goes through set_attack. Critical hit: damage x CRIT_MULT (2) more,
    and the multiplier x2 x (s k + 5) / (2s k + 5) (s = the Strike damage, k = 0.3846154) so that
    the opponent's hitstop is exactly 2x the Strike hit's.
@@ -42,7 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04B78A00           # grown .text (position_vars_cave.py GROW_END); its own blocks end before
-LIMIT = 0x04B79000
+LIMIT = 0x04B78F00           # copy_fx_cave.py from here
 HOOK_ATK = 0x02C08730       # set_attack, after the copy loop: lwz r8, 0(r28)
 HOOK_HS = 0x02C27638        # hitstop calc: mr r11, r5
 HOOK_THROW = 0x02C0B77C     # AttackModule MSC handler, throw (0x2716) case, before vt+0x64: lwz r12, 0(r30)
@@ -100,56 +100,21 @@ def inc(k):
 
 
 def owner_wm(am, fail):
-    """r12 = the WorkModule of the fighter whose AttackModule is am, else branch to fail (owner_scan).
-    Uses r0, r3, r6-r12; keeps r4 / r5."""
-    return """
-        mr r3, %(am)s
-        bl owner_scan
-        cmpwi r12, 0
-        beq %(fail)s""" % dict(am=am, fail=fail)
+    """r12 = the WorkModule of the object whose AttackModule is am, else branch to fail. AttackModule +4
+    is its module accessor (AttackModuleImpl's constructor 0x02C077F4 stores its argument there; the
+    fighter set-up 0x02E53764 passes the accessor, then stores the module at accessor +0x50), and the
+    accessor has the WorkModule at +0x28. Checks accessor +0x50 == am. Uses r0, r12."""
+    return chk(am, fail) + """
+        lwz r12, 4(%(am)s)              # module accessor
+%(c12)s
+        lwz r0, 0x50(r12)               # its AttackModule
+        cmplw r0, %(am)s
+        bne %(fail)s
+        lwz r12, 0x28(r12)              # WorkModule""" % dict(am=am, fail=fail, c12=chk("r12", fail))
 
 
-# The fighter that owns an AttackModule: the live fighter-table entry whose module accessor (+0xC)
-# has it at +0x50 (the same table and accessor the position variables use in game). An earlier
-# version went through AttackModule +4 (the owning object) and object +0xC, which didn't work in
-# game.
-OWNER_SCAN = """
-owner_scan:                             # r3 = AttackModule -> r12 = its fighter's WorkModule, or 0
-        lis r12, 0x1035
-        lwz r12, 0x184C(r12)            # [0x1035184C] -> fighter table
-%(c12)s
-        lwz r12, 0(r12)
-%(c12)s
-        lwz r11, 8(r12)                 # count
-        lwz r12, 0(r12)                 # entries
-%(c12)s
-        cmplwi r11, 8
-        ble scan_count
-        li r11, 8
-scan_count:
-        li r10, 0
-scan_loop:
-        cmpw r10, r11
-        bge scan_none
-        mulli r9, r10, 0x76B0
-        add r9, r9, r12
-        lbz r0, 0x1E(r9)                # live
-        cmplwi r0, 4
-        blt scan_next
-        lwz r9, 0xC(r9)                 # module accessor
-%(c9)s
-        lwz r0, 0x50(r9)                # its AttackModule
-        cmplw r0, r3
-        bne scan_next
-        lwz r12, 0x28(r9)               # WorkModule
-        blr
-scan_next:
-        addi r10, r10, 1
-        b scan_loop
-scan_none:
-        li r12, 0
-        blr
-""" % dict(c12=chk("r12", "scan_none"), c9=chk("r9", "scan_next"))
+# Earlier versions looked for the owner through [AM+4] +0xC (taking +4 for the battle object) and
+# then by scanning the fighter table; neither found Kirby in game. +4 is the accessor itself.
 
 
 SOURCE = """
@@ -228,7 +193,6 @@ hs_orig:
         mr r11, r5                      # the hitstop calc's own instruction
         b %(HS_BACK)s
 
-%(OWNER_SCAN)s
 strike_throw:                           # r30 = AttackModule, throw attack data at 0x78(r1)
 %(o_throw)s
 %(m12_throw)s
@@ -265,7 +229,7 @@ def assemble():
     a = Asm(CAVE)
     a.asm(SOURCE % dict(
         INC0=inc(0), INC1=inc(1), INC2=inc(2), INC3=inc(3),
-        OWNER_SCAN=OWNER_SCAN, o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
+        o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
         o_throw=owner_wm("r30", "throw_done"), m12_throw=marker("r12", "throw_done"), CRIT=CRIT_BIT,
         THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
         c4_hs=chk("r4", "hs_orig"), m12_hs=marker("r12", "hs_orig"),

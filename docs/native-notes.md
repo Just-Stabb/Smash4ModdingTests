@@ -688,7 +688,8 @@ reads", "Position variables" and "Losing the copy when hit" above.)
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \
       $(python3 tools/copy_custom_cave.py) 0x10136C58=9 $(python3 tools/kirby_stat_cave.py) \
-      $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000 $(python3 tools/strike_cave.py)
+      $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000 $(python3 tools/strike_cave.py) \
+      $(python3 tools/copy_fx_cave.py)
 
 Other copies: the native part (params, weapon custom number) is generic. The body ACMD is picked
 by MSC: every copy's pair of motion helpers (`[Copy: shared] helper`, e.g. Captain Falcon
@@ -840,9 +841,14 @@ Overdrive (×1.2 animations).
   vtable `+0x54` = `AttackModuleImpl::set_attack` `0x02C086A8(this, id, part, data)` (vtable
   `0x10103524`, the only AttackModule class). It copies the data to slot `[this+0x40] + id*0x84`.
   Data: `+0x18` damage, `+0x1C` size, `+0x30` trip, `+0x34` hitlag multiplier, `+0x38` SDI,
-  `+0x43` effect. AttackModule `+4` = the owning battle object (constructor `0x02C077F4`); a
-  battle object's `+0` is its ID (category = ID >> 28, 0 = fighter) and a fighter's `+0xC` its
-  module accessor.
+  `+0x43` effect. AttackModule `+4` = the owner's **module accessor** (constructor `0x02C077F4`
+  stores its argument there; the fighter set-up `0x02E53764` passes the accessor and then stores
+  the module at accessor `+0x50` through setter `0x02BF6340`). The same set-up gives the accessor's
+  other slots, e.g. `+0x28` WorkModule (`0x02F1B32C`), `+0x44` Motion, `+0x48` Stop, `+0x50`
+  Attack, `+0xC4` MotionAnimcmd.
+- `Extended_Special_Hitbox` (`0x02BDD46C`) goes through AttackModule's MSC handler (op `0x272C`,
+  like `0x272B`): that case calls vtable `+0x39C` (`0x02C0D210`), which builds the data and calls
+  set_attack too. So every hitbox kind reaches set_attack.
 - **Hitstop:** `0x02C26724(f1 damage, f2 0.3846154, f3 5, f4 multiplier, f5 30)` =
   floor(min((damage × 0.3846154 + 5) × multiplier, 30)). `0x02C2678C(r3, r4 hitbox data, f1
   damage, f2 multiplier, r5 side, r6 use the hitbox's multiplier)` multiplies by the data's `+0x34`
@@ -858,7 +864,7 @@ Overdrive (×1.2 animations).
   pack their parameters as MSC arguments and call AttackModule's MSC handler (vtable `+0x334`,
   `0x02C0ACFC`) with op `0x2716` / `0x2717`; that case builds the throw's attack data at `0x78(r1)`
   (damage first, from argument 3) and passes it to vtable `+0x64` at `0x02C0B790`.
-- `tools/strike_cave.py` (cave `0x04B78C00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
+- `tools/strike_cave.py` (cave `0x04B78A00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
   (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2; crit bit `0x10`:
   damage ×2 more, hitlag ×2 × (s·k + 5) / (2s·k + 5) so the opponent's hitstop is exactly 2× the
   Strike one), `0x02C27638` (attacker side, Strike Kirby: damage / 1.15 (crit / 2.3 and the
@@ -867,26 +873,37 @@ Overdrive (×1.2 animations).
 
 ### Strike: owner lookup and debug counters
 
-The first in-game test showed no Strike effect at all. The hitbox / throw hooks used to find the
-owner through AttackModule `+4` (the owning object, as the fighter's constructor `0x02E538B4`
-passes it) and object `+0xC`; that path was never confirmed in game. They now scan the fighter
-table instead (`owner_scan`: `[[0x1035184C]+0]`, entries `0x76B0` apart, live byte `+0x1E`,
-accessor `+0xC`, the entry whose accessor `+0x50` is this AttackModule; the same path the position
-variables use in game). The cave keeps four counters (words at the `counters` label, printed by
+The first two in-game tests showed no Strike effect at all (damage, hitstop, crit damage). Both
+owner lookups were wrong: v1 took AttackModule `+4` for the battle object and read its `+0xC`; v2
+scanned the fighter table (`[[0x1035184C]+0]`, entry `+0xC` as the accessor). AttackModule `+4` is
+the accessor itself (above), so the hooks now read the WorkModule as `[[AM+4]+0x28]`, after
+checking `[[AM+4]+0x50] == AM`. Projectiles / articles have their own accessor and WorkModule
+(no Kirby marker), so they're still never changed. The cave keeps four counters (words at the `counters` label, printed by
 `python3 -c "import sys; sys.path.insert(0, 'tools'); import strike_cave as S; a, w = S.assemble(); print(hex(a.labels['counters']))"`,
-currently `0x04B78DD4`): hitboxes seen by the set_attack hook, hitboxes scaled, own-hitstop
+currently `0x04B78D74`): hitboxes seen by the set_attack hook, hitboxes scaled, own-hitstop
 adjustments, throws scaled. In Cemu's memory viewer: seen counting up but scaled at 0 = the
 marker / owner check fails; seen at 0 = the hook isn't reached.
 
 ## Copy abilities: ACMD script sets
 
 `MotionAnimcmdModule(0, set, motion, kind)` (MSC handler `0x02760F4C`, FighterMotionAnimcmdModuleImpl
-vtable `0x10093B80`): op 0 calls vtable `+0x6C` (`0x02760CE4`), which stores the fighter kind for
-script set `set` (0 or 1, `[this+8+4*set]`). The copy helpers set set 0 (game) to the copied
-fighter with the copied fighter's own motion number; Kirby's own copy motions have their own
-names (e.g. `0x30B` hash `0x04961C1F` for Captain Falcon's `specialn` `0x211`), so effects / sounds
-come from Kirby's files. The game's own Diddy Kong copy also points set 1 at Diddy. For customs,
-`copy_custom_motion()` now does that too (experimental: set 1 → the copied fighter's custom).
+vtable `0x10093B80`): op 0 calls vtable `+0x6C(this, set, motion, kind)` (`0x02760CE4`), which
+stores the fighter kind for script set `set` (`[this+8+4*set]`). The module has three script
+agents (`this+0x50+0x38*set`): 0 game, 1 effect, 2 sound. A motion change (`0x027606C0`, from
+vtable `+0x44`: sets 0–2) binds all three to the default kind (`+0x18`):
+`script = 0x02E42518([0x102FF68C], kind, motion)` (the kind's script for that motion),
+`table = 0x02E424D8([0x102FF68C], kind, set)`, `0x02BEE560(table, [this+4], agent, script)`.
+`+0x6C` rebinds **set 0 only** (the motion is its third argument); for any other set it only
+stores the kind. So the copy helpers' `(0, 0, motion, kind)` ran the copied fighter's ACMD (and
+the custom's, with `copy_custom_motion()`), but the experimental `(0, 1, custom, kind)` did nothing
+to effects / sounds (user: still Kirby's).
+
+`tools/copy_fx_cave.py` (cave `0x04B78F00`, trampoline `0x037EE5F0`, hook = `+0x6C`'s first
+instruction) adds set `0x10`: bind sets 1 and 2 (effect, sound) to `kind`'s scripts for `motion`,
+exactly as above, and store the kind for them. `copy_custom_motion()` calls it for customs only
+(`copy_fx_all()`), before the helper's set-0 call. Defaults keep Kirby's own effect / sound
+scripts (bones match Kirby's); a custom's come from the copied fighter's files, so an effect on a
+bone ID Kirby doesn't have may sit somewhere else.
 
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).

@@ -55,6 +55,11 @@ attack check. When attack is pressed (`global38 & 0x1`): stick Y (`global32`) �
 up tilt; otherwise nothing (dash attack). The up smash command (`global24 & 0x20`) is left to the
 run loop's own up smash check.
 
+**Still dash attack in game with only that:** tilting the stick up / down drops stick X, which ends
+the run in RunBrake (`0x5`, loop `func_722`), and RunBrake has its own dash attack transition
+(`0x1e000054` + attack). So `run_attack_update()` is also called in the RunBrake loop, before
+`func_43` and that check (`sv_set_mem(0x1, 0x1, 0x5, func_N)` → main → `func_78(loop)` per fighter).
+
 Done: Kirby, Captain Falcon.
 
 ## Roll-off

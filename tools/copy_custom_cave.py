@@ -137,7 +137,7 @@ def patches():
         'done',
         ('b', RET_C),
     ])
-    assert end3 <= 0x037EE600
+    assert end3 <= 0x037EE5F0   # copy_fx_cave.py's trampoline from here
     p += cave_c
     p.append((HOOK_C, b(HOOK_C, CAVE_C)))
     p.append((HOOK_B, b(HOOK_B, end)))

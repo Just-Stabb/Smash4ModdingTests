@@ -7461,7 +7461,11 @@ void func_310()
     int var0;
     var0 = 0x68;
     var0 = func_311();
-    if (var0 == 0x68 && kirby_rapid_nair()) // neutral air: rapid jab's animation and ACMD (added, nair_rapid_*)
+    if (var0 == 0x68 && kirby_strike_nair()) // Strike neutral air: air jab 2 (added, strike_nair_*)
+    {
+        strike_nair_start();
+    }
+    else if (var0 == 0x68 && kirby_rapid_nair()) // neutral air: rapid jab's animation and ACMD (added, nair_rapid_*)
     {
         nair_rapid_start();
     }
@@ -7553,6 +7557,10 @@ void func_316()
 void func_317()
 {
     if (nair_rapid_update()) // neutral air rapid jab: finisher, landing lag, cancels (added)
+    {
+        return 0x1;
+    }
+    if (strike_nair_update()) // Strike neutral air (air jab 2): landing, air grab cancel (added)
     {
         return 0x1;
     }
@@ -14605,6 +14613,10 @@ void func_722()
     }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
+        return;
+    }
+    if (run_attack_update()) // tilts / down smash out of run: turning the stick up / down from a run
+    {                             // ends it in RunBrake, so the check is here too (added)
         return;
     }
     if (func_43())
@@ -71954,17 +71966,19 @@ int copy_custom_index(int motion, int kind)
     return motion + copy_custom_slot();
 }
 
-// The game ACMD is script set 0. For a custom, script set 1 (the one the game's own Diddy Kong copy
-// points at Diddy, MotionAnimcmdModule(0, 1, ...)) is pointed at the copied fighter's custom too,
-// so its effects / sounds come from the copied fighter's files instead of Kirby's own copy scripts
-// (which only have the default move's). Defaults keep Kirby's own. (Experimental.)
+// The game ACMD is script set 0 (the caller's MotionAnimcmdModule(0, 0, motion, kind)). For a custom,
+// set copy_fx_all() first binds the effect and sound scripts (sets 1 and 2) to the copied fighter's
+// custom too (native, tools/copy_fx_cave.py: the game only rebinds set 0 there), so its effects /
+// sounds come from the copied fighter's files instead of Kirby's own copy scripts (which only have
+// the default move's). Defaults keep Kirby's own.
+int copy_fx_all() { return 0x10; }
 int copy_custom_motion(int motion, int kind)
 {
     int m;
     m = copy_custom_index(motion, kind);
     if (m != motion)
     {
-        MotionAnimcmdModule(0, 0x1, m, kind);
+        MotionAnimcmdModule(0, copy_fx_all(), m, kind);
     }
     return m;
 }
@@ -72751,6 +72765,57 @@ void overdrive_update()
     overdrive_gfx_on(0x3);  // LLegJ
 }
 
+// ===================================================================
+// Strike neutral air (added): with the Strike trait, neutral air is jab 2 in the air: motion 0x51
+// (attack12) with status flag strike_nair_flag() (0x21000025), which picks the air version in its
+// ACMD (tools/kirby_strike_nair_acmd.py): frame duration x1.6, x1.4 from frame 7; the hitbox
+// Damage 6 / Angle 43 / KBG 32 / BKB 60 / Z 17.5 on frame 3, 1.2x hitstun (LASTHIT_HITSTUN_MUL).
+// From frame strike_nair_grab_frame() (4) grab cancels it into the air grab (airgrab_try()).
+// Landing: neutral air's landing lag (0x11000002 stays 0x68), straight to LandingAir.
+// ===================================================================
+int strike_nair_flag()       { return 0x21000025; }
+int strike_nair_motion()     { return 0x51; }  // jab 2
+float strike_nair_grab_frame() { return 4.0f; } // air grab cancel from this frame (1 = the first)
+
+int kirby_strike_nair()
+{
+    if (global76 == trait_strike())
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// neutral air main (func_310)
+void strike_nair_start()
+{
+    WorkModule(0x2710, strike_nair_flag()); // attack12's ACMD uses the air version
+    func_22(strike_nair_motion(), 0, 1.0f);
+    WorkModule(0x2710, 0x2100000d);         // landing lag on for the whole move
+}
+
+// neutral air loop (func_317), every frame. Returns 1 when it changed status.
+int strike_nair_update()
+{
+    if (global4 != 0x34 || MotionModule(0x7) != strike_nair_motion())
+    {
+        return 0;
+    }
+    if (global18 == 0) // landed: neutral air's landing lag
+    {
+        func_16(0x18, 0);
+        return 0x1;
+    }
+    if (MotionModuleF(0x1) + 1.0f >= strike_nair_grab_frame() && global24 & 0x20000000)
+    {
+        if (airgrab_try())
+        {
+            return 0x1;
+        }
+    }
+    return 0;
+}
+
 // neutral air uses the air rapid jab (nair_rapid_*)
 int kirby_rapid_nair()
 {
@@ -72853,6 +72918,10 @@ int upb_cancel_update()
     {
         return 0;
     }
+    if (global4 == 0x154 && MotionModuleF(0x1) + 1.0f < upb_cancel_frame()) // and the animation's frame
+    {                                                                        // (= the ACMD's) in the rise
+        return 0;
+    }
     if (!(global24 & 0x1000) || (global24 & 0xe000)) // neutral special only
     {
         return 0;
@@ -72877,7 +72946,9 @@ int upb_cancel_update()
 // Tilts / down smash out of run (universal mechanic, docs/universal-mechanics.md). While running
 // the stick is held forward, so the game's tilt and smash commands don't come out and A gave a dash
 // attack; the Run loop (func_717) reads the stick itself when attack is pressed, before the dash
-// attack check:
+// attack check. Moving the stick up / down from a run drops its X below the run threshold, which
+// ends the run in RunBrake (0x5) the same frame, and RunBrake allowed a dash attack, so its loop
+// (func_722) runs the same check:
 //   stick Y <= -run_tilt_y() (0.5): down smash if the stick was flicked down in the last
 //   run_smash_flick() (4) frames or the down smash command is set, else down tilt;
 //   stick Y >= run_tilt_y(): up tilt (up smash keeps its own check, which comes first).

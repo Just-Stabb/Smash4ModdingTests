@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Kirby's copy of a custom special: effect and sound scripts too. Prints rpx_patch.py args.
+
+  python3 tools/rpx_patch.py IN.rpx OUT.rpx ... $(python3 tools/position_vars_cave.py) \\
+      $(python3 tools/strike_cave.py) $(python3 tools/copy_fx_cave.py)
+
+(after position_vars_cave.py, whose grow:0x04B79000 makes the code space this uses; it sits after
+strike_cave.py's, which ends before 0x04B78F00. The hook is too far from there for a branch, so it
+goes through TRAMP, 4 free words at the end of copy_custom_cave.py's CAVE_C space in the Havok cave.)
+
+MotionAnimcmdModule (FighterMotionAnimcmdModuleImpl, vtable 0x10093B80) runs a motion's scripts on
+three agents (at +0x50, 0x38 bytes each): set 0 game (ACMD), 1 effect, 2 sound. A motion change
+(0x027606C0) binds all three to the fighter's own kind. MSC MotionAnimcmdModule(0, set, motion, kind)
+calls vtable +0x6C (0x02760CE4), which stores the kind for that set, but only set 0 is rebound
+(to the kind's script for that motion): copy_custom_motion() in fighters/kirby/kirby.c used it to run
+the copied fighter's custom ACMD, while the effects and sounds stayed Kirby's own (default) ones.
+
+The hook at +0x6C's first instruction adds set BIND_ALL (0x10, never used by the game): it binds
+sets 1 and 2 (effect, sound) to `kind`'s scripts for `motion`, the same way +0x6C binds set 0
+  script = 0x02E42518([0x102FF68C], kind, motion)       (0 = the kind has no such motion: nothing done)
+  table  = 0x02E424D8([0x102FF68C], kind, set)
+  0x02BEE560(table, [this+4], this + 0x50 + 0x38 set, script)
+and stores the kind at +8 + 4 set. Any other set goes on to the original function.
+copy_custom_motion() calls it for a custom slot only, before its set-0 call.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ppcasm import Asm, ha, lo  # noqa: E402
+
+CAVE = 0x04B78F00
+LIMIT = 0x04B79000
+TRAMP = 0x037EE5F0          # -0x037EE600 (transform_grab_cave.py starts there)
+HOOK = 0x02760CE4           # MotionAnimcmdModule vtable +0x6C: mflr r0
+BIND_ALL = 0x10
+SCRIPT_OF = 0x02E42518
+SET_TABLE = 0x02E424D8
+BIND = 0x02BEE560
+
+SOURCE = """
+copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-1 = own)
+        cmpwi r4, %(BIND_ALL)d
+        beq fx_all
+        mflr r0                         # +0x6C's own instruction
+        lis r12, %(BACK_HI)s            # back (too far for b; r12 is free at a function's start)
+        addi r12, r12, %(BACK_LO)s
+        mtctr r12
+        bctr
+fx_all:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r26, 0x18(r1)
+        mr r31, r3
+        mr r30, r5
+        mr r29, r6
+        cmpwi r29, -1
+        bne fx_kind
+        lwz r29, 0x18(r31)              # own kind
+fx_kind:
+        lis r3, 0x1030
+        lwz r3, -0x974(r3)              # [0x102FF68C] script manager
+        mr r4, r29
+        mr r5, r30
+        bl %(SCRIPT_OF)s
+        mr. r28, r3
+        beq fx_done
+        li r27, 1
+fx_loop:
+        slwi r0, r27, 2
+        add r12, r31, r0
+        stw r29, 8(r12)                 # the set's kind
+        lis r3, 0x1030
+        lwz r3, -0x974(r3)
+        mr r4, r29
+        mr r5, r27
+        bl %(SET_TABLE)s
+        cmpwi r3, 0
+        beq fx_next
+        mulli r5, r27, 0x38
+        addi r5, r5, 0x50
+        add r5, r31, r5                 # the set's agent
+        lwz r4, 4(r31)
+        mr r6, r28
+        bl %(BIND)s
+fx_next:
+        addi r27, r27, 1
+        cmpwi r27, 2
+        ble fx_loop
+fx_done:
+        lmw r26, 0x18(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+"""
+
+
+def assemble():
+    a = Asm(CAVE)
+    back = HOOK + 4
+    a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)), SCRIPT_OF="0x%08X" % SCRIPT_OF,
+                        SET_TABLE="0x%08X" % SET_TABLE, BIND="0x%08X" % BIND))
+    words = a.words()
+    assert CAVE + 4 * len(words) <= LIMIT, "copy fx cave too big: %d words" % len(words)
+    return a, words
+
+
+def trampoline(target):
+    t = Asm(TRAMP)
+    t.asm("""
+        lis r12, %s
+        addi r12, r12, %s
+        mtctr r12
+        bctr""" % (hex(ha(target)), hex(lo(target))))
+    return t.words()
+
+
+def main():
+    a, words = assemble()
+    out = ["0x%08X=0x%08X" % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    out += ["0x%08X=0x%08X" % (TRAMP + 4 * i, w) for i, w in enumerate(trampoline(a.labels["copy_fx"]))]
+    off = TRAMP - HOOK
+    out.append("0x%08X=0x%08X" % (HOOK, (18 << 26) | (off & 0x3FFFFFC)))
+    print(" ".join(out))
+
+
+if __name__ == "__main__":
+    main()

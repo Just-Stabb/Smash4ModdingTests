@@ -28,33 +28,19 @@ def fresh():
     mu.mem_map(0x10100000, 0x10000)
     mu.mem_write(0x10105D98, struct.pack(">f", 0.0))
     mu.mem_map(0x10400000, 0x100000)
-    mu.mem_map(0x10340000, 0x40000)                      # fighter table: [0x1035184C] -> [+0] -> entries
-    mu.mem_map(0x10500000, 0x40000)
-    mu.mem_write(0x1035184C, struct.pack(">I", 0x10360000))
-    mu.mem_write(0x10360000, struct.pack(">I", 0x10360100))
-    mu.mem_write(0x10360100, struct.pack(">III", ENTRIES, 0, 3))
-    for slot in range(3):                                 # slot 0 empty, slot 1 another fighter
-        mu.mem_write(ENTRIES + slot * 0x76B0 + 0x1E, bytes([4 if slot else 2]))
-    mu.mem_write(ENTRIES + 0x76B0 + 0xC, struct.pack(">I", 0x10410000))
-    mu.mem_write(0x10410000 + 0x50, struct.pack(">I", 0x10470000))
     mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
     return mu
 
 
-ENTRIES = 0x10500000
 AM = 0x10480000             # the AttackModule the hooks see
 
 
 def fighter(mu, base, kind_id, marker):
-    """a fighter in table slot 2 (its accessor at base + 0x100, AttackModule AM at accessor +0x50,
-    WorkModule int 0x8E = marker). kind_id with a category (>> 28) isn't a fighter: its object
-    isn't in the fighter table, so slot 2 is left empty."""
+    """a fighter: its module accessor at base + 0x100 (AttackModule AM at accessor +0x50, which
+    AM +4 points back to), WorkModule int 0x8E = marker. kind_id with a category (>> 28): the
+    accessor holds another AttackModule, so AM isn't this object's."""
     acc, wm, tbl, cat1, ints = base + 0x100, base + 0x200, base + 0x300, base + 0x400, base + 0x500
-    entry = ENTRIES + 2 * 0x76B0
-    live = (kind_id >> 28) == 0
-    mu.mem_write(entry + 0x1E, bytes([4 if live else 0]))
-    mu.mem_write(entry + 0xC, struct.pack(">I", acc))
-    mu.mem_write(acc + 0x50, struct.pack(">I", AM))
+    mu.mem_write(acc + 0x50, struct.pack(">I", AM if (kind_id >> 28) == 0 else 0x10470000))
     mu.mem_write(base, struct.pack(">I", kind_id))
     mu.mem_write(base + 0xC, struct.pack(">I", acc))
     mu.mem_write(acc + 0x28, struct.pack(">I", wm))
@@ -66,10 +52,15 @@ def fighter(mu, base, kind_id, marker):
     return acc
 
 
+def owner(obj):
+    """AM +4 for obj: kirby's accessor; other values are written as they are"""
+    return obj + 0x100 if obj == 0x10400000 else obj
+
+
 def run_atk(mu, obj, damage, hitlag):
     am, slot = AM if obj == 0x10400000 else 0x10490000, 0x10481000   # other values: an AttackModule nobody has
     mu.mem_write(am, struct.pack(">I", 0x1234))
-    mu.mem_write(am + 4, struct.pack(">I", obj))
+    mu.mem_write(am + 4, struct.pack(">I", owner(obj)))
     mu.mem_write(slot + 0x18, struct.pack(">f", damage))
     mu.mem_write(slot + 0x34, struct.pack(">f", hitlag))
     mu.reg_write(UC_PPC_REG_26, slot)
@@ -113,13 +104,10 @@ check("Strike bit with a stat profile: scaled", tuple(round(x, 4) for x in run_a
 fighter(mu, kirby, 0x00000003, 0x12340008)
 check("other fighter (no KI marker): unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
 fighter(mu, kirby, 0x10000003, STRIKE)               # a weapon (ID category 1) with the marker
-check("weapon / projectile: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
+check("accessor holds another AttackModule: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
 check("AttackModule of no fighter: unchanged", run_atk(mu, 0, 10.0, 1.0), (10.0, 1.0))
 fighter(mu, kirby, 3, STRIKE)
-mu.mem_write(ENTRIES + 2 * 0x76B0 + 0x1E, bytes([2]))
-check("fighter not live: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
-mu.mem_write(ENTRIES + 2 * 0x76B0 + 0xC, struct.pack(">I", 0x02000001)); mu.mem_write(ENTRIES + 2 * 0x76B0 + 0x1E, bytes([4]))
-check("bad accessor pointer: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
+check("bad accessor pointer: unchanged", run_atk(mu, 0x02000001, 10.0, 1.0), (10.0, 1.0))
 # --- hitstop ---
 mu = fresh()
 acc = fighter(mu, kirby, 3, STRIKE)
@@ -173,7 +161,7 @@ for dmg in (3.0, 10.0, 14.0, 18.0):
 def run_throw(mu, obj, damage):
     am, sp = AM if obj == 0x10400000 else 0x10490000, 0x104E0000
     mu.mem_write(am, struct.pack(">I", 0x5678))
-    mu.mem_write(am + 4, struct.pack(">I", obj))
+    mu.mem_write(am + 4, struct.pack(">I", owner(obj)))
     mu.mem_write(sp + 0x78, struct.pack(">f", damage))
     mu.reg_write(UC_PPC_REG_30, am)
     mu.reg_write(UC_PPC_REG_1, sp)
@@ -192,7 +180,7 @@ check("throw during a crit: x1.15 only", run_throw(mu, kirby, 8.0), 9.2)
 fighter(mu, kirby, 3, RUSH)
 check("Rush Kirby throw: unchanged", run_throw(mu, kirby, 10.0), 10.0)
 fighter(mu, kirby, 0x10000003, STRIKE)
-check("weapon throw data: unchanged", run_throw(mu, kirby, 10.0), 10.0)
+check("throw, accessor holds another AttackModule: unchanged", run_throw(mu, kirby, 10.0), 10.0)
 check("bad owner: unchanged", run_throw(mu, 0x7, 10.0), 10.0)
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

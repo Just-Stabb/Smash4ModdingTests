@@ -903,7 +903,17 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 
 - **Rush** (Captain Falcon, Sonic, Corrin): ×1.25 movement stats (not jump height); neutral air is
   the air rapid jab (`kirby_rapid_nair()` in `func_310`).
-- Without a copy, or with a non-Rush copy, neutral air is Kirby's normal neutral air
+- **Strike** (Bowser, ...): neutral air is jab 2 (`attack12`, motion `0x51`) in the air
+  (`kirby_strike_nair()` / `strike_nair_start()` in `func_310`, `strike_nair_update()` in the loop
+  `func_317`). `strike_nair_start()` sets status flag `0x21000025` (`strike_nair_flag()`), plays
+  `0x51`, and turns landing lag on (`0x2100000D`; `0x11000002` keeps `0x68`, neutral air's lag).
+  `tools/kirby_strike_nair_acmd.py` edits `attack12` in `game.bin`: with the flag, frame duration
+  1.6 from the start and 1.4 from frame 7, and the air hitbox (user's: Damage 6, Angle 43, KBG 32,
+  BKB 60, Size 3, Z 17.5 → Z2 7, Ground/Air 3) plus `SET_FLOAT(1.2, 0x0F000052)` (1.2× hitstun on
+  whoever it hits); without the flag (grounded jab 2) the original hitbox. From frame
+  `strike_nair_grab_frame()` (4), grab (`global24 & 0x20000000`) cancels it into an air grab
+  (`airgrab_try()`). Touching the ground: LandingAir (`0x18`).
+- Without a copy, or with a non-Rush / non-Strike copy, neutral air is Kirby's normal neutral air
   (`kirby_rapid_nair_without_copy()` = 1 brings the rapid jab back for plain Kirby).
 
 ## Added: up B once per airtime, neutral-special cancel with a copy
@@ -918,7 +928,10 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   up B (counted from its start, across the rise and fall statuses), neutral special (B with no
   direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral special
   (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /
-  `func_2299`). `global78` = up-B frames. (Before: 3, then 6 frames after the first hitbox;
+  `func_2299`). `global78` = up-B frames. In the rise (`0x154`) the animation must also be at frame
+  20 (`MotionModuleF(0x1)` + 1 ≥ 20, the ACMD's frame count), so a game frame counter that runs
+  ahead of the animation can't open it early (user: it was cancellable before frame 20).
+  (Before: 3, then 6 frames after the first hitbox;
   `global79` still records the frame the first hitbox appeared.)
 - Note: Kirby's ground up-B rise script (`specialhi`) isn't in this `game.bin` (air up B `JUMP`s to it),
   so the first hitbox may be the fall's (`0x2D1`, frame 1 of `0x172`). The cancel goes by whatever
