@@ -905,9 +905,9 @@ See `docs/character-traits.md`. While Kirby has a copy, `kirby_trait_update()` (
 writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scaling
 (`tools/kirby_stat_cave.py`; needs the current `build/cross_f.rpx`).
 
-- **Rush** (Captain Falcon, Sonic, Corrin): ×1.25 movement stats (not jump height); neutral air is
+- **Rush** (Captain Falcon, Sonic, Corrin, Little Mac): ×1.25 movement stats (not jump height); neutral air is
   the air rapid jab (`kirby_rapid_nair()` in `func_310`).
-- **Strike** (Bowser, ...): neutral air is jab 2 (`attack12`, motion `0x51`) in the air
+- **Strike** (Bowser, Marth, Donkey Kong): neutral air is jab 2 (`attack12`, motion `0x51`) in the air
   (`kirby_strike_nair()` / `strike_nair_start()` in `func_310`, `strike_nair_update()` in the loop
   `func_317`). `strike_nair_start()` sets status flag `0x21000025` (`strike_nair_flag()`), plays
   `0x51`, and turns landing lag on (`0x2100000D`; `0x11000002` keeps `0x68`, neutral air's lag).

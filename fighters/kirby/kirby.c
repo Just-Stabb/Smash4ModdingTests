@@ -72608,7 +72608,10 @@ int kirby_copy_trait(int kind)
     if (kind == 0xc)  { return trait_rush(); }   // Captain Falcon
     if (kind == 0x22) { return trait_rush(); }   // Sonic
     if (kind == 0x39) { return trait_rush(); }   // Corrin
+    if (kind == 0x29) { return trait_rush(); }   // Little Mac
     if (kind == 0xf)  { return trait_strike(); } // Bowser
+    if (kind == 0x12) { return trait_strike(); } // Marth
+    if (kind == 0x4)  { return trait_strike(); } // Donkey Kong
     return trait_normal();                       // not listed yet
 }
 
