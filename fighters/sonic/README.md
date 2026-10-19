@@ -18,9 +18,10 @@ older `body/2/…`, `newer/`, `test/` copies all still have the original roll.)
 
 Same code as Luigi's (the common function numbers match):
 - **Reverse up / down tilts:** `func_247` / `func_248`.
-- **Tilts / down smash out of run, RunBrake, dash and a turn out of a dash:** Run main
+- **Tilts / down smash out of run, RunBrake, dash, a turn out of a dash and a turn from a run:** Run main
   `func_716`, `run_attack_update()` in `func_715` / `func_717` / `func_722`,
-  `dash_turn_attack_update()` in `func_724` / `func_726`.
+  `dash_turn_attack_update()` in `func_724` / `func_726`, `run_attack_update()` in the TurnRun /
+  TurnRunBrake loops `func_730` / `func_732`.
 - **Roll-off:** speed **2.76** (user), air multiplier **1.0** (default). Roll pre
   `func_362` / `func_363` (kinetic 0x6), `rolloff_update()` in `func_370` / `func_372`, roll ends
   `func_381` / `func_382`, Fall main `func_501`, Fall end `func_535`. **Momentum into the next

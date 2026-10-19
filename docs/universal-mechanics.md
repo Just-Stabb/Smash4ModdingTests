@@ -30,8 +30,8 @@ Done: Kirby, Meta Knight, Corrin (user); Captain Falcon (copied from Kirby's); L
 Up tilt (AttackHi3 `0x29`), down tilt (AttackLw3 `0x2A`), down smash (AttackLw4Start `0x2E`) and
 shield (GuardOn `0x1B`) can be done straight out of a run (Run `0x4`). Up tilt, down tilt and down
 smash (**not shield**: shield still does a forward roll, EscapeF `0x20`) also come out of the initial
-dash (Dash `0x3`) and of a turn out of a dash (Turn `0x6` / TurnDash `0x7` whose previous status,
-`global5`, is Dash). Confirmed in game out of a run (user).
+dash (Dash `0x3`), of a turn out of a dash (Turn `0x6` / TurnDash `0x7` whose previous status,
+`global5`, is Dash) and of a turn from a run (TurnRun `0x8` / TurnRunBrake `0x9`). Confirmed in game out of a run (user).
 MSC, in the common Run scripts (same function numbers in Kirby and Captain Falcon; check
 `sv_set_mem(0x1, 0x1, 0x4, func_N)` per fighter):
 
@@ -64,7 +64,9 @@ the run in RunBrake (`0x5`, loop `func_722`), and RunBrake has its own dash atta
 
 Dash and turns: `run_attack_update()` at the top of the Dash loop (`func_715`, after the air
 check), and `dash_turn_attack_update()` (= `run_attack_update()` when `global5 == 0x3` and on the
-ground) in the Turn (`func_724`) and TurnDash (`func_726`) loops. Up smash (`global24 & 0x20`) is
+ground) in the Turn (`func_724`) and TurnDash (`func_726`) loops. Turning from a run (user):
+`run_attack_update()` on the ground in the TurnRun loop (`func_730`, after the `func_60` check) and
+the TurnRunBrake loop (`func_732`, after the CancelModule check). Up smash (`global24 & 0x20`) is
 still the loops' own.
 
 Done: Kirby, Captain Falcon, Luigi, Sonic.

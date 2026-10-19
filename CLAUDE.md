@@ -5,7 +5,8 @@
   `docs/character-traits.md` and `kirby_copy_trait()` in `fighters/kirby/kirby.c` (rebuild
   `kirby.mscsb`). Kirby's copy of that character gets the trait's changes.
 - **Roll-off** (`docs/universal-mechanics.md`), **reverse tilts** and **up / down tilt, down smash
-  and shield out of run** (not initial dash) are wanted on every character;
+  and shield out of run** (tilts / down smash, not shield, also out of the initial dash and of
+  turns out of a dash or a run) are wanted on every character;
   default roll-off speed 2.2 and air speed multiplier 1.0 (`rolloff_air_speed_mult()`) unless the
   user gives them.
 - Fighter stat (`fighter_param`) names and indices: `reference/fighter_param_attributes.csv`.

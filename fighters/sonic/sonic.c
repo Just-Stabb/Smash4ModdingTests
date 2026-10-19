@@ -14778,6 +14778,10 @@ void func_730()
     {
         return 0x1;
     }
+    if (global18 == 0 && run_attack_update()) // tilts / down smash when turning from a run (added)
+    {
+        return 0x1;
+    }
     var0 = PostureModuleF(0);
     var1 = global48 * var0;
     var2 = ControlModuleF(0);
@@ -14996,6 +15000,10 @@ void func_732()
         return 0x1;
     }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
+    {
+        return 0x1;
+    }
+    if (global18 == 0 && run_attack_update()) // tilts / down smash when turning from a run (added)
     {
         return 0x1;
     }
