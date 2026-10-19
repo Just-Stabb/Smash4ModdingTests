@@ -66,6 +66,7 @@ int global64;
 int global65;
 int global66;
 int global67;
+int global68;
 
 void func_0()
 {
@@ -1692,6 +1693,7 @@ void func_74()
     global29 = ControlModule(0xa, 0x2);
     global45 = ControlModule(0xa, 0x3);
     wavedash_shield_update(); // (Melee air dodge) shield held since the dodge: released yet? (added)
+    rolloff_momentum_update(); // roll-off: no air speed cap until grounded (added)
     var0 = StatusModule(0);
     if (var0 != 0xffffffff)
     {
@@ -7431,6 +7433,10 @@ void func_310()
     var0 = 0x68;
     var0 = func_311();
     func_22(var0, 0, 1.0f);
+    if (var0 == 0x69) // forward air: the animation doesn't move Luigi (user)
+    {
+        KineticModule(0x7, 0); // motion energy off
+    }
     WorkModule(0x7, var0, 0x11000002);
 }
 
@@ -8565,6 +8571,7 @@ void func_381()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        global68 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
     }
     func_383();
 }
@@ -8575,6 +8582,7 @@ void func_382()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        global68 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
     }
     func_383();
 }
@@ -11133,7 +11141,10 @@ void func_534()
 
 void func_535()
 {
-    WorkModule(0x2711, 0x20000044); // roll-off / air dodge: Fall over, the air speed cap is back
+    if (!global68) // (a roll-off keeps it until Luigi is grounded: rolloff_momentum_update)
+    {
+        WorkModule(0x2711, 0x20000044); // roll-off / air dodge: Fall over, the air speed cap is back
+    }
 }
 
 void func_536()
@@ -38050,10 +38061,14 @@ void func_2347()
 // status is Fall, and Fall's end (func_535) clears it. rolloff_fall_speed() can scale the carried
 // speed once. Lock: global62 counts the frames in a row shield has been held this roll; at
 // rolloff_lock_frames() (10) the roll can't slide off for the rest of it. global63: slid off.
+// Momentum (user): after sliding off, the speed carries into the next action too (aerial, special,
+// air dodge, double jump): global68 keeps flag 0x20000044 (no air speed cap) on, past Fall's end,
+// until Luigi is on the ground or a ledge (rolloff_momentum_update, main loop func_74); air
+// friction still slows it as usual.
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
-float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+float rolloff_air_speed_mult() { return 1.1f; } // speed carried off a ledge x this (1.0 = unchanged; Luigi 1.1, user)
 
 void rolloff_fall_speed()
 {
@@ -38069,6 +38084,21 @@ void rolloff_fall_speed()
             KineticModule(0x11, 0x3, x * rolloff_air_speed_mult(), y);
         }
     }
+}
+
+void rolloff_momentum_update()
+{
+    if (!global68)
+    {
+        return;
+    }
+    if (global18 != 0x2)
+    {
+        global68 = 0;
+        WorkModule(0x2711, 0x20000044);
+        return;
+    }
+    WorkModule(0x2710, 0x20000044);
 }
 
 void rolloff_update()

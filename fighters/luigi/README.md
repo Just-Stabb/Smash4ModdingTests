@@ -7,7 +7,7 @@ rebuilds and decompiles back to the same code). Built files: `build/luigi/`. Tra
 Build:
 
     python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/luigi/luigi.c -o build/luigi/luigi.mscsb
-    python3 tools/rolloff_acmd.py "<upload>/script/animcmd/body/game.bin" build/luigi/game.bin --plain --add EscapeF EscapeB
+    python3 tools/rolloff_acmd.py "<upload>/script/animcmd/body/game.bin" build/luigi/game.bin --plain --add 1.6 EscapeF EscapeB
     python3 tools/luigi_airdodge_acmd.py build/luigi/game.bin build/luigi/game.bin
 
 (`<upload>` = the zip's `luigi - Copy`; its top-level `body/` ACMD is vanilla Luigi's, `body/2/` is
@@ -20,10 +20,18 @@ Same code as Captain Falcon's (the common function numbers match):
 - **Tilts / down smash out of run, RunBrake, dash and a turn out of a dash:** Run main
   `func_716` (transition terms), `run_attack_update()` in `func_715` / `func_717` / `func_722`,
   `dash_turn_attack_update()` in `func_724` / `func_726`.
-- **Roll-off:** speed **2.2** (default), air multiplier **1.0**. Roll pre `func_362` / `func_363`
+- **Roll-off:** speed **1.6**, air multiplier **1.1** (user). **Momentum into the next action** (user): after a
+  slide-off, `global68` keeps `0x20000044` (no air speed cap) on past Fall's end until Luigi is on
+  the ground / a ledge (`rolloff_momentum_update()`, main loop `func_74`), so an aerial, special,
+  air dodge or double jump keeps the speed; air friction still slows it. Roll pre `func_362` / `func_363`
   (kinetic 0x6), `rolloff_update()` in `func_370` / `func_372`, roll ends `func_381` / `func_382`,
   Fall main `func_501` (`rolloff_fall_speed()`), Fall end `func_535` (clears `0x20000044`).
-  Globals: `global62` shield-hold count, `global63` slid off. ACMD: `tools/rolloff_acmd.py`.
+  Globals: `global62` shield-hold count, `global63` slid off. ACMD: `tools/rolloff_acmd.py --plain --add 1.6`.
+
+## Forward air
+
+No animation movement (user): `func_310` turns the motion energy off (`KineticModule(0x7, 0)`)
+when the aerial is forward air (motion `0x69`).
 
 ## Melee air dodge / wavedash (from the modded MSC)
 
