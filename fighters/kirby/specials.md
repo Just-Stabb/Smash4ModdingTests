@@ -90,6 +90,10 @@ release B from any of them --> SpecialSSwing 0x171
   - Damage is multiplied by `charge × 0x6000005`
     (`AttackModule(0x272D, …)`).
 
+- **Jump while turning (added):** HoldTurn (`0x16B`, loop `func_2443`) can jump into
+  HoldJumpSquat (`0x16C`) the same way HoldWait / HoldWalk do (`func_2470`: jump button, or tap
+  jump with the stick flicked up): `sideb_hold_turn_jump()`, after the air check.
+
 ### Your edits in `func_2430` (SpecialS loop)
 
 What your code does: Kirby slides forward on the ground, hops into the air
@@ -931,7 +935,9 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   up B (counted from its start, across the rise and fall statuses), neutral special (B with no
   direction: command bits `0x1000` without `0xE000`) cancels up B into the copy's neutral special
   (`upb_cancel_update()` at the top of the rise `func_2291` and fall loops `func_2295` /
-  `func_2299`). `global78` = up-B frames. In the rise (`0x154`) the animation must also be at that
+  `func_2299`). Before the neutral special, `upb_cancel_stop()` zeroes Kirby's speeds (kinetic
+  energies 0–3): after up B hit someone, the cancel flung Kirby very high and fast (user).
+  `global78` = up-B frames. In the rise (`0x154`) the animation must also be at that
   frame (`MotionModuleF(0x1)` + 1 ≥ 31, the ACMD's frame count), so a game frame counter that runs
   ahead of the animation can't open it early (user: it was cancellable before frame 20).
   (Before: 3, then 6 frames after the first hitbox, 14, 20;

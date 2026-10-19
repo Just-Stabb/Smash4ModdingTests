@@ -45,7 +45,7 @@ def fighter(mu, base, kind_id, marker):
     mu.mem_write(base + 0xC, struct.pack(">I", acc))
     mu.mem_write(acc + 0x28, struct.pack(">I", wm))
     mu.mem_write(wm + 8, struct.pack(">I", tbl))
-    mu.mem_write(tbl + 4, struct.pack(">I", cat1))
+    mu.mem_write(tbl, struct.pack(">I", cat1))           # category 0 container (instance ints)
     mu.mem_write(cat1 + 8, struct.pack(">I", 0xC0))
     mu.mem_write(cat1 + 0xC, struct.pack(">I", ints))
     mu.mem_write(ints + 0x8E * 4, struct.pack(">I", marker))

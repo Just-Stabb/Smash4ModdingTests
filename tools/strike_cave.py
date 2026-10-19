@@ -74,7 +74,8 @@ def marker(wm, fail, save=False):
     return chk(wm, fail) + """
         lwz r10, 8(%(wm)s)              # category table
 %(c10)s
-        lwz r11, 4(r10)                 # category 1 (instance ints)
+        lwz r11, 0(r10)                 # category 0 (ID 0x1000008E: (id >> 24) & 0xF = 0, get_int
+                                        # 0x0200F7F0); the first versions read category 1 (+4)
 %(c11)s
         lwz r10, 8(r11)                 # int count (top 2 bits are flags)
         rlwinm r10, r10, 0, 2, 31

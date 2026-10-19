@@ -899,6 +899,13 @@ Every fighter's hitboxes overwrite words 5–9, so read them in training with on
 a base reads 0); the user's `00 00 00 01` meant nothing. Now it counts in r10. The pointer check
 (`chk`) was also widened from `0x10000000`–`0x4FFFFFFF` to `0x10000000`–`0x8FFFFFFF`.
 
+**Third test (user): seen `0x85`, owner found `0x85`, scaled 0.** So the owner lookup works and
+the marker read failed. Int `0x1000008E` is in WorkModule category **0** (get_int `0x0200F7F0`:
+container `[[WM+8] + ((id >> 24) & 0xF) * 4]`, ints at container `+0xC`, index `id & 0xFFFFFF`), but
+the Strike cave and `tools/kirby_stat_cave.py` read category 1 (`[table + 4]`, the status ints).
+Both now read `[table]`. So the Rush / Overdrive stat scaling never worked in game either before
+this (`tools/kirby_stat_test.py` now tests it).
+
 ## Copy abilities: ACMD script sets
 
 `MotionAnimcmdModule(0, set, motion, kind)` (MSC handler `0x02760F4C`, FighterMotionAnimcmdModuleImpl
@@ -927,6 +934,10 @@ bone ID Kirby doesn't have may sit somewhere else.
 calls, `+0x08` last motion, `+0x0C` last kind, `+0x10` the motion's script (0 = the kind has none),
 `+0x14` / `+0x18` the set 1 / set 2 tables (0 = none). Breakpoint for the bind-all path:
 `0x04B78EB0`.
+
+Second test (user): `0xA7` `+0x6C` calls, 4 bind-all calls, motion `0x239`, kind 4 (Donkey Kong).
+The breakpoint at `0x04B78EB0` froze. Words `+0x10`–`+0x18` (script, tables) still needed; the
+bind call itself is `0x04B78F6C` (reached only when a set table exists).
 
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).

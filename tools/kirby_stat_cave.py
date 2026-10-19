@@ -102,9 +102,10 @@ def code(table):
         cmpwi(11, 3), BNELR,
         rlwinm(12, 4, 0, 8, 31),        # r12 = index
         cmplwi(12, 32), BGELR,
-        # this object's instance int INT_INDEX (category 1) must hold the Kirby marker
-        addi(10, 0, 4),                 # li r10, 4 (r0 can't be a D-form base: it reads as 0)
-        lwzx(11, 10, 0),                # r11 = category 1 container = [table + 4]
+        # this object's instance int INT_INDEX (ID 0x1000008E: category (id >> 24) & 0xF = 0, as in
+        # get_int 0x0200F7F0) must hold the Kirby marker. (The first version read category 1,
+        # [table + 4], the status ints, so it never matched.)
+        lwzx(11, 0, 0),                 # r11 = category 0 container = [table] (rA = 0: EA = r0)
         cmpwi(11, 0), BEQLR,
         lwz(10, 8, 11),                 # r10 = int count (top 2 bits are flags)
         rlwinm(10, 10, 0, 2, 31),

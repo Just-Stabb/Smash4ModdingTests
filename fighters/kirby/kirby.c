@@ -40742,6 +40742,10 @@ void func_2443()
         func_16(0x16f, 0);
         return;
     }
+    if (sideb_hold_turn_jump()) // jump while turning with the hammer charged, like HoldWait (added)
+    {
+        return 0x1;
+    }
     if (MotionModule(0x2712))
     {
         if (func_88() >= WorkModuleF(0, 0x2000001))
@@ -72920,6 +72924,17 @@ void upb_air_update()
 // up-B loops (func_2291 rise, func_2295 / func_2299 falls), every frame. With a copy ability,
 // from frame upb_cancel_frame() (31) of up B, neutral special cancels it (with a copy ability).
 // Returns 1 when it changed status.
+// The cancel stops up B's movement first: after up B hit someone, the neutral special kept a huge
+// upward speed and flung Kirby high (user). Zeroes the motion (0), gravity (1), energy 2 and
+// control (3) speeds; the neutral special's own start sets what it needs.
+void upb_cancel_stop()
+{
+    KineticModule(0x11, 0, 0, 0);
+    KineticModule(0x11, 0x1, 0);
+    KineticModule(0x11, 0x2, 0, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+}
+
 int upb_cancel_update()
 {
     if (global4 != 0x154 && global4 != 0x172 && global4 != 0x173)
@@ -72947,6 +72962,7 @@ int upb_cancel_update()
     {
         return 0;
     }
+    upb_cancel_stop();
     if (global18 == 0x2)
     {
         WorkModule(0x19, 0x1f00000a); // allow air specials
@@ -73013,4 +73029,21 @@ int dash_turn_attack_update()
         return 0;
     }
     return run_attack_update();
+}
+
+// Side B charge: HoldTurn (0x16B, loop func_2443) can jump (HoldJumpSquat 0x16C) like HoldWait /
+// HoldWalk (their func_2470: jump button, or tap jump with the stick flicked up).
+int sideb_hold_turn_jump()
+{
+    if (ControlModule(0x2710, 0x2))
+    {
+        func_16(0x16c, 0x1);
+        return 0x1;
+    }
+    if (ControlModule(0x271c) && global32 >= WorkModuleF(0, 0x200001f) && global47 < WorkModule(0x6, 0x12000020))
+    {
+        func_16(0x16c, 0x1);
+        return 0x1;
+    }
+    return 0;
 }
