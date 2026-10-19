@@ -878,11 +878,26 @@ owner lookups were wrong: v1 took AttackModule `+4` for the battle object and re
 scanned the fighter table (`[[0x1035184C]+0]`, entry `+0xC` as the accessor). AttackModule `+4` is
 the accessor itself (above), so the hooks now read the WorkModule as `[[AM+4]+0x28]`, after
 checking `[[AM+4]+0x50] == AM`. Projectiles / articles have their own accessor and WorkModule
-(no Kirby marker), so they're still never changed. The cave keeps four counters (words at the `counters` label, printed by
+(no Kirby marker), so they're still never changed. The cave keeps debug words at the `counters` label (printed by
 `python3 -c "import sys; sys.path.insert(0, 'tools'); import strike_cave as S; a, w = S.assemble(); print(hex(a.labels['counters']))"`,
-currently `0x04B78D74`): hitboxes seen by the set_attack hook, hitboxes scaled, own-hitstop
-adjustments, throws scaled. In Cemu's memory viewer: seen counting up but scaled at 0 = the
-marker / owner check fails; seen at 0 = the hook isn't reached.
+currently `0x04B78DD8`), 12 words:
+
+| word | offset | meaning |
+|---|---|---|
+| 0 | `+0x00` | hitboxes seen by the set_attack hook |
+| 1 | `+0x04` | hitboxes scaled (Strike) |
+| 2 | `+0x08` | own-hitstop adjustments |
+| 3 | `+0x0C` | throws scaled |
+| 4 | `+0x10` | hitboxes whose owner lookup worked |
+| 5–8 | `+0x14`–`+0x20` | last hitbox: AttackModule, its `+4` (accessor), accessor `+0x50` (should equal word 5), accessor `+0x28` (WorkModule) |
+| 9 | `+0x24` | last hitbox's owner's int `0x1000008E` |
+| 10 | `+0x28` | last value of it with Kirby's `0x4B49` magic (Strike = bit `0x8`) |
+| 11 | `+0x2C` | hitboxes from a fighter with the magic |
+
+Every fighter's hitboxes overwrite words 5–9, so read them in training with only Kirby attacking.
+**The first counters never went past 1:** `inc()` did `addi r0, r0, 1`, which is `li r0, 1` (r0 as
+a base reads 0); the user's `00 00 00 01` meant nothing. Now it counts in r10. The pointer check
+(`chk`) was also widened from `0x10000000`–`0x4FFFFFFF` to `0x10000000`–`0x8FFFFFFF`.
 
 ## Copy abilities: ACMD script sets
 
@@ -898,12 +913,20 @@ stores the kind. So the copy helpers' `(0, 0, motion, kind)` ran the copied figh
 the custom's, with `copy_custom_motion()`), but the experimental `(0, 1, custom, kind)` did nothing
 to effects / sounds (user: still Kirby's).
 
-`tools/copy_fx_cave.py` (cave `0x04B78F00`, trampoline `0x037EE5F0`, hook = `+0x6C`'s first
+`tools/copy_fx_cave.py` (cave `0x04B78E80`, trampoline `0x037EE5F0`, hook = `+0x6C`'s first
 instruction) adds set `0x10`: bind sets 1 and 2 (effect, sound) to `kind`'s scripts for `motion`,
 exactly as above, and store the kind for them. `copy_custom_motion()` calls it for customs only
 (`copy_fx_all()`), before the helper's set-0 call. Defaults keep Kirby's own effect / sound
 scripts (bones match Kirby's); a custom's come from the copied fighter's files, so an effect on a
 bone ID Kirby doesn't have may sit somewhere else.
+
+**First test: still Kirby's effects / sounds.** (Notes from then: the motion change `0x027608B0`
+(vtable `+0x4C`) binds only sets 0–1, and the frame set (MSC op 1, `0x02760EB0`) syncs only sets
+0–1; agents `+0x130` on are a second group, `0x027605C0`.) The cave now has debug words at `dbg`
+(`0x04B78F90`, tested in `tools/copy_fx_test.py`): `+0x00` every `+0x6C` call, `+0x04` bind-all
+calls, `+0x08` last motion, `+0x0C` last kind, `+0x10` the motion's script (0 = the kind has none),
+`+0x14` / `+0x18` the set 1 / set 2 tables (0 = none). Breakpoint for the bind-all path:
+`0x04B78EB0`.
 
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).

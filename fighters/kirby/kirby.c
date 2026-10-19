@@ -14202,6 +14202,10 @@ void func_715()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of the initial dash too (added; no shield)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -14718,6 +14722,10 @@ void func_724()
     {
         return 0x1;
     }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
+    {
+        return 0x1;
+    }
     if (func_704())
     {
         return 0x1;
@@ -14750,6 +14758,10 @@ void func_726()
 {
     float var0;
     if (func_71(global61))
+    {
+        return 0x1;
+    }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
     {
         return 0x1;
     }
@@ -72776,6 +72788,7 @@ void overdrive_update()
 int strike_nair_flag()       { return 0x21000025; }
 int strike_nair_motion()     { return 0x51; }  // jab 2
 float strike_nair_grab_frame() { return 4.0f; } // air grab cancel from this frame (1 = the first)
+float strike_nair_special_frame() { return 1.0f; } // special cancel from this frame (1 = any time)
 
 int kirby_strike_nair()
 {
@@ -72813,6 +72826,14 @@ int strike_nair_update()
             return 0x1;
         }
     }
+    if (MotionModuleF(0x1) + 1.0f >= strike_nair_special_frame() && global24 & 0xf000) // any special
+    {
+        WorkModule(0x19, 0x1f00000a); // allow air specials (their own conditions still apply)
+        if (func_58())
+        {
+            return 0x1;
+        }
+    }
     return 0;
 }
 
@@ -72838,7 +72859,7 @@ int kirby_rapid_nair()
 //   global78 / global79: up-B frame count / frame its first hitbox (ID 0) appeared (-1 = not yet).
 // ===================================================================
 int sideb_count_frame()   { return 5; } // an air side B uses up one of the air side Bs after this frame
-int upb_cancel_frame()    { return 20; } // copy ability: neutral special can cancel up B from this frame of it
+int upb_cancel_frame()    { return 31; } // copy ability: neutral special can cancel up B from this frame of it
 
 // side-B loops (func_2430 SpecialS, func_2467 swing), every frame
 void sideb_count_update()
@@ -72897,7 +72918,7 @@ void upb_air_update()
 }
 
 // up-B loops (func_2291 rise, func_2295 / func_2299 falls), every frame. With a copy ability,
-// from frame upb_cancel_frame() (14) of up B, neutral special cancels it (with a copy ability).
+// from frame upb_cancel_frame() (31) of up B, neutral special cancels it (with a copy ability).
 // Returns 1 when it changed status.
 int upb_cancel_update()
 {
@@ -72982,4 +73003,14 @@ int run_attack_update()
         return 0x1;
     }
     return 0;
+}
+
+// Turn (0x6) / TurnDash (0x7) loops: tilts / down smash when the turn came out of a Dash (0x3).
+int dash_turn_attack_update()
+{
+    if (global5 != 0x3 || global18 != 0)
+    {
+        return 0;
+    }
+    return run_attack_update();
 }

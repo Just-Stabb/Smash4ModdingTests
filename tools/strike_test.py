@@ -95,8 +95,14 @@ fighter(mu, kirby, 0x00000003, STRIKE)
 d, h = run_atk(mu, kirby, 10.0, 1.0)
 check("Strike Kirby hitbox: damage 10 -> 11.5", d, 11.5)
 check("Strike Kirby hitbox: hitlag mult 1 -> 1.2", h, 1.2)
+dbg = lambda k: struct.unpack(">I", mu.mem_read(a.labels["counters"] + 4 * k, 4))[0]
+check("debug: AM / accessor / accessor+0x50 / WM", tuple(dbg(k) for k in (S.DBG_AM, S.DBG_ACC, S.DBG_ACC_AM, S.DBG_WM)),
+      (AM, kirby + 0x100, AM, kirby + 0x200))
+check("debug: marker / KI marker / owner ok, KI counts", tuple(dbg(k) for k in (S.DBG_MARKER, S.DBG_KI, S.DBG_OWNER_OK, S.DBG_KI_COUNT)),
+      (STRIKE, STRIKE, 1, 1))
 d, h = run_atk(mu, kirby, 4.0, 1.5)
 check("Strike: 4 dmg / 1.5 hitlag -> 4.6 / 1.8", (round(d, 4), round(h, 4)), (4.6, 1.8))
+check("counters count past 1: seen / scaled / owner ok / KI", tuple(dbg(k) for k in (0, 1, S.DBG_OWNER_OK, S.DBG_KI_COUNT)), (2, 2, 2, 2))
 fighter(mu, kirby, 0x00000003, RUSH)
 check("Rush Kirby: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
 fighter(mu, kirby, 0x00000003, 0x4B49000A)            # Strike bit + stat profile 2

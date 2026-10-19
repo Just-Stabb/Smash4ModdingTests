@@ -42,7 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04B78A00           # grown .text (position_vars_cave.py GROW_END); its own blocks end before
-LIMIT = 0x04B78F00           # copy_fx_cave.py from here
+LIMIT = 0x04B78E80           # copy_fx_cave.py from here
 HOOK_ATK = 0x02C08730       # set_attack, after the copy loop: lwz r8, 0(r28)
 HOOK_HS = 0x02C27638        # hitstop calc: mr r11, r5
 HOOK_THROW = 0x02C0B77C     # AttackModule MSC handler, throw (0x2716) case, before vt+0x64: lwz r12, 0(r30)
@@ -58,18 +58,19 @@ BIAS = 1.00001              # so damage / 1.15 x 1.15 and x1.2 / 1.2 don't land 
 
 
 def chk(reg, fail):
-    """bne fail unless reg is a word-aligned pointer in 0x10000000-0x4FFFFFFF (data / heap)."""
+    """bne fail unless reg is a word-aligned pointer in 0x10000000-0x8FFFFFFF (data / heap; was
+    0x10000000-0x4FFFFFFF, widened in case the game's objects sit higher in Cemu)."""
     return """
         addis r0, %s, -0x1000
-        rlwinm. r0, r0, 0, 0, 1
+        rlwinm. r0, r0, 0, 0, 0
         bne %s
         andi. r0, %s, 3
         bne %s""" % (reg, fail, reg, fail)
 
 
-def marker(wm, fail):
+def marker(wm, fail, save=False):
     """r11 = the trait marker of WorkModule wm (int 0x1000008E) with the Strike bit, else branch to
-    fail. Uses r0, r10, r11."""
+    fail. Uses r0, r10, r11 (and r12 with save: debug words DBG_MARKER / DBG_KI / DBG_KI_COUNT)."""
     return chk(wm, fail) + """
         lwz r10, 8(%(wm)s)              # category table
 %(c10)s
@@ -82,35 +83,85 @@ def marker(wm, fail):
         lwz r11, 0xC(r11)               # ints
 %(c11)s
         lwz r11, %(off)d(r11)
+%(save)s
         srwi r10, r11, 16
         cmplwi r10, %(magic)d
         bne %(fail)s
+%(save_ki)s
         andi. r0, r11, %(bit)d
         beq %(fail)s""" % dict(wm=wm, fail=fail, c10=chk("r10", fail), c11=chk("r11", fail),
-                               n=INT_INDEX + 1, off=INT_INDEX * 4, magic=MAGIC, bit=STRIKE_BIT)
+                               n=INT_INDEX + 1, off=INT_INDEX * 4, magic=MAGIC, bit=STRIKE_BIT,
+                               save=dbg_store("r11", DBG_MARKER) if save else "",
+                               save_ki=(dbg_store("r11", DBG_KI) + "\n" + inc(DBG_KI_COUNT)) if save else "")
+
+
+# Debug words after the four counters (counters + 4 * index), for Cemu's memory viewer. Every
+# fighter's hitboxes overwrite the "last" ones, so read them in training with only Kirby attacking.
+DBG_OWNER_OK = 4      # count: hitboxes whose owner lookup worked
+DBG_AM = 5            # last AttackModule seen
+DBG_ACC = 6           # its [+4] (the accessor)
+DBG_ACC_AM = 7        # [accessor + 0x50] (should equal DBG_AM)
+DBG_WM = 8            # [accessor + 0x28] (the WorkModule)
+DBG_MARKER = 9        # its int 0x1000008E
+DBG_KI = 10           # last marker with Kirby's 0x4B49 magic (Strike bit = 0x8)
+DBG_KI_COUNT = 11     # count: hitboxes from a fighter with the 0x4B49 magic
+DBG_WORDS = 12
+
+
+def dbg_store(reg, k):
+    """counters[k] = reg (uses r12)"""
+    return """        lis r12, counters@ha
+        addi r12, r12, counters@l
+        stw %s, %d(r12)""" % (reg, 4 * k)
 
 
 def inc(k):
-    """counters[k] += 1 (uses r0, r12)"""
+    """counters[k] += 1 (uses r10, r12; not r0: `addi r0, r0, 1` is `li r0, 1`, which kept the
+    first version's counters at 1)"""
     return """        lis r12, counters@ha
         addi r12, r12, counters@l
-        lwz r0, %d(r12)
-        addi r0, r0, 1
-        stw r0, %d(r12)""" % (4 * k, 4 * k)
+        lwz r10, %d(r12)
+        addi r10, r10, 1
+        stw r10, %d(r12)""" % (4 * k, 4 * k)
 
 
-def owner_wm(am, fail):
+def owner_wm(am, fail, save=False):
     """r12 = the WorkModule of the object whose AttackModule is am, else branch to fail. AttackModule +4
     is its module accessor (AttackModuleImpl's constructor 0x02C077F4 stores its argument there; the
     fighter set-up 0x02E53764 passes the accessor, then stores the module at accessor +0x50), and the
-    accessor has the WorkModule at +0x28. Checks accessor +0x50 == am. Uses r0, r12."""
-    return chk(am, fail) + """
+    accessor has the WorkModule at +0x28. Checks accessor +0x50 == am. Uses r0, r12 (and r10, r11
+    with save: debug words DBG_AM..DBG_WM, DBG_OWNER_OK)."""
+    if not save:
+        return chk(am, fail) + """
         lwz r12, 4(%(am)s)              # module accessor
 %(c12)s
         lwz r0, 0x50(r12)               # its AttackModule
         cmplw r0, %(am)s
         bne %(fail)s
         lwz r12, 0x28(r12)              # WorkModule""" % dict(am=am, fail=fail, c12=chk("r12", fail))
+    return """
+        lis r10, counters@ha
+        addi r10, r10, counters@l
+        stw %(am)s, %(o_am)d(r10)
+        li r0, 0
+        stw r0, %(o_acc)d(r10)
+        stw r0, %(o_acc_am)d(r10)
+        stw r0, %(o_wm)d(r10)
+        stw r0, %(o_mk)d(r10)""" % dict(am=am, o_am=4 * DBG_AM, o_acc=4 * DBG_ACC, o_acc_am=4 * DBG_ACC_AM,
+                                       o_wm=4 * DBG_WM, o_mk=4 * DBG_MARKER) + chk(am, fail) + """
+        lwz r12, 4(%(am)s)              # module accessor
+        stw r12, %(o_acc)d(r10)
+%(c12)s
+        lwz r0, 0x50(r12)               # its AttackModule
+        stw r0, %(o_acc_am)d(r10)
+        cmplw r0, %(am)s
+        bne %(fail)s
+        lwz r12, 0x28(r12)              # WorkModule
+        stw r12, %(o_wm)d(r10)
+        lwz r11, %(o_ok)d(r10)
+        addi r11, r11, 1
+        stw r11, %(o_ok)d(r10)""" % dict(am=am, fail=fail, c12=chk("r12", fail), o_acc=4 * DBG_ACC,
+                                         o_acc_am=4 * DBG_ACC_AM, o_wm=4 * DBG_WM, o_ok=4 * DBG_OWNER_OK)
 
 
 # Earlier versions looked for the owner through [AM+4] +0xC (taking +4 for the battle object) and
@@ -207,7 +258,15 @@ throw_done:
         b %(THROW_BACK)s
 
 counters:                               # debug counts (see docs/native-notes.md): hitboxes seen, hitboxes
-        .word 0                         # scaled, own-hitstop adjustments, throws scaled
+        .word 0                         # scaled, own-hitstop adjustments, throws scaled, then the
+        .word 0                         # DBG_* words
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
         .word 0
         .word 0
         .word 0
@@ -229,7 +288,7 @@ def assemble():
     a = Asm(CAVE)
     a.asm(SOURCE % dict(
         INC0=inc(0), INC1=inc(1), INC2=inc(2), INC3=inc(3),
-        o_atk=owner_wm("r28", "atk_done"), m12_atk=marker("r12", "atk_done"),
+        o_atk=owner_wm("r28", "atk_done", save=True), m12_atk=marker("r12", "atk_done", save=True),
         o_throw=owner_wm("r30", "throw_done"), m12_throw=marker("r12", "throw_done"), CRIT=CRIT_BIT,
         THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
         c4_hs=chk("r4", "hs_orig"), m12_hs=marker("r12", "hs_orig"),

@@ -14193,6 +14193,10 @@ void func_715()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of the initial dash too (added; no shield)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -14709,6 +14713,10 @@ void func_724()
     {
         return 0x1;
     }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
+    {
+        return 0x1;
+    }
     if (func_704())
     {
         return 0x1;
@@ -14741,6 +14749,10 @@ void func_726()
 {
     float var0;
     if (func_71(global61))
+    {
+        return 0x1;
+    }
+    if (dash_turn_attack_update()) // tilts / down smash when turning out of a dash (added)
     {
         return 0x1;
     }
@@ -38201,4 +38213,14 @@ int run_attack_update()
         return 0x1;
     }
     return 0;
+}
+
+// Turn (0x6) / TurnDash (0x7) loops: tilts / down smash when the turn came out of a Dash (0x3).
+int dash_turn_attack_update()
+{
+    if (global5 != 0x3 || global18 != 0)
+    {
+        return 0;
+    }
+    return run_attack_update();
 }

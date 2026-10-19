@@ -5,7 +5,7 @@
       $(python3 tools/strike_cave.py) $(python3 tools/copy_fx_cave.py)
 
 (after position_vars_cave.py, whose grow:0x04B79000 makes the code space this uses; it sits after
-strike_cave.py's, which ends before 0x04B78F00. The hook is too far from there for a branch, so it
+strike_cave.py's, which ends before 0x04B78E80. The hook is too far from there for a branch, so it
 goes through TRAMP, 4 free words at the end of copy_custom_cave.py's CAVE_C space in the Havok cave.)
 
 MotionAnimcmdModule (FighterMotionAnimcmdModuleImpl, vtable 0x10093B80) runs a motion's scripts on
@@ -29,7 +29,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm, ha, lo  # noqa: E402
 
-CAVE = 0x04B78F00
+CAVE = 0x04B78E80
 LIMIT = 0x04B79000
 TRAMP = 0x037EE5F0          # -0x037EE600 (transform_grab_cave.py starts there)
 HOOK = 0x02760CE4           # MotionAnimcmdModule vtable +0x6C: mflr r0
@@ -40,6 +40,11 @@ BIND = 0x02BEE560
 
 SOURCE = """
 copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-1 = own)
+        lis r11, dbg@ha                 # debug: every +0x6C call (r11 / r12 are free here)
+        addi r11, r11, dbg@l
+        lwz r12, 0(r11)
+        addi r12, r12, 1
+        stw r12, 0(r11)
         cmpwi r4, %(BIND_ALL)d
         beq fx_all
         mflr r0                         # +0x6C's own instruction
@@ -59,12 +64,23 @@ fx_all:
         bne fx_kind
         lwz r29, 0x18(r31)              # own kind
 fx_kind:
+        lis r26, dbg@ha
+        addi r26, r26, dbg@l
+        lwz r12, 4(r26)                 # debug: bind-all calls, motion, kind
+        addi r12, r12, 1
+        stw r12, 4(r26)
+        stw r30, 8(r26)
+        stw r29, 0xC(r26)
+        li r0, 0
+        stw r0, 0x14(r26)
+        stw r0, 0x18(r26)
         lis r3, 0x1030
         lwz r3, -0x974(r3)              # [0x102FF68C] script manager
         mr r4, r29
         mr r5, r30
         bl %(SCRIPT_OF)s
         mr. r28, r3
+        stw r28, 0x10(r26)              # debug: the motion's script (0 = none)
         beq fx_done
         li r27, 1
 fx_loop:
@@ -76,6 +92,9 @@ fx_loop:
         mr r4, r29
         mr r5, r27
         bl %(SET_TABLE)s
+        slwi r0, r27, 2
+        add r12, r26, r0
+        stw r3, 0x10(r12)               # debug: set 1 / 2 table (0x14 / 0x18)
         cmpwi r3, 0
         beq fx_next
         mulli r5, r27, 0x38
@@ -94,6 +113,14 @@ fx_done:
         mtlr r0
         addi r1, r1, 0x30
         blr
+dbg:                                    # debug words (docs/native-notes.md): +0x6C calls, bind-all
+        .word 0                         # calls, last motion, last kind, last script, set 1 / 2 tables
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
 """
 
 
