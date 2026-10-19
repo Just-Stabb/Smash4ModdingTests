@@ -9,19 +9,25 @@ strike_cave.py's, which ends before 0x04B78E80. The hook is too far from there f
 goes through TRAMP, 4 free words at the end of copy_custom_cave.py's CAVE_C space in the Havok cave.)
 
 MotionAnimcmdModule (FighterMotionAnimcmdModuleImpl, vtable 0x10093B80) runs a motion's scripts on
-three agents (at +0x50, 0x38 bytes each): set 0 game (ACMD), 1 effect, 2 sound. A motion change
-(0x027606C0) binds all three to the fighter's own kind. MSC MotionAnimcmdModule(0, set, motion, kind)
-calls vtable +0x6C (0x02760CE4), which stores the kind for that set, but only set 0 is rebound
-(to the kind's script for that motion): copy_custom_motion() in fighters/kirby/kirby.c used it to run
-the copied fighter's custom ACMD, while the effects and sounds stayed Kirby's own (default) ones.
+four agents (at +0x50, 0x38 bytes each), one per script set: 0 game (ACMD), 1 expression, 2 sound,
+3 effect (the order the loader 0x02E421C0 stores game.bin / expression.bin / sound.bin / effect.bin
+at the kind's entry +0x10 + 8 set). A motion change (0x027608B0) binds sets 0-1 at once and leaves
+the motion at +0x1C; the module's late update (0x02760DB0, every frame) then binds sets 2-3 to the
+default kind for it (0x027606C0(this, 2, 3)) and sets +0x1C = -2. MSC MotionAnimcmdModule(0, set,
+motion, kind) calls vtable +0x6C (0x02760CE4), which stores the kind for that set but only rebinds
+set 0: copy_custom_motion() in fighters/kirby/kirby.c used it to run the copied fighter's custom
+ACMD, while the effects and sounds stayed Kirby's own (default) ones.
 
 The hook at +0x6C's first instruction adds set BIND_ALL (0x10, never used by the game): it binds
-sets 1 and 2 (effect, sound) to `kind`'s scripts for `motion`, the same way +0x6C binds set 0
+sets 2 and 3 (sound, effect) to `kind`'s scripts for `motion` the way 0x027606C0 does
   script = 0x02E42518([0x102FF68C], kind, motion)       (0 = the kind has no such motion: nothing done)
   table  = 0x02E424D8([0x102FF68C], kind, set)
   0x02BEE560(table, [this+4], this + 0x50 + 0x38 set, script)
-and stores the kind at +8 + 4 set. Any other set goes on to the original function.
-copy_custom_motion() calls it for a custom slot only, before its set-0 call.
+  0x02BEE950(table, [this+4], agent, [this+0x24], [this+0x20], ![this+0x2C])   (unless [this+0x2D])
+stores the kind at +8 + 4 set, and sets +0x1C = -2 so the late update doesn't rebind them to
+Kirby's own scripts (the first version bound sets 1-2 and was overwritten there; set 1 is
+expression). Any other set goes on to the original function. copy_custom_motion() calls it for a
+custom slot only, after the motion change.
 """
 import os
 import sys
@@ -37,6 +43,7 @@ BIND_ALL = 0x10
 SCRIPT_OF = 0x02E42518
 SET_TABLE = 0x02E424D8
 BIND = 0x02BEE560
+FSYNC = 0x02BEE950
 
 SOURCE = """
 copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-1 = own)
@@ -56,7 +63,7 @@ fx_all:
         stwu r1, -0x30(r1)
         mflr r0
         stw r0, 0x34(r1)
-        stmw r26, 0x18(r1)
+        stmw r24, 0x10(r1)
         mr r31, r3
         mr r30, r5
         mr r29, r6
@@ -82,7 +89,7 @@ fx_kind:
         mr. r28, r3
         stw r28, 0x10(r26)              # debug: the motion's script (0 = none)
         beq fx_done
-        li r27, 1
+        li r27, 2
 fx_loop:
         slwi r0, r27, 2
         add r12, r31, r0
@@ -94,27 +101,41 @@ fx_loop:
         bl %(SET_TABLE)s
         slwi r0, r27, 2
         add r12, r26, r0
-        stw r3, 0x10(r12)               # debug: set 1 / 2 table (0x14 / 0x18)
-        cmpwi r3, 0
+        stw r3, 0xC(r12)                # debug: set 2 / 3 table (0x14 / 0x18)
+        mr. r25, r3
         beq fx_next
-        mulli r5, r27, 0x38
-        addi r5, r5, 0x50
-        add r5, r31, r5                 # the set's agent
+        mulli r24, r27, 0x38
+        addi r24, r24, 0x50
+        add r24, r31, r24               # the set's agent
         lwz r4, 4(r31)
+        mr r5, r24
         mr r6, r28
         bl %(BIND)s
+        lbz r0, 0x2D(r31)               # frame sync, as 0x027606C0 does
+        cmpwi r0, 0
+        bne fx_next
+        lbz r6, 0x2C(r31)
+        xori r6, r6, 1
+        mr r3, r25
+        lwz r4, 4(r31)
+        mr r5, r24
+        lfs f1, 0x24(r31)
+        lfs f2, 0x20(r31)
+        bl %(FSYNC)s
 fx_next:
         addi r27, r27, 1
-        cmpwi r27, 2
+        cmpwi r27, 3
         ble fx_loop
+        li r0, -2                       # the late update's own "bound" mark: it won't rebind 2-3
+        stw r0, 0x1C(r31)
 fx_done:
-        lmw r26, 0x18(r1)
+        lmw r24, 0x10(r1)
         lwz r0, 0x34(r1)
         mtlr r0
         addi r1, r1, 0x30
         blr
 dbg:                                    # debug words (docs/native-notes.md): +0x6C calls, bind-all
-        .word 0                         # calls, last motion, last kind, last script, set 1 / 2 tables
+        .word 0                         # calls, last motion, last kind, last script, set 2 / 3 tables
         .word 0
         .word 0
         .word 0
@@ -128,7 +149,7 @@ def assemble():
     a = Asm(CAVE)
     back = HOOK + 4
     a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)), SCRIPT_OF="0x%08X" % SCRIPT_OF,
-                        SET_TABLE="0x%08X" % SET_TABLE, BIND="0x%08X" % BIND))
+                        SET_TABLE="0x%08X" % SET_TABLE, BIND="0x%08X" % BIND, FSYNC="0x%08X" % FSYNC))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, "copy fx cave too big: %d words" % len(words)
     return a, words

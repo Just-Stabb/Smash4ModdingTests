@@ -72925,14 +72925,22 @@ void upb_air_update()
 // from frame upb_cancel_frame() (31) of up B, neutral special cancels it (with a copy ability).
 // Returns 1 when it changed status.
 // The cancel stops up B's movement first: after up B hit someone, the neutral special kept a huge
-// upward speed and flung Kirby high (user). Zeroes the motion (0), gravity (1), energy 2 and
-// control (3) speeds; the neutral special's own start sets what it needs.
+// upward speed and flung Kirby high (user). Zeroes the motion (0), energy 2 and control (3) speeds;
+// Kirby's vertical speed (the total, KineticModuleF(0, 1)) is kept but capped at
+// upb_cancel_rise_cap() going up, in the gravity energy (1), so the cancel still rises a little.
+float upb_cancel_rise_cap() { return 1.5f; } // max upward speed kept by the cancel (user: a cap)
 void upb_cancel_stop()
 {
+    float vy;
+    vy = KineticModuleF(0, 0x1);
+    if (vy > upb_cancel_rise_cap())
+    {
+        vy = upb_cancel_rise_cap();
+    }
     KineticModule(0x11, 0, 0, 0);
-    KineticModule(0x11, 0x1, 0);
     KineticModule(0x11, 0x2, 0, 0);
     KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x11, 0x1, vy);
 }
 
 int upb_cancel_update()

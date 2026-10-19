@@ -936,8 +936,22 @@ calls, `+0x08` last motion, `+0x0C` last kind, `+0x10` the motion's script (0 = 
 `0x04B78EB0`.
 
 Second test (user): `0xA7` `+0x6C` calls, 4 bind-all calls, motion `0x239`, kind 4 (Donkey Kong).
-The breakpoint at `0x04B78EB0` froze. Words `+0x10`–`+0x18` (script, tables) still needed; the
-bind call itself is `0x04B78F6C` (reached only when a set table exists).
+The breakpoint at `0x04B78EB0` froze. Third test: script `0x96F2BA18`, tables `0x1278165C` /
+`0x12781024`, and the bind call `0x04B78F6C` froze: everything was found and bound, yet the effects
+stayed Kirby's. Why:
+
+- The script sets are **0 game, 1 expression, 2 sound, 3 effect** (the loader `0x02E421C0` stores
+  game.bin, expression.bin, sound.bin, effect.bin at the kind's entry `+0x10 + 8·set`). Group 1
+  has four agents (`+0x50` … `+0x118`), one per set.
+- A motion change (`0x027608B0`) binds sets 0–1 at once and leaves the motion at `+0x1C`. The
+  module's late update (`0x02760DB0`, every frame) binds sets 2–3 for it with `0x027606C0(this,
+  2, 3)`, to the default kind, then sets `+0x1C = -2`. So the cave's early bind of sets 1–2
+  hit expression and sound, and the late update put Kirby's sound / effect back anyway.
+- (Fighter set-up `0x02E13048` also keeps the kind's own effect table at `[[F+0x74D8]+0x4C]`.)
+
+Now the bind-all binds sets 2–3, frame-syncs them like `0x027606C0` (`0x02BEE950(table,
+accessor, agent, [+0x24], [+0x20], ![+0x2C])` unless `[+0x2D]`), and sets `+0x1C = -2` itself. Debug
+words: `+0x14` / `+0x18` are now the set 2 / 3 tables; `dbg` is at `0x04B78FC8`.
 
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).
