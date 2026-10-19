@@ -7504,7 +7504,7 @@ void func_310()
     }
     else
     {
-        func_22(var0, 0, 1.0f);
+        func_22(marth_sword_motion(var0), 0, 1.0f); // Marth copy: back / up air with the sword (added)
     }
     WorkModule(0x7, var0, 0x11000002);
 }
@@ -72957,14 +72957,14 @@ int kirby_strike_nair()
 void strike_nair_start()
 {
     WorkModule(0x2710, strike_nair_flag()); // attack12's ACMD uses the air version
-    func_22(strike_nair_motion(), 0, 1.0f);
+    func_22(marth_sword_motion(strike_nair_motion()), 0, 1.0f); // Marth copy: with the sword
     WorkModule(0x2710, 0x2100000d);         // landing lag on for the whole move
 }
 
 // neutral air loop (func_317), every frame. Returns 1 when it changed status.
 int strike_nair_update()
 {
-    if (global4 != 0x34 || MotionModule(0x7) != strike_nair_motion())
+    if (global4 != 0x34 || MotionModule(0x7) != marth_sword_motion(strike_nair_motion()))
     {
         return 0;
     }
@@ -73676,4 +73676,36 @@ int wavedash_escape_blocked()
         return 0x1;
     }
     return 0;
+}
+
+// ===================================================================
+// Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air (user).
+// The copy's sword (model marthsword on LHaveN) shows while Kirby plays an animation from
+// motion/marthbody, so these moves play Marth-copy versions of their animations: motion slots
+// 0x301 MarthAttack12 (Strike nair = air jab 2), 0x302 MarthAttackAirB, 0x303 MarthAttackAirHi,
+// empty in the original motion.mtable. tools/kirby_marth_sword.py makes the animations (Kirby's
+// own, with LHaveN moved / scaled: nair in the left hand from frame 3, shrinking 7-15; back air
+// between the legs from frame 7, shrinking 17-27; up air on the left leg from frame 4, shrinking
+// 16-28), the motion.mtable names and the ACMD (the moves' scripts under the new names).
+// fighters/kirby/specials.md "Marth copy sword". Int 0x11000002 keeps the vanilla aerial kind.
+// ===================================================================
+int marth_sword_motion(int motion)
+{
+    if (kirby_copy_kind() != 0x12)
+    {
+        return motion;
+    }
+    if (motion == strike_nair_motion())
+    {
+        return 0x301;
+    }
+    if (motion == 0x6a)
+    {
+        return 0x302;
+    }
+    if (motion == 0x6b)
+    {
+        return 0x303;
+    }
+    return motion;
 }

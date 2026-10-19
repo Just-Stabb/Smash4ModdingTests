@@ -974,3 +974,44 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   **Not ported:** Luigi's 2.5 ground collision drop (`GroundModule(0x1A, x, y − 2.5)`, in the
   jumpsquat wavedash and the stick-neutral air dodge). Kirby's collision is small, so it ended up under
   the stage and a buffered wavedash fell through it (user).
+
+## Added: Marth copy sword in Strike neutral air, back air and up air
+
+With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)
+in the left hand from frame 3, shrinking from frame 7 to nothing at 15; **back air** between the legs
+from frame 7 (grip between the knees, blade toward the feet), shrinking 17 → 27; **up air** on the
+left leg from frame 4 (grip at the knee, blade along the leg), shrinking 16 → 28.
+
+How the copy's sword shows (traced): it's its own model (`model/marthsword`, bones `HaveN` →
+`SwordN`, meshes `WeaponbladeM_VIS_O_OBJ` / `WeapongripM_VIS_O_OBJ`; the RPX's held-model table at
+`0x1041A8A0` + kind × 4 names it) on Kirby's `LHaveN`. No MSC / ACMD shows it and the animations have
+no track for it: it shows while Kirby plays an animation from the copy's motion folder
+(`motion/marthbody`). Tested in game: Strike nair playing motion `0x383` (MarthSpecialAirNEnd)
+showed it.
+
+Motion names: a `motion.mtable` entry is the CRC32 of a name, and an animation
+`FitKirby<Copy>Body<Main|Kirbypt1|Kirbypt2><3 chars><Name>.omo` in `motion/<copy>body` is that
+motion's when the name is `<Copy><Name>` (`MarthSpecialNStart` = `FitKirbyMarthBodyMainD00SpecialNStart`;
+616 of Kirby's 1171 named motions match this way). Slots `0x301`–`0x30A` are empty (between Final
+`0x300` and `CaptainSpecialN` `0x30B`) and unused by the MSC.
+
+- **Motions:** `0x301` `MarthAttack12` (Strike nair), `0x302` `MarthAttackAirB`, `0x303`
+  `MarthAttackAirHi`. MSC `marth_sword_motion()` (end of `kirby.c`) picks them with the Marth copy in
+  `strike_nair_start()` / `strike_nair_update()` and the AttackAir main (`func_310`); int
+  `0x11000002` still holds the vanilla aerial kind (landing lag etc.).
+- **Animations / ACMD:** `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body>
+  build/game.bin build/marthsword`: copies Kirby's `Attack12` / `AttackAirB` / `AttackAirHi`
+  (main, `kirbypt1`, `kirbypt2`) into the `marthbody` packs as `...MarthBody...D00<Name>.omo`; in the
+  main animation `LHaveN` gets a per-frame position / rotation / scale track (the blade is
+  `LHaveN` +Y; its X faces the camera, model X; "nothing" is scale 0.001). The bone math
+  (`tools/omo.py`, forward kinematics from the animation) matches the game's hitboxes (jab 2's fist
+  at Z ~18, its hitbox at Z 17.5). Kirby's arms stretch unevenly, so on a few frames the sword can
+  look up to ~30% longer. The tool also names the motion slots and copies the moves' game / effect
+  / sound / expression scripts to the new names.
+- **Files:** `build/marthsword/motion/marthbody/{main,kirbypt1,kirbypt2}.pac` →
+  `fighter/kirby/motion/marthbody/`; `build/marthsword/script/animcmd/body/*` →
+  `fighter/kirby/script/animcmd/body/` (`build/game.bin` = that game.bin).
+- **Format notes** (`tools/omo.py` docstring): OMO tracks per bone, position / rotation / scale,
+  constant, interpolated (min + range × u16 / 65535) or raw per frame; KCAP packs name-sorted. All
+  of Kirby's 188 packs and the 2185 animations with known track types read and write back byte
+  for byte.
