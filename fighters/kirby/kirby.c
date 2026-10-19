@@ -73297,10 +73297,8 @@ int melee_airdodge_entry()
             {
                 WorkModule(0x2710, 0x20000044); // no air speed cap during the dodge
                 func_16(0x22, 0x1);
-                if (global32 < 0.01f && global5 != 0x57)
-                {
-                    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
-                }
+                // (Luigi's 2.5 ground collision drop with the stick neutral is left out: Kirby's collision
+                // is small, so it went under the stage and he fell through it, user)
                 if (global32 < -0.18f)
                 {
                     // just after a jump with the stick down: move Luigi down to the ground (wavedash)
@@ -73581,7 +73579,8 @@ int jumpsquat_airdodge()
         }
         melee_airdodge_dir();
     }
-    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+    // (no 2.5 ground collision drop as in Luigi's: Kirby's collision is small, so it went under the
+    // stage and he fell through it, user; he is on the floor already, so the dodge still lands)
     return 0x1;
 }
 

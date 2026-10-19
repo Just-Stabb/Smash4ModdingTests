@@ -971,3 +971,6 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   `func_52`, …); globals `global89`–`global92`. ACMD (`tools/kirby_luigi_airdodge_acmd.py`):
   EscapeAir's `Set_Kinetic_Handler(0)` at frame 19 only without status flag `0x2100001F` (the Luigi
   dodge's), so Kirby's own dodge is unchanged.
+  **Not ported:** Luigi's 2.5 ground collision drop (`GroundModule(0x1A, x, y − 2.5)`, in the
+  jumpsquat wavedash and the stick-neutral air dodge). Kirby's collision is small, so it ended up under
+  the stage and a buffered wavedash fell through it (user).
