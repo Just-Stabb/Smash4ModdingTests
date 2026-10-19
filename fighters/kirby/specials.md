@@ -959,7 +959,9 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   `func_472`) and a roll-off (roll ends `func_381` / `func_382`) take the air speed cap off (flag
   `0x20000044`) until Kirby is on the ground / a ledge (`global93`, `kirby_momentum_update()` in the
   main loop `func_74`; Fall's end `func_535` no longer puts the cap back then). Air friction still
-  slows him.
+  slows him. With **Luigi's** copy the carried speed only goes down (`momentum_decay_only()`,
+  `global94`: energy 3's X speed can't go above both the max air speed and the carried amount); with
+  **Sonic's** it's only the cap removal, so the speed can go up (user).
 - **Luigi's Melee air dodge / wavedash (Luigi copy, `kirby_melee_dodge()`):** the same code as
   Luigi's (`fighters/luigi/README.md`): directional dodge (3.1, 10% decay to frame 30, helpless
   after, ledge grab), wavedash on landing, buffered wavedash out of jumpsquat with the 89° perfect

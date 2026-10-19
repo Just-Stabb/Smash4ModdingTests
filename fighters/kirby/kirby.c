@@ -92,6 +92,7 @@ int global90;
 int global91;
 int global92;
 int global93;
+float global94;
 
 void func_0()
 {
@@ -8649,6 +8650,7 @@ void func_381()
         if (kirby_momentum_copy())
         {
             global93 = 1; // Sonic / Luigi copy: the roll-off's momentum is kept until grounded (kirby_momentum_update)
+            global94 = -1.0f; // carried speed: measured next frame (momentum_decay_only)
         }
     }
     func_383();
@@ -8663,6 +8665,7 @@ void func_382()
         if (kirby_momentum_copy())
         {
             global93 = 1; // Sonic / Luigi copy: the roll-off's momentum is kept until grounded (kirby_momentum_update)
+            global94 = -1.0f; // carried speed: measured next frame (momentum_decay_only)
         }
     }
     func_383();
@@ -9970,6 +9973,7 @@ int func_472()
     {                          // from the jump until grounded (kirby_momentum_update)
         WorkModule(0x2710, 0x20000044);
         global93 = 1;
+        global94 = -1.0f; // carried speed: measured next frame (momentum_decay_only)
     }
     return 0;
 }
@@ -73272,6 +73276,10 @@ void kirby_momentum_update()
         return;
     }
     WorkModule(0x2710, 0x20000044);
+    if (kirby_melee_dodge()) // Luigi copy: the carried speed only goes down; Sonic copy: just no cap (user)
+    {
+        momentum_decay_only();
+    }
 }
 
 // (Luigi's func_62, from the air dodge input on)
@@ -73603,4 +73611,40 @@ int wavedash_shield_blocked()
         return 0x1;
     }
     return 0;
+}
+
+// Momentum only decreases (user): flag 0x20000044 takes the air speed cap off, so holding the
+// stick could speed up past the carried speed. Each frame: kinetic energy 3's X speed (the one the
+// stick drives, KineticModuleF(0xA / 0xB, 3)) above both the max air speed (0x3000016) and the
+// carried amount is set back to the larger of the two; otherwise the carried amount follows it
+// down. global94 < 0: not measured yet (first frame after the jump / roll-off).
+void momentum_decay_only()
+{
+    float x;
+    float a;
+    float m;
+    x = KineticModuleF(0xa, 0x3);
+    a = func_13(x);
+    if (global94 < 0)
+    {
+        global94 = a;
+        return;
+    }
+    m = WorkModuleF(0, 0x3000016);
+    if (a > global94 && a > m)
+    {
+        if (global94 > m)
+        {
+            m = global94;
+        }
+        if (x < 0)
+        {
+            m = -m;
+        }
+        KineticModule(0x11, 0x3, m, KineticModuleF(0xb, 0x3));
+    }
+    else if (a < global94)
+    {
+        global94 = a;
+    }
 }

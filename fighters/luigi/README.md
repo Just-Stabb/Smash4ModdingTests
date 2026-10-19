@@ -20,6 +20,9 @@ Same code as Captain Falcon's (the common function numbers match):
 - **Tilts / down smash out of run, RunBrake, dash and a turn out of a dash:** Run main
   `func_716` (transition terms), `run_attack_update()` in `func_715` / `func_717` / `func_722`,
   `dash_turn_attack_update()` in `func_724` / `func_726`.
+- **Carried speed only goes down** (user): while the jump / roll-off momentum is on,
+  `momentum_decay_only()` keeps kinetic energy 3's X speed (the one the stick drives) from going above
+  both the max air speed and the carried amount (`global69`), which follows the speed down.
 - **Roll-off:** speed **1.6**, air multiplier **1.1** (user). **Momentum into the next action** (user): after a
   slide-off, `global68` keeps `0x20000044` (no air speed cap) on past Fall's end until Luigi is on
   the ground / a ledge (`rolloff_momentum_update()`, main loop `func_74`), so an aerial, special,
