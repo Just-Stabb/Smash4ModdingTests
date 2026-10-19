@@ -984,6 +984,12 @@ are only found for that copy's own motion slots (Marth's are `0x37D`–`0x384`, 
 Breaker), not by name alone as assumed below. Also, `fighter_param_vl_kirby` group 1 is a
 per-motion table (6 bytes × 1222 motions: a flag (0 on loop motions), …, what looks like the
 interrupt frame: bair 41, up air 40) that new slots would need entries in.
+Test (user): a `FitKirbyMarthBodyMainD00SpecialNEndMax.omo` added to `marthbody/main.pac` did *not*
+change the full-charge Shield Breaker end (motion `0x380` MarthSpecialNEndMax, played with
+`MotionModule(0x2B, …)` by `func_2920` → `func_28`): it still plays the normal end animation, so a copy
+motion's animation isn't found by its name either; `0x380` is mapped to the End animation somewhere.
+The pack loader (`0x03326740`) keys each file by CRC32 of its full name without `.omo`; no such
+hashes or name strings are in the RPX.
 
 With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)
 in the left hand from frame 3, shrinking from frame 7 to nothing at 15; **back air** between the legs
