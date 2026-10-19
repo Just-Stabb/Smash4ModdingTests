@@ -171,8 +171,8 @@ namespace SALT.Moveset.AnimCMD
                         case 0: // 0x1A, 26, or a float stored as its bits (1.5f)
                             cmd.Parameters.Add(ACMDCommand.ParseInt(p));
                             break;
-                        case 1:
-                            cmd.Parameters.Add(float.Parse(p.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture));
+                        case 1: // 1.5, 1.5f, or its bits in hex (0x3FC00000, as an int parameter shows it)
+                            cmd.Parameters.Add(ParseFloat(p));
                             break;
                         case 2:
                             cmd.Parameters.Add(decimal.Parse(p, NumberStyles.Float, CultureInfo.InvariantCulture));
@@ -185,13 +185,28 @@ namespace SALT.Moveset.AnimCMD
                 catch (Exception e) when (!(e is ACMDCompileException))
                 {
                     string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A) or a float stored in an int (e.g. 1.5f)" :
-                                  specs[i] == 3 ? "a variable (e.g. 0x2100000D)" : "a number";
+                                  specs[i] == 3 ? "a variable (e.g. 0x2100000D)" :
+                                  specs[i] == 1 ? "a number (e.g. 1.5 or 250.0)" : "a number";
                     string pname = i < cmd.ParamSyntax.Length ? cmd.ParamSyntax[i] : $"#{i + 1}";
                     throw new ACMDCompileException(line, $"{cmd.Name} parameter {pname} must be {kind}, not \"{p}\"");
                 }
             }
 
             return cmd;
+        }
+        /// <summary>A float parameter: 1.5, 1.5f, or the float's bits in hex (0x3FC00000; up to 0xFFFF: that number).</summary>
+        public static float ParseFloat(string p)
+        {
+            p = p.Trim();
+            bool neg = p.StartsWith("-0x", StringComparison.OrdinalIgnoreCase);
+            if (neg || p.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                uint bits = uint.Parse(p.Substring(neg ? 3 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                // small values are numbers (0x5 = 5), as int parameters show them; larger ones are float bits
+                float f = bits <= 0xFFFF ? bits : BitConverter.ToSingle(BitConverter.GetBytes(bits), 0);
+                return neg ? -f : f;
+            }
+            return float.Parse(p.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture);
         }
         /// <summary>
         /// Compile an array of code lines.

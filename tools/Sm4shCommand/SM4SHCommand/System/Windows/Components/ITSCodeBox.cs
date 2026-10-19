@@ -21,6 +21,7 @@ namespace Sm4shCommand
         TextStyle ArrStyle = new TextStyle(Brushes.Blue, null, FontStyle.Regular);
         TextStyle CommentStyle = new TextStyle(Brushes.DarkGreen, null, FontStyle.Regular);
         TextStyle LinkStyle = new TextStyle(Brushes.DarkBlue, null, FontStyle.Underline);
+        ColorPreviewStyle ColorStyle = new ColorPreviewStyle();
 
         // JUMP(Hash=0x...) / CALL(Hash=0x...): the hash is a link to that script (Ctrl+click).
         static readonly Regex LinkRegex = new Regex(@"\b(?:JUMP|CALL)\s*\(\s*(?:Hash\s*=\s*)?(0x[0-9A-Fa-f]+)", RegexOptions.IgnoreCase);
@@ -48,12 +49,14 @@ namespace Sm4shCommand
             Script = script;
             Text = ScriptComments.TextFor(script);  // with its comments (.comments file), if any
             IsChanged = false;
+            ClearUndo(); // loading isn't an edit: undoing it used to empty the script
         }
         public ITS_EDITOR(IScript script, string[] autocomplete) : this()
         {
             Script = script;
             Text = ScriptComments.TextFor(script);
             IsChanged = false;
+            ClearUndo();
             if (autocomplete != null)
             {
                 this.AutocompleteMenu = new AutocompleteMenu(this) { AppearInterval = 1 };
@@ -70,6 +73,7 @@ namespace Sm4shCommand
             else
                 Text = script.Decompile();
             IsChanged = false;
+            ClearUndo();
         }
         public IScript Script { get; set; }
 
@@ -136,6 +140,9 @@ namespace Sm4shCommand
             e.ChangedRange.ClearStyle(StyleIndex.All);
             //highlight tags
             e.ChangedRange.SetStyle(CommentStyle, @"//.*$", RegexOptions.Multiline);
+            var colorNames = ColorCommandPattern();
+            if (colorNames != null)
+                e.ChangedRange.SetStyle(ColorStyle, colorNames);
             Range.SetStyle(CommentStyle, @"/\*[\s\S]*?\*/", RegexOptions.Multiline);
             e.ChangedRange.SetStyle(LinkStyle, @"(?<=\b(?:JUMP|CALL)\s*\(\s*(?:Hash\s*=\s*)?)0x[0-9A-Fa-f]+", RegexOptions.IgnoreCase);
             e.ChangedRange.SetStyle(keywordStyle, @"\b(if|else|try|catch)\b");
@@ -331,6 +338,8 @@ namespace Sm4shCommand
             var menu = new ContextMenuStrip();
             var edit = new ToolStripMenuItem("Edit Tooltip..", null, (o, e) => EditTooltip(_menuPlace));
             menu.Items.Add(edit);
+            var pick = new ToolStripMenuItem("Pick Color..", null, (o, e) => PickColor(_menuPlace.iLine));
+            menu.Items.Add(pick);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(new ToolStripMenuItem("Cut", null, (o, e) => Cut()));
             menu.Items.Add(new ToolStripMenuItem("Copy", null, (o, e) => Copy()));
@@ -341,6 +350,9 @@ namespace Sm4shCommand
                 var spot = SpotAt(_menuPlace);
                 edit.Enabled = spot.Token != null;
                 edit.Text = spot.Token != null ? $"Edit Tooltip for {spot.Token}.." : "Edit Tooltip.. (right-click a number)";
+                var c = _menuPlace.iLine >= 0 && _menuPlace.iLine < LinesCount ? ColorParams.Find(Lines[_menuPlace.iLine]) : null;
+                pick.Enabled = c != null;
+                pick.Text = c != null ? $"Pick Color for {c.Command}.." : "Pick Color.. (right-click a command with R, G, B)";
             };
             ContextMenuStrip = menu;
         }
@@ -388,6 +400,203 @@ namespace Sm4shCommand
                 {
                     MessageBox.Show(FindForm(), $"Couldn't save {Tooltips.CustomPath}:\n{ex.Message}", "Edit Tooltip");
                 }
+            }
+        }
+
+        // ---------------------------------------------------------------- colors
+
+        /// <summary>A regex matching the names of the commands that have R, G, B parameters (or null).</summary>
+        static Regex ColorCommandPattern()
+        {
+            var names = ACMD_INFO.CMD_NAMES.Where(x => ColorParams.Indexes(x.Key) != null).Select(x => Regex.Escape(x.Value)).ToArray();
+            return names.Length == 0 ? null : new Regex(@"\b(?:" + string.Join("|", names) + @")(?=\s*\()");
+        }
+
+        /// <summary>Right-click > Pick Color: a color dialog that fills in the line's R, G, B.</summary>
+        void PickColor(int iLine)
+        {
+            if (iLine < 0 || iLine >= LinesCount)
+                return;
+            var c = ColorParams.Find(Lines[iLine]);
+            if (c == null)
+                return;
+            using (var dlg = new ColorDialog { FullOpen = true, AnyColor = true })
+            {
+                Color current;
+                if (c.TryGetColor(out current))
+                    dlg.Color = current;
+                if (dlg.ShowDialog(FindForm()) != DialogResult.OK)
+                    return;
+                string line = c.WithColor(dlg.Color);
+                Selection = new Range(this, 0, iLine, GetLineLength(iLine), iLine);
+                InsertText(line); // one undo step
+            }
+        }
+
+        /// <summary>
+        /// Finds a command's R, G, B parameters (named R/G/B or Red/Green/Blue in its definition) on a
+        /// line and reads / writes them. Values 0-255; when all three are written as 0-1 (0.5, 1.0) the
+        /// line is taken to use that scale. Floats, hex float bits (0x437A0000) and ints are read.
+        /// </summary>
+        public class ColorParams
+        {
+            public string Command, Line;
+            int[] _idx;
+            List<int[]> _spans; // value start, length, per parameter
+            bool[] _float;
+
+            public static int[] Indexes(uint crc)
+            {
+                string syn;
+                if (!ACMD_INFO.PARAM_SYNTAX.TryGetValue(crc, out syn) || string.IsNullOrEmpty(syn))
+                    return null;
+                var names = syn.Split(',').Select(x => x.Trim().ToLowerInvariant()).ToList();
+                Func<string, string, int> at = (a, b) => names.IndexOf(a) >= 0 ? names.IndexOf(a) : names.IndexOf(b);
+                int r = at("r", "red"), g = at("g", "green"), bl = at("b", "blue");
+                return r < 0 || g < 0 || bl < 0 ? null : new[] { r, g, bl };
+            }
+
+            public static ColorParams Find(string line)
+            {
+                int open = line.IndexOf('(');
+                if (open < 0)
+                    return null;
+                uint crc;
+                if (!ACMD_INFO.TryGetIdent(line.Substring(0, open).Trim(), out crc))
+                    return null;
+                var idx = Indexes(crc);
+                if (idx == null)
+                    return null;
+                int close = line.IndexOf(')', open);
+                if (close < 0)
+                    close = line.Length;
+                var spans = new List<int[]>();
+                int start = open + 1;
+                for (int i = open + 1; i <= close; i++)
+                {
+                    if (i == close || line[i] == ',')
+                    {
+                        int vs = start, ve = i;
+                        int eq = line.IndexOf('=', vs, ve - vs);
+                        if (eq >= 0)
+                            vs = eq + 1;
+                        while (vs < ve && char.IsWhiteSpace(line[vs])) vs++;
+                        while (ve > vs && char.IsWhiteSpace(line[ve - 1])) ve--;
+                        spans.Add(new[] { vs, ve - vs });
+                        start = i + 1;
+                    }
+                }
+                if (idx.Max() >= spans.Count)
+                    return null;
+                string fmt;
+                var types = ACMD_INFO.PARAM_FORMAT.TryGetValue(crc, out fmt) && fmt != null ? fmt.Split(',') : new string[0];
+                return new ColorParams
+                {
+                    Command = ACMD_INFO.CMD_NAMES[crc], Line = line, _idx = idx, _spans = spans,
+                    _float = idx.Select(i => i < types.Length && types[i].Trim() == "1").ToArray()
+                };
+            }
+
+            static bool TryNumber(string s, out float v)
+            {
+                s = s.Trim();
+                v = 0;
+                bool neg = s.StartsWith("-");
+                string t = neg ? s.Substring(1) : s;
+                if (t.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                {
+                    uint bits;
+                    if (!uint.TryParse(t.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out bits))
+                        return false;
+                    v = bits <= 0xFFFF ? bits : BitConverter.ToSingle(BitConverter.GetBytes(bits), 0);
+                }
+                else if (!float.TryParse(t.TrimEnd('f', 'F'), NumberStyles.Float, CultureInfo.InvariantCulture, out v))
+                    return false;
+                if (neg)
+                    v = -v;
+                return !float.IsNaN(v) && !float.IsInfinity(v);
+            }
+
+            bool TryValues(out float[] v)
+            {
+                v = new float[3];
+                for (int k = 0; k < 3; k++)
+                {
+                    var sp = _spans[_idx[k]];
+                    if (!TryNumber(Line.Substring(sp[0], sp[1]), out v[k]))
+                        return false;
+                }
+                return true;
+            }
+
+            /// <summary>0-1 values (all three at most 1 and written with a decimal point).</summary>
+            bool UnitScale(float[] v)
+            {
+                return v.All(x => x <= 1f) && _idx.Any(i => Line.Substring(_spans[i][0], _spans[i][1]).Contains("."));
+            }
+
+            public bool TryGetColor(out Color c)
+            {
+                c = Color.Empty;
+                float[] v;
+                if (!TryValues(out v))
+                    return false;
+                float m = UnitScale(v) ? 255f : 1f;
+                Func<float, int> b = x => Math.Max(0, Math.Min(255, (int)Math.Round(x * m)));
+                c = Color.FromArgb(b(v[0]), b(v[1]), b(v[2]));
+                return true;
+            }
+
+            /// <summary>The line with R, G, B set to a color, in the line's scale and number style.</summary>
+            public string WithColor(Color c)
+            {
+                float[] v;
+                bool unit = TryValues(out v) && UnitScale(v);
+                var vals = new[] { c.R, c.G, c.B };
+                var line = Line;
+                // right to left, so the earlier spans stay valid
+                foreach (var k in Enumerable.Range(0, 3).OrderByDescending(k => _spans[_idx[k]][0]))
+                {
+                    var sp = _spans[_idx[k]];
+                    string old = Line.Substring(sp[0], sp[1]);
+                    string text;
+                    if (unit)
+                        text = (vals[k] / 255f).ToString("0.0##", CultureInfo.InvariantCulture);
+                    else if (_float[k] || old.Contains("."))
+                        text = vals[k].ToString("0.0", CultureInfo.InvariantCulture);
+                    else if (old.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && old.Length > 6) // float bits in an int parameter
+                        text = "0x" + BitConverter.ToUInt32(BitConverter.GetBytes((float)vals[k]), 0).ToString("X8");
+                    else
+                        text = vals[k].ToString(CultureInfo.InvariantCulture);
+                    line = line.Substring(0, sp[0]) + text + line.Substring(sp[0] + sp[1]);
+                }
+                return line;
+            }
+        }
+
+        /// <summary>Draws a color command's name in the color its R, G, B make (text in black or white,
+        /// whichever reads better).</summary>
+        class ColorPreviewStyle : TextStyle
+        {
+            public ColorPreviewStyle() : base(Brushes.Black, null, FontStyle.Bold) { }
+
+            public override void Draw(Graphics gr, Point position, Range range)
+            {
+                Color c;
+                var p = ColorParams.Find(range.tb.Lines[range.Start.iLine]);
+                if (p != null && p.TryGetColor(out c))
+                {
+                    BackgroundBrush = new SolidBrush(c);
+                    ForeBrush = c.R * 0.299 + c.G * 0.587 + c.B * 0.114 > 140 ? Brushes.Black : Brushes.White;
+                }
+                else
+                {
+                    BackgroundBrush = null;
+                    ForeBrush = Brushes.Black;
+                }
+                base.Draw(gr, position, range);
+                (BackgroundBrush as SolidBrush)?.Dispose();
+                BackgroundBrush = null;
             }
         }
 
