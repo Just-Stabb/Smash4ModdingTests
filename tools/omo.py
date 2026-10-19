@@ -91,11 +91,24 @@ def _sizes(flags):
         tr.append(('pos', t, {0x08: 24, 0x20: 12, 0x04: 0}[t], {0x08: 6, 0x20: 0, 0x04: 12}[t]))
     if flags & ROT:
         t = (flags >> 12) & 0xF
-        tr.append(('rot', t, {5: 24, 7: 12, 6: 16}[t], {5: 6, 7: 0, 6: 2}[t]))
+        tr.append(('rot', t, {5: 24, 7: 12, 6: 16, 10: 0}[t], {5: 6, 7: 0, 6: 2, 10: 8}[t]))
     if flags & SCL:
         t = flags & 0xFFF
         tr.append(('scl', t, {0x081: 24, 0x201: 12}[t], {0x081: 6, 0x201: 0}[t]))
     return tr
+
+
+def _rot10(kb):
+    """rotation type 10 (Smash Forge OMOOld.cs): three 20-bit components in [-1/sqrt2, 1/sqrt2]
+    and a 4-bit index of the left-out (largest, positive) one, as a quaternion (x, y, z, w)"""
+    b = kb
+    f = ((b[0] << 12) | (b[1] << 4) | (b[2] >> 4), ((b[2] & 0xF) << 16) | (b[3] << 8) | b[4],
+         (b[5] << 12) | (b[6] << 4) | (b[7] >> 4))
+    s1 = 1 / math.sqrt(2.0)
+    c = [x * 2 * s1 / 1048575.0 - s1 for x in f]
+    miss = b[7] & 0xF
+    c.insert(miss, math.sqrt(max(0.0, 1.0 - sum(x * x for x in c))))
+    return tuple(c)
 
 
 class Omo:
@@ -154,6 +167,8 @@ class Omo:
                 v = tuple(cf[i] + cf[3 + i] * u[i] / 65535.0 for i in range(3))
             elif kind == 'pos' and t == 0x04:
                 v = struct.unpack('>3f', kb)
+            elif kind == 'rot' and t == 10:
+                v = _rot10(kb)
             elif kind == 'rot' and t == 6:
                 u = struct.unpack('>H', kb)[0]
                 v = (cf[0], cf[1], cf[2] + cf[3] * u / 65535.0)
@@ -161,6 +176,8 @@ class Omo:
                 v = cf
             if kind == 'pos':
                 pos = v
+            elif kind == 'rot' and t == 10:
+                rot = v
             elif kind == 'rot':
                 w2 = 1.0 - (v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
                 rot = (v[0], v[1], v[2], math.sqrt(max(0.0, w2)))
@@ -187,17 +204,37 @@ def interp_track(values):
 def set_node_full(omo, h, pos, rot, scl):
     """replace bone h's tracks with interpolated position, rotation (x y z of quaternions with
     w >= 0) and scale, one value a frame"""
-    pc, pk = interp_track(pos)
-    rot = [(-q[0], -q[1], -q[2]) if q[3] < 0 else q[:3] for q in rot]
-    rc, rk = interp_track(rot)
-    sc, sk = interp_track(scl)
-    f = POS | ROT | SCL | (0x08 << 16) | (5 << 12) | 0x081
+    set_node(omo, h, pos, rot, scl)
+
+
+def set_node(omo, h, pos=None, rot=None, scl=None):
+    """set_node_full with only the given tracks (None: the bone has no such track)"""
+    f = 0
+    consts = b''
+    keys = [b''] * omo.frames
+    for vals, bit, kind in ((pos, POS, 0x08 << 16), (rot, ROT, 5 << 12), (scl, SCL, 0x081)):
+        if vals is None:
+            continue
+        if bit == ROT:
+            vals = [(-q[0], -q[1], -q[2]) if q[3] < 0 else q[:3] for q in vals]
+        c, k = interp_track(vals)
+        f |= bit | kind
+        consts += c
+        keys = [keys[i] + k[i] for i in range(omo.frames)]
     n = omo.node(h)
-    data = [f, h, pc + rc + sc, [pk[i] + rk[i] + sk[i] for i in range(omo.frames)]]
+    data = [f, h, consts, keys]
     if n is None:
         omo.nodes.append(data)
     else:
         n[:] = data
+
+
+def tracks(omo, h):
+    """the tracks bone h has: a subset of ('pos', 'rot', 'scl')"""
+    n = omo.node(h)
+    if n is None:
+        return ()
+    return tuple(k for k, bit in (('pos', POS), ('rot', ROT), ('scl', SCL)) if n[0] & bit)
 
 
 # ---------------------------------------------------------------- math (4x4 row-major, column vectors)

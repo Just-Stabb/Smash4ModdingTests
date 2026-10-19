@@ -975,6 +975,38 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   jumpsquat wavedash and the stick-neutral air dodge). Kirby's collision is small, so it ended up under
   the stage and a buffered wavedash fell through it (user).
 
+## Added: Marth copy forward smash (Marth's, with his sword)
+
+With Marth's copy, Kirby's F-smash (all three angles) becomes Marth's: same timing (charge from
+frame 3, hits on frames 10-13, 50 frames) and Marth's hitboxes (13% sword / arm / body, 18% tipper
+with his angle `0xA5`, KBG 80, BKB 55 / 80, sizes 3.5 / 3 / 2 / 3.5, hitlag 0.7 / 1.5, cutting).
+The hitboxes are capsules / points on bone 0 placed where the sword is on each active frame
+(Marth's are on his own sword / arm bones, which Kirby doesn't have): the body hit from 10% to
+55% of the blade, the tipper at 85%, the arm hit at the grip, the body hit at `BustN`.
+
+**Animation:** there are no Marth animations for Kirby to use, so it's Kirby's own Roy-copy Flare
+Blade (`motion/roybody`: start, charge loop, overhead slash ending in a lunge; the sword on
+`LHaveN`, blade +Y, the same as Marth's copy sword) retimed (`fs_specs()`): the draw in frames 0-3,
+the charge loop as the hold, the windup over the head in 4-9 (blended out of the charge pose), the
+slash 10-13, the rest of Roy's end (12-68) in 14-49. The sword is twice its size (as in the aerials)
+and shrinks away from frame 44.
+
+**Slots:** two more Marth slots: `0x383` (was the air end) plays the F-smash, `0x381` (was the air
+start) its charge. Shield Breaker in the air now plays the ground start / end animations
+(`func_2919`; the legs are bent as on the ground) and `marth_full_charge_fx()` binds the air
+start / end's own effects and sounds. `marth_fsmash()` / `marth_fsmash_bind()` (end of
+`kirby.c`) swap the motions in the F-smash statuses (`func_286` start, `func_288` charge,
+`func_292` release, which resumes at the charge frame) and bind game script `0x304`
+(`MarthSwordAttackS4`, the hitboxes and the charge flag) and effects / sounds `0x304` / `0x305`
+(the sword's `Sword_Trace` from frame 0 and again at frame 4 in case the release skips earlier
+commands, Kirby's smash flash, Marth's dust, the Marth copy's swing sound, Kirby's F-smash voice;
+the charge: the sword plus Kirby's own charge effects / sound). The slots' expression scripts are
+Kirby's `AttackS4` / `AttackS4Hold` (smash charge). The RPX tables / `fighter_param_vl_kirby` get
+`0x5F`'s / `0x62`'s flags and values.
+
+`tools/omo.py` reads rotation type 10 now (Smash Forge's `OMOOld.cs`: three 20-bit components
+and the index of the left-out one); Hammer Flip and the copy animations use it.
+
 ## Added: Marth copy sword in Strike neutral air, back air and up air
 
 **History.** v1 (named motion slots `0x301`–`0x303` + animations in `marthbody`) T-posed: a motion's
@@ -1041,7 +1073,7 @@ The RPX tables get the sword animations' hashes and the original moves' flags in
 ACMD changes.
 
 Build: `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body>
-<fighter_param_vl_kirby.bin> build/cave_fix_s4/cross_f.rpx build/marthsword`, then the standard RPX command with
+<fighter_param_vl_kirby.bin> build/cave_fix_s4/cross_f.rpx build/marthsword build/game.bin`, then the standard RPX command with
 `$(cat build/marthsword/rpx_args.txt)` added at the end.
 
 With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)

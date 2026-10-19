@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air.
+"""Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air, and Marth's
+forward smash with the sword.
 
-  python3 tools/kirby_marth_sword.py KIRBY_DIR ANIMCMD_DIR VL_BIN RPX OUT_DIR
+  python3 tools/kirby_marth_sword.py KIRBY_DIR ANIMCMD_DIR VL_BIN RPX OUT_DIR [GAME_BIN]
 
-KIRBY_DIR   the fighter/kirby folder (model/body/c00/model.vbn, motion/body, motion/marthbody)
+KIRBY_DIR   the fighter/kirby folder (model/body/c00/model.vbn, motion/body, motion/marthbody,
+            motion/roybody)
 ANIMCMD_DIR script/animcmd/body (motion.mtable, effect.bin, sound.bin, expression.bin)
 VL_BIN      fighter_param_vl_kirby.bin
 RPX         the RPX the motion tables are read from (build/cave_fix_s4/cross_f.rpx)
 OUT_DIR     gets motion/marthbody/{main,kirbypt1,kirbypt2}.pac, script/animcmd/body/
-            {motion.mtable,effect.bin,sound.bin,expression.bin}, fighter_param_vl_kirby.bin and
-            rpx_args.txt (rpx_patch.py args for the motion tables)
+            {motion.mtable,game.bin,effect.bin,sound.bin,expression.bin}, fighter_param_vl_kirby.bin
+            and rpx_args.txt (rpx_patch.py args for the motion tables)
+GAME_BIN    the game.bin to add the F-smash's script to (default ANIMCMD_DIR's; build/game.bin)
 
 (fighters/kirby/specials.md "Marth copy sword".) The copy's sword (model marthsword on Kirby's
 LHaveN) shows only in the Marth copy's own motions, 0x37D-0x384 (in game: Kirby's own slots
@@ -62,12 +65,45 @@ MOVES = [
 ]
 FX = {0x380: (0x301, 'MarthSwordAttack12'), 0x384: (0x302, 'MarthSwordAttackAirB'),
       0x382: (0x303, 'MarthSwordAttackAirHi')}
-SLOT_NAMES = {0x380: 'MarthSpecialNEndMax', 0x384: 'MarthSpecialAirNEndMax', 0x382: 'MarthSpecialAirNLoop'}
+SLOT_NAMES = {0x380: 'MarthSpecialNEndMax', 0x384: 'MarthSpecialAirNEndMax', 0x382: 'MarthSpecialAirNLoop',
+              0x383: 'MarthSpecialAirNEnd', 0x381: 'MarthSpecialAirNStart'}
 SWORD_FROM = 'marthspecialnendmax'      # the effect script whose Sword_Trace is used
 FORWARD = (0.0, 0.0, 1.0)  # model +Z: where Kirby faces
 BACK = (0.0, 0.0, -1.0)
 SIZE = 2.0                 # the sword's size (user: double)
 DEPTH = (1.0, 0.0, 0.0)   # model X: toward / away from the camera (Kirby faces +Z)
+
+# F-smash (user: Marth's, with his sword). Kirby's own Roy-copy Flare Blade animations (start, charge
+# loop, overhead slash ending in a lunge; the sword on LHaveN, blade +Y) retimed to Marth's forward
+# smash: charge at frame 3, hits on frames 10-13, 50 frames (Kirby's own is 50). Two more Marth slots:
+# 0x383 (air end) plays it, 0x381 (air start) the charge loop; Shield Breaker in the air plays the
+# ground start / end (func_2919) and binds those slots' own effects (marth_full_charge_fx()).
+FS_SLOT, FS_ORIG = 0x383, 0x5F                  # AttackS4 (0x5E / 0x61, the angled ones, too)
+FS_HOLD_SLOT, FS_HOLD_ORIG = 0x381, 0x62        # AttackS4Hold
+FS_FX = (0x304, 'MarthSwordAttackS4')           # game (hitboxes), effect and sound scripts
+FS_HOLD_FX = (0x305, 'MarthSwordAttackS4Hold')  # effect and sound scripts
+FS_NAME, FS_HOLD_NAME = 'AttackS4', 'AttackS4Hold'      # FitKirbyMarthBody<part>D00<name>
+ROY = 'FitKirbyRoyBody%sD00SpecialN%s.omo'
+FS_FRAMES = 50
+FS_HOLD = 3                # Marth's charge frame (ON_FLAG 0x2100001B)
+FS_SHRINK, FS_GONE = 44, 50
+FS_SLASH = {4: 2, 5: 4, 6: 6, 7: 8, 8: 9, 9: 10, 10: 10.5, 11: 11, 12: 11.5, 13: 12}  # frame: End's
+FS_BLEND = {4: 0.7, 5: 0.8}    # from the charge pose (Start's last frame) into End's
+FS_HITS = (10, 11, 12, 13)
+BLADE = 10.75              # the blade's end along LHaveN +Y (Marth's Sword_Trace), sword units
+HOLD_FLAG = 0x2100001B
+# Marth's AttackS4 hitboxes (his game.bin): (ID, where, damage, angle, KBG, BKB, size, hitlag, SDI, SFX)
+# where: a point along the blade (0 grip, 1 end), 'hand' or 'body'. Marth's are on his sword (Z 2 and
+# 7.3, the tipper), arm and body bones; here capsules / points at the same places on Kirby's sword.
+FS_HITBOXES = [
+    (0, (0.1, 0.55), 13.0, 361, 80, 55, 3.5, 0.7, 1.0, 3),
+    (1, 'hand', 13.0, 361, 80, 55, 3.0, 0.7, 1.0, 3),
+    (2, 'body', 13.0, 361, 80, 55, 2.0, 0.7, 1.0, 3),
+    (3, 0.85, 18.0, 0xA5, 80, 80, 3.5, 1.5, 0.0, 8),
+]
+SFX_CHARGE = 0xBF          # Kirby's smash charge sound (AttackS4Hold)
+SFX_SWING = 0x160040       # the Marth copy's sword swing (MarthSpecialNEnd)
+SFX_VOICE = 0x3F0016       # Kirby's F-smash voice
 
 
 def crc(name):
@@ -207,10 +243,143 @@ def sword_track(anim, bones, place, appear, shrink, gone):
     return have, P, R, S
 
 
+def slerp(a, b, t):
+    d = sum(a[i] * b[i] for i in range(4))
+    if d < 0:
+        b, d = tuple(-c for c in b), -d
+    if d > 0.9995:
+        return norm(tuple(a[i] + (b[i] - a[i]) * t for i in range(4)))
+    th = math.acos(d)
+    sa, sb = math.sin((1 - t) * th), math.sin(t * th)
+    return tuple((a[i] * sa + b[i] * sb) / math.sin(th) for i in range(4))
+
+
+def blend(x, y, t):
+    lerp = lambda u, v: tuple(u[i] + (v[i] - u[i]) * t for i in range(3))  # noqa: E731
+    return lerp(x[0], y[0]), slerp(x[1], y[1], t), lerp(x[2], y[2])
+
+
+def sample_at(anim, h, f):
+    """(pos, quat, scale) of bone h at a fractional frame (clamped to the animation), or None"""
+    f = min(max(f, 0.0), anim.frames - 1.0)
+    a = int(math.floor(f))
+    b = min(a + 1, anim.frames - 1)
+    sa = anim.sample(h, a)
+    return None if sa is None else blend(sa, anim.sample(h, b), f - a)
+
+
+def resample(srcs, specs):
+    """a new animation, frame i the blend of specs[i] = [(source name, frame, weight)]"""
+    out = omo.Omo(next(iter(srcs.values())).encode())
+    out.frames = len(specs)
+    out.nodes = []
+    hashes = []
+    for a in srcs.values():
+        hashes += [n[1] for n in a.nodes if n[1] not in hashes]
+    for h in hashes:
+        kinds = set()
+        for a in srcs.values():
+            kinds |= set(omo.tracks(a, h))
+        vals = []
+        for spec in specs:
+            v, wsum = None, 0.0
+            for name, f, w in spec:
+                s = sample_at(srcs[name], h, f) if w > 0 else None
+                if s is not None:
+                    v = s if v is None else blend(v, s, w / (wsum + w))
+                    wsum += w
+            if v is None:
+                v = next(sample_at(a, h, 0) for a in srcs.values() if a.node(h))
+            vals.append(v)
+        omo.set_node(out, h, *[[v[i] for v in vals] if k in kinds else None
+                               for i, k in enumerate(('pos', 'rot', 'scl'))])
+    return out
+
+
+def fs_specs():
+    """the F-smash's frames from Roy's Start / End, and the charge loop's from Loop"""
+    attack = []
+    for o in range(FS_FRAMES):
+        if o <= FS_HOLD:
+            attack.append([('Start', o * 11.0 / FS_HOLD, 1.0)])
+            continue
+        f = FS_SLASH.get(o, 12 + (o - 13) * 56.0 / (FS_FRAMES - 1 - 13))
+        w = FS_BLEND.get(o, 1.0)
+        attack.append([('Start', 11.0, 1.0 - w), ('End', f, w)])
+    return attack, [[('Loop', float(o), 1.0)] for o in range(31)]
+
+
+def fs_sword(anim, bones, appear, shrink, gone):
+    """Roy's sword placement, SIZE times as big, shrinking away at the end"""
+    have = next(h for n, p, h in bones if n == 'LHaveN')
+    P, R, S = [], [], []
+    for fr in range(anim.frames):
+        lp, lq, ls = anim.sample(have, fr)
+        s = scale_at(fr, appear, shrink, gone)
+        P.append(lp)
+        R.append(lq)
+        S.append(tuple(c * s * SIZE for c in ls))
+    omo.set_node(anim, have, P, R, S)
+
+
+def fs_game(anim, bones):
+    """the F-smash's game script: Marth's charge frame and hitboxes, on bone 0 (TransN) at the
+    sword's place each active frame"""
+    C = acmd.Command
+    out = [C(acmd.BY_NAME['frame'], [float(FS_HOLD)]), C(acmd.BY_NAME['on_flag'], [HOLD_FLAG])]
+    for fr in FS_HITS:
+        w = omo.world(anim, bones, fr)
+        it = omo.inv(w['TransN'])
+        rel = lambda p: tuple(it[i][3] + sum(it[i][k] * p[k] for k in range(3)) for i in range(3))  # noqa: E731
+        m = w['LHaveN']
+        along = lambda t: rel(tuple(m[i][3] + m[i][1] * BLADE * t for i in range(3)))  # noqa: E731
+        out.append(C(acmd.BY_NAME['frame'], [float(fr)]))
+        for hid, where, dmg, ang, kbg, bkb, size, lag, sdi, sfx in FS_HITBOXES:
+            if where == 'hand':
+                a = b = rel(pos(m))
+            elif where == 'body':
+                a = b = rel(pos(w['BustN']))
+            elif isinstance(where, tuple):
+                a, b = along(where[0]), along(where[1])
+            else:
+                a = b = along(where)
+            out.append(C(acmd.BY_NAME['extended_hitbox'],
+                         [hid, 0, 0, dmg, ang, kbg, 0, bkb, size, a[0], a[1], a[2], 2, 0.0, lag, sdi,
+                          1, 1, 0, 2, sfx, 3, 1, 0xA, b[0], b[1], b[2]]))
+    out.append(C(acmd.BY_NAME['frame'], [float(FS_HITS[-1] + 1)]))
+    out.append(C(acmd.BY_NAME['remove_all_hitboxes']))
+    out.append(C(acmd.END))
+    return out
+
+
+def fs_effects(eff, trace, stop):
+    """F-smash: the sword (from frame 0, again after the charge in case the release skips it),
+    Kirby's smash flash, Marth's dust; the charge loop: the sword plus Kirby's charge effects"""
+    C = acmd.Command
+    flash = [c for c in eff.script('AttackS4') if c.name == 'EFFECT_FOLLOW_FLIP'][0]
+    dust = C(acmd.BY_NAME['graphic_effect'], [0x1000020, 0] + [0.0] * 6 + [1.0] + [0.0] * 6 + [0])
+    dash = C(acmd.BY_NAME['graphic_effect3'], [0x1000020, 0, 8.0, 0.0, 0.0, 0.0, 180.0, 0.0, 0.5] +
+             [0.0] * 6 + [0])
+    attack = merge([C(acmd.END)], [(0.0, copy.deepcopy(trace)), (1.0, copy.deepcopy(flash)),
+                                   (float(FS_HOLD + 1), copy.deepcopy(trace)), (5.0, dust),
+                                   (13.0, dash), (float(FS_GONE - 1), copy.deepcopy(stop))])
+    hold = [copy.deepcopy(trace)] + copy.deepcopy(eff.script('AttackS4Hold'))
+    return attack, hold
+
+
+def fs_sounds(snd):
+    C = acmd.Command
+    attack = merge([C(acmd.END)], [(float(FS_HOLD + 1), C(acmd.BY_NAME['stop_sound_effect'], [SFX_CHARGE])),
+                                   (8.0, C(acmd.BY_NAME['sound_effect'], [SFX_SWING])),
+                                   (9.0, C(acmd.BY_NAME['sound_effect'], [SFX_VOICE]))])
+    return attack, copy.deepcopy(snd.script('AttackS4Hold'))
+
+
 def main():
-    if len(sys.argv) != 6:
+    if len(sys.argv) not in (6, 7):
         sys.exit(__doc__)
-    kdir, adir, vl_in, rpx, out = sys.argv[1:]
+    kdir, adir, vl_in, rpx, out = sys.argv[1:6]
+    game_in = sys.argv[6] if len(sys.argv) == 7 else os.path.join(adir, 'game.bin')
     bones = omo.vbn_read(os.path.join(kdir, 'model/body/c00/model.vbn'))
     mdir = os.path.join(out, 'motion/marthbody')
     sdir = os.path.join(out, 'script/animcmd/body')
@@ -221,8 +390,9 @@ def main():
     for part in ('Main', 'Kirbypt1', 'Kirbypt2'):
         fn = part.lower() + '.pac'
         body = dict(omo.pac_read(os.path.join(kdir, 'motion/body', fn)))
+        ours = [m[2] for m in MOVES] + [FS_NAME, FS_HOLD_NAME]
         marth = [e for e in omo.pac_read(os.path.join(kdir, 'motion/marthbody', fn))
-                 if not any(e[0].endswith('D00%s.omo' % m[2]) for m in MOVES)]
+                 if not any(e[0].endswith('D00%s.omo' % n) for n in ours)]
         for slot, new, src, code, place, a, s, g, orig in MOVES:
             data = body['FitKirbyBody%s%s%s.omo' % (part, code, src)]
             if part == 'Main':
@@ -231,12 +401,22 @@ def main():
                 omo.set_node_full(anim, have, P, R, S)
                 data = anim.encode()
             marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, src), data))
+        roy = dict(omo.pac_read(os.path.join(kdir, 'motion/roybody', fn)))
+        srcs = {k: omo.Omo(roy[ROY % (part, k)]) for k in ('Start', 'Loop', 'End')}
+        for name, specs, sword in ((FS_NAME, fs_specs()[0], (1, FS_SHRINK, FS_GONE)),
+                                   (FS_HOLD_NAME, fs_specs()[1], (1, 999, 1000))):
+            anim = resample(srcs, specs)
+            if part == 'Main':
+                fs_sword(anim, bones, *sword)
+                if name == FS_NAME:
+                    fs_attack = anim
+            marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, name), anim.encode()))
         omo.pac_write(os.path.join(mdir, fn), marth)
 
     # ACMD: effect / sound sets with the sword under the FX slots' names, the slots' expressions
     mt = open(os.path.join(adir, 'motion.mtable'), 'rb').read()
     table = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
-    for slot, (fx, name) in FX.items():
+    for slot, (fx, name) in list(FX.items()) + [(FS_SLOT, FS_FX), (FS_HOLD_SLOT, FS_HOLD_FX)]:
         assert table[fx] in (0, crc(name)), 'motion 0x%X is in use (0x%08X)' % (fx, table[fx])
         table[fx] = crc(name)
         assert table[slot] == crc(SLOT_NAMES[slot]), hex(slot)
@@ -252,6 +432,14 @@ def main():
                                                               (float(g - 1), copy.deepcopy(stop))])
         snd.scripts[crc(name)] = copy.deepcopy(snd.script(src) or [acmd.Command(acmd.END)])
         exp.scripts[crc(SLOT_NAMES[slot])] = copy.deepcopy(exp.script(src) or [acmd.Command(acmd.END)])
+    # F-smash
+    eff.scripts[crc(FS_FX[1])], eff.scripts[crc(FS_HOLD_FX[1])] = fs_effects(eff, trace, stop)
+    snd.scripts[crc(FS_FX[1])], snd.scripts[crc(FS_HOLD_FX[1])] = fs_sounds(snd)
+    exp.scripts[crc(SLOT_NAMES[FS_SLOT])] = copy.deepcopy(exp.script(FS_NAME))
+    exp.scripts[crc(SLOT_NAMES[FS_HOLD_SLOT])] = copy.deepcopy(exp.script(FS_HOLD_NAME))
+    game = acmd.ACMDFile.load(game_in)
+    game.scripts[crc(FS_FX[1])] = fs_game(fs_attack, bones)
+    game.save(os.path.join(sdir, 'game.bin'))
     eff.save(os.path.join(sdir, 'effect.bin'))
     snd.save(os.path.join(sdir, 'sound.bin'))
     exp.save(os.path.join(sdir, 'expression.bin'))
@@ -259,7 +447,9 @@ def main():
     # the RPX motion tables
     d, _shoff, _ent, secs = rpx_patch.load(rpx)
     args = []
-    for slot, new, src, code, place, a, s, g, orig in MOVES:
+    for slot, new, src, code, place, a, s, g, orig in MOVES + [(FS_SLOT, None, FS_NAME, 0, 0, 0, 0, 0, FS_ORIG),
+                                                              (FS_HOLD_SLOT, None, FS_HOLD_NAME, 0, 0, 0, 0, 0,
+                                                               FS_HOLD_ORIG)]:
         flags = rpx_patch.read_u32(d, secs, MAIN_TABLE + 8 * orig + 4)
         for table, size, part in ((MAIN_TABLE, 8, 'Main'), (PT1_TABLE, 4, 'Kirbypt1'), (PT2_TABLE, 4, 'Kirbypt2')):
             args.append('0x%08X=0x%08X' % (table + size * slot, anim_hash('FitKirbyMarthBody%sD00%s' % (part, src))))
@@ -269,14 +459,15 @@ def main():
     # per-motion params
     vl = bytearray(open(vl_in, 'rb').read())
     offs = vl_motion_offsets(vl)
-    for slot, *_rest in MOVES:
-        orig = _rest[-1]
+    for slot, orig in [(m[0], m[-1]) for m in MOVES] + [(FS_SLOT, FS_ORIG), (FS_HOLD_SLOT, FS_HOLD_ORIG)]:
         for a_, b_ in zip(offs[slot], offs[orig]):
             vl[a_] = vl[b_]
     open(os.path.join(out, 'fighter_param_vl_kirby.bin'), 'wb').write(vl)
 
     for slot, new, src, code, place, a, s, g, orig in MOVES:
         print('motion 0x%X (for 0x%X %s): sword %s, frames %d / %d / %d' % (slot, orig, src, place, a, s, g))
+    print('motion 0x%X (for 0x%X): F-smash, 0x%X (for 0x%X): its charge; scripts 0x%X / 0x%X' %
+          (FS_SLOT, FS_ORIG, FS_HOLD_SLOT, FS_HOLD_ORIG, FS_FX[0], FS_HOLD_FX[0]))
 
 
 if __name__ == '__main__':
