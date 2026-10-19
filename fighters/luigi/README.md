@@ -32,7 +32,7 @@ dodge / wavedash and momentum were wanted. Decompiling it needed a patched mscde
 analysis pass is exponential on this file and it rejects `try` blocks around syscalls); the
 pieces below are ported from that decompile (and the bytecode where it still failed).
 
-- **Directional dodge** (`melee_airdodge_dir()`, the mod's `func_819`): kinetic type `0xA`, gravity
+- **Directional dodge** (`melee_airdodge_dir()` → `melee_airdodge_xy(x, y)`, the mod's `func_819`): kinetic type `0xA`, gravity
   and brake off, all speed 0, then `melee_airdodge_speed()` (**3.1**) in the stick's direction
   (stick length ≥ 0.125; otherwise none). Flag `0x20000044` (no air speed cap) is on.
 - **From the air** (`func_62`): also moves the ECB bottom 2.5 down with the stick under 0.01
@@ -49,10 +49,15 @@ pieces below are ported from that decompile (and the bytecode where it still fai
 - **Wavedash on landing** (`wavedash_landing()` in the Landing pres `func_478` / `func_479`):
   landing from `0xB`–`0xF` with the air dodge input, no grab and the stick down: the dodge's speed
   and EscapeAir instead of the landing. Every landing also starts with no vertical speed.
-- **Wavedash out of jumpsquat** (`jumpsquat_airdodge()` in `func_488`): shield on the
-  jumpsquat's last frame → EscapeAir with the dodge's speed. **The mod only allows it for a
-  jumpsquat of 6+ frames (`jumpsquat_airdodge_min_frames()`), and Luigi's is 5, so it doesn't
-  happen with his normal attributes** (the mod probably changed them). Lower the minimum to use it.
+- **Wavedash out of jumpsquat** (`jumpsquat_airdodge()`, first in the JumpSquat loop `func_488`):
+  **buffered** (user): a shield press at any point of the jumpsquat (`global65`, reset by the
+  JumpSquat main `func_487`) gives EscapeAir with the dodge's speed on the jumpsquat's last frame
+  (status frame ≥ jump startup frames − 1). A held shield doesn't count, so jumping out of shield
+  stays a jump. **Straight left / right** (|stick Y| < `wavedash_straight_y()` 0.25, |X| ≥
+  `wavedash_straight_x()` 0.5): aimed **89° from straight down** (just under horizontal:
+  `melee_airdodge_xy(±sin 89°, −cos 89°)`), a perfect wavedash, without the mod's 0.1 raise so it
+  lands at once. Other directions: the stick's, as in the mod. (The mod only did it on a press
+  exactly on the last frame, and only for a jumpsquat of 6+ frames: Luigi's is 5.)
 - **Dodge / wavedash landing** (flag `0x200000B5`): normal landing lag (`func_509`, attribute
   `0x3000028`) and the dodge landing's motion rate (`func_586`), A / Z item catch while wavedashing
   (`func_511`); a helpless fall after the dodge lands the same way (SpecialFall pre `func_977`,

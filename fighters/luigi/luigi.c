@@ -63,6 +63,7 @@ int global61;
 int global62;
 int global63;
 int global64;
+int global65;
 
 void func_0()
 {
@@ -10069,6 +10070,7 @@ void func_487()
 {
     int var0;
     int var1;
+    global65 = 0; // (Melee air dodge) no air dodge buffered in this jumpsquat yet
     var0 = WorkModule(0x6, 0x1000007b);
     var1 = WorkModule(0x6, 0x12000020) + var0;
     if (global47 >= var1 || global49 <= 0)
@@ -10095,6 +10097,10 @@ void func_488()
     if (func_71(global57))
     {
         return 0x1;
+    }
+    if (jumpsquat_airdodge()) // (Melee air dodge) buffered air dodge -> wavedash out of jumpsquat
+    {
+        return;
     }
     if (WorkModule(0x15, 0x1e000099))
     {
@@ -10134,10 +10140,6 @@ void func_488()
                 return;
             }
         }
-    }
-    if (jumpsquat_airdodge()) // (Melee air dodge) wavedash out of jumpsquat
-    {
-        return;
     }
 }
 
@@ -38145,10 +38147,15 @@ int dash_turn_attack_update()
 // goes to Fall (func_502).
 // ===================================================================
 float melee_airdodge_speed() { return 3.1f; }
-int   jumpsquat_airdodge_min_frames() { return 6; } // the mod's: jumpsquats shorter than this have no last-frame dodge (Luigi's is 5)
 
-// (the modded MSC's func_819)
+// (the modded MSC's func_819) The dodge in the stick's direction.
 void melee_airdodge_dir()
+{
+    melee_airdodge_xy(global48, global32);
+}
+
+// The dodge's kinetics, with speed melee_airdodge_speed() along (x, y) (none if it's shorter than 0.125).
+void melee_airdodge_xy(float x, float y)
 {
     float len;
     float k;
@@ -38160,12 +38167,12 @@ void melee_airdodge_dir()
     WorkModule(0x2711, 0x2100000f);
     func_100(0);
     global64 = 1;
-    len = MathF(0, global32 * global32 + global48 * global48); // stick length
+    len = MathF(0, x * x + y * y);
     if (len >= 0.125f)
     {
         k = melee_airdodge_speed() / len;
-        KineticModule(0x11, 0x3, global48 * k, 0);
-        KineticModule(0x11, 0x1, global32 * k);
+        KineticModule(0x11, 0x3, x * k, 0);
+        KineticModule(0x11, 0x1, y * k);
     }
 }
 
@@ -38181,29 +38188,53 @@ int wavedash_landing()
     return 0;
 }
 
-// JumpSquat loop (func_488): shield on the jumpsquat's last frame -> air dodge.
+// JumpSquat loop (func_488, first): the air dodge is buffered by pressing shield at any point of the
+// jumpsquat (global65; reset by its main func_487; holding it doesn't count, so a jump out of
+// shield stays a jump) and comes out on the last frame (status frame >= jump startup frames - 1). With the stick straight
+// left / right (|Y| < wavedash_straight_y(), |X| >= wavedash_straight_x()) it aims
+// wavedash_angle() (89) degrees from straight down, i.e. just under horizontal: a perfect wavedash.
+// (The mod only did it on a press exactly on the last frame, for jumpsquats of 6+ frames.)
+float wavedash_angle_sin() { return 0.9998477f; } // sin(89 degrees): the horizontal part
+float wavedash_angle_cos() { return 0.0174524f; } // cos(89 degrees): the downward part
+float wavedash_straight_y() { return 0.25f; }
+float wavedash_straight_x() { return 0.5f; }
+
 int jumpsquat_airdodge()
 {
-    if (!(global38 & 0x40))
+    float x;
+    if (global38 & 0x40) // shield pressed this frame
+    {
+        global65 = 1;
+    }
+    if (global9 < (float)(WorkModule(0x6, 0x1300000c) - 0x1)) // not the last jumpsquat frame yet
     {
         return 0;
     }
-    if (WorkModule(0x6, 0x1300000c) < jumpsquat_airdodge_min_frames())
+    if (!global65) // a press, not a hold: jumping out of shield still holds it
     {
         return 0;
     }
-    if (global9 < (float)(WorkModule(0x6, 0x1300000c) - 0x1))
-    {
-        return 0;
-    }
+    global65 = 0;
     func_16(0x22, 0);
-    if (global32 >= -0.15f)
-    {
-        PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + 0.1f, PostureModuleF(0x3));
-    }
     WorkModule(0x2710, 0x200000b5);
     WorkModule(0x2710, 0x20000044);
-    melee_airdodge_dir();
+    if (func_13(global32) < wavedash_straight_y() && func_13(global48) >= wavedash_straight_x())
+    {
+        x = wavedash_angle_sin();
+        if (global48 < 0)
+        {
+            x = -x;
+        }
+        melee_airdodge_xy(x, -wavedash_angle_cos()); // perfect wavedash: no 0.1 raise, so it lands at once
+    }
+    else
+    {
+        if (global32 >= -0.15f)
+        {
+            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + 0.1f, PostureModuleF(0x3));
+        }
+        melee_airdodge_dir();
+    }
     GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
     return 0x1;
 }
