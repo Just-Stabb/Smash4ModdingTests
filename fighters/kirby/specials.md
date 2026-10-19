@@ -977,6 +977,13 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 
 ## Added: Marth copy sword in Strike neutral air, back air and up air
 
+**Status: switched off (`marth_sword_on()` = 0).** In game the three new slots T-posed and the
+moves never ended (Kirby slid along the ground and didn't respawn after a KO): a copy's animations
+are only found for that copy's own motion slots (Marth's are `0x37D`–`0x384`, all used by Shield
+Breaker), not by name alone as assumed below. Also, `fighter_param_vl_kirby` group 1 is a
+per-motion table (6 bytes × 1222 motions: a flag (0 on loop motions), …, what looks like the
+interrupt frame: bair 41, up air 40) that new slots would need entries in.
+
 With Marth's copy (kind `0x12`), Kirby holds Marth's sword (user): **Strike neutral air** (air jab 2)
 in the left hand from frame 3, shrinking from frame 7 to nothing at 15; **back air** between the legs
 from frame 7 (grip between the knees, blade toward the feet), shrinking 17 → 27; **up air** on the

@@ -73689,9 +73689,13 @@ int wavedash_escape_blocked()
 // 16-28), the motion.mtable names and the ACMD (the moves' scripts under the new names).
 // fighters/kirby/specials.md "Marth copy sword". Int 0x11000002 keeps the vanilla aerial kind.
 // ===================================================================
+// OFF (marth_sword_on() = 0): in game the new slots T-posed and the moves never ended (user): a
+// copy's animations are only found for that copy's own motion slots (Marth: 0x37D-0x384).
+int marth_sword_on() { return 0; }
+
 int marth_sword_motion(int motion)
 {
-    if (kirby_copy_kind() != 0x12)
+    if (!marth_sword_on() || kirby_copy_kind() != 0x12)
     {
         return motion;
     }
