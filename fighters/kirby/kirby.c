@@ -85,6 +85,8 @@ int global83;
 int global84;
 int global85;
 int global86;
+int global87;
+float global88;
 
 void func_0()
 {
@@ -1740,6 +1742,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
     kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
     upb_air_update();       // up B available again on the ground / when hit (added)
+    upb_cancel_carry();     // up B -> neutral special cancel: keeps the (capped) rise (added)
 }
 
 void func_75()
@@ -72925,10 +72928,14 @@ void upb_air_update()
 // from frame upb_cancel_frame() (31) of up B, neutral special cancels it (with a copy ability).
 // Returns 1 when it changed status.
 // The cancel stops up B's movement first: after up B hit someone, the neutral special kept a huge
-// upward speed and flung Kirby high (user). Zeroes the motion (0), energy 2 and control (3) speeds;
-// Kirby's vertical speed (the total, KineticModuleF(0, 1)) is kept but capped at
-// upb_cancel_rise_cap() going up, in the gravity energy (1), so the cancel still rises a little.
-float upb_cancel_rise_cap() { return 1.5f; } // max upward speed kept by the cancel (user: a cap)
+// upward speed and flung Kirby high (user). Zeroes the motion (0), energy 2 and control (3) speeds
+// and keeps Kirby's vertical speed (the total, KineticModuleF(0, 1)), capped at
+// upb_cancel_rise_cap() going up. The neutral special's start resets the gravity energy, so the
+// speed set here alone was lost at once (user); upb_cancel_carry() (main loop func_74) sets it
+// again on the first upb_cancel_carry_frames() frames after the cancel.
+//   global87: carry frames left. global88: the kept vertical speed.
+float upb_cancel_rise_cap() { return 2.5f; } // max upward speed kept by the cancel (user: a cap)
+int upb_cancel_carry_frames() { return 2; }
 void upb_cancel_stop()
 {
     float vy;
@@ -72941,6 +72948,29 @@ void upb_cancel_stop()
     KineticModule(0x11, 0x2, 0, 0);
     KineticModule(0x11, 0x3, 0, 0);
     KineticModule(0x11, 0x1, vy);
+    global88 = vy;
+    global87 = upb_cancel_carry_frames();
+}
+
+void upb_cancel_carry()
+{
+    if (global87 <= 0)
+    {
+        return;
+    }
+    global87--;
+    if (global4 == 0x154 || global4 == 0x172 || global4 == 0x173 || global18 != 0x2)
+    {
+        if (global18 != 0x2)
+        {
+            global87 = 0;
+        }
+        return;
+    }
+    if (global88 > 0 && KineticModuleF(0xb, 0x1) < global88) // only ever raises the rise
+    {
+        KineticModule(0x11, 0x1, global88);
+    }
 }
 
 int upb_cancel_update()

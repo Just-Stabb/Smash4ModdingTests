@@ -16,6 +16,7 @@ LOG = 0x10400000          # stub calls append (function id, r3, r4, r5, r6) here
 MGR = 0x10300000
 THIS = 0x10500000
 RET = 0x02000000
+SET_TABLE, BIND, FSYNC = 0x02E424D8, 0x02BEE560, 0x02BEE950   # stubbed: the cave must not call them
 
 
 def check(name, got, want):
@@ -61,7 +62,7 @@ def fresh(script=0x5C00, tables=(0x7AB1E0, 0x7AB1E1, 0x7AB1E2, 0x7AB1E3), no_syn
     mu.mem_write(C.HOOK + 4, struct.pack(">I", 0x48000000))          # b . (the original's rest)
     mu.mem_write(C.SCRIPT_OF, stub(C.SCRIPT_OF, 1, script))
     # the set table stub returns tables[set] (set in r5)
-    s = Asm(C.SET_TABLE)
+    s = Asm(SET_TABLE)
     s.asm("""
         lis r11, 0x1030
         slwi r12, r5, 2
@@ -69,14 +70,14 @@ def fresh(script=0x5C00, tables=(0x7AB1E0, 0x7AB1E1, 0x7AB1E2, 0x7AB1E3), no_syn
         lwzx r12, r11, r12
         mtctr r12
         bctr""")
-    mu.mem_write(C.SET_TABLE, b"".join(struct.pack(">I", w) for w in s.words()))
+    mu.mem_write(SET_TABLE, b"".join(struct.pack(">I", w) for w in s.words()))
     mu.mem_write(0x02F00000, stub(0x02F00000, 2, 0))                      # logs, then returns...
     for i, t in enumerate(tables):                                        # ...the table: one stub each
         addr = 0x02F00100 + 0x100 * i
         mu.mem_write(addr, stub(addr, 2, t))
         mu.mem_write(MGR + 0x100 + 4 * i, struct.pack(">I", addr))
-    mu.mem_write(C.BIND, stub(C.BIND, 3, 0))
-    mu.mem_write(C.FSYNC, stub(C.FSYNC, 4, 0))
+    mu.mem_write(BIND, stub(BIND, 3, 0))
+    mu.mem_write(FSYNC, stub(FSYNC, 4, 0))
     mu.mem_write(THIS + 0x1C, struct.pack(">I", 0x47C))                 # pending motion (late update)
     mu.mem_write(THIS + 0x20, struct.pack(">ff", 5.0, 1.0))             # frame, rate
     mu.mem_write(THIS + 0x2C, bytes([0, no_sync]))
@@ -108,39 +109,21 @@ check("  +0x6C calls counted", (dbg(mu, 0), dbg(mu, 1)), (1, 0))
 mu = fresh()
 pc, log = call(mu, C.BIND_ALL, 0x212, 0xF)
 check("bind all: returns to the caller", pc, RET)
-check("  script of (mgr, kind, motion)", log[0][:4], (1, MGR, 0xF, 0x212))
-check("  set tables for sets 2 (sound), 3 (effect)", [(l[0], l[2], l[3]) for l in log if l[0] == 2], [(2, 0xF, 2), (2, 0xF, 3)])
-binds = [l[1:] for l in log if l[0] == 3]
-check("  bind(table, accessor, agent, script) x2", binds,
-      [(0x7AB1E2, 0xACC, THIS + 0x50 + 0x70, 0x5C00), (0x7AB1E3, 0xACC, THIS + 0x50 + 0xA8, 0x5C00)])
-syncs = [l[1:] for l in log if l[0] == 4]
-check("  frame sync(table, accessor, agent, !+0x2C) x2", syncs,
-      [(0x7AB1E2, 0xACC, THIS + 0x50 + 0x70, 1), (0x7AB1E3, 0xACC, THIS + 0x50 + 0xA8, 1)])
-check("  kinds stored for sets 2, 3; set 1 untouched", struct.unpack(">III", mu.mem_read(THIS + 0xC, 12)), (0, 0xF, 0xF))
-check("  +0x1C = -2 (late update won't rebind)", struct.unpack(">i", mu.mem_read(THIS + 0x1C, 4))[0], -2)
+check("  only the script lookup (mgr, kind, motion)", [l[:4] for l in log], [(1, MGR, 0xF, 0x212)])
+check("  late bind override: +0x28 kind, +0x2E on", (struct.unpack(">I", mu.mem_read(THIS + 0x28, 4))[0], mu.mem_read(THIS + 0x2E, 1)[0]), (0xF, 1))
+check("  pending motion +0x1C = the custom", struct.unpack(">I", mu.mem_read(THIS + 0x1C, 4))[0], 0x212)
+check("  +0x2C / +0x2D (frame set's flags) untouched", tuple(mu.mem_read(THIS + 0x2C, 2)), (0, 0))
+check("  set kinds untouched (late bind stores them)", struct.unpack(">III", mu.mem_read(THIS + 0xC, 12)), (0, 0, 0))
 check("  debug: calls, bind-all, motion, kind, script", tuple(dbg(mu, k) for k in range(5)), (1, 1, 0x212, 0xF, 0x5C00))
-check("  debug: set 2 / 3 tables", (dbg(mu, 5), dbg(mu, 6)), (0x7AB1E2, 0x7AB1E3))
 pc, log = call(mu, C.BIND_ALL, 0x212, 0xF)
 check("  counts past 1", (dbg(mu, 0), dbg(mu, 1)), (2, 2))
 
 mu = fresh()
 call(mu, C.BIND_ALL, 0x212, -1 & 0xFFFFFFFF)
-check("kind -1: own kind (+0x18)", dbg(mu, 3), 8)
+check("kind -1: own kind (+0x18)", (dbg(mu, 3), struct.unpack(">I", mu.mem_read(THIS + 0x28, 4))[0]), (8, 8))
 
 mu = fresh(script=0)
 pc, log = call(mu, C.BIND_ALL, 0x999, 0xF)
-check("no script for the motion: nothing bound", (pc, [l[0] for l in log]), (RET, [1]))
-
-mu = fresh(tables=(1, 1, 0, 0x7AB1E3))
-pc, log = call(mu, C.BIND_ALL, 0x212, 0xF)
-check("no sound table: only effect bound", [l[3] for l in log if l[0] == 3], [THIS + 0x50 + 0xA8])
-
-mu = fresh(no_sync=1)
-pc, log = call(mu, C.BIND_ALL, 0x212, 0xF)
-check("+0x2D set: bound, no frame sync", ([l[0] for l in log].count(3), [l[0] for l in log].count(4)), (2, 0))
-
-mu = fresh(script=0)
-call(mu, C.BIND_ALL, 0x999, 0xF)
-check("no script: +0x1C left for the late update", struct.unpack(">I", mu.mem_read(THIS + 0x1C, 4))[0], 0x47C)
+check("no script: nothing changed", (pc, struct.unpack(">I", mu.mem_read(THIS + 0x1C, 4))[0], mu.mem_read(THIS + 0x2E, 1)[0]), (RET, 0x47C, 0))
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

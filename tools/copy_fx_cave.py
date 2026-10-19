@@ -18,16 +18,22 @@ motion, kind) calls vtable +0x6C (0x02760CE4), which stores the kind for that se
 set 0: copy_custom_motion() in fighters/kirby/kirby.c used it to run the copied fighter's custom
 ACMD, while the effects and sounds stayed Kirby's own (default) ones.
 
-The hook at +0x6C's first instruction adds set BIND_ALL (0x10, never used by the game): it binds
-sets 2 and 3 (sound, effect) to `kind`'s scripts for `motion` the way 0x027606C0 does
-  script = 0x02E42518([0x102FF68C], kind, motion)       (0 = the kind has no such motion: nothing done)
-  table  = 0x02E424D8([0x102FF68C], kind, set)
-  0x02BEE560(table, [this+4], this + 0x50 + 0x38 set, script)
-  0x02BEE950(table, [this+4], agent, [this+0x24], [this+0x20], ![this+0x2C])   (unless [this+0x2D])
-stores the kind at +8 + 4 set, and sets +0x1C = -2 so the late update doesn't rebind them to
-Kirby's own scripts (the first version bound sets 1-2 and was overwritten there; set 1 is
-expression). Any other set goes on to the original function. copy_custom_motion() calls it for a
-custom slot only, after the motion change.
+The hook at +0x6C's first instruction adds set BIND_ALL (0x10, never used by the game). It doesn't
+bind anything itself: it points the late update at the copied fighter's custom, through the late
+bind's own "other kind" override (0x027606C0: with +0x2E set it uses kind +0x28 instead of the
+default +0x18), and sets the pending motion +0x1C to `motion`:
+  [this+0x28] = kind; [this+0x2E] = 1; [this+0x1C] = motion
+when the kind has a script for it (0x02E42518([0x102FF68C], kind, motion) != 0). The late update
+then binds sets 2-3 to that kind's scripts and syncs them with the frame / "continue" flag
+(+0x20 / +0x2C) the MSC's frame set (op 1) has stored by then. A motion change resets +0x2E / +0x28
+/ +0x1C, so it lasts for this motion only. copy_custom_motion() calls it for a custom slot only,
+after the motion change.
+
+History: v1 bound sets 1-2 at once (set 1 is expression; the late update rebound 2-3 to Kirby's).
+v2 bound 2-3 at once, synced them and set +0x1C = -2: it worked, but it ran before the MSC's
+frame set, so when the motion restarted mid-move (landing: the copy helpers' ground / air swap
+continue at the current frame, op 1 with flag 1 = +0x2C) the effects and sounds replayed from the
+start (user).
 """
 import os
 import sys
@@ -41,9 +47,6 @@ TRAMP = 0x037EE5F0          # -0x037EE600 (transform_grab_cave.py starts there)
 HOOK = 0x02760CE4           # MotionAnimcmdModule vtable +0x6C: mflr r0
 BIND_ALL = 0x10
 SCRIPT_OF = 0x02E42518
-SET_TABLE = 0x02E424D8
-BIND = 0x02BEE560
-FSYNC = 0x02BEE950
 
 SOURCE = """
 copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-1 = own)
@@ -63,7 +66,7 @@ fx_all:
         stwu r1, -0x30(r1)
         mflr r0
         stw r0, 0x34(r1)
-        stmw r24, 0x10(r1)
+        stmw r26, 0x18(r1)
         mr r31, r3
         mr r30, r5
         mr r29, r6
@@ -78,9 +81,6 @@ fx_kind:
         stw r12, 4(r26)
         stw r30, 8(r26)
         stw r29, 0xC(r26)
-        li r0, 0
-        stw r0, 0x14(r26)
-        stw r0, 0x18(r26)
         lis r3, 0x1030
         lwz r3, -0x974(r3)              # [0x102FF68C] script manager
         mr r4, r29
@@ -89,55 +89,18 @@ fx_kind:
         mr. r28, r3
         stw r28, 0x10(r26)              # debug: the motion's script (0 = none)
         beq fx_done
-        li r27, 2
-fx_loop:
-        slwi r0, r27, 2
-        add r12, r31, r0
-        stw r29, 8(r12)                 # the set's kind
-        lis r3, 0x1030
-        lwz r3, -0x974(r3)
-        mr r4, r29
-        mr r5, r27
-        bl %(SET_TABLE)s
-        slwi r0, r27, 2
-        add r12, r26, r0
-        stw r3, 0xC(r12)                # debug: set 2 / 3 table (0x14 / 0x18)
-        mr. r25, r3
-        beq fx_next
-        mulli r24, r27, 0x38
-        addi r24, r24, 0x50
-        add r24, r31, r24               # the set's agent
-        lwz r4, 4(r31)
-        mr r5, r24
-        mr r6, r28
-        bl %(BIND)s
-        lbz r0, 0x2D(r31)               # frame sync, as 0x027606C0 does
-        cmpwi r0, 0
-        bne fx_next
-        lbz r6, 0x2C(r31)
-        xori r6, r6, 1
-        mr r3, r25
-        lwz r4, 4(r31)
-        mr r5, r24
-        lfs f1, 0x24(r31)
-        lfs f2, 0x20(r31)
-        bl %(FSYNC)s
-fx_next:
-        addi r27, r27, 1
-        cmpwi r27, 3
-        ble fx_loop
-        li r0, -2                       # the late update's own "bound" mark: it won't rebind 2-3
-        stw r0, 0x1C(r31)
+        stw r29, 0x28(r31)              # the late bind's override kind
+        li r0, 1
+        stb r0, 0x2E(r31)               # use it
+        stw r30, 0x1C(r31)              # and this motion (pending: the late update binds 2-3)
 fx_done:
-        lmw r24, 0x10(r1)
+        lmw r26, 0x18(r1)
         lwz r0, 0x34(r1)
         mtlr r0
         addi r1, r1, 0x30
         blr
 dbg:                                    # debug words (docs/native-notes.md): +0x6C calls, bind-all
-        .word 0                         # calls, last motion, last kind, last script, set 2 / 3 tables
-        .word 0
-        .word 0
+        .word 0                         # calls, last motion, last kind, last script
         .word 0
         .word 0
         .word 0
@@ -148,8 +111,7 @@ dbg:                                    # debug words (docs/native-notes.md): +0
 def assemble():
     a = Asm(CAVE)
     back = HOOK + 4
-    a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)), SCRIPT_OF="0x%08X" % SCRIPT_OF,
-                        SET_TABLE="0x%08X" % SET_TABLE, BIND="0x%08X" % BIND, FSYNC="0x%08X" % FSYNC))
+    a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)), SCRIPT_OF="0x%08X" % SCRIPT_OF))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, "copy fx cave too big: %d words" % len(words)
     return a, words

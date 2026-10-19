@@ -949,9 +949,17 @@ stayed Kirby's. Why:
   hit expression and sound, and the late update put Kirby's sound / effect back anyway.
 - (Fighter set-up `0x02E13048` also keeps the kind's own effect table at `[[F+0x74D8]+0x4C]`.)
 
-Now the bind-all binds sets 2–3, frame-syncs them like `0x027606C0` (`0x02BEE950(table,
-accessor, agent, [+0x24], [+0x20], ![+0x2C])` unless `[+0x2D]`), and sets `+0x1C = -2` itself. Debug
-words: `+0x14` / `+0x18` are now the set 2 / 3 tables; `dbg` is at `0x04B78FC8`.
+v2 bound sets 2–3, frame-synced them like `0x027606C0` and set `+0x1C = -2` itself: confirmed
+working (user), but when Kirby landed mid-move the effects and sounds played again from the start.
+The copy helpers' ground / air swap restarts the motion at the current frame and then sets the
+frame with op 1 flag 1 (`+0x2C`, "continue": the frame sync skips the earlier events); the cave
+ran before that, so it synced as a fresh start.
+
+v3 binds nothing itself: it uses the late bind's own override. `0x027606C0` takes the kind from
+`+0x28` instead of `+0x18` when `+0x2E` is set (a motion change resets both, and `+0x1C`). The
+bind-all sets `+0x28 = kind`, `+0x2E = 1`, `+0x1C = motion` (when the kind has a script for it), and
+the late update binds and syncs sets 2–3 with the flags op 1 has stored by then. Debug words
+(`dbg`, now `0x04B78F38`): `+0x6C` calls, bind-all calls, last motion, last kind, last script.
 
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).
