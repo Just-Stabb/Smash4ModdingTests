@@ -7760,6 +7760,11 @@ void func_339()
 void func_340()
 {
     FighterUtil(0x1);
+    if (MotionModule(0x7) == 0x69) // forward air: its animation doesn't move Luigi, every frame (user)
+    {
+        KineticModule(0x7, 0);        // motion energy off
+        KineticModule(0x11, 0, 0, 0); // and no speed left in it
+    }
 }
 
 void func_341()
@@ -9920,6 +9925,10 @@ int func_472()
         }
     }
     KineticModule(0x11, 0x2, var0);
+    // momentum conservation (user): no air speed cap from the jump until Luigi is grounded, so the
+    // jump keeps that speed instead of being cut to the max air speed (rolloff_momentum_update)
+    WorkModule(0x2710, 0x20000044);
+    global68 = 1;
     return 0;
 }
 
@@ -38086,6 +38095,7 @@ void rolloff_fall_speed()
     }
 }
 
+// (also the jump's momentum conservation, func_472)
 void rolloff_momentum_update()
 {
     if (!global68)

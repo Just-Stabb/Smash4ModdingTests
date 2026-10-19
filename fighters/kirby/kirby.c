@@ -87,6 +87,11 @@ int global85;
 int global86;
 int global87;
 float global88;
+int global89;
+int global90;
+int global91;
+int global92;
+int global93;
 
 void func_0()
 {
@@ -1054,6 +1059,10 @@ int func_50()
 {
     if (ControlModule(0x2712, 0x3))
     {
+        if (wavedash_shield_blocked()) // (Luigi copy's air dodge) still the dodge's shield press: keep sliding
+        {
+            return 0;
+        }
         return 0x1;
     }
     return 0;
@@ -1152,6 +1161,10 @@ int func_52(int arg0)
             }
             return 0x1;
         }
+    }
+    if (wavedash_walk_blocked()) // (Luigi copy's air dodge): no turn / walk until its landing ends
+    {
+        return 0;
     }
     if (global24 & 0x40000)
     {
@@ -1408,6 +1421,10 @@ int func_62()
     if (global18 != 0x2)
     {
         return 0;
+    }
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's Melee air dodge (added)
+    {
+        return melee_airdodge_entry();
     }
     if (global24 & 0x400000)
     {
@@ -1743,6 +1760,8 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
     upb_air_update();       // up B available again on the ground / when hit (added)
     upb_cancel_carry();     // up B -> neutral special cancel: keeps the (capped) rise (added)
+    wavedash_shield_update(); // Luigi copy's wavedash: shield / stick held since the dodge (added)
+    kirby_momentum_update();  // Sonic / Luigi copy: momentum conservation (added)
 }
 
 void func_75()
@@ -4047,6 +4066,10 @@ void func_141()
 {
     ArticleModule(0x2712, WorkModule(0x6, 0x11000002));
     PostureModule(0x4, 0, 0, 0);
+    if (global6 == 0x74)
+    {
+        WorkModule(0x2711, 0x200000b5); // (Luigi copy's wavedash)
+    }
 }
 
 int func_142()
@@ -4099,6 +4122,7 @@ void func_146()
 
 int func_147()
 {
+    WorkModule(0x2711, 0x200000b5); // (Luigi copy's wavedash)
     StatusModule(0x5, 0x1, 0x14, 0x4, 0, 0, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x4002, 0, 0);
     return 0;
@@ -5153,6 +5177,7 @@ int func_212()
 
 void func_213()
 {
+    WorkModule(0x2711, 0x200000b5); // (Luigi copy's wavedash)
     func_214();
     func_78(func_215);
 }
@@ -8212,6 +8237,10 @@ int func_364()
 
 int func_365()
 {
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's Melee air dodge (added)
+    {
+        return melee_airdodge_pre();
+    }
     StatusModule(0x5, 0x2, 0x13, 0x5, 0, 0, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x2, 0, 0, 0, 0, 0, 0, 0x400002);
     return 0;
@@ -8381,6 +8410,18 @@ void func_374()
 
 void func_375()
 {
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's Melee air dodge (added)
+    {
+        WorkModule(0x2710, 0x2100001f);
+        func_376();
+        if (func_55())
+        {
+            return;
+        }
+        func_22(0x4e, 0, 1.0f);
+        func_78(func_377);
+        return;
+    }
     func_376();
     func_22(0x4e, 0, 1.0f);
     func_78(func_377);
@@ -8419,6 +8460,10 @@ void func_377()
 void func_378()
 {
     int var0;
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's Melee air dodge loop (added)
+    {
+        return melee_airdodge_loop();
+    }
     if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
     {
         return 0x1;
@@ -8553,7 +8598,17 @@ void func_378()
 void func_379()
 {
     WorkModule(0x9, 0x11000002);
-    if (WorkModule(0x6, 0x11000002) <= WorkModule(0x6, 0x120001f1))
+    if (kirby_melee_dodge()) // Luigi copy: item catch on A / Z (Luigi's Melee air dodge, added)
+    {
+        if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x9))
+        {
+            if (ControlModule(0x2723, 0) >= 0x10 && ControlModule(0x2723, 0x9) >= 0x10)
+            {
+                func_103();
+            }
+        }
+    }
+    else if (WorkModule(0x6, 0x11000002) <= WorkModule(0x6, 0x120001f1))
     {
         func_103();
     }
@@ -8591,6 +8646,10 @@ void func_381()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global73 = 1.0f; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        if (kirby_momentum_copy())
+        {
+            global93 = 1; // Sonic / Luigi copy: the roll-off's momentum is kept until grounded (kirby_momentum_update)
+        }
     }
     func_383();
 }
@@ -8601,6 +8660,10 @@ void func_382()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global73 = 1.0f; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
+        if (kirby_momentum_copy())
+        {
+            global93 = 1; // Sonic / Luigi copy: the roll-off's momentum is kept until grounded (kirby_momentum_update)
+        }
     }
     func_383();
 }
@@ -9903,11 +9966,21 @@ int func_472()
         return 0x1;
     }
     func_471();
+    if (kirby_momentum_copy()) // Sonic / Luigi copy: momentum conservation (added): no air speed cap
+    {                          // from the jump until grounded (kirby_momentum_update)
+        WorkModule(0x2710, 0x20000044);
+        global93 = 1;
+    }
     return 0;
 }
 
 int func_473()
 {
+    if (global89 && WorkModule(0x10, 0x20000044)) // (Luigi copy's air dodge) double jump: its no-cap flag off
+    {
+        WorkModule(0x2711, 0x20000044);
+    }
+    global89 = 0;
     if (WorkModule(0x2712, 0x2000000b))
     {
         StatusModule(0x2711, 0xd7);
@@ -9986,6 +10059,14 @@ int func_477()
 
 int func_478()
 {
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's wavedash on landing (added)
+    {
+        KineticModule(0x11, 0x1, 0);
+        if (wavedash_landing())
+        {
+            return 0x1;
+        }
+    }
     if (func_558())
     {
         return 0x1;
@@ -9997,6 +10078,14 @@ int func_478()
 
 int func_479()
 {
+    if (kirby_melee_dodge()) // Luigi copy: Luigi's wavedash on landing (added)
+    {
+        KineticModule(0x11, 0x1, 0);
+        if (wavedash_landing())
+        {
+            return 0x1;
+        }
+    }
     if (func_558())
     {
         return 0x1;
@@ -10057,6 +10146,7 @@ void func_487()
 {
     int var0;
     int var1;
+    global90 = 0; // (Luigi copy's wavedash) no air dodge buffered in this jumpsquat yet
     var0 = WorkModule(0x6, 0x1000007b);
     var1 = WorkModule(0x6, 0x12000020) + var0;
     if (global47 >= var1 || global49 <= 0)
@@ -10083,6 +10173,10 @@ void func_488()
     if (func_71(global57))
     {
         return 0x1;
+    }
+    if (kirby_melee_dodge() && jumpsquat_airdodge()) // Luigi copy: buffered wavedash out of jumpsquat (added)
+    {
+        return;
     }
     if (WorkModule(0x15, 0x1e000099))
     {
@@ -10445,6 +10539,15 @@ void func_502()
     float var2;
     float var3;
     float var4;
+    if (global89) // (Luigi copy's air dodge) Fall after the dodge: its no-cap flag off, normal kinetics
+    {
+        global89 = 0;
+        if (!global93)
+        {
+            WorkModule(0x2711, 0x20000044);
+        }
+        KineticModule(0, 0);
+    }
     func_40();
     var0 = 0x24;
     var1 = MotionModule(0x7);
@@ -10646,6 +10749,11 @@ float func_509()
     float var1;
     float var2;
     float var3;
+    if (kirby_melee_dodge() && (global5 == 0x22 || WorkModule(0x10, 0x200000b5))) // Luigi copy: wavedash / dodge landing: normal landing lag
+    {
+        WorkModule(0x2710, 0x200000b5);
+        return WorkModuleF(0, 0x3000028);
+    }
     if (global5 == 0x22)
     {
         var0 = WorkModuleF(0, 0);
@@ -10691,6 +10799,13 @@ void func_510()
 
 void func_511()
 {
+    if (WorkModule(0x10, 0x200000b5) && ControlModule(0x2712, 0x3) && (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x9)))
+    {
+        if (ControlModule(0x2723, 0) >= 0x10 && ControlModule(0x2723, 0x9) >= 0x10)
+        {
+            func_103(); // (Luigi copy's wavedash) item catch while wavedashing
+        }
+    }
     if (func_512())
     {
         return;
@@ -11098,7 +11213,10 @@ void func_534()
 
 void func_535()
 {
-    WorkModule(0x14, 0x20000044); // roll-off: leaving Fall puts the air speed cap back
+    if (!global93) // (Sonic / Luigi copy: kept until grounded, kirby_momentum_update)
+    {
+        WorkModule(0x14, 0x20000044); // roll-off: leaving Fall puts the air speed cap back
+    }
 }
 
 void func_536()
@@ -11108,7 +11226,7 @@ void func_536()
 
 void func_537()
 {
-    
+    WorkModule(0x2711, 0x200000b5); // (Luigi copy's wavedash) wavedash landing over
 }
 
 void func_538()
@@ -11824,7 +11942,7 @@ void func_586()
             EffectModule(0x2f, 0x1);
         }
         var0 = 1.0f;
-        if (global5 == 0x22)
+        if (global5 == 0x22 || WorkModule(0x10, 0x200000b5)) // (Luigi copy's wavedash) its landing too
         {
             var1 = WorkModuleF(0, 0);
             if (var1 != 0)
@@ -19908,6 +20026,10 @@ int func_977()
     {
         return 0x1;
     }
+    if (global5 == 0x22 && kirby_melee_dodge())
+    {
+        WorkModule(0x2710, 0x200000b5); // (Luigi copy's air dodge) helpless after the dodge: dodge landing
+    }
     StatusModule(0x5, 0x2, 0x13, 0x5, 0x4, 0x1, 0x82, 0, 0, 0);
     StatusModule(0x2713, 0, 0, 0x1, 0, 0x1, 0, 0x10, 0, 0);
     return 0;
@@ -20019,7 +20141,12 @@ void func_987()
 
 void func_988()
 {
-    
+    float var0;
+    if (global6 == 0x16 && WorkModule(0x10, 0x200000b5)) // (Luigi copy's air dodge)
+    {
+        var0 = (float)WorkModule(0x6, 0x120000bf) / WorkModuleF(0, 0x20000c0);
+        WorkModule(0, var0, 0);
+    }
 }
 
 void func_989()
@@ -73085,6 +73212,394 @@ int sideb_hold_turn_jump()
     if (ControlModule(0x271c) && global32 >= WorkModuleF(0, 0x200001f) && global47 < WorkModule(0x6, 0x12000020))
     {
         func_16(0x16c, 0x1);
+        return 0x1;
+    }
+    return 0;
+}
+
+// ===================================================================
+// Kirby with Luigi's copy: Luigi's Melee air dodge / wavedash (fighters/luigi/README.md), the same
+// code, hooked into Kirby's common scripts behind kirby_melee_dodge(): func_62 (air dodge),
+// EscapeAir func_365 / func_375 / func_378 / func_379, Landing pres func_478 / func_479 (wavedash),
+// JumpSquat func_487 / func_488 (buffered wavedash), func_502, func_509, func_977 (dodge landing),
+// func_50 / func_52 (shield / walk after the dodge). Globals: global89 dodge kinetics pending,
+// global90 jumpsquat buffer, global91 shield held since the dodge, global92 no walk / turn until the
+// stick is neutral.
+// Sonic / Luigi copy: momentum conservation (kirby_momentum_copy): a jump and a roll-off take the
+// air speed cap off (flag 0x20000044) until Kirby is on the ground / a ledge (global93,
+// kirby_momentum_update, main loop func_74); air friction still slows him.
+// ===================================================================
+int kirby_copy_kind()
+{
+    if (WorkModule(0x10, 0x2000009a))
+    {
+        return WorkModule(0x6, 0x100000a4);
+    }
+    return 0xffffffff;
+}
+
+int kirby_melee_dodge()
+{
+    if (kirby_copy_kind() == 0xb) // Luigi
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+int kirby_momentum_copy()
+{
+    if (kirby_copy_kind() == 0xb || kirby_copy_kind() == 0x22) // Luigi, Sonic
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+void kirby_momentum_update()
+{
+    if (!global93)
+    {
+        return;
+    }
+    if (global18 != 0x2 || !kirby_momentum_copy())
+    {
+        global93 = 0;
+        if (!global89)
+        {
+            WorkModule(0x2711, 0x20000044);
+        }
+        return;
+    }
+    WorkModule(0x2710, 0x20000044);
+}
+
+// (Luigi's func_62, from the air dodge input on)
+int melee_airdodge_entry()
+{
+    if (global24 & 0x400000)
+    {
+        if (global6 != 0x46 && global6 != 0x47) // (Melee air dodge)
+        {
+            if (WorkModule(0x15, 0x1e00003d))
+            {
+                WorkModule(0x2710, 0x20000044); // no air speed cap during the dodge
+                func_16(0x22, 0x1);
+                if (global32 < 0.01f && global5 != 0x57)
+                {
+                    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+                }
+                if (global32 < -0.18f)
+                {
+                    // just after a jump with the stick down: move Luigi down to the ground (wavedash)
+                    if (global4 == 0xb && global9 <= 4.0f)
+                    {
+                        if (KineticModuleF(0x1, 0x1) >= WorkModuleF(0, 0x3000159))
+                        {
+                            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - WorkModuleF(0, 0x3000158), PostureModuleF(0x3));
+                        }
+                        if (KineticModuleF(0x1, 0x1) < WorkModuleF(0, 0x3000159))
+                        {
+                            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - (WorkModuleF(0, 0x3000159) + KineticModuleF(0x1, 0x1)), PostureModuleF(0x3));
+                        }
+                    }
+                    if (KineticModuleF(0x1, 0x1) < 0)
+                    {
+                        PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) - func_13(KineticModuleF(0x1, 0x1)), PostureModuleF(0x3));
+                    }
+                }
+                melee_airdodge_dir();
+                return 0x1;
+            }
+        }
+    }
+    return 0;
+}
+
+// (Luigi's func_365)
+int melee_airdodge_pre()
+{
+    KineticModule(0xf, 0x1, 0);   // (Melee air dodge) no gravity
+    KineticModule(0x10, 0x3, 0, 0);
+    WorkModule(0x2711, 0x2100000f);
+    StatusModule(0x5, 0x2, 0xa, 0x5, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0, 0, 0, 0, 0, 0, 0, 0x400002);
+    return 0;
+}
+
+// (Luigi's func_378)
+int melee_airdodge_loop()
+{
+    int var0;
+    float vx;
+    float vy;
+    if (WorkModule(0x10, 0x2100001f)) // (Luigi's Melee air dodge) 10% of the speed off every frame
+    {
+        vx = func_13(KineticModuleF(0, 0xffffffff)) * 0.1f;
+        KineticModule(0x10, 0x3, vx, 0);
+        vy = -KineticModuleF(0x1, 0xffffffff) * 0.1f;
+        KineticModule(0xf, 0x1, vy);
+        if (global20 >= 30.0f) // frame 30: normal air control and gravity again
+        {
+            func_550();
+            KineticModule(0, 0);
+            WorkModule(0x2711, 0x2100001f);
+        }
+    }
+    if (!StopModule(0x1))
+    {
+        func_550();
+    }
+    if (WorkModule(0x15, 0x1e000074))
+    {
+        if (global38 & 0x1)
+        {
+            if (ItemModule(0x4) == 0x1)
+            {
+                if (ItemModule(0x5, 0x800000) == 0)
+                {
+                    if (WorkModule(0x6, 0x11000002) <= WorkModule(0x6, 0x120001f5))
+                    {
+                        func_16(0x8c, 0);
+                        WorkModule(0x2711, 0x20000044);
+                        return 0x1;
+                    }
+                }
+            }
+        }
+    }
+    if (WorkModule(0x15, 0x1e000051))
+    {
+        if (WorkModule(0x6, 0x1300011f) != 0)
+        {
+            if (ControlModule(0x2712, 0x3))
+            {
+                if (global38 & 0x1)
+                {
+                    var0 = LinkModule(0x2, 0x3);
+                    if (!var0)
+                    {
+                        func_16(0xf1, 0x1);
+                        WorkModule(0x2711, 0x20000044);
+                        return 0x1;
+                    }
+                }
+            }
+        }
+    }
+    if (WorkModule(0x2712, 0x2100000f))
+    {
+        if (WorkModule(0x15, 0x1e000014))
+        {
+            if (global18 == 0)
+            {
+                if (func_84() >= WorkModuleF(0, 0x2000082))
+                {
+                    if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                    {
+                        func_16(0x65, 0x1);
+                        return 0x1;
+                    }
+                }
+            }
+        }
+        if (WorkModule(0x15, 0x1e000013))
+        {
+            if (global18 == 0)
+            {
+                if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                {
+                    func_16(0x64, 0);
+                    return 0x1;
+                }
+            }
+        }
+    }
+    if (WorkModule(0x2712, 0x21000010))
+    {
+        if (WorkModule(0x15, 0x1e000017))
+        {
+            if (GroundModule(0x2722, 0x6) == 0x1)
+            {
+                if (ControlModule(0x2722, 0x2) < WorkModule(0x6, 0x12000081))
+                {
+                    if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                    {
+                        func_16(0x67, 0);
+                        return 0x1;
+                    }
+                }
+            }
+        }
+        if (WorkModule(0x15, 0x1e000016))
+        {
+            if (GroundModule(0x2722, 0x6) == 0x1)
+            {
+                if (global32 >= WorkModuleF(0, 0x200001f))
+                {
+                    if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                    {
+                        func_16(0x67, 0x1);
+                        return 0x1;
+                    }
+                }
+            }
+        }
+        if (WorkModule(0x15, 0x1e000015))
+        {
+            if (GroundModule(0x2722, 0x6) == 0x1)
+            {
+                if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                {
+                    func_16(0x66, 0);
+                    return 0x1;
+                }
+            }
+        }
+        if (WorkModule(0x15, 0x1e000018))
+        {
+            if (GroundModule(0x2722, 0x1) == 0x1)
+            {
+                if (WorkModule(0x6, 0x11000002) < WorkModule(0x6, 0x12000081))
+                {
+                    func_16(0x68, 0);
+                    return 0x1;
+                }
+            }
+        }
+    }
+    if (func_55())
+    {
+        return 0x1;
+    }
+    if (func_56()) // (Luigi's Melee air dodge) can grab a ledge
+    {
+        return 0x1;
+    }
+    if (MotionModule(0x2712))
+    {
+        func_16(0x10, 0); // (Luigi's Melee air dodge) helpless (SpecialFall) after the dodge
+        return 0x1;
+    }
+    return 0;
+}
+
+float melee_airdodge_speed() { return 3.1f; }
+
+void melee_airdodge_dir()
+{
+    melee_airdodge_xy(global48, global32);
+}
+
+void melee_airdodge_xy(float x, float y)
+{
+    float len;
+    float k;
+    KineticModule(0, 0xa);
+    KineticModule(0xf, 0x1, 0);
+    KineticModule(0x10, 0x3, 0, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x11, 0x1, 0);
+    WorkModule(0x2711, 0x2100000f);
+    func_100(0);
+    global89 = 1;
+    global91 = 1; // the shield press that made this dodge doesn't shield the landing (wavedash_shield_blocked)
+    global92 = 1; // no turn / walk until the stick goes back to neutral (wavedash_walk_blocked)
+    len = MathF(0, x * x + y * y);
+    if (len >= 0.125f)
+    {
+        k = melee_airdodge_speed() / len;
+        KineticModule(0x11, 0x3, x * k, 0);
+        KineticModule(0x11, 0x1, y * k);
+    }
+}
+
+int wavedash_landing()
+{
+    if (global5 >= 0xb && global5 <= 0xf && global24 & 0x400000 && !(global24 & 0x20000000) && global32 < 0)
+    {
+        melee_airdodge_dir();
+        StatusModule(0x2711, 0x22); // EscapeAir instead of the landing
+        return 0x1;
+    }
+    return 0;
+}
+
+float wavedash_angle_sin() { return 0.9998477f; } // sin(89 degrees): the horizontal part
+
+float wavedash_angle_cos() { return 0.0174524f; } // cos(89 degrees): the downward part
+
+float wavedash_straight_y() { return 0.25f; }
+
+float wavedash_straight_x() { return 0.5f; }
+
+int jumpsquat_airdodge()
+{
+    float x;
+    if (global38 & 0x40) // shield pressed this frame
+    {
+        global90 = 1;
+    }
+    if (global9 < (float)(WorkModule(0x6, 0x1300000c) - 0x1)) // not the last jumpsquat frame yet
+    {
+        return 0;
+    }
+    if (!global90) // a press, not a hold: jumping out of shield still holds it
+    {
+        return 0;
+    }
+    global90 = 0;
+    func_16(0x22, 0);
+    WorkModule(0x2710, 0x200000b5);
+    WorkModule(0x2710, 0x20000044);
+    if (func_13(global32) < wavedash_straight_y() && func_13(global48) >= wavedash_straight_x())
+    {
+        x = wavedash_angle_sin();
+        if (global48 < 0)
+        {
+            x = -x;
+        }
+        melee_airdodge_xy(x, -wavedash_angle_cos()); // perfect wavedash: no 0.1 raise, so it lands at once
+    }
+    else
+    {
+        if (global32 >= -0.15f)
+        {
+            PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + 0.1f, PostureModuleF(0x3));
+        }
+        melee_airdodge_dir();
+    }
+    GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+    return 0x1;
+}
+
+void wavedash_shield_update()
+{
+    if (global91 && !ControlModule(0x2712, 0x3))
+    {
+        global91 = 0;
+    }
+    if (global92 && func_13(global48) < wavedash_walk_reset_x())
+    {
+        global92 = 0; // stick back to neutral: the next tilt is a new walk input
+    }
+}
+
+float wavedash_walk_reset_x() { return 0.2f; }
+
+int wavedash_walk_blocked()
+{
+    return global92;
+}
+
+int wavedash_shield_blocked()
+{
+    if (!global91)
+    {
+        return 0;
+    }
+    if ((global4 == 0x16 || global4 == 0x17) && (WorkModule(0x10, 0x200000b5) || global5 == 0x22))
+    {
         return 0x1;
     }
     return 0;

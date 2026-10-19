@@ -30,8 +30,10 @@ Same code as Captain Falcon's (the common function numbers match):
 
 ## Forward air
 
-No animation movement (user): `func_310` turns the motion energy off (`KineticModule(0x7, 0)`)
-when the aerial is forward air (motion `0x69`).
+No animation movement (user): the motion energy (energy 0, the animation's own movement) is turned
+off (`KineticModule(0x7, 0)`) when the aerial is forward air (motion `0x69`, `func_310`) and again
+every frame of it with its speed zeroed (AttackAir exec `func_340`). The jump / air speed (energies
+2 / 3) isn't touched, so forward air keeps Luigi's momentum.
 
 ## Melee air dodge / wavedash (from the modded MSC)
 
@@ -91,7 +93,8 @@ pieces below are ported from that decompile (and the bytecode where it still fai
 
 ## Momentum (from the modded MSC)
 
-- **Jump** (Jump pre `func_472`): the jump's horizontal speed is the ground speed + the stick ×
+- **Jump** (Jump pre `func_472`), **momentum conservation** (user): the jump also takes the air speed
+  cap off (`0x20000044`, `global68`) until Luigi is grounded, so the jump keeps its speed. The jump speed: the jump's horizontal speed is the ground speed + the stick ×
   attribute `0x0D`, capped at the max jump speed (`0x0F`) (and set first to ground speed ×
   `0x0E`); with the stick back it can't go past 0.
 - **Roll → item throw** (roll end `func_383`): a roll that ends in an item throw (`0x8C`) keeps

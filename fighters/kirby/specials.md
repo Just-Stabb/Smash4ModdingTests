@@ -952,3 +952,20 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 - Note: Kirby's ground up-B rise script (`specialhi`) isn't in this `game.bin` (air up B `JUMP`s to it),
   so the first hitbox may be the fall's (`0x2D1`, frame 1 of `0x172`). The cancel goes by whatever
   hitbox actually comes out first.
+
+## Added: Luigi / Sonic copies: momentum and Luigi's wavedash
+
+- **Momentum conservation (Sonic or Luigi copy, `kirby_momentum_copy()`):** a jump (Jump pre
+  `func_472`) and a roll-off (roll ends `func_381` / `func_382`) take the air speed cap off (flag
+  `0x20000044`) until Kirby is on the ground / a ledge (`global93`, `kirby_momentum_update()` in the
+  main loop `func_74`; Fall's end `func_535` no longer puts the cap back then). Air friction still
+  slows him.
+- **Luigi's Melee air dodge / wavedash (Luigi copy, `kirby_melee_dodge()`):** the same code as
+  Luigi's (`fighters/luigi/README.md`): directional dodge (3.1, 10% decay to frame 30, helpless
+  after, ledge grab), wavedash on landing, buffered wavedash out of jumpsquat with the 89° perfect
+  wavedash, no shield from the dodge's own press, no walk / turn until the stick is neutral. Hooked
+  into Kirby's common scripts (`func_62`, `func_365` / `func_375` / `func_378` / `func_379`,
+  `func_478` / `func_479`, `func_487` / `func_488`, `func_502`, `func_509`, `func_977`, `func_50` /
+  `func_52`, …); globals `global89`–`global92`. ACMD (`tools/kirby_luigi_airdodge_acmd.py`):
+  EscapeAir's `Set_Kinetic_Handler(0)` at frame 19 only without status flag `0x2100001F` (the Luigi
+  dodge's), so Kirby's own dodge is unchanged.
