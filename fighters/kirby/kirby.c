@@ -7094,7 +7094,6 @@ void func_285()
 
 void func_286()
 {
-    int marth_fs;
     if (global5 == 0x8)
     {
         KineticModule(0, 0x7);
@@ -7102,17 +7101,7 @@ void func_286()
     WorkModule(0x16, 0x1e00005a);
     WorkModule(0x16, 0x1e000058);
     PostureModule(0x2);
-    marth_fs = marth_fsmash(0x5f); // the Marth copy's F-smash (added)
-    if (marth_fs)
-    {
-        func_22(marth_fs, 0, 1.0f);
-        marth_fsmash_bind(marth_fs);
-        MotionAnimcmdModule(0x1, 0);
-    }
-    else
-    {
-        func_22(0x5f, 0, 1.0f);
-    }
+    func_22(0x5f, 0, 1.0f);
     func_78(func_287);
 }
 
@@ -7143,7 +7132,6 @@ void func_288()
     float var1;
     int var2;
     float var3;
-    int marth_fs;
     if (!StopModule(0x1))
     {
         func_283();
@@ -7161,17 +7149,7 @@ void func_288()
     var0 = var1 / (float)var2;
     WorkModule(0x7, var2, 0x11000005);
     WorkModule(0x7, var2, 0x11000009);
-    marth_fs = marth_fsmash(0x62); // the Marth copy's F-smash charge (added)
-    if (marth_fs)
-    {
-        func_22(marth_fs, 0, var0);
-        marth_fsmash_bind(marth_fs);
-        MotionAnimcmdModule(0x1, 0);
-    }
-    else
-    {
-        func_22(0x62, 0, var0);
-    }
+    func_22(0x62, 0, var0);
     func_78(func_289);
 }
 
@@ -7229,7 +7207,6 @@ void func_292()
     int var0;
     int var1;
     float var2;
-    int marth_fs;
     ControlModule(0x271b);
     WorkModule(0x2711, 0x2100000d);
     ComboModule(0x1, 0x2);
@@ -7238,17 +7215,7 @@ void func_292()
     {
         var1 = WorkModule(0x6, 0x11000002);
         var2 = WorkModuleF(0, 0x1000006);
-        marth_fs = marth_fsmash(var1); // the Marth copy's F-smash (added)
-        if (marth_fs)
-        {
-            MotionModule(0x26, marth_fs, var2, 1.0f);
-            marth_fsmash_bind(marth_fs);
-            MotionAnimcmdModule(0x1, var2);
-        }
-        else
-        {
-            MotionModule(0x26, var1, var2, 1.0f);
-        }
+        MotionModule(0x26, var1, var2, 1.0f);
     }
     else if (var0 == 0x2)
     {
@@ -49586,7 +49553,7 @@ int func_2919(int arg0)
     }
     else if (arg0 == 0x221)
     {
-        return 0x37d; // air start: the ground start's animation; 0x381 is the Marth F-smash charge's (added)
+        return 0x381;
     }
     else if (arg0 == 0x225)
     {
@@ -49594,11 +49561,11 @@ int func_2919(int arg0)
     }
     else if (arg0 == 0x229)
     {
-        return 0x37f; // air end: the ground end's animation; 0x383 is the Marth F-smash's (added)
+        return 0x383;
     }
     else if (arg0 == 0x22d)
     {
-        return 0x37f; // air full-charge end: the ground end's animation; 0x384 is the Marth sword's (added)
+        return 0x383; // air full-charge end: the air end's animation (it was the same); 0x384 is the Marth sword's (added)
     }
     return arg0;
 }
@@ -73784,42 +73751,5 @@ void marth_full_charge_fx(int sub)
     else if (sub == 0x22d)
     {
         MotionAnimcmdModule(0, 0x10, 0x384, 0x8);
-    }
-    else if (sub == 0x221)
-    {
-        MotionAnimcmdModule(0, 0x10, 0x381, 0x8);
-    }
-    else if (sub == 0x229)
-    {
-        MotionAnimcmdModule(0, 0x10, 0x383, 0x8);
-    }
-}
-
-// Marth copy F-smash (tools/kirby_marth_sword.py): motion 0x383 plays it, 0x381 its charge, with
-// Marth's sword; game script 0x304 (Marth's hitboxes), effects / sounds 0x304 / 0x305
-int marth_fsmash(int motion)
-{
-    if (kirby_copy_kind() != 0x12)
-    {
-        return 0;
-    }
-    if (motion == 0x62)
-    {
-        return 0x381;
-    }
-    return 0x383;
-}
-
-void marth_fsmash_bind(int m)
-{
-    if (m == 0x381)
-    {
-        MotionAnimcmdModule(0, 0, 0x62, 0x8);
-        MotionAnimcmdModule(0, 0x10, 0x305, 0x8);
-    }
-    else
-    {
-        MotionAnimcmdModule(0, 0, 0x304, 0x8);
-        MotionAnimcmdModule(0, 0x10, 0x304, 0x8);
     }
 }
