@@ -985,15 +985,19 @@ The hitboxes are capsules / points on bone 0 placed where the sword is on each a
 55% of the blade, the tipper at 85%, the arm hit at the grip, the body hit at `BustN`.
 
 **Animation (now):** Marth's own `AttackS4S` and `AttackS4Charge` (`fighter/marth`, `--marth`),
-retargeted onto Kirby's skeleton (`marth_retarget()`). The bones Kirby shares with Marth (`TransN` to
-`ThrowN`, the standard rig) copy Marth's rotations: the arms by their change from the T-pose (both
-T-poses hold the arms straight out, so the sword arm goes where Marth's does); the root, hips, body,
-head and legs by their change from Marth's standing pose (`Wait1` frame 0), measured in his own
-frame and put on Kirby's standing pose (Marth stands side-on and his leg bones point down, Kirby's
-out and back: T-pose deltas spun Kirby's body and swung his feet up). Bone lengths stay Kirby's; the
+retargeted onto Kirby's skeleton (`marth_retarget()`). The arms copy Marth's rotations by their
+change from the T-pose (both T-poses hold the arms straight out, so the sword arm goes where
+Marth's does). Kirby's body is one ball over the root, hips, waist, chest, neck and head, so those
+turn together, by half of Marth's chest's change from his standing pose (`Wait1` frame 0, measured
+in his own frame, put on Kirby's standing pose): turning them separately (Marth's spine, neck and
+head bend on their own) pulled the ball out of shape and slid the face over it, and the full turn
+tipped Kirby over. The legs move with the body plus 60% of Marth's leg motion against his hips,
+from Kirby's standing legs (his leg bones point out and back in his T-pose, so T-pose deltas swung
+his feet up), and the body is lifted on frames where a foot (ankle, toe, toe tip or heel) would go
+below where it stands. Kirby's own bones (body size, mouth, cheeks) stay as he stands. Bone lengths stay Kirby's; the
 lunge forward is Marth's times their head heights (7.7 → 2.8, Kirby's own F-smash moves 3.8), the
 hips' drop times their hip-to-ankle lengths (Kirby's legs are tiny). Kirby's own bones (body, mouth,
-cheeks) and face parts come from his own F-smash, stretched to 70 frames. The sword (`LHaveN`, twice
+cheeks) stay standing and the face parts come from his own F-smash, stretched to 70 frames. The sword (`LHaveN`, twice
 its size, as before) is put in Kirby's right hand (Marth's `RHaveN` holds his `SwordN`) along Marth's
 blade (`SwordN` +Z, `marthsw1.pac`), shrinking away from frame 64. The hitboxes follow it. On the
 hit frames Kirby's hand reaches about 1 unit below the floor (his arm bones are long for his body);
