@@ -1,6 +1,6 @@
 # Adding a new stage slot (research)
 
-Status: test build v3 (`build/new_stage_test_v3.zip`, see "v2 result and v3"); first test build (`build/new_stage_test_v1.zip`): a copy of Battlefield as a new stage,
+Status: **works in game (v6, user)**: the new stage (a Battlefield copy, `NewStage01`, cosmetic `0x38`, kinds `0x80` / `0x81`) is on the stage select's page 2 with its name and icon, and loads. Open: the user's modded layout's page 1 since the stage was added (see "v2 result and v3").
 `NewStage01`, not tested in game yet. Addresses are this repo's `cross_f.rpx` (the version
 the other caves target). Several of them were first found by **Manifold** (Fitz Null, zlib
 licence, https://gitlab.com/fitz.lol/manifold, `src/cross/stage.cpp` / `stage.hpp` / `ui.hpp`), a
@@ -133,7 +133,7 @@ content check failed). `stage_slot_cave.py` now moves those relocations to a dea
 left there, and `rpx_patch.py` keeps every `reloc:` argument's moves (each used to start again from
 the file's data, so only the first one, starcopy's, was kept). The same check found
 `position_vars_cave.py`'s five WorkModule div_float hooks over `lis` instructions with relocations
-(the loader would have broken those branches): moved too. **v6**: `build/new_stage_test_v6.zip`.
+(the loader would have broken those branches): moved too. **v6**: `build/new_stage_test_v6.zip`. **v6 result (user): the stage loads, with its name and icon.** (`build/new_stage_v6_release.zip`: the same RPX without the debug recorder.)
 
  with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)
