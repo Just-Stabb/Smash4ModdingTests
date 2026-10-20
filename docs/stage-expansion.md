@@ -1,0 +1,91 @@
+# Adding a new stage slot (research)
+
+Status: research only, nothing patched yet. Addresses are this repo's `cross_f.rpx` (the version
+the other caves target). Several of them were first found by **Manifold** (Fitz Null, zlib
+licence, https://gitlab.com/fitz.lol/manifold, `src/cross/stage.cpp` / `stage.hpp` / `ui.hpp`), a
+runtime patching framework (Aroma / WUMS function patcher) that loaded a custom stage, `XMadein`.
+Every address below was checked against this RPX; the plan uses static RPX patches and code
+caves, as the rest of this repo does, so it also works on Cemu.
+
+## Two numbers per stage
+
+- **Stage kind** (`STAGE_KIND`): which stage files and which `Stage*` class to load. 128 vanilla
+  kinds, `0x00`-`0x7F`: one per stage for normal play ("melee", `stage/melee/<Name>`) and another
+  for Omega ("end", `stage/end/<Name>`), the Smash Run / Home-Run / other modes, the DLC pairs
+  (`0x6E`-`0x7F`).
+- **Cosmetic id**: the stage-select / UI id, the index into `ui_stage_db.bin`. `0x00` random,
+  `0x01`-`0x37` the stages (DLC `0x30`-`0x37`), `0xC8`+ menu / mode backgrounds (`MenuMusic`,
+  `Homerun_f`, `sh_all`, `page`, ...). A new stage takes the next free id, `0x38`.
+
+## Stage kinds: one table, four small functions
+
+| what | address | vanilla |
+|---|---|---|
+| table `{const char *name; u32 variant}` x 128 (variant 0 melee, 1 end, 3/4 other) | `0x1011D95C` | `BattleField_f`/0 ... `Umbra_f`/1 |
+| count | `0x02D1FE24` | `li r3, 0x80; blr` |
+| name of a kind (`""` past the end) | `0x02D1FD7C` | `cmplwi r3, 0x80` + table read |
+| path of a kind (`stage/melee/%s`, `stage/end/%s`, `stage/other/%s`) | `0x02D1FDA0` | table read |
+| variant of a kind | `0x02D1FE10` | table read |
+
+Those three are the only code that reads the table (every `lis/addi` of `0x1011D95C` in
+`.text` checked), so the table can move to a code cave with room for more entries: point the
+three functions at the copy and make the count `0x80 + n`.
+
+Other limits on kinds:
+
+- `0x03014720`: `cmplwi r31, 0x80; blt; li r25, 1; li r31, 0`. The function that starts a match on
+  a kind turns a kind `>= 0x80` into kind 0 (Battlefield). Manifold nops these four instructions.
+- The stage factory, `app::StageManager` `0x03163B3C`: a jump table over the vanilla kinds
+  (`cmplwi r12, 0x7F; bgt 0x031647CC`) builds each stage's own class (its gimmicks). **Kinds past
+  `0x7F` fall through to the generic stage**: `StageBaseEnd` (0x11B0 bytes, `0x0264C88C`) for
+  variant 1, else `StageBaseCafe` (0x1140 bytes, `0x02D1A660`). So a new stage with no scripted
+  gimmicks (platforms, collision, blast zones and camera come from its files) needs no factory
+  change. A stage with gimmicks needs its own class, as Manifold's `StageXMadein` (a ladder, a
+  spring and a breakable pillar on `StageBaseCafe`).
+- Name -> kind lookups (`struct_03157edc` `0x031580EC`) loop over the count, so they follow it.
+
+## The stage-select screen is built from `ui_stage_db.bin`
+
+`data/param/ui/ui_stage_db.bin` (the string is at `0x101564CD`), loaded into a database of
+`0x54`-byte entries indexed by cosmetic id (ids `>= 0xC8` are searched for instead). Manifold's
+layout (`StageParamEntry`): `+0x00` cosmetic id, `+0x04` shown on the stage select, `+0x08`
+series, `+0x0C` (DLC page), `+0x10` stage kind, `+0x14` alternate kind, `+0x18` Omega kind,
+`+0x1C` alternate Omega kind, `+0x24` / `+0x28` max fighters (normal / Omega), ...
+
+The icons are not fixed in the layout: `0x0298FAC8` loops over every database entry, keeps the
+ones that are available (`0x0301BA8C` -> the database's own checks, `0x0293FD40`: usable, DLC,
+unlocked in the save), puts them in one of two lists (page 1, or page 2 when byte `+0x0C` is set,
+as the DLC stages), and sorts each by a key from the entry (`0x030A92CC`). `0x0298D068` then fills
+the layout's slots `img_01`..`img_48` of each page (`lumen/stage/stage.lm`, 48 per page) from those
+lists, with the icon textures by name (`stage_img_rep_%02d` / `stage_img_l_rep_%02d` and the
+`stage_10_<Name>.nut` family). Page 2 has the DLC stages and plenty of room, so **a new database
+entry should show up as a new icon without editing the layout**.
+
+Names: cosmetic id -> name, `0x0293DCE0`: a 79-entry `{id, name}` table at `0x1033C100`
+(`0x4F` in the function). Extend it the same way (cave copy + count) so id `0x38` gets a name,
+which picks its icons (`replace/stage/stage_10/stage_10_<Name>.nut`, `stage_11`, `stage_12`,
+`stage_30`, `stagen_10`, `stagel_10`) and its text (`message/melee.msbt` labels
+`MmelStageN_<Name>` (name) and `MmelStageG_<Name>` (series)).
+
+## Plan
+
+1. RPX caves (a `stage_slot_cave.py` like the others): a bigger stage-kind table (vanilla 128 +
+   new melee / end pairs) and cosmetic-name table, the three table functions and the name lookup
+   pointed at them, the count, the `0x03014720` check. Configurable list of new stages
+   (name, cosmetic id).
+2. `ui_stage_db.bin`: a tool that appends an entry (copy of an existing stage's, with the new
+   cosmetic id, kinds `0x80` / `0x81`, page 2, shown on the stage select).
+3. Files: `stage/melee/<Name>` and `stage/end/<Name>` (first test: a copy of Battlefield's, so only
+   the slot is being tested), the six icon / preview textures (copies first), the two msbt labels.
+4. Test in game: the icon, selecting it, the match loading it, Omega, random select, records /
+   save (see below).
+
+## Not known yet (to find while testing)
+
+- **Save data / records** indexed by cosmetic id (stage play counts, unlock bits) may be fixed
+  size for `0x00`-`0x37`; an id past it could write out of bounds. To check before release.
+- **Music**: the stage's song list (My Music) is per stage, by name (the sound config groups,
+  Manifold's `s_musicGroupNames` at `0x1041CE18`). A new name may need its own group or to be
+  pointed at an existing stage's.
+- **Online / replays** store stage ids; a modded stage there is untested.
+- Other `0x80` / `0x38` bounds checks on kinds or cosmetic ids that only show up in game.
