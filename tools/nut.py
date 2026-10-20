@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""Smash 4 Wii U textures (.nut, NTWU): read a texture to RGBA and write one back in the same format.
+
+  python3 tools/nut.py info FILE.nut
+  python3 tools/nut.py png FILE.nut OUT.png            first texture's first mip, as a PNG
+  python3 tools/nut.py replace FILE.nut IMAGE OUT.nut  IMAGE (any size; resized) into the texture,
+                                                       same format / size / ID, mips rebuilt
+
+Header layout and the GX2 (de)swizzle follow Smash Forge's NUT.cs / GTX.cs (MIT; GTX.cs ports
+AboodXD's GTX Extractor), as tools/Sm4shCommand's Viewer/Textures.cs does. Formats: 0x1A RGBA8,
+0x31 BC1, 0x32 BC2, 0x33 BC3, 0x34 BC4, 0x35 BC5. BC encoding is a simple fit (BC1:
+endpoints = the block's extremes along its main color axis; BC4: min / max), good enough for UI
+pictures. Only single-mip textures are written (the stage-select icons all are).
+"""
+import struct
+import sys
+import zlib
+
+import numpy as np
+
+
+# ---------------------------------------------------------------- container
+def be32(d, o):
+    return struct.unpack('>i', d[o:o + 4])[0]
+
+
+def be16(d, o):
+    return struct.unpack('>H', d[o:o + 2])[0]
+
+
+class Tex:
+    """one texture of a .nut: where its header / GX2 surface / data are"""
+    def __init__(self, d, hp):
+        self.hp = hp
+        self.header_size = be16(d, hp + 12)
+        self.data_off = be32(d, hp + 32) + hp
+        self.mip_off = be32(d, hp + 36) + hp
+        self.gtx = be32(d, hp + 40) + hp
+        g = self.gtx
+        self.dim, self.w, self.h, self.depth, self.levels, self.fmt, self.aa, self.use, self.image_size, \
+            self.image_ptr, self.mip_size, self.mip_ptr, self.tile_mode, self.swizzle, self.alignment, \
+            self.pitch = struct.unpack('>16i', d[g:g + 64])
+        self.mip_offsets = list(struct.unpack('>13i', d[g + 64:g + 64 + 52]))
+        self.gidx = d.find(b'GIDX', hp, hp + self.header_size)
+        self.tex_id = be32(d, self.gidx + 8) if self.gidx >= 0 else None
+
+
+def load(path):
+    d = open(path, 'rb').read()
+    if d[:2] == b'\x78\x9c':
+        d = zlib.decompress(d)
+    assert d[:4] == b'NTWU', d[:4]
+    count = be16(d, 6)
+    texs = []
+    hp = 0x10
+    for _ in range(count):
+        t = Tex(d, hp)
+        texs.append(t)
+        hp += t.header_size
+    return d, texs
+
+
+# ---------------------------------------------------------------- GX2 addressing
+def _bpp(fmt):
+    f = fmt & 0x3F
+    return {0x1A: 32, 0x08: 16, 0x0A: 16, 0x0B: 16, 0x31: 64, 0x34: 64, 0x32: 128, 0x33: 128, 0x35: 128}[f]
+
+
+def _is_bc(fmt):
+    return 0x31 <= (fmt & 0x3F) <= 0x35
+
+
+def _pixel_index(x, y, bpp):
+    bits = ((x & 4) << 1) | ((y & 2) << 3) | ((y & 4) << 3)
+    if bpp in (32, 96, 16):
+        bits |= (x & 1) | (x & 2) | ((y & 1) << 2)
+    elif bpp == 64:
+        bits |= (x & 1) | ((y & 1) << 1) | ((x & 2) << 1)
+    elif bpp == 128:
+        bits |= (y & 1) | ((x & 1) << 1) | ((x & 2) << 1)
+    return bits
+
+
+def _macro_tiled(x, y, bpp, pitch, swz):
+    pi = _pixel_index(x, y, bpp)
+    elem = (bpp * pi) >> 3
+    pipe = ((y ^ x) >> 3) & 1
+    bank = (((y >> 5) ^ (x >> 3)) & 1) | ((((y >> 4) ^ (x >> 4)) & 1) << 1)
+    bank_pipe = ((pipe + 2 * bank) ^ swz) % 9
+    pipe = bank_pipe % 2
+    bank = bank_pipe // 2
+    macro_bytes = (bpp * 512 + 7) >> 3
+    macro_off = (x // 32 + pitch // 32 * (y // 16)) * macro_bytes
+    u1 = elem + (macro_off >> 3)
+    u2 = u1 & ~0xFF
+    return (u2 << 3) | (0xFF & u1) | (pipe << 8) | (bank << 9)
+
+
+def element_offsets(ew, eh, bpp, tile_mode, swizzle, pitch):
+    """byte offset in the surface of each element (pixel / 4x4 block), [eh, ew]"""
+    eb = bpp // 8
+    swz = ((swizzle >> 8) & 1) + (((swizzle >> 9) & 3) << 1)
+    out = np.zeros((eh, ew), dtype=np.int64)
+    for y in range(eh):
+        for x in range(ew):
+            if tile_mode in (0, 1):
+                out[y, x] = (y * pitch + x) * eb
+            elif tile_mode in (2, 3):
+                out[y, x] = ((y // 8) * (pitch // 8) + x // 8) * 64 * eb + ((_pixel_index(x, y, bpp) * bpp) >> 3)
+            else:
+                out[y, x] = _macro_tiled(x, y, bpp, pitch, swz)
+    return out
+
+
+# ---------------------------------------------------------------- BC decode
+def _rgb565(v):
+    return np.stack([((v >> 11) & 31) * 255 // 31, ((v >> 5) & 63) * 255 // 63, (v & 31) * 255 // 31], -1)
+
+
+def _bc1_colors(blocks, punch):
+    c0 = blocks[:, 0].astype(np.int32) | (blocks[:, 1].astype(np.int32) << 8)
+    c1 = blocks[:, 2].astype(np.int32) | (blocks[:, 3].astype(np.int32) << 8)
+    a, b = _rgb565(c0), _rgb565(c1)
+    pal = np.zeros((len(blocks), 4, 4), dtype=np.int32)
+    pal[:, 0, :3], pal[:, 1, :3] = a, b
+    pal[:, :2, 3] = 255
+    four = (c0 > c1) | (not punch)
+    pal[:, 2, :3] = np.where(four[:, None], (2 * a + b) // 3, (a + b) // 2)
+    pal[:, 3, :3] = np.where(four[:, None], (a + 2 * b) // 3, 0)
+    pal[:, 2, 3] = 255
+    pal[:, 3, 3] = np.where(four, 255, 0)
+    bits = blocks[:, 4].astype(np.uint32) | (blocks[:, 5].astype(np.uint32) << 8) | \
+        (blocks[:, 6].astype(np.uint32) << 16) | (blocks[:, 7].astype(np.uint32) << 24)
+    idx = (bits[:, None] >> (2 * np.arange(16))) & 3
+    return np.take_along_axis(pal, idx[:, :, None].astype(np.int64).repeat(4, 2), 1)
+
+
+def _bc4_values(blocks):
+    a0, a1 = blocks[:, 0].astype(np.int32), blocks[:, 1].astype(np.int32)
+    pal = np.zeros((len(blocks), 8), dtype=np.int32)
+    pal[:, 0], pal[:, 1] = a0, a1
+    six = a0 > a1
+    for i in range(1, 7):
+        pal[:, i + 1] = np.where(six, ((7 - i) * a0 + i * a1) // 7, 0)
+    for i in range(1, 5):
+        pal[:, i + 1] = np.where(six, pal[:, i + 1], ((5 - i) * a0 + i * a1) // 5)
+    pal[:, 6] = np.where(six, pal[:, 6], 0)
+    pal[:, 7] = np.where(six, pal[:, 7], 255)
+    bits = np.zeros(len(blocks), dtype=np.uint64)
+    for i in range(6):
+        bits |= blocks[:, 2 + i].astype(np.uint64) << np.uint64(8 * i)
+    idx = (bits[:, None] >> (np.uint64(3) * np.arange(16, dtype=np.uint64))) & np.uint64(7)
+    return np.take_along_axis(pal, idx.astype(np.int64), 1)
+
+
+def decode(d, t, level=0):
+    """RGBA uint8 [h, w, 4] of the texture's first mip"""
+    f = t.fmt & 0x3F
+    bpp = _bpp(f)
+    bc = _is_bc(f)
+    w, h = t.w, t.h
+    ew, eh = ((w + 3) // 4, (h + 3) // 4) if bc else (w, h)
+    eb = bpp // 8
+    src = np.frombuffer(d[t.data_off:t.data_off + t.image_size], dtype=np.uint8)
+    offs = element_offsets(ew, eh, bpp, t.tile_mode, t.swizzle, t.pitch)
+    lin = src[(offs[..., None] + np.arange(eb)).reshape(-1, eb)].reshape(eh * ew, eb)
+    if not bc:
+        img = lin.reshape(h, w, 4) if f == 0x1A else None
+        if img is None:
+            raise NotImplementedError('format 0x%X' % f)
+        return img.copy()
+    if f == 0x31:
+        px = _bc1_colors(lin, True)
+    elif f == 0x32:
+        px = _bc1_colors(lin[:, 8:], False)
+        a = np.stack([(lin[:, j // 2] >> (4 * (j & 1))) & 15 for j in range(16)], 1).astype(np.int32) * 17
+        px[:, :, 3] = a
+    elif f == 0x33:
+        px = _bc1_colors(lin[:, 8:], False)
+        px[:, :, 3] = _bc4_values(lin[:, :8])
+    elif f == 0x34:
+        v = _bc4_values(lin)
+        px = np.stack([v, v, v, np.full_like(v, 255)], 2)
+    else:  # 0x35 BC5: red, green
+        r, g = _bc4_values(lin[:, :8]), _bc4_values(lin[:, 8:])
+        px = np.stack([r, g, np.zeros_like(r), np.full_like(r, 255)], 2)
+    img = px.reshape(eh, ew, 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(eh * 4, ew * 4, 4)
+    return img[:h, :w].astype(np.uint8)
+
+
+# ---------------------------------------------------------------- BC encode
+def _blocks(img):
+    """[h, w, 4] -> [n, 16, 4] 4x4 blocks in row order (edges repeated)"""
+    h, w = img.shape[:2]
+    H, W = (h + 3) // 4 * 4, (w + 3) // 4 * 4
+    pad = np.pad(img, ((0, H - h), (0, W - w), (0, 0)), mode='edge').astype(np.int32)
+    return pad.reshape(H // 4, 4, W // 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(-1, 16, 4), W // 4, H // 4
+
+
+def _enc_bc4(v):
+    """v [n, 16] 0-255 -> [n, 8] (8-value mode: a0 = max > a1 = min)"""
+    a0, a1 = v.max(1), v.min(1)
+    a1 = np.where(a0 == a1, np.maximum(a0 - 1, 0), a1)
+    a0 = np.where(a0 == a1, a1 + 1, a0)
+    pal = np.stack([a0, a1] + [((7 - i) * a0 + i * a1) // 7 for i in range(1, 7)], 1)
+    idx = np.abs(v[:, :, None] - pal[:, None, :]).argmin(2).astype(np.uint64)
+    bits = np.zeros(len(v), dtype=np.uint64)
+    for j in range(16):
+        bits |= idx[:, j] << np.uint64(3 * j)
+    out = np.zeros((len(v), 8), dtype=np.uint8)
+    out[:, 0], out[:, 1] = a0, a1
+    for i in range(6):
+        out[:, 2 + i] = ((bits >> np.uint64(8 * i)) & np.uint64(0xFF)).astype(np.uint8)
+    return out
+
+
+def _to565(c):
+    return ((c[..., 0] * 31 + 127) // 255 << 11) | ((c[..., 1] * 63 + 127) // 255 << 5) | ((c[..., 2] * 31 + 127) // 255)
+
+
+def _enc_bc1(rgb):
+    """rgb [n, 16, 3] -> [n, 8] (4-color mode; endpoints = the block's extremes along its main axis)"""
+    mean = rgb.mean(1, keepdims=True)
+    d = rgb - mean
+    cov = np.einsum('nki,nkj->nij', d, d)
+    axis = np.ones((len(rgb), 3))
+    for _ in range(4):
+        axis = np.einsum('nij,nj->ni', cov, axis)
+        axis /= np.linalg.norm(axis, axis=1, keepdims=True) + 1e-9
+    proj = np.einsum('nki,ni->nk', d, axis)
+    lo = rgb[np.arange(len(rgb)), proj.argmin(1)]
+    hi = rgb[np.arange(len(rgb)), proj.argmax(1)]
+    c0, c1 = _to565(hi), _to565(lo)
+    swap = c0 < c1
+    c0, c1 = np.where(swap, c1, c0), np.where(swap, c0, c1)
+    same = c0 == c1
+    c1 = np.where(same & (c1 > 0), c1 - 1, c1)
+    c0 = np.where(same & (c0 == 0), 1, c0)
+    a, b = _rgb565(c0), _rgb565(c1)
+    pal = np.stack([a, b, (2 * a + b) // 3, (a + 2 * b) // 3], 1)
+    idx = ((rgb[:, :, None, :] - pal[:, None, :, :]) ** 2).sum(3).argmin(2).astype(np.uint32)
+    bits = np.zeros(len(rgb), dtype=np.uint32)
+    for j in range(16):
+        bits |= idx[:, j] << np.uint32(2 * j)
+    out = np.zeros((len(rgb), 8), dtype=np.uint8)
+    out[:, 0], out[:, 1], out[:, 2], out[:, 3] = c0 & 0xFF, c0 >> 8, c1 & 0xFF, c1 >> 8
+    for i in range(4):
+        out[:, 4 + i] = (bits >> np.uint32(8 * i)) & 0xFF
+    return out
+
+
+def encode(img, t):
+    """RGBA [t.h, t.w, 4] -> the texture's image data (t's format, tiling, swizzle, pitch)"""
+    f = t.fmt & 0x3F
+    bpp = _bpp(f)
+    eb = bpp // 8
+    blocks, ew, eh = _blocks(img)
+    if f == 0x31:
+        lin = _enc_bc1(blocks[:, :, :3])
+    elif f == 0x33:
+        lin = np.concatenate([_enc_bc4(blocks[:, :, 3]), _enc_bc1(blocks[:, :, :3])], 1)
+    elif f == 0x34:
+        lin = _enc_bc4(blocks[:, :, 0])
+    elif f == 0x35:
+        lin = np.concatenate([_enc_bc4(blocks[:, :, 0]), _enc_bc4(blocks[:, :, 1])], 1)
+    else:
+        raise NotImplementedError('format 0x%X' % f)
+    out = np.zeros(t.image_size, dtype=np.uint8)
+    offs = element_offsets(ew, eh, bpp, t.tile_mode, t.swizzle, t.pitch).reshape(-1)
+    for k in range(eb):
+        out[offs + k] = lin[:, k]
+    return out.tobytes()
+
+
+def replace(d, t, img):
+    """the .nut data d with texture t's first mip replaced by img (RGBA [t.h, t.w, 4])"""
+    assert t.levels <= 1, 'mipmapped textures not supported'
+    data = encode(img, t)
+    return d[:t.data_off] + data + d[t.data_off + len(data):]
+
+
+def main():
+    cmd = sys.argv[1]
+    if cmd == 'info':
+        d, texs = load(sys.argv[2])
+        for t in texs:
+            print('id 0x%08X %dx%d fmt 0x%X tile %d swizzle 0x%X pitch %d levels %d image 0x%X mips 0x%X' %
+                  (t.tex_id or 0, t.w, t.h, t.fmt, t.tile_mode, t.swizzle, t.pitch, t.levels, t.image_size, t.mip_size))
+    elif cmd == 'png':
+        from PIL import Image
+        d, texs = load(sys.argv[2])
+        Image.fromarray(decode(d, texs[0]), 'RGBA').save(sys.argv[3])
+    elif cmd == 'replace':
+        from PIL import Image
+        d, texs = load(sys.argv[2])
+        t = texs[0]
+        img = np.asarray(Image.open(sys.argv[3]).convert('RGBA').resize((t.w, t.h), Image.LANCZOS))
+        open(sys.argv[4], 'wb').write(replace(d, t, img))
+
+
+if __name__ == '__main__':
+    main()

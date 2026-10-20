@@ -143,6 +143,19 @@ the stage.
  with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)
 
+## The new stage's own pictures
+
+The copies showed the user's Battlefield, which their pack makes "Duel Zone". The stage files are
+the game's unmodified Battlefield, so `build/new_stage_pictures.zip` has the unmodified Battlefield
+pictures (the user's "ui - unmodified": `stage_10`, `stage_11` preview, `stage_12`, `stage_30`,
+`stagel_10` series logo; own texture IDs), a page-2 grid tile made from the preview
+(`stage_13`, 356x232 BC3) and a "New Stage" name banner (`stagen_10`).
+- `tools/nut.py`: reads / writes NTWU textures (GX2 swizzle, BC1-BC5), `info` / `png` / `replace`
+  (any image into a texture, same format / size / ID). Round trip on the game's icons: 44-58 dB.
+- `tools/stage_name_banner.py TEMPLATE.nut "Text" OUT.nut`: a name banner like the game's (BC5:
+  red = fill, green = fill + 7 px outline + 5 px shadow; capitals y 43-197 from x 9, condensed;
+  FreeSerif Bold by default).
+
 ## Page 2 grid icon: the stage_13 set
 
 The new stage's tile stayed blank with unique `stage_10` texture IDs too. Page 2's grid isn't drawn
