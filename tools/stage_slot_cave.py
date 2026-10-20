@@ -158,13 +158,33 @@ has:    mflr r0
     return words, patches, count
 
 
+# --only=GROUP[,GROUP] (testing): only these groups of patches (the cave's data is always there)
+GROUPS = {
+    'kinds': [0x02D1FE24, 0x02D1FD80, 0x02D1FD90, 0x02D1FD94, 0x02D1FDA0, 0x02D1FDA8, 0x02D1FE10,
+              0x02D1FE18, 0x03014720],
+    'names': [0x0293DCE4, 0x0293DCE8, 0x0293DCEC],
+    'dlc': [DLC_UNLOCK + 4 * i for i in range(4)] + [NEEDS_DLC, HAS_DLC],
+}
+
+
 def main():
-    new = stages(sys.argv[1:])
+    args = [a for a in sys.argv[1:] if not a.startswith('--only=')]
+    only = [a.split('=', 1)[1] for a in sys.argv[1:] if a.startswith('--only=')]
+    keep = None
+    if only:
+        keep = set()
+        for g in only[0].split(','):
+            if g:
+                keep.update(GROUPS[g])
+    new = stages(args)
     words, patches, count = build(new)
+    if keep is not None:
+        patches = [(a, w) for a, w in patches if a in keep]
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (a, w) for a, w in patches]
-    out += ['reloc:0x%08X-0x%08X=0x%08X' % (a, a + 4, RELOC_DUMMY) for a in TABLE_SITES]
+    out += ['reloc:0x%08X-0x%08X=0x%08X' % (a, a + 4, RELOC_DUMMY) for a in TABLE_SITES
+            if keep is None or a in keep]
     print(' '.join(out))
     for i, (name, cos) in enumerate(new):
         print('%s: kinds 0x%X (stage/melee) / 0x%X (stage/end), cosmetic 0x%X' %
