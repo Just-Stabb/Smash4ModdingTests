@@ -1,9 +1,10 @@
 # Sm4shExplorer: faster builds and "Extract vanilla"
 
-`sm4shexplorer-faster.patch` applies to https://github.com/thefungus/Sm4shExplorer (`e349175`,
-the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
-(`/p:Configuration=Release`); the exe is in `build/sm4shexplorer_faster.zip` (replaces
-`Sm4shFileExplorer.exe`; the DLLs and plugins are unchanged).
+`sm4shexplorer-faster.patch` (2 commits) applies to https://github.com/thefungus/Sm4shExplorer
+(`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
+(`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
+the exe is in `build/sm4shexplorer_faster.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+plugins are unchanged).
 
 ## Why builds were slow
 
@@ -36,6 +37,18 @@ It also compressed every loose mod file again on every build.
 The package layout, padding, sizes and flags are computed exactly as before. The one difference
 in the output: an untouched file the old code would have recompressed now keeps the game's own
 compressed data, which the game already reads.
+
+## Memory (v2)
+
+v1 often failed with `System.OutOfMemoryException` (user): the exe is 32-bit (x86, 2 GB of
+address space) and v1 held a whole package in memory several times (the untouched files' stored
+data from extraction on, every file's data, the package in a MemoryStream and its copy). v2:
+- the package is written straight to its `packed` file;
+- an untouched file's location is kept at extraction, its data read only when the package is written;
+- files are read / compressed in batches (about 32 MB or 256 files, on all cores), each file's
+  data let go once written; loose mod files' data too;
+- the exe is marked large address aware (`set_laa.py`): 4 GB on 64-bit Windows. (It stays 32-bit:
+  the music plugin's audio library is native 32-bit.)
 
 ## Extract vanilla
 
