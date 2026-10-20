@@ -154,13 +154,15 @@ into `stage_img_l_rep_NN` instead of `0xA` / `stage_img_rep_NN`. The icon path (
 `add_stage.py --page 2` now writes `ui/replace/append/stage/stage_13/stage_13_<name>.nut` (a copy of
 `stage_13_BattleField_k.nut`, or `--stage13 FILE`); `build/new_stage_icon13.zip`.
 
-On page 2 the grid icon then showed, but the preview and the name were the select's fallback
-("Duel Zone" in the user's layout): a DLC-marked stage's other pictures and text come from the DLC
-content. Rather than fake DLC content, the stage moves to page 1 (`add_stage.py --page 1`, the v2
+On page 2 the grid icon then showed, with the preview and name "Duel Zone": not a fallback, as
+first thought, but the copies of the user's Battlefield (their pack's Battlefield is Duel Zone; the
+name is a picture, `stagen_10`). Page 2 works. (A page-1 build, before that was understood: the stage
+moves to page 1 (`add_stage.py --page 1`, the v2
 database), which works now: the user's layout has its 44-48 arrangements back (below), and the RPX
 side was fixed by the relocation moves. Page-1 stages take their pictures from `ui/replace/stage/`
 and their names from `melee.msbt`, and no DLC check applies (`build/new_stage_page1.zip`). Page 1
-holds at most 48 stages (47 + the new one now).
+holds at most 48 stages (47 + the new one now). Also worked (user: a second Duel Zone); the user
+wants new stages on page 2, which is back (`build/new_stage_page2.zip`, the v3 database).)
 
 ## The user's page 1 (solved: unlocked stages)
 
