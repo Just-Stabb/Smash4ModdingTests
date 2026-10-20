@@ -1,6 +1,6 @@
 # Adding a new stage slot (research)
 
-Status: first test build (`build/new_stage_test_v1.zip`): a copy of Battlefield as a new stage,
+Status: test build v3 (`build/new_stage_test_v3.zip`, see "v2 result and v3"); first test build (`build/new_stage_test_v1.zip`): a copy of Battlefield as a new stage,
 `NewStage01`, not tested in game yet. Addresses are this repo's `cross_f.rpx` (the version
 the other caves target). Several of them were first found by **Manifold** (Fitz Null, zlib
 licence, https://gitlab.com/fitz.lol/manifold, `src/cross/stage.cpp` / `stage.hpp` / `ui.hpp`), a
@@ -88,6 +88,29 @@ which picks its icons (`replace/stage/stage_10/stage_10_<Name>.nut`, `stage_11`,
 The generic stage loads the folder's files by pattern (`*/param/*_stprm`, `*.lvd` / `*%02u.lvd`,
 `*/sound/sound.nus3bank`), so renamed copies load. Battlefield's own class (day / night, `_stdat`)
 isn't used: the copy is a generic stage, so its background may not animate as Battlefield's does.
+
+## v2 result and v3 (page 2)
+
+**v2 (user): no new stage** on the select screen, with the user's modded stage layout and stages. The
+layout picks page 1's arrangement by stage count: `num_%02d`, or `type2_num_%02d` when there are two
+pages (`0x0298D068`; Random is the separate `img_99`). The user's modded `lumen/stage/stage.lm`
+renames `type2_num_44`-`type2_num_48` to `type2_num_74`-`78` and moves the icons, so its page 1 has
+room for the 47 stages it already has and the 48th (the new one, sorted last) has no slot.
+
+The game's availability checks (`0x0293FD40` through the stage database wrapper, vtable
+`0x100BAAFC`) pass for `0x38`: it's in `ui_stage_db.bin` and shown (`0x030A8DD0`), it has a
+`ui_sound_db.bin` entry with songs (`0x02948808`), and it isn't in the unlock list (`0x030A9230`).
+
+**v3 (`build/new_stage_test_v3.zip`): the stage on page 2**, with the DLC stages (their arrangement
+`type2_num_09` is in the modded layout). Page 2 is byte `+0x0C`, which also marks a stage as DLC:
+- unlock (`0x030A9230`): a DLC id's save unlock bit index is `id - 0x30 + 9`; `0x38` would read
+  index 17, which belongs to no stage;
+- DLC content (`0x030A8D78`, in the availability check `0x026F2ED0`): a DLC id with byte `+0x0E`
+  clear must be in the DLC content list.
+
+`stage_slot_cave.py` now treats only `0x30`-`0x37` as DLC in both (other ids: the normal unlock
+list, no DLC content); `stage_slot_test.py` checks the content one in unicorn. Database:
+`add_stage.py --page 2`.
 
 ## Plan (first version)
 

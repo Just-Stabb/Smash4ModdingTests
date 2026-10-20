@@ -97,6 +97,21 @@ def main():
     same = all(cstr(mu, call(mu, 0x0293DCE0, c)) == cstr(orig, call(orig, 0x0293DCE0, c)) for c in game)
     check('the game\'s cosmetic names unchanged', same, True)
     check('unknown cosmetic -> null', call(mu, 0x0293DCE0, 0x99), 0)
+    # needs DLC content (0x030A8D78) on a stage database of 0x60 entries, 0x30-0x38 marked DLC
+    # (+0x0C, the page-2 byte), +0x0E clear: the game's DLC ids still need it, 0x38 doesn't
+    for m in (mu, orig):
+        db, ents = 0x7F008000, 0x7F001000
+        m.mem_write(ents, b'\0' * 0x54 * 0x60)
+        for i in range(0x60):
+            m.mem_write(ents + 0x54 * i, struct.pack('>I', i))
+            if 0x30 <= i <= 0x38:
+                m.mem_write(ents + 0x54 * i + 0x0C, b'\1')
+        m.mem_write(db, struct.pack('>IIII', 0, 0, 0x60, ents))
+        m.mem_write(db + 0x20, struct.pack('>I', db))
+    check('DLC 0x31 needs DLC content', call(mu, 0x030A8D78, 0x7F008020, 0x31), 1)
+    check('page-2 0x38 needs no DLC content (game: 1)', (call(mu, 0x030A8D78, 0x7F008020, 0x38),
+          call(orig, 0x030A8D78, 0x7F008020, 0x38)), (0, 1))
+    check('non-DLC 0x01', call(mu, 0x030A8D78, 0x7F008020, 0x01), 0)
     print('FAILS', fails)
     sys.exit(1 if fails else 0)
 

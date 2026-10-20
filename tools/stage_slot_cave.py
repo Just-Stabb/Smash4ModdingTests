@@ -20,6 +20,11 @@ What it changes:
 - the cosmetic id -> name table ({id, name}, 79 entries at 0x1033C100, searched linearly by
   0x0293DCE0) is copied with the new names added: the name picks the stage's icons
   (replace/stage/stage_10/stage_10_NAME.nut, ...) and texts (MmelStageN_NAME / MmelStageG_NAME).
+- page 2: the stage-select page is the entry's byte +0x0C, which also marks the DLC stages. A
+  DLC-marked id gets save unlock bit index id - 0x30 + 9 (0x030A9230; 0x38 would read index 17,
+  no stage's) and must be in the DLC content list unless its byte +0x0E is set (0x030A8D78, used
+  by the stage's availability 0x026F2ED0). Both now treat only 0x30-0x37 as DLC: other ids take
+  the normal unlock-list search (not in it: unlocked) and need no DLC content.
 The stage factory (0x03163B3C) already builds the generic stage (StageBaseCafe / StageBaseEnd)
 for kinds past 0x7F, loading the stage folder's own models, collision (*.lvd) and params.
 
@@ -39,6 +44,9 @@ LIMIT = 0x04B7E000
 KIND_TABLE, KIND_COUNT = 0x1011D95C, 0x80
 COSMETIC_TABLE, COSMETIC_COUNT = 0x1033C100, 0x4F
 DEFAULT = ['NewStage01:0x38']
+FIRST_DLC, COSMETIC_DLC = 0x30, 8      # the DLC stages' cosmetic ids, 0x30-0x37
+DLC_UNLOCK = 0x030A926C                 # unlock index: DLC (+0x0C) -> id - 0x30 + 9 (save bit)
+NEEDS_DLC = 0x030A8D78                  # needs DLC content: +0x0C set and +0x0E clear
 
 
 def slo(v):
@@ -105,6 +113,24 @@ def build(new, rpx=RPX):
     patches += one(0x0293DCE4, 'lis r3, 0x%X' % ha(ct))
     patches += one(0x0293DCE8, 'li r4, %d' % (COSMETIC_COUNT + len(new)))
     patches += one(0x0293DCEC, 'addi r3, r3, %d' % slo(ct))
+    # page 2 (byte +0x0C, the DLC stages' page): the DLC checks skip ids past the DLC ones
+    patches += one(DLC_UNLOCK, '''
+        addi r12, r28, -%d
+        cmplwi r12, %d
+        addi r31, r12, 9
+        blt 0x%08X''' % (FIRST_DLC, COSMETIC_DLC, DLC_UNLOCK + 0x48))
+    code = CAVE + 4 * len(words)
+    a = Asm(code)
+    a.asm('''
+        cmplwi r4, %d
+        blt dlc
+        li r3, 0
+        blr
+dlc:    mflr r0
+        b 0x%08X''' % (FIRST_DLC + COSMETIC_DLC, NEEDS_DLC + 4))
+    words += a.words()
+    patches += one(NEEDS_DLC, 'b 0x%08X' % code)
+    assert CAVE + 4 * len(words) <= LIMIT, 'stage slot cave too big'
     return words, patches, count
 
 
