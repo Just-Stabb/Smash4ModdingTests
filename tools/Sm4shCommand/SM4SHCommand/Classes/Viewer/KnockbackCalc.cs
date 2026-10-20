@@ -72,6 +72,7 @@ namespace Sm4shCommand.Viewer
         internal FighterAttributes PathTarget;
         internal bool PathElectric;
         public List<int[]> TargetStops = new List<int[]>();  // extra hitstop during hitstun: {frame of hitstun, frames}
+        public List<int[]> AttackerStops = new List<int[]>(); // the attacker frozen after script frame: {frame, frames} (its hitlag first)
         public List<string> ScriptNotes = new List<string>();
         public List<float[]> Path = new List<float[]>();   // trajectory (x forward, y), one point a frame
     }
@@ -305,7 +306,7 @@ namespace Sm4shCommand.Viewer
                     {
                         // attacker hitstop from that frame: on the hit frame it replaces the hit's hitlag
                         if (w.GameFrame == hitFrame) { attackerLag = (int)w.Value; r.ScriptNotes.Add(Note(at, "_HITSTOP", w.Value, "attacker hitlag " + attackerLag)); }
-                        else { selfExtra += (int)w.Value; r.ScriptNotes.Add(Note(at, "_HITSTOP", w.Value, "attacker stops " + (int)w.Value + " more frames")); }
+                        else { selfExtra += (int)w.Value; r.AttackerStops.Add(new[] { w.GameFrame, (int)w.Value }); r.ScriptNotes.Add(Note(at, "_HITSTOP", w.Value, "attacker stops " + (int)w.Value + " more frames")); }
                     }
                     continue;
                 }
@@ -362,6 +363,7 @@ namespace Sm4shCommand.Viewer
             }
             r.FinalTargetHitlag = targetLag;
             r.FinalAttackerHitlag = attackerLag;
+            r.AttackerStops.Insert(0, new[] { hitFrame, attackerLag });
             r.FinalHitstun = Math.Max(0, stunEnd - launch - r.TargetStops.Sum(x => x[1]));
         }
 
