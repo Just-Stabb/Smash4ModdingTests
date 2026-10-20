@@ -114,3 +114,32 @@ say whatever `add_stage.py` wrote; the stage select shows the name picture.
 3. Omega.
 4. Lighting / day-night: if it turns dark or odd, `animation/light.bin` / `render/` are still
    Battlefield's.
+
+## Stage code: what moves stage collision (research, cross_f.rpx)
+
+Ultimate's stage code (biomes, blocks, mobs) is in Ultimate's executable, not in the stage files, so
+it would have to be rewritten for Smash 4. What Smash 4 offers for it:
+
+- Collisions are made in `0x03142CC8` (stage base) from each loaded `.lvd`. A collision with the
+  **rig flag** (`flag2`, byte 2 of the four flag bytes; runtime word `+0xE8` bit 16) isn't static:
+  `0x03142BA4` files it in a **link** named by its **subname** (one link a subname, made by
+  `0x0315CF34` in the stage's link manager at `stage + 0x1C8`; the link keeps the start position
+  `+0x94`, a joint index `+0xA0` (lvd `unk3`, -1 = none) and a bone name `+0xA4`), then
+  `0x0315C7DC` adds the ground to the link's list (`link + 0xEC`). Battlefield's own Omega floor is
+  rigged (subname `Ring`) and stays put.
+- Links are looked up by model name: `0x03142954(stage, name)` returns the link's ground list
+  (a name starting with `dyr_` is retried without it); `0x03142A48` the link's `+0x178` object.
+- Moving them is up to the stage's own class: each frame, stage classes call
+  `0x0315EF88(grounds, &(x, y), rotation)` (every ground of the link: `0x02D59E40(ground, &pos,
+  rot, scale x, scale y)`: position `+4/+8`, rotation `+0x1C`, scale `+0x28/+0x2C`, dirty flag
+  `+0x164`), or `0x0315F500` / `0x0315F548` (set / clear a flag on all of them, e.g. on / off).
+- The generic stage class new slots get (`StageBaseCafe`, vtable `0x1011D27C`; Omega
+  `StageBaseEnd`) never calls these, so rigged collision on NewStage01 stays where the lvd puts it.
+  Its update, `0x02D1CF9C(stage, f1 = frame rate)`, calls the base update at `0x02D1CFDC`
+  (`bl 0x031415C8`): a hook there can run NewStage01's own code every frame (the stage kind is at
+  `stage + 0xCC`; other generic stages must be left alone).
+
+So biome rotation can be: every biome's models in `dyr_` model folders whose animations show only
+the current biome, every biome's collision rigged under its own subname, and a cave on that hook
+counting frames (adding `f1`, as the animations do) that moves the inactive biomes' collision away
+(`0x0315EF88`) and the active one into place.
