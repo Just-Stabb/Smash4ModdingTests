@@ -5,12 +5,17 @@
   python3 tools/nut.py png FILE.nut OUT.png            first texture's first mip, as a PNG
   python3 tools/nut.py replace FILE.nut IMAGE OUT.nut  IMAGE (any size; resized) into the texture,
                                                        same format / size / ID, mips rebuilt
+  python3 tools/nut.py ntp3 OUT.nut ID:FORMAT:IMAGE...  new NTP3 .nut (FORMAT dxt1, dxt5 or rgba)
 
 Header layout and the GX2 (de)swizzle follow Smash Forge's NUT.cs / GTX.cs (MIT; GTX.cs ports
 AboodXD's GTX Extractor), as tools/Sm4shCommand's Viewer/Textures.cs does. Formats: 0x1A RGBA8,
 0x31 BC1, 0x32 BC2, 0x33 BC3, 0x34 BC4, 0x35 BC5. BC encoding is a simple fit (BC1:
 endpoints = the block's extremes along its main color axis; BC4: min / max), good enough for UI
 pictures. Only single-mip textures are written (the stage-select icons all are).
+
+NTP3 (write_ntp3): the untiled .nut the game also loads (some of Battlefield's own model.nut are
+NTP3), so new textures of any size need no GX2 tiling. Layout as Smash Forge's NUT.Rebuild
+(version 0x0200): formats 0 DXT1, 2 DXT5, 14 RGBA8 (stored A, R, G, B), full mip chains.
 """
 import struct
 import sys
@@ -279,6 +284,61 @@ def replace(d, t, img):
     return d[:t.data_off] + data + d[t.data_off + len(data):]
 
 
+# ---------------------------------------------------------------- NTP3
+NTP3_FORMATS = {'dxt1': 0, 'dxt5': 2, 'rgba': 14}
+
+
+def ntp3_mip(img, fmt):
+    """RGBA [h, w, 4] -> NTP3 data of format fmt (0 / 2 / 14)"""
+    if fmt == 14:
+        return np.ascontiguousarray(img[..., [3, 0, 1, 2]]).tobytes()
+    blocks, _, _ = _blocks(img)
+    if fmt == 0:
+        return _enc_bc1(blocks[:, :, :3]).tobytes()
+    return np.concatenate([_enc_bc4(blocks[:, :, 3]), _enc_bc1(blocks[:, :, :3])], 1).tobytes()
+
+
+def mip_chain(img, smallest=4):
+    """RGBA [h, w, 4] and its halvings down to `smallest` (box filter)"""
+    from PIL import Image
+    out = [img]
+    while min(out[-1].shape[:2]) > smallest:
+        h, w = out[-1].shape[:2]
+        out.append(np.asarray(Image.fromarray(out[-1], 'RGBA').resize((max(1, w // 2), max(1, h // 2)), Image.BOX)))
+    return out
+
+
+def write_ntp3(textures):
+    """textures: [(tex_id, fmt, [mip RGBA arrays])] -> .nut bytes"""
+    heads, datas = [], []
+    for tex_id, fmt, mips in textures:
+        data = [ntp3_mip(m, fmt) for m in mips]
+        data = [x + b'\0' * (-len(x) % 0x10) for x in data]
+        hs = 0x50 + (4 * len(mips) if len(mips) > 1 else 0)
+        hs += -hs % 0x10
+        heads.append((tex_id, fmt, mips, data, hs))
+        datas.append(b''.join(data))
+    out = bytearray(b'NTP3' + struct.pack('>HHII', 0x0200, len(textures), 0, 0))
+    remaining = sum(h[4] for h in heads)
+    data_before = 0
+    for (tex_id, fmt, mips, data, hs), blob in zip(heads, datas):
+        h, w = mips[0].shape[:2]
+        head = struct.pack('>IIIHHBBBBHHII', len(blob) + hs, 0, len(blob), hs, 0, 0, len(mips), 0, fmt, w, h, 0, 0)
+        head += struct.pack('>IIII', remaining + data_before, 0, 0, 0)
+        if len(mips) > 1:
+            head += b''.join(struct.pack('>I', len(x)) for x in data)
+        head += b'\0' * (-len(head) % 0x10)
+        head += b'eXt\0' + struct.pack('>III', 0x20, 0x10, 0)
+        head += b'GIDX' + struct.pack('>III', 0x10, tex_id, 0)
+        assert len(head) == hs
+        out += head
+        remaining -= hs
+        data_before += len(blob)
+    for blob in datas:
+        out += blob
+    return bytes(out)
+
+
 def main():
     cmd = sys.argv[1]
     if cmd == 'info':
@@ -296,6 +356,14 @@ def main():
         t = texs[0]
         img = np.asarray(Image.open(sys.argv[3]).convert('RGBA').resize((t.w, t.h), Image.LANCZOS))
         open(sys.argv[4], 'wb').write(replace(d, t, img))
+    elif cmd == 'ntp3':
+        from PIL import Image
+        texs = []
+        for arg in sys.argv[3:]:
+            tid, fmt, path = arg.split(':', 2)
+            img = np.asarray(Image.open(path).convert('RGBA'))
+            texs.append((int(tid, 0), NTP3_FORMATS[fmt], mip_chain(img)))
+        open(sys.argv[2], 'wb').write(write_ntp3(texs))
 
 
 if __name__ == '__main__':

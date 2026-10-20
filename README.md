@@ -17,3 +17,5 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - `tools/acmd.py`: reads/edits ACMD files (`animcmd/body/game.bin` etc., the format FITX uses). `dump game.bin specialairs` prints a script by animation name, `find game.bin Search_Collision` lists scripts using a command. Command table in `tools/acmd_info.json`, generated from Sammi Husky's [SALT](https://github.com/Sammi-Husky/SALT) (MIT)
 - [`fighters/metaknight/README.md`](fighters/metaknight/README.md): Meta Knight ledge grab during Mach Tornado
 - [`docs/native-notes.md`](docs/native-notes.md): notes from reading the game executable (Kirby BattleObject commands, homing investigation)
+- [`docs/stage-expansion.md`](docs/stage-expansion.md): adding a new stage slot (`NewStage01`) to the stage select
+- [`docs/minecraft-world.md`](docs/minecraft-world.md): Smash Ultimate's Minecraft World ported to `NewStage01` (`tools/minecraft_world.py`; Ultimate textures `tools/nutexb.py`, models `tools/nud.py`, collision `tools/lvd.py`)
