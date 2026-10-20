@@ -15,7 +15,10 @@ wrapper (static object 0x1054F408, vtable 0x100BAAFC) in a table, one byte an id
   +0x300 + id: exists (+0x1C: shown on the select, song list, DLC owned)
   +0x400 + id: DLC-marked (+0x24, byte +0x0C)
   +0x500 + id: +0x4C (DLC content record)   +0x600 + id: unlocked (+0x6C)   +0x700 + id: +0x74
-(each check byte is 0x10 | result)
+(each check byte is 0x10 | result; v5 records +0x500 only)
+v5 (NAMES), for id 0x38: +0x10 name list built (byte), +0x14 its records, +0x18 its count,
++0x1C the empty name, +0x20 / +0x24 / +0x28 record 0x38 (name, ?, hash), +0x40 what the name
+lookup 0x0293DCE0 returns for 0x38, +0x50 its first 12 characters.
 and, with ENTRIES (v2; no room for it next to all the checks), the database entry at that index (0x54 bytes from [[ [0x102F7188] + 4 ] + 0xC]):
   +0x800 + id: its id (low byte)   +0x900: +0x04 shown   +0xA00: +0x0C page 2 / DLC   +0xB00: +0x0D
   +0xC00: its stage kind (low byte)
@@ -43,8 +46,8 @@ GROW_END = 0x04B7F000
 HOOK = 0x0298FBCC           # bl 0x0301BA8C (r3 id, r4 mode)
 AVAILABLE = 0x0301BA8C
 WRAPPER = 0x1054F408
-CHECKS = [(0x300, 0x0293F1B0), (0x400, 0x0293F254), (0x500, 0x0293F280), (0x600, 0x0293F298),
-          (0x700, 0x0293F34C)]
+CHECKS = [(0x500, 0x0293F280)]
+NAMES = True                # v5: the database's name list and the name lookup, for id 0x38
 ENTRIES = False             # v2's entry dump (+0x800-+0xCFF); no room next to all the checks
 
 
@@ -105,7 +108,50 @@ ssdbg:                                  # called instead of 0x0301BA8C(r3 id, r4
         lbz r4, 0x13(r9)
         stb r4, 0xC00(r10)
 
-""" if ENTRIES else "") + """
+""" if ENTRIES else "") + ("""
+        lwz r4, 8(r1)
+        cmplwi r4, 0x38
+        bne names_out
+        lis r11, 0x%(THI)04X
+        ori r11, r11, 0x%(TLO)04X
+        lis r12, 0x1034
+        lwz r9, 0x610(r12)              # the empty name
+        stw r9, 0x1C(r11)
+        lis r12, 0x102F
+        lwz r12, 0x7188(r12)
+        lwz r12, 4(r12)                 # the database
+        lbz r9, 0x38(r12)               # its name list: built, records, count
+        stw r9, 0x10(r11)
+        lwz r9, 0x3C(r12)
+        stw r9, 0x14(r11)
+        lwz r10, 0x40(r12)
+        stw r10, 0x18(r11)
+        cmplw r4, r10
+        bge names_call
+        mulli r4, r4, 0xC
+        add r9, r9, r4
+        lwz r4, 0(r9)                   # record 0x38: name, +4, hash
+        stw r4, 0x20(r11)
+        lwz r4, 4(r9)
+        stw r4, 0x24(r11)
+        lwz r4, 8(r9)
+        stw r4, 0x28(r11)
+names_call:
+        li r3, 0x38
+        bl 0x0293DCE0                   # the name lookup (stage_slot_cave.py's table)
+        lis r11, 0x%(THI)04X
+        ori r11, r11, 0x%(TLO)04X
+        stw r3, 0x40(r11)
+        cmpwi r3, 0
+        beq names_out
+        lwz r4, 0(r3)
+        stw r4, 0x50(r11)
+        lwz r4, 4(r3)
+        stw r4, 0x54(r11)
+        lwz r4, 8(r3)
+        stw r4, 0x58(r11)
+names_out:
+""" % dict(THI=TABLE >> 16, TLO=TABLE & 0xFFFF) if NAMES else "") + """
         lis r11, 0x%(THI)04X
         ori r11, r11, 0x%(TLO)04X
         lis r12, 0x102F
