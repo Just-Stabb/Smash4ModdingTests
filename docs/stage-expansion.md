@@ -1,6 +1,6 @@
 # Adding a new stage slot (research)
 
-Status: **works in game (v6, user)**: the new stage (a Battlefield copy, `NewStage01`, cosmetic `0x38`, kinds `0x80` / `0x81`) is on the stage select's page 2 with its name and icon, and loads. Open: the user's modded layout's page 1 since the stage was added (see "v2 result and v3").
+Status: **works in game (user)**: the new stage (a copy of the user's Battlefield, `NewStage01`, cosmetic `0x38`, kinds `0x80` / `0x81`) is on page 2 with its grid icon (`stage_13`), preview, name and stage; the user's page 1 works with their layout's 44-48 arrangements restored. More stages: `stage_slot_cave.py NAME[:COSMETIC] ...` and `add_stage.py --page 2` on the database that already has the earlier ones (the user's layout has page arrangements up to 43).
 `NewStage01`, not tested in game yet. Addresses are this repo's `cross_f.rpx` (the version
 the other caves target). Several of them were first found by **Manifold** (Fitz Null, zlib
 licence, https://gitlab.com/fitz.lol/manifold, `src/cross/stage.cpp` / `stage.hpp` / `ui.hpp`), a
