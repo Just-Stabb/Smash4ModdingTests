@@ -1,9 +1,9 @@
 # Sm4shExplorer: faster builds and "Extract vanilla"
 
-`sm4shexplorer-faster.patch` (2 commits) applies to https://github.com/thefungus/Sm4shExplorer
+`sm4shexplorer-faster.patch` (3 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
 (`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster_v2.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+the exe is in `build/sm4shexplorer_faster_v3.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
 plugins are unchanged).
 
 ## Why builds were slow
@@ -49,6 +49,17 @@ data from extraction on, every file's data, the package in a MemoryStream and it
   data let go once written; loose mod files' data too;
 - the exe is marked large address aware (`set_laa.py`): 4 GB on 64-bit Windows. (It stays 32-bit:
   the music plugin's audio library is native 32-bit.)
+
+## Package cache (v3)
+
+A package whose inputs haven't changed since a build isn't rebuilt: after packing, its `packed`
+file and every file's resource values (offset, sizes, package flag) are saved in
+`cache/packages/<key>.packed` / `.meta`; the next build with the same key copies the file to the
+export folder and sets the values (log: "unchanged, taken from the cache"). The key is a hash of
+the package's path, its mod files (path, size, content hash), the game's own files in it (source,
+location, sizes) and a version string. Release builds only (debug builds write packages
+unpacked). Entries no build used for 30 days are deleted. It costs disk space: a copy of each
+modded package (a fighter's is often 100-300 MB).
 
 ## Extract vanilla
 
