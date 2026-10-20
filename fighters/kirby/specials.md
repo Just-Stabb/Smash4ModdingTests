@@ -988,6 +988,17 @@ the user's). `tools/omo.py` still reads rotation type 10 (compressed quaternions
 
 ## Added: Marth copy sword in Strike neutral air, back air and up air
 
+**v6 (now): what shows the sword, found.** Kirby's per-frame copy update (`0x02B02534`) shows the
+copy's held model (`[fighter+0x28]+0xA8`: `marthsword`, `ikesword`, `gamewatchpan`, ...) only while
+Kirby's **status kind** is in a fixed list (`0x181`, `0x18F`-`0x191`, `0x1BC`-`0x1C4` (Shield Breaker
+is `0x1C1`-`0x1C4`), `0x1FC`, `0x202`-`0x205`, `0x20B`-`0x20E`, `0x21F`-`0x221`, `0x229`-`0x22B`,
+`0x242`-`0x248`), and hides it in any other status. The aerials run in the aerial status, so
+no script, motion slot or animation could show it; what the earlier tests took for the sword was
+the `Sword_Trace` effect. `tools/copy_held_cave.py` hooks the hide path (`0x02B02730`) to take the
+show path too while the motion kind is `0x380` / `0x382` / `0x384` (only the sword aerials play
+those now). Added to the standard RPX command: `$(python3 tools/copy_held_cave.py)`. Test build
+`build/marthsword_v6.zip` (v5's files, new RPX).
+
 **History.** v1 (named motion slots `0x301`–`0x303` + animations in `marthbody`) T-posed: a motion's
 animation isn't found by its name. A nested call in the MSC (`func_22(marth_sword_motion(var0), …)`)
 then broke every aerial until removed (`docs/MSC-C_Guide.md`). A test animation named

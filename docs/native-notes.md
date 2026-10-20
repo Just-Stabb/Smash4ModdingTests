@@ -691,6 +691,10 @@ reads", "Position variables" and "Losing the copy when hit" above.)
       $(python3 tools/position_vars_cave.py) 0x02EF74A8=0x60000000 $(python3 tools/strike_cave.py) \
       $(python3 tools/copy_fx_cave.py)
 
+(Then `$(cat build/marthsword/rpx_args.txt) $(python3 tools/stage_slot_cave.py)
+$(python3 tools/copy_held_cave.py)`: the Marth copy sword aerials' motion tables, the new stage slot,
+and the copy held model shown in those aerials; see `fighters/kirby/specials.md`.)
+
 Other copies: the native part (params, weapon custom number) is generic. The body ACMD is picked
 by MSC: every copy's pair of motion helpers (`[Copy: shared] helper`, e.g. Captain Falcon
 `func_2785`/`2786`, Little Mac `func_3653`/`3654`) calls `MotionAnimcmdModule(0, 0, motion, kind)`
