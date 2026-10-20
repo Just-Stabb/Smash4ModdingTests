@@ -47,6 +47,13 @@ LIMIT = 0x04B7E000
 KIND_TABLE, KIND_COUNT = 0x1011D95C, 0x80
 COSMETIC_TABLE, COSMETIC_COUNT = 0x1033C100, 0x4F
 DEFAULT = ['NewStage01:0x38']
+# The table pointers patched below are lis / addi / lwz with relocations (ADDR16_HA / LO to the
+# game's tables): the loader would put the old addresses back (v1-v4: the new stage's kind had no
+# folder name, a black void, and its cosmetic id no name / icon), so their relocations go to a dead
+# word (starcopy_cave.py's).
+RELOC_DUMMY = 0x037EE73C
+TABLE_SITES = [0x02D1FD90, 0x02D1FD94, 0x02D1FDA0, 0x02D1FDA8, 0x02D1FE10, 0x02D1FE18, 0x0293DCE4,
+               0x0293DCEC]
 FIRST_DLC, COSMETIC_DLC = 0x30, 8      # the DLC stages' cosmetic ids, 0x30-0x37
 DLC_UNLOCK = 0x030A926C                 # unlock index: DLC (+0x0C) -> id - 0x30 + 9 (save bit)
 NEEDS_DLC = 0x030A8D78                  # needs DLC content: +0x0C set and +0x0E clear
@@ -157,6 +164,7 @@ def main():
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (a, w) for a, w in patches]
+    out += ['reloc:0x%08X-0x%08X=0x%08X' % (a, a + 4, RELOC_DUMMY) for a in TABLE_SITES]
     print(' '.join(out))
     for i, (name, cos) in enumerate(new):
         print('%s: kinds 0x%X (stage/melee) / 0x%X (stage/end), cosmetic 0x%X' %

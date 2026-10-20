@@ -114,6 +114,17 @@ def main():
     check('non-DLC 0x01', call(mu, 0x030A8D78, 0x7F008020, 0x01), 0)
     # DLC content record (0x030A8E58): new ids pass without reading the record list
     check('page-2 0x38 has its DLC content record', call(mu, 0x030A8E58, 0x7F008020, 0x38), 1)
+    # the loader applies relocations (unicorn doesn't): none may be left on a patched table pointer
+    d, _s, _e, secs = R.load(sys.argv[1])
+    left = []
+    for sec in secs:
+        if sec[1] == 4:  # SHT_RELA
+            data = R.section_data(d, sec)
+            for o in range(0, len(data), 12):
+                off = struct.unpack('>I', data[o:o + 4])[0]
+                if any(a <= off < a + 4 for a in C.TABLE_SITES):
+                    left.append(hex(off))
+    check('no relocation on the patched table pointers', left, [])
     print('FAILS', fails)
     sys.exit(1 if fails else 0)
 

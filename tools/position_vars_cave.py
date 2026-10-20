@@ -96,6 +96,9 @@ LIMIT2 = 0x037EE400
 # directly; for these IDs they are turned into a read and a write. (hook, first instruction)
 ARITH = [(0x0200F73C, "rlwinm r12, r4, 8, 28, 31"), (0x0200F764, "rlwinm r12, r4, 8, 28, 31"),
          (0x0200F78C, "rlwinm r12, r4, 8, 28, 31"), (0x0200F7B4, "lis r12, 0x1000")]
+# The div hooks replace a `lis` that has a relocation (ADDR16_HA): the loader would rewrite the
+# branch's low half, so their relocations go to a dead word (starcopy_cave.py's, 0x037EE73C).
+RELOC_DUMMY = 0x037EE73C
 FIGHTERS = 0x1035184C      # object manager tables: [+0] = fighter table
 ENTRY_SIZE = 0x76B0
 SLOTS = 8
@@ -1824,6 +1827,7 @@ def main():
         return
     out = ["grow:0x%08X" % GROW_END]
     out += ["0x%08X=0x%08X" % (a, v) for a, v in sorted(words().items())]
+    out += ["reloc:0x%08X-0x%08X=0x%08X" % (c[5], c[5] + 4, RELOC_DUMMY) for c in CLASSES]
     print(" ".join(out))
 
 

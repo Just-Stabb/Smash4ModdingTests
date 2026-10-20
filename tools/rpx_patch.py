@@ -100,7 +100,9 @@ def main():
         for idx, sec in enumerate(secs):
             if sec[1] != 4:  # SHT_RELA
                 continue
-            data = section_data(d, sec)
+            # the copy an earlier reloc: argument already changed, if any (each one used to start
+            # from the file's data again, so only the first argument's moves were kept)
+            data = by_section[idx][0] if idx in by_section else section_data(d, sec)
             moved = 0
             for o in range(0, len(data), 12):
                 off, = struct.unpack('>I', data[o:o + 4])

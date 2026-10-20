@@ -120,7 +120,22 @@ stage also needs a DLC content record at its index (`0x030A8E58`, the database's
 12 bytes a stage; only the DLC stages have one). **v4** (`build/new_stage_test_v4.zip`, the v3
 files + an RPX with the debug recorder): ids `0x38`-`0xC7` pass it too.
 
-(The first debug run read 134 entries with a different entry at 0x38: the stage select had
+**v4 result (user): the stage is on the select, with no name or icon; selecting it, everyone
+falls in a black void.** Debug v5 (name list, `0x0293DCE0` called in game): the lookup returned
+nothing for 0x38 although it returns "NewStage01" in unicorn. Cause: **relocations**. The patched
+table pointers (`lis` / `addi` / `lwz` at `0x02D1FD90`/`94`, `0x02D1FDA0`/`A8`, `0x02D1FE10`/`18`,
+`0x0293DCE4`/`EC`) carry ADDR16_HA / LO relocations to the game's tables, and the loader applies
+them after the file is loaded, putting the old table addresses back (unicorn doesn't apply
+relocations): the new kind read past the old kind table (no folder name: the void) and the new
+cosmetic id wasn't in the old name table (no name list entry: no name, no icon, and the DLC
+content check failed). `stage_slot_cave.py` now moves those relocations to a dead word
+(`reloc:`, starcopy_cave.py's `0x037EE73C`), `stage_slot_test.py` checks the built RPX has none
+left there, and `rpx_patch.py` keeps every `reloc:` argument's moves (each used to start again from
+the file's data, so only the first one, starcopy's, was kept). The same check found
+`position_vars_cave.py`'s five WorkModule div_float hooks over `lis` instructions with relocations
+(the loader would have broken those branches): moved too. **v6**: `build/new_stage_test_v6.zip`.
+
+ with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)
 
 ## Plan (first version)
