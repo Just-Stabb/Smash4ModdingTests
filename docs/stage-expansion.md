@@ -143,6 +143,17 @@ the stage.
  with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)
 
+## Page 2 grid icon: the stage_13 set
+
+The new stage's tile stayed blank with unique `stage_10` texture IDs too. Page 2's grid isn't drawn
+with `stage_10`: `0x0298D068` takes the page (`r7`, page != 0) and uses set `0xD` (`stage_13_<name>`)
+into `stage_img_l_rep_NN` instead of `0xA` / `stage_img_rep_NN`. The icon path (`0x02916C30` ->
+`0x029165D8`) tries the DLC root `ui/replace/append/stage/` first (for DLC-marked stages), then
+`ui/replace/stage/`. The DLC stages' `stage_13_*.nut` (106624 / 82688 bytes, all with texture ID
+`0x2800634B`) are under `ui/replace/append/stage/stage_13/`; the new stage had none.
+`add_stage.py --page 2` now writes `ui/replace/append/stage/stage_13/stage_13_<name>.nut` (a copy of
+`stage_13_BattleField_k.nut`, or `--stage13 FILE`); `build/new_stage_icon13.zip`.
+
 ## The user's page 1 (solved: unlocked stages)
 
 The user's page 1 showed one icon from the first build of their pack on. Bisect RPXs (none of the stage

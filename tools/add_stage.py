@@ -29,6 +29,7 @@ import os
 import shutil
 import struct
 import sys
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import msbt  # noqa: E402
@@ -142,6 +143,9 @@ def main():
     ap.add_argument('--title', default='New Stage')
     ap.add_argument('--series', default=None)
     ap.add_argument('--page', type=int, default=1, choices=(1, 2))
+    ap.add_argument('--stage13', default=None,
+                    help='page 2: the grid icon to copy (a stage_13_*.nut; default: '
+                         'UI_DIR/replace/append/stage/stage_13/stage_13_BattleField_k.nut)')
     a = ap.parse_args()
     cos, kind = int(a.cosmetic, 0), int(a.kind, 0)
     out = a.out
@@ -180,6 +184,23 @@ def main():
             open(os.path.join(out, 'ui', 'replace', 'stage', st, '%s_%s.nut' % (st, a.name)), 'wb').write(
                 with_texture_id(open(f, 'rb').read(), tex_id))
             icons.append('%s (texture 0x%08X)' % (st, tex_id))
+
+    # Page 2 (the DLC stages' page) draws its grid with the stage_13 set, looked for under the DLC
+    # root ui/replace/append/stage/ first (then ui/replace/stage/): 0x0298D068 with page != 0, path
+    # 0x02916C30 / 0x029165D8. A stage without one shows a blank tile (user). The stage_13 icons
+    # all share one texture ID (0x2800634B), so the copy keeps it.
+    if a.page == 2:
+        src13 = a.stage13 or os.path.join(a.ui, 'replace', 'append', 'stage', 'stage_13', 'stage_13_BattleField_k.nut')
+        if os.path.exists(src13):
+            data = open(src13, 'rb').read()
+            if data[:2] == b'\x78\x9c':        # loose files in a built pack are compressed
+                data = zlib.decompress(data)
+            d13 = os.path.join(out, 'ui', 'replace', 'append', 'stage', 'stage_13')
+            os.makedirs(d13, exist_ok=True)
+            open(os.path.join(d13, 'stage_13_%s.nut' % a.name), 'wb').write(data)
+            icons.append('append stage_13 (from %s)' % os.path.basename(src13))
+        else:
+            print('warning: no stage_13 icon (%s): the page-2 tile will be blank' % src13)
 
     for v in ('melee', 'end'):
         copy_stage(os.path.join(a.stage, v, a.src), os.path.join(out, 'stage', v, a.name), a.src, a.name)
