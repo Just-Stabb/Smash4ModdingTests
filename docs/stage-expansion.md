@@ -134,6 +134,11 @@ left there, and `rpx_patch.py` keeps every `reloc:` argument's moves (each used 
 the file's data, so only the first one, starcopy's, was kept). The same check found
 `position_vars_cave.py`'s five WorkModule div_float hooks over `lis` instructions with relocations
 (the loader would have broken those branches): moved too. **v6**: `build/new_stage_test_v6.zip`. **v6 result (user): the stage loads, with its name and icon.** (`build/new_stage_v6_release.zip`: the same RPX without the debug recorder.)
+But its stage-select grid icon was blank: the copied icons kept Battlefield's texture IDs (GIDX in
+the .nut; each stage's `stage_10_*` icon has its own). `add_stage.py` now gives copied icons unused
+IDs from `0x2800FF00` (`build/new_stage_icons_v7.zip`). Ω form shows a mix of the game's and the
+pack's Battlefield (the copy came from the unmodified stage folders); fine, the user is replacing
+the stage.
 
  with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)

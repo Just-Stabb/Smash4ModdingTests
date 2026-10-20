@@ -27,6 +27,7 @@ import argparse
 import copy
 import os
 import shutil
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -85,6 +86,39 @@ def sound_db(path, src, cos):
     return s4param.build(items, data[:8]), e
 
 
+# A texture's ID (the GIDX hash in a .nut) has to be unique: the stage-select grid icons
+# (stage_10_*) each have their own (Battlefield 0x28000999, End 0x280009A0, ...), and a copy with
+# Battlefield's ID showed blank in game (user). New icons get IDs from NEW_TEXTURE_IDS, 0x10 per
+# stage (cosmetic - 0x38) and one per icon set; the game's UI uses 0x28000000-0x28006395.
+NEW_TEXTURE_IDS = 0x2800FF00
+
+
+def texture_ids(data):
+    """[(offset of the ID, ID)] of every texture in a .nut"""
+    out = []
+    i = data.find(b'GIDX')
+    while i >= 0:
+        out.append((i + 8, struct.unpack('>I', data[i + 8:i + 12])[0]))
+        i = data.find(b'GIDX', i + 4)
+    return out
+
+
+def used_texture_ids(ui_dir):
+    used = set()
+    for root, _dirs, files in os.walk(ui_dir):
+        for f in files:
+            if f.endswith('.nut'):
+                used.update(t for _, t in texture_ids(open(os.path.join(root, f), 'rb').read()))
+    return used
+
+
+def with_texture_id(data, tex_id):
+    data = bytearray(data)
+    for off, _ in texture_ids(data):
+        struct.pack_into('>I', data, off, tex_id)
+    return bytes(data)
+
+
 def copy_stage(src_dir, dst_dir, src, name):
     """the folder with the source's name in file names replaced"""
     for root, _dirs, files in os.walk(src_dir):
@@ -133,13 +167,19 @@ def main():
     open(os.path.join(out, 'ui', 'message', 'melee.msbt'), 'wb').write(m.build())
 
     icons = []
+    used = used_texture_ids(a.ui)
+    tex_id = NEW_TEXTURE_IDS + 0x10 * (cos - 0x38)
     rs = os.path.join(a.ui, 'replace', 'stage')
     for st in sorted(os.listdir(rs)):
         f = os.path.join(rs, st, '%s_%s.nut' % (st, a.src))
         if os.path.exists(f):
+            while tex_id in used:
+                tex_id += 1
+            used.add(tex_id)
             os.makedirs(os.path.join(out, 'ui', 'replace', 'stage', st), exist_ok=True)
-            shutil.copyfile(f, os.path.join(out, 'ui', 'replace', 'stage', st, '%s_%s.nut' % (st, a.name)))
-            icons.append(st)
+            open(os.path.join(out, 'ui', 'replace', 'stage', st, '%s_%s.nut' % (st, a.name)), 'wb').write(
+                with_texture_id(open(f, 'rb').read(), tex_id))
+            icons.append('%s (texture 0x%08X)' % (st, tex_id))
 
     for v in ('melee', 'end'):
         copy_stage(os.path.join(a.stage, v, a.src), os.path.join(out, 'stage', v, a.name), a.src, a.name)
