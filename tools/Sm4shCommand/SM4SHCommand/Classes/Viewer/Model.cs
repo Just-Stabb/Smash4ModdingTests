@@ -263,6 +263,11 @@ namespace Sm4shCommand.Viewer
             public int[] Bones;     // 4 per vertex
             public float[] Weights; // 4 per vertex
             public int[] Tris;      // 3 per triangle
+            public float[] UV;      // u v per vertex (the first UV set), or null
+            public int TextureHash; // the material's first texture
+            public bool AlphaTest;  // the material blends or alpha-tests
+            public Texture Texture; // resolved from model.nut by FighterAssets
+            public Dictionary<string, float[]> Props = new Dictionary<string, float[]>();   // NU_ material values
         }
         public class Mesh
         {
@@ -300,9 +305,12 @@ namespace Sm4shCommand.Viewer
                 {
                     int ps = BE.I32(d, off) + pcs, vs = BE.I32(d, off + 4) + vcs, va = BE.I32(d, off + 8) + vas;
                     int vc = BE.U16(d, off + 12), vsz = d[off + 14], uvsz = d[off + 15];
+                    int mat = BE.I32(d, off + 16);
                     int fc = BE.U16(d, off + 32), pflag = BE.U16(d, off + 34);
                     off += 48;
-                    mesh.Polys.Add(ReadPoly(d, ps, vs, va, vc, vsz, uvsz, fc, pflag, o.Item2));
+                    var poly = ReadPoly(d, ps, vs, va, vc, vsz, uvsz, fc, pflag, o.Item2);
+                    ReadMaterial(d, mat, poly, names);
+                    mesh.Polys.Add(poly);
                 }
                 model.Meshes.Add(mesh);
             }
@@ -325,8 +333,18 @@ namespace Sm4shCommand.Viewer
             }
             int uvb = (colorType == 2 ? 4 : colorType == 4 ? 8 : 0) + uvCount * (uvType == 0 ? 4 : 8);
             var poly = new Poly { Pos = new float[vc * 3], Bones = new int[vc * 4], Weights = new float[vc * 4] };
+            int cb = colorType == 2 ? 4 : colorType == 4 ? 8 : 0;
+            if (uvCount > 0) poly.UV = new float[vc * 2];
+            Action<int, int> readUV = (k, q) =>
+            {
+                if (poly.UV == null) return;
+                q += cb;
+                poly.UV[k * 2] = uvType == 0 ? BE.Half(d, q) : BE.F32(d, q);
+                poly.UV[k * 2 + 1] = uvType == 0 ? BE.Half(d, q + 2) : BE.F32(d, q + 4);
+            };
             if (boneType != 0)
             {
+                for (int k = 0; k < vc; k++) readUV(k, vs + k * uvb);
                 int bsz = boneType == 0x10 ? 32 : boneType == 0x20 ? 16 : 8;
                 int p = va;
                 for (int k = 0; k < vc; k++, p += 12 + nsize + bsz)
@@ -347,6 +365,7 @@ namespace Sm4shCommand.Viewer
                 for (int k = 0; k < vc; k++, p += 12 + nsize + uvb)
                 {
                     for (int c = 0; c < 3; c++) poly.Pos[k * 3 + c] = BE.F32(d, p + 4 * c);
+                    readUV(k, p + 12 + nsize);
                     poly.Bones[k * 4] = Math.Max(0, single);
                     poly.Weights[k * 4] = 1;
                 }
@@ -381,6 +400,30 @@ namespace Sm4shCommand.Viewer
             }
             poly.Tris = tris.Where(t => t < vc).Count() == tris.Count ? tris.ToArray() : FilterTris(tris, vc);
             return poly;
+        }
+
+        /// <summary>The first material (Smash Forge's NUD.ReadMaterials): blend / alpha test and texture 0.</summary>
+        static void ReadMaterial(byte[] d, int mat, Poly poly, int names)
+        {
+            if (mat <= 0 || mat + 32 > d.Length) return;
+            int src = BE.U16(d, mat + 8), texCount = BE.U16(d, mat + 10), dst = BE.U16(d, mat + 12), alphaFunc = BE.U16(d, mat + 14);
+            poly.AlphaTest = src != 0 || dst != 0 || alphaFunc != 0;
+            if (texCount > 0 && mat + 36 <= d.Length)
+                poly.TextureHash = BE.I32(d, mat + 32);
+            // the material's values (NU_colorGain, NU_diffuseColor, ...): size, name, count, values
+            int p = mat + 32 + texCount * 24;
+            for (int guard = 0; guard < 64 && p + 16 <= d.Length; guard++)
+            {
+                int size = BE.I32(d, p), name = BE.I32(d, p + 4), count = d[p + 11];
+                if (count > 0 && count <= 16 && p + 16 + count * 4 <= d.Length)
+                {
+                    var v = new float[count];
+                    for (int i = 0; i < count; i++) v[i] = BE.F32(d, p + 16 + 4 * i);
+                    poly.Props[BE.CStr(d, names + name)] = v;
+                }
+                if (size == 0) break;
+                p += size;
+            }
         }
 
         static int[] FilterTris(List<int> tris, int vc)

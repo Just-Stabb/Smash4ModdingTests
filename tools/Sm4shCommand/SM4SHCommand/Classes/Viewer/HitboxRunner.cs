@@ -20,6 +20,14 @@ namespace Sm4shCommand.Viewer
         public bool Electric { get { return Effect == 3; } }
     }
 
+    /// <summary>A SET_FLOAT the script does to a variable (e.g. LASTHIT_HITSTUN_MUL), and on which game frame.</summary>
+    public class VarWrite
+    {
+        public int GameFrame;
+        public uint Variable;
+        public float Value;
+    }
+
     /// <summary>The script's state on one in-game frame.</summary>
     public class FrameState
     {
@@ -27,6 +35,7 @@ namespace Sm4shCommand.Viewer
         public float AnimFrame;          // the animation frame shown on this game frame
         public List<HitboxData> Hitboxes = new List<HitboxData>();
         public bool Intangible, Invincible, SuperArmor;
+        public List<VarWrite> Writes = new List<VarWrite>();   // SET_FLOATs done on this frame
     }
 
     /// <summary>
@@ -46,13 +55,16 @@ namespace Sm4shCommand.Viewer
             EXT_HITBOX = 0x2988D50F, SPECIAL = 0x14FCC7E4, EXT_SPECIAL = 0x7075DC5A, COLLATERAL = 0xCC7CC705,
             EXT_COLLATERAL = 0xED67D5DA, CLEAR = 0x9245E1A8, DELETE = 0xFF379EB6, DEACTIVATE_LAST = 0x7698BB42,
             SIZE = 0x684264C9, DAMAGE = 0xDFA4517A, MOVE = 0x1AFDA8E6, SET_LOOP = 0x0EB375E3, GOTO = 0x38A3EC78,
-            BODY = 0xF0D25BDA, ARMOR = 0x2A25155D, TRUE = 0xA5BD4F32, ELSE = 0x895B9275, FALSE = 0x870CF021, END = 0x5766F889;
+            BODY = 0xF0D25BDA, SET_FLOAT = 0x1E3AB92A, ANIM_RATE = 0x0F000098, ARMOR = 0x2A25155D, TRUE = 0xA5BD4F32, ELSE = 0x895B9275, FALSE = 0x870CF021, END = 0x5766F889;
 
         IList<ICommand> script;
         readonly List<IList<ICommand>> subscripts = new List<IList<ICommand>>();
         readonly Stack<int[]> states = new Stack<int[]>();
         int index, loopStart, loopIterations, skipWords;
-        double currentFrame, animFrame, frameSpeed, syncFrames;
+        double currentFrame, animFrame, frameSpeed, syncFrames, rate;
+        int gameFrame;
+        List<VarWrite> writes = new List<VarWrite>();
+        double Speed { get { return frameSpeed * rate; } }   // the move's frame speed x the animation rate variable
         bool incrementFrame;
         readonly SortedDictionary<int, HitboxData> hitboxes = new SortedDictionary<int, HitboxData>();
         bool intangible, invincible, armor;
@@ -63,16 +75,18 @@ namespace Sm4shCommand.Viewer
             script = commands;
             subscripts.Clear(); states.Clear(); hitboxes.Clear();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
-            currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1;
+            currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
             intangible = invincible = armor = false;
             var outList = new List<FrameState>();
             int guard = 0;
             for (int game = 0; game < frames; game++)
             {
+                gameFrame = game + 1;
+                writes = new List<VarWrite>();
                 if (incrementFrame)
-                    currentFrame += frameSpeed;
-                animFrame += frameSpeed;
+                    currentFrame += Speed;
+                animFrame += Speed;
                 bool keep = true;
                 while (keep && guard++ < 100000)
                 {
@@ -80,7 +94,7 @@ namespace Sm4shCommand.Viewer
                     ProcessFrame();
                     if (currentFrame < 1)     // the game's first-frame handling (Forge)
                     {
-                        currentFrame += frameSpeed;
+                        currentFrame += Speed;
                         if (currentFrame > 1)
                             incrementFrame = false;
                         else
@@ -96,7 +110,7 @@ namespace Sm4shCommand.Viewer
                 {
                     GameFrame = game + 1,
                     AnimFrame = (float)(animFrame - 1),
-                    Intangible = intangible, Invincible = invincible, SuperArmor = armor,
+                    Intangible = intangible, Invincible = invincible, SuperArmor = armor, Writes = writes,
                 };
                 foreach (var h in hitboxes.Values)
                     st.Hitboxes.Add(h.Clone());
@@ -177,7 +191,7 @@ namespace Sm4shCommand.Viewer
                 case SYNC:
                     {
                         if (syncFrames < 0) syncFrames = 0;
-                        else syncFrames += frameSpeed;
+                        else syncFrames += Speed;
                         double left = (int)F(p[0]) - syncFrames;
                         if (Math.Abs(left) > 0.001 && left > 0)
                             return false;
@@ -295,6 +309,15 @@ namespace Sm4shCommand.Viewer
                     {
                         skipWords = I(p[0]) - 2;
                         if (skipWords == 0) skipWords = 1;
+                    }
+                    break;
+                case SET_FLOAT:
+                    if (p.Count >= 2)
+                    {
+                        uint v = (uint)I(p[1]);
+                        float val = F(p[0]);
+                        writes.Add(new VarWrite { GameFrame = gameFrame, Variable = v, Value = val });
+                        if (v == ANIM_RATE && UseFrameSpeed && val > 0) rate = val;
                     }
                     break;
                 case END:

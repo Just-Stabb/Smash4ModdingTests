@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace Sm4shCommand.Viewer
@@ -65,6 +66,10 @@ namespace Sm4shCommand.Viewer
         public float Damage, StaleMultiplier, TargetPercentAfter, KB, Angle, LaunchSpeed, LaunchSpeedX, LaunchSpeedY;
         public int Hitstun, Faf, AttackerHitlag, TargetHitlag, ShieldStun, ShieldHitlag, AirdodgeCancel, AerialCancel;
         public bool Tumble, Spike;
+        // after the script's own changes (ScriptModifiers.Apply); the same as above when it has none
+        public int FinalHitstun, FinalTargetHitlag, FinalAttackerHitlag;
+        public List<int[]> TargetStops = new List<int[]>();  // extra hitstop during hitstun: {frame of hitstun, frames}
+        public List<string> ScriptNotes = new List<string>();
         public List<float[]> Path = new List<float[]>();   // trajectory (x forward, y), one point a frame
     }
 
@@ -189,6 +194,9 @@ namespace Sm4shCommand.Viewer
             double shl = h.Hitlag > 1 ? Math.Max(1, h.Hitlag * 0.8) : h.Hitlag;
             res.ShieldHitlag = Hitlag(res.Damage, shl, h.Electric, 1);
             Trajectory(res, angle, Math.Abs(hx), Math.Abs(vy), t, h.Electric);
+            res.FinalHitstun = res.Hitstun;
+            res.FinalTargetHitlag = res.TargetHitlag;
+            res.FinalAttackerHitlag = res.AttackerHitlag;
             return res;
         }
 
@@ -228,6 +236,108 @@ namespace Sm4shCommand.Viewer
             }
             if (res.AirdodgeCancel > res.Hitstun) res.AirdodgeCancel = res.Hitstun + 1;
             if (res.AerialCancel > res.Hitstun) res.AerialCancel = res.Hitstun + 1;
+        }
+    }
+
+    /// <summary>
+    /// The attacking script's SET_FLOATs to the combat variables (tools/position_vars_cave.py,
+    /// docs/position-variables.md "Hitstun, hitstop and the last fighter hit") applied to a hit: the
+    /// target is the nearest opponent (0x0F000048-4F) and the last fighter hit (0x0F000050-57),
+    /// self is 0x0F000040-47. Frames are counted in real time: the script stands still during the
+    /// attacker's hitlag, so a script frame after the hit is that many frames later.
+    /// </summary>
+    public static class ScriptModifiers
+    {
+        const uint SELF = 0x0F000040, OPP = 0x0F000048, LASTHIT = 0x0F000050;
+        const int HITSTUN = 0, HITSTUN_MUL = 2, HITSTOP_SHAKE = 3, HITSTOP = 4;
+
+        public static void Apply(KnockbackResult r, int hitFrame, IEnumerable<VarWrite> writes)
+        {
+            int attackerLag = r.AttackerHitlag, targetLag = r.TargetHitlag;
+            // the target's hitstun runs from launch (hit + its hitlag) to stunEnd; real frames
+            int launch = hitFrame + targetLag, stunEnd = launch + r.Hitstun;
+            double rememberedMul = 1;
+            int selfExtra = 0;
+            foreach (var w in writes)
+            {
+                uint v = w.Variable;
+                bool target = v >= OPP && v < OPP + 8 || v >= LASTHIT && v < LASTHIT + 8, self = v >= SELF && v < SELF + 8;
+                if (!target && !self) continue;
+                int q = (int)(v & 7);
+                bool after = w.GameFrame > hitFrame;
+                int real = after ? w.GameFrame + attackerLag + selfExtra : w.GameFrame;
+                string who = v >= LASTHIT && v < LASTHIT + 8 ? "LASTHIT" : v >= OPP && v < OPP + 8 ? "OPP" : "SELF";
+                string at = string.Format(CultureInfo.InvariantCulture, "frame {0}: {1}", w.GameFrame, who);
+                if (self)
+                {
+                    if ((q == HITSTOP || q == HITSTOP_SHAKE) && w.Value > 0 && w.GameFrame >= hitFrame)
+                    {
+                        // attacker hitstop from that frame: on the hit frame it replaces the hit's hitlag
+                        if (w.GameFrame == hitFrame) { attackerLag = (int)w.Value; r.ScriptNotes.Add(Note(at, "_HITSTOP", w.Value, "attacker hitlag " + attackerLag)); }
+                        else { selfExtra += (int)w.Value; r.ScriptNotes.Add(Note(at, "_HITSTOP", w.Value, "attacker stops " + (int)w.Value + " more frames")); }
+                    }
+                    continue;
+                }
+                switch (q)
+                {
+                    case HITSTUN_MUL:
+                        if (!after && who == "LASTHIT")
+                        {
+                            rememberedMul *= w.Value;   // remembered for the move's hits that land afterwards
+                            r.ScriptNotes.Add(Note(at, "_HITSTUN_MUL", w.Value, "hitstun x" + Fmt(w.Value)));
+                        }
+                        else if (after && real < stunEnd)
+                        {
+                            int from = Math.Max(real, launch), left = stunEnd - from;
+                            stunEnd = from + (int)Math.Round(left * w.Value);
+                            if (who == "LASTHIT") rememberedMul = 1;   // already applied to this hit
+                            r.ScriptNotes.Add(Note(at, "_HITSTUN_MUL", w.Value, "hitstun left x" + Fmt(w.Value)));
+                        }
+                        break;
+                    case HITSTUN:
+                        if (after && real < stunEnd)
+                        {
+                            int from = Math.Max(real, launch);
+                            stunEnd = from + (int)w.Value;
+                            r.ScriptNotes.Add(Note(at, "_HITSTUN", w.Value, (int)w.Value + " frames of hitstun left"));
+                        }
+                        break;
+                    case HITSTOP:
+                    case HITSTOP_SHAKE:
+                        if (w.GameFrame >= hitFrame && w.Value > 0)
+                        {
+                            int n = (int)w.Value, from = w.GameFrame == hitFrame ? hitFrame : real;
+                            if (from <= launch)
+                            {   // during the hit's own hitlag: it ends n frames from now
+                                int newLaunch = from + n;
+                                stunEnd += newLaunch - launch;
+                                launch = newLaunch;
+                                targetLag = launch - hitFrame;
+                            }
+                            else if (from < stunEnd)
+                            {   // frozen in the middle of hitstun
+                                r.TargetStops.Add(new[] { from - launch, n });
+                                stunEnd += n;
+                            }
+                            r.ScriptNotes.Add(Note(at, q == HITSTOP ? "_HITSTOP" : "_HITSTOP_SHAKE", w.Value, "target hitstop " + n));
+                        }
+                        break;
+                }
+            }
+            if (rememberedMul != 1)
+            {
+                int stun = stunEnd - launch;
+                stunEnd = launch + (int)Math.Round(stun * rememberedMul);
+            }
+            r.FinalTargetHitlag = targetLag;
+            r.FinalAttackerHitlag = attackerLag;
+            r.FinalHitstun = Math.Max(0, stunEnd - launch - r.TargetStops.Sum(x => x[1]));
+        }
+
+        static string Fmt(float v) { return v.ToString("0.###", CultureInfo.InvariantCulture); }
+        static string Note(string at, string name, float v, string what)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0}{1} = {2}: {3}", at, name, Fmt(v), what);
         }
     }
 }

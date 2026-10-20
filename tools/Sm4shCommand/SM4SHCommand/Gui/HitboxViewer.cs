@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using SALT.Moveset;
@@ -37,6 +38,12 @@ namespace Sm4shCommand.GUI
         readonly CheckBox showModel = new CheckBox { Text = "Model", Checked = true, AutoSize = true };
         readonly CheckBox showBones = new CheckBox { Text = "Bones", AutoSize = true };
         readonly CheckBox showAngles = new CheckBox { Text = "Angles", Checked = true, AutoSize = true };
+        readonly CheckBox showTextures = new CheckBox { Text = "Textures", Checked = true, AutoSize = true };
+        readonly CheckBox showEnemy = new CheckBox { Text = "Enemy", Checked = true, AutoSize = true };
+        FighterAssets enemy;
+        string enemyStand, enemyHurt, enemyFly;
+        uint currentCrc;
+        bool filling;           // the grid is being refilled (ShowFrame)        // the script shown: the open one, or the one for the animation picked
         readonly Label status = new Label { Dock = DockStyle.Bottom, Height = 18, ForeColor = Color.DimGray };
         readonly DataGridView grid = new DataGridView
         {
@@ -72,9 +79,16 @@ namespace Sm4shCommand.GUI
             target.SelectedIndex = Math.Max(0, target.Items.Cast<FighterAttributes>().ToList().FindIndex(x => x.Name == "Mario"));
             animBox.Items.Add("(none)");
             foreach (var n in assets.AnimationNames) animBox.Items.Add(n);
+            currentCrc = scriptCrc;
             animName = assets.AnimationFor(scriptCrc);
             animBox.SelectedItem = animName ?? "(none)";
-            animBox.SelectedIndexChanged += (o, e) => { animName = animBox.SelectedIndex <= 0 ? null : (string)animBox.SelectedItem; Rerun(); };
+            animBox.SelectedIndexChanged += (o, e) =>
+            {
+                animName = animBox.SelectedIndex <= 0 ? null : (string)animBox.SelectedItem;
+                currentCrc = ScriptFor(animName);
+                Rerun();
+            };
+            LoadEnemy(Runtime.GetSettingText("ViewerEnemyFolder", ""), false);
             timer.Tick += (o, e) => { bar.Value = bar.Value >= bar.Maximum ? bar.Minimum : bar.Value + 1; };
             editTimer.Tick += (o, e) => { editTimer.Stop(); Rerun(); };
             if (editor != null)
@@ -85,11 +99,71 @@ namespace Sm4shCommand.GUI
 
         void Editor_TextChanged(object sender, EventArgs e) { editTimer.Stop(); editTimer.Start(); }
 
+        /// <summary>The game script that plays an animation: the open script if it does, else the
+        /// first script named for it that game.bin has, else none (0).</summary>
+        uint ScriptFor(string anim)
+        {
+            if (anim == null) return scriptCrc;
+            var list = assets.ScriptsFor(anim);
+            if (list.Contains(scriptCrc) || anim == assets.AnimationFor(scriptCrc)) return scriptCrc;
+            foreach (var crc in list)
+                if (getScript(crc) != null) return crc;
+            return 0;
+        }
+
+        /// <summary>The enemy's model: the folder given (remembered), else Mario's next to this
+        /// fighter's folder (fighter/mario). The calculator's target follows it when the names match.</summary>
+        void LoadEnemy(string folder, bool remember)
+        {
+            string dir = folder;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                dir = Path.Combine(Path.GetDirectoryName(assets.Root) ?? "", "mario");
+            enemy = null;
+            try
+            {
+                string root = FighterAssets.FindRoot(dir);
+                if (root != null && root != assets.Root)
+                    enemy = FighterAssets.Load(root);
+            }
+            catch (Exception ex) { status.Text = "Couldn't load the enemy model: " + ex.Message; }
+            if (enemy != null)
+            {
+                enemyStand = enemy.FindAnimation("Wait1", "Wait", "Wait2");
+                enemyHurt = enemy.FindAnimation("DamageN2", "DamageN1", "DamageHi2", "DamageHi1");
+                enemyFly = enemy.FindAnimation("DamageFlyN", "DamageFlyHi", "DamageFlyTop", "DamageFlyLw");
+                if (remember) Runtime.SetSettingText("ViewerEnemyFolder", enemy.Root);
+                string key = Simple(enemy.Name);
+                foreach (FighterAttributes f in target.Items)
+                    if (Simple(f.Name) == key) { target.SelectedItem = f; break; }
+            }
+            showEnemy.Text = enemy != null ? "Enemy (" + enemy.Name + ")" : "Enemy (none: Enemy model..)";
+        }
+
+        static string Simple(string name)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in (name ?? "").ToLowerInvariant()) if (char.IsLetterOrDigit(c)) sb.Append(c);
+            return sb.ToString();
+        }
+
+        void PickEnemy()
+        {
+            using (var dlg = new FolderBrowserDialog { Description = "The enemy fighter's folder (with model and motion), e.g. fighter\\mario" })
+            {
+                if (enemy != null) dlg.SelectedPath = enemy.Root;
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                LoadEnemy(dlg.SelectedPath, true);
+                if (enemy == null)
+                    MessageBox.Show(this, "No model / motion folders found there.", "Enemy model", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Calc();
+            }
+        }
+
         void Build()
         {
-            var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, WrapContents = false };
+            var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 58, WrapContents = true };
             tools.Controls.AddRange(new Control[] { new Label { Text = "Animation:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, animBox,
-                ifTrue, frameSpeed, showModel, showBones, showAngles });
+                ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy });
             var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 34, ColumnCount = 5 };
             var prev = new Button { Text = "<", Width = 30 };
             var next = new Button { Text = ">", Width = 30 };
@@ -144,6 +218,7 @@ namespace Sm4shCommand.GUI
             right.Panel2.Controls.Add(calcGroup);
             grid.SelectionChanged += (o, e) =>
             {
+                if (filling) return;
                 view.SelectedHitbox = grid.SelectedRows.Count > 0 ? (int)grid.SelectedRows[0].Cells[0].Value : -1;
                 Calc();
             };
@@ -162,9 +237,14 @@ namespace Sm4shCommand.GUI
             showModel.CheckedChanged += (o, e) => { view.ShowModel = showModel.Checked; view.Recompute(); };
             showBones.CheckedChanged += (o, e) => { view.ShowBones = showBones.Checked; view.Invalidate(); };
             showAngles.CheckedChanged += (o, e) => { view.ShowAngles = showAngles.Checked; view.Invalidate(); };
+            showTextures.CheckedChanged += (o, e) => { view.ShowTextures = showTextures.Checked; view.Invalidate(); };
+            showEnemy.CheckedChanged += (o, e) => Calc();
             var meshes = new Button { Text = "Meshes..", AutoSize = true };
             meshes.Click += (o, e) => PickMeshes();
+            var enemyButton = new Button { Text = "Enemy model..", AutoSize = true };
+            enemyButton.Click += (o, e) => PickEnemy();
             tools.Controls.Add(meshes);
+            tools.Controls.Add(enemyButton);
         }
 
         void PickMeshes()
@@ -184,6 +264,8 @@ namespace Sm4shCommand.GUI
         IList<ICommand> CurrentCommands(out string error)
         {
             error = null;
+            if (currentCrc == 0) return null;
+            if (currentCrc != scriptCrc) return getScript(currentCrc);
             if (editor != null)
             {
                 try
@@ -224,9 +306,11 @@ namespace Sm4shCommand.GUI
             bar.Maximum = Math.Max(1, frames.Count);
             bar.Value = Math.Min(Math.Max(keep, 1), bar.Maximum);
             view.Animation = anim;
+            Text = "Hitbox Viewer - " + (currentCrc == 0 ? "(no script)" : Runtime.ScriptLabel(currentCrc)) +
+                   (currentCrc != scriptCrc && currentCrc != 0 ? " (saved game.bin; edits follow the open script only)" : "");
             status.Text = (error != null ? "Doesn't compile (showing the last saved script): " + error + "   " : "") +
                           (animName != null ? animName + ", " + length + " frames" : "No animation found for this script: pick one above") +
-                          (cmds == null ? "   (no game script)" : "");
+                          (cmds == null ? "   (no game script for this animation: no hitboxes)" : "");
             ShowFrame();
         }
 
@@ -236,9 +320,9 @@ namespace Sm4shCommand.GUI
             var f = frames[Math.Min(bar.Value, frames.Count) - 1];
             view.Frame = f;
             view.AnimFrame = Math.Max(0, f.AnimFrame);
-            view.Recompute();
             frameLabel.Text = string.Format(CultureInfo.InvariantCulture, "frame {0} / {1}   anim {2:0.##}", f.GameFrame, frames.Count, f.AnimFrame + 1);
             int sel = view.SelectedHitbox;
+            filling = true;
             grid.SuspendLayout();
             grid.Rows.Clear();
             if (grid.Columns.Count == 0)
@@ -256,19 +340,40 @@ namespace Sm4shCommand.GUI
             if (grid.SelectedRows.Count == 0 && grid.Rows.Count > 0 && sel < 0)
                 grid.Rows[0].Selected = true;
             grid.ResumeLayout();
+            filling = false;
             view.SelectedHitbox = grid.SelectedRows.Count > 0 ? (int)grid.SelectedRows[0].Cells[0].Value : sel;
             Calc();
         }
 
+        /// <summary>The picked hitbox (on this frame, or where it last came out before it) and the game
+        /// frame it hits on: the first frame of that run of frames.</summary>
+        HitboxData PickedHitbox(int current, out int hitFrame)
+        {
+            hitFrame = -1;
+            int id = view.SelectedHitbox;
+            if (id < 0 || frames.Count == 0) return null;
+            int at = -1;
+            for (int i = Math.Min(current, frames.Count - 1); i >= 0; i--)
+                if (frames[i].Hitboxes.Any(x => x.Id == id)) { at = i; break; }
+            if (at < 0) at = frames.FindIndex(f => f.Hitboxes.Any(x => x.Id == id));
+            if (at < 0) return null;
+            while (at > 0 && frames[at - 1].Hitboxes.Any(x => x.Id == id)) at--;
+            hitFrame = at + 1;
+            return frames[at].Hitboxes.Find(x => x.Id == id);
+        }
+
         void Calc()
         {
-            var f = frames.Count > 0 ? frames[Math.Min(bar.Value, frames.Count) - 1] : null;
-            var hb = f == null ? null : f.Hitboxes.Find(x => x.Id == view.SelectedHitbox);
+            int cur = frames.Count > 0 ? Math.Min(bar.Value, frames.Count) - 1 : -1;
+            int hitFrame = -1;
+            var hb = cur < 0 ? null : PickedHitbox(cur, out hitFrame);
             if (hb == null)
             {
-                results.Text = f == null || f.Hitboxes.Count == 0 ? "No hitboxes on this frame." : "Pick a hitbox in the list.";
+                results.Text = cur < 0 || frames[cur].Hitboxes.Count == 0 ? "No hitboxes on this frame." : "Pick a hitbox in the list.";
                 view.Trajectory = null;
-                view.Invalidate();
+                view.TrajectoryOrigin = null;
+                PlaceEnemy(null, 0, cur + 1, null);
+                view.Recompute();
                 return;
             }
             var inp = new KnockbackInput
@@ -279,26 +384,96 @@ namespace Sm4shCommand.GUI
                 LaunchRate = (float)launchRate.Value, UseDI = useDI.Checked, DIAngle = (float)diAngle.Value,
             };
             var r = KnockbackCalc.Calculate(inp);
-            int firstFrame = frames.FindIndex(x => x.Hitboxes.Any(y => y.Id == hb.Id)) + 1;
+            ScriptModifiers.Apply(r, hitFrame, frames.SelectMany(f => f.Writes));
             var end = r.Path[Math.Min(r.Hitstun, r.Path.Count - 1)];
+            int frozen = r.TargetStops.Sum(x => x[1]);
             var ic = CultureInfo.InvariantCulture;
-            results.Text = string.Join("\r\n", new[] {
+            bool changed = r.FinalHitstun != r.Hitstun || r.FinalTargetHitlag != r.TargetHitlag || r.FinalAttackerHitlag != r.AttackerHitlag;
+            var lines = new List<string> {
                 string.Format(ic, "Hitbox {0}: {1:0.##}% , angle {2}, BKB {3}, KBG {4}{5}", hb.Id, hb.Damage, hb.Angle, hb.BKB, hb.KBG, hb.WBKB != 0 ? ", WBKB " + hb.WBKB : ""),
                 string.Format(ic, "Damage dealt       {0:0.###}% (stale x{1:0.###})", r.Damage, r.StaleMultiplier),
                 string.Format(ic, "Target's % after   {0:0.###}%", r.TargetPercentAfter),
                 string.Format(ic, "Knockback          {0:0.###}{1}", r.KB, r.Tumble ? "  (tumble)" : ""),
                 string.Format(ic, "Launch angle       {0:0.##} deg{1}", r.Angle, r.Spike ? "  (spike)" : ""),
                 string.Format(ic, "Launch speed       {0:0.###}  (x {1:0.###}, y {2:0.###})", r.LaunchSpeed, r.LaunchSpeedX, r.LaunchSpeedY),
-                string.Format(ic, "Hitstun            {0} frames  (target acts on frame {1})", r.Hitstun, r.Faf),
+                string.Format(ic, "Hitstun            {0} frames  (target acts on frame {1}{2})", r.FinalHitstun,
+                    r.FinalHitstun == 0 ? 0 : r.FinalHitstun + frozen + 1, frozen > 0 ? ", after " + frozen + " frames of hitstop during it" : ""),
                 string.Format(ic, "Hitstun cancel     airdodge {0}, aerial {1}", r.AirdodgeCancel, r.AerialCancel),
-                string.Format(ic, "Hitlag             attacker {0}, target {1}", r.AttackerHitlag, r.TargetHitlag),
+                string.Format(ic, "Hitlag             attacker {0}, target {1}  (hitlag x{2:0.##})", r.FinalAttackerHitlag, r.FinalTargetHitlag, hb.Hitlag),
                 string.Format(ic, "Shield             stun {0}, hitlag {1}", r.ShieldStun, r.ShieldHitlag),
                 string.Format(ic, "Distance           {0:0.##} forward, {1:0.##} up at the end of hitstun", end[0], end[1]),
-                firstFrame > 0 ? string.Format(ic, "Comes out on game frame {0}", firstFrame) : "",
-                "Formulas: Sm4sh-Calculator (rubendal). Trajectory: no stage, dashed in the view.",
-            });
+                string.Format(ic, "Hits on game frame {0}", hitFrame),
+            };
+            if (r.ScriptNotes.Count > 0)
+            {
+                lines.Add("");
+                lines.Add("The script's modifiers:");
+                lines.AddRange(r.ScriptNotes.Select(x => "  " + x));
+                if (changed)
+                    lines.Add(string.Format(ic, "  Without them: hitstun {0}, hitlag attacker {1}, target {2}", r.Hitstun, r.AttackerHitlag, r.TargetHitlag));
+            }
+            lines.Add("");
+            lines.Add("Formulas: Sm4sh-Calculator (rubendal). Trajectory: no stage, dashed in the view.");
+            results.Text = string.Join("\r\n", lines.ToArray());
             view.Trajectory = r.Path;
-            view.Invalidate();
+            PlaceEnemy(hb, hitFrame, cur + 1, r);
+            view.Recompute();
+        }
+
+        /// <summary>Puts the enemy where the hitbox hits it (on the ground, or at the hitbox's height
+        /// in the air), standing until the hit, then in hitlag, then along the trajectory with its
+        /// damage animation. Real time: the attacker's script waits out its hitlag.</summary>
+        void PlaceEnemy(HitboxData hb, int hitFrame, int frame, KnockbackResult r)
+        {
+            view.TrajectoryOrigin = null;
+            if (enemy == null || !showEnemy.Checked) { view.Enemy = null; return; }
+            float z0 = 14, y0 = 0;
+            if (hb != null)
+            {
+                var pos = HitboxPosition(hb, hitFrame);
+                if (pos != null)
+                {
+                    z0 = Math.Max(4, pos[2] + hb.Size * 0.6f);   // its front in the hitbox
+                    if (aerial.Checked) y0 = Math.Max(0, pos[1] - 6);
+                }
+            }
+            var e = new EnemyFigure { Assets = enemy, Z = z0, Y = y0 };
+            e.Animation = enemy.GetAnimation(enemyStand);
+            if (e.Animation != null && e.Animation.Frames > 0) e.Frame = frame % e.Animation.Frames;
+            if (hb != null && r != null && frame >= hitFrame)
+            {
+                int real = frame == hitFrame ? frame : frame + r.FinalAttackerHitlag;
+                int launch = hitFrame + r.FinalTargetHitlag;
+                var damage = enemy.GetAnimation(r.Tumble ? enemyFly ?? enemyHurt : enemyHurt ?? enemyFly);
+                if (damage != null) e.Animation = damage;
+                if (real < launch)
+                {
+                    e.Frame = 0;
+                    e.Z += (real & 1) == 0 ? 0.35f : -0.35f;     // shaking in hitlag
+                }
+                else
+                {
+                    int k = real - launch;
+                    foreach (var stop in r.TargetStops)
+                        if (k > stop[0]) k -= Math.Min(stop[1], k - stop[0]);
+                    var p = r.Path[Math.Min(k, r.Path.Count - 1)];
+                    e.Z += p[0];
+                    e.Y = Math.Max(0, e.Y + p[1]);
+                    e.Frame = e.Animation != null ? Math.Min(k, Math.Max(0, e.Animation.Frames - 1)) : 0;
+                }
+            }
+            view.Enemy = e;
+            view.TrajectoryOrigin = new[] { 0f, y0, z0 };
+        }
+
+        /// <summary>The hitbox's world position on game frame (x, y, z).</summary>
+        float[] HitboxPosition(HitboxData hb, int gameFrame)
+        {
+            if (gameFrame < 1 || gameFrame > frames.Count) return null;
+            var world = assets.Skeleton.World(anim, Math.Max(0, frames[gameFrame - 1].AnimFrame));
+            int bi = assets.Skeleton.ScriptBone(hb.Bone);
+            if (bi < 0 || bi >= world.Length) return null;
+            return world[bi].ClearScale().Transform(hb.X, hb.Y, hb.Z);
         }
     }
 }

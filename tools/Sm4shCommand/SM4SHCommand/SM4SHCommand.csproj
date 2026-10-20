@@ -103,6 +103,7 @@
     <Compile Include="Classes\Viewer\HitboxRunner.cs" />
     <Compile Include="Classes\Viewer\KnockbackCalc.cs" />
     <Compile Include="Classes\Viewer\FighterAssets.cs" />
+    <Compile Include="Classes\Viewer\Textures.cs" />
     <Compile Include="Classes\Viewer\Viewport.cs">
       <SubType>Component</SubType>
     </Compile>

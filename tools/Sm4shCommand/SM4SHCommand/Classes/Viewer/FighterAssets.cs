@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,6 +15,7 @@ namespace Sm4shCommand.Viewer
         public string Root, Name, ModelPath;
         public Skeleton Skeleton;
         public NudModel Model;
+        public Dictionary<int, Texture> Textures = new Dictionary<int, Texture>();
         public Dictionary<string, byte[]> Animations = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<uint, string> byScript = new Dictionary<uint, string>();
         readonly Dictionary<string, Omo> loaded = new Dictionary<string, Omo>();
@@ -44,6 +45,22 @@ namespace Sm4shCommand.Viewer
             a.Model = NudModel.Load(Path.Combine(cdir, "model.nud"));
             foreach (var m in a.Model.Meshes)
                 m.Visible = !HiddenByDefault(m.Name);
+            try { a.Textures = Nut.Load(Path.Combine(cdir, "model.nut")); }
+            catch (Exception) { }
+            foreach (var m in a.Model.Meshes)
+                foreach (var p in m.Polys)
+                {
+                    Texture t;
+                    if (p.UV != null && a.Textures.TryGetValue(p.TextureHash, out t)) p.Texture = t;
+                    float[] st;     // the texture's UV scale and offset
+                    if (p.UV != null && p.Props.TryGetValue("NU_colorSamplerUV", out st) && st.Length >= 4 &&
+                        (st[0] != 1 || st[1] != 1 || st[2] != 0 || st[3] != 0))
+                        for (int i = 0; i + 1 < p.UV.Length; i += 2)
+                        {
+                            p.UV[i] = p.UV[i] * st[0] + st[2];
+                            p.UV[i + 1] = p.UV[i + 1] * st[1] + st[3];
+                        }
+                }
             string pac = Path.Combine(root, "motion", "body", "main.pac");
             if (File.Exists(pac))
                 a.Animations = Pac.Load(pac);
@@ -57,7 +74,8 @@ namespace Sm4shCommand.Viewer
         {
             string[] words = { "blink", "halfblink", "ouch", "talk", "capture", "furafura", "sorori", "steppose",
                                "pattern", "damagefly", "heavyouch", "bodybig2", "openmouth", "smile", "shout", "fura",
-                               "eye2", "eye3", "eye4", "_attack_", "kirby_attack" };
+                               "eye2", "eye3", "eye4", "_attack_", "kirby_attack", "nohat", "_down_", "_cliff_", "_bound_", "_final_",
+                               "_escape_", "_ottotto_", "_result_", "_heavyouch_", "facenmhalf", "facenmopen" };
             string n = mesh.ToLowerInvariant();
             return words.Any(w => n.Contains(w));
         }
@@ -100,6 +118,30 @@ namespace Sm4shCommand.Viewer
         {
             string f;
             return byScript.TryGetValue(scriptCrc, out f) ? f : null;
+        }
+
+        /// <summary>The script hashes that play an animation file: its own name first, then the
+        /// names scripts use for it (AttackS4S -> AttackS4, AttackS4S_C2, ..).</summary>
+        public List<uint> ScriptsFor(string file)
+        {
+            var o = new List<uint>();
+            if (file == null) return o;
+            var m = Regex.Match(file, @"(.*)([A-Z])([0-9][0-9])(.*)\.omo$");
+            if (m.Success) o.Add(Crc(m.Groups[4].Value));
+            foreach (var kv in byScript)
+                if (kv.Value == file && !o.Contains(kv.Key)) o.Add(kv.Key);
+            return o;
+        }
+
+        /// <summary>The first animation whose name (without prefix) is one of names, or null.</summary>
+        public string FindAnimation(params string[] names)
+        {
+            foreach (var n in names)
+            {
+                string f;
+                if (byScript.TryGetValue(Crc(n), out f)) return f;
+            }
+            return null;
         }
 
         public IEnumerable<string> AnimationNames { get { return Animations.Keys.OrderBy(x => x); } }

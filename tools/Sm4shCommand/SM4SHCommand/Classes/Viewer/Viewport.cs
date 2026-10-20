@@ -13,6 +13,14 @@ namespace Sm4shCommand.Viewer
     /// no graphics driver is needed) and the frame's hitboxes. Drag: rotate, right-drag: pan,
     /// wheel: zoom, double-click: reset to the game's side view.
     /// </summary>
+    /// <summary>The target fighter: its model, posed, standing at (Z, Y) and facing left.</summary>
+    public class EnemyFigure
+    {
+        public FighterAssets Assets;
+        public Omo Animation;
+        public float Frame, Z, Y;
+    }
+
     public class Viewport : Control
     {
         public FighterAssets Assets;
@@ -20,15 +28,16 @@ namespace Sm4shCommand.Viewer
         public float AnimFrame;
         public FrameState Frame;
         public int SelectedHitbox = -1;
-        public bool ShowModel = true, ShowAngles = true, ShowBones;
+        public bool ShowModel = true, ShowAngles = true, ShowBones, ShowTextures = true;
+        public EnemyFigure Enemy;           // the fighter being hit, or null
+        public float[] TrajectoryOrigin;    // where the trajectory starts (x, y, z); null: at the hitbox
         public List<float[]> Trajectory;    // forward / up from the selected hitbox (calculator)
 
         float yaw, pitch, zoom = 9f, panX, panY;
         Point dragFrom;
         MouseButtons dragButton;
         Mat4[] world;
-        float[] skinned;          // skinned vertex positions for every poly, concatenated
-        int[] polyStart;
+        Skinned attacker, enemy;
 
         public static readonly Color[] HitboxColors = {
             Color.FromArgb(255, 40, 40), Color.FromArgb(255, 150, 20), Color.FromArgb(240, 220, 0),
@@ -88,22 +97,39 @@ namespace Sm4shCommand.Viewer
         public void Recompute()
         {
             world = Assets != null ? Assets.Skeleton.World(Animation, AnimFrame) : null;
-            skinned = null;
-            if (Assets == null || !ShowModel) { Invalidate(); return; }
+            attacker = null;
+            if (Assets != null && ShowModel)
+                attacker = Skin(Assets, world, 0, 0, false);
+            enemy = null;
+            if (Enemy != null && Enemy.Assets != null)
+                enemy = Skin(Enemy.Assets, Enemy.Assets.Skeleton.World(Enemy.Animation, Enemy.Frame), Enemy.Z, Enemy.Y, true);
+            Invalidate();
+        }
+
+        /// <summary>A model's vertices skinned to world matrices, then moved to (z, y) (turned to face
+        /// left when faceLeft).</summary>
+        class Skinned
+        {
+            public FighterAssets Assets;
+            public float[] Pos;
+            public int[] PolyStart;
+        }
+
+        static Skinned Skin(FighterAssets assets, Mat4[] world, float z0, float y0, bool faceLeft)
+        {
             int n = 0;
             var starts = new List<int>();
-            foreach (var m in Assets.Model.Meshes)
+            foreach (var m in assets.Model.Meshes)
                 foreach (var p in m.Polys) { starts.Add(n); n += p.Pos.Length; }
-            skinned = new float[n];
-            polyStart = starts.ToArray();
-            var skel = Assets.Skeleton;
+            var s = new Skinned { Assets = assets, Pos = new float[n], PolyStart = starts.ToArray() };
+            var skel = assets.Skeleton;
             var skin = new Mat4[world.Length];
             for (int i = 0; i < world.Length; i++) skin[i] = world[i] * skel.InverseBind[i];
             int k = 0;
-            foreach (var m in Assets.Model.Meshes)
+            foreach (var m in assets.Model.Meshes)
                 foreach (var p in m.Polys)
                 {
-                    int vc = p.Pos.Length / 3, b = polyStart[k++];
+                    int vc = p.Pos.Length / 3, b = s.PolyStart[k++];
                     for (int v = 0; v < vc; v++)
                     {
                         float x = p.Pos[v * 3], y = p.Pos[v * 3 + 1], z = p.Pos[v * 3 + 2], ox = 0, oy = 0, oz = 0, wsum = 0;
@@ -120,10 +146,11 @@ namespace Sm4shCommand.Viewer
                         }
                         if (wsum <= 0) { ox = x; oy = y; oz = z; }
                         else if (Math.Abs(wsum - 1) > 1e-3) { ox /= wsum; oy /= wsum; oz /= wsum; }
-                        skinned[b + v * 3] = ox; skinned[b + v * 3 + 1] = oy; skinned[b + v * 3 + 2] = oz;
+                        if (faceLeft) { ox = -ox; oz = -oz; }     // turned around the vertical axis
+                        s.Pos[b + v * 3] = ox; s.Pos[b + v * 3 + 1] = oy + y0; s.Pos[b + v * 3 + 2] = oz + z0;
                     }
                 }
-            Invalidate();
+            return s;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -136,8 +163,10 @@ namespace Sm4shCommand.Viewer
                 var pix = new int[w * h];
                 int bg = BackColor.ToArgb();
                 for (int i = 0; i < pix.Length; i++) pix[i] = bg;
-                if (skinned != null)
-                    Rasterize(pix, w, h, r, u, f);
+                var zbuf = new float[w * h];
+                for (int i = 0; i < zbuf.Length; i++) zbuf[i] = float.MaxValue;
+                if (attacker != null) Rasterize(attacker, pix, zbuf, w, h, r, u, f);
+                if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
                 var data = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 Marshal.Copy(pix, 0, data.Scan0, pix.Length);
                 bmp.UnlockBits(data);
@@ -154,25 +183,24 @@ namespace Sm4shCommand.Viewer
             }
         }
 
-        void Rasterize(int[] pix, int w, int h, float[] r, float[] u, float[] f)
+        void Rasterize(Skinned s, int[] pix, float[] zbuf, int w, int h, float[] r, float[] u, float[] f)
         {
-            var zbuf = new float[w * h];
-            for (int i = 0; i < zbuf.Length; i++) zbuf[i] = float.MaxValue;
             float cx = w / 2f + panX, cy = h * 0.72f + panY;
             int k = 0;
-            int meshIndex = 0;
-            foreach (var m in Assets.Model.Meshes)
+            var tv = new float[6];
+            foreach (var m in s.Assets.Model.Meshes)
             {
                 int tint = (m.Name.GetHashCode() & 0x1F) - 16;
                 foreach (var p in m.Polys)
                 {
-                    int b = polyStart[k++];
+                    int b = s.PolyStart[k++];
                     if (!m.Visible) continue;
+                    var tex = ShowTextures ? p.Texture : null;
                     var t = p.Tris;
+                    float[] P = s.Pos;
                     for (int i = 0; i + 2 < t.Length; i += 3)
                     {
                         int a0 = b + t[i] * 3, a1 = b + t[i + 1] * 3, a2 = b + t[i + 2] * 3;
-                        float[] P = skinned;
                         // view space
                         float x0 = P[a0] * r[0] + P[a0 + 1] * r[1] + P[a0 + 2] * r[2], y0 = P[a0] * u[0] + P[a0 + 1] * u[1] + P[a0 + 2] * u[2], z0 = P[a0] * f[0] + P[a0 + 1] * f[1] + P[a0 + 2] * f[2];
                         float x1 = P[a1] * r[0] + P[a1 + 1] * r[1] + P[a1 + 2] * r[2], y1 = P[a1] * u[0] + P[a1 + 1] * u[1] + P[a1 + 2] * u[2], z1 = P[a1] * f[0] + P[a1 + 1] * f[1] + P[a1 + 2] * f[2];
@@ -183,21 +211,33 @@ namespace Sm4shCommand.Viewer
                         float nl = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
                         if (nl < 1e-9f) continue;
                         float light = Math.Abs(-0.3f * nx + 0.55f * ny - 0.78f * nz) / nl;
-                        float shade = 0.35f + 0.65f * light;
-                        int cr = Clamp((int)((196 + tint) * shade)), cg = Clamp((int)((188 + tint / 2) * shade)), cb = Clamp((int)((178 - tint) * shade));
-                        int col = unchecked((int)0xFF000000) | cr << 16 | cg << 8 | cb;
-                        Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
-                            cx + x2 * zoom, cy - y2 * zoom, z2, col);
+                        // brighter than plain diffuse: the game's lights and soft lighting lift the textures
+                        float shade = 0.75f + 0.55f * light;
+                        if (tex != null)
+                        {
+                            int i0 = t[i] * 2, i1 = t[i + 1] * 2, i2 = t[i + 2] * 2;
+                            tv[0] = p.UV[i0]; tv[1] = p.UV[i0 + 1]; tv[2] = p.UV[i1]; tv[3] = p.UV[i1 + 1]; tv[4] = p.UV[i2]; tv[5] = p.UV[i2 + 1];
+                            Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
+                                cx + x2 * zoom, cy - y2 * zoom, z2, 0, shade, tex, tv, p.AlphaTest || tex.HasAlpha);
+                        }
+                        else
+                        {
+                            int cr = Clamp((int)((196 + tint) * shade)), cg = Clamp((int)((188 + tint / 2) * shade)), cb = Clamp((int)((178 - tint) * shade));
+                            int col = unchecked((int)0xFF000000) | cr << 16 | cg << 8 | cb;
+                            Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
+                                cx + x2 * zoom, cy - y2 * zoom, z2, col, 1, null, null, false);
+                        }
                     }
                 }
-                meshIndex++;
             }
         }
 
         static int Clamp(int v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
 
+        /// <summary>One triangle into the z-buffer: a flat color, or the texture (affine UVs: the view
+        /// is orthographic) times the shade. Texels with little alpha are left out (alpha test).</summary>
         static void Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
-                        float cx, float cy, float cz, int col)
+                        float cx, float cy, float cz, int col, float shade, Texture tex, float[] uv, bool alphaTest)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -207,6 +247,7 @@ namespace Sm4shCommand.Viewer
             float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
             if (Math.Abs(area) < 1e-6f) return;
             float inv = 1 / area;
+            int sh = (int)(shade * 256);
             for (int y = minY; y <= maxY; y++)
             {
                 float py = y + 0.5f;
@@ -219,7 +260,17 @@ namespace Sm4shCommand.Viewer
                     if (w0 < 0 || w1 < 0 || w2 < 0) continue;
                     float z = w0 * az + w1 * bz + w2 * cz;
                     int i = y * w + x;
-                    if (z < zb[i]) { zb[i] = z; pix[i] = col; }
+                    if (z >= zb[i]) continue;
+                    if (tex != null)
+                    {
+                        int c = tex.Sample(w0 * uv[0] + w1 * uv[2] + w2 * uv[4], w0 * uv[1] + w1 * uv[3] + w2 * uv[5]);
+                        if (alphaTest && (uint)c >> 24 < 128) continue;
+                        int rr = (c >> 16 & 255) * sh >> 8, gg = (c >> 8 & 255) * sh >> 8, bb = (c & 255) * sh >> 8;
+                        pix[i] = unchecked((int)0xFF000000) | Math.Min(255, rr) << 16 | Math.Min(255, gg) << 8 | Math.Min(255, bb);
+                    }
+                    else
+                        pix[i] = col;
+                    zb[i] = z;
                 }
             }
         }
@@ -315,10 +366,12 @@ namespace Sm4shCommand.Viewer
         void DrawTrajectory(Graphics g, float[] r, float[] u)
         {
             if (Trajectory == null || Trajectory.Count < 2 || Frame == null) return;
-            var hb = Frame.Hitboxes.Find(x => x.Id == SelectedHitbox);
-            if (hb == null) return;
-            float[] a, b;
-            if (!HitboxEnds(hb, out a, out b)) return;
+            float[] a = TrajectoryOrigin, b;
+            if (a == null)
+            {
+                var hb = Frame.Hitboxes.Find(x => x.Id == SelectedHitbox);
+                if (hb == null || !HitboxEnds(hb, out a, out b)) return;
+            }
             var pts = new List<PointF>();
             float d;
             foreach (var p in Trajectory)
