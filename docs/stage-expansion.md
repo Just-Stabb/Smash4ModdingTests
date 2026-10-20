@@ -143,7 +143,19 @@ the stage.
  with a different entry at 0x38: the stage select had
 been opened with another setup installed; the user's pack itself has the 78-entry database.)
 
-## Plan (first version)
+## The user's page 1 (solved: unlocked stages)
+
+The user's page 1 showed one icon from the first build of their pack on. Bisect RPXs (none of the stage
+patches, then the RPX from before the stage work) and the user's original databases didn't
+bring it back, and the rebuilt packages check out (`ui/replace/stage`, `ui/lumen/stage`, `param`,
+`ui/message`: every resource-table entry matches its package's data). Cause: the layout (4xM-based
+`stage.lm`) has two-page arrangements `type2_num_01`-`43` only (44-48 renamed `type2_num_74`-`78`);
+`unlock_condition_of_stages.bin` makes 6 stages unlockable (0x0A, 0x16, 0x1E, 0x27, 0x2A, 0x2C). With
+them locked page 1 has 41 stages; the save had them all unlocked by then (debug v1: all "unlocked"),
+47, no arrangement. Fix: the layout with the five labels renamed back (`build/stage_lm_fix.zip`, 5
+bytes changed).
+
+
 
 1. RPX caves (a `stage_slot_cave.py` like the others): a bigger stage-kind table (vanilla 128 +
    new melee / end pairs) and cosmetic-name table, the three table functions and the name lookup
