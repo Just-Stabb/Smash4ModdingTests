@@ -38,5 +38,14 @@ namespace Sm4shCommand.GUI
                 }
             }
         }
+
+        /// <summary>The editor on the tab for the given script file ("game", "effect", ..), or null.</summary>
+        public ITS_EDITOR EditorFor(string key)
+        {
+            foreach (TabPage p in tabControl1.TabPages)
+                if (p.Text == key && p.Controls.Count > 0)
+                    return p.Controls[0] as ITS_EDITOR;
+            return null;
+        }
     }
 }

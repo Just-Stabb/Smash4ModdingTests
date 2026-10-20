@@ -132,6 +132,10 @@ namespace Sm4shCommand
             gotoId.ShortcutKeys = Keys.Control | Keys.Shift | Keys.G; // Ctrl+G is the editor's Go to line
             toolsToolStripMenuItem.DropDownItems.Add(gotoId);
 
+            var hitboxViewer = new ToolStripMenuItem("Hitbox Viewer..", null, hitboxViewer_Click);
+            hitboxViewer.ShortcutKeys = Keys.Control | Keys.Shift | Keys.H;
+            toolsToolStripMenuItem.DropDownItems.Add(hitboxViewer);
+
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Reload Tooltips", null, (o, e) =>
             {
@@ -944,6 +948,65 @@ namespace Sm4shCommand
             else
                 MessageBox.Show(this, $"No animation 0x{id:X} (the motion table has {nodes.Max(x => x.MotionIndex) + 1} entries; empty slots have no script).",
                     "Go to animation ID", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        /// <summary>
+        /// Tools > Hitbox Viewer: the open script's game hitboxes on the fighter's model and animation
+        /// (found from the game.bin's folder: fighter/NAME/model and motion), with a knockback calculator.
+        /// </summary>
+        private void hitboxViewer_Click(object sender, EventArgs e)
+        {
+            var page = Viewport.SelectedTab as CodeEditor;
+            var node = page == null ? null : AllNodes(FileTree.Nodes).OfType<ScriptNode>()
+                .FirstOrDefault(x => page.Name == $"script_{x.Identifier:X8}");
+            if (node == null && FileTree.SelectedNode is ScriptNode && IsAcmdNode((ScriptNode)FileTree.SelectedNode))
+            {
+                node = (ScriptNode)FileTree.SelectedNode;
+                OpenNode(node);
+                page = Viewport.SelectedTab as CodeEditor;
+            }
+            if (node == null || page == null || !IsAcmdNode(node))
+            {
+                MessageBox.Show(this, "Open an ACMD script first (the viewer shows its game script).", "Hitbox Viewer",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            var game = ScriptFiles.FirstOrDefault(x => x.Value is ACMDFile &&
+                Path.GetFileNameWithoutExtension(x.Key).Equals("game", StringComparison.OrdinalIgnoreCase));
+            if (game.Value == null)
+            {
+                MessageBox.Show(this, "No game.bin is open.", "Hitbox Viewer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            string root = Viewer.FighterAssets.FindRoot(game.Key);
+            if (root == null)
+            {
+                MessageBox.Show(this, "Couldn't find the fighter's model and motion folders above\n" + game.Key +
+                    "\n\nThe viewer needs the fighter folder laid out as in the game: NAME\\model\\body\\c00 (model.nud, model.vbn, model.jtb), " +
+                    "NAME\\motion\\body (main.pac or the .omo files) and NAME\\script\\animcmd\\body.",
+                    "Hitbox Viewer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            Viewer.FighterAssets assets;
+            try
+            {
+                Cursor = Cursors.WaitCursor;
+                assets = Viewer.FighterAssets.Load(root);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Couldn't load the fighter's model / animations:\n\n" + ex.Message, "Hitbox Viewer",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            finally { Cursor = Cursors.Default; }
+            var file = (ACMDFile)game.Value;
+            Func<uint, IList<ICommand>> getScript = crc =>
+            {
+                IScript s;
+                return file.Scripts.TryGetValue(crc, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
+            };
+            new HitboxViewer(assets, page.EditorFor("game"), node.Identifier, node.Text, getScript).Show(this);
         }
 
         private void commandDefinitions_Click(object sender, EventArgs e)
