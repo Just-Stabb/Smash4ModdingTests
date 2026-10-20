@@ -14,14 +14,16 @@ wrapper (static object 0x1054F408, vtable 0x100BAAFC) in a table, one byte an id
   +0x200 + id: mode
   +0x300 + id: exists (+0x1C: shown on the select, song list, DLC owned)
   +0x400 + id: DLC-marked (+0x24, byte +0x0C)
-  +0x600 + id: unlocked (+0x6C)
-(each check byte is 0x10 | result; v1 also had +0x500 (+0x4C) and +0x700 (+0x74), all passed)
-and the database entry itself at that index (0x54 bytes from [[ [0x102F7188] + 4 ] + 0xC]):
+  +0x500 + id: +0x4C (DLC content record)   +0x600 + id: unlocked (+0x6C)   +0x700 + id: +0x74
+(each check byte is 0x10 | result)
+and, with ENTRIES (v2; no room for it next to all the checks), the database entry at that index (0x54 bytes from [[ [0x102F7188] + 4 ] + 0xC]):
   +0x800 + id: its id (low byte)   +0x900: +0x04 shown   +0xA00: +0x0C page 2 / DLC   +0xB00: +0x0D
   +0xC00: its stage kind (low byte)
 
 v1 result (user): while the stage select ran, the database had 0x86 entries (the file: 0x4F) and
-the entry at 0x38 wasn't the file's 0x38 (not DLC-marked, not shown); v2 shows what the entries are.
+the entry at 0x38 wasn't the file's 0x38 (not DLC-marked, not shown). v2 (user, the file installed):
+79 entries, the file's, 0x38 the new stage, exists / page 2 / unlocked passed and it was still
+dropped: the +0x4C DLC content record (stage_slot_cave.py patches it now). v3 records all checks.
 
 The table is at TABLE (in Cemu: Debug > Memory, go to the address). Compare id 0x38 (the new
 stage) with 0x37 (Umbra, page 2) and 0x01 (Battlefield). The code sits in the Havok cave's free
@@ -41,7 +43,9 @@ GROW_END = 0x04B7F000
 HOOK = 0x0298FBCC           # bl 0x0301BA8C (r3 id, r4 mode)
 AVAILABLE = 0x0301BA8C
 WRAPPER = 0x1054F408
-CHECKS = [(0x300, 0x0293F1B0), (0x400, 0x0293F254), (0x600, 0x0293F298)]
+CHECKS = [(0x300, 0x0293F1B0), (0x400, 0x0293F254), (0x500, 0x0293F280), (0x600, 0x0293F298),
+          (0x700, 0x0293F34C)]
+ENTRIES = False             # v2's entry dump (+0x800-+0xCFF); no room next to all the checks
 
 
 def build():
@@ -81,6 +85,7 @@ ssdbg:                                  # called instead of 0x0301BA8C(r3 id, r4
         stb r3, 0x%(OFF)X(r10)
 """ % dict(WHI=WRAPPER >> 16, WLO=WRAPPER & 0xFFFF, FN=fn, THI=TABLE >> 16, TLO=TABLE & 0xFFFF, OFF=off)
     src += """
+""" + ("""
         lis r12, 0x102F
         lwz r12, 0x7188(r12)
         lwz r12, 4(r12)                 # the database
@@ -100,6 +105,7 @@ ssdbg:                                  # called instead of 0x0301BA8C(r3 id, r4
         lbz r4, 0x13(r9)
         stb r4, 0xC00(r10)
 
+""" if ENTRIES else "") + """
         lis r11, 0x%(THI)04X
         ori r11, r11, 0x%(TLO)04X
         lis r12, 0x102F

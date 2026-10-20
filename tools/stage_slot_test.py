@@ -112,6 +112,8 @@ def main():
     check('page-2 0x38 needs no DLC content (game: 1)', (call(mu, 0x030A8D78, 0x7F008020, 0x38),
           call(orig, 0x030A8D78, 0x7F008020, 0x38)), (0, 1))
     check('non-DLC 0x01', call(mu, 0x030A8D78, 0x7F008020, 0x01), 0)
+    # DLC content record (0x030A8E58): new ids pass without reading the record list
+    check('page-2 0x38 has its DLC content record', call(mu, 0x030A8E58, 0x7F008020, 0x38), 1)
     print('FAILS', fails)
     sys.exit(1 if fails else 0)
 

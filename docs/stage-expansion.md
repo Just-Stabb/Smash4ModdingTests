@@ -112,6 +112,17 @@ The game's availability checks (`0x0293FD40` through the stage database wrapper,
 list, no DLC content); `stage_slot_test.py` checks the content one in unicorn. Database:
 `add_stage.py --page 2`.
 
+**v3 result (user): still not shown.** `tools/stage_select_debug_cave.py` (records the stage
+select's availability checks per id in the grown code space, `0x04B7E000`, read in Cemu's memory
+view) showed, with the v3 files: 79 database entries, the new stage at 0x38, and its "exists",
+page-2 and unlock checks passing, yet not available. The one check left: a page-2 (DLC-marked)
+stage also needs a DLC content record at its index (`0x030A8E58`, the database's `+0x38` list,
+12 bytes a stage; only the DLC stages have one). **v4** (`build/new_stage_test_v4.zip`, the v3
+files + an RPX with the debug recorder): ids `0x38`-`0xC7` pass it too.
+
+(The first debug run read 134 entries with a different entry at 0x38: the stage select had
+been opened with another setup installed; the user's pack itself has the 78-entry database.)
+
 ## Plan (first version)
 
 1. RPX caves (a `stage_slot_cave.py` like the others): a bigger stage-kind table (vanilla 128 +

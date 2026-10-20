@@ -24,7 +24,10 @@ What it changes:
   DLC-marked id gets save unlock bit index id - 0x30 + 9 (0x030A9230; 0x38 would read index 17,
   no stage's) and must be in the DLC content list unless its byte +0x0E is set (0x030A8D78, used
   by the stage's availability 0x026F2ED0). Both now treat only 0x30-0x37 as DLC: other ids take
-  the normal unlock-list search (not in it: unlocked) and need no DLC content.
+  the normal unlock-list search (not in it: unlocked) and need no DLC content. A DLC-marked stage
+  also needs a DLC content record at its index (0x030A8E58, the database's +0x38 list, 12 bytes a
+  stage, only the DLC stages have one; the stage select's mode 1-4 check, wrapper +0x4C): ids
+  0x38-0xC7 pass it (debug v2, user: everything else passed and 0x38 was still dropped).
 The stage factory (0x03163B3C) already builds the generic stage (StageBaseCafe / StageBaseEnd)
 for kinds past 0x7F, loading the stage folder's own models, collision (*.lvd) and params.
 
@@ -47,6 +50,7 @@ DEFAULT = ['NewStage01:0x38']
 FIRST_DLC, COSMETIC_DLC = 0x30, 8      # the DLC stages' cosmetic ids, 0x30-0x37
 DLC_UNLOCK = 0x030A926C                 # unlock index: DLC (+0x0C) -> id - 0x30 + 9 (save bit)
 NEEDS_DLC = 0x030A8D78                  # needs DLC content: +0x0C set and +0x0E clear
+HAS_DLC = 0x030A8E58                    # DLC content record at the stage's index (wrapper +0x4C)
 
 
 def slo(v):
@@ -130,6 +134,19 @@ dlc:    mflr r0
         b 0x%08X''' % (FIRST_DLC + COSMETIC_DLC, NEEDS_DLC + 4))
     words += a.words()
     patches += one(NEEDS_DLC, 'b 0x%08X' % code)
+    code = CAVE + 4 * len(words)
+    a = Asm(code)
+    a.asm('''
+        cmplwi r4, %d
+        blt has
+        cmplwi r4, 0xC7
+        bgt has
+        li r3, 1
+        blr
+has:    mflr r0
+        b 0x%08X''' % (FIRST_DLC + COSMETIC_DLC, HAS_DLC + 4))
+    words += a.words()
+    patches += one(HAS_DLC, 'b 0x%08X' % code)
     assert CAVE + 4 * len(words) <= LIMIT, 'stage slot cave too big'
     return words, patches, count
 
