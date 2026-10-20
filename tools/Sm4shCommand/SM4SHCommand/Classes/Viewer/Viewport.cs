@@ -30,6 +30,7 @@ namespace Sm4shCommand.Viewer
         public int SelectedHitbox = -1;
         public bool ShowModel = true, ShowAngles = true, ShowBones, ShowTextures = true;
         public EnemyFigure Enemy;           // the fighter being hit, or null
+        public string EnemyStatus;          // its hitlag / hitstun state, shown in the corner
         public float[] TrajectoryOrigin;    // where the trajectory starts (x, y, z); null: at the hitbox
         public List<float[]> Trajectory;    // forward / up from the selected hitbox (calculator)
 
@@ -382,6 +383,8 @@ namespace Sm4shCommand.Viewer
 
         void DrawStatus(Graphics g)
         {
+            if (EnemyStatus != null)
+                g.DrawString(EnemyStatus, Font, Brushes.DarkRed, 6, 22);
             if (Frame == null) return;
             var parts = new List<string>();
             if (Frame.Intangible) parts.Add("intangible");

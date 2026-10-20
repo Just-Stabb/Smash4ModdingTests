@@ -67,7 +67,10 @@ namespace Sm4shCommand.Viewer
         public int Hitstun, Faf, AttackerHitlag, TargetHitlag, ShieldStun, ShieldHitlag, AirdodgeCancel, AerialCancel;
         public bool Tumble, Spike;
         // after the script's own changes (ScriptModifiers.Apply); the same as above when it has none
-        public int FinalHitstun, FinalTargetHitlag, FinalAttackerHitlag;
+        public int FinalHitstun, FinalTargetHitlag, FinalAttackerHitlag, FinalAirdodgeCancel, FinalAerialCancel;
+        internal double PathAngle, PathX, PathY;   // what the trajectory was made from (Retime redoes it)
+        internal FighterAttributes PathTarget;
+        internal bool PathElectric;
         public List<int[]> TargetStops = new List<int[]>();  // extra hitstop during hitstun: {frame of hitstun, frames}
         public List<string> ScriptNotes = new List<string>();
         public List<float[]> Path = new List<float[]>();   // trajectory (x forward, y), one point a frame
@@ -193,7 +196,11 @@ namespace Sm4shCommand.Viewer
             res.ShieldStun = (int)Math.Floor(res.Damage * 0.58 + 3) - 1;
             double shl = h.Hitlag > 1 ? Math.Max(1, h.Hitlag * 0.8) : h.Hitlag;
             res.ShieldHitlag = Hitlag(res.Damage, shl, h.Electric, 1);
-            Trajectory(res, angle, Math.Abs(hx), Math.Abs(vy), t, h.Electric);
+            res.PathAngle = angle; res.PathX = Math.Abs(hx); res.PathY = Math.Abs(vy); res.PathTarget = t; res.PathElectric = h.Electric;
+            int ad, ae;
+            res.Path = Trajectory(res.Hitstun, angle, Math.Abs(hx), Math.Abs(vy), t, h.Electric, out ad, out ae);
+            res.AirdodgeCancel = res.FinalAirdodgeCancel = ad;
+            res.AerialCancel = res.FinalAerialCancel = ae;
             res.FinalHitstun = res.Hitstun;
             res.FinalTargetHitlag = res.TargetHitlag;
             res.FinalAttackerHitlag = res.AttackerHitlag;
@@ -207,35 +214,59 @@ namespace Sm4shCommand.Viewer
         }
 
         /// <summary>Distance class without a stage: the launch decays, gravity and fall speed act.
-        /// Also the hitstun-cancel frames (HitstunCancel).</summary>
-        static void Trajectory(KnockbackResult res, double angle, double lx, double ly, FighterAttributes t, bool electric)
+        /// Also the hitstun-cancel frames (HitstunCancel): airdodge once the launch speed is under 2.5
+        /// (not before frame 40), aerials under 2 (not before 45), never later than the end of hitstun.</summary>
+        static List<float[]> Trajectory(int hitstun, double angle, double lx, double ly, FighterAttributes t, bool electric,
+                                        out int airdodge, out int aerial)
         {
+            var path = new List<float[]>();
             double c = Math.Cos(angle * Math.PI / 180), sn = Math.Sin(angle * Math.PI / 180);
             double vx = c < 0 ? -lx : lx, vy = sn < 0 ? -ly : ly;
             double dx = DECAY * c, dy = DECAY * sn;
             double x = 0, y = 0, g = 0;
-            res.Path.Add(new[] { 0f, 0f });
-            int limit = res.Hitstun < 200 ? res.Hitstun + 20 : 200;
-            res.AirdodgeCancel = res.AerialCancel = res.Hitstun + 1;
+            path.Add(new[] { 0f, 0f });
+            int limit = hitstun < 300 ? hitstun + 20 : 320;
+            airdodge = aerial = hitstun + 1;
             bool ad = false, ae = false;
             int ec = electric ? 1 : 0;
             for (int i = 0; i < limit; i++)
             {
                 double cy = Math.Max(g, -t.FallSpeed);
                 x += vx; y += vy + cy;
-                res.Path.Add(new[] { (float)x, (float)y });
+                path.Add(new[] { (float)x, (float)y });
                 if (vx != 0) { double dir = Math.Sign(vx); vx -= dx; if (Math.Sign(vx) != dir) vx = 0; }
                 if (vy != 0) { double dir = Math.Sign(vy); vy -= dy; if (Math.Sign(vy) != dir) vy = 0; }
                 g -= t.Gravity;
-                if (i < res.Hitstun)
+                if (i < hitstun)
                 {
                     double l = Math.Sqrt(vx * vx + vy * vy);
-                    if (l < 2.5 && !ad) { ad = true; res.AirdodgeCancel = Math.Max(i + 2, 40 + 1 + ec); }
-                    if (l < 2 && !ae) { ae = true; res.AerialCancel = Math.Max(i + 2, 45 + 1 + ec); }
+                    if (l < 2.5 && !ad) { ad = true; airdodge = Math.Max(i + 2, 40 + 1 + ec); }
+                    if (l < 2 && !ae) { ae = true; aerial = Math.Max(i + 2, 45 + 1 + ec); }
                 }
             }
-            if (res.AirdodgeCancel > res.Hitstun) res.AirdodgeCancel = res.Hitstun + 1;
-            if (res.AerialCancel > res.Hitstun) res.AerialCancel = res.Hitstun + 1;
+            if (airdodge > hitstun) airdodge = hitstun + 1;
+            if (aerial > hitstun) aerial = hitstun + 1;
+            return path;
+        }
+
+        /// <summary>The trajectory and hitstun-cancel frames again for the hitstun the script left
+        /// (FinalHitstun), counting the frames the target is frozen in hitstop during it.</summary>
+        public static void Retime(KnockbackResult r)
+        {
+            if (r.PathTarget == null) return;
+            int ad, ae;
+            r.Path = Trajectory(r.FinalHitstun, r.PathAngle, r.PathX, r.PathY, r.PathTarget, r.PathElectric, out ad, out ae);
+            r.FinalAirdodgeCancel = ad + FrozenBefore(r, ad);
+            r.FinalAerialCancel = ae + FrozenBefore(r, ae);
+        }
+
+        /// <summary>Hitstop frames (TargetStops) that come before hitstun frame n.</summary>
+        public static int FrozenBefore(KnockbackResult r, int n)
+        {
+            int f = 0;
+            foreach (var s in r.TargetStops)
+                if (s[0] < n + f) f += s[1];
+            return f;
         }
     }
 

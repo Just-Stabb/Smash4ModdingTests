@@ -23,6 +23,8 @@ namespace Sm4shCommand.GUI
         readonly uint scriptCrc;
         readonly Func<uint, IList<ICommand>> getScript;
         List<FrameState> frames = new List<FrameState>();
+        List<FrameState> probe = new List<FrameState>();   // the script run long past the animation
+        int animCount = 1;                                   // game frames the animation lasts
         Omo anim;
         string animName;
 
@@ -40,6 +42,11 @@ namespace Sm4shCommand.GUI
         readonly CheckBox showAngles = new CheckBox { Text = "Angles", Checked = true, AutoSize = true };
         readonly CheckBox showTextures = new CheckBox { Text = "Textures", Checked = true, AutoSize = true };
         readonly CheckBox showEnemy = new CheckBox { Text = "Enemy", Checked = true, AutoSize = true };
+        readonly CheckBox untilActionable = new CheckBox
+        {
+            Text = "Play until the enemy can act", AutoSize = true,
+            Checked = Runtime.GetSetting("ViewerUntilActionable", false),
+        };
         FighterAssets enemy;
         string enemyStand, enemyHurt, enemyFly;
         uint currentCrc;
@@ -53,7 +60,8 @@ namespace Sm4shCommand.GUI
         };
         readonly ComboBox target = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
         readonly NumericUpDown targetPct = Num(0, 999, 0), attackerPct = Num(0, 999, 0), charge = Num(0, 60, 0),
-            stale = Num(0, 9, 0), kbMult = Num(0, 10, 1, 2), launchRate = Num(0, 10, 1, 2), diAngle = Num(0, 359, 0);
+            stale = Num(0, 9, 0), kbMult = Num(0, 10, 1, 2), launchRate = Num(0, 10, 1, 2), diAngle = Num(0, 359, 0),
+            hitstunMul = Num(0, 20, 1, 2), selfStopMul = Num(0, 20, 1, 2), enemyStopMul = Num(0, 20, 1, 2);
         readonly CheckBox crouch = new CheckBox { Text = "Crouching", AutoSize = true };
         readonly CheckBox aerial = new CheckBox { Text = "Target in the air", AutoSize = true };
         readonly CheckBox useDI = new CheckBox { Text = "DI at", AutoSize = true };
@@ -163,7 +171,7 @@ namespace Sm4shCommand.GUI
         {
             var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 58, WrapContents = true };
             tools.Controls.AddRange(new Control[] { new Label { Text = "Animation:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, animBox,
-                ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy });
+                ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy, untilActionable });
             var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 34, ColumnCount = 5 };
             var prev = new Button { Text = "<", Width = 30 };
             var next = new Button { Text = ">", Width = 30 };
@@ -199,12 +207,14 @@ namespace Sm4shCommand.GUI
             row("Target", target, "Target %", targetPct);
             row("Attacker % (rage)", attackerPct, "Charge frames", charge);
             row("Stale (times used)", stale, "KB multiplier", kbMult);
-            row("Launch rate", launchRate, "", null);
+            row("Launch rate", launchRate, "Hitstun x", hitstunMul);
+            row("Attacker hitstop x", selfStopMul, "Enemy hitstop x", enemyStopMul);
             var flags = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
             flags.Controls.AddRange(new Control[] { crouch, aerial, useDI, diAngle, new Label { Text = "deg", AutoSize = true, Padding = new Padding(0, 5, 0, 0) } });
             calc.Controls.Add(flags);
             calc.SetColumnSpan(flags, 4);
-            foreach (Control c in new Control[] { target, targetPct, attackerPct, charge, stale, kbMult, launchRate, diAngle, crouch, aerial, useDI })
+            foreach (Control c in new Control[] { target, targetPct, attackerPct, charge, stale, kbMult, launchRate, diAngle, crouch, aerial, useDI,
+                                                  hitstunMul, selfStopMul, enemyStopMul })
             {
                 if (c is NumericUpDown) ((NumericUpDown)c).ValueChanged += (o, e) => Calc();
                 else if (c is CheckBox) ((CheckBox)c).CheckedChanged += (o, e) => Calc();
@@ -239,6 +249,7 @@ namespace Sm4shCommand.GUI
             showAngles.CheckedChanged += (o, e) => { view.ShowAngles = showAngles.Checked; view.Invalidate(); };
             showTextures.CheckedChanged += (o, e) => { view.ShowTextures = showTextures.Checked; view.Invalidate(); };
             showEnemy.CheckedChanged += (o, e) => Calc();
+            untilActionable.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerUntilActionable", untilActionable.Checked); Calc(); };
             var meshes = new Button { Text = "Meshes..", AutoSize = true };
             meshes.Click += (o, e) => PickMeshes();
             var enemyButton = new Button { Text = "Enemy model..", AutoSize = true };
@@ -289,7 +300,7 @@ namespace Sm4shCommand.GUI
             int length = anim != null ? anim.Frames : 0;
             var runner = new HitboxRunner { ConditionsTrue = ifTrue.Checked, UseFrameSpeed = frameSpeed.Checked, GetScript = getScript };
             // enough game frames for the whole animation (slowed down by Set_Frame_Duration), or 120
-            var probe = runner.Run(cmds ?? new List<ICommand>(), 600);
+            probe = runner.Run(cmds ?? new List<ICommand>(), 600);
             int n = probe.Count;
             if (length > 0)
             {
@@ -301,7 +312,8 @@ namespace Sm4shCommand.GUI
                 int last = probe.FindLastIndex(f => f.Hitboxes.Count > 0);
                 n = Math.Max(60, last + 20);
             }
-            frames = probe.Take(Math.Max(1, n)).ToList();
+            animCount = Math.Max(1, n);
+            frames = probe.Take(animCount).ToList();
             int keep = bar.Value;
             bar.Maximum = Math.Max(1, frames.Count);
             bar.Value = Math.Min(Math.Max(keep, 1), bar.Maximum);
@@ -319,8 +331,10 @@ namespace Sm4shCommand.GUI
             if (frames.Count == 0) return;
             var f = frames[Math.Min(bar.Value, frames.Count) - 1];
             view.Frame = f;
-            view.AnimFrame = Math.Max(0, f.AnimFrame);
-            frameLabel.Text = string.Format(CultureInfo.InvariantCulture, "frame {0} / {1}   anim {2:0.##}", f.GameFrame, frames.Count, f.AnimFrame + 1);
+            float af = Math.Max(0, f.AnimFrame);
+            if (anim != null && anim.Frames > 0) af = Math.Min(af, anim.Frames - 1);   // holds its last frame after the end
+            view.AnimFrame = af;
+            UpdateLabel(f, af);
             int sel = view.SelectedHitbox;
             filling = true;
             grid.SuspendLayout();
@@ -372,6 +386,7 @@ namespace Sm4shCommand.GUI
                 results.Text = cur < 0 || frames[cur].Hitboxes.Count == 0 ? "No hitboxes on this frame." : "Pick a hitbox in the list.";
                 view.Trajectory = null;
                 view.TrajectoryOrigin = null;
+                SetFrameCount(animCount);
                 PlaceEnemy(null, 0, cur + 1, null);
                 view.Recompute();
                 return;
@@ -384,9 +399,25 @@ namespace Sm4shCommand.GUI
                 LaunchRate = (float)launchRate.Value, UseDI = useDI.Checked, DIAngle = (float)diAngle.Value,
             };
             var r = KnockbackCalc.Calculate(inp);
-            ScriptModifiers.Apply(r, hitFrame, frames.SelectMany(f => f.Writes));
-            var end = r.Path[Math.Min(r.Hitstun, r.Path.Count - 1)];
+            // the viewer's own multipliers, before the script's changes
+            double hm = (double)hitstunMul.Value, am = (double)selfStopMul.Value, em = (double)enemyStopMul.Value;
+            if (hm != 1 || am != 1 || em != 1)
+            {
+                r.Hitstun = r.FinalHitstun = (int)Math.Round(r.Hitstun * hm);
+                r.AttackerHitlag = r.FinalAttackerHitlag = (int)Math.Round(r.AttackerHitlag * am);
+                r.TargetHitlag = r.FinalTargetHitlag = (int)Math.Round(r.TargetHitlag * em);
+                KnockbackCalc.Retime(r);
+                r.AirdodgeCancel = r.FinalAirdodgeCancel;
+                r.AerialCancel = r.FinalAerialCancel;
+            }
+            ScriptModifiers.Apply(r, hitFrame, probe.Take(Math.Max(frames.Count, animCount)).SelectMany(f => f.Writes));
+            KnockbackCalc.Retime(r);
+            var end = r.Path[Math.Min(r.FinalHitstun, r.Path.Count - 1)];
             int frozen = r.TargetStops.Sum(x => x[1]);
+            // the game frame (of this script's timeline) the enemy can act on
+            int actsReal = hitFrame + r.FinalTargetHitlag + r.FinalHitstun + frozen + 1;
+            int actsFrame = actsReal - (actsReal > hitFrame ? r.FinalAttackerHitlag : 0);
+            SetFrameCount(untilActionable.Checked ? Math.Max(animCount, actsFrame) : animCount);
             var ic = CultureInfo.InvariantCulture;
             bool changed = r.FinalHitstun != r.Hitstun || r.FinalTargetHitlag != r.TargetHitlag || r.FinalAttackerHitlag != r.AttackerHitlag;
             var lines = new List<string> {
@@ -398,16 +429,18 @@ namespace Sm4shCommand.GUI
                 string.Format(ic, "Launch speed       {0:0.###}  (x {1:0.###}, y {2:0.###})", r.LaunchSpeed, r.LaunchSpeedX, r.LaunchSpeedY),
                 string.Format(ic, "Hitstun            {0} frames  (target acts on frame {1}{2})", r.FinalHitstun,
                     r.FinalHitstun == 0 ? 0 : r.FinalHitstun + frozen + 1, frozen > 0 ? ", after " + frozen + " frames of hitstop during it" : ""),
-                string.Format(ic, "Hitstun cancel     airdodge {0}, aerial {1}", r.AirdodgeCancel, r.AerialCancel),
+                string.Format(ic, "Hitstun cancel     airdodge {0}, aerial {1}{2}", r.FinalAirdodgeCancel, r.FinalAerialCancel,
+                    r.FinalAirdodgeCancel != r.AirdodgeCancel || r.FinalAerialCancel != r.AerialCancel
+                        ? string.Format(ic, "  (without the script: {0}, {1})", r.AirdodgeCancel, r.AerialCancel) : ""),
                 string.Format(ic, "Hitlag             attacker {0}, target {1}  (hitlag x{2:0.##})", r.FinalAttackerHitlag, r.FinalTargetHitlag, hb.Hitlag),
                 string.Format(ic, "Shield             stun {0}, hitlag {1}", r.ShieldStun, r.ShieldHitlag),
                 string.Format(ic, "Distance           {0:0.##} forward, {1:0.##} up at the end of hitstun", end[0], end[1]),
-                string.Format(ic, "Hits on game frame {0}", hitFrame),
+                string.Format(ic, "Hits on game frame {0}; the enemy can act on game frame {1} of this timeline", hitFrame, actsFrame),
             };
             if (r.ScriptNotes.Count > 0)
             {
                 lines.Add("");
-                lines.Add("The script's modifiers:");
+                lines.Add("The script's modifiers (on top of the multipliers above):");
                 lines.AddRange(r.ScriptNotes.Select(x => "  " + x));
                 if (changed)
                     lines.Add(string.Format(ic, "  Without them: hitstun {0}, hitlag attacker {1}, target {2}", r.Hitstun, r.AttackerHitlag, r.TargetHitlag));
@@ -420,12 +453,35 @@ namespace Sm4shCommand.GUI
             view.Recompute();
         }
 
+        bool resizing;
+
+        void UpdateLabel(FrameState f, float af)
+        {
+            frameLabel.Text = string.Format(CultureInfo.InvariantCulture, "frame {0} / {1}   anim {2:0.##}{3}", f.GameFrame, frames.Count, af + 1,
+                f.GameFrame > animCount ? " (animation over)" : "");
+        }
+
+        /// <summary>Shows count game frames: the animation's, or more, to the frame the enemy can act
+        /// (the attacker holds its last pose; the script keeps running).</summary>
+        void SetFrameCount(int count)
+        {
+            count = Math.Max(1, Math.Min(count, probe.Count));
+            if (resizing || count == frames.Count || probe.Count == 0) return;
+            resizing = true;
+            frames = probe.Take(count).ToList();
+            bar.Maximum = frames.Count;
+            resizing = false;
+            var cur = frames[Math.Min(bar.Value, frames.Count) - 1];
+            UpdateLabel(cur, view.AnimFrame);
+        }
+
         /// <summary>Puts the enemy where the hitbox hits it (on the ground, or at the hitbox's height
         /// in the air), standing until the hit, then in hitlag, then along the trajectory with its
         /// damage animation. Real time: the attacker's script waits out its hitlag.</summary>
         void PlaceEnemy(HitboxData hb, int hitFrame, int frame, KnockbackResult r)
         {
             view.TrajectoryOrigin = null;
+            view.EnemyStatus = null;
             if (enemy == null || !showEnemy.Checked) { view.Enemy = null; return; }
             float z0 = 14, y0 = 0;
             if (hb != null)
@@ -446,20 +502,47 @@ namespace Sm4shCommand.GUI
                 int launch = hitFrame + r.FinalTargetHitlag;
                 var damage = enemy.GetAnimation(r.Tumble ? enemyFly ?? enemyHurt : enemyHurt ?? enemyFly);
                 if (damage != null) e.Animation = damage;
+                string name = enemy.Name.Length > 0 ? char.ToUpper(enemy.Name[0]) + enemy.Name.Substring(1) : "Enemy";
                 if (real < launch)
                 {
                     e.Frame = 0;
                     e.Z += (real & 1) == 0 ? 0.35f : -0.35f;     // shaking in hitlag
+                    view.EnemyStatus = string.Format("{0}: hitlag, {1} frames left", name, launch - real);
                 }
                 else
                 {
-                    int k = real - launch;
+                    int t = real - launch, k = t, stopLeft = 0;
+                    foreach (var stop in r.TargetStops)
+                        if (t >= stop[0] && t < stop[0] + stop[1]) stopLeft = stop[0] + stop[1] - t;
                     foreach (var stop in r.TargetStops)
                         if (k > stop[0]) k -= Math.Min(stop[1], k - stop[0]);
                     var p = r.Path[Math.Min(k, r.Path.Count - 1)];
                     e.Z += p[0];
                     e.Y = Math.Max(0, e.Y + p[1]);
                     e.Frame = e.Animation != null ? Math.Min(k, Math.Max(0, e.Animation.Frames - 1)) : 0;
+                    int left = r.FinalHitstun - k;
+                    if (stopLeft > 0)
+                    {
+                        e.Z += (t & 1) == 0 ? 0.35f : -0.35f;
+                        view.EnemyStatus = string.Format("{0}: hitstop, {1} frames left ({2} frames of hitstun after it)", name, stopLeft, left);
+                    }
+                    else if (left > 0)
+                    {
+                        var can = new List<string>();
+                        if (t + 1 >= r.FinalAirdodgeCancel) can.Add("airdodge");
+                        if (t + 1 >= r.FinalAerialCancel) can.Add("aerial");
+                        view.EnemyStatus = string.Format("{0}: hitstun, {1} frames left{2}", name, left,
+                            can.Count > 0 ? " (can cancel with " + string.Join(" / ", can.ToArray()) + ")" : "");
+                    }
+                    else
+                    {
+                        view.EnemyStatus = name + ": out of hitstun, can act";
+                        if (e.Y <= 0 && enemyStand != null)      // back on the ground: standing again
+                        {
+                            e.Animation = enemy.GetAnimation(enemyStand);
+                            if (e.Animation != null && e.Animation.Frames > 0) e.Frame = (-left) % e.Animation.Frames;
+                        }
+                    }
                 }
             }
             view.Enemy = e;
@@ -470,7 +553,9 @@ namespace Sm4shCommand.GUI
         float[] HitboxPosition(HitboxData hb, int gameFrame)
         {
             if (gameFrame < 1 || gameFrame > frames.Count) return null;
-            var world = assets.Skeleton.World(anim, Math.Max(0, frames[gameFrame - 1].AnimFrame));
+            float af = Math.Max(0, frames[gameFrame - 1].AnimFrame);
+            if (anim != null && anim.Frames > 0) af = Math.Min(af, anim.Frames - 1);
+            var world = assets.Skeleton.World(anim, af);
             int bi = assets.Skeleton.ScriptBone(hb.Bone);
             if (bi < 0 || bi >= world.Length) return null;
             return world[bi].ClearScale().Transform(hb.X, hb.Y, hb.Z);
