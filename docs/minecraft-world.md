@@ -143,3 +143,34 @@ So biome rotation can be: every biome's models in `dyr_` model folders whose ani
 the current biome, every biome's collision rigged under its own subname, and a cave on that hook
 counting frames (adding `f1`, as the animations do) that moves the inactive biomes' collision away
 (`0x0315EF88`) and the active one into place.
+
+## Moving-platform test (not tested in game yet)
+
+`build/moving_platform_test.zip`: the full RPX (the standard build plus
+`tools/stage_script_cave.py`) and `stage/melee/NewStage01` (the Plains build plus
+`tools/moving_platform_test.py`'s platform). A 3-block hay bale platform circles over the middle of
+the island (x -35 to 15, y 38 to 62, a 4-second loop): its model by animation, its drop-through
+collision by the cave.
+
+- `tools/stage_script_cave.py`: hooks StageBaseCafe's update (0x02D1CFDC) and setup (0x02D1C65C) as
+  above; for kind 0x80 only. `tools/stage_script_test.py PATCHED.rpx` runs it in unicorn with
+  stubs (counter reset, base update kept, link looked up by name and moved to `motion(t)` every
+  frame, slow motion, other kinds untouched): all ok. The built RPX differs from `full_rpx.zip`'s in
+  the two hook words and the new code only.
+- The link name: `0x03142954` doesn't compare names with the subname but with a short name taken
+  from subnames shaped `NAME__TAG__` (link `+0x48`, made in `0x0315C3EC`; at most 15 characters),
+  so the platform's subname is `mctest__move__`.
+- The platform is in `dyr_j_BG_most_far0_set` (Battlefield's: one bone, hash `0x181C1749`, an
+  animation the stage loops; 1201 frames for a 1200-frame loop), its mesh bound to the bone (bind 8,
+  bone 0), its animation 241 frames. The folder's `model.xmb` is the ring's: the xmb's numbers are
+  light set, draw range and drawing order (dyr_j: 3 / 2 / 0, the far background; the ring: 4 / 0 /
+  15; the backdrop folder `stc_k_BG_most_far2`: 13 / 2 / 0; the sky folder: 14 / 4 / 12).
+
+What the result tells:
+- platform moves and you ride it: animations play and the cave moves collision, so biome rotation
+  can be built this way;
+- platform moves, collision stays (you fall through it / stand on air where it started): the cave
+  isn't running or the link isn't found;
+- collision moves (you ride something invisible), the platform doesn't: the stage doesn't play the
+  animation (the cave would have to move the models too);
+- they drift apart over the match: the frame counts differ (loop length or slow motion).
