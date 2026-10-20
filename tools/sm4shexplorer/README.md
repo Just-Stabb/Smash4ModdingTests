@@ -3,7 +3,7 @@
 `sm4shexplorer-faster.patch` (2 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
 (`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+the exe is in `build/sm4shexplorer_faster_v2.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
 plugins are unchanged).
 
 ## Why builds were slow
