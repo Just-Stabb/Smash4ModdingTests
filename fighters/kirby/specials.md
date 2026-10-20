@@ -978,13 +978,28 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 ## Added: Marth copy forward smash (Marth's, with his sword)
 
 With Marth's copy, Kirby's F-smash (all three angles) becomes Marth's: same timing (charge from
-frame 3, hits on frames 10-13, 50 frames) and Marth's hitboxes (13% sword / arm / body, 18% tipper
+frame 3, hits on frames 10-13; 70 frames, Marth's animation length, with his animation) and Marth's hitboxes (13% sword / arm / body, 18% tipper
 with his angle `0xA5`, KBG 80, BKB 55 / 80, sizes 3.5 / 3 / 2 / 3.5, hitlag 0.7 / 1.5, cutting).
 The hitboxes are capsules / points on bone 0 placed where the sword is on each active frame
 (Marth's are on his own sword / arm bones, which Kirby doesn't have): the body hit from 10% to
 55% of the blade, the tipper at 85%, the arm hit at the grip, the body hit at `BustN`.
 
-**Animation:** there are no Marth animations for Kirby to use, so it's Kirby's own Roy-copy Flare
+**Animation (now):** Marth's own `AttackS4S` and `AttackS4Charge` (`fighter/marth`, `--marth`),
+retargeted onto Kirby's skeleton (`marth_retarget()`). The bones Kirby shares with Marth (`TransN` to
+`ThrowN`, the standard rig) copy Marth's rotations: the arms by their change from the T-pose (both
+T-poses hold the arms straight out, so the sword arm goes where Marth's does); the root, hips, body,
+head and legs by their change from Marth's standing pose (`Wait1` frame 0), measured in his own
+frame and put on Kirby's standing pose (Marth stands side-on and his leg bones point down, Kirby's
+out and back: T-pose deltas spun Kirby's body and swung his feet up). Bone lengths stay Kirby's; the
+lunge forward is Marth's times their head heights (7.7 → 2.8, Kirby's own F-smash moves 3.8), the
+hips' drop times their hip-to-ankle lengths (Kirby's legs are tiny). Kirby's own bones (body, mouth,
+cheeks) and face parts come from his own F-smash, stretched to 70 frames. The sword (`LHaveN`, twice
+its size, as before) is put in Kirby's right hand (Marth's `RHaveN` holds his `SwordN`) along Marth's
+blade (`SwordN` +Z, `marthsw1.pac`), shrinking away from frame 64. The hitboxes follow it. On the
+hit frames Kirby's hand reaches about 1 unit below the floor (his arm bones are long for his body);
+the blade is above it.
+
+**Animation (before, without `--marth`):** Kirby's own Roy-copy Flare
 Blade (`motion/roybody`: start, charge loop, overhead slash ending in a lunge; the sword on
 `LHaveN`, blade +Y, the same as Marth's copy sword) retimed (`fs_specs()`): the draw in frames 0-3,
 the charge loop as the hold, the windup over the head in 4-9 (blended out of the charge pose), the
@@ -1072,7 +1087,7 @@ The RPX tables get the sword animations' hashes and the original moves' flags in
 (`MotionAnimcmdModule(0, 0, motion, 8)`) and effects / sounds (set `0x10`). No `motion.mtable` or
 ACMD changes.
 
-Build: `python3 tools/kirby_marth_sword.py <kirby folder> <script/animcmd/body>
+Build: `python3 tools/kirby_marth_sword.py --marth <marth folder> <kirby folder> <script/animcmd/body>
 <fighter_param_vl_kirby.bin> build/cave_fix_s4/cross_f.rpx build/marthsword build/game.bin`, then the standard RPX command with
 `$(cat build/marthsword/rpx_args.txt)` added at the end.
 

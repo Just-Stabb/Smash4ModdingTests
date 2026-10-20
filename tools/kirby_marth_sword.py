@@ -2,7 +2,11 @@
 """Kirby with Marth's copy: Marth's sword in Strike neutral air, back air and up air, and Marth's
 forward smash with the sword.
 
-  python3 tools/kirby_marth_sword.py KIRBY_DIR ANIMCMD_DIR VL_BIN RPX OUT_DIR [GAME_BIN]
+  python3 tools/kirby_marth_sword.py [--marth MARTH_DIR] KIRBY_DIR ANIMCMD_DIR VL_BIN RPX OUT_DIR [GAME_BIN]
+
+MARTH_DIR   the fighter/marth folder (model/body/c00/model.vbn, motion/body/main.pac and
+            marthsw1.pac): the F-smash becomes Marth's own AttackS4S / AttackS4Charge retargeted
+            onto Kirby (marth_retarget()); without it, Kirby's Roy-copy Flare Blade, retimed
 
 KIRBY_DIR   the fighter/kirby folder (model/body/c00/model.vbn, motion/body, motion/marthbody,
             motion/roybody)
@@ -309,6 +313,160 @@ def fs_specs():
     return attack, [[('Loop', float(o), 1.0)] for o in range(31)]
 
 
+# ---------------------------------------------------------------- Marth's own F-smash on Kirby
+# Retargeting: each body bone Kirby shares with Marth (the standard rig: TransN .. LHaveN) turns
+# in the world the way Marth's does from his bind pose (a T-pose for both): Kirby world rotation =
+# Marth's world rotation x Marth's bind world rotation^-1 x Kirby's bind world rotation. Bone
+# lengths stay Kirby's; the root's and the hips' movement (TransN, RotN, HipN) is Marth's scaled
+# by their heights (head 6.37 / 17.5) along the ground and by their leg lengths (hip to ankle)
+# up and down. Kirby's own bones (body, mouth, cheeks) and the face parts
+# come from Kirby's own F-smash, stretched to Marth's length. The sword (LHaveN, as before) is put
+# in Kirby's right hand (Marth's RHaveN holds his SwordN) pointing where Marth's blade (SwordN
+# +Z, marthsw1.pac) points.
+MARTH_FS = ('AttackS4S', 'AttackS4Charge')       # Marth's animations (FitMarthBody<part>C03<name>)
+KIRBY_FS = ('AttackS4S', 'AttackS4Charge')       # Kirby's own, for his extra bones and face
+SHARED = ('TransN', 'RotN', 'HipN', 'LLegJ', 'LKneeJ', 'LFootJ', 'LToeN', 'RLegJ', 'RKneeJ', 'RFootJ',
+          'RToeN', 'WaistN', 'BustN', 'LShoulderN', 'LShoulderJ', 'LArmJ', 'LHandN', 'RShoulderN',
+          'RShoulderJ', 'RArmJ', 'RHandN', 'NeckN', 'HeadN', 'RHaveN', 'ThrowN')
+ROOTS = ('TransN', 'RotN', 'HipN')
+# the body (and root) turn the way Marth's does from his standing pose (Wait1 frame 0) instead of
+# from the T-pose: Marth stands side-on, and Kirby (a ball) would spin with him; this way Kirby
+# keeps his own stance and gets Marth's motion on top. The legs too: Kirby's leg bones point out
+# and back in his T-pose, not down like Marth's, so T-pose deltas would swing his feet up (the change measured in Marth's own frame,
+# so leaning forward stays forward although the two stances face different ways). The limbs follow Marth's T-pose deltas, so
+# the sword arm ends up where Marth's is.
+STANCE = ('RotN', 'HipN', 'WaistN', 'BustN', 'NeckN', 'HeadN',
+          'LLegJ', 'LKneeJ', 'LFootJ', 'LToeN', 'RLegJ', 'RKneeJ', 'RFootJ', 'RToeN')
+
+
+def vbn_bind(path):
+    """{name: (pos, quat, scale)} the bind pose (Euler XYZ angles, R = Rz Ry Rx)"""
+    d = open(path, 'rb').read()
+    e = '<' if d[:4] == b' NBV' else '>'
+    bones = omo.vbn_read(path)
+    off = 28 + 76 * len(bones)
+    out = {}
+    for name, _p, _h in bones:
+        v = struct.unpack(e + '9f', d[off:off + 36])
+        off += 36
+        cx, sx = math.cos(v[3] / 2), math.sin(v[3] / 2)
+        cy, sy = math.cos(v[4] / 2), math.sin(v[4] / 2)
+        cz, sz = math.cos(v[5] / 2), math.sin(v[5] / 2)
+        q = (sx * cy * cz - cx * sy * sz, cx * sy * cz + sx * cy * sz, cx * cy * sz - sx * sy * cz,
+             cx * cy * cz + sx * sy * sz)
+        out[name] = (v[0:3], q, v[6:9])
+    return out
+
+
+def worlds(bones, local):
+    """{name: world matrix} from local(name) -> (pos, quat, scale)"""
+    out = {}
+    for name, parent, _h in bones:
+        m = omo.trs(*local(name))
+        out[name] = omo.mul(out[bones[parent][0]], m) if 0 <= parent < len(bones) else m
+    return out
+
+
+def rot3(m):
+    """the rotation of a matrix (scale taken out)"""
+    cols = [norm(tuple(m[i][j] for i in range(3))) for j in range(3)]
+    return [[cols[j][i] for j in range(3)] for i in range(3)]
+
+
+def m3(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def t3(a):
+    return [[a[j][i] for j in range(3)] for i in range(3)]
+
+
+def marth_retarget(kdir, mdir, kbones, which, sword):
+    """{part: Omo} Marth's animation `which` (0 F-smash, 1 charge loop) on Kirby"""
+    mbones = omo.vbn_read(os.path.join(mdir, 'model/body/c00/model.vbn'))
+    mbind = vbn_bind(os.path.join(mdir, 'model/body/c00/model.vbn'))
+    kbind = vbn_bind(os.path.join(kdir, 'model/body/c00/model.vbn'))
+    mh = {n: h for n, _p, h in mbones}
+    kh = {n: h for n, _p, h in kbones}
+    mname = MARTH_FS[which]
+    main = omo.Omo(dict(omo.pac_read(os.path.join(mdir, 'motion/body/main.pac')))[
+        'FitMarthBodyMainC03%s.omo' % mname])
+    sw = omo.Omo(dict(omo.pac_read(os.path.join(mdir, 'motion/body/marthsw1.pac')))[
+        'FitMarthBodyMarthsw1C03%s.omo' % mname])
+    n = main.frames
+    kparts = {}
+    for part in ('Main', 'Kirbypt1', 'Kirbypt2'):
+        pac = dict(omo.pac_read(os.path.join(kdir, 'motion/body', part.lower() + '.pac')))
+        name = next(n for n in ['FitKirbyBody%sC03%s.omo' % (part, k) for k in (KIRBY_FS[which], KIRBY_FS[0])]
+                    if n in pac)     # Kirbypt2 has no charge loop
+        kparts[part] = omo.Omo(pac[name])
+    kmain = kparts['Main']
+    stretch = lambda f: f * (kmain.frames - 1) / float(max(1, n - 1))    # noqa: E731
+    mbw = worlds(mbones, lambda b: mbind[b])
+    kbw = worlds(kbones, lambda b: kbind[b])
+    mwait = omo.Omo(dict(omo.pac_read(os.path.join(mdir, 'motion/body/main.pac')))['FitMarthBodyMainA00Wait1.omo'])
+    kwait = omo.Omo(dict(omo.pac_read(os.path.join(kdir, 'motion/body/main.pac')))['FitKirbyBodyMainA00Wait1.omo'])
+    mst = worlds(mbones, lambda b: mwait.sample(mh[b], 0) or mbind[b])
+    kst = worlds(kbones, lambda b: kwait.sample(kh[b], 0) or kbind[b])
+    ratio = kbw['HeadN'][1][3] / mbw['HeadN'][1][3]     # head heights: moving along the ground
+    leg = lambda w: w['HipN'][1][3] - (w['LFootJ'][1][3] + w['RFootJ'][1][3]) / 2   # noqa: E731
+    yratio = leg(kbw) / leg(mbw)    # hip to ankle: crouching (Kirby's legs are tiny: his hips can't drop far)
+    out = {}
+    tracks = {name: ([], [], []) for name, _p, _h in kbones}
+    for f in range(n):
+        def mlocal(b, f=f):
+            src = sw if b in ('SwordN', 'SwordHeadN') and sw.node(mh[b]) else main
+            v = src.sample(mh[b], f)
+            return v if v else mbind[b]
+        mw = worlds(mbones, mlocal)
+        kw = {}
+        for name, parent, h in kbones:
+            if name in SHARED:
+                # N = orientation relative to the T-pose (both T-poses face +Z)
+                nm = m3(rot3(mw[name]), t3(rot3(mbw[name])))
+                if name in STANCE:
+                    # Marth's change from his stance, in his own frame, on Kirby's stance
+                    nst = m3(rot3(mst[name]), t3(rot3(mbw[name])))
+                    nk = m3(rot3(kst[name]), t3(rot3(kbw[name])))
+                    nm = m3(nk, m3(t3(nst), nm))
+                r = m3(nm, rot3(kbw[name]))
+                pr = rot3(kw[kbones[parent][0]]) if 0 <= parent < len(kbones) else [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+                q = omo.mat2q(m3(t3(pr), r))
+                if name in ROOTS:
+                    mp = mlocal(name)[0]
+                    p = tuple(kbind[name][0][i] + (mp[i] - mbind[name][0][i]) * (yratio if i == 1 else ratio)
+                              for i in range(3))
+                else:
+                    p = kbind[name][0]
+                loc = (p, q, kbind[name][2])
+            else:
+                loc = sample_at(kmain, h, stretch(f)) or kbind[name]
+            m = omo.trs(*loc)
+            kw[name] = omo.mul(kw[kbones[parent][0]], m) if 0 <= parent < len(kbones) else m
+            for i in range(3):
+                tracks[name][i].append(loc[i])
+        # the sword: grip in Kirby's right hand, blade along Marth's
+        s = scale_at(f, *sword)
+        if s > EPS:
+            blade = tuple(mw['SwordN'][i][2] for i in range(3))
+            lp, lq, ls = local_for(kw['LHandN'], pos(kw['RHaveN']), blade, SIZE * s)
+        else:
+            lp, lq, _ = (tracks['LHaveN'][i][-1] for i in range(3))
+            ls = (EPS, EPS, EPS)
+        tracks['LHaveN'][0][-1], tracks['LHaveN'][1][-1], tracks['LHaveN'][2][-1] = lp, lq, ls
+    anim = omo.Omo(kmain.encode())
+    anim.frames = n
+    anim.nodes = []
+    for name, _p, h in kbones:
+        if kmain.node(h) or name in SHARED or name == 'LHaveN':
+            omo.set_node_full(anim, h, *tracks[name])
+    out['Main'] = anim
+    for part in ('Kirbypt1', 'Kirbypt2'):
+        k = kparts[part]
+        out[part] = resample({'K': k}, [[('K', f * (k.frames - 1) / float(max(1, n - 1)), 1.0)] for f in range(n)])
+    return out
+
+
 def fs_sword(anim, bones, appear, shrink, gone):
     """Roy's sword placement, SIZE times as big, shrinking away at the end"""
     have = next(h for n, p, h in bones if n == 'LHaveN')
@@ -376,10 +534,15 @@ def fs_sounds(snd):
 
 
 def main():
-    if len(sys.argv) not in (6, 7):
+    global FS_FRAMES, FS_SHRINK, FS_GONE
+    args = sys.argv[1:]
+    marth_dir = None
+    if args[:1] == ['--marth']:
+        marth_dir, args = args[1], args[2:]
+    if len(args) not in (5, 6):
         sys.exit(__doc__)
-    kdir, adir, vl_in, rpx, out = sys.argv[1:6]
-    game_in = sys.argv[6] if len(sys.argv) == 7 else os.path.join(adir, 'game.bin')
+    kdir, adir, vl_in, rpx, out = args[:5]
+    game_in = args[5] if len(args) == 6 else os.path.join(adir, 'game.bin')
     bones = omo.vbn_read(os.path.join(kdir, 'model/body/c00/model.vbn'))
     mdir = os.path.join(out, 'motion/marthbody')
     sdir = os.path.join(out, 'script/animcmd/body')
@@ -387,6 +550,13 @@ def main():
     os.makedirs(sdir, exist_ok=True)
 
     # animations
+    retarget = None
+    if marth_dir:
+        attack = marth_retarget(kdir, marth_dir, bones, 0, (1, 0, 0))   # length first
+        FS_FRAMES = attack['Main'].frames
+        FS_SHRINK, FS_GONE = FS_FRAMES - 6, FS_FRAMES
+        retarget = (marth_retarget(kdir, marth_dir, bones, 0, (1, FS_SHRINK, FS_GONE)),
+                    marth_retarget(kdir, marth_dir, bones, 1, (1, 999, 1000)))
     for part in ('Main', 'Kirbypt1', 'Kirbypt2'):
         fn = part.lower() + '.pac'
         body = dict(omo.pac_read(os.path.join(kdir, 'motion/body', fn)))
@@ -403,13 +573,16 @@ def main():
             marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, src), data))
         roy = dict(omo.pac_read(os.path.join(kdir, 'motion/roybody', fn)))
         srcs = {k: omo.Omo(roy[ROY % (part, k)]) for k in ('Start', 'Loop', 'End')}
-        for name, specs, sword in ((FS_NAME, fs_specs()[0], (1, FS_SHRINK, FS_GONE)),
-                                   (FS_HOLD_NAME, fs_specs()[1], (1, 999, 1000))):
-            anim = resample(srcs, specs)
-            if part == 'Main':
-                fs_sword(anim, bones, *sword)
-                if name == FS_NAME:
-                    fs_attack = anim
+        for i, (name, specs, sword) in enumerate(((FS_NAME, fs_specs()[0], (1, FS_SHRINK, FS_GONE)),
+                                                  (FS_HOLD_NAME, fs_specs()[1], (1, 999, 1000)))):
+            if retarget:
+                anim = retarget[i][part]
+            else:
+                anim = resample(srcs, specs)
+                if part == 'Main':
+                    fs_sword(anim, bones, *sword)
+            if part == 'Main' and name == FS_NAME:
+                fs_attack = anim
             marth.append(('FitKirbyMarthBody%sD00%s.omo' % (part, name), anim.encode()))
         omo.pac_write(os.path.join(mdir, fn), marth)
 
