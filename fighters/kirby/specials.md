@@ -988,7 +988,7 @@ the user's). `tools/omo.py` still reads rotation type 10 (compressed quaternions
 
 ## Added: Marth copy sword in Strike neutral air, back air and up air
 
-**v6 (now): what shows the sword, found.** Kirby's per-frame copy update (`0x02B02534`) shows the
+**v6 (works in game, user: the sword shows in the aerials): what shows the sword, found.** Kirby's per-frame copy update (`0x02B02534`) shows the
 copy's held model (`[fighter+0x28]+0xA8`: `marthsword`, `ikesword`, `gamewatchpan`, ...) only while
 Kirby's **status kind** is in a fixed list (`0x181`, `0x18F`-`0x191`, `0x1BC`-`0x1C4` (Shield Breaker
 is `0x1C1`-`0x1C4`), `0x1FC`, `0x202`-`0x205`, `0x20B`-`0x20E`, `0x21F`-`0x221`, `0x229`-`0x22B`,

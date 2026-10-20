@@ -68,7 +68,7 @@ Right-click → **Extract vanilla**: extracts the game's own version (file or fo
 (plain **Extract** still gives the mod's version when there is one). It's greyed out for files only
 the mod has.
 
-## Not tested in a real build
+## Tested (user)
 
-Compiled and logic-checked here (no game dump in this environment): try it on a copy of a
-workspace and compare an export with the old exe's before relying on it.
+v3 in a real build: builds are faster, and with the package cache, rebuilding unchanged packages
+is over 1000x faster for large packs. (v1's out-of-memory error was fixed in v2.)
