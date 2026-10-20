@@ -223,6 +223,9 @@ def _position_lines():
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(INPUT_QUANTITIES):
             out.append((0x0F000100 + 0x20 * t + q, "%s %s" % (tn, qn.lower().replace("_", " ")), "Target: %s.\\n%s" % (td, qd)))
+    for t, (tn, td) in enumerate(zip(targets, tdesc)):
+        for n, stick in enumerate(("stick", "C-stick")):
+            out.append((0x0F000260 + 2 * t + n, "%s %s X raw" % (tn, stick), "Target: %s.\\nRead: %s X on screen, -1 to 1 (positive = right, whichever way it faces).\\nWrite: force it (until STICK_FORCED is written)." % (td, stick)))
     for slot in range(8):
         for n, axis in enumerate(("X", "Y", "Z", "facing")):
             rw = "Read only (1 right, -1 left)." if axis == "facing" else "Read / write."
@@ -265,6 +268,9 @@ def alias_lines():
     for t, tn in enumerate(COMBAT_TARGETS):
         for q, (qn, _) in enumerate(INPUT_QUANTITIES):
             out.append(("%s_%s" % (tn, qn), 0x0F000100 + 0x20 * t + q, ""))
+    for t, tn in enumerate(COMBAT_TARGETS):
+        out.append(("%s_STICK_X_RAW" % tn, 0x0F000260 + 2 * t, ""))
+        out.append(("%s_CSTICK_X_RAW" % tn, 0x0F000261 + 2 * t, ""))
     out.append(("SELF_ANIM_RATE", 0x0F000098, "animation rate multiplier (1.0 normally)"))
     return out
 

@@ -506,6 +506,28 @@
 0x0F00025C = Slot 8 invincible | Target: player slot 8.\nRead: 1 while invincible (body state 1).\nWrite: invincible for N frames.
 0x0F00025D = Slot 8 armor | Target: player slot 8.\nRead: armor: 0 none, 1 super armor, 2 knockback-based, 3 damage-based.\nWrite: set it (with ARMOR_THRESHOLD's value for 2 / 3).
 0x0F00025E = Slot 8 armor threshold | Target: player slot 8.\nRead: the armor's threshold (knockback for 2, damage for 3).\nWrite: set it (write it before ARMOR).
+0x0F000260 = Self stick X raw | Target: this fighter.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000261 = Self C-stick X raw | Target: this fighter.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000262 = Nearest opponent stick X raw | Target: the nearest other fighter.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000263 = Nearest opponent C-stick X raw | Target: the nearest other fighter.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000264 = Last fighter hit stick X raw | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000265 = Last fighter hit C-stick X raw | Target: the last fighter this one hit (its attack's newest hit; after the attack, the fighter whose last attacker was this one).\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000266 = Slot 1 stick X raw | Target: player slot 1.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000267 = Slot 1 C-stick X raw | Target: player slot 1.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000268 = Slot 2 stick X raw | Target: player slot 2.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000269 = Slot 2 C-stick X raw | Target: player slot 2.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026A = Slot 3 stick X raw | Target: player slot 3.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026B = Slot 3 C-stick X raw | Target: player slot 3.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026C = Slot 4 stick X raw | Target: player slot 4.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026D = Slot 4 C-stick X raw | Target: player slot 4.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026E = Slot 5 stick X raw | Target: player slot 5.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F00026F = Slot 5 C-stick X raw | Target: player slot 5.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000270 = Slot 6 stick X raw | Target: player slot 6.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000271 = Slot 6 C-stick X raw | Target: player slot 6.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000272 = Slot 7 stick X raw | Target: player slot 7.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000273 = Slot 7 C-stick X raw | Target: player slot 7.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000274 = Slot 8 stick X raw | Target: player slot 8.\nRead: stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
+0x0F000275 = Slot 8 C-stick X raw | Target: player slot 8.\nRead: C-stick X on screen, -1 to 1 (positive = right, whichever way it faces).\nWrite: force it (until STICK_FORCED is written).
 0x0F000020 = Slot 1 X | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000021 = Slot 1 Y | Player slot 1 (fighter table entry 0). Read / write.
 0x0F000022 = Slot 1 Z | Player slot 1 (fighter table entry 0). Read / write.

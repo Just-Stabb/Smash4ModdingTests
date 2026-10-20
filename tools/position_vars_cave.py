@@ -53,6 +53,7 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
   0x0F000100 + 0x20*target + q   inputs and state: buttons held / pressed (write: force), sticks,
               inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
               combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
+  0x0F000260 + 2*target + n   stick (n 0) / C-stick (n 1) X on screen (+ = right): read; write forces
 
 Reads with no such fighter (no opponent, empty slot, or called from a non-fighter such as an
 article, for self IDs) give 0 and writes do nothing.
@@ -1145,11 +1146,20 @@ inp_entry:                              # 0x100 + 0x20 * target + q: inputs / st
         bl find_self
         addi r3, r30, -0x100
         cmplwi r3, 0x160                # 11 targets
-        bge ext_zero
+        bge inp_entry_raw
         clrlwi r11, r3, 27
         addi r11, r11, 0x40
         stw r11, 0x14(r1)
         srwi r22, r3, 5
+        b ext_target
+inp_entry_raw:                          # 0x260 + 2 * target + n: raw stick / C-stick X (q 0x20 + n)
+        addi r3, r3, -0x160
+        cmplwi r3, 0x16
+        bge ext_zero
+        clrlwi r11, r3, 31
+        addi r11, r11, 0x60
+        stw r11, 0x14(r1)
+        srwi r22, r3, 1
         b ext_target
 """, False),
 ("""
@@ -1169,7 +1179,33 @@ inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 post
         blt inp_hit
         cmplwi r22, 0x1F
         blt inp_armor
+        cmplwi r22, 0x20
+        blt ext_zero
+        cmplwi r22, 0x22
+        blt inp_raw
         b ext_zero
+inp_raw:                                # q 0x20 / 0x21: stick / C-stick X on screen (+ = right)
+        addi r26, r22, -0x20
+        slwi r26, r26, 1                # inp_stick's numbering: 0 stick X, 2 C-stick X
+        cmpwi r29, 0
+        bne inp_raw_write
+        lwz r27, 0x24(r24)
+%(CHK_R27)s
+        lwz r27, 0xA0(r27)
+%(CHK_R27)s
+        li r0, 0
+        cmpwi r26, 0
+        beq inp_raw_go
+        li r0, 0x7C
+inp_raw_go:
+        lfsx f1, r27, r0
+        b ext_ret
+inp_raw_write:                          # = forcing X along the facing to value x facing
+        lfs f1, 0x10(r1)
+        lfs f0, 0x60(r25)
+        fmuls f1, f1, f0
+        stfs f1, 0x10(r1)
+        b inp_stick_write
 inp_slot:                               # r24 accessor -> r30 = &inp_state[its slot] or 0 (r31 used)
         mflr r0
         stwu r1, -0x10(r1)

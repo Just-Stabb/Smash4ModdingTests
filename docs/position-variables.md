@@ -146,6 +146,12 @@ fighter hit, 3–10 player slots 1–8), so `0x0F000100`–`0x0F00025F`. Sm4shCo
 | +0x1E `ARMOR_THRESHOLD` | the threshold (knockback for 2, damage for 3) | set it; write it before `ARMOR` |
 | +0x1F | 0 | ignored |
 
+Raw stick X, on screen whichever way the fighter faces (positive = right): `0x0F000260 + 2 × target`
+(`STICK_X_RAW`) and `+1` (`CSTICK_X_RAW`), e.g. `SELF_STICK_X_RAW` = `0x0F000260`,
+`OPP_CSTICK_X_RAW` = `0x0F000263`. The values are the game's own, −1 to 1 after its dead zone
+(Y has no facing, so `STICK_Y` / `CSTICK_Y` are already raw). Writing one forces the stick like
+`STICK_X` (the value is turned into "forward" with the fighter's facing at the time).
+
 **Forced inputs** go in where the game reads the controller, so they act exactly like pressing the
 button or tilting the stick: a forced press is "pressed this frame" on its first frame, a stick
 forced from neutral to 1.0 counts as a smash input, and so on. They work on CPUs too. They last
