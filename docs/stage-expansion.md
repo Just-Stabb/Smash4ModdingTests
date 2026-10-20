@@ -154,6 +154,14 @@ into `stage_img_l_rep_NN` instead of `0xA` / `stage_img_rep_NN`. The icon path (
 `add_stage.py --page 2` now writes `ui/replace/append/stage/stage_13/stage_13_<name>.nut` (a copy of
 `stage_13_BattleField_k.nut`, or `--stage13 FILE`); `build/new_stage_icon13.zip`.
 
+On page 2 the grid icon then showed, but the preview and the name were the select's fallback
+("Duel Zone" in the user's layout): a DLC-marked stage's other pictures and text come from the DLC
+content. Rather than fake DLC content, the stage moves to page 1 (`add_stage.py --page 1`, the v2
+database), which works now: the user's layout has its 44-48 arrangements back (below), and the RPX
+side was fixed by the relocation moves. Page-1 stages take their pictures from `ui/replace/stage/`
+and their names from `melee.msbt`, and no DLC check applies (`build/new_stage_page1.zip`). Page 1
+holds at most 48 stages (47 + the new one now).
+
 ## The user's page 1 (solved: unlocked stages)
 
 The user's page 1 showed one icon from the first build of their pack on. Bisect RPXs (none of the stage
