@@ -76,7 +76,7 @@ def main():
 
     by_section = {}
     cache = {}
-    for end in grows:
+    for end in sorted(set(grows))[-1:]:     # several grow: (one per cave script): the largest
         # the code section that ends below END grows (zero-filled) up to it; the loader maps the
         # whole text region (textRegionSize in the file info), so this stays inside allocated code
         # memory as long as END is below the region's end

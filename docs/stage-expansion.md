@@ -1,6 +1,7 @@
 # Adding a new stage slot (research)
 
-Status: research only, nothing patched yet. Addresses are this repo's `cross_f.rpx` (the version
+Status: first test build (`build/new_stage_test_v1.zip`): a copy of Battlefield as a new stage,
+`NewStage01`, not tested in game yet. Addresses are this repo's `cross_f.rpx` (the version
 the other caves target). Several of them were first found by **Manifold** (Fitz Null, zlib
 licence, https://gitlab.com/fitz.lol/manifold, `src/cross/stage.cpp` / `stage.hpp` / `ui.hpp`), a
 runtime patching framework (Aroma / WUMS function patcher) that loaded a custom stage, `XMadein`.
@@ -67,7 +68,28 @@ which picks its icons (`replace/stage/stage_10/stage_10_<Name>.nut`, `stage_11`,
 `stage_30`, `stagen_10`, `stagel_10`) and its text (`message/melee.msbt` labels
 `MmelStageN_<Name>` (name) and `MmelStageG_<Name>` (series)).
 
-## Plan
+## Built
+
+- `tools/stage_slot_cave.py [NAME[:COSMETIC] ...]`: the RPX side (default `NewStage01:0x38`, kinds
+  `0x80` / `0x81`). Added at the end of the standard RPX command: `$(python3
+  tools/stage_slot_cave.py)`. `tools/stage_slot_test.py PATCHED.rpx ORIGINAL.rpx` runs the patched
+  functions in unicorn: count 130, the new kinds' names / variants / paths (`stage/melee/NewStage01`,
+  `stage/end/NewStage01`), cosmetic `0x38` -> `NewStage01`, every game kind and cosmetic name
+  unchanged.
+- `tools/add_stage.py`: the files, copied from an existing stage (`--from BattleField_f`): the
+  `ui_stage_db.bin` entry (position / id `0x38`, kinds `0x80` / `0x81`, order 56, page 1 by
+  default: page 1 has 48 slots and 47 stages), the `ui_sound_db.bin` song list (the source's),
+  `MmelStageN_` / `MmelStageG_` texts in `melee.msbt`, the six icon sets, `stage/melee` and
+  `stage/end` folders (file names renamed). `tools/s4param.py` / `tools/msbt.py` read and write the
+  param / MSBT files (byte-identical round trips).
+- `rpx_patch.py`: several `grow:` arguments (one per cave script) now grow the section once, to the
+  largest (it used to keep the first, smaller copy for the patches).
+
+The generic stage loads the folder's files by pattern (`*/param/*_stprm`, `*.lvd` / `*%02u.lvd`,
+`*/sound/sound.nus3bank`), so renamed copies load. Battlefield's own class (day / night, `_stdat`)
+isn't used: the copy is a generic stage, so its background may not animate as Battlefield's does.
+
+## Plan (first version)
 
 1. RPX caves (a `stage_slot_cave.py` like the others): a bigger stage-kind table (vanilla 128 +
    new melee / end pairs) and cosmetic-name table, the three table functions and the name lookup
