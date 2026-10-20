@@ -49,8 +49,62 @@ w7: lwz r8, 8(r5)
  stw r7, 0x800(r8)
  li r3, 0
  blr""",
-    0x030B2FC4: "lwz r12, 4(r3)\n lwz r3, 0xA00(r12)\n blr",
-    0x030B2F8C: "lwz r12, 4(r3)\n lwz r3, 0xA04(r12)\n blr",
+    0x030B2FC4: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 0
+ beq df0
+ lwz r3, 0xA00(r12)
+ blr
+df0: lwz r3, 0xA4C(r12)
+ blr""",                                       # DamageModuleF(1) / (0) damage %
+    0x030B2F8C: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ cmpwi r6, 9
+ beq dm9
+ cmpwi r6, 0xB
+ beq dmb
+ lwz r3, 0xA04(r12)
+ blr
+dm9: lfs f0, 4(r5)
+ lfs f1, 0xA4C(r12)
+ fadds f1, f1, f0
+ stfs f1, 0xA4C(r12)
+ li r3, 0
+ blr
+dmb: lwz r8, 0x54(r12)
+ lwz r7, 4(r5)
+ stw r7, 0x14(r8)
+ lwz r9, 8(r5)
+ cmpwi r7, 2
+ bne dmb3
+ stw r9, 0x18(r8)
+ li r3, 0
+ blr
+dmb3: stw r9, 0x1C(r8)
+ li r3, 0
+ blr""",                                       # DamageModule(8) / (9, add %) / (0xB, armor)
+    0x030B2B60: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r7, 4(r5)
+ clrlwi r7, r7, 24
+ slwi r7, r7, 2
+ add r7, r7, r12
+ lwz r3, 0x800(r7)
+ blr""",                                       # WorkModuleF(0, id): same table as the ints
+    0x030B50B8: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ lwz r7, 4(r5)
+ cmpwi r6, 2
+ bne hm1
+ stw r7, 0xA5C(r12)
+ li r3, 0
+ blr
+hm1: stw r7, 0xA60(r12)
+ li r3, 0
+ blr""",                                       # HitModule(2, frames) intangible / (1, frames, 0)
     0x030B5160: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
@@ -67,7 +121,17 @@ s2: lwz r7, 4(r5)
  lwz r6, 0(r5)
  cmpwi r6, 3
  beq st3
+ cmpwi r6, 1
+ beq st1
+ cmpwi r6, 2
+ beq st2
  lwz r3, 0xA1C(r12)
+ blr
+st1: lwz r3, 0xA48(r12)
+ blr
+st2: lwz r7, 4(r5)
+ stw r7, 0xA48(r12)
+ li r3, 0
  blr
 st3: lwz r7, 4(r5)
  stw r7, 0xA1C(r12)
@@ -122,7 +186,7 @@ def setup(fighters, count=8):
     mu.mem_map(0x02F10000, 0x20000); mu.mem_write(0x02F10000, mem(0x02F10000, 0x20000))  # fighters' WorkModule copies
     mu.mem_map(0x037E0000, 0x20000); mu.mem_write(0x037E0000, mem(0x037E0000, 0x20000))
     mu.mem_write(SETPOS, b''.join(struct.pack('>I', w) for w in fake.words()))
-    mu.mem_map(0x04B70000, 0x10000); mu.mem_write(0x04B70000, mem(0x04B70000, 0x9000))  # combat variables (grown .text)
+    mu.mem_map(0x04B70000, 0x10000); mu.mem_write(0x04B70000, mem(0x04B70000, 0xC000))  # combat variables (grown .text)
     mu.mem_map(0x030B0000, 0x10000)
     for k, (addr, src) in enumerate(FAKES.items()):    # each in its own space, a branch at the wrapper
         body = 0x030B8000 + 0x100 * k
@@ -214,11 +278,11 @@ mu.mem_write(WMX + 0x200 + 4, struct.pack('>I', WMX + 0x300))
 mu.mem_write(WMX + 0x300 + 0x16 * 4, struct.pack('>f', 2.5))
 mu.mem_write(WMX + 0x100 + 0x3C, struct.pack('>I', WMX + 0x400))  # cat F
 mu.mem_write(WMX + 0x400 + 4, struct.pack('>I', WMX + 0x500))
-mu.mem_write(WMX + 0x500 + 4 * 0x123, struct.pack('>f', 8.5))
+mu.mem_write(WMX + 0x500 + 4 * 0x423, struct.pack(">f", 8.5))
 check('stat 0x03000016 normal path', call(mu, GET, WMX, 0x03000016), 2.5)
-check('0x0F000123 (index >= 0x100) normal path', call(mu, GET, WMX, 0x0F000123), 8.5)
+check('0x0F000423 (index >= 0x400) normal path', call(mu, GET, WMX, 0x0F000423), 8.5)
 call(mu, SET, WMX, 0x03000016, 4.0); check('set_float normal path', call(mu, GET, WMX, 0x03000016), 4.0)
-call(mu, SET, WMX, 0x0F000123, 1.5); check('set_float cat F index >= 0x100', call(mu, GET, WMX, 0x0F000123), 1.5)
+call(mu, SET, WMX, 0x0F000423, 1.5); check('set_float cat F index >= 0x400', call(mu, GET, WMX, 0x0F000423), 1.5)
 # only self alive
 mu, O = setup([(0, 1, 2, 3, 1, True)])
 check('no opponent: opp X', call(mu, GET, O[0][0], 0x0F000008), 0)
@@ -398,5 +462,145 @@ check('rate x: reads 1.0', call(mu, FGET, w0, 0x0F000098), 1.0)
 call(mu, FSET, w0, 0x0F000098, 1.2)
 check('rate x: set 1.2', round(struct.unpack('>f', mu.mem_read(MM + 0xF4, 4))[0], 5), 1.2)
 check('rate x: other fighter untouched', call(mu, FGET, w1, 0x0F000098), 0)
+# --- inputs / state (0x0F000100 + 0x20 * target + q) --------------------------------------------------
+def iid(target, q): return 0x0F000100 + 0x20 * target + q
+UPDATE = 0x020035FC                      # the game's controller update (hooked)
+SRC = 0x103A0000                         # fake pad source: +0x10/+0x14 stick, +0x18 buttons,
+SRC_FNS = 0x030B9C00                     # +0x1C/+0x20 triggers, +0x24/+0x28 C-stick
+def inp_setup(fighters):
+    mu, O = setup(fighters)
+    fns = {0x1C: 'blr', 0x24: 'lwz r4, 0x14(r3)\n lwz r3, 0x10(r3)\n blr', 0x34: 'lwz r3, 0x18(r3)\n blr',
+           0x3C: 'lwz r4, 0x20(r3)\n lwz r3, 0x1C(r3)\n blr', 0x7C: 'lwz r4, 0x28(r3)\n lwz r3, 0x24(r3)\n blr'}
+    mu.mem_write(SRC, struct.pack('>I', SRC + 0x100))
+    for k, (off, src) in enumerate(fns.items()):
+        f = Asm(SRC_FNS + 0x20 * k); f.asm(src)
+        mu.mem_write(SRC_FNS + 0x20 * k, b''.join(struct.pack('>I', w) for w in f.words()))
+        mu.mem_write(SRC + 0x100 + off, struct.pack('>I', SRC_FNS + 0x20 * k))
+    hm_get = Asm(SRC_FNS + 0x200); hm_get.asm('lwz r3, 4(r3)\n blr')    # HitModule vt +0x10C: state
+    mu.mem_write(SRC_FNS + 0x200, b''.join(struct.pack('>I', w) for w in hm_get.words()))
+    for slot, *_ in fighters:
+        acc = 0x10370000 + slot * 0x1000
+        mu.mem_write(acc + 0x24, struct.pack('>I', acc + 0xB00))            # ControlModule
+        mu.mem_write(acc + 0xB00 + 0xA0, struct.pack('>I', acc + 0xB10))    # its struct (CM + 0x10)
+        mu.mem_write(acc + 0x58, struct.pack('>I', acc + 0xC00))            # HitModule
+        mu.mem_write(acc + 0xC00, struct.pack('>I', acc + 0xC80))
+        mu.mem_write(acc + 0xC80 + 0x10C, struct.pack('>I', SRC_FNS + 0x200))
+        mu.mem_write(acc + 0x54, struct.pack('>I', acc + 0xD00))            # DamageModule
+    # the update saves / restores f30 / f31 with Espresso paired-single stores (opcode 4), which
+    # Unicorn doesn't run: nops in this copy (only the registers' second halves)
+    mu.mem_write(0x02000AE0, struct.pack('>II', 0xFC20082C, 0x4E800020))   # its sqrt: fsqrt f1, f1; blr
+    code = mu.mem_read(UPDATE, 0x800)
+    for o in range(0, 0x800, 4):
+        if code[o] >> 2 == 4:
+            mu.mem_write(UPDATE + o, struct.pack('>I', 0x60000000))
+    return mu, O
+def pad(mu, buttons=0, sx=0.0, sy=0.0, cx=0.0, cy=0.0):
+    mu.mem_write(SRC + 0x10, struct.pack('>ffIffff', sx, sy, buttons, 0.0, 0.0, cx, cy))
+def update(mu, slot):
+    st = 0x10370000 + slot * 0x1000 + 0xB10
+    mu.mem_write(RET, struct.pack('>I', 0x60000000))
+    mu.reg_write(UC_PPC_REG_3, st); mu.reg_write(UC_PPC_REG_4, SRC); mu.reg_write(UC_PPC_REG_5, 0)
+    mu.reg_write(UC_PPC_REG_1, 0x10480000)
+    for r in range(14, 32): mu.reg_write(getattr(sys.modules['unicorn.ppc_const'], 'UC_PPC_REG_%d' % r), 0x1000 + r)
+    mu.reg_write(UC_PPC_REG_LR, RET)
+    mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+    mu.emu_start(UPDATE, RET)
+    for r in range(14, 32):
+        assert mu.reg_read(getattr(sys.modules['unicorn.ppc_const'], 'UC_PPC_REG_%d' % r)) == 0x1000 + r, 'r%d clobbered' % r
+    assert mu.reg_read(UC_PPC_REG_1) == 0x10480000
+def st(mu, slot, off, fmt='>I'):
+    return struct.unpack(fmt, mu.mem_read(0x10370000 + slot * 0x1000 + 0xB10 + off, struct.calcsize(fmt)))[0]
+mu, O = inp_setup([(0, 0.0, 0.0, 0.0, 1.0, True), (1, 30.0, 0.0, 0.0, -1.0, True)])
+w0, w1 = O[0][0], O[1][0]
+pad(mu, buttons=0x5, sx=0.5, sy=-0.25)
+update(mu, 0)
+check('pad read through the hooks: held', st(mu, 0, 0x3C), 0x5)
+check('ATTACK held', call(mu, FGET, w0, iid(0, 0)), 1)
+check('SPECIAL held', call(mu, FGET, w0, iid(0, 1)), 0)
+check('JUMP held', call(mu, FGET, w0, iid(0, 2)), 1)
+check('JUMP pressed this frame', call(mu, FGET, w0, iid(0, 10)), 1)
+update(mu, 0)
+check('JUMP pressed: not on the 2nd frame', call(mu, FGET, w0, iid(0, 10)), 0)
+check('STICK_X (facing right)', call(mu, FGET, w0, iid(0, 0x10)), 0.5)
+check('STICK_Y', call(mu, FGET, w0, iid(0, 0x11)), -0.25)
+pad(mu)
+call(mu, FSET, w0, iid(0, 3), 1.0)             # hold shield
+update(mu, 0)
+check('forced SHIELD held', st(mu, 0, 0x3C), 0x8)
+check('forced SHIELD pressed', st(mu, 0, 0x48), 0x8)
+update(mu, 0)
+check('forced SHIELD still held', st(mu, 0, 0x3C), 0x8)
+call(mu, FSET, w0, iid(0, 1), 2.0)             # tap special
+update(mu, 0)
+check('tap SPECIAL: held this update', st(mu, 0, 0x3C), 0xA)
+update(mu, 0)
+check('tap SPECIAL: gone next update', st(mu, 0, 0x3C), 0x8)
+call(mu, FSET, w0, iid(0, 3), 0.0)
+update(mu, 0)
+check('SHIELD let go', st(mu, 0, 0x3C), 0)
+check('SHIELD released bit', st(mu, 0, 0x4C) & 0x8, 0x8)
+call(mu, FSET, w0, iid(0, 6), 1.0)             # side taunt
+update(mu, 0)
+check('forced side taunt = right d-pad', st(mu, 0, 0x3C), 0x4000)
+check('side taunt read', call(mu, FGET, w0, iid(0, 6)), 1)
+call(mu, FSET, w0, iid(0, 6), 0.0)
+call(mu, FSET, w1, iid(0, 0x10), 0.8)          # slot 1 (facing left): stick 0.8 forward
+call(mu, FSET, w1, iid(0, 0x13), 1.0)          # C-stick up
+pad(mu, sx=0.3, cx=0.2)
+update(mu, 1)
+check('forced stick X along the facing (raw)', st(mu, 1, 0, '>f'), -0.8)
+check('forced stick: STICK_X reads 0.8', call(mu, FGET, w1, iid(0, 0x10)), 0.8)
+check('forced C-stick Y', st(mu, 1, 0x80, '>f'), 1.0)
+check('sticks forced flag', call(mu, FGET, w1, iid(0, 0x14)), 1)
+check('slot 0 not forced', (update(mu, 0), st(mu, 0, 0, '>f'))[1], 0.3)
+call(mu, FSET, w1, iid(0, 0x14), 0.0)          # let go
+update(mu, 1)
+check('let go: pad stick again', st(mu, 1, 0, '>f'), 0.3)
+check('opponent of slot 0 = slot 1: its STICK_X fwd', call(mu, FGET, w0, iid(1, 0x10)), -0.3)
+call(mu, FSET, w0, iid(1, 0x15), 1.0)          # turn the opponent's inputs off
+pad(mu, buttons=0x1, sx=0.9, cx=0.9)
+update(mu, 1)
+check('inputs off: no buttons', st(mu, 1, 0x3C), 0)
+check('inputs off: no stick', st(mu, 1, 0, '>f'), 0.0)
+check('inputs off: no C-stick', st(mu, 1, 0x7C, '>f'), 0.0)
+check('inputs off read', call(mu, FGET, w1, iid(0, 0x15)), 1)
+call(mu, FSET, w0, iid(1, 2), 1.0)             # ... but forced jump still goes through
+update(mu, 1)
+check('inputs off + forced JUMP', st(mu, 1, 0x3C), 0x4)
+wi(mu, 1, 0xA1C, 0xB1)                         # KO'd: everything forgotten
+update(mu, 1)
+check('KO clears: pad buttons back', st(mu, 1, 0x3C), 0x1)
+check('KO clears: inputs on', call(mu, FGET, w1, iid(0, 0x15)), 0)
+wi(mu, 1, 0xA1C, 0)
+# state
+wi(mu, 0, 0xA48, 2)
+check('SITUATION air', call(mu, FGET, w0, iid(0, 0x16)), 2)
+call(mu, FSET, w0, iid(0, 0x16), 0.0); check('set SITUATION ground', ri(mu, 0, 0xA48), 0)
+wf(mu, 0, 0xA4C, 42.5)
+check('DAMAGE', call(mu, FGET, w0, iid(0, 0x17)), 42.5)
+call(mu, FSET, w0, iid(0, 0x17), 100.0); check('set DAMAGE 100', call(mu, FGET, w0, iid(0, 0x17)), 100)
+call(mu, FADD, w0, iid(0, 0x17), 5.0); check('add DAMAGE 5', call(mu, FGET, w0, iid(0, 0x17)), 105)
+wi(mu, 0, 0x804, 1); wi(mu, 0, 0x808, 2)
+check('JUMPS_USED', call(mu, FGET, w0, iid(0, 0x18)), 1)
+check('JUMPS_MAX', call(mu, FGET, w0, iid(0, 0x19)), 2)
+call(mu, FSET, w0, iid(0, 0x18), 0.0); check('give the jump back', ri(mu, 0, 0x804), 0)
+wf(mu, 0, 0x80C, 50.0)
+check('SHIELD health', call(mu, FGET, w0, iid(0, 0x1A)), 50)
+call(mu, FSET, w0, iid(0, 0x1A), 10.0); check('set SHIELD health', call(mu, FGET, w0, iid(0, 0x1A)), 10)
+wi(mu, 0, 0xC04, 2)
+check('INTANGIBLE body state', call(mu, FGET, w0, iid(0, 0x1B)), 2)
+check('INVINCIBLE (state 2): 0', call(mu, FGET, w0, iid(0, 0x1C)), 0)
+call(mu, FSET, w0, iid(0, 0x1B), 30.0); check('intangible 30 frames', ri(mu, 0, 0xA5C), 30)
+call(mu, FSET, w0, iid(0, 0x1C), 12.0); check('invincible 12 frames', ri(mu, 0, 0xA60), 12)
+wi(mu, 0, 0xD14, 3); wf(mu, 0, 0xD1C, 20.0)
+check('ARMOR type', call(mu, FGET, w0, iid(0, 0x1D)), 3)
+check('ARMOR threshold (damage)', call(mu, FGET, w0, iid(0, 0x1E)), 20)
+call(mu, FSET, w0, iid(0, 0x1E), 15.0); call(mu, FSET, w0, iid(0, 0x1D), 2.0)
+check('ARMOR set knockback, 15', (ri(mu, 0, 0xD14), struct.unpack('>f', mu.mem_read(0x10370000 + 0xD18, 4))[0]), (2, 15))
+check('ARMOR set 1 (super armor)', (call(mu, FSET, w0, iid(0, 0x1D), 1.0), ri(mu, 0, 0xD14))[1], 1)
+check('q 0x1F: 0', call(mu, FGET, w0, iid(0, 0x1F)), 0)
+check('slot 3 (empty): 0', call(mu, FGET, w0, iid(6, 0)), 0)
+check('target past the end: 0', call(mu, FGET, w0, 0x0F000260), 0)
+check('position IDs still fine', call(mu, FGET, w0, 0x0F00000C), 30)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

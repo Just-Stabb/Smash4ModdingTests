@@ -50,6 +50,9 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
               targets as for the combat variables (0x0F0000A0-0x0F0000F7)
   0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
               (1.0 normally)                      multiplies every animation, ACMD timing too)
+  0x0F000100 + 0x20*target + q   inputs and state: buttons held / pressed (write: force), sticks,
+              inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
+              combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
 
 Reads with no such fighter (no opponent, empty slot, or called from a non-fighter such as an
 article, for self IDs) give 0 and writes do nothing.
@@ -102,7 +105,7 @@ get_hook:
         rlwinm r11, r4, 8, 28, 31       # category
         cmpwi r11, 15
         bne get_other
-        rlwinm. r12, r4, 0, 8, 23       # index must be < 0x100
+        rlwinm. r12, r4, 0, 8, 21       # index must be < 0x400
         bne get_other
         li r5, 0
         {GET_GO}
@@ -113,7 +116,7 @@ set_hook:
         rlwinm r11, r4, 8, 28, 31       # set_float's own first instruction
         cmpwi r11, 15
         bne set_other
-        rlwinm. r12, r4, 0, 8, 23
+        rlwinm. r12, r4, 0, 8, 21
         bne set_other
         li r5, 1
         {SET_GO}
@@ -330,7 +333,7 @@ arith_hook{n}:
         rlwinm r11, r4, 8, 28, 31
         cmpwi r11, 15
         bne arith_other{n}
-        rlwinm. r12, r4, 0, 8, 23
+        rlwinm. r12, r4, 0, 8, 21
         bne arith_other{n}
         li r6, {n}
         b arith
@@ -431,9 +434,10 @@ def check_code(reg, fail):
 # Cemu allocates and maps all of it as code. rpx_patch.py's grow: extends .text into it. (An earlier
 # version reused "unreferenced" functions; one of them was the RPX entry point, 0x04AD2164, and the
 # game wouldn't start.)
-GROW_END = 0x04B79000
+GROW_END = 0x04B7C000
 EXT_REGIONS = [
-    (0x04B78000, 0x04B78A00),           # 0x04B78A00-GROW_END: tools/strike_cave.py
+    (0x04B78000, 0x04B78A00),           # 0x04B78A00-0x04B79000: tools/strike_cave.py, copy_fx_cave.py
+    (0x04B79000, 0x04B7C000),           # input / state variables (inp_*)
 ]
 MSC_WORK = 0x030B2B28      # MSC syscall wrappers (ctx, args): 0x16 WorkModule
 MSC_DAMAGE = 0x030B2F8C    # 0x24 DamageModule
@@ -444,6 +448,25 @@ MSC_STATUS = 0x030B2B98    # 0x18 StatusModule
 MSC_MOTION = 0x030B2A48    # 0x12 MotionModule
 MSC_MOTION_F = 0x030B2A80  # 0x13 MotionModuleF
 MSC_ATTACK = 0x030B50F0    # 0x2E AttackModule
+MSC_WORK_F = 0x030B2B60    # 0x17 WorkModuleF
+MSC_HIT = 0x030B50B8       # 0x2D HitModule
+# Input / state variables (0x0F000100 + 0x20 * target + q, docs/position-variables.md "Inputs and
+# state"). The fighters' controller update (0x020035FC, struct = ControlModule + 0x10, pad source
+# [ControlModule + 0xA4]) is hooked where it has read the source, so forced / disabled inputs go
+# through the game's own press / release / flick / smash-input logic:
+#   0x0200379C / 0x02003810  buttons read (r3), before the analog shield bit is added
+#   0x02003750 / 0x020037BC  main stick stored at struct +0 / +4
+#   0x02003DBC               C-stick stored at struct +0x7C / +0x80 (the update's epilogue)
+# Each replaced instruction is redone by inp_far; r12, r0 and ctr are free at all five.
+INP_HOOKS = [  # (address, return to, replaced instruction)
+    (0x0200379C, 0x020037A0, "rlwinm. r12, r3, 0, 28, 28"),
+    (0x02003810, 0x02003814, "rlwinm. r12, r3, 0, 28, 28"),
+    (0x02003750, 0x02003754, "lwz r12, 0(r31)"),
+    (0x020037BC, 0x020037C0, "lwz r12, 0(r31)"),
+    (0x02003DBC, 0x02003DC0, "lwz r28, 0x28(r1)"),
+]
+JUMPS_USED, JUMPS_MAX = 0x10000001, 0x10000002
+SHIELD_HP = 0x3            # float
 # set_int of each WorkModule class (identical code; other IDs continue in the base copy)
 SET_INT_HOOKS = [0x0200F810, 0x02BCDA88, 0x02DA6208, 0x02F1DDCC, 0x03060A68]
 SET_INT_RESUME = 0x0200F814
@@ -480,6 +503,9 @@ def ext_blocks(SLOTS, SETPOS_CALL):
     return [
 ("""
 var_entry:                              # every hook / arith call: r3 WM, r4 ID, r5 write, f1
+        rlwinm r12, r4, 0, 22, 31
+        cmplwi r12, 0x100
+        bge inp_entry
         rlwinm r12, r4, 0, 24, 31
         cmplwi r12, 0x40
         blt posvar
@@ -969,6 +995,8 @@ ext_b2:                                 # 0xA0 + 8 * target + q: hit / status / 
 """, False),
 ("""
 ext_q2:                                 # r22 = q + 8, r24 = the target's accessor
+        cmpwi r22, 0x40
+        bge inp_have
         cmpwi r22, 0xA
         bge ext_q2_sm
         cmpwi r29, 0                    # q0 / q1: its attack has connected (this move / this frame)
@@ -1104,6 +1132,496 @@ ext_magic:
         .word 0x43300000
         .word 0x80000000
 """, False),
+("""
+inp_entry:                              # 0x100 + 0x20 * target + q: inputs / state (quantity q + 0x40)
+        mflr r0
+        stwu r1, -0x80(r1)
+        stw r0, 0x84(r1)
+        stmw r22, 0x50(r1)
+        stfs f1, 0x10(r1)
+        mr r31, r3
+        rlwinm r30, r4, 0, 22, 31
+        mr r29, r5
+        bl find_self
+        addi r3, r30, -0x100
+        cmplwi r3, 0x160                # 11 targets
+        bge ext_zero
+        clrlwi r11, r3, 27
+        addi r11, r11, 0x40
+        stw r11, 0x14(r1)
+        srwi r22, r3, 5
+        b ext_target
+""", False),
+("""
+inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 posture, r23 WorkModule
+        addi r22, r22, -0x40
+        bl inp_slot                     # r30 = the target's forced-input state (0 = none)
+        cmplwi r22, 0x10
+        blt inp_button
+        cmplwi r22, 0x16
+        blt inp_stick
+        cmplwi r22, 0x18
+        blt inp_sit_dmg
+        cmplwi r22, 0x1A
+        blt inp_jumps
+        beq inp_shield
+        cmplwi r22, 0x1D
+        blt inp_hit
+        cmplwi r22, 0x1F
+        blt inp_armor
+        b ext_zero
+inp_slot:                               # r24 accessor -> r30 = &inp_state[its slot] or 0 (r31 used)
+        mflr r0
+        stwu r1, -0x10(r1)
+        stw r0, 0x14(r1)
+        li r31, 0
+        li r30, 0
+inp_slot_loop:
+        mr r3, r31
+        bl slot
+        cmpwi r3, 0
+        beq inp_slot_next
+        cmplw r12, r24
+        bne inp_slot_next
+        lis r30, inp_state@ha
+        addi r30, r30, inp_state@l
+        slwi r0, r31, 5
+        add r30, r30, r0
+        b inp_slot_done
+inp_slot_next:
+        addi r31, r31, 1
+        cmpwi r31, %(S)d
+        blt inp_slot_loop
+inp_slot_done:
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
+""", False),
+("""
+inp_button:                             # q 0-7 held, 8-15 pressed this frame; write 1 hold, 2 tap, 0 let go
+        clrlwi r26, r22, 29
+        lis r12, inp_masks@ha
+        addi r12, r12, inp_masks@l
+        slwi r0, r26, 2
+        lwzx r28, r12, r0
+        cmpwi r29, 0
+        bne inp_btn_write
+        lwz r27, 0x24(r24)              # ControlModule
+%(CHK_R27)s
+        lwz r27, 0xA0(r27)              # its controller struct
+%(CHK_R27)s
+        lwz r3, 0x3C(r27)               # held
+        cmplwi r22, 8
+        blt inp_btn_have
+        lwz r3, 0x48(r27)               # pressed this frame
+inp_btn_have:
+        and. r3, r3, r28
+        li r3, 0
+        beq ext_ret_int
+        li r3, 1
+        b ext_ret_int
+inp_btn_write:
+        cmpwi r30, 0
+        beq ext_zero
+        addi r12, r12, 0x20             # the masks to force (side taunt: right)
+        lwzx r28, r12, r0
+        bl ext_value_int
+        lwz r5, 0(r30)                  # held
+        lwz r6, 4(r30)                  # tapped (one update)
+        andc r5, r5, r28
+        andc r6, r6, r28
+        cmpwi r3, 1
+        blt inp_btn_set
+        bgt inp_btn_tap
+        or r5, r5, r28
+        b inp_btn_set
+inp_btn_tap:
+        or r6, r6, r28
+inp_btn_set:
+        stw r5, 0(r30)
+        stw r6, 4(r30)
+        b ext_zero
+""", False),
+("""
+inp_stick:                              # q 0x10-0x13 stick X (along the facing) / Y, C-stick X / Y
+        cmplwi r22, 0x14
+        bge inp_stick_misc
+        addi r26, r22, -0x10
+        cmpwi r29, 0
+        bne inp_stick_write
+        lwz r27, 0x24(r24)
+%(CHK_R27)s
+        lwz r27, 0xA0(r27)
+%(CHK_R27)s
+        lis r12, inp_stick_offs@ha
+        addi r12, r12, inp_stick_offs@l
+        slwi r0, r26, 2
+        lwzx r0, r12, r0
+        lfsx f1, r27, r0
+        andi. r0, r26, 1
+        bne ext_ret
+        lfs f0, 0x60(r25)
+        fmuls f1, f1, f0
+        b ext_ret
+inp_stick_write:                        # forced from the next update until 0x14 is written
+        cmpwi r30, 0
+        beq ext_zero
+        lfs f1, 0x10(r1)
+        slwi r0, r26, 2
+        add r12, r30, r0
+        stfs f1, 0x10(r12)
+        li r0, 1                        # bit 0 main stick, bit 1 C-stick
+        cmplwi r26, 2
+        blt inp_sw_flag
+        li r0, 2
+inp_sw_flag:
+        lwz r5, 0xC(r30)
+        or r5, r5, r0
+        stw r5, 0xC(r30)
+        b ext_zero
+inp_stick_misc:                         # q 0x14 sticks forced (write: let go), 0x15 inputs off
+        cmpwi r30, 0
+        beq ext_zero
+        li r26, 0xC
+        cmplwi r22, 0x14
+        beq inp_misc_go
+        li r26, 8
+inp_misc_go:
+        cmpwi r29, 0
+        bne inp_misc_write
+        lwzx r3, r30, r26
+        cmpwi r3, 0
+        li r3, 0
+        beq ext_ret_int
+        li r3, 1
+        b ext_ret_int
+inp_misc_write:
+        li r3, 0
+        cmplwi r22, 0x14
+        beq inp_misc_set
+        bl ext_value_int
+        cmpwi r3, 0
+        li r3, 0
+        beq inp_misc_set
+        li r3, 1
+inp_misc_set:
+        stwx r3, r30, r26
+        b ext_zero
+""", False),
+("""
+inp_sit_dmg:                            # q 0x16 situation (0 ground, 1 ledge, 2 air), 0x17 damage %%
+        cmplwi r22, 0x17
+        beq inp_damage
+        cmpwi r29, 0
+        bne inp_sit_set
+%(SITUATION)s
+        b ext_ret_int
+inp_sit_set:
+        bl ext_value_int
+        mr r22, r3
+%(SET_SITUATION)s
+        b ext_zero
+inp_damage:
+%(DAMAGE)s
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)
+        cmpwi r29, 0
+        beq ext_ret
+        lfs f0, 0x10(r1)                # set: add (value - damage), as DamageModule(9) does
+        fsubs f0, f0, f1
+        stfs f0, 0x8(r1)
+        lwz r22, 0x8(r1)
+%(ADD_DAMAGE)s
+        b ext_zero
+""", False),
+("""
+inp_jumps:                              # q 0x18 jumps used, 0x19 jumps max (ints 0x10000001 / 2)
+        lis r26, 0x1000
+        ori r26, r26, 1
+        cmplwi r22, 0x18
+        beq inp_j_go
+        addi r26, r26, 1
+inp_j_go:
+        cmpwi r29, 0
+        bne inp_j_set
+%(GET_WORK_R26)s
+        b ext_ret_int
+inp_j_set:
+        bl ext_value_int
+        mr r22, r3
+%(SET_WORK_R26)s
+        b ext_zero
+inp_shield:                             # q 0x1A shield health (float 0x3)
+        cmpwi r29, 0
+        bne inp_sh_set
+%(GET_SHIELD)s
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)
+        b ext_ret
+inp_sh_set:
+        lwz r22, 0x10(r1)
+%(SET_SHIELD)s
+        b ext_zero
+""", False),
+("""
+inp_hit:                                # q 0x1B body state / intangible frames, 0x1C invincible
+        mr r26, r22
+        cmpwi r29, 0
+        bne inp_hit_set
+        lwz r3, 0x58(r24)               # HitModule
+%(CHK_R3)s
+        lwz r12, 0(r3)
+%(CHK_VT)s
+        lwz r12, 0x10C(r12)             # its state: max(status body state, frame state)
+        li r4, 0
+        mtctr r12
+        bctrl
+        cmplwi r26, 0x1B
+        beq ext_ret_int                 # 0 normal, 1 invincible, 2-4 intangible
+        cmpwi r3, 1
+        li r3, 0
+        bne ext_ret_int
+        li r3, 1
+        b ext_ret_int
+inp_hit_set:
+        bl ext_value_int
+        mr r22, r3
+        cmplwi r26, 0x1B
+        bne inp_inv_set
+%(SET_INTANGIBLE)s
+        b ext_zero
+inp_inv_set:
+%(SET_INVINCIBLE)s
+        b ext_zero
+""", False),
+("""
+inp_armor:                              # q 0x1D armor type, 0x1E its threshold (DamageModule +0x14..)
+        lwz r27, 0x54(r24)              # DamageModule
+%(CHK_R27)s
+        cmplwi r22, 0x1E
+        beq inp_thr
+        cmpwi r29, 0
+        bne inp_arm_set
+        lwz r3, 0x14(r27)               # 0 none, 1 super armor, 2 knockback, 3 damage
+        b ext_ret_int
+inp_arm_set:
+        bl ext_value_int
+        mr r22, r3
+        lwz r26, 0x1C(r27)              # damage threshold
+        cmpwi r22, 2
+        bne inp_arm_go
+        lwz r26, 0x18(r27)              # knockback threshold
+inp_arm_go:
+%(SET_ARMOR)s
+        b ext_zero
+inp_thr:
+        cmpwi r29, 0
+        bne inp_thr_set
+        lfs f1, 0x1C(r27)
+        lwz r0, 0x14(r27)
+        cmpwi r0, 2
+        bne ext_ret
+        lfs f1, 0x18(r27)
+        b ext_ret
+inp_thr_set:
+        lfs f1, 0x10(r1)
+        stfs f1, 0x18(r27)
+        stfs f1, 0x1C(r27)
+        b ext_zero
+""", False),
+("""
+inp_far:                                # from inp_tramp_k with r12 = k: force / disable the inputs
+        stwu r1, -0xC0(r1)              # of the fighter whose controller struct is r30
+        mflr r0
+        stw r0, 0xC4(r1)
+        mfcr r0
+        stw r0, 0x38(r1)
+        stmw r3, 0x40(r1)               # r3-r31 at 0x40-0xB3 (r3 = the buttons at k 0 / 1)
+        stfs f0, 0xB8(r1)
+        stfs f1, 0xBC(r1)
+        stw r12, 0x8(r1)
+        mr r31, r12
+        addi r29, r30, -0x10            # its ControlModule
+        li r28, 0
+inpf_loop:
+        mr r3, r28
+        bl slot
+        cmpwi r3, 0
+        beq inpf_next
+        lwz r0, 0x24(r12)
+        cmplw r0, r29
+        beq inpf_found
+inpf_next:
+        addi r28, r28, 1
+        cmpwi r28, %(S)d
+        blt inpf_loop
+        b inpf_done
+inpf_found:                             # r28 slot, r3 posture, r12 accessor
+        mr r25, r3
+        mr r24, r12
+        lis r27, inp_state@ha
+        addi r27, r27, inp_state@l
+        slwi r0, r28, 5
+        add r27, r27, r0
+        cmpwi r31, 2
+        bge inpf_stick
+%(STATUS)s
+        cmpwi r3, 0xB1                  # KO'd, respawning, entrance, results: forget it all
+        beq inpf_clear
+        cmpwi r3, 0xB2
+        beq inpf_clear
+        cmpwi r3, 0x14F
+        blt inpf_btn
+        cmpwi r3, 0x151
+        bgt inpf_btn
+inpf_clear:
+        li r0, 0
+        stw r0, 0(r27)
+        stw r0, 4(r27)
+        stw r0, 8(r27)
+        stw r0, 0xC(r27)
+        b inpf_done
+inpf_btn:
+        lwz r3, 0x40(r1)                # the buttons read from the pad
+        lwz r0, 8(r27)
+        cmpwi r0, 0
+        beq inpf_btn_on
+        li r3, 0                        # inputs off: no buttons, no analog shield
+        lis r12, consts@ha
+        lfs f0, consts@l(r12)
+        stfs f0, 0x30(r30)
+inpf_btn_on:
+        lwz r0, 0(r27)
+        or r3, r3, r0
+        lwz r0, 4(r27)
+        or r3, r3, r0
+        li r0, 0
+        stw r0, 4(r27)                  # a tap lasts one update
+        stw r3, 0x40(r1)
+        b inpf_done
+""", False),
+("""
+inpf_stick:                             # k 2 / 3: main stick at +0 / +4, k 4: C-stick at +0x7C / +0x80
+        li r26, 1
+        li r29, 0
+        li r23, 0x10
+        cmpwi r31, 4
+        bne inpf_s_go
+        li r26, 2
+        li r29, 0x7C
+        li r23, 0x18
+inpf_s_go:
+        lwz r0, 0xC(r27)
+        and. r0, r0, r26
+        beq inpf_s_off
+        lfsx f0, r27, r23               # X is along the fighter's facing
+        lfs f1, 0x60(r25)
+        fmuls f0, f0, f1
+        stfsx f0, r30, r29
+        addi r23, r23, 4
+        addi r29, r29, 4
+        lfsx f0, r27, r23
+        stfsx f0, r30, r29
+        b inpf_done
+inpf_s_off:
+        lwz r0, 8(r27)
+        cmpwi r0, 0
+        beq inpf_done
+        lis r12, consts@ha
+        lfs f0, consts@l(r12)
+        stfsx f0, r30, r29
+        addi r29, r29, 4
+        stfsx f0, r30, r29
+inpf_done:
+        lwz r12, 0x8(r1)
+        slwi r0, r12, 2
+        lis r12, inp_ret@ha
+        addi r12, r12, inp_ret@l
+        lwzx r0, r12, r0
+        mtctr r0
+        lfs f0, 0xB8(r1)
+        lfs f1, 0xBC(r1)
+        lwz r0, 0xC4(r1)
+        mtlr r0
+        lwz r0, 0x38(r1)
+        mtcrf 0xFF, r0
+        lwz r12, 0x8(r1)
+        lmw r3, 0x40(r1)
+        addi r1, r1, 0xC0
+        cmpwi r12, 2                    # the replaced instruction, then back
+        blt inpf_ret_btn
+        cmpwi r12, 4
+        blt inpf_ret_stick
+        lwz r28, 0x28(r1)
+        bctr
+inpf_ret_btn:
+        rlwinm. r12, r3, 0, 28, 28
+        bctr
+inpf_ret_stick:
+        lwz r12, 0(r31)
+        bctr
+""", False),
+("""
+inp_tramp:                              # @near: the controller update's hooks branch here
+        lis r12, inp_far@ha
+        addi r12, r12, inp_far@l
+        mtctr r12
+        li r12, 0
+        bctr
+inp_tramp1:
+        lis r12, inp_far@ha
+        addi r12, r12, inp_far@l
+        mtctr r12
+        li r12, 1
+        bctr
+inp_tramp2:
+        lis r12, inp_far@ha
+        addi r12, r12, inp_far@l
+        mtctr r12
+        li r12, 2
+        bctr
+inp_tramp3:
+        lis r12, inp_far@ha
+        addi r12, r12, inp_far@l
+        mtctr r12
+        li r12, 3
+        bctr
+inp_tramp4:
+        lis r12, inp_far@ha
+        addi r12, r12, inp_far@l
+        mtctr r12
+        li r12, 4
+        bctr
+""", False),
+("""
+inp_ret:                                # where each hook goes back to
+%(INP_RET)s
+inp_masks:                              # button -> held / pressed bits: attack, special, jump, shield,
+        .word 0x1                       # grab, up taunt, side taunt (either), down taunt
+        .word 0x2
+        .word 0x4
+        .word 0x8
+        .word 0x10
+        .word 0x400
+        .word 0x6000
+        .word 0x1000
+        .word 0x1                       # the bits forced
+        .word 0x2
+        .word 0x4
+        .word 0x8
+        .word 0x10
+        .word 0x400
+        .word 0x4000
+        .word 0x1000
+inp_stick_offs:
+        .word 0
+        .word 4
+        .word 0x7C
+        .word 0x80
+inp_state:                              # per slot: held, tapped, inputs off, sticks forced (bit 0 main,
+%(INP_STATE)s
+""", False),
     ], dict(
         S=SLOTS, SETPOS=SETPOS_CALL,
         DEALT=msc(MSC_DAMAGE_F, 1),
@@ -1122,7 +1640,16 @@ ext_magic:
         LAST_ATTACKER=msc(MSC_WORK, 6, LAST_ATTACKER),
         CHK_VT=chk("r12", "ext_zero"), CHK_R3=chk("r3", "ext_zero"), CHK_R6=chk("r6", "ext_last_fb"), CHK_R7=chk("r7", "ext_last_next"),
         HS_HI=hex(HITSTUN >> 16), HS_LO=hex(HITSTUN & 0xFFFF),
-        WK_HI=hex(MSC_WORK >> 16), WK_LO=hex(MSC_WORK & 0xFFFF))
+        WK_HI=hex(MSC_WORK >> 16), WK_LO=hex(MSC_WORK & 0xFFFF),
+        CHK_R27=chk("r27", "ext_zero"),
+        SITUATION=msc(MSC_STATUS, 1), SET_SITUATION=msc(MSC_STATUS, 2, "r22"),
+        DAMAGE=msc(MSC_DAMAGE_F, 0), ADD_DAMAGE=msc(MSC_DAMAGE, 9, "r22"),
+        GET_WORK_R26=msc(MSC_WORK, 6, "r26"), SET_WORK_R26=msc(MSC_WORK, 7, "r22", "r26"),
+        GET_SHIELD=msc(MSC_WORK_F, 0, SHIELD_HP), SET_SHIELD=msc(MSC_WORK, 0, "r22", SHIELD_HP),
+        SET_INTANGIBLE=msc(MSC_HIT, 2, "r22"), SET_INVINCIBLE=msc(MSC_HIT, 1, "r22", 0),
+        SET_ARMOR=msc(MSC_DAMAGE, 0xB, "r22", "r26"),
+        INP_RET="\n".join("        .word 0x%08X" % r for _h, r, _i in INP_HOOKS),
+        INP_STATE="\n".join(["        .word 0"] * (8 * SLOTS)))
 
 
 def count(text):
@@ -1232,6 +1759,8 @@ def words():
     labels = parts[0].labels
     for hook in SET_INT_HOOKS:
         out[hook] = branch(hook, labels["seti_hook"])
+    for k, (hook, _ret, _ins) in enumerate(INP_HOOKS):
+        out[hook] = branch(hook, labels["inp_tramp" if k == 0 else "inp_tramp%d" % k])
     for get, set_, *arith in CLASSES:
         out[get] = branch(get, labels["get_hook"])
         out[set_] = branch(set_, labels["set_hook"])

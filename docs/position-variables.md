@@ -121,6 +121,50 @@ second hitbox comes out and the fighter it hit goes into shield break (status `0
 (shield break: `0x59` launch, `0x5A` tumble, `0x5B` landing, `0x5C`–`0x5E` dizzy). A status
 change takes effect on the fighter's next frame.
 
+## Inputs and state
+
+`0x0F000100 + 0x20 × target + quantity`, same targets as above (0 self, 1 nearest opponent, 2 last
+fighter hit, 3–10 player slots 1–8), so `0x0F000100`–`0x0F00025F`. Sm4shCommand names them
+`TARGET_QUANTITY`, e.g. `SELF_ATTACK`, `OPP_INPUT_OFF`, `SLOT2_DAMAGE`. Test them with
+**`Float_Var_Compare`** and set them with **`SET_FLOAT`** (`ADD_FLOAT` etc. work too).
+
+| quantity | read | write |
+|---|---|---|
+| +0 `ATTACK`, +1 `SPECIAL`, +2 `JUMP`, +3 `SHIELD`, +4 `GRAB`, +5 `TAUNT_UP`, +6 `TAUNT_SIDE`, +7 `TAUNT_DOWN` | 1 while that button is held | **1** hold it until **0** is written, **2** press it for one frame, **0** stop forcing it |
+| +8 to +0xF: the same buttons `_PRESSED` | 1 only on the frame it's pressed | as above |
+| +0x10 `STICK_X`, +0x11 `STICK_Y` | control stick, −1 to 1; X along the fighter's facing (positive = forward) | force the stick to the value until `STICK_FORCED` is written |
+| +0x12 `CSTICK_X`, +0x13 `CSTICK_Y` | C-stick, the same way | force the C-stick |
+| +0x14 `STICK_FORCED` | 1 while a stick is forced | any value: stop forcing both sticks |
+| +0x15 `INPUT_OFF` | 1 while its own inputs are ignored | **1** ignore its buttons and sticks (forced ones still work), **0** back on |
+| +0x16 `SITUATION` | 0 ground, 1 ledge, 2 air | set it (`StatusModule(2, value)`; the status itself doesn't change) |
+| +0x17 `DAMAGE` | damage % | set it (the counter updates) |
+| +0x18 `JUMPS_USED`, +0x19 `JUMPS_MAX` | jumps used / in all (ints `0x10000001` / `0x10000002`) | set them (`JUMPS_USED` 0 gives every jump back) |
+| +0x1A `SHIELD_HP` | shield health (float `0x3`) | set it |
+| +0x1B `INTANGIBLE` | body state: 0 normal, 1 invincible, 2–4 intangible (the stronger of the status's own and the timed one) | intangible for N frames (`HitModule(2, N)`) |
+| +0x1C `INVINCIBLE` | 1 while invincible | invincible for N frames (`HitModule(1, N, 0)`) |
+| +0x1D `ARMOR` | 0 none, 1 super armor, 2 knockback-based, 3 damage-based | set it (`DamageModule(0xB, type, threshold)`, threshold from `ARMOR_THRESHOLD`) |
+| +0x1E `ARMOR_THRESHOLD` | the threshold (knockback for 2, damage for 3) | set it; write it before `ARMOR` |
+| +0x1F | 0 | ignored |
+
+**Forced inputs** go in where the game reads the controller, so they act exactly like pressing the
+button or tilting the stick: a forced press is "pressed this frame" on its first frame, a stick
+forced from neutral to 1.0 counts as a smash input, and so on. They work on CPUs too. They last
+until changed, and are all cleared when the fighter is KO'd, respawns, or is in the match's
+entrance or results (so nothing carries into the next stock or match). Example: a move that makes
+the fighter it hit jump and drop its shield, and can't be mashed out of for 30 frames:
+
+    Float_Var_Compare(Variable=SELF_HIT_NOW, Method=0, Value=1)
+    True(Offset=0){
+        SET_FLOAT(Value=1, Variable=LASTHIT_INPUT_OFF)
+        SET_FLOAT(Value=2, Variable=LASTHIT_JUMP)
+    }
+    WAIT(Frames=30)
+    SET_FLOAT(Value=0, Variable=LASTHIT_INPUT_OFF)
+
+Checking an input: `Float_Var_Compare(Variable=SELF_SPECIAL_PRESSED, Method=0, Value=1)`;
+`Float_Var_Compare(Variable=SELF_STICK_Y, Method=5, Value=0.5)` for the stick up past halfway
+(Methods: 0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`; the game's table at `0x10351804`).
+
 ## Animation rate
 
 `0x0F000098`, self only.
@@ -145,9 +189,8 @@ ACMD: grab-style "pull the opponent in front of me" on frame 10:
     SET_FLOAT(Value=12, Variable=0x0F00000C)
     SET_FLOAT(Value=0, Variable=0x0F00000D)
 
-ACMD: only do something when the opponent is within 20 units. The method numbers are assumed to
-follow Int_Var_Compare's description: 0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`. That order is
-unconfirmed, so check it in game:
+ACMD: only do something when the opponent is within 20 units. The methods are 0 `==`, 1 `!=`,
+2 `<=`, 3 `>=`, 4 `<`, 5 `>` (confirmed: the compare functions' table at `0x10351804`):
 
     if(Float_Var_Compare(Variable=0x0F00000B, Method=0x4, Value=20)){
         ...

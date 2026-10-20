@@ -4,7 +4,7 @@
   python3 tools/rpx_patch.py IN.rpx OUT.rpx ... $(python3 tools/position_vars_cave.py) \\
       $(python3 tools/strike_cave.py) $(python3 tools/copy_fx_cave.py)
 
-(after position_vars_cave.py, whose grow:0x04B79000 makes the code space this uses; it sits after
+(after position_vars_cave.py, whose grow:0x04B7C000 makes the code space this uses; it sits after
 strike_cave.py's, which ends before 0x04B78E80. The hook is too far from there for a branch, so it
 goes through TRAMP, 4 free words at the end of copy_custom_cave.py's CAVE_C space in the Havok cave.)
 

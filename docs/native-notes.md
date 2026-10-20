@@ -816,6 +816,49 @@ indices < 0x40 in the position code and sends the rest to `ext`.
   don't match), the attacker is the fighter whose attack's hit records hold the victim, and if its
   multiplier is set and it's still in the same status, the value is multiplied; a stale one is cleared.
 
+## Controller (ControlModule) and the input / state variables
+
+`tools/position_vars_cave.py`, IDs `0x0F000100`–`0x0F00025F` (user docs: `docs/position-variables.md`
+"Inputs and state"). The hooks now take category-F indices < `0x400`; `var_entry` sends `>= 0x100`
+to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C000`).
+
+- **ControlModule:** accessor `+0x24`. Classes: ControlModuleImpl (vtable `0x10104D3C`, 0xB4 bytes,
+  `control_module_impl.cpp`, code `0x02C1B000`–`0x02C1F000`), another `0x101053DC`, fighters'
+  `0x1012B30C` (`0x02E7xxxx`). MSC handlers: int vtable `+0x2F4` (`0x02C1C7D0`, ops 0–`0x1E` and
+  `0x2710`–`0x2727`), float `+0x2FC` (`0x02C1D53C`, ops 0–8). `+0xA0` → the controller struct
+  (inline at `+0x10`), `+0xA4` the pad source (an object with vtable: `+0x1C` prepare, `+0x24`
+  stick (r3 / r4 float bits), `+0x34` buttons, `+0x3C` triggers, `+0x7C` C-stick), `+0xA8` flips
+  stick X for ControlModuleF(0) / (7).
+- **Struct** (class with vtable `0x100006B0` at `+0x8C`, constructor `0x02003314`): `+0` / `+4` stick
+  X / Y (X screen-space: + = right), `+8` / `+C` last frame's, `+0x30` analog shield, `+0x3C` held
+  buttons, `+0x40` last frame's, `+0x48` pressed this frame, `+0x4C` released, `+0x50`… per-button
+  frame counters, `+0x70`… stick flick counters, `+0x7C` / `+0x80` C-stick X / Y.
+  ControlModule(`0x2710` / `0x2711` / `0x2712` / `0x2713`, button) = pressed / released / held /
+  not held; ControlModuleF(0, 1) stick, (7, 8) C-stick.
+- **Button bits** (MSC button → bit, table `0x10000670`): 0 attack `0x1`, 1 special `0x2`, 2 jump
+  `0x4`, 3 shield `0x8`, 4 smash (A+B / C-stick) `0x20`, 5–8 d-pad up / down / left / right `0x400`
+  / `0x1000` / `0x2000` / `0x4000` (taunts), 9 grab (Z) `0x10`, 10 / 11 C-stick `0x40` / `0x80`,
+  12 / 13 A+B `0x8000` / `0x100`, 14 `0x200`, 15 `0x800`.
+- **Update** `0x020035FC(struct, source, accumulate)`, called by the fighter control module's
+  `0x02E729E4` (twice when accumulating). It reads the source and derives presses, releases and
+  flicks from the result, so the hooks change the read values: buttons after `+0x34`
+  (`0x0200379C` / `0x02003810`), stick after it's stored (`0x02003750` / `0x020037BC`), C-stick at
+  the epilogue (`0x02003DBC`). The hook sites branch to trampolines in the first cave (only there are
+  they in reach), which jump to `inp_far`. Per-slot forced state (`inp_state`, 0x20 a slot: held,
+  tapped, inputs off, sticks-forced bits, stick / C-stick values) is cleared in status `0xB1`
+  Dead, `0xB2` Rebirth, `0x14F`–`0x151` Entry / Win / Lose. The update uses paired-single
+  saves (Unicorn can't run them: the emulator test nops them) and calls sqrt at `0x02000AE0`.
+- **State:** situation = StatusModule(1) / (2, value). Damage = DamageModuleF(0); DamageModule(9, %)
+  adds (negative heals; the counter updates). Jumps: ints `0x10000001` used / `0x10000002` max.
+  Shield health: float `0x3` (WorkModuleF wrapper `0x030B2B60`). HitModule (accessor `+0x58`,
+  wrapper `0x030B50B8`, vtable `0x10107774`): state sets at `+0x40` (0x38 each): `+0x1C` the status's
+  body state (op 0), `+0x24` intangible frames (op 2), `+0x28` invincible frames (op 1), `+0x20`
+  their result (2 / 1 / 0); vtable `+0x10C(this, 0)` = max of the two. DamageModule (accessor
+  `+0x54`): armor op `0xB(type, threshold)` → `+0x14` type, `+0x18` knockback threshold, `+0x1C`
+  damage threshold.
+- Float_Var_Compare / the compare functions (`0x02BEE010`, table `0x10351804`): method 0 `==`,
+  1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`.
+
 ## MotionModule rates (animation speed)
 
 MotionModuleImpl (`app\battle_object\modules\motion\motion_module_impl.cpp`, code

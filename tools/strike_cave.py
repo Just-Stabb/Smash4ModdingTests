@@ -4,7 +4,7 @@
   python3 tools/rpx_patch.py IN.rpx OUT.rpx ... $(python3 tools/position_vars_cave.py) \\
       $(python3 tools/strike_cave.py)
 
-(after position_vars_cave.py, whose grow:0x04B79000 makes the code space this uses.)
+(after position_vars_cave.py, whose grow:0x04B7C000 makes the code space this uses.)
 
 A fighter is "Strike Kirby" when its WorkModule instance int 0x1000008E (Kirby's trait marker,
 written every frame by kirby_trait_update() in fighters/kirby/kirby.c) is 0x4B49xxxx with bit

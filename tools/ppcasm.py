@@ -23,7 +23,7 @@ D_OPS = {"lwz": 32, "lbz": 34, "stw": 36, "stwu": 37, "stb": 38, "lmw": 46, "stm
          "lfs": 48, "stfs": 52, "lfd": 50, "stfd": 54}
 IMM_OPS = {"addi": 14, "addis": 15, "mulli": 7, "ori": 24, "oris": 25, "xori": 26, "xoris": 27,
            "andi.": 28, "cmpwi": 11, "cmplwi": 10}
-X_OPS = {"add": 266, "subf": 40, "mullw": 235, "and": 28, "or": 444, "xor": 316, "slw": 24,
+X_OPS = {"add": 266, "subf": 40, "mullw": 235, "and": 28, "andc": 60, "or": 444, "xor": 316, "slw": 24,
          "srw": 536, "lwzx": 23, "stwx": 151, "lfsx": 535, "stfsx": 663}
 FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59, 18),
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),
@@ -143,7 +143,7 @@ class Asm:
             rc = op.endswith(".")
             base = op.rstrip(".")
             a, b_, c = (reg(x) for x in args)
-            if base in ("and", "or", "xor", "slw", "srw"):   # rA, rS, rB
+            if base in ("and", "andc", "or", "xor", "slw", "srw"):   # rA, rS, rB
                 return (31 << 26) | (b_ << 21) | (a << 16) | (c << 11) | (X_OPS[base] << 1) | rc
             return (31 << 26) | (a << 21) | (b_ << 16) | (c << 11) | (X_OPS[base] << 1) | rc
         if op in ("mr", "mr."):
@@ -156,6 +156,10 @@ class Asm:
             ra, rs, n = reg(args[0]), reg(args[1]), num(args[2])
             sh, mb, me = {"slwi": (n, 0, 31 - n), "srwi": ((32 - n) % 32, n, 31)}.get(op.rstrip("."), (0, n, 31))
             return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | op.endswith(".")
+        if op == "mfcr":
+            return (31 << 26) | (reg(args[0]) << 21) | (19 << 1)
+        if op == "mtcrf":                                # mtcrf FXM, rS
+            return (31 << 26) | (reg(args[1]) << 21) | ((num(args[0]) & 0xFF) << 12) | (144 << 1)
         if op in ("mflr", "mtlr", "mtctr"):
             spr = 0x100 if op != "mtctr" else 0x120     # spr field with halves swapped (8 / 9)
             xo = 339 if op == "mflr" else 467
