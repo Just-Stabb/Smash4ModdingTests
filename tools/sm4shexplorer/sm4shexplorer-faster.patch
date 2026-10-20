@@ -1,0 +1,772 @@
+From b1e78c462a5886ba1210d0295e12573031ec8020 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 20 Oct 2026 11:13:58 +0000
+Subject: [PATCH] Faster builds (stored data for untouched package files,
+ compression cache, parallel compression) and Extract vanilla
+
+---
+ Sm4shFileExplorer/RFManager.cs        | 109 +++++++--
+ Sm4shFileExplorer/Sm4shProject.cs     | 331 ++++++++++++++++++++++----
+ Sm4shFileExplorer/UI/Main.Designer.cs |  13 +-
+ Sm4shFileExplorer/UI/Main.cs          |   8 +
+ 4 files changed, 394 insertions(+), 67 deletions(-)
+
+diff --git a/Sm4shFileExplorer/RFManager.cs b/Sm4shFileExplorer/RFManager.cs
+index e1e9258..a4a8884 100644
+--- a/Sm4shFileExplorer/RFManager.cs
++++ b/Sm4shFileExplorer/RFManager.cs
+@@ -24,6 +24,7 @@ internal class RFManager
+         public bool SkipTrashEntries { get; set; }
+         public bool ForceOriginalFlags { get; set; }
+         private Dictionary<string, DataSource> _CachedDataSources = new Dictionary<string, DataSource>();
++        private Dictionary<int, FileStream> _DtStreams = new Dictionary<int, FileStream>();
+         #endregion
+ 
+         #region Constructors
+@@ -277,24 +278,10 @@ public bool ExtractFileFromPatch(ResourceItem rItem, string outputFile)
+                     }
+                 }
+ 
+-                string mainfolder = "";
+-                string gamePackedFile = PathHelper.GetGameFolder(PathHelperEnum.FOLDER_PATCH) + rItem.AbsolutePath.Replace('/', Path.DirectorySeparatorChar);
+                 if (!rItem.AbsolutePath.EndsWith("/"))
+                 {
+                     DataSource packedSource;
+-
+-                    //If packed file not datasourced yet
+-                    string packed = rItem.PatchItem.AbsolutePath;
+-                    if (!_CachedDataSources.TryGetValue(packed, out packedSource))
+-                    {
+-                        string path = gamePackedFile.Substring(0, gamePackedFile.LastIndexOf("\\data")) + Path.DirectorySeparatorChar + packed.Replace("/", "\\") + "packed";
+-                        if (File.Exists(path))
+-                        {
+-                            packedSource = new DataSource(FileMap.FromFile(path));
+-                            _CachedDataSources.Add(packed, packedSource);
+-                            mainfolder = path.Remove(path.Length - 6);
+-                        }
+-                    }
++                    TryGetPatchPackedSource(rItem, out packedSource);
+ 
+                     var fileData = new byte[0];
+ 
+@@ -319,11 +306,103 @@ public bool ExtractFileFromPatch(ResourceItem rItem, string outputFile)
+             }
+         }
+ 
++        /// <summary>
++        /// The game's own stored bytes of a file (zlib-compressed or not, as they are in the DT files or
++        /// the patch's packed file), without decompressing them, so that a package being rebuilt can
++        /// take an untouched file as it is instead of decompressing and compressing it again.
++        /// </summary>
++        /// <returns>false if the file can't be taken as it is (the caller then extracts it as usual)</returns>
++        public bool TryGetStoredData(ResourceItem rItem, out byte[] data, out uint cmpSize, out uint decSize)
++        {
++            data = null;
++            cmpSize = decSize = 0;
++            try
++            {
++                if (rItem.IsFolder || rItem.CmpSize == 0 || rItem.OverridePackedFile)
++                    return false;
++
++                if (rItem.Source == FileSource.LS)
++                {
++                    if (rItem.LSEntryInfo == null)
++                        return false;
++                    FileStream dt;
++                    if (!_DtStreams.TryGetValue(rItem.LSEntryInfo.DTIndex, out dt))
++                    {
++                        dt = new FileStream(_DtPaths[rItem.LSEntryInfo.DTIndex], FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
++                        _DtStreams.Add(rItem.LSEntryInfo.DTIndex, dt);
++                    }
++                    data = new byte[rItem.CmpSize];
++                    dt.Position = (long)rItem.LSEntryInfo.DTOffset + rItem.OffInPack;
++                    int read = 0;
++                    while (read < data.Length)
++                    {
++                        int n = dt.Read(data, read, data.Length - read);
++                        if (n <= 0)
++                            return false;
++                        read += n;
++                    }
++                    cmpSize = rItem.CmpSize;
++                    decSize = rItem.DecSize;
++                }
++                else if (rItem.Source == FileSource.Patch)
++                {
++                    //Files the patch has on their own are copied (and recompressed) as before
++                    string gameFile = PathHelper.GetGameFolder(PathHelperEnum.FOLDER_PATCH) + rItem.PatchItem.AbsolutePath.Replace('/', Path.DirectorySeparatorChar);
++                    if (File.Exists(gameFile))
++                        return false;
++                    DataSource packedSource;
++                    if (!TryGetPatchPackedSource(rItem, out packedSource))
++                        return false;
++                    byte[] checkCmp = packedSource.Slice((int)rItem.OffInPack, 2);
++                    bool compressed = checkCmp[0] == 0x78 && checkCmp[1] == 0x9c;
++                    cmpSize = compressed ? rItem.CmpSize : rItem.DecSize;
++                    decSize = rItem.DecSize;
++                    data = packedSource.Slice((int)rItem.OffInPack, (int)cmpSize);
++                }
++                else
++                    return false;
++
++                //Same cases as the extraction: compressed data starts with 78 9C (and then is smaller),
++                //anything else is stored as it is. Data starting with padding (CC) goes the usual way.
++                if (data.Length < 4 || BitConverter.ToUInt32(data, 0) == 0xCCCCCCCC)
++                    return false;
++                bool isZlib = data[0] == 0x78 && data[1] == 0x9c;
++                if (isZlib != (cmpSize != decSize))
++                    return false;
++                return true;
++            }
++            catch (Exception e)
++            {
++                LogHelper.Debug(string.Format("Can't take '{0}' as stored ({1}), extracting it", rItem.AbsolutePath, e.Message));
++                data = null;
++                return false;
++            }
++        }
++
++        private bool TryGetPatchPackedSource(ResourceItem rItem, out DataSource packedSource)
++        {
++            //If packed file not datasourced yet
++            string packed = rItem.PatchItem.AbsolutePath;
++            if (_CachedDataSources.TryGetValue(packed, out packedSource))
++                return true;
++
++            string gamePackedFile = PathHelper.GetGameFolder(PathHelperEnum.FOLDER_PATCH) + rItem.AbsolutePath.Replace('/', Path.DirectorySeparatorChar);
++            string path = gamePackedFile.Substring(0, gamePackedFile.LastIndexOf("\\data")) + Path.DirectorySeparatorChar + packed.Replace("/", "\\") + "packed";
++            if (!File.Exists(path))
++                return false;
++            packedSource = new DataSource(FileMap.FromFile(path));
++            _CachedDataSources.Add(packed, packedSource);
++            return true;
++        }
++
+         public void ClearCachedDataSources()
+         {
+             foreach (DataSource ds in _CachedDataSources.Values)
+                 ds.Close();
+             _CachedDataSources = new Dictionary<string, DataSource>();
++            foreach (FileStream dt in _DtStreams.Values)
++                dt.Dispose();
++            _DtStreams = new Dictionary<int, FileStream>();
+         }
+ 
+         /// <summary>
+diff --git a/Sm4shFileExplorer/Sm4shProject.cs b/Sm4shFileExplorer/Sm4shProject.cs
+index dff654d..9eb4f9e 100644
+--- a/Sm4shFileExplorer/Sm4shProject.cs
++++ b/Sm4shFileExplorer/Sm4shProject.cs
+@@ -7,7 +7,9 @@
+ using System.IO;
+ using System.Linq;
+ using System.Reflection;
++using System.Security.Cryptography;
+ using System.Text.RegularExpressions;
++using System.Threading.Tasks;
+ using System.Windows.Forms;
+ using System.Xml;
+ using System.Xml.Serialization;
+@@ -24,6 +26,28 @@ public class Sm4shProject
+         private RFManager _RfManager;
+         private BindingList<Sm4shBasePlugin> _Plugins;
+         private string _CachedSDPath;
++
++        //Package rebuilding: untouched files are taken as the game stores them (no decompression / compression)
++        private Dictionary<string, FileBinary> _StoredPackageFiles = new Dictionary<string, FileBinary>(StringComparer.OrdinalIgnoreCase);
++        private bool _ExtractStoredForPacking;
++        private const int COMPRESSION_CACHE_DAYS = 30;
++        #endregion
++
++        #region Nested types
++        private class FileBinary
++        {
++            public byte[] Data;
++            public uint CmpSize;
++            public uint DecSize;
++        }
++
++        private class PendingFile
++        {
++            public ResourceItem Item;
++            public string File;
++            public string SavePath;
++            public FileBinary Binary;
++        }
+         #endregion
+ 
+         #region Properties
+@@ -274,10 +298,45 @@ public string ExtractResource(ResourceCollection resCol, string relativePath)
+         {
+             return ExtractResource(resCol, relativePath, PathHelper.FolderExtract);
+         }
++
++        /// <summary>
++        /// Extract the game's own (vanilla) version of a resource to the "extract/vanilla" folder,
++        /// even when the workspace has a mod file for it (the mod file is left as it is)
++        /// If you wish to extract a folder, don't forget the "/" at the end
++        /// </summary>
++        /// <param name="absolutePath">Absolute path</param>
++        /// <returns>Path to the file or folder extracted</returns>
++        public string ExtractVanillaResource(string absolutePath)
++        {
++            ResourceCollection resCol = GetResourceCollection(absolutePath);
++            string relativePath = GetRelativePath(absolutePath);
++            string outputFolder = PathHelper.FolderExtract + "vanilla";
++            if (!relativePath.EndsWith("/"))
++                return ExtractFile(resCol, relativePath, outputFolder, false, true);
++            return ExtractFolder(resCol, relativePath, outputFolder, true);
++        }
++
++        /// <summary>
++        /// true if the game has its own version of this resource (it can be extracted as vanilla)
++        /// </summary>
++        public bool HasVanillaResource(string absolutePath)
++        {
++            if (string.IsNullOrEmpty(absolutePath) || absolutePath.IndexOf('/') < 0)
++                return false;
++            ResourceCollection resCol = _resCols.FirstOrDefault(p => p.PartitionName == absolutePath.Substring(0, absolutePath.IndexOf('/')));
++            if (resCol == null)
++                return false;
++            return resCol.CachedFilteredResources.ContainsKey(GetRelativePath(absolutePath)); //folders too ("path/")
++        }
+         #endregion
+ 
+         #region private methods
+         private string ExtractFile(ResourceCollection resCol, string relativePath, string outputFile, bool isFromFolder)
++        {
++            return ExtractFile(resCol, relativePath, outputFile, isFromFolder, false);
++        }
++
++        private string ExtractFile(ResourceCollection resCol, string relativePath, string outputFile, bool isFromFolder, bool vanilla)
+         {
+             //Get absolute path
+             string absolutePath = GetAbsolutePath(resCol, relativePath);
+@@ -290,8 +349,8 @@ private string ExtractFile(ResourceCollection resCol, string relativePath, strin
+ 
+             try
+             {
+-                //If file is present in workplace, a mod already exist.
+-                if (File.Exists(workplaceFile))
++                //If file is present in workplace, a mod already exist (unless the game's version is wanted).
++                if (!vanilla && File.Exists(workplaceFile))
+                 {
+                     IOHelper.CopyFile(workplaceFile, extractFile);
+ 
+@@ -305,11 +364,25 @@ private string ExtractFile(ResourceCollection resCol, string relativePath, strin
+                 ResourceItem rItem = null;
+                 if (!resCol.Resources.ContainsKey(relativePath))
+                 {
+-                    LogHelper.Error(string.Format("Can't find file '{0}' in resource {1}", absolutePath, resCol.PartitionName));
++                    if (vanilla)
++                        LogHelper.Warning(string.Format("'{0}' has no vanilla version (it's only in the mod)", absolutePath));
++                    else
++                        LogHelper.Error(string.Format("Can't find file '{0}' in resource {1}", absolutePath, resCol.PartitionName));
+                     return string.Empty;
+                 }
+                 rItem = resCol.Resources[relativePath];
+ 
++                //Rebuilding a package: an untouched file is taken as the game stores it (see ProcessPackage)
++                uint storedCmpSize, storedDecSize;
++                byte[] storedData;
++                if (_ExtractStoredForPacking && _RfManager.TryGetStoredData(rItem, out storedData, out storedCmpSize, out storedDecSize))
++                {
++                    Directory.CreateDirectory(Path.GetDirectoryName(extractFile));
++                    File.Create(extractFile).Dispose();
++                    _StoredPackageFiles[NormalizePath(extractFile)] = new FileBinary() { Data = storedData, CmpSize = storedCmpSize, DecSize = storedDecSize };
++                    return extractFile;
++                }
++
+                 //Special log for single file extraction
+                 if (!isFromFolder)
+                     LogHelper.Info(string.Format("Extracting file '{0}' from {1}...", absolutePath, rItem.Source.ToString()));
+@@ -349,11 +422,17 @@ private string ExtractFile(ResourceCollection resCol, string relativePath, strin
+         }
+ 
+         private string ExtractFolder(ResourceCollection resCol, string relativePath, string outputFolder)
++        {
++            return ExtractFolder(resCol, relativePath, outputFolder, false);
++        }
++
++        private string ExtractFolder(ResourceCollection resCol, string relativePath, string outputFolder, bool vanilla)
+         {
+             //Get all the existing resource to extract
+             List<string> lResources = FilterRelativePath(resCol.CachedFilteredResources.Keys.ToArray(), relativePath);
+-            //Get all the existing modded files from workspace
+-            lResources.AddRange(FilterRelativePath(GetAllWorkplaceRelativePaths(resCol.PartitionName), relativePath));
++            //Get all the existing modded files from workspace (not for the game's own version)
++            if (!vanilla)
++                lResources.AddRange(FilterRelativePath(GetAllWorkplaceRelativePaths(resCol.PartitionName), relativePath));
+             //Distinct union
+             lResources = lResources.Distinct().ToList();
+ 
+@@ -362,7 +441,7 @@ private string ExtractFolder(ResourceCollection resCol, string relativePath, str
+             foreach (string resource in lResources)
+             {
+                 if (!resource.EndsWith("/"))
+-                    ExtractFile(resCol, resource, outputFolder, true);
++                    ExtractFile(resCol, resource, outputFolder, true, vanilla);
+             }
+             _RfManager.ClearCachedDataSources();
+ 
+@@ -789,6 +868,8 @@ internal string RebuildRFAndPatchlist(bool packing)
+                 //Patchlist
+                 LogHelper.Info("Rebuilding 'patchlist'...");
+                 BuildPatchfile(exportPatchFolder);
++
++                PruneCompressionCache();
+             }
+             catch(Exception e)
+             {
+@@ -927,6 +1008,7 @@ private bool BuildNewResources(ResourceCollection resCol, string[] filesToProces
+ 
+             string baseToExclude = PathHelper.GetWorkplaceFolder(PathHelperEnum.FOLDER_PATCH, resCol.PartitionName);
+             List<PackageProcessor> packNeedsRepacking = new List<PackageProcessor>();
++            List<PendingFile> pendingFiles = new List<PendingFile>();
+             Sm4shModItem resourcesToPack = _CurrentProject.ResourcesToPack.Find(p => p.Partition == resCol.PartitionName);
+             foreach (string file in files)
+             {
+@@ -968,22 +1050,25 @@ private bool BuildNewResources(ResourceCollection resCol, string[] filesToProces
+ 
+                 if (!isFolder)
+                 {
+-                    uint cmpSize;
+-                    uint decSize;
+-                    byte[] fileToWrite;
+-
+-                    GetFileBinary(nItem, file, out cmpSize, out decSize, out fileToWrite);
+-
+-                    nItem.CmpSize = cmpSize;
+-                    nItem.DecSize = decSize;
+-
+-                    //Copy to export folder
++                    //Copy to export folder (compressed in parallel below)
+                     string savePath = exportFolder + resCol.PartitionName + Path.DirectorySeparatorChar + relativePath.Replace('/', Path.DirectorySeparatorChar);
+-                    Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+-                    File.WriteAllBytes(savePath, fileToWrite);
++                    pendingFiles.Add(new PendingFile() { Item = nItem, File = file, SavePath = savePath });
+                 }
+             }
+ 
++            RunParallel(pendingFiles.Count, i =>
++            {
++                PendingFile pending = pendingFiles[i];
++                pending.Binary = GetFileBinary(pending.Item, pending.File);
++                Directory.CreateDirectory(Path.GetDirectoryName(pending.SavePath));
++                File.WriteAllBytes(pending.SavePath, pending.Binary.Data);
++            });
++            foreach (PendingFile pending in pendingFiles)
++            {
++                pending.Item.CmpSize = pending.Binary.CmpSize;
++                pending.Item.DecSize = pending.Binary.DecSize;
++            }
++
+             //packed management
+             foreach (PackageProcessor package in packNeedsRepacking)
+                 ProcessPackage(package, packing);
+@@ -1055,6 +1140,24 @@ private bool ShouldBeCompressed(ResourceItem rItem, byte[] file)
+             return false;
+         }
+ 
++        private FileBinary GetFileBinary(ResourceItem rItem, string file)
++        {
++            FileBinary binary = new FileBinary();
++            GetFileBinary(rItem, file, out binary.CmpSize, out binary.DecSize, out binary.Data);
++            return binary;
++        }
++
++        /// <summary>
++        /// A file of a package being rebuilt: as the game stores it if it's untouched, else read and compressed
++        /// </summary>
++        private FileBinary GetPackageFileBinary(ResourceItem rItem, string file)
++        {
++            FileBinary stored;
++            if (_StoredPackageFiles.TryGetValue(NormalizePath(file), out stored))
++                return stored;
++            return GetFileBinary(rItem, file);
++        }
++
+         private void GetFileBinary(ResourceItem rItem, string file, out uint cmpSize, out uint decSize, out byte[] fileToWrite)
+         {
+             byte[] fileBinary = File.ReadAllBytes(file);
+@@ -1070,21 +1173,102 @@ private void GetFileBinary(ResourceItem rItem, string file, out uint cmpSize, ou
+             //Check if it should be compressed, and return its CmpSize
+             if (ShouldBeCompressed(rItem, fileBinary))
+             {
+-                fileToWrite = Utils.Compress(fileBinary);
++                fileToWrite = CompressCached(fileBinary);
+                 cmpSize = (uint)fileToWrite.Length;
+             }
+             else
+                 fileToWrite = fileBinary;
+         }
+ 
+-        private bool CheckIfLastFileInFolder(string[] files, string path, int position)
++        /// <summary>
++        /// Compressed data, from the compression cache (cache/compressed, by content hash) when this
++        /// content was compressed before: unchanged mod files aren't compressed again on every build
++        /// </summary>
++        private byte[] CompressCached(byte[] data)
+         {
+-            for (int i = position + 1; i < files.Length; i++)
++            string key;
++            using (SHA1 sha = SHA1.Create())
++                key = "z6_" + BitConverter.ToString(sha.ComputeHash(data)).Replace("-", string.Empty) + "_" + data.Length.ToString("X");
++            string folder = PathHelper.FolderCache + "compressed" + Path.DirectorySeparatorChar;
++            string path = folder + key;
++            try
+             {
+-                if (files[i].StartsWith(path))
+-                    return true;
++                if (File.Exists(path))
++                {
++                    byte[] cached = File.ReadAllBytes(path);
++                    if (Utils.IsCompressed(cached))
++                    {
++                        File.SetLastWriteTimeUtc(path, DateTime.UtcNow); //kept by PruneCompressionCache
++                        return cached;
++                    }
++                }
+             }
+-            return false;
++            catch (IOException) { }
++            catch (UnauthorizedAccessException) { }
++
++            byte[] compressed = Utils.Compress(data);
++            string tempPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
++            try
++            {
++                Directory.CreateDirectory(folder);
++                File.WriteAllBytes(tempPath, compressed);
++                if (!File.Exists(path))
++                    File.Move(tempPath, path);
++            }
++            catch (IOException) { }
++            catch (UnauthorizedAccessException) { }
++            finally
++            {
++                try
++                {
++                    if (File.Exists(tempPath))
++                        File.Delete(tempPath);
++                }
++                catch (IOException) { }
++                catch (UnauthorizedAccessException) { }
++            }
++            return compressed;
++        }
++
++        /// <summary>
++        /// Remove compression cache entries no build used for COMPRESSION_CACHE_DAYS days
++        /// </summary>
++        private void PruneCompressionCache()
++        {
++            string folder = PathHelper.FolderCache + "compressed" + Path.DirectorySeparatorChar;
++            if (!Directory.Exists(folder))
++                return;
++            DateTime limit = DateTime.UtcNow.AddDays(-COMPRESSION_CACHE_DAYS);
++            foreach (string file in Directory.GetFiles(folder))
++            {
++                try
++                {
++                    if (File.GetLastWriteTimeUtc(file) < limit || file.EndsWith(".tmp"))
++                        File.Delete(file);
++                }
++                catch (IOException) { }
++                catch (UnauthorizedAccessException) { }
++            }
++        }
++
++        /// <summary>
++        /// for i in 0..count-1 on all cores; the first exception is rethrown as it is
++        /// </summary>
++        private static void RunParallel(int count, Action<int> body)
++        {
++            try
++            {
++                Parallel.For(0, count, body);
++            }
++            catch (AggregateException e)
++            {
++                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.Flatten().InnerExceptions[0]).Throw();
++            }
++        }
++
++        private static string NormalizePath(string path)
++        {
++            return Path.GetFullPath(path);
+         }
+         #endregion
+         #endregion
+@@ -1111,23 +1295,19 @@ private void ProcessPackageUnpacked(ResourceItem rItemTopResource, string[] file
+ 
+                 ResourceItem nItem = GetEditedResource(resCol, resPath);
+                 nItem.OffInPack = 0;
+-                uint cmpSize = 0;
+-                uint decSize = 0;
+ 
+                 string unpackedPath = exportFolder + resCol.PartitionName + Path.DirectorySeparatorChar + file.Replace(baseTempFolder, string.Empty);
+                 if (!isFolder)
+                 {
+-                    byte[] fileToWrite;
++                    FileBinary binary = GetPackageFileBinary(nItem, file);
+ 
+-                    GetFileBinary(nItem, file, out cmpSize, out decSize, out fileToWrite);
+-
+-                    nItem.CmpSize = cmpSize;
+-                    nItem.DecSize = decSize;
++                    nItem.CmpSize = binary.CmpSize;
++                    nItem.DecSize = binary.DecSize;
+                     nItem.IsAPackage = true;
+ 
+                     //Saving UnPackedFiles
+                     Directory.CreateDirectory(Path.GetDirectoryName(unpackedPath));
+-                    File.WriteAllBytes(unpackedPath, fileToWrite);
++                    File.WriteAllBytes(unpackedPath, binary.Data);
+                 }
+                 else
+                 {
+@@ -1145,8 +1325,17 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+             ResourceCollection resCol = package.TopResource.ResourceCollection;
+             CleanTempFolder();
+ 
+-            //Extract all files
+-            ExtractFolder(package.TopResource.ResourceCollection, package.PackedRelativePath, PathHelper.FolderTemp);
++            //Extract all files (untouched ones only as names: their stored data is taken as it is)
++            _StoredPackageFiles.Clear();
++            _ExtractStoredForPacking = true;
++            try
++            {
++                ExtractFolder(package.TopResource.ResourceCollection, package.PackedRelativePath, PathHelper.FolderTemp);
++            }
++            finally
++            {
++                _ExtractStoredForPacking = false;
++            }
+ 
+             //Override with new files
+             if (package.FilesToAdd != null)
+@@ -1159,7 +1348,10 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                     if (pathAttrs.HasFlag(FileAttributes.Directory))
+                         Directory.CreateDirectory(savePath);
+                     else
++                    {
+                         IOHelper.CopyFile(file, savePath);
++                        _StoredPackageFiles.Remove(NormalizePath(savePath));
++                    }
+                 }
+             }
+ 
+@@ -1188,20 +1380,43 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                         string[] currentFolderFile = new string[20];
+ 
+                         string baseToExclude = PathHelper.FolderTemp + resCol.PartitionName + Path.DirectorySeparatorChar;
++
++                        //Resources of the files (in order), then their data, compressed on all cores
++                        ResourceItem[] items = new ResourceItem[files.Length];
++                        bool[] isFolders = new bool[files.Length];
++                        for (int f = 0; f < files.Length; f++)
++                        {
++                            string resPath = files[f].Replace(baseToExclude, string.Empty).Replace(Path.DirectorySeparatorChar, '/');
++                            isFolders[f] = File.GetAttributes(files[f]).HasFlag(FileAttributes.Directory);
++                            if (isFolders[f])
++                                resPath += "/";
++                            items[f] = GetEditedResource(resCol, resPath);
++                        }
++                        FileBinary[] binaries = new FileBinary[files.Length];
++                        RunParallel(files.Length, f =>
++                        {
++                            if (!isFolders[f])
++                                binaries[f] = GetPackageFileBinary(items[f], files[f]);
++                        });
++
++                        //Last file under each folder (path + separator): replaces a scan of the following files for each file
++                        Dictionary<string, int> lastInFolder = new Dictionary<string, int>();
++                        for (int f = 0; f < files.Length; f++)
++                        {
++                            string file = files[f];
++                            for (int sep = file.IndexOf(Path.DirectorySeparatorChar); sep >= 0; sep = file.IndexOf(Path.DirectorySeparatorChar, sep + 1))
++                                lastInFolder[file.Substring(0, sep + 1)] = f;
++                        }
++
+                         for (int f = 0; f < files.Length; f++)
+                         {
+                             uint currentPosition = (uint)streamPackage.Position;
+                             string file = files[f];
+                             uint paddingNeeded = 0;
+ 
+-                            string resPath = file.Replace(baseToExclude, string.Empty).Replace(Path.DirectorySeparatorChar, '/');
+-                            string fileName = Path.GetFileName(file);
+-                            FileAttributes pathAttrs = File.GetAttributes(file);
+-                            bool isFolder = pathAttrs.HasFlag(FileAttributes.Directory);
+-                            if (isFolder)
+-                                resPath += "/";
++                            bool isFolder = isFolders[f];
+ 
+-                            ResourceItem nItem = GetEditedResource(resCol, resPath);
++                            ResourceItem nItem = items[f];
+                             //nItem.OverridePackedFile = false;
+                             int folderDepth = (int)nItem.FolderDepth;
+                             uint cmpSize = 0;
+@@ -1210,9 +1425,9 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+ 
+                             if (!isFolder)
+                             {
+-                                byte[] fileToWrite;
+-
+-                                GetFileBinary(nItem, file, out cmpSize, out decSize, out fileToWrite);
++                                byte[] fileToWrite = binaries[f].Data;
++                                cmpSize = binaries[f].CmpSize;
++                                decSize = binaries[f].DecSize;
+ 
+                                 nItem.CmpSize = cmpSize;
+                                 nItem.DecSize = decSize;
+@@ -1223,20 +1438,21 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                                     writerPackage.Write(fileToWrite);
+                                 else
+                                 {//If empty, must had 0x80 padding
+-                                    for (int i = 0x00; i < 0x80; i++)
+-                                        writerPackage.Write((byte)0xCC);
++                                    WritePadding(writerPackage, 0x80);
+                                     paddingNeeded = 0x80;
+                                 }
+ 
+                                 if (f < files.Length - 1) //No padding for the last file
+                                 {
+                                     uint fileAndPadding = cmpSize;
++                                    uint padding = 0;
+                                     while (fileAndPadding % 0x80 != 0 || fileAndPadding - cmpSize < 0x40)
+                                     {
+-                                        writerPackage.Write((byte)0xCC);
+                                         fileAndPadding++;
+-                                        paddingNeeded++;
++                                        padding++;
+                                     }
++                                    WritePadding(writerPackage, padding);
++                                    paddingNeeded += padding;
+                                 }
+ 
+                                 folderDepth--; //Back to folder level
+@@ -1249,8 +1465,7 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                                 cmpSize = decSize = 0x80;
+ 
+                                 //New folder, add proper padding and yada yada
+-                                for (int i = 0x00; i < 0x80; i++)
+-                                    writerPackage.Write((byte)0xCC);
++                                WritePadding(writerPackage, 0x80);
+ 
+                                 currentFolder[folderDepth] = nItem;
+                                 currentFolderFile[folderDepth] = file + Path.DirectorySeparatorChar;
+@@ -1263,7 +1478,8 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                                     break;
+                                 currentFolder[i].CmpSize += cmpSize;
+                                 currentFolder[i].DecSize += decSize;
+-                                if (CheckIfLastFileInFolder(files, currentFolderFile[i], f))
++                                int last;
++                                if (lastInFolder.TryGetValue(currentFolderFile[i], out last) && last > f)
+                                 {
+                                     currentFolder[i].CmpSize += paddingNeeded;
+                                     currentFolder[i].DecSize += paddingNeeded;
+@@ -1279,8 +1495,21 @@ private void ProcessPackage(PackageProcessor package, bool packing)
+                 }
+             }
+ 
++            _StoredPackageFiles.Clear();
+             CleanTempFolder();
+         }
++
++        private static readonly byte[] _Padding = Enumerable.Repeat((byte)0xCC, 0x100).ToArray();
++
++        private static void WritePadding(BinaryWriter writer, uint count)
++        {
++            while (count > 0)
++            {
++                int n = (int)Math.Min(count, (uint)_Padding.Length);
++                writer.Write(_Padding, 0, n);
++                count -= (uint)n;
++            }
++        }
+         #endregion
+         #endregion
+ 
+diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
+index 5bf70d0..3676e8e 100644
+--- a/Sm4shFileExplorer/UI/Main.Designer.cs
++++ b/Sm4shFileExplorer/UI/Main.Designer.cs
+@@ -57,6 +57,7 @@ private void InitializeComponent()
+             this.aboutSm4shExplorerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.contextMenuTreeView = new System.Windows.Forms.ContextMenuStrip(this.components);
+             this.extractToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
++            this.extractVanillaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.removeModToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+             this.unlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+@@ -306,6 +307,7 @@ private void InitializeComponent()
+             // 
+             this.contextMenuTreeView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+             this.extractToolStripMenuItem,
++            this.extractVanillaToolStripMenuItem,
+             this.removeModToolStripMenuItem,
+             this.toolStripSeparator1,
+             this.unlocalizeToolStripMenuItem,
+@@ -317,7 +319,7 @@ private void InitializeComponent()
+             this.packThisFolderToolStripMenuItem,
+             this.doNotPackThisFolderToolStripMenuItem});
+             this.contextMenuTreeView.Name = "contextMenuTreeView";
+-            this.contextMenuTreeView.Size = new System.Drawing.Size(195, 198);
++            this.contextMenuTreeView.Size = new System.Drawing.Size(195, 220);
+             this.contextMenuTreeView.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuTreeView_Opening);
+             // 
+             // extractToolStripMenuItem
+@@ -327,6 +329,14 @@ private void InitializeComponent()
+             this.extractToolStripMenuItem.Text = "Extract";
+             this.extractToolStripMenuItem.Click += new System.EventHandler(this.extractToolStripMenuItem_Click);
+             // 
++            // extractVanillaToolStripMenuItem
++            // 
++            this.extractVanillaToolStripMenuItem.Name = "extractVanillaToolStripMenuItem";
++            this.extractVanillaToolStripMenuItem.Size = new System.Drawing.Size(194, 22);
++            this.extractVanillaToolStripMenuItem.Text = "Extract vanilla";
++            this.extractVanillaToolStripMenuItem.ToolTipText = "Extract the game's own version to extract\\vanilla, keeping the mod files";
++            this.extractVanillaToolStripMenuItem.Click += new System.EventHandler(this.extractVanillaToolStripMenuItem_Click);
++            // 
+             // removeModToolStripMenuItem
+             // 
+             this.removeModToolStripMenuItem.Name = "removeModToolStripMenuItem";
+@@ -628,6 +638,7 @@ private void InitializeComponent()
+         private System.Windows.Forms.ToolStripMenuItem menuBuild;
+         private System.Windows.Forms.ContextMenuStrip contextMenuTreeView;
+         private System.Windows.Forms.ToolStripMenuItem extractToolStripMenuItem;
++        private System.Windows.Forms.ToolStripMenuItem extractVanillaToolStripMenuItem;
+         private System.Windows.Forms.TextBox textConsole;
+         private System.Windows.Forms.Panel oPanelLeft;
+         private System.Windows.Forms.Panel oPanelFileInformation;
+diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
+index 9a522af..dc8ff36 100644
+--- a/Sm4shFileExplorer/UI/Main.cs
++++ b/Sm4shFileExplorer/UI/Main.cs
+@@ -211,6 +211,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+             }
+ 
+             extractToolStripMenuItem.Enabled = true;
++            extractVanillaToolStripMenuItem.Enabled = _ProjectManager.HasVanillaResource(selNode.Name);
+             removeModToolStripMenuItem.Enabled = false;
+             unlocalizeToolStripMenuItem.Enabled = false;
+             removeUnlocalizeToolStripMenuItem.Enabled = false;
+@@ -333,6 +334,13 @@ private void extractToolStripMenuItem_Click(object sender, EventArgs e)
+                 _ProjectManager.ExtractResource(node.Name);
+         }
+ 
++        private void extractVanillaToolStripMenuItem_Click(object sender, EventArgs e)
++        {
++            TreeNode node = treeView.SelectedNode;
++            if (node != null)
++                _ProjectManager.ExtractVanillaResource(node.Name);
++        }
++
+         private void removeToolStripMenuItem_Click(object sender, EventArgs e)
+         {
+             TreeNode node = treeView.SelectedNode;
+-- 
+2.43.0
+
