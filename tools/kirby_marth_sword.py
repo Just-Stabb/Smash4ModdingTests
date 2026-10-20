@@ -345,6 +345,19 @@ BODY_TURN = 0.5
 LEG_MOVE = 0.6
 
 
+def turn(a, b):
+    """the smallest rotation taking unit vector a to b"""
+    v = (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    c = sum(a[i] * b[i] for i in range(3))
+    if c < -0.9999:      # opposite: half a turn about any perpendicular axis
+        p = norm((0.0, -a[2], a[1]) if abs(a[0]) < 0.9 else (-a[2], 0.0, a[0]))
+        return [[2 * p[i] * p[j] - (1 if i == j else 0) for j in range(3)] for i in range(3)]
+    k = 1.0 / (1.0 + c)
+    vx = [[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]]
+    vx2 = m3(vx, vx)
+    return [[(1 if i == j else 0) + vx[i][j] + vx2[i][j] * k for j in range(3)] for i in range(3)]
+
+
 def damp(r, t):
     """rotation r scaled by t (slerp from no rotation)"""
     q = omo.mat2q(r)
@@ -443,29 +456,31 @@ def marth_retarget(kdir, mdir, kbones, which, sword):
             v = src.sample(mh[b], f)
             return v if v else mbind[b]
         mw = worlds(mbones, mlocal)
-        # the body: one turn for the whole ball (Marth's chest's change from his stance, in his
-        # frame, BODY_TURN of it), keeping Kirby's standing pose between his body bones
-        lb = damp(m3(t3(nrm(mst, 'BustN', mbw)), nrm(mw, 'BustN', mbw)), BODY_TURN)
-        kb_ = nrm(kst, 'BustN', kbw)
-        wbody = m3(m3(kb_, lb), t3(kb_))
+        # the body: Kirby's standing pose, leaning forward / back with BODY_TURN of Marth's chest's
+        # lean (its pitch about the sideways X axis; no turning or twisting: a ball that turns
+        # with Marth's torso looks like it spins)
+        up = m3(nrm(mw, 'BustN', mbw), t3(nrm(mst, 'BustN', mbw)))
+        up = (up[0][1], up[1][1], up[2][1])           # the chest's up after its change from standing
+        pitch = math.atan2(up[2], up[1]) * BODY_TURN
+        c, sn = math.cos(pitch), math.sin(pitch)
+        wbody = [[1, 0, 0], [0, c, -sn], [0, sn, c]]
 
-        def pose(lift):
+        def marth_arm(side):
+            a, b = pos(mw[side + 'ShoulderJ']), pos(mw[side + 'HandN'])
+            return norm(tuple(b[i] - a[i] for i in range(3)))
+
+        def pose(lift, aim):
             kw, locs = {}, {}
             for name, parent, h in kbones:
-                if name in SHARED:
-                    if name in BODY:
+                pr = rot3(kw[kbones[parent][0]]) if 0 <= parent < len(kbones) else I3
+                if name in BODY or name in LEGS or name in ('LShoulderJ', 'RShoulderJ'):
+                    if name in LEGS:
+                        nm = nrm(kst, name, kbw)        # planted: as he stands
+                    else:
                         nm = m3(wbody, nrm(kst, name, kbw))
-                    elif name in LEGS:
-                        # Marth's leg change against his hips, LEG_MOVE of it, on Kirby's standing leg
-                        hip = 'HipN'
-                        rel_st = m3(t3(nrm(mst, hip, mbw)), nrm(mst, name, mbw))
-                        rel = m3(t3(nrm(mw, hip, mbw)), nrm(mw, name, mbw))
-                        nm = m3(m3(wbody, nrm(kst, name, kbw)), damp(m3(t3(rel_st), rel), LEG_MOVE))
-                    else:      # arms, hands, ThrowN: Marth's change from the T-pose
-                        nm = nrm(mw, name, mbw)
-                    r = m3(nm, rot3(kbw[name]))
-                    pr = rot3(kw[kbones[parent][0]]) if 0 <= parent < len(kbones) else I3
-                    q = omo.mat2q(m3(t3(pr), r))
+                        if name in aim:                 # the whole arm pointed (shoulder -> hand)
+                            nm = m3(aim[name], nm)
+                    q = omo.mat2q(m3(t3(pr), m3(nm, rot3(kbw[name]))))
                     if name in ROOTS:
                         mp = mlocal(name)[0]
                         p = tuple(kbind[name][0][i] + (mp[i] - mbind[name][0][i]) * (yratio if i == 1 else ratio)
@@ -473,18 +488,32 @@ def marth_retarget(kdir, mdir, kbones, which, sword):
                         if name == 'RotN':
                             p = (p[0], p[1] + lift, p[2])
                     else:
-                        p = kbind[name][0]
+                        p = (kwait.sample(h, 0) or kbind[name])[0]
                     loc = (p, q, kbind[name][2])
-                else:      # Kirby's own bones (body size, mouth, cheeks): standing
+                elif name == 'TransN':
+                    mp = mlocal(name)[0]
+                    loc = (tuple(kbind[name][0][i] + (mp[i] - mbind[name][0][i]) * (yratio if i == 1 else ratio)
+                                 for i in range(3)), (0.0, 0.0, 0.0, 1.0), kbind[name][2])
+                else:      # the rest of the arms, the head's own bones, Kirby's extra bones: standing
                     loc = kwait.sample(h, 0) or kbind[name]
                 m = omo.trs(*loc)
                 kw[name] = omo.mul(kw[kbones[parent][0]], m) if 0 <= parent < len(kbones) else m
                 locs[name] = loc
             return kw, locs
-        kw, locs = pose(0.0)
+
+        def aims(kw):
+            out = {}
+            for side in ('L', 'R'):
+                a, b = pos(kw[side + 'ShoulderJ']), pos(kw[side + 'HandN'])
+                out[side + 'ShoulderJ'] = turn(norm(tuple(b[i] - a[i] for i in range(3))), marth_arm(side))
+            return out
+
+        kw, locs = pose(0.0, {})
+        aim = aims(kw)
+        kw, locs = pose(0.0, aim)
         low = foot_low(kw)
         if low < kfoot - 0.05:          # a foot through the floor: lift the body
-            kw, locs = pose(kfoot - low)
+            kw, locs = pose(kfoot - low, aim)
         for name, _p, _h in kbones:
             for i in range(3):
                 tracks[name][i].append(locs[name][i])
