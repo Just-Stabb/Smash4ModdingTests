@@ -19,7 +19,7 @@ numbers are absolute addresses; anything else is a label. Conditional branches c
 import re
 import struct
 
-D_OPS = {"lwz": 32, "lbz": 34, "lbzu": 35, "lwzu": 33, "stw": 36, "stwu": 37, "stb": 38, "lmw": 46, "stmw": 47,
+D_OPS = {"lwz": 32, "lbz": 34, "lbzu": 35, "lhz": 40, "sth": 44, "lwzu": 33, "stw": 36, "stwu": 37, "stb": 38, "lmw": 46, "stmw": 47,
          "lfs": 48, "stfs": 52, "lfd": 50, "stfd": 54}
 IMM_OPS = {"addi": 14, "addis": 15, "mulli": 7, "ori": 24, "oris": 25, "xori": 26, "xoris": 27,
            "andi.": 28, "cmpwi": 11, "cmplwi": 10}
@@ -29,7 +29,7 @@ FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59,
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),
           "fmul": (63, 25), "fmadd": (63, 29)}
 FX_OPS = {"fmr": 72, "fneg": 40, "fabs": 264, "frsp": 12, "fctiwz": 15}
-COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1)}
+COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1), "bdnz": (16, 0)}
 FIXED = {"blr": 0x4E800020, "bctr": 0x4E800420, "bctrl": 0x4E800421, "nop": 0x60000000}
 
 

@@ -23,6 +23,13 @@ Every update it shows the folders of the match's animals and, from MONSTER_FRAME
 end, the night's monsters, and hides the rest: v17b set them once, at the first update, and the
 game showing all of the stage's models as the match starts brought every animal kind back (all
 walking the same pen: the user saw them inside each other).
+Sounds (tools/minecraft_sound.py's bank; the events tools/minecraft_world.py lists in
+minecraft_sound_events.json, by biome and form): the stage's sound object is made by its name
+(0x03122E08(X, name, form) -> X + 0x390); NewStage01 matched none, so its name (and its biome
+folders') is matched as BattleField_f (NAME hook). Each update plays its biome's events (the biome
+cave's pick mod 6; Omega its own table) up to the cycle's frame whose mob's folder is shown, a
+variant at random: 0x03125D80(S, handle, (row 1147 << 16) | tone), the handle released after.
+
 Rolls: the game's clock-seeded xorshift, 0x024F6BE8(n) = x % n (not the battle RNG).
 
 A model by folder name: 0x03141D2C(stage, name) -> StageModel or 0. Shown / hidden as the game's
@@ -33,11 +40,15 @@ then 0x032FF68C(m + 0xDC, both set).
 
 Space: grown code 0x04B7F400-0x04B80000 (biome_select_cave.py's before it).
 """
+import json
 import os
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
+import biome_select_cave  # noqa: E402
+import minecraft_sound  # noqa: E402
 
 CAVE = 0x04B7F400
 LIMIT = 0x04B80000
@@ -53,18 +64,53 @@ SET_VISIBLE = 0x032FF68C       # (m + 0xDC, bool)
 RAND = 0x024F6BE8              # (n) -> x % n, the clock-seeded xorshift (instance 1); beyond bl reach: bctrl
 
 KINDS = (0x80, 0x81)            # NewStage01, normal play and Omega
+# sounds (tools/minecraft_sound.py's bank, the events tools/minecraft_world.py --sound-events lists)
+EVENTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'minecraft_sound_events.json')
+SOUND_ROW = minecraft_sound.ROW
+PLAY_SE = 0x03125D80           # (stage sound object, handle out (0x30 bytes), sound id): a stage's sound
+RELEASE = 0x033EFD88           # (handle, 2): the handle's destructor (not freed)
+SOUND_NAME = 0x03122E08        # (X, name, form): makes X+0x390, the stage's sound object, by its name
+SOUND_NAME_FIRST = 'stwu r1, -0x28(r1)'
+BATTLEFIELD_NAME = 0x10167024  # "BattleField_f" (rodata), the name it's matched to
+STAGE_NAME = 'NewStage01'      # its prefix (the biome folders' names too)
+TABLES = [(b, 'melee') for b, _f in biome_select_cave.BIOMES[:biome_select_cave.N_BIOMES]] + [('plains', 'end')]
 CYCLE = 9000.0                 # minecraft_world.CYCLE
 MONSTER_FRAME = 4200.0         # pickel_world.stdat frame_of_monster
 # the monsters' folders, then the animals' (minecraft_world.MONSTER_SETS, ANIMAL_SETS)
 FOLDERS = ['dyr_h_BG_more_far0_set', 'dyr_f_BG_far2_set_set', 'dyr_g_bgfar_set', 'dyr_n1_sunset_set',
            'dyr_p_animal_sheep_set', 'dyr_q_animal_cow_set', 'dyr_r_animal_chicken_set']
 MONSTERS = 4
+MONSTER_NAMES = ['zombie', 'skeleton', 'spider', 'enderman']
 MONSTER_ODDS = [40, 35, 20, 5]             # zombie, skeleton, spider, enderman: folders 0-3
 ANIMAL_ODDS = [(30, 4), (30, 6), (30, 5)]  # sheep (folder 4), chicken (6), cow (5); the rest: none
 COUNT_ODDS = [20, 60, 20]                  # one / two / three monsters a night
 
 
+def words_of(b):
+    b += b'\0' * (-len(b) % 4)
+    return [int.from_bytes(b[i:i + 4], 'big') for i in range(0, len(b), 4)]
+
+
+def event_tables(path=None):
+    """[bytes] a table each of TABLES: 8-byte events (frame, tone, mob bit or 0xFF, variants, 0),
+    ending with frame 0xFFFF"""
+    path = path or EVENTS
+    events = json.load(open(path)) if os.path.exists(path) else {}
+    bits = {'always': 0xFF}
+    for k, f in enumerate(FOLDERS):
+        bits[f.split('_')[-2] if k >= MONSTERS else MONSTER_NAMES[k]] = k
+    out = []
+    for biome, form in TABLES:
+        b = b''
+        for frame, sound, mob in sorted(events.get('%s/%s' % (biome, form), [])):
+            tone, variants = minecraft_sound.tone_index(sound)
+            b += struct.pack('>HHBBH', frame, tone, bits[mob], variants, 0)
+        out.append(b + struct.pack('>HHBBH', 0xFFFF, 0, 0, 0, 0))
+    return out
+
+
 def build():
+    pick = biome_select_cave.build()[0].addr('data') + 4
     a = Asm(CAVE)
     animal = ''
     run = 0
@@ -108,6 +154,7 @@ ours:
         li r0, 0
         stw r0, 0xC(r29)
         stw r0, 0x10(r29)
+        stw r0, -4(r29)
         bl roll_day
 counting:
         lfs f0, 0(r29)
@@ -119,6 +166,7 @@ counting:
         stfs f0, 0(r29)
         li r0, 0
         stw r0, 0x10(r29)
+        stw r0, -4(r29)
         b night
 nowrap:
         stfs f0, 0(r29)
@@ -140,8 +188,12 @@ current:
         beq cur
         lwz r4, 0x18(r29)
 cur:
+        mr r28, r4
         mr r3, r31
         bl apply
+        mr r3, r31
+        mr r4, r28
+        bl sounds
 done:
         mr r3, r30
         lfd f31, 0x30(r1)
@@ -299,6 +351,99 @@ nextm:
         mtlr r0
         addi r1, r1, 0x30
         blr
+sounds:
+        stwu r1, -0x70(r1)
+        mflr r0
+        stw r0, 0x74(r1)
+        stmw r24, 0x50(r1)
+        mr r31, r3
+        mr r30, r4
+        lis r29, data@ha
+        addi r29, r29, data@l
+        lfs f0, 0(r29)
+        fctiwz f0, f0
+        stfd f0, 0x48(r1)
+        lwz r28, 0x4C(r1)
+        lwz r0, 0(r31)
+        li r27, %(end_table)d
+        cmpwi r0, %(k1)d
+        beq tab
+        lis r12, 0x%(pick_hi)04X
+        ori r12, r12, 0x%(pick_lo)04X
+        lwz r27, 0(r12)
+        li r0, %(n_biomes)d
+        divwu r12, r27, r0
+        mullw r12, r12, r0
+        subf r27, r12, r27
+tab:
+        slwi r27, r27, 2
+        lis r12, tables@ha
+        addi r12, r12, tables@l
+        lwzx r26, r12, r27
+        lwz r25, -4(r29)
+sloop:
+        slwi r12, r25, 3
+        add r24, r26, r12
+        lhz r0, 0(r24)
+        cmplw r0, r28
+        bgt sout
+        addi r25, r25, 1
+        lbz r0, 4(r24)
+        cmpwi r0, 0xFF
+        beq splay
+        srw r0, r30, r0
+        andi. r0, r0, 1
+        beq sloop
+splay:
+        lbz r3, 5(r24)
+        bl rand
+        lhz r0, 2(r24)
+        add r5, r3, r0
+        oris r5, r5, 0x%(row)04X
+        lwz r3, 0xFF0(r31)
+        cmpwi r3, 0
+        beq sloop
+        lwz r3, 0(r3)
+        cmpwi r3, 0
+        beq sloop
+        lwz r3, 0x390(r3)
+        cmpwi r3, 0
+        beq sloop
+        addi r4, r1, 0x10
+        bl 0x%(play)08X
+        addi r3, r1, 0x10
+        li r4, 2
+        bl 0x%(release)08X
+        b sloop
+sout:
+        stw r25, -4(r29)
+        lmw r24, 0x50(r1)
+        lwz r0, 0x74(r1)
+        mtlr r0
+        addi r1, r1, 0x70
+        blr
+namefix:
+        lis r12, sname@ha
+        addi r12, r12, sname@l
+        addi r12, r12, -1
+        addi r11, r4, -1
+        li r0, %(name_len)d
+        mtctr r0
+ncmp:
+        lbzu r9, 1(r11)
+        lbzu r10, 1(r12)
+        cmpw r9, r10
+        bne nkeep
+        bdnz ncmp
+        lis r4, 0x%(bf_hi)04X
+        ori r4, r4, 0x%(bf_lo)04X
+nkeep:
+        %(name_first)s
+        b 0x%(name_back)08X
+sname:
+        %(sname)s
+snext:
+        .word 0
 data:
         .float 0
         .float %(cycle)r
@@ -311,7 +456,11 @@ data:
            rand_hi=RAND >> 16, rand_lo=RAND & 0xFFFF, animal=animal, c1=COUNT_ODDS[0],
            c2=COUNT_ODDS[0] + COUNT_ODDS[1], find=FIND_MODEL, isvis=IS_VISIBLE, add=SCENE_ADD,
            remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME,
-           monsters=MONSTERS, folders=len(FOLDERS)))
+           monsters=MONSTERS, folders=len(FOLDERS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
+           pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
+           release=RELEASE, name_len=len(STAGE_NAME), bf_hi=BATTLEFIELD_NAME >> 16,
+           bf_lo=BATTLEFIELD_NAME & 0xFFFF, name_first=SOUND_NAME_FIRST, name_back=SOUND_NAME + 4,
+           sname='\n'.join('.word 0x%08X' % w for w in words_of(STAGE_NAME.encode() + b'\0'))))
     # data: +0 counter, +4 cycle, +8 monster frame, +0xC new match, +0x10 tonight rolled, +0x14 the
     # animals' folders, +0x18 tonight's monsters' folders, +0x1C the monsters' weights, +0x2C the
     # folders' names
@@ -327,6 +476,15 @@ data:
         a.asm('.word 0x%08X' % p)
     for i in range(0, len(strings), 4):
         a.asm('.word 0x%08X' % int.from_bytes(strings[i:i + 4], 'big'))
+    tables = event_tables()
+    a.asm('tables:')
+    at = a.addr('tables') + 4 * len(tables)
+    for t in tables:
+        a.asm('.word 0x%08X' % at)
+        at += len(t)
+    for t in tables:
+        for w in words_of(t):
+            a.asm('.word 0x%08X' % w)
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
     assert words[(a.addr('data') + 0x2C - CAVE) // 4] == ptrs[0]
@@ -334,7 +492,9 @@ data:
     hook.asm('bl 0x%08X' % a.addr('update'))
     setup = Asm(SETUP)
     setup.asm('b 0x%08X' % a.addr('reset'))
-    return a, words, [(UPDATE_HOOK, hook.words()[0]), (SETUP, setup.words()[0])]
+    name = Asm(SOUND_NAME)
+    name.asm('b 0x%08X' % a.addr('namefix'))
+    return a, words, [(UPDATE_HOOK, hook.words()[0]), (SETUP, setup.words()[0]), (SOUND_NAME, name.words()[0])]
 
 
 def main():

@@ -8,9 +8,14 @@ name; the scene / visibility calls record what they're asked; the RNG returns a 
 Checks: the setup hook resets and goes on to the setup's second instruction; the update returns
 the base update's result; for the stage kinds (normal and Omega): the first update rolls the
 animals and shows their folder (flags bit 0x80000, scene add / remove, render visibility), hiding
-the others; at frame 4200 (slow motion too) the night's monsters are rolled once and shown; at the
-cycle's end the animals' folder again; a missing model is skipped; other kinds: nothing. Every
-roll of 6000 against the rules in Python (Ultimate's odds), with the resulting frequencies.
+the others, and hides them again after the game shows them all; at frame 4200 (slow motion too)
+the night's monsters are rolled once and shown with the animals; at the cycle's end the animals
+alone again; a missing model is skipped; other kinds: nothing. Sounds (a small event table of
+the test's own, EVENTS): the biome's table played up to the frame, only shown mobs', a random
+variant, on the stage's sound object with a stack handle released after; another biome's (a
+hazards-off pick); Omega's; again after the cycle wraps; nothing without a sound object; the
+sound object's name hook (NewStage01* -> BattleField_f). Every roll of 6000 against the rules in
+Python (Ultimate's odds), with the resulting frequencies.
 """
 import os
 import struct
@@ -20,8 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import monster_roll_cave as C  # noqa: E402
 from ppcasm import Asm  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
-from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_LR, UC_PPC_REG_FPR1,  # noqa: E402
-                               UC_PPC_REG_MSR)
+from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_LR,  # noqa: E402
+                               UC_PPC_REG_FPR1, UC_PPC_REG_MSR)
 
 STAGE = 0x7F004000
 MODELS = 0x7F006000        # fake models, 0x200 apart (flags +0x118, handle +0xDC: +0 visible)
@@ -33,16 +38,51 @@ SHEEP, COW, CHICKEN = (C.FOLDERS.index('dyr_%s' % c) for c in ('p_animal_sheep_s
                                                                 'r_animal_chicken_set'))
 
 
+def biome_pick(a):
+    """the biome cave's pick word, as the mob cave reads it"""
+    return C.biome_select_cave.build()[0].addr('data') + 4
+
+
 def stub(mu, addr, text):
     a = Asm(addr)
     a.asm(text)
     mu.mem_write(addr, b''.join(struct.pack('>I', w) for w in a.words()))
 
 
+# sounds: a small event table of our own (written over the cave: its tables are the build's)
+EVENTS = {'plains/melee': [[5, 'door_open', 'always'], [10, 'cow_vo', 'cow'], [12, 'zombi_vo', 'zombie'],
+                           [20, 'sheep_vo', 'sheep']],
+          'birchforest/melee': [[7, 'door_close', 'always']],
+          'plains/end': [[3, 'enderman_portal', 'enderman'], [4, 'villager_vo', 'always']]}
+SOUND_X = 0x7F002300       # stage + 0xFF0 -> SOUND_X; *SOUND_X = SOUND_X + 0x10 (X); X + 0x390 = S
+SOUND_S = 0x7F002800
+PLAYS = 0x7F002600         # the sound ids played (REC + 0x30 counts them, + 0x34 the releases)
+
+
 def main():
     mu = machine(sys.argv[1])
     mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
-    a, _words, _hooks = C.build()
+    import json
+    import tempfile
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
+        json.dump(EVENTS, f)
+    C.EVENTS = f.name
+    a, words, _hooks = C.build()
+    os.unlink(f.name)
+    mu.mem_write(C.CAVE, b''.join(struct.pack('>I', w) for w in words))
+    stub(mu, C.PLAY_SE, """
+        lis r7, 0x7F00
+        lwz r6, 0x2030(r7)
+        slwi r8, r6, 2
+        ori r9, r7, 0x2600
+        stwx r5, r9, r8
+        addi r6, r6, 1
+        stw r6, 0x2030(r7)
+        stw r3, 0x2038(r7)
+        subf r8, r1, r4
+        stw r8, 0x203C(r7)
+        blr""")
+    stub(mu, C.RELEASE, 'lis r7, 0x7F00\nlwz r6, 0x2034(r7)\naddi r6, r6, 1\nstw r6, 0x2034(r7)\nstw r4, 0x2040(r7)\nblr')
     stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
     # find: the name's 5th char's place in FOLDER_CHARS picks a model (0x200 apart); the enderman's
     # ('n') missing while REC+0x20 is set
@@ -156,7 +196,8 @@ miss:   li r3, 0
     mu.emu_start(a.addr('reset'), C.SETUP + 4, count=100)
     check('setup: counter 0, new match', (word(data), word(data + 0xC)), (0, 1))
     check('setup: its first instruction made (stwu)', mu.reg_read(UC_PPC_REG_1), 0x7F00F000 - 0x298)
-    # first update: the animals: 45 -> chicken
+    # first update: the animals: 45 -> chicken (savanna: no sound events in EVENTS)
+    setw(biome_pick(a), 2)
     models(True)
     rands([45])
     check('update returns the base update', update(), 0x55)
@@ -203,6 +244,57 @@ miss:   li r3, 0
     before = word(REC + 0x10)
     update(kind=0)
     check('other kind: no lookups, match still new', (word(REC + 0x10), word(data + 0xC)), (before, 1))
+    # sounds
+    pick = biome_pick(a)
+    setw(STAGE + 0xFF0, SOUND_X)
+    setw(SOUND_X, SOUND_X + 0x10)
+    setw(SOUND_X + 0x10 + 0x390, SOUND_S)
+
+    def plays():
+        n = word(REC + 0x30)
+        return [word(PLAYS + 4 * i) for i in range(n)]
+
+    def match(kind, biome, animal_roll, rs, frames):
+        setw(pick, biome)
+        setw(REC + 0x30, 0)
+        setw(REC + 0x34, 0)
+        setw(data + 0xC, 1)
+        setw(data, 0)
+        rands([animal_roll] + rs)
+        models(True)
+        for _ in range(frames):
+            update(kind=kind)
+        return plays()
+    row = C.SOUND_ROW << 16
+    tone = C.minecraft_sound.tone_index
+    got = match(C.KINDS[0], 0, 75, [0, 4, 0], 31)
+    check('plains, cow: the door at 5, the cow (variant 4) at 10; no zombie, no sheep',
+          got, [row | tone('door_open')[0], row | tone('cow_vo')[0] + 4])
+    check('played on the stage sound object, a handle on the stack, released (2) each',
+          (word(REC + 0x38), word(REC + 0x3C) > 0, word(REC + 0x34), word(REC + 0x40)), (SOUND_S, True, 2, 2))
+    got = match(C.KINDS[0], 1 + C.biome_select_cave.N_BIOMES, 5, [0, 0], 31)
+    check('birch forest (hazards off pick): its own table', got, [row | tone('door_close')[0]])
+    got = match(C.KINDS[1], 0, 75, [2, 0], 10)
+    check('Omega: its table; the enderman not out by day', got, [row | tone('villager_vo')[0] + 2])
+    setw(data, struct.unpack('>I', struct.pack('>f', C.CYCLE - 3))[0])
+    setw(data + 0x10, 1)
+    setw(REC + 0x30, 0)
+    rands([0] * 10)
+    for _ in range(10):
+        update(kind=C.KINDS[1])
+    check('the cycle wrapped: from its start again', plays(), [row | tone('villager_vo')[0]])
+    setw(STAGE + 0xFF0, 0)
+    got = match(C.KINDS[0], 0, 75, [0] * 10, 31)
+    check('no sound object: nothing played', got, [])
+    # the sound object's name: NewStage01 (and its biome folders) made Battlefield's
+    for name, want in (('NewStage01', C.BATTLEFIELD_NAME), ('NewStage01_forest', C.BATTLEFIELD_NAME),
+                       ('BattleField_f', REC + 0x400), ('NewStage0', REC + 0x400)):
+        mu.mem_write(REC + 0x400, name.encode() + b'\0')
+        mu.reg_write(UC_PPC_REG_4, REC + 0x400)
+        mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
+        mu.emu_start(a.addr('namefix'), C.SOUND_NAME + 4, count=200)
+        check('name %r -> %s' % (name, 'BattleField_f' if want == C.BATTLEFIELD_NAME else 'itself'),
+              (mu.reg_read(UC_PPC_REG_4), mu.reg_read(UC_PPC_REG_1)), (want, 0x7F00F000 - 0x28))
     # statistics: 6000 nights / matches with a uniform RNG, against the rules in Python
     import random
     rng = random.Random(2)

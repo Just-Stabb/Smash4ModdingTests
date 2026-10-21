@@ -786,6 +786,77 @@ User (v17): loads, the biomes switch with the buttons. Then (v17b):
   rules in Python; nights with zombie / skeleton / spider / enderman ~0.71 / 0.67 / 0.49 / 0.13.
   (`biome_odds` 85 and `biome_limit_count` 3 aren't used: their meaning is unknown.)
 
+## v17c: burning mobs, animals day and night, sounds
+
+User (v17b): the doors still too bright; the burning zombie / skeleton didn't flash, its fire
+looked wrong, no poof (Ultimate screenshots: a tall animated fire sheet over the mob, the mob
+tinted red, white puffs); the fog boxes still there on every biome but plains; the animals gone
+at night (Ultimate keeps them) and several kinds at once, inside each other on the same path;
+asked for the mobs' sounds (Ultimate's bank: the user's `sound-ssbu.zip`).
+
+- **Doors**: `DOOR_LIGHT_MAX` 0.18.
+- **Burning** (`burn_fx`, from `BURN_FROM` 8100 to the mob's last frame): Ultimate's
+  `ef_pickelworld_fire01` (16x512: 32 Minecraft fire frames side by side) on two quads over the
+  mob on a bone copying its hip, a frame every `FIRE_STEP` 3 by an MTA `NU_colorSamplerUV` curve
+  (`write_set` takes {property: values} curves); the mob's own materials on curve
+  `hurt_<kind>` = the island's times `HURT_TINT` (1, 0.4, 0.4) for `HURT_FRAMES` 30 of every
+  `HURT_PERIOD` 60 and the last `HURT_DEATH` 90; at its end a bone at its last place shows 7
+  puffs of `ef_pickelworld_smoke00` (7 frames, made white) for 21 frames.
+- **Fog boxes**: the other biomes' haze v runs 0-7; past 1 it's clear, but those cards sat on the
+  ramp's top edge, where the repeating sampler and the mips mixed in its opaque bottom rows. Their
+  fully-clear triangles (all corners v >= 1: ~400 a biome) are left out and the rest clamp
+  (`FOG_WRAP` 3).
+- **Animals** (day and night, one kind a match): each kind in a folder of the port's own
+  (`ANIMAL_SETS`: dyr_p sheep, dyr_q cow, dyr_r chicken, copies of dyr_h's files): the stage
+  makes a model of every folder it finds (Battlefield's folder names aren't in the executable;
+  its lookup `0x031429B4` only strips a `dyr_` prefix). Their animation: wait1 or wait2 twice,
+  then still on its first frame (= its last) to the cycle's end. `monster_roll_cave.py` applies
+  its mask every update: v17b set the folders once, at the first update, and the game showing
+  every stage model as the match starts brought all three kinds back (the same pen paths: inside
+  each other). The night's mask is its monsters and the animals.
+- **Sounds**: below.
+
+### Sounds
+
+Smash 4's stage sounds (cross_f.rpx):
+- The stage loader `0x031434B8` loads `*/sound/sound.nus3bank`, `*/sound/sequence.bin` and
+  `*/sound/sound_add.nus3bank` from the stage's folder into `X = **(stage + 0xFF0)`. The bank's
+  load `0x03124D54` calls `0x03122E08(X, name = stage + 0x10, form)`, which makes the stage's
+  sound object `S = X + 0x390` by the stage's name (a list per form: `BattleField_f` ->
+  `0x023A8EAC` (0x1004 bytes) / `0x023B17E0`, Galaxy, MarioU, ... Wufu ...); no match, no object.
+  NewStage01 matches nothing, so its bank (a copy of Battlefield's) never played.
+- A sound's ID is `(row << 16) | index` in `sound/config/soundlabeltable.bin` ('STB\0': 3252
+  rows of (bank id, sounds, offset, 0), then each row's tone indices); `0x0311EC80` checks the row
+  and `0x0311EDBC` the index against its count. Battlefield's (= NewStage01's) bank 3051 is row
+  1147, 7 sounds.
+- `sequence.bin` ('SQB\0'): 16-byte entries (sound ID, 1, frame, 0...), -2 = loop: Battlefield's
+  plays its ambient loops amb01-04 at 0 / 3120 / 5040 / 5760 (its day turning), loop 7200, through
+  the music player (`S + 0xFC8`, `0x03121D78`).
+- Stage code plays a sound with `0x03125D80(S, handle, id)` (the handle 0x30 bytes, the caller's;
+  then `0x033EFD88(handle, 2)`): Wuhu Island's code (301 calls, e.g. `0x023A8878`).
+
+Built:
+- `tools/minecraft_sound.py`: Ultimate's `se_stage_pickel_world.nus3audio` holds Namco IDSP (DSP
+  ADPCM, 48 kHz mono) as Smash 4's banks do: copied as they are into NewStage01's bank as tones
+  7-54 (`SOUNDS`: cow / chicken / sheep / villager / spider / zombie voices x6, zombi_burn x2,
+  zombi_death, bone_move x4, enderman_portal x3, door_open, door_close; the block sounds left
+  out), entries as a Smash 4 one-shot's (`snd_se_enemy_Metalface`'s: loop flag 0) in
+  Battlefield's group 0x272, `VOLUME` 0 dB. Battlefield's amb loops are made a silent loop, so
+  its sequence.bin (kept, known to load) plays nothing. soundlabeltable.bin's row 1147 grown to
+  55 (the other rows' offsets moved).
+- `tools/minecraft_world.py --sound-bank / --sound-events`: the bank in both forms' sound folders
+  (Omega's vanilla bank is an empty file); the build lists its sounds: the doors as they start to
+  open / close (`door_rig`), voices at random frames `SOUND_EVERY` apart while the mob is out
+  (fixed a build), a burning mob's hurt on each red flash and its death at the poof, the
+  enderman's portal as it leaves and lands. Ultimate's own timing is in its stage code, not
+  available. `tools/minecraft_sound_events.json`: all biomes' and Omega's.
+- `tools/monster_roll_cave.py`: hooks `0x03122E08` so a name starting `NewStage01` is matched as
+  `BattleField_f` (Battlefield's sound object: its methods only start / stop the sequence); each
+  update plays the events (8 bytes: frame, tone, mob folder bit or always, variants) of the
+  biome's table (the biome cave's pick mod 6; Omega its own) up to the cycle's frame, those
+  whose mob is shown, a variant at random (the clock RNG), with `0x03125D80`. 24 unicorn checks.
+- Install: also `sound/config/soundlabeltable.bin`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

@@ -1332,6 +1332,29 @@ FIRE_FRAMES, FIRE_STEP = 32, 3
 HURT_PERIOD, HURT_FRAMES, HURT_DEATH, HURT_TINT = 60, 30, 90, (1.0, 0.4, 0.4)
 POOF_FRAMES, POOF_STEP, POOF_PARTS = 7, 3, 7
 TELEPORT_SPEED, TELEPORT_FX, TELEPORT_PARTS = 11.0, 40, 12
+# Sounds (v17c): Ultimate's stage bank in the slot's (tools/minecraft_sound.py), played by
+# tools/monster_roll_cave.py at frames of the cycle this build lists (--sound-events), each when
+# its mob's folder is shown ('always': the villagers and doors). Ultimate's own timing is in its
+# stage code, which isn't available: its voices here come at random frames (fixed a build, the
+# variant random a time), an interval of SOUND_EVERY (frames) apart while the mob is out; the
+# doors as they start to open and close; a burning mob's hurt on each red flash (zombi_burn: Ultimate
+# has no skeleton burn of its own), its death (zombi_death) at the poof; the enderman's
+# portal as it leaves and lands
+SOUND_EVERY = {'sheep': (360, 900), 'cow': (360, 900), 'chicken': (300, 780), 'villager': (600, 1500),
+               'zombie': (300, 720), 'spider': (300, 720), 'skeleton': (240, 600)}
+SOUND_VOICE = {'sheep': 'sheep_vo', 'cow': 'cow_vo', 'chicken': 'chicken_vo', 'villager': 'villager_vo',
+               'zombie': 'zombi_vo', 'spider': 'spider_vo', 'skeleton': 'bone_move'}
+VILLAGER_OUT = (30, 5400)           # VILLAGER_CYCLE: out until they're home (sleep)
+
+
+def sound_times(lo, hi, every, seed):
+    """frames in [lo, hi), every[0]-every[1] apart (the first within every[0] of lo)"""
+    rng = np.random.default_rng(seed)
+    out, f = [], lo + int(rng.integers(0, every[0]))
+    while f < hi:
+        out.append(f)
+        f += int(rng.integers(every[0], every[1] + 1))
+    return out
 
 
 class Ground:
@@ -1396,9 +1419,11 @@ def burn_fx(meshes, bones, tracks, curves, kind, hip, start, end, at, tex, effec
     F = len(tracks[hip][0])
     f = np.arange(F)
     on = (f >= start) & (f <= end)
-    pos, rot, scl = (x.copy() for x in tracks[hip])
+    pos, _rot, scl = (x.copy() for x in tracks[hip])
     bones.append((hip + '_fire', 0))
-    tracks[bones[-1][0]] = (pos, rot, scl * on[:, None])
+    # its place only: the quads face the camera however the mob turns (its turn, about the
+    # vertical, barely moves the hip's place)
+    tracks[bones[-1][0]] = (pos, None, scl * on[:, None])
     k = len(bones) - 1
     # the mob's bind pose: feet at 0, about 8 wide and 17 high (zombie, skeleton): the fire over
     # it, in front and behind, a frame (1 / FIRE_FRAMES of the strip) each
@@ -1435,6 +1460,12 @@ def burn_fx(meshes, bones, tracks, curves, kind, hip, start, end, at, tex, effec
     curves['poof_' + kind] = {'NU_colorSamplerUV': uv}
 
 
+def teleport_frames(path, lo, hi):
+    """[frames] bool: the enderman dashing (path: its hip, per frame), in [lo, hi)"""
+    speed = np.r_[np.linalg.norm(np.diff(path, axis=0), axis=1), 0.0]
+    return (speed > TELEPORT_SPEED / 2) & (np.arange(len(path)) >= lo) & (np.arange(len(path)) < hi)
+
+
 def teleport_fx(meshes, bones, tracks, prefix, path, lo, hi, tex):
     """the enderman's dashes in [lo, hi] (path: its hip, world, per frame): hidden over them, and
     particle bursts where it leaves and lands"""
@@ -1444,8 +1475,7 @@ def teleport_fx(meshes, bones, tracks, prefix, path, lo, hi, tex):
         img[2:6, 2:6] = (200, 90, 255, 255)
         img[3:5, 3:5] = (245, 200, 255, 255)
         tex.extra['pickel_portal'] = img
-    speed = np.r_[np.linalg.norm(np.diff(path, axis=0), axis=1), 0.0]
-    fast = (speed > TELEPORT_SPEED / 2) & (np.arange(len(path)) >= lo) & (np.arange(len(path)) < hi)
+    fast = teleport_frames(path, lo, hi)
     names = [n for n in tracks if n.startswith(prefix)]
     for n in names:                         # hidden while dashing
         tracks[n][2][np.r_[fast[1:], False] | fast] = 0.0
@@ -1633,8 +1663,9 @@ def atlas_rows(parts, tex, name):
     return out
 
 
-def door_rig(src, form, doors, paths, tex, frames):
-    """meshes, bones, tracks: each door on its own bone, swung by the villagers' paths"""
+def door_rig(src, form, doors, paths, tex, frames, events=None):
+    """meshes, bones, tracks: each door on its own bone, swung by the villagers' paths; events:
+    a list for its sounds (frame, sound, 'always')"""
     import ssbh_data_py as s
     d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
     meshes, bones, tracks = [], [('door_root', -1)], {}
@@ -1664,6 +1695,12 @@ def door_rig(src, form, doors, paths, tex, frames):
         for f in range(1, frames):
             t[f] = min(1.0, t[f - 1] + 1 / DOOR_SWING) if near[f] else max(0.0, t[f - 1] - 1 / DOOR_SWING)
         t[0] = t[-1] = 0.0
+        if events is not None:
+            for f in range(1, frames):
+                if t[f - 1] == 0.0 < t[f]:
+                    events.append((f, 'door_open', 'always'))
+                elif t[f - 1] == 1.0 > t[f]:
+                    events.append((f, 'door_close', 'always'))
         bind_inv = np.linalg.inv(world[bone])
         pos, rot, scl = [], [], []
         for w in t:
@@ -2056,6 +2093,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         sky = [dict(p, pos=SKY_PIVOT + (p['pos'] - SKY_PIVOT) * DOME_PUSH) if p['label'] == 'sfx_sky_color' else p
                for p in sky]
     villagers, animals, monsters = mob_kinds(src, form, biome, animal, daynight)
+    events = []                             # sounds: (frame, SOUNDS sound, mob or 'always')
     mob_folders = sorted({ANIMAL_SETS[a.split('_')[2]] for a, _x in animals}
                          | {MONSTER_SETS[x.split('_')[2]] for x, _a in monsters})
     rig = villagers or (effect and torches == 'animated')
@@ -2125,7 +2163,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         if villagers:
             m, b, t = mob_rig(src, form, villagers, tex, frames, 'villager')
             if daynight:
-                dm, db, dt = door_rig(src, form, door_sets(src, form, biome), villager_paths(villagers), tex, frames)
+                dm, db, dt = door_rig(src, form, door_sets(src, form, biome), villager_paths(villagers), tex, frames,
+                                      events)
+                for k in range(len(villagers)):
+                    events += [(f, SOUND_VOICE['villager'], 'always')
+                               for f in sound_times(*VILLAGER_OUT, SOUND_EVERY['villager'], 100 + k)]
                 if points:                  # the torches' light on them too (user)
                     dm += torch_light(dm, points, DOOR_LIGHT_MAX)
                 for mesh in dm:
@@ -2148,6 +2190,10 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             print('%s: no room for the animals' % form)
             animals = []
         for kind in dict.fromkeys(a for a, _anims in animals):
+            a_kind = kind.split('_')[2]
+            if daynight:
+                events += [(f, SOUND_VOICE[a_kind], a_kind)
+                           for f in sound_times(0, CYCLE, SOUND_EVERY[a_kind], 200 + ANIMALS.index(a_kind))]
             m, b, t = mob_rig(src, form, [x for x in animals if x[0] == kind], tex, frames, 'animal')
             for name, (pos, rot, scl) in t.items():
                 pos += sh
@@ -2174,6 +2220,16 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 scl[:lo] = 0.0
                 scl[hi + 1:] = 0.0
                 pos += sh
+            out = BURN_FROM if kind in BURNING and hi > BURN_FROM else hi
+            if kind in SOUND_VOICE:
+                events += [(f, SOUND_VOICE[kind], kind)
+                           for f in sound_times(lo, out, SOUND_EVERY[kind], 300 + MONSTERS.index(kind))]
+            if out < hi:
+                events += [(f, 'zombi_burn', kind) for f in range(BURN_FROM, hi + 1 - HURT_DEATH, HURT_PERIOD)]
+                events += [(hi - HURT_DEATH, 'zombi_burn', kind), (hi + 1, 'zombi_death', kind)]
+            if kind == 'enderman':
+                fast = teleport_frames(paths[k], lo, hi).astype(int)
+                events += [(int(e) + 1, 'enderman_portal', kind) for e in np.flatnonzero(np.diff(fast))]
             if kind in BURNING and effect and curves and hi > BURN_FROM:
                 for mesh in m:
                     mesh.gain = 'hurt_' + kind
@@ -2229,7 +2285,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         if f.endswith('.lvd'):
             data = build_lvd(out_dir + '/param/' + f, d, cols).write()
             open(out_dir + '/param/' + f, 'wb').write(data)
-    return cols, blocks
+    return cols, blocks, sorted(events)
 
 
 def main():
@@ -2255,15 +2311,29 @@ def main():
     ap.add_argument('--animal', default='all', choices=('all',) + ANIMALS + ('none',),
                     help="the animals built in the pen: all three kinds (tools/monster_roll_cave.py shows the "
                          "one it rolls each match, as Ultimate) or one kind")
+    ap.add_argument('--sound-bank', help="tools/minecraft_sound.py's sound.nus3bank, put in both forms' sound folders")
+    ap.add_argument('--sound-events', help="a JSON file the forms' sound events are put in (by biome / form) for "
+                                           "tools/monster_roll_cave.py")
     a = ap.parse_args()
     global GAIN_FLAGS, ISLAND_FLAGS
     GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
     ISLAND_FLAGS = 0xA4001041 if a.island_shader == 'shadow' else None
     for form in ('melee', 'end'):
-        cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
-                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
-                                  {'all': ANIMALS, 'none': ()}.get(a.animal, (a.animal,)), a.daynight == 'on')
-        print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
+        out_dir = '%s/stage/%s/%s' % (a.out, form, a.name)
+        cols, blocks, events = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), out_dir,
+                                          form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches,
+                                          a.clouds, {'all': ANIMALS, 'none': ()}.get(a.animal, (a.animal,)),
+                                          a.daynight == 'on')
+        print('%s: %d collisions (%d drop-through), %d blocks, %d sounds' % (
+            form, len(cols), sum(c.flags[3] for c in cols), len(blocks), len(events)))
+        if a.sound_bank:
+            os.makedirs(out_dir + '/sound', exist_ok=True)
+            shutil.copy(a.sound_bank, out_dir + '/sound/sound.nus3bank')
+        if a.sound_events:
+            import json
+            table = json.load(open(a.sound_events)) if os.path.exists(a.sound_events) else {}
+            table['%s/%s' % (a.biome, form)] = [list(e) for e in events]
+            json.dump(table, open(a.sound_events, 'w'), indent=0, sort_keys=True)
 
 
 if __name__ == '__main__':
