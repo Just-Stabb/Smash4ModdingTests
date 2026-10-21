@@ -8,7 +8,8 @@ time the test sets).
 
 Checks: each button combination picks its biome's folder; the pick is kept within WINDOW and
 redone after; L not held: random, every biome reachable; invalid pads (+0x87 0) and the dummy slot
-are ignored; kind 0x81 (Omega) and the game's kinds keep their folders.
+are ignored; kind 0x81 (Omega) and the game's kinds keep their folders. Both with the hazards-off
+folders listed (ZL / Z picks them) and without (HAZARDS_OFF False: ZL ignored).
 """
 import os
 import struct
@@ -27,8 +28,19 @@ STATUS = 0x7F005000         # fake status objects, 0x100 apart; wrappers at 0x7F
 
 
 def main():
+    fails = 0
+    for hazards_off in (False, True):
+        print('-- hazards-off folders %s' % ('listed' if hazards_off else 'not listed (ZL ignored)'))
+        fails += run(hazards_off)
+    print('%d failed' % fails)
+    sys.exit(1 if fails else 0)
+
+
+def run(hazards_off):
+    """the checks on the cave built with or without the hazards-off folders (written over the RPX's)"""
     mu = machine(sys.argv[1])
-    a, words, _hooks = C.build()
+    a, words, _hooks = C.build(hazards_off)
+    mu.mem_write(C.CAVE, b''.join(struct.pack('>I', w) for w in words))
     # sprintf: record format and argument
     from ppcasm import Asm
     st = Asm(SPRINTF)
@@ -122,19 +134,21 @@ def main():
     want_last = folders.index(path(site=0x02AB83A0))
     check('the last random pick is kept for the prefetch', folders[want_last] in folders, True)
     check('random reaches every biome (hazards on)', sorted(seen), sorted(folders[:C.N_BIOMES]))
-    for held, want in ((C.L | C.ZL, 6), (C.L | C.R | C.ZL, 7), (C.L | C.STICK_UP | C.Z, 8),
-                       (C.L | C.STICK_LEFT | C.ZL | C.A, 11)):
+    off = C.N_BIOMES if hazards_off else 0
+    for held, want in ((C.L | C.ZL, 0), (C.L | C.R | C.ZL, 1), (C.L | C.STICK_UP | C.Z, 2),
+                       (C.L | C.STICK_LEFT | C.ZL | C.A, 5)):
         t += step
         settime(t)
         pads(held)
-        check('held 0x%X (hazards off)' % held, path(), folders[want])
+        check('held 0x%X (%s)' % (held, 'hazards off' if hazards_off else 'ZL ignored'), path(), folders[want + off])
     seen = set()
     for i in range(300):
         t += step + i * 977
         settime(t)
         pads(C.ZL)
         seen.add(path())
-    check('ZL alone: a random biome, hazards off', sorted(seen), sorted(folders[C.N_BIOMES:]))
+    check('ZL alone: a random biome, %s' % ('hazards off' if hazards_off else 'hazards on'), sorted(seen),
+          sorted(folders[off:off + C.N_BIOMES]))
     want_last = folders.index(path(site=0x02AB83A0))
     t += step
     settime(t)
@@ -144,8 +158,7 @@ def main():
     check('the prefetch reuses it', path(site=0x02AB83A0), folders[2])
     check('Omega (0x81) keeps its folder', path(0x81), 'NewStage01')
     check('Battlefield (0) keeps its folder', path(0), 'BattleField_f')
-    print('%d failed' % fails)
-    sys.exit(1 if fails else 0)
+    return fails
 
 
 if __name__ == '__main__':

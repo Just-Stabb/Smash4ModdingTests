@@ -856,6 +856,11 @@ Built:
   biome's table (the biome cave's pick mod 6; Omega its own) up to the cycle's frame, those
   whose mob is shown, a variant at random (the clock RNG), with `0x03125D80`. 24 unicorn checks.
 - Install: also `sound/config/soundlabeltable.bin`.
+- Space: the mob cave's tables (~6 KB) grow the code section to 0x04B84000.
+
+Packaging (user): the hazards-off folders only once the hazards are finished. Until then
+`biome_select_cave.HAZARDS_OFF` is False: ZL / Z ignored, only the six biome folders listed
+(`--hazards-off` lists the twelve); `biome_select_test.py` checks both. v17c ships the six.
 
 ## Freeze (user) and tests
 

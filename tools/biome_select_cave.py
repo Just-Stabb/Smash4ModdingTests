@@ -55,12 +55,17 @@ BIOMES = [('plains', 'NewStage01'), ('birchforest', 'NewStage01_forest'), ('sava
 OFF = ZL | Z
 BIOMES += [(b, f + '_off') for b, f in BIOMES]
 N_BIOMES = len(BIOMES) // 2
+# the hazards-off folders are packaged only once the hazards are finished (user): until then
+# (False) OFF is ignored and only the first N_BIOMES folders are listed; main's --hazards-off sets it
+HAZARDS_OFF = False
 # with L held: (buttons, biome index), the first that's held wins
 BUTTONS = [(R, 1), (STICK_UP | DPAD_UP, 2), (STICK_RIGHT | DPAD_RIGHT, 3), (STICK_DOWN | DPAD_DOWN, 4),
            (STICK_LEFT | DPAD_LEFT, 5)]
 
 
-def build():
+def build(hazards_off=None):
+    hazards_off = HAZARDS_OFF if hazards_off is None else hazards_off
+    biomes = BIOMES if hazards_off else BIOMES[:N_BIOMES]
     a = Asm(CAVE)
     tests = ''.join("""
         lis r0, 0x%04X
@@ -142,10 +147,10 @@ data:
         .word 0
         .word 0
 """ % dict(kind8=KIND * 8, window=WINDOW, pads_hi=PADS >> 16, pads_lo=PADS & 0xFFFF, slots=SLOTS, l=L,
-           tests=tests, n=N_BIOMES, off=OFF, back=BACK, ret_hi=SETTING_RET >> 16, ret_lo=SETTING_RET & 0xFFFF))
-    names_at = a.addr('data') + 8 + 4 * len(BIOMES)
+           tests=tests, n=N_BIOMES, off=OFF if hazards_off else 0, back=BACK, ret_hi=SETTING_RET >> 16, ret_lo=SETTING_RET & 0xFFFF))
+    names_at = a.addr('data') + 8 + 4 * len(biomes)
     strings, ptrs = b'', []
-    for _biome, folder in BIOMES:
+    for _biome, folder in biomes:
         ptrs.append(names_at + len(strings))
         s = folder.encode() + b'\0'
         strings += s + b'\0' * (-len(s) % 4)
@@ -161,7 +166,7 @@ data:
 
 
 def main():
-    a, words, hooks = build()
+    a, words, hooks = build('--hazards-off' in sys.argv[1:])
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % h for h in hooks]
