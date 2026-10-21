@@ -22,8 +22,8 @@ here from the models):
 
 Models go into Battlefield's model folders that have no material animation (model.mta):
 stc_c_Ring_set (everything using the block atlas), stc_k_BG_most_far2 (the backdrop) and
-stc_BG_most_far2_1_set (the sky, with stc_o_BG_clouds_set's model.xmb: its light set, draw range
-and order). Every other folder keeps Battlefield's files with the model's indices zeroed
+stc_BG_most_far2_1_set (the sky; its own model.xmb: draw range 2, as Battlefield's sky dome: the
+clouds' range 4 clipped it). Every other folder keeps Battlefield's files with the model's indices zeroed
 (nud.hidden: nothing drawn, its .mta / skeleton still match it). Only what Battlefield's own
 models have: its shaders (material flags, with its vertex layout), NTWU textures as its single-mip
 ones (nut.write_ntwu). The first builds (NTP3 textures, an empty model in every folder, other
@@ -44,6 +44,7 @@ import lvd  # noqa: E402
 import nud  # noqa: E402
 import nut  # noqa: E402
 import nutexb  # noqa: E402
+import omo  # noqa: E402
 
 BIOMES = ['plains', 'birchforest', 'savanna', 'taiga', 'snowytundra', 'stoneshore']
 FAR = {'plains': 'far_plains_set', 'birchforest': 'far_birchforest_set', 'savanna': 'far_savanna_set',
@@ -58,7 +59,21 @@ SKY_TOP, SKY_HORIZON = np.array([0.47, 0.65, 1.0]), np.array([0.75, 0.85, 1.0])
 CLOUD_ALPHA = 0.7                   # the cloud layer, seen from under it, would hide most of the sky
 
 RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
-SKY_XMB = 'stc_o_BG_clouds_set'     # Battlefield's clouds: the sky's draw settings
+# the cloud layers (far_common_set's bones cloud_model0-2, moved by its animation) each in a
+# Battlefield dyr_ folder with one bone, draw range 2 and no material animation, bound to the
+# bone, with an animation of the layer's motion (as moving_platform_test.py's platform, which the
+# stage plays): Ultimate's frames 0 to CLOUD_PERIOD (each layer slides 10.8 a frame and jumps
+# back every 2250 frames; the middle one half a period out of step, so all repeat after 4500)
+CLOUD_SETS = {'cloud_model0': 'dyr_i_BG_more_far1_set', 'cloud_model1': 'dyr_j_BG_most_far0_set',
+              'cloud_model2': 'dyr_l_BG_more_far2_set'}
+CLOUD_PERIOD = 4500
+SKY_GRADIENT = 'sky_gradient'       # a made texture: the day sky from the top (v 0) to the horizon
+SPLIT = 2                           # the panorama (3200x1600) in this many 2048x2048 textures,
+SPLIT_OVERLAP = 0.0625              # overlapping by its widest triangle (u)
+# Ultimate's colorSet1 on the ring and blocks is Minecraft's corner shading (0.5 = none) and is
+# kept at this fraction; shaders SFX_PBS_52... (doors, crops) get values near 0 there that they
+# can't use as color (they look lit in Ultimate), so those are 0.5
+AO_KEEP = 0.5
 DAY_FRAME = 945                     # Battlefield's light.bin: its most neutral midday frame
 # NAME_stprm.bin (typed values: a type byte, then the value): Battlefield's normal camera is
 # value 6 fov 30, 7 / 8 distance 83 / 1000, 9 vertical angle -5, 10 look-down angle -15 (Ultimate's
@@ -69,10 +84,10 @@ ISLAND_LIGHT_SET = 4                # stc_c_Ring_set's model.xmb light set
 # stage light is white from (0.20, 0.90, 0.38) (travel direction below, as light.bin's); Ultimate's
 # ambient (spherical harmonics) becomes a sky light from above, a fill from the camera and the 4th
 # (off, no direction: Battlefield's ambient color). (enabled, direction, hue, saturation, value)
-ISLAND_LIGHTS = [(1, (-0.204, -0.903, -0.379), 0.0, 0.0, 0.8),
+ISLAND_LIGHTS = [(1, (-0.204, -0.903, -0.379), 0.0, 0.0, 0.75),
                  (1, (0.0, -1.0, 0.0), 210.0, 0.1, 0.15),
                  (1, (0.0, -0.259, -0.966), 0.0, 0.0, 0.4),
-                 (0, (0.0, 0.0, 0.0), 0.0, 0.0, 0.35)]
+                 (0, (0.0, 0.0, 0.0), 0.0, 0.0, 0.45)]
 
 
 # ---------------------------------------------------------------- Ultimate models
@@ -112,6 +127,7 @@ def load_parts(setdir):
                 nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
         parts.append(dict(
             name=o.name, sub=o.subindex, pos=pos, nrm=nrm, label=label, shader=mat.shader_label,
+            bone=o.parent_bone_name,
             # colorSet1 is the vertex color (0.5 = 1.0); the others are shader inputs (the
             # backdrops' colorSet5 is a constant 0.33)
             col=next((np.array(c.data, dtype=np.float64) for c in o.color_sets if c.name == 'colorSet1'), None),
@@ -465,6 +481,21 @@ class Textures:
     def image(self, name):
         if name == 'default_white':
             return np.full((8, 8, 4), 255, np.uint8)
+        if name == SKY_GRADIENT:
+            t = np.linspace(1, 0, 256)[:, None, None]
+            rgb = SKY_TOP * t + SKY_HORIZON * (1 - t)
+            img = np.empty((256, 64, 4), np.uint8)
+            img[..., :3] = np.round(rgb * 255)
+            img[..., 3] = 255
+            return img
+        if '#' in name:                     # 'NAME#k': slice k of SPLIT, with the overlap, 2048x2048
+            from PIL import Image
+            base, k = name.split('#')
+            img = nutexb.decode(nutexb.Nutexb(self.files[base]))
+            w = img.shape[1]
+            lo, hi = split_range(int(k))
+            img = img[:, int(round(lo * w)):int(round(hi * w))]
+            return np.asarray(Image.fromarray(img).resize((2048, 2048), Image.LANCZOS))
         return nutexb.decode(nutexb.Nutexb(self.files[name]))
 
     def nut(self, names):
@@ -482,7 +513,8 @@ class Textures:
             if (w2, h2) != (w, h):
                 img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
                                                              else Image.LANCZOS))
-            texs.append((self.ids[n], 0x31 if (img[..., 3] >= 250).all() else 0x33, img))
+            fmt = 0x1A if n == SKY_GRADIENT else 0x31 if (img[..., 3] >= 250).all() else 0x33    # RGBA8: no banding
+            texs.append((self.ids[n], fmt, img))
         return nut.write_ntwu(texs)
 
 
@@ -521,6 +553,34 @@ def two_sided(idx):
     return np.concatenate([t, t[:, ::-1]]).reshape(-1)
 
 
+def split_range(k):
+    lo, hi = k / SPLIT - SPLIT_OVERLAP, (k + 1) / SPLIT + SPLIT_OVERLAP
+    return max(lo, 0.0), min(hi, 1.0)
+
+
+def split_wide(parts):
+    """each part as SPLIT parts by its triangles' u (centroid), on the slices of its texture
+    (Textures 'NAME#k'): the panorama at 2 x 1800 source pixels across instead of 2048"""
+    out = []
+    for p in parts:
+        tri = p['idx'].reshape(-1, 3)
+        cu = p['uv'][tri, 0].mean(1)
+        for k in range(SPLIT):
+            sel = tri[(cu >= k / SPLIT) & ((cu < (k + 1) / SPLIT) | (k == SPLIT - 1))]
+            if not len(sel):
+                continue
+            used, idx = np.unique(sel, return_inverse=True)
+            lo, hi = split_range(k)
+            uv = p['uv'][used].copy()
+            assert uv[:, 0].min() >= lo - 1e-6 and uv[:, 0].max() <= hi + 1e-6
+            uv[:, 0] = (uv[:, 0] - lo) / (hi - lo)
+            q = dict(p, pos=p['pos'][used], nrm=None if p['nrm'] is None else p['nrm'][used],
+                     col=None if p['col'] is None else p['col'][used], uv=uv, idx=idx.reshape(-1),
+                     textures=['%s#%d' % (p['textures'][0], k)] + p['textures'][1:], sub=p['sub'] * SPLIT + k)
+            out.append(q)
+    return out
+
+
 def to_nud(parts, tex, kind, sky=False):
     meshes = []
     for p in parts:
@@ -529,20 +589,29 @@ def to_nud(parts, tex, kind, sky=False):
         tname = p['textures'][0]
         if tname.startswith('all_blocks-rgba_c2_add') and tname not in ('all_blocks-rgba_c2_add_vegetables',):
             tname = ATLAS
-        tid = tex.id(tname)
-        poly = nud.Polygon()
-        poly.pos, poly.nrm, poly.uvs = p['pos'], p['nrm'], [p['uv']]
-        col = p['col'] if p['col'] is not None else np.full((len(p['pos']), 4), 0.502)
+        uv = p['uv']
+        col = p['col'].copy() if p['col'] is not None else np.full((len(p['pos']), 4), 0.502)
+        if kind == 'lit':
+            if p['shader'].startswith('SFX_PBS_52'):
+                col[:, :3] = 0.5
+            else:
+                col[:, :3] = np.where(col[:, :3] < 0.5, 0.5 - (0.5 - col[:, :3]) * AO_KEEP, col[:, :3])
         col = np.clip(np.round(col * 253), 0, 255)
         if sky:
-            # Ultimate tints the sky in its shader; a day gradient instead (127 = 1.0)
+            # Ultimate tints the sky in its shader; a day gradient instead, in a texture (by
+            # elevation; the vertex colors left at 1.0)
             d = p['pos'] / (np.linalg.norm(p['pos'], axis=1, keepdims=True) + 1e-9)
-            t = np.clip(d[:, 1:2] * 3, 0, 1)
+            t = np.clip(d[:, 1] * 3, 0, 1)
             if p['label'] == 'sfx_sky_color':
-                col[:, :3] = np.round(127 * (SKY_HORIZON * (1 - t) + SKY_TOP * t))
+                tname = SKY_GRADIENT
+                uv = np.c_[np.full(len(t), 0.5), 1 - t]
+                col[:, :3] = 127
             elif p['label'].startswith('sfx_cloud'):
                 col[:, 3] = 127 * CLOUD_ALPHA
             col = np.clip(col, 0, 255)
+        tid = tex.id(tname)
+        poly = nud.Polygon()
+        poly.pos, poly.nrm, poly.uvs = p['pos'], p['nrm'], [uv]
         poly.col = col
         poly.idx = p['idx']
         atlas = tname.startswith('all_blocks')
@@ -621,6 +690,40 @@ def stage_params(path, values=CAMERA):
     return bytes(d)
 
 
+def cloud_motion(src, form, bone):
+    """[CLOUD_PERIOD + 1] world offsets of a cloud bone from its rest pose, from Ultimate's sky
+    animation (the last frame is the first again, so the animation loops)"""
+    import ssbh_data_py as s
+    d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
+    skel = s.skel_data.read_skel(d + '/model/far_common_set/model.nusktb')
+    world = _world(skel)
+    b = [x for x in skel.bones if x.name == bone][0]
+    rest = np.array(b.transform, dtype=np.float64)[3, :3]
+    parent = world[skel.bones[b.parent_index].name][:3, :3]
+    anim = s.anim_data.read_anim(d + '/motion/far_common_set/far_common_set_00.nuanmb')
+    track = [n for g in anim.groups for n in g.nodes if n.name == bone][0].tracks[0].values
+    offs = [(np.array(track[f].translation) - rest) @ parent for f in range(CLOUD_PERIOD + 1)]
+    assert np.abs(offs[-1] - offs[0]).max() < 1, (bone, offs[0], offs[-1])
+    return offs
+
+
+def write_clouds(model_dir, anim_dir, parts, tex, src, form):
+    for bone, folder in CLOUD_SETS.items():
+        layer = [p for p in parts if p['bone'] == bone]
+        meshes = to_nud(layer, tex, 'bg', True)
+        for m in meshes:
+            m.bind, m.bone = 8, 0
+        write_set('%s/%s' % (model_dir, folder), meshes, tex)
+        h = omo.vbn_read('%s/%s/model.vbn' % (model_dir, folder))[0][2]
+        path = '%s/%s/%s.omo' % (anim_dir, folder, folder)
+        o = omo.Omo(open(path, 'rb').read())
+        pos = [tuple(float(x) for x in v) for v in cloud_motion(src, form, bone)]
+        o.frames = len(pos)
+        o.nodes = []
+        omo.set_node(o, h, pos, [(0.0, 0.0, 0.0, 1.0)] * len(pos), [(1.0, 1.0, 1.0)] * len(pos))
+        open(path, 'wb').write(o.encode())
+
+
 # ---------------------------------------------------------------- stage
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form)"""
@@ -641,28 +744,30 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
         for e in EXTRA.get(biome, []):
             extra += load_parts('%s/normal/model/%s' % (src, e))
         near = ring + (block_parts(src, blocks) if blocks else []) + plat + extra
-        far = [p for p in load_parts('%s/normal/model/%s' % (src, FAR[biome])) if p['sub'] == 0]
+        far = split_wide([p for p in load_parts('%s/normal/model/%s' % (src, FAR[biome])) if p['sub'] == 0])
         sky_src = '%s/normal/model/far_common_set' % src
     else:
         d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
         blocks = []
         near = load_parts('%s/battle/model/ring_endbattle_set' % src)
-        far = [p for p in load_parts('%s/battle/model/far_plains_set' % src) if p['sub'] == 0]
+        far = split_wide([p for p in load_parts('%s/battle/model/far_plains_set' % src) if p['sub'] == 0])
         sky_src = '%s/battle/model/far_common_set' % src
     sky = [p for p in load_parts(sky_src)
            if p['label'] in ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core')]
 
+    clouds = [p for p in sky if p['bone'] in CLOUD_SETS]
+    sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
     for name in sorted(os.listdir(model_dir)):
-        if name in (RING_SET, FAR_SET, SKY_SET):
+        if name in (RING_SET, FAR_SET, SKY_SET) or name in CLOUD_SETS.values():
             assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
             data = nud.hidden(path)
             open(path, 'wb').write(data)
-    shutil.copy('%s/%s/model.xmb' % (model_dir, SKY_XMB), '%s/%s/model.xmb' % (model_dir, SKY_SET))
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (SKY_SET, sky, 'bg', True)):
         write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
+    write_clouds(model_dir, out_dir + '/animation', clouds, tex, src, form)
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)

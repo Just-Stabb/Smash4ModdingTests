@@ -1,7 +1,8 @@
 # Minecraft World (Smash Ultimate) on NewStage01
 
 Status: **loads in game (v5, v6: user), normal play and Omega**; stage code moves rigged
-collision (moving-platform test, user). v7 (fog, island light, camera; below) not tested yet.
+collision (moving-platform test, user). v7 in game (user): camera and the island's front good;
+sky white, backdrop low-res, houses / trees / back blocks dark. v8 (below) not tested yet.
 v1-v4 froze while loading their models (see "Freeze"); v5 uses only forms Battlefield's own loaded
 models have. The whole normal-play stage (not the Battlefield form) converted
 from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
@@ -131,7 +132,30 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   `0x2000F001`... (Battlefield's are `0x2000xxxx` below that). The block atlas (512x512) is 4x larger
   with nearest pixels (2048x2048 BC3): each source pixel is one 4x4 block, exact in BC, and sharp
   under linear filtering. The panorama 2048x1024 BC3.
-- **Sky**: Ultimate colors the sky dome in its shader (its vertex colors are only shading), so the
+- **Sky (v8)**: v5-v7's sky folder had the clouds' `model.xmb` (draw range 4); Battlefield uses
+  range 4 only for things within ~27000 units (its clouds, grass, neon ring), its sky dome (to
+  85000) and backdrops have range 2, so the 47000-unit dome was most likely clipped (the user saw
+  white, no clouds). v8 keeps the folder's own xmb (range 2) and puts the gradient in a texture
+  (`sky_gradient`, 64x256 RGBA8, by elevation) with the vertex colors at 1.0, in case the unlit
+  shader doesn't use vertex colors.
+- **Clouds (v8)**: Ultimate moves the three cloud layers (`far_common_set` bones `cloud_model0-2`,
+  10.8 units a frame, jumping back; all repeat after 4500 frames). Each layer is in a Battlefield
+  `dyr_` folder with one bone at the origin, draw range 2 and no `.mta` (`dyr_i`, `dyr_j`, `dyr_l`),
+  bound to it (bind 8, bone 0), with that bone's animation = Ultimate's frames 0-4500 as offsets from
+  the rest pose (as the moving platform, which the stage plays). `moving_platform_test.py` uses
+  `dyr_j` too (it replaces the middle cloud layer). The unlit shader on a bone-bound mesh isn't in
+  Battlefield (its bound meshes are lit); binding should only change the transform.
+- **Not animated**: the torches' flames are particle effects in Ultimate (no torch models or
+  animations in the stage folder), which would need its effect files and a converter to Smash 4's;
+  the sun / moon / stars and the day-night cycle (the stage is held at midday).
+- **Backdrop resolution (v8)**: the 3200x1600 panorama is two 2048x2048 textures (its halves,
+  overlapping by its widest triangle, 6.25% of the width; each triangle on the half its centre is
+  in) instead of one 2048x1024.
+- **Vertex colors (v8)**: Ultimate's `colorSet1` is Minecraft's corner shading (0.5 = none) on the
+  ring and blocks; at full strength the houses, trees and back blocks were too dark (user), so it's
+  kept at half (`AO_KEEP`); the `SFX_PBS_52...` shaders (doors, crops) have values near 0 there that
+  can't be color (they look lit in Ultimate): 0.5. The island's ambient up to 0.45, sun 0.75.
+- **Sky gradient**: Ultimate colors the sky dome in its shader (its vertex colors are only shading), so the
   dome gets a fixed day gradient (Minecraft's day sky, `(0.47, 0.65, 1.0)` at the top, as vertex
   colors at 127 = 1.0). Clouds at 70% opacity (from under the layer they'd hide most of
   the sky). Sun kept; moon, stars and fog layers not.
