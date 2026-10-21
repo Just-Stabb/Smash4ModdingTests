@@ -14,7 +14,11 @@ alone again; a missing model is skipped; other kinds: nothing. Sounds (a small e
 the test's own, EVENTS): the biome's table played up to the frame, only shown mobs', a random
 variant, on the stage's sound object with a stack handle released after; another biome's (a
 hazards-off pick); Omega's; again after the cycle wraps; nothing without a sound object; the
-sound object's name hook (NewStage01* -> BattleField_f). Every roll of 6000 against the rules in
+sound object's name hook (NewStage01* -> BattleField_f). The breakable blocks (EVENTS' three): a
+gimmick each at the first update (sphere at its cell's centre, BLOCK_RADIUS, its life), damage taken
+off its life with the material's hit sound, at 0 its hurtbox removed, the break sound, its collision
+link switched off (only those on the plane), nothing more after; none on a hazards-off pick or on
+Omega. Every roll of 6000 against the rules in
 Python (Ultimate's odds), with the resulting frequencies.
 """
 import os
@@ -53,7 +57,13 @@ def stub(mu, addr, text):
 EVENTS = {'plains/melee': [[5, 'door_open', 'always'], [10, 'cow_vo', 'cow'], [12, 'zombi_vo', 'zombie'],
                            [20, 'sheep_vo', 'sheep']],
           'birchforest/melee': [[7, 'door_close', 'always']],
-          'plains/end': [[3, 'enderman_portal', 'enderman'], [4, 'villager_vo', 'always']]}
+          'plains/end': [[3, 'enderman_portal', 'enderman'], [4, 'villager_vo', 'always']],
+          'blocks/plains': [dict(x=-55.0, y=15.0, z=0.0, life=12.0, sound='grass', link=True),
+                            dict(x=25.0, y=5.0, z=-10.0, life=18.0, sound='wood', link=False),
+                            dict(x=5.0, y=5.0, z=0.0, life=24.0, sound='stone', link=True)]}
+GIMS = 0x7F00A000          # fake gimmick wrappers, 0x40 apart: +0 the damage the stub returns, +4 removed
+BREC = 0x7F00B000          # +0 creates, +4 activates, +8 ground calls, +0xC its list, +0x10 on/off, +0x20 shapes
+LINKS = 0x7F00B800         # the ground list the link lookup returns for 'b00' / 'b02'
 SOUND_X = 0x7F002300       # stage + 0xFF0 -> SOUND_X; *SOUND_X = SOUND_X + 0x10 (X); X + 0x390 = S
 SOUND_S = 0x7F002800
 PLAYS = 0x7F002600         # the sound ids played (REC + 0x30 counts them, + 0x34 the releases)
@@ -83,10 +93,83 @@ def main():
         stw r8, 0x203C(r7)
         blr""")
     stub(mu, C.RELEASE, 'lis r7, 0x7F00\nlwz r6, 0x2034(r7)\naddi r6, r6, 1\nstw r6, 0x2034(r7)\nstw r4, 0x2040(r7)\nblr')
+    # gimmicks: create -> the next fake wrapper (args checked: 0, 0, 2, 1), shape -> copied to BREC+0x20
+    # + 0x28 n, activate counted, damage -> f1 = w+0, remove -> w+4 = 1
+    stub(mu, C.GIM_CREATE, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xB000
+        lwz r8, 0(r7)
+        addi r9, r8, 1
+        stw r9, 0(r7)
+        cmpwi r3, 0
+        bne bad
+        cmpwi r4, 0
+        bne bad
+        cmpwi r5, 2
+        bne bad
+        cmpwi r6, 1
+        bne bad
+        slwi r8, r8, 6
+        lis r3, 0x7F00
+        ori r3, r3, 0xA000
+        add r3, r3, r8
+        blr
+bad:    li r3, 0
+        blr""")
+    stub(mu, C.GIM_SHAPE, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xB000
+        subf r8, r7, r7
+        lis r9, 0x7F00
+        ori r9, r9, 0xA000
+        subf r8, r9, r3
+        srwi r8, r8, 6
+        mulli r8, r8, 0x28
+        addi r9, r7, 0x20
+        add r9, r9, r8
+        li r10, 10
+        mtctr r10
+        addi r5, r5, -4
+        addi r9, r9, -4
+cp:     lwzu r11, 4(r5)
+        stwu r11, 4(r9)
+        bdnz cp
+        li r3, 0
+        blr""")
+    stub(mu, C.GIM_ACTIVATE, 'lis r7, 0x7F00\nori r7, r7, 0xB000\nlwz r6, 4(r7)\naddi r6, r6, 1\nstw r6, 4(r7)\nblr')
+    stub(mu, C.GIM_DAMAGE, 'lfs f1, 0(r3)\nblr')
+    stub(mu, C.GIM_REMOVE, 'li r6, 1\nstw r6, 4(r3)\nblr')
+    # the link lookup: 'b00' / 'b02' -> LINKS (anything else 0); the ground switch recorded
+    stub(mu, C.LINK_FIND, """
+        lbz r5, 0(r4)
+        cmpwi r5, 0x62
+        bne no
+        lbz r5, 1(r4)
+        cmpwi r5, 0x30
+        bne no
+        lbz r5, 2(r4)
+        cmpwi r5, 0x30
+        beq yes
+        cmpwi r5, 0x32
+        beq yes
+no:     li r3, 0
+        blr
+yes:    lis r3, 0x7F00
+        ori r3, r3, 0xB800
+        blr""")
+    stub(mu, C.GROUNDS_ON, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xB000
+        lwz r6, 8(r7)
+        addi r6, r6, 1
+        stw r6, 8(r7)
+        stw r3, 0xC(r7)
+        stw r4, 0x10(r7)
+        blr""")
     stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
     # find: the name's 5th char's place in FOLDER_CHARS picks a model (0x200 apart); the enderman's
     # ('n') missing while REC+0x20 is set
-    mu.mem_write(REC + 0x100, FOLDER_CHARS.encode() + b'\0')
+    mu.mem_write(REC + 0x100, (FOLDER_CHARS + 'b').encode() + b'\0')     # 'b': the blocks' (one fake model)
     stub(mu, C.FIND_MODEL, """
         lis r7, 0x7F00
         lwz r6, 0x2010(r7)
@@ -296,6 +379,64 @@ miss:   li r3, 0
         mu.emu_start(a.addr('namefix'), C.SOUND_NAME + 4, count=200)
         check('name %r -> %s' % (name, 'BattleField_f' if want == C.BATTLEFIELD_NAME else 'itself'),
               (mu.reg_read(UC_PPC_REG_4), mu.reg_read(UC_PPC_REG_1)), (want, 0x7F00F000 - 0x28))
+    # the breakable blocks (EVENTS' three on plains)
+    setw(STAGE + 0xFF0, SOUND_X)
+    mu.mem_write(BREC, b'\0' * 0x100)
+    mu.mem_write(GIMS, b'\0' * 0x100)
+
+    def wf(addr):
+        return struct.unpack('>f', mu.mem_read(addr, 4))[0]
+
+    def damage(i, d):
+        mu.mem_write(GIMS + 0x40 * i, struct.pack('>f', d))
+    for i in range(3):
+        damage(i, 0.0)
+    block_model = MODELS + 0x200 * N_FOLDERS
+    setw(block_model + 0x118, 0x020C0000 | 0x80000)
+    setw(block_model + 0xDC, 1)
+    all_plays = plays
+    tone = C.minecraft_sound.tone_index
+    got = match(C.KINDS[0], 0, 75, [0] * 10, 2)
+    shapes = [tuple(round(wf(BREC + 0x20 + 0x28 * i + 4 * k), 2) for k in (0, 1, 2, 6)) + (word(BREC + 0x20 + 0x28 * i + 0x20),)
+              for i in range(3)]
+    check('blocks: a gimmick each, made and activated once', (word(BREC), word(BREC + 4)), (3, 3))
+    check('their spheres (x, y, z, radius, kind 0)', shapes,
+          [(-55.0, 15.0, 0.0, C.BLOCK_RADIUS, 0), (25.0, 5.0, -10.0, C.BLOCK_RADIUS, 0), (5.0, 5.0, 0.0, C.BLOCK_RADIUS, 0)])
+    bhp = a.addr('bhp')
+    first_block = tone('block_dmg_soil')[0]
+
+    def plays():                                   # the blocks' only (the plains table's door at 5 too)
+        return [p for p in all_plays() if p & 0xFFFF >= first_block]
+    check('their lives (12 / 18 / 24)', [wf(bhp + 4 * i) for i in range(3)], [12.0, 18.0, 24.0])
+    setw(REC + 0x30, 0)
+    rands([3] * 10)
+    damage(0, 5.0)
+    update()
+    damage(0, 0.0)
+    check('5 damage: life 7, the grass hit sound', (wf(bhp), plays()), (7.0, [row | tone('block_dmg_grass')[0] + 3]))
+    setw(REC + 0x30, 0)
+    damage(0, 8.0)
+    update()
+    damage(0, 0.0)
+    check('8 more: broken (hurtbox removed, the grass break sound)', (word(GIMS + 4), plays()),
+          (1, [row | tone('block_break_grass')[0] + 3]))
+    check('its collision link switched off', (word(BREC + 8), word(BREC + 0xC), word(BREC + 0x10)), (1, LINKS, 0))
+    check('its model hidden', (bool(word(block_model + 0x118) & 0x80000), word(block_model + 0xDC)), (False, 0))
+    setw(REC + 0x30, 0)
+    damage(1, 20.0)
+    update()
+    damage(1, 0.0)
+    check('the wood block broken, no link (behind the plane)', (word(GIMS + 0x44), word(BREC + 8), plays()),
+          (1, 1, [row | tone('block_break_wood')[0] + 3]))
+    setw(REC + 0x30, 0)
+    update()
+    check('broken blocks: no more damage read, nothing played', plays(), [])
+    mu.mem_write(BREC, b'\0' * 0x10)
+    match(C.KINDS[0], C.biome_select_cave.N_BIOMES, 75, [0] * 10, 3)
+    check('a hazards-off pick: no blocks', word(BREC), 0)
+    match(C.KINDS[1], 0, 75, [0] * 10, 3)
+    check('Omega: no blocks', word(BREC), 0)
+    setw(pick, 2)                                  # (savanna: no blocks in EVENTS) for the statistics
     # statistics: 6000 nights / matches with a uniform RNG, against the rules in Python
     import random
     rng = random.Random(2)

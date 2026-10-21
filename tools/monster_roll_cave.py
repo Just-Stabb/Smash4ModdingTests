@@ -74,6 +74,19 @@ SOUND_NAME_FIRST = 'stwu r1, -0x28(r1)'
 BATTLEFIELD_NAME = 0x10167024  # "BattleField_f" (rodata), the name it's matched to
 STAGE_NAME = 'NewStage01'      # its prefix (the biome folders' names too)
 TABLES = [(b, 'melee') for b, _f in biome_select_cave.BIOMES[:biome_select_cave.N_BIOMES]] + [('plains', 'end')]
+# the breakable blocks (v18; tools/minecraft_world.py's BREAKABLE, its table 'blocks/<biome>' in the
+# events file): a stage gimmick each (as Luigi's Mansion's pillars: research in
+# docs/minecraft-world.md), its own model folder and, on the fighting plane, collision link
+GIM_CREATE = 0x03133A8C        # (0, kind 0, flags 2 (damage shapes), groups 1) -> gimmick wrapper
+GIM_SHAPE = 0x03133FF0         # (w, group, &shape (0x28 bytes), 0): a hurt shape
+GIM_ACTIVATE = 0x03133E4C      # (w, 0)
+GIM_DAMAGE = 0x0313408C        # (w, group) -> f1 the damage it took this frame
+GIM_REMOVE = 0x03133DFC        # (w): its battle object (the hurtbox) removed
+LINK_FIND = 0x03142954         # (stage, short name) -> the link's ground list or 0
+GROUNDS_ON = 0x0315EDD8        # (ground list, 0 off / 1 on)
+BLOCK_RADIUS = 7.0             # minecraft_world.BLOCK_RADIUS
+MAX_BLOCKS = 99                # names stc_blkNN_set / bNN
+BLOCK_NAME, BLOCK_LINK = 'stc_blk00_set', 'b00'
 CYCLE = 9000.0                 # minecraft_world.CYCLE
 MONSTER_FRAME = 4200.0         # pickel_world.stdat frame_of_monster
 # the monsters' folders, then the animals' (minecraft_world.MONSTER_SETS, ANIMAL_SETS)
@@ -109,6 +122,29 @@ def event_tables(path=None):
             b += struct.pack('>HHBBH', frame, tone, bits[mob], variants, 0)
         out.append(b + struct.pack('>HHBBH', 0xFFFF, 0, 0, 0, 0))
     return out
+
+
+def block_tables(path=None):
+    """([bytes] a table each biome (TABLES' melee ones): count, then 8 bytes a block: cell x, y, z
+    (signed), life, material (minecraft_sound.BLOCK_MATERIALS), has a link, 0, 0), the materials'
+    sounds (8 bytes each: hit tone, variants, 0, broken tone, variants, 0)"""
+    events = json.load(open(path or EVENTS)) if os.path.exists(path or EVENTS) else {}
+    out = []
+    for biome, form in TABLES[:-1]:
+        blocks = events.get('blocks/%s' % biome, [])
+        assert len(blocks) <= MAX_BLOCKS
+        b = struct.pack('>I', len(blocks))
+        for k in blocks:
+            x, y, z = int((k['x'] - 5) // 10), int((k['y'] - 5) // 10), int(round(k['z'] / 10))
+            b += struct.pack('>bbbBBBH', x, y, z, int(round(k['life'])),
+                             minecraft_sound.BLOCK_MATERIALS.index(k['sound']), int(k['link']), 0)
+        out.append(b)
+    mats = b''
+    for m in minecraft_sound.BLOCK_MATERIALS:
+        hit = minecraft_sound.tone_index('block_dmg_%s' % m)
+        broken = minecraft_sound.tone_index('block_break_%s' % m)
+        mats += struct.pack('>HBBHBB', hit[0], hit[1], 0, broken[0], broken[1], 0)
+    return out, mats
 
 
 def build():
@@ -157,6 +193,8 @@ ours:
         stw r0, 0xC(r29)
         stw r0, 0x10(r29)
         stw r0, -4(r29)
+        lis r12, bdata@ha
+        stw r0, bdata@l(r12)
         bl roll_day
 counting:
         lfs f0, 0(r29)
@@ -196,6 +234,8 @@ cur:
         mr r3, r31
         mr r4, r28
         bl sounds
+        mr r3, r31
+        bl blocks
 done:
         mr r3, r30
         lfd f31, 0x30(r1)
@@ -397,25 +437,10 @@ sloop:
         andi. r0, r0, 1
         beq sloop
 splay:
-        lbz r3, 5(r24)
-        bl rand
-        lhz r0, 2(r24)
-        add r5, r3, r0
-        oris r5, r5, 0x%(row)04X
-        lwz r3, 0xFF0(r31)
-        cmpwi r3, 0
-        beq sloop
-        lwz r3, 0(r3)
-        cmpwi r3, 0
-        beq sloop
-        lwz r3, 0x390(r3)
-        cmpwi r3, 0
-        beq sloop
-        addi r4, r1, 0x10
-        bl 0x%(play)08X
-        addi r3, r1, 0x10
-        li r4, 2
-        bl 0x%(release)08X
+        mr r3, r31
+        lhz r4, 2(r24)
+        lbz r5, 5(r24)
+        bl playsnd
         b sloop
 sout:
         stw r25, -4(r29)
@@ -423,6 +448,289 @@ sout:
         lwz r0, 0x74(r1)
         mtlr r0
         addi r1, r1, 0x70
+        blr
+blocks:
+        stwu r1, -0x80(r1)
+        mflr r0
+        stw r0, 0x84(r1)
+        stmw r22, 0x50(r1)
+        mr r31, r3
+        lis r29, bdata@ha
+        addi r29, r29, bdata@l
+        lwz r0, 0(r29)
+        cmpwi r0, 0
+        bne brun
+        li r0, 1
+        stw r0, 0(r29)
+        li r0, 0
+        stw r0, 4(r29)
+        lwz r0, 0(r31)
+        cmpwi r0, %(k0)d
+        bne bout
+        lis r12, 0x%(pick_hi)04X
+        ori r12, r12, 0x%(pick_lo)04X
+        lwz r27, 0(r12)
+        cmplwi r27, %(n_biomes)d
+        bge bout
+        slwi r27, r27, 2
+        lis r12, btables@ha
+        addi r12, r12, btables@l
+        lwzx r30, r12, r27
+        lwz r27, 0(r30)
+        addi r30, r30, 4
+        stw r27, 4(r29)
+        stw r30, 8(r29)
+        li r28, 0
+binit:
+        cmpw r28, r27
+        bge bout
+        slwi r26, r28, 2
+        slwi r12, r28, 3
+        add r25, r30, r12
+        li r0, 0
+        lis r12, bstate@ha
+        addi r12, r12, bstate@l
+        stwx r0, r12, r26
+        li r3, 0
+        li r4, 0
+        li r5, 2
+        li r6, 1
+        bl 0x%(gim_create)08X
+        lis r12, bwrap@ha
+        addi r12, r12, bwrap@l
+        stwx r3, r12, r26
+        mr. r24, r3
+        bne bshape
+        li r0, 1
+        lis r12, bstate@ha
+        addi r12, r12, bstate@l
+        stwx r0, r12, r26
+        b bmodel
+bshape:
+        lis r12, 0x4330
+        stw r12, 0x40(r1)
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfd f13, 0(r12)
+        lfs f12, 8(r12)
+        lfs f11, 12(r12)
+        lbz r11, 0(r25)
+        extsb r11, r11
+        mulli r11, r11, 10
+        addi r11, r11, 5
+        xoris r11, r11, 0x8000
+        stw r11, 0x44(r1)
+        lfd f0, 0x40(r1)
+        fsub f0, f0, f13
+        frsp f0, f0
+        stfs f0, 0x10(r1)
+        lbz r11, 1(r25)
+        extsb r11, r11
+        mulli r11, r11, 10
+        addi r11, r11, 5
+        xoris r11, r11, 0x8000
+        stw r11, 0x44(r1)
+        lfd f0, 0x40(r1)
+        fsub f0, f0, f13
+        frsp f0, f0
+        stfs f0, 0x14(r1)
+        lbz r11, 2(r25)
+        extsb r11, r11
+        mulli r11, r11, 10
+        xoris r11, r11, 0x8000
+        stw r11, 0x44(r1)
+        lfd f0, 0x40(r1)
+        fsub f0, f0, f13
+        frsp f0, f0
+        stfs f0, 0x18(r1)
+        stfs f11, 0x1C(r1)
+        stfs f11, 0x20(r1)
+        stfs f11, 0x24(r1)
+        stfs f12, 0x28(r1)
+        li r0, 0
+        stw r0, 0x2C(r1)
+        stw r0, 0x30(r1)
+        stw r0, 0x34(r1)
+        mr r3, r24
+        li r4, 0
+        addi r5, r1, 0x10
+        li r6, 0
+        bl 0x%(gim_shape)08X
+        mr r3, r24
+        li r4, 0
+        bl 0x%(gim_activate)08X
+        lis r12, 0x4330
+        stw r12, 0x40(r1)
+        lbz r0, 3(r25)
+        stw r0, 0x44(r1)
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfd f13, 16(r12)
+        lfd f0, 0x40(r1)
+        fsub f0, f0, f13
+        frsp f0, f0
+        lis r12, bhp@ha
+        addi r12, r12, bhp@l
+        add r12, r12, r26
+        stfs f0, 0(r12)
+bmodel:
+        mr r3, r28
+        bl bnames
+        mr r3, r31
+        lis r4, bname@ha
+        addi r4, r4, bname@l
+        bl 0x%(find)08X
+        lis r12, bmodels@ha
+        addi r12, r12, bmodels@l
+        stwx r3, r12, r26
+        addi r28, r28, 1
+        b binit
+brun:
+        lwz r27, 4(r29)
+        lwz r30, 8(r29)
+        li r28, 0
+bloop:
+        cmpw r28, r27
+        bge bout
+        slwi r26, r28, 2
+        slwi r12, r28, 3
+        add r25, r30, r12
+        lis r12, bstate@ha
+        addi r12, r12, bstate@l
+        lwzx r0, r12, r26
+        cmpwi r0, 0
+        bne bhide
+        lis r12, bwrap@ha
+        addi r12, r12, bwrap@l
+        lwzx r3, r12, r26
+        li r4, 0
+        bl 0x%(gim_damage)08X
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfs f13, 12(r12)
+        fcmpu cr0, f1, f13
+        ble bnext
+        lis r12, bhp@ha
+        addi r12, r12, bhp@l
+        add r24, r12, r26
+        lfs f0, 0(r24)
+        fsubs f0, f0, f1
+        stfs f0, 0(r24)
+        lbz r0, 4(r25)
+        slwi r0, r0, 3
+        lis r12, bmats@ha
+        addi r12, r12, bmats@l
+        add r23, r12, r0
+        fcmpu cr0, f0, f13
+        ble bbreak
+        mr r3, r31
+        lhz r4, 0(r23)
+        lbz r5, 2(r23)
+        bl playsnd
+        b bnext
+bbreak:
+        li r0, 1
+        lis r12, bstate@ha
+        addi r12, r12, bstate@l
+        stwx r0, r12, r26
+        lis r12, bwrap@ha
+        addi r12, r12, bwrap@l
+        lwzx r3, r12, r26
+        bl 0x%(gim_remove)08X
+        mr r3, r31
+        lhz r4, 4(r23)
+        lbz r5, 6(r23)
+        bl playsnd
+        lbz r0, 5(r25)
+        cmpwi r0, 0
+        beq bhide
+        mr r3, r28
+        bl bnames
+        mr r3, r31
+        lis r4, blink@ha
+        addi r4, r4, blink@l
+        bl 0x%(link_find)08X
+        cmpwi r3, 0
+        beq bhide
+        li r4, 0
+        bl 0x%(grounds_on)08X
+bhide:
+        lis r12, bmodels@ha
+        addi r12, r12, bmodels@l
+        lwzx r22, r12, r26
+        cmpwi r22, 0
+        beq bnext
+        lwz r5, 0x118(r22)
+        lis r6, 8
+        andc r5, r5, r6
+        stw r5, 0x118(r22)
+        addi r3, r22, 0xDC
+        bl 0x%(isvis)08X
+        cmpwi r3, 0
+        beq bvis
+        mr r3, r22
+        li r4, 0
+        bl 0x%(remove)08X
+bvis:
+        addi r3, r22, 0xDC
+        li r4, 0
+        bl 0x%(setvis)08X
+bnext:
+        addi r28, r28, 1
+        b bloop
+bout:
+        lmw r22, 0x50(r1)
+        lwz r0, 0x84(r1)
+        mtlr r0
+        addi r1, r1, 0x80
+        blr
+bnames:
+        li r0, 10
+        divwu r11, r3, r0
+        mullw r12, r11, r0
+        subf r12, r12, r3
+        addi r11, r11, 0x30
+        addi r12, r12, 0x30
+        lis r10, bname@ha
+        addi r10, r10, bname@l
+        stb r11, %(name_tens)d(r10)
+        stb r12, %(name_ones)d(r10)
+        lis r10, blink@ha
+        addi r10, r10, blink@l
+        stb r11, 1(r10)
+        stb r12, 2(r10)
+        blr
+playsnd:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r30, 0x50(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r3, r5
+        bl rand
+        add r30, r30, r3
+        oris r30, r30, 0x%(row)04X
+        lwz r3, 0xFF0(r31)
+        cmpwi r3, 0
+        beq pout
+        lwz r3, 0(r3)
+        cmpwi r3, 0
+        beq pout
+        lwz r3, 0x390(r3)
+        cmpwi r3, 0
+        beq pout
+        mr r5, r30
+        addi r4, r1, 0x10
+        bl 0x%(play)08X
+        addi r3, r1, 0x10
+        li r4, 2
+        bl 0x%(release)08X
+pout:
+        lmw r30, 0x50(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
         blr
 namefix:
         lis r12, sname@ha
@@ -457,7 +765,9 @@ data:
 """ % dict(first=SETUP_FIRST, setup1=SETUP + 4, base=BASE_UPDATE, k0=KINDS[0], k1=KINDS[1],
            rand_hi=RAND >> 16, rand_lo=RAND & 0xFFFF, animal=animal, c1=COUNT_ODDS[0],
            c2=COUNT_ODDS[0] + COUNT_ODDS[1], find=FIND_MODEL, isvis=IS_VISIBLE, add=SCENE_ADD,
-           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME,
+           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
+           gim_activate=GIM_ACTIVATE, gim_damage=GIM_DAMAGE, gim_remove=GIM_REMOVE, link_find=LINK_FIND,
+           grounds_on=GROUNDS_ON, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
            monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
            pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
            release=RELEASE, name_len=len(STAGE_NAME), bf_hi=BATTLEFIELD_NAME >> 16,
@@ -487,6 +797,38 @@ data:
     for t in tables:
         for w in words_of(t):
             a.asm('.word 0x%08X' % w)
+    # the blocks: constants (2^52 + 2^31 and 2^52 for int -> float, the radius, 0), a table a biome,
+    # the materials' sounds, names and the match's state
+    while a.pc % 8:
+        a.asm('.word 0')
+    a.asm('bconst:')
+    for w in (0x43300000, 0x80000000, struct.unpack('>I', struct.pack('>f', BLOCK_RADIUS))[0], 0,
+              0x43300000, 0):
+        a.asm('.word 0x%08X' % w)
+    btables, bmats = block_tables()
+    a.asm('btables:')
+    at = a.addr('btables') + 4 * len(btables)
+    for t in btables:
+        a.asm('.word 0x%08X' % at)
+        at += len(t)
+    for t in btables:
+        for w in words_of(t):
+            a.asm('.word 0x%08X' % w)
+    a.asm('bmats:')
+    for w in words_of(bmats):
+        a.asm('.word 0x%08X' % w)
+    a.asm('bname:')
+    for w in words_of(BLOCK_NAME.encode() + b'\0'):
+        a.asm('.word 0x%08X' % w)
+    a.asm('blink:')
+    for w in words_of(BLOCK_LINK.encode() + b'\0'):
+        a.asm('.word 0x%08X' % w)
+    a.asm('bdata:')
+    a.asm('.word 0\n.word 0\n.word 0')
+    for label in ('bwrap', 'bhp', 'bstate', 'bmodels'):
+        a.asm(label + ':')
+        for _ in range(MAX_BLOCKS):
+            a.asm('.word 0')
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
     assert words[(a.addr('data') + 0x2C - CAVE) // 4] == ptrs[0]

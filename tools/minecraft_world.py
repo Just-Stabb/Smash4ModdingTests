@@ -295,6 +295,20 @@ def material_code(name):
 
 
 # ---------------------------------------------------------------- blocks
+# v18 (BREAKABLE): the blocks break. Each in a static model folder of its own (BLOCK_SET, the ring's
+# model.xmb: tools/monster_roll_cave.py hides it when it breaks), those on the fighting plane with a
+# collision of their own (the sides not against the island; rigged in link BLOCK_LINK, which the
+# cave switches off), the island's outline made without them; the cave gives each a hurtbox (a
+# stage gimmick's sphere, BLOCK_RADIUS) and its life (Ultimate's block_info_table) and plays its
+# material's damage / break sounds (BLOCK_SOUND)
+BREAKABLE = True
+BLOCK_SET = 'stc_blk%02d_set'
+BLOCK_LINK = 'b%02d'                # the link's short name (subname 'b%02d__blk__')
+BLOCK_RADIUS = 7.0                  # Ultimate's block_damage_radius 7.5 is around the hit; this around the block
+BLOCK_SOUND = {'soil': 'soil', 'wood': 'wood', 'rock': 'stone', 'nibuiron': 'stone', 'grass': 'grass',
+               'snow': 'snow', 'ice': 'ice'}
+
+
 def breakable_blocks(src, index, labels):
     """the biome's breakable blocks: [(kind, x, y, z, flags)] (10-unit cells: x [10x, 10x + 10],
     y [10y, 10y + 10], z [10z - 5, 10z + 5]; flags 1: throughable, under a pass-through floor)"""
@@ -548,6 +562,47 @@ def grid_collisions(loops):
             cl.name = 'CLIFF_00_Floor%02d%s' % (k + 1, 'L' if cl.angle < 0 else 'R')
             cl.subname, cl.start = cl.name[6:], [cl.x, cl.y, 0.0]
         cols.append(c)
+    return cols
+
+
+def block_collisions(blocks, occ, x0, y0, block_mats):
+    """a rigged collision for each block on the fighting plane (BREAKABLE): its cell's sides that
+    aren't against the island (occ: the island's cells), clockwise, no ledges, in link BLOCK_LINK"""
+    ny, nx = occ.shape
+
+    def ground(i, j):
+        return 0 <= i < nx and 0 <= j < ny and occ[j, i] != 0
+    cols = []
+    for n, (kind, x, y, z, flags) in enumerate(blocks):
+        if z != 0 or flags:
+            continue
+        i, j = x - x0 // 10, y - y0 // 10
+        X, Y = x * 10, y * 10
+        # clockwise (y up): top, right, bottom, left, each (from, to, the neighbour beyond it)
+        sides = [((X, Y + 10), (X + 10, Y + 10), (i, j + 1)), ((X + 10, Y + 10), (X + 10, Y), (i + 1, j)),
+                 ((X + 10, Y), (X, Y), (i, j - 1)), ((X, Y), (X, Y + 10), (i - 1, j))]
+        keep = [not ground(*s[2]) for s in sides]
+        if not any(keep):
+            continue
+        start = next((k for k in range(4) if not keep[k - 1] and keep[k]), 0) if not all(keep) else 0
+        runs, run = [], []
+        for k in range(4):
+            s = sides[(start + k) % 4]
+            if keep[(start + k) % 4]:
+                run.append(s)
+            elif run:
+                runs.append(run)
+                run = []
+        if run:
+            runs.append(run)
+        for r, run in enumerate(runs):
+            verts = [run[0][0]] + [s[1] for s in run]
+            normals = [(-(b[1] - a[1]) / 10.0, (b[0] - a[0]) / 10.0) for a, b, _n in run]
+            c = lvd.collision('COL_00_Blk%02d_%d' % (n, r), verts, normals,
+                              [mat_bytes(block_mats[kind])] * len(run))
+            c.subname = (BLOCK_LINK % n) + '__blk__'
+            c.flags[1] = 1                  # rigged: in the link the cave switches off
+            cols.append(c)
     return cols
 
 
@@ -1669,10 +1724,10 @@ def villager_paths(villagers):
     return out
 
 
-def atlas_rows(parts, tex, name):
-    """parts on the block atlas moved to its rows they use (whole 16-pixel tiles), a texture of
+def atlas_rows(parts, tex, name, atlas=ATLAS):
+    """parts on a block atlas moved to its rows they use (whole 16-pixel tiles), a texture of
     their own (name): the atlas in each folder that draws them is 4 MB"""
-    img = tex.image(ATLAS)
+    img = tex.image(atlas)
     h = img.shape[0]
     v = np.concatenate([p['uv'][:, 1] for p in parts])
     lo, hi = int(np.floor(v.min() * h / 16)) * 16, int(np.ceil(v.max() * h / 16)) * 16
@@ -2094,17 +2149,20 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         for e in EXTRA.get(biome, []):
             if not (e.startswith('door_') and daynight and VILLAGERS.get(biome)):     # those: door_rig
                 extra += load_parts('%s/normal/model/%s' % (src, e))
-        bparts = block_parts(src, blocks) if blocks else []
-        if bparts:
+        bparts, block_sets = [], []
+        if blocks:
             solid = solid_cells(ring + plat) | {(x, y, z) for _k, x, y, z, _f in blocks}
-            bparts = [block_ao(p, solid) for p in bparts]
+            if BREAKABLE:
+                block_sets = [[block_ao(p, solid) for p in block_parts(src, [b])] for b in blocks]
+            else:
+                bparts = [block_ao(p, solid) for p in block_parts(src, blocks)]
         near = ring + bparts + plat + extra
         far_dir = '%s/normal/model/%s' % (src, FAR[biome])
         far, far_fog = far_parts(far_dir)
         sky_src = '%s/normal/model/far_common_set' % src
     else:
         d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
-        blocks = []
+        blocks, block_sets = [], []
         near = load_parts('%s/battle/model/ring_endbattle_set' % src)
         if not daynight:                    # with it: door_rig
             near += [p for e in door_sets(src, form, biome) for p in load_parts('%s/battle/model/%s' % (src, e))]
@@ -2166,6 +2224,17 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 m.gain = 'pano_glow'
                 meshes.append(m)
         write_set('%s/%s' % (model_dir, name), meshes, tex, curves)
+    for i, parts in enumerate(block_sets):
+        parts = [atlas_rows([q], tex, 'blk_%s' % KIND_MODEL[blocks[i][0]], q['textures'][0])[0]
+                 if q['textures'][0].startswith('all_blocks') else q for q in parts]
+        meshes = to_nud(parts, tex, 'lit', False, bake=not ISLAND_FLAGS)
+        for m in meshes:
+            m.gain = None if ISLAND_FLAGS else 'island'
+            for poly in m.polygons:
+                for mat in poly.materials:
+                    mat.flags = ISLAND_FLAGS or mat.flags
+        write_set('%s/%s' % (model_dir, BLOCK_SET % i), meshes, tex, curves)
+        shutil.copy('%s/%s/model.xmb' % (model_dir, RING_SET), '%s/%s/model.xmb' % (model_dir, BLOCK_SET % i))
     for name, changes in ((FAR_SET, {'drawing_order': {'number': FAR_ORDER}}),
                           (FOG_SET, {'drawing_order': {'number': FOG_ORDER}, 'draw_range': {'number': '2'}})):
         path = '%s/%s/model.xmb' % (model_dir, name)
@@ -2297,8 +2366,10 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
         block_mats = [material_code(b['material']) for b in info]
         assert len(solid) == 1, [c['name'] for c in solid]
-        occ, gx0, gy0 = solid_grid(solid[0], blocks, block_mats)
+        occ, gx0, gy0 = solid_grid(solid[0], [] if BREAKABLE else blocks, block_mats)
         cols = grid_collisions(outlines(occ, gx0, gy0, solid[0]))
+        if BREAKABLE:
+            cols += block_collisions(blocks, occ, gx0, gy0, block_mats)
     else:
         cols = [direct_collision(c, k + 1) for k, c in enumerate(solid)]
     floors = merged_floors([c for c in ucols if c['through']])
@@ -2311,7 +2382,14 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         if f.endswith('.lvd'):
             data = build_lvd(out_dir + '/param/' + f, d, cols).write()
             open(out_dir + '/param/' + f, 'wb').write(data)
-    return cols, blocks, sorted(events)
+    if blocks and BREAKABLE:
+        info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
+        table = [dict(x=x * 10 + 5.0, y=y * 10 + 5.0, z=z * 10.0, life=float(info[k]['life']),
+                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and not f))
+                 for k, x, y, z, f in blocks]
+    else:
+        table = []
+    return cols, blocks, sorted(events), table
 
 
 def main():
@@ -2340,13 +2418,16 @@ def main():
     ap.add_argument('--sound-bank', help="tools/minecraft_sound.py's sound.nus3bank, put in both forms' sound folders")
     ap.add_argument('--sound-events', help="a JSON file the forms' sound events are put in (by biome / form) for "
                                            "tools/monster_roll_cave.py")
+    ap.add_argument('--breakable', default='on', choices=('on', 'off'),
+                    help="the blocks break (v18: their own folders, collisions and hurtboxes) or are part of the island")
     a = ap.parse_args()
-    global GAIN_FLAGS, ISLAND_FLAGS
+    global GAIN_FLAGS, ISLAND_FLAGS, BREAKABLE
+    BREAKABLE = a.breakable == 'on'
     GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
     ISLAND_FLAGS = 0xA4001041 if a.island_shader == 'shadow' else None
     for form in ('melee', 'end'):
         out_dir = '%s/stage/%s/%s' % (a.out, form, a.name)
-        cols, blocks, events = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), out_dir,
+        cols, blocks, events, table = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), out_dir,
                                           form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches,
                                           a.clouds, {'all': ANIMALS, 'none': ()}.get(a.animal, (a.animal,)),
                                           a.daynight == 'on')
@@ -2357,9 +2438,11 @@ def main():
             shutil.copy(a.sound_bank, out_dir + '/sound/sound.nus3bank')
         if a.sound_events:
             import json
-            table = json.load(open(a.sound_events)) if os.path.exists(a.sound_events) else {}
-            table['%s/%s' % (a.biome, form)] = [list(e) for e in events]
-            json.dump(table, open(a.sound_events, 'w'), indent=0, sort_keys=True)
+            data = json.load(open(a.sound_events)) if os.path.exists(a.sound_events) else {}
+            data['%s/%s' % (a.biome, form)] = [list(e) for e in events]
+            if form == 'melee' and a.hazards == 'on':
+                data['blocks/%s' % a.biome] = table
+            json.dump(data, open(a.sound_events, 'w'), indent=0, sort_keys=True)
 
 
 if __name__ == '__main__':

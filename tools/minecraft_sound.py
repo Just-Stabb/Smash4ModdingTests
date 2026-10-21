@@ -34,10 +34,14 @@ ROW = 1147                      # soundlabeltable row of NewStage01's (Battlefie
 BANK_ID = 3051
 FIRST = 7                       # Battlefield's tones kept before ours
 # (sound, variants): Ultimate's se_stage_pickel_world_<sound><n> (n from 1; one without a number:
-# no variants); its block sounds are left out (the port's blocks don't break)
+# no variants)
 SOUNDS = [('cow_vo', 6), ('chicken_vo', 6), ('sheep_vo', 6), ('villager_vo', 6), ('spider_vo', 6),
           ('zombi_vo', 6), ('zombi_burn', 2), ('zombi_death', 0), ('bone_move', 4), ('enderman_portal', 3),
           ('door_open', 0), ('door_close', 0)]
+# the breakable blocks' (v18), a material each (BLOCK_MATERIALS): hit, broken
+BLOCK_MATERIALS = ('soil', 'wood', 'stone', 'grass', 'snow', 'ice')
+SOUNDS += [('block_%s_%s' % (k, m), 2 if (k, m) == ('break', 'ice') else 4)
+           for m in BLOCK_MATERIALS for k in ('dmg', 'break')]
 VOLUME = 0.0                    # dB (Smash 4's one-shots: mostly 0)
 STAGE_GROUP = 0x272             # Battlefield's tones' (the one-shot template's 0x271: an enemy's)
 RATE = 48000

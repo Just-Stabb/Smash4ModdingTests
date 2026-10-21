@@ -146,6 +146,9 @@ class Asm:
             if base in ("and", "andc", "or", "xor", "slw", "srw"):   # rA, rS, rB
                 return (31 << 26) | (b_ << 21) | (a << 16) | (c << 11) | (X_OPS[base] << 1) | rc
             return (31 << 26) | (a << 21) | (b_ << 16) | (c << 11) | (X_OPS[base] << 1) | rc
+        if op in ("extsb", "extsb.", "extsh", "extsh."):   # rA, rS
+            xo = 954 if op.startswith("extsb") else 922
+            return (31 << 26) | (reg(args[1]) << 21) | (reg(args[0]) << 16) | (xo << 1) | op.endswith(".")
         if op in ("mr", "mr."):
             s = reg(args[1])
             return (31 << 26) | (s << 21) | (reg(args[0]) << 16) | (s << 11) | (444 << 1) | (op == "mr.")
