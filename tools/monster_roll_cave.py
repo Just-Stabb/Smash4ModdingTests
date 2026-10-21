@@ -38,7 +38,7 @@ with both 0x80000 and the stage-wide 0x40000 set it's added to the render scene 
 unless it's already visible (0x032FF668(m + 0xDC)), else removed (0x031589E0(m, 0)) if it is;
 then 0x032FF68C(m + 0xDC, both set).
 
-Space: grown code 0x04B7F400-0x04B80000 (biome_select_cave.py's before it).
+Space: grown code 0x04B7F400-0x04B84000 (biome_select_cave.py's before it).
 """
 import json
 import os
@@ -51,7 +51,7 @@ import biome_select_cave  # noqa: E402
 import minecraft_sound  # noqa: E402
 
 CAVE = 0x04B7F400
-LIMIT = 0x04B80000
+LIMIT = 0x04B84000            # grown (the sound event tables: ~6 KB)
 UPDATE_HOOK = 0x02D1CFDC       # bl 0x031415C8 in StageBaseCafe's update 0x02D1CF9C
 BASE_UPDATE = 0x031415C8
 SETUP = 0x02D1C65C             # StageBaseCafe setup (vtable +0x1C)
