@@ -388,6 +388,30 @@ panorama is order 2 and its haze layer (Ultimate's `sfx_far_A_long_fog`) is in i
 `build/minecraft_world_v10_tests2.zip`: test 5 animated torches (dyr_d), 6 still torches (island
 model), 7 none; all with the draw order fix.
 
+## v11
+
+Test 6 (still torches in the island's model) loaded (user, with a screenshot); its notes:
+- **The sky still drawn over the background when the camera moves a lot, and the clouds seen
+  through it.** Ultimate draws the panorama premultiplied (`One, OneMinusSourceAlpha`; its texture's
+  color is already times alpha) and its distant band (rows 200-400 of 1600) has alpha ~230. Blended
+  with alpha / one minus alpha that band got more transparent, and as a blended model it was
+  still sorted against the sky's blended parts. v11 draws it alpha-tested (`UNLIT_CUTOUT`), with
+  the solid models: it hides what's behind it. Its color is un-premultiplied first
+  (`PREMULTIPLIED`; resizing works on premultiplied colors for every texture with alpha).
+- **The grass's white outline.** Ultimate's textures have white (about 222) in their fully
+  transparent texels, which linear filtering mixes in at the alpha-tested edges; `bleed` fills
+  them with their visible neighbors' color.
+- **Block colors lacking saturation.** Sampled from the screenshot: hay's top (229, 210, 102),
+  its blue channel ~100 where the texture has almost none, grey stone beige: the island's lit
+  shader (`0xA4001041`, no fog parameters of its own) gets the stage's light and haze on top.
+  v11 draws the island unlit (`0xA2001001`, as everything else of ours) with Minecraft-style face
+  shading baked into the vertex colors (`BAKE_SUN_DIR`, `BAKE_AMBIENT` 0.6 + `BAKE_SUN` 0.42 x the
+  face's share of Ultimate's sun: top 0.98, front 0.76, sides 0.69 / 0.6, bottom 0.6) times
+  Ultimate's corner shading. Characters are still lit by the stage's lights.
+
+No setup outside what test 6 loaded (checked on every biome); `build/minecraft_world.zip` (plains,
+hazards on, with Omega and the ui files) and `build/minecraft_world_biomes.zip`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

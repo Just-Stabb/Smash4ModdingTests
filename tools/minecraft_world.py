@@ -108,6 +108,14 @@ DAY_FRAME = 945                     # Battlefield's light.bin: its most neutral 
 # pickel_world's stageparam: 30, 83 / 1000, -5, -22): Ultimate's, where the fields match.
 CAMERA = {6: 30.0, 7: 83.0, 8: 1000.0, 9: -5.0, 10: -22.0}
 ISLAND_LIGHT_SET = 4                # stc_c_Ring_set's model.xmb light set
+# The island is drawn unlit (v11), its shading baked into the vertex colors: lit by the stage
+# (0xA4001041, which has no fog parameters of its own) it came out washed out in game (user's
+# screenshot: hay's blue channel ~0 -> ~100, grey stone beige), the stage's light and haze added
+# on top. Minecraft-style face shading from Ultimate's sun (travel direction as ISLAND_LIGHTS'):
+# BAKE_AMBIENT + BAKE_SUN x the face's share of it (top 0.98, front 0.76, sides 0.69 / 0.6,
+# bottom 0.6), times Ultimate's corner shading (colorSet1, AO_KEEP).
+BAKE_SUN_DIR = np.array([-0.204, -0.903, -0.379])
+BAKE_AMBIENT, BAKE_SUN = 0.6, 0.42
 # the island's light set, from Ultimate's (render/light/light00_set.nuanmb, frame 0 = day): its
 # stage light is white from (0.20, 0.90, 0.38) (travel direction below, as light.bin's); Ultimate's
 # ambient (spherical harmonics) becomes a sky light from above, a fill from the camera and the 4th
@@ -496,6 +504,47 @@ def build_lvd(base_lvd, d, cols):
 
 
 # ---------------------------------------------------------------- NUD / NUT
+# Ultimate's textures drawn with One / OneMinusSourceAlpha (color already times alpha): the panoramas
+PREMULTIPLIED = {'far_%s_day_low_col' % k for k in 'abcdef'}
+
+
+def premultiply(img):
+    out = img.astype(np.float64)
+    out[..., :3] *= out[..., 3:] / 255
+    return np.round(out).astype(np.uint8)
+
+
+def unpremultiply(img):
+    out = img.astype(np.float64)
+    a = out[..., 3:] / 255
+    out[..., :3] = np.where(a > 0, out[..., :3] / np.maximum(a, 1e-6), 0)
+    return np.clip(np.round(out), 0, 255).astype(np.uint8)
+
+
+def bleed(img, steps=4):
+    """the color of the texels with any alpha spread into the fully transparent ones next to
+    them, a texel a step: filtering mixes those in at the edges, and Ultimate's have them white
+    (the grass's white outline in game, user)"""
+    rgb = img[..., :3].astype(np.float64)
+    have = img[..., 3] > 0
+    if have.all() or not have.any():
+        return img
+    for _ in range(steps):
+        acc = np.zeros_like(rgb)
+        cnt = np.zeros(have.shape)
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            m = np.roll(have, (dy, dx), (0, 1))
+            acc += np.roll(rgb, (dy, dx), (0, 1)) * m[..., None]
+            cnt += m
+        grow = ~have & (cnt > 0)
+        rgb[grow] = acc[grow] / cnt[grow][:, None]
+        have = have | grow
+    out = img.copy()
+    out[..., :3] = np.round(rgb).astype(np.uint8)
+    out[..., 3] = img[..., 3]
+    return out
+
+
 class Textures:
     def __init__(self, src):
         self.src = src
@@ -544,9 +593,14 @@ class Textures:
                 img = img.repeat(4, 0).repeat(4, 1)
             h, w = img.shape[:2]
             w2, h2 = (min(2048, max(64, 1 << (v.bit_length() - 1))) for v in (w, h))
+            alpha = (img[..., 3] < 255).any()
+            if alpha and not n.split('#')[0] in PREMULTIPLIED:
+                img = premultiply(img)
             if (w2, h2) != (w, h):
                 img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
                                                              else Image.LANCZOS))
+            if alpha:
+                img = bleed(unpremultiply(img))
             fmt = 0x1A if n == SKY_GRADIENT else 0x31 if (img[..., 3] >= 250).all() else 0x33    # RGBA8: no banding
             texs.append((self.ids[n], fmt, img))
         return nut.write_ntwu(texs)
@@ -624,7 +678,10 @@ def far_parts(setdir):
     return split_wide([p for p in parts if p['sub'] == 0]), fog
 
 
-def to_nud(parts, tex, kind, sky=False):
+def to_nud(parts, tex, kind, sky=False, cutout=False):
+    """kind 'lit' (the island: unlit with baked shading, see BAKE_SUN_DIR) or 'bg' (unlit as
+    Ultimate's); cutout: alpha-tested even where Ultimate blends (the panorama, so it's drawn with
+    the solid models and hides the sky and clouds behind it)"""
     meshes = []
     for p in parts:
         if not p['textures'] or p['uv'] is None:
@@ -644,6 +701,9 @@ def to_nud(parts, tex, kind, sky=False):
                 col[:, :3] = 0.5
             else:
                 col[:, :3] = np.where(col[:, :3] < 0.5, 0.5 - (0.5 - col[:, :3]) * AO_KEEP, col[:, :3])
+            if p['nrm'] is not None:
+                n = p['nrm'] / (np.linalg.norm(p['nrm'], axis=1, keepdims=True) + 1e-9)
+                col[:, :3] *= (BAKE_AMBIENT + BAKE_SUN * np.clip(-n @ BAKE_SUN_DIR, 0, None))[:, None]
         col = np.clip(np.round(col * 253), 0, 255)
         if sky and p['label'] == 'sfx_sky_color':
             # the dome's color by elevation in a texture (vertex colors at 1.0), in case the unlit
@@ -668,14 +728,14 @@ def to_nud(parts, tex, kind, sky=False):
         poly.idx = p['idx']
         atlas = tname.startswith('all_blocks')
         cull = 1029 if p['cull'] == 1029 else 0
-        blend = p['blend'] and not atlas
+        blend = p['blend'] and not atlas and not cutout
         if kind == 'bg':
             # the backdrop and sky: Ultimate's are unlit (lighting baked in their textures)
             setup = UNLIT_BLEND if blend else UNLIT if sky else UNLIT_CUTOUT
         elif p['emissive']:
             setup = UNLIT_BLEND if blend else UNLIT_CUTOUT
         else:
-            setup = BLEND if blend else CUTOUT if atlas else OPAQUE
+            setup = UNLIT_BLEND if blend else UNLIT_CUTOUT if atlas else UNLIT
         if cull == 0 and setup not in CULLABLE:
             poly.idx = two_sided(poly.idx)
         poly.materials = [material(setup, tid, cull)]
@@ -923,7 +983,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                                                         torches == 'animated')
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (FOG_SET, far_fog, 'bg', False), (SKY_SET, sky, 'bg', True)):
-        meshes = to_nud(parts, tex, kind, is_sky)
+        meshes = to_nud(parts, tex, kind, is_sky, cutout=name == FAR_SET)
         if name == RING_SET and torches == 'still':
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
         write_set('%s/%s' % (model_dir, name), meshes, tex)
@@ -978,7 +1038,8 @@ def main():
     ap.add_argument('--yamlvd', default='yamlvd', help="lvd-rs' yamlvd (reads Ultimate's .lvd)")
     ap.add_argument('--labels', default='ParamLabels.csv', help="ultimate-research/param-labels' ParamLabels.csv")
     ap.add_argument('--effect', help="Ultimate's effect/stage/pickel_world/ef_pickel_world.eff (torch flames / smoke)")
-    ap.add_argument('--torches', default='animated', choices=('animated', 'still', 'off'))
+    ap.add_argument('--torches', default='still', choices=('animated', 'still', 'off'),
+                    help="still (default): v10 test 6, the one that loaded; animated: test 5")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
     a = ap.parse_args()
     for form in ('melee', 'end'):
