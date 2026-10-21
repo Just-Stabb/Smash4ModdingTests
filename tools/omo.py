@@ -223,11 +223,16 @@ def set_node(omo, h, pos=None, rot=None, scl=None):
     f = 0
     consts = b''
     keys = [b''] * omo.frames
-    for vals, bit, kind in ((pos, POS, 0x08 << 16), (rot, ROT, 5 << 12), (scl, SCL, 0x081)):
+    for vals, bit, kind, const in ((pos, POS, 0x08 << 16, None), (rot, ROT, 5 << 12, 7 << 12), (scl, SCL, 0x081, 0x201)):
         if vals is None:
             continue
         if bit == ROT:
             vals = [(-q[0], -q[1], -q[2]) if q[3] < 0 else q[:3] for q in vals]
+        if const is not None and all(tuple(v) == tuple(vals[0]) for v in vals):
+            # a constant rotation / scale: no frame data (Battlefield's use these: rotation 7, scale 0x201)
+            f |= bit | const
+            consts += struct.pack('>3f', *vals[0])
+            continue
         c, k = interp_track(vals)
         f |= bit | kind
         consts += c

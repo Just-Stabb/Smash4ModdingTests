@@ -452,6 +452,37 @@ them. The same pieces (a made skeleton, NUD header 0x0E, Battlefield's bone-boun
 animation track a bone) are what the mobs and villagers need: Ultimate's `ch_pickel_*_set`
 models are 12-16 bones, each part rigid on one bone, with idle motions (`motion/ch_pickel_*`).
 
+## v13: mobs and villagers
+
+Ultimate's `ch_pickel_*_set` models are rigid (every vertex fully on one bone) and their motions
+(`motion/ch_pickel_*_set/pickel_<biome>_<kind>_<motion>.nuanmb`) carry the stage paths in stage
+coordinates on the Hip bone (Trans and Rot still), so the models stay at the origin: the plains
+sheep wander the pen (x -84..-54, z -99..-70), the farmer and the butcher walk between their spots
+and the houses. The parameters only have odds (`pickel_world.stdat`: sheep / chicken / cow 30 / 30
+/ 30, one, two or three villagers 20 / 60 / 20; guest origins 0). Omega's (`battle/motion`) are the
+same files.
+
+- `mob_parts`: each mesh split by bone; each part a NUD mesh on its own bone of a made skeleton
+  (bind 8), unlit opaque `0xA2001001` (the clouds' bone-bound setup), shading baked in the bind
+  pose. `mob_motion`: a part's motion is A_f x B^-1 (its animated world matrix times its bind
+  pose's inverse, column vectors as `omo.trs`), decomposed into position / rotation / scale tracks.
+- Villagers (plains, snowy tundra): their day loop `VILLAGER_LOOP` (free1, work, free2, free3,
+  work, free4; each 1200 frames from and back to the villager's spot: 7200, Battlefield's
+  animation length) in `TORCH_SET` with the torches (240 divides it): one skeleton (26 bones; 32 on
+  Omega), one animation. Meeting / return / sleep (to the meeting spot, home, indoors at night) and
+  the night's monsters left out (the stage is held at day).
+- Animals: two (`--animal sheep|cow|chicken|none`, default sheep as in the user's Ultimate
+  screenshot), wait1 and wait2 (4200 frames each, start = end), in `ANIMAL_SET`
+  (`dyr_e_mid_left01_set`, no .mta).
+- `omo.set_node` writes a rotation / scale that doesn't change as a constant track (types 7 /
+  0x201, as Battlefield's; flags `0x7087201` like most of its animations): the torch + villager
+  animation 2.6 MB (was 3.3). The stage's models and animations: 33.6 MB (Omega 37.2), Battlefield's
+  31.6.
+- Checked offline (`view_rig.py`: the meshes posed from the written .omo through `omo.world`, as
+  the game reads it): sheep whole and in the pen, villagers whole and on the path.
+
+`build/minecraft_world_v13_test.zip`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

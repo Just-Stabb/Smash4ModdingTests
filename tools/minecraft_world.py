@@ -948,36 +948,155 @@ def torch_meshes(points, tex, effect, animated=True):
     return meshes, bones, motion
 
 
-def write_torches(model_dir, anim_dir, meshes, bones, motion, tex, own_skeleton=True):
-    """animated torches into TORCH_SET: model, skeleton, animation. own_skeleton=False (a test):
-    every mesh on the folder's own (Battlefield's) bone, its animation still"""
-    import zlib
-    folder = '%s/%s' % (model_dir, TORCH_SET)
-    path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
-    o = omo.Omo(open(path, 'rb').read())
-    o.frames = TORCH_LOOP + 1
-    o.nodes = []
-    if not own_skeleton:
-        for m in meshes:
-            m.bone = 0
-        write_set(folder, meshes, tex)
-        h = omo.vbn_read(folder + '/model.vbn')[0][2]
-        n = o.frames
-        omo.set_node(o, h, [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)
-        open(path, 'wb').write(o.encode())
-        return
-    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
-    write_set(folder, meshes, tex)
-    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
-    n = o.frames
-    omo.set_node(o, bones[0][2], [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)   # the root, still
-    for name, _p, h in bones[1:]:
+def torch_tracks(bones, motion, frames):
+    """the torches' {bone: (positions, None, scales)} over frames (their TORCH_LOOP repeated)"""
+    out = {}
+    f = np.arange(frames) % TORCH_LOOP
+    for name, _p in bones[1:]:
         c, sc, up = motion[name]
-        sc = np.asarray(sc, dtype=np.float64)
-        t = c[None, :] * (1 - sc[:, None]) + up              # scale about the sprite's centre
-        omo.set_node(o, h, [tuple(map(float, v)) for v in t], [(0.0, 0.0, 0.0, 1.0)] * o.frames,
-                     [(float(x), float(x), float(x)) for x in sc])
+        sc = np.asarray(sc, dtype=np.float64)[f]
+        t = c[None, :] * (1 - sc[:, None]) + np.asarray(up)[f]       # scale about the sprite's centre
+        out[name] = (t, None, np.repeat(sc[:, None], 3, 1))
+    return out
+
+
+def write_rig(model_dir, anim_dir, folder, meshes, bones, tracks, frames, tex):
+    """a dyr_ folder with a made skeleton: meshes (bind 8, bone n), bones [(name, parent)] (bone 0
+    a still root), tracks {bone: (positions [F, 3], quaternions [F, 4] x y z w or None, scales
+    [F, 3] or None)} over frames; NUD header 0x0E = the highest bone (nud.write)"""
+    import zlib
+    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
+    write_set('%s/%s' % (model_dir, folder), meshes, tex)
+    open('%s/%s/model.vbn' % (model_dir, folder), 'wb').write(omo.vbn_write(bones))
+    path = '%s/%s/%s.omo' % (anim_dir, folder, folder)
+    o = omo.Omo(open(path, 'rb').read())
+    o.frames = frames
+    o.nodes = []
+    omo.set_node(o, bones[0][2], [(0.0, 0.0, 0.0)] * frames, [(0.0, 0.0, 0.0, 1.0)] * frames, [(1.0, 1.0, 1.0)] * frames)
+    for name, _p, h in bones[1:]:
+        pos, rot, scl = tracks[name]
+        omo.set_node(o, h, [tuple(map(float, v)) for v in pos],
+                     [tuple(map(float, q)) for q in rot] if rot is not None else [(0.0, 0.0, 0.0, 1.0)] * frames,
+                     [tuple(map(float, v)) for v in scl] if scl is not None else [(1.0, 1.0, 1.0)] * frames)
     open(path, 'wb').write(o.encode())
+
+
+# Ultimate's mobs and villagers (model/ch_pickel_*_set: rigid parts, each vertex on one bone;
+# motion/ch_pickel_*_set: the stage's own paths, in stage coordinates on the Hip bone, so the models
+# stay at the origin). Each part becomes a mesh on a bone of a made skeleton, its animation the
+# part's motion from its bind pose: A_f x B^-1 (column vectors, as omo.trs). Day only (the night's
+# monsters and the villagers' meeting / return / sleep, which take them indoors, left out).
+VILLAGERS = {'plains': ('plains_farmer', 'plains_butcher'),
+             'snowytundra': ('snowytundra_farmer', 'snowytundra_butcher')}
+# the day loop: each 1200 frames from and back to the villager's spot, 7200 in all (Battlefield's
+# animations' length); with the torches (TORCH_LOOP divides it) in TORCH_SET
+VILLAGER_LOOP = ('free1', 'work', 'free2', 'free3', 'work', 'free4')
+VILLAGER_FRAMES = 1200
+# animals: two of a kind (Ultimate picks sheep / chicken / cow 30 / 30 / 30), playing wait1 and
+# wait2 (4200 frames each, start = end), in their own folder
+ANIMAL_SET = 'dyr_e_mid_left01_set'
+ANIMAL_FRAMES = 4200
+
+
+def mob_parts(setdir):
+    """load_parts split by bone: [(bone name, part)]"""
+    import ssbh_data_py as s
+    mesh = s.mesh_data.read_mesh(setdir + '/model.numshb')
+    out = []
+    for p, o in zip(load_parts(setdir), mesh.objects):
+        vb = np.full(len(p['pos']), -1)
+        names = []
+        for bi in o.bone_influences:
+            names.append(bi.bone_name)
+            for vw in bi.vertex_weights:
+                if vw.vertex_weight > 0.5:
+                    vb[vw.vertex_index] = len(names) - 1
+        tri = p['idx'].reshape(-1, 3)
+        tb = vb[tri]
+        assert (tb >= 0).all() and (tb == tb[:, :1]).all(), 'not rigid: ' + setdir
+        for k, name in enumerate(names):
+            t = tri[tb[:, 0] == k]
+            if not len(t):
+                continue
+            used, idx = np.unique(t.reshape(-1), return_inverse=True)
+            q = dict(p, pos=p['pos'][used], nrm=None if p['nrm'] is None else p['nrm'][used],
+                     col=None if p['col'] is None else p['col'][used], uv=p['uv'][used], idx=idx)
+            out.append((name, q))
+    return out
+
+
+def mob_motion(setdir, anim_paths, frames, bones):
+    """{bone: (positions, quaternions, scales)} over frames: the anims' frames one after another"""
+    import ssbh_data_py as s
+    skel = s.skel_data.read_skel(setdir + '/model.nusktb')
+    bind = {k: np.linalg.inv(m.T) for k, m in _world(skel).items()}
+    rest = {b.name: np.array(b.transform, dtype=np.float64).T for b in skel.bones}
+    seq = []
+    for path, n in anim_paths:
+        a = s.anim_data.read_anim(path)
+        nodes = {x.name: x.tracks[0].values for g in a.groups if g.group_type.name == 'Transform' for x in g.nodes}
+        seq += [(nodes, f) for f in range(n)]
+    assert len(seq) >= frames
+    out = {b: ([], [], []) for b in bones}
+    for nodes, f in seq[:frames]:
+        world = {}
+        for b in skel.bones:
+            v = nodes.get(b.name)
+            if v is not None:
+                v = v[min(f, len(v) - 1)]
+                local = np.array(omo.trs(v.translation, v.rotation, v.scale), dtype=np.float64)
+            else:
+                local = rest[b.name]
+            if b.parent_index is not None and b.parent_index >= 0:
+                local = world[skel.bones[b.parent_index].name] @ local
+            world[b.name] = local
+        for b in bones:
+            m = world[b] @ bind[b]
+            p, q, sc = omo.decompose(m.tolist())
+            out[b][0].append(p)
+            out[b][1].append(q)
+            out[b][2].append(sc)
+    return {b: tuple(np.array(x) for x in v) for b, v in out.items()}
+
+
+def mob_rig(src, form, kinds, tex, frames, prefix):
+    """kinds [(model set, [(anim path, frames)])] -> meshes, bones, tracks (bones after a root)"""
+    d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
+    meshes, bones, tracks = [], [('%s_root' % prefix, -1)], {}
+    for i, (setname, anims) in enumerate(kinds):
+        setdir = '%s/model/%s' % (d, setname)
+        parts = mob_parts(setdir)
+        names = sorted({b for b, _ in parts})
+        motion = mob_motion(setdir, anims, frames, names)
+        index = {}
+        for b in names:
+            bones.append(('%s%d_%s' % (prefix, i, b), 0))
+            index[b] = len(bones) - 1
+            tracks[bones[-1][0]] = motion[b]
+        for b, part in parts:
+            for m in to_nud([part], tex, 'lit'):
+                m.name = '%s%d_%s' % (prefix, i, b)
+                m.bind, m.bone = 8, index[b]
+                meshes.append(m)
+    return meshes, bones, tracks
+
+
+def mob_kinds(src, form, biome, animal):
+    """(villagers, animals): [(model set, [(anim path, frames)])] for the biome (Omega: plains')"""
+    d = '%s/%s/motion' % (src, 'normal' if form == 'melee' else 'battle')
+    b = biome if form == 'melee' else 'plains'
+    villagers = []
+    for v in VILLAGERS.get(b, ()):
+        anims = [('%s/ch_pickel_%s_set/pickel_%s_%s.nuanmb' % (d, v, v, a), VILLAGER_FRAMES) for a in VILLAGER_LOOP]
+        anims.append((anims[0][0], 1))                      # the loop's last frame = its first
+        villagers.append(('ch_pickel_%s_set' % v, anims))
+    animals = []
+    if animal:
+        for w in ('wait1', 'wait2'):
+            path = '%s/ch_pickel_%s_set/pickel_%s_%s_%s.nuanmb' % (d, animal, b, animal, w)
+            if os.path.exists(path):
+                animals.append(('ch_pickel_%s_set' % animal, [(path, ANIMAL_FRAMES + 1)]))
+    return villagers, animals
 
 
 # ---------------------------------------------------------------- stage
@@ -996,10 +1115,10 @@ def tiny_nut(path):
 
 
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
-               clouds='moving', torch_skeleton='own'):
+               clouds='moving', animal='sheep'):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches (need
     effect): 'animated' (TORCH_SET), 'still' (flames in the island's model) or 'off'; clouds:
-    'moving' or 'still'"""
+    'moving' or 'still'; animal: 'sheep', 'cow', 'chicken' or None"""
     if torches == 'off':
         effect = None
     if os.path.exists(out_dir):
@@ -1032,8 +1151,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
 
     cloud_parts = [p for p in sky if p['bone'] in CLOUD_SETS]
     sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
+    villagers, animals = mob_kinds(src, form, biome, animal)
+    rig = villagers or (effect and torches == 'animated')
     for name in sorted(os.listdir(model_dir)):
-        if name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or effect and torches == 'animated' and name == TORCH_SET:
+        if (name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or name == TORCH_SET and rig
+                or name == ANIMAL_SET and animals):
             assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
@@ -1043,7 +1165,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             if os.path.exists(path):
                 data = tiny_nut(path)
                 open(path, 'wb').write(data)
-    torch, torch_bones, torch_motion = [], [], {}
+    torch, torch_bones, torch_motion = [], [('torch_root', -1)], {}
     if effect:
         row = BIOMES.index(biome) if form == 'melee' else TORCH_ROW_END
         torch, torch_bones, torch_motion = torch_meshes(torch_points(src, labels, row), tex, effect,
@@ -1060,9 +1182,27 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         data = xmb.edit(open(path, 'rb').read(), changes)
         open(path, 'wb').write(data)
     write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
-    if effect and torches == 'animated':
-        write_torches(model_dir, out_dir + '/animation', torch, torch_bones, torch_motion, tex,
-                      torch_skeleton == 'own')
+    anim_dir = out_dir + '/animation'
+    if rig:
+        # torches (their own bones) and villagers in TORCH_SET, one skeleton, one animation
+        frames = VILLAGER_FRAMES * len(VILLAGER_LOOP) + 1 if villagers else TORCH_LOOP + 1
+        meshes, bones = [], [('rig_root', -1)]
+        tracks = {}
+        if effect and torches == 'animated':
+            meshes += torch
+            bones += torch_bones[1:]
+            tracks.update(torch_tracks(torch_bones, torch_motion, frames))
+        if villagers:
+            m, b, t = mob_rig(src, form, villagers, tex, frames, 'villager')
+            for mesh in m:                  # its bones come after the torches'
+                mesh.bone += len(bones) - 1
+            meshes += m
+            bones += [(n, 0) for n, _p in b[1:]]
+            tracks.update(t)
+        write_rig(model_dir, anim_dir, TORCH_SET, meshes, bones, tracks, frames, tex)
+    if animals:
+        m, b, t = mob_rig(src, form, animals, tex, ANIMAL_FRAMES + 1, 'animal')
+        write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, ANIMAL_FRAMES + 1, tex)
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)
@@ -1109,13 +1249,13 @@ def main():
     ap.add_argument('--torches', default='animated', choices=('animated', 'still', 'off'),
                     help="animated (default; v12 test A2 in game), still (flames in the island's model) or off")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
-    ap.add_argument('--torch-skeleton', default='own', choices=('own', 'battlefield'),
-                    help="animated torches' skeleton: their own (a bone a sprite) or the folder's one bone (a test)")
+    ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
+                    help="the two animals in the pen (Ultimate picks one of the three each time)")
     a = ap.parse_args()
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
                                   form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
-                                  a.torch_skeleton)
+                                  None if a.animal == 'none' else a.animal)
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 
