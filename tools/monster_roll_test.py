@@ -181,7 +181,7 @@ miss:   li r3, 0
         """the cave's rules in Python: (animal folders mask, monster folders mask) from a rand sequence
         (each value taken % n, as 0x024F6BE8 does)"""
         it = iter(rs)
-        r = next(it) % 100
+        r = next(it) % sum(o for o, _f in C.ANIMAL_ODDS)
         run, day = 0, 0
         for o, f in C.ANIMAL_ODDS:
             run += o
@@ -238,7 +238,8 @@ miss:   li r3, 0
     rands([95])
     models(True)
     update()
-    check('none (95), a missing enderman skipped', shown()[:3] + shown()[4:], [False] * (N_FOLDERS - 1))
+    check('95 (of 90): sheep again; a missing enderman skipped', shown()[:3] + shown()[4:],
+          [i == SHEEP for i in range(N_FOLDERS) if i != 3])
     setw(REC + 0x20, 0)
     setw(data + 0xC, 1)
     before = word(REC + 0x10)

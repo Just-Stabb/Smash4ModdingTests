@@ -57,11 +57,15 @@ EXTRA = {'plains': ['door_plains_butcher_set', 'door_plains_firmer_set', 'vegeta
 ATLAS = 'all_blocks-rgba_c2_add'
 TEX_BASE = 0x2000F000               # texture IDs of the port: 0x2000F001... (Battlefield's: 0x2000xxxx below 0x2000F000)
 CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
-# the panorama's fog layer: its texture is white with alpha 0 at the top rows, 1 at the bottom, and
-# its UVs put the bottom rows on the near ground, the top near the horizon, which as read would
-# hide the hills near the island and clear them at the horizon; Ultimate shows the opposite (clear
-# near, hazy far: the user's screenshots), so the ramp is read the other way up, at this strength
+# the panorama's fog layer: a bowl, its rim high in the sky (v 0), the horizon at v ~0.87 and under
+# it down to the ground below the island (v 1, or up to 7 but on plains); its texture is white with
+# alpha 0 at the top rows, 1 at the bottom (ragged, along the hills). Read as it is, the sky is clear
+# and the horizon hazy, but the ground under the horizon (near the island) white: v11-v17c read
+# it the other way up (clear near, hazy far: the user's Ultimate screenshots), which made the sky's
+# top hazy (v17c, with the clamped sampler: pale shapes at the top of every biome's sky, user).
+# v17d: read as it is above the horizon (FOG_HORIZON_Y), clear (v 0) from there down; at this strength
 FAR_FOG_ALPHA = 0.8
+FOG_HORIZON_Y = 0.0                 # the bowl's vertices below this height (its rings at y -2890 and lower)
 FOG_WRAP = 3                        # clamp (NUD wrap: 1 repeat, 2 mirror, 3 clamp)
 # Draw order (model.xmb drawing_order; Battlefield's go far to near: sky 0, moon 2, sun 4,
 # background 5-9, near objects 12-18; blended models drawn in that order, ties by distance). The
@@ -815,19 +819,19 @@ def far_parts(setdir):
     """the panorama (split, see split_wide) and its fog layer (Ultimate's distance haze: a blended
     texture in front of it; 1% nearer, as it's drawn over the panorama there)"""
     parts = load_parts(setdir)
-    # v clamped first: plains' runs 0-1, the other biomes' 0-7 (Ultimate's sampler clamps it); read
-    # the other way up and repeated, it tiled the ramp in bands: pale see-through boxes (user)
-    # v17c: past 1 the haze is clear, but at the texture's top edge the repeating sampler and its
-    # mips still mixed in the opaque bottom rows (pale boxes on every biome but plains, user): those
-    # triangles are left out, and the rest clamped (FOG_WRAP)
+    # (v17b: v clamped, the other biomes' running to 7 had tiled the ramp in bands; v17c: the
+    # sampler clamped (FOG_WRAP), the mips no longer mixing the top and bottom rows.) Under the
+    # horizon v 0 (clear); the triangles all under it left out
     fog = []
     for p in parts:
         if p['sub'] != 1:
             continue
+        below = p['pos'][:, 1] < FOG_HORIZON_Y
+        v = np.where(below, 0.0, np.clip(p['uv'][:, 1], 0, 0.995))
         tri = p['idx'].reshape(-1, 3)
-        tri = tri[(p['uv'][tri, 1] < 1.0).any(1)]
+        tri = tri[~below[tri].all(1)]
         if len(tri):
-            fog.append(dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - np.clip(p['uv'][:, 1], 0, 1)],
+            fog.append(dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], v],
                             col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)),
                             idx=tri.reshape(-1)))
     pano = [p for p in parts if p['sub'] == 0]
@@ -927,10 +931,11 @@ def write_set(outdir, meshes, tex, curves=None):
     if os.path.exists(outdir + '/model.mta'):
         os.remove(outdir + '/model.mta')
     if kinds:
-        # a curve: NU_finalColorGain's values, or {property: values} (the fire's and the puff's UVs)
+        # a curve: NU_finalColorGain's values, or {property: values} (the fire's and the puff's UVs;
+        # a UV curve's u2 1, as every one of Battlefield's: v17c's 0 didn't animate, user)
         open(outdir + '/model.mta', 'wb').write(mta.write(CYCLE + 1, [
             dict(name='mcw_%s' % k, hash=gain_hash(k),
-                 props=[dict(name=n, values=np.asarray(v).tolist()) for n, v in
+                 props=[dict(name=n, values=np.asarray(v).tolist(), u2=1 if n.endswith('UV') else 0) for n, v in
                         (curves[k].items() if isinstance(curves[k], dict) else [('NU_finalColorGain', curves[k])])])
             for k in kinds]))
     used = []
@@ -1405,59 +1410,69 @@ def sprite(center, w, h, tex_id, spec, bone):
     return mesh
 
 
+def sprites(quads, tex_id, spec, bone):
+    """quads facing +z (front only) in one mesh on a bone (bind 8): [(center, w, h, (u0, u1))]"""
+    poly = nud.Polygon()
+    pos, uv = [], []
+    for center, w, h, (u0, u1) in quads:
+        pos += list(np.asarray(center, dtype=np.float64) + np.array([[-w / 2, -h / 2, 0], [w / 2, -h / 2, 0],
+                                                                    [w / 2, h / 2, 0], [-w / 2, h / 2, 0]]))
+        uv += [[u0, 1], [u1, 1], [u1, 0], [u0, 0]]
+    n = len(quads)
+    poly.pos = np.array(pos)
+    poly.nrm = np.tile([0.0, 0.0, 1.0], (4 * n, 1))
+    poly.col = np.full((4 * n, 4), 127.0)
+    poly.uvs = [np.array(uv, dtype=np.float64)]
+    poly.idx = np.concatenate([np.array([0, 1, 2, 0, 2, 3]) + 4 * k for k in range(n)])
+    poly.materials = [bf_material(spec, tex_id)]
+    mesh = nud.Mesh('fx%d' % bone, [poly], bone=bone, bind=8)
+    mesh.gain = None                        # their own light
+    return mesh
+
+
 def burn_fx(meshes, bones, tracks, curves, kind, hip, start, end, at, tex, effect):
-    """a mob burning from start to its end (end): Minecraft's fire on it (a bone copying its hip's
-    track, scaled to nothing outside), its own meshes flashing red (their gain 'hurt_<kind>'), and
-    its death puff at `at` (world, where it ends)"""
+    """a mob burning from start to its end (end): Minecraft's fire on it, its own meshes flashing
+    red (their gain 'hurt_<kind>'), and its death puff at `at` (world, where it ends). The fire and
+    the puff are flipbooks: a mesh a frame of their strips, each on a bone of its own shown (scale
+    1) only for its frame (v17c animated one quad's UVs with an MTA curve, which didn't play on the
+    flames' shader, user)"""
     import bntx
     if 'pickel_fire_strip' not in tex.extra:
         sp = bntx.read_all(open(effect, "rb").read())
-        tex.extra['pickel_fire_strip'] = sp['ef_pickelworld_fire01']
-        poof = sp['ef_pickelworld_smoke00'].astype(np.float64)
+        tex.extra['pickel_fire_strip'] = sp['ef_pickelworld_fire01']        # 16 x 512: 32 frames
+        poof = sp['ef_pickelworld_smoke00'].astype(np.float64)              # 32 x 224: 7 frames
         poof[..., :3] = 255.0                               # white (its colour is in its alpha)
         tex.extra['pickel_poof_strip'] = np.round(poof).astype(np.uint8)
     F = len(tracks[hip][0])
     f = np.arange(F)
     on = (f >= start) & (f <= end)
     pos, _rot, scl = (x.copy() for x in tracks[hip])
-    bones.append((hip + '_fire', 0))
     # its place only: the quads face the camera however the mob turns (its turn, about the
-    # vertical, barely moves the hip's place)
-    tracks[bones[-1][0]] = (pos, None, scl * on[:, None])
-    k = len(bones) - 1
-    # the mob's bind pose: feet at 0, about 8 wide and 17 high (zombie, skeleton): the fire over
-    # it, in front and behind, a frame (1 / FIRE_FRAMES of the strip) each
-    for c, w, h in (((0, 10, 3.5), 13, 22), ((0, 11, -2.5), 12, 20)):
-        mesh = sprite(c, w, h, tex.id('pickel_fire_strip'), BF_FLAME, k)
-        mesh.polygons[0].uvs[0][:, 0] /= FIRE_FRAMES
-        mesh.gain = 'fire_' + kind
-        meshes.append(mesh)
-    uv = np.zeros((F, 4))
-    uv[:, :2] = 1.0
-    uv[:, 2] = (f // FIRE_STEP % FIRE_FRAMES) / FIRE_FRAMES
-    curves['fire_' + kind] = {'NU_colorSamplerUV': uv}
+    # vertical, barely moves the hip's place). The mob's bind pose: feet at 0, about 8 wide and
+    # 17 high (zombie, skeleton): the fire over it, in front and behind
+    frame = f // FIRE_STEP % FIRE_FRAMES
+    for k in range(FIRE_FRAMES):
+        bones.append(('%s_fire%d' % (hip, k), 0))
+        tracks[bones[-1][0]] = (pos, None, scl * (on & (frame == k))[:, None])
+        u = (k / FIRE_FRAMES, (k + 1) / FIRE_FRAMES)
+        meshes.append(sprites([((0, 10, 3.5), 13, 22, u), ((0, 11, -2.5), 12, 20, u)],
+                              tex.id('pickel_fire_strip'), BF_FLAME, len(bones) - 1))
     hurt = curves['island'].copy()
     red = on & (((f - start) % HURT_PERIOD < HURT_FRAMES) | (f > end - HURT_DEATH))
     hurt[red, :3] *= HURT_TINT
     curves['hurt_' + kind] = hurt
-    # the puff: a bone at `at`, shown for its frames after the end
-    bones.append((hip + '_poof', 0))
-    k = len(bones) - 1
-    live = (f > end) & (f <= end + POOF_FRAMES * POOF_STEP)
-    tracks[bones[-1][0]] = (np.tile(np.asarray(at, dtype=np.float64), (F, 1)), None,
-                            np.repeat(live[:, None].astype(np.float64), 3, 1))
+    # the puff: at `at`, its frames one after another after the end
     rng = np.random.default_rng(len(bones))
-    for _ in range(POOF_PARTS):
-        c = (rng.uniform(-5, 5), rng.uniform(2, 16), rng.uniform(0, 4))
-        sz = rng.uniform(5, 8)
-        mesh = sprite(c, sz, sz, tex.id('pickel_poof_strip'), BF_GLOW, k)
-        mesh.polygons[0].uvs[0][:, 0] /= POOF_FRAMES
-        mesh.gain = 'poof_' + kind
-        meshes.append(mesh)
-    uv = np.zeros((F, 4))
-    uv[:, :2] = 1.0
-    uv[:, 2] = np.clip((f - end - 1) // POOF_STEP, 0, POOF_FRAMES - 1) / POOF_FRAMES
-    curves['poof_' + kind] = {'NU_colorSamplerUV': uv}
+    puffs = [((rng.uniform(-5, 5), rng.uniform(2, 16), rng.uniform(0, 4)), rng.uniform(5, 8))
+             for _ in range(POOF_PARTS)]
+    place = np.tile(np.asarray(at, dtype=np.float64), (F, 1))
+    for k in range(POOF_FRAMES):
+        bones.append(('%s_poof%d' % (hip, k), 0))
+        live = (f > end + k * POOF_STEP) & (f <= end + (k + 1) * POOF_STEP)
+        tracks[bones[-1][0]] = (place, None, np.repeat(live[:, None].astype(np.float64), 3, 1))
+        u = (k / POOF_FRAMES, (k + 1) / POOF_FRAMES)
+        meshes.append(sprites([(c, sz, sz, u) for c, sz in puffs], tex.id('pickel_poof_strip'), BF_GLOW,
+                              len(bones) - 1))
 
 
 def teleport_frames(path, lo, hi):
@@ -1726,7 +1741,10 @@ def mob_kinds(src, form, biome, animals, daynight=True):
     d = '%s/%s/motion' % (src, 'normal' if form == 'melee' else 'battle')
     b = biome if form == 'melee' else 'plains'
     villagers = []
+    doors = door_sets(src, form, biome) if daynight else None
     for v in VILLAGERS.get(b, ()) if form == 'melee' else END_VILLAGERS:
+        if doors is not None and 'door_%s_set' % v.replace('farmer', 'firmer') not in doors:
+            continue                        # no house of its own (snowy tundra's farmer: it slept outdoors, user)
         path = '%s/ch_pickel_%s_set/pickel_%s_%%s.nuanmb' % (d, v, v)
         if daynight:
             anims = [(path % a, n) for a, n in VILLAGER_CYCLE]
@@ -1771,7 +1789,7 @@ def mob_window(anims):
 # hash a kind of curve, GAIN_KINDS).
 CYCLE = 9000
 GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars', 'sun_core', 'torchlight', 'pano_glow',
-              'hurt_zombie', 'hurt_skeleton', 'fire_zombie', 'fire_skeleton', 'poof_zombie', 'poof_skeleton')
+              'hurt_zombie', 'hurt_skeleton')
 NIGHT_FLOOR = 0.5                   # the island's least gain (Ultimate's stage light 2.4 by day, 0.3 at night: 0.39, darker
                                     # than Ultimate's night island, whose ambient light stays: user's comparison)
 SKY_RIG = 'dyr_m_SKY_DOME_set'      # the sun, the moon and the stars on their turning bones

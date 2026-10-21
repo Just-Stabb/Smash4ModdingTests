@@ -14,7 +14,7 @@ the base update with `bl 0x031415C8` at 0x02D1CFDC: that goes to UPDATE, which m
 for kinds KINDS (stage + 0: NewStage01 and its Omega), adds the frame rate (f1, as the stage's
 animations do) to a frame counter over the day / night cycle (CYCLE):
 - on the first update (the setup, 0x02D1C65C, which Omega's calls too, flags a new match): rolls
-  the match's animals (sheep / chicken / cow 30 / 30 / 30, none 10%);
+  the match's animals (sheep / chicken / cow 30 / 30 / 30: always one kind);
 - at MONSTER_FRAME (frame_of_monster 4200) each night: rolls how many monsters come (guest
   single / double / triple 20 / 60 / 20) and which (that many different kinds, weighted zombie /
   skeleton / spider / enderman 40 / 35 / 20 / 5);
@@ -82,7 +82,9 @@ FOLDERS = ['dyr_h_BG_more_far0_set', 'dyr_f_BG_far2_set_set', 'dyr_g_bgfar_set',
 MONSTERS = 4
 MONSTER_NAMES = ['zombie', 'skeleton', 'spider', 'enderman']
 MONSTER_ODDS = [40, 35, 20, 5]             # zombie, skeleton, spider, enderman: folders 0-3
-ANIMAL_ODDS = [(30, 4), (30, 6), (30, 5)]  # sheep (folder 4), chicken (6), cow (5); the rest: none
+# sheep (folder 4), chicken (6), cow (5): weights (v17c rolled of 100, the last 10 none: matches
+# without animals, which the user doesn't see in Ultimate)
+ANIMAL_ODDS = [(30, 4), (30, 6), (30, 5)]
 COUNT_ODDS = [20, 60, 20]                  # one / two / three monsters a night
 
 
@@ -211,7 +213,7 @@ roll_day:
         stwu r1, -0x20(r1)
         mflr r0
         stw r0, 0x24(r1)
-        li r3, 100
+        li r3, %(animal_total)d
         bl rand
         %(animal)s
         li r4, 0
@@ -456,7 +458,7 @@ data:
            rand_hi=RAND >> 16, rand_lo=RAND & 0xFFFF, animal=animal, c1=COUNT_ODDS[0],
            c2=COUNT_ODDS[0] + COUNT_ODDS[1], find=FIND_MODEL, isvis=IS_VISIBLE, add=SCENE_ADD,
            remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME,
-           monsters=MONSTERS, folders=len(FOLDERS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
+           monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
            pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
            release=RELEASE, name_len=len(STAGE_NAME), bf_hi=BATTLEFIELD_NAME >> 16,
            bf_lo=BATTLEFIELD_NAME & 0xFFFF, name_first=SOUND_NAME_FIRST, name_back=SOUND_NAME + 4,

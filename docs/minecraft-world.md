@@ -862,6 +862,28 @@ Packaging (user): the hazards-off folders only once the hazards are finished. Un
 `biome_select_cave.HAZARDS_OFF` is False: ZL / Z ignored, only the six biome folders listed
 (`--hazards-off` lists the twelve); `biome_select_test.py` checks both. v17c ships the six.
 
+## v17d
+
+User (v17c): loads, the sounds play. Animals sometimes missing; the fog still visible at the top
+of every biome but plains by day; villagers going to sleep where there's no house; the fire on the
+burning mobs not Minecraft's and not animating, nor the puff.
+
+- **Fire / puff**: Battlefield's MTA UV curves all have the property's u2 = 1 (its colour gains
+  0); ours had 0 (`write_set` now writes 1 on UV properties). The flames' shader (0xA3C01081) has no
+  UV curve of Battlefield's, so the fire and the puff are now flipbooks instead: a mesh a frame of
+  the strip (`sprites`: several quads in one mesh), each on a bone shown (scale 1) only for its
+  frame (`FIRE_STEP` 3 frames each, 32 frames; the puff 7 frames of `POOF_STEP` 3).
+- **Fog**: the layer is a bowl, its rim high in the sky (v 0), the horizon at v ~0.87, under it to
+  the ground below the island; its texture white, alpha 0 at the top rows to 1 at the bottom along a
+  ragged edge that follows the farthest hills (it hazes the far hill line). v11-v17c read it the
+  other way up (to keep the near ground clear), which put the haze at the top of the sky (with
+  v17c's clamped sampler: pale shapes at the top of the screen). Now read as it is above
+  `FOG_HORIZON_Y` (0) and clear (v 0) below: the far hills hazy, the sky and the near ground clear.
+- **Animals**: Ultimate's 30 / 30 / 30 read as weights: a kind every match (v17c: none 10%).
+- **Villagers**: one is built only where its house's door is (`door_<villager>_set`, the farmer's
+  named "firmer"): snowy tundra has no farmer's house (Ultimate's model has only the butcher's
+  door), so its farmer is left out (as Omega's).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
