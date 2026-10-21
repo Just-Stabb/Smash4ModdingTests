@@ -737,8 +737,11 @@ def material(setup, tex_id, cull=1029, fog=NO_FOG):
 # Bone-bound materials as Battlefield's own (flags, blend, alpha test, culling, properties, sampler):
 # v9 / v10 tests 1, 2 and 5 froze with the torches' unlit 0xA2001001 alpha-tested / blended on
 # bones, which no Battlefield model has. Flames: dyr_g_bgfar_set's (0xA3C01081, blend 1 / 2:
-# source alpha, one, so additive); smoke: dyr_f_BG_far2_set_set's (0xA4011001, blend 5 / 1: one,
-# one minus source alpha, so a premultiplied texture), its fog strengths 0.
+# source alpha, one, so additive); smoke: dyr_f_BG_far2_set_set's (0xA4011001, blend 5 / 1: source
+# alpha, one minus source alpha (Smash Forge's NudEnums), so plain alpha blending; the smoke's
+# texture is written premultiplied all the same, which only darkens its thin edges), its fog
+# strengths 0. Glow (the sun and the moon): the flames' shader, which fades with its gain's alpha
+# (Battlefield's moon), alpha-blended (5 / 1) as Ultimate's (colour x alpha over the sky).
 BF_FLAME = (0xA3C01081, 1, 2, 0, 0, 1029,
             [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_finalColorGain', [1.0, 1.0, 1.0, 1.0]),
              ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]), ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 3)
@@ -747,6 +750,7 @@ BF_SMOKE = (0xA4011001, 5, 1, 0, 0, 1029,
              ('NU_fresnelColor', [0.0, 0.0, 0.0, 0.0]), ('NU_fogParams', [300.0, 9000.0, 0.0, 0.0]),
              ('NU_diffuseColor', [1.0, 1.0, 1.0, 0.0]), ('NU_fogColor', [0.43, 0.712, 0.994, 0.0]),
              ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 1)
+BF_GLOW = (BF_FLAME[0], 5, 1) + BF_FLAME[3:]
 
 
 def bf_material(spec, tex_id):
@@ -1003,6 +1007,101 @@ def torch_points(src, labels, row):
     return [np.array([t['x%d' % i], t['y%d' % i], t['z%d' % i]]) for i in range(t['count'])]
 
 
+# the torches' light at night (Ultimate's point lights; our island is unlit): the island's faces
+# within TORCH_LIGHT_RANGE of a torch drawn again, added (Battlefield's unbound 0xA3C01081, blend
+# 5 / 2: source alpha, one), their texture times a warm light in the vertex colours (per corner,
+# as Minecraft's smooth lighting: a quarter from everywhere, the rest by how much the face looks
+# at the torch), the curve 'torchlight' fading it in as the island darkens
+TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 1.6
+TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
+TORCH_LIGHT_LIFT = 0.05             # the copy this far out along its normals, in front of the island
+
+
+def torch_light(meshes, points):
+    """additive copies of meshes' triangles lit by the torches at points, each with gain 'torchlight'"""
+    out = []
+    pts = np.array(points, dtype=np.float64)
+    for m in meshes:
+        polys = []
+        for p in m.polygons:
+            if p.nrm is None:
+                continue
+            n = p.nrm / (np.linalg.norm(p.nrm, axis=1, keepdims=True) + 1e-9)
+            light = np.zeros(len(p.pos))
+            for t in pts:
+                v = t - p.pos
+                d = np.linalg.norm(v, axis=1) + 1e-9
+                face = np.clip(np.einsum('ij,ij->i', n, v) / d, 0, 1)
+                light += TORCH_LIGHT * np.clip(1 - d / TORCH_LIGHT_RANGE, 0, 1) ** 2 * (0.25 + 0.75 * face)
+            light = np.minimum(light, TORCH_LIGHT_MAX)
+            tri = np.asarray(p.idx).reshape(-1, 3)
+            tri = tri[light[tri].max(1) > 0.02]
+            if not len(tri):
+                continue
+            keep, idx = np.unique(tri, return_inverse=True)
+            q = nud.Polygon()
+            q.pos = p.pos[keep] + n[keep] * TORCH_LIGHT_LIFT
+            q.nrm = p.nrm[keep]
+            q.uvs = [uv[keep] for uv in p.uvs]
+            q.col = np.c_[np.round(light[keep, None] * np.array(TORCH_LIGHT_COLOR) * 128), np.full(len(keep), 128)]
+            q.idx = idx.reshape(-1)
+            q.materials = [added(p.materials[0])]
+            polys.append(q)
+        if polys:
+            lit = nud.Mesh(m.name + '_torchlight', polys, bone=m.bone, bind=m.bind)
+            lit.gain = 'torchlight'
+            out.append(lit)
+    return out
+
+
+def added(mat):
+    """mat's texture, drawn added (Battlefield's 0xA3C01081, blend 5 / 2, bound or not)"""
+    m = nud.Material(BF_FLAME[0], 5, 2, 0, 0, mat.cull)
+    m.textures = [dict(t) for t in mat.textures]
+    m.props = [(n, list(v)) for n, v in BF_FLAME[6]]
+    return m
+
+
+# the backdrop's own lights at night: Ultimate's night panorama has torch-lit patches and lava
+# glowing (user), which our night panorama (the day one darkened, see daynight_curves) lacks.
+# What the night texture has over the darkened day one, softened to PANO_GLOW_SIZE, drawn added
+# over the panorama's triangles it reaches, faded in with Ultimate's day / night blend ('pano_glow')
+PANO_GLOW_SIZE = (1024, 512)
+PANO_GLOW_MIN = 6                   # the least texel (0-255) a triangle must reach to be drawn again
+
+
+def pano_glow(setdir, tex):
+    """the panorama's glow parts (texture 'pano_glow')"""
+    from PIL import Image, ImageFilter
+    parts = [p for p in load_parts(setdir) if p['sub'] == 0]
+    path = '%s/%s.nutexb' % (setdir, parts[0]['textures'][0])
+    a = nutexb.decode(nutexb.Nutexb(path)).astype(np.float64)
+    b = nutexb.decode(nutexb.Nutexb(path.replace('_day_', '_night_'))).astype(np.float64)
+    m = a[..., 3] > 250
+    k = b[m][:, :3].mean(0) / a[m][:, :3].mean(0)
+    glow = np.clip(b[..., :3] - a[..., :3] * k, 0, 255) * m[..., None]
+    small = Image.fromarray(np.round(glow).astype(np.uint8)).resize(PANO_GLOW_SIZE, Image.BOX)
+    img = np.dstack([np.asarray(small), np.full(PANO_GLOW_SIZE[::-1], 255, np.uint8)])
+    tex.extra['pano_glow'] = img
+    reach = np.asarray(small.convert('L').filter(ImageFilter.MaxFilter(9)))
+    h, w = reach.shape
+    out = []
+    for p in parts:
+        tri = p['idx'].reshape(-1, 3)
+        uv = p['uv'][tri]                                   # [t, 3, 2]
+        pts = np.concatenate([uv, uv.mean(1, keepdims=True)], 1)
+        x = np.clip((pts[..., 0] * w).astype(int), 0, w - 1)
+        y = np.clip((pts[..., 1] * h).astype(int), 0, h - 1)
+        sel = tri[reach[y, x].max(1) >= PANO_GLOW_MIN]
+        if not len(sel):
+            continue
+        used, idx = np.unique(sel, return_inverse=True)
+        out.append(dict(p, pos=p['pos'][used] * 0.995, nrm=None if p['nrm'] is None else p['nrm'][used],
+                        col=np.full((len(used), 4), 0.502), uv=p['uv'][used], idx=idx.reshape(-1),
+                        textures=['pano_glow'], emissive=False, blend=False, sub=200))
+    return out
+
+
 def torch_meshes(points, tex, effect, animated=True):
     """the torches' flames (and, animated, smoke) as meshes. animated: each on its own bone
     (bind 8, bone n; made skeleton [(name, parent)], bone 0 the root) with its motion
@@ -1116,6 +1215,13 @@ VILLAGER_FRAMES = 1200
 # frame_of_monster (4200, when its monsters come) to the end of the night (scaled to nothing)
 ANIMAL_SET = 'dyr_e_mid_left01_set'
 ANIMAL_FRAMES = 4200
+# Omega (the battle folder's ring_endbattle_set): its motions are the normal form's, but its island
+# is narrower and has only the butcher's house (the middle one). The farmer's spot is a block above
+# its ground and his house isn't there (he floated, user), so he and his door are left out; the
+# animals' pen walked off its edge, so they're moved by END_ANIMAL_SHIFT (blocks of 10), the least
+# shift that keeps every frame of all three animals' paths on its ground
+END_VILLAGERS = ('plains_butcher',)
+END_ANIMAL_SHIFT = (10.0, 0.0, 20.0)
 
 
 def mob_parts(setdir):
@@ -1202,12 +1308,107 @@ def mob_rig(src, form, kinds, tex, frames, prefix):
     return meshes, bones, tracks
 
 
+# the houses' doors (door_*_set: one bone each, Ultimate's open / close animations swing it 90
+# degrees in 4 frames): on the villagers' skeleton, open while a villager is within DOOR_REACH of
+# it (going in to sleep, coming out at dawn), DOOR_EARLY frames before and after; without them
+# the villagers walked through the shut doors (user)
+DOOR_REACH, DOOR_EARLY, DOOR_SWING = 8.0, 12, 4
+
+
+def door_sets(src, form, biome):
+    """the biome's door model sets (Omega: the butcher's, END_VILLAGERS)"""
+    if form == 'melee':
+        return [e for e in EXTRA.get(biome, []) if e.startswith('door_')]
+    return ['door_%s_set' % v for v in END_VILLAGERS]
+
+
+def villager_paths(villagers):
+    """[[frames, 3]] each villager's Hip position (stage coordinates) over its animations"""
+    import ssbh_data_py as s
+    out = []
+    for _set, anims in villagers:
+        seq = []
+        for path, n in anims:
+            a = s.anim_data.read_anim(path)
+            hip = [x for g in a.groups for x in g.nodes if x.name == 'Hip'][0].tracks[0].values
+            seq += [hip[min(f, len(hip) - 1)].translation for f in (range(n) if isinstance(n, int) else n)]
+        out.append(np.array(seq))
+    return out
+
+
+def atlas_rows(parts, tex, name):
+    """parts on the block atlas moved to its rows they use (whole 16-pixel tiles), a texture of
+    their own (name): the atlas in each folder that draws them is 4 MB"""
+    img = tex.image(ATLAS)
+    h = img.shape[0]
+    v = np.concatenate([p['uv'][:, 1] for p in parts])
+    lo, hi = int(np.floor(v.min() * h / 16)) * 16, int(np.ceil(v.max() * h / 16)) * 16
+    tex.extra[name] = img[lo:hi].copy()
+    out = []
+    for p in parts:
+        q = dict(p)
+        q['uv'] = np.c_[p['uv'][:, 0], (p['uv'][:, 1] * h - lo) / (hi - lo)]
+        q['textures'] = [name] + list(p['textures'][1:])
+        out.append(q)
+    return out
+
+
+def door_rig(src, form, doors, paths, tex, frames):
+    """meshes, bones, tracks: each door on its own bone, swung by the villagers' paths"""
+    import ssbh_data_py as s
+    d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
+    meshes, bones, tracks = [], [('door_root', -1)], {}
+    for setname in doors:
+        setdir = '%s/model/%s' % (d, setname)
+        parts = load_parts(setdir)
+        skel = s.skel_data.read_skel(setdir + '/model.nusktb')
+        world = {k: m.T for k, m in _world(skel).items()}
+        bone = parts[0]['bone']
+        b = [x for x in skel.bones if x.name == bone][0]
+        parent = world[skel.bones[b.parent_index].name] if b.parent_index is not None and b.parent_index >= 0 else np.eye(4)
+        rest_p, _rq, rest_s = omo.decompose(np.array(b.transform, dtype=np.float64).T.tolist())
+
+        def last(motion):
+            a = s.anim_data.read_anim('%s/motion/%s/pickel_door_%s.nuanmb' % (d, setname, motion))
+            return np.array([x for g in a.groups for x in g.nodes if x.name == bone][0].tracks[0].values[-1].rotation)
+        shut, wide = last('close'), last('open')
+        if np.dot(shut, wide) < 0:
+            wide = -wide
+        centre = np.concatenate([p['pos'] for p in parts]).mean(0)[[0, 2]]
+        near = np.zeros(frames, bool)
+        for path in paths:
+            close = np.linalg.norm(path[:frames, [0, 2]] - centre, axis=1) < DOOR_REACH
+            for f in np.where(close)[0]:
+                near[max(0, f - DOOR_EARLY):f + DOOR_EARLY + 1] = True
+        t = np.zeros(frames)                # 0 shut, 1 open, DOOR_SWING frames between
+        for f in range(1, frames):
+            t[f] = min(1.0, t[f - 1] + 1 / DOOR_SWING) if near[f] else max(0.0, t[f - 1] - 1 / DOOR_SWING)
+        t[0] = t[-1] = 0.0
+        bind_inv = np.linalg.inv(world[bone])
+        pos, rot, scl = [], [], []
+        for w in t:
+            q = (1 - w) * shut + w * wide
+            q /= np.linalg.norm(q)
+            m = parent @ np.array(omo.trs(rest_p, q, rest_s)) @ bind_inv
+            p_, q_, s_ = omo.decompose(m.tolist())
+            pos.append(p_)
+            rot.append(q_)
+            scl.append(s_)
+        bones.append(('door_%s' % setname, 0))
+        tracks[bones[-1][0]] = tuple(np.array(x) for x in (pos, rot, scl))
+        for m in to_nud(atlas_rows(parts, tex, 'all_blocks_doors'), tex, 'lit'):
+            m.bind, m.bone = 8, len(bones) - 1
+            m.gain = 'island'
+            meshes.append(m)
+    return meshes, bones, tracks
+
+
 def mob_kinds(src, form, biome, animal, daynight=True):
-    """(villagers, animals): [(model set, [(anim path, frames)])] for the biome (Omega: plains')"""
+    """(villagers, animals): [(model set, [(anim path, frames)])] for the biome (Omega: plains', END_VILLAGERS)"""
     d = '%s/%s/motion' % (src, 'normal' if form == 'melee' else 'battle')
     b = biome if form == 'melee' else 'plains'
     villagers = []
-    for v in VILLAGERS.get(b, ()):
+    for v in VILLAGERS.get(b, ()) if form == 'melee' else END_VILLAGERS:
         path = '%s/ch_pickel_%s_set/pickel_%s_%%s.nuanmb' % (d, v, v)
         if daynight:
             anims = [(path % a, n) for a, n in VILLAGER_CYCLE]
@@ -1235,11 +1436,16 @@ def mob_kinds(src, form, biome, animal, daynight=True):
 # its own (lit, unlit and additive) shaders, on materials found by their NU_materialHash (one
 # hash a kind of curve, GAIN_KINDS).
 CYCLE = 9000
-GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars')
-NIGHT_FLOOR = 0.3                   # the island's least gain (Ultimate's stage light 2.4 by day, 0.3 at night: 0.39)
+GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars', 'sun_core', 'torchlight', 'pano_glow')
+NIGHT_FLOOR = 0.5                   # the island's least gain (Ultimate's stage light 2.4 by day, 0.3 at night: 0.39, darker
+                                    # than Ultimate's night island, whose ambient light stays: user's comparison)
 SKY_RIG = 'dyr_m_SKY_DOME_set'      # the sun, the moon and the stars on their turning bones
 PANO_MEAN = 0.55                    # the panoramas' mean texel value, about
-RIG_LABELS = {'zz_sun': 'sun', 'zz_sun_core': 'sun', 'zz_moon': 'stars', 'sun_stars': 'stars'}
+RIG_LABELS = {'zz_sun': 'sun', 'zz_sun_core': 'sun_core', 'zz_moon': 'stars', 'sun_stars': 'stars'}
+GLOW_LABELS = ('zz_sun', 'zz_sun_core', 'zz_moon')     # alpha-blended (BF_GLOW); the stars added
+# the moon's glow: Ultimate's is its texture's grey-blue halo, lifted by the bloom; Smash 4's
+# bloom doesn't reach a colour that dim, so the halo is drawn paler and stronger
+MOON_GLOW, MOON_GLOW_ALPHA = (205, 218, 255), 1.6
 GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 on materials with a curve
 # light.bin (the fighters' lights; their records every 3 frames): Battlefield's own records for the
 # same time of day (its cycle: night 1950-2400 and 0-100, dawn 200-500, day 800-1100, sunset
@@ -1283,9 +1489,18 @@ def daynight_curves(src, form, far_set):
     col = at(_ult_track(light, 'LightStg0', 'CustomVector0'))[:, :3]
     col = (col / col.max(1, keepdims=True)) ** (1 / GAMMA)
     out['island'] = np.c_[inten[:, None] ** (1 / GAMMA) * col, np.ones(len(u))]
+    isl = out['island'][:, :3].mean(1)
+    dark = np.clip((isl.max() - isl) / (isl.max() - isl.min()), 0, 1)
+    out['torchlight'] = np.c_[np.repeat(dark[:, None], 3, 1), np.ones(len(u))]
     out['sky'] = ratio('sfx_sky_color')
     out['cloud'] = ratio('sfx_cloud')
+    # the sun's glow: Ultimate's colour, faded out with it once set (in Ultimate a black glow
+    # below the horizon); its core white all day (Ultimate's doesn't change), fading with it
+    sun = at(_ult_track(common, 'zz_sun', 'CustomVector8'))[:, :3]
+    fade = np.clip(2 * (sun / sun[:1]).max(1), 0, 1)
     out['sun'] = ratio('zz_sun')
+    out['sun'][:, 3] = fade
+    out['sun_core'] = np.c_[np.ones((len(u), 3)), fade]
     stars = at(_ult_track(common, 'sun_stars', 'CustomVector8'))[:, 3]
     out['stars'] = np.c_[np.ones((len(u), 3)), stars]
     # the panorama: Ultimate blends its day and night textures (CustomVector20.w); here the day one
@@ -1293,7 +1508,13 @@ def daynight_curves(src, form, far_set):
     far = '%s/motion/%s/%s_00.nuanmb' % (d, far_set, far_set)
     if not os.path.exists(far):
         far = '%s/normal/motion/far_plains_set/far_plains_set_00.nuanmb' % src
-    night = at(_ult_track(far, 'sfx_far_A_long', 'CustomVector20'))[:, 3]
+    import ssbh_data_py as s
+    # its material's node: sfx_far_A_long (plains), sfx_far_E_long (snowy tundra), sfx_far_C, ...
+    names = {x.name for g in s.anim_data.read_anim(far).groups for x in g.nodes}
+    pano_node = [n for n in names if n.startswith('sfx_far_') and not n.endswith('_fog')][0]
+    fog_node = [n for n in names if n.startswith('sfx_far_') and n.endswith('_fog')][0]
+    night = at(_ult_track(far, pano_node, 'CustomVector20'))[:, 3]
+    out['pano_glow'] = np.c_[np.repeat(night[:, None], 3, 1), np.ones(len(u))]
     day_tex = glob.glob('%s/normal/model/%s/far_*_day_low_col.nutexb' % (src, far_set))[0]
     a = nutexb.decode(nutexb.Nutexb(day_tex)).astype(np.float64)
     b = nutexb.decode(nutexb.Nutexb(day_tex.replace('_day_', '_night_'))).astype(np.float64)
@@ -1303,10 +1524,10 @@ def daynight_curves(src, form, far_set):
     base = ((1 - night)[:, None] + night[:, None] * k) * warm
     # and its haze (CustomVector19: colour, .w how much; reddish at sunset, near black late at
     # night) as a gain towards that colour over the texture's mean (PANO_MEAN)
-    haze = at(_ult_track(far, 'sfx_far_A_long', 'CustomVector19'))
+    haze = at(_ult_track(far, pano_node, 'CustomVector19'))
     w = haze[:, 3:4]
     out['pano'] = np.c_[base * (1 - w) + w * np.clip(haze[:, :3], 0, None) ** (1 / GAMMA) / PANO_MEAN, np.ones(len(u))]
-    fog = ratio('sfx_far_A_long_fog', far)
+    fog = ratio(fog_node, far)
     fog[:, 3] = np.clip(fog[:, :3].mean(1), 0, 1)       # the haze fades out with its colour
     out['fog'] = fog
     return out
@@ -1336,10 +1557,21 @@ def cycle_light(path, phases=LIGHT_PHASES):
 
 def sky_rig(src, form, tex):
     """the sun, the moon and the stars (far_common_set, each mesh on one bone) on a made skeleton,
-    turning as Ultimate's (sunmoon_rotateAxis, stars_RotateAxis) over CYCLE; additive (BF_FLAME)"""
+    turning as Ultimate's (sunmoon_rotateAxis, stars_RotateAxis) over CYCLE; the sun and the moon
+    alpha-blended (BF_GLOW), the stars added (BF_FLAME)"""
     d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
     setdir = '%s/model/far_common_set' % d
     parts = [p for p in load_parts(setdir) if p['label'] in RIG_LABELS]
+    moon = [p for p in parts if p['label'] == 'zz_moon']
+    if moon:                                # its half of the shared sun / moon texture: a paler glow
+        name = moon[0]['textures'][0]
+        img = tex.image(name).copy()
+        w = img.shape[1]
+        half = img[:, int(moon[0]['uv'][:, 0].min() * w):int(np.ceil(moon[0]['uv'][:, 0].max() * w))]
+        halo = half[..., 3] < 250
+        half[halo, :3] = MOON_GLOW
+        half[halo, 3] = np.clip(np.round(half[halo, 3] * MOON_GLOW_ALPHA), 0, 255)
+        tex.extra[name] = img
     names = sorted({p['bone'] for p in parts})
     motion = mob_motion(setdir, [('%s/motion/far_common_set/far_common_set_00.nuanmb' % d, list(range(CYCLE + 1)))],
                         CYCLE + 1, names)
@@ -1351,7 +1583,8 @@ def sky_rig(src, form, tex):
     for p in parts:
         for m in to_nud([p], tex, 'bg'):
             for poly in m.polygons:
-                poly.materials = [bf_material(BF_FLAME, poly.materials[0].textures[0]['hash'])]
+                poly.materials = [bf_material(BF_GLOW if p['label'] in GLOW_LABELS else BF_FLAME,
+                                              poly.materials[0].textures[0]['hash'])]
             m.bind, m.bone = 8, index[p['bone']]
             m.gain = RIG_LABELS[p['label']]
             meshes.append(m)
@@ -1397,19 +1630,24 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             plat = load_parts('%s/normal/model/platform_%s_set' % (src, biome))
         extra = []
         for e in EXTRA.get(biome, []):
-            extra += load_parts('%s/normal/model/%s' % (src, e))
+            if not (e.startswith('door_') and daynight and VILLAGERS.get(biome)):     # those: door_rig
+                extra += load_parts('%s/normal/model/%s' % (src, e))
         bparts = block_parts(src, blocks) if blocks else []
         if bparts:
             solid = solid_cells(ring + plat) | {(x, y, z) for _k, x, y, z, _f in blocks}
             bparts = [block_ao(p, solid) for p in bparts]
         near = ring + bparts + plat + extra
-        far, far_fog = far_parts('%s/normal/model/%s' % (src, FAR[biome]))
+        far_dir = '%s/normal/model/%s' % (src, FAR[biome])
+        far, far_fog = far_parts(far_dir)
         sky_src = '%s/normal/model/far_common_set' % src
     else:
         d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
         blocks = []
         near = load_parts('%s/battle/model/ring_endbattle_set' % src)
-        far, far_fog = far_parts('%s/battle/model/far_plains_set' % src)
+        if not daynight:                    # with it: door_rig
+            near += [p for e in door_sets(src, form, biome) for p in load_parts('%s/battle/model/%s' % (src, e))]
+        far_dir = '%s/battle/model/far_plains_set' % src
+        far, far_fog = far_parts(far_dir)
         sky_src = '%s/battle/model/far_common_set' % src
     sky = [p for p in load_parts(sky_src) if p['label'] in SKY_LABELS]
 
@@ -1430,11 +1668,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             if os.path.exists(path):
                 data = tiny_nut(path)
                 open(path, 'wb').write(data)
-    torch, torch_bones, torch_motion = [], [('torch_root', -1)], {}
+    torch, torch_bones, torch_motion, points = [], [('torch_root', -1)], {}, []
     if effect:
         row = BIOMES.index(biome) if form == 'melee' else TORCH_ROW_END
-        torch, torch_bones, torch_motion = torch_meshes(torch_points(src, labels, row), tex, effect,
-                                                        torches == 'animated')
+        points = torch_points(src, labels, row)
+        torch, torch_bones, torch_motion = torch_meshes(points, tex, effect, torches == 'animated')
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (FOG_SET, far_fog, 'bg', False), (SKY_SET, sky, 'bg', True)):
         meshes = to_nud(parts, tex, kind, is_sky, cutout=name == FAR_SET)
@@ -1443,6 +1681,14 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 'sun' if part['label'].startswith('zz_sun') else 'sky')
         if name == RING_SET and torches == 'still':
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
+        if name == RING_SET and curves and points:
+            meshes += torch_light(meshes, points)
+        if name == FAR_SET and curves:
+            for m in to_nud(pano_glow(far_dir, tex), tex, 'bg'):
+                for poly in m.polygons:
+                    poly.materials = [added(poly.materials[0])]
+                m.gain = 'pano_glow'
+                meshes.append(m)
         write_set('%s/%s' % (model_dir, name), meshes, tex, curves)
     for name, changes in ((FAR_SET, {'drawing_order': {'number': FAR_ORDER}}),
                           (FOG_SET, {'drawing_order': {'number': FOG_ORDER}, 'draw_range': {'number': '2'}})):
@@ -1466,6 +1712,14 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             tracks.update(torch_tracks(torch_bones, torch_motion, frames))
         if villagers:
             m, b, t = mob_rig(src, form, villagers, tex, frames, 'villager')
+            if daynight:
+                dm, db, dt = door_rig(src, form, door_sets(src, form, biome), villager_paths(villagers), tex, frames)
+                if points:                  # the torches' light on them too (user)
+                    dm += torch_light(dm, points)
+                for mesh in dm:
+                    mesh.bone += len(b) - 1
+                m, b = m + dm, b + db[1:]
+                t.update(dt)
             for mesh in m:                  # its bones come after the torches'
                 mesh.bone += len(bones) - 1
             meshes += m
@@ -1477,6 +1731,8 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         m, b, t = mob_rig(src, form, animals, tex, frames, 'animal')
         for name, (pos, rot, scl) in t.items():
             scl[ANIMAL_FRAMES + 1:frames - 1] = 0.0         # away for the night
+            if form != 'melee':
+                pos += END_ANIMAL_SHIFT
         write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, frames, tex, curves)
 
     light = out_dir + '/animation/light.bin'
@@ -1525,7 +1781,7 @@ def main():
                     help="animated (default; v12 test A2 in game), still (flames in the island's model) or off")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
     ap.add_argument('--daynight', default='on', choices=('on', 'off'), help="Ultimate's day / night cycle, or midday")
-    ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a2',
+    ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a3c',
                     help="a test: the curves on our unlit 0xA2001001 or on Battlefield's 0xA3C01081")
     ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
                     help="the two animals in the pen (Ultimate picks one of the three each time)")

@@ -542,6 +542,49 @@ for it rather than Battlefield's 7200).
   night. Size: 39.5 MB normal, 42.9 Omega (v13c 33.6).
 
 `build/minecraft_world_v14_tests.zip`: test A (curves on our unlit shader), B (on 0xA3C01081).
+User: A's island didn't darken (the fighters' light did), B worked: 0xA2001001 ignores
+NU_finalColorGain, so `--gain-shader a3c` is the default.
+
+## v15: doors, Omega's village, sun and moon, torch light
+
+From the user's v14 notes:
+- **Doors** ("they just walk through the door"): `door_rig`. Each house's door (door_*_set: one
+  bone; Ultimate's open / close motions swing it 90 degrees in 4 frames) on the villagers'
+  skeleton in TORCH_SET, open while a villager's Hip is within `DOOR_REACH` (8) of it, from
+  `DOOR_EARLY` (12) frames before to after, swinging over `DOOR_SWING` (4). Plains: the farmer
+  through the firmer door at ~4462 and ~8348, the butcher through his at ~4482 and ~8613 (checked
+  offline). The doors' texels: the block atlas's rows they use (`atlas_rows`, 352 KB instead of
+  a second 4 MB atlas in that folder).
+- **Omega** (a floating villager, no door on the middle house): battle/model's motions are the
+  normal form's, but ring_endbattle_set is narrower and has only the butcher's house. The farmer's
+  spot is a block above its ground and his house isn't there, so Omega has the butcher only
+  (`END_VILLAGERS`) and his door; the animals' pen walked off its edge, so they're moved by
+  `END_ANIMAL_SHIFT` (10, 0, 20): the least block shift that keeps every frame of all three
+  animals' paths on its ground (checked against its up-facing triangles).
+- **Sun at sunset** ("extremely bright ... the square sun appear round"): the sun was added
+  (BF_FLAME) over the bright sky, white past 1 and rounded by the game's bloom. Ultimate draws it
+  with one / one minus source alpha and colour x alpha in its shader, i.e. alpha blending. Smash
+  Forge's NudEnums: source 1 and 5 are both source alpha, so Battlefield's 5 / 1 is plain alpha
+  blending (and the smoke's 5 / 1 isn't premultiplied, as the code had said). The sun, its core and
+  the moon now use `BF_GLOW` (0xA3C01081, 5 / 1); its glow fades with its colour once set, its core
+  stays white (Ultimate's doesn't change) and fades with it (`sun_core`).
+- **Moon** ("seems to not glow at all"): Ultimate's halo is a dim grey-blue its bloom lifts;
+  Smash 4's doesn't reach it, so the moon's half of the texture gets a paler, stronger halo
+  (`MOON_GLOW`, `MOON_GLOW_ALPHA`).
+- **Torch light** ("the torches also don't light the surrounding area"): Ultimate's are point
+  lights; our island is unlit. `torch_light`: the island's faces within `TORCH_LIGHT_RANGE` (45)
+  of a torch drawn again, added (Battlefield's unbound 0xA3C01081 5 / 2), lifted 0.05 along their
+  normals, their texture times a warm light per corner (a quarter from everywhere, the rest by
+  how much the face looks at the torch, falling off with distance squared), faded in as the
+  island darkens (`torchlight`). The doors get it too, on their bones (user).
+- **Backdrop lights** (user: its torches and lava, weaker): Ultimate's night panorama has torch-lit
+  patches and lava our darkened day one lacks. `pano_glow`: the night texture's excess over the
+  darkened day one, at 1024 x 512, added over the panorama triangles it reaches, faded in by
+  Ultimate's own day / night blend (CustomVector20.w).
+- **Night floor**: `NIGHT_FLOOR` 0.5 (was 0.3; Ultimate's light ratio gave 0.39): the user's
+  comparison shows Ultimate's island much brighter at night (its ambient light stays).
+- **Other biomes**: `daynight_curves` read plains' panorama material node (sfx_far_A_long) on
+  every biome; now each far set's own (sfx_far_E_long, sfx_far_C, ...). All six build.
 
 ## Freeze (user) and tests
 
