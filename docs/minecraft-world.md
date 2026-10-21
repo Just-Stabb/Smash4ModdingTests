@@ -893,6 +893,52 @@ burning mobs not Minecraft's and not animating, nor the puff.
   named "firmer"): snowy tundra has no farmer's house (Ultimate's model has only the butcher's
   door), so its farmer is left out (as Omega's).
 
+## v18: breakable blocks (hazards)
+
+Ultimate's blocks (`pickel_world_breakable_NN.stdat`: 42-89 a biome, 16-42 of them on the
+fighting plane) each have a life (`block_info_table`: 2-30 by kind; `block_life_rate_table` ×1-1.5
+by the number of fighters, not used yet) that attacks take damage off; Ultimate's stage code
+builds their collision at run time (its lvd has only the island's).
+
+### Research (cross_f.rpx; the user found a mod spawning Luigi's Mansion's pillars)
+
+Stage parts that attacks damage are **gimmicks** (a wrapper owning a category-3 battle object with
+a gimmick module holding hurt shapes): Luigi's Mansion's pillars, Mario Maker's bricks, Wrecking
+Crew's parts.
+- `w = 0x03133A8C(0, kind 0, flags 2 (damage shapes), groups 1)`; `0x03133FF0(w, group, &shape,
+  0)` adds a shape (0x28 bytes: +0 x/y/z (the object is at the origin: world), +0xC a capsule's
+  vector / a box's size, +0x18 radius, +0x1C pointer, +0x20 kind 0 sphere / 1 box / 2 capsule /
+  3 a ground's, +0x24 tag); `0x03133E4C(w, 0)` activates it.
+- `f1 = 0x0313408C(w, group)`: the damage it took this frame (`0x0313AAE4` -> `0x0313C6F4` add
+  each hit's damage; `0x0313C35C` clears them each frame); `0x03134204(w)` the last attacker.
+- `0x03133DFC(w)` removes its battle object (no more hits), `0x03133DAC(w)` brings it back.
+- All are deleted with the stage (`0x03141020` -> `0x03134BCC`); 256 a battle.
+- LVD `damage_shapes` (section 12: type 2 sphere / 3 capsule, start, vector, radius; `lvd.py`
+  `DamageShape`) are filed in links by subname; `0x03142A48(stage, name)` (= the mod's
+  `search_damage_collision`) returns a link's shape list, which a gimmick takes with
+  `0x03134014(w, group, list)` (Luigi's Mansion's pillars, set up in `0x02D19788`, updated in
+  `0x02D17618`: HP -= damage; at 0 the model hidden, `0x03133DFC`).
+- A link's grounds on / off: `0x0315EDD8(0x03142954(stage, short name), 1 / 0)` (Luigi's
+  Mansion's collapsing floors).
+
+### Built
+
+- `tools/minecraft_world.py` (`BREAKABLE`, `--breakable on`): each block in a static folder of its
+  own (`stc_blkNN_set`: its cube, the block atlas's rows it uses, the ring's model.xmb); the
+  island's outline made without the blocks; each block on the plane (not the pass-through
+  ones) a rigged collision of the cell sides not against the island (`block_collisions`,
+  subname `bNN__blk__`: link `bNN`; no ledges); the table (cell, life, material, link) in the
+  events file (`blocks/<biome>`).
+- `tools/minecraft_sound.py`: Ultimate's block sounds (hit / broken a material: soil, wood,
+  stone, grass, snow, ice): 101 tones.
+- `tools/monster_roll_cave.py`: at a match's first update (kind 0x80, a hazards-on pick) a gimmick
+  for each of the biome's blocks (a sphere `BLOCK_RADIUS` 7 at its cell's centre), its life, its
+  model; every update each intact block's damage off its life (its material's hit sound); at 0
+  the gimmick removed, the break sound, its link's grounds off, its model hidden (every update
+  after). `monster_roll_test.py`: 35 checks.
+
+Not yet: the life rate by fighter count; Ultimate's break particles; whether blocks come back.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
