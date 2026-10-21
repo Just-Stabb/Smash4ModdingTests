@@ -229,7 +229,11 @@ def write(meshes):
     polys += b'\0' * (-len(polys) % 16)
     verts += b'\0' * (-len(verts) % 16)
     sph = _sphere(np.concatenate(all_pos))
-    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), 0, 0, pstart, len(polys), len(verts), 0, *sph))
+    # 0x0E: the highest bone index the meshes use (the game's fighters: bone count - 1; Battlefield's
+    # one-bone stage models 0). Left 0 with meshes on bones 1-15, the stage froze loading (user).
+    top_bone = max([m.bone for m in meshes] + [0])
+    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), 0, top_bone, pstart, len(polys), len(verts), 0,
+                                          *sph))
     out += mesh_entries + body + polys + verts + strs
     struct.pack_into('>I', out, 4, len(out))
     return bytes(out)

@@ -969,6 +969,8 @@ def write_torches(model_dir, anim_dir, meshes, bones, motion, tex, own_skeleton=
     bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
     write_set(folder, meshes, tex)
     open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
+    n = o.frames
+    omo.set_node(o, bones[0][2], [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)   # the root, still
     for name, _p, h in bones[1:]:
         c, sc, up = motion[name]
         sc = np.asarray(sc, dtype=np.float64)

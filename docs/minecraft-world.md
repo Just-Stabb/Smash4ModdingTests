@@ -438,6 +438,14 @@ materials don't take them).
 
 `build/minecraft_world_v12_tests.zip`.
 
+Results (user): A froze, B loaded: Battlefield's bone materials are fine, the made skeleton
+isn't. The cause found: NUD header 0x0E is the highest bone index the meshes use (Mario's body
+83 of 84 bones, the pump 16 of 17, Battlefield's one-bone stage models 0; all 59 of the game's
+files we have agree), and `nud.write` always wrote 0, so the game's bone data for the model was
+one bone long while the meshes used bones 1-15 (v9's torches too). `nud.write` now writes it;
+the torch animation also gets a still track for the root bone, as the game's files have one a
+bone. `build/minecraft_world_v12_testA2.zip`: test A with that.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
