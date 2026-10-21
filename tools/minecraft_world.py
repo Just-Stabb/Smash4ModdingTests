@@ -749,12 +749,15 @@ def cloud_motion(src, form, bone):
     return offs
 
 
-def write_clouds(model_dir, anim_dir, parts, tex, src, form):
+def write_clouds(model_dir, anim_dir, parts, tex, src, form, moving=True):
+    """moving=False: the layers unbound, where Ultimate's animation starts (the folder's bone and
+    animation as for moving ones, but no mesh follows them)"""
     for bone, folder in CLOUD_SETS.items():
         layer = [p for p in parts if p['bone'] == bone]
         meshes = to_nud(layer, tex, 'bg', True)
-        for m in meshes:
-            m.bind, m.bone = 8, 0
+        if moving:
+            for m in meshes:
+                m.bind, m.bone = 8, 0
         write_set('%s/%s' % (model_dir, folder), meshes, tex)
         h = omo.vbn_read('%s/%s/model.vbn' % (model_dir, folder))[0][2]
         path = '%s/%s/%s.omo' % (anim_dir, folder, folder)
@@ -771,8 +774,10 @@ def torch_points(src, labels, row):
     return [np.array([t['x%d' % i], t['y%d' % i], t['z%d' % i]]) for i in range(t['count'])]
 
 
-def write_torches(model_dir, anim_dir, points, tex, effect):
-    """the torches' flames and smoke (see TORCH_SET) into the folder: model, skeleton, animation"""
+def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
+    """the torches' flames and smoke (see TORCH_SET) into the folder: model, skeleton, animation.
+    animated=False: the flames only, still, on the folder's own bone (Battlefield's skeleton
+    kept, its animation made still)"""
     import zlib
     import bntx
     sprites = bntx.read_all(open(effect, 'rb').read())
@@ -800,6 +805,8 @@ def write_torches(model_dir, anim_dir, points, tex, effect):
         rng = np.random.default_rng(i)
         flame = c + np.array([0.0, FLAME_SIZE * 0.3, 0.5])
         quad(flame, FLAME_SIZE, 'torch_flame', [1, 1, 1, 1], UNLIT_CUTOUT, 'torch%d_flame' % i)
+        if not animated:
+            continue
         ph = rng.uniform(0, 2 * np.pi, 2)
         s = 1 + 0.08 * np.sin(2 * np.pi * frames / 20 + ph[0]) + 0.05 * np.sin(2 * np.pi * frames / 12 + ph[1])
         pos[bones[-1][0]] = (flame, s, np.zeros((len(frames), 3)))
@@ -811,13 +818,23 @@ def write_torches(model_dir, anim_dir, points, tex, effect):
             rise = np.zeros((len(frames), 3))
             rise[:, 1] = SMOKE_RISE * u
             pos[bones[-1][0]] = (base, 1 - SMOKE_SHRINK * u, rise)
-    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
     folder = '%s/%s' % (model_dir, TORCH_SET)
-    write_set(folder, meshes, tex)
-    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
     path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
     o = omo.Omo(open(path, 'rb').read())
     o.frames = len(frames)
+    if not animated:
+        for m in meshes:
+            m.bone = 0
+        write_set(folder, meshes, tex)
+        h = omo.vbn_read(folder + '/model.vbn')[0][2]
+        o.nodes = []
+        n = len(frames)
+        omo.set_node(o, h, [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)
+        open(path, 'wb').write(o.encode())
+        return
+    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
+    write_set(folder, meshes, tex)
+    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
     o.nodes = []
     for name, _p, h in bones[1:]:
         c, sc, up = pos[name]
@@ -829,8 +846,26 @@ def write_torches(model_dir, anim_dir, points, tex, effect):
 
 
 # ---------------------------------------------------------------- stage
-def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None):
-    """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form)"""
+def tiny_nut(path):
+    """a hidden folder's textures at 64x64, same IDs (its materials and material animations still
+    find them; the model is never drawn): Battlefield's full-size ones were 14.5 MB of the stage's
+    memory. Files that aren't single-mip-able 2D NTWU (Omega's NTP3, a cube map) stay as they are."""
+    try:
+        d, ts = nut.load(path)
+    except AssertionError:
+        return open(path, 'rb').read()
+    if any(t.dim != 1 or t.depth != 1 or t.tex_id is None for t in ts):
+        return d
+    blank = np.zeros((64, 64, 4), np.uint8)
+    return nut.write_ntwu([(t.tex_id, t.fmt if t.fmt in nut.NTWU_CODE else 0x33, blank) for t in ts])
+
+
+def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
+               clouds='moving'):
+    """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches: 'animated',
+    'still' or 'off' (needs effect); clouds: 'moving' or 'still'"""
+    if torches == 'off':
+        effect = None
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
     shutil.copytree(base_dir, out_dir)
@@ -858,7 +893,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         sky_src = '%s/battle/model/far_common_set' % src
     sky = [p for p in load_parts(sky_src) if p['label'] in SKY_LABELS]
 
-    clouds = [p for p in sky if p['bone'] in CLOUD_SETS]
+    cloud_parts = [p for p in sky if p['bone'] in CLOUD_SETS]
     sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
     for name in sorted(os.listdir(model_dir)):
         if name in (RING_SET, FAR_SET, SKY_SET) or name in CLOUD_SETS.values() or effect and name == TORCH_SET:
@@ -867,13 +902,18 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             path = '%s/%s/model.nud' % (model_dir, name)
             data = nud.hidden(path)
             open(path, 'wb').write(data)
+            path = '%s/%s/model.nut' % (model_dir, name)
+            if os.path.exists(path):
+                data = tiny_nut(path)
+                open(path, 'wb').write(data)
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (SKY_SET, sky, 'bg', True)):
         write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
-    write_clouds(model_dir, out_dir + '/animation', clouds, tex, src, form)
+    write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
     if effect:
         row = BIOMES.index(biome) if form == 'melee' else TORCH_ROW_END
-        write_torches(model_dir, out_dir + '/animation', torch_points(src, labels, row), tex, effect)
+        write_torches(model_dir, out_dir + '/animation', torch_points(src, labels, row), tex, effect,
+                      torches == 'animated')
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)
@@ -917,10 +957,12 @@ def main():
     ap.add_argument('--yamlvd', default='yamlvd', help="lvd-rs' yamlvd (reads Ultimate's .lvd)")
     ap.add_argument('--labels', default='ParamLabels.csv', help="ultimate-research/param-labels' ParamLabels.csv")
     ap.add_argument('--effect', help="Ultimate's effect/stage/pickel_world/ef_pickel_world.eff (torch flames / smoke)")
+    ap.add_argument('--torches', default='animated', choices=('animated', 'still', 'off'))
+    ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
     a = ap.parse_args()
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
-                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect)
+                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds)
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 

@@ -337,11 +337,36 @@ Smash 4 the way Sm4shMusic adds songs (nothing replaced; `build/minecraft_music.
   a 95th, `NewStage01`, with Ultimate's odds: incidence 10000 / 5000 / 2500 -> rarity 100
   (Halland / Dalarna) / 50 (Earth) / 25. Sm4shMusic re-saving the file would blank the names again.
 
-To check in game: the songs in the Sound Test; NewStage01 playing them (and Omega); My Music's
+In game (user): the Sound Test and the stage's music work, other stages keep theirs. The My
+Music chances for NewStage01 showed 0: the menu shows the save's values, not the file's. The
+save keeps them as bytes, 99 rows of 20 (0x7BC; writer `0x2A4ECA4`: row x 0x14 + song), each
+stage's rows in `ui_stage_db.bin` (value 20: songs 1-20, value 21: 21-40, -1 none; read by
+`0x030A93EC`). The game uses rows 0-55 and 98; `add_stage.py` gives a new stage the next free one
+(NewStage01: 56), which a save made before it has at 0. The menu's Reset (`reset_sound_rate`,
+`0x0223F33C`) sets the stage's songs to their `bgm_mymusic.mmb` rarity, finding the group from
+the cosmetic id -> kind -> name, so it gives 100 / 50 / 25 here.
+
+Still to check: My Music's other effects; NewStage01 playing them (and Omega); My Music's
 NewStage01 page if there is one; nothing else losing its music; save data with a 95th group.
 
     python3 -I tools/minecraft_music.py AUDIO sound/bgm/snd_bgm_CRS02_Senjyou.nus3bank \
       sound/config param "ui/message/sound.msbt" OUT
+
+## v10: v9 froze (user)
+
+v9 (and v8, never tested) froze loading; v7 loaded. Compared with v7 and with Battlefield:
+- **Memory**: v9's models are 35.9 MB, Battlefield's 26.3 (v8's two 2048x2048 panorama halves,
+  +6.7 MB). Every hidden Battlefield folder still carried its full textures (14.5 MB, e.g. the sky
+  dome's 6 MB). v10 cuts them to 64x64 with the same IDs (`tiny_nut`; not the cube map file or
+  Omega's NTP3 ones): 24.0 MB (normal), 27.1 (Omega).
+- **Torches** (v9): the only folder with a skeleton of its own (16 / 22 bones instead of
+  Battlefield's 1) and a scale animation. `--torches still` keeps Battlefield's skeleton (the
+  flames on its bone, its animation made still); `--torches off` leaves the folder hidden.
+- **Unlit on a bone** (v8 clouds, v9 torches): `0xA2001001` on a bone-bound mesh, the one flag /
+  layout / binding combination Battlefield doesn't have. `--clouds still` leaves them unbound.
+
+`build/minecraft_world_v10_tests.zip`: test 1 animated torches, 2 still torches, 3 no torches,
+4 no torches and still clouds (no combination outside Battlefield's); all with the small textures.
 
 ## Freeze (user) and tests
 
