@@ -1,53 +1,79 @@
 # Minecraft World (Smash Ultimate) on NewStage01
 
-Status: **built, not tested in game yet.** The whole normal-play stage (not the Battlefield form)
-is converted from Ultimate's files (`stage/pickel_world`, from the user's Drive) into the
-`NewStage01` slot (`docs/stage-expansion.md`), with collision made from the models, for both
-normal play and Omega.
+Status: **built, not tested in game yet** (the first in-game try, the moving-platform test, froze
+while loading; see "Freeze"). The whole normal-play stage (not the Battlefield form) converted
+from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
+`NewStage01` slot (`docs/stage-expansion.md`), normal play and Omega, with Ultimate's own collision,
+spawns, camera, blast zones, item areas and breakable-block layouts.
 
-Build: `python3 tools/minecraft_world.py SRC BASE OUT [--biome plains]`. SRC is the extracted
-`stage/pickel_world` folder, BASE holds the slot's current `melee/NewStage01` and `end/NewStage01`
-(the Battlefield copy), and OUT gets `stage/melee/NewStage01` and `stage/end/NewStage01`.
+Build:
+
+    python3 tools/minecraft_world.py SRC BASE OUT [--biome plains] [--hazards on|off] \
+        --yamlvd PATH/yamlvd --labels PATH/ParamLabels.csv
+
+SRC is the dumped `stage/pickel_world` folder (`normal/` and `battle/`, each with `model/`,
+`param/`, ...), BASE holds the slot's current `melee/NewStage01` and `end/NewStage01` (the Battlefield
+copy), OUT gets `stage/melee/NewStage01` and `stage/end/NewStage01`. Ultimate's `.lvd` is read with
+lvd-rs' `yamlvd` (github.com/ultimate-research/lvd-rs, `cargo build --release`), its `.stdat`
+params with pyprc (`pip install pyprc`) and ultimate-research/param-labels' `ParamLabels.csv`.
+
 Deliverables (git-ignored `build/`):
-- `minecraft_world.zip`: both stage folders, built with the Plains biome, plus the stage-select
-  pictures (`ui/...`: a preview rendered from the port, the page-2 tile and a "Minecraft World"
-  name banner; same files, texture IDs and formats as `new_stage_pictures.zip`, which this replaces).
-- `minecraft_world_biomes.zip`: the other five biomes (Birch Forest, Savanna, Taiga, Snowy Tundra,
-  Stone Shore). Each is the three model folders plus `NewStage0100.lvd` that differ from Plains;
-  copy one over `stage/melee/NewStage01` to switch biomes.
+- `minecraft_world.zip`: both stage folders (Plains, hazards on) and the stage-select pictures
+  (`ui/...`, same files / texture IDs / formats as `new_stage_pictures.zip`): Ultimate's own preview
+  (`stage_2_pickel_world`) in the preview, tiles and icons, the "MINECRAFT" logo in the series logo
+  (`stagel_10`: red = the logo's fill, green = its silhouette, as the Smash Bros. logo there) and a
+  "Minecraft World" name banner.
+- `minecraft_world_biomes.zip`: every other biome / hazards combination (`<biome>_hazards_on|off`):
+  the three model folders and `NewStage0100.lvd` that differ; copy one over `stage/melee/NewStage01`.
 
-## What Ultimate's files have (and don't)
+## Ultimate's files
 
-- `normal/model`: per biome a `ring_<biome>_set` (the island: terrain, village, trees, under-side,
-  10-unit Minecraft blocks), `far_<biome>_set` (the panorama: a 3200x1600 texture on a ~8800-unit
-  bowl), `platform_<biome>_set` (the orange-trimmed pass-through plates; Plains and Taiga have
-  none), doors, Plains' farm, mobs (rigged and animated; not ported), `ink_*` (Splatoon-ink
-  decals), `lightboard_*` (a lighting duplicate of the ring), and one model per block kind
-  (`bg_b_<kind>_01_set`: a 10-unit cube). `far_common_set`: sky dome, clouds, sun, moon and stars.
-- `battle/model`: the Battlefield form (`ring_endbattle_set`, `floating_plate_set`) and the flat
-  form `ring_end_l_set`, used here for Omega.
-- No `param` folder, so no collision (`.lvd`) and no stage parameters, and no stage code. Which
-  breakable blocks a biome has, where they are, the biome rotation, day / night and the mobs are
-  all run by Ultimate's stage code.
+- `normal/model`: per biome a `ring_<biome>_set` (the island: terrain, village, trees, under-side),
+  `far_<biome>_set` (the panorama: a 3200x1600 texture on a ~8800-unit bowl), `platform_<biome>_set`
+  (the pass-through plates), doors, Plains' farm, mobs (rigged and animated; not ported), `ink_*`
+  (Splatoon-ink decals), `lightboard_*` (a lighting duplicate of the ring), and a model per block
+  kind (`bg_b_<model>_set`, a 10-unit cube). `far_common_set`: sky dome, clouds, sun, moon, stars.
+  `pickel_world_visual.stdat` lists each biome's models (biome order: 0 Plains, 1 Birch Forest,
+  2 Savanna, 3 Taiga, 4 Snowy Tundra, 5 Stone Shore).
+- `normal/param`: `pickel_world_NN.lvd` (biome NN) and `pickel_world_NN_gimmick_off.lvd` (hazards off:
+  no breakable blocks, spawns on the ground); `pickel_world_breakable_NN.stdat` (the biome's blocks:
+  kind, x, y, z in 10-unit cells, flags); `pickel_world.stdat` (biome odds / limit, day / night /
+  monster frames, mob odds, the block table: life and material a kind).
+- `battle/`: the Battlefield form (`ring_endbattle_set` + `floating_plate_set`, `pickel_world_battle_00
+  .lvd`) and Omega (`ring_endbattle_set`, `pickel_world_end_00.lvd`: +-80, Battlefield-Omega-like;
+  `end_l` is a larger +-120 variant, not used).
+- No stage code: the biome rotation, breaking / placing blocks, day / night and the mobs are
+  Ultimate's executable's.
 
-The blocks' places come from `ink_<biome>block_set`: one ink-able top face per breakable block
-(named by column / row, 10-unit cells, with its depth). The kind of block isn't in the files, so
-it's grass-type on top and dirt under (Stone Shore: stone; Snowy Tundra: the snowy grass block).
+Ultimate's collision: the ground is one open line (x +-100, top y 0, down to -160) with a material a
+10-unit segment and ledges at (+-100, 0); the pass-through floors are separate 10-unit pieces. All
+are "dynamic" (`basic_floor_<biome>`, `hidden_floor_*`: moved by the stage code); the port makes
+them static. Blast zones +-260 / 180 / -120, camera +-190 / 130 / -60 in every biome.
 
-Scale is 1:1. Ultimate's Battlefield form sits where Smash 4's Battlefield does (plates at
-x ±59, top 47 against Battlefield's 59 / 47.3; ledges ±78 in both), so no rescaling.
+Breakable blocks: on the fighting plane (z 0) they're solid (the spawns stand on them: Plains on the
+hay pile and the house, Birch Forest / Taiga on the leaves), except those with flag 1 (the branch
+logs under each pass-through floor). Kinds -> models (`KIND_MODEL`; the files don't name them):
+worked out from where each kind sits (trunks / branches / leaves, the Plains house, the Stone Shore
+ores, the Snowy Tundra igloo), the block table's materials and lives, and the models: 0 dirt, 1 oak
+log (`wood_01`), 2 stone, 3 iron ore, 5 grass block, 9 hay bale, 10 snow (the igloo), 11 cobblestone,
+12 mossy cobblestone, 18 oak planks, 21-23 birch log / branch / leaves, 24-26 acacia, 27-29 pine,
+35 furnace; 7 (six "soil" blocks in Taiga: dirt) and 33 (two "snow" blocks at the igloo's ends:
+blue ice) are guesses. Ultimate's own preview of Plains shows the same hay pile and house.
+
+Scale is 1:1 (Ultimate's Battlefield form sits where Smash 4's Battlefield does: plates x +-59,
+top 47 against 59 / 47.3; ledges +-78 / +-80).
 
 ## Formats (new tools)
 
 - `tools/nutexb.py`: Ultimate textures. Tegra X1 block-linear deswizzle (64-byte x 8-row GOBs, block
   height from the image height) and RGBA8 / BC1-BC5 decode (reusing `nut.py`'s BC decoders).
-- `tools/nut.py ntp3`: new NTP3 textures (untiled, so any size; the game's own Battlefield has
-  NTP3 `model.nut`s, and the header matches them). Formats 0 DXT1, 2 DXT5, 14 RGBA8 (stored
-  A, R, G, B), full mip chains.
+- `tools/bntx.py`: Ultimate UI textures (BNTX: BRTI format / size / block height; BC1-BC5, BC7
+  through Pillow's DDS reader, RGBA8).
+- `tools/nut.py ntp3`: new NTP3 textures (untiled; the game's own Battlefield has NTP3
+  `model.nut`s, and the header matches them).
 - `tools/nud.py`: NUD read / write. Checked by rewriting every static Battlefield model with it:
   byte-identical except the bounding spheres it recomputes (and one unused vertex field).
-- `tools/lvd.py`: LVD read / write (collisions with ledges and surface kinds, spawns, respawns,
-  camera, blast zones, item areas, general points; Battlefield's melee and Omega files round-trip
+- `tools/lvd.py`: Smash 4 LVD read / write (Battlefield's melee and Omega files round-trip
   byte-identical).
 
 ## The conversion
@@ -56,7 +82,8 @@ x ±59, top 47 against Battlefield's 59 / 47.3; ledges ±78 in both), so no resc
   colors from `colorSet1` (Ultimate 0.5 = 1.0 maps to Battlefield's 127 = 1.0; the other color
   sets are shader inputs, e.g. the backdrops' `colorSet5` is a constant 0.33), the first UV set
   (same orientation in both games, checked by rendering Battlefield's own models), triangle lists.
-  Meshes under a bone (doors) are moved by the skeleton. Each block kind is merged into one mesh.
+  Meshes under a bone (doors) are moved by the skeleton. The blocks are placed from the breakable
+  file (every block, every depth) and merged into one mesh a material.
 - **Materials** are Battlefield's: `0xA4001041` (its ground: lit, vertex colors, shadows) for the
   island, blocks, plates, doors and farm, with an alpha test (`>= 128`) for the block atlas'
   cut-outs (leaves, grass, flowers) and nearest filtering (pixel art). `0xA2000001` (its background
@@ -76,44 +103,37 @@ x ±59, top 47 against Battlefield's 59 / 47.3; ledges ±78 in both), so no resc
   a transparent 4x4 texture). Melee's `stc_a_surinuke_set` isn't empty in Battlefield (it holds
   Battlefield's pass-through platforms), so it's emptied too. The replaced folders' `model.mta`
   (material animations) are removed.
-- Melee folder: 13 MB (Battlefield's: 32 MB).
+- **Omega**: `battle/model/ring_endbattle_set` (the ring the Battlefield form and Omega share) with
+  `pickel_world_end_00.lvd`, Plains' panorama and the sky.
 
 ## Collision
 
-The fighting plane is z = 0 (the block grid is centered on it). Solid cells (10x10) there come
-from the ring's block meshes (parity of the x-facing faces each row crosses) plus the block
-cells; their outlines (clockwise, holes dropped, collinear points merged) become the collisions,
-normals pointing out as in Battlefield. Ledges at the main outline's outer top corners, on 5-unit
-floor lines (`0x40` left / `0x80` right, as Battlefield). Platforms: the up-facing faces of the
-platform set crossing z = 0, as drop-through lines. Surface sounds: soil (snow on Snowy Tundra,
-rock on Stone Shore, wood on platforms).
+- Hazards off, and Omega: Ultimate's lines one for one (vertices, normals, a surface kind a line
+  from its material name, ledge flags `0x40` / `0x80` from `hang_l` / `hang_r`, the cliffs).
+- Hazards on (normal play): the ground's cells (inside its line, closed along its ends) and the
+  solid blocks' cells on the plane become one outline per solid region (clockwise, holes dropped,
+  a line where the direction or the material changes: the ground's from its own lines, a block's
+  from the block table), ledges at the island's outer top corners on 5-unit floor lines as
+  Battlefield's. Pass-through floors: Ultimate's pieces joined into lines, left to right.
+- Spawns, respawns, camera, blast zones, item areas (every path) and Kirby's points: Ultimate's,
+  into Battlefield's entries.
 
-| | island | ledges | blocks |
-|---|---|---|---|
-| Plains | x ±100, top y 0 | ±100 | mound x -70..-40 (to y 20), arch x 20..60 (to y 30) |
-| Omega (end_l) | x ±120 | ±120 | none |
-
-Spawns: players 1 / 2 a mirrored pair on the ground nearest 35% of the half-width (Plains ±80),
-the rest spread over flat floor. Respawns 50 / 78 above the highest floor. Camera: island ±90,
-top 130 or more. Blast zones: island ±165 (Plains ±265, Omega ±285), top 192 or more, bottom -140.
-Item drops along a line 60 above the highest floor. These numbers are this port's (Ultimate's
-lvd isn't in the files).
-
-`tools/minecraft_world.py` was checked by rendering every biome's built NUDs from the front with
-the collision drawn on top (it follows the blocks in all six biomes and the Omega form).
+`tools/minecraft_world.py`'s output was checked by rendering every biome from the front with the
+collision and spawns drawn on top (all spawns on a floor, blocks and outlines matching), and the
+lvds for zero-length lines, unit normals and ledges on their lines.
 
 ## Not ported (no stage code to drive it)
 
-Biome rotation (one biome per build; `minecraft_world_biomes.zip` has the others), breakable /
-placeable blocks (they're solid scenery), mobs, day / night (the sky is day; the lighting is still
-Battlefield's, which may darken over the match), the ink decals, Ultimate's particle effects
-(Battlefield's effect files are still in the folder). The `melee.msbt` texts for the slot still
-say whatever `add_stage.py` wrote; the stage select shows the name picture.
+Biome rotation (one biome a build; `minecraft_world_biomes.zip` has the others), breaking / placing
+blocks (solid scenery), mobs, day / night (the sky is day; the lighting is still Battlefield's, which
+may darken over the match), the ink decals, Ultimate's particle effects (Battlefield's effect files
+are still in the folder). The `melee.msbt` texts for the slot still say whatever `add_stage.py`
+wrote; the stage select shows the name picture.
 
 ## To check in game
 
 1. The stage loads and looks like the preview (models, textures, sky; no Battlefield pieces).
-2. Standing on the ground, the blocks, the ledges at ±100, the Plains arch and mound.
+2. Standing on the ground and the blocks, the ledges at +-100, the pass-through floors.
 3. Omega.
 4. Lighting / day-night: if it turns dark or odd, `animation/light.bin` / `render/` are still
    Battlefield's.
@@ -191,6 +211,8 @@ Battlefield copy.
 
 ## Ultimate files (user)
 
-`param-SSBU.zip` is Ultimate's top-level `param/` (game, spirits, sound settings), not the stage's
-own `stage/pickel_world/*/param` (the lvd collision and stage params). `ui-SSBU.zip` has Minecraft
-World's stage pictures: `ui/replace_patch/stage/stage_0`-`stage_4/stage_N_pickel_world.bntx`.
+`param-SSBU.zip` is Ultimate's top-level `param/` (game, spirits, sound settings). `pickel_world.zip`
+is the stage's dump with its `param` folders (used above). `ui-SSBU.zip` has the stage pictures
+(`ui/replace_patch/stage/stage_0`-`stage_4/stage_N_pickel_world.bntx`: the "MINECRAFT" logo, a small
+icon, the normal / Omega / Battlefield-form previews) and the series symbol
+(`ui/replace_patch/series/series_0|1/series_N_minecraft.bntx`, a cube).

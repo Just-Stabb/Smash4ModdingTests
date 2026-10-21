@@ -44,16 +44,9 @@ import nutexb  # noqa: E402
 BIOMES = ['plains', 'birchforest', 'savanna', 'taiga', 'snowytundra', 'stoneshore']
 FAR = {'plains': 'far_plains_set', 'birchforest': 'far_birchforest_set', 'savanna': 'far_savanna_set',
        'taiga': 'far_taiga_set', 'snowytundra': 'far_snowytundra_set', 'stoneshore': 'far_stoneshore_set'}
-# blocks: (top block, block under another); bg_b_<kind>_01_set
-BLOCKS = {'plains': ('grass_block', 'dirt'), 'birchforest': ('grass_block', 'dirt'),
-          'savanna': ('grass_block_savanna', 'dirt'), 'taiga': ('grass_block', 'dirt'),
-          'snowytundra': ('grass_block_tundra', 'dirt'), 'stoneshore': ('stone', 'stone')}
 EXTRA = {'plains': ['door_plains_butcher_set', 'door_plains_firmer_set', 'vegetables_set'],
          'snowytundra': ['door_snowytundra_butcher_set'],
          'stoneshore': ['ring_stoneshore_water_set']}
-# surface kind of the collision (lvd material byte 3): soil, rock
-SURFACE = {'plains': 3, 'birchforest': 3, 'savanna': 3, 'taiga': 3, 'snowytundra': 0x0D, 'stoneshore': 1}
-
 ATLAS = 'all_blocks-rgba_c2_add'
 TEX_BASE = 0x2000F000               # texture IDs of the port: 0x2000F001... (Battlefield's: 0x2000xxxx below 0x2000F000)
 LIT, BG = 0xA4001041, 0xA2000001
@@ -135,64 +128,190 @@ def merged(parts, name):
     return list(out.values())
 
 
-# ---------------------------------------------------------------- layout
-def block_cells(src, biome):
-    """{(column, row): (z_min, z_max)} of the biome's blocks, from ink_<biome>block_set"""
-    import ssbh_data_py as s
-    path = '%s/normal/model/ink_%sblock_set/model.numshb' % (src, biome)
-    cells = {}
-    for o in s.mesh_data.read_mesh(path).objects:
-        p = np.array(o.positions[0].data)[:, :3]
-        lo, hi = p.min(0), p.max(0)
-        col, row = int(round(lo[0] / 10)), int(round(hi[1] / 10)) - 1
-        cells[(col, row)] = (int(round(lo[2] / 10)) * 10, int(round(hi[2] / 10)) * 10)
-    return cells
+# ---------------------------------------------------------------- Ultimate stage data
+# Breakable block kinds (pickel_world_breakable_NN.stdat "kind", index into pickel_world.stdat's
+# block_info_table) -> bg_b_<model>_set. The files don't name them: worked out from where each kind
+# sits in the six biomes (trunks / branches / leaves, the Plains house, the Stone Shore ores), the
+# block table's materials and lives, and the models (tools: the block sheet in
+# docs/minecraft-world.md). 7 (six "soil" blocks in Taiga) and 33 (two "snow" blocks at the Snowy
+# Tundra igloo's ends) are guesses; 10 is the igloo (its 7 x 4 x 7 dome), the white snow block.
+KIND_MODEL = {0: 'dirt_01', 1: 'wood_01', 2: 'stone_01', 3: 'iron_ore_01', 4: 'oakleaves_01',
+              5: 'grass_block_01', 6: 'grass_block_savanna_01', 7: 'dirt_01', 9: 'hay_bale_01',
+              10: 'snow_01', 11: 'cobblestone_01', 12: 'mossy_cobblestone_01',
+              13: 'andesite_01', 14: 'diorite_01', 15: 'granite_01', 18: 'oak_pkanks_01',
+              21: 'birch_log_01', 22: 'birch_log_02', 23: 'birchleaves_01', 24: 'acacia_log_01',
+              25: 'acacia_log_02', 26: 'acacialeaves_01', 27: 'pine_log_01', 28: 'pine_log_02',
+              29: 'pineleaves_01', 33: 'blue_ice_01', 35: 'furnace_01'}
+# Smash 4 lvd surface kinds (material byte 3; Smash Forge's CollisionMatType) by Ultimate's names
+MATERIAL = {'basic': 0, 'rock': 1, 'grass': 2, 'soil': 3, 'wood': 4, 'iron': 5, 'nibuiron': 6,
+            'carpet': 7, 'numenume': 8, 'creature': 9, 'asase': 10, 'soft': 11, 'turuturu': 12,
+            'snow': 13, 'ice': 14, 'gamewatch': 15, 'oil': 16, 'danbouru': 17, 'cloud': 22, 'brick': 24,
+            'sand': 28}
 
 
-def block_parts(src, biome, cells):
-    top_kind, fill_kind = BLOCKS[biome]
+def yaml_loader():
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+
+    def any_tag(loader, _suffix, node):
+        if isinstance(node, yaml.MappingNode):
+            return loader.construct_mapping(node, deep=True)
+        if isinstance(node, yaml.SequenceNode):
+            return loader.construct_sequence(node, deep=True)
+        return loader.construct_scalar(node)
+    Loader.add_multi_constructor('!', any_tag)
+    return Loader
+
+
+def ult_lvd(path, yamlvd):
+    """an Ultimate .lvd as a dict, through lvd-rs' yamlvd (github.com/ultimate-research/lvd-rs)"""
+    import subprocess
+    import tempfile
+    import yaml
+    with tempfile.TemporaryDirectory() as t:
+        subprocess.run([yamlvd, path, t + '/x.yml'], check=True, capture_output=True)
+        return yaml.load(open(t + '/x.yml'), Loader=yaml_loader())
+
+
+def els(x):
+    return x['elements'] if isinstance(x, dict) and 'elements' in x else x
+
+
+def ult_prc(path, labels):
+    """an Ultimate param file (.stdat / .prc) as plain dicts / lists, through pyprc"""
+    import pyprc
+    pyprc.hash.load_labels(labels)
+
+    def conv(p):
+        if p.type == pyprc.PARAM_TYPE_STRUCT:
+            return {str(k): conv(v) for k, v in list(p)}
+        if p.type == pyprc.PARAM_TYPE_LIST:
+            return [conv(v) for v in list(p)]
+        return str(p.value) if p.type == pyprc.PARAM_TYPE_HASH else p.value
+    return conv(pyprc.param(path))
+
+
+def material_code(name):
+    return MATERIAL.get(str(name).lower(), 0)
+
+
+# ---------------------------------------------------------------- blocks
+def breakable_blocks(src, index, labels):
+    """the biome's breakable blocks: [(kind, x, y, z, flags)] (10-unit cells: x [10x, 10x + 10],
+    y [10y, 10y + 10], z [10z - 5, 10z + 5]; flags 1: throughable, under a pass-through floor)"""
+    d = ult_prc('%s/normal/param/pickel_world_breakable_%02d.stdat' % (src, index), labels)
+    return [(b['kind'], b['x'], b['y'], b['z'], b['flags']) for b in d['blocks']]
+
+
+def block_parts(src, blocks):
     cube = {}
     out = []
-    for (c, r), (z0, z1) in sorted(cells.items()):
-        kind = fill_kind if (c, r + 1) in cells else top_kind
-        if kind not in cube:
-            cube[kind] = load_parts('%s/normal/model/bg_b_%s_01_set' % (src, kind))
-        for z in range(z0, z1, 10):
-            out += translated(cube[kind], np.array([c * 10 + 5, r * 10 + 5, z + 5.0]))
-    return merged(out, 'blocks_%s' % biome)
+    for kind, x, y, z, _f in blocks:
+        model = KIND_MODEL[kind]
+        if model not in cube:
+            cube[model] = load_parts('%s/normal/model/bg_b_%s_set' % (src, model))
+        out += translated(cube[model], np.array([x * 10 + 5.0, y * 10 + 5.0, z * 10.0]))
+    return merged(out, 'blocks')
 
 
-def solid_grid(tris_list, cells, x0=-140, x1=140, y0=-200, y1=120):
-    """occupancy of 10-unit cells in the plane z = 0 ([row][column], row 0 at y0): parity of the
-    faces facing +-x the cell-center rows cross, plus the block cells"""
+# ---------------------------------------------------------------- collision
+def mat_bytes(surface, flags=0):
+    m = bytearray(12)
+    m[3] = surface
+    m[10] = flags
+    return m
+
+
+def ult_collisions(d):
+    """[dict(name, through, verts, normals, mats, hang_l/hang_r line sets, cliffs)]"""
+    out = []
+    for c in els(d['collisions']):
+        attrs = els(c['attributes'])
+        out.append(dict(
+            name=c['base']['meta_info']['name'], through=bool(c['flags']['throughable']),
+            verts=[(float(p['x']), float(p['y'])) for p in els(c['vertices'])],
+            normals=[(float(p['x']), float(p['y'])) for p in els(c['normals'])],
+            mats=[material_code(a['material']) for a in attrs],
+            hang_l={i for i, a in enumerate(attrs) if a['flags']['hang_l']},
+            hang_r={i for i, a in enumerate(attrs) if a['flags']['hang_r']},
+            cliffs=[(float(x['pos']['x']), float(x['pos']['y']), float(x['lr']), int(x['line_index']))
+                    for x in els(c.get('cliffs') or [])]))
+    return out
+
+
+def direct_collision(c, k):
+    """an Ultimate collision as a Smash 4 one, line for line"""
+    mats = [mat_bytes(m, (0x40 if i in c['hang_l'] else 0) | (0x80 if i in c['hang_r'] else 0))
+            for i, m in enumerate(c['mats'])]
+    name = 'COL_00_Platform%02d_through' % k if c['through'] else 'COL_00_Floor%02d' % k
+    col = lvd.collision(name, c['verts'], c['normals'], mats, c['cliffs'], drop_through=c['through'])
+    col.subname = name[4:]
+    for cl in col.cliffs:
+        cl.name = 'CLIFF_%s%s' % (name[4:], 'L' if cl.angle < 0 else 'R')
+        cl.subname, cl.start = cl.name[6:], [cl.x, cl.y, 0.0]
+    return col
+
+
+def merged_floors(cols):
+    """the pass-through collisions joined where they continue each other (Ultimate cuts them
+    into 10-unit pieces, one a block, some drawn right to left): [(verts left to right, material)]"""
+    segs = sorted((tuple(sorted((c['verts'][0], c['verts'][-1]))) + (c['mats'][0],) for c in cols),
+                  key=lambda s: (s[0][1], s[0][0]))       # left to right, as Battlefield's platforms
+    out = []
+    for a, b, m in segs:
+        if out and out[-1][0][-1] == a and a[1] == b[1] == out[-1][0][0][1] and out[-1][1] == m:
+            out[-1][0].append(b)
+        else:
+            out.append(([a, b], m))
+    return out
+
+
+def inside(poly, x, y):
+    n, c = len(poly), False
+    for i in range(n):
+        (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+            c = not c
+    return c
+
+
+def solid_grid(ground, blocks, block_mats, x0=-140, x1=140, y0=-200, y1=120):
+    """10-unit cells in the fighting plane: [row][column] material code + 1 (0 = empty), row 0 at
+    y0. The ground's cells are inside its outline (Ultimate's ground line closed along its ends);
+    the blocks' cells are those on the plane (z 0), not throughable."""
     nx, ny = (x1 - x0) // 10, (y1 - y0) // 10
-    occ = np.zeros((ny, nx), bool)
-    T = np.concatenate(tris_list)
-    xs = T[:, :, 0]
-    F = T[(np.ptp(xs, 1) < 1e-3) & (T[:, :, 2].min(1) < 0) & (T[:, :, 2].max(1) > 0)]
-    a, b, c = F[:, 0, 1:], F[:, 1, 1:], F[:, 2, 1:]
-    v0, v1 = b - a, c - a
-    den = v0[:, 0] * v1[:, 1] - v1[:, 0] * v0[:, 1]
-    ok = np.abs(den) > 1e-9
-    den = np.where(ok, den, 1)
+    occ = np.zeros((ny, nx), int)
     for j in range(ny):
-        v2 = np.array([y0 + j * 10 + 5.0, 0.0]) - a
-        u = (v2[:, 0] * v1[:, 1] - v1[:, 0] * v2[:, 1]) / den
-        v = (v0[:, 0] * v2[:, 1] - v2[:, 0] * v0[:, 1]) / den
-        hit = ok & (u >= -1e-6) & (v >= -1e-6) & (u + v <= 1 + 1e-6)
-        hx = np.unique(np.round(F[hit, 0, 0], 2))
         for i in range(nx):
-            occ[j, i] = (hx < x0 + i * 10 + 5).sum() % 2 == 1
-    for (cc, r), (z0, z1) in cells.items():
-        if z0 < 0 < z1 or z0 <= 0 <= z1:
-            i, j = cc - x0 // 10, r - y0 // 10
+            if inside(ground['verts'], x0 + i * 10 + 5, y0 + j * 10 + 5):
+                occ[j, i] = -1                  # ground: material from the ground's own lines
+    for kind, x, y, z, flags in blocks:
+        if z == 0 and not flags:
+            i, j = x - x0 // 10, y - y0 // 10
             if 0 <= i < nx and 0 <= j < ny:
-                occ[j, i] = True
+                occ[j, i] = block_mats[kind] + 1
     return occ, x0, y0
 
 
-def outlines(occ, x0, y0):
-    """clockwise outlines (y up) of the solid regions, holes dropped: [[(x, y), ...]] closed"""
+def ground_line_material(ground, a, b):
+    """the material of the ground line holding the edge a-b (Ultimate's lines are 10 units)"""
+    for (p, q), m in zip(zip(ground['verts'], ground['verts'][1:]), ground['mats']):
+        for e in (a, b):
+            if abs((q[0] - p[0]) * (e[1] - p[1]) - (q[1] - p[1]) * (e[0] - p[0])) > 1e-3:
+                break
+            if not (min(p[0], q[0]) - 1e-3 <= e[0] <= max(p[0], q[0]) + 1e-3 and
+                    min(p[1], q[1]) - 1e-3 <= e[1] <= max(p[1], q[1]) + 1e-3):
+                break
+        else:
+            return m
+    return MATERIAL['rock']
+
+
+def outlines(occ, x0, y0, ground):
+    """clockwise outlines (y up) of the solid cells, holes dropped: [[(x, y, material of the line
+    from this point)]]; points kept where the direction or the material changes"""
     ny, nx = occ.shape
     edges = {}
     for j in range(ny):
@@ -205,108 +324,64 @@ def outlines(occ, x0, y0):
                 if (e[1], e[0]) in edges:
                     del edges[(e[1], e[0])]
                 else:
-                    edges[e] = True
+                    m = occ[j, i] - 1 if occ[j, i] > 0 else ground_line_material(ground, *e)
+                    edges[e] = m
     nxt = {}
-    for a, b in edges:
-        nxt.setdefault(a, []).append(b)
+    for (a, b), m in edges.items():
+        nxt.setdefault(a, []).append((b, m))
     loops = []
     while nxt:
         start = next(iter(nxt))
-        loop = [start]
-        cur = start
+        loop, cur = [], start
         while True:
-            b = nxt[cur].pop()
+            b, m = nxt[cur].pop()
             if not nxt[cur]:
                 del nxt[cur]
+            loop.append((cur, m))
             if b == start:
                 break
-            loop.append(b)
             cur = b
-        # merge collinear points
         pts = []
         n = len(loop)
         for k in range(n):
-            p, q, r = loop[k - 1], loop[k], loop[(k + 1) % n]
-            if (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]) != 0:
-                pts.append(q)
+            (p, mp), (q, mq), r = loop[k - 1], loop[k], loop[(k + 1) % n][0]
+            turn = (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0])
+            if turn != 0 or mp != mq:
+                pts.append((q[0], q[1], mq))
         area = sum(pts[k - 1][0] * pts[k][1] - pts[k][0] * pts[k - 1][1] for k in range(len(pts))) / 2
-        if area < 0:                    # clockwise: an outer outline
+        if area < 0:
             loops.append(pts)
     return loops
 
 
-def platform_tops(parts):
-    """drop-through platforms: the up-facing faces crossing z = 0, as (x0, x1, y)"""
-    segs = []
-    for p in parts:
-        T = p['pos'][p['idx'].reshape(-1, 3)]
-        flat = np.ptp(T[:, :, 1], 1) < 1e-3
-        up = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])[:, 1] > 0
-        cross = (T[:, :, 2].min(1) <= 0) & (T[:, :, 2].max(1) >= 0)
-        for t in T[flat & up & cross]:
-            segs.append((round(t[:, 0].min(), 1), round(t[:, 0].max(), 1), round(t[0, 1], 1)))
-    by_y = {}
-    for a, b, y in segs:
-        by_y.setdefault(y, []).append((a, b))
-    out = []
-    for y in sorted(by_y):
-        iv = sorted(by_y[y])
-        cur = list(iv[0])
-        for a, b in iv[1:]:
-            if a <= cur[1] + 0.1:
-                cur[1] = max(cur[1], b)
-            else:
-                out.append((cur[0], cur[1], y))
-                cur = [a, b]
-        out.append((cur[0], cur[1], y))
-    # drop faces under another face of the same platform (keep the top of each)
-    keep = []
-    for a, b, y in out:
-        if not any(aa <= a + 0.1 and bb >= b - 0.1 and yy > y and yy - y < 6 for aa, bb, yy in out):
-            keep.append((a, b, y))
-    return keep
-
-
-# ---------------------------------------------------------------- collision
-def mat_bytes(surface, flags=0):
-    m = bytearray(12)
-    m[3] = surface
-    m[10] = flags
-    return m
-
-
-def build_lvd(base_lvd, loops, platforms, surface):
-    lv = lvd.LVD(base_lvd)
-    template = lv.collisions[0]
+def grid_collisions(loops):
+    """Smash 4 collisions from the outlines (the widest is the island: its outer top corners are
+    the ledges, on 5-unit floor lines as Battlefield's)"""
     main = max(loops, key=lambda L: max(p[0] for p in L) - min(p[0] for p in L))
     left, right = min(p[0] for p in main), max(p[0] for p in main)
-    # the ledges: the outer top corners, where the outer walls meet the floor
     left_y = max(p[1] for p in main if p[0] == left)
     right_y = max(p[1] for p in main if p[0] == right)
     cols = []
     for k, loop in enumerate([main] + [L for L in loops if L is not main]):
         is_main = k == 0
-        cliffs = []
-        # start at the bottom-left so the outline reads as Battlefield's
         start = min(range(len(loop)), key=lambda i: (loop[i][1], loop[i][0]))
         pts = loop[start:] + loop[:start]
         if is_main:
-            # split the floor lines at the ledges 5 units in, as Battlefield does
             out = []
             for i, p in enumerate(pts):
                 out.append(p)
                 q = pts[(i + 1) % len(pts)]
-                if p == (left, left_y) and q[1] == left_y and q[0] - p[0] > 10:
-                    out.append((left + 5, left_y))
-                if q == (right, right_y) and p[1] == right_y and q[0] - p[0] > 10:
-                    out.append((right - 5, right_y))
+                if (p[0], p[1]) == (left, left_y) and q[1] == left_y and q[0] - p[0] > 10:
+                    out.append((left + 5, left_y, p[2]))
+                if (q[0], q[1]) == (right, right_y) and p[1] == right_y and q[0] - p[0] > 10:
+                    out.append((right - 5, right_y, p[2]))
             pts = out
         pts = pts + [pts[0]]
-        normals, mats = [], []
+        normals, mats, cliffs = [], [], []
         for i in range(len(pts) - 1):
-            (ax, ay), (bx, by) = pts[i], pts[i + 1]
+            (ax, ay, m), (bx, by) = pts[i], pts[i + 1][:2]
             ln = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
-            n = (-(by - ay) / ln, (bx - ax) / ln)
+            normals.append((-(by - ay) / ln, (bx - ax) / ln))
             flags = 0
             if is_main and (ax, ay) == (left, left_y) and by == ay:
                 flags = 0x40
@@ -314,78 +389,44 @@ def build_lvd(base_lvd, loops, platforms, surface):
             elif is_main and (bx, by) == (right, right_y) and by == ay:
                 flags = 0x80
                 cliffs.append((bx, by, 1, i))
-            normals.append(n)
-            mats.append(mat_bytes(surface, flags))
-        c = lvd.collision('COL_00_Floor%02d' % (k + 1), pts, normals, mats, cliffs)
+            mats.append(mat_bytes(m, flags))
+        c = lvd.collision('COL_00_Floor%02d' % (k + 1), [p[:2] for p in pts], normals, mats, cliffs)
         c.subname = '00_Floor%02d' % (k + 1)
         for cl in c.cliffs:
             cl.name = 'CLIFF_00_Floor%02d%s' % (k + 1, 'L' if cl.angle < 0 else 'R')
-        c.unk3 = template.unk3
+            cl.subname, cl.start = cl.name[6:], [cl.x, cl.y, 0.0]
         cols.append(c)
-    for k, (a, b, y) in enumerate(platforms):
-        c = lvd.collision('COL_00_Platform%02d_through' % (k + 1), [(a, y), (b, y)], [(0, 1)],
-                          [mat_bytes(4)], drop_through=True)
-        c.subname = '00_Platform%02d_through' % (k + 1)
-        cols.append(c)
+    return cols
+
+
+def point(x, y):
+    return [float(x), float(y)]
+
+
+def build_lvd(base_lvd, d, cols):
+    """BASE's lvd (Battlefield's: its entry names, section layout) with Ultimate's lvd d's points
+    and regions and the collisions cols"""
+    lv = lvd.LVD(base_lvd)
     lv.collisions = cols
-    return lv, main
-
-
-def floor_height(loops, platforms, x):
-    """the highest floor at x (outline lines facing up, platforms)"""
-    best = None
-    for L in loops:
-        P = L + [L[0]]
-        for (ax, ay), (bx, by) in zip(P, P[1:]):
-            if ay == by and bx > ax and ax <= x <= bx and (best is None or ay > best):
-                best = ay
-    for a, b, y in platforms:
-        if a <= x <= b and (best is None or y > best):
-            best = y
-    return best
-
-
-def place_points(lv, loops, platforms, main, blast_margin):
-    xs = [p[0] for p in main]
-    left, right = min(xs), max(xs)
-    mid = (left + right) / 2
-    half = (right - left) / 2
-    ground = floor_height([main], [], left + 1)
-
-    def flat(x):
-        """the island's floor at x if it's flat 5 units either side"""
-        y = [floor_height([main], [], x + d) for d in (-5, 0, 5)]
-        return y[0] if y[0] is not None and y[0] == y[1] == y[2] else None
-
-    cand = [float(x) for x in np.arange(left + 15, right - 14, 5.0) if flat(x) is not None]
-    # players 1 / 2: a mirrored pair at least 20% of the half width from the middle, nearest 35%
-    # (on the ground level if there is one), else the spots nearest -35% / +35%
-    pairs = [d for d in range(5, int(half) - 10, 5) if mid - d in cand and mid + d in cand]
-    pairs.sort(key=lambda d: (d < 0.2 * half, flat(mid - d) != ground or flat(mid + d) != ground,
-                              abs(d - 0.35 * half)))
-    if pairs:
-        chosen = [mid - pairs[0], mid + pairs[0]]
-    else:
-        chosen = [min((x for x in cand if x < mid), key=lambda x: abs(x - mid + 0.35 * half), default=cand[0]),
-                  min((x for x in cand if x > mid), key=lambda x: abs(x - mid - 0.35 * half), default=cand[-1])]
-    while len(chosen) < len(lv.spawns):
-        chosen.append(max(cand, key=lambda x: min(abs(x - y) for y in chosen)))
-    for s, x in zip(lv.spawns, chosen):
-        s.x, s.y = round(x, 1), flat(x)
-    highest = max(floor_height(loops, platforms, x + 5.0) or ground for x in range(int(left), int(right), 10))
-    re_x = [0, 0.36, -0.36, 0.72, -0.18, 0.18, -0.54, 0.54]
-    for s, f in zip(lv.respawns, re_x):
-        s.x = round(f * half * 0.9 + mid, 1)
-        s.y = highest + (50 if abs(f) in (0, 0.36, 0.72) else 78)
-    cam = lv.camera[0]
-    cam.left, cam.right = left - 90, right + 90
-    cam.top, cam.bottom = max(130.0, highest + 110), -80.0
-    bl = lv.blast[0]
-    bl.left, bl.right = left - blast_margin, right + blast_margin
-    bl.top, bl.bottom = max(192.0, highest + 170), -140.0
-    for it in lv.items:
-        it.sections = it.sections[:1]
-        it.sections[0].points = [[left + 20, highest + 60], [right - 20, highest + 60]]
+    for mine, key in ((lv.spawns, 'start_positions'), (lv.respawns, 'restart_positions')):
+        theirs = els(d[key])
+        assert len(theirs) == len(mine), key
+        for e, t in zip(mine, theirs):
+            e.x, e.y = float(t['pos']['x']), float(t['pos']['y'])
+    for mine, key in ((lv.camera, 'camera_regions'), (lv.blast, 'death_regions')):
+        r = els(d[key])[0]['rect']
+        mine[0].left, mine[0].right, mine[0].top, mine[0].bottom = (float(r[k]) for k in ('left', 'right', 'top', 'bottom'))
+    paths = [[point(p['x'], p['y']) for p in els(s['path']['points'])]
+             for s in els(els(d['item_popups'])[0]['shapes']['shapes'])]
+    template = lv.items[0].sections[0]
+    lv.items[0].sections = []
+    for pts in paths:
+        sec = lvd.Shape()
+        sec.type, sec.v, sec.points = template.type, list(template.v), pts
+        lv.items[0].sections.append(sec)
+    kir = [e for e in els(d.get('general_shapes3') or []) if e['base']['meta_info']['name'].endswith('_Kir')]
+    for e, t in zip(lv.points, kir):
+        e.x, e.y, e.z = float(t['shape']['pos_x']), float(t['shape']['pos_y']), float(t['shape']['pos_z'])
     return lv
 
 
@@ -504,56 +545,67 @@ def write_set(outdir, meshes, tex):
 
 
 # ---------------------------------------------------------------- stage
-def build_form(src, base_dir, out_dir, form, biome):
-    """form 'melee' (the biome) or 'end' (the flat form)"""
+def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
+    """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form)"""
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
     shutil.copytree(base_dir, out_dir)
     model_dir = out_dir + '/model'
     tex = Textures(src)
-    cells = {}
     if form == 'melee':
+        index = BIOMES.index(biome)
+        d = ult_lvd('%s/normal/param/pickel_world_%02d%s.lvd' % (src, index, '' if hazards else '_gimmick_off'), yamlvd)
         ring = load_parts('%s/normal/model/ring_%s_set' % (src, biome))
-        cells = block_cells(src, biome)
-        blocks = block_parts(src, biome, cells)
+        blocks = breakable_blocks(src, index, labels) if hazards else []
         plat = []
         if os.path.exists('%s/normal/model/platform_%s_set' % (src, biome)):
             plat = load_parts('%s/normal/model/platform_%s_set' % (src, biome))
         extra = []
         for e in EXTRA.get(biome, []):
             extra += load_parts('%s/normal/model/%s' % (src, e))
-        near = ring + blocks + plat + extra
-        solid_tris = [p['pos'][p['idx'].reshape(-1, 3)] for p in ring if p['sub'] in (1, 2)]
+        near = ring + (block_parts(src, blocks) if blocks else []) + plat + extra
         far = [p for p in load_parts('%s/normal/model/%s' % (src, FAR[biome])) if p['sub'] == 0]
         sky_src = '%s/normal/model/far_common_set' % src
     else:
-        ring = load_parts('%s/battle/model/ring_end_l_set' % src)
-        plat = []
-        near = ring
-        solid_tris = [p['pos'][p['idx'].reshape(-1, 3)] for p in ring if p['sub'] in (1, 2)]
+        d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
+        blocks = []
+        near = load_parts('%s/battle/model/ring_endbattle_set' % src)
         far = [p for p in load_parts('%s/battle/model/far_plains_set' % src) if p['sub'] == 0]
         sky_src = '%s/battle/model/far_common_set' % src
     sky = [p for p in load_parts(sky_src)
            if p['label'] in ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core')]
 
-    for d in sorted(os.listdir(model_dir)):
-        if os.path.exists('%s/%s/model.mta' % (model_dir, d)):      # material animations
-            os.remove('%s/%s/model.mta' % (model_dir, d))
-        if d not in (RING_SET, FAR_SET, SKY_SET):
-            write_empty('%s/%s' % (model_dir, d))
-    for d, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
-                                   (SKY_SET, sky, 'bg', True)):
-        write_set('%s/%s' % (model_dir, d), to_nud(parts, tex, kind, is_sky), tex)
+    for name in sorted(os.listdir(model_dir)):
+        if os.path.exists('%s/%s/model.mta' % (model_dir, name)):      # material animations
+            os.remove('%s/%s/model.mta' % (model_dir, name))
+        if name not in (RING_SET, FAR_SET, SKY_SET):
+            write_empty('%s/%s' % (model_dir, name))
+    for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
+                                      (SKY_SET, sky, 'bg', True)):
+        write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
 
-    occ, gx0, gy0 = solid_grid(solid_tris, cells)
-    loops = outlines(occ, gx0, gy0)
-    platforms = platform_tops(plat)
-    lvds = [f for f in os.listdir(out_dir + '/param') if f.endswith('.lvd')]
-    for f in lvds:
-        lv, main = build_lvd(out_dir + '/param/' + f, loops, platforms, SURFACE[biome if form == 'melee' else 'plains'])
-        place_points(lv, loops, platforms, main, 165)
-        open(out_dir + '/param/' + f, 'wb').write(lv.write())
-    return loops, platforms
+    ucols = ult_collisions(d)
+    solid = [c for c in ucols if not c['through']]
+    if blocks:
+        # the blocks on the fighting plane join the ground (one outline, as Battlefield's)
+        info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
+        block_mats = [material_code(b['material']) for b in info]
+        assert len(solid) == 1, [c['name'] for c in solid]
+        occ, gx0, gy0 = solid_grid(solid[0], blocks, block_mats)
+        cols = grid_collisions(outlines(occ, gx0, gy0, solid[0]))
+    else:
+        cols = [direct_collision(c, k + 1) for k, c in enumerate(solid)]
+    floors = merged_floors([c for c in ucols if c['through']])
+    for k, (verts, m) in enumerate(floors):
+        c = lvd.collision('COL_00_Platform%02d_through' % (k + 1), verts, [(0, 1)] * (len(verts) - 1),
+                          [mat_bytes(m)] * (len(verts) - 1), drop_through=True)
+        c.subname = '00_Platform%02d_through' % (k + 1)
+        cols.append(c)
+    for f in os.listdir(out_dir + '/param'):
+        if f.endswith('.lvd'):
+            data = build_lvd(out_dir + '/param/' + f, d, cols).write()
+            open(out_dir + '/param/' + f, 'wb').write(data)
+    return cols, blocks
 
 
 def main():
@@ -563,11 +615,14 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--biome', default='plains', choices=BIOMES)
     ap.add_argument('--name', default='NewStage01')
+    ap.add_argument('--hazards', default='on', choices=('on', 'off'))
+    ap.add_argument('--yamlvd', default='yamlvd', help="lvd-rs' yamlvd (reads Ultimate's .lvd)")
+    ap.add_argument('--labels', default='ParamLabels.csv', help="ultimate-research/param-labels' ParamLabels.csv")
     a = ap.parse_args()
     for form in ('melee', 'end'):
-        loops, platforms = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
-                                      form, a.biome)
-        print('%s: %d outlines, %d platforms' % (form, len(loops), len(platforms)))
+        cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
+                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels)
+        print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 
 if __name__ == '__main__':
