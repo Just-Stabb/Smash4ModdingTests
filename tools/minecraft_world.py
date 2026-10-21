@@ -45,6 +45,7 @@ import nud  # noqa: E402
 import nut  # noqa: E402
 import nutexb  # noqa: E402
 import omo  # noqa: E402
+import xmb  # noqa: E402
 
 BIOMES = ['plains', 'birchforest', 'savanna', 'taiga', 'snowytundra', 'stoneshore']
 FAR = {'plains': 'far_plains_set', 'birchforest': 'far_birchforest_set', 'savanna': 'far_savanna_set',
@@ -60,6 +61,13 @@ CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
 # hide the hills near the island and clear them at the horizon; Ultimate shows the opposite (clear
 # near, hazy far: the user's screenshots), so the ramp is read the other way up, at this strength
 FAR_FOG_ALPHA = 0.8
+# Draw order (model.xmb drawing_order; Battlefield's go far to near: sky 0, moon 2, sun 4,
+# background 5-9, near objects 12-18; blended models drawn in that order, ties by distance). The
+# sky folder (dome, sun, Ultimate's haze ring) and the panorama were both 0 in v10 test 3, and
+# the user saw the sky drawn over the panorama depending on the camera. The panorama's own haze
+# layer gets a folder of its own, drawn after it (stc_b_shadow_gareki_set: no .mta).
+FAR_ORDER = '2'
+FOG_SET, FOG_ORDER = 'stc_b_shadow_gareki_set', '3'
 GAMMA = 2.2                         # Ultimate's material colors are linear; Smash 4's vertex colors not
 SKY_LABELS = ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core', 'fog_near')
 
@@ -78,7 +86,10 @@ CLOUD_PERIOD = 4500
 # own sprites (its BNTX: ef_pickelworld_fire00, smoke00) on quads, each on a bone of a made
 # skeleton in a dyr_ folder (all bones at the origin, as Battlefield's), animated: the flame
 # flickering, two smoke puffs a torch rising and shrinking, out of step
-TORCH_SET = 'dyr_change_160_2_O_OBJ_O_HIR_set'
+# (dyr_d_mid_front01_set: a plain one-bone Battlefield object. v9 used dyr_change_160_2_O_OBJ_O_HIR_set
+# and froze, with its own skeleton or Battlefield's (user, v10 tests 1-2): that folder is Battlefield's
+# 160-mesh building whose windows light up at night, likely by mesh, and ours had 8 meshes.)
+TORCH_SET = 'dyr_d_mid_front01_set'
 TORCH_ROW_END = 6
 TORCH_LOOP = 240                    # frames; the flicker periods and the smoke's life divide it
 SMOKE_LIFE, SMOKE_RISE, SMOKE_SHRINK = 60, 7.0, 0.7
@@ -610,7 +621,7 @@ def far_parts(setdir):
     fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - p['uv'][:, 1]],
                 col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)))
            for p in parts if p['sub'] == 1]
-    return split_wide([p for p in parts if p['sub'] == 0]) + fog
+    return split_wide([p for p in parts if p['sub'] == 0]), fog
 
 
 def to_nud(parts, tex, kind, sky=False):
@@ -774,11 +785,10 @@ def torch_points(src, labels, row):
     return [np.array([t['x%d' % i], t['y%d' % i], t['z%d' % i]]) for i in range(t['count'])]
 
 
-def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
-    """the torches' flames and smoke (see TORCH_SET) into the folder: model, skeleton, animation.
-    animated=False: the flames only, still, on the folder's own bone (Battlefield's skeleton
-    kept, its animation made still)"""
-    import zlib
+def torch_meshes(points, tex, effect, animated=True):
+    """the torches' flames (and, animated, smoke) as meshes. animated: each on its own bone
+    (bind 8, bone n; made skeleton [(name, parent)], bone 0 the root) with its motion
+    {bone: (sprite centre, scale a frame, offset a frame)}; still: flames only, unbound"""
     import bntx
     sprites = bntx.read_all(open(effect, 'rb').read())
     tex.extra['torch_flame'] = sprites['ef_pickelworld_fire00']
@@ -786,7 +796,7 @@ def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
     tex.extra['torch_smoke'] = smoke.repeat(2, 0).repeat(2, 1)
     bones = [('torch_root', -1)]
     meshes = []
-    pos = {}
+    motion = {}
     frames = np.arange(TORCH_LOOP + 1)
 
     def quad(c, size, tname, col, setup, name):
@@ -798,8 +808,11 @@ def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
         poly.uvs = [np.array([[0, 1], [1, 1], [1, 0], [0, 0]], dtype=np.float64)]
         poly.idx = two_sided([0, 1, 2, 0, 2, 3])
         poly.materials = [material(setup, tex.id(tname))]
-        bones.append((name, 0))
-        meshes.append(nud.Mesh(name, [poly], bone=len(bones) - 1, bind=8))
+        if animated:
+            bones.append((name, 0))
+            meshes.append(nud.Mesh(name, [poly], bone=len(bones) - 1, bind=8))
+        else:
+            meshes.append(nud.Mesh(name, [poly]))
 
     for i, c in enumerate(points):
         rng = np.random.default_rng(i)
@@ -809,7 +822,7 @@ def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
             continue
         ph = rng.uniform(0, 2 * np.pi, 2)
         s = 1 + 0.08 * np.sin(2 * np.pi * frames / 20 + ph[0]) + 0.05 * np.sin(2 * np.pi * frames / 12 + ph[1])
-        pos[bones[-1][0]] = (flame, s, np.zeros((len(frames), 3)))
+        motion[bones[-1][0]] = (flame, s, np.zeros((len(frames), 3)))
         start = int(rng.integers(SMOKE_LIFE))
         for k in range(2):
             base = c + np.array([0.0, FLAME_SIZE * 0.6, 0.4])
@@ -817,30 +830,26 @@ def write_torches(model_dir, anim_dir, points, tex, effect, animated=True):
             u = ((frames + start + k * SMOKE_LIFE // 2) % SMOKE_LIFE) / SMOKE_LIFE
             rise = np.zeros((len(frames), 3))
             rise[:, 1] = SMOKE_RISE * u
-            pos[bones[-1][0]] = (base, 1 - SMOKE_SHRINK * u, rise)
-    folder = '%s/%s' % (model_dir, TORCH_SET)
-    path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
-    o = omo.Omo(open(path, 'rb').read())
-    o.frames = len(frames)
-    if not animated:
-        for m in meshes:
-            m.bone = 0
-        write_set(folder, meshes, tex)
-        h = omo.vbn_read(folder + '/model.vbn')[0][2]
-        o.nodes = []
-        n = len(frames)
-        omo.set_node(o, h, [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)
-        open(path, 'wb').write(o.encode())
-        return
+            motion[bones[-1][0]] = (base, 1 - SMOKE_SHRINK * u, rise)
+    return meshes, bones, motion
+
+
+def write_torches(model_dir, anim_dir, meshes, bones, motion, tex):
+    """animated torches into TORCH_SET: model, skeleton, animation"""
+    import zlib
     bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
+    folder = '%s/%s' % (model_dir, TORCH_SET)
     write_set(folder, meshes, tex)
     open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
+    path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
+    o = omo.Omo(open(path, 'rb').read())
+    o.frames = TORCH_LOOP + 1
     o.nodes = []
     for name, _p, h in bones[1:]:
-        c, sc, up = pos[name]
+        c, sc, up = motion[name]
         sc = np.asarray(sc, dtype=np.float64)
         t = c[None, :] * (1 - sc[:, None]) + up              # scale about the sprite's centre
-        omo.set_node(o, h, [tuple(map(float, v)) for v in t], [(0.0, 0.0, 0.0, 1.0)] * len(frames),
+        omo.set_node(o, h, [tuple(map(float, v)) for v in t], [(0.0, 0.0, 0.0, 1.0)] * o.frames,
                      [(float(x), float(x), float(x)) for x in sc])
     open(path, 'wb').write(o.encode())
 
@@ -862,8 +871,9 @@ def tiny_nut(path):
 
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
                clouds='moving'):
-    """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches: 'animated',
-    'still' or 'off' (needs effect); clouds: 'moving' or 'still'"""
+    """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches (need
+    effect): 'animated' (TORCH_SET), 'still' (flames in the island's model) or 'off'; clouds:
+    'moving' or 'still'"""
     if torches == 'off':
         effect = None
     if os.path.exists(out_dir):
@@ -883,20 +893,20 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         for e in EXTRA.get(biome, []):
             extra += load_parts('%s/normal/model/%s' % (src, e))
         near = ring + (block_parts(src, blocks) if blocks else []) + plat + extra
-        far = far_parts('%s/normal/model/%s' % (src, FAR[biome]))
+        far, far_fog = far_parts('%s/normal/model/%s' % (src, FAR[biome]))
         sky_src = '%s/normal/model/far_common_set' % src
     else:
         d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
         blocks = []
         near = load_parts('%s/battle/model/ring_endbattle_set' % src)
-        far = far_parts('%s/battle/model/far_plains_set' % src)
+        far, far_fog = far_parts('%s/battle/model/far_plains_set' % src)
         sky_src = '%s/battle/model/far_common_set' % src
     sky = [p for p in load_parts(sky_src) if p['label'] in SKY_LABELS]
 
     cloud_parts = [p for p in sky if p['bone'] in CLOUD_SETS]
     sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
     for name in sorted(os.listdir(model_dir)):
-        if name in (RING_SET, FAR_SET, SKY_SET) or name in CLOUD_SETS.values() or effect and name == TORCH_SET:
+        if name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or effect and torches == 'animated' and name == TORCH_SET:
             assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
@@ -906,14 +916,25 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             if os.path.exists(path):
                 data = tiny_nut(path)
                 open(path, 'wb').write(data)
-    for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
-                                      (SKY_SET, sky, 'bg', True)):
-        write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
-    write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
+    torch, torch_bones, torch_motion = [], [], {}
     if effect:
         row = BIOMES.index(biome) if form == 'melee' else TORCH_ROW_END
-        write_torches(model_dir, out_dir + '/animation', torch_points(src, labels, row), tex, effect,
-                      torches == 'animated')
+        torch, torch_bones, torch_motion = torch_meshes(torch_points(src, labels, row), tex, effect,
+                                                        torches == 'animated')
+    for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
+                                      (FOG_SET, far_fog, 'bg', False), (SKY_SET, sky, 'bg', True)):
+        meshes = to_nud(parts, tex, kind, is_sky)
+        if name == RING_SET and torches == 'still':
+            meshes += torch                 # unbound, the island's alpha-tested unlit setup
+        write_set('%s/%s' % (model_dir, name), meshes, tex)
+    for name, changes in ((FAR_SET, {'drawing_order': {'number': FAR_ORDER}}),
+                          (FOG_SET, {'drawing_order': {'number': FOG_ORDER}, 'draw_range': {'number': '2'}})):
+        path = '%s/%s/model.xmb' % (model_dir, name)
+        data = xmb.edit(open(path, 'rb').read(), changes)
+        open(path, 'wb').write(data)
+    write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
+    if effect and torches == 'animated':
+        write_torches(model_dir, out_dir + '/animation', torch, torch_bones, torch_motion, tex)
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)

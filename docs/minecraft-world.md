@@ -368,6 +368,26 @@ v9 (and v8, never tested) froze loading; v7 loaded. Compared with v7 and with Ba
 `build/minecraft_world_v10_tests.zip`: test 1 animated torches, 2 still torches, 3 no torches,
 4 no torches and still clouds (no combination outside Battlefield's); all with the small textures.
 
+Results (user): test 3 loaded, 1 and 2 froze, so the torch folder, with or without its own
+skeleton. `dyr_change_160_2_O_OBJ_O_HIR_set` is Battlefield's 160-mesh building (meshes
+`mix_000_w002_O_OBJ`...; its windows light up at night, most likely the stage code switching them
+by mesh number) and the torch model had 8 meshes. The torches now go in `dyr_d_mid_front01_set`
+(a one-mesh, one-bone object, draw range 1, order 12) or, `--torches still`, into the island's
+model unbound (nothing test 3 doesn't load).
+
+Also in test 3 (user): the sky sometimes drawn over the background, depending on where the camera
+is. The sky folder and the panorama both had drawing order 0, so the blended ones (the sun, the
+haze ring, the panorama) were drawn by distance, and the haze ring's bounding sphere (centred at
+the origin, radius 11600) and the panorama halves' trade places as the camera moves. Now the
+panorama is order 2 and its haze layer (Ultimate's `sfx_far_A_long_fog`) is in its own folder,
+`stc_b_shadow_gareki_set`, order 3, draw range 2 (`tools/xmb.py` edits `model.xmb`: Battlefield's
+88 files rebuild byte for byte). The background's resolution: Ultimate's own panorama is
+3200x1600 (`far_a_day_low_col`) around the whole stage, used at full resolution since v8 (two
+2048x2048 halves); `lightboard_<biome>_set` is the blocks' additive glow, not a background.
+
+`build/minecraft_world_v10_tests2.zip`: test 5 animated torches (dyr_d), 6 still torches (island
+model), 7 none; all with the draw order fix.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
