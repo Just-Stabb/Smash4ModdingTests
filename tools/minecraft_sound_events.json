@@ -928,6 +928,3130 @@
 "chicken"
 ]
 ],
+"blocks/birchforest": [
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": 45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -55.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -85.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -75.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -65.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -95.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -85.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 45.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 35.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 35.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 25.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 15.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 5.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 55.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 65.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 25.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 15.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 15.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 25.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 5.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 15.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 25.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 35.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 65.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 65.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": 65.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": 75.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -85.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -75.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -75.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -75.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -75.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -75.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -65.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -55.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 15.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 35.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 45.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 45.0,
+"z": 0.0
+}
+],
+"blocks/plains": [
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -55.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -45.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -45.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -45.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "grass",
+"x": -65.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 35.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 55.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 55.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 45.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 35.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 35.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 35.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 35.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 35.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 35.0,
+"y": 25.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 55.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 55.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 25.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 25.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 25.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 25.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 35.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 25.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": 55.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 45.0,
+"y": 5.0,
+"z": -20.0
+}
+],
+"blocks/savanna": [
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -45.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -35.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -25.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -25.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -15.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -35.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -45.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -55.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -65.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -75.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -75.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -85.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -85.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -95.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -75.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -45.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -35.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -25.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": -65.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": -55.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -55.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -55.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -45.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -35.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -25.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": false,
+"sound": "wood",
+"x": -65.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -75.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -85.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -85.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": -95.0,
+"y": 45.0,
+"z": 0.0
+}
+],
+"blocks/snowytundra": [
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -25.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -15.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -5.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 5.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 5.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -5.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -15.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -25.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -15.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -5.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 5.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 15.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 15.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": 25.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "snow",
+"x": -35.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 25.0,
+"y": 15.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 25.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -35.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -35.0,
+"y": 15.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 15.0,
+"z": 30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 5.0,
+"z": 30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 5.0,
+"z": 30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 15.0,
+"z": 30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 15.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 5.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 5.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 15.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 25.0,
+"z": 30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 25.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 25.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 25.0,
+"z": 20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -35.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -35.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 25.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 15.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -25.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -15.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": -5.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "snow",
+"x": 5.0,
+"y": 25.0,
+"z": -20.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "snow",
+"x": 25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "snow",
+"x": -35.0,
+"y": 5.0,
+"z": 0.0
+}
+],
+"blocks/stoneshore": [
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -5.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 15.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -15.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": 55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 30.0,
+"link": true,
+"sound": "stone",
+"x": 5.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 30.0,
+"link": true,
+"sound": "stone",
+"x": 35.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 30.0,
+"link": true,
+"sound": "stone",
+"x": 5.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -15.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 45.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 35.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 25.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 5.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 25.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 45.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 45.0,
+"z": -20.0
+},
+{
+"life": 30.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -15.0,
+"y": 15.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -15.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -25.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -15.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 35.0,
+"y": 5.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": 5.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": 25.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": 25.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": 25.0,
+"y": 45.0,
+"z": -20.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -5.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -5.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -5.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 15.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -5.0,
+"y": 45.0,
+"z": -20.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 5.0,
+"y": 45.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 15.0,
+"y": 45.0,
+"z": -30.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": 25.0,
+"y": 45.0,
+"z": -30.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -5.0,
+"y": 45.0,
+"z": -30.0
+}
+],
+"blocks/taiga": [
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -75.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -65.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -55.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -55.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -65.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -65.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -55.0,
+"y": 15.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -55.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -65.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -65.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -75.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -45.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -55.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -35.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -35.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -75.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 25.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 25.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 35.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 65.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 65.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 25.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 35.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 45.0,
+"z": 10.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 55.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": true,
+"sound": "grass",
+"x": 45.0,
+"y": 55.0,
+"z": 0.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 45.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 45.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 35.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 35.0,
+"z": -10.0
+},
+{
+"life": 2.0,
+"link": false,
+"sound": "grass",
+"x": 55.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 45.0,
+"y": 45.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 55.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 55.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 35.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 18.0,
+"link": true,
+"sound": "wood",
+"x": 35.0,
+"y": 35.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -15.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -25.0,
+"y": 5.0,
+"z": 0.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -25.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -15.0,
+"y": 5.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": false,
+"sound": "soil",
+"x": -35.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 12.0,
+"link": true,
+"sound": "soil",
+"x": -35.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -75.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -45.0,
+"y": 25.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -45.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -65.0,
+"y": 15.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -55.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -45.0,
+"y": 5.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -55.0,
+"y": 25.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -65.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -65.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -45.0,
+"y": 15.0,
+"z": -10.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -45.0,
+"y": 15.0,
+"z": 0.0
+},
+{
+"life": 24.0,
+"link": false,
+"sound": "stone",
+"x": -45.0,
+"y": 15.0,
+"z": 10.0
+},
+{
+"life": 24.0,
+"link": true,
+"sound": "stone",
+"x": -55.0,
+"y": 15.0,
+"z": 0.0
+}
+],
 "plains/end": [
 [
 13,
