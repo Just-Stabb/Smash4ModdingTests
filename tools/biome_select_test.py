@@ -16,7 +16,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import biome_select_cave as C  # noqa: E402
-from stage_slot_test import machine, call, cstr  # noqa: E402
+from stage_slot_test import machine, cstr  # noqa: E402
+from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4  # noqa: E402
 
 SPRINTF = 0x04ADA3F4
 REC = 0x7F002000            # sprintf stub: +0 fmt, +4 arg
@@ -73,9 +74,14 @@ def main():
     def settime(t):
         mu.mem_write(TIME, struct.pack('>II', t >> 32, t & 0xFFFFFFFF))
 
-    def path(kind=0x80):
+    def path(kind=0x80, site=0x0315805C):
+        """the path function called from a call site (the setting build 0x0315805C, the prefetch
+        0x02AB83A0), as the game does"""
         mu.mem_write(REC, b'\0' * 8)
-        call(mu, 0x02D1FDA0, BUF, kind)
+        mu.reg_write(UC_PPC_REG_3, BUF)
+        mu.reg_write(UC_PPC_REG_4, kind)
+        mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
+        mu.emu_start(site, site + 4, count=10000)
         return cstr(mu, struct.unpack('>I', mu.mem_read(REC + 4, 4))[0])
 
     t = 1 << 40
@@ -113,7 +119,15 @@ def main():
         settime(t)
         pads(None)
         seen.add(path())
+    want_last = folders.index(path(site=0x02AB83A0))
+    check('the last random pick is kept for the prefetch', folders[want_last] in folders, True)
     check('random reaches every biome', sorted(seen), sorted(folders))
+    t += step
+    settime(t)
+    pads(C.L | C.STICK_UP)
+    check('the prefetch reuses the last pick', path(site=0x02AB83A0), folders[want_last])
+    check('the setting build then picks', path(), folders[2])
+    check('the prefetch reuses it', path(site=0x02AB83A0), folders[2])
     check('Omega (0x81) keeps its folder', path(0x81), 'NewStage01')
     check('Battlefield (0) keeps its folder', path(0), 'BattleField_f')
     print('%d failed' % fails)

@@ -14,9 +14,13 @@ The buttons: every controller's held word, ORed (the pad manager's static slot a
 slot 0 the GamePad, 2-8 Wii Remotes / Pro, 9-16 the GameCube adapter; polled every frame, also
 while loading). L held picks the biome (BUTTONS); otherwise one at random (the time base).
 
-The path is built more than once a load (and maybe ahead of it), so a pick is kept while calls
-come within WINDOW of each other (the time base's upper word and the top byte of its lower:
-units of 2^24 ticks, ~0.27 s at 62.15 MHz): a new load after a pause picks again.
+The path is built where a match's stage setting is made (0x0315800C, returning to SETTING_RET; it
+is cached there and the loader uses that copy) and for an optional prefetch of the folder
+(0x02AB82B0, LR 0x02AB83A4) whose order to it is unknown: only the setting build picks, any other
+caller gets the last pick (a prefetch of another biome only wastes the prefetch). A setting can be
+built more than once a match, so a pick is kept while setting builds come within WINDOW of each
+other (the time base's upper word and the top byte of its lower: units of 2^24 ticks, ~0.27 s
+at 62.15 MHz): a new match after a pause picks again.
 
 Space: grown code 0x04B7F000-0x04B80000 (within `b` reach of the hook). The pick and the time are
 words in it (writable in Cemu, as stage_script_cave.py's counter).
@@ -33,6 +37,7 @@ HOOK = 0x02D1FDD8               # lwzx r5, r10, r8 (the kind's name) in the path
 HOOK_WORD = 0x7CAA402E
 BACK = HOOK + 4
 KIND = 0x80                     # NewStage01, normal play
+SETTING_RET = 0x03158060        # the stage setting's build (bl at 0x0315805C), the call that picks
 PADS = 0x1057581C               # the pad manager's slot array (26 wrappers)
 SLOTS = 17                      # 0 GamePad, (1 a dummy), 2-8 Wii Remotes / Pro, 9-16 GameCube
 WINDOW = 20                     # ~5.4 s
@@ -64,6 +69,12 @@ pick:
         bne back
         lis r12, data@ha
         addi r12, r12, data@l
+        lwz r9, 4(r12)
+        mflr r0
+        lis r6, 0x%(ret_hi)04X
+        ori r6, r6, 0x%(ret_lo)04X
+        cmplw r0, r6
+        bne use
         mftbu r6
         mftb r7
         slwi r6, r6, 8
@@ -72,7 +83,6 @@ pick:
         lwz r0, 0(r12)
         stw r6, 0(r12)
         subf r0, r0, r6
-        lwz r9, 4(r12)
         cmplwi r0, %(window)d
         blt use
         lis r10, 0x%(pads_hi)04X
@@ -122,7 +132,7 @@ data:
         .word 0
         .word 0
 """ % dict(kind8=KIND * 8, window=WINDOW, pads_hi=PADS >> 16, pads_lo=PADS & 0xFFFF, slots=SLOTS, l=L,
-           tests=tests, n=len(BIOMES), back=BACK))
+           tests=tests, n=len(BIOMES), back=BACK, ret_hi=SETTING_RET >> 16, ret_lo=SETTING_RET & 0xFFFF))
     names_at = a.addr('data') + 8 + 4 * len(BIOMES)
     strings, ptrs = b'', []
     for _biome, folder in BIOMES:

@@ -718,6 +718,51 @@ User: A loads. The zombie should burn in daylight and the enderman teleport, nei
 
 `build/minecraft_world_v16b_test.zip`.
 
+## v17: the biome picked at load, the monsters rolled (executable patches)
+
+User: random biome per match as Ultimate, a biome chosen by buttons (as Boxing Ring's): L+A plains
+(Grassland), L+R+A birch forest (Forest), L+stick up+A savanna, L+right+A taiga, L+down+A snowy
+tundra, L+left+A stone shore; monsters random per match. Both need code: research (two agents,
+notes in the scratchpad's `re_input/` and `re_stage/`):
+- **Controllers** (all static, polled every frame, also while loading): the pad manager's slot
+  array `0x1057581C` (26 wrappers; slot 0 the GamePad, 1 a dummy, 2-8 Wii Remotes / Pro, 9-16 the
+  GameCube adapter, 17-24 3DS / network); wrapper `+8` the status: `+0` held buttons in the game's
+  own layout (A `0x10`, L `0x1000`, R `0x2000`, ZL `0x4000`, ZR `0x8000`, d-pad left / right / down
+  / up `1` / `2` / `4` / `8`, the left stick as buttons left `0x80000` / right `0x100000` / down
+  `0x200000` / up `0x400000` past half way), `+8` / `+0xC` stick X / Y floats, `+0x68` pressed,
+  `+0x7C` pad type, `+0x87` valid this frame. GameCube L / R are their analog values past 48 / 255
+  (a light press), Wii Remotes have no L / R.
+- **Stage folder**: the path function `0x02D1FDA0` is called when a match's stage setting is built
+  (`0x0315800C`, return `0x03158060`; the setting caches the path, the loader uses that copy), for
+  an optional prefetch (return `0x02AB83A4`) and for StageEdit only. Nothing else builds
+  `stage/melee/%s`; the kind's name also names the music group, so only the path changes.
+- **RNG**: the game's xorshift128 x4 at `0x105759C0`: instance 0 the battle's (seeded per match,
+  replays / online), instance 1 seeded from the clock: `0x024F6BE8(n)` = x % n on it.
+- **Stage models**: `0x03141D2C(stage, folder)` -> StageModel; flags `+0x118` (`0x80000` visible,
+  `0x40000` stage-wide visible, both for drawn); the game's per-model show / hide in setAllVisible
+  `0x03159750` (scene add `0x03158994`, remove `0x031589E0`, render `0x032FF668` / `0x032FF68C` on
+  `+0xDC`); OMO frame `0x0315871C(m, f1, 1)`.
+
+Built:
+- `tools/biome_select_cave.py` (test: `tools/biome_select_test.py`, unicorn, 22 checks): kind 0x80's
+  folder: `NewStage01` (plains), `NewStage01_forest`, `_savanna`, `_taiga`, `_tundra`, `_shore`:
+  every controller's held word ORed; L held: R or a stick / d-pad direction picks (`BUTTONS`), L
+  alone plains; no L: random (the time base). Only the setting build picks, kept within ~5 s of
+  setting builds (several a match); other callers get the last pick. Omega (0x81) stays plains.
+- `tools/monster_roll_cave.py` (test: `tools/monster_roll_test.py`, unicorn, 14 checks): replaces
+  `stage_script_cave.py` (the moving-platform test) on the generic stage's update / setup hooks; for
+  kind 0x80 counts frames (f1) over the 9000-frame cycle and on the first update and each cycle's
+  end rolls 3 spawns at Ultimate's odds (40 / 35 / 20 / 5) on the clock RNG, showing the monsters
+  rolled (zombie ~78% of nights, skeleton 73%, spider 49%, enderman 14%). The stage builder puts
+  each monster in its own Battlefield folder (`MONSTER_SETS`: dyr_h / dyr_f / dyr_g / dyr_n1).
+  Omega's generic stage is another class (StageBaseEnd), not hooked: all its monsters every night.
+- The RPX: the user's current one (`minecraft_music.zip`'s, = `build/cross_f.rpx`) plus both:
+  `rpx_patch.py build/cross_f.rpx OUT $(biome_select_cave.py) $(monster_roll_cave.py)`.
+- `ppcasm.py`: `mftb` / `mftbu`, `divwu`.
+
+Open (Cemu): the prefetch's order to the setting build; L / direction held through the confirm
+(A) and the load; the show / hide on our folders; online / replays (a clock pick isn't synced).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

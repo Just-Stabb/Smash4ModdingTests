@@ -1241,12 +1241,14 @@ END_VILLAGERS = ('plains_butcher',)
 # the night's monsters (pickel_world.stdat: from frame_of_monster 4200; Ultimate rolls each one,
 # zombie / skeleton / spider / enderman 40 / 35 / 20 / 5, several a night): all four, each its
 # biome's path once from MONSTER_FRAME (zombie 4180 frames, skeleton 4000, spider and enderman
-# 3600: all gone by dawn, 8250), scaled to nothing before and after; in a Battlefield folder of their
-# own (MONSTER_SET, draw range 2), as the animals' folder would grow past 3 MB. Their biome's
-# visibility (the enderman's block: grass, dirt, tundra or savanna) as Ultimate's animation sets it
+# 3600: all gone by dawn, 8250), scaled to nothing before and after; each in a Battlefield folder
+# of its own (MONSTER_SETS), so tools/monster_roll_cave.py can show the ones it rolls each night
+# (its list matches this one). Their biome's visibility (the enderman's block: grass, dirt, tundra
+# or savanna) as Ultimate's animation sets it
 MONSTERS = ('zombie', 'skeleton', 'spider', 'enderman')
 MONSTER_FRAME = 4200
-MONSTER_SET = 'dyr_h_BG_more_far0_set'
+MONSTER_SETS = {'zombie': 'dyr_h_BG_more_far0_set', 'skeleton': 'dyr_f_BG_far2_set_set',
+                'spider': 'dyr_g_bgfar_set', 'enderman': 'dyr_n1_sunset_set'}
 # Omega: a monster's path (its window, MONSTER_FRAME on) moved to where as much of it is on Omega's
 # ground as there is on the normal form's (Ultimate's own: 0.79-0.90, from rising out of the
 # ground, coming in from off the island), at least END_MONSTER_FIT of that, or left out; heights
@@ -1943,8 +1945,10 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
     curves = daynight_curves(src, form, FAR[biome] if form == 'melee' else 'far_plains_set') if daynight else None
     for name in sorted(os.listdir(model_dir)):
         if (name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or name == TORCH_SET and rig
-                or name == ANIMAL_SET and animals or name == SKY_RIG and daynight or name == MONSTER_SET and monsters):
-            assert name in (SKY_RIG, MONSTER_SET) or not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
+                or name == ANIMAL_SET and animals or name == SKY_RIG and daynight
+                or name in [MONSTER_SETS[x.split('_')[2]] for x, _a in monsters]):
+            assert name in (SKY_RIG,) + tuple(MONSTER_SETS.values()) or not os.path.exists(
+                '%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
             data = nud.hidden(path)
@@ -2061,23 +2065,20 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 continue
             kept.append(i)
             shifts.append(sh)
-        monsters = [monsters[i] for i in kept]
-        m, b, t = mob_rig(src, form, monsters, tex, CYCLE + 1, 'monster')
-        for name, (pos, rot, scl) in t.items():
-            k = int(name.split('_')[0][len('monster'):])
-            lo, hi = mob_window(monsters[k][1])
-            scl[:lo] = 0.0
-            scl[hi + 1:] = 0.0
-            pos += shifts[k]
-        paths = [villager_paths([x])[0] for x in monsters]
-        for k, (setname, anims) in enumerate(monsters):
+        for k in kept:                      # each in its own folder
+            setname, anims = monsters[k]
             kind = setname.split('_')[2]
+            m, b, t = mob_rig(src, form, [monsters[k]], tex, CYCLE + 1, 'monster')
             lo, hi = mob_window(anims)
+            for name, (pos, rot, scl) in t.items():
+                scl[:lo] = 0.0
+                scl[hi + 1:] = 0.0
+                pos += shifts[kept.index(k)]
             if kind in BURNING and effect and hi > BURN_FROM:
-                burn_fx(m, b, t, 'monster%d_Hip' % k, BURN_FROM, hi, tex)
+                burn_fx(m, b, t, 'monster0_Hip', BURN_FROM, hi, tex)
             if kind == 'enderman':
-                teleport_fx(m, b, t, 'monster%d_' % k, paths[k] + shifts[k], lo, hi, tex)
-        write_rig(model_dir, anim_dir, MONSTER_SET, m, b, t, CYCLE + 1, tex, curves)
+                teleport_fx(m, b, t, 'monster0_', paths[k] + shifts[kept.index(k)], lo, hi, tex)
+            write_rig(model_dir, anim_dir, MONSTER_SETS[kind], m, b, t, CYCLE + 1, tex, curves)
 
     light = out_dir + '/animation/light.bin'
     data = (cycle_light(light, fighter=chr_light(src), island=curves['island'][:, :3] if ISLAND_FLAGS else None)

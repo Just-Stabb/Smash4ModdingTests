@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Runs tools/monster_roll_cave.py's code in a patched RPX in unicorn, the game functions it calls
+replaced by stubs (the base update returns 0x55; the model lookup returns a fake model per folder
+name; the scene / visibility calls record what they're asked; the RNG returns a set sequence).
+
+  python3 tools/monster_roll_test.py PATCHED.rpx
+
+Checks: the setup hook resets and goes on to the setup's second instruction; the update returns
+the base update's result; for the stage kind, the first update rolls, shows the rolled monsters
+and hides the others (flags bit 0x80000, scene add / remove, render visibility), rolls only again
+when the counter passes the cycle (slow motion too), and a missing model is skipped; other kinds:
+nothing. The odds: 10000 rolls of a uniform RNG land within 1.5% of 40 / 35 / 20 / 5 per draw.
+"""
+import os
+import struct
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import monster_roll_cave as C  # noqa: E402
+from ppcasm import Asm  # noqa: E402
+from stage_slot_test import machine, RET  # noqa: E402
+from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_LR, UC_PPC_REG_FPR1,  # noqa: E402
+                               UC_PPC_REG_MSR)
+
+STAGE = 0x7F004000
+MODELS = 0x7F006000        # fake models, 0x200 apart (flags +0x118, handle +0xDC: +0 visible)
+REC = 0x7F002000           # +0 rand index, +4 calls to add, +8 remove, +0xC setvis, +0x10 finds
+RANDS = 0x7F003000         # the RNG's sequence (words)
+
+
+def stub(mu, addr, text):
+    a = Asm(addr)
+    a.asm(text)
+    mu.mem_write(addr, b''.join(struct.pack('>I', w) for w in a.words()))
+
+
+def main():
+    mu = machine(sys.argv[1])
+    mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+    a, _words, _hooks = C.build()
+    names = [f for f, _o in C.MONSTERS]
+    stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
+    # find: compare the name's 5th char (h / f / g / n) to pick a model; 'n' -> missing when REC+0x20 set
+    stub(mu, C.FIND_MODEL, """
+        lis r7, 0x7F00
+        lwz r6, 0x2010(r7)
+        addi r6, r6, 1
+        stw r6, 0x2010(r7)
+        lbz r5, 4(r4)
+        lis r3, 0x7F00
+        ori r3, r3, 0x6000
+        cmpwi r5, 0x68
+        beq f0
+        cmpwi r5, 0x66
+        beq f1
+        cmpwi r5, 0x67
+        beq f2
+        lwz r6, 0x2020(r7)
+        cmpwi r6, 0
+        beq f3
+        li r3, 0
+        blr
+f3:     addi r3, r3, 0x600
+        blr
+f2:     addi r3, r3, 0x400
+        blr
+f1:     addi r3, r3, 0x200
+f0:     blr""")
+    stub(mu, C.RAND, """
+        lis r7, 0x7F00
+        lwz r6, 0x2000(r7)
+        addi r5, r6, 1
+        stw r5, 0x2000(r7)
+        slwi r6, r6, 2
+        ori r7, r7, 0x3000
+        lwzx r6, r7, r6
+        divwu r5, r6, r3
+        mullw r5, r5, r3
+        subf r3, r5, r6
+        blr""")
+    stub(mu, C.IS_VISIBLE, 'lwz r3, 0(r3)\nblr')
+    stub(mu, C.SET_VISIBLE, """
+        stw r4, 0(r3)
+        lis r7, 0x7F00
+        lwz r6, 0x200C(r7)
+        addi r6, r6, 1
+        stw r6, 0x200C(r7)
+        blr""")
+    stub(mu, C.SCENE_ADD, 'lis r7, 0x7F00\nlwz r6, 0x2004(r7)\naddi r6, r6, 1\nstw r6, 0x2004(r7)\nblr')
+    stub(mu, C.SCENE_REMOVE, 'lis r7, 0x7F00\nlwz r6, 0x2008(r7)\naddi r6, r6, 1\nstw r6, 0x2008(r7)\nblr')
+    fails = 0
+
+    def check(what, got, want):
+        nonlocal fails
+        ok = got == want
+        fails += not ok
+        print('%s %s: %r%s' % ('ok  ' if ok else 'FAIL', what, got, '' if ok else ' (want %r)' % (want,)))
+
+    def word(addr):
+        return struct.unpack('>I', mu.mem_read(addr, 4))[0]
+
+    def setw(addr, v):
+        mu.mem_write(addr, struct.pack('>I', v))
+
+    def models(visible):
+        for i in range(4):
+            m = MODELS + 0x200 * i
+            setw(m + 0x118, 0x020C0000 | (0x80000 if visible else 0))
+            setw(m + 0xDC, 1 if visible else 0)
+
+    def rands(seq):
+        setw(REC, 0)
+        for i, v in enumerate(seq):
+            setw(RANDS + 4 * i, v)
+
+    def update(kind=C.KIND, f1=1.0):
+        setw(STAGE, kind)
+        mu.reg_write(UC_PPC_REG_3, STAGE)
+        mu.reg_write(UC_PPC_REG_FPR1, struct.unpack('>Q', struct.pack('>d', f1))[0])
+        mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
+        mu.reg_write(UC_PPC_REG_LR, RET)
+        mu.emu_start(a.addr('update'), RET, count=100000)
+        return mu.reg_read(UC_PPC_REG_3)
+
+    def shown():
+        return [bool(word(MODELS + 0x200 * i + 0x118) & 0x80000) and word(MODELS + 0x200 * i + 0xDC) == 1
+                for i in range(4)]
+
+    data = a.addr('data')
+    # setup hook
+    setw(data, 0x3F800000)
+    setw(data + 8, 0)
+    mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
+    mu.emu_start(a.addr('reset'), C.SETUP + 4, count=100)
+    check('setup: counter 0, roll due', (word(data), word(data + 8)), (0, 1))
+    check('setup: its first instruction made (stwu)', mu.reg_read(UC_PPC_REG_1), 0x7F00F000 - 0x298)
+    # first update: rolls 3 draws: 10 (zombie), 50 (skeleton), 12 (zombie) -> zombie + skeleton
+    models(True)
+    rands([10, 50, 12])
+    check('update returns the base update', update(), 0x55)
+    check('rolled zombie + skeleton', shown(), [True, True, False, False])
+    check('the roll mask', word(data + 0x1C), 0b0011)
+    check('scene removes for the hidden two', word(REC + 8), 2)
+    rands([99, 99, 99])
+    for _ in range(100):
+        update()
+    check('no roll before the cycle ends', shown(), [True, True, False, False])
+    # run to the cycle's end in slow motion and full speed: one roll at the wrap
+    rands([96, 80, 99])
+    n = 0
+    while word(REC) == 0 and n < 20000:     # until the RNG is called
+        update(f1=0.5 if n % 2 else 1.0)
+        n += 1
+    check('rolled at the cycle\'s end (spider + enderman)', shown(), [False, False, True, True])
+    check('the counter wrapped', struct.unpack('>f', mu.mem_read(data, 4))[0] < 2.0, True)
+    check('frames to the wrap (8900 left, 1 / 0.5 alternating)', abs(n - 8900 / 0.75) < 3, True)
+    # a missing model is skipped
+    setw(REC + 0x20, 1)
+    setw(data + 8, 1)
+    rands([0, 0, 0])
+    update()
+    check('missing enderman skipped, zombie only', shown()[:3], [True, False, False])
+    setw(REC + 0x20, 0)
+    # other kinds: nothing
+    setw(data + 8, 1)
+    models(True)
+    before = word(REC + 0x10)
+    update(kind=0)
+    check('other kind: no lookups', word(REC + 0x10), before)
+    check('other kind: roll still due', word(data + 8), 1)
+    # odds
+    import random
+    rng = random.Random(1)
+    counts = [0] * 4
+    seq = [rng.randrange(1 << 32) for _ in range(30000)]
+    for k in range(10000):
+        rands(seq[3 * k:3 * k + 3])
+        setw(data + 8, 1)
+        models(True)
+        update()
+        m = word(data + 0x1C)
+        for i in range(4):
+            counts[i] += bool(m >> i & 1)
+    want = [1 - (1 - o / 100) ** 3 for _f, o in C.MONSTERS]
+    got = [c / 10000 for c in counts]
+    check('nights with each (3 draws: %s)' % ' / '.join('%.2f' % w for w in want),
+          all(abs(g - w) < 0.015 for g, w in zip(got, want)), True)
+    print('   got', ['%.3f' % g for g in got])
+    print('%d failed' % fails)
+    sys.exit(1 if fails else 0)
+
+
+if __name__ == '__main__':
+    main()
