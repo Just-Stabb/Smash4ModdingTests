@@ -230,13 +230,39 @@ class GeneralPoint(Entry):
         return self.head() + b'\1' + struct.pack('>i', self.id) + b'\1' + struct.pack('>i3f', self.type, self.x, self.y, self.z) + self.pad
 
 
+class DamageShape(Entry):
+    """a damage collision (Luigi's Mansion's pillars: capsules "DamageeCapsule_00_LD_Pillar", subname
+    "00_LD_Pillar", which the stage finds by subname): type (3 capsule), start x / y / z, direction
+    dx / dy / dz, radius, a float (0), a byte (0)"""
+    def __init__(self, name='', subname='', magic=MAGIC_1):
+        super().__init__(name, subname, magic)
+        self.type, self.v, self.tail_byte = 3, [0.0] * 8, 0
+
+    def read(self, r):
+        self.read_head(r)
+        r.u8()
+        self.type = r.i32()
+        self.v = list(r.f32(8))
+        self.tail_byte = r.u8()
+
+    def write(self):
+        return self.head() + b'\1' + struct.pack('>i8f', self.type, *self.v) + bytes([self.tail_byte])
+
+
+def capsule(name, subname, start, direction, radius):
+    """a DamageShape capsule from start (x, y, z) along direction (dx, dy, dz)"""
+    d = DamageShape(name, subname)
+    d.v = [*map(float, start), *map(float, direction), float(radius), 0.0]
+    return d
+
+
 class Raw(Entry):
     """an entry kept as its bytes (damage shapes: their length depends on the type)"""
 
 
 SECTIONS = [('collisions', Collision), ('spawns', Point), ('respawns', Point), ('camera', Bounds),
             ('blast', Bounds), ('enemy', None), ('s7', None), ('s8', None), ('s9', None), ('s10', None),
-            ('s11', None), ('damage', None), ('items', ItemSpawner), ('shapes', GeneralShape),
+            ('s11', None), ('damage', DamageShape), ('items', ItemSpawner), ('shapes', GeneralShape),
             ('points', GeneralPoint)]
 
 
