@@ -693,7 +693,9 @@ reads", "Position variables" and "Losing the copy when hit" above.)
 
 (Then `$(cat build/marthsword/rpx_args.txt) $(python3 tools/stage_slot_cave.py)
 $(python3 tools/copy_held_cave.py)`: the Marth copy sword aerials' motion tables, the new stage slot,
-and the copy held model shown in those aerials; see `fighters/kirby/specials.md`.)
+and the copy held model shown in those aerials; see `fighters/kirby/specials.md`. Then
+`$(python3 tools/stage_script_cave.py) 0x0311CE50=0x38600001`: stage scripts and My Music group
+names read from `bgm_mymusic.mmb`; see `docs/minecraft-world.md`.)
 
 Other copies: the native part (params, weapon custom number) is generic. The body ACMD is picked
 by MSC: every copy's pair of motion helpers (`[Copy: shared] helper`, e.g. Captain Falcon

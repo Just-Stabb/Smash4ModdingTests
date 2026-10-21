@@ -298,14 +298,50 @@ What the result tells:
   animation (the cave would have to move the models too);
 - they drift apart over the match: the frame counts differ (loop length or slow motion).
 
-## Music (in progress)
+## Music
 
 Ultimate's Minecraft World playlist (`ui_bgm_db.prc`'s `bgmpickel`, the user's `ui-SSBU.zip`): 7
 tracks, `stream:/sound/bgm/bgm_mc01_mc_glide` ... `bgm_mc07_mc_danceoftheblocks` (`.nus3audio`,
-the user's `stream-ssbu.zip`; `stream_property`: loop flag, end point, sudden death / transition
-start points). `tools/nus3audio_opus.py` decodes them to WAV (Namco OPUS header + Switch Opus,
-libopus; 48 kHz stereo, loop points from the header). Smash 4's side (its BGM files' format and how
-a stage's music list is set) needs the user's Smash 4 sound files.
+the user's `stream-ssbu.zip`). `tools/nus3audio_opus.py` decodes them (Namco OPUS header + Switch
+Opus, libopus; 48 kHz stereo, loop points from the header). `tools/minecraft_music.py` adds them to
+Smash 4 the way Sm4shMusic adds songs (nothing replaced; `build/minecraft_music.zip`):
+
+- **Banks** `sound/bgm/snd_bgm_MC0n_<Title>.nus3bank`: a copy of Battlefield's
+  (`snd_bgm_CRS02_Senjyou`; the writer rebuilds it byte for byte) with the name in BINF / TONE, a
+  new BINF id (unique per bank: the game's 730 go up to 6136; ours 6200+), TONE's pack size, volume
+  (Battlefield's 4.6: the tracks are as loud, -14 dB RMS) and stream info (rate, channels, samples,
+  loop start / end, loop flag at its end), and an IDSP in PACK: big-endian, `IDSP`, 0, channels,
+  rate, samples, loop start, loop end, interleave 0x10, header 0x40, header size 0x60, data 0x100,
+  data size per channel; a standard 0x60-byte DSP header per channel (loop context = the decoded
+  samples before the loop); the channels' DSP-ADPCM interleaved every 0x10 bytes. Every Smash 4 BGM
+  is 47999 Hz (0xBB7F); so are ours (48000 Hz sources, 0.002% slower). Encoder: `tools/dspadpcm`
+  (jackoalan's gc-dspadpcm-encode, MIT); 36-40 dB SNR against the decoded Opus.
+- **`sound/config/bgm_property.mpb`** (`MPB\0`, 6, count 1983, offsets or -1, 0x74-byte entries:
+  name 0x3C, 4 ints, 4 menu check points, loop start / end ms, loop start / end samples, total ms /
+  samples, all at 47999 Hz): BGM ids 1-7 (Sm4shMusic's choice: the lowest free ones; the game's
+  start at 17), each naming its file. The game's own entries leave the name empty and use its table.
+- **`param/ui/ui_sound_db.bin`**: sounds 600-606 (copies of Battlefield's, label `SOUND<id + 1>`,
+  Sound Test order 999 like Sm4shMusic, mix 3 = new remix, 0 for Clockwork Crafter which Ultimate
+  credits as Mojang's own), and NewStage01's (0x38) song list set to them in Ultimate's order.
+- **`ui/message/sound.msbt`**: the unmodified one + `MsndN_` / `MsndN2_` (title), `MsndS_`
+  (source game), `MsndW_` (staff) and `MsndO_` (copyright) for each, Ultimate's texts
+  (`msg_bgm.msbt`). The user's modified copy had been re-saved by Sm4shMusic, which relabels every
+  song in base 36 (`SOUND1A`), not matching the vanilla ui_sound_db's labels.
+- **My Music** (which song plays in a match, with what odds): `sound/config/bgm_mymusic.mmb`
+  (`MMB\0`, 4, count 94, offsets, then per group a 0x20-byte name, a count and 0x3C-byte entries:
+  BGM id, index, -1, rarity, -1, ...). The game finds a stage's group by its stage-kind name
+  (`BattleField_f`, `Galaxy`, ...; Omega shares it; NewStage01's is `NewStage01`), but names the
+  groups from its own 94-name table (`0x1041CE18`, loader `0x0311CD6C`), unless `0x02A7BA48` (a
+  stub returning 0) says to take the name fields in the file, which are blank in vanilla. RPX patch
+  `0x0311CE50=0x38600001` (that call -> `li r3, 1`) does that; the tool names all 94 groups and adds
+  a 95th, `NewStage01`, with Ultimate's odds: incidence 10000 / 5000 / 2500 -> rarity 100
+  (Halland / Dalarna) / 50 (Earth) / 25. Sm4shMusic re-saving the file would blank the names again.
+
+To check in game: the songs in the Sound Test; NewStage01 playing them (and Omega); My Music's
+NewStage01 page if there is one; nothing else losing its music; save data with a 95th group.
+
+    python3 -I tools/minecraft_music.py AUDIO sound/bgm/snd_bgm_CRS02_Senjyou.nus3bank \
+      sound/config param "ui/message/sound.msbt" OUT
 
 ## Freeze (user) and tests
 

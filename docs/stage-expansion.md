@@ -208,8 +208,9 @@ bytes changed).
 
 - **Save data / records** indexed by cosmetic id (stage play counts, unlock bits) may be fixed
   size for `0x00`-`0x37`; an id past it could write out of bounds. To check before release.
-- **Music**: the stage's song list (My Music) is per stage, by name (the sound config groups,
-  Manifold's `s_musicGroupNames` at `0x1041CE18`). A new name may need its own group or to be
-  pointed at an existing stage's.
+- **Music**: the stage's song list (My Music) is per stage, by its stage-kind name (the sound config
+  groups, Manifold's `s_musicGroupNames` at `0x1041CE18`). `0x0311CE50=0x38600001` makes the game
+  take the group names from `bgm_mymusic.mmb` instead, so a new stage gets a group by adding one
+  (`tools/minecraft_music.py`, `docs/minecraft-world.md`); untested in game yet.
 - **Online / replays** store stage ids; a modded stage there is untested.
 - Other `0x80` / `0x38` bounds checks on kinds or cosmetic ids that only show up in game.
