@@ -814,7 +814,9 @@ def far_parts(setdir):
     """the panorama (split, see split_wide) and its fog layer (Ultimate's distance haze: a blended
     texture in front of it; 1% nearer, as it's drawn over the panorama there)"""
     parts = load_parts(setdir)
-    fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - p['uv'][:, 1]],
+    # v clamped first: plains' runs 0-1, the other biomes' 0-7 (Ultimate's sampler clamps it); read
+    # the other way up and repeated, it tiled the ramp in bands: pale see-through boxes (user)
+    fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - np.clip(p['uv'][:, 1], 0, 1)],
                 col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)))
            for p in parts if p['sub'] == 1]
     pano = [p for p in parts if p['sub'] == 0]
@@ -1026,7 +1028,44 @@ def torch_points(src, labels, row):
 TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 0.8     # the most: 1.6 blew out Omega's lamp post (four torches on it, user)
 TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
 DOOR_LIGHT_MAX = 0.35               # the doors' corners are next to their torches: at the cap, far too bright (user)
-TORCH_LIGHT_LIFT = 0.05             # the copy this far out along its normals, in front of the island
+TORCH_LIGHT_LIFT = 0.25             # the copy this far out along its normals, in front of the island
+                                    # (0.05 flickered against it with the camera's distance, user)
+
+
+def lamp_points(parts, torches, apart=8.0):
+    """the island's other lights (taiga's lantern, snowy tundra's): its emissive meshes' connected
+    pieces, those within `apart` of each other as one, minus the torches (within `apart` of one)"""
+    centers = []
+    for p in parts:
+        if not p['emissive'] or p.get('idx') is None:
+            continue
+        n = len(p['pos'])
+        par = np.arange(n)
+
+        def root(x):
+            while par[x] != x:
+                par[x] = par[par[x]]
+                x = par[x]
+            return x
+        for a, b, c in np.asarray(p['idx']).reshape(-1, 3):
+            for u, v in ((a, b), (b, c)):
+                ru, rv = root(u), root(v)
+                if ru != rv:
+                    par[ru] = rv
+        groups = {}
+        for i in range(n):
+            groups.setdefault(root(i), []).append(i)
+        centers += [p['pos'][g].mean(0) for g in groups.values()]
+    lamps = []
+    for c in centers:
+        for m in lamps:
+            if np.linalg.norm(np.mean(m, 0) - c) < apart:
+                m.append(c)
+                break
+        else:
+            lamps.append([c])
+    lamps = [np.mean(m, 0) for m in lamps]
+    return [c for c in lamps if all(np.linalg.norm(c - t) >= apart for t in torches)]
 
 
 def torch_light(meshes, points, cap=None):
@@ -1977,7 +2016,8 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         if name == RING_SET and torches == 'still':
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
         if name == RING_SET and curves and points:
-            meshes += torch_light(meshes, points)
+            # the torches' light, and the island's lamps' (lamp_points)
+            meshes += torch_light(meshes, points + lamp_points(near, points))
         if name == FAR_SET and curves:
             for m in to_nud(pano_glow(far_dir, tex), tex, 'bg'):
                 for poly in m.polygons:
