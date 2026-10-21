@@ -121,7 +121,21 @@ def main():
         seen.add(path())
     want_last = folders.index(path(site=0x02AB83A0))
     check('the last random pick is kept for the prefetch', folders[want_last] in folders, True)
-    check('random reaches every biome', sorted(seen), sorted(folders))
+    check('random reaches every biome (hazards on)', sorted(seen), sorted(folders[:C.N_BIOMES]))
+    for held, want in ((C.L | C.ZL, 6), (C.L | C.R | C.ZL, 7), (C.L | C.STICK_UP | C.Z, 8),
+                       (C.L | C.STICK_LEFT | C.ZL | C.A, 11)):
+        t += step
+        settime(t)
+        pads(held)
+        check('held 0x%X (hazards off)' % held, path(), folders[want])
+    seen = set()
+    for i in range(300):
+        t += step + i * 977
+        settime(t)
+        pads(C.ZL)
+        seen.add(path())
+    check('ZL alone: a random biome, hazards off', sorted(seen), sorted(folders[C.N_BIOMES:]))
+    want_last = folders.index(path(site=0x02AB83A0))
     t += step
     settime(t)
     pads(C.L | C.STICK_UP)

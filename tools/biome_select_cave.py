@@ -42,13 +42,19 @@ PADS = 0x1057581C               # the pad manager's slot array (26 wrappers)
 SLOTS = 17                      # 0 GamePad, (1 a dummy), 2-8 Wii Remotes / Pro, 9-16 GameCube
 WINDOW = 20                     # ~5.4 s
 
-L, R, A = 0x1000, 0x2000, 0x10
+L, R, A, ZL, Z = 0x1000, 0x2000, 0x10, 0x4000, 0x200
 STICK_LEFT, STICK_RIGHT, STICK_DOWN, STICK_UP = 0x80000, 0x100000, 0x200000, 0x400000
 DPAD_LEFT, DPAD_RIGHT, DPAD_DOWN, DPAD_UP = 0x1, 0x2, 0x4, 0x8
 
-# the biomes' folders, in the order the buttons pick them (index 0: L alone)
+# the biomes' folders, in the order the buttons pick them (index 0: L alone), then the same with
+# hazards off (tools/minecraft_world.py --hazards off: no breakable blocks, Ultimate's
+# gimmick-off collision), picked with OFF held as well (ZL; Z on a GameCube controller, which has
+# no ZL and whose L is its left trigger), the biome by the same buttons or at random
 BIOMES = [('plains', 'NewStage01'), ('birchforest', 'NewStage01_forest'), ('savanna', 'NewStage01_savanna'),
           ('taiga', 'NewStage01_taiga'), ('snowytundra', 'NewStage01_tundra'), ('stoneshore', 'NewStage01_shore')]
+OFF = ZL | Z
+BIOMES += [(b, f + '_off') for b, f in BIOMES]
+N_BIOMES = len(BIOMES) // 2
 # with L held: (buttons, biome index), the first that's held wins
 BUTTONS = [(R, 1), (STICK_UP | DPAD_UP, 2), (STICK_RIGHT | DPAD_RIGHT, 3), (STICK_DOWN | DPAD_DOWN, 4),
            (STICK_LEFT | DPAD_LEFT, 5)]
@@ -121,6 +127,10 @@ random:
         mullw r8, r8, r0
         subf r9, r8, r7
 chosen:
+        andi. r0, r11, %(off)d
+        beq store
+        addi r9, r9, %(n)d
+store:
         stw r9, 4(r12)
 use:
         slwi r9, r9, 2
@@ -132,7 +142,7 @@ data:
         .word 0
         .word 0
 """ % dict(kind8=KIND * 8, window=WINDOW, pads_hi=PADS >> 16, pads_lo=PADS & 0xFFFF, slots=SLOTS, l=L,
-           tests=tests, n=len(BIOMES), back=BACK, ret_hi=SETTING_RET >> 16, ret_lo=SETTING_RET & 0xFFFF))
+           tests=tests, n=N_BIOMES, off=OFF, back=BACK, ret_hi=SETTING_RET >> 16, ret_lo=SETTING_RET & 0xFFFF))
     names_at = a.addr('data') + 8 + 4 * len(BIOMES)
     strings, ptrs = b'', []
     for _biome, folder in BIOMES:
