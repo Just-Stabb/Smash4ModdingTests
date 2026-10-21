@@ -6,10 +6,11 @@ name; the scene / visibility calls record what they're asked; the RNG returns a 
   python3 tools/monster_roll_test.py PATCHED.rpx
 
 Checks: the setup hook resets and goes on to the setup's second instruction; the update returns
-the base update's result; for the stage kind, the first update rolls, shows the rolled monsters
-and hides the others (flags bit 0x80000, scene add / remove, render visibility), rolls only again
-when the counter passes the cycle (slow motion too), and a missing model is skipped; other kinds:
-nothing. The odds: 10000 rolls of a uniform RNG land within 1.5% of 40 / 35 / 20 / 5 per draw.
+the base update's result; for the stage kinds (normal and Omega): the first update rolls the
+animals and shows their folder (flags bit 0x80000, scene add / remove, render visibility), hiding
+the others; at frame 4200 (slow motion too) the night's monsters are rolled once and shown; at the
+cycle's end the animals' folder again; a missing model is skipped; other kinds: nothing. Every
+roll of 6000 against the rules in Python (Ultimate's odds), with the resulting frequencies.
 """
 import os
 import struct
@@ -38,7 +39,6 @@ def main():
     mu = machine(sys.argv[1])
     mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
     a, _words, _hooks = C.build()
-    names = [f for f, _o in C.MONSTERS]
     stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
     # find: compare the name's 5th char (h / f / g / n) to pick a model; 'n' -> missing when REC+0x20 set
     stub(mu, C.FIND_MODEL, """
@@ -113,7 +113,7 @@ f0:     blr""")
         for i, v in enumerate(seq):
             setw(RANDS + 4 * i, v)
 
-    def update(kind=C.KIND, f1=1.0):
+    def update(kind=C.KINDS[0], f1=1.0):
         setw(STAGE, kind)
         mu.reg_write(UC_PPC_REG_3, STAGE)
         mu.reg_write(UC_PPC_REG_FPR1, struct.unpack('>Q', struct.pack('>d', f1))[0])
@@ -127,65 +127,115 @@ f0:     blr""")
                 for i in range(4)]
 
     data = a.addr('data')
+
+    def roll_model(rs):
+        """the cave's rules in Python: (animal folders mask, monster folders mask) from a rand sequence
+        (each value taken % n, as 0x024F6BE8 does)"""
+        it = iter(rs)
+        r = next(it) % 100
+        run, day = 0, 0
+        for o, f in C.ANIMAL_ODDS:
+            run += o
+            if r < run:
+                day = 1 << f
+                break
+        return day
     # setup hook
     setw(data, 0x3F800000)
-    setw(data + 8, 0)
+    setw(data + 0xC, 0)
     mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
     mu.emu_start(a.addr('reset'), C.SETUP + 4, count=100)
-    check('setup: counter 0, roll due', (word(data), word(data + 8)), (0, 1))
+    check('setup: counter 0, new match', (word(data), word(data + 0xC)), (0, 1))
     check('setup: its first instruction made (stwu)', mu.reg_read(UC_PPC_REG_1), 0x7F00F000 - 0x298)
-    # first update: rolls 3 draws: 10 (zombie), 50 (skeleton), 12 (zombie) -> zombie + skeleton
+    # first update: the animals: 45 -> chicken (folder 2)
     models(True)
-    rands([10, 50, 12])
+    rands([45])
     check('update returns the base update', update(), 0x55)
-    check('rolled zombie + skeleton', shown(), [True, True, False, False])
-    check('the roll mask', word(data + 0x1C), 0b0011)
-    check('scene removes for the hidden two', word(REC + 8), 2)
-    rands([99, 99, 99])
+    check('match start: chicken (folder 2) shown, the rest hidden', shown(), [False, False, True, False])
+    rands([99] * 10)
     for _ in range(100):
         update()
-    check('no roll before the cycle ends', shown(), [True, True, False, False])
-    # run to the cycle's end in slow motion and full speed: one roll at the wrap
-    rands([96, 80, 99])
+    check('no roll in the day', (shown(), word(REC)), ([False, False, True, False], 0))
+    # to frame 4200: count 50 -> two; picks 10 -> zombie, then 40 of 60 left -> spider (35 skipped)
+    rands([50, 10, 40])
     n = 0
-    while word(REC) == 0 and n < 20000:     # until the RNG is called
+    while word(REC) == 0 and n < 10000:
         update(f1=0.5 if n % 2 else 1.0)
         n += 1
-    check('rolled at the cycle\'s end (spider + enderman)', shown(), [False, False, True, True])
-    check('the counter wrapped', struct.unpack('>f', mu.mem_read(data, 4))[0] < 2.0, True)
-    check('frames to the wrap (8900 left, 1 / 0.5 alternating)', abs(n - 8900 / 0.75) < 3, True)
-    # a missing model is skipped
+    frame = struct.unpack('>f', mu.mem_read(data, 4))[0]
+    check('the monsters rolled at frame 4200', abs(frame - C.MONSTER_FRAME) < 1.01, True)
+    check('night: zombie + spider shown', shown(), [True, False, True, False])
+    rands([0] * 10)
+    for _ in range(50):
+        update()
+    check('rolled once a night', word(REC), 0)
+    # to the cycle's end: the animals again, no roll
+    n = 0
+    while struct.unpack('>f', mu.mem_read(data, 4))[0] >= C.MONSTER_FRAME and n < 10000:
+        update()
+        n += 1
+    check('cycle end: chicken again, no roll', (shown(), word(REC)), ([False, False, True, False], 0))
+    # Omega's kind too; a missing model skipped; other kinds nothing
+    setw(data + 0xC, 1)
+    rands([5])
+    update(kind=0x81)
+    check('Omega: sheep (folder 0)', shown(), [True, False, False, False])
     setw(REC + 0x20, 1)
-    setw(data + 8, 1)
-    rands([0, 0, 0])
-    update()
-    check('missing enderman skipped, zombie only', shown()[:3], [True, False, False])
-    setw(REC + 0x20, 0)
-    # other kinds: nothing
-    setw(data + 8, 1)
+    setw(data + 0xC, 1)
+    rands([95])
     models(True)
+    update()
+    check('none (95), a missing enderman skipped', shown()[:3], [False, False, False])
+    setw(REC + 0x20, 0)
+    setw(data + 0xC, 1)
     before = word(REC + 0x10)
     update(kind=0)
-    check('other kind: no lookups', word(REC + 0x10), before)
-    check('other kind: roll still due', word(data + 8), 1)
-    # odds
+    check('other kind: no lookups, match still new', (word(REC + 0x10), word(data + 0xC)), (before, 1))
+    # statistics: 6000 nights / matches with a uniform RNG, against the rules in Python
     import random
-    rng = random.Random(1)
-    counts = [0] * 4
-    seq = [rng.randrange(1 << 32) for _ in range(30000)]
-    for k in range(10000):
-        rands(seq[3 * k:3 * k + 3])
-        setw(data + 8, 1)
+    rng = random.Random(2)
+
+    def model_night(rs):
+        it = iter(rs)
+        r = next(it) % 100
+        count = 1 if r < C.COUNT_ODDS[0] else 2 if r < C.COUNT_ODDS[0] + C.COUNT_ODDS[1] else 3
+        picked = 0
+        for _ in range(count):
+            left = [k for k in range(4) if not picked >> k & 1]
+            total = sum(C.MONSTER_ODDS[k] for k in left)
+            r = next(it) % total
+            for k in left:
+                if r < C.MONSTER_ODDS[k]:
+                    picked |= 1 << k
+                    break
+                r -= C.MONSTER_ODDS[k]
+        return picked
+    same, nights, days = 0, [0] * 4, [0] * 4
+    N = 3000
+    for _ in range(N):
+        rs = [rng.randrange(1 << 32) for _ in range(4)]
+        rands(rs)
+        setw(data + 0xC, 0)
+        setw(data + 0x10, 0)
+        setw(data, struct.unpack('>I', struct.pack('>f', C.MONSTER_FRAME - 0.5))[0])
         models(True)
         update()
-        m = word(data + 0x1C)
-        for i in range(4):
-            counts[i] += bool(m >> i & 1)
-    want = [1 - (1 - o / 100) ** 3 for _f, o in C.MONSTERS]
-    got = [c / 10000 for c in counts]
-    check('nights with each (3 draws: %s)' % ' / '.join('%.2f' % w for w in want),
-          all(abs(g - w) < 0.015 for g, w in zip(got, want)), True)
-    print('   got', ['%.3f' % g for g in got])
+        got = word(data + 0x18)
+        same += got == model_night(rs)
+        for k in range(4):
+            nights[k] += got >> k & 1
+        rs = [rng.randrange(1 << 32)]
+        rands(rs)
+        setw(data + 0xC, 1)
+        setw(data, 0)
+        update()
+        d = word(data + 0x14)
+        same += d == roll_model(rs)
+        for k in range(4):
+            days[k] += d >> k & 1
+    check('every roll as the rules in Python (%d)' % (2 * N), same, 2 * N)
+    print('   nights with zombie / skeleton / spider / enderman:', ['%.2f' % (x / N) for x in nights])
+    print('   matches with sheep / cow / chicken (folders 0 / 1 / 2):', ['%.2f' % (x / N) for x in days[:3]])
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

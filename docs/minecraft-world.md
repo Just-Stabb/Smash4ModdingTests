@@ -763,6 +763,29 @@ Built:
 Open (Cemu): the prefetch's order to the setting build; L / direction held through the confirm
 (A) and the load; the show / hide on our folders; online / replays (a clock pick isn't synced).
 
+User (v17): loads, the biomes switch with the buttons. Then (v17b):
+- **Pale see-through boxes** in the other biomes' backgrounds: their fog layer's v runs 0-7
+  (plains' 0-1; Ultimate's sampler clamps); read the other way up and repeated, the ramp tiled into
+  bands over the backdrop's big quads. v is clamped to 0-1 before the flip (`far_parts`).
+- **Grass flickering near torches**: the torch light overlay 0.05 off the faces fought them for
+  depth at the camera's distance: `TORCH_LIGHT_LIFT` 0.25.
+- **Taiga's lamp gives no light**: `lamp_points`: the island's emissive mesh's connected pieces
+  (pieces within 8 of each other as one) that aren't torches light like them (taiga's lantern at
+  (-5, 37, -180); snowy tundra's two at (55 / 75, 27, -120)).
+- **Spawns as Ultimate's** (user): pickel_world.stdat has, besides the monsters' odds, sheep /
+  chicken / cow 30 / 30 / 30 (one kind a match, else none) and guest single / double / triple
+  20 / 60 / 20 (read as how many monsters a night; their kinds then picked without repeats,
+  weighted 40 / 35 / 20 / 5). The animals are all built in Ultimate's pen, each kind sharing a
+  folder with a monster (`ANIMAL_SETS`: sheep + zombie in dyr_h, cow + skeleton dyr_f, chicken +
+  spider dyr_g; the enderman dyr_n1): each is scaled to nothing outside its time by its own
+  animation, so `monster_roll_cave.py` shows a folder by day for its animal and by night for its
+  monster: the animals' kind at the match's start (setup), the night's monsters at frame 4200,
+  the animals again at the cycle's end. Omega's update calls StageBaseCafe's (0x0264D1C0 /
+  0x0264D228) and its setup Cafe's (0x0264CB2C), so the patch takes kind 0x81 too. The folders
+  the port doesn't fill are hidden (`hide_folder`). `monster_roll_test.py`: 6000 rolls as the
+  rules in Python; nights with zombie / skeleton / spider / enderman ~0.71 / 0.67 / 0.49 / 0.13.
+  (`biome_odds` 85 and `biome_limit_count` 3 aren't used: their meaning is unknown.)
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
