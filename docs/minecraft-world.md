@@ -604,6 +604,23 @@ v15 in game (user): loaded; the doors open, the torches light up. Then (v15b):
   each record's fighter block is Battlefield's midday one (`DAY_FRAME`) with that colour and the
   intensity's ratio (gamma-encoded: 0.65 at night); the five colour tracks are midday's likewise.
 
+v15b in game (user): loaded; the flame squares gone, stars shown. Then (v15c):
+- **Stars as long streaks**: BF_FLAME's sampler clamps (wrap 3), the stars' UVs run 0-4 / -3-1,
+  so their edge texels were stretched across the sky. `BF_STARS`: the same, repeating (wrap 1).
+- **Doors still far too bright**: their overlay wasn't doubled (checked) and was at 0.5. The
+  door's own material (on a bone) had the night curve's hash but no `NU_finalColorGain`, which
+  every material Battlefield animates on a bone has; the unbound island darkens without it, the
+  door looked to stay at day brightness. `write_set` now gives every curve material the property;
+  `DOOR_LIGHT_MAX` 0.35.
+- **Omega's lamp post extremely bright** (four torches on it): `TORCH_LIGHT_MAX` 1.6 -> 0.8 (the
+  walls a few blocks away were at about 0.9).
+- **No fighter shadows**: Smash 4 draws them on materials with flag 0x40 (Smash Forge's
+  `TextureFlag.Shadow`); our 0xA3C01081 has none (0x81: glow, diffuse). Battlefield's own platform
+  (stc_c_Ring_set) is 0xA4001041 (and 0xA6101045 with a reflection), lit. `--island-shader shadow`
+  (`ISLAND_FLAGS`) puts the island on it: a test, as a lit shader once washed the colours out.
+
+`build/minecraft_world_v15c_tests.zip`: test A (the island unlit, no shadows), B (on 0xA4001041).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

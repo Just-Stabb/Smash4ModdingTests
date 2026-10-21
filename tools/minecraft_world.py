@@ -754,6 +754,9 @@ BF_SMOKE = (0xA4011001, 5, 1, 516, 0, 1029,
              ('NU_diffuseColor', [1.0, 1.0, 1.0, 0.0]), ('NU_fogColor', [0.43, 0.712, 0.994, 0.0]),
              ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 1)
 BF_GLOW = (BF_FLAME[0], 5, 1) + BF_FLAME[3:]
+# the stars: the flames' material, their texture repeated (UVs 0-4 and -3-1; the flames' clamp
+# drew their edge texels as long streaks, user)
+BF_STARS = BF_FLAME[:7] + (1,)
 
 
 def bf_material(spec, tex_id):
@@ -900,8 +903,13 @@ def write_set(outdir, meshes, tex, curves=None):
         for p in m.polygons:
             for mat in p.materials:
                 mat.props = [(n, [h, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else v) for n, v in mat.props]
-                if GAIN_FLAGS and mat.flags == 0xA2001001:
+                if GAIN_FLAGS and mat.flags == 0xA2001001 and not (ISLAND_FLAGS and k == 'island'
+                                                                   and outdir.endswith(RING_SET)):
                     mat.flags = GAIN_FLAGS
+                if not any(n == 'NU_finalColorGain' for n, _v in mat.props):
+                    # as every material Battlefield animates on a bone has it (v15b: without it the
+                    # doors on their bones seemed to stay at full day brightness at night, user)
+                    mat.props.insert(1, ('NU_finalColorGain', [1.0, 1.0, 1.0, 1.0]))
         if k not in kinds:
             kinds.append(k)
     if os.path.exists(outdir + '/model.mta'):
@@ -1015,9 +1023,9 @@ def torch_points(src, labels, row):
 # 5 / 2: source alpha, one), their texture times a warm light in the vertex colours (per corner,
 # as Minecraft's smooth lighting: a quarter from everywhere, the rest by how much the face looks
 # at the torch), the curve 'torchlight' fading it in as the island darkens
-TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 1.6
+TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 0.8     # the most: 1.6 blew out Omega's lamp post (four torches on it, user)
 TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
-DOOR_LIGHT_MAX = 0.5                # the doors' corners are next to their torches: at the cap, far too bright (user)
+DOOR_LIGHT_MAX = 0.35               # the doors' corners are next to their torches: at the cap, far too bright (user)
 TORCH_LIGHT_LIFT = 0.05             # the copy this far out along its normals, in front of the island
 
 
@@ -1457,6 +1465,10 @@ MOON_GLOW, MOON_GLOW_ALPHA, MOON_BRIGHT = (205, 218, 255), 1.6, 1.8
 # bloom; here they came out at 0.17 at most, not seen in game (user). Drawn at that 1.5, alpha 1
 STARS_BRIGHT = 1.5
 GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 on materials with a curve
+# fighters' shadows: Smash 4 draws them on materials with flag 0x40 (Smash Forge's NudEnums
+# TextureFlag.Shadow); our unlit 0xA3C01081 (0x81: glow, diffuse) has none, so no shadows (user).
+# Battlefield's own platform (stc_c_Ring_set) is 0xA4001041, lit. A test: the island on it
+ISLAND_FLAGS = None
 # light.bin (the fighters' lights; their records every 3 frames): Battlefield's own records for the
 # same time of day (its cycle: night 1950-2400 and 0-100, dawn 200-500, day 800-1100, sunset
 # 1300-1800), as (our frame, its record, counted on past 2400)
@@ -1599,7 +1611,7 @@ def cycle_light(path, phases=LIGHT_PHASES, fighter=None):
 def sky_rig(src, form, tex):
     """the sun, the moon and the stars (far_common_set, each mesh on one bone) on a made skeleton,
     turning as Ultimate's (sunmoon_rotateAxis, stars_RotateAxis) over CYCLE; the sun and the moon
-    alpha-blended (BF_GLOW), the stars added (BF_FLAME)"""
+    alpha-blended (BF_GLOW), the stars added (BF_STARS)"""
     d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
     setdir = '%s/model/far_common_set' % d
     parts = [p for p in load_parts(setdir) if p['label'] in RIG_LABELS]
@@ -1624,7 +1636,7 @@ def sky_rig(src, form, tex):
     for p in parts:
         for m in to_nud([p], tex, 'bg'):
             for poly in m.polygons:
-                poly.materials = [bf_material(BF_GLOW if p['label'] in GLOW_LABELS else BF_FLAME,
+                poly.materials = [bf_material(BF_GLOW if p['label'] in GLOW_LABELS else BF_STARS,
                                               poly.materials[0].textures[0]['hash'])]
                 if p['label'] == 'zz_moon':
                     poly.col[:, :3] = round(128 * MOON_BRIGHT)
@@ -1725,6 +1737,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         for m, part in zip(meshes, [q for q in parts if q['textures'] and q['uv'] is not None]):
             m.gain = {RING_SET: 'island', FAR_SET: 'pano', FOG_SET: 'fog'}.get(name) or (
                 'sun' if part['label'].startswith('zz_sun') else 'sky')
+        if name == RING_SET and ISLAND_FLAGS:
+            for m in meshes:
+                for poly in m.polygons:
+                    for mat in poly.materials:
+                        mat.flags = ISLAND_FLAGS
         if name == RING_SET and torches == 'still':
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
         if name == RING_SET and curves and points:
@@ -1829,11 +1846,14 @@ def main():
     ap.add_argument('--daynight', default='on', choices=('on', 'off'), help="Ultimate's day / night cycle, or midday")
     ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a3c',
                     help="a test: the curves on our unlit 0xA2001001 or on Battlefield's 0xA3C01081")
+    ap.add_argument('--island-shader', choices=('unlit', 'shadow'), default='unlit',
+                    help="a test: the island on Battlefield's platform shader 0xA4001041 (fighters' shadows)")
     ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
                     help="the two animals in the pen (Ultimate picks one of the three each time)")
     a = ap.parse_args()
-    global GAIN_FLAGS
+    global GAIN_FLAGS, ISLAND_FLAGS
     GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
+    ISLAND_FLAGS = 0xA4001041 if a.island_shader == 'shadow' else None
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
                                   form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
