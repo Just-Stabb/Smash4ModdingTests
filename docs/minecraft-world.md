@@ -657,6 +657,22 @@ v15e:
 
 `build/minecraft_world_v15e_tests.zip`: test A (unlit), D (shadows, own lights).
 
+User: D loads with shadows and looks good, torch light still there; the shadows go at the darkest
+point of the night; the stars look good but show over the moon. v15f (D the default:
+`--island-shader shadow`):
+- **Shadows at night**: a light.bin record ends with 16 bytes: a word, then a position ~55000 out
+  following Battlefield's sun (midday (53100, 14294, -2112), at night below the horizon): the
+  shadows' light. `cycle_light` copied Battlefield's for the time of day; now `SHADOW_SUN` (Ultimate's
+  sun, ISLAND_LIT's main light, x 55000) every frame.
+- **Stars over the moon**: Ultimate's stars are at 27000-41700 from the sky's turning point
+  (0, 250, 0), in front of the moon (45000); Ultimate draws the moon over them, Smash 4 by depth.
+  The stars (`STARS_PUSH` 1.75: 46900-72800) and the sky dome (`DOME_PUSH` 1.76: 78900-83700,
+  Battlefield's own reaches 85000) are pushed out from that point: the same directions and sizes
+  on screen, the sun and the moon in front.
+- With `--daynight off` and the shadow island, `still_light` writes ISLAND_LIT at midday.
+
+`build/minecraft_world_v15f_test.zip`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

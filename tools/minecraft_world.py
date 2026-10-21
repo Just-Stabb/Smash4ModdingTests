@@ -947,7 +947,8 @@ def still_light(path, frame=DAY_FRAME):
     # (enabled, direction, hue, saturation, value) and 4 more bytes
     o = 116 * (1 + ISLAND_LIGHT_SET)
     assert struct.unpack('>i', r[o:o + 4])[0] == 1
-    for k, (on, v, h, sat, val) in enumerate(ISLAND_LIGHTS):
+    lights = [(on, v, 0.0, 0.0, val) for on, v, val in ISLAND_LIT] if ISLAND_FLAGS else ISLAND_LIGHTS
+    for k, (on, v, h, sat, val) in enumerate(lights):
         r[o + 28 * k:o + 28 * k + 28] = struct.pack('>i6f', on, *v, h, sat, val)
     d[rec:] = bytes(r) * n
     return bytes(d)
@@ -1469,7 +1470,18 @@ GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 
 # fighters' shadows: Smash 4 draws them on materials with flag 0x40 (Smash Forge's NudEnums
 # TextureFlag.Shadow); our unlit 0xA3C01081 (0x81: glow, diffuse) has none, so no shadows (user).
 # Battlefield's own platform (stc_c_Ring_set) is 0xA4001041, lit. A test: the island on it
-ISLAND_FLAGS = None                 # 0xA4001041 with ISLAND_LIT (--island-shader shadow)
+ISLAND_FLAGS = None                 # 0xA4001041 with ISLAND_LIT (--island-shader shadow, the default)
+# a light.bin record's last 16 bytes: a word, then a position ~55000 out that follows Battlefield's
+# sun (midday (53100, 14294, -2112), night below the horizon): the shadows' light. Battlefield's
+# for the time of day put it below the horizon at night, and the shadows went (v15e test D, user);
+# now Ultimate's sun (ISLAND_LIT's main light) every frame
+SHADOW_SUN = (0.204 * 55000, 0.903 * 55000, 0.379 * 55000)
+# the stars (Ultimate's at 27000-41700 from the sky's turning point, in front of the moon at
+# 45000: Ultimate draws the moon over them, Smash 4 by depth, so they showed over it, user) and
+# the sky dome (44700-47550) pushed out from that point (SKY_PIVOT): the stars behind the sun and
+# the moon (47200-72900), the dome behind them (78700-83700; Battlefield's own reaches 85000)
+SKY_PIVOT = np.array([0.0, 250.0, 0.0])
+STARS_PUSH, DOME_PUSH = 1.75, 1.76
 # v15c test B (the island on it, Battlefield's island lights): shadows, but its look wrong (user).
 # v15d test C, the island unlit and a shadow catcher over it on 0xA4001041 multiplied (blend 8 / 0,
 # destination colour, zero, per Smash Forge): shadows, but the catcher drawn opaque white (user; no
@@ -1619,6 +1631,7 @@ def cycle_light(path, phases=LIGHT_PHASES, fighter=None, island=None):
             h, sat, _v = colorsys.rgb_to_hsv(*col[i])
             r[:116] = day
             r[:28] = struct.pack('>i6f', on, *v, h * 360, sat, val * bright[i])
+            r[-12:] = struct.pack('>3f', *SHADOW_SUN)
             if island is not None:
                 o = 116 * (1 + ISLAND_LIGHT_SET)
                 c = island[f[i]]
@@ -1636,6 +1649,8 @@ def sky_rig(src, form, tex):
     d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
     setdir = '%s/model/far_common_set' % d
     parts = [p for p in load_parts(setdir) if p['label'] in RIG_LABELS]
+    parts = [dict(p, pos=SKY_PIVOT + (p['pos'] - SKY_PIVOT) * STARS_PUSH) if p['label'] == 'sun_stars' else p
+             for p in parts]
     stars = [p for p in parts if p['label'] == 'sun_stars']
     if stars:                               # each star its brightest texel only
         from PIL import Image, ImageFilter
@@ -1741,6 +1756,9 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
 
     cloud_parts = [p for p in sky if p['bone'] in CLOUD_SETS]
     sky = [p for p in sky if p['bone'] not in CLOUD_SETS and not (daynight and p['label'] in RIG_LABELS)]
+    if daynight:                            # behind the stars (STARS_PUSH)
+        sky = [dict(p, pos=SKY_PIVOT + (p['pos'] - SKY_PIVOT) * DOME_PUSH) if p['label'] == 'sfx_sky_color' else p
+               for p in sky]
     villagers, animals = mob_kinds(src, form, biome, animal, daynight)
     rig = villagers or (effect and torches == 'animated')
     curves = daynight_curves(src, form, FAR[biome] if form == 'melee' else 'far_plains_set') if daynight else None
@@ -1878,9 +1896,9 @@ def main():
     ap.add_argument('--daynight', default='on', choices=('on', 'off'), help="Ultimate's day / night cycle, or midday")
     ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a3c',
                     help="a test: the curves on our unlit 0xA2001001 or on Battlefield's 0xA3C01081")
-    ap.add_argument('--island-shader', choices=('unlit', 'shadow'), default='unlit',
-                    help="a test: the island on Battlefield's platform shader 0xA4001041 (fighters' shadows), "
-                         "lit by ISLAND_LIT")
+    ap.add_argument('--island-shader', choices=('unlit', 'shadow'), default='shadow',
+                    help="the island on Battlefield's platform shader 0xA4001041 lit by ISLAND_LIT (fighters' "
+                         "shadows; v15e test D, user), or unlit with its shading baked")
     ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
                     help="the two animals in the pen (Ultimate picks one of the three each time)")
     a = ap.parse_args()
