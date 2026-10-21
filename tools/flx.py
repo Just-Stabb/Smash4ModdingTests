@@ -10,7 +10,8 @@ Format: docs/flx2-format.md.
 
 A movie is Flash-like: sprites (movie clips; sprite 0 is the root) with frames, frame labels and
 keyframes; each keyframe is the full display list of that frame: placements of images, sprites
-or text fields, with a transform and a colour transform. All tables are global and referenced by
+or text fields, with a transform and a colour transform. The game finds instances by name
+(e.g. root/dmg_1/ko_mc) and drives their frames by label. All tables are global and referenced by
 index; this module keeps them that way (Flx.sprites, .keys, .places, ...) and has helpers to append
 new images, sprites and instances (add_*, insert_place).
 """
@@ -41,15 +42,17 @@ def _dec(b):
 # ---------------------------------------------------------------- records
 @dataclass
 class Transform:
-    """flags: 1 x, 2 y, 4 scale x (also y without 8), 8 scale y, 0x10 angle (u16, 0x10000 = 360
-    degrees; rotates the x axis, and the y axis without 0x20), 0x20 angle of the y axis"""
+    """flags: 1 x, 2 y, 4 scale x (also y without 8), 8 scale y, 0x10 angle rot, 0x20 angle rot2
+    (u16, 0x10000 = 360 degrees, clockwise on screen). Alone, rot is a rotation; with 0x20 they are
+    Flash's skewX (rot: the y axis's angle) and skewY (rot2: the x axis's angle), e.g. rot2 = 180
+    degrees mirrors horizontally, rot = 180 vertically"""
     flags: int = 3
     x: float = 0.0
     y: float = 0.0
     sx: float = 1.0
     sy: float = 1.0
     rot: int = 0
-    rot_y: int = 0
+    rot2: int = 0
 
     @staticmethod
     def make(x=0.0, y=0.0, sx=1.0, sy=None, deg=0.0):
@@ -69,9 +72,9 @@ class Transform:
         f = self.flags
         sx = self.sx if f & 4 else 1.0
         sy = self.sy if f & 8 else sx
-        r1 = self.rot * math.pi / 0x8000 if f & 0x10 else 0.0
-        r2 = self.rot_y * math.pi / 0x8000 if f & 0x20 else r1
-        return (sx * math.cos(r1), sx * math.sin(r1), -sy * math.sin(r2), sy * math.cos(r2),
+        ry = self.rot * math.pi / 0x8000 if f & 0x10 else 0.0
+        rx = self.rot2 * math.pi / 0x8000 if f & 0x20 else ry
+        return (sx * math.cos(rx), sx * math.sin(rx), -sy * math.sin(ry), sy * math.cos(ry),
                 self.x if f & 1 else 0.0, self.y if f & 2 else 0.0)
 
     def encode(self):
@@ -80,7 +83,7 @@ class Transform:
         for bit, v in ((1, self.x), (2, self.y), (4, self.sx), (8, self.sy)):
             if f & bit:
                 out += struct.pack('>f', v)
-        for bit, v in ((0x10, self.rot), (0x20, self.rot_y)):
+        for bit, v in ((0x10, self.rot), (0x20, self.rot2)):
             if f & bit:
                 out += struct.pack('>H', v)
         return out
@@ -96,12 +99,12 @@ class Transform:
                 o += 4
         if not f & 8:
             t.sy = t.sx
-        for bit, k in ((0x10, 'rot'), (0x20, 'rot_y')):
+        for bit, k in ((0x10, 'rot'), (0x20, 'rot2')):
             if f & bit:
                 setattr(t, k, struct.unpack('>H', b[o:o + 2])[0])
                 o += 2
         if not f & 0x20:
-            t.rot_y = t.rot
+            t.rot2 = t.rot
         assert not f & 0xC0, 'transform flags 0x%X' % f
         return t, o
 
@@ -113,7 +116,7 @@ class Transform:
         if f & 0x10:
             s += ' rot %.1f' % (self.rot * 360.0 / 0x10000)
         if f & 0x20:
-            s += '/%.1f' % (self.rot_y * 360.0 / 0x10000)
+            s += '/%.1f' % (self.rot2 * 360.0 / 0x10000)
         return s
 
 
@@ -145,7 +148,9 @@ class Sprite:
 @dataclass
 class Key:
     """keyframe: the whole display list (Flx.places indices, highest depth first) and a frame
-    action number (per sprite, NONE16 = none; the action bodies are not in the file)"""
+    action (NONE16 = none): an index into the game's native per-sprite function table (compiled
+    ActionScript: stop(), gotoAndPlay(...)), not in the file. New sprites past the end of that
+    table (dmg: 0x5F entries) must not have actions."""
     action: int = NONE16
     places: list = field(default_factory=list)
 
@@ -160,7 +165,7 @@ class Place:
     slot: int = 0          # child slot in the parent sprite: same slot and char = same instance
     char: int = 0
     depth: int = 0         # stacking order (higher is in front; display lists are sorted by it)
-    blend: int = 0         # 0 normal, 9 (glow effects; probably additive)
+    blend: int = 0         # 0 normal, 9 on glow effects (drawn additive by flx_render)
     xform: int = NONE16    # Flx.transforms index
     color: int = NONE16    # Flx.colors index
     info: int = NONE16     # Flx.infos index
@@ -211,7 +216,7 @@ class Flx:
         self.bg_color = 0
         self.fps = 60
         self.width, self.height = 1920, 1080
-        self.unk_counts = [0] * 6   # header 0x28-0x33: not read by the loader (see the format doc)
+        self.unk_counts = [0] * 6   # header 0x28-0x33: not read by the loader; kept as they are
         self.sprites = []
         self.transforms = []
         self.colors = []
@@ -358,10 +363,6 @@ class Flx:
 
 
 # ---------------------------------------------------------------- read / write
-SECTIONS = ['sprites', 'transforms', 'colors', 'infos', 'texts', 'formats', 'keys', 'places',
-            'lists', 'labels', 'frames', 'images', 'strings']
-
-
 def read(data):
     """parse .flx bytes into a Flx"""
     assert data[:4] == b'flx2', data[:4]
