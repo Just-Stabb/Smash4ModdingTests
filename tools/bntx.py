@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Smash Ultimate UI textures (.bntx, Switch): the first texture's first mip, as RGBA.
+"""Smash Ultimate textures (.bntx, Switch): a texture's first mip, as RGBA.
 
-  python3 tools/bntx.py png FILE.bntx OUT.png
+  python3 tools/bntx.py png FILE.bntx OUT.png     the first texture
+  python3 tools/bntx.py all FILE OUTDIR           every texture (also a BNTX inside another file,
+                                                  e.g. an effect .eff), as NAME.png
 
 BNTX: an "NX  " block after the 0x20 header, a BRTI block per texture (format, size, block height,
 the mip offsets); the data is Tegra block-linear (nutexb.deswizzle) with the BRTI's block height.
@@ -24,7 +26,23 @@ BLOCK_BYTES = {0x1A: 8, 0x1B: 16, 0x1C: 16, 0x1D: 8, 0x1E: 16, 0x20: 16, 0x0B: 4
 def read(path):
     d = open(path, 'rb').read()
     assert d[:4] == b'BNTX', path
-    i = d.index(b'BRTI')
+    return _brti(d, d.index(b'BRTI'))
+
+
+def read_all(d):
+    """{name: RGBA} of every texture of the first BNTX in d (offsets are from the BNTX's start)"""
+    d = d[d.index(b'BNTX'):]
+    out = {}
+    i = d.find(b'BRTI')
+    while i >= 0:
+        name_ptr, = struct.unpack('<Q', d[i + 0x60:i + 0x68])
+        n, = struct.unpack('<H', d[name_ptr:name_ptr + 2])
+        out[d[name_ptr + 2:name_ptr + 2 + n].decode()] = _brti(d, i)
+        i = d.find(b'BRTI', i + 4)
+    return out
+
+
+def _brti(d, i):
     mips, = struct.unpack('<H', d[i + 0x16:i + 0x18])
     fmt, = struct.unpack('<I', d[i + 0x1C:i + 0x20])
     w, h, _depth, _layers, layout = struct.unpack('<5I', d[i + 0x24:i + 0x38])
@@ -63,9 +81,14 @@ def read(path):
 
 
 def main():
+    from PIL import Image
     if sys.argv[1] == 'png':
-        from PIL import Image
         Image.fromarray(read(sys.argv[2]), 'RGBA').save(sys.argv[3])
+    elif sys.argv[1] == 'all':
+        os.makedirs(sys.argv[3], exist_ok=True)
+        for name, img in read_all(open(sys.argv[2], 'rb').read()).items():
+            Image.fromarray(img, 'RGBA').save('%s/%s.png' % (sys.argv[3], name))
+            print(name, img.shape[1], img.shape[0])
 
 
 if __name__ == '__main__':

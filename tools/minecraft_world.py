@@ -55,8 +55,13 @@ EXTRA = {'plains': ['door_plains_butcher_set', 'door_plains_firmer_set', 'vegeta
 ATLAS = 'all_blocks-rgba_c2_add'
 TEX_BASE = 0x2000F000               # texture IDs of the port: 0x2000F001... (Battlefield's: 0x2000xxxx below 0x2000F000)
 CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
-SKY_TOP, SKY_HORIZON = np.array([0.47, 0.65, 1.0]), np.array([0.75, 0.85, 1.0])
-CLOUD_ALPHA = 0.7                   # the cloud layer, seen from under it, would hide most of the sky
+# the panorama's fog layer: its texture is white with alpha 0 at the top rows, 1 at the bottom, and
+# its UVs put the bottom rows on the near ground, the top near the horizon, which as read would
+# hide the hills near the island and clear them at the horizon; Ultimate shows the opposite (clear
+# near, hazy far: the user's screenshots), so the ramp is read the other way up, at this strength
+FAR_FOG_ALPHA = 0.8
+GAMMA = 2.2                         # Ultimate's material colors are linear; Smash 4's vertex colors not
+SKY_LABELS = ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core', 'fog_near')
 
 RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
 # the cloud layers (far_common_set's bones cloud_model0-2, moved by its animation) each in a
@@ -67,6 +72,18 @@ RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_mos
 CLOUD_SETS = {'cloud_model0': 'dyr_i_BG_more_far1_set', 'cloud_model1': 'dyr_j_BG_most_far0_set',
               'cloud_model2': 'dyr_l_BG_more_far2_set'}
 CLOUD_PERIOD = 4500
+# torches: Ultimate puts its flame / smoke effect (ef_pickel_world.eff's P_PickelWorldFire) at
+# pickel_world_visual.stdat's torch_info_table points (row = biome; 6 = the battle / Omega island).
+# Smash 4 can't take Ultimate's effects (other format, compiled Switch shaders), so: the effect's
+# own sprites (its BNTX: ef_pickelworld_fire00, smoke00) on quads, each on a bone of a made
+# skeleton in a dyr_ folder (all bones at the origin, as Battlefield's), animated: the flame
+# flickering, two smoke puffs a torch rising and shrinking, out of step
+TORCH_SET = 'dyr_change_160_2_O_OBJ_O_HIR_set'
+TORCH_ROW_END = 6
+TORCH_LOOP = 240                    # frames; the flicker periods and the smoke's life divide it
+SMOKE_LIFE, SMOKE_RISE, SMOKE_SHRINK = 60, 7.0, 0.7
+FLAME_SIZE, SMOKE_SIZE = 3.0, 2.5
+SMOKE_GREY, SMOKE_ALPHA = 0.45, 0.8
 SKY_GRADIENT = 'sky_gradient'       # a made texture: the day sky from the top (v 0) to the horizon
 SPLIT = 2                           # the panorama (3200x1600) in this many 2048x2048 textures,
 SPLIT_OVERLAP = 0.0625              # overlapping by its widest triangle (u)
@@ -134,6 +151,10 @@ def load_parts(setdir):
             uv=np.array(o.texture_coordinates[0].data, dtype=np.float64)[:, :2] if o.texture_coordinates else None,
             idx=np.array(o.vertex_indices, dtype=np.int64),
             textures=[t.data.lower() for t in mat.textures if not t.data.startswith('#')],
+            # Ultimate's emission shaders (a Texture5): color = texture x CustomVector3 x CustomVector8
+            # x colorSet1 x 2, unlit (render/shader/nuc2effectlibrary.nufxlb's programs)
+            emissive=any(str(t.param_id).split('.')[-1].startswith('Texture5') for t in mat.textures),
+            vec={str(v.param_id).split('.')[-1].split(':')[0]: np.array(v.data, dtype=np.float64) for v in mat.vectors},
             blend=any(b.data.destination_color.name != 'Zero' for b in mat.blend_states),
             cull=CULL.get(mat.rasterizer_states[0].data.cull_mode.name, 1029) if mat.rasterizer_states else 1029))
     return parts
@@ -469,6 +490,8 @@ class Textures:
         self.src = src
         self.ids = {}
         self.order = []
+        self.sky = np.ones((256, 3))
+        self.extra = {}                     # made textures: name -> RGBA
         self.files = {os.path.basename(f)[:-7].lower(): f
                       for f in glob.glob(src + '/*/model/*/*.nutexb') + glob.glob(src + '/*/render/*.nutexb')}
 
@@ -481,11 +504,11 @@ class Textures:
     def image(self, name):
         if name == 'default_white':
             return np.full((8, 8, 4), 255, np.uint8)
+        if name in self.extra:
+            return self.extra[name]
         if name == SKY_GRADIENT:
-            t = np.linspace(1, 0, 256)[:, None, None]
-            rgb = SKY_TOP * t + SKY_HORIZON * (1 - t)
             img = np.empty((256, 64, 4), np.uint8)
-            img[..., :3] = np.round(rgb * 255)
+            img[..., :3] = np.round(np.clip(self.sky, 0, 1) * 255)[:, None, :]
             img[..., 3] = 255
             return img
         if '#' in name:                     # 'NAME#k': slice k of SPLIT, with the overlap, 2048x2048
@@ -534,7 +557,6 @@ CULLABLE = (CUTOUT, UNLIT_CUTOUT)                   # take Ultimate's culling; t
 # a material's own fog (as Battlefield's far models have; without it the stage's default fog turns
 # everything white by a few thousand units): NU_fogParams = start, end, strength at start / end
 NO_FOG = ([0.0, 0.0, 0.0, 0.0], [36000.0, 42300.0, 0.0, 0.0])
-BACKDROP_FOG = ([0.75, 0.85, 1.0, 0.0], [8300.0, 8900.0, 0.0, 0.15])     # Ultimate's light distance haze
 
 
 def material(setup, tex_id, cull=1029, fog=NO_FOG):
@@ -576,9 +598,19 @@ def split_wide(parts):
             uv[:, 0] = (uv[:, 0] - lo) / (hi - lo)
             q = dict(p, pos=p['pos'][used], nrm=None if p['nrm'] is None else p['nrm'][used],
                      col=None if p['col'] is None else p['col'][used], uv=uv, idx=idx.reshape(-1),
-                     textures=['%s#%d' % (p['textures'][0], k)] + p['textures'][1:], sub=p['sub'] * SPLIT + k)
+                     textures=['%s#%d' % (p['textures'][0], k)] + p['textures'][1:], sub=100 * (p['sub'] + 1) + k)
             out.append(q)
     return out
+
+
+def far_parts(setdir):
+    """the panorama (split, see split_wide) and its fog layer (Ultimate's distance haze: a blended
+    texture in front of it; 1% nearer, as it's drawn over the panorama there)"""
+    parts = load_parts(setdir)
+    fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - p['uv'][:, 1]],
+                col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)))
+           for p in parts if p['sub'] == 1]
+    return split_wide([p for p in parts if p['sub'] == 0]) + fog
 
 
 def to_nud(parts, tex, kind, sky=False):
@@ -591,41 +623,51 @@ def to_nud(parts, tex, kind, sky=False):
             tname = ATLAS
         uv = p['uv']
         col = p['col'].copy() if p['col'] is not None else np.full((len(p['pos']), 4), 0.502)
-        if kind == 'lit':
+        if p['emissive']:
+            # emission (the sky, the island's glowing blocks): Ultimate's color, as vertex colors
+            tint = p['vec'].get('CustomVector3', np.ones(4))[:3] * p['vec'].get('CustomVector8', np.ones(4))[:3]
+            col[:, :3] = (tint * col[:, :3] * 2) ** (1 / GAMMA) / 2
+        elif kind == 'lit':
             if p['shader'].startswith('SFX_PBS_52'):
+                # toon shaders (Texture11 a ToonGradationMap): colorSet1 drives their lighting, not color
                 col[:, :3] = 0.5
             else:
                 col[:, :3] = np.where(col[:, :3] < 0.5, 0.5 - (0.5 - col[:, :3]) * AO_KEEP, col[:, :3])
         col = np.clip(np.round(col * 253), 0, 255)
-        if sky:
-            # Ultimate tints the sky in its shader; a day gradient instead, in a texture (by
-            # elevation; the vertex colors left at 1.0)
+        if sky and p['label'] == 'sfx_sky_color':
+            # the dome's color by elevation in a texture (vertex colors at 1.0), in case the unlit
+            # shader doesn't take vertex colors
             d = p['pos'] / (np.linalg.norm(p['pos'], axis=1, keepdims=True) + 1e-9)
-            t = np.clip(d[:, 1] * 3, 0, 1)
-            if p['label'] == 'sfx_sky_color':
-                tname = SKY_GRADIENT
-                uv = np.c_[np.full(len(t), 0.5), 1 - t]
-                col[:, :3] = 127
-            elif p['label'].startswith('sfx_cloud'):
-                col[:, 3] = 127 * CLOUD_ALPHA
-            col = np.clip(col, 0, 255)
+            t = np.clip(d[:, 1], 0, 1)
+            rows = np.round((1 - t) * 255).astype(int)
+            sky_rgb = np.zeros((256, 3))
+            for c in range(3):
+                n = np.bincount(rows, minlength=256)
+                v = np.bincount(rows, col[:, c] / 127, minlength=256)
+                have = n > 0
+                sky_rgb[:, c] = np.interp(np.arange(256), np.where(have)[0], v[have] / n[have])
+            tex.sky = sky_rgb
+            tname = SKY_GRADIENT
+            uv = np.c_[np.full(len(t), 0.5), 1 - t]
+            col[:, :3] = 127
         tid = tex.id(tname)
         poly = nud.Polygon()
         poly.pos, poly.nrm, poly.uvs = p['pos'], p['nrm'], [uv]
         poly.col = col
         poly.idx = p['idx']
         atlas = tname.startswith('all_blocks')
-        cloud = sky and p['label'].startswith('sfx_cloud')
         cull = 1029 if p['cull'] == 1029 else 0
-        blend = p['blend'] and not atlas or cloud
+        blend = p['blend'] and not atlas
         if kind == 'bg':
             # the backdrop and sky: Ultimate's are unlit (lighting baked in their textures)
             setup = UNLIT_BLEND if blend else UNLIT if sky else UNLIT_CUTOUT
+        elif p['emissive']:
+            setup = UNLIT_BLEND if blend else UNLIT_CUTOUT
         else:
             setup = BLEND if blend else CUTOUT if atlas else OPAQUE
         if cull == 0 and setup not in CULLABLE:
             poly.idx = two_sided(poly.idx)
-        poly.materials = [material(setup, tid, cull, BACKDROP_FOG if kind == 'bg' and not sky else NO_FOG)]
+        poly.materials = [material(setup, tid, cull)]
         if len(poly.pos) >= 0x10000:
             raise ValueError('%s: %d vertices' % (p['name'], len(poly.pos)))
         meshes.append(nud.Mesh('%s_%d' % (p['name'], p['sub']), [poly]))
@@ -724,8 +766,70 @@ def write_clouds(model_dir, anim_dir, parts, tex, src, form):
         open(path, 'wb').write(o.encode())
 
 
+def torch_points(src, labels, row):
+    t = ult_prc('%s/normal/param/pickel_world_visual.stdat' % src, labels)['torch_info_table'][row]
+    return [np.array([t['x%d' % i], t['y%d' % i], t['z%d' % i]]) for i in range(t['count'])]
+
+
+def write_torches(model_dir, anim_dir, points, tex, effect):
+    """the torches' flames and smoke (see TORCH_SET) into the folder: model, skeleton, animation"""
+    import zlib
+    import bntx
+    sprites = bntx.read_all(open(effect, 'rb').read())
+    tex.extra['torch_flame'] = sprites['ef_pickelworld_fire00']
+    smoke = sprites['ef_pickelworld_smoke00'][:, :32]                    # the sheet's first (largest) puff
+    tex.extra['torch_smoke'] = smoke.repeat(2, 0).repeat(2, 1)
+    bones = [('torch_root', -1)]
+    meshes = []
+    pos = {}
+    frames = np.arange(TORCH_LOOP + 1)
+
+    def quad(c, size, tname, col, setup, name):
+        h = size / 2
+        poly = nud.Polygon()
+        poly.pos = c + np.array([[-h, -h, 0], [h, -h, 0], [h, h, 0], [-h, h, 0]])
+        poly.nrm = np.tile([0.0, 0.0, 1.0], (4, 1))
+        poly.col = np.tile(np.round(np.array(col) * 127), (4, 1))
+        poly.uvs = [np.array([[0, 1], [1, 1], [1, 0], [0, 0]], dtype=np.float64)]
+        poly.idx = two_sided([0, 1, 2, 0, 2, 3])
+        poly.materials = [material(setup, tex.id(tname))]
+        bones.append((name, 0))
+        meshes.append(nud.Mesh(name, [poly], bone=len(bones) - 1, bind=8))
+
+    for i, c in enumerate(points):
+        rng = np.random.default_rng(i)
+        flame = c + np.array([0.0, FLAME_SIZE * 0.3, 0.5])
+        quad(flame, FLAME_SIZE, 'torch_flame', [1, 1, 1, 1], UNLIT_CUTOUT, 'torch%d_flame' % i)
+        ph = rng.uniform(0, 2 * np.pi, 2)
+        s = 1 + 0.08 * np.sin(2 * np.pi * frames / 20 + ph[0]) + 0.05 * np.sin(2 * np.pi * frames / 12 + ph[1])
+        pos[bones[-1][0]] = (flame, s, np.zeros((len(frames), 3)))
+        start = int(rng.integers(SMOKE_LIFE))
+        for k in range(2):
+            base = c + np.array([0.0, FLAME_SIZE * 0.6, 0.4])
+            quad(base, SMOKE_SIZE, 'torch_smoke', [SMOKE_GREY] * 3 + [SMOKE_ALPHA], UNLIT_BLEND, 'torch%d_smoke%d' % (i, k))
+            u = ((frames + start + k * SMOKE_LIFE // 2) % SMOKE_LIFE) / SMOKE_LIFE
+            rise = np.zeros((len(frames), 3))
+            rise[:, 1] = SMOKE_RISE * u
+            pos[bones[-1][0]] = (base, 1 - SMOKE_SHRINK * u, rise)
+    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
+    folder = '%s/%s' % (model_dir, TORCH_SET)
+    write_set(folder, meshes, tex)
+    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
+    path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
+    o = omo.Omo(open(path, 'rb').read())
+    o.frames = len(frames)
+    o.nodes = []
+    for name, _p, h in bones[1:]:
+        c, sc, up = pos[name]
+        sc = np.asarray(sc, dtype=np.float64)
+        t = c[None, :] * (1 - sc[:, None]) + up              # scale about the sprite's centre
+        omo.set_node(o, h, [tuple(map(float, v)) for v in t], [(0.0, 0.0, 0.0, 1.0)] * len(frames),
+                     [(float(x), float(x), float(x)) for x in sc])
+    open(path, 'wb').write(o.encode())
+
+
 # ---------------------------------------------------------------- stage
-def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
+def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form)"""
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
@@ -744,21 +848,20 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
         for e in EXTRA.get(biome, []):
             extra += load_parts('%s/normal/model/%s' % (src, e))
         near = ring + (block_parts(src, blocks) if blocks else []) + plat + extra
-        far = split_wide([p for p in load_parts('%s/normal/model/%s' % (src, FAR[biome])) if p['sub'] == 0])
+        far = far_parts('%s/normal/model/%s' % (src, FAR[biome]))
         sky_src = '%s/normal/model/far_common_set' % src
     else:
         d = ult_lvd('%s/battle/param/pickel_world_end_00.lvd' % src, yamlvd)
         blocks = []
         near = load_parts('%s/battle/model/ring_endbattle_set' % src)
-        far = split_wide([p for p in load_parts('%s/battle/model/far_plains_set' % src) if p['sub'] == 0])
+        far = far_parts('%s/battle/model/far_plains_set' % src)
         sky_src = '%s/battle/model/far_common_set' % src
-    sky = [p for p in load_parts(sky_src)
-           if p['label'] in ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core')]
+    sky = [p for p in load_parts(sky_src) if p['label'] in SKY_LABELS]
 
     clouds = [p for p in sky if p['bone'] in CLOUD_SETS]
     sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
     for name in sorted(os.listdir(model_dir)):
-        if name in (RING_SET, FAR_SET, SKY_SET) or name in CLOUD_SETS.values():
+        if name in (RING_SET, FAR_SET, SKY_SET) or name in CLOUD_SETS.values() or effect and name == TORCH_SET:
             assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
@@ -768,6 +871,9 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
                                       (SKY_SET, sky, 'bg', True)):
         write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
     write_clouds(model_dir, out_dir + '/animation', clouds, tex, src, form)
+    if effect:
+        row = BIOMES.index(biome) if form == 'melee' else TORCH_ROW_END
+        write_torches(model_dir, out_dir + '/animation', torch_points(src, labels, row), tex, effect)
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)
@@ -810,10 +916,11 @@ def main():
     ap.add_argument('--hazards', default='on', choices=('on', 'off'))
     ap.add_argument('--yamlvd', default='yamlvd', help="lvd-rs' yamlvd (reads Ultimate's .lvd)")
     ap.add_argument('--labels', default='ParamLabels.csv', help="ultimate-research/param-labels' ParamLabels.csv")
+    ap.add_argument('--effect', help="Ultimate's effect/stage/pickel_world/ef_pickel_world.eff (torch flames / smoke)")
     a = ap.parse_args()
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
-                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels)
+                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect)
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 

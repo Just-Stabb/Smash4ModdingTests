@@ -82,6 +82,17 @@ def vbn_read(path):
     return out
 
 
+def vbn_write(bones):
+    """[(name, parent index or -1, hash)] -> a big-endian model.vbn as Battlefield's stage ones
+    ('VBN ', version 1.2, every bone type 0, at the origin, unrotated, scale 1)"""
+    out = struct.pack('>4sHHI4I', b'VBN ', 1, 2, len(bones), len(bones), 0, 0, 0)
+    for name, parent, h in bones:
+        out += name.encode().ljust(64, b'\0') + struct.pack('>IiI', 0, 0x0FFFFFFF if parent < 0 else parent, h)
+    for _ in bones:
+        out += struct.pack('>9f', 0, 0, 0, 0, 0, 0, 1, 1, 1)
+    return out
+
+
 # ---------------------------------------------------------------- OMO
 def _sizes(flags):
     """(constants bytes, frame bytes) of each present track: [(kind, type, csize, fsize)]"""

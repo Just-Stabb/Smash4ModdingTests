@@ -2,7 +2,7 @@
 
 Status: **loads in game (v5, v6: user), normal play and Omega**; stage code moves rigged
 collision (moving-platform test, user). v7 in game (user): camera and the island's front good;
-sky white, backdrop low-res, houses / trees / back blocks dark. v8 (below) not tested yet.
+sky white, backdrop low-res, houses / trees / back blocks dark. v8 and v9 (below) not tested yet.
 v1-v4 froze while loading their models (see "Freeze"); v5 uses only forms Battlefield's own loaded
 models have. The whole normal-play stage (not the Battlefield form) converted
 from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
@@ -145,9 +145,33 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   the rest pose (as the moving platform, which the stage plays). `moving_platform_test.py` uses
   `dyr_j` too (it replaces the middle cloud layer). The unlit shader on a bone-bound mesh isn't in
   Battlefield (its bound meshes are lit); binding should only change the transform.
-- **Not animated**: the torches' flames are particle effects in Ultimate (no torch models or
-  animations in the stage folder), which would need its effect files and a converter to Smash 4's;
-  the sun / moon / stars and the day-night cycle (the stage is held at midday).
+- **Shaders (v9)**: from Ultimate's `render/shader/nuc2effectlibrary.nufxlb` (the user's
+  `render-ssbu.zip`; dumped with ssbh_lib, every program's vertex attributes and material
+  parameters): every shader the stage uses reads `colorSet1`. The `SFX_PBS_...4100` / `...4000`
+  family has an emission texture (`Texture5`): color = texture x `CustomVector3` x `CustomVector8` x
+  `colorSet1` x 2, unlit (the sky, clouds, sun, fog layers, the island's `EmissiveSFX` glowing
+  blocks); v9 makes those unlit and takes Ultimate's colors (day: the animation's frame 0) into the
+  vertex colors (linear -> gamma 2.2). The sky dome: (0.25, 0.43, 1.0) x its shading, by elevation
+  into `sky_gradient`; clouds (0.61, 0.61, 0.62), opaque as Ultimate's (not 70%); the sun x 2.
+  `SFX_PBS_52.../53...` (doors, crops, the block models): toon shading (`Texture11` =
+  `ToonGradationMap`, material `PointLight_block`), where `colorSet1` drives the lighting.
+  Ultimate's own haze replaces v7's material fog: `sky_fog_model`'s `fog_near` ring and the
+  panorama's fog layer (`far_fog_<x>_low_col`, white with an alpha ramp, (0.38, 0.62, 1.0)). That
+  layer's ramp as read would hide the near hills and clear the horizon, the opposite of Ultimate's
+  look, so it's read the other way up, at 80% (`FAR_FOG_ALPHA`); 1% nearer than the panorama, so it
+  draws over it.
+- **Torches (v9)**: Ultimate's `effect/stage/pickel_world/ef_pickel_world.eff` (the user's
+  `effect-ssbu-partial.zip`: EFFN with a VFXB, emitter sets `P_PickelWorldFire` (fire1 + smoke1),
+  the mobs', a block-break set per block kind; textures in a BNTX: `tools/bntx.py all`) can't be
+  converted (Switch VFXB vs Wii U EFTF, compiled shaders). Its positions are in
+  `pickel_world_visual.stdat`'s `torch_info_table` (row = biome, row 6 = the battle / Omega island;
+  up to 8, `count`). `--effect PATH` adds, in `dyr_change_160_2_O_OBJ_O_HIR_set` (draw range 0, no
+  `.mta`): a quad a flame (`ef_pickelworld_fire00`) and two smoke puffs (`smoke00`'s first frame)
+  per torch, each mesh on its own bone (bind 8, bone n) of a made skeleton (`omo.vbn_write`:
+  Battlefield's layout, rebuilds its 1-bone file byte for byte; every bone at the origin), animated
+  (240 frames: the flame flickering in scale, the smoke rising 7 units and shrinking over 60 frames,
+  out of step; a scale about the sprite's centre is a translation c (1 - s) with it).
+- **Not animated**: the sun / moon / stars and the day-night cycle (the stage is held at midday).
 - **Backdrop resolution (v8)**: the 3200x1600 panorama is two 2048x2048 textures (its halves,
   overlapping by its widest triangle, 6.25% of the width; each triangle on the half its centre is
   in) instead of one 2048x1024.
@@ -273,6 +297,15 @@ What the result tells:
 - collision moves (you ride something invisible), the platform doesn't: the stage doesn't play the
   animation (the cave would have to move the models too);
 - they drift apart over the match: the frame counts differ (loop length or slow motion).
+
+## Music (in progress)
+
+Ultimate's Minecraft World playlist (`ui_bgm_db.prc`'s `bgmpickel`, the user's `ui-SSBU.zip`): 7
+tracks, `stream:/sound/bgm/bgm_mc01_mc_glide` ... `bgm_mc07_mc_danceoftheblocks` (`.nus3audio`,
+the user's `stream-ssbu.zip`; `stream_property`: loop flag, end point, sudden death / transition
+start points). `tools/nus3audio_opus.py` decodes them to WAV (Namco OPUS header + Switch Opus,
+libopus; 48 kHz stereo, loop points from the header). Smash 4's side (its BGM files' format and how
+a stage's music list is set) needs the user's Smash 4 sound files.
 
 ## Freeze (user) and tests
 
