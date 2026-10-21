@@ -1,9 +1,9 @@
-# Sm4shExplorer: faster builds and "Extract vanilla"
+# Sm4shExplorer: faster builds, "Extract vanilla" and "Clean vanilla files"
 
-`sm4shexplorer-faster.patch` (3 commits) applies to https://github.com/thefungus/Sm4shExplorer
+`sm4shexplorer-faster.patch` (4 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
 (`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster_v3.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+the exe is in `build/sm4shexplorer_faster_v4.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
 plugins are unchanged).
 
 ## Why builds were slow
@@ -67,6 +67,29 @@ Right-click → **Extract vanilla**: extracts the game's own version (file or fo
 `extract/vanilla/`, even where the workspace has a mod file, and leaves the mod file alone
 (plain **Extract** still gives the mod's version when there is one). It's greyed out for files only
 the mod has.
+
+## Clean vanilla files (v4)
+
+A workspace often holds files that are the game's own, unchanged (a whole folder extracted to edit
+one file in it). Each makes the build rebuild its package, and ships in the build for nothing.
+**Project → Clean vanilla files from workspace...** (or right-click a mod folder / file → **Clean
+vanilla files**, for just that part):
+1. in the background, every workspace file the game also has is compared with the game's own
+   version: the one the game loads (the update's if it has one, else the DT files'), decompressed,
+   as Extract writes it (`RFManager.GetVanillaData`). A different size is enough to keep a file;
+   same size: byte for byte. Mod-only files, files of resources marked removed, and (without the
+   DT files) files only the DT files have are left alone;
+2. the identical ones are listed (count, size; all of them in the console) and, on **Yes**, moved
+   to `<workspace>_removed_vanilla/<date>/` with the same paths (next to the workspace folder, so
+   builds don't see them; nothing is deleted), the folders they leave empty removed, the plugins
+   told as for "Remove mod files" (any can keep a file), and the tree refreshed.
+
+A package whose workspace files were all vanilla is then not rebuilt at all (the game's own is
+used), and the others pack only real mod files.
+
+Not tested on a game dump yet (none here): built with 0 errors, the patch reproduces the source
+exactly, and the empty-folder clean-up was run on a fake workspace (emptied folders removed up to
+the partition folders, a folder still holding a file kept).
 
 ## Tested (user)
 

@@ -1,7 +1,7 @@
 From b1e78c462a5886ba1210d0295e12573031ec8020 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 11:13:58 +0000
-Subject: [PATCH 1/3] Faster builds (stored data for untouched package files,
+Subject: [PATCH 1/4] Faster builds (stored data for untouched package files,
  compression cache, parallel compression) and Extract vanilla
 
 ---
@@ -774,7 +774,7 @@ index 9a522af..dc8ff36 100644
 From 2b9de497a2a3cd03e727c453174384cdc370999b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:36:36 +0000
-Subject: [PATCH 2/3] Packing: stream packages to disk, read stored files when
+Subject: [PATCH 2/4] Packing: stream packages to disk, read stored files when
  written, compress in 32 MB batches
 
 ---
@@ -1104,7 +1104,7 @@ index 9eb4f9e..445f418 100644
 From f0542a4ae26924d8a26adfaef1f98773a38c2ff5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:58:24 +0000
-Subject: [PATCH 3/3] Package cache: unchanged packages are copied from
+Subject: [PATCH 3/4] Package cache: unchanged packages are copied from
  cache/packages instead of being rebuilt
 
 ---
@@ -1331,6 +1331,475 @@ index 445f418..0dd3aa3 100644
              }
  
              _StoredPackageFiles.Clear();
+-- 
+2.43.0
+
+
+From 26656d7ba316786b580e4c802e3cb25131803ea2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 21 Oct 2026 20:54:10 +0000
+Subject: [PATCH 4/4] Clean vanilla files: move workspace files identical to
+ the game's own version out of the workspace
+
+Project > Clean vanilla files from workspace... (or right-click a mod folder / file > Clean vanilla
+files) compares each workspace file the game also has with the game's own version (the update's if
+it has one, else the DT files'; decompressed, as extraction writes it), after a size check, and lists
+the identical ones; on Yes they are moved to <workspace>_removed_vanilla/<date>/ (same paths) and the
+folders they leave empty are deleted. Packages holding only such files are then no longer rebuilt.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0191SKAyPvzEPBA8SgbtYxcK
+---
+ Sm4shFileExplorer/RFManager.cs                |  57 +++++--
+ Sm4shFileExplorer/Sm4shProject.cs             | 146 ++++++++++++++++++
+ Sm4shFileExplorer/UI/Main.Designer.cs         |  24 ++-
+ Sm4shFileExplorer/UI/Main.cs                  |  65 ++++++++
+ .../UI/Objects/BackgroundWorkerInstance.cs    |   3 +-
+ 5 files changed, 283 insertions(+), 12 deletions(-)
+
+diff --git a/Sm4shFileExplorer/RFManager.cs b/Sm4shFileExplorer/RFManager.cs
+index 6d3c5bd..3a255f9 100644
+--- a/Sm4shFileExplorer/RFManager.cs
++++ b/Sm4shFileExplorer/RFManager.cs
+@@ -279,16 +279,7 @@ public bool ExtractFileFromPatch(ResourceItem rItem, string outputFile)
+ 
+                 if (!rItem.AbsolutePath.EndsWith("/"))
+                 {
+-                    DataSource packedSource;
+-                    TryGetPatchPackedSource(rItem, out packedSource);
+-
+-                    var fileData = new byte[0];
+-
+-                    byte[] checkCmp = packedSource.Slice((int)rItem.OffInPack, 4);
+-                    if (checkCmp[0] == 0x78 && checkCmp[1] == 0x9c)
+-                        fileData = Utils.DeCompress(packedSource.Slice((int)rItem.OffInPack, (int)rItem.CmpSize));
+-                    else
+-                        fileData = packedSource.Slice((int)rItem.OffInPack, (int)rItem.DecSize);
++                    byte[] fileData = ReadFromPatchPacked(rItem);
+                     Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
+                     File.WriteAllBytes(outputFile, fileData);
+                 }
+@@ -305,6 +296,52 @@ public bool ExtractFileFromPatch(ResourceItem rItem, string outputFile)
+             }
+         }
+ 
++        /// <summary>
++        /// A file in the patch's packed file, decompressed
++        /// </summary>
++        private byte[] ReadFromPatchPacked(ResourceItem rItem)
++        {
++            DataSource packedSource;
++            TryGetPatchPackedSource(rItem, out packedSource);
++
++            byte[] checkCmp = packedSource.Slice((int)rItem.OffInPack, 4);
++            if (checkCmp[0] == 0x78 && checkCmp[1] == 0x9c)
++                return Utils.DeCompress(packedSource.Slice((int)rItem.OffInPack, (int)rItem.CmpSize));
++            return packedSource.Slice((int)rItem.OffInPack, (int)rItem.DecSize);
++        }
++
++        /// <summary>
++        /// The game's own data of a file, as extraction writes it (decompressed), without writing it anywhere
++        /// </summary>
++        /// <returns>null if it can't be read (no LS information, missing packed file, a folder)</returns>
++        public byte[] GetVanillaData(ResourceItem rItem)
++        {
++            if (rItem.IsFolder)
++                return null;
++            switch (rItem.Source)
++            {
++                case FileSource.LS:
++                    if (rItem.LSEntryInfo == null)
++                        return null;
++                    if (rItem.CmpSize == 0)
++                        return new byte[0];
++                    return GetFileDataDecompressed(rItem.LSEntryInfo.DTOffset + rItem.OffInPack, rItem.CmpSize, rItem.LSEntryInfo.DTIndex);
++                case FileSource.Patch:
++                    string gameFile = PathHelper.GetGameFolder(PathHelperEnum.FOLDER_PATCH) + rItem.PatchItem.AbsolutePath.Replace('/', Path.DirectorySeparatorChar);
++                    if (File.Exists(gameFile))
++                    {
++                        byte[] fileBinary = File.ReadAllBytes(gameFile);
++                        if (rItem.OverridePackedFile && Utils.IsCompressed(fileBinary))
++                            fileBinary = Utils.DeCompress(fileBinary);
++                        return fileBinary;
++                    }
++                    if (!File.Exists(GetPatchPackedPath(rItem)))
++                        return null;
++                    return ReadFromPatchPacked(rItem);
++            }
++            return null;
++        }
++
+         /// <summary>
+         /// Where the game stores a file (in a DT file or the patch's packed file) and its sizes, so that a
+         /// package being rebuilt can take an untouched file as it is (still compressed) instead of
+diff --git a/Sm4shFileExplorer/Sm4shProject.cs b/Sm4shFileExplorer/Sm4shProject.cs
+index 0dd3aa3..0abf8dd 100644
+--- a/Sm4shFileExplorer/Sm4shProject.cs
++++ b/Sm4shFileExplorer/Sm4shProject.cs
+@@ -557,6 +557,152 @@ public bool RemoveFileFromWorkspace(string absolutePath)
+ 
+             return true;
+         }
++
++        /// <summary>
++        /// A workspace file whose content is the game's own (vanilla) version, byte for byte
++        /// </summary>
++        public class VanillaCopy
++        {
++            public string AbsolutePath;
++            public string WorkspaceFile;
++            public long Size;
++        }
++
++        /// <summary>
++        /// Find the workspace files identical to the game's own version (what the game loads: the update's
++        /// version if it has one, else the DT files'). Building without them gives the same result, without
++        /// rebuilding the packages they're in. Only files the game has are checked; mod-only files, folders,
++        /// files of removed resources and files without an accepted extension are left out.
++        /// </summary>
++        /// <param name="absolutePath">Only look under this path ("data/fighter/kirby/", a file, a partition "data/"); null: the whole workspace</param>
++        public List<VanillaCopy> FindVanillaCopies(string absolutePath)
++        {
++            List<VanillaCopy> copies = new List<VanillaCopy>();
++            int checkedFiles = 0, skippedLS = 0;
++            foreach (ResourceCollection resCol in _resCols)
++            {
++                string prefix = string.Empty;
++                if (absolutePath != null)
++                {
++                    if (absolutePath.Substring(0, absolutePath.IndexOf('/')) != resCol.PartitionName)
++                        continue;
++                    prefix = GetRelativePath(absolutePath);
++                }
++                foreach (string relativePath in GetAllWorkplaceRelativePaths(resCol.PartitionName))
++                {
++                    if (relativePath.EndsWith("/") || !relativePath.StartsWith(prefix))
++                        continue;
++                    ResourceItem rItem = GetResource(resCol, relativePath);
++                    if (rItem == null || rItem.IsFolder || _CurrentProject.IsResourceRemoved(resCol.PartitionName, relativePath))
++                        continue;
++                    if (rItem.Source == FileSource.LS && !_CurrentProject.DTFilesFound)
++                    {
++                        skippedLS++;
++                        continue;
++                    }
++                    string absPath = GetAbsolutePath(resCol, relativePath);
++                    string workspaceFile = GetWorkspaceFileFromPath(absPath);
++                    FileInfo info = new FileInfo(workspaceFile);
++                    if (!info.Exists)
++                        continue;
++                    checkedFiles++;
++                    if (checkedFiles % 500 == 0)
++                        LogHelper.Info(string.Format("Checked {0} files, {1} identical to the game's so far...", checkedFiles, copies.Count));
++                    //Different size: modified, no need to read anything
++                    if (info.Length != rItem.DecSize)
++                        continue;
++                    try
++                    {
++                        byte[] vanilla = _RfManager.GetVanillaData(rItem);
++                        if (vanilla == null || vanilla.LongLength != info.Length)
++                            continue;
++                        if (SameBytes(File.ReadAllBytes(workspaceFile), vanilla))
++                            copies.Add(new VanillaCopy() { AbsolutePath = absPath, WorkspaceFile = workspaceFile, Size = info.Length });
++                    }
++                    catch (Exception e)
++                    {
++                        LogHelper.Warning(string.Format("Can't compare '{0}' with the game's version ({1}), keeping it", absPath, e.Message));
++                    }
++                }
++                _RfManager.ClearCachedDataSources();
++            }
++            if (skippedLS > 0)
++                LogHelper.Warning(string.Format("{0} files could not be checked: the DT files were not found", skippedLS));
++            LogHelper.Info(string.Format("Checked {0} workspace files: {1} identical to the game's version ({2:0.0} MB)", checkedFiles, copies.Count, copies.Sum(c => c.Size) / 1048576.0));
++            return copies;
++        }
++
++        /// <summary>
++        /// Move files found by FindVanillaCopies out of the workspace, to backupFolder (the same paths under it),
++        /// then delete the workspace folders they leave empty. The plugins are asked first, as for "Remove mod files".
++        /// </summary>
++        /// <returns>The number of files moved</returns>
++        public int RemoveVanillaCopies(List<VanillaCopy> copies, string backupFolder)
++        {
++            int moved = 0;
++            HashSet<string> folders = new HashSet<string>();
++            foreach (VanillaCopy copy in copies)
++            {
++                ResourceCollection resCol = GetResourceCollection(copy.AbsolutePath);
++                string relativePath = GetRelativePath(copy.AbsolutePath);
++                bool cancel = false;
++                foreach (Sm4shBasePlugin plugin in _Plugins)
++                {
++                    PluginActionResult result = plugin.InternalResourcesRemovingFromWorkspace(resCol, relativePath, copy.WorkspaceFile);
++                    if (result.Cancel)
++                    {
++                        LogHelper.Warning(string.Format("Keeping '{0}', reason: {1}", copy.AbsolutePath, result.Reason));
++                        cancel = true;
++                        break;
++                    }
++                }
++                if (cancel)
++                    continue;
++                try
++                {
++                    string target = backupFolder + copy.AbsolutePath.Replace('/', Path.DirectorySeparatorChar);
++                    Directory.CreateDirectory(Path.GetDirectoryName(target));
++                    if (File.Exists(target))
++                        File.Delete(target);
++                    File.Move(copy.WorkspaceFile, target);
++                    folders.Add(Path.GetDirectoryName(copy.WorkspaceFile));
++                    moved++;
++                }
++                catch (Exception e)
++                {
++                    LogHelper.Error(string.Format("Error while moving '{0}': {1}", copy.WorkspaceFile, e.Message));
++                    continue;
++                }
++                foreach (Sm4shBasePlugin plugin in _Plugins)
++                    plugin.InternalResourcesRemovedFromWorkspace(resCol, relativePath, copy.WorkspaceFile);
++            }
++
++            //Folders left empty, deepest first, up to the partition folder
++            string root = PathHelper.GetWorkplaceFolder(PathHelperEnum.FOLDER_PATCH);
++            foreach (string folder in folders.OrderByDescending(f => f.Length))
++            {
++                string dir = folder;
++                while (dir != null && dir.Length > root.Length && dir.StartsWith(root) && dir.Substring(root.Length).IndexOf(Path.DirectorySeparatorChar) > 0
++                    && Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any())
++                {
++                    Directory.Delete(dir);
++                    dir = Path.GetDirectoryName(dir);
++                }
++            }
++
++            LogHelper.Info(string.Format("Moved {0} files identical to the game's version to '{1}'", moved, backupFolder));
++            return moved;
++        }
++
++        private static bool SameBytes(byte[] a, byte[] b)
++        {
++            if (a.Length != b.Length)
++                return false;
++            for (int i = 0; i < a.Length; i++)
++                if (a[i] != b[i])
++                    return false;
++            return true;
++        }
+         #endregion
+ 
+         #region Unlocalizing Files && Resource Removal
+diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
+index 3676e8e..e899272 100644
+--- a/Sm4shFileExplorer/UI/Main.Designer.cs
++++ b/Sm4shFileExplorer/UI/Main.Designer.cs
+@@ -59,6 +59,8 @@ private void InitializeComponent()
+             this.extractToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.extractVanillaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.removeModToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
++            this.cleanVanillaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
++            this.menuCleanVanilla = new System.Windows.Forms.ToolStripMenuItem();
+             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+             this.unlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.removeUnlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+@@ -122,6 +124,7 @@ private void InitializeComponent()
+             this.sendToSDToolStripMenuItem,
+             this.toolStripSeparator3,
+             this.refreshTreeviewToolStripMenuItem,
++            this.menuCleanVanilla,
+             this.menuOptions,
+             this.oMenuFileSeparator,
+             this.menuExit});
+@@ -166,6 +169,14 @@ private void InitializeComponent()
+             this.refreshTreeviewToolStripMenuItem.Text = "Refresh Treeview";
+             this.refreshTreeviewToolStripMenuItem.Click += new System.EventHandler(this.refreshTreeviewToolStripMenuItem_Click);
+             // 
++            // menuCleanVanilla
++            // 
++            this.menuCleanVanilla.Name = "menuCleanVanilla";
++            this.menuCleanVanilla.Size = new System.Drawing.Size(299, 22);
++            this.menuCleanVanilla.Text = "Clean vanilla files from workspace...";
++            this.menuCleanVanilla.ToolTipText = "Move the workspace files identical to the game's own version out of the workspace";
++            this.menuCleanVanilla.Click += new System.EventHandler(this.menuCleanVanilla_Click);
++            // 
+             // menuOptions
+             // 
+             this.menuOptions.Name = "menuOptions";
+@@ -309,6 +320,7 @@ private void InitializeComponent()
+             this.extractToolStripMenuItem,
+             this.extractVanillaToolStripMenuItem,
+             this.removeModToolStripMenuItem,
++            this.cleanVanillaToolStripMenuItem,
+             this.toolStripSeparator1,
+             this.unlocalizeToolStripMenuItem,
+             this.removeUnlocalizeToolStripMenuItem,
+@@ -319,7 +331,7 @@ private void InitializeComponent()
+             this.packThisFolderToolStripMenuItem,
+             this.doNotPackThisFolderToolStripMenuItem});
+             this.contextMenuTreeView.Name = "contextMenuTreeView";
+-            this.contextMenuTreeView.Size = new System.Drawing.Size(195, 220);
++            this.contextMenuTreeView.Size = new System.Drawing.Size(195, 242);
+             this.contextMenuTreeView.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuTreeView_Opening);
+             // 
+             // extractToolStripMenuItem
+@@ -344,6 +356,14 @@ private void InitializeComponent()
+             this.removeModToolStripMenuItem.Text = "Remove mod files";
+             this.removeModToolStripMenuItem.Click += new System.EventHandler(this.removeToolStripMenuItem_Click);
+             // 
++            // cleanVanillaToolStripMenuItem
++            // 
++            this.cleanVanillaToolStripMenuItem.Name = "cleanVanillaToolStripMenuItem";
++            this.cleanVanillaToolStripMenuItem.Size = new System.Drawing.Size(194, 22);
++            this.cleanVanillaToolStripMenuItem.Text = "Clean vanilla files";
++            this.cleanVanillaToolStripMenuItem.ToolTipText = "Move the mod files here that are identical to the game's own version out of the workspace";
++            this.cleanVanillaToolStripMenuItem.Click += new System.EventHandler(this.cleanVanillaToolStripMenuItem_Click);
++            // 
+             // toolStripSeparator1
+             // 
+             this.toolStripSeparator1.Name = "toolStripSeparator1";
+@@ -651,6 +671,8 @@ private void InitializeComponent()
+         private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
+         private System.ComponentModel.BackgroundWorker backgroundWorker;
+         private System.Windows.Forms.ToolStripMenuItem removeModToolStripMenuItem;
++        private System.Windows.Forms.ToolStripMenuItem cleanVanillaToolStripMenuItem;
++        private System.Windows.Forms.ToolStripMenuItem menuCleanVanilla;
+         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+         private System.Windows.Forms.ToolStripMenuItem unlocalizeToolStripMenuItem;
+         private System.Windows.Forms.DataGridViewTextBoxColumn gridViewName;
+diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
+index dc8ff36..22eaa3a 100644
+--- a/Sm4shFileExplorer/UI/Main.cs
++++ b/Sm4shFileExplorer/UI/Main.cs
+@@ -213,6 +213,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+             extractToolStripMenuItem.Enabled = true;
+             extractVanillaToolStripMenuItem.Enabled = _ProjectManager.HasVanillaResource(selNode.Name);
+             removeModToolStripMenuItem.Enabled = false;
++            cleanVanillaToolStripMenuItem.Enabled = false;
+             unlocalizeToolStripMenuItem.Enabled = false;
+             removeUnlocalizeToolStripMenuItem.Enabled = false;
+             packThisFolderToolStripMenuItem.Enabled = false;
+@@ -226,12 +227,14 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+                 if (File.Exists(filePath))
+                 {
+                     removeModToolStripMenuItem.Enabled = true;
++                    cleanVanillaToolStripMenuItem.Enabled = extractVanillaToolStripMenuItem.Enabled;
+                     return;
+                 }
+                 //Mod Folder
+                 if (Directory.Exists(filePath))
+                 {
+                     removeModToolStripMenuItem.Enabled = true;
++                    cleanVanillaToolStripMenuItem.Enabled = true;
+ 
+                     //Can pack
+                     if (_ProjectManager.CanBePacked(selNode.Name))
+@@ -354,6 +357,13 @@ private void removeToolStripMenuItem_Click(object sender, EventArgs e)
+             }
+         }
+ 
++        private void cleanVanillaToolStripMenuItem_Click(object sender, EventArgs e)
++        {
++            TreeNode node = treeView.SelectedNode;
++            if (node != null)
++                StartFindVanillaCopies(node.Name);
++        }
++
+         private void packThisFolderToolStripMenuItem_Click(object sender, EventArgs e)
+         {
+             TreeNode node = treeView.SelectedNode;
+@@ -426,6 +436,50 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
+             backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.BuildProject, false));
+         }
+ 
++        private void menuCleanVanilla_Click(object sender, EventArgs e)
++        {
++            StartFindVanillaCopies(null);
++        }
++
++        /// <summary>
++        /// Look for workspace files identical to the game's own version (under absolutePath, or everywhere
++        /// when null) in the background; then ask to move them out (CleanVanillaCopies)
++        /// </summary>
++        private void StartFindVanillaCopies(string absolutePath)
++        {
++            LogHelper.Info(string.Format("Looking for files identical to the game's version in the workspace{0}...", absolutePath == null ? string.Empty : " under '" + absolutePath + "'"));
++            menuStrip.Enabled = false;
++            treeView.Enabled = false;
++            backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.FindVanillaCopies, absolutePath));
++        }
++
++        private void CleanVanillaCopies(List<Sm4shProject.VanillaCopy> copies)
++        {
++            if (copies == null || copies.Count == 0)
++            {
++                MessageBox.Show("No workspace file is identical to the game's own version.", "Clean vanilla files", MessageBoxButtons.OK, MessageBoxIcon.Information);
++                return;
++            }
++            string backupFolder = PathHelper.FolderWorkplace.TrimEnd(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar })
++                + "_removed_vanilla" + Path.DirectorySeparatorChar + string.Format("{0:yyyyMMdd-HHmmss}", DateTime.Now) + Path.DirectorySeparatorChar;
++            const int listed = 15;
++            string list = string.Join(Environment.NewLine, copies.Take(listed).Select(c => c.AbsolutePath));
++            if (copies.Count > listed)
++                list += Environment.NewLine + string.Format("... and {0} more (all listed in the console)", copies.Count - listed);
++            foreach (Sm4shProject.VanillaCopy c in copies)
++                LogHelper.Info(string.Format("Identical to the game's: {0}", c.AbsolutePath));
++            string message = string.Format("{0} workspace files ({1:0.0} MB) are identical to the game's own version, so builds don't need them:"
++                + "{2}{2}{3}{2}{2}Move them out of the workspace, to{2}{4}?{2}(Nothing is deleted: you can delete that folder, or move files back.)",
++                copies.Count, copies.Sum(c => c.Size) / 1048576.0, Environment.NewLine, list, backupFolder);
++            if (MessageBox.Show(message, "Clean vanilla files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
++                return;
++            Cursor.Current = Cursors.WaitCursor;
++            _ProjectManager.RemoveVanillaCopies(copies, backupFolder);
++            treeView.Nodes.Clear();
++            PopulateTreeView(_ProjectManager.ResourceDataCollection);
++            Cursor.Current = Cursors.Default;
++        }
++
+         private void menuOptions_Click(object sender, EventArgs e)
+         {
+             _Options.ShowDialog(this);
+@@ -567,6 +621,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+                         }
+                     }
+                     break;
++                case BackgroundWorkerMode.FindVanillaCopies:
++                    e.Result = _ProjectManager.FindVanillaCopies((string)bw.Object);
++                    break;
+                 case BackgroundWorkerMode.SendToSD:
+                     string workspaceName = GetWorkspaceName((string)bw.Object);
+                     if (workspaceName == null)
+@@ -610,9 +667,17 @@ private void backgroundWorker_RunWorkerCompleted(object sender, RunWorkerComplet
+                 case BackgroundWorkerMode.SendToSD:
+                     break;
+             }
++            BackgroundWorkerMode mode = _CurrentBackgroundInstance.Mode;
+             _CurrentBackgroundInstance = null;
+             menuStrip.Enabled = true;
+             treeView.Enabled = true;
++            if (mode == BackgroundWorkerMode.FindVanillaCopies)
++            {
++                if (e.Error != null)
++                    LogHelper.Error(string.Format("Error while looking for vanilla files: {0}", e.Error.Message));
++                else
++                    CleanVanillaCopies(e.Result as List<Sm4shProject.VanillaCopy>);
++            }
+         }
+         #endregion
+ 
+diff --git a/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs b/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
+index d3719f2..2c8c3a0 100644
+--- a/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
++++ b/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
+@@ -11,7 +11,8 @@ internal enum BackgroundWorkerMode
+         ProjectLoading = 0,
+         BuildProject = 1,
+         SendToSD = 2,
+-        Extract = 3
++        Extract = 3,
++        FindVanillaCopies = 4
+     }
+ 
+     internal class BackgroundWorkerInstance
 -- 
 2.43.0
 
