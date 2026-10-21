@@ -4,21 +4,25 @@ the animals' kind each match, the monsters each night. Prints rpx_patch.py args 
 standard build's; it takes over the generic stage's update / setup hooks from
 stage_script_cave.py, the moving-platform test, which it replaces).
 
-The stage files (tools/minecraft_world.py) have the mobs in four Battlefield model folders
-(FOLDERS), each a day animal and a night monster (each scaled to nothing outside its time by its
-own animation): dyr_h sheep + zombie, dyr_f cow + skeleton, dyr_g chicken + spider, dyr_n1 the
-enderman. Showing a folder by day shows its animal, by night its monster.
+The stage files (tools/minecraft_world.py) have each mob kind in a model folder of its own
+(FOLDERS; each scaled to nothing outside its time by its own animation): the monsters in four of
+Battlefield's (dyr_h zombie, dyr_f skeleton, dyr_g spider, dyr_n1 enderman), the animals (there
+day and night, as in Ultimate) in three of the port's own (dyr_p sheep, dyr_q cow, dyr_r chicken).
 
 StageBaseCafe's update (0x02D1CF9C; Omega's StageBaseEnd update 0x0264CEBC calls it too) calls
 the base update with `bl 0x031415C8` at 0x02D1CFDC: that goes to UPDATE, which makes it and then,
 for kinds KINDS (stage + 0: NewStage01 and its Omega), adds the frame rate (f1, as the stage's
 animations do) to a frame counter over the day / night cycle (CYCLE):
 - on the first update (the setup, 0x02D1C65C, which Omega's calls too, flags a new match): rolls
-  the match's animals (sheep / chicken / cow 30 / 30 / 30, none 10%) and shows their folder;
+  the match's animals (sheep / chicken / cow 30 / 30 / 30, none 10%);
 - at MONSTER_FRAME (frame_of_monster 4200) each night: rolls how many monsters come (guest
   single / double / triple 20 / 60 / 20) and which (that many different kinds, weighted zombie /
-  skeleton / spider / enderman 40 / 35 / 20 / 5), and shows their folders;
-- at the cycle's end (the monsters gone, the animals back at frame 0): the animals' folder again.
+  skeleton / spider / enderman 40 / 35 / 20 / 5);
+- at the cycle's end (the monsters gone): the night's roll cleared.
+Every update it shows the folders of the match's animals and, from MONSTER_FRAME to the cycle's
+end, the night's monsters, and hides the rest: v17b set them once, at the first update, and the
+game showing all of the stage's models as the match starts brought every animal kind back (all
+walking the same pen: the user saw them inside each other).
 Rolls: the game's clock-seeded xorshift, 0x024F6BE8(n) = x % n (not the battle RNG).
 
 A model by folder name: 0x03141D2C(stage, name) -> StageModel or 0. Shown / hidden as the game's
@@ -51,9 +55,12 @@ RAND = 0x024F6BE8              # (n) -> x % n, the clock-seeded xorshift (instan
 KINDS = (0x80, 0x81)            # NewStage01, normal play and Omega
 CYCLE = 9000.0                 # minecraft_world.CYCLE
 MONSTER_FRAME = 4200.0         # pickel_world.stdat frame_of_monster
-FOLDERS = ['dyr_h_BG_more_far0_set', 'dyr_f_BG_far2_set_set', 'dyr_g_bgfar_set', 'dyr_n1_sunset_set']
+# the monsters' folders, then the animals' (minecraft_world.MONSTER_SETS, ANIMAL_SETS)
+FOLDERS = ['dyr_h_BG_more_far0_set', 'dyr_f_BG_far2_set_set', 'dyr_g_bgfar_set', 'dyr_n1_sunset_set',
+           'dyr_p_animal_sheep_set', 'dyr_q_animal_cow_set', 'dyr_r_animal_chicken_set']
+MONSTERS = 4
 MONSTER_ODDS = [40, 35, 20, 5]             # zombie, skeleton, spider, enderman: folders 0-3
-ANIMAL_ODDS = [(30, 0), (30, 2), (30, 1)]  # sheep (folder 0), chicken (2), cow (1); the rest: none
+ANIMAL_ODDS = [(30, 4), (30, 6), (30, 5)]  # sheep (folder 4), chicken (6), cow (5); the rest: none
 COUNT_ODDS = [20, 60, 20]                  # one / two / three monsters a night
 
 
@@ -102,9 +109,6 @@ ours:
         stw r0, 0xC(r29)
         stw r0, 0x10(r29)
         bl roll_day
-        mr r3, r31
-        lwz r4, 0x14(r29)
-        bl apply
 counting:
         lfs f0, 0(r29)
         fadds f0, f0, f31
@@ -115,25 +119,28 @@ counting:
         stfs f0, 0(r29)
         li r0, 0
         stw r0, 0x10(r29)
-        mr r3, r31
-        lwz r4, 0x14(r29)
-        bl apply
         b night
 nowrap:
         stfs f0, 0(r29)
 night:
         lwz r0, 0x10(r29)
         cmpwi r0, 0
-        bne done
+        bne current
         lfs f0, 0(r29)
         lfs f13, 8(r29)
         fcmpu cr0, f0, f13
-        blt done
+        blt current
         li r0, 1
         stw r0, 0x10(r29)
         bl roll_night
-        mr r3, r31
+current:
+        lwz r0, 0x10(r29)
+        lwz r4, 0x14(r29)
+        cmpwi r0, 0
+        beq cur
         lwz r4, 0x18(r29)
+cur:
+        mr r3, r31
         bl apply
 done:
         mr r3, r30
@@ -190,7 +197,7 @@ tot:
         add r26, r26, r6
 tskip:
         addi r5, r5, 1
-        cmpwi r5, 4
+        cmpwi r5, %(monsters)d
         blt tot
         cmpwi r26, 0
         beq ndone
@@ -209,7 +216,7 @@ walk:
         subf r3, r6, r3
 wskip:
         addi r5, r5, 1
-        cmpwi r5, 4
+        cmpwi r5, %(monsters)d
         blt walk
         b ndone
 take:
@@ -220,6 +227,8 @@ take:
         cmpwi r28, 0
         bne pick
 ndone:
+        lwz r0, 0x14(r29)
+        or r27, r27, r0
         stw r27, 0x18(r29)
         lwz r0, 0x24(r1)
         mtlr r0
@@ -283,7 +292,7 @@ sv:
         bl 0x%(setvis)08X
 nextm:
         addi r27, r27, 1
-        cmpwi r27, 4
+        cmpwi r27, %(folders)d
         blt ap
         lmw r25, 0x14(r1)
         lwz r0, 0x34(r1)
@@ -301,7 +310,8 @@ data:
 """ % dict(first=SETUP_FIRST, setup1=SETUP + 4, base=BASE_UPDATE, k0=KINDS[0], k1=KINDS[1],
            rand_hi=RAND >> 16, rand_lo=RAND & 0xFFFF, animal=animal, c1=COUNT_ODDS[0],
            c2=COUNT_ODDS[0] + COUNT_ODDS[1], find=FIND_MODEL, isvis=IS_VISIBLE, add=SCENE_ADD,
-           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME))
+           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME,
+           monsters=MONSTERS, folders=len(FOLDERS)))
     # data: +0 counter, +4 cycle, +8 monster frame, +0xC new match, +0x10 tonight rolled, +0x14 the
     # animals' folders, +0x18 tonight's monsters' folders, +0x1C the monsters' weights, +0x2C the
     # folders' names

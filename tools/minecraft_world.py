@@ -62,6 +62,7 @@ CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
 # hide the hills near the island and clear them at the horizon; Ultimate shows the opposite (clear
 # near, hazy far: the user's screenshots), so the ramp is read the other way up, at this strength
 FAR_FOG_ALPHA = 0.8
+FOG_WRAP = 3                        # clamp (NUD wrap: 1 repeat, 2 mirror, 3 clamp)
 # Draw order (model.xmb drawing_order; Battlefield's go far to near: sky 0, moon 2, sun 4,
 # background 5-9, near objects 12-18; blended models drawn in that order, ties by distance). The
 # sky folder (dome, sun, Ultimate's haze ring) and the panorama were both 0 in v10 test 3, and
@@ -816,9 +817,19 @@ def far_parts(setdir):
     parts = load_parts(setdir)
     # v clamped first: plains' runs 0-1, the other biomes' 0-7 (Ultimate's sampler clamps it); read
     # the other way up and repeated, it tiled the ramp in bands: pale see-through boxes (user)
-    fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - np.clip(p['uv'][:, 1], 0, 1)],
-                col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)))
-           for p in parts if p['sub'] == 1]
+    # v17c: past 1 the haze is clear, but at the texture's top edge the repeating sampler and its
+    # mips still mixed in the opaque bottom rows (pale boxes on every biome but plains, user): those
+    # triangles are left out, and the rest clamped (FOG_WRAP)
+    fog = []
+    for p in parts:
+        if p['sub'] != 1:
+            continue
+        tri = p['idx'].reshape(-1, 3)
+        tri = tri[(p['uv'][tri, 1] < 1.0).any(1)]
+        if len(tri):
+            fog.append(dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - np.clip(p['uv'][:, 1], 0, 1)],
+                            col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)),
+                            idx=tri.reshape(-1)))
     pano = [p for p in parts if p['sub'] == 0]
     t = nutexb.Nutexb('%s/%s.nutexb' % (setdir, pano[0]['textures'][0]))
     return split_wide(pano, (t.w, t.h)), fog
@@ -916,8 +927,11 @@ def write_set(outdir, meshes, tex, curves=None):
     if os.path.exists(outdir + '/model.mta'):
         os.remove(outdir + '/model.mta')
     if kinds:
+        # a curve: NU_finalColorGain's values, or {property: values} (the fire's and the puff's UVs)
         open(outdir + '/model.mta', 'wb').write(mta.write(CYCLE + 1, [
-            dict(name='mcw_%s' % k, hash=gain_hash(k), props=[dict(name='NU_finalColorGain', values=curves[k].tolist())])
+            dict(name='mcw_%s' % k, hash=gain_hash(k),
+                 props=[dict(name=n, values=np.asarray(v).tolist()) for n, v in
+                        (curves[k].items() if isinstance(curves[k], dict) else [('NU_finalColorGain', curves[k])])])
             for k in kinds]))
     used = []
     for m in meshes:
@@ -1290,21 +1304,33 @@ MONSTER_SETS = {'zombie': 'dyr_h_BG_more_far0_set', 'skeleton': 'dyr_f_BG_far2_s
                 'spider': 'dyr_g_bgfar_set', 'enderman': 'dyr_n1_sunset_set'}
 # the animals share them, a day animal and a night monster a folder (each scaled to nothing outside
 # its time), so the patch shows a folder for its animal by day, its monster by night
-ANIMAL_SETS = {'sheep': MONSTER_SETS['zombie'], 'cow': MONSTER_SETS['skeleton'], 'chicken': MONSTER_SETS['spider']}
+# v17c: the animals stay day and night (as in Ultimate; v17 hid them at night, user), so each kind
+# has a dyr_ folder of its own, made for the port (a copy of ANIMAL_BASE: the stage makes a model of
+# every folder it finds, by name); v16-v17b shared the monsters' folders
+ANIMAL_SETS = {'sheep': 'dyr_p_animal_sheep_set', 'cow': 'dyr_q_animal_cow_set', 'chicken': 'dyr_r_animal_chicken_set'}
+ANIMAL_BASE = MONSTER_SETS['zombie']
 # Omega: a monster's path (its window, MONSTER_FRAME on) moved to where as much of it is on Omega's
 # ground as there is on the normal form's (Ultimate's own: 0.79-0.90, from rising out of the
 # ground, coming in from off the island), at least END_MONSTER_FIT of that, or left out; heights
 # measured from its feet (the enderman's path is 3 below them: its offset found on the normal form)
 END_MONSTER_FIT = 0.9
 # their effects (Ultimate's are stage code + ef_pickel_world.eff emitters, none of which Smash 4
-# plays; user): the zombie burns at dawn (P_PickelWorldEnemyFired: it stops in the sun ~8120, falls
-# over ~8280-8360): from BURN_FROM to its end, flame sprites (the torches' ef_pickelworld_fire00)
-# on its hip, flickering (BURN_FLICKER frames a step); the enderman teleports in dashes of a few
-# frames (8-15 units a frame, its walk at most ~10.6 / 2 = TELEPORT_SPEED below): hidden over them,
-# and a burst of purple particles (P_PickelWorldEnderman, Minecraft's portal particles) where it
-# leaves and where it lands, rising and shrinking over TELEPORT_FX frames
-BURNING = ('zombie',)
-BURN_FROM, BURN_FLICKER = 8100, 3
+# plays; user): the zombie and the skeleton burn at dawn (P_PickelWorldEnemyFired; the zombie stops
+# in the sun ~8120 and falls over ~8280-8360, the skeleton walks off by 8200): from BURN_FROM to
+# their end Minecraft's fire on them (ef_pickelworld_fire01: 32 frames of 16 x 16 side by side,
+# a frame every FIRE_STEP game frames by the material's UV offset, as Battlefield animates its
+# sky's), flashing red as the fire hurts them (Minecraft: a hit a second, red half a second:
+# HURT_PERIOD / HURT_FRAMES; red from HURT_DEATH frames before their end, as they fall), and gone
+# in Minecraft's death puff (ef_pickelworld_smoke00: 7 frames of 32 x 32, POOF_STEP frames each;
+# user: "they don't poof"); the enderman teleports in dashes of a few frames (8-15 units a frame,
+# its walk at most ~10.6 / 2 = TELEPORT_SPEED below): hidden over them, and a burst of purple
+# particles (P_PickelWorldEnderman, Minecraft's portal particles) where it leaves and where it
+# lands, rising and shrinking over TELEPORT_FX frames
+BURNING = ('zombie', 'skeleton')
+BURN_FROM = 8100
+FIRE_FRAMES, FIRE_STEP = 32, 3
+HURT_PERIOD, HURT_FRAMES, HURT_DEATH, HURT_TINT = 60, 30, 90, (1.0, 0.4, 0.4)
+POOF_FRAMES, POOF_STEP, POOF_PARTS = 7, 3, 7
 TELEPORT_SPEED, TELEPORT_FX, TELEPORT_PARTS = 11.0, 40, 12
 
 
@@ -1356,23 +1382,57 @@ def sprite(center, w, h, tex_id, spec, bone):
     return mesh
 
 
-def burn_fx(meshes, bones, tracks, hip, start, end, tex):
-    """flames on a mob (its hip bone's track) from start to end: a bone following the hip, scaled
-    to nothing outside and flickering inside"""
-    pos, rot, scl = (x.copy() for x in tracks[hip])
-    rng = np.random.default_rng(len(bones))
-    f = np.arange(len(pos))
-    flick = rng.uniform(0.8, 1.15, len(pos) // BURN_FLICKER + 1)[f // BURN_FLICKER]
+def burn_fx(meshes, bones, tracks, curves, kind, hip, start, end, at, tex, effect):
+    """a mob burning from start to its end (end): Minecraft's fire on it (a bone copying its hip's
+    track, scaled to nothing outside), its own meshes flashing red (their gain 'hurt_<kind>'), and
+    its death puff at `at` (world, where it ends)"""
+    import bntx
+    if 'pickel_fire_strip' not in tex.extra:
+        sp = bntx.read_all(open(effect, "rb").read())
+        tex.extra['pickel_fire_strip'] = sp['ef_pickelworld_fire01']
+        poof = sp['ef_pickelworld_smoke00'].astype(np.float64)
+        poof[..., :3] = 255.0                               # white (its colour is in its alpha)
+        tex.extra['pickel_poof_strip'] = np.round(poof).astype(np.uint8)
+    F = len(tracks[hip][0])
+    f = np.arange(F)
     on = (f >= start) & (f <= end)
-    scl = scl * np.where(on, flick, 0.0)[:, None]
+    pos, rot, scl = (x.copy() for x in tracks[hip])
     bones.append((hip + '_fire', 0))
+    tracks[bones[-1][0]] = (pos, rot, scl * on[:, None])
     k = len(bones) - 1
-    tracks[bones[-1][0]] = (pos, rot, scl)
-    fire = tex.id('torch_flame')
-    # the mob's bind pose: feet at 0, hip ~9, head ~17 (the zombie); the scale is about the origin,
-    # under the feet, so the flames flicker upwards
-    for c, w, h in (((0, 9, 3), 12, 18), ((-3, 6, 2.5), 7, 11), ((3, 12, 2.5), 7, 11), ((0, 15, -2.5), 10, 12)):
-        meshes.append(sprite(c, w, h, fire, BF_FLAME, k))
+    # the mob's bind pose: feet at 0, about 8 wide and 17 high (zombie, skeleton): the fire over
+    # it, in front and behind, a frame (1 / FIRE_FRAMES of the strip) each
+    for c, w, h in (((0, 10, 3.5), 13, 22), ((0, 11, -2.5), 12, 20)):
+        mesh = sprite(c, w, h, tex.id('pickel_fire_strip'), BF_FLAME, k)
+        mesh.polygons[0].uvs[0][:, 0] /= FIRE_FRAMES
+        mesh.gain = 'fire_' + kind
+        meshes.append(mesh)
+    uv = np.zeros((F, 4))
+    uv[:, :2] = 1.0
+    uv[:, 2] = (f // FIRE_STEP % FIRE_FRAMES) / FIRE_FRAMES
+    curves['fire_' + kind] = {'NU_colorSamplerUV': uv}
+    hurt = curves['island'].copy()
+    red = on & (((f - start) % HURT_PERIOD < HURT_FRAMES) | (f > end - HURT_DEATH))
+    hurt[red, :3] *= HURT_TINT
+    curves['hurt_' + kind] = hurt
+    # the puff: a bone at `at`, shown for its frames after the end
+    bones.append((hip + '_poof', 0))
+    k = len(bones) - 1
+    live = (f > end) & (f <= end + POOF_FRAMES * POOF_STEP)
+    tracks[bones[-1][0]] = (np.tile(np.asarray(at, dtype=np.float64), (F, 1)), None,
+                            np.repeat(live[:, None].astype(np.float64), 3, 1))
+    rng = np.random.default_rng(len(bones))
+    for _ in range(POOF_PARTS):
+        c = (rng.uniform(-5, 5), rng.uniform(2, 16), rng.uniform(0, 4))
+        sz = rng.uniform(5, 8)
+        mesh = sprite(c, sz, sz, tex.id('pickel_poof_strip'), BF_GLOW, k)
+        mesh.polygons[0].uvs[0][:, 0] /= POOF_FRAMES
+        mesh.gain = 'poof_' + kind
+        meshes.append(mesh)
+    uv = np.zeros((F, 4))
+    uv[:, :2] = 1.0
+    uv[:, 2] = np.clip((f - end - 1) // POOF_STEP, 0, POOF_FRAMES - 1) / POOF_FRAMES
+    curves['poof_' + kind] = {'NU_colorSamplerUV': uv}
 
 
 def teleport_fx(meshes, bones, tracks, prefix, path, lo, hi, tex):
@@ -1642,9 +1702,10 @@ def mob_kinds(src, form, biome, animals, daynight=True):
         for w in ('wait1', 'wait2'):
             path = '%s/ch_pickel_%s_set/pickel_%s_%s_%s.nuanmb' % (d, animal, b, animal, w)
             if os.path.exists(path):
-                anims = [(path, ANIMAL_FRAMES + 1)]
-                if daynight:                # away for the night (animal_tracks hides them), then back
-                    anims.append((path, [0] * (CYCLE - ANIMAL_FRAMES)))
+                if daynight:                # twice, then still at its start (= its end) to the cycle's end
+                    anims = [(path, ANIMAL_FRAMES)] * 2 + [(path, [0] * (CYCLE + 1 - 2 * ANIMAL_FRAMES))]
+                else:
+                    anims = [(path, ANIMAL_FRAMES + 1)]
                 out.append(('ch_pickel_%s_set' % animal, anims))
     monsters = []
     for m in MONSTERS if daynight else ():
@@ -1672,7 +1733,8 @@ def mob_window(anims):
 # its own (lit, unlit and additive) shaders, on materials found by their NU_materialHash (one
 # hash a kind of curve, GAIN_KINDS).
 CYCLE = 9000
-GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars', 'sun_core', 'torchlight', 'pano_glow')
+GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars', 'sun_core', 'torchlight', 'pano_glow',
+              'hurt_zombie', 'hurt_skeleton', 'fire_zombie', 'fire_skeleton', 'poof_zombie', 'poof_skeleton')
 NIGHT_FLOOR = 0.5                   # the island's least gain (Ultimate's stage light 2.4 by day, 0.3 at night: 0.39, darker
                                     # than Ultimate's night island, whose ambient light stays: user's comparison)
 SKY_RIG = 'dyr_m_SKY_DOME_set'      # the sun, the moon and the stars on their turning bones
@@ -2016,6 +2078,12 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         for m, part in zip(meshes, [q for q in parts if q['textures'] and q['uv'] is not None]):
             m.gain = {RING_SET: 'island', FAR_SET: 'pano', FOG_SET: 'fog'}.get(name) or (
                 'sun' if part['label'].startswith('zz_sun') else 'sky')
+        if name == FOG_SET:
+            for m in meshes:
+                for poly in m.polygons:
+                    for mat in poly.materials:
+                        for t in mat.textures:
+                            t['wrap_t'] = FOG_WRAP
         if name == RING_SET and ISLAND_FLAGS:
             for m in meshes:
                 m.gain = None               # its lights darken it (cycle_light)
@@ -2082,7 +2150,6 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         for kind in dict.fromkeys(a for a, _anims in animals):
             m, b, t = mob_rig(src, form, [x for x in animals if x[0] == kind], tex, frames, 'animal')
             for name, (pos, rot, scl) in t.items():
-                scl[ANIMAL_FRAMES + 1:frames - 1] = 0.0     # away for the night
                 pos += sh
             rigs.setdefault(ANIMAL_SETS[kind.split('_')[2]], []).append((m, b, t))
     if monsters:
@@ -2107,15 +2174,22 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 scl[:lo] = 0.0
                 scl[hi + 1:] = 0.0
                 pos += sh
-            if kind in BURNING and effect and hi > BURN_FROM:
-                burn_fx(m, b, t, 'monster0_Hip', BURN_FROM, hi, tex)
+            if kind in BURNING and effect and curves and hi > BURN_FROM:
+                for mesh in m:
+                    mesh.gain = 'hurt_' + kind
+                burn_fx(m, b, t, curves, kind, "monster0_Hip", BURN_FROM, hi, paths[k][hi] + sh, tex, effect)
             if kind == 'enderman':
                 teleport_fx(m, b, t, 'monster0_', paths[k] + sh, lo, hi, tex)
             rigs.setdefault(MONSTER_SETS[kind], []).append((m, b, t))
-    for folder in mob_folders:              # a day animal and a night monster a folder, one skeleton
+    for folder in mob_folders:              # an animal kind or a monster a folder, one skeleton
         if folder not in rigs:
-            hide_folder(model_dir, folder)
+            if folder not in ANIMAL_SETS.values():
+                hide_folder(model_dir, folder)
             continue
+        if folder in ANIMAL_SETS.values():   # a folder of the port's own
+            shutil.copytree('%s/%s' % (model_dir, ANIMAL_BASE), '%s/%s' % (model_dir, folder))
+            os.makedirs('%s/%s' % (anim_dir, folder))
+            shutil.copy('%s/%s/%s.omo' % (anim_dir, ANIMAL_BASE, ANIMAL_BASE), '%s/%s/%s.omo' % (anim_dir, folder, folder))
         meshes, bones, tracks = [], [('mob_root', -1)], {}
         for m, b, t in rigs[folder]:
             for mesh in m:
