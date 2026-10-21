@@ -63,6 +63,36 @@ def deswizzle(src, width_bytes, height, bh):
     return src[addr]
 
 
+def lut3d(t):
+    """a 3D R8G8B8A8 texture (a color grading LUT, 16 x 16 x 16) as float RGB [z, y, x, 3] in 0-1,
+    z = blue, y = green, x = red. Its blocks are one GOB high and the texture's depth deep
+    (checked: that layout gives Pickel World's LUT within 6 / 255 of the identity)"""
+    assert t.fmt in (0x0400, 0x0405) and t.depth > 1
+    src = np.frombuffer(t.data, dtype=np.uint8)
+    z = np.arange(t.depth)[:, None, None]
+    y = np.arange(t.h)[None, :, None]
+    x = np.arange(t.w)[None, None, :] * 4
+    addr = ((y // 8) * 512 * t.depth + z * 512 + ((x % 64) // 32) * 256 + ((y % 8) // 2) * 64
+            + ((x % 32) // 16) * 32 + (y % 2) * 16 + (x % 16))
+    return np.stack([src[addr + c] for c in range(3)], -1) / 255.0
+
+
+def apply_lut(lut, rgb):
+    """rgb [..., 3] uint8 graded through lut (trilinear) -> uint8"""
+    n = lut.shape[0] - 1
+    p = rgb.astype(np.float64) / 255 * n
+    i = np.minimum(np.floor(p).astype(int), n - 1)
+    f = p - i
+    out = np.zeros(rgb.shape[:-1] + (3,))
+    for dz in (0, 1):
+        for dy in (0, 1):
+            for dx in (0, 1):
+                w = ((f[..., 2] if dz else 1 - f[..., 2]) * (f[..., 1] if dy else 1 - f[..., 1])
+                     * (f[..., 0] if dx else 1 - f[..., 0]))
+                out += w[..., None] * lut[i[..., 2] + dz, i[..., 1] + dy, i[..., 0] + dx]
+    return np.clip(np.round(out * 255), 0, 255).astype(np.uint8)
+
+
 def decode(t):
     """RGBA uint8 [h, w, 4] of mip 0, layer 0"""
     eb, bs, _ = FORMATS[t.fmt]

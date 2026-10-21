@@ -418,6 +418,26 @@ Test 6 (still torches in the island's model) loaded (user, with a screenshot); i
 No setup outside what test 6 loaded (checked on every biome); `build/minecraft_world.zip` (plains,
 hazards on, with Omega and the ui files) and `build/minecraft_world_biomes.zip`.
 
+## v12
+
+v11 in game (user, screenshot; it matches the offline render within a few percent, so the
+renderer predicts the game's unlit colors): no more sky over the background; "a bit too dark",
+the hay's and the background's colors off next to Ultimate (user's screenshot), a lighter band of
+sky over the hills; the grass fixed; no fighter shadows (none before either: the island's
+materials don't take them).
+- The panorama shows its texture's own color in game (sampled: (129, 153, 95) vs the texture's
+  (127, 152, 95)), so Ultimate's livelier look is its post-processing: the stage's color grading LUT
+  (`lut/color_grading_lut.nutexb`, a 16^3 R8G8B8A8 3D texture: `nutexb.lut3d`, blocks one GOB high
+  and the full depth deep; near the identity, it adds ~0.07 saturation) and its lighting. v12 puts
+  every texture through the LUT and `GRADE_SATURATION` 1.1, and the island's baked shading x1.25.
+- The lighter band: Ultimate's haze ring (`fog_near`), now behind a solid panorama: left out.
+- Animated torches (test A): the sprites' materials are now exact copies of Battlefield's
+  bone-bound ones (`BF_FLAME`: dyr_g's 0xA3C01081, additive; `BF_SMOKE`: dyr_f's 0xA4011001,
+  premultiplied, the texture written premultiplied; their property lists as Battlefield's).
+  Test B: the same on Battlefield's one bone (whether the made skeleton matters); C: still.
+
+`build/minecraft_world_v12_tests.zip`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

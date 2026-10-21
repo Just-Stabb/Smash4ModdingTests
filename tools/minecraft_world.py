@@ -69,7 +69,9 @@ FAR_FOG_ALPHA = 0.8
 FAR_ORDER = '2'
 FOG_SET, FOG_ORDER = 'stc_b_shadow_gareki_set', '3'
 GAMMA = 2.2                         # Ultimate's material colors are linear; Smash 4's vertex colors not
-SKY_LABELS = ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core', 'fog_near')
+# (Ultimate's haze ring, fog_near, left out in v12: with the panorama solid it showed as a lighter
+# band of sky over the hills, user)
+SKY_LABELS = ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core')
 
 RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
 # the cloud layers (far_common_set's bones cloud_model0-2, moved by its animation) each in a
@@ -112,10 +114,16 @@ ISLAND_LIGHT_SET = 4                # stc_c_Ring_set's model.xmb light set
 # (0xA4001041, which has no fog parameters of its own) it came out washed out in game (user's
 # screenshot: hay's blue channel ~0 -> ~100, grey stone beige), the stage's light and haze added
 # on top. Minecraft-style face shading from Ultimate's sun (travel direction as ISLAND_LIGHTS'):
-# BAKE_AMBIENT + BAKE_SUN x the face's share of it (top 0.98, front 0.76, sides 0.69 / 0.6,
-# bottom 0.6), times Ultimate's corner shading (colorSet1, AO_KEEP).
+# BAKE_AMBIENT + BAKE_SUN x the face's share of it (top 1.22, front 0.95, sides 0.86 / 0.75,
+# bottom 0.75), times Ultimate's corner shading (colorSet1, AO_KEEP).
 BAKE_SUN_DIR = np.array([-0.204, -0.903, -0.379])
-BAKE_AMBIENT, BAKE_SUN = 0.6, 0.42
+# (v11: 0.6 + 0.42, top 0.98 ... bottom 0.6, "a bit too dark", user; v12 x1.25)
+BAKE_AMBIENT, BAKE_SUN = 0.75, 0.52
+# Ultimate grades the finished picture through the stage's LUT (lut/color_grading_lut.nutexb,
+# 16^3: near the identity, saturation +0.07 on the blocks' colors); v12 puts every texture through
+# it (an approximation: Ultimate grades the lit result), with GRADE_SATURATION more on top
+# (v11 next to Ultimate in the user's screenshots: the hay's and the background's colors weaker)
+GRADE_SATURATION = 1.1
 # the island's light set, from Ultimate's (render/light/light00_set.nuanmb, frame 0 = day): its
 # stage light is white from (0.20, 0.90, 0.38) (travel direction below, as light.bin's); Ultimate's
 # ambient (spherical harmonics) becomes a sky light from above, a fill from the camera and the 4th
@@ -545,9 +553,20 @@ def bleed(img, steps=4):
     return out
 
 
+def graded(img, lut):
+    """RGBA through Ultimate's grading LUT, then GRADE_SATURATION (about the pixel's grey)"""
+    out = img.copy()
+    rgb = nutexb.apply_lut(lut, img[..., :3]).astype(np.float64)
+    grey = rgb.mean(-1, keepdims=True)
+    out[..., :3] = np.clip(np.round(grey + (rgb - grey) * GRADE_SATURATION), 0, 255).astype(np.uint8)
+    return out
+
+
 class Textures:
-    def __init__(self, src):
+    def __init__(self, src, lut=None):
         self.src = src
+        self.lut = lut                      # Ultimate's grading LUT (nutexb.lut3d) or None
+        self.premultiplied_out = set()      # textures written with color x alpha (for blend one / 1 - alpha)
         self.ids = {}
         self.order = []
         self.sky = np.ones((256, 3))
@@ -600,7 +619,13 @@ class Textures:
                 img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
                                                              else Image.LANCZOS))
             if alpha:
-                img = bleed(unpremultiply(img))
+                img = unpremultiply(img)
+            if self.lut is not None:
+                img = graded(img, self.lut)
+            if alpha:
+                img = bleed(img)
+            if n in self.premultiplied_out:
+                img = premultiply(img)
             fmt = 0x1A if n == SKY_GRADIENT else 0x31 if (img[..., 3] >= 250).all() else 0x33    # RGBA8: no banding
             texs.append((self.ids[n], fmt, img))
         return nut.write_ntwu(texs)
@@ -631,6 +656,29 @@ def material(setup, tex_id, cull=1029, fog=NO_FOG):
     m.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_fogParams', list(fog[1])),
                ('NU_fogColor', list(fog[0])), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
                ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
+    return m
+
+
+# Bone-bound materials as Battlefield's own (flags, blend, alpha test, culling, properties, sampler):
+# v9 / v10 tests 1, 2 and 5 froze with the torches' unlit 0xA2001001 alpha-tested / blended on
+# bones, which no Battlefield model has. Flames: dyr_g_bgfar_set's (0xA3C01081, blend 1 / 2:
+# source alpha, one, so additive); smoke: dyr_f_BG_far2_set_set's (0xA4011001, blend 5 / 1: one,
+# one minus source alpha, so a premultiplied texture), its fog strengths 0.
+BF_FLAME = (0xA3C01081, 1, 2, 0, 0, 1029,
+            [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_finalColorGain', [1.0, 1.0, 1.0, 1.0]),
+             ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]), ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 3)
+BF_SMOKE = (0xA4011001, 5, 1, 0, 0, 1029,
+            [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_fresnelParams', [1.0, 1.0, 0.0, 1.0]),
+             ('NU_fresnelColor', [0.0, 0.0, 0.0, 0.0]), ('NU_fogParams', [300.0, 9000.0, 0.0, 0.0]),
+             ('NU_diffuseColor', [1.0, 1.0, 1.0, 0.0]), ('NU_fogColor', [0.43, 0.712, 0.994, 0.0]),
+             ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 1)
+
+
+def bf_material(spec, tex_id):
+    flags, src, dst, af, ref, cull, props, wrap = spec
+    m = nud.Material(flags, src, dst, af, ref, cull)
+    m.textures.append(dict(hash=tex_id, map_mode=0, wrap_s=wrap, wrap_t=wrap, min_f=3, mag_f=2, mip=6, unk=0, unk2=0))
+    m.props = [(n, list(v)) for n, v in props]
     return m
 
 
@@ -848,18 +896,24 @@ def torch_points(src, labels, row):
 def torch_meshes(points, tex, effect, animated=True):
     """the torches' flames (and, animated, smoke) as meshes. animated: each on its own bone
     (bind 8, bone n; made skeleton [(name, parent)], bone 0 the root) with its motion
-    {bone: (sprite centre, scale a frame, offset a frame)}; still: flames only, unbound"""
+    {bone: (sprite centre, scale a frame, offset a frame)}, Battlefield's bone-bound materials
+    (BF_FLAME, BF_SMOKE); still: flames only, unbound, the island's alpha-tested unlit setup"""
     import bntx
     sprites = bntx.read_all(open(effect, 'rb').read())
     tex.extra['torch_flame'] = sprites['ef_pickelworld_fire00']
     smoke = sprites['ef_pickelworld_smoke00'][:, :32]                    # the sheet's first (largest) puff
-    tex.extra['torch_smoke'] = smoke.repeat(2, 0).repeat(2, 1)
+    smoke = smoke.repeat(2, 0).repeat(2, 1).astype(np.float64)
+    if animated:                            # grey and opacity in the texture, written premultiplied for BF_SMOKE
+        smoke[..., 3] *= SMOKE_ALPHA
+        smoke[..., :3] *= SMOKE_GREY
+        tex.premultiplied_out.add('torch_smoke')
+    tex.extra['torch_smoke'] = np.round(smoke).astype(np.uint8)
     bones = [('torch_root', -1)]
     meshes = []
     motion = {}
     frames = np.arange(TORCH_LOOP + 1)
 
-    def quad(c, size, tname, col, setup, name):
+    def quad(c, size, tname, col, setup, name, spec=None):
         h = size / 2
         poly = nud.Polygon()
         poly.pos = c + np.array([[-h, -h, 0], [h, -h, 0], [h, h, 0], [-h, h, 0]])
@@ -867,7 +921,7 @@ def torch_meshes(points, tex, effect, animated=True):
         poly.col = np.tile(np.round(np.array(col) * 127), (4, 1))
         poly.uvs = [np.array([[0, 1], [1, 1], [1, 0], [0, 0]], dtype=np.float64)]
         poly.idx = two_sided([0, 1, 2, 0, 2, 3])
-        poly.materials = [material(setup, tex.id(tname))]
+        poly.materials = [bf_material(spec, tex.id(tname)) if animated else material(setup, tex.id(tname))]
         if animated:
             bones.append((name, 0))
             meshes.append(nud.Mesh(name, [poly], bone=len(bones) - 1, bind=8))
@@ -877,7 +931,7 @@ def torch_meshes(points, tex, effect, animated=True):
     for i, c in enumerate(points):
         rng = np.random.default_rng(i)
         flame = c + np.array([0.0, FLAME_SIZE * 0.3, 0.5])
-        quad(flame, FLAME_SIZE, 'torch_flame', [1, 1, 1, 1], UNLIT_CUTOUT, 'torch%d_flame' % i)
+        quad(flame, FLAME_SIZE, 'torch_flame', [1, 1, 1, 1], UNLIT_CUTOUT, 'torch%d_flame' % i, BF_FLAME)
         if not animated:
             continue
         ph = rng.uniform(0, 2 * np.pi, 2)
@@ -886,7 +940,7 @@ def torch_meshes(points, tex, effect, animated=True):
         start = int(rng.integers(SMOKE_LIFE))
         for k in range(2):
             base = c + np.array([0.0, FLAME_SIZE * 0.6, 0.4])
-            quad(base, SMOKE_SIZE, 'torch_smoke', [SMOKE_GREY] * 3 + [SMOKE_ALPHA], UNLIT_BLEND, 'torch%d_smoke%d' % (i, k))
+            quad(base, SMOKE_SIZE, 'torch_smoke', [1, 1, 1, 1], UNLIT_BLEND, 'torch%d_smoke%d' % (i, k), BF_SMOKE)
             u = ((frames + start + k * SMOKE_LIFE // 2) % SMOKE_LIFE) / SMOKE_LIFE
             rise = np.zeros((len(frames), 3))
             rise[:, 1] = SMOKE_RISE * u
@@ -894,17 +948,27 @@ def torch_meshes(points, tex, effect, animated=True):
     return meshes, bones, motion
 
 
-def write_torches(model_dir, anim_dir, meshes, bones, motion, tex):
-    """animated torches into TORCH_SET: model, skeleton, animation"""
+def write_torches(model_dir, anim_dir, meshes, bones, motion, tex, own_skeleton=True):
+    """animated torches into TORCH_SET: model, skeleton, animation. own_skeleton=False (a test):
+    every mesh on the folder's own (Battlefield's) bone, its animation still"""
     import zlib
-    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
     folder = '%s/%s' % (model_dir, TORCH_SET)
-    write_set(folder, meshes, tex)
-    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
     path = '%s/%s/%s.omo' % (anim_dir, TORCH_SET, TORCH_SET)
     o = omo.Omo(open(path, 'rb').read())
     o.frames = TORCH_LOOP + 1
     o.nodes = []
+    if not own_skeleton:
+        for m in meshes:
+            m.bone = 0
+        write_set(folder, meshes, tex)
+        h = omo.vbn_read(folder + '/model.vbn')[0][2]
+        n = o.frames
+        omo.set_node(o, h, [(0.0, 0.0, 0.0)] * n, [(0.0, 0.0, 0.0, 1.0)] * n, [(1.0, 1.0, 1.0)] * n)
+        open(path, 'wb').write(o.encode())
+        return
+    bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
+    write_set(folder, meshes, tex)
+    open(folder + '/model.vbn', 'wb').write(omo.vbn_write(bones))
     for name, _p, h in bones[1:]:
         c, sc, up = motion[name]
         sc = np.asarray(sc, dtype=np.float64)
@@ -930,7 +994,7 @@ def tiny_nut(path):
 
 
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
-               clouds='moving'):
+               clouds='moving', torch_skeleton='own'):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches (need
     effect): 'animated' (TORCH_SET), 'still' (flames in the island's model) or 'off'; clouds:
     'moving' or 'still'"""
@@ -940,7 +1004,8 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         shutil.rmtree(out_dir)
     shutil.copytree(base_dir, out_dir)
     model_dir = out_dir + '/model'
-    tex = Textures(src)
+    lut = nutexb.lut3d(nutexb.Nutexb('%s/%s/lut/color_grading_lut.nutexb' % (src, 'normal' if form == 'melee' else 'battle')))
+    tex = Textures(src, lut)
     if form == 'melee':
         index = BIOMES.index(biome)
         d = ult_lvd('%s/normal/param/pickel_world_%02d%s.lvd' % (src, index, '' if hazards else '_gimmick_off'), yamlvd)
@@ -994,7 +1059,8 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         open(path, 'wb').write(data)
     write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
     if effect and torches == 'animated':
-        write_torches(model_dir, out_dir + '/animation', torch, torch_bones, torch_motion, tex)
+        write_torches(model_dir, out_dir + '/animation', torch, torch_bones, torch_motion, tex,
+                      torch_skeleton == 'own')
 
     light = out_dir + '/animation/light.bin'
     data = still_light(light)
@@ -1041,10 +1107,13 @@ def main():
     ap.add_argument('--torches', default='still', choices=('animated', 'still', 'off'),
                     help="still (default): v10 test 6, the one that loaded; animated: test 5")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
+    ap.add_argument('--torch-skeleton', default='own', choices=('own', 'battlefield'),
+                    help="animated torches' skeleton: their own (a bone a sprite) or the folder's one bone (a test)")
     a = ap.parse_args()
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
-                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds)
+                                  form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
+                                  a.torch_skeleton)
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 
