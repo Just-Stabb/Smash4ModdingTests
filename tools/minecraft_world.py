@@ -512,6 +512,14 @@ def build_lvd(base_lvd, d, cols):
 
 
 # ---------------------------------------------------------------- NUD / NUT
+def pixel_art(name):
+    """textures drawn 4x larger with nearest pixels, so each source pixel is one 4x4 BC block
+    (exact) and stays sharp under linear filtering: the block atlases and the mobs' skins
+    (pickel_guestg_col, pickel_plains_col, ...: 128 pixels, faces of a few; at their own size BC
+    and filtering lost the sheep's eyes and the villagers' faces in game, user)"""
+    return name.startswith('all_blocks') or name.startswith('pickel_') and not name.startswith('pickel_world')
+
+
 # Ultimate's textures drawn with One / OneMinusSourceAlpha (color already times alpha): the panoramas
 PREMULTIPLIED = {'far_%s_day_low_col' % k for k in 'abcdef'}
 
@@ -602,13 +610,12 @@ class Textures:
 
     def nut(self, names):
         """NTWU, one mip, as Battlefield's single-mip textures: BC1 (opaque) or BC3, power-of-two
-        sizes 64-2048. The block atlases are pixel art: 4x larger with nearest pixels, so each
-        source pixel is one 4x4 block (exact in BC) and the game's linear filtering keeps it sharp."""
+        sizes 64-2048; pixel art (see pixel_art) 4x larger with nearest pixels."""
         from PIL import Image
         texs = []
         for n in names:
             img = self.image(n)
-            if n.startswith('all_blocks'):
+            if pixel_art(n):
                 img = img.repeat(4, 0).repeat(4, 1)
             h, w = img.shape[:2]
             w2, h2 = (min(2048, max(64, 1 << (v.bit_length() - 1))) for v in (w, h))
@@ -616,8 +623,7 @@ class Textures:
             if alpha and not n.split('#')[0] in PREMULTIPLIED:
                 img = premultiply(img)
             if (w2, h2) != (w, h):
-                img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
-                                                             else Image.LANCZOS))
+                img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if pixel_art(n) else Image.LANCZOS))
             if alpha:
                 img = unpremultiply(img)
             if self.lut is not None:

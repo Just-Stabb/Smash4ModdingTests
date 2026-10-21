@@ -481,7 +481,14 @@ same files.
 - Checked offline (`view_rig.py`: the meshes posed from the written .omo through `omo.world`, as
   the game reads it): sheep whole and in the pen, villagers whole and on the path.
 
-`build/minecraft_world_v13_test.zip`.
+v13 in game (user, screenshots): loads; the sheep's and villagers' faces and the villagers'
+clothes smeared. Their skins are 128-pixel pixel art (`pickel_guestg_col` 128x128,
+`pickel_plains_col` 128x64) with faces a few pixels wide: BC1's 4x4 blocks (4 colors on a line)
+mixed the eyes (16 pixels off by up to 122 / 255) and linear filtering blurred the rest. v13b draws
+them 4x larger with nearest pixels as the block atlas (`pixel_art`): each source pixel one BC block,
+within 5 / 255 of the source.
+
+`build/minecraft_world_v13_test.zip` (v13b).
 
 ## Freeze (user) and tests
 
