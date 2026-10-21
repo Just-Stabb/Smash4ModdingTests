@@ -6,8 +6,9 @@ NewStage01 (tools/minecraft_world.py's output).
 
 SRC is Ultimate's stage/pickel_world (for the hay bale block), STAGE_DIR the built
 stage/melee/NewStage01. Adds:
-- a 3-block hay bale platform (bright, to tell it from the planks of the houses behind) in the model folder dyr_j_BG_most_far0_set (Battlefield's: one bone,
-  an animation the stage plays; the folder's model was emptied by minecraft_world.py): the mesh is
+- a 3-block hay bale platform (bright, to tell it from the planks of the houses behind) in the model
+  folder dyr_j_BG_most_far0_set (Battlefield's: one bone, an animation the stage plays, no material
+  animation; minecraft_world.py hid its model): the mesh is
   bound to the bone (bind 8, bone 0, vertices around it, as Battlefield's own), the bone's
   animation (animation/dyr_j_BG_most_far0_set/*.omo, PERIOD + 1 frames, the last = the first, as
   Battlefield's loops) moves it along stage_script_cave.motion around (CX, CY);

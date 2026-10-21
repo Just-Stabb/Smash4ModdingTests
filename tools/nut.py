@@ -105,16 +105,12 @@ def element_offsets(ew, eh, bpp, tile_mode, swizzle, pitch):
     """byte offset in the surface of each element (pixel / 4x4 block), [eh, ew]"""
     eb = bpp // 8
     swz = ((swizzle >> 8) & 1) + (((swizzle >> 9) & 3) << 1)
-    out = np.zeros((eh, ew), dtype=np.int64)
-    for y in range(eh):
-        for x in range(ew):
-            if tile_mode in (0, 1):
-                out[y, x] = (y * pitch + x) * eb
-            elif tile_mode in (2, 3):
-                out[y, x] = ((y // 8) * (pitch // 8) + x // 8) * 64 * eb + ((_pixel_index(x, y, bpp) * bpp) >> 3)
-            else:
-                out[y, x] = _macro_tiled(x, y, bpp, pitch, swz)
-    return out
+    y, x = np.mgrid[0:eh, 0:ew].astype(np.int64)
+    if tile_mode in (0, 1):
+        return (y * pitch + x) * eb
+    if tile_mode in (2, 3):
+        return ((y // 8) * (pitch // 8) + x // 8) * 64 * eb + ((_pixel_index(x, y, bpp) * bpp) >> 3)
+    return _macro_tiled(x, y, bpp, pitch, swz)
 
 
 # ---------------------------------------------------------------- BC decode
@@ -268,6 +264,9 @@ def encode(img, t):
         lin = _enc_bc4(blocks[:, :, 0])
     elif f == 0x35:
         lin = np.concatenate([_enc_bc4(blocks[:, :, 0]), _enc_bc4(blocks[:, :, 1])], 1)
+    elif f == 0x1A:
+        lin = np.ascontiguousarray(img).reshape(-1, 4)
+        ew, eh = img.shape[1], img.shape[0]
     else:
         raise NotImplementedError('format 0x%X' % f)
     out = np.zeros(t.image_size, dtype=np.uint8)
@@ -336,6 +335,56 @@ def write_ntp3(textures):
         data_before += len(blob)
     for blob in datas:
         out += blob
+    return bytes(out)
+
+
+# ---------------------------------------------------------------- NTWU (write)
+NTWU_CODE = {0x31: 0, 0x33: 2, 0x1A: 14}          # GX2 format -> the .nut header's format byte
+NTWU_ALIGN = {0x31: 0x1000, 0x33: 0x2000, 0x1A: 0x800}
+
+
+class Surface:
+    """a single-mip 2D texture as the game's own: tile mode 4, pitch (elements) a multiple of 32,
+    rows to a multiple of 16 (checked against all 626 of Battlefield's textures)"""
+    def __init__(self, fmt, w, h, swizzle=0xD0000):
+        self.fmt, self.w, self.h, self.swizzle = fmt, w, h, swizzle
+        bc = _is_bc(fmt)
+        ew, eh = ((w + 3) // 4, (h + 3) // 4) if bc else (w, h)
+        self.tile_mode, self.alignment = 4, NTWU_ALIGN[fmt]
+        self.pitch = -(-ew // 32) * 32
+        self.image_size = self.pitch * (-(-eh // 16) * 16) * (_bpp(fmt) // 8)
+
+    def gx2(self):
+        return struct.pack('>16i13i12x', 1, self.w, self.h, 1, 1, self.fmt, 0, 1, self.image_size, 0, 0, 0,
+                           self.tile_mode, self.swizzle, self.alignment, self.pitch, *[0] * 13)
+
+
+def write_ntwu(textures):
+    """textures: [(tex_id, GX2 format 0x31 BC1 / 0x33 BC3 / 0x1A RGBA8, RGBA [h, w, 4])] -> .nut bytes:
+    one mip each, laid out as Battlefield's single-mip .nut (the headers, the data from 0x1000 each
+    at its alignment, the GX2 surfaces at the end)"""
+    hs = 0x50
+    surfs = [Surface(fmt, img.shape[1], img.shape[0]) for _, fmt, img in textures]
+    out = bytearray(b'NTWU' + struct.pack('>HH8x', 0x020E, len(textures)))
+    pos = 0x10 + hs * len(textures)
+    offs = []
+    for s in surfs:
+        pos = -(-max(pos, 0x1000) // s.alignment) * s.alignment
+        offs.append(pos)
+        pos += s.image_size
+    gtx = pos
+    for i, ((tex_id, fmt, img), s) in enumerate(zip(textures, surfs)):
+        hp = 0x10 + hs * i
+        out += struct.pack('>IIIHHBBBBHHII', s.image_size + hs, 0, s.image_size, hs, 0, 0, 1, 0, NTWU_CODE[fmt],
+                           s.w, s.h, 1, 0)
+        out += struct.pack('>IIII', offs[i] - hp, 0, gtx + 0x80 * i - hp, 0)
+        out += b'eXt\0' + struct.pack('>III', 0x20, 0x10, 0)
+        out += b'GIDX' + struct.pack('>III', 0x10, tex_id, 0)
+    for (tex_id, fmt, img), s, o in zip(textures, surfs, offs):
+        out += b'\0' * (o - len(out))
+        out += encode(img, s)
+    for s in surfs:
+        out += s.gx2()
     return bytes(out)
 
 

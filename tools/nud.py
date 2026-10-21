@@ -142,6 +142,28 @@ def _read_material(d, o, str_base):
     return m
 
 
+def hidden(path):
+    """the .nud's bytes with every polygon's indices zeroed: nothing is drawn, and the rest (meshes,
+    materials, bones, so the folder's material animations and skeleton still match) is as it was"""
+    d = bytearray(open(path, 'rb').read())
+    packed = d[:2] == b'\x78\x9c'             # some of Battlefield's are zlib-packed: kept so
+    if packed:
+        d = bytearray(zlib.decompress(d))
+    assert d[:4] == b'NDP3', d[:4]
+    nmesh, = struct.unpack('>h', d[0xA:0xC])
+    pstart, = struct.unpack('>i', d[0x10:0x14])
+    for i in range(nmesh):
+        o = 0x30 + i * 0x30
+        npoly, obj = struct.unpack('>hi', d[o + 42:o + 48])
+        for j in range(npoly):
+            q = obj + j * 0x30
+            poff, = struct.unpack('>i', d[q:q + 4])
+            nidx, = struct.unpack('>H', d[q + 32:q + 34])
+            a = 0x30 + pstart + poff
+            d[a:a + 2 * nidx] = bytes(2 * nidx)
+    return zlib.compress(bytes(d)) if packed else bytes(d)     # default level: the game's own 78 9C header
+
+
 # ---------------------------------------------------------------- write
 def _vertex_bytes(p):
     n = len(p.pos)

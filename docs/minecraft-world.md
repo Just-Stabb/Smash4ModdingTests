@@ -1,7 +1,7 @@
 # Minecraft World (Smash Ultimate) on NewStage01
 
-Status: **built, not tested in game yet** (the first in-game try, the moving-platform test, froze
-while loading; see "Freeze"). The whole normal-play stage (not the Battlefield form) converted
+Status: **v5 built, not tested in game yet.** v1-v4 froze while loading their models (user's
+tests; see "Freeze"); v5 uses only forms Battlefield's own loaded models have. The whole normal-play stage (not the Battlefield form) converted
 from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
 `NewStage01` slot (`docs/stage-expansion.md`), normal play and Omega, with Ultimate's own collision,
 spawns, camera, blast zones, item areas and breakable-block layouts.
@@ -25,6 +25,9 @@ Deliverables (git-ignored `build/`):
   "Minecraft World" name banner.
 - `minecraft_world_biomes.zip`: every other biome / hazards combination (`<biome>_hazards_on|off`):
   the three model folders and `NewStage0100.lvd` that differ; copy one over `stage/melee/NewStage01`.
+- `minecraft_world_tests.zip`: `5_moving_platform` (the moving-platform test on v5, with its RPX)
+  and, if v5 still freezes, `1_battlefield_hidden` (Battlefield's NewStage01 with every model
+  hidden) and `2_ring_only` / `3_backdrop_only` / `4_sky_only` (one v5 folder each, over 1).
 
 ## Ultimate's files
 
@@ -69,10 +72,13 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   height from the image height) and RGBA8 / BC1-BC5 decode (reusing `nut.py`'s BC decoders).
 - `tools/bntx.py`: Ultimate UI textures (BNTX: BRTI format / size / block height; BC1-BC5, BC7
   through Pillow's DDS reader, RGBA8).
-- `tools/nut.py ntp3`: new NTP3 textures (untiled; the game's own Battlefield has NTP3
-  `model.nut`s, and the header matches them).
+- `tools/nut.py`: `write_ntwu` writes new NTWU textures (GX2 tile mode 4, one mip) as
+  Battlefield's: its pitch / size / alignment rule holds for all 626 of Battlefield's textures, and
+  rebuilding `stc_moon__set/model.nut` gives the same headers and GX2 surfaces byte for byte.
+  `ntp3` (NTP3, untiled) is still there, but the game's loaded models don't use it (below).
 - `tools/nud.py`: NUD read / write. Checked by rewriting every static Battlefield model with it:
   byte-identical except the bounding spheres it recomputes (and one unused vertex field).
+  `hidden(path)`: the model with its indices zeroed (nothing drawn, everything else unchanged).
 - `tools/lvd.py`: Smash 4 LVD read / write (Battlefield's melee and Omega files round-trip
   byte-identical).
 
@@ -84,25 +90,26 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   (same orientation in both games, checked by rendering Battlefield's own models), triangle lists.
   Meshes under a bone (doors) are moved by the skeleton. The blocks are placed from the breakable
   file (every block, every depth) and merged into one mesh a material.
-- **Materials** are Battlefield's: `0xA4001041` (its ground: lit, vertex colors, shadows) for the
-  island, blocks, plates, doors and farm, with an alpha test (`>= 128`) for the block atlas'
-  cut-outs (leaves, grass, flowers) and nearest filtering (pixel art). `0xA2000001` (its background
-  plane) for the panorama (alpha-tested sky cut-out) and the sky. Cull mode from Ultimate's.
-- **Textures**: only the NTP3 forms the game's own files use (Battlefield's models, the UI): RGBA8
-  and DXT5 with one mip, DXT1 with a full mip chain, power-of-two sizes. The block atlas (512x512)
-  is RGBA8, one copy for the island and the blocks (Ultimate's `_for_programBlock` copy has the same
-  layout, slightly different tones); the panorama 2048x1024 DXT5. Texture IDs `0x2000F001`... (the
-  game's are `0x2000xxxx`). v1 used RGBA8 / DXT5 with mips, a 36x36 texture and IDs `0x204Dxxxx`:
-  the moving-platform test froze while loading the stage (user), which is the first suspect.
+- **Materials**: only setups Battlefield's melee models have (flags, vertex layout, blending,
+  alpha test, culling, sampler), from `tools/minecraft_world.py`'s `OPAQUE` (`0xA4001041`, its
+  ring), `CUTOUT` (`0xA4011001` alpha test >= 128, its rubble; the block atlas, the panorama),
+  `BLEND` (`0xA4001041` blended, its grass; clouds, glass, sun) and `UNLIT` (`0xA2001001`, its
+  platforms; the sky dome). Faces Ultimate draws from both sides are doubled (reversed copies)
+  outside `CUTOUT`, as Battlefield's other setups cull back faces. Linear filtering, as all of
+  Battlefield's.
+- **Textures**: NTWU, one mip, BC1 (opaque) or BC3, powers of two from 64 to 2048, IDs
+  `0x2000F001`... (Battlefield's are `0x2000xxxx` below that). The block atlas (512x512) is 4x larger
+  with nearest pixels (2048x2048 BC3): each source pixel is one 4x4 block, exact in BC, and sharp
+  under linear filtering. The panorama 2048x1024 BC3.
 - **Sky**: Ultimate colors the sky dome in its shader (its vertex colors are only shading), so the
   dome gets a fixed day gradient. Clouds at 70% opacity (from under the layer they'd hide most of
   the sky). Sun kept; moon, stars and fog layers not.
-- **Model folders**: Battlefield's names are kept (whether the generic stage enumerates the folder
-  isn't known). `stc_c_Ring_set`: everything on the block atlas; `stc_k_BG_most_far2`: the panorama;
-  `stc_o_BG_clouds_set`: the sky. Every other folder gets an empty model (one zero-size triangle,
-  a transparent 4x4 texture). Melee's `stc_a_surinuke_set` isn't empty in Battlefield (it holds
-  Battlefield's pass-through platforms), so it's emptied too. The replaced folders' `model.mta`
-  (material animations) are removed.
+- **Model folders**: only Battlefield folders without a material animation (`model.mta`) get new
+  models: `stc_c_Ring_set` (everything on the block atlas), `stc_k_BG_most_far2` (the panorama),
+  `stc_BG_most_far2_1_set` (the sky, with `stc_o_BG_clouds_set`'s `model.xmb`: light set 14, draw
+  range 4, order 12). Every other folder keeps all of Battlefield's files with the model hidden
+  (`nud.hidden`), so its `.mta` and skeleton still match its model (installing over an old build
+  can't remove files, so dropping the `.mta`s as v1-v4 did may leave them beside other models).
 - **Omega**: `battle/model/ring_endbattle_set` (the ring the Battlefield form and Omega share) with
   `pickel_world_end_00.lvd`, Plains' panorama and the sky.
 
@@ -169,9 +176,9 @@ counting frames (adding `f1`, as the animations do) that moves the inactive biom
 
 ## Moving-platform test (not tested in game yet)
 
-`build/moving_platform_test.zip`: the full RPX (the standard build plus
-`tools/stage_script_cave.py`) and `stage/melee/NewStage01` (the Plains build plus
-`tools/moving_platform_test.py`'s platform). A 3-block hay bale platform circles over the middle of
+`build/minecraft_world_tests.zip`'s `5_moving_platform`: the full RPX (the standard build plus
+`tools/stage_script_cave.py`) and the files `tools/moving_platform_test.py` adds to the v5 Plains
+build (its platform model, animation and lvd). A 3-block hay bale platform circles over the middle of
 the island (x -35 to 15, y 38 to 62, a 4-second loop): its model by animation, its drop-through
 collision by the cave.
 
@@ -200,14 +207,27 @@ What the result tells:
 
 ## Freeze (user) and tests
 
-The moving-platform test build froze while loading the stage. Not the cause (checked): the link
-manager rigged collision needs exists on every stage (made in the base constructor,
-`0x03140B78`); the generated lvd has Battlefield's layout (no zero-length lines, unit normals,
-ledges on their lines); a cave keeping data next to its code (strike_cave.py's counters already do).
-Fixed on suspicion: the texture forms and IDs (above). `build/freeze_tests.zip` splits it:
-1 Minecraft World alone (current RPX), 2 the moving-platform test, 3 Minecraft models with
-Battlefield's collision, 4 Battlefield's models with Minecraft collision, 5 the new RPX with the plain
-Battlefield copy.
+The moving-platform test build froze while loading the stage, and so did v4. Not the cause
+(checked): the link manager rigged collision needs exists on every stage (made in the base
+constructor, `0x03140B78`); a cave keeping data next to its code (strike_cave.py's counters already
+do). `build/freeze_tests.zip` (v4) split it; the user's results:
+- 1 (Minecraft World, normal and Omega): froze;
+- 3 (Minecraft models, Battlefield's collision): froze;
+- 4 (Battlefield's models, Minecraft collision): loaded, with the Minecraft collision. Omega froze,
+  but that folder still had test 1's Minecraft models (user).
+
+So the models, not the collision. Compared with Battlefield's own loaded models, v4's had:
+- **NTP3 textures**: all 43 `model.nut` / `render` textures Battlefield's melee and Omega folders
+  load are NTWU (GX2 tiled); its only NTP3 files are in three Omega-only folders (`stc_BG_set`,
+  `stc_ring_set`, `stc_surinuke_set`) that melee doesn't have, likely never loaded;
+- material setups Battlefield doesn't have: `0xA2000001` with normals (its one use, an Omega-only
+  folder, has none), `0xA4001041` with an alpha test, nearest filtering, a texture ID `0x2001EFFF`;
+- `model.mta` removed from folders whose model it no longer matched (or left over on install);
+- 4x4 / 8x8 textures (Battlefield's smallest: 32x32).
+
+v5 changes all four (above); `tools/minecraft_world.py`'s output is checked (scratch
+`check_v5.py`) for: every material setup and sampler in Battlefield's melee models, every texture
+by the NTWU rule, every other file Battlefield's or its model hidden, no file missing or extra.
 
 ## Ultimate files (user)
 

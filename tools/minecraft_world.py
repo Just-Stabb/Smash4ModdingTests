@@ -20,12 +20,14 @@ here from the models):
   block grid), as outlines (ledges at the outer top corners of the main island), the platforms as
   drop-through lines; spawns / respawns / camera / blast zones / item areas from the layout.
 
-Models go into Battlefield's model folders (stc_c_Ring_set: everything using the block atlas,
-stc_k_BG_most_far2: the backdrop, stc_o_BG_clouds_set: the sky); every other model folder gets an
-empty model (one zero-size triangle, a transparent 4x4 texture; melee's stc_a_surinuke_set is
-Battlefield's pass-through platforms, so it's emptied too). Materials are Battlefield's: 0xA4001041
-(stage ground: lit, vertex colors, shadows) with an alpha test for the block atlas' cut-outs,
-0xA2000001 (its background plane) for the sky and backdrop. Textures are NTP3 .nut (nut.py).
+Models go into Battlefield's model folders that have no material animation (model.mta):
+stc_c_Ring_set (everything using the block atlas), stc_k_BG_most_far2 (the backdrop) and
+stc_BG_most_far2_1_set (the sky, with stc_o_BG_clouds_set's model.xmb: its light set, draw range
+and order). Every other folder keeps Battlefield's files with the model's indices zeroed
+(nud.hidden: nothing drawn, its .mta / skeleton still match it). Only what Battlefield's own
+models have: its material setups (material()), its vertex layout, NTWU textures as its single-mip
+ones (nut.write_ntwu). The first builds (NTP3 textures, an empty model in every folder, other
+material setups) froze the game while loading the models.
 """
 import argparse
 import glob
@@ -49,13 +51,12 @@ EXTRA = {'plains': ['door_plains_butcher_set', 'door_plains_firmer_set', 'vegeta
          'stoneshore': ['ring_stoneshore_water_set']}
 ATLAS = 'all_blocks-rgba_c2_add'
 TEX_BASE = 0x2000F000               # texture IDs of the port: 0x2000F001... (Battlefield's: 0x2000xxxx below 0x2000F000)
-LIT, BG = 0xA4001041, 0xA2000001
 CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
 SKY_TOP, SKY_HORIZON = np.array([0.47, 0.65, 1.0]), np.array([0.75, 0.85, 1.0])
 CLOUD_ALPHA = 0.7                   # the cloud layer, seen from under it, would hide most of the sky
 
-RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_o_BG_clouds_set'
-EMPTY_TEX = TEX_BASE + 0xFFFF
+RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
+SKY_XMB = 'stc_o_BG_clouds_set'     # Battlefield's clouds: the sky's draw settings
 
 
 # ---------------------------------------------------------------- Ultimate models
@@ -451,35 +452,45 @@ class Textures:
         return nutexb.decode(nutexb.Nutexb(self.files[name]))
 
     def nut(self, names):
-        """NTP3 in the forms the game's own NTP3 files use (stage and UI): RGBA8 and DXT5 with one mip,
-        DXT1 with a full mip chain; power-of-two sizes. (v1 had RGBA8 / DXT5 with mips and a 36x36
-        texture, which no game file has; the stage froze while loading.)"""
+        """NTWU, one mip, as Battlefield's single-mip textures: BC1 (opaque) or BC3, power-of-two
+        sizes 64-2048. The block atlases are pixel art: 4x larger with nearest pixels, so each
+        source pixel is one 4x4 block (exact in BC) and the game's linear filtering keeps it sharp."""
         from PIL import Image
         texs = []
         for n in names:
             img = self.image(n)
+            if n.startswith('all_blocks'):
+                img = img.repeat(4, 0).repeat(4, 1)
             h, w = img.shape[:2]
-            w2, h2 = min(2048, 1 << (w.bit_length() - 1)), min(2048, 1 << (h.bit_length() - 1))
+            w2, h2 = (min(2048, max(64, 1 << (v.bit_length() - 1))) for v in (w, h))
             if (w2, h2) != (w, h):
                 img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
                                                              else Image.LANCZOS))
-            if n.startswith('all_blocks'):
-                texs.append((self.ids[n], 14, [img]))
-            elif (img[..., 3] < 250).any():
-                texs.append((self.ids[n], 2, [img]))
-            else:
-                texs.append((self.ids[n], 0, nut.mip_chain(img, 1)))
-        return nut.write_ntp3(texs)
+            texs.append((self.ids[n], 0x31 if (img[..., 3] >= 250).all() else 0x33, img))
+        return nut.write_ntwu(texs)
 
 
-def material(kind, tex_id, nearest, blend, cull, alpha_test):
-    m = nud.Material(LIT if kind == 'lit' else BG, 1 if blend else 0, 1 if blend else 0,
-                     518 if alpha_test else 0, 128 if alpha_test else 0, cull)
-    m.textures.append(dict(hash=tex_id, map_mode=0, wrap_s=1, wrap_t=1, min_f=3 if nearest else 0,
-                           mag_f=1 if nearest else 2, mip=6, unk=0, unk2=7936))
+# Battlefield's material setups (flags, source / destination blend, alpha test, culling), from its
+# melee models; anything else isn't proven to have a shader in the game
+OPAQUE = (0xA4001041, 0, 0, 0, 0, 1029)             # stc_c_Ring_set
+CUTOUT = (0xA4011001, 0, 0, 518, 128, 1029)         # stc_b_shadow_gareki_set (also with culling 0)
+BLEND = (0xA4001041, 1, 1, 0, 0, 1029)              # stc_s_ring_kusa_set
+UNLIT = (0xA2001001, 0, 0, 0, 0, 1029)              # stc_a_surinuke_set
+
+
+def material(setup, tex_id, cull=1029):
+    flags, src, dst, af, ref, c = setup
+    m = nud.Material(flags, src, dst, af, ref, cull if setup == CUTOUT else c)
+    m.textures.append(dict(hash=tex_id, map_mode=0, wrap_s=1, wrap_t=1, min_f=3, mag_f=2, mip=6, unk=0, unk2=0))
     m.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
                ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
     return m
+
+
+def two_sided(idx):
+    """a triangle list and its reverse (both faces drawn with back-face culling)"""
+    t = np.asarray(idx).reshape(-1, 3)
+    return np.concatenate([t, t[:, ::-1]]).reshape(-1)
 
 
 def to_nud(parts, tex, kind, sky=False):
@@ -508,26 +519,20 @@ def to_nud(parts, tex, kind, sky=False):
         poly.idx = p['idx']
         atlas = tname.startswith('all_blocks')
         cloud = sky and p['label'].startswith('sfx_cloud')
-        poly.materials = [material(kind, tid, atlas, p['blend'] and not atlas or cloud, p['cull'],
-                                   atlas or kind == 'bg' and not sky)]
+        cull = 1029 if p['cull'] == 1029 else 0
+        if p['blend'] and not atlas or cloud:
+            setup = BLEND
+        elif atlas or kind == 'bg' and not sky:
+            setup = CUTOUT
+        else:
+            setup = UNLIT if kind == 'bg' else OPAQUE
+        if cull == 0 and setup != CUTOUT:      # Battlefield's other setups all cull back faces
+            poly.idx = two_sided(poly.idx)
+        poly.materials = [material(setup, tid, cull)]
         if len(poly.pos) >= 0x10000:
             raise ValueError('%s: %d vertices' % (p['name'], len(poly.pos)))
         meshes.append(nud.Mesh('%s_%d' % (p['name'], p['sub']), [poly]))
     return meshes
-
-
-def write_empty(outdir):
-    poly = nud.Polygon()
-    poly.pos = np.zeros((3, 3))
-    poly.nrm = np.tile([0.0, 1.0, 0.0], (3, 1))
-    poly.col = np.full((3, 4), 127.0)
-    poly.uvs = [np.zeros((3, 2))]
-    poly.idx = np.array([0, 1, 2])
-    poly.materials = [material('bg', EMPTY_TEX, False, False, 0, True)]
-    mesh = nud.Mesh('empty', [poly])
-    mesh.sphere = [0.0, 0.0, 0.0, 1.0]
-    open(outdir + '/model.nud', 'wb').write(nud.write([mesh]))
-    open(outdir + '/model.nut', 'wb').write(nut.write_ntp3([(EMPTY_TEX, 14, [np.zeros((4, 4, 4), np.uint8)])]))
 
 
 def write_set(outdir, meshes, tex):
@@ -576,10 +581,13 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
            if p['label'] in ('sfx_sky_color', 'sfx_cloud', 'sfx_cloud_bottom', 'zz_sun', 'zz_sun_core')]
 
     for name in sorted(os.listdir(model_dir)):
-        if os.path.exists('%s/%s/model.mta' % (model_dir, name)):      # material animations
-            os.remove('%s/%s/model.mta' % (model_dir, name))
-        if name not in (RING_SET, FAR_SET, SKY_SET):
-            write_empty('%s/%s' % (model_dir, name))
+        if name in (RING_SET, FAR_SET, SKY_SET):
+            assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
+        else:
+            path = '%s/%s/model.nud' % (model_dir, name)
+            data = nud.hidden(path)
+            open(path, 'wb').write(data)
+    shutil.copy('%s/%s/model.xmb' % (model_dir, SKY_XMB), '%s/%s/model.xmb' % (model_dir, SKY_SET))
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (SKY_SET, sky, 'bg', True)):
         write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
