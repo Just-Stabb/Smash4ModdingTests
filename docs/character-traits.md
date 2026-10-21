@@ -48,7 +48,9 @@ writes that), it multiplies the stats of profile `xxxx & 0xF`:
 | 1 | Rush | the Rush list above | 1.25 |
 | 2 | Overdrive (below) | the Rush list | 1.25 × 1.2 = 1.5 |
 
-Kirby's MSC writes the int every frame (`kirby_trait_profile()`). A new trait with stat changes
+Kirby's MSC writes the int every frame (`kirby_trait_profile()`); bits 8-11 hold the trait number
+(0 none, 1 Normal, 2 Rush, 3 Zoning, 4 Strike, 5 Juggernaut, 6 Technical) for the damage panel's
+trait badge (in progress). A new trait with stat changes
 needs a profile in `PROFILES` in `tools/kirby_stat_cave.py` and in `kirby_trait_profile()`.
 Moveset changes (like Rush's neutral air) are MSC only (`global76` = current trait).
 

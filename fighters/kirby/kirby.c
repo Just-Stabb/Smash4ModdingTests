@@ -72735,7 +72735,7 @@ void nair_rapid_drift()
 //   Zoning, Juggernaut, Normal, Technical: no changes yet.
 // Stat boosts need the patched cross_f.rpx (tools/kirby_stat_cave.py): the stats are shared data,
 // so the executable scales them when they're read, for an object whose int 0x1000008E holds
-// 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile()).
+// 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile(); bits 8-11 the trait number).
 // ===================================================================
 int trait_none()       { return 0; }
 int trait_normal()     { return 1; }
@@ -72846,7 +72846,8 @@ void kirby_trait_update()
     global76 = trait;
     overdrive_update();
     strike_crit_update(trait);
-    WorkModule(0x7, 0x4b490000 + kirby_trait_profile(trait) + kirby_trait_flags(trait), 0x1000008e);
+    // bits 8-11: the trait number, for the damage panel's trait badge (tools/trait_badge_cave.py)
+    WorkModule(0x7, 0x4b490000 + trait * 0x100 + kirby_trait_profile(trait) + kirby_trait_flags(trait), 0x1000008e);
 }
 
 // ===================================================================
