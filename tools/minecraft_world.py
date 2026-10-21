@@ -1252,6 +1252,16 @@ MONSTER_SET = 'dyr_h_BG_more_far0_set'
 # ground, coming in from off the island), at least END_MONSTER_FIT of that, or left out; heights
 # measured from its feet (the enderman's path is 3 below them: its offset found on the normal form)
 END_MONSTER_FIT = 0.9
+# their effects (Ultimate's are stage code + ef_pickel_world.eff emitters, none of which Smash 4
+# plays; user): the zombie burns at dawn (P_PickelWorldEnemyFired: it stops in the sun ~8120, falls
+# over ~8280-8360): from BURN_FROM to its end, flame sprites (the torches' ef_pickelworld_fire00)
+# on its hip, flickering (BURN_FLICKER frames a step); the enderman teleports in dashes of a few
+# frames (8-15 units a frame, its walk at most ~10.6 / 2 = TELEPORT_SPEED below): hidden over them,
+# and a burst of purple particles (P_PickelWorldEnderman, Minecraft's portal particles) where it
+# leaves and where it lands, rising and shrinking over TELEPORT_FX frames
+BURNING = ('zombie',)
+BURN_FROM, BURN_FLICKER = 8100, 3
+TELEPORT_SPEED, TELEPORT_FX, TELEPORT_PARTS = 11.0, 40, 12
 
 
 class Ground:
@@ -1285,6 +1295,74 @@ class Ground:
 
     def share(self, pts):
         return np.mean([self.on(*p) for p in pts]) if len(pts) else 0.0
+
+
+def sprite(center, w, h, tex_id, spec, bone):
+    """a quad facing +z (front only), on a bone (bind 8)"""
+    poly = nud.Polygon()
+    poly.pos = np.asarray(center, dtype=np.float64) + np.array([[-w / 2, -h / 2, 0], [w / 2, -h / 2, 0],
+                                                              [w / 2, h / 2, 0], [-w / 2, h / 2, 0]])
+    poly.nrm = np.tile([0.0, 0.0, 1.0], (4, 1))
+    poly.col = np.full((4, 4), 127.0)
+    poly.uvs = [np.array([[0, 1], [1, 1], [1, 0], [0, 0]], dtype=np.float64)]
+    poly.idx = np.array([0, 1, 2, 0, 2, 3])
+    poly.materials = [bf_material(spec, tex_id)]
+    mesh = nud.Mesh('fx%d' % bone, [poly], bone=bone, bind=8)
+    mesh.gain = None                        # their own light
+    return mesh
+
+
+def burn_fx(meshes, bones, tracks, hip, start, end, tex):
+    """flames on a mob (its hip bone's track) from start to end: a bone following the hip, scaled
+    to nothing outside and flickering inside"""
+    pos, rot, scl = (x.copy() for x in tracks[hip])
+    rng = np.random.default_rng(len(bones))
+    f = np.arange(len(pos))
+    flick = rng.uniform(0.8, 1.15, len(pos) // BURN_FLICKER + 1)[f // BURN_FLICKER]
+    on = (f >= start) & (f <= end)
+    scl = scl * np.where(on, flick, 0.0)[:, None]
+    bones.append((hip + '_fire', 0))
+    k = len(bones) - 1
+    tracks[bones[-1][0]] = (pos, rot, scl)
+    fire = tex.id('torch_flame')
+    # the mob's bind pose: feet at 0, hip ~9, head ~17 (the zombie); the scale is about the origin,
+    # under the feet, so the flames flicker upwards
+    for c, w, h in (((0, 9, 3), 12, 18), ((-3, 6, 2.5), 7, 11), ((3, 12, 2.5), 7, 11), ((0, 15, -2.5), 10, 12)):
+        meshes.append(sprite(c, w, h, fire, BF_FLAME, k))
+
+
+def teleport_fx(meshes, bones, tracks, prefix, path, lo, hi, tex):
+    """the enderman's dashes in [lo, hi] (path: its hip, world, per frame): hidden over them, and
+    particle bursts where it leaves and lands"""
+    if 'pickel_portal' not in tex.extra:    # a Minecraft portal particle: purple, lighter in the middle
+        img = np.zeros((8, 8, 4), np.uint8)
+        img[1:7, 1:7] = (140, 40, 210, 255)
+        img[2:6, 2:6] = (200, 90, 255, 255)
+        img[3:5, 3:5] = (245, 200, 255, 255)
+        tex.extra['pickel_portal'] = img
+    speed = np.r_[np.linalg.norm(np.diff(path, axis=0), axis=1), 0.0]
+    fast = (speed > TELEPORT_SPEED / 2) & (np.arange(len(path)) >= lo) & (np.arange(len(path)) < hi)
+    names = [n for n in tracks if n.startswith(prefix)]
+    for n in names:                         # hidden while dashing
+        tracks[n][2][np.r_[fast[1:], False] | fast] = 0.0
+    edges = np.flatnonzero(np.diff(fast.astype(int)))
+    for e in edges:
+        at = e + 1                          # leaving (0 -> 1) or landing (1 -> 0)
+        bones.append(('%sport%d' % (prefix, at), 0))
+        k = len(bones) - 1
+        F = len(path)
+        t = np.arange(F) - at
+        live = (t >= 0) & (t < TELEPORT_FX)
+        u = np.clip(t / TELEPORT_FX, 0, 1)
+        pos = np.tile(path[min(at, F - 1)] + [0.0, 3.0, 0.0], (F, 1))
+        pos[:, 1] += 6 * u                  # rising
+        scl = np.where(live, 1 - u, 0.0)[:, None] * np.ones((1, 3))
+        tracks[bones[-1][0]] = (pos, None, scl)
+        rng = np.random.default_rng(at)
+        for _ in range(TELEPORT_PARTS):
+            c = (rng.uniform(-5, 5), rng.uniform(0, 26), rng.uniform(1, 4))
+            sz = rng.uniform(1.0, 2.0)
+            meshes.append(sprite(c, sz, sz, tex.id('pickel_portal'), BF_FLAME, k))
 
 
 def fit_shift(ground, pts, apart=(), back=None, need=1.0, prefer_zero=True):
@@ -1991,6 +2069,14 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             scl[:lo] = 0.0
             scl[hi + 1:] = 0.0
             pos += shifts[k]
+        paths = [villager_paths([x])[0] for x in monsters]
+        for k, (setname, anims) in enumerate(monsters):
+            kind = setname.split('_')[2]
+            lo, hi = mob_window(anims)
+            if kind in BURNING and effect and hi > BURN_FROM:
+                burn_fx(m, b, t, 'monster%d_Hip' % k, BURN_FROM, hi, tex)
+            if kind == 'enderman':
+                teleport_fx(m, b, t, 'monster%d_' % k, paths[k] + shifts[k], lo, hi, tex)
         write_rig(model_dir, anim_dir, MONSTER_SET, m, b, t, CYCLE + 1, tex, curves)
 
     light = out_dir + '/animation/light.bin'

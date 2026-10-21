@@ -704,6 +704,20 @@ and the other animals.
 
 `build/minecraft_world_v16_tests.zip`: test A (all the mobs), B (the monsters, the sheep only).
 
+User: A loads. The zombie should burn in daylight and the enderman teleport, neither shows
+(Ultimate's are stage code playing ef_pickel_world.eff emitters, `P_PickelWorldEnemyFired` /
+`P_PickelWorldEnderman`). v16b:
+- **Burning** (`burn_fx`, `BURNING`): the zombie's path stops in the sun at ~8120 and falls over
+  ~8280-8360. From `BURN_FROM` (8100) to its end, four flame sprites (the torches'
+  ef_pickelworld_fire00; the eff's fire01 is a streak, not a frame sheet) on a bone copying its
+  hip's track, scaled to nothing outside and flickering (scaled about the feet) inside.
+- **Teleports** (`teleport_fx`): the enderman's path dashes in 6-10 frames at 8-15 units a frame
+  (its walk at most 10.6 over 2 frames): its bones scaled to nothing over each dash, and at both
+  ends a burst of `TELEPORT_PARTS` (12) purple particle sprites (a made 8 x 8 `pickel_portal`)
+  rising and shrinking over `TELEPORT_FX` (40) frames. Plains: 7 teleports a night.
+
+`build/minecraft_world_v16b_test.zip`.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
