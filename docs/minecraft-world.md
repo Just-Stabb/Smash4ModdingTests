@@ -388,6 +388,12 @@ panorama is order 2 and its haze layer (Ultimate's `sfx_far_A_long_fog`) is in i
 `build/minecraft_world_v10_tests2.zip`: test 5 animated torches (dyr_d), 6 still torches (island
 model), 7 none; all with the draw order fix.
 
+Results (user): test 5 froze, test 6 loaded. So animated torches freeze in a plain one-bone folder
+too: what tests 1 and 5 share, and test 6 doesn't, is the made 16-bone skeleton with its scale
+animation and unlit alpha-tested / blended meshes on bones (`0xA2001001` with an alpha test or
+blending, bone-bound: not in Battlefield; the clouds, which load, are the same shader bone-bound
+but opaque). The torches stay still (`--torches still`, the default).
+
 ## v11
 
 Test 6 (still torches in the island's model) loaded (user, with a screenshot); its notes:
