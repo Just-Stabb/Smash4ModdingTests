@@ -586,6 +586,24 @@ From the user's v14 notes:
 - **Other biomes**: `daynight_curves` read plains' panorama material node (sfx_far_A_long) on
   every biome; now each far set's own (sfx_far_E_long, sfx_far_C, ...). All six build.
 
+v15 in game (user): loaded; the doors open, the torches light up. Then (v15b):
+- **The door far too bright**: its corners are next to its two torches, at the cap (1.6); doors
+  now at most `DOOR_LIGHT_MAX` (0.5).
+- **A growing semi-transparent square with each flame**: the flame (and smoke) quads wrote depth
+  over their whole area, so the torch light drawn after them was hidden behind it (the unlit wall
+  showed through, as big as the flame). All our blended materials now alpha-test (greater than
+  0, as every blended material of Battlefield's); the sprites' alpha is 0 or over 239.
+- **The moon gives no light**: drawn past white (`MOON_BRIGHT` 1.8) for Smash 4's bloom to glow
+  around it, as it does around the sun.
+- **No stars**: their vertex colours (0.34, alpha 0.49) left them at 0.17 at most, invisible in
+  Smash 4's night sky (Ultimate lifts them by its CustomVector8 1.5 and its HDR bloom). Now 1.5,
+  alpha 1 (`STARS_BRIGHT`).
+- **Fighters' light** (with Ultimate's for comparison): `cycle_light` used Battlefield's own
+  fighter light for the time of day, a strong blue one at night. Ultimate's `LightChr` (light00_set)
+  goes from 4.6 by day to 1.8 at night, white, slightly warm at night (1, 0.97, 0.88). `chr_light`:
+  each record's fighter block is Battlefield's midday one (`DAY_FRAME`) with that colour and the
+  intensity's ratio (gamma-encoded: 0.65 at night); the five colour tracks are midday's likewise.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

@@ -741,11 +741,14 @@ def material(setup, tex_id, cull=1029, fog=NO_FOG):
 # alpha, one minus source alpha (Smash Forge's NudEnums), so plain alpha blending; the smoke's
 # texture is written premultiplied all the same, which only darkens its thin edges), its fog
 # strengths 0. Glow (the sun and the moon): the flames' shader, which fades with its gain's alpha
-# (Battlefield's moon), alpha-blended (5 / 1) as Ultimate's (colour x alpha over the sky).
-BF_FLAME = (0xA3C01081, 1, 2, 0, 0, 1029,
+# (Battlefield's moon), alpha-blended (5 / 1) as Ultimate's (colour x alpha over the sky). All with
+# an alpha test (greater than 0) as Battlefield's blended materials: without it a flame's whole quad
+# wrote depth, hiding the torch light (torch_light, drawn after) behind it, a dark square that grew
+# with the flame (user).
+BF_FLAME = (0xA3C01081, 1, 2, 516, 0, 1029,
             [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_finalColorGain', [1.0, 1.0, 1.0, 1.0]),
              ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]), ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])], 3)
-BF_SMOKE = (0xA4011001, 5, 1, 0, 0, 1029,
+BF_SMOKE = (0xA4011001, 5, 1, 516, 0, 1029,
             [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_fresnelParams', [1.0, 1.0, 0.0, 1.0]),
              ('NU_fresnelColor', [0.0, 0.0, 0.0, 0.0]), ('NU_fogParams', [300.0, 9000.0, 0.0, 0.0]),
              ('NU_diffuseColor', [1.0, 1.0, 1.0, 0.0]), ('NU_fogColor', [0.43, 0.712, 0.994, 0.0]),
@@ -1014,11 +1017,13 @@ def torch_points(src, labels, row):
 # at the torch), the curve 'torchlight' fading it in as the island darkens
 TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 1.6
 TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
+DOOR_LIGHT_MAX = 0.5                # the doors' corners are next to their torches: at the cap, far too bright (user)
 TORCH_LIGHT_LIFT = 0.05             # the copy this far out along its normals, in front of the island
 
 
-def torch_light(meshes, points):
-    """additive copies of meshes' triangles lit by the torches at points, each with gain 'torchlight'"""
+def torch_light(meshes, points, cap=None):
+    """additive copies of meshes' triangles lit by the torches at points, each with gain 'torchlight';
+    cap: the most light (TORCH_LIGHT_MAX)"""
     out = []
     pts = np.array(points, dtype=np.float64)
     for m in meshes:
@@ -1033,7 +1038,7 @@ def torch_light(meshes, points):
                 d = np.linalg.norm(v, axis=1) + 1e-9
                 face = np.clip(np.einsum('ij,ij->i', n, v) / d, 0, 1)
                 light += TORCH_LIGHT * np.clip(1 - d / TORCH_LIGHT_RANGE, 0, 1) ** 2 * (0.25 + 0.75 * face)
-            light = np.minimum(light, TORCH_LIGHT_MAX)
+            light = np.minimum(light, cap or TORCH_LIGHT_MAX)
             tri = np.asarray(p.idx).reshape(-1, 3)
             tri = tri[light[tri].max(1) > 0.02]
             if not len(tri):
@@ -1056,7 +1061,7 @@ def torch_light(meshes, points):
 
 def added(mat):
     """mat's texture, drawn added (Battlefield's 0xA3C01081, blend 5 / 2, bound or not)"""
-    m = nud.Material(BF_FLAME[0], 5, 2, 0, 0, mat.cull)
+    m = nud.Material(BF_FLAME[0], 5, 2, 516, 0, mat.cull)
     m.textures = [dict(t) for t in mat.textures]
     m.props = [(n, list(v)) for n, v in BF_FLAME[6]]
     return m
@@ -1444,8 +1449,13 @@ PANO_MEAN = 0.55                    # the panoramas' mean texel value, about
 RIG_LABELS = {'zz_sun': 'sun', 'zz_sun_core': 'sun_core', 'zz_moon': 'stars', 'sun_stars': 'stars'}
 GLOW_LABELS = ('zz_sun', 'zz_sun_core', 'zz_moon')     # alpha-blended (BF_GLOW); the stars added
 # the moon's glow: Ultimate's is its texture's grey-blue halo, lifted by the bloom; Smash 4's
-# bloom doesn't reach a colour that dim, so the halo is drawn paler and stronger
-MOON_GLOW, MOON_GLOW_ALPHA = (205, 218, 255), 1.6
+# bloom doesn't reach a colour that dim, so the halo is drawn paler and stronger, and the moon past
+# white (MOON_BRIGHT, in its vertex colours: 2 the most) for the bloom to glow around it, as it
+# does around the sun (v15: still no light from it, user)
+MOON_GLOW, MOON_GLOW_ALPHA, MOON_BRIGHT = (205, 218, 255), 1.6, 1.8
+# the stars: their vertex colours (0.34, alpha 0.49) under Ultimate's CustomVector8 1.5 and HDR
+# bloom; here they came out at 0.17 at most, not seen in game (user). Drawn at that 1.5, alpha 1
+STARS_BRIGHT = 1.5
 GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 on materials with a curve
 # light.bin (the fighters' lights; their records every 3 frames): Battlefield's own records for the
 # same time of day (its cycle: night 1950-2400 and 0-100, dawn 200-500, day 800-1100, sunset
@@ -1533,9 +1543,24 @@ def daynight_curves(src, form, far_set):
     return out
 
 
-def cycle_light(path, phases=LIGHT_PHASES):
+def chr_light(src):
+    """Ultimate's fighter light (light00_set LightChr: intensity 4.6 by day, 1.8 at night, white,
+    warm at night) over CYCLE: [CYCLE + 1] its brightness over midday's (gamma-encoded, as the
+    island's), [CYCLE + 1, 3] its colour (max 1)"""
+    light = '%s/normal/render/light/light00_set.nuanmb' % src
+    n = CYCLE + 1
+    inten = _ult_track(light, 'LightChr', 'CustomFloat0')[:, 0]
+    col = _ult_track(light, 'LightChr', 'CustomVector0')[:, :3]
+    f = np.minimum(np.arange(n), len(inten) - 1)
+    g = np.minimum(np.arange(n), len(col) - 1)
+    return (inten[f] / inten[0]) ** (1 / GAMMA), col[g] / col[g].max(1, keepdims=True)
+
+
+def cycle_light(path, phases=LIGHT_PHASES, fighter=None):
     """Battlefield's light.bin over CYCLE: a record every 3 frames (3001), each Battlefield's for the
-    same time of day (phases), and the five colour tracks likewise"""
+    same time of day (phases), and the five colour tracks likewise. fighter (chr_light's): the fighters'
+    light (each record's first block) and the colour tracks instead Battlefield's midday (DAY_FRAME)
+    ones dimmed and tinted by it: Battlefield's night lit them with a strong blue light (user)"""
     d = open(path, 'rb').read()
     magic, ver, n, step, rec = struct.unpack('>4sIIII', d[:20])
     assert magic == b'LIGH' and ver == 5 and step == 3
@@ -1548,10 +1573,26 @@ def cycle_light(path, phases=LIGHT_PHASES):
     out = bytearray(b'LIGH' + struct.pack('>III', ver, count, step))
     start = 0x28 + 5 * (3 * count + pad)
     out += struct.pack('>I', start) + struct.pack('>5I', *[0x28 + i * (3 * count + pad) for i in range(5)])
+    if fighter is not None:
+        bright, col = fighter[0][f], fighter[1][f]
     for o in tracks:
-        out += b''.join(d[o + 3 * r:o + 3 * r + 3] for r in src) + b'\0' * pad
+        if fighter is None:
+            out += b''.join(d[o + 3 * r:o + 3 * r + 3] for r in src) + b'\0' * pad
+        else:
+            day = np.frombuffer(d[o + 3 * DAY_FRAME:o + 3 * DAY_FRAME + 3], np.uint8).astype(np.float64)
+            rgb = np.clip(np.round(day * bright[:, None] * col), 0, 255).astype(np.uint8)
+            out += rgb.tobytes() + b'\0' * pad
     assert len(out) == start
-    out += b''.join(d[rec + size * r:rec + size * (r + 1)] for r in src)
+    recs = [bytearray(d[rec + size * r:rec + size * (r + 1)]) for r in src]
+    if fighter is not None:
+        import colorsys
+        day = bytes(d[rec + size * DAY_FRAME:rec + size * DAY_FRAME + 116])
+        on, *v, _h, _s, val = struct.unpack('>i6f', day[:28])
+        for i, r in enumerate(recs):
+            h, sat, _v = colorsys.rgb_to_hsv(*col[i])
+            r[:116] = day
+            r[:28] = struct.pack('>i6f', on, *v, h * 360, sat, val * bright[i])
+    out += b''.join(bytes(r) for r in recs)
     return bytes(out)
 
 
@@ -1585,6 +1626,11 @@ def sky_rig(src, form, tex):
             for poly in m.polygons:
                 poly.materials = [bf_material(BF_GLOW if p['label'] in GLOW_LABELS else BF_FLAME,
                                               poly.materials[0].textures[0]['hash'])]
+                if p['label'] == 'zz_moon':
+                    poly.col[:, :3] = round(128 * MOON_BRIGHT)
+                elif p['label'] == 'sun_stars':
+                    poly.col[:, :3] = round(128 * STARS_BRIGHT)
+                    poly.col[:, 3] = 128
             m.bind, m.bone = 8, index[p['bone']]
             m.gain = RIG_LABELS[p['label']]
             meshes.append(m)
@@ -1715,7 +1761,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             if daynight:
                 dm, db, dt = door_rig(src, form, door_sets(src, form, biome), villager_paths(villagers), tex, frames)
                 if points:                  # the torches' light on them too (user)
-                    dm += torch_light(dm, points)
+                    dm += torch_light(dm, points, DOOR_LIGHT_MAX)
                 for mesh in dm:
                     mesh.bone += len(b) - 1
                 m, b = m + dm, b + db[1:]
@@ -1736,7 +1782,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, frames, tex, curves)
 
     light = out_dir + '/animation/light.bin'
-    data = cycle_light(light) if daynight else still_light(light)
+    data = cycle_light(light, fighter=chr_light(src)) if daynight else still_light(light)
     open(light, 'wb').write(data)
     prm = glob.glob(out_dir + '/param/*_stprm.bin')[0]
     data = stage_params(prm)
