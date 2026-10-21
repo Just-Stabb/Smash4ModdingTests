@@ -446,6 +446,12 @@ one bone long while the meshes used bones 1-15 (v9's torches too). `nud.write` n
 the torch animation also gets a still track for the root bone, as the game's files have one a
 bone. `build/minecraft_world_v12_testA2.zip`: test A with that.
 
+A2 in game (user): loads, the torches animate. Animated torches are the default
+(`--torches animated`); `build/minecraft_world.zip` / `minecraft_world_biomes.zip` are v12 with
+them. The same pieces (a made skeleton, NUD header 0x0E, Battlefield's bone-bound materials, an
+animation track a bone) are what the mobs and villagers need: Ultimate's `ch_pickel_*_set`
+models are 12-16 bones, each part rigid on one bone, with idle motions (`motion/ch_pickel_*`).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

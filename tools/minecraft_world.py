@@ -1106,8 +1106,8 @@ def main():
     ap.add_argument('--yamlvd', default='yamlvd', help="lvd-rs' yamlvd (reads Ultimate's .lvd)")
     ap.add_argument('--labels', default='ParamLabels.csv', help="ultimate-research/param-labels' ParamLabels.csv")
     ap.add_argument('--effect', help="Ultimate's effect/stage/pickel_world/ef_pickel_world.eff (torch flames / smoke)")
-    ap.add_argument('--torches', default='still', choices=('animated', 'still', 'off'),
-                    help="still (default): v10 test 6, the one that loaded; animated: test 5")
+    ap.add_argument('--torches', default='animated', choices=('animated', 'still', 'off'),
+                    help="animated (default; v12 test A2 in game), still (flames in the island's model) or off")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
     ap.add_argument('--torch-skeleton', default='own', choices=('own', 'battlefield'),
                     help="animated torches' skeleton: their own (a bone a sprite) or the folder's one bone (a test)")
