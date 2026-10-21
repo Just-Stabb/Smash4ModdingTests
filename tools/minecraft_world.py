@@ -1027,7 +1027,7 @@ def torch_points(src, labels, row):
 # at the torch), the curve 'torchlight' fading it in as the island darkens
 TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 0.8     # the most: 1.6 blew out Omega's lamp post (four torches on it, user)
 TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
-DOOR_LIGHT_MAX = 0.35               # the doors' corners are next to their torches: at the cap, far too bright (user)
+DOOR_LIGHT_MAX = 0.18               # the doors' corners are next to their torches: at the cap far too bright, at 0.35 still a bit (user)
 TORCH_LIGHT_LIFT = 0.25             # the copy this far out along its normals, in front of the island
                                     # (0.05 flickered against it with the camera's distance, user)
 
