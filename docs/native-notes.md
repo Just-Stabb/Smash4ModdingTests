@@ -1013,3 +1013,34 @@ the late update binds and syncs sets 2–3 with the flags op 1 has stored by the
 `0x02ED1ED4` (fighter vtable `0x10130DD8` + `0x24`) is **not** called on a shield hit (Cemu
 breakpoint, user).
 
+
+## Damage panel (battle HUD) and Kirby's trait badge
+
+The damage panel is `data/ui/info/dmg/dmg.flx` (flx2: docs/flx2-format.md, tools/flx.py); the
+GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
+- Panel object `P = [[0x1033BCB4] + 0x754]`, vtable `P+0x98` = `0x100871D8`; the UI manager
+  (`0x028F9E5C`) advances the flx runtime (`0x030920FC`), then calls vt+0x3C, the per-frame update
+  `0x02661808(P)` (at `0x028FA088`), which calls `0x02661674(P, slot)` for each player.
+- Slot `S = P + 0xC0 + slot * 0x30C0` (8): +0 s16 entry id, +8 s16 2 = empty, +0xA s8 fighter kind
+  (the starting one), +0x5C the player's panel clip (`dmg_k`), +0x60 a panel element (its alpha byte
+  +0x74 follows the panel's fade), +0x18C `ko_mc`, +0x1A4 `mnd_mc` (cached children).
+- Slot → fighter: `FM = [0x102F7024]`, `FE = [FM + 0x24 + entry * 4]` (entry < `[FM+0x18]`),
+  `obj = [FE + 0xDC0 + 4 * lbz FE+0x14E9]` (< `[FE+0xDB4]`): +4 kind, +0xC module accessor.
+- flx runtime: names are interned atoms (`0x032CB1B8([0x102FCAA4]+0x24, char*, len)`; the loader
+  interns every string in a file); `0x032CCAA0(inst, &atom)` child by instance name,
+  `0x032CDFFC(inst, visible)`, `0x032CE00C(inst)` frame (1-based), `0x032CCC44(inst, frame)` /
+  `0x032CCCA0(inst, &label)` goto and play (then `sth 1, 0x9C(inst)` to stop),
+  `0x032CDF6C(inst, alpha)`, x / y `0x032CDD4C` / `0x032CDD6C`, scale `0x032CDDA0` / `0x032CDE28`.
+  The game's own name atoms: `G = [0x102FCE14]`, names at `0x10086678` (`ko_mc` 0x40, `mnd_mc` 0x42).
+- Little Mac's KO meter (`ko_mc`, sprite 6): shown only for kind 0x29 (`0x0265F684`);
+  `0x02663C54(P, slot, v)`: v 0 → label `num_0`, 1-99 → `num_1`..`num_10` (stopped), 100 → `ko`
+  (blinks). Shulk (`mnd_mc`, sprite 9): Shulk's code calls the panel (`0x02666E54` etc.) with the art,
+  labels `mode_1..5`.
+- A new element: a sprite appended to dmg.flx (index 0x5F and up) must have no frame actions
+  (keyframe action 0xFFFF: the native per-sprite action table `0x102FCEB4` has 0x5F entries); it's
+  placed by name in the panel sprites 1-4 (one per layout) and found by name in code.
+- **Kirby's trait badge** (tools/trait_badge_cave.py, test trait_badge_test.py; the flx side
+  tools/dmg_trait_badge.py): the vtable's +0x3C (0x10087214, its relocation moved to the dead word
+  0x037EE73C) points at the cave (0x04B84000; 0x02661674 is out of a branch's reach from the grown
+  code), which calls the original update, then for each non-empty slot shows `trait_mc` at the
+  frame of Kirby's trait (marker int 0x1000008E bits 8-11) or hides it.
