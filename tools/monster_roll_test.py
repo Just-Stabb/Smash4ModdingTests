@@ -15,10 +15,11 @@ the test's own, EVENTS): the biome's table played up to the frame, only shown mo
 variant, on the stage's sound object with a stack handle released after; another biome's (a
 hazards-off pick); Omega's; again after the cycle wraps; nothing without a sound object; the
 sound object's name hook (NewStage01* -> BattleField_f). The breakable blocks (EVENTS' three): a
-gimmick each at the first update (sphere at its cell's centre, BLOCK_RADIUS, its life), damage taken
-off its life with the material's hit sound, at 0 its hurtbox removed, the break sound, its collision
-link switched off (only those on the plane), nothing more after; none on a hazards-off pick or on
-Omega. Every roll of 6000 against the rules in
+gimmick each block on the plane at the first update (sphere at its cell's centre, BLOCK_RADIUS, its
+life), damage taken off its life with the material's hit sound, at 0 its hurtbox removed, the break
+sound, its collision link switched off, nothing more after; a block behind the plane broken with its
+column's plane block; the lives × LIFE_RATE by the number of live fighters (5 / 4 / 2 / 8); none on a
+hazards-off pick or on Omega. Every roll of 6000 against the rules in
 Python (Ultimate's odds), with the resulting frequencies.
 """
 import os
@@ -58,9 +59,9 @@ EVENTS = {'plains/melee': [[5, 'door_open', 'always'], [10, 'cow_vo', 'cow'], [1
                            [20, 'sheep_vo', 'sheep']],
           'birchforest/melee': [[7, 'door_close', 'always']],
           'plains/end': [[3, 'enderman_portal', 'enderman'], [4, 'villager_vo', 'always']],
-          'blocks/plains': [dict(x=-55.0, y=15.0, z=0.0, life=12.0, sound='grass', link=True),
-                            dict(x=25.0, y=5.0, z=-10.0, life=18.0, sound='wood', link=False),
-                            dict(x=5.0, y=5.0, z=0.0, life=24.0, sound='stone', link=True)]}
+          'blocks/plains': [dict(x=-55.0, y=15.0, z=0.0, life=12.0, sound='grass', link=True, leader=0),
+                            dict(x=5.0, y=5.0, z=-10.0, life=18.0, sound='wood', link=False, leader=2),
+                            dict(x=5.0, y=5.0, z=0.0, life=24.0, sound='stone', link=True, leader=2)]}
 GIMS = 0x7F00A000          # fake gimmick wrappers, 0x40 apart: +0 the damage the stub returns, +4 removed
 BREC = 0x7F00B000          # +0 creates, +4 activates, +8 ground calls, +0xC its list, +0x10 on/off, +0x20 shapes
 LINKS = 0x7F00B800         # the ground list the link lookup returns for 'b00' / 'b02'
@@ -398,22 +399,24 @@ miss:   li r3, 0
     tone = C.minecraft_sound.tone_index
     got = match(C.KINDS[0], 0, 75, [0] * 10, 2)
     shapes = [tuple(round(wf(BREC + 0x20 + 0x28 * i + 4 * k), 2) for k in (0, 1, 2, 6)) + (word(BREC + 0x20 + 0x28 * i + 0x20),)
-              for i in range(3)]
-    check('blocks: a gimmick each, made and activated once', (word(BREC), word(BREC + 4)), (3, 3))
+              for i in range(2)]
+    check('blocks: a gimmick each plane block, made and activated once', (word(BREC), word(BREC + 4)), (2, 2))
     check('their spheres (x, y, z, radius, kind 0)', shapes,
-          [(-55.0, 15.0, 0.0, C.BLOCK_RADIUS, 0), (25.0, 5.0, -10.0, C.BLOCK_RADIUS, 0), (5.0, 5.0, 0.0, C.BLOCK_RADIUS, 0)])
-    bhp = a.addr('bhp')
+          [(-55.0, 15.0, 0.0, C.BLOCK_RADIUS, 0), (5.0, 5.0, 0.0, C.BLOCK_RADIUS, 0)])
+    bhp, bstate = a.addr('bhp'), a.addr('bstate')
     first_block = tone('block_dmg_soil')[0]
 
     def plays():                                   # the blocks' only (the plains table's door at 5 too)
         return [p for p in all_plays() if p & 0xFFFF >= first_block]
-    check('their lives (12 / 18 / 24)', [wf(bhp + 4 * i) for i in range(3)], [12.0, 18.0, 24.0])
+    check('their lives (12 / 24; the wood block behind follows the stone one)',
+          ([wf(bhp + 4 * i) for i in (0, 2)], [word(bstate + 4 * i) for i in range(3)]), ([12.0, 24.0], [0, 2, 0]))
     setw(REC + 0x30, 0)
     rands([3] * 10)
     damage(0, 5.0)
     update()
     damage(0, 0.0)
-    check('5 damage: life 7, the grass hit sound', (wf(bhp), plays()), (7.0, [row | tone('block_dmg_grass')[0] + 3]))
+    check('no fighters yet: lives unscaled; 5 damage: life 7, the grass hit sound', (wf(bhp), plays()),
+          (7.0, [row | tone('block_dmg_grass')[0] + 3]))
     setw(REC + 0x30, 0)
     damage(0, 8.0)
     update()
@@ -422,15 +425,33 @@ miss:   li r3, 0
           (1, [row | tone('block_break_grass')[0] + 3]))
     check('its collision link switched off', (word(BREC + 8), word(BREC + 0xC), word(BREC + 0x10)), (1, LINKS, 0))
     check('its model hidden', (bool(word(block_model + 0x118) & 0x80000), word(block_model + 0xDC)), (False, 0))
+    check('the wood block still there', word(bstate + 4), 2)
     setw(REC + 0x30, 0)
-    damage(1, 20.0)
+    damage(1, 30.0)
     update()
     damage(1, 0.0)
-    check('the wood block broken, no link (behind the plane)', (word(GIMS + 0x44), word(BREC + 8), plays()),
-          (1, 1, [row | tone('block_break_wood')[0] + 3]))
+    update()
+    check('the stone block broken (its link off), the wood block behind it with it',
+          (word(GIMS + 0x44), word(BREC + 8), [word(bstate + 4 * i) for i in range(3)], plays()),
+          (1, 2, [1, 1, 1], [row | tone('block_break_stone')[0] + 3]))
     setw(REC + 0x30, 0)
     update()
     check('broken blocks: no more damage read, nothing played', plays(), [])
+    # the lives × Ultimate's rate by the number of live fighters, once there are any
+    table = 0x7E000000                             # a fake fighter table (8 entries of 0x76B0)
+    mu.mem_map(table, 0x50000)
+    for n, rate in ((5, 1.4), (4, 1.3), (2, 1.0), (8, 1.5)):
+        setw(0x1035184C, table + 0x100)
+        setw(table + 0x100, table + 0x200)
+        setw(table + 0x200, table + 0x1000)
+        setw(table + 0x208, 8)
+        for i in range(8):
+            mu.mem_write(table + 0x1000 + C.FIGHTER_ENTRY * i + 0x1E, bytes([5 if i < n else 0]))
+        match(C.KINDS[0], 0, 75, [0] * 10, 2)
+        update()
+        check('%d fighters: lives × %.1f' % (n, rate), [round(wf(bhp + 4 * i), 3) for i in (0, 2)],
+              [round(12 * rate, 3), round(24 * rate, 3)])
+    setw(0x1035184C, 0)
     mu.mem_write(BREC, b'\0' * 0x10)
     match(C.KINDS[0], C.biome_select_cave.N_BIOMES, 75, [0] * 10, 3)
     check('a hazards-off pick: no blocks', word(BREC), 0)

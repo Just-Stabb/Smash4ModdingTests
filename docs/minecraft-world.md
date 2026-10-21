@@ -937,7 +937,27 @@ Crew's parts.
   the gimmick removed, the break sound, its link's grounds off, its model hidden (every update
   after). `monster_roll_test.py`: 35 checks.
 
-Not yet: the life rate by fighter count; Ultimate's break particles; whether blocks come back.
+### v18b: SmashWiki's technical details
+
+SmashWiki's Minecraft World page ("Technical details"; read 2026-10-21) against v18:
+- "Blocks take damage from hitboxes within 7.5 units of their center": the hurtbox radius 7.5
+  (Ultimate's `block_damage_radius`; v18 7).
+- HP × 1.0 (1-3 fighters), 1.3 (4), 1.4 (5-6), 1.5 (7-8): Ultimate's `block_life_rate_table`; the
+  cave counts the live fighters (fighter table entries with byte +0x1E >= 4) at the first update
+  that has any and multiplies the lives once.
+- "The HP percent of a block is also applied to the three blocks in the foreground or the
+  background of that block": every block column has a block on the plane (checked: all six
+  biomes), so only those get a hurtbox (16-42 gimmicks a biome instead of 42-89); the others
+  (`leader` in the table) break with it.
+- Its block table (terrain, base HP) matches `block_info_table`; from it kind 7 is "Grass
+  (tundra)" (soil; the taiga's darker `grass_block_tundra`, was dirt) and kind 33 packed ice
+  (was blue ice, which "does not appear in any biome").
+- Breaks don't come back ("will not respawn when broken"), as built.
+- Not done: "Jumping into the bottom of a block or being launched into the side of one will deal 9
+  damage" (Ultimate's 9.0 params; needs the blocks' ground contacts); the fixed 6 frames of hitlag
+  on a hit (the gimmick hit's hitlag is the game's usual); Steve's mining (not in Smash 4).
+
+Not yet: the bump / launch damage, Ultimate's break particles.
 
 ## Freeze (user) and tests
 

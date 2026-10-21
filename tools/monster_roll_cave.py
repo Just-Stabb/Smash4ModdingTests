@@ -84,7 +84,13 @@ GIM_DAMAGE = 0x0313408C        # (w, group) -> f1 the damage it took this frame
 GIM_REMOVE = 0x03133DFC        # (w): its battle object (the hurtbox) removed
 LINK_FIND = 0x03142954         # (stage, short name) -> the link's ground list or 0
 GROUNDS_ON = 0x0315EDD8        # (ground list, 0 off / 1 on)
-BLOCK_RADIUS = 7.0             # minecraft_world.BLOCK_RADIUS
+BLOCK_RADIUS = 7.5             # minecraft_world.BLOCK_RADIUS
+# Ultimate's block_life_rate_table (pickel_world.stdat): the blocks' lives × this by the number of
+# fighters (1-8; SmashWiki: 1-3 ×1, 4 ×1.3, 5-6 ×1.4, 7-8 ×1.5), counted (live entries of the fighter
+# table, as tools/position_vars_cave.py) at the first update that has fighters
+LIFE_RATE = [1.0, 1.0, 1.0, 1.3, 1.4, 1.4, 1.5, 1.5]
+FIGHTERS = 0x1035184C          # [[FIGHTERS] + 0]: +0 entries (0x76B0 each, live: byte +0x1E >= 4), +8 count
+FIGHTER_ENTRY = 0x76B0
 MAX_BLOCKS = 99                # names stc_blkNN_set / bNN
 BLOCK_NAME, BLOCK_LINK = 'stc_blk00_set', 'b00'
 CYCLE = 9000.0                 # minecraft_world.CYCLE
@@ -126,7 +132,8 @@ def event_tables(path=None):
 
 def block_tables(path=None):
     """([bytes] a table each biome (TABLES' melee ones): count, then 8 bytes a block: cell x, y, z
-    (signed), life, material (minecraft_sound.BLOCK_MATERIALS), has a link, 0, 0), the materials'
+    (signed), life, material (minecraft_sound.BLOCK_MATERIALS), has a link, the index of its column's
+    plane block (its own if on the plane), 0), the materials'
     sounds (8 bytes each: hit tone, variants, 0, broken tone, variants, 0)"""
     events = json.load(open(path or EVENTS)) if os.path.exists(path or EVENTS) else {}
     out = []
@@ -134,10 +141,10 @@ def block_tables(path=None):
         blocks = events.get('blocks/%s' % biome, [])
         assert len(blocks) <= MAX_BLOCKS
         b = struct.pack('>I', len(blocks))
-        for k in blocks:
+        for i, k in enumerate(blocks):
             x, y, z = int((k['x'] - 5) // 10), int((k['y'] - 5) // 10), int(round(k['z'] / 10))
-            b += struct.pack('>bbbBBBH', x, y, z, int(round(k['life'])),
-                             minecraft_sound.BLOCK_MATERIALS.index(k['sound']), int(k['link']), 0)
+            b += struct.pack('>bbbBBBBB', x, y, z, int(round(k['life'])),
+                         minecraft_sound.BLOCK_MATERIALS.index(k['sound']), int(k['link']), k.get('leader', i), 0)
         out.append(b)
     mats = b''
     for m in minecraft_sound.BLOCK_MATERIALS:
@@ -464,6 +471,7 @@ blocks:
         stw r0, 0(r29)
         li r0, 0
         stw r0, 4(r29)
+        stw r0, 12(r29)
         lwz r0, 0(r31)
         cmpwi r0, %(k0)d
         bne bout
@@ -487,6 +495,19 @@ binit:
         slwi r26, r28, 2
         slwi r12, r28, 3
         add r25, r30, r12
+        li r0, 0
+        lis r12, bwrap@ha
+        addi r12, r12, bwrap@l
+        stwx r0, r12, r26
+        lbz r11, 6(r25)
+        cmpw r11, r28
+        beq bleader
+        li r0, 2
+        lis r12, bstate@ha
+        addi r12, r12, bstate@l
+        stwx r0, r12, r26
+        b bmodel
+bleader:
         li r0, 0
         lis r12, bstate@ha
         addi r12, r12, bstate@l
@@ -588,6 +609,60 @@ bmodel:
 brun:
         lwz r27, 4(r29)
         lwz r30, 8(r29)
+        lwz r0, 12(r29)
+        cmpwi r0, 0
+        bne bcounted
+        lis r12, 0x%(fighters_hi)04X
+        lwz r12, 0x%(fighters_lo)04X(r12)
+        cmpwi r12, 0
+        beq bcounted
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq bcounted
+        lwz r11, 8(r12)
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq bcounted
+        li r10, 0
+        li r9, 0
+bcount:
+        cmpw r9, r11
+        bge bcounts
+        lbz r0, 0x1E(r12)
+        cmplwi r0, 4
+        blt bcskip
+        addi r10, r10, 1
+bcskip:
+        addi r12, r12, %(entry)d
+        addi r9, r9, 1
+        b bcount
+bcounts:
+        cmpwi r10, 0
+        beq bcounted
+        cmpwi r10, 8
+        ble bcmax
+        li r10, 8
+bcmax:
+        li r0, 1
+        stw r0, 12(r29)
+        addi r10, r10, -1
+        slwi r10, r10, 2
+        lis r12, brate@ha
+        addi r12, r12, brate@l
+        lfsx f12, r12, r10
+        lis r12, bhp@ha
+        addi r12, r12, bhp@l
+        li r9, 0
+bcmul:
+        cmpw r9, r27
+        bge bcounted
+        slwi r10, r9, 2
+        lfsx f0, r12, r10
+        fmuls f0, f0, f12
+        stfsx f0, r12, r10
+        addi r9, r9, 1
+        b bcmul
+bcounted:
         li r28, 0
 bloop:
         cmpw r28, r27
@@ -598,8 +673,19 @@ bloop:
         lis r12, bstate@ha
         addi r12, r12, bstate@l
         lwzx r0, r12, r26
-        cmpwi r0, 0
-        bne bhide
+        cmpwi r0, 1
+        beq bhide
+        cmpwi r0, 2
+        bne bintact
+        lbz r11, 6(r25)
+        slwi r11, r11, 2
+        lwzx r0, r12, r11
+        cmpwi r0, 1
+        bne bnext
+        li r0, 1
+        stwx r0, r12, r26
+        b bhide
+bintact:
         lis r12, bwrap@ha
         addi r12, r12, bwrap@l
         lwzx r3, r12, r26
@@ -765,7 +851,8 @@ data:
 """ % dict(first=SETUP_FIRST, setup1=SETUP + 4, base=BASE_UPDATE, k0=KINDS[0], k1=KINDS[1],
            rand_hi=RAND >> 16, rand_lo=RAND & 0xFFFF, animal=animal, c1=COUNT_ODDS[0],
            c2=COUNT_ODDS[0] + COUNT_ODDS[1], find=FIND_MODEL, isvis=IS_VISIBLE, add=SCENE_ADD,
-           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
+           remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, fighters_hi=(FIGHTERS + 0x8000) >> 16,
+           fighters_lo=FIGHTERS & 0xFFFF, entry=FIGHTER_ENTRY, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
            gim_activate=GIM_ACTIVATE, gim_damage=GIM_DAMAGE, gim_remove=GIM_REMOVE, link_find=LINK_FIND,
            grounds_on=GROUNDS_ON, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
            monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
@@ -823,8 +910,11 @@ data:
     a.asm('blink:')
     for w in words_of(BLOCK_LINK.encode() + b'\0'):
         a.asm('.word 0x%08X' % w)
+    a.asm('brate:')
+    for r in LIFE_RATE:
+        a.asm('.word 0x%08X' % struct.unpack('>I', struct.pack('>f', r))[0])
     a.asm('bdata:')
-    a.asm('.word 0\n.word 0\n.word 0')
+    a.asm('.word 0\n.word 0\n.word 0\n.word 0')
     for label in ('bwrap', 'bhp', 'bstate', 'bmodels'):
         a.asm(label + ':')
         for _ in range(MAX_BLOCKS):

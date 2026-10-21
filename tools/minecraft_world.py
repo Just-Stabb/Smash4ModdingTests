@@ -230,15 +230,16 @@ def merged(parts, name):
 # block_info_table) -> bg_b_<model>_set. The files don't name them: worked out from where each kind
 # sits in the six biomes (trunks / branches / leaves, the Plains house, the Stone Shore ores), the
 # block table's materials and lives, and the models (tools: the block sheet in
-# docs/minecraft-world.md). 7 (six "soil" blocks in Taiga) and 33 (two "snow" blocks at the Snowy
-# Tundra igloo's ends) are guesses; 10 is the igloo (its 7 x 4 x 7 dome), the white snow block.
+# docs/minecraft-world.md). 10 is the igloo (its 7 x 4 x 7 dome), the white snow block. 7 and 33 as
+# SmashWiki's block table has them (v18b; were dirt and blue ice): 7 "Grass (tundra)", soil, 12 (the
+# taiga's darker grass block), 33 packed ice, snow, 18 (blue ice "does not appear in any biome")
 KIND_MODEL = {0: 'dirt_01', 1: 'wood_01', 2: 'stone_01', 3: 'iron_ore_01', 4: 'oakleaves_01',
-              5: 'grass_block_01', 6: 'grass_block_savanna_01', 7: 'dirt_01', 9: 'hay_bale_01',
+              5: 'grass_block_01', 6: 'grass_block_savanna_01', 7: 'grass_block_tundra_01', 9: 'hay_bale_01',
               10: 'snow_01', 11: 'cobblestone_01', 12: 'mossy_cobblestone_01',
               13: 'andesite_01', 14: 'diorite_01', 15: 'granite_01', 18: 'oak_pkanks_01',
               21: 'birch_log_01', 22: 'birch_log_02', 23: 'birchleaves_01', 24: 'acacia_log_01',
               25: 'acacia_log_02', 26: 'acacialeaves_01', 27: 'pine_log_01', 28: 'pine_log_02',
-              29: 'pineleaves_01', 33: 'blue_ice_01', 35: 'furnace_01'}
+              29: 'pineleaves_01', 33: 'packed_ice__01', 35: 'furnace_01'}
 # Smash 4 lvd surface kinds (material byte 3; Smash Forge's CollisionMatType) by Ultimate's names
 MATERIAL = {'basic': 0, 'rock': 1, 'grass': 2, 'soil': 3, 'wood': 4, 'iron': 5, 'nibuiron': 6,
             'carpet': 7, 'numenume': 8, 'creature': 9, 'asase': 10, 'soft': 11, 'turuturu': 12,
@@ -298,13 +299,15 @@ def material_code(name):
 # v18 (BREAKABLE): the blocks break. Each in a static model folder of its own (BLOCK_SET, the ring's
 # model.xmb: tools/monster_roll_cave.py hides it when it breaks), those on the fighting plane with a
 # collision of their own (the sides not against the island; rigged in link BLOCK_LINK, which the
-# cave switches off), the island's outline made without them; the cave gives each a hurtbox (a
-# stage gimmick's sphere, BLOCK_RADIUS) and its life (Ultimate's block_info_table) and plays its
-# material's damage / break sounds (BLOCK_SOUND)
+# cave switches off), the island's outline made without them; the cave gives each block on the
+# plane a hurtbox (a stage gimmick's sphere, BLOCK_RADIUS) and its life (Ultimate's
+# block_info_table, × block_life_rate_table by the number of fighters) and plays its material's
+# damage / break sounds (BLOCK_SOUND). v18b (SmashWiki's technical details): the blocks in front of /
+# behind a plane block (every column has one) share its life: they break with it (`leader`)
 BREAKABLE = True
 BLOCK_SET = 'stc_blk%02d_set'
 BLOCK_LINK = 'b%02d'                # the link's short name (subname 'b%02d__blk__')
-BLOCK_RADIUS = 7.0                  # Ultimate's block_damage_radius 7.5 is around the hit; this around the block
+BLOCK_RADIUS = 7.5                  # Ultimate's block_damage_radius (SmashWiki: hits within 7.5 of a block's centre)
 BLOCK_SOUND = {'soil': 'soil', 'wood': 'wood', 'rock': 'stone', 'nibuiron': 'stone', 'grass': 'grass',
                'snow': 'snow', 'ice': 'ice'}
 
@@ -2384,8 +2387,9 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             open(out_dir + '/param/' + f, 'wb').write(data)
     if blocks and BREAKABLE:
         info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
+        plane = {(x, y): i for i, (_k, x, y, z, _f) in enumerate(blocks) if z == 0}
         table = [dict(x=x * 10 + 5.0, y=y * 10 + 5.0, z=z * 10.0, life=float(info[k]['life']),
-                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and not f))
+                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and not f), leader=plane[(x, y)])
                  for k, x, y, z, f in blocks]
     else:
         table = []
