@@ -507,6 +507,42 @@ edge showing stray green pixels and an odd resolution; every torch on the same t
 
 `build/minecraft_world_v13_test.zip` (v13c).
 
+## v14: day and night
+
+Ultimate's cycle (its far_common_set / far_<biome>_set / render/light/light00_set animations,
+9000 frames: day, sunset ~4500, night ~6000, dawn ~8250) at its full length (`CYCLE`; the user asked
+for it rather than Battlefield's 7200).
+- **Material animations**: `tools/mta.py` reads / writes MTA4 (a folder's model.mta; Battlefield's
+  16 without texture patterns rebuild byte for byte; blocks 32-byte aligned, a material's pattern
+  offset its own block's end). Entries find materials by their `NU_materialHash` (its float's bits:
+  all 21 of Battlefield's match), and Battlefield animates `NU_finalColorGain` on its lit, unlit and
+  additive shaders (its grass, sky, moon, clouds). `write_set` gives each mesh's materials its kind's
+  hash (`gain_hash`: one a kind, `GAIN_KINDS`) and writes the folder's model.mta.
+- **Curves** (`daynight_curves`, per frame): island and mobs: Ultimate's stage light (LightStg0:
+  intensity 2.4 -> 0.3, colour white / orange at sunset / blue at night), gamma-encoded, at least
+  0.3; sky, clouds, sun, haze: their CustomVector8 over its day value (gamma-encoded, our vertex
+  colours are); stars: sun_stars' .w as alpha; the panorama: the night texture over the day one
+  (per channel) by CustomVector20.w, warmed at sunset, towards its haze colour by
+  CustomVector19.w (late night near black). Whether our unlit 0xA2001001 takes NU_finalColorGain
+  is untested: `--gain-shader a3c` puts the curves on Battlefield's 0xA3C01081 instead (a test).
+- **Sun, moon, stars** (`sky_rig`, `SKY_RIG` = dyr_m_SKY_DOME_set, Battlefield's sky dome folder:
+  draw range 2, order 0; its own .mta replaced): far_common_set's meshes on their bones
+  (sunmoon_rotateAxis turns once a cycle, stars_RotateAxis), BF_FLAME (additive). Ultimate's haze
+  ring stays out.
+- **Clouds**: Ultimate's motion over the whole cycle (two of its 4500-frame loops).
+- **Villagers**: `VILLAGER_CYCLE`: free1, work, free2 (day), meeting (dusk, 600), return (home,
+  1200), sleep (3600: indoors, out to their spot at dawn) = 9000. **Animals**: wait1 until
+  Ultimate's frame_of_monster (4200), then scaled to nothing until the end of the night.
+  **Torches**: `TORCH_LOOP` 300 (divides 9000).
+- **Fighters' light** (`cycle_light`): light.bin's header has a record every 3 frames (Battlefield
+  2401 records = 7200 frames); 3001 records over the cycle, each Battlefield's own record for the
+  same time of day (`LIGHT_PHASES`), its colour tracks likewise.
+- Offline (`view_cycle.py`: the curves and rigs applied as the game should): day, a soft orange
+  sunset with the sun low over the hills, a dark island under stars at night, the moon late at
+  night. Size: 39.5 MB normal, 42.9 Omega (v13c 33.6).
+
+`build/minecraft_world_v14_tests.zip`: test A (curves on our unlit shader), B (on 0xA3C01081).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

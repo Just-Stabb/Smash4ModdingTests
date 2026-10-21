@@ -45,6 +45,7 @@ import nud  # noqa: E402
 import nut  # noqa: E402
 import nutexb  # noqa: E402
 import omo  # noqa: E402
+import mta  # noqa: E402
 import xmb  # noqa: E402
 
 BIOMES = ['plains', 'birchforest', 'savanna', 'taiga', 'snowytundra', 'stoneshore']
@@ -93,14 +94,14 @@ CLOUD_PERIOD = 4500
 # 160-mesh building whose windows light up at night, likely by mesh, and ours had 8 meshes.)
 TORCH_SET = 'dyr_d_mid_front01_set'
 TORCH_ROW_END = 6
-TORCH_LOOP = 240                    # frames; the flicker periods and the smoke's life divide it
+TORCH_LOOP = 300                    # frames; the flicker periods and the smoke's life divide it, it divides CYCLE
 SMOKE_LIFE, SMOKE_RISE, SMOKE_SHRINK = 60, 7.0, 0.7
 # each torch its own rhythm (v13 had every flame on the same two periods and every puff on the
 # same life, only their phases apart: the user saw them all move in step, Ultimate's don't):
 # periods and lives drawn from divisors of TORCH_LOOP, so the loop still closes
-FLICKER_PERIODS = (16, 20, 24, 30, 40)
-FLICKER2_PERIODS = (8, 10, 12, 15)
-SMOKE_LIVES = (40, 48, 60, 80)
+FLICKER_PERIODS = (20, 25, 30, 50, 60)
+FLICKER2_PERIODS = (10, 12, 15)
+SMOKE_LIVES = (50, 60, 75, 100)
 FLAME_SIZE, SMOKE_SIZE = 3.0, 2.5
 SMOKE_GREY, SMOKE_ALPHA = 0.45, 0.8
 SKY_GRADIENT = 'sky_gradient'       # a made texture: the day sky from the top (v 0) to the horizon
@@ -878,8 +879,30 @@ def to_nud(parts, tex, kind, sky=False, cutout=False):
     return meshes
 
 
-def write_set(outdir, meshes, tex):
+def write_set(outdir, meshes, tex, curves=None):
+    """the folder's model.nud / .nut; with curves ({kind: [CYCLE + 1, 4]}), each mesh with a `gain`
+    kind gets that kind's NU_materialHash and the folder a model.mta animating its
+    NU_finalColorGain (any other model.mta removed)"""
     os.makedirs(outdir, exist_ok=True)
+    kinds = []
+    for m in meshes if curves else ():
+        k = getattr(m, 'gain', None)
+        if k not in curves:
+            continue
+        h = struct.unpack('>f', struct.pack('>I', gain_hash(k)))[0]
+        for p in m.polygons:
+            for mat in p.materials:
+                mat.props = [(n, [h, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else v) for n, v in mat.props]
+                if GAIN_FLAGS and mat.flags == 0xA2001001:
+                    mat.flags = GAIN_FLAGS
+        if k not in kinds:
+            kinds.append(k)
+    if os.path.exists(outdir + '/model.mta'):
+        os.remove(outdir + '/model.mta')
+    if kinds:
+        open(outdir + '/model.mta', 'wb').write(mta.write(CYCLE + 1, [
+            dict(name='mcw_%s' % k, hash=gain_hash(k), props=[dict(name='NU_finalColorGain', values=curves[k].tolist())])
+            for k in kinds]))
     used = []
     for m in meshes:
         for p in m.polygons:
@@ -936,9 +959,10 @@ def stage_params(path, values=CAMERA):
     return bytes(d)
 
 
-def cloud_motion(src, form, bone):
-    """[CLOUD_PERIOD + 1] world offsets of a cloud bone from its rest pose, from Ultimate's sky
-    animation (the last frame is the first again, so the animation loops)"""
+def cloud_motion(src, form, bone, frames=CLOUD_PERIOD + 1):
+    """[frames] world offsets of a cloud bone from its rest pose, from Ultimate's sky animation
+    (CLOUD_PERIOD + 1, or CYCLE + 1: its whole length, two of its loops; the last frame is the first
+    again, so the animation loops)"""
     import ssbh_data_py as s
     d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
     skel = s.skel_data.read_skel(d + '/model/far_common_set/model.nusktb')
@@ -948,25 +972,26 @@ def cloud_motion(src, form, bone):
     parent = world[skel.bones[b.parent_index].name][:3, :3]
     anim = s.anim_data.read_anim(d + '/motion/far_common_set/far_common_set_00.nuanmb')
     track = [n for g in anim.groups for n in g.nodes if n.name == bone][0].tracks[0].values
-    offs = [(np.array(track[f].translation) - rest) @ parent for f in range(CLOUD_PERIOD + 1)]
+    offs = [(np.array(track[f].translation) - rest) @ parent for f in range(frames)]
     assert np.abs(offs[-1] - offs[0]).max() < 1, (bone, offs[0], offs[-1])
     return offs
 
 
-def write_clouds(model_dir, anim_dir, parts, tex, src, form, moving=True):
+def write_clouds(model_dir, anim_dir, parts, tex, src, form, moving=True, curves=None):
     """moving=False: the layers unbound, where Ultimate's animation starts (the folder's bone and
     animation as for moving ones, but no mesh follows them)"""
     for bone, folder in CLOUD_SETS.items():
         layer = [p for p in parts if p['bone'] == bone]
         meshes = to_nud(layer, tex, 'bg', True)
-        if moving:
-            for m in meshes:
+        for m in meshes:
+            m.gain = 'cloud'
+            if moving:
                 m.bind, m.bone = 8, 0
-        write_set('%s/%s' % (model_dir, folder), meshes, tex)
+        write_set('%s/%s' % (model_dir, folder), meshes, tex, curves)
         h = omo.vbn_read('%s/%s/model.vbn' % (model_dir, folder))[0][2]
         path = '%s/%s/%s.omo' % (anim_dir, folder, folder)
         o = omo.Omo(open(path, 'rb').read())
-        pos = [tuple(float(x) for x in v) for v in cloud_motion(src, form, bone)]
+        pos = [tuple(float(x) for x in v) for v in cloud_motion(src, form, bone, CYCLE + 1 if curves else CLOUD_PERIOD + 1)]
         o.frames = len(pos)
         o.nodes = []
         omo.set_node(o, h, pos, [(0.0, 0.0, 0.0, 1.0)] * len(pos), [(1.0, 1.0, 1.0)] * len(pos))
@@ -1012,6 +1037,7 @@ def torch_meshes(points, tex, effect, animated=True):
             meshes.append(nud.Mesh(name, [poly], bone=len(bones) - 1, bind=8))
         else:
             meshes.append(nud.Mesh(name, [poly]))
+        meshes[-1].gain = 'island' if 'smoke' in name else None     # the flames keep their light
 
     for i, c in enumerate(points):
         rng = np.random.default_rng(i)
@@ -1049,13 +1075,13 @@ def torch_tracks(bones, motion, frames):
     return out
 
 
-def write_rig(model_dir, anim_dir, folder, meshes, bones, tracks, frames, tex):
+def write_rig(model_dir, anim_dir, folder, meshes, bones, tracks, frames, tex, curves=None):
     """a dyr_ folder with a made skeleton: meshes (bind 8, bone n), bones [(name, parent)] (bone 0
     a still root), tracks {bone: (positions [F, 3], quaternions [F, 4] x y z w or None, scales
     [F, 3] or None)} over frames; NUD header 0x0E = the highest bone (nud.write)"""
     import zlib
     bones = [(n, p, zlib.crc32(n.encode())) for n, p in bones]
-    write_set('%s/%s' % (model_dir, folder), meshes, tex)
+    write_set('%s/%s' % (model_dir, folder), meshes, tex, curves)
     open('%s/%s/model.vbn' % (model_dir, folder), 'wb').write(omo.vbn_write(bones))
     path = '%s/%s/%s.omo' % (anim_dir, folder, folder)
     o = omo.Omo(open(path, 'rb').read())
@@ -1077,12 +1103,17 @@ def write_rig(model_dir, anim_dir, folder, meshes, bones, tracks, frames, tex):
 # monsters and the villagers' meeting / return / sleep, which take them indoors, left out).
 VILLAGERS = {'plains': ('plains_farmer', 'plains_butcher'),
              'snowytundra': ('snowytundra_farmer', 'snowytundra_butcher')}
-# the day loop: each 1200 frames from and back to the villager's spot, 7200 in all (Battlefield's
-# animations' length); with the torches (TORCH_LOOP divides it) in TORCH_SET
-VILLAGER_LOOP = ('free1', 'work', 'free2', 'free3', 'work', 'free4')
+# their day and night over Ultimate's cycle (CYCLE, 9000 frames): free1, work and free2 from and
+# back to their spot (1200 frames each), to the meeting at dusk (600), home (1200), sleep indoors
+# (3600: still inside until it walks back out to the spot at dawn); with the torches (TORCH_LOOP
+# divides CYCLE) in TORCH_SET. Without the cycle (--daynight off): the day part looped (7200).
+VILLAGER_DAY = ('free1', 'work', 'free2', 'free3', 'work', 'free4')
+VILLAGER_CYCLE = (('free1', 1200), ('work', 1200), ('free2', 1200), ('meeting', 600), ('return', 1200),
+                  ('sleep', 3600))
 VILLAGER_FRAMES = 1200
 # animals: two of a kind (Ultimate picks sheep / chicken / cow 30 / 30 / 30), playing wait1 and
-# wait2 (4200 frames each, start = end), in their own folder
+# wait2 (4200 frames each, start = end), in their own folder; with the cycle, gone from Ultimate's
+# frame_of_monster (4200, when its monsters come) to the end of the night (scaled to nothing)
 ANIMAL_SET = 'dyr_e_mid_left01_set'
 ANIMAL_FRAMES = 4200
 
@@ -1121,10 +1152,10 @@ def mob_motion(setdir, anim_paths, frames, bones):
     bind = {k: np.linalg.inv(m.T) for k, m in _world(skel).items()}
     rest = {b.name: np.array(b.transform, dtype=np.float64).T for b in skel.bones}
     seq = []
-    for path, n in anim_paths:
+    for path, n in anim_paths:              # n: a frame count from 0, or the frames to take
         a = s.anim_data.read_anim(path)
         nodes = {x.name: x.tracks[0].values for g in a.groups if g.group_type.name == 'Transform' for x in g.nodes}
-        seq += [(nodes, f) for f in range(n)]
+        seq += [(nodes, f) for f in (range(n) if isinstance(n, int) else n)]
     assert len(seq) >= frames
     out = {b: ([], [], []) for b in bones}
     for nodes, f in seq[:frames]:
@@ -1166,17 +1197,22 @@ def mob_rig(src, form, kinds, tex, frames, prefix):
             for m in to_nud([part], tex, 'lit'):
                 m.name = '%s%d_%s' % (prefix, i, b)
                 m.bind, m.bone = 8, index[b]
+                m.gain = 'island'
                 meshes.append(m)
     return meshes, bones, tracks
 
 
-def mob_kinds(src, form, biome, animal):
+def mob_kinds(src, form, biome, animal, daynight=True):
     """(villagers, animals): [(model set, [(anim path, frames)])] for the biome (Omega: plains')"""
     d = '%s/%s/motion' % (src, 'normal' if form == 'melee' else 'battle')
     b = biome if form == 'melee' else 'plains'
     villagers = []
     for v in VILLAGERS.get(b, ()):
-        anims = [('%s/ch_pickel_%s_set/pickel_%s_%s.nuanmb' % (d, v, v, a), VILLAGER_FRAMES) for a in VILLAGER_LOOP]
+        path = '%s/ch_pickel_%s_set/pickel_%s_%%s.nuanmb' % (d, v, v)
+        if daynight:
+            anims = [(path % a, n) for a, n in VILLAGER_CYCLE]
+        else:
+            anims = [(path % a, VILLAGER_FRAMES) for a in VILLAGER_DAY]
         anims.append((anims[0][0], 1))                      # the loop's last frame = its first
         villagers.append(('ch_pickel_%s_set' % v, anims))
     animals = []
@@ -1184,8 +1220,142 @@ def mob_kinds(src, form, biome, animal):
         for w in ('wait1', 'wait2'):
             path = '%s/ch_pickel_%s_set/pickel_%s_%s_%s.nuanmb' % (d, animal, b, animal, w)
             if os.path.exists(path):
-                animals.append(('ch_pickel_%s_set' % animal, [(path, ANIMAL_FRAMES + 1)]))
+                anims = [(path, ANIMAL_FRAMES + 1)]
+                if daynight:                # away for the night (animal_tracks hides them), then back
+                    anims.append((path, [0] * (CYCLE - ANIMAL_FRAMES)))
+                animals.append(('ch_pickel_%s_set' % animal, anims))
     return villagers, animals
+
+
+# ---------------------------------------------------------------- day and night
+# Ultimate's cycle at its full length (pickel_world.stdat frame_of_night 6000; its far_common_set,
+# far_<biome>_set and render/light/light00_set animations: 9000 frames, day at 0, sunset ~4500,
+# night ~6000, dawn ~8250). Smash 4 has no lights on our unlit models, so each material's colour
+# follows a curve: an MTA (model.mta) animating NU_finalColorGain, which Battlefield animates on
+# its own (lit, unlit and additive) shaders, on materials found by their NU_materialHash (one
+# hash a kind of curve, GAIN_KINDS).
+CYCLE = 9000
+GAIN_KINDS = ('island', 'pano', 'fog', 'sky', 'cloud', 'sun', 'stars')
+NIGHT_FLOOR = 0.3                   # the island's least gain (Ultimate's stage light 2.4 by day, 0.3 at night: 0.39)
+SKY_RIG = 'dyr_m_SKY_DOME_set'      # the sun, the moon and the stars on their turning bones
+PANO_MEAN = 0.55                    # the panoramas' mean texel value, about
+RIG_LABELS = {'zz_sun': 'sun', 'zz_sun_core': 'sun', 'zz_moon': 'stars', 'sun_stars': 'stars'}
+GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 on materials with a curve
+# light.bin (the fighters' lights; their records every 3 frames): Battlefield's own records for the
+# same time of day (its cycle: night 1950-2400 and 0-100, dawn 200-500, day 800-1100, sunset
+# 1300-1800), as (our frame, its record, counted on past 2400)
+LIGHT_PHASES = ((0, 950), (3000, 1100), (3750, 1300), (4500, 1600), (5250, 1950), (7500, 2501),
+                (8250, 2851), (9000, 3351))
+
+
+def gain_hash(kind):
+    """the NU_materialHash bits of a curve's materials (a plain float: 4096 + its index)"""
+    return struct.unpack('>I', struct.pack('>f', 4096.0 + GAIN_KINDS.index(kind)))[0]
+
+
+def _ult_track(path, node, param):
+    """[frames, k] values of a material / light animation's track"""
+    import ssbh_data_py as s
+    a = s.anim_data.read_anim(path)
+    n = [x for g in a.groups for x in g.nodes if x.name == node][0]
+    v = [t for t in n.tracks if t.name == param][0].values
+    return np.array([x if isinstance(x, list) else [x] for x in v], dtype=np.float64)
+
+
+def daynight_curves(src, form, far_set):
+    """{kind: NU_finalColorGain [CYCLE + 1, 4]} from Ultimate's animations"""
+    d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
+    u = np.arange(CYCLE + 1)
+    common = '%s/motion/far_common_set/far_common_set_00.nuanmb' % d
+    light = '%s/normal/render/light/light00_set.nuanmb' % src
+
+    def at(t):
+        return t[np.minimum(u, len(t) - 1)]
+
+    def ratio(node, path=common, param='CustomVector8'):
+        # Ultimate's colours are linear, our vertex colours gamma-encoded (to_nud): the ratio too
+        t = at(_ult_track(path, node, param))
+        g = np.ones((len(u), 4))
+        g[:, :3] = np.clip(t[:, :3] / t[:1, :3], 0, None) ** (1 / GAMMA)
+        return g
+    out = {}
+    inten = np.clip(at(_ult_track(light, 'LightStg0', 'CustomFloat0'))[:, 0] / 2.4, NIGHT_FLOOR ** GAMMA, 1)
+    col = at(_ult_track(light, 'LightStg0', 'CustomVector0'))[:, :3]
+    col = (col / col.max(1, keepdims=True)) ** (1 / GAMMA)
+    out['island'] = np.c_[inten[:, None] ** (1 / GAMMA) * col, np.ones(len(u))]
+    out['sky'] = ratio('sfx_sky_color')
+    out['cloud'] = ratio('sfx_cloud')
+    out['sun'] = ratio('zz_sun')
+    stars = at(_ult_track(common, 'sun_stars', 'CustomVector8'))[:, 3]
+    out['stars'] = np.c_[np.ones((len(u), 3)), stars]
+    # the panorama: Ultimate blends its day and night textures (CustomVector20.w); here the day one
+    # times the night one's colour over the day one's (per channel), warmed at sunset as the island
+    far = '%s/motion/%s/%s_00.nuanmb' % (d, far_set, far_set)
+    if not os.path.exists(far):
+        far = '%s/normal/motion/far_plains_set/far_plains_set_00.nuanmb' % src
+    night = at(_ult_track(far, 'sfx_far_A_long', 'CustomVector20'))[:, 3]
+    day_tex = glob.glob('%s/normal/model/%s/far_*_day_low_col.nutexb' % (src, far_set))[0]
+    a = nutexb.decode(nutexb.Nutexb(day_tex)).astype(np.float64)
+    b = nutexb.decode(nutexb.Nutexb(day_tex.replace('_day_', '_night_'))).astype(np.float64)
+    m = a[..., 3] > 250
+    k = b[m][:, :3].mean(0) / a[m][:, :3].mean(0)
+    warm = 0.6 + 0.4 * col              # col: the stage light's colour (gamma-encoded, max 1)
+    base = ((1 - night)[:, None] + night[:, None] * k) * warm
+    # and its haze (CustomVector19: colour, .w how much; reddish at sunset, near black late at
+    # night) as a gain towards that colour over the texture's mean (PANO_MEAN)
+    haze = at(_ult_track(far, 'sfx_far_A_long', 'CustomVector19'))
+    w = haze[:, 3:4]
+    out['pano'] = np.c_[base * (1 - w) + w * np.clip(haze[:, :3], 0, None) ** (1 / GAMMA) / PANO_MEAN, np.ones(len(u))]
+    fog = ratio('sfx_far_A_long_fog', far)
+    fog[:, 3] = np.clip(fog[:, :3].mean(1), 0, 1)       # the haze fades out with its colour
+    out['fog'] = fog
+    return out
+
+
+def cycle_light(path, phases=LIGHT_PHASES):
+    """Battlefield's light.bin over CYCLE: a record every 3 frames (3001), each Battlefield's for the
+    same time of day (phases), and the five colour tracks likewise"""
+    d = open(path, 'rb').read()
+    magic, ver, n, step, rec = struct.unpack('>4sIIII', d[:20])
+    assert magic == b'LIGH' and ver == 5 and step == 3
+    tracks = struct.unpack('>5I', d[0x14:0x28])
+    size = (len(d) - rec) // n
+    count = CYCLE // step + 1
+    f = np.arange(count) * step
+    src = np.round(np.interp(f, *zip(*phases))).astype(int) % n
+    pad = -3 * count % 4
+    out = bytearray(b'LIGH' + struct.pack('>III', ver, count, step))
+    start = 0x28 + 5 * (3 * count + pad)
+    out += struct.pack('>I', start) + struct.pack('>5I', *[0x28 + i * (3 * count + pad) for i in range(5)])
+    for o in tracks:
+        out += b''.join(d[o + 3 * r:o + 3 * r + 3] for r in src) + b'\0' * pad
+    assert len(out) == start
+    out += b''.join(d[rec + size * r:rec + size * (r + 1)] for r in src)
+    return bytes(out)
+
+
+def sky_rig(src, form, tex):
+    """the sun, the moon and the stars (far_common_set, each mesh on one bone) on a made skeleton,
+    turning as Ultimate's (sunmoon_rotateAxis, stars_RotateAxis) over CYCLE; additive (BF_FLAME)"""
+    d = '%s/%s' % (src, 'normal' if form == 'melee' else 'battle')
+    setdir = '%s/model/far_common_set' % d
+    parts = [p for p in load_parts(setdir) if p['label'] in RIG_LABELS]
+    names = sorted({p['bone'] for p in parts})
+    motion = mob_motion(setdir, [('%s/motion/far_common_set/far_common_set_00.nuanmb' % d, list(range(CYCLE + 1)))],
+                        CYCLE + 1, names)
+    meshes, bones, tracks, index = [], [('sky_root', -1)], {}, {}
+    for b in names:
+        bones.append(('sky_%s' % b, 0))
+        index[b] = len(bones) - 1
+        tracks[bones[-1][0]] = motion[b]
+    for p in parts:
+        for m in to_nud([p], tex, 'bg'):
+            for poly in m.polygons:
+                poly.materials = [bf_material(BF_FLAME, poly.materials[0].textures[0]['hash'])]
+            m.bind, m.bone = 8, index[p['bone']]
+            m.gain = RIG_LABELS[p['label']]
+            meshes.append(m)
+    return meshes, bones, tracks
 
 
 # ---------------------------------------------------------------- stage
@@ -1204,10 +1374,11 @@ def tiny_nut(path):
 
 
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
-               clouds='moving', animal='sheep'):
+               clouds='moving', animal='sheep', daynight=True):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches (need
     effect): 'animated' (TORCH_SET), 'still' (flames in the island's model) or 'off'; clouds:
-    'moving' or 'still'; animal: 'sheep', 'cow', 'chicken' or None"""
+    'moving' or 'still'; animal: 'sheep', 'cow', 'chicken' or None; daynight: Ultimate's day / night
+    cycle (CYCLE), or held at midday"""
     if torches == 'off':
         effect = None
     if os.path.exists(out_dir):
@@ -1243,13 +1414,14 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
     sky = [p for p in load_parts(sky_src) if p['label'] in SKY_LABELS]
 
     cloud_parts = [p for p in sky if p['bone'] in CLOUD_SETS]
-    sky = [p for p in sky if p['bone'] not in CLOUD_SETS]
-    villagers, animals = mob_kinds(src, form, biome, animal)
+    sky = [p for p in sky if p['bone'] not in CLOUD_SETS and not (daynight and p['label'] in RIG_LABELS)]
+    villagers, animals = mob_kinds(src, form, biome, animal, daynight)
     rig = villagers or (effect and torches == 'animated')
+    curves = daynight_curves(src, form, FAR[biome] if form == 'melee' else 'far_plains_set') if daynight else None
     for name in sorted(os.listdir(model_dir)):
         if (name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or name == TORCH_SET and rig
-                or name == ANIMAL_SET and animals):
-            assert not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
+                or name == ANIMAL_SET and animals or name == SKY_RIG and daynight):
+            assert name == SKY_RIG or not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
             data = nud.hidden(path)
@@ -1266,19 +1438,26 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (FOG_SET, far_fog, 'bg', False), (SKY_SET, sky, 'bg', True)):
         meshes = to_nud(parts, tex, kind, is_sky, cutout=name == FAR_SET)
+        for m, part in zip(meshes, [q for q in parts if q['textures'] and q['uv'] is not None]):
+            m.gain = {RING_SET: 'island', FAR_SET: 'pano', FOG_SET: 'fog'}.get(name) or (
+                'sun' if part['label'].startswith('zz_sun') else 'sky')
         if name == RING_SET and torches == 'still':
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
-        write_set('%s/%s' % (model_dir, name), meshes, tex)
+        write_set('%s/%s' % (model_dir, name), meshes, tex, curves)
     for name, changes in ((FAR_SET, {'drawing_order': {'number': FAR_ORDER}}),
                           (FOG_SET, {'drawing_order': {'number': FOG_ORDER}, 'draw_range': {'number': '2'}})):
         path = '%s/%s/model.xmb' % (model_dir, name)
         data = xmb.edit(open(path, 'rb').read(), changes)
         open(path, 'wb').write(data)
-    write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving')
+    write_clouds(model_dir, out_dir + '/animation', cloud_parts, tex, src, form, clouds == 'moving', curves)
     anim_dir = out_dir + '/animation'
+    if daynight:
+        m, b, t = sky_rig(src, form, tex)
+        write_rig(model_dir, anim_dir, SKY_RIG, m, b, t, CYCLE + 1, tex, curves)
     if rig:
         # torches (their own bones) and villagers in TORCH_SET, one skeleton, one animation
-        frames = VILLAGER_FRAMES * len(VILLAGER_LOOP) + 1 if villagers else TORCH_LOOP + 1
+        frames = ((CYCLE if daynight else VILLAGER_FRAMES * len(VILLAGER_DAY)) + 1 if villagers
+                  else TORCH_LOOP + 1)
         meshes, bones = [], [('rig_root', -1)]
         tracks = {}
         if effect and torches == 'animated':
@@ -1292,13 +1471,16 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             meshes += m
             bones += [(n, 0) for n, _p in b[1:]]
             tracks.update(t)
-        write_rig(model_dir, anim_dir, TORCH_SET, meshes, bones, tracks, frames, tex)
+        write_rig(model_dir, anim_dir, TORCH_SET, meshes, bones, tracks, frames, tex, curves)
     if animals:
-        m, b, t = mob_rig(src, form, animals, tex, ANIMAL_FRAMES + 1, 'animal')
-        write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, ANIMAL_FRAMES + 1, tex)
+        frames = (CYCLE if daynight else ANIMAL_FRAMES) + 1
+        m, b, t = mob_rig(src, form, animals, tex, frames, 'animal')
+        for name, (pos, rot, scl) in t.items():
+            scl[ANIMAL_FRAMES + 1:frames - 1] = 0.0         # away for the night
+        write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, frames, tex, curves)
 
     light = out_dir + '/animation/light.bin'
-    data = still_light(light)
+    data = cycle_light(light) if daynight else still_light(light)
     open(light, 'wb').write(data)
     prm = glob.glob(out_dir + '/param/*_stprm.bin')[0]
     data = stage_params(prm)
@@ -1342,13 +1524,18 @@ def main():
     ap.add_argument('--torches', default='animated', choices=('animated', 'still', 'off'),
                     help="animated (default; v12 test A2 in game), still (flames in the island's model) or off")
     ap.add_argument('--clouds', default='moving', choices=('moving', 'still'))
+    ap.add_argument('--daynight', default='on', choices=('on', 'off'), help="Ultimate's day / night cycle, or midday")
+    ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a2',
+                    help="a test: the curves on our unlit 0xA2001001 or on Battlefield's 0xA3C01081")
     ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
                     help="the two animals in the pen (Ultimate picks one of the three each time)")
     a = ap.parse_args()
+    global GAIN_FLAGS
+    GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
                                   form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
-                                  None if a.animal == 'none' else a.animal)
+                                  None if a.animal == 'none' else a.animal, a.daynight == 'on')
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 
