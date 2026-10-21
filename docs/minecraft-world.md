@@ -673,6 +673,37 @@ point of the night; the stars look good but show over the moon. v15f (D the defa
 
 `build/minecraft_world_v15f_test.zip`.
 
+## v16: monsters, all the animals
+
+User: v15f loads, shadows stay at night, the moon shows over the stars; add the rest of the mobs
+and the other animals.
+- **Monsters** (`MONSTERS`, `mob_kinds`): `pickel_world.stdat` has frame_of_monster 4200 and odds
+  zombie 40 / skeleton 35 / spider 20 / enderman 5 (Ultimate rolls them, several a night: the user's
+  Ultimate screenshots show more than one). No stage code here to roll, so all four, each playing
+  its biome's path (`pickel_<biome>_<monster>`: zombie 4180 frames, rising out of the ground;
+  skeleton 4000; spider and enderman 3600) once from `MONSTER_FRAME` (4200), scaled to nothing
+  before and after, gone by dawn. In Battlefield's dyr_h_BG_more_far0_set (`MONSTER_SET`, draw
+  range 2), a rig of their own. Their animations' Visibility tracks are fixed per biome (the
+  enderman's carried block: grass in plains, dirt / tundra / savanna grass elsewhere):
+  `hidden_meshes` drops what starts hidden. The block meshes have no weights, only a parent bone:
+  `mob_parts` puts them on it.
+- **Fitting paths to ground** (`Ground`, `fit_shift`): the up-facing faces' heights on a 2.5-unit
+  grid; a path frame fits where it stands on one (within 2) with nothing within 30 above;
+  `fit_shift` finds the least shift (blocks of 10) for a path's sampled frames. Replaces v15's
+  hand-found `END_ANIMAL_SHIFT`.
+- **Omega monsters**: Ultimate's own paths fit the normal form's ground 0.79-0.90 of the time
+  (rising out of it, coming in from off the island; the enderman's path is 3 below its feet, found
+  per monster). On Omega each is moved to where it fits at least `END_MONSTER_FIT` (0.9) of that:
+  the zombie, skeleton and enderman; the spider (0.71 at best, 0.77 needed) is left out.
+- **Animals** (`ANIMALS`, `--animal all`, the default): Ultimate picks one kind a match, all three
+  walking the same pen; all three here, the first (sheep) in the pen, the others moved by
+  `fit_shift` to ground behind the fighters (z <= `ANIMAL_BACK` -45), `ANIMAL_APART` (15) from the
+  others. `--animal sheep|cow|chicken` keeps one kind in the pen.
+- Size: 54 MB normal / 48 MB Omega (v15f 44): the six animals' animation is 6.5 MB, the monsters'
+  4.8 MB.
+
+`build/minecraft_world_v16_tests.zip`: test A (all the mobs), B (the monsters, the sheep only).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

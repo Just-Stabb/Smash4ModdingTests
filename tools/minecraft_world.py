@@ -1223,28 +1223,113 @@ VILLAGER_DAY = ('free1', 'work', 'free2', 'free3', 'work', 'free4')
 VILLAGER_CYCLE = (('free1', 1200), ('work', 1200), ('free2', 1200), ('meeting', 600), ('return', 1200),
                   ('sleep', 3600))
 VILLAGER_FRAMES = 1200
-# animals: two of a kind (Ultimate picks sheep / chicken / cow 30 / 30 / 30), playing wait1 and
-# wait2 (4200 frames each, start = end), in their own folder; with the cycle, gone from Ultimate's
-# frame_of_monster (4200, when its monsters come) to the end of the night (scaled to nothing)
+# animals: two of a kind, playing wait1 and wait2 (4200 frames each, start = end), in their own
+# folder; with the cycle, gone from Ultimate's frame_of_monster (4200, when its monsters come) to the
+# end of the night (scaled to nothing). Ultimate picks one kind a match (sheep / chicken / cow
+# 30 / 30 / 30), all three walking the same pen; Smash 4 has no stage code to pick, so all three
+# (user): the first in the pen, the others moved (fit_shift) where their paths stay on the island's
+# ground, behind the fighters (ANIMAL_BACK), ANIMAL_APART from the others
 ANIMAL_SET = 'dyr_e_mid_left01_set'
 ANIMAL_FRAMES = 4200
+ANIMALS = ('sheep', 'cow', 'chicken')
+ANIMAL_BACK, ANIMAL_APART = -45.0, 15.0
 # Omega (the battle folder's ring_endbattle_set): its motions are the normal form's, but its island
 # is narrower and has only the butcher's house (the middle one). The farmer's spot is a block above
 # its ground and his house isn't there (he floated, user), so he and his door are left out; the
-# animals' pen walked off its edge, so they're moved by END_ANIMAL_SHIFT (blocks of 10), the least
-# shift that keeps every frame of all three animals' paths on its ground
+# animals' pen walked off its edge, so the animals and the monsters are moved there too (fit_shift)
 END_VILLAGERS = ('plains_butcher',)
-END_ANIMAL_SHIFT = (10.0, 0.0, 20.0)
+# the night's monsters (pickel_world.stdat: from frame_of_monster 4200; Ultimate rolls each one,
+# zombie / skeleton / spider / enderman 40 / 35 / 20 / 5, several a night): all four, each its
+# biome's path once from MONSTER_FRAME (zombie 4180 frames, skeleton 4000, spider and enderman
+# 3600: all gone by dawn, 8250), scaled to nothing before and after; in a Battlefield folder of their
+# own (MONSTER_SET, draw range 2), as the animals' folder would grow past 3 MB. Their biome's
+# visibility (the enderman's block: grass, dirt, tundra or savanna) as Ultimate's animation sets it
+MONSTERS = ('zombie', 'skeleton', 'spider', 'enderman')
+MONSTER_FRAME = 4200
+MONSTER_SET = 'dyr_h_BG_more_far0_set'
+# Omega: a monster's path (its window, MONSTER_FRAME on) moved to where as much of it is on Omega's
+# ground as there is on the normal form's (Ultimate's own: 0.79-0.90, from rising out of the
+# ground, coming in from off the island), at least END_MONSTER_FIT of that, or left out; heights
+# measured from its feet (the enderman's path is 3 below them: its offset found on the normal form)
+END_MONSTER_FIT = 0.9
 
 
-def mob_parts(setdir):
-    """load_parts split by bone: [(bone name, part)]"""
+class Ground:
+    """the heights of the upward faces of parts, on a grid (GROUND_CELL): where a mob may walk"""
+    CELL = 2.5
+
+    def __init__(self, parts):
+        cells = {}
+        for p in parts:
+            if p.get('idx') is None or p['pos'] is None:
+                continue
+            t = p['pos'][np.asarray(p['idx']).reshape(-1, 3)]
+            n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+            n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-9
+            for a, b, c in t[np.abs(n[:, 1]) > 0.9]:
+                lo = np.floor(np.minimum(np.minimum(a, b), c)[[0, 2]] / self.CELL).astype(int)
+                hi = np.floor(np.maximum(np.maximum(a, b), c)[[0, 2]] / self.CELL).astype(int)
+                for i in range(lo[0], hi[0] + 1):
+                    for k in range(lo[1], hi[1] + 1):
+                        q = (np.array([i, k]) + 0.5) * self.CELL
+                        d = [(v[0] - q[0]) * (w[1] - q[1]) - (w[0] - q[0]) * (v[1] - q[1])
+                             for v, w in ((a[[0, 2]], b[[0, 2]]), (b[[0, 2]], c[[0, 2]]), (c[[0, 2]], a[[0, 2]]))]
+                        if min(d) >= -1e-6 or max(d) <= 1e-6:
+                            cells.setdefault((i, k), []).append((a[1] + b[1] + c[1]) / 3)
+        self.cells = {k: np.array(v) for k, v in cells.items()}
+
+    def on(self, x, y, z):
+        """standing on a face (within 2) with nothing above within 30"""
+        h = self.cells.get((int(np.floor(x / self.CELL)), int(np.floor(z / self.CELL))))
+        return h is not None and (np.abs(h - y) <= 2).any() and not ((h > y + 2) & (h <= y + 30)).any()
+
+    def share(self, pts):
+        return np.mean([self.on(*p) for p in pts]) if len(pts) else 0.0
+
+
+def fit_shift(ground, pts, apart=(), back=None, need=1.0, prefer_zero=True):
+    """the least (dx, 0, dz), in blocks of 10, that puts pts ([n, 3], sampled path frames) on
+    ground (at least `need` of them), all at z <= back, ANIMAL_APART from apart ([m, 3]): or None"""
+    pts = np.asarray(pts, dtype=np.float64)
+    apart = np.asarray(apart, dtype=np.float64).reshape(-1, 3)
+    shifts = sorted(((dx, dz) for dx in range(-160, 170, 10) for dz in range(-200, 70, 10)),
+                    key=lambda v: (abs(v[0]) + abs(v[1]), v))
+    best = None
+    for dx, dz in shifts:
+        q = pts + [dx, 0, dz]
+        if back is not None and q[:, 2].max() > back:
+            continue
+        if len(apart) and np.min(np.linalg.norm(q[:, None, [0, 2]] - apart[None, :, [0, 2]], axis=2)) < ANIMAL_APART:
+            continue
+        sh = ground.share(q)
+        if sh >= need:
+            return np.array([dx, 0.0, dz])
+        if best is None or sh > best[0] + 1e-9:
+            best = (sh, np.array([dx, 0.0, dz]))
+    return None if need >= 1.0 or best is None or best[0] < need else best[1]
+
+
+def hidden_meshes(anim_path):
+    """the mesh names an animation keeps hidden (its Visibility tracks' first value)"""
+    import ssbh_data_py as s
+    a = s.anim_data.read_anim(anim_path)
+    return {n.name for g in a.groups if g.group_type.name == 'Visibility' for n in g.nodes
+            if n.tracks and n.tracks[0].values and not n.tracks[0].values[0]}
+
+
+def mob_parts(setdir, hidden=()):
+    """load_parts split by bone: [(bone name, part)]; without the meshes named in hidden (a name,
+    or a name + 'Shape')"""
     import ssbh_data_py as s
     mesh = s.mesh_data.read_mesh(setdir + '/model.numshb')
     out = []
     for p, o in zip(load_parts(setdir), mesh.objects):
+        if o.name in hidden or o.name.endswith('Shape') and o.name[:-5] in hidden:
+            continue
         vb = np.full(len(p['pos']), -1)
         names = []
+        if not o.bone_influences and o.parent_bone_name:     # on its parent bone (the enderman's block)
+            names, vb[:] = [o.parent_bone_name], 0
         for bi in o.bone_influences:
             names.append(bi.bone_name)
             for vw in bi.vertex_weights:
@@ -1304,7 +1389,7 @@ def mob_rig(src, form, kinds, tex, frames, prefix):
     meshes, bones, tracks = [], [('%s_root' % prefix, -1)], {}
     for i, (setname, anims) in enumerate(kinds):
         setdir = '%s/model/%s' % (d, setname)
-        parts = mob_parts(setdir)
+        parts = mob_parts(setdir, hidden_meshes(anims[0][0]))
         names = sorted({b for b, _ in parts})
         motion = mob_motion(setdir, anims, frames, names)
         index = {}
@@ -1416,8 +1501,9 @@ def door_rig(src, form, doors, paths, tex, frames):
     return meshes, bones, tracks
 
 
-def mob_kinds(src, form, biome, animal, daynight=True):
-    """(villagers, animals): [(model set, [(anim path, frames)])] for the biome (Omega: plains', END_VILLAGERS)"""
+def mob_kinds(src, form, biome, animals, daynight=True):
+    """(villagers, animals, monsters): [(model set, [(anim path, frames)])] for the biome (Omega:
+    plains', END_VILLAGERS); animals: the kinds (ANIMALS), two of each; monsters with the cycle"""
     d = '%s/%s/motion' % (src, 'normal' if form == 'melee' else 'battle')
     b = biome if form == 'melee' else 'plains'
     villagers = []
@@ -1429,16 +1515,31 @@ def mob_kinds(src, form, biome, animal, daynight=True):
             anims = [(path % a, VILLAGER_FRAMES) for a in VILLAGER_DAY]
         anims.append((anims[0][0], 1))                      # the loop's last frame = its first
         villagers.append(('ch_pickel_%s_set' % v, anims))
-    animals = []
-    if animal:
+    out = []
+    for animal in animals:
         for w in ('wait1', 'wait2'):
             path = '%s/ch_pickel_%s_set/pickel_%s_%s_%s.nuanmb' % (d, animal, b, animal, w)
             if os.path.exists(path):
                 anims = [(path, ANIMAL_FRAMES + 1)]
                 if daynight:                # away for the night (animal_tracks hides them), then back
                     anims.append((path, [0] * (CYCLE - ANIMAL_FRAMES)))
-                animals.append(('ch_pickel_%s_set' % animal, anims))
-    return villagers, animals
+                out.append(('ch_pickel_%s_set' % animal, anims))
+    monsters = []
+    for m in MONSTERS if daynight else ():
+        path = '%s/ch_pickel_%s_set/pickel_%s_%s.nuanmb' % (d, m, b, m)
+        if not os.path.exists(path):
+            continue
+        import ssbh_data_py as s
+        n = int(s.anim_data.read_anim(path).final_frame_index) + 1
+        n = min(n, CYCLE + 1 - MONSTER_FRAME)
+        monsters.append(('ch_pickel_%s_set' % m, [(path, [0] * MONSTER_FRAME), (path, n),
+                                                  (path, [n - 1] * (CYCLE + 1 - MONSTER_FRAME - n))]))
+    return villagers, out, monsters
+
+
+def mob_window(anims):
+    """(first, last) frame a monster's anims (mob_kinds) show it"""
+    return len(anims[0][1]), len(anims[0][1]) + anims[1][1] - 1
 
 
 # ---------------------------------------------------------------- day and night
@@ -1710,10 +1811,10 @@ def tiny_nut(path):
 
 
 def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, effect=None, torches='animated',
-               clouds='moving', animal='sheep', daynight=True):
+               clouds='moving', animal=ANIMALS, daynight=True):
     """form 'melee' (one biome) or 'end' (Omega: the battle folder's flat form). torches (need
     effect): 'animated' (TORCH_SET), 'still' (flames in the island's model) or 'off'; clouds:
-    'moving' or 'still'; animal: 'sheep', 'cow', 'chicken' or None; daynight: Ultimate's day / night
+    'moving' or 'still'; animal: the animal kinds (ANIMALS: the first in the pen); daynight: Ultimate's day / night
     cycle (CYCLE), or held at midday"""
     if torches == 'off':
         effect = None
@@ -1759,13 +1860,13 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
     if daynight:                            # behind the stars (STARS_PUSH)
         sky = [dict(p, pos=SKY_PIVOT + (p['pos'] - SKY_PIVOT) * DOME_PUSH) if p['label'] == 'sfx_sky_color' else p
                for p in sky]
-    villagers, animals = mob_kinds(src, form, biome, animal, daynight)
+    villagers, animals, monsters = mob_kinds(src, form, biome, animal, daynight)
     rig = villagers or (effect and torches == 'animated')
     curves = daynight_curves(src, form, FAR[biome] if form == 'melee' else 'far_plains_set') if daynight else None
     for name in sorted(os.listdir(model_dir)):
         if (name in (RING_SET, FAR_SET, SKY_SET, FOG_SET) or name in CLOUD_SETS.values() or name == TORCH_SET and rig
-                or name == ANIMAL_SET and animals or name == SKY_RIG and daynight):
-            assert name == SKY_RIG or not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
+                or name == ANIMAL_SET and animals or name == SKY_RIG and daynight or name == MONSTER_SET and monsters):
+            assert name in (SKY_RIG, MONSTER_SET) or not os.path.exists('%s/%s/model.mta' % (model_dir, name)), name
         else:
             path = '%s/%s/model.nud' % (model_dir, name)
             data = nud.hidden(path)
@@ -1838,14 +1939,59 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             bones += [(n, 0) for n, _p in b[1:]]
             tracks.update(t)
         write_rig(model_dir, anim_dir, TORCH_SET, meshes, bones, tracks, frames, tex, curves)
+    ground = Ground(near) if animals or monsters else None
     if animals:
         frames = (CYCLE if daynight else ANIMAL_FRAMES) + 1
+        paths = [x[:ANIMAL_FRAMES + 1:50] for x in villager_paths(animals)]
+        shifts, placed, kept = {}, [], []
+        for kind in dict.fromkeys(a for a, _anims in animals):
+            idx = [i for i, (a, _anims) in enumerate(animals) if a == kind]
+            pts = np.concatenate([paths[i] for i in idx])
+            if not placed and form == 'melee' and ground.share(pts) == 1.0:
+                sh = np.zeros(3)            # Ultimate's pen
+            else:
+                sh = fit_shift(ground, pts, placed, ANIMAL_BACK)
+            if sh is None:
+                print('%s: no room for the %s' % (form, kind.split('_')[2]))
+                continue
+            placed += list(pts + sh)
+            for i in idx:
+                shifts[i] = sh
+                kept.append(i)
+        animals = [animals[i] for i in kept]
         m, b, t = mob_rig(src, form, animals, tex, frames, 'animal')
         for name, (pos, rot, scl) in t.items():
             scl[ANIMAL_FRAMES + 1:frames - 1] = 0.0         # away for the night
-            if form != 'melee':
-                pos += END_ANIMAL_SHIFT
+            pos += shifts[kept[int(name.split('_')[0][len('animal'):])]]
         write_rig(model_dir, anim_dir, ANIMAL_SET, m, b, t, frames, tex, curves)
+    if monsters:
+        paths = villager_paths(monsters)
+        shifts, kept = [], []
+        if form != 'melee':                 # the paths' fit on the normal form (plains, Ultimate's)
+            ref = Ground(load_parts('%s/normal/model/ring_plains_set' % src)
+                         + [p for e in EXTRA['plains'] for p in load_parts('%s/normal/model/%s' % (src, e))])
+        for i, (setname, anims) in enumerate(monsters):
+            lo, hi = mob_window(anims)
+            if form == 'melee':
+                sh = np.zeros(3)            # Ultimate's own paths
+            else:
+                pts = paths[i][lo:hi + 1:50]
+                share, dy = max((ref.share(pts + [0, dy, 0]), dy) for dy in range(-6, 7))
+                sh = fit_shift(ground, pts + [0, dy, 0], need=END_MONSTER_FIT * share)
+            if sh is None:
+                print('%s: no room for the %s' % (form, setname.split('_')[2]))
+                continue
+            kept.append(i)
+            shifts.append(sh)
+        monsters = [monsters[i] for i in kept]
+        m, b, t = mob_rig(src, form, monsters, tex, CYCLE + 1, 'monster')
+        for name, (pos, rot, scl) in t.items():
+            k = int(name.split('_')[0][len('monster'):])
+            lo, hi = mob_window(monsters[k][1])
+            scl[:lo] = 0.0
+            scl[hi + 1:] = 0.0
+            pos += shifts[k]
+        write_rig(model_dir, anim_dir, MONSTER_SET, m, b, t, CYCLE + 1, tex, curves)
 
     light = out_dir + '/animation/light.bin'
     data = (cycle_light(light, fighter=chr_light(src), island=curves['island'][:, :3] if ISLAND_FLAGS else None)
@@ -1899,8 +2045,9 @@ def main():
     ap.add_argument('--island-shader', choices=('unlit', 'shadow'), default='shadow',
                     help="the island on Battlefield's platform shader 0xA4001041 lit by ISLAND_LIT (fighters' "
                          "shadows; v15e test D, user), or unlit with its shading baked")
-    ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
-                    help="the two animals in the pen (Ultimate picks one of the three each time)")
+    ap.add_argument('--animal', default='all', choices=('all',) + ANIMALS + ('none',),
+                    help="the animals: all three kinds (the first, sheep, in the pen; Ultimate picks one "
+                         "each match) or one kind in the pen")
     a = ap.parse_args()
     global GAIN_FLAGS, ISLAND_FLAGS
     GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
@@ -1908,7 +2055,7 @@ def main():
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
                                   form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
-                                  None if a.animal == 'none' else a.animal, a.daynight == 'on')
+                                  {'all': ANIMALS, 'none': ()}.get(a.animal, (a.animal,)), a.daynight == 'on')
         print('%s: %d collisions (%d drop-through), %d blocks' % (form, len(cols), sum(c.flags[3] for c in cols), len(blocks)))
 
 
