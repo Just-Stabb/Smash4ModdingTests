@@ -55,7 +55,7 @@ EXTRA = {'plains': ['door_plains_butcher_set', 'door_plains_firmer_set', 'vegeta
 SURFACE = {'plains': 3, 'birchforest': 3, 'savanna': 3, 'taiga': 3, 'snowytundra': 0x0D, 'stoneshore': 1}
 
 ATLAS = 'all_blocks-rgba_c2_add'
-TEX_BASE = 0x204D0000               # texture IDs of the port: 0x204D0001...
+TEX_BASE = 0x2000F000               # texture IDs of the port: 0x2000F001... (Battlefield's: 0x2000xxxx below 0x2000F000)
 LIT, BG = 0xA4001041, 0xA2000001
 CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
 SKY_TOP, SKY_HORIZON = np.array([0.47, 0.65, 1.0]), np.array([0.75, 0.85, 1.0])
@@ -410,19 +410,24 @@ class Textures:
         return nutexb.decode(nutexb.Nutexb(self.files[name]))
 
     def nut(self, names):
+        """NTP3 in the forms the game's own NTP3 files use (stage and UI): RGBA8 and DXT5 with one mip,
+        DXT1 with a full mip chain; power-of-two sizes. (v1 had RGBA8 / DXT5 with mips and a 36x36
+        texture, which no game file has; the stage froze while loading.)"""
         from PIL import Image
         texs = []
         for n in names:
             img = self.image(n)
-            if n.startswith('all_blocks'):
-                texs.append((self.ids[n], 14, nut.mip_chain(img, 32)))
-                continue
             h, w = img.shape[:2]
-            if w > 2048 or h > 2048:
-                k = 2048 / max(w, h)
-                img = np.asarray(Image.fromarray(img).resize((int(w * k) // 4 * 4, int(h * k) // 4 * 4), Image.LANCZOS))
-            fmt = 2 if (img[..., 3] < 250).any() else 0
-            texs.append((self.ids[n], fmt, nut.mip_chain(img, 4)))
+            w2, h2 = min(2048, 1 << (w.bit_length() - 1)), min(2048, 1 << (h.bit_length() - 1))
+            if (w2, h2) != (w, h):
+                img = np.asarray(Image.fromarray(img).resize((w2, h2), Image.NEAREST if n.startswith('all_blocks')
+                                                             else Image.LANCZOS))
+            if n.startswith('all_blocks'):
+                texs.append((self.ids[n], 14, [img]))
+            elif (img[..., 3] < 250).any():
+                texs.append((self.ids[n], 2, [img]))
+            else:
+                texs.append((self.ids[n], 0, nut.mip_chain(img, 1)))
         return nut.write_ntp3(texs)
 
 

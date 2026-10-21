@@ -61,9 +61,12 @@ x ±59, top 47 against Battlefield's 59 / 47.3; ledges ±78 in both), so no resc
   island, blocks, plates, doors and farm, with an alpha test (`>= 128`) for the block atlas'
   cut-outs (leaves, grass, flowers) and nearest filtering (pixel art). `0xA2000001` (its background
   plane) for the panorama (alpha-tested sky cut-out) and the sky. Cull mode from Ultimate's.
-- **Textures**: the block atlas (512x512) is RGBA8 with 5 mips, one copy for the island and the
-  blocks (Ultimate's `_for_programBlock` copy has the same layout, slightly different tones). The
-  panorama is resized to 2048x1024 DXT5.
+- **Textures**: only the NTP3 forms the game's own files use (Battlefield's models, the UI): RGBA8
+  and DXT5 with one mip, DXT1 with a full mip chain, power-of-two sizes. The block atlas (512x512)
+  is RGBA8, one copy for the island and the blocks (Ultimate's `_for_programBlock` copy has the same
+  layout, slightly different tones); the panorama 2048x1024 DXT5. Texture IDs `0x2000F001`... (the
+  game's are `0x2000xxxx`). v1 used RGBA8 / DXT5 with mips, a 36x36 texture and IDs `0x204Dxxxx`:
+  the moving-platform test froze while loading the stage (user), which is the first suspect.
 - **Sky**: Ultimate colors the sky dome in its shader (its vertex colors are only shading), so the
   dome gets a fixed day gradient. Clouds at 70% opacity (from under the layer they'd hide most of
   the sky). Sun kept; moon, stars and fog layers not.
@@ -174,3 +177,20 @@ What the result tells:
 - collision moves (you ride something invisible), the platform doesn't: the stage doesn't play the
   animation (the cave would have to move the models too);
 - they drift apart over the match: the frame counts differ (loop length or slow motion).
+
+## Freeze (user) and tests
+
+The moving-platform test build froze while loading the stage. Not the cause (checked): the link
+manager rigged collision needs exists on every stage (made in the base constructor,
+`0x03140B78`); the generated lvd has Battlefield's layout (no zero-length lines, unit normals,
+ledges on their lines); a cave keeping data next to its code (strike_cave.py's counters already do).
+Fixed on suspicion: the texture forms and IDs (above). `build/freeze_tests.zip` splits it:
+1 Minecraft World alone (current RPX), 2 the moving-platform test, 3 Minecraft models with
+Battlefield's collision, 4 Battlefield's models with Minecraft collision, 5 the new RPX with the plain
+Battlefield copy.
+
+## Ultimate files (user)
+
+`param-SSBU.zip` is Ultimate's top-level `param/` (game, spirits, sound settings), not the stage's
+own `stage/pickel_world/*/param` (the lvd collision and stage params). `ui-SSBU.zip` has Minecraft
+World's stage pictures: `ui/replace_patch/stage/stage_0`-`stage_4/stage_N_pickel_world.bntx`.
