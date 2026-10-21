@@ -63,9 +63,13 @@ CULL = {'Back': 1029, 'Front': 1028, 'Disabled': 0}
 # and the horizon hazy, but the ground under the horizon (near the island) white: v11-v17c read
 # it the other way up (clear near, hazy far: the user's Ultimate screenshots), which made the sky's
 # top hazy (v17c, with the clamped sampler: pale shapes at the top of every biome's sky, user).
-# v17d: read as it is above the horizon (FOG_HORIZON_Y), clear (v 0) from there down; at this strength
+# v17d: read as it is above the horizon (FOG_HORIZON_Y), clear (v 0) from there down: still in front of
+# the panorama (1%, since v9), it laid a white band over the far hills with a hard lower edge (user).
+# v17e: where Ultimate has it, a little behind the panorama (its rim at 8825, the panorama's 8804;
+# FOG_SCALE): the hills hide it but at their edges (as rendered offline); at this strength
 FAR_FOG_ALPHA = 0.8
 FOG_HORIZON_Y = 0.0                 # the bowl's vertices below this height (its rings at y -2890 and lower)
+FOG_SCALE = 1.01
 FOG_WRAP = 3                        # clamp (NUD wrap: 1 repeat, 2 mirror, 3 clamp)
 # Draw order (model.xmb drawing_order; Battlefield's go far to near: sky 0, moon 2, sun 4,
 # background 5-9, near objects 12-18; blended models drawn in that order, ties by distance). The
@@ -817,7 +821,7 @@ def split_wide(parts, size):
 
 def far_parts(setdir):
     """the panorama (split, see split_wide) and its fog layer (Ultimate's distance haze: a blended
-    texture in front of it; 1% nearer, as it's drawn over the panorama there)"""
+    texture just behind it, FOG_SCALE)"""
     parts = load_parts(setdir)
     # (v17b: v clamped, the other biomes' running to 7 had tiled the ramp in bands; v17c: the
     # sampler clamped (FOG_WRAP), the mips no longer mixing the top and bottom rows.) Under the
@@ -831,7 +835,7 @@ def far_parts(setdir):
         tri = p['idx'].reshape(-1, 3)
         tri = tri[~below[tri].all(1)]
         if len(tri):
-            fog.append(dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], v],
+            fog.append(dict(p, pos=p['pos'] * FOG_SCALE, uv=np.c_[p['uv'][:, 0], v],
                             col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)),
                             idx=tri.reshape(-1)))
     pano = [p for p in parts if p['sub'] == 0]

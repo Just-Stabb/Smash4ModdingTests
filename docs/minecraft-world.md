@@ -879,6 +879,11 @@ burning mobs not Minecraft's and not animating, nor the puff.
   other way up (to keep the near ground clear), which put the haze at the top of the sky (with
   v17c's clamped sampler: pale shapes at the top of the screen). Now read as it is above
   `FOG_HORIZON_Y` (0) and clear (v 0) below: the far hills hazy, the sky and the near ground clear.
+- **Fog (v17e)**: in game (user) v17d's fog, still 1% in front of the panorama as since v9, laid a
+  white band over the far hills with a hard lower edge (the texture's alpha runs out within a few
+  rows of the horizon). Ultimate's bowl is a little *behind* the panorama (rim 8825, panorama
+  8804): now there too (`FOG_SCALE` 1.01), read as it is: the hills hide it, only their edges
+  catch a little haze (rendered offline for plains, taiga, savanna).
 - **Animals**: Ultimate's 30 / 30 / 30 read as weights: a kind every match (v17c: none 10%).
 - **Villagers**: one is built only where its house's door is (`door_<villager>_set`, the farmer's
   named "firmer"): snowy tundra has no farmer's house (Ultimate's model has only the butcher's
