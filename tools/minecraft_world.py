@@ -60,6 +60,19 @@ CLOUD_ALPHA = 0.7                   # the cloud layer, seen from under it, would
 RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
 SKY_XMB = 'stc_o_BG_clouds_set'     # Battlefield's clouds: the sky's draw settings
 DAY_FRAME = 945                     # Battlefield's light.bin: its most neutral midday frame
+# NAME_stprm.bin (typed values: a type byte, then the value): Battlefield's normal camera is
+# value 6 fov 30, 7 / 8 distance 83 / 1000, 9 vertical angle -5, 10 look-down angle -15 (Ultimate's
+# pickel_world's stageparam: 30, 83 / 1000, -5, -22): Ultimate's, where the fields match.
+CAMERA = {6: 30.0, 7: 83.0, 8: 1000.0, 9: -5.0, 10: -22.0}
+ISLAND_LIGHT_SET = 4                # stc_c_Ring_set's model.xmb light set
+# the island's light set, from Ultimate's (render/light/light00_set.nuanmb, frame 0 = day): its
+# stage light is white from (0.20, 0.90, 0.38) (travel direction below, as light.bin's); Ultimate's
+# ambient (spherical harmonics) becomes a sky light from above, a fill from the camera and the 4th
+# (off, no direction: Battlefield's ambient color). (enabled, direction, hue, saturation, value)
+ISLAND_LIGHTS = [(1, (-0.204, -0.903, -0.379), 0.0, 0.0, 0.8),
+                 (1, (0.0, -1.0, 0.0), 210.0, 0.1, 0.15),
+                 (1, (0.0, -0.259, -0.966), 0.0, 0.0, 0.4),
+                 (0, (0.0, 0.0, 0.0), 0.0, 0.0, 0.35)]
 
 
 # ---------------------------------------------------------------- Ultimate models
@@ -486,11 +499,18 @@ UNLIT_BLEND = (0xA2001001, 1, 1, 0, 0, 1029)
 CULLABLE = (CUTOUT, UNLIT_CUTOUT)                   # take Ultimate's culling; the others cull back faces
 
 
-def material(setup, tex_id, cull=1029):
+# a material's own fog (as Battlefield's far models have; without it the stage's default fog turns
+# everything white by a few thousand units): NU_fogParams = start, end, strength at start / end
+NO_FOG = ([0.0, 0.0, 0.0, 0.0], [36000.0, 42300.0, 0.0, 0.0])
+BACKDROP_FOG = ([0.75, 0.85, 1.0, 0.0], [8300.0, 8900.0, 0.0, 0.15])     # Ultimate's light distance haze
+
+
+def material(setup, tex_id, cull=1029, fog=NO_FOG):
     flags, src, dst, af, ref, c = setup
     m = nud.Material(flags, src, dst, af, ref, cull if setup in CULLABLE else c)
     m.textures.append(dict(hash=tex_id, map_mode=0, wrap_s=1, wrap_t=1, min_f=3, mag_f=2, mip=6, unk=0, unk2=0))
-    m.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
+    m.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_fogParams', list(fog[1])),
+               ('NU_fogColor', list(fog[0])), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
                ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
     return m
 
@@ -536,7 +556,7 @@ def to_nud(parts, tex, kind, sky=False):
             setup = BLEND if blend else CUTOUT if atlas else OPAQUE
         if cull == 0 and setup not in CULLABLE:
             poly.idx = two_sided(poly.idx)
-        poly.materials = [material(setup, tid, cull)]
+        poly.materials = [material(setup, tid, cull, BACKDROP_FOG if kind == 'bg' and not sky else NO_FOG)]
         if len(poly.pos) >= 0x10000:
             raise ValueError('%s: %d vertices' % (p['name'], len(poly.pos)))
         meshes.append(nud.Mesh('%s_%d' % (p['name'], p['sub']), [poly]))
@@ -559,7 +579,8 @@ def write_set(outdir, meshes, tex):
 
 def still_light(path, frame=DAY_FRAME):
     """Battlefield's animation/light.bin (its day / night cycle: night at frame 0, midday around
-    945, sunset around 1400) with every frame set to `frame`'s, so the stage stays at midday.
+    945, sunset around 1400) with every frame set to `frame`'s, so the stage stays at midday, and
+    the island's light set replaced by ISLAND_LIGHTS.
     Layout: 'LIGH', version, frame count, ?, the per-frame records' offset; five RGB tracks (3 bytes
     a frame) from the offsets at 0x14; then one fixed-size record a frame. Only values change."""
     d = bytearray(open(path, 'rb').read())
@@ -569,7 +590,34 @@ def still_light(path, frame=DAY_FRAME):
     assert rec + size * n == len(d)
     for o in struct.unpack('>5I', d[0x14:0x28]):
         d[o:o + 3 * n] = d[o + 3 * frame:o + 3 * frame + 3] * n
-    d[rec:] = d[rec + size * frame:rec + size * (frame + 1)] * n
+    r = bytearray(d[rec + size * frame:rec + size * (frame + 1)])
+    # a record: a 116-byte block for the characters, then one a light set: 4 lights of 28 bytes
+    # (enabled, direction, hue, saturation, value) and 4 more bytes
+    o = 116 * (1 + ISLAND_LIGHT_SET)
+    assert struct.unpack('>i', r[o:o + 4])[0] == 1
+    for k, (on, v, h, sat, val) in enumerate(ISLAND_LIGHTS):
+        r[o + 28 * k:o + 28 * k + 28] = struct.pack('>i6f', on, *v, h, sat, val)
+    d[rec:] = bytes(r) * n
+    return bytes(d)
+
+
+def stage_params(path, values=CAMERA):
+    """a Smash 4 typed param file (ff ff 00 00 header) with float values (by index) replaced"""
+    d = bytearray(open(path, 'rb').read())
+    assert d[:2] == b'\xff\xff'
+    sizes = {1: 1, 2: 1, 3: 2, 4: 2, 5: 4, 6: 4, 7: 4, 0x20: 4}
+    o, i = 8, 0
+    while o < len(d):
+        t = d[o]
+        if t == 8:
+            n = 4 + struct.unpack('>I', d[o + 1:o + 5])[0]
+        else:
+            n = sizes[t]
+        if i in values:
+            assert t == 7, (i, t)
+            d[o + 1:o + 5] = struct.pack('>f', values[i])
+        o += 1 + n
+        i += 1
     return bytes(d)
 
 
@@ -619,6 +667,9 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
     light = out_dir + '/animation/light.bin'
     data = still_light(light)
     open(light, 'wb').write(data)
+    prm = glob.glob(out_dir + '/param/*_stprm.bin')[0]
+    data = stage_params(prm)
+    open(prm, 'wb').write(data)
 
     ucols = ult_collisions(d)
     solid = [c for c in ucols if not c['through']]

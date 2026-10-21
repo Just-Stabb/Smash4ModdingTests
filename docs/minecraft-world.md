@@ -1,6 +1,7 @@
 # Minecraft World (Smash Ultimate) on NewStage01
 
-Status: **loads in game (v5, user), normal play and Omega**; v6 (lighting, below) not tested yet.
+Status: **loads in game (v5, v6: user), normal play and Omega**; stage code moves rigged
+collision (moving-platform test, user). v7 (fog, island light, camera; below) not tested yet.
 v1-v4 froze while loading their models (see "Freeze"); v5 uses only forms Battlefield's own loaded
 models have. The whole normal-play stage (not the Battlefield form) converted
 from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
@@ -102,11 +103,30 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   are GPU states, not shaders, so v6 adds them to `0xA2001001`. Faces Ultimate draws from both
   sides are doubled (reversed copies) except with the alpha test (Battlefield's has culling 0).
   Linear filtering, as all of Battlefield's.
+- **Fog** (v7): v6 in game (user's screenshot): the sky white, the backdrop washed out with
+  distance, the island greyed. Battlefield's far materials carry their own fog (`NU_fogParams`
+  start, end, strength at start / end, e.g. `[36000, 42300, 0.17, 0.44]`, and `NU_fogColor`); ours
+  had none, so (read from the result) the stage's default fog, white and full by a few thousand
+  units. Now every material has its own: none on the island and the sky, a light blue haze on the
+  far backdrop (Ultimate's distant hills).
 - **Light**: Battlefield's `animation/light.bin` is its day / night cycle (2401 frames: night at
   0, dawn, midday around 945, sunset around 1400, night again; light colors, directions, fog), which
   the user saw as wrong lighting. `still_light` sets every frame to frame 945 (the most neutral
   white, light from above): same file layout ('LIGH', version 5, frame count, ?, the per-frame
-  records' offset; five RGB tracks of 3 bytes a frame; one 1988-byte record a frame).
+  records' offset; five RGB tracks of 3 bytes a frame; one 1988-byte record a frame). A record: a
+  116-byte block for the characters, then one per light set (`model.xmb`'s light set number), each
+  4 lights of 28 bytes (enabled, direction of travel, hue, saturation, value; the 4th off, without
+  a direction: likely the set's ambient) and 4 bytes; then 16 bytes (a moving position, likely the
+  sun). Battlefield's midday set 4 (the island's): a warm main light (V 1.3), a weak blue one and
+  a strong blue one from below-front, which tinted the island. v7 sets it from Ultimate's
+  `render/light/light00_set.nuanmb` (9000 frames, day at 0): its stage light is white and comes from
+  (0.20, 0.90, 0.38) (Battlefield's midday sun is (0.17, 0.90, 0.39), same convention), plus a
+  sky light from above, a fill from the camera and a neutral ambient for Ultimate's ambient
+  (spherical harmonics, `render/stage_01plains.shpcanim`, not decoded). Its fog, bloom and color
+  settings (`render_param.prc`, the light file's `sceneAttributesForShaderFX`) aren't mapped.
+- **Camera** (v7): `NAME_stprm.bin` value 6-10 are Battlefield's normal camera (fov 30, distance
+  83 / 1000, vertical angle -5, look-down angle -15); Ultimate's `stageparam_pickel_world.stprm` has
+  30, 83 / 1000, -5, -22, which v7 uses. The camera area (lvd) is already Ultimate's.
 - **Textures**: NTWU, one mip, BC1 (opaque) or BC3, powers of two from 64 to 2048, IDs
   `0x2000F001`... (Battlefield's are `0x2000xxxx` below that). The block atlas (512x512) is 4x larger
   with nearest pixels (2048x2048 BC3): each source pixel is one 4x4 block, exact in BC, and sharp
@@ -198,7 +218,8 @@ entry's `unk1` (runtime `+0xD4`) is 0, so the collision is filed in the link man
 that the lookup searches (non-zero: `+0x1CC`'s, with `unk2` copied to the link); the short name is
 `mctest`; the lookup returns the link's ground list when it isn't empty; `0x02D59E40` sets the
 position and the dirty flag. Second try: `build/moving_platform_test.zip`, the kind read at
-`stage + 0` (the RPX differs from the first one's in that word only), not tested yet.
+`stage + 0` (the RPX differs from the first one's in that word only): **works** (user): the
+collision follows the bales, you can stand on it as it moves.
 
 `build/moving_platform_test.zip`: the full RPX (the standard build plus
 `tools/stage_script_cave.py`) and the files `tools/moving_platform_test.py` adds to the v6 Plains
