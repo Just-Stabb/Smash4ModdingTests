@@ -1232,7 +1232,7 @@ VILLAGER_FRAMES = 1200
 ANIMAL_SET = 'dyr_e_mid_left01_set'
 ANIMAL_FRAMES = 4200
 ANIMALS = ('sheep', 'cow', 'chicken')
-ANIMAL_BACK, ANIMAL_APART = -45.0, 15.0
+ANIMAL_BACK, ANIMAL_APART = -35.0, 12.0     # (-45 / 15 left the chickens out on four biomes)
 # Omega (the battle folder's ring_endbattle_set): its motions are the normal form's, but its island
 # is narrower and has only the butcher's house (the middle one). The farmer's spot is a block above
 # its ground and his house isn't there (he floated, user), so he and his door are left out; the

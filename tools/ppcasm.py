@@ -23,8 +23,8 @@ D_OPS = {"lwz": 32, "lbz": 34, "stw": 36, "stwu": 37, "stb": 38, "lmw": 46, "stm
          "lfs": 48, "stfs": 52, "lfd": 50, "stfd": 54}
 IMM_OPS = {"addi": 14, "addis": 15, "mulli": 7, "ori": 24, "oris": 25, "xori": 26, "xoris": 27,
            "andi.": 28, "cmpwi": 11, "cmplwi": 10}
-X_OPS = {"add": 266, "subf": 40, "mullw": 235, "and": 28, "andc": 60, "or": 444, "xor": 316, "slw": 24,
-         "srw": 536, "lwzx": 23, "stwx": 151, "lfsx": 535, "stfsx": 663}
+X_OPS = {"add": 266, "subf": 40, "mullw": 235, "divwu": 459, "and": 28, "andc": 60, "or": 444, "xor": 316,
+         "slw": 24, "srw": 536, "lwzx": 23, "stwx": 151, "lfsx": 535, "stfsx": 663}
 FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59, 18),
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),
           "fmul": (63, 25), "fmadd": (63, 29)}
@@ -156,6 +156,9 @@ class Asm:
             ra, rs, n = reg(args[0]), reg(args[1]), num(args[2])
             sh, mb, me = {"slwi": (n, 0, 31 - n), "srwi": ((32 - n) % 32, n, 31)}.get(op.rstrip("."), (0, n, 31))
             return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | op.endswith(".")
+        if op in ("mftb", "mftbu"):                       # the time base, lower / upper word (TBR 268 / 269)
+            tbr = 268 if op == "mftb" else 269
+            return (31 << 26) | (reg(args[0]) << 21) | (((tbr & 31) << 5 | tbr >> 5) << 11) | (371 << 1)
         if op == "mfcr":
             return (31 << 26) | (reg(args[0]) << 21) | (19 << 1)
         if op == "mtcrf":                                # mtcrf FXM, rS
