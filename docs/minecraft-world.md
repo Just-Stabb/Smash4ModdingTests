@@ -641,6 +641,22 @@ was lit before). v15d:
 
 `build/minecraft_world_v15d_tests.zip`: test A (v15c A, new pictures), C (the shadow catcher).
 
+User: C loads with shadows, but the catcher is drawn opaque white (8 / 0 isn't a multiply in
+Smash 4; no model of the game's we have uses it, or any multiply: the blends found are 0/0, 0/1,
+1/1, 1/2, 3/1, 4/0, 5/1, 5/2). The catcher is removed. And the stars "look 3d and incorrect".
+v15e:
+- **Stars**: each is a 3 x 3 texel square, which without mips and at 1.5 came out as big bright
+  blocks (on Ultimate's planes at different depths, so moving apart: "3d"). Ultimate samples them
+  with mips, dim (colorSet 0.03 x 1.5): pinpricks. Now each star's brightest texel only, at 1.0.
+- **Shadows, test D** (`--island-shader shadow`): the island on 0xA4001041 as in B, but lit by its
+  own light set (`ISLAND_LIT`, written into every light.bin record by `cycle_light`) instead of
+  Battlefield's: the sun 0.35, a sky light from above 0.15, a fill from the camera 0.15, the
+  ambient 0.7, for the baked shading's top 1.21, front 0.97, sides 0.77, bottom 0.7 (the bake:
+  1.22, 0.95, 0.86 / 0.75, 0.75), scaled and tinted each frame by the island's curve; the vertex
+  colours its corner shading only (`to_nud(..., bake=False)`), and no gain curve on it.
+
+`build/minecraft_world_v15e_tests.zip`: test A (unlit), D (shadows, own lights).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
