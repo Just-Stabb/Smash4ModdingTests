@@ -25,14 +25,16 @@ stc_c_Ring_set (everything using the block atlas), stc_k_BG_most_far2 (the backd
 stc_BG_most_far2_1_set (the sky, with stc_o_BG_clouds_set's model.xmb: its light set, draw range
 and order). Every other folder keeps Battlefield's files with the model's indices zeroed
 (nud.hidden: nothing drawn, its .mta / skeleton still match it). Only what Battlefield's own
-models have: its material setups (material()), its vertex layout, NTWU textures as its single-mip
+models have: its shaders (material flags, with its vertex layout), NTWU textures as its single-mip
 ones (nut.write_ntwu). The first builds (NTP3 textures, an empty model in every folder, other
-material setups) froze the game while loading the models.
+material flags) froze the game while loading the models. The island is lit by the stage's lights,
+held at Battlefield's midday (still_light); the backdrop and sky are unlit, as Ultimate's.
 """
 import argparse
 import glob
 import os
 import shutil
+import struct
 import sys
 
 import numpy as np
@@ -57,6 +59,7 @@ CLOUD_ALPHA = 0.7                   # the cloud layer, seen from under it, would
 
 RING_SET, FAR_SET, SKY_SET = 'stc_c_Ring_set', 'stc_k_BG_most_far2', 'stc_BG_most_far2_1_set'
 SKY_XMB = 'stc_o_BG_clouds_set'     # Battlefield's clouds: the sky's draw settings
+DAY_FRAME = 945                     # Battlefield's light.bin: its most neutral midday frame
 
 
 # ---------------------------------------------------------------- Ultimate models
@@ -470,17 +473,22 @@ class Textures:
         return nut.write_ntwu(texs)
 
 
-# Battlefield's material setups (flags, source / destination blend, alpha test, culling), from its
-# melee models; anything else isn't proven to have a shader in the game
-OPAQUE = (0xA4001041, 0, 0, 0, 0, 1029)             # stc_c_Ring_set
+# material setups (flags, source / destination blend, alpha test, culling). The flags pick the
+# shader: only flags Battlefield's melee models have, with the vertex layout they have them with.
+# Blending and the alpha test are GPU states, not shaders (the unlit ones below add them to
+# Battlefield's unlit 0xA2001001).
+OPAQUE = (0xA4001041, 0, 0, 0, 0, 1029)             # stc_c_Ring_set (lit by the stage's lights)
 CUTOUT = (0xA4011001, 0, 0, 518, 128, 1029)         # stc_b_shadow_gareki_set (also with culling 0)
 BLEND = (0xA4001041, 1, 1, 0, 0, 1029)              # stc_s_ring_kusa_set
-UNLIT = (0xA2001001, 0, 0, 0, 0, 1029)              # stc_a_surinuke_set
+UNLIT = (0xA2001001, 0, 0, 0, 0, 1029)              # stc_a_surinuke_set (texture x vertex color)
+UNLIT_CUTOUT = (0xA2001001, 0, 0, 518, 128, 1029)
+UNLIT_BLEND = (0xA2001001, 1, 1, 0, 0, 1029)
+CULLABLE = (CUTOUT, UNLIT_CUTOUT)                   # take Ultimate's culling; the others cull back faces
 
 
 def material(setup, tex_id, cull=1029):
     flags, src, dst, af, ref, c = setup
-    m = nud.Material(flags, src, dst, af, ref, cull if setup == CUTOUT else c)
+    m = nud.Material(flags, src, dst, af, ref, cull if setup in CULLABLE else c)
     m.textures.append(dict(hash=tex_id, map_mode=0, wrap_s=1, wrap_t=1, min_f=3, mag_f=2, mip=6, unk=0, unk2=0))
     m.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
                ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
@@ -507,11 +515,11 @@ def to_nud(parts, tex, kind, sky=False):
         col = p['col'] if p['col'] is not None else np.full((len(p['pos']), 4), 0.502)
         col = np.clip(np.round(col * 253), 0, 255)
         if sky:
-            # Ultimate tints the sky in its shader; a day gradient instead
+            # Ultimate tints the sky in its shader; a day gradient instead (127 = 1.0)
             d = p['pos'] / (np.linalg.norm(p['pos'], axis=1, keepdims=True) + 1e-9)
             t = np.clip(d[:, 1:2] * 3, 0, 1)
             if p['label'] == 'sfx_sky_color':
-                col[:, :3] *= (SKY_HORIZON * (1 - t) + SKY_TOP * t) * 2
+                col[:, :3] = np.round(127 * (SKY_HORIZON * (1 - t) + SKY_TOP * t))
             elif p['label'].startswith('sfx_cloud'):
                 col[:, 3] = 127 * CLOUD_ALPHA
             col = np.clip(col, 0, 255)
@@ -520,13 +528,13 @@ def to_nud(parts, tex, kind, sky=False):
         atlas = tname.startswith('all_blocks')
         cloud = sky and p['label'].startswith('sfx_cloud')
         cull = 1029 if p['cull'] == 1029 else 0
-        if p['blend'] and not atlas or cloud:
-            setup = BLEND
-        elif atlas or kind == 'bg' and not sky:
-            setup = CUTOUT
+        blend = p['blend'] and not atlas or cloud
+        if kind == 'bg':
+            # the backdrop and sky: Ultimate's are unlit (lighting baked in their textures)
+            setup = UNLIT_BLEND if blend else UNLIT if sky else UNLIT_CUTOUT
         else:
-            setup = UNLIT if kind == 'bg' else OPAQUE
-        if cull == 0 and setup != CUTOUT:      # Battlefield's other setups all cull back faces
+            setup = BLEND if blend else CUTOUT if atlas else OPAQUE
+        if cull == 0 and setup not in CULLABLE:
             poly.idx = two_sided(poly.idx)
         poly.materials = [material(setup, tid, cull)]
         if len(poly.pos) >= 0x10000:
@@ -547,6 +555,22 @@ def write_set(outdir, meshes, tex):
                         used.append(n)
     open(outdir + '/model.nud', 'wb').write(nud.write(meshes))
     open(outdir + '/model.nut', 'wb').write(tex.nut(used))
+
+
+def still_light(path, frame=DAY_FRAME):
+    """Battlefield's animation/light.bin (its day / night cycle: night at frame 0, midday around
+    945, sunset around 1400) with every frame set to `frame`'s, so the stage stays at midday.
+    Layout: 'LIGH', version, frame count, ?, the per-frame records' offset; five RGB tracks (3 bytes
+    a frame) from the offsets at 0x14; then one fixed-size record a frame. Only values change."""
+    d = bytearray(open(path, 'rb').read())
+    magic, _, n, _, rec = struct.unpack('>4sIIII', d[:20])
+    assert magic == b'LIGH'
+    size = (len(d) - rec) // n
+    assert rec + size * n == len(d)
+    for o in struct.unpack('>5I', d[0x14:0x28]):
+        d[o:o + 3 * n] = d[o + 3 * frame:o + 3 * frame + 3] * n
+    d[rec:] = d[rec + size * frame:rec + size * (frame + 1)] * n
+    return bytes(d)
 
 
 # ---------------------------------------------------------------- stage
@@ -591,6 +615,10 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels):
     for name, parts, kind, is_sky in ((RING_SET, near, 'lit', False), (FAR_SET, far, 'bg', False),
                                       (SKY_SET, sky, 'bg', True)):
         write_set('%s/%s' % (model_dir, name), to_nud(parts, tex, kind, is_sky), tex)
+
+    light = out_dir + '/animation/light.bin'
+    data = still_light(light)
+    open(light, 'wb').write(data)
 
     ucols = ult_collisions(d)
     solid = [c for c in ucols if not c['through']]

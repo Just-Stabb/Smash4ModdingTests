@@ -7,7 +7,7 @@ New stage slots get the game's generic stage class (StageBaseCafe), which loads 
 frame (docs/minecraft-world.md "Stage code"). This adds that for one stage kind:
 
 - the generic update (0x02D1CF9C) calls the base update with `bl 0x031415C8` at 0x02D1CFDC; that
-  call goes to UPDATE, which makes it and then, if the stage's kind (stage + 0xCC) is KIND, adds
+  call goes to UPDATE, which makes it and then, if the stage's kind (stage + 0, KIND_AT) is KIND, adds
   the frame rate (f1, as the stage's animations do) to a frame counter wrapping at PERIOD and moves
   the collision of the link LINK (0x03142954(stage, LINK): the link whose subname is
   "LINK__<anything>__") to (x, y) = (AX * tri(p), AY * tri(p + 1/4)), p = counter / PERIOD,
@@ -39,6 +39,9 @@ LINK_GROUNDS = 0x03142954      # (stage, name) -> the link's ground list or 0
 MOVE_GROUNDS = 0x0315EF88      # (grounds, &(x, y), f1 rotation)
 
 KIND = 0x80                    # NewStage01, normal play
+KIND_AT = 0x00                 # the stage's kind: init (vtable +0x14, 0x02D1A760) copies the stage
+                               # manager's settings (kind first) to the stage's start; +0xCC is
+                               # the manager's +0xF4 (0 / 1 / -1), which the first test read
 LINK = 'mctest'
 PERIOD = 240.0                 # frames (4 s)
 AX, AY = 25.0, 12.0            # half the swing, x and y
@@ -76,7 +79,7 @@ update:
         fmr f31, f1
         bl 0x%(base)08X
         stw r3, 0x10(r1)
-        lwz r0, 0xCC(r31)
+        lwz r0, %(kind_at)d(r31)
         cmpwi r0, %(kind)d
         bne done
         lis r30, data@ha
@@ -141,7 +144,7 @@ data:
         .float %(ay)r
         .float 0
 """ % dict(first=SETUP_FIRST, setup1=SETUP + 4, base=BASE_UPDATE, kind=KIND, lookup=LINK_GROUNDS,
-           move=MOVE_GROUNDS, period=PERIOD, ax=AX, ay=AY))
+           move=MOVE_GROUNDS, period=PERIOD, ax=AX, ay=AY, kind_at=KIND_AT))
     for i in range(0, len(name), 4):
         a.asm('.word 0x%08X' % int.from_bytes(name[i:i + 4], 'big'))
     words = a.words()

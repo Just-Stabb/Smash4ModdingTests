@@ -1,7 +1,8 @@
 # Minecraft World (Smash Ultimate) on NewStage01
 
-Status: **v5 built, not tested in game yet.** v1-v4 froze while loading their models (user's
-tests; see "Freeze"); v5 uses only forms Battlefield's own loaded models have. The whole normal-play stage (not the Battlefield form) converted
+Status: **loads in game (v5, user), normal play and Omega**; v6 (lighting, below) not tested yet.
+v1-v4 froze while loading their models (see "Freeze"); v5 uses only forms Battlefield's own loaded
+models have. The whole normal-play stage (not the Battlefield form) converted
 from Ultimate's `stage/pickel_world` (the user's dump, with its `param` folders) into the
 `NewStage01` slot (`docs/stage-expansion.md`), normal play and Omega, with Ultimate's own collision,
 spawns, camera, blast zones, item areas and breakable-block layouts.
@@ -25,9 +26,10 @@ Deliverables (git-ignored `build/`):
   "Minecraft World" name banner.
 - `minecraft_world_biomes.zip`: every other biome / hazards combination (`<biome>_hazards_on|off`):
   the three model folders and `NewStage0100.lvd` that differ; copy one over `stage/melee/NewStage01`.
-- `minecraft_world_tests.zip`: `5_moving_platform` (the moving-platform test on v5, with its RPX)
-  and, if v5 still freezes, `1_battlefield_hidden` (Battlefield's NewStage01 with every model
-  hidden) and `2_ring_only` / `3_backdrop_only` / `4_sky_only` (one v5 folder each, over 1).
+- `moving_platform_test.zip`: the moving-platform test (below) on v6, with its RPX.
+- `minecraft_world_tests.zip` (v5): the first moving-platform test and the freeze bisect
+  (`1_battlefield_hidden`: Battlefield's NewStage01 with every model hidden; `2_ring_only` /
+  `3_backdrop_only` / `4_sky_only`: one v5 folder each), not needed since v5 loaded.
 
 ## Ultimate's files
 
@@ -90,19 +92,28 @@ top 47 against 59 / 47.3; ledges +-78 / +-80).
   (same orientation in both games, checked by rendering Battlefield's own models), triangle lists.
   Meshes under a bone (doors) are moved by the skeleton. The blocks are placed from the breakable
   file (every block, every depth) and merged into one mesh a material.
-- **Materials**: only setups Battlefield's melee models have (flags, vertex layout, blending,
-  alpha test, culling, sampler), from `tools/minecraft_world.py`'s `OPAQUE` (`0xA4001041`, its
-  ring), `CUTOUT` (`0xA4011001` alpha test >= 128, its rubble; the block atlas, the panorama),
-  `BLEND` (`0xA4001041` blended, its grass; clouds, glass, sun) and `UNLIT` (`0xA2001001`, its
-  platforms; the sky dome). Faces Ultimate draws from both sides are doubled (reversed copies)
-  outside `CUTOUT`, as Battlefield's other setups cull back faces. Linear filtering, as all of
-  Battlefield's.
+- **Materials**: the flags (which pick the shader) only as Battlefield's melee models have them,
+  with their vertex layout: `0xA4001041` (its ring; lit by the stage's lights), `0xA4011001` (its
+  rubble; lit, alpha test >= 128: the block atlas) and `0xA2001001` (its platforms; unlit: texture x
+  vertex color). The island is lit (`OPAQUE`, `CUTOUT`, `BLEND`); the panorama, sky dome, clouds
+  and sun are unlit (`UNLIT`, `UNLIT_CUTOUT`, `UNLIT_BLEND`), as Ultimate's (their lighting is in the
+  texture): v5 lit the panorama and clouds and doubled the sky's vertex colors, and the user saw
+  the background "extremely bright". Blending (`1 / 1`: alpha, one minus alpha) and the alpha test
+  are GPU states, not shaders, so v6 adds them to `0xA2001001`. Faces Ultimate draws from both
+  sides are doubled (reversed copies) except with the alpha test (Battlefield's has culling 0).
+  Linear filtering, as all of Battlefield's.
+- **Light**: Battlefield's `animation/light.bin` is its day / night cycle (2401 frames: night at
+  0, dawn, midday around 945, sunset around 1400, night again; light colors, directions, fog), which
+  the user saw as wrong lighting. `still_light` sets every frame to frame 945 (the most neutral
+  white, light from above): same file layout ('LIGH', version 5, frame count, ?, the per-frame
+  records' offset; five RGB tracks of 3 bytes a frame; one 1988-byte record a frame).
 - **Textures**: NTWU, one mip, BC1 (opaque) or BC3, powers of two from 64 to 2048, IDs
   `0x2000F001`... (Battlefield's are `0x2000xxxx` below that). The block atlas (512x512) is 4x larger
   with nearest pixels (2048x2048 BC3): each source pixel is one 4x4 block, exact in BC, and sharp
   under linear filtering. The panorama 2048x1024 BC3.
 - **Sky**: Ultimate colors the sky dome in its shader (its vertex colors are only shading), so the
-  dome gets a fixed day gradient. Clouds at 70% opacity (from under the layer they'd hide most of
+  dome gets a fixed day gradient (Minecraft's day sky, `(0.47, 0.65, 1.0)` at the top, as vertex
+  colors at 127 = 1.0). Clouds at 70% opacity (from under the layer they'd hide most of
   the sky). Sun kept; moon, stars and fog layers not.
 - **Model folders**: only Battlefield folders without a material animation (`model.mta`) get new
   models: `stc_c_Ring_set` (everything on the block atlas), `stc_k_BG_most_far2` (the panorama),
@@ -167,17 +178,30 @@ it would have to be rewritten for Smash 4. What Smash 4 offers for it:
   `StageBaseEnd`) never calls these, so rigged collision on NewStage01 stays where the lvd puts it.
   Its update, `0x02D1CF9C(stage, f1 = frame rate)`, calls the base update at `0x02D1CFDC`
   (`bl 0x031415C8`): a hook there can run NewStage01's own code every frame (the stage kind is at
-  `stage + 0xCC`; other generic stages must be left alone).
+  `stage + 0`: `app::StageManager` (`0x031653F4`) makes the stage, then calls its init, vtable
+  (`stage + 0x111C`) `+0x14` = `0x02D1A760`, which copies the manager's settings (`+8`, the kind
+  first) to the stage's start and the manager's `+0xF4` (0 / 1 / -1, not the kind) to `+0xCC`;
+  other generic stages must be left alone).
 
 So biome rotation can be: every biome's models in `dyr_` model folders whose animations show only
 the current biome, every biome's collision rigged under its own subname, and a cave on that hook
 counting frames (adding `f1`, as the animations do) that moves the inactive biomes' collision away
 (`0x0315EF88`) and the active one into place.
 
-## Moving-platform test (not tested in game yet)
+## Moving-platform test
 
-`build/minecraft_world_tests.zip`'s `5_moving_platform`: the full RPX (the standard build plus
-`tools/stage_script_cave.py`) and the files `tools/moving_platform_test.py` adds to the v5 Plains
+First try (user, `minecraft_world_tests.zip`'s `5_moving_platform`): the hay bales move, their
+collision stays a drop-through platform where the lvd puts it. So the stage plays a `dyr_` model's
+animation, and the cave didn't move the link: it checked the kind at `stage + 0xCC`, which isn't
+the kind (above), so it never ran. Every other step was checked again in the game's code: the
+entry's `unk1` (runtime `+0xD4`) is 0, so the collision is filed in the link manager at `+0x1C8`
+that the lookup searches (non-zero: `+0x1CC`'s, with `unk2` copied to the link); the short name is
+`mctest`; the lookup returns the link's ground list when it isn't empty; `0x02D59E40` sets the
+position and the dirty flag. Second try: `build/moving_platform_test.zip`, the kind read at
+`stage + 0` (the RPX differs from the first one's in that word only), not tested yet.
+
+`build/moving_platform_test.zip`: the full RPX (the standard build plus
+`tools/stage_script_cave.py`) and the files `tools/moving_platform_test.py` adds to the v6 Plains
 build (its platform model, animation and lvd). A 3-block hay bale platform circles over the middle of
 the island (x -35 to 15, y 38 to 62, a 4-second loop): its model by animation, its drop-through
 collision by the cave.

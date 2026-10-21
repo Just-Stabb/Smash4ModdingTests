@@ -75,7 +75,8 @@ def main():
           mu.reg_read(UC_PPC_REG_PC) == C.SETUP + 4)
 
     def frame(kind, rate):
-        mu.mem_write(STAGE + 0xCC, struct.pack('>I', kind))
+        mu.mem_write(STAGE + C.KIND_AT, struct.pack('>I', kind))
+        mu.mem_write(STAGE + 0xCC, struct.pack('>I', 0))      # the manager's slot, not the kind
         mu.reg_write(UC_PPC_REG_3, STAGE)
         mu.reg_write(UC_PPC_REG_FPR1, f2i(rate))
         mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
