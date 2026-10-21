@@ -884,6 +884,10 @@ burning mobs not Minecraft's and not animating, nor the puff.
   rows of the horizon). Ultimate's bowl is a little *behind* the panorama (rim 8825, panorama
   8804): now there too (`FOG_SCALE` 1.01), read as it is: the hills hide it, only their edges
   catch a little haze (rendered offline for plains, taiga, savanna).
+- **Fire (v17e)**: in game (user) the flipbook flickered and lit the mob up too much: now blended as
+  the puff (source alpha, inverse; was the flames' additive), and each frame stays shown on the
+  next one's first frame, so a frame sampled between two keys (scaling one down and the next up)
+  never leaves a gap.
 - **Animals**: Ultimate's 30 / 30 / 30 read as weights: a kind every match (v17c: none 10%).
 - **Villagers**: one is built only where its house's door is (`door_<villager>_set`, the farmer's
   named "firmer"): snowy tundra has no farmer's house (Ultimate's model has only the butcher's

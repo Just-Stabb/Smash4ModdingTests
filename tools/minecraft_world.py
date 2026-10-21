@@ -1454,13 +1454,17 @@ def burn_fx(meshes, bones, tracks, curves, kind, hip, start, end, at, tex, effec
     # its place only: the quads face the camera however the mob turns (its turn, about the
     # vertical, barely moves the hip's place). The mob's bind pose: feet at 0, about 8 wide and
     # 17 high (zombie, skeleton): the fire over it, in front and behind
+    # v17e: each frame also shown on the next one's first frame (v17d's flickered in game, user: a
+    # frame sampled between two keys scaled the old one down and the new one up), and blended as
+    # the puff is (source alpha, inverse) instead of the flames' additive (it lit the mob up, user)
     frame = f // FIRE_STEP % FIRE_FRAMES
+    shown = np.r_[frame[:1], frame[:-1]]
     for k in range(FIRE_FRAMES):
         bones.append(('%s_fire%d' % (hip, k), 0))
-        tracks[bones[-1][0]] = (pos, None, scl * (on & (frame == k))[:, None])
+        tracks[bones[-1][0]] = (pos, None, scl * (on & ((frame == k) | (shown == k)))[:, None])
         u = (k / FIRE_FRAMES, (k + 1) / FIRE_FRAMES)
         meshes.append(sprites([((0, 10, 3.5), 13, 22, u), ((0, 11, -2.5), 12, 20, u)],
-                              tex.id('pickel_fire_strip'), BF_FLAME, len(bones) - 1))
+                              tex.id('pickel_fire_strip'), BF_GLOW, len(bones) - 1))
     hurt = curves['island'].copy()
     red = on & (((f - start) % HURT_PERIOD < HURT_FRAMES) | (f > end - HURT_DEATH))
     hurt[red, :3] *= HURT_TINT
