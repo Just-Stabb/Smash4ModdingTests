@@ -488,7 +488,24 @@ mixed the eyes (16 pixels off by up to 122 / 255) and linear filtering blurred t
 them 4x larger with nearest pixels as the block atlas (`pixel_art`): each source pixel one BC block,
 within 5 / 255 of the source.
 
-`build/minecraft_world_v13_test.zip` (v13b).
+v13b in game (user): the breakable blocks a little lighter than the island's; the skyline's cutout
+edge showing stray green pixels and an odd resolution; every torch on the same timing.
+- Blocks: the island mesh has Minecraft's corner shading in colorSet1 (mean 0.39), the breakable
+  blocks next to none (0.49): Ultimate shades them at run time (`ao_depth_table`). `block_ao` gives
+  them Minecraft's smooth-lighting levels from the solid cells around each face corner (the
+  island's cells from its axis-aligned faces, `solid_cells`, and the blocks'), at the island mesh's
+  own values a level (its vertices' colorSet1 by level, computed the same way: 0.5 / 0.31 / 0.18
+  / 0.15, `AO_LEVELS`).
+- Skyline: the panorama slices (1800 x 1600 source pixels) were scaled to 2048 x 2048 (Lanczos),
+  which rang at the cutout edge (stray bright pixels over the trees); now they're kept pixel for
+  pixel in the slice texture's corner (`SLICE`, UVs scaled to it; the edges repeated outwards so
+  filtering there stays solid).
+- Torches: each its own flicker periods and amplitudes and its own smoke life and height
+  (`FLICKER_PERIODS`, `FLICKER2_PERIODS`, `SMOKE_LIVES`: divisors of `TORCH_LOOP`).
+- Pixel art (`pixel_art`) now goes straight to the power of two at or above 4x with nearest pixels
+  (the crops' 164 x 72 went 4x to 656 and then down to 512, dropping columns).
+
+`build/minecraft_world_v13_test.zip` (v13c).
 
 ## Freeze (user) and tests
 

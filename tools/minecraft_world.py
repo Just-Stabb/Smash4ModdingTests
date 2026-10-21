@@ -95,6 +95,12 @@ TORCH_SET = 'dyr_d_mid_front01_set'
 TORCH_ROW_END = 6
 TORCH_LOOP = 240                    # frames; the flicker periods and the smoke's life divide it
 SMOKE_LIFE, SMOKE_RISE, SMOKE_SHRINK = 60, 7.0, 0.7
+# each torch its own rhythm (v13 had every flame on the same two periods and every puff on the
+# same life, only their phases apart: the user saw them all move in step, Ultimate's don't):
+# periods and lives drawn from divisors of TORCH_LOOP, so the loop still closes
+FLICKER_PERIODS = (16, 20, 24, 30, 40)
+FLICKER2_PERIODS = (8, 10, 12, 15)
+SMOKE_LIVES = (40, 48, 60, 80)
 FLAME_SIZE, SMOKE_SIZE = 3.0, 2.5
 SMOKE_GREY, SMOKE_ALPHA = 0.45, 0.8
 SKY_GRADIENT = 'sky_gradient'       # a made texture: the day sky from the top (v 0) to the horizon
@@ -284,6 +290,61 @@ def breakable_blocks(src, index, labels):
     y [10y, 10y + 10], z [10z - 5, 10z + 5]; flags 1: throughable, under a pass-through floor)"""
     d = ult_prc('%s/normal/param/pickel_world_breakable_%02d.stdat' % (src, index), labels)
     return [(b['kind'], b['x'], b['y'], b['z'], b['flags']) for b in d['blocks']]
+
+
+# Minecraft's corner shading for the breakable blocks: Ultimate's island mesh has it in colorSet1,
+# its breakable blocks don't (Ultimate shades them at run time, ao_depth_table 200 / 128 / 64 / 0),
+# so ours were lighter than the island around them (user). A face corner's level counts the solid
+# cells beside it on the face's open side (Minecraft's smooth lighting: two sides, or the sides and
+# the corner); the colorSet1 a level, as the island mesh has them (medians of its vertices by level,
+# computed the same way): 3 (open) 0.5, 2 0.31, 1 0.18, 0 0.15
+AO_LEVELS = (0.15, 0.18, 0.31, 0.5)
+
+
+def _cell(p):
+    """the 10-unit cell of a point (breakable_blocks' cells: x and y from 10 n, z centred on 10 n)"""
+    return int(np.floor(p[0] / 10 + 1e-6)), int(np.floor(p[1] / 10 + 1e-6)), int(np.round(p[2] / 10))
+
+
+def solid_cells(parts):
+    """the cells behind the parts' axis-aligned faces (the island is made of 10-unit blocks)"""
+    out = set()
+    for p in parts:
+        if p['nrm'] is None:
+            continue
+        for t in p['idx'].reshape(-1, 3):
+            n = p['nrm'][t].mean(0)
+            a = np.argmax(np.abs(n))
+            if abs(n[a]) < 0.95:
+                continue
+            d = np.zeros(3)
+            d[a] = np.sign(n[a])
+            out.add(_cell(p['pos'][t].mean(0) - d * 2.5))
+    return out
+
+
+def block_ao(p, solid):
+    """the part with colorSet1 from its face corners' levels (AO_LEVELS)"""
+    col = np.full((len(p['pos']), 4), 0.502) if p['col'] is None else p['col'].copy()
+    for t in p['idx'].reshape(-1, 3):
+        n = p['nrm'][t].mean(0)
+        a = np.argmax(np.abs(n))
+        if abs(n[a]) < 0.95:
+            continue
+        c = p['pos'][t].mean(0)
+        d = np.zeros(3, int)
+        d[a] = int(np.sign(n[a]))
+        layer = np.array(_cell(c + d * 2.5))
+        ax = [i for i in range(3) if i != a]
+        for v in t:
+            t1 = np.zeros(3, int)
+            t2 = np.zeros(3, int)
+            t1[ax[0]] = 1 if p['pos'][v][ax[0]] > c[ax[0]] else -1
+            t2[ax[1]] = 1 if p['pos'][v][ax[1]] > c[ax[1]] else -1
+            s1, s2 = tuple(layer + t1) in solid, tuple(layer + t2) in solid
+            corner = tuple(layer + t1 + t2) in solid
+            col[v, :3] = AO_LEVELS[0 if s1 and s2 else 3 - (s1 + s2 + corner)]
+    return dict(p, col=col)
 
 
 def block_parts(src, blocks):
@@ -598,14 +659,18 @@ class Textures:
             img[..., :3] = np.round(np.clip(self.sky, 0, 1) * 255)[:, None, :]
             img[..., 3] = 255
             return img
-        if '#' in name:                     # 'NAME#k': slice k of SPLIT, with the overlap, 2048x2048
-            from PIL import Image
+        if '#' in name:                     # 'NAME#k': slice k of SPLIT, with the overlap, unscaled (split_wide)
             base, k = name.split('#')
             img = nutexb.decode(nutexb.Nutexb(self.files[base]))
             w = img.shape[1]
             lo, hi = split_range(int(k))
             img = img[:, int(round(lo * w)):int(round(hi * w))]
-            return np.asarray(Image.fromarray(img).resize((2048, 2048), Image.LANCZOS))
+            out = np.zeros((SLICE, SLICE, 4), np.uint8)
+            h, sw = img.shape[:2]
+            out[:h, :sw] = img
+            out[h:, :sw] = img[-1]              # the edges repeated: filtering at them stays solid
+            out[:, sw:] = out[:, sw - 1:sw]
+            return out
         return nutexb.decode(nutexb.Nutexb(self.files[name]))
 
     def nut(self, names):
@@ -615,10 +680,13 @@ class Textures:
         texs = []
         for n in names:
             img = self.image(n)
-            if pixel_art(n):
-                img = img.repeat(4, 0).repeat(4, 1)
             h, w = img.shape[:2]
-            w2, h2 = (min(2048, max(64, 1 << (v.bit_length() - 1))) for v in (w, h))
+            if pixel_art(n):
+                # at least 4x, up to a power of two, nearest: no source pixel dropped (the crops'
+                # 164 x 72 went 4x to 656 and then down to 512, losing columns)
+                w2, h2 = (min(2048, 1 << (4 * v - 1).bit_length()) for v in (w, h))
+            else:
+                w2, h2 = (min(2048, max(64, 1 << (v.bit_length() - 1))) for v in (w, h))
             alpha = (img[..., 3] < 255).any()
             if alpha and not n.split('#')[0] in PREMULTIPLIED:
                 img = premultiply(img)
@@ -699,9 +767,16 @@ def split_range(k):
     return max(lo, 0.0), min(hi, 1.0)
 
 
-def split_wide(parts):
+SLICE = 2048                        # a panorama slice's texture (its source pixels unscaled in its corner)
+
+
+def split_wide(parts, size):
     """each part as SPLIT parts by its triangles' u (centroid), on the slices of its texture
-    (Textures 'NAME#k'): the panorama at 2 x 1800 source pixels across instead of 2048"""
+    (Textures 'NAME#k'): the panorama at 2 x 1800 source pixels across instead of 2048. size: the
+    texture's (w, h). v12 scaled each slice to 2048 x 2048 (the user saw the skyline's cutout
+    edge ragged, stray pixels over it); v13c keeps its pixels as they are, in the slice texture's
+    top left corner (UVs scaled to it)"""
+    w, h = size
     out = []
     for p in parts:
         tri = p['idx'].reshape(-1, 3)
@@ -714,7 +789,9 @@ def split_wide(parts):
             lo, hi = split_range(k)
             uv = p['uv'][used].copy()
             assert uv[:, 0].min() >= lo - 1e-6 and uv[:, 0].max() <= hi + 1e-6
-            uv[:, 0] = (uv[:, 0] - lo) / (hi - lo)
+            sw = int(round(hi * w)) - int(round(lo * w))
+            uv[:, 0] = (uv[:, 0] - lo) / (hi - lo) * sw / SLICE
+            uv[:, 1] *= h / SLICE
             q = dict(p, pos=p['pos'][used], nrm=None if p['nrm'] is None else p['nrm'][used],
                      col=None if p['col'] is None else p['col'][used], uv=uv, idx=idx.reshape(-1),
                      textures=['%s#%d' % (p['textures'][0], k)] + p['textures'][1:], sub=100 * (p['sub'] + 1) + k)
@@ -729,7 +806,9 @@ def far_parts(setdir):
     fog = [dict(p, pos=p['pos'] * 0.99, uv=np.c_[p['uv'][:, 0], 1 - p['uv'][:, 1]],
                 col=np.tile([0.5, 0.5, 0.5, 0.5 * FAR_FOG_ALPHA], (len(p['pos']), 1)))
            for p in parts if p['sub'] == 1]
-    return split_wide([p for p in parts if p['sub'] == 0]), fog
+    pano = [p for p in parts if p['sub'] == 0]
+    t = nutexb.Nutexb('%s/%s.nutexb' % (setdir, pano[0]['textures'][0]))
+    return split_wide(pano, (t.w, t.h)), fog
 
 
 def to_nud(parts, tex, kind, sky=False, cutout=False):
@@ -941,15 +1020,19 @@ def torch_meshes(points, tex, effect, animated=True):
         if not animated:
             continue
         ph = rng.uniform(0, 2 * np.pi, 2)
-        s = 1 + 0.08 * np.sin(2 * np.pi * frames / 20 + ph[0]) + 0.05 * np.sin(2 * np.pi * frames / 12 + ph[1])
+        p1, p2 = rng.choice(FLICKER_PERIODS), rng.choice(FLICKER2_PERIODS)
+        a1, a2 = rng.uniform(0.05, 0.1), rng.uniform(0.03, 0.06)
+        s = 1 + a1 * np.sin(2 * np.pi * frames / p1 + ph[0]) + a2 * np.sin(2 * np.pi * frames / p2 + ph[1])
         motion[bones[-1][0]] = (flame, s, np.zeros((len(frames), 3)))
-        start = int(rng.integers(SMOKE_LIFE))
+        life = int(rng.choice(SMOKE_LIVES))
+        start = int(rng.integers(life))
+        rise_to = SMOKE_RISE * rng.uniform(0.8, 1.2)
         for k in range(2):
             base = c + np.array([0.0, FLAME_SIZE * 0.6, 0.4])
             quad(base, SMOKE_SIZE, 'torch_smoke', [1, 1, 1, 1], UNLIT_BLEND, 'torch%d_smoke%d' % (i, k), BF_SMOKE)
-            u = ((frames + start + k * SMOKE_LIFE // 2) % SMOKE_LIFE) / SMOKE_LIFE
+            u = ((frames + start + k * life // 2) % life) / life
             rise = np.zeros((len(frames), 3))
-            rise[:, 1] = SMOKE_RISE * u
+            rise[:, 1] = rise_to * u
             motion[bones[-1][0]] = (base, 1 - SMOKE_SHRINK * u, rise)
     return meshes, bones, motion
 
@@ -1144,7 +1227,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         extra = []
         for e in EXTRA.get(biome, []):
             extra += load_parts('%s/normal/model/%s' % (src, e))
-        near = ring + (block_parts(src, blocks) if blocks else []) + plat + extra
+        bparts = block_parts(src, blocks) if blocks else []
+        if bparts:
+            solid = solid_cells(ring + plat) | {(x, y, z) for _k, x, y, z, _f in blocks}
+            bparts = [block_ao(p, solid) for p in bparts]
+        near = ring + bparts + plat + extra
         far, far_fog = far_parts('%s/normal/model/%s' % (src, FAR[biome]))
         sky_src = '%s/normal/model/far_common_set' % src
     else:
