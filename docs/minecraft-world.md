@@ -621,6 +621,26 @@ v15b in game (user): loaded; the flame squares gone, stars shown. Then (v15c):
 
 `build/minecraft_world_v15c_tests.zip`: test A (the island unlit, no shadows), B (on 0xA4001041).
 
+User: B has shadows, but the island's lighting is wrong (Battlefield's island lights, as when it
+was lit before). v15d:
+- **Shadow catcher** (`--island-shader catcher`, `shadow_catcher`): the island stays unlit (A),
+  and its upward faces are drawn again on 0xA4001041 (shadows) with a white texture, multiplied
+  over it (blend 8 / 0: destination colour, zero, per Smash Forge's NudEnums; no Battlefield
+  material uses it). Its light set (the island's, 4, every frame: `SHADOW_LIGHTS`) brings a
+  sunlit top face to 1 (main light 0.55 at 0.90 of it, ambient 0.5), so only the shadows darken;
+  the island's own curves still darken it at night. 0.02 in front of the island, behind its torch
+  light (0.05): it writes depth, and if drawn first it would hide that light.
+- **Stage-select pictures** ("less compressed", user): ours were Ultimate's 512 x 256 preview
+  enlarged slightly and BC3-compressed. Now rendered from the port (offline renderer, day, camera
+  (-15, 38, 220) to (5, 22, -110), fov 27) at 2048 x 1024, contrast 1.12 and saturation 1.25
+  towards Ultimate's preview, cropped as before (the crops found by matching the old pictures
+  against Ultimate's: stage_13 x 60-450 of 512, stage_10 64-450, stage_12 32-478 into 210 x 120
+  of 256 x 128, stage_30 128-382) and scaled down; stage_10 / 12 / 13 / 30 uncompressed RGBA8
+  (0x1A, which the game's own UI uses, e.g. lumen/popup2), stage_11 (1024 x 512) BC3. Same
+  texture IDs.
+
+`build/minecraft_world_v15d_tests.zip`: test A (v15c A, new pictures), C (the shadow catcher).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

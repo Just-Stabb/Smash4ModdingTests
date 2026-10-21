@@ -1469,6 +1469,48 @@ GAIN_FLAGS = None                   # a test: these flags instead of 0xA2001001 
 # TextureFlag.Shadow); our unlit 0xA3C01081 (0x81: glow, diffuse) has none, so no shadows (user).
 # Battlefield's own platform (stc_c_Ring_set) is 0xA4001041, lit. A test: the island on it
 ISLAND_FLAGS = None
+# v15c test B (the island on 0xA4001041): shadows, but its look back to Battlefield's lights (user).
+# A test: the island unlit as before, with a shadow catcher over its upward faces: 0xA4001041 on
+# white, multiplied over them (blend 8 / 0: destination colour, zero, Smash Forge's NudEnums), lit
+# by an island light set whose sunlit top face comes to 1 (SHADOW_LIGHTS: the main light 0.55 from
+# Ultimate's sun at 0.90 of it, ambient 0.5), so only the shadows darken; every frame the same (the
+# island's own curves darken it)
+SHADOW_CATCHER = False
+SHADOW_LIFT = 0.02                  # in front of the island, behind its torch light (0.05): it writes depth, and
+                                    # drawn first it would have hidden the torch light; the other way only a shadow
+SHADOW_LIGHTS = [(1, (-0.204, -0.903, -0.379), 0.0, 0.0, 0.55),
+                 (0, (0.0, -1.0, 0.0), 0.0, 0.0, 0.0),
+                 (0, (0.0, -0.259, -0.966), 0.0, 0.0, 0.0),
+                 (0, (0.0, 0.0, 0.0), 0.0, 0.0, 0.5)]
+
+
+def shadow_catcher(meshes, tex):
+    """the upward faces of meshes, white, multiplied (SHADOW_CATCHER)"""
+    out = []
+    for m in meshes:
+        for p in m.polygons:
+            if p.nrm is None:
+                continue
+            n = p.nrm / (np.linalg.norm(p.nrm, axis=1, keepdims=True) + 1e-9)
+            tri = np.asarray(p.idx).reshape(-1, 3)
+            tri = tri[(n[tri][:, :, 1] > 0.9).all(1)]
+            if not len(tri):
+                continue
+            keep, idx = np.unique(tri, return_inverse=True)
+            q = nud.Polygon()
+            q.pos = p.pos[keep] + n[keep] * SHADOW_LIFT
+            q.nrm = p.nrm[keep]
+            q.uvs = [np.zeros((len(keep), 2))]
+            q.col = np.full((len(keep), 4), 128.0)
+            q.idx = idx.reshape(-1)
+            mat = nud.Material(0xA4001041, 8, 0, 0, 0, 1029)
+            mat.textures.append(dict(hash=tex.id('default_white'), map_mode=0, wrap_s=1, wrap_t=1, min_f=3,
+                                     mag_f=2, mip=6, unk=0, unk2=0))
+            mat.props = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_diffuseColor', [1.0, 1.0, 1.0, 1.0]),
+                         ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
+            q.materials = [mat]
+            out.append(nud.Mesh(m.name + '_shadow', [q]))
+    return out
 # light.bin (the fighters' lights; their records every 3 frames): Battlefield's own records for the
 # same time of day (its cycle: night 1950-2400 and 0-100, dawn 200-500, day 800-1100, sunset
 # 1300-1800), as (our frame, its record, counted on past 2400)
@@ -1604,6 +1646,10 @@ def cycle_light(path, phases=LIGHT_PHASES, fighter=None):
             h, sat, _v = colorsys.rgb_to_hsv(*col[i])
             r[:116] = day
             r[:28] = struct.pack('>i6f', on, *v, h * 360, sat, val * bright[i])
+            if SHADOW_CATCHER:
+                o = 116 * (1 + ISLAND_LIGHT_SET)
+                for k, (on_, v_, h_, s_, val_) in enumerate(SHADOW_LIGHTS):
+                    r[o + 28 * k:o + 28 * k + 28] = struct.pack('>i6f', on_, *v_, h_, s_, val_)
     out += b''.join(bytes(r) for r in recs)
     return bytes(out)
 
@@ -1746,6 +1792,8 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             meshes += torch                 # unbound, the island's alpha-tested unlit setup
         if name == RING_SET and curves and points:
             meshes += torch_light(meshes, points)
+        if name == RING_SET and SHADOW_CATCHER:
+            meshes += shadow_catcher([m for m in meshes if getattr(m, 'gain', None) == 'island'], tex)
         if name == FAR_SET and curves:
             for m in to_nud(pano_glow(far_dir, tex), tex, 'bg'):
                 for poly in m.polygons:
@@ -1846,14 +1894,16 @@ def main():
     ap.add_argument('--daynight', default='on', choices=('on', 'off'), help="Ultimate's day / night cycle, or midday")
     ap.add_argument('--gain-shader', choices=('a2', 'a3c'), default='a3c',
                     help="a test: the curves on our unlit 0xA2001001 or on Battlefield's 0xA3C01081")
-    ap.add_argument('--island-shader', choices=('unlit', 'shadow'), default='unlit',
-                    help="a test: the island on Battlefield's platform shader 0xA4001041 (fighters' shadows)")
+    ap.add_argument('--island-shader', choices=('unlit', 'shadow', 'catcher'), default='unlit',
+                    help="a test: the island on Battlefield's platform shader 0xA4001041 (fighters' shadows), "
+                         "or unlit with a shadow catcher over it")
     ap.add_argument('--animal', default='sheep', choices=('sheep', 'cow', 'chicken', 'none'),
                     help="the two animals in the pen (Ultimate picks one of the three each time)")
     a = ap.parse_args()
-    global GAIN_FLAGS, ISLAND_FLAGS
+    global GAIN_FLAGS, ISLAND_FLAGS, SHADOW_CATCHER
     GAIN_FLAGS = 0xA3C01081 if a.gain_shader == 'a3c' else None
     ISLAND_FLAGS = 0xA4001041 if a.island_shader == 'shadow' else None
+    SHADOW_CATCHER = a.island_shader == 'catcher'
     for form in ('melee', 'end'):
         cols, blocks = build_form(a.src, '%s/%s/%s' % (a.base, form, a.name), '%s/stage/%s/%s' % (a.out, form, a.name),
                                   form, a.biome, a.hazards == 'on', a.yamlvd, a.labels, a.effect, a.torches, a.clouds,
