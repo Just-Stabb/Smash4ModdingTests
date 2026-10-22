@@ -1084,6 +1084,35 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     `0x0265F138(P, slot, is_stamina)` sets the damage display type. Names come from `0x0300074C`
     (8 player slots of 0x1D00 bytes, UTF-16 name at +0x66).
 
+## New ACMD commands (dispatch, Extra hitboxes)
+
+`tools/acmd_ext_cave.py` (cave `0x04B90000`–`0x04B94000`, extras table `0x04B92000`), user docs
+`docs/acmd-extra-commands.md`, test `tools/acmd_ext_test.py`.
+
+- **Loading:** the script loaders `0x02BEE1CC` / `0x02BEE2F8` replace each command CRC by its index.
+  - The index comes from the binary search `0x02BEE154` over `{crc, index}` at `0x100FAAB8` (584
+    pairs, sorted by CRC).
+  - Each loader steps over the command with the size table `0x100FA198` (words, header included).
+  - Hooks: the search's not-found `li r3, -1` (`0x02BEE1BC`) and the two size reads (`0x02BEE2C0`,
+    `0x02BEE3C0`).
+- **Running:** the interpreter `0x02BEE63C` calls `handler[index]` (table `0x10350ED8`, read at
+  `0x02BEE84C`; r12 is live there).
+  - Call: `handler(r3 module accessor, r4, r5 script state, r6 (+8: execute flag), r7 parameters)`.
+  - The handler moves the script on itself: `state +4 += size × 4` when `state +8 == -1`, then
+    returns 2.
+- **Hitbox data at hit time:** the hit info's `+0x44` is a 0x68-byte copy of the hitbox's data (copy
+  loop `0x02C213E4` from the slot, AttackModule vt `+0x194`), not a pointer. Its `+0x10` is the
+  knockback and `+0xC` the damage.
+- **Victim:** `0x02C25318`.
+  - Hitstun = knockback × common param `+0x2C` (0.4) in f28, stored at `0x02C25C88` to the damage
+    record `+0x30` (= `DamageModuleF(1)`).
+  - Final hitstop frames in r20 at `0x02C25A78` (after the slowdown rate).
+- **Attacker:** `0x02C2639C`. Hitstop before the rate in r3 at `0x02C2645C`, after it at `0x02C264C4`.
+- **DI isn't native.** Every fighter's MSC damage code (Kirby `func_885`) turns the launch angle by
+  `WorkModuleF(0, 0x0200011A)` (max DI angle) × the stick, then LSI (`0x0200011B` / `0x0200011C`) and
+  `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the
+  hitbox's SDI.
+
 ## Manifold cross-reference (other native findings)
 
 Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targets this same RPX
