@@ -222,6 +222,39 @@ All 84 checks pass on base + biome + monster + trait + kind_expand (supamario), 
 - The 164 RAM immediates come from a static scan: a site it missed still works for vanilla kinds
   (mirror), but would read stale or wrong values for kind 0x41.
 
+## v1 in game (user) and v2
+
+v1 (Supamario, a copy of Mario): on the character select, loads, plays, stable; effects shown. Then:
+- **Mario-only effects missing** (Fireball, F.L.U.D.D. water): an ACMD effect id `0xTKKnnnn` is
+  bank `0x300 + kind` (`0x400 +` the Final Smash's). The copy's body ACMD uses `0x341` (loaded), but
+  the articles load from `fighter/mario/` by the owner name and their ACMD uses Mario's `0x303`
+  (fireball, pump, pumpwater) / `0x403` (hugeflame), only loaded with a Mario in the match.
+  `tools/base_effects_cave.py` (cave `0x04B88000`): 13 call sites (effect folder add / remove, bank
+  register / release, the Final Smash folder and bank) re-aimed at wrappers that repeat the call
+  for the kind's base (`"effects_base": false` in a record turns it off); refcounted like two
+  players of one fighter. `base_effects_test.py` (50 checks, the game's own holder / slot code).
+  Limit: the bank slot table has 8 slots; a clone without its base uses two.
+- **Character select distorted**: it shows frame `num_<count>` of `ui/lumen/chara/chara.lm`
+  (`0x028BEE20`) and binds `face_001...` in list order. The user's (4XM honeycomb) file is clean
+  up to `num_057` only (their count); `tools/chara_layout.py` rewrites `num_058...num_096` in their
+  style. The "big portrait": the grid icon is `chr_10` (`0x028BE920` -> `0x02917A84`, set 0xA); v1
+  copied the unmodified (rectangular) art, so `add_fighter.py --ui` must be the UI the game shows
+  (the user's); `chr_12` added to `PORTRAIT_SETS`.
+- **Customs: no custom moves**: the owned-move save bits are keyed by character id, room for 51
+  ids (`0x02A51368`: `0x02A4D40C(id) * 12 + slot * 3 + variant - 1`, -1 past `0x264`; the prize
+  code's `0x02946468` the same). `tools/base_customs_cave.py` (cave `0x04B8A000`) rewrites both
+  entries to map a new id to its base's (59 -> 4): Supamario owns what Mario owns.
+  `tools/add_fighter_customs.py` adds the `MmenSpN__ / MmenSpI__<Name>_*` labels (menu.msbt) and
+  `spi_10_<Name>_*` icons. The "amiibo" look and the test-play softlock weren't explained (no id
+  or kind range checks found in the Customize set-up, `0x029BA004` / `0x029BA0C4` / `0x0301491C`).
+- v1's melee.msbt was built on the unmodified text; v2 on the user's (with the stage names).
+
+Build (v2): `rpx_patch.py build/cross_f.rpx OUT.rpx` with `biome_select_cave`, `monster_roll_cave`,
+`trait_badge_cave`, `kind_expand`, `base_effects_cave`, `base_customs_cave`; data
+`add_fighter.py --param USER_PARAM --param VANILLA_PARAM --ui USER_UI --msbt USER_melee.msbt`, then
+`add_fighter_customs.py --ui USER_UI --menu USER_menu.msbt --used-ui OUT/ui --used-ui USER_UI`,
+then `chara_layout.py USER_chara.lm OUT/ui/lumen/chara/chara.lm`.
+
 ## Open items
 
 - Save data keyed by character id (records, Classic clears): not traced. `record_vs_param.bin` (79
