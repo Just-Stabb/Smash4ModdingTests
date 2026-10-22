@@ -35,7 +35,9 @@ OUT_DIR    gets only the changed / new files, laid out like data/:
            every file the executable finds by the fighter's name renamed (FOLDER_PATHS below), the
            ACMD effect IDs moved to the new kind (0x3KK / 0x4KK, as Dr. Mario's 0x324 / Lucina's
            0x325 scripts do; --keep-effect-ids keeps the base's), and no article folders (weapons
-           load from their owner's folder, fighter/<base>/...; --articles copies them anyway).
+           load from their owner's folder, fighter/<base>/...; --articles copies them anyway), but
+           those of the record's "weapons" (its own weapon kinds, tools/weapon_expand.py): copied
+           with their names, their ACMD's effect IDs moved like the body's.
            --model DIR: take model/ from another copy of the base folder (DIR/model or DIR itself).
 
 Every edited param file is re-read with tools/s4param.py and checked: with the added rows taken
@@ -151,6 +153,8 @@ def load_records(a):
         rec['title'] = ui.get('title') or rec['ui_name']
         for k in ('series', 'costumes', 'sort'):
             rec[k] = ui.get(k)
+        # weapons of its own (tools/weapon_expand.py): {article: new weapon kind}
+        rec['weapons'] = {art: num(wk) for art, wk in (r.get('weapons') or {}).items()}
         out.append(rec)
     return out, src
 
@@ -454,6 +458,18 @@ def is_article(rel, base):
     return False
 
 
+def article_of(rel):
+    """the article a file of the fighter folder belongs to (None: the fighter's own)"""
+    p = rel.split('/')
+    if p[0] in ('model', 'motion') and len(p) > 2:
+        return p[1]
+    if p[:3] == ['script', 'animcmd', 'weapon'] and len(p) > 4:
+        return p[3]
+    if p[:2] == ['script', 'msc'] and len(p) > 3:
+        return p[2]
+    return None
+
+
 def new_rel(rel, r):
     """the file's path in the new folder: names the executable builds with %L / %C"""
     b, bc, n, nc = r['base'], r['bcap'], r['name'], r['cap']
@@ -533,14 +549,18 @@ def copy_folder(recs, a, log):
     renamed, kept_named, skipped, effects = [], [], [], []
     count = size = 0
     for rel, src in sorted(files):
-        if is_article(rel, r['base']) and not a.articles:
+        own = is_article(rel, r['base']) and article_of(rel) in r['weapons']
+        if is_article(rel, r['base']) and not a.articles and not own:
             skipped.append(rel)
             continue
         nrel = new_rel(rel, r)
         dst = os.path.join(dst_dir, nrel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         data = open(src, 'rb').read()
-        if not a.keep_effect_ids and rel.startswith('script/animcmd/body/') and rel.endswith('.bin'):
+        # its own weapons' ACMD (weapon_expand.py's kinds) gets its effect banks too; the base's weapons
+        # (copied with --articles but still the base's kinds) keep the base's
+        if not a.keep_effect_ids and rel.endswith('.bin') and (rel.startswith('script/animcmd/body/') or own and
+                                                                rel.startswith('script/animcmd/weapon/')):
             data2, n = move_effect_ids(data, r['bkind'], r['kind'])
             if n:
                 effects.append('%s: %d effect IDs 0x3%02X/0x4%02X.... -> 0x3%02X/0x4%02X....'
@@ -569,6 +589,13 @@ def copy_folder(recs, a, log):
         log.append('  kept their names (found by listing / hash / a name inside another file):\n    '
                    + '\n    '.join(kept_named))
     log.append('  effect IDs: ' + ('; '.join(effects) if effects else 'kept (--keep-effect-ids)' if a.keep_effect_ids else 'none'))
+    if r['weapons']:
+        log.append('  its own weapons (tools/weapon_expand.py; files under fighter/%s/, names kept): %s'
+                   % (r['name'], ', '.join('%s 0x%X' % (art, wk) for art, wk in sorted(r['weapons'].items(),
+                                                                                   key=lambda x: x[1]))))
+        missing = [art for art in r['weapons'] if not any(article_of(rel) == art for rel, _s in files)]
+        if missing:
+            log.append('  MISSING article folders in the base: %s' % ', '.join(missing))
     if skipped:
         log.append('  article folders not copied (%d files; weapons load from fighter/%s/ by owner name): %s'
                    % (len(skipped), r['base'], ', '.join(arts)))

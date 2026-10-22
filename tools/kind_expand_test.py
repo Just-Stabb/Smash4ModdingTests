@@ -297,8 +297,11 @@ def main():
         words = [P.w(d + 4 * i) for i in range(K.DESC_SIZE // 4)]
         bwords = [O.w(bd + 4 * i) for i in range(K.DESC_SIZE // 4)]
         check('  +0 = kind, +0x1C = 0', (words[0], words[7]), (r['kind'], 0))
+        art = info.get('article_lists', {}).get(r['kind'])
+        check('  +8 = %s' % ('its own article list (tools/weapon_expand.py)' if art else 'the base\'s article list'),
+              words[2], art if art else bwords[2])
         check('  other words = %s\'s' % info['names'][r['dkind']],
-              [i for i in range(K.DESC_SIZE // 4) if i not in (0, 1, 7) and words[i] != bwords[i]], [])
+              [i for i in range(K.DESC_SIZE // 4) if i not in (0, 1, 2, 7) and words[i] != bwords[i]], [])
         mi, bmi = words[1], bwords[1]
         check('  motion info: own main table, the rest = the base\'s',
               ([P.w(mi + 4 * i) for i in range(6)][0] != O.w(bmi), [P.w(mi + 4 * i) for i in range(1, 6)]),

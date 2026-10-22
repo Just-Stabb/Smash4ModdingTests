@@ -56,3 +56,31 @@ Open risks: native code testing specific weapon kinds inline (copies fail such c
 data-flow scan), the article callbacks reading the owner's specializer (fine while Supamario uses
 Mario's), writable descriptors in the grown code space on a real console, two article sets (Mario +
 Supamario) in one match sharing fixed load pools, CPU projectile handling by kind.
+
+## Built (unicorn-tested, not yet run in game)
+
+`tools/weapon_expand.py` (records' `weapons` maps in `tools/extra_kinds.json`, `weapon_capacity`
+0x1C0): Supamario's weapons `0x185`-`0x18A` = Mario's fireball, mantle, pump, pumpwater, hugeflame,
+dokan, owner "supamario". Cave `0x04B8C000`-`0x04B8F804`: Supamario's article list first (Mario's
+order; `kind_expand.py` sets its descriptor copy's `+8` to it via `weapon_expand.article_lists()`),
+the 4 name tables and 3 static tables with 0x1C0 entries (27 HA/LO pairs repointed, the `0x0320E5AC`
+bound raised), the 13 switches' bounds raised in place (and `0x02B83B84` / `0x02B83C74`) with a far
+jump after each `bgt` (its temp register one the original writes there) to a stub that dispatches old
+kinds as before and a new kind as its base (the descriptor getter returns the new kind's own
+descriptor), per new kind a descriptor copy (`+0x1C` = kind, own motion info, the pump's sub-article
+remapped to `0x188`) and param getter copies reading Supamario's vl slot (`+0x26B4`: fireball x2, pump,
+pumpwater, hugeflame). 122 words in place, 80 relocations moved. `weapon_expand_test.py`: 78 checks
+(every switch for every kind 0-0x1C0+, descriptors, sub-articles, param getters, the 14 table
+accessors, the path builders building `fighter/supamario/...`, the article list, no overlap).
+Inline weapon-kind checks: none found (12 candidates in weapon / Mario code, all count / null tests or
+a param-type switch; a heuristic scan).
+
+`add_fighter.py`: a record with `weapons` copies those articles' folders (names unchanged) and moves
+their weapon ACMD effect ids to the new kind's banks (fireball 8, pump 13, pumpwater 8, hugeflame 1).
+
+Kept: `base_effects_cave.py` (Mario's native code may still call effects by Mario's bank; set
+`"effects_base": false` once a game test shows nothing missing). Native per-kind code still reads
+Mario's vl slot at fixed offsets; the copies' bound params are Supamario's.
+
+Build: the eight scripts' outputs to `rpx_patch.py` (biome_select, monster_roll, trait_badge,
+kind_expand, base_effects, base_customs, series, weapon_expand).

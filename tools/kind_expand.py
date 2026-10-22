@@ -654,6 +654,12 @@ inc:    lwzx r4, r5, r0
 
     # ---- 7. per kind: descriptor, motion info, main motion table
     sw = {name: switch_targets(img, name) for name in SWITCHES}
+    # new fighters with weapons of their own (tools/weapon_expand.py): their article lists
+    articles = {}
+    if any(r.get('weapons') for r in json.load(open(spec_path))['kinds']):
+        import weapon_expand
+        articles = weapon_expand.article_lists(spec_path, rpx)
+    info['article_lists'] = articles
     for r in kinds:
         dsrc = sw['descriptor'][0][r['dkind']]
         # case: bl getter; getter: lis r3 / addi r3 / blr
@@ -667,7 +673,7 @@ inc:    lwzx r4, r5, r0
         m_at = B.alloc(MINFO_SIZE, 8)
         t_at = B.alloc(8 * mcount, 8)
         desc = bytearray(img.blob(dbase, DESC_SIZE))
-        struct.pack_into('>III', desc, 0, r['kind'], m_at, img.w(dbase + 8))
+        struct.pack_into('>III', desc, 0, r['kind'], m_at, articles.get(r['kind'], img.w(dbase + 8)))
         struct.pack_into('>I', desc, 0x1C, 0)
         mi = bytearray(img.blob(minfo, MINFO_SIZE))
         struct.pack_into('>I', mi, 0, t_at)

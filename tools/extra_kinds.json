@@ -7,7 +7,19 @@
       "cap": "Supamario",
       "base": "mario",
       "ai": "base",
-      "ui": {"id": 59, "name": "Supamario"}
+      "ui": {
+        "id": 59,
+        "name": "Supamario"
+      },
+      "weapons": {
+        "fireball": "0x185",
+        "mantle": "0x186",
+        "pump": "0x187",
+        "pumpwater": "0x188",
+        "hugeflame": "0x189",
+        "dokan": "0x18A"
+      }
     }
-  ]
+  ],
+  "weapon_capacity": "0x1C0"
 }
