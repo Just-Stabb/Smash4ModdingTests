@@ -1,0 +1,104 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,10,10,10,10,f32,Max cap to fully charge,Name 0/Name 2 = The number of arm swings to fully charge,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2631; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2635; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2640; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2648",m12[*].0
+,1,,0x05000001,2,0.5,1,2,f32,Damage per arm swing,first arm swing has no effect,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2631",m12[*].1
+,2,,0x05000002,1,2,2,1,f32,Charge level increment with each swings,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2641",m12[*].2
+14,0,Side B,0x06000000,0.5,1,0.5,0,f32,H speed multiplier on grounded startup,,medium,community,m13[*].0
+,1,,0x06000001,0,2,0.5,0,f32,V speed multiplier on grounded startup,lower = more,medium,community,m13[*].1
+,2,,0x06000002,0.67,1,0.5,0.67,f32,H speed multiplier on aerial startup,,medium,community,m13[*].2
+,3,,0x06000003,0.5,1,0.5,0,f32,V speed multiplier on aerial startup,,medium,community,m13[*].3
+,4,,0x06000004,0.3,4,0.8,0,f32,Gravity multiplier,,medium,community,m13[*].4
+15,0,Up B,0x07000000,0.7,2.9,0.7,0.6,f32,Aerial V initial speed,,medium,community,m14[*].0
+,1,,0x07000001,0.07,1,0.02,0.07,f32,Gravity multiplier,,medium,community,m14[*].1
+,2,,0x07000002,1.1,0,1.2,1.1,f32,Max ground speed,,medium,community,m14[*].2
+,3,,0x07000003,1.7,0.7,2,1.7,f32,Max air speed,,medium,community,m14[*].3
+,4,,0x07000004,0.034,0,0.034,0.034,f32,Ground acceleration,,medium,community,m14[*].4
+,5,,0x07000005,0.015,0,0.02,0.02,f32,Grounded friction,,medium,community,m14[*].5
+,6,,0x07000006,0.04,0.05,0.059,0.059,f32,Aerial acceleration,,medium,community,m14[*].6
+,7,,0x07000007,0.05,0.04,0.15,0.05,f32,Air friction,,medium,community,m14[*].7
+,8,,0x07000008,40,50,40,40,f32,Landing lag (frames),,medium,community,m14[*].8
+,9,,0x07000009,63,62,62,62,f32,Starting frame of SpecialHi animation when landing from SpecialAirHi,true = this - 1,medium,community,m14[*].9
+16,0,Down B,0x08000000,16,16,13,16,f32,Distance between hitboxes,"Z offset on flat surface: -17.5, -1.5, 14.5, 30.5
+Y offset on flat surface: 1.99 (not a param)",medium,community,m15[*].0
+,1,,0x08000001,6.5,9,6.5,6.5,f32,Z offset to middle of hitboxes,,medium,community,m15[*].1
+,2,,0x08000002,30,30,30,30,f32,Landing Lag during SpecialLwStart (frames),,medium,community,m15[*].2
+,0,Final Smash,0x14000000,0x7,,,,u32,[auto] read by native code (get_int at 0x02EDA774); meaning not traced,,low,reads: native 0x02EDA774 (fn 0x02EDA314),m16.0
+,1,,0x14000001,0x8,,,,u32,,,,,m16.1
+,2,,0x14000002,0x2,,,,u32,,,,,m16.2
+,3,,0x14000003,0x3,,,,u32,,,,,m16.3
+,4,,0x04000004,0.05,,,,f32,[auto] read by native code (get_float at 0x02EDA908); meaning not traced,,low,reads: native 0x02EDA908 (fn 0x02EDA314),m16.4
+,5,,0x04000005,1.025,,,,f32,[auto] read by native code (get_float at 0x02EDAD3C); meaning not traced,,low,reads: native 0x02EDAD3C (fn 0x02EDA314); native 0x02EDADAC (fn 0x02EDA314),m16.5
+,6,,0x04000006,1.72,,,,f32,[auto] read by native code (get_float at 0x02EDAD5C); meaning not traced,,low,reads: native 0x02EDAD5C (fn 0x02EDA314); native 0x02EDADD0 (fn 0x02EDA314),m16.6
+,7,,0x04000007,1.04,,,,f32,[auto] read by native code (get_float at 0x02EDAE30); meaning not traced,,low,reads: native 0x02EDAE30 (fn 0x02EDA314),m16.7
+,8,,0x04000008,2.1,,,,f32,[auto] read by native code (get_float at 0x02EDAE54); meaning not traced,,low,reads: native 0x02EDAE54 (fn 0x02EDA314),m16.8
+,9,,0x04000009,1.03,,,,f32,[auto] read by native code (get_float at 0x02EDAEB4); meaning not traced,,low,reads: native 0x02EDAEB4 (fn 0x02EDA314),m16.9
+,10,,0x0400000A,2.05,,,,f32,[auto] read by native code (get_float at 0x02EDAED4); meaning not traced,,low,reads: native 0x02EDAED4 (fn 0x02EDA314),m16.10
+,11,,0x1400000B,0x15,,,,u32,,,,,m16.11
+,12,,0x1400000C,0x6,,,,u32,,,,,m16.12
+,13,,0x1400000D,0x4,,,,u32,,,,,m16.13
+,14,,0x1400000E,0x6,,,,u32,,,,,m16.14
+,15,,0x1400000F,0x5,,,,u32,,,,,m16.15
+,16,,0x14000010,0x4,,,,u32,,,,,m16.16
+,17,,0x14000011,0x8,,,,u32,,,,,m16.17
+,18,,0x14000012,0x3,,,,u32,,,,,m16.18
+,19,,0x14000013,0x2,,,,u32,[auto] read by native code (get_int at 0x02ED96BC); meaning not traced,,low,reads: native 0x02ED96BC (fn 0x02ED95E0); native 0x02ED97A8 (fn 0x02ED95E0),m16.19
+,20,,0x14000014,0x2,,,,u32,,,,,m16.20
+,21,,0x14000015,0x3,,,,u32,,,,,m16.21
+,22,,0x14000016,0x0,,,,u32,,,,,m16.22
+,23,,0x14000017,0x280,,,,u32,[auto] read by native code (get_int at 0x02ED9D70); meaning not traced,,low,reads: native 0x02ED9D70 (fn 0x02ED9D18),m16.23
+,24,,0x14000018,0x4,,,,u32,,,,,m16.24
+,25,,0x14000019,0x3,,,,u32,,,,,m16.25
+,26,,0x1400001A,0x3,,,,u32,,,,,m16.26
+,27,,0x1400001B,0x2,,,,u32,,,,,m16.27
+,28,,0x0400001C,2,,,,f32,[auto] read by native code (get_float at 0x02EDAD00); meaning not traced,,low,reads: native 0x02EDAD00 (fn 0x02EDA314),m16.28
+,29,,0x0400001D,25,,,,f32,[auto] read by native code (get_float at 0x02ED9B24); meaning not traced,,low,reads: native 0x02ED9B24 (fn 0x02ED9AC4),m16.29
+,30,,0x0400001E,6,,,,f32,[auto] read by native code (get_float at 0x02ED96E0); meaning not traced,,low,reads: native 0x02ED96E0 (fn 0x02ED95E0); native 0x02ED97D0 (fn 0x02ED95E0),m16.30
+,31,,0x0400001F,1.7,,,,f32,,,,,m16.31
+17,0,soundeffect,0x12000000,0x28,,,,u32,,,,,m17[0].0
+,1,,0x02000001,1.4,,,,f32,,,,,m17[0].1
+,2,,0x02000002,2,,,,f32,,,,,m17[0].2
+,3,,0x12000003,0x10,,,,u32,,,,,m17[0].3
+,4,,0x12000004,0x4,,,,u32,,,,,m17[0].4
+18,0,Final Smash?,,0x1,,,,u32,"list of the 30-degree angles, beat sweetspot timing(frames)?",,medium,community,m18[0].0
+,1,,,0x0,,,,u32,,,,,m18[0].1
+,0,,,0x1F,,,,u32,,,,,m18[1].0
+,1,,,0x0,,,,u32,,,,,m18[1].1
+,0,,,0x3D,,,,u32,,,,,m18[2].0
+,1,,,0x0,,,,u32,,,,,m18[2].1
+,0,,,0x5B,,,,u32,,,,,m18[3].0
+,1,,,0x0,,,,u32,,,,,m18[3].1
+,0,,,0x79,,,,u32,,,,,m18[4].0
+,1,,,0x0,,,,u32,,,,,m18[4].1
+,0,,,0x97,,,,u32,,,,,m18[5].0
+,1,,,0x1,,,,u32,,,,,m18[5].1
+,0,,,0xB5,,,,u32,,,,,m18[6].0
+,1,,,0x0,,,,u32,,,,,m18[6].1
+,0,,,0xD3,,,,u32,,,,,m18[7].0
+,1,,,0x0,,,,u32,,,,,m18[7].1
+,0,,,0xF1,,,,u32,,,,,m18[8].0
+,1,,,0x0,,,,u32,,,,,m18[8].1
+,0,,,0x10F,,,,u32,,,,,m18[9].0
+,1,,,0x1,,,,u32,,,,,m18[9].1
+,0,,,0x12D,,,,u32,,,,,m18[10].0
+,1,,,0x0,,,,u32,,,,,m18[10].1
+,0,,,0x14B,,,,u32,,,,,m18[11].0
+,1,,,0x0,,,,u32,,,,,m18[11].1
+,0,,,0x169,,,,u32,,,,,m18[12].0
+,1,,,0x0,,,,u32,,,,,m18[12].1
+,0,,,0x187,,,,u32,,,,,m18[13].0
+,1,,,0x1,,,,u32,,,,,m18[13].1
+,0,,,0x1A5,,,,u32,,,,,m18[14].0
+,1,,,0x0,,,,u32,,,,,m18[14].1
+,0,,,0x1C3,,,,u32,,,,,m18[15].0
+,1,,,0x0,,,,u32,,,,,m18[15].1
+,0,,,0x1E1,,,,u32,,,,,m18[16].0
+,1,,,0x0,,,,u32,,,,,m18[16].1
+,0,,,0x1FF,,,,u32,,,,,m18[17].0
+,1,,,0x1,,,,u32,,,,,m18[17].1
+,0,,,0x21D,,,,u32,,,,,m18[18].0
+,1,,,0x0,,,,u32,,,,,m18[18].1
+,0,,,0x23B,,,,u32,,,,,m18[19].0
+,1,,,0x0,,,,u32,,,,,m18[19].1
+,0,,,0x259,,,,u32,,,,,m18[20].0
+,1,,,0x0,,,,u32,,,,,m18[20].1
+,0,,,0x277,,,,u32,,,,,m18[21].0
+,1,,,0x1,,,,u32,,,,,m18[21].1

@@ -1,0 +1,83 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,1,1,1,1,f32,Charge speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3175",m12[*].0
+,1,,0x05000001,5.5,5.5,3.5,5.5,f32,X offset,,medium,community,m12[*].1
+,2,,0x05000002,0.5,0.5,0.5,0.5,f32,Y offset,,medium,community,m12[*].2
+14,0,Side B,0x16000000,0x0,0x0,0x0,0x0,u32,?,,medium,community,m13[*]
+15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,?,,medium,community,m14[*].0
+,1,,0x07000001,18,0,5,18,f32,Ability to angle (degrees),,medium,community,m14[*].1
+,2,,0x07000002,0.5,0.5,0.5,0.5,f32,Sensitivity,,medium,community,m14[*].2
+,3,,0x07000003,0.67,0.67,0.67,0.67,f32,Aerial H speed multiplier,,medium,community,m14[*].3
+,4,,0x07000004,0.5,0.1,0.5,0.5,f32,?,,medium,community,m14[*].4
+,5,,0x07000005,1.1,1.4,0.9,1.1,f32,Grounded animation movement multiplier,,medium,community,m14[*].5
+,6,,0x07000006,1,1.3,0.9,1,f32,,,,,m14[*].6
+,7,,0x07000007,1,1,0.8,1,f32,H speed multiplier on startup,,medium,community,m14[*].7
+,8,,0x07000008,1,1,1,1,f32,V speed multiplier on startup,,medium,community,m14[*].8
+,9,,0x07000009,0.5,0.5,0.9,0.5,f32,,,,,m14[*].9
+,10,,0x0700000A,22,45,35,35,f32,Landing lag (frames),,medium,community,m14[*].10
+16,0,Down B,0x18000000,0x3,0x3,0x3,0x3,u32,Wall jump count,read on starting frame,medium,community,m15[*].0
+,1,,0x08000001,1,1.3,1,1.3,f32,Maximum H speed on footstool (this * StickX),Multiplied by X stick value,medium,community,m15[*].1
+,2,,0x08000002,3,3.5,2.2,3.5,f32,V speed on footstool,,medium,community,m15[*].2
+,3,,0x08000003,0.5,0.5,0.5,0.5,f32,Flip Jump kick stick turn sensitivity,,medium,community,m15[*].3
+,4,,0x08000004,0.7,-2.8,0.5,0.7,f32,H backward speed on successful hit,,medium,community,m15[*].4
+,5,,0x08000005,2.5,-1.4,1.8,2.5,f32,V speed on successful hit,,medium,community,m15[*].5
+,6,,0x08000006,0,0,0,0,f32,X offset of footstool detection,,medium,community,m15[*].6
+,7,,0x08000007,0,0,0,0,f32,Y offset of footstool detection,,medium,community,m15[*].7
+,8,,0x08000008,10.5,9,8,9,f32,Width of footstool detection,,medium,community,m15[*].8
+,9,,0x08000009,9,9,8,9,f32,Height of footstool detection,,medium,community,m15[*].9
+,10,,0x0800000A,0.7,0.2,0,0.5,f32,Air speed multiplier while flying,,medium,community,m15[*].10
+,11,,0x0800000B,20,50,36,20,f32,Frames before footstool attack takes effect,,medium,community,m15[*].11
+,12,,0x0800000C,1,1.1,1.3,1,f32,Animation movement multiplier,,medium,community,m15[*].12
+,13,,0x0800000D,35,48,30,35,f32,Landing lag after kick (frames),,medium,community,m15[*].13
+,0,Final Smash?,0x14000000,0xA,,,,u32,,,,,m16.0
+,1,,0x14000001,0x14,,,,u32,,,,,m16.1
+,2,,0x04000002,0.25,,,,f32,,,,,m16.2
+,3,,0x04000003,5,,,,f32,H reticle speed?,,medium,community,m16.3
+,4,,0x04000004,4,,,,f32,V reticle speed?,,medium,community,m16.4
+,5,,0x14000005,0xA,,,,u32,,,,,m16.5
+,6,,0x14000006,0x3C,,,,u32,Firing duriation (frames),,medium,community,m16.6
+,7,,0x04000007,0.3,,,,f32,Aiming reticle speed while firing,,medium,community,m16.7
+,8,,0x04000008,0.21,,,,f32,,,,,m16.8
+,9,,0x04000009,0.8,,,,f32,,,,,m16.9
+,10,,0x0400000A,1.1,,,,f32,,,,,m16.10
+,11,,0x1400000B,0x3C,,,,u32,Time in between firing (frames),,medium,community,m16.11
+,12,,0x1400000C,0x384,,,,u32,,,,,m16.12
+,13,,0x1400000D,0x5,,,,u32,Max number of shots,,medium,community,m16.13
+,14,,0x0400000E,15,,,,f32,Final Smash duration (seconds),community ID was 0x1400000E,medium,community,m16.14
+17,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
+,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17[0].1
+18,0,Tether?,,0x64,,,,u32,?,,medium,community,m18[0].0
+,1,,,10,,,,f32,?,,medium,community,m18[0].1
+,2,,,4,,,,f32,?,,medium,community,m18[0].2
+,3,,,2,,,,f32,,,,,m18[0].3
+,4,,,0x22,,,,u32,,,,,m18[0].4
+,5,,,0x5,,,,u32,,,,,m18[0].5
+,6,,,0x0,,,,u32,,,,,m18[0].6
+19,0,"Neutral B
+(Projectile)",0x02000000,2.1,3.2,0.66,2.1,f32,Non-fully charged speed,,medium,community,m19[*].0
+,1,,0x02000001,1.5,2.2,0.87,1.5,f32,Fully charged speed,,medium,community,m19[*].1
+,2,,0x12000002,0x18,0x1C,0x24,0x18,u32,Non-fully charged lifetime (frames),,medium,community,m19[*].2
+,3,,0x12000003,0x30,0x26,0x28,0x30,u32,Fully charged lifetime (frames),,medium,community,m19[*].3
+,4,,0x12000004,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m19[*].4
+20,0,"Side B / Tether
+(whip)",0x02000000,3,3,3,3,f32,Variable ID,,medium,community,m20[*].0
+,1,,0x02000001,32,32,32,32,f32,Variable ID,,medium,community,m20[*].1
+,2,,0x02000002,20,20,20,20,f32,,,,,m20[*].2
+,3,,0x02000003,61.3,61.3,61.3,61.3,f32,,,,,m20[*].3
+,4,,0x02000004,0.1,0.1,0.1,0.1,f32,,,,,m20[*].4
+,5,,0x12000005,0x6,0x6,0x6,0x6,u32,Variable ID,,medium,community,m20[*].5
+,6,,0x02000006,1,1,1,1,f32,,Added in 1.0.4,,,m20[*].6
+21,0,,,0x2000000,,,,u32,Paralyzer weapon param Name0?,,medium,community,m21[0].0
+,1,,,1,,,,f32,,,,,m21[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m21[0].2
+,3,,,0,,,,f32,,,,,m21[0].3
+,4,,,1,,,,f32,,,,,m21[0].4
+,5,,,0,,,,f32,,,,,m21[0].5
+,0,,,0x2000001,,,,u32,Paralyzer weapon param Name1?,,medium,community,m21[1].0
+,1,,,1,,,,f32,,,,,m21[1].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m21[1].2
+,3,,,0,,,,f32,,,,,m21[1].3
+,4,,,1,,,,f32,,,,,m21[1].4
+,5,,,0,,,,f32,,,,,m21[1].5
+22,0,Article params (cockpit),0x02000000,0,0,0,0,f32,,,,,m22[*]
+23,0,Article params (gunship),0x02000000,0,0,0,0,f32,,,,,m23[*]
+24,0,Article params (laser),0x02000000,0,0,0,0,f32,,,,,m24[*]

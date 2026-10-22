@@ -1,0 +1,85 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,25,0,20,25,f32,Flame spread randomness (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,50,90,40,50,f32,Max angle upwards (degrees),,medium,community | reads: MSC koopa.mscsb func_2345,m12[*].1
+,2,,0x05000002,40,90,30,40,f32,Max angle downwards (degrees),,medium,community | reads: MSC koopa.mscsb func_2345,m12[*].2
+,3,,0x05000003,1.55,5.25,1.55,2.8,f32,Turning angle per frame (degrees),,medium,community | reads: MSC koopa.mscsb func_2345,m12[*].3
+,4,,0x05000004,0.3,1,0.3,0.7,f32,Rotation of flames and head in relation to Name3,,medium,community | reads: MSC koopa.mscsb func_2304; MSC koopa.mscsb func_2345,m12[*].4
+,5,,0x15000005,0x19,0x6,0x2D,0x19,u32,Amount of frames spent firing after releasing B,,medium,community | reads: MSC koopa.mscsb func_2299,m12[*].5
+,6,,0x05000006,1.2,1.1,1.8,1,f32,Max flame speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,0.15,1.1,0.1,0.155,f32,Min flame speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,300,300,95,602,f32,Frames to min flame speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,700,300,1200,645,f32,Frames to max flame speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,1.7,1.3,2.5,1,f32,Max flame size multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,0.2,1.1,0.1,0.21,f32,Min flame size multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,300,300,95,602,f32,Frames to min flame size,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,700,300,1200,645,f32,Frames to max flame size,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x1500000E,0x7,0x20,0x7,0x7,u32,Frames between flames,,medium,community | reads: MSC koopa.mscsb func_2345,m12[*].14
+,15,,0x0500000F,8,8,8,8,f32,X offset of flames launch,,medium,community | no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,-2,-2,-2,-2,f32,Y offset of flames launch,,medium,community | no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,330,0,10,330,f32,Initial flame angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x15000012,0xA,0x2D,0xA,0xA,u32,"[auto] debug print ""se id: %d vc id: %d""",,low,reads: MSC koopa.mscsb func_2345,m12[*].18
+,19,,0x05000013,0.6,0,0.6,0.6,f32,"[auto] debug print ""se id: %d vc id: %d""",,low,reads: MSC koopa.mscsb func_2345,m12[*].19
+,20,,0x05000014,0.55,0.55,0.55,0.55,f32,,,,no read in the vanilla MSC (native or unused),m12[*].20
+,21,,0x15000015,0x3C,0x3C,0x3C,0x3C,u32,,,,no read in the vanilla MSC (native or unused),m12[*].21
+,22,,0x05000016,45,30,45,45,f32,Amount of pushback,,medium,community | no read in the vanilla MSC (native or unused),m12[*].22
+,23,,0x15000017,0x3,0x3,0x3,0x3,u32,Number of hitbox connects to trigger pushback,,medium,community | no read in the vanilla MSC (native or unused),m12[*].23
+14,0,Side B,0x06000000,0.25,0.25,0.25,0.25,f32,Initial H base forward speed,Initial H speed = Name0 + (Bowser stickX * Name1),medium,community | reads: MSC koopa.mscsb func_2350,m13[*].0
+,1,,0x06000001,0.2,0.2,0.2,0.2,f32,Initial H max additional speed,,medium,community | reads: MSC koopa.mscsb func_2350,m13[*].1
+,2,,0x06000002,0.21,0.27,0.15,0.15,f32,Bowser base additional air accel,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].2
+,3,,0x06000003,0.00075,0.00145,0.00075,0.00075,f32,Bowser additional air accel reduction per %,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].3
+,4,,0x06000004,0.02,0.08,0.02,0.02,f32,Bowser min additional air accel,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].4
+,5,,0x06000005,0.19,0.31,0.18,0.18,f32,Opponent base additional air accel,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].5
+,6,,0x06000006,0.00075,0.00075,0.00075,0.00075,f32,Opponent additional air acceleration reduction per %,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].6
+,7,,0x06000007,0.03,0.06,0.03,0.03,f32,Opponent min additional air accel,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].7
+,8,,0x06000008,1,1.62,1,1,f32,Maximum total H acceleration,,medium,community | reads: MSC koopa.mscsb func_2351,m13[*].8
+,9,,0x06000009,1.5,3.15,1.5,1.5,f32,Max H speed,,medium,community | reads: MSC koopa.mscsb func_2350; MSC koopa.mscsb func_2351,m13[*].9
+,10,,0x0600000A,5,8,5,5,f32,Fall speed,,medium,community | reads: MSC koopa.mscsb func_2353,m13[*].10
+,11,,0x0600000B,-0.6,-0.2,-0.6,-0.6,f32,H speed on landing,,medium,community | reads: MSC koopa.mscsb func_2356,m13[*].11
+,12,,0x0600000C,2,2,2,2,f32,V speed on landing,,medium,community | reads: MSC koopa.mscsb func_2356,m13[*].12
+,13,,0x0600000D,1,1.25,1,1,f32,Acceleration multiplier (only for Name2),,medium,community | reads: MSC koopa.mscsb func_2351; MSC koopa.mscsb func_2356,m13[*].13
+,14,,0x0600000E,1,1.58,1,1,f32,Maximum H speed multiplier,,medium,community | reads: MSC koopa.mscsb func_2350; MSC koopa.mscsb func_2351; MSC koopa.mscsb func_2356,m13[*].14
+,15,,0x0600000F,-10,-10,-10,-10,f32,"[auto] read by MSC: WorkModule(0, WorkModuleF(0, 0x600000f), 0x2b);",,low,reads: MSC koopa.mscsb func_2323,m13[*].15
+15,0,Up B,0x07000000,2.3,0.95,1.6,2.3,f32,Aerial V initial speed,,medium,community | reads: MSC koopa.mscsb func_2290,m14[*].0
+,1,,0x07000001,0.055,0.096,0.033,0.055,f32,Gravity,,medium,community | reads: MSC koopa.mscsb func_2290,m14[*].1
+,2,,0x07000002,1,0.9,1,1,f32,Max fall speed,,medium,community | reads: MSC koopa.mscsb func_2290,m14[*].2
+,3,,0x07000003,1.3,0.84,3.3,2.2,f32,Grounded H max speed,,medium,community | reads: MSC koopa.mscsb func_2291,m14[*].3
+,4,,0x07000004,1.6,0.84,2.4,1.6,f32,Aerial H max speed,,medium,community | reads: MSC koopa.mscsb func_2290; MSC koopa.mscsb func_2294,m14[*].4
+,5,,0x07000005,0.15,0.04,0.12,0.15,f32,Grounded max additional accel,Base accel = 0.01,medium,community | reads: MSC koopa.mscsb func_2291,m14[*].5
+,6,,0x07000006,0.02,0.04,0.05,0.02,f32,Aerial max additional accel,Base accel = 0.01,medium,community | reads: MSC koopa.mscsb func_2290,m14[*].6
+,7,,0x17000007,0xF,0xF,0xF,0xF,u32,How many frames after falling to landing to automatically do a grounded fortress again,,medium,community | reads: MSC koopa.mscsb func_2296,m14[*].7
+,8,,0x17000008,0x32,0x32,0x32,0x32,u32,Something dealing with Name7 but affects how long you stay in shell,,medium,community | reads: MSC koopa.mscsb func_2296,m14[*].8
+,9,,0x17000009,0xA,0xA,0xA,0xA,u32,Something dealing with Name7 but making it really high delays the animation somehow,,medium,community | reads: MSC koopa.mscsb func_2291; MSC koopa.mscsb func_2296,m14[*].9
+,10,,0x1700000A,0x32,0x3C,0x3C,0x32,u32,Landing lag (frames),,medium,community | reads: MSC koopa.mscsb func_2296,m14[*].10
+,11,,0x0700000B,1,0,0.8,1,f32,Fortress V initial speed,,medium,community | reads: MSC koopa.mscsb func_2285,m14[*].11
+,12,,0x0700000C,1,1,1,1,f32,"[auto] read by MSC: var0 = WorkModuleF(0, 0x700000c);",,low,reads: MSC koopa.mscsb func_2285,m14[*].12
+,13,,0x0700000D,50,50,50,50,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x700000d);",,low,reads: MSC koopa.mscsb func_2285,m14[*].13
+,14,,0x0700000E,5,50,5,5,f32,"[auto] read by MSC: if (var3 > WorkModuleF(0, 0x700000e))",,low,reads: MSC koopa.mscsb func_2285,m14[*].14
+16,0,Down B,0x08000000,0.8,0.8,0.6,0.8,f32,Aerial H speed multiplier on startup,,medium,community | reads: MSC koopa.mscsb func_2274,m15[*].0
+,1,,0x08000001,0.5,0.5,4,0.5,f32,Aerial V speed multiplier on startup,,medium,community | reads: MSC koopa.mscsb func_2274,m15[*].1
+,2,,0x08000002,0.02,0.02,0.02,0.02,f32,[auto] movement value (passed to KineticModule),read on aerial Down B,low,reads: MSC koopa.mscsb func_2274,m15[*].2
+,3,,0x08000003,0.03,0.03,0.01,0.03,f32,Gravity,read on aerial Down B,medium,community | reads: MSC koopa.mscsb func_2274,m15[*].3
+,4,,0x08000004,0.4,0.4,0.01,0.4,f32,Max fallspeed,read on aerial Down B,medium,community | reads: MSC koopa.mscsb func_2274,m15[*].4
+,5,,0x08000005,-9,-7,-20,-9,f32,Falling V speed,,medium,community | reads: MSC koopa.mscsb func_2274; MSC koopa.mscsb func_2275,m15[*].5
+,0,Tough Guy,0x04000000,19,,,,f32,Knockback threshold,,medium,community | no read in the vanilla MSC (native or unused),m16
+17,0,"Neutral B
+(breath)",0x02000000,-3.6,0,0,-3.6,f32,Landing detection,,medium,community,m17[*].0
+,1,,0x02000001,12,286,12,15,f32,Lifetime (frames),,medium,community | reads: MSC breath.mscsb func_48,m17[*].1
+,2,,0x02000002,12,285,12,20,f32,Flame hitbox terminates on,,medium,community | reads: MSC breath.mscsb func_48,m17[*].2
+,3,,0x02000003,3.5,1.6,3.9,2.8,f32,Flame speed,,medium,community | reads: MSC breath.mscsb func_48,m17[*].3
+,4,,0x02000004,4,1.85,4.3,4.6,f32,H speed of flames,,medium,community | reads: MSC breath.mscsb func_48,m17[*].4
+,0,,,0x1,,,,u32,,,,,m18.0
+,1,,,2,,,,f32,,,,,m18.1
+,2,,,0,,,,f32,,,,,m18.2
+,3,,,1,,,,f32,,,,,m18.3
+18,0,,,0x2000001,0x2000002,0x2000003,0x2000004,u32,Flame weapon param Name1?,,medium,community,m19[*].0
+,1,,,1,1,1,1,f32,,,,,m19[*].1
+,2,,,1.3,1.3,1.2,1.2,f32,Multiplier?,,medium,community,m19[*].2
+,3,,,0,0,0,0,f32,,,,,m19[*].3
+,4,,,1,1,1,1,f32,,,,,m19[*].4
+,5,,,0,0,0,0,f32,,,,,m19[*].5
+18,0,,,0x2000002,,,,,Flame weapon param Name2?,community row not matched to a value of the vanilla file,low,community,
+18,2,,,1.3,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+18,0,,,0x2000003,,,,,Flame weapon param Name3?,community row not matched to a value of the vanilla file,low,community,
+18,2,,,1.2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+18,0,,,0x2000004,,,,,Flame weapon param Name4?,community row not matched to a value of the vanilla file,low,community,
+18,2,,,1.2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,

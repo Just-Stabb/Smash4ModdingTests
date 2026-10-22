@@ -1,0 +1,251 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,0.2,0.2,0,0,f32,Grounded H speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].0
+,1,,0x05000001,0.4,0.4,0,0,f32,Aerial H speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].1
+,2,,0x05000002,0.65,0.65,0,0,f32,Aerial V speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].2
+,3,,0x05000003,0.5,0.5,0,0,f32,Aerial max additional accel/max air speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].3
+,4,,0x05000004,0.8,0.8,0,0,f32,Aerial V speed,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].4
+,5,,0x05000005,0.06,0.06,0,0,f32,Gravity,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].5
+,6,,0x05000006,1.5,1.5,0,0,f32,Max fall speed,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].6
+,7,,0x05000007,12,12,0,0,f32,X offset of ground/aerial projectile,,medium,community,m12[*].7
+,8,,0x05000008,2,2,0,0,f32,Y offset of aerial projectile,,medium,community,m12[*].8
+,9,,0x05000009,11,11,0,0,f32,?,,medium,community,m12[*].9
+,10,,0x0500000A,2,2,0,0,f32,?,,medium,community,m12[*].10
+14,0,Side B,0x06000000,0.6,0.2,0,0,f32,Grounded / aerial H speed multiplier on startup,,medium,community | reads: native 0x02781B0C (fn 0x027819E8),m13[*].0
+,1,,0x06000001,0.8,1,0,0,f32,Aerial H speed multiplier on startup,,medium,community,m13[*].1
+,2,,0x06000002,0.05,0.01,0,0,f32,Gravity on startup,,medium,community | reads: native 0x02781964 (fn 0x02781914),m13[*].2
+,3,,0x06000003,0.8,0.1,0,0,f32,Max fall speed on startup,,medium,community | reads: native 0x0278197C (fn 0x02781914),m13[*].3
+,4,,0x06000004,0.5,0.1,0,0,f32,Aerial V speed multiplier on startup,,medium,community,m13[*].4
+,5,,0x16000005,0x0,0x1E,0x0,0x0,u32,,,,,m13[*].5
+,6,,0x16000006,0x0,0x4,0x0,0x0,u32,,,,,m13[*].6
+,7,,0x06000007,0,2.4,0,0,f32,,,,,m13[*].7
+,8,,0x16000008,0x0,0x6,0x0,0x0,u32,,,,,m13[*].8
+,9,,0x06000009,0,15,0,0,f32,,,,,m13[*].9
+,10,,0x0600000A,0,5,0,0,f32,,,,,m13[*].10
+15,0,Up B,0x07000000,0.5,0.5,0,0,f32,Backward speed,,medium,community,m14[*].0
+,1,,0x07000001,1,1.6,0,0,f32,Grounded height multiplier,,medium,community,m14[*].1
+,2,,0x07000002,1.1,1.85,0,0,f32,Aerial height multiplier,,medium,community,m14[*].2
+,3,,0x17000003,0x14,0x14,0x0,0x0,u32,Landing lag without additional input (frames),,medium,community,m14[*].3
+,4,,0x07000004,0.67,0.67,0,0,f32,Aerial H mobility multiplier on startup,,medium,community,m14[*].4
+,5,,0x07000005,0.25,0.25,0,0,f32,,,,,m14[*].5
+,6,,0x07000006,0.625,0.625,0,0,f32,H mobility multiplier after rising,,medium,community,m14[*].6
+,7,,0x07000007,3,12,0,0,f32,Time spent rising (frames),,medium,community,m14[*].7
+,8,,0x07000008,0.6,0.8,0,0,f32,Aerial H mobility multiplier on Special fall,,medium,community,m14[*].8
+,9,,0x17000009,0x32,0x3C,0x0,0x0,u32,Affects falling hitbox duration,,medium,community,m14[*].9
+,10,,0x0700000A,-4.2,0,0,0,f32,Initial V speed on SpecialHi2,,medium,community,m14[*].10
+,11,,0x0700000B,0.07,0,0,0,f32,Gravity on SpecialHi2,,medium,community,m14[*].11
+,12,,0x0700000C,4.2,0,0,0,f32,Fallspeed on SpecialHi2,,medium,community,m14[*].12
+,13,,0x1700000D,0x28,0x0,0x0,0x0,u32,Landing lag with additional input (frames),,medium,community,m14[*].13
+,14,,0x1700000E,0x0,0xF,0x0,0x0,u32,,,,,m14[*].14
+,15,,0x1700000F,0x0,0x2,0x0,0x0,u32,,,,,m14[*].15
+,16,,0x07000010,0,1.8,0,0,f32,,,,,m14[*].16
+,17,,0x17000011,0x0,0x1,0x0,0x0,u32,,,,,m14[*].17
+,18,,0x17000012,0x0,0x14,0x0,0x0,u32,,,,,m14[*].18
+16,0,Down B,0x08000000,1,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].0
+,1,,0x08000001,1,0,0,0,f32,Aerial V speed multiplier,,medium,community,m15[*].1
+,2,,0x08000002,20,0,0,0,f32,Y offset of Limit charge box GFX,,medium,community,m15[*].2
+,3,,0x18000003,0x3C,0x0,0x0,0x0,u32,Duration of Limit charge box GFX remains after cancelling (frames),,medium,community,m15[*].3
+,4,,0x08000004,0.25,0,0,0,f32,Limit Charge growth rate per frame,,medium,community,m15[*].4
+,5,"Down B
+(Limit Break)",0x08000005,0.4,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].5
+,6,,0x08000006,0.4,0,0,0,f32,Aerial V speed multiplier,,medium,community,m15[*].6
+,7,,0x08000007,0.02,0,0,0,f32,Gravity,,medium,community,m15[*].7
+,8,,0x08000008,0.5,0,0,0,f32,Max fall speed,,medium,community,m15[*].8
+,9,,0x18000009,0x1C,0x0,0x0,0x0,u32,Slowdown duration after Finishing Touch (frames),,medium,community,m15[*].9
+,10,,0x1800000A,0x8,0x0,0x0,0x0,u32,Slowdown effect speed,,medium,community,m15[*].10
+,11,,0x0800000B,2.4,0,0,0,f32,Camera zoom Z position,,medium,community,m15[*].11
+,12,,0x1800000C,0x2,0x0,0x0,0x0,u32,Camera transition frames,,medium,community,m15[*].12
+,0,Limit Charge,0x04000000,1,,,,f32,Limit Charge growth rate per damage taken,,medium,community,m16.0
+,1,,0x04000001,0.4,,,,f32,Limit Charge growth rate per damage dealt,,medium,community,m16.1
+,2,"Finising Touch
+and Final Smash?",0x14000002,0xB4,,,,u32,,,,,m16.2
+,3,,0x04000003,8,,,,f32,V speed related,script_2315,medium,community,m16.3
+,4,,0x14000004,0x10,,,,u32,Time spent dashing (Frames),script_2315,medium,community,m16.4
+,5,,0x14000005,0x6,,,,u32,"addi, set to 0x11000002",script_2315,medium,community,m16.5
+,6,,0x04000006,0.09,,,,f32,Air friction,script_2320,medium,community,m16.6
+,7,,0x04000007,7,,,,f32,,,,,m16.7
+,8,,0x04000008,20,,,,f32,,script_2329,,,m16.8
+,9,,0x04000009,0,,,,f32,,script_2329,,,m16.9
+,10,,0x1400000A,0x8,,,,u32,,script_2329,,,m16.10
+,11,,0x1400000B,0x18,,,,u32,,,,,m16.11
+,12,,0x0400000C,0.9,,,,f32,,,,,m16.12
+,13,,0x0400000D,0.95,,,,f32,How the camera zooms in when using Finishing Touch,Higher numbers = Further away,medium,community,m16.13
+,14,,0x0400000E,5,,,,f32,Fall speed??,script_2337,medium,community,m16.14
+17,0,"Walk Initial
+Multiplier",,0x3000001,,,,u32,0x03000001,,medium,community,m17[0].0
+,1,,,1,,,,f32,,,,,m17[0].1
+,2,,,1.15,,,,f32,Multiplier,,medium,community,m17[0].2
+,3,,,0,,,,f32,,,,,m17[0].3
+,4,,,1,,,,f32,,,,,m17[0].4
+,5,,,0,,,,f32,,,,,m17[0].5
+,0,"Walk Accel
+Multiplier",,0x3000002,,,,u32,0x03000002,,medium,community,m17[1].0
+,1,,,1,,,,f32,,,,,m17[1].1
+,2,,,1.15,,,,f32,Multiplier,,medium,community,m17[1].2
+,3,,,0,,,,f32,,,,,m17[1].3
+,4,,,1,,,,f32,,,,,m17[1].4
+,5,,,0,,,,f32,,,,,m17[1].5
+,0,"Walk Velocity
+Multiplier",,0x3000003,,,,u32,0x03000003,,medium,community,m17[2].0
+,1,,,1,,,,f32,,,,,m17[2].1
+,2,,,1.15,,,,f32,Multiplier,,medium,community,m17[2].2
+,3,,,0,,,,f32,,,,,m17[2].3
+,4,,,1,,,,f32,,,,,m17[2].4
+,5,,,0,,,,f32,,,,,m17[2].5
+,0,"Ground Friction
+Multiplier",,0x3000007,,,,u32,0x03000007,,medium,community,m17[3].0
+,1,,,1,,,,f32,,,,,m17[3].1
+,2,,,1.15,,,,f32,Multiplier,,medium,community,m17[3].2
+,3,,,0,,,,f32,,,,,m17[3].3
+,4,,,1,,,,f32,,,,,m17[3].4
+,5,,,0,,,,f32,,,,,m17[3].5
+,0,"Dash Initial
+Multiplier",,0x3000008,,,,u32,0x03000008,,medium,community,m17[4].0
+,1,,,1,,,,f32,,,,,m17[4].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[4].2
+,3,,,0,,,,f32,,,,,m17[4].3
+,4,,,1,,,,f32,,,,,m17[4].4
+,5,,,0,,,,f32,,,,,m17[4].5
+,0,"Dash Accel A
+Multiplier",,0x3000009,,,,u32,0x03000009,,medium,community,m17[5].0
+,1,,,1,,,,f32,,,,,m17[5].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[5].2
+,3,,,0,,,,f32,,,,,m17[5].3
+,4,,,1,,,,f32,,,,,m17[5].4
+,5,,,0,,,,f32,,,,,m17[5].5
+,0,"Dash Accel B
+Multiplier",,0x300000A,,,,u32,0x0300000a,,medium,community,m17[6].0
+,1,,,1,,,,f32,,,,,m17[6].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[6].2
+,3,,,0,,,,f32,,,,,m17[6].3
+,4,,,1,,,,f32,,,,,m17[6].4
+,5,,,0,,,,f32,,,,,m17[6].5
+,0,"Run Speed
+Multiplier",,0x300000B,,,,u32,0x0300000b,,medium,community,m17[7].0
+,1,,,1,,,,f32,,,,,m17[7].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[7].2
+,3,,,0,,,,f32,,,,,m17[7].3
+,4,,,1,,,,f32,,,,,m17[7].4
+,5,,,0,,,,f32,,,,,m17[7].5
+,0,"Air Accel A
+Multiplier",,0x3000014,,,,u32,0x03000013,,medium,community,m17[8].0
+,1,,,1,,,,f32,,,,,m17[8].1
+,2,,,1.2,,,,f32,Multiplier,,medium,community,m17[8].2
+,3,,,0,,,,f32,,,,,m17[8].3
+,4,,,1,,,,f32,,,,,m17[8].4
+,5,,,0,,,,f32,,,,,m17[8].5
+,0,"Air Accel B
+Multiplier",,0x3000015,,,,u32,0x03000014,,medium,community,m17[9].0
+,1,,,1,,,,f32,,,,,m17[9].1
+,2,,,1.2,,,,f32,Multiplier,,medium,community,m17[9].2
+,3,,,0,,,,f32,,,,,m17[9].3
+,4,,,1,,,,f32,,,,,m17[9].4
+,5,,,0,,,,f32,,,,,m17[9].5
+,0,"Air Speed
+Multiplier",,0x3000016,,,,u32,0x03000015,,medium,community,m17[10].0
+,1,,,1,,,,f32,,,,,m17[10].1
+,2,,,1.2,,,,f32,Multiplier,,medium,community,m17[10].2
+,3,,,0,,,,f32,,,,,m17[10].3
+,4,,,1,,,,f32,,,,,m17[10].4
+,5,,,0,,,,f32,,,,,m17[10].5
+,0,"Air Friction
+Multiplier",,0x3000017,,,,u32,0x03000016,,medium,community,m17[11].0
+,1,,,1,,,,f32,,,,,m17[11].1
+,2,,,1.15,,,,f32,Multiplier,,medium,community,m17[11].2
+,3,,,0,,,,f32,,,,,m17[11].3
+,4,,,1,,,,f32,,,,,m17[11].4
+,5,,,0,,,,f32,,,,,m17[11].5
+,0,"Fall Speed
+Multiplier",,0x3000018,,,,u32,0x03000017,,medium,community,m17[12].0
+,1,,,1,,,,f32,,,,,m17[12].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[12].2
+,3,,,0,,,,f32,,,,,m17[12].3
+,4,,,1,,,,f32,,,,,m17[12].4
+,5,,,0,,,,f32,,,,,m17[12].5
+,0,"Gravity
+Multiplier",,0x3000019,,,,u32,0x03000018,,medium,community,m17[13].0
+,1,,,1,,,,f32,,,,,m17[13].1
+,2,,,1.1,,,,f32,Multiplier,,medium,community,m17[13].2
+,3,,,0,,,,f32,,,,,m17[13].3
+,4,,,1,,,,f32,,,,,m17[13].4
+,5,,,0,,,,f32,,,,,m17[13].5
+18,0,"Neutral B
+(wave)",0x12000000,0x32,0x29,0x0,0x0,u32,Lifetime (frames),,medium,community,m18[*].0
+,1,,0x02000001,1.6,2.24,0,0,f32,Aerial speed,,medium,community,m18[*].1
+,2,,0x02000002,2,2.8,0,0,f32,Grounded speed,,medium,community,m18[*].2
+,3,,0x02000003,50,50,0,0,f32,?,Compared to H speed?,medium,community,m18[*].3
+,4,,0x12000004,0x5,0x4,0x0,0x0,u32,,Related to angles?,,,m18[*].4
+,5,,0x02000005,8,6,0,0,f32,"Damage (grounded, early)","Used when transitioning between air/ground.
+""Late"" = when RA-Bit 5 is set",medium,community,m18[*].5
+,6,,0x02000006,6,6,0,0,f32,"Damage (grounded, late)",,medium,community,m18[*].6
+,7,,0x02000007,6.4,4.8,0,0,f32,"Damage (aerial, early)",,medium,community,m18[*].7
+,8,,0x02000008,4.8,4.8,0,0,f32,"Damage (aerial, late)",,medium,community,m18[*].8
+,9,,0x02000009,3,5.5,0,0,f32,Size (early),,medium,community,m18[*].9
+,10,,0x0200000A,2.7,5.5,0,0,f32,Size (late),,medium,community,m18[*].10
+19,0,,,0x2000002,,,,u32,Blade Beam weapon param Name2?,,medium,community,m19[0].0
+,1,,,1,,,,f32,,,,,m19[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m19[0].2
+,3,,,0,,,,f32,,,,,m19[0].3
+,4,,,1,,,,f32,,,,,m19[0].4
+,5,,,0,,,,f32,,,,,m19[0].5
+,0,,,0x2000001,,,,u32,Blade Beam weapon param Name1?,,medium,community,m19[1].0
+,1,,,1,,,,f32,,,,,m19[1].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m19[1].2
+,3,,,0,,,,f32,,,,,m19[1].3
+,4,,,1,,,,f32,,,,,m19[1].4
+,5,,,0,,,,f32,,,,,m19[1].5
+,0,,,0x1,,,,u32,,,,,m20.0
+,1,,,10,,,,f32,,,,,m20.1
+,2,,,0,,,,f32,,,,,m20.2
+,3,,,2,,,,f32,,,,,m20.3
+13,11,"Neutral B
+(Limit Break)",0x0500000b,0.2,,,,,Grounded H speed multiplier,community row not matched to a value of the vanilla file,low,community,
+13,12,,0x0500000c,0.4,,,,,Aerial H speed multiplier,community row not matched to a value of the vanilla file,low,community,
+13,13,,0x0500000d,0.65,,,,,Aerial V speed multiplier,community row not matched to a value of the vanilla file,low,community,
+13,14,,0x0500000e,0.5,,,,,Aerial max additional accel/max air speed multiplier,community row not matched to a value of the vanilla file,low,community,
+13,15,,0x0500000f,0.8,,,,,Aerial V speed,community row not matched to a value of the vanilla file,low,community,
+13,16,,0x05000010,0.06,,,,,Gravity,community row not matched to a value of the vanilla file,low,community,
+13,17,,0x05000011,1.5,,,,,Max fall speed,community row not matched to a value of the vanilla file,low,community,
+13,18,,0x05000012,12,,,,,X offset of ground/aerial projectile,community row not matched to a value of the vanilla file,low,community,
+13,19,,0x05000013,2,,,,,Y offset of aerial projectile,community row not matched to a value of the vanilla file,low,community,
+13,20,,0x05000014,11,,,,,?,community row not matched to a value of the vanilla file,low,community,
+13,21,,0x05000015,2,,,,,?,community row not matched to a value of the vanilla file,low,community,
+14,11,"Side B
+(Limit Break)",0x0600000b,0.2,,,,,Grounded / aerial H speed multiplier on startup,community row not matched to a value of the vanilla file,low,community,
+14,12,,0x0600000c,1,,,,,Aerial H speed multiplier on startup,community row not matched to a value of the vanilla file,low,community,
+14,13,,0x0600000d,0.01,,,,,Gravity on startup,community row not matched to a value of the vanilla file,low,community,
+14,14,,0x0600000e,0.1,,,,,Max fall speed on startup,community row not matched to a value of the vanilla file,low,community,
+14,15,,0x0600000f,0.1,,,,,Aerial V speed multiplier on startup,community row not matched to a value of the vanilla file,low,community,
+14,16,,0x16000010,0x1E,,,,,Slowdown duration after Limit Cross Slash (frames),community row not matched to a value of the vanilla file,low,community,
+14,17,,0x16000011,0x4,,,,,Slowdown effect speed,community row not matched to a value of the vanilla file,low,community,
+14,18,,0x06000012,2.4,,,,,How the camera zooms in when using Limit Cross Slash,community row not matched to a value of the vanilla file,low,community,
+14,19,,0x16000013,0x6,,,,,Camera transition frames,community row not matched to a value of the vanilla file,low,community,
+14,20,,0x06000014,15,,,,,Camera zoom X position,community row not matched to a value of the vanilla file,low,community,
+14,21,,0x06000015,5,,,,,Camera zoom Y position,community row not matched to a value of the vanilla file,low,community,
+15,19,"Up B
+(Limit Break)",0x07000013,0.5,,,,,Backward speed,community row not matched to a value of the vanilla file,low,community,
+15,20,,0x07000014,1.6,,,,,Grounded height multiplier,community row not matched to a value of the vanilla file,low,community,
+15,21,,0x07000015,1.85,,,,,Aerial height multiplier,community row not matched to a value of the vanilla file,low,community,
+15,22,,0x17000016,0x14,,,,,Landing lag without additional input (frames),community row not matched to a value of the vanilla file,low,community,
+15,23,,0x07000017,0.67,,,,,Aerial H mobility multiplier on startup,community row not matched to a value of the vanilla file,low,community,
+15,25,,0x07000019,0.625,,,,,H mobility multiplier after rising,community row not matched to a value of the vanilla file,low,community,
+15,26,,0x0700001a,12,,,,,Time spent rising (frames),community row not matched to a value of the vanilla file,low,community,
+15,27,,0x0700001b,0.8,,,,,Aerial H mobility multiplier on Special fall,community row not matched to a value of the vanilla file,low,community,
+15,28,,0x1700001c,0x3C,,,,,Affects falling hitbox duration,community row not matched to a value of the vanilla file,low,community,
+15,33,,0x17000021,0xF,,,,,Slowdown duration after Limit Climhazard (frames),community row not matched to a value of the vanilla file,low,community,
+15,34,,0x17000022,0x2,,,,,Slowdown effect speed,community row not matched to a value of the vanilla file,low,community,
+15,35,,0x07000023,1.8,,,,,Camera zoom Z position,community row not matched to a value of the vanilla file,low,community,
+15,37,,0x17000025,0x14,,,,,?,community row not matched to a value of the vanilla file,low,community,
+18,11,"Neutral B
+(Limit Break,
+wave)",0x1200000b,0x29,,,,,Lifetime (frames),community row not matched to a value of the vanilla file,low,community,
+18,12,,0x0200000c,2.24,,,,,Aerial speed,community row not matched to a value of the vanilla file,low,community,
+18,13,,0x0200000d,2.8,,,,,Grounded speed,community row not matched to a value of the vanilla file,low,community,
+18,14,,0x0200000e,50,,,,,?,Compared to H speed?; community row not matched to a value of the vanilla file,low,community,
+18,15,,0x1200000f,0x4,,,,,,Related to angles?; community row not matched to a value of the vanilla file,low,community,
+18,16,,0x02000010,6,,,,,"Damage (grounded, early)","Used when transitioning between air/ground.
+""Late"" = when RA-Bit 5 is set; community row not matched to a value of the vanilla file",low,community,
+18,17,,0x02000011,6,,,,,"Damage (grounded, late)",community row not matched to a value of the vanilla file,low,community,
+18,18,,0x02000012,4.8,,,,,"Damage (aerial, early)",community row not matched to a value of the vanilla file,low,community,
+18,19,,0x02000013,4.8,,,,,"Damage (aerial, late)",community row not matched to a value of the vanilla file,low,community,
+18,20,,0x02000014,5.5,,,,,Size (early),community row not matched to a value of the vanilla file,low,community,
+18,21,,0x02000015,5.5,,,,,Size (late),community row not matched to a value of the vanilla file,low,community,

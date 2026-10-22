@@ -1,0 +1,155 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x15000000,0x28,0x2E,0x14,0x28,u32,Minimum number of frames Inhale is held before ending,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3224",m12[*].0
+,1,,0x05000001,250,250,250,250,f32,,,,,m12[*].1
+,2,,0x05000002,1.22,1.22,1.22,1.22,f32,,,,,m12[*].2
+,3,,0x05000003,1,1,1,1,f32,Speed of a swallowed opponent when spit out as a star,,medium,community,m12[*].3
+,4,,0x05000004,10,10,0,10,f32,,,,,m12[*].4
+,5,,0x05000005,10,10,0,10,f32,Camera position with a swallowed charcter?,,medium,community,m12[*].5
+,6,,0x05000006,-0.2,-0.2,-0.2,-0.2,f32,Turn sensitivity with a swallowed character,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3245",m12[*].6
+,7,,0x05000007,0.6,0.6,0.6,0.6,f32,Max walk speed multiplier with a swallowed character,,medium,community,m12[*].7
+,8,,0x05000008,0.8,0.8,0.8,0.8,f32,Jump speed multiplier with a swallowed character,,medium,community,m12[*].8
+,9,,0x05000009,0.6,0.6,0.6,0.6,f32,,,,,m12[*].9
+,10,,0x0500000A,10,10,10,10,f32,,,,,m12[*].10
+,11,,0x0500000B,8,8,8,8,f32,,,,,m12[*].11
+,12,,0x1500000C,0xC8,0xC8,0x1,0xC8,u32,Frames before being forced into SpecialNSpit,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3237",m12[*].12
+,13,,0x0500000D,0.25,0.25,0.25,0.25,f32,Multiplier applied to Dedede's battle_object Name5 on KB formula when hit while having a swallowed character,,medium,community,m12[*].13
+,14,,0x0500000E,5,5,5,5,f32,Damage received inhaling explosive items,,medium,community,m12[*].14
+,15,,0x0500000F,0,0,0,0,f32,,,,,m12[*].15
+,16,,0x05000010,1.5,1.5,1.5,1.5,f32,Damage healed multiplier inhaling food items,,medium,community,m12[*].16
+,17,,0x15000011,0x0,0x3,0x0,0x0,u32,[auto] read by native code (get_int at 0x02ECBF74); meaning not traced,,low,"reads: native 0x02ECBF74 (fn 0x02ECBF1C, attributed by type fit)",m12[*].17
+,18,,0x05000012,0,45,0,0,f32,[auto] read by native code (get_float at 0x02ECBFE0); meaning not traced,,low,"reads: native 0x02ECBFE0 (fn 0x02ECBF1C, attributed by type fit)",m12[*].18
+,19,,0x05000013,0,0.55,0,0,f32,[auto] read by native code (get_float at 0x02ECC050); meaning not traced,,low,"reads: native 0x02ECC050 (fn 0x02ECBF1C, attributed by type fit)",m12[*].19
+,20,,0x15000014,0x0,0x3C,0x0,0x0,u32,[auto] read by native code (get_int at 0x02ECC088); meaning not traced,,low,"reads: native 0x02ECC088 (fn 0x02ECBF1C, attributed by type fit); native 0x02ECC0FC (fn 0x02ECBF1C, attributed by type fit)",m12[*].20
+14,0,Side B,0x06000000,1.7,1.1,2.6,1.7,f32,Initial Gordo toss speed,,medium,community | reads: native 0x02ECB734 (fn 0x02ECB6B0); native 0x02ECF3A4 (fn 0x02ECF340); native 0x02ECFA10 (fn 0x02ECF944),m13[*].0
+,1,,0x06000001,1.25,1.1,1.25,1.25,f32,Smash input speed multiplier,,medium,community | reads: native 0x02ECF4AC (fn 0x02ECF340); native 0x02ECFB18 (fn 0x02ECF944),m13[*].1
+,2,,0x06000002,20,50,40,20,f32,Forward/Default Gordo launch angle (degrees),,medium,community | reads: native 0x02ECF3B8 (fn 0x02ECF340); native 0x02ECFA24 (fn 0x02ECF944),m13[*].2
+,3,,0x06000003,84,65,50,84,f32,Up-angled Gordo launch angle (degrees),,medium,community | reads: native 0x02ECF668 (fn 0x02ECF578),m13[*].3
+,4,,0x06000004,50,38,25,50,f32,Down-angled Gordo launch angle (degrees),,medium,community | reads: native 0x02ECF608 (fn 0x02ECF578),m13[*].4
+,5,,0x06000005,15,15,15,15,f32,,,,,m13[*].5
+,6,,0x06000006,14,14,14,14,f32,,,,,m13[*].6
+,7,,0x06000007,8,8,8,8,f32,,,,,m13[*].7
+15,0,Up B,0x07000000,1,0.5,0.8,1,f32,H speed multiplier on startup,,medium,community,m14[*].0
+,1,,0x07000001,-0.5,-0.2,0.2,-0.5,f32,V speed multiplier on startup,,medium,community,m14[*].1
+,2,,0x07000002,-0.03,0.02,0.02,-0.03,f32,Gravity on startup,Multiplied by -1 in msc script_2457,medium,community,m14[*].2
+,3,,0x07000003,1.1,1.2,2.2,1.1,f32,H movement ratio,,medium,community,m14[*].3
+,4,,0x07000004,7.5,5.5,10,7.5,f32,V speed on travel,,medium,community,m14[*].4
+,5,,0x07000005,0.25,0.25,0.25,0.25,f32,Bonus gravity,,medium,community,m14[*].5
+,6,,0x07000006,0.9,1,0.9,0.9,f32,V speed multiplier on aerial travel,,medium,community,m14[*].6
+,7,,0x07000007,0.3,0.17,0.48,0.3,f32,Gravity on launch?,,medium,community,m14[*].7
+,8,,0x07000008,17,50,50,17,f32,Frames when falling animation starts,,medium,community,m14[*].8
+,9,,0x07000009,24,24,24,24,f32,,read on up B normal landing,,,m14[*].9
+,10,,0x0700000A,0.85,0.6,0.85,0.85,f32,,,,,m14[*].10
+,11,,0x0700000B,2,1.7,2,2,f32,Fall speed when cancelling the jump?,,medium,community,m14[*].11
+,12,,0x0700000C,36,30,36,36,f32,Landing lag (frames),,medium,community,m14[*].12
+,13,,0x0700000D,7,7,7,7,f32,X offset of right buttstar,,medium,community,m14[*].13
+,14,,0x0700000E,2,2,2,2,f32,Y offset of right buttstar,,medium,community,m14[*].14
+,15,,0x0700000F,-7,-7,-7,-7,f32,X offset of left buttstar,,medium,community,m14[*].15
+,16,,0x07000010,2,2,2,2,f32,Y offset of left buttstar,,medium,community,m14[*].16
+16,0,Down B,0x08000000,0.7,0.6,0.4,0.7,f32,Charging walk speed,"Not multiplier, both for initial speed and max speed",medium,community,m15[*].0
+,1,,0x08000001,120,100,120,120,f32,Time to fully charge (frames),,medium,community,m15[*].1
+,2,,0x08000002,0.15,0.12,0.08,0.15,f32,Damage added per frame,,medium,community,m15[*].2
+,3,,0x08000003,30,18,24,30,f32,Interval of self-damage (frames),,medium,community,m15[*].3
+,4,,0x08000004,100,100,100,100,f32,Full charge hold self-damage limit,,medium,community,m15[*].4
+,5,,0x08000005,1,1,1,1,f32,"Has self-damage (1 = Yes, 0 = No)",,medium,community,m15[*].5
+,0,Category 4 block,0x14000000,0x14,,,,u32,,,,,m16.0
+,1,,0x04000001,20,,,,f32,,,,,m16.1
+,2,,0x04000002,12,,,,f32,,,,,m16.2
+,3,,0x04000003,3,,,,f32,,,,,m16.3
+,4,,0x04000004,2,,,,f32,,,,,m16.4
+,5,,0x04000005,17,,,,f32,,,,,m16.5
+17,0,Jumps,,0.3,,,,f32,,,,,m17[0].i0.0
+,1,,,0.5,,,,f32,,,,,m17[0].i0.1
+,2,,,0.8,,,,f32,Aerial forward jump initial H speed cap,Initial H speed = Max air speed * 0.8,medium,community,m17[0].i0.2
+,3,,,0.8,,,,f32,Aerial forward jump initial H speed/air max additional accel multiplier,,medium,community,m17[0].i0.3
+18,0,Jumps,,2,,,,f32,Aerial jump1 initial V speed,,medium,community,m17[0].i1[0]
+,1,,,2,,,,f32,Aerial jump2 initial V speed,,medium,community,m17[0].i1[1]
+,2,,,1.73,,,,f32,Aerial jump3 initial V speed,,medium,community,m17[0].i1[2]
+,3,,,1.56,,,,f32,Aerial jump4 initial V speed,,medium,community,m17[0].i1[3]
+,4,,,1.33,,,,f32,Aerial jump5 initial V speed,,medium,community,m17[0].i1[4]
+19,0,Jumps,,15,,,,f32,"Angle rotation values when turning during midair jump.
+
+Character turns around when angle value reaches 90 or more. They can input aerials in the new direction on the frame after",,medium,community,m17[0].i2[0]
+,1,,,30,,,,f32,,,,,m17[0].i2[1]
+,2,,,45,,,,f32,,,,,m17[0].i2[2]
+,3,,,60,,,,f32,,,,,m17[0].i2[3]
+,4,,,75,,,,f32,,,,,m17[0].i2[4]
+,5,,,90,,,,f32,,,,,m17[0].i2[5]
+,6,,,105,,,,f32,,,,,m17[0].i2[6]
+,7,,,120,,,,f32,,,,,m17[0].i2[7]
+,8,,,135,,,,f32,,,,,m17[0].i2[8]
+,9,,,150,,,,f32,,,,,m17[0].i2[9]
+,10,,,165,,,,f32,,,,,m17[0].i2[10]
+,11,,,180,,,,f32,,,,,m17[0].i2[11]
+20,0,Neutral B,0x02000000,3.15,3.15,7,3.15,f32,H base speed,,medium,community,m18[*].0
+,1,,0x02000001,0.05,0.05,0.4,0.05,f32,H deceleration?,,medium,community,m18[*].1
+,2,,0x02000002,30,30,100,30,f32,,,,,m18[*].2
+,3,,0x02000003,0.55,0.55,0.55,0.55,f32,,,,,m18[*].3
+,4,,0x02000004,60,60,72,60,f32,,,,,m18[*].4
+,5,,0x02000005,12,12,2,12,f32,,,,,m18[*].5
+,6,,0x02000006,15,15,30,15,f32,Spinning speed,,medium,community,m18[*].6
+,7,,0x02000007,0.1,0.1,0.1,0.1,f32,,,,,m18[*].7
+,8,,0x02000008,1,1,1,1,f32,X offset,,medium,community,m18[*].8
+,9,,0x02000009,-1,-1,-1,-1,f32,Y offset,,medium,community,m18[*].9
+,10,,0x0200000A,1,1,1,1,f32,,,,,m18[*].10
+21,0,Gordo,0x12000000,0x82,0x78,0x12C,0xA0,u32,Lifetimes (frames),,medium,community,m19[*].0
+,1,,0x02000001,0.01,0.008,0.15,0.01,f32,H deceleration,,medium,community,m19[*].1
+,2,,0x02000002,0.3,0.4,1.5,0.3,f32,Terminal H speed,,medium,community,m19[*].2
+,3,,0x02000003,0.15,0.07,0.09,0.15,f32,Gravity,,medium,community,m19[*].3
+,4,,0x02000004,3,3,3.3,3,f32,Max fall speed,,medium,community,m19[*].4
+,5,,0x02000005,10,6,10,10,f32,,,,,m19[*].5
+,6,,0x02000006,0.02,0.02,0.02,0.02,f32,,,,,m19[*].6
+,7,,0x02000007,1.5,1.5,1.5,1.5,f32,,,,,m19[*].7
+,8,,0x02000008,0.95,7,-0.95,0.95,f32,H speed multiplier when the gordo touches the ground,,medium,community,m19[*].8
+,9,,0x02000009,1.15,1,1.05,1.15,f32,V speed multiplier when the gordo touches the ground,,medium,community,m19[*].9
+,10,,0x0200000A,13,30,13,13,f32,,,,,m19[*].10
+,11,,0x0200000B,2,2,2,2,f32,,,,,m19[*].11
+,12,,0x1200000C,0x3,0x1,0x5,0x3,u32,Bounces until despawn,,medium,community,m19[*].12
+,13,,0x1200000D,0x32,0x32,0x64,0x32,u32,Gordo wall sticking chance (percent),,medium,community,m19[*].13
+,14,,0x1200000E,0xC8,0xC8,0xC8,0xC8,u32,Wall sticked Gordo lifetime (frames),,medium,community,m19[*].14
+,15,,0x0200000F,2,2,2,2,f32,Damage required for knockback,,medium,community,m19[*].15
+,16,,0x02000010,30,30,30,30,f32,,,,,m19[*].16
+,17,,0x02000011,160,180,160,160,f32,,,,,m19[*].17
+,18,,0x02000012,76,120,76,76,f32,,,,,m19[*].18
+,19,,0x02000013,7,1,7,7,f32,,,,,m19[*].19
+,20,,0x02000014,3,0.8,3,3,f32,,,,,m19[*].20
+,21,,0x02000015,15,30,15,15,f32,,,,,m19[*].21
+,22,,0x02000016,1.5,1.5,1.5,1.5,f32,,,,,m19[*].22
+,23,,0x12000017,0x3,0x3,0x3,0x3,u32,,,,,m19[*].23
+,24,,0x02000018,0.01,0.01,0.01,0.01,f32,,,,,m19[*].24
+,25,,0x02000019,0.8,0.8,0.8,0.8,f32,,,,,m19[*].25
+,26,,0x0200001A,0.6,0.4,0.4,0.4,f32,,,,,m19[*].26
+,27,,0x0200001B,2.2,2.2,2.2,2.2,f32,,,,,m19[*].27
+,28,,0x1200001C,0x3C,0x3C,0x3C,0x3C,u32,,,,,m19[*].28
+,0,,,0x1,,,,u32,,,,,m20.0
+,1,,,11,,,,f32,,,,,m20.1
+,2,,,2,,,,f32,,,,,m20.2
+,3,,,4.5,,,,f32,,,,,m20.3
+22,0,"Gordo
+Hurtbox",,0,,,,f32,X offset,,medium,community,m21[0].0
+,1,,,0,,,,f32,Y offset,,medium,community,m21[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m21[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m21[0].3
+,4,,,0,,,,f32,Y2 offset,,medium,community,m21[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m21[0].5
+,6,,,9,,,,f32,Size,,medium,community,m21[0].6
+,7,,,0x7D2,,,,u32,Bone,,medium,community,m21[0].7
+,8,,,0x1,,,,u32,,,,,m21[0].8
+,9,,,0x1,,,,u32,,,,,m21[0].9
+,10,,,0x0,,,,u32,,,,,m21[0].10
+,11,,,0x2,,,,u32,,,,,m21[0].11
+23,0,star?,0x12000000,0x14,0x14,0x14,0x14,u32,,,,,m22[*]
+24,0,,,0,,,,u8,,,,,m23[0].0
+,1,,,5,,,,u8,,,,,m23[0].1
+,2,,,5,,,,u16,,,,,m23[0].2
+,3,,,0x20000,,,,s32,,,,,m23[0].3
+,4,,,0x0,,,,s32,,,,,m23[0].4
+,5,,,0x0,,,,s32,,,,,m23[0].5
+,6,,,5,,,,f32,,,,,m23[0].6
+,7,,,7,,,,f32,,,,,m23[0].7
+,8,,,10,,,,f32,,,,,m23[0].8
+,9,,,14,,,,f32,,,,,m23[0].9
+25,0,Final Smash,0x02000000,60,,,,f32,Bomb launch angle (degrees),,medium,community,m24[0].0
+,1,,0x02000001,3.5,,,,f32,Bomb launch initial speed,Bomb gravity = -0.1 (written in MSC),medium,community,m24[0].1
+,2,,0x02000002,1.05,,,,f32,"Model size multiplier, per frame",,medium,community,m24[0].2
+,3,,0x02000003,2,,,,f32,Maximum model scale,,medium,community,m24[0].3
+,4,,0x12000004,0xA,,,,u32,Frames before bomb explodes,,medium,community,m24[0].4

@@ -1,0 +1,173 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x15000000,0xA,0x0,0x0,0x0,u32,Frames to halt vert momentum before using Name3,0 permanently halts fall speed,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3950",m12[*].0
+,1,,0x15000001,0x14,0x0,0x0,0x0,u32,How long after releasing B PK Freeze explodes,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3962",m12[*].1
+,2,,0x15000002,0x45,0x0,0x0,0x0,u32,PK Freeze lifetime (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3962",m12[*].2
+,3,,0x05000003,0.012,0,0,0,f32,Gravity after initial V halt,,medium,community,m12[*].3
+,4,,0x05000004,30,0,0,0,f32,Landing lag (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3958; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3976",m12[*].4
+14,0,Side B,0x06000000,3.5,0,0,0,f32,X offset of starting point,,medium,community,m13[*].0
+,1,,0x06000001,0.7,0,0,0,f32,Y offset of starting point,,medium,community,m13[*].1
+,2,,0x06000002,22,0,0,0,f32,Landing lag (frames),,medium,community,m13[*].2
+15,0,Up B,0x17000000,0x1E,0x0,0x0,0x0,u32,How long you continue doing the PKT hold anim after it dies?,,medium,community,m14[*].0
+,1,,0x17000001,0xA,0x0,0x0,0x0,u32,Same as Name0?,,medium,community,m14[*].1
+,2,,0x17000002,0x28,0x0,0x0,0x0,u32,How long before you fall during upB hold in air?,community ID was 0x07000002,medium,community,m14[*].2
+,3,,0x07000003,0.5,0,0,0,f32,Something with falling speed initially,,medium,community,m14[*].3
+,4,,0x07000004,0.017,0,0,0,f32,Up B hold falling acceleration,,medium,community,m14[*].4
+,5,,0x07000005,2.5,0,0,0,f32,PKT2 initial speed,,medium,"community | reads: native 0x027AB62C (fn 0x027AB590, shared with lucariom)",m14[*].5
+,6,,0x07000006,0,0,0,0,f32,PKT2 deceleration rate,,medium,community,m14[*].6
+,7,,0x07000007,0.071,0,0,0,f32,Additional PKT2 deceleration rate after hitting something,,medium,community,m14[*].7
+,8,,0x07000008,0.64,0,0,0,f32,,,,,m14[*].8
+,9,,0x07000009,0.65,0,0,0,f32,,,,,m14[*].9
+,10,,0x0700000A,0.5,0,0,0,f32,,,,,m14[*].10
+,11,,0x0700000B,0,0,0,0,f32,,,,,m14[*].11
+,12,,0x0700000C,65,0,0,0,f32,Grounded PKT2 angle??,read on PKT2,medium,"community | reads: native 0x027AB3A4 (fn 0x027AAF80, shared with lucariom)",m14[*].12
+,13,,0x0700000D,60,0,0,0,f32,,read on PKT2 end,,,m14[*].13
+,14,,0x0700000E,1.4,0,0,0,f32,,,,,m14[*].14
+,15,,0x0700000F,30,0,0,0,f32,Landing lag (Frames),,medium,"community | reads: native 0x027AC6F8 (fn 0x027AC680, shared with lucariom); native 0x027AC774 (fn 0x027AC754, shared with lucariom)",m14[*].15
+16,0,Down B,0x18000000,0x12,0x0,0x0,0x0,u32,How many frames after releasing B you continue to hold it,,medium,community,m15[*].0
+,1,,0x18000001,0x4,0x0,0x0,0x0,u32,Delay before gravity affects startup (frames),,medium,community,m15[*].1
+,2,,0x08000002,8,0,0,0,f32,Related to speed preservation?,,medium,community,m15[*].2
+,3,,0x08000003,1,0,0,0,f32,Initial H speed on aerial startup,,medium,community,m15[*].3
+,4,,0x08000004,0,0,0,0,f32,Initial V speed on aerial startup,,medium,community,m15[*].4
+,5,,0x08000005,0.03,0,0,0,f32,Gravity,,medium,community,m15[*].5
+,6,,0x08000006,2.5,1.5,0,0,f32,Damage recovery mulitplier,,medium,community,m15[*].6
+,7,,0x08000007,30,0,0,0,f32,Max damage recoverable,,medium,community,m15[*].7
+,8,,0x18000008,0x1,0x1,0x1,0x1,u32,,,,,m15[*].8
+,9,,0x08000009,0,0,0,0,f32,Absorption bubble X offset,,medium,community,m15[*].9
+,10,,0x0800000A,6.5,0,0,0,f32,Absorption bubble Y offset,,medium,community,m15[*].10
+,11,,0x0800000B,11.5,10,0,0,f32,Absorption bubble Z offset,,medium,community,m15[*].11
+,12,,0x0800000C,12.8,16,0,0,f32,Absorption bubble Size,,medium,community,m15[*].12
+,13,,0x0800000D,0.85,0,0,0,f32,GFX size multiplier,,medium,community,m15[*].13
+,14,,0x0800000E,1,0,0,0,f32,,,,,m15[*].14
+,15,,0x1800000F,0x7,0x0,0x0,0x0,u32,,,,,m15[*].15
+,16,,0x08000010,1.8,0,0,0,f32,,,,,m15[*].16
+,0,Category 4 block,0x04000000,0,,,,f32,,,,,m16.0
+,1,,0x04000001,0,,,,f32,,,,,m16.1
+17,0,,,0xB4,,,,u32,,,,,m17[0].0
+,1,,,10,,,,f32,,,,,m17[0].1
+,2,,,4,,,,f32,,,,,m17[0].2
+,3,,,2,,,,f32,,,,,m17[0].3
+,4,,,0x28,,,,u32,,,,,m17[0].4
+,5,,,0x5,,,,u32,,,,,m17[0].5
+,6,,,0x0,,,,u32,,,,,m17[0].6
+,0,,,0x0,,,,u32,,,,,m18.0
+,1,F Smash,,50,,,,f32,Break threshold,,medium,community,m18.1
+,2,,,0,,,,f32,Reflection bubble X offset,,medium,community,m18.2
+,3,,,6,,,,f32,Reflection bubble Y offset,,medium,community,m18.3
+,4,,,9,,,,f32,Reflection bubble Z offset,,medium,community,m18.4
+,5,,,10,,,,f32,Reflection bubble size,,medium,community,m18.5
+,6,,,1.5,,,,f32,Reflected projectile damage multiplier,,medium,community,m18.6
+,7,,,1.5,,,,f32,Reflected projectile speed multiplier,,medium,community,m18.7
+,8,,,0.7,,,,f32,Reflected projectile lifetime multiplier,,medium,community,m18.8
+,9,,,0x0,,,,s32,,,,,m18.9
+18,0,Tether,0x02000000,3,,,,f32,Grounded speed,,medium,community,m19[0].0
+,1,,0x02000001,20,,,,f32,Grounded length,,medium,community,m19[0].1
+,2,,0x02000002,2.7,,,,f32,Aerial speed,,medium,community,m19[0].2
+,3,,0x02000003,30,,,,f32,Aerial length,,medium,community,m19[0].3
+,4,,0x02000004,8,,,,f32,,,,,m19[0].4
+,5,,0x02000005,50,,,,f32,,,,,m19[0].5
+,6,,0x02000006,0.1,,,,f32,,,,,m19[0].6
+,7,,0x12000007,0x16,,,,u32,,,,,m19[0].7
+,8,,0x02000008,1,,,,f32,,,,,m19[0].8
+19,0,Neutral B,0x02000000,70,0,0,0,f32,Damage/Size multiplier?,less = larger GFX size but less damage,medium,community,m20[*].0
+,1,,0x02000001,0.45,0,0,0,f32,Starting size,,medium,community,m20[*].1
+,2,,0x02000002,1.6,0,0,0,f32,Size multiplier,,medium,community,m20[*].2
+,3,,0x02000003,-20,0,0,0,f32,Initial firing angle,,medium,community,m20[*].3
+,4,,0x02000004,1.2,0,0,0,f32,PK Freeze rising height,,medium,community,m20[*].4
+,5,,0x02000005,0.04,0,0,0,f32,PK Freeze speed added from stick press,,medium,community,m20[*].5
+,6,,0x02000006,0.04,0,0,0,f32,PK Freeze gravity,,medium,community,m20[*].6
+,7,,0x02000007,2,0,0,0,f32,,read on startup,,,m20[*].7
+,8,,0x02000008,3,0,0,0,f32,,read on startup,,,m20[*].8
+,9,,0x12000009,0x6,0x0,0x0,0x0,u32,Delay before PK Freeze explosion when releasing the special attack button,,medium,community,m20[*].9
+,10,,0x0200000A,5,0,0,0,f32,Base damage,Damage = 5 + Frames * 0.255 ?,medium,community,m20[*].10
+,11,,0x0200000B,0.255,0.22,0,0,f32,Damage from charge,,medium,community,m20[*].11
+,0,,,0x3,,,,u32,,,,,m21.0
+,1,,,0,,,,f32,,,,,m21.1
+,2,,,0.5,,,,f32,,,,,m21.2
+20,0,,,0x2000004,,,,u32,PK Freeze weapon param Name 4?,,medium,community,m22[0].0
+,1,,,1,,,,f32,,,,,m22[0].1
+,2,,,1.2,,,,f32,Multiplier?,,medium,community,m22[0].2
+,3,,,0,,,,f32,,,,,m22[0].3
+,4,,,1,,,,f32,,,,,m22[0].4
+,5,,,0,,,,f32,,,,,m22[0].5
+,0,,,0x2000005,,,,u32,PK Freeze weapon param Name 5?,,medium,community,m22[1].0
+,1,,,1,,,,f32,,,,,m22[1].1
+,2,,,1.2,,,,f32,Multiplier?,,medium,community,m22[1].2
+,3,,,0,,,,f32,,,,,m22[1].3
+,4,,,1,,,,f32,,,,,m22[1].4
+,5,,,0,,,,f32,,,,,m22[1].5
+,0,,,0x2000006,,,,u32,PK Freeze weapon param Name 6?,,medium,community,m22[2].0
+,1,,,1,,,,f32,,,,,m22[2].1
+,2,,,1.2,,,,f32,Multiplier?,,medium,community,m22[2].2
+,3,,,0,,,,f32,,,,,m22[2].3
+,4,,,1,,,,f32,,,,,m22[2].4
+,5,,,0,,,,f32,,,,,m22[2].5
+,0,,,0x2000007,,,,u32,PK Freeze weapon param Name 7?,,medium,community,m22[3].0
+,1,,,1,,,,f32,,,,,m22[3].1
+,2,,,1.2,,,,f32,Multiplier?,,medium,community,m22[3].2
+,3,,,0,,,,f32,,,,,m22[3].3
+,4,,,1,,,,f32,,,,,m22[3].4
+,5,,,0,,,,f32,,,,,m22[3].5
+,0,,,0x2000008,,,,u32,PK Freeze weapon param Name 8?,,medium,community,m22[4].0
+,1,,,1,,,,f32,,,,,m22[4].1
+,2,,,1.2,,,,f32,Multiplier?,,medium,community,m22[4].2
+,3,,,0,,,,f32,,,,,m22[4].3
+,4,,,1,,,,f32,,,,,m22[4].4
+,5,,,0,,,,f32,,,,,m22[4].5
+21,0,Side B,0x02000000,0.6,0,0,0,f32,Grounded PK Fire angle (degrees),,medium,community,m23[*].0
+,1,,0x02000001,2.5,0,0,0,f32,Grounded PK Fire velocity,,medium,community,m23[*].1
+,2,,0x02000002,0,0,0,0,f32,Aerial PK Fire angle (degrees),,medium,community,m23[*].2
+,3,,0x02000003,2.8,0,0,0,f32,Aerial PK Fire velocity,,medium,community,m23[*].3
+,4,,0x12000004,0x13,0x0,0x0,0x0,u32,Spark lifetime (frames),,medium,community,m23[*].4
+,5,,0x12000005,0x1E,0x0,0x0,0x0,u32,Pillar lifetime (frames),,medium,community,m23[*].5
+,6,,0x02000006,1,0,0,0,f32,Pillar vert momentum on first hit,,medium,community,m23[*].6
+,7,,0x02000007,0.01,0,0,0,f32,Pillar gravity,read when spark is generated,medium,community,m23[*].7
+,8,,0x02000008,0.8,0,0,0,f32,Pillar max fall speed,read when spark is generated,medium,community,m23[*].8
+,9,,0x02000009,3,0,0,0,f32,Amount of time Spark stays out?,,medium,community,m23[*].9
+,10,,0x0200000A,0.5,0,0,0,f32,Fire pillar final size,Pillar size = Name10 + (1 - Name10) * Current frame / Name5,medium,community,m23[*].10
+,0,,,0x3,,,,u32,,,,,m24.0
+,1,,,0,,,,f32,,,,,m24.1
+,2,,,2,,,,f32,,,,,m24.2
+22,0,,,0,,,,f32,X offset,,medium,community,m25[0].0
+,1,,,0,,,,f32,Y offset,,medium,community,m25[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m25[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m25[0].3
+,4,,,0,,,,f32,Y2 offset,,medium,community,m25[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m25[0].5
+,6,,,0.5,,,,f32,Size,,medium,community,m25[0].6
+,7,,,0x1,,,,u32,Bone,,medium,community,m25[0].7
+,8,,,0x1,,,,u32,,,,,m25[0].8
+,9,,,0x0,,,,u32,,,,,m25[0].9
+,0,,,0,,,,f32,X offset,,medium,community,m25[1].0
+,1,,,6,,,,f32,Y offset,,medium,community,m25[1].1
+,2,,,0,,,,f32,Z offset,,medium,community,m25[1].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m25[1].3
+,4,,,2,,,,f32,Y2 offset,,medium,community,m25[1].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m25[1].5
+,6,,,3,,,,f32,Size,,medium,community,m25[1].6
+,7,,,0x1,,,,u32,Bone,,medium,community,m25[1].7
+,8,,,0x1,,,,u32,,,,,m25[1].8
+,9,,,0x0,,,,u32,,,,,m25[1].9
+23,0,,,0x2000003,,,,u32,PK Fire weapon param Name 3?,,medium,community,m26[0].0
+,1,,,1,,,,f32,,,,,m26[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m26[0].2
+,3,,,0,,,,f32,,,,,m26[0].3
+,4,,,1,,,,f32,,,,,m26[0].4
+,5,,,0,,,,f32,,,,,m26[0].5
+,0,,,0x2000001,,,,u32,PK Fire weapon param Name 1?,,medium,community,m26[1].0
+,1,,,1,,,,f32,,,,,m26[1].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m26[1].2
+,3,,,0,,,,f32,,,,,m26[1].3
+,4,,,1,,,,f32,,,,,m26[1].4
+,5,,,0,,,,f32,,,,,m26[1].5
+24,0,"Up B
+(Projectile)",0x02000000,120,0,0,0,f32,Lifetime (frames),,medium,community,m27[*].0
+,1,,0x02000001,1.5,0,0,0,f32,Projectile speed,,medium,community,m27[*].1
+,2,,0x02000002,90,0,0,0,f32,Initial angle (degrees),,medium,community,m27[*].2
+,3,,0x02000003,0.5,0,0,0,f32,PKT turning control,lower number = higher amount of control,medium,community,m27[*].3
+,4,,0x02000004,8,0,0,0,f32,PKT turning radius,higher number = tighter radius,medium,community,m27[*].4
+,5,,0x12000005,0x78,0x0,0x0,0x0,u32,,,,,m27[*].5
+,0,,,0x3,,,,u32,,,,,m28.0
+,1,,,0,,,,f32,,,,,m28.1
+,2,,,2,,,,f32,,,,,m28.2
+25,0,pkstarstorm,0x02000000,30,,,,f32,,,,,m29[0].0
+,1,,0x12000001,0x136,,,,u32,,,,,m29[0].1

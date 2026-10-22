@@ -1,0 +1,191 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,1,1,1.5,2,f32,Height multiplier for Yoshi goes after laying an egg in mid-air?,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2744",m12[*]
+14,0,Side B,0x06000000,180,300,60,120,f32,How many frames you can be in egg before exiting automatically,,medium,community | reads: native 0x02F94FAC (fn 0x02F94DB0); native 0x02F96310 (fn 0x02F962BC),m13[*].0
+,1,,0x06000001,35,35,28,30,f32,Min number of frames to be in egg before exiting with B,,medium,community | reads: native 0x02F96328 (fn 0x02F962BC),m13[*].1
+,2,,0x16000002,0x28,0x3C,0x0,0x28,u32,,not read on Side B,,,m13[*].2
+,3,,0x06000003,0,0,0,0,f32,Initial H speed on startup,,medium,community | reads: native 0x02F94EC4 (fn 0x02F94DB0),m13[*].3
+,4,,0x06000004,2,2.6,1.6,1.8,f32,Initial V speed on startup,,medium,community,m13[*].4
+,5,,0x06000005,30,30,30,30,f32,[auto] read by native code (get_float at 0x02F92328); meaning not traced,read on Rolling?,low,reads: native 0x02F92328 (fn 0x02F922F8),m13[*].5
+,6,,0x06000006,1.5,0,0.7,0,f32,Rolling speed when you land for the first time,,medium,community,m13[*].6
+,7,,0x06000007,1.2,1.1,1,1,f32,,read on aerial startup,,,m13[*].7
+,8,,0x06000008,0.13,0.21,0.1,0.13,f32,Gravity,,medium,community | reads: native 0x02F95224 (fn 0x02F951D8),m13[*].8
+,9,,0x06000009,2.1,3.5,2.5,2.8,f32,Bounciness when hitting ground,,medium,community | reads: native 0x02F9523C (fn 0x02F951D8),m13[*].9
+,10,,0x0600000A,0.1,0.012,0,0,f32,Base rolling speed?,,medium,community | reads: native 0x02F8FB5C (fn 0x02F8FADC),m13[*].10
+,11,,0x0600000B,0.07,0.07,0,0,f32,Rolling speed multiplier?,,medium,community,m13[*].11
+,12,,0x0600000C,3.1,1.2,3.3,3.5,f32,Something with rolling speed?,,medium,community,m13[*].12
+,13,,0x0600000D,4.1,2.8,3.3,3.5,f32,Something with rolling speed?,,medium,community,m13[*].13
+,14,,0x0600000E,0.7,0.35,0,0,f32,,,,,m13[*].14
+,15,,0x0600000F,2.8,2,3.3,3.5,f32,,,,,m13[*].15
+,16,,0x16000010,0x1,0x1,0x0,0x0,u32,,,,,m13[*].16
+,17,,0x06000011,57.6,57.6,57.6,57.6,f32,[auto] read by native code (get_float at 0x02F95870); meaning not traced,,low,reads: native 0x02F95870 (fn 0x02F95788),m13[*].17
+,18,,0x06000012,0.4,0.6,0.4,0.4,f32,Wall bounce H speed multiplier,,medium,community | reads: native 0x02F93D60 (fn 0x02F93C58); native 0x02F95CF8 (fn 0x02F95C9C),m13[*].18
+,19,,0x06000013,1.7,1,1.7,1.7,f32,[auto] read by native code (get_float at 0x02F95D1C); meaning not traced,,low,reads: native 0x02F95D1C (fn 0x02F95C9C),m13[*].19
+,20,,0x06000014,0.85,0.7,1.2,0.9,f32,Bounce speed multiplier?,,medium,community,m13[*].20
+,21,,0x06000015,1.7,2.1,0,0,f32,,,,,m13[*].21
+,22,,0x06000016,1.3,0.1,0.1,3,f32,,,,,m13[*].22
+,23,,0x06000017,1.5,0.1,0.5,2,f32,Used in damage formula?,,medium,community | reads: native 0x02F97324 (fn 0x02F972E8),m13[*].23
+,24,,0x06000018,2,12,3,2.5,f32,[auto] read by native code (get_float at 0x02F97344); meaning not traced,,low,reads: native 0x02F97344 (fn 0x02F972E8),m13[*].24
+,25,,0x06000019,1,1.4,1,2,f32,,,,,m13[*].25
+,26,,0x0600001A,0.7,0.7,0.5,0.2,f32,Ending air acceleration?,,medium,community | reads: native 0x02F932D0 (fn 0x02F93280),m13[*].26
+,27,,0x0600001B,0.5,0.5,0.6,0.5,f32,V multiplier on exit,,medium,community | reads: native 0x02F932F0 (fn 0x02F93280),m13[*].27
+,28,,0x0600001C,1.1,2.2,1.1,1.1,f32,[auto] read by native code (get_float at 0x02F93A88); meaning not traced,,low,reads: native 0x02F93A88 (fn 0x02F93A30),m13[*].28
+,29,,0x0600001D,1.1,1.1,1.1,1.1,f32,[auto] read by native code (get_float at 0x02F93AC8); meaning not traced,,low,reads: native 0x02F93AC8 (fn 0x02F93A30),m13[*].29
+,30,,0x0600001E,0.4,0.4,0,0,f32,Ending H speed?,,medium,community,m13[*].30
+,31,,0x0600001F,45,45,45,45,f32,(degrees),,medium,community | reads: native 0x02F95890 (fn 0x02F95788),m13[*].31
+,32,,0x06000020,30,30,30,30,f32,,,,,m13[*].32
+15,0,Up B,0x07000000,0.9,0.6,0.9,0.9,f32,Air speed multiplier,,medium,community | reads: native 0x02F92B84 (fn 0x02F92A78),m14[*].0
+,1,,0x07000001,1.9,3.8,1.8,1.8,f32,Upward speed of throwing,,medium,community | reads: native 0x02F92ADC (fn 0x02F92A78),m14[*].1
+,2,,0x07000002,0.07,0.14,0.08,0.07,f32,Downward speed of throwing,,medium,community,m14[*].2
+,3,,0x07000003,1.29,1.4,1.5,1.29,f32,Max fall speed after throwing,,medium,community,m14[*].3
+,4,,0x07000004,0.5,0.88,0.45,0.84,f32,Upward speed after throwing 2+ times in air?,,medium,community,m14[*].4
+,5,,0x07000005,3,3,3,5,f32,Number of times Yoshi hops from Egg Toss in the air until landing?,,medium,community,m14[*].5
+,6,,0x07000006,58,58,58,58,f32,Default egg throw angle (degrees),,medium,community,m14[*].6
+,7,,0x07000007,90,90,90,90,f32,Max egg throw angle (degrees),When set to 100 Yoshi is able to throw eggs behind him (similar to Melee),medium,community,m14[*].7
+,8,,0x07000008,18,18,1,26,f32,Min egg throw angle (degrees),,medium,community,m14[*].8
+,9,,0x07000009,0.8,0.8,1.2,0.8,f32,H speed of throwing?,,medium,community,m14[*].9
+,10,,0x0700000A,5,5,7,5,f32,Egg X offset,,medium,community,m14[*].10
+,11,,0x0700000B,13,13,17,18,f32,Egg Y offset,,medium,community,m14[*].11
+16,0,Down B,0x08000000,-5,-5,-8,-5,f32,Descent speed?,,medium,community | reads: native 0x02F91FD4 (fn 0x02F91F8C),m15[*].0
+,1,,0x08000001,8,8,8,8,f32,Stars X offset,,medium,community,m15[*].1
+,2,,0x08000002,1,1,1,1,f32,Stars Y offset,,medium,community,m15[*].2
+,0,Final Smash?,0x04000000,0.3,,,,f32,[auto] read by native code (get_float at 0x02F8FF68); meaning not traced,,low,reads: native 0x02F8FF68 (fn 0x02F8FDF4); native 0x02F906D0 (fn 0x02F905DC); native 0x02F9133C (fn 0x02F91218),m16.0
+,1,,0x04000001,0.3,,,,f32,[auto] read by native code (get_float at 0x02F8FF00); meaning not traced,,low,reads: native 0x02F8FF00 (fn 0x02F8FDF4); native 0x02F9036C (fn 0x02F90274); native 0x02F906A8 (fn 0x02F905DC),m16.1
+,2,,0x04000002,2.4,,,,f32,,,,,m16.2
+,3,,0x04000003,0.1,,,,f32,,,,,m16.3
+,4,,0x04000004,0.35,,,,f32,,,,,m16.4
+,5,,0x04000005,1.5,,,,f32,,,,,m16.5
+,6,,0x04000006,0.08,,,,f32,,,,,m16.6
+,7,,0x04000007,0.02,,,,f32,,,,,m16.7
+,8,,0x04000008,0.15,,,,f32,,,,,m16.8
+,9,,0x04000009,2.5,,,,f32,,,,,m16.9
+,10,,0x0400000A,0.5,,,,f32,,,,,m16.10
+,11,,0x0400000B,10,,,,f32,,,,,m16.11
+,12,,0x0400000C,12,,,,f32,,,,,m16.12
+,13,,0x0400000D,0,,,,f32,,,,,m16.13
+,14,,0x0400000E,60,,,,f32,,,,,m16.14
+,15,,0x0400000F,6,,,,f32,,,,,m16.15
+,16,,0x04000010,7,,,,f32,,,,,m16.16
+,17,,0x04000011,-2,,,,f32,,,,,m16.17
+,18,,0x04000012,60,,,,f32,,,,,m16.18
+,19,,0x04000013,0,,,,f32,,,,,m16.19
+,20,,0x04000014,5,,,,f32,,,,,m16.20
+,21,,0x04000015,0,,,,f32,,,,,m16.21
+,22,,0x04000016,30,,,,f32,,,,,m16.22
+,23,,0x04000017,14,,,,f32,Super Dragon's duration (seconds)?,,medium,community | reads: native 0x02F91BB8 (fn 0x02F91B70),m16.23
+,24,,0x04000018,60,,,,f32,[auto] read by native code (get_float at 0x02F91BD4); meaning not traced,,low,reads: native 0x02F91BD4 (fn 0x02F91B70),m16.24
+,25,,0x04000019,180,,,,f32,,,,,m16.25
+,0,Jump,,0xC,,,,u32,Number of frames to turn around during Double Jump,,medium,community,m17.0
+,1,,,0.3,,,,f32,Joystick sensitivity to turn around during Double Jump,,medium,community,m17.1
+,2,,,120,,,,f32,Knockback resistance,,medium,community,m17.2
+,0,,,5,,,,f32,,,,,m18.0
+,1,,,0.5,,,,f32,,,,,m18.1
+,2,,,0x8,,,,u32,,,,,m18.2
+,0,,,0x14,,,,u32,,,,,m19
+17,0,"Egg
+(tamago)",0x12000000,0x2E,0x2E,0x1F,0x2A,u32,Lifetime (Frames),,medium,community,m20[*].0
+,1,,0x02000001,1.2,1.2,1.7,1.25,f32,Initial speed of the thrown egg,,medium,community,m20[*].1
+,2,,0x02000002,1.25,1.25,1.3,1,f32,Max fallspeed of the thrown egg?,,medium,community,m20[*].2
+,3,,0x02000003,0.088,0.088,0.05,0.09,f32,Gravity of the thrown egg?,,medium,community,m20[*].3
+,4,,0x02000004,-1.5,-1.5,-0.4,-1.5,f32,Egg air friction?,,medium,community,m20[*].4
+,5,,0x02000005,-2.1,-2.1,-1,-2.1,f32,Base Egg spin,,medium,community,m20[*].5
+,6,,0x02000006,1,1,1,1,f32,,,,,m20[*].6
+,7,,0x02000007,0.09,0.09,0.1,0.07,f32,,,,,m20[*].7
+,8,,0x02000008,10,10,4,10,f32,,,,,m20[*].8
+,9,,0x12000009,0x0,0x0,0x1,0x0,u32,"0 = explodes on contact, 1 = doesn't",,medium,community,m20[*].9
+18,0,"Down B
+(star)",0x02000000,0.6,2.5,0.6,0.8,f32,H speed of stars?,,medium,community,m21[*].0
+,1,,0x02000001,0,-0.06,0,-0.02,f32,Stars gravity?,,medium,community,m21[*].1
+,2,,0x02000002,2,2.7,2,0.48,f32,,,,,m21[*].2
+,3,,0x02000003,2,2.7,2,1,f32,,,,,m21[*].3
+,4,,0x02000004,-0.2,-0.19,-0.2,0.03,f32,,,,,m21[*].4
+,0,Pivot Grab,,0x9,,,,u32,Brawl grabbox starting frames,,medium,community,m22.0
+,1,,,0x13,,,,u32,Brawl grabbox ending frames,,medium,community,m22.1
+19,0,Pivot Grab,,0x1A,,,,u32,Animation frame set.,"Upon successfully grabbing, 
+he grab animation is set to this frame to show Yoshi pulling his foe in.
+The frame to switch to depends on the frame Yoshi grabbed his foe.
+By default, a successful grab on the first frame of the grab
+sets the animation frame to 26 (tongue just returning to Yoshi's mouth)
+and a successful grab on the last frame of the grab,
+where Yoshi's tongue is extended to its max distance,
+sets the animation to frame 20, where Yoshi's tongue
+is just starting to return to his mouth from max distance.",medium,community,m23[0]
+,1,,,0x1A,,,,u32,,,,,m23[1]
+,2,,,0x19,,,,u32,,,,,m23[2]
+,3,,,0x19,,,,u32,,,,,m23[3]
+,4,,,0x18,,,,u32,,,,,m23[4]
+,5,,,0x18,,,,u32,,,,,m23[5]
+,6,,,0x17,,,,u32,,,,,m23[6]
+,7,,,0x16,,,,u32,,,,,m23[7]
+,8,,,0x15,,,,u32,,,,,m23[8]
+,9,,,0x15,,,,u32,,,,,m23[9]
+,10,,,0x14,,,,u32,,,,,m23[10]
+,0,Dash Grab,,0xA,,,,u32,Brawl grabbox starting frames,,medium,community,m24.0
+,1,,,0x15,,,,u32,Brawl grabbox ending frames,,medium,community,m24.1
+20,0,Dash Grab,,0x23,,,,u32,Animation frame set.,"Upon successfully grabbing,
+the grab animation is set to this frame to show Yoshi pulling his foe in.
+The frame to switch to depends on the frame Yoshi grabbed his foe.
+By default, a successful grab on the first frame of the grab
+sets the animation frame to 34 (tongue just returning to Yoshi's mouth)
+and a successful grab on the last frame of the grab,
+where Yoshi's tongue is extended to its max distance,
+sets the animation to frame 22, where Yoshi's tongue
+is just starting to return to his mouth from max distance.",medium,community,m25[0]
+,1,,,0x22,,,,u32,,,,,m25[1]
+,2,,,0x20,,,,u32,,,,,m25[2]
+,3,,,0x1E,,,,u32,,,,,m25[3]
+,4,,,0x1D,,,,u32,,,,,m25[4]
+,5,,,0x1C,,,,u32,,,,,m25[5]
+,6,,,0x1B,,,,u32,,,,,m25[6]
+,7,,,0x1A,,,,u32,,,,,m25[7]
+,8,,,0x19,,,,u32,,,,,m25[8]
+,9,,,0x18,,,,u32,,,,,m25[9]
+,10,,,0x17,,,,u32,,,,,m25[10]
+,11,,,0x16,,,,u32,,,,,m25[11]
+,0,Standing Grab,,0x10,,,,u32,Brawl grabbox starting frames,,medium,community,m26.0
+,1,,,0x1A,,,,u32,Brawl grabbox ending frames,,medium,community,m26.1
+21,0,Standing Grab,,0x2E,,,,u32,Animation frame set.,"Upon successfully grabbing,
+the grab animation is set to this frame to show Yoshi pulling his foe in.
+The frame to switch to depends on the frame Yoshi grabbed his foe.
+By default, a successful grab on the first frame of the grab
+sets the animation frame to 46 (tongue just returning to Yoshi's mouth)
+and a successful grab on the last frame of the grab,
+where Yoshi's tongue is extended to its max distance,
+sets the animation to frame 29, where Yoshi's tongue
+is just starting to return to his mouth from max distance.",medium,community,m27[0]
+,1,,,0x2C,,,,u32,,,,,m27[1]
+,2,,,0x2A,,,,u32,,,,,m27[2]
+,3,,,0x28,,,,u32,,,,,m27[3]
+,4,,,0x26,,,,u32,,,,,m27[4]
+,5,,,0x24,,,,u32,,,,,m27[5]
+,6,,,0x22,,,,u32,,,,,m27[6]
+,7,,,0x21,,,,u32,,,,,m27[7]
+,8,,,0x20,,,,u32,,,,,m27[8]
+,9,,,0x1F,,,,u32,,,,,m27[9]
+,10,,,0x1D,,,,u32,,,,,m27[10]
+22,0,,,0.7,0.7,2.4,0.68,f32,,,,,m28[*].0
+,1,,,2,2,3,2.2,f32,,,,,m28[*].1
+,2,,,0.66,0.66,0.66,0.5,f32,,,,,m28[*].2
+,3,,,0.45,0.45,0.45,0.45,f32,,,,,m28[*].3
+,4,,,20,20,15,20,f32,,,,,m28[*].4
+,5,,,100,80,28,120,f32,,,,,m28[*].5
+,6,,,1.8,1.5,0.07,1.25,f32,,,,,m28[*].6
+,7,,,1,1,0.28,1,f32,,,,,m28[*].7
+,8,,,7,7,0.2,10,f32,,,,,m28[*].8
+,9,,,9,8,8,8,f32,,,,,m28[*].9
+,10,,,2,2,2,2,f32,,,,,m28[*].10
+,11,,,10,10,10,14,f32,,,,,m28[*].11
+,12,,,0,0,-0.8,0,f32,,,,,m28[*].12
+,13,,,2.5,2.5,2.1,2.4,f32,,,,,m28[*].13
+,14,,,2,2,1,2,f32,,,,,m28[*].14
+,15,,,0.29,0.27,0.27,0.5,f32,,,,,m28[*].15
+23,0,,,0x2000001,,,,u32,Egg weapon param Name1?,,medium,community,m29[0].0
+,1,,,1,,,,f32,,,,,m29[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m29[0].2
+,3,,,0,,,,f32,,,,,m29[0].3
+,4,,,1,,,,f32,,,,,m29[0].4
+,5,,,0,,,,f32,,,,,m29[0].5
+24,0,firebreath?,0x02000000,5,,,,f32,,,,,m30[0].0
+,1,,0x02000001,0.15,,,,f32,,,,,m30[0].1
+,2,,0x12000002,0xF,,,,u32,,,,,m30[0].2
+25,0,firecannon?,0x02000000,5,,,,f32,,,,,m31[0].0
+,1,,0x12000001,0x46,,,,u32,,,,,m31[0].1

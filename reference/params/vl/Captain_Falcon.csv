@@ -1,0 +1,34 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,0.125,0.125,0.125,0.125,f32,Stick Y dead zone for angling the aerial Falcon Punch: |stick Y| below this = no angle.,,high,community | MSC captain.mscsb (vanilla) func_2257 | reads: MSC captain.mscsb func_2257,m12[*].0
+,1,,0x05000001,0.625,0.625,0.625,0.625,f32,Stick Y for the full angle: |stick Y| is clamped to this.,,high,community | MSC captain.mscsb (vanilla) func_2257 | reads: MSC captain.mscsb func_2257,m12[*].1
+,2,,0x05000002,35,35,35,35,f32,Max angle (degrees): angle = (|stick Y| - field 0) / (field 1 - field 0) x this.,,high,community | MSC captain.mscsb (vanilla) func_2257 | reads: MSC captain.mscsb func_2257,m12[*].2
+,3,,0x05000003,2.2,6.2,1.3,2.2,f32,"Speed along the punch angle when it moves (flag 0x2100000F): X = cos(angle) x this x facing, Y = sin(angle) x this.",,high,community | MSC captain.mscsb (vanilla) func_2255 | reads: MSC captain.mscsb func_2255,m12[*].3
+,4,,0x05000004,0.92,0.92,0.92,0.92,f32,"Speed multiplier applied every frame in phase 1 (status int 0x11000002 = 1, KineticModule 0x1).",,high,community | MSC captain.mscsb (vanilla) func_2256 | reads: MSC captain.mscsb func_2256,m12[*].4
+14,0,Side B,0x06000000,0.18,0.18,0.18,0.18,f32,H speed on hit -- Speed multiplier (KineticModule 0x8 on energy 3) in the grounded phase (status int 0x11000002 = 0) after a hit.,negative is equivalent of 0,medium,community | MSC captain.mscsb (vanilla) func_2281 | reads: MSC captain.mscsb func_2281,m13[*].0
+,1,,0x06000001,22,22,22,22,f32,Landing lag (frames),,high,community | MSC captain.mscsb (vanilla) func_2276 | reads: MSC captain.mscsb func_2276,m13[*].1
+,2,,0x06000002,40,40,40,40,f32,On-hit Landing lag (frames),,high,community | MSC captain.mscsb (vanilla) func_2282 | reads: MSC captain.mscsb func_2282,m13[*].2
+,3,,0x06000003,1,0.6,1,1,f32,H speed multiplier,,high,community | MSC captain.mscsb (vanilla) func_2271 | reads: MSC captain.mscsb func_2271,m13[*].3
+15,0,Up B,0x07000000,1.1,1.1,0,1.1,f32,How much you slide on ground aiming Up B,,medium,community | native 0x02EC6B00 (Captain specializer) | reads: native 0x02EC6C74 (fn 0x02EC6B00),m14[*].0
+,1,,0x07000001,6,6,0,6,f32,Something with mobility in aiming?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0.95,0.95,0.95,0.95,f32,Air mobility multiplier,,medium,community | native 0x02EC66D4 | reads: native 0x02EC6854 (fn 0x02EC66D4),m14[*].2
+,3,,0x07000003,0.7,0.7,0.7,0.7,f32,Special fall mobility (includes terminal velocity) -- Copied to status float 0x100000C at the start (special fall mobility).,,high,community | MSC captain.mscsb (vanilla) func_2284 | reads: MSC captain.mscsb func_2284,m14[*].3
+,4,,0x17000004,0x1E,0x1E,0x1E,0x1E,u32,Landing lag (frames),read during Up B on ground,high,community | MSC captain.mscsb (vanilla) func_2284 | reads: MSC captain.mscsb func_2284,m14[*].4
+,5,,0x07000005,0.225,0.225,0.225,0.225,f32,B-Reverse sensitivity -- Copied to status float 0x1000006 at the start.,,high,community | MSC captain.mscsb (vanilla) func_2284 | reads: MSC captain.mscsb func_2284,m14[*].5
+,6,,0x07000006,0.103,0.103,0.103,0.103,f32,Post-release gravity ratio,,medium,community | native 0x02EC66D4 | reads: native 0x02EC693C (fn 0x02EC66D4),m14[*].6
+,7,,0x07000007,1,1.2,0.8,1,f32,Height multiplier,,high,community | MSC captain.mscsb (vanilla) func_2284 | reads: MSC captain.mscsb func_2284,m14[*].7
+16,0,Down B,0x08000000,0.8,0.95,1,0.66,f32,Speed multiplier on hit,,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
+,1,,0x18000001,0x4,0x4,0x0,0x4,u32,Frames: copied to status int 0x11000003 when Falcon Kick starts (a phase timer).,Set as RA-Basic 3 in MSC,medium,MSC captain.mscsb (vanilla) func_2300 | reads: MSC captain.mscsb func_2300,m15[*].1
+,2,,0x08000002,0.95,1,1,1,f32,Frame speed multiplier for SpecialLwEnd,,high,community | MSC captain.mscsb (vanilla) func_2304 | reads: MSC captain.mscsb func_2304,m15[*].2
+,3,,0x08000003,0.95,0.8,0.8,1,f32,Frame speed multiplier for SpecialAirLwEnd,(Air-to-ground animation),high,community | MSC captain.mscsb (vanilla) func_2304 | reads: MSC captain.mscsb func_2304,m15[*].3
+,4,,0x08000004,0.12,0.12,0.12,0.12,f32,Ground friction during SpecialLwEnd with RA-Bit 13 set,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,0,Final Smash,0x04000000,30,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,20,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,50,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,50,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,200,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,0.75,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
+,7,,0x04000007,18.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,4,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
+,9,,0x04000009,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.9
+,10,,0x0400000A,0.01,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.10

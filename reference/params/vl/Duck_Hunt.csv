@@ -1,0 +1,423 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,0.3,0.1,0.1,0.3,f32,,,,,m12[*].0
+,1,,0x05000001,8,16,8,8,f32,How long before you can do more inputs to make the can bounce,,medium,community,m12[*].1
+,2,,0x05000002,10,10,10,10,f32,,,,,m12[*].2
+14,0,Side B,0x06000000,1.3,1.3,1.3,1.3,f32,,,,,m13[*].0
+,1,,0x06000001,0.7,0.7,0.7,0.7,f32,,,,,m13[*].1
+,2,,0x06000002,8,8,14,8,f32,,,,,m13[*].2
+,3,,0x06000003,6,6,1,6,f32,,,,,m13[*].3
+,4,,0x06000004,3,3,1,3,f32,Y offset of the second shot,,medium,community,m13[*].4
+,5,,0x06000005,5,5,5,5,f32,,,,,m13[*].5
+,6,,0x06000006,5,5,5,5,f32,,,,,m13[*].6
+,7,,0x06000007,0.2,0.2,1,0.2,f32,,,,,m13[*].7
+,8,,0x06000008,0.2,0.2,0.6,0.2,f32,,,,,m13[*].8
+,9,,0x06000009,17,67,15,12,f32,,,,,m13[*].9
+15,0,Up B,0x07000000,0.6,0.6,0.5,0.6,f32,H speed multiplier on startup,,medium,community,m14[*].0
+,1,,0x07000001,0.7,0.7,0.2,0.7,f32,V speed mutiplier on startup,,medium,community,m14[*].1
+,2,,0x07000002,0.5,0.5,0.2,0.5,f32,Added V speed on aerial startup,,medium,community,m14[*].2
+,3,,0x07000003,1,1,1,1,f32,Gravity multiplier on startup,,medium,community,m14[*].3
+,4,,0x07000004,0.5,0.4,0.2,0.5,f32,Initial H speed,,medium,community,m14[*].4
+,5,,0x07000005,1,-3.5,1,1,f32,Initial V speed,,medium,community,m14[*].5
+,6,,0x07000006,1.05,1.05,0.9,1.25,f32,H max speed,,medium,community,m14[*].6
+,7,,0x07000007,0.01,0.015,0.01,0.01,f32,Air friction rate,,medium,community,m14[*].7
+,8,,0x07000008,0.072,0.072,0.072,0.072,f32,Gravity,,medium,community,m14[*].8
+,9,,0x07000009,1.5,1.5,1.8,1.5,f32,Max fall speed,,medium,community,m14[*].9
+,10,,0x0700000A,1,0.9,2,1,f32,Gravity multiplier,,medium,community,m14[*].10
+,11,,0x0700000B,1.2,1.2,0.8,1.2,f32,max fall speed multiplier,,medium,community,m14[*].11
+,12,,0x0700000C,0.81,1.6,4.1,0.84,f32,Added V speed,,medium,community,m14[*].12
+,13,,0x0700000D,0.35,0.35,0.1,0.35,f32,Added H speed multiplier,This * previous H speed is added to H speed when abs(StickX) > 0.1,medium,community,m14[*].13
+,14,,0x0700000E,0.025,0.052,0.014,0.025,f32,StickX * this is added to H speed,H speed += (StickX * Name14) - (H speed * Name7),medium,community,m14[*].14
+,15,,0x0700000F,10,10,25,10,f32,Gravity duration?,,medium,community,m14[*].15
+,16,,0x17000010,0x7,0x3,0x1,0x7,u32,Carry duration (half-seconds)?,,medium,community,m14[*].16
+,17,,0x07000011,30,28,38,30,f32,Landing lag (frames),,medium,community,m14[*].17
+16,0,Down B,0x08000000,0.7,0.7,0.7,0.7,f32,H speed mutiplier on startup,,medium,community,m15[*].0
+,1,,0x08000001,0.6,0.6,0.6,0.6,f32,V speed multiplier on startup,,medium,community,m15[*].1
+,2,,0x08000002,0.6,0.6,0.6,0.6,f32,Added V speed on aerial startup,,medium,community,m15[*].2
+,3,,0x08000003,6,6,4,6,f32,,,,,m15[*].3
+,4,,0x08000004,10,10,13,10,f32,,,,,m15[*].4
+,0,?,0x04000000,2,,,,f32,?,,medium,community,m16.0
+,1,Fsmash,0x04000001,1.5,,,,f32,Fully-charged Fsmash hitbox X offset multiplier,,medium,community,m16.1
+,2,,0x04000002,0,,,,f32,Fsmash hitbox X offset randomness,,medium,community,m16.2
+,3,,0x04000003,0.5,,,,f32,Fsmash hitbox Y offset randomness,,medium,community,m16.3
+,4,?,0x04000004,10,,,,f32,?,,medium,community,m16.4
+,5,,0x04000005,10,,,,f32,?,,medium,community,m16.5
+,6,Final Smash,0x04000006,49,,,,f32,Frames to transition to Action 0x15c (this - 1),"(Action 0x15b, MSC script_2305)",medium,community,m16.6
+,7,,0x04000007,85,,,,f32,Frames to transition to Action 0x15d,"(Action 0x15c, MSC script_2311)",medium,community,m16.7
+,8,,0x04000008,44,,,,f32,Frames to transition to Action 0x15e,"(Action 0x15d, MSC script_2317)",medium,community,m16.8
+,9,,0x04000009,55,,,,f32,Frames to transition to Action 0x15f,"(Action 0x15e, MSC script_2323)",medium,community,m16.9
+,10,,0x0400000A,75,,,,f32,Frames to transition to Action 0x160,"(Action 0x15f, MSC script_2329)",medium,community,m16.10
+,11,,0x0400000B,35,,,,f32,,,,,m16.11
+,12,,0x0400000C,40,,,,f32,,,,,m16.12
+,13,,0x0400000D,0,,,,f32,,,,,m16.13
+,14,,0x0400000E,-11,,,,f32,,,,,m16.14
+,15,,0x0400000F,-20,,,,f32,,,,,m16.15
+,16,,0x04000010,-28,,,,f32,,,,,m16.16
+,17,,0x04000011,-32,,,,f32,,,,,m16.17
+,18,,0x04000012,-20,,,,f32,,,,,m16.18
+,19,,0x04000013,-4.5,,,,f32,,,,,m16.19
+,20,,0x04000014,-8,,,,f32,,,,,m16.20
+,21,,0x04000015,-33,,,,f32,,,,,m16.21
+,22,,0x04000016,-46,,,,f32,,,,,m16.22
+,23,,0x04000017,-11,,,,f32,,,,,m16.23
+,24,,0x04000018,-38,,,,f32,,,,,m16.24
+,25,,0x04000019,-60,,,,f32,,,,,m16.25
+,26,,0x0400001A,0,,,,f32,,,,,m16.26
+,27,,0x0400001B,0,,,,f32,,,,,m16.27
+,28,,0x0400001C,160,,,,f32,?,,medium,community,m16.28
+,29,,0x0400001D,0.75,,,,f32,,,,,m16.29
+,30,,0x0400001E,1,,,,f32,,,,,m16.30
+,31,,0x0400001F,-15,,,,f32,,,,,m16.31
+,32,,0x04000020,-20,,,,f32,,,,,m16.32
+,33,,0x04000021,-33,,,,f32,,,,,m16.33
+,34,,0x04000022,-5,,,,f32,,,,,m16.34
+,35,,0x04000023,-50,,,,f32,,,,,m16.35
+,36,,0x04000024,0,,,,f32,,,,,m16.36
+,37,,0x04000025,-3,,,,f32,,,,,m16.37
+,38,,0x04000026,-45,,,,f32,,,,,m16.38
+,39,,0x04000027,-25,,,,f32,,,,,m16.39
+,40,,0x04000028,18,,,,f32,,,,,m16.40
+,41,,0x04000029,-27,,,,f32,,,,,m16.41
+,42,,0x0400002A,-48,,,,f32,,,,,m16.42
+,43,,0x0400002B,0,,,,f32,,,,,m16.43
+,44,,0x0400002C,0,,,,f32,,,,,m16.44
+,45,,0x0400002D,6,,,,f32,,,,,m16.45
+,46,,0x0400002E,8,,,,f32,,,,,m16.46
+,47,,0x0400002F,24,,,,f32,,,,,m16.47
+,48,,0x04000030,0.12,,,,f32,,,,,m16.48
+17,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
+,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17[0].1
+18,0,Reticle,0x02000000,1,,,,f32,Reticle GFX size multiplier,"affects to Can, Clay and all smashes",medium,community,m18[0].0
+,1,,0x02000001,80,,,,f32,,,,,m18[0].1
+,2,,0x12000002,0xFF,,,,u32,"Reticle Scope color values (Player 1)
+RGB: 0xFF0000 (Red)
+Sample",,medium,community,m18[0].2
+,3,,0x12000003,0x0,,,,u32,,,,,m18[0].3
+,4,,0x12000004,0x0,,,,u32,,,,,m18[0].4
+,5,,0x12000005,0x14,,,,u32,"Reticle Scope color values (Player 2)
+RGB: 0x145AFF (Blue)
+Sample",,medium,community,m18[0].5
+,6,,0x12000006,0x5A,,,,u32,,,,,m18[0].6
+,7,,0x12000007,0xFF,,,,u32,,,,,m18[0].7
+,8,,0x12000008,0xFF,,,,u32,"Reticle Scope color values (Player 3)
+RGB: 0xFFC814 (Yellow)
+Sample",,medium,community,m18[0].8
+,9,,0x12000009,0xC8,,,,u32,,,,,m18[0].9
+,10,,0x1200000A,0x14,,,,u32,,,,,m18[0].10
+,11,,0x1200000B,0x14,,,,u32,"Reticle Scope color values (Player 4)
+RGB: 0x14B400 (Green)
+Sample",,medium,community,m18[0].11
+,12,,0x1200000C,0xB4,,,,u32,,,,,m18[0].12
+,13,,0x1200000D,0x0,,,,u32,,,,,m18[0].13
+,14,,0x1200000E,0xFF,,,,u32,"Reticle Scope color values (Player 5)
+RGB: 0xFF7800 (Orange)
+Sample",,medium,community,m18[0].14
+,15,,0x1200000F,0x78,,,,u32,,,,,m18[0].15
+,16,,0x12000010,0x0,,,,u32,,,,,m18[0].16
+,17,,0x12000011,0x0,,,,u32,"Reticle Scope color values (Player 6)
+RGB: 0x00FFD7 (Cyan)
+Sample",,medium,community,m18[0].17
+,18,,0x12000012,0xFF,,,,u32,,,,,m18[0].18
+,19,,0x12000013,0xD7,,,,u32,,,,,m18[0].19
+,20,,0x12000014,0xC8,,,,u32,"Reticle Scope color values (Player 7)
+RGB: 0xC800FF (Purple)
+Sample",,medium,community,m18[0].20
+,21,,0x12000015,0x0,,,,u32,,,,,m18[0].21
+,22,,0x12000016,0xFF,,,,u32,,,,,m18[0].22
+,23,,0x12000017,0x60,,,,u32,"Reticle Scope color values (Player 8)
+RGB: 0x604987 (Dark Purple)
+Sample",,medium,community,m18[0].23
+,24,,0x12000018,0x49,,,,u32,,,,,m18[0].24
+,25,,0x12000019,0x87,,,,u32,,,,,m18[0].25
+,26,,0x1200001A,0x82,,,,u32,"Reticle Scope color values (CPU, amiibo)
+RGB: 0x828282 (Gray)
+Sample",,medium,community,m18[0].26
+,27,,0x1200001B,0x82,,,,u32,,,,,m18[0].27
+,28,,0x1200001C,0x82,,,,u32,,,,,m18[0].28
+19,0,Can,0x02000000,600,70,900,600,f32,Frames before flashing,,medium,community,m19[*].0
+,1,,0x02000001,0.3,1.8,1.5,0.3,f32,Initial H speed,,medium,community,m19[*].1
+,2,,0x02000002,1,1.4,1.4,1,f32,Initial V speed,,medium,community,m19[*].2
+,3,,0x02000003,0.04,0.07,0.05,0.04,f32,Gravity on launching,,medium,community,m19[*].3
+,4,,0x02000004,1.2,2,1.3,1.2,f32,Max fall speed on launching,,medium,community,m19[*].4
+,5,,0x02000005,2,1.1,1.1,2,f32,,,,,m19[*].5
+,6,,0x02000006,0.3,0.3,0.2,0.3,f32,Max fall speed,,medium,community,m19[*].6
+,7,,0x02000007,3,3,3,3,f32,,Maximum value for something?,,,m19[*].7
+,8,,0x02000008,15,15,15,15,f32,,Maximum value for something?,,,m19[*].8
+,9,,0x02000009,100,100,0,100,f32,% chance the can goes forward when shot,,medium,community,m19[*].9
+,10,,0x0200000A,0.12,0.12,0.08,0.12,f32,,,,,m19[*].10
+,11,,0x0200000B,0.15,3,0.08,0.15,f32,Added V speed,,medium,community,m19[*].11
+,12,,0x0200000C,0.021,0.021,0.01,0.021,f32,,,,,m19[*].12
+,13,,0x0200000D,0.5,0.5,0.5,0.5,f32,,,,,m19[*].13
+,14,,0x0200000E,0,0,0,0,f32,,,,,m19[*].14
+,15,,0x0200000F,0.001,0.001,0,0.001,f32,,,,,m19[*].15
+,16,,0x02000010,0.015,0.015,0,0.015,f32,,,,,m19[*].16
+,17,,0x02000011,25,25,20,25,f32,Related to launch speed,,medium,community,m19[*].17
+,18,,0x02000012,60,60,120,60,f32,,,,,m19[*].18
+,19,,0x02000013,5,5,5,5,f32,,,,,m19[*].19
+,20,,0x02000014,5,5,5,5,f32,Max added V speed,,medium,community,m19[*].20
+,21,,0x02000015,20,20,20,20,f32,,,,,m19[*].21
+,22,,0x02000016,40,40,40,40,f32,,,,,m19[*].22
+,23,,0x02000017,1,1,1,1,f32,Max V speed,,medium,community,m19[*].23
+,24,,0x02000018,30,30,30,30,f32,,,,,m19[*].24
+,25,,0x02000019,0.1,0.1,0.1,0.1,f32,,,,,m19[*].25
+,26,,0x0200001A,6,1,1,6,f32,Launch delay after getting hit?,,medium,community,m19[*].26
+,27,,0x0200001B,1,1,1,1,f32,Base damage,Damage = This + (Name28 * total speed) in some situation,medium,community,m19[*].27
+,28,,0x0200001C,1,0,1,1,f32,This * Can speed is added to base damage,,medium,community,m19[*].28
+,29,,0x1200001D,0x1,0x0,0x0,0x1,u32,,,,,m19[*].29
+,30,,0x0200001E,0.5,0.1,0.85,0.5,f32,Speed multiplier,,medium,community,m19[*].30
+,31,,0x0200001F,40,1,40,40,f32,Amount of damage for flashing?,,medium,community,m19[*].31
+,32,,0x02000020,0.3,1,0.3,0.3,f32,,,,,m19[*].32
+,33,,0x12000021,0x8,0x1,0x9,0x8,u32,Number of times shot for flashing?,,medium,community,m19[*].33
+,34,,0x02000022,60,1,20,60,f32,,Frames,,,m19[*].34
+,35,,0x02000023,0.2,0.2,0.2,0.2,f32,H speed multiplier,,medium,community,m19[*].35
+,36,,0x02000024,1,1,1.5,1,f32,V speed multiplier,,medium,community,m19[*].36
+,37,,0x02000025,0.06,0.06,0.03,0.06,f32,Gravity,,medium,community,m19[*].37
+,38,,0x02000026,3,3,3,3,f32,,Max V speed,,,m19[*].38
+,39,,0x02000027,20,20,10,20,f32,,,,,m19[*].39
+,0,,,10,,,,f32,,,,,m20.0
+,1,,,22,,,,f32,,,,,m20.1
+,2,,,-9,,,,f32,,,,,m20.2
+,3,,,16,,,,f32,,,,,m20.3
+,4,,,-9,,,,f32,,,,,m20.4
+,0,,,0x1,,,,u32,,,,,m21.0
+,1,,,3.9,,,,f32,,,,,m21.1
+,2,,,-3.9,,,,f32,,,,,m21.2
+,3,,,3,,,,f32,,,,,m21.3
+20,0,Can Hurtbox,,0,,,,f32,X offset,,medium,community,m22[0].0
+,1,,,0,,,,f32,Y offset,,medium,community,m22[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m22[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m22[0].3
+,4,,,0,,,,f32,Y2 offset,,medium,community,m22[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m22[0].5
+,6,,,4.2,,,,f32,Size,,medium,community,m22[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m22[0].7
+,8,,,0x0,,,,u32,,,,,m22[0].8
+,9,,,0x1,,,,u32,,,,,m22[0].9
+,10,,,0x0,,,,u32,,,,,m22[0].10
+,11,,,0x0,,,,u32,,,,,m22[0].11
+21,0,Clay,0x02000000,1.4,1.6,2,1.4,f32,Initial H speed,,medium,community,m23[*].0
+,1,,0x02000001,0.4,-0.2,0.6,0.4,f32,Initial V speed,,medium,community,m23[*].1
+,2,,0x02000002,1.9,2.4,2.4,1.9,f32,Initial H speed (smash input),,medium,community,m23[*].2
+,3,,0x02000003,0.26,-0.45,0.8,0.26,f32,Initial V speed (smash input),,medium,community,m23[*].3
+,4,,0x02000004,0.01,0,0.005,0.01,f32,Air friction,,medium,community,m23[*].4
+,5,,0x02000005,0.012,-0.03,0.02,0.012,f32,Gravity,,medium,community,m23[*].5
+,6,,0x02000006,2,2,3,2,f32,Max fall speed,,medium,community,m23[*].6
+,7,,0x02000007,0.4,0.4,5,0.4,f32,"Speed threshold for something (sys_2E(0x2722, 0xX))",,medium,community,m23[*].7
+,8,,0x02000008,10,10,10,10,f32,,,,,m23[*].8
+,9,,0x02000009,0.5,1.4,1,1,f32,,,,,m23[*].9
+,10,,0x0200000A,0.9,0,0.5,0.5,f32,,,,,m23[*].10
+,11,,0x0200000B,5,5,5,5,f32,,,,,m23[*].11
+,12,,0x0200000C,0.5,0,0.5,0.5,f32,,,,,m23[*].12
+,13,,0x0200000D,0.4,0.9,0.4,0.4,f32,,,,,m23[*].13
+,14,,0x0200000E,5,5,5,5,f32,,,,,m23[*].14
+,15,,0x0200000F,160,78,110,160,f32,Maximum lifetime (frames),,medium,community,m23[*].15
+,0,,,0x1,,,,u32,,,,,m24.0
+,1,,,0.75,,,,f32,,,,,m24.1
+,2,,,-0.75,,,,f32,,,,,m24.2
+,3,,,3,,,,f32,,,,,m24.3
+22,0,Clay Hurtbox,,0,,,,f32,X offset,,medium,community,m25[0].0
+,1,,,0,,,,f32,Y offset,,medium,community,m25[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m25[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m25[0].3
+,4,,,0,,,,f32,Y2 offset,,medium,community,m25[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m25[0].5
+,6,,,4.2,,,,f32,Size,,medium,community,m25[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m25[0].7
+,8,,,0x0,,,,u32,,,,,m25[0].8
+,9,,,0x1,,,,u32,,,,,m25[0].9
+,10,,,0x0,,,,u32,,,,,m25[0].10
+,11,,,0x2,,,,u32,,,,,m25[0].11
+23,0,Gunmans,0x02000000,0.3,0.3,0.3,0.3,f32,Added V speed aerial startup,,medium,community,m26[*].0
+,1,,0x02000001,0.02,0.02,0.05,0.02,f32,Gravity on startup,,medium,community,m26[*].1
+,2,,0x02000002,0.5,0.5,1.3,0.5,f32,Max fall speed on startup,,medium,community,m26[*].2
+,3,,0x02000003,1,0.3,5,1,f32,Number of seconds to turn (Black Vest & Brown Hat),,medium,community,m26[*].3
+,4,,0x02000004,1.2,0.36,6,1.2,f32,Number of seconds to turn (White Shirt & Brown Hat),,medium,community,m26[*].4
+,5,,0x02000005,0.8,0.24,4,0.8,f32,Number of seconds to turn (Black Coat & Hat),,medium,community,m26[*].5
+,6,,0x02000006,0.9,0.27,4.5,0.9,f32,Number of seconds to turn (Sombrero),,medium,community,m26[*].6
+,7,,0x02000007,0.6,0.18,3,0.6,f32,Number of seconds to turn (Brown Coat & Hat),,medium,community,m26[*].7
+,8,,0x02000008,8,6.5,9,8,f32,,Names 8-12 related to range,,,m26[*].8
+,9,,0x02000009,9,7,10,9,f32,,,,,m26[*].9
+,10,,0x0200000A,8,6.5,9,8,f32,,,,,m26[*].10
+,11,,0x0200000B,5,5,6,5,f32,,,,,m26[*].11
+,12,,0x0200000C,8,6.5,9,8,f32,,,,,m26[*].12
+,13,,0x0200000D,12,20,12,12,f32,Firing frame after turn,Firing frame = INT(Names3-7 * 60 * Name25 + Name13),medium,community,m26[*].13
+,14,,0x0200000E,100,80,50,100,f32,Lifetime after firing (frames),Gunman will face screen with 40 frames lifetime left (set in MSC),medium,community,m26[*].14
+,15,,0x0200000F,5,1,40,5,f32,HP,,medium,community,m26[*].15
+,16,,0x02000010,11,15,8,11,f32,,,,,m26[*].16
+,17,,0x02000011,1.6,2,1.2,1.6,f32,Max fall speed,,medium,community,m26[*].17
+,18,,0x02000012,100,100,100,100,f32,,White Shirt & Brown Hat? Probability of not launching?,,,m26[*].18
+,19,,0x02000013,100,100,100,100,f32,,Black Coat & Hat? Probability of not launching?,,,m26[*].19
+,20,,0x02000014,2.5,2.5,2.5,2.5,f32,Lifetime after launched (seconds) (Black Vest & Brown Hat),,medium,community,m26[*].20
+,21,,0x02000015,2.5,2.5,2.5,2.5,f32,Lifetime after launched (seconds) (White Shirt & Brown Hat),,medium,community,m26[*].21
+,22,,0x02000016,2.5,2.5,2.5,2.5,f32,Lifetime after launched (seconds) (Black Coat & Hat),,medium,community,m26[*].22
+,23,,0x02000017,2.5,2.5,2.5,2.5,f32,Lifetime after launched (seconds) (Sombrero),,medium,community,m26[*].23
+,24,,0x02000018,2.5,2.5,2.5,2.5,f32,Lifetime after launched (seconds) (Brown Coat & Hat),,medium,community,m26[*].24
+,25,,0x02000019,1,1,1,1,f32,Number of seconds to turn multiplier,,medium,community,m26[*].25
+,0,Gunmans,,0x1,,,,u32,Black Vest & Brown Hat,,medium,community,m27.0
+,1,,,16,,,,f32,,,,,m27.1
+,2,,,0,,,,f32,,,,,m27.2
+,3,,,3,,,,f32,,,,,m27.3
+,0,,,0x1,,,,u32,,,,,m28.0
+,1,,,6,,,,f32,,,,,m28.1
+,2,,,0,,,,f32,,,,,m28.2
+,3,,,4,,,,f32,,,,,m28.3
+,0,,,0x1,,,,u32,White Shirt & Brown Hat,,medium,community,m29.0
+,1,,,18,,,,f32,,,,,m29.1
+,2,,,0,,,,f32,,,,,m29.2
+,3,,,2.5,,,,f32,,,,,m29.3
+,0,,,0x1,,,,u32,,,,,m30.0
+,1,,,6,,,,f32,,,,,m30.1
+,2,,,0,,,,f32,,,,,m30.2
+,3,,,4,,,,f32,,,,,m30.3
+,0,,,0x1,,,,u32,Black Coat & Hat,,medium,community,m31.0
+,1,,,20,,,,f32,,,,,m31.1
+,2,,,0,,,,f32,,,,,m31.2
+,3,,,3.5,,,,f32,,,,,m31.3
+,0,,,0x1,,,,u32,,,,,m32.0
+,1,,,6,,,,f32,,,,,m32.1
+,2,,,0,,,,f32,,,,,m32.2
+,3,,,4,,,,f32,,,,,m32.3
+,0,,,0x1,,,,u32,Sombrero,,medium,community,m33.0
+,1,,,15,,,,f32,,,,,m33.1
+,2,,,0,,,,f32,,,,,m33.2
+,3,,,4,,,,f32,,,,,m33.3
+,0,,,0x1,,,,u32,,,,,m34.0
+,1,,,6,,,,f32,,,,,m34.1
+,2,,,0,,,,f32,,,,,m34.2
+,3,,,4,,,,f32,,,,,m34.3
+,0,,,0x1,,,,u32,Brown Coat & Hat,,medium,community,m35.0
+,1,,,18,,,,f32,,,,,m35.1
+,2,,,0,,,,f32,,,,,m35.2
+,3,,,3.5,,,,f32,,,,,m35.3
+,0,,,0x1,,,,u32,,,,,m36.0
+,1,,,6,,,,f32,,,,,m36.1
+,2,,,0,,,,f32,,,,,m36.2
+,3,,,4,,,,f32,,,,,m36.3
+24,0,"Black Vest
+& Brown Hat
+Hurtbox",,0,,,,f32,X offset,,medium,community,m37[0].0
+,1,,,2.5,,,,f32,Y offset,,medium,community,m37[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m37[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m37[0].3
+,4,,,13,,,,f32,Y2 offset,,medium,community,m37[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m37[0].5
+,6,,,4,,,,f32,Size,,medium,community,m37[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m37[0].7
+,8,,,0x0,,,,u32,,,,,m37[0].8
+,9,,,0x1,,,,u32,,,,,m37[0].9
+,10,,,0x0,,,,u32,,,,,m37[0].10
+,11,,,0x2,,,,u32,,,,,m37[0].11
+25,0,"White Shirt
+& Brown Hat
+Hurtbox",,0,,,,f32,X offset,,medium,community,m38[0].0
+,1,,,12.5,,,,f32,Y offset,,medium,community,m38[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m38[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m38[0].3
+,4,,,16,,,,f32,Y2 offset,,medium,community,m38[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m38[0].5
+,6,,,4,,,,f32,Size,,medium,community,m38[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m38[0].7
+,8,,,0x0,,,,u32,,,,,m38[0].8
+,9,,,0x1,,,,u32,,,,,m38[0].9
+,10,,,0x0,,,,u32,,,,,m38[0].10
+,11,,,0x2,,,,u32,,,,,m38[0].11
+,0,,,0,,,,f32,X offset,,medium,community,m38[1].0
+,1,,,2.5,,,,f32,Y offset,,medium,community,m38[1].1
+,2,,,0,,,,f32,Z offset,,medium,community,m38[1].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m38[1].3
+,4,,,7,,,,f32,Y2 offset,,medium,community,m38[1].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m38[1].5
+,6,,,4,,,,f32,Size,,medium,community,m38[1].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m38[1].7
+,8,,,0x2,,,,u32,,,,,m38[1].8
+,9,,,0x1,,,,u32,,,,,m38[1].9
+,10,,,0x0,,,,u32,,,,,m38[1].10
+,11,,,0x2,,,,u32,,,,,m38[1].11
+26,0,"Black Coat & Hat
+Hurtbox",,0,,,,f32,X offset,,medium,community,m39[0].0
+,1,,,12.5,,,,f32,Y offset,,medium,community,m39[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m39[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m39[0].3
+,4,,,17,,,,f32,Y2 offset,,medium,community,m39[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m39[0].5
+,6,,,4,,,,f32,Size,,medium,community,m39[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m39[0].7
+,8,,,0x0,,,,u32,,,,,m39[0].8
+,9,,,0x1,,,,u32,,,,,m39[0].9
+,10,,,0x0,,,,u32,,,,,m39[0].10
+,11,,,0x2,,,,u32,,,,,m39[0].11
+,0,,,0,,,,f32,X offset,,medium,community,m39[1].0
+,1,,,2.5,,,,f32,Y offset,,medium,community,m39[1].1
+,2,,,0,,,,f32,Z offset,,medium,community,m39[1].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m39[1].3
+,4,,,7,,,,f32,Y2 offset,,medium,community,m39[1].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m39[1].5
+,6,,,4,,,,f32,Size,,medium,community,m39[1].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m39[1].7
+,8,,,0x2,,,,u32,,,,,m39[1].8
+,9,,,0x1,,,,u32,,,,,m39[1].9
+,10,,,0x0,,,,u32,,,,,m39[1].10
+,11,,,0x2,,,,u32,,,,,m39[1].11
+27,0,"Sombrero
+Hurtbox",,0,,,,f32,X offset,,medium,community,m40[0].0
+,1,,,2.5,,,,f32,Y offset,,medium,community,m40[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m40[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m40[0].3
+,4,,,12,,,,f32,Y2 offset,,medium,community,m40[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m40[0].5
+,6,,,4,,,,f32,Size,,medium,community,m40[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m40[0].7
+,8,,,0x0,,,,u32,,,,,m40[0].8
+,9,,,0x1,,,,u32,,,,,m40[0].9
+,10,,,0x0,,,,u32,,,,,m40[0].10
+,11,,,0x2,,,,u32,,,,,m40[0].11
+28,0,"Brown Coat & Hat
+Hurtbox",,0,,,,f32,X offset,,medium,community,m41[0].0
+,1,,,2.5,,,,f32,Y offset,,medium,community,m41[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m41[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m41[0].3
+,4,,,15,,,,f32,Y2 offset,,medium,community,m41[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m41[0].5
+,6,,,4,,,,f32,Size,,medium,community,m41[0].6
+,7,,,0x7D0,,,,u32,Bone,,medium,community,m41[0].7
+,8,,,0x0,,,,u32,,,,,m41[0].8
+,9,,,0x1,,,,u32,,,,,m41[0].9
+,10,,,0x0,,,,u32,,,,,m41[0].10
+,11,,,0x2,,,,u32,,,,,m41[0].11
+,0,,,0.7,,,,f32,,,,,m42.0
+,1,,,0.7,,,,f32,,,,,m42.1
+,2,,,0.3,,,,f32,,,,,m42.2
+,3,,,0.3,,,,f32,,,,,m42.3
+,4,,,0.1,,,,f32,,,,,m42.4
+,5,,,1.4,,,,f32,,,,,m42.5
+,6,,,8,,,,f32,,,,,m42.6
+,7,,,10,,,,f32,,,,,m42.7
+,8,,,18,,,,f32,,,,,m42.8
+,9,,,18,,,,f32,,,,,m42.9
+,10,,,1,,,,f32,,,,,m42.10
+29,0,"""Black Coat & Hat""
+gunman hat",0x02000000,0.22,0.22,0.22,0.22,f32,"""Black Coat and Hat"" gunman hat H speed",,medium,community,m43[*].0
+,1,,0x02000001,0.92,0.92,0.92,0.92,f32,"""Black Coat and Hat"" gunman hat initial V speed",,medium,community,m43[*].1
+,2,,0x02000002,0.022,0.022,0.022,0.022,f32,"""Black Coat and Hat"" gunman hat gravity",,medium,community,m43[*].2
+,0,,,0x1,,,,u32,,,,,m44.0
+,1,,,2,,,,f32,,,,,m44.1
+,2,,,0,,,,f32,,,,,m44.2
+,3,,,2,,,,f32,,,,,m44.3
+30,0,,,0x2000019,,,,u32,0x02000019,,medium,community,m45[0].0
+,1,,,1,,,,f32,,,,,m45[0].1
+,2,,,0.5,,,,f32,Multiplier?,,medium,community,m45[0].2
+,3,,,0,,,,f32,,,,,m45[0].3
+,4,,,2,,,,f32,,,,,m45[0].4
+,5,,,0,,,,f32,,,,,m45[0].5
+31,0,Article params (finalduck),0x02000000,0,,,,f32,,,,,m46[0]
+32,0,Article params (finalenemy),0x02000000,90,,,,f32,,,,,m47[0].0
+,1,,0x12000001,0xC,,,,u32,,,,,m47[0].1
+,2,,0x12000002,0x12,,,,u32,,,,,m47[0].2
+,3,,0x12000003,0x18,,,,u32,,,,,m47[0].3
+,4,,0x12000004,0x1E,,,,u32,,,,,m47[0].4
+33,0,Article params (finalbird),0x02000000,30,,,,f32,,,,,m48[0].0
+,1,,0x02000001,40,,,,f32,,,,,m48[0].1
+,2,,0x02000002,-15,,,,f32,,,,,m48[0].2
+,3,,0x02000003,30,,,,f32,,,,,m48[0].3
+,4,,0x02000004,40,,,,f32,,,,,m48[0].4
+,5,,0x02000005,-100,,,,f32,,,,,m48[0].5
+,6,,0x12000006,0xF0,,,,u32,,,,,m48[0].6

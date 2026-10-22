@@ -1,0 +1,719 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,12,16,14,15,f32,How long it takes to scroll through each fruit (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3869",m12[*].0
+,1,,0x05000001,1.6,1.6,1.6,1.6,f32,Max V speed,,medium,community,m12[*].1
+,2,,0x05000002,0.5,0.5,0.5,0.5,f32,Gravity multiplier while charging,,medium,community,m12[*].2
+,3,,0x05000003,0.9,0.9,0.9,0.9,f32,Max fall speed multiplier while charging,,medium,community,m12[*].3
+,4,,0x15000004,0x10,0x10,0x10,0x10,u32,"[auto] debug print ""Pacman status_SpecialN ChargeRank:%d""",,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3869",m12[*].4
+,5,,0x15000005,0x1,0x1,0x1,0x5,u32,# of Bonus Fruits on screen?,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3864",m12[*].5
+14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,H speed multiplier for SpecialSStart,,medium,community,m13[*].0
+,1,,0x06000001,0.7,0.5,0.5,0.5,f32,V speed multiplier for SpecialSStart,,medium,community,m13[*].1
+,2,,0x06000002,0.8,1,0.3,0.6,f32,Max fall speed multiplier,,medium,community,m13[*].2
+,3,,0x16000003,0xC,0xC,0x14,0xC,u32,Min duration of SpecialSLoop,,medium,community,m13[*].3
+,4,,0x16000004,0x2D,0x28,0x3C,0x1E,u32,Max duration of SpecialSLoop,,medium,community,m13[*].4
+,5,,0x06000005,8,8,8,8,f32,,,,,m13[*].5
+,6,,0x06000006,6,6,6,6,f32,this * model scale is added to V speed,,medium,community,m13[*].6
+,7,,0x06000007,0.8,1.2,0.5,0.8,f32,Initial speed,,medium,community,m13[*].7
+,8,,0x06000008,0.18,0.1,0.5,0.18,f32,H acceleration,,medium,community,m13[*].8
+,9,,0x06000009,3,2.9,2,3,f32,H max speed,,medium,community,m13[*].9
+,10,,0x0600000A,0.1,1.8,3,4,f32,Min base damage of SpecialSMove (Min speed),Dmg = 4 + (5 - 4) * (Speed - 0.8) / (3 - 0.8),medium,community,m13[*].10
+,11,,0x0600000B,0.15,2.2,4,5,f32,Max base damage of SpecialSMove (Max speed),,medium,community,m13[*].11
+,12,,0x0600000C,30,30,30,30,f32,,Set as localVar 0x16 in script_2335 but unused?,,,m13[*].12
+,13,,0x0600000D,2,1.5,2.5,1.8,f32,Min travel speed on SpecialSDash (Min charge),,medium,community,m13[*].13
+,14,,0x0600000E,3.1,1.5,3.2,3,f32,Max travel speed on SpecialSDash (Max charge),Related to min pellet hold time,medium,community,m13[*].14
+,15,,0x0600000F,0.02,0.02,0.02,0.02,f32,Gravity on SpecialSDash,Related to max pellet hold time,medium,community,m13[*].15
+,16,,0x06000010,1,1,3,1,f32,Minimum total speed for SpecialSDash to decelerate,,medium,community,m13[*].16
+,17,,0x06000011,0.12,0.06,0.06,0.06,f32,Decel after flying,,medium,community,m13[*].17
+,18,,0x06000012,0.1,3,4,4,f32,Min base damage of SpecialSDash (Min charge),,medium,community,m13[*].18
+,19,,0x06000013,0.15,5,10,8,f32,Max base damage of SpecialSDash (Max charge),,medium,community,m13[*].19
+,20,,0x16000014,0xE,0xA,0x8,0xE,u32,Min duration of SpecialSDash (Min charge),,medium,community,m13[*].20
+,21,,0x16000015,0x16,0x10,0xB,0x16,u32,Max duration of SpecialSDash (Max charge),,medium,community,m13[*].21
+,22,,0x06000016,1.45,1.45,1.2,1.45,f32,SpecialSDash speed multiplier (when 0x2100000e is set),,medium,community,m13[*].22
+,23,,0x06000017,1.5,1.2,1.5,1.5,f32,SpecialSDash damage multiplier,,medium,community,m13[*].23
+,24,,0x06000018,1.5,1.2,1.5,1.5,f32,SpecialSDash duration multiplier ( floor(this) ),,medium,community,m13[*].24
+,25,,0x16000019,0x8,0x4,0x4,0x8,u32,SpecialSDash super armor end frame,,medium,community,m13[*].25
+,26,,0x0600001A,0.5,0.5,0.5,0.5,f32,H speed multiplier for SpecialSReflectFall,,medium,community,m13[*].26
+,27,,0x0600001B,30,30,30,30,f32,Stage line angle difference to cause SpecialSReflectFall (degress),,medium,community,m13[*].27
+,28,,0x0600001C,2.7,2.7,2.7,2.7,f32,V initial speed for SpecialSReflectFall (uses negative for ceiling collision),,medium,community,m13[*].28
+,29,,0x0600001D,0.2,0.2,0.2,0.2,f32,Gravity for SpecialSReflectFall,,medium,community,m13[*].29
+,30,,0x0600001E,2,2,2,2,f32,Max fall speed for SpecialSReflectFall,,medium,community,m13[*].30
+,31,,0x0600001F,0.4,0.8,0.4,0.8,f32,H speed multiplier for SpecialSReturn,,medium,community,m13[*].31
+,32,,0x06000020,0.6,0.8,0.4,0.8,f32,V speed multiplier for SpecialSReturn,,medium,community,m13[*].32
+15,0,Up B,0x07000000,3.9,6.8,5,4.3,f32,Initial V speed,,medium,community,m14[*].0
+,1,,0x07000001,1.1,1.1,1,1.1,f32,V speed multiplier,,medium,community,m14[*].1
+,2,,0x07000002,0.3,0.3,0.3,0.3,f32,,,,,m14[*].2
+,3,,0x17000003,0x14,0x12,0x14,0x14,u32,,,,,m14[*].3
+,4,,0x07000004,1.3,1,1,1,f32,Air max additional accel / base air accel multiplier while flying,,medium,community,m14[*].4
+,5,,0x07000005,1.4,1,1.3,1.2,f32,Air max speed multiplier while flying,,medium,community,m14[*].5
+,6,,0x07000006,0.18,0.13,0.22,0.18,f32,Gravity while flying,,medium,community,m14[*].6
+,7,,0x07000007,20,10,20,20,f32,Max X axis rotation angle (degrees),this * StickX,medium,community,m14[*].7
+,8,,0x07000008,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 2nd time in a row,,medium,community,m14[*].8
+,9,,0x07000009,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 3rd time in a row,,medium,community,m14[*].9
+,10,,0x1700000A,0x3,0x3,0x3,0x3,u32,,related to ledge grab?,,,m14[*].10
+,11,,0x0700000B,30,38,30,30,f32,Landing lag (frames),,medium,community,m14[*].11
+16,0,Down B,0x08000000,2.4,2.4,3.6,2.4,f32,Initial V speed,,medium,community,m15[*].0
+,1,,0x08000001,0.14,0.14,0.21,0.14,f32,Gravity after spawning the hydrant,,medium,community,m15[*].1
+,2,,0x08000002,-14,-14,-14,-14,f32,,,,,m15[*].2
+,3,,0x18000003,0x1E,0x1E,0x28,0x1E,u32,,,,,m15[*].3
+17,0,,,1.25,1.25,1.25,1.25,f32,,,,,m16[*].0
+,1,,,0x5A,0x5A,0x5A,0x5A,u32,,,,,m16[*].1
+,2,,,2,2,2,2,f32,,,,,m16[*].2
+,3,,,0.1,0.1,0.1,0.1,f32,,,,,m16[*].3
+,4,,,0x1E,0x1,0x1,0x1E,u32,,,,,m16[*].4
+18,0,Cherry,,1,0.4,0.2,1,f32,Initial H speed,,medium,community,m17[*].0
+,1,,,1,1.6,1.3,1,f32,Initial V speed,,medium,community,m17[*].1
+,2,,,0.09,0.13,0.07,0.09,f32,Gravity,,medium,community,m17[*].2
+,3,,,1.8,0.4,1.3,1.8,f32,V speed when thrown upwards,,medium,community,m17[*].3
+,4,,,0.8,-1.1,0.9,0.8,f32,H speed multiplier on bounce,,medium,community,m17[*].4
+,5,,,0.8,1.4,1.02,0.8,f32,V speed multiplier on bounce,,medium,community,m17[*].5
+,6,,,1,1,0.1,1,f32,Something to do with the time taken to despawn after it lands on the ground,,medium,community,m17[*].6
+,7,,,0x78,0xA0,0xDC,0x78,u32,Lifetime (frames),,medium,community,m17[*].7
+,8,,,0x1,0x8,0x8,0x1,u32,Number of times the fruit can bounce before losing hitbox and flashing,,medium,community,m17[*].8
+19,0,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].2
+,3,,,0x4,0x2,0x2,0x4,u32,,,,,m18[*].3
+,4,,,0x37,0x78,0x37,0x37,u32,,,,,m18[*].4
+,5,,,0x50,0x50,0x50,0x50,u32,,,,,m18[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].6
+,7,,,0x28,0x28,0x28,0x28,u32,,,,,m18[*].7
+,8,,,3.5,3.5,3.5,3.5,f32,,,,,m18[*].8
+,9,,,0,0,0,0,f32,,,,,m18[*].9
+,10,,,0,0,0,0,f32,,,,,m18[*].10
+,11,,,0,0,0,0,f32,,,,,m18[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].12
+,13,,,0,0,0,0,f32,,,,,m18[*].13
+,14,,,1,1,1,1,f32,,,,,m18[*].14
+,15,,,1,1,1,1,f32,,,,,m18[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m18[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].18
+,19,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m18[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m18[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m18[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m18[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m18[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m18[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].30
+,31,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].33
+,34,,,0x1,0x0,0x1,0x1,u32,,,,,m18[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m18[*].40
+20,0,"Cherry
+Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m19[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m19[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m19[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m19[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m19[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m19[0].6
+21,0,Cherry,,0x1,,,,u32,,,,,m20[0].0
+,1,,,3,,,,f32,,,,,m20[0].1
+,2,,,-3,,,,f32,,,,,m20[0].2
+,3,,,3,,,,f32,,,,,m20[0].3
+22,0,Strawberry,,1.5,1.3,0.8,1.5,f32,Initial H speed,,medium,community,m21[*].0
+,1,,,0.8,0.6,1.6,0.8,f32,Initial V speed,,medium,community,m21[*].1
+,2,,,0.09,0.03,0.075,0.09,f32,Gravity,,medium,community,m21[*].2
+,3,,,1.8,0.3,1.7,1.8,f32,V speed when thrown upwards,,medium,community,m21[*].3
+,4,,,0.7,-1,0.2,0.7,f32,H speed multiplier on bounce,,medium,community,m21[*].4
+,5,,,0.9,1.02,1.02,0.9,f32,V speed multiplier on bounce,,medium,community,m21[*].5
+,6,,,1,0.1,0.1,1,f32,Something to do with the time taken to despawn after it lands on the ground,,medium,community,m21[*].6
+,7,,,0x96,0xC8,0xDC,0x96,u32,Lifetime (frames),,medium,community,m21[*].7
+,8,,,0x3,0x5,0x8,0x3,u32,Number of times the fruit can bounce before losing hitbox and flashing,,medium,community,m21[*].8
+23,0,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].2
+,3,,,0x6,0x4,0x5,0x6,u32,,,,,m22[*].3
+,4,,,0x37,0x96,0x37,0x37,u32,,,,,m22[*].4
+,5,,,0x50,0x50,0x50,0x50,u32,,,,,m22[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].6
+,7,,,0x28,0x28,0x28,0x28,u32,,,,,m22[*].7
+,8,,,3.5,3.5,3.5,3.5,f32,,,,,m22[*].8
+,9,,,0,0,0,0,f32,,,,,m22[*].9
+,10,,,0,0,0,0,f32,,,,,m22[*].10
+,11,,,0,0,0,0,f32,,,,,m22[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].12
+,13,,,0,0,0,0,f32,,,,,m22[*].13
+,14,,,1,1,1.3,1,f32,,,,,m22[*].14
+,15,,,1,1,1,1,f32,,,,,m22[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m22[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].18
+,19,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m22[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m22[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m22[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m22[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m22[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m22[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].30
+,31,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].33
+,34,,,0x1,0x0,0x1,0x1,u32,,,,,m22[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].40
+24,0,Strawberry,,0,,,,f32,X?,,medium,community,m23[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m23[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m23[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m23[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m23[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m23[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m23[0].6
+25,0,Strawberry,,0x1,,,,u32,,,,,m24[0].0
+,1,,,3,,,,f32,,,,,m24[0].1
+,2,,,-2.5,,,,f32,,,,,m24[0].2
+,3,,,3,,,,f32,,,,,m24[0].3
+26,0,Orange,,2,4.7,0.15,2,f32,Initial speed,,medium,community,m25[*].0
+,1,,,0.09,0.1,0.04,0.09,f32,Gravity upon bouncing,,medium,community,m25[*].1
+,2,,,1,1,1,1,f32,H speed multiplier upon bouncing,,medium,community,m25[*].2
+,3,,,1,1,1,1,f32,V speed multiplier upon bouncing,,medium,community,m25[*].3
+,4,,,0.3,0.3,0.3,0.3,f32,,,,,m25[*].4
+,5,,,0x30,0x24,0xC8,0x30,u32,Lifetime (frames),,medium,community,m25[*].5
+,6,,,0x3,0x3,0x3,0x3,u32,# of times it can bounce before considered idling,,medium,community,m25[*].6
+27,0,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].2
+,3,,,0x8,0x2,0x8,0x8,u32,,,,,m26[*].3
+,4,,,0x1E,0x2D,0x46,0x1E,u32,,,,,m26[*].4
+,5,,,0x4C,0x4C,0x3C,0x4C,u32,,,,,m26[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].6
+,7,,,0x32,0x32,0x32,0x32,u32,,,,,m26[*].7
+,8,,,3.5,3.5,3.5,3.5,f32,,,,,m26[*].8
+,9,,,0,0,0,0,f32,,,,,m26[*].9
+,10,,,0,0,0,0,f32,,,,,m26[*].10
+,11,,,0,0,0,0,f32,,,,,m26[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].12
+,13,,,0,0,0,0,f32,,,,,m26[*].13
+,14,,,1,0.8,1.5,1,f32,,,,,m26[*].14
+,15,,,1,1,1,1,f32,,,,,m26[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m26[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].18
+,19,,,0x0,0x0,0x1,0x0,u32,,,,,m26[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m26[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m26[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m26[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m26[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m26[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m26[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].30
+,31,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].33
+,34,,,0x1,0x1,0x1,0x1,u32,,,,,m26[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].40
+28,0,Orange,,0,,,,f32,X?,,medium,community,m27[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m27[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m27[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m27[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m27[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m27[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m27[0].6
+29,0,Orange,,0x1,,,,u32,,,,,m28[0].0
+,1,,,3,,,,f32,,,,,m28[0].1
+,2,,,-3,,,,f32,,,,,m28[0].2
+,3,,,3,,,,f32,,,,,m28[0].3
+30,0,Apple,,1.8,0.4,1.4,1.8,f32,Initial H speed,,medium,community,m29[*].0
+,1,,,-2.2,-2.2,2.2,-2.2,f32,Initial V speed,,medium,community,m29[*].1
+,2,,,0.16,1,0.1,0.16,f32,Gravity,,medium,community,m29[*].2
+,3,,,3,5,3,3,f32,V speed when thrown upwards,,medium,community,m29[*].3
+,4,,,0.8,1.3,0.05,0.8,f32,H speed multiplier on bounce,,medium,community,m29[*].4
+,5,,,0.98,2,1.2,0.98,f32,V speed multiplier on bounce,,medium,community,m29[*].5
+,6,,,1,0.1,0.1,1,f32,Something to do with the time taken to despawn after it lands on the ground,,medium,community,m29[*].6
+,7,,,0xF0,0xF0,0x118,0xF0,u32,Lifetime (frames),,medium,community,m29[*].7
+,8,,,0x3,0xA,0x8,0x3,u32,Number of times the fruit can bounce before losing hitbox and flashing,,medium,community,m29[*].8
+31,0,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].2
+,3,,,0x9,0x9,0x9,0x9,u32,,,,,m30[*].3
+,4,,,0x4B,0x3C,0x4B,0x4B,u32,,,,,m30[*].4
+,5,,,0x64,0x50,0x64,0x64,u32,,,,,m30[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].6
+,7,,,0x3C,0x3C,0x3C,0x3C,u32,,,,,m30[*].7
+,8,,,3.5,3.5,3.5,3.5,f32,,,,,m30[*].8
+,9,,,0,0,0,0,f32,,,,,m30[*].9
+,10,,,0,0,0,0,f32,,,,,m30[*].10
+,11,,,0,0,0,0,f32,,,,,m30[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].12
+,13,,,0,0,0,0,f32,,,,,m30[*].13
+,14,,,1,1,1,1,f32,,,,,m30[*].14
+,15,,,1,1,1,1,f32,,,,,m30[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m30[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].18
+,19,,,0x0,0x1,0x0,0x0,u32,,,,,m30[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m30[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m30[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m30[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m30[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m30[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m30[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].30
+,31,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].33
+,34,,,0x1,0x1,0x1,0x1,u32,,,,,m30[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m30[*].40
+32,0,Apple,,0,,,,f32,X?,,medium,community,m31[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m31[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m31[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m31[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m31[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m31[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m31[0].6
+33,0,Apple,,0x1,,,,u32,,,,,m32[0].0
+,1,,,3,,,,f32,,,,,m32[0].1
+,2,,,-2.5,,,,f32,,,,,m32[0].2
+,3,,,3,,,,f32,,,,,m32[0].3
+34,0,Melon,,1,0.7,1.4,1,f32,Initial H speed,,medium,community,m33[*].0
+,1,,,0.2,2.2,1.4,0.2,f32,Initial V speed,,medium,community,m33[*].1
+,2,,,0.005,0.04,0.04,0.005,f32,Gravity,,medium,community,m33[*].2
+,3,,,0.5,2.2,1.7,0.5,f32,V speed when thrown upwards,,medium,community,m33[*].3
+,4,,,1,-1.2,0.05,1,f32,H speed multiplier on bounce,,medium,community,m33[*].4
+,5,,,1,0.8,1.2,1,f32,V speed multiplier on bounce,,medium,community,m33[*].5
+,6,,,1,0.1,0.1,1,f32,Something to do with the time taken to despawn after it lands on the ground,,medium,community,m33[*].6
+,7,,,0x78,0x96,0x118,0x78,u32,Lifetime (frames),,medium,community,m33[*].7
+,8,,,0x2,0x1,0x8,0x2,u32,Number of times the fruit can bounce before losing hitbox and flashing,,medium,community,m33[*].8
+35,0,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].2
+,3,,,0xC,0xD,0xC,0xC,u32,,,,,m34[*].3
+,4,,,0x37,0x32,0x37,0x37,u32,,,,,m34[*].4
+,5,,,0x64,0x64,0x64,0x64,u32,,,,,m34[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].6
+,7,,,0x28,0x28,0x28,0x28,u32,,,,,m34[*].7
+,8,,,3.8,3.8,3.8,3.8,f32,,,,,m34[*].8
+,9,,,0,0,0,0,f32,,,,,m34[*].9
+,10,,,0,0,0,0,f32,,,,,m34[*].10
+,11,,,0,0,0,0,f32,,,,,m34[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].12
+,13,,,0,0,0,0,f32,,,,,m34[*].13
+,14,,,1,1.2,1,1,f32,,,,,m34[*].14
+,15,,,1,1,1,1,f32,,,,,m34[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m34[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].18
+,19,,,0x0,0x1,0x0,0x0,u32,,,,,m34[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m34[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m34[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m34[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m34[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m34[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m34[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].30
+,31,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].33
+,34,,,0x1,0x1,0x1,0x1,u32,,,,,m34[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m34[*].40
+36,0,Melon,,0,,,,f32,X?,,medium,community,m35[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m35[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m35[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m35[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m35[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m35[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m35[0].6
+37,0,Melon,,0x1,,,,u32,,,,,m36[0].0
+,1,,,3,,,,f32,,,,,m36[0].1
+,2,,,-3.5,,,,f32,,,,,m36[0].2
+,3,,,3,,,,f32,,,,,m36[0].3
+38,0,Galaga,,1.5,3,1,1.5,f32,Initial speed,,medium,community,m37[*].0
+,1,,,0x19,0x28,0xA,0x19,u32,Frame the galaga starts spinning?,,medium,community,m37[*].1
+,2,,,10,15,12,10,f32,Angle the galaga spins per frame?,,medium,community,m37[*].2
+,3,,,36,11,220,36,f32,Min frames spent spinning?,,medium,community,m37[*].3
+,4,,,40,12,220,40,f32,Max frames spent spinning?,,medium,community,m37[*].4
+,5,,,0.1,0.05,0.1,0.1,f32,,,,,m37[*].5
+,6,,,2,5,1.5,2,f32,,,,,m37[*].6
+,7,,,0.09,0.045,0.045,0.09,f32,,,,,m37[*].7
+,8,,,0.5,0.5,0.5,0.5,f32,,,,,m37[*].8
+,9,,,0.5,0.5,0.5,0.5,f32,,,,,m37[*].9
+,10,,,1,1,1,1,f32,,,,,m37[*].10
+,11,,,0x82,0x64,0xE6,0x82,u32,Lifetime (frames),,medium,community,m37[*].11
+,12,,,0x1,0x1,0x1,0x1,u32,,,,,m37[*].12
+39,0,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].2
+,3,,,0x9,0x7,0x3,0x9,u32,,,,,m38[*].3
+,4,,,0x46,0x50,0x64,0x46,u32,,,,,m38[*].4
+,5,,,0x50,0x32,0x2D,0x50,u32,,,,,m38[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].6
+,7,,,0x28,0x4B,0x3C,0x28,u32,,,,,m38[*].7
+,8,,,4,4,4,4,f32,,,,,m38[*].8
+,9,,,0,0,0,0,f32,,,,,m38[*].9
+,10,,,0,0,0,0,f32,,,,,m38[*].10
+,11,,,0,0,0,0,f32,,,,,m38[*].11
+,12,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].12
+,13,,,0,0,0,0,f32,,,,,m38[*].13
+,14,,,1,0.5,0.8,1,f32,,,,,m38[*].14
+,15,,,1,0.5,1,1,f32,,,,,m38[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m38[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].18
+,19,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].19
+,20,,,0x2,0x2,0x2,0x2,u32,,,,,m38[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m38[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m38[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m38[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m38[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m38[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].30
+,31,,,0x1E,0x14,0x18,0x1E,u32,,,,,m38[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].33
+,34,,,0x1,0x1,0x0,0x1,u32,,,,,m38[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m38[*].40
+40,0,Galaga,,0,,,,f32,X?,,medium,community,m39[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m39[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m39[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m39[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m39[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m39[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m39[0].6
+41,0,Galaga,,0x1,,,,u32,,,,,m40[0].0
+,1,,,3,,,,f32,,,,,m40[0].1
+,2,,,-2.8,,,,f32,,,,,m40[0].2
+,3,,,3,,,,f32,,,,,m40[0].3
+42,0,Bell,,1.3,1,0,1.3,f32,Initial H speed,,medium,community,m41[*].0
+,1,,,3,-0.5,0.8,3,f32,Initial V speed,,medium,community,m41[*].1
+,2,,,0.11,-0.05,0.006,0.11,f32,Gravity before the drop,,medium,community,m41[*].2
+,3,,,3,3,4.5,3,f32,Initial V speed when thrown upwards,,medium,community,m41[*].3
+,4,,,0x14,0x1E,0xA0,0x14,u32,Min frames before the drop,,medium,community,m41[*].4
+,5,,,0x1E,0x1E,0xA0,0x1E,u32,Max frames before the drop,,medium,community,m41[*].5
+,6,,,3,-4,4.5,3,f32,Downwards V speed,,medium,community,m41[*].6
+,7,,,0.6,0,0,0.6,f32,Gravity during the drop,,medium,community,m41[*].7
+,8,,,0.7,0.2,0.2,0.7,f32,speed multiplier for bouncing off walls/ceilings,,medium,community,m41[*].8
+,9,,,0.5,0.5,0.5,0.5,f32,speed multiplier for bouncing off floors,,medium,community,m41[*].9
+,10,,,0x64,0x3C,0xD2,0x64,u32,Lifetime (frames),,medium,community,m41[*].10
+,11,,,0x2,0x1,0x2,0x2,u32,The number of times it can bounce before can disappear,,medium,community,m41[*].11
+43,0,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].2
+,3,,,0x8,0x6,0xA,0x8,u32,,,,,m42[*].3
+,4,,,0x37,0x50,0x37,0x37,u32,,,,,m42[*].4
+,5,,,0x78,0x3C,0x78,0x78,u32,,,,,m42[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].6
+,7,,,0x1E,0x5A,0x1E,0x1E,u32,,,,,m42[*].7
+,8,,,4.7,4.7,4.7,4.7,f32,,,,,m42[*].8
+,9,,,0,0,0,0,f32,,,,,m42[*].9
+,10,,,0,0,0,0,f32,,,,,m42[*].10
+,11,,,0,0,0,0,f32,,,,,m42[*].11
+,12,,,0x14,0x0,0x14,0x14,u32,,,,,m42[*].12
+,13,,,0,0,0,0,f32,,,,,m42[*].13
+,14,,,1,1,1,1,f32,,,,,m42[*].14
+,15,,,1,1,1,1,f32,,,,,m42[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m42[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].18
+,19,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].19
+,20,,,0x24,0x24,0x24,0x24,u32,,,,,m42[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m42[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m42[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m42[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m42[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m42[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].30
+,31,,,0x0,0x19,0x0,0x0,u32,,,,,m42[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].33
+,34,,,0x1,0x3,0x1,0x1,u32,,,,,m42[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].40
+44,0,Bell,,0,,,,f32,X?,,medium,community,m43[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m43[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m43[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m43[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m43[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m43[0].5
+,6,,,3,,,,f32,Size?,,medium,community,m43[0].6
+45,0,Bell,,0x1,,,,u32,,,,,m44[0].0
+,1,,,3,,,,f32,,,,,m44[0].1
+,2,,,-3,,,,f32,,,,,m44[0].2
+,3,,,3,,,,f32,,,,,m44[0].3
+46,0,Key,,3.6,0,0.2,3.6,f32,Initial speed,,medium,community,m45[*].0
+,1,,,45,0,60,45,f32,Rotation per frame (degrees),,medium,community,m45[*].1
+,2,,,0.09,0,0.045,0.09,f32,Gravity upon bouncing,,medium,community,m45[*].2
+,3,,,0.5,1,0.5,0.5,f32,H speed multiplier upon bouncing,,medium,community,m45[*].3
+,4,,,0.5,1,0.5,0.5,f32,V speed multiplier upon bouncing,,medium,community,m45[*].4
+,5,,,1,1,1,1,f32,Piecing capability,,medium,community,m45[*].5
+,6,,,0x26,0xC,0x96,0x26,u32,Lifetime (frames),,medium,community,m45[*].6
+,7,,,0x3,0x1,0x3,0x3,u32,The number of times it can bounce before can disappear,,medium,community,m45[*].7
+47,0,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].2
+,3,,,0xF,0xA,0xA,0xF,u32,,,,,m46[*].3
+,4,,,0x37,0x104,0x28,0x37,u32,,,,,m46[*].4
+,5,,,0x5A,0x64,0x46,0x5A,u32,,,,,m46[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].6
+,7,,,0x28,0x14,0x46,0x28,u32,,,,,m46[*].7
+,8,,,3.5,2.2,3.5,3.5,f32,,,,,m46[*].8
+,9,,,0,0,0,0,f32,,,,,m46[*].9
+,10,,,0,-1.5,0,0,f32,,,,,m46[*].10
+,11,,,0,0,0,0,f32,,,,,m46[*].11
+,12,,,0x0,0x0,0x2,0x0,u32,,,,,m46[*].12
+,13,,,0,0,0,0,f32,,,,,m46[*].13
+,14,,,1,1.5,1,1,f32,,,,,m46[*].14
+,15,,,1,1,1,1,f32,,,,,m46[*].15
+,16,,,0x1,0x1,0x1,0x1,u32,,,,,m46[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].18
+,19,,,0x0,0x1,0x1,0x0,u32,,,,,m46[*].19
+,20,,,0x2,0x2,0x3,0x2,u32,,,,,m46[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m46[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].23
+,24,,,0x1F,0x1F,0x1F,0x1F,u32,,,,,m46[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m46[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m46[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m46[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].30
+,31,,,0x0,0x0,0x3C,0x0,u32,,,,,m46[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].33
+,34,,,0x1,0x1,0x1,0x1,u32,,,,,m46[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m46[*].40
+48,0,Key,,0,,,,f32,,,,,m47[0].0
+,1,,,0,,,,f32,,,,,m47[0].1
+,2,,,0,,,,f32,,,,,m47[0].2
+,3,,,0,,,,f32,,,,,m47[0].3
+,4,,,0,,,,f32,,,,,m47[0].4
+,5,,,0,,,,f32,,,,,m47[0].5
+,6,,,3,,,,f32,,,,,m47[0].6
+49,0,Key,,0x1,,,,u32,,,,,m48[0].0
+,1,,,3,,,,f32,,,,,m48[0].1
+,2,,,-3.1,,,,f32,,,,,m48[0].2
+,3,,,3,,,,f32,,,,,m48[0].3
+50,0,"Side B
+(esa)",0x02000000,1,1.8,0.4,1,f32,Initial Speed,,medium,community,m49[*].0
+,1,,0x02000001,0,0,0,0,f32,Affects distance traveled,,medium,community,m49[*].1
+,2,,0x02000002,1.5,1.8,1.5,1.5,f32,,,,,m49[*].2
+,3,,0x02000003,0.5,0.8,1,0.5,f32,this * 10 * model scale,,medium,community,m49[*].3
+,4,,0x02000004,8,20,6,8,f32,,,,,m49[*].4
+51,0,,,0x1,,,,u32,,,,,m50[0].0
+,1,,,5.9,,,,f32,,,,,m50[0].1
+,2,,,-5.9,,,,f32,,,,,m50[0].2
+,3,,,5.9,,,,f32,,,,,m50[0].3
+52,0,Power pellet,,2,2,2,2,f32,V speed when attacked,,medium,community,m51[*].0
+,1,,,0.2,0.2,0.2,0.2,f32,Gravity,,medium,community,m51[*].1
+,2,,,1,1,1,1,f32,HP,,medium,community,m51[*].2
+,3,,,0.5,0.5,0.5,0.5,f32,,,,,m51[*].3
+,4,,,0x12C,0x12C,0x12C,0x12C,u32,Lifetime of pellet left on the ground (frames),,medium,community,m51[*].4
+,5,,,2,2,2,2,f32,Damage healed from eating pellet off of the ground,,medium,community,m51[*].5
+53,0,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].2
+,3,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].3
+,4,,,0x0,0x0,0x16F,0x0,u32,,,,,m52[*].4
+,5,,,0x0,0x0,0x64,0x0,u32,,,,,m52[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].6
+,7,,,0x0,0x0,0xF,0x0,u32,,,,,m52[*].7
+,8,,,3,3,20,3,f32,,,,,m52[*].8
+,9,,,0,0,0,0,f32,,,,,m52[*].9
+,10,,,0,0,0,0,f32,,,,,m52[*].10
+,11,,,0,0,0,0,f32,,,,,m52[*].11
+,12,,,0x1,0x1,0x0,0x1,u32,,,,,m52[*].12
+,13,,,0,0,0,0,f32,,,,,m52[*].13
+,14,,,1,1,1,1,f32,,,,,m52[*].14
+,15,,,1,1,1,1,f32,,,,,m52[*].15
+,16,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].18
+,19,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].19
+,20,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m52[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].22
+,23,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].23
+,24,,,0x1F,0x1F,0xB,0x1F,u32,,,,,m52[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m52[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].27
+,28,,,0x0,0x0,0x1,0x0,u32,,,,,m52[*].28
+,29,,,0x1,0x1,0x0,0x1,u32,,,,,m52[*].29
+,30,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].30
+,31,,,0x0,0x0,0x7,0x0,u32,,,,,m52[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].33
+,34,,,0x1,0x1,0x1,0x1,u32,,,,,m52[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].36
+,37,,,0x0,0x0,0x1,0x0,u32,,,,,m52[*].37
+,38,,,0x0,0x0,0x1,0x0,u32,,,,,m52[*].38
+,39,,,0x0,0x0,0x1,0x0,u32,,,,,m52[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m52[*].40
+54,0,Pellet hurtbox,,0,,,,f32,X?,,medium,community,m53[0].0
+,1,,,0,,,,f32,Y?,,medium,community,m53[0].1
+,2,,,0,,,,f32,Z?,,medium,community,m53[0].2
+,3,,,0,,,,f32,X2?,,medium,community,m53[0].3
+,4,,,0,,,,f32,Y2?,,medium,community,m53[0].4
+,5,,,0,,,,f32,Z2?,,medium,community,m53[0].5
+,6,,,5,,,,f32,Size?,,medium,community,m53[0].6
+55,0,Power pellet,,0x1,,,,u32,Affects the position of the pellet when attacked,,medium,community,m54[0].0
+,1,,,2,,,,f32,,,,,m54[0].1
+,2,,,-2,,,,f32,,,,,m54[0].2
+,3,,,2,,,,f32,,,,,m54[0].3
+56,0,trampoline,0x12000000,0x12C,0xE,0x190,0x12C,u32,,,,,m55[*].0
+,1,,0x02000001,1.1,1,1.1,1.1,f32,,,,,m55[*].1
+,2,,0x02000002,2.7,2.7,2,2.7,f32,,,,,m55[*].2
+,3,,0x02000003,1.5,1.4,0.9,1.4,f32,,,,,m55[*].3
+57,0,,,0x1,,,,u32,,,,,m56[0].0
+,1,,,0,,,,f32,,,,,m56[0].1
+,2,,,-10,,,,f32,,,,,m56[0].2
+,3,,,10,,,,f32,,,,,m56[0].3
+58,0,Hydrant,0x12000000,0x190,0x190,0x1C,0x190,u32,,,,,m57[*].0
+,1,,0x12000001,0xA,0xA,0x1C,0xA,u32,,,,,m57[*].1
+,2,,0x02000002,2,2,2.2,2,f32,,,,,m57[*].2
+,3,,0x02000003,0.1,0.1,0.2,0.1,f32,,,,,m57[*].3
+,4,,0x02000004,3.2,3.8,3.5,3.8,f32,,,,,m57[*].4
+,5,,0x02000005,0.5,0.5,0.5,0.5,f32,,,,,m57[*].5
+,6,,0x12000006,0x2,0x3,0x0,0x2,u32,Number of water shots,,medium,community,m57[*].6
+,7,,0x12000007,0x5A,0x5A,0x5A,0x5A,u32,,,,,m57[*].7
+,8,,0x12000008,0x78,0x78,0x78,0x78,u32,Frames between the shots of water,,medium,community,m57[*].8
+,9,,0x02000009,80,80,80,80,f32,,,,,m57[*].9
+,10,,0x1200000A,0x1E,0x1E,0x1E,0x1E,u32,,,,,m57[*].10
+,11,,0x0200000B,30,30,89,30,f32,Angle difference between floor (degrees),,medium,community,m57[*].11
+,12,,0x1200000C,0x258,0x258,0x258,0x258,u32,,,,,m57[*].12
+,13,,0x0200000D,1,1,1,1,f32,var4,,medium,community,m57[*].13
+,14,,0x0200000E,10,10,10,10,f32,Min rotation angle (degrees)?,,medium,community,m57[*].14
+,15,,0x0200000F,0.1,0.1,0.1,0.1,f32,var5,,medium,community,m57[*].15
+,16,,0x02000010,1,1,1,1,f32,var4,,medium,community,m57[*].16
+,17,,0x02000011,10,10,10,10,f32,Min rotation angle (degrees)?,,medium,community,m57[*].17
+,18,,0x12000012,0x4,0x4,0x4,0x4,u32,,,,,m57[*].18
+,19,,0x02000013,100,100,100,100,f32,,,,,m57[*].19
+,20,,0x02000014,140,140,140,140,f32,Max rotation angle (degrees)?,,medium,community,m57[*].20
+,21,,0x02000015,2,2,2,2,f32,,,,,m57[*].21
+,22,,0x12000016,0xD,0xD,0x3E7,0xA,u32,Required damage to knockback,,medium,community,m57[*].22
+,23,,0x12000017,0x96,0x96,0x96,0x96,u32,,,,,m57[*].23
+,24,,0x02000018,1.25,1.4,1.25,1.25,f32,,,,,m57[*].24
+,25,,0x02000019,2,1.5,2,2,f32,,,,,m57[*].25
+,26,,0x0200001A,18,18,18,18,f32,Hydrant's spin when launched,,medium,community,m57[*].26
+,27,,0x0200001B,7,7,7,7,f32,,,,,m57[*].27
+,28,,0x0200001C,20,20,20,20,f32,,,,,m57[*].28
+,29,,0x0200001D,0,0,0,0,f32,,,,,m57[*].29
+,30,,0x0200001E,0.86,0.86,0.86,0.86,f32,Bouncing multiplier while launched,,medium,community,m57[*].30
+,31,,0x0200001F,0.5,0.5,0.5,0.5,f32,,,,,m57[*].31
+,32,,0x12000020,0x4,0x4,0x4,0x4,u32,,,,,m57[*].32
+,0,,,0x1,,,,u32,,,,,m58.0
+,1,,,6,,,,f32,,,,,m58.1
+,2,,,-7,,,,f32,,,,,m58.2
+,3,,,4,,,,f32,,,,,m58.3
+59,0,"Hydrant
+Hurtbox",,0,,,,f32,X offset,,medium,community,m59[0].0
+,1,,,4,,,,f32,Y offset,,medium,community,m59[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m59[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m59[0].3
+,4,,,9,,,,f32,Y2 offset,,medium,community,m59[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m59[0].5
+,6,,,4,,,,f32,Size,,medium,community,m59[0].6
+,7,,,0x7D2,,,,u32,Bone,,medium,community,m59[0].7
+,8,,,0x1,,,,u32,,,,,m59[0].8
+,9,,,0x1,,,,u32,,,,,m59[0].9
+,10,,,0x0,,,,u32,,,,,m59[0].10
+,11,,,0x2,,,,u32,,,,,m59[0].11
+,0,,,0,,,,f32,,,,,m60.0
+,1,,,6.5,,,,f32,,,,,m60.1
+,2,,,10,,,,f32,,,,,m60.2
+,3,,,12,,,,f32,,,,,m60.3
+,4,,,5,,,,f32,,,,,m60.4
+,5,,,10,,,,f32,,,,,m60.5
+60,0,Water,0x02000000,1.35,0,1.35,1.35,f32,KBG for water hitbox (True = this * 100),,medium,community,m61[*].0
+,1,,0x12000001,0x28,0x1C,0x28,0x28,u32,WBKB for water hitbox,,medium,community,m61[*].1
+61,0,,,0x2000000,,,,u32,Weapon param Name0?,,medium,community,m62[0].0
+,1,,,1,,,,f32,,,,,m62[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m62[0].2
+,3,,,0,,,,f32,,,,,m62[0].3
+,4,,,1,,,,f32,,,,,m62[0].4
+,5,,,0,,,,f32,,,,,m62[0].5
+,0,bigpacman,,0x258,,,,u32,Length of Big Pac-Man (Frames),,medium,community,m63.0
+,1,,,1.4,,,,f32,Speed,,medium,community,m63.1
+,2,,,1.45,,,,f32,Speed multiplier when B-button is held?,,medium,community,m63.2
+,3,,,4,,,,f32,,,,,m63.3
+,4,,,0x1E,,,,u32,,,,,m63.4
+,5,,,1,,,,f32,,,,,m63.5
+,6,,,0x28,,,,u32,,,,,m63.6
+,7,,,0x78,,,,u32,,,,,m63.7
+,8,,,32,,,,f32,,,,,m63.8
+,9,,,190,,,,f32,,,,,m63.9
+,0,,,0x1,,,,u32,,,,,m64.0
+,1,,,12,,,,f32,,,,,m64.1
+,2,,,-12,,,,f32,,,,,m64.2
+,3,,,12,,,,f32,,,,,m64.3
+19,0 - 40,Cherry Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+23,0 - 40,"Strawberry
+ Hitbox",,,,,,,,community row not matched to a value of the vanilla file,low,community,
+27,0 - 40,Orange Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+31,0 - 40,Apple Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+35,0 - 40,Melon Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+39,0 - 40,Galaga Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+43,0 - 40,Bell Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+47,0 - 40,Key Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
+53,0 - 40,"Power pellet
+hitbox",,,,,,,,community row not matched to a value of the vanilla file,low,community,

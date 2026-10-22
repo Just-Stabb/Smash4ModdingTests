@@ -1,0 +1,120 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,60,0,0,0,f32,,,,,m12[*].0
+,1,,0x05000001,2.2,0,0,0,f32,,,,,m12[*].1
+,2,,0x05000002,0.8,0,0,0,f32,,,,,m12[*].2
+,3,,0x05000003,0.02,0,0,0,f32,Speed of the tornado in the air?,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].3
+,4,,0x05000004,1,0,0,0,f32,H speed preservation,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].4
+,5,,0x15000005,0x0,0x3E6,0x0,0x0,u32,,,,,m12[*].5
+,6,,0x15000006,0x0,0x3E7,0x0,0x0,u32,,,,,m12[*].6
+,7,,0x05000007,0,0,7,0,f32,Landing lag (frames),,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].7
+,8,,0x05000008,0,0,7,0,f32,X offset of Syuriken,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].8
+,9,,0x05000009,0,0,7,0,f32,Y offset of Syuriken,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].9
+,10,,0x0500000A,0,0,4,0,f32,Times to fully charge (frames),,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].10
+,11,,0x0500000B,0,0,0.5,0,f32,Full charge damage multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].11
+,12,,0x0500000C,0,0,0.5,0,f32,Acceleration/deceleration when hitting a character on the ground,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].12
+,13,,0x0500000D,0,0,0.002,0,f32,Acceleration/deceleration when hitting a character mid-air,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].13
+,14,,0x0500000E,0,0,24,0,f32,Charging animation frame speed multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m12[*].14
+14,0,Side B,0x06000000,0.1,0,0,0,f32,H speed multiplire while charging,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].0
+,1,,0x06000001,26,0,0,0,f32,H air decel while charging,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].1
+,2,,0x06000002,0,1,0,0,f32,Gravity while charging,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].2
+,3,,0x16000003,0x0,0xC,0x0,0x0,u32,,,,,m13[*].3
+,4,,0x06000004,0,4.2,0,0,f32,Initial charged frames of smash input,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].4
+,5,,0x06000005,0,3.6,0,0,f32,Base damage multiplier (true = this / 9),,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].5
+,6,,0x06000006,0,0.045,0,0,f32,Max damage multiplier (true = this / 9),,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].6
+,7,,0x06000007,0,0.045,0,0,f32,,,,,m13[*].7
+,8,,0x16000008,0x0,0x46,0x0,0x0,u32,,,,,m13[*].8
+,9,,0x06000009,0,0,0,0,f32,Max H speed,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].9
+,10,,0x1600000A,0x0,0x46,0x0,0x0,u32,,,,,m13[*].10
+,11,,0x0600000B,0,0.1,0,0,f32,Max V speed,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].11
+,12,,0x0600000C,0,0.065,0,0,f32,Gravity on flying,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].12
+,13,,0x0600000D,0,0.8,0,0,f32,Max fall speed on flying,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].13
+,14,,0x0600000E,0,0.5,0,0,f32,H speed on-hit,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].14
+,15,,0x0600000F,0,0.6,0,0,f32,V speed on-hit,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].15
+,16,,0x06000010,0,0.5,0,0,f32,H speed multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].16
+,17,,0x06000011,0,9,0,0,f32,Base air friction,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].17
+,18,,0x06000012,0,2,0,0,f32,Max air friction,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].18
+,19,,0x06000013,0,8,0,0,f32,Gravity,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].19
+,20,,0x06000014,0,1,0,0,f32,Special fall max air speed multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].20
+,21,,0x06000015,0,0,0.8,0,f32,V speed multiplier on aerial startup,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].21
+,22,,0x06000016,0,0,0.02,0,f32,,,,,m13[*].22
+,23,,0x06000017,0,0,0.04,0,f32,Base grounded travel speed,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].23
+,24,,0x06000018,0,0,40,0,f32,Base aerial travel speed,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].24
+,25,,0x06000019,0,0,15,0,f32,Grounded travel speed added per charge frame,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].25
+,26,,0x0600001A,0,0,7,0,f32,Aerial travel speed added per charge frame,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].26
+,27,,0x0600001B,0,0,16,0,f32,,,,,m13[*].27
+,28,,0x1600001C,0x0,0x0,0x8,0x0,u32,,,,,m13[*].28
+,29,,0x0600001D,0,0,1.1,0,f32,,,,,m13[*].29
+,30,,0x0600001E,0,0,2.2,0,f32,Grounded friction,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].30
+,31,,0x0600001F,0,0,1,0,f32,Aerial friction,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].31
+,32,,0x06000020,0,0,1.1,0,f32,H speed multiplier on grounded hitting,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].32
+,33,,0x06000021,0,0,0.045,0,f32,H speed multiplier on aerial hitting,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].33
+,34,,0x06000022,0,0,1.1,0,f32,H speed multiplier on grounded ending,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].34
+,35,,0x06000023,0,0,-0.9,0,f32,H speed multiplier on aerial ending,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].35
+,36,,0x06000024,0,0,2.4,0,f32,Search bubble Z offset,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].36
+,37,,0x06000025,0,0,1,0,f32,Search bubble Y offset,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].37
+,38,,0x06000026,0,0,0.06,0,f32,Search bubble radius,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].38
+,39,,0x06000027,0,0,0.08,0,f32,H speed / Air friction / Grounded friction multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m13[*].39
+,40,,0x06000028,0,0,0.1,0,f32,,,,,m13[*].40
+,41,,0x06000029,0,0,1,0,f32,,,,,m13[*].41
+15,0,Up B,0x17000000,0x3C,0x0,0x0,0x0,u32,,,,,m14[*].0
+,1,,0x07000001,1.6,0,0,0,f32,,,,,m14[*].1
+,2,,0x07000002,1,0,0,0,f32,Landing lag?,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].2
+,3,,0x07000003,2.35,0,0,0,f32,Height multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].3
+,4,,0x07000004,0.55,0,0,0,f32,Air max additional acceleration multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].4
+,5,,0x07000005,0.4,0,0,0,f32,H speed multiplier on startup,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].5
+,6,,0x07000006,0.22,0,0,0,f32,,,,,m14[*].6
+,7,,0x07000007,0.2,0,0,0,f32,H air friction during startup,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].7
+,8,,0x07000008,1,0,0,0,f32,Gravity during startup,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].8
+,9,,0x17000009,0x1E,0x0,0x0,0x0,u32,How many frames before you stop traveling,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].9
+,10,,0x0700000A,0,0.8,0,0,f32,,,,,m14[*].10
+,11,,0x1700000B,0x0,0xC,0x0,0x0,u32,Frames before decaying speed,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].11
+,12,,0x0700000C,0,0.02,0,0,f32,Initial speed of travel,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].12
+,13,,0x0700000D,0,0.015,0,0,f32,Speed decay per frame / Deceleration,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].13
+,14,,0x1700000E,0x0,0x1E,0x0,0x0,u32,,,,,m14[*].14
+,15,,0x1700000F,0x0,0xF,0x0,0x0,u32,,,,,m14[*].15
+,16,,0x17000010,0x0,0x6,0x0,0x0,u32,,,,,m14[*].16
+,17,,0x07000011,0,3.3,0,0,f32,Air friction after bouncing,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].17
+,18,,0x07000012,0,0.1,0,0,f32,Initial V speed after bouncing,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].18
+,19,,0x07000013,0,0.85,0,0,f32,Gravity after bouncing,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].19
+,20,,0x07000014,0,20,0,0,f32,,,,,m14[*].20
+,21,,0x07000015,0,0.8,0,0,f32,,,,,m14[*].21
+,22,,0x07000016,0,0.05,0,0,f32,Max damage multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].22
+,23,,0x07000017,0,3,0,0,f32,Startup animation speed multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].23
+,24,,0x07000018,0,0.19,0,0,f32,Initial V speed on startup,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].24
+,25,,0x17000019,0x0,0x14,0x0,0x0,u32,,,,,m14[*].25
+,26,,0x0700001A,0,0,1,0,f32,,,,,m14[*].26
+,27,,0x0700001B,0,0,8,0,f32,H mobility,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].27
+,28,,0x0700001C,0,0,0.2,0,f32,H max mobility,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].28
+,29,,0x0700001D,0,0,0,0,f32,Height multiplier,,low,"copied from Mii_Swordsman (same layout, same position)",m14[*].29
+,30,,0x0700001E,0,0,1,0,f32,,,,,m14[*].30
+16,0,Down B,0x08000000,0.5,0,0,0,f32,,,,,m15[*].0
+,1,,0x08000001,0.0025,0,0,0,f32,,,,,m15[*].1
+,2,,0x08000002,0.04,0,0,0,f32,,,,,m15[*].2
+,3,,0x08000003,1.2,0,0,0,f32,,,,,m15[*].3
+,4,,0x18000004,0x10,0x0,0x0,0x0,u32,,,,,m15[*].4
+,5,,0x08000005,8,0,0,0,f32,,,,,m15[*].5
+,6,,0x08000006,1.15,0,0,0,f32,,,,,m15[*].6
+,7,,0x08000007,35,0,0,0,f32,,,,,m15[*].7
+,8,,0x18000008,0x0,0x0,0x0,0x0,u32,,,,,m15[*].8
+,9,,0x08000009,0,0,0,0,f32,,,,,m15[*].9
+,10,,0x0800000A,6.5,0,0,0,f32,,,,,m15[*].10
+,11,,0x0800000B,-1,0,0,0,f32,,,,,m15[*].11
+,12,,0x0800000C,9,0,0,0,f32,,,,,m15[*].12
+,13,,0x0800000D,1,0,0,0,f32,,,,,m15[*].13
+,14,,0x0800000E,0,0.4,0,0,f32,,,,,m15[*].14
+,15,,0x0800000F,0,0.0025,0,0,f32,,,,,m15[*].15
+,16,,0x08000010,0,0.5,0,0,f32,,,,,m15[*].16
+,17,,0x08000011,0,0.029,0,0,f32,,,,,m15[*].17
+,18,,0x08000012,0,0.9,0,0,f32,,,,,m15[*].18
+,19,,0x08000013,0,0,0.66,0,f32,,,,,m15[*].19
+,20,,0x18000014,0x0,0x0,0x4,0x0,u32,,,,,m15[*].20
+,21,,0x08000015,0,0,1,0,f32,,,,,m15[*].21
+,22,,0x08000016,0,0,1,0,f32,,,,,m15[*].22
+,23,,0x08000017,0,0,0.12,0,f32,,,,,m15[*].23
+,24,,0x08000018,0,0,3,0,f32,,,,,m15[*].24
+,25,,0x18000019,0x0,0x0,0x1E,0x0,u32,,,,,m15[*].25
+,0,Category 4 block,0x14000000,0x0,,,,u32,,,,,m16.0
+,1,,0x04000001,1.1,,,,f32,,,,,m16.1
+17,0,,,0,,,,f32,,,,,m17[0].0
+,1,,,8,,,,f32,,,,,m17[0].1
+,2,,,8,,,,f32,,,,,m17[0].2

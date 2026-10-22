@@ -1,0 +1,25 @@
+Group,Path,Field,Type,Name,Description,Confidence,Evidence
+1,m0[*],,,Motion table,"One 6-byte entry per motion kind (entry n = motion n; 0x000-0x210 common, 0x211+ the fighter's own). The count must equal the fighter's motion count (motion.mtable).",high,"loader 0x02EA9008 copies it into the motion table; docs/params/fighter_files.md section 4"
+,m0[*].0,0,u8,Loop flag,"Non-zero sets bit 0x80 of the motion entry flags (+6); 0 on looping motions (docs/params/fighter_files.md); community: Animation Loop",medium,0x02EA9008 (byte 0 -> motion entry +6 bit 0x80)
+,m0[*].1,1,u8,Transition / blend frames,Copied to the motion entry +4 (community: transition frame),medium,0x02EA9008 (byte 1 -> motion entry +4)
+,m0[*].2,2,u8,Interrupt frame,Frame compared with the current motion frame (community: interrupt frame),medium,"0x02E24D4C, 0x02E299B0, 0x02E2DFEC (lbz +2, converted to float, compared with the frame)"
+,m0[*].3,3,u8,Intangibility start,Community: intangibility start frame,medium,0x02E29AFC (lbz +3)
+,m0[*].4,4,u8,Intangibility end,Community: intangibility end frame,medium,"0x02E24DB8, 0x02E299E4.. (lbz +4)"
+,m0[*].5,5,u8,Disable hitlag animation,Community: disable hitlag animation,medium,0x02E29B68 (lbz +5)
+2,m1[*],,,Idle (Wait) animation odds,"Entries (u32 subaction/motion ID, u32 odds); last entry 0xFFFFFFFF 0xFFFFFFFF ends the list",medium,community sheet; values fit (Kirby: (0,50) (1,25) (2,25) (-1,-1))
+3,m2[*],,,Crouch idle animation odds,Same layout as group 2,medium,community sheet
+4,m3[*],,,Ground box (ECB) bones,"u32 bone ID, f32 x y z: the ground box is the bounding box of these points (min 4 x 4)",high,docs/params/fighter_files.md 3.2 (GroundModule 0x02C39C40)
+5,m4[*],,,Hurtboxes,"f32 x1 y1 z1 x2 y2 z2, f32 radius, u32 bone, part, height, unk, pool (0x30 bytes); count free",high,"docs/params/fighter_files.md 3.1 (HitModule 0x02C42D7C), tools/vl_shapes.py"
+6,m5[*],,,Three u32 values,"Unknown. 3 entries everywhere; e.g. Mario 1 0 6, Marth 2 0 8, Captain Falcon 0 1 7, Kirby 0 0 0. Entry 0 is read by 0x02BFBD04 for the fighter found through a linked object (resolved by ID 0x50000000) and by Meta Knight's code (0x02F25150, entry 1)",low,0x02BFBD04; 0x02F25244
+7,m6[*],,,Ledge-grab boxes,"f32 x y x2 y2 (sheet) / x y w h (vl_shapes); entry 0 normal, 1 tumble, extra entries for tethers",high,docs/params/fighter_files.md 3.3 (GroundModule 0x02C36A34)
+8,m7[*],,,Final Smash aura bones,"u32 bone, f32 x y height width (community)",medium,community sheet
+9,m8[*],,,Attach points (item placement),"u32 bone, f32 x y z, f32 rot x y z; kept as joint IDs 10000+n",medium,"0x02EA8D50 (mgr+0x1838+kind*0x24), docs/params/fighter_files.md 3.4"
+10,m9[*],,,Attach points (gooey bomb / pikmin placement),"same layout; joint IDs 11000+n; usually one per hurtbox bone",medium,"0x02EA8D50, docs/params/fighter_files.md 3.4"
+11,m10[*],,,Unknown 7-float entries,"2 (sometimes 3 or 16) entries of 7 floats: mirrored X (-x / +x), y, z, three angles?, a size (e.g. Kirby -0.9 -0.2 -0.2 0 0 0 1 / 0.9 ...); entry fields read by 0x02E01CD4 (+0x20/+0x24/+0x28 of the entry block)",low,0x02E01D38
+12,m11[*],,,Special-move param modifiers,"(u32 param ID of category 5-8 or a weapon's 2, f32 ?, f32 multiplier, f32 ?, f32 ?, f32 ?): the specials params that a stat boost scales (community: Smash Tour ""Special"" stat). Weapons have the same kind of list in their own vl member (e.g. Kirby g24 for Final Cutter, served by the weapon descriptor +0x24)",medium,community sheet; 0x031AA6EC (Final Cutter descriptor returns Kirby vl+0x1A8)
+13,m12[*],,,Neutral special,"4 entries (custom slots 0-2 + an extra slot 3); the entry of the fighter's slot (instance int 0x10000048) is copied into WorkModule category 5 when the fighter is set up: ID 0x05000000+i (float) / 0x15000000+i (int) = word i",high,"0x02F1BF88 / 0x02F1C19C; slot values set at 0x02E12B94 (player's custom choice, >= 3 -> 0; kinds 0x33-0x3C always 0)"
+14,m13[*],,,Side special,Same with slot int 0x10000049 -> category 6 (0x06000000 / 0x16000000),high,0x02F1BF88
+15,m14[*],,,Up special,Same with slot int 0x1000004A -> category 7 (0x07000000 / 0x17000000),high,0x02F1BF88
+16,m15[*],,,Down special,Same with slot int 0x1000004B -> category 8 (0x08000000 / 0x18000000),high,0x02F1BF88
+16+,m16,,,Category 4 block,"The struct (or single value) at vl+0x140, right after group 16's entries (no group marker of its own). Copied into WorkModule category 4 (0x04000000+i / 0x14000000+i). Often Final Smash params; size per kind: table 0x1012F638",high,0x02F1BF88 (memcpy of vl+0x140)
+17+,m17...,,,Fighter-specific members,"Vectors, structs and scalars that only the fighter's own native code reads (directly from the vl struct), or weapon (article) param blocks: the weapon descriptor's get_param (+0x18) returns entry [custom slot] and it becomes the weapon's WorkModule category 2 (0x02000000+i / 0x12000000+i)",high,"e.g. 0x02B03F3C (Kirby star missile), 0x031AA6B0 (Final Cutter); 194 such accessors mapped (vl_schema.json role weapon)"

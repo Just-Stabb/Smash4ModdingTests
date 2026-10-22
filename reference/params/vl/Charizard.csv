@@ -1,0 +1,191 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,25,0,0,0,f32,Flame spread randomness (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,45,25,120,45,f32,Max angle upwards (degrees),,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2262",m12[*].1
+,2,,0x05000002,28,20,240,28,f32,Max angle downwards (degrees),,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2262",m12[*].2
+,3,,0x05000003,2.6,2.6,3.5,2.6,f32,Max turning angle per frame (degrees),this * StickY (StickY > 0.5),medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2262",m12[*].3
+,4,,0x05000004,0.7,0.7,0.7,0.7,f32,Rotation of flames and head in relation to Name3,"XRot = Angle  * this * 0.5 -  45, YRot = -Angle  * this * 0.5 * - 20",medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2262",m12[*].4
+,5,,0x15000005,0x19,0x4,0x1E,0x19,u32,Amount of frames spent firing after releasing B,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2264",m12[*].5
+,6,,0x05000006,1,1.4,1,1,f32,Max flame speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,0.15,1.4,1,1,f32,Min flame speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,300,1,1000,1,f32,Frames to min flame speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,600,360,1,360,f32,Frames to max flame speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,1,1.6,1,1.1,f32,Max flame size multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,0.21,1.6,1,1.1,f32,Min flame size multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,300,1,240,1,f32,Frames to min flame size,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,600,360,600,360,f32,Frames to max flame size,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x1500000E,0x7,0x6,0x12,0x6,u32,Frames between flames,,medium,community | no read in the vanilla MSC (native or unused),m12[*].14
+,15,,0x0500000F,3,4,2,4,f32,X offset of flames launch,,medium,community | no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,-2,-1.5,-2,-1.5,f32,Y offset of flames launch,,medium,community | no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,330,330,0,310,f32,Initial flame angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x15000012,0xC,0xC,0x20,0xC,u32,"[auto] read by MSC: if (global18 == 0 && var2 > 0.30000001192092896f && var3 == 0x1 && WorkModule(0x6, 0x11000002) % WorkModule(0x",,low,"reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2262",m12[*].18
+,19,,0x05000013,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].19
+,20,,0x05000014,0.55,0.55,0.55,0.55,f32,,,,no read in the vanilla MSC (native or unused),m12[*].20
+,21,,0x15000015,0x3C,0x3C,0x3C,0x3C,u32,,,,no read in the vanilla MSC (native or unused),m12[*].21
+,22,,0x05000016,45,45,0,45,f32,Amount of pushback,,medium,community | no read in the vanilla MSC (native or unused),m12[*].22
+,23,,0x15000017,0x3,0x3,0x64,0x3,u32,Number of hitbox connects to trigger pushback,,medium,community | no read in the vanilla MSC (native or unused),m12[*].23
+14,0,Side B,0x06000000,5,6,0,4,f32,Self damage,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2272",m13[*].0
+,1,,0x06000001,4,1.5,3.3,4,f32,H speed,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2272",m13[*].1
+,2,,0x06000002,0.05,0.03,0.05,0.05,f32,H deceleration on startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2272",m13[*].2
+,3,,0x06000003,15,15,0,15,f32,Damage-based armor threshold,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2272",m13[*].3
+,4,,0x06000004,40,40,40,30,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,2,4,5,2,f32,"[auto] read by MSC: if (WorkModuleF(0, 0x6000005) - 0.10000000149011612f <= var2)",,low,"reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2273",m13[*].5
+,6,,0x06000006,15,7.5,6,15,f32,FSM = (SpecialS/SpecialAirS animation frame + 1) / 2 / this,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2272",m13[*].6
+,7,,0x06000007,0.05,0.02,0.04,0.05,f32,SpecialSEnd H deceleration,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2276",m13[*].7
+,8,,0x06000008,0.03,0.03,0.02,0.03,f32,SpecialAirSEnd H deceleration,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2276",m13[*].8
+,9,,0x16000009,0x0,0x3,0x0,0x0,u32,"[auto] read by MSC: var0 = WorkModule(0x6, 0x16000009) + 0x1;",,low,"reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2280",m13[*].9
+,10,,0x0600000A,5,10,0,5,f32,Total recoil damage Charizard takes when successfully hitting,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2281",m13[*].10
+,11,,0x1600000B,0xA,0x5,0xA,0xA,u32,Frames between each 1% damage increment on recoil,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2281",m13[*].11
+,12,,0x0600000C,0.7,0.7,0.5,1.5,f32,Recoil initial H speed,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2280",m13[*].12
+,13,,0x0600000D,2.5,2.5,1.8,2.5,f32,Recoil initial V speed,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2280",m13[*].13
+,14,,0x0600000E,0.11,0.11,0.11,0.1,f32,Recoil gravity,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2280",m13[*].14
+15,0,Up B,0x07000000,0.25,0.25,0.25,0.25,f32,H speed multiplier on aerial startup,read on Up B,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].0
+,1,,0x07000001,0.625,0.625,0.625,0.625,f32,[auto] copied to status work float 0x1000007,read on Up B,low,"reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].1
+,2,,0x07000002,18,18,90,18,f32,Ability to angle (degrees),,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].2
+,3,,0x07000003,1,0.5,0.84,1,f32,Grounded height multiplier,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].3
+,4,,0x07000004,0.66,0.66,0.66,0.66,f32,H speed multiplier on startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].4
+,5,,0x07000005,0.95,0.8,1.72,0.95,f32,Aerial height multiplier,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].5
+,6,,0x07000006,0.5,0.08,0.05,0.5,f32,Gravity,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].6
+,7,,0x07000007,0.6,0.6,2,0.6,f32,Speacial Fall aerial speed multiplier,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].7
+,8,,0x17000008,0x1E,0x28,0x20,0x1E,u32,Landing lag (frames),,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2284",m14[*].8
+16,0,Down B,0x08000000,0.5,0.9,0.5,0.5,f32,H speed multiplier on grounded startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2288",m15[*].0
+,1,,0x08000001,0,0,0,0,f32,V speed multiplier on grounded startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2288",m15[*].1
+,2,,0x08000002,0.67,0.9,0.67,0.67,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2288",m15[*].2
+,3,,0x08000003,0.5,0.2,0.5,0.5,f32,V speed multiplier on aerial startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2288",m15[*].3
+,4,,0x08000004,0.3,0.3,0.3,0.3,f32,Gravity multiplier on startup,,medium,"community | reads: MSC lizardon.mscsb (vanilla decompile, repo first commit) func_2288",m15[*].4
+,5,,0x08000005,32,32,68,32,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,180,180,30,180,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,0,Category 4 block,0x14000000,0x0,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,1.1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+17,0,Jumps,,0.3,,,,f32,,read on turnaround third jump,,,m17[0].i0.0
+,1,,,0.5,,,,f32,,,,,m17[0].i0.1
+,2,,,0.8,,,,f32,Aerial forward jump initial H speed cap,Initial H speed = Max air speed * 0.8,medium,community,m17[0].i0.2
+,3,,,0.8,,,,f32,Aerial forward jump initial H speed/air max additional accel multiplier,,medium,community,m17[0].i0.3
+18,0,Jumps,,28,,,,f32,Second jump height,,medium,community,m17[0].i1[0]
+,1,,,18,,,,f32,Third jump height,,medium,community,m17[0].i1[1]
+19,0,Jumps,,15,,,,f32,"Angle rotation values when turning during midair jump.
+
+Character turns around when angle value reaches 90 or more. They can input aerials in the new direction on the frame after",,medium,community,m17[0].i2[0]
+,1,,,30,,,,f32,,,,,m17[0].i2[1]
+,2,,,45,,,,f32,,,,,m17[0].i2[2]
+,3,,,60,,,,f32,,,,,m17[0].i2[3]
+,4,,,75,,,,f32,,,,,m17[0].i2[4]
+,5,,,90,,,,f32,,,,,m17[0].i2[5]
+,6,,,105,,,,f32,,,,,m17[0].i2[6]
+,7,,,120,,,,f32,,,,,m17[0].i2[7]
+,8,,,135,,,,f32,,,,,m17[0].i2[8]
+,9,,,150,,,,f32,,,,,m17[0].i2[9]
+,10,,,165,,,,f32,,,,,m17[0].i2[10]
+,11,,,180,,,,f32,,,,,m17[0].i2[11]
+20,0,"Neutral B
+(breath)",0x02000000,-3.6,-3.6,-3.6,-3.6,f32,Landing detection,,medium,community,m18[*].0
+,1,,0x02000001,15,4,480,4,f32,Lifetime (frames),,medium,"community | reads: MSC breath.mscsb (vanilla decompile, repo first commit) func_46",m18[*].1
+,2,,0x02000002,14,3,481,3,f32,Flame hitbox terminates on,,medium,"community | reads: MSC breath.mscsb (vanilla decompile, repo first commit) func_46",m18[*].2
+,3,,0x02000003,2.8,3,1.5,3,f32,Flame speed,,medium,community,m18[*].3
+,4,,0x02000004,4.3,3,1.6,3,f32,H speed of flames,,medium,community,m18[*].4
+,5,,0x12000005,0x0,0x1,0x1,0x1,u32,Piecing capability,,medium,community,m18[*].5
+21,0,"Down B
+(rockstone)",0x02000000,-4,-4,-4,-4,f32,Spread randomness,Lower = Less,medium,community,m19[*].0
+,1,,0x02000001,0.038,0.038,0.038,0.038,f32,,,,,m19[*].1
+,2,,0x02000002,1.65,1.65,1.65,1.65,f32,,,,,m19[*].2
+,3,,0x12000003,0x4,0x4,0x5,0x4,u32,# of rocks,,medium,community,m19[*].3
+,4,,0x12000004,0x5,0x5,0x2,0x5,u32,Frames between rocks,,medium,community,m19[*].4
+,5,,0x02000005,4.5,4.5,7.4,4.5,f32,,,,,m19[*].5
+,6,,0x12000006,0xA,0xA,0x18,0xA,u32,Lifetimes (frames),,medium,community,m19[*].6
+,7,,0x12000007,0x0,0x0,0x0,0x0,u32,,,,,m19[*].7
+22,0,"Side B
+(explosion?)",0x02000000,3,20,3,20,f32,,,,,m20[*]
+23,0,,,0x2000001,0x2000002,0x2000003,0x2000004,u32,0x02000001,Flame weapon param Name1?,medium,community,m21[*].0
+,1,,,1,1,1,1,f32,,,,,m21[*].1
+,2,,,1.3,1.3,1.2,1.2,f32,Multiplier?,,medium,community,m21[*].2
+,3,,,0,0,0,0,f32,,,,,m21[*].3
+,4,,,1,1,1,1,f32,,,,,m21[*].4
+,5,,,0,0,0,0,f32,,,,,m21[*].5
+24,0,Mega Charizard,0x02000000,0.3,,,,f32,,,,,m22[0].0
+,1,,0x02000001,0.1,,,,f32,,,,,m22[0].1
+,2,,0x02000002,2.45,,,,f32,H speed,,medium,community,m22[0].2
+,3,,0x02000003,0.06,,,,f32,,,,,m22[0].3
+,4,,0x02000004,0.24,,,,f32,,,,,m22[0].4
+,5,,0x02000005,2.25,,,,f32,,,,,m22[0].5
+,6,,0x02000006,0.06,,,,f32,,,,,m22[0].6
+,7,,0x02000007,0.001,,,,f32,,,,,m22[0].7
+,8,,0x02000008,0.2,,,,f32,,,,,m22[0].8
+,9,,0x02000009,1.5,,,,f32,,,,,m22[0].9
+,10,,0x0200000A,0.5,,,,f32,,,,,m22[0].10
+,11,,0x0200000B,0,,,,f32,,,,,m22[0].11
+,12,,0x1200000C,0x78,,,,u32,,,,,m22[0].12
+,13,,0x0200000D,12,,,,f32,Duration (seconds),,medium,community,m22[0].13
+,14,,0x0200000E,300,,,,f32,,,,,m22[0].14
+,15,,0x1200000F,0x5,,,,u32,,,,,m22[0].15
+,16,,0x02000010,0.5,,,,f32,,,,,m22[0].16
+,17,,0x02000011,3.8,,,,f32,,,,,m22[0].17
+,18,,0x02000012,0.06,,,,f32,,,,,m22[0].18
+,19,,0x02000013,60,,,,f32,,,,,m22[0].19
+,20,,0x02000014,0.08,,,,f32,,,,,m22[0].20
+,21,,0x02000015,0.1,,,,f32,,,,,m22[0].21
+,22,,0x02000016,300,,,,f32,,,,,m22[0].22
+,23,,0x02000017,120,,,,f32,,,,,m22[0].23
+25,0,Daimonji (Mega Charizard Fire),0x02000000,3,,,,f32,Speed,,medium,community,m23[0].0
+,1,,0x12000001,0x64,,,,u32,Lifetime during travel (frames),,medium,community,m23[0].1
+,2,,0x12000002,0x28,,,,u32,"Duration of ""hitting"" action",Increasing the value does not affect hitbox duration,medium,community,m23[0].2
+26,0,,,-3.5,,,,f32,,,,,m24[0].0
+,1,,,0,,,,f32,,,,,m24[0].1
+,2,,,0,,,,f32,,,,,m24[0].2
+,3,,,4.5,,,,f32,,,,,m24[0].3
+,4,,,0,,,,f32,,,,,m24[0].4
+,5,,,0,,,,f32,,,,,m24[0].5
+,6,,,2,,,,f32,,,,,m24[0].6
+,7,,,0x1,,,,u32,,,,,m24[0].7
+,8,,,0x1,,,,u32,,,,,m24[0].8
+,9,,,0x7E7,,,,u32,,,,,m24[0].9
+,0,,,-3.1,,,,f32,,,,,m24[1].0
+,1,,,1.7,,,,f32,,,,,m24[1].1
+,2,,,0,,,,f32,,,,,m24[1].2
+,3,,,2.2,,,,f32,,,,,m24[1].3
+,4,,,0,,,,f32,,,,,m24[1].4
+,5,,,0,,,,f32,,,,,m24[1].5
+,6,,,3,,,,f32,,,,,m24[1].6
+,7,,,0x1,,,,u32,,,,,m24[1].7
+,8,,,0x0,,,,u32,,,,,m24[1].8
+,9,,,0x7D2,,,,u32,,,,,m24[1].9
+,0,,,-1,,,,f32,,,,,m24[2].0
+,1,,,0.5,,,,f32,,,,,m24[2].1
+,2,,,0,,,,f32,,,,,m24[2].2
+,3,,,3.9,,,,f32,,,,,m24[2].3
+,4,,,0.6,,,,f32,,,,,m24[2].4
+,5,,,0,,,,f32,,,,,m24[2].5
+,6,,,2.3,,,,f32,,,,,m24[2].6
+,7,,,0x1,,,,u32,,,,,m24[2].7
+,8,,,0x0,,,,u32,,,,,m24[2].8
+,9,,,0x7D2,,,,u32,,,,,m24[2].9
+,0,,,3,,,,f32,,,,,m24[3].0
+,1,,,0,,,,f32,,,,,m24[3].1
+,2,,,0,,,,f32,,,,,m24[3].2
+,3,,,8,,,,f32,,,,,m24[3].3
+,4,,,0,,,,f32,,,,,m24[3].4
+,5,,,0,,,,f32,,,,,m24[3].5
+,6,,,2.4,,,,f32,,,,,m24[3].6
+,7,,,0x1,,,,u32,,,,,m24[3].7
+,8,,,0x0,,,,u32,,,,,m24[3].8
+,9,,,0x7D7,,,,u32,,,,,m24[3].9
+,0,,,3,,,,f32,,,,,m24[4].0
+,1,,,0,,,,f32,,,,,m24[4].1
+,2,,,0,,,,f32,,,,,m24[4].2
+,3,,,8,,,,f32,,,,,m24[4].3
+,4,,,0,,,,f32,,,,,m24[4].4
+,5,,,0,,,,f32,,,,,m24[4].5
+,6,,,2.4,,,,f32,,,,,m24[4].6
+,7,,,0x1,,,,u32,,,,,m24[4].7
+,8,,,0x0,,,,u32,,,,,m24[4].8
+,9,,,0x7DF,,,,u32,,,,,m24[4].9
+,0,,,0x1,,,,u32,,,,,m25.0
+,1,,,4,,,,f32,,,,,m25.1
+,2,,,4,,,,f32,,,,,m25.2
+,3,,,0,,,,f32,,,,,m25.3
+23,0,,,0x2000002,,,,,0x02000002,Flame weapon param Name2?; community row not matched to a value of the vanilla file,low,community,
+23,2,,,1.3,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+23,0,,,0x2000003,,,,,0x02000003,Flame weapon param Name3?; community row not matched to a value of the vanilla file,low,community,
+23,2,,,1.2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+23,0,,,0x2000004,,,,,0x02000004,Flame weapon param Name4?; community row not matched to a value of the vanilla file,low,community,
+23,2,,,1.2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+26,0 - 4,"Mega Charizard
+ Hurtbox",,,,,,,,community row not matched to a value of the vanilla file,low,community,

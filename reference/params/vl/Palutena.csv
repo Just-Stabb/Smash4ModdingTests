@@ -1,0 +1,216 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,90,0,0,0,f32,,,,,m12[*].0
+,1,,0x05000001,12,0,0,0,f32,,,,,m12[*].1
+,2,,0x05000002,-1.5,0,0,1,f32,X offset,,medium,community,m12[*].2
+,3,,0x05000003,0.6,0,0,0,f32,H speed multiplier on startup,,medium,community,m12[*].3
+,4,,0x05000004,0.5,0,0,0,f32,V speed multiplier on startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3713",m12[*].4
+,5,,0x05000005,0.5,0,0,0,f32,Added initial V speed on aerial startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3713",m12[*].5
+,6,,0x15000006,0x1C,0x0,0x0,0x0,u32,Frame 1st bullet comes out?,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3716",m12[*].6
+,7,,0x15000007,0x6,0x0,0x0,0x0,u32,Frame duration betwwen bullets?,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3716",m12[*].7
+,8,,0x05000008,0,0.8,0,0,f32,H speed multiplier on aerial startup,,medium,community,m12[*].8
+,9,,0x05000009,0,0.7,0,0,f32,V speed multiplier on aerial startup,,medium,community,m12[*].9
+,10,,0x0500000A,0,0.5,0,0,f32,Added initial V speed on aerial startup,,medium,community,m12[*].10
+,11,,0x0500000B,0,55,0,0,f32,X offset of flame,,medium,community,m12[*].11
+,12,,0x1500000C,0x0,0x0,0x12,0x0,u32,Min frames for Heavenly Light,,medium,community,m12[*].12
+,13,,0x1500000D,0x0,0x0,0xB4,0x0,u32,Max frames for Heavenly Light,,medium,community,m12[*].13
+,14,,0x0500000E,0,0,0.9,0,f32,H speed multiplier on startup,,medium,community,m12[*].14
+,15,,0x0500000F,0,0,0.7,0,f32,V speed multiplier on startup,,medium,community,m12[*].15
+,16,,0x05000010,0,0,0.9,0,f32,Added initial V speed on aerial startup,,medium,community,m12[*].16
+14,0,Side B,0x06000000,0.6,0,0,0,f32,H speed multiplier on startup,,medium,community,m13[*].0
+,1,,0x06000001,0.7,0,0,0,f32,V speed multiplier on startup,,medium,community,m13[*].1
+,2,,0x06000002,0.7,0,0,0,f32,Added V speed on startup,,medium,community,m13[*].2
+,3,,0x06000003,10,0,0,0,f32,X offset of reflect barrier,,medium,community,m13[*].3
+,4,,0x06000004,10,0,0,0,f32,Y offset of reflect barrier,,medium,community,m13[*].4
+,5,,0x16000005,0x0,0x1A,0x0,0x0,u32,Action timer,,medium,community,m13[*].5
+,6,,0x06000006,0,2.6,0,0,f32,Initial H speed,,medium,community,m13[*].6
+,7,,0x06000007,0,0.6,0,0,f32,Initial V speed,"""This * 0.5 + This * 0.5"" is set to V speed for some reason",medium,community,m13[*].7
+,8,,0x06000008,0,0.024,0,0,f32,Gravity on traveling,,medium,community,m13[*].8
+,9,,0x06000009,0,1.1,0,0,f32,Max fall speed on traveling,,medium,community,m13[*].9
+,10,,0x0600000A,0,0,0,0,f32,H speed,,medium,community,m13[*].10
+,11,,0x0600000B,0,2,0,0,f32,V speed,,medium,community,m13[*].11
+,12,,0x0600000C,0,0.7,0,0,f32,H speed multiplier,,medium,community,m13[*].12
+,13,,0x0600000D,0,0.02,0,0,f32,Air frcition,,medium,community,m13[*].13
+,14,,0x0600000E,0,0.04,0,0,f32,Gravity after traveling,,medium,community,m13[*].14
+,15,,0x0600000F,0,0.8,0,0,f32,V speed multiplier,,medium,community,m13[*].15
+,16,,0x06000010,0,0.09,0,0,f32,Air frcition,,medium,community,m13[*].16
+,17,,0x06000011,0,0,0,0,f32,Min H speed on grounded startup,,medium,community,m13[*].17
+,18,,0x06000012,0,0,0.14,0,f32,H acceleration on grounded startup,,medium,community,m13[*].18
+,19,,0x06000013,0,0,3.2,0,f32,Max H speed on grounded startup,,medium,community,m13[*].19
+,20,,0x06000014,0,0,0.5,0,f32,Min H speed on aerial startup,,medium,community,m13[*].20
+,21,,0x06000015,0,0,0.12,0,f32,H acceleration on aerial startup,,medium,community,m13[*].21
+,22,,0x06000016,0,0,3.8,0,f32,Max H speed on aerial startup,,medium,community,m13[*].22
+,23,,0x16000017,0x0,0x0,0x3C,0x0,u32,Timer,,medium,community,m13[*].23
+,24,,0x16000018,0x0,0x0,0xE6,0x0,u32,Super Speed recharge rate (frames),,medium,community,m13[*].24
+,25,,0x06000019,0,0,0.5,0,f32,H speed multiplier,Gravity = 0.15,medium,community,m13[*].25
+,26,,0x0600001A,0,0,0.2,0,f32,V speed multiplier,Max fall speed = 2.2,medium,community,m13[*].26
+,27,,0x0600001B,0,0,20,0,f32,Knockback based armar KB threshold,Gravity on turning = 0.01,medium,community,m13[*].27
+,28,,0x1600001C,0x0,0x0,0x2A,0x0,u32,Frames to max damage dealt,Damage dealt multiplier = current frame / Name28 * Name29,medium,community,m13[*].28
+,29,,0x0600001D,0,0,3,0,f32,Damage dealt multiplier,,medium,community,m13[*].29
+,30,,0x1600001E,0x0,0x0,0x20,0x0,u32,"FSM = sys_45(0x63) / (this - 1), related to RunBrake",,medium,community,m13[*].30
+,31,,0x0600001F,0,0,0.15,0,f32,V speed,,medium,community,m13[*].31
+,32,,0x06000020,0,0,2.2,0,f32,Max fall speed,,medium,community,m13[*].32
+15,0,Up B,0x07000000,1.5,0,0,0,f32,H speed divisor on startup,,medium,community,m14[*].0
+,1,,0x07000001,3,0,0,0,f32,V speed divisor on startup,,medium,community,m14[*].1
+,2,,0x07000002,0.03,0,0,0,f32,Gravity on startup,,medium,community | reads: native 0x02F4649C (fn 0x02F46174),m14[*].2
+,3,,0x07000003,0.75,0,0,0,f32,Max fall speed on startup,,medium,community | reads: native 0x02F464B8 (fn 0x02F46174),m14[*].3
+,4,,0x17000004,0x11,0x0,0x0,0x0,u32,Travel time (frames),,medium,community,m14[*].4
+,5,,0x17000005,0x3,0x0,0x0,0x0,u32,Frames to something,,medium,community,m14[*].5
+,6,,0x17000006,0x5,0x0,0x0,0x0,u32,Frames to grab ledge??,,medium,community,m14[*].6
+,7,,0x07000007,0.5,0,0,0,f32,[auto] read by native code (get_float at 0x02F4576C); meaning not traced,probably sensitibity,low,reads: native 0x02F4576C (fn 0x02F45668),m14[*].7
+,8,,0x07000008,3.5,0,0,0,f32,Base travel speed,,medium,community,m14[*].8
+,9,,0x07000009,0,0,0,0,f32,Max added travel speed,,medium,community,m14[*].9
+,10,,0x0700000A,2.7,0,0,0,f32,Max air speed multiplier,,medium,community,m14[*].10
+,11,,0x0700000B,0.5,0,0,0,f32,Speed multiplier on reappearance,,medium,community,m14[*].11
+,12,,0x0700000C,0.8,0,0,0,f32,Special fall max air speed multiplier,,medium,community,m14[*].12
+,13,,0x0700000D,22,0,0,0,f32,Landing lag (frames),,medium,community,m14[*].13
+,14,,0x0700000E,1,0,0,0,f32,Gravity multiplier,,medium,community,m14[*].14
+,15,,0x0700000F,0,0.6,0,0,f32,H speed multiplier on startup,,medium,community,m14[*].15
+,16,,0x07000010,0,0.7,0,0,f32,V speed multiplier on startup,,medium,community,m14[*].16
+,17,,0x07000011,0,0.8,0,0,f32,Initial H speed,,medium,community,m14[*].17
+,18,,0x07000012,0,1.8,0,0,f32,Initial V speed on grounded startup,,medium,community,m14[*].18
+,19,,0x07000013,0,3.5,0,0,f32,Initial V speed on aerial startup,,medium,community,m14[*].19
+,20,,0x07000014,0,0.3,0,0,f32,X sensitivity,,medium,community,m14[*].20
+,21,,0x17000015,0x0,0x96,0x0,0x0,u32,Glide duration (frames),,medium,community,m14[*].21
+,22,,0x07000016,0,0.08,0,0,f32,Air accel,,medium,community,m14[*].22
+,23,,0x07000017,0,2.5,0,0,f32,Max air speed,,medium,community,m14[*].23
+,24,,0x07000018,0,0.35,0,0,f32,Min air speed,,medium,community,m14[*].24
+,25,,0x07000019,0,0.01,0,0,f32,Gravity on flying,,medium,community,m14[*].25
+,26,,0x0700001A,0,0.5,0,0,f32,Max fall speed on flying,,medium,community,m14[*].26
+,27,,0x1700001B,0x0,0x12,0x0,0x0,u32,Frames,,medium,community,m14[*].27
+,28,,0x0700001C,0,0.8,0,0,f32,Special fall max air speed multiplier,,medium,community,m14[*].28
+,29,,0x0700001D,0,30,0,0,f32,Landing lag (frames),,medium,community,m14[*].29
+,30,,0x0700001E,0,0,0.35,0,f32,H speed multiplier on grounded startup,,medium,community,m14[*].30
+,31,,0x0700001F,0,0,0.15,0,f32,V speed multiplier on aerial startup,,medium,community,m14[*].31
+,32,,0x07000020,0,0,0.2,0,f32,Gravity multiplier,,medium,community,m14[*].32
+,33,,0x07000021,0,0,3.3,0,f32,Initial V speed on grounded firing,,medium,community,m14[*].33
+,34,,0x07000022,0,0,0.95,0,f32,Initial V speed on aerial firing,,medium,community,m14[*].34
+,35,,0x07000023,0,0,0.5,0,f32,Base/Additional acceleration multiplier on flying,,medium,community,m14[*].35
+,36,,0x07000024,0,0,1,0,f32,Max air speed/H air speed cap multiplier on flying,,medium,community,m14[*].36
+,37,,0x07000025,0,0,0.8,0,f32,Special fall max air speed multiplier,,medium,community,m14[*].37
+,38,,0x07000026,0,0,38,0,f32,Landing lag (frames),,medium,community,m14[*].38
+16,0,Down B,0x08000000,0,0,0,0,f32,,,,,m15[*].0
+,1,,0x08000001,0.33,0,0,0,f32,H speed multiplier on startup,,medium,community,m15[*].1
+,2,,0x08000002,0.8,0,0,0,f32,Max V speed on startup,,medium,community,m15[*].2
+,3,,0x08000003,0.0025,0,0,0,f32,Air friction,,medium,community,m15[*].3
+,4,,0x08000004,0.04,0,0,0,f32,Gravity,,medium,community,m15[*].4
+,5,,0x08000005,1.2,0,0,0,f32,Max fall speed,,medium,community,m15[*].5
+,6,,0x08000006,1.3,0,0,0,f32,Damage multiplier,,medium,community,m15[*].6
+,7,,0x18000007,0x10,0x0,0x0,0x0,u32,Freeze frames on activation,,medium,community,m15[*].7
+,8,,0x08000008,10,0,0,0,f32,Min damage,,medium,community,m15[*].8
+,9,,0x08000009,50,0,0,0,f32,Max damage,,medium,community,m15[*].9
+,10,,0x0800000A,50,0,0,0,f32,Max damage when 0x21000013 is set,,medium,community,m15[*].10
+,11,,0x0800000B,1,0,0,0,f32,Frame speed multiplier,,medium,community,m15[*].11
+,12,,0x1800000C,0x0,0x0,0x0,0x0,u32,,,,,m15[*].12
+,13,,0x0800000D,0,0,0,0,f32,,,,,m15[*].13
+,14,,0x0800000E,9.4,0,0,0,f32,Counter trigger bubble size,,medium,community,m15[*].14
+,15,,0x0800000F,1.5,0,0,0,f32,,,,,m15[*].15
+,16,,0x08000010,11.5,0,0,0,f32,,,,,m15[*].16
+,17,,0x08000011,0,1.1,0,0,f32,Damage received multiplier,,medium,community,m15[*].17
+,18,,0x08000012,0,1,0,0,f32,KB received multiplier,,medium,community,m15[*].18
+,19,,0x08000013,0,720,0,0,f32,Lightweight duration (frames),,medium,community,m15[*].19
+,20,,0x08000014,0,0.8,0,0,f32,H speed multiplier on startup,,medium,community,m15[*].20
+,21,,0x08000015,0,0.8,0,0,f32,V speed multiplier on startup,,medium,community,m15[*].21
+,22,,0x18000016,0x0,0x12C,0x0,0x0,u32,Lightweight slowdown time (frames),,medium,community,m15[*].22
+,23,,0x08000017,0,1.5,0,0,f32,Walk speed multiplier,,medium,community,m15[*].23
+,24,,0x08000018,0,1.5,0,0,f32,Dash initial velocity multiplier,,medium,community,m15[*].24
+,25,,0x08000019,0,1.3,0,0,f32,Dash accel A multiplier,,medium,community,m15[*].25
+,26,,0x0800001A,0,1.3,0,0,f32,Dash accel B multiplier,,medium,community,m15[*].26
+,27,,0x0800001B,0,1.5,0,0,f32,Max ground speed multiplier,,medium,community,m15[*].27
+,28,,0x0800001C,0,1.5,0,0,f32,Jump H max speed multiplier,,medium,community,m15[*].28
+,29,,0x0800001D,0,1.25,0,0,f32,Jump heights multiplier,,medium,community,m15[*].29
+,30,,0x0800001E,0,1.25,0,0,f32,Hop heights multiplier,,medium,community,m15[*].30
+,31,,0x0800001F,0,1.3,0,0,f32,?,,medium,community,m15[*].31
+,32,,0x08000020,0,1,0,0,f32,Gravity multiplier,,medium,community,m15[*].32
+,33,,0x08000021,0,0.8,0,0,f32,Fall speed multiplier,,medium,community,m15[*].33
+,34,,0x08000022,0,1.5,0,0,f32,Fast fall speed multiplier,,medium,community,m15[*].34
+,35,,0x08000023,0,1,0,0,f32,,,,,m15[*].35
+,36,,0x08000024,0,1,0,0,f32,,,,,m15[*].36
+,37,,0x08000025,0,1.7,0,0,f32,Air speed multiplier,,medium,community,m15[*].37
+,38,,0x08000026,0,1.3,0,0,f32,,,,,m15[*].38
+,39,,0x08000027,0,1.3,0,0,f32,,,,,m15[*].39
+,40,,0x08000028,0,1.3,0,0,f32,,,,,m15[*].40
+,41,,0x08000029,0,1.3,0,0,f32,[auto] read by native code (get_float at 0x0318A084); meaning not traced,,low,"reads: native 0x0318A084 (fn 0x03189E04, attributed by type fit)",m15[*].41
+,42,,0x1800002A,0x0,0x12C,0x0,0x0,u32,Lightweight cooldown time (frames),,medium,community,m15[*].42
+,43,,0x0800002B,0,0.5,0,0,f32,Slowdown walk speed multiplier,,medium,community,m15[*].43
+,44,,0x0800002C,0,0.5,0,0,f32,Slowdown run speed multiplier,,medium,community,m15[*].44
+,45,,0x0800002D,0,0.7,0,0,f32,Slowdown air speed multiplier,,medium,community,m15[*].45
+,46,,0x0800002E,0,0,0.7,0,f32,H speed multiplier,,medium,community,m15[*].46
+,47,,0x0800002F,0,0,0.6,0,f32,V speed multiplier,,medium,community,m15[*].47
+,48,,0x08000030,0,0,0.6,0,f32,Added initial V speed on aerial startup,,medium,community,m15[*].48
+,49,,0x08000031,0,0,12,0,f32,X offset,,medium,community,m15[*].49
+,50,,0x08000032,0,0,5,0,f32,Y offset,,medium,community,m15[*].50
+,0,Final Smash?,0x14000000,0x1C,,,,u32,"Actiion timer, script_2301",,medium,community,m16.0
+,1,,0x14000001,0x19,,,,u32,[auto] read by native code (get_int at 0x027BD2A4); meaning not traced,,low,reads: native 0x027BD2A4 (fn 0x027BD278),m16.1
+,2,,0x04000002,30,,,,f32,,,,,m16.2
+,3,,0x04000003,30,,,,f32,,,,,m16.3
+,4,,0x04000004,0.15,,,,f32,[auto] read by native code (get_float at 0x027BD4FC); meaning not traced,,low,reads: native 0x027BD4FC (fn 0x027BD44C),m16.4
+,5,,0x04000005,6,,,,f32,,,,,m16.5
+,6,,0x14000006,0x78,,,,u32,"Action timer, script_2309",,medium,community,m16.6
+,7,,0x04000007,30,,,,f32,,,,,m16.7
+,8,,0x04000008,314,,,,f32,,,,,m16.8
+,9,,0x04000009,9.3,,,,f32,,,,,m16.9
+,10,,0x0400000A,1.5,,,,f32,,,,,m16.10
+,11,,0x0400000B,5,,,,f32,,,,,m16.11
+,12,,0x0400000C,2,,,,f32,,,,,m16.12
+17,0,,,0x0,,,,u32,,,,,m17[0]
+18,0,Article params (explosiveflame),0x12000000,0x20,,,,u32,,,,,m18[0]
+19,0,Article params (fireworks),0x12000000,0x6,,,,u32,,,,,m19[0].0
+,1,,0x12000001,0x1B,,,,u32,,,,,m19[0].1
+,2,,0x02000002,1.5,,,,f32,V speed,,medium,community,m19[0].2
+20,0,Article params (autoaimbullet),0x02000000,5,,,,f32,,,,,m20[0].0
+,1,,0x12000001,0x1E,,,,u32,,,,,m20[0].1
+,2,,0x12000002,0x0,,,,u32,,,,,m20[0].2
+,0,,,0x3,,,,u32,,,,,m21.0
+,1,,,0,,,,f32,,,,,m21.1
+,2,,,0.3,,,,f32,,,,,m21.2
+21,0,Article params (autoreticle),0x12000000,0x0,,,,u32,,,,,m22[0]
+22,0,Side B,0x12000000,0x24,,,,u32,Time spent traveling (frames),,medium,community,m23[0].0
+,1,,0x02000001,0.4,,,,f32,Initial speed,,medium,community,m23[0].1
+,2,,0x02000002,60,,,,f32,Duration (frames),,medium,community,m23[0].2
+,3,,0x12000003,0x32,,,,u32,,,,,m23[0].3
+,4,,0x02000004,1,,,,f32,Animation duration multiplier,Higher = graphic animation is slowed down,medium,community,m23[0].4
+23,0,Side B,,0x0,,,,u32,,,,,m24[0].0
+,1,,,50,,,,f32,Break threshold,,medium,community,m24[0].1
+,2,,,0,,,,f32,Reflection bubble X offset,,medium,community,m24[0].2
+,3,,,8,,,,f32,Reflection bubble Y offset,,medium,community,m24[0].3
+,4,,,0,,,,f32,Reflection bubble Z offset,,medium,community,m24[0].4
+,5,,,0,,,,f32,Reflection bubble X2 offset,,medium,community,m24[0].5
+,6,,,-4,,,,f32,Reflection bubble Y2 offset,,medium,community,m24[0].6
+,7,,,0,,,,f32,Reflection bubble Z2 offset,,medium,community,m24[0].7
+,8,,,3,,,,f32,Reflection bubble size,,medium,community,m24[0].8
+,9,,,1.17,,,,f32,Reflected projectile damage multiplier,,medium,community,m24[0].9
+,10,,,1.25,,,,f32,Reflected projectile speed multiplier,,medium,community,m24[0].10
+,11,,,1,,,,f32,Reflected projectile lifetime multiplier,,medium,community,m24[0].11
+,12,,,0x0,,,,s32,,,,,m24[0].12
+24,0,,,0x2000000,,,,u32,Weapon param Name0?,,medium,community,m25[0].0
+,1,,,1,,,,f32,,,,,m25[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m25[0].2
+,3,,,0,,,,f32,,,,,m25[0].3
+,4,,,1,,,,f32,,,,,m25[0].4
+,5,,,0,,,,f32,,,,,m25[0].5
+25,0,,,0x2000002,,,,u32,Weapon param Name2?,,medium,community,m26[0].0
+,1,,,1,,,,f32,,,,,m26[0].1
+,2,,,2,,,,f32,Multiplier?,,medium,community,m26[0].2
+,3,,,0,,,,f32,,,,,m26[0].3
+,4,,,1,,,,f32,,,,,m26[0].4
+,5,,,0,,,,f32,,,,,m26[0].5
+,0,,,0x2000004,,,,u32,Weapon param Name4?,,medium,community,m26[1].0
+,1,,,1,,,,f32,,,,,m26[1].1
+,2,,,2,,,,f32,Multiplier?,,medium,community,m26[1].2
+,3,,,0,,,,f32,,,,,m26[1].3
+,4,,,1,,,,f32,,,,,m26[1].4
+,5,,,0,,,,f32,,,,,m26[1].5
+26,0,Article params (blackhole),0x12000000,0xC8,,,,u32,,,,,m27[0]
+27,0,Article params (beam),0x12000000,0x69,,,,u32,,,,,m28[0]
+28,0,,,15,,,,f32,"Angle rotation values, used for Turn animation?",,medium,community,m29[0]
+,1,,,30,,,,f32,,,,,m29[1]
+,2,,,45,,,,f32,,,,,m29[2]
+,3,,,60,,,,f32,,,,,m29[3]
+,4,,,75,,,,f32,,,,,m29[4]
+,5,,,90,,,,f32,,,,,m29[5]
+,6,,,105,,,,f32,,,,,m29[6]
+,7,,,120,,,,f32,,,,,m29[7]
+,8,,,135,,,,f32,,,,,m29[8]
+,9,,,150,,,,f32,,,,,m29[9]
+,10,,,165,,,,f32,,,,,m29[10]
+,11,,,180,,,,f32,,,,,m29[11]

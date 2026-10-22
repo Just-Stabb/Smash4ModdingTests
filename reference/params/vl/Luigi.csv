@@ -1,0 +1,88 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x15000000,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m12[*]
+14,0,Side B,0x06000000,0.25,0.25,0.25,0.25,f32,StickX sensitivity,smaller = more,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2277",m13[*].0
+,1,,0x06000001,20,20,20,20,f32,Initial charged frames of smash input,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2282",m13[*].1
+,2,,0x06000002,90,45,100,90,f32,Frames to fully charge,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2283; MSC luigi.mscsb (vanilla decompile, repo first commit) func_2339",m13[*].2
+,3,,0x06000003,150,110,150,150,f32,Frames until charge automatically cancels,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2284",m13[*].3
+,4,,0x06000004,1,1,1,1,f32,Charge animation frame speed multiplier,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2283",m13[*].4
+,5,,0x06000005,6,4,5,6,f32,Uncharged damage multiplier (this / 10),"Normally this doesn't make a difference, but the damage dealt is still relative to what is written in ACMD",medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2339",m13[*].5
+,6,,0x06000006,21,18,20,21,f32,Max charge damage multiplier (this / 10),,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2339",m13[*].6
+,7,,0x06000007,1e-05,1,0.8,0.8,f32,[auto] read by native code (get_float at 0x02F1946C); meaning not traced,,low,reads: native 0x02F1946C (fn 0x02F193D4); native 0x02F19AAC (fn 0x02F19A14),m13[*].7
+,8,,0x06000008,0.02,0.02,0.02,0.02,f32,[auto] read by native code (get_float at 0x02F194A0); meaning not traced,,low,reads: native 0x02F194A0 (fn 0x02F193D4); native 0x02F19AE0 (fn 0x02F19A14),m13[*].8
+,9,,0x06000009,0.05,0.05,0.05,0.05,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x0600000A,0.5,1.2,2.1,1.4,f32,,,,no read in the vanilla MSC (native or unused),m13[*].10
+,11,,0x0600000B,1,2.3,3.8,2.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].11
+,12,,0x0600000C,1.8,0,0.2,0.4,f32,,,,no read in the vanilla MSC (native or unused),m13[*].12
+,13,,0x0600000D,2.5,0,0.4,0.8,f32,Max H speed,community ID was 0x0600000B,medium,community | no read in the vanilla MSC (native or unused),m13[*].13
+,14,,0x0600000E,0.01,0,0.0065,0.01,f32,Gravity while flying,,medium,community | no read in the vanilla MSC (native or unused),m13[*].14
+,15,,0x0600000F,1.2,0,0.45,1.2,f32,,,,no read in the vanilla MSC (native or unused),m13[*].15
+,16,,0x06000010,0.05,0.05,0.03,0.05,f32,[auto] read by native code (get_float at 0x02F199D4); meaning not traced,,low,reads: native 0x02F199D4 (fn 0x02F19928); native 0x02F19B84 (fn 0x02F19B34),m13[*].16
+,17,,0x06000011,0.1,0.1,0.075,0.1,f32,[auto] read by native code (get_float at 0x02F19BD0); meaning not traced,,low,reads: native 0x02F19BD0 (fn 0x02F19B34),m13[*].17
+,18,,0x06000012,10,10,7,10,f32,Misfire % chance,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2286",m13[*].18
+,19,,0x06000013,1,2.3,3.8,2.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].19
+,20,,0x06000014,4,0,0.4,0.8,f32,,,,no read in the vanilla MSC (native or unused),m13[*].20
+,21,,0x06000015,1.8,1.5,1.8,1.8,f32,Minimum H speed for wall stick,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2339",m13[*].21
+,22,,0x06000016,50,50,75,50,f32,Wall stick % chance,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2339",m13[*].22
+15,0,Up B,0x07000000,0.25,0.25,0.25,0.25,f32,[auto] copied to status work float 0x1000006,,low,"reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].0
+,1,,0x07000001,0,0,0,0,f32,Initial H speed?,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].1
+,2,,0x07000002,1,20,1,1,f32,Air control during Up B?,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].2
+,3,,0x07000003,0.7,0.7,1,0.7,f32,[auto] copied to status work float 0x100000c,,low,"reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].3
+,4,,0x07000004,1.5,1.5,6,1.5,f32,Special fall max fall speed?,,medium,community | reads: native 0x02F19F5C (fn 0x02F19F18),m14[*].4
+,5,,0x17000005,0x43,0x50,0x24,0x3F,u32,Landing lag (frames),,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].5
+,6,,0x07000006,1,0.6,1.3,0.95,f32,Grounded height multiplier,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].6
+,7,,0x17000007,0x4,0x4,0x4,0x4,u32,,,,no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,0.33,0.33,0.33,0.33,f32,Special fall aerial mobility?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].8
+,9,,0x17000009,0x28,0x28,0x28,0x28,u32,,,,no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,0,0,0,0,f32,[auto] copied to status work float 0x1000009,,low,"reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].10
+,11,,0x0700000B,0.05,0.05,0.05,0.05,f32,Gravity before the jump,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].11
+,12,,0x0700000C,1,0.85,1.3,0.95,f32,Aerial height multiplier,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2314",m14[*].12
+16,0,Down B,0x08000000,1.9,0.3,1.1,1.9,f32,Grounded H max speed,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2337; native 0x027B1144 (fn 0x027B1030); native 0x02F19D64 (fn 0x02F19C7C)",m15[*].0
+,1,,0x08000001,0.2,0.02,0.4,0.2,f32,Grounded H accel,,medium,community | reads: native 0x02F19D0C (fn 0x02F19C7C),m15[*].1
+,2,,0x08000002,0.66,0.66,0.66,0.66,f32,"[auto] read by MSC: var0 += WorkModuleF(0, 0x8000002);",,low,"reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2337",m15[*].2
+,3,,0x08000003,0.7,0.95,0.45,0.7,f32,Gained V speed from tapping B,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2337",m15[*].3
+,4,,0x08000004,1.8,2.4,1.2,1.8,f32,Max V speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,1.3,0.3,1.1,1.3,f32,Aerial H max speed / Max V speed after the spin,,medium,"community | reads: MSC luigi.mscsb (vanilla decompile, repo first commit) func_2337; native 0x02F19E94 (fn 0x02F19DAC)",m15[*].5
+,6,,0x08000006,0.08,0.02,0.4,0.08,f32,Aerial H accel,,medium,community | reads: native 0x02F19E3C (fn 0x02F19DAC),m15[*].6
+,7,,0x08000007,1,1,0.9,1,f32,Ending friction?,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,0,Category 4 block,0x04000000,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,30,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,2.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+17,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
+,1,,,0.4,,,,f32,Crawl backward speed,,medium,community,m17[0].1
+18,0,"Neutral B
+(Projectile)",0x02000000,0,0.2,0.0022,0,f32,Fireball gravity,,medium,community,m18[*].0
+,1,,0x02000001,1.65,1.65,1.65,1.65,f32,,,,,m18[*].1
+,2,,0x02000002,0.85,0.9,0.85,0.85,f32,Fireball bounce speed multiplier,,medium,community,m18[*].2
+,3,,0x02000003,1.25,2,0.55,1.25,f32,Fireball speed,,medium,community,m18[*].3
+,4,,0x02000004,0,45,15,0,f32,Fireball angle (degrees),,medium,community,m18[*].4
+,5,,0x12000005,0x32,0x4B,0x5A,0x32,u32,Fireball lifetime (frames),,medium,community,m18[*].5
+,6,,0x02000006,0.9,0.25,0.9,0.9,f32,,,,,m18[*].6
+,7,,0x02000007,2,5,2,2,f32,,,,,m18[*].7
+,8,,0x02000008,1.2,2.5,1.2,1.2,f32,Max H speed,,medium,community,m18[*].8
+,9,,0x02000009,0,0,0,0,f32,,,,,m18[*].9
+,10,,0x0200000A,1.2,2.5,1.2,1.2,f32,Max V speed,,medium,community,m18[*].10
+,11,,0x0200000B,60,60,60,60,f32,,,,,m18[*].11
+,12,,0x1200000C,0x5,0x3,0x5,0x5,u32,,,,,m18[*].12
+,13,,0x1200000D,0x0,0x0,0x0,0x0,u32,,,,,m18[*].13
+,14,,0x1200000E,0x0,0x0,0x0,0x0,u32,,,,,m18[*].14
+,0,,,0x3,,,,u32,,,,,m19.0
+,1,,,0.2,,,,f32,,,,,m19.1
+,2,,,-0.2,,,,f32,,,,,m19.2
+,3,,,1,,,,f32,,,,,m19.3
+19,0,,,0x2000003,,,,u32,Fireball weapon param Name3?,,medium,community,m20[0].0
+,1,,,1,,,,f32,,,,,m20[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[0].2
+,3,,,0,,,,f32,,,,,m20[0].3
+,4,,,1,,,,f32,,,,,m20[0].4
+,5,,,0,,,,f32,,,,,m20[0].5
+20,0,Article params (obakyumu),0x02000000,3,,,,f32,,,,,m21[0].0
+,1,,0x02000001,30,,,,f32,,,,,m21[0].1
+,2,,0x02000002,3,,,,f32,,,,,m21[0].2
+,3,,0x02000003,3.5,,,,f32,,,,,m21[0].3
+14,7,,0x06000007,0.8,,,,,Friction when charging,community row not matched to a value of the vanilla file,low,community,
+14,10,,0x0600000a,1.4,,,,,Base H speed,community row not matched to a value of the vanilla file,low,community,
+14,12,,0x0600000c,0.4,,,,,Base V speed,community row not matched to a value of the vanilla file,low,community,
+14,13,,0x0600000d,0.8,,,,,Max V speed,community row not matched to a value of the vanilla file,low,community,
+14,19,,0x06000013,2.5,,,,,Misfire H speed,community row not matched to a value of the vanilla file,low,community,
+14,20,,0x06000014,0.8,,,,,Misfire V speed,community row not matched to a value of the vanilla file,low,community,

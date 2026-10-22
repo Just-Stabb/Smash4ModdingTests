@@ -1,0 +1,148 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x15000000,0x1E,0x0,0x0,0x0,u32,Time to fully charge (frames),,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2274; MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4108",m12[*].0
+,1,,0x05000001,10,0,0,0,f32,X offset of shot,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,10,0,0,0,f32,Y offset of shot,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,0.2,0,0,0,f32,H recoil speed after grounded uncharged shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].3
+,4,,0x05000004,0.8,0,0,0,f32,H recoil speed after grounded fully-charged shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].4
+,5,,0x05000005,0.4,0,0,0,f32,H recoil speed after aerial uncharged shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].5
+,6,,0x05000006,1,0,0,0,f32,H recoil speed after aerial fully-charged shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].6
+,7,,0x05000007,0.06,0,0,0,f32,Air friction after shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].7
+,8,,0x05000008,0.65,0,0,0,f32,Initial V speed after aerial shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].8
+,9,,0x05000009,0.06,0,0,0,f32,Gravity after shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2279",m12[*].9
+,10,,0x0500000A,0.6,0,0,0,f32,V speed 1 frame after aerial shooting,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2283",m12[*].10
+,11,,0x0500000B,1,0,0,0,f32,Charging animation frame speed multiplier,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2274; MSC kamui.mscsb (vanilla decompile, repo first commit) func_2275",m12[*].11
+,12,,0x0500000C,10,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,7.7,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+14,0,Side B,0x06000000,0,0,0,0,f32,Initial H speed on SpecialSJump,,medium,community | reads: native 0x02794A38 (fn 0x027947B4),m13[*].0
+,1,,0x06000001,2.05,0,0,0,f32,Initial V speed on SpecialSJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,2,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,0.145,0,0,0,f32,Gravity on SpecialSJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x02794CE4); meaning not traced,,low,reads: native 0x02794CE4 (fn 0x02794C28),m13[*].5
+,6,,0x06000006,0.65,0,0,0,f32,Acceleration on SpecialSJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,-0.05,0,0,0,f32,Deceleration on SpecialSJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x06000008,1.05,0,0,0,f32,H max speed on SpecialSJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x16000009,0x10,0x0,0x0,0x0,u32,Landing lag on SpecialSJumpLanding (frames),,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2290",m13[*].9
+,10,,0x0600000A,1.05,0,0,0,f32,Initial V speed on SpecialSAttack,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294",m13[*].10
+,11,,0x0600000B,0.75,0,0,0,f32,Added V speed on SpecialAirSAttack,V speed * Name12 + Name11,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294",m13[*].11
+,12,,0x0600000C,0.4,0,0,0,f32,V speed multiplier on SpecialAirSAttack,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294",m13[*].12
+,13,,0x0600000D,0.75,0,0,0,f32,H speed multiplier on SpecialAirSAttack,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294",m13[*].13
+,14,,0x0600000E,0.07,0,0,0,f32,Gravity on SpecialAirSAttack/SpecialSWallAttack,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294; MSC kamui.mscsb (vanilla decompile, repo first commit) func_2320",m13[*].14
+,15,,0x0600000F,1,0,0,0,f32,Max fall speed on SpecialAirSAttack/SpecialSWallAttack,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2294; MSC kamui.mscsb (vanilla decompile, repo first commit) func_2320",m13[*].15
+,16,,0x06000010,1.9,0,0,0,f32,Transition speed for positioning on SpecialSWall?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].16
+,17,,0x06000011,5,0,0,0,f32,Transition speed for positioning on SpecialSWall?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].17
+,18,,0x06000012,2.6,0,0,0,f32,Initial H speed on SpecialSWallAttackF,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2313",m13[*].18
+,19,,0x06000013,0.35,0,0,0,f32,Initial V speed on SpecialSWallAttackF,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2313",m13[*].19
+,20,,0x06000014,2.6,0,0,0,f32,Initial H speed on SpecialSWallAttackB,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2320",m13[*].20
+,21,,0x06000015,0.35,0,0,0,f32,Initial V speed on SpecialSWallAttackB,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2320",m13[*].21
+,22,,0x06000016,0.02,0,0,0,f32,H air friction on SpecialSWallAttackF,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2313",m13[*].22
+,23,,0x06000017,0.02,0,0,0,f32,H air friction on SpecialSWallAttackB,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2320",m13[*].23
+,24,,0x06000018,0.05,0,0,0,f32,Gravity on SpecialSWallAttack,,medium,community | no read in the vanilla MSC (native or unused),m13[*].24
+,25,,0x06000019,1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].25
+,26,,0x1600001A,0x2A,0x0,0x0,0x0,u32,Landing lag on SpecialSWallAttackLanding (frames),,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2331; MSC kamui.mscsb (vanilla decompile, repo first commit) func_2335",m13[*].26
+,27,,0x0600001B,1,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].27
+,28,,0x0600001C,0.6,0,0,0,f32,Initial H speed on SpecialSWallJump,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2326",m13[*].28
+,29,,0x0600001D,4,0,0,0,f32,Initial V speed on SpecialSWallJump,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2326",m13[*].29
+,30,,0x0600001E,0.3,0,0,0,f32,Gravity on SpecialSWallJump,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2326",m13[*].30
+,31,,0x1600001F,0x19,0x0,0x0,0x0,u32,[auto] read by native code (get_int at 0x02794D50); meaning not traced,,low,reads: native 0x02794D50 (fn 0x02794C28); native 0x02794DDC (fn 0x02794C28),m13[*].31
+15,0,Up B,0x07000000,0.67,0,0,0,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].0
+,1,,0x07000001,0.6,0,0,0,f32,V speed multiplier on aerial startup,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].1
+,2,,0x07000002,0.1,0,0,0,f32,Gravity on startup,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].2
+,3,,0x07000003,0.5,0,0,0,f32,Max fall speed on startup,,medium,community | reads: native 0x02794838 (fn 0x027947B4),m14[*].3
+,4,,0x07000004,0.3,0,0,0,f32,Turnaround sensitivity,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].4
+,5,,0x07000005,75,0,0,0,f32,Ability to angle (degrees),,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].5
+,6,,0x07000006,0.6,0,0,0,f32,Angling sensitivity,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].6
+,7,,0x07000007,1.45,0,0,0,f32,Grounded height multiplier,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].7
+,8,,0x07000008,1.35,0,0,0,f32,Aerial height multiplier,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].8
+,9,,0x07000009,0.6,0,0,0,f32,Special fall max air speed multiplier,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].9
+,10,,0x1700000A,0x1E,0x0,0x0,0x0,u32,Landing lag (frames),,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2340",m14[*].10
+,11,,0x0700000B,0.02,0,0,0,f32,Air friction on Special fall,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2341",m14[*].11
+,12,,0x0700000C,0.04,0,0,0,f32,Gravity on Special fall,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2341",m14[*].12
+,13,,0x0700000D,25,0,0,0,f32,Related to tilt,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2342",m14[*].13
+,14,,0x0700000E,3,0,0,0,f32,Related to tilt,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2342",m14[*].14
+,15,,0x0700000F,1,0,0,0,f32,Launch speed added with positive X sensitivity,,medium,community | no read in the vanilla MSC (native or unused),m14[*].15
+,16,,0x07000010,0.66,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].16
+16,0,Down B,0x08000000,0.5,0,0,0,f32,Aerial H speed multiplier,,medium,community | reads: native 0x027951E8 (fn 0x027950EC),m15[*].0
+,1,,0x08000001,0.0025,0,0,0,f32,Aerial friction,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,0.04,0,0,0,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.2,0,0,0,f32,Max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x6,0x0,0x0,0x0,u32,[auto] read by native code (lwz at 0x0278D5C0); meaning not traced,,low,"reads: native 0x0278D5C0 (fn 0x0278D430, direct vl read)",m15[*].4
+,5,,0x18000005,0x19,0x0,0x0,0x0,u32,[auto] read by native code (lwz at 0x0278D5C8); meaning not traced,,low,"reads: native 0x0278D5C8 (fn 0x0278D430, direct vl read)",m15[*].5
+,6,,0x08000006,0.01,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0.1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,1.2,0,0,0,f32,Damage multiplier,,medium,community | reads: native 0x02795594 (fn 0x027954C0),m15[*].8
+,9,,0x18000009,0x0,0x0,0x0,0x0,u32,Freeze frames on activation,community ID was 0x08000009,medium,"community | reads: native 0x0278D5A0 (fn 0x0278D430, direct vl read); native 0x0278D734 (fn 0x0278D698, direct vl read); native 0x0278D884 (fn 0x0278D698, direct vl read); native 0x0278D8E4 (fn 0x0278D698, direct vl read)",m15[*].9
+,10,,0x0800000A,10,0,0,0,f32,Min damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,50,0,0,0,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,80,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x1800000D,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x0800000F,7.7,0,0,0,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,9.5,0,0,0,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].17
+,18,,0x08000012,1,0,0,0,f32,Animation frame speed multiplier,,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2346",m15[*].18
+,0,Final smash?,0x04000000,40,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,55,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x14000002,0x10,,,,u32,Final > FinalVisualScene01 transition frames,script_2367,medium,"community | reads: MSC kamui.mscsb (vanilla decompile, repo first commit) func_2367",m16.2
+,3,,0x04000003,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,15,,,,f32,Y camera position when activating the move?,,medium,community | no read in the vanilla MSC (native or unused),m16.4
+,5,,0x14000005,0xA,,,,u32,[auto] read by native code (get_int at 0x02794080); meaning not traced,,low,reads: native 0x02794080 (fn 0x02793FBC),m16.5
+,6,,0x04000006,3.3,,,,f32,Final/FinalAir camera Z position,,medium,community | reads: native 0x02794098 (fn 0x02793FBC),m16.6
+,7,,0x04000007,204,,,,f32,RGBs? Float?,,medium,community | no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,89,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
+,9,,0x04000009,96,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.9
+,10,,0x0400000A,159,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.10
+,11,,0x0400000B,54,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.11
+,12,,0x0400000C,51,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.12
+,13,,0x0400000D,242,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.13
+,14,,0x0400000E,130,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.14
+,15,,0x0400000F,89,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.15
+,16,,0x04000010,182,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.16
+,17,,0x04000011,70,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.17
+,18,,0x04000012,29,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.18
+,19,,0x04000013,102,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.19
+,20,,0x04000014,122,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.20
+,21,,0x04000015,204,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.21
+,22,,0x04000016,48,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.22
+,23,,0x04000017,67,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.23
+,24,,0x04000018,149,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.24
+,25,,0x04000019,229,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.25
+,26,,0x0400001A,127,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.26
+,27,,0x0400001B,178,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.27
+,28,,0x0400001C,169,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.28
+,29,,0x0400001D,67,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.29
+,30,,0x0400001E,118,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.30
+,31,,0x0400001F,51,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.31
+,32,,0x04000020,153,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.32
+,33,,0x04000021,130,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.33
+,34,,0x04000022,24,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.34
+,35,,0x04000023,84,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.35
+,36,,0x04000024,60,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.36
+,37,,0x04000025,94,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.37
+,38,,0x04000026,108,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.38
+,39,,0x04000027,113,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.39
+,40,,0x04000028,44,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.40
+,41,,0x04000029,45,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.41
+,42,,0x0400002A,46,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.42
+17,0,"Neutral B
+(Projectile)",0x02000000,1.33,0,0,0,f32,Uncharged projectile speed,,medium,community,m17[*].0
+,1,,0x02000001,2.8,0,0,0,f32,Fully charged projectile speed,,medium,community,m17[*].1
+,2,,0x02000002,47,0,0,0,f32,Uncharged projectile lifetime (frames),,medium,community,m17[*].2
+,3,,0x02000003,45,0,0,0,f32,Fully charged projectile lifetime (frames),,medium,community,m17[*].3
+,4,,0x02000004,0.45,0,0,0,f32,Uncharged hitbox/GFX size,,medium,community,m17[*].4
+,5,,0x02000005,1.35,0,0,0,f32,Fully charged hitbox/GFX size,,medium,community,m17[*].5
+,0,,,0x3,,,,u32,,,,,m18.0
+,1,,,0,,,,f32,,,,,m18.1
+,2,,,2,,,,f32,,,,,m18.2
+18,0,"Dragon Lunge
+floor detections",0x12000000,0x7D2,0x0,0x0,0x0,u32,Bone,,medium,community,m19[*].0
+,1,,0x02000001,-0.5,0,0,0,f32,X offset?,,medium,community,m19[*].1
+,2,,0x02000002,0.5,0,0,0,f32,Y offset?,,medium,community,m19[*].2
+,3,,0x12000003,0x7D0,0x0,0x0,0x0,u32,Bone,,medium,community,m19[*].3
+,4,,0x02000004,-3,0,0,0,f32,X offset?,,medium,community,m19[*].4
+,5,,0x02000005,0,0,0,0,f32,Y offset?,,medium,community,m19[*].5
+,6,,0x12000006,0x7D6,0x0,0x0,0x0,u32,Bone,,medium,community,m19[*].6
+,7,,0x02000007,-1,0,0,0,f32,X offset?,,medium,community,m19[*].7
+,8,,0x02000008,1,0,0,0,f32,Y offset?,,medium,community,m19[*].8
+,9,,0x02000009,0.7,0,0,0,f32,,,,,m19[*].9
+,10,,0x0200000A,1.8,0,0,0,f32,,,,,m19[*].10

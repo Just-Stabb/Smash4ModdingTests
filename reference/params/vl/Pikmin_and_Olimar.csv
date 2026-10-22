@@ -1,0 +1,969 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,3,3,3,3,f32,X offset of pluck,,medium,community,m12[*].0
+,1,,0x05000001,0,0,0,0,f32,Y offset of pluck,,medium,community,m12[*].1
+14,0,Side B,0x16000000,0x4,0x4,0x4,0x4,u32,,,,,m13[*].0
+,1,,0x06000001,9,9,9,9,f32,X offset of sideB toss,,medium,community | reads: native 0x02F52B04 (fn 0x02F528A4),m13[*].1
+,2,,0x06000002,-1,-1,-1,-1,f32,Y offset of sideB toss,,medium,community | reads: native 0x02F52B28 (fn 0x02F528A4),m13[*].2
+15,0,Up B,0x07000000,0,0,0,0,f32,[auto] read by native code (get_float at 0x027BE218); meaning not traced,,low,reads: native 0x027BE218 (fn 0x027BE08C),m14[*].0
+,1,,0x07000001,1.8,3,1.4,1.8,f32,Initial V speed,,medium,community | reads: native 0x027BE23C (fn 0x027BE08C),m14[*].1
+,2,,0x17000002,0x1E,0x1E,0x1E,0x1E,u32,Min flying duration (frames),True = This - 1,medium,community,m14[*].2
+,3,,0x07000003,0.04,0.12,0.02,0.04,f32,Max H acceleration while flying (no Pikmin),,medium,community,m14[*].3
+,4,,0x07000004,0.005,0.004,0.001,0.005,f32,Reduction of H acceleration per Pikmin,,medium,community,m14[*].4
+,5,,0x07000005,1.65,2.1,1.65,1.5,f32,Max horizontal airspeed while flying (no Pikmin),,medium,community,m14[*].5
+,6,,0x07000006,0.3,0.2,0.03,0.3,f32,Reduction of max H airspeed per Pikmin,,medium,community,m14[*].6
+,7,,0x07000007,0.02,0.02,0.02,0.02,f32,,,,,m14[*].7
+,8,,0x07000008,0.1,0.17,0.12,0.1,f32,Max V upward acceleration (no Pikmin),,medium,community,m14[*].8
+,9,,0x07000009,0.02,0.015,0.002,0.02,f32,Reduction of V upward acceleration per Pikmin,,medium,community,m14[*].9
+,10,,0x0700000A,1.1,2.2,1.2,1.1,f32,Max ascent speed (no Pikmin),,medium,community,m14[*].10
+,11,,0x0700000B,0.02,0.015,0.002,0.02,f32,,,,,m14[*].11
+,12,,0x0700000C,0.04,0.04,0.04,0.04,f32,,,,,m14[*].12
+,13,,0x0700000D,0.008,0.006,0.001,0.008,f32,,,,,m14[*].13
+,14,,0x0700000E,0.8,0.8,0.8,0.8,f32,,,,,m14[*].14
+,15,,0x0700000F,0.2,0.15,0.02,0.2,f32,Reduction of max ascent speed per Pikmin,,medium,community,m14[*].15
+,16,,0x07000010,0.7,0.7,0.7,0.7,f32,Pikmin reduction multiplier for White,,medium,community,m14[*].16
+,17,,0x07000011,1.2,1.2,1.2,1.2,f32,Pikmin reduction multiplier for Purple,,medium,community,m14[*].17
+,18,,0x07000012,5,5,5,5,f32,,,,,m14[*].18
+,19,,0x07000013,0.7,0.7,0.7,0.7,f32,,,,,m14[*].19
+,20,,0x07000014,140,25,100,120,f32,Max flying duration (frames),,medium,community,m14[*].20
+,21,,0x07000015,0.7,0.05,0.6,0.7,f32,,,,,m14[*].21
+,22,,0x07000016,0.7,0.08,0.7,0.7,f32,,,,,m14[*].22
+,23,,0x07000017,18,36,40,30,f32,Landing lag (frames),,medium,community,m14[*].23
+16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,,m15[*]
+,0,Category 4 block,0x04000000,4,,,,f32,[auto] read by native code (get_float at 0x02F518A8); meaning not traced,,low,reads: native 0x02F518A8 (fn 0x02F517DC),m16.0
+,1,,0x04000001,0,,,,f32,[auto] read by native code (get_float at 0x02F518BC); meaning not traced,community ID was 0x18000001,low,reads: native 0x02F518BC (fn 0x02F517DC),m16.1
+,2,,0x04000002,0,,,,f32,[auto] read by native code (get_float at 0x02F51190); meaning not traced,community ID was 0x18000002,low,reads: native 0x02F51190 (fn 0x02F510D0),m16.2
+,3,,0x04000003,5,,,,f32,[auto] read by native code (get_float at 0x02F511B4); meaning not traced,,low,reads: native 0x02F511B4 (fn 0x02F510D0),m16.3
+,4,,0x04000004,4,,,,f32,,,,,m16.4
+,5,,0x04000005,0,,,,f32,,,,,m16.5
+,6,,0x04000006,0,,,,f32,,,,,m16.6
+,7,,0x04000007,2.8,,,,f32,[auto] read by native code (get_float at 0x027BE1B4); meaning not traced,,low,reads: native 0x027BE1B4 (fn 0x027BE08C),m16.7
+,8,,0x14000008,0xFF,,,,u32,RGB?,community ID was 0x14000000,medium,community,m16.8
+,9,,0x14000009,0x33,,,,u32,,community ID was 0x14000001,,,m16.9
+,10,,0x1400000A,0x33,,,,u32,,community ID was 0x14000002,,,m16.10
+,11,,0x1400000B,0xFF,,,,u32,,,,,m16.11
+,12,,0x1400000C,0x33,,,,u32,,community ID was 0x14000004,,,m16.12
+,13,,0x1400000D,0x33,,,,u32,,community ID was 0x14000005,,,m16.13
+,14,,0x1400000E,0x34,,,,u32,RGB?,community ID was 0x14000006,medium,community,m16.14
+,15,,0x1400000F,0xB9,,,,u32,,community ID was 0x14000007,,,m16.15
+,16,,0x14000010,0x40,,,,u32,,community ID was 0x14000008,,,m16.16
+,17,,0x14000011,0x34,,,,u32,RGB?,community ID was 0x14000009,medium,community,m16.17
+,18,,0x14000012,0x6F,,,,u32,,community ID was 0x1400000A,,,m16.18
+,19,,0x14000013,0xFF,,,,u32,,,,,m16.19
+,20,,0x14000014,0x30,,,,u32,RGB?,community ID was 0x1400000C,medium,community,m16.20
+,21,,0x14000015,0x8E,,,,u32,,community ID was 0x1400000D,,,m16.21
+,22,,0x14000016,0xFF,,,,u32,,community ID was 0x1400000E,,,m16.22
+,23,,0x14000017,0x34,,,,u32,RGB?,community ID was 0x1400000F,medium,community,m16.23
+,24,,0x14000018,0xB9,,,,u32,,community ID was 0x14000010,,,m16.24
+,25,,0x14000019,0x40,,,,u32,,community ID was 0x14000011,,,m16.25
+,26,,0x1400001A,0xFF,,,,u32,RGB?,community ID was 0x14000012,medium,community,m16.26
+,27,,0x1400001B,0x32,,,,u32,,community ID was 0x14000013,,,m16.27
+,28,,0x1400001C,0xA0,,,,u32,,community ID was 0x14000014,,,m16.28
+,29,,0x1400001D,0xFF,,,,u32,RGB?,community ID was 0x14000015,medium,community,m16.29
+,30,,0x1400001E,0x33,,,,u32,,community ID was 0x14000016,,,m16.30
+,31,,0x1400001F,0x33,,,,u32,,community ID was 0x14000017,,,m16.31
+17,0,All Pikmins,0x02000000,4,4,4,4,f32,Pikmin 'Safespot' Olimar-distance,How far the 'ideal' position for the Pikmin to stand is from olimar. Higher = farther,medium,community,m17[*].0
+,1,,0x02000001,4,4,4,4,f32,Pikmin 'Safespot' spacing,The distance between the pikmin's safespots,medium,community,m17[*].1
+,2,,0x02000002,60,60,60,60,f32,Pikmin runspeed?,,medium,community,m17[*].2
+,3,,0x02000003,23,23,23,23,f32,,,,,m17[*].3
+,4,,0x02000004,4,4,4,4,f32,Effort,"When set to 100, they just stand still whenever you idle and you can run away from them and through them and they won't care. Only if you whistle or do certain moves will they respond, and even then, only some of them do",medium,community,m17[*].4
+,5,,0x02000005,8,8,8,8,f32,How long Pikmin continue to follow the previous aerial velocity,,medium,community,m17[*].5
+,6,,0x12000006,0x320,0x320,0x96,0x320,u32,Desynch death time (frames),How long a desynched Pikmin has to live in frames,medium,community,m17[*].6
+,7,,0x12000007,0x26C,0x26C,0x5A,0x26C,u32,Desynch warning time (frames),How long to wait before flashtinting a desynched pikmin to warn the olimar player that it is about to die,medium,community,m17[*].7
+,8,,0x12000008,0x3,0x3,0x3,0x3,u32,Olimar-Pikmin interaction box size?,,medium,community,m17[*].8
+,9,,0x02000009,24,24,24,24,f32,Pikmin teleport box size?,,medium,community,m17[*].9
+,10,,0x0200000A,5,5,5,5,f32,,,,,m17[*].10
+,11,,0x0200000B,8,8,8,8,f32,,,,,m17[*].11
+,12,,0x0200000C,600,1200,1200,1200,f32,Budding time (frames),,medium,community,m17[*].12
+,13,,0x0200000D,2400,2400,2400,2400,f32,Full bloom time (frames),,medium,community,m17[*].13
+,14,,0x0200000E,1.1,1.1,1.1,1.1,f32,"Budded movement speed multiplier, unused?",,medium,community,m17[*].14
+,15,,0x0200000F,1.2,1.2,1.2,1.2,f32,"Flower movement speed multiplier, unused?",,medium,community,m17[*].15
+,16,,0x02000010,0.21,0.21,0.18,0.21,f32,H speed of pikmin pluck,,medium,community,m17[*].16
+,17,,0x02000011,2.1,1.8,2.8,2.1,f32,Initial V speed of pikmin pluck,,medium,community,m17[*].17
+,18,,0x02000012,0.075,0.075,0.075,0.075,f32,,,,,m17[*].18
+,19,,0x02000013,3.2,3.2,3.2,3.2,f32,Pikmin Fsmash H initial speed,Purple initlal speed = 2.3 > 0.5 (written in ACMD),medium,community,m17[*].19
+,20,,0x02000014,0,0,0,0,f32,,,,,m17[*].20
+,21,,0x02000015,0.5,0.5,0.5,0.5,f32,Pikmin Fsmash H speed after decel point,,medium,community,m17[*].21
+,22,,0x02000016,0.18,0.18,0.18,0.18,f32,Pikmin Fsmash air friction,,medium,community,m17[*].22
+,23,,0x02000017,3,3,3,3,f32,Pikmin Fsmash H max speed,Purple initlal speed = 1.1 > 0 (written in ACMD),medium,community,m17[*].23
+,24,,0x02000018,0.7,0.7,0.7,0.7,f32,Pikmin Fsmash V initial speed,,medium,community,m17[*].24
+,25,,0x02000019,0.06,0.06,0.06,0.06,f32,Pikmin Fsmash gravity,,medium,community,m17[*].25
+,26,,0x0200001A,2.8,2.8,2.8,2.8,f32,Pikmin Usmash initial V speed,Purple initlal speed = 2.7 (written in ACMD),medium,community,m17[*].26
+,27,,0x0200001B,0.25,0.25,0.25,0.25,f32,Pikmin Usmash gravity,,medium,community,m17[*].27
+,28,,0x0200001C,2.8,2.8,2.8,2.8,f32,Pikmin Usmash max fall speed,,medium,community,m17[*].28
+,29,,0x0200001D,1.2,1.1,1.1,1.2,f32,Smash input SideB H speed multiplier,,medium,community,m17[*].29
+,30,,0x1200001E,0x12C,0x190,0x12C,0x12C,u32,Max additional frames of latch time,Latch frames = INT(60 + (300 - Opponent's%)),medium,community,m17[*].30
+,31,,0x1200001F,0x78,0x3C,0x3C,0x3C,u32,Base frames of latch time,,medium,community,m17[*].31
+,32,,0x12000020,0x7,0x5,0x7,0x7,u32,Latch time reduction per directional input (frames),,medium,community,m17[*].32
+,33,,0x02000021,-0.4,-0.4,-0.4,-0.4,f32,SideB throw strength?,,medium,community,m17[*].33
+,34,,0x02000022,1.3,1.3,1.3,1.3,f32,Speed Pikmin fly off opponnent after they're done Side-B beating him,,medium,community,m17[*].34
+,35,,0x12000023,0x24,0x5A,0x24,0x24,u32,,,,,m17[*].35
+,36,,0x02000024,-1.3,-1.3,-1.3,-1.3,f32,,,,,m17[*].36
+,37,,0x12000025,0x1E,0x3C,0x28,0x1E,u32,Something related to SpecialLwRespond,,medium,community,m17[*].37
+,38,,0x02000026,2000,2000,2000,2000,f32,,,,,m17[*].38
+,39,,0x02000027,8,8,8,8,f32,,,,,m17[*].39
+,40,,0x02000028,4,4,4,4,f32,,,,,m17[*].40
+,41,,0x02000029,3.5,3.5,3.5,3.5,f32,"Simillar to Name4, related to CatchReturn/CatchReturnEnd",,medium,community,m17[*].41
+,42,,0x0200002A,45,45,45,45,f32,,,,,m17[*].42
+,43,,0x0200002B,0.05,0.05,0.05,0.05,f32,,,,,m17[*].43
+,44,,0x0200002C,0.04,0.04,0.04,0.04,f32,,,,,m17[*].44
+,45,,0x0200002D,0.3,0.3,0.3,0.3,f32,,,,,m17[*].45
+,46,,0x0200002E,0.3,0.3,0.3,0.3,f32,,,,,m17[*].46
+,47,,0x0200002F,1.5,1.5,1.5,1.5,f32,,,,,m17[*].47
+,48,,0x02000030,180,180,180,180,f32,,,,,m17[*].48
+,49,,0x02000031,1,1,1,1,f32,,,,,m17[*].49
+,50,,0x02000032,1,1,1,1,f32,,,,,m17[*].50
+,51,,0x02000033,1,1,1,1,f32,,,,,m17[*].51
+,52,,0x02000034,1,1,1,1,f32,,,,,m17[*].52
+,53,,0x02000035,1,1,1,1,f32,,,,,m17[*].53
+,54,,0x02000036,1,1,1,1,f32,,,,,m17[*].54
+,55,,0x02000037,1,1,1,1,f32,,,,,m17[*].55
+,56,,0x02000038,1,1,1,1,f32,,,,,m17[*].56
+,57,,0x02000039,1,1,1,1,f32,,,,,m17[*].57
+,58,,0x0200003A,1,1,1,1,f32,,,,,m17[*].58
+,59,,0x0200003B,1,1,1,1,f32,,,,,m17[*].59
+,60,,0x0200003C,1,1,1,1,f32,,,,,m17[*].60
+,61,,0x0200003D,1,1,1,1,f32,,,,,m17[*].61
+,62,,0x0200003E,1,1,1,1,f32,,,,,m17[*].62
+,63,,0x0200003F,1,1,1,1,f32,,,,,m17[*].63
+,64,,0x02000040,1,1,1,1,f32,,,,,m17[*].64
+,65,,0x02000041,1,1,1,1,f32,,,,,m17[*].65
+,66,,0x02000042,1,1,1,1,f32,,,,,m17[*].66
+,67,,0x02000043,1,1,1,1,f32,,,,,m17[*].67
+,68,,0x02000044,1,1,1,1,f32,,,,,m17[*].68
+,69,,0x02000045,1,1,1,1,f32,,,,,m17[*].69
+,70,,0x02000046,1,1,1,1,f32,,,,,m17[*].70
+,71,,0x02000047,1,1,0.95,1,f32,,,,,m17[*].71
+,72,,0x02000048,1,1,1,1,f32,,,,,m17[*].72
+,73,,0x02000049,1,1,1,1,f32,,,,,m17[*].73
+,74,,0x0200004A,1,1,1,1,f32,,,,,m17[*].74
+,75,,0x0200004B,1,1,1,1,f32,,,,,m17[*].75
+,76,,0x0200004C,1,1,1,1,f32,,,,,m17[*].76
+,77,,0x0200004D,1,1,1,1,f32,,,,,m17[*].77
+,78,,0x0200004E,1,1,1,1,f32,,,,,m17[*].78
+,79,,0x0200004F,1,1,1,1,f32,,,,,m17[*].79
+,80,,0x02000050,1,1,1,1,f32,,,,,m17[*].80
+,81,,0x02000051,1,1,1,1,f32,,,,,m17[*].81
+,82,,0x02000052,1,1,1,1,f32,,,,,m17[*].82
+,83,,0x02000053,1,1,1,1,f32,,,,,m17[*].83
+18,0,"Individual Pikmin
+(See also: Pikmin)",,0xD,,,,u32,HP,,medium,community,m18[0].0
+,1,,,0.1,,,,f32,Walk/Run acceleration,,medium,community,m18[0].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[0].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[0].3
+,4,,,3.5,,,,f32,,,,,m18[0].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[0].5
+,6,,,1.25,,,,f32,SideB max return speed,,medium,community,m18[0].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[0].7
+,8,,,1.8,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[0].8
+,9,,,1.8,,,,f32,,,,,m18[0].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[0].10
+,11,,,0.7,,,,f32,,,,,m18[0].11
+,12,,,1.3,,,,f32,,,,,m18[0].12
+,13,,,2.6,,,,f32,,,,,m18[0].13
+,14,,,2.3,,,,f32,,,,,m18[0].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[0].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[0].16
+,17,,,0.1,,,,f32,,,,,m18[0].17
+,18,,,1,,,,f32,?,,medium,community,m18[0].18
+,19,,,0x5,,,,u32,Frames alive in water,,medium,community,m18[0].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[0].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[0].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[0].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[0].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[0].24
+,25,,,2.1,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[0].25
+,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[0].26
+,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[0].27
+,28,,,2.1,,,,f32,?,,medium,community,m18[0].28
+,29,,,3.3,,,,f32,Dash grab H initial speed,,medium,community,m18[0].29
+,30,,,-0.2,,,,f32,Dash grab accel,,medium,community,m18[0].30
+,31,,,0,,,,f32,Something with dash grab,,medium,community,m18[0].31
+,32,,,3.3,,,,f32,?,,medium,community,m18[0].32
+,33,,,0x4,,,,u32,,,,,m18[0].33
+,34,,,4,,,,f32,,,,,m18[0].34
+,0,,,0xB,,,,u32,HP,,medium,community,m18[1].0
+,1,,,0.1,,,,f32,Walk/Run acceleration,,medium,community,m18[1].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[1].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[1].3
+,4,,,3.5,,,,f32,,,,,m18[1].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[1].5
+,6,,,1.25,,,,f32,SideB max return speed,,medium,community,m18[1].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[1].7
+,8,,,1.8,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[1].8
+,9,,,1.8,,,,f32,,,,,m18[1].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[1].10
+,11,,,0.7,,,,f32,,,,,m18[1].11
+,12,,,1.3,,,,f32,,,,,m18[1].12
+,13,,,2.6,,,,f32,,,,,m18[1].13
+,14,,,2.3,,,,f32,,,,,m18[1].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[1].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[1].16
+,17,,,0.1,,,,f32,,,,,m18[1].17
+,18,,,1,,,,f32,?,,medium,community,m18[1].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[1].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[1].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[1].21
+,22,,,1.1,,,,f32,SideB H speed,,medium,community,m18[1].22
+,23,,,2.2,,,,f32,?,,medium,community,m18[1].23
+,24,,,1.6,,,,f32,SideB V initial speed,,medium,community,m18[1].24
+,25,,,2.1,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[1].25
+,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[1].26
+,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[1].27
+,28,,,2.1,,,,f32,?,,medium,community,m18[1].28
+,29,,,3.3,,,,f32,Dash grab H initial speed,,medium,community,m18[1].29
+,30,,,-0.2,,,,f32,Dash grab accel,,medium,community,m18[1].30
+,31,,,0,,,,f32,Something with dash grab,,medium,community,m18[1].31
+,32,,,3.3,,,,f32,?,,medium,community,m18[1].32
+,33,,,0xA,,,,u32,,,,,m18[1].33
+,34,,,4,,,,f32,,,,,m18[1].34
+,0,,,0xB,,,,u32,HP,,medium,community,m18[2].0
+,1,,,0.1,,,,f32,Walk/Run acceleration,,medium,community,m18[2].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[2].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[2].3
+,4,,,3.5,,,,f32,,,,,m18[2].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[2].5
+,6,,,1.25,,,,f32,SideB max return speed,,medium,community,m18[2].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[2].7
+,8,,,1.8,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[2].8
+,9,,,1.8,,,,f32,,,,,m18[2].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[2].10
+,11,,,0.7,,,,f32,,,,,m18[2].11
+,12,,,1.3,,,,f32,,,,,m18[2].12
+,13,,,2.6,,,,f32,,,,,m18[2].13
+,14,,,2.3,,,,f32,,,,,m18[2].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[2].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[2].16
+,17,,,0.1,,,,f32,,,,,m18[2].17
+,18,,,1,,,,f32,?,,medium,community,m18[2].18
+,19,,,0x4B0,,,,u32,Frames alive in water,,medium,community,m18[2].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[2].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[2].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[2].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[2].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[2].24
+,25,,,2.1,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[2].25
+,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[2].26
+,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[2].27
+,28,,,2.1,,,,f32,?,,medium,community,m18[2].28
+,29,,,3.3,,,,f32,Dash grab H initial speed,,medium,community,m18[2].29
+,30,,,-0.2,,,,f32,Dash grab accel,,medium,community,m18[2].30
+,31,,,0,,,,f32,Something with dash grab,,medium,community,m18[2].31
+,32,,,3.3,,,,f32,?,,medium,community,m18[2].32
+,33,,,0xA,,,,u32,,,,,m18[2].33
+,34,,,6,,,,f32,,,,,m18[2].34
+,0,,,0x6,,,,u32,HP,,medium,community,m18[3].0
+,1,,,0.135,,,,f32,Walk/Run acceleration,,medium,community,m18[3].1
+,2,,,4,,,,f32,Walk/Run max speed,,medium,community,m18[3].2
+,3,,,0.4,,,,f32,Ground/Air friction,,medium,community,m18[3].3
+,4,,,3.5,,,,f32,,,,,m18[3].4
+,5,,,0.04,,,,f32,SideB return accel,,medium,community,m18[3].5
+,6,,,1.5,,,,f32,SideB max return speed,,medium,community,m18[3].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[3].7
+,8,,,2.2,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[3].8
+,9,,,2.2,,,,f32,,,,,m18[3].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[3].10
+,11,,,0.8,,,,f32,,,,,m18[3].11
+,12,,,1.3,,,,f32,,,,,m18[3].12
+,13,,,2.9,,,,f32,,,,,m18[3].13
+,14,,,2.6,,,,f32,,,,,m18[3].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[3].15
+,16,,,1.45,,,,f32,Max fall speed,,medium,community,m18[3].16
+,17,,,0.18,,,,f32,,,,,m18[3].17
+,18,,,1,,,,f32,?,,medium,community,m18[3].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[3].19
+,20,,,0.2,,,,f32,?,,medium,community,m18[3].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[3].21
+,22,,,3,,,,f32,SideB H speed,,medium,community,m18[3].22
+,23,,,5,,,,f32,?,,medium,community,m18[3].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[3].24
+,25,,,6.4,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[3].25
+,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[3].26
+,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[3].27
+,28,,,2.4,,,,f32,?,,medium,community,m18[3].28
+,29,,,3.6,,,,f32,Dash grab H initial speed,,medium,community,m18[3].29
+,30,,,-0.2,,,,f32,Dash grab accel,,medium,community,m18[3].30
+,31,,,0,,,,f32,Something with dash grab,,medium,community,m18[3].31
+,32,,,3.6,,,,f32,?,,medium,community,m18[3].32
+,33,,,0xA,,,,u32,,,,,m18[3].33
+,34,,,8,,,,f32,,,,,m18[3].34
+,0,,,0x96,,,,u32,HP,,medium,community,m18[4].0
+,1,,,0.08,,,,f32,Walk/Run acceleration,,medium,community,m18[4].1
+,2,,,1.7,,,,f32,Walk/Run max speed,,medium,community,m18[4].2
+,3,,,0.17,,,,f32,Ground/Air friction,,medium,community,m18[4].3
+,4,,,3.5,,,,f32,,,,,m18[4].4
+,5,,,0.018,,,,f32,SideB return accel,,medium,community,m18[4].5
+,6,,,1.05,,,,f32,SideB max return speed,,medium,community,m18[4].6
+,7,,,0.08,,,,f32,Return accel,,medium,community,m18[4].7
+,8,,,1.6,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[4].8
+,9,,,1.6,,,,f32,,,,,m18[4].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[4].10
+,11,,,0.7,,,,f32,,,,,m18[4].11
+,12,,,1.3,,,,f32,,,,,m18[4].12
+,13,,,2.5,,,,f32,,,,,m18[4].13
+,14,,,2.3,,,,f32,,,,,m18[4].14
+,15,,,0.09,,,,f32,Gravity,,medium,community,m18[4].15
+,16,,,1.7,,,,f32,Max fall speed,,medium,community,m18[4].16
+,17,,,0.05,,,,f32,,,,,m18[4].17
+,18,,,0.5,,,,f32,?,,medium,community,m18[4].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[4].19
+,20,,,0.03,,,,f32,?,,medium,community,m18[4].20
+,21,,,0.5,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[4].21
+,22,,,1.5,,,,f32,SideB H speed,,medium,community,m18[4].22
+,23,,,3,,,,f32,?,,medium,community,m18[4].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[4].24
+,25,,,1.7,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[4].25
+,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[4].26
+,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[4].27
+,28,,,1.7,,,,f32,?,,medium,community,m18[4].28
+,29,,,2.7,,,,f32,Dash grab H initial speed,,medium,community,m18[4].29
+,30,,,-0.2,,,,f32,Dash grab accel,,medium,community,m18[4].30
+,31,,,0,,,,f32,Something with dash grab,,medium,community,m18[4].31
+,32,,,2.7,,,,f32,?,,medium,community,m18[4].32
+,33,,,0xA,,,,u32,,,,,m18[4].33
+,34,,,1.6,,,,f32,,,,,m18[4].34
+,0,,,0x5A,,,,u32,HP,,medium,community,m18[5].0
+,1,,,0.035,,,,f32,Walk/Run acceleration,,medium,community,m18[5].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[5].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[5].3
+,4,,,2.6,,,,f32,,,,,m18[5].4
+,5,,,0.017,,,,f32,SideB return accel,,medium,community,m18[5].5
+,6,,,0.9,,,,f32,SideB max return speed,,medium,community,m18[5].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[5].7
+,8,,,1.3,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[5].8
+,9,,,1.2,,,,f32,,,,,m18[5].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[5].10
+,11,,,0.7,,,,f32,,,,,m18[5].11
+,12,,,1.3,,,,f32,,,,,m18[5].12
+,13,,,2.5,,,,f32,,,,,m18[5].13
+,14,,,2.3,,,,f32,,,,,m18[5].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[5].15
+,16,,,1.8,,,,f32,Max fall speed,,medium,community,m18[5].16
+,17,,,0.08,,,,f32,,,,,m18[5].17
+,18,,,0.8,,,,f32,?,,medium,community,m18[5].18
+,19,,,0x5,,,,u32,Frames alive in water,,medium,community,m18[5].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[5].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[5].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[5].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[5].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[5].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[5].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[5].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[5].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[5].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[5].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[5].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[5].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[5].32
+,33,,,0x0,,,,u32,,,,,m18[5].33
+,34,,,4,,,,f32,,,,,m18[5].34
+,0,,,0x5A,,,,u32,HP,,medium,community,m18[6].0
+,1,,,0.035,,,,f32,Walk/Run acceleration,,medium,community,m18[6].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[6].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[6].3
+,4,,,2.6,,,,f32,,,,,m18[6].4
+,5,,,0.017,,,,f32,SideB return accel,,medium,community,m18[6].5
+,6,,,0.9,,,,f32,SideB max return speed,,medium,community,m18[6].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[6].7
+,8,,,1.3,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[6].8
+,9,,,1.2,,,,f32,,,,,m18[6].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[6].10
+,11,,,0.7,,,,f32,,,,,m18[6].11
+,12,,,1.3,,,,f32,,,,,m18[6].12
+,13,,,2.5,,,,f32,,,,,m18[6].13
+,14,,,2.3,,,,f32,,,,,m18[6].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[6].15
+,16,,,1.8,,,,f32,Max fall speed,,medium,community,m18[6].16
+,17,,,0.08,,,,f32,,,,,m18[6].17
+,18,,,0.8,,,,f32,?,,medium,community,m18[6].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[6].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[6].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[6].21
+,22,,,1.1,,,,f32,SideB H speed,,medium,community,m18[6].22
+,23,,,2.2,,,,f32,?,,medium,community,m18[6].23
+,24,,,1.6,,,,f32,SideB V initial speed,,medium,community,m18[6].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[6].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[6].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[6].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[6].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[6].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[6].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[6].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[6].32
+,33,,,0x0,,,,u32,,,,,m18[6].33
+,34,,,4,,,,f32,,,,,m18[6].34
+,0,,,0x82,,,,u32,HP,,medium,community,m18[7].0
+,1,,,0.035,,,,f32,Walk/Run acceleration,,medium,community,m18[7].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[7].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[7].3
+,4,,,2.6,,,,f32,,,,,m18[7].4
+,5,,,0.017,,,,f32,SideB return accel,,medium,community,m18[7].5
+,6,,,0.9,,,,f32,SideB max return speed,,medium,community,m18[7].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[7].7
+,8,,,1.3,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[7].8
+,9,,,1.2,,,,f32,,,,,m18[7].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[7].10
+,11,,,0.7,,,,f32,,,,,m18[7].11
+,12,,,1.3,,,,f32,,,,,m18[7].12
+,13,,,2.5,,,,f32,,,,,m18[7].13
+,14,,,2.3,,,,f32,,,,,m18[7].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[7].15
+,16,,,1.8,,,,f32,Max fall speed,,medium,community,m18[7].16
+,17,,,0.08,,,,f32,,,,,m18[7].17
+,18,,,0.8,,,,f32,?,,medium,community,m18[7].18
+,19,,,0x4B0,,,,u32,Frames alive in water,,medium,community,m18[7].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[7].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[7].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[7].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[7].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[7].24
+,25,,,1.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[7].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[7].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[7].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[7].28
+,29,,,1.6,,,,f32,Dash grab H initial speed,,medium,community,m18[7].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[7].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[7].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[7].32
+,33,,,0x0,,,,u32,,,,,m18[7].33
+,34,,,6,,,,f32,,,,,m18[7].34
+,0,,,0x32,,,,u32,HP,,medium,community,m18[8].0
+,1,,,0.05,,,,f32,Walk/Run acceleration,,medium,community,m18[8].1
+,2,,,4,,,,f32,Walk/Run max speed,,medium,community,m18[8].2
+,3,,,0.4,,,,f32,Ground/Air friction,,medium,community,m18[8].3
+,4,,,2.6,,,,f32,,,,,m18[8].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[8].5
+,6,,,1.3,,,,f32,SideB max return speed,,medium,community,m18[8].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[8].7
+,8,,,1.7,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[8].8
+,9,,,1.8,,,,f32,,,,,m18[8].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[8].10
+,11,,,0.8,,,,f32,,,,,m18[8].11
+,12,,,1.3,,,,f32,,,,,m18[8].12
+,13,,,2.8,,,,f32,,,,,m18[8].13
+,14,,,2.6,,,,f32,,,,,m18[8].14
+,15,,,0.08,,,,f32,Gravity,,medium,community,m18[8].15
+,16,,,1.6,,,,f32,Max fall speed,,medium,community,m18[8].16
+,17,,,0.14,,,,f32,,,,,m18[8].17
+,18,,,0.8,,,,f32,?,,medium,community,m18[8].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[8].19
+,20,,,0.2,,,,f32,?,,medium,community,m18[8].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[8].21
+,22,,,3,,,,f32,SideB H speed,,medium,community,m18[8].22
+,23,,,5,,,,f32,?,,medium,community,m18[8].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[8].24
+,25,,,2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[8].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[8].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[8].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[8].28
+,29,,,2,,,,f32,Dash grab H initial speed,,medium,community,m18[8].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[8].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[8].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[8].32
+,33,,,0x0,,,,u32,,,,,m18[8].33
+,34,,,8,,,,f32,,,,,m18[8].34
+,0,,,0x96,,,,u32,HP,,medium,community,m18[9].0
+,1,,,0.027,,,,f32,Walk/Run acceleration,,medium,community,m18[9].1
+,2,,,2,,,,f32,Walk/Run max speed,,medium,community,m18[9].2
+,3,,,0.17,,,,f32,Ground/Air friction,,medium,community,m18[9].3
+,4,,,2.6,,,,f32,,,,,m18[9].4
+,5,,,0.014,,,,f32,SideB return accel,,medium,community,m18[9].5
+,6,,,0.75,,,,f32,SideB max return speed,,medium,community,m18[9].6
+,7,,,0.08,,,,f32,Return accel,,medium,community,m18[9].7
+,8,,,1,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[9].8
+,9,,,0.7,,,,f32,,,,,m18[9].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[9].10
+,11,,,0.7,,,,f32,,,,,m18[9].11
+,12,,,1.3,,,,f32,,,,,m18[9].12
+,13,,,2.5,,,,f32,,,,,m18[9].13
+,14,,,2.3,,,,f32,,,,,m18[9].14
+,15,,,0.13,,,,f32,Gravity,,medium,community,m18[9].15
+,16,,,2,,,,f32,Max fall speed,,medium,community,m18[9].16
+,17,,,0.04,,,,f32,,,,,m18[9].17
+,18,,,0.4,,,,f32,?,,medium,community,m18[9].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[9].19
+,20,,,0.03,,,,f32,?,,medium,community,m18[9].20
+,21,,,0.5,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[9].21
+,22,,,1.5,,,,f32,SideB H speed,,medium,community,m18[9].22
+,23,,,3,,,,f32,?,,medium,community,m18[9].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[9].24
+,25,,,0.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[9].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[9].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[9].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[9].28
+,29,,,0.6,,,,f32,Dash grab H initial speed,,medium,community,m18[9].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[9].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[9].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[9].32
+,33,,,0x0,,,,u32,,,,,m18[9].33
+,34,,,1.6,,,,f32,,,,,m18[9].34
+,0,,,0x3,,,,u32,HP,,medium,community,m18[10].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[10].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[10].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[10].3
+,4,,,3,,,,f32,,,,,m18[10].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[10].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[10].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[10].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[10].8
+,9,,,1.5,,,,f32,,,,,m18[10].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[10].10
+,11,,,0.7,,,,f32,,,,,m18[10].11
+,12,,,1.3,,,,f32,,,,,m18[10].12
+,13,,,2.5,,,,f32,,,,,m18[10].13
+,14,,,2.3,,,,f32,,,,,m18[10].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[10].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[10].16
+,17,,,0.1,,,,f32,,,,,m18[10].17
+,18,,,1,,,,f32,?,,medium,community,m18[10].18
+,19,,,0x5,,,,u32,Frames alive in water,,medium,community,m18[10].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[10].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[10].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[10].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[10].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[10].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[10].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[10].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[10].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[10].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[10].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[10].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[10].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[10].32
+,33,,,0x0,,,,u32,,,,,m18[10].33
+,34,,,4,,,,f32,,,,,m18[10].34
+,0,,,0x3,,,,u32,HP,,medium,community,m18[11].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[11].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[11].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[11].3
+,4,,,3,,,,f32,,,,,m18[11].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[11].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[11].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[11].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[11].8
+,9,,,1.5,,,,f32,,,,,m18[11].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[11].10
+,11,,,0.7,,,,f32,,,,,m18[11].11
+,12,,,1.3,,,,f32,,,,,m18[11].12
+,13,,,2.5,,,,f32,,,,,m18[11].13
+,14,,,2.3,,,,f32,,,,,m18[11].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[11].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[11].16
+,17,,,0.1,,,,f32,,,,,m18[11].17
+,18,,,1,,,,f32,?,,medium,community,m18[11].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[11].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[11].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[11].21
+,22,,,1.1,,,,f32,SideB H speed,,medium,community,m18[11].22
+,23,,,2.2,,,,f32,?,,medium,community,m18[11].23
+,24,,,1.6,,,,f32,SideB V initial speed,,medium,community,m18[11].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[11].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[11].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[11].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[11].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[11].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[11].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[11].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[11].32
+,33,,,0x0,,,,u32,,,,,m18[11].33
+,34,,,4,,,,f32,,,,,m18[11].34
+,0,,,0x5,,,,u32,HP,,medium,community,m18[12].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[12].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[12].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[12].3
+,4,,,3,,,,f32,,,,,m18[12].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[12].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[12].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[12].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[12].8
+,9,,,1.5,,,,f32,,,,,m18[12].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[12].10
+,11,,,0.7,,,,f32,,,,,m18[12].11
+,12,,,1.3,,,,f32,,,,,m18[12].12
+,13,,,2.5,,,,f32,,,,,m18[12].13
+,14,,,2.3,,,,f32,,,,,m18[12].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[12].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[12].16
+,17,,,0.1,,,,f32,,,,,m18[12].17
+,18,,,1,,,,f32,?,,medium,community,m18[12].18
+,19,,,0x4B0,,,,u32,Frames alive in water,,medium,community,m18[12].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[12].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[12].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[12].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[12].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[12].24
+,25,,,1.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[12].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[12].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[12].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[12].28
+,29,,,1.6,,,,f32,Dash grab H initial speed,,medium,community,m18[12].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[12].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[12].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[12].32
+,33,,,0x0,,,,u32,,,,,m18[12].33
+,34,,,6,,,,f32,,,,,m18[12].34
+,0,,,0x2,,,,u32,HP,,medium,community,m18[13].0
+,1,,,0.12,,,,f32,Walk/Run acceleration,,medium,community,m18[13].1
+,2,,,4,,,,f32,Walk/Run max speed,,medium,community,m18[13].2
+,3,,,0.4,,,,f32,Ground/Air friction,,medium,community,m18[13].3
+,4,,,3,,,,f32,,,,,m18[13].4
+,5,,,0.04,,,,f32,SideB return accel,,medium,community,m18[13].5
+,6,,,1.5,,,,f32,SideB max return speed,,medium,community,m18[13].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[13].7
+,8,,,2,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[13].8
+,9,,,2,,,,f32,,,,,m18[13].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[13].10
+,11,,,0.8,,,,f32,,,,,m18[13].11
+,12,,,1.3,,,,f32,,,,,m18[13].12
+,13,,,2.8,,,,f32,,,,,m18[13].13
+,14,,,2.6,,,,f32,,,,,m18[13].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[13].15
+,16,,,1.45,,,,f32,Max fall speed,,medium,community,m18[13].16
+,17,,,0.18,,,,f32,,,,,m18[13].17
+,18,,,1,,,,f32,?,,medium,community,m18[13].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[13].19
+,20,,,0.2,,,,f32,?,,medium,community,m18[13].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[13].21
+,22,,,3,,,,f32,SideB H speed,,medium,community,m18[13].22
+,23,,,5,,,,f32,?,,medium,community,m18[13].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[13].24
+,25,,,2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[13].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[13].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[13].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[13].28
+,29,,,2,,,,f32,Dash grab H initial speed,,medium,community,m18[13].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[13].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[13].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[13].32
+,33,,,0x0,,,,u32,,,,,m18[13].33
+,34,,,8,,,,f32,,,,,m18[13].34
+,0,,,0x5,,,,u32,HP,,medium,community,m18[14].0
+,1,,,0.05,,,,f32,Walk/Run acceleration,,medium,community,m18[14].1
+,2,,,2,,,,f32,Walk/Run max speed,,medium,community,m18[14].2
+,3,,,0.17,,,,f32,Ground/Air friction,,medium,community,m18[14].3
+,4,,,3,,,,f32,,,,,m18[14].4
+,5,,,0.018,,,,f32,SideB return accel,,medium,community,m18[14].5
+,6,,,0.8,,,,f32,SideB max return speed,,medium,community,m18[14].6
+,7,,,0.08,,,,f32,Return accel,,medium,community,m18[14].7
+,8,,,1.2,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[14].8
+,9,,,0.75,,,,f32,,,,,m18[14].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[14].10
+,11,,,0.7,,,,f32,,,,,m18[14].11
+,12,,,1.3,,,,f32,,,,,m18[14].12
+,13,,,2.5,,,,f32,,,,,m18[14].13
+,14,,,2.3,,,,f32,,,,,m18[14].14
+,15,,,0.09,,,,f32,Gravity,,medium,community,m18[14].15
+,16,,,1.7,,,,f32,Max fall speed,,medium,community,m18[14].16
+,17,,,0.05,,,,f32,,,,,m18[14].17
+,18,,,0.5,,,,f32,?,,medium,community,m18[14].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[14].19
+,20,,,0.03,,,,f32,?,,medium,community,m18[14].20
+,21,,,0.5,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[14].21
+,22,,,1.5,,,,f32,SideB H speed,,medium,community,m18[14].22
+,23,,,3,,,,f32,?,,medium,community,m18[14].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[14].24
+,25,,,0.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[14].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[14].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[14].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[14].28
+,29,,,0.6,,,,f32,Dash grab H initial speed,,medium,community,m18[14].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[14].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[14].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[14].32
+,33,,,0x0,,,,u32,,,,,m18[14].33
+,34,,,1.6,,,,f32,,,,,m18[14].34
+,0,,,0x9,,,,u32,HP,,medium,community,m18[15].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[15].1
+,2,,,2,,,,f32,Walk/Run max speed,,medium,community,m18[15].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[15].3
+,4,,,3,,,,f32,,,,,m18[15].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[15].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[15].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[15].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[15].8
+,9,,,1.5,,,,f32,,,,,m18[15].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[15].10
+,11,,,0.7,,,,f32,,,,,m18[15].11
+,12,,,1.3,,,,f32,,,,,m18[15].12
+,13,,,2.5,,,,f32,,,,,m18[15].13
+,14,,,2.3,,,,f32,,,,,m18[15].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[15].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[15].16
+,17,,,0.1,,,,f32,,,,,m18[15].17
+,18,,,1,,,,f32,?,,medium,community,m18[15].18
+,19,,,0x5,,,,u32,Frames alive in water,,medium,community,m18[15].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[15].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[15].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[15].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[15].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[15].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[15].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[15].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[15].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[15].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[15].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[15].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[15].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[15].32
+,33,,,0x0,,,,u32,,,,,m18[15].33
+,34,,,4,,,,f32,,,,,m18[15].34
+,0,,,0x9,,,,u32,HP,,medium,community,m18[16].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[16].1
+,2,,,2,,,,f32,Walk/Run max speed,,medium,community,m18[16].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[16].3
+,4,,,3,,,,f32,,,,,m18[16].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[16].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[16].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[16].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[16].8
+,9,,,1.5,,,,f32,,,,,m18[16].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[16].10
+,11,,,0.7,,,,f32,,,,,m18[16].11
+,12,,,1.3,,,,f32,,,,,m18[16].12
+,13,,,2.5,,,,f32,,,,,m18[16].13
+,14,,,2.3,,,,f32,,,,,m18[16].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[16].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[16].16
+,17,,,0.1,,,,f32,,,,,m18[16].17
+,18,,,1,,,,f32,?,,medium,community,m18[16].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[16].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[16].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[16].21
+,22,,,1.1,,,,f32,SideB H speed,,medium,community,m18[16].22
+,23,,,2.2,,,,f32,?,,medium,community,m18[16].23
+,24,,,1.6,,,,f32,SideB V initial speed,,medium,community,m18[16].24
+,25,,,1.2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[16].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[16].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[16].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[16].28
+,29,,,1.2,,,,f32,Dash grab H initial speed,,medium,community,m18[16].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[16].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[16].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[16].32
+,33,,,0x0,,,,u32,,,,,m18[16].33
+,34,,,4,,,,f32,,,,,m18[16].34
+,0,,,0xD,,,,u32,HP,,medium,community,m18[17].0
+,1,,,0.075,,,,f32,Walk/Run acceleration,,medium,community,m18[17].1
+,2,,,2,,,,f32,Walk/Run max speed,,medium,community,m18[17].2
+,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[17].3
+,4,,,3,,,,f32,,,,,m18[17].4
+,5,,,0.025,,,,f32,SideB return accel,,medium,community,m18[17].5
+,6,,,1,,,,f32,SideB max return speed,,medium,community,m18[17].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[17].7
+,8,,,1.5,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[17].8
+,9,,,1.5,,,,f32,,,,,m18[17].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[17].10
+,11,,,0.7,,,,f32,,,,,m18[17].11
+,12,,,1.3,,,,f32,,,,,m18[17].12
+,13,,,2.5,,,,f32,,,,,m18[17].13
+,14,,,2.3,,,,f32,,,,,m18[17].14
+,15,,,0.07,,,,f32,Gravity,,medium,community,m18[17].15
+,16,,,1.5,,,,f32,Max fall speed,,medium,community,m18[17].16
+,17,,,0.1,,,,f32,,,,,m18[17].17
+,18,,,1,,,,f32,?,,medium,community,m18[17].18
+,19,,,0x4B0,,,,u32,Frames alive in water,,medium,community,m18[17].19
+,20,,,0.1,,,,f32,?,,medium,community,m18[17].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[17].21
+,22,,,1.8,,,,f32,SideB H speed,,medium,community,m18[17].22
+,23,,,3.6,,,,f32,?,,medium,community,m18[17].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[17].24
+,25,,,1.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[17].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[17].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[17].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[17].28
+,29,,,1.6,,,,f32,Dash grab H initial speed,,medium,community,m18[17].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[17].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[17].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[17].32
+,33,,,0x0,,,,u32,,,,,m18[17].33
+,34,,,6,,,,f32,,,,,m18[17].34
+,0,,,0x5,,,,u32,HP,,medium,community,m18[18].0
+,1,,,0.12,,,,f32,Walk/Run acceleration,,medium,community,m18[18].1
+,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[18].2
+,3,,,0.4,,,,f32,Ground/Air friction,,medium,community,m18[18].3
+,4,,,3,,,,f32,,,,,m18[18].4
+,5,,,0.04,,,,f32,SideB return accel,,medium,community,m18[18].5
+,6,,,1.5,,,,f32,SideB max return speed,,medium,community,m18[18].6
+,7,,,0.1,,,,f32,Return accel,,medium,community,m18[18].7
+,8,,,2,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[18].8
+,9,,,2,,,,f32,,,,,m18[18].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[18].10
+,11,,,0.8,,,,f32,,,,,m18[18].11
+,12,,,1.3,,,,f32,,,,,m18[18].12
+,13,,,2.8,,,,f32,,,,,m18[18].13
+,14,,,2.6,,,,f32,,,,,m18[18].14
+,15,,,0.1,,,,f32,Gravity,,medium,community,m18[18].15
+,16,,,1.45,,,,f32,Max fall speed,,medium,community,m18[18].16
+,17,,,0.18,,,,f32,,,,,m18[18].17
+,18,,,1,,,,f32,?,,medium,community,m18[18].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[18].19
+,20,,,0.2,,,,f32,?,,medium,community,m18[18].20
+,21,,,1,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[18].21
+,22,,,3,,,,f32,SideB H speed,,medium,community,m18[18].22
+,23,,,5,,,,f32,?,,medium,community,m18[18].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[18].24
+,25,,,2,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[18].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[18].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[18].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[18].28
+,29,,,2,,,,f32,Dash grab H initial speed,,medium,community,m18[18].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[18].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[18].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[18].32
+,33,,,0x0,,,,u32,,,,,m18[18].33
+,34,,,8,,,,f32,,,,,m18[18].34
+,0,,,0xF,,,,u32,HP,,medium,community,m18[19].0
+,1,,,0.05,,,,f32,Walk/Run acceleration,,medium,community,m18[19].1
+,2,,,1.5,,,,f32,Walk/Run max speed,,medium,community,m18[19].2
+,3,,,0.17,,,,f32,Ground/Air friction,,medium,community,m18[19].3
+,4,,,3,,,,f32,,,,,m18[19].4
+,5,,,0.018,,,,f32,SideB return accel,,medium,community,m18[19].5
+,6,,,0.8,,,,f32,SideB max return speed,,medium,community,m18[19].6
+,7,,,0.08,,,,f32,Return accel,,medium,community,m18[19].7
+,8,,,1.2,,,,f32,Something to do with jump timing of Pikmin coming back from sideB,,medium,community,m18[19].8
+,9,,,0.75,,,,f32,,,,,m18[19].9
+,10,,,0.75,,,,f32,Pikmin speed/response to TurnRun,,medium,community,m18[19].10
+,11,,,0.7,,,,f32,,,,,m18[19].11
+,12,,,1.3,,,,f32,,,,,m18[19].12
+,13,,,2.5,,,,f32,,,,,m18[19].13
+,14,,,2.3,,,,f32,,,,,m18[19].14
+,15,,,0.09,,,,f32,Gravity,,medium,community,m18[19].15
+,16,,,1.7,,,,f32,Max fall speed,,medium,community,m18[19].16
+,17,,,0.05,,,,f32,,,,,m18[19].17
+,18,,,0.5,,,,f32,?,,medium,community,m18[19].18
+,19,,,0x3C,,,,u32,Frames alive in water,,medium,community,m18[19].19
+,20,,,0.03,,,,f32,?,,medium,community,m18[19].20
+,21,,,0.5,,,,f32,Dsmash H initial speed multiplier,,medium,community,m18[19].21
+,22,,,1.5,,,,f32,SideB H speed,,medium,community,m18[19].22
+,23,,,3,,,,f32,?,,medium,community,m18[19].23
+,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[19].24
+,25,,,0.6,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[19].25
+,26,,,0.03,,,,f32,Standing/Pivot grab accel,,medium,community,m18[19].26
+,27,,,0.1,,,,f32,Something with standing/pivot grab,,medium,community,m18[19].27
+,28,,,1.5,,,,f32,?,,medium,community,m18[19].28
+,29,,,0.6,,,,f32,Dash grab H initial speed,,medium,community,m18[19].29
+,30,,,0.03,,,,f32,Dash grab accel,,medium,community,m18[19].30
+,31,,,0.1,,,,f32,Something with dash grab,,medium,community,m18[19].31
+,32,,,1.5,,,,f32,?,,medium,community,m18[19].32
+,33,,,0x0,,,,u32,,,,,m18[19].33
+,34,,,1.6,,,,f32,,,,,m18[19].34
+19,0,,,1,,,,f32,Pluk speed of terrain ID = 0,,medium,community,m19[0].0
+,1,,,1,,,,f32,Pluk speed of terrain ID = 1,,medium,community,m19[0].1
+,2,,,1,,,,f32,Pluk speed of terrain ID = 2,,medium,community,m19[0].2
+,3,,,1,,,,f32,Pluk speed of terrain ID = 3,,medium,community,m19[0].3
+,4,,,1,,,,f32,Pluk speed of terrain ID = 4,,medium,community,m19[0].4
+,5,,,1,,,,f32,Pluk speed of terrain ID = 5,,medium,community,m19[0].5
+,6,,,1,,,,f32,Pluk speed of terrain ID = 6,,medium,community,m19[0].6
+,7,,,1,,,,f32,Pluk speed of terrain ID = 7,,medium,community,m19[0].7
+,8,,,1,,,,f32,Pluk speed of terrain ID = 8,,medium,community,m19[0].8
+,9,,,1,,,,f32,Pluk speed of terrain ID = 9,,medium,community,m19[0].9
+,10,,,1,,,,f32,Pluk speed of terrain ID = 10,,medium,community,m19[0].10
+,11,,,1,,,,f32,Pluk speed of terrain ID = 11,,medium,community,m19[0].11
+,12,,,1,,,,f32,Pluk speed of terrain ID = 12,,medium,community,m19[0].12
+,13,,,1,,,,f32,Pluk speed of terrain ID = 13,,medium,community,m19[0].13
+,14,,,1,,,,f32,Pluk speed of terrain ID = 14,,medium,community,m19[0].14
+,15,,,1,,,,f32,Pluk speed of terrain ID = 15,,medium,community,m19[0].15
+,16,,,1,,,,f32,Pluk speed of terrain ID = 16,,medium,community,m19[0].16
+,17,,,1,,,,f32,Pluk speed of terrain ID = 17,,medium,community,m19[0].17
+,18,,,1,,,,f32,Pluk speed of terrain ID = 18,,medium,community,m19[0].18
+,19,,,1,,,,f32,Pluk speed of terrain ID = 19,,medium,community,m19[0].19
+,20,,,1,,,,f32,Pluk speed of terrain ID = 20,,medium,community,m19[0].20
+,21,,,1,,,,f32,Pluk speed of terrain ID = 21,,medium,community,m19[0].21
+,22,,,1,,,,f32,Pluk speed of terrain ID = 22,,medium,community,m19[0].22
+,23,,,1,,,,f32,Pluk speed of terrain ID = 23,,medium,community,m19[0].23
+,24,,,1,,,,f32,Pluk speed of terrain ID = 24,,medium,community,m19[0].24
+,25,,,1,,,,f32,Pluk speed of terrain ID = 25,,medium,community,m19[0].25
+,26,,,1,,,,f32,Pluk speed of terrain ID = 26,,medium,community,m19[0].26
+,27,,,1,,,,f32,Pluk speed of terrain ID = 27,,medium,community,m19[0].27
+,28,,,1,,,,f32,Pluk speed of terrain ID = 28,,medium,community,m19[0].28
+,29,,,1,,,,f32,Pluk speed of terrain ID = 29,,medium,community,m19[0].29
+20,0,,,0x2000047,,,,u32,Pikmin weapon param Name71?,,medium,community,m20[0].0
+,1,,,1,,,,f32,,,,,m20[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[0].2
+,3,,,0,,,,f32,,,,,m20[0].3
+,4,,,1,,,,f32,,,,,m20[0].4
+,5,,,0,,,,f32,,,,,m20[0].5
+,0,,,0x2000048,,,,u32,Pikmin weapon param Name72?,,medium,community,m20[1].0
+,1,,,1,,,,f32,,,,,m20[1].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[1].2
+,3,,,0,,,,f32,,,,,m20[1].3
+,4,,,1,,,,f32,,,,,m20[1].4
+,5,,,0,,,,f32,,,,,m20[1].5
+,0,,,0x2000049,,,,u32,Pikmin weapon param Name73?,,medium,community,m20[2].0
+,1,,,1,,,,f32,,,,,m20[2].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[2].2
+,3,,,0,,,,f32,,,,,m20[2].3
+,4,,,1,,,,f32,,,,,m20[2].4
+,5,,,0,,,,f32,,,,,m20[2].5
+21,0,,,0x2000032,,,,u32,Pikmin weapon param Name50?,,medium,community,m21[0].0
+,1,,,1,,,,f32,,,,,m21[0].1
+,2,,,5,,,,f32,Multiplier?,,medium,community,m21[0].2
+,3,,,0,,,,f32,,,,,m21[0].3
+,4,,,1,,,,f32,,,,,m21[0].4
+,5,,,0,,,,f32,,,,,m21[0].5
+,0,,,0x2000033,,,,u32,Pikmin weapon param Name51?,,medium,community,m21[1].0
+,1,,,1,,,,f32,,,,,m21[1].1
+,2,,,3,,,,f32,Multiplier?,,medium,community,m21[1].2
+,3,,,0,,,,f32,,,,,m21[1].3
+,4,,,1,,,,f32,,,,,m21[1].4
+,5,,,0,,,,f32,,,,,m21[1].5
+,0,,,0x2000035,,,,u32,Pikmin weapon param Name53?,,medium,community,m21[2].0
+,1,,,1,,,,f32,,,,,m21[2].1
+,2,,,2,,,,f32,Multiplier?,,medium,community,m21[2].2
+,3,,,0,,,,f32,,,,,m21[2].3
+,4,,,1,,,,f32,,,,,m21[2].4
+,5,,,0,,,,f32,,,,,m21[2].5
+22,0,,,0x200003E,,,,u32,Pikmin weapon param Name62?,,medium,community,m22[0].0
+,1,,,1,,,,f32,,,,,m22[0].1
+,2,,,2,,,,f32,Multiplier?,,medium,community,m22[0].2
+,3,,,0,,,,f32,,,,,m22[0].3
+,4,,,1,,,,f32,,,,,m22[0].4
+,5,,,0,,,,f32,,,,,m22[0].5
+,0,,,0x200003F,,,,u32,Pikmin weapon param Name63?,,medium,community,m22[1].0
+,1,,,1,,,,f32,,,,,m22[1].1
+,2,,,2,,,,f32,Multiplier?,,medium,community,m22[1].2
+,3,,,0,,,,f32,,,,,m22[1].3
+,4,,,1,,,,f32,,,,,m22[1].4
+,5,,,0,,,,f32,,,,,m22[1].5
+,0,,,0x2000041,,,,u32,Pikmin weapon param Name65?,,medium,community,m22[2].0
+,1,,,1,,,,f32,,,,,m22[2].1
+,2,,,5,,,,f32,Multiplier?,,medium,community,m22[2].2
+,3,,,0,,,,f32,,,,,m22[2].3
+,4,,,1,,,,f32,,,,,m22[2].4
+,5,,,0,,,,f32,,,,,m22[2].5
+23,0,,,0x0,0x0,0x0,0x0,u32,,,,,m23[*]
+,0,,,0.5,,,,f32,,Added in 1.0.6,,,m24.0
+,1,,,0.5,,,,f32,,Added in 1.0.6,,,m24.1
+,2,,,0.5,,,,f32,,Added in 1.0.6,,,m24.2
+,3,,,0.5,,,,f32,,Added in 1.0.6,,,m24.3
+,4,,,0.5,,,,f32,,Added in 1.0.6,,,m24.4
+,5,,,3,,,,f32,,Added in 1.0.6,,,m24.5
+24,0,Dolfin,0x02000000,1.5,,,,f32,,,,,m25[0].0
+,1,,0x02000001,0.04,,,,f32,,,,,m25[0].1
+,2,,0x02000002,4,,,,f32,,,,,m25[0].2
+,3,,0x12000003,0x14,,,,u32,,,,,m25[0].3
+,4,,0x12000004,0x78,,,,u32,,,,,m25[0].4
+,5,,0x02000005,15,,,,f32,,,,,m25[0].5
+,6,,0x02000006,-3.5,,,,f32,,,,,m25[0].6
+,7,,0x02000007,115,,,,f32,,,,,m25[0].7
+,8,,0x02000008,30,,,,f32,,,,,m25[0].8
+,9,,0x02000009,50,,,,f32,,,,,m25[0].9
+,10,,0x0200000A,50,,,,f32,,Added in 1.0.6,,,m25[0].10
+,11,,0x0200000B,80,,,,f32,,Added in 1.0.6,,,m25[0].11
+,12,,0x0200000C,30,,,,f32,,,,,m25[0].12
+,13,,0x1200000D,0x28A,,,,u32,,,,,m25[0].13
+,14,,0x0200000E,0.9,,,,f32,H speed (StickX * this),,medium,community,m25[0].14
+25,0,Hurtbox?,,0,,,,f32,X offset,,medium,community,m26[0].0
+,1,,,-15,,,,f32,Y offset,,medium,community,m26[0].1
+,2,,,0,,,,f32,Z offset,,medium,community,m26[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m26[0].3
+,4,,,15,,,,f32,Y2 offset,,medium,community,m26[0].4
+,5,,,0,,,,f32,Z2 offset,,medium,community,m26[0].5
+,6,,,10,,,,f32,Size,,medium,community,m26[0].6
+,7,,,0x1,,,,u32,,,,,m26[0].7
+,8,,,0x1,,,,u32,,,,,m26[0].8
+,9,,,0x7D3,,,,u32,Bone,,medium,community,m26[0].9
+,0,,,0x1,,,,u32,,,,,m27.0
+,1,,,50,,,,f32,,,,,m27.1
+,2,,,13,,,,f32,,,,,m27.2
+,3,,,10,,,,f32,,,,,m27.3
+16,3,,0x14000003,0xFF,,,,,RGB?,community row not matched to a value of the vanilla file,low,community,

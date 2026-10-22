@@ -1,0 +1,61 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x15000000,0x28,0x1E,0x1E,0x1E,u32,"[auto] read by MSC: if (MotionModuleF(0x1) >= (float)WorkModule(0x6, 0x15000000))",,low,reads: MSC littlemacg.mscsb func_2260; MSC littlemacg.mscsb func_2271,m12[*].0
+,1,,0x15000001,0x50,0x78,0x78,0x78,u32,"[auto] read by MSC: var0 = (float)WorkModule(0x6, 0x15000001) + 0;",,low,reads: MSC littlemacg.mscsb func_2260,m12[*].1
+,2,,0x05000002,1.8,1.2,1.2,1.2,f32,"[auto] read by MSC: var6 = WorkModuleF(0, 0x5000002);",,low,reads: MSC littlemacg.mscsb func_2271,m12[*].2
+,3,,0x05000003,0.6,0.6,0.6,0.6,f32,"[auto] read by MSC: var6 = WorkModuleF(0, 0x5000003);",,low,reads: MSC littlemacg.mscsb func_2271,m12[*].3
+,4,,0x05000004,0.1,0.08,0.08,0.08,f32,"[auto] read by MSC: var8 = WorkModuleF(0, 0x5000004);",,low,reads: MSC littlemacg.mscsb func_2271; MSC littlemacg.mscsb func_2272,m12[*].4
+,5,,0x05000005,0.04,0.04,0.04,0.04,f32,"[auto] read by MSC: var8 = WorkModuleF(0, 0x5000005);",,low,reads: MSC littlemacg.mscsb func_2271; MSC littlemacg.mscsb func_2272,m12[*].5
+,6,,0x05000006,3,2,2,2,f32,"[auto] read by MSC: var5 = WorkModuleF(0, 0x5000006);",,low,reads: MSC littlemacg.mscsb func_2271,m12[*].6
+,7,,0x05000007,3,3,3,3,f32,"[auto] read by MSC: var0 = WorkModuleF(0, 0x5000007) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2263,m12[*].7
+,8,,0x05000008,3,3,3,3,f32,"[auto] read by MSC: var0 = WorkModuleF(0, 0x5000008) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2263,m12[*].8
+,9,,0x05000009,0.018,0.02,0.02,0.02,f32,[auto] movement value (passed to KineticModule),,low,reads: MSC littlemacg.mscsb func_2263,m12[*].9
+,10,,0x0500000A,0.06,0.06,0.06,0.06,f32,[auto] movement value (passed to KineticModule),,low,reads: MSC littlemacg.mscsb func_2263,m12[*].10
+,11,,0x0500000B,0.5,0.5,0.5,0.5,f32,"[auto] read by MSC: var0 *= WorkModuleF(0, 0x500000b);",,low,reads: MSC littlemacg.mscsb func_2267,m12[*].11
+,12,,0x0500000C,0.3,0.3,0.3,0.3,f32,"[auto] read by MSC: var0 *= WorkModuleF(0, 0x500000c);",,low,reads: MSC littlemacg.mscsb func_2267,m12[*].12
+,13,,0x0500000D,8,15,15,15,f32,[auto] compared with / applied to damage,,low,reads: MSC littlemacg.mscsb func_2259,m12[*].13
+,14,,0x0500000E,14,15,15,15,f32,[auto] compared with / applied to damage,,low,reads: MSC littlemacg.mscsb func_2263,m12[*].14
+14,0,Side B,0x06000000,2,2,2,2,f32,H initial speed on grouded startup,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].0
+,1,,0x06000001,1.7,1.5,1.5,1.5,f32,H initial speed on aerial startup,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].1
+,2,,0x06000002,1.9,1,1,1,f32,V initial speed on grouded startup,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].2
+,3,,0x06000003,1.8,1,1,1,f32,V initial speed on aerial startup,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].3
+,4,,0x06000004,0.03,0.03,0.03,0.03,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1.5,1.5,1.5,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x16000006,0xF,0xF,0xF,0xF,u32,Frames spent spinning helplessly after an additional button input,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].6
+,7,,0x16000007,0x8,0x8,0x8,0x8,u32,Something to do with when you can do a button input to punch during the leap?,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2280",m13[*].7
+,8,,0x06000008,0.015,0.07,0.07,0.07,f32,Air friction,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].8
+,9,,0x06000009,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x1600000A,0x14,0x14,0x14,0x14,u32,"[auto] read by MSC: if (MotionModule(0x2712) && global9 >= (float)WorkModule(0x6, 0x1600000a))",,low,reads: MSC littlemacg.mscsb func_2292,m13[*].10
+,11,,0x1600000B,0x1E,0x1E,0x1E,0x1E,u32,Landing lag (frames),,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2279",m13[*].11
+15,0,Up B,0x07000000,0.95,1,1,1,f32,Grounded height multiplier,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2302",m14[*].0
+,1,,0x07000001,0.9,0.95,0.95,0.95,f32,Aerial height multiplier,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2302",m14[*].1
+,2,,0x07000002,0.6666,0.6666,0.6666,0.6666,f32,[auto] copied to status work float 0x1000009,,low,reads: MSC littlemacg.mscsb func_2302,m14[*].2
+,3,,0x07000003,0.25,0.25,0.25,0.25,f32,[auto] copied to status work float 0x1000006,,low,reads: MSC littlemacg.mscsb func_2302,m14[*].3
+,4,,0x07000004,0.5,0.5,0.5,0.5,f32,Aerial max air speed multiplier,,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2302",m14[*].4
+,5,,0x07000005,0.625,0.625,0.625,0.625,f32,[auto] copied to status work float 0x1000007,,low,reads: MSC littlemacg.mscsb func_2302,m14[*].5
+,6,,0x07000006,18,18,18,18,f32,Ability to angle (degrees),,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2302",m14[*].6
+,7,,0x07000007,0.6,0.6,0.6,0.6,f32,[auto] copied to status work float 0x100000c,,low,reads: MSC littlemacg.mscsb func_2302,m14[*].7
+,8,,0x17000008,0x1E,0x1E,0x1E,0x1E,u32,Landing lag (frames),,low,"copied from Little_Mac (same layout, same position) | reads: MSC littlemacg.mscsb func_2302",m14[*].8
+16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,[auto] read by native code (get_float at 0x0279F01C); meaning not traced,,low,reads: native 0x0279F01C (fn 0x0279EEC8),m15[*].0
+,1,,0x08000001,0.0025,0.0025,0.0025,0.0025,f32,[auto] read by native code (get_float at 0x0279F4E8); meaning not traced,,low,reads: native 0x0279F4E8 (fn 0x0279F388),m15[*].1
+,2,,0x08000002,0.04,0.04,0.04,0.04,f32,,,,no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.2,1.2,1.2,1.2,f32,,,,no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0.3,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,9.4,9.3,9.3,9.3,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,13.7,9.2,9.2,9.2,f32,,,,no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,1.5,1,1,1,f32,"[auto] read by MSC: var0 = -WorkModuleF(0, 0x8000009) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2310,m15[*].9
+,10,,0x0800000A,0.5,0.5,0.5,0.5,f32,"[auto] read by MSC: var0 = -WorkModuleF(0, 0x800000a) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2310,m15[*].10
+,11,,0x0800000B,4.5,4,4,4,f32,"[auto] read by MSC: var0 = WorkModuleF(0, 0x800000b) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2311,m15[*].11
+,12,,0x0800000C,1,1.5,1.5,1.5,f32,"[auto] read by MSC: var0 = WorkModuleF(0, 0x800000c) * PostureModuleF(0);",,low,reads: MSC littlemacg.mscsb func_2311,m15[*].12
+,13,,0x0800000D,1.3,1.1,1.1,1.1,f32,,,,no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x1800000E,0x10,0x10,0x10,0x10,u32,,,,no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x0800000F,30,8,8,8,f32,,,,no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,50,100,100,100,f32,,,,no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,50,100,100,100,f32,,,,no read in the vanilla MSC (native or unused),m15[*].17
+,18,,0x08000012,0.2,0.2,0.2,0.2,f32,"[auto] read by MSC: var0 *= WorkModuleF(0, 0x8000012);",,low,reads: MSC littlemacg.mscsb func_2311,m15[*].18
+,19,,0x08000013,0.3,0.3,0.3,0.3,f32,"[auto] read by MSC: var0 *= WorkModuleF(0, 0x8000013);",,low,reads: MSC littlemacg.mscsb func_2311,m15[*].19
+,0,Category 4 block,0x14000000,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,11,,,,f32,Duration of Giga Mac (seconds),,low,"copied from Little_Mac (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.1
+,2,,0x14000002,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x14000003,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.3

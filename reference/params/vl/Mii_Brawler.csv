@@ -1,0 +1,122 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,2.25,0,0,0,f32,Shot Put firing speed,,medium,community,m12[*].0
+,1,,0x05000001,45,45,0,0,f32,Shot Put firing angle (degrees),,medium,community,m12[*].1
+,2,,0x05000002,0,7,0,0,f32,Max cap to fully charge,Donkey Neutral B,medium,community,m12[*].2
+,3,,0x05000003,0,1.5,0,0,f32,Damage per 1 loop of charging animation,,medium,community,m12[*].3
+,4,,0x05000004,0,1,0,0,f32,Charge level increment with each loops of charging animation,,medium,community,m12[*].4
+,5,,0x05000005,0,0,0.125,0,f32,Min stickY sensitivity to angle Name3 speed up/down,Exactly same as Falcon Punch,medium,community,m12[*].5
+,6,,0x05000006,0,0,0.625,0,f32,Max stickY sensitivity to angle Name3 speed up/down,,medium,community,m12[*].6
+,7,,0x05000007,0,0,35,0,f32,Max angle of Name8 speed from holding up/down (degrees),,medium,community,m12[*].7
+,8,,0x05000008,0,0,2.2,0,f32,Momentum forward in air (with RA-Bit 15 set),,medium,community,m12[*].8
+,9,,0x05000009,0,0,0.92,0,f32,Momentum from holding up (used with RA-Basic 2 set to 1),,medium,community,m12[*].9
+14,0,Side B,0x06000000,0.18,0,0,0,f32,,,,,m13[*].0
+,1,,0x06000001,40,0,0,0,f32,Aerial landing lag on hit (frames),,medium,community,m13[*].1
+,2,,0x06000002,30,0,0,0,f32,Aerial landing lag on miss (frames),,medium,community,m13[*].2
+,3,,0x06000003,0.25,0,0,0,f32,Ground H speed multiplier when missing,,medium,community,m13[*].3
+,4,,0x06000004,1,0,0,0,f32,Onslaught H distance multiplier,,medium,community,m13[*].4
+,5,,0x06000005,0,10,0,0,f32,Base damage multiplier (true = this / 7),Damage multiplier = (10  + (18 - 10) * Charged frames / 54) / 7,medium,community,m13[*].5
+,6,,0x06000006,0,18,0,0,f32,Max damage multiplier (true = this / 7),,medium,community,m13[*].6
+,7,,0x06000007,0,54,0,0,f32,Time to fully charge (frames),,medium,community,m13[*].7
+,8,,0x06000008,0,20,0,0,f32,Initial charged frames of smash input,,medium,community,m13[*].8
+,9,,0x06000009,0,0.8,0,0,f32,V speed multiplier,,medium,community,m13[*].9
+,10,,0x0600000A,0,0.02,0,0,f32,Air friction,,medium,community,m13[*].10
+,11,,0x0600000B,0,0.026,0,0,f32,Gravity,,medium,community,m13[*].11
+,12,,0x1600000C,0x0,0xC,0x0,0x0,u32,Animation length + 1 / this,,medium,community,m13[*].12
+,13,,0x0600000D,0,1.5,0,0,f32,Base H speed,H speed = 1.5  + (2.7 - 1.5) * Charged frames / 54,medium,community,m13[*].13
+,14,,0x0600000E,0,2.7,0,0,f32,Max H speed,,medium,community,m13[*].14
+,15,,0x0600000F,0,0.3,0,0,f32,Base V speed,V speed = 0.3  + (0.4 - 0.3) * Charged frames / 54,medium,community,m13[*].15
+,16,,0x06000010,0,0.4,0,0,f32,Max V speed,,medium,community,m13[*].16
+,17,,0x06000011,0,0.017,0,0,f32,Gravity,,medium,community,m13[*].17
+,18,,0x06000012,0,0.7,0,0,f32,Max fall speed,,medium,community,m13[*].18
+,19,,0x06000013,0,0.5,0,0,f32,,,,,m13[*].19
+,20,,0x06000014,0,1.8,0,0,f32,,,,,m13[*].20
+,21,,0x06000015,0,0.8,0,0,f32,[auto] read by native code (get_float at 0x027B951C); meaning not traced,,low,reads: native 0x027B951C (fn 0x027B93EC),m13[*].21
+,22,,0x06000016,0,0.03,0,0,f32,,,,,m13[*].22
+,23,,0x06000017,0,0.06,0,0,f32,,,,,m13[*].23
+,24,,0x06000018,0,0.1,0,0,f32,,,,,m13[*].24
+,25,,0x06000019,0,0,0.5,0,f32,Grounded H speed,,medium,community,m13[*].25
+,26,,0x0600001A,0,0,1.2,0,f32,Aerial H speed,,medium,community,m13[*].26
+,27,,0x0600001B,0,0,2.8,0,f32,Grounded V speed,,medium,community,m13[*].27
+,28,,0x0600001C,0,0,2.8,0,f32,Aerial V speed,,medium,community,m13[*].28
+,29,,0x0600001D,0,0,0.04,0,f32,,,,,m13[*].29
+,30,,0x0600001E,0,0,13,0,f32,,,,,m13[*].30
+,31,,0x1600001F,0x0,0x0,0xF,0x0,u32,,,,,m13[*].31
+,32,,0x16000020,0x0,0x0,0xB,0x0,u32,,,,,m13[*].32
+,33,,0x06000021,0,0,0.015,0,f32,Air friction,,medium,community,m13[*].33
+,34,,0x06000022,0,0,1.5,0,f32,,,,,m13[*].34
+,35,,0x16000023,0x0,0x0,0x1E,0x0,u32,Landing lag (frames),,medium,community,m13[*].35
+15,0,Up B,0x07000000,1,0,0,0,f32,Aerial height multiplier,,medium,community,m14[*].0
+,1,,0x07000001,0.6,0,0,0,f32,Max H air speed multiplier,Doesn't grow stronger if set above 1?,medium,community,m14[*].1
+,2,,0x07000002,1,0,0,0,f32,Height multiplier,"Higher numbers have bizarre effects on ground movement speed after landing. Set to 3, walking speed and dodge rolls were greatly sped up. Set to 30, the Mii began warping across platforms at extremely high speed.",medium,community,m14[*].2
+,3,,0x07000003,8,0,0,0,f32,Air max additional acceleration multiplier,,medium,community,m14[*].3
+,4,,0x07000004,0,1.49,0,0,f32,V height,,medium,community,m14[*].4
+,5,,0x07000005,0,0.4,0,0,f32,,,,,m14[*].5
+,6,,0x07000006,0,0.7,0,0,f32,,,,,m14[*].6
+,7,,0x07000007,0,0.01,0,0,f32,,,,,m14[*].7
+,8,,0x07000008,0,0.5,0,0,f32,,,,,m14[*].8
+,9,,0x07000009,0,0.7,0,0,f32,,,,,m14[*].9
+,10,,0x1700000A,0x0,0x1A,0x0,0x0,u32,Landing lag (frames),,medium,community,m14[*].10
+,11,,0x0700000B,0,1,0,0,f32,,,,,m14[*].11
+,12,,0x0700000C,0,0,0.3,0,f32,,,,,m14[*].12
+,13,,0x0700000D,0,0,0.5,0,f32,,,,,m14[*].13
+,14,,0x0700000E,0,0,20,0,f32,,,,,m14[*].14
+,15,,0x0700000F,0,0,0.6,0,f32,,,,,m14[*].15
+,16,,0x17000010,0x0,0x0,0x1E,0x0,u32,Landing lag (frames),,medium,community,m14[*].16
+,17,,0x07000011,0,0,0.89,0,f32,Vertical height multiplier,,medium,community,m14[*].17
+,18,,0x07000012,0,0,0.67,0,f32,,,,,m14[*].18
+,19,,0x07000013,0,0,0.5,0,f32,,,,,m14[*].19
+,20,,0x07000014,0,0,0.8,0,f32,,,,,m14[*].20
+16,0,Down B,0x08000000,1.45,0,0,0,f32,Grounded H speed,Bowser DownB,medium,community,m15[*].0
+,1,,0x08000001,0.5,0,0,0,f32,Aerial H speed,,medium,community,m15[*].1
+,2,,0x08000002,0.5,0,0,0,f32,Grounded V speed,,medium,community,m15[*].2
+,3,,0x08000003,0.5,0,0,0,f32,Aerial V speed,,medium,community,m15[*].3
+,4,,0x08000004,0.02,0,0,0,f32,Air friction,,medium,community,m15[*].4
+,5,,0x08000005,0.03,0,0,0,f32,Gravity,,medium,community,m15[*].5
+,6,,0x08000006,0.4,0,0,0,f32,Max fall speed,,medium,community,m15[*].6
+,7,,0x08000007,-9,0,0,0,f32,V speed on falling,,medium,community,m15[*].7
+,8,,0x18000008,0x0,0x4,0x0,0x0,u32,,ZSS Down B,,,m15[*].8
+,9,,0x08000009,0,0.5,0,0,f32,Max H speed (StickX * this),,medium,community,m15[*].9
+,10,,0x0800000A,0,20,0,0,f32,,community ID was 0x1800000A,,,m15[*].10
+,11,,0x0800000B,0,0,0,0,f32,Max H speed on successful hit (StickX * this),,medium,community,m15[*].11
+,12,,0x0800000C,0,0,0,0,f32,V speed on successful hit,,medium,community,m15[*].12
+,13,,0x0800000D,0,0,0,0,f32,X offset of footstool detection (Unused?),,medium,community,m15[*].13
+,14,,0x0800000E,0,0,0,0,f32,Y offset of footstool detection (Unused?),,medium,community,m15[*].14
+,15,,0x0800000F,0,9,0,0,f32,,,,,m15[*].15
+,16,,0x08000010,0,9,0,0,f32,,,,,m15[*].16
+,17,,0x08000011,0,0.5,0,0,f32,StickX sensitivity,,medium,community,m15[*].17
+,18,,0x08000012,0,0.5,0,0,f32,Gravity,,medium,community,m15[*].18
+,19,,0x08000013,0,1,0,0,f32,Animation frame speed multiplier,,medium,community,m15[*].19
+,20,,0x08000014,0,0,0.2,0,f32,Added V speed,,medium,community,m15[*].20
+,21,,0x08000015,0,0,0.6,0,f32,V speed multiplier,,medium,community,m15[*].21
+,22,,0x08000016,0,0,0.04,0,f32,Gravity,,medium,community,m15[*].22
+,23,,0x08000017,0,0,1.15,0,f32,,,,,m15[*].23
+,24,,0x18000018,0x0,0x0,0x4,0x0,u32,,,,,m15[*].24
+,25,,0x08000019,0,0,1,0,f32,Animation frame speed multiplier (subaction 0x24d),,medium,community,m15[*].25
+,26,,0x0800001A,0,0,1,0,f32,Animation frame speed multiplier (subaction 0x250),,medium,community,m15[*].26
+,27,,0x0800001B,0,0,0.012,0,f32,Ground friction,,medium,community,m15[*].27
+,28,,0x0800001C,0,0,3,0,f32,,,,,m15[*].28
+,0,Final Smash?,0x14000000,0x7,,,,u32,,,,,m16.0
+,1,,0x04000001,0.02,,,,f32,,,,,m16.1
+,2,,0x04000002,30,,,,f32,Camera X offset?,,medium,community,m16.2
+,3,,0x14000003,0x8,,,,u32,[auto] read by native code (get_int at 0x027B7B84); meaning not traced,,low,reads: native 0x027B7B84 (fn 0x027B77EC),m16.3
+,4,,0x04000004,1.5,,,,f32,,,,,m16.4
+,5,,0x14000005,0x0,,,,u32,[auto] read by native code (get_int at 0x027B8894); meaning not traced,,low,reads: native 0x027B8894 (fn 0x027B820C),m16.5
+,6,,0x04000006,20,,,,f32,,,,,m16.6
+,7,,0x04000007,20,,,,f32,,,,,m16.7
+,8,,0x04000008,12,,,,f32,,,,,m16.8
+17,0,Article params (hat),0x12000000,0x0,,,,u32,,,,,m17[0]
+18,0,Iron Ball,0x12000000,0x48,,,,u32,Lifetime after stage impact (frames),,medium,community,m18[0].0
+,1,,0x02000001,0,,,,f32,,,,,m18[0].1
+,2,,0x02000002,0.22,,,,f32,,,,,m18[0].2
+,3,,0x02000003,4,,,,f32,,,,,m18[0].3
+,4,,0x02000004,0.08,,,,f32,,,,,m18[0].4
+,5,,0x02000005,7,,,,f32,,,,,m18[0].5
+,6,,0x02000006,0.7,,,,f32,,,,,m18[0].6
+,7,,0x02000007,0.5,,,,f32,,,,,m18[0].7
+,8,,0x02000008,0.75,,,,f32,Damage multiplier after a boucing (grounded only),,medium,community,m18[0].8
+,9,,0x02000009,1,,,,f32,,,,,m18[0].9
+,10,,0x0200000A,0.75,,,,f32,Damage multiplier after a boucing (aerial only),,medium,community,m18[0].10
+19,0,,,0x1,,,,u32,,,,,m19[0].0
+,1,,,2.4,,,,f32,,,,,m19[0].1
+,2,,,-2.4,,,,f32,,,,,m19[0].2
+,3,,,2.4,,,,f32,,,,,m19[0].3

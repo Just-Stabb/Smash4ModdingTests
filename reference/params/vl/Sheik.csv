@@ -1,0 +1,100 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,1,1,1,1,f32,Charge animation frame speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2908",m12[*].0
+,1,,0x05000001,17,17,17,17,f32,X offset grounded needles,,medium,community,m12[*].1
+,2,,0x05000002,8,8,8,8,f32,Y offset grounded needles,,medium,community,m12[*].2
+,3,,0x05000003,7,7,7,7,f32,X offset aerial needles,,medium,community,m12[*].3
+,4,,0x05000004,6,6,6,6,f32,Y offset aerial needles,,medium,community,m12[*].4
+,5,,0x05000005,30,30,30,30,f32,Landing lag (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2918",m12[*].5
+,6,,0x15000006,0x6,0x3,0x1,0x6,u32,Amount of Needles,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2903; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2908",m12[*].6
+14,0,Side B,0x06000000,0.2,0.2,0.2,0.2,f32,Grounded H speed multiplier on startup,,medium,community | reads: native 0x02F7840C (fn 0x02F782A8),m13[*].0
+,1,,0x06000001,0.5,0.5,0.5,0.5,f32,Aerial H speed multiplier on startup,,medium,community,m13[*].1
+,2,,0x06000002,1,1,1,1,f32,Upward speed received on startup,,medium,community,m13[*].2
+,3,,0x06000003,0.075,0.075,0.075,0.075,f32,Gravity on holding,,medium,community,m13[*].3
+,4,,0x06000004,1.8,1.8,1.8,1.8,f32,Max fall speed on holding,,medium,community,m13[*].4
+,5,,0x06000005,10,24,20,10,f32,Grenade launch angle (degrees),,medium,community,m13[*].5
+,6,,0x06000006,1.5,1.8,1.4,1.5,f32,Grenade launch speed,,medium,community,m13[*].6
+,7,,0x16000007,0x46,0x5A,0x3C,0x46,u32,Latest frame during SpecialSHold that SpecialSFire can occur,On the ground it happens early due to the grenade having less speed,medium,community,m13[*].7
+15,0,Up B,0x07000000,3.2,2,0.8,3.2,f32,Aerial V speed of startup,,medium,community,m14[*].0
+,1,,0x07000001,0.19,0.15,0.08,0.19,f32,Gravity of startup,,medium,community | reads: native 0x02F78870 (fn 0x02F782A8),m14[*].1
+,2,,0x07000002,0.25,0.25,0.25,0.25,f32,Max fall speed during startup,,medium,community | reads: native 0x02F78890 (fn 0x02F782A8),m14[*].2
+,3,,0x17000003,0x14,0xA,0x10,0x14,u32,Travel time (frames),changes distance you travel,medium,community,m14[*].3
+,4,,0x17000004,0x3,0x3,0x3,0x3,u32,?,,medium,community,m14[*].4
+,5,,0x07000005,0.5,0.5,0.5,0.5,f32,Sensitivity to use max additional travel speed?,,medium,community,m14[*].5
+,6,,0x07000006,1,1,1,1,f32,Base travel speed,,medium,community,m14[*].6
+,7,,0x07000007,1.5,4.5,1.4,1.5,f32,Max additional travel speed,,medium,community,m14[*].7
+,8,,0x07000008,0.6,0.6,0.6,0.6,f32,Max H air speed multiplier (this * 2.5),,medium,community,m14[*].8
+,9,,0x17000009,0x2D,0x2D,0x2D,0x2D,u32,Angle (degrees),,medium,community,m14[*].9
+,10,,0x0700000A,0.3,0.3,0.5,0.3,f32,Speed multiplier on reappearance,,medium,community,m14[*].10
+,11,,0x0700000B,0,0,0,0,f32,X offset of hitbox,doesn't take facing direction into account,medium,community,m14[*].11
+,12,,0x0700000C,5,5,5,5,f32,Y offset of hitbox,,medium,community,m14[*].12
+,13,,0x0700000D,20,42,30,20,f32,Landing lag (frames),,medium,community,m14[*].13
+16,0,Down B,0x08000000,0.3,0.3,0.3,0.3,f32,,,,,m15[*].0
+,1,,0x08000001,1.6,0.6,2.6,1.6,f32,Initial H speed on grounded startup,,medium,community,m15[*].1
+,2,,0x08000002,3,3.8,1.6,3,f32,Initial V speed on grounded startup,,medium,community,m15[*].2
+,3,,0x08000003,1.5,0.6,2,1.5,f32,Initial H speed on aerial startup,,medium,community,m15[*].3
+,4,,0x08000004,3,3.6,1.3,3,f32,Initial V speed on aerial startup,,medium,community,m15[*].4
+,5,,0x18000005,0xF,0x16,0x11,0xF,u32,Min amount of frames for earilest attack (True = this +2),,medium,community,m15[*].5
+,6,,0x08000006,0.2,0.05,0.3,0.2,f32,H acceleration,,medium,community,m15[*].6
+,7,,0x08000007,-0.2,-0.05,-0.05,-0.2,f32,H deceleration,,medium,community,m15[*].7
+,8,,0x08000008,2.4,1,2.6,2.4,f32,H max speed,,medium,community,m15[*].8
+,9,,0x08000009,0,0,0.5,0,f32,,,,,m15[*].9
+,10,,0x0800000A,1.5,1.2,0.9,1.5,f32,Max fall speed on startup??,,medium,community,m15[*].10
+,11,,0x0800000B,13,15,13,13,f32,Variable ID,,medium,community,m15[*].11
+,12,,0x0800000C,25,25,25,25,f32,Variable ID,,medium,community,m15[*].12
+,13,,0x1800000D,0x2,0x2,0x2,0x2,u32,?,,medium,community,m15[*].13
+,14,,0x0800000E,0.9,0.9,0.9,0.9,f32,H speed deceleration ratio,Current H speed = Previous H speed * 0.9,medium,community,m15[*].14
+,15,,0x0800000F,0.1,0.1,0.1,0.1,f32,,,,,m15[*].15
+,16,,0x08000010,1.8,-0.4,-1.8,1.8,f32,,,,,m15[*].16
+,17,,0x08000011,3.5,3.3,2.8,3.5,f32,,,,,m15[*].17
+,18,,0x08000012,1.8,1.8,1.8,1.8,f32,,,,,m15[*].18
+,19,,0x08000013,3.5,3.3,3.5,3.5,f32,,,,,m15[*].19
+,20,,0x08000014,0.2,0.2,0.06,0.2,f32,H acceleration after bouncing,,medium,community,m15[*].20
+,21,,0x08000015,-0.2,-0.2,-0.04,-0.2,f32,H deceleration after bouncing,,medium,community,m15[*].21
+,22,,0x08000016,1.4,1.4,-0.7,1.4,f32,Max H speed after bouncing,,medium,community,m15[*].22
+,23,,0x08000017,0,0,-2.4,0,f32,Min H speed after bouncing,,medium,community,m15[*].23
+,24,,0x18000018,0x14,0x14,0x14,0x14,u32,Minimum frames before earliest attack during SpecialLwReturn,,medium,community,m15[*].24
+,25,,0x08000019,13,13,13,13,f32,Variable ID,,medium,community,m15[*].25
+,26,,0x0800001A,40,40,40,40,f32,Variable ID,,medium,community,m15[*].26
+,27,,0x1800001B,0x2,0x1,0x0,0x2,u32,Total times Down B can be used again (on-hit),,medium,community,m15[*].27
+,0,Final Smash,0x04000000,50,,,,f32,,,,,m16.0
+,1,,0x04000001,38,,,,f32,,,,,m16.1
+,2,,0x04000002,5,,,,f32,,,,,m16.2
+,3,,0x04000003,1.3,,,,f32,,,,,m16.3
+,4,,0x04000004,0.6,,,,f32,,,,,m16.4
+,5,,0x04000005,30,,,,f32,,,,,m16.5
+,6,,0x04000006,0,,,,f32,,,,,m16.6
+,7,,0x04000007,0.75,,,,f32,[auto] read by native code (get_float at 0x027D2ACC); meaning not traced,,low,reads: native 0x027D2ACC (fn 0x027D2A70),m16.7
+,8,,0x04000008,200,,,,f32,,,,,m16.8
+,9,Side B,0x04000009,16,,,,f32,Transition frame between SpecialS and SpecialSEnd if previous grenade still alive,,medium,community,m16.9
+17,0,Needles,0x12000000,0xA,0xA,0xB,0xC,u32,Lifetimes (frames),,medium,community,m17[*].0
+,1,,0x12000001,0x78,0x78,0x78,0x78,u32,Lifetime after sticking to surface (frames),,medium,community,m17[*].1
+,2,,0x02000002,0.5,0.5,0.5,0.5,f32,?,,medium,community,m17[*].2
+,3,,0x02000003,12,10.5,7.8,12,f32,Needle speed,,medium,community,m17[*].3
+,4,,0x12000004,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community,m17[*].4
+,0,,,0x1,,,,u32,,,,,m18.0
+,1,,,0.3,,,,f32,,,,,m18.1
+,2,,,0,,,,f32,,,,,m18.2
+,3,,,0.3,,,,f32,,,,,m18.3
+18,0,,,0x2000003,,,,u32,Needle weapon param Name3,Needle weapon param Name3,medium,community,m19[0].0
+,1,,,1,,,,f32,,,,,m19[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m19[0].2
+,3,,,0,,,,f32,,,,,m19[0].3
+,4,,,1,,,,f32,,,,,m19[0].4
+,5,,,0,,,,f32,,,,,m19[0].5
+19,0,Grenade,,1,1,1,1,f32,,,,,m20[*].0
+,1,,,0.05,0.045,0.1,0.05,f32,Gravity,,medium,community,m20[*].1
+,2,,,1.8,2.5,2.2,1.8,f32,Max fall speed,,medium,community,m20[*].2
+,3,,,0.1,0.01,-0.6,0.1,f32,Affects explosion?,,medium,community,m20[*].3
+,4,,,0.7,0.5,0.8,0.7,f32,Affects explosion?,,medium,community,m20[*].4
+,5,,,0x3,0x5,0x8,0x3,u32,,,,,m20[*].5
+,6,,,0.4,0.3,0.95,0.4,f32,H speed multiplier on bouncing,,medium,community,m20[*].6
+,7,,,0.4,0.5,0.95,0.4,f32,?,,medium,community,m20[*].7
+,8,,,0x1C,0x4,0x10,0x1C,u32,Related to windbox damage?,,medium,community,m20[*].8
+,9,,,0.2,0.1,-0.8,0.2,f32,,,,,m20[*].9
+,10,,,1,0.5,1.2,1,f32,,,,,m20[*].10
+,11,,,0.05,0.05,0.18,0.05,f32,Affects windbox damage,,medium,community,m20[*].11
+,12,,,0.5,0.5,0.5,0.5,f32,,,,,m20[*].12
+,13,,,0x1,0x1,0x1,0x1,u32,,,,,m20[*].13
+,14,,,0x78,0x78,0x78,0x78,u32,?,,medium,community,m20[*].14
+,0,,,0x1E,,,,u32,,,,,m21
+20,0,lightingbowarrow?,0x12000000,0x50,,,,u32,,,,,m22[0]

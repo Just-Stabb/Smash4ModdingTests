@@ -1,0 +1,443 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,0.6,0,0,0,f32,H speed multiplier on grounded startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].0
+,1,,0x05000001,0.4,0,0,0,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].1
+,2,,0x05000002,0.25,0,0,0,f32,V speed multiplier on aerial startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].2
+,3,,0x05000003,0.03,0,0,0,f32,Gravity on startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].3
+,4,,0x05000004,1.4,0,0,0,f32,Max fall speed on startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].4
+,5,,0x15000005,0x2,0x0,0x0,0x0,u32,Number of times of button input to repeat firing animation,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4090",m12[*].5
+,6,,0x15000006,0x3,0x0,0x0,0x0,u32,Max number of times of repeat firing animation,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4089",m12[*].6
+,7,,0x05000007,0.03,0,0,0,f32,Gravity on firing,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4094",m12[*].7
+,8,,0x05000008,1.4,0,0,0,f32,Max fall speed on firing,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4094",m12[*].8
+,9,,0x05000009,1,0,0,0,f32,Animation speed multiplier after firing,,medium,community,m12[*].9
+,10,,0x0500000A,0,0,0,0,f32,,X?,,,m12[*].10
+,11,,0x0500000B,5,0,0,0,f32,,Y?,,,m12[*].11
+,12,,0x0500000C,6,0,0,0,f32,,Z?,,,m12[*].12
+,13,,0x0500000D,0,0,0,0,f32,,X?,,,m12[*].13
+,14,,0x0500000E,7,0,0,0,f32,,Y?,,,m12[*].14
+,15,,0x0500000F,3,0,0,0,f32,,Z?,,,m12[*].15
+,16,,0x05000010,0,0,0,0,f32,,X?,,,m12[*].16
+,17,,0x05000011,11,0,0,0,f32,,Y?,,,m12[*].17
+,18,,0x05000012,2,0,0,0,f32,,Z?,,,m12[*].18
+,19,,0x05000013,0,0,0,0,f32,,X?,,,m12[*].19
+,20,,0x05000014,11,0,0,0,f32,,Y?,,,m12[*].20
+,21,,0x05000015,2,0,0,0,f32,,Z?,,,m12[*].21
+14,0,Side B,0x06000000,1,0,0,0,f32,Grounded H speed multiplier on Heel Slide startup,,medium,community | reads: native 0x02779A6C (fn 0x02779958),m13[*].0
+,1,,0x06000001,0.8,0,0,0,f32,Maximum H speed multiplier on uphill Heel Slide,Slope angle to reach to max is unknown.,medium,community,m13[*].1
+,2,,0x06000002,1.2,0,0,0,f32,Maximum H speed multiplier on downhill Heel Slide,,medium,community,m13[*].2
+,3,,0x06000003,0.2,0,0,0,f32,H speed multiplier if next action is DamageFall??,script_2393,medium,community,m13[*].3
+,4,,0x16000004,0x18,0x0,0x0,0x0,u32,FAF after hitting opponents with Heel Slide,,medium,community,m13[*].4
+,5,,0x06000005,0.3,0,0,0,f32,H speed multiplier after hitting opponents with Heel Slide,,medium,community,m13[*].5
+,6,,0x06000006,1,0,0,0,f32,Speed multiplier on Heel Slide Bullet Arts startup,,medium,community,m13[*].6
+,7,,0x06000007,0.92,0,0,0,f32,Amount of animation movement multiplier for uABK,,medium,community | reads: native 0x02779BEC (fn 0x02779B88),m13[*].7
+,8,,0x06000008,-16,0,0,0,f32,uABK animation rotation angle (degrees),,medium,community | reads: native 0x0277938C (fn 0x027792D0),m13[*].8
+,9,,0x16000009,0x16,0x0,0x0,0x0,u32,Stick down > dABK input window (frames),Sensitivity?,medium,community,m13[*].9
+,10,,0x0600000A,0.6,0,0,0,f32,H speed multiplier on uABK Bullet Arts startup,,medium,community,m13[*].10
+,11,,0x0600000B,0.09,0,0,0,f32,H decel on uABK Bullet Arts,,medium,community,m13[*].11
+,12,,0x0600000C,0.2,0,0,0,f32,?,,medium,community,m13[*].12
+,13,,0x0600000D,0.9,0,0,0,f32,Initial V speed on uABK Bullet Arts,,medium,community,m13[*].13
+,14,,0x0600000E,0.07,0,0,0,f32,Gravity on uABK Bullet Arts,,medium,community,m13[*].14
+,15,,0x0600000F,-1.1,0,0,0,f32,?,,medium,community,m13[*].15
+,16,,0x16000010,0x14,0x0,0x0,0x0,u32,Landing lag after single uABK or WTw > uABK (frames),,medium,community,m13[*].16
+,17,,0x16000011,0x1E,0x0,0x0,0x0,u32,Landing lag after uABK > uABK (frames),,medium,community,m13[*].17
+,18,,0x16000012,0x14,0x0,0x0,0x0,u32,Related to dABK input window,,medium,community,m13[*].18
+,19,,0x06000013,1,0,0,0,f32,Amount of animation movement multiplier for dABK,,medium,community | reads: native 0x02779C18 (fn 0x02779B88),m13[*].19
+,20,,0x06000014,310,0,0,0,f32,dABK animation rotation angle (degrees),,medium,community,m13[*].20
+,21,,0x06000015,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x0277954C); meaning not traced,,low,reads: native 0x0277954C (fn 0x027794C4),m13[*].21
+,22,,0x06000016,2.9,0,0,0,f32,Initial V speed of SpecialAirSDHit,,medium,community,m13[*].22
+,23,,0x06000017,0.15,0,0,0,f32,Gravity after hitting on character / bouncing off walls with uABK / dABK?,,medium,community,m13[*].23
+,24,,0x06000018,1.5,0,0,0,f32,?,,medium,community,m13[*].24
+,25,,0x16000019,0x2,0x0,0x0,0x0,u32,?,script_2411,medium,community,m13[*].25
+,26,,0x0600001A,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x02779CF4); meaning not traced,,low,reads: native 0x02779CF4 (fn 0x02779C60),m13[*].26
+,27,,0x0600001B,0,0,0,0,f32,,,,,m13[*].27
+,28,,0x0600001C,0.03,0,0,0,f32,H accel on SpecialAirSDHit,,medium,community,m13[*].28
+,29,,0x0600001D,1.45,0,0,0,f32,Max airspeed on SpecialAirSDHit,,medium,community,m13[*].29
+,30,,0x0600001E,1,0,0,0,f32,?,,medium,community,m13[*].30
+,31,,0x1600001F,0x1E,0x0,0x0,0x0,u32,Landing lag on SpecialAirSDHit or SpecialAirSDHit > WTw/aerial attacks/airdodge (frames),,medium,community,m13[*].31
+,32,,0x16000020,0x28,0x0,0x0,0x0,u32,Landing lag on ABKs > SpecialAirSDHit > SpecialAirSDLanding (frames),,medium,community,m13[*].32
+,33,,0x16000021,0x1E,0x0,0x0,0x0,u32,Landing lag on SpecialAirSDLanding (frames),,medium,community,m13[*].33
+,34,,0x16000022,0x28,0x0,0x0,0x0,u32,Landing lag on ABKs > SpecialAirSDLanding (frames),,medium,community,m13[*].34
+,35,,0x16000023,0x3C,0x0,0x0,0x0,u32,End of SpecialAirSU/SpecialAirDHit > second ABKs input window (frames),,medium,community,m13[*].35
+,36,,0x16000024,0x3,0x0,0x0,0x0,u32,First ABKs actable frame after ground jump,,medium,community,m13[*].36
+15,0,Up B,0x07000000,0.8,0,0,0,f32,H speed multiplier on grounded startup,,medium,community,m14[*].0
+,1,,0x07000001,0.5,0,0,0,f32,H speed multiplier on aerial startup,,medium,community,m14[*].1
+,2,,0x07000002,0.5,0,0,0,f32,V speed multiplier on aerial startup,,medium,community,m14[*].2
+,3,,0x07000003,0.03,0,0,0,f32,Gravity on startup,,medium,community,m14[*].3
+,4,,0x07000004,0.4,0,0,0,f32,Max fall speed on startup,,medium,community,m14[*].4
+,5,,0x07000005,1.3,0,0,0,f32,Grounded height multiplier,,medium,community | reads: native 0x02779F84 (fn 0x02779F1C),m14[*].5
+,6,,0x07000006,1.4,0,0,0,f32,Aerial height multiplier on first Witch Twist,,medium,community,m14[*].6
+,7,,0x07000007,1.25,0,0,0,f32,Aerial height multiplier on second Witch Twist,,medium,community,m14[*].7
+,8,,0x17000008,0x12,0x0,0x0,0x0,u32,Landing lag after single WTw or ABKs > WTw (frames),,medium,community,m14[*].8
+,9,,0x17000009,0x19,0x0,0x0,0x0,u32,Landing lag after WTw > ABKs / aerials / airdodge (frames),,medium,community,m14[*].9
+,10,,0x1700000A,0x20,0x0,0x0,0x0,u32,Landing lag after WTw > WTw (frames),,medium,community,m14[*].10
+,11,,0x1700000B,0x2A,0x0,0x0,0x0,u32,Landing lag after double WTw + ABKs / aerials / airdodge (frames),,medium,community,m14[*].11
+,12,,0x0700000C,3,0,0,0,f32,Double jump > WTw input window to retain jump (frames),,medium,community,m14[*].12
+16,0,Down B,0x08000000,0.03,0,0,0,f32,Gravity,,medium,community,m15[*].0
+,1,,0x08000001,1,0,0,0,f32,Max fall speed,,medium,community,m15[*].1
+,2,,0x18000002,0x16,0x0,0x0,0x0,u32,Amount of frames Bayonetta is slowed down on successful Witch Time,,medium,community,m15[*].2
+,3,,0x18000003,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta,,medium,community,m15[*].3
+,4,,0x18000004,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta (Bat Within),,medium,community,m15[*].4
+,5,,0x18000005,0x2A,0x0,0x0,0x0,u32,Intangibility frames after activating Witch Time (True=1-62F),,medium,community,m15[*].5
+,6,,0x18000006,0x26,0x0,0x0,0x0,u32,,,,,m15[*].6
+,7,,0x18000007,0xF,0x0,0x0,0x0,u32,FAF after activating Witch Time (True=35F),if the value is higher than animation length then it's ignored and Bayo can act when animation ends,medium,community,m15[*].7
+,8,,0x18000008,0x8,0x0,0x0,0x0,u32,Slow down effect speed,,medium,community,m15[*].8
+,9,,0x08000009,180,0,0,0,f32,Base slowdown duration (frames),,medium,community,m15[*].9
+,10,,0x0800000A,75,0,0,0,f32,Penalty per use (frames),,medium,community,m15[*].10
+,11,,0x0800000B,20,0,0,0,f32,Additional penalty if Witch Time activates (frames),,medium,community,m15[*].11
+,12,,0x0800000C,20,0,0,0,f32,Min slowdown duration (frames),"this is checked after penalty is applied, not at the beginning of a stock in case this value is higher than base duration",medium,community,m15[*].12
+,13,,0x0800000D,0.1,0,0,0,f32,Additional slowdown duration (this * opponent's %),,medium,community,m15[*].13
+,14,,0x1800000E,0xF0,0x0,0x0,0x0,u32,Max slowdown duration (frames),,medium,community,m15[*].14
+,15,,0x0800000F,0.67,0,0,0,f32,Witch Time Bat Within slowdown duration multiplier,doesn't apply to Name 13,medium,community,m15[*].15
+,16,,0x08000010,0.06,0,0,0,f32,Recovery per frame,,medium,community,m15[*].16
+,17,,0x08000011,30,0,0,0,f32,Witch Time Bat Within animation duration (frames),FSM = (38 - Current_Animation_Frame + 1) / 30,medium,community,m15[*].17
+,18,,0x08000012,38,0,0,0,f32,Witch Time animation start frame after activating Bat Within With Time,,medium,community,m15[*].18
+,19,,0x08000013,0.5,0,0,0,f32,Smash attack charge frames multiplier when WT is active on an opponent,ex: full charge smash attack will deal damage equal to normal half charge,medium,community,m15[*].19
+,20,,0x08000014,1,0,0,0,f32,Slowdown duration multiplier,,medium,community,m15[*].20
+,0,Nair,0x14000000,0x4,,,,u32,Max number of Nair looping animations,script_2289,medium,community,m16.0
+,1,Uair,0x14000001,0xC,,,,u32,Max number of Uair looping animations,script_2289,medium,community,m16.1
+,2,Fair,0x04000002,1.5,,,,f32,Fair1 initial V speed when hitting opponents,,medium,community,m16.2
+,3,,0x04000003,1.5,,,,f32,Fair2 initial V speed when hitting opponents,,medium,community,m16.3
+,4,,0x14000004,0x3,,,,u32,Number of Fair,script_2299,medium,community,m16.4
+,5,,0x04000005,30,,,,f32,Frame where the attack button stops being read for Fair2,,medium,community,m16.5
+,6,,0x04000006,30,,,,f32,Frame where the attack button stops being read for Fair3,,medium,community,m16.6
+,7,Dash Attack,0x04000007,0.8,,,,f32,Dash attack H speed multiplier when hitting opponents,,medium,community,m16.7
+,8,,0x14000008,0x4,,,,u32,Dash attack related,script_2279,medium,community,m16.8
+,9,Rose GFX,0x04000009,2,,,,f32,Rose GFX X/Y offset max randomness?,,medium,community,m16.9
+,10,,0x0400000A,0.7,,,,f32,Rose GFX X/Y offset min randomness?,,medium,community,m16.10
+,11,,0x0400000B,1.3,,,,f32,Rose GFX max size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community,m16.11
+,12,,0x0400000C,0.7,,,,f32,Rose GFX min size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community,m16.12
+,13,Unknown,0x1400000D,0x1E,,,,u32,,,,,m16.13
+,14,Bat Within,0x1400000E,0x19,,,,u32,Opponents slowdown duration when activates Bat Within (frames),,medium,community,m16.14
+,15,,0x1400000F,0x6,,,,u32,Opponents slowdown effect when activates Bat Within,,medium,community,m16.15
+,16,Witch Time,0x04000010,30,,,,f32,Witch Time slowdown hitbox size,,medium,community,m16.16
+,17,Bat Within,0x04000011,30,,,,f32,Spotdodge Bat Within animation duration,FSM = (24 - Current_Animation_Frame + 1) / 30,medium,community,m16.17
+,18,,0x04000012,24,,,,f32,Frame of spotdodge animation starts after Bat Within,,medium,community,m16.18
+,19,,0x04000013,30,,,,f32,Forward roll Bat Within animation duration,Uses JumpAerialF2 subaction,medium,community,m16.19
+,20,,0x04000014,26,,,,f32,Frame of forward roll animation starts after Bat Within,,medium,community,m16.20
+,21,,0x04000015,30,,,,f32,Backward roll Bat Within animation duration,Uses JumpAerialF3 subaction,medium,community,m16.21
+,22,,0x04000016,26,,,,f32,Frame of backward roll animation starts after Bat Within,,medium,community,m16.22
+,23,,0x04000017,30,,,,f32,Airdodge Bat Within animation duration,Uses JumpAerialF4 subaction,medium,community,m16.23
+,24,,0x04000018,25,,,,f32,Frame of airdodge animation starts after Bat Within,,medium,community,m16.24
+,25,"Final Smash
+(and more?)",0x14000019,0x4,,,,u32,Final Smash slow down effect speed,,medium,community,m16.25
+,26,,0x1400001A,0x1A4,,,,u32,Final Smash slow down effect duration (frames),,medium,community | reads: native 0x0276C4F4 (fn 0x0276C488); native 0x02771764 (fn 0x027716F4); native 0x02771ACC (fn 0x02771934); native 0x0277382C (fn 0x027736E8); +1 more,m16.26
+,27,,0x0400001B,1,,,,f32,[auto] read by native code (get_float at 0x0276C2F4); meaning not traced,,low,reads: native 0x0276C2F4 (fn 0x0276C204),m16.27
+,28,,0x0400001C,2.2,,,,f32,,,,,m16.28
+,29,,0x0400001D,12,,,,f32,[auto] read by native code (get_float at 0x0276CA84); meaning not traced,,low,reads: native 0x0276CA84 (fn 0x0276C830),m16.29
+,30,,0x0400001E,0.6,,,,f32,,,,,m16.30
+,31,,0x0400001F,1.7,,,,f32,,,,,m16.31
+,32,,0x14000020,0xE,,,,u32,[auto] read by native code (get_int at 0x02774464); meaning not traced,,low,reads: native 0x02774464 (fn 0x02773E68); native 0x027744DC (fn 0x02773E68),m16.32
+,33,,0x04000021,100,,,,f32,Min % to occur instance KO,,medium,community | reads: native 0x02775BC0 (fn 0x02775A4C),m16.33
+,34,,0x04000022,100,,,,f32,[auto] read by native code (get_float at 0x02775B5C); meaning not traced,,low,reads: native 0x02775B5C (fn 0x02775A4C),m16.34
+,35,,0x04000023,40,,,,f32,[auto] read by native code (get_float at 0x02775C58); meaning not traced,,low,reads: native 0x02775C58 (fn 0x02775C10),m16.35
+,36,,0x04000024,45,,,,f32,[auto] read by native code (get_float at 0x02775C74); meaning not traced,,low,reads: native 0x02775C74 (fn 0x02775C10),m16.36
+,37,,0x04000025,10,,,,f32,,,,,m16.37
+,38,,0x04000026,5,,,,f32,,,,,m16.38
+,39,,0x14000027,0x1E,,,,u32,Min frames for transition to FinalVisualScene,"compared to variable 0x11000003, script_2340",medium,community,m16.39
+,40,,0x04000028,0.1,,,,f32,Frame speed multiplier,script_2339,medium,community,m16.40
+,41,,0x14000029,0x3,,,,u32,Final animation frame,script_2340,medium,community,m16.41
+,42,,0x1400002A,0xF,,,,u32,"related to Name43, camera related",script_2340,medium,community,m16.42
+,43,,0x0400002B,35,,,,f32,(45 / this),script_2340,medium,community,m16.43
+,44,,0x1400002C,0x14,,,,u32,Final animation frame,script_2340,medium,community,m16.44
+,45,,0x1400002D,0x14,,,,u32,Background overlay transition frames,script_2340,medium,community,m16.45
+,46,,0x1400002E,0xA,,,,u32,[auto] read by native code (get_int at 0x02772610); meaning not traced,,low,reads: native 0x02772610 (fn 0x027725D4),m16.46
+,47,,0x0400002F,3,,,,f32,,,,,m16.47
+,48,,0x04000030,4,,,,f32,,,,,m16.48
+,49,,0x04000031,-20,,,,f32,,,,,m16.49
+,50,,0x04000032,10,,,,f32,,,,,m16.50
+,51,,0x04000033,300,,,,f32,,,,,m16.51
+,52,,0x04000034,11,,,,f32,,,,,m16.52
+,53,,0x04000035,0,,,,f32,,,,,m16.53
+,54,,0x04000036,20,,,,f32,,,,,m16.54
+,55,,0x04000037,15,,,,f32,,,,,m16.55
+,56,,0x04000038,-3,,,,f32,,,,,m16.56
+,57,,0x04000039,-5,,,,f32,,,,,m16.57
+,58,,0x1400003A,0x8,,,,u32,,,,,m16.58
+,59,,0x1400003B,0x14,,,,u32,,,,,m16.59
+,60,,0x0400003C,1,,,,f32,,,,,m16.60
+,61,,0x0400003D,32,,,,f32,,,,,m16.61
+,62,,0x0400003E,32,,,,f32,,,,,m16.62
+,63,,0x0400003F,32,,,,f32,,,,,m16.63
+,64,,0x04000040,10,,,,f32,,,,,m16.64
+,65,,0x04000041,0,,,,f32,,,,,m16.65
+17,0,,,0,,,,f32,,,,,m17[0].0
+,1,,,0,,,,f32,,,,,m17[0].1
+,2,,,0,,,,f32,,,,,m17[0].2
+,3,,,0x1,,,,u32,,,,,m17[0].3
+,4,,,1,,,,u8,,,,,m17[0].4
+,0,,,0,,,,f32,,,,,m17[1].0
+,1,,,0,,,,f32,,,,,m17[1].1
+,2,,,-6,,,,f32,,,,,m17[1].2
+,3,,,0x2,,,,u32,,,,,m17[1].3
+,4,,,0,,,,u8,,,,,m17[1].4
+,0,,,0,,,,f32,,,,,m17[2].0
+,1,,,0,,,,f32,,,,,m17[2].1
+,2,,,24,,,,f32,,,,,m17[2].2
+,3,,,0x0,,,,u32,,,,,m17[2].3
+,4,,,0,,,,u8,,,,,m17[2].4
+,0,,,0,,,,f32,,,,,m17[3].0
+,1,,,0,,,,f32,,,,,m17[3].1
+,2,,,24,,,,f32,,,,,m17[3].2
+,3,,,0x0,,,,u32,,,,,m17[3].3
+,4,,,0,,,,u8,,,,,m17[3].4
+,0,,,0,,,,f32,,,,,m17[4].0
+,1,,,0,,,,f32,,,,,m17[4].1
+,2,,,12,,,,f32,,,,,m17[4].2
+,3,,,0x0,,,,u32,,,,,m17[4].3
+,4,,,0,,,,u8,,,,,m17[4].4
+,0,,,0,,,,f32,,,,,m17[5].0
+,1,,,0,,,,f32,,,,,m17[5].1
+,2,,,12,,,,f32,,,,,m17[5].2
+,3,,,0x0,,,,u32,,,,,m17[5].3
+,4,,,0,,,,u8,,,,,m17[5].4
+,0,,,0,,,,f32,,,,,m17[6].0
+,1,,,0,,,,f32,,,,,m17[6].1
+,2,,,0,,,,f32,,,,,m17[6].2
+,3,,,0x0,,,,u32,,,,,m17[6].3
+,4,,,0,,,,u8,,,,,m17[6].4
+19,0,Neutral B,,b'ShootingArmL_AtkOn',,,,str,,,,,m18[0][0]
+,1,,,b'ShootingArmR_AtkOn',,,,str,,,,,m18[0][1]
+,2,,,b'ShootingLegL_AtkOn',,,,str,,,,,m18[0][2]
+,3,,,b'ShootingLegR_AtkOn',,,,str,,,,,m18[0][3]
+20,0,,,b'ShootingArmL_AtkOff',,,,str,,,,,m18[1][0]
+,1,,,b'ShootingArmR_AtkOff',,,,str,,,,,m18[1][1]
+,2,,,b'ShootingLegL_AtkOff',,,,str,,,,,m18[1][2]
+,3,,,b'ShootingLegR_AtkOff',,,,str,,,,,m18[1][3]
+21,0,,,0x18,0x3E8,0x6,0xA,u32,,,,,m19[*].0
+,1,,,0,0,1,1,f32,,,,,m19[*].1
+,2,,,0.6,0.6,0.7,0.7,f32,,,,,m19[*].2
+,3,,,2,2.5,0,0,f32,,,,,m19[*].3
+,4,,,0,0,180,0,f32,,,,,m19[*].4
+,5,,,0,0,-90,90,f32,,,,,m19[*].5
+,6,,,0,0,0,0,f32,,,,,m19[*].6
+22,0,,,18,0,0,0,f32,,,,,m20[*].0
+,1,,,0,0,0,0,f32,,,,,m20[*].1
+,2,,,2.6,0,0,0,f32,,,,,m20[*].2
+,3,,,0xB9,0x0,0x0,0x0,u32,,,,,m20[*].3
+,4,,,6,0,0,0,f32,,,,,m20[*].4
+,0,,,0x1,,,,u32,,,,,m21.0
+,1,,,1,,,,f32,,,,,m21.1
+,2,,,-1,,,,f32,,,,,m21.2
+,3,,,1,,,,f32,,,,,m21.3
+23,0,,,0x2000004,,,,u32,,,,,m22[0].0
+,1,,,1,,,,f32,,,,,m22[0].1
+,2,,,2,,,,f32,,,,,m22[0].2
+,3,,,0,,,,f32,,,,,m22[0].3
+,4,,,1,,,,f32,,,,,m22[0].4
+,5,,,0,,,,f32,,,,,m22[0].5
+24,0,,,0x8,,,,u32,,,,,m23[0].0
+,1,Unknown,,0x0,,,,u32,,,,,m23[0].1
+,2,,,0,,,,f32,,,,,m23[0].2
+,3,,,0,,,,f32,,,,,m23[0].3
+,4,,,1,,,,f32,,,,,m23[0].4
+,5,,,0,,,,f32,,,,,m23[0].5
+,6,,,0,,,,f32,,,,,m23[0].6
+,7,,,0,,,,f32,,,,,m23[0].7
+,8,,,1,,,,f32,,,,,m23[0].8
+,9,,,0.5,,,,f32,,,,,m23[0].9
+,10,,,1,,,,f32,,,,,m23[0].10
+,11,,,1,,,,f32,,,,,m23[0].11
+,12,,,0,,,,f32,,,,,m23[0].12
+,13,,,0,,,,f32,,,,,m23[0].13
+,0,,,0x32,,,,u32,,,,,m23[1].0
+,1,,,0x28,,,,u32,,,,,m23[1].1
+,2,,,32,,,,f32,,,,,m23[1].2
+,3,,,1.1,,,,f32,,,,,m23[1].3
+,4,,,0.4,,,,f32,,,,,m23[1].4
+,5,,,0.44,,,,f32,,,,,m23[1].5
+,6,,,0,,,,f32,,,,,m23[1].6
+,7,,,0,,,,f32,,,,,m23[1].7
+,8,,,1.5,,,,f32,,,,,m23[1].8
+,9,,,0.55,,,,f32,,,,,m23[1].9
+,10,,,0.7,,,,f32,,,,,m23[1].10
+,11,,,1,,,,f32,,,,,m23[1].11
+,12,,,0,,,,f32,,,,,m23[1].12
+,13,,,0,,,,f32,,,,,m23[1].13
+,0,,,0xE6,,,,u32,,,,,m23[2].0
+,1,,,0x28,,,,u32,,,,,m23[2].1
+,2,,,32,,,,f32,,,,,m23[2].2
+,3,,,1.1,,,,f32,,,,,m23[2].3
+,4,,,0.6,,,,f32,,,,,m23[2].4
+,5,,,0.44,,,,f32,,,,,m23[2].5
+,6,,,0,,,,f32,,,,,m23[2].6
+,7,,,0,,,,f32,,,,,m23[2].7
+,8,,,1.5,,,,f32,,,,,m23[2].8
+,9,,,0.5,,,,f32,,,,,m23[2].9
+,10,,,0.45,,,,f32,,,,,m23[2].10
+,11,,,1,,,,f32,,,,,m23[2].11
+,12,,,0,,,,f32,,,,,m23[2].12
+,13,,,0,,,,f32,,,,,m23[2].13
+25,0,Article params (bat),0x02000000,0,0,0,0,f32,,,,,m24[*].0
+,1,,0x02000001,0,0,0,0,f32,,,,,m24[*].1
+26,0,,,1,,,,f32,,,,,m25[0]
+,1,,,0.75,,,,f32,,,,,m25[1]
+,2,,,0.5,,,,f32,,,,,m25[2]
+,3,,,0.55,,,,f32,,,,,m25[3]
+,4,,,0.75,,,,f32,,,,,m25[4]
+,5,,,1.15,,,,f32,,,,,m25[5]
+,6,,,1.1,,,,f32,,,,,m25[6]
+,7,,,1,,,,f32,Multiplier,,medium,community,m25[7]
+27,0,,,0x3000001,,,,u32,,,,,m26[0].0
+,1,,,1,,,,f32,,,,,m26[0].1
+,2,,,1,,,,f32,,,,,m26[0].2
+,3,,,0,,,,f32,,,,,m26[0].3
+,4,,,1,,,,f32,,,,,m26[0].4
+,5,,,0,,,,f32,,,,,m26[0].5
+,0,,,0x3000002,,,,u32,,,,,m26[1].0
+,1,,,1,,,,f32,,,,,m26[1].1
+,2,,,1,,,,f32,,,,,m26[1].2
+,3,,,0,,,,f32,,,,,m26[1].3
+,4,,,1,,,,f32,,,,,m26[1].4
+,5,,,0,,,,f32,,,,,m26[1].5
+,0,,,0x3000003,,,,u32,,,,,m26[2].0
+,1,,,1,,,,f32,,,,,m26[2].1
+,2,,,1,,,,f32,,,,,m26[2].2
+,3,,,0,,,,f32,,,,,m26[2].3
+,4,,,1,,,,f32,,,,,m26[2].4
+,5,,,0,,,,f32,,,,,m26[2].5
+,0,,,0x3000007,,,,u32,,,,,m26[3].0
+,1,,,1,,,,f32,,,,,m26[3].1
+,2,,,1,,,,f32,,,,,m26[3].2
+,3,,,0,,,,f32,,,,,m26[3].3
+,4,,,1,,,,f32,,,,,m26[3].4
+,5,,,0,,,,f32,,,,,m26[3].5
+,0,,,0x3000008,,,,u32,,,,,m26[4].0
+,1,,,1,,,,f32,,,,,m26[4].1
+,2,,,1,,,,f32,,,,,m26[4].2
+,3,,,0,,,,f32,,,,,m26[4].3
+,4,,,1,,,,f32,,,,,m26[4].4
+,5,,,0,,,,f32,,,,,m26[4].5
+,0,,,0x3000009,,,,u32,,,,,m26[5].0
+,1,,,1,,,,f32,,,,,m26[5].1
+,2,,,1,,,,f32,,,,,m26[5].2
+,3,,,0,,,,f32,,,,,m26[5].3
+,4,,,1,,,,f32,,,,,m26[5].4
+,5,,,0,,,,f32,,,,,m26[5].5
+,0,,,0x300000A,,,,u32,,,,,m26[6].0
+,1,,,1,,,,f32,,,,,m26[6].1
+,2,,,1,,,,f32,,,,,m26[6].2
+,3,,,0,,,,f32,,,,,m26[6].3
+,4,,,1,,,,f32,,,,,m26[6].4
+,5,,,0,,,,f32,,,,,m26[6].5
+,0,,,0x300000B,,,,u32,,,,,m26[7].0
+,1,,,1,,,,f32,,,,,m26[7].1
+,2,,,1,,,,f32,,,,,m26[7].2
+,3,,,0,,,,f32,,,,,m26[7].3
+,4,,,1,,,,f32,,,,,m26[7].4
+,5,,,0,,,,f32,,,,,m26[7].5
+,0,,,0x3000014,,,,u32,,,,,m26[8].0
+,1,,,1,,,,f32,,,,,m26[8].1
+,2,,,1,,,,f32,,,,,m26[8].2
+,3,,,0,,,,f32,,,,,m26[8].3
+,4,,,1,,,,f32,,,,,m26[8].4
+,5,,,0,,,,f32,,,,,m26[8].5
+,0,,,0x3000015,,,,u32,,,,,m26[9].0
+,1,,,1,,,,f32,,,,,m26[9].1
+,2,,,1,,,,f32,,,,,m26[9].2
+,3,,,0,,,,f32,,,,,m26[9].3
+,4,,,1,,,,f32,,,,,m26[9].4
+,5,,,0,,,,f32,,,,,m26[9].5
+,0,,,0x3000016,,,,u32,,,,,m26[10].0
+,1,,,1,,,,f32,,,,,m26[10].1
+,2,,,1,,,,f32,,,,,m26[10].2
+,3,,,0,,,,f32,,,,,m26[10].3
+,4,,,1,,,,f32,,,,,m26[10].4
+,5,,,0,,,,f32,,,,,m26[10].5
+,0,,,0x3000017,,,,u32,,,,,m26[11].0
+,1,,,1,,,,f32,,,,,m26[11].1
+,2,,,1,,,,f32,,,,,m26[11].2
+,3,,,0,,,,f32,,,,,m26[11].3
+,4,,,1,,,,f32,,,,,m26[11].4
+,5,,,0,,,,f32,,,,,m26[11].5
+,0,,,0x3000018,,,,u32,,,,,m26[12].0
+,1,,,1,,,,f32,,,,,m26[12].1
+,2,,,0.8,,,,f32,,,,,m26[12].2
+,3,,,0,,,,f32,,,,,m26[12].3
+,4,,,1,,,,f32,,,,,m26[12].4
+,5,,,0,,,,f32,,,,,m26[12].5
+,0,,,0x3000019,,,,u32,,,,,m26[13].0
+,1,,,1,,,,f32,,,,,m26[13].1
+,2,,,0.6,,,,f32,,,,,m26[13].2
+,3,,,0,,,,f32,,,,,m26[13].3
+,4,,,1,,,,f32,,,,,m26[13].4
+,5,,,0,,,,f32,,,,,m26[13].5
+,0,,,0x1,,,,u32,,,,,m27.0
+,1,,,1,,,,f32,,,,,m27.1
+,2,,,-1,,,,f32,,,,,m27.2
+,3,,,1,,,,f32,,,,,m27.3
+18,0,Neutral B,,ShootingArmL_AtkOn,,,,,,community row not matched to a value of the vanilla file,low,community,
+20,0,,,0x18,,,,,Bone,community row not matched to a value of the vanilla file,low,community,
+20,1,,,0,,,,,X offset,community row not matched to a value of the vanilla file,low,community,
+20,2,,,0.6,,,,,Y offset,community row not matched to a value of the vanilla file,low,community,
+20,3,,,2,,,,,Z offset,community row not matched to a value of the vanilla file,low,community,
+20,4,,,0,,,,,RotX,community row not matched to a value of the vanilla file,low,community,
+20,5,,,0,,,,,RotY,community row not matched to a value of the vanilla file,low,community,
+20,6,,,0,,,,,RotZ,community row not matched to a value of the vanilla file,low,community,
+20,0,,,0x3E8,,,,,Bone,community row not matched to a value of the vanilla file,low,community,
+20,1,,,0,,,,,X offset,community row not matched to a value of the vanilla file,low,community,
+20,2,,,0.6,,,,,Y offset,community row not matched to a value of the vanilla file,low,community,
+20,3,,,2.5,,,,,Z offset,community row not matched to a value of the vanilla file,low,community,
+20,4,,,0,,,,,RotX,community row not matched to a value of the vanilla file,low,community,
+20,5,,,0,,,,,RotY,community row not matched to a value of the vanilla file,low,community,
+20,6,,,0,,,,,RotZ,community row not matched to a value of the vanilla file,low,community,
+20,0,,,0x6,,,,,Bone,community row not matched to a value of the vanilla file,low,community,
+20,1,,,1,,,,,X offset,community row not matched to a value of the vanilla file,low,community,
+20,2,,,0.7,,,,,Y offset,community row not matched to a value of the vanilla file,low,community,
+20,3,,,0,,,,,Z offset,community row not matched to a value of the vanilla file,low,community,
+20,4,,,180,,,,,RotX,community row not matched to a value of the vanilla file,low,community,
+20,5,,,-90,,,,,RotY,community row not matched to a value of the vanilla file,low,community,
+20,6,,,0,,,,,RotZ,community row not matched to a value of the vanilla file,low,community,
+20,0,,,0xA,,,,,Bone,community row not matched to a value of the vanilla file,low,community,
+20,1,,,1,,,,,X offset,community row not matched to a value of the vanilla file,low,community,
+20,2,,,0.7,,,,,Y offset,community row not matched to a value of the vanilla file,low,community,
+20,3,,,0,,,,,Z offset,community row not matched to a value of the vanilla file,low,community,
+20,4,,,0,,,,,RotX,community row not matched to a value of the vanilla file,low,community,
+20,5,,,90,,,,,RotY,community row not matched to a value of the vanilla file,low,community,
+20,6,,,0,,,,,RotZ,community row not matched to a value of the vanilla file,low,community,
+21,0,"Neutral B
+(specialn_bullet)",0x02000000,6,,,,,Firing angle from arm guns (degrees),community row not matched to a value of the vanilla file,low,community,
+21,1,,0x02000001,6,,,,,Firing angle from leg guns (degrees),community row not matched to a value of the vanilla file,low,community,
+21,2,,0x02000002,15,,,,,Bullet speed,community row not matched to a value of the vanilla file,low,community,
+21,3,,0x12000003,0xA,,,,,Duration (frames),community row not matched to a value of the vanilla file,low,community,
+21,4,,0x02000004,1,,,,,Hitbox/GFX size multiplier,community row not matched to a value of the vanilla file,low,community,
+22,2,,,2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
+26,0,"Walk Initial
+Multiplier",,0x3000001,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,6,"Walk Accel
+Multiplier",,0x3000002,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,1,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,5,"Walk Velocity
+Multiplier",,0x3000003,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,0,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,4,"Ground Friction
+Multiplier",,0x3000007,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,6,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,3,"Dash Initial
+Multiplier",,0x3000008,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,5,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,2,"Dash Accel A
+Multiplier",,0x3000009,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,4,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,1,"Dash Accel B
+Multiplier",,0x300000a,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,3,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,0,"Run Speed
+Multiplier",,0x300000b,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,2,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,6,"Air Accel A
+Multiplier",,0x3000014,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,1,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,5,"Air Accel B
+Multiplier",,0x3000015,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,0,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,4,"Air Speed
+Multiplier",,0x3000016,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,6,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,3,"Air Friction
+Multiplier",,0x3000017,,,,,,community row not matched to a value of the vanilla file,low,community,
+26,5,,,1,,,,,Multiplier,community row not matched to a value of the vanilla file,low,community,
+26,2,"Fall Speed
+Multiplier",,0x3000018,,,,,0x03000018,community row not matched to a value of the vanilla file,low,community,
+26,4,,,0.8,,,,,"Multiplier, used in Final Smash slowdown duration",community row not matched to a value of the vanilla file,low,community,
+26,1,"Gravity
+Multiplier",,0x3000019,,,,,0x03000019,community row not matched to a value of the vanilla file,low,community,
+26,3,,,0.6,,,,,"Multiplier, used in Final Smash slowdown duration",community row not matched to a value of the vanilla file,low,community,

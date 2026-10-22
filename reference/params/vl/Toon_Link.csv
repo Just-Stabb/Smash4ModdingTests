@@ -1,0 +1,146 @@
+Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
+13,0,Neutral B,0x05000000,60,30,80,60,f32,Time to fully charge (frames),"More velocity with lower value, ONLY affects charged arrows",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3448",m12[*].0
+,1,,0x05000001,1,2,1,1,f32,Charge animaton frame speed multiplier,Higher = Charge faster,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3446",m12[*].1
+,2,,0x05000002,5,7,0,5,f32,Firing angle (degrees),,medium,community,m12[*].2
+,3,,0x15000003,0x19,0x19,0x19,0x19,u32,Landing lag post firing (frames),,medium,community | reads: MSC kirby.mscsb func_2281,m12[*].3
+,4,,0x05000004,1,1,1,1,f32,Charge animaton set frames duration (FSM = Name1/Name4),Higher = Charge slower,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3448",m12[*].4
+14,0,Side B,0x06000000,0.1,0.1,0.25,0.1,f32,Something to do with boomerang angle,Anything above 1=cant angle boomerang,medium,community,m13[*].0
+,1,,0x06000001,35,15,90,35,f32,Angle of upward/downward boomerang throw (degrees),,medium,community,m13[*].1
+15,0,Up B,0x17000000,0x3C,0x3C,0x3C,0x3C,u32,Time to fully charge (frames),,medium,community,m14[*].0
+,1,,0x07000001,1.6,1.6,1.6,1.6,f32,Damage multiplier,,medium,community,m14[*].1
+,2,,0x07000002,1,1,1,1,f32,Charge animation set frame duration (FSM = 1 / this),Also increase damage the longer the charge is held,medium,community,m14[*].2
+,3,,0x07000003,2.17,1.25,1.45,2.17,f32,V speed,,medium,community | reads: native 0x02F851A4 (fn 0x02F8513C),m14[*].3
+,4,,0x07000004,0.55,0.4,0.42,0.55,f32,Gravity multiplier,,medium,community,m14[*].4
+,5,,0x07000005,0.4,0.95,0,0.4,f32,Not used in-game in Brawl,,medium,community,m14[*].5
+,6,,0x07000006,0.22,0,0,0.22,f32,H mobility,,medium,community,m14[*].6
+,7,,0x07000007,0.2,0,0,0.2,f32,H max mobility,,medium,community,m14[*].7
+,8,,0x07000008,1,1,1,1,f32,Height multiplier,,medium,community,m14[*].8
+,9,,0x17000009,0x1E,0x19,0x28,0x1E,u32,Landing lag (frames),,medium,community,m14[*].9
+16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,,m15[*]
+,0,"Dair?
+(Unused?)",0x04000000,8,,,,f32,Number of frames that Dair's hitbox reappears after said hitbox has connceted,,medium,community,m16.0
+,1,,0x14000001,0x2,,,,u32,Used on aerial attacks. Compared to 0x10000084,,medium,community,m16.1
+,2,Shield?,0x04000002,2.5,,,,f32,X scale of Bone = 0x2716,,medium,community,m16.2
+,3,,0x04000003,3.4,,,,f32,Y scale of Bone = 0x2716,,medium,community,m16.3
+,4,,0x04000004,0.8,,,,f32,Z scale of Bone = 0x2716,,medium,community,m16.4
+,5,,0x04000005,1.13,,,,f32,,,,,m16.5
+,6,Final Smash,0x04000006,6,,,,f32,Search bubble size,Attached to Bone ID=0x1A,medium,community,m16.6
+,7,,0x04000007,70,,,,f32,Search bubble Z offset,,medium,community,m16.7
+,8,,0x14000008,0xA,,,,u32,How many frames after successful hit he travels to opponent,,medium,community,m16.8
+,9,,0x04000009,8,,,,f32,Travel speed,,medium,community | reads: native 0x02F853C0 (fn 0x02F852A4),m16.9
+,10,,0x1400000A,0x1E,,,,u32,(frames),read on successful hit,low,"copied from Link (same layout, same position)",m16.10
+,11,,0x0400000B,0.05,,,,f32,[auto] read by native code (get_float at 0x02F854D0); meaning not traced,read on successful hit,low,reads: native 0x02F854D0 (fn 0x02F85464),m16.11
+17,0,Tether?,,0xB4,,,,u32,,,,,m17[0].0
+,1,,,10,,,,f32,,,,,m17[0].1
+,2,,,4,,,,f32,,,,,m17[0].2
+,3,,,2,,,,f32,,,,,m17[0].3
+,4,,,0x23,,,,u32,,,,,m17[0].4
+,5,,,0x5,,,,u32,,,,,m17[0].5
+,6,,,0x0,,,,u32,,,,,m17[0].6
+18,0,Boomerang,0x02000000,-0.5,-0.5,-0.5,-0.5,f32,Boomerang Y offset,"-16 = Higher, hits floor sooner than it should",medium,community,m18[*].0
+,1,,0x12000001,0xC8,0x190,0x6E,0xC8,u32,Duration of short Boomerang (frames),,medium,community,m18[*].1
+,2,,0x12000002,0xFA,0x1C2,0xB4,0xFA,u32,Duration of long Boomerang (frames),,medium,community,m18[*].2
+,3,,0x02000003,2.3,2.3,3.7,2.3,f32,Short Boomerang start velocity,,medium,community,m18[*].3
+,4,,0x02000004,2.8,2.8,4.9,2.8,f32,Long Boomerang start velocity,,medium,community,m18[*].4
+,5,,0x02000005,-68,-90,-20,-68,f32,Rotation of the actual Boomerang,,medium,community,m18[*].5
+,6,,0x02000006,-28,-90,-20,-28,f32,Y Rotation of the actual Boomerang,,medium,community,m18[*].6
+,7,,0x02000007,0.04,0.04,0.145,0.04,f32,Boomerang decceleration/resistance (Speed * this),,medium,community,m18[*].7
+,8,,0x02000008,2.3,1.1,5,2.3,f32,Returning Boomerang max speed (Speed + Name7 cannot be higher than this),,medium,community,m18[*].8
+,9,,0x02000009,0.3,0.1,0.55,0.3,f32,this * Name14,"Higher makes the 'rang reverse direction quicker and sharply, Lower makes the turnaround slower",medium,community,m18[*].9
+,10,,0x0200000A,43,43,43,43,f32,(degrees),Seems to VERY slightly do something near the turnaround point,medium,community,m18[*].10
+,11,,0x0200000B,0.86,1.85,5,0.86,f32,Boomerang homing max angle per frames (degrees),This was 0.85 deg in Brawl,medium,community,m18[*].11
+,12,,0x1200000C,0x6E,0xDC,0x0,0x6E,u32,Something to do with returning Boomerang homing,lowering makes it stop homing after awhile,medium,community,m18[*].12
+,13,,0x1200000D,0x0,0x1,0x0,0x0,u32,Frames,"Freezes if too high, right near turnaround point",low,"copied from Link (same layout, same position)",m18[*].13
+,14,,0x0200000E,1,1,1,1,f32,Speed multiplier?,,medium,community,m18[*].14
+,15,,0x1200000F,0x0,0x0,0x1,0x0,u32,Piercing capabilty,,medium,community,m18[*].15
+19,0,Arrow,0x12000000,0x3C,0xC8,0xB4,0x3C,u32,Lifetimes after stage impact (frames),,medium,community,m19[*].0
+,1,,0x02000001,2,1.1,2.1,2,f32,Uncharged arrow speed,Speed = (2 + (4.4 - 2) * Charged frames / 120) * Name8,medium,community,m19[*].1
+,2,,0x02000002,4.4,2.9,3.9,3.8,f32,Fully-charged arrow speed,,medium,community,m19[*].2
+,3,,0x02000003,4,2,3,4,f32,Uncharged arrow damage,Damage = (4 + (12 - 4) * Charged frames / 120) * Name5,medium,community,m19[*].3
+,4,,0x02000004,12,6,5,12,f32,Full charge arrow damage,,medium,community,m19[*].4
+,5,,0x02000005,1,1,1,1,f32,Damage multiplier,,medium,community,m19[*].5
+,6,,0x12000006,0x78,0x78,0x1A4,0x78,u32,Lifetime after firing (frames),,medium,community,m19[*].6
+,7,,0x02000007,0.015,0.125,0,0.015,f32,Arrow gravity,,medium,community,m19[*].7
+,8,,0x02000008,1,1,1,1,f32,Speed multiplier,,medium,community,m19[*].8
+,9,,0x12000009,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m19[*].9
+20,0,Tether,0x02000000,3.5,,,,f32,Grounded chain speed,,medium,community,m20[0].0
+,1,,0x02000001,20,,,,f32,Length of grounded chain,,medium,community,m20[0].1
+,2,,0x02000002,3.5,,,,f32,Aerial chain speed,,medium,community,m20[0].2
+,3,,0x02000003,22,,,,f32,Length of aerial chain,,medium,community,m20[0].3
+,4,,0x02000004,10,,,,f32,Chain speed?,,medium,community,m20[0].4
+,5,,0x02000005,48,,,,f32,,,,,m20[0].5
+,6,,0x02000006,0.1,,,,f32,,,,,m20[0].6
+,7,,0x12000007,0x8,,,,u32,Frames,,medium,community,m20[0].7
+,8,,0x02000008,1,,,,f32,,,,,m20[0].8
+,9,,0x02000009,1,,,,f32,,,,,m20[0].9
+21,0,Article params (takt),0x12000000,0x0,,,,u32,,,,,m21[0]
+22,0,Article params (fairy),0x12000000,0x0,,,,u32,,,,,m22[0]
+23,0,Shield Hurtbox,,-1,,,,f32,X offset,,medium,community,m23[0].0
+,1,,,-0.2,,,,f32,Y offset,,medium,community,m23[0].1
+,2,,,-0.7,,,,f32,Z offset,,medium,community,m23[0].2
+,3,,,0,,,,f32,X2 offset,,medium,community,m23[0].3
+,4,,,-0.2,,,,f32,Y2 offset,,medium,community,m23[0].4
+,5,,,-1,,,,f32,Z2 offset,,medium,community,m23[0].5
+,6,,,1.25,,,,f32,Size,,medium,community,m23[0].6
+,7,,,0x2716,,,,s32,Bone,,medium,community,m23[0].7
+,8,,,0x2,,,,s32,,,,,m23[0].8
+24,0,,,0x2000008,,,,u32,Boomerang weapon param Name14?,,low,"copied from Link (same layout, same position)",m24[0].0
+,1,,,1,,,,f32,,,,,m24[0].1
+,2,,,1.3,,,,f32,Multiplier?,,medium,community,m24[0].2
+,3,,,0,,,,f32,,,,,m24[0].3
+,4,,,1,,,,f32,,,,,m24[0].4
+,5,,,0,,,,f32,,,,,m24[0].5
+25,0,,,0x200000E,,,,u32,,,,,m25[0].0
+,1,,,1,,,,f32,,,,,m25[0].1
+,2,,,1.5,,,,f32,Multiplier?,,medium,community,m25[0].2
+,3,,,0,,,,f32,,,,,m25[0].3
+,4,,,1,,,,f32,,,,,m25[0].4
+,5,,,0,,,,f32,,,,,m25[0].5
+26,0,Bomb,,1,0.8,0.9,1,f32,Toss speed multiplier,,medium,community,m26[*].0
+,1,,,1,0.75,1.45,1,f32,Bomb model size multiplier,,medium,community,m26[*].1
+,2,,,300,150,70,300,f32,Explodes frames from generation,,medium,community,m26[*].2
+,3,,,96,96,75,96,f32,Duration of bomb flashing red in frames,,medium,community,m26[*].3
+,4,,,0.7,20,0.7,0.7,f32,Velocity required for bomb to detonate on impact with the ground,,medium,community,m26[*].4
+,5,,,0x1,0x0,0x1,0x1,u32,"0 = Bounces off fighters, 1 = Explodes on contact",,medium,community,m26[*].5
+27,0,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].0
+,1,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].1
+,2,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].2
+,3,,,0x4,0x10,0xA,0x3,u32,,,,,m27[*].3
+,4,,,0x46,0x19,0x4B,0x46,u32,,,,,m27[*].4
+,5,,,0x50,0x1E,0x4B,0x46,u32,,,,,m27[*].5
+,6,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].6
+,7,,,0x28,0x4B,0x37,0x28,u32,,,,,m27[*].7
+,8,,,12,14,17,12,f32,,,,,m27[*].8
+,9,,,0,0,0,0,f32,,,,,m27[*].9
+,10,,,0,0,0,0,f32,,,,,m27[*].10
+,11,,,0,0,0,0,f32,,,,,m27[*].11
+,12,,,0x5,0x5,0x5,0x5,u32,,,,,m27[*].12
+,13,,,0,0,0,0,f32,,,,,m27[*].13
+,14,,,1,1,1,1,f32,,,,,m27[*].14
+,15,,,1,1,1,1,f32,,,,,m27[*].15
+,16,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].16
+,17,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].17
+,18,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].18
+,19,,,0x0,0x1,0x0,0x0,u32,,,,,m27[*].19
+,20,,,0xB,0xB,0xB,0xB,u32,,,,,m27[*].20
+,21,,,0x3,0x3,0x3,0x3,u32,,,,,m27[*].21
+,22,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].22
+,23,,,0xC,0xC,0xC,0xC,u32,,,,,m27[*].23
+,24,,,0x3F,0x3F,0x3F,0x3F,u32,,,,,m27[*].24
+,25,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].25
+,26,,,0xF,0xF,0xF,0xF,u32,,,,,m27[*].26
+,27,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].27
+,28,,,0x1,0x1,0x1,0x1,u32,,,,,m27[*].28
+,29,,,0x1,0x1,0x1,0x1,u32,,,,,m27[*].29
+,30,,,0x1,0x1,0x1,0x1,u32,,,,,m27[*].30
+,31,,,0x64,0x64,0x64,0x64,u32,,,,,m27[*].31
+,32,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].32
+,33,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].33
+,34,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].34
+,35,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].35
+,36,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].36
+,37,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].37
+,38,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].38
+,39,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].39
+,40,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].40
+27,0 - 40,Bomb Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,
