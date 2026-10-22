@@ -74,6 +74,9 @@
     <Compile Include="GUI\CommandDefinitionsForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="GUI\CommandListForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="GUI\CodeEditor.cs">
       <SubType>Component</SubType>
     </Compile>

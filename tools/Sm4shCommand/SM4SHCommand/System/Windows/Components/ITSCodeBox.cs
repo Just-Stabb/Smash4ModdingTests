@@ -139,6 +139,34 @@ namespace Sm4shCommand
             return false;
         }
 
+        /// <summary>
+        /// Adds a line below the caret's line (in its place if it's blank), indented like it, and selects
+        /// the new line's first parameter value. One undo step. Used by View > Commands.
+        /// </summary>
+        public void InsertCommandLine(string text)
+        {
+            int l = Math.Max(0, Math.Min(Selection.Start.iLine, LinesCount - 1));
+            string cur = LinesCount > 0 ? Lines[l] : "";
+            string indent = cur.Substring(0, cur.Length - cur.TrimStart().Length);
+            int target;
+            if (cur.Trim().Length == 0)
+            {
+                Selection = new Range(this, 0, l, cur.Length, l);
+                InsertText(indent + text);
+                target = l;
+            }
+            else
+            {
+                Selection = new Range(this, cur.Length, l, cur.Length, l);
+                InsertText("\n" + indent + text);
+                target = l + 1;
+            }
+            var spans = ParameterValues(Lines[target]);
+            if (spans.Count > 0)
+                Selection = new Range(this, spans[0].Item1, target, spans[0].Item2, target);
+            DoSelectionVisible();
+        }
+
         public ITS_EDITOR()
         {
             this.TextChanged += NewBox_TextChanged;

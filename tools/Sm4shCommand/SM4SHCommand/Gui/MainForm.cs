@@ -32,6 +32,12 @@ namespace Sm4shCommand
 
             var defs = new ToolStripMenuItem("Command Definitions..", null, commandDefinitions_Click);
             toolsToolStripMenuItem.DropDownItems.Add(defs);
+            var cmdList = new ToolStripMenuItem("Commands..", null, commandList_Click)
+            {
+                ShortcutKeys = Keys.F1,
+                ToolTipText = "Every ACMD command, grouped by what it does, with its parameters; inserts one into the open script.",
+            };
+            viewToolStripMenuItem.DropDownItems.Add(cmdList);
             var varNames = new ToolStripMenuItem("Show variables as LA-Int[1] style") { CheckOnClick = true };
             varNames.Checked = FighterVariable.ShowDescriptiveNames = Runtime.GetSetting("DescriptiveVariableNames", false);
             varNames.CheckedChanged += (o, e) =>
@@ -1066,6 +1072,28 @@ namespace Sm4shCommand
                 return file.Scripts.TryGetValue(crc, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
             };
             new HitboxViewer(assets, page.EditorFor("game"), node.Identifier, node.Text, getScript).Show(this);
+        }
+
+        CommandListForm commandList;
+
+        // View > Commands (F1): one window, kept open beside the editor
+        private void commandList_Click(object sender, EventArgs e)
+        {
+            if (commandList == null || commandList.IsDisposed)
+                commandList = new CommandListForm(ActiveAcmdEditor) { Owner = this };
+            commandList.Show();
+            commandList.Activate();
+        }
+
+        /// <summary>The ACMD script editor in the selected tab, or null.</summary>
+        ITS_EDITOR ActiveAcmdEditor()
+        {
+            var editor = Viewport.SelectedTab as CodeEditor;
+            if (editor == null || editor.Controls.Count == 0)
+                return null;
+            var tabs = editor.Controls[0] as TabControl;
+            var box = tabs?.SelectedTab?.Controls.Count > 0 ? tabs.SelectedTab.Controls[0] as ITS_EDITOR : null;
+            return box != null && box.Script is ACMDScript ? box : null;
         }
 
         private void commandDefinitions_Click(object sender, EventArgs e)

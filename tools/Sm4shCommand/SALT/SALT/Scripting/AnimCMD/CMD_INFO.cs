@@ -2498,6 +2498,17 @@ namespace SALT.Moveset.AnimCMD
         public static Dictionary<uint, Dictionary<string, string>> PARAM_DESC = new Dictionary<uint, Dictionary<string, string>>();
 
         /// <summary>
+        /// Optional group of each command (Hitboxes, Effects, Sound, ...), for the command list.
+        /// </summary>
+        public static Dictionary<uint, string> CMD_CATEGORY = new Dictionary<uint, string>();
+
+        public static string GetCategory(uint crc)
+        {
+            string cat;
+            return CMD_CATEGORY.TryGetValue(crc, out cat) && !string.IsNullOrEmpty(cat) ? cat : "Other";
+        }
+
+        /// <summary>
         /// Looks a command up by name. An exact match wins (some names differ only by case, e.g. Else and
         /// ELSE are different commands); otherwise a case-insensitive match is used if there's only one.
         /// Returns false if there's no such command.
@@ -2581,6 +2592,7 @@ namespace SALT.Moveset.AnimCMD
         ///   parameter types, comma separated (0 int, 1 float, 2 decimal, 3 variable) or NONE
         ///   parameter names, comma separated, or NONE
         ///   description (optional, NONE = none)
+        ///   "Category: group" (optional, the command list's group)
         ///   "Param: Name = description" lines (optional, one per parameter)
         /// Lines starting with // are comments. Returns the number of definitions read;
         /// problems are added to <paramref name="errors"/> and that block is skipped.
@@ -2641,7 +2653,7 @@ namespace SALT.Moveset.AnimCMD
                     if (syntax.Length != types.Length)
                         throw new FormatException($"{types.Length} parameter types but {syntax.Length} parameter names");
 
-                    string desc = null;
+                    string desc = null, category = null;
                     var paramDesc = new Dictionary<string, string>();
                     for (int i = 4; i < block.Count; i++)
                     {
@@ -2654,6 +2666,8 @@ namespace SALT.Moveset.AnimCMD
                                 throw new FormatException("parameter description lines look like \"Param: Name = description\"");
                             paramDesc[body.Substring(0, eq).Trim()] = body.Substring(eq + 1).Trim();
                         }
+                        else if (line.StartsWith("Category:", StringComparison.OrdinalIgnoreCase))
+                            category = line.Substring(9).Trim();
                         else if (desc == null)
                             desc = line == "NONE" ? string.Empty : line;
                         else
@@ -2661,6 +2675,8 @@ namespace SALT.Moveset.AnimCMD
                     }
 
                     SetCMDInfo(crc, types.Length + 1, name, types, syntax, desc, paramDesc);
+                    if (!string.IsNullOrEmpty(category))
+                        CMD_CATEGORY[crc] = category;
                     count++;
                 }
                 catch (Exception e)
@@ -2690,6 +2706,7 @@ namespace SALT.Moveset.AnimCMD
             sb.AppendLine("//   parameter types, comma separated: 0 int, 1 float, 2 decimal, 3 variable (or NONE)");
             sb.AppendLine("//   parameter names, comma separated (or NONE)");
             sb.AppendLine("//   description shown in tooltips (optional; NONE = no description)");
+            sb.AppendLine("//   Category: group   (optional: the command list's group, View > Commands)");
             sb.AppendLine("//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)");
             sb.AppendLine("// Lines starting with // are comments. Tools > Command Definitions edits this file.");
             foreach (var pair in CMD_NAMES.OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase))
@@ -2710,6 +2727,9 @@ namespace SALT.Moveset.AnimCMD
                 sb.AppendLine(syntax);
                 var desc = GetDescription(crc);
                 sb.AppendLine(string.IsNullOrEmpty(desc) ? "NONE" : desc.Replace("\r", "").Replace("\n", " "));
+                string cat;
+                if (CMD_CATEGORY.TryGetValue(crc, out cat) && !string.IsNullOrEmpty(cat))
+                    sb.AppendLine("Category: " + cat);
                 Dictionary<string, string> pd;
                 if (PARAM_DESC.TryGetValue(crc, out pd))
                     foreach (var p in pd)
