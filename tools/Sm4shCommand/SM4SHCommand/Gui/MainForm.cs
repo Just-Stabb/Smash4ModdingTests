@@ -111,6 +111,65 @@ namespace Sm4shCommand
                 RefreshScriptNames();
             };
             viewToolStripMenuItem.DropDownItems.Add(animIds);
+
+            // Parameter jump (ITS_EDITOR.ProcessKey): a key selects the next parameter's value
+            Keys savedKey;
+            if (Enum.TryParse(Runtime.GetSettingText("ParamJumpKey", "Tab"), true, out savedKey) && savedKey != Keys.None)
+                ITS_EDITOR.ParamJumpKey = savedKey;
+            var paramJump = new ToolStripMenuItem() { CheckOnClick = true };
+            var paramJumpKey = new ToolStripMenuItem("Parameter Jump Key..");
+            Action jumpText = () =>
+            {
+                paramJump.Text = string.Format("Jump Between Parameters ({0}; Shift+{0}: back)", ITS_EDITOR.ParamJumpKey);
+                paramJump.ToolTipText = string.Format("In a script, {0} selects the next parameter's value on the line (e.g. from a Hitbox's\n" +
+                    "ID to its Bone, Damage, ...), so typing replaces it; Shift+{0} goes back. After the line's\n" +
+                    "last parameter it goes to the next line's first. Off: {0} works as usual.", ITS_EDITOR.ParamJumpKey);
+            };
+            jumpText();
+            paramJump.Checked = ITS_EDITOR.ParamJumpEnabled = Runtime.GetSetting("ParamJump", false);
+            paramJump.CheckedChanged += (o, e) =>
+            {
+                ITS_EDITOR.ParamJumpEnabled = paramJump.Checked;
+                Runtime.SetSetting("ParamJump", paramJump.Checked);
+            };
+            paramJumpKey.Click += (o, e) =>
+            {
+                using (var dlg = new Form())
+                {
+                    dlg.Text = "Parameter Jump Key";
+                    dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    dlg.MinimizeBox = dlg.MaximizeBox = false;
+                    dlg.StartPosition = FormStartPosition.CenterParent;
+                    dlg.ClientSize = new Size(360, 110);
+                    Keys chosen = ITS_EDITOR.ParamJumpKey;
+                    var label = new Label { Left = 12, Top = 10, Width = 336, Height = 30, Text = "Press the key that jumps to the next parameter (Shift + it goes back):" };
+                    var box = new TextBox { Left = 12, Top = 44, Width = 336, ReadOnly = true, Text = chosen.ToString() };
+                    box.PreviewKeyDown += (s, k) => k.IsInputKey = true;    // Tab, arrows, ... reach KeyDown
+                    box.KeyDown += (s, k) =>
+                    {
+                        var code = k.KeyCode;
+                        if (code != Keys.ShiftKey && code != Keys.ControlKey && code != Keys.Menu && code != Keys.Escape)
+                        {
+                            chosen = code;
+                            box.Text = code.ToString();
+                        }
+                        k.SuppressKeyPress = k.Handled = true;
+                    };
+                    var ok = new Button { Text = "OK", Left = 192, Top = 76, Width = 75, DialogResult = DialogResult.OK };
+                    var cancel = new Button { Text = "Cancel", Left = 273, Top = 76, Width = 75, DialogResult = DialogResult.Cancel };
+                    dlg.Controls.AddRange(new Control[] { label, box, ok, cancel });
+                    dlg.CancelButton = cancel;
+                    dlg.Shown += (s, k) => box.Focus();
+                    if (dlg.ShowDialog(this) != DialogResult.OK)
+                        return;
+                    ITS_EDITOR.ParamJumpKey = chosen;
+                    Runtime.SetSettingText("ParamJumpKey", chosen.ToString());
+                    jumpText();
+                }
+            };
+            viewToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            viewToolStripMenuItem.DropDownItems.Add(paramJump);
+            viewToolStripMenuItem.DropDownItems.Add(paramJumpKey);
             viewToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
             viewToolStripMenuItem.DropDownItems.Add(decimalInts);
             viewToolStripMenuItem.DropDownItems.Add(floatBits);

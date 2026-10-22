@@ -33,6 +33,112 @@ namespace Sm4shCommand
 
         public AutocompleteMenu AutocompleteMenu { get; set; }
 
+        // ---------------------------------------------------------------- parameter jump
+        //
+        // View > Jump Between Parameters: ParamJumpKey (Tab by default) selects the next parameter's
+        // value on the line (Shift + the key: the previous one), so typing replaces it; past the line's
+        // last parameter it goes on to the next line that has some. Off: the key does what it did.
+
+        public static bool ParamJumpEnabled;
+        public static Keys ParamJumpKey = Keys.Tab;
+
+        public override bool ProcessKey(Keys keyData)
+        {
+            if (ParamJumpEnabled && (keyData & Keys.KeyCode) == ParamJumpKey && (keyData & (Keys.Control | Keys.Alt)) == 0
+                && JumpToParameter((keyData & Keys.Shift) != 0))
+                return true;
+            return base.ProcessKey(keyData);
+        }
+
+        /// <summary>
+        /// The value spans (start, end: character indices) of a line's parameters: the text after
+        /// "Name=" (or the whole parameter without a name) up to the next ',' or ')', trimmed, in every
+        /// parameter list on the line (a parameter that holds a call, as if(Bit_Variable_Test(...)),
+        /// gives its call's values instead). Nothing for a line without one; "//" ends the line.
+        /// </summary>
+        public static List<Tuple<int, int>> ParameterValues(string line)
+        {
+            var spans = new List<Tuple<int, int>>();
+            int comment = line.IndexOf("//", StringComparison.Ordinal);
+            if (comment >= 0)
+                line = line.Substring(0, comment);
+            var start = new Stack<int>();       // the open lists' current parameter starts
+            var nested = new Stack<bool>();     // ... and whether that parameter holds a list
+            bool quoted = false;
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '"')
+                    quoted = !quoted;
+                if (quoted)
+                    continue;
+                if (c == '(' || c == '[')
+                {
+                    if (nested.Count > 0)
+                    {
+                        nested.Pop();
+                        nested.Push(true);
+                    }
+                    start.Push(i + 1);
+                    nested.Push(false);
+                }
+                else if (start.Count > 0 && (c == ',' || c == ')' || c == ']'))
+                {
+                    if (!nested.Pop())
+                        AddValue(line, start.Peek(), i, spans);
+                    start.Pop();
+                    if (c == ',')
+                    {
+                        start.Push(i + 1);
+                        nested.Push(false);
+                    }
+                }
+            }
+            return spans;
+        }
+
+        static void AddValue(string line, int from, int to, List<Tuple<int, int>> spans)
+        {
+            int eq = line.IndexOf('=', from, to - from);
+            int s = eq >= 0 ? eq + 1 : from, e = to;
+            while (s < e && char.IsWhiteSpace(line[s])) s++;
+            while (e > s && char.IsWhiteSpace(line[e - 1])) e--;
+            if (e > s)
+                spans.Add(Tuple.Create(s, e));
+        }
+
+        /// <summary>
+        /// Selects the next (or previous) parameter value from the caret; false if the script has none.
+        /// </summary>
+        public bool JumpToParameter(bool back)
+        {
+            var sel = Selection.Clone();
+            sel.Normalize();
+            int line = sel.Start.iLine, at = sel.Start.iChar;
+            bool empty = sel.IsEmpty;
+            for (int n = 0; n < LinesCount; n++)
+            {
+                int l = back ? line - n : line + n;
+                if (l < 0 || l >= LinesCount)
+                    break;
+                var spans = ParameterValues(Lines[l]);
+                if (spans.Count == 0)
+                    continue;
+                Tuple<int, int> pick;
+                if (n == 0)
+                    pick = back ? spans.LastOrDefault(s => s.Item1 < at)
+                                : spans.FirstOrDefault(s => s.Item1 > at || s.Item1 == at && empty);
+                else
+                    pick = back ? spans.Last() : spans.First();
+                if (pick == null)
+                    continue;
+                Selection = new Range(this, pick.Item1, l, pick.Item2, l);
+                DoSelectionVisible();
+                return true;
+            }
+            return false;
+        }
+
         public ITS_EDITOR()
         {
             this.TextChanged += NewBox_TextChanged;
