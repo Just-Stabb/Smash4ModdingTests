@@ -6,7 +6,7 @@ when he has no copy ability or isn't Kirby.
   python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/trait_badge_cave.py)
 
 Kirby's MSC (fighters/kirby/kirby.c kirby_trait_update) writes int 0x1000008E = 0x4B49xxxx every
-frame, bits 8-11 the trait (0 none, 1 Normal, 2 Rush, 3 Zoning, 4 Strike, 5 Juggernaut, 6 Technical).
+frame, bits 8-11 the trait (0 none, 1 Normal, 2 Rush, 3 Shooter, 4 Strike, 5 Juggernaut, 6 Technical).
 
 Native details (research: docs/flx2-format.md, docs/native-notes.md "Damage panel"):
   hook        the damage panel's per-frame update, its vtable's +0x3C (0x100871D8 + 0x3C =

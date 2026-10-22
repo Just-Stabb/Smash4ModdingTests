@@ -291,7 +291,7 @@ Renders of the samples: `flx_render.py` with, for example, `ko_mc=num_7` or `col
 4. `flx.write` recomputes every count, size, offset (transform offsets included) and the keyframe list
    indices. The unknown header words are left alone.
 
-The badge adds sprite **0x5F**: 6 frames (`normal`, `rush`, `zoning`, `strike`, `juggernaut`,
+The badge adds sprite **0x5F**: 6 frames (`normal`, `rush`, `shooter`, `strike`, `juggernaut`,
 `technical`), one 256×64 image each, with no actions. `trait_mc` is placed in panel sprites 1–4 at:
 
 | panel sprite | trait_mc (x, y), scale |

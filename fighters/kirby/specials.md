@@ -857,13 +857,13 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   full loop (`rapidjab_loop()`) plays the finisher (`rapidjab_cancel()` keeps flag `0x21000015`
   on for the first loop and turns it off on release after that).
 - **Rapid jab cancel:** after one full loop (`global71` frames in the loop ≥ the loop motion's
-  length) and before the final hit (finisher motion `0x55`, its hitbox at frame
+  length) and until the frame before the final hit (finisher motion `0x55`, its hitbox at frame
   `rapidjab_final_frame()` = 5), `rapidjab_cancel()` (top of the loop `func_337`) goes into any
   attack from the command bits in `global24`: tilts `0x2`/`0x4`/`0x8` → `0x28`/`0x29`/`0x2A`,
   smashes `0x10`/`0x20`/`0x40` → `0x2B`/`0x31`/`0x2E`, specials `0x2000`/`0x4000`/`0x8000`/`0x1000`
   → `0x153`/`0x154`/`0x155`/`0x152`, grab `0x20000000` → Catch `0x35` (checked first).
-  Plain jab isn't included (mashing A keeps it going). Not from the finisher's hit frame
-  (`rapidjab_final_frame()`, 5) on, except with **Overdrive** (`global83`): then the finisher can be
+  Plain jab isn't included (mashing A keeps it going). Not from the frame before the finisher's hit
+  (`rapidjab_cancel_end_frame()`, 4) on (user), except with **Overdrive** (`global83`): then the finisher can be
   cancelled too, during and after its hit (that was the whole Rush trait's before; user).
 - **Neutral air = rapid jab:** `func_310` plays rapid jab's loop motion `0x54` (animation and its
   ACMD, which calls the hit `0xDCD907DA` every 4 frames and loops) instead of AttackAirN `0x68`.
@@ -877,13 +877,13 @@ damage, ×1.2 speed, up to 999 damage, ×1.2 lifetime. If the swing status ends 
   Landing goes straight to LandingAir (`0x18`) from `nair_rapid_update()` whenever Kirby touches
   the ground in the loop or finisher, instead of relying on flag `0x2100000D` (with only the
   flag, it landed with almost no lag in-game).
-- **Air rapid jab cancel (`nair_rapid_cancel()`):** after one loop and before the final hit:
+- **Air rapid jab cancel (`nair_rapid_cancel()`):** after one loop and until the frame before the final hit:
   grab → Kirby's air grab (`airgrab_try()`, same once-per-airtime / item / after-forward-throw
   limits as `airgrab_check()`, without the aerial-transition check), specials → `func_58`
   (air specials enabled with `0x1F00000A`), attack with a direction (command bits `0x2`–`0x40`)
   → `func_63` (aerials enabled with `0x1F00000E`). Plain attack doesn't cancel; it would only
-  restart neutral air. The finisher can't be cancelled from its hit's frame
-  (`rapidjab_final_frame()`, 5) on, except with **Overdrive** (`global83`), where it can be
+  restart neutral air. The finisher can't be cancelled from the frame before its hit
+  (`rapidjab_cancel_end_frame()`, 4) on (user), except with **Overdrive** (`global83`), where it can be
   cancelled during and after its hit (that was the whole Rush trait's before; user).
 - **Air hitboxes (loop 60% damage, finisher 65% knockback):** neutral air sets status flag
   `0x21000024` (`nair_rapid_air_flag()`) when it starts. `tools/kirby_rapid_air_acmd.py` turns

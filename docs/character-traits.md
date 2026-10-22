@@ -5,7 +5,7 @@ trait's changes (Kirby's MSC: `kirby_copy_trait()` / `kirby_trait_update()` at t
 `fighters/kirby/kirby.c`). **Add a character here (and to `kirby_copy_trait()`) the first time we
 work on them, with the trait the user specifies.**
 
-Traits: **Rush**, **Zoning**, **Strike**, **Juggernaut**, **Normal**, **Technical**.
+Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technical**.
 
 | Character | Kind (ID) | Trait |
 |---|---|---|
@@ -28,7 +28,7 @@ Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy k
 |---|---|
 | Rush | ×1.25 movement stats: walk (`0x01`–`0x03`), dash / run (`0x08`–`0x0B`), jump horizontal speed (`0x0D`, `0x0F`, `0x10`), air acceleration and max air speed (`0x14`–`0x16`), max fall and fast fall speed (`0x19`, `0x1B`). Not jump height (`0x11`–`0x13`), gravity (`0x18`, it would change jump height), traction or landing lag. Neutral air is the air rapid jab. |
 | Strike | ×1.15 damage on Kirby's own hitboxes (anything that isn't a projectile / article: those are separate objects), ×1.2 hitstop for the opponent, Kirby's own hitstop unchanged. Native (`tools/strike_cave.py`, marker bit `0x8` from `kirby_trait_flags()`). Throws ×1.15 too. Knockback goes up with the damage, as it does for any harder hit. Not `Change_Hitbox_Damage`. **Critical hits:** each smash attack has a 1 in 8 chance (rolled at the windup, `strike_crit_*()`) to double the Strike values: ×2 damage on top of ×1.15 (×2.3), and exactly 2× the Strike hitstop for both Kirby (2× his normal) and the opponent (marker bit `0x10`), with a close camera zoom on Kirby when it connects. **Neutral air:** jab 2 in the air (1.6 / 1.4 frame duration, 6% / 43° hitbox, 1.2× hitstun, air grab cancel from frame 4, special cancel any time; `fighters/kirby/specials.md`). |
-| Zoning | none yet |
+| Shooter | none yet |
 | Juggernaut | none yet |
 | Normal | none yet |
 | Technical | none yet |
@@ -50,7 +50,7 @@ writes that), it multiplies the stats of profile `xxxx & 0xF`:
 | 2 | Overdrive (below) | the Rush list | 1.25 × 1.2 = 1.5 |
 
 Kirby's MSC writes the int every frame (`kirby_trait_profile()`); bits 8-11 hold the trait number
-(0 none, 1 Normal, 2 Rush, 3 Zoning, 4 Strike, 5 Juggernaut, 6 Technical) for the damage panel's
+(0 none, 1 Normal, 2 Rush, 3 Shooter, 4 Strike, 5 Juggernaut, 6 Technical) for the damage panel's
 trait badge: Kirby's panel shows the trait (icon + name, art from tools/trait_badge_art.py) while he
 has a copy (tools/trait_badge_cave.py in the executable, tools/dmg_trait_badge.py adds the element to
 ui/info/dmg; docs/native-notes.md "Damage panel"). A new trait with stat changes

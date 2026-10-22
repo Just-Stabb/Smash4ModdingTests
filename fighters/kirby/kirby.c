@@ -72383,7 +72383,8 @@ void falconpunch_hold_update()
 // - Rapid jab loops while the attack button is held; releasing it goes straight to the finisher.
 //   global71 = frames spent looping (reset in the Attack100 main func_336).
 // - After one full loop (global71 >= the loop motion's length, MotionModule(0, 0x54), else
-//   rapidjab_loop_frames()), rapid jab can be cancelled into any attack before its final hit: tilts, smashes and
+//   rapidjab_loop_frames()), rapid jab can be cancelled into any attack until the frame before its final hit
+//   (rapidjab_cancel_end_frame()): tilts, smashes and
 //   specials (from the command bits in global24: 0x2/0x4/0x8 tilts, 0x10/0x20/0x40 smashes,
 //   0x1000-0x8000 specials) and grab (0x20000000 -> Catch 0x35). Plain jab (0x1) isn't
 //   included, so mashing A keeps the rapid jab going. The final hit is the finisher's hitbox at frame rapidjab_final_frame() (5,
@@ -72396,11 +72397,13 @@ void falconpunch_hold_update()
 //   alone it landed with almost no lag). Once the finisher's hit is out (frame rapidjab_final_frame()), global75 = 1 and the
 //   landing (func_586 -> nair_rapid_landing) plays at nair_rapid_landing_mult() (half) the lag.
 //   Neutral air sets nair_rapid_air_flag() so the ACMD uses the air hitboxes: loop hits at 60%
-//   damage, finisher at 65% knockback (tools/kirby_rapid_air_acmd.py). After one loop and before the final
-//   hit, air rapid jab cancels into the air grab, air specials and the other aerials
+//   damage, finisher at 65% knockback (tools/kirby_rapid_air_acmd.py). After one loop and until the frame
+//   before the final hit, air rapid jab cancels into the air grab, air specials and the other aerials
 //   (nair_rapid_cancel). global70 = neutral air frame count.
 // ===================================================================
 float rapidjab_final_frame() { return 5.0f; }
+// Cancels (ground and air rapid jab) end this frame of the finisher: the frame before its hit
+float rapidjab_cancel_end_frame() { return rapidjab_final_frame() - 1.0f; }
 int   nair_rapid_air_flag()  { return 0x21000024; } // status flag the loop / finisher ACMD check for their air hitboxes
 float nair_rapid_landing_mult() { return 0.5f; }  // landing lag after the air final hit, times neutral air's
 float nair_rapid_drift_mult()   { return 0.7f; }  // air drift (max stick air speed) during air rapid jab, times normal
@@ -72445,12 +72448,12 @@ int rapidjab_cancel()
             WorkModule(0x2711, 0x21000015);
         }
     }
-    // cancels only after one full loop, and not once the finisher's hit is out
+    // cancels only after one full loop, and not from the frame before the finisher's hit
     if (global71 < loop)
     {
         return 0;
     }
-    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_final_frame() && !global83)
+    if (state == 0x2 && MotionModuleF(0x1) >= rapidjab_cancel_end_frame() && !global83)
     {
         return 0; // (Overdrive: the finisher can be cancelled too, during and after its hit)
     }
@@ -72517,10 +72520,10 @@ int nair_rapid_update()
         if (MotionModuleF(0x1) >= rapidjab_final_frame())
         {
             global75 = 0x1; // final hit out: half landing lag from here (nair_rapid_landing)
-            if (!global83)
-            {
-                return 0; // (Overdrive: the finisher can be cancelled too, during and after its hit)
-            }
+        }
+        if (MotionModuleF(0x1) >= rapidjab_cancel_end_frame() && !global83)
+        {
+            return 0; // no cancel from the frame before the final hit (Overdrive: the finisher can be cancelled too)
         }
     }
     else
@@ -72732,7 +72735,7 @@ void nair_rapid_drift()
 //         fall / fast fall speed; not jump height), and neutral air is the air rapid jab.
 //   Strike: x1.15 damage on Kirby's own hitboxes (not projectiles), x1.2 hitstop for the opponent,
 //         his own hitstop unchanged (tools/strike_cave.py, marker bit 0x8).
-//   Zoning, Juggernaut, Normal, Technical: no changes yet.
+//   Shooter, Juggernaut, Normal, Technical: no changes yet.
 // Stat boosts need the patched cross_f.rpx (tools/kirby_stat_cave.py): the stats are shared data,
 // so the executable scales them when they're read, for an object whose int 0x1000008E holds
 // 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile(); bits 8-11 the trait number).
@@ -72740,7 +72743,7 @@ void nair_rapid_drift()
 int trait_none()       { return 0; }
 int trait_normal()     { return 1; }
 int trait_rush()       { return 2; }
-int trait_zoning()     { return 3; }
+int trait_shooter()    { return 3; }
 int trait_strike()     { return 4; }
 int trait_juggernaut() { return 5; }
 int trait_technical()  { return 6; }

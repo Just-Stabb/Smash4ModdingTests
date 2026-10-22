@@ -1,7 +1,7 @@
 # Notes for Claude
 
 - **Character traits:** the first time we work on a character, ask the user for its trait (Rush,
-  Zoning, Strike, Juggernaut, Normal or Technical) if they haven't given one, and add it to
+  Shooter, Strike, Juggernaut, Normal or Technical) if they haven't given one, and add it to
   `docs/character-traits.md` and `kirby_copy_trait()` in `fighters/kirby/kirby.c` (rebuild
   `kirby.mscsb`). Kirby's copy of that character gets the trait's changes.
 - **Roll-off** (`docs/universal-mechanics.md`), **reverse tilts** and **up / down tilt, down smash
