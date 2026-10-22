@@ -226,6 +226,9 @@ def _position_lines():
     out.append((0x0F000331, "Tracking frames left", "Read: frames of Track_Target left (-1 = until stopped). Write: set them; 0 stops tracking. Needs tools/acmd_ext_cave.py."))
     out.append((0x0F000332, "Speed X", "Read only: the object's current X speed (all its kinetic energies). Needs tools/acmd_ext_cave.py."))
     out.append((0x0F000333, "Speed Y", "Read only: the object's current Y speed (all its kinetic energies). Needs tools/acmd_ext_cave.py."))
+    for i, (nm, d) in enumerate((("Team", "the object's team (-1 = none)"), ("Hurt team", "the team whose attacks can't hit it (-1 = none); Track_Target skips a fighter whose hurt team is the tracker's attack team"),
+                                 ("Attack team", "the team its attacks can't hit (-1 = none; a projectile's is its owner's, or the reflector's after a reflect)"))):
+        out.append((0x0F000334 + i, nm, "Read only: %s. Needs tools/acmd_ext_cave.py." % d))
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(STATE_QUANTITIES):
             out.append((0x0F0000A0 + 8 * t + q, "%s %s" % (tn, qn.lower().replace("_", " ")), "Target: %s.\\n%s" % (td, qd)))
@@ -284,7 +287,8 @@ def alias_lines():
     out += [("VAR_%d" % i, 0x0F000300 + i, "user variable (per object)" if i == 0 else "") for i in range(32)]
     out += [("TIMER_%d" % i, 0x0F000320 + i, "counts down each frame to 0 (per object)" if i == 0 else "") for i in range(16)]
     out += [("KINETIC_TYPE", 0x0F000330, "read / set the kinetic type"), ("TRACK_FRAMES", 0x0F000331, "Track_Target frames left; 0 stops"),
-            ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, "")]
+            ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, ""),
+            ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, "")]
     return out
 
 

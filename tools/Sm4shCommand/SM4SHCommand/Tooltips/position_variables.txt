@@ -162,6 +162,9 @@
 0x0F000331 = Tracking frames left | Read: frames of Track_Target left (-1 = until stopped). Write: set them; 0 stops tracking. Needs tools/acmd_ext_cave.py.
 0x0F000332 = Speed X | Read only: the object's current X speed (all its kinetic energies). Needs tools/acmd_ext_cave.py.
 0x0F000333 = Speed Y | Read only: the object's current Y speed (all its kinetic energies). Needs tools/acmd_ext_cave.py.
+0x0F000334 = Team | Read only: the object's team (-1 = none). Needs tools/acmd_ext_cave.py.
+0x0F000335 = Hurt team | Read only: the team whose attacks can't hit it (-1 = none); Track_Target skips a fighter whose hurt team is the tracker's attack team. Needs tools/acmd_ext_cave.py.
+0x0F000336 = Attack team | Read only: the team its attacks can't hit (-1 = none; a projectile's is its owner's, or the reflector's after a reflect). Needs tools/acmd_ext_cave.py.
 0x0F0000A0 = Self hit | Target: this fighter.\nRead: 1 once its current attack has connected (until the move ends), else 0.
 0x0F0000A1 = Self hit now | Target: this fighter.\nRead: 1 only on the frame its attack connects, else 0.
 0x0F0000A2 = Self status | Target: this fighter.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).

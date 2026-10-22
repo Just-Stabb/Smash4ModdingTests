@@ -69,6 +69,8 @@ script).
 | TurnRate | float | The most the direction can turn per frame, in degrees. 0 (or 180 and up) points straight at the target every frame. |
 | Range | float | Only targets within this X/Y distance count. 0 means any distance. With no target in range, the object keeps going as it was. |
 | Mode | int | Bit 1: horizontal only (height is ignored; fighters keep their gravity). Bit 2: fighters turn to face the target. |
+| TargetOwner | int | 1: a projectile may also target the fighter who fired it (normally skipped). |
+| TargetTeammates | int | 1: teammates are targets too. Normally a fighter on the tracker's team is skipped when the game wouldn't let the tracker hit them. |
 
 - **When it runs:** every frame the object moves (not during hitlag), right after its script for
   that frame.
@@ -83,15 +85,69 @@ script).
   - Sets their speed the way Kirby's side-B homing does: X and Y speed, no braking and, unless
     horizontal only, no gravity while tracking.
   - It works in the air. On the ground the fighter's status may move them its own way.
-- **Targets:** teams aren't considered, so teammates can be targeted.
+- **Teams:** a fighter is skipped when their "hurt team" equals the tracker's "attack team". That
+  is the pair the game compares when deciding whether an attack can hit someone, so these are the
+  teammates the tracker couldn't hit anyway.
+  - A projectile's attack team is its owner's, or the reflector's after a reflect.
+  - In free-for-all the teams are presumably all different or none, so nobody is skipped.
+  - **Not confirmed in game:** that turning team attack on changes the hurt teams, so that
+    teammates become targets automatically. The team-attack setting itself wasn't found in the
+    game code.
+  - The read-only variables `TEAM`, `HURT_TEAM` and `ATTACK_TEAM` (below) show the values.
+    Comparing them in a team battle with team attack on and off settles it. If team attack doesn't
+    change them, teammates stay skipped either way, and `TargetTeammates=1` includes them.
 - **Untested in game:** projectiles whose movement isn't their first energy won't turn. Tell me
   which one and I'll look at it.
 
 Example: a projectile that homes for 60 frames at speed 1.8, turning at most 4° a frame.
 
 ```
-Track_Target(Frames=60, Speed=1.8, TurnRate=4.0, Range=0.0, Mode=0)
+Track_Target(Frames=60, Speed=1.8, TurnRate=4.0, Range=0.0, Mode=0, TargetOwner=0, TargetTeammates=0)
 ```
+
+## Thread_Start / Thread_Stop
+
+`Thread_Start(ID, Flags){ ... }` runs the commands in its block on their own, frame by frame, while
+the script goes on past the block.
+
+- **What can stop it:** nothing about the script itself. The thread keeps running after the
+  animation ends or switches, and while the character is KO'd.
+- **When it ends:** at the end of its block, at `Thread_Stop(ID)`, or when the object is set up
+  again. For a projectile, that means its next use.
+- **Inside the block:** any command works, including `FRAME`, `WAIT`, `If` / `True` / `Else`, loops,
+  hitboxes, effects, sounds and `CALL`. `FRAME` counts from the thread's start.
+- **Timing:**
+  - The thread's first frame is the frame after `Thread_Start`.
+  - It runs 1 frame per game frame, whatever the animation's speed.
+  - It pauses while the object is in hitlag, unless Flags bit 1 is set.
+
+| Parameter | Meaning |
+|---|---|
+| Offset | Words to the end of the block. Sm4shCommand fills it in from the braces, like `True`'s. |
+| ID | Any number. Running `Thread_Start` with an ID that's already running restarts that thread. `Thread_Stop(ID)` stops it; `Thread_Stop(-1)` stops all of this object's threads. |
+| Flags | Bit 1: keep running during hitlag. |
+
+Sm4shCommand ends the block with a `Script_End` when it compiles, and doesn't show it when it
+decompiles. The script itself jumps over the block, so it never reaches that `Script_End`.
+
+Example: a lingering explosion 30 frames after the move, whatever the fighter is doing by then.
+
+```
+Thread_Start(Offset=0, ID=1, Flags=0){
+    FRAME(Frames=30)
+    Graphic_Effect(...)
+    Hitbox(ID=3, ...)
+    WAIT(Frames=3)
+    Remove_Hitbox(ID=3)
+}
+```
+
+- **Capacity:** up to 32 threads at once, across all objects.
+- **KO'd fighters:** thread hitboxes made while the fighter is in a KO status may be ignored by the
+  game.
+- **Kirby:** don't leave a thread running in a copy ability's script when Kirby can lose the copy.
+  The script it runs may be unloaded with the copy, and the game would crash.
+- **Untested in game:** whether a respawn counts as "set up again" and ends the threads.
 
 ## Variables, timers and the kinetic type
 
@@ -113,6 +169,7 @@ the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`.
 | `0x0F000330` | `KINETIC_TYPE` | the current kinetic type, the one `Set_Kinetic_Handler` sets | change it (projectiles too) |
 | `0x0F000331` | `TRACK_FRAMES` | `Track_Target` frames left (-1 = until stopped) | set them; 0 stops tracking |
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
+| `0x0F000334` / `335` / `336` | `TEAM` / `HURT_TEAM` / `ATTACK_TEAM` | the object's team ids (-1 = none) | — |
 
 Example: the move hits harder if it's used again within 2 seconds (120 frames) of its last use.
 `Method=5` is "greater than" (0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`).

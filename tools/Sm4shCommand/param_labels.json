@@ -1189,7 +1189,7 @@
   },
   "6": {
    "name": "TargetTeammates",
-   "desc": "1 = may target teammates even when team attack is off (normally skipped then; with team attack on they are always targets).",
+   "desc": "1 = may target teammates. Normally a fighter this object can't hit because of teams (its hurt team = this object's attack team: a teammate with team attack off) is skipped.",
    "confidence": "high"
   }
  },

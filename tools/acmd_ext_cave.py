@@ -150,7 +150,7 @@ TRACK_PARAMS = [
     ('Range', 1, 'Only targets within this distance (X/Y). 0 = any distance.'),
     ('Mode', 0, 'Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).'),
     ('TargetOwner', 0, '1 = a projectile may also target the fighter who fired it (normally skipped). Fighters: no effect.'),
-    ('TargetTeammates', 0, '1 = may target teammates even when team attack is off (normally skipped then; with team attack on they are always targets).'),
+    ('TargetTeammates', 0, '1 = may target teammates. Normally a fighter this object can\'t hit because of teams (its hurt team = this object\'s attack team: a teammate with team attack off) is skipped.'),
 ]
 
 
@@ -457,7 +457,7 @@ def kcall(wrapper, words):
 def obj_code(a):
     """per-object state: user variables / timers / kinetic type / tracking"""
     U = dict(ubase=USER_BASE, u20=USER_BASE + 0x20, u30=USER_BASE + 0x30, u31=USER_BASE + 0x31,
-             u32=USER_BASE + 0x32, u33=USER_BASE + 0x33)
+             u32=USER_BASE + 0x32, u33=USER_BASE + 0x33, u34=USER_BASE + 0x34, u36=USER_BASE + 0x36)
     fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
     a.asm("""
 # --- obj_find(r3 WorkModule, r4 create) -> r3 entry or 0; leaf: r0 r10 r11 r12 -----------------
@@ -515,19 +515,55 @@ of_none:
         blr
 
 # --- acc_of(r3 WorkModule) -> r3 accessor or 0 (the per-frame cache); leaf: r0 r11 r12 -----------
-acc_of:
-        rlwinm r12, r3, 31, 23, 28      # ((wm >> 4) & 63) * 8
+acc_of:                                 # (searched: a direct-mapped cache let two objects evict each other)
+        lis r11, acc_cache@ha
+        addi r11, r11, acc_cache@l
+        li r12, 64
+ao_loop:
+        lwz r0, 0(r11)
+        cmplw r0, r3
+        beq ao_hit
+        addi r11, r11, 8
+        addi r12, r12, -1
+        cmpwi r12, 0
+        bne ao_loop
+        li r3, 0
+        blr
+ao_hit:
+        lwz r3, 4(r11)
+        blr
+
+# --- acc_put(r3 WorkModule, r4 accessor): remember it (the same entry, else the next in turn); r0 r11 r12
+acc_put:
+        lis r11, acc_cache@ha
+        addi r11, r11, acc_cache@l
+        li r12, 64
+ap_loop:
+        lwz r0, 0(r11)
+        cmplw r0, r3
+        beq ap_set
+        addi r11, r11, 8
+        addi r12, r12, -1
+        cmpwi r12, 0
+        bne ap_loop
+        lis r11, acc_next@ha
+        lwz r12, acc_next@l(r11)
+        addi r0, r12, 1
+        cmplwi r0, 64
+        blt ap_wrap
+        li r0, 0
+ap_wrap:
+        stw r0, acc_next@l(r11)
+        slwi r12, r12, 3
         lis r11, acc_cache@ha
         addi r11, r11, acc_cache@l
         add r11, r11, r12
-        lwz r0, 0(r11)
-        cmplw r0, r3
-        bne ao_none
-        lwz r3, 4(r11)
+ap_set:
+        stw r3, 0(r11)
+        stw r4, 4(r11)
         blr
-ao_none:
-        li r3, 0
-        blr
+acc_next:
+        .word 0
 
 # --- i2f(r3) -> f1 (float); f2i(f1) -> r3 (truncated). r0 r12 f0 f12 ------------------------------
 i2f:
@@ -606,8 +642,20 @@ user_entry:
         cmplwi r30, %(u31)d
         beq ue_track
         cmplwi r30, %(u33)d
+        ble ue_speed
+        cmplwi r30, %(u36)d
         bgt ue_zero
-        b ue_speed
+        cmpwi r29, 0                    # team ids: read only
+        bne ue_out
+        mr r3, r31
+        bl acc_of""" % U + fl('r3', 'ue_zero') + """
+        lwz r3, 0x6C(r3)                # team module""" + fl('r3', 'ue_zero') + """
+        addi r12, r30, -%(u34)d          # (index - 0x334) * 0x10 + 8: main / hurt / attack team id
+        slwi r12, r12, 4
+        addi r12, r12, 8
+        lwzx r3, r3, r12
+        bl i2f
+        b ue_out
 ue_var:
         addi r28, r30, -%(ubase)d
         slwi r28, r28, 2
@@ -735,12 +783,9 @@ hk_frame:
         lwz r29, 4(r31)                 # accessor (r31 = MotionModule)""" % dict(U, n=OBJ_N, size=OBJ_SIZE, wm_back=WM_RESET + 4)
         + fl('r29', 'hf_out') + """
         lwz r28, 0x28(r29)              # WorkModule""" + fl('r28', 'hf_out') + """
-        rlwinm r12, r28, 31, 23, 28
-        lis r11, acc_cache@ha
-        addi r11, r11, acc_cache@l
-        add r11, r11, r12
-        stw r28, 0(r11)
-        stw r29, 4(r11)
+        mr r3, r28
+        mr r4, r29
+        bl acc_put
         mr r3, r28
         li r4, 0
         bl obj_find
@@ -864,10 +909,17 @@ track_step:
         stwu r1, -0x90(r1)
         mflr r0
         stw r0, 0x94(r1)
-        stmw r20, 0x58(r1)
+        stmw r19, 0x58(r1)
         mr r31, r3
         mr r30, r4
         li r21, -1                      # reflected: the original owner (the only target, if live)
+        li r19, -1                      # this object's attack team (team module +0x28), -1 = none / ignore
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 0x200             # TargetTeammates: teammates are targets too
+        bne ts_noteam
+        lwz r3, 0x6C(r30)""" + fl('r3', 'ts_noteam') + """
+        lwz r19, 0x28(r3)
+ts_noteam:
         lwz r29, 0x34(r30)""" + fl('r29', 'ts_out') + """
         lwz r28, 0x18(r30)""" + fl('r28', 'ts_out') + """
         li r27, -1
@@ -966,6 +1018,15 @@ ts_id_ok:
         lwz r10, 0xC(r12)
         cmplw r10, r30
         beq ts_floop""" % dict(fe=FIGHTER_ENTRY) + fl('r10', 'ts_floop') + """
+        cmpwi r19, -1
+        beq ts_team_ok
+        lwz r9, 0x6C(r10)               # target's team module: its hurt team (+0x18) = our attack team ->
+        cmpwi r9, 0                     # a teammate the game won't let us hit (team attack off): skip
+        beq ts_team_ok
+        lwz r9, 0x18(r9)
+        cmpw r9, r19
+        beq ts_floop
+ts_team_ok:
         lwz r10, 0x18(r10)""" + fl('r10', 'ts_floop') + """
         lfs f1, 0x10(r10)
         lfs f2, 0x10(r28)
@@ -1101,7 +1162,7 @@ ts_face:
         fcmpu cr0, f1, f0
         bge ts_out""" + kcall(POSTURE_W, [0x2710]) + kcall(POSTURE_W, [0x2]) + """
 ts_out:
-        lmw r20, 0x58(r1)
+        lmw r19, 0x58(r1)
         lwz r0, 0x94(r1)
         mtlr r0
         addi r1, r1, 0x90

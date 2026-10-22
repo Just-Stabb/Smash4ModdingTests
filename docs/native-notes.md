@@ -1135,6 +1135,28 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   - LinkModule link 0 stays the original owner, so the projectile is reflected when `+0x34`
     differs from link 0's ID.
   - Weapon MSC isn't involved.
+- **Teams:** the team module is at accessor `+0x6C` (vtable `0x10002EC8`, 8-byte vtable entries).
+  - It holds three team objects (vtable `0x10002E70`, each with its id at `+4`). Getters: vt `+0x34`
+    → `+4`, team (id `+8`); vt `+0x44` → `+0x14`, hurt team (id `+0x18`); vt `+0x54` → `+0x24`, attack
+    team (id `+0x28`). -1 means none.
+  - The AttackModule registers the attack team with its hitboxes (`0x02C07F7C`) and the HitModule
+    registers the hurt team (`0x02C42718`).
+  - Weapons and items get their owner's team at spawn (`0x02B64740`), with the hurt team equal to
+    it.
+  - The clank check `0x02C0F180` compares team ids, unless TeamDamage is set (hitbox data `+0x51`).
+  - Not found: the team-attack rule global, where fighters' teams are set at match start, and the
+    attack-versus-hurt filter.
+- **ACMD threads:** the object step entries (fighters `0x02E408B8`, weapons `0x02BAD64C`, items?
+  `0x03048064`) start with `stwu r1, -0x38(r1)` and get `[r4]` = accessor. They run every unpaused
+  frame: the hitlag check is inside, and nothing checks status, so they run in KO statuses too.
+  - Interpreter wrapper: `0x02BEE950(table, accessor, state, exec, f1 frames, f2 target)`. The
+    MotionAnimcmd agent's per-frame call `0x02C2986C` uses `(agent +0x4C, agent +4, agent +0x48, 1,
+    1.0, 0.0)`.
+  - The state is 0x38 bytes: `+0` start, `+4` current command, `+8` -1 while running (0 at the end),
+    `+0xC` condition result, `+0x18` frame, `+0x1C` advance factor, `+0x34` nested CALL state.
+    Reset (and free the nested state) with `0x02BEE9B8`.
+  - Handlers return 2 to go on, 1 to wait, 0 to end (Script_End `0x02BE5814`).
+  - True / Else jump `Offset` words from their own header.
 - **A weapon's owner:** LinkModule (accessor `+0x68`) vt `+0x5C(0)` says whether it has a link 0.
   vt `+0x6C(0, 1)` gives that object's ID, which matches the fighter table entry's `+0`.
 - **DI isn't native.** Every fighter's MSC damage code (Kirby `func_885`) turns the launch angle by

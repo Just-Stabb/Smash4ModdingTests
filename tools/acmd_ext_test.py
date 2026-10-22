@@ -221,6 +221,8 @@ wr_l:
         w32(pm, acc + 0x34, km)
         w32(pm, acc + 0x68, lm)
         w32(pm, acc + 0x6C, base + 0xA00)                 # owner module: +0x34 current owner's ID
+        for off in (8, 0x18, 0x28):                       # team / hurt team / attack team ids: none
+            w32(pm, base + 0xA00 + off, -1)
         pm.mem_write(post + 0x10, struct.pack('>ff', x, y))
         pm.mem_write(post + 0x60, struct.pack('>f', 1.0))
         w32(pm, km, vt)
@@ -332,6 +334,28 @@ wr_l:
     track(3, 2.0, 0.0, 0.0, 0, owner=1)
     frame(me)
     check('TargetOwner=1: the owner (nearest) is a target', vel(me_km), (0.0, -2.0))
+    # teams: the weapon's attack team 2 = the foe's hurt team 2 -> a teammate (team attack off): skipped
+    w32(pm, me + 0xA00 + 0x28, 2)
+    w32(pm, foe + 0xA00 + 0x18, 2)
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 0.0, 0)
+    frame(me)
+    check('teammate (attack team = its hurt team): skipped', vel(me_km), (1.0, 0.0))
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 0.0, 0, mates=1)
+    frame(me)
+    check('TargetTeammates=1: targeted', vel(me_km), (0.0, 2.0))
+    w32(pm, foe + 0xA00 + 0x18, 5)                        # hurt team differs (e.g. team attack on): a target
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 0.0, 0)
+    frame(me)
+    check('hurt team differs: targeted', vel(me_km), (0.0, 2.0))
+    w32(pm, foe + 0xA00 + 8, 3)
+    frame(foe)                                            # (its accessor is known once it has stepped)
+    check('team variables: team / hurt / attack', (fcall(pm, FGET, foe_wm, V(0x34)), fcall(pm, FGET, foe_wm, V(0x35)),
+          fcall(pm, FGET, me_wm, V(0x36))), (3.0, 5.0, 2.0))
+    w32(pm, me + 0xA00 + 0x28, -1)
+    w32(pm, foe + 0xA00 + 0x18, -1)
     track(5, 2.0, 0.0, 0.0, 0)
     w32(pm, 0x10390000 + 0x28, me_wm)
     run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: 0x10390000})
