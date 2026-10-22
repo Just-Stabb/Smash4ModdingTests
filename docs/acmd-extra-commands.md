@@ -116,11 +116,14 @@ Example: the move hits harder if it's used again within 2 seconds (120 frames) o
 
 ```
 FRAME(Frames=10)
+Hitbox(ID=0, Part=0, Bone=0, Damage=8.0, Angle=361, KBG=100, FKB=0, BKB=40, Size=5.0, X=0.0, Y=8.0, Z=8.0, Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
 Float_Var_Compare(Variable=TIMER_0, Method=5, Value=0)
 True(Offset=0){
-    SET_FLOAT(Value=1.5, Variable=VAR_0)            // remember it was the strong version
+    // the same ID again: replaces the 8% hitbox with a 12% one
+    Hitbox(ID=0, Part=0, Bone=0, Damage=12.0, Angle=361, KBG=100, FKB=0, BKB=50, Size=5.0, X=0.0, Y=8.0, Z=8.0, Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
 }
-...
+WAIT(Frames=3)
+Remove_All_Hitboxes()
 // at the end of the move: start (or restart) the 2-second window
 SET_FLOAT(Value=120, Variable=TIMER_0)
 ```
