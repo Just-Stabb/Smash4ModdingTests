@@ -11,10 +11,11 @@ How sure each fact is:
 - **(files)**: seen in the data files (checked on the fighters named).
 - **(inferred)**: worked out from the data, not confirmed in the code.
 
-Related docs: `fighter_param_vl` in general (the other groups, the struct) is covered by the
-vl write-up (`scratchpad/params/vl_notes.md` for now); `fighter_param.bin` (the stats) and the
-UI / character-slot side (`ui_character_db`, adding a kind) are covered elsewhere in
-`docs/params/`. This page links to them where they meet.
+Related docs: `docs/params/fighter_param_vl.md` ("the vl write-up": the whole vl file, every
+group, `tools/fighter_param_vl.py`), `docs/params/fighter_param.md` ("the fighter_param
+write-up": stats, shield, camera, bone fields) and `docs/new-fighter-slot.md` ("the new-slot
+write-up": kinds, the UI side, and the plan for a new fighter as a clone kind in a reused slot).
+This page links to them where they meet.
 
 Tools written for this page (all in `tools/`, each with a docstring):
 
@@ -86,8 +87,10 @@ folder: `model.xmb`, `model.vbn`, `model.nhb`, `model.moi`, `model.mta`, `model.
 
 Kinds are hard-wired in many places (switches with 65 cases: the vl loader `0x02EA6BC4`, the
 per-kind descriptor getter `0x02E4313C`, the specializer getter `0x02E669F0`, ...). A new
-fighter is far easier as a **replacement of an existing kind's slot** than as a 66th kind; see
-the new-slot write-up in `docs/params/` for adding one.
+fighter is far easier in an existing kind's slot than as a 66th kind: either replacing that
+fighter, or as a clone kind (a reused slot redirected to a base fighter's native code) as
+planned in `docs/new-fighter-slot.md`. Either way the new fighter follows its base fighter's
+motion and status layout, and everything below applies to its folder.
 
 ---
 
@@ -392,7 +395,8 @@ read off the hitboxes, e.g. with Sm4shCommand's hitbox viewer).
   `snd_se_Marth` = BINF 2020 = row 22 → `Sound_Effect(0x16xxxx)`; `snd_vc_Marth` = 6016 = row 73 →
   `0x49xxxx`; cheers 6094 = row 2251; Kirby-copy voices 2091 = row 116. So a replacement bank must
   keep the base's BINF id and have at least as many labels / tones as its row (or the row must
-  be edited, as `tools/minecraft_sound.py` does for a stage bank).
+  be edited, as `tools/minecraft_sound.py` does for a stage bank). Whether two loaded banks may
+  share a BINF id (a clone and its base in one match) is untested; new ids need new rows.
 - **`soundseq_<Name>.sqb`**: header {u16 4, u16 **set id**, u32 count, u32 count x 4}, offsets
   (-1 = none), sequences of weighted choices (sound ID or -1 = silence, weight %). ACMD plays
   sequence n as `0x8000 | set id << 16 | n` (Marth's set 0x28: `Low_Voice_Clip(0x80280000)`,
@@ -435,18 +439,21 @@ a fighter folder.
   vl file) and an RPX weapon kind (weapon name table `0x10419604`). A new fighter is simplest
   with the base's article set.
 - **Kirby's copy** of the fighter: Kirby's hat model `fighter/kirby/model/<name>cap/c00`
-  (hat names table at `0x10159368`-`0x1015980C`: `marthcap`, `marthsword`, ...; held models
-  `0x1041A8A0` + kind x 4), Kirby's animations `fighter/kirby/motion/<name>body/`, Kirby's motion
-  table and scripts for the copy (motions above `0x30A` in Kirby's 1222), the copied fighter's own
-  neutral-special block of its vl file (group 13, which Kirby loads with the copy: vl write-up), and `snd_se_vc_Kirby_copy_<Name>.nus3bank` in the fighter's own sound
-  folder (`docs/native-notes.md` "Copy abilities"). In a slot replacement all of this stays the
-  base fighter's copy unless replaced.
+  (hat / held-model names are strings at `0x10159368`-`0x1015980C`: `marthcap`, `marthsword`,
+  ...; held models `0x1041A8A0` + kind x 4), Kirby's animations `fighter/kirby/motion/<name>body/`, Kirby's motion
+  table and scripts for the copy (motions above `0x30A` in Kirby's 1222), the copied fighter's
+  own neutral-special block of its vl file (group 13, which Kirby loads with the copy: vl
+  write-up), and `snd_se_vc_Kirby_copy_<Name>.nus3bank` in the fighter's own sound folder
+  (`docs/native-notes.md` "Copy abilities"). In a slot replacement all of this stays the base
+  fighter's copy unless replaced.
 
 ---
 
-## 9. Checklist: a new fighter in an existing slot (base = the slot's fighter)
+## 9. Checklist: a new fighter in an existing slot
 
-Files in `data/fighter/<base>/`:
+"Base" = the fighter whose motion / status layout it follows (the replaced fighter, or X of a
+clone kind). Files go in the slot's folder `data/fighter/<slot name>/`, named with the slot's
+names (`%s` in section 1), except the animations, which keep the base's names (4.2):
 - [ ] `model/body/c00`..`cNN` (+ `l00`..`lNN`): `model.nud`, `model.nut`, `model.vbn`,
       **`model.jtb` mapping the base's bone IDs to the new bones** (3.5), `metal.nud`, `model.xmb`
       (copy), `model.mta` + `material_anime_*.pac` (eyes / face, incl. mouth shapes for
@@ -456,15 +463,16 @@ Files in `data/fighter/<base>/`:
       part packs if the parts exist; `bodyentry`, `bodyresult` (incl. `face.pac`), `bodyroutemap`.
 - [ ] `script/animcmd/body/`: `motion.mtable` (the base's, unless script names change; same
       length) + `game.bin`, `effect.bin`, `sound.bin`, `expression.bin`.
-- [ ] `script/msc/<base>.mscsb` (start from the base's).
+- [ ] `script/msc/<slot name>.mscsb` (start from the base's).
 - [ ] `script/ai/`: base's `param.bin`, `param_nfp.bin`, `script.bin`; new `attack_data.bin`.
-- [ ] `sound/`: banks with the base's BINF ids (and enough labels for their STB rows),
-      `soundseq` with the base's set id, `voiceanim`.
-- [ ] `effect/<base>/` and `effect/Fin<Base>/` (`.efc` indices as the scripts use them),
+- [ ] `sound/`: banks whose BINF ids have `soundlabeltable` rows with enough labels (the replaced
+      fighter's ids; a clone kind playing in the same match as its base may need its own ids and
+      rows, untested), ACMD sound IDs to match, `soundseq` (set id as the ACMD uses it), `voiceanim`.
+- [ ] `effect/<slot name>/` and `effect/Fin<Slot Name>/` (`.efc` indices as the scripts use them),
       `camera/final/` if the kind has one.
 
 Data elsewhere:
-- [ ] `param/fighter/fighter_param_vl_<base>.bin`: hurtboxes (group 5), ECB bones (4),
+- [ ] `param/fighter/fighter_param_vl_<slot name>.bin`: hurtboxes (group 5), ECB bones (4),
       ledge boxes (7), attach points (9, 10) with the new bone IDs (`vl_shapes.py`), per-motion
       values (group 1) and special params (vl write-up).
 - [ ] `param/fighter/fighter_param.bin` entry (stats, shield, camera box, item box, bone IDs).
