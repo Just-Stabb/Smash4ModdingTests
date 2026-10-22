@@ -1029,6 +1029,23 @@ read off its own logos (red: a grayscale picture of the logo, white fill and bla
 green: the silhouette with a soft edge). v15-v18c's "MINECRAFT" wordmark had red the other way round
 (fill on black), which the green kept hidden.
 
+
+### v18e: platforms whole again, "Minecraft World", the Minecraft series
+
+User on v18d: the branch platforms should stay floating after the branches break (Ultimate's), and
+the stage is called "Minecraft World". So the pass-through platforms are Ultimate's whole lvd ones
+again (as v18c) with every block solid; the banner and `MmelStageN_NewStage01` are "Minecraft World",
+`MmelStageG_NewStage01` "Minecraft" (its series). The series: Smash 4 shows a stage's series symbol on
+the stage select (`0x0298BDE4`: `stage_mark_rep` / `stage_mark2_rep` <- `0x02918178(out, 0x3C,
+cosmetic)`, the series from `ui_stage_db` value [2], its name -> `mark_60_<name>`); My Music has no
+symbol. Series ids are named by a 204-entry `{id, name}` table (`0x1033CEE0`, read only by the stub
+`0x0293DD44`, count 0xCC); `tools/series_cave.py` puts a copy with `{0x2A, "minecraft"}` added in the
+cave at `0x04B8B000` (test: `series_test.py`, every id 0-0xFFFF as unpatched but 0x2A).
+`tools/add_series.py` writes the cube in the game's three symbol sets (`ui/replace/append/mark/
+mark_00|30|60`), a `ui_mark_db.bin` row (`{0x2A, 1, 31, 0}`), the stage's series in `ui_stage_db.bin`
+and `Mmen_MarkN_minecraft` in `menu.msbt`. The mark folders are packed by the game: they need
+Sm4shExplorer v5 (or "Pack this folder").
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause
