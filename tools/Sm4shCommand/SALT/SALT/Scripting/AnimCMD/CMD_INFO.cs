@@ -132,7 +132,9 @@ namespace SALT.Moveset.AnimCMD
              { 0xF0D25BDA, 2 }, { 0x3341CBFE, 1 }, { 0x92A88908, 2 }, { 0x300A0A85, 1 },
             {0x5C8A67C9,50},
             {0x974EA5BE,48},
-            {0x113030DB,6}
+            {0x113030DB,8},
+            {0x1B492AD1,2},
+            {0x4C0DBE48,4}
         };
         #endregion
         #region Names
@@ -725,6 +727,8 @@ namespace SALT.Moveset.AnimCMD
             {0x5C8A67C9,"Extra_Extended_Special_Hitbox"},
             {0x974EA5BE,"Extra_Special_Hitbox"},
             {0x113030DB,"Track_Target"},
+            {0x1B492AD1,"Thread_Stop"},
+            {0x4C0DBE48,"Thread_Start"},
         };
         #endregion
         #region Params
@@ -1318,7 +1322,9 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,String.Empty},
             {0x5C8A67C9,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,1,0,1"},
             {0x974EA5BE,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1"},
-            {0x113030DB,"0,1,1,1,0"},
+            {0x113030DB,"0,1,1,1,0,0,0"},
+            {0x1B492AD1,"0"},
+            {0x4C0DBE48,"0,0,0"},
         };
         #endregion
         #region syntax
@@ -1910,7 +1916,9 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,String.Empty},
             {0x5C8A67C9,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,X2,Y2,Z2,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
             {0x974EA5BE,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,Shape,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
-            {0x113030DB,"Frames,Speed,TurnRate,Range,Mode"},
+            {0x113030DB,"Frames,Speed,TurnRate,Range,Mode,TargetOwner,TargetTeammates"},
+            {0x1B492AD1,"ID"},
+            {0x4C0DBE48,"Offset,ID,Flags"},
         };
         #endregion
 
@@ -2505,6 +2513,8 @@ namespace SALT.Moveset.AnimCMD
             {0x5C8A67C9,"Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x974EA5BE,"Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; a reflected one goes back at its original owner instead (any distance). Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x1B492AD1,"Stops this object's thread ID (-1 = all of them). New command: needs the patched cross_f.rpx."},
+            {0x4C0DBE48,"Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

@@ -176,6 +176,7 @@ namespace SALT.Moveset.AnimCMD
         {
             switch (ident)
             {
+                case ACMDCompiler.ThreadStart:
                 case 0x895B9275://Else
                 case 0xC31DF569:
                 case 0x47810508:
@@ -203,6 +204,13 @@ namespace SALT.Moveset.AnimCMD
             while (len > 0)
             {
                 len -= this[i].Size / 4;
+                // a thread block's closing Script_End isn't shown (the compiler adds it back)
+                if (this[startIndex].Ident == ACMDCompiler.ThreadStart && len == 0 && this[i].Ident == 0x5766F889)
+                {
+                    i++;
+                    count++;
+                    break;
+                }
                 //Break if this is an Else and if the conditional statement branched into it
                 //the enclosing methods will handle it
                 if (this[i].Ident == 0x895B9275 && len == 0)
@@ -266,6 +274,7 @@ namespace SALT.Moveset.AnimCMD
         {
             switch (ident)
             {
+                case ACMDCompiler.ThreadStart:
                 case 0x895B9275://Else
                 case 0xC31DF569:
                 case 0x47810508:

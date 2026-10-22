@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04B90000
-LIMIT = 0x04B98000
+LIMIT = 0x04B9A000
 TABLE = 0x04B92000               # extras entries (zero at load)
 ENTRIES = 128
 ENTRY = 0x30
@@ -74,7 +74,15 @@ OBJ_SIZE = 0x100                 # +0 WorkModule, +4 accessor (last seen), +8 tr
                                  # stopped), +0xC speed, +0x10 cos(turn) (< -1.5: turn at once), +0x14 sin(turn),
                                  # +0x18 range squared (0 = any), +0x1C mode, +0x20 timers[16], +0x60 vars[32]
 ACC_CACHE = 0x04B97000           # 64 x {WorkModule, accessor}, filled by the per-frame hook for every object
-GROW = 0x04B98000
+THREADS = 0x04B98000             # THREAD_N slots of THREAD_SIZE: +0 accessor (0 = free), +4 script table (the
+THREAD_N = 32                    # handler's r4), +8 ID, +0xC flags (0x80000000 = stop after this frame),
+THREAD_SIZE = 0x48               # +0x10 the thread's own interpreter state (0x38 bytes)
+STEP_HOOKS = [0x02E408B8, 0x02BAD64C, 0x03048064]   # object step entries (fighters, weapons, items?): every
+                                 # unpaused frame, hitlag and KO included; stwu r1, -0x38(r1), r4 -> accessor
+INTERP = 0x02BEE950              # (r3 script table, r4 accessor, r5 state, r6 exec, f1 frames, f2 target)
+STATE_RESET = 0x02BEE9B8         # (r3 state): clear it, free a nested CALL state
+THREAD_STOP_BIT = 0x80000000
+GROW = 0x04B9A000
 FRAME_HOOK = 0x02C5F430          # every object's motion step, right after its ACMD ran (not in hitlag): li r0, 1
 WM_RESET = 0x02BF5864            # object set-up (every class, 0x02BF57B0): lwz r3, 0x28(r31) before WorkModule
                                  # vt +0x24 (reset): an object is set up / reused. r0 r10 ctr are free there
@@ -85,6 +93,7 @@ FIGHTER_ENTRY = 0x76B0           # entry: +0 object ID, +0xC accessor, byte +0x1
 KINETIC_W = 0x030B29D8           # MSC module wrappers: wrapper(ctx (+4 = accessor), {words, count})
 POSTURE_W = 0x030B2AB8
 OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
+OBJ_ORIG.update({h: 0x9421FFC8 for h in STEP_HOOKS})
 
 SPECIAL_HITBOX = 0x02BDBB20      # handler, size 42
 EXT_SPECIAL_HITBOX = 0x02BDD46C  # handler, size 44
@@ -111,12 +120,28 @@ SM4SHCOMMAND_DESC['Track_Target'] = (
     'its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; '
     'a reflected one goes back at its original owner instead (any distance). '
     'Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
+SM4SHCOMMAND_DESC['Thread_Start'] = (
+    'Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, '
+    'while the script goes on past the block. The thread keeps running after the animation ends or changes and while the '
+    'character is KO\'d, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from '
+    'the thread\'s start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
+SM4SHCOMMAND_DESC['Thread_Stop'] = 'Stops this object\'s thread ID (-1 = all of them). New command: needs the patched cross_f.rpx.'
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
     ('Extra_Special_Hitbox', 42 + N_EXTRA, 'h_extra', SPECIAL_HITBOX),
     ('Extra_Extended_Special_Hitbox', 44 + N_EXTRA, 'h_extra_ext', EXT_SPECIAL_HITBOX),
     ('Track_Target', 8, 'h_track', None),
+    ('Thread_Start', 4, 'h_thread', None),
+    ('Thread_Stop', 2, 'h_thread_stop', None),
+]
+THREAD_PARAMS = [
+    ('Offset', 0, 'Words to the end of the block (Sm4shCommand works it out from the braces, like True).'),
+    ('ID', 0, 'This thread\'s number (any). Starting it again restarts it; Thread_Stop(ID) stops it.'),
+    ('Flags', 0, 'Bits: 1 = keep running during hitlag (normally the thread pauses with the object).'),
+]
+THREAD_STOP_PARAMS = [
+    ('ID', 0, 'The thread to stop (Thread_Start\'s ID); -1 = every thread of this object.'),
 ]
 TRACK_PARAMS = [
     ('Frames', 0, 'Frames to track for (counted while the object moves: not in hitlag). -1 = until a Track_Target with 0 frames (or the object is reset).'),
@@ -369,6 +394,7 @@ next_entry:
 
     hit_code(a)
     obj_code(a)
+    thread_code(a)
     if a.pc % 8:
         a.asm('.word 0')
     a.asm("""
@@ -385,11 +411,12 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     a.labels['di_tab'] = TABLE + ENTRIES * ENTRY
     a.labels['objs'] = OBJS
     a.labels['acc_cache'] = ACC_CACHE
+    a.labels['threads'] = THREADS
     assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= OBJS
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
-    assert ACC_CACHE + 64 * 8 <= GROW <= LIMIT
+    assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
              HIT_STUN: b(HIT_STUN, a.addr('hk_stun')), HIT_VSTOP: b(HIT_VSTOP, a.addr('hk_vstop')),
@@ -397,6 +424,8 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
              DI_STAT: b(DI_STAT, a.addr('di_check')),   # was bnelr: di_check tests cr0
              FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
+    for k, h in enumerate(STEP_HOOKS):
+        hooks[h] = b(h, a.addr('hk_step%d' % k))
     return a, words, hooks
 
 
@@ -681,6 +710,22 @@ wr_loop:
 wr_next:
         addi r10, r10, %(size)d
         bdnz wr_loop
+        stwu r1, -0x90(r1)              # and its threads (STATE_RESET frees a CALL state: save all)
+        mflr r0
+        stw r0, 0x94(r1)
+        stmw r3, 0x10(r1)
+        mfcr r0
+        stw r0, 0x88(r1)
+        mr r3, r31
+        li r4, -1
+        li r5, 0
+        bl thread_drop
+        lwz r0, 0x88(r1)
+        mtcrf 0xFF, r0
+        lmw r3, 0x10(r1)
+        lwz r0, 0x94(r1)
+        mtlr r0
+        addi r1, r1, 0x90
         b 0x%(wm_back)08X
 
 # --- every object, every frame it moves (after its ACMD): timers, tracking --------------------------
@@ -1088,6 +1133,254 @@ def horner(fd, fx2, ds):
     return "\n".join(out)
 
 
+def thread_code(a):
+    """Thread_Start / Thread_Stop handlers, the per-object thread runner (step entries), thread_drop"""
+    fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
+    D = dict(n=THREAD_N, size=THREAD_SIZE, reset=STATE_RESET, interp=INTERP, stop=THREAD_STOP_BIT >> 16)
+    a.asm("""
+# --- thread_drop(r3 accessor, r4 ID (-1 = all), r5 running state or 0): stop matching threads;
+#     the one whose state is r5 (it's running this command) is only marked to stop after this frame
+thread_drop:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r28, 0x10(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        lis r28, threads@ha
+        addi r28, r28, threads@l
+        li r0, %(n)d
+        stw r0, 8(r1)
+td_loop:
+        lwz r0, 0(r28)
+        cmplw r0, r31
+        bne td_next
+        cmpwi r30, -1
+        beq td_hit
+        lwz r0, 8(r28)
+        cmpw r0, r30
+        bne td_next
+td_hit:
+        addi r3, r28, 0x10
+        cmplw r3, r29
+        bne td_free
+        lwz r0, 0xC(r28)
+        oris r0, r0, %(stop)d
+        stw r0, 0xC(r28)
+        b td_next
+td_free:
+        bl 0x%(reset)08X
+        li r0, 0
+        stw r0, 0(r28)
+td_next:
+        addi r28, r28, %(size)d
+        lwz r12, 8(r1)
+        addi r12, r12, -1               # (not r0: addi rD, r0, n is li)
+        stw r12, 8(r1)
+        cmpwi r12, 0
+        bne td_loop
+        lmw r28, 0x10(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- Thread_Start(Offset, ID, Flags){ block ... Script_End }: r3 accessor, r4 table, r5 state, r6 ctx, r7 params
+h_thread:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r26, 0x18(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        mr r28, r7
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq th_step""" % D + fl('r31', 'th_step') + """
+        lwz r27, 4(r28)                 # ID
+        lis r26, threads@ha
+        addi r26, r26, threads@l
+        li r11, %(n)d
+th_find:                                # this object's thread with this ID: restart it
+        lwz r0, 0(r26)
+        cmplw r0, r31
+        bne th_fnext
+        lwz r0, 8(r26)
+        cmpw r0, r27
+        bne th_fnext
+        addi r3, r26, 0x10
+        cmplw r3, r29                   # (not from inside itself)
+        beq th_step
+        bl 0x%(reset)08X
+        b th_take
+th_fnext:
+        addi r26, r26, %(size)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne th_find
+        lis r26, threads@ha
+        addi r26, r26, threads@l
+        li r11, %(n)d
+th_free:
+        lwz r0, 0(r26)
+        cmpwi r0, 0
+        beq th_take
+        addi r26, r26, %(size)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne th_free
+        b th_step                       # all taken: not started
+th_take:
+        stw r31, 0(r26)
+        stw r30, 4(r26)
+        stw r27, 8(r26)
+        lwz r0, 8(r28)
+        rlwinm r0, r0, 0, 1, 31
+        stw r0, 0xC(r26)
+        li r0, 0
+        li r11, 0x34
+th_zero:
+        addi r12, r26, 0x10
+        stwx r0, r12, r11
+        addi r11, r11, -4
+        cmpwi r11, 0
+        bge th_zero
+        li r0, -1
+        stw r0, 0x18(r26)               # state +8: running
+        lwz r3, 4(r29)
+        addi r3, r3, 16                 # the block's first command (after Thread_Start's 4 words)
+        stw r3, 0x10(r26)
+        stw r3, 0x14(r26)
+th_step:
+        lwz r3, 8(r29)
+        cmpwi r3, -1
+        bne th_ret
+        lwz r0, 0(r28)                  # jump over the block (as True)
+        slwi r0, r0, 2
+        lwz r11, 4(r29)
+        add r11, r11, r0
+        stw r11, 4(r29)
+        li r3, 2
+th_ret:
+        lmw r26, 0x18(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- Thread_Stop(ID)
+h_thread_stop:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r5
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq ts2_step
+        lwz r4, 0(r7)
+        mr r5, r31
+        bl thread_drop
+ts2_step:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne ts2_ret
+        lwz r11, 4(r31)
+        addi r11, r11, 8
+        stw r11, 4(r31)
+        li r3, 2
+ts2_ret:
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- thread_run(r3 accessor): one frame of each of its threads ---------------------------------------
+thread_run:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r27, 0x1C(r1)
+        mr r31, r3
+        li r30, 0                       # in hitlag?
+        lwz r3, 0x48(r31)               # StopModule""" % D + fl('r3', 'tr_go') + """
+        lbz r30, 0x10(r3)
+tr_go:
+        lis r29, threads@ha
+        addi r29, r29, threads@l
+        li r28, %(n)d
+tr_loop:
+        lwz r0, 0(r29)
+        cmplw r0, r31
+        bne tr_next
+        lwz r0, 0xC(r29)
+        andi. r0, r0, 1                 # Flags 1: also in hitlag
+        bne tr_run
+        cmpwi r30, 0
+        bne tr_next
+tr_run:
+        lwz r3, 4(r29)
+        mr r4, r31
+        addi r5, r29, 0x10
+        li r6, 1
+        lis r12, one@ha
+        lfs f1, one@l(r12)
+        lfs f2, zero@l(r12)
+        bl 0x%(interp)08X
+        lwz r0, 0x14(r29)               # state +4 = 0: ended (Script_End)
+        cmpwi r0, 0
+        beq tr_end
+        cmpwi r3, 0
+        beq tr_end
+        lwz r0, 0xC(r29)
+        rlwinm. r0, r0, 0, 0, 0         # stop bit (Thread_Stop from inside itself)
+        beq tr_next
+tr_end:
+        addi r3, r29, 0x10
+        bl 0x%(reset)08X
+        li r0, 0
+        stw r0, 0(r29)
+tr_next:
+        addi r29, r29, %(size)d
+        addi r28, r28, -1
+        cmpwi r28, 0
+        bne tr_loop
+        lmw r27, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+""" % D)
+    for k, h in enumerate(STEP_HOOKS):
+        a.asm("""
+hk_step%(k)d:                            # object step entry: r4 -> accessor; save everything, run its threads
+        stwu r1, -0xA0(r1)
+        mflr r0
+        stw r0, 0xA4(r1)
+        stmw r3, 0x10(r1)
+        mfcr r0
+        stw r0, 0x88(r1)
+        stfd f1, 0x90(r1)
+        stfd f2, 0x98(r1)""" % dict(k=k) + fl('r4', 'hs%d_out' % k) + """
+        lwz r3, 0(r4)""" + fl('r3', 'hs%d_out' % k) + """
+        bl thread_run
+hs%(k)d_out:
+        lfd f1, 0x90(r1)
+        lfd f2, 0x98(r1)
+        lwz r0, 0x88(r1)
+        mtcrf 0xFF, r0
+        lmw r3, 0x10(r1)
+        lwz r0, 0xA4(r1)
+        mtlr r0
+        addi r1, r1, 0xA0
+        stwu r1, -0x38(r1)
+        b 0x%(back)08X
+""" % dict(k=k, back=h + 4))
+
+
 def hit_code(a):
     """find_copy, the four hit-time hooks, the DI table and the DI stat read"""
     sig = ''.join("""
@@ -1324,10 +1617,12 @@ def labels(path):
     d = json.load(open(path))
     info = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'acmd_info.json')))['commands']
     for name, size, _label, _base in COMMANDS:
-        if name == 'Track_Target':
+        own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS}
+        if name in own:
             e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
-                 '_format': [t for _n, t, _d in TRACK_PARAMS]}
-            for k, (pname, _t, desc) in enumerate(TRACK_PARAMS):
+                 '_format': [t for _n, t, _d in own[name]]}
+            assert len(own[name]) == size - 1
+            for k, (pname, _t, desc) in enumerate(own[name]):
                 e[str(k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
             d['%08X' % crc(name)] = e
             continue

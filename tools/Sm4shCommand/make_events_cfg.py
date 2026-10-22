@@ -38,7 +38,7 @@ def param_lines(entry, names):
 # group whose pattern matches its name, else its real name (from _desc_extra), else, for the unk_
 # commands, its research note (_note: the module its handler calls).
 CATEGORIES = [
-    ("Script flow & timing", r"^(FRAME|FRAME_\w+|WAIT|WAIT_LOOP\w*|LOOP|Loop_Rest|Set_Loop|IF|ELIF|ELSE|Else|ENDIF|SWITCH|CASE|DEFAULT|"
+    ("Script flow & timing", r"^Thread_|^(FRAME|FRAME_\w+|WAIT|WAIT_LOOP\w*|LOOP|Loop_Rest|Set_Loop|IF|ELIF|ELSE|Else|ENDIF|SWITCH|CASE|DEFAULT|"
      r"ENDSWITCH|Goto|CALL|JUMP|Script_End|END|EXECUTE|NOP|True|False|Is_Bool|Is_Not_Bool|IS_RANDOM|"
      r"Set_Frame_Duration|Set_Frame_Speed|POOL)$"),
     ("Variables & compares", r"^(SET_INT|ADD_INT|INC_INT|SET_FLOAT|ADD_FLOAT|SUB_FLOAT\w*|ON_FLAG|OFF_FLAG|IS_FLAG)$|"

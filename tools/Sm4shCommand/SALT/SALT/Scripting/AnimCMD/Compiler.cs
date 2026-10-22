@@ -290,10 +290,16 @@ namespace SALT.Moveset.AnimCMD
             return Commands.ToArray();
         }
 
+        /// <summary>Thread_Start(Offset, ID, Flags){ ... } (a new command, tools/acmd_ext_cave.py): its block runs
+        /// on its own; the script jumps over it like True. The block must end with Script_End (added if missing).</summary>
+        public const uint ThreadStart = 0x4C0DBE48;
+        const uint ScriptEndIdent = 0x5766F889;
+
         private static int HandleSpecialCommands(ref int index, uint ident, ref List<string> lines)
         {
             switch (ident)
             {
+                case ThreadStart:
                 case 0x895B9275:
                 case 0xC31DF569:
                 case 0x47810508:
@@ -326,6 +332,14 @@ namespace SALT.Moveset.AnimCMD
                     len += tmp.Size / 4;
                     Commands.Add(tmp);
                 }
+            }
+
+            // a thread's block ends with Script_End, which stops the thread (the script itself jumps over it)
+            if (cmd.Ident == ThreadStart && Commands[Commands.Count - 1].Ident != ScriptEndIdent)
+            {
+                ACMDCommand end = new ACMDCommand(ScriptEndIdent);
+                len += end.Size / 4;
+                Commands.Add(end);
             }
 
             //check for Else statement. If the next command is Else, set True/False size parameter (current len + Else len)
@@ -393,6 +407,7 @@ namespace SALT.Moveset.AnimCMD
         {
             switch (ident)
             {
+                case ThreadStart:
                 case 0x895B9275://Else
                 case 0xC31DF569:
                 case 0x47810508:

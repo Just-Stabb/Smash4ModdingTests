@@ -10142,13 +10142,15 @@
 ]
 },
 "113030DB": {
-"size": 6,
+"size": 8,
 "name": "Track_Target",
 "format": [
 0,
 1,
 1,
 1,
+0,
+0,
 0
 ],
 "syntax": [
@@ -10156,7 +10158,33 @@
 "Speed",
 "TurnRate",
 "Range",
-"Mode"
+"Mode",
+"TargetOwner",
+"TargetTeammates"
+]
+},
+"1B492AD1": {
+"size": 2,
+"name": "Thread_Stop",
+"format": [
+0
+],
+"syntax": [
+"ID"
+]
+},
+"4C0DBE48": {
+"size": 4,
+"name": "Thread_Start",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Offset",
+"ID",
+"Flags"
 ]
 }
 }

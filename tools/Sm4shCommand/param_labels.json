@@ -1146,13 +1146,15 @@
   "_command": "Track_Target",
   "_new": true,
   "_name": "Track_Target",
-  "_size": 6,
+  "_size": 8,
   "_desc": "Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; a reflected one goes back at its original owner instead (any distance). Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
   "_format": [
    0,
    1,
    1,
    1,
+   0,
+   0,
    0
   ],
   "0": {
@@ -1178,6 +1180,16 @@
   "4": {
    "name": "Mode",
    "desc": "Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "TargetOwner",
+   "desc": "1 = a projectile may also target the fighter who fired it (normally skipped). Fighters: no effect.",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "TargetTeammates",
+   "desc": "1 = may target teammates even when team attack is off (normally skipped then; with team attack on they are always targets).",
    "confidence": "high"
   }
  },
@@ -2490,6 +2502,21 @@
    "values": "0, 1",
    "evidence": "handler 0x02BE8948: {0x3E8, p0..p8} -> 0x02BF2108 / 0x02BF019C (object vtable +0x21C)",
    "confidence": "low"
+  }
+ },
+ "1B492AD1": {
+  "_command": "Thread_Stop",
+  "_new": true,
+  "_name": "Thread_Stop",
+  "_size": 2,
+  "_desc": "Stops this object's thread ID (-1 = all of them). New command: needs the patched cross_f.rpx.",
+  "_format": [
+   0
+  ],
+  "0": {
+   "name": "ID",
+   "desc": "The thread to stop (Thread_Start's ID); -1 = every thread of this object.",
+   "confidence": "high"
   }
  },
  "1BFC5837": {
@@ -6537,6 +6564,33 @@
    "values": "0..100",
    "evidence": "p0 kept across a random call 0x03082EDC",
    "confidence": "low"
+  }
+ },
+ "4C0DBE48": {
+  "_command": "Thread_Start",
+  "_new": true,
+  "_name": "Thread_Start",
+  "_size": 4,
+  "_desc": "Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Offset",
+   "desc": "Words to the end of the block (Sm4shCommand works it out from the braces, like True).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "ID",
+   "desc": "This thread's number (any). Starting it again restarts it; Thread_Stop(ID) stops it.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Flags",
+   "desc": "Bits: 1 = keep running during hitlag (normally the thread pauses with the object).",
+   "confidence": "high"
   }
  },
  "4E761504": {

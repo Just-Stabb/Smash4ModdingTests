@@ -355,6 +355,105 @@ wr_l:
           [[0x11, 3, fb(0.0), 0], [0x10, 3, 0, 0], [0xB, 3], [0x11, 1, fb(-1.5)], [0xF, 1, 0], [0x14, 1, fb(1.5)], [0xB, 1]])
 
 
+def thread_tests(pm, om, a):
+    """Thread_Start / Thread_Stop with the game's own interpreter (0x02BEE950 -> 0x02BEE63C): a loaded script
+    (command words = indices) Thread_Start(15, 7, flags){ FRAME(2); Track_Target(3, 2, 0, 0, 0, 0, 0) } Script_End"""
+    from unicorn.ppc_const import UC_PPC_REG_PC
+    idx = {r32(om, CRC_TABLE + 8 * i): r32(om, CRC_TABLE + 8 * i + 4) for i in range(COUNT)}
+    new = {c[0]: C.NEW_BASE + k for k, c in enumerate(C.COMMANDS)}
+    me = 0x10380000                                        # the weapon from obj_tests (WorkModule +0x200)
+    me_wm = me + 0x200
+    script, state, ctx, table = 0x10391000, 0x10392000, 0x10392100, 0x10392200
+    f = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]        # noqa: E731
+
+    def load(flags):
+        words = [new['Thread_Start'], 15, 7, flags, idx[0x42ACFE7D], f(2.0),
+                 new['Track_Target'], 3, f(2.0), 0, 0, 0, 0, 0, idx[0x5766F889], idx[0x5766F889]]
+        for i, w in enumerate(words):
+            w32(pm, script + 4 * i, w)
+
+    def start(flags=0, exe=1):
+        load(flags)
+        w32(pm, state + 4, script)
+        w32(pm, state + 8, -1)
+        pm.mem_write(ctx + 8, bytes([exe]))
+        run(pm, a.addr('h_thread'), RET, {UC_PPC_REG_3: me, UC_PPC_REG_4: table, UC_PPC_REG_5: state,
+                                          UC_PPC_REG_6: ctx, UC_PPC_REG_7: script + 4})
+        return pm.reg_read(UC_PPC_REG_3), r32(pm, state + 4) - script
+
+    def slots():
+        return [(k, r32(pm, C.THREADS + C.THREAD_SIZE * k + 8)) for k in range(C.THREAD_N)
+                if r32(pm, C.THREADS + C.THREAD_SIZE * k) == me]
+
+    def entry_frames():
+        e = [C.OBJS + C.OBJ_SIZE * k for k in range(C.OBJ_N) if r32(pm, C.OBJS + C.OBJ_SIZE * k) == me_wm]
+        return r32(pm, e[0] + 8) if e else None
+    holder = 0x10393000
+    w32(pm, holder, me)
+
+    def step(k=1):                                         # the weapon step entry, as the game calls it
+        regs = {UC_PPC_REG_3 + i: 0x2000 + i for i in range(5, 29)}
+        regs[UC_PPC_REG_3] = 0x1234
+        regs[UC_PPC_REG_4] = holder
+        run(pm, C.STEP_HOOKS[k], C.STEP_HOOKS[k] + 4, regs)
+        kept = all(pm.reg_read(UC_PPC_REG_3 + i) == 0x2000 + i for i in range(5, 29))
+        return kept and pm.reg_read(UC_PPC_REG_3) == 0x1234 and pm.reg_read(UC_PPC_REG_4) == holder \
+            and pm.reg_read(UC_PPC_REG_1) == 0x7F00F000 - 0x38
+    # the interpreter saves / restores f29-f31's paired-single halves (Gekko psq_st / psq_l, primary
+    # opcodes 4 / 56 / 57 / 60 / 61): unicorn can't run them, nop them here (the float values are kept)
+    nopped = 0
+    for lo, hi in ((0x02BEE63C, 0x02BEE9B8), (0x02BE5500, 0x02BE5B00)):
+        for at in range(lo, hi, 4):
+            if r32(pm, at) >> 26 in (4, 56, 57, 60, 61):
+                w32(pm, at, 0x60000000)
+                nopped += 1
+    w32(pm, me + 0x48, 0)                                  # no StopModule: not in hitlag
+    check('Thread_Start: returns 2, the script jumps over the block (15 words)', start(), (2, 60))
+    check('thread registered (ID 7)', [i for _, i in slots()], [7])
+    k = slots()[0][0]
+    check('thread state starts at the block', r32(pm, C.THREADS + C.THREAD_SIZE * k + 0x14), script + 16)
+    track_before = entry_frames()
+    check('step hook keeps registers / stack', step(), True)
+    check('frame 1: FRAME(2) still waiting', (entry_frames(), [i for _, i in slots()]), (track_before, [7]))
+    step()
+    step()
+    check('Track_Target ran by frame 3 (frames 3, then 2 after the frame hook would count)', entry_frames(), 3)
+    for _ in range(3):
+        step()
+    check('the block\'s Script_End ends the thread', slots(), [])
+    start()
+    run(pm, a.addr('h_thread_stop'), RET, {UC_PPC_REG_3: me, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
+                                           UC_PPC_REG_7: holder + 0x10})
+    w32(pm, holder + 0x10, 7)
+    w32(pm, state + 8, -1)
+    run(pm, a.addr('h_thread_stop'), RET, {UC_PPC_REG_3: me, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
+                                           UC_PPC_REG_7: holder + 0x10})
+    check('Thread_Stop(7) stops it', slots(), [])
+    start()
+    start()
+    check('starting the same ID again restarts it (one thread)', len(slots()), 1)
+    w32(pm, 0x10390000 + 0x28, me_wm)
+    run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: me})
+    check('object set-up drops its threads', slots(), [])
+    stop = 0x10394000
+    w32(pm, me + 0x48, stop)
+    pm.mem_write(stop + 0x10, b'\1')                       # in hitlag
+    start()
+    k = slots()[0][0]
+    fr = lambda: struct.unpack('>f', pm.mem_read(C.THREADS + C.THREAD_SIZE * k + 0x10 + 0x18, 4))[0]   # noqa: E731
+    step()
+    step()
+    check('hitlag: the thread waits', (len(slots()), fr()), (1, 0.0))
+    start(flags=1)
+    step()
+    step()
+    check('Flags 1: runs during hitlag', fr() > 0.0, True)
+    pm.mem_write(stop + 0x10, b'\0')
+    run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: me})
+    check('fast-forward (not executed): still jumps over the block', start(exe=0), (2, 60))
+    check('fast-forward: no thread started', slots(), [])
+
+
 def main():
     patched, original = sys.argv[1:3]
     a, words, hooks = C.build()
@@ -462,6 +561,7 @@ def main():
 
     hit_tests(pm, om, a, slot, acc)
     obj_tests(pm, om, a)
+    thread_tests(pm, om, a)
     print('%d failures' % fails)
     sys.exit(1 if fails else 0)
 
