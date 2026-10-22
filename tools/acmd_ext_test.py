@@ -15,6 +15,10 @@ code with the new commands.
   hitstun hook multiplies f28 and keeps the DI x for the victim's WorkModule, which the max DI angle
   read (0x0200011A, through the real get_float with the other caves' hooks) then returns multiplied;
   the victim / attacker hitstop hooks; untagged hits change nothing (and reset the victim's DI x);
+- objects: user variables / timers / kinetic type / speed through the real get_float / set_float
+  (0x0F000300+, via position_vars_cave.py's hooks and the var_entry gate), the per-frame hook counting
+  timers down, the set-up hook forgetting an object, Track_Target steering a weapon (owner skipped,
+  instant and 45-degree turns, range) and a fighter (kinetic ops logged by a stub wrapper);
 - the Extra handlers (base handler stubbed: steps over its own size like the real ones): the script
   moves over base + extra words, the extras are recorded for the slot (multipliers <= 0 -> 1.0),
   ext_find finds them from the slot's data, not after the slot is rewritten, not when skipped.
@@ -146,6 +150,189 @@ def hit_tests(pm, om, a, slot, acc):
     check('self hitstop: no fixed frames', afix(hi, 9), 9)
 
 
+def fcall(mu, fn, wm, ident, val=0.0):
+    """get_float / set_float(r3 WorkModule, r4 ID, f1): callee-saved registers must survive"""
+    mu.reg_write(UC_PPC_REG_3, wm)
+    mu.reg_write(UC_PPC_REG_4, ident)
+    mu.reg_write(UC_PPC_REG_FPR1, f2bits(val))
+    for r in range(14, 32):
+        mu.reg_write(UC_PPC_REG_3 + r - 3, 0x1000 + r)
+    run(mu, fn, RET, {UC_PPC_REG_3: wm, UC_PPC_REG_4: ident})
+    bad = [r for r in range(14, 32) if mu.reg_read(UC_PPC_REG_3 + r - 3) != 0x1000 + r]
+    assert not bad, 'clobbered r%s' % bad
+    return round(struct.unpack('>d', struct.pack('>Q', mu.reg_read(UC_PPC_REG_FPR1)))[0], 4)
+
+
+def obj_tests(pm, om, a):
+    from ppcasm import Asm
+    for at, w in C.OBJ_ORIG.items():
+        check('original word at 0x%08X' % at, r32(om, at), w)
+    FGET, FSET = 0x02F1DBE4, 0x02F1DC04
+    pm.mem_map(0x7E000000, 0x10000)
+    stubs = Asm(0x7E000000)
+    stubs.asm("""
+set_kind:                       # KineticModule vt +0xEC(km, type)
+        stw r4, 0x11C(r3)
+        blr
+speed_sum:                      # vt +0xA4(km, mask) -> r3 x, r4 y bits
+        lwz r4, 0x204(r3)
+        lwz r3, 0x200(r3)
+        blr
+energy:                         # vt +0x54(km, id) -> energy
+        addi r3, r3, 0x300
+        blr
+has_link:                       # LinkModule vt +0x5C
+        li r3, 1
+        blr
+link_id:                        # vt +0x6C -> the owner's object ID
+        lis r3, 0x7E00
+        lwz r3, 0x1F00(r3)
+        blr
+wrapper:                        # MSC module wrapper(ctx, {words, n}): log [n, words...] at 0x7E002000+
+        lis r11, 0x7E00
+        lwz r12, 0x1FF0(r11)
+        lwz r10, 4(r4)
+        stw r10, 0(r12)
+        lwz r9, 0(r4)
+wr_l:
+        addi r12, r12, 4
+        lwz r0, 0(r9)
+        stw r0, 0(r12)
+        addi r9, r9, 4
+        addi r10, r10, -1
+        cmpwi r10, 0
+        bne wr_l
+        addi r12, r12, 4
+        stw r12, 0x1FF0(r11)
+        blr
+""")
+    for i, w in enumerate(stubs.words()):
+        w32(pm, 0x7E000000 + 4 * i, w)
+    # the game's wrappers -> the logging stub
+    wa = stubs.addr('wrapper')
+    for wrap in (C.KINETIC_W, C.POSTURE_W):                 # lis r12 / ori r12 / mtctr r12 / bctr
+        for i, wd in enumerate([0x3D800000 | (wa >> 16), 0x618C0000 | (wa & 0xFFFF), 0x7D8903A6, 0x4E800420]):
+            w32(pm, wrap + 4 * i, wd)
+    # objects: accessor +0x18 posture, +0x28 WorkModule, +0x34 KineticModule, +0x68 LinkModule
+    def obj(base, x, y):
+        acc, post, wm, km, lm, vt = base, base + 0x100, base + 0x200, base + 0x400, base + 0x800, base + 0x900
+        w32(pm, acc + 0x18, post)
+        w32(pm, acc + 0x28, wm)
+        w32(pm, acc + 0x34, km)
+        w32(pm, acc + 0x68, lm)
+        pm.mem_write(post + 0x10, struct.pack('>ff', x, y))
+        pm.mem_write(post + 0x60, struct.pack('>f', 1.0))
+        w32(pm, km, vt)
+        w32(pm, lm, vt + 0x100)
+        for off, lab in ((0xEC, 'set_kind'), (0xA4, 'speed_sum'), (0x54, 'energy')):
+            w32(pm, vt + off, stubs.addr(lab))
+        w32(pm, vt + 0x100 + 0x5C, stubs.addr('has_link'))
+        w32(pm, vt + 0x100 + 0x6C, stubs.addr('link_id'))
+        return acc, wm, km
+    me, me_wm, me_km = obj(0x10380000, 0.0, 0.0)          # a weapon
+    own, own_wm, _ = obj(0x10381000, 0.0, -3.0)          # its owner (nearest, but skipped)
+    foe, foe_wm, foe_km = obj(0x10382000, 0.0, 10.0)
+    mm = 0x10383000                                       # MotionModule: +4 accessor
+
+    def frame(acc):
+        w32(pm, mm + 4, acc)
+        regs = {UC_PPC_REG_3 + 31 - 3: mm}
+        run(pm, C.FRAME_HOOK, C.FRAME_HOOK + 4, regs)
+        check('frame hook keeps r31 / r0 = 1', (pm.reg_read(UC_PPC_REG_3 + 28), pm.reg_read(UC_PPC_REG_0)), (mm, 1)) if acc == me else None
+    # fighter table: [[FIGHTERS]] = {entries, ?, count}; entries: owner (ID 0x10000), foe (ID 0x20000)
+    tab, ents = 0x10384000, 0x10386000
+    w32(pm, C.FIGHTERS, tab)
+    w32(pm, tab, tab + 0x10)
+    w32(pm, tab + 0x10, ents)
+    w32(pm, tab + 0x18, 2)
+    pm.mem_write(ents, b'\0' * (2 * C.FIGHTER_ENTRY))
+    for k, (ident, acc) in enumerate(((0x10000, own), (0x20000, foe))):
+        e = ents + k * C.FIGHTER_ENTRY
+        w32(pm, e, ident)
+        w32(pm, e + 0xC, acc)
+        pm.mem_write(e + 0x1E, b'\4')
+    w32(pm, 0x7E001F00, 0x10000)                          # the weapon's owner: entry 0
+
+    V = lambda i: 0x0F000300 + i                          # noqa: E731
+    check('user var unset -> 0', fcall(pm, FGET, me_wm, V(5)), 0.0)
+    fcall(pm, FSET, me_wm, V(5), 7.5)
+    check('user var 5 = 7.5', fcall(pm, FGET, me_wm, V(5)), 7.5)
+    check('another object: own vars', fcall(pm, FGET, foe_wm, V(5)), 0.0)
+    fcall(pm, FSET, foe_wm, V(5), -2.0)
+    check('both kept', (fcall(pm, FGET, me_wm, V(5)), fcall(pm, FGET, foe_wm, V(5))), (7.5, -2.0))
+    fcall(pm, FSET, me_wm, V(0x21), 3.0)
+    frame(me)
+    frame(me)
+    check('timer 1: 3 -> 1 after 2 frames', fcall(pm, FGET, me_wm, V(0x21)), 1.0)
+    for _ in range(4):
+        frame(me)
+    check('timer stops at 0', fcall(pm, FGET, me_wm, V(0x21)), 0.0)
+    check('position IDs still work (self X of a non-fighter = 0)', fcall(pm, FGET, me_wm, 0x0F000000), 0.0)
+    w32(pm, me_km + 0x11C, 5)
+    check('kinetic type read', fcall(pm, FGET, me_wm, V(0x30)), 5.0)
+    fcall(pm, FSET, me_wm, V(0x30), 9.0)
+    check('kinetic type set (vt +0xEC)', r32(pm, me_km + 0x11C), 9)
+    pm.mem_write(me_km + 0x200, struct.pack('>ff', 1.25, -0.5))
+    check('speed X / Y', (fcall(pm, FGET, me_wm, V(0x32)), fcall(pm, FGET, me_wm, V(0x33))), (1.25, -0.5))
+
+    # Track_Target on the weapon: energy 0 at km + 0x300, moving right (1, 0)
+    h = a.addr('h_track')
+    state, flag, params = 0x10373000, 0x10374000, 0x10375000
+
+    def track(frames, speed, turn, rng, mode):
+        pm.mem_write(params, struct.pack('>iff', frames, speed, turn) + struct.pack('>fi', rng, mode))
+        w32(pm, state + 4, 0x1000)
+        w32(pm, state + 8, -1)
+        pm.mem_write(flag + 8, b'\1')
+        run(pm, h, RET, {UC_PPC_REG_3: me, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
+        return pm.reg_read(UC_PPC_REG_3), r32(pm, state + 4) - 0x1000
+
+    def vel(km):
+        return tuple(round(x, 3) for x in struct.unpack('>ff', pm.mem_read(km + 0x300, 8)))
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    check('Track_Target: returns 2, steps 6 words', track(3, 2.0, 0.0, 0.0, 0), (2, 24))
+    ent = [C.OBJS + C.OBJ_SIZE * k for k in range(C.OBJ_N) if r32(pm, C.OBJS + C.OBJ_SIZE * k) == me_wm]
+    check('Track_Target: entry frames / speed / mode', ent and (r32(pm, ent[0] + 8), struct.unpack('>f', pm.mem_read(ent[0] + 0xC, 4))[0], r32(pm, ent[0] + 0x1C)), (3, 2.0, 0))
+    frame(me)
+    check('weapon: straight at the foe (owner skipped), speed 2', vel(me_km), (0.0, 2.0))
+    check('tracking frames left (raw) 2', r32(pm, ent[0] + 8), 2)
+    check('tracking frames left 2', fcall(pm, FGET, me_wm, V(0x31)), 2.0)
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 0.0, 45.0, 0.0, 0)
+    frame(me)
+    check('weapon: turn 45 degrees a frame, keep speed 1', vel(me_km), (0.707, 0.707))
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 0.0, 0.0, 5.0, 0)
+    frame(me)
+    check('weapon: foe out of range -> unchanged', vel(me_km), (1.0, 0.0))
+    track(1, 2.0, 0.0, 0.0, 0)
+    frame(me)
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    frame(me)
+    check('frames run out -> no more steering', vel(me_km), (1.0, 0.0))
+    track(5, 2.0, 0.0, 0.0, 0)
+    w32(pm, 0x10390000 + 0x28, me_wm)
+    run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: 0x10390000})
+    check('set-up hook: r3 = WorkModule', pm.reg_read(UC_PPC_REG_3), me_wm)
+    check('set-up hook: object forgotten', (fcall(pm, FGET, me_wm, V(5)), fcall(pm, FGET, me_wm, V(0x31))), (0.0, 0.0))
+
+    # a fighter tracking: the foe (in the table) toward the weapon's owner (entry 0)
+    w32(pm, 0x7E001FF0, 0x7E002000)
+    pm.mem_write(foe_km + 0x200, struct.pack('>ff', 0.0, 0.0))
+    run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
+    pm.mem_write(params, struct.pack('>iff', 3, 1.5, 0.0) + struct.pack('>fi', 0.0, 0))
+    run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
+    frame(foe)
+    log, p = [], 0x7E002000
+    while p < r32(pm, 0x7E001FF0):
+        n = r32(pm, p)
+        log.append([r32(pm, p + 4 + 4 * i) for i in range(n)])
+        p += 4 + 4 * n
+    fb = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]      # noqa: E731
+    check('fighter: kinetic ops (as Kirby side B), straight down at speed 1.5', log,
+          [[0x11, 3, fb(0.0), 0], [0x10, 3, 0, 0], [0xB, 3], [0x11, 1, fb(-1.5)], [0xF, 1, 0], [0x14, 1, fb(1.5)], [0xB, 1]])
+
+
 def main():
     patched, original = sys.argv[1:3]
     a, words, hooks = C.build()
@@ -201,7 +388,7 @@ def main():
 
     # handlers, base handler stubbed (steps over its own size when state +8 == -1, returns 2)
     acc, am, slots, state, flag, params = 0x10370000, 0x10371000, 0x10372000, 0x10373000, 0x10374000, 0x10375000
-    for k, (name, csize, label, base) in enumerate(C.COMMANDS):
+    for k, (name, csize, label, base) in enumerate(C.COMMANDS[:2]):
         nbase = csize - C.N_EXTRA
         stub = [0x8005_0008, 0x2C00FFFF, 0x40820010, 0x8165_0004, 0x396B0000 | (4 * nbase), 0x91650004,
                 0x38600002, 0x4E800020]          # lwz r0,8(r5); cmpwi r0,-1; bne +16; lwz r11,4(r5);
@@ -252,6 +439,7 @@ def main():
         check('%s: bad pointer: no crash, nothing' % name, find(0x00001234), 0)
 
     hit_tests(pm, om, a, slot, acc)
+    obj_tests(pm, om, a)
     print('%d failures' % fails)
     sys.exit(1 if fails else 0)
 

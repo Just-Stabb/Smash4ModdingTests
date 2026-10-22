@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04B90000
-LIMIT = 0x04B94000
+LIMIT = 0x04B98000
 TABLE = 0x04B92000               # extras entries (zero at load)
 ENTRIES = 128
 ENTRY = 0x30
@@ -67,6 +67,25 @@ DI_SLOTS = 16
 HIT_ORIG = {HIT_STUN: 0xD39E0030, HIT_VSTOP: 0x2C130002, HIT_AMUL: 0x7C7B1B79, HIT_AFIX: 0x83610010,
             DI_STAT: 0x4C820020}
 
+# per-object state (user variables, timers, tracking), keyed by the object's WorkModule
+OBJS = 0x04B94000                # OBJ_N entries of OBJ_SIZE (zero at load)
+OBJ_N = 48
+OBJ_SIZE = 0x100                 # +0 WorkModule, +4 accessor (last seen), +8 tracking frames left (int, < 0 = until
+                                 # stopped), +0xC speed, +0x10 cos(turn) (< -1.5: turn at once), +0x14 sin(turn),
+                                 # +0x18 range squared (0 = any), +0x1C mode, +0x20 timers[16], +0x60 vars[32]
+ACC_CACHE = 0x04B97000           # 64 x {WorkModule, accessor}, filled by the per-frame hook for every object
+GROW = 0x04B98000
+FRAME_HOOK = 0x02C5F430          # every object's motion step, right after its ACMD ran (not in hitlag): li r0, 1
+WM_RESET = 0x02BF5864            # object set-up (every class, 0x02BF57B0): lwz r3, 0x28(r31) before WorkModule
+                                 # vt +0x24 (reset): an object is set up / reused. r0 r10 ctr are free there
+VAR_ENTRY = 0x04B79000           # position_vars_cave.py's var_entry (0x0F000xxx IDs): rlwinm r12, r4, 0, 22, 31
+USER_BASE = 0x300                # IDs 0x0F000300+ come here (docs/acmd-extra-commands.md)
+FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0] = fighter table: +0 entries, +8 count
+FIGHTER_ENTRY = 0x76B0           # entry: +0 object ID, +0xC accessor, byte +0x1E >= 4 = live
+KINETIC_W = 0x030B29D8           # MSC module wrappers: wrapper(ctx (+4 = accessor), {words, count})
+POSTURE_W = 0x030B2AB8
+OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
+
 SPECIAL_HITBOX = 0x02BDBB20      # handler, size 42
 EXT_SPECIAL_HITBOX = 0x02BDD46C  # handler, size 44
 N_EXTRA = 6
@@ -87,12 +106,33 @@ SM4SHCOMMAND_DESC = {
                                      'hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched '
                                      'cross_f.rpx (docs/acmd-extra-commands.md).',
 }
+SM4SHCOMMAND_DESC['Track_Target'] = (
+    'Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: '
+    'its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner. '
+    'Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
     ('Extra_Special_Hitbox', 42 + N_EXTRA, 'h_extra', SPECIAL_HITBOX),
     ('Extra_Extended_Special_Hitbox', 44 + N_EXTRA, 'h_extra_ext', EXT_SPECIAL_HITBOX),
+    ('Track_Target', 6, 'h_track', None),
 ]
+TRACK_PARAMS = [
+    ('Frames', 0, 'Frames to track for (counted while the object moves: not in hitlag). -1 = until a Track_Target with 0 frames (or the object is reset).'),
+    ('Speed', 1, 'Travel speed while tracking. 0 = keep the current speed (and turn it).'),
+    ('TurnRate', 1, 'Most the direction can turn per frame, in degrees. 0 (or 180+) = point straight at the target every frame.'),
+    ('Range', 1, 'Only targets within this distance (X/Y). 0 = any distance.'),
+    ('Mode', 0, 'Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).'),
+]
+
+
+def ha(v):
+    return ((v + 0x8000) >> 16) & 0xFFFF
+
+
+def lo(v):
+    v &= 0xFFFF
+    return v - 0x10000 if v & 0x8000 else v
 
 
 def crc(name):
@@ -325,6 +365,7 @@ next_entry:
 """ % dict(tag=TAG_OFF, TAG=TAG, entries=ENTRIES, entry=ENTRY))
 
     hit_code(a)
+    obj_code(a)
     if a.pc % 8:
         a.asm('.word 0')
     a.asm("""
@@ -339,15 +380,663 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     a.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
     a.labels['table'] = TABLE
     a.labels['di_tab'] = TABLE + ENTRIES * ENTRY
+    a.labels['objs'] = OBJS
+    a.labels['acc_cache'] = ACC_CACHE
+    assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= OBJS
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
+    assert ACC_CACHE + 64 * 8 <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
              HIT_STUN: b(HIT_STUN, a.addr('hk_stun')), HIT_VSTOP: b(HIT_VSTOP, a.addr('hk_vstop')),
              HIT_AMUL: b(HIT_AMUL, a.addr('hk_amul')), HIT_AFIX: b(HIT_AFIX, a.addr('hk_afix')),
-             DI_STAT: b(DI_STAT, a.addr('di_check'))}   # was bnelr: di_check tests cr0
+             DI_STAT: b(DI_STAT, a.addr('di_check')),   # was bnelr: di_check tests cr0
+             FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
+             VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
     return a, words, hooks
+
+
+def vcall(off):
+    """call vt +off of the object in r3 (r12 / ctr clobbered)"""
+    return """
+        lwz r12, 0(r3)
+        lwz r12, %d(r12)
+        mtctr r12
+        bctrl""" % off
+
+
+def kcall(wrapper, words):
+    """MSC module op through its wrapper: ctx at 0x40(r1) (+4 = accessor in r30), args {0x30(r1), n} at
+    0x28(r1); words: ints, or ('f', stack offset) for a float kept at that offset of the frame"""
+    out = ["        stw r30, 0x44(r1)"]
+    for i, w in enumerate(words):
+        if isinstance(w, tuple):
+            out.append("        lwz r0, %d(r1)" % w[1])
+        else:
+            out.append("        li r0, %d" % w)
+        out.append("        stw r0, %d(r1)" % (0x30 + 4 * i))
+    out += ["        addi r0, r1, 0x30", "        stw r0, 0x28(r1)", "        li r0, %d" % len(words),
+            "        stw r0, 0x2C(r1)", "        addi r3, r1, 0x40", "        addi r4, r1, 0x28",
+            "        bl 0x%08X" % wrapper]
+    return "\n" + "\n".join(out)
+
+
+def obj_code(a):
+    """per-object state: user variables / timers / kinetic type / tracking"""
+    U = dict(ubase=USER_BASE, u20=USER_BASE + 0x20, u30=USER_BASE + 0x30, u31=USER_BASE + 0x31,
+             u32=USER_BASE + 0x32, u33=USER_BASE + 0x33)
+    fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
+    a.asm("""
+# --- obj_find(r3 WorkModule, r4 create) -> r3 entry or 0; leaf: r0 r10 r11 r12 -----------------
+obj_find:
+        lis r12, objs@ha
+        addi r12, r12, objs@l
+        li r11, %(n)d
+of_loop:
+        lwz r0, 0(r12)
+        cmplw r0, r3
+        beq of_hit
+        addi r12, r12, %(size)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne of_loop
+        cmpwi r4, 0
+        beq of_none
+        lis r12, objs@ha
+        addi r12, r12, objs@l
+        li r11, %(n)d
+of_free:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq of_take
+        addi r12, r12, %(size)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne of_free
+        lis r10, obj_next@ha            # all taken: the oldest one goes
+        lwz r11, obj_next@l(r10)
+        addi r0, r11, 1
+        cmplwi r0, %(n)d
+        blt of_wrap
+        li r0, 0
+of_wrap:
+        stw r0, obj_next@l(r10)
+        mulli r11, r11, %(size)d
+        lis r12, objs@ha
+        addi r12, r12, objs@l
+        add r12, r12, r11
+of_take:
+        li r0, 0
+        li r11, %(last)d
+of_zero:
+        stwx r0, r12, r11
+        addi r11, r11, -4
+        cmpwi r11, 0
+        bge of_zero
+        stw r3, 0(r12)
+of_hit:
+        mr r3, r12
+        blr
+of_none:
+        li r3, 0
+        blr
+
+# --- acc_of(r3 WorkModule) -> r3 accessor or 0 (the per-frame cache); leaf: r0 r11 r12 -----------
+acc_of:
+        rlwinm r12, r3, 31, 23, 28      # ((wm >> 4) & 63) * 8
+        lis r11, acc_cache@ha
+        addi r11, r11, acc_cache@l
+        add r11, r11, r12
+        lwz r0, 0(r11)
+        cmplw r0, r3
+        bne ao_none
+        lwz r3, 4(r11)
+        blr
+ao_none:
+        li r3, 0
+        blr
+
+# --- i2f(r3) -> f1 (float); f2i(f1) -> r3 (truncated). r0 r12 f0 f12 ------------------------------
+i2f:
+        lis r12, scratch@ha
+        addi r12, r12, scratch@l
+        xoris r0, r3, 0x8000
+        stw r0, 4(r12)
+        lis r0, 0x4330
+        stw r0, 0(r12)
+        lfd f0, 0(r12)
+        lfd f12, 8(r12)
+        fsub f1, f0, f12
+        frsp f1, f1
+        blr
+f2i:
+        lis r12, scratch@ha
+        addi r12, r12, scratch@l
+        fctiwz f0, f1
+        stfd f0, 0(r12)
+        lwz r3, 4(r12)
+        blr
+
+# --- fsqrt(f1) -> f1; f0 f12 f13 (0 for <= 0) -----------------------------------------------------
+fsqrt:
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        fcmpu cr0, f1, f0
+        bgt fs_go
+        fmr f1, f0
+        blr
+fs_go:
+        frsqrte f12, f1
+        lfs f13, half@l(r12)
+        lfs f0, onehalf@l(r12)
+        fmul f13, f1, f13               # x / 2
+        fmul f2, f12, f12
+        fmul f2, f2, f13
+        fsub f2, f0, f2
+        fmul f12, f12, f2               # y (1.5 - x/2 y^2), twice
+        fmul f2, f12, f12
+        fmul f2, f2, f13
+        fsub f2, f0, f2
+        fmul f12, f12, f2
+        fmul f1, f1, f12
+        frsp f1, f1
+        blr
+
+# --- var_entry gate: IDs 0x0F000300+ -> user_entry ---------------------------------------------------
+user_gate:
+        rlwinm r12, r4, 0, 22, 31
+        cmplwi r12, %(ubase)d
+        blt ug_back
+        b user_entry
+ug_back:
+        b 0x%(var_back)08X
+
+# --- user_entry(r3 WorkModule, r4 ID, r5 write, f1 value) -> f1 ----------------------------------------
+# 0x300+i (i < 32) user variable i; 0x320+i (i < 16) timer i (counts down to 0 each frame);
+# 0x330 kinetic type (write: change it); 0x331 tracking frames left (write: set, 0 stops);
+# 0x332 / 0x333 speed X / Y (read only, all energies). Any other: reads 0.
+user_entry:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x1C(r1)
+        stfs f1, 0x18(r1)
+        mr r31, r3
+        rlwinm r30, r4, 0, 22, 31
+        mr r29, r5""" % dict(n=OBJ_N, size=OBJ_SIZE, last=OBJ_SIZE - 4, ubase=USER_BASE, var_back=VAR_ENTRY + 4)
+        + fl('r31', 'ue_zero') + """
+        cmplwi r30, %(u20)d
+        blt ue_var
+        cmplwi r30, %(u30)d
+        blt ue_timer
+        beq ue_kin
+        cmplwi r30, %(u31)d
+        beq ue_track
+        cmplwi r30, %(u33)d
+        bgt ue_zero
+        b ue_speed
+ue_var:
+        addi r28, r30, -%(ubase)d
+        slwi r28, r28, 2
+        addi r28, r28, 0x60
+        b ue_slot
+ue_timer:
+        addi r28, r30, -%(u20)d
+        slwi r28, r28, 2
+        addi r28, r28, 0x20
+ue_slot:
+        mr r3, r31
+        mr r4, r29                      # writing creates the object's entry
+        bl obj_find
+        cmpwi r3, 0
+        beq ue_zero
+        cmpwi r29, 0
+        bne ue_slot_w
+        lfsx f1, r3, r28
+        b ue_out
+ue_slot_w:
+        lfs f1, 0x18(r1)
+        stfsx f1, r3, r28
+        b ue_out
+ue_track:
+        mr r3, r31
+        mr r4, r29
+        bl obj_find
+        mr. r28, r3
+        beq ue_zero
+        cmpwi r29, 0
+        bne ue_track_w
+        lwz r3, 8(r28)
+        bl i2f
+        b ue_out
+ue_track_w:
+        lfs f1, 0x18(r1)
+        bl f2i
+        stw r3, 8(r28)
+        b ue_out
+ue_kin:
+        mr r3, r31
+        bl acc_of""" % U + fl('r3', 'ue_zero') + """
+        lwz r3, 0x34(r3)                # KineticModule""" + fl('r3', 'ue_zero') + """
+        mr r28, r3
+        cmpwi r29, 0
+        bne ue_kin_w
+        lwz r3, 0x11C(r28)              # current kinetic type
+        bl i2f
+        b ue_out
+ue_kin_w:
+        lfs f1, 0x18(r1)
+        bl f2i
+        mr r4, r3
+        mr r3, r28""" + vcall(0xEC) + """   # set the kinetic type (as Set_Kinetic_Handler: op 0)
+        b ue_out
+ue_speed:
+        cmpwi r29, 0
+        bne ue_out
+        mr r3, r31
+        bl acc_of""" + fl('r3', 'ue_zero') + """
+        lwz r3, 0x34(r3)""" + fl('r3', 'ue_zero') + """
+        li r4, -1""" + vcall(0xA4) + """   # sum of the enabled energies' speed: r3 x, r4 y (float bits)
+        stw r3, 0x10(r1)
+        stw r4, 0x14(r1)
+        cmplwi r30, 0x332
+        bne ue_sp_y
+        lfs f1, 0x10(r1)
+        b ue_out
+ue_sp_y:
+        lfs f1, 0x14(r1)
+        b ue_out
+ue_zero:
+        lis r12, zero@ha
+        lfs f1, zero@l(r12)
+ue_out:
+        cmpwi r29, 0
+        beq ue_ret
+        lfs f1, 0x18(r1)
+ue_ret:
+        lmw r27, 0x1C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# --- WorkModule set up / reused: forget its entry --------------------------------------------------
+hk_wmreset:
+        lwz r3, 0x28(r31)               # the WorkModule about to be reset
+        lis r10, objs@ha
+        addi r10, r10, objs@l
+        li r0, %(n)d
+        mtctr r0
+wr_loop:
+        lwz r0, 0(r10)
+        cmplw r0, r3
+        bne wr_next
+        li r0, 0
+        stw r0, 0(r10)
+        stw r0, 8(r10)                  # no tracking
+wr_next:
+        addi r10, r10, %(size)d
+        bdnz wr_loop
+        b 0x%(wm_back)08X
+
+# --- every object, every frame it moves (after its ACMD): timers, tracking --------------------------
+hk_frame:
+        stwu r1, -0x60(r1)
+        stmw r26, 0x28(r1)
+        lwz r29, 4(r31)                 # accessor (r31 = MotionModule)""" % dict(U, n=OBJ_N, size=OBJ_SIZE, wm_back=WM_RESET + 4)
+        + fl('r29', 'hf_out') + """
+        lwz r28, 0x28(r29)              # WorkModule""" + fl('r28', 'hf_out') + """
+        rlwinm r12, r28, 31, 23, 28
+        lis r11, acc_cache@ha
+        addi r11, r11, acc_cache@l
+        add r11, r11, r12
+        stw r28, 0(r11)
+        stw r29, 4(r11)
+        mr r3, r28
+        li r4, 0
+        bl obj_find
+        mr. r30, r3
+        beq hf_out
+        stw r29, 4(r30)
+        lis r12, one@ha
+        lfs f2, one@l(r12)
+        lfs f3, zero@l(r12)
+        li r11, 0x20
+hf_timer:
+        lfsx f1, r30, r11
+        fcmpu cr0, f1, f3
+        ble hf_tnext
+        fsubs f1, f1, f2
+        fcmpu cr0, f1, f3
+        bge hf_tset
+        fmr f1, f3
+hf_tset:
+        stfsx f1, r30, r11
+hf_tnext:
+        addi r11, r11, 4
+        cmpwi r11, 0x60
+        blt hf_timer
+        lwz r12, 8(r30)
+        cmpwi r12, 0
+        beq hf_out
+        blt hf_go                       # < 0: until stopped
+        addi r12, r12, -1               # (not r0: addi rD, r0, n is li)
+        stw r12, 8(r30)
+hf_go:
+        mr r3, r30
+        mr r4, r29
+        bl track_step
+hf_out:
+        lmw r26, 0x28(r1)
+        addi r1, r1, 0x60
+        li r0, 1
+        b 0x%(frame_back)08X
+""" % dict(frame_back=FRAME_HOOK + 4))
+    track_code(a)
+
+
+def track_code(a):
+    fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
+    # frame: 0x10/0x14 current v, 0x18/0x1C target delta, 0x20/0x24 new v, 0x28 args, 0x30 words,
+    # 0x40 ctx (+4 accessor), 0x48 best d2; r31 entry, r30 accessor, r29 KineticModule, r28 posture,
+    # r27 owner ID, r26 self is a fighter, r25 count, r24 entries, r23 energy 0 (weapons), r22 found
+    a.asm("""
+# --- Track_Target command: (Frames, Speed, TurnRate, Range, Mode) ------------------------------------
+h_track:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r28, 0x1C(r1)
+        mr r31, r5
+        mr r30, r7
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq ht_step""" + fl('r3', 'ht_step') + """
+        lwz r3, 0x28(r3)""" + fl('r3', 'ht_step') + """
+        li r4, 1
+        bl obj_find
+        mr. r29, r3
+        beq ht_step
+        lwz r0, 0(r30)
+        stw r0, 8(r29)                  # frames
+        lfs f1, 4(r30)
+        stfs f1, 0xC(r29)               # speed
+        lfs f1, 0xC(r30)                # range -> squared
+        fmuls f1, f1, f1
+        stfs f1, 0x18(r29)
+        lwz r0, 0x10(r30)
+        stw r0, 0x1C(r29)               # mode
+        lfs f1, 8(r30)                  # turn rate (degrees)
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        lfs f2, snap@l(r12)
+        stfs f2, 0x10(r29)              # cos < -1.5: turn at once
+        fcmpu cr0, f1, f0
+        ble ht_step
+        lfs f3, deg180@l(r12)
+        fcmpu cr0, f1, f3
+        bge ht_step
+        lfs f3, deg2rad@l(r12)
+        fmuls f1, f1, f3                # x (radians)
+        fmuls f2, f1, f1                # x^2
+        lfs f4, one@l(r12)
+""" + horner('f5', 'f2', [72, 42, 20, 6]) + """
+        fmuls f5, f5, f1                # sin x = x (1 - x2/6 (1 - x2/20 (...)))
+        stfs f5, 0x14(r29)
+""" + horner('f5', 'f2', [56, 30, 12, 2]) + """
+        stfs f5, 0x10(r29)              # cos x
+ht_step:
+        lwz r0, 8(r31)
+        cmpwi r0, -1
+        bne ht_out
+        lwz r11, 4(r31)
+        addi r11, r11, 24
+        stw r11, 4(r31)
+ht_out:
+        li r3, 2
+        lmw r28, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- track_step(r3 entry, r4 accessor): steer toward the nearest other fighter ------------------------
+track_step:
+        stwu r1, -0x90(r1)
+        mflr r0
+        stw r0, 0x94(r1)
+        stmw r22, 0x58(r1)
+        mr r31, r3
+        mr r30, r4
+        lwz r29, 0x34(r30)""" + fl('r29', 'ts_out') + """
+        lwz r28, 0x18(r30)""" + fl('r28', 'ts_out') + """
+        li r27, -1
+        li r26, 0
+        lis r12, %(fh)d
+        lwz r12, %(fl)d(r12)""" % dict(fh=ha(FIGHTERS), fl=lo(FIGHTERS)) + fl('r12', 'ts_out') + """
+        lwz r12, 0(r12)""" + fl('r12', 'ts_out') + """
+        lwz r25, 8(r12)
+        lwz r24, 0(r12)""" + fl('r24', 'ts_out') + """
+        cmplwi r25, 16
+        bgt ts_out
+        li r11, 0
+ts_self:
+        cmpw r11, r25
+        bge ts_self_done
+        mulli r12, r11, %(fe)d
+        add r12, r24, r12
+        lwz r0, 0xC(r12)
+        cmplw r0, r30
+        bne ts_self_next
+        li r26, 1
+ts_self_next:
+        addi r11, r11, 1
+        b ts_self
+ts_self_done:
+        cmpwi r26, 0
+        bne ts_vel
+        lwz r3, 0x68(r30)               # a weapon: its owner (LinkModule link 0's object ID)""" % dict(fe=FIGHTER_ENTRY)
+        + fl('r3', 'ts_vel') + """
+        mr r22, r3
+        li r4, 0""" + vcall(0x5C) + """
+        cmpwi r3, 0
+        beq ts_vel
+        mr r3, r22
+        li r4, 0
+        li r5, 1""" + vcall(0x6C) + """
+        mr r27, r3
+ts_vel:
+        cmpwi r26, 0
+        beq ts_vel_w
+        mr r3, r29
+        li r4, -1""" + vcall(0xA4) + """   # fighter: speed of all energies
+        stw r3, 0x10(r1)
+        stw r4, 0x14(r1)
+        b ts_find
+ts_vel_w:
+        mr r3, r29
+        li r4, 0""" + vcall(0x54) + """   # weapon: energy 0 (its own movement)""" + fl('r3', 'ts_out') + """
+        mr r23, r3
+        lwz r0, 0(r23)
+        stw r0, 0x10(r1)
+        lwz r0, 4(r23)
+        stw r0, 0x14(r1)
+ts_find:
+        li r22, 0
+        li r11, 0
+ts_floop:
+        cmpw r11, r25
+        bge ts_fdone
+        mulli r12, r11, %(fe)d
+        add r12, r24, r12
+        addi r11, r11, 1
+        lbz r0, 0x1E(r12)
+        cmplwi r0, 4
+        blt ts_floop
+        lwz r0, 0(r12)
+        cmpw r0, r27
+        beq ts_floop
+        lwz r10, 0xC(r12)
+        cmplw r10, r30
+        beq ts_floop""" % dict(fe=FIGHTER_ENTRY) + fl('r10', 'ts_floop') + """
+        lwz r10, 0x18(r10)""" + fl('r10', 'ts_floop') + """
+        lfs f1, 0x10(r10)
+        lfs f2, 0x10(r28)
+        fsubs f1, f1, f2                # dx
+        lfs f2, 0x14(r10)
+        lfs f3, 0x14(r28)
+        fsubs f2, f2, f3                # dy
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 1
+        beq ts_d2
+        lis r12, zero@ha
+        lfs f2, zero@l(r12)
+ts_d2:
+        fmuls f3, f1, f1
+        fmadds f3, f2, f2, f3           # d2
+        lfs f4, 0x18(r31)               # range squared (0 = any)
+        lis r12, zero@ha
+        lfs f5, zero@l(r12)
+        fcmpu cr0, f4, f5
+        ble ts_inrange
+        fcmpu cr0, f3, f4
+        bgt ts_floop
+ts_inrange:
+        cmpwi r22, 0
+        beq ts_take
+        lfs f4, 0x48(r1)
+        fcmpu cr0, f3, f4
+        bge ts_floop
+ts_take:
+        li r22, 1
+        stfs f3, 0x48(r1)
+        stfs f1, 0x18(r1)
+        stfs f2, 0x1C(r1)
+        b ts_floop
+ts_fdone:
+        cmpwi r22, 0
+        beq ts_out
+        lfs f1, 0x48(r1)                # d^ = d / |d|
+        bl fsqrt
+        lis r12, tiny@ha
+        lfs f0, tiny@l(r12)
+        fcmpu cr0, f1, f0
+        blt ts_out
+        lfs f2, 0x18(r1)
+        lfs f3, 0x1C(r1)
+        fdivs f6, f2, f1                # f6, f7 = d^
+        fdivs f7, f3, f1
+        stfs f6, 0x20(r1)
+        stfs f7, 0x24(r1)
+        lfs f2, 0x10(r1)                # |v|
+        lfs f3, 0x14(r1)
+        fmuls f1, f2, f2
+        fmadds f1, f3, f3, f1
+        bl fsqrt
+        stfs f1, 0x4C(r1)
+        lfs f6, 0x20(r1)
+        lfs f7, 0x24(r1)
+        lfs f8, 0xC(r31)                # speed (0 = keep |v|)
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        fcmpu cr0, f8, f0
+        bgt ts_spd
+        fmr f8, f1
+ts_spd:
+        lis r12, tiny@ha
+        lfs f0, tiny@l(r12)
+        fcmpu cr0, f1, f0
+        blt ts_dir_d                    # not moving: straight at the target
+        lfs f2, 0x10(r1)
+        lfs f3, 0x14(r1)
+        fdivs f2, f2, f1                # f2, f3 = v^
+        fdivs f3, f3, f1
+        lfs f4, 0x10(r31)               # cos(turn)
+        lfs f5, snap@l(r12)
+        fcmpu cr0, f4, f5
+        blt ts_dir_d
+        fmuls f9, f2, f6                # dot
+        fmadds f9, f3, f7, f9
+        fcmpu cr0, f9, f4
+        bge ts_dir_d
+        lfs f5, 0x14(r31)               # sin(turn), signed by cross
+        fmuls f10, f2, f7               # cross = vx dy - vy dx
+        fmuls f11, f3, f6
+        fsubs f10, f10, f11
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        fcmpu cr0, f10, f0
+        bge ts_rot
+        fneg f5, f5
+ts_rot:
+        fmuls f6, f2, f4                # (vx c - vy s, vx s + vy c)
+        fmuls f11, f3, f5
+        fsubs f6, f6, f11
+        fmuls f7, f2, f5
+        fmadds f7, f3, f4, f7
+ts_dir_d:
+        fmuls f6, f6, f8
+        fmuls f7, f7, f8
+        stfs f6, 0x20(r1)
+        stfs f7, 0x24(r1)
+        stfs f8, 0x4C(r1)
+        cmpwi r26, 0
+        bne ts_fighter
+        stfs f6, 0(r23)                 # weapon: its own movement energy
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 1
+        bne ts_out
+        stfs f7, 4(r23)
+        b ts_out
+ts_fighter:""" + kcall(KINETIC_W, [0x11, 3, ('f', 0x20), 0]) + kcall(KINETIC_W, [0x10, 3, 0, 0])
+        + kcall(KINETIC_W, [0xB, 3]) + """
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 1
+        bne ts_face""" + kcall(KINETIC_W, [0x11, 1, ('f', 0x24)]) + kcall(KINETIC_W, [0xF, 1, 0])
+        + kcall(KINETIC_W, [0x14, 1, ('f', 0x4C)]) + kcall(KINETIC_W, [0xB, 1]) + """
+ts_face:
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 2
+        beq ts_out
+        lfs f1, 0x18(r1)
+        lfs f2, 0x60(r28)               # facing
+        fmuls f1, f1, f2
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        fcmpu cr0, f1, f0
+        bge ts_out""" + kcall(POSTURE_W, [0x2710]) + kcall(POSTURE_W, [0x2]) + """
+ts_out:
+        lmw r22, 0x58(r1)
+        lwz r0, 0x94(r1)
+        mtlr r0
+        addi r1, r1, 0x90
+        blr
+half:
+        .float 0.5
+onehalf:
+        .float 1.5
+tiny:
+        .float 0.0001
+snap:
+        .float -2.0
+deg180:
+        .float 180.0
+deg2rad:
+        .float 0.017453292
+obj_next:
+        .word 0
+""" + ''.join("k_%d:\n        .float %r\n" % (d, 1.0 / d) for d in (72, 42, 20, 6, 56, 30, 12, 2)))
+
+
+def horner(fd, fx2, ds):
+    """fd = 1 - x2/d0 (1 - x2/d1 (... (1 - x2/dn))) for ds = [dn ... d0] (innermost first); f4 = 1.0;
+    the constants 1/d are inline-loaded from k_<d> labels (made by consts_for)"""
+    out = ["        fmr %s, f4" % fd]
+    for d in ds:
+        out += ["        lfs f6, k_%d@l(r12)" % d, "        fmuls f6, f6, %s" % fx2, "        fmuls f6, f6, %s" % fd,
+                "        fsubs %s, f4, f6" % fd]
+    return "\n".join(out)
 
 
 def hit_code(a):
@@ -586,7 +1275,12 @@ def labels(path):
     d = json.load(open(path))
     info = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'acmd_info.json')))['commands']
     for name, size, _label, _base in COMMANDS:
-        if name not in BASE_CRC:
+        if name == 'Track_Target':
+            e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
+                 '_format': [t for _n, t, _d in TRACK_PARAMS]}
+            for k, (pname, _t, desc) in enumerate(TRACK_PARAMS):
+                e[str(k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
+            d['%08X' % crc(name)] = e
             continue
         base = '%08X' % BASE_CRC[name]
         bi, bl = info[base], d.get(base, {})

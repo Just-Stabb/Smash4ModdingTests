@@ -10140,6 +10140,24 @@
 "SelfHitstopFrames",
 "DIMul"
 ]
+},
+"113030DB": {
+"size": 6,
+"name": "Track_Target",
+"format": [
+0,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Frames",
+"Speed",
+"TurnRate",
+"Range",
+"Mode"
+]
 }
 }
 }

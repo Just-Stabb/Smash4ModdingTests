@@ -131,7 +131,8 @@ namespace SALT.Moveset.AnimCMD
              { 0x4B7B6E51, 2 }, { 0x5F4CF775, 1 }, { 0x522DBA37, 1 }, { 0xCD25726B, 1 }, { 0x314839A7, 1 },
              { 0xF0D25BDA, 2 }, { 0x3341CBFE, 1 }, { 0x92A88908, 2 }, { 0x300A0A85, 1 },
             {0x5C8A67C9,50},
-            {0x974EA5BE,48}
+            {0x974EA5BE,48},
+            {0x113030DB,6}
         };
         #endregion
         #region Names
@@ -723,6 +724,7 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,"unk_300A0A85"},
             {0x5C8A67C9,"Extra_Extended_Special_Hitbox"},
             {0x974EA5BE,"Extra_Special_Hitbox"},
+            {0x113030DB,"Track_Target"},
         };
         #endregion
         #region Params
@@ -1316,6 +1318,7 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,String.Empty},
             {0x5C8A67C9,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,1,0,1"},
             {0x974EA5BE,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1"},
+            {0x113030DB,"0,1,1,1,0"},
         };
         #endregion
         #region syntax
@@ -1907,6 +1910,7 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,String.Empty},
             {0x5C8A67C9,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,X2,Y2,Z2,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
             {0x974EA5BE,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,Shape,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
+            {0x113030DB,"Frames,Speed,TurnRate,Range,Mode"},
         };
         #endregion
 
@@ -2500,6 +2504,7 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,"NONE"},
             {0x5C8A67C9,"Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x974EA5BE,"Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner. Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

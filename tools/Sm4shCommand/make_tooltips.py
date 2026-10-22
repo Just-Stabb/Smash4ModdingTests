@@ -217,6 +217,15 @@ def _position_lines():
         for q, (qn, qd) in enumerate(quantities):
             out.append((0x0F000040 + 8 * t + q, "%s %s" % (tn, qn), "Target: %s.\\n%s" % (td, qd)))
     out.append((0x0F000098, "Self animation rate x", "Read: this fighter's animation rate multiplier (1.0 normally).\\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)"))
+    # per-object variables, timers, kinetic type, tracking (tools/acmd_ext_cave.py, docs/acmd-extra-commands.md)
+    for i in range(32):
+        out.append((0x0F000300 + i, "User variable %d" % i, "Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py."))
+    for i in range(16):
+        out.append((0x0F000320 + i, "Timer %d" % i, "Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py."))
+    out.append((0x0F000330, "Kinetic type", "Read: the object's current kinetic type (what Set_Kinetic_Handler sets). Write: change it (works for projectiles too). Needs tools/acmd_ext_cave.py."))
+    out.append((0x0F000331, "Tracking frames left", "Read: frames of Track_Target left (-1 = until stopped). Write: set them; 0 stops tracking. Needs tools/acmd_ext_cave.py."))
+    out.append((0x0F000332, "Speed X", "Read only: the object's current X speed (all its kinetic energies). Needs tools/acmd_ext_cave.py."))
+    out.append((0x0F000333, "Speed Y", "Read only: the object's current Y speed (all its kinetic energies). Needs tools/acmd_ext_cave.py."))
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(STATE_QUANTITIES):
             out.append((0x0F0000A0 + 8 * t + q, "%s %s" % (tn, qn.lower().replace("_", " ")), "Target: %s.\\n%s" % (td, qd)))
@@ -272,6 +281,10 @@ def alias_lines():
         out.append(("%s_STICK_X_RAW" % tn, 0x0F000260 + 2 * t, ""))
         out.append(("%s_CSTICK_X_RAW" % tn, 0x0F000261 + 2 * t, ""))
     out.append(("SELF_ANIM_RATE", 0x0F000098, "animation rate multiplier (1.0 normally)"))
+    out += [("VAR_%d" % i, 0x0F000300 + i, "user variable (per object)" if i == 0 else "") for i in range(32)]
+    out += [("TIMER_%d" % i, 0x0F000320 + i, "counts down each frame to 0 (per object)" if i == 0 else "") for i in range(16)]
+    out += [("KINETIC_TYPE", 0x0F000330, "read / set the kinetic type"), ("TRACK_FRAMES", 0x0F000331, "Track_Target frames left; 0 stops"),
+            ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, "")]
     return out
 
 

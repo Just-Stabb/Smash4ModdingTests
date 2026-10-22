@@ -54,7 +54,7 @@ CATEGORIES = [
     ("Sound", r"(^|_)SE(_|$)|Sound|SOUND|Voice|VOICE|PITCH|VOLUME|BGM|SEQUENCE|^PLAY_|^IS_PLAYING|INHIVIT"),
     ("Camera, quake & rumble", r"CAM|Camera|QUAKE|Rumble|RUMBLE|SCROLL"),
     ("Slowdown", r"Time_Manipulation"),
-    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$"),
+    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$|^Track_"),
     ("Animation, model & visibility", r"^MOT_|Model|Morph|^VIS_|Visibility|SHADOW|MATERIAL|^MII_|^STRANS"),
     ("Articles (projectiles)", r"ARTICLE|Article"),
     ("Items", r"(?i:item)|^Fire_Weapon$|BULLET"),

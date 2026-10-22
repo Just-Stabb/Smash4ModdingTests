@@ -110,6 +110,58 @@
 0x0F000096 = Slot 8 offset Y | Target: player slot 8.\nRead: its Y - this fighter's Y.\nWrite: put it at this fighter's Y + value.
 0x0F000097 = Slot 8 offset Z | Target: player slot 8.\nRead: its Z - this fighter's Z.\nWrite: put it at this fighter's Z + value.
 0x0F000098 = Self animation rate x | Read: this fighter's animation rate multiplier (1.0 normally).\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)
+0x0F000300 = User variable 0 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000301 = User variable 1 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000302 = User variable 2 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000303 = User variable 3 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000304 = User variable 4 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000305 = User variable 5 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000306 = User variable 6 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000307 = User variable 7 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000308 = User variable 8 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000309 = User variable 9 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030A = User variable 10 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030B = User variable 11 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030C = User variable 12 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030D = User variable 13 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030E = User variable 14 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00030F = User variable 15 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000310 = User variable 16 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000311 = User variable 17 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000312 = User variable 18 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000313 = User variable 19 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000314 = User variable 20 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000315 = User variable 21 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000316 = User variable 22 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000317 = User variable 23 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000318 = User variable 24 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000319 = User variable 25 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031A = User variable 26 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031B = User variable 27 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031C = User variable 28 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031D = User variable 29 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031E = User variable 30 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F00031F = User variable 31 | Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py.
+0x0F000320 = Timer 0 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000321 = Timer 1 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000322 = Timer 2 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000323 = Timer 3 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000324 = Timer 4 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000325 = Timer 5 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000326 = Timer 6 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000327 = Timer 7 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000328 = Timer 8 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000329 = Timer 9 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032A = Timer 10 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032B = Timer 11 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032C = Timer 12 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032D = Timer 13 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032E = Timer 14 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F00032F = Timer 15 | Write: frames; it counts down by 1 every frame the object moves (not in hitlag) and stops at 0.\nRead: frames left (0 = done). Per object. Needs tools/acmd_ext_cave.py.
+0x0F000330 = Kinetic type | Read: the object's current kinetic type (what Set_Kinetic_Handler sets). Write: change it (works for projectiles too). Needs tools/acmd_ext_cave.py.
+0x0F000331 = Tracking frames left | Read: frames of Track_Target left (-1 = until stopped). Write: set them; 0 stops tracking. Needs tools/acmd_ext_cave.py.
+0x0F000332 = Speed X | Read only: the object's current X speed (all its kinetic energies). Needs tools/acmd_ext_cave.py.
+0x0F000333 = Speed Y | Read only: the object's current Y speed (all its kinetic energies). Needs tools/acmd_ext_cave.py.
 0x0F0000A0 = Self hit | Target: this fighter.\nRead: 1 once its current attack has connected (until the move ends), else 0.
 0x0F0000A1 = Self hit now | Target: this fighter.\nRead: 1 only on the frame its attack connects, else 0.
 0x0F0000A2 = Self status | Target: this fighter.\nRead: its status kind (e.g. 0x59 shield break).\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy).
