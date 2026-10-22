@@ -2,13 +2,19 @@
 """Character select grid arrangements in ui/lumen/chara/chara.lm (Lumen LMB): rewrite the
 `num_NNN` frames of the face-layout sprite so every count from FIRST up has a clean grid.
 
-  python3 tools/chara_layout.py IN.lm OUT.lm [--first 58] [--style user4] [--png sheet.png]
+  python3 tools/chara_layout.py IN.lm OUT.lm [--first 58] [--last N] [--style user4] [--png sheet.png]
+
+--last: only the counts up to N (the file grows ~3 KB a count; all of 58-96 is +130 KB)
 
 The game shows `num_%03d` with the number of character select entries (0x028BEE20) and binds
 face_001.. face_NNN in list order (0x028BE920). Each num_ frame of the layout sprite (the one with
 the num_ labels whose placements are named face_NNN) is a delta on the previous frame; here every
 face of a rewritten frame gets an explicit placement (existing tags re-aimed, move tags added),
 so each rewritten frame no longer depends on the one before it.
+
+Each num_ frame also has a keyframe (tag 0xF105, after the sprite's last frame): its full state,
+which a goto shows; a rewritten frame's keyframe gets the same placements (v2 left them alone and,
+reading the last frame's children up to the sprite's end, gave every keyframe num_096's).
 
 Style user4 (the user's honeycomb CSS): 4 rows, odd rows from x -869.5, even rows from -807.5,
 124.5 apart, rows at y -156.5 / -51 / 54.5 / 160 (their num_057); 15 + 14 + 15 + 14 = 58 fit at
@@ -22,6 +28,7 @@ import sys
 HEADER = 0x40
 T_SYMBOLS, T_TRANSFORMS, T_POSITIONS = 0xF001, 0xF003, 0xF103
 T_SPRITE, T_FRAME, T_LABEL, T_PLACE, T_REMOVE, T_END = 0x27, 0x1, 0x2B, 0x4, 0x5, 0xFF00
+T_KEYFRAME = 0xF105
 NONE = 0xFFFFFFFF
 POS_FLAG = 0x80000000
 
@@ -107,19 +114,47 @@ class Lm:
         raise SystemExit('no face layout sprite')
 
     def frames(self):
-        """[(frame tag index, [tag indices of its children])], labels {frame: name}"""
+        """[(frame tag index, [tag indices of its children])], labels {frame: name}; a frame's
+        children are the T_FRAME's count of tags after it (the sprite's keyframes follow its last
+        frame: keyframes())"""
         a, b = self.layout_sprite()
         fr, labels = [], {}
-        for i in range(a + 1, b):
+        i = a + 1
+        while i < b:
             t, body = self.tags[i]
             if t == T_LABEL:
                 w = words(body)
                 labels[w[1]] = self.sy[w[0]]
-            elif t == T_FRAME:
-                fr.append([i, []])
-            elif fr:
-                fr[-1][1].append(i)
+            elif t in (T_FRAME, T_KEYFRAME):
+                n = words(body)[1]
+                if t == T_FRAME:
+                    fr.append([i, list(range(i + 1, i + 1 + n))])
+                i += 1 + n
+                continue
+            i += 1
         return fr, labels
+
+    def keyframes(self):
+        """{frame: [tag indices of its keyframe's placements]}: the full display state of each frame,
+        which a goto (the game's gotoAndStop num_NNN) shows"""
+        a, b = self.layout_sprite()
+        out = {}
+        i = a + 1
+        while i < b:
+            t, body = self.tags[i]
+            if t in (T_FRAME, T_KEYFRAME):
+                w = words(body)
+                if t == T_KEYFRAME:
+                    out[w[0]] = list(range(i + 1, i + 1 + w[1]))
+                i += 1 + w[1]
+                continue
+            i += 1
+        return out
+
+    def keyframe_state(self, f):
+        """{depth: transform reference} of frame f's keyframe placements"""
+        return {words(self.tags[i][1])[5] >> 16: words(self.tags[i][1])[7]
+                for i in self.keyframes()[f] if self.tags[i][0] == T_PLACE}
 
     def simulate(self):
         """the display state after each frame: [{depth: {char, name, m}}]"""
@@ -149,6 +184,22 @@ class Lm:
                         state[d] = dict(state[d], m=mat(w[7]))
             out.append({d: dict(e) for d, e in state.items()})
         return out
+
+
+def keyframes_match(lm, states):
+    """every keyframe = the state its frames build (the user's file holds to it)"""
+    pos = table(lm.tags[lm.ti[T_POSITIONS]][1], 2)
+    xf = table(lm.tags[lm.ti[T_TRANSFORMS]][1], 6)
+
+    def mat(i):
+        if i == NONE:
+            return None
+        if i & POS_FLAG:
+            x, y = pos[i & 0xFFFF]
+            return (1.0, 0.0, 0.0, 1.0, x, y)
+        return xf[i]
+    return all({d: mat(r) for d, r in lm.keyframe_state(f).items()} == {d: e['m'] for d, e in states[f].items()}
+               for f in range(len(states)))
 
 
 def faces(st):
@@ -240,6 +291,16 @@ def relayout(lm, first, style, last=None):
         lm.tags[ftag][1] = pack(fw)
         at = (kids[-1] + 1) if kids else ftag + 1
         lm.tags[at:at] = add
+        # the frame's keyframe (its full state, what a goto shows): the same placements
+        moved = set()
+        for i in lm.keyframes()[fi]:
+            t, body = lm.tags[i]
+            w = words(body)
+            if t == T_PLACE and (w[5] >> 16) in by_depth:
+                w[7] = ref[by_depth[w[5] >> 16]]
+                lm.tags[i][1] = pack(w)
+                moved.add(w[5] >> 16)
+        assert moved == set(by_depth), (lab, 'faces missing from the keyframe')
         changed.append((lab, len(add)))
         lm.ti = {t: i for i, (t, _) in reversed(list(enumerate(lm.tags)))}
     return changed
@@ -271,19 +332,29 @@ def main():
     a = sys.argv[1:]
     src, dst = a[0], a[1]
     first = int(a[a.index('--first') + 1]) if '--first' in a else 58
+    last = int(a[a.index('--last') + 1]) if '--last' in a else None
     style = STYLES[a[a.index('--style') + 1] if '--style' in a else 'user4']
     data = open(src, 'rb').read()
     lm = Lm(data)
     assert lm.data() == data, 'round trip'
+    lm0 = Lm(data)
+    assert keyframes_match(lm0, lm0.simulate()), 'the input: a keyframe differs from its frame'
     before = lm.simulate()
-    changed = relayout(lm, first, style)
+    changed = relayout(lm, first, style, last)
     out = lm.data()
     open(dst, 'wb').write(out)
     after = Lm(out).simulate()
     assert len(before) == len(after)
     fr, labels = Lm(out).frames()
-    same = sum(1 for fi in range(len(before)) if int(labels[fi][4:]) < first and before[fi] == after[fi])
-    print('%s: %d frames rewritten (%s), %d earlier frames unchanged, %d -> %d bytes' % (
+    def kept(fi):
+        n = int(labels[fi][4:])
+        return n < first or (last is not None and n > last)
+    same = sum(1 for fi in range(len(before)) if kept(fi) and before[fi] == after[fi])
+    assert same == sum(1 for fi in range(len(before)) if kept(fi)), 'a frame outside the range changed'
+    assert keyframes_match(Lm(out), after), 'a keyframe differs from its frame'
+    assert all(Lm(out).keyframe_state(f) == lm0.keyframe_state(f) for f in range(len(before))
+               if kept(f)), 'a keyframe outside the range changed'
+    print('%s: %d frames rewritten (%s), %d other frames unchanged, %d -> %d bytes' % (
         dst, len(changed), ', '.join('%s +%d' % c for c in changed[:4]) + (' ...' if len(changed) > 4 else ''),
         same, len(data), len(out)))
     if '--png' in a:

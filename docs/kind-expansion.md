@@ -249,6 +249,16 @@ v1 (Supamario, a copy of Mario): on the character select, loads, plays, stable; 
   or kind range checks found in the Customize set-up, `0x029BA004` / `0x029BA0C4` / `0x0301491C`).
 - v1's melee.msbt was built on the unmodified text; v2 on the user's (with the stage names).
 
+v2 in game (user): crashed on the character select. Found: `chara_layout.py` read the last frame's
+children up to the sprite's end, so it also rewrote the sprite's keyframes (tag `0xF105`, after the
+last frame: each frame's full state, what a goto shows; in the user's file every keyframe equals
+its frame's simulated state). All 84 got `num_096`'s scaled placements, and the file grew 130 KB
+(58-96 rewritten). v3: frames read by their tag counts, a rewritten frame's keyframe updated too
+(checked: keyframes = frames, every other frame and keyframe unchanged), `--last 58` (+1.8 KB).
+The customs cave's two functions were checked (callers keep nothing in the registers it uses).
+Not confirmed as the crash: v3 ships a split test (no chara.lm / no chr_12 / an RPX without the
+v2 code).
+
 Build (v2): `rpx_patch.py build/cross_f.rpx OUT.rpx` with `biome_select_cave`, `monster_roll_cave`,
 `trait_badge_cave`, `kind_expand`, `base_effects_cave`, `base_customs_cave`; data
 `add_fighter.py --param USER_PARAM --param VANILLA_PARAM --ui USER_UI --msbt USER_melee.msbt`, then
