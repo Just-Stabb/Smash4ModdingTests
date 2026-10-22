@@ -89,7 +89,9 @@ CAPS = ['MiiFighter', 'MiiSwordsman', 'MiiGunner', 'Mario', 'Donkey', 'Link', 'S
 # Portrait sets (docs/new-fighter-slot.md "Names, portraits and text"): 0x0291673C / 0x029169A8 /
 # 0x02916B44 build <set>/<set>_<UiName>_%02d under ui/replace/chr (ui/replace/append/chr first).
 # chr_70 is only the Vault sound test's replace slot (optional; copied when the base has one).
-PORTRAIT_SETS = ['chr_00', 'chr_10', 'chr_11', 'chr_13', 'chr_40', 'chr_70', 'chr_90',
+# --ui must be the UI the user's game shows (their mod's art: a vanilla portrait in a modded
+# character select shows as a misfit picture), unpacked from its packed files.
+PORTRAIT_SETS = ['chr_00', 'chr_10', 'chr_11', 'chr_12', 'chr_13', 'chr_40', 'chr_70', 'chr_90',
                  'chrn_11', 'chrn_12', 'chrn_40', 'chrn_41', 'stock_90']
 # New portraits get texture IDs (GIDX) from here, 0x100 per character id (id - 59); the game's
 # UI uses 0x28000000-0x28006395, add_stage.py's stage icons 0x2800FF00+.
