@@ -176,6 +176,7 @@ namespace Sm4shCommand
             this.MouseDown += Editor_MouseDown;
             this.MouseMove += Editor_MouseMove;
             this.ToolTipDelay = 400;
+            WatchToolTip();
             BuildContextMenu();
         }
         public ITS_EDITOR(IScript script) : this()
@@ -421,6 +422,81 @@ namespace Sm4shCommand
             string word = line.Substring(start, end - start);
             uint v;
             return word.Length > 0 && Tooltips.TryParseValue(word, out v) ? word : null;
+        }
+
+        // ---------------------------------------------------------------- tooltip lifetime
+        //
+        // FastColoredTextBox only hides its tooltip on a mouse move over the editor, so switching to
+        // another program, moving the window or changing tabs left it on screen (over other tabs,
+        // sometimes for good). It's shown only while the pointer is over a visible editor in the
+        // active window, and a watch hides it as soon as that stops.
+
+        static readonly System.Reflection.MethodInfo cancelToolTip = typeof(FastColoredTextBox).GetMethod(
+            "CancelToolTip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        readonly Timer toolTipWatch = new Timer { Interval = 150 };
+
+        bool PointerOverEditor()
+        {
+            if (IsDisposed || !IsHandleCreated || !Visible)
+                return false;
+            var form = FindForm();
+            if (form == null || Form.ActiveForm != form || form.WindowState == FormWindowState.Minimized)
+                return false;
+            return ClientRectangle.Contains(PointToClient(Cursor.Position));
+        }
+
+        /// <summary>Hides the tooltip (and drops one that's waiting for its delay).</summary>
+        public void HideToolTip()
+        {
+            toolTipWatch.Stop();
+            try { cancelToolTip?.Invoke(this, null); } catch (Exception) { }
+            if (ToolTip != null && IsHandleCreated)
+                ToolTip.Hide(this);
+        }
+
+        protected override void OnToolTip()
+        {
+            if (!PointerOverEditor())   // the delay ran out after the pointer / window went elsewhere
+                return;
+            base.OnToolTip();
+            toolTipWatch.Start();
+        }
+
+        void WatchToolTip()
+        {
+            toolTipWatch.Tick += (o, e) => { if (!PointerOverEditor()) HideToolTip(); };
+            MouseLeave += (o, e) => HideToolTip();
+            Disposed += (o, e) => toolTipWatch.Dispose();
+            Form hooked = null;     // the window: hide on switching away from it, moving or resizing it
+            EventHandler hide = (o, e) => HideToolTip();
+            Action hook = () =>
+            {
+                var form = FindForm();
+                if (form == hooked)
+                    return;
+                if (hooked != null)
+                {
+                    hooked.Deactivate -= hide;
+                    hooked.Move -= hide;
+                    hooked.ResizeBegin -= hide;
+                }
+                hooked = form;
+                if (form != null)
+                {
+                    form.Deactivate += hide;
+                    form.Move += hide;
+                    form.ResizeBegin += hide;
+                }
+            };
+            ParentChanged += (o, e) => hook();
+            HandleCreated += (o, e) => hook();
+            VisibleChanged += (o, e) =>
+            {
+                if (Visible)
+                    hook();     // a tab added to the window after the editor was put in it
+                else
+                    HideToolTip();
+            };
         }
 
         private void Editor_ToolTipNeeded(object sender, ToolTipNeededEventArgs e)
