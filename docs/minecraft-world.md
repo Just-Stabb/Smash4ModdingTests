@@ -946,8 +946,14 @@ Crew's parts.
   `search_damage_collision`) returns a link's shape list, which a gimmick takes with
   `0x03134014(w, group, list)` (Luigi's Mansion's pillars, set up in `0x02D19788`, updated in
   `0x02D17618`: HP -= damage; at 0 the model hidden, `0x03133DFC`).
-- A link's grounds on / off: `0x0315EDD8(0x03142954(stage, short name), 1 / 0)` (Luigi's
-  Mansion's collapsing floors).
+- A link's grounds off / on: `0x0315EDD8(0x03142954(stage, short name), 1 / 0)`: the second
+  argument is an **off** flag (Luigi's Mansion's collapsing floors, the `yuka` caller `0x02848C64`
+  passes `!on`). 1 runs `0x02D5D870` on each ground's line (`+0x72` = 0: out of the collision
+  manager's passes, which skip lines with `+0x72` 0, e.g. `0x02D48860`); 0 runs `0x02D5D6E0`
+  (`+0x72` = 1, as a new line from `0x02D5ABA8`; a line already on is left alone). v18 / v18b
+  passed 0 at a break, which left the block's collision in place (user: "the collision seems to
+  not change when the blocks are broken"); v18c passes 1, and `monster_roll_test.py` runs the
+  game's own `0x0315EDD8` on a fake link list to check which value takes grounds out.
 
 ### Built
 
@@ -962,8 +968,8 @@ Crew's parts.
 - `tools/monster_roll_cave.py`: at a match's first update (kind 0x80, a hazards-on pick) a gimmick
   for each of the biome's blocks (a sphere `BLOCK_RADIUS` 7 at its cell's centre), its life, its
   model; every update each intact block's damage off its life (its material's hit sound); at 0
-  the gimmick removed, the break sound, its link's grounds off, its model hidden (every update
-  after). `monster_roll_test.py`: 35 checks.
+  the gimmick removed, the break sound, its link's grounds off (`0x0315EDD8(list, 1)`: v18c; v18 /
+  v18b passed 0, which leaves them on), its model hidden (every update after). `monster_roll_test.py`: 35 checks.
 
 ### v18b: SmashWiki's technical details
 
@@ -986,6 +992,20 @@ SmashWiki's Minecraft World page ("Technical details"; read 2026-10-21) against 
   on a hit (the gimmick hit's hitlag is the game's usual); Steve's mining (not in Smash 4).
 
 Not yet: the bump / launch damage, Ultimate's break particles.
+
+### v18c: blocks' textures and broken blocks' collision
+
+v18b in game (user): the blocks take hits, have collision and lives, but their textures were
+garbled ("the previous texture bug") and a broken block's collision stayed.
+- **Collision**: the cave passed 0 to `0x0315EDD8`, which is "on" (research above); now 1.
+- **Textures**: each block folder's texture was the atlas's rows the block uses, named `blk_*`:
+  not pixel art (`pixel_art` takes `all_blocks*` / mob skins), so `Textures.nut` resized it
+  smoothly to a power of two below its height (grass 112 rows to 64, tundra grass 416 to 256),
+  the same smear the mob skins had before they were pixel art. `atlas_tiles` crops the block's
+  16-pixel tiles (both ways) from the island's atlas (`ATLAS`, as the island draws its blocks),
+  grows the box to a power of two each way and names it `all_blocks_blk_<model>`: drawn 4x with
+  nearest pixels, exact (every block model sampled at random points inside its triangles: the
+  same texels as the atlas). 32 x 32 to 512 x 64 source pixels a block.
 
 ## Freeze (user) and tests
 

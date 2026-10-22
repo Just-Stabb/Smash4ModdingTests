@@ -1744,6 +1744,31 @@ def atlas_rows(parts, tex, name, atlas=ATLAS):
     return out
 
 
+def atlas_tiles(parts, tex, name, atlas=ATLAS):
+    """parts on a block atlas moved to the box of 16-pixel tiles they use, grown to a power of two
+    each way (so pixel_art scales it exactly 4x), a texture of their own (name: 'all_blocks...',
+    pixel art). v18 cropped rows only, named blk_*: not pixel art, resized smoothly to a power of
+    two (grass 112 rows to 64), the blocks came out smeared (user)"""
+    img = tex.image(atlas)
+    uv = np.concatenate([p['uv'] for p in parts])
+    box = []
+    for axis, size in ((1, img.shape[0]), (0, img.shape[1])):
+        c = uv[:, axis] * size
+        lo, hi = int(np.floor(c.min() / 16)) * 16, int(np.ceil(c.max() / 16)) * 16
+        n = 1 << (hi - lo - 1).bit_length()
+        hi = min(size, lo + n)
+        box.append((hi - n, n))
+    (top, h), (left, w) = box
+    tex.extra[name] = img[top:top + h, left:left + w].copy()
+    out = []
+    for p in parts:
+        q = dict(p)
+        q['uv'] = np.c_[(p['uv'][:, 0] * img.shape[1] - left) / w, (p['uv'][:, 1] * img.shape[0] - top) / h]
+        q['textures'] = [name] + list(p['textures'][1:])
+        out.append(q)
+    return out
+
+
 def door_rig(src, form, doors, paths, tex, frames, events=None):
     """meshes, bones, tracks: each door on its own bone, swung by the villagers' paths; events:
     a list for its sounds (frame, sound, 'always')"""
@@ -2228,7 +2253,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 meshes.append(m)
         write_set('%s/%s' % (model_dir, name), meshes, tex, curves)
     for i, parts in enumerate(block_sets):
-        parts = [atlas_rows([q], tex, 'blk_%s' % KIND_MODEL[blocks[i][0]], q['textures'][0])[0]
+        parts = [atlas_tiles([q], tex, 'all_blocks_blk_%s' % KIND_MODEL[blocks[i][0]])[0]
                  if q['textures'][0].startswith('all_blocks') else q for q in parts]
         meshes = to_nud(parts, tex, 'lit', False, bake=not ISLAND_FLAGS)
         for m in meshes:

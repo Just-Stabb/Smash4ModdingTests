@@ -83,7 +83,9 @@ GIM_ACTIVATE = 0x03133E4C      # (w, 0)
 GIM_DAMAGE = 0x0313408C        # (w, group) -> f1 the damage it took this frame
 GIM_REMOVE = 0x03133DFC        # (w): its battle object (the hurtbox) removed
 LINK_FIND = 0x03142954         # (stage, short name) -> the link's ground list or 0
-GROUNDS_ON = 0x0315EDD8        # (ground list, 0 off / 1 on)
+GROUNDS_OFF = 0x0315EDD8       # (ground list, 1 off / 0 on): 1 -> 0x02D5D870 per ground (+0x72 = 0,
+                               # out of the collision manager's lists), 0 -> 0x02D5D6E0 (+0x72 = 1, as
+                               # a new ground, 0x02D5ABA8); v18b passed 0, which left them on
 BLOCK_RADIUS = 7.5             # minecraft_world.BLOCK_RADIUS
 # Ultimate's block_life_rate_table (pickel_world.stdat): the blocks' lives × this by the number of
 # fighters (1-8; SmashWiki: 1-3 ×1, 4 ×1.3, 5-6 ×1.4, 7-8 ×1.5), counted (live entries of the fighter
@@ -738,8 +740,8 @@ bbreak:
         bl 0x%(link_find)08X
         cmpwi r3, 0
         beq bhide
-        li r4, 0
-        bl 0x%(grounds_on)08X
+        li r4, 1
+        bl 0x%(grounds_off)08X
 bhide:
         lis r12, bmodels@ha
         addi r12, r12, bmodels@l
@@ -854,7 +856,7 @@ data:
            remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, fighters_hi=(FIGHTERS + 0x8000) >> 16,
            fighters_lo=FIGHTERS & 0xFFFF, entry=FIGHTER_ENTRY, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
            gim_activate=GIM_ACTIVATE, gim_damage=GIM_DAMAGE, gim_remove=GIM_REMOVE, link_find=LINK_FIND,
-           grounds_on=GROUNDS_ON, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
+           grounds_off=GROUNDS_OFF, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
            monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
            pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
            release=RELEASE, name_len=len(STAGE_NAME), bf_hi=BATTLEFIELD_NAME >> 16,

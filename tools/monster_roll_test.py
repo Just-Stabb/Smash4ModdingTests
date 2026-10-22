@@ -19,7 +19,9 @@ gimmick each block on the plane at the first update (sphere at its cell's centre
 life), damage taken off its life with the material's hit sound, at 0 its hurtbox removed, the break
 sound, its collision link switched off, nothing more after; a block behind the plane broken with its
 column's plane block; the lives × LIFE_RATE by the number of live fighters (5 / 4 / 2 / 8); none on a
-hazards-off pick or on Omega. Every roll of 6000 against the rules in
+hazards-off pick or on Omega. The game's own ground switch (0x0315EDD8, unstubbed, on a fake link
+list of two grounds): 1 takes them out (+0x72 0, +0x163 0), 0 puts them back (+0x72 1, +0x163 1);
+the cave passes 1. Every roll of 6000 against the rules in
 Python (Ultimate's odds), with the resulting frequencies.
 """
 import os
@@ -158,7 +160,7 @@ no:     li r3, 0
 yes:    lis r3, 0x7F00
         ori r3, r3, 0xB800
         blr""")
-    stub(mu, C.GROUNDS_ON, """
+    stub(mu, C.GROUNDS_OFF, """
         lis r7, 0x7F00
         ori r7, r7, 0xB000
         lwz r6, 8(r7)
@@ -423,7 +425,7 @@ miss:   li r3, 0
     damage(0, 0.0)
     check('8 more: broken (hurtbox removed, the grass break sound)', (word(GIMS + 4), plays()),
           (1, [row | tone('block_break_grass')[0] + 3]))
-    check('its collision link switched off', (word(BREC + 8), word(BREC + 0xC), word(BREC + 0x10)), (1, LINKS, 0))
+    check('its collision link switched off (0x0315EDD8(list, 1))', (word(BREC + 8), word(BREC + 0xC), word(BREC + 0x10)), (1, LINKS, 1))
     check('its model hidden', (bool(word(block_model + 0x118) & 0x80000), word(block_model + 0xDC)), (False, 0))
     check('the wood block still there', word(bstate + 4), 2)
     setw(REC + 0x30, 0)
@@ -503,8 +505,42 @@ miss:   li r3, 0
     check('every roll as the rules in Python (%d)' % (2 * N), same, 2 * N)
     print('   nights with zombie / skeleton / spider / enderman:', ['%.2f' % (x / N) for x in nights])
     print('   matches with sheep / cow / chicken:', ['%.2f' % (x / N) for x in days[:3]])
+    real_switch(sys.argv[1], check)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
+
+
+def real_switch(path, check):
+    """the game's 0x0315EDD8 itself on a fake link ground list (the collision manager's
+    0x02D4BDD0 / 0x02D4BCF8-family calls and the ground's own 0x02D417B8 stubbed): which value takes
+    the grounds out of play. A ground (the list's element) has its line set at +0 (+0x72 1 live,
+    as 0x02D5ABA8 makes it; +0x38 / +0x34 sub-lists empty, +0x10 none); check counts the failures"""
+    mu = machine(path)
+    mu.mem_map(0x7E000000, 0x10000)
+    stub(mu, 0x02D4BDD0, 'blr')
+    stub(mu, 0x02D4BCF8, 'blr')
+    stub(mu, 0x02D417B8, 'blr')
+    lst, vec, grounds, lines = 0x7E000000, 0x7E000100, 0x7E001000, 0x7E004000
+    for k in range(2):
+        g, ln = grounds + 0x400 * k, lines + 0x200 * k
+        mu.mem_write(vec + 4 * k, struct.pack('>I', g))
+        mu.mem_write(g, struct.pack('>I', ln))
+        mu.mem_write(ln + 0x72, b'\1')
+        mu.mem_write(g + 0x163, b'\1')
+    mu.mem_write(lst + 4, struct.pack('>II', vec, vec + 8))
+
+    def switch(v):
+        mu.reg_write(UC_PPC_REG_3, lst)
+        mu.reg_write(UC_PPC_REG_4, v)
+        mu.reg_write(UC_PPC_REG_1, 0x7E00F000)
+        mu.reg_write(UC_PPC_REG_LR, RET)
+        mu.emu_start(C.GROUNDS_OFF, RET, count=100000)
+        return [(mu.mem_read(lines + 0x200 * k + 0x72, 1)[0], mu.mem_read(grounds + 0x400 * k + 0x163, 1)[0])
+                for k in range(2)]
+    for what, v, want in (('1: both grounds out (+0x72 0, +0x163 0)', 1, [(0, 0)] * 2),
+                          ('0: both back (+0x72 1, +0x163 1)', 0, [(1, 1)] * 2),
+                          ('0 again: stay on', 0, [(1, 1)] * 2)):
+        check('the game\'s ground switch, ' + what, switch(v), want)
 
 
 if __name__ == '__main__':
