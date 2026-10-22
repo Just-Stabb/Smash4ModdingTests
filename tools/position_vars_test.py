@@ -186,7 +186,7 @@ def setup(fighters, count=8):
     mu.mem_map(0x02F10000, 0x20000); mu.mem_write(0x02F10000, mem(0x02F10000, 0x20000))  # fighters' WorkModule copies
     mu.mem_map(0x037E0000, 0x20000); mu.mem_write(0x037E0000, mem(0x037E0000, 0x20000))
     mu.mem_write(SETPOS, b''.join(struct.pack('>I', w) for w in fake.words()))
-    mu.mem_map(0x04B70000, 0x10000); mu.mem_write(0x04B70000, mem(0x04B70000, 0xC000))  # combat variables (grown .text)
+    mu.mem_map(0x04B70000, 0x40000); mu.mem_write(0x04B70000, mem(0x04B70000, 0x40000))  # grown .text (combat variables ... acmd_ext_cave.py)
     mu.mem_map(0x030B0000, 0x10000)
     for k, (addr, src) in enumerate(FAKES.items()):    # each in its own space, a branch at the wrapper
         body = 0x030B8000 + 0x100 * k

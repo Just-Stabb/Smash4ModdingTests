@@ -54,6 +54,19 @@ SIZE2 = 0x02BEE3C0               # slwi r11, r3, 2 / stwx r3, r28, r5 / lwzx r12
 FETCH = 0x02BEE84C               # slwi r6, r7, 2 / lwzx r0, r6, r29 -> 0x02BEE854 (r12 is live)
 NEW_BASE = 584
 
+# hit time (docs/acmd-extra-commands.md): the hit info's +0x44 is a copy of the hitbox data, so the
+# tag is at hit info +0x44 +0x66; find_copy checks the tag and the check words (not the slot).
+HIT_STUN = 0x02C25C88            # victim: stfs f28, 0x30(r30) (hitstun = knockback x 0.4 -> DamageModuleF(1));
+                                 #   r27 victim accessor, r28 hit info; free r5 r8 r9 r10 r12 f9-f13
+HIT_VSTOP = 0x02C25A78           # victim: cmpwi r19, 2, r20 = final hitstop frames; free r0 r3-r12 f0 f12 f13
+HIT_AMUL = 0x02C2645C            # attacker: or. r27, r3, r3 (r3 = hitstop before the rate); r30 hit info
+HIT_AFIX = 0x02C264C4            # attacker: lwz r27, 0x10(r1) (after the rate); r3 / ctr live
+DI_STAT = 0x037EE180             # kirby_stat_cave.py's get_float path: bnelr after cmpwi r11, 3 (not a fighter stat)
+DI_ID = 0x11A                    # fighter_param 0x0200011A: max DI angle (read by every fighter's MSC damage code)
+DI_SLOTS = 16
+HIT_ORIG = {HIT_STUN: 0xD39E0030, HIT_VSTOP: 0x2C130002, HIT_AMUL: 0x7C7B1B79, HIT_AFIX: 0x83610010,
+            DI_STAT: 0x4C820020}
+
 SPECIAL_HITBOX = 0x02BDBB20      # handler, size 42
 EXT_SPECIAL_HITBOX = 0x02BDD46C  # handler, size 44
 N_EXTRA = 6
@@ -311,15 +324,232 @@ next_entry:
         .word 0
 """ % dict(tag=TAG_OFF, TAG=TAG, entries=ENTRIES, entry=ENTRY))
 
+    hit_code(a)
+    if a.pc % 8:
+        a.asm('.word 0')
+    a.asm("""
+scratch:                                # scale_int: a double, then 2^52 + 2^31
+        .word 0
+        .word 0
+        .word 0x43300000
+        .word 0x80000000
+""")
     a.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
     a.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
     a.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
     a.labels['table'] = TABLE
+    a.labels['di_tab'] = TABLE + ENTRIES * ENTRY
+    assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
-             SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch'))}
+             SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
+             HIT_STUN: b(HIT_STUN, a.addr('hk_stun')), HIT_VSTOP: b(HIT_VSTOP, a.addr('hk_vstop')),
+             HIT_AMUL: b(HIT_AMUL, a.addr('hk_amul')), HIT_AFIX: b(HIT_AFIX, a.addr('hk_afix')),
+             DI_STAT: b(DI_STAT, a.addr('di_check'))}   # was bnelr: di_check tests cr0
     return a, words, hooks
+
+
+def hit_code(a):
+    """find_copy, the four hit-time hooks, the DI table and the DI stat read"""
+    sig = ''.join("""
+        lwz r12, %d(r10)
+        lwz r8, %d(r5)
+        cmplw r8, r12
+        bne fc_none""" % (e, d) for e, d in ((4, 0x20), (8, 0x24), (0xC, 0x28), (0x10, 0x2C), (0x2C, 0x3C)))
+    a.asm("""
+find_copy:                              # r5 = hitbox data (a copy) -> r5 = its extras or 0; uses r8 r10 r12 cr0
+        andi. r10, r5, 3
+        bne fc_none
+        addis r10, r5, -0x1000
+        rlwinm. r10, r10, 0, 0, 0
+        bne fc_none
+        lhz r10, %(tag)d(r5)
+        rlwinm r12, r10, 0, 16, 23
+        cmplwi r12, %(TAG)d
+        bne fc_none
+        rlwinm r10, r10, 0, 24, 31
+        cmplwi r10, %(entries)d
+        bge fc_none
+        mulli r10, r10, %(entry)d
+        lis r12, table@ha
+        addi r12, r12, table@l
+        add r10, r12, r10
+        lwz r12, 0(r10)
+        cmpwi r12, 0
+        beq fc_none""" % dict(tag=TAG_OFF, TAG=TAG, entries=ENTRIES, entry=ENTRY) + sig + """
+        mr r5, r10
+        blr
+fc_none:
+        li r5, 0
+        blr
+
+scale_int:                              # r3 = floor(r3 x f13) (r3 >= 0); uses r0 r12 f0 f12
+        lis r12, scratch@ha
+        addi r12, r12, scratch@l
+        xoris r0, r3, 0x8000
+        stw r0, 4(r12)
+        lis r0, 0x4330
+        stw r0, 0(r12)
+        lfd f0, 0(r12)
+        lfd f12, 8(r12)                 # 2^52 + 2^31
+        fsub f0, f0, f12
+        fmul f0, f0, f13
+        fctiwz f0, f0
+        stfd f0, 0(r12)
+        lwz r3, 4(r12)
+        blr
+
+hk_stun:                                # victim's hitstun (f28) x HitstunMul; this hit's DI x for the victim
+        mfcr r9
+        addi r5, r28, 0x44
+        bl find_copy
+        lis r12, one@ha
+        lfs f9, one@l(r12)              # DI x (1 for any other hit)
+        cmpwi r5, 0
+        beq st_di
+        lfs f10, 0x14(r5)
+        fmuls f28, f28, f10
+        lfs f9, 0x28(r5)
+st_di:""" + chk_t('r27', 'r12', 'st_out') + """
+        lwz r8, 0x28(r27)               # the victim's WorkModule""" + chk_t('r8', 'r12', 'st_out') + """
+        bl di_store
+st_out:
+        mtcrf 0xFF, r9
+        stfs f28, 0x30(r30)
+        b 0x%(stun_back)08X
+
+di_store:                               # r8 = WorkModule, f9 = DI x; uses r5 r10 r12 f10
+        lis r10, di_tab@ha
+        addi r10, r10, di_tab@l
+        li r5, 0
+ds_loop:
+        lwz r12, 0(r10)
+        cmplw r12, r8
+        beq ds_set
+        addi r10, r10, 8
+        addi r5, r5, 1
+        cmpwi r5, %(slots)d
+        blt ds_loop
+        lis r12, one@ha
+        lfs f10, one@l(r12)
+        fcmpu cr0, f9, f10
+        beqlr                           # x1 and no entry: nothing to keep
+        lis r12, di_next@ha
+        lwz r5, di_next@l(r12)
+        addi r10, r5, 1
+        cmpwi r10, %(slots)d
+        blt ds_wrap
+        li r10, 0
+ds_wrap:
+        stw r10, di_next@l(r12)
+        lis r10, di_tab@ha
+        addi r10, r10, di_tab@l
+        slwi r5, r5, 3
+        add r10, r10, r5
+        stw r8, 0(r10)
+ds_set:
+        stfs f9, 4(r10)
+        blr
+
+di_check:                               # from get_float after cmpwi r11, 3 (a b replaces its bnelr): r3 this, r4 id, f1
+        bne dc_go
+        b 0x%(stat_back)08X                # a fighter stat (category 3): on as before
+dc_go:
+        cmpwi r11, 2
+        bnelr
+        rlwinm r12, r4, 0, 8, 31
+        cmplwi r12, %(di_id)d
+        bnelr
+        lis r10, di_tab@ha
+        addi r10, r10, di_tab@l
+        li r12, %(slots)d
+dc_loop:
+        lwz r0, 0(r10)
+        cmplw r0, r3
+        beq dc_found
+        addi r10, r10, 8
+        addi r12, r12, -1
+        cmpwi r12, 0
+        bne dc_loop
+        blr
+dc_found:
+        lfs f0, 4(r10)
+        fmuls f1, f1, f0
+        blr
+
+hk_vstop:                               # victim's hitstop (r20): HitstopFrames, else x HitstopMul
+        addi r5, r28, 0x44
+        bl find_copy
+        cmpwi r5, 0
+        beq vs_out
+        lwz r0, 0x1C(r5)
+        cmpwi r0, 0
+        ble vs_mul
+        mr r20, r0
+        b vs_out
+vs_mul:
+        lfs f13, 0x18(r5)
+        mr r3, r20
+        bl scale_int
+        mr r20, r3
+vs_out:
+        cmpwi r19, 2
+        b 0x%(vstop_back)08X
+
+hk_amul:                                # attacker's hitstop before the rate (r3): x SelfHitstopMul
+        mfcr r9
+        mr r27, r3
+        addi r5, r30, 0x44
+        bl find_copy
+        cmpwi r5, 0
+        beq am_out
+        mr r8, r5
+        lfs f13, 0x20(r8)
+        mr r3, r27
+        bl scale_int
+        mr r27, r3
+        lwz r0, 0x24(r8)                # fixed frames: make sure the hitstop path runs (set at HIT_AFIX)
+        cmpwi r0, 0
+        ble am_out
+        cmpwi r27, 0
+        bgt am_out
+        li r27, 1
+am_out:
+        mtcrf 0xFF, r9
+        mr r3, r27
+        or. r27, r27, r27
+        b 0x%(amul_back)08X
+
+hk_afix:                                # attacker's hitstop after the rate: SelfHitstopFrames
+        lwz r27, 0x10(r1)
+        mfcr r9
+        addi r5, r30, 0x44
+        bl find_copy
+        cmpwi r5, 0
+        beq af_out
+        lwz r0, 0x24(r5)
+        cmpwi r0, 0
+        ble af_out
+        mr r27, r0
+af_out:
+        mtcrf 0xFF, r9
+        b 0x%(afix_back)08X
+
+di_next:
+        .word 0
+""" % dict(stun_back=HIT_STUN + 4, vstop_back=HIT_VSTOP + 4, amul_back=HIT_AMUL + 4, afix_back=HIT_AFIX + 4,
+           slots=DI_SLOTS, di_id=DI_ID, stat_back=DI_STAT + 4))
+
+
+def chk_t(reg, tmp, fail):
+    """branch to fail unless reg is a word-aligned pointer in 0x10000000-0x8FFFFFFF (temp register tmp)"""
+    return """
+        addis %(t)s, %(r)s, -0x1000
+        rlwinm. %(t)s, %(t)s, 0, 0, 0
+        bne %(f)s
+        andi. %(t)s, %(r)s, 3
+        bne %(f)s""" % dict(t=tmp, r=reg, f=fail)
 
 
 def mul(src, dst, k):
