@@ -8,12 +8,30 @@ of it at startup, it replaced SALT's hitbox definitions with outdated ones (Unkn
 swapped). Run this after updating CMD_INFO.cs. Same format as ACMD_INFO.SaveInfo (what Tools > Command
 Definitions saves).
 """
+import json
 import os
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "SALT", "SALT", "Scripting", "AnimCMD", "CMD_INFO.cs")
 DST = os.path.join(HERE, "SM4SHCommand", "Events.cfg")
+LABELS = os.path.join(HERE, "param_labels.json")   # the parameter research (apply_param_labels.py)
+
+
+def one_line(t):
+    return " ".join(str(t).split())
+
+
+def param_lines(entry, names):
+    """"Param: Name = description" lines for a command's labelled parameters"""
+    out = []
+    for k, p in sorted(((int(k), v) for k, v in entry.items() if not k.startswith("_")), key=lambda kv: kv[0]):
+        if k >= len(names) or not p.get("desc"):
+            continue
+        extra = "; ".join(x for x in (p.get("values") and "values: %s" % one_line(p["values"]),
+                                       p.get("confidence") and "confidence: %s" % p["confidence"]) if x)
+        out.append("Param: %s = %s%s" % (names[k], one_line(p["desc"]), " [%s]" % extra if extra else ""))
+    return out
 
 
 def table(text, name):
@@ -28,6 +46,7 @@ def table(text, name):
 def main():
     text = open(SRC, encoding="utf-8-sig").read()
     names, fmt, syn, desc = (table(text, n) for n in ("CMD_NAMES", "PARAM_FORMAT", "PARAM_SYNTAX", "CMD_DESC"))
+    labels = {int(k, 16): v for k, v in json.load(open(LABELS)).items()} if os.path.exists(LABELS) else {}
     sizes = table(text, "CMD_SIZES")
     out = [
         "// Sm4shCommand ACMD command definitions. Read at startup on top of the built-in ones.",
@@ -57,7 +76,11 @@ def main():
             have = [] if s == "NONE" else s.split(",")
             s = ",".join((have + ["Unknown"] * n)[:n])
         d = desc.get(crc, "NONE").replace('\\"', '"') or "NONE"
+        entry = labels.get(crc, {})
+        if d == "NONE" and entry.get("_note"):
+            d = one_line(entry["_note"])
         out += ["", "%08X" % crc, name, f, s, d]
+        out += param_lines(entry, [] if s == "NONE" else s.split(","))
     open(DST, "w", newline="\r\n").write("\n".join(out) + "\n")
     print("%d commands -> %s" % (len(names), DST))
 
