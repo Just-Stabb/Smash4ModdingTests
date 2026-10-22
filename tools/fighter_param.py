@@ -17,6 +17,7 @@ Labels come from reference/params/<file>.csv (column `name`).
   python3 tools/fighter_param.py set-common FILE OUT NAME=VALUE ...   (fighter_param_common.bin)
   python3 tools/fighter_param.py check FILE...                 parse + rebuild, must be byte-identical
 
+The file kind is taken from the file name, or detected from the content (the five layouts differ).
 FIGHTER = kind number (0-64) or internal name (mario, kirby, koopag, ...).  NAME = attribute name
 from the CSV, an index (e.g. 0x21 or 33) or an ID (0x03000021 / 0x13000022).
 
@@ -135,10 +136,14 @@ class Val:
 
 def fmt(val):
     v = val.v
-    if val.t == 7:
+    if val.t == 7:   # shortest text that gives back the same float32
+        for p in range(6, 10):
+            t = '%.*g' % (p, v)
+            if struct.pack('>f', float(t)) == val.raw:
+                return t
         return '%.9g' % v
-    if val.t == 5 and v >= 0x80000000:
-        return '0x%X' % v
+    if val.t == 5 and (v >= 0x80000000 or ((v >> 24) in (0x02, 0x03, 0x09, 0x12, 0x13, 0x19) and v & 0xFFFFFF < 0x1000)):
+        return '0x%08X' % v   # param IDs (e.g. in power_up / equipment / etc g20) and -1
     return str(v)
 
 
@@ -199,14 +204,20 @@ class ParamFile:
         self.path = path
         self.data = open(path, 'rb').read()
         base = os.path.basename(path)
-        self.kind = kind or os.path.splitext(base)[0]
-        if self.kind not in LAYOUTS:
-            raise SystemExit('unknown file kind %s (expected one of %s)' % (self.kind, ', '.join(LAYOUTS)))
-        self.layout = LAYOUTS[self.kind]
         self.header = self.data[:8]
         toks = tokens(self.data)
-        self.root, pos = parse_fields(self.layout, toks, 0)
-        assert pos == len(toks), 'trailing values after layout (%d of %d)' % (pos, len(toks))
+        name = os.path.splitext(base)[0]
+        cands = [kind] if kind else ([name] if name in LAYOUTS else []) + [k for k in LAYOUTS if k != name]
+        for k in cands:
+            try:
+                root, pos = parse_fields(LAYOUTS[k], toks, 0)
+            except (AssertionError, IndexError):
+                continue
+            if pos == len(toks):
+                self.kind, self.layout, self.root = k, LAYOUTS[k], root
+                break
+        else:
+            raise SystemExit('%s does not match any known layout (%s)' % (path, ', '.join(LAYOUTS)))
 
     def build(self):
         out = [self.header]
@@ -302,11 +313,18 @@ def cmd_dump(args):
     elif pf.kind == 'fighter_param_common':
         for i, x in enumerate(pf.root[0][1]):
             r = labels.get(i, {})
-            print('%3d 0x%s %-6s %-40s %s' % (i, '%X' % ((0x12 if x.t == 5 else 0x02) << 24 | i), TYPE_NAMES[x.t],
+            print('%3d 0x%08X %-6s %-40s %s' % (i, (0x12 if x.t == 5 else 0x02) << 24 | i, TYPE_NAMES[x.t],
                                               r.get('name', ''), fmt(x)))
     else:
         for path, x in walk(pf.layout, pf.root):
-            r = labels.get(path) or labels.get(generic_path(path), {})
+            parts = path.split('.')
+            r = {}
+            for k in range(len(parts), 0, -1):   # most specific label first: g09[3].sub[2].w.1 -> ... -> g09[3]
+                key = '.'.join(parts[:k])
+                r = labels.get(key) or labels.get(generic_path(key))
+                if r:
+                    break
+            r = r or {}
             print('%-24s %-6s %-40s %s' % (path, TYPE_NAMES[x.t], r.get('name', ''), fmt(x)))
 
 
@@ -375,6 +393,9 @@ def cmd_check(args):
 
 
 def main():
+    import signal
+    if hasattr(signal, 'SIGPIPE'):
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     if len(sys.argv) < 3:
         print(__doc__)
         sys.exit(1)
