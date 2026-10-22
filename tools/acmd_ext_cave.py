@@ -58,6 +58,24 @@ SPECIAL_HITBOX = 0x02BDBB20      # handler, size 42
 EXT_SPECIAL_HITBOX = 0x02BDD46C  # handler, size 44
 N_EXTRA = 6
 
+# the extra parameters of the Extra hitbox commands: name, type (0 int, 1 float), description
+EXTRA_PARAMS = [
+    ('HitstunMul', 1, 'Multiplies the hitstun this hit gives the opponent (the game\'s own: knockback x 0.4). 0 or less = x1 (normal).'),
+    ('HitstopMul', 1, 'Multiplies the opponent\'s hitstop (hitlag) from this hit, on top of the Hitlag parameter. 0 or less = x1.'),
+    ('HitstopFrames', 0, 'The opponent\'s hitstop in frames, replacing the computed one (HitstopMul is then ignored). 0 = computed.'),
+    ('SelfHitstopMul', 1, 'Multiplies the attacker\'s own hitstop from this hit. 0 or less = x1.'),
+    ('SelfHitstopFrames', 0, 'The attacker\'s own hitstop in frames, replacing the computed one. 0 = computed.'),
+    ('DIMul', 1, 'Multiplies how far DI can turn this hit\'s launch angle (0.5 = half, 2 = double). 0 or less = x1; for no DI use a tiny value (0.001).'),
+]
+SM4SHCOMMAND_DESC = {
+    'Extra_Special_Hitbox': 'Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier '
+                            'and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).',
+    'Extra_Extended_Special_Hitbox': 'Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, '
+                                     'hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched '
+                                     'cross_f.rpx (docs/acmd-extra-commands.md).',
+}
+BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
+
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
     ('Extra_Special_Hitbox', 42 + N_EXTRA, 'h_extra', SPECIAL_HITBOX),
     ('Extra_Extended_Special_Hitbox', 44 + N_EXTRA, 'h_extra_ext', EXT_SPECIAL_HITBOX),
@@ -331,7 +349,32 @@ def b(at, to):
     return 0x48000000 | (off & 0x3FFFFFC)
 
 
+def labels(path):
+    """add / update the new commands in tools/Sm4shCommand/param_labels.json (apply_param_labels.py then
+    puts them in Sm4shCommand's table, tools/acmd_info.json and Events.cfg)"""
+    import json
+    d = json.load(open(path))
+    info = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'acmd_info.json')))['commands']
+    for name, size, _label, _base in COMMANDS:
+        if name not in BASE_CRC:
+            continue
+        base = '%08X' % BASE_CRC[name]
+        bi, bl = info[base], d.get(base, {})
+        e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
+             '_format': bi['format'] + [t for _n, t, _d in EXTRA_PARAMS]}
+        for k, pname in enumerate(bi['syntax']):
+            e[str(k)] = dict(bl.get(str(k), {}), name=pname)
+        for k, (pname, _t, desc) in enumerate(EXTRA_PARAMS):
+            e[str(len(bi['syntax']) + k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
+        assert len(e['_format']) == size - 1
+        d['%08X' % crc(name)] = e
+    json.dump(dict(sorted(d.items())), open(path, 'w'), indent=1)
+
+
 def main():
+    if '--labels' in sys.argv:
+        labels(sys.argv[sys.argv.index('--labels') + 1])
+        return
     a, words, hooks = build()
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]

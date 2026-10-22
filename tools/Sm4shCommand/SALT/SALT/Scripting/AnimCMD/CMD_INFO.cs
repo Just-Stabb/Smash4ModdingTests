@@ -129,7 +129,9 @@ namespace SALT.Moveset.AnimCMD
              { 0x91CF842D, 2 }, { 0x5BC50AA6, 3 }, { 0x8FF62E3D, 2 }, { 0x83A45688, 2 }, { 0x96114CFC, 3 },
              { 0xF4940C87, 4 }, { 0x15F0023E, 3 }, { 0xCB59A07E, 2 }, { 0x0202C138, 3 }, { 0x53F0D3E1, 4 },
              { 0x4B7B6E51, 2 }, { 0x5F4CF775, 1 }, { 0x522DBA37, 1 }, { 0xCD25726B, 1 }, { 0x314839A7, 1 },
-             { 0xF0D25BDA, 2 }, { 0x3341CBFE, 1 }, { 0x92A88908, 2 }, { 0x300A0A85, 1 }
+             { 0xF0D25BDA, 2 }, { 0x3341CBFE, 1 }, { 0x92A88908, 2 }, { 0x300A0A85, 1 },
+            {0x5C8A67C9,50},
+            {0x974EA5BE,48}
         };
         #endregion
         #region Names
@@ -719,6 +721,8 @@ namespace SALT.Moveset.AnimCMD
             {0x3341CBFE,"unk_3341CBFE"},
             {0x92A88908,"CHANGE_KINETIC"},
             {0x300A0A85,"unk_300A0A85"},
+            {0x5C8A67C9,"Extra_Extended_Special_Hitbox"},
+            {0x974EA5BE,"Extra_Special_Hitbox"},
         };
         #endregion
         #region Params
@@ -1310,6 +1314,8 @@ namespace SALT.Moveset.AnimCMD
             {0x3341CBFE,String.Empty},
             {0x92A88908,"0"},
             {0x300A0A85,String.Empty},
+            {0x5C8A67C9,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,1,0,1"},
+            {0x974EA5BE,"0,0,0,1,0,0,0,0,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1"},
         };
         #endregion
         #region syntax
@@ -1899,6 +1905,8 @@ namespace SALT.Moveset.AnimCMD
             {0x3341CBFE,String.Empty},
             {0x92A88908,"KineticType"},
             {0x300A0A85,String.Empty},
+            {0x5C8A67C9,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,X2,Y2,Z2,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
+            {0x974EA5BE,"ID,Part,Bone,Damage,Angle,KBG,FKB,BKB,Size,X,Y,Z,Effect,Trip,Hitlag,SDI,Clang,Rebound,ShieldDamage,SFXLevel,SFXType,Ground/Air,Direct/Indirect,Type,HitBits,Unk41,CollisionPart,NoScale,Shieldable,Reflectable,Absorbable,Rehit,IgnoreInvuln,HitAllStates,FacingRestrict,NoGrabRelease,TeamDamage,DisableHitlag,NoGFX,Flinchless,Shape,HitstunMul,HitstopMul,HitstopFrames,SelfHitstopMul,SelfHitstopFrames,DIMul"},
         };
         #endregion
 
@@ -2490,6 +2498,8 @@ namespace SALT.Moveset.AnimCMD
             {0x3341CBFE,"NONE"},
             {0x92A88908,"NONE"},
             {0x300A0A85,"NONE"},
+            {0x5C8A67C9,"Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x974EA5BE,"Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

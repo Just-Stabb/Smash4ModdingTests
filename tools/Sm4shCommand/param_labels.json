@@ -7650,6 +7650,395 @@
    "confidence": "high"
   }
  },
+ "5C8A67C9": {
+  "_command": "Extra_Extended_Special_Hitbox",
+  "_new": true,
+  "_name": "Extra_Extended_Special_Hitbox",
+  "_size": 50,
+  "_desc": "Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   0,
+   1
+  ],
+  "0": {
+   "name": "ID",
+   "desc": "Hitbox slot 0-7 (AttackModule slot [this+0x40] + id*0x84).",
+   "values": "0-7",
+   "evidence": "set_attack 0x02C086A8 r4",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Part",
+   "desc": "Hit group: hitboxes of one part share one already-hit list (a victim is hit once per part).",
+   "values": "0-3",
+   "evidence": "set_attack r5; IGNORE lists are per part (0x02C0A560 r6)",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Bone",
+   "desc": "Bone ID the hitbox follows.",
+   "values": "bone id",
+   "evidence": "data +0x3C (u16)",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Damage",
+   "desc": "Damage %.",
+   "values": "float",
+   "evidence": "data +0x18",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "Angle",
+   "desc": "Launch angle (361 = Sakurai angle).",
+   "values": "int",
+   "evidence": "data +0x20",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "KBG",
+   "desc": "Knockback growth.",
+   "values": "int",
+   "evidence": "data +0x24",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "FKB",
+   "desc": "Fixed (weight-based / set) knockback; 0 = off. Same thing as \"WBKB\".",
+   "values": "int",
+   "evidence": "data +0x28; Ultimate ATTACK arg fkb",
+   "confidence": "high"
+  },
+  "7": {
+   "name": "BKB",
+   "desc": "Base knockback.",
+   "values": "int",
+   "evidence": "data +0x2C",
+   "confidence": "high"
+  },
+  "8": {
+   "name": "Size",
+   "desc": "Radius.",
+   "values": "float",
+   "evidence": "data +0x1C",
+   "confidence": "high"
+  },
+  "9": {
+   "name": "X",
+   "desc": "Offset X from the bone.",
+   "values": "float",
+   "evidence": "data +0x00",
+   "confidence": "high"
+  },
+  "10": {
+   "name": "Y",
+   "desc": "Offset Y.",
+   "values": "float",
+   "evidence": "data +0x04",
+   "confidence": "high"
+  },
+  "11": {
+   "name": "Z",
+   "desc": "Offset Z.",
+   "values": "float",
+   "evidence": "data +0x08",
+   "confidence": "high"
+  },
+  "12": {
+   "name": "Effect",
+   "desc": "Hit attribute (normal 0, slash 2, electric 3, fire 5, ...); drives the hit effect and special reactions (hurt code 0x02C24DF4 branches on 7, 0xE, 0x18).",
+   "values": "0,2,5,3,25,21,36,...",
+   "evidence": "data +0x43; hit info +0x87",
+   "confidence": "high"
+  },
+  "13": {
+   "name": "Trip",
+   "desc": "Trip chance.",
+   "values": "float",
+   "evidence": "data +0x30",
+   "confidence": "high"
+  },
+  "14": {
+   "name": "Hitlag",
+   "desc": "Hitlag multiplier.",
+   "values": "float",
+   "evidence": "data +0x34",
+   "confidence": "high"
+  },
+  "15": {
+   "name": "SDI",
+   "desc": "SDI multiplier.",
+   "values": "float",
+   "evidence": "data +0x38",
+   "confidence": "high"
+  },
+  "16": {
+   "name": "Clang",
+   "desc": "Can clang with other hitboxes (filter flag 0x01).",
+   "values": "0/1",
+   "evidence": "filter builder 0x02C0E77C",
+   "confidence": "high"
+  },
+  "17": {
+   "name": "Rebound",
+   "desc": "Clang causes rebound.",
+   "values": "0/1",
+   "evidence": "data +0x47",
+   "confidence": "high"
+  },
+  "18": {
+   "name": "ShieldDamage",
+   "desc": "Extra shield damage.",
+   "values": "int",
+   "evidence": "data +0x58 (u16)",
+   "confidence": "high"
+  },
+  "19": {
+   "name": "SFXLevel",
+   "desc": "Hit sound strength (0-3).",
+   "values": "0-3",
+   "evidence": "data +0x44",
+   "confidence": "high"
+  },
+  "20": {
+   "name": "SFXType",
+   "desc": "Hit sound kind.",
+   "values": "int",
+   "evidence": "data +0x45",
+   "confidence": "high"
+  },
+  "21": {
+   "name": "Ground/Air",
+   "desc": "Victim situation mask: 1 ground, 2 air, 3 both. Bit 31 (0x80000000) sets data +0x56, which drops victim class 2 from the accept mask (accept-word bits 3-4 = 1 instead of 3); used by inhales, Bowser/Koopa command grab, Little Mac smashes/dash attack, Greninja Shadow Sneak.",
+   "values": "1,2,3 (+0x80000000)",
+   "evidence": "data +0x40, +0x56; 0x02C0E77C",
+   "confidence": "high"
+  },
+  "22": {
+   "name": "Direct/Indirect",
+   "desc": "Direct hit (1) vs indirect/projectile (0).",
+   "values": "0/1",
+   "evidence": "data +0x4C",
+   "confidence": "high"
+  },
+  "23": {
+   "name": "Type",
+   "desc": "Attack region / kind (punch, kick, sword, body, head, object, ...; Ultimate ATTACK_REGION_*).",
+   "values": "0-25+",
+   "evidence": "data +0x55; Ultimate last ATTACK arg",
+   "confidence": "medium"
+  },
+  "24": {
+   "name": "HitBits",
+   "desc": "Target category mask (6 bits; 63 = everything, 31 / 1 / 43 seen). Goes into the collision filter word.",
+   "values": "63,31,1,43,2,3",
+   "evidence": "0x02C0E77C word1 bits 19+",
+   "confidence": "high"
+  },
+  "25": {
+   "name": "Unk41",
+   "desc": "Unknown flag at data +0x41. Only Shulk Back Slash front-facing hitboxes (FacingRestrict 3, part 0) set it; the back-hit set (FacingRestrict 6, part 1) leaves it 0. No direct reader found in the battle code; likely \"don't hit a victim from behind\" (lets the back set take that case).",
+   "values": "0 (28 uses of 1)",
+   "evidence": "corpus; data +0x41",
+   "confidence": "low"
+  },
+  "26": {
+   "name": "CollisionPart",
+   "desc": "Victim hurtbox-part mask (4 bits, 15 = all parts); Ultimate collision_part (COLLISION_PART_MASK_ALL).",
+   "values": "15 always",
+   "evidence": "0x02C0E77C word1 bits 12-15; default 0xF in Hitbox",
+   "confidence": "high"
+  },
+  "27": {
+   "name": "NoScale",
+   "desc": "Hitbox size/offset not multiplied by the owner's scale (scale argument replaced by 1.0).",
+   "values": "0 (never set in vanilla)",
+   "evidence": "0x02C0E8D4 / 0x02C0E918: if +0x48 then f2 = 1.0 (0x10103A1C) before the shape update 0x02C14F14 / 0x02C13360",
+   "confidence": "medium"
+  },
+  "28": {
+   "name": "Shieldable",
+   "desc": "Can hit shields (0 = unblockable, goes through shield).",
+   "values": "0/1",
+   "evidence": "filter flag 0x04 in 0x02C0E77C",
+   "confidence": "high"
+  },
+  "29": {
+   "name": "Reflectable",
+   "desc": "Can be reflected (filter flag 0x08, self type 2).",
+   "values": "0/1",
+   "evidence": "0x02C0E77C",
+   "confidence": "high"
+  },
+  "30": {
+   "name": "Absorbable",
+   "desc": "Can be absorbed (filter flag 0x10, self type 4).",
+   "values": "0/1",
+   "evidence": "0x02C0E77C",
+   "confidence": "high"
+  },
+  "31": {
+   "name": "Rehit",
+   "desc": "Rehit rate in frames (0 = once).",
+   "values": "int",
+   "evidence": "data +0x5C",
+   "confidence": "high"
+  },
+  "32": {
+   "name": "IgnoreInvuln",
+   "desc": "Flag at data +0x4D (getter 0x02C09090). Only vanilla use: Wii Fit Trainer d-tilt push box; label kept, not verified.",
+   "values": "0 (1 use of 1)",
+   "evidence": "getter at 0x02C09090",
+   "confidence": "low"
+  },
+  "33": {
+   "name": "HitAllStates",
+   "desc": "Widens the victim-state accept field (accept word bits 8-10) from 3 to 7, letting the hitbox hit a 3rd target class normal hitboxes skip. Only Jigglypuff's Puff Up FS uses it.",
+   "values": "0 (13 uses of 1)",
+   "evidence": "0x02C0E77C: lbz 0x4E -> r31 = 7; getter 0x02C090A4",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "FacingRestrict",
+   "desc": "Facing / side check (LR check). 3 most common, 0, 1, 4, 6, 5, 2. Shulk Back Slash: 3 front set, 6 back-hit set. Hitbox (24-param) takes the module default (AttackModule +0x11A).",
+   "values": "0-6",
+   "evidence": "data +0x4F",
+   "confidence": "medium"
+  },
+  "35": {
+   "name": "NoGrabRelease",
+   "desc": "A hit from the fighter currently holding the victim doesn't count as a release hit (the captured victim's damage check 0x02C233C0 skips hits whose attacker is its link parent and that have this set). Set on every pummel and throw; also on most ledge attacks and many b-airs, where it has no effect.",
+   "values": "0/1 (509 uses)",
+   "evidence": "0x02C233C0 (callers 0x02DAC0C4 / 0x02E5ED70 set the release flag)",
+   "confidence": "medium"
+  },
+  "36": {
+   "name": "TeamDamage",
+   "desc": "Hits teammates (friendly fire).",
+   "values": "0/1",
+   "evidence": "data +0x51, AttackModule +0x2E",
+   "confidence": "high"
+  },
+  "37": {
+   "name": "DisableHitlag",
+   "desc": "No hitstop for this hit.",
+   "values": "0/1",
+   "evidence": "0x02C2678C skips the hitstop",
+   "confidence": "high"
+  },
+  "38": {
+   "name": "NoGFX",
+   "desc": "No hit effect graphic.",
+   "values": "0/1",
+   "evidence": "data +0x53",
+   "confidence": "medium"
+  },
+  "39": {
+   "name": "Flinchless",
+   "desc": "Victim doesn't flinch (no damage reaction); hurt code 0x02C24DF4 takes a separate path when set.",
+   "values": "0/1",
+   "evidence": "hit info +0x98",
+   "confidence": "medium"
+  },
+  "40": {
+   "name": "X2",
+   "desc": "Capsule end point X (Shape 2).",
+   "values": "float",
+   "evidence": "data +0x0C",
+   "confidence": "high"
+  },
+  "41": {
+   "name": "Y2",
+   "desc": "Capsule end point Y.",
+   "values": "float",
+   "evidence": "data +0x10",
+   "confidence": "high"
+  },
+  "42": {
+   "name": "Z2",
+   "desc": "Capsule end point Z.",
+   "values": "float",
+   "evidence": "data +0x14",
+   "confidence": "high"
+  },
+  "43": {
+   "name": "HitstunMul",
+   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 or less = x1 (normal).",
+   "confidence": "high"
+  },
+  "44": {
+   "name": "HitstopMul",
+   "desc": "Multiplies the opponent's hitstop (hitlag) from this hit, on top of the Hitlag parameter. 0 or less = x1.",
+   "confidence": "high"
+  },
+  "45": {
+   "name": "HitstopFrames",
+   "desc": "The opponent's hitstop in frames, replacing the computed one (HitstopMul is then ignored). 0 = computed.",
+   "confidence": "high"
+  },
+  "46": {
+   "name": "SelfHitstopMul",
+   "desc": "Multiplies the attacker's own hitstop from this hit. 0 or less = x1.",
+   "confidence": "high"
+  },
+  "47": {
+   "name": "SelfHitstopFrames",
+   "desc": "The attacker's own hitstop in frames, replacing the computed one. 0 = computed.",
+   "confidence": "high"
+  },
+  "48": {
+   "name": "DIMul",
+   "desc": "Multiplies how far DI can turn this hit's launch angle (0.5 = half, 2 = double). 0 or less = x1; for no DI use a tiny value (0.001).",
+   "confidence": "high"
+  }
+ },
  "5D5AF322": {
   "_command": "unk_5D5AF322",
   "_note": "Registers the item take-out sound for the current status only",
@@ -11418,6 +11807,379 @@
    "values": "0",
    "evidence": "second arg of the same call",
    "confidence": "medium"
+  }
+ },
+ "974EA5BE": {
+  "_command": "Extra_Special_Hitbox",
+  "_new": true,
+  "_name": "Extra_Special_Hitbox",
+  "_size": 48,
+  "_desc": "Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   0,
+   1,
+   0,
+   1
+  ],
+  "0": {
+   "name": "ID",
+   "desc": "Hitbox slot 0-7 (AttackModule slot [this+0x40] + id*0x84).",
+   "values": "0-7",
+   "evidence": "set_attack 0x02C086A8 r4",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Part",
+   "desc": "Hit group: hitboxes of one part share one already-hit list (a victim is hit once per part).",
+   "values": "0-3",
+   "evidence": "set_attack r5; IGNORE lists are per part (0x02C0A560 r6)",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Bone",
+   "desc": "Bone ID the hitbox follows.",
+   "values": "bone id",
+   "evidence": "data +0x3C (u16)",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Damage",
+   "desc": "Damage %.",
+   "values": "float",
+   "evidence": "data +0x18",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "Angle",
+   "desc": "Launch angle (361 = Sakurai angle).",
+   "values": "int",
+   "evidence": "data +0x20",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "KBG",
+   "desc": "Knockback growth.",
+   "values": "int",
+   "evidence": "data +0x24",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "FKB",
+   "desc": "Fixed (weight-based / set) knockback; 0 = off. Same thing as \"WBKB\".",
+   "values": "int",
+   "evidence": "data +0x28; Ultimate ATTACK arg fkb",
+   "confidence": "high"
+  },
+  "7": {
+   "name": "BKB",
+   "desc": "Base knockback.",
+   "values": "int",
+   "evidence": "data +0x2C",
+   "confidence": "high"
+  },
+  "8": {
+   "name": "Size",
+   "desc": "Radius.",
+   "values": "float",
+   "evidence": "data +0x1C",
+   "confidence": "high"
+  },
+  "9": {
+   "name": "X",
+   "desc": "Offset X from the bone.",
+   "values": "float",
+   "evidence": "data +0x00",
+   "confidence": "high"
+  },
+  "10": {
+   "name": "Y",
+   "desc": "Offset Y.",
+   "values": "float",
+   "evidence": "data +0x04",
+   "confidence": "high"
+  },
+  "11": {
+   "name": "Z",
+   "desc": "Offset Z.",
+   "values": "float",
+   "evidence": "data +0x08",
+   "confidence": "high"
+  },
+  "12": {
+   "name": "Effect",
+   "desc": "Hit attribute (normal 0, slash 2, electric 3, fire 5, ...); drives the hit effect and special reactions (hurt code 0x02C24DF4 branches on 7, 0xE, 0x18).",
+   "values": "0,2,5,3,25,21,36,...",
+   "evidence": "data +0x43; hit info +0x87",
+   "confidence": "high"
+  },
+  "13": {
+   "name": "Trip",
+   "desc": "Trip chance.",
+   "values": "float",
+   "evidence": "data +0x30",
+   "confidence": "high"
+  },
+  "14": {
+   "name": "Hitlag",
+   "desc": "Hitlag multiplier.",
+   "values": "float",
+   "evidence": "data +0x34",
+   "confidence": "high"
+  },
+  "15": {
+   "name": "SDI",
+   "desc": "SDI multiplier.",
+   "values": "float",
+   "evidence": "data +0x38",
+   "confidence": "high"
+  },
+  "16": {
+   "name": "Clang",
+   "desc": "Can clang with other hitboxes (filter flag 0x01).",
+   "values": "0/1",
+   "evidence": "filter builder 0x02C0E77C",
+   "confidence": "high"
+  },
+  "17": {
+   "name": "Rebound",
+   "desc": "Clang causes rebound.",
+   "values": "0/1",
+   "evidence": "data +0x47",
+   "confidence": "high"
+  },
+  "18": {
+   "name": "ShieldDamage",
+   "desc": "Extra shield damage.",
+   "values": "int",
+   "evidence": "data +0x58 (u16)",
+   "confidence": "high"
+  },
+  "19": {
+   "name": "SFXLevel",
+   "desc": "Hit sound strength (0-3).",
+   "values": "0-3",
+   "evidence": "data +0x44",
+   "confidence": "high"
+  },
+  "20": {
+   "name": "SFXType",
+   "desc": "Hit sound kind.",
+   "values": "int",
+   "evidence": "data +0x45",
+   "confidence": "high"
+  },
+  "21": {
+   "name": "Ground/Air",
+   "desc": "Victim situation mask: 1 ground, 2 air, 3 both. Bit 31 (0x80000000) sets data +0x56, which drops victim class 2 from the accept mask (accept-word bits 3-4 = 1 instead of 3); used by inhales, Bowser/Koopa command grab, Little Mac smashes/dash attack, Greninja Shadow Sneak.",
+   "values": "1,2,3 (+0x80000000)",
+   "evidence": "data +0x40, +0x56; 0x02C0E77C",
+   "confidence": "high"
+  },
+  "22": {
+   "name": "Direct/Indirect",
+   "desc": "Direct hit (1) vs indirect/projectile (0).",
+   "values": "0/1",
+   "evidence": "data +0x4C",
+   "confidence": "high"
+  },
+  "23": {
+   "name": "Type",
+   "desc": "Attack region / kind (punch, kick, sword, body, head, object, ...; Ultimate ATTACK_REGION_*).",
+   "values": "0-25+",
+   "evidence": "data +0x55; Ultimate last ATTACK arg",
+   "confidence": "medium"
+  },
+  "24": {
+   "name": "HitBits",
+   "desc": "Target category mask (6 bits; 63 = everything, 31 / 1 / 43 seen). Goes into the collision filter word.",
+   "values": "63,31,1,43,2,3",
+   "evidence": "0x02C0E77C word1 bits 19+",
+   "confidence": "high"
+  },
+  "25": {
+   "name": "Unk41",
+   "desc": "Unknown flag at data +0x41. Only Shulk Back Slash front-facing hitboxes (FacingRestrict 3, part 0) set it; the back-hit set (FacingRestrict 6, part 1) leaves it 0. No direct reader found in the battle code; likely \"don't hit a victim from behind\" (lets the back set take that case).",
+   "values": "0 (28 uses of 1)",
+   "evidence": "corpus; data +0x41",
+   "confidence": "low"
+  },
+  "26": {
+   "name": "CollisionPart",
+   "desc": "Victim hurtbox-part mask (4 bits, 15 = all parts); Ultimate collision_part (COLLISION_PART_MASK_ALL).",
+   "values": "15 always",
+   "evidence": "0x02C0E77C word1 bits 12-15; default 0xF in Hitbox",
+   "confidence": "high"
+  },
+  "27": {
+   "name": "NoScale",
+   "desc": "Hitbox size/offset not multiplied by the owner's scale (scale argument replaced by 1.0).",
+   "values": "0 (never set in vanilla)",
+   "evidence": "0x02C0E8D4 / 0x02C0E918: if +0x48 then f2 = 1.0 (0x10103A1C) before the shape update 0x02C14F14 / 0x02C13360",
+   "confidence": "medium"
+  },
+  "28": {
+   "name": "Shieldable",
+   "desc": "Can hit shields (0 = unblockable, goes through shield).",
+   "values": "0/1",
+   "evidence": "filter flag 0x04 in 0x02C0E77C",
+   "confidence": "high"
+  },
+  "29": {
+   "name": "Reflectable",
+   "desc": "Can be reflected (filter flag 0x08, self type 2).",
+   "values": "0/1",
+   "evidence": "0x02C0E77C",
+   "confidence": "high"
+  },
+  "30": {
+   "name": "Absorbable",
+   "desc": "Can be absorbed (filter flag 0x10, self type 4).",
+   "values": "0/1",
+   "evidence": "0x02C0E77C",
+   "confidence": "high"
+  },
+  "31": {
+   "name": "Rehit",
+   "desc": "Rehit rate in frames (0 = once).",
+   "values": "int",
+   "evidence": "data +0x5C",
+   "confidence": "high"
+  },
+  "32": {
+   "name": "IgnoreInvuln",
+   "desc": "Flag at data +0x4D (getter 0x02C09090). Only vanilla use: Wii Fit Trainer d-tilt push box; label kept, not verified.",
+   "values": "0 (1 use of 1)",
+   "evidence": "getter at 0x02C09090",
+   "confidence": "low"
+  },
+  "33": {
+   "name": "HitAllStates",
+   "desc": "Widens the victim-state accept field (accept word bits 8-10) from 3 to 7, letting the hitbox hit a 3rd target class normal hitboxes skip. Only Jigglypuff's Puff Up FS uses it.",
+   "values": "0 (13 uses of 1)",
+   "evidence": "0x02C0E77C: lbz 0x4E -> r31 = 7; getter 0x02C090A4",
+   "confidence": "medium"
+  },
+  "34": {
+   "name": "FacingRestrict",
+   "desc": "Facing / side check (LR check). 3 most common, 0, 1, 4, 6, 5, 2. Shulk Back Slash: 3 front set, 6 back-hit set. Hitbox (24-param) takes the module default (AttackModule +0x11A).",
+   "values": "0-6",
+   "evidence": "data +0x4F",
+   "confidence": "medium"
+  },
+  "35": {
+   "name": "NoGrabRelease",
+   "desc": "A hit from the fighter currently holding the victim doesn't count as a release hit (the captured victim's damage check 0x02C233C0 skips hits whose attacker is its link parent and that have this set). Set on every pummel and throw; also on most ledge attacks and many b-airs, where it has no effect.",
+   "values": "0/1 (509 uses)",
+   "evidence": "0x02C233C0 (callers 0x02DAC0C4 / 0x02E5ED70 set the release flag)",
+   "confidence": "medium"
+  },
+  "36": {
+   "name": "TeamDamage",
+   "desc": "Hits teammates (friendly fire).",
+   "values": "0/1",
+   "evidence": "data +0x51, AttackModule +0x2E",
+   "confidence": "high"
+  },
+  "37": {
+   "name": "DisableHitlag",
+   "desc": "No hitstop for this hit.",
+   "values": "0/1",
+   "evidence": "0x02C2678C skips the hitstop",
+   "confidence": "high"
+  },
+  "38": {
+   "name": "NoGFX",
+   "desc": "No hit effect graphic.",
+   "values": "0/1",
+   "evidence": "data +0x53",
+   "confidence": "medium"
+  },
+  "39": {
+   "name": "Flinchless",
+   "desc": "Victim doesn't flinch (no damage reaction); hurt code 0x02C24DF4 takes a separate path when set.",
+   "values": "0/1",
+   "evidence": "hit info +0x98",
+   "confidence": "medium"
+  },
+  "40": {
+   "name": "Shape",
+   "desc": "Collision shape kind: 0 sphere, 2 capsule (X2/Y2/Z2; X2 = X if no end point is given). Extended_* commands force 2. Shapes are pooled per kind (0x02C108C4 / 0x02C118E4).",
+   "values": "0 / 2",
+   "evidence": "0x02C0AA64; 0x02C108C4",
+   "confidence": "medium"
+  },
+  "41": {
+   "name": "HitstunMul",
+   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 or less = x1 (normal).",
+   "confidence": "high"
+  },
+  "42": {
+   "name": "HitstopMul",
+   "desc": "Multiplies the opponent's hitstop (hitlag) from this hit, on top of the Hitlag parameter. 0 or less = x1.",
+   "confidence": "high"
+  },
+  "43": {
+   "name": "HitstopFrames",
+   "desc": "The opponent's hitstop in frames, replacing the computed one (HitstopMul is then ignored). 0 = computed.",
+   "confidence": "high"
+  },
+  "44": {
+   "name": "SelfHitstopMul",
+   "desc": "Multiplies the attacker's own hitstop from this hit. 0 or less = x1.",
+   "confidence": "high"
+  },
+  "45": {
+   "name": "SelfHitstopFrames",
+   "desc": "The attacker's own hitstop in frames, replacing the computed one. 0 = computed.",
+   "confidence": "high"
+  },
+  "46": {
+   "name": "DIMul",
+   "desc": "Multiplies how far DI can turn this hit's launch angle (0.5 = half, 2 = double). 0 or less = x1; for no DI use a tiny value (0.001).",
+   "confidence": "high"
   }
  },
  "979D8828": {
