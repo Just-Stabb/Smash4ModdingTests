@@ -22,3 +22,14 @@ soundlabeltable row, instead of sharing Mario's) and played from the move's ACMD
 
 Plan: a small self-authored test effect first (prove the chain in game), then the three parts, then
 the move (animations, ACMD hitboxes, MSC charge logic).
+
+## Built so far
+
+- Formats: `tools/ptcl.py` (docs/ptcl-format.md), `tools/efc.py` (docs/efc-format.md).
+- Supamario's own sound bank: `tools/fighter_own_bank.py` (docs/kind-expansion.md): BINF id 2144,
+  soundlabeltable row 3249; Kamehameha sounds `0x0CB1008B` charge, `0x0CB1008C` fire,
+  `0x0CB1008D` beam head.
+- Chain test (Supamario v5): `PtcSupamarioKameCharge`, a new emitter set built from the fireball's
+  8 emitters (blue colour keys, our own 64x64 orb texture, the templates' shaders), `.efc` entry
+  `0x16` (effect id `0x03410016`), played from the up taunt (`External_Graphic` at bone 0x11,
+  terminated with the animation) with the charge sound.
