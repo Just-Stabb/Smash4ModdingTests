@@ -1108,6 +1108,25 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     record `+0x30` (= `DamageModuleF(1)`).
   - Final hitstop frames in r20 at `0x02C25A78` (after the slowdown rate).
 - **Attacker:** `0x02C2639C`. Hitstop before the rate in r3 at `0x02C2645C`, after it at `0x02C264C4`.
+- **Per frame:** every object's motion step (fighters `0x02E408B8`, weapons `0x02BAD64C`, a third
+  class `0x03048064`) calls `0x02C5F3BC` when it isn't stopped (StopModule byte `+0x10`). That runs the
+  frame's ACMD (accessor `+0xC4` → `0x02C2986C` → the interpreter).
+  - `0x02C5F430` (`li r0, 1`) comes right after, with r31 = MotionModule (`+4` = accessor). It never
+    runs in hitlag.
+- **Object set-up:** `0x02BF57B0` resets each module. At `0x02BF5864`, `lwz r3, 0x28(r31)` loads the
+  WorkModule before its reset (vt `+0x24`, `0x0200E650`). Weapons are pooled, so this is where a
+  reused one starts over.
+- **KineticModule:** accessor `+0x34`.
+  - Fields: kinetic type at `+0x11C`, energies at `+0x18` (0x10 each).
+  - Methods: set the type with vt `+0xEC`, get an energy with vt `+0x54(id)`, get the speed sum with
+    vt `+0xA4(mask)` (x in r3, y in r4).
+  - An energy holds its speed at `+0` / `+4`, its enabled byte at `+0x18`, and acceleration / limit
+    at `+0x20` / `+0x24`.
+  - A weapon's own movement is energy 0 and gravity is energy 2.
+  - Set_Kinetic_Handler sends op 0 `{0, ID}` through vt `+0x114`, so it works on any object.
+    Set_Kinetic_Handler_Aerial is fighter-only.
+- **A weapon's owner:** LinkModule (accessor `+0x68`) vt `+0x5C(0)` says whether it has a link 0.
+  vt `+0x6C(0, 1)` gives that object's ID, which matches the fighter table entry's `+0`.
 - **DI isn't native.** Every fighter's MSC damage code (Kirby `func_885`) turns the launch angle by
   `WorkModuleF(0, 0x0200011A)` (max DI angle) × the stick, then LSI (`0x0200011B` / `0x0200011C`) and
   `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the

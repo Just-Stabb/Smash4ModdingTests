@@ -4,7 +4,8 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them (View > Commands, under Hitboxes), with tooltips for every parameter.
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes
+under Hitboxes and Track_Target under Traces & targeting.
 `tools/acmd.py` reads and writes them too.
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -55,6 +56,71 @@ Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12.0, Angle=361, KBG=100, FKB=
   - **Not yet checked in game:** that every fighter's damage code reads the DI angle this way.
 - **Projectiles and other articles** work too: their scripts use the same commands.
 
+## Track_Target
+
+`Track_Target(Frames, Speed, TurnRate, Range, Mode)` makes the object running the script home in on
+the nearest other fighter. That object can be a fighter, or a projectile (in the projectile's own
+script).
+
+| Parameter | Type | Meaning |
+|---|---|---|
+| Frames | int | How long to track. -1 means until stopped: `Track_Target` with 0 frames, writing 0 to `TRACK_FRAMES`, or the object being reset. |
+| Speed | float | Travel speed while tracking. 0 keeps the current speed and only turns it. |
+| TurnRate | float | The most the direction can turn per frame, in degrees. 0 (or 180 and up) points straight at the target every frame. |
+| Range | float | Only targets within this X/Y distance count. 0 means any distance. With no target in range, the object keeps going as it was. |
+| Mode | int | Bit 1: horizontal only (height is ignored; fighters keep their gravity). Bit 2: fighters turn to face the target. |
+
+- **When it runs:** every frame the object moves (not during hitlag), right after its script for
+  that frame.
+- **Projectiles:**
+  - Steers the projectile's own movement (its first kinetic energy, the one its MSC sets when it's
+    fired). Gravity stays as it was, so give a falling projectile enough Speed.
+  - Never targets the fighter who fired it.
+- **Fighters:**
+  - Sets their speed the way Kirby's side-B homing does: X and Y speed, no braking and, unless
+    horizontal only, no gravity while tracking.
+  - It works in the air. On the ground the fighter's status may move them its own way.
+- **Targets:** teams aren't considered, so teammates can be targeted.
+- **Untested in game:** projectiles whose movement isn't their first energy won't turn. Tell me
+  which one and I'll look at it.
+
+Example: a projectile that homes for 60 frames at speed 1.8, turning at most 4° a frame.
+
+```
+Track_Target(Frames=60, Speed=1.8, TurnRate=4.0, Range=0.0, Mode=0)
+```
+
+## Variables, timers and the kinetic type
+
+These are ordinary float variables in the same `0x0F000xxx` range as the position variables
+(`docs/position-variables.md`). Use them with `SET_FLOAT`, `ADD_FLOAT`, `Float_Var_Compare` and
+the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`.
+
+- **Floats only.** `SET_INT` and the int compares don't work on them.
+- **Each object has its own,** fighters and projectiles alike, up to 48 objects using them at
+  once.
+- **Lifetime:** the values stay until the object is set up again: a fighter's KO, or a projectile
+  being reused for its next shot. They start at 0.
+- **Names:** Sm4shCommand shows the names below, and the names compile too.
+
+| ID | Name | Read | Write |
+|---|---|---|---|
+| `0x0F000300`–`31F` | `VAR_0`–`VAR_31` | the value | set it |
+| `0x0F000320`–`32F` | `TIMER_0`–`TIMER_15` | frames left (0 = done) | set frames; it then counts down by 1 every frame the object moves (not in hitlag), stopping at 0 |
+| `0x0F000330` | `KINETIC_TYPE` | the current kinetic type, the one `Set_Kinetic_Handler` sets | change it (projectiles too) |
+| `0x0F000331` | `TRACK_FRAMES` | `Track_Target` frames left (-1 = until stopped) | set them; 0 stops tracking |
+| `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
+
+Example: a move that can only be used again 120 frames after it ends.
+
+```
+// at the end of the move
+SET_FLOAT(TIMER_0, 120.0)
+
+// at the start of the move: do something different while the timer runs
+Float_Var_Compare(TIMER_0, ...) ...
+```
+
 ## How it works
 
 `tools/acmd_ext_cave.py` (docstring and comments), tested in the emulator by `tools/acmd_ext_test.py`.
@@ -67,4 +133,8 @@ Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12.0, Angle=361, KBG=100, FKB=
 - **At hit time:** the hit carries a copy of the hitbox data. The tag and a few check words find the
   record. Hooks then scale the victim's hitstun, the victim's and attacker's hitstop, and the
   victim's DI angle read.
+- **Per-object state:** the variables, timers and tracking live in a table keyed by the object's
+  WorkModule, reached through the position variables' ID hook.
+  - A hook after each object's per-frame ACMD run counts the timers down and steers.
+  - The object set-up code clears an object's state when it's set up or reused.
 - Addresses: `docs/native-notes.md`, "New ACMD commands".
