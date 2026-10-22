@@ -1,80 +1,80 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,0,0,0,0,f32,X offset for SpecialN animation,,medium,community,m12[*].0
-,1,,0x05000001,4,4,4,4,f32,Y offset for SpecialN animation,,medium,community,m12[*].1
-,2,,0x05000002,0,0,0,0,f32,X offset for SpecialNTurn animation,,medium,community,m12[*].2
-,3,,0x05000003,2,2,2,2,f32,Y offset for SpecialNTurn animation,,medium,community,m12[*].3
-,4,,0x05000004,0.19,1.3,2.1,1.9,f32,Speed of the Metal Blade,,medium,community,m12[*].4
-14,0,Side B,0x06000000,6,6,6,6,f32,,,,,m13[*]
-15,0,Up B,0x17000000,0x1,0xA,0x0,0x5,u32,,,,,m14[*].0
-,1,,0x17000001,0x1,0xA,0x5A,0x1,u32,,,,,m14[*].1
-,2,Up B,0x07000002,5,0.4,0.38,8.9,f32,Frames Mega Man is in jumpsquat animation/ before going upwards,community ID was 0x17000000,medium,community,m14[*].2
-,3,,0x07000003,1.2,1.03,1,1.03,f32,,,,,m14[*].3
-,4,,0x07000004,-1,0.2,0.037,-1.3,f32,,,,,m14[*].4
-,5,,0x17000005,0x6,0x1C,0x59,0x6,u32,Duration of Name4 takes effect,,medium,community,m14[*].5
-,6,,0x07000006,1,0.15,1.05,0.8,f32,,,,,m14[*].6
-,7,,0x07000007,1,0.15,0.65,0.8,f32,,,,,m14[*].7
-,8,,0x07000008,0,0,0,0,f32,Landing lag?,,medium,community,m14[*].8
-,9,,0x17000009,0x1E,0x1E,0x3C,0x0,u32,,,,,m14[*].9
-16,0,Down B,0x08000000,0.6,0.6,0.6,0.6,f32,H speed multiplier on aerial startup,,medium,community,m15[*].0
-,1,,0x08000001,0.5,0.5,0.5,0.5,f32,V speed multiplier on aerial startup,,medium,community,m15[*].1
-,2,,0x08000002,0.5,0.5,0.5,0.5,f32,Added V speed on aerial startup,,medium,community,m15[*].2
-,3,,0x18000003,0x1,0x1,0x1,0x1,u32,Can shoot as projectile,"0x1 = can, 0x0 = cant",medium,community,m15[*].3
-,4,,0x18000004,0x0,0x1,0x0,0x0,u32,,,,,m15[*].4
-,5,,0x08000005,0,12,12,10,f32,,,,,m15[*].5
-,6,,0x08000006,0,25,50,50,f32,Break threshold,,medium,community,m15[*].6
-,7,,0x08000007,0,1.2,1.5,1.5,f32,Reflected projectile damage multiplier,,medium,community,m15[*].7
-,8,,0x08000008,0,1.2,1.7,1.7,f32,Reflected projectile speed multiplier,,medium,community,m15[*].8
-,9,,0x08000009,0,0.7,0.7,0.7,f32,Reflected projectile lifetime multiplier,,medium,community,m15[*].9
-,0,Final Smash?,0x04000000,0,,,,f32,,,,,m16.0
-,1,,0x04000001,8,,,,f32,,,,,m16.1
-,2,,0x04000002,8,,,,f32,,,,,m16.2
-,3,,0x14000003,0x14,,,,u32,Animation frame,,medium,community,m16.3
-,4,,0x04000004,0,,,,f32,,,,,m16.4
-,5,,0x04000005,9,,,,f32,,,,,m16.5
-,6,,0x04000006,7.5,,,,f32,,,,,m16.6
-,7,,0x14000007,0x28,,,,u32,[auto] read by native code (get_int at 0x027C8A78); meaning not traced,,low,reads: native 0x027C8A78 (fn 0x027C8998),m16.7
-,8,,0x14000008,0x1E,,,,u32,,,,,m16.8
+13,0,Neutral B,0x05000000,0,0,0,0,f32,X offset for SpecialN animation,,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,4,4,4,4,f32,Y offset for SpecialN animation,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,0,0,0,0,f32,X offset for SpecialNTurn animation,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,2,2,2,2,f32,Y offset for SpecialNTurn animation,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,1.9,1.3,2.1,1.9,f32,Speed of the Metal Blade,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+14,0,Side B,0x06000000,6,6,6,6,f32,,,,no read in the vanilla MSC (native or unused),m13[*]
+15,0,Up B,0x17000000,0x5,0xA,0x0,0x5,u32,"Frames Mega Man is in jumpsquat animation/ before going upwards -- code: stored in status int 0x2, then decremented in func_2361 (a countdown / remaining count), tested against 0 (func_2359) [status 0x154 (SpecialHiSquat)]",,high,community | reads: MSC rockman.mscsb func_2359,m14[*].0
+,1,,0x17000001,0x1,0xA,0x5A,0x1,u32,"code: stored in status int 0x3, then decremented in func_2361 (a countdown / remaining count) (func_2359) [status 0x154 (SpecialHiSquat)]",,medium,reads: MSC rockman.mscsb func_2359,m14[*].1
+,2,,0x07000002,9,0.4,0.38,8.9,f32,Initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,1.03,1.03,1,1.03,f32,Aerial added V initial speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,-1.3,0.2,0.037,-1.3,f32,Aerial V acceleration (negative gravity),,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x17000005,0x6,0x1C,0x59,0x6,u32,"Duration of Name4 takes effect -- code: stored in status int 0x2, then decremented in func_2367 (a countdown / remaining count), tested against 0 (func_2365) [status 0x158]",,high,community | reads: MSC rockman.mscsb func_2365,m14[*].5
+,6,,0x07000006,0.8,0.15,1.05,0.8,f32,Air max speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.8,0.15,0.65,0.8,f32,Air max additional accel multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,0,0,0,0,f32,Landing lag? -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2368) [status 0x158],,high,community | reads: MSC rockman.mscsb func_2368,m14[*].8
+,9,,0x17000009,0x1E,0x1E,0x3C,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].9
+16,0,Down B,0x08000000,0.6,0.6,0.6,0.6,f32,"H speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2370) [status 0x155]",,high,community | reads: MSC rockman.mscsb func_2370,m15[*].0
+,1,,0x08000001,0.5,0.5,0.5,0.5,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2370) [status 0x155]",,high,community | reads: MSC rockman.mscsb func_2370,m15[*].1
+,2,,0x08000002,0.5,0.5,0.5,0.5,f32,"Added V speed on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2370) [status 0x155]",,high,community | reads: MSC rockman.mscsb func_2370,m15[*].2
+,3,,0x18000003,0x1,0x1,0x1,0x1,u32,Can shoot as projectile,"0x1 = can, 0x0 = cant",medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x0,0x1,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0,12,12,10,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,0,25,50,50,f32,Break threshold,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0,1.2,1.5,1.5,f32,Reflected projectile damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,0,1.2,1.7,1.7,f32,Reflected projectile speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,0,0.7,0.7,0.7,f32,Reflected projectile lifetime multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,0,Final Smash?,0x04000000,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,8,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,8,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x14000003,0x14,,,,u32,Animation frame -- code: compared with the animation frame (func_2278) [status 0x16],,high,community | reads: MSC rockman.mscsb func_2278,m16.3
+,4,,0x04000004,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,9,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,7.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
+,7,,0x14000007,0x28,,,,u32,[auto] read by native code (get_int at 0x027C8A78); meaning not traced,community value differs: Default 0x32 (vanilla 0x28),low,reads: native 0x027C8A78 (fn 0x027C8998),m16.7
+,8,,0x14000008,0x1E,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.8
 ,9,,0x04000009,42,,,,f32,[auto] read by native code (get_float at 0x027C4D5C); meaning not traced,,low,reads: native 0x027C4D5C (fn 0x027C4998),m16.9
 ,10,,0x0400000A,-160,,,,f32,[auto] read by native code (get_float at 0x027C5644); meaning not traced,,low,reads: native 0x027C5644 (fn 0x027C542C),m16.10
 ,11,,0x0400000B,-8,,,,f32,[auto] read by native code (get_float at 0x027C56E8); meaning not traced,,low,reads: native 0x027C56E8 (fn 0x027C542C); native 0x027C5790 (fn 0x027C542C),m16.11
-,12,,0x0400000C,10,,,,f32,,,,,m16.12
-,13,,0x0400000D,4,,,,f32,,,,,m16.13
-,14,,0x0400000E,5,,,,f32,,,,,m16.14
+,12,,0x0400000C,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.12
+,13,,0x0400000D,4,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.13
+,14,,0x0400000E,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.14
 ,15,,0x0400000F,40,,,,f32,[auto] read by native code (get_float at 0x027C7610); meaning not traced,,low,reads: native 0x027C7610 (fn 0x027C75C8),m16.15
 ,16,,0x04000010,50,,,,f32,[auto] read by native code (get_float at 0x027C762C); meaning not traced,,low,reads: native 0x027C762C (fn 0x027C75C8),m16.16
 17,0,"Jab/Nair
-(rockbuster)",0x12000000,0x24,,,,u32,Lifetime (frames),,medium,community,m17[0].0
-,1,,0x02000001,2.5,,,,f32,H speed,,medium,community,m17[0].1
+(rockbuster)",0x12000000,0x14,,,,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/rockbuster.mscsb func_51,m17[0].0
+,1,,0x02000001,2.5,,,,f32,"H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_51)",,high,community | reads: MSC rockman/rockbuster.mscsb func_51,m17[0].1
 18,0,"F-smash
-(chargeshot)",0x02000000,1.15,,,,f32,Uncharged damage multiplier (True damage = this * 10),,medium,community,m18[0].0
-,1,,0x02000001,1.95,,,,f32,Fully-charged damage multiplier (True damage = this * 10),,medium,community,m18[0].1
-,2,,0x02000002,1,,,,f32,Uncharged hitbox/GFX size,,medium,community,m18[0].2
-,3,,0x02000003,2.7,,,,f32,Fully-charged hitbox/GFX size,,medium,community,m18[0].3
-,4,,0x02000004,1.6,,,,f32,Uncharged projectile speed,,medium,community,m18[0].4
-,5,,0x02000005,3.3,,,,f32,Fully-charged projectile speed,,medium,community,m18[0].5
-,6,,0x12000006,0x70,,,,u32,Uncharged projectile lifetime (frames),,medium,community,m18[0].6
-,7,,0x12000007,0x88,,,,u32,Fully-charged projectile lifetime (frames),,medium,community,m18[0].7
+(chargeshot)",0x02000000,1.15,,,,f32,Uncharged damage multiplier (True damage = this * 10) -- code: AttackModule op 0x2728 (func_51),,high,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].0
+,1,,0x02000001,1.95,,,,f32,Fully-charged damage multiplier (True damage = this * 10) -- code: AttackModule op 0x2728 (func_51),,high,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].1
+,2,,0x02000002,1,,,,f32,Uncharged hitbox/GFX size -- code: PostureModule op 0x2713 (func_51),,medium,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].2
+,3,,0x02000003,2.7,,,,f32,Fully-charged hitbox/GFX size -- code: PostureModule op 0x2713 (func_51),,medium,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].3
+,4,,0x02000004,2,,,,f32,"Uncharged projectile speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_51)",,high,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].4
+,5,,0x02000005,2.9,,,,f32,"Fully-charged projectile speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_51)",,high,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].5
+,6,,0x12000006,0x18,,,,u32,"Uncharged projectile lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].6
+,7,,0x12000007,0x1E,,,,u32,"Fully-charged projectile lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/chargeshot.mscsb func_51,m18[0].7
 ,0,,,0x0,,,,u32,,,,,m19.0
 ,1,,,1,,,,f32,offset?,,medium,community,m19.1
 ,2,,,-1,,,,f32,,,,,m19.2
 ,3,,,1,,,,f32,,,,,m19.3
 19,0,"Dair
-(hardknuckle)",0x12000000,0x70,,,,u32,Lifetime (frames),,medium,community,m20[0].0
-,1,,0x02000001,-1.45,,,,f32,V speed,,medium,community,m20[0].1
-,2,,0x12000002,0x5C,,,,u32,Lifetime after stage impact (frames),,medium,community,m20[0].2
+(hardknuckle)",0x12000000,0xD,,,,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/hardknuckle.mscsb func_51,m20[0].0
+,1,,0x02000001,4.2,,,,f32,"V speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/hardknuckle.mscsb func_51,m20[0].1
+,2,,0x12000002,0x5,,,,u32,"Lifetime after stage impact (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_57); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_57)",,medium,community | reads: MSC rockman/hardknuckle.mscsb func_57,m20[0].2
 20,0,"Uair
-(airshooter)",0x12000000,0x4C,,,,u32,Lifetime (frames),,medium,community,m21[0].0
-,1,,0x02000001,-0.1,,,,f32,Initial V speed,,medium,community,m21[0].1
-,2,,0x02000002,-0.075,,,,f32,V acceleration,,medium,community,m21[0].2
-,3,,0x02000003,-1.65,,,,f32,Max V speed,,medium,community,m21[0].3
+(airshooter)",0x12000000,0x33,,,,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/airshooter.mscsb func_51,m21[0].0
+,1,,0x02000001,0.1,,,,f32,"Initial V speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/airshooter.mscsb func_51,m21[0].1
+,2,,0x02000002,0.07,,,,f32,"V acceleration -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/airshooter.mscsb func_51,m21[0].2
+,3,,0x02000003,1.5,,,,f32,"Max V speed -- code: KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/airshooter.mscsb func_51,m21[0].3
 21,0,"Metal Blade
 (Projectile)",,1.9,1.3,2.1,1.9,f32,"Speed (unused, controlled by Group13, Name4)",,medium,community,m22[*].0
 ,1,,,0,2.8,0,0,f32,Base downward speed?,,medium,community,m22[*].1
 ,2,,,0,-0.13,0,0,f32,Additional downward speed?,,medium,community,m22[*].2
 ,3,,,-1,4,-1,-1,f32,?,,medium,community,m22[*].3
 ,4,,,0xFFFFFFFF,0xFFFFFFFF,0x19,0xFFFFFFFF,u32,,,,,m22[*].4
-,5,,,0x1F4,0x5A,0x35,0x32,u32,Lifetime (frames),,medium,community,m22[*].5
-,6,,,500,0,0,100,f32,Chance the Metal Blade has of getting stuck on a surface (%),,medium,community,m22[*].6
+,5,,,0x32,0x5A,0x35,0x32,u32,Lifetime (frames),,medium,community,m22[*].5
+,6,,,100,0,0,100,f32,Chance the Metal Blade has of getting stuck on a surface (%),,medium,community,m22[*].6
 ,7,,,0xF0,0xF0,0x4,0xF0,u32,Lifetime after getting stuck on a surface (frames),,medium,community,m22[*].7
 ,8,,,0x1E,0x1E,0x1E,0x1E,u32,,,,,m22[*].8
 ,9,,,0x1,0x0,0x1,0x1,u32,,,,,m22[*].9
@@ -90,7 +90,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,,75,0,0,100,f32,Chance the Metal Blade has of getting stuck on a surface (%),,medium,community,m23[*].6
 ,7,,,0xA0,0xF0,0x4,0xA0,u32,Lifetime after getting stuck on a surface (frames),,medium,community,m23[*].7
 ,8,,,0x1,0x0,0x1,0x1,u32,,,,,m23[*].8
-,9,,,0x0,0x1,0x0,0x0,u32,,,,,m23[*].9
+,9,,,0x0,0x1,0x0,0x0,u32,,community value differs: Default 0x1 (vanilla 0x0),,,m23[*].9
 23,0,,,0x0,0x0,0x0,0x0,u32,,,,,m24[*].0
 ,1,,,0x0,0x0,0x0,0x0,u32,,,,,m24[*].1
 ,2,,,0x0,0x0,0x0,0x0,u32,,,,,m24[*].2
@@ -256,51 +256,51 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,39,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].39
 ,40,,,0x0,0x0,0x0,0x0,u32,,,,,m27[*].40
 27,0,"Side B
-(crushbomb)",0x12000000,0x3C,0x28,0x56,0x3C,u32,Lifetime (frames),,medium,community,m28[*].0
-,1,,0x02000001,2,1.7,0.28,2.4,f32,H speed,,medium,community,m28[*].1
-,2,,0x02000002,0,0,0.025,0,f32,Gravity,,medium,community,m28[*].2
-,3,,0x02000003,-1,-1,2.6,-1,f32,Max fall speed,,medium,community,m28[*].3
-,4,,0x12000004,0x78,0x1,0x1,0x78,u32,Frames before detonation on impact?,,medium,community,m28[*].4
-,5,,0x12000005,0x16,0x1,0x14,0x16,u32,,,,,m28[*].5
-,6,,0x12000006,0x3C,0x3C,0x3C,0x3C,u32,,,,,m28[*].6
-,7,,0x12000007,0x19,0x19,0x19,0x19,u32,,,,,m28[*].7
-,8,,0x12000008,0x3C,0x3C,0x3C,0x3C,u32,,,,,m28[*].8
-,9,,0x12000009,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community,m28[*].9
+(crushbomb)",0x12000000,0x3C,0x28,0x56,0x3C,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/crashbomb.mscsb func_51,m28[*].0
+,1,,0x02000001,2,1.7,0.28,2.4,f32,"H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_51)",,high,community | reads: MSC rockman/crashbomb.mscsb func_51,m28[*].1
+,2,,0x02000002,0,0,0.025,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/crashbomb.mscsb func_51,m28[*].2
+,3,,0x02000003,-1,-1,2.6,-1,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 2 (func_51)",,high,community | reads: MSC rockman/crashbomb.mscsb func_51,m28[*].3
+,4,,0x12000004,0x78,0x1,0x1,0x78,u32,"Frames before detonation on impact? -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_57); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_57)",,medium,community | reads: MSC rockman/crashbomb.mscsb func_57,m28[*].4
+,5,,0x12000005,0x16,0x1,0x14,0x16,u32,"code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_64); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_64)",,medium,reads: MSC rockman/crashbomb.mscsb func_64; MSC rockman/crashbomb.mscsb func_69,m28[*].5
+,6,,0x12000006,0x3C,0x3C,0x3C,0x3C,u32,,,,no read in the article MSC (native or unused),m28[*].6
+,7,,0x12000007,0x19,0x19,0x19,0x19,u32,,,,no read in the article MSC (native or unused),m28[*].7
+,8,,0x12000008,0x3C,0x3C,0x3C,0x3C,u32,,,,no read in the article MSC (native or unused),m28[*].8
+,9,,0x12000009,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m28[*].9
 28,0,"Rush
-(rushcoil)",0x02000000,0.05,0.03,0.05,0.05,f32,Gravity,,medium,community,m29[*].0
-,1,,0x02000001,0.42,2,0.7,0.8,f32,Max fall speed,,medium,community,m29[*].1
-,2,,0x12000002,0x35C,0x48,0x64,0x78,u32,Lifetime (frames),,medium,community,m29[*].2
-,3,,0x02000003,1.4,-0.5,3.8,3.8,f32,Aerial jump initial V speed?,,medium,community,m29[*].3
-,4,,0x02000004,0,0,0,0,f32,,,,,m29[*].4
-,5,,0x02000005,1.9,-0.1,5.2,5.2,f32,Grounded jump initial V speed?,,medium,community,m29[*].5
-,6,,0x12000006,0x0,0x1,0x0,0x0,u32,,,,,m29[*].6
-,7,,0x02000007,860,24,0,0,f32,Frames the hitbox is active,,medium,community,m29[*].7
+(rushcoil)",0x02000000,0.05,0.03,0.05,0.05,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 2 (func_52)",,high,community | reads: MSC rockman/rushcoil.mscsb func_52,m29[*].0
+,1,,0x02000001,0.7,2,0.7,0.8,f32,"Max fall speed -- code: KineticModule op 0x15 (sets a max speed) on energy 0 (motion), argument 2 (func_52)",,high,community | reads: MSC rockman/rushcoil.mscsb func_52,m29[*].1
+,2,,0x12000002,0x78,0x48,0x64,0x78,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m29[*].2
+,3,,0x02000003,3.8,-0.5,3.8,3.8,f32,Aerial jump initial V speed?,,medium,community | no read in the article MSC (native or unused),m29[*].3
+,4,,0x02000004,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m29[*].4
+,5,,0x02000005,5.2,-0.1,5.2,5.2,f32,Grounded jump initial V speed?,,medium,community | no read in the article MSC (native or unused),m29[*].5
+,6,,0x12000006,0x0,0x1,0x0,0x0,u32,,,,no read in the article MSC (native or unused),m29[*].6
+,7,,0x02000007,0,24,0,0,f32,Frames the hitbox is active -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_53),,medium,community | reads: MSC rockman/rushcoil.mscsb func_53,m29[*].7
 ,0,,,0,,,,f32,,,,,m30.0
 ,1,,,3,,,,f32,,,,,m30.1
 ,2,,,10,,,,f32,,,,,m30.2
 ,3,,,16,,,,f32,,,,,m30.3
 ,4,,,0.4,,,,f32,,,,,m30.4
 29,0,"Down B
-(leafshield)",0x02000000,0.88,1,1,1,f32,Projectile speed,,medium,community,m31[*].0
-,1,,0x12000001,0x1,0x1,0x2,0x1,u32,,,,,m31[*].1
-,2,,0x12000002,0x87,0x64,0x82,0x78,u32,Lifetime (frames),,medium,community,m31[*].2
-,3,,0x02000003,2.3,2,1,2.3,f32,H speed,,medium,community,m31[*].3
-,4,,0x12000004,0x3C,0x1E,0x28,0x3C,u32,Lifetime when thrown (frames),,medium,community,m31[*].4
-,5,,0x12000005,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community,m31[*].5
+(leafshield)",0x02000000,0.88,1,1,1,f32,Projectile speed,,medium,community | no read in the article MSC (native or unused),m31[*].0
+,1,,0x12000001,0x1,0x1,0x2,0x1,u32,,,,no read in the article MSC (native or unused),m31[*].1
+,2,,0x12000002,0x87,0x64,0x82,0x78,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC rockman/leafshield.mscsb func_51,m31[*].2
+,3,,0x02000003,2.3,2,1,2.3,f32,"H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_56)",,high,community | reads: MSC rockman/leafshield.mscsb func_56,m31[*].3
+,4,,0x12000004,0x3C,0x1E,0x28,0x3C,u32,"Lifetime when thrown (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_57); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_57)",,medium,community | reads: MSC rockman/leafshield.mscsb func_57,m31[*].4
+,5,,0x12000005,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m31[*].5
 30,0,,,0x2000001,,,,u32,,,,,m32[0].0
 ,1,,,1,,,,f32,,,,,m32[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m32[0].2
 ,3,,,0,,,,f32,,,,,m32[0].3
 ,4,,,1,,,,f32,,,,,m32[0].4
 ,5,,,0,,,,f32,,,,,m32[0].5
-31,0,blackhole,0x12000000,0x46,,,,u32,,,,,m33[0].0
-,1,,0x12000001,0x1E,,,,u32,,,,,m33[0].1
-,2,,0x02000002,0.01,,,,f32,,,,,m33[0].2
-,3,,0x02000003,0.04,,,,f32,,,,,m33[0].3
-,4,,0x02000004,3.2,,,,f32,Speed,,medium,community,m33[0].4
-,5,,0x12000005,0x2D,,,,u32,,,,,m33[0].5
-,6,,0x02000006,70,,,,f32,,,,,m33[0].6
-,7,,0x02000007,1.25,,,,f32,,,,,m33[0].7
+31,0,blackhole,0x12000000,0x46,,,,u32,,,,no read in the article MSC (native or unused),m33[0].0
+,1,,0x12000001,0x1E,,,,u32,"code: stored in status int 0x2, then decremented in func_51 (a countdown / remaining count), ControlModule op 0x2710 (func_49)",,medium,reads: MSC rockman/blackhole.mscsb func_49,m33[0].1
+,2,,0x02000002,0.01,,,,f32,,,,no read in the article MSC (native or unused),m33[0].2
+,3,,0x02000003,0.04,,,,f32,,,,no read in the article MSC (native or unused),m33[0].3
+,4,,0x02000004,3.2,,,,f32,Speed,,medium,community | no read in the article MSC (native or unused),m33[0].4
+,5,,0x12000005,0x2D,,,,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_51 (a countdown / remaining count), tested against 0 (func_55)",,medium,reads: MSC rockman/blackhole.mscsb func_55,m33[0].5
+,6,,0x02000006,70,,,,f32,,,,no read in the article MSC (native or unused),m33[0].6
+,7,,0x02000007,1.25,,,,f32,,,,no read in the article MSC (native or unused),m33[0].7
 ,0,,,0x0,,,,u32,,,,,m34.0
 ,1,,,1,,,,f32,,,,,m34.1
 ,2,,,-1,,,,f32,,,,,m34.2
@@ -310,15 +310,10 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,2,,,-15,,,,f32,Camera position,,medium,community,m35.2
 ,3,,,15,,,,f32,Camera position,,medium,community,m35.3
 ,4,,,-15,,,,f32,Camera position,,medium,community,m35.4
-32,0,Article params (rockmanx),0x02000000,0,,,,f32,,,,,m36[0]
-33,0,Article params (rockmandash),0x02000000,0,,,,f32,,,,,m37[0]
-34,0,Article params (rockmanexe),0x02000000,0,,,,f32,,,,,m38[0]
-35,0,Article params (shootingstarrockman),0x02000000,0,,,,f32,,,,,m39[0]
-15,2,,0x07000002,9,,,,,Initial V speed,community row not matched to a value of the vanilla file,low,community,
-15,3,,0x07000003,1.03,,,,,Aerial added V initial speed,community row not matched to a value of the vanilla file,low,community,
-15,4,,0x07000004,-1.3,,,,,Aerial V acceleration (negative gravity),community row not matched to a value of the vanilla file,low,community,
-15,6,,0x07000006,0.8,,,,,Air max speed multiplier,community row not matched to a value of the vanilla file,low,community,
-15,7,,0x07000007,0.8,,,,,Air max additional accel multiplier,community row not matched to a value of the vanilla file,low,community,
+32,0,Article params (rockmanx),0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m36[0]
+33,0,Article params (rockmandash),0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m37[0]
+34,0,Article params (rockmanexe),0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m38[0]
+35,0,Article params (shootingstarrockman),0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m39[0]
 23,0 - 40,"Neutral B
 Hitbox",,-,,,,,,community row not matched to a value of the vanilla file,low,community,
 24,0 - 40,"Side B

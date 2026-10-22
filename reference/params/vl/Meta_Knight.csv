@@ -1,60 +1,60 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
 13,0,Neutral B,0x05000000,1,0,1,1,f32,Initial V speed,,medium,"community | reads: native 0x02F2413C (fn 0x02F23EA4, attributed by type fit)",m12[*].0
 ,1,,0x05000001,0.7,0.3,0.7,0.7,f32,H speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
-,2,,0x05000002,80,80,160,80,f32,Initial spin speed,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2284",m12[*].2
+,2,,0x05000002,80,80,160,80,f32,Initial spin speed -- code: animation rate (MotionModule set rate) (func_3118) [status 0x190; status 0x157 (SpecialNSpin)],,medium,community | reads: MSC kirby.mscsb func_3118; MSC metaknight.mscsb func_2284,m12[*].2
 ,3,,0x05000003,0.12,0.015,0.1,0.12,f32,Grounded H acceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
 ,4,,0x05000004,2,0.2,1.8,2,f32,Grounded H max speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
 ,5,,0x05000005,0.1,0.01,0.08,0.1,f32,Air max added acceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
-,6,,0x05000006,1.7,0.15,2,1.7,f32,Aerial H max speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,6,,0x05000006,1.7,0.15,1.5,1.7,f32,Aerial H max speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
 ,7,,0x05000007,0.008,0.008,0.008,0.008,f32,Ground/air friction,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
-,8,,0x05000008,-0.08,-0.06,-0.03,-0.08,f32,Aerial V acceleration (negative gravity),,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,8,,0x05000008,-0.08,-0.06,-0.08,-0.08,f32,Aerial V acceleration (negative gravity),,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
 ,9,,0x05000009,0.5,0.5,0.5,0.5,f32,Max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
 ,10,,0x0500000A,1,0.8,1,1,f32,V speed added per button press,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
 ,11,,0x1500000B,0xA,0xA,0xA,0xA,u32,Min frames between button presses,buffers if B is pressed before then,medium,"community | reads: native 0x02F24A74 (fn 0x02F24940, attributed by type fit)",m12[*].11
-,12,,0x0500000C,1.4,1.4,2,3.5,f32,Max V speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,12,,0x0500000C,1.4,1.4,1.4,1.4,f32,Max V speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
 ,13,,0x0500000D,10,10,10,10,f32,Spin speed added per button press,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
 ,14,,0x0500000E,80,80,120,80,f32,Max spin speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].14
 ,15,,0x0500000F,1.7,1.7,5.1,1.7,f32,Subtracts this each frame while listening for button input,,medium,community | no read in the vanilla MSC (native or unused),m12[*].15
-,16,,0x15000010,0x46,0x46,0x46,0x46,u32,Frames to listen for button input,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2284",m12[*].16
+,16,,0x15000010,0x46,0x46,0x46,0x46,u32,Frames to listen for button input -- code: stored in status int 0x5 (func_3118) [status 0x190; status 0x157 (SpecialNSpin)],,medium,community | reads: MSC kirby.mscsb func_3118; MSC metaknight.mscsb func_2284,m12[*].16
 ,17,,0x05000011,3,3,3,3,f32,Subtracts this each frame while not listening for button input,,medium,community | no read in the vanilla MSC (native or unused),m12[*].17
-,18,,0x05000012,30,30,30,30,f32,Landing lag (frames),,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2285; native 0x02F268F4 (fn 0x02F2639C, attributed by type fit); native 0x02F269B0 (fn 0x02F2639C, attributed by type fit)",m12[*].18
+,18,,0x05000012,30,30,30,30,f32,Landing lag (frames) -- code: compared with a computed value (func_3119) [status 0x190; status 0x157 (SpecialNSpin)],,medium,"community | reads: MSC kirby.mscsb func_3119; MSC metaknight.mscsb func_2285; native 0x02F268F4 (fn 0x02F2639C, attributed by type fit); native 0x02F269B0 (fn 0x02F2639C, attributed by type fit)",m12[*].18
 ,19,,0x15000013,0x9,0x9,0x0,0x9,u32,Spin speed equal to or less than this to end move,,medium,"community | reads: native 0x02F26570 (fn 0x02F2639C, attributed by type fit)",m12[*].19
-,20,,0x15000014,0x14,0x14,0x14,0x14,u32,[auto] copied to status work int 0x1100000c,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2290; MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2291",m12[*].20
+,20,,0x15000014,0x14,0x14,0x14,0x14,u32,"code: stored in status int 0xC, then EffectModule op 0x2C; compared with status int 0xB (a counter) (func_3125) (func_3124); stored in status int 0xC, then EffectModule op 0x2C; compared with status int 0xB (a counter) (func_2291) (func_2290); compared with a computed value (func_3125) [status 0x191; status 0x158]",,medium,reads: MSC kirby.mscsb func_3124; MSC kirby.mscsb func_3125; MSC metaknight.mscsb func_2290; MSC metaknight.mscsb func_2291,m12[*].20
 ,21,,0x15000015,0x1,0x1,0x1,0x1,u32,[auto] read by native code (get_int at 0x02F26A20); meaning not traced,,low,"reads: native 0x02F26A20 (fn 0x02F2639C, attributed by type fit)",m12[*].21
 14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,H speed multiplier on startup,,medium,"community | reads: native 0x02F2723C (fn 0x02F27028); native 0x02F242EC (fn 0x02F23EA4, attributed by type fit); native 0x02F243AC (fn 0x02F23EA4, attributed by type fit); native 0x02F24418 (fn 0x02F23EA4, attributed by type fit)",m13[*].0
 ,1,,0x06000001,1,1,0.5,1,f32,V speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
 ,2,,0x06000002,-0.08,-0.08,-0.02,-0.08,f32,Aerial V acceleration (negative gravity),,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
 ,3,,0x06000003,3,0,3,3,f32,Control,,medium,"community | reads: native 0x02F27184 (fn 0x02F27028, direct vl read); native 0x02F271EC (fn 0x02F27028, direct vl read)",m13[*].3
-,4,,0x16000004,0xA,0xA,0xA,0xA,u32,Something to do with direction after landing on platform and finishing,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2300",m13[*].4
+,4,,0x16000004,0xA,0xA,0xA,0xA,u32,Something to do with direction after landing on platform and finishing -- code: stored in status int 0x5 (func_2300) [status 0x15A],,medium,community | reads: MSC metaknight.mscsb func_2300,m13[*].4
 ,5,,0x06000005,1,1.2,0.7,1,f32,Speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m13[*].5
 ,6,,0x06000006,50,50,50,50,f32,Highest/lowest angle to directionally aim Metaknight towards (degrees)?,,medium,community | reads: native 0x02F27410 (fn 0x02F27330); native 0x02F2747C (fn 0x02F27330),m13[*].6
-,7,,0x06000007,-1,-1.1,-0.8,-1,f32,Initial H speed on ending when having hit another character,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2300",m13[*].7
-,8,,0x06000008,2.5,2.2,2,2.5,f32,Initial V speed on ending when having hit another character,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2300",m13[*].8
+,7,,0x06000007,-1,-1.1,-0.8,-1,f32,Initial H speed on ending when having hit another character -- code: KineticModule op 0x2710 (func_2300) [status 0x15A],,medium,community | reads: MSC metaknight.mscsb func_2300,m13[*].7
+,8,,0x06000008,2.5,2.2,2,2.5,f32,Initial V speed on ending when having hit another character -- code: KineticModule op 0x2710 (func_2300) [status 0x15A],,medium,community | reads: MSC metaknight.mscsb func_2300,m13[*].8
 ,9,,0x06000009,0.1,0.4,0.15,0.1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
 ,10,,0x0600000A,0.6,0.6,0.6,0.6,f32,[auto] read by native code (get_float at 0x02F26F0C); meaning not traced,,low,reads: native 0x02F26F0C (fn 0x02F26D10),m13[*].10
 ,11,,0x1600000B,0x1A,0x22,0x1A,0x1A,u32,Landing lag (frames),,medium,community | reads: native 0x02F26EB4 (fn 0x02F26D10),m13[*].11
-15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,[auto] copied to status work float 0x1000006,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].0
-,1,,0x07000001,0.5,0.5,0.5,0.5,f32,Sensitivity to angle,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].1
-,2,,0x07000002,18,9,18,18,f32,Ability to angle,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].2
-,3,,0x07000003,1,1,0.8,1,f32,[auto] copied to status work float 0x100000e,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].3
-,4,,0x07000004,1,1,0.8,1,f32,[auto] copied to status work float 0x100000f,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].4
-,5,,0x07000005,0.5,0.5,0.5,0.5,f32,[auto] copied to status work float 0x100000c,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].5
-,6,,0x17000006,0x1E,0x1E,0x24,0x1E,u32,Landing lag (frames),,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].6
-,7,,0x07000007,1.1,1,1.05,1.1,f32,Grounded height multiplier,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].7
-,8,,0x07000008,0.67,0.67,0.67,0.67,f32,[auto] copied to status work float 0x1000009,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].8
-,9,,0x07000009,0.5,0.2,0.5,0.5,f32,Special fall max air speed multiplier,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].9
-,10,,0x0700000A,1.08,1,1.25,1.08,f32,Aerial height multiplier?,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].10
-16,0,Down B,0x08000000,0.4,0.5,0.5,0.5,f32,Initial V speed multiplier,community ID was 0x08000001,medium,"community | reads: native 0x02F245A0 (fn 0x02F23EA4, attributed by type fit)",m15[*].0
-,1,,0x08000001,0.7,0.4,0.4,0.4,f32,,,,no read in the vanilla MSC (native or unused),m15[*].1
-,2,,0x08000002,0.8,1,0.16,0.5,f32,,,,no read in the vanilla MSC (native or unused),m15[*].2
-,3,,0x08000003,3.3,3,1.6,3,f32,,,,no read in the vanilla MSC (native or unused),m15[*].3
-,4,,0x08000004,0.8,0.9,0.14,0.5,f32,,,,no read in the vanilla MSC (native or unused),m15[*].4
-,5,,0x08000005,3.7,4.5,1.4,2,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
-,6,,0x18000006,0x1C,0x10,0x3C,0x1C,u32,Frames before Meta Knight reappears,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2324",m15[*].6
-,7,,0x08000007,0.6,0.6,0.6,0.6,f32,Special fall max air speed multiplier,,medium,"community | reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2331",m15[*].7
-,8,,0x18000008,0x10,0x24,0x20,0x1E,u32,"[auto] written to instance float 0 (the special-fall landing frames, i.e. landing lag)",,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2331",m15[*].8
-,0,Final Smash?,0x14000000,0x64,,,,u32,[auto] copied to status work int 0x11000005,,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2354",m16.0
-,1,,0x14000001,0x1E,,,,u32,"[auto] read by MSC: WorkModule(0xb, WorkModule(0x6, 0x14000001), 0x11000005);",,low,"reads: MSC metaknight.mscsb (vanilla decompile, repo first commit) func_2354",m16.1
+15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,"code: stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2360) (func_2308) [status 0x154; status 0x15E]",,medium,reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].0
+,1,,0x07000001,0.5,0.5,0.5,0.5,f32,Sensitivity to angle -- code: stored in status float 0x7 (func_2308) [status 0x154; status 0x15E],,medium,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].1
+,2,,0x07000002,18,9,18,18,f32,Ability to angle -- code: stored in status float 0x8 (func_2308) [status 0x154; status 0x15E],,medium,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].2
+,3,,0x07000003,1,1,0.8,1,f32,"code: stored in status float 0xE, then KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2360) (func_2308) [status 0x154; status 0x15E]",,medium,reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].3
+,4,,0x07000004,1,1,0.8,1,f32,"code: stored in status float 0xF, then KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2360) (func_2308) [status 0x154; status 0x15E]",,medium,reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].4
+,5,,0x07000005,0.5,0.5,0.5,0.5,f32,"code: stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2361) (func_2308) [status 0x154; status 0x15E]",,medium,reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].5
+,6,,0x17000006,0x1E,0x1E,0x24,0x1E,u32,"Landing lag (frames) -- code: stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2361) (func_2308) [status 0x154; status 0x15E]",,high,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].6
+,7,,0x07000007,1.1,1,1.05,1.1,f32,Grounded height multiplier -- code: stored in status float 0xD (func_2308) [status 0x154; status 0x15E],,medium,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].7
+,8,,0x07000008,0.67,0.67,0.67,0.67,f32,code: stored in status float 0x9 (func_2308) [status 0x154; status 0x15E],,medium,reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].8
+,9,,0x07000009,0.5,0.2,0.5,0.5,f32,Special fall max air speed multiplier -- code: stored in status float 0xA (func_2308) [status 0x154; status 0x15E],,medium,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].9
+,10,,0x0700000A,1.08,1,1.25,1.08,f32,Aerial height multiplier? -- code: stored in status float 0xB (func_2308) [status 0x154; status 0x15E],,medium,community | reads: MSC metaknight.mscsb func_2308; MSC metaknight.mscsb func_2319,m14[*].10
+16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,Initial H speed multiplier,,medium,"community | reads: native 0x02F245A0 (fn 0x02F23EA4, attributed by type fit)",m15[*].0
+,1,,0x08000001,0.4,0.4,0.4,0.4,f32,Initial V speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,0.5,1,0.16,0.5,f32,H acceleration,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,3,3,1.6,3,f32,H max speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x08000004,0.5,0.9,0.14,0.5,f32,V acceleration,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,2,4.5,1.4,2,f32,V max speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x18000006,0x1C,0x10,0x3C,0x1C,u32,Frames before Meta Knight reappears -- code: compared with the status frame counter (global9) (func_2324) [status 0x155],,high,community | reads: MSC metaknight.mscsb func_2324,m15[*].6
+,7,,0x08000007,0.6,0.6,0.6,0.6,f32,"Special fall max air speed multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2331) [status 0x15B; status 0x15C]",,medium,community | reads: MSC metaknight.mscsb func_2331; MSC metaknight.mscsb func_2337,m15[*].7
+,8,,0x18000008,0x1E,0x24,0x20,0x1E,u32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2331) [status 0x15B; status 0x15C],community value differs: Default 0x2E (vanilla 0x1E),high,community | reads: MSC metaknight.mscsb func_2331; MSC metaknight.mscsb func_2337,m15[*].8
+,0,Final Smash?,0x14000000,0x64,,,,u32,"code: stored in status int 0x5, then decremented in func_2356 (a countdown / remaining count), tested against 0 (func_2354) [status 0x160]",,medium,reads: MSC metaknight.mscsb func_2354,m16.0
+,1,,0x14000001,0x1E,,,,u32,"code: read in: WorkModule(0xb, WorkModule(0x6, 0x14000001), 0x11000005); (func_2354) [status 0x160]",,low,reads: MSC metaknight.mscsb func_2354,m16.1
 ,2,,0x14000002,0xD,,,,u32,[auto] read by native code (get_int at 0x02F25434); meaning not traced,,low,reads: native 0x02F25434 (fn 0x02F25398),m16.2
 ,3,,0x14000003,0x3C,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.3
 ,4,,0x14000004,0x7,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.4
@@ -73,7 +73,7 @@ Character turns around when angle value reaches 90 or more. They can input aeria
 ,1,,,30,,,,f32,,,,,m17[0].i2[1]
 ,2,,,45,,,,f32,,,,,m17[0].i2[2]
 ,3,,,60,,,,f32,,,,,m17[0].i2[3]
-,4,,,70,,,,f32,,,,,m17[0].i2[4]
+,4,,,70,,,,f32,,community value differs: Default 75 (vanilla 70),,,m17[0].i2[4]
 ,5,,,90,,,,f32,,,,,m17[0].i2[5]
 ,6,,,105,,,,f32,,,,,m17[0].i2[6]
 ,7,,,120,,,,f32,,,,,m17[0].i2[7]
@@ -81,10 +81,4 @@ Character turns around when angle value reaches 90 or more. They can input aeria
 ,9,,,150,,,,f32,,,,,m17[0].i2[9]
 ,10,,,165,,,,f32,,,,,m17[0].i2[10]
 ,11,,,180,,,,f32,,,,,m17[0].i2[11]
-20,0,Article params (mantle),0x12000000,0x0,,,,u32,,,,,m18[0]
-16,0,Down B,0x08000000,0.5,,,,,Initial H speed multiplier,community row not matched to a value of the vanilla file,low,community,
-16,2,,0x08000002,0.5,,,,,H acceleration,community row not matched to a value of the vanilla file,low,community,
-16,3,,0x08000003,3,,,,,H max speed,community row not matched to a value of the vanilla file,low,community,
-16,4,,0x08000004,0.5,,,,,V acceleration,community row not matched to a value of the vanilla file,low,community,
-16,5,,0x08000005,2,,,,,V max speed,community row not matched to a value of the vanilla file,low,community,
-16,8,,0x18000008,0x2E,,,,,Landing lag (frames),community row not matched to a value of the vanilla file,low,community,
+20,0,Article params (mantle),0x12000000,0x0,,,,u32,,,,no read in the article MSC (native or unused),m18[0]

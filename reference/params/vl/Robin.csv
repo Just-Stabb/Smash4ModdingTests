@@ -1,102 +1,102 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x2,0x2,0x2,0x2,u32,Frames to charge to Thunder,,medium,community | reads: MSC kirby.mscsb func_3781,m12[*].0
-,1,,0x05000001,30,50,22,30,f32,Frames to charge to Elthunder,"Every time Robin interrupts the charge, it resets to 2 frames of charge",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3776",m12[*].1
-,2,,0x05000002,100,120,66,100,f32,Frames to charge to Arcthunder,"Every time Robin interrupts the charge, it resets to 30 frames of charge",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3776",m12[*].2
-,3,,0x05000003,160,220,110,160,f32,Frames to charge to Thoron,"Every time Robin interrupts the charge, it resets to 100 frames of charge",medium,community,m12[*].3
-,4,,0x15000004,0x1,0x2,0x1,0x1,u32,Durability cost for Thunder,,medium,community,m12[*].4
-,5,,0x15000005,0x3,0x5,0x3,0x3,u32,Durability cost for Elthunder,,medium,community,m12[*].5
-,6,,0x15000006,0x5,0x8,0x5,0x5,u32,Durability cost for Arcthunder,,medium,community,m12[*].6
-,7,,0x15000007,0x8,0x14,0x8,0x8,u32,Durability cost for Thoron,,medium,community,m12[*].7
-,8,,0x05000008,0.5,0.5,0.5,0.5,f32,"Aerial H speed multiplier, Gravity multiplier (true = this * 0.089)",,medium,community,m12[*].8
-,9,,0x05000009,1.2,1.2,1.2,1.2,f32,Initial min V speed on aerial startup,,medium,community,m12[*].9
-,10,,0x1500000A,0xC,0x10,0x6,0xC,u32,Minimum number of frames you can lengthen thoron,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3790",m12[*].10
-,11,,0x1500000B,0x16,0x1E,0xE,0x16,u32,Maximum number of frames you can lengthen thoron,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3790",m12[*].11
-14,0,Side B,0x06000000,1,1,1,1,f32,,,,,m13[*].0
-,1,,0x06000001,0.2,0.2,0.2,0.2,f32,,,,,m13[*].1
-,2,,0x06000002,2,2,2,2,f32,,,,,m13[*].2
+13,0,Neutral B,0x15000000,0x2,0x2,0x2,0x2,u32,Frames to charge to Thunder -- code: compared with instance int 0x92 (a counter) (func_3781) [status 0x224; status 0x158],,high,community | reads: MSC kirby.mscsb func_3781; MSC reflet.mscsb func_2301,m12[*].0
+,1,,0x05000001,30,50,22,30,f32,Frames to charge to Elthunder -- code: stored in status int 0x8 (func_3776) [status 0x223; status 0x157],"Every time Robin interrupts the charge, it resets to 2 frames of charge",medium,community | reads: MSC kirby.mscsb func_3776; MSC reflet.mscsb func_2296,m12[*].1
+,2,,0x05000002,100,120,66,100,f32,Frames to charge to Arcthunder -- code: stored in status int 0x8 (func_3776) [status 0x223; status 0x157],"Every time Robin interrupts the charge, it resets to 30 frames of charge",medium,community | reads: MSC kirby.mscsb func_3776; MSC reflet.mscsb func_2296,m12[*].2
+,3,,0x05000003,160,220,110,160,f32,Frames to charge to Thoron,"Every time Robin interrupts the charge, it resets to 100 frames of charge",medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x15000004,0x1,0x2,0x1,0x1,u32,"Durability cost for Thunder -- code: read in: return WorkModule(0x6, 0x15000004); (func_2290)",,medium,community | reads: MSC reflet.mscsb func_2290,m12[*].4
+,5,,0x15000005,0x3,0x5,0x3,0x3,u32,"Durability cost for Elthunder -- code: read in: return WorkModule(0x6, 0x15000005); (func_2290)",,medium,community | reads: MSC reflet.mscsb func_2290,m12[*].5
+,6,,0x15000006,0x5,0x8,0x5,0x5,u32,"Durability cost for Arcthunder -- code: read in: return WorkModule(0x6, 0x15000006); (func_2290)",,medium,community | reads: MSC reflet.mscsb func_2290,m12[*].6
+,7,,0x15000007,0x8,0x14,0x8,0x8,u32,"Durability cost for Thoron -- code: read in: return WorkModule(0x6, 0x15000007); (func_2290)",,medium,community | reads: MSC reflet.mscsb func_2290,m12[*].7
+,8,,0x05000008,0.5,0.5,0.5,0.5,f32,"Aerial H speed multiplier, Gravity multiplier (true = this * 0.089) -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2245)",,high,community | reads: MSC reflet.mscsb func_2245,m12[*].8
+,9,,0x05000009,1.2,1.2,1.2,1.2,f32,Initial min V speed on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2245); compared with a computed value (func_2245),,high,community | reads: MSC reflet.mscsb func_2245,m12[*].9
+,10,,0x1500000A,0xC,0x10,0x6,0xC,u32,Minimum number of frames you can lengthen thoron -- code: compared with a computed value (func_3790) [status 0x226; status 0x15A],,medium,community | reads: MSC kirby.mscsb func_3790; MSC reflet.mscsb func_2310,m12[*].10
+,11,,0x1500000B,0x16,0x1E,0xE,0x16,u32,Maximum number of frames you can lengthen thoron -- code: compared with a computed value (func_3790) [status 0x226; status 0x15A],,medium,community | reads: MSC kirby.mscsb func_3790; MSC reflet.mscsb func_2310,m12[*].11
+14,0,Side B,0x06000000,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,0.2,0.2,0.2,0.2,f32,,,,no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,2,2,2,2,f32,,,,no read in the vanilla MSC (native or unused),m13[*].2
 15,0,Up B,0x07000000,0.5,0.2,0.6,1,f32,Aerial H speed multiplier on startup,,medium,community | reads: native 0x02F65B7C (fn 0x02F65A34),m14[*].0
 ,1,,0x07000001,0.3,0.3,0.8,0.3,f32,Aerial V speed multiplier on startup,,medium,community | reads: native 0x02F65B0C (fn 0x02F65A34),m14[*].1
-,2,,0x07000002,0.6,0.1,0.6,0.5,f32,H speed control of 1st elwind,,medium,community,m14[*].2
-,3,,0x07000003,0.8,0.1,0.6,0.5,f32,Aerial H mobility while 1st flying,,medium,community,m14[*].3
-,4,,0x07000004,0.4,0.4,0.4,0.4,f32,Downwards speed?,,medium,community,m14[*].4
-,5,,0x07000005,0.6,0.2,2.5,2,f32,H speed of 1st elwind,,medium,community,m14[*].5
-,6,,0x07000006,2,1.9,2.4,2.8,f32,V speed of 1st elwind,,medium,community,m14[*].6
-,7,,0x07000007,0.2,0.1,0.1,0,f32,H speed of 2nd elwind,,medium,community,m14[*].7
-,8,,0x07000008,2.9,3.9,1.8,2.6,f32,V speed of 2nd elwind,,medium,community,m14[*].8
-,9,,0x07000009,0.8,0.135,1,0.5,f32,Aerial H mobility while 2nd flying,,medium,community,m14[*].9
-,10,,0x1700000A,0x3C,0x3C,0x3C,0x3C,u32,"Wind durability, rapid jab?",,medium,community,m14[*].10
-,11,,0x0700000B,0,0,-0.2,0,f32,Elwind X offset,,medium,community,m14[*].11
-,12,,0x0700000C,0,0,0.1,0,f32,Elwind Y offset,,medium,community,m14[*].12
-,13,,0x0700000D,25,30,25,25,f32,Landing lag (frames),,medium,community,m14[*].13
+,2,,0x07000002,0.6,0.1,0.6,0.5,f32,H speed control of 1st elwind,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.8,0.1,0.6,0.5,f32,Aerial H mobility while 1st flying,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0.4,0.4,0.4,0.4,f32,Downwards speed?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,0.6,0.2,2.5,2,f32,H speed of 1st elwind,,medium,community | no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,2,1.9,2.4,2.8,f32,V speed of 1st elwind,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.2,0.1,0.1,0,f32,H speed of 2nd elwind,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,2.9,3.9,1.8,2.6,f32,V speed of 2nd elwind,,medium,community | no read in the vanilla MSC (native or unused),m14[*].8
+,9,,0x07000009,0.8,0.135,1,0.5,f32,Aerial H mobility while 2nd flying,,medium,community | no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x1700000A,0x3C,0x3C,0x3C,0x3C,u32,"Wind durability, rapid jab? -- code: stored in status int 0x8, then decremented in func_2286 (a countdown / remaining count), tested against 0 (func_2285) [status 0x26]",,medium,community | reads: MSC reflet.mscsb func_2285; MSC reflet.mscsb func_2286,m14[*].10
+,11,,0x0700000B,0,0,-0.2,0,f32,Elwind X offset,,medium,community | no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,0,0,0.1,0,f32,Elwind Y offset,,medium,community | no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,25,30,25,25,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2321) [status 0x154 (specialhi, specialairhi); status 0x15D (SpecialHiFail, SpecialAirHiFail)]",,high,community | reads: MSC reflet.mscsb func_2321; MSC reflet.mscsb func_2330,m14[*].13
 16,0,Down B,0x08000000,0.5,0.3,0.5,0.5,f32,H speed multiplier during SpecialLwStart,,medium,community | reads: native 0x02F65784 (fn 0x02F65678),m15[*].0
-,1,,0x08000001,0.3,0.2,0.3,0.3,f32,V speed multiplier during SpecialLwStart,,medium,community,m15[*].1
-,2,,0x08000002,15,45,19,15,f32,X offset of victim during SpecialLwCapture,,medium,community,m15[*].2
-,3,,0x08000003,0,0,0,0,f32,Y offset of victim during SpecialLwCapture,,medium,community,m15[*].3
-,4,,0x08000004,0.4,0.1,0.4,0.4,f32,Speed reduction upon a successful grab,,medium,community,m15[*].4
-,5,,0x18000005,0xA,0xA,0xA,0xA,u32,Delay before SpecialLwCapture takes effect (frames)?,,medium,community,m15[*].5
-,6,,0x08000006,0.03,0.03,0.03,0.03,f32,Gravity during SpecialLwCapture,,medium,community,m15[*].6
-,7,,0x08000007,0.5,0.5,0.5,0.5,f32,Max fall speed during SpecialLwCapture,,medium,community,m15[*].7
-,8,,0x08000008,80,45,0,80,f32,Healing rate per hit (percentage),80 = 80%,medium,community,m15[*].8
-,9,,0x08000009,0.02,0,0,0.1,f32,Damage difference healing multiplier,"When Robin's % > Opponent's %, it adds (Robin% - Opponent%)*0.02 to the base healing amount every hit",medium,community,m15[*].9
-,10,,0x0800000A,30,5,0,30,f32,,,,,m15[*].10
-,11,,0x0800000B,1.25,1.25,1,1.25,f32,Backside healing factor of some sort,(Front healing) * (Name 11) = Back healing,medium,community,m15[*].11
+,1,,0x08000001,0.3,0.2,0.3,0.3,f32,V speed multiplier during SpecialLwStart,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,15,45,19,15,f32,X offset of victim during SpecialLwCapture -- code: BattleObject op 0x3E8 (func_2334) [status 0x155],,medium,community | reads: MSC reflet.mscsb func_2334,m15[*].2
+,3,,0x08000003,0,0,0,0,f32,Y offset of victim during SpecialLwCapture -- code: BattleObject op 0x3E8 (func_2334) [status 0x155],,medium,community | reads: MSC reflet.mscsb func_2334,m15[*].3
+,4,,0x08000004,0.4,0.1,0.4,0.4,f32,Speed reduction upon a successful grab,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x18000005,0xA,0xA,0xA,0xA,u32,Delay before SpecialLwCapture takes effect (frames)? -- code: stored in status int 0xA (func_2339) [status 0x15E],,medium,community | reads: MSC reflet.mscsb func_2339,m15[*].5
+,6,,0x08000006,0.03,0.03,0.03,0.03,f32,Gravity during SpecialLwCapture,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0.5,0.5,0.5,0.5,f32,Max fall speed during SpecialLwCapture,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,80,45,0,80,f32,Healing rate per hit (percentage),80 = 80%,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,0.02,0,0,0.1,f32,Damage difference healing multiplier,"When Robin's % > Opponent's %, it adds (Robin% - Opponent%)*0.02 to the base healing amount every hit",medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,30,5,0,30,f32,,,,no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,1.25,1.25,1,1.25,f32,Backside healing factor of some sort,(Front healing) * (Name 11) = Back healing,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
 ,0,Levin Sword,0x14000000,0x8,,,,u32,Durability points Levin Sword has,Each moves use 1 durability.,medium,community | reads: native 0x02F6540C (fn 0x02F652F0),m16.0
-,1,,0x14000001,0x1E0,,,,u32,Levin Sword related (use_thundersword. script_2248),set as LA-Basic 0x8d,medium,community,m16.1
-,2,,0x14000002,0x258,,,,u32,Frames for restoring Levin Sword,,medium,community,m16.2
-,3,,0x14000003,0x14,,,,u32,Shorten Recovery Frames per Levin Sword Moves,,medium,community,m16.3
-,4,,0x14000004,0xB4,,,,u32,Shorten Recovery Frames per Kill,,medium,community,m16.4
+,1,,0x14000001,0x1E0,,,,u32,Levin Sword related (use_thundersword. script_2248) -- code: stored in instance int 0x8D (func_2248) [status 0x16D (ResurrectionThundersword)],set as LA-Basic 0x8d,medium,community | reads: MSC reflet.mscsb func_2248; MSC reflet.mscsb func_2256,m16.1
+,2,,0x14000002,0x258,,,,u32,Frames for restoring Levin Sword,,medium,community | no read in the vanilla MSC (native or unused),m16.2
+,3,,0x14000003,0x14,,,,u32,Shorten Recovery Frames per Levin Sword Moves -- code: stored in instance int 0x8E (func_2247),,medium,community | reads: MSC reflet.mscsb func_2247,m16.3
+,4,,0x14000004,0xB4,,,,u32,Shorten Recovery Frames per Kill,community value differs: Default 0xC8 (vanilla 0xB4),medium,community | no read in the vanilla MSC (native or unused),m16.4
 ,5,"Thunder/Fire/
 Wind/Nosferatu",0x14000005,0x14,,,,u32,Durability points Thunder has,"Thunder: 1, Elthunder: 3, Arcthunder: 5, Thoron: 8, all written in Entry 13.",medium,community | reads: native 0x02F6530C (fn 0x02F652F0),m16.5
-,6,,0x14000006,0x6,,,,u32,Durability points Fire has,"Arcfire: 1, Jab 3: 1",medium,community,m16.6
-,7,,0x14000007,0x12,,,,u32,Durability points Wind has,"Elwind: 1*2, Rapid Jab: 1 per 60F, Rapid Jab Finisher: 2",medium,community,m16.7
-,8,,0x14000008,0x4,,,,u32,Durability points Nosferatu has,Nosferatu: 1,medium,community,m16.8
-,9,,0x14000009,0x2D0,,,,u32,Frames for restoring Thunder,,medium,community,m16.9
-,10,,0x1400000A,0x2D0,,,,u32,Frames for restoring Fire,,medium,community,m16.10
-,11,,0x1400000B,0x1E0,,,,u32,Frames for restoring Wind,True: 540F? / Takes only 490F if you use all durability from Elwind second hit.,medium,community,m16.11
-,12,,0x1400000C,0x960,,,,u32,Frames for restoring Nosferatu,,medium,community,m16.12
-,13,,0x1400000D,0x5A,,,,u32,Shorten Thunder Recovery Frames per Kill,,medium,community,m16.13
-,14,,0x1400000E,0x3C,,,,u32,Shorten Flame Recovery Frames per Kill,,medium,community,m16.14
-,15,,0x1400000F,0x78,,,,u32,Shorten Wind Recovery Frames per Kill,,medium,community,m16.15
-,16,,0x14000010,0x3C,,,,u32,Shorten Nosferatu Recovery Frames per Kill,,medium,community,m16.16
-,17,Final Smash?,0x14000011,0x4,,,,u32,,,,,m16.17
-,18,,0x04000012,0.02,,,,f32,,,,,m16.18
-,19,,0x04000013,0,,,,f32,,,,,m16.19
-,20,,0x04000014,0,,,,f32,,,,,m16.20
+,6,,0x14000006,0x6,,,,u32,Durability points Fire has,"Arcfire: 1, Jab 3: 1",medium,community | no read in the vanilla MSC (native or unused),m16.6
+,7,,0x14000007,0x12,,,,u32,Durability points Wind has,"Elwind: 1*2, Rapid Jab: 1 per 60F, Rapid Jab Finisher: 2",medium,community | no read in the vanilla MSC (native or unused),m16.7
+,8,,0x14000008,0x4,,,,u32,Durability points Nosferatu has,Nosferatu: 1,medium,community | no read in the vanilla MSC (native or unused),m16.8
+,9,,0x14000009,0x2D0,,,,u32,Frames for restoring Thunder,,medium,community | no read in the vanilla MSC (native or unused),m16.9
+,10,,0x1400000A,0x2D0,,,,u32,Frames for restoring Fire,,medium,community | no read in the vanilla MSC (native or unused),m16.10
+,11,,0x1400000B,0x1E0,,,,u32,Frames for restoring Wind,True: 540F? / Takes only 490F if you use all durability from Elwind second hit.,medium,community | no read in the vanilla MSC (native or unused),m16.11
+,12,,0x1400000C,0x960,,,,u32,Frames for restoring Nosferatu,,medium,community | no read in the vanilla MSC (native or unused),m16.12
+,13,,0x1400000D,0x5A,,,,u32,Shorten Thunder Recovery Frames per Kill,,medium,community | no read in the vanilla MSC (native or unused),m16.13
+,14,,0x1400000E,0x3C,,,,u32,Shorten Flame Recovery Frames per Kill,,medium,community | no read in the vanilla MSC (native or unused),m16.14
+,15,,0x1400000F,0x78,,,,u32,Shorten Wind Recovery Frames per Kill,,medium,community | no read in the vanilla MSC (native or unused),m16.15
+,16,,0x14000010,0x3C,,,,u32,Shorten Nosferatu Recovery Frames per Kill,,medium,community | no read in the vanilla MSC (native or unused),m16.16
+,17,Final Smash?,0x14000011,0x4,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.17
+,18,,0x04000012,0.02,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.18
+,19,,0x04000013,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.19
+,20,,0x04000014,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.20
 ,21,,0x14000015,0x23,,,,u32,[auto] read by native code (get_int at 0x027C1A04); meaning not traced,,low,reads: native 0x027C1A04 (fn 0x027C16D0),m16.21
-,22,,0x04000016,5,,,,f32,,,,,m16.22
-,23,,0x04000017,480,,,,f32,GFX Y offset,,medium,community,m16.23
-,24,,0x14000018,0x28,,,,u32,,,,,m16.24
-17,0,Thunders,0x02000000,4,2.8,6,4,f32,Speed of Thunder,,medium,community,m17[*].0
-,1,,0x12000001,0xF,0x20,0xF,0xF,u32,Thunder lifetime (frames),,medium,community,m17[*].1
-,2,,0x02000002,2.5,1.9,4.5,2.5,f32,Speed of Elthunder,,medium,community,m17[*].2
-,3,,0x12000003,0x2E,0x38,0x22,0x2E,u32,Elthunder lifetime (frames),,medium,community,m17[*].3
-,4,,0x12000004,0x24,0x2E,0x18,0x24,u32,Non-projectile Arcthunder lifetime (frames)?,,medium,community,m17[*].4
-,5,,0x02000005,0,0,3.8,0,f32,,,,,m17[*].5
-,6,,0x02000006,0.078,0.068,-0.06,0.078,f32,,,,,m17[*].6
-,7,,0x02000007,3.8,3.2,4,3.8,f32,Speed of Arcthunder,,medium,community,m17[*].7
-,8,,0x12000008,0x3B,0x48,0x28,0x3B,u32,Projectile Arcthunder lifetime (frames),,medium,community,m17[*].8
-,9,,0x02000009,7,5,7,7,f32,Speed of Thoron,,medium,community,m17[*].9
-,10,,0x1200000A,0x46,0x50,0x46,0x46,u32,Thoron lifetime (frames),,medium,community,m17[*].10
-,11,,0x1200000B,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community,m17[*].11
-18,0,Arcfire,0x02000000,25,15,65,25,f32,Negative launch angle of Arcfire (degrees),,medium,community,m18[*].0
-,1,,0x02000001,2,3.2,4,2,f32,Speed of Arcfire,,medium,community,m18[*].1
-,2,,0x12000002,0x23,0x20,0x2C,0x23,u32,Arcfire lifetime (frames),,medium,community,m18[*].2
-,3,,0x12000003,0x1E,0x0,0xC,0x1E,u32,Pillar lifetime (frames),,medium,community,m18[*].3
-,4,,0x02000004,0.1,0.1,0.1,0.1,f32,Max fall speed?,,medium,community,m18[*].4
-,5,,0x12000005,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m18[*].5
-19,0,Elwind,0x02000000,97,93,140,97,f32,Negative launch angle of the first Elwind (degrees),,medium,community,m19[*].0
-,1,,0x02000001,93,100,95,93,f32,Negative launch angle of the second Elwind (degrees),,medium,community,m19[*].1
-,2,,0x02000002,0.3,0.5,0.3,0.3,f32,V acceleration,,medium,community,m19[*].2
-,3,,0x02000003,0.3,0.2,0.8,0.3,f32,,,,,m19[*].3
-,4,,0x02000004,0.25,0.3,0.25,0.25,f32,,,,,m19[*].4
-,5,,0x02000005,0.25,0.15,0.3,0.25,f32,,,,,m19[*].5
-,6,,0x02000006,4,4,4,4,f32,,,,,m19[*].6
-,7,,0x02000007,4,3,4.5,4,f32,,,,,m19[*].7
-,8,,0x12000008,0x16,0xC,0x16,0x16,u32,First Elwind lifetime (frames),,medium,community,m19[*].8
-,9,,0x12000009,0x1A,0x12,0x20,0x1A,u32,Second Elwind lifetime (frames),,medium,community,m19[*].9
-,10,,0x1200000A,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community,m19[*].10
-20,0,chrom?,0x02000000,8,,,,f32,H speed,,medium,community,m20[0].0
-,1,,0x02000001,8,,,,f32,Friction?,,medium,community,m20[0].1
+,22,,0x04000016,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.22
+,23,,0x04000017,480,,,,f32,"GFX Y offset -- code: read in: var4 = -WorkModuleF(0, 0x4000017); (func_2369) [status 0x16F]",,medium,community | reads: MSC reflet.mscsb func_2369,m16.23
+,24,,0x14000018,0x28,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.24
+17,0,Thunders,0x02000000,4,2.8,6,4,f32,Speed of Thunder,,medium,community | no read in the article MSC (native or unused),m17[*].0
+,1,,0x12000001,0xF,0x20,0xF,0xF,u32,"Thunder lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_48); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_48)",,medium,community | reads: MSC reflet/thunder.mscsb func_48,m17[*].1
+,2,,0x02000002,2.5,1.9,4.5,2.5,f32,Speed of Elthunder,,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x12000003,0x2E,0x38,0x22,0x2E,u32,"Elthunder lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_52); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_52)",,medium,community | reads: MSC reflet/thunder.mscsb func_52,m17[*].3
+,4,,0x12000004,0x24,0x2E,0x18,0x24,u32,"Non-projectile Arcthunder lifetime (frames)? -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_60); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_60)",,medium,community | reads: MSC reflet/thunder.mscsb func_60,m17[*].4
+,5,,0x02000005,0,0,3.8,0,f32,,,,no read in the article MSC (native or unused),m17[*].5
+,6,,0x02000006,0.078,0.068,-0.06,0.078,f32,,,,no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,3.8,3.2,4,3.8,f32,Speed of Arcthunder,,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x12000008,0x3B,0x48,0x28,0x3B,u32,"Projectile Arcthunder lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_56); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_56)",,medium,community | reads: MSC reflet/thunder.mscsb func_56,m17[*].8
+,9,,0x02000009,7,5,7,7,f32,"Speed of Thoron -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_69); PostureModule op 0x3 (func_69); KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_69)",,high,community | reads: MSC reflet/thunder.mscsb func_69,m17[*].9
+,10,,0x1200000A,0x46,0x50,0x46,0x46,u32,"Thoron lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_69); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_69)",,medium,community | reads: MSC reflet/thunder.mscsb func_69,m17[*].10
+,11,,0x1200000B,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m17[*].11
+18,0,Arcfire,0x02000000,25,15,65,25,f32,Negative launch angle of Arcfire (degrees),,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,2,3.2,4,2,f32,Speed of Arcfire,,medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x12000002,0x23,0x20,0x2C,0x23,u32,"Arcfire lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_52); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_52)",,medium,community | reads: MSC reflet/gigafire.mscsb func_52,m18[*].2
+,3,,0x12000003,0x1E,0x0,0xC,0x1E,u32,"Pillar lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_62); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_62)",,medium,community | reads: MSC reflet/gigafire.mscsb func_62,m18[*].3
+,4,,0x02000004,0.1,0.1,0.1,0.1,f32,Max fall speed? -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion) (func_57),,medium,community | reads: MSC reflet/gigafire.mscsb func_57,m18[*].4
+,5,,0x12000005,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m18[*].5
+19,0,Elwind,0x02000000,97,93,140,97,f32,Negative launch angle of the first Elwind (degrees),,medium,community | no read in the article MSC (native or unused),m19[*].0
+,1,,0x02000001,93,100,95,93,f32,Negative launch angle of the second Elwind (degrees),,medium,community | no read in the article MSC (native or unused),m19[*].1
+,2,,0x02000002,0.3,0.5,0.3,0.3,f32,V acceleration,,medium,community | no read in the article MSC (native or unused),m19[*].2
+,3,,0x02000003,0.3,0.2,0.8,0.3,f32,,,,no read in the article MSC (native or unused),m19[*].3
+,4,,0x02000004,0.25,0.3,0.25,0.25,f32,,,,no read in the article MSC (native or unused),m19[*].4
+,5,,0x02000005,0.25,0.15,0.3,0.25,f32,,,,no read in the article MSC (native or unused),m19[*].5
+,6,,0x02000006,4,4,4,4,f32,,,,no read in the article MSC (native or unused),m19[*].6
+,7,,0x02000007,4,3,4.5,4,f32,,,,no read in the article MSC (native or unused),m19[*].7
+,8,,0x12000008,0x16,0xC,0x16,0x16,u32,"First Elwind lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_48); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_48)",,medium,community | reads: MSC reflet/elwind.mscsb func_48,m19[*].8
+,9,,0x12000009,0x1A,0x12,0x20,0x1A,u32,"Second Elwind lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_52); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_52)",,medium,community | reads: MSC reflet/elwind.mscsb func_52,m19[*].9
+,10,,0x1200000A,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m19[*].10
+20,0,chrom?,0x02000000,8,,,,f32,H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion) (func_50),,high,community | reads: MSC reflet/chrom.mscsb func_50; MSC reflet/chrom.mscsb func_55; MSC reflet/chrom.mscsb func_75,m20[0].0
+,1,,0x02000001,8,,,,f32,Friction? -- code: KineticModule op 0x10 (sets a brake / friction) on energy 0 (motion) (func_55),,high,community | reads: MSC reflet/chrom.mscsb func_55; MSC reflet/chrom.mscsb func_75,m20[0].1
 21,0,,,0x1,,,,u32,,,,,m21[0].0
 ,1,,,3,,,,f32,,,,,m21[0].1
 ,2,,,0,,,,f32,,,,,m21[0].2

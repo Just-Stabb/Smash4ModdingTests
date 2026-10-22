@@ -1,97 +1,97 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,46,90,46,46,f32,Determinate Arts frames from last input,General,medium,community,m12[*].0
-,1,,0x05000001,16,20,6,16,f32,Monado Art duration (seconds),,medium,community,m12[*].1
+13,0,Neutral B,0x05000000,46,90,46,46,f32,Determinate Arts frames from last input,General,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,16,20,6,16,f32,Monado Art duration (seconds),,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
 ,2,,0x15000002,0x258,0x12C,0x384,0x258,u32,Monado Art cooldown (frames),,medium,community | reads: native 0x02F7B078 (fn 0x02F7AE58),m12[*].2
-,3,,0x15000003,0x3C,0x4B0,0x3C,0x3C,u32,Art's deactivation held down (frames),,medium,community,m12[*].3
-,4,,0x15000004,0x1E,0x0,0x1E,0x1E,u32,Window for Art deactivation via special multipress (frames),,medium,community,m12[*].4
-,5,,0x05000005,2,2.2,2.4,2,f32,Jump / hop height multiplier,Jump,medium,community,m12[*].5
-,6,,0x05000006,1.5,1.65,1.8,1.5,f32,Air accels / max air speed multiplier,,medium,community,m12[*].6
-,7,,0x05000007,1.3,1.43,1.56,1.3,f32,Gravity multiplier,,medium,community,m12[*].7
-,8,,0x05000008,1.22,1.342,1.464,1.22,f32,Fall speed / fast fall speed multiplier,,medium,community,m12[*].8
-,9,,0x05000009,1.3,1.3,1.3,1.3,f32,Ledge jump height multiplier,,medium,community,m12[*].9
-,10,,0x0500000A,1.3,1.43,1.56,1.3,f32,1st Air Slash height multiplier,,medium,community,m12[*].10
-,11,,0x0500000B,2,2.2,2.4,2,f32,2nd Air Slash height multiplier,,medium,community,m12[*].11
-,12,,0x0500000C,1.22,1.22,1.464,1.22,f32,Damage taken multiplier,,medium,community,m12[*].12
-,13,,0x0500000D,1.3,1.43,1.56,1.3,f32,Air accels / max air speed multiplier,Speed,medium,community,m12[*].13
-,14,,0x0500000E,1,1.1,1.2,1,f32,Gravity multiplier,,medium,community,m12[*].14
-,15,,0x0500000F,1.7,1.87,2.04,1.8,f32,Walk / run max speed multiplier,,medium,community,m12[*].15
-,16,,0x05000010,1.7,1.87,2.04,1.7,f32,Dash initial speed mltiplier,,medium,community,m12[*].16
-,17,,0x05000011,1.7,1.87,2.04,1.8,f32,Dash accel multiplier,,medium,community,m12[*].17
-,18,,0x05000012,1.5,1.65,1.8,1.5,f32,Ground friction multiplier,,medium,community,m12[*].18
-,19,,0x05000013,0.8,0.8,0.64,0.72,f32,Damage dealt multiplier,,medium,community,m12[*].19
-,20,,0x05000014,0.77,0.77,0.616,0.77,f32,Jump / hop height multiplier,,medium,community,m12[*].20
-,21,,0x05000015,0.77,0.77,0.616,0.77,f32,,,,,m12[*].21
-,22,,0x05000016,0.67,0.603,0.536,0.6,f32,Damage taken multiplier,Shield,medium,community,m12[*].22
-,23,,0x05000017,0.78,0.702,0.624,0.7,f32,Knockback received multiplier,,medium,community,m12[*].23
-,24,,0x05000018,1.5,1.65,1.8,2,f32,Shield HP multiplier,,medium,community,m12[*].24
-,25,,0x05000019,1.3,1.43,1.56,1.5,f32,Shield regenaration speed multiplier,,medium,community,m12[*].25
-,26,,0x0500001A,0.7,0.7,0.56,0.72,f32,Damage dealt multiplier,,medium,community,m12[*].26
-,27,,0x0500001B,0.6,0.6,0.48,0.6,f32,Air accels / max air speed multiplier,,medium,community,m12[*].27
-,28,,0x0500001C,0.6,0.6,0.48,0.5,f32,Walk / run max speed multiplier,,medium,community,m12[*].28
-,29,,0x0500001D,0.7,0.7,0.56,0.6,f32,Dash initial speed mltiplier/,,medium,community,m12[*].29
-,30,,0x0500001E,0.6,0.6,0.48,0.5,f32,Dash Initial/Dash Accel/Run Speed?,,medium,community,m12[*].30
-,31,,0x0500001F,0.8,0.8,0.64,0.8,f32,Jump / hop height multiplier,,medium,community,m12[*].31
-,32,,0x05000020,0.8,0.8,0.64,0.8,f32,,,,,m12[*].32
-,33,,0x05000021,1.4,1.54,1.68,1.35,f32,Damage dealt multiplier,Buster,medium,community,m12[*].33
-,34,,0x05000022,1.27,1.397,1.524,1.35,f32,,,,,m12[*].34
-,35,,0x05000023,1.13,1.13,1.356,1.2,f32,Damage taken multiplier,,medium,community,m12[*].35
-,36,,0x05000024,0.68,0.68,0.544,0.6,f32,Knockback dealt multiplier,,medium,community,m12[*].36
-,37,,0x05000025,1.18,1.298,1.416,1.5,f32,Knockback dealt multiplier,Smash,medium,community,m12[*].37
-,38,,0x05000026,1.12,1.232,1.344,1.5,f32,,,,,m12[*].38
-,39,,0x05000027,0.5,0.5,0.4,0.5,f32,Damage dealt multiplier,,medium,community,m12[*].39
-,40,,0x05000028,1.07,1.07,1.284,1.3,f32,Knockback received multiplier,,medium,community,m12[*].40
-14,0,Side B,0x06000000,1.1,0.5,1.8,1.1,f32,H initial speed on grounded startup,,medium,community,m13[*].0
-,1,,0x06000001,1.9,5,1.9,1.9,f32,V initial speed on grounded startup,,medium,community,m13[*].1
-,2,,0x06000002,1.1,0.5,1.8,1.1,f32,H initial speed on aerial startup,,medium,community,m13[*].2
-,3,,0x06000003,1.6,5,1.6,1.6,f32,V initial speed on aerial startup,,medium,community,m13[*].3
-,4,,0x06000004,0.15,0.4,0.15,0.15,f32,Gravity,,medium,community,m13[*].4
-,5,,0x06000005,4.5,7,4.5,4.5,f32,Max fall speed,,medium,community,m13[*].5
-,6,,0x06000006,0.1,1,0.1,0.1,f32,Gravity after hitting opponents,,medium,community,m13[*].6
-,7,,0x06000007,4.5,6,4.5,4.5,f32,Max fall speed after hitting opponents,,medium,community,m13[*].7
-15,0,Up B,0x07000000,1,1,1.2,1,f32,Grounded height multiplier,,medium,community,m14[*].0
-,1,,0x07000001,1,1,1.1,1,f32,Aerial height multiplier,,medium,community,m14[*].1
-,2,,0x07000002,0.6666,0.6666,0.6666,0.6666,f32,Aerial H speed multiplier,,medium,community,m14[*].2
-,3,,0x07000003,0.25,0.25,0.25,0.25,f32,Aerial max H speed mutliplier while falling,,medium,community,m14[*].3
-,4,,0x07000004,0.5,0.5,0.5,0.5,f32,,,,,m14[*].4
-,5,,0x07000005,0.625,0.625,0,0.625,f32,,,,,m14[*].5
-,6,,0x07000006,6,6,6,6,f32,,,,,m14[*].6
-,7,,0x07000007,0.4,1,0.4,0.4,f32,H air max speed muliplier,,medium,community,m14[*].7
-,8,,0x17000008,0x1E,0x1E,0x1E,0x1E,u32,Landing lag without additional input (frames),,medium,community,m14[*].8
-,9,,0x07000009,1.7,0,2,1.7,f32,Initial V speed of additional input,,medium,community,m14[*].9
-,10,,0x1700000A,0x1E,0x1E,0x1E,0x1E,u32,Landing lag with additional input (frames),,medium,community,m14[*].10
+,3,,0x15000003,0x3C,0x4B0,0x3C,0x3C,u32,Art's deactivation held down (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x15000004,0x1E,0x0,0x1E,0x1E,u32,Window for Art deactivation via special multipress (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,2,2.2,2.4,2,f32,Jump / hop height multiplier,Jump,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,1.5,1.65,1.8,1.5,f32,Air accels / max air speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,1.3,1.43,1.56,1.3,f32,Gravity multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,1.22,1.342,1.464,1.22,f32,Fall speed / fast fall speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,1.3,1.3,1.3,1.3,f32,Ledge jump height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,1.3,1.43,1.56,1.3,f32,1st Air Slash height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,2,2.2,2.4,2,f32,2nd Air Slash height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,1.22,1.22,1.464,1.22,f32,Damage taken multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,1.3,1.43,1.56,1.3,f32,Air accels / max air speed multiplier,Speed,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x0500000E,1,1.1,1.2,1,f32,Gravity multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].14
+,15,,0x0500000F,1.7,1.87,2.04,1.8,f32,Walk / run max speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,1.7,1.87,2.04,1.7,f32,Dash initial speed mltiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,1.7,1.87,2.04,1.8,f32,Dash accel multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x05000012,1.5,1.65,1.8,1.5,f32,Ground friction multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].18
+,19,,0x05000013,0.8,0.8,0.64,0.72,f32,Damage dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].19
+,20,,0x05000014,0.77,0.77,0.616,0.77,f32,Jump / hop height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].20
+,21,,0x05000015,0.77,0.77,0.616,0.77,f32,,,,no read in the vanilla MSC (native or unused),m12[*].21
+,22,,0x05000016,0.67,0.603,0.536,0.6,f32,Damage taken multiplier,Shield,medium,community | no read in the vanilla MSC (native or unused),m12[*].22
+,23,,0x05000017,0.78,0.702,0.624,0.7,f32,Knockback received multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].23
+,24,,0x05000018,1.5,1.65,1.8,2,f32,Shield HP multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].24
+,25,,0x05000019,1.3,1.43,1.56,1.5,f32,Shield regenaration speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].25
+,26,,0x0500001A,0.7,0.7,0.56,0.72,f32,Damage dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].26
+,27,,0x0500001B,0.6,0.6,0.48,0.6,f32,Air accels / max air speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].27
+,28,,0x0500001C,0.6,0.6,0.48,0.5,f32,Walk / run max speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].28
+,29,,0x0500001D,0.7,0.7,0.56,0.6,f32,Dash initial speed mltiplier/,,medium,community | no read in the vanilla MSC (native or unused),m12[*].29
+,30,,0x0500001E,0.6,0.6,0.48,0.5,f32,Dash Initial/Dash Accel/Run Speed?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].30
+,31,,0x0500001F,0.8,0.8,0.64,0.8,f32,Jump / hop height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].31
+,32,,0x05000020,0.8,0.8,0.64,0.8,f32,,,,no read in the vanilla MSC (native or unused),m12[*].32
+,33,,0x05000021,1.4,1.54,1.68,1.35,f32,Damage dealt multiplier,Buster,medium,community | no read in the vanilla MSC (native or unused),m12[*].33
+,34,,0x05000022,1.27,1.397,1.524,1.35,f32,,,,no read in the vanilla MSC (native or unused),m12[*].34
+,35,,0x05000023,1.13,1.13,1.356,1.2,f32,Damage taken multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].35
+,36,,0x05000024,0.68,0.68,0.544,0.6,f32,Knockback dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].36
+,37,,0x05000025,1.18,1.298,1.416,1.5,f32,Knockback dealt multiplier,Smash,medium,community | no read in the vanilla MSC (native or unused),m12[*].37
+,38,,0x05000026,1.12,1.232,1.344,1.5,f32,,,,no read in the vanilla MSC (native or unused),m12[*].38
+,39,,0x05000027,0.5,0.5,0.4,0.5,f32,Damage dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].39
+,40,,0x05000028,1.07,1.07,1.284,1.3,f32,Knockback received multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].40
+14,0,Side B,0x06000000,1.1,0.5,1.8,1.1,f32,"H initial speed on grounded startup -- code: read in: var0 = WorkModuleF(0, 0x6000000); (func_2260) [status 0x157]",,medium,community | reads: MSC shulk.mscsb func_2260,m13[*].0
+,1,,0x06000001,1.9,5,1.9,1.9,f32,"V initial speed on grounded startup -- code: read in: var1 = WorkModuleF(0, 0x6000001); (func_2260) [status 0x157]",,medium,community | reads: MSC shulk.mscsb func_2260,m13[*].1
+,2,,0x06000002,1.1,0.5,1.8,1.1,f32,"H initial speed on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2260) [status 0x157]",,high,community | reads: MSC shulk.mscsb func_2260,m13[*].2
+,3,,0x06000003,1.6,5,1.6,1.6,f32,"V initial speed on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2260) [status 0x157]",,high,community | reads: MSC shulk.mscsb func_2260,m13[*].3
+,4,,0x06000004,0.15,0.4,0.15,0.15,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2260) [status 0x157],,high,community | reads: MSC shulk.mscsb func_2260,m13[*].4
+,5,,0x06000005,4.5,7,4.5,4.5,f32,Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2260); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2260) [status 0x157],,high,community | reads: MSC shulk.mscsb func_2260,m13[*].5
+,6,,0x06000006,0.1,1,0.1,0.1,f32,Gravity after hitting opponents -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2264) [status 0x158 (SpecialAirSFall)],,high,community | reads: MSC shulk.mscsb func_2264,m13[*].6
+,7,,0x06000007,4.5,6,4.5,4.5,f32,Max fall speed after hitting opponents -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2264); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2264) [status 0x158 (SpecialAirSFall)],,high,community | reads: MSC shulk.mscsb func_2264,m13[*].7
+15,0,Up B,0x07000000,1,1,1.2,1,f32,Grounded height multiplier -- code: stored in status float 0xD (func_2272) [status 0x154],,medium,community | reads: MSC shulk.mscsb func_2272,m14[*].0
+,1,,0x07000001,1,1,1.1,1,f32,Aerial height multiplier -- code: stored in status float 0xB (func_2272) [status 0x154],,medium,community | reads: MSC shulk.mscsb func_2272,m14[*].1
+,2,,0x07000002,0.6666,0.6666,0.6666,0.6666,f32,Aerial H speed multiplier -- code: stored in status float 0x9 (func_2272) [status 0x154],,medium,community | reads: MSC shulk.mscsb func_2272,m14[*].2
+,3,,0x07000003,0.25,0.25,0.25,0.25,f32,"Aerial max H speed mutliplier while falling -- code: stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2331) (func_2272) [status 0x154]",,medium,community | reads: MSC shulk.mscsb func_2272,m14[*].3
+,4,,0x07000004,0.5,0.5,0.5,0.5,f32,code: stored in status float 0xA (func_2272) [status 0x154],,medium,reads: MSC shulk.mscsb func_2272,m14[*].4
+,5,,0x07000005,0.625,0.625,0,0.625,f32,code: stored in status float 0x7 (func_2272) [status 0x154],,medium,reads: MSC shulk.mscsb func_2272,m14[*].5
+,6,,0x07000006,6,6,6,6,f32,code: stored in status float 0x8 (func_2272) [status 0x154],,medium,reads: MSC shulk.mscsb func_2272,m14[*].6
+,7,,0x07000007,0.4,1,0.4,0.4,f32,"H air max speed muliplier -- code: stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2332) (func_2272); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), argument 1 (func_2273); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), argument 1 (func_2273) [status 0x154; status 0x15A (SpecialHiAdd)]",,high,community | reads: MSC shulk.mscsb func_2272; MSC shulk.mscsb func_2273; MSC shulk.mscsb func_2276; MSC shulk.mscsb func_2277,m14[*].7
+,8,,0x17000008,0x1E,0x1E,0x1E,0x1E,u32,"Landing lag without additional input (frames) -- code: stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2332) (func_2272) [status 0x154]",,high,community | reads: MSC shulk.mscsb func_2272,m14[*].8
+,9,,0x07000009,1.7,0,2,1.7,f32,Initial V speed of additional input -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical) (func_2277) [status 0x15A (SpecialHiAdd)],,high,community | reads: MSC shulk.mscsb func_2277,m14[*].9
+,10,,0x1700000A,0x1E,0x1E,0x1E,0x1E,u32,Landing lag with additional input (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2278) [status 0x15A (SpecialHiAdd)],,high,community | reads: MSC shulk.mscsb func_2278,m14[*].10
 16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,Aerial H speed multiplier,,medium,community | reads: native 0x027D90C4 (fn 0x027D8F70),m15[*].0
 ,1,,0x08000001,0.0025,0.0025,0.0025,0.0025,f32,Air friction,,medium,community | reads: native 0x027D9580 (fn 0x027D9424),m15[*].1
-,2,,0x08000002,0.04,0.04,0.04,0.04,f32,Counter gravity,,medium,community,m15[*].2
-,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Counter max fall speed,,medium,community,m15[*].3
-,4,,0x18000004,0x0,0x0,0x0,0x0,u32,,,,,m15[*].4
-,5,,0x08000005,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community,m15[*].5
-,6,,0x08000006,6,6,6,6,f32,Counter trigger bubble Y offset,,medium,community,m15[*].6
-,7,,0x08000007,1,1,1,1,f32,Counter trigger bubble Z offset,,medium,community,m15[*].7
-,8,,0x08000008,9.5,9.5,9.5,9.5,f32,Counter trigger bubble size,,medium,community,m15[*].8
-,9,,0x08000009,35,25,45,25,f32,Max counter active frames,,medium,community,m15[*].9
-,10,,0x0800000A,5,5,3,5,f32,Min counter active frames,,medium,community,m15[*].10
-,11,,0x0800000B,0.66,0.6,0.1,0.6,f32,Counter active frames multiplier applied after use,,medium,community,m15[*].11
-,12,,0x0800000C,0.02,0.05,0.02,0.05,f32,Counter active frame recovery frames multiplier,,medium,community,m15[*].12
-,13,,0x0800000D,4,4,8,4,f32,Counter active frames multiplier applied after use,,medium,community,m15[*].13
-,14,,0x0800000E,0.01,0.01,0.01,0.01,f32,Gravity on attacks,,medium,community,m15[*].14
-,15,,0x0800000F,0.6,0.6,0.6,0.6,f32,Max fall speed on attacks,,medium,community,m15[*].15
-,16,,0x08000010,1.3,1,1.5,1.3,f32,Damage multiplier,,medium,community,m15[*].16
-,17,,0x08000011,8,6,10,8,f32,Min damage,,medium,community,m15[*].17
-,18,,0x08000012,50,50,50,50,f32,Max damage,,medium,community,m15[*].18
-,19,,0x08000013,80,80,80,80,f32,,,,,m15[*].19
-,20,,0x08000014,1,1,1,1,f32,,,,,m15[*].20
-,0,Final Smash,0x04000000,30,,,,f32,,,,,m16.0
-,1,,0x04000001,0,,,,f32,,,,,m16.1
+,2,,0x08000002,0.04,0.04,0.04,0.04,f32,Counter gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Counter max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,6,6,6,6,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,1,1,1,1,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,9.5,9.5,9.5,9.5,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,35,25,45,25,f32,Max counter active frames,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,5,5,3,5,f32,"Min counter active frames -- code: stored in instance float 0x32, then compared with the animation frame; compared with a computed value (func_2281) (func_2282); compared with a computed value (func_2282) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC shulk.mscsb func_2282,m15[*].10
+,11,,0x0800000B,0.66,0.6,0.1,0.6,f32,"Counter active frames multiplier applied after use -- code: compared with a computed value (func_2282) [status 0x155 (SpecialLw, SpecialAirLw)]",,medium,community | reads: MSC shulk.mscsb func_2282,m15[*].11
+,12,,0x0800000C,0.02,0.05,0.02,0.05,f32,Counter active frame recovery frames multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,4,4,8,4,f32,Counter active frames multiplier applied after use,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,0.01,0.01,0.01,0.01,f32,"Gravity on attacks -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2284) [status 0x15B (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC shulk.mscsb func_2284,m15[*].14
+,15,,0x0800000F,0.6,0.6,0.6,0.6,f32,"Max fall speed on attacks -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2284); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2284) [status 0x15B (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC shulk.mscsb func_2284,m15[*].15
+,16,,0x08000010,1.3,1,1.5,1.3,f32,Damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,8,6,10,8,f32,Min damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].17
+,18,,0x08000012,50,50,50,50,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].18
+,19,,0x08000013,80,80,80,80,f32,,,,no read in the vanilla MSC (native or unused),m15[*].19
+,20,,0x08000014,1,1,1,1,f32,"code: animation rate (MotionModule set rate) (func_2281) [status 0x155 (SpecialLw, SpecialAirLw)]",,medium,reads: MSC shulk.mscsb func_2281,m15[*].20
+,0,Final Smash,0x04000000,30,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
 ,2,,0x14000002,0xC,,,,u32,[auto] read by native code (get_int at 0x027D8140); meaning not traced,,low,reads: native 0x027D8140 (fn 0x027D806C),m16.2
 ,3,,0x04000003,3,,,,f32,[auto] read by native code (get_float at 0x027D815C); meaning not traced,,low,reads: native 0x027D815C (fn 0x027D806C),m16.3
-,4,,0x04000004,-30,,,,f32,,community ID was 0x04000003,,,m16.4
-,5,,0x04000005,15,,,,f32,,community ID was 0x04000004,,,m16.5
-,6,,0x04000006,4,,,,f32,,community ID was 0x04000005,,,m16.6
-,7,,0x04000007,5,,,,f32,,community ID was 0x04000006,,,m16.7
-,8,,0x04000008,32,,,,f32,,community ID was 0x04000007,,,m16.8
-,9,,0x04000009,10,,,,f32,,community ID was 0x04000008,,,m16.9
-,10,,0x0400000A,0.5,,,,f32,,community ID was 0x04000009,,,m16.10
-,11,,0x0400000B,35,,,,f32,,community ID was 0x0400000A,,,m16.11
-,12,,0x0400000C,45,,,,f32,,community ID was 0x0400000B,,,m16.12
+,4,,0x04000004,-30,,,,f32,,community ID was 0x04000003,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,15,,,,f32,,community ID was 0x04000004,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,4,,,,f32,,community ID was 0x04000005,,no read in the vanilla MSC (native or unused),m16.6
+,7,,0x04000007,5,,,,f32,,community ID was 0x04000006,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,32,,,,f32,,community ID was 0x04000007,,no read in the vanilla MSC (native or unused),m16.8
+,9,,0x04000009,10,,,,f32,,community ID was 0x04000008,,no read in the vanilla MSC (native or unused),m16.9
+,10,,0x0400000A,0.5,,,,f32,,community ID was 0x04000009,,no read in the vanilla MSC (native or unused),m16.10
+,11,,0x0400000B,35,,,,f32,,community ID was 0x0400000A,,no read in the vanilla MSC (native or unused),m16.11
+,12,,0x0400000C,45,,,,f32,,community ID was 0x0400000B,,no read in the vanilla MSC (native or unused),m16.12
 17,0,,,0,,,,f32,,,,,m17[0]
 18,0,,,0,,,,f32,,,,,m18[0]

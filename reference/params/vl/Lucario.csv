@@ -1,26 +1,26 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,90,75,42,84,f32,Charge time (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3394; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3404",m12[*].0
-,1,,0x05000001,0,0,0,0,f32,H backward speed received from uncharged grounded firing,,medium,community,m12[*].1
-,2,,0x05000002,1.05,1.05,0.9,1.05,f32,H backward speed received from fully-charged grounded firing,,medium,community,m12[*].2
-,3,,0x05000003,0,0,0,0,f32,H backward speed received from uncharged aerial firing,,medium,community,m12[*].3
-,4,,0x05000004,1.4,0.8,1.1,1.4,f32,H backward speed received from fully-charged aerial firing,,medium,community,m12[*].4
-,5,,0x05000005,0.06,0.06,0.06,0.06,f32,,,,,m12[*].5
-14,0,Side B,0x06000000,13,13,13,13,f32,Grounded X offset,,medium,community,m13[*].0
-,1,,0x06000001,7,7,7,7,f32,Grounded Y offset,,medium,community,m13[*].1
-,2,,0x06000002,13,13,13,13,f32,Aerial X offset,,medium,community,m13[*].2
-,3,,0x06000003,11,11,11,11,f32,Aerial Y offset,,medium,community,m13[*].3
+13,0,Neutral B,0x05000000,90,75,42,84,f32,Charge time (frames) -- code: compared with instance int 0x83 (a counter) (func_3394); MotionModule op 0x2711 (func_3404); animation rate (MotionModule set rate) (func_3404) [status 0x1EB; status 0x1EC],,high,community | reads: MSC kirby.mscsb func_3394; MSC kirby.mscsb func_3404; MSC lucario.mscsb func_2261; MSC lucario.mscsb func_2271,m12[*].0
+,1,,0x05000001,0,0,0,0,f32,H backward speed received from uncharged grounded firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,1.05,1.05,0.9,1.05,f32,H backward speed received from fully-charged grounded firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,0,0,0,0,f32,H backward speed received from uncharged aerial firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,1.4,0.8,1.1,1.4,f32,H backward speed received from fully-charged aerial firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,0.06,0.06,0.06,0.06,f32,,,,no read in the vanilla MSC (native or unused),m12[*].5
+14,0,Side B,0x06000000,13,13,13,13,f32,Grounded X offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,7,7,7,7,f32,Grounded Y offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,13,13,13,13,f32,Aerial X offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,11,11,11,11,f32,Aerial Y offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
 ,4,,0x06000004,1.12,1.1,1.1,1.1,f32,Command grab hit GFX size multiplier,,medium,community | reads: native 0x02F16DD8 (fn 0x02F16D5C),m13[*].4
 15,0,Up B,0x07000000,1.25,1.25,1.25,1.25,f32,Aerial H speed multiplier on startup,read on startup,medium,community | reads: native 0x02F130DC (fn 0x02F1306C),m14[*].0
 ,1,,0x07000001,0.02,0.02,0.02,0.02,f32,Air friction on startup,,medium,community | reads: native 0x02F132A8 (fn 0x02F131D0); native 0x02F132F4 (fn 0x02F131D0),m14[*].1
 ,2,,0x07000002,0.015,0.015,0.015,0.015,f32,Gravity on startup,,medium,community | reads: native 0x02F13268 (fn 0x02F131D0),m14[*].2
-,3,,0x07000003,0.125,0.125,0.125,0.125,f32,Max fall speed on startup?,read on travel,medium,community,m14[*].3
-,4,,0x07000004,0.5,0.5,0.5,0.5,f32,,Sensitivity?,,,m14[*].4
+,3,,0x07000003,0.125,0.125,0.125,0.125,f32,Max fall speed on startup?,read on travel,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0.5,0.5,0.5,0.5,f32,,Sensitivity?,,no read in the vanilla MSC (native or unused),m14[*].4
 ,5,,0x07000005,3.05,1.5,5.5,3.05,f32,Base travel speed,Travel speed = 3.05 + 3 * Aura multiplier,medium,community | reads: native 0x02F14138 (fn 0x02F13FF8); native 0x02F141E0 (fn 0x02F13FF8),m14[*].5
-,6,,0x07000006,3,1.6,3.3,3,f32,Added travel speed from Aura multiplier,,medium,community,m14[*].6
+,6,,0x07000006,3,1.6,3.3,3,f32,Added travel speed from Aura multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
 ,7,,0x07000007,10,7,0,10,f32,Turning angle per frames (degrees),,medium,community | reads: native 0x02F14E9C (fn 0x02F14B1C),m14[*].7
 ,8,,0x07000008,55,55,55,55,f32,Min angle required to bounce off wall,,medium,community | reads: native 0x02F14C68 (fn 0x02F14B1C); native 0x02F14CF4 (fn 0x02F14B1C),m14[*].8
 ,9,,0x17000009,0x5,0x2E,0x5,0x5,u32,Frame duration of travel,,medium,community | reads: native 0x02F143EC (fn 0x02F14348),m14[*].9
-,10,,0x0700000A,1,1,0.4,1,f32,V speed multiplier after flying,,medium,community,m14[*].10
+,10,,0x0700000A,1,1,0.4,1,f32,V speed multiplier after flying,,medium,community | no read in the vanilla MSC (native or unused),m14[*].10
 ,11,,0x0700000B,0.2,0.2,0.18,0.2,f32,Ending air friction?,,medium,community | reads: native 0x02F1577C (fn 0x02F15738),m14[*].11
 ,12,,0x0700000C,0.5,0.75,0.5,0.5,f32,[auto] read by native code (get_float at 0x02F1553C); meaning not traced,read on end,low,reads: native 0x02F1553C (fn 0x02F154A0); native 0x02F15928 (fn 0x02F15880),m14[*].12
 ,13,,0x1700000D,0x3C,0x26,0x1B,0x12,u32,Landing lag (frames),,medium,community | reads: native 0x02F1551C (fn 0x02F154A0); native 0x02F158D4 (fn 0x02F15880),m14[*].13
@@ -29,31 +29,31 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,H speed multiplier,,medium,community | reads: native 0x02F15D48 (fn 0x02F15CD8),m15[*].0
 ,1,,0x08000001,0.03,0.06,0.02,0.03,f32,Gravity,,medium,community | reads: native 0x02F15DC8 (fn 0x02F15CD8),m15[*].1
 ,2,,0x08000002,1,1,1,1,f32,Max fall speed,,medium,community | reads: native 0x02F15DEC (fn 0x02F15CD8),m15[*].2
-,3,,0x18000003,0x1A,0x1A,0x2D,0x1A,u32,Frames duration for dodge before hitbox action occurs,,medium,community,m15[*].3
+,3,,0x18000003,0x1A,0x1A,0x2D,0x1A,u32,"Frames duration for dodge before hitbox action occurs -- code: stored in status int 0x2, then decremented in func_2324 (a countdown / remaining count), tested against 0 (func_2322) [status 0x15E (SpecialLwSplit)]",,high,community | reads: MSC lucario.mscsb func_2322,m15[*].3
 ,4,,0x08000004,28,28,2,28,f32,Max added travel distance from Y stick location?,,medium,community | reads: native 0x02F15FC8 (fn 0x02F15E78); native 0x02F16098 (fn 0x02F15E78); native 0x02F1616C (fn 0x02F15E78),m15[*].4
 ,5,,0x08000005,45,45,2,45,f32,Max added travel distance from X stick location?,,medium,community | reads: native 0x02F15FE4 (fn 0x02F15E78); native 0x02F160B4 (fn 0x02F15E78); native 0x02F16188 (fn 0x02F15E78),m15[*].5
-,6,,0x18000006,0x8,0x8,0x8,0x8,u32,Attack kick duration (frames),,medium,community | reads: native 0x02F16520 (fn 0x02F15E78); native 0x02F16618 (fn 0x02F15E78),m15[*].6
-,7,,0x08000007,1,1,1,1,f32,Frame speed multiplier,Frame speed multiplier for something,medium,community,m15[*].7
-,0,Category 4 block,0x04000000,0,,,,f32,,,,,m16
+,6,,0x18000006,0x8,0x8,0x8,0x8,u32,"Attack kick duration (frames) -- code: stored in status int 0x2, then decremented in func_2330 (a countdown / remaining count) (func_2330) [status 0x15F (SpecialAirAppear)]",,high,community | reads: MSC lucario.mscsb func_2330; native 0x02F16520 (fn 0x02F15E78); native 0x02F16618 (fn 0x02F15E78),m15[*].6
+,7,,0x08000007,1,1,1,1,f32,Frame speed multiplier -- code: animation rate (MotionModule set rate) (func_2318) [status 0x155],Frame speed multiplier for something,high,community | reads: MSC lucario.mscsb func_2318,m15[*].7
+,0,Category 4 block,0x04000000,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16
 17,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
 ,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17[0].1
 18,0,"Neutral B
-(Projectile)",0x02000000,0.69,0.5,0.75,0.75,f32,Hitbox damage multiplier,,medium,community,m18[*].0
-,1,,0x02000001,2.6,2,2.6,2.6,f32,Max Aura Sphere size multiplier?,,medium,community,m18[*].1
-,2,,0x02000002,0.5,0.5,0.5,0.5,f32,?,,medium,community,m18[*].2
-,3,,0x12000003,0x3C,0x96,0x32,0x46,u32,Lifetime (frames),,medium,community,m18[*].3
-,4,,0x02000004,0,0,0,0,f32,Firing angle (degrees),,medium,community,m18[*].4
-,5,,0x02000005,1,0.5,2.1,1.4,f32,Min projectile speed,,medium,community,m18[*].5
-,6,,0x02000006,2.5,0.2,3.8,3.2,f32,Max projectile speed,,medium,community,m18[*].6
-,7,,0x12000007,0x6,0x1E,0x6,0x6,u32,?,,medium,community,m18[*].7
-,8,,0x02000008,8,0.8,8,8,f32,?,,medium,community,m18[*].8
-,9,,0x02000009,0.5,0.4,0,0.5,f32,Non charged projectile randomness,,medium,community,m18[*].9
-,10,,0x0200000A,0.2,0.2,0,0.2,f32,Fully-charged projectile randomness,,medium,community,m18[*].10
-,11,,0x0200000B,3.5,3.5,3.5,3.5,f32,,,,,m18[*].11
-,12,,0x0200000C,1,3,1,1,f32,,,,,m18[*].12
-,13,,0x0200000D,4,4.5,2.4,4,f32,,,,,m18[*].13
-,14,,0x0200000E,20,20,20,20,f32,,,,,m18[*].14
-,15,,0x1200000F,0x0,0x1,0x1,0x0,u32,Piercing capability,,medium,community,m18[*].15
+(Projectile)",0x02000000,0.69,0.5,0.75,0.75,f32,Hitbox damage multiplier,,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,2.6,2,2.6,2.6,f32,Max Aura Sphere size multiplier?,,medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,0.5,0.5,0.5,0.5,f32,?,,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x12000003,0x3C,0x96,0x32,0x46,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_59); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_56 (a countdown / remaining count), tested against 0 (func_59)",,high,community | reads: MSC lucario/auraball.mscsb func_59,m18[*].3
+,4,,0x02000004,0,0,0,0,f32,Firing angle (degrees),,medium,community | no read in the article MSC (native or unused),m18[*].4
+,5,,0x02000005,1,0.5,2.1,1.4,f32,Min projectile speed,,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,2.5,0.2,3.8,3.2,f32,Max projectile speed,,medium,community | no read in the article MSC (native or unused),m18[*].6
+,7,,0x12000007,0x6,0x1E,0x6,0x6,u32,?,,medium,community | no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,8,0.8,8,8,f32,?,,medium,community | no read in the article MSC (native or unused),m18[*].8
+,9,,0x02000009,0.5,0.4,0,0.5,f32,Non charged projectile randomness,,medium,community | no read in the article MSC (native or unused),m18[*].9
+,10,,0x0200000A,0.2,0.2,0,0.2,f32,Fully-charged projectile randomness,,medium,community | no read in the article MSC (native or unused),m18[*].10
+,11,,0x0200000B,3.5,3.5,3.5,3.5,f32,,,,no read in the article MSC (native or unused),m18[*].11
+,12,,0x0200000C,1,3,1,1,f32,,,,no read in the article MSC (native or unused),m18[*].12
+,13,,0x0200000D,4,4.5,2.4,4,f32,,,,no read in the article MSC (native or unused),m18[*].13
+,14,,0x0200000E,20,20,20,20,f32,,,,no read in the article MSC (native or unused),m18[*].14
+,15,,0x1200000F,0x0,0x1,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m18[*].15
 19,0,Down B,,-4,,,,f32,Counter trigger bubble X offset,,medium,community,m19[0].0
 ,1,,,0,,,,f32,Counter trigger bubble Y offset,,medium,community,m19[0].1
 ,2,,,0,,,,f32,Counter trigger bubble Z offset,,medium,community,m19[0].2
@@ -66,34 +66,34 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,1,,,0.6,,,,f32,,,,,m20[0].1
 ,2,,,1.2,,,,f32,,,,,m20[0].2
 ,3,,,1.6,,,,f32,,,,,m20[0].3
-21,0,Aura physics,,0.9,,,,f32,Aura floor multiplier,,medium,community,m21[0].0
-,1,,,1.9,,,,f32,Aura ceiling multiplier,,medium,community,m21[0].1
+21,0,Aura physics,,0.66,,,,f32,Aura floor multiplier,,medium,community,m21[0].0
+,1,,,1.7,,,,f32,Aura ceiling multiplier,,medium,community,m21[0].1
 ,2,,,0,,,,f32,Aura floor percentage,Multiplier = 1.0 ＋ (% - 70) * (1.0 - 0.66) / (70 － 0）,medium,community,m21[0].2
-,3,,,60,,,,f32,Aura baseline percentage,Multiplier = 1.0 ＋ (% - 70) * (1.7 - 1.0) / (190 - 70）,medium,community,m21[0].3
-,4,,,180,,,,f32,Aura ceiling percentage,Multiplier = 1.7,medium,community,m21[0].4
+,3,,,70,,,,f32,Aura baseline percentage,Multiplier = 1.0 ＋ (% - 70) * (1.7 - 1.0) / (190 - 70）,medium,community,m21[0].3
+,4,,,190,,,,f32,Aura ceiling percentage,Multiplier = 1.7,medium,community,m21[0].4
 ,5,,,1,,,,f32,Flat Aura damage multiplier,,medium,community,m21[0].5
 ,6,,,1.8,,,,f32,Aura max multiplier,,medium,community,m21[0].6
-,7,,,0.9,,,,f32,Aura min multiplier,,medium,community,m21[0].7
+,7,,,0.6,,,,f32,Aura min multiplier,,medium,community,m21[0].7
 ,8,,,0.9,,,,f32,,,,,m21[0].8
 ,9,,,1.4,,,,f32,,,,,m21[0].9
 ,10,,,0,,,,f32,,,,,m21[0].10
 ,11,,,84,,,,f32,,,,,m21[0].11
 ,12,,,310,,,,f32,,,,,m21[0].12
-22,0,Aura physics2?,,0.9,,,,f32,Aura floor multiplier,,medium,community,m22[0].0
-,1,,,1.9,,,,f32,Aura ceiling multiplier,,medium,community,m22[0].1
+22,0,Aura physics2?,,0.66,,,,f32,Aura floor multiplier,,medium,community,m22[0].0
+,1,,,1.7,,,,f32,Aura ceiling multiplier,,medium,community,m22[0].1
 ,2,,,100,,,,f32,,,,,m22[0].2
 ,3,,,50,,,,f32,,,,,m22[0].3
 ,4,,,10,,,,f32,,,,,m22[0].4
 ,5,,,1.8,,,,f32,Aura max multiplier,,medium,community,m22[0].5
-,6,,,0.9,,,,f32,Aura min multiplier,,medium,community,m22[0].6
+,6,,,0.6,,,,f32,Aura min multiplier,,medium,community,m22[0].6
 ,7,,,0.9,,,,f32,,,,,m22[0].7
 ,8,,,1.4,,,,f32,,,,,m22[0].8
 ,9,,,100,,,,f32,,,,,m22[0].9
 ,10,,,45,,,,f32,,,,,m22[0].10
 ,11,,,8,,,,f32,,,,,m22[0].11
 23,0,"Side B
-(Projectile)",0x02000000,1.08,1,1.06,1.2,f32,Damage multiplier,,medium,community,m23[*].0
-,1,,0x02000001,1.12,0.8,1.3,1.1,f32,Size/GFX multiplier,,medium,community,m23[*].1
+(Projectile)",0x02000000,1.08,1,1.06,1.2,f32,Damage multiplier,,medium,community | no read in the article MSC (native or unused),m23[*].0
+,1,,0x02000001,1.12,0.8,1.3,1.1,f32,Size/GFX multiplier,,medium,community | no read in the article MSC (native or unused),m23[*].1
 24,0,,,0x2000005,,,,u32,0x02000005,Aura Sphere weapon param Name5?,medium,community,m24[0].0
 ,1,,,1,,,,f32,,,,,m24[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m24[0].2

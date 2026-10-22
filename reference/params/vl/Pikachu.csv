@@ -1,54 +1,54 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,6.5,6.5,6.5,6.5,f32,Grounded X offset,,medium,community,m12[*].0
-,1,,0x05000001,1,1,6,1,f32,Grounded Y offset,,medium,community,m12[*].1
-,2,,0x05000002,6.5,6.5,6.5,6.5,f32,Aerial X offset,,medium,community,m12[*].2
-,3,,0x05000003,1,1,1,1,f32,Aerial Y offset,,medium,community,m12[*].3
+13,0,Neutral B,0x05000000,6.5,6.5,6.5,6.5,f32,Grounded X offset,,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,1,1,6,1,f32,Grounded Y offset,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,6.5,6.5,6.5,6.5,f32,Aerial X offset,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,1,1,1,1,f32,Aerial Y offset,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
 ,4,,0x05000004,100,64,25,100,f32,Aerial lifetime (frames),"Only names 0-3 affect Thunderjolt.
-Names 4-8 are unused; Thunderjolt uses Group 18 for these",medium,community,m12[*].4
-,5,,0x05000005,-58,-58,-7,-58,f32,Aerial jolt angle (degrees),,medium,community,m12[*].5
-,6,,0x05000006,2,1.9,3,2,f32,Aerial jolt speed,,medium,community,m12[*].6
-,7,,0x05000007,84,33,5,100,f32,Grounded lifetime (frames),,medium,community,m12[*].7
-,8,,0x05000008,0.9,1,0,1,f32,Grounded jolt frame speed multiplier,,medium,community,m12[*].8
-14,0,Side B,0x06000000,7,5,3,7,f32,Minimum charge damage multiplier (this / 7),"Formula for charge damage multiplier:
+Names 4-8 are unused; Thunderjolt uses Group 18 for these",medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,-58,-58,-7,-58,f32,Aerial jolt angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,2,1.9,3,2,f32,Aerial jolt speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,84,33,5,100,f32,Grounded lifetime (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,0.9,1,0,1,f32,Grounded jolt frame speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+14,0,Side B,0x06000000,7,5,3,7,f32,Minimum charge damage multiplier (this / 7) -- code: AttackModule op 0x2728 (func_2287) [status 0x15B (SpecialS)],"Formula for charge damage multiplier:
 (1/7) * (Name0 + (Name1 - Name0) * (charge frames+1) / (Name2))
 
-charge frames+1 cannot exceed Name2",medium,community,m13[*].0
-,1,,0x06000001,25,10,15,25,f32,Maximum charge damage multiplier (this / 7),,medium,community,m13[*].1
-,2,,0x06000002,90,90,60,90,f32,Charge time (frames),,medium,community,m13[*].2
-,3,,0x06000003,20,20,20,20,f32,Initial charged frames of smash input,,medium,community,m13[*].3
-,4,,0x06000004,0.8,0.8,0.8,0.8,f32,H speed multiplier on startup,,medium,community,m13[*].4
-,5,,0x06000005,0.02,0.02,0.02,0.02,f32,H air friction during startup/charge,,medium,community,m13[*].5
-,6,,0x06000006,0.04,0.04,0.04,0.04,f32,Gravity during startup/charge,,medium,community,m13[*].6
-,7,,0x16000007,0xC,0xC,0xC,0xC,u32,Affects the amount of time after button release before Pikachu fires,,medium,community,m13[*].7
-,8,,0x06000008,1.6,1.4,4.2,1.6,f32,Base H firing speed,"H firing speed
- = Name8 + (Name9 - Name8) * ((charge frames + 1) / Name2)",medium,community,m13[*].8
-,9,,0x06000009,3.2,2.5,4.2,3.2,f32,Full charge H firing speed,,medium,community,m13[*].9
-,10,,0x0600000A,0.4,0.2,0.5,0.4,f32,Base V firing speed,"Initial V firing speed
- = Name10 + (Name11 - Name10) * ((charge frames + 1) / Name2)",medium,community,m13[*].10
-,11,,0x0600000B,0.7,0.3,0.5,0.8,f32,Full charge V firing speed,,medium,community,m13[*].11
-,12,,0x0600000C,0.024,0.01,0.024,0.024,f32,Gravity when firing,,medium,community,m13[*].12
-,13,,0x0600000D,1.1,0.02,1,1.1,f32,Max fall speed when firing,,medium,community,m13[*].13
-,14,,0x0600000E,0.7,0.6,1,0.6,f32,H speed multiplier for SpecialSEnd and SpecialAirSEnd,,medium,community,m13[*].14
-,15,,0x0600000F,0.02,0.02,0.03,0.02,f32,Base friction of SpecialSEnd,"Friction of SpecialSEnd
- = Name15 + Name16 * ((charge frames + 1) / Name2)",medium,community,m13[*].15
-,16,,0x06000010,0.08,0.1,0.03,0.08,f32,Max additional friction for SpecialSEnd,,medium,community,m13[*].16
-,17,,0x06000011,0.1,0.1,0.1,0.1,f32,Gravity during SpecialAirSEnd,,medium,community,m13[*].17
-15,0,Up B,0x17000000,0xA,0x8,0xA,0xA,u32,Delay before SpecialAirHiStart uses vertical acceleration (frames),"True = this + 1, V acceleration = 0.08 / 30, given in MSC",medium,community,m14[*].0
-,1,,0x07000001,0.5,0.5,0.5,0.5,f32,Sensitivity for choosing an angle,Detailed description by Ben Hall is here:,medium,community,m14[*].1
-,2,,0x07000002,11,10.5,15,7,f32,Base Segment speed,,medium,community,m14[*].2
-,3,,0x07000003,0,0,0,0,f32,Max additional Segment speed,This * control stick distance added to Base speed,medium,community,m14[*].3
-,4,,0x17000004,0x6,0x4,0x6,0x5,u32,Segment length duration (frames),,medium,community,m14[*].4
-,5,,0x17000005,0x37,0x37,0x37,0x37,u32,Max angle difference between segment and wall/ceiling to slide along it (degrees),"when set to 90 you can aim directly into a wall without stopping, but when set to 0, aiming anywhere into a wall stops the segment motion",medium,community,m14[*].5
-,6,,0x17000006,0x0,0x23,0x168,0x26,u32,Min angle change requirement for second segment (degrees),"must be >, not ≥",medium,community,m14[*].6
-,7,,0x07000007,0.9,0.9,0.9,0.9,f32,Second segment speed multiplier,,medium,community,m14[*].7
-,8,,0x07000008,1.1,0.6,0.6,0.6,f32,H momentum preservation,,medium,community,m14[*].8
-,9,,0x07000009,1,0.4,0.4,0.4,f32,Air mobility,read when landing from air -> ground,medium,community,m14[*].9
-,10,,0x0700000A,24,24,24,24,f32,Landing lag (frames),,medium,community,m14[*].10
-16,0,Down B,0x08000000,1,0.8,0.8,0.8,f32,Grounded H speed multiplier on startup,,medium,community,m15[*].0
-,1,,0x08000001,0.85,0.6,0.8,0.8,f32,Aerial H speed multiplier on startup,,medium,community,m15[*].1
-,2,,0x08000002,0,0,15,15,f32,Cloud height (this * 10),,medium,community,m15[*].2
-,3,,0x08000003,0.66,0,0.66,0.66,f32,Initial V speed and max fall speed after aerial thunder hit,,medium,community,m15[*].3
-,4,,0x08000004,0.016,0,0.016,0.016,f32,Gravity on aerial thunder hit,,medium,community,m15[*].4
+charge frames+1 cannot exceed Name2",high,community | reads: MSC pikachu.mscsb func_2287,m13[*].0
+,1,,0x06000001,25,10,15,25,f32,Maximum charge damage multiplier (this / 7) -- code: AttackModule op 0x2728 (func_2287) [status 0x15B (SpecialS)],,high,community | reads: MSC pikachu.mscsb func_2287,m13[*].1
+,2,,0x06000002,90,90,60,90,f32,Charge time (frames) -- code: compared with status int 0x2 (a counter) (func_2265); stored in status float 0x6 (func_2285); stored in status int 0x3 (func_2285) [status 0x159; status 0x15A],,high,community | reads: MSC pikachu.mscsb func_2265; MSC pikachu.mscsb func_2285; MSC pikachu.mscsb func_2286; MSC pikachu.mscsb func_2287; +1 more,m13[*].2
+,3,,0x06000003,20,20,20,20,f32,"Initial charged frames of smash input -- code: stored in status int 0x2, then counted up (func_2265); compared with a computed value (func_2284) [status 0x159]",,high,community | reads: MSC pikachu.mscsb func_2284,m13[*].3
+,4,,0x06000004,0.8,0.8,0.8,0.8,f32,H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop) (func_2283) [status 0x153],,high,community | reads: MSC pikachu.mscsb func_2283,m13[*].4
+,5,,0x06000005,0.02,0.02,0.02,0.02,f32,"H air friction during startup/charge -- code: KineticModule op 0xF (sets an acceleration) on energy 3 (stop), with the facing direction (func_2283) [status 0x153]",,high,community | reads: MSC pikachu.mscsb func_2283,m13[*].5
+,6,,0x06000006,0.04,0.04,0.04,0.04,f32,Gravity during startup/charge -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2283) [status 0x153],,high,community | reads: MSC pikachu.mscsb func_2283,m13[*].6
+,7,,0x16000007,0xC,0xC,0xC,0xC,u32,"Affects the amount of time after button release before Pikachu fires -- code: stored in status int 0x3, then decremented in func_2270 (a countdown / remaining count), tested against 0 (func_2285) [status 0x15A]",,high,community | reads: MSC pikachu.mscsb func_2285,m13[*].7
+,8,,0x06000008,1.6,1.4,4.2,1.6,f32,"Base H firing speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2286) [status 0x15B (SpecialS)]","H firing speed
+ = Name8 + (Name9 - Name8) * ((charge frames + 1) / Name2)",high,community | reads: MSC pikachu.mscsb func_2286,m13[*].8
+,9,,0x06000009,3.2,2.5,4.2,3.2,f32,"Full charge H firing speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2286) [status 0x15B (SpecialS)]",,high,community | reads: MSC pikachu.mscsb func_2286,m13[*].9
+,10,,0x0600000A,0.4,0.2,0.5,0.4,f32,"Base V firing speed -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2286) [status 0x15B (SpecialS)]","Initial V firing speed
+ = Name10 + (Name11 - Name10) * ((charge frames + 1) / Name2)",high,community | reads: MSC pikachu.mscsb func_2286,m13[*].10
+,11,,0x0600000B,0.7,0.3,0.5,0.8,f32,"Full charge V firing speed -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2286) [status 0x15B (SpecialS)]",,high,community | reads: MSC pikachu.mscsb func_2286,m13[*].11
+,12,,0x0600000C,0.024,0.01,0.024,0.024,f32,"Gravity when firing -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2287) [status 0x15B (SpecialS)]",,high,community | reads: MSC pikachu.mscsb func_2287,m13[*].12
+,13,,0x0600000D,1.1,0.02,1,1.1,f32,Max fall speed when firing -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2287) [status 0x15B (SpecialS)],,high,community | reads: MSC pikachu.mscsb func_2287,m13[*].13
+,14,,0x0600000E,0.7,0.6,1,0.6,f32,"H speed multiplier for SpecialSEnd and SpecialAirSEnd -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2288) [status 0x15C]",,high,community | reads: MSC pikachu.mscsb func_2288,m13[*].14
+,15,,0x0600000F,0.02,0.02,0.03,0.02,f32,"Base friction of SpecialSEnd -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2289) [status 0x15C]","Friction of SpecialSEnd
+ = Name15 + Name16 * ((charge frames + 1) / Name2)",high,community | reads: MSC pikachu.mscsb func_2289,m13[*].15
+,16,,0x06000010,0.08,0.1,0.03,0.08,f32,"Max additional friction for SpecialSEnd -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2289) [status 0x15C]",,high,community | reads: MSC pikachu.mscsb func_2289,m13[*].16
+,17,,0x06000011,0.1,0.1,0.1,0.1,f32,"Gravity during SpecialAirSEnd -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2289) [status 0x15C]",,high,community | reads: MSC pikachu.mscsb func_2289,m13[*].17
+15,0,Up B,0x17000000,0xA,0x8,0xA,0xA,u32,"Delay before SpecialAirHiStart uses vertical acceleration (frames) -- code: stored in status int 0x4 (func_2303) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]","True = this + 1, V acceleration = 0.08 / 30, given in MSC",medium,community | reads: MSC pikachu.mscsb func_2303,m14[*].0
+,1,,0x07000001,0.5,0.5,0.5,0.5,f32,"Sensitivity for choosing an angle -- code: compared with a computed value (func_2305) [status 0x157 (specialairhi1, specialairhi2); status 0x158 (SpecialHiEnd, SpecialAirHiEnd)]",Detailed description by Ben Hall is here:,medium,community | reads: MSC pikachu.mscsb func_2305; MSC pikachu.mscsb func_2312,m14[*].1
+,2,,0x07000002,11,10.5,15,7,f32,"Base Segment speed -- code: KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), argument 2, with the facing direction (func_2305) [status 0x157 (specialairhi1, specialairhi2)]",,high,community | reads: MSC pikachu.mscsb func_2305,m14[*].2
+,3,,0x07000003,0,0,0,0,f32,"Max additional Segment speed -- code: KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), argument 2, with the facing direction (func_2305) [status 0x157 (specialairhi1, specialairhi2)]",This * control stick distance added to Base speed,high,community | reads: MSC pikachu.mscsb func_2305,m14[*].3
+,4,,0x17000004,0x5,0x4,0x6,0x5,u32,"Segment length duration (frames) -- code: stored in status int 0x3, then decremented in func_2297 (a countdown / remaining count), tested against 0 (func_2295) [status 0x157 (specialairhi1, specialairhi2)]",,high,community | reads: MSC pikachu.mscsb func_2295,m14[*].4
+,5,,0x17000005,0x37,0x37,0x37,0x37,u32,"Max angle difference between segment and wall/ceiling to slide along it (degrees) -- code: compared with a computed value (func_2308) [status 0x157 (specialairhi1, specialairhi2)]","when set to 90 you can aim directly into a wall without stopping, but when set to 0, aiming anywhere into a wall stops the segment motion",medium,community | reads: MSC pikachu.mscsb func_2308,m14[*].5
+,6,,0x17000006,0x23,0x23,0x168,0x26,u32,"Min angle change requirement for second segment (degrees) -- code: compared with a computed value (func_2312) [status 0x158 (SpecialHiEnd, SpecialAirHiEnd)]","must be >, not ≥",medium,community | reads: MSC pikachu.mscsb func_2312,m14[*].6
+,7,,0x07000007,0.9,0.9,0.9,0.9,f32,"Second segment speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), argument 2 (func_2305); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), argument 2, with the facing direction (func_2305) [status 0x157 (specialairhi1, specialairhi2)]",,high,community | reads: MSC pikachu.mscsb func_2305,m14[*].7
+,8,,0x07000008,0.6,0.6,0.6,0.6,f32,"H momentum preservation -- code: KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal) (func_2311) [status 0x158 (SpecialHiEnd, SpecialAirHiEnd)]",,medium,community | reads: MSC pikachu.mscsb func_2311,m14[*].8
+,9,,0x07000009,0.4,0.4,0.4,0.4,f32,"Air mobility -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2313) [status 0x158 (SpecialHiEnd, SpecialAirHiEnd)]",read when landing from air -> ground,medium,community | reads: MSC pikachu.mscsb func_2313,m14[*].9
+,10,,0x0700000A,24,24,24,24,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2313) [status 0x158 (SpecialHiEnd, SpecialAirHiEnd)]",,high,community | reads: MSC pikachu.mscsb func_2313,m14[*].10
+16,0,Down B,0x08000000,1,0.8,0.8,0.8,f32,"Grounded H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2315) [status 0x155]",,high,community | reads: MSC pikachu.mscsb func_2315,m15[*].0
+,1,,0x08000001,0.85,0.6,0.8,0.8,f32,"Aerial H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2315) [status 0x155]",,high,community | reads: MSC pikachu.mscsb func_2315,m15[*].1
+,2,,0x08000002,10.5,0,15,15,f32,Cloud height (this * 10),,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,0.66,0,0.66,0.66,f32,Initial V speed and max fall speed after aerial thunder hit -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2326); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2326); KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2326) [status 0x15D],,high,community | reads: MSC pikachu.mscsb func_2326,m15[*].3
+,4,,0x08000004,0.016,0,0.016,0.016,f32,"Gravity on aerial thunder hit -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2326) [status 0x15D]",,high,community | reads: MSC pikachu.mscsb func_2326,m15[*].4
 ,0,Final Smash,0x04000000,12,,,,f32,Number of seconds of Final Smash,,medium,community | reads: native 0x02F4BB54 (fn 0x02F4BA60),m16.0
 ,1,,0x04000001,3.6,,,,f32,Max H speed of Final Smash center point,,medium,community | reads: native 0x027BDF08 (fn 0x027BDE30),m16.1
 ,2,,0x04000002,3.4,,,,f32,Max V speed of Final Smash center point,,medium,community | reads: native 0x027BDF28 (fn 0x027BDE30),m16.2
@@ -57,25 +57,25 @@ charge frames+1 cannot exceed Name2",medium,community,m13[*].0
 17,0,Crawl,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
 ,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17[0].1
 18,0,"Thunder Jolt
-(Projectile)",0x02000000,100,64,25,100,f32,Aerial lifetime (frames),Actual value is 2 frames less,medium,community,m18[*].0
-,1,,0x02000001,-1.01229,-1.01229,-0.122173,-1.01229,f32,Aerial jolt angle (radians),"Equal to -58, -58, -7 degrees.",medium,community,m18[*].1
-,2,,0x02000002,2,1.9,3,2,f32,Aerial jolt speed,,medium,community,m18[*].2
-,3,,0x02000003,84,33,5,100,f32,Grounded lifetime (frames),Actual value is 2 frames less,medium,community,m18[*].3
-,4,,0x02000004,0.9,1,0,1,f32,Grounded jolt frame speed multiplier,,medium,community,m18[*].4
+(Projectile)",0x02000000,100,64,25,100,f32,Aerial lifetime (frames),Actual value is 2 frames less,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,-1.01229,-1.01229,-0.122173,-1.01229,f32,Aerial jolt angle (radians),"Equal to -58, -58, -7 degrees.",medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,2,1.9,3,2,f32,Aerial jolt speed,,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,84,33,5,100,f32,Grounded lifetime (frames),Actual value is 2 frames less,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,0.9,1,0,1,f32,"Grounded jolt frame speed multiplier -- code: read in: func_24(0, 0, WorkModuleF(0, 0x2000004)); (func_49)",,medium,community | reads: MSC pikachu/dengeki.mscsb func_49,m18[*].4
 19,0,"Thunder
-(Projectile)",0x02000000,-4,0,-5,-5,f32,Vertical speed of thunder,A 2nd thunder spawns when after abs(int(speed / 32)) frames,medium,community,m19[*].0
-,1,,0x02000001,50,0,30,30,f32,Distance thunder travels to disappear (this * 10),,medium,community,m19[*].1
-,2,,0x02000002,8,0,9,9,f32,Distance thunder travels before it can collide with ground (this * 10),,medium,community,m19[*].2
-,3,,0x02000003,0,0,1.7,1.7,f32,Collision-detection-box size (this * 10),0 passes through Pikachu. Is this a sphere? Rectangle?,medium,community,m19[*].3
-20,0,Final Smash,0x02000000,1.3,,,,f32,Affects damage of Vortex (final smash electric ball),"""setPowerAddStatus"" (Brawl)",medium,community,m20[0].0
-,1,,0x02000001,-0.4,,,,f32,,"""setPowerSpeedStatus"" (Brawl)",,,m20[0].1
-,2,,0x02000002,0.5,,,,f32,H/V Acceleration of Vortex toward center point (1st phase),,medium,community,m20[0].2
-,3,,0x02000003,3.8,,,,f32,Max H/V speed of Vortex (1st phase),,medium,community,m20[0].3
-,4,,0x02000004,0.2,,,,f32,H/V Acceleration of Vortex toward center point (2nd phase),,medium,community,m20[0].4
-,5,,0x02000005,0.08,,,,f32,H/V Deceleration to new max air speed (2nd phase),,medium,community,m20[0].5
-,6,,0x02000006,2.2,,,,f32,Max H/V speed of Vortex (2nd phase),,medium,community,m20[0].6
-,7,,0x02000007,0.7,,,,f32,Vertical acceleration/speed multiplier (both phases),,medium,community,m20[0].7
-,8,,0x12000008,0x32,,,,u32,,"""status Discharge"" frames before entering ""status_Normal""?",,,m20[0].8
+(Projectile)",0x02000000,-4,0,-5,-5,f32,"Vertical speed of thunder -- code: read in: var1 = WorkModuleF(0, 0x2000000); (func_54)",A 2nd thunder spawns when after abs(int(speed / 32)) frames,medium,community | reads: MSC pikachu/cloud.mscsb func_54,m19[*].0
+,1,,0x02000001,30,0,30,30,f32,Distance thunder travels to disappear (this * 10),,medium,community | no read in the article MSC (native or unused),m19[*].1
+,2,,0x02000002,8,0,9,9,f32,Distance thunder travels before it can collide with ground (this * 10),,medium,community | no read in the article MSC (native or unused),m19[*].2
+,3,,0x02000003,1.7,0,1.7,1.7,f32,Collision-detection-box size (this * 10),0 passes through Pikachu. Is this a sphere? Rectangle?,medium,community | no read in the article MSC (native or unused),m19[*].3
+20,0,Final Smash,0x02000000,1.3,,,,f32,Affects damage of Vortex (final smash electric ball),"""setPowerAddStatus"" (Brawl)",medium,community | no read in the article MSC (native or unused),m20[0].0
+,1,,0x02000001,-0.4,,,,f32,,"""setPowerSpeedStatus"" (Brawl)",,no read in the article MSC (native or unused),m20[0].1
+,2,,0x02000002,0.5,,,,f32,H/V Acceleration of Vortex toward center point (1st phase),,medium,community | no read in the article MSC (native or unused),m20[0].2
+,3,,0x02000003,3.8,,,,f32,Max H/V speed of Vortex (1st phase),,medium,community | no read in the article MSC (native or unused),m20[0].3
+,4,,0x02000004,0.2,,,,f32,H/V Acceleration of Vortex toward center point (2nd phase),,medium,community | no read in the article MSC (native or unused),m20[0].4
+,5,,0x02000005,0.08,,,,f32,H/V Deceleration to new max air speed (2nd phase),,medium,community | no read in the article MSC (native or unused),m20[0].5
+,6,,0x02000006,2.2,,,,f32,Max H/V speed of Vortex (2nd phase),,medium,community | no read in the article MSC (native or unused),m20[0].6
+,7,,0x02000007,0.7,,,,f32,Vertical acceleration/speed multiplier (both phases),,medium,community | no read in the article MSC (native or unused),m20[0].7
+,8,,0x12000008,0x32,,,,u32,"code: stored in instance int 0x9, then decremented in func_57 (a countdown / remaining count), tested against 0 (func_55)","""status Discharge"" frames before entering ""status_Normal""?",medium,reads: MSC pikachu/vortex.mscsb func_55,m20[0].8
 ,0,,,0,,,,f32,,,,,m21.0
 ,1,,,20,,,,f32,Affects horizontal camera view area,"Set to 120, camera zooms out; more focused on left stage",medium,community,m21.1
 ,2,,,-20,,,,f32,Affects horizontal camera view area,"Set to -120, camera zooms out; more focused on right stage",medium,community,m21.2

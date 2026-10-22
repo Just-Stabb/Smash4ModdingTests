@@ -1,164 +1,164 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,0.6,0,0,0,f32,H speed multiplier on grounded startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].0
-,1,,0x05000001,0.4,0,0,0,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].1
-,2,,0x05000002,0.25,0,0,0,f32,V speed multiplier on aerial startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].2
-,3,,0x05000003,0.03,0,0,0,f32,Gravity on startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].3
-,4,,0x05000004,1.4,0,0,0,f32,Max fall speed on startup,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4081",m12[*].4
-,5,,0x15000005,0x2,0x0,0x0,0x0,u32,Number of times of button input to repeat firing animation,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4090",m12[*].5
-,6,,0x15000006,0x3,0x0,0x0,0x0,u32,Max number of times of repeat firing animation,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4089",m12[*].6
-,7,,0x05000007,0.03,0,0,0,f32,Gravity on firing,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4094",m12[*].7
-,8,,0x05000008,1.4,0,0,0,f32,Max fall speed on firing,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4094",m12[*].8
-,9,,0x05000009,1,0,0,0,f32,Animation speed multiplier after firing,,medium,community,m12[*].9
-,10,,0x0500000A,0,0,0,0,f32,,X?,,,m12[*].10
-,11,,0x0500000B,5,0,0,0,f32,,Y?,,,m12[*].11
-,12,,0x0500000C,6,0,0,0,f32,,Z?,,,m12[*].12
-,13,,0x0500000D,0,0,0,0,f32,,X?,,,m12[*].13
-,14,,0x0500000E,7,0,0,0,f32,,Y?,,,m12[*].14
-,15,,0x0500000F,3,0,0,0,f32,,Z?,,,m12[*].15
-,16,,0x05000010,0,0,0,0,f32,,X?,,,m12[*].16
-,17,,0x05000011,11,0,0,0,f32,,Y?,,,m12[*].17
-,18,,0x05000012,2,0,0,0,f32,,Z?,,,m12[*].18
-,19,,0x05000013,0,0,0,0,f32,,X?,,,m12[*].19
-,20,,0x05000014,11,0,0,0,f32,,Y?,,,m12[*].20
-,21,,0x05000015,2,0,0,0,f32,,Z?,,,m12[*].21
+13,0,Neutral B,0x05000000,0.6,0,0,0,f32,"H speed multiplier on grounded startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2372) [status 0x152; status 0x15B]",,high,community | reads: MSC bayonetta.mscsb func_2372; MSC bayonetta.mscsb func_2385; MSC kirby.mscsb func_4081; MSC kirby.mscsb func_4094,m12[*].0
+,1,,0x05000001,0.4,0,0,0,f32,"H speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2372) [status 0x152; status 0x249]",,high,community | reads: MSC bayonetta.mscsb func_2372; MSC kirby.mscsb func_4081,m12[*].1
+,2,,0x05000002,0.25,0,0,0,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2372) [status 0x152; status 0x249]",,high,community | reads: MSC bayonetta.mscsb func_2372; MSC kirby.mscsb func_4081,m12[*].2
+,3,,0x05000003,0.03,0,0,0,f32,Gravity on startup -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2370) [status 0x152; status 0x15A],,high,community | reads: MSC bayonetta.mscsb func_2370; MSC bayonetta.mscsb func_2372; MSC bayonetta.mscsb func_2378; MSC kirby.mscsb func_4081; +1 more,m12[*].3
+,4,,0x05000004,1.4,0,0,0,f32,Max fall speed on startup -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2370); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2370) [status 0x152; status 0x15A],,high,community | reads: MSC bayonetta.mscsb func_2370; MSC bayonetta.mscsb func_2372; MSC bayonetta.mscsb func_2378; MSC kirby.mscsb func_4081; +1 more,m12[*].4
+,5,,0x15000005,0x2,0x0,0x0,0x0,u32,Number of times of button input to repeat firing animation -- code: compared with status int 0x5 (a counter) (func_2381) [status 0x15B; status 0x24B],,high,community | reads: MSC bayonetta.mscsb func_2381; MSC kirby.mscsb func_4090,m12[*].5
+,6,,0x15000006,0x3,0x0,0x0,0x0,u32,"Max number of times of repeat firing animation -- code: stored in status int 0x4, then decremented in func_2381 (a countdown / remaining count), tested against 0 (func_2380); stored in status int 0x4, then decremented in func_4090 (a countdown / remaining count), tested against 0 (func_4089) [status 0x15B; status 0x24B]",,high,community | reads: MSC bayonetta.mscsb func_2380; MSC kirby.mscsb func_4089,m12[*].6
+,7,,0x05000007,0.03,0,0,0,f32,Gravity on firing -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2383) [status 0x15B; status 0x24B],,high,community | reads: MSC bayonetta.mscsb func_2383; MSC bayonetta.mscsb func_2385; MSC kirby.mscsb func_4094,m12[*].7
+,8,,0x05000008,1.4,0,0,0,f32,Max fall speed on firing -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2383); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2383) [status 0x15B; status 0x24B],,high,community | reads: MSC bayonetta.mscsb func_2383; MSC bayonetta.mscsb func_2385; MSC kirby.mscsb func_4094,m12[*].8
+,9,,0x05000009,1,0,0,0,f32,"Animation speed multiplier after firing -- code: stored in status float 0x6, then combined with status int 0x2; combined with status int 0x3 (func_2369) (func_2387); combined with status float 0x8 (func_2387) [status 0x15C]",,medium,community | reads: MSC bayonetta.mscsb func_2387,m12[*].9
+,10,,0x0500000A,0,0,0,0,f32,,X?,,no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,5,0,0,0,f32,,Y?,,no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,6,0,0,0,f32,,Z?,,no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,0,0,0,0,f32,,X?,,no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x0500000E,7,0,0,0,f32,,Y?,,no read in the vanilla MSC (native or unused),m12[*].14
+,15,,0x0500000F,3,0,0,0,f32,,Z?,,no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,0,0,0,0,f32,,X?,,no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,11,0,0,0,f32,,Y?,,no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x05000012,2,0,0,0,f32,,Z?,,no read in the vanilla MSC (native or unused),m12[*].18
+,19,,0x05000013,0,0,0,0,f32,,X?,,no read in the vanilla MSC (native or unused),m12[*].19
+,20,,0x05000014,11,0,0,0,f32,,Y?,,no read in the vanilla MSC (native or unused),m12[*].20
+,21,,0x05000015,2,0,0,0,f32,,Z?,,no read in the vanilla MSC (native or unused),m12[*].21
 14,0,Side B,0x06000000,1,0,0,0,f32,Grounded H speed multiplier on Heel Slide startup,,medium,community | reads: native 0x02779A6C (fn 0x02779958),m13[*].0
-,1,,0x06000001,0.8,0,0,0,f32,Maximum H speed multiplier on uphill Heel Slide,Slope angle to reach to max is unknown.,medium,community,m13[*].1
-,2,,0x06000002,1.2,0,0,0,f32,Maximum H speed multiplier on downhill Heel Slide,,medium,community,m13[*].2
-,3,,0x06000003,0.2,0,0,0,f32,H speed multiplier if next action is DamageFall??,script_2393,medium,community,m13[*].3
-,4,,0x16000004,0x18,0x0,0x0,0x0,u32,FAF after hitting opponents with Heel Slide,,medium,community,m13[*].4
-,5,,0x06000005,0.3,0,0,0,f32,H speed multiplier after hitting opponents with Heel Slide,,medium,community,m13[*].5
-,6,,0x06000006,1,0,0,0,f32,Speed multiplier on Heel Slide Bullet Arts startup,,medium,community,m13[*].6
+,1,,0x06000001,0.8,0,0,0,f32,Maximum H speed multiplier on uphill Heel Slide,Slope angle to reach to max is unknown.,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,1.2,0,0,0,f32,Maximum H speed multiplier on downhill Heel Slide,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,0.2,0,0,0,f32,"H speed multiplier if next action is DamageFall?? -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_2393); combined with a current speed (KineticModuleF) (func_2393) [status 0x153 (SpecialS)]",script_2393,high,community | reads: MSC bayonetta.mscsb func_2393,m13[*].3
+,4,,0x16000004,0x21,0x0,0x0,0x0,u32,FAF after hitting opponents with Heel Slide,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,0.3,0,0,0,f32,"H speed multiplier after hitting opponents with Heel Slide -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_2393); combined with a current speed (KineticModuleF) (func_2393) [status 0x153 (SpecialS)]",,high,community | reads: MSC bayonetta.mscsb func_2393,m13[*].5
+,6,,0x06000006,1,0,0,0,f32,Speed multiplier on Heel Slide Bullet Arts startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
 ,7,,0x06000007,0.92,0,0,0,f32,Amount of animation movement multiplier for uABK,,medium,community | reads: native 0x02779BEC (fn 0x02779B88),m13[*].7
 ,8,,0x06000008,-16,0,0,0,f32,uABK animation rotation angle (degrees),,medium,community | reads: native 0x0277938C (fn 0x027792D0),m13[*].8
-,9,,0x16000009,0x16,0x0,0x0,0x0,u32,Stick down > dABK input window (frames),Sensitivity?,medium,community,m13[*].9
-,10,,0x0600000A,0.6,0,0,0,f32,H speed multiplier on uABK Bullet Arts startup,,medium,community,m13[*].10
-,11,,0x0600000B,0.09,0,0,0,f32,H decel on uABK Bullet Arts,,medium,community,m13[*].11
-,12,,0x0600000C,0.2,0,0,0,f32,?,,medium,community,m13[*].12
-,13,,0x0600000D,0.9,0,0,0,f32,Initial V speed on uABK Bullet Arts,,medium,community,m13[*].13
-,14,,0x0600000E,0.07,0,0,0,f32,Gravity on uABK Bullet Arts,,medium,community,m13[*].14
-,15,,0x0600000F,-1.1,0,0,0,f32,?,,medium,community,m13[*].15
-,16,,0x16000010,0x14,0x0,0x0,0x0,u32,Landing lag after single uABK or WTw > uABK (frames),,medium,community,m13[*].16
-,17,,0x16000011,0x1E,0x0,0x0,0x0,u32,Landing lag after uABK > uABK (frames),,medium,community,m13[*].17
-,18,,0x16000012,0x14,0x0,0x0,0x0,u32,Related to dABK input window,,medium,community,m13[*].18
+,9,,0x16000009,0x16,0x0,0x0,0x0,u32,Stick down > dABK input window (frames) -- code: compared with the status frame counter (global9) (func_2400) [status 0x15E (SpecialAirSU)],Sensitivity?,high,community | reads: MSC bayonetta.mscsb func_2400,m13[*].9
+,10,,0x0600000A,0.6,0,0,0,f32,H speed multiplier on uABK Bullet Arts startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].10
+,11,,0x0600000B,0.09,0,0,0,f32,H decel on uABK Bullet Arts,,medium,community | no read in the vanilla MSC (native or unused),m13[*].11
+,12,,0x0600000C,0.2,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].12
+,13,,0x0600000D,0.9,0,0,0,f32,Initial V speed on uABK Bullet Arts,,medium,community | no read in the vanilla MSC (native or unused),m13[*].13
+,14,,0x0600000E,0.07,0,0,0,f32,Gravity on uABK Bullet Arts,,medium,community | no read in the vanilla MSC (native or unused),m13[*].14
+,15,,0x0600000F,-1.1,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].15
+,16,,0x16000010,0x14,0x0,0x0,0x0,u32,"Landing lag after single uABK or WTw > uABK (frames) -- code: read in: func_2354(WorkModule(0x6, 0x16000010), 0); (func_2401) [status 0x15E (SpecialAirSU)]",,medium,community | reads: MSC bayonetta.mscsb func_2401,m13[*].16
+,17,,0x16000011,0x1E,0x0,0x0,0x0,u32,"Landing lag after uABK > uABK (frames) -- code: read in: func_2354(WorkModule(0x6, 0x16000011), 0); (func_2401) [status 0x15E (SpecialAirSU)]",,medium,community | reads: MSC bayonetta.mscsb func_2401,m13[*].17
+,18,,0x16000012,0x14,0x0,0x0,0x0,u32,Related to dABK input window,,medium,community | no read in the vanilla MSC (native or unused),m13[*].18
 ,19,,0x06000013,1,0,0,0,f32,Amount of animation movement multiplier for dABK,,medium,community | reads: native 0x02779C18 (fn 0x02779B88),m13[*].19
-,20,,0x06000014,310,0,0,0,f32,dABK animation rotation angle (degrees),,medium,community,m13[*].20
+,20,,0x06000014,0,0,0,0,f32,dABK animation rotation angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m13[*].20
 ,21,,0x06000015,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x0277954C); meaning not traced,,low,reads: native 0x0277954C (fn 0x027794C4),m13[*].21
-,22,,0x06000016,2.9,0,0,0,f32,Initial V speed of SpecialAirSDHit,,medium,community,m13[*].22
-,23,,0x06000017,0.15,0,0,0,f32,Gravity after hitting on character / bouncing off walls with uABK / dABK?,,medium,community,m13[*].23
-,24,,0x06000018,1.5,0,0,0,f32,?,,medium,community,m13[*].24
-,25,,0x16000019,0x2,0x0,0x0,0x0,u32,?,script_2411,medium,community,m13[*].25
+,22,,0x06000016,3.4,0,0,0,f32,Initial V speed of SpecialAirSDHit,,medium,community | no read in the vanilla MSC (native or unused),m13[*].22
+,23,,0x06000017,0.15,0,0,0,f32,Gravity after hitting on character / bouncing off walls with uABK / dABK?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].23
+,24,,0x06000018,1.5,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].24
+,25,,0x16000019,0x2,0x0,0x0,0x0,u32,? -- code: compared with status int 0x2 (a counter) (func_2411) [status 0x160 (SpecialAirSDHit)],script_2411,medium,community | reads: MSC bayonetta.mscsb func_2411,m13[*].25
 ,26,,0x0600001A,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x02779CF4); meaning not traced,,low,reads: native 0x02779CF4 (fn 0x02779C60),m13[*].26
-,27,,0x0600001B,0,0,0,0,f32,,,,,m13[*].27
-,28,,0x0600001C,0.03,0,0,0,f32,H accel on SpecialAirSDHit,,medium,community,m13[*].28
-,29,,0x0600001D,1.45,0,0,0,f32,Max airspeed on SpecialAirSDHit,,medium,community,m13[*].29
-,30,,0x0600001E,1,0,0,0,f32,?,,medium,community,m13[*].30
-,31,,0x1600001F,0x1E,0x0,0x0,0x0,u32,Landing lag on SpecialAirSDHit or SpecialAirSDHit > WTw/aerial attacks/airdodge (frames),,medium,community,m13[*].31
-,32,,0x16000020,0x28,0x0,0x0,0x0,u32,Landing lag on ABKs > SpecialAirSDHit > SpecialAirSDLanding (frames),,medium,community,m13[*].32
-,33,,0x16000021,0x1E,0x0,0x0,0x0,u32,Landing lag on SpecialAirSDLanding (frames),,medium,community,m13[*].33
-,34,,0x16000022,0x28,0x0,0x0,0x0,u32,Landing lag on ABKs > SpecialAirSDLanding (frames),,medium,community,m13[*].34
-,35,,0x16000023,0x3C,0x0,0x0,0x0,u32,End of SpecialAirSU/SpecialAirDHit > second ABKs input window (frames),,medium,community,m13[*].35
-,36,,0x16000024,0x3,0x0,0x0,0x0,u32,First ABKs actable frame after ground jump,,medium,community,m13[*].36
-15,0,Up B,0x07000000,0.8,0,0,0,f32,H speed multiplier on grounded startup,,medium,community,m14[*].0
-,1,,0x07000001,0.5,0,0,0,f32,H speed multiplier on aerial startup,,medium,community,m14[*].1
-,2,,0x07000002,0.5,0,0,0,f32,V speed multiplier on aerial startup,,medium,community,m14[*].2
-,3,,0x07000003,0.03,0,0,0,f32,Gravity on startup,,medium,community,m14[*].3
-,4,,0x07000004,0.4,0,0,0,f32,Max fall speed on startup,,medium,community,m14[*].4
+,27,,0x0600001B,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].27
+,28,,0x0600001C,0.025,0,0,0,f32,H accel on SpecialAirSDHit,,medium,community | no read in the vanilla MSC (native or unused),m13[*].28
+,29,,0x0600001D,0.7,0,0,0,f32,Max airspeed on SpecialAirSDHit,,medium,community | no read in the vanilla MSC (native or unused),m13[*].29
+,30,,0x0600001E,1,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].30
+,31,,0x1600001F,0x1E,0x0,0x0,0x0,u32,"Landing lag on SpecialAirSDHit or SpecialAirSDHit > WTw/aerial attacks/airdodge (frames) -- code: read in: func_2354(WorkModule(0x6, 0x1600001f), 0); (func_2405) [status 0x15F (SpecialAirSD)]",,medium,community | reads: MSC bayonetta.mscsb func_2405,m13[*].31
+,32,,0x16000020,0x28,0x0,0x0,0x0,u32,"Landing lag on ABKs > SpecialAirSDHit > SpecialAirSDLanding (frames) -- code: read in: func_2354(WorkModule(0x6, 0x16000020), 0); (func_2405) [status 0x15F (SpecialAirSD)]",,medium,community | reads: MSC bayonetta.mscsb func_2405,m13[*].32
+,33,,0x16000021,0x1E,0x0,0x0,0x0,u32,"Landing lag on SpecialAirSDLanding (frames) -- code: read in: func_2354(WorkModule(0x6, 0x16000021), 0); (func_2405) [status 0x15F (SpecialAirSD)]",,medium,community | reads: MSC bayonetta.mscsb func_2405,m13[*].33
+,34,,0x16000022,0x28,0x0,0x0,0x0,u32,"Landing lag on ABKs > SpecialAirSDLanding (frames) -- code: read in: func_2354(WorkModule(0x6, 0x16000022), 0); (func_2405) [status 0x15F (SpecialAirSD)]",,medium,community | reads: MSC bayonetta.mscsb func_2405,m13[*].34
+,35,,0x16000023,0x3C,0x0,0x0,0x0,u32,End of SpecialAirSU/SpecialAirDHit > second ABKs input window (frames),,medium,community | no read in the vanilla MSC (native or unused),m13[*].35
+,36,,0x16000024,0x3,0x0,0x0,0x0,u32,First ABKs actable frame after ground jump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].36
+15,0,Up B,0x07000000,0.8,0,0,0,f32,"H speed multiplier on grounded startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2426) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC bayonetta.mscsb func_2426,m14[*].0
+,1,,0x07000001,0.5,0,0,0,f32,"H speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2426) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC bayonetta.mscsb func_2426,m14[*].1
+,2,,0x07000002,0.5,0,0,0,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2426) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC bayonetta.mscsb func_2426,m14[*].2
+,3,,0x07000003,0.03,0,0,0,f32,"Gravity on startup -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2425) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC bayonetta.mscsb func_2425; MSC bayonetta.mscsb func_2426,m14[*].3
+,4,,0x07000004,0.4,0,0,0,f32,"Max fall speed on startup -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2425); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2425) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC bayonetta.mscsb func_2425; MSC bayonetta.mscsb func_2426,m14[*].4
 ,5,,0x07000005,1.3,0,0,0,f32,Grounded height multiplier,,medium,community | reads: native 0x02779F84 (fn 0x02779F1C),m14[*].5
-,6,,0x07000006,1.4,0,0,0,f32,Aerial height multiplier on first Witch Twist,,medium,community,m14[*].6
-,7,,0x07000007,1.25,0,0,0,f32,Aerial height multiplier on second Witch Twist,,medium,community,m14[*].7
-,8,,0x17000008,0x12,0x0,0x0,0x0,u32,Landing lag after single WTw or ABKs > WTw (frames),,medium,community,m14[*].8
-,9,,0x17000009,0x19,0x0,0x0,0x0,u32,Landing lag after WTw > ABKs / aerials / airdodge (frames),,medium,community,m14[*].9
-,10,,0x1700000A,0x20,0x0,0x0,0x0,u32,Landing lag after WTw > WTw (frames),,medium,community,m14[*].10
-,11,,0x1700000B,0x2A,0x0,0x0,0x0,u32,Landing lag after double WTw + ABKs / aerials / airdodge (frames),,medium,community,m14[*].11
-,12,,0x0700000C,3,0,0,0,f32,Double jump > WTw input window to retain jump (frames),,medium,community,m14[*].12
-16,0,Down B,0x08000000,0.03,0,0,0,f32,Gravity,,medium,community,m15[*].0
-,1,,0x08000001,1,0,0,0,f32,Max fall speed,,medium,community,m15[*].1
-,2,,0x18000002,0x16,0x0,0x0,0x0,u32,Amount of frames Bayonetta is slowed down on successful Witch Time,,medium,community,m15[*].2
-,3,,0x18000003,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta,,medium,community,m15[*].3
-,4,,0x18000004,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta (Bat Within),,medium,community,m15[*].4
-,5,,0x18000005,0x2A,0x0,0x0,0x0,u32,Intangibility frames after activating Witch Time (True=1-62F),,medium,community,m15[*].5
-,6,,0x18000006,0x26,0x0,0x0,0x0,u32,,,,,m15[*].6
-,7,,0x18000007,0xF,0x0,0x0,0x0,u32,FAF after activating Witch Time (True=35F),if the value is higher than animation length then it's ignored and Bayo can act when animation ends,medium,community,m15[*].7
-,8,,0x18000008,0x8,0x0,0x0,0x0,u32,Slow down effect speed,,medium,community,m15[*].8
-,9,,0x08000009,180,0,0,0,f32,Base slowdown duration (frames),,medium,community,m15[*].9
-,10,,0x0800000A,75,0,0,0,f32,Penalty per use (frames),,medium,community,m15[*].10
-,11,,0x0800000B,20,0,0,0,f32,Additional penalty if Witch Time activates (frames),,medium,community,m15[*].11
-,12,,0x0800000C,20,0,0,0,f32,Min slowdown duration (frames),"this is checked after penalty is applied, not at the beginning of a stock in case this value is higher than base duration",medium,community,m15[*].12
-,13,,0x0800000D,0.1,0,0,0,f32,Additional slowdown duration (this * opponent's %),,medium,community,m15[*].13
-,14,,0x1800000E,0xF0,0x0,0x0,0x0,u32,Max slowdown duration (frames),,medium,community,m15[*].14
-,15,,0x0800000F,0.67,0,0,0,f32,Witch Time Bat Within slowdown duration multiplier,doesn't apply to Name 13,medium,community,m15[*].15
-,16,,0x08000010,0.06,0,0,0,f32,Recovery per frame,,medium,community,m15[*].16
-,17,,0x08000011,30,0,0,0,f32,Witch Time Bat Within animation duration (frames),FSM = (38 - Current_Animation_Frame + 1) / 30,medium,community,m15[*].17
-,18,,0x08000012,38,0,0,0,f32,Witch Time animation start frame after activating Bat Within With Time,,medium,community,m15[*].18
-,19,,0x08000013,0.5,0,0,0,f32,Smash attack charge frames multiplier when WT is active on an opponent,ex: full charge smash attack will deal damage equal to normal half charge,medium,community,m15[*].19
-,20,,0x08000014,1,0,0,0,f32,Slowdown duration multiplier,,medium,community,m15[*].20
-,0,Nair,0x14000000,0x4,,,,u32,Max number of Nair looping animations,script_2289,medium,community,m16.0
-,1,Uair,0x14000001,0xC,,,,u32,Max number of Uair looping animations,script_2289,medium,community,m16.1
-,2,Fair,0x04000002,1.5,,,,f32,Fair1 initial V speed when hitting opponents,,medium,community,m16.2
-,3,,0x04000003,1.5,,,,f32,Fair2 initial V speed when hitting opponents,,medium,community,m16.3
-,4,,0x14000004,0x3,,,,u32,Number of Fair,script_2299,medium,community,m16.4
-,5,,0x04000005,30,,,,f32,Frame where the attack button stops being read for Fair2,,medium,community,m16.5
-,6,,0x04000006,30,,,,f32,Frame where the attack button stops being read for Fair3,,medium,community,m16.6
-,7,Dash Attack,0x04000007,0.8,,,,f32,Dash attack H speed multiplier when hitting opponents,,medium,community,m16.7
-,8,,0x14000008,0x4,,,,u32,Dash attack related,script_2279,medium,community,m16.8
-,9,Rose GFX,0x04000009,2,,,,f32,Rose GFX X/Y offset max randomness?,,medium,community,m16.9
-,10,,0x0400000A,0.7,,,,f32,Rose GFX X/Y offset min randomness?,,medium,community,m16.10
-,11,,0x0400000B,1.3,,,,f32,Rose GFX max size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community,m16.11
-,12,,0x0400000C,0.7,,,,f32,Rose GFX min size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community,m16.12
-,13,Unknown,0x1400000D,0x1E,,,,u32,,,,,m16.13
-,14,Bat Within,0x1400000E,0x19,,,,u32,Opponents slowdown duration when activates Bat Within (frames),,medium,community,m16.14
-,15,,0x1400000F,0x6,,,,u32,Opponents slowdown effect when activates Bat Within,,medium,community,m16.15
-,16,Witch Time,0x04000010,30,,,,f32,Witch Time slowdown hitbox size,,medium,community,m16.16
-,17,Bat Within,0x04000011,30,,,,f32,Spotdodge Bat Within animation duration,FSM = (24 - Current_Animation_Frame + 1) / 30,medium,community,m16.17
-,18,,0x04000012,24,,,,f32,Frame of spotdodge animation starts after Bat Within,,medium,community,m16.18
-,19,,0x04000013,30,,,,f32,Forward roll Bat Within animation duration,Uses JumpAerialF2 subaction,medium,community,m16.19
-,20,,0x04000014,26,,,,f32,Frame of forward roll animation starts after Bat Within,,medium,community,m16.20
-,21,,0x04000015,30,,,,f32,Backward roll Bat Within animation duration,Uses JumpAerialF3 subaction,medium,community,m16.21
-,22,,0x04000016,26,,,,f32,Frame of backward roll animation starts after Bat Within,,medium,community,m16.22
-,23,,0x04000017,30,,,,f32,Airdodge Bat Within animation duration,Uses JumpAerialF4 subaction,medium,community,m16.23
-,24,,0x04000018,25,,,,f32,Frame of airdodge animation starts after Bat Within,,medium,community,m16.24
+,6,,0x07000006,1.4,0,0,0,f32,Aerial height multiplier on first Witch Twist,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,1.25,0,0,0,f32,Aerial height multiplier on second Witch Twist,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x17000008,0x12,0x0,0x0,0x0,u32,"Landing lag after single WTw or ABKs > WTw (frames) -- code: read in: var1 = WorkModule(0x6, 0x17000008); (func_2420) [motions SpecialHi, SpecialAirHi]",,medium,community | reads: MSC bayonetta.mscsb func_2420,m14[*].8
+,9,,0x17000009,0x19,0x0,0x0,0x0,u32,"Landing lag after WTw > ABKs / aerials / airdodge (frames) -- code: read in: var1 = WorkModule(0x6, 0x17000009); (func_2420) [motions SpecialHi, SpecialAirHi]",community value differs: Default 0x1C (vanilla 0x19),medium,community | reads: MSC bayonetta.mscsb func_2420,m14[*].9
+,10,,0x1700000A,0x20,0x0,0x0,0x0,u32,"Landing lag after WTw > WTw (frames) -- code: read in: var1 = WorkModule(0x6, 0x1700000a); (func_2420) [motions SpecialHi, SpecialAirHi]",,medium,community | reads: MSC bayonetta.mscsb func_2420,m14[*].10
+,11,,0x1700000B,0x2A,0x0,0x0,0x0,u32,"Landing lag after double WTw + ABKs / aerials / airdodge (frames) -- code: read in: var1 = WorkModule(0x6, 0x1700000b); (func_2420) [motions SpecialHi, SpecialAirHi]",,medium,community | reads: MSC bayonetta.mscsb func_2420,m14[*].11
+,12,,0x0700000C,3,0,0,0,f32,Double jump > WTw input window to retain jump (frames) -- code: compared with the status frame counter (global9) (func_2304) [status 0xC; status 0xA4],,high,community | reads: MSC bayonetta.mscsb func_2304; MSC bayonetta.mscsb func_2306,m14[*].12
+16,0,Down B,0x08000000,0.03,0,0,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2329) [status 0x159; status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC bayonetta.mscsb func_2329; MSC bayonetta.mscsb func_2437; MSC bayonetta.mscsb func_2438,m15[*].0
+,1,,0x08000001,1,0,0,0,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2329); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2329) [status 0x159; status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC bayonetta.mscsb func_2329; MSC bayonetta.mscsb func_2437; MSC bayonetta.mscsb func_2438,m15[*].1
+,2,,0x18000002,0x16,0x0,0x0,0x0,u32,Amount of frames Bayonetta is slowed down on successful Witch Time,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x18000003,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x1E,0x0,0x0,0x0,u32,Amount of frames Witch Time visual effect is attached to Bayonetta (Bat Within),,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x18000005,0x2A,0x0,0x0,0x0,u32,Intangibility frames after activating Witch Time (True=1-62F),,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x18000006,0x26,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x18000007,0xF,0x0,0x0,0x0,u32,"FAF after activating Witch Time (True=35F) -- code: stored in status int 0x5 (func_2438) [status 0x155 (SpecialLw, SpecialAirLw)]",if the value is higher than animation length then it's ignored and Bayo can act when animation ends,medium,community | reads: MSC bayonetta.mscsb func_2438,m15[*].7
+,8,,0x18000008,0x8,0x0,0x0,0x0,u32,Slow down effect speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,180,0,0,0,f32,Base slowdown duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,75,0,0,0,f32,"Penalty per use (frames) -- code: stored in a work variable, then stored in status float 0x9; compared with a computed value (func_2438) (func_2438) [status 0x155 (SpecialLw, SpecialAirLw)]",,medium,community | reads: MSC bayonetta.mscsb func_2438,m15[*].10
+,11,,0x0800000B,20,0,0,0,f32,Additional penalty if Witch Time activates (frames),,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,20,0,0,0,f32,"Min slowdown duration (frames) -- code: stored in instance float 0x31, then stored in status float 0x9; compared with a computed value (func_2438) (func_2438); compared with instance float 0x31 (func_2438) [status 0x155 (SpecialLw, SpecialAirLw)]","this is checked after penalty is applied, not at the beginning of a stock in case this value is higher than base duration",medium,community | reads: MSC bayonetta.mscsb func_2438,m15[*].12
+,13,,0x0800000D,0.1,0,0,0,f32,Additional slowdown duration (this * opponent's %),,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x1800000E,0xF0,0x0,0x0,0x0,u32,Max slowdown duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x0800000F,0.67,0,0,0,f32,Witch Time Bat Within slowdown duration multiplier,doesn't apply to Name 13,medium,community | no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,0.06,0,0,0,f32,Recovery per frame,,medium,community | no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,30,0,0,0,f32,"Witch Time Bat Within animation duration (frames) -- code: stored in status int 0x4, then decremented in func_2323 (a countdown / remaining count), tested against 0 (func_2325) [status 0x159]",FSM = (38 - Current_Animation_Frame + 1) / 30,high,community | reads: MSC bayonetta.mscsb func_2315; MSC bayonetta.mscsb func_2325,m15[*].17
+,18,,0x08000012,38,0,0,0,f32,"Witch Time animation start frame after activating Bat Within With Time -- code: read in: var2 = WorkModuleF(0, 0x8000012); (func_2315)",,medium,community | reads: MSC bayonetta.mscsb func_2315,m15[*].18
+,19,,0x08000013,0.5,0,0,0,f32,"Smash attack charge frames multiplier when WT is active on an opponent -- code: stored in status float 0x0 (with status float 0x0), then AttackModule op 0x2728 (func_345) (func_2284) [status 0x96]",ex: full charge smash attack will deal damage equal to normal half charge,medium,community | reads: MSC bayonetta.mscsb func_2284; MSC bayonetta.mscsb func_2287,m15[*].19
+,20,,0x08000014,1,0,0,0,f32,Slowdown duration multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].20
+,0,Nair,0x14000000,0x4,,,,u32,"Max number of Nair looping animations -- code: stored in status int 0x6, then decremented in func_2294 (a countdown / remaining count), tested against 0 (func_2289) [status 0x34]",script_2289,high,community | reads: MSC bayonetta.mscsb func_2289,m16.0
+,1,Uair,0x14000001,0x4,,,,u32,"Max number of Uair looping animations -- code: stored in status int 0x6, then decremented in func_2294 (a countdown / remaining count), tested against 0 (func_2289) [status 0x34]",script_2289,high,community | reads: MSC bayonetta.mscsb func_2289,m16.1
+,2,Fair,0x04000002,1.5,,,,f32,Fair1 initial V speed when hitting opponents,,medium,community | no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,1.5,,,,f32,Fair2 initial V speed when hitting opponents,,medium,community | no read in the vanilla MSC (native or unused),m16.3
+,4,,0x14000004,0x3,,,,u32,"Number of Fair -- code: compared with a computed value (func_2299) [status 0x157 (AttackAirF2, AttackAirF3)]",script_2299,medium,community | reads: MSC bayonetta.mscsb func_2299,m16.4
+,5,,0x04000005,30,,,,f32,Frame where the attack button stops being read for Fair2,,medium,community | no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,30,,,,f32,Frame where the attack button stops being read for Fair3,,medium,community | no read in the vanilla MSC (native or unused),m16.6
+,7,Dash Attack,0x04000007,0.8,,,,f32,Dash attack H speed multiplier when hitting opponents,,medium,community | no read in the vanilla MSC (native or unused),m16.7
+,8,,0x14000008,0x4,,,,u32,Dash attack related -- code: stored in status int 0x4 (func_2279) [status 0x27],script_2279,medium,community | reads: MSC bayonetta.mscsb func_2279,m16.8
+,9,Rose GFX,0x04000009,2,,,,f32,Rose GFX X/Y offset max randomness?,,medium,community | no read in the vanilla MSC (native or unused),m16.9
+,10,,0x0400000A,0.7,,,,f32,Rose GFX X/Y offset min randomness?,,medium,community | no read in the vanilla MSC (native or unused),m16.10
+,11,,0x0400000B,1.3,,,,f32,Rose GFX max size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community | no read in the vanilla MSC (native or unused),m16.11
+,12,,0x0400000C,0.7,,,,f32,Rose GFX min size multiplier,"Based on hitbox damage, uses HipN bone?",medium,community | no read in the vanilla MSC (native or unused),m16.12
+,13,Unknown,0x1400000D,0x1E,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.13
+,14,Bat Within,0x1400000E,0x19,,,,u32,Opponents slowdown duration when activates Bat Within (frames),,medium,community | no read in the vanilla MSC (native or unused),m16.14
+,15,,0x1400000F,0x6,,,,u32,Opponents slowdown effect when activates Bat Within,,medium,community | no read in the vanilla MSC (native or unused),m16.15
+,16,Witch Time,0x04000010,30,,,,f32,Witch Time slowdown hitbox size,,medium,community | no read in the vanilla MSC (native or unused),m16.16
+,17,Bat Within,0x04000011,30,,,,f32,"Spotdodge Bat Within animation duration -- code: read in: var1 = WorkModuleF(0, 0x4000011); (func_2315) [status 0x158]",FSM = (24 - Current_Animation_Frame + 1) / 30,medium,community | reads: MSC bayonetta.mscsb func_2315; MSC bayonetta.mscsb func_2317,m16.17
+,18,,0x04000012,24,,,,f32,"Frame of spotdodge animation starts after Bat Within -- code: read in: var2 = WorkModuleF(0, 0x4000012); (func_2315)",,medium,community | reads: MSC bayonetta.mscsb func_2315,m16.18
+,19,,0x04000013,30,,,,f32,"Forward roll Bat Within animation duration -- code: read in: var1 = WorkModuleF(0, 0x4000013); (func_2315) [status 0x158]",Uses JumpAerialF2 subaction,medium,community | reads: MSC bayonetta.mscsb func_2315; MSC bayonetta.mscsb func_2317,m16.19
+,20,,0x04000014,26,,,,f32,"Frame of forward roll animation starts after Bat Within -- code: read in: var2 = WorkModuleF(0, 0x4000014); (func_2315)",,medium,community | reads: MSC bayonetta.mscsb func_2315,m16.20
+,21,,0x04000015,30,,,,f32,"Backward roll Bat Within animation duration -- code: read in: var1 = WorkModuleF(0, 0x4000015); (func_2315) [status 0x158]",Uses JumpAerialF3 subaction,medium,community | reads: MSC bayonetta.mscsb func_2315; MSC bayonetta.mscsb func_2317,m16.21
+,22,,0x04000016,26,,,,f32,"Frame of backward roll animation starts after Bat Within -- code: read in: var2 = WorkModuleF(0, 0x4000016); (func_2315)",,medium,community | reads: MSC bayonetta.mscsb func_2315,m16.22
+,23,,0x04000017,30,,,,f32,"Airdodge Bat Within animation duration -- code: stored in status int 0x4, then decremented in func_2323 (a countdown / remaining count), tested against 0 (func_2317) [status 0x158]",Uses JumpAerialF4 subaction,high,community | reads: MSC bayonetta.mscsb func_2315; MSC bayonetta.mscsb func_2317,m16.23
+,24,,0x04000018,25,,,,f32,"Frame of airdodge animation starts after Bat Within -- code: read in: var2 = WorkModuleF(0, 0x4000018); (func_2315)",,medium,community | reads: MSC bayonetta.mscsb func_2315,m16.24
 ,25,"Final Smash
-(and more?)",0x14000019,0x4,,,,u32,Final Smash slow down effect speed,,medium,community,m16.25
+(and more?)",0x14000019,0x4,,,,u32,Final Smash slow down effect speed,,medium,community | no read in the vanilla MSC (native or unused),m16.25
 ,26,,0x1400001A,0x1A4,,,,u32,Final Smash slow down effect duration (frames),,medium,community | reads: native 0x0276C4F4 (fn 0x0276C488); native 0x02771764 (fn 0x027716F4); native 0x02771ACC (fn 0x02771934); native 0x0277382C (fn 0x027736E8); +1 more,m16.26
 ,27,,0x0400001B,1,,,,f32,[auto] read by native code (get_float at 0x0276C2F4); meaning not traced,,low,reads: native 0x0276C2F4 (fn 0x0276C204),m16.27
-,28,,0x0400001C,2.2,,,,f32,,,,,m16.28
+,28,,0x0400001C,2.2,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.28
 ,29,,0x0400001D,12,,,,f32,[auto] read by native code (get_float at 0x0276CA84); meaning not traced,,low,reads: native 0x0276CA84 (fn 0x0276C830),m16.29
-,30,,0x0400001E,0.6,,,,f32,,,,,m16.30
-,31,,0x0400001F,1.7,,,,f32,,,,,m16.31
+,30,,0x0400001E,0.6,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.30
+,31,,0x0400001F,1.7,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.31
 ,32,,0x14000020,0xE,,,,u32,[auto] read by native code (get_int at 0x02774464); meaning not traced,,low,reads: native 0x02774464 (fn 0x02773E68); native 0x027744DC (fn 0x02773E68),m16.32
 ,33,,0x04000021,100,,,,f32,Min % to occur instance KO,,medium,community | reads: native 0x02775BC0 (fn 0x02775A4C),m16.33
 ,34,,0x04000022,100,,,,f32,[auto] read by native code (get_float at 0x02775B5C); meaning not traced,,low,reads: native 0x02775B5C (fn 0x02775A4C),m16.34
 ,35,,0x04000023,40,,,,f32,[auto] read by native code (get_float at 0x02775C58); meaning not traced,,low,reads: native 0x02775C58 (fn 0x02775C10),m16.35
 ,36,,0x04000024,45,,,,f32,[auto] read by native code (get_float at 0x02775C74); meaning not traced,,low,reads: native 0x02775C74 (fn 0x02775C10),m16.36
-,37,,0x04000025,10,,,,f32,,,,,m16.37
-,38,,0x04000026,5,,,,f32,,,,,m16.38
-,39,,0x14000027,0x1E,,,,u32,Min frames for transition to FinalVisualScene,"compared to variable 0x11000003, script_2340",medium,community,m16.39
-,40,,0x04000028,0.1,,,,f32,Frame speed multiplier,script_2339,medium,community,m16.40
-,41,,0x14000029,0x3,,,,u32,Final animation frame,script_2340,medium,community,m16.41
-,42,,0x1400002A,0xF,,,,u32,"related to Name43, camera related",script_2340,medium,community,m16.42
-,43,,0x0400002B,35,,,,f32,(45 / this),script_2340,medium,community,m16.43
-,44,,0x1400002C,0x14,,,,u32,Final animation frame,script_2340,medium,community,m16.44
-,45,,0x1400002D,0x14,,,,u32,Background overlay transition frames,script_2340,medium,community,m16.45
+,37,,0x04000025,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.37
+,38,,0x04000026,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.38
+,39,,0x14000027,0x1E,,,,u32,Min frames for transition to FinalVisualScene -- code: compared with status int 0x3 (a counter) (func_2340) [status 0x165],"compared to variable 0x11000003, script_2340",high,community | reads: MSC bayonetta.mscsb func_2340,m16.39
+,40,,0x04000028,0.1,,,,f32,Frame speed multiplier -- code: animation rate (MotionModule set rate) (func_2339) [status 0x165],script_2339,high,community | reads: MSC bayonetta.mscsb func_2339,m16.40
+,41,,0x14000029,0x3,,,,u32,Final animation frame -- code: compared with status int 0x3 (a counter) (func_2340) [status 0x165],script_2340,high,community | reads: MSC bayonetta.mscsb func_2340,m16.41
+,42,,0x1400002A,0xF,,,,u32,"related to Name43, camera related -- code: CameraModule op 0x2714 (func_2340) [status 0x165]",script_2340,medium,community | reads: MSC bayonetta.mscsb func_2340,m16.42
+,43,,0x0400002B,35,,,,f32,(45 / this) -- code: CameraModule op 0x2714 (func_2340) [status 0x165],script_2340,medium,community | reads: MSC bayonetta.mscsb func_2340,m16.43
+,44,,0x1400002C,0x14,,,,u32,Final animation frame -- code: compared with status int 0x3 (a counter) (func_2340) [status 0x165],script_2340,high,community | reads: MSC bayonetta.mscsb func_2340,m16.44
+,45,,0x1400002D,0x14,,,,u32,Background overlay transition frames -- code: EffectModule op 0x0 (func_2340) [status 0x165],script_2340,medium,community | reads: MSC bayonetta.mscsb func_2340,m16.45
 ,46,,0x1400002E,0xA,,,,u32,[auto] read by native code (get_int at 0x02772610); meaning not traced,,low,reads: native 0x02772610 (fn 0x027725D4),m16.46
-,47,,0x0400002F,3,,,,f32,,,,,m16.47
-,48,,0x04000030,4,,,,f32,,,,,m16.48
-,49,,0x04000031,-20,,,,f32,,,,,m16.49
-,50,,0x04000032,10,,,,f32,,,,,m16.50
-,51,,0x04000033,300,,,,f32,,,,,m16.51
-,52,,0x04000034,11,,,,f32,,,,,m16.52
-,53,,0x04000035,0,,,,f32,,,,,m16.53
-,54,,0x04000036,20,,,,f32,,,,,m16.54
-,55,,0x04000037,15,,,,f32,,,,,m16.55
-,56,,0x04000038,-3,,,,f32,,,,,m16.56
-,57,,0x04000039,-5,,,,f32,,,,,m16.57
-,58,,0x1400003A,0x8,,,,u32,,,,,m16.58
-,59,,0x1400003B,0x14,,,,u32,,,,,m16.59
-,60,,0x0400003C,1,,,,f32,,,,,m16.60
-,61,,0x0400003D,32,,,,f32,,,,,m16.61
-,62,,0x0400003E,32,,,,f32,,,,,m16.62
-,63,,0x0400003F,32,,,,f32,,,,,m16.63
-,64,,0x04000040,10,,,,f32,,,,,m16.64
-,65,,0x04000041,0,,,,f32,,,,,m16.65
+,47,,0x0400002F,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.47
+,48,,0x04000030,4,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.48
+,49,,0x04000031,-20,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.49
+,50,,0x04000032,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.50
+,51,,0x04000033,300,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.51
+,52,,0x04000034,11,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.52
+,53,,0x04000035,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.53
+,54,,0x04000036,20,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.54
+,55,,0x04000037,15,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.55
+,56,,0x04000038,-3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.56
+,57,,0x04000039,-5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.57
+,58,,0x1400003A,0x8,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.58
+,59,,0x1400003B,0x14,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.59
+,60,,0x0400003C,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.60
+,61,,0x0400003D,32,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.61
+,62,,0x0400003E,32,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.62
+,63,,0x0400003F,32,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.63
+,64,,0x04000040,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.64
+,65,,0x04000041,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.65
 17,0,,,0,,,,f32,,,,,m17[0].0
 ,1,,,0,,,,f32,,,,,m17[0].1
 ,2,,,0,,,,f32,,,,,m17[0].2
@@ -209,18 +209,18 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,0,0,180,0,f32,,,,,m19[*].4
 ,5,,,0,0,-90,90,f32,,,,,m19[*].5
 ,6,,,0,0,0,0,f32,,,,,m19[*].6
-22,0,,,18,0,0,0,f32,,,,,m20[*].0
-,1,,,0,0,0,0,f32,,,,,m20[*].1
-,2,,,2.6,0,0,0,f32,,,,,m20[*].2
-,3,,,0xB9,0x0,0x0,0x0,u32,,,,,m20[*].3
-,4,,,6,0,0,0,f32,,,,,m20[*].4
+22,0,,,6,0,0,0,f32,,,,,m20[*].0
+,1,,,6,0,0,0,f32,,,,,m20[*].1
+,2,,,15,0,0,0,f32,,,,,m20[*].2
+,3,,,0xA,0x0,0x0,0x0,u32,,,,,m20[*].3
+,4,,,1,0,0,0,f32,,,,,m20[*].4
 ,0,,,0x1,,,,u32,,,,,m21.0
 ,1,,,1,,,,f32,,,,,m21.1
 ,2,,,-1,,,,f32,,,,,m21.2
 ,3,,,1,,,,f32,,,,,m21.3
-23,0,,,0x2000004,,,,u32,,,,,m22[0].0
-,1,,,1,,,,f32,,,,,m22[0].1
-,2,,,2,,,,f32,,,,,m22[0].2
+23,0,,,0x2000004,,,,u32,,community value differs: Default 0x8 (vanilla 0x2000004),,,m22[0].0
+,1,,,1,,,,f32,,community value differs: Default 0x0 (vanilla 1),,,m22[0].1
+,2,,,2,,,,f32,,community value differs: Default 0 (vanilla 2),,,m22[0].2
 ,3,,,0,,,,f32,,,,,m22[0].3
 ,4,,,1,,,,f32,,,,,m22[0].4
 ,5,,,0,,,,f32,,,,,m22[0].5
@@ -266,8 +266,8 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,11,,,1,,,,f32,,,,,m23[2].11
 ,12,,,0,,,,f32,,,,,m23[2].12
 ,13,,,0,,,,f32,,,,,m23[2].13
-25,0,Article params (bat),0x02000000,0,0,0,0,f32,,,,,m24[*].0
-,1,,0x02000001,0,0,0,0,f32,,,,,m24[*].1
+25,0,Article params (bat),0x02000000,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m24[*].0
+,1,,0x02000001,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m24[*].1
 26,0,,,1,,,,f32,,,,,m25[0]
 ,1,,,0.75,,,,f32,,,,,m25[1]
 ,2,,,0.5,,,,f32,,,,,m25[2]

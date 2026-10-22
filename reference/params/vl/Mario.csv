@@ -1,25 +1,25 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
 13,0,Neutral B,0x15000000,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m12[*]
-14,0,Side B,0x06000000,2.5,1,1.5,2.5,f32,H speed divisor,,medium,community | reads: MSC mario.mscsb func_2263,m13[*].0
-,1,,0x06000001,0.0025,0.001,0.002,0.0025,f32,H air friction,,medium,community | reads: MSC mario.mscsb func_2263,m13[*].1
-,2,,0x06000002,0.3,0.2,0.6,0.7,f32,V speed for 1st aerial use,,medium,community | reads: MSC mario.mscsb func_2264,m13[*].2
-,3,,0x06000003,0.031,0.04,0.029,0.029,f32,Gravity for 1st aerial use,,medium,community | reads: MSC mario.mscsb func_2264,m13[*].3
-,4,,0x06000004,1,1.6,0.9,0.9,f32,Max fall speed,,medium,community | reads: MSC mario.mscsb func_2264,m13[*].4
-15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,Joystick backward sensitivity?,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].0
-,1,,0x07000001,0.5,0.5,0.5,0.5,f32,Joystick forward sensitivity?,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].1
-,2,,0x07000002,18,30,0,24,f32,Ability to angle (degrees),,medium,community | reads: MSC mario.mscsb func_2287,m14[*].2
-,3,,0x07000003,1,1,0.7,1,f32,[auto] copied to status work float 0x100000e,,low,reads: MSC mario.mscsb func_2287,m14[*].3
-,4,,0x07000004,1,1,0.7,1,f32,[auto] copied to status work float 0x100000f,,low,reads: MSC mario.mscsb func_2287,m14[*].4
-,5,,0x07000005,0.6,0.6,0.6,0.6,f32,Special fall aerial mobility,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].5
-,6,,0x17000006,0x1E,0x28,0x28,0x1E,u32,Landing lag (frames),,medium,community | reads: MSC mario.mscsb func_2287,m14[*].6
-,7,,0x07000007,1.1,1.65,0.7,1.35,f32,Grounded height multiplier,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].7
-,8,,0x07000008,0.67,0.5,0,0.67,f32,Initial H speed from moving stick forward during the jump,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].8
-,9,,0x07000009,0.5,0.5,0.005,0.7,f32,Gravity before the jump,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].9
-,10,,0x0700000A,1.08,1.55,0.7,1.25,f32,Aerial height multiplier,,medium,community | reads: MSC mario.mscsb func_2287,m14[*].10
-16,0,Down B,0x18000000,0x50,0x35,0x85,0x5A,u32,Time to fully charge (frames),,medium,community | reads: MSC mario.mscsb func_2266; MSC mario.mscsb func_2271; MSC mario.mscsb func_2275,m15[*].0
-,1,,0x18000001,0x46,0x1E,0x50,0x46,u32,Charge frames to use SpecialLwHeavy instead of SpecialLwLight,,medium,community | reads: MSC mario.mscsb func_2272,m15[*].1
-,2,,0x08000002,0.02,0,0.032,0,f32,Backward speed from firing gained per charge frame,affects aerial too,medium,community | reads: MSC mario.mscsb func_2275,m15[*].2
-,3,,0x18000003,0x1,0x1,0x1,0x1,u32,[auto] copied to fighter work int 0x10000084,,low,reads: MSC mario.mscsb func_2282,m15[*].3
+14,0,Side B,0x06000000,2.5,1,1.5,2.5,f32,"H speed divisor -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2263) [status 0x153 (SpecialS, SpecialAirS)]",community value differs: Custom2 2.5 (vanilla 1.5),high,community | reads: MSC mario.mscsb func_2263,m13[*].0
+,1,,0x06000001,0.0025,0.001,0.002,0.0025,f32,"H air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2263) [status 0x153 (SpecialS, SpecialAirS)]",community value differs: Custom2 0.0025 (vanilla 0.002),high,community | reads: MSC mario.mscsb func_2263,m13[*].1
+,2,,0x06000002,0.3,0.2,0.6,0.7,f32,"V speed for 1st aerial use -- code: read in: var0 = WorkModuleF(0, 0x6000002); (func_2264) [status 0x153 (SpecialS, SpecialAirS)]",community value differs: Custom2 0.7 (vanilla 0.6),medium,community | reads: MSC mario.mscsb func_2264,m13[*].2
+,3,,0x06000003,0.031,0.04,0.029,0.029,f32,"Gravity for 1st aerial use -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2264) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mario.mscsb func_2264,m13[*].3
+,4,,0x06000004,1,1.6,0.9,0.9,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2264) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mario.mscsb func_2264,m13[*].4
+15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,"Joystick backward sensitivity? -- code: named ""stick x"" in a debug print (func_2287); stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2291) (func_2287) [status 0x154]",,high,community | reads: MSC mario.mscsb func_2287,m14[*].0
+,1,,0x07000001,0.5,0.5,0.5,0.5,f32,"Joystick forward sensitivity? -- code: named ""dir stick x"" in a debug print (func_2287); stored in status float 0x7 (func_2287) [status 0x154]",,high,community | reads: MSC mario.mscsb func_2287,m14[*].1
+,2,,0x07000002,18,30,0,24,f32,"Ability to angle (degrees) -- code: named ""dir mul"" in a debug print (func_2287); stored in status float 0x8 (func_2287) [status 0x154]",,medium,community | reads: MSC mario.mscsb func_2287,m14[*].2
+,3,,0x07000003,1,1,0.7,1,f32,"code: stored in status float 0xE, then KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2291) (func_2287) [status 0x154]",,medium,reads: MSC mario.mscsb func_2287,m14[*].3
+,4,,0x07000004,1,1,0.7,1,f32,"code: stored in status float 0xF, then KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2291) (func_2287) [status 0x154]",,medium,reads: MSC mario.mscsb func_2287,m14[*].4
+,5,,0x07000005,0.6,0.6,0.6,0.6,f32,"Special fall aerial mobility -- code: named ""fall x mul"" in a debug print (func_2287); stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2292) (func_2287) [status 0x154]",,high,community | reads: MSC mario.mscsb func_2287,m14[*].5
+,6,,0x17000006,0x1E,0x28,0x28,0x1E,u32,"Landing lag (frames) -- code: named ""parameter test landing frame"" in a debug print (func_2287); stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2292) (func_2287) [status 0x154]",,high,community | reads: MSC mario.mscsb func_2287,m14[*].6
+,7,,0x07000007,1.1,1.65,0.7,1.35,f32,"Grounded height multiplier -- code: named ""pass mul"" in a debug print (func_2287); stored in status float 0xD (func_2287) [status 0x154]",,medium,community | reads: MSC mario.mscsb func_2287,m14[*].7
+,8,,0x07000008,0.67,0.5,0,0.67,f32,Initial H speed from moving stick forward during the jump -- code: stored in status float 0x9 (func_2287) [status 0x154],,medium,community | reads: MSC mario.mscsb func_2287,m14[*].8
+,9,,0x07000009,0.5,0.5,0.005,0.7,f32,"Gravity before the jump -- code: named ""accel y"" in a debug print (func_2287); stored in status float 0xA (func_2287) [status 0x154]",,medium,community | reads: MSC mario.mscsb func_2287,m14[*].9
+,10,,0x0700000A,1.08,1.55,0.7,1.25,f32,"Aerial height multiplier -- code: named ""air pass mul"" in a debug print (func_2287); stored in status float 0xB (func_2287) [status 0x154]",,medium,community | reads: MSC mario.mscsb func_2287,m14[*].10
+16,0,Down B,0x18000000,0x50,0x35,0x85,0x5A,u32,"Time to fully charge (frames) -- code: compared with instance int 0x83 (a counter) (func_2266); BattleObject op 0x3E8 (func_2275) [status 0x155 (SpecialLwStart, SpecialAirLwStart); status 0x157 (SpecialLwHold, SpecialAirLwHold)]",,high,community | reads: MSC mario.mscsb func_2266; MSC mario.mscsb func_2269; MSC mario.mscsb func_2271; MSC mario.mscsb func_2275; +1 more,m15[*].0
+,1,,0x18000001,0x46,0x1E,0x50,0x46,u32,Charge frames to use SpecialLwHeavy instead of SpecialLwLight -- code: compared with instance int 0x83 (a counter) (func_2272) [status 0x158],,high,community | reads: MSC mario.mscsb func_2272,m15[*].1
+,2,,0x08000002,0.02,0,0.032,0,f32,Backward speed from firing gained per charge frame -- code: KineticModule op 0x2710 (func_2275) [status 0x158],affects aerial too,medium,community | reads: MSC mario.mscsb func_2275,m15[*].2
+,3,,0x18000003,0x1,0x1,0x1,0x1,u32,"code: stored in instance int 0x84 (func_2282) [status 0x155 (SpecialLwStart, SpecialAirLwStart); status 0x157 (SpecialLwHold, SpecialAirLwHold)]",,medium,reads: MSC mario.mscsb func_2282; MSC mario.mscsb func_2283; MSC mario.mscsb func_2284,m15[*].3
 ,0,Category 4 block,0x04000000,0,,,,f32,?,community ID was 0x04000004,low,"copied from Dr_Mario (same layout, same position) | no read in the vanilla MSC (native or unused)",m16
 17,0,Side B,,50,1,50,50,f32,Break threshold,,medium,community,m17[*].0
 ,1,,,0,0,0,0,f32,Reflection bubble X offset,,medium,community,m17[*].1
@@ -30,39 +30,39 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,,1,1,1,1,f32,Reflected projectile speed multiplier,,medium,community,m17[*].6
 ,7,,,0.75,0.1,0.7,0.66,f32,Reflected projectile lifetime multiplier,,medium,community,m17[*].7
 18,0,"Neutral B
-(fireball)",0x02000000,0.1,0,0.003,0.12,f32,Gravity,,medium,community,m18[*].0
-,1,,0x02000001,1,0,0.1,0.5,f32,,,,,m18[*].1
-,2,,0x02000002,0.97,0.97,0.97,1,f32,Bounce velocity multiplier,,medium,community,m18[*].2
-,3,,0x02000003,1.4,3.7,0.3,1.2,f32,Initial speed,,medium,community,m18[*].3
-,4,,0x02000004,-10,0,40,30,f32,Initial angle (degrees),,medium,community,m18[*].4
-,5,,0x12000005,0x46,0x16,0x2D0,0x3C,u32,Lifetime (frames),,medium,community,m18[*].5
-,6,,0x02000006,1.4,0,0,1.2,f32,Min velocity on ground collision,any lower will delete fireball,medium,community,m18[*].6
-,7,,0x02000007,1.6,0,0,1.8,f32,Something to do with how many times it can bounce before disappearing,"2 = none, 4 = too many to count.",medium,community,m18[*].7
-,8,,0x02000008,60,30,1,60,f32,,,,,m18[*].8
-,9,,0x12000009,0x7,0x2,0x1,0x5,u32,,,,,m18[*].9
-,10,,0x1200000A,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m18[*].10
+(fireball)",0x02000000,0.1,0,0.003,0.12,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,1,0,0.1,0.5,f32,,,,no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,0.97,0.97,0.97,1,f32,Bounce velocity multiplier,,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,1.4,3.7,0.3,1.2,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,-10,0,40,30,f32,Initial angle (degrees),,medium,community | no read in the article MSC (native or unused),m18[*].4
+,5,,0x12000005,0x46,0x16,0x5A,0x3C,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,1.4,0,0,1.2,f32,Min velocity on ground collision,any lower will delete fireball,medium,community | no read in the article MSC (native or unused),m18[*].6
+,7,,0x02000007,1.6,0,0,1.8,f32,Something to do with how many times it can bounce before disappearing,"2 = none, 4 = too many to count.",medium,community | no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,60,30,1,60,f32,,,,no read in the article MSC (native or unused),m18[*].8
+,9,,0x12000009,0x7,0x2,0x1,0x5,u32,,,,no read in the article MSC (native or unused),m18[*].9
+,10,,0x1200000A,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m18[*].10
 ,0,,,0x3,,,,u32,,,,,m19.0
 ,1,,,0,,,,f32,,,,,m19.1
 ,2,,,1,,,,f32,,,,,m19.2
 19,0,"Down B
-(pump)",0x02000000,12,25,0,22,f32,Initial angle (degrees),,medium,community | reads: MSC pump.mscsb func_53; MSC pump.mscsb func_56,m20[*].0
-,1,,0x02000001,50,50,50,0,f32,Max upward angle (degrees),Degrees per frame = Name0 + (Name1 - Name0) * Stick Y (cannot be highter than Name3),medium,community | reads: MSC pump.mscsb func_56,m20[*].1
-,2,,0x02000002,18,18,18,0,f32,Max downward angle (degrees),,medium,community | reads: MSC pump.mscsb func_56,m20[*].2
-,3,,0x02000003,1.9,1,1.2,0,f32,Max angling (degrees),,medium,community | reads: MSC pump.mscsb func_56,m20[*].3
-,4,,0x02000004,0.5,0,0,0.5,f32,Relates to offsets?,at 100 they are really far up from mario and spaced out,medium,community,m20[*].4
-,5,,0x12000005,0x8,0x8,0x8,0x5,u32,"[auto] debug print ""status_uniq_Shoot :%f""",,low,reads: MSC pump.mscsb func_55,m20[*].5
-,6,,0x12000006,0x5,0x5,0x5,0x8,u32,"[auto] debug print ""status_uniq_Shoot :%f""; copied to fighter work int 0x10000009",,low,reads: MSC pump.mscsb func_55,m20[*].6
+(pump)",0x02000000,12,25,0,22,f32,"Initial angle (degrees) -- code: stored in status float 0x0, then compared with a computed value; ModelModule op 0x1 (func_56) (func_53); ModelModule op 0x1 (func_53); compared with a computed value (func_56)",,medium,community | reads: MSC mario/pump.mscsb func_53; MSC mario/pump.mscsb func_56,m20[*].0
+,1,,0x02000001,50,50,50,0,f32,"Max upward angle (degrees) -- code: read in: var2 = WorkModuleF(0, 0x2000001); (func_56)",Degrees per frame = Name0 + (Name1 - Name0) * Stick Y (cannot be highter than Name3),medium,community | reads: MSC mario/pump.mscsb func_56,m20[*].1
+,2,,0x02000002,18,18,18,0,f32,Max downward angle (degrees) -- code: compared with a computed value (func_56),,medium,community | reads: MSC mario/pump.mscsb func_56,m20[*].2
+,3,,0x02000003,1.9,1,1.2,0,f32,"Max angling (degrees) -- code: stored in status float 0x0, then compared with a computed value; ModelModule op 0x1 (func_56) (func_56); ModelModule op 0x1 (func_56); compared with a computed value (func_56)",,medium,community | reads: MSC mario/pump.mscsb func_56,m20[*].3
+,4,,0x02000004,0.5,0,0,0.5,f32,Relates to offsets?,at 100 they are really far up from mario and spaced out,medium,community | no read in the article MSC (native or unused),m20[*].4
+,5,,0x12000005,0x8,0x8,0x8,0x5,u32,code: compared with instance int 0x8 (a counter) (func_55),,medium,reads: MSC mario/pump.mscsb func_55,m20[*].5
+,6,,0x12000006,0x5,0x5,0x5,0x8,u32,"code: stored in instance int 0x9, then decremented in func_55 (a countdown / remaining count), tested against 0 (func_55)",,medium,reads: MSC mario/pump.mscsb func_55,m20[*].6
 20,0,"Down B
-(pumpwater)",0x02000000,4.3,1.6,3,3.5,f32,Water speed multiplier/knockback multiplier?,,medium,community,m21[*].0
-,1,,0x02000001,4.3,2.4,6,0.5,f32,Water base speed,,medium,community,m21[*].1
-,2,,0x02000002,0.17,0.3,0,0,f32,Water gravity,,medium,community,m21[*].2
-,3,,0x02000003,3,3,3,0,f32,,read on firing,,,m21[*].3
-,4,,0x12000004,0xC,0xC,0xC,0xE,u32,Water lifetime (frames),,medium,community,m21[*].4
-,5,,0x02000005,0.8,1,1,0.8,f32,Water GFX size,,medium,community,m21[*].5
-,6,,0x02000006,1.2,1,1,1.2,f32,Water GFX size multiplier,GFX get larger further they go,medium,community,m21[*].6
-,7,,0x12000007,0x37,0x20,0x3C,0x14,u32,,,,,m21[*].7
-21,0,hugeflame?,0x12000000,0x104,,,,u32,,,,,m22[0].0
-,1,,0x02000001,0.5,,,,f32,,,,,m22[0].1
+(pumpwater)",0x02000000,4.3,1.6,3,3.5,f32,Water speed multiplier/knockback multiplier?,,medium,community | no read in the article MSC (native or unused),m21[*].0
+,1,,0x02000001,4.3,2.4,6,0.5,f32,Water base speed,,medium,community | no read in the article MSC (native or unused),m21[*].1
+,2,,0x02000002,0.17,0.3,0,0,f32,Water gravity,,medium,community | no read in the article MSC (native or unused),m21[*].2
+,3,,0x02000003,3,3,3,0,f32,,read on firing,,no read in the article MSC (native or unused),m21[*].3
+,4,,0x12000004,0xC,0xC,0xC,0xE,u32,Water lifetime (frames),,medium,community | no read in the article MSC (native or unused),m21[*].4
+,5,,0x02000005,0.8,1,1,0.8,f32,Water GFX size,,medium,community | no read in the article MSC (native or unused),m21[*].5
+,6,,0x02000006,1.2,1,1,1.2,f32,Water GFX size multiplier,GFX get larger further they go,medium,community | no read in the article MSC (native or unused),m21[*].6
+,7,,0x12000007,0x37,0x20,0x3C,0x14,u32,,,,no read in the article MSC (native or unused),m21[*].7
+21,0,hugeflame?,0x12000000,0x104,,,,u32,,,,no read in the article MSC (native or unused),m22[0].0
+,1,,0x02000001,0.5,,,,f32,,,,no read in the article MSC (native or unused),m22[0].1
 22,0,,,0x2000003,,,,u32,,,,,m23[0].0
 ,1,,,1,,,,f32,,,,,m23[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m23[0].2

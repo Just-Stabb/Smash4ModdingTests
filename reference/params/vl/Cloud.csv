@@ -1,75 +1,75 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,0.2,0.2,0,0,f32,Grounded H speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].0
-,1,,0x05000001,0.4,0.4,0,0,f32,Aerial H speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].1
-,2,,0x05000002,0.65,0.65,0,0,f32,Aerial V speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].2
-,3,,0x05000003,0.5,0.5,0,0,f32,Aerial max additional accel/max air speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4061",m12[*].3
-,4,,0x05000004,0.8,0.8,0,0,f32,Aerial V speed,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].4
-,5,,0x05000005,0.06,0.06,0,0,f32,Gravity,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].5
-,6,,0x05000006,1.5,1.5,0,0,f32,Max fall speed,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4064",m12[*].6
-,7,,0x05000007,12,12,0,0,f32,X offset of ground/aerial projectile,,medium,community,m12[*].7
-,8,,0x05000008,2,2,0,0,f32,Y offset of aerial projectile,,medium,community,m12[*].8
-,9,,0x05000009,11,11,0,0,f32,?,,medium,community,m12[*].9
-,10,,0x0500000A,2,2,0,0,f32,?,,medium,community,m12[*].10
+13,0,Neutral B,0x05000000,0.2,0.2,0,0,f32,"Grounded H speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2252); KineticModule op 0xE (sets a speed) on energy 2 (control / horizontal), argument 2 (func_2252) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2252; MSC kirby.mscsb func_4061,m12[*].0
+,1,,0x05000001,0.4,0.4,0,0,f32,"Aerial H speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 2 (control / horizontal), argument 2 (func_2252) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2252; MSC kirby.mscsb func_4061,m12[*].1
+,2,,0x05000002,0.65,0.65,0,0,f32,"Aerial V speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2252) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2252; MSC kirby.mscsb func_4061,m12[*].2
+,3,,0x05000003,0.5,0.5,0,0,f32,"Aerial max additional accel/max air speed multiplier -- code: KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), with fighter_param 0x16 (air_speed_x_stable) (func_2251); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), with fighter_param 0x16 (air_speed_x_stable) (func_2252) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,medium,community | reads: MSC cloud.mscsb func_2251; MSC cloud.mscsb func_2252; MSC kirby.mscsb func_4061,m12[*].3
+,4,,0x05000004,0.8,0.8,0,0,f32,"Aerial V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2255) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2255; MSC kirby.mscsb func_4064,m12[*].4
+,5,,0x05000005,0.06,0.06,0,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2255) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2255; MSC kirby.mscsb func_4064,m12[*].5
+,6,,0x05000006,1.5,1.5,0,0,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2255) [status 0x152 (SpecialN, SpecialAirN); status 0x248]",,high,community | reads: MSC cloud.mscsb func_2255; MSC kirby.mscsb func_4064,m12[*].6
+,7,,0x05000007,12,12,0,0,f32,X offset of ground/aerial projectile,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,2,2,0,0,f32,Y offset of aerial projectile,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,11,11,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,2,2,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
 14,0,Side B,0x06000000,0.6,0.2,0,0,f32,Grounded / aerial H speed multiplier on startup,,medium,community | reads: native 0x02781B0C (fn 0x027819E8),m13[*].0
-,1,,0x06000001,0.8,1,0,0,f32,Aerial H speed multiplier on startup,,medium,community,m13[*].1
+,1,,0x06000001,0.8,1,0,0,f32,Aerial H speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
 ,2,,0x06000002,0.05,0.01,0,0,f32,Gravity on startup,,medium,community | reads: native 0x02781964 (fn 0x02781914),m13[*].2
 ,3,,0x06000003,0.8,0.1,0,0,f32,Max fall speed on startup,,medium,community | reads: native 0x0278197C (fn 0x02781914),m13[*].3
-,4,,0x06000004,0.5,0.1,0,0,f32,Aerial V speed multiplier on startup,,medium,community,m13[*].4
-,5,,0x16000005,0x0,0x1E,0x0,0x0,u32,,,,,m13[*].5
-,6,,0x16000006,0x0,0x4,0x0,0x0,u32,,,,,m13[*].6
-,7,,0x06000007,0,2.4,0,0,f32,,,,,m13[*].7
-,8,,0x16000008,0x0,0x6,0x0,0x0,u32,,,,,m13[*].8
-,9,,0x06000009,0,15,0,0,f32,,,,,m13[*].9
-,10,,0x0600000A,0,5,0,0,f32,,,,,m13[*].10
-15,0,Up B,0x07000000,0.5,0.5,0,0,f32,Backward speed,,medium,community,m14[*].0
-,1,,0x07000001,1,1.6,0,0,f32,Grounded height multiplier,,medium,community,m14[*].1
-,2,,0x07000002,1.1,1.85,0,0,f32,Aerial height multiplier,,medium,community,m14[*].2
-,3,,0x17000003,0x14,0x14,0x0,0x0,u32,Landing lag without additional input (frames),,medium,community,m14[*].3
-,4,,0x07000004,0.67,0.67,0,0,f32,Aerial H mobility multiplier on startup,,medium,community,m14[*].4
-,5,,0x07000005,0.25,0.25,0,0,f32,,,,,m14[*].5
-,6,,0x07000006,0.625,0.625,0,0,f32,H mobility multiplier after rising,,medium,community,m14[*].6
-,7,,0x07000007,3,12,0,0,f32,Time spent rising (frames),,medium,community,m14[*].7
-,8,,0x07000008,0.6,0.8,0,0,f32,Aerial H mobility multiplier on Special fall,,medium,community,m14[*].8
-,9,,0x17000009,0x32,0x3C,0x0,0x0,u32,Affects falling hitbox duration,,medium,community,m14[*].9
-,10,,0x0700000A,-4.2,0,0,0,f32,Initial V speed on SpecialHi2,,medium,community,m14[*].10
-,11,,0x0700000B,0.07,0,0,0,f32,Gravity on SpecialHi2,,medium,community,m14[*].11
-,12,,0x0700000C,4.2,0,0,0,f32,Fallspeed on SpecialHi2,,medium,community,m14[*].12
-,13,,0x1700000D,0x28,0x0,0x0,0x0,u32,Landing lag with additional input (frames),,medium,community,m14[*].13
-,14,,0x1700000E,0x0,0xF,0x0,0x0,u32,,,,,m14[*].14
-,15,,0x1700000F,0x0,0x2,0x0,0x0,u32,,,,,m14[*].15
-,16,,0x07000010,0,1.8,0,0,f32,,,,,m14[*].16
-,17,,0x17000011,0x0,0x1,0x0,0x0,u32,,,,,m14[*].17
-,18,,0x17000012,0x0,0x14,0x0,0x0,u32,,,,,m14[*].18
-16,0,Down B,0x08000000,1,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].0
-,1,,0x08000001,1,0,0,0,f32,Aerial V speed multiplier,,medium,community,m15[*].1
-,2,,0x08000002,20,0,0,0,f32,Y offset of Limit charge box GFX,,medium,community,m15[*].2
-,3,,0x18000003,0x3C,0x0,0x0,0x0,u32,Duration of Limit charge box GFX remains after cancelling (frames),,medium,community,m15[*].3
-,4,,0x08000004,0.25,0,0,0,f32,Limit Charge growth rate per frame,,medium,community,m15[*].4
+,4,,0x06000004,0.5,0.1,0,0,f32,Aerial V speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x16000005,0x0,0x1E,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x16000006,0x0,0x4,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,0,2.4,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x16000008,0x0,0x6,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x06000009,0,15,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x0600000A,0,5,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].10
+15,0,Up B,0x07000000,0.5,0.5,0,0,f32,Backward speed -- code: stored in status float 0xA (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].0
+,1,,0x07000001,1,1.6,0,0,f32,Grounded height multiplier -- code: stored in status float 0xD (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].1
+,2,,0x07000002,1.1,1.85,0,0,f32,Aerial height multiplier -- code: stored in status float 0xB (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].2
+,3,,0x17000003,0x14,0x14,0x0,0x0,u32,"Landing lag without additional input (frames) -- code: stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2291) (func_2275) [status 0x154]",,high,community | reads: MSC cloud.mscsb func_2275,m14[*].3
+,4,,0x07000004,0.67,0.67,0,0,f32,Aerial H mobility multiplier on startup -- code: stored in status float 0x9 (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].4
+,5,,0x07000005,0.25,0.25,0,0,f32,"code: stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2290) (func_2275) [status 0x154]",,medium,reads: MSC cloud.mscsb func_2275,m14[*].5
+,6,,0x07000006,0.625,0.625,0,0,f32,H mobility multiplier after rising -- code: stored in status float 0x7 (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].6
+,7,,0x07000007,3,12,0,0,f32,Time spent rising (frames) -- code: stored in status float 0x8 (func_2275) [status 0x154],,medium,community | reads: MSC cloud.mscsb func_2275,m14[*].7
+,8,,0x07000008,0.6,0.8,0,0,f32,"Aerial H mobility multiplier on Special fall -- code: stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2291) (func_2275); multiplies fighter_param 0x16 (air_speed_x_stable) (func_2276); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), argument 1 (func_2276) [status 0x154; status 0x159 (SpecialHi2)]",,medium,community | reads: MSC cloud.mscsb func_2275; MSC cloud.mscsb func_2276; MSC cloud.mscsb func_2279,m14[*].8
+,9,,0x17000009,0x32,0x3C,0x0,0x0,u32,"Affects falling hitbox duration -- code: stored in status int 0x2, then tested against 0 (func_2284) (func_2283) [status 0x15A (specialhi2end)]",,medium,community | reads: MSC cloud.mscsb func_2283,m14[*].9
+,10,,0x0700000A,-4.2,0,0,0,f32,Initial V speed on SpecialHi2 -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical) (func_2283) [status 0x15A (specialhi2end)],,high,community | reads: MSC cloud.mscsb func_2283,m14[*].10
+,11,,0x0700000B,0.07,0,0,0,f32,Gravity on SpecialHi2 -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2279) [status 0x159 (SpecialHi2); status 0x15A (specialhi2end)],,high,community | reads: MSC cloud.mscsb func_2279; MSC cloud.mscsb func_2283,m14[*].11
+,12,,0x0700000C,4.2,0,0,0,f32,Fallspeed on SpecialHi2 -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2279) [status 0x159 (SpecialHi2); status 0x15A (specialhi2end)],,medium,community | reads: MSC cloud.mscsb func_2279; MSC cloud.mscsb func_2283,m14[*].12
+,13,,0x1700000D,0x28,0x0,0x0,0x0,u32,Landing lag with additional input (frames) -- code: tested against 0 (func_2288) [status 0x15B],,medium,community | reads: MSC cloud.mscsb func_2288,m14[*].13
+,14,,0x1700000E,0x0,0xF,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x1700000F,0x0,0x2,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].15
+,16,,0x07000010,0,1.8,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].16
+,17,,0x17000011,0x0,0x1,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].17
+,18,,0x17000012,0x0,0x14,0x0,0x0,u32,"code: read in: var0 = (float)WorkModule(0x6, 0x17000012); (func_2288) [status 0x15B]",,low,reads: MSC cloud.mscsb func_2288,m14[*].18
+16,0,Down B,0x08000000,1,0,0,0,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
+,1,,0x08000001,1,0,0,0,f32,Aerial V speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,20,0,0,0,f32,Y offset of Limit charge box GFX -- code: EffectModule op 0x31 (func_2301); EffectModule op 0x18 (func_2301); EffectModule op 0x33 (func_2301) [status 0x15C (SpecialLwLoop)],,medium,community | reads: MSC cloud.mscsb func_2301,m15[*].2
+,3,,0x18000003,0x3C,0x0,0x0,0x0,u32,Duration of Limit charge box GFX remains after cancelling (frames) -- code: stored in instance int 0x84 (func_2303) [status 0x15C (SpecialLwLoop)],,medium,community | reads: MSC cloud.mscsb func_2303,m15[*].3
+,4,,0x08000004,0.25,0,0,0,f32,Limit Charge growth rate per frame,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
 ,5,"Down B
-(Limit Break)",0x08000005,0.4,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].5
-,6,,0x08000006,0.4,0,0,0,f32,Aerial V speed multiplier,,medium,community,m15[*].6
-,7,,0x08000007,0.02,0,0,0,f32,Gravity,,medium,community,m15[*].7
-,8,,0x08000008,0.5,0,0,0,f32,Max fall speed,,medium,community,m15[*].8
-,9,,0x18000009,0x1C,0x0,0x0,0x0,u32,Slowdown duration after Finishing Touch (frames),,medium,community,m15[*].9
-,10,,0x1800000A,0x8,0x0,0x0,0x0,u32,Slowdown effect speed,,medium,community,m15[*].10
-,11,,0x0800000B,2.4,0,0,0,f32,Camera zoom Z position,,medium,community,m15[*].11
-,12,,0x1800000C,0x2,0x0,0x0,0x0,u32,Camera transition frames,,medium,community,m15[*].12
-,0,Limit Charge,0x04000000,1,,,,f32,Limit Charge growth rate per damage taken,,medium,community,m16.0
-,1,,0x04000001,0.4,,,,f32,Limit Charge growth rate per damage dealt,,medium,community,m16.1
+(Limit Break)",0x08000005,0.4,0,0,0,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,0.4,0,0,0,f32,Aerial V speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0.02,0,0,0,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2294),,high,community | reads: MSC cloud.mscsb func_2294,m15[*].7
+,8,,0x08000008,0.5,0,0,0,f32,Max fall speed -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2294),,high,community | reads: MSC cloud.mscsb func_2294,m15[*].8
+,9,,0x18000009,0x1C,0x0,0x0,0x0,u32,Slowdown duration after Finishing Touch (frames),,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x1800000A,0x8,0x0,0x0,0x0,u32,Slowdown effect speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,2.4,0,0,0,f32,Camera zoom Z position,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x1800000C,0x2,0x0,0x0,0x0,u32,Camera transition frames,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,0,Limit Charge,0x04000000,1,,,,f32,Limit Charge growth rate per damage taken,,medium,community | no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,0.4,,,,f32,Limit Charge growth rate per damage dealt,,medium,community | no read in the vanilla MSC (native or unused),m16.1
 ,2,"Finising Touch
-and Final Smash?",0x14000002,0xB4,,,,u32,,,,,m16.2
-,3,,0x04000003,8,,,,f32,V speed related,script_2315,medium,community,m16.3
-,4,,0x14000004,0x10,,,,u32,Time spent dashing (Frames),script_2315,medium,community,m16.4
-,5,,0x14000005,0x6,,,,u32,"addi, set to 0x11000002",script_2315,medium,community,m16.5
-,6,,0x04000006,0.09,,,,f32,Air friction,script_2320,medium,community,m16.6
-,7,,0x04000007,7,,,,f32,,,,,m16.7
-,8,,0x04000008,20,,,,f32,,script_2329,,,m16.8
-,9,,0x04000009,0,,,,f32,,script_2329,,,m16.9
-,10,,0x1400000A,0x8,,,,u32,,script_2329,,,m16.10
-,11,,0x1400000B,0x18,,,,u32,,,,,m16.11
-,12,,0x0400000C,0.9,,,,f32,,,,,m16.12
-,13,,0x0400000D,0.95,,,,f32,How the camera zooms in when using Finishing Touch,Higher numbers = Further away,medium,community,m16.13
-,14,,0x0400000E,5,,,,f32,Fall speed??,script_2337,medium,community,m16.14
+and Final Smash?",0x14000002,0xB4,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,8,,,,f32,"V speed related -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2315); combined with the facing direction (func_2315) [status 0x15E (FinalDash)]",script_2315,high,community | reads: MSC cloud.mscsb func_2315,m16.3
+,4,,0x14000004,0x10,,,,u32,"Time spent dashing (Frames) -- code: stored in status int 0x2, then decremented in func_2314 (a countdown / remaining count), tested against 0 (func_2315) [status 0x15E (FinalDash)]",script_2315,high,community | reads: MSC cloud.mscsb func_2315,m16.4
+,5,,0x14000005,0x6,,,,u32,"addi, set to 0x11000002 -- code: stored in status int 0x3, then tested against 0 (func_2314) (func_2315) [status 0x15E (FinalDash)]",script_2315,medium,community | reads: MSC cloud.mscsb func_2315,m16.5
+,6,,0x04000006,0.09,,,,f32,"Air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2320) [status 0x15F (FinalDashEnd, FinalAirDashEnd)]",script_2320,high,community | reads: MSC cloud.mscsb func_2320,m16.6
+,7,,0x04000007,7,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,20,,,,f32,"code: stored in status float 0x6, then compared with status float 0x9; PostureModule op 0x3 (func_2331) (func_2329); stored in status float 0x9 (func_2329); compared with a computed value (func_2329) [status 0x161 (FinalMove)]",script_2329,medium,reads: MSC cloud.mscsb func_2329,m16.8
+,9,,0x04000009,0,,,,f32,"code: stored in status float 0x7, then compared with status float 0x9; PostureModule op 0x3 (func_2331) (func_2329); stored in status float 0x9 (func_2329) [status 0x161 (FinalMove)]",script_2329,medium,reads: MSC cloud.mscsb func_2329,m16.9
+,10,,0x1400000A,0x8,,,,u32,"code: stored in status float 0x9, then compared with a computed value; PostureModule op 0x3 (func_2331) (func_2329) [status 0x161 (FinalMove)]",script_2329,medium,reads: MSC cloud.mscsb func_2329,m16.10
+,11,,0x1400000B,0x18,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.11
+,12,,0x0400000C,0.9,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.12
+,13,,0x0400000D,0.95,,,,f32,How the camera zooms in when using Finishing Touch,Higher numbers = Further away,medium,community | no read in the vanilla MSC (native or unused),m16.13
+,14,,0x0400000E,5,,,,f32,"Fall speed?? -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3, negated (func_2337); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2337) [motions FinalAttack, FinalFall]",script_2337; community value differs: Default 0.1 (vanilla 5),high,community | reads: MSC cloud.mscsb func_2337,m16.14
 17,0,"Walk Initial
 Multiplier",,0x3000001,,,,u32,0x03000001,,medium,community,m17[0].0
 ,1,,,1,,,,f32,,,,,m17[0].1
@@ -169,27 +169,27 @@ Multiplier",,0x3000019,,,,u32,0x03000018,,medium,community,m17[13].0
 ,4,,,1,,,,f32,,,,,m17[13].4
 ,5,,,0,,,,f32,,,,,m17[13].5
 18,0,"Neutral B
-(wave)",0x12000000,0x32,0x29,0x0,0x0,u32,Lifetime (frames),,medium,community,m18[*].0
-,1,,0x02000001,1.6,2.24,0,0,f32,Aerial speed,,medium,community,m18[*].1
-,2,,0x02000002,2,2.8,0,0,f32,Grounded speed,,medium,community,m18[*].2
-,3,,0x02000003,50,50,0,0,f32,?,Compared to H speed?,medium,community,m18[*].3
-,4,,0x12000004,0x5,0x4,0x0,0x0,u32,,Related to angles?,,,m18[*].4
-,5,,0x02000005,8,6,0,0,f32,"Damage (grounded, early)","Used when transitioning between air/ground.
-""Late"" = when RA-Bit 5 is set",medium,community,m18[*].5
-,6,,0x02000006,6,6,0,0,f32,"Damage (grounded, late)",,medium,community,m18[*].6
-,7,,0x02000007,6.4,4.8,0,0,f32,"Damage (aerial, early)",,medium,community,m18[*].7
-,8,,0x02000008,4.8,4.8,0,0,f32,"Damage (aerial, late)",,medium,community,m18[*].8
-,9,,0x02000009,3,5.5,0,0,f32,Size (early),,medium,community,m18[*].9
-,10,,0x0200000A,2.7,5.5,0,0,f32,Size (late),,medium,community,m18[*].10
+(wave)",0x12000000,0x32,0x29,0x0,0x0,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,1.6,2.24,0,0,f32,"Aerial speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_48)",,high,community | reads: MSC cloud/wave.mscsb func_48,m18[*].1
+,2,,0x02000002,2,2.8,0,0,f32,"Grounded speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion) (func_48); KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_49)",,high,community | reads: MSC cloud/wave.mscsb func_48; MSC cloud/wave.mscsb func_49,m18[*].2
+,3,,0x02000003,50,50,0,0,f32,? -- code: compared with a computed value (func_49),Compared to H speed?,medium,community | reads: MSC cloud/wave.mscsb func_49; MSC cloud/wave.mscsb func_51,m18[*].3
+,4,,0x12000004,0x5,0x4,0x0,0x0,u32,code: PostureModule op 0x2718 (func_49),Related to angles?,medium,reads: MSC cloud/wave.mscsb func_49,m18[*].4
+,5,,0x02000005,8,6,0,0,f32,"Damage (grounded, early) -- code: read in: var2 = WorkModuleF(0, 0x2000005); (func_48)","Used when transitioning between air/ground.
+""Late"" = when RA-Bit 5 is set",medium,community | reads: MSC cloud/wave.mscsb func_48,m18[*].5
+,6,,0x02000006,6,6,0,0,f32,"Damage (grounded, late) -- code: read in: var2 = WorkModuleF(0, 0x2000006); (func_48)",,medium,community | reads: MSC cloud/wave.mscsb func_48,m18[*].6
+,7,,0x02000007,6.4,4.8,0,0,f32,"Damage (aerial, early) -- code: AttackModule op 0x271A (func_48)",,high,community | reads: MSC cloud/wave.mscsb func_48,m18[*].7
+,8,,0x02000008,4.8,4.8,0,0,f32,"Damage (aerial, late) -- code: read in: var2 = WorkModuleF(0, 0x2000008); (func_48)",,medium,community | reads: MSC cloud/wave.mscsb func_48,m18[*].8
+,9,,0x02000009,3,5.5,0,0,f32,"Size (early) -- code: read in: var3 = WorkModuleF(0, 0x2000009); (func_48)",,medium,community | reads: MSC cloud/wave.mscsb func_48,m18[*].9
+,10,,0x0200000A,2.7,5.5,0,0,f32,"Size (late) -- code: read in: var3 = WorkModuleF(0, 0x200000a); (func_48)",,medium,community | reads: MSC cloud/wave.mscsb func_48,m18[*].10
 19,0,,,0x2000002,,,,u32,Blade Beam weapon param Name2?,,medium,community,m19[0].0
 ,1,,,1,,,,f32,,,,,m19[0].1
-,2,,,1.5,,,,f32,Multiplier?,,medium,community,m19[0].2
+,2,,,1.5,,,,f32,Multiplier?,community value differs: Default 1.15 (vanilla 1.5),medium,community,m19[0].2
 ,3,,,0,,,,f32,,,,,m19[0].3
 ,4,,,1,,,,f32,,,,,m19[0].4
 ,5,,,0,,,,f32,,,,,m19[0].5
 ,0,,,0x2000001,,,,u32,Blade Beam weapon param Name1?,,medium,community,m19[1].0
 ,1,,,1,,,,f32,,,,,m19[1].1
-,2,,,1.5,,,,f32,Multiplier?,,medium,community,m19[1].2
+,2,,,1.5,,,,f32,Multiplier?,community value differs: Default 1.15 (vanilla 1.5),medium,community,m19[1].2
 ,3,,,0,,,,f32,,,,,m19[1].3
 ,4,,,1,,,,f32,,,,,m19[1].4
 ,5,,,0,,,,f32,,,,,m19[1].5

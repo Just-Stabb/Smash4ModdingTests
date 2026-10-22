@@ -1,54 +1,54 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,-1,0,0,0,f32,Charge time (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3900; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3909",m12[*].0
-,1,,0x05000001,0.2,0,0,0,f32,H recoil speed on uncharged grounded firing,,medium,community,m12[*].1
-,2,,0x05000002,1.4,0,0,0,f32,H recoil speed on fully-charged grounded firing,,medium,community,m12[*].2
-,3,,0x05000003,0.4,0,0,0,f32,H recoil speed on uncharged aerial firing,,medium,community,m12[*].3
-,4,,0x05000004,2.3,0,0,0,f32,H recoil speed on fully-charged aerial firing,,medium,community,m12[*].4
-,5,,0x05000005,0.07,0,0,0,f32,?,,medium,community,m12[*].5
-14,0,Side B,0x06000000,1.8,0,0,0,f32,Initial V speed on 1st aerial startup,,medium,community,m13[*].0
-,1,,0x06000001,1,1,1,1,f32,"Multiplier, used for Smash Tour (Group12, Entry3)",,medium,community,m13[*].1
-15,0,Up B,0x07000000,2,0,0,0,f32,H speed divisor on aerial startup,,medium,community,m14[*].0
-,1,,0x07000001,2,0,0,0,f32,V speed divisor on aerial startup,,medium,community,m14[*].1
-,2,,0x07000002,0.04,0,0,0,f32,Gravity on startup,,medium,community,m14[*].2
-,3,,0x07000003,0.75,0,0,0,f32,Max fall speed on startup,,medium,community,m14[*].3
-,4,,0x17000004,0xA,0x0,0x0,0x0,u32,Travel time (frames),,medium,community,m14[*].4
-,5,,0x17000005,0x3,0x0,0x0,0x0,u32,,,,,m14[*].5
-,6,,0x17000006,0x1,0x0,0x0,0x0,u32,Ledge hang,,medium,community,m14[*].6
-,7,,0x07000007,360,0,0,0,f32,,,,,m14[*].7
+13,0,Neutral B,0x05000000,120,0,0,0,f32,Charge time (frames) -- code: compared with instance int 0x83 (a counter) (func_3900); MotionModule op 0x2711 (func_3909); animation rate (MotionModule set rate) (func_3909) [status 0x237; status 0x238],,high,community | reads: MSC kirby.mscsb func_3900; MSC kirby.mscsb func_3909; MSC mewtwo.mscsb func_2265; MSC mewtwo.mscsb func_2274,m12[*].0
+,1,,0x05000001,0.2,0,0,0,f32,H recoil speed on uncharged grounded firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,1.4,0,0,0,f32,H recoil speed on fully-charged grounded firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,0.4,0,0,0,f32,H recoil speed on uncharged aerial firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,2.3,0,0,0,f32,H recoil speed on fully-charged aerial firing,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,0.07,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+14,0,Side B,0x06000000,1.8,0,0,0,f32,Initial V speed on 1st aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2289) [status 0x153],,high,community | reads: MSC mewtwo.mscsb func_2289,m13[*].0
+,1,,0x06000001,1,1,1,1,f32,"Multiplier, used for Smash Tour (Group12, Entry3)",,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+15,0,Up B,0x07000000,2,0,0,0,f32,"H speed divisor on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2301)",,high,community | reads: MSC mewtwo.mscsb func_2301,m14[*].0
+,1,,0x07000001,2,0,0,0,f32,V speed divisor on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2301),,high,community | reads: MSC mewtwo.mscsb func_2301,m14[*].1
+,2,,0x07000002,0.04,0,0,0,f32,Gravity on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.75,0,0,0,f32,Max fall speed on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x17000004,0xA,0x0,0x0,0x0,u32,Travel time (frames) -- code: compared with status int 0x2 (a counter) (func_2305) [status 0x15B],,high,community | reads: MSC mewtwo.mscsb func_2305,m14[*].4
+,5,,0x17000005,0x3,0x0,0x0,0x0,u32,code: compared with a computed value (func_2306) [status 0x15B],,medium,reads: MSC mewtwo.mscsb func_2306,m14[*].5
+,6,,0x17000006,0x1,0x0,0x0,0x0,u32,Ledge hang -- code: compared with a computed value (func_2306) [status 0x15B],,medium,community | reads: MSC mewtwo.mscsb func_2306,m14[*].6
+,7,,0x07000007,360,0,0,0,f32,code: compared with a computed value (func_2304) [status 0x15B],,medium,reads: MSC mewtwo.mscsb func_2304,m14[*].7
 ,8,,0x07000008,0.5,0,0,0,f32,Sensitivity to use max additional travel speed?,,medium,"community | reads: native 0x027B4ABC (fn 0x027B49B8, shared with mariod)",m14[*].8
-,9,,0x07000009,2,0,0,0,f32,Base travel speed,,medium,community,m14[*].9
-,10,,0x0700000A,3,0,0,0,f32,Max additional travel speed,,medium,community,m14[*].10
-,11,,0x0700000B,0.6,0,0,0,f32,Max air speed multiplier,,medium,community,m14[*].11
-,12,,0x0700000C,0.2,0,0,0,f32,Speed multiplier on grounded reappearance,,medium,community,m14[*].12
-,13,,0x0700000D,0.4,0,0,0,f32,Speed multiplier on aerial reappearance,,medium,community,m14[*].13
-,14,,0x0700000E,0.6,0,0,0,f32,Special fall max air speed multiplier,,medium,community,m14[*].14
-,15,,0x0700000F,30,0,0,0,f32,Landing lag (frames),,medium,community,m14[*].15
-16,0,Down B,0x08000000,0.08,0,0,0,f32,Gravity,,medium,community,m15[*].0
-,1,,0x08000001,1,0,0,0,f32,Max fall speed,,medium,community,m15[*].1
-,2,,0x08000002,4.5,0,0,0,f32,X offset of first hitbox,,medium,community,m15[*].2
-,3,,0x08000003,4.5,0,0,0,f32,Y offset of first hitbox,,medium,community,m15[*].3
-,4,,0x08000004,0.5,0,0,0,f32,V speed multiplier on aerial startup,,medium,community,m15[*].4
-,0,Category 4 block,0x04000000,1,,,,f32,,,,,m16.0
-,1,,0x04000001,0.5,,,,f32,,,,,m16.1
-,2,,0x04000002,0,,,,f32,,,,,m16.2
+,9,,0x07000009,2,0,0,0,f32,Base travel speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,3,0,0,0,f32,Max additional travel speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].10
+,11,,0x0700000B,0.6,0,0,0,f32,"Max air speed multiplier -- code: multiplies fighter_param 0x16 (air_speed_x_stable) (func_2315); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2315); compared with a computed value (func_2315) [status 0x15C (SpecialHi, SpecialAirHi)]",,medium,community | reads: MSC mewtwo.mscsb func_2315,m14[*].11
+,12,,0x0700000C,0.2,0,0,0,f32,"Speed multiplier on grounded reappearance -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2312) [status 0x15C (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC mewtwo.mscsb func_2312,m14[*].12
+,13,,0x0700000D,0.4,0,0,0,f32,"Speed multiplier on aerial reappearance -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2312) [status 0x15C (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC mewtwo.mscsb func_2312,m14[*].13
+,14,,0x0700000E,0.6,0,0,0,f32,"Special fall max air speed multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2309) [status 0x15C (SpecialHi, SpecialAirHi)]",,medium,community | reads: MSC mewtwo.mscsb func_2309,m14[*].14
+,15,,0x0700000F,30,0,0,0,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2309) [status 0x15C (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC mewtwo.mscsb func_2309,m14[*].15
+16,0,Down B,0x08000000,0.08,0,0,0,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2320) [status 0x155],,high,community | reads: MSC mewtwo.mscsb func_2320,m15[*].0
+,1,,0x08000001,1,0,0,0,f32,Max fall speed -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2320) [status 0x155],,high,community | reads: MSC mewtwo.mscsb func_2320,m15[*].1
+,2,,0x08000002,4.5,0,0,0,f32,X offset of first hitbox,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,4.5,0,0,0,f32,Y offset of first hitbox,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x08000004,0.5,0,0,0,f32,V speed multiplier on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2321) [status 0x155],,high,community | reads: MSC mewtwo.mscsb func_2321,m15[*].4
+,0,Category 4 block,0x04000000,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,0.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
 17,0,"Neutral B
-(Projectile)",0x12000000,0x50,0x0,0x0,0x0,u32,Lifetime (frames),,medium,community,m17[*].0
-,1,,0x02000001,0,0,0,0,f32,Firing angle (radians),,medium,community,m17[*].1
-,2,,0x02000002,1.6,0,0,0,f32,Uncharged projectile speed,,medium,community,m17[*].2
-,3,,0x02000003,2.3,0,0,0,f32,Fully charged projectile speed,,medium,community,m17[*].3
-,4,,0x12000004,0xA,0x0,0x0,0x0,u32,Projectile trajectory curve?,,medium,community,m17[*].4
-,5,,0x02000005,10,0,0,0,f32,Projectile trajectory curve?,,medium,community,m17[*].5
-,6,,0x02000006,0.5,0,0,0,f32,Non charged projectile randomness,,medium,community,m17[*].6
-,7,,0x02000007,0.2,0,0,0,f32,Fully-charged projectile randomness,,medium,community,m17[*].7
-,8,,0x02000008,5,0,0,0,f32,,,,,m17[*].8
-,9,,0x02000009,4,0,0,0,f32,,,,,m17[*].9
-,10,,0x0200000A,12,0,0,0,f32,Terminal Shadow Ball size,,medium,community,m17[*].10
-,11,,0x0200000B,3.6,0,0,0,f32,?,,medium,community,m17[*].11
-,12,,0x0200000C,5.6,0,0,0,f32,?,,medium,community,m17[*].12
-,13,,0x0200000D,20,0,0,0,f32,?,,medium,community,m17[*].13
-,14,,0x0200000E,9,0,0,0,f32,?,,medium,community,m17[*].14
-,15,,0x1200000F,0xC,0x0,0x0,0x0,u32,Lifetime after ground detection (frames)?,,medium,community,m17[*].15
-,16,,0x02000010,2,0,0,0,f32,,,,,m17[*].16
+(Projectile)",0x12000000,0x50,0x0,0x0,0x0,u32,"Lifetime (frames) -- code: read in: var1 = WorkModule(0x6, 0x12000000); (func_57)",,medium,community | reads: MSC mewtwo/shadowball.mscsb func_57,m17[*].0
+,1,,0x02000001,0,0,0,0,f32,Firing angle (radians),,medium,community | no read in the article MSC (native or unused),m17[*].1
+,2,,0x02000002,1.6,0,0,0,f32,Uncharged projectile speed,,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x02000003,2.3,0,0,0,f32,Fully charged projectile speed,,medium,community | no read in the article MSC (native or unused),m17[*].3
+,4,,0x12000004,0xA,0x0,0x0,0x0,u32,Projectile trajectory curve?,,medium,community | no read in the article MSC (native or unused),m17[*].4
+,5,,0x02000005,10,0,0,0,f32,Projectile trajectory curve?,,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x02000006,0.5,0,0,0,f32,Non charged projectile randomness,,medium,community | no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,0.2,0,0,0,f32,Fully-charged projectile randomness,,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x02000008,5,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].8
+,9,,0x02000009,4,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].9
+,10,,0x0200000A,12,0,0,0,f32,Terminal Shadow Ball size,,medium,community | no read in the article MSC (native or unused),m17[*].10
+,11,,0x0200000B,3.6,0,0,0,f32,?,,medium,community | no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,5.6,0,0,0,f32,?,,medium,community | no read in the article MSC (native or unused),m17[*].12
+,13,,0x0200000D,20,0,0,0,f32,?,,medium,community | no read in the article MSC (native or unused),m17[*].13
+,14,,0x0200000E,9,0,0,0,f32,?,,medium,community | no read in the article MSC (native or unused),m17[*].14
+,15,,0x1200000F,0xC,0x0,0x0,0x0,u32,"Lifetime after ground detection (frames)? -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_57); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_57)",,medium,community | reads: MSC mewtwo/shadowball.mscsb func_57,m17[*].15
+,16,,0x02000010,2,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].16
 18,0,,,0x2000002,,,,u32,Shadow Ball weapon param Name2?,,medium,community,m18[0].0
 ,1,,,1,,,,f32,,,,,m18[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m18[0].2
@@ -75,14 +75,14 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,8,,,1.4,0,0,0,f32,Reflected projectile damage multiplier,,medium,community,m20[*].8
 ,9,,,1.2,0,0,0,f32,Reflected projectile speed multiplier,,medium,community,m20[*].9
 ,10,,,1.25,0,0,0,f32,Reflected projectile lifetime multiplier,,medium,community,m20[*].10
-20,0,Down B,0x12000000,0x148,0x0,0x0,0x0,u32,Projectile lifetime (frames),,medium,community,m21[*].0
-,1,,0x02000001,0,0,0,0,f32,Projectile speed,,medium,community,m21[*].1
-21,0,Article params (mewtwom),0x02000000,0,,,,f32,,,,,m22[0]
-22,0,search,0x02000000,2.5,,,,f32,,,,,m23[0].0
-,1,,0x02000001,0.02,,,,f32,,,,,m23[0].1
-,2,,0x02000002,3,,,,f32,,,,,m23[0].2
-,3,,0x12000003,0x64,,,,u32,,,,,m23[0].3
-23,0,bindball?,0x12000000,0xA,,,,u32,,,,,m24[0]
+20,0,Down B,0x12000000,0x7,0x0,0x0,0x0,u32,"Projectile lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_48 (a countdown / remaining count), tested against 0 (func_51)",,high,community | reads: MSC mewtwo/bindball.mscsb func_51,m21[*].0
+,1,,0x02000001,2.9,0,0,0,f32,Projectile speed,,medium,community | no read in the article MSC (native or unused),m21[*].1
+21,0,Article params (mewtwom),0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m22[0]
+22,0,search,0x02000000,2.5,,,,f32,,,,no read in the article MSC (native or unused),m23[0].0
+,1,,0x02000001,0.02,,,,f32,,,,no read in the article MSC (native or unused),m23[0].1
+,2,,0x02000002,3,,,,f32,,,,no read in the article MSC (native or unused),m23[0].2
+,3,,0x12000003,0x64,,,,u32,"code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_50); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_48 (a countdown / remaining count), tested against 0 (func_50)",,medium,reads: MSC mewtwo/search.mscsb func_50,m23[0].3
+23,0,bindball?,0x12000000,0xA,,,,u32,"code: stored in status int 0x0, then decremented in func_49 (a countdown / remaining count), tested against 0 (func_48)",,medium,reads: MSC mewtwo/psychobreak.mscsb func_48,m24[0]
 24,0,Hurtbox,,-3.5,,,,f32,X offset,,medium,community,m25[0].0
 ,1,,,0,,,,f32,Y offset,,medium,community,m25[0].1
 ,2,,,0,,,,f32,Z offset,,medium,community,m25[0].2

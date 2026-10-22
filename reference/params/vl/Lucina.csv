@@ -1,14 +1,14 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,60,60,66,60,f32,Time to fully charge (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3578",m12[*].0
-,1,,0x05000001,2.2,2.2,2,2.2,f32,Max multiplier,,medium,community,m12[*].1
-,2,,0x05000002,0.8,0.8,0.8,0.8,f32,Aerial H speed multiplier,,medium,community,m12[*].2
-,3,,0x05000003,0.02,0.02,0.02,0.02,f32,Aerial H deceleration,,medium,community,m12[*].3
-,4,,0x05000004,1,1,1,1,f32,Charge animation frame speed multiplier,read once on initial pullback,low,"copied from Marth (same layout, same position) | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3578",m12[*].4
+13,0,Neutral B,0x05000000,60,60,66,60,f32,"Time to fully charge (frames) -- code: compared with a computed value (func_3578) [status 0x203; status 0x157 (SpecialNLoop, SpecialAirNLoop)]",,medium,community | reads: MSC kirby.mscsb func_3578; MSC lucina.mscsb func_2281,m12[*].0
+,1,,0x05000001,2.2,2.2,2,2.2,f32,Max multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,0.8,0.8,0.8,0.8,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,0.02,0.02,0.02,0.02,f32,Aerial H deceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,1,1,1,1,f32,"code: animation rate (MotionModule set rate) (func_2282); ColorBlendModule op 0x7 (func_2282); compared with a computed value (func_3578) [status 0x203; status 0x157 (SpecialNLoop, SpecialAirNLoop)] (same position as Marth: ""Charge animation frame speed multiplier"")",read once on initial pullback,medium,"copied from Marth (same layout, same position) | reads: MSC kirby.mscsb func_3578; MSC lucina.mscsb func_2281; MSC lucina.mscsb func_2282",m12[*].4
 14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,Aerial H speed multiplier,,medium,"community | reads: native 0x027AFCAC (fn 0x027AFB24, direct vl read)",m13[*].0
 ,1,,0x06000001,1.4,1.4,1.4,1.4,f32,Initial V speed on aerial startup,,medium,"community | reads: native 0x027AFCD4 (fn 0x027AFB24, direct vl read)",m13[*].1
-,2,,0x16000002,0x1,0x0,0x1,0x1,u32,Can use up/down variants,,medium,community,m13[*].2
+,2,,0x16000002,0x1,0x0,0x1,0x1,u32,Can use up/down variants -- code: tested against 0 (func_2288),,medium,community | reads: MSC lucina.mscsb func_2288,m13[*].2
 15,0,Up B,0x07000000,0.4,1,0.4,0.4,f32,Aerial H mobility multiplier on special fall,,medium,"community | reads: native 0x027AE768 (fn 0x027AE6F0, direct vl read)",m14[*].0
-,1,,0x07000001,19,33,39,36,f32,Landing lag (frames),,medium,"community | reads: native 0x027AE74C (fn 0x027AE6F0, direct vl read)",m14[*].1
+,1,,0x07000001,19,33,39,36,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2248) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,"community | reads: MSC lucina.mscsb func_2248; native 0x027AE74C (fn 0x027AE6F0, direct vl read)",m14[*].1
 ,2,,0x07000002,0.5,0.5,0.5,0.5,f32,Sensitivity for angling,read throughout entire move,low,"copied from Marth (same layout, same position) | reads: native 0x027AE334 (fn 0x027AE268, direct vl read)",m14[*].2
 ,3,,0x07000003,20,5,20,20,f32,Ability to angle (degrees),,medium,"community | reads: native 0x027AE354 (fn 0x027AE268, direct vl read)",m14[*].3
 ,4,,0x07000004,0.6666,0.6666,0.6666,0.6666,f32,Directionalized pre-jump displacement,has a low max,medium,"community | reads: native 0x027AE004 (fn 0x027ADF20, direct vl read)",m14[*].4
@@ -16,25 +16,25 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,0x07000006,0.06,0.12,0.06,0.06,f32,Gravity after flying,,medium,"community | reads: native 0x027AE57C (fn 0x027AE268, direct vl read)",m14[*].6
 ,7,,0x07000007,1.8,1.58,1.8,1.8,f32,Max fall speed after falling,,medium,"community | reads: native 0x027AE590 (fn 0x027AE268, direct vl read)",m14[*].7
 ,8,,0x07000008,1,1,1,1,f32,[auto] read by native code (get_float at 0x027AE488); meaning not traced,read once post-jump,low,reads: native 0x027AE488 (fn 0x027AE268),m14[*].8
-16,0,Down B,0x08000000,0.5,0.45,0.5,0.5,f32,Aerial H speed multiplier,,medium,community,m15[*].0
+16,0,Down B,0x08000000,0.5,0.45,0.5,0.5,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
 ,1,,0x08000001,0.0025,0.003,0.0025,0.0025,f32,H air friction,,medium,"community | reads: native 0x027AEDF4 (fn 0x027AEC68, direct vl read)",m15[*].1
 ,2,,0x08000002,0.04,0.025,0.04,0.04,f32,Counter gravity,,medium,"community | reads: native 0x027AEE44 (fn 0x027AEC68, direct vl read)",m15[*].2
 ,3,,0x08000003,1.2,1.1,1.2,1.2,f32,Counter max fall speed,,medium,"community | reads: native 0x027AEE5C (fn 0x027AEC68, direct vl read)",m15[*].3
-,4,,0x08000004,1.2,0.7,1.3,1.1,f32,Damage multiplier,,medium,community,m15[*].4
+,4,,0x08000004,1.2,0.7,1.3,1.1,f32,Damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
 ,5,,0x18000005,0x10,0x10,0x5,0x10,u32,Freeze frames on activation,,medium,"community | reads: native 0x02F17A44 (fn 0x02F178AC, direct vl read)",m15[*].5
-,6,,0x08000006,8,4,6,8,f32,Min damage,,medium,community,m15[*].6
-,7,,0x08000007,50,50,50,50,f32,Max damage,,medium,community,m15[*].7
+,6,,0x08000006,8,4,6,8,f32,Min damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,50,50,50,50,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
 ,8,,0x08000008,50,50,50,50,f32,[auto] read by native code (get_float at 0x027AEB94); meaning not traced,"read on activation, only difference from Marth",low,reads: native 0x027AEB94 (fn 0x027AE860),m15[*].8
-,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,,m15[*].9
-,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community,m15[*].10
-,11,,0x0800000B,9.3,9.3,9.3,9.3,f32,Counter trigger bubble Y offset,,medium,community,m15[*].11
-,12,,0x0800000C,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community,m15[*].12
-,13,,0x0800000D,9.2,9.2,9.2,9.2,f32,Counter trigger bubble size,,medium,community,m15[*].13
-,14,,0x0800000E,1,1,1,1,f32,,,,,m15[*].14
+,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,9.3,9.3,9.3,9.3,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,9.2,9.2,9.2,9.2,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,1,1,1,1,f32,"code: animation rate (MotionModule set rate) (func_2254) [status 0x155 (SpecialLw, SpecialAirLw)]",,medium,reads: MSC lucina.mscsb func_2254,m15[*].14
 ,0,Final smash,0x04000000,9,,,,f32,H speed,,medium,community | reads: native 0x027AD834 (fn 0x027AD67C); native 0x027ADC08 (fn 0x027ADB6C),m16.0
-,1,,0x14000001,0x1E,,,,u32,Travel time (frames),,medium,community,m16.1
-,2,,0x04000002,10,,,,f32,,,,,m16.2
-,3,,0x04000003,20,,,,f32,,,,,m16.3
-,4,,0x04000004,0.05,,,,f32,,,,,m16.4
-,5,,0x14000005,0x28,,,,u32,,,,,m16.5
-,6,,0x14000006,0x5A,,,,u32,,,,,m16.6
+,1,,0x14000001,0x1E,,,,u32,"Travel time (frames) -- code: stored in status int 0x4, then decremented in func_2312 (a countdown / remaining count), tested against 0 (func_2311) [status 0x15E]",,high,community | reads: MSC lucina.mscsb func_2311,m16.1
+,2,,0x04000002,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,20,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,0.05,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x14000005,0x28,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x14000006,0x5A,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.6

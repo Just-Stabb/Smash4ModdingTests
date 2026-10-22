@@ -1,33 +1,33 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,60,108,30,60,f32,Frames until max arrow angle?,"More velocity with lower value, ONLY affects charged arrows",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2674",m12[*].0
-,1,,0x05000001,1,0.5,2,1,f32,Charging animation speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2672",m12[*].1
-,2,,0x05000002,2.5,3.2,0,2.5,f32,Firing angle (degrees),,medium,community,m12[*].2
-,3,,0x15000003,0x1E,0x1E,0x1E,0x1E,u32,Landing lag post firing (frames),Doesn't apply until after the arrow has been shot,medium,community | reads: MSC kirby.mscsb func_2281,m12[*].3
-,4,,0x05000004,1,1,1,1,f32,Frames used pulling out the bow and arrow,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2674",m12[*].4
-14,0,Side B,0x06000000,0.1,0.1,0.1,0.1,f32,Angle modification Y sensitivity,,medium,community,m13[*].0
-,1,,0x06000001,26,28,12,26,f32,Modification angle (degrees),Cant be above 90?,medium,community,m13[*].1
-15,0,Up B,0x17000000,0x3C,0x3C,0x1,0x3C,u32,Time to fully charge (frames),,medium,community,m14[*].0
-,1,,0x07000001,1.6,1.6,1.6,1.6,f32,Damage multiplier,,medium,community,m14[*].1
-,2,,0x07000002,1,1,1,1,f32,Startup animation speed multiplier,,medium,community,m14[*].2
+13,0,Neutral B,0x05000000,60,108,30,60,f32,"Frames until max arrow angle? -- code: stored in status float 0x6, then compared with a computed value (func_2674) (func_2674); stored in status float 0x6, then compared with a computed value (func_2334) (func_2334); compared with a computed value (func_2674) [status 0x1E9; status 0x152 (SpecialNStart, specialn, SpecialNEnd)]","More velocity with lower value, ONLY affects charged arrows",medium,community | reads: MSC kirby.mscsb func_2674; MSC link.mscsb func_2334,m12[*].0
+,1,,0x05000001,1,0.5,2,1,f32,"Charging animation speed multiplier -- code: animation rate (MotionModule set rate) (func_2672) [status 0x1E9; status 0x152 (SpecialNStart, specialn, SpecialNEnd)]",,high,community | reads: MSC kirby.mscsb func_2672; MSC link.mscsb func_2332; MSC link.mscsb func_2333,m12[*].1
+,2,,0x05000002,2.5,3.2,0,2.5,f32,Firing angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x15000003,0x1E,0x1E,0x1E,0x1E,u32,Landing lag post firing (frames) -- code: compared with a computed value (func_2281) [status 0x16],Doesn't apply until after the arrow has been shot,medium,community | reads: MSC kirby.mscsb func_2281; MSC link.mscsb func_2410,m12[*].3
+,4,,0x05000004,1,1,1,1,f32,"Frames used pulling out the bow and arrow -- code: stored in a work variable, then compared with a computed value (func_2674) (func_2674); animation rate (MotionModule set rate) (func_2333); stored in a work variable, then compared with a computed value (func_2334) (func_2334) [status 0x1E9; status 0x152 (SpecialNStart, specialn, SpecialNEnd)]",,medium,community | reads: MSC kirby.mscsb func_2674; MSC link.mscsb func_2333; MSC link.mscsb func_2334,m12[*].4
+14,0,Side B,0x06000000,0.1,0.1,0.1,0.1,f32,Angle modification Y sensitivity,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,26,28,12,26,f32,Modification angle (degrees),Cant be above 90?,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+15,0,Up B,0x17000000,0x3C,0x3C,0x1,0x3C,u32,"Time to fully charge (frames) -- code: ControlModule op 0x2713 (func_2278); AttackModule op 0x2728 (func_2341) [status 0x158 (SpecialHiHold); status 0x159 (SpecialHi, SpecialAirHi)]",,medium,community | reads: MSC link.mscsb func_2278; MSC link.mscsb func_2341,m14[*].0
+,1,,0x07000001,1.6,1.6,1.6,1.6,f32,"Damage multiplier -- code: AttackModule op 0x2728 (func_2341) [status 0x159 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC link.mscsb func_2341,m14[*].1
+,2,,0x07000002,1,1,1,1,f32,"Startup animation speed multiplier -- code: animation rate (MotionModule set rate) (func_2268); stored in a work variable, then ControlModule op 0x2713 (func_2278) (func_2278) [status 0x154 (SpecialHiStart, SpecialAirHi); status 0x158 (SpecialHiHold)]",,high,community | reads: MSC link.mscsb func_2268; MSC link.mscsb func_2278,m14[*].2
 ,3,,0x07000003,2.4,2.9,3.3,2.35,f32,Initial V speed on startup,,medium,community | reads: native 0x02F0AA78 (fn 0x02F0AA10),m14[*].3
-,4,,0x07000004,0.55,1,0.7,0.55,f32,Gravity multiplier,,medium,community,m14[*].4
-,5,,0x07000005,0.4,0.4,1.2,0.4,f32,Not used in-game in Brawl,,low,"copied from Toon_Link (same layout, same position)",m14[*].5
-,6,,0x07000006,0.22,0.22,1.2,0.22,f32,H mobility,,medium,community,m14[*].6
-,7,,0x07000007,0.5,0.2,1.6,0.2,f32,H max mobility,,medium,community,m14[*].7
-,8,,0x07000008,1,1,1,1,f32,Height multiplier,,medium,community,m14[*].8
-,9,,0x17000009,0x1E,0x28,0x18,0x1E,u32,Landing lag (frames),,medium,community,m14[*].9
-16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,,m15[*]
-,0,Dair,0x04000000,30,,,,f32,Number of frames that Dair's hitbox reappears after said hitbox has connceted,,medium,community,m16.0
-,1,,0x14000001,0x2,,,,u32,Max number of times reappeared Dair hitbox can hit,,medium,community,m16.1
-,2,Shield?,0x04000002,2.869,,,,f32,X scale of Bone = 0x2716,,medium,community,m16.2
-,3,,0x04000003,3.498,,,,f32,Y scale of Bone = 0x2716,,medium,community,m16.3
-,4,,0x04000004,1,,,,f32,Z scale of Bone = 0x2716,,medium,community,m16.4
-,5,Final Smash,0x04000005,1.13,,,,f32,,,,,m16.5
-,6,,0x04000006,7,,,,f32,Search bubble size,Attached Bone ID=0x1A,medium,community,m16.6
-,7,,0x04000007,150,,,,f32,Search bubble Z offset,,medium,community,m16.7
-,8,,0x14000008,0x14,,,,u32,How many frames after successful hit he travels to opponent,,medium,community,m16.8
+,4,,0x07000004,0.55,1,0.7,0.55,f32,Gravity multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,0.4,0.4,1.2,0.4,f32,Not used in-game in Brawl,,low,"copied from Toon_Link (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].5
+,6,,0x07000006,0.22,0.22,1.2,0.22,f32,H mobility,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.5,0.2,1.6,0.2,f32,H max mobility,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,1,1,1,1,f32,Height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].8
+,9,,0x17000009,0x1E,0x28,0x18,0x1E,u32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2267) [status 0x154 (SpecialHiStart, SpecialAirHi)]",,high,community | reads: MSC link.mscsb func_2267,m14[*].9
+16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*]
+,0,Dair,0x04000000,30,,,,f32,Number of frames that Dair's hitbox reappears after said hitbox has connceted,,medium,community | no read in the vanilla MSC (native or unused),m16.0
+,1,,0x14000001,0x2,,,,u32,Max number of times reappeared Dair hitbox can hit -- code: compared with a computed value (func_2255) [status 0x34],,medium,community | reads: MSC link.mscsb func_2255,m16.1
+,2,Shield?,0x04000002,2.869,,,,f32,X scale of Bone = 0x2716 -- code: ModelModule op 0x0 (func_2331),,medium,community | reads: MSC link.mscsb func_2331,m16.2
+,3,,0x04000003,3.498,,,,f32,Y scale of Bone = 0x2716 -- code: ModelModule op 0x0 (func_2331),,medium,community | reads: MSC link.mscsb func_2331,m16.3
+,4,,0x04000004,1,,,,f32,Z scale of Bone = 0x2716 -- code: ModelModule op 0x0 (func_2331),,medium,community | reads: MSC link.mscsb func_2331,m16.4
+,5,Final Smash,0x04000005,1.13,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,7,,,,f32,"Search bubble size -- code: SearchModule op 0x1 (func_2348) [status 0x156 (FinalStart, FinalAirStart)]",Attached Bone ID=0x1A,medium,community | reads: MSC link.mscsb func_2348,m16.6
+,7,,0x04000007,150,,,,f32,"Search bubble Z offset -- code: SearchModule op 0x1 (func_2348) [status 0x156 (FinalStart, FinalAirStart)]",,medium,community | reads: MSC link.mscsb func_2348,m16.7
+,8,,0x14000008,0x14,,,,u32,How many frames after successful hit he travels to opponent -- code: BattleObject op 0x3EB (via func_2382) (func_2353); StopModule op 0x2 (func_2353) [status 0x15B (FinalDash)],,medium,community | reads: MSC link.mscsb func_2353,m16.8
 ,9,,0x04000009,10,,,,f32,Travel speed,,medium,community | reads: native 0x02F0AC94 (fn 0x02F0AB78),m16.9
-,10,,0x1400000A,0xF,,,,u32,(frames),read on successful hit,medium,community,m16.10
+,10,,0x1400000A,0xF,,,,u32,"(frames) -- code: stored in status int 0x2, then decremented in func_2322 (a countdown / remaining count), tested against 0 (func_2320) [status 0x15B (FinalDash)]",read on successful hit,high,community | reads: MSC link.mscsb func_2320,m16.10
 ,11,,0x0400000B,0.05,,,,f32,[auto] read by native code (get_float at 0x02F0ADA4); meaning not traced,read on successful hit,low,reads: native 0x02F0ADA4 (fn 0x02F0AD38),m16.11
 17,0,Side B,,0x64,,,,u32,,,,,m17[0].0
 ,1,,,10,,,,f32,,,,,m17[0].1
@@ -36,43 +36,43 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,0x22,,,,u32,,,,,m17[0].4
 ,5,,,0x5,,,,u32,,,,,m17[0].5
 ,6,,,0x0,,,,u32,,,,,m17[0].6
-18,0,Boomerang,0x02000000,-4.15,-4.15,-4.15,-4.15,f32,Boomerang V offset,"-16 = Higher, hits floor sooner than it should",medium,community,m18[*].0
-,1,,0x12000001,0x8C,0x8C,0x8C,0x8C,u32,Duration of short Boomerang (frames),,medium,community,m18[*].1
-,2,,0x12000002,0xAA,0xAA,0xAA,0xAA,u32,Duration of long Boomerang (frames),,medium,community,m18[*].2
-,3,,0x02000003,2.4,2.4,1.65,2.4,f32,Short Boomerang initial velocity,,medium,community,m18[*].3
-,4,,0x02000004,3.1,3.1,2,3.1,f32,Long Boomerang initial velocity,,medium,community,m18[*].4
-,5,,0x02000005,-22,-60,-18,-20,f32,Rotation of the actual Boomerang,,medium,community,m18[*].5
-,6,,0x02000006,-18,-40,-16,-30,f32,Rotation of the actual Boomerang,,medium,community,m18[*].6
-,7,,0x02000007,0.047,0.05,0.04,0.047,f32,Boomerang decceleration/resistance,,medium,community,m18[*].7
-,8,,0x02000008,3,3,3,3,f32,Returning Boomerang velocity,,medium,community,m18[*].8
-,9,,0x02000009,0.3,0.3,0.3,0.3,f32,this * Name14,"Higher makes the 'rang reverse direction quicker and sharply, Lower makes the turnaround slower",low,"copied from Toon_Link (same layout, same position)",m18[*].9
-,10,,0x0200000A,30,30,30,30,f32,(degrees),Seems to VERY slightly do something near the turnaround point,medium,community,m18[*].10
-,11,,0x0200000B,0.75,0.75,0.75,0.75,f32,Boomerang homing angle per frames (degrees),,medium,community,m18[*].11
-,12,,0x1200000C,0x8C,0x8C,0x8C,0x8C,u32,Something to do with returning Boomerang homing,lowering makes it stop homing after awhile,medium,community,m18[*].12
-,13,,0x1200000D,0x0,0x0,0x0,0x0,u32,Frames,"Freezes if too high, right near turnaround point",medium,community,m18[*].13
-,14,,0x0200000E,1,1,1,1,f32,X-offset of when Boomerang is catchable,,medium,community,m18[*].14
-,15,,0x1200000F,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m18[*].15
-19,0,Arrow,0x12000000,0x28,0x19,0xB,0x28,u32,Lifetimes after stage impact (frames),,medium,community,m19[*].0
-,1,,0x02000001,2.3,0.5,5,3,f32,Uncharged arrow speed,,medium,community,m19[*].1
-,2,,0x02000002,10,9,10,10,f32,Fully-charged arrow speed,,medium,community,m19[*].2
-,3,,0x02000003,4,1,2,4,f32,Uncharged arrow damage,,medium,community,m19[*].3
-,4,,0x02000004,12,19,7,12,f32,Full charge arrow damage,,medium,community,m19[*].4
-,5,,0x02000005,1,1.1,1,1,f32,Damage multiplier,,medium,community,m19[*].5
-,6,,0x12000006,0x50,0x50,0x28,0x50,u32,Time to fully charge (frames),,medium,community,m19[*].6
-,7,,0x02000007,0.13,0.05,0,0.053,f32,Arrow gravity,,medium,community,m19[*].7
-,8,,0x02000008,1,1,1,1,f32,Speed multiplier,,medium,community,m19[*].8
-,9,,0x12000009,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m19[*].9
-20,0,Tether,0x02000000,2.95,,,,f32,Affects grounded chain speed,FSM = This * Animation length / Speed?,medium,community,m20[0].0
-,1,,0x02000001,24.95,,,,f32,Length of grounded chain,Will freeze when exceed the limit determined by animation?,medium,community,m20[0].1
-,2,,0x02000002,2.7,,,,f32,Aerial chain speed,,medium,community,m20[0].2
-,3,,0x02000003,30,,,,f32,Length of aerial chain,,medium,community,m20[0].3
-,4,,0x02000004,8,,,,f32,Chain speed?,,low,"copied from Toon_Link (same layout, same position)",m20[0].4
-,5,,0x02000005,50,,,,f32,,,,,m20[0].5
-,6,,0x02000006,0.1,,,,f32,,,,,m20[0].6
-,7,,0x12000007,0x8,,,,u32,Frames,,low,"copied from Toon_Link (same layout, same position)",m20[0].7
-,8,,0x02000008,1,,,,f32,,,,,m20[0].8
-,9,,0x02000009,1,,,,f32,,,,,m20[0].9
-21,0,Article params (navy),0x12000000,0x0,,,,u32,,,,,m21[0]
+18,0,Boomerang,0x02000000,-4.15,-4.15,-4.15,-4.15,f32,Boomerang V offset,"-16 = Higher, hits floor sooner than it should",medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x12000001,0x8C,0x8C,0x8C,0x8C,u32,Duration of short Boomerang (frames),,medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x12000002,0xAA,0xAA,0xAA,0xAA,u32,Duration of long Boomerang (frames),,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,2.4,2.4,1.65,2.4,f32,Short Boomerang initial velocity,,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,3.1,3.1,2,3.1,f32,Long Boomerang initial velocity,,medium,community | no read in the article MSC (native or unused),m18[*].4
+,5,,0x02000005,-22,-60,-18,-20,f32,Rotation of the actual Boomerang,,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,-18,-40,-16,-30,f32,Rotation of the actual Boomerang -- code: PostureModule op 0x4 (func_71),,medium,community | reads: MSC link/boomerang.mscsb func_71,m18[*].6
+,7,,0x02000007,0.047,0.05,0.04,0.047,f32,"Boomerang decceleration/resistance -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 1 (func_70); compared with a computed value (func_72)",,medium,community | reads: MSC link/boomerang.mscsb func_70; MSC link/boomerang.mscsb func_72,m18[*].7
+,8,,0x02000008,3,3,3,3,f32,"Returning Boomerang velocity -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_72); compared with a computed value (func_72)",,high,community | reads: MSC link/boomerang.mscsb func_72,m18[*].8
+,9,,0x02000009,0.3,0.3,0.3,0.3,f32,"code: compared with a computed value (func_58) (same position as Toon_Link: ""this * Name14"")","Higher makes the 'rang reverse direction quicker and sharply, Lower makes the turnaround slower",medium,"copied from Toon_Link (same layout, same position) | reads: MSC link/boomerang.mscsb func_58",m18[*].9
+,10,,0x0200000A,30,30,30,30,f32,(degrees),Seems to VERY slightly do something near the turnaround point,medium,community | no read in the article MSC (native or unused),m18[*].10
+,11,,0x0200000B,0.75,0.75,0.75,0.75,f32,"Boomerang homing angle per frames (degrees) -- code: stored in instance float 0x2, then KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1; compared with a computed value (func_70) (func_72); KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_72); compared with a computed value (func_72)",,medium,community | reads: MSC link/boomerang.mscsb func_72,m18[*].11
+,12,,0x1200000C,0x8C,0x8C,0x8C,0x8C,u32,"Something to do with returning Boomerang homing -- code: stored in status int 0x0, then decremented in func_72 (a countdown / remaining count), tested against 0 (func_71)",lowering makes it stop homing after awhile,medium,community | reads: MSC link/boomerang.mscsb func_71,m18[*].12
+,13,,0x1200000D,0x0,0x0,0x0,0x0,u32,Frames,"Freezes if too high, right near turnaround point",medium,community | no read in the article MSC (native or unused),m18[*].13
+,14,,0x0200000E,1,1,1,1,f32,"X-offset of when Boomerang is catchable -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_72); compared with a computed value (func_58)",,medium,community | reads: MSC link/boomerang.mscsb func_58; MSC link/boomerang.mscsb func_72,m18[*].14
+,15,,0x1200000F,0x0,0x0,0x1,0x0,u32,Piercing capability -- code: tested against 0 (func_58),community value differs: Custom2 0x0 (vanilla 0x1),medium,community | reads: MSC link/boomerang.mscsb func_58,m18[*].15
+19,0,Arrow,0x12000000,0x28,0x19,0xB,0x28,u32,"Lifetimes after stage impact (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_63); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_63)",,medium,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].0
+,1,,0x02000001,3,0.5,5,3,f32,"Uncharged arrow speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_63)",,high,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].1
+,2,,0x02000002,10,9,10,10,f32,"Fully-charged arrow speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_63)",,high,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].2
+,3,,0x02000003,4,1,2,4,f32,"Uncharged arrow damage -- code: stored in status int 0x0, then decremented in func_62 (a countdown / remaining count), AttackModule op 0x271A (func_63)",,medium,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].3
+,4,,0x02000004,12,19,7,12,f32,"Full charge arrow damage -- code: stored in status int 0x0, then decremented in func_62 (a countdown / remaining count), AttackModule op 0x271A (func_63)",,medium,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].4
+,5,,0x02000005,1,1.1,1,1,f32,"Damage multiplier -- code: stored in status int 0x0, then decremented in func_62 (a countdown / remaining count), AttackModule op 0x271A (func_63)",,medium,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].5
+,6,,0x12000006,0x50,0x50,0x28,0x50,u32,"Time to fully charge (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_63); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_63)",,medium,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].6
+,7,,0x02000007,0.053,0.05,0,0.053,f32,"Arrow gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 2, negated (func_63)",,high,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].7
+,8,,0x02000008,1,1,1,1,f32,"Speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_63)",,high,community | reads: MSC link/bowarrow.mscsb func_63,m19[*].8
+,9,,0x12000009,0x0,0x0,0x1,0x0,u32,Piercing capability,community value differs: Custom2 0x0 (vanilla 0x1),medium,community | no read in the article MSC (native or unused),m19[*].9
+20,0,Tether,0x02000000,2.95,,,,f32,Affects grounded chain speed,FSM = This * Animation length / Speed?,medium,community | no read in the article MSC (native or unused),m20[0].0
+,1,,0x02000001,24.95,,,,f32,Length of grounded chain,Will freeze when exceed the limit determined by animation?,medium,community | no read in the article MSC (native or unused),m20[0].1
+,2,,0x02000002,2.7,,,,f32,Aerial chain speed,,medium,community | no read in the article MSC (native or unused),m20[0].2
+,3,,0x02000003,30,,,,f32,Length of aerial chain,,medium,community | no read in the article MSC (native or unused),m20[0].3
+,4,,0x02000004,8,,,,f32,Chain speed?,,low,"copied from Toon_Link (same layout, same position) | no read in the article MSC (native or unused)",m20[0].4
+,5,,0x02000005,50,,,,f32,,,,no read in the article MSC (native or unused),m20[0].5
+,6,,0x02000006,0.1,,,,f32,,,,no read in the article MSC (native or unused),m20[0].6
+,7,,0x12000007,0x8,,,,u32,Frames,,low,"copied from Toon_Link (same layout, same position) | no read in the article MSC (native or unused)",m20[0].7
+,8,,0x02000008,1,,,,f32,,,,no read in the article MSC (native or unused),m20[0].8
+,9,,0x02000009,1,,,,f32,,,,no read in the article MSC (native or unused),m20[0].9
+21,0,Article params (navy),0x12000000,0x0,,,,u32,,,,no read in the article MSC (native or unused),m21[0]
 22,0,Shield Hurtbox,,0,,,,f32,X offset,,medium,community,m22[0].0
 ,1,,,0,,,,f32,Y offset,,medium,community,m22[0].1
 ,2,,,0,,,,f32,Z offset,,medium,community,m22[0].2
@@ -94,12 +94,12 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m24[0].3
 ,4,,,1,,,,f32,,,,,m24[0].4
 ,5,,,0,,,,f32,,,,,m24[0].5
-25,0,,,1.3,1,1,1,f32,,,,,m25[*].0
-,1,,,1.3,2.5,1,1,f32,,,,,m25[*].1
-,2,,,270,180,120,300,f32,,,,,m25[*].2
-,3,,,20,126,84,96,f32,,,,,m25[*].3
-,4,,,999,5,4,0.7,f32,,,,,m25[*].4
-,5,Bomb,,0x1,0x0,0x1,0x1,u32,Toss speed multiplier,,medium,community,m25[*].5
+25,0,Bomb,,1,1,1,1,f32,Toss speed multiplier,,medium,community,m25[*].0
+,1,,,1,2.5,1,1,f32,Bomb model size multiplier,,medium,community,m25[*].1
+,2,,,220,180,120,300,f32,Explodes frames from generation,,medium,community,m25[*].2
+,3,,,154,126,84,96,f32,Duration of bomb flashing red (frames),smaller number = less warning before explosion,medium,community,m25[*].3
+,4,,,1.7,5,4,0.7,f32,Velocity required for bomb to detonate on impact with the ground,,medium,community,m25[*].4
+,5,,,0x1,0x0,0x1,0x1,u32,Explodes on contact with fighters,,medium,community,m25[*].5
 26,0,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].0
 ,1,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].1
 ,2,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].2
@@ -141,9 +141,4 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,38,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].38
 ,39,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].39
 ,40,,,0x0,0x0,0x0,0x0,u32,,,,,m26[*].40
-25,1,,0x02000001,1,,,,,Bomb model size multiplier,community row not matched to a value of the vanilla file,low,community,
-25,2,,0x02000002,220,,,,,Explodes frames from generation,community row not matched to a value of the vanilla file,low,community,
-25,3,,0x02000003,154,,,,,Duration of bomb flashing red (frames),smaller number = less warning before explosion; community row not matched to a value of the vanilla file,low,community,
-25,4,,0x02000004,1.7,,,,,Velocity required for bomb to detonate on impact with the ground,community row not matched to a value of the vanilla file,low,community,
-25,5,,0x12000005,0x1,,,,,Explodes on contact with fighters,community row not matched to a value of the vanilla file,low,community,
 26,0 to 40,Bomb Hitbox,,,,,,,,community row not matched to a value of the vanilla file,low,community,

@@ -43,7 +43,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,7,,0x06000007,100,100,100,100,f32,Self-damage stops once Kirby's damage reaches this (%).,,high,community | MSC kirby.mscsb (vanilla) func_2476 | reads: MSC kirby.mscsb func_2476,m13[*].7
 ,8,,0x16000008,0x1,0x1,0x1,0x1,u32,Charge counter increment per frame (status int 0x11000003 += this).,,high,MSC kirby.mscsb (vanilla) func_2474 | reads: MSC kirby.mscsb func_2474,m13[*].8
 15,0,Up B,0x07000000,0.8,0.8,1,0.8,f32,"Rise speed multiplier in the air: in the aerial version (status int 0x11000004 = 2), while rising, the Y speed is scaled by this x field 6.",,high,community | MSC kirby.mscsb (vanilla) func_2309 | reads: MSC kirby.mscsb func_2309,m14[*].0
-,1,,0x07000001,8,8,8,8,f32,Air acceleration multiplier during the rise: air accel (fighter_param 0x03000014) x this.,read on Up-B input and initial rise,high,community | MSC kirby.mscsb (vanilla) func_2305 | reads: MSC kirby.mscsb func_2305,m14[*].1
+,1,,0x07000001,8,8,8,8,f32,Air acceleration multiplier during the rise: air accel (fighter_param 0x03000014) x this.,read on Up-B input and initial rise,high,community | MSC kirby.mscsb (vanilla) func_2305 | reads: MSC kirby.mscsb func_2305; MSC kirby.mscsb func_2308,m14[*].1
 ,2,,0x07000002,14,14,14,14,f32,X offset of cutter,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
 ,3,,0x07000003,0,0,0,0,f32,Y offset of cutter,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
 ,4,,0x07000004,0.2,0.2,0.2,0.2,f32,mobility related,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
@@ -85,40 +85,40 @@ Character turns around when angle value reaches 90 or more. They can input aeria
 ,10,,,110,,,,f32,,,,,m17[0].i2[10]
 ,11,,,120,,,,f32,,,,,m17[0].i2[11]
 20,0,"Neutral B
-(starmissile)",0x02000000,2.8,2.8,2.3,4,f32,,,,,m18[*].0
-,1,,0x02000001,0.05,0.06,0.06,0.13,f32,,,,,m18[*].1
-,2,,0x02000002,62,62,62,62,f32,?,,medium,community,m18[*].2
-,3,,0x02000003,3.4,3.4,3.4,3.4,f32,V speed of opponents after copying,,medium,community,m18[*].3
-,4,,0x02000004,0.17,0.17,0.17,0.17,f32,,,,,m18[*].4
-,5,,0x02000005,0.008,0.008,0.008,0.01,f32,Gained H speed of spitted star (per opponent's %?),,medium,community,m18[*].5
-,6,,0x02000006,0.008,0.008,0.008,0.01,f32,Reduced H speed of spitted star (per Kirby's %?),,medium,community,m18[*].6
-,7,,0x02000007,25,25,25,30,f32,,,,,m18[*].7
-,8,,0x02000008,0.5,0.2,0.2,0.5,f32,,,,,m18[*].8
-,9,,0x02000009,60,55,55,60,f32,,,,,m18[*].9
-,10,,0x0200000A,10,6,6,12,f32,,,,,m18[*].10
-,11,,0x0200000B,15,15,15,15,f32,,,,,m18[*].11
-,12,,0x0200000C,0.4,0.4,0.4,0.2,f32,,,,,m18[*].12
-,13,,0x0200000D,8,8,8,8,f32,Spin per frame (degrees): added to the star's rotation (work float 0x1000002) every frame while spinning.,,high,community | MSC starmissile.mscsb func_60 | reads: MSC starmissile.mscsb func_60,m18[*].13
-,14,,0x0200000E,0.67,0.67,0.67,0.67,f32,,,,,m18[*].14
-,15,,0x0200000F,2.67,2.67,2.67,2.67,f32,,,,,m18[*].15
-,16,,0x02000010,0.1,0.1,0.1,0.1,f32,,,,,m18[*].16
-,17,,0x02000011,3,3,3,3,f32,,,,,m18[*].17
-,18,,0x02000012,1.2,1.2,1.2,1.2,f32,,,,,m18[*].18
-,19,,0x12000013,0x32,0x32,0x32,0x32,u32,"Frame count for the star's status 1 (spat star): copied to status int 0x11000002, its counter (probably the lifetime).",,medium,MSC starmissile.mscsb func_59 | reads: MSC starmissile.mscsb func_59,m18[*].19
-,20,,0x12000014,0x0,0x0,0x0,0x0,u32,Piercing capability?,,medium,community,m18[*].20
-,21,,0x02000015,1,1,1,1,f32,X offset?,,medium,community,m18[*].21
-,22,,0x02000016,-1,-1,-1,-1,f32,Y offset?,,medium,community,m18[*].22
-,23,,0x02000017,1,1,1,1,f32,Z offset?,,medium,community,m18[*].23
-,24,,0x02000018,1,1,1,1,f32,X offset?,,medium,community,m18[*].24
-,25,,0x02000019,-1,-1,-1,-1,f32,Y offset?,,medium,community,m18[*].25
-,26,,0x0200001A,1,1,1,1,f32,Z offset?,,medium,community,m18[*].26
-21,0,Final Cutter,0x02000000,4.5,4.5,4.5,6,f32,Initial speed,,medium,community,m19[*].0
-,1,,0x02000001,0,0,0,0,f32,,,,,m19[*].1
-,2,,0x02000002,19,19,19,25,f32,Lifetime (frames),,medium,community,m19[*].2
-,3,,0x02000003,0.28,0.28,0.28,0.31,f32,Speed decay,,high,community | MSC finalcutter.mscsb func_53 (deceleration) | reads: MSC finalcutter.mscsb func_53,m19[*].3
-,4,,0x12000004,0x0,0x0,0x0,0x0,u32,Piercing capability,,medium,community,m19[*].4
-22,0,Article params (hammer),0x12000000,0x0,0x0,0x0,0x0,u32,,,,,m20[*]
-23,0,Article params (stone),0x12000000,0x0,0x0,0x0,0x0,u32,,,,,m21[*]
+(starmissile)",0x02000000,2.8,2.8,2.3,4,f32,,community value differs: Custom2 2.8 (vanilla 2.3),,no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,0.05,0.06,0.06,0.13,f32,,,,no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,62,62,62,62,f32,?,,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,3.4,3.4,3.4,3.4,f32,V speed of opponents after copying,,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,0.17,0.17,0.17,0.17,f32,,,,no read in the article MSC (native or unused),m18[*].4
+,5,,0x02000005,0.008,0.008,0.008,0.01,f32,Gained H speed of spitted star (per opponent's %?),,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,0.008,0.008,0.008,0.01,f32,Reduced H speed of spitted star (per Kirby's %?),,medium,community | no read in the article MSC (native or unused),m18[*].6
+,7,,0x02000007,25,25,25,30,f32,,,,no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,0.5,0.2,0.2,0.5,f32,,,,no read in the article MSC (native or unused),m18[*].8
+,9,,0x02000009,60,55,55,60,f32,,,,no read in the article MSC (native or unused),m18[*].9
+,10,,0x0200000A,10,6,6,12,f32,,,,no read in the article MSC (native or unused),m18[*].10
+,11,,0x0200000B,15,15,15,15,f32,,,,no read in the article MSC (native or unused),m18[*].11
+,12,,0x0200000C,0.4,0.4,0.4,0.2,f32,,,,no read in the article MSC (native or unused),m18[*].12
+,13,,0x0200000D,8,8,8,8,f32,Spin per frame (degrees): added to the star's rotation (work float 0x1000002) every frame while spinning.,,high,community | MSC starmissile.mscsb func_60 | reads: MSC kirby/starmissile.mscsb func_60,m18[*].13
+,14,,0x0200000E,0.67,0.67,0.67,0.67,f32,,,,no read in the article MSC (native or unused),m18[*].14
+,15,,0x0200000F,2.67,2.67,2.67,2.67,f32,,,,no read in the article MSC (native or unused),m18[*].15
+,16,,0x02000010,0.1,0.1,0.1,0.1,f32,,,,no read in the article MSC (native or unused),m18[*].16
+,17,,0x02000011,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m18[*].17
+,18,,0x02000012,1.2,1.2,1.2,1.2,f32,,,,no read in the article MSC (native or unused),m18[*].18
+,19,,0x12000013,0x32,0x32,0x32,0x32,u32,"Frame count for the star's status 1 (spat star): copied to status int 0x11000002, its counter (probably the lifetime).",,medium,MSC starmissile.mscsb func_59 | reads: MSC kirby/starmissile.mscsb func_59,m18[*].19
+,20,,0x12000014,0x0,0x0,0x0,0x0,u32,Piercing capability?,,medium,community | no read in the article MSC (native or unused),m18[*].20
+,21,,0x02000015,1,1,1,1,f32,X offset?,,medium,community | no read in the article MSC (native or unused),m18[*].21
+,22,,0x02000016,-1,-1,-1,-1,f32,Y offset?,,medium,community | no read in the article MSC (native or unused),m18[*].22
+,23,,0x02000017,1,1,1,1,f32,Z offset?,,medium,community | no read in the article MSC (native or unused),m18[*].23
+,24,,0x02000018,1,1,1,1,f32,X offset?,,medium,community | no read in the article MSC (native or unused),m18[*].24
+,25,,0x02000019,-1,-1,-1,-1,f32,Y offset?,,medium,community | no read in the article MSC (native or unused),m18[*].25
+,26,,0x0200001A,1,1,1,1,f32,Z offset?,,medium,community | no read in the article MSC (native or unused),m18[*].26
+21,0,Final Cutter,0x02000000,4.5,4.5,4.5,6,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m19[*].0
+,1,,0x02000001,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m19[*].1
+,2,,0x02000002,19,19,19,25,f32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m19[*].2
+,3,,0x02000003,0.28,0.28,0.28,0.31,f32,Speed decay,,high,community | MSC finalcutter.mscsb func_53 (deceleration) | reads: MSC kirby/finalcutter.mscsb func_53,m19[*].3
+,4,,0x12000004,0x0,0x0,0x0,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m19[*].4
+22,0,Article params (hammer),0x12000000,0x0,0x0,0x0,0x0,u32,,,,no read in the article MSC (native or unused),m20[*]
+23,0,Article params (stone),0x12000000,0x0,0x0,0x0,0x0,u32,,,,no read in the article MSC (native or unused),m21[*]
 24,0,,,0x2000000,,,,u32,Final Cutter weapon param Name0?,,medium,community,m22[0].0
 ,1,,,1,,,,f32,,,,,m22[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m22[0].2

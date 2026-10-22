@@ -2,91 +2,91 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 13,0,Neutral B,0x05000000,4,4,4,4,f32,X offset?,"Name3 is used for recharging(SpecialNHold animation).
 If you cancel Sun Salutation, you have to wait for
 ""Charged frames / (Name3 * 3)"" frames to begin recharging.
-i.e. if cancels in frame18, needs another (18 / 3 - 18 + 85) frames to full charge.",medium,community,m12[*].0
-,1,,0x05000001,2,0,3,2,f32,Healing percentage,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3649",m12[*].1
-,2,,0x05000002,0.3,0.3,0.3,0.3,f32,,,,,m12[*].2
-,3,,0x05000003,1,1,1,1,f32,Charging animation frame speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3645; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3646",m12[*].3
-14,0,Side B,0x16000000,0x1,0x1,0x1,0x1,u32,X offset of the soccer ball when used on the ground,,medium,community,m13[*].0
-,1,,0x06000001,0.4,0.4,0.7,0.4,f32,Initial V speed on aerial startup,,medium,community,m13[*].1
-,2,,0x06000002,0.06,0.06,0.06,0.06,f32,Gravity on startup / after firing,,medium,community,m13[*].2
-,3,,0x16000003,0x4,0x4,0x4,0x4,u32,,,,,m13[*].3
-,4,,0x06000004,1.2,1.2,1.2,1.2,f32,Initial V speed of firing,,medium,community,m13[*].4
-,5,,0x16000005,0x14,0x1E,0x1E,0x1E,u32,Landing lag from heading (frames),,medium,community,m13[*].5
-,6,,0x16000006,0xF,0xF,0xF,0xF,u32,Landing lag from no heading (frames),,medium,community,m13[*].6
-15,0,Up B,0x07000000,0.5,0.5,0.8,0.5,f32,H speed multiplier on startup,,medium,community,m14[*].0
-,1,,0x07000001,0.5,0.5,0.2,0.5,f32,V speed multiplier on aerial startup,,medium,community,m14[*].1
-,2,,0x07000002,0.3,0.3,0.3,0.3,f32,Reverse sensitivty,,medium,community,m14[*].2
-,3,,0x17000003,0x2D,0x78,0x28,0x2D,u32,Duration of hula hoops (frames),Frames before WFT begins to fall,medium,community,m14[*].3
-,4,,0x07000004,0.75,0.1,0.5,0.8,f32,V base speed,,medium,community,m14[*].4
-,5,,0x07000005,0.7,1.3,0.05,0.7,f32,H max speed while flying (this * StickX),,medium,community,m14[*].5
-,6,,0x07000006,0.9,0.9,1,0.8,f32,1 - (1 - this) * StickX is multiplied to Name 4,,medium,community,m14[*].6
-,7,,0x17000007,0x1,0x4,0x1,0x1,u32,First frame to read tapping B,True: these + 5,medium,community,m14[*].7
-,8,,0x17000008,0x20,0x20,0x24,0x20,u32,End frame to read tapping B,,medium,community,m14[*].8
-,9,,0x07000009,0.2,0.25,0.3,0.2,f32,Added V speed with tapping B,,medium,community,m14[*].9
-,10,,0x0700000A,30,30,30,30,f32,"this / 100, related to SFX pitch",,medium,community,m14[*].10
-,11,,0x1700000B,0xA,0xA,0xA,0xA,u32,Duration of breaking air max speed limit before falling?,,medium,community,m14[*].11
-,12,,0x1700000C,0x6,0x6,0x5,0x5,u32,Min frames between button presses,,medium,community,m14[*].12
-,13,,0x0700000D,9.6,9.6,9.6,10,f32,Max V speed,,medium,community,m14[*].13
-,14,,0x0700000E,0.3,0.12,0.05,0.3,f32,StickX * this is added to H speed?,,medium,community,m14[*].14
-,15,,0x0700000F,0.04,0.03,0.046,0.04,f32,Gravity while falling,,medium,community,m14[*].15
-,16,,0x07000010,10,10,10,10,f32,H speed multiplier?,,medium,community,m14[*].16
-,17,,0x07000011,30,45,30,30,f32,Landing lag (frames),,medium,community,m14[*].17
-16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,H speed multiplier on startup,,medium,community,m15[*].0
-,1,,0x18000001,0x4,0x4,0x4,0x4,u32,Frames before Name2 takes effect,community ID was 0x08000001,medium,community,m15[*].1
-,2,,0x08000002,0.02,0.02,0.02,0.02,f32,Gravity,,medium,community,m15[*].2
-,3,,0x18000003,0x14,0xA,0x14,0x14,u32,prohibit_frame,,medium,community,m15[*].3
-,4,,0x18000004,0x258,0x96,0x5DC,0x258,u32,Max shrinking frames,,medium,community,m15[*].4
-,5,,0x08000005,1,0,5,1,f32,Min healing dealt,,medium,community,m15[*].5
-,6,,0x18000006,0x168,0x0,0x14A,0x168,u32,Min duration of buff (frames),,medium,community,m15[*].6
-,7,,0x08000007,1.15,1,1,1.2,f32,Min damage dealt multiplier,,medium,community,m15[*].7
-,8,,0x08000008,0.9,1,1,0.9,f32,Min damage taken multiplier,,medium,community,m15[*].8
-,9,,0x08000009,1,1,0.2,0.9,f32,Min knockback received multiplier,,medium,community,m15[*].9
-,10,,0x0800000A,1.1,1,1,1.05,f32,Min walk speed multiplier,,medium,community,m15[*].10
-,11,,0x1800000B,0x10,0x10,0x20,0x10,u32,Max success window (frames),,medium,community,m15[*].11
-,12,,0x1800000C,0x30,0x30,0x30,0x30,u32,Min shrinking frames,,medium,community,m15[*].12
-,13,,0x0800000D,2,0,5,5,f32,Max healing dealt,,medium,community,m15[*].13
-,14,,0x1800000E,0x228,0x0,0x17B,0x0,u32,Max duration of buff (frames),True = 590 F (?),medium,community,m15[*].14
-,15,,0x0800000F,1.2,1,1,1.2,f32,Max damage dealt multiplier,,medium,community,m15[*].15
-,16,,0x08000010,0.9,1,1,0.9,f32,Max damage taken multiplier,,medium,community,m15[*].16
-,17,,0x08000011,1,1,0.2,0.8,f32,Max knockback received multiplier,,medium,community,m15[*].17
-,18,,0x08000012,1.2,1,1,1.15,f32,Max walk speed multiplier,,medium,community,m15[*].18
-,19,,0x18000013,0xA,0xA,0x12,0xA,u32,Min success window (frames),,medium,community,m15[*].19
-,20,,0x18000014,0xE10,0x4B0,0x4650,0xE10,u32,Amount of frames for fastest shrinking ring speed back again,,medium,community,m15[*].20
-,21,,0x08000015,0.4,0.4,1,0.4,f32,,,,,m15[*].21
-,0,Category 4 block,0x14000000,0x64,,,,u32,,,,,m16
+i.e. if cancels in frame18, needs another (18 / 3 - 18 + 85) frames to full charge.",medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,2,0,3,2,f32,"Healing percentage -- code: BattleObject op 0x1A (func_3649); tested against 0 (func_3649) [status 0x211; status 0x158 (SpecialNShoot, SpecialAirNShoot)]",,medium,community | reads: MSC kirby.mscsb func_3649; MSC wiifit.mscsb func_2264,m12[*].1
+,2,,0x05000002,0.3,0.3,0.3,0.3,f32,,,,no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,1,1,1,1,f32,"Charging animation frame speed multiplier -- code: animation rate (MotionModule set rate) (func_3645) [status 0x210; status 0x157 (SpecialNHold, SpecialAirNHold)]",,high,community | reads: MSC kirby.mscsb func_3645; MSC kirby.mscsb func_3646; MSC wiifit.mscsb func_2260; MSC wiifit.mscsb func_2261,m12[*].3
+14,0,Side B,0x16000000,0x1,0x1,0x1,0x1,u32,X offset of the soccer ball when used on the ground,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,0.4,0.4,0.7,0.4,f32,"Initial V speed on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2268) [status 0x153 (SpecialSStart, SpecialAirSStart)]",,high,community | reads: MSC wiifit.mscsb func_2268,m13[*].1
+,2,,0x06000002,0.06,0.06,0.06,0.06,f32,"Gravity on startup / after firing -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2268) [status 0x153 (SpecialSStart, SpecialAirSStart); status 0x159 (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC wiifit.mscsb func_2268; MSC wiifit.mscsb func_2273,m13[*].2
+,3,,0x16000003,0x4,0x4,0x4,0x4,u32,"code: compared with the status frame counter (global9) (func_2275) [status 0x159 (SpecialSJump, SpecialAirSJump)]",,medium,reads: MSC wiifit.mscsb func_2275,m13[*].3
+,4,,0x06000004,1.2,1.2,1.2,1.2,f32,"Initial V speed of firing -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2273) [status 0x159 (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC wiifit.mscsb func_2273,m13[*].4
+,5,,0x16000005,0x14,0x1E,0x1E,0x1E,u32,"Landing lag from heading (frames) -- code: named ""param frame"" in a debug print (func_2284); compared with the status frame counter (global9) (func_2284) [status 0x16]",,high,community | reads: MSC wiifit.mscsb func_2284,m13[*].5
+,6,,0x16000006,0xF,0xF,0xF,0xF,u32,"Landing lag from no heading (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2275) [status 0x159 (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC wiifit.mscsb func_2275,m13[*].6
+15,0,Up B,0x07000000,0.5,0.5,0.8,0.5,f32,"H speed multiplier on startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2291) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,high,community | reads: MSC wiifit.mscsb func_2291,m14[*].0
+,1,,0x07000001,0.5,0.5,0.2,0.5,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2291) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,high,community | reads: MSC wiifit.mscsb func_2291,m14[*].1
+,2,,0x07000002,0.3,0.3,0.3,0.3,f32,"Reverse sensitivty -- code: compared with a computed value (func_2294) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,medium,community | reads: MSC wiifit.mscsb func_2294,m14[*].2
+,3,,0x17000003,0x2D,0x78,0x28,0x2D,u32,Duration of hula hoops (frames) -- code: compared with the status frame counter (global9) (func_2298) [status 0x15B (SpecialHiJump)],Frames before WFT begins to fall,high,community | reads: MSC wiifit.mscsb func_2298,m14[*].3
+,4,,0x07000004,0.75,0.1,0.5,0.8,f32,"V base speed -- code: named ""speed_y"" in a debug print (func_2296); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2296); stored in instance float 0x34, then compared with a computed value; KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2302) (func_2296) [status 0x15B (SpecialHiJump)]",,high,community | reads: MSC wiifit.mscsb func_2296; MSC wiifit.mscsb func_2300,m14[*].4
+,5,,0x07000005,0.7,1.3,0.05,0.7,f32,"H max speed while flying (this * StickX) -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2296); stored in status float 0x9, then compared with a computed value (func_2299) (func_2296); compared with a computed value (func_2299) [status 0x15B (SpecialHiJump)]",,medium,community | reads: MSC wiifit.mscsb func_2296; MSC wiifit.mscsb func_2299; MSC wiifit.mscsb func_2300,m14[*].5
+,6,,0x07000006,0.9,0.9,1,0.8,f32,"1 - (1 - this) * StickX is multiplied to Name 4 -- code: named ""speed_y"" in a debug print (func_2296); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2296); stored in instance float 0x34, then compared with a computed value; KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2302) (func_2296) [status 0x15B (SpecialHiJump)]",,medium,community | reads: MSC wiifit.mscsb func_2296; MSC wiifit.mscsb func_2300,m14[*].6
+,7,,0x17000007,0x1,0x4,0x1,0x1,u32,First frame to read tapping B -- code: compared with the status frame counter (global9) (func_2298) [status 0x15B (SpecialHiJump)],True: these + 5,high,community | reads: MSC wiifit.mscsb func_2298,m14[*].7
+,8,,0x17000008,0x20,0x20,0x24,0x20,u32,End frame to read tapping B -- code: compared with the status frame counter (global9) (func_2298) [status 0x15B (SpecialHiJump)],,high,community | reads: MSC wiifit.mscsb func_2298,m14[*].8
+,9,,0x07000009,0.2,0.25,0.3,0.2,f32,Added V speed with tapping B -- code: compared with a computed value (func_2298) [status 0x15B (SpecialHiJump)],,medium,community | reads: MSC wiifit.mscsb func_2298,m14[*].9
+,10,,0x0700000A,30,30,30,30,f32,"this / 100, related to SFX pitch -- code: animation rate (MotionModule set rate) (func_2298); stored in status float 0x8, then animation rate (MotionModule set rate) (func_2298) (func_2298) [status 0x15B (SpecialHiJump)]",,medium,community | reads: MSC wiifit.mscsb func_2298,m14[*].10
+,11,,0x1700000B,0xA,0xA,0xA,0xA,u32,Duration of breaking air max speed limit before falling? -- code: compared with a computed value (func_2298) [status 0x15B (SpecialHiJump)],,medium,community | reads: MSC wiifit.mscsb func_2298,m14[*].11
+,12,,0x1700000C,0x6,0x6,0x5,0x5,u32,Min frames between button presses -- code: compared with a computed value (func_2298) [status 0x15B (SpecialHiJump)],,medium,community | reads: MSC wiifit.mscsb func_2298,m14[*].12
+,13,,0x0700000D,9.6,9.6,9.6,10,f32,"Max V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2298); stored in instance float 0x34, then compared with a computed value; KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2302) (func_2298); compared with a computed value (func_2298) [status 0x15B (SpecialHiJump)]",,medium,community | reads: MSC wiifit.mscsb func_2298,m14[*].13
+,14,,0x0700000E,0.3,0.12,0.05,0.3,f32,StickX * this is added to H speed? -- code: compared with a computed value (func_2299); combined with stick X (func_2299); tested against 0 (via func_13) (func_2299) [status 0x15B (SpecialHiJump)],,medium,community | reads: MSC wiifit.mscsb func_2299,m14[*].14
+,15,,0x0700000F,0.04,0.03,0.046,0.04,f32,"Gravity while falling -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2306); stored in instance float 0x34, then compared with a computed value; KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2302) (func_2306); compared with a computed value (func_2302) [status 0x15B (SpecialHiJump); status 0x15C (SpecialHiEnd)]",,medium,community | reads: MSC wiifit.mscsb func_2302; MSC wiifit.mscsb func_2306,m14[*].15
+,16,,0x07000010,10,10,10,10,f32,H speed multiplier? -- code: stored in instance float 0x35 (func_2299) [status 0x15B (SpecialHiJump)],,medium,community | reads: MSC wiifit.mscsb func_2299,m14[*].16
+,17,,0x07000011,30,45,30,30,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2308) [status 0x15C (SpecialHiEnd)],,high,community | reads: MSC wiifit.mscsb func_2308,m14[*].17
+16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,"H speed multiplier on startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2311) [status 0x155 (SpecialLwStartL, SpecialLwStartR, SpecialAirLwStartL)]",,high,community | reads: MSC wiifit.mscsb func_2311,m15[*].0
+,1,,0x18000001,0x4,0x4,0x4,0x4,u32,"Frames before Name2 takes effect -- code: compared with the status frame counter (global9) (func_2313) [status 0x155 (SpecialLwStartL, SpecialLwStartR, SpecialAirLwStartL)]",community ID was 0x08000001,high,community | reads: MSC wiifit.mscsb func_2313,m15[*].1
+,2,,0x08000002,0.02,0.02,0.02,0.02,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2315) [motions SpecialLwStartL, SpecialLwStartR, SpecialAirLwStartL; motions SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL]",,high,community | reads: MSC wiifit.mscsb func_2315; MSC wiifit.mscsb func_2325,m15[*].2
+,3,,0x18000003,0x14,0xA,0x14,0x14,u32,"prohibit_frame -- code: named ""prohibit_frame"" in a debug print (func_2319); compared with the status frame counter (global9) (func_2319) [status 0x15D (speciallws, specialairlws)]",,high,community | reads: MSC wiifit.mscsb func_2319,m15[*].3
+,4,,0x18000004,0x258,0x96,0x5DC,0x258,u32,"Max shrinking frames -- code: named ""FL_step_min"" in a debug print (func_2318); named ""MINF"" in a debug print (func_2318); animation rate (MotionModule set rate) (func_2318) [status 0x15D (speciallws, specialairlws)]",,medium,community | reads: MSC wiifit.mscsb func_2318,m15[*].4
+,5,,0x08000005,1,0,5,1,f32,"Min healing dealt -- code: BattleObject op 0x1A (func_2322); tested against 0 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].5
+,6,,0x18000006,0x168,0x0,0x14A,0x168,u32,"Min duration of buff (frames) -- code: named ""effective_frame_cast"" in a debug print (func_2322); stored in instance int 0x86 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].6
+,7,,0x08000007,1.15,1,1,1.2,f32,"Min damage dealt multiplier -- code: named ""FL_effective_attack_rate"" in a debug print (func_2322); stored in instance float 0x30 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].7
+,8,,0x08000008,0.9,1,1,0.9,f32,"Min damage taken multiplier -- code: named ""FL_effective_damage_rate"" in a debug print (func_2322); stored in instance float 0x31 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,high,community | reads: MSC wiifit.mscsb func_2322,m15[*].8
+,9,,0x08000009,1,1,0.2,0.9,f32,"Min knockback received multiplier -- code: named ""FL_effective_damage_reaction_mul"" in a debug print (func_2322); stored in instance float 0x33 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].9
+,10,,0x0800000A,1.1,1,1,1.05,f32,"Min walk speed multiplier -- code: named ""FL_effective_walk_rate"" in a debug print (func_2322); stored in instance float 0x32 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,high,community | reads: MSC wiifit.mscsb func_2322,m15[*].10
+,11,,0x1800000B,0x10,0x10,0x20,0x10,u32,"Max success window (frames) -- code: named ""FL_success start"" in a debug print (func_2319); stored in status float 0x9 (func_2319); compared with the status frame counter (global9) (func_2319) [status 0x15D (speciallws, specialairlws)]",,high,community | reads: MSC wiifit.mscsb func_2319,m15[*].11
+,12,,0x1800000C,0x30,0x30,0x30,0x30,u32,"Min shrinking frames -- code: named ""FL_step_min"" in a debug print (func_2318); named ""MAXF"" in a debug print (func_2318); named ""FL_substance_end_frame"" in a debug print (func_2318) [status 0x15D (speciallws, specialairlws)]",,medium,community | reads: MSC wiifit.mscsb func_2318; MSC wiifit.mscsb func_2319,m15[*].12
+,13,,0x0800000D,2,0,5,5,f32,"Max healing dealt -- code: BattleObject op 0x1A (func_2322); tested against 0 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].13
+,14,,0x1800000E,0x228,0x0,0x17B,0x0,u32,"Max duration of buff (frames) -- code: named ""effective_frame_cast"" in a debug print (func_2322); stored in instance int 0x86 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",True = 590 F (?),medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].14
+,15,,0x0800000F,1.2,1,1,1.2,f32,"Max damage dealt multiplier -- code: named ""FL_effective_attack_rate"" in a debug print (func_2322); stored in instance float 0x30 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].15
+,16,,0x08000010,0.9,1,1,0.9,f32,"Max damage taken multiplier -- code: named ""FL_effective_damage_rate"" in a debug print (func_2322); stored in instance float 0x31 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,high,community | reads: MSC wiifit.mscsb func_2322,m15[*].16
+,17,,0x08000011,1,1,0.2,0.8,f32,"Max knockback received multiplier -- code: named ""FL_effective_damage_reaction_mul"" in a debug print (func_2322); stored in instance float 0x33 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,medium,community | reads: MSC wiifit.mscsb func_2322,m15[*].17
+,18,,0x08000012,1.2,1,1,1.15,f32,"Max walk speed multiplier -- code: named ""FL_effective_walk_rate"" in a debug print (func_2322); stored in instance float 0x32 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL)]",,high,community | reads: MSC wiifit.mscsb func_2322,m15[*].18
+,19,,0x18000013,0xA,0xA,0x12,0xA,u32,"Min success window (frames) -- code: named ""FL_success start"" in a debug print (func_2319); stored in status float 0x9 (func_2319); compared with the status frame counter (global9) (func_2319) [status 0x15D (speciallws, specialairlws)]",,high,community | reads: MSC wiifit.mscsb func_2319,m15[*].19
+,20,,0x18000014,0xE10,0x4B0,0x4650,0xE10,u32,"Amount of frames for fastest shrinking ring speed back again -- code: named ""restore_frame_cast"" in a debug print (func_2330); stored in instance int 0x85 (func_2322) [status 0x15E (SpecialLwSuccessL, SpecialLwSuccessR, SpecialAirLwSuccessL); motions speciallws, specialairlws, SpecialLwFailureL]",,medium,community | reads: MSC wiifit.mscsb func_2322; MSC wiifit.mscsb func_2330,m15[*].20
+,21,,0x08000015,0.4,0.4,1,0.4,f32,"code: compared with a computed value (func_2330) [motions speciallws, specialairlws, SpecialLwFailureL]",,medium,reads: MSC wiifit.mscsb func_2330,m15[*].21
+,0,Category 4 block,0x14000000,0x64,,,,u32,code: compared with the status frame counter (global9) (func_2338) [status 0x160],,medium,reads: MSC wiifit.mscsb func_2338,m16
 17,0,Crawling,,0.3,,,,f32,Crawl forward speed,,medium,community,m17[0].0
 ,1,,,0.3,,,,f32,Crawl backward speed,,medium,community,m17[0].1
-18,0,Article params (hulahoop),0x02000000,1,1,2.5,0.4,f32,,,,,m18[*].0
-,1,,0x12000001,0x37,0x37,0x1E,0x37,u32,,,,,m18[*].1
-,2,,0x02000002,0.06,0.12,0.1,0.05,f32,,,,,m18[*].2
-,3,,0x02000003,3,2.5,3,1.25,f32,,,,,m18[*].3
-,4,,0x02000004,1,1.5,1,1,f32,,,,,m18[*].4
-,5,,0x12000005,0x96,0x96,0x96,0x96,u32,,,,,m18[*].5
-,6,,0x12000006,0xFF,0xFF,0xFF,0xFF,u32,,,,,m18[*].6
-,7,,0x12000007,0x74,0x74,0x74,0x74,u32,,,,,m18[*].7
-,8,,0x12000008,0x12C,0x12C,0x12C,0x12C,u32,,,,,m18[*].8
-,9,,0x12000009,0x98,0x98,0x98,0x98,u32,,,,,m18[*].9
-,10,,0x1200000A,0x45,0x45,0x45,0x45,u32,,,,,m18[*].10
-,11,,0x1200000B,0x7F,0x7F,0x7F,0x7F,u32,,,,,m18[*].11
-,12,,0x1200000C,0x66,0x66,0x66,0x66,u32,,,,,m18[*].12
-,13,,0x1200000D,0x17E,0x17E,0x17E,0x17E,u32,,,,,m18[*].13
-,14,,0x1200000E,0x17E,0x17E,0x17E,0x17E,u32,,,,,m18[*].14
-,15,,0x1200000F,0x66,0x66,0x66,0x66,u32,,,,,m18[*].15
-,16,,0x12000010,0x66,0x66,0x66,0x66,u32,,,,,m18[*].16
-,17,,0x12000011,0x66,0x66,0x66,0x66,u32,,,,,m18[*].17
-,18,,0x12000012,0x99,0x99,0x99,0x99,u32,,,,,m18[*].18
-,19,,0x12000013,0x165,0x165,0x165,0x165,u32,,,,,m18[*].19
-,20,,0x12000014,0xFF,0xFF,0xFF,0xFF,u32,,,,,m18[*].20
-,21,,0x12000015,0xFF,0xFF,0xFF,0xFF,u32,,,,,m18[*].21
-,22,,0x12000016,0xFF,0xFF,0xFF,0xFF,u32,,,,,m18[*].22
-19,0,Sun Salutation,0x12000000,0x46,0x3A,0x4A,0x46,u32,Lifetime (frames),,medium,community,m19[*].0
-,1,,0x02000001,1.5,1,1.1,1.5,f32,Uncharged projectile speed,,medium,community,m19[*].1
-,2,,0x02000002,2.5,2.8,1.5,2.5,f32,Fully charged projectile speed,,medium,community,m19[*].2
-,3,,0x02000003,0.3,1.18,0.3,0.3,f32,Uncharged projectile hitbox/GFX size multiplier,,medium,community,m19[*].3
-,4,,0x02000004,0.95,0.22,0.95,0.95,f32,Fully charged projectile hitbox/GFX size multiplier,,medium,community,m19[*].4
-,5,,0x02000005,7.5,7.5,7.5,7.5,f32,X offset,,medium,community,m19[*].5
-,6,,0x12000006,0x4,0x4,0x4,0x4,u32,Y offset?,,medium,community,m19[*].6
-,7,,0x12000007,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m19[*].7
+18,0,Article params (hulahoop),0x02000000,1,1,2.5,0.4,f32,,,,no read in the article MSC (native or unused),m18[*].0
+,1,,0x12000001,0x37,0x37,0x1E,0x37,u32,,,,no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,0.06,0.12,0.1,0.05,f32,,,,no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,3,2.5,3,1.25,f32,,,,no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,1,1.5,1,1,f32,,,,no read in the article MSC (native or unused),m18[*].4
+,5,,0x12000005,0x96,0x96,0x96,0x96,u32,,,,no read in the article MSC (native or unused),m18[*].5
+,6,,0x12000006,0xFF,0xFF,0xFF,0xFF,u32,,,,no read in the article MSC (native or unused),m18[*].6
+,7,,0x12000007,0x74,0x74,0x74,0x74,u32,,,,no read in the article MSC (native or unused),m18[*].7
+,8,,0x12000008,0x12C,0x12C,0x12C,0x12C,u32,,,,no read in the article MSC (native or unused),m18[*].8
+,9,,0x12000009,0x98,0x98,0x98,0x98,u32,,,,no read in the article MSC (native or unused),m18[*].9
+,10,,0x1200000A,0x45,0x45,0x45,0x45,u32,,,,no read in the article MSC (native or unused),m18[*].10
+,11,,0x1200000B,0x7F,0x7F,0x7F,0x7F,u32,,,,no read in the article MSC (native or unused),m18[*].11
+,12,,0x1200000C,0x66,0x66,0x66,0x66,u32,,,,no read in the article MSC (native or unused),m18[*].12
+,13,,0x1200000D,0x17E,0x17E,0x17E,0x17E,u32,,,,no read in the article MSC (native or unused),m18[*].13
+,14,,0x1200000E,0x17E,0x17E,0x17E,0x17E,u32,,,,no read in the article MSC (native or unused),m18[*].14
+,15,,0x1200000F,0x66,0x66,0x66,0x66,u32,,,,no read in the article MSC (native or unused),m18[*].15
+,16,,0x12000010,0x66,0x66,0x66,0x66,u32,,,,no read in the article MSC (native or unused),m18[*].16
+,17,,0x12000011,0x66,0x66,0x66,0x66,u32,,,,no read in the article MSC (native or unused),m18[*].17
+,18,,0x12000012,0x99,0x99,0x99,0x99,u32,,,,no read in the article MSC (native or unused),m18[*].18
+,19,,0x12000013,0x165,0x165,0x165,0x165,u32,,,,no read in the article MSC (native or unused),m18[*].19
+,20,,0x12000014,0xFF,0xFF,0xFF,0xFF,u32,,,,no read in the article MSC (native or unused),m18[*].20
+,21,,0x12000015,0xFF,0xFF,0xFF,0xFF,u32,,,,no read in the article MSC (native or unused),m18[*].21
+,22,,0x12000016,0xFF,0xFF,0xFF,0xFF,u32,,,,no read in the article MSC (native or unused),m18[*].22
+19,0,Sun Salutation,0x12000000,0x46,0x3A,0x4A,0x46,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m19[*].0
+,1,,0x02000001,1.5,1,1.1,1.5,f32,Uncharged projectile speed,,medium,community | no read in the article MSC (native or unused),m19[*].1
+,2,,0x02000002,2.5,2.8,1.5,2.5,f32,Fully charged projectile speed,,medium,community | no read in the article MSC (native or unused),m19[*].2
+,3,,0x02000003,0.3,1.18,0.3,0.3,f32,Uncharged projectile hitbox/GFX size multiplier,,medium,community | no read in the article MSC (native or unused),m19[*].3
+,4,,0x02000004,0.95,0.22,0.95,0.95,f32,Fully charged projectile hitbox/GFX size multiplier,,medium,community | no read in the article MSC (native or unused),m19[*].4
+,5,,0x02000005,7.5,7.5,7.5,7.5,f32,X offset,,medium,community | no read in the article MSC (native or unused),m19[*].5
+,6,,0x12000006,0x4,0x4,0x4,0x4,u32,Y offset?,,medium,community | no read in the article MSC (native or unused),m19[*].6
+,7,,0x12000007,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m19[*].7
 20,0,Soccer ball,,8,8.6,8,8,f32,,,,,m20[*].0
 ,1,,,0.2,2.4,0.2,0.2,f32,,,,,m20[*].1
 ,2,,,1.6,1.6,1.55,1.6,f32,,,,,m20[*].2
@@ -128,8 +128,8 @@ i.e. if cancels in frame18, needs another (18 / 3 - 18 + 85) frames to full char
 ,38,,,1.5,1.5,2.4,1.3,f32,,Added in 1.1.0,,,m20[*].38
 21,0,,,0x1,,,,u32,,,,,m21[0].0
 ,1,,,2,,,,f32,,,,,m21[0].1
-,2,,,-2,,,,f32,,,,,m21[0].2
-,3,,,2,,,,f32,,,,,m21[0].3
+,2,,,-2,,,,f32,,community value differs: Default -1 (vanilla -2),,,m21[0].2
+,3,,,2,,,,f32,,community value differs: Default 1 (vanilla 2),,,m21[0].3
 22,0,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].0
 ,1,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].1
 ,2,,,0x0,0x0,0x0,0x0,u32,,,,,m22[*].2

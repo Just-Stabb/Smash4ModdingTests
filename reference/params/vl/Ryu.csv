@@ -1,54 +1,54 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,0.4,0.8,0,0,f32,H speed multiplier on grounded startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2301",m12[*].0
-,1,,0x05000001,0.2,0.9,0,0,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2301",m12[*].1
-,2,,0x05000002,1,0.6,0,0,f32,V speed multiplier on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2301",m12[*].2
-,3,,0x05000003,0.45,1.2,0,0,f32,Max air speed multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2299; MSC ryu.mscsb (vanilla decompile, repo first commit) func_2301",m12[*].3
-,4,,0x05000004,0.9,1.45,0,0,f32,Initial V speed on aerial firing,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2302",m12[*].4
-,5,,0x05000005,0.05,0.07,0,0,f32,Gravity,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2302",m12[*].5
-,6,,0x05000006,1.55,1.95,0,0,f32,Max fall speed,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2302",m12[*].6
-,7,,0x15000007,0x5,0x5,0x0,0x0,u32,Input window for Light Hadouken,"1-5F for Light, 6-12F for Medium, 13F~ for Heavy Hadoken.
+13,0,Neutral B,0x05000000,0.4,0,0,0,f32,"H speed multiplier on grounded startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_3932); KineticModule op 0xE (sets a speed) on energy 2 (control / horizontal), argument 2 (func_3932)",,high,community | reads: MSC kirby.mscsb func_3932; MSC ryu.mscsb func_2301,m12[*].0
+,1,,0x05000001,0.2,0,0,0,f32,"H speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 2 (control / horizontal), argument 2 (func_3932)",,high,community | reads: MSC kirby.mscsb func_3932; MSC ryu.mscsb func_2301,m12[*].1
+,2,,0x05000002,1,0,0,0,f32,"V speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_3932)",,high,community | reads: MSC kirby.mscsb func_3932; MSC ryu.mscsb func_2301,m12[*].2
+,3,,0x05000003,0.45,0,0,0,f32,"Max air speed multiplier -- code: KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), with fighter_param 0x16 (air_speed_x_stable) (func_3932); KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), with fighter_param 0x16 (air_speed_x_stable) (func_2299)",,high,community | reads: MSC kirby.mscsb func_3932; MSC ryu.mscsb func_2299; MSC ryu.mscsb func_2301,m12[*].3
+,4,,0x05000004,0.9,0,0,0,f32,Initial V speed on aerial firing -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_3933),,high,community | reads: MSC kirby.mscsb func_3933; MSC ryu.mscsb func_2302,m12[*].4
+,5,,0x05000005,0.05,0,0,0,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_3933),,high,community | reads: MSC kirby.mscsb func_3933; MSC ryu.mscsb func_2302,m12[*].5
+,6,,0x05000006,1.55,0,0,0,f32,Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_3933),,high,community | reads: MSC kirby.mscsb func_3933; MSC ryu.mscsb func_2302,m12[*].6
+,7,,0x15000007,0x5,0x0,0x0,0x0,u32,Input window for Light Hadouken,"1-5F for Light, 6-12F for Medium, 13F~ for Heavy Hadoken.
 Different mechanics for Syoryuken?",medium,community | no read in the vanilla MSC (native or unused),m12[*].7
-,8,,0x05000008,13,13,0,0,f32,Input window for Medium Hadouken?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
-,9,,0x05000009,11.5,9,0,0,f32,Y offset of Hadoken,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
-,10,,0x0500000A,13,13,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
-,11,,0x0500000B,5,5,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
-14,0,Side B,0x06000000,0.5,0,0,0,f32,H speed multiplier on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2314",m13[*].0
-,1,,0x06000001,0.4,0,0,0,f32,V speed multiplier on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2314",m13[*].1
-,2,,0x06000002,1,0,0,0,f32,H initial speed before turning,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2314",m13[*].2
-,3,,0x06000003,0.025,0,0,0,f32,Gravity before turning / SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2312",m13[*].3
-,4,,0x06000004,0.4,0,0,0,f32,Max fall speed before turning / SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2312",m13[*].4
-,5,,0x06000005,0.35,0,0,0,f32,Added V speed on SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2314",m13[*].5
+,8,,0x05000008,13,0,0,0,f32,Input window for Medium Hadouken?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,11.5,0,0,0,f32,Y offset of Hadoken,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,13,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,5,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+14,0,Side B,0x06000000,0.5,0,0,0,f32,"H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2314)",,high,community | reads: MSC ryu.mscsb func_2314,m13[*].0
+,1,,0x06000001,0.4,0,0,0,f32,"V speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2314)",,high,community | reads: MSC ryu.mscsb func_2314,m13[*].1
+,2,,0x06000002,1,0,0,0,f32,"H initial speed before turning -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2314); combined with the facing direction (func_2314)",,high,community | reads: MSC ryu.mscsb func_2314,m13[*].2
+,3,,0x06000003,0.025,0,0,0,f32,"Gravity before turning / SpecialAirS -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2312) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2312; MSC ryu.mscsb func_2314; MSC ryu.mscsb func_2323,m13[*].3
+,4,,0x06000004,0.4,0,0,0,f32,"Max fall speed before turning / SpecialAirS -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2312) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2312; MSC ryu.mscsb func_2314; MSC ryu.mscsb func_2323,m13[*].4
+,5,,0x06000005,0.35,0,0,0,f32,"Added V speed on SpecialAirS -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2314)",,high,community | reads: MSC ryu.mscsb func_2314,m13[*].5
 ,6,,0x16000006,0x6,0x0,0x0,0x0,u32,Input window for grounded / aerial Light Tatsu,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
-,7,,0x16000007,0x1,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].7
-,8,,0x16000008,0x2,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].8
-,9,,0x16000009,0x3,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].9
-,10,,0x1600000A,0x2,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].10
-,11,,0x1600000B,0x3,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].11
-,12,,0x1600000C,0x2,0x0,0x0,0x0,u32,Input window?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].12
-,13,,0x0600000D,1.5,0,0,0,f32,H speed on Light SpecialS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].13
-,14,,0x0600000E,1.1,0,0,0,f32,H speed on Light SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].14
-,15,,0x0600000F,1.2,0,0,0,f32,H speed on Medium SpecialS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].15
-,16,,0x06000010,1.3,0,0,0,f32,H speed on Medium SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].16
-,17,,0x06000011,1.4,0,0,0,f32,H speed on Heavy SpecialS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].17
-,18,,0x06000012,1.5,0,0,0,f32,H speed on Heavy SpecialAirS,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2323",m13[*].18
+,7,,0x16000007,0x1,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].7
+,8,,0x16000008,0x2,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].8
+,9,,0x16000009,0x3,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].9
+,10,,0x1600000A,0x2,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].10
+,11,,0x1600000B,0x3,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].11
+,12,,0x1600000C,0x2,0x0,0x0,0x0,u32,"Input window? -- code: stored in status int 0x5, then decremented in func_2320 (a countdown / remaining count), tested against 0 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].12
+,13,,0x0600000D,1.5,0,0,0,f32,"H speed on Light SpecialS -- code: read in: var3 = WorkModuleF(0, 0x600000d); (func_2323) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2323,m13[*].13
+,14,,0x0600000E,1.1,0,0,0,f32,"H speed on Light SpecialAirS -- code: read in: var3 = WorkModuleF(0, 0x600000e); (func_2323) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2323,m13[*].14
+,15,,0x0600000F,1.2,0,0,0,f32,"H speed on Medium SpecialS -- code: read in: var3 = WorkModuleF(0, 0x600000f); (func_2323) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2323,m13[*].15
+,16,,0x06000010,1.3,0,0,0,f32,"H speed on Medium SpecialAirS -- code: read in: var3 = WorkModuleF(0, 0x6000010); (func_2323) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2323,m13[*].16
+,17,,0x06000011,1.4,0,0,0,f32,"H speed on Heavy SpecialS -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].17
+,18,,0x06000012,1.5,0,0,0,f32,"H speed on Heavy SpecialAirS -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2323) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2323,m13[*].18
 ,19,,0x16000013,0x24,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].19
-,20,,0x16000014,0x24,0x0,0x0,0x0,u32,Duration of SpecialSEnd / SpecialAirSEnd for Light Tatsu (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].20
+,20,,0x16000014,0x24,0x0,0x0,0x0,u32,"Duration of SpecialSEnd / SpecialAirSEnd for Light Tatsu (frames) -- code: read in: var1 = func_2307(var0, WorkModule(0x6, 0x16000014)); (func_2328) [status 0x15A]",,medium,community | reads: MSC ryu.mscsb func_2328,m13[*].20
 ,21,,0x16000015,0x24,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].21
-,22,,0x16000016,0x24,0x0,0x0,0x0,u32,Duration of SpecialSEnd / SpecialAirSEnd for Medium Tatsu (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].22
+,22,,0x16000016,0x24,0x0,0x0,0x0,u32,"Duration of SpecialSEnd / SpecialAirSEnd for Medium Tatsu (frames) -- code: read in: var1 = func_2307(var0, WorkModule(0x6, 0x16000016)); (func_2328) [status 0x15A]",,medium,community | reads: MSC ryu.mscsb func_2328,m13[*].22
 ,23,,0x16000017,0x24,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].23
-,24,,0x16000018,0x24,0x0,0x0,0x0,u32,Duration of SpecialSEnd / SpecialAirSEnd for Heavy Tatsu (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].24
-,25,,0x06000019,0.9,0,0,0,f32,H speed multiplier on ground ending,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2329",m13[*].25
-,26,,0x0600001A,0.8,0,0,0,f32,H speed multiplier on aerial ending,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2329",m13[*].26
-,27,,0x0600001B,0.045,0,0,0,f32,Ground friction on ending,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].27
-,28,,0x0600001C,0.015,0,0,0,f32,Air friction on ending,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].28
-,29,,0x0600001D,1,0,0,0,f32,Max fall speed on ending,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2328",m13[*].29
-,30,,0x0600001E,1.16,0,0,0,f32,Damage multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2314",m13[*].30
-,31,,0x0600001F,50,0,0,0,f32,Tatsu wind GFX related (this * 0.01),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2319",m13[*].31
-,32,,0x06000020,100,0,0,0,f32,True Tatsu wind GFX related (this * 0.01),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2319",m13[*].32
-15,0,Up B,0x07000000,0.5,0,0,0,f32,H speed multiplier on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2338",m14[*].0
-,1,,0x07000001,0.5,0,0,0,f32,V speed multiplier on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2338",m14[*].1
-,2,,0x07000002,0.01,0,0,0,f32,Gravity on startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2336",m14[*].2
-,3,,0x07000003,0.3,0,0,0,f32,Turn sensitivity,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2337",m14[*].3
+,24,,0x16000018,0x24,0x0,0x0,0x0,u32,Duration of SpecialSEnd / SpecialAirSEnd for Heavy Tatsu (frames) -- code: animation rate (MotionModule set rate) (func_2328) [status 0x15A],,medium,community | reads: MSC ryu.mscsb func_2328,m13[*].24
+,25,,0x06000019,0.9,0,0,0,f32,"H speed multiplier on ground ending -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2329) [status 0x15A]",,high,community | reads: MSC ryu.mscsb func_2329,m13[*].25
+,26,,0x0600001A,0.8,0,0,0,f32,"H speed multiplier on aerial ending -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2329) [status 0x15A]",,high,community | reads: MSC ryu.mscsb func_2329,m13[*].26
+,27,,0x0600001B,0.045,0,0,0,f32,Ground friction on ending -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2328) [status 0x15A],,high,community | reads: MSC ryu.mscsb func_2328; MSC ryu.mscsb func_2329,m13[*].27
+,28,,0x0600001C,0.015,0,0,0,f32,Air friction on ending -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2328) [status 0x15A],,high,community | reads: MSC ryu.mscsb func_2328; MSC ryu.mscsb func_2329,m13[*].28
+,29,,0x0600001D,1,0,0,0,f32,Max fall speed on ending -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2328) [status 0x15A],,high,community | reads: MSC ryu.mscsb func_2328; MSC ryu.mscsb func_2329,m13[*].29
+,30,,0x0600001E,1.16,0,0,0,f32,"Damage multiplier -- code: AttackModule op 0x2728 (func_2314) [status 0x159 (SpecialS, specialairs)]",,high,community | reads: MSC ryu.mscsb func_2314; MSC ryu.mscsb func_2323,m13[*].30
+,31,,0x0600001F,50,0,0,0,f32,"Tatsu wind GFX related (this * 0.01) -- code: EffectModule op 0x2C (func_2319) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2319,m13[*].31
+,32,,0x06000020,100,0,0,0,f32,"True Tatsu wind GFX related (this * 0.01) -- code: EffectModule op 0x2C (func_2319) [status 0x159 (SpecialS, specialairs)]",,medium,community | reads: MSC ryu.mscsb func_2319,m13[*].32
+15,0,Up B,0x07000000,0.5,0,0,0,f32,"H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2338)",,high,community | reads: MSC ryu.mscsb func_2338,m14[*].0
+,1,,0x07000001,0.5,0,0,0,f32,"V speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2338)",,high,community | reads: MSC ryu.mscsb func_2338,m14[*].1
+,2,,0x07000002,0.01,0,0,0,f32,Gravity on startup -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2336),,high,community | reads: MSC ryu.mscsb func_2336; MSC ryu.mscsb func_2338,m14[*].2
+,3,,0x07000003,0.3,0,0,0,f32,Turn sensitivity -- code: compared with a computed value (func_2337),,medium,community | reads: MSC ryu.mscsb func_2337,m14[*].3
 ,4,,0x17000004,0x3,0x0,0x0,0x0,u32,Input window for Light Shoryuken,"1-3F for Light, 4-5F for Medium, 6F~ for Heavy Syoryuken
 Different mechanics for Hadoken?",medium,community | no read in the vanilla MSC (native or unused),m14[*].4
 ,5,,0x17000005,0x5,0x0,0x0,0x0,u32,Input window for Medium Shoryuken,,medium,community | no read in the vanilla MSC (native or unused),m14[*].5
@@ -66,58 +66,58 @@ Not the case for easy input True Shoryuken (→↘→ or ↘↓↘)",medium,comm
 ,16,,0x07000010,0.85,0,0,0,f32,Added initial H speed of Medium Syoryuken,,medium,community | no read in the vanilla MSC (native or unused),m14[*].16
 ,17,,0x07000011,1.5,0,0,0,f32,Added initial H speed of Heavy Syoryuken,,medium,community | no read in the vanilla MSC (native or unused),m14[*].17
 ,18,,0x07000012,1.4,0,0,0,f32,Added initial V speed of aerial Shoryuken,,medium,community | no read in the vanilla MSC (native or unused),m14[*].18
-,19,,0x17000013,0x4,0x0,0x0,0x0,u32,Timer,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2346",m14[*].19
-,20,,0x07000014,0.3,0,0,0,f32,Maximum air speed / H air speed cap multiplier on SpecialHiFall / SpecialAirHiFall,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2352",m14[*].20
-,21,,0x07000015,1,0,0,0,f32,Vertical acceleration multiplier,multiplied by fighter_param Name26,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2352",m14[*].21
-,22,,0x17000016,0x19,0x0,0x0,0x0,u32,"Timer, falling animation?",frames,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2352",m14[*].22
-,23,,0x17000017,0x12,0x0,0x0,0x0,u32,Light Shoryuken landing lag (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].23
-,24,,0x17000018,0x12,0x0,0x0,0x0,u32,Medium Shoryuken landing lag (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].24
-,25,,0x17000019,0x12,0x0,0x0,0x0,u32,Heavy Shoryuken landing lag (frames),,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].25
-,26,,0x0700001A,1.2,0,0,0,f32,Damage multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2338",m14[*].26
-,27,,0x0700001B,0.66,0,0,0,f32,True Syoryuken landing lag multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].27
-16,0,Down B,0x08000000,0.7,0,0,0,f32,H speed multiplier on aerial startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370",m15[*].0
-,1,,0x08000001,0.5,0,0,0,f32,V speed multiplier on aerial startup,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370",m15[*].1
-,2,,0x08000002,0.03,0,0,0,f32,Gravity,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2368",m15[*].2
-,3,,0x08000003,1.7,0,0,0,f32,Max fall speed,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2368",m15[*].3
-,4,,0x08000004,0.8,0,0,0,f32,[auto] copied to status work float 0x1000005,,low,"reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370",m15[*].4
-,5,,0x18000005,0x1E,0x0,0x0,0x0,u32,Timer,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2369",m15[*].5
-,6,,0x08000006,10,0,0,0,f32,Damage-based armor start threshold,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370; MSC ryu.mscsb (vanilla decompile, repo first commit) func_2371",m15[*].6
-,7,,0x08000007,20,0,0,0,f32,Damage-based armor end threshold,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2371",m15[*].7
-,8,,0x08000008,0.5,0,0,0,f32,Damage received multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370",m15[*].8
-,9,,0x08000009,2.2,0,0,0,f32,Hitlag multiplier,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2370; MSC ryu.mscsb (vanilla decompile, repo first commit) func_2371; MSC ryu.mscsb (vanilla decompile, repo first commit) func_2384",m15[*].9
-,10,,0x0800000A,1.96,0,0,0,f32,H intial speed of aerial cancelling,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2390",m15[*].10
-,11,,0x0800000B,0.81,0,0,0,f32,Added V intial speed of aerial cancelling,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2390",m15[*].11
-,12,,0x0800000C,0.6,0,0,0,f32,H intial speed of grounded stage1 hit cancelling,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2390",m15[*].12
-,13,,0x0800000D,0.55,0,0,0,f32,H intial speed multiplier of aerial stage1 hit cancelling,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2390",m15[*].13
+,19,,0x17000013,0x4,0x0,0x0,0x0,u32,"Timer -- code: stored in status int 0x5, then decremented in func_2345 (a countdown / remaining count) (func_2346) [status 0x15C]",,high,community | reads: MSC ryu.mscsb func_2346,m14[*].19
+,20,,0x07000014,0.3,0,0,0,f32,"Maximum air speed / H air speed cap multiplier on SpecialHiFall / SpecialAirHiFall -- code: multiplies fighter_param 0x16 (air_speed_x_stable) (func_2352); KineticModule op 0x15 (sets a max speed) on energy 2 (control / horizontal), argument 1 (func_2352); multiplies fighter_param 0x24 (air_speed_x_limit) (func_2352) [status 0x15D (SpecialHiFall)]",,high,community | reads: MSC ryu.mscsb func_2352,m14[*].20
+,21,,0x07000015,1,0,0,0,f32,"Vertical acceleration multiplier -- code: KineticModule op 0x10 (sets a brake / friction) on energy 1 (gravity / vertical), with fighter_param 0x1A (air_brake_y) (func_2352) [status 0x15D (SpecialHiFall)]",multiplied by fighter_param Name26,high,community | reads: MSC ryu.mscsb func_2352,m14[*].21
+,22,,0x17000016,0x19,0x0,0x0,0x0,u32,"Timer, falling animation? -- code: stored in status int 0x5, then decremented in func_2351 (a countdown / remaining count), tested against 0 (func_2352) [status 0x15D (SpecialHiFall)]",frames,high,community | reads: MSC ryu.mscsb func_2352,m14[*].22
+,23,,0x17000017,0x12,0x0,0x0,0x0,u32,"Light Shoryuken landing lag (frames) -- code: read in: var2 = (float)WorkModule(0x6, 0x17000017); (func_2331) [motions SpecialAirHiEnd]",,medium,community | reads: MSC ryu.mscsb func_2331,m14[*].23
+,24,,0x17000018,0x12,0x0,0x0,0x0,u32,"Medium Shoryuken landing lag (frames) -- code: read in: var2 = (float)WorkModule(0x6, 0x17000018); (func_2331) [motions SpecialAirHiEnd]",,medium,community | reads: MSC ryu.mscsb func_2331,m14[*].24
+,25,,0x17000019,0x12,0x0,0x0,0x0,u32,"Heavy Shoryuken landing lag (frames) -- code: read in: var2 = (float)WorkModule(0x6, 0x17000019); (func_2331) [motions SpecialAirHiEnd]",,medium,community | reads: MSC ryu.mscsb func_2331,m14[*].25
+,26,,0x0700001A,1.2,0,0,0,f32,Damage multiplier -- code: AttackModule op 0x2728 (func_2338) [status 0x15C; status 0x15D (SpecialHiFall)],,high,community | reads: MSC ryu.mscsb func_2338; MSC ryu.mscsb func_2346; MSC ryu.mscsb func_2352,m14[*].26
+,27,,0x0700001B,0.66,0,0,0,f32,"True Syoryuken landing lag multiplier -- code: read in: var2 *= WorkModuleF(0, 0x700001b); (func_2331) [motions SpecialAirHiEnd]",,medium,community | reads: MSC ryu.mscsb func_2331,m14[*].27
+16,0,Down B,0x08000000,0.7,0,0,0,f32,"H speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2370) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2370,m15[*].0
+,1,,0x08000001,0.5,0,0,0,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2370) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2370,m15[*].1
+,2,,0x08000002,0.03,0,0,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2368) [status 0x155 (SpecialLwStart, SpecialAirLwStart); status 0x161 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC ryu.mscsb func_2368; MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2376; MSC ryu.mscsb func_2383,m15[*].2
+,3,,0x08000003,1.7,0,0,0,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2368) [status 0x155 (SpecialLwStart, SpecialAirLwStart); status 0x161 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC ryu.mscsb func_2368; MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2376; MSC ryu.mscsb func_2383,m15[*].3
+,4,,0x08000004,0.4,0,0,0,f32,"code: stored in status float 0x5 (func_2370) [status 0x155 (SpecialLwStart, SpecialAirLwStart); motions SpecialLw, SpecialLwTurn, SpecialAirLw]",,medium,reads: MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2384,m15[*].4
+,5,,0x18000005,0x1E,0x0,0x0,0x0,u32,"Timer -- code: compared with status int 0x4 (a counter) (func_2369) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2369,m15[*].5
+,6,,0x08000006,10,0,0,0,f32,"Damage-based armor start threshold -- code: DamageModule op 0xB (func_2370); HitModule op 0x271B (func_2370); DamageModule op 0x11 (func_2371) [status 0x155 (SpecialLwStart, SpecialAirLwStart); motions SpecialLw, SpecialLwTurn, SpecialAirLw]",,high,community | reads: MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2371; MSC ryu.mscsb func_2384,m15[*].6
+,7,,0x08000007,20,0,0,0,f32,"Damage-based armor end threshold -- code: DamageModule op 0x11 (func_2371); HitModule op 0x271B (func_2371); stored in status float 0x8 (func_2371) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2371,m15[*].7
+,8,,0x08000008,0.5,0,0,0,f32,"Damage received multiplier -- code: HitModule op 0x271C (func_2370) [status 0x155 (SpecialLwStart, SpecialAirLwStart); motions SpecialLw, SpecialLwTurn, SpecialAirLw]",,medium,community | reads: MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2384,m15[*].8
+,9,,0x08000009,2.2,0,0,0,f32,"Hitlag multiplier -- code: HitModule op 0x271B (func_2370) [status 0x155 (SpecialLwStart, SpecialAirLwStart); motions SpecialLw, SpecialLwTurn, SpecialAirLw]",,medium,community | reads: MSC ryu.mscsb func_2370; MSC ryu.mscsb func_2371; MSC ryu.mscsb func_2384,m15[*].9
+,10,,0x0800000A,1.4,0,0,0,f32,"H intial speed of aerial cancelling -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2390)",,high,community | reads: MSC ryu.mscsb func_2390,m15[*].10
+,11,,0x0800000B,0.4,0,0,0,f32,"Added V intial speed of aerial cancelling -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2390)",,high,community | reads: MSC ryu.mscsb func_2390,m15[*].11
+,12,,0x0800000C,0.6,0,0,0,f32,H intial speed of grounded stage1 hit cancelling -- code: KineticModule op 0x12 on energy 0 (motion) (func_2390),,medium,community | reads: MSC ryu.mscsb func_2390,m15[*].12
+,13,,0x0800000D,0.55,0,0,0,f32,"H intial speed multiplier of aerial stage1 hit cancelling -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2390)",,high,community | reads: MSC ryu.mscsb func_2390,m15[*].13
 ,14,,0x0800000E,0.15,0,0,0,f32,H intial speed of grounded stage2 hit cancelling,,medium,community | no read in the vanilla MSC (native or unused),m15[*].14
 ,15,,0x0800000F,8,0,0,0,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m15[*].15
-,16,,0x08000010,20,0,0,0,f32,Timer for Action 0x161,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2369",m15[*].16
-,17,,0x08000011,1,0,0,0,f32,Min frames before cancelling,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2369",m15[*].17
-,18,,0x08000012,30,0,0,0,f32,Related to Action 0x163 and 0x164,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2378",m15[*].18
-,19,,0x08000013,1,0,0,0,f32,?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2387",m15[*].19
-,20,,0x08000014,1,0,0,0,f32,?,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2387",m15[*].20
+,16,,0x08000010,20,0,0,0,f32,"Timer for Action 0x161 -- code: compared with the status frame counter (global9) (func_2369) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2369,m15[*].16
+,17,,0x08000011,25,0,0,0,f32,"Min frames before cancelling -- code: compared with the status frame counter (global9) (func_2369) [status 0x155 (SpecialLwStart, SpecialAirLwStart)]",,high,community | reads: MSC ryu.mscsb func_2369,m15[*].17
+,18,,0x08000012,30,0,0,0,f32,"Related to Action 0x163 and 0x164 -- code: compared with the status frame counter (global9) (func_2378) [motions SpecialLw, SpecialLwTurn, SpecialAirLw]",,medium,community | reads: MSC ryu.mscsb func_2378,m15[*].18
+,19,,0x08000013,1,0,0,0,f32,? -- code: BattleObject op 0x3E8 (func_2387),,medium,community | reads: MSC ryu.mscsb func_2387,m15[*].19
+,20,,0x08000014,1,0,0,0,f32,? -- code: BattleObject op 0x3E8 (func_2387),,medium,community | reads: MSC ryu.mscsb func_2387,m15[*].20
 ,21,,0x08000015,0.1,0,0,0,f32,The amount of pushout opponents with grounded cancelling,,medium,community | no read in the vanilla MSC (native or unused),m15[*].21
 ,22,,0x08000016,5,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].22
 ,23,,0x08000017,11,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].23
-,24,,0x08000018,60,0,0,0,f32,59 / this is added when 0x1000009 is lower than 59,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2362",m15[*].24
-,25,,0x08000019,30,0,0,0,f32,59 / this is subtracted when 0x1000009 is higher than 0,,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2362",m15[*].25
+,24,,0x08000018,60,0,0,0,f32,59 / this is added when 0x1000009 is lower than 59 -- code: compared with a computed value (func_2362),,medium,community | reads: MSC ryu.mscsb func_2362,m15[*].24
+,25,,0x08000019,30,0,0,0,f32,59 / this is subtracted when 0x1000009 is higher than 0 -- code: tested against 0 (func_2362),,medium,community | reads: MSC ryu.mscsb func_2362,m15[*].25
 ,0,Category 4 block,0x04000000,5,,,,f32,Weak jab input window (frames),,medium,community | no read in the vanilla MSC (native or unused),m16.0
 ,1,,0x04000001,6,,,,f32,Weak Ftilt input window (frames),,medium,community | no read in the vanilla MSC (native or unused),m16.1
 ,2,,0x04000002,5,,,,f32,Weak Utilt input window (frames),,medium,community | no read in the vanilla MSC (native or unused),m16.2
 ,3,,0x04000003,6,,,,f32,Weak Dtilt input window (frames),,medium,community | no read in the vanilla MSC (native or unused),m16.3
-,4,,0x04000004,3,,,,f32,0 makes jab repeated,Related to jab?,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2267",m16.4
-,5,,0x04000005,3,,,,f32,[auto] threshold compared with a status counter (frames / count),Related to u-tilt (timer of some sort),low,"reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2279",m16.5
-,6,,0x04000006,3,,,,f32,[auto] threshold compared with a status counter (frames / count),Related to d-tilt (timer of some sort),low,"reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2284",m16.6
-,7,,0x14000007,0x0,,,,u32,"Platform through related, 2 or higher = can't (except shield drop)",Related to crouching (timer of some sort),medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2253",m16.7
-,8,,0x04000008,5,,,,f32,lag,Related to turning while running?,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2256",m16.8
-,9,,0x04000009,3,,,,f32,input window,Related to f-tilt/u-tilt/more?,medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2267",m16.9
-,10,,0x0400000A,8,,,,f32,"[auto] read by MSC: if (global9 >= WorkModuleF(0, 0x400000a))",,low,"reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2259",m16.10
+,4,,0x04000004,3,,,,f32,0 makes jab repeated -- code: compared with status int 0xA (a counter) (func_2267) [status 0x25],Related to jab?,medium,community | reads: MSC ryu.mscsb func_2267,m16.4
+,5,,0x04000005,3,,,,f32,code: compared with status int 0xA (a counter) (func_2279) [status 0x29],Related to u-tilt (timer of some sort),medium,reads: MSC ryu.mscsb func_2279,m16.5
+,6,,0x04000006,3,,,,f32,code: compared with status int 0xA (a counter) (func_2284) [status 0x2A],Related to d-tilt (timer of some sort),medium,reads: MSC ryu.mscsb func_2284,m16.6
+,7,,0x14000007,0x0,,,,u32,"Platform through related, 2 or higher = can't (except shield drop) -- code: stored in status int 0x4, then stored in status int 0x2 (func_623) (func_2253) [status 0x11; status 0x12]",Related to crouching (timer of some sort),medium,community | reads: MSC ryu.mscsb func_2253; MSC ryu.mscsb func_2254,m16.7
+,8,,0x04000008,5,,,,f32,lag -- code: compared with the status frame counter (global9) (func_2256) [status 0x7],Related to turning while running?,medium,community | reads: MSC ryu.mscsb func_2256,m16.8
+,9,,0x04000009,3,,,,f32,input window -- code: compared with the status frame counter (global9) (func_2267) [status 0x25; status 0x28],Related to f-tilt/u-tilt/more?,high,community | reads: MSC ryu.mscsb func_2267; MSC ryu.mscsb func_2274; MSC ryu.mscsb func_2279; MSC ryu.mscsb func_2284; +2 more,m16.9
+,10,,0x0400000A,8,,,,f32,code: compared with the status frame counter (global9) (func_2259) [status 0x69],,medium,reads: MSC ryu.mscsb func_2259,m16.10
 ,11,,0x0400000B,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.11
 ,12,,0x0400000C,6.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.12
 ,13,,0x0400000D,20,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.13
 ,14,,0x0400000E,1.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.14
 ,15,,0x1400000F,0x19,,,,u32,[auto] read by native code (get_int at 0x027D0DDC); meaning not traced,,low,reads: native 0x027D0DDC (fn 0x027D09D0),m16.15
-,16,,0x14000010,0x1E,,,,u32,Landing lag from FinalLanding/FinalHitLanding (frames),"While Ryu is in landing lag, stage animations won't work",medium,"community | reads: MSC ryu.mscsb (vanilla decompile, repo first commit) func_2392; native 0x027D1D34 (fn 0x027D1CC4)",m16.16
+,16,,0x14000010,0x1E,,,,u32,"Landing lag from FinalLanding/FinalHitLanding (frames) -- code: read in: var0 = (float)WorkModule(0x6, 0x14000010); (func_2392) [status 0x167]","While Ryu is in landing lag, stage animations won't work",medium,community | reads: MSC ryu.mscsb func_2392; native 0x027D1D34 (fn 0x027D1CC4),m16.16
 ,17,,0x14000011,0x19,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.17
 ,18,,0x04000012,1.15,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.18
 ,19,,0x04000013,1.2,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.19
@@ -150,22 +150,22 @@ Sample",,medium,community | no read in the vanilla MSC (native or unused),m16.40
 ,45,,0x1400002D,0x3C,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.45
 ,46,,0x0400002E,13,,,,f32,Z offset of Shinku Hadoken,,medium,community | no read in the vanilla MSC (native or unused),m16.46
 ,47,,0x0400002F,11.5,,,,f32,Y offset of Shinku Hadoken,,medium,community | no read in the vanilla MSC (native or unused),m16.47
-17,0,Hadouken,0x02000000,0.9,0,0,0,f32,Speed of Light Hadoken,,medium,community,m17[*].0
-,1,,0x02000001,1.2,0,0,0,f32,Speed of Medium Hadoken,,medium,community,m17[*].1
-,2,,0x02000002,1.5,0,0,0,f32,Speed of Heavy Hadoken,,medium,community,m17[*].2
-,3,,0x12000003,0x59,0x0,0x0,0x0,u32,Lifetime of Light Hadoken (frames),,medium,community,m17[*].3
-,4,,0x12000004,0x6E,0x0,0x0,0x0,u32,Lifetime of Medium Hadoken (frames),,medium,community,m17[*].4
-,5,,0x12000005,0x8A,0x0,0x0,0x0,u32,Lifetime of Heavy Hadoken (frames),,medium,community,m17[*].5
-,6,,0x02000006,1.25,0,0,0,f32,Damage multiplier for normal Hadoken,,medium,community,m17[*].6
-,7,,0x02000007,0.4,0,0,0,f32,Speed of Light Shakunetsu Hadoken,,medium,community,m17[*].7
-,8,,0x02000008,1.2,0,0,0,f32,Speed of Medium Shakunetsu Hadoken,,medium,community,m17[*].8
-,9,,0x02000009,2.1,0,0,0,f32,Speed of Heavy Shakunetsu Hadoken,,medium,community,m17[*].9
-,10,,0x1200000A,0x78,0x0,0x0,0x0,u32,Lifetime of Light Shakunetsu Hadoken (frames),,medium,community,m17[*].10
-,11,,0x1200000B,0x5C,0x0,0x0,0x0,u32,Lifetime of Medium Shakunetsu Hadoken (frames),,medium,community,m17[*].11
-,12,,0x1200000C,0x3C,0x0,0x0,0x0,u32,Lifetime of Heavy Shakunetsu Hadoken (frames),,medium,community,m17[*].12
-,13,,0x1200000D,0x5,0x0,0x0,0x0,u32,,community ID was 0x0200000D,,,m17[*].13
-,14,,0x0200000E,0.6,0,0,0,f32,,,,,m17[*].14
-,15,,0x0200000F,1.9,0,0,0,f32,,,,,m17[*].15
+17,0,Hadouken,0x02000000,0.9,0,0,0,f32,Speed of Light Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].0
+,1,,0x02000001,1.2,0,0,0,f32,Speed of Medium Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].1
+,2,,0x02000002,1.5,0,0,0,f32,Speed of Heavy Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x12000003,0x4B,0x0,0x0,0x0,u32,Lifetime of Light Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].3
+,4,,0x12000004,0x43,0x0,0x0,0x0,u32,Lifetime of Medium Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].4
+,5,,0x12000005,0x3C,0x0,0x0,0x0,u32,Lifetime of Heavy Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x02000006,1.25,0,0,0,f32,Damage multiplier for normal Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,0.9,0,0,0,f32,Speed of Light Shakunetsu Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x02000008,1.2,0,0,0,f32,Speed of Medium Shakunetsu Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].8
+,9,,0x02000009,1.5,0,0,0,f32,Speed of Heavy Shakunetsu Hadoken,,medium,community | no read in the article MSC (native or unused),m17[*].9
+,10,,0x1200000A,0x4B,0x0,0x0,0x0,u32,Lifetime of Light Shakunetsu Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].10
+,11,,0x1200000B,0x43,0x0,0x0,0x0,u32,Lifetime of Medium Shakunetsu Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].11
+,12,,0x1200000C,0x3C,0x0,0x0,0x0,u32,Lifetime of Heavy Shakunetsu Hadoken (frames),,medium,community | no read in the article MSC (native or unused),m17[*].12
+,13,,0x1200000D,0x5,0x0,0x0,0x0,u32,,community ID was 0x0200000D,,no read in the article MSC (native or unused),m17[*].13
+,14,,0x0200000E,0.6,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].14
+,15,,0x0200000F,1.9,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].15
 ,0,,,0x1,,,,u32,,,,,m18.0
 ,1,,,1,,,,f32,,,,,m18.1
 ,2,,,-1,,,,f32,,,,,m18.2
@@ -173,13 +173,13 @@ Sample",,medium,community | no read in the vanilla MSC (native or unused),m16.40
 18,0,,,0x2000000,,,,u32,Hadouken weapon param Name0?,,medium,community,m19[0].0
 ,1,,,1,,,,f32,,,,,m19[0].1
 ,2,,,1.2,,,,f32,Multiplier?,,medium,community,m19[0].2
-,3,,,2,,,,f32,,,,,m19[0].3
+,3,,,0,,,,f32,,,,,m19[0].3
 ,4,,,1,,,,f32,,,,,m19[0].4
-,5,,,2,,,,f32,,,,,m19[0].5
+,5,,,0,,,,f32,,,,,m19[0].5
 ,0,,,0x2000001,,,,u32,Hadouken weapon param Name1?,,medium,community,m19[1].0
 ,1,,,1,,,,f32,,,,,m19[1].1
 ,2,,,1.1,,,,f32,Multiplier?,,medium,community,m19[1].2
-,3,,,2,,,,f32,,,,,m19[1].3
+,3,,,0,,,,f32,,,,,m19[1].3
 ,4,,,1,,,,f32,,,,,m19[1].4
 ,5,,,0,,,,f32,,,,,m19[1].5
 ,0,,,0x2000002,,,,u32,Hadouken weapon param Name2?,,medium,community,m19[2].0
@@ -206,5 +206,5 @@ Sample",,medium,community | no read in the vanilla MSC (native or unused),m16.40
 ,3,,,0,,,,f32,,,,,m19[5].3
 ,4,,,1,,,,f32,,,,,m19[5].4
 ,5,,,0,,,,f32,,,,,m19[5].5
-19,0,Article params (shinkuhadoken),0x12000000,0x5F,,,,u32,,,,,m20[0].0
-,1,,0x02000001,1.3,,,,f32,,,,,m20[0].1
+19,0,Article params (shinkuhadoken),0x12000000,0x5F,,,,u32,,,,no read in the article MSC (native or unused),m20[0].0
+,1,,0x02000001,1.3,,,,f32,,,,no read in the article MSC (native or unused),m20[0].1

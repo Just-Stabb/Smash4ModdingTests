@@ -1,5 +1,5 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,90,75,42,84,f32,Charge time (frames),,low,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2302; MSC lucariom.mscsb func_2312",m12[*].0
+13,0,Neutral B,0x05000000,90,75,42,84,f32,"code: compared with instance int 0x83 (a counter) (func_2302); MotionModule op 0x2711 (func_2312); animation rate (MotionModule set rate) (func_2312) [status 0x152; status 0x157] (same position as Lucario: ""Charge time (frames)"")",,medium,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2302; MSC lucariom.mscsb func_2312",m12[*].0
 ,1,,0x05000001,0,0,0,0,f32,H backward speed received from uncharged grounded firing,,low,"copied from Lucario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].1
 ,2,,0x05000002,1.05,1.05,0.9,1.05,f32,H backward speed received from fully-charged grounded firing,,low,"copied from Lucario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].2
 ,3,,0x05000003,0,0,0,0,f32,H backward speed received from uncharged aerial firing,,low,"copied from Lucario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].3
@@ -29,11 +29,11 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,H speed multiplier,,low,"copied from Lucario (same layout, same position) | reads: native 0x027A728C (fn 0x027A721C)",m15[*].0
 ,1,,0x08000001,0.03,0.06,0.02,0.03,f32,Gravity,,low,"copied from Lucario (same layout, same position) | reads: native 0x027A730C (fn 0x027A721C)",m15[*].1
 ,2,,0x08000002,1,1,1,1,f32,Max fall speed,,low,"copied from Lucario (same layout, same position) | reads: native 0x027A7330 (fn 0x027A721C)",m15[*].2
-,3,,0x18000003,0x1A,0x1A,0x2D,0x1A,u32,Frames duration for dodge before hitbox action occurs,,low,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2281",m15[*].3
+,3,,0x18000003,0x1A,0x1A,0x2D,0x1A,u32,"code: stored in status int 0x2, then decremented in func_2283 (a countdown / remaining count), tested against 0 (func_2281) [status 0x15E (SpecialLwSplit)] (same position as Lucario: ""Frames duration for dodge before hitbox action occurs"")",,medium,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2281",m15[*].3
 ,4,,0x08000004,28,28,2,28,f32,Max added travel distance from Y stick location?,,low,"copied from Lucario (same layout, same position) | reads: native 0x027A750C (fn 0x027A73BC); native 0x027A75DC (fn 0x027A73BC); native 0x027A76B0 (fn 0x027A73BC)",m15[*].4
 ,5,,0x08000005,45,45,2,45,f32,Max added travel distance from X stick location?,,low,"copied from Lucario (same layout, same position) | reads: native 0x027A7528 (fn 0x027A73BC); native 0x027A75F8 (fn 0x027A73BC); native 0x027A76CC (fn 0x027A73BC)",m15[*].5
-,6,,0x18000006,0x8,0x8,0x8,0x8,u32,Attack kick duration (frames),,low,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2289; native 0x027A7A64 (fn 0x027A73BC); native 0x027A7B5C (fn 0x027A73BC)",m15[*].6
-,7,,0x08000007,1,1,1,1,f32,Frame speed multiplier,,low,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2277",m15[*].7
+,6,,0x18000006,0x8,0x8,0x8,0x8,u32,"code: stored in status int 0x2, then decremented in func_2289 (a countdown / remaining count) (func_2289) [status 0x15F (SpecialAirAppear)] (same position as Lucario: ""Attack kick duration (frames)"")",,medium,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2289; native 0x027A7A64 (fn 0x027A73BC); native 0x027A7B5C (fn 0x027A73BC)",m15[*].6
+,7,,0x08000007,1,1,1,1,f32,"code: animation rate (MotionModule set rate) (func_2277) [status 0x155] (same position as Lucario: ""Frame speed multiplier"")",,medium,"copied from Lucario (same layout, same position) | reads: MSC lucariom.mscsb func_2277",m15[*].7
 ,0,Category 4 block,0x14000000,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
 ,1,,0x04000001,14,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
 ,2,,0x14000002,0x12C,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
@@ -43,22 +43,22 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,0x14000006,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.6
 17,0,,,0.7,,,,f32,Crawl forward speed,,low,"copied from Lucario (same layout, same position)",m17[0].0
 ,1,,,0.5,,,,f32,Crawl backward speed,,low,"copied from Lucario (same layout, same position)",m17[0].1
-18,0,Article params (auraball),0x02000000,0.69,0.5,0.75,0.75,f32,Hitbox damage multiplier,,low,"copied from Lucario (same layout, same position)",m18[*].0
-,1,,0x02000001,2.6,2,2.6,2.6,f32,Max Aura Sphere size multiplier?,,low,"copied from Lucario (same layout, same position)",m18[*].1
-,2,,0x02000002,0.5,0.5,0.5,0.5,f32,?,,low,"copied from Lucario (same layout, same position)",m18[*].2
-,3,,0x12000003,0x3C,0x96,0x32,0x46,u32,Lifetime (frames),,low,"copied from Lucario (same layout, same position)",m18[*].3
-,4,,0x02000004,0,0,0,0,f32,Firing angle (degrees),,low,"copied from Lucario (same layout, same position)",m18[*].4
-,5,,0x02000005,1,0.5,2.1,1.4,f32,Min projectile speed,,low,"copied from Lucario (same layout, same position)",m18[*].5
-,6,,0x02000006,2.5,0.2,3.8,3.2,f32,Max projectile speed,,low,"copied from Lucario (same layout, same position)",m18[*].6
-,7,,0x12000007,0x6,0x1E,0x6,0x6,u32,?,,low,"copied from Lucario (same layout, same position)",m18[*].7
-,8,,0x02000008,8,0.8,8,8,f32,?,,low,"copied from Lucario (same layout, same position)",m18[*].8
-,9,,0x02000009,0.5,0.4,0,0.5,f32,Non charged projectile randomness,,low,"copied from Lucario (same layout, same position)",m18[*].9
-,10,,0x0200000A,0.2,0.2,0,0.2,f32,Fully-charged projectile randomness,,low,"copied from Lucario (same layout, same position)",m18[*].10
-,11,,0x0200000B,3.5,3.5,3.5,3.5,f32,,,,,m18[*].11
-,12,,0x0200000C,1,3,1,1,f32,,,,,m18[*].12
-,13,,0x0200000D,4,4.5,2.4,4,f32,,,,,m18[*].13
-,14,,0x0200000E,20,20,20,20,f32,,,,,m18[*].14
-,15,,0x1200000F,0x0,0x1,0x1,0x0,u32,Piercing capability,,low,"copied from Lucario (same layout, same position)",m18[*].15
+18,0,Article params (auraball),0x02000000,0.69,0.5,0.75,0.75,f32,Hitbox damage multiplier,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].0
+,1,,0x02000001,2.6,2,2.6,2.6,f32,Max Aura Sphere size multiplier?,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].1
+,2,,0x02000002,0.5,0.5,0.5,0.5,f32,?,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].2
+,3,,0x12000003,0x3C,0x96,0x32,0x46,u32,"code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_59); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_56 (a countdown / remaining count), tested against 0 (func_59) (same position as Lucario: ""Lifetime (frames)"")",,medium,"copied from Lucario (same layout, same position) | reads: MSC lucariom/auraball.mscsb func_59",m18[*].3
+,4,,0x02000004,0,0,0,0,f32,Firing angle (degrees),,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].4
+,5,,0x02000005,1,0.5,2.1,1.4,f32,Min projectile speed,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].5
+,6,,0x02000006,2.5,0.2,3.8,3.2,f32,Max projectile speed,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].6
+,7,,0x12000007,0x6,0x1E,0x6,0x6,u32,?,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].7
+,8,,0x02000008,8,0.8,8,8,f32,?,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].8
+,9,,0x02000009,0.5,0.4,0,0.5,f32,Non charged projectile randomness,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].9
+,10,,0x0200000A,0.2,0.2,0,0.2,f32,Fully-charged projectile randomness,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].10
+,11,,0x0200000B,3.5,3.5,3.5,3.5,f32,,,,no read in the article MSC (native or unused),m18[*].11
+,12,,0x0200000C,1,3,1,1,f32,,,,no read in the article MSC (native or unused),m18[*].12
+,13,,0x0200000D,4,4.5,2.4,4,f32,,,,no read in the article MSC (native or unused),m18[*].13
+,14,,0x0200000E,20,20,20,20,f32,,,,no read in the article MSC (native or unused),m18[*].14
+,15,,0x1200000F,0x0,0x1,0x1,0x0,u32,Piercing capability,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m18[*].15
 19,0,,,-4,,,,f32,Counter trigger bubble X offset,,low,"copied from Lucario (same layout, same position)",m19[0].0
 ,1,,,0,,,,f32,Counter trigger bubble Y offset,,low,"copied from Lucario (same layout, same position)",m19[0].1
 ,2,,,0,,,,f32,Counter trigger bubble Z offset,,low,"copied from Lucario (same layout, same position)",m19[0].2
@@ -86,8 +86,8 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,10,,,,f32,,,,,m22[0].4
 ,5,,,1.8,,,,f32,,,,,m22[0].5
 ,6,,,1.8,,,,f32,,,,,m22[0].6
-23,0,Article params (qigong),0x02000000,1.08,1,1.06,1.2,f32,Damage multiplier,,low,"copied from Lucario (same layout, same position)",m23[*].0
-,1,,0x02000001,1.2,0.8,1.3,1.1,f32,Size/GFX multiplier,,low,"copied from Lucario (same layout, same position)",m23[*].1
+23,0,Article params (qigong),0x02000000,1.08,1,1.06,1.2,f32,Damage multiplier,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m23[*].0
+,1,,0x02000001,1.2,0.8,1.3,1.1,f32,Size/GFX multiplier,,low,"copied from Lucario (same layout, same position) | no read in the article MSC (native or unused)",m23[*].1
 24,0,,,0x2000005,,,,u32,0x02000005,,low,"copied from Lucario (same layout, same position)",m24[0].0
 ,1,,,1,,,,f32,,,,,m24[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,low,"copied from Lucario (same layout, same position)",m24[0].2

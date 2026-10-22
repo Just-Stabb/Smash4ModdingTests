@@ -1,47 +1,47 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0xA,0x0,0x0,0x0,u32,Frames to halt vert momentum before using Name3,0 permanently halts fall speed,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3950",m12[*].0
-,1,,0x15000001,0x14,0x0,0x0,0x0,u32,How long after releasing B PK Freeze explodes,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3962",m12[*].1
-,2,,0x15000002,0x45,0x0,0x0,0x0,u32,PK Freeze lifetime (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3962",m12[*].2
-,3,,0x05000003,0.012,0,0,0,f32,Gravity after initial V halt,,medium,community,m12[*].3
-,4,,0x05000004,30,0,0,0,f32,Landing lag (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3958; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3976",m12[*].4
-14,0,Side B,0x06000000,3.5,0,0,0,f32,X offset of starting point,,medium,community,m13[*].0
-,1,,0x06000001,0.7,0,0,0,f32,Y offset of starting point,,medium,community,m13[*].1
-,2,,0x06000002,22,0,0,0,f32,Landing lag (frames),,medium,community,m13[*].2
-15,0,Up B,0x17000000,0x1E,0x0,0x0,0x0,u32,How long you continue doing the PKT hold anim after it dies?,,medium,community,m14[*].0
-,1,,0x17000001,0xA,0x0,0x0,0x0,u32,Same as Name0?,,medium,community,m14[*].1
-,2,,0x17000002,0x28,0x0,0x0,0x0,u32,How long before you fall during upB hold in air?,community ID was 0x07000002,medium,community,m14[*].2
-,3,,0x07000003,0.5,0,0,0,f32,Something with falling speed initially,,medium,community,m14[*].3
-,4,,0x07000004,0.017,0,0,0,f32,Up B hold falling acceleration,,medium,community,m14[*].4
+13,0,Neutral B,0x15000000,0xA,0x0,0x0,0x0,u32,"Frames to halt vert momentum before using Name3 -- code: stored in status int 0x4, then decremented in func_3952 (a countdown / remaining count), tested against 0 (func_3950); stored in status int 0x4, then decremented in func_2299 (a countdown / remaining count), tested against 0 (func_2297) [status 0x23E; status 0x152 (SpecialNStart, SpecialAirNStart)]",0 permanently halts fall speed,high,community | reads: MSC kirby.mscsb func_3950; MSC lucas.mscsb func_2297,m12[*].0
+,1,,0x15000001,0x14,0x0,0x0,0x0,u32,"How long after releasing B PK Freeze explodes -- code: stored in status int 0x5, then tested against 0; ArticleModule op 0x2717 (func_3954) (func_3962); stored in status int 0x5, then tested against 0; ArticleModule op 0x2717 (func_2301) (func_2313) [status 0x23F; status 0x157]",,medium,community | reads: MSC kirby.mscsb func_3962; MSC lucas.mscsb func_2313,m12[*].1
+,2,,0x15000002,0x45,0x0,0x0,0x0,u32,"PK Freeze lifetime (frames) -- code: stored in status int 0x2, then tested against 0 (func_3954) (func_3962); stored in status int 0x2, then tested against 0 (func_2301) (func_2313) [status 0x23F; status 0x157]",,medium,community | reads: MSC kirby.mscsb func_3962; MSC lucas.mscsb func_2313,m12[*].2
+,3,,0x05000003,0.012,0,0,0,f32,Gravity after initial V halt,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,30,0,0,0,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_3976); tested against 0 (func_3958) [status 0x240; status 0x241],,high,community | reads: MSC kirby.mscsb func_3958; MSC kirby.mscsb func_3968; MSC kirby.mscsb func_3976; MSC lucas.mscsb func_2305; +2 more,m12[*].4
+14,0,Side B,0x06000000,3.5,0,0,0,f32,X offset of starting point,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,0.7,0,0,0,f32,Y offset of starting point,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,22,0,0,0,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2333); tested against 0 (func_2333) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC lucas.mscsb func_2333,m13[*].2
+15,0,Up B,0x17000000,0x1E,0x0,0x0,0x0,u32,How long you continue doing the PKT hold anim after it dies? -- code: stored in status int 0x2 (func_2335),,medium,community | reads: MSC lucas.mscsb func_2335,m14[*].0
+,1,,0x17000001,0xA,0x0,0x0,0x0,u32,Same as Name0? -- code: stored in status int 0x3 (func_2335),,medium,community | reads: MSC lucas.mscsb func_2335,m14[*].1
+,2,,0x17000002,0x28,0x0,0x0,0x0,u32,"How long before you fall during upB hold in air? -- code: stored in status int 0x4, then decremented in func_2340 (a countdown / remaining count), tested against 0 (func_2335)",community ID was 0x07000002,medium,community | reads: MSC lucas.mscsb func_2335,m14[*].2
+,3,,0x07000003,0.5,0,0,0,f32,Something with falling speed initially,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0.017,0,0,0,f32,Up B hold falling acceleration,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
 ,5,,0x07000005,2.5,0,0,0,f32,PKT2 initial speed,,medium,"community | reads: native 0x027AB62C (fn 0x027AB590, shared with lucariom)",m14[*].5
-,6,,0x07000006,0,0,0,0,f32,PKT2 deceleration rate,,medium,community,m14[*].6
-,7,,0x07000007,0.071,0,0,0,f32,Additional PKT2 deceleration rate after hitting something,,medium,community,m14[*].7
-,8,,0x07000008,0.64,0,0,0,f32,,,,,m14[*].8
-,9,,0x07000009,0.65,0,0,0,f32,,,,,m14[*].9
-,10,,0x0700000A,0.5,0,0,0,f32,,,,,m14[*].10
-,11,,0x0700000B,0,0,0,0,f32,,,,,m14[*].11
+,6,,0x07000006,0,0,0,0,f32,PKT2 deceleration rate,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.071,0,0,0,f32,"Additional PKT2 deceleration rate after hitting something -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 2 (func_2346) [status 0x15C (SpecialAirHi)]",,high,community | reads: MSC lucas.mscsb func_2346,m14[*].7
+,8,,0x07000008,0.64,0,0,0,f32,"code: KineticModule op 0x8 on energy 3 (stop), argument 1 (func_2346) [status 0x15C (SpecialAirHi)]",,medium,reads: MSC lucas.mscsb func_2346,m14[*].8
+,9,,0x07000009,0.65,0,0,0,f32,"code: KineticModule op 0x8 on energy 3 (stop), argument 1 (func_2346) [status 0x15C (SpecialAirHi)]",,medium,reads: MSC lucas.mscsb func_2346,m14[*].9
+,10,,0x0700000A,0.5,0,0,0,f32,"code: KineticModule op 0x8 on energy 3 (stop), argument 1 (func_2346) [status 0x15C (SpecialAirHi)]",,medium,reads: MSC lucas.mscsb func_2346,m14[*].10
+,11,,0x0700000B,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].11
 ,12,,0x0700000C,65,0,0,0,f32,Grounded PKT2 angle??,read on PKT2,medium,"community | reads: native 0x027AB3A4 (fn 0x027AAF80, shared with lucariom)",m14[*].12
-,13,,0x0700000D,60,0,0,0,f32,,read on PKT2 end,,,m14[*].13
-,14,,0x0700000E,1.4,0,0,0,f32,,,,,m14[*].14
-,15,,0x0700000F,30,0,0,0,f32,Landing lag (Frames),,medium,"community | reads: native 0x027AC6F8 (fn 0x027AC680, shared with lucariom); native 0x027AC774 (fn 0x027AC754, shared with lucariom)",m14[*].15
-16,0,Down B,0x18000000,0x12,0x0,0x0,0x0,u32,How many frames after releasing B you continue to hold it,,medium,community,m15[*].0
-,1,,0x18000001,0x4,0x0,0x0,0x0,u32,Delay before gravity affects startup (frames),,medium,community,m15[*].1
-,2,,0x08000002,8,0,0,0,f32,Related to speed preservation?,,medium,community,m15[*].2
-,3,,0x08000003,1,0,0,0,f32,Initial H speed on aerial startup,,medium,community,m15[*].3
-,4,,0x08000004,0,0,0,0,f32,Initial V speed on aerial startup,,medium,community,m15[*].4
-,5,,0x08000005,0.03,0,0,0,f32,Gravity,,medium,community,m15[*].5
-,6,,0x08000006,2.5,1.5,0,0,f32,Damage recovery mulitplier,,medium,community,m15[*].6
-,7,,0x08000007,30,0,0,0,f32,Max damage recoverable,,medium,community,m15[*].7
-,8,,0x18000008,0x1,0x1,0x1,0x1,u32,,,,,m15[*].8
-,9,,0x08000009,0,0,0,0,f32,Absorption bubble X offset,,medium,community,m15[*].9
-,10,,0x0800000A,6.5,0,0,0,f32,Absorption bubble Y offset,,medium,community,m15[*].10
-,11,,0x0800000B,11.5,10,0,0,f32,Absorption bubble Z offset,,medium,community,m15[*].11
-,12,,0x0800000C,12.8,16,0,0,f32,Absorption bubble Size,,medium,community,m15[*].12
-,13,,0x0800000D,0.85,0,0,0,f32,GFX size multiplier,,medium,community,m15[*].13
-,14,,0x0800000E,1,0,0,0,f32,,,,,m15[*].14
-,15,,0x1800000F,0x7,0x0,0x0,0x0,u32,,,,,m15[*].15
-,16,,0x08000010,1.8,0,0,0,f32,,,,,m15[*].16
-,0,Category 4 block,0x04000000,0,,,,f32,,,,,m16.0
-,1,,0x04000001,0,,,,f32,,,,,m16.1
+,13,,0x0700000D,60,0,0,0,f32,,read on PKT2 end,,no read in the vanilla MSC (native or unused),m14[*].13
+,14,,0x0700000E,1.4,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x0700000F,30,0,0,0,f32,Landing lag (Frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2350); tested against 0 (func_2350) [status 0x15B; status 0x15D],,high,"community | reads: MSC lucas.mscsb func_2350; MSC lucas.mscsb func_2360; native 0x027AC6F8 (fn 0x027AC680, shared with lucariom); native 0x027AC774 (fn 0x027AC754, shared with lucariom)",m14[*].15
+16,0,Down B,0x18000000,0x12,0x0,0x0,0x0,u32,"How many frames after releasing B you continue to hold it -- code: stored in status int 0x2, then decremented in func_2369 (a countdown / remaining count), tested against 0 (func_2366) [status 0x155]",,high,community | reads: MSC lucas.mscsb func_2366,m15[*].0
+,1,,0x18000001,0x4,0x0,0x0,0x0,u32,"Delay before gravity affects startup (frames) -- code: stored in status int 0x3, then decremented in func_2369 (a countdown / remaining count), tested against 0 (func_2366) [status 0x155]",,high,community | reads: MSC lucas.mscsb func_2366,m15[*].1
+,2,,0x08000002,8,0,0,0,f32,Related to speed preservation?,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1,0,0,0,f32,Initial H speed on aerial startup -- code: KineticModule op 0x1 (func_2366) [status 0x155],,medium,community | reads: MSC lucas.mscsb func_2366,m15[*].3
+,4,,0x08000004,0,0,0,0,f32,Initial V speed on aerial startup -- code: KineticModule op 0x1 (func_2366) [status 0x155],,medium,community | reads: MSC lucas.mscsb func_2366,m15[*].4
+,5,,0x08000005,0.03,0,0,0,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,2.5,1.5,0,0,f32,Damage recovery mulitplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,30,0,0,0,f32,Max damage recoverable,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x18000008,0x1,0x1,0x1,0x1,u32,,,,no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,0,0,0,0,f32,Absorption bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,6.5,0,0,0,f32,Absorption bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,11.5,10,0,0,f32,Absorption bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,12.8,16,0,0,f32,Absorption bubble Size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,0.85,0,0,0,f32,GFX size multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x1800000F,0x7,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,1.8,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].16
+,0,Category 4 block,0x04000000,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
 17,0,,,0xB4,,,,u32,,,,,m17[0].0
 ,1,,,10,,,,f32,,,,,m17[0].1
 ,2,,,4,,,,f32,,,,,m17[0].2
@@ -59,27 +59,27 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,7,,,1.5,,,,f32,Reflected projectile speed multiplier,,medium,community,m18.7
 ,8,,,0.7,,,,f32,Reflected projectile lifetime multiplier,,medium,community,m18.8
 ,9,,,0x0,,,,s32,,,,,m18.9
-18,0,Tether,0x02000000,3,,,,f32,Grounded speed,,medium,community,m19[0].0
-,1,,0x02000001,20,,,,f32,Grounded length,,medium,community,m19[0].1
-,2,,0x02000002,2.7,,,,f32,Aerial speed,,medium,community,m19[0].2
-,3,,0x02000003,30,,,,f32,Aerial length,,medium,community,m19[0].3
-,4,,0x02000004,8,,,,f32,,,,,m19[0].4
-,5,,0x02000005,50,,,,f32,,,,,m19[0].5
-,6,,0x02000006,0.1,,,,f32,,,,,m19[0].6
-,7,,0x12000007,0x16,,,,u32,,,,,m19[0].7
-,8,,0x02000008,1,,,,f32,,,,,m19[0].8
-19,0,Neutral B,0x02000000,70,0,0,0,f32,Damage/Size multiplier?,less = larger GFX size but less damage,medium,community,m20[*].0
-,1,,0x02000001,0.45,0,0,0,f32,Starting size,,medium,community,m20[*].1
-,2,,0x02000002,1.6,0,0,0,f32,Size multiplier,,medium,community,m20[*].2
-,3,,0x02000003,-20,0,0,0,f32,Initial firing angle,,medium,community,m20[*].3
-,4,,0x02000004,1.2,0,0,0,f32,PK Freeze rising height,,medium,community,m20[*].4
-,5,,0x02000005,0.04,0,0,0,f32,PK Freeze speed added from stick press,,medium,community,m20[*].5
-,6,,0x02000006,0.04,0,0,0,f32,PK Freeze gravity,,medium,community,m20[*].6
-,7,,0x02000007,2,0,0,0,f32,,read on startup,,,m20[*].7
-,8,,0x02000008,3,0,0,0,f32,,read on startup,,,m20[*].8
-,9,,0x12000009,0x6,0x0,0x0,0x0,u32,Delay before PK Freeze explosion when releasing the special attack button,,medium,community,m20[*].9
-,10,,0x0200000A,5,0,0,0,f32,Base damage,Damage = 5 + Frames * 0.255 ?,medium,community,m20[*].10
-,11,,0x0200000B,0.255,0.22,0,0,f32,Damage from charge,,medium,community,m20[*].11
+18,0,Tether,0x02000000,3,,,,f32,Grounded speed,,medium,community | no read in the article MSC (native or unused),m19[0].0
+,1,,0x02000001,20,,,,f32,Grounded length,,medium,community | no read in the article MSC (native or unused),m19[0].1
+,2,,0x02000002,2.7,,,,f32,Aerial speed,,medium,community | no read in the article MSC (native or unused),m19[0].2
+,3,,0x02000003,30,,,,f32,Aerial length,,medium,community | no read in the article MSC (native or unused),m19[0].3
+,4,,0x02000004,8,,,,f32,,,,no read in the article MSC (native or unused),m19[0].4
+,5,,0x02000005,50,,,,f32,,,,no read in the article MSC (native or unused),m19[0].5
+,6,,0x02000006,0.1,,,,f32,,,,no read in the article MSC (native or unused),m19[0].6
+,7,,0x12000007,0x16,,,,u32,,,,no read in the article MSC (native or unused),m19[0].7
+,8,,0x02000008,1,,,,f32,,,,no read in the article MSC (native or unused),m19[0].8
+19,0,Neutral B,0x02000000,70,0,0,0,f32,Damage/Size multiplier?,less = larger GFX size but less damage,medium,community | no read in the article MSC (native or unused),m20[*].0
+,1,,0x02000001,0.45,0,0,0,f32,Starting size,,medium,community | no read in the article MSC (native or unused),m20[*].1
+,2,,0x02000002,1.6,0,0,0,f32,Size multiplier,,medium,community | no read in the article MSC (native or unused),m20[*].2
+,3,,0x02000003,-20,0,0,0,f32,Initial firing angle,,medium,community | no read in the article MSC (native or unused),m20[*].3
+,4,,0x02000004,1.2,0,0,0,f32,PK Freeze rising height,,medium,community | no read in the article MSC (native or unused),m20[*].4
+,5,,0x02000005,0.04,0,0,0,f32,PK Freeze speed added from stick press,,medium,community | no read in the article MSC (native or unused),m20[*].5
+,6,,0x02000006,0.04,0,0,0,f32,PK Freeze gravity,,medium,community | no read in the article MSC (native or unused),m20[*].6
+,7,,0x02000007,2,0,0,0,f32,,read on startup,,no read in the article MSC (native or unused),m20[*].7
+,8,,0x02000008,3,0,0,0,f32,,read on startup,,no read in the article MSC (native or unused),m20[*].8
+,9,,0x12000009,0x6,0x0,0x0,0x0,u32,Delay before PK Freeze explosion when releasing the special attack button -- code: stored in instance int 0x9 (func_52),,medium,community | reads: MSC lucas/pkfreeze.mscsb func_52,m20[*].9
+,10,,0x0200000A,5,0,0,0,f32,Base damage,Damage = 5 + Frames * 0.255 ?,medium,community | no read in the article MSC (native or unused),m20[*].10
+,11,,0x0200000B,0.255,0.22,0,0,f32,Damage from charge,,medium,community | no read in the article MSC (native or unused),m20[*].11
 ,0,,,0x3,,,,u32,,,,,m21.0
 ,1,,,0,,,,f32,,,,,m21.1
 ,2,,,0.5,,,,f32,,,,,m21.2
@@ -113,17 +113,17 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m22[4].3
 ,4,,,1,,,,f32,,,,,m22[4].4
 ,5,,,0,,,,f32,,,,,m22[4].5
-21,0,Side B,0x02000000,0.6,0,0,0,f32,Grounded PK Fire angle (degrees),,medium,community,m23[*].0
-,1,,0x02000001,2.5,0,0,0,f32,Grounded PK Fire velocity,,medium,community,m23[*].1
-,2,,0x02000002,0,0,0,0,f32,Aerial PK Fire angle (degrees),,medium,community,m23[*].2
-,3,,0x02000003,2.8,0,0,0,f32,Aerial PK Fire velocity,,medium,community,m23[*].3
-,4,,0x12000004,0x13,0x0,0x0,0x0,u32,Spark lifetime (frames),,medium,community,m23[*].4
-,5,,0x12000005,0x1E,0x0,0x0,0x0,u32,Pillar lifetime (frames),,medium,community,m23[*].5
-,6,,0x02000006,1,0,0,0,f32,Pillar vert momentum on first hit,,medium,community,m23[*].6
-,7,,0x02000007,0.01,0,0,0,f32,Pillar gravity,read when spark is generated,medium,community,m23[*].7
-,8,,0x02000008,0.8,0,0,0,f32,Pillar max fall speed,read when spark is generated,medium,community,m23[*].8
-,9,,0x02000009,3,0,0,0,f32,Amount of time Spark stays out?,,medium,community,m23[*].9
-,10,,0x0200000A,0.5,0,0,0,f32,Fire pillar final size,Pillar size = Name10 + (1 - Name10) * Current frame / Name5,medium,community,m23[*].10
+21,0,Side B,0x02000000,0.6,0,0,0,f32,Grounded PK Fire angle (degrees),,medium,community | no read in the article MSC (native or unused),m23[*].0
+,1,,0x02000001,2.5,0,0,0,f32,Grounded PK Fire velocity,,medium,community | no read in the article MSC (native or unused),m23[*].1
+,2,,0x02000002,0,0,0,0,f32,Aerial PK Fire angle (degrees),,medium,community | no read in the article MSC (native or unused),m23[*].2
+,3,,0x02000003,2.8,0,0,0,f32,Aerial PK Fire velocity,,medium,community | no read in the article MSC (native or unused),m23[*].3
+,4,,0x12000004,0x13,0x0,0x0,0x0,u32,"Spark lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC lucas/pkfire.mscsb func_51,m23[*].4
+,5,,0x12000005,0x1E,0x0,0x0,0x0,u32,"Pillar lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_58); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_58); PostureModule op 0x2713 (func_63)",,medium,community | reads: MSC lucas/pkfire.mscsb func_58; MSC lucas/pkfire.mscsb func_63,m23[*].5
+,6,,0x02000006,1,0,0,0,f32,Pillar vert momentum on first hit -- code: PostureModule op 0x2716 (func_62),,medium,community | reads: MSC lucas/pkfire.mscsb func_62,m23[*].6
+,7,,0x02000007,0.01,0,0,0,f32,Pillar gravity,read when spark is generated,medium,community | no read in the article MSC (native or unused),m23[*].7
+,8,,0x02000008,0.8,0,0,0,f32,Pillar max fall speed,read when spark is generated,medium,community | no read in the article MSC (native or unused),m23[*].8
+,9,,0x02000009,3,0,0,0,f32,Amount of time Spark stays out?,,medium,community | no read in the article MSC (native or unused),m23[*].9
+,10,,0x0200000A,0.5,0,0,0,f32,Fire pillar final size -- code: PostureModule op 0x2713 (func_63),Pillar size = Name10 + (1 - Name10) * Current frame / Name5,medium,community | reads: MSC lucas/pkfire.mscsb func_63,m23[*].10
 ,0,,,0x3,,,,u32,,,,,m24.0
 ,1,,,0,,,,f32,,,,,m24.1
 ,2,,,2,,,,f32,,,,,m24.2
@@ -160,14 +160,14 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,1,,,,f32,,,,,m26[1].4
 ,5,,,0,,,,f32,,,,,m26[1].5
 24,0,"Up B
-(Projectile)",0x02000000,120,0,0,0,f32,Lifetime (frames),,medium,community,m27[*].0
-,1,,0x02000001,1.5,0,0,0,f32,Projectile speed,,medium,community,m27[*].1
-,2,,0x02000002,90,0,0,0,f32,Initial angle (degrees),,medium,community,m27[*].2
-,3,,0x02000003,0.5,0,0,0,f32,PKT turning control,lower number = higher amount of control,medium,community,m27[*].3
-,4,,0x02000004,8,0,0,0,f32,PKT turning radius,higher number = tighter radius,medium,community,m27[*].4
-,5,,0x12000005,0x78,0x0,0x0,0x0,u32,,,,,m27[*].5
+(Projectile)",0x02000000,120,0,0,0,f32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_49); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_49)",,medium,community | reads: MSC lucas/pkthunder.mscsb func_49,m27[*].0
+,1,,0x02000001,1.5,0,0,0,f32,Projectile speed,,medium,community | no read in the article MSC (native or unused),m27[*].1
+,2,,0x02000002,90,0,0,0,f32,Initial angle (degrees),,medium,community | no read in the article MSC (native or unused),m27[*].2
+,3,,0x02000003,0.5,0,0,0,f32,PKT turning control,lower number = higher amount of control,medium,community | no read in the article MSC (native or unused),m27[*].3
+,4,,0x02000004,8,0,0,0,f32,PKT turning radius,higher number = tighter radius,medium,community | no read in the article MSC (native or unused),m27[*].4
+,5,,0x12000005,0x78,0x0,0x0,0x0,u32,,,,no read in the article MSC (native or unused),m27[*].5
 ,0,,,0x3,,,,u32,,,,,m28.0
 ,1,,,0,,,,f32,,,,,m28.1
 ,2,,,2,,,,f32,,,,,m28.2
-25,0,pkstarstorm,0x02000000,30,,,,f32,,,,,m29[0].0
-,1,,0x12000001,0x136,,,,u32,,,,,m29[0].1
+25,0,pkstarstorm,0x02000000,30,,,,f32,,,,no read in the article MSC (native or unused),m29[0].0
+,1,,0x12000001,0x136,,,,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_48 (a countdown / remaining count), tested against 0 (func_46); stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_46)",,medium,reads: MSC lucas/pkstarstorm.mscsb func_46,m29[0].1

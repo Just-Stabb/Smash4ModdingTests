@@ -1,59 +1,59 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,12,16,14,15,f32,How long it takes to scroll through each fruit (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3869",m12[*].0
-,1,,0x05000001,1.6,1.6,1.6,1.6,f32,Max V speed,,medium,community,m12[*].1
-,2,,0x05000002,0.5,0.5,0.5,0.5,f32,Gravity multiplier while charging,,medium,community,m12[*].2
-,3,,0x05000003,0.9,0.9,0.9,0.9,f32,Max fall speed multiplier while charging,,medium,community,m12[*].3
-,4,,0x15000004,0x10,0x10,0x10,0x10,u32,"[auto] debug print ""Pacman status_SpecialN ChargeRank:%d""",,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3869",m12[*].4
-,5,,0x15000005,0x1,0x1,0x1,0x5,u32,# of Bonus Fruits on screen?,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3864",m12[*].5
-14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,H speed multiplier for SpecialSStart,,medium,community,m13[*].0
-,1,,0x06000001,0.7,0.5,0.5,0.5,f32,V speed multiplier for SpecialSStart,,medium,community,m13[*].1
-,2,,0x06000002,0.8,1,0.3,0.6,f32,Max fall speed multiplier,,medium,community,m13[*].2
-,3,,0x16000003,0xC,0xC,0x14,0xC,u32,Min duration of SpecialSLoop,,medium,community,m13[*].3
-,4,,0x16000004,0x2D,0x28,0x3C,0x1E,u32,Max duration of SpecialSLoop,,medium,community,m13[*].4
-,5,,0x06000005,8,8,8,8,f32,,,,,m13[*].5
-,6,,0x06000006,6,6,6,6,f32,this * model scale is added to V speed,,medium,community,m13[*].6
-,7,,0x06000007,0.8,1.2,0.5,0.8,f32,Initial speed,,medium,community,m13[*].7
-,8,,0x06000008,0.18,0.1,0.5,0.18,f32,H acceleration,,medium,community,m13[*].8
-,9,,0x06000009,3,2.9,2,3,f32,H max speed,,medium,community,m13[*].9
-,10,,0x0600000A,0.1,1.8,3,4,f32,Min base damage of SpecialSMove (Min speed),Dmg = 4 + (5 - 4) * (Speed - 0.8) / (3 - 0.8),medium,community,m13[*].10
-,11,,0x0600000B,0.15,2.2,4,5,f32,Max base damage of SpecialSMove (Max speed),,medium,community,m13[*].11
-,12,,0x0600000C,30,30,30,30,f32,,Set as localVar 0x16 in script_2335 but unused?,,,m13[*].12
-,13,,0x0600000D,2,1.5,2.5,1.8,f32,Min travel speed on SpecialSDash (Min charge),,medium,community,m13[*].13
-,14,,0x0600000E,3.1,1.5,3.2,3,f32,Max travel speed on SpecialSDash (Max charge),Related to min pellet hold time,medium,community,m13[*].14
-,15,,0x0600000F,0.02,0.02,0.02,0.02,f32,Gravity on SpecialSDash,Related to max pellet hold time,medium,community,m13[*].15
-,16,,0x06000010,1,1,3,1,f32,Minimum total speed for SpecialSDash to decelerate,,medium,community,m13[*].16
-,17,,0x06000011,0.12,0.06,0.06,0.06,f32,Decel after flying,,medium,community,m13[*].17
-,18,,0x06000012,0.1,3,4,4,f32,Min base damage of SpecialSDash (Min charge),,medium,community,m13[*].18
-,19,,0x06000013,0.15,5,10,8,f32,Max base damage of SpecialSDash (Max charge),,medium,community,m13[*].19
-,20,,0x16000014,0xE,0xA,0x8,0xE,u32,Min duration of SpecialSDash (Min charge),,medium,community,m13[*].20
-,21,,0x16000015,0x16,0x10,0xB,0x16,u32,Max duration of SpecialSDash (Max charge),,medium,community,m13[*].21
-,22,,0x06000016,1.45,1.45,1.2,1.45,f32,SpecialSDash speed multiplier (when 0x2100000e is set),,medium,community,m13[*].22
-,23,,0x06000017,1.5,1.2,1.5,1.5,f32,SpecialSDash damage multiplier,,medium,community,m13[*].23
-,24,,0x06000018,1.5,1.2,1.5,1.5,f32,SpecialSDash duration multiplier ( floor(this) ),,medium,community,m13[*].24
-,25,,0x16000019,0x8,0x4,0x4,0x8,u32,SpecialSDash super armor end frame,,medium,community,m13[*].25
-,26,,0x0600001A,0.5,0.5,0.5,0.5,f32,H speed multiplier for SpecialSReflectFall,,medium,community,m13[*].26
-,27,,0x0600001B,30,30,30,30,f32,Stage line angle difference to cause SpecialSReflectFall (degress),,medium,community,m13[*].27
-,28,,0x0600001C,2.7,2.7,2.7,2.7,f32,V initial speed for SpecialSReflectFall (uses negative for ceiling collision),,medium,community,m13[*].28
-,29,,0x0600001D,0.2,0.2,0.2,0.2,f32,Gravity for SpecialSReflectFall,,medium,community,m13[*].29
-,30,,0x0600001E,2,2,2,2,f32,Max fall speed for SpecialSReflectFall,,medium,community,m13[*].30
-,31,,0x0600001F,0.4,0.8,0.4,0.8,f32,H speed multiplier for SpecialSReturn,,medium,community,m13[*].31
-,32,,0x06000020,0.6,0.8,0.4,0.8,f32,V speed multiplier for SpecialSReturn,,medium,community,m13[*].32
-15,0,Up B,0x07000000,3.9,6.8,5,4.3,f32,Initial V speed,,medium,community,m14[*].0
-,1,,0x07000001,1.1,1.1,1,1.1,f32,V speed multiplier,,medium,community,m14[*].1
-,2,,0x07000002,0.3,0.3,0.3,0.3,f32,,,,,m14[*].2
-,3,,0x17000003,0x14,0x12,0x14,0x14,u32,,,,,m14[*].3
-,4,,0x07000004,1.3,1,1,1,f32,Air max additional accel / base air accel multiplier while flying,,medium,community,m14[*].4
-,5,,0x07000005,1.4,1,1.3,1.2,f32,Air max speed multiplier while flying,,medium,community,m14[*].5
-,6,,0x07000006,0.18,0.13,0.22,0.18,f32,Gravity while flying,,medium,community,m14[*].6
-,7,,0x07000007,20,10,20,20,f32,Max X axis rotation angle (degrees),this * StickX,medium,community,m14[*].7
-,8,,0x07000008,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 2nd time in a row,,medium,community,m14[*].8
-,9,,0x07000009,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 3rd time in a row,,medium,community,m14[*].9
-,10,,0x1700000A,0x3,0x3,0x3,0x3,u32,,related to ledge grab?,,,m14[*].10
-,11,,0x0700000B,30,38,30,30,f32,Landing lag (frames),,medium,community,m14[*].11
-16,0,Down B,0x08000000,2.4,2.4,3.6,2.4,f32,Initial V speed,,medium,community,m15[*].0
-,1,,0x08000001,0.14,0.14,0.21,0.14,f32,Gravity after spawning the hydrant,,medium,community,m15[*].1
-,2,,0x08000002,-14,-14,-14,-14,f32,,,,,m15[*].2
-,3,,0x18000003,0x1E,0x1E,0x28,0x1E,u32,,,,,m15[*].3
+13,0,Neutral B,0x05000000,12,16,14,15,f32,"How long it takes to scroll through each fruit (frames) -- code: compared with status int 0x2 (a counter) (func_3869) [status 0x233; status 0x157 (SpecialNHold, SpecialAirNHold)]",,high,community | reads: MSC kirby.mscsb func_3869; MSC pacman.mscsb func_2303,m12[*].0
+,1,,0x05000001,1.6,1.6,1.6,1.6,f32,Max V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2314); compared with a computed value (func_2314),,medium,community | reads: MSC pacman.mscsb func_2314,m12[*].1
+,2,,0x05000002,0.5,0.5,0.5,0.5,f32,"Gravity multiplier while charging -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2314)",,high,community | reads: MSC pacman.mscsb func_2314,m12[*].2
+,3,,0x05000003,0.9,0.9,0.9,0.9,f32,Max fall speed multiplier while charging -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2314),community value differs: Custom2 0.6 (vanilla 0.9),high,community | reads: MSC pacman.mscsb func_2314,m12[*].3
+,4,,0x15000004,0x10,0x10,0x10,0x10,u32,"code: compared with a computed value (func_3869) [status 0x233; status 0x157 (SpecialNHold, SpecialAirNHold)]",,medium,reads: MSC kirby.mscsb func_3869; MSC pacman.mscsb func_2303,m12[*].4
+,5,,0x15000005,0x1,0x1,0x1,0x5,u32,"# of Bonus Fruits on screen? -- code: compared with a computed value (func_3864) [status 0x232; status 0x152 (SpecialN, SpecialAirN)]",,medium,community | reads: MSC kirby.mscsb func_3864; MSC pacman.mscsb func_2298,m12[*].5
+14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,"H speed multiplier for SpecialSStart -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2316) [status 0x153 (SpecialSStart, SpecialAirSStart)]",,high,community | reads: MSC pacman.mscsb func_2316,m13[*].0
+,1,,0x06000001,0.7,0.5,0.5,0.5,f32,"V speed multiplier for SpecialSStart -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2316) [status 0x153 (SpecialSStart, SpecialAirSStart)]",,high,community | reads: MSC pacman.mscsb func_2316,m13[*].1
+,2,,0x06000002,0.8,1,0.3,0.6,f32,"Max fall speed multiplier -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2316) [status 0x153 (SpecialSStart, SpecialAirSStart)]",,high,community | reads: MSC pacman.mscsb func_2316,m13[*].2
+,3,,0x16000003,0xC,0xC,0x14,0xC,u32,"Min duration of SpecialSLoop -- code: compared with a computed value (func_2323) [status 0x15B (SpecialSLoop, SpecialAirSLoop); status 0x15F (SpecialSDash)]",,medium,community | reads: MSC pacman.mscsb func_2323; MSC pacman.mscsb func_2339,m13[*].3
+,4,,0x16000004,0x1E,0x28,0x3C,0x1E,u32,"Max duration of SpecialSLoop -- code: compared with a computed value (func_2323) [status 0x15B (SpecialSLoop, SpecialAirSLoop); status 0x15F (SpecialSDash)]",,medium,community | reads: MSC pacman.mscsb func_2323; MSC pacman.mscsb func_2339,m13[*].4
+,5,,0x06000005,8,8,8,8,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x06000006,6,6,6,6,f32,this * model scale is added to V speed -- code: PostureModule op 0x3 (func_2335); compared with a computed value (func_2335); tested against 0 (via func_13) (func_2335) [status 0x15D (SpecialSMove)],,medium,community | reads: MSC pacman.mscsb func_2335,m13[*].6
+,7,,0x06000007,0.8,1.2,0.5,0.8,f32,"Initial speed -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2333); AttackModule op 0x271A (func_2335) [status 0x15D (SpecialSMove)]",,high,community | reads: MSC pacman.mscsb func_2333; MSC pacman.mscsb func_2335,m13[*].7
+,8,,0x06000008,0.18,0.1,0.5,0.18,f32,"H acceleration -- code: KineticModule op 0xF (sets an acceleration) on energy 3 (stop), argument 1 (func_2333); KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2335) [status 0x15D (SpecialSMove)]",,high,community | reads: MSC pacman.mscsb func_2333; MSC pacman.mscsb func_2335,m13[*].8
+,9,,0x06000009,3,2.9,2,3,f32,"H max speed -- code: KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_2333); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2333); AttackModule op 0x271A (func_2335) [status 0x15D (SpecialSMove)]",,high,community | reads: MSC pacman.mscsb func_2333; MSC pacman.mscsb func_2335,m13[*].9
+,10,,0x0600000A,4,1.8,3,4,f32,Min base damage of SpecialSMove (Min speed) -- code: AttackModule op 0x271A (func_2335) [status 0x15D (SpecialSMove)],Dmg = 4 + (5 - 4) * (Speed - 0.8) / (3 - 0.8),high,community | reads: MSC pacman.mscsb func_2335,m13[*].10
+,11,,0x0600000B,5,2.2,4,5,f32,Max base damage of SpecialSMove (Max speed) -- code: AttackModule op 0x271A (func_2335) [status 0x15D (SpecialSMove)],,high,community | reads: MSC pacman.mscsb func_2335,m13[*].11
+,12,,0x0600000C,30,30,30,30,f32,"code: read in: var22 = WorkModuleF(0, 0x600000c); (func_2335) [status 0x15D (SpecialSMove)]",Set as localVar 0x16 in script_2335 but unused?,low,reads: MSC pacman.mscsb func_2335,m13[*].12
+,13,,0x0600000D,2,1.5,2.5,1.8,f32,Min travel speed on SpecialSDash (Min charge) -- code: compared with a computed value (func_2339) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].13
+,14,,0x0600000E,3.1,1.5,3.2,3,f32,"Max travel speed on SpecialSDash (Max charge) -- code: stored in status float 0x9, then compared with a computed value (func_2341) (func_2339); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2339); compared with a computed value (func_2339) [status 0x15F (SpecialSDash)]",Related to min pellet hold time,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].14
+,15,,0x0600000F,0.02,0.02,0.02,0.02,f32,Gravity on SpecialSDash -- code: compared with a computed value (func_2341) [status 0x15F (SpecialSDash)],Related to max pellet hold time,medium,community | reads: MSC pacman.mscsb func_2339; MSC pacman.mscsb func_2341,m13[*].15
+,16,,0x06000010,1,1,3,1,f32,Minimum total speed for SpecialSDash to decelerate -- code: compared with a computed value (func_2341) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2341,m13[*].16
+,17,,0x06000011,0.06,0.06,0.06,0.06,f32,"Decel after flying -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2341); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2341) [status 0x15F (SpecialSDash)]",,medium,community | reads: MSC pacman.mscsb func_2341,m13[*].17
+,18,,0x06000012,4,3,4,4,f32,Min base damage of SpecialSDash (Min charge) -- code: compared with a computed value (func_2339) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].18
+,19,,0x06000013,8,5,10,8,f32,"Max base damage of SpecialSDash (Max charge) -- code: stored in status float 0x7, then AttackModule op 0x271A (func_2341) (func_2339); compared with a computed value (func_2339) [status 0x15F (SpecialSDash)]",,high,community | reads: MSC pacman.mscsb func_2339,m13[*].19
+,20,,0x16000014,0xE,0xA,0x8,0xE,u32,Min duration of SpecialSDash (Min charge) -- code: compared with a computed value (func_2339) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].20
+,21,,0x16000015,0x16,0x10,0xB,0x16,u32,"Max duration of SpecialSDash (Max charge) -- code: stored in status int 0x6, then compared with a computed value (func_2341) (func_2339); compared with a computed value (func_2339) [status 0x15F (SpecialSDash)]",,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].21
+,22,,0x06000016,1.45,1.45,1.2,1.45,f32,SpecialSDash speed multiplier (when 0x2100000e is set) -- code: compared with a computed value (func_2339) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].22
+,23,,0x06000017,1.5,1.2,1.5,1.5,f32,"SpecialSDash damage multiplier -- code: stored in status float 0x7, then AttackModule op 0x271A (func_2341) (func_2339) [status 0x15F (SpecialSDash)]",,high,community | reads: MSC pacman.mscsb func_2339,m13[*].23
+,24,,0x06000018,1.5,1.2,1.5,1.5,f32,"SpecialSDash duration multiplier ( floor(this) ) -- code: stored in status int 0x6, then compared with a computed value (func_2341) (func_2339) [status 0x15F (SpecialSDash)]",,medium,community | reads: MSC pacman.mscsb func_2339,m13[*].24
+,25,,0x16000019,0x8,0x4,0x4,0x8,u32,SpecialSDash super armor end frame -- code: compared with a computed value (func_2341) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2341,m13[*].25
+,26,,0x0600001A,0.5,0.5,0.5,0.5,f32,"H speed multiplier for SpecialSReflectFall -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2335) [status 0x15D (SpecialSMove); status 0x15F (SpecialSDash)]",,high,community | reads: MSC pacman.mscsb func_2335; MSC pacman.mscsb func_2341,m13[*].26
+,27,,0x0600001B,30,30,30,30,f32,Stage line angle difference to cause SpecialSReflectFall (degress) -- code: compared with a computed value (func_2341) [status 0x15F (SpecialSDash)],,medium,community | reads: MSC pacman.mscsb func_2341,m13[*].27
+,28,,0x0600001C,2.7,2.7,2.7,2.7,f32,V initial speed for SpecialSReflectFall (uses negative for ceiling collision) -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2335) [status 0x15D (SpecialSMove); status 0x15F (SpecialSDash)],,high,community | reads: MSC pacman.mscsb func_2335; MSC pacman.mscsb func_2341,m13[*].28
+,29,,0x0600001D,0.2,0.2,0.2,0.2,f32,"Gravity for SpecialSReflectFall -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2345) [status 0x160]",,high,community | reads: MSC pacman.mscsb func_2345,m13[*].29
+,30,,0x0600001E,2,2,2,2,f32,Max fall speed for SpecialSReflectFall -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2345) [status 0x160],,high,community | reads: MSC pacman.mscsb func_2345,m13[*].30
+,31,,0x0600001F,0.4,0.8,0.4,0.8,f32,"H speed multiplier for SpecialSReturn -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2350); KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2350); KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), argument 1 (func_2350) [status 0x15E (SpecialSReturn, SpecialAirSReturn)]",,high,community | reads: MSC pacman.mscsb func_2350,m13[*].31
+,32,,0x06000020,0.6,0.8,0.4,0.8,f32,"V speed multiplier for SpecialSReturn -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2350) [status 0x15E (SpecialSReturn, SpecialAirSReturn)]",,high,community | reads: MSC pacman.mscsb func_2350,m13[*].32
+15,0,Up B,0x07000000,3.9,6.8,5,4.3,f32,Initial V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2363) [status 0x161 (SpecialAirHiLoop)],,high,community | reads: MSC pacman.mscsb func_2363,m14[*].0
+,1,,0x07000001,1.1,1.1,1,1.1,f32,V speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2363) [status 0x161 (SpecialAirHiLoop)],,high,community | reads: MSC pacman.mscsb func_2363,m14[*].1
+,2,,0x07000002,0.3,0.3,0.3,0.3,f32,,,,no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x17000003,0x14,0x12,0x14,0x14,u32,"code: stored in status int 0x2, then decremented in func_2365 (a countdown / remaining count), tested against 0 (func_2363) [status 0x161 (SpecialAirHiLoop)]",,medium,reads: MSC pacman.mscsb func_2363,m14[*].3
+,4,,0x07000004,1.3,1,1,1,f32,Air max additional accel / base air accel multiplier while flying -- code: KineticModule op 0x16 (func_2363); KineticModule op 0x17 (func_2363) [status 0x161 (SpecialAirHiLoop)],,medium,community | reads: MSC pacman.mscsb func_2363,m14[*].4
+,5,,0x07000005,1.4,1,1.3,1.2,f32,Air max speed multiplier while flying -- code: KineticModule op 0x6 on energy 2 (control / horizontal) (func_2363) [status 0x161 (SpecialAirHiLoop)],,medium,community | reads: MSC pacman.mscsb func_2363,m14[*].5
+,6,,0x07000006,0.18,0.13,0.22,0.18,f32,"Gravity while flying -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2363); KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2363) [status 0x161 (SpecialAirHiLoop)]",,high,community | reads: MSC pacman.mscsb func_2363,m14[*].6
+,7,,0x07000007,20,10,20,20,f32,Max X axis rotation angle (degrees) -- code: ModelModule op 0x1 (func_2365) [status 0x161 (SpecialAirHiLoop)],this * StickX,medium,community | reads: MSC pacman.mscsb func_2365,m14[*].7
+,8,,0x07000008,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 2nd time in a row -- code: AttackModule op 0x271F (func_2363) [status 0x161 (SpecialAirHiLoop)],,medium,community | reads: MSC pacman.mscsb func_2363,m14[*].8
+,9,,0x07000009,1.2,1.2,1,1.2,f32,Speed multiplier when bouncing off the trampoline the 3rd time in a row -- code: AttackModule op 0x273A (func_2363) [status 0x161 (SpecialAirHiLoop)],,medium,community | reads: MSC pacman.mscsb func_2363,m14[*].9
+,10,,0x1700000A,0x3,0x3,0x3,0x3,u32,code: compared with instance int 0x85 (a counter) (func_2257),related to ledge grab?,medium,reads: MSC pacman.mscsb func_2257,m14[*].10
+,11,,0x0700000B,30,38,30,30,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2363) [status 0x161 (SpecialAirHiLoop)],,high,community | reads: MSC pacman.mscsb func_2363,m14[*].11
+16,0,Down B,0x08000000,2.4,2.4,3.6,2.4,f32,"Initial V speed -- code: read in: var0 = WorkModuleF(0, 0x8000000); (func_2372) [status 0x155 (SpecialLw, SpecialLwFailure, SpecialAirLw)]",,medium,community | reads: MSC pacman.mscsb func_2372,m15[*].0
+,1,,0x08000001,0.14,0.14,0.21,0.14,f32,"Gravity after spawning the hydrant -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2372) [status 0x155 (SpecialLw, SpecialLwFailure, SpecialAirLw)]",,high,community | reads: MSC pacman.mscsb func_2372,m15[*].1
+,2,,0x08000002,-14,-14,-14,-14,f32,,,,no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x18000003,0x1E,0x1E,0x28,0x1E,u32,"code: stored in instance int 0x8A, then tested against 0 (func_2372) (func_2372) [status 0x155 (SpecialLw, SpecialLwFailure, SpecialAirLw)]",,medium,reads: MSC pacman.mscsb func_2372,m15[*].3
 17,0,,,1.25,1.25,1.25,1.25,f32,,,,,m16[*].0
 ,1,,,0x5A,0x5A,0x5A,0x5A,u32,,,,,m16[*].1
 ,2,,,2,2,2,2,f32,,,,,m16[*].2
@@ -431,7 +431,7 @@ Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
 42,0,Bell,,1.3,1,0,1.3,f32,Initial H speed,,medium,community,m41[*].0
 ,1,,,3,-0.5,0.8,3,f32,Initial V speed,,medium,community,m41[*].1
 ,2,,,0.11,-0.05,0.006,0.11,f32,Gravity before the drop,,medium,community,m41[*].2
-,3,,,3,3,4.5,3,f32,Initial V speed when thrown upwards,,medium,community,m41[*].3
+,3,,,3,3,4.5,3,f32,Initial V speed when thrown upwards,community value differs: Custom2 1.5 (vanilla 4.5),medium,community,m41[*].3
 ,4,,,0x14,0x1E,0xA0,0x14,u32,Min frames before the drop,,medium,community,m41[*].4
 ,5,,,0x1E,0x1E,0xA0,0x1E,u32,Max frames before the drop,,medium,community,m41[*].5
 ,6,,,3,-4,4.5,3,f32,Downwards V speed,,medium,community,m41[*].6
@@ -439,7 +439,7 @@ Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
 ,8,,,0.7,0.2,0.2,0.7,f32,speed multiplier for bouncing off walls/ceilings,,medium,community,m41[*].8
 ,9,,,0.5,0.5,0.5,0.5,f32,speed multiplier for bouncing off floors,,medium,community,m41[*].9
 ,10,,,0x64,0x3C,0xD2,0x64,u32,Lifetime (frames),,medium,community,m41[*].10
-,11,,,0x2,0x1,0x2,0x2,u32,The number of times it can bounce before can disappear,,medium,community,m41[*].11
+,11,,,0x2,0x1,0x2,0x2,u32,The number of times it can bounce before can disappear,community value differs: Custom1 0x0 (vanilla 0x1),medium,community,m41[*].11
 43,0,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].0
 ,1,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].1
 ,2,,,0x0,0x0,0x0,0x0,u32,,,,,m42[*].2
@@ -493,7 +493,7 @@ Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
 ,2,,,-3,,,,f32,,,,,m44[0].2
 ,3,,,3,,,,f32,,,,,m44[0].3
 46,0,Key,,3.6,0,0.2,3.6,f32,Initial speed,,medium,community,m45[*].0
-,1,,,45,0,60,45,f32,Rotation per frame (degrees),,medium,community,m45[*].1
+,1,,,45,0,60,45,f32,Rotation per frame (degrees),community value differs: Custom2 0 (vanilla 60),medium,community,m45[*].1
 ,2,,,0.09,0,0.045,0.09,f32,Gravity upon bouncing,,medium,community,m45[*].2
 ,3,,,0.5,1,0.5,0.5,f32,H speed multiplier upon bouncing,,medium,community,m45[*].3
 ,4,,,0.5,1,0.5,0.5,f32,V speed multiplier upon bouncing,,medium,community,m45[*].4
@@ -553,11 +553,11 @@ Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
 ,2,,,-3.1,,,,f32,,,,,m48[0].2
 ,3,,,3,,,,f32,,,,,m48[0].3
 50,0,"Side B
-(esa)",0x02000000,1,1.8,0.4,1,f32,Initial Speed,,medium,community,m49[*].0
-,1,,0x02000001,0,0,0,0,f32,Affects distance traveled,,medium,community,m49[*].1
-,2,,0x02000002,1.5,1.8,1.5,1.5,f32,,,,,m49[*].2
-,3,,0x02000003,0.5,0.8,1,0.5,f32,this * 10 * model scale,,medium,community,m49[*].3
-,4,,0x02000004,8,20,6,8,f32,,,,,m49[*].4
+(esa)",0x02000000,1,1.8,0.4,1,f32,Initial Speed,,medium,community | no read in the article MSC (native or unused),m49[*].0
+,1,,0x02000001,0,0,0,0,f32,"Affects distance traveled -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 1 (func_54); KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 2 (func_54)",,medium,community | reads: MSC pacman/esa.mscsb func_54,m49[*].1
+,2,,0x02000002,1.5,1.8,1.5,1.5,f32,,,,no read in the article MSC (native or unused),m49[*].2
+,3,,0x02000003,0.5,0.8,1,0.5,f32,this * 10 * model scale -- code: compared with a computed value (func_54),,medium,community | reads: MSC pacman/esa.mscsb func_54,m49[*].3
+,4,,0x02000004,8,20,6,8,f32,"code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_54); compared with a computed value (func_54)",,medium,reads: MSC pacman/esa.mscsb func_54,m49[*].4
 51,0,,,0x1,,,,u32,,,,,m50[0].0
 ,1,,,5.9,,,,f32,,,,,m50[0].1
 ,2,,,-5.9,,,,f32,,,,,m50[0].2
@@ -620,47 +620,47 @@ Hurtbox?",,0,,,,f32,X?,,medium,community,m19[0].0
 ,1,,,2,,,,f32,,,,,m54[0].1
 ,2,,,-2,,,,f32,,,,,m54[0].2
 ,3,,,2,,,,f32,,,,,m54[0].3
-56,0,trampoline,0x12000000,0x12C,0xE,0x190,0x12C,u32,,,,,m55[*].0
-,1,,0x02000001,1.1,1,1.1,1.1,f32,,,,,m55[*].1
-,2,,0x02000002,2.7,2.7,2,2.7,f32,,,,,m55[*].2
-,3,,0x02000003,1.5,1.4,0.9,1.4,f32,,,,,m55[*].3
+56,0,trampoline,0x12000000,0x12C,0xE,0x190,0x12C,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_45 (a countdown / remaining count), tested against 0 (func_47)",,medium,reads: MSC pacman/trampoline.mscsb func_47,m55[*].0
+,1,,0x02000001,1.1,1,1.1,1.1,f32,,,,no read in the article MSC (native or unused),m55[*].1
+,2,,0x02000002,2.7,2.7,2,2.7,f32,,,,no read in the article MSC (native or unused),m55[*].2
+,3,,0x02000003,1.5,1.4,0.9,1.4,f32,,,,no read in the article MSC (native or unused),m55[*].3
 57,0,,,0x1,,,,u32,,,,,m56[0].0
 ,1,,,0,,,,f32,,,,,m56[0].1
 ,2,,,-10,,,,f32,,,,,m56[0].2
 ,3,,,10,,,,f32,,,,,m56[0].3
-58,0,Hydrant,0x12000000,0x190,0x190,0x1C,0x190,u32,,,,,m57[*].0
-,1,,0x12000001,0xA,0xA,0x1C,0xA,u32,,,,,m57[*].1
-,2,,0x02000002,2,2,2.2,2,f32,,,,,m57[*].2
-,3,,0x02000003,0.1,0.1,0.2,0.1,f32,,,,,m57[*].3
-,4,,0x02000004,3.2,3.8,3.5,3.8,f32,,,,,m57[*].4
-,5,,0x02000005,0.5,0.5,0.5,0.5,f32,,,,,m57[*].5
-,6,,0x12000006,0x2,0x3,0x0,0x2,u32,Number of water shots,,medium,community,m57[*].6
-,7,,0x12000007,0x5A,0x5A,0x5A,0x5A,u32,,,,,m57[*].7
-,8,,0x12000008,0x78,0x78,0x78,0x78,u32,Frames between the shots of water,,medium,community,m57[*].8
-,9,,0x02000009,80,80,80,80,f32,,,,,m57[*].9
-,10,,0x1200000A,0x1E,0x1E,0x1E,0x1E,u32,,,,,m57[*].10
-,11,,0x0200000B,30,30,89,30,f32,Angle difference between floor (degrees),,medium,community,m57[*].11
-,12,,0x1200000C,0x258,0x258,0x258,0x258,u32,,,,,m57[*].12
-,13,,0x0200000D,1,1,1,1,f32,var4,,medium,community,m57[*].13
-,14,,0x0200000E,10,10,10,10,f32,Min rotation angle (degrees)?,,medium,community,m57[*].14
-,15,,0x0200000F,0.1,0.1,0.1,0.1,f32,var5,,medium,community,m57[*].15
-,16,,0x02000010,1,1,1,1,f32,var4,,medium,community,m57[*].16
-,17,,0x02000011,10,10,10,10,f32,Min rotation angle (degrees)?,,medium,community,m57[*].17
-,18,,0x12000012,0x4,0x4,0x4,0x4,u32,,,,,m57[*].18
-,19,,0x02000013,100,100,100,100,f32,,,,,m57[*].19
-,20,,0x02000014,140,140,140,140,f32,Max rotation angle (degrees)?,,medium,community,m57[*].20
-,21,,0x02000015,2,2,2,2,f32,,,,,m57[*].21
-,22,,0x12000016,0xD,0xD,0x3E7,0xA,u32,Required damage to knockback,,medium,community,m57[*].22
-,23,,0x12000017,0x96,0x96,0x96,0x96,u32,,,,,m57[*].23
-,24,,0x02000018,1.25,1.4,1.25,1.25,f32,,,,,m57[*].24
-,25,,0x02000019,2,1.5,2,2,f32,,,,,m57[*].25
-,26,,0x0200001A,18,18,18,18,f32,Hydrant's spin when launched,,medium,community,m57[*].26
-,27,,0x0200001B,7,7,7,7,f32,,,,,m57[*].27
-,28,,0x0200001C,20,20,20,20,f32,,,,,m57[*].28
-,29,,0x0200001D,0,0,0,0,f32,,,,,m57[*].29
-,30,,0x0200001E,0.86,0.86,0.86,0.86,f32,Bouncing multiplier while launched,,medium,community,m57[*].30
-,31,,0x0200001F,0.5,0.5,0.5,0.5,f32,,,,,m57[*].31
-,32,,0x12000020,0x4,0x4,0x4,0x4,u32,,,,,m57[*].32
+58,0,Hydrant,0x12000000,0x190,0x190,0x1C,0x190,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_47 (a countdown / remaining count), compared with a computed value (func_49); compared with a computed value (func_47)",community value differs: Custom2 0x12 (vanilla 0x1C),medium,reads: MSC pacman/firehydrant.mscsb func_47; MSC pacman/firehydrant.mscsb func_49,m57[*].0
+,1,,0x12000001,0xA,0xA,0x1C,0xA,u32,code: compared with a computed value (func_47),,medium,reads: MSC pacman/firehydrant.mscsb func_47,m57[*].1
+,2,,0x02000002,2,2,2.2,2,f32,,,,no read in the article MSC (native or unused),m57[*].2
+,3,,0x02000003,0.1,0.1,0.2,0.1,f32,,,,no read in the article MSC (native or unused),m57[*].3
+,4,,0x02000004,3.2,3.8,3.5,3.8,f32,,,,no read in the article MSC (native or unused),m57[*].4
+,5,,0x02000005,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m57[*].5
+,6,,0x12000006,0x2,0x3,0x0,0x2,u32,Number of water shots -- code: compared with a computed value (func_56),,medium,community | reads: MSC pacman/firehydrant.mscsb func_56,m57[*].6
+,7,,0x12000007,0x5A,0x5A,0x5A,0x5A,u32,"code: stored in instance int 0x9, then decremented in func_56 (a countdown / remaining count), compared with a computed value (func_54)",,medium,reads: MSC pacman/firehydrant.mscsb func_54,m57[*].7
+,8,,0x12000008,0x78,0x78,0x78,0x78,u32,Frames between the shots of water -- code: compared with a computed value (func_56),,medium,community | reads: MSC pacman/firehydrant.mscsb func_56,m57[*].8
+,9,,0x02000009,80,80,80,80,f32,,,,no read in the article MSC (native or unused),m57[*].9
+,10,,0x1200000A,0x1E,0x1E,0x1E,0x1E,u32,code: compared with a computed value (func_56),,medium,reads: MSC pacman/firehydrant.mscsb func_56,m57[*].10
+,11,,0x0200000B,30,30,89,30,f32,Angle difference between floor (degrees) -- code: compared with a computed value (func_56),,medium,community | reads: MSC pacman/firehydrant.mscsb func_56,m57[*].11
+,12,,0x1200000C,0x258,0x258,0x258,0x258,u32,"code: stored in instance int 0xD, then decremented in func_73 (a countdown / remaining count), tested against 0 (func_71)",,medium,reads: MSC pacman/firehydrant.mscsb func_71,m57[*].12
+,13,,0x0200000D,1,1,1,1,f32,"var4 -- code: read in: var4 = WorkModuleF(0, 0x200000d); (func_73)",,medium,community | reads: MSC pacman/firehydrant.mscsb func_73,m57[*].13
+,14,,0x0200000E,10,10,10,10,f32,"Min rotation angle (degrees)? -- code: read in: var6 = WorkModuleF(0, 0x200000e); (func_73)",,medium,community | reads: MSC pacman/firehydrant.mscsb func_73,m57[*].14
+,15,,0x0200000F,0.1,0.1,0.1,0.1,f32,var5 -- code: compared with a computed value (func_73); tested against 0 (func_73),,medium,community | reads: MSC pacman/firehydrant.mscsb func_73,m57[*].15
+,16,,0x02000010,1,1,1,1,f32,var4 -- code: compared with a computed value (func_73),,medium,community | reads: MSC pacman/firehydrant.mscsb func_73,m57[*].16
+,17,,0x02000011,10,10,10,10,f32,Min rotation angle (degrees)? -- code: AttackModule op 0x271F (func_73); compared with a computed value (func_73),,medium,community | reads: MSC pacman/firehydrant.mscsb func_73,m57[*].17
+,18,,0x12000012,0x4,0x4,0x4,0x4,u32,code: compared with a computed value (func_73),,medium,reads: MSC pacman/firehydrant.mscsb func_73,m57[*].18
+,19,,0x02000013,100,100,100,100,f32,code: compared with a computed value (func_73),,medium,reads: MSC pacman/firehydrant.mscsb func_73,m57[*].19
+,20,,0x02000014,140,140,140,140,f32,"Max rotation angle (degrees)? -- code: stored in instance float 0x3, then ModelModule op 0x1; AttackModule op 0x271F (func_68) (func_73); compared with a computed value (func_73); tested against 0 (func_73)",,medium,community | reads: MSC pacman/firehydrant.mscsb func_73; MSC pacman/firehydrant.mscsb func_76,m57[*].20
+,21,,0x02000015,2,2,2,2,f32,code: compared with a computed value (func_83); tested against 0 (func_83),,medium,reads: MSC pacman/firehydrant.mscsb func_83,m57[*].21
+,22,,0x12000016,0xD,0xD,0x3E7,0xA,u32,Required damage to knockback -- code: stored in instance int 0x8 (func_49),,medium,community | reads: MSC pacman/firehydrant.mscsb func_49,m57[*].22
+,23,,0x12000017,0x96,0x96,0x96,0x96,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_47 (a countdown / remaining count), compared with a computed value (func_64)",,medium,reads: MSC pacman/firehydrant.mscsb func_64,m57[*].23
+,24,,0x02000018,1.25,1.4,1.25,1.25,f32,,,,no read in the article MSC (native or unused),m57[*].24
+,25,,0x02000019,2,1.5,2,2,f32,,,,no read in the article MSC (native or unused),m57[*].25
+,26,,0x0200001A,18,18,18,18,f32,Hydrant's spin when launched,,medium,community | no read in the article MSC (native or unused),m57[*].26
+,27,,0x0200001B,7,7,7,7,f32,,,,no read in the article MSC (native or unused),m57[*].27
+,28,,0x0200001C,20,20,20,20,f32,,,,no read in the article MSC (native or unused),m57[*].28
+,29,,0x0200001D,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m57[*].29
+,30,,0x0200001E,0.86,0.86,0.86,0.86,f32,Bouncing multiplier while launched,,medium,community | no read in the article MSC (native or unused),m57[*].30
+,31,,0x0200001F,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m57[*].31
+,32,,0x12000020,0x4,0x4,0x4,0x4,u32,"code: stored in instance int 0xB, then decremented in func_69 (a countdown / remaining count), tested against 0 (func_64)",,medium,reads: MSC pacman/firehydrant.mscsb func_64,m57[*].32
 ,0,,,0x1,,,,u32,,,,,m58.0
 ,1,,,6,,,,f32,,,,,m58.1
 ,2,,,-7,,,,f32,,,,,m58.2
@@ -684,8 +684,8 @@ Hurtbox",,0,,,,f32,X offset,,medium,community,m59[0].0
 ,3,,,12,,,,f32,,,,,m60.3
 ,4,,,5,,,,f32,,,,,m60.4
 ,5,,,10,,,,f32,,,,,m60.5
-60,0,Water,0x02000000,1.35,0,1.35,1.35,f32,KBG for water hitbox (True = this * 100),,medium,community,m61[*].0
-,1,,0x12000001,0x28,0x1C,0x28,0x28,u32,WBKB for water hitbox,,medium,community,m61[*].1
+60,0,Water,0x02000000,1.35,0,1.35,1.35,f32,KBG for water hitbox (True = this * 100),,medium,community | no read in the article MSC (native or unused),m61[*].0
+,1,,0x12000001,0x28,0x1C,0x28,0x28,u32,"WBKB for water hitbox -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_49 (a countdown / remaining count), tested against 0 (func_46)",community value differs: Custom1 0x12 (vanilla 0x1C),medium,community | reads: MSC pacman/firehydrantwater.mscsb func_46,m61[*].1
 61,0,,,0x2000000,,,,u32,Weapon param Name0?,,medium,community,m62[0].0
 ,1,,,1,,,,f32,,,,,m62[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m62[0].2

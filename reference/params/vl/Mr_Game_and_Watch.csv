@@ -1,102 +1,102 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,4,0,15,4,f32,Min number of frames until a second piece of food can be thrown,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2951",m12[*].0
-,1,,0x15000001,0x5,0x1,0x3,0x5,u32,Max number of food per cycle,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2951",m12[*].1
+13,0,Neutral B,0x05000000,4,0,15,4,f32,"Min number of frames until a second piece of food can be thrown -- code: MotionModule op 0x2711 (func_2270) [status 0x152 (SpecialN, SpecialAirN); status 0x1FC]",,medium,community | reads: MSC gamewatch.mscsb func_2270; MSC kirby.mscsb func_2951,m12[*].0
+,1,,0x15000001,0x5,0x1,0x3,0x5,u32,"Max number of food per cycle -- code: compared with status int 0x2 (a counter) (func_2270) [status 0x152 (SpecialN, SpecialAirN); status 0x1FC]",,high,community | reads: MSC gamewatch.mscsb func_2270; MSC kirby.mscsb func_2951,m12[*].1
 14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,Aerial H speed multiplier,,medium,community | reads: native 0x02EEB5F0 (fn 0x02EEB1E8),m13[*].0
 ,1,,0x06000001,0.0025,0.0025,0.0025,0.0025,f32,H air friction,,medium,community | reads: native 0x02EE6F10 (fn 0x02EE6D30),m13[*].1
 ,2,,0x16000002,0x1,0x8,0x1,0x1,u32,Odds for getting 1,,medium,community | reads: native 0x02EEB304 (fn 0x02EEB1E8),m13[*].2
-,3,,0x16000003,0x1,0x0,0x2,0x1,u32,Odds for getting 2,,medium,community,m13[*].3
-,4,,0x16000004,0x1,0x0,0x3,0x1,u32,Odds for getting 3,,medium,community,m13[*].4
-,5,,0x16000005,0x1,0x0,0x3,0x1,u32,Odds for getting 4,,medium,community,m13[*].5
-,6,,0x16000006,0x1,0x0,0x2,0x1,u32,Odds for getting 5,,medium,community,m13[*].6
-,7,,0x16000007,0x1,0x0,0x2,0x1,u32,Odds for getting 6,,medium,community,m13[*].7
-,8,,0x16000008,0x1,0x0,0x1,0x1,u32,Odds for getting 7,,medium,community,m13[*].8
-,9,,0x16000009,0x1,0x0,0x1,0x1,u32,Odds for getting 8,,medium,community,m13[*].9
-,10,,0x1600000A,0x1,0x2,0x1,0x1,u32,Odds for getting 9,,medium,community,m13[*].10
+,3,,0x16000003,0x1,0x0,0x2,0x1,u32,Odds for getting 2,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x16000004,0x1,0x0,0x3,0x1,u32,Odds for getting 3,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x16000005,0x1,0x0,0x3,0x1,u32,Odds for getting 4,,medium,community | no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x16000006,0x1,0x0,0x2,0x1,u32,Odds for getting 5,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x16000007,0x1,0x0,0x2,0x1,u32,Odds for getting 6,,medium,community | no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x16000008,0x1,0x0,0x1,0x1,u32,Odds for getting 7,,medium,community | no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x16000009,0x1,0x0,0x1,0x1,u32,Odds for getting 8,,medium,community | no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x1600000A,0x1,0x2,0x1,0x1,u32,Odds for getting 9,,medium,community | no read in the vanilla MSC (native or unused),m13[*].10
 15,0,Up B,0x07000000,0.25,0,0.25,0.25,f32,[auto] read by native code (get_float at 0x02EEA954); meaning not traced,,low,reads: native 0x02EEA954 (fn 0x02EEA8E8),m14[*].0
 ,1,,0x07000001,30,0,30,30,f32,Angle leniency it has when holding forward during startup (degrees),,medium,community | reads: native 0x02EEA968 (fn 0x02EEA8E8),m14[*].1
 ,2,,0x07000002,0.5,0.3,1.6,0.5,f32,Parachute descent speed multiplier,,medium,community | reads: native 0x02EEAC24 (fn 0x02EEABC4),m14[*].2
-,3,,0x07000003,40,45,40,40,f32,"Landing Lag (when he lands during the move, aka the peak)","This doesn't effect his Special Fall landing lag, although they use the same animation",medium,community | reads: native 0x02EEAACC (fn 0x02EEAAA8),m14[*].3
+,3,,0x07000003,40,45,40,40,f32,"Landing Lag (when he lands during the move, aka the peak) -- code: tested against 0 (func_2278) [status 0x154 (SpecialHi, SpecialAirHi)]","This doesn't effect his Special Fall landing lag, although they use the same animation",medium,community | reads: MSC gamewatch.mscsb func_2278; native 0x02EEAACC (fn 0x02EEAAA8),m14[*].3
 ,4,,0x07000004,1,1,1,1,f32,Height multiplier,,medium,community | reads: native 0x02EEA8B8 (fn 0x02EEA87C),m14[*].4
 16,0,Down B,0x08000000,0.5,0.65,0.5,0.5,f32,Initial H speed multiplier,,medium,community | reads: native 0x02EEB034 (fn 0x02EEAF8C),m15[*].0
-,1,,0x08000001,0.0025,1,0.0025,0.0025,f32,Air friction,,medium,community,m15[*].1
-,2,,0x08000002,0.04,0.05,0.04,0.04,f32,Gravity,,medium,community,m15[*].2
-,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Max fall speed,,medium,community,m15[*].3
+,1,,0x08000001,0.0025,0.01,0.0025,0.0025,f32,Air friction,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,0.04,0.05,0.04,0.04,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
 ,4,,0x08000004,18,10,15,18,f32,Min damage,,medium,community | reads: native 0x02EEADF0 (fn 0x02EEADCC),m15[*].4
-,5,,0x08000005,2.8,2,2.5,2.8,f32,Damage multiplier,,medium,community,m15[*].5
-,6,,0x08000006,20,8,15,20,f32,Max damage per unit,,medium,community,m15[*].6
-,7,,0x08000007,10,1,10,10,f32,If attack does > this amount then +2 units,,medium,community,m15[*].7
-,8,,0x08000008,2,3,2,2,f32,Amount of units added if attack does >10%,,medium,community,m15[*].8
-,9,,0x08000009,20,1,20,20,f32,If attack does > this amount then +3 units,,medium,community,m15[*].9
-,10,,0x0800000A,3,3,3,3,f32,Amount of units added if attack does >20%,,medium,community,m15[*].10
-,11,,0x0800000B,6,6,6,6,f32,,,,,m15[*].11
-,12,,0x0800000C,1,0.75,1.85,1,f32,Oil GFX size multiplier,,medium,community,m15[*].12
-,13,,0x0800000D,1,1,1,1,f32,,,,,m15[*].13
-,0,Character Model,0x04000000,0.01,,,,f32,Character model Z scale,,medium,community,m16.0
-,1,Final Smash?,0x04000001,0.75,,,,f32,,,,,m16.1
-,2,,0x04000002,3,,,,f32,,,,,m16.2
-,3,,0x04000003,0.06,,,,f32,,,,,m16.3
-,4,,0x04000004,0.925,,,,f32,,,,,m16.4
-,5,,0x04000005,0.04,,,,f32,,,,,m16.5
-,6,,0x04000006,0.045,,,,f32,,,,,m16.6
-,7,,0x14000007,0x14,,,,u32,,,,,m16.7
-,8,,0x04000008,0.7,,,,f32,,,,,m16.8
-,9,,0x04000009,0.05,,,,f32,,,,,m16.9
-,10,,0x0400000A,0.05,,,,f32,,,,,m16.10
-,11,,0x0400000B,0.475,,,,f32,,,,,m16.11
-,12,,0x0400000C,0.4,,,,f32,,,,,m16.12
-,13,,0x0400000D,0.75,,,,f32,,,,,m16.13
-,14,,0x0400000E,2.35,,,,f32,,,,,m16.14
-,15,,0x0400000F,0.45,,,,f32,,,,,m16.15
-,16,,0x04000010,1.1,,,,f32,,,,,m16.16
-,17,,0x04000011,0.84,,,,f32,,,,,m16.17
-,18,,0x04000012,0.05,,,,f32,,,,,m16.18
-,19,,0x04000013,0.9,,,,f32,,,,,m16.19
-,20,,0x04000014,0.006,,,,f32,,,,,m16.20
-,21,,0x04000015,10,,,,f32,,,,,m16.21
-,22,,0x04000016,0.5405,,,,f32,,,,,m16.22
-,23,,0x04000017,0.006,,,,f32,,,,,m16.23
-,24,,0x04000018,2.5,,,,f32,,,,,m16.24
-,25,,0x04000019,0.015,,,,f32,,,,,m16.25
-,26,,0x0400001A,0.035,,,,f32,,,,,m16.26
-,27,,0x0400001B,0.001,,,,f32,,,,,m16.27
-,28,,0x0400001C,0.05,,,,f32,,,,,m16.28
-,29,,0x0400001D,0.08,,,,f32,,,,,m16.29
-,30,,0x0400001E,1,,,,f32,,,,,m16.30
-,31,,0x1400001F,0x1,,,,u32,,,,,m16.31
-,32,,0x14000020,0x1,,,,u32,,,,,m16.32
+,5,,0x08000005,2.8,2,2.5,2.8,f32,Damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,20,8,15,20,f32,Max damage per unit,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,10,1,10,10,f32,If attack does > this amount then +2 units,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,2,3,2,2,f32,Amount of units added if attack does >10%,,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,20,1,20,20,f32,If attack does > this amount then +3 units,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,3,3,3,3,f32,Amount of units added if attack does >20%,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,6,6,6,6,f32,"code: stored in status float 0x7, then tested against 0 (func_2292) (func_2292) [motions SpecialLw, SpecialLwEnd, SpecialAirLw]",,medium,reads: MSC gamewatch.mscsb func_2292,m15[*].11
+,12,,0x0800000C,1,0.75,1.85,1,f32,"Oil GFX size multiplier -- code: AttackModule op 0x273A (func_2306) [status 0x15B (SpecialLwShoot, SpecialAirLwShoot)]",,medium,community | reads: MSC gamewatch.mscsb func_2306,m15[*].12
+,13,,0x0800000D,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m15[*].13
+,0,Character Model,0x04000000,0.01,,,,f32,Character model Z scale,,medium,community | no read in the vanilla MSC (native or unused),m16.0
+,1,Final Smash?,0x04000001,0.75,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,0.06,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,0.925,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,0.04,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,0.045,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
+,7,,0x14000007,0x14,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,0.7,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
+,9,,0x04000009,0.05,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.9
+,10,,0x0400000A,0.05,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.10
+,11,,0x0400000B,0.475,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.11
+,12,,0x0400000C,0.4,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.12
+,13,,0x0400000D,0.75,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.13
+,14,,0x0400000E,2.35,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.14
+,15,,0x0400000F,0.45,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.15
+,16,,0x04000010,1.1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.16
+,17,,0x04000011,0.84,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.17
+,18,,0x04000012,0.05,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.18
+,19,,0x04000013,0.9,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.19
+,20,,0x04000014,0.006,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.20
+,21,,0x04000015,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.21
+,22,,0x04000016,0.5405,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.22
+,23,,0x04000017,0.006,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.23
+,24,,0x04000018,2.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.24
+,25,,0x04000019,0.015,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.25
+,26,,0x0400001A,0.035,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.26
+,27,,0x0400001B,0.001,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.27
+,28,,0x0400001C,0.05,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.28
+,29,,0x0400001D,0.08,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.29
+,30,,0x0400001E,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.30
+,31,,0x1400001F,0x1,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.31
+,32,,0x14000020,0x1,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.32
 17,0,"Neutral B
-(Projectile)",0x02000000,0.5,70,0.25,0.5,f32,,,,,m17[*].0
-,1,,0x12000001,0x3E7,0x6E,0x46,0x50,u32,Lifetime (frames),,medium,community,m17[*].1
-,2,,0x12000002,0x1E,0x2D,0x1E,0x1E,u32,Time spent flashing (frames),,medium,community,m17[*].2
-,3,,0x02000003,1,3.8,0.8,1,f32,Model size multiplier (food 1 sausage?),,medium,community,m17[*].3
-,4,,0x02000004,1,2.55,0.8,1,f32,Model size multiplier (food 2 steak?),,medium,community,m17[*].4
-,5,,0x02000005,1,2.8,0.8,1,f32,Model size multiplier (food 3 prawn?),,medium,community,m17[*].5
-,6,,0x02000006,1,2.55,0.8,1,f32,Model size multiplier (food 4 fish?),,medium,community,m17[*].6
-,7,,0x02000007,0,0,2,1,f32,Trajectory 1 initial H speed,,medium,community,m17[*].7
-,8,,0x02000008,-1,1.35,0.65,1,f32,Trajectory 1 initial V speed,,medium,community,m17[*].8
-,9,,0x02000009,0.1,0.02,0.06,0.04,f32,Trajectory 1 gravity,,medium,community,m17[*].9
-,10,,0x0200000A,2.5,1.5,2.5,2.5,f32,Trajectory 1 max fall speed,,medium,community,m17[*].10
-,11,,0x0200000B,50,1,25,10,f32,Trajectory 1 spinning,,medium,community,m17[*].11
-,12,,0x0200000C,0,0,1.85,0.8,f32,Trajectory 2,,medium,community,m17[*].12
-,13,,0x0200000D,-1,1.35,0.75,1.1,f32,,,,,m17[*].13
-,14,,0x0200000E,0.1,0.02,0.055,0.04,f32,,,,,m17[*].14
-,15,,0x0200000F,2.5,1.5,2.5,2.5,f32,,,,,m17[*].15
-,16,,0x02000010,50,1,30,31,f32,,,,,m17[*].16
-,17,,0x02000011,0,0,1.75,0.6,f32,Trajectory 3,,medium,community,m17[*].17
-,18,,0x02000012,-1,1.35,0.85,1.2,f32,,,,,m17[*].18
-,19,,0x02000013,0.1,0.02,0.05,0.04,f32,,,,,m17[*].19
-,20,,0x02000014,2.5,1.5,2.5,2.5,f32,,,,,m17[*].20
-,21,,0x02000015,50,1,20,8,f32,,,,,m17[*].21
-,22,,0x02000016,0,0,1.5,0.4,f32,Trajectory 4,,medium,community,m17[*].22
-,23,,0x02000017,-1,1.35,0.95,1.3,f32,,,,,m17[*].23
-,24,,0x02000018,0.1,0.02,0.045,0.04,f32,,,,,m17[*].24
-,25,,0x02000019,2.5,1.5,2.5,2.5,f32,,,,,m17[*].25
-,26,,0x0200001A,50,1,15,42,f32,,,,,m17[*].26
-,27,,0x0200001B,0,0,1.25,0.2,f32,Trajectory 5,,medium,community,m17[*].27
-,28,,0x0200001C,-1,1.35,1.05,1.4,f32,,,,,m17[*].28
-,29,,0x0200001D,0.1,0.01,0.04,0.04,f32,,,,,m17[*].29
-,30,,0x0200001E,2.5,1.5,10,2.5,f32,,,,,m17[*].30
-,31,,0x0200001F,50,1,12,12,f32,,,,,m17[*].31
+(Projectile)",0x02000000,0.5,0.25,0.25,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].0
+,1,,0x12000001,0x50,0x6E,0x46,0x50,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_46); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_46)",,medium,community | reads: MSC gamewatch/food.mscsb func_46,m17[*].1
+,2,,0x12000002,0x1E,0x1E,0x1E,0x1E,u32,"Time spent flashing (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,community | reads: MSC gamewatch/food.mscsb func_51,m17[*].2
+,3,,0x02000003,1,3.8,0.8,1,f32,Model size multiplier (food 1 sausage?),,medium,community | no read in the article MSC (native or unused),m17[*].3
+,4,,0x02000004,1,2.55,0.8,1,f32,Model size multiplier (food 2 steak?),,medium,community | no read in the article MSC (native or unused),m17[*].4
+,5,,0x02000005,1,2.8,0.8,1,f32,Model size multiplier (food 3 prawn?),,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x02000006,1,2.55,0.8,1,f32,Model size multiplier (food 4 fish?),,medium,community | no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,1,0.6,2,1,f32,Trajectory 1 initial H speed,,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x02000008,1,1.35,0.65,1,f32,Trajectory 1 initial V speed,,medium,community | no read in the article MSC (native or unused),m17[*].8
+,9,,0x02000009,0.04,0.035,0.06,0.04,f32,Trajectory 1 gravity,,medium,community | no read in the article MSC (native or unused),m17[*].9
+,10,,0x0200000A,2.5,2.5,2.5,2.5,f32,Trajectory 1 max fall speed,,medium,community | no read in the article MSC (native or unused),m17[*].10
+,11,,0x0200000B,10,6,25,10,f32,Trajectory 1 spinning,,medium,community | no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,0.8,0.5,1.85,0.8,f32,Trajectory 2,,medium,community | no read in the article MSC (native or unused),m17[*].12
+,13,,0x0200000D,1.1,1.35,0.75,1.1,f32,,,,no read in the article MSC (native or unused),m17[*].13
+,14,,0x0200000E,0.04,0.035,0.055,0.04,f32,,,,no read in the article MSC (native or unused),m17[*].14
+,15,,0x0200000F,2.5,3,2.5,2.5,f32,,,,no read in the article MSC (native or unused),m17[*].15
+,16,,0x02000010,31,1,30,31,f32,,,,no read in the article MSC (native or unused),m17[*].16
+,17,,0x02000011,0.6,0.4,1.75,0.6,f32,Trajectory 3,,medium,community | no read in the article MSC (native or unused),m17[*].17
+,18,,0x02000012,1.2,1.45,0.85,1.2,f32,,,,no read in the article MSC (native or unused),m17[*].18
+,19,,0x02000013,0.04,0.035,0.05,0.04,f32,,,,no read in the article MSC (native or unused),m17[*].19
+,20,,0x02000014,2.5,3,2.5,2.5,f32,,,,no read in the article MSC (native or unused),m17[*].20
+,21,,0x02000015,8,5,20,8,f32,,,,no read in the article MSC (native or unused),m17[*].21
+,22,,0x02000016,0.4,0.3,1.5,0.4,f32,Trajectory 4,,medium,community | no read in the article MSC (native or unused),m17[*].22
+,23,,0x02000017,1.3,1.55,0.95,1.3,f32,,,,no read in the article MSC (native or unused),m17[*].23
+,24,,0x02000018,0.04,0.035,0.045,0.04,f32,,,,no read in the article MSC (native or unused),m17[*].24
+,25,,0x02000019,2.5,3,2.5,2.5,f32,,,,no read in the article MSC (native or unused),m17[*].25
+,26,,0x0200001A,42,8,15,42,f32,,,,no read in the article MSC (native or unused),m17[*].26
+,27,,0x0200001B,0.2,0.2,1.25,0.2,f32,Trajectory 5,,medium,community | no read in the article MSC (native or unused),m17[*].27
+,28,,0x0200001C,1.4,1.65,1.05,1.4,f32,,,,no read in the article MSC (native or unused),m17[*].28
+,29,,0x0200001D,0.04,0.035,0.04,0.04,f32,,,,no read in the article MSC (native or unused),m17[*].29
+,30,,0x0200001E,2.5,3,10,2.5,f32,,,,no read in the article MSC (native or unused),m17[*].30
+,31,,0x0200001F,12,4,12,12,f32,,,,no read in the article MSC (native or unused),m17[*].31
 ,0,,,0x1,,,,u32,,,,,m18.0
 ,1,,,0.6,,,,f32,,,,,m18.1
 ,2,,,-0.6,,,,f32,,,,,m18.2
@@ -106,9 +106,9 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,2,,,1.5,1.5,3,1.5,f32,Absorb bubble Y offset,,medium,community,m19[*].2
 ,3,,,0,0,0,0,f32,Absorb bubble Z offset,,medium,community,m19[*].3
 ,4,,,22,22,6,22,f32,Absorb bubble size,,medium,community,m19[*].4
-19,0,Final Smash,0x02000000,120,,,,f32,Frame duration,,medium,community,m20[0].0
-,1,,0x02000001,12,,,,f32,Damage his body itself does,"Although this is stored within scripting, not params",medium,community,m20[0].1
-,2,,0x02000002,40,,,,f32,Frame duration of one loop?,,medium,community,m20[0].2
+19,0,Final Smash,0x02000000,120,,,,f32,Frame duration -- code: compared with status float 0x0 (func_45),,medium,community | reads: MSC gamewatch/octopus.mscsb func_45,m20[0].0
+,1,,0x02000001,12,,,,f32,Damage his body itself does,"Although this is stored within scripting, not params",medium,community | no read in the article MSC (native or unused),m20[0].1
+,2,,0x02000002,40,,,,f32,Frame duration of one loop?,,medium,community | no read in the article MSC (native or unused),m20[0].2
 20,0,Final Smash,,0,,,,f32,X offset,,medium,community,m21[0].0
 ,1,,,6,,,,f32,Y offset,,medium,community,m21[0].1
 ,2,,,-14,,,,f32,Z offset,,medium,community,m21[0].2
@@ -123,9 +123,9 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,1,,,7,,,,f32,,,,,m21[1].1
 ,2,,,6,,,,f32,Y offset,,medium,community,m21[1].2
 ,3,,,0,,,,f32,X2 offset,,medium,community,m21[1].3
-,4,,,7,,,,f32,Y2 offset,,medium,community,m21[1].4
-,5,,,8,,,,f32,Z2 offset,,medium,community,m21[1].5
-,6,,,12,,,,f32,,,,,m21[1].6
+,4,,,7,,,,f32,Y2 offset,community value differs: Default 6 (vanilla 7),medium,community,m21[1].4
+,5,,,8,,,,f32,Z2 offset,community value differs: Default -16 (vanilla 8),medium,community,m21[1].5
+,6,,,12,,,,f32,,community value differs: Default 16 (vanilla 12),,,m21[1].6
 ,7,,,0x1,,,,u32,,,,,m21[1].7
 ,8,,,0x1,,,,u32,,,,,m21[1].8
 ,9,,,0x7D2,,,,u32,Bone,,medium,community,m21[1].9

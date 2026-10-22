@@ -1,123 +1,123 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,-0.1,0,0,0,f32,H initial speed of non-fully charged aerial shot,H speed = - 0.1 - (0.8 - 0.1) * Charged frames / 120,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2582",m12[*].0
-,1,,0x05000001,-0.8,0,0,0,f32,H initial speed of full charged aerial shot,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2582",m12[*].1
-,2,,0x05000002,120,0,0,0,f32,Time to fully charge (frames),,medium,community,m12[*].2
-,3,,0x05000003,0,0,0,0,f32,,,,,m12[*].3
-,4,,0x05000004,0,6,0,0,f32,X offset grounded laser,Fox Neutral B,medium,community,m12[*].4
-,5,,0x05000005,0,-0.3,0,0,f32,Y offset grounded laser,,medium,community,m12[*].5
-,6,,0x05000006,0,6,0,0,f32,X offset aerial laser,,medium,community,m12[*].6
-,7,,0x05000007,0,-0.3,0,0,f32,Y offset aerial laser,,medium,community,m12[*].7
-,8,,0x05000008,0,7,0,0,f32,Laser speed,,medium,community,m12[*].8
-,9,,0x05000009,0,35,0,0,f32,,,,,m12[*].9
-,10,,0x0500000A,0,90,0,0,f32,,,,,m12[*].10
-,11,,0x0500000B,0,0,2,0,f32,Acceleration of the bomb based on charge time,,medium,community,m12[*].11
-,12,,0x1500000C,0x0,0x0,0x23,0x0,u32,Maximum frames before firing action occurs,,medium,community,m12[*].12
-14,0,Side B,0x06000000,-15,0,0,0,f32,Grounded firing angle (degrees),,medium,community,m13[*].0
-,1,,0x06000001,2.5,0,0,0,f32,Grounded projectile speed,,medium,community,m13[*].1
-,2,,0x06000002,-43,0,0,0,f32,Aerial firing angle (degrees),,medium,community,m13[*].2
-,3,,0x06000003,2.8,0,0,0,f32,Aerial projectile speed,,medium,community,m13[*].3
-,4,,0x06000004,3.2,0,0,0,f32,Projectile X offset,,medium,community,m13[*].4
-,5,,0x06000005,1.1,0,0,0,f32,Projectile Y offset,,medium,community,m13[*].5
-,6,,0x06000006,30,0,0,0,f32,Aerial landing lag (frames),,medium,community,m13[*].6
-,7,,0x16000007,0x0,0x0,0x0,0x0,u32,,,,,m13[*].7
-,8,,0x06000008,0,9,0,0,f32,X offset,Zelda Side B,medium,community,m13[*].8
-,9,,0x06000009,0,-0.8,0,0,f32,Y offset,,medium,community,m13[*].9
+13,0,Neutral B,0x05000000,-0.1,0,0,0,f32,"H initial speed of non-fully charged aerial shot -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2582) [status 0x18B; status 0x15E]",H speed = - 0.1 - (0.8 - 0.1) * Charged frames / 120,high,community | reads: MSC kirby.mscsb func_2582; MSC miigunner.mscsb func_2311,m12[*].0
+,1,,0x05000001,-0.8,0,0,0,f32,"H initial speed of full charged aerial shot -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2582); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1, with a current speed (KineticModuleF) (func_2582); tested against 0 (via func_13) (func_2582) [status 0x18B; status 0x15E]",,high,community | reads: MSC kirby.mscsb func_2582; MSC miigunner.mscsb func_2311,m12[*].1
+,2,,0x05000002,120,0,0,0,f32,"Time to fully charge (frames) -- code: read in: var0 = (int)WorkModuleF(0, 0x5000002); (func_2303)",,medium,community | reads: MSC miigunner.mscsb func_2303,m12[*].2
+,3,,0x05000003,0,0,0,0,f32,code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2288); compared with a computed value (func_2288) [status 0x15E],,medium,reads: MSC miigunner.mscsb func_2288,m12[*].3
+,4,,0x05000004,0,6,0,0,f32,X offset grounded laser,Fox Neutral B,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,0,-0.3,0,0,f32,Y offset grounded laser,,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,0,6,0,0,f32,X offset aerial laser,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,0,-0.3,0,0,f32,Y offset aerial laser,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,0,7,0,0,f32,Laser speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,0,35,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,0,90,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,0,0,2,0,f32,Acceleration of the bomb based on charge time,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x1500000C,0x0,0x0,0x23,0x0,u32,"Maximum frames before firing action occurs -- code: compared with status int 0x2 (a counter) (func_2340) [status 0x15B (SpecialN3Loop, SpecialAirN3Loop)]",,high,community | reads: MSC miigunner.mscsb func_2340,m12[*].12
+14,0,Side B,0x06000000,-15,0,0,0,f32,Grounded firing angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,2.5,0,0,0,f32,Grounded projectile speed,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,-43,0,0,0,f32,Aerial firing angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,2.8,0,0,0,f32,Aerial projectile speed,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,3.2,0,0,0,f32,Projectile X offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1.1,0,0,0,f32,Projectile Y offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x06000006,30,0,0,0,f32,"Aerial landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2350); tested against 0 (func_2350) [status 0x153 (SpecialS1, SpecialAirS1)]",,high,community | reads: MSC miigunner.mscsb func_2350,m13[*].6
+,7,,0x16000007,0x0,0x0,0x0,0x0,u32,code: stored in status int 0x4 (func_2352),,medium,reads: MSC miigunner.mscsb func_2352,m13[*].7
+,8,,0x06000008,0,9,0,0,f32,X offset,Zelda Side B,medium,community | no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x06000009,0,-0.8,0,0,f32,Y offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].9
 ,10,,0x0600000A,0,0.019,0,0,f32,Falling gravity,,medium,community | reads: native 0x027B9C84 (fn 0x027B9BDC),m13[*].10
-,11,,0x0600000B,0,24,0,0,f32,Landing lag (frames)?,,medium,community,m13[*].11
-,12,,0x1600000C,0x0,0x16,0x0,0x0,u32,Landing lag (frames)?,,medium,community,m13[*].12
-,13,,0x0600000D,0,0,0.5,0,f32,H speed multiplier on startup,,medium,community,m13[*].13
-,14,,0x0600000E,0,0,0.0025,0,f32,Air friction,,medium,community,m13[*].14
-,15,,0x0600000F,0,0,3,0,f32,X offset,,medium,community,m13[*].15
+,11,,0x0600000B,0,24,0,0,f32,"Landing lag (frames)? -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2369); tested against 0 (func_2369) [status 0x160 (SpecialS2End, SpecialAirS2End)]",,high,community | reads: MSC miigunner.mscsb func_2369; MSC miigunner.mscsb func_2370,m13[*].11
+,12,,0x1600000C,0x0,0x16,0x0,0x0,u32,Landing lag (frames)? -- code: stored in status int 0x5 (func_2352),,medium,community | reads: MSC miigunner.mscsb func_2352,m13[*].12
+,13,,0x0600000D,0,0,0.5,0,f32,"H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2395)",,high,community | reads: MSC miigunner.mscsb func_2395,m13[*].13
+,14,,0x0600000E,0,0,0.0025,0,f32,"Air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2392)",,high,community | reads: MSC miigunner.mscsb func_2392; MSC miigunner.mscsb func_2395,m13[*].14
+,15,,0x0600000F,0,0,3,0,f32,X offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].15
 15,0,Up B,0x07000000,0.5,0,0,0,f32,[auto] read by native code (get_float at 0x027BA188); meaning not traced,,low,reads: native 0x027BA188 (fn 0x027BA028),m14[*].0
 ,1,,0x07000001,0.3,0,0,0,f32,[auto] read by native code (get_float at 0x027BA0E4); meaning not traced,,low,reads: native 0x027BA0E4 (fn 0x027BA028),m14[*].1
 ,2,,0x07000002,0.2,0,0,0,f32,[auto] read by native code (get_float at 0x027BA164); meaning not traced,,low,reads: native 0x027BA164 (fn 0x027BA028),m14[*].2
-,3,,0x07000003,0.6,0,0,0,f32,,,,,m14[*].3
-,4,,0x07000004,0,0,0,0,f32,,,,,m14[*].4
-,5,,0x07000005,0.6,0,0,0,f32,,,,,m14[*].5
-,6,,0x07000006,3.2,0,0,0,f32,Height gain multiplier,,medium,community,m14[*].6
-,7,,0x07000007,0.7,0,0,0,f32,,,,,m14[*].7
-,8,,0x07000008,18,0,0,0,f32,Landing lag (frames),,medium,community,m14[*].8
-,9,,0x07000009,0,0,0,0,f32,,,,,m14[*].9
-,10,,0x0700000A,0,0,0,0,f32,,,,,m14[*].10
-,11,,0x0700000B,-93,0,0,0,f32,Lunar Launch projectile angle (degrees),,medium,community,m14[*].11
-,12,,0x0700000C,0,6,0,0,f32,V height,,medium,community,m14[*].12
-,13,,0x0700000D,0,1.03,0,0,f32,,,,,m14[*].13
-,14,,0x0700000E,0,0.82,0,0,f32,,,,,m14[*].14
-,15,,0x0700000F,0,6,0,0,f32,,,,,m14[*].15
-,16,,0x07000010,0,0.5,0,0,f32,,,,,m14[*].16
-,17,,0x07000011,0,0.65,0,0,f32,,,,,m14[*].17
-,18,,0x17000012,0x0,0x1C,0x0,0x0,u32,Landing lag (frames),,medium,community,m14[*].18
-,19,,0x17000013,0x0,0x0,0x3,0x0,u32,,,,,m14[*].19
-,20,,0x07000014,0,0,0.8,0,f32,H speed multiplier,,medium,community,m14[*].20
-,21,,0x07000015,0,0,0.02,0,f32,Air friction on startup,,medium,community,m14[*].21
-,22,,0x07000016,0,0,0.015,0,f32,Gravity on startup,,medium,community,m14[*].22
-,23,,0x07000017,0,0,0.125,0,f32,Turn sensitivity,,medium,community,m14[*].23
-,24,,0x07000018,0,0,0.5,0,f32,StickX + StickY,,medium,community,m14[*].24
-,25,,0x07000019,0,0,150,0,f32,Min stick angle (90 - this * 0.5),,medium,community,m14[*].25
-,26,,0x0700001A,0,0,2.7,0,f32,Speed multiplier,,medium,community,m14[*].26
-,27,,0x1700001B,0x0,0x0,0x5,0x0,u32,,,,,m14[*].27
-,28,,0x0700001C,0,0,0.3,0,f32,,,,,m14[*].28
-,29,,0x0700001D,0,0,0,0,f32,,,,,m14[*].29
-,30,,0x0700001E,0,0,0.8,0,f32,Special Fall max H mobility multiplier,,medium,community,m14[*].30
-,31,,0x1700001F,0x0,0x0,0x22,0x0,u32,Landing lag (frames),community ID was 0x0700001F,medium,community,m14[*].31
-16,0,Down B,0x18000000,0x4,0x0,0x0,0x0,u32,Frames before Name2 takes effect,Fox Down B; community ID was 0x08000000,medium,community,m15[*].0
-,1,,0x08000001,0.5,0,0,0,f32,H speed multiplier,,medium,community,m15[*].1
-,2,,0x08000002,0.027,0,0,0,f32,Gravity,,medium,community,m15[*].2
-,3,,0x08000003,20,0,0,0,f32,Frames Mii Gunner is locked in shine,,medium,community,m15[*].3
-,4,,0x08000004,1,0,0,0,f32,,,,,m15[*].4
-,5,,0x08000005,0,5,0,0,f32,,,,,m15[*].5
-,6,,0x08000006,0,0,0,0,f32,,,,,m15[*].6
-,7,,0x18000007,0x0,0x0,0x12,0x0,u32,How many frames after releasing B you continue to hold it,Ness Down B,medium,community,m15[*].7
-,8,,0x18000008,0x0,0x0,0x0,0x0,u32,How long before applying gravity (in frames),,medium,community,m15[*].8
-,9,,0x08000009,0,0,8,0,f32,Something about absorption bubble,,medium,community,m15[*].9
+,3,,0x07000003,0.6,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,0.6,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,3.2,0,0,0,f32,Height gain multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.7,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,18,0,0,0,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2399) [status 0x154 (SpecialHi1, SpecialAirHi1)]",,high,community | reads: MSC miigunner.mscsb func_2399,m14[*].8
+,9,,0x07000009,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].10
+,11,,0x0700000B,-93,0,0,0,f32,Lunar Launch projectile angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,0,6,0,0,f32,V height,,medium,community | no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,0,1.03,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].13
+,14,,0x0700000E,0,0.82,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x0700000F,0,6,0,0,f32,"code: stored in status int 0x2, then decremented in func_2411 (a countdown / remaining count), tested against 0 (func_2408) [status 0x165 (SpecialHi2)]",,medium,reads: MSC miigunner.mscsb func_2408,m14[*].15
+,16,,0x07000010,0,0.5,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].16
+,17,,0x07000011,0,0.65,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].17
+,18,,0x17000012,0x0,0x1C,0x0,0x0,u32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2408) [status 0x165 (SpecialHi2)],,high,community | reads: MSC miigunner.mscsb func_2408,m14[*].18
+,19,,0x17000013,0x0,0x0,0x3,0x0,u32,code: stored in status int 0x2 (func_2413),,medium,reads: MSC miigunner.mscsb func_2413,m14[*].19
+,20,,0x07000014,0,0,0.8,0,f32,"H speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2427)",,high,community | reads: MSC miigunner.mscsb func_2427,m14[*].20
+,21,,0x07000015,0,0,0.02,0,f32,Air friction on startup -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2429),,high,community | reads: MSC miigunner.mscsb func_2429,m14[*].21
+,22,,0x07000016,0,0,0.015,0,f32,Gravity on startup -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2429),,high,community | reads: MSC miigunner.mscsb func_2429,m14[*].22
+,23,,0x07000017,0,0,0.125,0,f32,Turn sensitivity -- code: threshold for stick X (func_2427),,high,community | reads: MSC miigunner.mscsb func_2427,m14[*].23
+,24,,0x07000018,0,0,0.5,0,f32,StickX + StickY -- code: threshold for stick Y / stick X (func_2427); tested against 0 (via func_13) (func_2427),,high,community | reads: MSC miigunner.mscsb func_2427,m14[*].24
+,25,,0x07000019,0,0,150,0,f32,"Min stick angle (90 - this * 0.5) -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 2 (func_2427); stored in status float 0x8, then KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2429) (func_2427); compared with a computed value (func_2427)",,medium,community | reads: MSC miigunner.mscsb func_2427,m14[*].25
+,26,,0x0700001A,0,0,2.7,0,f32,"Speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 2 (func_2427); stored in status float 0x8, then KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2429) (func_2427)",,high,community | reads: MSC miigunner.mscsb func_2427,m14[*].26
+,27,,0x1700001B,0x0,0x0,0x5,0x0,u32,"code: MotionModule op 0x0 (func_2427); stored in status float 0x8, then KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2429) (func_2427); stored in status float 0x9 (func_2427)",,medium,reads: MSC miigunner.mscsb func_2427; MSC miigunner.mscsb func_2429,m14[*].27
+,28,,0x0700001C,0,0,0.3,0,f32,"code: stored in status float 0x8, then KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2429) (func_2427)",,medium,reads: MSC miigunner.mscsb func_2427,m14[*].28
+,29,,0x0700001D,0,0,0,0,f32,"code: stored in status float 0x9, then KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 2 (func_2429) (func_2427)",,medium,reads: MSC miigunner.mscsb func_2427,m14[*].29
+,30,,0x0700001E,0,0,0.8,0,f32,"Special Fall max H mobility multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2432) [motions SpecialHi3, SpecialAirHi3End]",,medium,community | reads: MSC miigunner.mscsb func_2432,m14[*].30
+,31,,0x1700001F,0x0,0x0,0x22,0x0,u32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2432) [motions SpecialHi3, SpecialAirHi3End]",community ID was 0x0700001F,high,community | reads: MSC miigunner.mscsb func_2432,m14[*].31
+16,0,Down B,0x18000000,0x4,0x0,0x0,0x0,u32,Frames before Name2 takes effect -- code: stored in status int 0x4 (func_2434); tested against 0 (func_2454) [status 0x155],Fox Down B; community ID was 0x08000000,medium,community | reads: MSC miigunner.mscsb func_2434; MSC miigunner.mscsb func_2454,m15[*].0
+,1,,0x08000001,0.5,0,0,0,f32,H speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop) (func_2453),,high,community | reads: MSC miigunner.mscsb func_2453,m15[*].1
+,2,,0x08000002,0.027,0,0,0,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2454),,high,community | reads: MSC miigunner.mscsb func_2454,m15[*].2
+,3,,0x08000003,20,0,0,0,f32,Frames Mii Gunner is locked in shine -- code: compared with the status frame counter (global9) (func_2440) [status 0x168],,high,community | reads: MSC miigunner.mscsb func_2440,m15[*].3
+,4,,0x08000004,1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0,5,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x18000007,0x0,0x0,0x12,0x0,u32,How many frames after releasing B you continue to hold it -- code: stored in status int 0x2 (func_2464),Ness Down B,medium,community | reads: MSC miigunner.mscsb func_2464,m15[*].7
+,8,,0x18000008,0x0,0x0,0x0,0x0,u32,How long before applying gravity (in frames) -- code: stored in status int 0x3 (func_2464),,medium,community | reads: MSC miigunner.mscsb func_2464,m15[*].8
+,9,,0x08000009,0,0,8,0,f32,Something about absorption bubble,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
 ,10,,0x0800000A,0,0,0.8,0,f32,H speed multiplier,,medium,community | reads: native 0x027B9AC4 (fn 0x027B9A7C),m15[*].10
-,11,,0x0800000B,0,0,0.8,0,f32,V speed multiplier,,medium,community,m15[*].11
-,12,,0x0800000C,0,0,0.03,0,f32,Gravity,,medium,community,m15[*].12
-,13,,0x0800000D,0,0,1.6,0,f32,Damage recovery mulitplier,,medium,community,m15[*].13
-,14,,0x0800000E,0,0,30,0,f32,Max damage recoverable,,medium,community,m15[*].14
-,15,,0x1800000F,0x1,0x1,0x1,0x1,u32,,,,,m15[*].15
-,16,,0x08000010,0,0,0,0,f32,Absorption bubble X offset,,medium,community,m15[*].16
-,17,,0x08000011,0,0,6.5,0,f32,Absorption bubble Y offset,,medium,community,m15[*].17
-,18,,0x08000012,0,0,0,0,f32,Absorption bubble Z offset,,medium,community,m15[*].18
-,19,,0x08000013,0,0,14,0,f32,Absorption bubble size,,medium,community,m15[*].19
-,20,,0x08000014,0,0,10,0,f32,Influence the spin effect when a projectile hits the magnet,,medium,community,m15[*].20
-,21,,0x18000015,0x0,0x0,0x4,0x0,u32,Time before the projectile is absorbed (frames),,medium,community,m15[*].21
-,22,,0x08000016,0,0,1.3,0,f32,,,,,m15[*].22
-,0,Final Smash?,0x04000000,0.3,,,,f32,Initial V speed on aerial startup,,medium,community,m16.0
-,1,,0x04000001,0.01,,,,f32,Gravity,,medium,community,m16.1
-,2,,0x04000002,0.075,,,,f32,Max air speed,,medium,community,m16.2
-,3,,0x04000003,0.26,,,,f32,StickX * this,,medium,community,m16.3
-,4,,0x04000004,8,,,,f32,Max change angle (degrees),,medium,community,m16.4
-,5,,0x04000005,2.5,,,,f32,,,,,m16.5
-,6,,0x14000006,0x96,,,,u32,,,,,m16.6
-,7,,0x04000007,210,,,,f32,,,,,m16.7
-,8,,0x04000008,380,,,,f32,,,,,m16.8
+,11,,0x0800000B,0,0,0.8,0,f32,V speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,0,0,0.03,0,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,0,0,1.6,0,f32,Damage recovery mulitplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,0,0,30,0,f32,Max damage recoverable,,medium,community | no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x1800000F,0x1,0x1,0x1,0x1,u32,,,,no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,0,0,0,0,f32,Absorption bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,0,0,6.5,0,f32,Absorption bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].17
+,18,,0x08000012,0,0,0,0,f32,Absorption bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].18
+,19,,0x08000013,0,0,14,0,f32,Absorption bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].19
+,20,,0x08000014,0,0,10,0,f32,Influence the spin effect when a projectile hits the magnet,,medium,community | no read in the vanilla MSC (native or unused),m15[*].20
+,21,,0x18000015,0x0,0x0,0x4,0x0,u32,Time before the projectile is absorbed (frames),,medium,community | no read in the vanilla MSC (native or unused),m15[*].21
+,22,,0x08000016,0,0,1.3,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].22
+,0,Final Smash?,0x04000000,0.3,,,,f32,"Initial V speed on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2494)",,high,community | reads: MSC miigunner.mscsb func_2494,m16.0
+,1,,0x04000001,0.01,,,,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2481),,high,community | reads: MSC miigunner.mscsb func_2481; MSC miigunner.mscsb func_2494,m16.1
+,2,,0x04000002,0.075,,,,f32,Max air speed -- code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2481); KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2481),,high,community | reads: MSC miigunner.mscsb func_2481; MSC miigunner.mscsb func_2494,m16.2
+,3,,0x04000003,0.26,,,,f32,StickX * this -- code: stored in instance float 0x36 (func_2495); combined with the facing direction (func_2495); tested against 0 (func_2495),,medium,community | reads: MSC miigunner.mscsb func_2495,m16.3
+,4,,0x04000004,8,,,,f32,Max change angle (degrees) -- code: stored in instance float 0x36 (func_2495); MotionModule op 0x13 (func_2495); tested against 0 (func_2495),,medium,community | reads: MSC miigunner.mscsb func_2495,m16.4
+,5,,0x04000005,2.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x14000006,0x96,,,,u32,"code: stored in instance int 0x87, then decremented in func_2495 (a countdown / remaining count), tested against 0 (func_2483) [status 0x156]",,medium,reads: MSC miigunner.mscsb func_2483,m16.6
+,7,,0x04000007,210,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x04000008,380,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
 17,0,Fair,,5,,,,f32,X offset,,medium,community,m17[0].0
 ,1,,,0,,,,f32,Y offset,,medium,community,m17[0].1
 ,2,,,3.8,,,,f32,Speed,,medium,community,m17[0].2
-18,0,Article params (hat),0x12000000,0x0,,,,u32,,,,,m18[0]
+18,0,Article params (hat),0x12000000,0x0,,,,u32,,,,no read in the article MSC (native or unused),m18[0]
 19,0,Reflector,,50,,,,f32,Break threshold,,medium,community,m19[0].0
 ,1,,,8.5,,,,f32,Reflection trigger bubble size,,medium,community,m19[0].1
 ,2,,,1.4,,,,f32,Reflected projectile damage multiplier,,medium,community,m19[0].2
 ,3,,,1.1,,,,f32,Reflected projectile speed multiplier,,medium,community,m19[0].3
 ,4,,,1,,,,f32,Reflected projectile lifetime multiplier,,medium,community,m19[0].4
 20,0,"Laser Blaze
-(lazer)",0x12000000,0x16,,,,u32,Laser lifetime (frames),community ID was 0x02000000,medium,community,m20[0].0
-,1,,0x02000001,3,,,,f32,Laser length,,medium,community,m20[0].1
-,2,,0x02000002,11.25,,,,f32,Laser lengthening time?,,medium,community,m20[0].2
-,3,,0x12000003,0x0,,,,u32,Piercing capability,community ID was 0x02000003,medium,community,m20[0].3
-,4,,0x02000004,0,,,,f32,,,,,m20[0].4
+(lazer)",0x12000000,0x16,,,,u32,Laser lifetime (frames),community ID was 0x02000000,medium,community | no read in the article MSC (native or unused),m20[0].0
+,1,,0x02000001,3,,,,f32,Laser length,,medium,community | no read in the article MSC (native or unused),m20[0].1
+,2,,0x02000002,11.25,,,,f32,Laser lengthening time?,,medium,community | no read in the article MSC (native or unused),m20[0].2
+,3,,0x12000003,0x0,,,,u32,Piercing capability,community ID was 0x02000003,medium,community | no read in the article MSC (native or unused),m20[0].3
+,4,,0x02000004,0,,,,f32,,,,no read in the article MSC (native or unused),m20[0].4
 ,0,,,0x1,,,,u32,,,,,m21.0
 ,1,,,1,,,,f32,,,,,m21.1
 ,2,,,-1,,,,f32,,,,,m21.2
 ,3,,,10,,,,f32,,,,,m21.3
 21,0,"Charged Shot
-(gunnercharge)",0x12000000,0x3C,,,,u32,Lifetime (frames),,medium,community,m22[0].0
-,1,,0x12000001,0x0,,,,u32,Firing angle (units?),,medium,community,m22[0].1
-,2,,0x02000002,1.6,,,,f32,"Base speed, diminishes with more charge",,medium,community,m22[0].2
-,3,,0x02000003,3,,,,f32,Charged shot velocity,,medium,community,m22[0].3
-,4,,0x02000004,0.3,,,,f32,Initial Charged Shot graphic size,,medium,community,m22[0].4
-,5,,0x02000005,1,,,,f32,Final Charged Shot graphic size,,medium,community,m22[0].5
+(gunnercharge)",0x12000000,0x3C,,,,u32,"Lifetime (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_58); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_58)",,medium,community | reads: MSC miigunner/gunnercharge.mscsb func_58,m22[0].0
+,1,,0x12000001,0x0,,,,u32,Firing angle (units?),,medium,community | no read in the article MSC (native or unused),m22[0].1
+,2,,0x02000002,1.6,,,,f32,"Base speed, diminishes with more charge -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_58)",,high,community | reads: MSC miigunner/gunnercharge.mscsb func_58,m22[0].2
+,3,,0x02000003,3,,,,f32,"Charged shot velocity -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_58)",,high,community | reads: MSC miigunner/gunnercharge.mscsb func_58,m22[0].3
+,4,,0x02000004,0.3,,,,f32,"Initial Charged Shot graphic size -- code: stored in instance int 0x9, then EffectModule op 0x17; EffectModule op 0x19 (func_59) (func_58); EffectModule op 0x19 (func_59)",,medium,community | reads: MSC miigunner/gunnercharge.mscsb func_58; MSC miigunner/gunnercharge.mscsb func_59,m22[0].4
+,5,,0x02000005,1,,,,f32,"Final Charged Shot graphic size -- code: stored in instance int 0x9, then EffectModule op 0x17; EffectModule op 0x19 (func_59) (func_58); EffectModule op 0x19 (func_59)",,medium,community | reads: MSC miigunner/gunnercharge.mscsb func_58; MSC miigunner/gunnercharge.mscsb func_59,m22[0].5
 ,0,,,0x1,,,,u32,,,,,m23.0
 ,1,,,2,,,,f32,,,,,m23.1
 ,2,,,-2,,,,f32,,,,,m23.2
@@ -135,15 +135,15 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,1,,,,f32,,,,,m24[1].4
 ,5,,,0,,,,f32,,,,,m24[1].5
 23,0,"Gunner Missle
-(miimissile)",0x12000000,0x2,,,,u32,,community ID was 0x02000000,,,m25[0].0
-,1,,0x12000001,0x68,,,,u32,Homing Missile lifetime (frames),community ID was 0x02000001,medium,community,m25[0].1
-,2,,0x12000002,0x5A,,,,u32,Homing Missile deceleration point (frames),community ID was 0x02000002,medium,community,m25[0].2
-,3,,0x02000003,1,,,,f32,Homing Missile initial velocity,,medium,community,m25[0].3
-,4,,0x02000004,0.95,,,,f32,Homing Missile secondary velocity,,medium,community,m25[0].4
-,5,,0x02000005,0.5,,,,f32,Homing Missile deceleration,,medium,community,m25[0].5
-,6,,0x02000006,2,,,,f32,Homing capability (degrees),,medium,community,m25[0].6
-,7,,0x02000007,140,,,,f32,Something to do with homing (degrees),,medium,community,m25[0].7
-,8,,0x02000008,1,,,,f32,Something to do with homing (degrees),,medium,community,m25[0].8
+(miimissile)",0x12000000,0x2,,,,u32,,community ID was 0x02000000,,no read in the article MSC (native or unused),m25[0].0
+,1,,0x12000001,0x68,,,,u32,Homing Missile lifetime (frames),community ID was 0x02000001,medium,community | no read in the article MSC (native or unused),m25[0].1
+,2,,0x12000002,0x5A,,,,u32,Homing Missile deceleration point (frames),community ID was 0x02000002,medium,community | no read in the article MSC (native or unused),m25[0].2
+,3,,0x02000003,1,,,,f32,Homing Missile initial velocity,,medium,community | no read in the article MSC (native or unused),m25[0].3
+,4,,0x02000004,0.95,,,,f32,Homing Missile secondary velocity,,medium,community | no read in the article MSC (native or unused),m25[0].4
+,5,,0x02000005,0.5,,,,f32,Homing Missile deceleration,,medium,community | no read in the article MSC (native or unused),m25[0].5
+,6,,0x02000006,2,,,,f32,Homing capability (degrees),,medium,community | no read in the article MSC (native or unused),m25[0].6
+,7,,0x02000007,140,,,,f32,Something to do with homing (degrees),,medium,community | no read in the article MSC (native or unused),m25[0].7
+,8,,0x02000008,1,,,,f32,Something to do with homing (degrees),,medium,community | no read in the article MSC (native or unused),m25[0].8
 24,0,,,0x1,,,,u32,,,,,m26[0].0
 ,1,,,2.4,,,,f32,,,,,m26[0].1
 ,2,,,-2.4,,,,f32,,,,,m26[0].2
@@ -167,12 +167,12 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,4,,,1,,,,f32,,,,,m27[2].4
 ,5,,,0,,,,f32,,,,,m27[2].5
 26,0,"Gunner Missle
-(supermissile)",0x12000000,0x1,,,,u32,,community ID was 0x02000000,,,m28[0].0
-,1,,0x12000001,0x48,,,,u32,Super Missile lifetime (frames),community ID was 0x02000001,medium,community,m28[0].1
-,2,,0x12000002,0x14,,,,u32,Super Missile acceleration point (frames),community ID was 0x02000002,medium,community,m28[0].2
-,3,,0x02000003,0.4,,,,f32,Super Missile initial velocity,,medium,community,m28[0].3
-,4,,0x02000004,0.08,,,,f32,Super Missile acceleration,,medium,community,m28[0].4
-,5,,0x02000005,1.75,,,,f32,Super Missile final speed?,,medium,community,m28[0].5
+(supermissile)",0x12000000,0x1,,,,u32,,community ID was 0x02000000,,no read in the article MSC (native or unused),m28[0].0
+,1,,0x12000001,0x48,,,,u32,Super Missile lifetime (frames),community ID was 0x02000001,medium,community | no read in the article MSC (native or unused),m28[0].1
+,2,,0x12000002,0x14,,,,u32,Super Missile acceleration point (frames),community ID was 0x02000002,medium,community | no read in the article MSC (native or unused),m28[0].2
+,3,,0x02000003,0.4,,,,f32,Super Missile initial velocity,,medium,community | no read in the article MSC (native or unused),m28[0].3
+,4,,0x02000004,0.08,,,,f32,Super Missile acceleration,,medium,community | no read in the article MSC (native or unused),m28[0].4
+,5,,0x02000005,1.75,,,,f32,Super Missile final speed?,,medium,community | no read in the article MSC (native or unused),m28[0].5
 27,0,,,0x1,,,,u32,,,,,m29[0].0
 ,1,,,2.4,,,,f32,,,,,m29[0].1
 ,2,,,-2.4,,,,f32,,,,,m29[0].2
@@ -195,14 +195,14 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m30[2].3
 ,4,,,1,,,,f32,,,,,m30[2].4
 ,5,,,0,,,,f32,,,,,m30[2].5
-29,0,grenadelauncher,0x12000000,0x118,,,,u32,,,,,m31[0].0
-,1,,0x02000001,0.4,,,,f32,,,,,m31[0].1
-,2,,0x02000002,-1.5,,,,f32,,,,,m31[0].2
-,3,,0x02000003,1.3,,,,f32,,,,,m31[0].3
-,4,,0x02000004,0.01,,,,f32,,,,,m31[0].4
-,5,,0x02000005,38,,,,f32,,,,,m31[0].5
-,6,,0x02000006,0.6,,,,f32,,,,,m31[0].6
-,7,,0x12000007,0x1,,,,u32,,,,,m31[0].7
+29,0,grenadelauncher,0x12000000,0x50,,,,u32,,,,no read in the article MSC (native or unused),m31[0].0
+,1,,0x02000001,0.07,,,,f32,,,,no read in the article MSC (native or unused),m31[0].1
+,2,,0x02000002,1.5,,,,f32,,,,no read in the article MSC (native or unused),m31[0].2
+,3,,0x02000003,1.3,,,,f32,,,,no read in the article MSC (native or unused),m31[0].3
+,4,,0x02000004,0.01,,,,f32,,,,no read in the article MSC (native or unused),m31[0].4
+,5,,0x02000005,38,,,,f32,,,,no read in the article MSC (native or unused),m31[0].5
+,6,,0x02000006,0.6,,,,f32,,,,no read in the article MSC (native or unused),m31[0].6
+,7,,0x12000007,0x1,,,,u32,code: compared with instance int 0x7 (a counter) (func_53),,medium,reads: MSC miigunner/grenadelauncher.mscsb func_53,m31[0].7
 ,0,,,0x1,,,,u32,,,,,m32.0
 ,1,,,1,,,,f32,,,,,m32.1
 ,2,,,-1,,,,f32,,,,,m32.2
@@ -213,13 +213,13 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m33[0].3
 ,4,,,1,,,,f32,,,,,m33[0].4
 ,5,,,0,,,,f32,,,,,m33[0].5
-31,0,?,0x12000000,0x14,,,,u32,,,,,m34[0].0
-,1,,0x12000001,0x28,,,,u32,,,,,m34[0].1
-,2,,0x02000002,2,,,,f32,,,,,m34[0].2
-,3,,0x02000003,0.05,,,,f32,,,,,m34[0].3
-,4,,0x02000004,1.5,,,,f32,,,,,m34[0].4
-,5,,0x02000005,10,,,,f32,,,,,m34[0].5
-,6,,0x02000006,0.7,,,,f32,Hitbox/GFX size multiplier,Mult. = 0.7 + (1.0 - 0.7) * Charged frames / 40,medium,community,m34[0].6
+31,0,?,0x12000000,0x14,,,,u32,"code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_51); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_51)",,medium,reads: MSC miigunner/flamepillar.mscsb func_51,m34[0].0
+,1,,0x12000001,0x28,,,,u32,"code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_58); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_58); PostureModule op 0x2713 (func_63)",,medium,reads: MSC miigunner/flamepillar.mscsb func_58; MSC miigunner/flamepillar.mscsb func_63,m34[0].1
+,2,,0x02000002,2,,,,f32,code: PostureModule op 0x2716 (func_62),,medium,reads: MSC miigunner/flamepillar.mscsb func_62,m34[0].2
+,3,,0x02000003,0.05,,,,f32,,,,no read in the article MSC (native or unused),m34[0].3
+,4,,0x02000004,1.5,,,,f32,,,,no read in the article MSC (native or unused),m34[0].4
+,5,,0x02000005,10,,,,f32,,,,no read in the article MSC (native or unused),m34[0].5
+,6,,0x02000006,0.7,,,,f32,Hitbox/GFX size multiplier -- code: PostureModule op 0x2713 (func_63),Mult. = 0.7 + (1.0 - 0.7) * Charged frames / 40,medium,community | reads: MSC miigunner/flamepillar.mscsb func_63,m34[0].6
 ,0,,,0x1,,,,u32,,,,,m35.0
 ,1,,,2.4,,,,f32,,,,,m35.1
 ,2,,,-2.4,,,,f32,,,,,m35.2
@@ -245,57 +245,57 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,8,,,0x1,,,,u32,,,,,m36[1].8
 ,9,,,0x0,,,,u32,,,,,m36[1].9
 33,0,"Stealth Burst
-(stealthbomb)",0x02000000,50,,,,f32,Max traveling frames,,medium,community,m37[0].0
-,1,,0x02000001,50,,,,f32,Frames where damage grows with distance,,medium,community,m37[0].1
-,2,,0x02000002,1,,,,f32,Initial hit+GFX size,,medium,community,m37[0].2
-,3,,0x02000003,1.5,,,,f32,Terminal hit+GFX size,,medium,community,m37[0].3
-,4,,0x02000004,0,,,,f32,Firing angle (radians),,medium,community,m37[0].4
-,5,,0x02000005,0.7,,,,f32,Initial speed,,medium,community,m37[0].5
-,6,,0x02000006,0.04,,,,f32,Acceleration,,medium,community,m37[0].6
-,7,,0x02000007,5,,,,f32,Terminal velocity of projectile,,medium,community,m37[0].7
-,8,,0x02000008,0,,,,f32,Joystick sensitivity for maneuverability,,medium,community,m37[0].8
-,9,,0x02000009,0,,,,f32,Up/Down maneuverability,,medium,community,m37[0].9
-,10,,0x0200000A,0,,,,f32,Max curve projectile can angle (degrees),,medium,community,m37[0].10
-,11,,0x0200000B,8,,,,f32,Detonation Timer (frames),,medium,community,m37[0].11
+(stealthbomb)",0x02000000,50,,,,f32,"Max traveling frames -- code: stored in status float 0x0, then tested against 0 (func_51) (func_50)",,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_50,m37[0].0
+,1,,0x02000001,50,,,,f32,"Frames where damage grows with distance -- code: stored in status float 0x1, then compared with a computed value; PostureModule op 0x2713 (func_52) (func_52); PostureModule op 0x2713 (func_54); compared with status float 0x1 (func_52)",,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_52; MSC miigunner/stealthbomb.mscsb func_54,m37[0].1
+,2,,0x02000002,1,,,,f32,Initial hit+GFX size -- code: PostureModule op 0x2713 (func_54),,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].2
+,3,,0x02000003,1.5,,,,f32,Terminal hit+GFX size -- code: PostureModule op 0x2713 (func_54),,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].3
+,4,,0x02000004,0,,,,f32,Firing angle (radians),,medium,community | no read in the article MSC (native or unused),m37[0].4
+,5,,0x02000005,0.7,,,,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m37[0].5
+,6,,0x02000006,0.04,,,,f32,Acceleration -- code: compared with a computed value (func_54),,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].6
+,7,,0x02000007,5,,,,f32,"Terminal velocity of projectile -- code: stored in status float 0x3, then compared with a computed value (func_54) (func_54); KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_54); compared with a computed value (func_54)",,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].7
+,8,,0x02000008,0,,,,f32,Joystick sensitivity for maneuverability -- code: compared with a computed value (func_54),,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].8
+,9,,0x02000009,0,,,,f32,Up/Down maneuverability -- code: compared with a computed value (func_54); tested against 0 (via func_15) (func_54),,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].9
+,10,,0x0200000A,0,,,,f32,"Max curve projectile can angle (degrees) -- code: stored in a work variable, then compared with a computed value (func_54) (func_54); compared with a computed value (func_54); tested against 0 (via func_15) (func_54)",,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_54,m37[0].10
+,11,,0x0200000B,8,,,,f32,"Detonation Timer (frames) -- code: stored in status float 0x0, then tested against 0 (func_58) (func_60)",,medium,community | reads: MSC miigunner/stealthbomb.mscsb func_60,m37[0].11
 ,0,,,0x1,,,,u32,,,,,m38.0
 ,1,,,2.4,,,,f32,,,,,m38.1
 ,2,,,-2.4,,,,f32,,,,,m38.2
 ,3,,,2.4,,,,f32,,,,,m38.3
-34,0,stealthbomb_s,0x02000000,2.2,,,,f32,,,,,m39[0]
-35,0,Article params (bottomshoot),0x02000000,2.8,,,,f32,,,,,m40[0].0
-,1,,0x02000001,0,,,,f32,,,,,m40[0].1
-,2,,0x02000002,2.8,,,,f32,,,,,m40[0].2
-,3,,0x12000003,0x12C,,,,u32,,,,,m40[0].3
-,4,,0x12000004,0x0,,,,u32,,,,,m40[0].4
-36,0,Article params (groundbomb),0x12000000,0x3C,,,,u32,,,,,m41[0].0
-,1,,0x12000001,0x2D,,,,u32,,,,,m41[0].1
-,2,,0x02000002,0.6,,,,f32,,,,,m41[0].2
-,3,,0x02000003,0,,,,f32,,,,,m41[0].3
-,4,,0x02000004,1.3,,,,f32,,,,,m41[0].4
-,5,,0x02000005,0.05,,,,f32,,,,,m41[0].5
-,6,,0x02000006,2,,,,f32,,,,,m41[0].6
-,7,,0x02000007,0.6,,,,f32,,,,,m41[0].7
-,8,,0x02000008,0.2,,,,f32,,,,,m41[0].8
+34,0,stealthbomb_s,0x02000000,2.2,,,,f32,,,,no read in the article MSC (native or unused),m39[0]
+35,0,Article params (bottomshoot),0x02000000,2.8,,,,f32,,,,no read in the article MSC (native or unused),m40[0].0
+,1,,0x02000001,0,,,,f32,,,,no read in the article MSC (native or unused),m40[0].1
+,2,,0x02000002,2.8,,,,f32,,,,no read in the article MSC (native or unused),m40[0].2
+,3,,0x12000003,0x10,,,,u32,,,,no read in the article MSC (native or unused),m40[0].3
+,4,,0x12000004,0x0,,,,u32,,,,no read in the article MSC (native or unused),m40[0].4
+36,0,Article params (groundbomb),0x12000000,0x3C,,,,u32,,,,no read in the article MSC (native or unused),m41[0].0
+,1,,0x12000001,0x2D,,,,u32,code: compared with instance int 0x4 (a counter) (func_52),,medium,reads: MSC miigunner/groundbomb.mscsb func_52,m41[0].1
+,2,,0x02000002,0.6,,,,f32,,,,no read in the article MSC (native or unused),m41[0].2
+,3,,0x02000003,0,,,,f32,,,,no read in the article MSC (native or unused),m41[0].3
+,4,,0x02000004,1.3,,,,f32,,,,no read in the article MSC (native or unused),m41[0].4
+,5,,0x02000005,0.05,,,,f32,,,,no read in the article MSC (native or unused),m41[0].5
+,6,,0x02000006,2,,,,f32,,,,no read in the article MSC (native or unused),m41[0].6
+,7,,0x02000007,0.6,,,,f32,,,,no read in the article MSC (native or unused),m41[0].7
+,8,,0x02000008,0.2,,,,f32,,,,no read in the article MSC (native or unused),m41[0].8
 37,0,,,0x1,,,,u32,,,,,m42[0].0
 ,1,,,2,,,,f32,,,,,m42[0].1
 ,2,,,-2,,,,f32,,,,,m42[0].2
 ,3,,,2,,,,f32,,,,,m42[0].3
-38,0,bottomshoot?,0x12000000,0xE,,,,u32,Lifetime (frames)?,,medium,community,m43[0].0
-,1,,0x12000001,0x0,,,,u32,,,,,m43[0].1
-,2,,0x02000002,0,,,,f32,,community ID was 0x12000002,,,m43[0].2
+38,0,bottomshoot?,0x12000000,0xE,,,,u32,Lifetime (frames)?,,medium,community | no read in the article MSC (native or unused),m43[0].0
+,1,,0x12000001,0x0,,,,u32,,,,no read in the article MSC (native or unused),m43[0].1
+,2,,0x02000002,0,,,,f32,,community ID was 0x12000002,,no read in the article MSC (native or unused),m43[0].2
 ,0,,,0x1,,,,u32,,,,,m44.0
 ,1,,,1,,,,f32,,,,,m44.1
 ,2,,,-1,,,,f32,,,,,m44.2
-,3,,,2,,,,f32,,,,,m44.3
-39,0,Article params (laser),0x12000000,0xD2,,,,u32,,,,,m45[0]
+,3,,,2,,,,f32,,community value differs: Default 1 (vanilla 2),,,m44.3
+39,0,Article params (laser),0x12000000,0xD2,,,,u32,"code: stored in instance int 0x7, then decremented in func_53 (a countdown / remaining count), tested against 0 (func_55)",,medium,reads: MSC miigunner/laser.mscsb func_55,m45[0]
 40,0,,,0x1,,,,u32,,,,,m46[0].0
 ,1,,,2,,,,f32,,,,,m46[0].1
 ,2,,,-2,,,,f32,,,,,m46[0].2
 ,3,,,2,,,,f32,,,,,m46[0].3
-41,0,Article params (fullthrottle),0x12000000,0x96,,,,u32,,,,,m47[0].0
-,1,,0x02000001,20,,,,f32,,,,,m47[0].1
-,2,,0x02000002,1.5,,,,f32,,,,,m47[0].2
-,3,,0x02000003,-8,,,,f32,,,,,m47[0].3
+41,0,Article params (fullthrottle),0x12000000,0x96,,,,u32,"code: stored in instance int 0x7, then decremented in func_53 (a countdown / remaining count), tested against 0 (func_59)",,medium,reads: MSC miigunner/fullthrottle.mscsb func_59,m47[0].0
+,1,,0x02000001,20,,,,f32,,,,no read in the article MSC (native or unused),m47[0].1
+,2,,0x02000002,1.5,,,,f32,,,,no read in the article MSC (native or unused),m47[0].2
+,3,,0x02000003,-8,,,,f32,,,,no read in the article MSC (native or unused),m47[0].3
 42,0,,,0x1,,,,u32,,,,,m48[0].0
 ,1,,,2,,,,f32,,,,,m48[0].1
 ,2,,,-2,,,,f32,,,,,m48[0].2

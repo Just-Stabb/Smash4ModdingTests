@@ -2,120 +2,121 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 13,0,Neutral B,0x05000000,0.8,0.4,0.8,0.8,f32,H speed multiplier on startup,,medium,community | reads: native 0x0279BF88 (fn 0x0279BD94); native 0x0279C034 (fn 0x0279BD94),m12[*].0
 ,1,,0x05000001,0.8,0.2,0.4,0.8,f32,V speed multiplier on startup,,medium,community | reads: native 0x0279C044 (fn 0x0279BD94),m12[*].1
 ,2,,0x05000002,0.7,0.4,0.8,0.7,f32,Added V initial speed on startup,,medium,community | reads: native 0x0279C070 (fn 0x0279BD94),m12[*].2
-,3,,0x05000003,30,60,50,70,f32,Time to fully charge (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3814; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3819",m12[*].3
-,4,,0x05000004,0,0.5,0.4,1,f32,Base H recoil speed upon firing,"Recoil H speed =
-  (Name5 - Name4) * Charged Frames / Name3 + Name4",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3819",m12[*].4
-,5,,0x05000005,0,1,0.8,2,f32,Full charge H recoil speed,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3819",m12[*].5
-14,0,Side B,0x16000000,0x12,0x12,0x13,0x12,u32,Start-up time on ground,Higher number = Longer-lasting animation,medium,community,m13[*].0
-,1,,0x06000001,1,1,1,1,f32,Recoil H speed on SpecialSStart,,medium,community,m13[*].1
-,2,,0x16000002,0xF,0xF,0x13,0xF,u32,Start-up time in mid-air,,medium,community,m13[*].2
-,3,,0x06000003,1,1,0,1,f32,Recoil H speed on SpecialAirSStart,,medium,community,m13[*].3
-,4,,0x06000004,0.5,0.1,0.5,0.5,f32,Recoil V speed on SpecialSStart/SpecialAirSStart,,medium,community,m13[*].4
-,5,,0x16000005,0x82,0x3C,0x12,0x82,u32,Max duration (frames),,medium,community,m13[*].5
-,6,,0x06000006,2.2,2,5,2.2,f32,Initial H speed on SpecialS,,medium,community,m13[*].6
-,7,,0x06000007,2.2,2,5,2.2,f32,Initial H speed on SpecialAirS,,medium,community,m13[*].7
-,8,,0x06000008,0.5,0.5,0.1,0.5,f32,Initial V speed on SpecialS/SpecialAirS,,medium,community,m13[*].8
-,9,,0x06000009,0.2,0.2,0,0.2,f32,,,,,m13[*].9
-,10,,0x0600000A,0.005,0.02,0.001,0.005,f32,Ground fricion on SpecialS,,medium,community,m13[*].10
-,11,,0x0600000B,0.08,0.08,0.0005,0.08,f32,,,,,m13[*].11
-,12,,0x0600000C,0.04,0.04,0.004,0.04,f32,,,,,m13[*].12
-,13,,0x0600000D,3.5,3,5,3.5,f32,Used in damage multiplier formula,,medium,community,m13[*].13
-,14,,0x0600000E,1.8,1.8,5,1.8,f32,,,,,m13[*].14
-,15,,0x0600000F,3,3,5,3,f32,Grounded H max speed on SpecialS,,medium,community,m13[*].15
-,16,,0x06000010,1,1.5,4,1,f32,,,,,m13[*].16
-,17,,0x06000011,0.01,0.015,0.01,0.01,f32,Air friction on SpecialAirS,,medium,community,m13[*].17
-,18,,0x06000012,1.5,1.25,2,1.5,f32,,,,,m13[*].18
-,19,,0x06000013,0.08,0.1,0.1,0.08,f32,Gravity on SpecialAirS,,medium,community,m13[*].19
-,20,,0x06000014,2,2.2,2.5,2,f32,Max fall speed on SpecialAirS,,medium,community,m13[*].20
-,21,,0x06000015,60,60,60,60,f32,Unk * this * 0.01,,medium,community,m13[*].21
-,22,,0x06000016,20,20,20,20,f32,(Unk * Name21 * 0.01 - Unk2) / this,,medium,community,m13[*].22
-,23,,0x06000017,0.8,0.6,1,0.8,f32,Initial H speed on SpecialSCliffJump,,medium,community,m13[*].23
-,24,,0x06000018,0.8,0.9,0,0.8,f32,Initial V speed on SpecialSCliffJump,,medium,community,m13[*].24
-,25,,0x06000019,0.25,0.25,0.25,0.25,f32,,,,,m13[*].25
-,26,,0x0600001A,1,1,1,1,f32,,,,,m13[*].26
-,27,,0x0600001B,1.5,1.5,1.5,1.5,f32,,,,,m13[*].27
-,28,,0x0600001C,1.8,1.8,1.8,1.8,f32,Min speed to have hitbox?,"Damage multiplier
-  = 1 + (Name29 - 1) * (H speed - Name28) / (Name13 - Name28)",medium,community,m13[*].28
-,29,,0x0600001D,2.2,1,1,2.2,f32,Added damage multiplier,,medium,community,m13[*].29
-,30,,0x0600001E,8,8,15,8,f32,Damage-based armor threshold (only for Clown Car),,medium,community,m13[*].30
-,31,,0x0600001F,0.5,0.5,0,0.5,f32,V speed multiplier on SpecialSAttack/SpecialAirSAttack startup,,medium,community,m13[*].31
-,32,,0x06000020,0.025,0.028,0.05,0.025,f32,,,,,m13[*].32
-,33,,0x06000021,0.01,0.0075,0.009,0.01,f32,Air friction on SpecialAirSAttack,,medium,community,m13[*].33
-,34,,0x06000022,2,2.6,1.5,2,f32,Aerial H max speed on SpecialAirSAttack,,medium,community,m13[*].34
-,35,,0x06000023,0.04,0.03,0.005,0.04,f32,Gravity on SpecialAirSAttack,,medium,community,m13[*].35
-,36,,0x06000024,1.5,1.5,1.5,1.5,f32,Max fall speed on SpecialAirSAttack,,medium,community,m13[*].36
-,37,,0x06000025,0.5,0.5,0.5,0.5,f32,H speed multiplier on SpecialSWallClash startup,Number of frames are determined by MSC?,medium,community,m13[*].37
-,38,,0x06000026,0.015,0.015,0.015,0.015,f32,,,,,m13[*].38
-,39,,0x06000027,1.5,1.5,1.5,1.5,f32,Aerial friction multiplier on SpecialSWallClash/SpecialAirSWallClash,,medium,community,m13[*].39
-,40,,0x06000028,0.5,0.25,0.4,0.5,f32,Initial H speed on SpecialSWallClash/SpecialAirSWallClash,Written in ACMD too for some reason,medium,community,m13[*].40
-,41,,0x06000029,2.2,1.5,1.8,2.2,f32,Initial V speed on SpecialSWallClash/SpecialAirSWallClash,Written in ACMD too for some reason,medium,community,m13[*].41
-15,0,Up B,0x07000000,5,0.7,1,0.7,f32,[auto] read by native code (get_float at 0x0279CF30); meaning not traced,,low,reads: native 0x0279CF30 (fn 0x0279BD94),m14[*].0
-,1,,0x07000001,0,0.02,0.01,0.02,f32,,,,,m14[*].1
-,2,,0x07000002,0.75,0.75,1,0.75,f32,,,,,m14[*].2
-,3,,0x07000003,0.02,0.02,0.01,0.02,f32,,,,,m14[*].3
-,4,,0x07000004,1,0.1,0.5,0.5,f32,Fast fall speed multiplier on SpecialHiJrFall,community ID was 0x0700000F,medium,community,m14[*].4
-,5,,0x07000005,3,2.6,-0.8,3,f32,Initial V speed on SpecialHiJrRise,,medium,community,m14[*].5
-,6,,0x07000006,0.6,0.8,0,0.6,f32,Base air accel/max add air accel multiplier on SpecialHiJrRise,,medium,community,m14[*].6
-,7,,0x07000007,0.8,1,0,0.8,f32,,,,,m14[*].7
-,8,,0x17000008,0xA,0x5,0x1,0xA,u32,First frame Name9 takes effect,,medium,community,m14[*].8
-,9,,0x07000009,0.1,0.09,0.3,0.1,f32,Gravity on SpecialHiJrRise,,medium,community,m14[*].9
-,10,,0x0700000A,1.1,1,0.6,0.9,f32,,,,,m14[*].10
-,11,,0x0700000B,100,0.7,0.8,0.8,f32,,,,,m14[*].11
-,12,,0x0700000C,100,0.7,2,0.8,f32,,,,,m14[*].12
-,13,,0x0700000D,0.2,0.7,2,0.8,f32,,,,,m14[*].13
-,14,,0x0700000E,0.4,0.7,1,0.8,f32,,,,,m14[*].14
-,15,,0x0700000F,100,0.7,1.515,1,f32,[auto] read by native code (get_float at 0x0279D708); meaning not traced,,low,reads: native 0x0279D708 (fn 0x0279D628),m14[*].15
-,16,,0x07000010,15,40,31,30,f32,,,,,m14[*].16
-,17,,0x07000011,37,48,42,38,f32,Landing lag from SpecialHiJrAttack (frames),,medium,community,m14[*].17
-,18,,0x07000012,33,44,38,34,f32,Landing lag from SpecialHiJrEscape (frames),,medium,community,m14[*].18
-,19,,0x07000013,37,42,33,32,f32,,,,,m14[*].19
+,3,,0x05000003,64,60,50,70,f32,Time to fully charge (frames) -- code: compared with status float 0x6 (func_3814); compared with a computed value (func_3819) [status 0x22A; status 0x22B],,medium,community | reads: MSC kirby.mscsb func_3814; MSC kirby.mscsb func_3819; MSC koopajr.mscsb func_2280; MSC koopajr.mscsb func_2285,m12[*].3
+,4,,0x05000004,0.8,0.5,0.4,1,f32,Base H recoil speed upon firing -- code: KineticModule op 0x2710 (func_3819) [status 0x22B; status 0x158],"Recoil H speed =
+  (Name5 - Name4) * Charged Frames / Name3 + Name4",medium,community | reads: MSC kirby.mscsb func_3819; MSC koopajr.mscsb func_2285,m12[*].4
+,5,,0x05000005,1.3,1,0.8,2,f32,Full charge H recoil speed -- code: KineticModule op 0x2710 (func_3819) [status 0x22B; status 0x158],,medium,community | reads: MSC kirby.mscsb func_3819; MSC koopajr.mscsb func_2285,m12[*].5
+14,0,Side B,0x16000000,0x12,0x12,0x13,0x12,u32,Start-up time on ground,Higher number = Longer-lasting animation,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,1,1,1,1,f32,Recoil H speed on SpecialSStart,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x16000002,0xF,0xF,0x13,0xF,u32,Start-up time in mid-air,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,1,1,0,1,f32,Recoil H speed on SpecialAirSStart,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,0.5,0.1,0.5,0.5,f32,Recoil V speed on SpecialSStart/SpecialAirSStart,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x16000005,0x82,0x3C,0x12,0x82,u32,"Max duration (frames) -- code: stored in status int 0x5, then decremented in func_2300 (a countdown / remaining count), tested against 0 (func_2298) [status 0x159 (SpecialS, SpecialSLanding, SpecialSCliffJump)]",,high,community | reads: MSC koopajr.mscsb func_2298,m13[*].5
+,6,,0x06000006,2.2,2,5,2.2,f32,Initial H speed on SpecialS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,2.2,2,5,2.2,f32,Initial H speed on SpecialAirS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x06000008,0.5,0.5,0.1,0.5,f32,Initial V speed on SpecialS/SpecialAirS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x06000009,0.2,0.2,0,0.2,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x0600000A,0.005,0.02,0.001,0.005,f32,Ground fricion on SpecialS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].10
+,11,,0x0600000B,0.08,0.08,0.0005,0.08,f32,,,,no read in the vanilla MSC (native or unused),m13[*].11
+,12,,0x0600000C,0.04,0.04,0.004,0.04,f32,,,,no read in the vanilla MSC (native or unused),m13[*].12
+,13,,0x0600000D,3.5,3,5,3.5,f32,"Used in damage multiplier formula -- code: AttackModule op 0x2728 (func_2288) [motions SpecialS, SpecialSLanding, SpecialSCliffJump]",,high,community | reads: MSC koopajr.mscsb func_2288,m13[*].13
+,14,,0x0600000E,1.8,1.8,5,1.8,f32,,,,no read in the vanilla MSC (native or unused),m13[*].14
+,15,,0x0600000F,3,3,5,3,f32,Grounded H max speed on SpecialS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].15
+,16,,0x06000010,1,1.5,4,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].16
+,17,,0x06000011,0.01,0.015,0.01,0.01,f32,Air friction on SpecialAirS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].17
+,18,,0x06000012,1.5,1.25,2,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].18
+,19,,0x06000013,0.08,0.1,0.1,0.08,f32,Gravity on SpecialAirS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].19
+,20,,0x06000014,2,2.2,2.5,2,f32,Max fall speed on SpecialAirS,,medium,community | no read in the vanilla MSC (native or unused),m13[*].20
+,21,,0x06000015,60,60,60,60,f32,"Unk * this * 0.01 -- code: stored in status float 0x9, then tested against 0 (func_2289) (func_2289); stored in status float 0x8 (func_2289); compared with a computed value (func_2289)",,medium,community | reads: MSC koopajr.mscsb func_2289,m13[*].21
+,22,,0x06000016,20,20,20,20,f32,"(Unk * Name21 * 0.01 - Unk2) / this -- code: stored in status float 0x9, then tested against 0 (func_2289) (func_2289); tested against 0 (func_2289)",,medium,community | reads: MSC koopajr.mscsb func_2289,m13[*].22
+,23,,0x06000017,0.8,0.6,1,0.8,f32,Initial H speed on SpecialSCliffJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].23
+,24,,0x06000018,0.8,0.9,0,0.8,f32,Initial V speed on SpecialSCliffJump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].24
+,25,,0x06000019,0.25,0.25,0.25,0.25,f32,,,,no read in the vanilla MSC (native or unused),m13[*].25
+,26,,0x0600001A,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].26
+,27,,0x0600001B,1.5,1.5,1.5,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].27
+,28,,0x0600001C,1.8,1.8,1.8,1.8,f32,"Min speed to have hitbox? -- code: AttackModule op 0x2728 (func_2288); compared with a computed value (func_2288) [motions SpecialS, SpecialSLanding, SpecialSCliffJump]","Damage multiplier
+  = 1 + (Name29 - 1) * (H speed - Name28) / (Name13 - Name28)",medium,community | reads: MSC koopajr.mscsb func_2288,m13[*].28
+,29,,0x0600001D,2.2,1,1,2.2,f32,"Added damage multiplier -- code: AttackModule op 0x2728 (func_2288) [motions SpecialS, SpecialSLanding, SpecialSCliffJump]",,high,community | reads: MSC koopajr.mscsb func_2288,m13[*].29
+,30,,0x0600001E,8,8,15,8,f32,"Damage-based armor threshold (only for Clown Car) -- code: DamageModule op 0xB (func_2298) [status 0x159 (SpecialS, SpecialSLanding, SpecialSCliffJump)]",,high,community | reads: MSC koopajr.mscsb func_2298,m13[*].30
+,31,,0x0600001F,0.5,0.5,0,0.5,f32,V speed multiplier on SpecialSAttack/SpecialAirSAttack startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].31
+,32,,0x06000020,0.025,0.028,0.05,0.025,f32,,,,no read in the vanilla MSC (native or unused),m13[*].32
+,33,,0x06000021,0.01,0.0075,0.009,0.01,f32,Air friction on SpecialAirSAttack,,medium,community | no read in the vanilla MSC (native or unused),m13[*].33
+,34,,0x06000022,2,2.6,1.5,2,f32,Aerial H max speed on SpecialAirSAttack,,medium,community | no read in the vanilla MSC (native or unused),m13[*].34
+,35,,0x06000023,0.04,0.03,0.005,0.04,f32,Gravity on SpecialAirSAttack,,medium,community | no read in the vanilla MSC (native or unused),m13[*].35
+,36,,0x06000024,1.5,1.5,1.5,1.5,f32,Max fall speed on SpecialAirSAttack,,medium,community | no read in the vanilla MSC (native or unused),m13[*].36
+,37,,0x06000025,0.5,0.5,0.5,0.5,f32,H speed multiplier on SpecialSWallClash startup,Number of frames are determined by MSC?,medium,community | no read in the vanilla MSC (native or unused),m13[*].37
+,38,,0x06000026,0.015,0.015,0.015,0.015,f32,,,,no read in the vanilla MSC (native or unused),m13[*].38
+,39,,0x06000027,1.5,1.5,1.5,1.5,f32,Aerial friction multiplier on SpecialSWallClash/SpecialAirSWallClash,,medium,community | no read in the vanilla MSC (native or unused),m13[*].39
+,40,,0x06000028,0.5,0.25,0.4,0.5,f32,Initial H speed on SpecialSWallClash/SpecialAirSWallClash,Written in ACMD too for some reason,medium,community | no read in the vanilla MSC (native or unused),m13[*].40
+,41,,0x06000029,2.2,1.5,1.8,2.2,f32,Initial V speed on SpecialSWallClash/SpecialAirSWallClash,Written in ACMD too for some reason,medium,community | no read in the vanilla MSC (native or unused),m13[*].41
+15,0,Up B,0x07000000,0.7,0.7,1,0.7,f32,Grounded H speed multiplier on startup,,medium,community | reads: native 0x0279CF30 (fn 0x0279BD94),m14[*].0
+,1,,0x07000001,0.02,0.02,0.01,0.02,f32,Ground friction on SpecialHiStart,,medium,community | no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0.75,0.75,1,0.75,f32,,,,no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.02,0.02,0.01,0.02,f32,,,,no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0.5,0.1,0.5,0.5,f32,Initial V speed on SpecialAirHiStart,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,3,2.6,-0.8,3,f32,Initial V speed on SpecialHiJrRise,,medium,community | no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,0.6,0.8,0,0.6,f32,Base air accel/max add air accel multiplier on SpecialHiJrRise,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.8,1,0,0.8,f32,,,,no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x17000008,0xA,0x5,0x1,0xA,u32,First frame Name9 takes effect -- code: compared with status int 0x2 (a counter) (func_2323) [status 0x15D (SpecialHiJrRise)],,high,community | reads: MSC koopajr.mscsb func_2323,m14[*].8
+,9,,0x07000009,0.1,0.09,0.3,0.1,f32,Gravity on SpecialHiJrRise,,medium,community | no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,1.1,1,0.6,0.9,f32,,,,no read in the vanilla MSC (native or unused),m14[*].10
+,11,,0x0700000B,0.8,0.7,0.8,0.8,f32,Air max speed multiplier on SpecialHiJrFall?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,0.8,0.7,2,0.8,f32,Fall speed multiplier on SpecialHiJrFall,,medium,community | no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,0.8,0.7,2,0.8,f32,V accel multiplier on SpecialHiJrFall?,Upward accel = This * gravity?,medium,community | no read in the vanilla MSC (native or unused),m14[*].13
+,14,,0x0700000E,0.8,0.7,1,0.8,f32,Terminal fall speed multiplier after SpecialHiAttack?,Terminal fall speed = This * fall speed?,medium,community | no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x0700000F,1,0.7,1.515,1,f32,Fast fall speed multiplier on SpecialHiJrFall,,medium,community | reads: native 0x0279D708 (fn 0x0279D628),m14[*].15
+,16,,0x07000010,26,40,31,30,f32,"Landing lag from SpecialHiJrFall (frames) -- code: read in: var1 = WorkModuleF(0, 0x7000010); (func_2346) [status 0x162]",,medium,community | reads: MSC koopajr.mscsb func_2346,m14[*].16
+,17,,0x07000011,37,48,42,38,f32,"Landing lag from SpecialHiJrAttack (frames) -- code: read in: var1 = WorkModuleF(0, 0x7000011); (func_2346) [status 0x162]",,medium,community | reads: MSC koopajr.mscsb func_2346,m14[*].17
+,18,,0x07000012,33,44,38,34,f32,Landing lag from SpecialHiJrEscape (frames) -- code: compared with a computed value (func_2346) [status 0x162],,medium,community | reads: MSC koopajr.mscsb func_2346,m14[*].18
+,19,,0x07000013,28,42,33,32,f32,Landing lag from fast fall SpecialHiJrAttack (frames) -- code: animation rate of the motion it starts (func_22) (func_2346); MotionModule op 0x1 (via func_22) (func_2346); compared with a computed value (func_2346) [status 0x162],,medium,community | reads: MSC koopajr.mscsb func_2346,m14[*].19
 16,0,Down B,0x08000000,0.5,1.5,0.5,0.5,f32,Grounded initial V speed,,medium,community | reads: native 0x0279D51C (fn 0x0279BD94),m15[*].0
 ,1,,0x08000001,0.25,0.25,0.25,0.25,f32,Aerial V speed multiplier on startup,,medium,community | reads: native 0x0279D4CC (fn 0x0279BD94),m15[*].1
-,2,,0x08000002,3.8,3.8,3.8,3.8,f32,X offset of the Mechakoopa when spawned,,medium,community,m15[*].2
-,3,,0x08000003,2,2,2,2,f32,Y offset of the Mechakoopa when spawned,,medium,community,m15[*].3
-,0,Category 4 block,0x14000000,0x0,,,,u32,,,,,m16.0
-,1,,0x04000001,1.1,,,,f32,,,,,m16.1
+,2,,0x08000002,3.8,3.8,3.8,3.8,f32,X offset of the Mechakoopa when spawned,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,2,2,2,2,f32,Y offset of the Mechakoopa when spawned,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,0,Category 4 block,0x14000000,0x0,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,1.1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
 17,0,"Hurtbox
 damage
 multiplier",,1.15,,,,f32,Damage multiplier vs. hurtbox 0x0 (Jr's head),,medium,community,m17[0]
 ,1,,,1.15,,,,f32,Damage multiplier vs. hurtbox 0x1 (Jr's body),,medium,community,m17[1]
 ,2,,,0.88,,,,f32,Damage multiplier vs. hurtbox 0x2 (Clown Cart),You can fix his Clown Kart mechanic by re-assigning the Clown Kart to hurtbox 0x0 and modding name 0 to 0.88,medium,community,m17[2]
-18,0,Article params (cannonball),0x02000000,0.4,3,1.8,1.3,f32,,,,,m18[*].0
-,1,,0x02000001,2,4.2,4.5,2.7,f32,,,,,m18[*].1
-,2,,0x02000002,20,4,0,7,f32,Fully charged Canon base damage,community ID was 0x02000003,medium,community,m18[*].2
-,3,,0x02000003,40,10,0,16,f32,,,,,m18[*].3
-,4,,0x12000004,0xA,0x19,0x5,0x2B,u32,,,,,m18[*].4
-,5,,0x02000005,0.7,0.5,0.8,0.7,f32,Damage depreciation for late hit,(Clean hit dmg) * (name 5) = late hit damage,medium,community,m18[*].5
-,6,,0x02000006,-0.1,0.1,0,0.08,f32,,,,,m18[*].6
-,7,,0x02000007,1,5,0,1.5,f32,Bounce/Rebound V speed multiplier,Negative numbers cause it to plummet when it hits something; community ID was 0x0200000A,medium,community,m18[*].7
-,8,,0x02000008,-3,0.25,0,0.5,f32,,,,,m18[*].8
-,9,,0x02000009,5,-0.1,0,0.3,f32,,,,,m18[*].9
-,10,,0x0200000A,5,0.8,0,1,f32,,,,,m18[*].10
-,11,,0x1200000B,0x50,0x3C,0x19,0xB4,u32,,,,,m18[*].11
-,12,,0x1200000C,0x0,0x1,0x1,0x0,u32,Piercing capability,,medium,community,m18[*].12
+18,0,"Cannon
+(cannonball)",0x02000000,1.3,3,1.8,1.3,f32,Base speed,,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,2.9,4.2,4.5,2.7,f32,Fully charged speed,,medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,8.5,4,0,7,f32,Non charged Canon base damage -- code: AttackModule op 0x271F (func_47),,high,community | reads: MSC koopajr/cannonball.mscsb func_47,m18[*].2
+,3,,0x02000003,20,10,0,16,f32,Fully charged Canon base damage -- code: AttackModule op 0x271F (func_47),,high,community | reads: MSC koopajr/cannonball.mscsb func_47,m18[*].3
+,4,,0x12000004,0x2B,0x19,0x5,0x2B,u32,"Max clean hit frames -- code: stored in instance int 0x7, then tested against 0 (func_49) (func_47)",Becomes late hit on frame 44,medium,community | reads: MSC koopajr/cannonball.mscsb func_47,m18[*].4
+,5,,0x02000005,0.7,0.5,0.8,0.7,f32,Damage depreciation for late hit -- code: AttackModule op 0x2728 (func_49),(Clean hit dmg) * (name 5) = late hit damage,high,community | reads: MSC koopajr/cannonball.mscsb func_49,m18[*].5
+,6,,0x02000006,0.08,0.1,0,0.08,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m18[*].6
+,7,,0x02000007,1.5,5,0,1.5,f32,Max fallspeed,,medium,community | no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,0.5,0.25,0,0.5,f32,Bounce H speed multiplier,Bounce = when it hits the floor; negative numbers cause it to reverse direction,medium,community | no read in the article MSC (native or unused),m18[*].8
+,9,,0x02000009,0.3,-0.1,0,0.3,f32,Rebound H speed multiplier,Rebound = when it hits a wall/another character; negative numbers cause it to go through opponents,medium,community | no read in the article MSC (native or unused),m18[*].9
+,10,,0x0200000A,1,0.8,0,1,f32,Bounce/Rebound V speed multiplier,Negative numbers cause it to plummet when it hits something,medium,community | no read in the article MSC (native or unused),m18[*].10
+,11,,0x1200000B,0xB4,0x3C,0x19,0xB4,u32,Aerial lifetime (frames),,medium,community | no read in the article MSC (native or unused),m18[*].11
+,12,,0x1200000C,0x0,0x1,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m18[*].12
 ,0,,,0x3,,,,u32,Stage detection bit,,medium,community,m19.0
 ,1,,,0,,,,f32,Frames before detecting a surface?,,medium,community,m19.1
 ,2,,,4,,,,f32,,,,,m19.2
 19,0,"Abandon Ship
-(remainclown)",0x12000000,0x28,0x19,0x1,0x28,u32,Detonation timer (frames),Starts during SpecialHiJrRise?,medium,community,m20[*].0
-,1,,0x02000001,0.05,0.18,0.05,0.05,f32,Gravity,,medium,community,m20[*].1
-,2,,0x02000002,0.8,0.5,0.8,0.8,f32,Max fall speed,,medium,community,m20[*].2
+(remainclown)",0x12000000,0x28,0x19,0x1,0x28,u32,"Detonation timer (frames) -- code: stored in instance int 0x8, then decremented in func_48 (a countdown / remaining count), tested against 0 (func_46)",Starts during SpecialHiJrRise?,high,community | reads: MSC koopajr/remainclown.mscsb func_46,m20[*].0
+,1,,0x02000001,0.05,0.18,0.05,0.05,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m20[*].1
+,2,,0x02000002,0.8,0.5,0.8,0.8,f32,Max fall speed -- code: KineticModule op 0x1 (func_47),,medium,community | reads: MSC koopajr/remainclown.mscsb func_47,m20[*].2
 ,0,,,0x3,,,,u32,,,,,m21.0
 ,1,,,6,,,,f32,,,,,m21.1
 ,2,,,6,,,,f32,,,,,m21.2
 20,0,Mechakoopa,,0xD2,0x12,0x78,0xD2,u32,Frames before stopping,,medium,community,m22[*].0
-,1,,,0x3C,0x12,0x1E,0x3C,u32,Frames not moving before exploding,,medium,community,m22[*].1
-,2,,,7,1,7,7,f32,,,,,m22[*].2
-,3,,,0.02,1,0.02,0.02,f32,,,,,m22[*].3
+,1,,,0x3C,0x12,0x1E,0x3C,u32,Frames not moving before exploding,community value differs: Custom2 0x1D (vanilla 0x1E),medium,community,m22[*].1
+,2,,,7,1,1,7,f32,,,,,m22[*].2
+,3,,,0.02,1,1,0.02,f32,,,,,m22[*].3
 ,4,,,0.1,0.05,0.1,0.1,f32,,,,,m22[*].4
 ,5,,,2,2,2,2,f32,,,,,m22[*].5
 ,6,,,1.7,2.4,1.7,1.7,f32,Initial H speed on generated,,medium,community,m22[*].6
-,7,,,0.04,0.02,0,0.04,f32,Gravity on generated,,medium,community,m22[*].7
+,7,,,0.04,0.02,0.04,0.04,f32,Gravity on generated,,medium,community,m22[*].7
 ,8,,,1,1,1,1,f32,Max fall speed on generated,,medium,community,m22[*].8
 ,9,,,0.5,0,0.5,0.5,f32,,,,,m22[*].9
 ,10,,,0.5,0,0.5,0.5,f32,,,,,m22[*].10
-,11,,,0.1,0,0.8,0.1,f32,,,,,m22[*].11
-,12,,,1.2,0,1.2,1.2,f32,Walk speed,,medium,community,m22[*].12
+,11,,,0.1,0,0.1,0.1,f32,,,,,m22[*].11
+,12,,,1.2,0,0.4,1.2,f32,Walk speed,,medium,community,m22[*].12
 ,13,,,0x14,0x14,0x14,0x14,u32,,,,,m22[*].13
 ,14,,,-0.1,-0.1,-0.1,-0.1,f32,,,,,m22[*].14
 ,15,,,3,3,3,3,f32,,,,,m22[*].15
@@ -134,24 +135,5 @@ Hurtbox",,0,,,,f32,X offset,,medium,community,m23[0].0
 ,9,,,0x1,,,,u32,Zone,,medium,community,m23[0].9
 ,10,,,0x0,,,,u32,Invincible/Intangible,,medium,community,m23[0].10
 ,11,,,0x2,,,,u32,,,,,m23[0].11
-22,0,?,0x12000000,0x1E0,0x258,0x258,0x258,u32,,,,,m24[*].0
-,1,,0x12000001,0x78,0xB4,0xB4,0xB4,u32,,,,,m24[*].1
-15,0,Up B,0x07000000,0.7,,,,,Grounded H speed multiplier on startup,community row not matched to a value of the vanilla file,low,community,
-15,1,,0x07000001,0.02,,,,,Ground friction on SpecialHiStart,community row not matched to a value of the vanilla file,low,community,
-15,4,,0x07000004,0.5,,,,,Initial V speed on SpecialAirHiStart,community row not matched to a value of the vanilla file,low,community,
-15,11,,0x0700000b,0.8,,,,,Air max speed multiplier on SpecialHiJrFall?,community row not matched to a value of the vanilla file,low,community,
-15,12,,0x0700000c,0.8,,,,,Fall speed multiplier on SpecialHiJrFall,community row not matched to a value of the vanilla file,low,community,
-15,13,,0x0700000d,0.8,,,,,V accel multiplier on SpecialHiJrFall?,Upward accel = This * gravity?; community row not matched to a value of the vanilla file,low,community,
-15,14,,0x0700000e,0.8,,,,,Terminal fall speed multiplier after SpecialHiAttack?,Terminal fall speed = This * fall speed?; community row not matched to a value of the vanilla file,low,community,
-15,16,,0x07000010,26,,,,,Landing lag from SpecialHiJrFall (frames),community row not matched to a value of the vanilla file,low,community,
-15,19,,0x07000013,28,,,,,Landing lag from fast fall SpecialHiJrAttack (frames),community row not matched to a value of the vanilla file,low,community,
-18,0,"Cannon
-(cannonball)",0x02000000,1.3,,,,,Base speed,community row not matched to a value of the vanilla file,low,community,
-18,1,,0x02000001,2.9,,,,,Fully charged speed,community row not matched to a value of the vanilla file,low,community,
-18,2,,0x02000002,8.5,,,,,Non charged Canon base damage,community row not matched to a value of the vanilla file,low,community,
-18,4,,0x12000004,0x2B,,,,,Max clean hit frames,Becomes late hit on frame 44; community row not matched to a value of the vanilla file,low,community,
-18,6,,0x02000006,0.08,,,,,Gravity,community row not matched to a value of the vanilla file,low,community,
-18,7,,0x02000007,1.5,,,,,Max fallspeed,community row not matched to a value of the vanilla file,low,community,
-18,8,,0x02000008,0.5,,,,,Bounce H speed multiplier,Bounce = when it hits the floor; negative numbers cause it to reverse direction; community row not matched to a value of the vanilla file,low,community,
-18,9,,0x02000009,0.3,,,,,Rebound H speed multiplier,Rebound = when it hits a wall/another character; negative numbers cause it to go through opponents; community row not matched to a value of the vanilla file,low,community,
-18,11,,0x1200000b,0xB4,,,,,Aerial lifetime (frames),community row not matched to a value of the vanilla file,low,community,
+22,0,?,0x12000000,0x1E0,0x258,0x258,0x258,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_48 (a countdown / remaining count), tested against 0 (func_46)",,medium,reads: MSC koopajr/batten.mscsb func_46,m24[*].0
+,1,,0x12000001,0x78,0xB4,0xB4,0xB4,u32,,,,no read in the article MSC (native or unused),m24[*].1

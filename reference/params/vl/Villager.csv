@@ -1,57 +1,57 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,23,11,25,23,f32,Pocket bubble size,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3692",m12[*].0
-,1,,0x05000001,12,9,23,12,f32,Z offset of Pocket bubble,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3692",m12[*].1
-,2,,0x05000002,8,8,8,8,f32,Y offset of Pocket bubble,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3692",m12[*].2
-,3,,0x15000003,0x11,0x8,0x1A,0x11,u32,Pocket active duration (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3692",m12[*].3
-,4,,0x05000004,1.9,1,1.3,1.7,f32,Damage multiplier for return fire,,medium,community,m12[*].4
-,5,,0x05000005,5,5,5,5,f32,,,,,m12[*].5
-,6,,0x05000006,15,15,15,15,f32,SpecialNHand animation frame items can be pocketed,"If you get hit damage in frame 1-14, items can't be pocketed.",medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3696",m12[*].6
-,7,,0x15000007,0x708,0x708,0x708,0x708,u32,Time Villager can hold an item in Pocket (frames),,medium,community,m12[*].7
+13,0,Neutral B,0x05000000,23,11,25,23,f32,Pocket bubble size -- code: SearchModule op 0x0 (func_3692) [status 0x21B; status 0x157],,medium,community | reads: MSC kirby.mscsb func_3692; MSC murabito.mscsb func_2295,m12[*].0
+,1,,0x05000001,12,9,23,12,f32,Z offset of Pocket bubble -- code: SearchModule op 0x0 (func_3692) [status 0x21B; status 0x157],,medium,community | reads: MSC kirby.mscsb func_3692; MSC murabito.mscsb func_2295,m12[*].1
+,2,,0x05000002,8,8,8,8,f32,Y offset of Pocket bubble -- code: SearchModule op 0x0 (func_3692) [status 0x21B; status 0x157],,medium,community | reads: MSC kirby.mscsb func_3692; MSC murabito.mscsb func_2295,m12[*].2
+,3,,0x15000003,0x11,0x8,0x1A,0x11,u32,Pocket active duration (frames) -- code: compared with status int 0x5 (a counter) (func_3692) [status 0x21B; status 0x157],,high,community | reads: MSC kirby.mscsb func_3692; MSC murabito.mscsb func_2295,m12[*].3
+,4,,0x05000004,1.9,1,1.3,1.7,f32,Damage multiplier for return fire,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x05000005,5,5,5,5,f32,,,,no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,15,15,15,15,f32,"SpecialNHand animation frame items can be pocketed -- code: stored in status float 0x9, then BattleObject op 0x3F0 (func_3697) (func_3696); stored in status float 0x9, then BattleObject op 0x3F0 (func_2300) (func_2299); combined with status float 0xA (func_3696) [status 0x21C; status 0x158]","If you get hit damage in frame 1-14, items can't be pocketed.",medium,community | reads: MSC kirby.mscsb func_3696; MSC murabito.mscsb func_2299,m12[*].6
+,7,,0x15000007,0x708,0x708,0x708,0x708,u32,Time Villager can hold an item in Pocket (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
 14,0,Side B,0x06000000,0.5,0.3,0.5,0.5,f32,Control capability while riding?,,medium,community | reads: native 0x02F390A4 (fn 0x02F38CF4),m13[*].0
-,1,,0x06000001,1.3,2.5,1.2,1.3,f32,V speed from jumping,,medium,community,m13[*].1
-,2,,0x06000002,-0.3,0.6,-0.3,-0.3,f32,H speed after the rocket explodes without touching a character,,medium,community,m13[*].2
-,3,,0x06000003,1.7,2.8,1.4,1.7,f32,V speed after the rocket explodes without touching a character,,medium,community,m13[*].3
-,4,,0x16000004,0x0,0x0,0x0,0x0,u32,?,,medium,community,m13[*].4
+,1,,0x06000001,1.3,2.5,1.2,1.3,f32,V speed from jumping,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,-0.3,0.6,-0.3,-0.3,f32,H speed after the rocket explodes without touching a character,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,1.7,2.8,1.4,1.7,f32,V speed after the rocket explodes without touching a character,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x16000004,0x0,0x0,0x0,0x0,u32,?,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
 15,0,Up B,0x07000000,0.5,0.8,0.5,0.5,f32,Aerial H speed multiplier on startup,,medium,community | reads: native 0x02F38E28 (fn 0x02F38CF4),m14[*].0
-,1,,0x07000001,0.3,0.6,1,0.3,f32,?,,medium,community,m14[*].1
-,2,,0x07000002,0,0,1.2,0,f32,Initial H speed while flying,,medium,community,m14[*].2
-,3,,0x07000003,2,1,4.8,2,f32,?,,medium,community,m14[*].3
-,4,,0x17000004,0x1E,0x1E,0x1E,0x1E,u32,,,,,m14[*].4
+,1,,0x07000001,0.3,0.6,1,0.3,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0,0,1.2,0,f32,Initial H speed while flying,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,2,1,4.8,2,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x17000004,0x1E,0x1E,0x1E,0x1E,u32,code: stored in status int 0x3 (func_2347) [status 0x154],,medium,reads: MSC murabito.mscsb func_2347,m14[*].4
 ,5,,0x07000005,0.03,0.023,0.09,0.03,f32,Gravity while flying,,medium,"community | reads: native 0x02F3C554 (fn 0x02F3C4B8, shared with ness)",m14[*].5
-,6,,0x07000006,0.03,0.023,0.09,0.03,f32,?,,medium,community,m14[*].6
-,7,,0x07000007,1.1,1.3,2.8,1.1,f32,Max H speed while flying,,medium,community,m14[*].7
+,6,,0x07000006,0.03,0.023,0.09,0.03,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,1.1,1.3,2.8,1.1,f32,Max H speed while flying,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
 ,8,,0x07000008,0.9,1,2.8,0.9,f32,?,,medium,"community | reads: native 0x02F3C2CC (fn 0x02F3BEA8, shared with ness)",m14[*].8
-,9,,0x07000009,1.2,1,4.2,1.2,f32,V initial speed,,medium,community,m14[*].9
-,10,,0x0700000A,0.9,0.9,4.2,0.9,f32,?,,medium,community,m14[*].10
+,9,,0x07000009,1.2,1,4.2,1.2,f32,V initial speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,0.9,0.9,4.2,0.9,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].10
 ,11,,0x0700000B,1.2,0.6,1.2,1.2,f32,?,,medium,"community | reads: native 0x02F3D594 (fn 0x02F3D51C, shared with ness); native 0x02F3D610 (fn 0x02F3D5F0, shared with ness)",m14[*].11
-,12,,0x0700000C,1.6,1.2,1.2,1.6,f32,?,,medium,community,m14[*].12
-,13,,0x0700000D,0.01,0.006,0.04,0.01,f32,Air centripetal speed,"Not friction, e.g. 0.008 > -0.002 > 0.008 > ...",medium,community,m14[*].13
-,14,,0x0700000E,0.02,0.012,0.04,0.02,f32,Air accel?,accel/decel lasts 1 frame longer,medium,community,m14[*].14
-,15,,0x0700000F,0.028,0.028,0.028,0.028,f32,H speed difference of Villager and ..???,,medium,community,m14[*].15
-,16,,0x07000010,4,1,30,4,f32,,,,,m14[*].16
-,17,,0x17000011,0x5,0x3,0x5,0x5,u32,?,,medium,community,m14[*].17
-,18,,0x07000012,420,350,0,420,f32,Max duration (frames),,medium,community,m14[*].18
-,19,,0x07000013,0.5,0.5,0.5,0.5,f32,,,,,m14[*].19
-,20,,0x07000014,5,5,5,5,f32,Fuel mechanic?,,medium,community,m14[*].20
-,21,,0x17000015,0x3,0x4,0x3,0x3,u32,,,,,m14[*].21
-,22,,0x07000016,0.14,0.065,0.14,0.14,f32,,,,,m14[*].22
-,23,,0x07000017,0.1,0.05,0.14,0.1,f32,Base air decel?,,medium,community,m14[*].23
-,24,,0x07000018,0.18,0.1,0.18,0.18,f32,Max additional air decel?,,medium,community,m14[*].24
-,25,,0x07000019,0.14,0.05,0.18,0.14,f32,,,,,m14[*].25
-,26,,0x0700001A,0.9,0.7,1,0.9,f32,,,,,m14[*].26
-,27,,0x0700001B,0.6,0.6,1,1,f32,Fuel mechanic?,,medium,community,m14[*].27
-,28,,0x0700001C,0.5,0.8,0.5,0.5,f32,,,,,m14[*].28
-,29,,0x0700001D,1.2,0.8,1.2,1.2,f32,,,,,m14[*].29
-,30,,0x0700001E,0.5,0.8,0.5,0.5,f32,H speed multiplier,,medium,community,m14[*].30
-,31,,0x0700001F,2,3.33,2,2,f32,V speed,,medium,community,m14[*].31
-,32,,0x07000020,30,35,26,30,f32,Landing lag (frames),,medium,community,m14[*].32
-16,0,Down B,0x08000000,6,6,6,6,f32,Changes how many times you need to water the sapling before it grows?,,medium,community,m15[*].0
-,1,,0x08000001,10,10,10,10,f32,?,,medium,community,m15[*].1
-,2,,0x08000002,5,5,5,5,f32,,,,,m15[*].2
-,3,,0x08000003,10,10,10,10,f32,,,,,m15[*].3
-,0,Uair/Dair,0x04000000,30,,,,f32,Uair/Dair single turnip odds,,medium,community,m16.0
-,1,,0x04000001,30,,,,f32,Uair/Dair double turnip odds,,medium,community,m16.1
-,2,,0x04000002,40,,,,f32,Uair/Dair triple turnip odds,,medium,community,m16.2
+,12,,0x0700000C,1.6,1.2,1.2,1.6,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,0.01,0.006,0.04,0.01,f32,Air centripetal speed,"Not friction, e.g. 0.008 > -0.002 > 0.008 > ...",medium,community | no read in the vanilla MSC (native or unused),m14[*].13
+,14,,0x0700000E,0.02,0.012,0.04,0.02,f32,Air accel?,accel/decel lasts 1 frame longer,medium,community | no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x0700000F,0.028,0.028,0.028,0.028,f32,"H speed difference of Villager and ..??? -- code: KineticModule op 0x19 on energy 2 (control / horizontal), argument 1 (func_2337); combined with stick X (func_2337); tested against 0 (func_2337)",,medium,community | reads: MSC murabito.mscsb func_2337,m14[*].15
+,16,,0x07000010,4,1,30,4,f32,,,,no read in the vanilla MSC (native or unused),m14[*].16
+,17,,0x17000011,0x5,0x3,0x5,0x5,u32,?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].17
+,18,,0x07000012,420,350,0,420,f32,Max duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m14[*].18
+,19,,0x07000013,0.5,0.5,0.5,0.5,f32,code: KineticModule op 0x8 on energy 2 (control / horizontal) (func_2339),,medium,reads: MSC murabito.mscsb func_2339,m14[*].19
+,20,,0x07000014,5,5,5,5,f32,"Fuel mechanic? -- code: stored in instance float 0x31, then compared with a computed value; tested against 0 (func_2337) (func_2337); compared with a computed value (func_2337)",,medium,community | reads: MSC murabito.mscsb func_2337,m14[*].20
+,21,,0x17000015,0x3,0x4,0x3,0x3,u32,"code: stored in status int 0x2, then decremented in func_2336 (a countdown / remaining count), tested against 0 (func_2337)",,medium,reads: MSC murabito.mscsb func_2337,m14[*].21
+,22,,0x07000016,0.14,0.065,0.14,0.14,f32,"code: KineticModule op 0x19 on energy 2 (control / horizontal), argument 2 (func_2337); tested against 0 (func_2337)",,medium,reads: MSC murabito.mscsb func_2337,m14[*].22
+,23,,0x07000017,0.1,0.05,0.14,0.1,f32,"Base air decel? -- code: read in: var3 = WorkModuleF(0, 0x7000017); (func_2337)",,medium,community | reads: MSC murabito.mscsb func_2337,m14[*].23
+,24,,0x07000018,0.18,0.1,0.18,0.18,f32,"Max additional air decel? -- code: read in: var2 = WorkModuleF(0, 0x7000018); (func_2337)",,medium,community | reads: MSC murabito.mscsb func_2337,m14[*].24
+,25,,0x07000019,0.14,0.05,0.18,0.14,f32,"code: read in: var2 = WorkModuleF(0, 0x7000019); (func_2337)",,low,reads: MSC murabito.mscsb func_2337,m14[*].25
+,26,,0x0700001A,0.9,0.7,1,0.9,f32,,,,no read in the vanilla MSC (native or unused),m14[*].26
+,27,,0x0700001B,0.6,0.6,1,1,f32,Fuel mechanic?,,medium,community | no read in the vanilla MSC (native or unused),m14[*].27
+,28,,0x0700001C,0.5,0.8,0.5,0.5,f32,,,,no read in the vanilla MSC (native or unused),m14[*].28
+,29,,0x0700001D,1.2,0.8,1.2,1.2,f32,,,,no read in the vanilla MSC (native or unused),m14[*].29
+,30,,0x0700001E,0.5,0.8,0.5,0.5,f32,"H speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), with a current speed (KineticModuleF) (func_2338)",,high,community | reads: MSC murabito.mscsb func_2338,m14[*].30
+,31,,0x0700001F,2,3.33,2,2,f32,"V speed -- code: KineticModule op 0x11 (sets a speed) on energy 2 (control / horizontal), with a current speed (KineticModuleF) (func_2338)",,high,community | reads: MSC murabito.mscsb func_2338,m14[*].31
+,32,,0x07000020,30,35,26,30,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2347) [status 0x154],,high,community | reads: MSC murabito.mscsb func_2347,m14[*].32
+16,0,Down B,0x08000000,6,6,6,6,f32,"Changes how many times you need to water the sapling before it grows? -- code: stored in status int 0x12, then decremented in func_2395 (a countdown / remaining count), tested against 0 (func_2395)",,high,community | reads: MSC murabito.mscsb func_2395,m15[*].0
+,1,,0x08000001,10,10,10,10,f32,? -- code: BattleObject op 0x3F6 (func_2378) [motions SpecialLw1],,medium,community | reads: MSC murabito.mscsb func_2378,m15[*].1
+,2,,0x08000002,5,5,5,5,f32,code: BattleObject op 0x3F6 (func_2378) [motions SpecialLw1],,medium,reads: MSC murabito.mscsb func_2378,m15[*].2
+,3,,0x08000003,10,10,10,10,f32,code: BattleObject op 0x3F6 (func_2378) [motions SpecialLw1],,medium,reads: MSC murabito.mscsb func_2378,m15[*].3
+,0,Uair/Dair,0x04000000,30,,,,f32,Uair/Dair single turnip odds -- code: compared with a computed value (func_2261) [status 0x34],,medium,community | reads: MSC murabito.mscsb func_2261,m16.0
+,1,,0x04000001,30,,,,f32,Uair/Dair double turnip odds -- code: compared with a computed value (func_2261) [status 0x34],,medium,community | reads: MSC murabito.mscsb func_2261,m16.1
+,2,,0x04000002,40,,,,f32,Uair/Dair triple turnip odds -- code: compared with a computed value (func_2261) [status 0x34],,medium,community | reads: MSC murabito.mscsb func_2261,m16.2
 17,0,,,0x82,0x74,0x11B,0x12E,u32,?,,medium,community,m17[*].0
 ,1,,,-5,0,1,5,f32,"X offset, pocket?",,medium,community,m17[*].1
 ,2,,,-3,0,0,0,f32,"Y offset, pocket?",,medium,community,m17[*].2
@@ -95,29 +95,29 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,0,,,0x3,,,,u32,,,,,m24.0
 ,1,,,0,,,,f32,,,,,m24.1
 ,2,,,0.5,,,,f32,Stage detection size,,medium,community,m24.2
-18,0,Lloid Rocket,0x02000000,0,0.9,0,0,f32,H speed added from second use?,,medium,community,m25[*].0
-,1,,0x02000001,0.05,-0.009,0.095,0.05,f32,Accel,,medium,community,m25[*].1
-,2,,0x02000002,1.8,2.4,1.1,1.8,f32,,,,,m25[*].2
-,3,,0x02000003,0.003,-0.1,0,0.003,f32,Gravity,,medium,community,m25[*].3
-,4,,0x02000004,0.4,-0.05,0,0.4,f32,,,,,m25[*].4
-,5,,0x02000005,70,40,60,70,f32,Decel point (frames),,medium,community,m25[*].5
-,6,,0x02000006,0.025,0.008,0,0.025,f32,H decel after decel point,,medium,community,m25[*].6
-,7,,0x02000007,0.04,-0.15,0,0.04,f32,?,,medium,community,m25[*].7
-,8,,0x02000008,0.7,5.5,0,0.7,f32,?,,medium,community,m25[*].8
-,9,,0x02000009,0.5,5,0,0.5,f32,?,,medium,community,m25[*].9
-,10,,0x0200000A,60,1,1,60,f32,Lifetime after decel point (frames),,medium,community,m25[*].10
-,11,,0x0200000B,1.3,1.2,1.1,1.3,f32,?,,medium,community,m25[*].11
-,12,,0x0200000C,1.1,1,1,1.1,f32,,,,,m25[*].12
-,13,,0x0200000D,1.5,1.7,1.2,1.5,f32,,,,,m25[*].13
-,14,,0x0200000E,0.55,0.7,0.55,0.55,f32,,,,,m25[*].14
-,15,,0x0200000F,0.07,0.01,0.095,0.07,f32,,,,,m25[*].15
-,16,,0x02000010,2.3,2.4,1.2,2.3,f32,Lloid ride damage multiplier,,medium,community,m25[*].16
-,17,,0x02000011,1.2,1,1,1.2,f32,,,,,m25[*].17
-,18,,0x02000012,2,2,1,2,f32,,,,,m25[*].18
-,19,,0x02000013,1.6,2.4,1.2,1.6,f32,,,,,m25[*].19
-,20,,0x02000014,120,140,120,120,f32,?,,medium,community,m25[*].20
-,21,,0x02000015,12,12,12,12,f32,Hitbox damage threshold to beat Lloid Rocket,,medium,community,m25[*].21
-,22,,0x12000016,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m25[*].22
+18,0,Lloid Rocket,0x02000000,0,0.9,0,0,f32,H speed added from second use?,,medium,community | no read in the article MSC (native or unused),m25[*].0
+,1,,0x02000001,0.05,-0.009,0.095,0.05,f32,Accel,,medium,community | no read in the article MSC (native or unused),m25[*].1
+,2,,0x02000002,1.8,2.4,1.1,1.8,f32,,,,no read in the article MSC (native or unused),m25[*].2
+,3,,0x02000003,0.003,-0.1,0,0.003,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m25[*].3
+,4,,0x02000004,0.4,-0.05,0,0.4,f32,,,,no read in the article MSC (native or unused),m25[*].4
+,5,,0x02000005,70,40,60,70,f32,"Decel point (frames) -- code: read in: func_45(WorkModuleF(0, 0x2000005)); (func_65)",,medium,community | reads: MSC murabito/clayrocket.mscsb func_65; MSC murabito/clayrocket.mscsb func_66,m25[*].5
+,6,,0x02000006,0.025,0.008,0,0.025,f32,H decel after decel point,,medium,community | no read in the article MSC (native or unused),m25[*].6
+,7,,0x02000007,0.04,-0.15,0,0.04,f32,?,,medium,community | no read in the article MSC (native or unused),m25[*].7
+,8,,0x02000008,0.7,5.5,0,0.7,f32,?,,medium,community | no read in the article MSC (native or unused),m25[*].8
+,9,,0x02000009,0.5,5,0,0.5,f32,?,,medium,community | no read in the article MSC (native or unused),m25[*].9
+,10,,0x0200000A,60,1,1,60,f32,"Lifetime after decel point (frames) -- code: read in: func_45(WorkModuleF(0, 0x200000a)); (func_69)",,medium,community | reads: MSC murabito/clayrocket.mscsb func_69; MSC murabito/clayrocket.mscsb func_70,m25[*].10
+,11,,0x0200000B,1.3,1.2,1.1,1.3,f32,?,,medium,community | no read in the article MSC (native or unused),m25[*].11
+,12,,0x0200000C,1.1,1,1,1.1,f32,,,,no read in the article MSC (native or unused),m25[*].12
+,13,,0x0200000D,1.5,1.7,1.2,1.5,f32,,,,no read in the article MSC (native or unused),m25[*].13
+,14,,0x0200000E,0.55,0.7,0.55,0.55,f32,,,,no read in the article MSC (native or unused),m25[*].14
+,15,,0x0200000F,0.07,0.01,0.095,0.07,f32,,,,no read in the article MSC (native or unused),m25[*].15
+,16,,0x02000010,2.3,2.4,1.2,2.3,f32,Lloid ride damage multiplier,,medium,community | no read in the article MSC (native or unused),m25[*].16
+,17,,0x02000011,1.2,1,1,1.2,f32,"code: read in: arg0 = arg0 * WorkModuleF(0, 0x2000011) + 0.5f; (func_45)",,low,reads: MSC murabito/clayrocket.mscsb func_45,m25[*].17
+,18,,0x02000012,2,2,1,2,f32,,,,no read in the article MSC (native or unused),m25[*].18
+,19,,0x02000013,1.6,2.4,1.2,1.6,f32,,,,no read in the article MSC (native or unused),m25[*].19
+,20,,0x02000014,120,140,120,120,f32,?,,medium,community | no read in the article MSC (native or unused),m25[*].20
+,21,,0x02000015,12,12,12,12,f32,Hitbox damage threshold to beat Lloid Rocket,,medium,community | no read in the article MSC (native or unused),m25[*].21
+,22,,0x12000016,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m25[*].22
 ,0,,,0x1,,,,u32,,,,,m26.0
 ,1,,,5,,,,f32,,,,,m26.1
 ,2,,,-5,,,,f32,,,,,m26.2
@@ -182,14 +182,14 @@ hurtbox",,0,,,,f32,X offset,,medium,community,m27[0].0
 ,3,,,0,,,,f32,,,,,m28[7].3
 ,4,,,1,,,,f32,,,,,m28[7].4
 ,5,,,0,,,,f32,,,,,m28[7].5
-21,0,Balloon,0x12000000,0x78,0x96,0x19,0x78,u32,Duration (frames),,medium,community,m29[*].0
-,1,,0x02000001,0.2,0.3,0.5,0.2,f32,Minimum H speed,Initial H speed is random from (Name1) to (Name1 + Name2),medium,community,m29[*].1
-,2,,0x02000002,0.7,0.7,0.7,0.7,f32,Maximum additional H speed,,medium,community,m29[*].2
-,3,,0x02000003,0.005,0.007,0.005,0.005,f32,H air friction,,medium,community,m29[*].3
-,4,,0x02000004,-0.4,-0.5,0.6,-0.4,f32,Minimum V speed,Initial V speed is random from (Name4) to (Name4 + Name5),medium,community,m29[*].4
-,5,,0x02000005,1,-0.1,0.6,1,f32,Maximum additional V speed,,medium,community,m29[*].5
-,6,,0x02000006,0.03,0.009,0.03,0.03,f32,V upward acceleration,,medium,community,m29[*].6
-,7,,0x02000007,4,2.5,4,4,f32,Maximum V speed,,medium,community,m29[*].7
+21,0,Balloon,0x12000000,0x78,0x96,0x19,0x78,u32,"Duration (frames) -- code: stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_60); stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_60)",,medium,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].0
+,1,,0x02000001,0.2,0.3,0.5,0.2,f32,"Minimum H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_60); KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 1 (func_60)",Initial H speed is random from (Name1) to (Name1 + Name2),high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].1
+,2,,0x02000002,0.7,0.7,0.7,0.7,f32,"Maximum additional H speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_60); KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 1 (func_60)",,high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].2
+,3,,0x02000003,0.005,0.007,0.005,0.005,f32,"H air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 0 (motion), argument 1 (func_60)",,high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].3
+,4,,0x02000004,-0.4,-0.5,0.6,-0.4,f32,"Minimum V speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_60)",Initial V speed is random from (Name4) to (Name4 + Name5),high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].4
+,5,,0x02000005,1,-0.1,0.6,1,f32,"Maximum additional V speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_60)",,medium,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].5
+,6,,0x02000006,0.03,0.009,0.03,0.03,f32,V upward acceleration -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion) (func_60),,high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].6
+,7,,0x02000007,4,2.5,4,4,f32,"Maximum V speed -- code: KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 2 (func_60)",,high,community | reads: MSC murabito/balloon.mscsb func_60,m29[*].7
 22,0,Balloon hurtbox,,0,,,,f32,X offset,,medium,community,m30[0].0
 ,1,,,9,,,,f32,Y offset,,medium,community,m30[0].1
 ,2,,,0,,,,f32,Z offset,,medium,community,m30[0].2
@@ -212,7 +212,7 @@ RGB: 0x4753FF (Blue)",,medium,community,m31[1].0
 ,0,,,255,,,,f32,"Popping GFX color values (Player 3)
 RGB: 0xFFBB0F (Yellow)",,medium,community,m31[2].0
 ,1,,,187,,,,f32,,,,,m31[2].1
-,2,,,16,,,,f32,,,,,m31[2].2
+,2,,,16,,,,f32,,community value differs: Default 0xF (vanilla 16),,,m31[2].2
 ,0,,,35,,,,f32,"Popping GFX color values (Player 4)
 RGB: 0x239F3F (Green)",,medium,community,m31[3].0
 ,1,,,159,,,,f32,,,,,m31[3].1
@@ -237,45 +237,45 @@ RGB: 0x464E63 (Dark Gray, slightly Purple)",,medium,community,m31[7].0
 RGB: 0x8D8D8D (Gray)",,medium,community,m31[8].0
 ,1,,,141,,,,f32,,,,,m31[8].1
 ,2,,,141,,,,f32,,,,,m31[8].2
-24,0,Plant,0x12000000,0x348,0x3C0,0x258,0x348,u32,Duration (frames),,medium,community,m32[*].0
-,1,,0x12000001,0x5,0x5,0x5,0x5,u32,,,,,m32[*].1
-,2,,0x02000002,30,30,50,30,f32,,,,,m32[*].2
-,3,,0x02000003,4,4,4,4,f32,Water detection size,,medium,community,m32[*].3
+24,0,Plant,0x12000000,0x348,0x3C0,0x258,0x348,u32,"Duration (frames) -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_49); stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_49)",,medium,community | reads: MSC murabito/sprout.mscsb func_49,m32[*].0
+,1,,0x12000001,0x5,0x5,0x5,0x5,u32,"code: stored in instance int 0x8, then stored in status int 0x0; compared with status int 0x0 (a counter) (func_57) (func_49)",,medium,reads: MSC murabito/sprout.mscsb func_49,m32[*].1
+,2,,0x02000002,30,30,50,30,f32,,,,no read in the article MSC (native or unused),m32[*].2
+,3,,0x02000003,4,4,4,4,f32,Water detection size -- code: SearchModule op 0x0 (func_46),,medium,community | reads: MSC murabito/sprout.mscsb func_46,m32[*].3
 ,0,,,0x3,,,,u32,,,,,m33.0
 ,1,,,1,,,,f32,,,,,m33.1
 ,2,,,1,,,,f32,,,,,m33.2
-25,0,Water,0x02000000,1.8,1.5,2.3,1.8,f32,Speed,,medium,community,m34[*].0
-,1,,0x02000001,0.01,0.01,0.02,0.01,f32,?,,medium,community,m34[*].1
-,2,,0x02000002,0.4,0.3,0.5,0.4,f32,V initial speed?,,medium,community,m34[*].2
-,3,,0x02000003,0.1,0.12,0.04,0.1,f32,Gravity?,,medium,community,m34[*].3
-,4,,0x02000004,2,2,1.2,2,f32,?,,medium,community,m34[*].4
-,5,,0x12000005,0x10,0x10,0x15,0x10,u32,Duration (frames),,medium,community,m34[*].5
-,6,,0x12000006,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community,m34[*].6
+25,0,Water,0x02000000,1.8,1.5,2.3,1.8,f32,Speed,,medium,community | no read in the article MSC (native or unused),m34[*].0
+,1,,0x02000001,0.01,0.01,0.02,0.01,f32,?,,medium,community | no read in the article MSC (native or unused),m34[*].1
+,2,,0x02000002,0.4,0.3,0.5,0.4,f32,V initial speed?,,medium,community | no read in the article MSC (native or unused),m34[*].2
+,3,,0x02000003,0.1,0.12,0.04,0.1,f32,Gravity?,,medium,community | no read in the article MSC (native or unused),m34[*].3
+,4,,0x02000004,2,2,1.2,2,f32,?,,medium,community | no read in the article MSC (native or unused),m34[*].4
+,5,,0x12000005,0x10,0x10,0x15,0x10,u32,"Duration (frames) -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_48 (a countdown / remaining count), tested against 0 (func_46); stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_46)",,high,community | reads: MSC murabito/sprinkling_water.mscsb func_46,m34[*].5
+,6,,0x12000006,0x1,0x1,0x1,0x1,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m34[*].6
 ,0,,,0x3,,,,u32,,,,,m35.0
 ,1,,,0,,,,f32,,,,,m35.1
 ,2,,,0.1,,,,f32,,,,,m35.2
-26,0,Tree,0x02000000,30,15,50,30,f32,HP,,medium,community,m36[*].0
-,1,,0x12000001,0x258,0x384,0x21C,0x258,u32,Max duration (frames),,medium,community,m36[*].1
-,2,,0x12000002,0x12C,0x12C,0xF0,0x28,u32,Duration after chopping down (frames),,medium,community,m36[*].2
-,3,,0x12000003,0x1E,0x1E,0x32,0x1,u32,,,,,m36[*].3
-,4,,0x02000004,0.3,0.3,0.3,10,f32,,,,,m36[*].4
-,5,,0x02000005,5,5,4,0,f32,,,,,m36[*].5
-,6,,0x02000006,18,18,15,-10,f32,,,,,m36[*].6
-,7,,0x02000007,2,2,3,0,f32,Fall speed?,,medium,community,m36[*].7
-,8,,0x02000008,0.6,0.1,0.3,0.6,f32,,,,,m36[*].8
-,9,,0x02000009,0,0,0,0,f32,,,,,m36[*].9
-,10,,0x0200000A,0.05,0.08,0.09,-0.12,f32,,,,,m36[*].10
-,11,,0x0200000B,1,0.8,1,0,f32,Drop chance of trunk ?,Only 2 trunks can be exist at the same time,medium,community,m36[*].11
-,12,,0x0200000C,1,1,1,1,f32,Drop chance of trunk ?,,medium,community,m36[*].12
-,13,,0x0200000D,0,0,0,0,f32,Drop chance of trunk ?,,medium,community,m36[*].13
-,14,,0x0200000E,50,50,50,50,f32,Base added V speed?,Name14 + (Name15 - Name14) * V_speed is added to previous V speed?,medium,community,m36[*].14
-,15,,0x0200000F,40,40,40,40,f32,Additional V speed?,,medium,community,m36[*].15
-,16,,0x02000010,20,20,20,20,f32,"randf(0, This*2) - This is added to V speed?",,medium,community,m36[*].16
-,17,,0x02000011,1.7,1.7,1.7,1.7,f32,Base added H speed?,Name17 + (Name18 - Name17) * V_speed is added to previous H speed?,medium,community,m36[*].17
-,18,,0x02000012,1.4,1.4,1.4,1.4,f32,Additional H speed?,,medium,community,m36[*].18
-,19,,0x02000013,0.3,0.3,0.3,0.3,f32,"randf(0, This*2) - This is added to H speed?",,medium,community,m36[*].19
-,20,,0x12000014,0xC,0xC,0xC,0xC,u32,Duration (frames)?,,medium,community,m36[*].20
-,21,,0x02000015,3,3,3,3,f32,,,,,m36[*].21
+26,0,Tree,0x02000000,30,15,50,30,f32,"HP -- code: stored in instance float 0x1, then tested against 0 (func_45) (func_52)",,medium,community | reads: MSC murabito/tree.mscsb func_52,m36[*].0
+,1,,0x12000001,0x258,0x384,0x21C,0x258,u32,"Max duration (frames) -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_61 (a countdown / remaining count), tested against 0 (func_52); stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_52)",,high,community | reads: MSC murabito/tree.mscsb func_52,m36[*].1
+,2,,0x12000002,0x12C,0x12C,0xF0,0x28,u32,"Duration after chopping down (frames) -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_61 (a countdown / remaining count), tested against 0 (func_60); stored in instance int 0x3 (the article's life counter: lifetime in frames, by use) (func_60)",,high,community | reads: MSC murabito/tree.mscsb func_60,m36[*].2
+,3,,0x12000003,0x1E,0x1E,0x32,0x1,u32,"code: stored in status int 0x3, then decremented in func_61 (a countdown / remaining count) (func_60)",community value differs: Custom2 0x1E (vanilla 0x32),medium,reads: MSC murabito/tree.mscsb func_60,m36[*].3
+,4,,0x02000004,0.3,0.3,0.3,10,f32,code: compared with a computed value (func_61),,medium,reads: MSC murabito/tree.mscsb func_61,m36[*].4
+,5,,0x02000005,5,5,4,0,f32,,,,no read in the article MSC (native or unused),m36[*].5
+,6,,0x02000006,18,18,15,-10,f32,,,,no read in the article MSC (native or unused),m36[*].6
+,7,,0x02000007,2,2,3,0,f32,Fall speed?,,medium,community | no read in the article MSC (native or unused),m36[*].7
+,8,,0x02000008,0.6,0.1,0.3,0.6,f32,,,,no read in the article MSC (native or unused),m36[*].8
+,9,,0x02000009,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m36[*].9
+,10,,0x0200000A,0.05,0.08,0.09,-0.12,f32,,,,no read in the article MSC (native or unused),m36[*].10
+,11,,0x0200000B,1,0.8,1,0,f32,Drop chance of trunk ?,Only 2 trunks can be exist at the same time,medium,community | no read in the article MSC (native or unused),m36[*].11
+,12,,0x0200000C,1,1,1,1,f32,Drop chance of trunk ?,,medium,community | no read in the article MSC (native or unused),m36[*].12
+,13,,0x0200000D,0,0,0,0,f32,Drop chance of trunk ?,,medium,community | no read in the article MSC (native or unused),m36[*].13
+,14,,0x0200000E,50,50,50,50,f32,"Base added V speed? -- code: stored in status float 0x2, then BattleObject op 0x3ED (func_47) (func_61)",Name14 + (Name15 - Name14) * V_speed is added to previous V speed?,medium,community | reads: MSC murabito/tree.mscsb func_61,m36[*].14
+,15,,0x0200000F,40,40,40,40,f32,"Additional V speed? -- code: stored in status float 0x2, then BattleObject op 0x3ED (func_47) (func_61)",,medium,community | reads: MSC murabito/tree.mscsb func_61,m36[*].15
+,16,,0x02000010,20,20,20,20,f32,"randf(0, This*2) - This is added to V speed?",,medium,community | no read in the article MSC (native or unused),m36[*].16
+,17,,0x02000011,1.7,1.7,1.7,1.7,f32,"Base added H speed? -- code: stored in status float 0x1, then BattleObject op 0x3ED (func_47) (func_61)",Name17 + (Name18 - Name17) * V_speed is added to previous H speed?,medium,community | reads: MSC murabito/tree.mscsb func_61,m36[*].17
+,18,,0x02000012,1.4,1.4,1.4,1.4,f32,"Additional H speed? -- code: stored in status float 0x1, then BattleObject op 0x3ED (func_47) (func_61)",,medium,community | reads: MSC murabito/tree.mscsb func_61,m36[*].18
+,19,,0x02000013,0.3,0.3,0.3,0.3,f32,"randf(0, This*2) - This is added to H speed?",,medium,community | no read in the article MSC (native or unused),m36[*].19
+,20,,0x12000014,0xC,0xC,0xC,0xC,u32,"Duration (frames)? -- code: stored in status int 0x1, then decremented in func_61 (a countdown / remaining count), tested against 0 (func_47)",,high,community | reads: MSC murabito/tree.mscsb func_47,m36[*].20
+,21,,0x02000015,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m36[*].21
 ,0,,,0x1,,,,u32,,,,,m37.0
 ,1,,,8,,,,f32,,,,,m37.1
 ,2,,,-4.6,,,,f32,,,,,m37.2

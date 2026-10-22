@@ -151,75 +151,75 @@ scalars. Two kinds:
 
 Words of each WorkModule block (category 4 = m16, 5-8 = one entry of m12-m15), from the
 size tables `0x1012F638` (u16 per kind, category 4) and `0x1012F6BC` / `F700` / `F744` / `F788`
-(u8 per kind, categories 5-8). "MSC here" = a vanilla decompile was available for this work.
+(u8 per kind, categories 5-8). "MSC" = the vanilla fighter script and article scripts were scanned (now every kind).
 
-| Kind | Name (CSV) | Members | Cat 4 / 5 / 6 / 7 / 8 (words) | Weapon blocks (member: article) | MSC here |
+| Kind | Name (CSV) | Members | Cat 4 / 5 / 6 / 7 / 8 (words) | Weapon blocks (member: article) | MSC |
 |---|---|---|---|---|---|
-| 0x00 | miifighter (Mii_Brawler) | 20 | 9 / 10 / 36 / 21 / 29 | m17:hat, m18:ironball |  |
-| 0x01 | miiswordsman (Mii_Swordsman) | 31 | 1 / 15 / 42 / 31 / 27 | m20:hat, m22:chakram, m25:lightshuriken, m28:tornadoshot |  |
-| 0x02 | miigunner (Mii_Gunner) | 49 | 9 / 13 / 16 / 32 / 23 | m18:hat, m20:rapidshot_bullet, m22:gunnercharge, m25:miimissile, m28:supermissile, m31:grenadelauncher, m34:flamepillar, m37:stealthbomb, m39:stealthbomb_s, m40:bottomshoot, m41:groundbomb, m43:attackairf_bullet, m45:laser, m47:fullthrottle |  |
+| 0x00 | miifighter (Mii_Brawler) | 20 | 9 / 10 / 36 / 21 / 29 | m17:hat, m18:ironball | yes |
+| 0x01 | miiswordsman (Mii_Swordsman) | 31 | 1 / 15 / 42 / 31 / 27 | m20:hat, m22:chakram, m25:lightshuriken, m28:tornadoshot | yes |
+| 0x02 | miigunner (Mii_Gunner) | 49 | 9 / 13 / 16 / 32 / 23 | m18:hat, m20:rapidshot_bullet, m22:gunnercharge, m25:miimissile, m28:supermissile, m31:grenadelauncher, m34:flamepillar, m37:stealthbomb, m39:stealthbomb_s, m40:bottomshoot, m41:groundbomb, m43:attackairf_bullet, m45:laser, m47:fullthrottle | yes |
 | 0x03 | mario (Mario) | 24 | 1 / 1 / 5 / 11 / 4 | m18:fireball, m20:pump, m21:pumpwater, m22:hugeflame | yes |
-| 0x04 | donkey (Donkey_Kong) | 19 | 32 / 3 / 5 / 10 / 3 | m17:soundeffect |  |
-| 0x05 | link (Link) | 27 | 12 / 5 / 2 / 10 / 1 | m18:boomerang, m19:bowarrow, m20:clawshotall/clawshot, m21:navy |  |
-| 0x06 | samus (Samus) | 35 | 9 / 4 / 6 / 8 / 20 | m18:gbeam/gbeam, m19:cshot, m22:missile, m25:supermissile, m28:bomb, m30:laser, m32:laser2, m34:gun |  |
-| 0x07 | yoshi (Yoshi) | 32 | 26 / 1 / 33 / 12 / 3 | m20:tamago, m21:star, m30:firebreath, m31:firecannon |  |
+| 0x04 | donkey (Donkey_Kong) | 19 | 32 / 3 / 5 / 10 / 3 | m17:soundeffect | yes |
+| 0x05 | link (Link) | 27 | 12 / 5 / 2 / 10 / 1 | m18:boomerang, m19:bowarrow, m20:clawshotall/clawshot, m21:navy | yes |
+| 0x06 | samus (Samus) | 35 | 9 / 4 / 6 / 8 / 20 | m18:gbeam/gbeam, m19:cshot, m22:missile, m25:supermissile, m28:bomb, m30:laser, m32:laser2, m34:gun | yes |
+| 0x07 | yoshi (Yoshi) | 32 | 26 / 1 / 33 / 12 / 3 | m20:tamago, m21:star, m30:firebreath, m31:firecannon | yes |
 | 0x08 | kirby (Kirby) | 23 | 1 / 34 / 9 / 7 / 11 | m18:starmissile, m19:finalcutter, m20:hammer, m21:stone | yes |
-| 0x09 | fox (Fox) | 26 | 2 / 5 / 16 / 16 / 6 | m19:blaster, m20:blaster_bullet, m22:illusion, m23:landmaster, m25:landmaster_shell |  |
-| 0x0A | pikachu (Pikachu) | 23 | 5 / 9 / 18 / 11 / 5 | m18:dengekidama/dengeki, m19:kaminari/cloud, m20:vortex |  |
+| 0x09 | fox (Fox) | 26 | 2 / 5 / 16 / 16 / 6 | m19:blaster, m20:blaster_bullet, m22:illusion, m23:landmaster, m25:landmaster_shell | yes |
+| 0x0A | pikachu (Pikachu) | 23 | 5 / 9 / 18 / 11 / 5 | m18:dengekidama/dengeki, m19:kaminari/cloud, m20:vortex | yes |
 | 0x0B | luigi (Luigi) | 22 | 4 / 1 / 23 / 13 / 8 | m18:fireball, m21:obakyumu | yes |
 | 0x0C | captain (Captain_Falcon) | 17 | 11 / 5 / 4 / 8 / 5 | - | yes |
-| 0x0D | ness (Ness) | 30 | 1 / 5 / 3 / 12 / 17 | m20:pkflash, m23:pkfire, m27:pkthunder, m29:pkstarstorm |  |
-| 0x0E | peach (Peach) | 21 | 10 / 6 / 15 / 11 / 5 | m17:kinopio |  |
+| 0x0D | ness (Ness) | 30 | 1 / 5 / 3 / 12 / 17 | m20:pkflash, m23:pkfire, m27:pkthunder, m29:pkstarstorm | yes |
+| 0x0E | peach (Peach) | 21 | 10 / 6 / 15 / 11 / 5 | m17:kinopio | yes |
 | 0x0F | koopa (Bowser) | 20 | 1 / 24 / 16 / 15 / 6 | m17:breath | yes |
-| 0x10 | zelda (Zelda) | 27 | 9 / 4 / 6 / 14 / 3 | m18:dein, m20:dein_s, m21:phantom, m26:lightingbowarrow |  |
-| 0x11 | sheik (Sheik) | 23 | 10 / 7 / 8 / 14 / 28 | m17:needlehave/needle, m22:lightingbowarrow |  |
+| 0x10 | zelda (Zelda) | 27 | 9 / 4 / 6 / 14 / 3 | m18:dein, m20:dein_s, m21:phantom, m26:lightingbowarrow | yes |
+| 0x11 | sheik (Sheik) | 23 | 10 / 7 / 8 / 14 / 28 | m17:needlehave/needle, m22:lightingbowarrow | yes |
 | 0x12 | marth (Marth) | 17 | 7 / 5 / 3 / 9 / 15 | - | yes |
-| 0x13 | gamewatch (Mr_Game_and_Watch) | 23 | 33 / 2 / 11 / 5 / 14 | m17:food, m20:octopus |  |
-| 0x14 | ganon (Ganondorf) | 18 | 1 / 3 / 9 / 9 / 6 | m17:beast |  |
-| 0x15 | falco (Falco) | 25 | 2 / 5 / 16 / 16 / 1 | m18:blaster, m19:blaster_bullet, m21:illusion, m22:landmaster, m24:landmaster_shell |  |
-| 0x16 | wario (Wario) | 23 | 1 / 9 / 8 / 9 / 8 | m17:wariobike |  |
+| 0x13 | gamewatch (Mr_Game_and_Watch) | 23 | 33 / 2 / 11 / 5 / 14 | m17:food, m20:octopus | yes |
+| 0x14 | ganon (Ganondorf) | 18 | 1 / 3 / 9 / 9 / 6 | m17:beast | yes |
+| 0x15 | falco (Falco) | 25 | 2 / 5 / 16 / 16 / 1 | m18:blaster, m19:blaster_bullet, m21:illusion, m22:landmaster, m24:landmaster_shell | yes |
+| 0x16 | wario (Wario) | 23 | 1 / 9 / 8 / 9 / 8 | m17:wariobike | yes |
 | 0x17 | metaknight (Meta_Knight) | 19 | 5 / 22 / 12 / 11 / 9 | m18:mantle | yes |
-| 0x18 | pit (Pit) | 26 | 1 / 4 / 7 / 13 / 10 | m18:bowarrow |  |
-| 0x19 | szerosuit (Zero_Suit_Samus) | 25 | 15 / 3 / 1 / 11 / 14 | m19:paralyzer_bullet, m20:whip, m22:cockpit, m23:gunship, m24:laser |  |
-| 0x1A | pikmin (Pikmin_and_Olimar) | 28 | 32 / 2 / 3 / 24 / 1 | m17:pikmin, m25:dolfin |  |
-| 0x1B | diddy (Diddy_Kong) | 31 | 47 / 9 / 5 / 20 / 5 | m18:explosion, m19:gun, m20:peanuts, m21:barreljet |  |
-| 0x1C | dedede (King_Dedede) | 25 | 6 / 21 / 8 / 17 / 6 | m18:starmissile, m19:gordo, m22:star, m24:bomb |  |
-| 0x1D | ike (Ike) | 18 | 14 / 9 / 19 / 5 / 15 | m17:sword |  |
-| 0x1E | lucario (Lucario) | 25 | 1 / 6 / 5 / 16 / 8 | m18:auraball, m23:qigong |  |
-| 0x1F | robot (ROB) | 24 | 17 / 7 / 19 / 17 / 7 | m18:beam, m21:hugebeam, m22:narrowbeam, m23:widebeam |  |
-| 0x20 | toonlink (Toon_Link) | 28 | 12 / 5 / 2 / 10 / 1 | m18:boomerang, m19:bowarrow, m20:hookshotall/hookshot, m21:takt, m22:fairy |  |
+| 0x18 | pit (Pit) | 26 | 1 / 4 / 7 / 13 / 10 | m18:bowarrow | yes |
+| 0x19 | szerosuit (Zero_Suit_Samus) | 25 | 15 / 3 / 1 / 11 / 14 | m19:paralyzer_bullet, m20:whip, m22:cockpit, m23:gunship, m24:laser | yes |
+| 0x1A | pikmin (Pikmin_and_Olimar) | 28 | 32 / 2 / 3 / 24 / 1 | m17:pikmin, m25:dolfin | yes |
+| 0x1B | diddy (Diddy_Kong) | 31 | 47 / 9 / 5 / 20 / 5 | m18:explosion, m19:gun, m20:peanuts, m21:barreljet | yes |
+| 0x1C | dedede (King_Dedede) | 25 | 6 / 21 / 8 / 17 / 6 | m18:starmissile, m19:gordo, m22:star, m24:bomb | yes |
+| 0x1D | ike (Ike) | 18 | 14 / 9 / 19 / 5 / 15 | m17:sword | yes |
+| 0x1E | lucario (Lucario) | 25 | 1 / 6 / 5 / 16 / 8 | m18:auraball, m23:qigong | yes |
+| 0x1F | robot (ROB) | 24 | 17 / 7 / 19 / 17 / 7 | m18:beam, m21:hugebeam, m22:narrowbeam, m23:widebeam | yes |
+| 0x20 | toonlink (Toon_Link) | 28 | 12 / 5 / 2 / 10 / 1 | m18:boomerang, m19:bowarrow, m20:hookshotall/hookshot, m21:takt, m22:fairy | yes |
 | 0x21 | lizardon (Charizard) | 26 | 2 / 24 / 15 / 9 / 7 | m18:breath, m19:rockstone/rock, m20:explosion, m22:lizardonm, m23:daimonji | yes |
 | 0x22 | sonic (Sonic) | 22 | 1 / 29 / 47 / 10 / 15 | m17:gimmickjump, m18:supersonic | yes |
-| 0x23 | purin (Jigglypuff) | 18 | 4 / 26 / 5 / 1 / 2 | - |  |
-| 0x24 | mariod (Dr_Mario) | 23 | 1 / 1 / 5 / 11 / 8 | m19:drcapsule, m21:hugecapsule |  |
-| 0x25 | lucina (Lucina) | 17 | 7 / 5 / 3 / 9 / 15 | - |  |
-| 0x26 | pitb (Dark_Pit) | 22 | 9 / 4 / 7 / 13 / 10 | m18:bowarrow |  |
-| 0x27 | rosetta (Rosalina_and_Luma) | 32 | 1 / 19 / 3 / 16 / 18 | m18:rosettaticomissile, m26:starpiece |  |
-| 0x28 | wiifit (Wii_Fit_Trainer) | 24 | 1 / 4 / 7 / 18 / 22 | m18:hulahoop, m19:sunbullet |  |
-| 0x29 | littlemac (Little_Mac) | 17 | 4 / 24 / 12 / 9 / 24 | - |  |
-| 0x2A | murabito (Villager) | 45 | 3 / 8 / 5 / 33 / 4 | m25:clayrocket, m29:balloon, m32:sprout, m34:sprinkling_water, m36:tree |  |
-| 0x2B | palutena (Palutena) | 30 | 13 / 17 / 33 / 39 / 51 | m18:explosiveflame, m19:fireworks, m20:autoaimbullet, m22:autoreticle, m23:reflectionboard, m27:blackhole, m28:beam |  |
-| 0x2C | reflet (Robin) | 24 | 25 / 12 / 3 / 14 / 12 | m17:thunder, m18:gigafire, m19:elwind, m20:chrom |  |
-| 0x2D | duckhunt (Duck_Hunt) | 49 | 49 / 3 / 10 / 18 / 5 | m18:reticle, m19:can, m23:clay, m26:gunman, m43:kurofukuhat, m46:finalduck, m47:finalenemy, m48:finalbird |  |
-| 0x2E | koopajr (Bowser_Jr) | 25 | 2 / 6 / 42 / 20 / 4 | m18:cannonball, m20:remainclown, m24:batten |  |
-| 0x2F | shulk (Shulk) | 19 | 13 / 41 / 8 / 11 / 21 | - |  |
+| 0x23 | purin (Jigglypuff) | 18 | 4 / 26 / 5 / 1 / 2 | - | yes |
+| 0x24 | mariod (Dr_Mario) | 23 | 1 / 1 / 5 / 11 / 8 | m19:drcapsule, m21:hugecapsule | yes |
+| 0x25 | lucina (Lucina) | 17 | 7 / 5 / 3 / 9 / 15 | - | yes |
+| 0x26 | pitb (Dark_Pit) | 22 | 9 / 4 / 7 / 13 / 10 | m18:bowarrow | yes |
+| 0x27 | rosetta (Rosalina_and_Luma) | 32 | 1 / 19 / 3 / 16 / 18 | m18:rosettaticomissile, m26:starpiece | yes |
+| 0x28 | wiifit (Wii_Fit_Trainer) | 24 | 1 / 4 / 7 / 18 / 22 | m18:hulahoop, m19:sunbullet | yes |
+| 0x29 | littlemac (Little_Mac) | 17 | 4 / 24 / 12 / 9 / 24 | - | yes |
+| 0x2A | murabito (Villager) | 45 | 3 / 8 / 5 / 33 / 4 | m25:clayrocket, m29:balloon, m32:sprout, m34:sprinkling_water, m36:tree | yes |
+| 0x2B | palutena (Palutena) | 30 | 13 / 17 / 33 / 39 / 51 | m18:explosiveflame, m19:fireworks, m20:autoaimbullet, m22:autoreticle, m23:reflectionboard, m27:blackhole, m28:beam | yes |
+| 0x2C | reflet (Robin) | 24 | 25 / 12 / 3 / 14 / 12 | m17:thunder, m18:gigafire, m19:elwind, m20:chrom | yes |
+| 0x2D | duckhunt (Duck_Hunt) | 49 | 49 / 3 / 10 / 18 / 5 | m18:reticle, m19:can, m23:clay, m26:gunman, m43:kurofukuhat, m46:finalduck, m47:finalenemy, m48:finalbird | yes |
+| 0x2E | koopajr (Bowser_Jr) | 25 | 2 / 6 / 42 / 20 / 4 | m18:cannonball, m20:remainclown, m24:batten | yes |
+| 0x2F | shulk (Shulk) | 19 | 13 / 41 / 8 / 11 / 21 | - | yes |
 | 0x30 | gekkouga (Greninja) | 28 | 11 / 9 / 14 / 15 / 39 | m18:shuriken, m19:water | yes |
-| 0x31 | pacman (PAC-MAN) | 65 | 0 (empty struct, 1 byte) / 6 / 33 / 12 / 4 | m49:esa, m55:trampoline, m57:firehydrant, m61:firehydrantwater |  |
-| 0x32 | rockman (Mega_Man) | 40 | 17 / 5 / 1 / 10 / 10 | m17:rockbuster, m18:chargeshot, m20:hardknuckle, m21:airshooter, m28:crashbomb, m29:rushcoil, m31:leafshield, m33:blackhole, m36:rockmanx, m37:rockmandash, m38:rockmanexe, m39:shootingstarrockman |  |
-| 0x33 | mewtwo (Mewtwo) | 27 | 3 / 6 / 2 / 16 / 5 | m17:shadowball, m21:bindball, m22:mewtwom, m23:search, m24:psychobreak |  |
+| 0x31 | pacman (PAC-MAN) | 65 | 0 (empty struct, 1 byte) / 6 / 33 / 12 / 4 | m49:esa, m55:trampoline, m57:firehydrant, m61:firehydrantwater | yes |
+| 0x32 | rockman (Mega_Man) | 40 | 17 / 5 / 1 / 10 / 10 | m17:rockbuster, m18:chargeshot, m20:hardknuckle, m21:airshooter, m28:crashbomb, m29:rushcoil, m31:leafshield, m33:blackhole, m36:rockmanx, m37:rockmandash, m38:rockmanexe, m39:shootingstarrockman | yes |
+| 0x33 | mewtwo (Mewtwo) | 27 | 3 / 6 / 2 / 16 / 5 | m17:shadowball, m21:bindball, m22:mewtwom, m23:search, m24:psychobreak | yes |
 | 0x34 | ryu (Ryu) | 21 | 48 / 12 / 33 / 28 / 26 | m17:hadoken, m20:shinkuhadoken | yes |
-| 0x35 | lucas (Lucas) | 30 | 2 / 5 / 3 / 16 / 17 | m19:himohebi/himohebi, m20:pkfreeze, m23:pkfire, m27:pkthunder, m29:pkstarstorm |  |
-| 0x36 | roy (Roy) | 17 | 6 / 9 / 3 / 10 / 15 | - |  |
-| 0x37 | cloud (Cloud) | 21 | 15 / 11 / 11 / 19 / 13 | m18:wave |  |
-| 0x38 | bayonetta (Bayonetta) | 28 | 66 / 22 / 37 / 13 / 21 | m24:bat |  |
+| 0x35 | lucas (Lucas) | 30 | 2 / 5 / 3 / 16 / 17 | m19:himohebi/himohebi, m20:pkfreeze, m23:pkfire, m27:pkthunder, m29:pkstarstorm | yes |
+| 0x36 | roy (Roy) | 17 | 6 / 9 / 3 / 10 / 15 | - | yes |
+| 0x37 | cloud (Cloud) | 21 | 15 / 11 / 11 / 19 / 13 | m18:wave | yes |
+| 0x38 | bayonetta (Bayonetta) | 28 | 66 / 22 / 37 / 13 / 21 | m24:bat | yes |
 | 0x39 | kamui (Corrin) | 20 | 43 / 14 / 32 / 17 / 19 | m17:ryusensya, m19:spearhand | yes |
-| 0x3A | koopag (Giga_Bowser) | 19 | 3 / 20 / 16 / 15 / 6 | m17:breath |  |
-| 0x3B | warioman (Wario-Man) | 23 | 4 / 9 / 8 / 9 / 8 | m17:wariobike |  |
+| 0x3A | koopag (Giga_Bowser) | 19 | 3 / 20 / 16 / 15 / 6 | m17:breath | yes |
+| 0x3B | warioman (Wario-Man) | 23 | 4 / 9 / 8 / 9 / 8 | m17:wariobike | yes |
 | 0x3C | littlemacg (Giga_Mac) | 17 | 4 / 15 / 12 / 9 / 20 | - | yes |
 | 0x3D | lucariom (Mega_Lucario) | 25 | 7 / 6 / 5 / 16 / 8 | m18:auraball, m23:qigong | yes |
-| 0x3E | miienemyf (Fighting_Mii_Brawler) | 21 | 2 / 10 / 29 / 23 / 21 | - |  |
-| 0x3F | miienemys (Fighting_Mii_Swordfighter) | 18 | 2 / 15 / 42 / 31 / 26 | - |  |
-| 0x40 | miienemyg (Fighting_Mii_Gunner) | 23 | 9 / 13 / 18 / 36 / 23 | m18:rapidshot_bullet, m20:attackairf_bullet |  |
+| 0x3E | miienemyf (Fighting_Mii_Brawler) | 21 | 2 / 10 / 29 / 23 / 21 | - | yes |
+| 0x3F | miienemys (Fighting_Mii_Swordfighter) | 18 | 2 / 15 / 42 / 31 / 26 | - | yes |
+| 0x40 | miienemyg (Fighting_Mii_Gunner) | 23 | 9 / 13 / 18 / 36 / 23 | m18:rapidshot_bullet, m20:attackairf_bullet | yes |
 
 ## 4. Param IDs and where they come from (code)
 
@@ -249,7 +249,16 @@ when the fighter is set up (`0x02F1BF88`, records at WM `+0x1540`, sizes `0x02F1
   transformations) always get 0. **Entry 3 is never selected at set-up** (the community sheets
   don't list it; the CSVs now show it as Custom3). Some fighters' own code changes a slot later
   (e.g. Lucina / Roy read the slot ints in their special code; `set_int(0x1000004B)` at
-  `0x027AECB0`). The community suspects Cloud uses entry 1 for Limit Break (not checked).
+  `0x027AECB0`). **What can select entry 3** (MSC): a debug "change special" handler
+  (`printf("sub_change_special_command ...")`, installed as `global22`, reading instance ints
+  `0x10000046` = status and `0x10000047` = target) sets a slot from 0 to 3: Fox and Falco's down
+  special (`set_int(var1 - 0xC, 0x1000004B)`, fox.mscsb `func_2250`), Dr. Mario's side special
+  (`0x10000049`, mariod.mscsb `func_2248`); in the three Miis' and Palutena's scripts the same
+  handler re-registers the status functions of the chosen move (0-15) instead. Nothing in normal
+  play was found that sends that command. **Cloud**: in the vanilla file entry 1 of every special
+  block has its own values (e.g. up special fields 1, 2, 7, 9: 1 / 1.1 / 3 / 50 in entry 0,
+  1.6 / 1.85 / 12 / 60 in entry 1; the community sheet leaves Custom1 at 0), consistent with the community's "entry 1 = Limit Break"; his MSC only sums the four slot
+  ints (cloud.mscsb), so what switches the slot is native (not traced).
 - **Kirby** (`0x02F1B8B0`): while he has a copy (instance int `0x100000A4` < 0x3A), category 5
   is replaced by the copied fighter's m12 **entry 0** (size from that fighter's table entry).
   So Kirby's MSC copy functions read the copied fighter's neutral-special IDs; the CSVs use
@@ -273,10 +282,21 @@ the weapon-kind switches (`cmplwi 0x184`) and the weapon name table `0x10419604`
 Three ways in, all used for the evidence column:
 
 1. **MSC**: `WorkModuleF(0, id)` / `WorkModule(0x6, id)` in the fighter's and its articles'
-   scripts. Common code in every fighter script has per-kind branches (`global1` = fighter kind,
-   e.g. `if (global1 == 0x16)` reads Wario's `0x06000007`); those reads count for that kind.
+   scripts: all 293 vanilla scripts (65 fighter scripts, 228 article scripts), 3131 read sites.
+   Common code in every fighter script has per-kind branches (`global1` = fighter kind,
+   e.g. `if (global1 == 0x16)` reads Wario's `0x06000007`); those reads count for that kind
+   (conditions that are `global1 == K`, possibly `&&` other terms, or a pure `||` of such tests).
    Scripts also contain leftovers from the fighter they were made from (Kirby's has Mario's cape
-   code), so a read only counts when its type and index fit the kind's block.
+   code), so a read only counts when its type and index fit the kind's block. Article reads
+   (category 2) count for the vl weapon block whose name is the article's folder (179 article
+   scripts; 49 others, e.g. Kirby's `hat` / `ultrasword` and Pit's `chargeshot`, have no vl
+   block of their own: their 47 reads are left out). For each read the scan also records: the status it runs in (functions reached
+   within 3 calls from `sv_set_mem(0x1, key, status, func)`), the motions that status starts
+   (`func_22/23/24(motion, ...)`, named from motion.mtable), where the value flows (a forward
+   taint over the function and one level into called script functions) and, when it is stored
+   in a work variable, what the same status (status variables) or the whole script (instance
+   variables) then does with that variable (compared, counted down with `WorkModule(0xa, ..)`,
+   passed to a module).
 2. **Native WorkModule reads** with a constant ID (`lis/addi r4` + `get_float` / `get_int`):
    1149 sites; attributed to a kind when the function is reached from that kind's specializer
    vtable (and the status classes it installs) and the ID fits the kind's layout
@@ -326,7 +346,9 @@ python3 tools/fighter_param_vl.py test <param/fighter dir>      # byte-exact rou
 
 Paths: `m<i>` member, `[e]` vector entry, `.<f>` struct field, `.i<k>` item k of an entry with
 nested vectors (`m17[0].i1[3]` = Kirby's 4th air-jump speed). Labels come from the CSV's
-`Path` column (`[*]` = every entry). Kind from the file name or `--kind` (name or CSV name).
+`Path` column (`[*]` = every entry); a label is the description without its ` -- code: ` part
+(or the short `code:` use), and name lookups (`set ... "Landing lag=20"`) match only the
+community / hand-written text. Kind from the file name or `--kind` (name or CSV name).
 Round trip: all 65 vanilla files rebuild byte for byte.
 
 ## 8. The CSVs
@@ -339,12 +361,32 @@ IDs are computed from the layout; where the sheet had another ID the Comment say
 Mario's category 4 value is `0x04000000`, not `0x04000004`). Community rows that match no value
 are kept at the end of their group.
 
-Confidence: **high** = the code was read and does what the description says; **medium** = the
-community description (game-tested, not checked in code, or consistent with where it is read)
-or a code reading whose purpose is partly inferred; **low** = guess, an `[auto]` usage summary
-from the reading code, or copied from a fighter with the same layout. Evidence lists the read
-sites (MSC function, native address) and "no read in the vanilla MSC (native or unused)" for
-special fields of fighters whose script was available.
+Values: Default / Custom1-3 are the **vanilla** values (the vanilla data/param dump). Where the
+community sheet has another value the Comment says `community value differs: Default X (vanilla
+Y)` (69 rows; the sheets' unfilled Custom columns of fighters without customs are not counted).
+
+Descriptions: the community's text, then ` -- code: ` and what the vanilla MSC does with the
+value; rows the community left empty get `code: ...` alone. The code part names the sink
+(written to instance float 0 = the special-fall landing frames; animation rate; KineticModule
+op / energy; stored in a status / instance variable, then what is done with it; compared with
+the animation frame, the status frame counter, a counter, stick X / Y, the damage; named by a
+debug `printf`), the script function, and in brackets the status and its motions. KineticModule
+op names come from the MSC guide (0x0, 0xF, 0x11, 0x14) and from what the params passed to them
+are called across all fighters (0x10 brake / friction, 0x15 max speed, 0xE speed); instance
+float 1 is the special-fall air speed multiplier by the same consensus (22 of 24 described
+params written there).
+
+Confidence: **high** = the code was read and does what the description says: hand-checked
+(`annotations.py`) or a community description that names what the code does (a fixed rule,
+`rowdesc.concordant`: e.g. "landing lag" + written to instance float 0, "gravity" / "friction"
++ KineticModule 0xF / 0x10, "max ... speed" + 0x14 / 0x15, "frames" + compared with a frame
+counter or counted down, "animation speed" + MotionModule rate, a word of the debug-print
+name); **medium** = the community description not confirmed by that rule (game-tested, or
+consistent with where it is read), or a `code:` description with a recognised use whose purpose
+is partly inferred; **low** = guess, an `[auto]` summary of a native read, a `code:` description
+with no recognised use, or copied from a fighter with the same layout. Evidence lists the read
+sites (MSC script and function, native address); "no read in the vanilla MSC (native or unused)"
+/ "no read in the article MSC" for fields nothing in the scripts reads.
 
 Coverage. Before (the community sheets): 8633 rows, 4810 with a description (718 of them with
 a "?"), IDs partly missing or off, no confidence or evidence, entry 3 missing. Now: 11372 rows
@@ -354,20 +396,44 @@ apart), 5773 with a description: 40 high, 5223 medium, 510 low (225 `[auto]` usa
 graded). 953 rows have read sites as evidence; 135 community IDs were corrected. Kirby: 135 rows,
 82 described (17 high); Marth: 39 / 32 (9 high); Captain Falcon: 33 / 22 (14 high).
 
+**Second pass (every vanilla script, vanilla values).** 11372 rows, **6012 described: 939 high,
+4690 medium, 383 low** (before: 5773; 40 / 5223 / 510). 2408 rows have read sites as evidence
+(2037 with MSC reads; before 953 / 570), and every row with an MSC read now has a description:
+1652 community descriptions with the code use added (899 of them confirmed by it, now high),
+343 new `code:` descriptions (318 medium, 25 low), 132 `[auto]` native-read summaries left (were
+225). By block: specials (categories 5-8) 3366 rows, 2810 described (785 high); category 4
+724 / 273 (39 high); article blocks 1587 / 916 (115 high); other members (lists, native-only)
+5695 / 2013. The community alignment improved with the vanilla values (9357 rows matched, 211
+community rows left unmatched; were 9307 / 259). The values of 362 rows in 27 CSVs changed:
+the first pass had taken them from the user's `param - Copy/fighter/` files, 30 of which are not
+vanilla.
+
 ## 9. Not known yet
 
 - Groups 6 and 11 (General.csv): unknown; group 1 bytes 1-5 only partly checked.
 - Fighter-specific non-weapon members: most are read by native code not traced here.
 - Marth's counter fields 6-13, Captain Falcon's category 4 (Blue Falcon), many article fields:
   no read found (native code with IDs in registers other than r4, or tables).
-- Entry 3 of the special blocks: what (if anything) selects it.
-- Which fighters switch custom slots at runtime and why (Cloud's Limit Break?).
-
-**MSC needed to finish the rest**: decompiled vanilla `script/msc/*.mscsb` (fighter and article
-scripts) of every fighter not yet covered: bayonetta, cloud, dedede, diddy, donkey, duckhunt, falco, fox, gamewatch, ganon, ike, koopag, koopajr, link, littlemac, lucario, lucas, lucina, mariod, mewtwo, miienemyf, miienemyg, miienemys, miifighter, miigunner, miiswordsman, murabito, ness, pacman, palutena, peach, pikachu, pikmin, pit, pitb, purin, reflet, robot, rockman, rosetta, roy, samus, sheik, shulk, szerosuit, toonlink, wario, warioman, wiifit, yoshi, zelda. MSC used here: the fighter scripts of Kirby, Bowser, Sonic, Luigi, Marth, Captain Falcon, Mario, Greninja, Corrin, Ryu, Meta Knight, Charizard, Giga Mac and Mega Lucario, and the article scripts that came with the Kirby, Bowser, Sonic, Luigi, Mario, Captain Falcon and Charizard uploads. The articles' scripts matter as much as the
-fighter's (weapon blocks are category 2 of the article's WorkModule).
+- Entry 3 of the special blocks: only the debug "change special" command (section 4) selects it.
+- What switches Cloud to entry 1 (native code; not traced).
+- Special / category-4 fields that no script reads: 1007 rows with an ID have neither a
+  description nor a read (and 1055 have only the community's): native code (IDs in registers
+  other than r4, direct vl reads, tables) or unused. 671 article-block rows likewise.
+- `code:` descriptions say what the code does with a value, not always what it is for: a value
+  only "stored in status float 0x8" is read again in a way the scan couldn't follow (loops,
+  helper functions more than one call deep, status variables read in another status).
+- MotionModule, DamageModule, AttackModule, SearchModule op numbers are given as numbers.
+- The 3682 rows with no ID (fighter-specific lists and native-only members) are unchanged: no
+  script reads them.
 
 ## 10. Method
+
+Second pass (scratchpad `params/work2/`): every vanilla `script/msc/*.mscsb` decompiled with
+mscdec (a copy patched to keep going when a function fails; no function failed); `scan3.py`
+(read sites, guards, statuses, motions, dataflow, second hop → `reads3.json`), `usage.py` /
+`rowdesc.py` (use classes, phrases, the concordance rule), `motions.py` (motion names per
+fighter), `consensus.py` (what the community calls the params passed to each sink),
+`vl/gen/gen_csv2.py` (CSVs; vanilla values; value-difference flags).
 
 Analysis scripts (kept in the session scratchpad, `vl/`, not in the repo; the results they
 produced are the files above): `emu_vl.py` (Unicorn run of the parser), `schema2.py` → `schemas.json`,
@@ -400,5 +466,5 @@ various game versions).
 Exception: the top-level `fighter_param_vl_bayonetta.bin` doesn't parse with this executable's
 layout (one extra string in member 18, her shooting-bone list: "ShootingArmL_AtkOn" before
 "ShootingLegR_AtkOn"), so it's likely from another game version; the `fighter/` one parses.
-The layouts in vl_schema.json come from the game's parser and don't depend on values. The values
-quoted in the CSVs' Default / Custom columns are the community's.
+The layouts in vl_schema.json come from the game's parser and don't depend on values. The CSVs'
+Default / Custom columns now come from the vanilla dump (section 8).

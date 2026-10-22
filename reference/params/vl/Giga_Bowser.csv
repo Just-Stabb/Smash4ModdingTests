@@ -1,64 +1,64 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,25,25,25,25,f32,,,,,m12[*].0
-,1,,0x05000001,60,50,50,50,f32,,,,,m12[*].1
-,2,,0x05000002,10,40,40,40,f32,,,,,m12[*].2
-,3,,0x05000003,1.55,2.8,2.8,2.8,f32,,,,,m12[*].3
-,4,,0x05000004,1,0.3,0.7,0.7,f32,,,,,m12[*].4
-,5,,0x15000005,0x1E,0x19,0x19,0x19,u32,,,,,m12[*].5
-,6,,0x05000006,1.5,1,1,1,f32,,,,,m12[*].6
-,7,,0x05000007,0.35,0.155,0.155,0.155,f32,,,,,m12[*].7
-,8,,0x05000008,300,602,602,602,f32,,,,,m12[*].8
-,9,,0x05000009,600,645,645,645,f32,,,,,m12[*].9
-,10,,0x0500000A,1.4,1,1,1,f32,,,,,m12[*].10
-,11,,0x0500000B,0.8,0.21,0.21,0.21,f32,,,,,m12[*].11
-,12,,0x0500000C,300,602,602,602,f32,,,,,m12[*].12
-,13,,0x0500000D,600,645,645,645,f32,,,,,m12[*].13
-,14,,0x1500000E,0x7,0x7,0x7,0x7,u32,,,,,m12[*].14
-,15,,0x0500000F,6,6,6,6,f32,,,,,m12[*].15
-,16,,0x05000010,-7,-7,-7,-7,f32,,,,,m12[*].16
-,17,,0x05000011,300,330,330,330,f32,,,,,m12[*].17
-,18,,0x15000012,0xA,0xA,0xA,0xA,u32,,,,,m12[*].18
-,19,,0x05000013,0.6,0.6,0.6,0.6,f32,,,,,m12[*].19
-14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,Initial H base forward speed,,low,"copied from Bowser (same layout, same position)",m13[*].0
-,1,,0x06000001,0.5,0.5,0.5,0.5,f32,Initial H max additional speed,,low,"copied from Bowser (same layout, same position)",m13[*].1
-,2,,0x06000002,0.1,0.1,0.1,0.1,f32,Bowser base additional air accel,,low,"copied from Bowser (same layout, same position)",m13[*].2
-,3,,0x06000003,0.00075,0.00075,0.00075,0.00075,f32,Bowser additional air accel reduction per %,,low,"copied from Bowser (same layout, same position)",m13[*].3
-,4,,0x06000004,0.05,0.05,0.05,0.05,f32,Bowser min additional air accel,,low,"copied from Bowser (same layout, same position)",m13[*].4
-,5,,0x06000005,0.12,0.12,0.12,0.12,f32,Opponent base additional air accel,,low,"copied from Bowser (same layout, same position)",m13[*].5
-,6,,0x06000006,0.00075,0.00075,0.00075,0.00075,f32,Opponent additional air acceleration reduction per %,,low,"copied from Bowser (same layout, same position)",m13[*].6
-,7,,0x06000007,0.05,0.05,0.05,0.05,f32,Opponent min additional air accel,,low,"copied from Bowser (same layout, same position)",m13[*].7
-,8,,0x06000008,1,1,1,1,f32,Maximum total H acceleration,,low,"copied from Bowser (same layout, same position)",m13[*].8
-,9,,0x06000009,1.5,1.5,1.5,1.5,f32,Max H speed,,low,"copied from Bowser (same layout, same position)",m13[*].9
-,10,,0x0600000A,5,5,5,5,f32,Fall speed,,low,"copied from Bowser (same layout, same position)",m13[*].10
-,11,,0x0600000B,0,0,0,0,f32,H speed on landing,,low,"copied from Bowser (same layout, same position)",m13[*].11
-,12,,0x0600000C,0,0,0,0,f32,V speed on landing,,low,"copied from Bowser (same layout, same position)",m13[*].12
-,13,,0x0600000D,1,1,1,1,f32,Acceleration multiplier (only for Name2),,low,"copied from Bowser (same layout, same position)",m13[*].13
-,14,,0x0600000E,1,1,1,1,f32,Maximum H speed multiplier,,low,"copied from Bowser (same layout, same position)",m13[*].14
-,15,,0x0600000F,-20,-20,-20,-20,f32,,,,,m13[*].15
-15,0,Up B,0x07000000,2.3,2.3,2.3,2.3,f32,Aerial V initial speed,,low,"copied from Bowser (same layout, same position)",m14[*].0
-,1,,0x07000001,0.055,0.055,0.055,0.055,f32,Gravity,,low,"copied from Bowser (same layout, same position)",m14[*].1
-,2,,0x07000002,1,1,1,1,f32,Max fall speed,,low,"copied from Bowser (same layout, same position)",m14[*].2
-,3,,0x07000003,2.2,2.2,2.2,2.2,f32,Grounded H max speed,,low,"copied from Bowser (same layout, same position)",m14[*].3
-,4,,0x07000004,1.6,1.6,1.6,1.6,f32,Aerial H max speed,,low,"copied from Bowser (same layout, same position)",m14[*].4
-,5,,0x07000005,0.15,0.15,0.15,0.15,f32,Grounded max additional accel,,low,"copied from Bowser (same layout, same position)",m14[*].5
-,6,,0x07000006,0.02,0.02,0.02,0.02,f32,Aerial max additional accel,,low,"copied from Bowser (same layout, same position)",m14[*].6
-,7,,0x17000007,0xF,0xF,0xF,0xF,u32,How many frames after falling to landing to automatically do a grounded fortress again,,low,"copied from Bowser (same layout, same position)",m14[*].7
-,8,,0x17000008,0x32,0x32,0x32,0x32,u32,Something dealing with Name7 but affects how long you stay in shell,,low,"copied from Bowser (same layout, same position)",m14[*].8
-,9,,0x17000009,0xA,0xA,0xA,0xA,u32,Something dealing with Name7 but making it really high delays the animation somehow,,low,"copied from Bowser (same layout, same position)",m14[*].9
-,10,,0x1700000A,0x32,0x32,0x32,0x32,u32,Landing lag (frames),,low,"copied from Bowser (same layout, same position)",m14[*].10
-,11,,0x0700000B,1,1,1,1,f32,Fortress V initial speed,,low,"copied from Bowser (same layout, same position)",m14[*].11
-,12,,0x0700000C,1,1,1,1,f32,,,,,m14[*].12
-,13,,0x0700000D,50,50,50,50,f32,,,,,m14[*].13
-,14,,0x0700000E,5,5,5,5,f32,,,,,m14[*].14
-16,0,Down B,0x08000000,0.8,0.8,0.8,0.8,f32,Aerial H speed multiplier on startup,,low,"copied from Bowser (same layout, same position)",m15[*].0
-,1,,0x08000001,0.5,0.5,0.5,0.5,f32,Aerial V speed multiplier on startup,,low,"copied from Bowser (same layout, same position)",m15[*].1
-,2,,0x08000002,0.02,0.02,0.02,0.02,f32,,,,,m15[*].2
-,3,,0x08000003,0.03,0.03,0.03,0.03,f32,Gravity,,low,"copied from Bowser (same layout, same position)",m15[*].3
-,4,,0x08000004,0.4,0.4,0.4,0.4,f32,Max fallspeed,,low,"copied from Bowser (same layout, same position)",m15[*].4
-,5,,0x08000005,-9,-9,-9,-9,f32,Falling V speed,,low,"copied from Bowser (same layout, same position)",m15[*].5
-,0,Category 4 block,0x14000000,0x78,,,,u32,,,,,m16.0
-,1,,0x14000001,0x1E0,,,,u32,,,,,m16.1
-,2,,0x14000002,0x78,,,,u32,,,,,m16.2
+13,0,Neutral B,0x05000000,25,25,25,25,f32,,,,no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,60,50,50,50,f32,"code: stored in status float 0x6, then ModelModule op 0x1 (func_2286) (func_2331); ModelModule op 0x1 (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2331,m12[*].1
+,2,,0x05000002,10,40,40,40,f32,"code: stored in status float 0x6, then ModelModule op 0x1 (func_2286) (func_2331); ModelModule op 0x1 (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2331,m12[*].2
+,3,,0x05000003,1.55,2.8,2.8,2.8,f32,"code: stored in status float 0x6, then ModelModule op 0x1 (func_2286) (func_2331); ModelModule op 0x1 (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2331,m12[*].3
+,4,,0x05000004,1,0.3,0.7,0.7,f32,"code: ModelModule op 0x1 (func_2286) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2286; MSC koopag.mscsb func_2331,m12[*].4
+,5,,0x15000005,0x1E,0x19,0x19,0x19,u32,"code: ControlModule op 0x2713 (func_2281) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2281; MSC koopag.mscsb func_2284,m12[*].5
+,6,,0x05000006,1.5,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,0.35,0.155,0.155,0.155,f32,,,,no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,300,602,602,602,f32,,,,no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,600,645,645,645,f32,,,,no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,1.4,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,0.8,0.21,0.21,0.21,f32,,,,no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,300,602,602,602,f32,,,,no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,600,645,645,645,f32,,,,no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x1500000E,0x7,0x7,0x7,0x7,u32,"code: compared with a computed value (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2331,m12[*].14
+,15,,0x0500000F,6,6,6,6,f32,,,,no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,-7,-7,-7,-7,f32,,,,no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,300,330,330,330,f32,,,,no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x15000012,0xA,0xA,0xA,0xA,u32,"code: tested against 0 (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,low,reads: MSC koopag.mscsb func_2331,m12[*].18
+,19,,0x05000013,0.6,0.6,0.6,0.6,f32,"code: compared with a computed value (func_2331); SoundModule op 0x2719 (func_2331) [status 0x152 (SpecialNStart, SpecialN, SpecialNEnd)]",,medium,reads: MSC koopag.mscsb func_2331,m12[*].19
+14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,"code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2354); combined with the facing direction (func_2354) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Initial H base forward speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2354",m13[*].0
+,1,,0x06000001,0.5,0.5,0.5,0.5,f32,"code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2354); combined with the facing direction (func_2354) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Initial H max additional speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2354",m13[*].1
+,2,,0x06000002,0.1,0.1,0.1,0.1,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Bowser base additional air accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].2
+,3,,0x06000003,0.00075,0.00075,0.00075,0.00075,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Bowser additional air accel reduction per %"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].3
+,4,,0x06000004,0.05,0.05,0.05,0.05,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Bowser min additional air accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].4
+,5,,0x06000005,0.12,0.12,0.12,0.12,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Opponent base additional air accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].5
+,6,,0x06000006,0.00075,0.00075,0.00075,0.00075,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Opponent additional air acceleration reduction per %"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].6
+,7,,0x06000007,0.05,0.05,0.05,0.05,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Opponent min additional air accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].7
+,8,,0x06000008,1,1,1,1,f32,"code: compared with a computed value (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Maximum total H acceleration"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355",m13[*].8
+,9,,0x06000009,1.5,1.5,1.5,1.5,f32,"code: KineticModule op 0x15 (sets a max speed) on energy 3 (stop) (func_2354); KineticModule op 0x14 (sets a max speed) on energy 3 (stop) (func_2354); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2355) [status 0x15F (SpecialSJump)] (same position as Bowser: ""Max H speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2354; MSC koopag.mscsb func_2355",m13[*].9
+,10,,0x0600000A,5,5,5,5,f32,"code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical) (func_2357) [status 0x160 (SpecialSFall)] (same position as Bowser: ""Fall speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2357",m13[*].10
+,11,,0x0600000B,0,0,0,0,f32,"code: KineticModule op 0xE (sets a speed) on energy 3 (stop), with the facing direction (func_2360) [status 0x161 (SpecialSLanding)] (same position as Bowser: ""H speed on landing"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2360",m13[*].11
+,12,,0x0600000C,0,0,0,0,f32,"code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical) (func_2360) [status 0x161 (SpecialSLanding)] (same position as Bowser: ""V speed on landing"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2360",m13[*].12
+,13,,0x0600000D,1,1,1,1,f32,"code: KineticModule op 0x16 (func_2360); compared with a computed value (func_2355) [status 0x15F (SpecialSJump); status 0x161 (SpecialSLanding)] (same position as Bowser: ""Acceleration multiplier (only for Name2)"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2355; MSC koopag.mscsb func_2360",m13[*].13
+,14,,0x0600000E,1,1,1,1,f32,"code: KineticModule op 0x15 (sets a max speed) on energy 3 (stop) (func_2354); KineticModule op 0x14 (sets a max speed) on energy 3 (stop) (func_2354); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2355) [status 0x15F (SpecialSJump); status 0x161 (SpecialSLanding)] (same position as Bowser: ""Maximum H speed multiplier"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2354; MSC koopag.mscsb func_2355; MSC koopag.mscsb func_2360",m13[*].14
+,15,,0x0600000F,-20,-20,-20,-20,f32,code: stored in instance float 0x2B (func_2309) [status 0x160 (SpecialSFall)],,medium,reads: MSC koopag.mscsb func_2309,m13[*].15
+15,0,Up B,0x07000000,2.3,2.3,2.3,2.3,f32,"code: KineticModule op 0xE (sets a speed) (func_2343) [motions SpecialHi, SpecialAirHi] (same position as Bowser: ""Aerial V initial speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2343",m14[*].0
+,1,,0x07000001,0.055,0.055,0.055,0.055,f32,"code: KineticModule op 0xF (sets an acceleration) (func_2343) [motions SpecialHi, SpecialAirHi; status 0x158 (SpecialAirHi)] (same position as Bowser: ""Gravity"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2343; MSC koopag.mscsb func_2347",m14[*].1
+,2,,0x07000002,1,1,1,1,f32,"code: KineticModule op 0x15 (sets a max speed) (func_2343); KineticModule op 0x14 (sets a max speed) (func_2343) [motions SpecialHi, SpecialAirHi; status 0x158 (SpecialAirHi)] (same position as Bowser: ""Max fall speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2343; MSC koopag.mscsb func_2347",m14[*].2
+,3,,0x07000003,2.2,2.2,2.2,2.2,f32,"code: KineticModule op 0x15 (sets a max speed) (func_2344); KineticModule op 0x14 (sets a max speed) (func_2344) [status 0x157 (SpecialHi)] (same position as Bowser: ""Grounded H max speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2344",m14[*].3
+,4,,0x07000004,1.6,1.6,1.6,1.6,f32,"code: KineticModule op 0x15 (sets a max speed) (func_2343); KineticModule op 0x14 (sets a max speed) (func_2343) [motions SpecialHi, SpecialAirHi; status 0x158 (SpecialAirHi)] (same position as Bowser: ""Aerial H max speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2343; MSC koopag.mscsb func_2347",m14[*].4
+,5,,0x07000005,0.15,0.15,0.15,0.15,f32,"code: KineticModule op 0x16 (func_2344) [status 0x157 (SpecialHi)] (same position as Bowser: ""Grounded max additional accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2344",m14[*].5
+,6,,0x07000006,0.02,0.02,0.02,0.02,f32,"code: KineticModule op 0x16 (func_2343) [motions SpecialHi, SpecialAirHi; status 0x158 (SpecialAirHi)] (same position as Bowser: ""Aerial max additional accel"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2343; MSC koopag.mscsb func_2347",m14[*].6
+,7,,0x17000007,0xF,0xF,0xF,0xF,u32,"code: compared with a computed value (func_2349) [status 0x158 (SpecialAirHi)] (same position as Bowser: ""How many frames after falling to landing to automatically do a grounded fortress again"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2349",m14[*].7
+,8,,0x17000008,0x32,0x32,0x32,0x32,u32,"code: compared with a computed value (func_2349) [status 0x158 (SpecialAirHi)] (same position as Bowser: ""Something dealing with Name7 but affects how long you stay in shell"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2349",m14[*].8
+,9,,0x17000009,0xA,0xA,0xA,0xA,u32,"code: MotionModule op 0x2711 (func_2344); compared with a computed value (func_2349) [status 0x157 (SpecialHi); status 0x158 (SpecialAirHi)] (same position as Bowser: ""Something dealing with Name7 but making it really high delays the animation somehow"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2344; MSC koopag.mscsb func_2349",m14[*].9
+,10,,0x1700000A,0x32,0x32,0x32,0x32,u32,"code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2349) [status 0x158 (SpecialAirHi)] (same position as Bowser: ""Landing lag (frames)"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2349",m14[*].10
+,11,,0x0700000B,1,1,1,1,f32,"code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2261) [status 0x158 (SpecialAirHi)] (same position as Bowser: ""Fortress V initial speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2261",m14[*].11
+,12,,0x0700000C,1,1,1,1,f32,code: compared with the status frame counter (global9) (func_2261) [status 0x158 (SpecialAirHi)],,medium,reads: MSC koopag.mscsb func_2261,m14[*].12
+,13,,0x0700000D,50,50,50,50,f32,code: compared with the status frame counter (global9) (func_2261) [status 0x158 (SpecialAirHi)],,medium,reads: MSC koopag.mscsb func_2261,m14[*].13
+,14,,0x0700000E,5,5,5,5,f32,code: compared with a computed value (func_2261) [status 0x158 (SpecialAirHi)],,medium,reads: MSC koopag.mscsb func_2261,m14[*].14
+16,0,Down B,0x08000000,0.8,0.8,0.8,0.8,f32,"code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2338) [status 0x15A (SpecialAirLw)] (same position as Bowser: ""Aerial H speed multiplier on startup"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2338",m15[*].0
+,1,,0x08000001,0.5,0.5,0.5,0.5,f32,"code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2338) [status 0x15A (SpecialAirLw)] (same position as Bowser: ""Aerial V speed multiplier on startup"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2338",m15[*].1
+,2,,0x08000002,0.02,0.02,0.02,0.02,f32,code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2338) [status 0x15A (SpecialAirLw)],,medium,reads: MSC koopag.mscsb func_2338,m15[*].2
+,3,,0x08000003,0.03,0.03,0.03,0.03,f32,"code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2338) [status 0x15A (SpecialAirLw)] (same position as Bowser: ""Gravity"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2338",m15[*].3
+,4,,0x08000004,0.4,0.4,0.4,0.4,f32,"code: KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2338); KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2338) [status 0x15A (SpecialAirLw)] (same position as Bowser: ""Max fallspeed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2338",m15[*].4
+,5,,0x08000005,-9,-9,-9,-9,f32,"code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical) (func_2338); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2339); compared with a computed value (func_2339) [status 0x15A (SpecialAirLw)] (same position as Bowser: ""Falling V speed"")",,medium,"copied from Bowser (same layout, same position) | reads: MSC koopag.mscsb func_2338; MSC koopag.mscsb func_2339",m15[*].5
+,0,Category 4 block,0x14000000,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x14000001,0x1E0,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x14000002,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
 17,0,Article params (breath),,-3.6,,,,f32,,,,,m17[0].i0.0
 ,1,,,28,,,,f32,,,,,m17[0].i0.1
 ,2,,,20,,,,f32,,,,,m17[0].i0.2

@@ -291,8 +291,18 @@ def load_labels(kind):
             path = row.get('Path', '').strip()
             if not path:
                 continue
-            res[path] = (row.get('Move', '').strip(), row.get('Description', '').strip())
+            res[path] = (row.get('Move', '').strip(), short_desc(row.get('Description', '').strip()))
     return res
+
+
+def short_desc(d):
+    """the CSV description without the code-use part: 'community text -- code: ...' -> 'community text';
+    'code: <use> (func_N) ...' (no community text) -> 'code: <use>'"""
+    if ' -- code: ' in d:
+        return d.split(' -- code: ')[0]
+    if d.startswith('code: '):
+        return re.split(r' \(func_\d+|; ', d)[0]
+    return d
 
 
 def label_for(labels, path):
@@ -338,7 +348,7 @@ def find(vf, key, slot='0', labels=None):
         return [(p, t) for p, t, *_ in leaves if p == key or p.startswith(key + '.') or p.startswith(key + '[')]
     if labels:
         hits = [(p, t) for p, t, *_ in leaves
-                if key.lower() in ' '.join(label_for(labels, p)).lower()]
+                if key.lower() in ' '.join(x for x in label_for(labels, p) if not x.startswith('code: ')).lower()]
         if slot != 'all':
             hits = [(p, t) for p, t in hits if not re.search(r'\[(\d+)\]', p) or
                     re.search(r'\[(\d+)\]', p).group(1) == str(slot)]

@@ -1,74 +1,74 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x20,0x6,0x4,0x28,u32,Minimum number of frames before launching,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3662; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673",m12[*].0
-,1,,0x15000001,0x78,0x3C,0x3C,0x78,u32,Maximum number of frames before launching,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3662",m12[*].1
-,2,,0x05000002,1.9,2.2,4.3,1.8,f32,Min H initial speed of grounded non fully-charged,Grounded H speed = 1.9 + (2.65 - 1.9) * Charged frames / (150 - 32 - 1),medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673",m12[*].2
-,3,,0x05000003,0.6,0.9,2,0.6,f32,Min H initial speed of aerial non fully-charged,Aerial H speed = 0.6 + (2.65 - 0.6) * Charged frames / (150 - 32 - 1),medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673",m12[*].3
-,4,,0x05000004,0.1,0.13,0.15,0.1,f32,Ground friction of non-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3674",m12[*].4
-,5,,0x05000005,0.04,0.05,0.04,0.04,f32,Air friction of non-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3674",m12[*].5
-,6,,0x05000006,2.65,1.8,1.5,3,f32,Max H initial speed of non fully-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3673",m12[*].6
-,7,,0x05000007,3.4,3.3,5.6,3.1,f32,H initial speed of grounded fully-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3665",m12[*].7
-,8,,0x05000008,3,3.5,3.6,3,f32,H initial speed of aerial fully-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3665",m12[*].8
-,9,,0x05000009,0.018,0.08,0.01,0.018,f32,Ground friction of fully-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3665",m12[*].9
-,10,,0x0500000A,0.06,0.06,0.06,0.06,f32,Air friction of fully-charged,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3665",m12[*].10
-,11,,0x0500000B,0.85,0.5,0.4,0.5,f32,H speed multiplier on ground ending,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3669",m12[*].11
-,12,,0x0500000C,0.3,0.3,0.3,0.3,f32,H speed multiplier on aerial ending,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3669",m12[*].12
-,13,,0x0500000D,8,8,4,8,f32,Damage-based armor threshold (for charging),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3660",m12[*].13
-,14,,0x0500000E,14,14,28,14,f32,Damage-based armor threshold (for max charge release),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3665",m12[*].14
-,15,,0x0500000F,1,1,1,1,f32,KO punch charge amount per damage received,,medium,community,m12[*].15
-,16,,0x05000010,0.3,0.3,0.3,0.3,f32,KO punch charge amount per damage dealt,,medium,community,m12[*].16
-,17,,0x15000011,0xF0,0xF0,0xF0,0xF0,u32,Grace period to lose the KO punch (frames),,medium,community,m12[*].17
-,18,,0x15000012,0x32,0x32,0x32,0x32,u32,,,,,m12[*].18
-,19,,0x05000013,0.33,0.33,0.33,0.33,f32,,,,,m12[*].19
-,20,,0x15000014,0x2A,0x2A,0x2A,0x2A,u32,,,,,m12[*].20
-,21,,0x05000015,4,4,4,4,f32,,,,,m12[*].21
-,22,,0x05000016,1,1,1,1,f32,Frame speed multiplier for SpecialNStart and SpecialAirNStart,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3660",m12[*].22
-,23,,0x05000017,0,0,0,0,f32,,,,,m12[*].23
-14,0,Side B,0x06000000,2,1.2,0,2,f32,H initial speed on grouded startup,,medium,community,m13[*].0
-,1,,0x06000001,1.3,1.2,0.5,1.5,f32,H initial speed on aerial startup,,medium,community,m13[*].1
-,2,,0x06000002,1.4,2.8,0,1.4,f32,V initial speed on grouded startup,,medium,community,m13[*].2
-,3,,0x06000003,1.3,3.2,0.5,1.3,f32,V initial speed on aerial startup,,medium,community,m13[*].3
-,4,,0x06000004,0.03,0.03,0.03,0.03,f32,,,,,m13[*].4
-,5,,0x06000005,1.5,1.5,1.5,1.5,f32,,,,,m13[*].5
-,6,,0x16000006,0xF,0x0,0x1A,0xF,u32,Frames spent spinning helplessly after an additional button input,,medium,community,m13[*].6
-,7,,0x16000007,0x8,0x10,0x18,0x8,u32,Something to do with when you can do a button input to punch during the leap?,,medium,community,m13[*].7
-,8,,0x06000008,0.015,0.015,0.015,0.015,f32,Air friction,,medium,community,m13[*].8
-,9,,0x06000009,1,1.4,0.7,1,f32,,,,,m13[*].9
-,10,,0x1600000A,0x14,0x14,0x14,0x14,u32,,,,,m13[*].10
-,11,,0x1600000B,0x1E,0x8,0x1E,0x1E,u32,Landing lag (frames),,medium,community,m13[*].11
-15,0,Up B,0x07000000,1.5,2.15,0.7,1.5,f32,Grounded height multiplier,,medium,community,m14[*].0
-,1,,0x07000001,0.95,1.85,0.9,0.95,f32,Aerial height multiplier,,medium,community,m14[*].1
-,2,,0x07000002,0.6666,0.6666,0.6666,0.6666,f32,,,,,m14[*].2
-,3,,0x07000003,0.25,0.25,0.25,0.25,f32,,,,,m14[*].3
-,4,,0x07000004,0.5,0.6,0.2,0.5,f32,Aerial max air speed multiplier,,medium,community,m14[*].4
-,5,,0x07000005,0.625,0.625,0.625,0.625,f32,,,,,m14[*].5
-,6,,0x07000006,18,179,0,18,f32,Ability to angle (degrees),,medium,community,m14[*].6
-,7,,0x07000007,0.6,0.6,0.8,0.6,f32,,,,,m14[*].7
-,8,,0x17000008,0x1E,0x16,0x28,0x1E,u32,Landing lag (frames),,medium,community,m14[*].8
-16,0,Down B,0x08000000,0.5,1.5,0.5,0.5,f32,H speed multiplier on startup,,medium,community | reads: native 0x02F0D1A8 (fn 0x02F0D054),m15[*].0
+13,0,Neutral B,0x15000000,0x20,0x18,0x26,0x28,u32,"Minimum number of frames before launching -- code: compared with the animation frame (func_3662); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3673); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3673) [status 0x213; status 0x217]",,high,community | reads: MSC kirby.mscsb func_3662; MSC kirby.mscsb func_3673; MSC littlemac.mscsb func_2258; MSC littlemac.mscsb func_2269,m12[*].0
+,1,,0x15000001,0x78,0x3C,0x64,0x78,u32,"Maximum number of frames before launching -- code: stored in status float 0x6 (func_3662); compared with the animation frame (func_3662); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3673) [status 0x213; status 0x217]",,high,community | reads: MSC kirby.mscsb func_3662; MSC kirby.mscsb func_3673; MSC littlemac.mscsb func_2258; MSC littlemac.mscsb func_2269,m12[*].1
+,2,,0x05000002,1.9,2.2,4.3,1.8,f32,"Min H initial speed of grounded non fully-charged -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3673); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3673) [status 0x217; status 0x15B (SpecialNDash, SpecialAirNDash)]",Grounded H speed = 1.9 + (2.65 - 1.9) * Charged frames / (150 - 32 - 1),high,community | reads: MSC kirby.mscsb func_3673; MSC littlemac.mscsb func_2269,m12[*].2
+,3,,0x05000003,0.6,0.9,2,0.6,f32,"Min H initial speed of aerial non fully-charged -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3673); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3673) [status 0x217; status 0x15B (SpecialNDash, SpecialAirNDash)]",Aerial H speed = 0.6 + (2.65 - 0.6) * Charged frames / (150 - 32 - 1),high,community | reads: MSC kirby.mscsb func_3673; MSC littlemac.mscsb func_2269,m12[*].3
+,4,,0x05000004,0.1,0.13,0.15,0.1,f32,"Ground friction of non-charged -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_3673) [status 0x217; status 0x15B (SpecialNDash, SpecialAirNDash)]",,high,community | reads: MSC kirby.mscsb func_3673; MSC kirby.mscsb func_3674; MSC littlemac.mscsb func_2269; MSC littlemac.mscsb func_2270,m12[*].4
+,5,,0x05000005,0.04,0.05,0.04,0.04,f32,"Air friction of non-charged -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_3673) [status 0x217; status 0x15B (SpecialNDash, SpecialAirNDash)]",,high,community | reads: MSC kirby.mscsb func_3673; MSC kirby.mscsb func_3674; MSC littlemac.mscsb func_2269; MSC littlemac.mscsb func_2270,m12[*].5
+,6,,0x05000006,2.65,1.8,1.5,3,f32,"Max H initial speed of non fully-charged -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3673); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3673) [status 0x217; status 0x15B (SpecialNDash, SpecialAirNDash)]",,high,community | reads: MSC kirby.mscsb func_3673; MSC littlemac.mscsb func_2269,m12[*].6
+,7,,0x05000007,3.4,3.3,5.6,3.1,f32,"H initial speed of grounded fully-charged -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3665); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3665); combined with the facing direction (func_3665) [status 0x214; status 0x158 (SpecialNMaxDash, SpecialAirNMaxDash)]",,high,community | reads: MSC kirby.mscsb func_3665; MSC littlemac.mscsb func_2261,m12[*].7
+,8,,0x05000008,3,3.5,3.6,3,f32,"H initial speed of aerial fully-charged -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3665); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_3665); combined with the facing direction (func_3665) [status 0x214; status 0x158 (SpecialNMaxDash, SpecialAirNMaxDash)]",,high,community | reads: MSC kirby.mscsb func_3665; MSC littlemac.mscsb func_2261,m12[*].8
+,9,,0x05000009,0.018,0.08,0.01,0.018,f32,"Ground friction of fully-charged -- code: KineticModule op 0xF (sets an acceleration) on energy 3 (stop), with the facing direction (func_3665) [status 0x214; status 0x158 (SpecialNMaxDash, SpecialAirNMaxDash)]",,high,community | reads: MSC kirby.mscsb func_3665; MSC littlemac.mscsb func_2261,m12[*].9
+,10,,0x0500000A,0.06,0.06,0.06,0.06,f32,"Air friction of fully-charged -- code: KineticModule op 0xF (sets an acceleration) on energy 3 (stop), with the facing direction (func_3665) [status 0x214; status 0x158 (SpecialNMaxDash, SpecialAirNMaxDash)]",,high,community | reads: MSC kirby.mscsb func_3665; MSC littlemac.mscsb func_2261,m12[*].10
+,11,,0x0500000B,0.85,0.5,0.4,0.5,f32,"H speed multiplier on ground ending -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3669) [status 0x216; status 0x15A (SpecialNMaxDashEnd, SpecialAirNMaxDashEnd)]",,high,community | reads: MSC kirby.mscsb func_3669; MSC littlemac.mscsb func_2265,m12[*].11
+,12,,0x0500000C,0.3,0.3,0.3,0.3,f32,"H speed multiplier on aerial ending -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_3669) [status 0x216; status 0x15A (SpecialNMaxDashEnd, SpecialAirNMaxDashEnd)]",,high,community | reads: MSC kirby.mscsb func_3669; MSC littlemac.mscsb func_2265,m12[*].12
+,13,,0x0500000D,8,8,0,8,f32,"Damage-based armor threshold (for charging) -- code: DamageModule op 0xB (func_3660) [status 0x213; status 0x157 (SpecialNStart, SpecialAirNStart)]",,high,community | reads: MSC kirby.mscsb func_3660; MSC littlemac.mscsb func_2256,m12[*].13
+,14,,0x0500000E,14,14,0,14,f32,"Damage-based armor threshold (for max charge release) -- code: DamageModule op 0xB (func_3665) [status 0x214; status 0x158 (SpecialNMaxDash, SpecialAirNMaxDash)]",,high,community | reads: MSC kirby.mscsb func_3665; MSC littlemac.mscsb func_2261,m12[*].14
+,15,,0x0500000F,1,1,1,1,f32,KO punch charge amount per damage received,,medium,community | no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,0.3,0.3,0.3,0.3,f32,KO punch charge amount per damage dealt,,medium,community | no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x15000011,0xF0,0xF0,0xF0,0xF0,u32,Grace period to lose the KO punch (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x15000012,0x32,0x32,0x32,0x32,u32,,,,no read in the vanilla MSC (native or unused),m12[*].18
+,19,,0x05000013,0.33,0.33,0.33,0.33,f32,,,,no read in the vanilla MSC (native or unused),m12[*].19
+,20,,0x15000014,0x2A,0x2A,0x2A,0x2A,u32,,,,no read in the vanilla MSC (native or unused),m12[*].20
+,21,,0x05000015,4,4,4,4,f32,,,,no read in the vanilla MSC (native or unused),m12[*].21
+,22,,0x05000016,1,1,1,1,f32,"Frame speed multiplier for SpecialNStart and SpecialAirNStart -- code: read in: func_3653(0x22d, 0, WorkModuleF(0, 0x5000016)); (func_3660) [status 0x213; status 0x157 (SpecialNStart, SpecialAirNStart)]",,medium,community | reads: MSC kirby.mscsb func_3660; MSC littlemac.mscsb func_2256,m12[*].22
+,23,,0x05000017,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].23
+14,0,Side B,0x06000000,2,1.2,0,2,f32,"H initial speed on grouded startup -- code: combined with the facing direction (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,medium,community | reads: MSC littlemac.mscsb func_2281,m13[*].0
+,1,,0x06000001,1.3,1.2,0.5,1.5,f32,"H initial speed on aerial startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2281); combined with the facing direction (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC littlemac.mscsb func_2281,m13[*].1
+,2,,0x06000002,1.4,2.8,0,1.4,f32,"V initial speed on grouded startup -- code: read in: var1 = WorkModuleF(0, 0x6000002); (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,medium,community | reads: MSC littlemac.mscsb func_2281,m13[*].2
+,3,,0x06000003,1.3,2,0.5,1.3,f32,"V initial speed on aerial startup -- code: read in: var1 = WorkModuleF(0, 0x6000003); (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,medium,community | reads: MSC littlemac.mscsb func_2281,m13[*].3
+,4,,0x06000004,0.03,0.03,0.03,0.03,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1.5,1.5,1.5,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x16000006,0xF,0xF,0x1A,0xF,u32,"Frames spent spinning helplessly after an additional button input -- code: stored in instance int 0x86, then decremented in func_2282 (a countdown / remaining count), tested against 0 (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC littlemac.mscsb func_2281,m13[*].6
+,7,,0x16000007,0x8,0x10,0x18,0x8,u32,"Something to do with when you can do a button input to punch during the leap? -- code: compared with a computed value (func_2283) [status 0x15E (SpecialSJump, SpecialAirSJump)]",community value differs: Custom2 0x16 (vanilla 0x18),medium,community | reads: MSC littlemac.mscsb func_2283,m13[*].7
+,8,,0x06000008,0.015,0.015,0.015,0.015,f32,"Air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC littlemac.mscsb func_2281,m13[*].8
+,9,,0x06000009,1,1.4,0.7,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x1600000A,0x14,0x14,0x14,0x14,u32,code: compared with the status frame counter (global9) (func_2296) [status 0x161 (SpecialSBlowEnd)],,medium,reads: MSC littlemac.mscsb func_2296,m13[*].10
+,11,,0x1600000B,0x1E,0x1E,0x1E,0x1E,u32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2281) [status 0x15E (SpecialSJump, SpecialAirSJump)]",,high,community | reads: MSC littlemac.mscsb func_2281,m13[*].11
+15,0,Up B,0x07000000,1.5,1.55,0.7,1.5,f32,Grounded height multiplier -- code: stored in status float 0xD (func_2306) [status 0x163],,medium,community | reads: MSC littlemac.mscsb func_2306,m14[*].0
+,1,,0x07000001,0.95,1.15,0.9,0.95,f32,Aerial height multiplier -- code: stored in status float 0xB (func_2306) [status 0x163],,medium,community | reads: MSC littlemac.mscsb func_2306,m14[*].1
+,2,,0x07000002,0.6666,0.6666,0.6666,0.6666,f32,code: stored in status float 0x9 (func_2306) [status 0x163],,medium,reads: MSC littlemac.mscsb func_2306,m14[*].2
+,3,,0x07000003,0.25,0.25,0.25,0.25,f32,"code: stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2327) (func_2306) [status 0x163]",,medium,reads: MSC littlemac.mscsb func_2306,m14[*].3
+,4,,0x07000004,0.5,0.4,0.2,0.5,f32,Aerial max air speed multiplier -- code: stored in status float 0xA (func_2306) [status 0x163],,medium,community | reads: MSC littlemac.mscsb func_2306,m14[*].4
+,5,,0x07000005,0.625,0.625,0.625,0.625,f32,code: stored in status float 0x7 (func_2306) [status 0x163],,medium,reads: MSC littlemac.mscsb func_2306,m14[*].5
+,6,,0x07000006,18,14,0,18,f32,Ability to angle (degrees) -- code: stored in status float 0x8 (func_2306) [status 0x163],,medium,community | reads: MSC littlemac.mscsb func_2306,m14[*].6
+,7,,0x07000007,0.6,0.6,0.8,0.6,f32,"code: stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2328) (func_2306) [status 0x163]",,medium,reads: MSC littlemac.mscsb func_2306,m14[*].7
+,8,,0x17000008,0x1E,0x26,0x28,0x1E,u32,"Landing lag (frames) -- code: stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2328) (func_2306) [status 0x163]",,high,community | reads: MSC littlemac.mscsb func_2306,m14[*].8
+16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,H speed multiplier on startup,,medium,community | reads: native 0x02F0D1A8 (fn 0x02F0D054),m15[*].0
 ,1,,0x08000001,0.0025,0.0025,0.0025,0.0025,f32,Air friction,,medium,community | reads: native 0x02F0D674 (fn 0x02F0D514),m15[*].1
-,2,,0x08000002,0.04,0.04,0.04,0.04,f32,Gravity,,medium,community,m15[*].2
-,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Max fall speed,,medium,community,m15[*].3
-,4,,0x18000004,0x0,0x0,0x0,0x0,u32,,,,,m15[*].4
-,5,,0x08000005,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community,m15[*].5
-,6,,0x08000006,7,8,8,8,f32,Counter trigger bubble Y offset,,medium,community,m15[*].6
-,7,,0x08000007,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community,m15[*].7
-,8,,0x08000008,9.2,9.2,9.2,9.2,f32,Counter trigger bubble size,,medium,community,m15[*].8
-,9,,0x08000009,1.5,0.9,1.5,1.5,f32,Max H ground speed,,medium,community,m15[*].9
-,10,,0x0800000A,1,2,1.8,0.5,f32,Max H air speed,,medium,community,m15[*].10
-,11,,0x0800000B,4.5,2.2,4.5,4.5,f32,Max H ground speed after activating,,medium,community,m15[*].11
-,12,,0x0800000C,3.9,1,2.6,1,f32,Max H aerial speed after activating,,medium,community,m15[*].12
-,13,,0x0800000D,0.07,0.07,0.07,0.07,f32,Ground friction after activating,,medium,community,m15[*].13
-,14,,0x0800000E,0.007,0.007,0.007,0.007,f32,Air friction after activating,,medium,community,m15[*].14
-,15,,0x0800000F,1.3,1,1.1,1.3,f32,Counter damage multiplier,,medium,community,m15[*].15
-,16,,0x18000010,0x10,0x10,0x10,0x10,u32,,,,,m15[*].16
-,17,,0x18000011,0x19,0x19,0x19,0x19,u32,?,Added in 1.0.4,medium,community,m15[*].17
-,18,,0x08000012,10,6,7,8,f32,Min damage,,medium,community,m15[*].18
-,19,,0x08000013,50,90,50,50,f32,Max damage,,medium,community,m15[*].19
-,20,,0x08000014,100,100,100,100,f32,,,,,m15[*].20
-,21,,0x08000015,0.2,0.32,0.5,0.2,f32,H speed multiplier on grounded ending,,medium,community,m15[*].21
-,22,,0x08000016,0.3,0.9,0.5,0.3,f32,H speed multiplier on aerial ending,,medium,community,m15[*].22
-,23,,0x08000017,1,1,1,1,f32,Animation frame speed multiplier,,medium,community,m15[*].23
-,0,Final Smash,0x14000000,0x78,,,,u32,,,,,m16.0
-,1,,0x04000001,11,,,,f32,Duration of Giga Mac (seconds),,medium,community,m16.1
-,2,,0x14000002,0x78,,,,u32,,,,,m16.2
-,3,,0x14000003,0x78,,,,u32,,,,,m16.3
+,2,,0x08000002,0.04,0.04,0.04,0.04,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.2,1.2,1.2,1.2,f32,Max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x18000004,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,7,8,8,8,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,9.2,9.2,9.2,9.2,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,1.5,0.7,1.5,1.5,f32,"Max H ground speed -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2314); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_2314); combined with the facing direction (func_2314) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2314,m15[*].9
+,10,,0x0800000A,1,0.5,0.5,0.5,f32,"Max H air speed -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2314); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_2314); combined with the facing direction (func_2314) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2314,m15[*].10
+,11,,0x0800000B,4.5,2.2,4.5,4.5,f32,"Max H ground speed after activating -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2315); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_2315); combined with the facing direction (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].11
+,12,,0x0800000C,3.9,1,2.6,1,f32,"Max H aerial speed after activating -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2315); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 1 (func_2315); combined with the facing direction (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].12
+,13,,0x0800000D,0.07,0.07,0.07,0.07,f32,"Ground friction after activating -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].13
+,14,,0x0800000E,0.007,0.007,0.007,0.007,f32,"Air friction after activating -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].14
+,15,,0x0800000F,1.3,0.8,1.1,1.3,f32,Counter damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x18000010,0x10,0x10,0x10,0x10,u32,,,,no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x18000011,0x19,0x19,0x19,0x19,u32,?,Added in 1.0.4,medium,community | no read in the vanilla MSC (native or unused),m15[*].17
+,18,,0x08000012,10,4,7,8,f32,Min damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].18
+,19,,0x08000013,50,50,50,50,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].19
+,20,,0x08000014,100,100,100,100,f32,,,,no read in the vanilla MSC (native or unused),m15[*].20
+,21,,0x08000015,0.2,0.2,0.5,0.2,f32,"H speed multiplier on grounded ending -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].21
+,22,,0x08000016,0.3,0.3,0.5,0.3,f32,"H speed multiplier on aerial ending -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2315) [status 0x164 (SpecialLwHit, SpecialAirLwHit)]",,high,community | reads: MSC littlemac.mscsb func_2315,m15[*].22
+,23,,0x08000017,1,1,1,1,f32,"Animation frame speed multiplier -- code: animation rate (MotionModule set rate) (func_2311) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC littlemac.mscsb func_2311,m15[*].23
+,0,Final Smash,0x14000000,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,11,,,,f32,Duration of Giga Mac (seconds),,medium,community | no read in the vanilla MSC (native or unused),m16.1
+,2,,0x14000002,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x14000003,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.3

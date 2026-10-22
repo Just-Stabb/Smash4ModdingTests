@@ -1,40 +1,40 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x4,0x4,0x4,0x4,u32,[auto] copied to status work int 0x11000002,,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2881",m12[*].0
-,1,,0x05000001,2,2,2,2,f32,H speed divisor,less = more,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2885",m12[*].1
-,2,,0x05000002,0.023,0.023,0.023,0.023,f32,Gravity,,medium,community,m12[*].2
-,3,,0x05000003,1.25,1.25,1.25,1.25,f32,Reflection damage multiplier,,medium,community,m12[*].3
-14,0,Side B,0x16000000,0x14,0x14,0x14,0x14,u32,Frames of cooldown after detonating,,medium,community,m13[*].0
-,1,,0x16000001,0xA,0xA,0xA,0xA,u32,Min frames to detonate projectile,,medium,community,m13[*].1
-,2,,0x06000002,9,9,9,9,f32,X offset,,medium,community,m13[*].2
-,3,,0x06000003,-0.8,-0.8,-0.8,-0.8,f32,Y offset,,medium,community,m13[*].3
-,4,,0x06000004,0.019,0.019,0.019,0.019,f32,Gravity,,medium,community,m13[*].4
-,5,,0x06000005,21,21,21,21,f32,Landing lag (frames),,medium,community,m13[*].5
-15,0,Up B,0x07000000,1.5,1.5,1.5,1.5,f32,H speed divisor on startup,,medium,community,m14[*].0
-,1,,0x07000001,3,3,3,3,f32,V speed divisor on startup,,medium,community,m14[*].1
-,2,,0x07000002,0.03,0.01,0,0.03,f32,Gravity on startup,,medium,community,m14[*].2
-,3,,0x07000003,0.75,0.45,0.75,0.75,f32,Max fall speed on startup,,medium,community,m14[*].3
-,4,,0x17000004,0x14,0x14,0xC,0x14,u32,Travel time (frames),,medium,community,m14[*].4
-,5,,0x17000005,0x3,0x14,0x3,0x3,u32,,,,,m14[*].5
-,6,,0x17000006,0xF,0xF,0xF,0xF,u32,Ledge grab,,medium,community,m14[*].6
+13,0,Neutral B,0x15000000,0x4,0x4,0x4,0x4,u32,"code: stored in status int 0x2, then decremented in func_2883 (a countdown / remaining count), tested against 0 (func_2881); stored in status int 0x2, then decremented in func_2252 (a countdown / remaining count), tested against 0 (func_2250) [status 0x1AE; status 0x152 (SpecialN, SpecialAirN)]",,medium,reads: MSC kirby.mscsb func_2881; MSC zelda.mscsb func_2250,m12[*].0
+,1,,0x05000001,2,2,2,2,f32,"H speed divisor -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2885) [status 0x1AE; status 0x152 (SpecialN, SpecialAirN)]",less = more,high,community | reads: MSC kirby.mscsb func_2885; MSC zelda.mscsb func_2254,m12[*].1
+,2,,0x05000002,0.023,0.023,0.023,0.023,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,1.25,1.25,1.25,1.25,f32,Reflection damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+14,0,Side B,0x16000000,0x14,0x14,0x14,0x14,u32,"Frames of cooldown after detonating -- code: stored in status int 0x4, then decremented in func_2265 (a countdown / remaining count), ControlModule op 0x2713 (func_2262) [status 0x153 (SpecialSStart, SpecialAirSStart)]",,high,community | reads: MSC zelda.mscsb func_2262,m13[*].0
+,1,,0x16000001,0xA,0xA,0xA,0xA,u32,"Min frames to detonate projectile -- code: stored in status int 0x3, then decremented in func_2265 (a countdown / remaining count), tested against 0 (func_2262) [status 0x153 (SpecialSStart, SpecialAirSStart)]","community value differs: Default 0x1A (vanilla 0xA), Custom1 0x1A (vanilla 0xA), Custom2 0x1A (vanilla 0xA)",high,community | reads: MSC zelda.mscsb func_2262,m13[*].1
+,2,,0x06000002,9,9,9,9,f32,X offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,-0.8,-0.8,-0.8,-0.8,f32,Y offset,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,0.019,0.019,0.019,0.019,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,21,21,21,21,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2268); tested against 0 (func_2268) [status 0x158 (SpecialSEnd, SpecialAirSEnd)]",,high,community | reads: MSC zelda.mscsb func_2268; MSC zelda.mscsb func_2269,m13[*].5
+15,0,Up B,0x07000000,1.5,1.5,1.5,1.5,f32,"H speed divisor on startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2281)",,high,community | reads: MSC zelda.mscsb func_2281,m14[*].0
+,1,,0x07000001,3,3,3,3,f32,V speed divisor on startup -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2281),,high,community | reads: MSC zelda.mscsb func_2281,m14[*].1
+,2,,0x07000002,0.03,0.01,0,0.03,f32,Gravity on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.75,0.45,0.75,0.75,f32,Max fall speed on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x17000004,0x14,0x14,0xC,0x14,u32,Travel time (frames) -- code: compared with status int 0x2 (a counter) (func_2284) [status 0x159],,high,community | reads: MSC zelda.mscsb func_2284,m14[*].4
+,5,,0x17000005,0x3,0x14,0x3,0x3,u32,code: compared with a computed value (func_2285) [status 0x159],,medium,reads: MSC zelda.mscsb func_2285,m14[*].5
+,6,,0x17000006,0xF,0xF,0xF,0xF,u32,Ledge grab -- code: compared with a computed value (func_2285) [status 0x159],,medium,community | reads: MSC zelda.mscsb func_2285,m14[*].6
 ,7,,0x07000007,0.5,0.5,2,0.5,f32,[auto] read by native code (get_float at 0x02F98508); meaning not traced,,low,reads: native 0x02F98508 (fn 0x02F98404),m14[*].7
-,8,,0x07000008,2.2,2.2,2.2,2.2,f32,Base travel speed,,medium,community,m14[*].8
-,9,,0x07000009,2,3,3.5,2,f32,Max added travel speed,,medium,community,m14[*].9
-,10,,0x0700000A,0.6,0.6,1,0.6,f32,Max air speed multiplier,,medium,community,m14[*].10
-,11,,0x0700000B,0.2,0.15,0.4,0.2,f32,Speed multiplier on reappearance,,medium,community,m14[*].11
-,12,,0x0700000C,0.8,0.8,1,0.8,f32,Special fall max air speed multiplier,,medium,community,m14[*].12
-,13,,0x0700000D,30,30,30,30,f32,Landing lag (frames),,medium,community,m14[*].13
-16,0,Down B,0x08000000,7,7,4,7,f32,Max charge level,lower = charges faster,medium,community,m15[*].0
-,1,,0x18000001,0x3C,0x3C,0x3C,0x3C,u32,Max full charge hold time (frames),,medium,community,m15[*].1
-,2,,0x08000002,0,0,0,0,f32,V speed,,medium,community,m15[*].2
-,0,Final Smash,0x04000000,50,,,,f32,,,,,m16.0
-,1,,0x04000001,38,,,,f32,,,,,m16.1
-,2,,0x04000002,5,,,,f32,,,,,m16.2
-,3,,0x04000003,1.3,,,,f32,,,,,m16.3
-,4,,0x04000004,0.6,,,,f32,,,,,m16.4
-,5,,0x04000005,30,,,,f32,,,,,m16.5
-,6,,0x04000006,0,,,,f32,,,,,m16.6
+,8,,0x07000008,2.2,2.2,2.2,2.2,f32,Base travel speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].8
+,9,,0x07000009,2,3,3.5,2,f32,Max added travel speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x0700000A,0.6,0.6,1,0.6,f32,"Max air speed multiplier -- code: multiplies fighter_param 0x16 (air_speed_x_stable) (func_2294); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2294); compared with a computed value (func_2294) [status 0x15A (SpecialHi, SpecialAirHi)]",,medium,community | reads: MSC zelda.mscsb func_2294,m14[*].10
+,11,,0x0700000B,0.2,0.15,0.4,0.2,f32,"Speed multiplier on reappearance -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2291) [status 0x15A (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC zelda.mscsb func_2291,m14[*].11
+,12,,0x0700000C,0.8,0.8,1,0.8,f32,"Special fall max air speed multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2288) [status 0x15A (SpecialHi, SpecialAirHi)]",,medium,community | reads: MSC zelda.mscsb func_2288,m14[*].12
+,13,,0x0700000D,30,30,30,30,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2288) [status 0x15A (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC zelda.mscsb func_2288,m14[*].13
+16,0,Down B,0x08000000,7,7,4,7,f32,Max charge level -- code: compared with a computed value (func_2305) [status 0x15B],lower = charges faster,medium,community | reads: MSC zelda.mscsb func_2305; MSC zelda.mscsb func_2307,m15[*].0
+,1,,0x18000001,0x3C,0x3C,0x3C,0x3C,u32,Max full charge hold time (frames) -- code: compared with a computed value (func_2305) [status 0x15B],,medium,community | reads: MSC zelda.mscsb func_2305,m15[*].1
+,2,,0x08000002,0,0,0,0,f32,V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2310) [status 0x15C],,high,community | reads: MSC zelda.mscsb func_2310,m15[*].2
+,0,Final Smash,0x04000000,50,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x04000001,38,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,1.3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,0.6,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,30,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
 ,7,,0x04000007,0.75,,,,f32,[auto] read by native code (get_float at 0x02F99BAC); meaning not traced,,low,reads: native 0x02F99BAC (fn 0x02F99B50),m16.7
-,8,,0x04000008,200,,,,f32,,,,,m16.8
+,8,,0x04000008,200,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
 17,0,Neutral B,,0x3,0x3,0x3,0x3,u32,Reflection bubble attached bone index,,medium,community,m17[*].0
 ,1,,,50,50,50,50,f32,Break threshold,,medium,community,m17[*].1
 ,2,,,0,0,0,0,f32,Reflection bubble X offset,,medium,community,m17[*].2
@@ -44,34 +44,34 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,,1.4,1.2,1.2,1.2,f32,Reflected projectile speed multiplier,,medium,community,m17[*].6
 ,7,,,0.75,0.5,0.5,0.5,f32,Reflected projectile lifetime multiplier,,medium,community,m17[*].7
 18,0,"Side B
-(dein)",0x02000000,50,60,80,50,f32,Max traveling frames,,medium,community,m18[*].0
-,1,,0x02000001,50,1,60,50,f32,Frames where damage grows with distance,,medium,community,m18[*].1
-,2,,0x02000002,1,1,2.5,1,f32,Initial hitbox/GFX size,,medium,community,m18[*].2
-,3,,0x02000003,3.8,2.5,5,3.8,f32,Terminal hitbox/GFX size,,medium,community,m18[*].3
-,4,,0x02000004,0,0,0,0,f32,Firing angle (radians),,medium,community,m18[*].4
-,5,,0x02000005,0.5,0.5,0.25,0.5,f32,Initial speed,,medium,community,m18[*].5
-,6,,0x02000006,0.065,0.1,0.04,0.065,f32,Acceleration,,medium,community,m18[*].6
-,7,,0x02000007,7,4,1.5,7,f32,Terminal speed of projectile,read during startup,medium,community,m18[*].7
-,8,,0x02000008,0.5,0.5,0.3,0.5,f32,Sensitivity for maneuverability,higher than 1.0 you can't maneuver up/down,medium,community,m18[*].8
-,9,,0x02000009,1.375,0.15,3,1.375,f32,Maneuverability angle (degrees),This * StickY,medium,community,m18[*].9
-,10,,0x0200000A,74.5,35,90,74.5,f32,Max curve projectile can angle (degrees),high numbers allow reversing direction,medium,community,m18[*].10
-,11,,0x0200000B,15,12,50,12,f32,Detonation timer (frames),,medium,community,m18[*].11
+(dein)",0x02000000,50,60,80,50,f32,"Max traveling frames -- code: stored in status float 0x0, then tested against 0 (func_51) (func_50)",,medium,community | reads: MSC zelda/dein.mscsb func_50,m18[*].0
+,1,,0x02000001,50,1,60,50,f32,"Frames where damage grows with distance -- code: stored in status float 0x1, then compared with a computed value (func_52) (func_52); compared with status float 0x1 (func_52)",,medium,community | reads: MSC zelda/dein.mscsb func_52,m18[*].1
+,2,,0x02000002,1,1,2.5,1,f32,Initial hitbox/GFX size,,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,3.8,2.5,5,3.8,f32,Terminal hitbox/GFX size,,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,0,0,0,0,f32,Firing angle (radians),,medium,community | no read in the article MSC (native or unused),m18[*].4
+,5,,0x02000005,0.5,0.5,0.25,0.5,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,0.065,0.1,0.04,0.065,f32,Acceleration -- code: compared with a computed value (func_54),,medium,community | reads: MSC zelda/dein.mscsb func_54,m18[*].6
+,7,,0x02000007,7,4,1.5,7,f32,"Terminal speed of projectile -- code: stored in status float 0x3, then compared with a computed value (func_54) (func_54); KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2 (func_54); compared with a computed value (func_54)",read during startup,medium,community | reads: MSC zelda/dein.mscsb func_54,m18[*].7
+,8,,0x02000008,0.5,0.5,0.3,0.5,f32,Sensitivity for maneuverability -- code: compared with a computed value (func_54),higher than 1.0 you can't maneuver up/down,medium,community | reads: MSC zelda/dein.mscsb func_54,m18[*].8
+,9,,0x02000009,1.375,0.15,3,1.375,f32,Maneuverability angle (degrees) -- code: compared with a computed value (func_54); tested against 0 (via func_15) (func_54),This * StickY,medium,community | reads: MSC zelda/dein.mscsb func_54,m18[*].9
+,10,,0x0200000A,74.5,35,90,74.5,f32,"Max curve projectile can angle (degrees) -- code: stored in a work variable, then compared with a computed value (func_54) (func_54); compared with a computed value (func_54); tested against 0 (via func_15) (func_54)",high numbers allow reversing direction,medium,community | reads: MSC zelda/dein.mscsb func_54,m18[*].10
+,11,,0x0200000B,15,12,50,12,f32,"Detonation timer (frames) -- code: stored in status float 0x0, then tested against 0 (func_58) (func_56)",,medium,community | reads: MSC zelda/dein.mscsb func_56,m18[*].11
 ,0,,,0x1,,,,u32,,,,,m19.0
 ,1,,,2,,,,f32,,read on article generation,,,m19.1
 ,2,,,-2,,,,f32,,read on article generation,,,m19.2
 ,3,,,2,,,,f32,,read on article generation,,,m19.3
 19,0,"Side B
-(dein_s)",0x02000000,7,7,9,7,f32,Side B base damage,,medium,community,m20[*]
+(dein_s)",0x02000000,7,7,9,7,f32,Side B base damage,,medium,community | no read in the article MSC (native or unused),m20[*]
 20,0,"Phantom
-(phantom)",0x02000000,3.5,3,3.5,3.5,f32,Phantom's speed?,,medium,community,m21[*].0
-,1,,0x02000001,0.3,0.1,0.3,0.3,f32,,,,,m21[*].1
-,2,,0x02000002,0.32,0,0,0.32,f32,Speed added per charged level??,,medium,community,m21[*].2
-,3,,0x02000003,1.2,1,1.2,1.2,f32,Damage added per charged level,,medium,community,m21[*].3
-,4,,0x02000004,13,13,13,13,f32,Phantom HP,,medium,community,m21[*].4
-,5,,0x12000005,0x258,0x168,0x168,0x168,u32,Frames for respawn Phantom,,medium,community,m21[*].5
-,6,,0x02000006,0.05,0.05,0.05,0.05,f32,,,,,m21[*].6
-,7,,0x02000007,0.03,0.03,0.03,0.03,f32,,,,,m21[*].7
-,8,,0x02000008,0.8,0.8,0.8,0.8,f32,,,,,m21[*].8
+(phantom)",0x02000000,3.5,3,3.5,3.5,f32,Phantom's speed?,,medium,community | no read in the article MSC (native or unused),m21[*].0
+,1,,0x02000001,0.3,0.1,0.3,0.3,f32,,,,no read in the article MSC (native or unused),m21[*].1
+,2,,0x02000002,0.32,0,0,0.32,f32,Speed added per charged level??,,medium,community | no read in the article MSC (native or unused),m21[*].2
+,3,,0x02000003,1.2,1,1.2,1.2,f32,Damage added per charged level -- code: AttackModule op 0x272D (func_54),,high,community | reads: MSC zelda/phantom.mscsb func_54,m21[*].3
+,4,,0x02000004,13,13,13,13,f32,Phantom HP,,medium,community | no read in the article MSC (native or unused),m21[*].4
+,5,,0x12000005,0x258,0x168,0x168,0x168,u32,"Frames for respawn Phantom -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use) (func_58)",,medium,community | reads: MSC zelda/phantom.mscsb func_58,m21[*].5
+,6,,0x02000006,0.05,0.05,0.05,0.05,f32,,,,no read in the article MSC (native or unused),m21[*].6
+,7,,0x02000007,0.03,0.03,0.03,0.03,f32,,,,no read in the article MSC (native or unused),m21[*].7
+,8,,0x02000008,0.8,0.8,0.8,0.8,f32,,,,no read in the article MSC (native or unused),m21[*].8
 ,0,,,0x1,,,,u32,,,,,m22.0
 ,1,,,20,,,,f32,,,,,m22.1
 ,2,,,0,,,,f32,,,,,m22.2
@@ -226,7 +226,7 @@ Also can be found in battle_object file and fighter_param_etc file.",,medium,com
 ,3,,,137.3,,,,f32,,,,,m25[0][3]
 ,4,,,164,,,,f32,,,,,m25[0][4]
 ,5,,,180,,,,f32,,,,,m25[0][5]
-24,0,lightingbowarrow,0x12000000,0x50,,,,u32,,,,,m26[0]
+24,0,lightingbowarrow,0x12000000,0x50,,,,u32,"code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_47 (a countdown / remaining count), tested against 0 (func_46)",,medium,reads: MSC zelda/lightingbowarrow.mscsb func_46,m26[0]
 21,-,"Phantom
 Hurtbox
 ",,,,,,,X offset,community row not matched to a value of the vanilla file,low,community,

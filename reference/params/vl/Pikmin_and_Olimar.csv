@@ -1,152 +1,152 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,3,3,3,3,f32,X offset of pluck,,medium,community,m12[*].0
-,1,,0x05000001,0,0,0,0,f32,Y offset of pluck,,medium,community,m12[*].1
-14,0,Side B,0x16000000,0x4,0x4,0x4,0x4,u32,,,,,m13[*].0
+13,0,Neutral B,0x05000000,3,3,3,3,f32,X offset of pluck,,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,0,0,0,0,f32,Y offset of pluck,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+14,0,Side B,0x16000000,0x4,0x4,0x4,0x4,u32,"code: compared with a computed value (func_2308) [status 0x153 (SpecialS, SpecialAirS)]",,medium,reads: MSC pikmin.mscsb func_2308,m13[*].0
 ,1,,0x06000001,9,9,9,9,f32,X offset of sideB toss,,medium,community | reads: native 0x02F52B04 (fn 0x02F528A4),m13[*].1
 ,2,,0x06000002,-1,-1,-1,-1,f32,Y offset of sideB toss,,medium,community | reads: native 0x02F52B28 (fn 0x02F528A4),m13[*].2
 15,0,Up B,0x07000000,0,0,0,0,f32,[auto] read by native code (get_float at 0x027BE218); meaning not traced,,low,reads: native 0x027BE218 (fn 0x027BE08C),m14[*].0
 ,1,,0x07000001,1.8,3,1.4,1.8,f32,Initial V speed,,medium,community | reads: native 0x027BE23C (fn 0x027BE08C),m14[*].1
-,2,,0x17000002,0x1E,0x1E,0x1E,0x1E,u32,Min flying duration (frames),True = This - 1,medium,community,m14[*].2
-,3,,0x07000003,0.04,0.12,0.02,0.04,f32,Max H acceleration while flying (no Pikmin),,medium,community,m14[*].3
-,4,,0x07000004,0.005,0.004,0.001,0.005,f32,Reduction of H acceleration per Pikmin,,medium,community,m14[*].4
-,5,,0x07000005,1.65,2.1,1.65,1.5,f32,Max horizontal airspeed while flying (no Pikmin),,medium,community,m14[*].5
-,6,,0x07000006,0.3,0.2,0.03,0.3,f32,Reduction of max H airspeed per Pikmin,,medium,community,m14[*].6
-,7,,0x07000007,0.02,0.02,0.02,0.02,f32,,,,,m14[*].7
-,8,,0x07000008,0.1,0.17,0.12,0.1,f32,Max V upward acceleration (no Pikmin),,medium,community,m14[*].8
-,9,,0x07000009,0.02,0.015,0.002,0.02,f32,Reduction of V upward acceleration per Pikmin,,medium,community,m14[*].9
-,10,,0x0700000A,1.1,2.2,1.2,1.1,f32,Max ascent speed (no Pikmin),,medium,community,m14[*].10
-,11,,0x0700000B,0.02,0.015,0.002,0.02,f32,,,,,m14[*].11
-,12,,0x0700000C,0.04,0.04,0.04,0.04,f32,,,,,m14[*].12
-,13,,0x0700000D,0.008,0.006,0.001,0.008,f32,,,,,m14[*].13
-,14,,0x0700000E,0.8,0.8,0.8,0.8,f32,,,,,m14[*].14
-,15,,0x0700000F,0.2,0.15,0.02,0.2,f32,Reduction of max ascent speed per Pikmin,,medium,community,m14[*].15
-,16,,0x07000010,0.7,0.7,0.7,0.7,f32,Pikmin reduction multiplier for White,,medium,community,m14[*].16
-,17,,0x07000011,1.2,1.2,1.2,1.2,f32,Pikmin reduction multiplier for Purple,,medium,community,m14[*].17
-,18,,0x07000012,5,5,5,5,f32,,,,,m14[*].18
-,19,,0x07000013,0.7,0.7,0.7,0.7,f32,,,,,m14[*].19
-,20,,0x07000014,140,25,100,120,f32,Max flying duration (frames),,medium,community,m14[*].20
-,21,,0x07000015,0.7,0.05,0.6,0.7,f32,,,,,m14[*].21
-,22,,0x07000016,0.7,0.08,0.7,0.7,f32,,,,,m14[*].22
-,23,,0x07000017,18,36,40,30,f32,Landing lag (frames),,medium,community,m14[*].23
-16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,,m15[*]
+,2,,0x17000002,0x1E,0x1E,0x1E,0x1E,u32,"Min flying duration (frames) -- code: stored in status int 0x3 (func_2281) [status 0x154 (SpecialHi, SpecialAirHi)]",True = This - 1,medium,community | reads: MSC pikmin.mscsb func_2281,m14[*].2
+,3,,0x07000003,0.04,0.12,0.02,0.04,f32,Max H acceleration while flying (no Pikmin) -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].3
+,4,,0x07000004,0.005,0.004,0.001,0.005,f32,Reduction of H acceleration per Pikmin -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].4
+,5,,0x07000005,1.65,2.1,1.65,1.5,f32,Max horizontal airspeed while flying (no Pikmin) -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].5
+,6,,0x07000006,0.3,0.2,0.03,0.3,f32,Reduction of max H airspeed per Pikmin -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].6
+,7,,0x07000007,0.02,0.02,0.02,0.02,f32,code: tested against 0 (func_2286) [status 0x15B (SpecialAirHiWait1)],,low,reads: MSC pikmin.mscsb func_2286,m14[*].7
+,8,,0x07000008,0.1,0.17,0.12,0.1,f32,Max V upward acceleration (no Pikmin) -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2286); compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,high,community | reads: MSC pikmin.mscsb func_2286,m14[*].8
+,9,,0x07000009,0.02,0.015,0.002,0.02,f32,Reduction of V upward acceleration per Pikmin -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].9
+,10,,0x0700000A,1.1,2.2,1.2,1.1,f32,Max ascent speed (no Pikmin) -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2286); KineticModule op 0x15 (sets a max speed) on energy 1 (gravity / vertical) (func_2286); compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,high,community | reads: MSC pikmin.mscsb func_2286,m14[*].10
+,11,,0x0700000B,0.02,0.015,0.002,0.02,f32,,,,no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,0.04,0.04,0.04,0.04,f32,code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,reads: MSC pikmin.mscsb func_2286,m14[*].12
+,13,,0x0700000D,0.008,0.006,0.001,0.008,f32,code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,reads: MSC pikmin.mscsb func_2286,m14[*].13
+,14,,0x0700000E,0.8,0.8,0.8,0.8,f32,"code: read in: var4 = -WorkModuleF(0, 0x700000e); (func_2286) [status 0x15B (SpecialAirHiWait1)]",,low,reads: MSC pikmin.mscsb func_2286,m14[*].14
+,15,,0x0700000F,0.2,0.15,0.02,0.2,f32,Reduction of max ascent speed per Pikmin -- code: compared with a computed value (func_2286) [status 0x15B (SpecialAirHiWait1)],,medium,community | reads: MSC pikmin.mscsb func_2286,m14[*].15
+,16,,0x07000010,0.7,0.7,0.7,0.7,f32,Pikmin reduction multiplier for White,,medium,community | no read in the vanilla MSC (native or unused),m14[*].16
+,17,,0x07000011,1.2,1.2,1.2,1.2,f32,Pikmin reduction multiplier for Purple,,medium,community | no read in the vanilla MSC (native or unused),m14[*].17
+,18,,0x07000012,5,5,5,5,f32,,,,no read in the vanilla MSC (native or unused),m14[*].18
+,19,,0x07000013,0.7,0.7,0.7,0.7,f32,code: KineticModule op 0x8 on energy 3 (stop) (func_2275) [status 0x15B (SpecialAirHiWait1)],,medium,reads: MSC pikmin.mscsb func_2275,m14[*].19
+,20,,0x07000014,140,25,100,120,f32,Max flying duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m14[*].20
+,21,,0x07000015,0.7,0.05,0.6,0.7,f32,"code: stored in instance float 0x2F, then tested against 0 (func_2274) (func_2274) [status 0x15B (SpecialAirHiWait1)]",,medium,reads: MSC pikmin.mscsb func_2274,m14[*].21
+,22,,0x07000016,0.7,0.08,0.7,0.7,f32,,,,no read in the vanilla MSC (native or unused),m14[*].22
+,23,,0x07000017,30,36,40,30,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2281) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,community | reads: MSC pikmin.mscsb func_2281,m14[*].23
+16,0,Down B,0x18000000,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*]
 ,0,Category 4 block,0x04000000,4,,,,f32,[auto] read by native code (get_float at 0x02F518A8); meaning not traced,,low,reads: native 0x02F518A8 (fn 0x02F517DC),m16.0
 ,1,,0x04000001,0,,,,f32,[auto] read by native code (get_float at 0x02F518BC); meaning not traced,community ID was 0x18000001,low,reads: native 0x02F518BC (fn 0x02F517DC),m16.1
 ,2,,0x04000002,0,,,,f32,[auto] read by native code (get_float at 0x02F51190); meaning not traced,community ID was 0x18000002,low,reads: native 0x02F51190 (fn 0x02F510D0),m16.2
 ,3,,0x04000003,5,,,,f32,[auto] read by native code (get_float at 0x02F511B4); meaning not traced,,low,reads: native 0x02F511B4 (fn 0x02F510D0),m16.3
-,4,,0x04000004,4,,,,f32,,,,,m16.4
-,5,,0x04000005,0,,,,f32,,,,,m16.5
-,6,,0x04000006,0,,,,f32,,,,,m16.6
+,4,,0x04000004,4,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
 ,7,,0x04000007,2.8,,,,f32,[auto] read by native code (get_float at 0x027BE1B4); meaning not traced,,low,reads: native 0x027BE1B4 (fn 0x027BE08C),m16.7
-,8,,0x14000008,0xFF,,,,u32,RGB?,community ID was 0x14000000,medium,community,m16.8
-,9,,0x14000009,0x33,,,,u32,,community ID was 0x14000001,,,m16.9
-,10,,0x1400000A,0x33,,,,u32,,community ID was 0x14000002,,,m16.10
-,11,,0x1400000B,0xFF,,,,u32,,,,,m16.11
-,12,,0x1400000C,0x33,,,,u32,,community ID was 0x14000004,,,m16.12
-,13,,0x1400000D,0x33,,,,u32,,community ID was 0x14000005,,,m16.13
-,14,,0x1400000E,0x34,,,,u32,RGB?,community ID was 0x14000006,medium,community,m16.14
-,15,,0x1400000F,0xB9,,,,u32,,community ID was 0x14000007,,,m16.15
-,16,,0x14000010,0x40,,,,u32,,community ID was 0x14000008,,,m16.16
-,17,,0x14000011,0x34,,,,u32,RGB?,community ID was 0x14000009,medium,community,m16.17
-,18,,0x14000012,0x6F,,,,u32,,community ID was 0x1400000A,,,m16.18
-,19,,0x14000013,0xFF,,,,u32,,,,,m16.19
-,20,,0x14000014,0x30,,,,u32,RGB?,community ID was 0x1400000C,medium,community,m16.20
-,21,,0x14000015,0x8E,,,,u32,,community ID was 0x1400000D,,,m16.21
-,22,,0x14000016,0xFF,,,,u32,,community ID was 0x1400000E,,,m16.22
-,23,,0x14000017,0x34,,,,u32,RGB?,community ID was 0x1400000F,medium,community,m16.23
-,24,,0x14000018,0xB9,,,,u32,,community ID was 0x14000010,,,m16.24
-,25,,0x14000019,0x40,,,,u32,,community ID was 0x14000011,,,m16.25
-,26,,0x1400001A,0xFF,,,,u32,RGB?,community ID was 0x14000012,medium,community,m16.26
-,27,,0x1400001B,0x32,,,,u32,,community ID was 0x14000013,,,m16.27
-,28,,0x1400001C,0xA0,,,,u32,,community ID was 0x14000014,,,m16.28
-,29,,0x1400001D,0xFF,,,,u32,RGB?,community ID was 0x14000015,medium,community,m16.29
-,30,,0x1400001E,0x33,,,,u32,,community ID was 0x14000016,,,m16.30
-,31,,0x1400001F,0x33,,,,u32,,community ID was 0x14000017,,,m16.31
-17,0,All Pikmins,0x02000000,4,4,4,4,f32,Pikmin 'Safespot' Olimar-distance,How far the 'ideal' position for the Pikmin to stand is from olimar. Higher = farther,medium,community,m17[*].0
-,1,,0x02000001,4,4,4,4,f32,Pikmin 'Safespot' spacing,The distance between the pikmin's safespots,medium,community,m17[*].1
-,2,,0x02000002,60,60,60,60,f32,Pikmin runspeed?,,medium,community,m17[*].2
-,3,,0x02000003,23,23,23,23,f32,,,,,m17[*].3
-,4,,0x02000004,4,4,4,4,f32,Effort,"When set to 100, they just stand still whenever you idle and you can run away from them and through them and they won't care. Only if you whistle or do certain moves will they respond, and even then, only some of them do",medium,community,m17[*].4
-,5,,0x02000005,8,8,8,8,f32,How long Pikmin continue to follow the previous aerial velocity,,medium,community,m17[*].5
-,6,,0x12000006,0x320,0x320,0x96,0x320,u32,Desynch death time (frames),How long a desynched Pikmin has to live in frames,medium,community,m17[*].6
-,7,,0x12000007,0x26C,0x26C,0x5A,0x26C,u32,Desynch warning time (frames),How long to wait before flashtinting a desynched pikmin to warn the olimar player that it is about to die,medium,community,m17[*].7
-,8,,0x12000008,0x3,0x3,0x3,0x3,u32,Olimar-Pikmin interaction box size?,,medium,community,m17[*].8
-,9,,0x02000009,24,24,24,24,f32,Pikmin teleport box size?,,medium,community,m17[*].9
-,10,,0x0200000A,5,5,5,5,f32,,,,,m17[*].10
-,11,,0x0200000B,8,8,8,8,f32,,,,,m17[*].11
-,12,,0x0200000C,600,1200,1200,1200,f32,Budding time (frames),,medium,community,m17[*].12
-,13,,0x0200000D,2400,2400,2400,2400,f32,Full bloom time (frames),,medium,community,m17[*].13
-,14,,0x0200000E,1.1,1.1,1.1,1.1,f32,"Budded movement speed multiplier, unused?",,medium,community,m17[*].14
-,15,,0x0200000F,1.2,1.2,1.2,1.2,f32,"Flower movement speed multiplier, unused?",,medium,community,m17[*].15
-,16,,0x02000010,0.21,0.21,0.18,0.21,f32,H speed of pikmin pluck,,medium,community,m17[*].16
-,17,,0x02000011,2.1,1.8,2.8,2.1,f32,Initial V speed of pikmin pluck,,medium,community,m17[*].17
-,18,,0x02000012,0.075,0.075,0.075,0.075,f32,,,,,m17[*].18
-,19,,0x02000013,3.2,3.2,3.2,3.2,f32,Pikmin Fsmash H initial speed,Purple initlal speed = 2.3 > 0.5 (written in ACMD),medium,community,m17[*].19
-,20,,0x02000014,0,0,0,0,f32,,,,,m17[*].20
-,21,,0x02000015,0.5,0.5,0.5,0.5,f32,Pikmin Fsmash H speed after decel point,,medium,community,m17[*].21
-,22,,0x02000016,0.18,0.18,0.18,0.18,f32,Pikmin Fsmash air friction,,medium,community,m17[*].22
-,23,,0x02000017,3,3,3,3,f32,Pikmin Fsmash H max speed,Purple initlal speed = 1.1 > 0 (written in ACMD),medium,community,m17[*].23
-,24,,0x02000018,0.7,0.7,0.7,0.7,f32,Pikmin Fsmash V initial speed,,medium,community,m17[*].24
-,25,,0x02000019,0.06,0.06,0.06,0.06,f32,Pikmin Fsmash gravity,,medium,community,m17[*].25
-,26,,0x0200001A,2.8,2.8,2.8,2.8,f32,Pikmin Usmash initial V speed,Purple initlal speed = 2.7 (written in ACMD),medium,community,m17[*].26
-,27,,0x0200001B,0.25,0.25,0.25,0.25,f32,Pikmin Usmash gravity,,medium,community,m17[*].27
-,28,,0x0200001C,2.8,2.8,2.8,2.8,f32,Pikmin Usmash max fall speed,,medium,community,m17[*].28
-,29,,0x0200001D,1.2,1.1,1.1,1.2,f32,Smash input SideB H speed multiplier,,medium,community,m17[*].29
-,30,,0x1200001E,0x12C,0x190,0x12C,0x12C,u32,Max additional frames of latch time,Latch frames = INT(60 + (300 - Opponent's%)),medium,community,m17[*].30
-,31,,0x1200001F,0x78,0x3C,0x3C,0x3C,u32,Base frames of latch time,,medium,community,m17[*].31
-,32,,0x12000020,0x7,0x5,0x7,0x7,u32,Latch time reduction per directional input (frames),,medium,community,m17[*].32
-,33,,0x02000021,-0.4,-0.4,-0.4,-0.4,f32,SideB throw strength?,,medium,community,m17[*].33
-,34,,0x02000022,1.3,1.3,1.3,1.3,f32,Speed Pikmin fly off opponnent after they're done Side-B beating him,,medium,community,m17[*].34
-,35,,0x12000023,0x24,0x5A,0x24,0x24,u32,,,,,m17[*].35
-,36,,0x02000024,-1.3,-1.3,-1.3,-1.3,f32,,,,,m17[*].36
-,37,,0x12000025,0x1E,0x3C,0x28,0x1E,u32,Something related to SpecialLwRespond,,medium,community,m17[*].37
-,38,,0x02000026,2000,2000,2000,2000,f32,,,,,m17[*].38
-,39,,0x02000027,8,8,8,8,f32,,,,,m17[*].39
-,40,,0x02000028,4,4,4,4,f32,,,,,m17[*].40
-,41,,0x02000029,3.5,3.5,3.5,3.5,f32,"Simillar to Name4, related to CatchReturn/CatchReturnEnd",,medium,community,m17[*].41
-,42,,0x0200002A,45,45,45,45,f32,,,,,m17[*].42
-,43,,0x0200002B,0.05,0.05,0.05,0.05,f32,,,,,m17[*].43
-,44,,0x0200002C,0.04,0.04,0.04,0.04,f32,,,,,m17[*].44
-,45,,0x0200002D,0.3,0.3,0.3,0.3,f32,,,,,m17[*].45
-,46,,0x0200002E,0.3,0.3,0.3,0.3,f32,,,,,m17[*].46
-,47,,0x0200002F,1.5,1.5,1.5,1.5,f32,,,,,m17[*].47
-,48,,0x02000030,180,180,180,180,f32,,,,,m17[*].48
-,49,,0x02000031,1,1,1,1,f32,,,,,m17[*].49
-,50,,0x02000032,1,1,1,1,f32,,,,,m17[*].50
-,51,,0x02000033,1,1,1,1,f32,,,,,m17[*].51
-,52,,0x02000034,1,1,1,1,f32,,,,,m17[*].52
-,53,,0x02000035,1,1,1,1,f32,,,,,m17[*].53
-,54,,0x02000036,1,1,1,1,f32,,,,,m17[*].54
-,55,,0x02000037,1,1,1,1,f32,,,,,m17[*].55
-,56,,0x02000038,1,1,1,1,f32,,,,,m17[*].56
-,57,,0x02000039,1,1,1,1,f32,,,,,m17[*].57
-,58,,0x0200003A,1,1,1,1,f32,,,,,m17[*].58
-,59,,0x0200003B,1,1,1,1,f32,,,,,m17[*].59
-,60,,0x0200003C,1,1,1,1,f32,,,,,m17[*].60
-,61,,0x0200003D,1,1,1,1,f32,,,,,m17[*].61
-,62,,0x0200003E,1,1,1,1,f32,,,,,m17[*].62
-,63,,0x0200003F,1,1,1,1,f32,,,,,m17[*].63
-,64,,0x02000040,1,1,1,1,f32,,,,,m17[*].64
-,65,,0x02000041,1,1,1,1,f32,,,,,m17[*].65
-,66,,0x02000042,1,1,1,1,f32,,,,,m17[*].66
-,67,,0x02000043,1,1,1,1,f32,,,,,m17[*].67
-,68,,0x02000044,1,1,1,1,f32,,,,,m17[*].68
-,69,,0x02000045,1,1,1,1,f32,,,,,m17[*].69
-,70,,0x02000046,1,1,1,1,f32,,,,,m17[*].70
-,71,,0x02000047,1,1,0.95,1,f32,,,,,m17[*].71
-,72,,0x02000048,1,1,1,1,f32,,,,,m17[*].72
-,73,,0x02000049,1,1,1,1,f32,,,,,m17[*].73
-,74,,0x0200004A,1,1,1,1,f32,,,,,m17[*].74
-,75,,0x0200004B,1,1,1,1,f32,,,,,m17[*].75
-,76,,0x0200004C,1,1,1,1,f32,,,,,m17[*].76
-,77,,0x0200004D,1,1,1,1,f32,,,,,m17[*].77
-,78,,0x0200004E,1,1,1,1,f32,,,,,m17[*].78
-,79,,0x0200004F,1,1,1,1,f32,,,,,m17[*].79
-,80,,0x02000050,1,1,1,1,f32,,,,,m17[*].80
-,81,,0x02000051,1,1,1,1,f32,,,,,m17[*].81
-,82,,0x02000052,1,1,1,1,f32,,,,,m17[*].82
-,83,,0x02000053,1,1,1,1,f32,,,,,m17[*].83
+,8,,0x14000008,0xFF,,,,u32,RGB?,community ID was 0x14000000,medium,community | no read in the vanilla MSC (native or unused),m16.8
+,9,,0x14000009,0x33,,,,u32,,community ID was 0x14000001,,no read in the vanilla MSC (native or unused),m16.9
+,10,,0x1400000A,0x33,,,,u32,,community ID was 0x14000002,,no read in the vanilla MSC (native or unused),m16.10
+,11,,0x1400000B,0xFF,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.11
+,12,,0x1400000C,0x33,,,,u32,,community ID was 0x14000004,,no read in the vanilla MSC (native or unused),m16.12
+,13,,0x1400000D,0x33,,,,u32,,community ID was 0x14000005,,no read in the vanilla MSC (native or unused),m16.13
+,14,,0x1400000E,0x34,,,,u32,RGB?,community ID was 0x14000006,medium,community | no read in the vanilla MSC (native or unused),m16.14
+,15,,0x1400000F,0xB9,,,,u32,,community ID was 0x14000007,,no read in the vanilla MSC (native or unused),m16.15
+,16,,0x14000010,0x40,,,,u32,,community ID was 0x14000008,,no read in the vanilla MSC (native or unused),m16.16
+,17,,0x14000011,0x34,,,,u32,RGB?,community ID was 0x14000009,medium,community | no read in the vanilla MSC (native or unused),m16.17
+,18,,0x14000012,0x6F,,,,u32,,community ID was 0x1400000A,,no read in the vanilla MSC (native or unused),m16.18
+,19,,0x14000013,0xFF,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.19
+,20,,0x14000014,0x30,,,,u32,RGB?,community ID was 0x1400000C,medium,community | no read in the vanilla MSC (native or unused),m16.20
+,21,,0x14000015,0x8E,,,,u32,,community ID was 0x1400000D,,no read in the vanilla MSC (native or unused),m16.21
+,22,,0x14000016,0xFF,,,,u32,,community ID was 0x1400000E,,no read in the vanilla MSC (native or unused),m16.22
+,23,,0x14000017,0x34,,,,u32,RGB?,community ID was 0x1400000F,medium,community | no read in the vanilla MSC (native or unused),m16.23
+,24,,0x14000018,0xB9,,,,u32,,community ID was 0x14000010,,no read in the vanilla MSC (native or unused),m16.24
+,25,,0x14000019,0x40,,,,u32,,community ID was 0x14000011,,no read in the vanilla MSC (native or unused),m16.25
+,26,,0x1400001A,0xFF,,,,u32,RGB?,community ID was 0x14000012,medium,community | no read in the vanilla MSC (native or unused),m16.26
+,27,,0x1400001B,0x32,,,,u32,,community ID was 0x14000013,,no read in the vanilla MSC (native or unused),m16.27
+,28,,0x1400001C,0xA0,,,,u32,,community ID was 0x14000014,,no read in the vanilla MSC (native or unused),m16.28
+,29,,0x1400001D,0xFF,,,,u32,RGB?,community ID was 0x14000015,medium,community | no read in the vanilla MSC (native or unused),m16.29
+,30,,0x1400001E,0x33,,,,u32,,community ID was 0x14000016,,no read in the vanilla MSC (native or unused),m16.30
+,31,,0x1400001F,0x33,,,,u32,,community ID was 0x14000017,,no read in the vanilla MSC (native or unused),m16.31
+17,0,All Pikmins,0x02000000,4,4,4,4,f32,Pikmin 'Safespot' Olimar-distance,How far the 'ideal' position for the Pikmin to stand is from olimar. Higher = farther,medium,community | no read in the article MSC (native or unused),m17[*].0
+,1,,0x02000001,4,4,4,4,f32,Pikmin 'Safespot' spacing,The distance between the pikmin's safespots,medium,community | no read in the article MSC (native or unused),m17[*].1
+,2,,0x02000002,60,60,60,60,f32,Pikmin runspeed?,,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x02000003,23,23,23,23,f32,,,,no read in the article MSC (native or unused),m17[*].3
+,4,,0x02000004,4,4,4,4,f32,Effort -- code: BattleObject op 0x3E8 (func_53); BattleObject op 0x3E9 (func_84); tested as a flag (non-zero = on) (func_49),"When set to 100, they just stand still whenever you idle and you can run away from them and through them and they won't care. Only if you whistle or do certain moves will they respond, and even then, only some of them do",medium,community | reads: MSC pikmin.mscsb func_49; MSC pikmin.mscsb func_53; MSC pikmin.mscsb func_57; MSC pikmin.mscsb func_69; +10 more,m17[*].4
+,5,,0x02000005,8,8,8,8,f32,How long Pikmin continue to follow the previous aerial velocity,,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x12000006,0x320,0x320,0x96,0x320,u32,Desynch death time (frames),How long a desynched Pikmin has to live in frames,medium,community | no read in the article MSC (native or unused),m17[*].6
+,7,,0x12000007,0x26C,0x26C,0x5A,0x26C,u32,Desynch warning time (frames),How long to wait before flashtinting a desynched pikmin to warn the olimar player that it is about to die,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x12000008,0x3,0x3,0x3,0x3,u32,"Olimar-Pikmin interaction box size? -- code: stored in instance int 0xA, then tested against 0 (func_112) (func_114)",,medium,community | reads: MSC pikmin.mscsb func_114; MSC pikmin.mscsb func_127; MSC pikmin.mscsb func_136; MSC pikmin.mscsb func_167; +1 more,m17[*].8
+,9,,0x02000009,24,24,24,24,f32,Pikmin teleport box size?,,medium,community | no read in the article MSC (native or unused),m17[*].9
+,10,,0x0200000A,5,5,5,5,f32,,,,no read in the article MSC (native or unused),m17[*].10
+,11,,0x0200000B,8,8,8,8,f32,,,,no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,1200,1200,1200,1200,f32,Budding time (frames),,medium,community | no read in the article MSC (native or unused),m17[*].12
+,13,,0x0200000D,2400,2400,2400,2400,f32,Full bloom time (frames),,medium,community | no read in the article MSC (native or unused),m17[*].13
+,14,,0x0200000E,1.1,1.1,1.1,1.1,f32,"Budded movement speed multiplier, unused?",,medium,community | no read in the article MSC (native or unused),m17[*].14
+,15,,0x0200000F,1.2,1.2,1.2,1.2,f32,"Flower movement speed multiplier, unused?",,medium,community | no read in the article MSC (native or unused),m17[*].15
+,16,,0x02000010,0.21,0.21,0.18,0.21,f32,H speed of pikmin pluck,,medium,community | no read in the article MSC (native or unused),m17[*].16
+,17,,0x02000011,2.1,1.8,2.8,2.1,f32,Initial V speed of pikmin pluck,,medium,community | no read in the article MSC (native or unused),m17[*].17
+,18,,0x02000012,0.075,0.075,0.075,0.075,f32,,,,no read in the article MSC (native or unused),m17[*].18
+,19,,0x02000013,3.2,3.2,3.2,3.2,f32,Pikmin Fsmash H initial speed,Purple initlal speed = 2.3 > 0.5 (written in ACMD),medium,community | no read in the article MSC (native or unused),m17[*].19
+,20,,0x02000014,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].20
+,21,,0x02000015,0.5,0.5,0.5,0.5,f32,Pikmin Fsmash H speed after decel point,,medium,community | no read in the article MSC (native or unused),m17[*].21
+,22,,0x02000016,0.18,0.18,0.18,0.18,f32,Pikmin Fsmash air friction,,medium,community | no read in the article MSC (native or unused),m17[*].22
+,23,,0x02000017,3,3,3,3,f32,Pikmin Fsmash H max speed,Purple initlal speed = 1.1 > 0 (written in ACMD),medium,community | no read in the article MSC (native or unused),m17[*].23
+,24,,0x02000018,0.7,0.7,0.7,0.7,f32,Pikmin Fsmash V initial speed,,medium,community | no read in the article MSC (native or unused),m17[*].24
+,25,,0x02000019,0.06,0.06,0.06,0.06,f32,Pikmin Fsmash gravity,,medium,community | no read in the article MSC (native or unused),m17[*].25
+,26,,0x0200001A,2.8,2.8,2.8,2.8,f32,Pikmin Usmash initial V speed,Purple initlal speed = 2.7 (written in ACMD),medium,community | no read in the article MSC (native or unused),m17[*].26
+,27,,0x0200001B,0.25,0.25,0.25,0.25,f32,Pikmin Usmash gravity,,medium,community | no read in the article MSC (native or unused),m17[*].27
+,28,,0x0200001C,2.8,2.8,2.8,2.8,f32,Pikmin Usmash max fall speed,,medium,community | no read in the article MSC (native or unused),m17[*].28
+,29,,0x0200001D,1.2,1.1,1.1,1.2,f32,Smash input SideB H speed multiplier,,medium,community | no read in the article MSC (native or unused),m17[*].29
+,30,,0x1200001E,0x12C,0x190,0x12C,0x12C,u32,Max additional frames of latch time,Latch frames = INT(60 + (300 - Opponent's%)),medium,community | no read in the article MSC (native or unused),m17[*].30
+,31,,0x1200001F,0x3C,0x3C,0x3C,0x3C,u32,Base frames of latch time,,medium,community | no read in the article MSC (native or unused),m17[*].31
+,32,,0x12000020,0x7,0x5,0x7,0x7,u32,Latch time reduction per directional input (frames),,medium,community | no read in the article MSC (native or unused),m17[*].32
+,33,,0x02000021,-0.4,-0.4,-0.4,-0.4,f32,SideB throw strength?,,medium,community | no read in the article MSC (native or unused),m17[*].33
+,34,,0x02000022,1.3,1.3,1.3,1.3,f32,Speed Pikmin fly off opponnent after they're done Side-B beating him,,medium,community | no read in the article MSC (native or unused),m17[*].34
+,35,,0x12000023,0x24,0x5A,0x24,0x24,u32,,,,no read in the article MSC (native or unused),m17[*].35
+,36,,0x02000024,-1.3,-1.3,-1.3,-1.3,f32,,,,no read in the article MSC (native or unused),m17[*].36
+,37,,0x12000025,0x1E,0x3C,0x28,0x1E,u32,"Something related to SpecialLwRespond -- code: stored in instance int 0xA, then tested against 0 (func_112) (func_161)",,medium,community | reads: MSC pikmin.mscsb func_161,m17[*].37
+,38,,0x02000026,2000,2000,2000,2000,f32,,,,no read in the article MSC (native or unused),m17[*].38
+,39,,0x02000027,8,8,8,8,f32,,,,no read in the article MSC (native or unused),m17[*].39
+,40,,0x02000028,4,4,4,4,f32,,,,no read in the article MSC (native or unused),m17[*].40
+,41,,0x02000029,3.5,3.5,3.5,3.5,f32,"Simillar to Name4, related to CatchReturn/CatchReturnEnd -- code: BattleObject op 0x3E8 (func_208)",,medium,community | reads: MSC pikmin.mscsb func_208,m17[*].41
+,42,,0x0200002A,45,45,45,45,f32,,,,no read in the article MSC (native or unused),m17[*].42
+,43,,0x0200002B,0.05,0.05,0.05,0.05,f32,,,,no read in the article MSC (native or unused),m17[*].43
+,44,,0x0200002C,0.04,0.04,0.04,0.04,f32,,,,no read in the article MSC (native or unused),m17[*].44
+,45,,0x0200002D,0.3,0.3,0.3,0.3,f32,,,,no read in the article MSC (native or unused),m17[*].45
+,46,,0x0200002E,0.3,0.3,0.3,0.3,f32,,,,no read in the article MSC (native or unused),m17[*].46
+,47,,0x0200002F,1.5,1.5,1.5,1.5,f32,,,,no read in the article MSC (native or unused),m17[*].47
+,48,,0x02000030,180,180,180,180,f32,,,,no read in the article MSC (native or unused),m17[*].48
+,49,,0x02000031,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].49
+,50,,0x02000032,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].50
+,51,,0x02000033,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].51
+,52,,0x02000034,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].52
+,53,,0x02000035,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].53
+,54,,0x02000036,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].54
+,55,,0x02000037,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].55
+,56,,0x02000038,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].56
+,57,,0x02000039,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].57
+,58,,0x0200003A,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].58
+,59,,0x0200003B,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].59
+,60,,0x0200003C,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].60
+,61,,0x0200003D,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].61
+,62,,0x0200003E,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].62
+,63,,0x0200003F,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].63
+,64,,0x02000040,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].64
+,65,,0x02000041,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].65
+,66,,0x02000042,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].66
+,67,,0x02000043,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].67
+,68,,0x02000044,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].68
+,69,,0x02000045,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].69
+,70,,0x02000046,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].70
+,71,,0x02000047,1,1,0.95,1,f32,,,,no read in the article MSC (native or unused),m17[*].71
+,72,,0x02000048,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].72
+,73,,0x02000049,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].73
+,74,,0x0200004A,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].74
+,75,,0x0200004B,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].75
+,76,,0x0200004C,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].76
+,77,,0x0200004D,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].77
+,78,,0x0200004E,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].78
+,79,,0x0200004F,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].79
+,80,,0x02000050,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].80
+,81,,0x02000051,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].81
+,82,,0x02000052,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].82
+,83,,0x02000053,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].83
 18,0,"Individual Pikmin
-(See also: Pikmin)",,0xD,,,,u32,HP,,medium,community,m18[0].0
+(See also: Pikmin)",,0x8,,,,u32,HP,,medium,community,m18[0].0
 ,1,,,0.1,,,,f32,Walk/Run acceleration,,medium,community,m18[0].1
 ,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[0].2
 ,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[0].3
@@ -181,7 +181,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,32,,,3.3,,,,f32,?,,medium,community,m18[0].32
 ,33,,,0x4,,,,u32,,,,,m18[0].33
 ,34,,,4,,,,f32,,,,,m18[0].34
-,0,,,0xB,,,,u32,HP,,medium,community,m18[1].0
+,0,,,0x8,,,,u32,HP,,medium,community,m18[1].0
 ,1,,,0.1,,,,f32,Walk/Run acceleration,,medium,community,m18[1].1
 ,2,,,3,,,,f32,Walk/Run max speed,,medium,community,m18[1].2
 ,3,,,0.2,,,,f32,Ground/Air friction,,medium,community,m18[1].3
@@ -251,7 +251,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,32,,,3.3,,,,f32,?,,medium,community,m18[2].32
 ,33,,,0xA,,,,u32,,,,,m18[2].33
 ,34,,,6,,,,f32,,,,,m18[2].34
-,0,,,0x6,,,,u32,HP,,medium,community,m18[3].0
+,0,,,0x7,,,,u32,HP,,medium,community,m18[3].0
 ,1,,,0.135,,,,f32,Walk/Run acceleration,,medium,community,m18[3].1
 ,2,,,4,,,,f32,Walk/Run max speed,,medium,community,m18[3].2
 ,3,,,0.4,,,,f32,Ground/Air friction,,medium,community,m18[3].3
@@ -276,7 +276,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,22,,,3,,,,f32,SideB H speed,,medium,community,m18[3].22
 ,23,,,5,,,,f32,?,,medium,community,m18[3].23
 ,24,,,1.1,,,,f32,SideB V initial speed,,medium,community,m18[3].24
-,25,,,6.4,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[3].25
+,25,,,2.4,,,,f32,Standing/Pivot grab H initial speed,,medium,community,m18[3].25
 ,26,,,-0.15,,,,f32,Standing/Pivot grab accel,,medium,community,m18[3].26
 ,27,,,0,,,,f32,Something with standing/pivot grab,,medium,community,m18[3].27
 ,28,,,2.4,,,,f32,?,,medium,community,m18[3].28
@@ -286,7 +286,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,32,,,3.6,,,,f32,?,,medium,community,m18[3].32
 ,33,,,0xA,,,,u32,,,,,m18[3].33
 ,34,,,8,,,,f32,,,,,m18[3].34
-,0,,,0x96,,,,u32,HP,,medium,community,m18[4].0
+,0,,,0xD,,,,u32,HP,,medium,community,m18[4].0
 ,1,,,0.08,,,,f32,Walk/Run acceleration,,medium,community,m18[4].1
 ,2,,,1.7,,,,f32,Walk/Run max speed,,medium,community,m18[4].2
 ,3,,,0.17,,,,f32,Ground/Air friction,,medium,community,m18[4].3
@@ -884,13 +884,13 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,5,,,0,,,,f32,,,,,m20[0].5
 ,0,,,0x2000048,,,,u32,Pikmin weapon param Name72?,,medium,community,m20[1].0
 ,1,,,1,,,,f32,,,,,m20[1].1
-,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[1].2
+,2,,,1.5,,,,f32,Multiplier?,community value differs: Default 1.2 (vanilla 1.5),medium,community,m20[1].2
 ,3,,,0,,,,f32,,,,,m20[1].3
 ,4,,,1,,,,f32,,,,,m20[1].4
 ,5,,,0,,,,f32,,,,,m20[1].5
 ,0,,,0x2000049,,,,u32,Pikmin weapon param Name73?,,medium,community,m20[2].0
 ,1,,,1,,,,f32,,,,,m20[2].1
-,2,,,1.5,,,,f32,Multiplier?,,medium,community,m20[2].2
+,2,,,1.5,,,,f32,Multiplier?,community value differs: Default 1.2 (vanilla 1.5),medium,community,m20[2].2
 ,3,,,0,,,,f32,,,,,m20[2].3
 ,4,,,1,,,,f32,,,,,m20[2].4
 ,5,,,0,,,,f32,,,,,m20[2].5
@@ -937,21 +937,21 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0.5,,,,f32,,Added in 1.0.6,,,m24.3
 ,4,,,0.5,,,,f32,,Added in 1.0.6,,,m24.4
 ,5,,,3,,,,f32,,Added in 1.0.6,,,m24.5
-24,0,Dolfin,0x02000000,1.5,,,,f32,,,,,m25[0].0
-,1,,0x02000001,0.04,,,,f32,,,,,m25[0].1
-,2,,0x02000002,4,,,,f32,,,,,m25[0].2
-,3,,0x12000003,0x14,,,,u32,,,,,m25[0].3
-,4,,0x12000004,0x78,,,,u32,,,,,m25[0].4
-,5,,0x02000005,15,,,,f32,,,,,m25[0].5
-,6,,0x02000006,-3.5,,,,f32,,,,,m25[0].6
-,7,,0x02000007,115,,,,f32,,,,,m25[0].7
-,8,,0x02000008,30,,,,f32,,,,,m25[0].8
-,9,,0x02000009,50,,,,f32,,,,,m25[0].9
-,10,,0x0200000A,50,,,,f32,,Added in 1.0.6,,,m25[0].10
-,11,,0x0200000B,80,,,,f32,,Added in 1.0.6,,,m25[0].11
-,12,,0x0200000C,30,,,,f32,,,,,m25[0].12
-,13,,0x1200000D,0x28A,,,,u32,,,,,m25[0].13
-,14,,0x0200000E,0.9,,,,f32,H speed (StickX * this),,medium,community,m25[0].14
+24,0,Dolfin,0x02000000,1.5,,,,f32,,,,no read in the article MSC (native or unused),m25[0].0
+,1,,0x02000001,0.04,,,,f32,,,,no read in the article MSC (native or unused),m25[0].1
+,2,,0x02000002,4,,,,f32,,,,no read in the article MSC (native or unused),m25[0].2
+,3,,0x12000003,0x14,,,,u32,"code: stored in status int 0x0, then decremented in func_53 (a countdown / remaining count), tested against 0 (func_51)",,medium,reads: MSC pikmin/dolfin.mscsb func_51,m25[0].3
+,4,,0x12000004,0x78,,,,u32,"code: stored in status int 0x0, then decremented in func_58 (a countdown / remaining count), tested against 0 (func_56)",,medium,reads: MSC pikmin/dolfin.mscsb func_56,m25[0].4
+,5,,0x02000005,15,,,,f32,,,,no read in the article MSC (native or unused),m25[0].5
+,6,,0x02000006,-3.5,,,,f32,,,,no read in the article MSC (native or unused),m25[0].6
+,7,,0x02000007,115,,,,f32,,,,no read in the article MSC (native or unused),m25[0].7
+,8,,0x02000008,30,,,,f32,,,,no read in the article MSC (native or unused),m25[0].8
+,9,,0x02000009,50,,,,f32,,,,no read in the article MSC (native or unused),m25[0].9
+,10,,0x0200000A,50,,,,f32,,Added in 1.0.6,,no read in the article MSC (native or unused),m25[0].10
+,11,,0x0200000B,80,,,,f32,,Added in 1.0.6,,no read in the article MSC (native or unused),m25[0].11
+,12,,0x0200000C,30,,,,f32,,,,no read in the article MSC (native or unused),m25[0].12
+,13,,0x1200000D,0x28A,,,,u32,"code: stored in status int 0x1, then decremented in func_63 (a countdown / remaining count), GroundModule op 0x2722 (func_61)",,medium,reads: MSC pikmin/dolfin.mscsb func_61,m25[0].13
+,14,,0x0200000E,0.9,,,,f32,"H speed (StickX * this) -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), with a current speed (KineticModuleF) (func_62)",,high,community | reads: MSC pikmin/dolfin.mscsb func_62,m25[0].14
 25,0,Hurtbox?,,0,,,,f32,X offset,,medium,community,m26[0].0
 ,1,,,-15,,,,f32,Y offset,,medium,community,m26[0].1
 ,2,,,0,,,,f32,Z offset,,medium,community,m26[0].2

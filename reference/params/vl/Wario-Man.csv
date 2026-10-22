@@ -1,87 +1,87 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x14,0xA,0xA,0xA,u32,Min frames you can hold bite,,low,"copied from Wario (same layout, same position)",m12[*].0
-,1,,0x15000001,0x78,0x78,0x78,0x78,u32,Max frames you can hold bite,,low,"copied from Wario (same layout, same position)",m12[*].1
-,2,,0x05000002,4,4,4,4,f32,Affects number of chews during bite,,low,"copied from Wario (same layout, same position)",m12[*].2
-,3,,0x15000003,0x5,0x5,0x5,0x5,u32,,,,,m12[*].3
-,4,,0x05000004,6,6,6,6,f32,Damage received eating explosive items,,low,"copied from Wario (same layout, same position)",m12[*].4
-,5,,0x15000005,0xF,0xF,0xF,0xF,u32,,,,,m12[*].5
-,6,,0x05000006,2,1.5,1.5,1.5,f32,Damage healed multiplier eating food items,,low,"copied from Wario (same layout, same position)",m12[*].6
-,7,,0x05000007,1,2,2,2,f32,Damage healed eating normal items,,low,"copied from Wario (same layout, same position)",m12[*].7
-,8,,0x05000008,90,10,10,10,f32,Additional waft charge frames eating food items,,low,"copied from Wario (same layout, same position)",m12[*].8
-14,0,Side B,0x06000000,60,60,60,60,f32,,,,,m13[*].0
-,1,,0x06000001,30,30,30,30,f32,Knockback resistance,,low,"copied from Wario (same layout, same position)",m13[*].1
-,2,,0x06000002,1.5,1.5,1.5,1.5,f32,Jumping off bike H momentum,,low,"copied from Wario (same layout, same position)",m13[*].2
-,3,,0x06000003,2.8,2.8,2.8,2.8,f32,Jumping off bike V momentum,,low,"copied from Wario (same layout, same position)",m13[*].3
-,4,,0x06000004,1.5,1.5,1.5,1.5,f32,,,,,m13[*].4
-,5,,0x06000005,1,1,1,1,f32,,,,,m13[*].5
+13,0,Neutral B,0x15000000,0x14,0xA,0xA,0xA,u32,"code: stored in status int 0x4, then decremented in func_2345 (a countdown / remaining count), tested against 0 (func_2342) [status 0x157] (same position as Wario: ""Min frames you can hold bite"")",,medium,"copied from Wario (same layout, same position) | reads: MSC warioman.mscsb func_2342",m12[*].0
+,1,,0x15000001,0x78,0x78,0x78,0x78,u32,"code: stored in status int 0x5, then decremented in func_2345 (a countdown / remaining count), tested against 0 (func_2342) [status 0x157] (same position as Wario: ""Max frames you can hold bite"")",,medium,"copied from Wario (same layout, same position) | reads: MSC warioman.mscsb func_2342",m12[*].1
+,2,,0x05000002,4,4,4,4,f32,Affects number of chews during bite,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].2
+,3,,0x15000003,0x5,0x5,0x5,0x5,u32,,,,no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,6,6,6,6,f32,Damage received eating explosive items,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].4
+,5,,0x15000005,0xF,0xF,0xF,0xF,u32,,,,no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,2,1.5,1.5,1.5,f32,Damage healed multiplier eating food items,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].6
+,7,,0x05000007,1,2,2,2,f32,Damage healed eating normal items,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].7
+,8,,0x05000008,90,10,10,10,f32,Additional waft charge frames eating food items,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].8
+14,0,Side B,0x06000000,60,60,60,60,f32,,,,no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,30,30,30,30,f32,Knockback resistance,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m13[*].1
+,2,,0x06000002,1.5,1.5,1.5,1.5,f32,Jumping off bike H momentum,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m13[*].2
+,3,,0x06000003,2.8,2.8,2.8,2.8,f32,Jumping off bike V momentum,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m13[*].3
+,4,,0x06000004,1.5,1.5,1.5,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
 ,6,,0x16000006,0x1,0xB4,0xB4,0xB4,u32,[auto] read by native code (get_int at 0x027DD3D4); meaning not traced,,low,reads: native 0x027DD3D4 (fn 0x027DCE78),m13[*].6
-,7,,0x06000007,26,26,26,26,f32,Bike HP,,low,"copied from Wario (same layout, same position)",m13[*].7
-15,0,Up B,0x07000000,1,0.5,0.5,0.5,f32,H speed multiplier on startup,,low,"copied from Wario (same layout, same position)",m14[*].0
-,1,,0x07000001,0,-0.9,-0.9,-0.9,f32,V speed multiplier on startup,,low,"copied from Wario (same layout, same position)",m14[*].1
-,2,,0x07000002,0,0.01,0.01,0.01,f32,Gravity on startup,,low,"copied from Wario (same layout, same position)",m14[*].2
-,3,,0x07000003,0.3,0.3,0.3,0.3,f32,Sensitivity to angle,,low,"copied from Wario (same layout, same position)",m14[*].3
-,4,,0x07000004,60,40,40,40,f32,Ability to angle (degrees),,low,"copied from Wario (same layout, same position)",m14[*].4
-,5,,0x07000005,0.15,0.15,0.15,0.15,f32,,,,,m14[*].5
-,6,,0x07000006,-0.9,-0.9,-0.9,-0.9,f32,V speed subtracted from end of corkscrew,,low,"copied from Wario (same layout, same position)",m14[*].6
-,7,,0x07000007,1,1,1,1,f32,Height multiplier,,low,"copied from Wario (same layout, same position)",m14[*].7
-,8,,0x07000008,20,0,0,0,f32,Landing lag (frames),,low,"copied from Wario (same layout, same position)",m14[*].8
-16,0,Down B,0x08000000,110,110,110,110,f32,Times for reaching charge level 3 (seconds),,low,"copied from Wario (same layout, same position)",m15[*].0
-,1,,0x08000001,1,15,15,15,f32,Times for reaching charge level 1 (seconds),,low,"copied from Wario (same layout, same position)",m15[*].1
-,2,,0x08000002,5,55,55,55,f32,Times for reaching charge level 2 (seconds),,low,"copied from Wario (same layout, same position)",m15[*].2
-,3,,0x08000003,2,1.3,1.3,1.3,f32,Charge level 1 damage multiplier,,low,"copied from Wario (same layout, same position)",m15[*].3
-,4,,0x08000004,1.5,1.5,1.5,1.5,f32,Charge level 2 damage multiplier,,low,"copied from Wario (same layout, same position)",m15[*].4
-,5,,0x08000005,2.3,2.4,2.4,2.4,f32,V initial launch speed (level 1),,low,"copied from Wario (same layout, same position)",m15[*].5
-,6,,0x08000006,3.3,3.5,3.5,3.5,f32,V initial launch speed (level 2),,low,"copied from Wario (same layout, same position)",m15[*].6
-,7,,0x08000007,4.6,4.6,4.6,4.6,f32,V initial launch speed (level 3),,low,"copied from Wario (same layout, same position)",m15[*].7
-,0,Category 4 block,0x14000000,0xC,,,,u32,,,,,m16.0
-,1,,0x14000001,0x78,,,,u32,,,,,m16.1
-,2,,0x14000002,0x5,,,,u32,,,,,m16.2
-,3,,0x14000003,0xB4,,,,u32,,,,,m16.3
-17,0,Article params (wariobike),0x02000000,5,2.2,2.2,2.2,f32,Initial grounded speed,,low,"copied from Wario (same layout, same position)",m17[*].0
-,1,,0x02000001,5,2,2,2,f32,Initial aerial speed,,low,"copied from Wario (same layout, same position)",m17[*].1
-,2,,0x02000002,1.5,1.5,1.5,1.5,f32,Aerial initial jump height multiplier,,low,"copied from Wario (same layout, same position)",m17[*].2
-,3,,0x02000003,0.15,0.15,0.15,0.15,f32,V speed received from jump break of bouncing off walls,,low,"copied from Wario (same layout, same position)",m17[*].3
-,4,,0x02000004,0.6,0.4,0.4,0.4,f32,,,,,m17[*].4
-,5,,0x02000005,5,2.5,2.5,2.5,f32,Grounded max speed,,low,"copied from Wario (same layout, same position)",m17[*].5
-,6,,0x12000006,0x1E,0xA,0xA,0xA,u32,,,,,m17[*].6
-,7,,0x02000007,0.05,0.015,0.015,0.015,f32,Grounded friction,,low,"copied from Wario (same layout, same position)",m17[*].7
-,8,,0x02000008,0.5,0.3,0.3,0.3,f32,Grounded acceleration,,low,"copied from Wario (same layout, same position)",m17[*].8
-,9,,0x02000009,5,1.3,1.3,1.3,f32,Aerial H max speed,,low,"copied from Wario (same layout, same position)",m17[*].9
-,10,,0x0200000A,0.01,0.01,0.01,0.01,f32,Aerial air resistance,,low,"copied from Wario (same layout, same position)",m17[*].10
-,11,,0x0200000B,0.8,0.8,0.8,0.8,f32,,,,,m17[*].11
-,12,,0x0200000C,2,1.5,1.5,1.5,f32,,,,,m17[*].12
-,13,,0x0200000D,0.06,0.06,0.06,0.06,f32,Gravity,,low,"copied from Wario (same layout, same position)",m17[*].13
-,14,,0x0200000E,1.5,1.5,1.5,1.5,f32,Max fall speed,,low,"copied from Wario (same layout, same position)",m17[*].14
-,15,,0x0200000F,0.05,0.05,0.05,0.05,f32,,,,,m17[*].15
-,16,,0x02000010,0.07,0.07,0.07,0.07,f32,,,,,m17[*].16
-,17,,0x02000011,5,5,5,5,f32,,,,,m17[*].17
-,18,,0x02000012,0.5,0.5,0.5,0.5,f32,,,,,m17[*].18
-,19,,0x02000013,0.7,0.7,0.7,0.7,f32,,,,,m17[*].19
-,20,,0x02000014,3,3,3,3,f32,,,,,m17[*].20
-,21,,0x02000015,1,1,1,1,f32,,,,,m17[*].21
-,22,,0x02000016,0.15,0.09,0.09,0.09,f32,Min speed to have a hitbox?,,low,"copied from Wario (same layout, same position)",m17[*].22
-,23,,0x02000017,10,10,10,10,f32,,,,,m17[*].23
-,24,,0x02000018,0.1,1,1,1,f32,,,,,m17[*].24
-,25,,0x02000019,1,22,22,22,f32,,,,,m17[*].25
-,26,,0x0200001A,2,2,2,2,f32,Aerial rotation speed,,low,"copied from Wario (same layout, same position)",m17[*].26
-,27,,0x0200001B,2.3,2.3,2.3,2.3,f32,Air to ground bounce height,,low,"copied from Wario (same layout, same position)",m17[*].27
-,28,,0x0200001C,0.5,0.5,0.5,0.5,f32,,,,,m17[*].28
-,29,,0x0200001D,2,2,2,2,f32,,,,,m17[*].29
-,30,,0x0200001E,0.015,0.015,0.015,0.015,f32,,,,,m17[*].30
-,31,,0x0200001F,0.2,0.2,0.2,0.2,f32,,,,,m17[*].31
-,32,,0x02000020,0,0,0,0,f32,,,,,m17[*].32
-,33,,0x02000021,10,10,10,10,f32,,,,,m17[*].33
-,34,,0x02000022,0.5,0.5,0.5,0.5,f32,,,,,m17[*].34
-,35,,0x02000023,0.3,0.3,0.3,0.3,f32,,,,,m17[*].35
-,36,,0x02000024,0.8,0.5,0.5,0.5,f32,,,,,m17[*].36
-,37,,0x02000025,0.2,0.2,0.2,0.2,f32,,,,,m17[*].37
-,38,,0x02000026,3,3,3,3,f32,,,,,m17[*].38
-,39,,0x02000027,4,20,20,20,f32,,,,,m17[*].39
-,40,,0x02000028,40,20,20,20,f32,,,,,m17[*].40
-,41,,0x02000029,2,2.5,2.5,2.5,f32,,,,,m17[*].41
-,42,,0x0200002A,0.01,0.1,0.1,0.1,f32,,,,,m17[*].42
-,43,,0x0200002B,1.5,0.5,0.5,0.5,f32,,,,,m17[*].43
-,44,,0x0200002C,3,3,3,3,f32,,,,,m17[*].44
+,7,,0x06000007,26,26,26,26,f32,Bike HP,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m13[*].7
+15,0,Up B,0x07000000,1,0.5,0.5,0.5,f32,H speed multiplier on startup,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].0
+,1,,0x07000001,0,-0.9,-0.9,-0.9,f32,V speed multiplier on startup,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].1
+,2,,0x07000002,0,0.01,0.01,0.01,f32,Gravity on startup,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].2
+,3,,0x07000003,0.3,0.3,0.3,0.3,f32,Sensitivity to angle,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].3
+,4,,0x07000004,60,40,40,40,f32,Ability to angle (degrees),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].4
+,5,,0x07000005,0.15,0.15,0.15,0.15,f32,,,,no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,-0.9,-0.9,-0.9,-0.9,f32,V speed subtracted from end of corkscrew,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].6
+,7,,0x07000007,1,1,1,1,f32,Height multiplier,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m14[*].7
+,8,,0x07000008,20,0,0,0,f32,"code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2267) [status 0x154 (SpecialHiStart, SpecialAirHiStart)] (same position as Wario: ""Landing lag (frames)"")",,medium,"copied from Wario (same layout, same position) | reads: MSC warioman.mscsb func_2267",m14[*].8
+16,0,Down B,0x08000000,110,110,110,110,f32,Times for reaching charge level 3 (seconds),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].0
+,1,,0x08000001,1,15,15,15,f32,Times for reaching charge level 1 (seconds),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].1
+,2,,0x08000002,5,55,55,55,f32,Times for reaching charge level 2 (seconds),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].2
+,3,,0x08000003,2,1.3,1.3,1.3,f32,Charge level 1 damage multiplier,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].3
+,4,,0x08000004,1.5,1.5,1.5,1.5,f32,Charge level 2 damage multiplier,,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].4
+,5,,0x08000005,2.3,2.4,2.4,2.4,f32,V initial launch speed (level 1),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].5
+,6,,0x08000006,3.3,3.5,3.5,3.5,f32,V initial launch speed (level 2),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].6
+,7,,0x08000007,4.6,4.6,4.6,4.6,f32,V initial launch speed (level 3),,low,"copied from Wario (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].7
+,0,Category 4 block,0x14000000,0xC,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
+,1,,0x14000001,0x78,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x14000002,0x5,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x14000003,0xB4,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.3
+17,0,Article params (wariobike),0x02000000,5,2.2,2.2,2.2,f32,Initial grounded speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].0
+,1,,0x02000001,5,2,2,2,f32,Initial aerial speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].1
+,2,,0x02000002,1.5,1.5,1.5,1.5,f32,Aerial initial jump height multiplier,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].2
+,3,,0x02000003,0.15,0.15,0.15,0.15,f32,V speed received from jump break of bouncing off walls,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].3
+,4,,0x02000004,0.6,0.4,0.4,0.4,f32,,,,no read in the article MSC (native or unused),m17[*].4
+,5,,0x02000005,5,2.5,2.5,2.5,f32,Grounded max speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].5
+,6,,0x12000006,0x1E,0xA,0xA,0xA,u32,,,,no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,0.05,0.015,0.015,0.015,f32,Grounded friction,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].7
+,8,,0x02000008,0.5,0.3,0.3,0.3,f32,Grounded acceleration,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].8
+,9,,0x02000009,5,1.3,1.3,1.3,f32,Aerial H max speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].9
+,10,,0x0200000A,0.01,0.01,0.01,0.01,f32,Aerial air resistance,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].10
+,11,,0x0200000B,0.8,0.8,0.8,0.8,f32,,,,no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,2,1.5,1.5,1.5,f32,,,,no read in the article MSC (native or unused),m17[*].12
+,13,,0x0200000D,0.06,0.06,0.06,0.06,f32,Gravity,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].13
+,14,,0x0200000E,1.5,1.5,1.5,1.5,f32,Max fall speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].14
+,15,,0x0200000F,0.05,0.05,0.05,0.05,f32,,,,no read in the article MSC (native or unused),m17[*].15
+,16,,0x02000010,0.07,0.07,0.07,0.07,f32,,,,no read in the article MSC (native or unused),m17[*].16
+,17,,0x02000011,5,5,5,5,f32,,,,no read in the article MSC (native or unused),m17[*].17
+,18,,0x02000012,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].18
+,19,,0x02000013,0.7,0.7,0.7,0.7,f32,,,,no read in the article MSC (native or unused),m17[*].19
+,20,,0x02000014,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m17[*].20
+,21,,0x02000015,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].21
+,22,,0x02000016,0.15,0.09,0.09,0.09,f32,Min speed to have a hitbox?,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].22
+,23,,0x02000017,10,10,10,10,f32,,,,no read in the article MSC (native or unused),m17[*].23
+,24,,0x02000018,0.1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].24
+,25,,0x02000019,1,22,22,22,f32,,,,no read in the article MSC (native or unused),m17[*].25
+,26,,0x0200001A,2,2,2,2,f32,Aerial rotation speed,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].26
+,27,,0x0200001B,2.3,2.3,2.3,2.3,f32,Air to ground bounce height,,low,"copied from Wario (same layout, same position) | no read in the article MSC (native or unused)",m17[*].27
+,28,,0x0200001C,0.5,0.5,0.5,0.5,f32,code: compared with a computed value (func_76),,medium,reads: MSC warioman/wariobike.mscsb func_76,m17[*].28
+,29,,0x0200001D,2,2,2,2,f32,,,,no read in the article MSC (native or unused),m17[*].29
+,30,,0x0200001E,0.015,0.015,0.015,0.015,f32,,,,no read in the article MSC (native or unused),m17[*].30
+,31,,0x0200001F,0.2,0.2,0.2,0.2,f32,,,,no read in the article MSC (native or unused),m17[*].31
+,32,,0x02000020,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].32
+,33,,0x02000021,10,10,10,10,f32,,,,no read in the article MSC (native or unused),m17[*].33
+,34,,0x02000022,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].34
+,35,,0x02000023,0.3,0.3,0.3,0.3,f32,,,,no read in the article MSC (native or unused),m17[*].35
+,36,,0x02000024,0.8,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].36
+,37,,0x02000025,0.2,0.2,0.2,0.2,f32,,,,no read in the article MSC (native or unused),m17[*].37
+,38,,0x02000026,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m17[*].38
+,39,,0x02000027,4,20,20,20,f32,"code: named ""OK"" in a debug print (func_120); compared with a computed value (func_120)",,medium,reads: MSC warioman/wariobike.mscsb func_120,m17[*].39
+,40,,0x02000028,40,20,20,20,f32,code: compared with a computed value (func_120),,medium,reads: MSC warioman/wariobike.mscsb func_120,m17[*].40
+,41,,0x02000029,2,2.5,2.5,2.5,f32,,,,no read in the article MSC (native or unused),m17[*].41
+,42,,0x0200002A,0.01,0.1,0.1,0.1,f32,,,,no read in the article MSC (native or unused),m17[*].42
+,43,,0x0200002B,1.5,0.5,0.5,0.5,f32,code: tested as a flag (non-zero = on) (func_120),,low,reads: MSC warioman/wariobike.mscsb func_120,m17[*].43
+,44,,0x0200002C,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m17[*].44
 18,0,,,0,,,,f32,X offset,,low,"copied from Wario (same layout, same position)",m18[0].0
 ,1,,,0.9,,,,f32,Y offset,,low,"copied from Wario (same layout, same position)",m18[0].1
 ,2,,,6.5,,,,f32,Z offset,,low,"copied from Wario (same layout, same position)",m18[0].2

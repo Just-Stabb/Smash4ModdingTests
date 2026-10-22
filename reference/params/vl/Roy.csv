@@ -1,44 +1,44 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x3,0x0,0x0,0x0,u32,"[auto] read by MSC: var1 = (float)WorkModule(0x6, 0x15000000) * 30.0f;",,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3986; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4010",m12[*].0
-,1,,0x15000001,0x5,0x0,0x0,0x0,u32,"[auto] read by MSC: var2 = (float)WorkModule(0x6, 0x15000001) * 30.0f;",,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3986; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4010",m12[*].1
-,2,,0x15000002,0x8,0x0,0x0,0x0,u32,Time to fully charge (half-seconds),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3986; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3987; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4008; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_4010",m12[*].2
-,3,,0x15000003,0x6,0x0,0x0,0x0,u32,Base damage,,medium,community,m12[*].3
-,4,,0x15000004,0x5,0x0,0x0,0x0,u32,Damage per half-second of charge,,medium,community,m12[*].4
-,5,,0x05000005,0.8,0,0,0,f32,Aerial H speed multiplier,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3996",m12[*].5
-,6,,0x05000006,0.02,0,0,0,f32,Aerial H deceleration,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3996; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3998",m12[*].6
-,7,,0x05000007,10,0,0,0,f32,Inflicted self-damage,,medium,community,m12[*].7
-,8,,0x05000008,1,0,0,0,f32,"[auto] read by MSC: WorkModule(0x2, WorkModuleF(0, 0x5000008), 0x1000006);",,low,"reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3987",m12[*].8
+13,0,Neutral B,0x15000000,0x3,0x0,0x0,0x0,u32,"code: compared with a computed value (func_3986) [status 0x243; status 0x157 (SpecialNLoop, SpecialAirNLoop)]",,medium,reads: MSC kirby.mscsb func_3986; MSC kirby.mscsb func_4010; MSC roy.mscsb func_2260; MSC roy.mscsb func_2346,m12[*].0
+,1,,0x15000001,0x5,0x0,0x0,0x0,u32,"code: compared with a computed value (func_3986) [status 0x243; status 0x157 (SpecialNLoop, SpecialAirNLoop)]",,medium,reads: MSC kirby.mscsb func_3986; MSC kirby.mscsb func_4010; MSC roy.mscsb func_2260; MSC roy.mscsb func_2346,m12[*].1
+,2,,0x15000002,0x8,0x0,0x0,0x0,u32,"Time to fully charge (half-seconds) -- code: stored in status int 0x2 (func_4008); compared with a computed value (func_3986) [status 0x243; status 0x157 (SpecialNLoop, SpecialAirNLoop)]",,medium,community | reads: MSC kirby.mscsb func_3986; MSC kirby.mscsb func_3987; MSC kirby.mscsb func_4008; MSC kirby.mscsb func_4010; +4 more,m12[*].2
+,3,,0x15000003,0x6,0x0,0x0,0x0,u32,Base damage -- code: AttackModule op 0x271A (func_2327),,high,community | reads: MSC roy.mscsb func_2327,m12[*].3
+,4,,0x15000004,0x5,0x0,0x0,0x0,u32,Damage per half-second of charge -- code: AttackModule op 0x271A (func_2327); combined with status float 0x6 (func_2327),,high,community | reads: MSC roy.mscsb func_2327,m12[*].4
+,5,,0x05000005,0.8,0,0,0,f32,"Aerial H speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_3996) [status 0x242; status 0x152 (SpecialNStart, SpecialAirNStart)]",,high,community | reads: MSC kirby.mscsb func_3996; MSC roy.mscsb func_2355,m12[*].5
+,6,,0x05000006,0.02,0,0,0,f32,"Aerial H deceleration -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_3996) [status 0x242; status 0x152 (SpecialNStart, SpecialAirNStart)]",,high,community | reads: MSC kirby.mscsb func_3996; MSC kirby.mscsb func_3998; MSC roy.mscsb func_2355; MSC roy.mscsb func_2357,m12[*].6
+,7,,0x05000007,10,0,0,0,f32,"Inflicted self-damage -- code: DamageModule op 0x9 (func_2338) [status 0x15B (SpecialNEndMax, SpecialAirNEndMax)]",,high,community | reads: MSC roy.mscsb func_2338,m12[*].7
+,8,,0x05000008,1,0,0,0,f32,"code: stored in a work variable, then compared with a computed value (func_3986) (func_3987); stored in a work variable, then compared with a computed value (func_2260) (func_2261); animation rate of the motion it starts (func_22) (func_2262) [status 0x243; status 0x157 (SpecialNLoop, SpecialAirNLoop)]",,medium,reads: MSC kirby.mscsb func_3987; MSC roy.mscsb func_2261; MSC roy.mscsb func_2262,m12[*].8
 14,0,Side B,0x06000000,0.8,0,0,0,f32,Aerial H speed multiplier,,medium,"community | reads: native 0x027CB724 (fn 0x027CB59C, direct vl read)",m13[*].0
 ,1,,0x06000001,1.2,0,0,0,f32,Aerial V speed recieved,,medium,"community | reads: native 0x027CB74C (fn 0x027CB59C, direct vl read)",m13[*].1
-,2,,0x16000002,0x1,0x0,0x0,0x0,u32,Can use up/down variants,,low,"copied from Marth (same layout, same position)",m13[*].2
+,2,,0x16000002,0x1,0x0,0x0,0x0,u32,"code: tested against 0 (func_2289) (same position as Marth: ""Can use up/down variants"")",,low,"copied from Marth (same layout, same position) | reads: MSC roy.mscsb func_2289",m13[*].2
 15,0,Up B,0x07000000,0.6,0,0,0,f32,Special fall aerial mobility,,medium,"community | reads: native 0x027CAAF0 (fn 0x027CAA78, direct vl read)",m14[*].0
-,1,,0x07000001,30,0,0,0,f32,Landing lag (frames),,medium,"community | reads: native 0x027CAAD4 (fn 0x027CAA78, direct vl read)",m14[*].1
+,1,,0x07000001,30,0,0,0,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2307) [status 0x154 (SpecialHi, SpecialAirHi)]",,high,"community | reads: MSC roy.mscsb func_2307; native 0x027CAAD4 (fn 0x027CAA78, direct vl read)",m14[*].1
 ,2,,0x07000002,0.5,0,0,0,f32,[auto] read by native code (lfs at 0x027CA6A0); meaning not traced,read throughout entire move,low,"reads: native 0x027CA6A0 (fn 0x027CA5B0, direct vl read); native 0x027CA6CC (fn 0x027CA5B0, direct vl read)",m14[*].2
 ,3,,0x07000003,40,0,0,0,f32,Directionalization distance,"displacement, not angle",medium,"community | reads: native 0x027CA6E8 (fn 0x027CA5B0, direct vl read)",m14[*].3
 ,4,,0x07000004,0.6666,0,0,0,f32,Directionalized pre-jump displacement,has a low max,medium,"community | reads: native 0x027CA34C (fn 0x027CA268, direct vl read)",m14[*].4
 ,5,,0x07000005,1.1,0,0,0,f32,Aerial jump height ratio,relative to ground version,medium,community | reads: native 0x027CA7C8 (fn 0x027CA5B0),m14[*].5
 ,6,,0x07000006,0.06,0,0,0,f32,Post jump gravity,,medium,"community | reads: native 0x027CA8E8 (fn 0x027CA5B0, direct vl read)",m14[*].6
 ,7,,0x07000007,1.8,0,0,0,f32,Post jump max fall speed,,medium,"community | reads: native 0x027CA8FC (fn 0x027CA5B0, direct vl read)",m14[*].7
-,8,,0x07000008,1.08,0,0,0,f32,,community ID was 0x07000000,,,m14[*].8
+,8,,0x07000008,1.08,0,0,0,f32,,community ID was 0x07000000,,no read in the vanilla MSC (native or unused),m14[*].8
 ,9,,0x07000009,1,1,1,1,f32,[auto] read by native code (get_float at 0x027CA7F4); meaning not traced,read once post-jump; community ID was 0x07000008,low,reads: native 0x027CA7F4 (fn 0x027CA5B0),m14[*].9
-16,0,Down B,0x08000000,0.5,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].0
-,1,,0x08000001,0.0025,0,0,0,f32,H air friction,,medium,community,m15[*].1
-,2,,0x08000002,0.06,0,0,0,f32,Counter gravity,,medium,community,m15[*].2
-,3,,0x08000003,1.4,0,0,0,f32,Counter max fall speed,,medium,community,m15[*].3
-,4,,0x08000004,1.35,0,0,0,f32,Damage multiplier,,medium,community,m15[*].4
+16,0,Down B,0x08000000,0.5,0,0,0,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
+,1,,0x08000001,0.0025,0,0,0,f32,H air friction,,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,0.06,0,0,0,f32,Counter gravity,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.4,0,0,0,f32,Counter max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x08000004,1.35,0,0,0,f32,Damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
 ,5,,0x18000005,0x10,0x0,0x0,0x0,u32,Freeze frames on activation,,medium,"community | reads: native 0x027C96BC (fn 0x027C9524, direct vl read)",m15[*].5
-,6,,0x08000006,8,0,0,0,f32,Min damage,,medium,community,m15[*].6
-,7,,0x08000007,50,0,0,0,f32,Max damage,,medium,community,m15[*].7
-,8,,0x08000008,80,0,0,0,f32,,read on activation,,,m15[*].8
-,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,,m15[*].9
-,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community,m15[*].10
-,11,,0x0800000B,9.3,0,0,0,f32,Counter trigger bubble Y offset,,medium,community,m15[*].11
-,12,,0x0800000C,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community,m15[*].12
-,13,,0x0800000D,9.2,0,0,0,f32,Counter trigger bubble size,,medium,community,m15[*].13
-,14,,0x0800000E,1,1,1,1,f32,,,,,m15[*].14
-,0,Category 4 block,0x04000000,0,,,,f32,H speed,,low,"copied from Marth (same layout, same position)",m16.0
-,1,Final Smash,0x04000001,10,,,,f32,,community ID was 0x04000000,,,m16.1
-,2,,0x04000002,20,,,,f32,,community ID was 0x04000001,,,m16.2
-,3,,0x04000003,0.05,,,,f32,,community ID was 0x04000002,,,m16.3
-,4,,0x14000004,0x28,,,,u32,,community ID was 0x14000003,,,m16.4
-,5,,0x14000005,0x5A,,,,u32,,community ID was 0x14000004,,,m16.5
+,6,,0x08000006,8,0,0,0,f32,Min damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,50,0,0,0,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,80,0,0,0,f32,,read on activation,,no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,9.3,0,0,0,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,9.2,0,0,0,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,1,1,1,1,f32,"code: animation rate (MotionModule set rate) (func_2313) [status 0x155 (SpecialLw, SpecialAirLw)]",,medium,reads: MSC roy.mscsb func_2313,m15[*].14
+,0,Category 4 block,0x04000000,0,,,,f32,H speed,,low,"copied from Marth (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.0
+,1,Final Smash,0x04000001,10,,,,f32,,community ID was 0x04000000,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,20,,,,f32,,community ID was 0x04000001,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,0.05,,,,f32,,community ID was 0x04000002,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x14000004,0x28,,,,u32,,community ID was 0x14000003,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x14000005,0x5A,,,,u32,,community ID was 0x14000004,,no read in the vanilla MSC (native or unused),m16.5

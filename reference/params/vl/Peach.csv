@@ -1,52 +1,52 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,2,2,2,2,f32,H speed divisor,,medium,community,m12[*].0
-,1,,0x05000001,0.0025,0.0025,0.0025,0.0025,f32,H deceleration,,medium,community,m12[*].1
-,2,,0x05000002,0.7,0.5,0.7,0.7,f32,Initial V speed,,medium,community,m12[*].2
-,3,,0x05000003,0.025,0.035,0.025,0.025,f32,Gravity,,medium,community,m12[*].3
-,4,,0x05000004,0.7,1,0.7,0.7,f32,Max fall speed,,medium,community,m12[*].4
-,5,,0x15000005,0xD,0x10,0xD,0xD,u32,Freeze frames on hit,,medium,community,m12[*].5
-14,0,Side B,0x06000000,1.1,0.5,1.1,1.1,f32,Initial V speed on startup,,medium,community,m13[*].0
-,1,,0x06000001,2.9,3.4,3.6,2.9,f32,H initial speed on ground startup,,medium,community,m13[*].1
-,2,,0x06000002,3.3,3.8,4,3.3,f32,H initial speed on aerial startup,,medium,community,m13[*].2
-,3,,0x06000003,0.15,0.3,0.5,0.15,f32,V speed received after launching,,medium,community,m13[*].3
-,4,,0x06000004,0.04,0.04,-0.15,0.04,f32,Gravity on startup,,medium,community,m13[*].4
-,5,,0x06000005,1,1,1.6,1,f32,Some sort of transition ratio between post-launch and ending gravities?,higher = more of the second?,medium,community,m13[*].5
-,6,,0x06000006,0.1,0.4,0.3,0.1,f32,H deceleration after launching,,medium,community,m13[*].6
-,7,,0x06000007,0.05,0.06,0.09,0.05,f32,Gravity after launching,,medium,community,m13[*].7
-,8,,0x06000008,-1.2,-1.5,-1.2,-1.2,f32,Recoil initial H speed,"read on hit, controls direction of recoil",medium,community,m13[*].8
-,9,,0x06000009,1.4,0.7,1.4,1.4,f32,Recoil initial V speed,,medium,community,m13[*].9
-,10,,0x0600000A,1,1,2,1,f32,something to do with ending,,medium,community,m13[*].10
-,11,,0x0600000B,2,1,2,2,f32,something to do with ending,"when set low causes massive fall speed, when set high casues momentary floating",medium,community,m13[*].11
-,12,,0x0600000C,1,1,1,1,f32,,,,,m13[*].12
-,13,,0x0600000D,1,1,1,1,f32,,,,,m13[*].13
-,14,,0x0600000E,1,1,1,1,f32,,,,,m13[*].14
-15,0,Up B,0x07000000,0.625,0.625,0.625,0.625,f32,Sensitivity,larger = harder,medium,community,m14[*].0
-,1,,0x07000001,18,12,18,18,f32,Ability to angle (degrees),larger = significantly more control,medium,community,m14[*].1
-,2,,0x07000002,0.95,0.95,0.95,0.95,f32,Grounded height multiplier,,medium,community,m14[*].2
-,3,,0x07000003,0.6666,0.5,0.8,0.6666,f32,,read 1-3 times per frame during launch,,,m14[*].3
-,4,,0x07000004,0.5,0.068,0.5,0.5,f32,,read twice on aerial launch,,,m14[*].4
-,5,,0x07000005,1.2,1,1.3,1.2,f32,Floating max H speed multiplier,,medium,community,m14[*].5
-,6,,0x07000006,0.3,1,0.65,0.3,f32,Floating fall speed,,medium,community,m14[*].6
-,7,,0x07000007,0.6,0.5,0.7,0.6,f32,Falling max H speed multiplier,,medium,community,m14[*].7
-,8,,0x17000008,0x28,0x30,0x24,0x1E,u32,Landing lag (frames),,medium,community,m14[*].8
-,9,,0x17000009,0x1E0,0x0,0x69,0x1E0,u32,Max parasol opening frames,,medium,community,m14[*].9
-,10,,0x0700000A,1,1.35,0.5,1,f32,Aerial height multiplier,,medium,community,m14[*].10
-16,0,Down B,0x18000000,0x64,0x0,0x0,0x50,u32,Odds of getting an item,,medium,community,m15[*].0
-,1,,0x18000001,0x2,0x0,0x0,0x2,u32,Relative odds of getting a Bob-bomb,,medium,community,m15[*].1
-,2,,0x18000002,0x3,0x0,0x0,0x3,u32,Relative odds of getting a Mr. Saturn,,medium,community,m15[*].2
-,3,,0x18000003,0x0,0x0,0x0,0x1,u32,Relative odds of getting a Beam Sword,,medium,community,m15[*].3
+13,0,Neutral B,0x05000000,2,2,2,2,f32,H speed divisor,,medium,community | no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,0.0025,0.0025,0.0025,0.0025,f32,H deceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,0.7,0.5,0.7,0.7,f32,Initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,0.025,0.035,0.025,0.025,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,0.7,1,0.7,0.7,f32,Max fall speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x15000005,0xD,0x10,0xD,0xD,u32,Freeze frames on hit,,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+14,0,Side B,0x06000000,1.1,0.5,1.1,1.1,f32,Initial V speed on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,2.9,3.4,3.6,2.9,f32,H initial speed on ground startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,3.3,3.8,4,3.3,f32,H initial speed on aerial startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,0.15,0.3,0.5,0.15,f32,V speed received after launching,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,0.04,0.04,-0.15,0.04,f32,Gravity on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1,1,1.6,1,f32,Some sort of transition ratio between post-launch and ending gravities?,higher = more of the second?,medium,community | no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x06000006,0.1,0.4,0.3,0.1,f32,H deceleration after launching,,medium,community | no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,0.05,0.06,0.09,0.05,f32,Gravity after launching,,medium,community | no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x06000008,-1.2,-1.5,-1.2,-1.2,f32,Recoil initial H speed,"read on hit, controls direction of recoil",medium,community | no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x06000009,1.4,0.7,1.4,1.4,f32,Recoil initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x0600000A,1,1,2,1,f32,something to do with ending,,medium,community | no read in the vanilla MSC (native or unused),m13[*].10
+,11,,0x0600000B,2,1,2,2,f32,something to do with ending,"when set low causes massive fall speed, when set high casues momentary floating",medium,community | no read in the vanilla MSC (native or unused),m13[*].11
+,12,,0x0600000C,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].12
+,13,,0x0600000D,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].13
+,14,,0x0600000E,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].14
+15,0,Up B,0x07000000,0.625,0.625,0.625,0.625,f32,Sensitivity,larger = harder,medium,community | no read in the vanilla MSC (native or unused),m14[*].0
+,1,,0x07000001,18,12,18,18,f32,Ability to angle (degrees),larger = significantly more control,medium,community | no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0.95,0.95,0.95,0.95,f32,Grounded height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.6666,0.5,0.8,0.6666,f32,,read 1-3 times per frame during launch,,no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,0.5,0.068,0.5,0.5,f32,,read twice on aerial launch,,no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,1.2,1,1.3,1.2,f32,Floating max H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,0.3,1,0.65,0.3,f32,Floating fall speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,0.6,0.5,0.7,0.6,f32,Falling max H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x17000008,0x28,0x30,0x24,0x1E,u32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2270) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,high,community | reads: MSC peach.mscsb func_2270,m14[*].8
+,9,,0x17000009,0x1E0,0x0,0x69,0x1E0,u32,"Max parasol opening frames -- code: stored in status int 0x6, then debug print ""MINE: Parasol Init Time %d"" (func_2270) (func_2270) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,medium,community | reads: MSC peach.mscsb func_2270,m14[*].9
+,10,,0x0700000A,1,1.35,0.5,1,f32,Aerial height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].10
+16,0,Down B,0x18000000,0x64,0x0,0x0,0x50,u32,Odds of getting an item -- code: tested against 0 (func_2331) [status 0x155 (SpecialLw)],,medium,community | reads: MSC peach.mscsb func_2331,m15[*].0
+,1,,0x18000001,0x2,0x0,0x0,0x2,u32,Relative odds of getting a Bob-bomb -- code: compared with a computed value (func_2331); tested against 0 (func_2331) [status 0x155 (SpecialLw)],,medium,community | reads: MSC peach.mscsb func_2331,m15[*].1
+,2,,0x18000002,0x3,0x0,0x0,0x3,u32,Relative odds of getting a Mr. Saturn -- code: compared with a computed value (func_2331); tested against 0 (func_2331) [status 0x155 (SpecialLw)],,medium,community | reads: MSC peach.mscsb func_2331,m15[*].2
+,3,,0x18000003,0x0,0x0,0x0,0x1,u32,Relative odds of getting a Beam Sword -- code: compared with a computed value (func_2331); tested against 0 (func_2331) [status 0x155 (SpecialLw)],,medium,community | reads: MSC peach.mscsb func_2331,m15[*].3
 ,4,,0x18000004,0xA,0x3,0x3,0x1,u32,Max # of turnips on the screen,,medium,community | reads: native 0x027BDA6C (fn 0x027BD974); native 0x027BDB60 (fn 0x027BD974),m15[*].4
-,0,Float,0x14000000,0x96,,,,u32,Maximum duration (frames),,medium,community,m16.0
-,1,Final Smash?,0x04000001,1,,,,f32,,,,,m16.1
-,2,,0x04000002,1,,,,f32,,,,,m16.2
-,3,,0x04000003,10,,,,f32,,,,,m16.3
-,4,,0x04000004,0,,,,f32,,,,,m16.4
-,5,,0x04000005,0,,,,f32,,,,,m16.5
-,6,,0x04000006,0,,,,f32,,,,,m16.6
+,0,Float,0x14000000,0x96,,,,u32,"Maximum duration (frames) -- code: stored in status int 0x5, then decremented in func_2295 (a countdown / remaining count), tested against 0 (func_2292) [status 0x15E (Fuwafuwa)]",,high,community | reads: MSC peach.mscsb func_2292,m16.0
+,1,Final Smash?,0x04000001,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
+,2,,0x04000002,1,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.2
+,3,,0x04000003,10,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
+,4,,0x04000004,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.4
+,5,,0x04000005,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x04000006,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.6
 ,7,,0x14000007,0x3,,,,u32,[auto] read by native code (get_int at 0x02F49634); meaning not traced,,low,reads: native 0x02F49634 (fn 0x02F4951C),m16.7
 ,8,,0x14000008,0x8,,,,u32,[auto] read by native code (get_int at 0x02F4A1EC); meaning not traced,,low,reads: native 0x02F4A1EC (fn 0x02F49DF4),m16.8
 ,9,,0x14000009,0x258,,,,u32,[auto] read by native code (get_int at 0x02F496EC); meaning not traced,,low,reads: native 0x02F496EC (fn 0x02F4951C),m16.9
-17,0,Article params (kinopio),0x02000000,0,0,0,0,f32,,,,,m17[*]
+17,0,Article params (kinopio),0x02000000,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*]
 18,0,Neutral B,,0,0,0,0,f32,X offset,,medium,community,m18[*].0
 ,1,,,-1,-1,-1,-1,f32,Y offset,,medium,community,m18[*].1
 ,2,,,4,4,4,4,f32,Z offset,,medium,community,m18[*].2

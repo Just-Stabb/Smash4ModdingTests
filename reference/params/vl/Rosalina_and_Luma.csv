@@ -2,118 +2,118 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 13,0,Neutral B,0x05000000,0.8,0.8,0.8,0.8,f32,Aerial H speed multiplier while shooting,,medium,community | reads: native 0x02F74EA0 (fn 0x02F74CD4); native 0x02F74F44 (fn 0x02F74CD4),m12[*].0
 ,1,,0x05000001,0.7,0.7,0.7,0.7,f32,Aerial V speed multiplier while shooting,,medium,community | reads: native 0x02F74F58 (fn 0x02F74CD4),m12[*].1
 ,2,,0x05000002,0.7,0.7,0.7,0.7,f32,V upward speed while shooting?,,medium,community | reads: native 0x02F74F80 (fn 0x02F74CD4),m12[*].2
-,3,,0x05000003,20,20,20,20,f32,Initial chargred frames of smash input?,,medium,community,m12[*].3
-,4,,0x05000004,70,70,100,70,f32,Max charge time (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3615; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3621; MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3626",m12[*].4
-,5,,0x05000005,17,4,100,30,f32,Uncharged hitbox duration (frames),,medium,community,m12[*].5
-,6,,0x05000006,30,0,150,30,f32,Fully charged hitbox duration (frames),,medium,community,m12[*].6
-,7,,0x05000007,2.2,30,0.3,2.9,f32,Base initial speed,,medium,community,m12[*].7
-,8,,0x05000008,4.4,0,0.6,4.6,f32,Max initial speed,,medium,community,m12[*].8
-,9,,0x05000009,0.06,0,0.001,0.06,f32,Base charge air friction,,medium,community,m12[*].9
-,10,,0x0500000A,0.08,0,0.001,0.08,f32,Max charge air friction,,medium,community,m12[*].10
-,11,,0x0500000B,5,0,3,5,f32,Base charge damage dealt multiplier,,medium,community,m12[*].11
-,12,,0x0500000C,16,0,22,16,f32,Max charge damage dealt multiplier,,medium,community,m12[*].12
-,13,,0x0500000D,1,0,0.8,1,f32,Base charge Knockback dealt multiplier,,medium,community,m12[*].13
-,14,,0x0500000E,1,0,0.85,1,f32,Max charge Knockback dealt multiplier,,medium,community,m12[*].14
-,15,,0x1500000F,0xA,0x1E,0x5,0xA,u32,,,,,m12[*].15
-,16,,0x05000010,20,55,20,20,f32,,,,,m12[*].16
-,17,,0x05000011,0.4,0,0.75,0.4,f32,,,,,m12[*].17
-,18,,0x05000012,0.5,0,0.75,0.5,f32,Late hitbox damage dealt multiplier?,,medium,community,m12[*].18
-14,0,Side B,0x16000000,0x6,0x12C,0x12C,0x1,u32,,,,,m13[*].0
-,1,,0x06000001,17,35,0.1,15.5,f32,,,,,m13[*].1
-,2,,0x16000002,0x7,0x1,0x1,0x7,u32,,,,,m13[*].2
+,3,,0x05000003,20,20,20,20,f32,Initial chargred frames of smash input?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,70,70,100,70,f32,"Max charge time (frames) -- code: stored in instance float 0x2F, then compared with a computed value (func_2631) (func_3615); stored in status float 0x7 (func_3621); stored in instance float 0x2F, then combined with status int 0x2, status int 0x3 (func_2265) (func_2259) [status 0x20B; status 0x20C]",,medium,community | reads: MSC kirby.mscsb func_3615; MSC kirby.mscsb func_3621; MSC kirby.mscsb func_3626; MSC rosetta.mscsb func_2259; +2 more,m12[*].4
+,5,,0x05000005,17,4,100,30,f32,Uncharged hitbox duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,30,0,150,30,f32,Fully charged hitbox duration (frames),,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,2.2,30,0.3,2.9,f32,Base initial speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,4.4,0,0.6,4.6,f32,Max initial speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,0.06,0,0.001,0.06,f32,Base charge air friction,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,0.08,0,0.001,0.08,f32,Max charge air friction,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,5,0,3,5,f32,Base charge damage dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,16,0,22,16,f32,Max charge damage dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,1,0,0.8,1,f32,Base charge Knockback dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x0500000E,1,0,0.85,1,f32,Max charge Knockback dealt multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].14
+,15,,0x1500000F,0xA,0x1E,0x5,0xA,u32,,,,no read in the vanilla MSC (native or unused),m12[*].15
+,16,,0x05000010,20,55,20,20,f32,,,,no read in the vanilla MSC (native or unused),m12[*].16
+,17,,0x05000011,0.4,0,0.75,0.4,f32,,,,no read in the vanilla MSC (native or unused),m12[*].17
+,18,,0x05000012,0.5,0,0.75,0.5,f32,Late hitbox damage dealt multiplier?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].18
+14,0,Side B,0x16000000,0x6,0x12C,0x12C,0x1,u32,,,,no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,17,35,0.1,15.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x16000002,0x7,0x1,0x1,0x7,u32,,,,no read in the vanilla MSC (native or unused),m13[*].2
 15,0,Up B,0x07000000,0.66,0.66,0.66,0.66,f32,H speed multiplier on startup,,medium,community | reads: native 0x02F75064 (fn 0x02F74CD4),m14[*].0
 ,1,,0x07000001,0.5,0.5,0.5,0.5,f32,V speed multiplier on startup,,medium,community | reads: native 0x02F75104 (fn 0x02F74CD4),m14[*].1
-,2,,0x07000002,0.25,0.25,0.25,0.25,f32,StickX sensitivity,,medium,community,m14[*].2
-,3,,0x07000003,20,20,20,20,f32,,,,,m14[*].3
-,4,,0x07000004,3.2,9,4,3.2,f32,Max added travel speed with +X sensitivity,,medium,community,m14[*].4
-,5,,0x07000005,3,8.9,3.9,3,f32,Max added travel speed with +Y sensitivity,,medium,community,m14[*].5
-,6,,0x07000006,2.8,8.8,3.8,2.8,f32,Max added travel speed with -X sensitivity,,medium,community,m14[*].6
+,2,,0x07000002,0.25,0.25,0.25,0.25,f32,StickX sensitivity -- code: PostureModule op 0x271C (func_2283); compared with a computed value (func_2285) [status 0x154],,medium,community | reads: MSC rosetta.mscsb func_2283; MSC rosetta.mscsb func_2285,m14[*].2
+,3,,0x07000003,20,20,20,20,f32,,,,no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,3.2,9,4,3.2,f32,Max added travel speed with +X sensitivity -- code: stored in status float 0x9 (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].4
+,5,,0x07000005,3,8.9,3.9,3,f32,Max added travel speed with +Y sensitivity -- code: stored in status float 0x9 (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].5
+,6,,0x07000006,2.8,8.8,3.8,2.8,f32,Max added travel speed with -X sensitivity -- code: stored in status float 0x9 (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].6
 ,7,,0x07000007,0.01,0.41,0.09,0.01,f32,[auto] read by native code (get_float at 0x02F74B74); meaning not traced,,low,reads: native 0x02F74B74 (fn 0x02F74AD8),m14[*].7
-,8,,0x07000008,75,75,58,75,f32,Initial angle (degrees),,medium,community,m14[*].8
-,9,,0x07000009,35,4,20,35,f32,Ability to angle (degrees),,medium,community,m14[*].9
-,10,,0x0700000A,0.2,0.2,0.2,0.2,f32,Turnaround sensitivity,,medium,community,m14[*].10
-,11,,0x0700000B,0.1,0.1,0.1,0.1,f32,,,,,m14[*].11
-,12,,0x0700000C,1,1,1,1,f32,,,,,m14[*].12
-,13,,0x0700000D,1.1,1.65,1.2,1.1,f32,Gravity multiplier,,medium,community,m14[*].13
+,8,,0x07000008,75,75,58,75,f32,Initial angle (degrees) -- code: stored in status float 0xA (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].8
+,9,,0x07000009,35,4,20,35,f32,Ability to angle (degrees) -- code: stored in status float 0xA (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].9
+,10,,0x0700000A,0.2,0.2,0.2,0.2,f32,Turnaround sensitivity -- code: stored in status float 0xB (func_2288) [status 0x15A (SpecialHi)],,medium,community | reads: MSC rosetta.mscsb func_2288,m14[*].10
+,11,,0x0700000B,0.1,0.1,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,1.1,1.65,1.2,1.1,f32,Gravity multiplier -- code: stored in status float 0x8 (with fighter_param 0x18 (air_accel_y)) (func_2283) [status 0x154],,medium,community | reads: MSC rosetta.mscsb func_2283,m14[*].13
 ,14,,0x0700000E,0.02,0.02,0.2,0.02,f32,[auto] read by native code (get_float at 0x02F74D80); meaning not traced,,low,reads: native 0x02F74D80 (fn 0x02F74CD4); native 0x02F75354 (fn 0x02F7532C),m14[*].14
-,15,,0x0700000F,30,48,30,30,f32,Landing lag (frames),,medium,community,m14[*].15
+,15,,0x0700000F,30,48,30,30,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2296) [status 0x15B (SpecialHiEnd)],,high,community | reads: MSC rosetta.mscsb func_2296,m14[*].15
 16,0,Down B,0x08000000,0.66,0.66,1,0.66,f32,Aerial H speed multiplier,only apply to first use,medium,community | reads: native 0x02F751F4 (fn 0x02F74CD4),m15[*].0
 ,1,,0x08000001,0.5,0.5,0.5,0.5,f32,Aerial V speed multiplier,only apply to first use,medium,community | reads: native 0x02F75208 (fn 0x02F74CD4),m15[*].1
 ,2,,0x08000002,0.03,0.03,0.03,0.03,f32,Gravity on startup,,medium,community | reads: native 0x02F752D8 (fn 0x02F74CD4),m15[*].2
-,3,,0x08000003,5,5,5,5,f32,Projectile pull Y offset,,medium,community,m15[*].3
-,4,,0x08000004,35,0,0,35,f32,Projectile pull radius,,medium,community,m15[*].4
-,5,,0x18000005,0x4,0x4,0x4,0x4,u32,,,,,m15[*].5
-,6,,0x08000006,16,16,16,16,f32,,,,,m15[*].6
-,7,,0x18000007,0x2,0x2,0x2,0x2,u32,,,,,m15[*].7
-,8,,0x08000008,1.3,1.3,1.3,1.3,f32,,,,,m15[*].8
-,9,,0x08000009,53,0,40,53,f32,Item pull radius,,medium,community,m15[*].9
-,10,,0x0800000A,10,10,10,10,f32,,,,,m15[*].10
-,11,,0x1800000B,0x3C,0x3C,0x3C,0x3C,u32,Gravity Pull item pull end frame,,medium,community,m15[*].11
-,12,,0x0800000C,0.1,0.1,0.1,0.1,f32,,,,,m15[*].12
-,13,,0x0800000D,0.06,0.06,0.06,0.06,f32,,,,,m15[*].13
-,14,,0x0800000E,2.5,2.5,2.5,2.5,f32,,,,,m15[*].14
-,15,,0x0800000F,0.1,0.1,0.1,0.1,f32,,,,,m15[*].15
-,16,,0x08000010,0.03,0.03,0.03,0.03,f32,,,,,m15[*].16
-,17,,0x08000011,1.8,1.8,1.8,1.8,f32,,,,,m15[*].17
-,0,?,0x04000000,4.5,,,,f32,,,,,m16
+,3,,0x08000003,5,5,5,5,f32,Projectile pull Y offset -- code: SearchModule op 0x0 (func_2298) [status 0x155],,medium,community | reads: MSC rosetta.mscsb func_2298,m15[*].3
+,4,,0x08000004,35,0,0,35,f32,Projectile pull radius -- code: SearchModule op 0x0 (func_2298) [status 0x155],,medium,community | reads: MSC rosetta.mscsb func_2298,m15[*].4
+,5,,0x18000005,0x4,0x4,0x4,0x4,u32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,16,16,16,16,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x18000007,0x2,0x2,0x2,0x2,u32,,,,no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,1.3,1.3,1.3,1.3,f32,,,,no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x08000009,53,0,40,53,f32,Item pull radius,,medium,community | no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,10,10,10,10,f32,,,,no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x1800000B,0x3C,0x3C,0x3C,0x3C,u32,Gravity Pull item pull end frame,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,0.1,0.1,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,0.06,0.06,0.06,0.06,f32,,,,no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,2.5,2.5,2.5,2.5,f32,,,,no read in the vanilla MSC (native or unused),m15[*].14
+,15,,0x0800000F,0.1,0.1,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,0.03,0.03,0.03,0.03,f32,,,,no read in the vanilla MSC (native or unused),m15[*].16
+,17,,0x08000011,1.8,1.8,1.8,1.8,f32,,,,no read in the vanilla MSC (native or unused),m15[*].17
+,0,?,0x04000000,4.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16
 ,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17.0
 ,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17.1
-17,0,Luma,0x02000000,0.6,,,,f32,,community ID was 0x04000000,,,m18[0].0
-,1,,0x02000001,0.3,,,,f32,,community ID was 0x04000001,,,m18[0].1
-,2,,0x02000002,0.3,,,,f32,,community ID was 0x04000002,,,m18[0].2
-,3,,0x02000003,0.3,,,,f32,,community ID was 0x04000003,,,m18[0].3
-,4,,0x02000004,0.1,,,,f32,,community ID was 0x04000004,,,m18[0].4
-,5,,0x02000005,0.1,,,,f32,,community ID was 0x04000005,,,m18[0].5
-,6,,0x02000006,50,,,,f32,Luma HP,community ID was 0x04000006,medium,community,m18[0].6
-,7,,0x12000007,0x2EE,,,,u32,Respawn frames,community ID was 0x14000007,medium,community,m18[0].7
-,8,,0x02000008,15,,,,f32,Additional % for calculating KB formula,Weight is set to 100; community ID was 0x04000008,medium,community,m18[0].8
-,9,,0x02000009,1.3,,,,f32,Launch speed multiplier from fatal attacks,community ID was 0x04000009,medium,community,m18[0].9
-,10,,0x1200000A,0x78,,,,u32,Frames Luma can be off-stage (un-tethered) before falling?,community ID was 0x1400000A,medium,community,m18[0].10
-,11,,0x0200000B,6,,,,f32,Y-offset from Rosalina?,this is added to 0x01000001; community ID was 0x0400000B,medium,community,m18[0].11
-,12,,0x0200000C,8,,,,f32,Z-offset from Rosalina?,community ID was 0x0400000C,medium,community,m18[0].12
-,13,,0x0200000D,50,,,,f32,Max distance Luma can move away from Rosa before automatically returning to normal position?,community ID was 0x0400000D,medium,community,m18[0].13
+17,0,Luma,0x02000000,0.6,,,,f32,,community ID was 0x04000000,,no read in the article MSC (native or unused),m18[0].0
+,1,,0x02000001,0.3,,,,f32,,community ID was 0x04000001,,no read in the article MSC (native or unused),m18[0].1
+,2,,0x02000002,0.3,,,,f32,,community ID was 0x04000002,,no read in the article MSC (native or unused),m18[0].2
+,3,,0x02000003,0.3,,,,f32,,community ID was 0x04000003,,no read in the article MSC (native or unused),m18[0].3
+,4,,0x02000004,0.1,,,,f32,,community ID was 0x04000004,,no read in the article MSC (native or unused),m18[0].4
+,5,,0x02000005,0.1,,,,f32,,community ID was 0x04000005,,no read in the article MSC (native or unused),m18[0].5
+,6,,0x02000006,50,,,,f32,Luma HP,community ID was 0x04000006,medium,community | no read in the article MSC (native or unused),m18[0].6
+,7,,0x12000007,0x2EE,,,,u32,Respawn frames,community ID was 0x14000007,medium,community | no read in the article MSC (native or unused),m18[0].7
+,8,,0x02000008,15,,,,f32,Additional % for calculating KB formula,Weight is set to 100; community ID was 0x04000008,medium,community | no read in the article MSC (native or unused),m18[0].8
+,9,,0x02000009,1.3,,,,f32,Launch speed multiplier from fatal attacks,community ID was 0x04000009,medium,community | no read in the article MSC (native or unused),m18[0].9
+,10,,0x1200000A,0x78,,,,u32,Frames Luma can be off-stage (un-tethered) before falling?,community ID was 0x1400000A,medium,community | no read in the article MSC (native or unused),m18[0].10
+,11,,0x0200000B,6,,,,f32,Y-offset from Rosalina?,this is added to 0x01000001; community ID was 0x0400000B,medium,community | no read in the article MSC (native or unused),m18[0].11
+,12,,0x0200000C,8,,,,f32,Z-offset from Rosalina?,community ID was 0x0400000C,medium,community | no read in the article MSC (native or unused),m18[0].12
+,13,,0x0200000D,50,,,,f32,Max distance Luma can move away from Rosa before automatically returning to normal position?,community ID was 0x0400000D,medium,community | no read in the article MSC (native or unused),m18[0].13
 ,14,,0x0200000E,0.15,,,,f32,Initial return speed with Neutral B,"decel = previous frame speed * 0.9
-min speed = 0.1; community ID was 0x0400000E",medium,community,m18[0].14
-,15,,0x0200000F,1.2,,,,f32,Return accel with Neutral B,community ID was 0x0400000F,medium,community,m18[0].15
-,16,,0x02000010,3,,,,f32,Max return speed with Neutral B,community ID was 0x04000010,medium,community,m18[0].16
-,17,,0x02000011,3,,,,f32,,community ID was 0x04000011,,,m18[0].17
-,18,,0x02000012,30,,,,f32,,community ID was 0x04000012,,,m18[0].18
-,19,,0x02000013,0.7,,,,f32,,community ID was 0x04000013,,,m18[0].19
-,20,,0x02000014,20,,,,f32,,community ID was 0x04000014,,,m18[0].20
-,21,,0x02000015,40,,,,f32,,community ID was 0x04000015,,,m18[0].21
-,22,,0x12000016,0x12C,,,,u32,,community ID was 0x14000016,,,m18[0].22
-,23,,0x12000017,0x3C,,,,u32,,community ID was 0x14000017,,,m18[0].23
-,24,,0x02000018,15,,,,f32,,community ID was 0x04000018,,,m18[0].24
-,25,,0x02000019,8,,,,f32,,community ID was 0x04000019,,,m18[0].25
-,26,,0x0200001A,40,,,,f32,,community ID was 0x0400001A,,,m18[0].26
-,27,,0x0200001B,30,,,,f32,,community ID was 0x0400001B,,,m18[0].27
-,28,,0x0200001C,25,,,,f32,,community ID was 0x0400001C,,,m18[0].28
-,29,,0x1200001D,0x1E,,,,u32,,community ID was 0x1400001D,,,m18[0].29
-,30,,0x0200001E,0.5,,,,f32,,community ID was 0x0400001E,,,m18[0].30
-,31,,0x0200001F,30,,,,f32,,community ID was 0x0400001F,,,m18[0].31
-,32,,0x02000020,0.02,,,,f32,,community ID was 0x04000020,,,m18[0].32
-,33,,0x02000021,0.05,,,,f32,Back accel,community ID was 0x04000021,medium,community,m18[0].33
-,34,,0x02000022,0.75,,,,f32,,community ID was 0x04000022,,,m18[0].34
-,35,,0x02000023,1.5,,,,f32,Max back speed,community ID was 0x04000023,medium,community,m18[0].35
-,36,,0x02000024,0.4,,,,f32,,community ID was 0x04000024,,,m18[0].36
-,37,,0x02000025,0.03,,,,f32,Back decel,community ID was 0x04000025,medium,community,m18[0].37
-,38,,0x12000026,0x3,,,,u32,,community ID was 0x14000026,,,m18[0].38
-,39,,0x12000027,0x1E,,,,u32,,community ID was 0x14000027,,,m18[0].39
-,40,,0x12000028,0x1E,,,,u32,,community ID was 0x14000028,,,m18[0].40
-,41,,0x02000029,0.4,,,,f32,,community ID was 0x04000029,,,m18[0].41
-,42,,0x0200002A,0.3,,,,f32,,community ID was 0x0400002A,,,m18[0].42
-,43,,0x0200002B,1.79,,,,f32,,community ID was 0x0400002B,,,m18[0].43
-,44,,0x0200002C,0.06,,,,f32,,community ID was 0x0400002C,,,m18[0].44
-,45,,0x0200002D,1.3,,,,f32,,community ID was 0x0400002D,,,m18[0].45
-,46,,0x0200002E,1.2,,,,f32,,community ID was 0x0400002E,,,m18[0].46
-,47,,0x1200002F,0xF0,,,,u32,,community ID was 0x1400002F,,,m18[0].47
-,48,,0x02000030,0.02,,,,f32,,community ID was 0x04000030,,,m18[0].48
-,49,,0x02000031,0.5,,,,f32,,community ID was 0x04000031,,,m18[0].49
-,50,,0x02000032,0.2,,,,f32,,community ID was 0x04000032,,,m18[0].50
-,51,,0x12000033,0xB4,,,,u32,,community ID was 0x14000033,,,m18[0].51
-,52,,0x02000034,15,,,,f32,,community ID was 0x04000034,,,m18[0].52
-,53,,0x02000035,0.064,,,,f32,Fall speed?,community ID was 0x04000035,medium,community,m18[0].53
-,54,,0x02000036,0.062,,,,f32,Gravity,community ID was 0x04000036,medium,community,m18[0].54
+min speed = 0.1; community ID was 0x0400000E",medium,community | no read in the article MSC (native or unused),m18[0].14
+,15,,0x0200000F,1.2,,,,f32,Return accel with Neutral B,community ID was 0x0400000F,medium,community | no read in the article MSC (native or unused),m18[0].15
+,16,,0x02000010,3,,,,f32,Max return speed with Neutral B,community ID was 0x04000010,medium,community | no read in the article MSC (native or unused),m18[0].16
+,17,,0x02000011,3,,,,f32,,community ID was 0x04000011,,no read in the article MSC (native or unused),m18[0].17
+,18,,0x02000012,30,,,,f32,,community ID was 0x04000012,,no read in the article MSC (native or unused),m18[0].18
+,19,,0x02000013,0.7,,,,f32,,community ID was 0x04000013,,no read in the article MSC (native or unused),m18[0].19
+,20,,0x02000014,20,,,,f32,,community ID was 0x04000014,,no read in the article MSC (native or unused),m18[0].20
+,21,,0x02000015,40,,,,f32,,community ID was 0x04000015,,no read in the article MSC (native or unused),m18[0].21
+,22,,0x12000016,0x12C,,,,u32,,community ID was 0x14000016,,no read in the article MSC (native or unused),m18[0].22
+,23,,0x12000017,0x3C,,,,u32,,community ID was 0x14000017,,no read in the article MSC (native or unused),m18[0].23
+,24,,0x02000018,15,,,,f32,,community ID was 0x04000018,,no read in the article MSC (native or unused),m18[0].24
+,25,,0x02000019,8,,,,f32,,community ID was 0x04000019,,no read in the article MSC (native or unused),m18[0].25
+,26,,0x0200001A,40,,,,f32,,community ID was 0x0400001A,,no read in the article MSC (native or unused),m18[0].26
+,27,,0x0200001B,30,,,,f32,,community ID was 0x0400001B,,no read in the article MSC (native or unused),m18[0].27
+,28,,0x0200001C,25,,,,f32,,community ID was 0x0400001C,,no read in the article MSC (native or unused),m18[0].28
+,29,,0x1200001D,0x1E,,,,u32,,community ID was 0x1400001D,,no read in the article MSC (native or unused),m18[0].29
+,30,,0x0200001E,0.5,,,,f32,,community ID was 0x0400001E,,no read in the article MSC (native or unused),m18[0].30
+,31,,0x0200001F,30,,,,f32,,community ID was 0x0400001F,,no read in the article MSC (native or unused),m18[0].31
+,32,,0x02000020,0.02,,,,f32,,community ID was 0x04000020,,no read in the article MSC (native or unused),m18[0].32
+,33,,0x02000021,0.05,,,,f32,Back accel,community ID was 0x04000021,medium,community | no read in the article MSC (native or unused),m18[0].33
+,34,,0x02000022,0.75,,,,f32,,community ID was 0x04000022,,no read in the article MSC (native or unused),m18[0].34
+,35,,0x02000023,1.5,,,,f32,Max back speed,community ID was 0x04000023,medium,community | no read in the article MSC (native or unused),m18[0].35
+,36,,0x02000024,0.4,,,,f32,,community ID was 0x04000024,,no read in the article MSC (native or unused),m18[0].36
+,37,,0x02000025,0.03,,,,f32,Back decel,community ID was 0x04000025,medium,community | no read in the article MSC (native or unused),m18[0].37
+,38,,0x12000026,0x3,,,,u32,,community ID was 0x14000026,,no read in the article MSC (native or unused),m18[0].38
+,39,,0x12000027,0x1E,,,,u32,,community ID was 0x14000027,,no read in the article MSC (native or unused),m18[0].39
+,40,,0x12000028,0x1E,,,,u32,,community ID was 0x14000028,,no read in the article MSC (native or unused),m18[0].40
+,41,,0x02000029,0.4,,,,f32,,community ID was 0x04000029,,no read in the article MSC (native or unused),m18[0].41
+,42,,0x0200002A,0.3,,,,f32,,community ID was 0x0400002A,,no read in the article MSC (native or unused),m18[0].42
+,43,,0x0200002B,1.79,,,,f32,,community ID was 0x0400002B,,no read in the article MSC (native or unused),m18[0].43
+,44,,0x0200002C,0.06,,,,f32,,community ID was 0x0400002C,,no read in the article MSC (native or unused),m18[0].44
+,45,,0x0200002D,1.3,,,,f32,,community ID was 0x0400002D,,no read in the article MSC (native or unused),m18[0].45
+,46,,0x0200002E,1.2,,,,f32,,community ID was 0x0400002E,,no read in the article MSC (native or unused),m18[0].46
+,47,,0x1200002F,0xF0,,,,u32,,community ID was 0x1400002F,,no read in the article MSC (native or unused),m18[0].47
+,48,,0x02000030,0.02,,,,f32,,community ID was 0x04000030,,no read in the article MSC (native or unused),m18[0].48
+,49,,0x02000031,0.5,,,,f32,,community ID was 0x04000031,,no read in the article MSC (native or unused),m18[0].49
+,50,,0x02000032,0.2,,,,f32,,community ID was 0x04000032,,no read in the article MSC (native or unused),m18[0].50
+,51,,0x12000033,0xB4,,,,u32,,community ID was 0x14000033,,no read in the article MSC (native or unused),m18[0].51
+,52,,0x02000034,15,,,,f32,,community ID was 0x04000034,,no read in the article MSC (native or unused),m18[0].52
+,53,,0x02000035,0.064,,,,f32,Fall speed?,community ID was 0x04000035,medium,community | no read in the article MSC (native or unused),m18[0].53
+,54,,0x02000036,0.062,,,,f32,Gravity,community ID was 0x04000036,medium,community | no read in the article MSC (native or unused),m18[0].54
 ,0,,,0x1,,,,u32,,,,,m19.0
 ,1,,,8,,,,f32,,,,,m19.1
 ,2,,,0,,,,f32,,,,,m19.2
@@ -422,10 +422,10 @@ min speed = 0.1; community ID was 0x0400000E",medium,community,m18[0].14
 ,3,,,0,,,,f32,,,,,m25[7].3
 ,4,,,1,,,,f32,,,,,m25[7].4
 ,5,,,0,,,,f32,,,,,m25[7].5
-23,0,meteor,0x12000000,0xF,0x64,0x19,0x13,u32,,,,,m26[*].0
-,1,,0x02000001,5,0.6,7,5,f32,,,,,m26[*].1
-,2,,0x02000002,0.25,0.006,0.1,0.25,f32,,,,,m26[*].2
-,3,,0x12000003,0x0,0x1,0x0,0x0,u32,,,,,m26[*].3
+23,0,meteor,0x12000000,0xF,0x64,0x19,0x13,u32,,,,no read in the article MSC (native or unused),m26[*].0
+,1,,0x02000001,5,0.6,7,5,f32,,,,no read in the article MSC (native or unused),m26[*].1
+,2,,0x02000002,0.25,0.006,0.1,0.25,f32,,,,no read in the article MSC (native or unused),m26[*].2
+,3,,0x12000003,0x0,0x1,0x0,0x0,u32,,,,no read in the article MSC (native or unused),m26[*].3
 ,0,,,0x3,,,,u32,,,,,m27.0
 ,1,,,0.5,,,,f32,,,,,m27.1
 ,2,,,1,,,,f32,,,,,m27.2

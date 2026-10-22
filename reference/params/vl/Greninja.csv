@@ -1,90 +1,90 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,40,30,1,40,f32,Time to fully charge (frames),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2266",m12[*].0
-,1,,0x05000001,0.3,0.3,0.3,0.3,f32,Aerial H recoil initial speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2281",m12[*].1
-,2,,0x05000002,1.6,1.6,1.6,1.6,f32,Aerial V speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2281",m12[*].2
-,3,,0x15000003,0x1,0x1,0x1,0x1,u32,"Throws when fully charged (when set to 0, he stores the charge instead)",,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2262; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2267",m12[*].3
+13,0,Neutral B,0x05000000,40,30,1,40,f32,"Time to fully charge (frames) -- code: named ""motion_rate"" in a debug print (func_2266); named ""param max frame"" in a debug print (func_2266); stored in status float 0x8, then compared with a computed value (func_2267) (func_2266) [status 0x157; status 0x22E]",,medium,community | reads: MSC gekkouga.mscsb func_2266; MSC kirby.mscsb func_3838,m12[*].0
+,1,,0x05000001,0.3,0.3,0.3,0.3,f32,"Aerial H recoil initial speed -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2281)",,high,community | reads: MSC gekkouga.mscsb func_2281; MSC kirby.mscsb func_3853,m12[*].1
+,2,,0x05000002,1.6,1.6,1.6,1.6,f32,"Aerial V speed -- code: read in: var2 = WorkModuleF(0, 0x5000002); (func_2281)",,medium,community | reads: MSC gekkouga.mscsb func_2281; MSC kirby.mscsb func_3853,m12[*].2
+,3,,0x15000003,0x1,0x1,0x1,0x1,u32,"Throws when fully charged (when set to 0, he stores the charge instead) -- code: compared with 0x1 (a mode / switch value) (func_2262) [status 0x152; status 0x157]",,medium,community | reads: MSC gekkouga.mscsb func_2262; MSC gekkouga.mscsb func_2267; MSC kirby.mscsb func_3834; MSC kirby.mscsb func_3839,m12[*].3
 ,4,,0x05000004,0.55,0.55,0.55,0.55,f32,,,,no read in the vanilla MSC (native or unused),m12[*].4
 ,5,,0x15000005,0x3C,0x3C,0x3C,0x3C,u32,,,,no read in the vanilla MSC (native or unused),m12[*].5
 ,6,,0x05000006,45,45,45,45,f32,,,,no read in the vanilla MSC (native or unused),m12[*].6
 ,7,,0x15000007,0x5,0x5,0x5,0x5,u32,,,,no read in the vanilla MSC (native or unused),m12[*].7
-,8,,0x05000008,1,1,1,1,f32,Charge animation frame speed multiplier,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2266",m12[*].8
+,8,,0x05000008,1,1,1,1,f32,"Charge animation frame speed multiplier -- code: named ""motion_rate"" in a debug print (func_2266); named ""power_up_rate"" in a debug print (func_2266); animation rate (MotionModule set rate) (func_2266) [status 0x157; status 0x22E]",,high,community | reads: MSC gekkouga.mscsb func_2266; MSC gekkouga.mscsb func_2267; MSC kirby.mscsb func_3838; MSC kirby.mscsb func_3839,m12[*].8
 14,0,Side B,0x16000000,0x5,0x1E,0x4,0x5,u32,Min frames before activation,,medium,community | no read in the vanilla MSC (native or unused),m13[*].0
 ,1,,0x06000001,0.75,0.6,0.6,0.75,f32,Walk speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
 ,2,,0x06000002,0.5,0.4,0.5,0.5,f32,Air speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
-,3,,0x06000003,0.3,0.3,0.3,0.3,f32,-X sensitivity,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2290; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2379",m13[*].3
-,4,,0x06000004,2.1,2.1,1,2.1,f32,Initial V speed of aerial disappering,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2288",m13[*].4
-,5,,0x06000005,0.2,0.2,0.05,0.2,f32,Gravity after disappearing,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2288",m13[*].5
-,6,,0x16000006,0xC,0x18,0xE,0xC,u32,Frames before disappearing,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2289; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2290; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2291",m13[*].6
-,7,,0x16000007,0xA,0xF,0x4,0xA,u32,Frames before reappearing,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2291",m13[*].7
+,3,,0x06000003,0.3,0.3,0.3,0.3,f32,-X sensitivity -- code: compared with a computed value (func_2290) [status 0x153],,medium,community | reads: MSC gekkouga.mscsb func_2290; MSC gekkouga.mscsb func_2379,m13[*].3
+,4,,0x06000004,2.1,2.1,1,2.1,f32,Initial V speed of aerial disappering -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2288) [status 0x153],,high,community | reads: MSC gekkouga.mscsb func_2288,m13[*].4
+,5,,0x06000005,0.2,0.2,0.05,0.2,f32,Gravity after disappearing -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2288) [status 0x153],,high,community | reads: MSC gekkouga.mscsb func_2288,m13[*].5
+,6,,0x16000006,0xC,0x18,0xE,0xC,u32,Frames before disappearing -- code: animation rate of the motion it starts (func_22) (func_2289); MotionModule op 0x1 (via func_22) (func_2289); compared with instance int 0x85 (a counter) (func_2290) [status 0x153],,high,community | reads: MSC gekkouga.mscsb func_2289; MSC gekkouga.mscsb func_2290; MSC gekkouga.mscsb func_2291,m13[*].6
+,7,,0x16000007,0xA,0xF,0x4,0xA,u32,Frames before reappearing -- code: compared with a computed value (func_2291) [status 0x153],,medium,community | reads: MSC gekkouga.mscsb func_2291,m13[*].7
 ,8,,0x06000008,2.4,2.4,5,2.4,f32,V initial speed of aerial reappering,,medium,community | no read in the vanilla MSC (native or unused),m13[*].8
-,9,,0x06000009,2,2,45,2,f32,Min distance of shadow from Greninja,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2379",m13[*].9
+,9,,0x06000009,2,2,45,2,f32,Min distance of shadow from Greninja -- code: stored in instance float 0x35 (func_2379),,medium,community | reads: MSC gekkouga.mscsb func_2379,m13[*].9
 ,10,,0x0600000A,40,40,40,40,f32,,,,no read in the vanilla MSC (native or unused),m13[*].10
 ,11,,0x0600000B,1.2,0.7,0.4,1.2,f32,Shadow speed,,medium,community | no read in the vanilla MSC (native or unused),m13[*].11
 ,12,,0x0600000C,70,120,55,70,f32,Max distance of shadow from Greninja,,medium,community | no read in the vanilla MSC (native or unused),m13[*].12
-,13,,0x0600000D,90,140,8,90,f32,Max frames before activation,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2379",m13[*].13
-15,0,Up B,0x17000000,0x10,0x12,0x16,0x10,u32,Startup frames,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2302; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2303",m14[*].0
-,1,,0x17000001,0xA,0x11,0xA,0xA,u32,"[auto] read by MSC: var1 = WorkModule(0x6, 0x17000001);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2303",m14[*].1
-,2,,0x07000002,0.4,0.4,2,0.4,f32,Sensitivity for choosing an angle,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2303; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2319; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2328",m14[*].2
-,3,,0x07000003,3.7,2.2,8.3,3.8,f32,Segment base speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2319",m14[*].3
-,4,,0x17000004,0xA,0x16,0x5,0xA,u32,Time spent traveling (frames),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2308",m14[*].4
-,5,,0x17000005,0x3C,0x3C,0x3C,0x3C,u32,Max angle difference between segment and wall/ceiling to slide along it (degrees),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2322",m14[*].5
-,6,,0x17000006,0x0,0x0,0xB5,0x0,u32,Min angle change requirement for second segment (degrees),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2328",m14[*].6
-,7,,0x07000007,0.9,1.4,1,0.9,f32,Second segment speed multiplier,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2319",m14[*].7
-,8,,0x07000008,0.5,0.6,0.4,0.5,f32,H speed multiplier on ending,Air frcition = 0.03,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2326",m14[*].8
-,9,,0x07000009,0.7,0.8,0.6,0.7,f32,V speed multiplier on ending,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2326",m14[*].9
-,10,,0x0700000A,0.8,0.8,1.35,0.8,f32,Max air speed multiplier on ending,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2327",m14[*].10
-,11,,0x0700000B,0.6,0.6,0.85,0.6,f32,Special fall max air speed multiplier,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2329",m14[*].11
-,12,,0x0700000C,0.3,0.8,0.8,0.8,f32,H speed after bouncing from walls,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].12
-,13,,0x0700000D,3.5,3.5,3.5,3.5,f32,V speed after bouncing from walls,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2331",m14[*].13
-,14,,0x0700000E,32,32,26,32,f32,Landing lag (frames),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2329",m14[*].14
-16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,H speed multiplier on startup,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2341",m15[*].0
-,1,,0x08000001,0.02,0.005,0.02,0.02,f32,Gravity,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2340",m15[*].1
-,2,,0x08000002,0.6,0.6,0.6,0.6,f32,Max fall speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2340",m15[*].2
-,3,,0x08000003,50,50,50,50,f32,Doll chance?,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2346",m15[*].3
-,4,,0x08000004,35,35,55,35,f32,Frame count,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2347",m15[*].4
+,13,,0x0600000D,90,140,8,90,f32,Max frames before activation -- code: stored in instance float 0x30 (func_2379),,medium,community | reads: MSC gekkouga.mscsb func_2379,m13[*].13
+15,0,Up B,0x17000000,0x10,0x12,0x16,0x10,u32,"Startup frames -- code: animation rate (MotionModule set rate) (func_2302); stored in status float 0x8, then ModelModule op 0x1 (func_2306) (func_2303); ModelModule op 0x1 (func_2303) [status 0x154]",,medium,community | reads: MSC gekkouga.mscsb func_2302; MSC gekkouga.mscsb func_2303,m14[*].0
+,1,,0x17000001,0xA,0x11,0xA,0xA,u32,"code: stored in status float 0x8, then ModelModule op 0x1 (func_2306) (func_2303); compared with a computed value (func_2303) [status 0x154]",,medium,reads: MSC gekkouga.mscsb func_2303; MSC gekkouga.mscsb func_2306,m14[*].1
+,2,,0x07000002,0.4,0.4,2,0.4,f32,Sensitivity for choosing an angle -- code: compared with a computed value (func_2303) [status 0x154; status 0x15D (SpecialAirHi)],,medium,community | reads: MSC gekkouga.mscsb func_2303; MSC gekkouga.mscsb func_2319; MSC gekkouga.mscsb func_2328,m14[*].2
+,3,,0x07000003,3.7,2.2,8.3,3.8,f32,"Segment base speed -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 2 (func_2319); KineticModule op 0x15 (sets a max speed) on energy 3 (stop), argument 2 (func_2319); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 2, with the facing direction (func_2319) [status 0x15D (SpecialAirHi)]",,high,community | reads: MSC gekkouga.mscsb func_2319,m14[*].3
+,4,,0x17000004,0xA,0x16,0x5,0xA,u32,"Time spent traveling (frames) -- code: stored in status int 0x4, then decremented in func_2321 (a countdown / remaining count), tested against 0 (func_2308) [status 0x15D (SpecialAirHi)]",,high,community | reads: MSC gekkouga.mscsb func_2308,m14[*].4
+,5,,0x17000005,0x3C,0x3C,0x3C,0x3C,u32,Max angle difference between segment and wall/ceiling to slide along it (degrees) -- code: compared with a computed value (func_2322) [status 0x15D (SpecialAirHi)],,medium,community | reads: MSC gekkouga.mscsb func_2322,m14[*].5
+,6,,0x17000006,0x0,0x0,0xB5,0x0,u32,Min angle change requirement for second segment (degrees) -- code: compared with a computed value (func_2328); tested against 0 (func_2328) [status 0x15F (SpecialAirHiEnd)],,medium,community | reads: MSC gekkouga.mscsb func_2328,m14[*].6
+,7,,0x07000007,0.9,1.4,1,0.9,f32,"Second segment speed multiplier -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 2 (func_2319); KineticModule op 0x15 (sets a max speed) on energy 3 (stop), argument 2 (func_2319); KineticModule op 0x14 (sets a max speed) on energy 3 (stop), argument 2, with the facing direction (func_2319) [status 0x15D (SpecialAirHi)]",,high,community | reads: MSC gekkouga.mscsb func_2319,m14[*].7
+,8,,0x07000008,0.5,0.6,0.4,0.5,f32,"H speed multiplier on ending -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2326) [status 0x15F (SpecialAirHiEnd)]",Air frcition = 0.03,high,community | reads: MSC gekkouga.mscsb func_2326,m14[*].8
+,9,,0x07000009,0.7,0.8,0.6,0.7,f32,"V speed multiplier on ending -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2326) [status 0x15F (SpecialAirHiEnd)]",,high,community | reads: MSC gekkouga.mscsb func_2326,m14[*].9
+,10,,0x0700000A,0.8,0.8,1.35,0.8,f32,Max air speed multiplier on ending -- code: KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal) (func_2327) [status 0x15F (SpecialAirHiEnd)],,high,community | reads: MSC gekkouga.mscsb func_2327,m14[*].10
+,11,,0x0700000B,0.6,0.6,0.85,0.6,f32,"Special fall max air speed multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2329) [status 0x15F (SpecialAirHiEnd)]",,medium,community | reads: MSC gekkouga.mscsb func_2329,m14[*].11
+,12,,0x0700000C,0.3,0.8,0.8,0.8,f32,"H speed after bouncing from walls -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2331) [status 0x15E]",,high,community | reads: MSC gekkouga.mscsb func_2331,m14[*].12
+,13,,0x0700000D,3.5,3.5,3.5,3.5,f32,V speed after bouncing from walls -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2331) [status 0x15E],,high,community | reads: MSC gekkouga.mscsb func_2331,m14[*].13
+,14,,0x0700000E,32,32,26,32,f32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2329) [status 0x15F (SpecialAirHiEnd)],,high,community | reads: MSC gekkouga.mscsb func_2329,m14[*].14
+16,0,Down B,0x08000000,0.5,0.5,0.5,0.5,f32,"H speed multiplier on startup -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2341) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC gekkouga.mscsb func_2341,m15[*].0
+,1,,0x08000001,0.02,0.005,0.02,0.02,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2340) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC gekkouga.mscsb func_2340,m15[*].1
+,2,,0x08000002,0.6,0.6,0.6,0.6,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2340) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC gekkouga.mscsb func_2340,m15[*].2
+,3,,0x08000003,50,50,50,50,f32,Doll chance? -- code: compared with a computed value (func_2346) [status 0x160 (SpecialLwHit)],,medium,community | reads: MSC gekkouga.mscsb func_2346,m15[*].3
+,4,,0x08000004,35,35,55,35,f32,Frame count -- code: compared with the status frame counter (global9) (func_2347) [status 0x160 (SpecialLwHit)],,high,community | reads: MSC gekkouga.mscsb func_2347,m15[*].4
 ,5,,0x08000005,5,5,10,5,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
-,6,,0x08000006,3,3,10,3,f32,"[auto] read by MSC: var17 = WorkModuleF(0, 0x8000006) * 10.0f;",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].6
-,7,,0x08000007,3.6,3.6,4,3.6,f32,this * 10,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].7
-,8,,0x08000008,10,10,14,10,f32,Frame count,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].8
-,9,,0x08000009,4.5,4.5,5.5,4.5,f32,Min X/Y coordinate difference,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].9
+,6,,0x08000006,3,3,10,3,f32,"code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2358); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2358) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,reads: MSC gekkouga.mscsb func_2358,m15[*].6
+,7,,0x08000007,3.6,3.6,4,3.6,f32,"this * 10 -- code: read in: var19 = WorkModuleF(0, 0x8000007) * 10.0f; (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354; MSC gekkouga.mscsb func_2358,m15[*].7
+,8,,0x08000008,10,10,14,10,f32,"Frame count -- code: read in: var1 = WorkModuleF(0, 0x8000008); (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2353; MSC gekkouga.mscsb func_2354,m15[*].8
+,9,,0x08000009,4.5,4.5,5.5,4.5,f32,"Min X/Y coordinate difference -- code: read in: var18 = WorkModuleF(0, 0x8000009); (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354,m15[*].9
 ,10,,0x0800000A,3.6,3.6,12,3.6,f32,"202.5 =< Angle < 247.5
-292.5 =< Angle < 337.5",,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].10
-,11,,0x0800000B,10,10,14,10,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x800000b);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].11
-,12,,0x0800000C,4.5,4.5,5.5,4.5,f32,"[auto] read by MSC: var18 = WorkModuleF(0, 0x800000c);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].12
+292.5 =< Angle < 337.5 -- code: read in: var19 = WorkModuleF(0, 0x800000a) * 10.0f; (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354; MSC gekkouga.mscsb func_2358,m15[*].10
+,11,,0x0800000B,10,10,14,10,f32,"code: read in: var1 = WorkModuleF(0, 0x800000b); (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2353; MSC gekkouga.mscsb func_2354,m15[*].11
+,12,,0x0800000C,4.5,4.5,5.5,4.5,f32,"code: read in: var18 = WorkModuleF(0, 0x800000c); (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2354,m15[*].12
 ,13,,0x0800000D,3.6,3.6,9,3.6,f32,"22.5 =< Angle < 67.5
-157.5 =< Angle < 202.5",,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].13
-,14,,0x0800000E,10,10,14,10,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x800000e);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].14
-,15,,0x0800000F,4.5,4.5,5.5,4.5,f32,"[auto] read by MSC: var18 = WorkModuleF(0, 0x800000f);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].15
-,16,,0x08000010,3.6,3.6,12,3.6,f32,67.5 =< Angle < 112.5,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].16
-,17,,0x08000011,10,10,14,10,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x8000011);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].17
-,18,,0x08000012,4.5,4.5,5.5,4.5,f32,"[auto] read by MSC: var18 = WorkModuleF(0, 0x8000012);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].18
-,19,,0x08000013,3.6,3.6,18,3.6,f32,112.5 =< Angle < 157.5,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].19
-,20,,0x08000014,10,10,14,10,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x8000014);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].20
-,21,,0x08000015,4.5,4.5,5.5,4.5,f32,"[auto] read by MSC: var18 = WorkModuleF(0, 0x8000015);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2354",m15[*].21
-,22,,0x18000016,0xA,0xA,0x14,0xA,u32,Frame count,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353",m15[*].22
-,23,,0x08000017,30,30,30,30,f32,Angle difference,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2359",m15[*].23
-,24,,0x08000018,10,10,5,10,f32,Additional frame count,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2353",m15[*].24
-,25,,0x08000019,0.3,0.3,0.3,0.3,f32,Min sensitivity (StickX + StickY have to be higher than this),,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2358",m15[*].25
+157.5 =< Angle < 202.5 -- code: read in: var19 = WorkModuleF(0, 0x800000d) * 10.0f; (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354; MSC gekkouga.mscsb func_2358,m15[*].13
+,14,,0x0800000E,10,10,14,10,f32,"code: read in: var1 = WorkModuleF(0, 0x800000e); (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2353; MSC gekkouga.mscsb func_2354,m15[*].14
+,15,,0x0800000F,4.5,4.5,5.5,4.5,f32,"code: read in: var18 = WorkModuleF(0, 0x800000f); (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2354,m15[*].15
+,16,,0x08000010,3.6,3.6,12,3.6,f32,"67.5 =< Angle < 112.5 -- code: read in: var19 = WorkModuleF(0, 0x8000010) * 10.0f; (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354; MSC gekkouga.mscsb func_2358,m15[*].16
+,17,,0x08000011,10,10,14,10,f32,"code: read in: var1 = WorkModuleF(0, 0x8000011); (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2353; MSC gekkouga.mscsb func_2354,m15[*].17
+,18,,0x08000012,4.5,4.5,5.5,4.5,f32,"code: read in: var18 = WorkModuleF(0, 0x8000012); (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,low,reads: MSC gekkouga.mscsb func_2354,m15[*].18
+,19,,0x08000013,3.6,3.6,18,3.6,f32,"112.5 =< Angle < 157.5 -- code: named ""status_SpecialLwAttack_Main lower FL_attack_speed_min length"" in a debug print (func_2354); compared with a computed value (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2354; MSC gekkouga.mscsb func_2358,m15[*].19
+,20,,0x08000014,10,10,14,10,f32,"code: compared with status int 0x3 (a counter) (func_2353); compared with a computed value (func_2354); tested against 0 (via func_13) (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,reads: MSC gekkouga.mscsb func_2353; MSC gekkouga.mscsb func_2354,m15[*].20
+,21,,0x08000015,4.5,4.5,5.5,4.5,f32,"code: compared with a computed value (func_2354); tested against 0 (via func_13) (func_2354) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,reads: MSC gekkouga.mscsb func_2354,m15[*].21
+,22,,0x18000016,0xA,0xA,0x14,0xA,u32,"Frame count -- code: compared with status int 0x3 (a counter) (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,high,community | reads: MSC gekkouga.mscsb func_2353,m15[*].22
+,23,,0x08000017,30,30,30,30,f32,"Angle difference -- code: compared with a computed value (func_2359) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2359,m15[*].23
+,24,,0x08000018,10,10,5,10,f32,"Additional frame count -- code: compared with status int 0x3 (a counter) (func_2353) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,high,community | reads: MSC gekkouga.mscsb func_2353,m15[*].24
+,25,,0x08000019,0.3,0.3,0.3,0.3,f32,"Min sensitivity (StickX + StickY have to be higher than this) -- code: compared with a computed value (func_2358) [status 0x161 (SpecialLwAttack, SpecialAirLwAttack)]",,medium,community | reads: MSC gekkouga.mscsb func_2358,m15[*].25
 ,26,,0x1800001A,0x16,0x16,0x10,0x16,u32,,,,no read in the vanilla MSC (native or unused),m15[*].26
-,27,,0x0800001B,2.5,2.5,2,2.5,f32,H/V speed multiplier on SpecialAirLwEnd,H speed = This * H speed / (abs(H speed + V speed)),medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2365",m15[*].27
-,28,,0x0800001C,0.05,0.05,0.2,0.05,f32,H air friction/gravity multiplier on SpecialAirLwEnd,Gravity = This * abs(V speed) / abs(H speed + V speed),medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2365",m15[*].28
-,29,,0x1800001D,0x3,0x3,0x3,0x3,u32,Min frame for something,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2363",m15[*].29
-,30,,0x0800001E,0.5,0.5,0.7,0.5,f32,"[auto] read by MSC: var0 *= WorkModuleF(0, 0x800001e);",,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2368",m15[*].30
-,31,,0x0800001F,1,1,1,1,f32,H speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2373",m15[*].31
-,32,,0x08000020,3.4,3.4,3.4,3.4,f32,V speed,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2373",m15[*].32
+,27,,0x0800001B,2.5,2.5,2,2.5,f32,"H/V speed multiplier on SpecialAirLwEnd -- code: named ""y"" in a debug print (func_2365); KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2365); KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2365) [status 0x162 (SpecialAirLwEnd)]",H speed = This * H speed / (abs(H speed + V speed)),high,community | reads: MSC gekkouga.mscsb func_2365,m15[*].27
+,28,,0x0800001C,0.05,0.05,0.2,0.05,f32,"H air friction/gravity multiplier on SpecialAirLwEnd -- code: named ""brake x"" in a debug print (func_2365); KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2365); KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2365) [status 0x162 (SpecialAirLwEnd)]",Gravity = This * abs(V speed) / abs(H speed + V speed),high,community | reads: MSC gekkouga.mscsb func_2365,m15[*].28
+,29,,0x1800001D,0x3,0x3,0x3,0x3,u32,"Min frame for something -- code: named ""param frame"" in a debug print (func_2363); compared with the status frame counter (global9) (func_2363) [status 0x162 (SpecialAirLwEnd)]",,high,community | reads: MSC gekkouga.mscsb func_2363,m15[*].29
+,30,,0x0800001E,0.5,0.5,0.7,0.5,f32,"code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2368) [status 0x163 (SpecialLwLanding)]",,medium,reads: MSC gekkouga.mscsb func_2368,m15[*].30
+,31,,0x0800001F,1,1,1,1,f32,"H speed -- code: read in: var0 = WorkModuleF(0, 0x800001f); (func_2373) [status 0x164 (SpecialLwBound)]",,medium,community | reads: MSC gekkouga.mscsb func_2373,m15[*].31
+,32,,0x08000020,3.4,3.4,3.4,3.4,f32,V speed -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2373) [status 0x164 (SpecialLwBound)],,high,community | reads: MSC gekkouga.mscsb func_2373,m15[*].32
 ,33,,0x18000021,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].33
 ,34,,0x08000022,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].34
 ,35,,0x08000023,6.5,6.5,6.5,6.5,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].35
 ,36,,0x08000024,0,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].36
 ,37,,0x08000025,8,8,8,8,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].37
-,38,,0x08000026,1,1,1,1,f32,Animation frame speed multiplier,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2337",m15[*].38
+,38,,0x08000026,1,1,1,1,f32,"Animation frame speed multiplier -- code: animation rate (MotionModule set rate) (func_2337) [status 0x155 (SpecialLw, SpecialAirLw)]",,high,community | reads: MSC gekkouga.mscsb func_2337,m15[*].38
 ,0,Category 4 block,0x14000000,0xF,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.0
 ,1,,0x04000001,0.02,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.1
-,2,,0x04000002,30,,,,f32,Camera X offset?,,medium,"community | reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2404",m16.2
+,2,,0x04000002,30,,,,f32,Camera X offset? -- code: CameraModule op 0x2712 (func_2404) [status 0x167 (FinalAttack)],,medium,community | reads: MSC gekkouga.mscsb func_2404,m16.2
 ,3,,0x04000003,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.3
 ,4,,0x14000004,0x41,,,,u32,[auto] read by native code (get_int at 0x027894B8); meaning not traced,,low,reads: native 0x027894B8 (fn 0x027890A4),m16.4
 ,5,,0x04000005,5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
-,6,,0x14000006,0x14,,,,u32,[auto] copied to fighter work int 0x1000008c,,low,"reads: MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2408; MSC gekkouga.mscsb (vanilla decompile, repo first commit) func_2412; native 0x02789F28 (fn 0x02789CF4)",m16.6
+,6,,0x14000006,0x14,,,,u32,"code: stored in instance int 0x8C, then decremented in func_2413 (a countdown / remaining count), compared with a computed value (func_2408); compared with a computed value (func_2412) [status 0x168 (FinalEnd); motions FinalAttack, FinalJump]",,medium,reads: MSC gekkouga.mscsb func_2408; MSC gekkouga.mscsb func_2412; MSC gekkouga.mscsb func_2413; native 0x02789F28 (fn 0x02789CF4),m16.6
 ,7,,0x04000007,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.7
 ,8,,0x04000008,-110,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.8
 ,9,,0x04000009,-200,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.9
@@ -92,18 +92,18 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 17,0,Crawling,,0.7,,,,f32,Crawl forward speed,,medium,community,m17[0].0
 ,1,,,0.5,,,,f32,Crawl backward speed,,medium,community,m17[0].1
 18,0,"Neutral B
-(Projectile)",0x02000000,0.4,0.8,0.6,0.4,f32,Uncharged Shuriken size,,medium,community,m18[*].0
-,1,,0x02000001,1.2,1.3,0.8,1.2,f32,Fully-charged Shuriken size,,medium,community,m18[*].1
-,2,,0x02000002,16,41,28,18,f32,Uncharged Shuriken lifetime (frames),,medium,community,m18[*].2
-,3,,0x02000003,32,51,32,46,f32,Fully-charged Shuriken lifetime (frames),,medium,community,m18[*].3
-,4,,0x02000004,5,0.02,0.8,5,f32,Uncharged Shuriken speed,,medium,community,m18[*].4
-,5,,0x02000005,1.9,0.04,2.1,1.9,f32,Fully-charged Shuriken speed,,medium,community,m18[*].5
-,6,,0x12000006,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community,m18[*].6
-,7,,0x02000007,1,1.5,1,1,f32,X offset,,medium,community,m18[*].7
-,8,,0x02000008,0,0,0,0,f32,Y offset,,medium,community,m18[*].8
-,9,,0x02000009,3,0,0,3,f32,Freeze frames when charged Shuriken hits the opponent,,medium,community,m18[*].9
-19,0,Water?,0x02000000,4,1.6,4.6,4,f32,Speed,,medium,community,m19[*].0
-,1,,0x02000001,17,25,25,17,f32,Lifetime (frames),,medium,community,m19[*].1
+(Projectile)",0x02000000,0.4,0.8,0.6,0.4,f32,Uncharged Shuriken size,,medium,community | no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,1.2,1.3,0.8,1.2,f32,Fully-charged Shuriken size,,medium,community | no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,16,41,28,18,f32,Uncharged Shuriken lifetime (frames),,medium,community | no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,32,51,32,46,f32,Fully-charged Shuriken lifetime (frames),,medium,community | no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,5,0.02,0.8,5,f32,Uncharged Shuriken speed,,medium,community | no read in the article MSC (native or unused),m18[*].4
+,5,,0x02000005,1.9,0.04,2.1,1.9,f32,Fully-charged Shuriken speed,,medium,community | no read in the article MSC (native or unused),m18[*].5
+,6,,0x12000006,0x0,0x1,0x0,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m18[*].6
+,7,,0x02000007,1,1.5,1,1,f32,X offset,,medium,community | no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,0,0,0,0,f32,Y offset,,medium,community | no read in the article MSC (native or unused),m18[*].8
+,9,,0x02000009,3,0,0,3,f32,Freeze frames when charged Shuriken hits the opponent,,medium,community | no read in the article MSC (native or unused),m18[*].9
+19,0,Water?,0x02000000,4,1.6,4.6,4,f32,Speed,,medium,community | no read in the article MSC (native or unused),m19[*].0
+,1,,0x02000001,17,25,25,17,f32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m19[*].1
 20,0,Doll/Log,,0x258,0x258,0x258,0x258,u32,Doll duration (frames),,medium,community,m20[*].0
 ,1,,,4,4,4,4,f32,,,,,m20[*].1
 ,2,,,3,3,3,3,f32,V speed of doll when spawned?,,medium,community,m20[*].2
@@ -163,7 +163,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,Z offset?,,medium,community,m27[0].3
 ,4,,,2,,,,f32,Size?,,medium,community,m27[0].4
 ,0,,,0x7E9,,,,u32,Bone,,medium,community,m27[1].0
-,1,,,2,,,,f32,X offset?,,medium,community,m27[1].1
+,1,,,2,,,,f32,X offset?,community value differs: Default 0 (vanilla 2),medium,community,m27[1].1
 ,2,,,0,,,,f32,Y offset?,,medium,community,m27[1].2
 ,3,,,0,,,,f32,Z offset?,,medium,community,m27[1].3
 ,4,,,0.8,,,,f32,Size?,,medium,community,m27[1].4

@@ -1,120 +1,120 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,7,0,0,0,f32,,,,,m12[*].0
-,1,,0x05000001,7,0,0,0,f32,,,,,m12[*].1
-,2,,0x05000002,7,0,0,0,f32,,,,,m12[*].2
-,3,,0x05000003,4,0,0,0,f32,Speed of the tornado in the air?,,medium,community,m12[*].3
+13,0,Neutral B,0x05000000,7,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].0
+,1,,0x05000001,7,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].1
+,2,,0x05000002,7,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x05000003,4,0,0,0,f32,Speed of the tornado in the air?,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
 ,4,,0x05000004,0.5,0,0,0,f32,H speed preservation,,medium,community | reads: native 0x027BAB4C (fn 0x027BAAFC),m12[*].4
-,5,,0x05000005,0.5,0,0,0,f32,V speed preservation,,medium,community,m12[*].5
-,6,,0x05000006,0.002,0,0,0,f32,,,,,m12[*].6
-,7,,0x05000007,24,0,0,0,f32,Landing lag (frames),,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_2506",m12[*].7
-,8,,0x05000008,0,12.5,0,0,f32,X offset of Syuriken,,medium,community,m12[*].8
-,9,,0x05000009,0,5,0,0,f32,Y offset of Syuriken,,medium,community,m12[*].9
-,10,,0x0500000A,0,0,50,0,f32,Times to fully charge (frames),,medium,community | reads: native 0x027BB8C4 (fn 0x027BB874),m12[*].10
-,11,,0x0500000B,0,0,2.4,0,f32,Full charge damage multiplier,,medium,community,m12[*].11
-,12,,0x0500000C,0,0,0.8,0,f32,Acceleration/deceleration when hitting a character on the ground,,medium,community,m12[*].12
-,13,,0x0500000D,0,0,0.02,0,f32,Acceleration/deceleration when hitting a character mid-air,,medium,community,m12[*].13
-,14,,0x0500000E,0,0,1,0,f32,Charging animation frame speed multiplier,,medium,community,m12[*].14
-14,0,Side B,0x06000000,0.8,0,0,0,f32,H speed multiplire while charging,,medium,community,m13[*].0
-,1,,0x06000001,0.02,0,0,0,f32,H air decel while charging,,medium,community,m13[*].1
-,2,,0x06000002,0.04,0,0,0,f32,Gravity while charging,,medium,community,m13[*].2
-,3,,0x06000003,40,0,0,0,f32,Times to fully charge (frames),,medium,community,m13[*].3
-,4,,0x06000004,15,0,0,0,f32,Initial charged frames of smash input,,medium,community,m13[*].4
-,5,,0x06000005,7,0,0,0,f32,Base damage multiplier (true = this / 9),Damage multiplier = 7 + (16 - 7) * Charged frame / 40,medium,community,m13[*].5
-,6,,0x06000006,16,0,0,0,f32,Max damage multiplier (true = this / 9),,medium,community,m13[*].6
-,7,,0x16000007,0x8,0x0,0x0,0x0,u32,FSM = current charged frame / this?,,medium,community,m13[*].7
-,8,,0x06000008,1.4,0,0,0,f32,Base H speed,H speed = 1.4 + (2.6 - 1.4) * Charged frame / 40,medium,community,m13[*].8
-,9,,0x06000009,2.6,0,0,0,f32,Max H speed,,medium,community,m13[*].9
-,10,,0x0600000A,0.8,0,0,0,f32,Base V speed,V speed = 0.8 + (0.8 - 0.8) * Charged frame / 40,medium,community,m13[*].10
-,11,,0x0600000B,0.8,0,0,0,f32,Max V speed,,medium,community,m13[*].11
-,12,,0x0600000C,0.038,0,0,0,f32,Gravity on flying,,medium,community,m13[*].12
-,13,,0x0600000D,0.9,0,0,0,f32,Max fall speed on flying,,medium,community,m13[*].13
-,14,,0x0600000E,0.9,0,0,0,f32,H speed on-hit,,medium,community,m13[*].14
-,15,,0x0600000F,1.9,0,0,0,f32,V speed on-hit,,medium,community,m13[*].15
-,16,,0x06000010,1,0,0,0,f32,H speed multiplier,,medium,community,m13[*].16
-,17,,0x06000011,0.06,0,0,0,f32,Base air friction,Air friction = 0.06 + (0.08 - 0.06) * Charged frame / 40,medium,community,m13[*].17
-,18,,0x06000012,0.08,0,0,0,f32,Max air friction,,medium,community,m13[*].18
-,19,,0x06000013,0.1,0,0,0,f32,Gravity,,medium,community,m13[*].19
-,20,,0x06000014,1,0,0,0,f32,Special fall max air speed multiplier,,medium,community,m13[*].20
-,21,,0x06000015,0,1,0,0,f32,V speed multiplier on aerial startup,Simillar to Ike Side B,medium,community,m13[*].21
-,22,,0x16000016,0x0,0xC,0x0,0x0,u32,,,,,m13[*].22
-,23,,0x06000017,0,3.9,0,0,f32,Base grounded travel speed,,medium,community,m13[*].23
-,24,,0x06000018,0,3.1,0,0,f32,Base aerial travel speed,,medium,community,m13[*].24
-,25,,0x06000019,0,0.037,0,0,f32,Grounded travel speed added per charge frame,,medium,community,m13[*].25
-,26,,0x0600001A,0,0.037,0,0,f32,Aerial travel speed added per charge frame,,medium,community,m13[*].26
-,27,,0x1600001B,0x0,0x46,0x0,0x0,u32,Frames for max damage,,medium,community,m13[*].27
-,28,,0x0600001C,0,0.06,0,0,f32,Damage added per charge frame,,medium,community,m13[*].28
-,29,,0x1600001D,0x0,0x46,0x0,0x0,u32,Frames for max distance,,medium,community,m13[*].29
-,30,,0x0600001E,0,0.1,0,0,f32,Grounded friction,,medium,community,m13[*].30
-,31,,0x0600001F,0,0.065,0,0,f32,Aerial friction,,medium,community,m13[*].31
-,32,,0x06000020,0,0.8,0,0,f32,H speed multiplier on grounded hitting,,medium,community,m13[*].32
-,33,,0x06000021,0,0.5,0,0,f32,H speed multiplier on aerial hitting,,medium,community,m13[*].33
-,34,,0x06000022,0,0.7,0,0,f32,H speed multiplier on grounded ending,,medium,community,m13[*].34
-,35,,0x06000023,0,0.6,0,0,f32,H speed multiplier on aerial ending,,medium,community,m13[*].35
-,36,,0x06000024,0,9,0,0,f32,Search bubble Z offset,Attached to Bone ID=0x2(HipN),medium,community,m13[*].36
-,37,,0x06000025,0,2,0,0,f32,Search bubble Y offset,,medium,community,m13[*].37
-,38,,0x06000026,0,8,0,0,f32,Search bubble radius,,medium,community,m13[*].38
-,39,,0x06000027,0,1,0,0,f32,H speed / Air friction / Grounded friction multiplier,"Affects travel speed, Name30 and Name31",medium,community,m13[*].39
-,40,,0x06000028,0,0,0.1,0,f32,,,,,m13[*].40
-,41,,0x06000029,0,0,26,0,f32,,,,,m13[*].41
-15,0,Up B,0x07000000,1,0,0,0,f32,Aerial height multiplier,,medium,community,m14[*].0
-,1,,0x07000001,0.2,0,0,0,f32,,,,,m14[*].1
-,2,,0x07000002,0,0,0,0,f32,Landing lag?,,medium,community,m14[*].2
-,3,,0x07000003,1,0,0,0,f32,Height multiplier,,medium,community,m14[*].3
-,4,,0x07000004,8,0,0,0,f32,Air max additional acceleration multiplier,,medium,community,m14[*].4
-,5,,0x07000005,0,0.8,0,0,f32,H speed multiplier on startup,Fox Up B,medium,community,m14[*].5
-,6,,0x17000006,0x0,0xC,0x0,0x0,u32,Delay before gravity affects startup (frames),,medium,community,m14[*].6
-,7,,0x07000007,0,0.02,0,0,f32,H air friction during startup,,medium,community,m14[*].7
-,8,,0x07000008,0,0.015,0,0,f32,Gravity during startup,,medium,community,m14[*].8
-,9,,0x17000009,0x0,0x24,0x0,0x0,u32,How many frames before you stop traveling,,medium,community,m14[*].9
-,10,,0x1700000A,0x0,0xF,0x0,0x0,u32,,,,,m14[*].10
-,11,,0x1700000B,0x0,0x6,0x0,0x0,u32,Frames before decaying speed,,medium,community,m14[*].11
-,12,,0x0700000C,0,2.9,0,0,f32,Initial speed of travel,,medium,community,m14[*].12
-,13,,0x0700000D,0,0.075,0,0,f32,Speed decay per frame / Deceleration,,medium,community,m14[*].13
-,14,,0x0700000E,0,0.85,0,0,f32,Special fall max air speed multiplier,,medium,community,m14[*].14
-,15,,0x0700000F,0,20,0,0,f32,Max angle difference to slide on the ground,,medium,community,m14[*].15
-,16,,0x07000010,0,0.8,0,0,f32,H speed multiplier after bouncing,,medium,community,m14[*].16
-,17,,0x07000011,0,0.05,0,0,f32,Air friction after bouncing,,medium,community,m14[*].17
-,18,,0x07000012,0,3,0,0,f32,Initial V speed after bouncing,,medium,community,m14[*].18
-,19,,0x07000013,0,0.19,0,0,f32,Gravity after bouncing,,medium,community,m14[*].19
-,20,,0x17000014,0x0,0x14,0x0,0x0,u32,Landing lag (Frames),,medium,community,m14[*].20
-,21,,0x17000015,0x0,0x0,0x3C,0x0,u32,Time to fully charge (frames),Link Up B,medium,community,m14[*].21
-,22,,0x07000016,0,0,1.4,0,f32,Max damage multiplier,,medium,community,m14[*].22
-,23,,0x07000017,0,0,1,0,f32,Startup animation speed multiplier,Also increase damage the longer the charge is held,medium,community,m14[*].23
+,5,,0x05000005,0.5,0,0,0,f32,V speed preservation,,medium,community | no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,0.002,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,24,0,0,0,f32,"Landing lag (frames) -- code: stored in status int 0x2 (func_2506); stored in status int 0x2, then decremented in func_2266 (a countdown / remaining count), tested against 0 (func_2262) [status 0x181; status 0x152]",,high,community | reads: MSC kirby.mscsb func_2506; MSC miiswordsman.mscsb func_2262,m12[*].7
+,8,,0x05000008,0,12.5,0,0,f32,X offset of Syuriken,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+,9,,0x05000009,0,5,0,0,f32,Y offset of Syuriken,,medium,community | no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,0,0,50,0,f32,"Times to fully charge (frames) -- code: compared with a computed value (func_2280) [status 0x157 (SpecialN3Loop, SpecialAirN3Loop)]",,medium,community | reads: MSC miiswordsman.mscsb func_2280; native 0x027BB8C4 (fn 0x027BB874),m12[*].10
+,11,,0x0500000B,0,0,2.4,0,f32,Full charge damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].11
+,12,,0x0500000C,0,0,0.8,0,f32,Acceleration/deceleration when hitting a character on the ground,,medium,community | no read in the vanilla MSC (native or unused),m12[*].12
+,13,,0x0500000D,0,0,0.02,0,f32,Acceleration/deceleration when hitting a character mid-air,,medium,community | no read in the vanilla MSC (native or unused),m12[*].13
+,14,,0x0500000E,0,0,1,0,f32,"Charging animation frame speed multiplier -- code: ColorBlendModule op 0x7 (func_2281); animation rate (MotionModule set rate) (func_2281); compared with a computed value (func_2280) [status 0x157 (SpecialN3Loop, SpecialAirN3Loop)]",,high,community | reads: MSC miiswordsman.mscsb func_2280; MSC miiswordsman.mscsb func_2281,m12[*].14
+14,0,Side B,0x06000000,0.8,0,0,0,f32,H speed multiplire while charging -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop) (func_2326) [status 0x153],,high,community | reads: MSC miiswordsman.mscsb func_2326,m13[*].0
+,1,,0x06000001,0.02,0,0,0,f32,"H air decel while charging -- code: KineticModule op 0xF (sets an acceleration) on energy 3 (stop), with the facing direction (func_2326) [status 0x153]",,high,community | reads: MSC miiswordsman.mscsb func_2326,m13[*].1
+,2,,0x06000002,0.04,0,0,0,f32,Gravity while charging -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2326) [status 0x153],,high,community | reads: MSC miiswordsman.mscsb func_2326,m13[*].2
+,3,,0x06000003,40,0,0,0,f32,Times to fully charge (frames) -- code: compared with status int 0x2 (a counter) (func_2304); stored in instance float 0x36 (func_2304); stored in status float 0x6 (func_2328) [status 0x15A; status 0x15B],,high,community | reads: MSC miiswordsman.mscsb func_2304; MSC miiswordsman.mscsb func_2306; MSC miiswordsman.mscsb func_2328; MSC miiswordsman.mscsb func_2329; +2 more,m13[*].3
+,4,,0x06000004,15,0,0,0,f32,"Initial charged frames of smash input -- code: stored in status int 0x2, then counted up (func_2304); compared with a computed value (func_2327) [status 0x15A]",,high,community | reads: MSC miiswordsman.mscsb func_2327,m13[*].4
+,5,,0x06000005,7,0,0,0,f32,Base damage multiplier (true = this / 9) -- code: AttackModule op 0x2728 (func_2330) [status 0x15D (SpecialS1Hit)],Damage multiplier = 7 + (16 - 7) * Charged frame / 40,high,community | reads: MSC miiswordsman.mscsb func_2330,m13[*].5
+,6,,0x06000006,16,0,0,0,f32,Max damage multiplier (true = this / 9) -- code: AttackModule op 0x2728 (func_2330) [status 0x15D (SpecialS1Hit)],,high,community | reads: MSC miiswordsman.mscsb func_2330,m13[*].6
+,7,,0x16000007,0x8,0x0,0x0,0x0,u32,"FSM = current charged frame / this? -- code: stored in status int 0x3, then decremented in func_2309 (a countdown / remaining count), tested against 0 (func_2328) [status 0x15B]",,high,community | reads: MSC miiswordsman.mscsb func_2293; MSC miiswordsman.mscsb func_2328,m13[*].7
+,8,,0x06000008,1.4,0,0,0,f32,"Base H speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2329) [status 0x15C (SpecialS1)]",H speed = 1.4 + (2.6 - 1.4) * Charged frame / 40,high,community | reads: MSC miiswordsman.mscsb func_2329,m13[*].8
+,9,,0x06000009,2.6,0,0,0,f32,"Max H speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2329) [status 0x15C (SpecialS1)]",,medium,community | reads: MSC miiswordsman.mscsb func_2329,m13[*].9
+,10,,0x0600000A,0.8,0,0,0,f32,"Base V speed -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2329) [status 0x15C (SpecialS1)]",V speed = 0.8 + (0.8 - 0.8) * Charged frame / 40,high,community | reads: MSC miiswordsman.mscsb func_2329,m13[*].10
+,11,,0x0600000B,0.8,0,0,0,f32,"Max V speed -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2329) [status 0x15C (SpecialS1)]",,medium,community | reads: MSC miiswordsman.mscsb func_2329,m13[*].11
+,12,,0x0600000C,0.038,0,0,0,f32,"Gravity on flying -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2331) [status 0x15C (SpecialS1)]",,high,community | reads: MSC miiswordsman.mscsb func_2331,m13[*].12
+,13,,0x0600000D,0.9,0,0,0,f32,Max fall speed on flying -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2331) [status 0x15C (SpecialS1)],,high,community | reads: MSC miiswordsman.mscsb func_2331,m13[*].13
+,14,,0x0600000E,0.9,0,0,0,f32,"H speed on-hit -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1, with the facing direction (func_2323) [status 0x15D (SpecialS1Hit)]",,high,community | reads: MSC miiswordsman.mscsb func_2323,m13[*].14
+,15,,0x0600000F,1.9,0,0,0,f32,V speed on-hit -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2323) [status 0x15D (SpecialS1Hit)],,high,community | reads: MSC miiswordsman.mscsb func_2323,m13[*].15
+,16,,0x06000010,1,0,0,0,f32,"H speed multiplier -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2332) [status 0x15E]",,high,community | reads: MSC miiswordsman.mscsb func_2332,m13[*].16
+,17,,0x06000011,0.06,0,0,0,f32,"Base air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2333) [status 0x15E]",Air friction = 0.06 + (0.08 - 0.06) * Charged frame / 40,high,community | reads: MSC miiswordsman.mscsb func_2333,m13[*].17
+,18,,0x06000012,0.08,0,0,0,f32,"Max air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2333) [status 0x15E]",,high,community | reads: MSC miiswordsman.mscsb func_2333,m13[*].18
+,19,,0x06000013,0.1,0,0,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical), negated (func_2333) [status 0x15E]",,high,community | reads: MSC miiswordsman.mscsb func_2333,m13[*].19
+,20,,0x06000014,1,0,0,0,f32,"Special fall max air speed multiplier -- code: KineticModule op 0x14 (sets a max speed) on energy 2 (control / horizontal), with fighter_param 0x16 (air_speed_x_stable) (func_2319) [status 0x15E]",,high,community | reads: MSC miiswordsman.mscsb func_2319,m13[*].20
+,21,,0x06000015,0,1,0,0,f32,"V speed multiplier on aerial startup -- code: KineticModule op 0xE (sets a speed) on energy 1 (gravity / vertical), argument 3 (func_2362)",Simillar to Ike Side B,high,community | reads: MSC miiswordsman.mscsb func_2362,m13[*].21
+,22,,0x16000016,0x0,0xC,0x0,0x0,u32,"code: stored in status int 0x5, then decremented in func_2349 (a countdown / remaining count), tested against 0 (func_2346) [status 0x160 (SpecialS2Dash, SpecialAirS2Dash)]",,medium,reads: MSC miiswordsman.mscsb func_2346,m13[*].22
+,23,,0x06000017,0,3.9,0,0,f32,"Base grounded travel speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364,m13[*].23
+,24,,0x06000018,0,3.1,0,0,f32,"Base aerial travel speed -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364,m13[*].24
+,25,,0x06000019,0,0.037,0,0,f32,"Grounded travel speed added per charge frame -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364,m13[*].25
+,26,,0x0600001A,0,0.037,0,0,f32,"Aerial travel speed added per charge frame -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364,m13[*].26
+,27,,0x1600001B,0x0,0x46,0x0,0x0,u32,"Frames for max damage -- code: compared with a computed value (func_2345) [status 0x15F (SpecialS2Hold, SpecialAirS2Hold)]",,medium,community | reads: MSC miiswordsman.mscsb func_2345,m13[*].27
+,28,,0x0600001C,0,0.06,0,0,f32,Damage added per charge frame -- code: AttackModule op 0x272D (func_2365),,high,community | reads: MSC miiswordsman.mscsb func_2365,m13[*].28
+,29,,0x1600001D,0x0,0x46,0x0,0x0,u32,"Frames for max distance -- code: stored in status float 0x8 (func_2345); compared with a computed value (func_2345) [status 0x15F (SpecialS2Hold, SpecialAirS2Hold)]",,medium,community | reads: MSC miiswordsman.mscsb func_2345,m13[*].29
+,30,,0x0600001E,0,0.1,0,0,f32,"Grounded friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364; MSC miiswordsman.mscsb func_2371,m13[*].30
+,31,,0x0600001F,0,0.065,0,0,f32,"Aerial friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2364)",,high,community | reads: MSC miiswordsman.mscsb func_2364; MSC miiswordsman.mscsb func_2371,m13[*].31
+,32,,0x06000020,0,0.8,0,0,f32,"H speed multiplier on grounded hitting -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2366)",,high,community | reads: MSC miiswordsman.mscsb func_2366,m13[*].32
+,33,,0x06000021,0,0.5,0,0,f32,"H speed multiplier on aerial hitting -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2366)",,high,community | reads: MSC miiswordsman.mscsb func_2366,m13[*].33
+,34,,0x06000022,0,0.7,0,0,f32,"H speed multiplier on grounded ending -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2366)",,high,community | reads: MSC miiswordsman.mscsb func_2366,m13[*].34
+,35,,0x06000023,0,0.6,0,0,f32,"H speed multiplier on aerial ending -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2366)",,high,community | reads: MSC miiswordsman.mscsb func_2366,m13[*].35
+,36,,0x06000024,0,9,0,0,f32,Search bubble Z offset -- code: SearchModule op 0x1 (func_2382),Attached to Bone ID=0x2(HipN),medium,community | reads: MSC miiswordsman.mscsb func_2382,m13[*].36
+,37,,0x06000025,0,2,0,0,f32,Search bubble Y offset -- code: SearchModule op 0x1 (func_2382),,medium,community | reads: MSC miiswordsman.mscsb func_2382,m13[*].37
+,38,,0x06000026,0,8,0,0,f32,Search bubble radius -- code: SearchModule op 0x1 (func_2382),,medium,community | reads: MSC miiswordsman.mscsb func_2382,m13[*].38
+,39,,0x06000027,0,1,0,0,f32,"H speed / Air friction / Grounded friction multiplier -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2364); KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 1 (func_2364)","Affects travel speed, Name30 and Name31",high,community | reads: MSC miiswordsman.mscsb func_2364; MSC miiswordsman.mscsb func_2371,m13[*].39
+,40,,0x06000028,0,0,0.1,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].40
+,41,,0x06000029,0,0,26,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].41
+15,0,Up B,0x07000000,1,0,0,0,f32,Aerial height multiplier -- code: KineticModule op 0x12 on energy 0 (motion) (func_2410) [status 0x163],,medium,community | reads: MSC miiswordsman.mscsb func_2410,m14[*].0
+,1,,0x07000001,0.2,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0,0,0,0,f32,Landing lag? -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2405) [status 0x165],,high,community | reads: MSC miiswordsman.mscsb func_2405,m14[*].2
+,3,,0x07000003,1,0,0,0,f32,Height multiplier -- code: stored in status float 0x4 (func_2391); KineticModule op 0x12 on energy 0 (motion) (func_2410) [status 0x154; status 0x163],,medium,community | reads: MSC miiswordsman.mscsb func_2391; MSC miiswordsman.mscsb func_2410,m14[*].3
+,4,,0x07000004,8,0,0,0,f32,"Air max additional acceleration multiplier -- code: KineticModule op 0x6 on energy 2 (control / horizontal), with fighter_param 0x14 (air_accel_x_mul) (func_2406) [status 0x154; status 0x163]",,medium,community | reads: MSC miiswordsman.mscsb func_2406; MSC miiswordsman.mscsb func_2409,m14[*].4
+,5,,0x07000005,0,0.8,0,0,f32,"H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2438)",Fox Up B,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].5
+,6,,0x17000006,0x0,0xC,0x0,0x0,u32,Delay before gravity affects startup (frames) -- code: stored in status int 0x2 (func_2420); tested against 0 (func_2438),,medium,community | reads: MSC miiswordsman.mscsb func_2420; MSC miiswordsman.mscsb func_2438; MSC miiswordsman.mscsb func_2440,m14[*].6
+,7,,0x07000007,0,0.02,0,0,f32,H air friction during startup -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2440),,high,community | reads: MSC miiswordsman.mscsb func_2440,m14[*].7
+,8,,0x07000008,0,0.015,0,0,f32,Gravity during startup -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2440),,high,community | reads: MSC miiswordsman.mscsb func_2440,m14[*].8
+,9,,0x17000009,0x0,0x24,0x0,0x0,u32,How many frames before you stop traveling -- code: compared with status int 0x3 (a counter) (func_2427) [status 0x166 (SpecialHi2)],,high,community | reads: MSC miiswordsman.mscsb func_2427,m14[*].9
+,10,,0x1700000A,0x0,0xF,0x0,0x0,u32,code: compared with status int 0x3 (a counter) (func_2428) [status 0x166 (SpecialHi2)],,medium,reads: MSC miiswordsman.mscsb func_2428,m14[*].10
+,11,,0x1700000B,0x0,0x6,0x0,0x0,u32,Frames before decaying speed -- code: compared with a computed value (func_2440),,medium,community | reads: MSC miiswordsman.mscsb func_2440,m14[*].11
+,12,,0x0700000C,0,2.9,0,0,f32,"Initial speed of travel -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 2 (func_2438)",,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].12
+,13,,0x0700000D,0,0.075,0,0,f32,"Speed decay per frame / Deceleration -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop), argument 2 (func_2440)",,high,community | reads: MSC miiswordsman.mscsb func_2440,m14[*].13
+,14,,0x0700000E,0,0.85,0,0,f32,"Special fall max air speed multiplier -- code: stored in instance float 0x1 (the special-fall air speed multiplier), then compared with a computed value (func_581) (func_2444)",,medium,community | reads: MSC miiswordsman.mscsb func_2444,m14[*].14
+,15,,0x0700000F,0,20,0,0,f32,Max angle difference to slide on the ground -- code: compared with a computed value (func_2443),,medium,community | reads: MSC miiswordsman.mscsb func_2443,m14[*].15
+,16,,0x07000010,0,0.8,0,0,f32,H speed multiplier after bouncing -- code: KineticModule op 0x11 (sets a speed) on energy 3 (stop) (func_2438),,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].16
+,17,,0x07000011,0,0.05,0,0,f32,Air friction after bouncing -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2438),,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].17
+,18,,0x07000012,0,3,0,0,f32,Initial V speed after bouncing -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2438),,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].18
+,19,,0x07000013,0,0.19,0,0,f32,Gravity after bouncing -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2438),,high,community | reads: MSC miiswordsman.mscsb func_2438,m14[*].19
+,20,,0x17000014,0x0,0x14,0x0,0x0,u32,Landing lag (Frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2444),,high,community | reads: MSC miiswordsman.mscsb func_2444,m14[*].20
+,21,,0x17000015,0x0,0x0,0x3C,0x0,u32,"Time to fully charge (frames) -- code: ControlModule op 0x2713 (func_2453); AttackModule op 0x2728 (func_2461) [status 0x169 (SpecialHi3Hold); status 0x16A (SpecialHi3, SpecialAirHi3)]",Link Up B,medium,community | reads: MSC miiswordsman.mscsb func_2453; MSC miiswordsman.mscsb func_2461,m14[*].21
+,22,,0x07000016,0,0,1.4,0,f32,"Max damage multiplier -- code: AttackModule op 0x2728 (func_2461) [status 0x16A (SpecialHi3, SpecialAirHi3)]",,high,community | reads: MSC miiswordsman.mscsb func_2461,m14[*].22
+,23,,0x07000017,0,0,1,0,f32,"Startup animation speed multiplier -- code: animation rate (MotionModule set rate) (func_2450); stored in a work variable, then ControlModule op 0x2713 (func_2453) (func_2460) [status 0x169 (SpecialHi3Hold)]",Also increase damage the longer the charge is held,high,community | reads: MSC miiswordsman.mscsb func_2450; MSC miiswordsman.mscsb func_2460,m14[*].23
 ,24,,0x07000018,0,0,2.35,0,f32,Initial V speed on startup,,medium,community | reads: native 0x027BA9FC (fn 0x027BA994),m14[*].24
-,25,,0x07000019,0,0,0.55,0,f32,Gravity multiplier,,medium,community,m14[*].25
-,26,,0x0700001A,0,0,0.4,0,f32,,,,,m14[*].26
-,27,,0x0700001B,0,0,0.22,0,f32,H mobility,,medium,community,m14[*].27
-,28,,0x0700001C,0,0,0.2,0,f32,H max mobility,,medium,community,m14[*].28
-,29,,0x0700001D,0,0,1,0,f32,Height multiplier,,medium,community,m14[*].29
-,30,,0x1700001E,0x0,0x0,0x1E,0x0,u32,Landing lag (frames),,medium,community,m14[*].30
-16,0,Down B,0x08000000,0.5,0,0,0,f32,Aerial H speed multiplier,,medium,community,m15[*].0
+,25,,0x07000019,0,0,0.55,0,f32,Gravity multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].25
+,26,,0x0700001A,0,0,0.4,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].26
+,27,,0x0700001B,0,0,0.22,0,f32,H mobility,,medium,community | no read in the vanilla MSC (native or unused),m14[*].27
+,28,,0x0700001C,0,0,0.2,0,f32,H max mobility,,medium,community | no read in the vanilla MSC (native or unused),m14[*].28
+,29,,0x0700001D,0,0,1,0,f32,Height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].29
+,30,,0x1700001E,0x0,0x0,0x1E,0x0,u32,Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2449),,high,community | reads: MSC miiswordsman.mscsb func_2449,m14[*].30
+16,0,Down B,0x08000000,0.5,0,0,0,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
 ,1,,0x08000001,0.0025,0,0,0,f32,H air friction,,medium,"community | reads: native 0x027BB3DC (fn 0x027BB278, direct vl read)",m15[*].1
 ,2,,0x08000002,0.04,0,0,0,f32,Counter gravity,,medium,"community | reads: native 0x027BB430 (fn 0x027BB278, direct vl read)",m15[*].2
 ,3,,0x08000003,1.2,0,0,0,f32,Counter max fall speed,,medium,"community | reads: native 0x027BB448 (fn 0x027BB278, direct vl read)",m15[*].3
-,4,,0x18000004,0x10,0x0,0x0,0x0,u32,Freeze frames,,medium,community,m15[*].4
-,5,,0x08000005,8,0,0,0,f32,Minumum damage,,medium,community,m15[*].5
-,6,,0x08000006,1.25,0,0,0,f32,Damage multiplier,,medium,community,m15[*].6
-,7,,0x08000007,50,0,0,0,f32,Max damage,,medium,community,m15[*].7
-,8,,0x08000008,50,0,0,0,f32,,,,,m15[*].8
-,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,,m15[*].9
-,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community,m15[*].10
-,11,,0x0800000B,6.5,0,0,0,f32,Counter trigger bubble Y offset,,medium,community,m15[*].11
-,12,,0x0800000C,1,0,0,0,f32,Counter trigger bubble Z offset,,medium,community,m15[*].12
-,13,,0x0800000D,9,0,0,0,f32,Counter trigger bubble size,,medium,community,m15[*].13
-,14,,0x0800000E,1,0,0,0,f32,Animation frame speed multiplier,,medium,community,m15[*].14
-,15,,0x0800000F,0,0.4,0,0,f32,H speed multiplier on startup,Mario Side B,medium,community,m15[*].15
-,16,,0x08000010,0,0.0025,0,0,f32,H air friction,,medium,community,m15[*].16
-,17,,0x08000011,0,0.3,0,0,f32,V speed for 1st aerial use,,medium,community,m15[*].17
-,18,,0x08000012,0,0.04,0,0,f32,Gravity for 1st aerial use,"For some reason, changing this to 100 gets rid of the rainbow effect",medium,community,m15[*].18
-,19,,0x08000013,0,1.2,0,0,f32,Max fall speed,,medium,community,m15[*].19
-,20,,0x08000014,0,0,0.66,0,f32,Speed multiplier on hit,Falcon Donw B,medium,community,m15[*].20
-,21,,0x18000015,0x0,0x0,0x4,0x0,u32,,,,,m15[*].21
-,22,,0x08000016,0,0,1,0,f32,Ground to ground lag duration multiplier,,medium,community,m15[*].22
-,23,,0x08000017,0,0,1,0,f32,Air to ground landing lag duration multiplier,,medium,community,m15[*].23
-,24,,0x08000018,0,0,0.12,0,f32,Ground friction during SpecialLwEnd with RA-Bit 13 is 0x0,,medium,community,m15[*].24
-,25,,0x08000019,0,0,3,0,f32,Ground friction during SpecialLwEnd with RA-Bit 13 is 0x2,,medium,community,m15[*].25
-,26,,0x1800001A,0x0,0x0,0x1E,0x0,u32,Landing lag (frames),,medium,community,m15[*].26
-,0,Category 4 block,0x14000000,0x64,,,,u32,Frames,,medium,community,m16
+,4,,0x18000004,0x10,0x0,0x0,0x0,u32,Freeze frames,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,8,0,0,0,f32,Minumum damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,1.25,0,0,0,f32,Damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,50,0,0,0,f32,Max damage,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,8,,0x08000008,50,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].8
+,9,,0x18000009,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].9
+,10,,0x0800000A,0,0,0,0,f32,Counter trigger bubble X offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].10
+,11,,0x0800000B,6.5,0,0,0,f32,Counter trigger bubble Y offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].11
+,12,,0x0800000C,1,0,0,0,f32,Counter trigger bubble Z offset,,medium,community | no read in the vanilla MSC (native or unused),m15[*].12
+,13,,0x0800000D,9,0,0,0,f32,Counter trigger bubble size,,medium,community | no read in the vanilla MSC (native or unused),m15[*].13
+,14,,0x0800000E,1,0,0,0,f32,"Animation frame speed multiplier -- code: animation rate (MotionModule set rate) (func_2464) [status 0x155 (SpecialLw1, SpecialAirLw1)]",,high,community | reads: MSC miiswordsman.mscsb func_2464,m15[*].14
+,15,,0x0800000F,0,0.4,0,0,f32,"H speed multiplier on startup -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2476) [status 0x155 (SpecialLw1, SpecialAirLw1)]",Mario Side B,high,community | reads: MSC miiswordsman.mscsb func_2476,m15[*].15
+,16,,0x08000010,0,0.0025,0,0,f32,"H air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2476) [status 0x155 (SpecialLw1, SpecialAirLw1)]",,high,community | reads: MSC miiswordsman.mscsb func_2476,m15[*].16
+,17,,0x08000011,0,0.3,0,0,f32,"V speed for 1st aerial use -- code: KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2477) [status 0x155 (SpecialLw1, SpecialAirLw1)]",,high,community | reads: MSC miiswordsman.mscsb func_2477,m15[*].17
+,18,,0x08000012,0,0.04,0,0,f32,"Gravity for 1st aerial use -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2477) [status 0x155 (SpecialLw1, SpecialAirLw1)]","For some reason, changing this to 100 gets rid of the rainbow effect",high,community | reads: MSC miiswordsman.mscsb func_2477,m15[*].18
+,19,,0x08000013,0,1.2,0,0,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2477) [status 0x155 (SpecialLw1, SpecialAirLw1)]",,high,community | reads: MSC miiswordsman.mscsb func_2477,m15[*].19
+,20,,0x08000014,0,0,0.66,0,f32,Speed multiplier on hit,Falcon Donw B,medium,community | no read in the vanilla MSC (native or unused),m15[*].20
+,21,,0x18000015,0x0,0x0,0x4,0x0,u32,code: stored in status int 0x3 (func_2481),,medium,reads: MSC miiswordsman.mscsb func_2481,m15[*].21
+,22,,0x08000016,0,0,1,0,f32,"Ground to ground lag duration multiplier -- code: read in: func_22(0x24b, 0, WorkModuleF(0, 0x8000016)); (func_2485) [status 0x16C (SpecialLw3End, SpecialLw3EndAir, SpecialAirLw3End)]",,medium,community | reads: MSC miiswordsman.mscsb func_2485,m15[*].22
+,23,,0x08000017,0,0,1,0,f32,"Air to ground landing lag duration multiplier -- code: read in: func_22(0x24e, 0, WorkModuleF(0, 0x8000017)); (func_2485) [status 0x16C (SpecialLw3End, SpecialLw3EndAir, SpecialAirLw3End)]",,medium,community | reads: MSC miiswordsman.mscsb func_2485,m15[*].23
+,24,,0x08000018,0,0,0.12,0,f32,Ground friction during SpecialLwEnd with RA-Bit 13 is 0x0,,medium,community | no read in the vanilla MSC (native or unused),m15[*].24
+,25,,0x08000019,0,0,3,0,f32,Ground friction during SpecialLwEnd with RA-Bit 13 is 0x2,,medium,community | no read in the vanilla MSC (native or unused),m15[*].25
+,26,,0x1800001A,0x0,0x0,0x1E,0x0,u32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2490) [status 0x16C (SpecialLw3End, SpecialLw3EndAir, SpecialAirLw3End)]",,high,community | reads: MSC miiswordsman.mscsb func_2490,m15[*].26
+,0,Category 4 block,0x14000000,0x64,,,,u32,Frames -- code: compared with the status frame counter (global9) (func_2502) [status 0x16D],,high,community | reads: MSC miiswordsman.mscsb func_2502,m16
 17,0,,,0xDD,,,,u32,,,,,m17[0].0
 ,1,,,0xDD,,,,u32,,,,,m17[0].1
 ,0,,,0xDD,,,,u32,,,,,m17[1].0
@@ -379,7 +379,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,1,,,0x3010037,,,,u32,,,,,m19[42].1
 ,0,,,0x3010037,,,,u32,,,,,m19[43].0
 ,1,,,0x3010037,,,,u32,,,,,m19[43].1
-20,0,Article params (hat),0x12000000,0x0,,,,u32,,,,,m20[0]
+20,0,Article params (hat),0x12000000,0x0,,,,u32,,,,no read in the article MSC (native or unused),m20[0]
 21,0,,,50,,,,f32,Break threshold,,medium,community,m21[0].0
 ,1,,,0,,,,f32,Reflection bubble X offset,,medium,community,m21[0].1
 ,2,,,6,,,,f32,Reflection bubble Y offset,,medium,community,m21[0].2
@@ -388,22 +388,22 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,5,,,1.5,,,,f32,Reflected projectile damage multiplier,,medium,community,m21[0].5
 ,6,,,1,,,,f32,Reflected projectile speed multiplier,,medium,community,m21[0].6
 ,7,,,0.75,,,,f32,Reflected projectile lifetime multiplier,,medium,community,m21[0].7
-22,0,Chakram,0x02000000,0,,,,f32,,,,,m22[0].0
-,1,,0x12000001,0x34,,,,u32,Chakram lifetime (frames),community ID was 0x02000001,medium,community,m22[0].1
-,2,,0x12000002,0x1E,,,,u32,Smash input Chakram lifetime (frames),community ID was 0x02000002,medium,community,m22[0].2
-,3,,0x02000003,1.3,,,,f32,Chakram initial speed,,medium,community,m22[0].3
-,4,,0x02000004,3,,,,f32,Smash input Chakram initial speed,,medium,community,m22[0].4
-,5,,0x02000005,0,,,,f32,Smash input H decel?,,medium,community,m22[0].5
-,6,,0x02000006,-0.035,,,,f32,Deceleration ratio (H decel = H speed * this),Only affects to air frcition on flat surface,medium,community,m22[0].6
-,7,,0x02000007,4,,,,f32,Max H speed,,medium,community,m22[0].7
-,8,,0x02000008,1,,,,f32,,,,,m22[0].8
-,9,,0x12000009,0x1,,,,u32,,community ID was 0x02000009,,,m22[0].9
-,10,,0x0200000A,1.5,,,,f32,H max back speed,,medium,community,m22[0].10
-,11,,0x0200000B,0.025,,,,f32,H deceleration,,medium,community,m22[0].11
-,12,,0x0200000C,2,,,,f32,V max back speed,,medium,community,m22[0].12
-,13,,0x0200000D,-0.1,,,,f32,Gravity,,medium,community,m22[0].13
-,14,,0x1200000E,0x96,,,,u32,Frames stuck to a surface,community ID was 0x0200000E,medium,community,m22[0].14
-,15,,0x0200000F,1,,,,f32,Piercing capability?,,medium,community,m22[0].15
+22,0,Chakram,0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m22[0].0
+,1,,0x12000001,0x34,,,,u32,Chakram lifetime (frames),community ID was 0x02000001,medium,community | no read in the article MSC (native or unused),m22[0].1
+,2,,0x12000002,0x1E,,,,u32,Smash input Chakram lifetime (frames),community ID was 0x02000002,medium,community | no read in the article MSC (native or unused),m22[0].2
+,3,,0x02000003,1.3,,,,f32,Chakram initial speed,,medium,community | no read in the article MSC (native or unused),m22[0].3
+,4,,0x02000004,3,,,,f32,Smash input Chakram initial speed,,medium,community | no read in the article MSC (native or unused),m22[0].4
+,5,,0x02000005,0,,,,f32,Smash input H decel?,,medium,community | no read in the article MSC (native or unused),m22[0].5
+,6,,0x02000006,-0.035,,,,f32,"Deceleration ratio (H decel = H speed * this) -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 1 (func_74)",Only affects to air frcition on flat surface,high,community | reads: MSC miiswordsman/chakram.mscsb func_74,m22[0].6
+,7,,0x02000007,4,,,,f32,"Max H speed -- code: KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 1 (func_74)",,high,community | reads: MSC miiswordsman/chakram.mscsb func_74; MSC miiswordsman/chakram.mscsb func_75,m22[0].7
+,8,,0x02000008,1,,,,f32,,,,no read in the article MSC (native or unused),m22[0].8
+,9,,0x12000009,0x1,,,,u32,,community ID was 0x02000009,,no read in the article MSC (native or unused),m22[0].9
+,10,,0x0200000A,1.5,,,,f32,"H max back speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 1 (func_75)",,medium,community | reads: MSC miiswordsman/chakram.mscsb func_75,m22[0].10
+,11,,0x0200000B,0.025,,,,f32,H deceleration -- code: KineticModule op 0x10 (sets a brake / friction) on energy 0 (motion) (func_75),,high,community | reads: MSC miiswordsman/chakram.mscsb func_75,m22[0].11
+,12,,0x0200000C,2,,,,f32,V max back speed -- code: KineticModule op 0x11 (sets a speed) on energy 0 (motion) (func_75),,medium,community | reads: MSC miiswordsman/chakram.mscsb func_75,m22[0].12
+,13,,0x0200000D,-0.1,,,,f32,Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion) (func_75),,high,community | reads: MSC miiswordsman/chakram.mscsb func_75,m22[0].13
+,14,,0x1200000E,0x96,,,,u32,"Frames stuck to a surface -- code: stored in instance int 0x4 (the article's life counter: lifetime in frames, by use), then decremented in func_69 (a countdown / remaining count), tested against 0 (func_62)",community ID was 0x0200000E,high,community | reads: MSC miiswordsman/chakram.mscsb func_62,m22[0].14
+,15,,0x0200000F,1,,,,f32,Piercing capability?,,medium,community | no read in the article MSC (native or unused),m22[0].15
 23,0,,,0x1,,,,u32,,,,,m23[0].0
 ,1,,,1.2,,,,f32,,,,,m23[0].1
 ,2,,,-1.2,,,,f32,,,,,m23[0].2
@@ -414,14 +414,14 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m24[0].3
 ,4,,,1,,,,f32,,,,,m24[0].4
 ,5,,,0,,,,f32,,,,,m24[0].5
-25,0,Shuriken,0x02000000,0,,,,f32,,,,,m25[0].0
-,1,,0x12000001,0x1E,,,,u32,Shuriken duration (frames),community ID was 0x02000001,medium,community,m25[0].1
-,2,,0x02000002,1,,,,f32,,,,,m25[0].2
-,3,,0x02000003,0.1,,,,f32,Deceleration ratio (H decel = H speed * this),,medium,community,m25[0].3
-,4,,0x02000004,4,,,,f32,Max H speed,,medium,community,m25[0].4
-,5,,0x02000005,48,,,,f32,Model rotation (degrees)?,,medium,community,m25[0].5
-,6,,0x02000006,1,,,,f32,,,,,m25[0].6
-,7,,0x12000007,0x0,,,,u32,,community ID was 0x02000007,,,m25[0].7
+25,0,Shuriken,0x02000000,0,,,,f32,,,,no read in the article MSC (native or unused),m25[0].0
+,1,,0x12000001,0x1E,,,,u32,Shuriken duration (frames),community ID was 0x02000001,medium,community | no read in the article MSC (native or unused),m25[0].1
+,2,,0x02000002,1,,,,f32,,,,no read in the article MSC (native or unused),m25[0].2
+,3,,0x02000003,0.1,,,,f32,"Deceleration ratio (H decel = H speed * this) -- code: KineticModule op 0xF (sets an acceleration) on energy 0 (motion), argument 1 (func_65)",,high,community | reads: MSC miiswordsman/lightshuriken.mscsb func_65,m25[0].3
+,4,,0x02000004,4,,,,f32,"Max H speed -- code: KineticModule op 0x14 (sets a max speed) on energy 0 (motion), argument 1 (func_65)",,high,community | reads: MSC miiswordsman/lightshuriken.mscsb func_65,m25[0].4
+,5,,0x02000005,48,,,,f32,"Model rotation (degrees)? -- code: stored in instance float 0x2, then KineticModule op 0x11 (sets a speed) on energy 0 (motion), argument 2; compared with a computed value (func_65) (func_66); compared with a computed value (func_66)",,medium,community | reads: MSC miiswordsman/lightshuriken.mscsb func_66,m25[0].5
+,6,,0x02000006,1,,,,f32,,,,no read in the article MSC (native or unused),m25[0].6
+,7,,0x12000007,0x0,,,,u32,,community ID was 0x02000007,,no read in the article MSC (native or unused),m25[0].7
 26,0,,,0x1,,,,u32,,,,,m26[0].0
 ,1,,,2.4,,,,f32,,,,,m26[0].1
 ,2,,,-2.4,,,,f32,,,,,m26[0].2
@@ -432,20 +432,20 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,3,,,0,,,,f32,,,,,m27[0].3
 ,4,,,1,,,,f32,,,,,m27[0].4
 ,5,,,0,,,,f32,,,,,m27[0].5
-28,0,Tornado,0x02000000,90,,,,f32,Lifetime (frames),,medium,community,m28[0].0
-,1,,0x02000001,0.35,,,,f32,Initial speed,,medium,community,m28[0].1
-,2,,0x02000002,0.025,,,,f32,,,,,m28[0].2
-,3,,0x02000003,4,,,,f32,,,,,m28[0].3
-,4,,0x02000004,-0.6,,,,f32,,,,,m28[0].4
-,5,,0x02000005,-0.013,,,,f32,,,,,m28[0].5
-,6,,0x02000006,3,,,,f32,,,,,m28[0].6
-,7,,0x02000007,50,,,,f32,,,,,m28[0].7
-,8,,0x12000008,0x1,,,,u32,,,,,m28[0].8
+28,0,Tornado,0x02000000,90,,,,f32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m28[0].0
+,1,,0x02000001,0.35,,,,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m28[0].1
+,2,,0x02000002,0.025,,,,f32,,,,no read in the article MSC (native or unused),m28[0].2
+,3,,0x02000003,4,,,,f32,,,,no read in the article MSC (native or unused),m28[0].3
+,4,,0x02000004,-0.6,,,,f32,,,,no read in the article MSC (native or unused),m28[0].4
+,5,,0x02000005,-0.013,,,,f32,,,,no read in the article MSC (native or unused),m28[0].5
+,6,,0x02000006,3,,,,f32,,,,no read in the article MSC (native or unused),m28[0].6
+,7,,0x02000007,50,,,,f32,,,,no read in the article MSC (native or unused),m28[0].7
+,8,,0x12000008,0x1,,,,u32,,,,no read in the article MSC (native or unused),m28[0].8
 29,0,,,0x1,,,,u32,,,,,m29[0].0
 ,1,,,8,,,,f32,,,,,m29[0].1
 ,2,,,-3.5,,,,f32,,,,,m29[0].2
 ,3,,,4,,,,f32,,,,,m29[0].3
-30,0,,,0x2000000,,,,u32,Tornado weapon param Name0?,,medium,community,m30[0].0
+30,0,,,0x2000000,,,,u32,Tornado weapon param Name0?,community value differs: Default 0x20000000 (vanilla 0x2000000),medium,community,m30[0].0
 ,1,,,1,,,,f32,,,,,m30[0].1
 ,2,,,1.5,,,,f32,Multiplier?,,medium,community,m30[0].2
 ,3,,,0,,,,f32,,,,,m30[0].3

@@ -1,9 +1,9 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,60,60,66,60,f32,Time to fully charge (frames),,high,community | MSC marth.mscsb (vanilla) func_2300 | reads: MSC marth.mscsb func_2300,m12[*].0
+13,0,Neutral B,0x05000000,60,60,66,60,f32,Time to fully charge (frames),,high,community | MSC marth.mscsb (vanilla) func_2300 | reads: MSC kirby.mscsb func_2940; MSC marth.mscsb func_2300,m12[*].0
 ,1,,0x05000001,2.2,2.2,2,2.2,f32,Max multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].1
 ,2,,0x05000002,0.8,0.8,0.8,0.8,f32,Aerial H speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
 ,3,,0x05000003,0.02,0.02,0.02,0.02,f32,Aerial H deceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].3
-,4,,0x05000004,1,1,1,1,f32,Charge animation speed (MotionModule rate and color-blend rate during SpecialNHold); also divides field 0.,,high,"community | MSC marth.mscsb (vanilla) func_2300, func_2301 | reads: MSC marth.mscsb func_2300; MSC marth.mscsb func_2301",m12[*].4
+,4,,0x05000004,1,1,1,1,f32,Charge animation speed (MotionModule rate and color-blend rate during SpecialNHold); also divides field 0.,,high,"community | MSC marth.mscsb (vanilla) func_2300, func_2301 | reads: MSC kirby.mscsb func_2940; MSC marth.mscsb func_2300; MSC marth.mscsb func_2301",m12[*].4
 14,0,Side B,0x06000000,0.5,0.5,0.5,0.5,f32,Aerial H speed multiplier,,medium,"community | reads: native 0x02F21D48 (fn 0x02F21BC0, direct vl read)",m13[*].0
 ,1,,0x06000001,1.4,1.4,1.4,1.4,f32,Initial V speed on aerial startup,,medium,"community | reads: native 0x02F21D70 (fn 0x02F21BC0, direct vl read)",m13[*].1
 ,2,,0x16000002,0x1,0x0,0x1,0x1,u32,Non-zero = the next Dancing Blade hit can go up / down (stick Y vs fighter_param_common 0x0200001A sets flags 0x21000013 / 0x21000012).,,high,community | MSC marth.mscsb (vanilla) func_2307 | reads: MSC marth.mscsb func_2307,m13[*].2

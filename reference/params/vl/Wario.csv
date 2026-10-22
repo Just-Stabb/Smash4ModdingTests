@@ -1,84 +1,84 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0xC,0x32,0x3C,0xC,u32,Min frames you can hold bite,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3049",m12[*].0
-,1,,0x15000001,0x3C,0xB4,0x5A,0x78,u32,Max frames you can hold bite,,medium,"community | reads: MSC kirby.mscsb (repo fighters/kirby/kirby.c, copy fn) func_3049",m12[*].1
-,2,,0x05000002,1,2,4,4,f32,Affects number of chews during bite,Higher = More,medium,community,m12[*].2
-,3,,0x15000003,0x5,0x4,0x5,0x5,u32,,,,,m12[*].3
-,4,,0x05000004,5,5,5,5,f32,Damage received eating explosive items,,medium,community,m12[*].4
-,5,,0x15000005,0x32,0x28,0x14,0x14,u32,,,,,m12[*].5
-,6,,0x05000006,1.5,1.5,1.5,1.5,f32,Damage healed multiplier eating food items,,medium,community,m12[*].6
-,7,,0x05000007,1,1,1,1,f32,Damage healed eating normal items,,medium,community,m12[*].7
-,8,,0x05000008,90,90,90,90,f32,Additional waft charge frames eating food items,,medium,community,m12[*].8
-14,0,Side B,0x06000000,60,30,60,60,f32,,,,,m13[*].0
-,1,,0x06000001,80,20,20,30,f32,Knockback resistance,,medium,community,m13[*].1
-,2,,0x06000002,1.5,1.5,2.4,1.5,f32,Jumping off bike H momentum,,medium,community,m13[*].2
-,3,,0x06000003,2.8,2.8,1.7,2.8,f32,Jumping off bike V momentum,,medium,community,m13[*].3
-,4,,0x06000004,1.5,1.5,1.5,1.5,f32,,,,,m13[*].4
-,5,,0x06000005,1,1,1,1,f32,,,,,m13[*].5
-,6,,0x16000006,0x1,0x1,0x1E,0x1,u32,,,,,m13[*].6
-,7,,0x06000007,1,5,40,26,f32,Bike HP,,medium,community | reads: MSC kirby.mscsb func_2161,m13[*].7
-15,0,Up B,0x07000000,0.5,1,0.5,0.5,f32,H speed multiplier on startup,,medium,community,m14[*].0
-,1,,0x07000001,-0.9,-0.9,-0.9,-0.9,f32,V speed multiplier on startup,,medium,community,m14[*].1
-,2,,0x07000002,0.01,0.01,0.01,0.01,f32,Gravity on startup,,medium,community,m14[*].2
-,3,,0x07000003,0.3,0.3,0.3,0.3,f32,Sensitivity to angle,,medium,community,m14[*].3
-,4,,0x07000004,80,80,0,40,f32,Ability to angle (degrees),,medium,community,m14[*].4
-,5,,0x07000005,0.15,0.15,0.15,0.15,f32,,,,,m14[*].5
-,6,,0x07000006,-0.9,-0.9,0.18,-0.9,f32,V speed subtracted from end of corkscrew,,medium,community,m14[*].6
-,7,,0x07000007,1,0.85,0.98,1,f32,Height multiplier,,medium,community,m14[*].7
-,8,,0x07000008,20,18,24,20,f32,Landing lag (frames),,medium,community,m14[*].8
-16,0,Down B,0x08000000,110,70,30,110,f32,Times for reaching charge level 3 (seconds),,medium,community,m15[*].0
-,1,,0x08000001,15,12,8,15,f32,Times for reaching charge level 1 (seconds),,medium,community,m15[*].1
-,2,,0x08000002,55,35,20,55,f32,Times for reaching charge level 2 (seconds),,medium,community,m15[*].2
-,3,,0x08000003,1.3,1.3,1.3,1.3,f32,Charge level 1 damage multiplier,,medium,community,m15[*].3
-,4,,0x08000004,1.5,1.3,1.2,1.5,f32,Charge level 2 damage multiplier,,medium,community,m15[*].4
-,5,,0x08000005,2.4,2.2,1.6,2.4,f32,V initial launch speed (level 1),,medium,community,m15[*].5
-,6,,0x08000006,3.3,3,2.3,3.3,f32,V initial launch speed (level 2),,medium,community,m15[*].6
-,7,,0x08000007,4.2,3.9,3,4.2,f32,V initial launch speed (level 3),,medium,community,m15[*].7
-,0,Category 4 block,0x04000000,0,,,,f32,,,,,m16
-17,0,Bike,0x02000000,2,3,0.7,2,f32,Initial grounded speed,,medium,community,m17[*].0
-,1,,0x02000001,2,3,0.7,2,f32,Initial aerial speed,,medium,community,m17[*].1
-,2,,0x02000002,1.5,1.5,1.5,1.5,f32,Aerial initial jump height multiplier,,medium,community,m17[*].2
-,3,,0x02000003,0.15,0.15,0.09,0.15,f32,V speed received from jump break of bouncing off walls,,medium,community,m17[*].3
-,4,,0x02000004,0.6,1.5,0.5,0.6,f32,,,,,m17[*].4
-,5,,0x02000005,2.5,4,1.7,2.5,f32,Grounded max speed,,medium,community,m17[*].5
-,6,,0x12000006,0xA,0xA,0xA,0xA,u32,,,,,m17[*].6
-,7,,0x02000007,0.015,0.015,0.01,0.015,f32,Grounded friction,,medium,community,m17[*].7
-,8,,0x02000008,0.5,1.5,0.5,0.5,f32,Grounded acceleration,,medium,community,m17[*].8
-,9,,0x02000009,2.5,3.3,1.7,2.5,f32,Aerial H max speed,,medium,community,m17[*].9
-,10,,0x0200000A,0.01,0.01,0.01,0.01,f32,Aerial air resistance,,medium,community,m17[*].10
-,11,,0x0200000B,0.8,0.8,0,0.8,f32,,,,,m17[*].11
-,12,,0x0200000C,1.5,1.5,1.2,1.5,f32,,,,,m17[*].12
-,13,,0x0200000D,0.06,0.06,0.12,0.06,f32,Gravity,,medium,community,m17[*].13
-,14,,0x0200000E,1.5,1.5,2,1.5,f32,Max fall speed,,medium,community,m17[*].14
-,15,,0x0200000F,0.05,0.05,0.05,0.05,f32,,,,,m17[*].15
-,16,,0x02000010,0.07,0.07,0.07,0.07,f32,,,,,m17[*].16
-,17,,0x02000011,5,5,5,5,f32,,,,,m17[*].17
-,18,,0x02000012,0.5,0.5,0.5,0.5,f32,,,,,m17[*].18
-,19,,0x02000013,0.7,0.7,0.7,0.7,f32,,,,,m17[*].19
-,20,,0x02000014,3,3,3,3,f32,,,,,m17[*].20
-,21,,0x02000015,1,1,1,1,f32,,,,,m17[*].21
-,22,,0x02000016,0.05,0.05,0.05,0.05,f32,Min speed to have a hitbox?,,medium,community,m17[*].22
-,23,,0x02000017,10,10,10,10,f32,,,,,m17[*].23
-,24,,0x02000018,0.1,0.1,0.1,0.1,f32,,read on grounded travel,,,m17[*].24
-,25,,0x02000019,90,90,90,90,f32,,read on grounded travel,,,m17[*].25
-,26,,0x0200001A,2,2,2,2,f32,Aerial rotation speed,,medium,community,m17[*].26
-,27,,0x0200001B,2.3,2.3,2.3,2.3,f32,Air to ground bounce height,,medium,community,m17[*].27
-,28,,0x0200001C,0.5,0.5,0.5,0.5,f32,,,,,m17[*].28
-,29,,0x0200001D,2,2,2,2,f32,,,,,m17[*].29
-,30,,0x0200001E,0.015,0.015,0.015,0.015,f32,,,,,m17[*].30
-,31,,0x0200001F,0.2,0.2,0.2,0.2,f32,,,,,m17[*].31
-,32,,0x02000020,0.8,1.5,0.5,0.8,f32,,,,,m17[*].32
-,33,,0x02000021,10,10,4,10,f32,,,,,m17[*].33
-,34,,0x02000022,0.5,0.5,0.7,0.5,f32,,,,,m17[*].34
-,35,,0x02000023,0.7,0.7,0.7,0.7,f32,,,,,m17[*].35
-,36,,0x02000024,0.5,0.5,0.5,0.5,f32,,,,,m17[*].36
-,37,,0x02000025,0.2,0.2,0.2,0.2,f32,,,,,m17[*].37
-,38,,0x02000026,3,3,3,3,f32,,,,,m17[*].38
-,39,,0x02000027,14,10,14,14,f32,,,,,m17[*].39
-,40,,0x02000028,40,20,20,40,f32,,,,,m17[*].40
-,41,,0x02000029,2,3.5,1,2,f32,,,,,m17[*].41
-,42,,0x0200002A,0.01,0.01,0.01,0.01,f32,,,,,m17[*].42
-,43,,0x0200002B,1.5,2.5,1.5,1.5,f32,,,,,m17[*].43
-,44,,0x0200002C,5,5,5,5,f32,,,,,m17[*].44
+13,0,Neutral B,0x15000000,0xC,0x32,0x3C,0xC,u32,"Min frames you can hold bite -- code: stored in status int 0x4, then decremented in func_3052 (a countdown / remaining count), tested against 0 (func_3049); stored in status int 0x4, then decremented in func_2339 (a countdown / remaining count), tested against 0 (func_2336) [status 0x19F; status 0x157]",,high,community | reads: MSC kirby.mscsb func_3049; MSC wario.mscsb func_2336,m12[*].0
+,1,,0x15000001,0x3C,0xB4,0x5A,0x78,u32,"Max frames you can hold bite -- code: stored in status int 0x5, then decremented in func_3052 (a countdown / remaining count), tested against 0 (func_3049); stored in status int 0x5, then decremented in func_2339 (a countdown / remaining count), tested against 0 (func_2336) [status 0x19F; status 0x157]",,high,community | reads: MSC kirby.mscsb func_3049; MSC wario.mscsb func_2336,m12[*].1
+,2,,0x05000002,4,2,4,4,f32,Affects number of chews during bite,Higher = More,medium,community | no read in the vanilla MSC (native or unused),m12[*].2
+,3,,0x15000003,0x5,0x4,0x5,0x5,u32,,,,no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,5,5,5,5,f32,Damage received eating explosive items,,medium,community | no read in the vanilla MSC (native or unused),m12[*].4
+,5,,0x15000005,0x32,0x28,0x14,0x14,u32,,,,no read in the vanilla MSC (native or unused),m12[*].5
+,6,,0x05000006,1.5,1.5,1.5,1.5,f32,Damage healed multiplier eating food items,,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
+,7,,0x05000007,1,1,1,1,f32,Damage healed eating normal items,,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
+,8,,0x05000008,90,90,90,90,f32,Additional waft charge frames eating food items,,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
+14,0,Side B,0x06000000,60,30,60,60,f32,,,,no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,20,20,20,30,f32,Knockback resistance,,medium,community | no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,1.5,1.5,2.4,1.5,f32,Jumping off bike H momentum,,medium,community | no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,2.8,2.8,1.7,2.8,f32,Jumping off bike V momentum,,medium,community | no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,1.5,1.5,1.5,1.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,1,1,1,1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x16000006,0x1,0x1,0x1E,0x1,u32,,,,no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,18,5,40,26,f32,Bike HP -- code: stored in instance float 0x30 (func_2161) [status 0x14F],,medium,community | reads: MSC bayonetta.mscsb func_2161,m13[*].7
+15,0,Up B,0x07000000,0.5,1,0.5,0.5,f32,H speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].0
+,1,,0x07000001,-0.9,-0.9,-0.9,-0.9,f32,V speed multiplier on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0.01,0.01,0.01,0.01,f32,Gravity on startup,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0.3,0.3,0.3,0.3,f32,Sensitivity to angle,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,40,80,0,40,f32,Ability to angle (degrees),,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,0.15,0.15,0.15,0.15,f32,,,,no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,-0.9,-0.9,0.18,-0.9,f32,V speed subtracted from end of corkscrew,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,1,0.85,0.98,1,f32,Height multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,20,18,24,20,f32,"Landing lag (frames) -- code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2261) [status 0x154 (SpecialHiStart, SpecialAirHiStart)]",,high,community | reads: MSC wario.mscsb func_2261,m14[*].8
+16,0,Down B,0x08000000,110,70,30,110,f32,Times for reaching charge level 3 (seconds),,medium,community | no read in the vanilla MSC (native or unused),m15[*].0
+,1,,0x08000001,15,12,8,15,f32,Times for reaching charge level 1 (seconds),,medium,community | no read in the vanilla MSC (native or unused),m15[*].1
+,2,,0x08000002,55,35,20,55,f32,Times for reaching charge level 2 (seconds),,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.3,1.3,1.3,1.3,f32,Charge level 1 damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x08000004,1.5,1.3,1.2,1.5,f32,Charge level 2 damage multiplier,,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,2.4,2.2,1.6,2.4,f32,V initial launch speed (level 1),,medium,community | no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,3.3,3,2.3,3.3,f32,V initial launch speed (level 2),,medium,community | no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x08000007,4.2,3.9,3,4.2,f32,V initial launch speed (level 3),,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,0,Category 4 block,0x04000000,0,,,,f32,,,,no read in the vanilla MSC (native or unused),m16
+17,0,Bike,0x02000000,2,3,0.7,2,f32,Initial grounded speed,,medium,community | no read in the article MSC (native or unused),m17[*].0
+,1,,0x02000001,2,3,0.7,2,f32,Initial aerial speed,,medium,community | no read in the article MSC (native or unused),m17[*].1
+,2,,0x02000002,1.5,1.5,1.5,1.5,f32,Aerial initial jump height multiplier,,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x02000003,0.15,0.15,0.09,0.15,f32,V speed received from jump break of bouncing off walls,,medium,community | no read in the article MSC (native or unused),m17[*].3
+,4,,0x02000004,0.6,1.5,0.5,0.6,f32,,,,no read in the article MSC (native or unused),m17[*].4
+,5,,0x02000005,2.5,4,1.7,2.5,f32,Grounded max speed,,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x12000006,0xA,0xA,0xA,0xA,u32,,,,no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,0.015,0.015,0.01,0.015,f32,Grounded friction,,medium,community | no read in the article MSC (native or unused),m17[*].7
+,8,,0x02000008,0.5,1.5,0.5,0.5,f32,Grounded acceleration,,medium,community | no read in the article MSC (native or unused),m17[*].8
+,9,,0x02000009,2.5,3.3,1.7,2.5,f32,Aerial H max speed,,medium,community | no read in the article MSC (native or unused),m17[*].9
+,10,,0x0200000A,0.01,0.01,0.01,0.01,f32,Aerial air resistance,,medium,community | no read in the article MSC (native or unused),m17[*].10
+,11,,0x0200000B,0.8,0.8,0,0.8,f32,,,,no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,1.5,1.5,1.2,1.5,f32,,,,no read in the article MSC (native or unused),m17[*].12
+,13,,0x0200000D,0.06,0.06,0.12,0.06,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m17[*].13
+,14,,0x0200000E,1.5,1.5,2,1.5,f32,Max fall speed,,medium,community | no read in the article MSC (native or unused),m17[*].14
+,15,,0x0200000F,0.05,0.05,0.05,0.05,f32,,,,no read in the article MSC (native or unused),m17[*].15
+,16,,0x02000010,0.07,0.07,0.07,0.07,f32,,,,no read in the article MSC (native or unused),m17[*].16
+,17,,0x02000011,5,5,5,5,f32,,,,no read in the article MSC (native or unused),m17[*].17
+,18,,0x02000012,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].18
+,19,,0x02000013,0.7,0.7,0.7,0.7,f32,,,,no read in the article MSC (native or unused),m17[*].19
+,20,,0x02000014,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m17[*].20
+,21,,0x02000015,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].21
+,22,,0x02000016,0.05,0.05,0.05,0.05,f32,Min speed to have a hitbox?,,medium,community | no read in the article MSC (native or unused),m17[*].22
+,23,,0x02000017,10,10,10,10,f32,,,,no read in the article MSC (native or unused),m17[*].23
+,24,,0x02000018,0.1,0.1,0.1,0.1,f32,,read on grounded travel,,no read in the article MSC (native or unused),m17[*].24
+,25,,0x02000019,90,90,90,90,f32,,read on grounded travel,,no read in the article MSC (native or unused),m17[*].25
+,26,,0x0200001A,2,2,2,2,f32,Aerial rotation speed,,medium,community | no read in the article MSC (native or unused),m17[*].26
+,27,,0x0200001B,2.3,2.3,2.3,2.3,f32,Air to ground bounce height,,medium,community | no read in the article MSC (native or unused),m17[*].27
+,28,,0x0200001C,0.5,0.5,0.5,0.5,f32,code: compared with a computed value (func_76),,medium,reads: MSC wario/wariobike.mscsb func_76,m17[*].28
+,29,,0x0200001D,2,2,2,2,f32,,,,no read in the article MSC (native or unused),m17[*].29
+,30,,0x0200001E,0.015,0.015,0.015,0.015,f32,,,,no read in the article MSC (native or unused),m17[*].30
+,31,,0x0200001F,0.2,0.2,0.2,0.2,f32,,,,no read in the article MSC (native or unused),m17[*].31
+,32,,0x02000020,0.8,1.5,0.5,0.8,f32,,,,no read in the article MSC (native or unused),m17[*].32
+,33,,0x02000021,10,10,4,10,f32,,,,no read in the article MSC (native or unused),m17[*].33
+,34,,0x02000022,0.5,0.5,0.7,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].34
+,35,,0x02000023,0.7,0.7,0.7,0.7,f32,,,,no read in the article MSC (native or unused),m17[*].35
+,36,,0x02000024,0.5,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m17[*].36
+,37,,0x02000025,0.2,0.2,0.2,0.2,f32,,,,no read in the article MSC (native or unused),m17[*].37
+,38,,0x02000026,3,3,3,3,f32,,,,no read in the article MSC (native or unused),m17[*].38
+,39,,0x02000027,14,10,14,14,f32,"code: named ""OK"" in a debug print (func_120); compared with a computed value (func_120)",,medium,reads: MSC wario/wariobike.mscsb func_120,m17[*].39
+,40,,0x02000028,40,20,20,40,f32,code: compared with a computed value (func_120),,medium,reads: MSC wario/wariobike.mscsb func_120,m17[*].40
+,41,,0x02000029,2,3.5,1,2,f32,,,,no read in the article MSC (native or unused),m17[*].41
+,42,,0x0200002A,0.01,0.01,0.01,0.01,f32,,,,no read in the article MSC (native or unused),m17[*].42
+,43,,0x0200002B,1.5,2.5,1.5,1.5,f32,code: tested as a flag (non-zero = on) (func_120),,low,reads: MSC wario/wariobike.mscsb func_120,m17[*].43
+,44,,0x0200002C,5,5,5,5,f32,,,,no read in the article MSC (native or unused),m17[*].44
 18,0,Bike Hurtbox,,0,,,,f32,X offset,,medium,community,m18[0].0
 ,1,,,0.9,,,,f32,Y offset,,medium,community,m18[0].1
 ,2,,,6.5,,,,f32,Z offset,,medium,community,m18[0].2
@@ -117,9 +117,9 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 22,0,,,0x2000000,0x2000001,0x2000005,0x2000009,u32,Bike weapon param Name0?,,medium,community,m22[*].0
 ,1,,,1,1,1,1,f32,,,,,m22[*].1
 ,2,,,1.2,1.2,1.2,1.2,f32,Multiplier?,,medium,community,m22[*].2
-,3,,,1,1,1,1,f32,,,,,m22[*].3
+,3,,,0,0,0,0,f32,,,,,m22[*].3
 ,4,,,1,1,1,1,f32,,,,,m22[*].4
-,5,,,1,1,1,1,f32,,,,,m22[*].5
+,5,,,0,0,0,0,f32,,,,,m22[*].5
 22,0,,,0x2000001,,,,,Bike weapon param Name1?,community row not matched to a value of the vanilla file,low,community,
 22,2,,,1.2,,,,,Multiplier?,community row not matched to a value of the vanilla file,low,community,
 22,0,,,0x2000005,,,,,Bike weapon param Name5?,community row not matched to a value of the vanilla file,low,community,

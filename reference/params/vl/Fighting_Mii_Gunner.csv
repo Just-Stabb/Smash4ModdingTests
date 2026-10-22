@@ -1,118 +1,118 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,-0.1,0,0,0,f32,H initial speed of non-fully charged aerial shot,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].0
-,1,,0x05000001,-0.8,0,0,0,f32,H initial speed of full charged aerial shot,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].1
-,2,,0x05000002,112,0,0,0,f32,Time to fully charge (frames),,low,"copied from Mii_Gunner (same layout, same position)",m12[*].2
-,3,,0x05000003,0,0,0,0,f32,,,,,m12[*].3
-,4,,0x05000004,0,6,0,0,f32,X offset grounded laser,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].4
-,5,,0x05000005,0,-0.3,0,0,f32,Y offset grounded laser,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].5
-,6,,0x05000006,0,6,0,0,f32,X offset aerial laser,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].6
-,7,,0x05000007,0,-0.3,0,0,f32,Y offset aerial laser,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].7
-,8,,0x05000008,0,7,0,0,f32,Laser speed,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].8
-,9,,0x05000009,0,0,0.12,0,f32,,,,,m12[*].9
-,10,,0x0500000A,0,0,0.5,0,f32,,,,,m12[*].10
-,11,,0x0500000B,0,0,0.3,0,f32,Acceleration of the bomb based on charge time,,low,"copied from Mii_Gunner (same layout, same position)",m12[*].11
-,12,,0x0500000C,0,0,40,0,f32,,,,,m12[*].12
-14,0,Side B,0x16000000,0x3,0x0,0x0,0x0,u32,,,,,m13[*].0
-,1,,0x06000001,2,0,0,0,f32,,,,,m13[*].1
-,2,,0x06000002,0.0025,0,0,0,f32,,,,,m13[*].2
-,3,,0x06000003,1,0,0,0,f32,,,,,m13[*].3
-,4,,0x06000004,0,-3.6,0,0,f32,,,,,m13[*].4
-,5,,0x06000005,0,2.5,0,0,f32,,,,,m13[*].5
-,6,,0x06000006,0,-43,0,0,f32,,,,,m13[*].6
-,7,,0x06000007,0,2.8,0,0,f32,,,,,m13[*].7
-,8,,0x06000008,0,3.2,0,0,f32,,,,,m13[*].8
-,9,,0x06000009,0,1.1,0,0,f32,,,,,m13[*].9
-,10,,0x0600000A,0,30,0,0,f32,,,,,m13[*].10
-,11,,0x1600000B,0x0,0x0,0x0,0x0,u32,,,,,m13[*].11
-,12,,0x1600000C,0x0,0x0,0xA,0x0,u32,,,,,m13[*].12
-,13,,0x1600000D,0x0,0x0,0xA,0x0,u32,,,,,m13[*].13
-,14,,0x0600000E,0,0,9,0,f32,,,,,m13[*].14
-,15,,0x0600000F,0,0,-0.8,0,f32,,,,,m13[*].15
-,16,,0x06000010,0,0,0.019,0,f32,,,,,m13[*].16
-,17,,0x06000011,0,0,24,0,f32,,,,,m13[*].17
-15,0,Up B,0x07000000,3,0,0,0,f32,,,,,m14[*].0
-,1,,0x07000001,1,0,0,0,f32,,,,,m14[*].1
-,2,,0x07000002,0,0,0,0,f32,,,,,m14[*].2
-,3,,0x07000003,0,0,0,0,f32,,,,,m14[*].3
-,4,,0x07000004,8.4,0,0,0,f32,,,,,m14[*].4
-,5,,0x07000005,0.95,0,0,0,f32,,,,,m14[*].5
-,6,,0x07000006,-1,0,0,0,f32,,,,,m14[*].6
-,7,,0x07000007,6,0,0,0,f32,,,,,m14[*].7
-,8,,0x07000008,0.5,0,0,0,f32,,,,,m14[*].8
-,9,,0x07000009,0.65,0,0,0,f32,,,,,m14[*].9
-,10,,0x1700000A,0x1E,0x0,0x0,0x0,u32,,,,,m14[*].10
-,11,,0x0700000B,0,0.5,0,0,f32,,,,,m14[*].11
-,12,,0x0700000C,0,0.3,0,0,f32,,,,,m14[*].12
-,13,,0x0700000D,0,0.2,0,0,f32,,,,,m14[*].13
-,14,,0x0700000E,0,0.6,0,0,f32,,,,,m14[*].14
-,15,,0x0700000F,0,0.4,0,0,f32,,,,,m14[*].15
-,16,,0x07000010,0,0.6,0,0,f32,,,,,m14[*].16
-,17,,0x07000011,0,2.7,0,0,f32,,,,,m14[*].17
-,18,,0x07000012,0,0.7,0,0,f32,,,,,m14[*].18
-,19,,0x07000013,0,25,0,0,f32,,,,,m14[*].19
-,20,,0x07000014,0,0,0,0,f32,,,,,m14[*].20
-,21,,0x07000015,0,0,0,0,f32,,,,,m14[*].21
-,22,,0x07000016,0,97,0,0,f32,,,,,m14[*].22
-,23,,0x17000017,0x0,0x0,0xF,0x0,u32,,,,,m14[*].23
-,24,,0x07000018,0,0,0.8,0,f32,,,,,m14[*].24
-,25,,0x07000019,0,0,0.02,0,f32,,,,,m14[*].25
-,26,,0x0700001A,0,0,0.015,0,f32,,,,,m14[*].26
-,27,,0x0700001B,0,0,0.125,0,f32,,,,,m14[*].27
-,28,,0x0700001C,0,0,0.5,0,f32,,,,,m14[*].28
-,29,,0x0700001D,0,0,160,0,f32,,,,,m14[*].29
-,30,,0x0700001E,0,0,3.9,0,f32,,,,,m14[*].30
-,31,,0x1700001F,0x0,0x0,0x5,0x0,u32,,,,,m14[*].31
-,32,,0x07000020,0,0,0.3,0,f32,,,,,m14[*].32
-,33,,0x07000021,0,0,0,0,f32,,,,,m14[*].33
-,34,,0x07000022,0,0,0.8,0,f32,,,,,m14[*].34
-,35,,0x17000023,0x0,0x0,0x1E,0x0,u32,,,,,m14[*].35
-16,0,Down B,0x08000000,5,0,0,0,f32,,,,,m15[*].0
-,1,,0x08000001,0,0,0,0,f32,H speed multiplier,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].1
-,2,,0x18000002,0x0,0x4,0x0,0x0,u32,,,,,m15[*].2
-,3,,0x08000003,0,0.5,0,0,f32,Frames Mii Gunner is locked in shine,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].3
-,4,,0x08000004,0,0.027,0,0,f32,,,,,m15[*].4
-,5,,0x08000005,0,20,0,0,f32,,,,,m15[*].5
-,6,,0x08000006,0,1.4,0,0,f32,,,,,m15[*].6
-,7,,0x18000007,0x0,0x0,0x1E,0x0,u32,How many frames after releasing B you continue to hold it,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].7
-,8,,0x18000008,0x0,0x0,0x4,0x0,u32,How long before applying gravity (in frames),,low,"copied from Mii_Gunner (same layout, same position)",m15[*].8
-,9,,0x08000009,0,0,8,0,f32,Something about absorption bubble,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].9
-,10,,0x0800000A,0,0,0.5,0,f32,H speed multiplier,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].10
-,11,,0x0800000B,0,0,0.5,0,f32,V speed multiplier,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].11
-,12,,0x0800000C,0,0,0.0266667,0,f32,Gravity,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].12
-,13,,0x0800000D,0,0,1.6,0,f32,Damage recovery mulitplier,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].13
-,14,,0x0800000E,0,0,30,0,f32,Max damage recoverable,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].14
-,15,,0x1800000F,0x1,0x1,0x1,0x1,u32,,,,,m15[*].15
-,16,,0x08000010,0,0,0,0,f32,Absorption bubble X offset,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].16
-,17,,0x08000011,0,0,6.5,0,f32,Absorption bubble Y offset,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].17
-,18,,0x08000012,0,0,0,0,f32,Absorption bubble Z offset,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].18
-,19,,0x08000013,0,0,14,0,f32,Absorption bubble size,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].19
-,20,,0x08000014,0,0,10,0,f32,Influence the spin effect when a projectile hits the magnet,,low,"copied from Mii_Gunner (same layout, same position)",m15[*].20
-,21,,0x18000015,0x0,0x0,0x14,0x0,u32,Time before the projectile is absorbed (frames),,low,"copied from Mii_Gunner (same layout, same position)",m15[*].21
-,22,,0x08000016,0,0,1,0,f32,,,,,m15[*].22
-,0,Category 4 block,0x04000000,0.5,,,,f32,Initial V speed on aerial startup,,low,"copied from Mii_Gunner (same layout, same position)",m16.0
-,1,,0x04000001,0.01,,,,f32,Gravity,,low,"copied from Mii_Gunner (same layout, same position)",m16.1
-,2,,0x04000002,0.18,,,,f32,Max air speed,,low,"copied from Mii_Gunner (same layout, same position)",m16.2
-,3,,0x04000003,0.13,,,,f32,StickX * this,,low,"copied from Mii_Gunner (same layout, same position)",m16.3
-,4,,0x04000004,8,,,,f32,Max change angle (degrees),,low,"copied from Mii_Gunner (same layout, same position)",m16.4
-,5,,0x04000005,2.5,,,,f32,,,,,m16.5
-,6,,0x14000006,0x96,,,,u32,,,,,m16.6
-,7,,0x14000007,0x21,,,,u32,,,,,m16.7
-,8,,0x14000008,0x4,,,,u32,,,,,m16.8
+13,0,Neutral B,0x05000000,-0.1,0,0,0,f32,H initial speed of non-fully charged aerial shot,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].0
+,1,,0x05000001,-0.8,0,0,0,f32,H initial speed of full charged aerial shot,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].1
+,2,,0x05000002,112,0,0,0,f32,Time to fully charge (frames),,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].2
+,3,,0x05000003,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].3
+,4,,0x05000004,0,6,0,0,f32,X offset grounded laser,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].4
+,5,,0x05000005,0,-0.3,0,0,f32,Y offset grounded laser,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].5
+,6,,0x05000006,0,6,0,0,f32,X offset aerial laser,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].6
+,7,,0x05000007,0,-0.3,0,0,f32,Y offset aerial laser,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].7
+,8,,0x05000008,0,7,0,0,f32,Laser speed,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].8
+,9,,0x05000009,0,0,0.12,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].9
+,10,,0x0500000A,0,0,0.5,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].10
+,11,,0x0500000B,0,0,0.3,0,f32,Acceleration of the bomb based on charge time,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m12[*].11
+,12,,0x0500000C,0,0,40,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].12
+14,0,Side B,0x16000000,0x3,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].0
+,1,,0x06000001,2,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].1
+,2,,0x06000002,0.0025,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].2
+,3,,0x06000003,1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].3
+,4,,0x06000004,0,-3.6,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].4
+,5,,0x06000005,0,2.5,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].5
+,6,,0x06000006,0,-43,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].6
+,7,,0x06000007,0,2.8,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].7
+,8,,0x06000008,0,3.2,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].8
+,9,,0x06000009,0,1.1,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].9
+,10,,0x0600000A,0,30,0,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].10
+,11,,0x1600000B,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].11
+,12,,0x1600000C,0x0,0x0,0xA,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].12
+,13,,0x1600000D,0x0,0x0,0xA,0x0,u32,,,,no read in the vanilla MSC (native or unused),m13[*].13
+,14,,0x0600000E,0,0,9,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].14
+,15,,0x0600000F,0,0,-0.8,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].15
+,16,,0x06000010,0,0,0.019,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].16
+,17,,0x06000011,0,0,24,0,f32,,,,no read in the vanilla MSC (native or unused),m13[*].17
+15,0,Up B,0x07000000,3,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].0
+,1,,0x07000001,1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].1
+,2,,0x07000002,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].2
+,3,,0x07000003,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].3
+,4,,0x07000004,8.4,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].4
+,5,,0x07000005,0.95,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].5
+,6,,0x07000006,-1,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].6
+,7,,0x07000007,6,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].7
+,8,,0x07000008,0.5,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].8
+,9,,0x07000009,0.65,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].9
+,10,,0x1700000A,0x1E,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].10
+,11,,0x0700000B,0,0.5,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].11
+,12,,0x0700000C,0,0.3,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].12
+,13,,0x0700000D,0,0.2,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].13
+,14,,0x0700000E,0,0.6,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].14
+,15,,0x0700000F,0,0.4,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].15
+,16,,0x07000010,0,0.6,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].16
+,17,,0x07000011,0,2.7,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].17
+,18,,0x07000012,0,0.7,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].18
+,19,,0x07000013,0,25,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].19
+,20,,0x07000014,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].20
+,21,,0x07000015,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].21
+,22,,0x07000016,0,97,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].22
+,23,,0x17000017,0x0,0x0,0xF,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].23
+,24,,0x07000018,0,0,0.8,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].24
+,25,,0x07000019,0,0,0.02,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].25
+,26,,0x0700001A,0,0,0.015,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].26
+,27,,0x0700001B,0,0,0.125,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].27
+,28,,0x0700001C,0,0,0.5,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].28
+,29,,0x0700001D,0,0,160,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].29
+,30,,0x0700001E,0,0,3.9,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].30
+,31,,0x1700001F,0x0,0x0,0x5,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].31
+,32,,0x07000020,0,0,0.3,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].32
+,33,,0x07000021,0,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].33
+,34,,0x07000022,0,0,0.8,0,f32,,,,no read in the vanilla MSC (native or unused),m14[*].34
+,35,,0x17000023,0x0,0x0,0x1E,0x0,u32,,,,no read in the vanilla MSC (native or unused),m14[*].35
+16,0,Down B,0x08000000,5,0,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].0
+,1,,0x08000001,0,0,0,0,f32,H speed multiplier,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].1
+,2,,0x18000002,0x0,0x4,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,0,0.5,0,0,f32,Frames Mii Gunner is locked in shine,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].3
+,4,,0x08000004,0,0.027,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].4
+,5,,0x08000005,0,20,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
+,6,,0x08000006,0,1.4,0,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].6
+,7,,0x18000007,0x0,0x0,0x1E,0x0,u32,How many frames after releasing B you continue to hold it,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].7
+,8,,0x18000008,0x0,0x0,0x4,0x0,u32,How long before applying gravity (in frames),,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].8
+,9,,0x08000009,0,0,8,0,f32,Something about absorption bubble,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].9
+,10,,0x0800000A,0,0,0.5,0,f32,H speed multiplier,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].10
+,11,,0x0800000B,0,0,0.5,0,f32,V speed multiplier,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].11
+,12,,0x0800000C,0,0,0.0266667,0,f32,Gravity,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].12
+,13,,0x0800000D,0,0,1.6,0,f32,Damage recovery mulitplier,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].13
+,14,,0x0800000E,0,0,30,0,f32,Max damage recoverable,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].14
+,15,,0x1800000F,0x1,0x1,0x1,0x1,u32,,,,no read in the vanilla MSC (native or unused),m15[*].15
+,16,,0x08000010,0,0,0,0,f32,Absorption bubble X offset,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].16
+,17,,0x08000011,0,0,6.5,0,f32,Absorption bubble Y offset,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].17
+,18,,0x08000012,0,0,0,0,f32,Absorption bubble Z offset,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].18
+,19,,0x08000013,0,0,14,0,f32,Absorption bubble size,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].19
+,20,,0x08000014,0,0,10,0,f32,Influence the spin effect when a projectile hits the magnet,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].20
+,21,,0x18000015,0x0,0x0,0x14,0x0,u32,Time before the projectile is absorbed (frames),,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m15[*].21
+,22,,0x08000016,0,0,1,0,f32,,,,no read in the vanilla MSC (native or unused),m15[*].22
+,0,Category 4 block,0x04000000,0.5,,,,f32,Initial V speed on aerial startup,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.0
+,1,,0x04000001,0.01,,,,f32,Gravity,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.1
+,2,,0x04000002,0.18,,,,f32,Max air speed,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.2
+,3,,0x04000003,0.13,,,,f32,StickX * this,,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.3
+,4,,0x04000004,8,,,,f32,Max change angle (degrees),,low,"copied from Mii_Gunner (same layout, same position) | no read in the vanilla MSC (native or unused)",m16.4
+,5,,0x04000005,2.5,,,,f32,,,,no read in the vanilla MSC (native or unused),m16.5
+,6,,0x14000006,0x96,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.6
+,7,,0x14000007,0x21,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.7
+,8,,0x14000008,0x4,,,,u32,,,,no read in the vanilla MSC (native or unused),m16.8
 17,0,,,5,,,,f32,X offset,,low,"copied from Mii_Gunner (same layout, same position)",m17[0].0
 ,1,,,0,,,,f32,Y offset,,low,"copied from Mii_Gunner (same layout, same position)",m17[0].1
 ,2,,,3.8,,,,f32,Speed,,low,"copied from Mii_Gunner (same layout, same position)",m17[0].2
-18,0,Article params (rapidshot_bullet),0x12000000,0x16,,,,u32,,,,,m18[0].0
-,1,,0x02000001,3,,,,f32,,,,,m18[0].1
-,2,,0x02000002,11.25,,,,f32,,,,,m18[0].2
-,3,,0x12000003,0x0,,,,u32,,,,,m18[0].3
-,4,,0x02000004,0,,,,f32,,,,,m18[0].4
+18,0,Article params (rapidshot_bullet),0x12000000,0x16,,,,u32,,,,no read in the article MSC (native or unused),m18[0].0
+,1,,0x02000001,3,,,,f32,,,,no read in the article MSC (native or unused),m18[0].1
+,2,,0x02000002,11.25,,,,f32,,,,no read in the article MSC (native or unused),m18[0].2
+,3,,0x12000003,0x0,,,,u32,,,,no read in the article MSC (native or unused),m18[0].3
+,4,,0x02000004,0,,,,f32,,,,no read in the article MSC (native or unused),m18[0].4
 ,0,,,0x1,,,,u32,,,,,m19.0
 ,1,,,1,,,,f32,,,,,m19.1
 ,2,,,-1,,,,f32,,,,,m19.2
 ,3,,,10,,,,f32,,,,,m19.3
-19,0,Article params (attackairf_bullet),0x12000000,0xE,,,,u32,,,,,m20[0].0
-,1,,0x12000001,0x0,,,,u32,,,,,m20[0].1
-,2,,0x02000002,0,,,,f32,,,,,m20[0].2
+19,0,Article params (attackairf_bullet),0x12000000,0xE,,,,u32,,,,no read in the article MSC (native or unused),m20[0].0
+,1,,0x12000001,0x0,,,,u32,,,,no read in the article MSC (native or unused),m20[0].1
+,2,,0x02000002,0,,,,f32,,,,no read in the article MSC (native or unused),m20[0].2
 ,0,,,0x1,,,,u32,,,,,m21.0
 ,1,,,1,,,,f32,,,,,m21.1
 ,2,,,-1,,,,f32,,,,,m21.2

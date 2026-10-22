@@ -1,17 +1,17 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x05000000,1,1,1,1,f32,Animation set_frame_duration,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2286; native 0x03211C34 (fn 0x03211BA8, attributed by type fit); native 0x03211C70 (fn 0x03211BA8, attributed by type fit); native 0x03211C94 (fn 0x03211BA8, attributed by type fit); +1 more",m12[*].0
+13,0,Neutral B,0x05000000,1,1,1,1,f32,"Animation set_frame_duration -- code: stored in status float 0x8, then tested against 0; compared with a computed value (func_3467) (func_3469); stored in status float 0x8, then tested against 0; compared with a computed value (func_2284) (func_2286); compared with status float 0x9 (func_3469) [status 0x192; status 0x152 (SpecialNStart, SpecialAirNStart, SpecialNSpin)]",,medium,"community | reads: MSC kirby.mscsb func_3469; MSC sonic.mscsb func_2286; native 0x03211C34 (fn 0x03211BA8, attributed by type fit); native 0x03211C70 (fn 0x03211BA8, attributed by type fit); +2 more",m12[*].0
 ,1,,0x05000001,1,1,0,1,f32,Initial V speed on ground charge,,medium,"community | reads: native 0x03211C10 (fn 0x03211BA8, attributed by type fit)",m12[*].1
 ,2,,0x05000002,0.8,0.8,0,0.8,f32,Initial V speed on aerial charge,,medium,"community | reads: native 0x03211C4C (fn 0x03211BA8, attributed by type fit)",m12[*].2
 ,3,,0x05000003,0.78,0,0.78,0.78,f32,Speed conservation,"Set to 2, it will multiply current momentum by 2. Set to 0.5, current momentum will be halved. Etc.",medium,"community | reads: native 0x032143AC (fn 0x03214378, attributed by type fit)",m12[*].3
-,4,,0x15000004,0x12,0x12,0xC,0x12,u32,Min startup,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2282; MSC sonic.mscsb (vanilla decompile, repo first commit) func_2284",m12[*].4
-,5,,0x15000005,0x1E,0x1E,0xD,0x1E,u32,Max startup,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2284; MSC sonic.mscsb (vanilla decompile, repo first commit) func_2286",m12[*].5
+,4,,0x15000004,0x12,0x12,0xC,0x12,u32,"Min startup -- code: stored in status float 0x9, then compared with a computed value (func_3469) (func_3465); stored in status float 0x9, then compared with a computed value (func_2286) (func_2282); stored in instance int 0x84, then AttackModule op 0x271E (func_2292) (func_2284) [status 0x192; status 0x152 (SpecialNStart, SpecialAirNStart, SpecialNSpin)]",,medium,community | reads: MSC kirby.mscsb func_3465; MSC sonic.mscsb func_2282; MSC sonic.mscsb func_2284,m12[*].4
+,5,,0x15000005,0x1E,0x1E,0xD,0x1E,u32,"Max startup -- code: stored in instance int 0x84, then AttackModule op 0x271E (func_2292) (func_2284); compared with status float 0x8 (func_3469); compared with a computed value (func_2284) [status 0x192; status 0x152 (SpecialNStart, SpecialAirNStart, SpecialNSpin)]",,medium,community | reads: MSC kirby.mscsb func_3469; MSC sonic.mscsb func_2284; MSC sonic.mscsb func_2286,m12[*].5
 ,6,,0x05000006,13,13,13,13,f32,Max curve,Lower = smaller curves,medium,community | no read in the vanilla MSC (native or unused),m12[*].6
 ,7,,0x05000007,30,30,30,30,f32,Homing intensity,Lower = better homing,medium,community | no read in the vanilla MSC (native or unused),m12[*].7
 ,8,,0x05000008,5.6,5.6,4.6,5.6,f32,Homing speed,Higher = faster,medium,community | no read in the vanilla MSC (native or unused),m12[*].8
 ,9,,0x05000009,4,4,2,4,f32,Homing dash acceleration,,medium,"community | reads: native 0x032148E4 (fn 0x032146A0, attributed by type fit)",m12[*].9
 ,10,,0x0500000A,0.15,0.15,0.15,0.15,f32,Homing dash deceleration,,medium,community | no read in the vanilla MSC (native or unused),m12[*].10
 ,11,,0x0500000B,2.5,2.5,2.5,2.5,f32,,,,no read in the vanilla MSC (native or unused),m12[*].11
-,12,,0x1500000C,0xF,0xF,0xF,0xF,u32,Homing dash duration (frames),,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2302",m12[*].12
+,12,,0x1500000C,0xF,0xF,0xF,0xF,u32,"Homing dash duration (frames) -- code: stored in status int 0x5, then decremented in func_3489 (a countdown / remaining count), tested against 0 (func_3485); stored in status int 0x5, then decremented in func_2306 (a countdown / remaining count), tested against 0 (func_2302) [status 0x193; status 0x158]",,high,community | reads: MSC kirby.mscsb func_3485; MSC sonic.mscsb func_2302,m12[*].12
 ,13,,0x0500000D,0.7,0.7,0.7,0.9,f32,Floor/Person-bounce intial H speed,,medium,"community | reads: native 0x03211FE0 (fn 0x03211EB0, attributed by type fit)",m12[*].13
 ,14,,0x0500000E,1.2,1.2,1.2,0.25,f32,Floor-bounce initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].14
 ,15,,0x0500000F,0,0,0,0.017,f32,,,,no read in the vanilla MSC (native or unused),m12[*].15
@@ -19,18 +19,18 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,17,,0x05000011,1,1,1,1,f32,Person-bounce aerial mobility,,medium,"community | reads: native 0x03212240 (fn 0x032121C8, attributed by type fit)",m12[*].17
 ,18,,0x05000012,4.5,5,5,4.5,f32,Person-bounce initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].18
 ,19,,0x05000013,5,5,8,5,f32,Person-bounce gravity multiplier,,medium,community | no read in the vanilla MSC (native or unused),m12[*].19
-,20,,0x15000014,0x8,0x8,0x8,0x8,u32,Duration of Name16/Name19 takes effect (frames),,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2297",m12[*].20
+,20,,0x15000014,0x8,0x8,0x8,0x8,u32,"Duration of Name16/Name19 takes effect (frames) -- code: stored in status int 0x4, then decremented in func_3483 (a countdown / remaining count), tested against 0 (func_3480); stored in status int 0x4, then decremented in func_2300 (a countdown / remaining count), tested against 0 (func_2297) [status 0x199; status 0x15D (SpecialNHit)]",,high,community | reads: MSC kirby.mscsb func_3480; MSC sonic.mscsb func_2297,m12[*].20
 ,21,,0x05000015,-50,270,90,-50,f32,No-homing dash angle (degrees),,medium,"community | reads: native 0x03211D60 (fn 0x03211D2C, attributed by type fit)",m12[*].21
 ,22,,0x05000016,5,5,2,5,f32,No-homing dash speed,,medium,community | no read in the vanilla MSC (native or unused),m12[*].22
-,23,,0x15000017,0x6,0x6,0x6,0x6,u32,No-homing dash duration (frames),,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2292",m12[*].23
+,23,,0x15000017,0x6,0x6,0x6,0x6,u32,"No-homing dash duration (frames) -- code: stored in status int 0x4, then decremented in func_3478 (a countdown / remaining count), tested against 0 (func_3475); stored in status int 0x4, then decremented in func_2295 (a countdown / remaining count), tested against 0 (func_2292) [status 0x195; status 0x159]",,high,community | reads: MSC kirby.mscsb func_3475; MSC sonic.mscsb func_2292,m12[*].23
 ,24,,0x05000018,0.1,0.1,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m12[*].24
 ,25,,0x05000019,0.1,0.3,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m12[*].25
-,26,,0x1500001A,0xA,0xA,0xA,0xA,u32,Additional no-homing dash duration? (frames),,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2292; native 0x03214498 (fn 0x03214408, attributed by type fit)",m12[*].26
-,27,,0x1500001B,0x7,0x0,0x3,0x7,u32,Int((Charge frames - Name4) / (Name5 - Name4) * this),used for some hitbox property (unknown),medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2284",m12[*].27
+,26,,0x1500001A,0xA,0xA,0xA,0xA,u32,"Additional no-homing dash duration? (frames) -- code: read in: WorkModule(0xb, WorkModule(0x6, 0x1500001a), 0x11000004); (func_3475) [status 0x195; status 0x159]",,medium,"community | reads: MSC kirby.mscsb func_3475; MSC sonic.mscsb func_2292; native 0x03214498 (fn 0x03214408, attributed by type fit)",m12[*].26
+,27,,0x1500001B,0x7,0x0,0x3,0x7,u32,"Int((Charge frames - Name4) / (Name5 - Name4) * this) -- code: stored in instance int 0x84, then AttackModule op 0x271E (func_2292) (func_2284) [status 0x152 (SpecialNStart, SpecialAirNStart, SpecialNSpin)]",used for some hitbox property (unknown),medium,community | reads: MSC sonic.mscsb func_2284,m12[*].27
 ,28,,0x0500001C,75,0,65,0,f32,,,,no read in the vanilla MSC (native or unused),m12[*].28
-14,0,Side B,0x06000000,1,1,1,1,f32,Animation set_frame_duration,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2343; native 0x03212844 (fn 0x032127D4, attributed by type fit); native 0x032129EC (fn 0x03212978, attributed by type fit)",m13[*].0
-,1,,0x16000001,0xA,0x1,0xA,0xA,u32,How many frames after charge you do spin dash,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2341",m13[*].1
-,2,,0x16000002,0x28,0xA,0x28,0x28,u32,Time to fully charge (frames),,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2341; MSC sonic.mscsb (vanilla decompile, repo first commit) func_2343; native 0x03212CF0 (fn 0x03212B5C, attributed by type fit); native 0x03212D38 (fn 0x03212B5C, attributed by type fit)",m13[*].2
+14,0,Side B,0x06000000,1,1,1,1,f32,"Animation set_frame_duration -- code: stored in status float 0x6, then compared with a computed value (func_2341) (func_2343); compared with a computed value (func_2343); combined with status float 0x6 (func_2343) [status 0x15E (SpecialSHold)]",,medium,"community | reads: MSC sonic.mscsb func_2343; native 0x03212844 (fn 0x032127D4, attributed by type fit); native 0x032129EC (fn 0x03212978, attributed by type fit)",m13[*].0
+,1,,0x16000001,0xA,0x1,0xA,0xA,u32,How many frames after charge you do spin dash -- code: compared with status float 0x6 (func_2341) [status 0x15E (SpecialSHold)],,medium,community | reads: MSC sonic.mscsb func_2341,m13[*].1
+,2,,0x16000002,0x28,0xA,0x28,0x28,u32,Time to fully charge (frames) -- code: compared with status float 0x6 (func_2341); compared with a computed value (func_2343) [status 0x15E (SpecialSHold)],,medium,"community | reads: MSC sonic.mscsb func_2341; MSC sonic.mscsb func_2343; native 0x03212CF0 (fn 0x03212B5C, attributed by type fit); native 0x03212D38 (fn 0x03212B5C, attributed by type fit)",m13[*].2
 ,3,,0x06000003,-0.3,-0.3,-0.3,-0.3,f32,H speed during charge on ground,,medium,"community | reads: native 0x03212820 (fn 0x032127D4, attributed by type fit); native 0x032129C0 (fn 0x03212978, attributed by type fit)",m13[*].3
 ,4,,0x06000004,0.65,1,0.65,0.65,f32,Gravity after jump,,medium,community | no read in the vanilla MSC (native or unused),m13[*].4
 ,5,,0x06000005,2.4,4,2.4,2.4,f32,Max fall speed on startup,,medium,community | no read in the vanilla MSC (native or unused),m13[*].5
@@ -54,9 +54,9 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,23,,0x06000017,7.7,3.5,11.1,11,f32,Damage multiplier before hitting ground,,medium,community | no read in the vanilla MSC (native or unused),m13[*].23
 ,24,,0x06000018,0.09,0.2,0.09,0.09,f32,Skidding friction,,medium,"community | reads: native 0x032138A4 (fn 0x03213840, attributed by type fit)",m13[*].24
 ,25,,0x06000019,0.075,0.075,0.075,0.075,f32,Skidding friction?,,medium,"community | reads: native 0x032139BC (fn 0x03213900, attributed by type fit)",m13[*].25
-,26,,0x0600001A,0.3,0,0.3,0.3,f32,"When H speed is lower than this, action 0x161",,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2325",m13[*].26
-,27,,0x0600001B,0.3,0.3,0.3,0.3,f32,Min H speed for SpecialSEnd,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2333",m13[*].27
-,28,,0x0600001C,0.3,0.3,0.3,0.3,f32,Min H speed for SpecialAirSEnd,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2333",m13[*].28
+,26,,0x0600001A,0.3,0,0.3,0.3,f32,"When H speed is lower than this, action 0x161 -- code: compared with a current speed (KineticModuleF) (func_2325) [status 0x160 (SpecialSDashLw)]",,medium,community | reads: MSC sonic.mscsb func_2325,m13[*].26
+,27,,0x0600001B,0.3,0.3,0.3,0.3,f32,Min H speed for SpecialSEnd -- code: compared with a current speed (KineticModuleF) (func_2333) [status 0x161],,medium,community | reads: MSC sonic.mscsb func_2333; MSC sonic.mscsb func_2334,m13[*].27
+,28,,0x0600001C,0.3,0.3,0.3,0.3,f32,Min H speed for SpecialAirSEnd -- code: compared with a current speed (KineticModuleF) (func_2333) [status 0x161],,medium,community | reads: MSC sonic.mscsb func_2333; MSC sonic.mscsb func_2334,m13[*].28
 ,29,,0x0600001D,0.5,0.5,0.5,0.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].29
 ,30,,0x0600001E,0.02,0.02,0.02,0.02,f32,,,,no read in the vanilla MSC (native or unused),m13[*].30
 ,31,,0x0600001F,0.1,0.1,0.1,0.1,f32,Ground friction on ending,,medium,community | no read in the vanilla MSC (native or unused),m13[*].31
@@ -65,7 +65,7 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,34,,0x16000022,0x14,0x14,0x14,0x14,u32,,,,no read in the vanilla MSC (native or unused),m13[*].34
 ,35,,0x06000023,0.3,0,0.3,0.3,f32,,,,no read in the vanilla MSC (native or unused),m13[*].35
 ,36,,0x06000024,0.5,0.5,3,0.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].36
-,37,,0x06000025,1.8,3,1.8,1.8,f32,"When H speed is lower than this, action 0x161 (needs StickX < -0.25)",,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2325",m13[*].37
+,37,,0x06000025,1.8,3,1.8,1.8,f32,"When H speed is lower than this, action 0x161 (needs StickX < -0.25) -- code: compared with a current speed (KineticModuleF) (func_2325) [status 0x160 (SpecialSDashLw)]",,medium,community | reads: MSC sonic.mscsb func_2325,m13[*].37
 ,38,,0x06000026,0.9,0.9,0.9,0.9,f32,[auto] read by native code (get_float at 0x032137BC); meaning not traced,,low,"reads: native 0x032137BC (fn 0x032136E8, attributed by type fit)",m13[*].38
 ,39,,0x06000027,0.5,0.5,0.5,0.5,f32,[auto] read by native code (get_float at 0x03213F80); meaning not traced,,low,"reads: native 0x03213F80 (fn 0x03213EBC, attributed by type fit); native 0x03213FB4 (fn 0x03213EBC, attributed by type fit)",m13[*].39
 ,40,,0x06000028,0.1,0.1,0.1,0.1,f32,,,,no read in the vanilla MSC (native or unused),m13[*].40
@@ -75,23 +75,23 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,44,,0x0600002C,0.02,0.02,0.02,0.02,f32,,,,no read in the vanilla MSC (native or unused),m13[*].44
 ,45,,0x0600002D,1.15,1.15,1.15,1.15,f32,,,,no read in the vanilla MSC (native or unused),m13[*].45
 ,46,,0x0600002E,2.5,2.5,2.5,2.5,f32,,,,no read in the vanilla MSC (native or unused),m13[*].46
-15,0,Up B,0x07000000,3,3,3,3,f32,How much time before you jump,negative will make spring invisible,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2259",m14[*].0
-,1,,0x07000001,1,3,1,1,f32,"[auto] read by MSC: var1 = (int)WorkModuleF(0, 0x7000001);",,low,"reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2259",m14[*].1
+15,0,Up B,0x07000000,3,3,3,3,f32,"How much time before you jump -- code: stored in status int 0x4, then decremented in func_2262 (a countdown / remaining count), tested against 0 (func_2259) [status 0x154 (SpecialHiSquat)]",negative will make spring invisible,high,community | reads: MSC sonic.mscsb func_2259,m14[*].0
+,1,,0x07000001,1,1,1,1,f32,"code: stored in status int 0x5, then decremented in func_2262 (a countdown / remaining count) (func_2259) [status 0x154 (SpecialHiSquat)]",,medium,reads: MSC sonic.mscsb func_2259,m14[*].1
 ,2,,0x07000002,8.2,6.5,7.8,8.4,f32,Ground initial V speed,,medium,community | no read in the vanilla MSC (native or unused),m14[*].2
 ,3,,0x07000003,0.95,0.95,0.95,0.95,f32,Aerial initial V multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].3
 ,4,,0x07000004,-1,-1,-1,-1,f32,Gravity,,medium,community | no read in the vanilla MSC (native or unused),m14[*].4
-,5,,0x07000005,6,6,6,6,f32,Duration of Name4 takes effect,,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2264",m14[*].5
+,5,,0x07000005,6,6,6,6,f32,"Duration of Name4 takes effect -- code: stored in status int 0x4, then decremented in func_2267 (a countdown / remaining count), tested against 0 (func_2264) [status 0x165 (SpecialHi)]",,high,community | reads: MSC sonic.mscsb func_2264,m14[*].5
 ,6,,0x07000006,0.5,1,0.7,0.5,f32,Max air speed multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].6
 ,7,,0x07000007,0.65,1,0.8,0.65,f32,Max added air accel multiplier,,medium,community | no read in the vanilla MSC (native or unused),m14[*].7
-,8,,0x17000008,0x0,0x2,0x0,0x0,u32,The number of Up B to Up B,Used for Custom1,medium,"community | reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2365",m14[*].8
-,9,,0x17000009,0x1E,0x10,0x1E,0x1E,u32,"[auto] written to instance float 0 (the special-fall landing frames, i.e. landing lag)",,low,"reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2259",m14[*].9
+,8,,0x17000008,0x0,0x1,0x0,0x0,u32,The number of Up B to Up B -- code: compared with instance int 0x86 (a counter) (func_2365),Used for Custom1,high,community | reads: MSC sonic.mscsb func_2365,m14[*].8
+,9,,0x17000009,0x1E,0x1E,0x1E,0x1E,u32,code: written to instance float 0 (the special-fall landing frames = landing lag) (func_2259) [status 0x154 (SpecialHiSquat)],,medium,reads: MSC sonic.mscsb func_2259,m14[*].9
 16,0,Down B,0x08000000,25,25,25,25,f32,[auto] read by native code (get_float at 0x02F7F294); meaning not traced,,low,reads: native 0x02F7F294 (fn 0x02F7F240),m15[*].0
 ,1,,0x08000001,25,25,25,25,f32,,,,no read in the vanilla MSC (native or unused),m15[*].1
 ,2,,0x08000002,60,60,60,60,f32,[auto] read by native code (get_float at 0x02F7F1C0); meaning not traced,,low,reads: native 0x02F7F1C0 (fn 0x02F7F180); native 0x02F7F1EC (fn 0x02F7F180); native 0x02F7F364 (fn 0x02F7F318),m15[*].2
 ,3,,0x08000003,0.8,0.4,0.8,0.8,f32,[auto] read by native code (get_float at 0x02F7F76C); meaning not traced,,low,reads: native 0x02F7F76C (fn 0x02F7F724),m15[*].3
 ,4,,0x08000004,3,3,6,3,f32,,,,no read in the vanilla MSC (native or unused),m15[*].4
 ,5,,0x08000005,0.3,0.3,0.6,0.3,f32,,,,no read in the vanilla MSC (native or unused),m15[*].5
-,6,,0x08000006,6,6,6,6,f32,"[auto] read by MSC: if (WorkModuleF(0, 0x1000007) <= WorkModuleF(0, 0x8000006))",,low,"reads: MSC sonic.mscsb (vanilla decompile, repo first commit) func_2279",m15[*].6
+,6,,0x08000006,6,6,6,6,f32,code: compared with status float 0x7 (func_2279) [status 0x166],,medium,reads: MSC sonic.mscsb func_2279,m15[*].6
 ,7,,0x08000007,17,17,8.5,17,f32,,,,no read in the vanilla MSC (native or unused),m15[*].7
 ,8,,0x18000008,0x3,0x1,0x3,0x3,u32,[auto] read by native code (get_int at 0x02F7F8DC); meaning not traced,,low,reads: native 0x02F7F8DC (fn 0x02F7F724),m15[*].8
 ,9,,0x08000009,0.5,0.5,0.5,0.5,f32,[auto] read by native code (get_float at 0x03213E40); meaning not traced,,low,"reads: native 0x03213E40 (fn 0x03213DB4, attributed by type fit)",m15[*].9
@@ -101,33 +101,33 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,13,,0x1800000D,0x0,0x1,0x0,0x0,u32,[auto] read by native code (get_int at 0x02F7F794); meaning not traced,,low,reads: native 0x02F7F794 (fn 0x02F7F724),m15[*].13
 ,14,,0x0800000E,2,2,2,2,f32,,,,no read in the vanilla MSC (native or unused),m15[*].14
 ,0,Category 4 block,0x04000000,3,,,,f32,,,,no read in the vanilla MSC (native or unused),m16
-17,0,Spring,0x02000000,3.8,1.5,3,3.8,f32,,,,,m17[*].0
-,1,,0x02000001,0,0,0,0,f32,,,,,m17[*].1
-,2,,0x02000002,10.5,10.5,10.5,10.5,f32,Jump initial V speed...? (True = 4.175),How high off of the ground foes are when they start their 'i just bounced off of this' animation,medium,community,m17[*].2
-,3,,0x02000003,240,480,20,240,f32,Sonic Spring duration (frames),,medium,community | reads: MSC gimmickjump.mscsb func_73,m17[*].3
-,4,,0x02000004,0,0,0,0,f32,Initial V speed,,medium,community,m17[*].4
-,5,,0x02000005,-0.05,-0.03,-0.05,-0.05,f32,Gravity,,medium,community,m17[*].5
-,6,,0x02000006,2,0.5,2,2,f32,Same as Name2?,,medium,community,m17[*].6
-,7,,0x02000007,2,2,2,2,f32,,,,,m17[*].7
-,8,,0x02000008,12,12,12,12,f32,,,,,m17[*].8
-,9,,0x02000009,1.5,1,1.5,1.5,f32,,,,,m17[*].9
-,10,,0x0200000A,28,28,28,28,f32,,,,,m17[*].10
-,11,,0x0200000B,1,0.95,1,1,f32,,,,,m17[*].11
-,12,,0x0200000C,14,14,14,14,f32,,,,,m17[*].12
-18,0,Super Sonic,0x02000000,0.4,0.5,0.5,0.5,f32,,,,,m18[*].0
-,1,,0x02000001,8,8,8,8,f32,,,,,m18[*].1
-,2,,0x02000002,0.2,0.3,0.3,0.3,f32,,,,,m18[*].2
-,3,,0x02000003,3.5,3.5,3.5,3.5,f32,,,,,m18[*].3
-,4,,0x02000004,0.12,0.25,0.25,0.25,f32,[auto] stick threshold,,low,reads: MSC supersonic.mscsb func_53,m18[*].4
-,5,,0x02000005,0.06,0.06,0.06,0.06,f32,,,,,m18[*].5
-,6,,0x02000006,0.15,0.2,0.2,0.2,f32,[auto] stick threshold,,low,reads: MSC supersonic.mscsb func_53,m18[*].6
-,7,,0x02000007,-0.1,-0.1,-0.1,-0.1,f32,,,,,m18[*].7
-,8,,0x02000008,1.1,1.1,1.1,1.1,f32,"[auto] read by MSC: if (func_15(KineticModuleF(0, 0x1)) >= WorkModuleF(0, 0x2000008))",,low,reads: MSC supersonic.mscsb func_53,m18[*].8
-,9,,0x02000009,0.8,0.8,0.8,0.8,f32,"[auto] read by MSC: if (func_15(KineticModuleF(0, 0x1)) < WorkModuleF(0, 0x2000009))",,low,reads: MSC supersonic.mscsb func_53,m18[*].9
-,10,,0x0200000A,4.5,13,13,13,f32,"[auto] read by MSC: var1 = WorkModuleF(0, 0x200000a);",,low,reads: MSC supersonic.mscsb func_54,m18[*].10
-,11,,0x0200000B,1.28,1,1,1,f32,"[auto] read by MSC: var2 = WorkModuleF(0, 0x200000b);",,low,reads: MSC supersonic.mscsb func_54,m18[*].11
-,12,,0x1200000C,0x1E0,0x1E0,0x1E0,0x1E0,u32,,,,,m18[*].12
-,13,,0x1200000D,0x258,0x294,0x294,0x294,u32,[auto] copied to status work int 0x11000000,,low,reads: MSC supersonic.mscsb func_51,m18[*].13
+17,0,Spring,0x02000000,3.8,1.5,3,3.8,f32,,,,no read in the article MSC (native or unused),m17[*].0
+,1,,0x02000001,0,0,0,0,f32,,,,no read in the article MSC (native or unused),m17[*].1
+,2,,0x02000002,10.5,10.5,10.5,10.5,f32,Jump initial V speed...? (True = 4.175),How high off of the ground foes are when they start their 'i just bounced off of this' animation,medium,community | no read in the article MSC (native or unused),m17[*].2
+,3,,0x02000003,240,20,20,240,f32,"Sonic Spring duration (frames) -- code: stored in instance int 0x9, then decremented in func_49 (a countdown / remaining count), tested against 0 (func_73)",,high,community | reads: MSC sonic/gimmickjump.mscsb func_73,m17[*].3
+,4,,0x02000004,0,0,0,0,f32,Initial V speed,,medium,community | no read in the article MSC (native or unused),m17[*].4
+,5,,0x02000005,-0.05,-0.03,-0.05,-0.05,f32,Gravity,,medium,community | no read in the article MSC (native or unused),m17[*].5
+,6,,0x02000006,2,0.5,2,2,f32,Same as Name2?,,medium,community | no read in the article MSC (native or unused),m17[*].6
+,7,,0x02000007,2,2,2,2,f32,,,,no read in the article MSC (native or unused),m17[*].7
+,8,,0x02000008,12,12,12,12,f32,,,,no read in the article MSC (native or unused),m17[*].8
+,9,,0x02000009,1.5,1,1.5,1.5,f32,,,,no read in the article MSC (native or unused),m17[*].9
+,10,,0x0200000A,28,28,28,28,f32,,,,no read in the article MSC (native or unused),m17[*].10
+,11,,0x0200000B,1,1,1,1,f32,,,,no read in the article MSC (native or unused),m17[*].11
+,12,,0x0200000C,14,14,14,14,f32,,,,no read in the article MSC (native or unused),m17[*].12
+18,0,Super Sonic,0x02000000,0.4,0.5,0.5,0.5,f32,,,,no read in the article MSC (native or unused),m18[*].0
+,1,,0x02000001,8,8,8,8,f32,,,,no read in the article MSC (native or unused),m18[*].1
+,2,,0x02000002,0.2,0.3,0.3,0.3,f32,,,,no read in the article MSC (native or unused),m18[*].2
+,3,,0x02000003,3.5,3.5,3.5,3.5,f32,,,,no read in the article MSC (native or unused),m18[*].3
+,4,,0x02000004,0.12,0.25,0.25,0.25,f32,code: compared with the facing direction (func_53),,medium,reads: MSC sonic/supersonic.mscsb func_53,m18[*].4
+,5,,0x02000005,0.06,0.06,0.06,0.06,f32,,,,no read in the article MSC (native or unused),m18[*].5
+,6,,0x02000006,0.15,0.2,0.2,0.2,f32,code: compared with the facing direction (func_53),,medium,reads: MSC sonic/supersonic.mscsb func_53,m18[*].6
+,7,,0x02000007,-0.1,-0.1,-0.1,-0.1,f32,,,,no read in the article MSC (native or unused),m18[*].7
+,8,,0x02000008,1.1,1.1,1.1,1.1,f32,"code: compared with a current speed (KineticModuleF) (func_53); compared with the facing direction, a current speed (KineticModuleF) (func_53)",,medium,reads: MSC sonic/supersonic.mscsb func_53,m18[*].8
+,9,,0x02000009,0.8,0.8,0.8,0.8,f32,code: compared with a current speed (KineticModuleF) (func_53),,medium,reads: MSC sonic/supersonic.mscsb func_53,m18[*].9
+,10,,0x0200000A,4.5,13,13,13,f32,code: compared with a computed value (func_54),,medium,reads: MSC sonic/supersonic.mscsb func_54,m18[*].10
+,11,,0x0200000B,1.28,1,1,1,f32,code: compared with a computed value (func_54),,medium,reads: MSC sonic/supersonic.mscsb func_54,m18[*].11
+,12,,0x1200000C,0x1E0,0x1E0,0x1E0,0x1E0,u32,,,,no read in the article MSC (native or unused),m18[*].12
+,13,,0x1200000D,0x258,0x294,0x294,0x294,u32,"code: stored in status int 0x0, then decremented in func_56 (a countdown / remaining count), tested against 0 (func_51)",,medium,reads: MSC sonic/supersonic.mscsb func_51,m18[*].13
 ,0,,,10,,,,f32,,,,,m19.0
 ,1,,,22,,,,f32,,,,,m19.1
 ,2,,,-9,,,,f32,,,,,m19.2

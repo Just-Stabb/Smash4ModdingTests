@@ -1,30 +1,30 @@
 Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Comment,Confidence,Evidence,Path
-13,0,Neutral B,0x15000000,0x0,0x0,0x0,0x0,u32,,,,,m12[*]
-14,0,Side B,0x06000000,1,1,1,0,f32,H speed divisor,,medium,community,m13[*].0
-,1,,0x06000001,0.0025,0.001,0.002,0,f32,H air friction,,medium,community,m13[*].1
-,2,,0x06000002,0,0,0,0,f32,V speed on 1st aerial usage,,medium,community,m13[*].2
-,3,,0x06000003,0.092,0.092,0.092,0,f32,Gravity,,medium,community,m13[*].3
-,4,,0x06000004,1.5,1.6,0.9,0,f32,Max fall speed,,medium,community,m13[*].4
-15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,Joystick backward sensitivity?,,medium,community,m14[*].0
-,1,,0x07000001,0.5,0.5,0.5,0.5,f32,Joystick forward sensitivity?,,medium,community,m14[*].1
-,2,,0x07000002,18,30,0,24,f32,Ability to angle (degrees),,medium,community,m14[*].2
-,3,,0x07000003,1,1,0.7,1,f32,,,,,m14[*].3
-,4,,0x07000004,1,1,0.7,1,f32,,,,,m14[*].4
-,5,,0x07000005,0.6,0.6,0.6,0.6,f32,Special fall max air speed multiplier,,medium,community,m14[*].5
-,6,,0x17000006,0x1E,0x28,0x28,0x1E,u32,Landing lag (frames),,medium,community,m14[*].6
-,7,,0x07000007,0.85,1.275,0.58,1.35,f32,Grounded height multiplier,,medium,community,m14[*].7
-,8,,0x07000008,0.67,0.5,0,0.67,f32,Initial H speed from moving stick forward during the jump,read on Up B,low,"copied from Mario (same layout, same position) | reads: native 0x027B4ABC (fn 0x027B49B8, shared with mewtwo)",m14[*].8
-,9,,0x07000009,0.5,0.5,0.005,0.7,f32,Gravity on special fall,read on Up B,medium,community,m14[*].9
-,10,,0x0700000A,0.85,1.3,0.58,1.25,f32,Aerial height multiplier,"read on Up B, different with Mario",medium,community,m14[*].10
+13,0,Neutral B,0x15000000,0x0,0x0,0x0,0x0,u32,,,,no read in the vanilla MSC (native or unused),m12[*]
+14,0,Side B,0x06000000,1,1,1,0,f32,"H speed divisor -- code: KineticModule op 0xE (sets a speed) on energy 3 (stop), argument 2 (func_2261) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mariod.mscsb func_2261,m13[*].0
+,1,,0x06000001,0.0025,0.001,0.002,0,f32,"H air friction -- code: KineticModule op 0x10 (sets a brake / friction) on energy 3 (stop) (func_2261) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mariod.mscsb func_2261,m13[*].1
+,2,,0x06000002,0,0,0,0,f32,"V speed on 1st aerial usage -- code: read in: var0 = WorkModuleF(0, 0x6000002); (func_2262) [status 0x153 (SpecialS, SpecialAirS)]",,medium,community | reads: MSC mariod.mscsb func_2262,m13[*].2
+,3,,0x06000003,0.092,0.092,0.092,0,f32,"Gravity -- code: KineticModule op 0xF (sets an acceleration) on energy 1 (gravity / vertical) (func_2262) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mariod.mscsb func_2262,m13[*].3
+,4,,0x06000004,1.5,1.6,0.9,0,f32,"Max fall speed -- code: KineticModule op 0x14 (sets a max speed) on energy 1 (gravity / vertical) (func_2262) [status 0x153 (SpecialS, SpecialAirS)]",,high,community | reads: MSC mariod.mscsb func_2262,m13[*].4
+15,0,Up B,0x07000000,0.3,0.3,0.3,0.3,f32,"Joystick backward sensitivity? -- code: named ""stick x"" in a debug print (func_2267); stored in status float 0x6, then debug print ""super_jump_punch_uniq x abs: %f LR_STICK_X: %f""; compared with a computed value (func_2280) (func_2267) [status 0x154]",,high,community | reads: MSC mariod.mscsb func_2267,m14[*].0
+,1,,0x07000001,0.5,0.5,0.5,0.5,f32,"Joystick forward sensitivity? -- code: named ""dir stick x"" in a debug print (func_2267); stored in status float 0x7 (func_2267) [status 0x154]",,high,community | reads: MSC mariod.mscsb func_2267,m14[*].1
+,2,,0x07000002,18,30,0,24,f32,"Ability to angle (degrees) -- code: named ""dir mul"" in a debug print (func_2267); stored in status float 0x8 (func_2267) [status 0x154]",,medium,community | reads: MSC mariod.mscsb func_2267,m14[*].2
+,3,,0x07000003,1,1,0.7,1,f32,"code: stored in status float 0xE, then KineticModule op 0x11 (sets a speed) on energy 3 (stop), argument 1 (func_2280) (func_2267) [status 0x154]",,medium,reads: MSC mariod.mscsb func_2267,m14[*].3
+,4,,0x07000004,1,1,0.7,1,f32,"code: stored in status float 0xF, then KineticModule op 0x11 (sets a speed) on energy 1 (gravity / vertical) (func_2280) (func_2267) [status 0x154]",,medium,reads: MSC mariod.mscsb func_2267,m14[*].4
+,5,,0x07000005,0.6,0.6,0.6,0.6,f32,"Special fall max air speed multiplier -- code: named ""fall x mul"" in a debug print (func_2267); stored in status float 0xC, then stored in instance float 0x1 (the special-fall air speed multiplier) (func_2281) (func_2267) [status 0x154]",,high,community | reads: MSC mariod.mscsb func_2267,m14[*].5
+,6,,0x17000006,0x1E,0x28,0x28,0x1E,u32,"Landing lag (frames) -- code: named ""parameter test landing frame"" in a debug print (func_2267); stored in status int 0x5, then written to instance float 0 (the special-fall landing frames = landing lag) (func_2281) (func_2267) [status 0x154]",,high,community | reads: MSC mariod.mscsb func_2267,m14[*].6
+,7,,0x07000007,0.85,1.275,0.58,1.35,f32,"Grounded height multiplier -- code: named ""pass mul"" in a debug print (func_2267); stored in status float 0xD (func_2267) [status 0x154]",,medium,community | reads: MSC mariod.mscsb func_2267,m14[*].7
+,8,,0x07000008,0.67,0.5,0,0.67,f32,"code: stored in status float 0x9 (func_2267) [status 0x154] (same position as Mario: ""Initial H speed from moving stick forward during the jump"")",read on Up B,medium,"copied from Mario (same layout, same position) | reads: MSC mariod.mscsb func_2267; native 0x027B4ABC (fn 0x027B49B8, shared with mewtwo)",m14[*].8
+,9,,0x07000009,0.5,0.5,0.005,0.7,f32,"Gravity on special fall -- code: named ""accel y"" in a debug print (func_2267); stored in status float 0xA (func_2267) [status 0x154]",read on Up B,medium,community | reads: MSC mariod.mscsb func_2267,m14[*].9
+,10,,0x0700000A,0.85,1.3,0.58,1.25,f32,"Aerial height multiplier -- code: named ""air pass mul"" in a debug print (func_2267); stored in status float 0xB (func_2267) [status 0x154]","read on Up B, different with Mario",medium,community | reads: MSC mariod.mscsb func_2267,m14[*].10
 16,0,Down B,0x08000000,0.9,0.14,0.52,1.9,f32,Grounded max H speed?,,medium,community | reads: native 0x027B263C (fn 0x027B2554); native 0x027B2BDC (fn 0x027B2AC8),m15[*].0
 ,1,,0x08000001,0.07,0.007,0.14,0.2,f32,Grounded acceleration?,,medium,community | reads: native 0x027B25E4 (fn 0x027B2554),m15[*].1
-,2,,0x08000002,0.02,0.02,0.02,0.66,f32,Ground/aerial friction on attack,,medium,community,m15[*].2
-,3,,0x08000003,1.7,2.03,0.96,0.7,f32,Initial V speed for tapping B?,True = Name7 * this?,medium,community,m15[*].3
-,4,,0x08000004,1.7,2.26,1.13,1.8,f32,Max V speed?,True = Name7 * this?,medium,community,m15[*].4
+,2,,0x08000002,0.02,0.02,0.02,0.66,f32,Ground/aerial friction on attack,,medium,community | no read in the vanilla MSC (native or unused),m15[*].2
+,3,,0x08000003,1.7,2.03,0.96,0.7,f32,Initial V speed for tapping B?,True = Name7 * this?,medium,community | no read in the vanilla MSC (native or unused),m15[*].3
+,4,,0x08000004,1.7,2.26,1.13,1.8,f32,Max V speed?,True = Name7 * this?,medium,community | no read in the vanilla MSC (native or unused),m15[*].4
 ,5,,0x08000005,0.9,0.2,0.76,1.3,f32,Aerial max H speed?,,medium,community | reads: native 0x027B276C (fn 0x027B2684),m15[*].5
 ,6,,0x08000006,0.07,0.02,0.35,0.08,f32,Aerial acceleration?,,medium,community | reads: native 0x027B2714 (fn 0x027B2684),m15[*].6
-,7,,0x08000007,0.9,0.9,0.81,1,f32,V speed multiplier?,,medium,community,m15[*].7
-,0,Category 4 block,0x04000000,0,,,,f32,?,,medium,community,m16
+,7,,0x08000007,0.9,0.9,0.81,1,f32,V speed multiplier?,,medium,community | no read in the vanilla MSC (native or unused),m15[*].7
+,0,Category 4 block,0x04000000,0,,,,f32,?,,medium,community | no read in the vanilla MSC (native or unused),m16
 ,0,Equipment,,15,,,,f32,Attack equipment,,medium,community,m17.0
 ,1,,,-50,,,,f32,Speed equipment,,medium,community,m17.1
 17,0,Side B,,50,1,50,50,f32,Break threshold,,medium,community,m18[*].0
@@ -36,23 +36,23 @@ Group,Name,Move,Variable ID,Default,Custom1,Custom2,Custom3,Type,Description,Com
 ,6,,,1,1,1,1,f32,Reflected projectile speed multiplier,,medium,community,m18[*].6
 ,7,,,0.75,0.1,0.7,0.66,f32,Reflected projectile lifetime multiplier,,medium,community,m18[*].7
 18,0,"Neutral B
-(drcapsule)",0x02000000,0.1,0,0.003,0,f32,Capsule gravity,,medium,community,m19[*].0
-,1,,0x02000001,1,0,0.1,0,f32,,,,,m19[*].1
-,2,,0x02000002,1,1,1,0,f32,Bounce speed multiplier,,medium,community,m19[*].2
-,3,,0x02000003,1.4,3.7,0.3,0,f32,Initial speed,,medium,community,m19[*].3
-,4,,0x02000004,-10,0,40,0,f32,Initial angle (degrees),,medium,community,m19[*].4
-,5,,0x12000005,0x46,0x16,0x6E,0x0,u32,Lifetime (frames),,medium,community,m19[*].5
-,6,,0x02000006,1.8,0,0,0,f32,Min velocity on ground collision,any lower will delete capsule,medium,community,m19[*].6
-,7,,0x02000007,2.2,0,0,0,f32,Something to do with how many times it can bounce before disappearing,"2 = none, 4 = too many to count.",medium,community,m19[*].7
-,8,,0x02000008,60,30,1,0,f32,,,,,m19[*].8
-,9,,0x12000009,0x7,0x2,0x1,0x0,u32,,,,,m19[*].9
-,10,,0x1200000A,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community,m19[*].10
+(drcapsule)",0x02000000,0.1,0,0.003,0,f32,Capsule gravity,,medium,community | no read in the article MSC (native or unused),m19[*].0
+,1,,0x02000001,1,0,0.1,0,f32,,,,no read in the article MSC (native or unused),m19[*].1
+,2,,0x02000002,1,1,1,0,f32,Bounce speed multiplier,,medium,community | no read in the article MSC (native or unused),m19[*].2
+,3,,0x02000003,1.4,3.7,0.3,0,f32,Initial speed,,medium,community | no read in the article MSC (native or unused),m19[*].3
+,4,,0x02000004,-10,0,40,0,f32,Initial angle (degrees),,medium,community | no read in the article MSC (native or unused),m19[*].4
+,5,,0x12000005,0x46,0x16,0x6E,0x0,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m19[*].5
+,6,,0x02000006,1.8,0,0,0,f32,Min velocity on ground collision,any lower will delete capsule,medium,community | no read in the article MSC (native or unused),m19[*].6
+,7,,0x02000007,2.2,0,0,0,f32,Something to do with how many times it can bounce before disappearing,"2 = none, 4 = too many to count.",medium,community | no read in the article MSC (native or unused),m19[*].7
+,8,,0x02000008,60,30,1,0,f32,,,,no read in the article MSC (native or unused),m19[*].8
+,9,,0x12000009,0x7,0x2,0x1,0x0,u32,,,,no read in the article MSC (native or unused),m19[*].9
+,10,,0x1200000A,0x0,0x0,0x1,0x0,u32,Piercing capability,,medium,community | no read in the article MSC (native or unused),m19[*].10
 ,0,,,0x3,,,,u32,,,,,m20.0
 ,1,,,0,,,,f32,,,,,m20.1
 ,2,,,1,,,,f32,,,,,m20.2
 19,0,"Final Smash
-(hugecapsule)",0x12000000,0x104,,,,u32,Lifetime (frames),,medium,community,m21[0].0
-,1,,0x02000001,0.5,,,,f32,,,,,m21[0].1
+(hugecapsule)",0x12000000,0x104,,,,u32,Lifetime (frames),,medium,community | no read in the article MSC (native or unused),m21[0].0
+,1,,0x02000001,0.5,,,,f32,,,,no read in the article MSC (native or unused),m21[0].1
 20,0,,,0x2000003,,,,u32,Pill weapon param Name1,,medium,community,m22[0].0
 ,1,,,1,,,,f32,,,,,m22[0].1
 ,2,,,1.5,,,,f32,Multiplier,,medium,community,m22[0].2
