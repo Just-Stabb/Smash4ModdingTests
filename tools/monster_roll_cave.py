@@ -94,7 +94,17 @@ LIFE_RATE = [1.0, 1.0, 1.0, 1.3, 1.4, 1.4, 1.5, 1.5]
 FIGHTERS = 0x1035184C          # [[FIGHTERS] + 0]: +0 entries (0x76B0 each, live: byte +0x1E >= 4), +8 count
 FIGHTER_ENTRY = 0x76B0
 MAX_BLOCKS = 99                # names stc_blkNN_set / bNN
-BLOCK_NAME, BLOCK_LINK = 'stc_blk00_set', 'b00'
+BLOCK_NAME, BLOCK_LINK = 'dyr_blk00_set', 'b00'
+# cracks (v18f): each block folder (minecraft_world.BLOCK_SET, a dyr_ folder: the stage plays its motion)
+# has its crack overlay's 10 stages on bones shown only in their window of CRACK_STEP frames (state 0:
+# no crack, s + 1: stage s); every update the cave holds each intact block at its state's middle frame
+# with the draw model's set-motion-frame (Manifold's set_motion_current_frame: 0x031593FC(m, f1, apply):
+# the motion player at m + 0xF4, 0x0330A5F8 its frame; the model's own update 0x03158E24 advances it by
+# f1 x m+0xF8, which can't leave the window). Stage = floor(10 x damage / life) (Minecraft's), a follower
+# its column leader's.
+SET_MOTION_FRAME = 0x031593FC  # (m, f1 frame, r4 apply the pose now)
+CRACK_STEP = 10                # minecraft_world.CRACK_STEP
+CRACK_STAGES = 10
 CYCLE = 9000.0                 # minecraft_world.CYCLE
 MONSTER_FRAME = 4200.0         # pickel_world.stdat frame_of_monster
 # the monsters' folders, then the animals' (minecraft_world.MONSTER_SETS, ANIMAL_SETS)
@@ -596,6 +606,10 @@ bshape:
         addi r12, r12, bhp@l
         add r12, r12, r26
         stfs f0, 0(r12)
+        lis r12, bmax@ha
+        addi r12, r12, bmax@l
+        add r12, r12, r26
+        stfs f0, 0(r12)
 bmodel:
         mr r3, r28
         bl bnames
@@ -654,6 +668,8 @@ bcmax:
         lfsx f12, r12, r10
         lis r12, bhp@ha
         addi r12, r12, bhp@l
+        lis r11, bmax@ha
+        addi r11, r11, bmax@l
         li r9, 0
 bcmul:
         cmpw r9, r27
@@ -662,6 +678,9 @@ bcmul:
         lfsx f0, r12, r10
         fmuls f0, f0, f12
         stfsx f0, r12, r10
+        lfsx f0, r11, r10
+        fmuls f0, f0, f12
+        stfsx f0, r11, r10
         addi r9, r9, 1
         b bcmul
 bcounted:
@@ -683,7 +702,7 @@ bloop:
         slwi r11, r11, 2
         lwzx r0, r12, r11
         cmpwi r0, 1
-        bne bnext
+        bne bfollow
         li r0, 1
         stwx r0, r12, r26
         b bhide
@@ -697,7 +716,7 @@ bintact:
         addi r12, r12, bconst@l
         lfs f13, 12(r12)
         fcmpu cr0, f1, f13
-        ble bnext
+        ble bkeep
         lis r12, bhp@ha
         addi r12, r12, bhp@l
         add r24, r12, r26
@@ -715,7 +734,7 @@ bintact:
         lhz r4, 0(r23)
         lbz r5, 2(r23)
         bl playsnd
-        b bnext
+        b bkeep
 bbreak:
         li r0, 1
         lis r12, bstate@ha
@@ -763,6 +782,16 @@ bvis:
         addi r3, r22, 0xDC
         li r4, 0
         bl 0x%(setvis)08X
+        b bnext
+bfollow:
+        mr r3, r28
+        lbz r4, 6(r25)
+        bl bcrack
+        b bnext
+bkeep:
+        mr r3, r28
+        mr r4, r28
+        bl bcrack
 bnext:
         addi r28, r28, 1
         b bloop
@@ -771,6 +800,64 @@ bout:
         lwz r0, 0x84(r1)
         mtlr r0
         addi r1, r1, 0x80
+        blr
+bcrack:                                 # r3 block, r4 its column's leader: hold the block's crack state
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        slwi r3, r3, 2
+        lis r12, bmodels@ha
+        addi r12, r12, bmodels@l
+        lwzx r3, r12, r3
+        cmpwi r3, 0
+        beq cout
+        slwi r4, r4, 2
+        lis r12, bhp@ha
+        addi r12, r12, bhp@l
+        lfsx f1, r12, r4
+        lis r12, bmax@ha
+        addi r12, r12, bmax@l
+        lfsx f2, r12, r4
+        li r5, 0
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfs f3, 12(r12)
+        fcmpu cr0, f2, f3
+        ble cset
+        fcmpu cr0, f1, f2
+        bge cset
+        fsubs f3, f2, f1
+        fdivs f3, f3, f2
+        lfs f4, 24(r12)
+        fmuls f3, f3, f4
+        fctiwz f3, f3
+        stfd f3, 0x10(r1)
+        lwz r5, 0x14(r1)
+        cmpwi r5, 0
+        bge cmin
+        li r5, 0
+cmin:
+        cmpwi r5, %(stages)d
+        blt cmax
+        li r5, %(stages1)d
+cmax:
+        addi r5, r5, 1
+cset:
+        mulli r5, r5, %(step)d
+        addi r5, r5, %(half)d
+        lis r0, 0x4330
+        stw r0, 0x10(r1)
+        stw r5, 0x14(r1)
+        lfd f1, 0x10(r1)
+        lfd f0, 16(r12)
+        fsub f1, f1, f0
+        frsp f1, f1
+        li r4, 1
+        bl 0x%(set_frame)08X
+cout:
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
         blr
 bnames:
         li r0, 10
@@ -856,7 +943,8 @@ data:
            remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, fighters_hi=(FIGHTERS + 0x8000) >> 16,
            fighters_lo=FIGHTERS & 0xFFFF, entry=FIGHTER_ENTRY, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
            gim_activate=GIM_ACTIVATE, gim_damage=GIM_DAMAGE, gim_remove=GIM_REMOVE, link_find=LINK_FIND,
-           grounds_off=GROUNDS_OFF, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
+           grounds_off=GROUNDS_OFF, set_frame=SET_MOTION_FRAME, step=CRACK_STEP, half=CRACK_STEP // 2,
+           stages=CRACK_STAGES, stages1=CRACK_STAGES - 1, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
            monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
            pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
            release=RELEASE, name_len=len(STAGE_NAME), bf_hi=BATTLEFIELD_NAME >> 16,
@@ -886,13 +974,13 @@ data:
     for t in tables:
         for w in words_of(t):
             a.asm('.word 0x%08X' % w)
-    # the blocks: constants (2^52 + 2^31 and 2^52 for int -> float, the radius, 0), a table a biome,
+    # the blocks: constants (2^52 + 2^31 and 2^52 for int -> float, the radius, 0, the stages), a table a biome,
     # the materials' sounds, names and the match's state
     while a.pc % 8:
         a.asm('.word 0')
     a.asm('bconst:')
     for w in (0x43300000, 0x80000000, struct.unpack('>I', struct.pack('>f', BLOCK_RADIUS))[0], 0,
-              0x43300000, 0):
+              0x43300000, 0, struct.unpack('>I', struct.pack('>f', float(CRACK_STAGES)))[0], 0):
         a.asm('.word 0x%08X' % w)
     btables, bmats = block_tables()
     a.asm('btables:')
@@ -917,7 +1005,7 @@ data:
         a.asm('.word 0x%08X' % struct.unpack('>I', struct.pack('>f', r))[0])
     a.asm('bdata:')
     a.asm('.word 0\n.word 0\n.word 0\n.word 0')
-    for label in ('bwrap', 'bhp', 'bstate', 'bmodels'):
+    for label in ('bwrap', 'bhp', 'bstate', 'bmodels', 'bmax'):
         a.asm(label + ':')
         for _ in range(MAX_BLOCKS):
             a.asm('.word 0')

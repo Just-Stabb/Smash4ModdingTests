@@ -1046,6 +1046,36 @@ mark_00|30|60`), a `ui_mark_db.bin` row (`{0x2A, 1, 31, 0}`), the stage's series
 and `Mmen_MarkN_minecraft` in `menu.msbt`. The mark folders are packed by the game: they need
 Sm4shExplorer v5 (or "Pack this folder").
 
+
+### v18f: cracks on damaged blocks
+
+User: Ultimate shows how damaged a block is (Minecraft's crack overlay). Its crack atlas is
+`render/allbiormcrack.nutexb` (332 x 652): a row a block kind (18 px apart from y 1; the kinds of
+`block_info_table`, tinted to match), 10 stages of 16 x 16 at x 19 + 18 s (x 1: no crack).
+- **Frame control** (research): the draw model's motion player is at `m + 0xF4`;
+  `0x031593FC(m, f1 frame, r4 apply)` (Manifold's `set_motion_current_frame`) sets its frame
+  (`0x0330A5F8`: `[player + 0xC] + 0x24`) and with apply recomputes the pose (`[player + 0xC]`'s
+  vtable `+0x14`, `0x03309C64`); the model's own update `0x03158E24(m, f1)` advances it by
+  `f1 x [m + 0xF8]` (`0x03308ED0`), loop flag `[player] + 0x36` / `m + 0xFC` (`0x03158A2C` on,
+  `0x03159458` off). The material animation (the day / night gain) is the draw model's at `+0xDC`,
+  apart from the motion.
+- **Folders** (`tools/minecraft_world.py`): each block folder is now `dyr_blkNN_set` (a `dyr_` folder:
+  the stage plays its motion; v18-v18e `stc_blkNN_set`) with a skeleton: the cube on `blk_root`, its
+  faces again `CRACK_LIFT` (0.04) out, one copy a stage on bones `crack0-9` (`crack_parts`: each
+  face's UVs over its stage's tile of `crack_texture`, the kind's 10 stages on a 64 x 64 pixel-art
+  texture, 4x); the motion (`crack_tracks`, 121 frames) shows stage s's bone (scale 1) in frames
+  [(s + 1) x 10, (s + 2) x 10) and scales the rest to nothing (the fire's flipbook way); state 0
+  (frames 0-9) no crack. The cube's and cracks' material: the blocks' (0xA2001001, alpha test 128),
+  bone-bound as the doors. ~9 MB more a biome.
+- **Cave** (`tools/monster_roll_cave.py`, `bcrack`): the full lives (`bmax`, x the fighter rate as
+  `bhp`); every update each intact block is held at its state's middle frame (state 0 if undamaged,
+  else 1 + floor(10 x damage / life), at most 10; a block in front / behind its column leader's,
+  an update behind it when it comes first in the table) by `0x031593FC(model, frame, 1)`; broken
+  blocks are left alone (hidden). `monster_roll_test.py`: 54 checks (the frames per state, held
+  without hits, followers, none once broken, the full lives scaled).
+- Installing: the old `stc_blkNN_set` folders must go (a new build can't remove them: they'd stay
+  drawn as unbreakable copies).
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

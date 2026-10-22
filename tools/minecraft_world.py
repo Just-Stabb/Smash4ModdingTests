@@ -305,7 +305,16 @@ def material_code(name):
 # damage / break sounds (BLOCK_SOUND). v18b (SmashWiki's technical details): the blocks in front of /
 # behind a plane block (every column has one) share its life: they break with it (`leader`)
 BREAKABLE = True
-BLOCK_SET = 'stc_blk%02d_set'
+BLOCK_SET = 'dyr_blk%02d_set'        # v18f: dyr_ (the stage plays its motion: the cracks); v18-v18e stc_
+# the blocks' cracks (v18f, user: Ultimate shows a block's damage): render/allbiormcrack.nutexb has a
+# row a block kind (18 px apart from y 1), its 10 stages 16 x 16 at x 19 + 18 s (x 1: none). Each
+# block folder gets the block's faces again, CRACK_LIFT out, one copy a stage on a bone of its own
+# (crack0-9), shown (scale 1) only in its window of CRACK_STEP frames of the folder's motion (state 0:
+# none, state s + 1: stage s; the rest scaled to nothing, as the fire's flipbook);
+# tools/monster_roll_cave.py holds each block at its state's middle frame (0x031593FC)
+CRACK_ATLAS = 'allbiormcrack'
+CRACK_STAGES, CRACK_STEP = 10, 10
+CRACK_LIFT = 0.04
 BLOCK_LINK = 'b%02d'                # the link's short name (subname 'b%02d__blk__')
 BLOCK_RADIUS = 7.5                  # Ultimate's block_damage_radius (SmashWiki: hits within 7.5 of a block's centre)
 BLOCK_SOUND = {'soil': 'soil', 'wood': 'wood', 'rock': 'stone', 'nibuiron': 'stone', 'grass': 'grass',
@@ -1744,6 +1753,55 @@ def atlas_rows(parts, tex, name, atlas=ATLAS):
     return out
 
 
+def crack_texture(tex, kind):
+    """the kind's 10 crack stages on a 64 x 64 pixel-art texture (4 x 4 tiles of 16, stage s at
+    column s % 4, row s // 4)"""
+    name = 'all_blocks_crack_%02d' % kind
+    if name not in tex.extra:
+        img = tex.image(CRACK_ATLAS)
+        out = np.zeros((64, 64, 4), np.uint8)
+        y0 = 1 + 18 * kind
+        for s in range(CRACK_STAGES):
+            x0 = 19 + 18 * s
+            out[(s // 4) * 16:(s // 4) * 16 + 16, (s % 4) * 16:(s % 4) * 16 + 16] = img[y0:y0 + 16, x0:x0 + 16]
+        tex.extra[name] = out
+    return name
+
+
+def crack_parts(parts, kind, tex):
+    """[[parts] a stage]: the block's faces CRACK_LIFT out along their normals, each face's UVs over
+    the stage's tile (u along x, or z on the x faces; v down from the top, or along z on the y faces;
+    half a texel in from the tile's edges)"""
+    name = crack_texture(tex, kind)
+    out = [[] for _ in range(CRACK_STAGES)]
+    for p in parts:
+        n = p['nrm'] / (np.linalg.norm(p['nrm'], axis=1, keepdims=True) + 1e-9)
+        rel = (p['pos'] - p['pos'].min(0)) / 10.0
+        ax = np.abs(n).argmax(1)
+        u = np.where(ax == 0, rel[:, 2], rel[:, 0])
+        v = np.where(ax == 1, rel[:, 2], 1 - rel[:, 1])
+        half = 0.5 / 64
+        for s in range(CRACK_STAGES):
+            q = dict(p)
+            q['pos'] = p['pos'] + n * CRACK_LIFT
+            tu, tv = (s % 4) * 0.25, (s // 4) * 0.25
+            q['uv'] = np.c_[tu + half + u * (0.25 - 2 * half), tv + half + v * (0.25 - 2 * half)]
+            q['textures'] = [name] + list(p['textures'][1:])
+            q['name'], q['sub'] = 'crack', s
+            out[s].append(q)
+    return out
+
+
+def crack_tracks(frames):
+    """{crack bone: (positions, None, scales)}: stage s's bone scale 1 in frames [(s + 1) x
+    CRACK_STEP, (s + 2) x CRACK_STEP), else 0"""
+    out = {}
+    for s in range(CRACK_STAGES):
+        on = np.array([(f // CRACK_STEP) == s + 1 for f in range(frames)], float)
+        out['crack%d' % s] = (np.zeros((frames, 3)), None, np.repeat(on[:, None], 3, 1))
+    return out
+
+
 def atlas_tiles(parts, tex, name, atlas=ATLAS):
     """parts on a block atlas moved to the box of 16-pixel tiles they use, grown to a power of two
     each way (so pixel_art scales it exactly 4x), a texture of their own (name: 'all_blocks...',
@@ -2252,17 +2310,31 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 m.gain = 'pano_glow'
                 meshes.append(m)
         write_set('%s/%s' % (model_dir, name), meshes, tex, curves)
+    crack_frames = (CRACK_STAGES + 2) * CRACK_STEP + 1     # states 0-10, then a still window
     for i, parts in enumerate(block_sets):
         parts = [atlas_tiles([q], tex, 'all_blocks_blk_%s' % KIND_MODEL[blocks[i][0]])[0]
                  if q['textures'][0].startswith('all_blocks') else q for q in parts]
         meshes = to_nud(parts, tex, 'lit', False, bake=not ISLAND_FLAGS)
         for m in meshes:
+            m.bind, m.bone = 8, 0
+        # its cracks, a stage a bone (crack_parts)
+        for s, cparts in enumerate(crack_parts(parts, blocks[i][0], tex)):
+            for m in to_nud(cparts, tex, 'lit', False, bake=not ISLAND_FLAGS):
+                m.bind, m.bone = 8, s + 1
+                meshes.append(m)
+        for m in meshes:
             m.gain = None if ISLAND_FLAGS else 'island'
             for poly in m.polygons:
                 for mat in poly.materials:
                     mat.flags = ISLAND_FLAGS or mat.flags
-        write_set('%s/%s' % (model_dir, BLOCK_SET % i), meshes, tex, curves)
-        shutil.copy('%s/%s/model.xmb' % (model_dir, RING_SET), '%s/%s/model.xmb' % (model_dir, BLOCK_SET % i))
+        folder = BLOCK_SET % i
+        os.makedirs('%s/animation/%s' % (out_dir, folder), exist_ok=True)
+        shutil.copy('%s/animation/%s/%s.omo' % (out_dir, ANIMAL_BASE, ANIMAL_BASE),
+                    '%s/animation/%s/%s.omo' % (out_dir, folder, folder))
+        write_rig(model_dir, out_dir + '/animation', folder, meshes,
+                  [('blk_root', -1)] + [('crack%d' % s, 0) for s in range(CRACK_STAGES)],
+                  crack_tracks(crack_frames), crack_frames, tex, curves)
+        shutil.copy('%s/%s/model.xmb' % (model_dir, RING_SET), '%s/%s/model.xmb' % (model_dir, folder))
     for name, changes in ((FAR_SET, {'drawing_order': {'number': FAR_ORDER}}),
                           (FOG_SET, {'drawing_order': {'number': FOG_ORDER}, 'draw_range': {'number': '2'}})):
         path = '%s/%s/model.xmb' % (model_dir, name)

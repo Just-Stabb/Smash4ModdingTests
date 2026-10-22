@@ -70,6 +70,7 @@ LINKS = 0x7F00B800         # the ground list the link lookup returns for 'b00' /
 SOUND_X = 0x7F002300       # stage + 0xFF0 -> SOUND_X; *SOUND_X = SOUND_X + 0x10 (X); X + 0x390 = S
 SOUND_S = 0x7F002800
 PLAYS = 0x7F002600         # the sound ids played (REC + 0x30 counts them, + 0x34 the releases)
+FRAMES = 0x7F00C000        # the crack frames set: +0 count, then (model, frame, apply) 12 bytes each (64, wrapping)
 
 
 def main():
@@ -170,6 +171,19 @@ yes:    lis r3, 0x7F00
         stw r4, 0x10(r7)
         blr""")
     stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
+    stub(mu, C.SET_MOTION_FRAME, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xC000
+        lwz r6, 0(r7)
+        andi. r5, r6, 63
+        mulli r5, r5, 12
+        add r5, r5, r7
+        stw r3, 4(r5)
+        stfs f1, 8(r5)
+        stw r4, 12(r5)
+        addi r6, r6, 1
+        stw r6, 0(r7)
+        blr""")
     # find: the name's 5th char's place in FOLDER_CHARS picks a model (0x200 apart); the enderman's
     # ('n') missing while REC+0x20 is set
     mu.mem_write(REC + 0x100, (FOLDER_CHARS + 'b').encode() + b'\0')     # 'b': the blocks' (one fake model)
@@ -392,6 +406,13 @@ miss:   li r3, 0
 
     def damage(i, d):
         mu.mem_write(GIMS + 0x40 * i, struct.pack('>f', d))
+
+    def frames():
+        """the crack frames set since the last call: [(model, frame, apply)]"""
+        n = word(FRAMES)
+        setw(FRAMES, 0)
+        return [(word(FRAMES + 4 + 12 * k) - block_model, round(wf(FRAMES + 8 + 12 * k), 3), word(FRAMES + 12 + 12 * k))
+                for k in range(min(n, 64))]
     for i in range(3):
         damage(i, 0.0)
     block_model = MODELS + 0x200 * N_FOLDERS
@@ -412,6 +433,12 @@ miss:   li r3, 0
         return [p for p in all_plays() if p & 0xFFFF >= first_block]
     check('their lives (12 / 24; the wood block behind follows the stone one)',
           ([wf(bhp + 4 * i) for i in (0, 2)], [word(bstate + 4 * i) for i in range(3)]), ([12.0, 24.0], [0, 2, 0]))
+    bmax = a.addr('bmax')
+    check('their full lives kept (bmax)', [wf(bmax + 4 * i) for i in (0, 2)], [12.0, 24.0])
+    frames()
+    update()
+    check('cracks: every intact block held at state 0 (no crack: frame %d), the pose applied' % (C.CRACK_STEP // 2),
+          frames(), [(0, C.CRACK_STEP // 2, 1)] * 3)
     setw(REC + 0x30, 0)
     rands([3] * 10)
     damage(0, 5.0)
@@ -419,6 +446,12 @@ miss:   li r3, 0
     damage(0, 0.0)
     check('no fighters yet: lives unscaled; 5 damage: life 7, the grass hit sound', (wf(bhp), plays()),
           (7.0, [row | tone('block_dmg_grass')[0] + 3]))
+    mid = C.CRACK_STEP // 2
+    # 5 of 12: stage floor(10 x 5 / 12) = 4 -> state 5
+    check('5 / 12 damage: the grass block at stage 4 (state 5), the others still uncracked',
+          frames(), [(0, 5 * C.CRACK_STEP + mid, 1), (0, mid, 1), (0, mid, 1)])
+    update()
+    check('no hit the next update: held at the same stage', [f[1] for f in frames()], [5 * C.CRACK_STEP + mid, mid, mid])
     setw(REC + 0x30, 0)
     damage(0, 8.0)
     update()
@@ -428,11 +461,22 @@ miss:   li r3, 0
     check('its collision link switched off (0x0315EDD8(list, 1))', (word(BREC + 8), word(BREC + 0xC), word(BREC + 0x10)), (1, LINKS, 1))
     check('its model hidden', (bool(word(block_model + 0x118) & 0x80000), word(block_model + 0xDC)), (False, 0))
     check('the wood block still there', word(bstate + 4), 2)
+    frames()
+    damage(1, 23.9)
+    update()
+    damage(1, 0.0)
+    check('23.9 / 24 on the stone block: stage 9 (state 10); the wood block behind (before it in the table) an update later',
+          frames(), [(0, mid, 1), (0, 10 * C.CRACK_STEP + mid, 1)])
+    update()
+    check('  then both at stage 9; none for the broken grass block', frames(),
+          [(0, 10 * C.CRACK_STEP + mid, 1), (0, 10 * C.CRACK_STEP + mid, 1)])
     setw(REC + 0x30, 0)
     damage(1, 30.0)
     update()
     damage(1, 0.0)
+    frames()
     update()
+    check('broken (the wood block behind gone with it): no crack frames set any more', frames(), [])
     check('the stone block broken (its link off), the wood block behind it with it',
           (word(GIMS + 0x44), word(BREC + 8), [word(bstate + 4 * i) for i in range(3)], plays()),
           (1, 2, [1, 1, 1], [row | tone('block_break_stone')[0] + 3]))
@@ -453,6 +497,9 @@ miss:   li r3, 0
         update()
         check('%d fighters: lives × %.1f' % (n, rate), [round(wf(bhp + 4 * i), 3) for i in (0, 2)],
               [round(12 * rate, 3), round(24 * rate, 3)])
+        check('  full lives × %.1f too, so no crack' % rate,
+              ([round(wf(bmax + 4 * i), 3) for i in (0, 2)], sorted(set(f[1] for f in frames()))),
+              ([round(12 * rate, 3), round(24 * rate, 3)], [C.CRACK_STEP // 2]))
     setw(0x1035184C, 0)
     mu.mem_write(BREC, b'\0' * 0x10)
     match(C.KINDS[0], C.biome_select_cave.N_BIOMES, 75, [0] * 10, 3)
