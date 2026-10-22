@@ -222,6 +222,66 @@ All 84 checks pass on base + biome + monster + trait + kind_expand (supamario), 
 - The 164 RAM immediates come from a static scan: a site it missed still works for vanilla kinds
   (mirror), but would read stale or wrong values for kind 0x41.
 
+## A new fighter's own sound-effect bank (and new sounds)
+
+`tools/fighter_own_bank.py FIGHTER_DIR SOUNDLABELTABLE OUT --name <Name> [--bank-id N] [--row N]
+[--sound LABEL=FILE[@VOLUME_DB] ...]` gives a new fighter's renamed copy of its base's
+`snd_se_<Name>.nus3bank` its own bank id and soundlabeltable row, appends sounds from audio files, and
+moves the fighter's scripts' sound ids to the new row.
+
+How the game binds sounds (cross_f.rpx):
+- A fighter's banks are loaded by file name (`fighter/%s/sound/snd_se_%s.nus3bank`, builder
+  `0x030BB464`); no table of bank ids by fighter kind. The bank id is BINF's.
+- A sound id is `(row << 16) | label`. `soundlabeltable.bin` (`STB\0`, rows of
+  `{bank id, labels, offset, 0}`, then the label lists: tone indices, -1 = none): `0x0311EC30(stb, row)`
+  -> the row (bounded by the row count), `0x0311EC80` -> its bank id, `0x0311EDC4` / `0x0311EEC4` ->
+  the label's tone index. The bank id is then matched against the banks the player has loaded by
+  their BINF id (`0x033EC060` a bank handle's id; e.g. a stage's `0x03125C78` tries its own handles,
+  then the global ones). No array is indexed by bank id or row.
+- So a renamed copy keeping the base's BINF id plays from the base's row, and with the base in the same
+  match two loaded banks share the id (which answers is unknown). With its own id and row it is
+  independent.
+
+Supamario: `snd_se_Supamario` BINF `snd_se_Supamario` id **2144** (the fighter se ids run 2000-2143),
+soundlabeltable row **3249** (an empty row, bank id -1: the row count stays 3252) = Mario's row 2's 139
+labels + 3:
+
+| sound | tone | label | sound id | length | volume |
+|---|---|---|---|---|---|
+| kame_charge (the charge) | 86 | 139 | `0x0CB1008B` | 6.20 s | 0 dB |
+| kame_fire (the beam firing) | 87 | 140 | `0x0CB1008C` | 5.70 s | +1 dB |
+| kame_beamhead (the beam head) | 88 | 141 | `0x0CB1008D` | 3.23 s | -2 dB |
+
+Encoded as Mario's se one-shots: Namco IDSP (DSP-ADPCM, 48000 Hz mono; header loop points 0, DSP loop
+flag 0; nibble count / loop end as the game's), each clip normalised to a -0.5 dBFS peak (Mario's
+special tones peak at ~0 dBFS; their RMS + TONE volume is -12 to -16 dB; these come to -15 / -12 /
+-10.6 dB), the TONE entry a copy of `snd_se_Mario_Special_L01`'s (its group / flags), data 0x20-aligned
+at the end of PACK. PROP / GRP / DTON untouched (the stage bank's 100 added tones play with GRP as
+it was).
+
+Scripts moved from row 2 to row 3249 (same labels): `script/animcmd/body/sound.bin` 190 ids,
+`weapon/fireball/sound.bin` 8, `weapon/pumpwater/sound.bin` 4 (every int param of sound.bin commands,
+the unnamed ones included; other ACMD files hold none), and the fireball's MSC `sys_1E(0x2710,
+0x20037)` (pushInt at 0xE50). MSC pushInts are moved only as a SoundModule call's sound id (after a
+`0x27xx` selector, up to `sys 0x1E`): Supamario's main script's `sys_18(0x2713, ..., 0x20001, ...)`
+attack flags look like row-2 ids and are left alone. Checks: the scripts' bytes differ only in those
+id words (ACMD round trip byte-exact), every moved id maps to the same tone, Mario's row and every other
+row unchanged, the new tones decode at 43-49 dB SNR against the clips.
+
+Left on Mario's ids: the voice banks (`snd_vc_Supamario` 6001 row 94, `_ouen` 6086, the Kirby-copy bank
+2077) and the soundseq file (voice rows only).
+
+Native code playing Mario's se ids: an immediate scan (`lis rN, 2` + `addi`) finds one, the fireball's
+native code at `0x031B1D40` (vtable `+0x54` play, `0x20037` = `snd_se_Mario_Special_N02`, the bounce /
+landing). Supamario's fireball (weapon kind 0x185) runs that code, so without Mario in the match that
+one sound finds no bank 2004 and is silent; ids built at run time from tables weren't searched. Fixes if
+it matters: load the base's se bank for the clone too (as `base_effects_cave.py` does effect banks), or
+a weapon_expand hook rewriting the id for the copied kind.
+
+Only the game can confirm: the bank with id 2144 loading and playing (Supamario's moves' sounds), the
+three new sounds from ACMD (`Sound_Effect` 0x0CB1008B...), the fireball bounce, Mario and Supamario
+together (now separate banks).
+
 ## v1 in game (user) and v2
 
 v1 (Supamario, a copy of Mario): on the character select, loads, plays, stable; effects shown. Then:
