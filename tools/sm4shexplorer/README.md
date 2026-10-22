@@ -1,9 +1,9 @@
-# Sm4shExplorer: faster builds, "Extract vanilla" and "Clean vanilla files"
+# Sm4shExplorer: faster builds, "Extract vanilla", "Clean vanilla files" and "Build to Folder"
 
-`sm4shexplorer-faster.patch` (5 commits) applies to https://github.com/thefungus/Sm4shExplorer
+`sm4shexplorer-faster.patch` (6 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
 (`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster_v5.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+the exe is in `build/sm4shexplorer_faster_v6.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
 plugins are unchanged).
 
 ## Why builds were slow
@@ -108,3 +108,21 @@ icon; Cemu: `ResourceSystem:Reading` on `data/ui/replace/chr/chr_10/packed` with
 portrait folders, set to pack, had theirs in the package). `BuildNewResources` now puts such a file in
 its package (offset 1, as a file set "in package"); files in folders that aren't packages are built
 as before.
+
+## Build to Folder (e.g. a Cemu graphic pack)
+
+Project > **Build to Folder...** builds the mod (packed, like Build) into a folder you pick instead
+of `export/release`. Project > **Build to <folder>** (Ctrl+Alt+B) builds into the last one again.
+The folder is remembered in the project.
+
+- **Layout:** the build goes in the folder's `content/patch`, the same layout as `export/release`.
+  That is what a Cemu graphic pack lays over the game: `Cemu/graphicPacks/<pack>/content/patch/...`.
+- **What's replaced:** only `content/patch` is deleted before building. The rest of the folder
+  (`rules.txt`, other files) is kept. The release build, by contrast, empties its whole folder.
+- **rules.txt:** if the folder has none, Sm4shExplorer offers to write one, so Cemu lists it as a
+  graphic pack for Smash 4. It covers all three regions (title IDs `0005000010144F00`,
+  `0005000010145000`, `0005000010110E00`) and uses rules version 6 (Cemu 1.25 and later). Enable
+  the pack in Cemu's Options > Graphic packs.
+- **Blocked folders:** a folder holding (or inside) the workspace or the game folder is refused,
+  since the build would wipe it.
+- **SD card:** it doesn't offer to copy the build to an SD card afterwards.

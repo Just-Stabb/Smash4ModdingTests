@@ -1,7 +1,7 @@
 From b1e78c462a5886ba1210d0295e12573031ec8020 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 11:13:58 +0000
-Subject: [PATCH 1/5] Faster builds (stored data for untouched package files,
+Subject: [PATCH 1/6] Faster builds (stored data for untouched package files,
  compression cache, parallel compression) and Extract vanilla
 
 ---
@@ -774,7 +774,7 @@ index 9a522af..dc8ff36 100644
 From 2b9de497a2a3cd03e727c453174384cdc370999b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:36:36 +0000
-Subject: [PATCH 2/5] Packing: stream packages to disk, read stored files when
+Subject: [PATCH 2/6] Packing: stream packages to disk, read stored files when
  written, compress in 32 MB batches
 
 ---
@@ -1104,7 +1104,7 @@ index 9eb4f9e..445f418 100644
 From f0542a4ae26924d8a26adfaef1f98773a38c2ff5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:58:24 +0000
-Subject: [PATCH 3/5] Package cache: unchanged packages are copied from
+Subject: [PATCH 3/6] Package cache: unchanged packages are copied from
  cache/packages instead of being rebuilt
 
 ---
@@ -1338,7 +1338,7 @@ index 445f418..0dd3aa3 100644
 From 26656d7ba316786b580e4c802e3cb25131803ea2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Wed, 21 Oct 2026 20:54:10 +0000
-Subject: [PATCH 4/5] Clean vanilla files: move workspace files identical to
+Subject: [PATCH 4/6] Clean vanilla files: move workspace files identical to
  the game's own version out of the workspace
 
 Project > Clean vanilla files from workspace... (or right-click a mod folder / file > Clean vanilla
@@ -1807,7 +1807,7 @@ index d3719f2..2c8c3a0 100644
 From 9345a19b6075362d40553f864c92cf7966f1a1d3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 22 Oct 2026 07:51:50 +0000
-Subject: [PATCH 5/5] New files inside a packaged folder go in the package
+Subject: [PATCH 5/6] New files inside a packaged folder go in the package
 
 A file the game doesn't have, in a folder the game reads as one package (e.g. a new character's
 ui/replace/chr/chr_10 icon), kept offset 0, which made it a package of its own: it was written as a
@@ -1848,6 +1848,281 @@ index 0abf8dd..45b1a0c 100644
  
                  //Checking if part of a pack to repack, if yes, lets process it after with PackageProcessor
                  ResourceItem resPacked = GetPackedPath(resCol, relativePath);
+-- 
+2.43.0
+
+
+From a74f0cb8caa9910c925774774052fe9ad75332c3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 22 Oct 2026 23:42:43 +0000
+Subject: [PATCH 6/6] Build to Folder: build into any folder (e.g. a Cemu
+ graphic pack's content/patch), only content/patch replaced; optional
+ rules.txt
+
+---
+ Sm4shFileExplorer/Objects/Sm4shMod.cs         |  1 +
+ Sm4shFileExplorer/Sm4shProject.cs             | 35 ++++++--
+ Sm4shFileExplorer/UI/Main.Designer.cs         | 23 +++++
+ Sm4shFileExplorer/UI/Main.cs                  | 83 +++++++++++++++++++
+ .../UI/Objects/BackgroundWorkerInstance.cs    |  3 +-
+ 5 files changed, 137 insertions(+), 8 deletions(-)
+
+diff --git a/Sm4shFileExplorer/Objects/Sm4shMod.cs b/Sm4shFileExplorer/Objects/Sm4shMod.cs
+index 1a0694e..5a54e5b 100644
+--- a/Sm4shFileExplorer/Objects/Sm4shMod.cs
++++ b/Sm4shFileExplorer/Objects/Sm4shMod.cs
+@@ -20,6 +20,7 @@ public class Sm4shMod
+         public bool ExportCSVIgnorePackOffsets { get; set; }
+         public bool ExportCSVIgnoreCompSize { get; set; }
+         public bool ExportWithDateFolder { get; set; }
++        public string BuildTargetFolder { get; set; } //Project > Build to Folder: the last folder built into (e.g. a Cemu graphic pack)
+ 
+         public List<Sm4shModItem> UnlocalizationItems { get; set; }
+         public List<Sm4shModItem> ResourcesToRemove { get; set; }
+diff --git a/Sm4shFileExplorer/Sm4shProject.cs b/Sm4shFileExplorer/Sm4shProject.cs
+index 45b1a0c..00162ef 100644
+--- a/Sm4shFileExplorer/Sm4shProject.cs
++++ b/Sm4shFileExplorer/Sm4shProject.cs
+@@ -937,26 +937,47 @@ internal string RebuildRFAndPatchlist()
+         }
+ 
+         internal string RebuildRFAndPatchlist(bool packing)
++        {
++            return RebuildRFAndPatchlist(packing, null);
++        }
++
++        /// <summary>
++        /// Builds the mod (packed when packing). targetFolder: null = export/release (or debug), whose old
++        /// contents are deleted first; else that folder (e.g. a Cemu graphic pack): the build goes in its
++        /// content/patch, and only content/patch is deleted first, so the rest of the folder (rules.txt, ...) stays.
++        /// </summary>
++        internal string RebuildRFAndPatchlist(bool packing, string targetFolder)
+         {
+             LogHelper.Info("----------------------------------------------------------------");
+-            LogHelper.Info(string.Format("Commencing build ({0})...", (packing ? "release" : "debug")));
++            LogHelper.Info(string.Format("Commencing build ({0})...", targetFolder != null ? "into " + targetFolder : (packing ? "release" : "debug")));
+ 
+-            string exportFolder = PathHelper.FolderExport + (packing ? "release" : "debug") + Path.DirectorySeparatorChar + (_CurrentProject.ExportWithDateFolder ? string.Format("{0:yyyyMMdd-HHmmss}", DateTime.Now) + Path.DirectorySeparatorChar : string.Empty);
++            string exportFolder;
++            string cleanFolder;
++            if (targetFolder != null)
++            {
++                exportFolder = targetFolder.TrimEnd(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }) + Path.DirectorySeparatorChar;
++                cleanFolder = exportFolder + "content" + Path.DirectorySeparatorChar + "patch" + Path.DirectorySeparatorChar;
++            }
++            else
++            {
++                exportFolder = PathHelper.FolderExport + (packing ? "release" : "debug") + Path.DirectorySeparatorChar + (_CurrentProject.ExportWithDateFolder ? string.Format("{0:yyyyMMdd-HHmmss}", DateTime.Now) + Path.DirectorySeparatorChar : string.Empty);
++                cleanFolder = exportFolder;
++            }
+ 
+             bool deleted = true;
+-            if (Directory.Exists(exportFolder))
++            if (Directory.Exists(cleanFolder))
+             {
+-                foreach (string folder in Directory.GetDirectories(exportFolder))
++                foreach (string folder in Directory.GetDirectories(cleanFolder))
+                     if (!IOHelper.DeleteDirectory(folder))
+                         deleted = false;
+-                foreach (string file in Directory.GetFiles(exportFolder))
++                foreach (string file in Directory.GetFiles(cleanFolder))
+                     if (!IOHelper.DeleteFile(file))
+                         deleted = false;
+             }
+ 
+             if (!deleted)
+             {
+-                LogHelper.Error(string.Format("Error deleting '{0}', please delete it manually before attempting to build again.", exportFolder));
++                LogHelper.Error(string.Format("Error deleting '{0}', please delete it manually before attempting to build again.", cleanFolder));
+                 return string.Empty;
+             }
+ 
+@@ -1028,7 +1049,7 @@ internal string RebuildRFAndPatchlist(bool packing)
+             foreach (Sm4shBasePlugin plugin in _Plugins)
+                 plugin.InternalNewModBuilt(exportFolder);
+ 
+-            LogHelper.Info(string.Format("Build completed ({0})", (packing ? "release" : "debug")));
++            LogHelper.Info(string.Format("Build completed ({0})", targetFolder != null ? exportFolder : (packing ? "release" : "debug")));
+             LogHelper.Info("----------------------------------------------------------------");
+ 
+             return exportFolder;
+diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
+index e899272..51d4a6a 100644
+--- a/Sm4shFileExplorer/UI/Main.Designer.cs
++++ b/Sm4shFileExplorer/UI/Main.Designer.cs
+@@ -34,6 +34,8 @@ private void InitializeComponent()
+             this.menuProject = new System.Windows.Forms.ToolStripMenuItem();
+             this.menuBuild = new System.Windows.Forms.ToolStripMenuItem();
+             this.menuBuildDebug = new System.Windows.Forms.ToolStripMenuItem();
++            this.menuBuildToFolder = new System.Windows.Forms.ToolStripMenuItem();
++            this.menuBuildToLastFolder = new System.Windows.Forms.ToolStripMenuItem();
+             this.sendToSDToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+             this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
+             this.refreshTreeviewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+@@ -121,6 +123,8 @@ private void InitializeComponent()
+             this.menuProject.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+             this.menuBuild,
+             this.menuBuildDebug,
++            this.menuBuildToFolder,
++            this.menuBuildToLastFolder,
+             this.sendToSDToolStripMenuItem,
+             this.toolStripSeparator3,
+             this.refreshTreeviewToolStripMenuItem,
+@@ -150,6 +154,23 @@ private void InitializeComponent()
+             this.menuBuildDebug.Text = "Build (no packaging)";
+             this.menuBuildDebug.Click += new System.EventHandler(this.menuBuildDebug_Click);
+             // 
++            // menuBuildToFolder
++            // 
++            this.menuBuildToFolder.Name = "menuBuildToFolder";
++            this.menuBuildToFolder.Size = new System.Drawing.Size(299, 22);
++            this.menuBuildToFolder.Text = "Build to Folder...";
++            this.menuBuildToFolder.ToolTipText = "Build into a folder of your choice, e.g. a Cemu graphic pack (the mod goes in its content\\patch)";
++            this.menuBuildToFolder.Click += new System.EventHandler(this.menuBuildToFolder_Click);
++            // 
++            // menuBuildToLastFolder
++            // 
++            this.menuBuildToLastFolder.Name = "menuBuildToLastFolder";
++            this.menuBuildToLastFolder.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Alt) 
++            | System.Windows.Forms.Keys.B)));
++            this.menuBuildToLastFolder.Size = new System.Drawing.Size(299, 22);
++            this.menuBuildToLastFolder.Text = "Build to Last Folder";
++            this.menuBuildToLastFolder.Click += new System.EventHandler(this.menuBuildToLastFolder_Click);
++            // 
+             // sendToSDToolStripMenuItem
+             // 
+             this.sendToSDToolStripMenuItem.Name = "sendToSDToolStripMenuItem";
+@@ -690,6 +711,8 @@ private void InitializeComponent()
+         private System.Windows.Forms.ToolStripMenuItem aboutSm4shExplorerToolStripMenuItem;
+         private System.Windows.Forms.ToolStripMenuItem removeUnlocalizeToolStripMenuItem;
+         private System.Windows.Forms.ToolStripMenuItem menuBuildDebug;
++        private System.Windows.Forms.ToolStripMenuItem menuBuildToFolder;
++        private System.Windows.Forms.ToolStripMenuItem menuBuildToLastFolder;
+         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
+         private System.Windows.Forms.ToolStripMenuItem refreshTreeviewToolStripMenuItem;
+         private System.Windows.Forms.ToolStripMenuItem directoriesToolStripMenuItem;
+diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
+index 22eaa3a..62a9895 100644
+--- a/Sm4shFileExplorer/UI/Main.cs
++++ b/Sm4shFileExplorer/UI/Main.cs
+@@ -436,6 +436,83 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
+             backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.BuildProject, false));
+         }
+ 
++        // Project > Build to Folder: build into any folder, e.g. a Cemu graphic pack
++        // (graphicPacks\<pack>: the build goes in its content\patch, which Cemu lays over the game's).
++        // Only content\patch is replaced; the folder is remembered for Build to Last Folder.
++        private void menuBuildToFolder_Click(object sender, EventArgs e)
++        {
++            string last = _ProjectManager.CurrentProject.BuildTargetFolder;
++            folderBrowserDialog.Description = "Folder to build into (e.g. a Cemu graphic pack: Cemu\\graphicPacks\\<your pack>). "
++                + "The mod goes in its content\\patch; the rest of the folder is kept.";
++            folderBrowserDialog.ShowNewFolderButton = true;
++            if (!string.IsNullOrEmpty(last) && Directory.Exists(last))
++                folderBrowserDialog.SelectedPath = last;
++            if (folderBrowserDialog.ShowDialog(this) != DialogResult.OK || string.IsNullOrEmpty(folderBrowserDialog.SelectedPath))
++                return;
++            BuildToFolder(folderBrowserDialog.SelectedPath, true);
++        }
++
++        private void menuBuildToLastFolder_Click(object sender, EventArgs e)
++        {
++            string last = _ProjectManager.CurrentProject.BuildTargetFolder;
++            if (string.IsNullOrEmpty(last) || !Directory.Exists(last))
++            {
++                menuBuildToFolder_Click(sender, e);
++                return;
++            }
++            BuildToFolder(last, false);
++        }
++
++        private void BuildToFolder(string folder, bool ask)
++        {
++            folder = folder.TrimEnd(new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
++            string patchFolder = Path.Combine(Path.Combine(folder, "content"), "patch");
++            // building into the workspace or the game would wipe it
++            foreach (string own in new string[] { PathHelper.FolderWorkplace, _ProjectManager.CurrentProject.GamePath })
++            {
++                if (string.IsNullOrEmpty(own))
++                    continue;
++                string a = Path.GetFullPath(own).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
++                string b = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
++                if (a.StartsWith(b, StringComparison.OrdinalIgnoreCase) || b.StartsWith(a, StringComparison.OrdinalIgnoreCase))
++                {
++                    MessageBox.Show(string.Format("Pick another folder: '{0}' holds (or is inside) '{1}'.", folder, own), UIStrings.CAPTION_PACK_REBUILD, MessageBoxButtons.OK, MessageBoxIcon.Warning);
++                    return;
++                }
++            }
++            if (ask)
++            {
++                if (Directory.Exists(patchFolder) && MessageBox.Show(string.Format("'{0}' already has a build. Replace it?{1}{1}(Only content\\patch is replaced; the rest of the folder is kept.)", patchFolder, Environment.NewLine),
++                    UIStrings.CAPTION_PACK_REBUILD, MessageBoxButtons.YesNo) != DialogResult.Yes)
++                    return;
++                string rules = Path.Combine(folder, "rules.txt");
++                if (!File.Exists(rules) && MessageBox.Show(string.Format("'{0}' has no rules.txt. Make it a Cemu graphic pack (adds a rules.txt for Smash 4, all regions)?{1}{1}"
++                    + "Put the folder in Cemu's graphicPacks folder (or pick a folder there) and enable it in Options > Graphic packs.", folder, Environment.NewLine),
++                    "Cemu graphic pack", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
++                    WriteCemuRules(rules, Path.GetFileName(folder));
++            }
++            _ProjectManager.CurrentProject.BuildTargetFolder = folder;
++            _ProjectManager.SaveProject();
++            menuStrip.Enabled = false;
++            treeView.Enabled = false;
++            backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.BuildProjectToFolder, folder));
++        }
++
++        private static void WriteCemuRules(string path, string name)
++        {
++            // Super Smash Bros. for Wii U: USA / EUR / JPN title IDs. rules.txt version 6 (Cemu 1.25+ / 2.x)
++            string text = string.Join(Environment.NewLine, new string[] {
++                "[Definition]",
++                "titleIds = 0005000010144F00,0005000010145000,0005000010110E00",
++                "name = " + name,
++                "path = \"Super Smash Bros. for Wii U/Mods/" + name + "\"",
++                "description = Built by Sm4shExplorer (content\\patch replaces the game's update files).",
++                "version = 6",
++                "" });
++            File.WriteAllText(path, text);
++            LogHelper.Info(string.Format("Wrote Cemu graphic pack rules: '{0}'", path));
++        }
++
+         private void menuCleanVanilla_Click(object sender, EventArgs e)
+         {
+             StartFindVanillaCopies(null);
+@@ -522,6 +599,9 @@ private void sendToSDToolStripMenuItem_Click(object sender, EventArgs e)
+ 
+         private void menuProject_DropDownOpening(object sender, EventArgs e)
+         {
++            string lastTarget = _ProjectManager.CurrentProject == null ? null : _ProjectManager.CurrentProject.BuildTargetFolder;
++            menuBuildToLastFolder.Enabled = !string.IsNullOrEmpty(lastTarget) && Directory.Exists(lastTarget);
++            menuBuildToLastFolder.Text = menuBuildToLastFolder.Enabled ? "Build to " + lastTarget : "Build to Last Folder";
+             if (!Directory.Exists(PathHelper.FolderExport))
+                 return;
+             sendToSDToolStripMenuItem.DropDownItems.Clear();
+@@ -596,6 +676,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+                 case BackgroundWorkerMode.ProjectLoading:
+                     LoadConfig();
+                     break;
++                case BackgroundWorkerMode.BuildProjectToFolder:
++                    _ProjectManager.RebuildRFAndPatchlist(true, (string)bw.Object);
++                    break;
+                 case BackgroundWorkerMode.BuildProject:
+                     string exportedFolder = _ProjectManager.RebuildRFAndPatchlist((bool)bw.Object);
+                     string sdCardPath = _ProjectManager.GetSDFolder();
+diff --git a/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs b/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
+index 2c8c3a0..663f733 100644
+--- a/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
++++ b/Sm4shFileExplorer/UI/Objects/BackgroundWorkerInstance.cs
+@@ -12,7 +12,8 @@ internal enum BackgroundWorkerMode
+         BuildProject = 1,
+         SendToSD = 2,
+         Extract = 3,
+-        FindVanillaCopies = 4
++        FindVanillaCopies = 4,
++        BuildProjectToFolder = 5
+     }
+ 
+     internal class BackgroundWorkerInstance
 -- 
 2.43.0
 
