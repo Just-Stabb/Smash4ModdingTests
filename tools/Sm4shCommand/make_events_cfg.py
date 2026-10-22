@@ -79,6 +79,8 @@ def main():
         entry = labels.get(crc, {})
         if d == "NONE" and entry.get("_note"):
             d = one_line(entry["_note"])
+        if entry.get("_desc_extra"):                  # e.g. the command's real (hash-verified) name
+            d = one_line(entry["_desc_extra"]) if d == "NONE" else "%s %s" % (d, one_line(entry["_desc_extra"]))
         out += ["", "%08X" % crc, name, f, s, d]
         out += param_lines(entry, [] if s == "NONE" else s.split(","))
     open(DST, "w", newline="\r\n").write("\n".join(out) + "\n")

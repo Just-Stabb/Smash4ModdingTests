@@ -7,7 +7,8 @@ and regenerates what is made from it.
 param_labels.json: {command hash (hex): {"_command": its current name, "_name": a new name (for
 unk_XXXXXXXX commands), "_note": what the command does, "_format": [types, one per parameter: 0 int,
 1 float, 2 decimal, 3 variable] (only where the old types were wrong), "_size": parameter count + 1
-(only where the old size was wrong), "<slot>": {"name", "desc", "values", "evidence",
+(only where the old size was wrong), "_desc_extra": text added to the command's description (its
+real name where the table's is wrong: names are kept, scripts use them), "<slot>": {"name", "desc", "values", "evidence",
 "confidence": high | medium | low}}}.
 
 Writes:
@@ -113,7 +114,8 @@ def main():
     print('%d table edits for %d commands' % (changes, len(labels)))
     if check:
         return
-    open(CMD_INFO, 'w', encoding='utf-8-sig', newline='\r\n').write(text.replace('\r\n', '\n'))
+    crlf = b'\r\n' in open(CMD_INFO, 'rb').read(4096)             # keep the file's line endings
+    open(CMD_INFO, 'w', encoding='utf-8-sig', newline='\r\n' if crlf else '\n').write(text.replace('\r\n', '\n'))
     names, syntax, fmt, sizes = (table(text, n) for n in ('CMD_NAMES', 'PARAM_SYNTAX', 'PARAM_FORMAT', 'CMD_SIZES'))
     cmds = {}
     for crc, name in names.items():
@@ -125,7 +127,7 @@ def main():
             'syntax': s.split(',') if s and s != 'NONE' else []}
     json.dump({'_source': 'Generated from SALT (Sammi Husky, MIT license) Scripting/AnimCMD/CMD_INFO.cs, '
                'with tools/Sm4shCommand/param_labels.json applied', 'commands': cmds},
-              open(ACMD_INFO, 'w'), indent=1)
+              open(ACMD_INFO, 'w'), indent=0)
     subprocess.run([sys.executable, os.path.join(HERE, 'make_events_cfg.py')], check=True)
 
 

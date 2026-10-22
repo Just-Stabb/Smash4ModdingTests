@@ -1,5 +1,5 @@
 {
-"_source": "Generated from SALT (Sammi Husky, MIT license) Scripting/AnimCMD/CMD_INFO.cs",
+"_source": "Generated from SALT (Sammi Husky, MIT license) Scripting/AnimCMD/CMD_INFO.cs, with tools/Sm4shCommand/param_labels.json applied",
 "commands": {
 "99CF7BE6": {
 "size": 1,
@@ -34,9 +34,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z"
 ]
 },
 "F1FBEFEE": {
@@ -56,11 +56,11 @@
 "name": "ADD_SPEED_NO_LIMIT",
 "format": [
 0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown"
+"SpeedX",
+"SpeedY"
 ]
 },
 "6F4AACA8": {
@@ -70,6 +70,13 @@
 0,
 0,
 0,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -79,42 +86,35 @@
 0,
 0,
 0,
+1,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Texture",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
+"Graphic",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"TrailMode",
+"Axis",
+"Unused"
 ]
 },
 "E07CF8BB": {
@@ -146,29 +146,29 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"TextureWork",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
+"GraphicWork",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"TrailMode",
+"Axis",
+"Unused"
 ]
 },
 "D7F6CBCD": {
@@ -203,18 +203,18 @@
 0
 ],
 "syntax": [
-"Color",
-"unknown",
+"Texture1",
+"Texture2",
 "BlurLength",
 "Bone1",
-"X",
-"Y",
-"Z",
+"X1",
+"Y1",
+"Z1",
 "Bone2",
-"X",
-"Y",
-"Z",
-"Anchored",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
 "Graphic",
 "Bone3",
 "X",
@@ -224,11 +224,11 @@
 "RotY",
 "RotZ",
 "Size",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"TrailMode",
+"Axis",
+"Unused",
+"BlendMode",
+"Shader"
 ]
 },
 "11097635": {
@@ -263,43 +263,49 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Texture1",
+"Texture2",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
+"GraphicWork",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"TrailMode",
+"Axis",
+"Unused",
+"BlendMode",
+"Shader"
 ]
 },
 "73E2040C": {
 "size": 28,
-"name": "unk_73E2040C",
+"name": "AFTER_IMAGE_27_arg_sword_trail_form",
 "format": [
 0,
 0,
 0,
 0,
 0,
+1,
+1,
+0,
+0,
+1,
+1,
 0,
 0,
 0,
@@ -309,13 +315,7 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
 0,
 0,
 0,
@@ -324,33 +324,33 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"TrailEffect",
+"TrailEffect2",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Anchored",
+"Effect",
+"Bone3",
+"Ex",
+"Ey",
+"Ez",
+"Erx",
+"Ery",
+"Erz",
+"Size",
+"Unk21",
+"Unk22",
+"Unk23",
+"Unk24",
+"Unk25",
+"Extra"
 ]
 },
 "F707ECF8": {
@@ -362,6 +362,11 @@
 0,
 0,
 0,
+1,
+0,
+0,
+0,
+1,
 0,
 0,
 0,
@@ -372,12 +377,7 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
 0,
 0,
 0,
@@ -385,59 +385,59 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Texture1Work",
+"Texture2Work",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
+"GraphicWork",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"TrailMode",
+"Axis",
+"Unused",
+"BlendMode",
+"Shader"
 ]
 },
 "2953BFDE": {
 "size": 28,
-"name": "unk_2953BFDE",
+"name": "Sword_Glow2",
 "format": [
 0,
 0,
 0,
 0,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -446,33 +446,33 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Color",
+"Unknown1",
+"BlurLength",
+"Bone1",
+"X",
+"Y",
+"Z",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Anchored",
+"Graphic",
+"Bone3",
+"X3",
+"Y3",
+"Z3",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"Unknown21",
+"Unknown22",
+"Unknown23",
+"Unknown24",
+"Unknown25",
+"Unknown26"
 ]
 },
 "6539137D": {
@@ -490,7 +490,7 @@
 "name": "Sword_Trace",
 "format": [
 0,
-1,
+0,
 0,
 1,
 1,
@@ -518,15 +518,15 @@
 "Y",
 "Z",
 "Bone2",
-"X",
-"Y",
-"Z",
+"X2",
+"Y2",
+"Z2",
 "Anchored",
 "Graphic",
 "Bone3",
-"X",
-"Y",
-"Z",
+"X3",
+"Y3",
+"Z3",
 "RotX",
 "RotY",
 "RotZ",
@@ -559,26 +559,26 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"TextureWork",
+"BlurLength",
+"Bone1",
+"X1",
+"Y1",
+"Z1",
+"Bone2",
+"X2",
+"Y2",
+"Z2",
+"Terminate",
+"GraphicWork",
+"Bone3",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size"
 ]
 },
 "79380B43": {
@@ -586,25 +586,25 @@
 "name": "AREA_WIND_2ND",
 "format": [
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"AreaID",
+"Speed",
+"Angle",
+"Unknown3",
+"Unknown4",
+"X",
+"Y",
+"Width",
+"Height"
 ]
 },
 "FE73ACAA": {
@@ -616,19 +616,19 @@
 1,
 1,
 1,
-0,
+1,
 1,
 1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"AreaID",
+"Speed",
+"Decay",
+"Unknown3",
+"Unknown4",
+"X",
+"Y",
+"Radius"
 ]
 },
 "3C95CD87": {
@@ -646,15 +646,15 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"AreaIndex",
+"Speed",
+"RadialUnk",
+"Duration",
+"Rate",
+"X",
+"Y",
+"Radius",
+"Unk"
 ]
 },
 "14C10D92": {
@@ -673,16 +673,16 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"AreaIndex",
+"Speed",
+"Angle",
+"Duration",
+"Rate",
+"X",
+"Y",
+"Width",
+"Height",
+"Unk"
 ]
 },
 "D5D67F56": {
@@ -692,7 +692,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AreaIndex"
 ]
 },
 "7698BB42": {
@@ -734,11 +734,11 @@
 0
 ],
 "syntax": [
-"ID",
+"Kind",
 "Bone",
-"Unknown",
-"Unknown",
-"Unknown"
+"TargetObjectVar",
+"TargetHitGroup",
+"TargetHitNoVar"
 ]
 },
 "A3A28BE3": {
@@ -752,11 +752,11 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Kind",
+"Bone",
+"TargetType",
+"Group",
+"NoType"
 ]
 },
 "D7645E49": {
@@ -770,11 +770,11 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Kind",
+"Bone",
+"TargetVar",
+"Group",
+"No"
 ]
 },
 "BAB9BAA2": {
@@ -788,11 +788,11 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Kind",
+"Bone",
+"TargetVar",
+"Group",
+"NoType"
 ]
 },
 "CDBE8A34": {
@@ -806,11 +806,11 @@
 0
 ],
 "syntax": [
-"ID",
+"Kind",
 "Bone",
-"Unknown",
-"Unknown",
-"Unknown"
+"TargetObjectVar",
+"TargetHitGroupVar",
+"TargetHitNoVar"
 ]
 },
 "E634F701": {
@@ -820,7 +820,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"HitboxID"
 ]
 },
 "CC26B487": {
@@ -831,8 +831,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"HitboxID1",
+"HitboxID2"
 ]
 },
 "7A128321": {
@@ -842,7 +842,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"RatioVar"
 ]
 },
 "1AFDA8E6": {
@@ -870,7 +870,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "8B925A6C": {
@@ -880,7 +880,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "DD526C98": {
@@ -891,8 +891,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"HitboxId",
+"Value"
 ]
 },
 "DFA4517A": {
@@ -915,28 +915,28 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"HitboxID",
+"IntVar"
 ]
 },
 "C735C806": {
 "size": 2,
 "name": "ATK_POWER_MUL",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Multiplier"
 ]
 },
 "6EFB0DB3": {
 "size": 2,
 "name": "ATK_POWER_MUL_STATUS",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Multiplier"
 ]
 },
 "AC811479": {
@@ -947,8 +947,8 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown"
+"Bone",
+"Axis"
 ]
 },
 "A1B6E607": {
@@ -988,7 +988,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Sleep"
 ]
 },
 "B0777995": {
@@ -999,8 +999,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"HitboxID",
+"Flag"
 ]
 },
 "B738EABD": {
@@ -1039,7 +1039,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1053,7 +1053,7 @@
 "Rebound",
 "ShieldDamage",
 "SFXLevel",
-"SFX",
+"SFXType",
 "Ground/Air",
 "Direct/Indirect",
 "Type"
@@ -1071,7 +1071,7 @@
 0,
 0,
 0,
-0,
+1,
 1,
 1,
 0,
@@ -1082,22 +1082,22 @@
 0
 ],
 "syntax": [
-"ID",
-"Bone",
+"Kind",
+"Part",
 "Damage",
 "Angle",
 "KBG",
 "WBKB",
 "BKB",
 "Effect",
-"Unknown",
-"Hitlag",
-"Unknown",
+"Trip",
+"HitlagMult",
+"SDIMult",
 "SFXLevel",
 "SFXType",
 "FacingRestriction",
 "DisableHitlag",
-"Unknown",
+"NoReaction",
 "Type"
 ]
 },
@@ -1111,11 +1111,11 @@
 1,
 0,
 0,
-1,
 0,
-1,
 0,
-1,
+0,
+0,
+0,
 0,
 1,
 1,
@@ -1130,8 +1130,8 @@
 0
 ],
 "syntax": [
-"ID",
-"Bone",
+"Kind",
+"Part",
 "Damage",
 "Damage2",
 "Angle",
@@ -1141,18 +1141,18 @@
 "WBKB2",
 "BKB",
 "BKB2",
-"Effect?",
-"Unknown",
-"Hitlag",
-"Unknown",
+"Effect",
+"Trip",
+"HitlagMult",
+"SDIMult",
 "SFXLevel",
 "SFXType",
 "FacingRestriction",
 "DisableHitlag",
+"NoReaction",
 "Type",
-"Unknown",
-"Unknown",
-"Unknown"
+"IntensityVar",
+"Unk50"
 ]
 },
 "2988D50F": {
@@ -1194,7 +1194,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1256,7 +1256,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1332,7 +1332,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1351,22 +1351,22 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
 "Flinchless",
-"StretchToggle"
+"Shape"
 ]
 },
 "7640AEEB": {
@@ -1419,10 +1419,10 @@
 "ID",
 "Part",
 "Bone",
-"Damage",
+"DamageWorkInt",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1441,22 +1441,22 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
 "Flinchless",
-"StretchToggle"
+"Shape"
 ]
 },
 "7075DC5A": {
@@ -1514,7 +1514,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -1533,17 +1533,17 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
@@ -1560,6 +1560,19 @@
 0,
 0,
 0,
+1,
+0,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+0,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -1585,66 +1598,53 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"FKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"HitAllStates",
+"FacingRestrict",
+"NoGrabRelease",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"Shape",
+"X2",
+"Y2"
 ]
 },
 "3DF66202": {
@@ -1710,8 +1710,8 @@
 "Angle",
 "KBG",
 "KBG2",
-"WBKB",
-"WBKB2",
+"FKB",
+"FKB2",
 "BKB",
 "BKB2",
 "Size",
@@ -1732,17 +1732,17 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
@@ -1750,7 +1750,7 @@
 "X2",
 "Y2",
 "Z2",
-"Unknown"
+"IntensityWorkFloat"
 ]
 },
 "97E2CEAA": {
@@ -1760,19 +1760,19 @@
 0,
 0,
 0,
+1,
 0,
 0,
 0,
 0,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -1800,47 +1800,47 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"FKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"HitAllStates",
+"FacingRestrict",
+"NoGrabRelease",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"Shape"
 ]
 },
 "BD04BDC3": {
@@ -1850,19 +1850,19 @@
 0,
 0,
 0,
+1,
 0,
 0,
 0,
 0,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -1890,47 +1890,47 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"FKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"HitAllStates",
+"FacingRestrict",
+"NoGrabRelease",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"Shape"
 ]
 },
 "C93DA32A": {
@@ -1986,7 +1986,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -2005,22 +2005,22 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
 "Flinchless",
-"StretchToggle"
+"Shape"
 ]
 },
 "126AB61D": {
@@ -2072,6 +2072,7 @@
 0,
 0,
 0,
+0,
 0
 ],
 "syntax": [
@@ -2083,8 +2084,8 @@
 "Angle",
 "KBG",
 "KBG2",
-"WBKB",
-"WBKB2",
+"FKB",
+"FKB2",
 "BKB",
 "BKB2",
 "Size",
@@ -2105,22 +2106,23 @@
 "Direct/Indirect",
 "Type",
 "HitBits",
-"Unknown",
-"Unknown",
-"Unknown",
-"Blockability",
+"Unk41",
+"CollisionPart",
+"NoScale",
+"Shieldable",
 "Reflectable",
 "Absorbable",
 "Rehit",
 "IgnoreInvuln",
-"Unknown",
+"HitAllStates",
 "FacingRestrict",
-"Unknown",
+"NoGrabRelease",
 "TeamDamage",
 "DisableHitlag",
 "NoGFX",
 "Flinchless",
-"Unknown"
+"Shape",
+"IntensityWorkFloat"
 ]
 },
 "CC7CC705": {
@@ -2159,7 +2161,7 @@
 "Damage",
 "Angle",
 "KBG",
-"WBKB",
+"FKB",
 "BKB",
 "Size",
 "X",
@@ -2176,8 +2178,7 @@
 "SFXType",
 "Ground/Air",
 "Direct/Indirect",
-"Type",
-"HitBits"
+"Type"
 ]
 },
 "DBDDC840": {
@@ -2187,19 +2188,19 @@
 0,
 0,
 0,
+1,
 0,
 0,
 0,
 0,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -2210,30 +2211,30 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"FKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type"
 ]
 },
 "4E94C51B": {
@@ -2250,8 +2251,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"ID",
+"Level"
 ]
 },
 "7D1058C3": {
@@ -2261,7 +2262,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Part"
 ]
 },
 "7F55AAA2": {
@@ -2271,7 +2272,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Part"
 ]
 },
 "D41DF827": {
@@ -2281,7 +2282,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Part"
 ]
 },
 "B09F03B2": {
@@ -2292,8 +2293,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"HitboxId",
+"Flag"
 ]
 },
 "37CA2121": {
@@ -2303,7 +2304,7 @@
 1
 ],
 "syntax": [
-"Unknown"
+"Value"
 ]
 },
 "83197B9A": {
@@ -2391,19 +2392,19 @@
 0
 ],
 "syntax": [
-"unknown"
+"Mode"
 ]
 },
 "20DB2106": {
 "size": 3,
 "name": "CAM_OFFSET",
 "format": [
-0,
+1,
 1
 ],
 "syntax": [
-"unknown",
-"unknown"
+"OffsetX",
+"OffsetY"
 ]
 },
 "89CE242B": {
@@ -2435,7 +2436,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Frames"
 ]
 },
 "F0EF4C5F": {
@@ -2455,17 +2456,17 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Frames",
+"Unknown1",
+"ZoomRate",
+"X",
+"Y",
+"Unknown5",
+"Unknown6",
+"Distance",
+"Flag",
+"Variable",
+"Unknown10"
 ]
 },
 "E940DCC2": {
@@ -2480,7 +2481,7 @@
 ],
 "syntax": [
 "ZoomTime",
-"Unknown",
+"Arg1",
 "Distance",
 "XRot",
 "YRot"
@@ -2488,22 +2489,22 @@
 },
 "70498D78": {
 "size": 7,
-"name": "unk_70498D78",
+"name": "CAM_ZOOM_IN_6_arg_form",
 "format": [
 0,
 0,
-0,
-0,
-0,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Frames",
+"Arg1",
+"Distance",
+"RotX",
+"RotY",
+"Flag"
 ]
 },
 "86EB40DD": {
@@ -2546,16 +2547,16 @@
 0
 ],
 "syntax": [
-"Part",
+"ID",
 "Bone",
 "Size",
 "X",
 "Y",
 "Z",
-"HitBits",
-"Air/Ground",
-"unknown",
-"unknown"
+"TargetStatus",
+"SituationMask",
+"HitStatusExclude",
+"Flag26"
 ]
 },
 "B0AF39A6": {
@@ -2577,7 +2578,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Energy"
 ]
 },
 "692BBCFA": {
@@ -2599,7 +2600,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Priority"
 ]
 },
 "F45595A1": {
@@ -2657,7 +2658,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "D741B7F5": {
@@ -2702,7 +2703,7 @@
 0,
 0,
 0,
-0,
+1,
 0,
 0,
 0,
@@ -2712,22 +2713,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "EE1BAF5F": {
@@ -2754,24 +2755,24 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"FlipType"
 ]
 },
 "7B105723": {
@@ -2852,6 +2853,48 @@
 1,
 1,
 0,
+1
+],
+"syntax": [
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"Alpha"
+]
+},
+"D8D9A901": {
+"size": 18,
+"name": "EFFECT_ATTR",
+"format": [
+0,
+0,
+1,
+1,
+0,
+0,
+0,
+0,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0,
 0
 ],
 "syntax": [
@@ -2871,49 +2914,7 @@
 "RandomYRot",
 "RandomZRot",
 "Terminate",
-"Unknown"
-]
-},
-"D8D9A901": {
-"size": 18,
-"name": "EFFECT_ATTR",
-"format": [
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
-],
-"syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Attribute"
 ]
 },
 "30392B40": {
@@ -2925,9 +2926,9 @@
 1,
 1,
 1,
-0,
-0,
-0,
+1,
+1,
+1,
 1,
 1,
 1,
@@ -2943,23 +2944,23 @@
 "syntax": [
 "Graphic",
 "Bone",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"Red",
+"Green",
+"Blue"
 ]
 },
 "E3C26DB5": {
@@ -2969,12 +2970,12 @@
 0,
 0,
 0,
+1,
 0,
 0,
 0,
 0,
-0,
-0,
+1,
 0,
 0,
 0,
@@ -2987,25 +2988,25 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"RedWork",
+"GreenWork",
+"BlueWork"
 ]
 },
 "C81F667E": {
@@ -3018,10 +3019,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"Size",
+"Terminate"
 ]
 },
 "6F2F2212": {
@@ -3031,7 +3032,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Slot"
 ]
 },
 "29BC5960": {
@@ -3043,7 +3044,7 @@
 ],
 "syntax": [
 "Graphic",
-"unknown"
+"EndFadeFrames"
 ]
 },
 "9FCB5AD5": {
@@ -3054,8 +3055,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"GraphicWork",
+"EndFadeFrames"
 ]
 },
 "46596E40": {
@@ -3077,29 +3078,29 @@
 1,
 1,
 1,
-0,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"FlipType"
 ]
 },
 "46C4655C": {
@@ -3143,9 +3144,9 @@
 "RandomXRot",
 "RandomYRot",
 "RandomZRot",
-"unknown",
-"unknown",
-"unknown"
+"Terminate",
+"FlipType",
+"Alpha"
 ]
 },
 "F07214DF": {
@@ -3191,10 +3192,11 @@
 "RandomXRot",
 "RandomYRot",
 "RandomZRot",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Terminate",
+"FlipType",
+"Red",
+"Green",
+"Blue"
 ]
 },
 "089EBF6C": {
@@ -3227,35 +3229,35 @@
 },
 "51BF42D5": {
 "size": 11,
-"name": "unk_51BF42D5",
+"name": "EFFECT_FLW_POS_NO_STOP",
 "format": [
 0,
 0,
 0,
+1,
 0,
 0,
 0,
-0,
-0,
-0,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate"
 ]
 },
 "D98926B9": {
 "size": 11,
-"name": "unk_D98926B9",
+"name": "EFFECT_FLW_POS_STR",
 "format": [
 0,
 0,
@@ -3269,21 +3271,21 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate"
 ]
 },
 "D86F0143": {
 "size": 13,
-"name": "unk_D86F0143",
+"name": "EFFECT_FLW_POS_STRENGTH",
 "format": [
 0,
 0,
@@ -3299,74 +3301,74 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Strength",
+"Terminate",
+"Rate"
 ]
 },
 "524EF3F5": {
 "size": 11,
-"name": "unk_524EF3F5",
+"name": "EFFECT_FLW_POS_UNSYNC_VIS",
 "format": [
 0,
 0,
+1,
+1,
+1,
 0,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate"
 ]
 },
 "D4FC6AC3": {
 "size": 11,
-"name": "unk_D4FC6AC3",
+"name": "EFFECT_FLW_UNSYNC_VIS",
 "format": [
 0,
 0,
+1,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate"
 ]
 },
 "FC061097": {
@@ -3411,7 +3413,7 @@
 1,
 1,
 0,
-0
+1
 ],
 "syntax": [
 "Graphic",
@@ -3424,7 +3426,7 @@
 "ZRot",
 "Size",
 "Terminate",
-"Unknown"
+"Alpha"
 ]
 },
 "E20C02D4": {
@@ -3433,32 +3435,32 @@
 "format": [
 0,
 0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"Red",
+"Green",
+"Blue"
 ]
 },
 "7EF50766": {
@@ -3468,13 +3470,13 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
@@ -3490,7 +3492,7 @@
 "ZRot",
 "Size",
 "Terminate",
-"unknown"
+"FlipType"
 ]
 },
 "2ED684DE": {
@@ -3500,31 +3502,31 @@
 0,
 0,
 0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"FlipType",
+"Alpha"
 ]
 },
 "9860F55D": {
@@ -3534,35 +3536,35 @@
 0,
 0,
 0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"FlipType",
+"Red",
+"Green",
+"Blue"
 ]
 },
 "072D2AAD": {
@@ -3573,74 +3575,74 @@
 0,
 0,
 0,
+1,
 0,
 0,
+1,
 0,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"FlipType"
 ]
 },
 "9E3105F2": {
 "size": 14,
-"name": "unk_9E3105F2",
+"name": "EFFECT_FOLLOW_FLIP_work_form",
 "format": [
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"EffectR",
+"EffectL",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate",
+"Arg11",
+"WorkVar"
 ]
 },
 "00559051": {
@@ -3650,33 +3652,33 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"Unknown2",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"Unknown10",
+"Unknown11",
+"Unknown12",
+"ValueType"
 ]
 },
 "EF4016CA": {
@@ -3685,40 +3687,40 @@
 "format": [
 0,
 0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"Red",
+"Green",
+"Blue",
+"LightIntensity",
+"LightX",
+"LightY",
+"LightZ"
 ]
 },
 "0EDC8BFD": {
@@ -3756,29 +3758,29 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"FlipType"
 ]
 },
 "99CC9AF2": {
@@ -3797,16 +3799,16 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
 ]
 },
 "D5FC182B": {
@@ -3816,61 +3818,61 @@
 0,
 0,
 0,
+1,
+1,
 0,
+1,
 0,
-0,
-0,
-0,
-0,
+1,
 0,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"GraphicOffset",
+"MaterialAnim",
+"HandleWork"
 ]
 },
 "FA435729": {
 "size": 12,
-"name": "unk_FA435729",
+"name": "EFFECT_FOLLOW_NO_STOP_work_form",
 "format": [
 0,
 0,
 0,
+1,
 0,
 0,
 0,
 0,
-0,
-0,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate",
+"WorkVar"
 ]
 },
 "1CB9BEE8": {
@@ -3920,37 +3922,37 @@
 0,
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GraphicWork",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "59829B55": {
@@ -3969,16 +3971,16 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"BoneNameHash",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
 ]
 },
 "ED85CA70": {
@@ -3999,18 +4001,18 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Strength",
+"Terminate",
+"SizePerStrength"
 ]
 },
 "4261788B": {
@@ -4020,27 +4022,27 @@
 0,
 0,
 0,
+1,
+1,
 0,
 0,
 0,
-0,
-0,
-0,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"ParentHandleWork"
 ]
 },
 "FC4BE069": {
@@ -4050,25 +4052,25 @@
 0,
 0,
 0,
+1,
 0,
 0,
+1,
 0,
-0,
-0,
-0,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate"
 ]
 },
 "1D9C1ECE": {
@@ -4088,17 +4090,17 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Terminate",
+"HandleWork"
 ]
 },
 "B7458BB3": {
@@ -4117,7 +4119,7 @@
 0
 ],
 "syntax": [
-"Graphic",
+"GraphicWork",
 "Bone",
 "X",
 "Y",
@@ -4126,42 +4128,42 @@
 "YRot",
 "ZRot",
 "Size",
-"unknown"
+"Terminate"
 ]
 },
 "0A539357": {
 "size": 12,
-"name": "unk_0A539357",
+"name": "EFFECT_FOLLOW_VARIATION",
 "format": [
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Size",
+"Terminate",
+"VariationVar"
 ]
 },
 "935AC2ED": {
 "size": 13,
-"name": "unk_935AC2ED",
+"name": "EFFECT_FOLLOW_value_form",
 "format": [
 0,
 0,
@@ -4171,24 +4173,24 @@
 0,
 0,
 0,
-0,
+1,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"Scale",
+"Terminate",
+"Arg10",
+"ValueSrc"
 ]
 },
 "7C37DF64": {
@@ -4196,23 +4198,23 @@
 "name": "EFFECT_GLOBAL",
 "format": [
 0,
+1,
+1,
 0,
 0,
 0,
 0,
-0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size"
 ]
 },
 "CF86D9CB": {
@@ -4229,14 +4231,14 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size"
 ]
 },
 "3D753F5E": {
@@ -4251,6 +4253,7 @@
 0,
 0,
 0,
+1,
 0,
 0,
 0,
@@ -4259,38 +4262,37 @@
 0,
 0,
 0,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"Red",
+"Green",
+"Blue",
+"LightIntensity",
+"LightX",
+"LightY",
+"LightZ"
 ]
 },
 "D5F5735F": {
@@ -4301,8 +4303,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"FadeFrames",
+"AttrMask"
 ]
 },
 "5A3B874D": {
@@ -4313,8 +4315,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"AttrMask",
+"KillParticles"
 ]
 },
 "CC635654": {
@@ -4333,8 +4335,8 @@
 ],
 "syntax": [
 "Graphic",
-"unknown",
-"unknown"
+"KillParticles",
+"KillImmediately"
 ]
 },
 "89D3AD87": {
@@ -4346,9 +4348,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"GraphicWork",
+"KillParticles",
+"KillImmediately"
 ]
 },
 "12ABD222": {
@@ -4361,10 +4363,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Unknown1",
+"Unknown2",
+"Unknown3"
 ]
 },
 "81F5F144": {
@@ -4380,7 +4382,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AttrMask"
 ]
 },
 "51FA432A": {
@@ -4391,8 +4393,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Attr",
+"Arg2"
 ]
 },
 "0CA3C450": {
@@ -4402,7 +4404,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"CommonEffectId"
 ]
 },
 "C31ABACD": {
@@ -4413,8 +4415,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"FadeFrames",
+"FadeFlag"
 ]
 },
 "36FA6671": {
@@ -4427,10 +4429,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Preset",
+"Bone",
+"SizeA",
+"SizeB"
 ]
 },
 "13B7328C": {
@@ -4446,13 +4448,13 @@
 1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Preset",
+"Bone",
+"SizeA",
+"SizeB",
+"X",
+"Y",
+"Z"
 ]
 },
 "3B31D521": {
@@ -4462,7 +4464,7 @@
 0,
 0,
 0,
-0,
+1,
 0,
 0,
 0,
@@ -4470,15 +4472,15 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Arg0",
+"Arg1",
+"Arg2",
+"Arg3",
+"Arg4",
+"Arg5",
+"Arg6",
+"Arg7",
+"Arg8"
 ]
 },
 "F4F38447": {
@@ -4509,22 +4511,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "056A8146": {
@@ -4551,24 +4553,24 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Strength",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"SizePerStrength"
 ]
 },
 "0141BB6A": {
@@ -4578,7 +4580,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "1E42EE23": {
@@ -4604,23 +4606,23 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"HandleWork"
 ]
 },
 "8FE9E295": {
@@ -4638,29 +4640,29 @@
 1,
 0,
 0,
-0,
+1,
 0,
 0,
 1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GraphicWork",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "E9396C35": {
@@ -4685,22 +4687,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"XWork",
+"YWork",
+"ZWork",
+"XRotWork",
+"YRotWork",
+"ZRotWork",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "BBAD115E": {
@@ -4727,20 +4729,20 @@
 "syntax": [
 "Graphic",
 "Bone",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z",
+"XRotWork",
+"YRotWork",
+"ZRotWork",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "31051FF6": {
@@ -4749,40 +4751,40 @@
 "format": [
 0,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"Bone",
+"F2",
+"F3",
+"F4",
+"F5",
+"F6",
+"F7",
+"F8",
+"F9",
+"F10",
+"F11",
+"F12",
+"F13",
+"F14",
+"Flag",
+"VariationVar"
 ]
 },
 "4A0A135E": {
@@ -4799,7 +4801,7 @@
 },
 "16945ACC": {
 "size": 42,
-"name": "unk_16945ACC",
+"name": "ATTACK_MOTION_FLIP",
 "format": [
 0,
 0,
@@ -4844,47 +4846,47 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Part",
+"Bone",
+"Damage",
+"Angle",
+"KBG",
+"WBKB",
+"BKB",
+"Size",
+"X",
+"Y",
+"Z",
+"Effect",
+"Trip",
+"Hitlag",
+"SDI",
+"Clang",
+"Rebound",
+"ShieldDamage",
+"SFXLevel",
+"SFXType",
+"Ground/Air",
+"Direct/Indirect",
+"Type",
+"HitBits",
+"Unknown",
+"Unknown",
+"Unknown",
+"Blockability",
+"Reflectable",
+"Absorbable",
+"Rehit",
+"IgnoreInvuln",
+"Unknown",
+"FacingRestrict",
+"Unknown",
+"TeamDamage",
+"DisableHitlag",
+"NoGFX",
+"Flinchless",
+"StretchToggle"
 ]
 },
 "2440EFE2": {
@@ -4908,21 +4910,21 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "332DB456": {
@@ -4946,21 +4948,21 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Graphic",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate"
 ]
 },
 "8E3DBED5": {
@@ -4970,7 +4972,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "2C5DE016": {
@@ -4980,7 +4982,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "4882328E": {
@@ -4990,7 +4992,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AreaKind"
 ]
 },
 "606717F5": {
@@ -5012,7 +5014,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Energy"
 ]
 },
 "965B713B": {
@@ -5046,7 +5048,7 @@
 1
 ],
 "syntax": [
-"Unknown"
+"Frame"
 ]
 },
 "34BCD3F7": {
@@ -5072,23 +5074,23 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"ValueA",
+"Compare",
+"ValueB"
 ]
 },
 "2E66078A": {
 "size": 4,
-"name": "unk_2E66078A",
+"name": "Float_Compare_Var",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Type",
+"Method",
+"Variable"
 ]
 },
 "2DA7E2B6": {
@@ -5107,30 +5109,30 @@
 },
 "407A065D": {
 "size": 4,
-"name": "unk_407A065D",
+"name": "Float_Var_Compare_Type",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Variable",
+"Method",
+"Type"
 ]
 },
 "377D36CB": {
 "size": 4,
-"name": "unk_377D36CB",
+"name": "Float_Var_Compare_Var",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Variable1",
+"Method",
+"Variable2"
 ]
 },
 "5E6C3483": {
@@ -5149,30 +5151,30 @@
 },
 "33B1D068": {
 "size": 4,
-"name": "unk_33B1D068",
+"name": "Int_Compare_Type_Type",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Type1",
+"Method",
+"Type2"
 ]
 },
 "44B6E0FE": {
 "size": 4,
-"name": "unk_44B6E0FE",
+"name": "Int_Compare_Var",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Type",
+"Method",
+"Variable"
 ]
 },
 "477705C2": {
@@ -5191,58 +5193,58 @@
 },
 "2AAAE129": {
 "size": 4,
-"name": "unk_2AAAE129",
+"name": "Int_Var_Compare_Type",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Variable",
+"Method",
+"Type"
 ]
 },
 "5DADD1BF": {
 "size": 4,
-"name": "unk_5DADD1BF",
+"name": "INT_VAR_COMPARE_VAR",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"VarA",
+"Compare",
+"VarB"
 ]
 },
 "D97D2806": {
 "size": 4,
-"name": "unk_D97D2806",
+"name": "IF_SE_PLAYING",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Se",
+"Compare",
+"Value"
 ]
 },
 "A0FA2515": {
 "size": 4,
-"name": "unk_A0FA2515",
+"name": "IF_STATUS_SE_PLAYING",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Se",
+"Compare",
+"Value"
 ]
 },
 "5121D3C3": {
@@ -5254,23 +5256,23 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"VoiceType",
+"Compare",
+"Value"
 ]
 },
 "7FCE1BCF": {
 "size": 4,
-"name": "unk_7FCE1BCF",
+"name": "IF_SOUND_VARIATION",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Variation",
+"Compare",
+"Value"
 ]
 },
 "ED4B60E1": {
@@ -5280,7 +5282,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Var"
 ]
 },
 "E3212177": {
@@ -5387,14 +5389,14 @@
 0
 ],
 "syntax": [
-"TransitionTime",
+"Mode",
+"TransitionFrames",
 "Red",
 "Green",
 "Blue",
 "Alpha",
-"Duration",
-"unknown",
-"TransitionOutTime"
+"Layer",
+"Priority"
 ]
 },
 "FE6B9F2F": {
@@ -5416,19 +5418,19 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"F8",
+"F9",
+"F10",
+"W11",
+"Flag"
 ]
 },
 "8E016BA0": {
@@ -5453,27 +5455,27 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Bone",
+"X",
+"Y",
+"Z",
+"RotX",
+"RotY",
+"RotZ",
+"F8",
+"F9",
+"F10",
+"F11",
+"F12",
+"F13",
+"W14",
+"W15"
 ]
 },
 "2E8ABC2E": {
 "size": 7,
-"name": "unk_2E8ABC2E",
+"name": "Screen_Tint2",
 "format": [
 0,
 0,
@@ -5483,12 +5485,12 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Mode",
+"TransitionFrames",
+"Red",
+"Green",
+"Blue",
+"Alpha"
 ]
 },
 "598D8CB8": {
@@ -5551,16 +5553,16 @@
 "size": 5,
 "name": "FLASH_NO_STOP",
 "format": [
-0,
-0,
-0,
-0
+1,
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Red",
+"Green",
+"Blue",
+"Alpha"
 ]
 },
 "E46277B2": {
@@ -5628,7 +5630,7 @@
 0,
 0,
 0,
-0,
+1,
 0,
 0,
 0,
@@ -5639,24 +5641,24 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"GFXRight",
+"GFXLeft",
+"Bone",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"RandomX",
+"RandomY",
+"RandomZ",
+"RandomXRot",
+"RandomYRot",
+"RandomZRot",
+"Terminate",
+"FlipType"
 ]
 },
 "42ACFE7D": {
@@ -5694,7 +5696,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"FrameVar"
 ]
 },
 "F7B97AC1": {
@@ -5708,11 +5710,11 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Gun",
+"Arg1",
+"Arg2",
+"Arg3",
+"Frames"
 ]
 },
 "D8DF1DCC": {
@@ -5726,11 +5728,11 @@
 0
 ],
 "syntax": [
-"ID",
+"Kind",
 "Bone",
-"Unknown",
-"Unknown",
-"Unknown"
+"TargetObjectVar",
+"TargetHitGroupVar",
+"TargetHitNoVar"
 ]
 },
 "DF057B20": {
@@ -5756,22 +5758,22 @@
 0
 ],
 "syntax": [
-"ID",
-"Bone",
+"Kind",
+"Part",
 "Damage",
 "Angle",
 "KBG",
 "WBKB",
 "BKB",
 "Effect",
-"Unknown",
-"Hitlag",
-"Unknown",
+"Trip",
+"HitlagMult",
+"SDIMult",
 "SFXLevel",
 "SFXType",
 "FacingRestriction",
 "DisableHitlag",
-"Unknown",
+"NoReaction",
 "Type"
 ]
 },
@@ -5783,8 +5785,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Kind",
+"CameraQuake"
 ]
 },
 "F6218798": {
@@ -5792,13 +5794,13 @@
 "name": "unk_F6218798",
 "format": [
 0,
-0,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Frames",
+"Value",
+"Mode"
 ]
 },
 "548F2D4C": {
@@ -5821,8 +5823,8 @@
 "X",
 "Y",
 "Z",
-"Action",
-"Ground/Air"
+"TargetStatus",
+"SituationMask"
 ]
 },
 "7B48FE1C": {
@@ -5848,8 +5850,8 @@
 "X",
 "Y",
 "Z",
-"Action",
-"Ground/Air",
+"TargetStatus",
+"SituationMask",
 "X2",
 "Y2",
 "Z2"
@@ -5879,12 +5881,12 @@
 "X",
 "Y",
 "Z",
-"Action",
-"Ground/Air",
+"TargetStatus",
+"SituationMask",
 "X2",
 "Y2",
 "Z2",
-"unknown"
+"Flag26"
 ]
 },
 "46F15F52": {
@@ -5893,22 +5895,22 @@
 "format": [
 0,
 0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ID",
+"Bone",
+"Size",
+"X",
+"Y",
+"Z",
+"TargetStatus",
+"SituationMask"
 ]
 },
 "1EAF840C": {
@@ -5932,9 +5934,9 @@
 "X",
 "Y",
 "Z",
-"Action",
-"Ground/Air",
-"Unknown"
+"TargetStatus",
+"SituationMask",
+"CanGrabInvincible"
 ]
 },
 "1B26C673": {
@@ -5943,26 +5945,26 @@
 "format": [
 0,
 0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
 0,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1",
+"F2",
+"F3",
+"F4",
+"F5",
+"Unknown6",
+"Unknown7",
+"Unknown8",
+"Unknown9"
 ]
 },
 "E74D94EE": {
@@ -5998,7 +6000,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Flag"
 ]
 },
 "D014D5A8": {
@@ -6010,9 +6012,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Effect",
+"Arg1",
+"Arg2"
 ]
 },
 "D2B4D575": {
@@ -6023,20 +6025,20 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Arg0",
+"Arg1"
 ]
 },
 "2E9BD610": {
 "size": 3,
 "name": "FT_MOTION_ANGLE",
 "format": [
-0,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Angle",
+"Mode"
 ]
 },
 "7172A764": {
@@ -6056,7 +6058,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "E2E96674": {
@@ -6069,8 +6071,8 @@
 ],
 "syntax": [
 "ID",
-"unknown",
-"unknown"
+"Length",
+"Width"
 ]
 },
 "6A5DB458": {
@@ -6086,7 +6088,7 @@
 1
 ],
 "syntax": [
-"unknown"
+"Rate"
 ]
 },
 "467A5ED5": {
@@ -6096,7 +6098,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Flag"
 ]
 },
 "1B41048C": {
@@ -6114,15 +6116,15 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Arg0",
+"Arg1",
+"Arg2",
+"Arg3",
+"Arg4",
+"Arg5",
+"Arg6",
+"Arg7",
+"Arg8"
 ]
 },
 "23A9AC4B": {
@@ -6142,57 +6144,57 @@
 0
 ],
 "syntax": [
-"Unknown"
+"ArticleID"
 ]
 },
 "B459AB04": {
 "size": 3,
-"name": "unk_B459AB04",
+"name": "GENERATE_ARTICLE_ENABLE_2_arg_form",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"Arg"
 ]
 },
 "C35E9B92": {
 "size": 4,
-"name": "unk_C35E9B92",
+"name": "GENERATE_ARTICLE_ENABLE_3_arg_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Article",
+"Arg1",
+"Arg2"
 ]
 },
 "BFCBE5FF": {
 "size": 3,
-"name": "unk_BFCBE5FF",
+"name": "GENERATE_ARTICLE_ENABLE_2_arg_form_alt",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"Arg"
 ]
 },
 "0A7BF1D4": {
 "size": 3,
-"name": "unk_0A7BF1D4",
+"name": "GENERATE_ARTICLE2",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"ArticleID",
+"Flag"
 ]
 },
 "C4AF2746": {
@@ -6202,7 +6204,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "012C4A1B": {
@@ -6212,7 +6214,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "C7429968": {
@@ -6224,44 +6226,44 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Dist",
+"OutXVar",
+"OutYVar"
 ]
 },
 "3D29000F": {
 "size": 5,
 "name": "unk_3D29000F",
 "format": [
-0,
+1,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Value",
+"Var1",
+"Var2",
+"Unknown3"
 ]
 },
 "FAC3816A": {
 "size": 4,
 "name": "GET_TRACE_TARGET_VEC",
 "format": [
-0,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Value",
+"Var1",
+"Var2"
 ]
 },
 "585B1516": {
 "size": 5,
-"name": "unk_585B1516",
+"name": "GET_TRACE_TARGET_VEC_int_form",
 "format": [
 0,
 0,
@@ -6269,10 +6271,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Dist",
+"OutXVar",
+"OutYVar",
+"Unused"
 ]
 },
 "F7B8FD7E": {
@@ -6282,7 +6284,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "14712DA5": {
@@ -6292,7 +6294,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "8B298D04": {
@@ -6303,8 +6305,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Flag",
+"Enable"
 ]
 },
 "CEDC237E": {
@@ -6333,12 +6335,12 @@
 "size": 3,
 "name": "HIT_STOP_MUL",
 "format": [
-0,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Multiplier",
+"Target"
 ]
 },
 "FFDD0216": {
@@ -6354,7 +6356,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "AECB846B": {
@@ -6364,7 +6366,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "8827F88C": {
@@ -6398,9 +6400,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z"
 ]
 },
 "F0B8437F": {
@@ -6410,7 +6412,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "979D8828": {
@@ -6420,7 +6422,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"ArticleID"
 ]
 },
 "A21BC6EA": {
@@ -6440,7 +6442,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"ArticleID"
 ]
 },
 "372CCA43": {
@@ -6472,7 +6474,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"Value"
 ]
 },
 "C3D1C317": {
@@ -6489,8 +6491,8 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown"
+"Se1",
+"Se2"
 ]
 },
 "F6D9DCF6": {
@@ -6501,18 +6503,18 @@
 1
 ],
 "syntax": [
-"Unknown",
-"Unknown"
+"Index",
+"Value"
 ]
 },
 "C7AF54A0": {
 "size": 2,
 "name": "IT_AI_DIR_FACTOR",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Factor"
 ]
 },
 "6E417C5C": {
@@ -6522,17 +6524,17 @@
 0
 ],
 "syntax": [
-"unknown"
+"Mode"
 ]
 },
 "EA4A168D": {
 "size": 2,
 "name": "IT_AI_DISTANCE_FACTOR",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Factor"
 ]
 },
 "AA1ACDAF": {
@@ -6551,16 +6553,16 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"F6",
+"F7",
+"F8",
+"F9"
 ]
 },
 "79CAF3BB": {
@@ -6571,22 +6573,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"BrakeX",
+"BrakeY"
 ]
 },
 "ACE34E4C": {
 "size": 4,
-"name": "unk_ACE34E4C",
+"name": "IT_AI_MOVE_BRAKE_flag_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"BrakeX",
+"BrakeY",
+"Flag"
 ]
 },
 "B8725CDD": {
@@ -6603,7 +6605,7 @@
 },
 "E1E1175A": {
 "size": 12,
-"name": "unk_E1E1175A",
+"name": "IT_AI_MOVE_1_flag_form",
 "format": [
 0,
 0,
@@ -6618,22 +6620,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"F6",
+"F7",
+"F8",
+"F9",
+"FlagA"
 ]
 },
 "78E846E0": {
 "size": 13,
-"name": "unk_78E846E0",
+"name": "IT_AI_MOVE_2_flag_form",
 "format": [
 0,
 0,
@@ -6649,18 +6651,18 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"F6",
+"F7",
+"F8",
+"F9",
+"FlagA",
+"FlagB"
 ]
 },
 "0FEF7676": {
@@ -6671,8 +6673,8 @@
 1,
 1,
 1,
-0,
-0,
+1,
+1,
 1,
 1,
 1,
@@ -6682,19 +6684,19 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"F6",
+"F7",
+"F8",
+"F9",
+"I10",
+"I11",
+"I12"
 ]
 },
 "E69F056C": {
@@ -6706,48 +6708,48 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"RotX",
+"RotY",
+"RotZ"
 ]
 },
 "36F14B53": {
 "size": 5,
 "name": "unk_36F14B53",
 "format": [
-0,
-0,
-0,
-0
+1,
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3"
 ]
 },
 "41F67BC5": {
 "size": 6,
 "name": "unk_41F67BC5",
 "format": [
-0,
-0,
-0,
-0,
-0
+1,
+1,
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4"
 ]
 },
 "D8FF2A7F": {
 "size": 7,
-"name": "unk_D8FF2A7F",
+"name": "IT_AI_ROT_2_vector_form",
 "format": [
 0,
 0,
@@ -6757,12 +6759,12 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"RotX",
+"RotY",
+"RotZ",
+"Vec2X",
+"Vec2Y",
+"Vec2Z"
 ]
 },
 "C9FAADFE": {
@@ -6772,7 +6774,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Type"
 ]
 },
 "A08B9A5A": {
@@ -6783,8 +6785,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Mode",
+"X"
 ]
 },
 "D78CAACC": {
@@ -6796,9 +6798,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Mode",
+"X",
+"Y"
 ]
 },
 "49E83F6F": {
@@ -6811,10 +6813,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Mode",
+"X",
+"Y",
+"X2"
 ]
 },
 "3EEF0FF9": {
@@ -6822,17 +6824,17 @@
 "name": "unk_3EEF0FF9",
 "format": [
 0,
-0,
-0,
-0,
-0
+1,
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Type",
+"F1",
+"F2",
+"F3",
+"F4"
 ]
 },
 "A728E2C6": {
@@ -6842,7 +6844,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "AFEA0B23": {
@@ -6854,9 +6856,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"RotX",
+"RotY",
+"RotZ"
 ]
 },
 "D0344D95": {
@@ -6867,8 +6869,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unused0",
+"Unused1"
 ]
 },
 "5E25434E": {
@@ -6880,19 +6882,19 @@
 0,
 0,
 0,
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"ItemKind",
+"Unknown1",
+"Var1",
+"Var2",
+"Var3",
+"X",
+"Y",
+"Z"
 ]
 },
 "A6227E16": {
@@ -6909,7 +6911,7 @@
 ],
 "syntax": [
 "ItemID",
-"unknown",
+"Unknown1",
 "Variable1",
 "Variable2",
 "Variable3",
@@ -6931,7 +6933,7 @@
 ],
 "syntax": [
 "ItemID",
-"unknown",
+"Arg1",
 "Variable1",
 "Variable2",
 "Variable3",
@@ -6946,7 +6948,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Variable"
 ]
 },
 "9A8D6A8E": {
@@ -6956,7 +6958,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AreaKind"
 ]
 },
 "ED72E95A": {
@@ -6967,32 +6969,32 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1"
 ]
 },
 "7114F253": {
 "size": 9,
 "name": "IT_GET_DIR",
 "format": [
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X1",
+"Y1",
+"X2",
+"Y2",
+"Unknown4",
+"Unknown5",
+"Unknown6",
+"ResultVar"
 ]
 },
 "B6C47C1B": {
@@ -7011,16 +7013,16 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"W6",
+"W7",
+"W8",
+"F9"
 ]
 },
 "A3E0DE1B": {
@@ -7038,15 +7040,15 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"F2",
+"F3",
+"F4",
+"F5",
+"W6",
+"W7",
+"W8"
 ]
 },
 "7528A2BC": {
@@ -7059,29 +7061,29 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Node",
+"OutXVar",
+"OutYVar",
+"OutZVar"
 ]
 },
 "6BA1B159": {
 "size": 4,
-"name": "unk_6BA1B159",
+"name": "IT_GET_NODE_POS_2D_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Node",
+"OutXVar",
+"OutYVar"
 ]
 },
 "6CCC7540": {
 "size": 8,
-"name": "unk_6CCC7540",
+"name": "IT_GET_NODE_POS_offset_form",
 "format": [
 0,
 0,
@@ -7092,13 +7094,13 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Node",
+"OutXVar",
+"OutYVar",
+"OutZVar",
+"OffsetX",
+"OffsetY",
+"OffsetZ"
 ]
 },
 "E8C8E371": {
@@ -7110,14 +7112,14 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Node",
+"OutXVar",
+"OutYVar"
 ]
 },
 "AAE5133F": {
 "size": 5,
-"name": "unk_AAE5133F",
+"name": "IT_GET_NODE_ROT_3D_form",
 "format": [
 0,
 0,
@@ -7125,10 +7127,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Node",
+"OutXVar",
+"OutYVar",
+"OutZVar"
 ]
 },
 "F8B7B2B5": {
@@ -7142,27 +7144,27 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Kind",
+"Unknown1",
+"TargetType",
+"Group",
+"NoType"
 ]
 },
 "A6BCC330": {
 "size": 5,
 "name": "IT_IS_EXIST_GROUND_NO_CLIFF",
 "format": [
+1,
+1,
 0,
-0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Unknown2",
+"Distance"
 ]
 },
 "42FAC19A": {
@@ -7172,7 +7174,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "4A606461": {
@@ -7182,7 +7184,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Percent"
 ]
 },
 "AEE75C14": {
@@ -7200,9 +7202,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"W",
+"F1",
+"F2"
 ]
 },
 "994CF8FF": {
@@ -7212,7 +7214,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "046B0422": {
@@ -7220,13 +7222,13 @@
 "name": "IT_MOVE_CAMERA",
 "format": [
 0,
-0,
-0
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Kind",
+"X",
+"Y"
 ]
 },
 "C76174F3": {
@@ -7236,7 +7238,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Flag"
 ]
 },
 "0C89CF7B": {
@@ -7264,7 +7266,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Scale"
 ]
 },
 "A75BDF91": {
@@ -7274,12 +7276,12 @@
 0
 ],
 "syntax": [
-"unknown"
+"Frames"
 ]
 },
 "B078C69A": {
 "size": 5,
-"name": "unk_B078C69A",
+"name": "IT_SCALE_ANIM_full_form",
 "format": [
 0,
 0,
@@ -7287,10 +7289,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Frames",
+"Arg1",
+"ScaleFrom",
+"ScaleTo"
 ]
 },
 "65037812": {
@@ -7300,7 +7302,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"SearchKind"
 ]
 },
 "E4824295": {
@@ -7311,8 +7313,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"A",
+"B"
 ]
 },
 "93857203": {
@@ -7324,9 +7326,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"A",
+"B",
+"C"
 ]
 },
 "0DE1E7A0": {
@@ -7339,10 +7341,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1",
+"Unknown2",
+"Unknown3"
 ]
 },
 "E0F4DA21": {
@@ -7352,7 +7354,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Count"
 ]
 },
 "131E5816": {
@@ -7363,8 +7365,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1"
 ]
 },
 "451797FF": {
@@ -7375,22 +7377,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"RotX",
+"RotY"
 ]
 },
 "43760F0D": {
 "size": 4,
 "name": "unk_43760F0D",
 "format": [
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z"
 ]
 },
 "3E6F2200": {
@@ -7400,7 +7402,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "4290DF6A": {
@@ -7411,8 +7413,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Value1",
+"Value2"
 ]
 },
 "FB4AE8F4": {
@@ -7423,22 +7425,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Team",
+"Arg"
 ]
 },
 "3880B83A": {
 "size": 4,
 "name": "IT_SHOOT",
 "format": [
+1,
 0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Speed",
+"Kind",
+"Angle"
 ]
 },
 "2663C7BA": {
@@ -7448,7 +7450,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"SlopeType"
 ]
 },
 "4375BE5A": {
@@ -7459,8 +7461,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unused0",
+"Unused1"
 ]
 },
 "95EAF9B0": {
@@ -7486,7 +7488,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AreaKind"
 ]
 },
 "4DFB84C9": {
@@ -7502,7 +7504,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "56A2339E": {
@@ -7514,9 +7516,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Id",
+"Value1",
+"Value2"
 ]
 },
 "0E3842F2": {
@@ -7526,7 +7528,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "5A175A68": {
@@ -7542,13 +7544,13 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Unused0",
+"Unused1",
+"Unused2",
+"Unused3",
+"Unused4",
+"Unused5",
+"Unused6"
 ]
 },
 "9126EBA2": {
@@ -7569,8 +7571,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Suspend",
+"AttrMask"
 ]
 },
 "104F0834": {
@@ -7654,7 +7656,7 @@
 "RandomYRot",
 "RandomZRot",
 "Terminate",
-"unknown"
+"FlipType"
 ]
 },
 "9D7F5D71": {
@@ -7667,34 +7669,34 @@
 "size": 2,
 "name": "LAST_EFFECT_SET_ALPHA",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Alpha"
 ]
 },
 "09C4CC49": {
 "size": 4,
 "name": "LAST_EFFECT_SET_COLOR",
 "format": [
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Red",
+"Green",
+"Blue"
 ]
 },
 "E6181A6B": {
 "size": 2,
-"name": "unk_E6181A6B",
+"name": "LAST_EFFECT_SET_DISABLE_SYSTEM_SLOW",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Disable"
 ]
 },
 "E59FB667": {
@@ -7704,17 +7706,17 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "E1D78BFB": {
 "size": 2,
-"name": "unk_E1D78BFB",
+"name": "LAST_EFFECT_SET_OFFSET_TO_CAMERA_FLAT",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Offset"
 ]
 },
 "FD1F7ECF": {
@@ -7724,7 +7726,7 @@
 1
 ],
 "syntax": [
-"unknown"
+"Rate"
 ]
 },
 "6E332637": {
@@ -7734,7 +7736,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"RateWork"
 ]
 },
 "83D4A124": {
@@ -7746,9 +7748,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"ScaleX",
+"ScaleY",
+"ScaleZ"
 ]
 },
 "D9CC663F": {
@@ -7760,59 +7762,59 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"ScaleXWork",
+"ScaleYWork",
+"ScaleZWork"
 ]
 },
 "8F27D612": {
 "size": 4,
-"name": "unk_8F27D612",
+"name": "LAST_PARTICLE_SET_COLOR",
 "format": [
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"R",
+"G",
+"B"
 ]
 },
 "FE036C47": {
 "size": 15,
 "name": "LIGHT_AXIS",
 "format": [
+1,
+1,
+1,
+1,
 0,
 0,
 0,
+1,
+1,
 0,
 0,
+1,
 0,
-0,
-0,
-0,
-0,
-0,
-0,
-0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Red",
+"Green",
+"Blue",
+"Alpha",
+"Unk4",
+"Unk5",
+"Unk6",
+"Radius",
+"Length",
+"AxisX",
+"AxisY",
+"AxisZ",
+"Unk12",
+"Unk13"
 ]
 },
 "70FBED79": {
@@ -7820,15 +7822,15 @@
 "name": "LIGHT_AXIS_FRM",
 "format": [
 0,
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Frames",
+"Unk1",
+"Unk2",
+"Unk3"
 ]
 },
 "2558D7F3": {
@@ -7894,7 +7896,7 @@
 1
 ],
 "syntax": [
-"unknown"
+"Frame"
 ]
 },
 "3A52D8B7": {
@@ -7904,7 +7906,7 @@
 1
 ],
 "syntax": [
-"unknown"
+"Rate"
 ]
 },
 "5143DD2A": {
@@ -7915,16 +7917,16 @@
 },
 "C7B586AF": {
 "size": 4,
-"name": "unk_C7B586AF",
+"name": "MII_HEAD_OFFSET",
 "format": [
 1,
 1,
 1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"OffsetA",
+"OffsetB",
+"Frames"
 ]
 },
 "FFB519E1": {
@@ -7942,9 +7944,9 @@
 1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Up",
+"Down",
+"Width"
 ]
 },
 "A3B1A56D": {
@@ -7954,7 +7956,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "73415E57": {
@@ -7964,7 +7966,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "35C3DF13": {
@@ -7974,7 +7976,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Unused"
 ]
 },
 "8C79D4D7": {
@@ -8003,8 +8005,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"ArticleID",
+"Motion"
 ]
 },
 "AE994DAF": {
@@ -8014,7 +8016,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "A546845C": {
@@ -8034,7 +8036,7 @@
 3
 ],
 "syntax": [
-"unknown"
+"RateVar"
 ]
 },
 "2A25155D": {
@@ -8076,7 +8078,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"Enable"
 ]
 },
 "22E2E4C6": {
@@ -8086,7 +8088,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "58E8478D": {
@@ -8096,7 +8098,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "65590360": {
@@ -8130,7 +8132,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Enable"
 ]
 },
 "140B3778": {
@@ -8157,22 +8159,22 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown"
+"Unknown0",
+"Unknown1"
 ]
 },
 "96E6DDC4": {
 "size": 4,
-"name": "unk_96E6DDC4",
+"name": "PICKUP_ITEM_3_arg_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Arg0",
+"Arg1",
+"Arg2"
 ]
 },
 "08824867": {
@@ -8185,10 +8187,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1",
+"Unknown2",
+"Unknown3"
 ]
 },
 "3A1C50C4": {
@@ -8198,7 +8200,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"SoundID"
 ]
 },
 "F7016A91": {
@@ -8219,8 +8221,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Voice1",
+"Voice2"
 ]
 },
 "E022FE8A": {
@@ -8256,7 +8258,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Sequence"
 ]
 },
 "40639C05": {
@@ -8266,7 +8268,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Sequence"
 ]
 },
 "3A775D26": {
@@ -8276,7 +8278,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "B73EF69C": {
@@ -8286,7 +8288,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "FB98EE28": {
@@ -8311,14 +8313,14 @@
 },
 "01A5A27C": {
 "size": 3,
-"name": "unk_01A5A27C",
+"name": "PLAY_STEP_FLIPPABLE",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"SoundID",
+"SoundIDFlip"
 ]
 },
 "99044432": {
@@ -8334,7 +8336,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Kind"
 ]
 },
 "65F38512": {
@@ -8344,7 +8346,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Kind"
 ]
 },
 "0412FE17": {
@@ -8380,7 +8382,7 @@
 "ReflectDmgMul",
 "ReflectSpdMul",
 "Threshold",
-"Unknown",
+"Flag",
 "ReflectLifetimeMul",
 "Type"
 ]
@@ -8392,7 +8394,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "501A7157": {
@@ -8425,21 +8427,21 @@
 "size": 5,
 "name": "RENEW_TRACE",
 "format": [
-0,
-0,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Unknown2",
+"ResultVar"
 ]
 },
 "E2A24D87": {
 "size": 6,
-"name": "unk_E2A24D87",
+"name": "RENEW_TRACE_result_form",
 "format": [
 0,
 0,
@@ -8448,11 +8450,11 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"F0",
+"F1",
+"Flag",
+"OutVar",
+"Arg"
 ]
 },
 "14DA2640": {
@@ -8462,7 +8464,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "3D155C42": {
@@ -8501,8 +8503,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Part",
+"State"
 ]
 },
 "BE0C4A94": {
@@ -8514,9 +8516,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Part",
+"State",
+"Frames"
 ]
 },
 "2068DF37": {
@@ -8529,10 +8531,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Arg0",
+"Arg1",
+"Arg2",
+"Arg3"
 ]
 },
 "406D24BC": {
@@ -8543,8 +8545,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Kind",
+"StartFrame"
 ]
 },
 "F395CC2C": {
@@ -8555,8 +8557,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Kind",
+"StartFrame"
 ]
 },
 "42D70BB3": {
@@ -8566,7 +8568,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"Situation"
 ]
 },
 "56055BA2": {
@@ -8576,7 +8578,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "98203AF6": {
@@ -8627,16 +8629,16 @@
 "X",
 "Y",
 "Z",
-"Unknown",
-"Unknown",
-"Ground/Air",
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown",
+"CollisionKindMask",
+"HitStatusMask",
+"SituationMask",
+"Unused",
+"CategoryMask",
+"PartMask",
+"IgnoreScale",
 "RehitRate",
-"SelfAffectionToggle",
-"Unknown"
+"Flag1C",
+"ShapeType"
 ]
 },
 "B39C1A7C": {
@@ -8658,7 +8660,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "A5187BBC": {
@@ -8668,7 +8670,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Visible"
 ]
 },
 "1E3AB92A": {
@@ -8688,11 +8690,11 @@
 "name": "SET_FRAME_ARTICLE",
 "format": [
 0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"Frame"
 ]
 },
 "F38E805D": {
@@ -8714,7 +8716,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "21FDA8DF": {
@@ -8724,7 +8726,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Length"
 ]
 },
 "1BFC5837": {
@@ -8734,7 +8736,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Radius"
 ]
 },
 "95794508": {
@@ -8769,10 +8771,10 @@
 1
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown"
+"Article",
+"Arg1",
+"Arg2",
+"Offset"
 ]
 },
 "F0005966": {
@@ -8783,8 +8785,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Se",
+"Pitch"
 ]
 },
 "374A735E": {
@@ -8794,7 +8796,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Pitch"
 ]
 },
 "19A86DA9": {
@@ -8805,20 +8807,20 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Handle",
+"Pitch"
 ]
 },
 "687F9320": {
 "size": 3,
-"name": "unk_687F9320",
+"name": "SET_PLAY_INHIVIT",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Se",
+"Frames"
 ]
 },
 "6706BC40": {
@@ -8837,24 +8839,24 @@
 1
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown"
+"Article",
+"Arg1",
+"X",
+"Y"
 ]
 },
 "1C843790": {
 "size": 4,
-"name": "unk_1C843790",
+"name": "SET_POS2",
 "format": [
-0,
-0,
-0
+1,
+1,
+1
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Z"
 ]
 },
 "2B62F859": {
@@ -8865,8 +8867,8 @@
 1
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"Rate"
 ]
 },
 "26ED10F4": {
@@ -8877,8 +8879,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"ValueSrc"
 ]
 },
 "51EA2062": {
@@ -8889,8 +8891,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"RateVar"
 ]
 },
 "3B8D1838": {
@@ -8901,8 +8903,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unknown0",
+"Unknown1"
 ]
 },
 "DE950B48": {
@@ -8912,7 +8914,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Value"
 ]
 },
 "FAE6FD8D": {
@@ -8924,9 +8926,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"RotX",
+"RotY",
+"RotZ"
 ]
 },
 "46396A70": {
@@ -8939,10 +8941,10 @@
 1
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown"
+"Article",
+"Arg1",
+"RotA",
+"RotB"
 ]
 },
 "3BD9C23B": {
@@ -8965,10 +8967,10 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown"
+"ID",
+"Part",
+"Field",
+"Value"
 ]
 },
 "1511931F": {
@@ -8978,7 +8980,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Visible"
 ]
 },
 "D8B91949": {
@@ -9011,14 +9013,14 @@
 },
 "D3D9401B": {
 "size": 3,
-"name": "unk_D3D9401B",
+"name": "SET_SPEED_EX_2_arg_form",
 "format": [
 1,
 1
 ],
 "syntax": [
-"Unknown",
-"Unknown"
+"SpeedX",
+"SpeedY"
 ]
 },
 "A4DE708D": {
@@ -9037,22 +9039,22 @@
 },
 "5FC8FA49": {
 "size": 2,
-"name": "unk_5FC8FA49",
+"name": "SET_TAKEOUT_SE",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "5D5AF322": {
 "size": 2,
-"name": "unk_5D5AF322",
+"name": "SET_TAKEOUT_SE_STATUS",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Se"
 ]
 },
 "D9FDDCEC": {
@@ -9063,22 +9065,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Se",
+"Volume"
 ]
 },
 "51A2AD03": {
 "size": 4,
-"name": "unk_51A2AD03",
+"name": "SET_VOLUME_3_arg_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Se",
+"Volume",
+"Frames"
 ]
 },
 "F0DF9A8B": {
@@ -9150,19 +9152,19 @@
 0
 ],
 "syntax": [
-"unknown"
+"ArticleID"
 ]
 },
 "BFC0031F": {
 "size": 3,
-"name": "unk_BFC0031F",
+"name": "SHOOT_EXIST_ARTICLE_2_arg_form",
 "format": [
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Article",
+"Arg"
 ]
 },
 "965E035A": {
@@ -9175,10 +9177,10 @@
 "size": 2,
 "name": "SHOOT_ITEM_BULLET_ANGLE",
 "format": [
-0
+1
 ],
 "syntax": [
-"unknown"
+"Angle"
 ]
 },
 "42998FB4": {
@@ -9188,7 +9190,7 @@
 0
 ],
 "syntax": [
-"Unknown"
+"ShotKind"
 ]
 },
 "745B20A7": {
@@ -9198,17 +9200,17 @@
 0
 ],
 "syntax": [
-"Unknown"
+"IntVar"
 ]
 },
 "F2C328A7": {
 "size": 2,
-"name": "unk_F2C328A7",
+"name": "SHOOT_ITEM_BULLET_1_arg_form",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Arg"
 ]
 },
 "AF988735": {
@@ -9218,7 +9220,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"SlopeStatus"
 ]
 },
 "961521C4": {
@@ -9229,22 +9231,22 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"SlopeStatus",
+"Frames"
 ]
 },
 "040FD56E": {
 "size": 4,
-"name": "unk_040FD56E",
+"name": "Slope_Full2",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"SlopeStatus",
+"Frames",
+"Unknown"
 ]
 },
 "74B61BAC": {
@@ -9252,21 +9254,21 @@
 "name": "SLOPE_TOE",
 "format": [
 0,
-0
+1
 ],
 "syntax": [
-"unknown",
-"unknown"
+"SlopeStatus",
+"MaxAngle"
 ]
 },
 "5DD6C56C": {
 "size": 2,
-"name": "unk_5DD6C56C",
+"name": "SLOPE_TOE_1_arg_form",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"SlopeStatus"
 ]
 },
 "37ED7029": {
@@ -9289,42 +9291,42 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Rate",
+"Frames"
 ]
 },
 "C52B4328": {
 "size": 8,
 "name": "START_CHARGE",
 "format": [
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Charge1A",
+"Charge1B",
+"Charge1C",
+"Charge2A",
+"Charge2B",
+"Charge2C",
+"Target"
 ]
 },
 "7E977FAA": {
 "size": 13,
-"name": "unk_7E977FAA",
+"name": "START_CHARGE_6_joint_form",
 "format": [
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0,
 0,
@@ -9333,42 +9335,42 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"RateA1",
+"RateA2",
+"RateA3",
+"RateB1",
+"RateB2",
+"RateB3",
+"Joint1",
+"Joint2",
+"Joint3",
+"Joint4",
+"Joint5",
+"Joint6"
 ]
 },
 "50B5DFBD": {
 "size": 9,
-"name": "unk_50B5DFBD",
+"name": "START_CHARGE_2_joint_form",
 "format": [
-0,
-0,
-0,
-0,
-0,
-0,
+1,
+1,
+1,
+1,
+1,
+1,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"RateA1",
+"RateA2",
+"RateA3",
+"RateB1",
+"RateB2",
+"RateB3",
+"Joint1",
+"Joint2"
 ]
 },
 "EE37008F": {
@@ -9381,24 +9383,24 @@
 "size": 9,
 "name": "START_TRACE",
 "format": [
+1,
+1,
 0,
-0,
-0,
-0,
+1,
 0,
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"X",
+"Y",
+"Unknown2",
+"Unknown3",
+"Unknown4",
+"Unknown5",
+"Unknown6",
+"ResultVar"
 ]
 },
 "AF41E94E": {
@@ -9439,12 +9441,12 @@
 },
 "5B23A4DE": {
 "size": 2,
-"name": "unk_5B23A4DE",
+"name": "SET_LR",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Lr"
 ]
 },
 "AFE548A4": {
@@ -9477,12 +9479,12 @@
 },
 "666B608E": {
 "size": 2,
-"name": "unk_666B608E",
+"name": "STOP_SE_ALL_1_arg_form",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"Arg"
 ]
 },
 "F4B1C95B": {
@@ -9499,8 +9501,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Se",
+"Value"
 ]
 },
 "1CF1A390": {
@@ -9541,8 +9543,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Variable",
+"SourceVariable"
 ]
 },
 "6D8D18B7": {
@@ -9568,7 +9570,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Node"
 ]
 },
 "72982F32": {
@@ -9585,8 +9587,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Unused",
+"Unused2"
 ]
 },
 "50730439": {
@@ -9600,30 +9602,30 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown",
-"Unknown"
+"OffsetX",
+"OffsetY",
+"Unused",
+"Unused2",
+"Unused3"
 ]
 },
 "2F20B6C7": {
 "size": 4,
 "name": "THROW_ITEM_OFFSET_MOTION",
 "format": [
-0,
-0,
+1,
+1,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"OffsetX",
+"OffsetY",
+"Motion"
 ]
 },
 "6CD94C77": {
 "size": 5,
-"name": "unk_6CD94C77",
+"name": "THROW_ITEM_OFFSET_4_arg_form",
 "format": [
 1,
 1,
@@ -9631,10 +9633,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"OffsetX",
+"OffsetY",
+"Arg3",
+"Arg4"
 ]
 },
 "BFE18BE1": {
@@ -9652,14 +9654,14 @@
 0
 ],
 "syntax": [
-"Unknown",
-"Unknown",
-"Unknown"
+"Unused",
+"Unused2",
+"Unused3"
 ]
 },
 "F061A233": {
 "size": 5,
-"name": "unk_F061A233",
+"name": "THROW_ITEM_4_arg_form",
 "format": [
 0,
 0,
@@ -9667,10 +9669,10 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown",
-"unknown"
+"Unused0",
+"Unused1",
+"Unused2",
+"Unused3"
 ]
 },
 "8F67803A": {
@@ -9692,7 +9694,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"AreaKind"
 ]
 },
 "15670DCC": {
@@ -9702,7 +9704,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"EnergyID"
 ]
 },
 "4DD83EFF": {
@@ -9734,7 +9736,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Visible"
 ]
 },
 "315E8C48": {
@@ -9745,8 +9747,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Group",
+"State"
 ]
 },
 "91CF842D": {
@@ -9756,7 +9758,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Group"
 ]
 },
 "5BC50AA6": {
@@ -9767,8 +9769,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"ArticleID",
+"Group"
 ]
 },
 "8FF62E3D": {
@@ -9788,7 +9790,7 @@
 0
 ],
 "syntax": [
-"unknown"
+"Group"
 ]
 },
 "96114CFC": {
@@ -9812,9 +9814,9 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Article",
+"Group",
+"State"
 ]
 },
 "15F0023E": {
@@ -9825,8 +9827,8 @@
 0
 ],
 "syntax": [
-"unknown",
-"unknown"
+"Group",
+"State"
 ]
 },
 "CB59A07E": {
@@ -9853,16 +9855,16 @@
 },
 "53F0D3E1": {
 "size": 4,
-"name": "unk_53F0D3E1",
+"name": "ARTICLE_VISIBILITY_3_arg_form",
 "format": [
 0,
 0,
 0
 ],
 "syntax": [
-"unknown",
-"unknown",
-"unknown"
+"Article",
+"State",
+"Arg3"
 ]
 },
 "4B7B6E51": {
@@ -9917,12 +9919,12 @@
 },
 "92A88908": {
 "size": 2,
-"name": "unk_92A88908",
+"name": "CHANGE_KINETIC",
 "format": [
 0
 ],
 "syntax": [
-"unknown"
+"KineticType"
 ]
 },
 "300A0A85": {
