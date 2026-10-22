@@ -111,15 +111,23 @@ the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`.
 | `0x0F000331` | `TRACK_FRAMES` | `Track_Target` frames left (-1 = until stopped) | set them; 0 stops tracking |
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
 
-Example: a move that can only be used again 120 frames after it ends.
+Example: the move hits harder if it's used again within 2 seconds (120 frames) of its last use.
+`Method=5` is "greater than" (0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`).
 
 ```
-// at the end of the move
-SET_FLOAT(TIMER_0, 120.0)
-
-// at the start of the move: do something different while the timer runs
-Float_Var_Compare(TIMER_0, ...) ...
+FRAME(Frames=10)
+Float_Var_Compare(Variable=TIMER_0, Method=5, Value=0)
+True(Offset=0){
+    SET_FLOAT(Value=1.5, Variable=VAR_0)            // remember it was the strong version
+}
+...
+// at the end of the move: start (or restart) the 2-second window
+SET_FLOAT(Value=120, Variable=TIMER_0)
 ```
+
+Sm4shCommand works out `True`'s offset from the braces. The variables only hold numbers, so a
+script can't stop a move from starting. MSC (`WorkModuleF(0, 0x0F000320)`) can read the same timer
+to do that.
 
 ## How it works
 
