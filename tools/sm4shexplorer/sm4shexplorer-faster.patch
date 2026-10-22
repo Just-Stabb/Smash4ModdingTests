@@ -1,7 +1,7 @@
 From b1e78c462a5886ba1210d0295e12573031ec8020 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 11:13:58 +0000
-Subject: [PATCH 1/4] Faster builds (stored data for untouched package files,
+Subject: [PATCH 1/5] Faster builds (stored data for untouched package files,
  compression cache, parallel compression) and Extract vanilla
 
 ---
@@ -774,7 +774,7 @@ index 9a522af..dc8ff36 100644
 From 2b9de497a2a3cd03e727c453174384cdc370999b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:36:36 +0000
-Subject: [PATCH 2/4] Packing: stream packages to disk, read stored files when
+Subject: [PATCH 2/5] Packing: stream packages to disk, read stored files when
  written, compress in 32 MB batches
 
 ---
@@ -1104,7 +1104,7 @@ index 9eb4f9e..445f418 100644
 From f0542a4ae26924d8a26adfaef1f98773a38c2ff5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:58:24 +0000
-Subject: [PATCH 3/4] Package cache: unchanged packages are copied from
+Subject: [PATCH 3/5] Package cache: unchanged packages are copied from
  cache/packages instead of being rebuilt
 
 ---
@@ -1338,7 +1338,7 @@ index 445f418..0dd3aa3 100644
 From 26656d7ba316786b580e4c802e3cb25131803ea2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Wed, 21 Oct 2026 20:54:10 +0000
-Subject: [PATCH 4/4] Clean vanilla files: move workspace files identical to
+Subject: [PATCH 4/5] Clean vanilla files: move workspace files identical to
  the game's own version out of the workspace
 
 Project > Clean vanilla files from workspace... (or right-click a mod folder / file > Clean vanilla
@@ -1800,6 +1800,54 @@ index d3719f2..2c8c3a0 100644
      }
  
      internal class BackgroundWorkerInstance
+-- 
+2.43.0
+
+
+From 9345a19b6075362d40553f864c92cf7966f1a1d3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 22 Oct 2026 07:51:50 +0000
+Subject: [PATCH 5/5] New files inside a packaged folder go in the package
+
+A file the game doesn't have, in a folder the game reads as one package (e.g. a new character's
+ui/replace/chr/chr_10 icon), kept offset 0, which made it a package of its own: it was written as a
+loose file inside the packaged folder unless the folder was set to "Pack this folder", and the game
+crashed reading the package. It now goes in the package, as a file set "in package" does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0191SKAyPvzEPBA8SgbtYxcK
+---
+ Sm4shFileExplorer/Sm4shProject.cs | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/Sm4shFileExplorer/Sm4shProject.cs b/Sm4shFileExplorer/Sm4shProject.cs
+index 0abf8dd..45b1a0c 100644
+--- a/Sm4shFileExplorer/Sm4shProject.cs
++++ b/Sm4shFileExplorer/Sm4shProject.cs
+@@ -1170,6 +1170,7 @@ private bool BuildNewResources(ResourceCollection resCol, string[] filesToProces
+                     isFolder = true;
+                 }
+ 
++                bool isNew = !resCol.Resources.ContainsKey(relativePath);
+                 ResourceItem nItem = GetEditedResource(resCol, relativePath);
+ 
+                 //Force packed
+@@ -1182,6 +1183,15 @@ private bool BuildNewResources(ResourceCollection resCol, string[] filesToProces
+                     nItem.OffInPack = 1;
+                     nItem.IsAPackage = false;
+                 }
++                else if (isNew && !isFolder && GetPackedPath(resCol, relativePath.Substring(0, relativePath.LastIndexOf('/') + 1)) != null)
++                {
++                    //A file the game doesn't have, in a folder the game reads as one package: it goes in the
++                    //package. Left as it was (offset 0 = a package of its own), it was written as a loose file
++                    //inside the packaged folder, and the game crashed reading the package (a new character's
++                    //ui/replace/chr/chr_10 icon, user).
++                    nItem.OffInPack = 1;
++                    nItem.IsAPackage = false;
++                }
+ 
+                 //Checking if part of a pack to repack, if yes, lets process it after with PackageProcessor
+                 ResourceItem resPacked = GetPackedPath(resCol, relativePath);
 -- 
 2.43.0
 

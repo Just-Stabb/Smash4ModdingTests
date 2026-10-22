@@ -259,6 +259,16 @@ The customs cave's two functions were checked (callers keep nothing in the regis
 Not confirmed as the crash: v3 ships a split test (no chara.lm / no chr_12 / an RPX without the
 v2 code).
 
+**The crash, found** (the user's Cemu log, resource file and `chr_10/packed`): `ResourceSystem:Reading`
+died reading `data/ui/replace/chr/chr_10/packed` with a size of `0xFFE7B682`. The build's resource
+table (`tools/rf_check.py`) had `chr_10_Supamario_01.nut` at offset 0 with flags `0xC05` (`0x400`: a
+package of its own), a loose file inside the `chr_10` package, which the package file doesn't hold.
+Sm4shExplorer gives a file the game doesn't have offset 0, and offset 0 on a file reads as "a package
+of its own", so a new file in a packaged folder is built loose unless the folder is set to **Pack this
+folder** (the user's other portrait folders were: their Supamario files are in their packages). Not
+our files or code: Sm4shExplorer v5 (`tools/sm4shexplorer/`) puts such files in their package; with
+an older one, set each packaged folder holding a new character's files to "Pack this folder".
+
 Build (v2): `rpx_patch.py build/cross_f.rpx OUT.rpx` with `biome_select_cave`, `monster_roll_cave`,
 `trait_badge_cave`, `kind_expand`, `base_effects_cave`, `base_customs_cave`; data
 `add_fighter.py --param USER_PARAM --param VANILLA_PARAM --ui USER_UI --msbt USER_melee.msbt`, then

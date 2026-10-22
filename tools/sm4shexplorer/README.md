@@ -1,9 +1,9 @@
 # Sm4shExplorer: faster builds, "Extract vanilla" and "Clean vanilla files"
 
-`sm4shexplorer-faster.patch` (4 commits) applies to https://github.com/thefungus/Sm4shExplorer
+`sm4shexplorer-faster.patch` (5 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
 (`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster_v4.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
+the exe is in `build/sm4shexplorer_faster_v5.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
 plugins are unchanged).
 
 ## Why builds were slow
@@ -95,3 +95,16 @@ the partition folders, a folder still holding a file kept).
 
 v3 in a real build: builds are faster, and with the package cache, rebuilding unchanged packages
 is over 1000x faster for large packs. (v1's out-of-memory error was fixed in v2.)
+
+## New files in packaged folders (v5)
+
+A file the game doesn't have, in a folder the game reads as one package (`ui/replace/chr/chr_10/`
+and the other portrait sets, a fighter's folder, ...), starts with offset 0, and the original code
+takes offset 0 on a file as "a package of its own" (`ResourceItem.IsAPackage`): unless the folder was
+set to **Pack this folder**, the file was written loose with flag `0x400` in the resource table,
+inside the packaged folder, and the game crashed reading the package (user: Supamario's `chr_10`
+icon; Cemu: `ResourceSystem:Reading` on `data/ui/replace/chr/chr_10/packed` with a size of
+`0xFFE7B682`; the table had `chr_10_Supamario_01.nut` at offset 0, flags `0xC05`, while the other
+portrait folders, set to pack, had theirs in the package). `BuildNewResources` now puts such a file in
+its package (offset 1, as a file set "in package"); files in folders that aren't packages are built
+as before.
