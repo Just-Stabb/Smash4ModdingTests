@@ -63,6 +63,22 @@ for each fighter kind. Members are read in order:
   error flag is set and **everything after it is skipped**;
 - **scalars** of a fixed type.
 
+**Manifold confirms / adds** (Manifold by Fitz Null, zlib License,
+https://gitlab.com/fitz.lol/manifold, `scripts/decode_param_format.js`; checked against
+`0x033B5500`):
+- Nibble `i` is `byte[i >> 1] >> (4 * (i & 1))`: **low nibble first**.
+- A type-3 nibble with repeat 1-3 **skips that many bytes of the output struct** (alignment
+  padding). It reads no token from the stream. Repeat 4 (`F`) ends the struct.
+- A field whose token has the wrong width is not stored, and **the output pointer doesn't move**.
+  Besides the error flag, every later field of that struct lands one field early.
+
+Manifold's example string `42 27 38 0E 6B CC F0` decodes as:
+- `u32, u8 x2`, 2 bytes of padding;
+- `u32, u8 x3`, 1 byte of padding;
+- `u32 x4, u8`, 3 bytes of padding;
+- `u32 x2, u8 x9`;
+- end.
+
 So the fields of every struct are mandatory and only vector counts are free. A struct that
 follows a vector has no marker of its own: in the token stream it looks like extra values at the
 end of the previous "group", which is why the community sheets have rows with odd IDs after

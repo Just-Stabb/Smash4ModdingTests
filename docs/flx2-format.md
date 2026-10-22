@@ -15,6 +15,28 @@ Tools:
 The loader is at `0x032CEFA4`. The runtime ("lumen", `0x032C8000`–`0x032DA000`) is described in the
 HUD research notes.
 
+**Manifold notes** (Manifold by Fitz Null, zlib License, https://gitlab.com/fitz.lol/manifold;
+docs/manifold-notes.md):
+- **Naming.** Manifold calls this runtime `flx2` (`src/cross/flx2/`) and keeps "lumen" for the
+  menus' `.lm` runtime. That is separate code: its `MovieClipInterface` is at
+  `0x03268704`-`0x0326B160` and doesn't call into `0x032Cxxxx`. Our "lumen" above means the flx2
+  runtime. Part of that runtime is outside the range given above: element setters end in
+  `b 0x03402B24`, and a dynamic-text method is at `0x0340457C`.
+- **Classes (checked against the RPX):**
+  - `Object` (0x1C bytes: child list, vtable at +0x18);
+  - `DisplayObject` (0x3C: prev / next at +0x28 / +0x2C, system at +0x30);
+  - the sprite-instance base, 0xBC bytes: frame at +0x3C, transform matrices at +0x44 / +0x5C,
+    colour transforms at +0x74 / +0x80, dirty mask at +0x8C, depth / owner lists at +0x94 /
+    +0x98, stopped (u16) at +0x9C;
+  - `MovieClip` (0xEC: x / y at +0xD8 / +0xDC, scale at +0xE0 / +0xE4, flags word at +0xE8,
+    visible bit `0x4000`);
+  - `System` (0x83C: context, file data, root clip at +0x1C);
+  - `Context` (0x58C: 78 interned names at +0x20);
+  - `Any` (type 0 null, 1 undefined, 2 number, 3 boolean, 4 string, ...).
+
+  These are runtime objects. They don't change the file format below.
+- **Element functions:** in docs/native-notes.md ("Damage panel").
+
 ## Model
 
 - A movie is a list of **sprites** (movie clips). Sprite 0 is the root, drawn on the stage

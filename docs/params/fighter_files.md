@@ -72,6 +72,16 @@ the costume number mapped first for some kinds: Olimar (0x1A) and Bayonetta (0x3
 → c01, Little Mac (0x29) >= 8 → c01, Wii Fit (0x28), Robin (0x2C), Cloud (0x37), Corrin (0x39)
 odd costumes → c01; others use the costume number as is (Bowser Jr.'s Koopalings c01-c07).
 
+**Manifold** (Fitz Null, zlib License, https://gitlab.com/fitz.lol/manifold, `getCostumeVoiceId`)
+found a second copy of this mapping as a function, `0x030C1B34(this, kind, costume)`. It is used
+by:
+- the result-screen loader `0x030C1BBC` (voice bank, resource ID `kind*9+5`);
+- `0x030C20F4` (`snd_se_%s_common_c%02d`, ID `kind*9+4`).
+
+The thresholds there are the same as above, but kinds not listed (other than Koopa Jr., costume as
+is) get 0, i.e. the base bank. Manifold's own replacement has wrong thresholds (>= 3 / >= 7) and no
+Robin, so it doesn't match the game. The mapping above is the right one (checked).
+
 Articles (projectiles, items a fighter owns; `reference/FighterArticles.xml`), builder at
 `0x030BCB10`: `fighter/<owner>/model/<article>/c%02d/`, `fighter/<owner>/motion/<article>/`,
 `fighter/<owner>/script/msc/<article>/<article>.mscsb`,
@@ -183,7 +193,8 @@ Animations are found by a hash of their **file name** (section 4), so the names 
 | `param/ai/fighter_ai_fighter_param.bin` | 65 entries x 72 values, value 0 = kind | CPU tuning per kind |
 | `param/ai/fighter_ai_nfp_learning_param.bin` | 65 x 41 | amiibo learning per kind |
 | `param/fighter/ai/fighter_ai_<name>_param.bin` | | extra CPU params for Little Mac, Cloud, Rosalina, Bowser Jr., Villager, Robin, Greninja only (`0x101255BE`...) |
-| `param/sound/audience_ouen_param.bin` | 70 x 5, value 0 = index | crowd cheer timing |
+| `param/sound/audience_ouen_param.bin` | 70 x 5: value 0 = fighter kind, value 1 = variant (Koopa Jr. 0x2E has 8 rows); kinds 0x3A-0x40 have none | crowd cheer timing |
+| `param/ui/ui_layout_db.bin` | 101 x 122, keyed by (UI character id, variant); lookup `0x0294194C` falls back to the id's first row, then to row 0 (random) | portrait layout; from Manifold's checklist, see the new-slot write-up |
 | `param/sound/narration_param.bin` | 98 x 3 (sound ID, two frame values) | announcer calls |
 | `sound/config/soundlabeltable.bin` | one row per bank | makes the fighter's banks playable (section 6) |
 | `sound/config/commonsoundtable.csb` | one entry per fighter | three common voice clips + the cheer bank |
@@ -367,7 +378,11 @@ shown with their animation.
 
 ## 5. AI (script/ai/) (code + files)
 
-The loader (`0x02DE1DBC`) lists the fighter's `script/ai/` folder and picks files by name:
+The loader (`0x02DE1DBC`) lists the fighter's `script/ai/` folder and picks files by name.
+It returns without loading for a kind `>= 0x41` (`0x02DE1DDC`). When `0x02DFC824` validates
+`attack_data.bin`, it calls `0x0275BAB0(kind)`. That function returns the kind's motion count
+from its descriptor, or -1 for `>= 0x41`; it is one of the bounds Manifold raises
+(new-slot write-up, "Manifold cross-reference"). The files:
 
 | File | Format | Notes |
 |---|---|---|

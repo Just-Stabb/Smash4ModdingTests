@@ -1044,3 +1044,80 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   0x037EE73C) points at the cave (0x04B84000; 0x02661674 is out of a branch's reach from the grown
   code), which calls the original update, then for each non-empty slot shows `trait_mc` at the
   frame of Kirby's trait (marker int 0x1000008E bits 8-11) or hides it.
+- **Manifold confirms / adds** (Manifold by Fitz Null, zlib License,
+  https://gitlab.com/fitz.lol/manifold: `src/cross/flx2/InfoGadgetDmg.*`, `MovieClip.*`; overview
+  in docs/manifold-notes.md; every item checked against the RPX):
+  - **Panel class `InfoGadgetDmg`, 0x2AA80 bytes.** Base `InfoGadget` (0x9C bytes: 32 resource
+    slots at +0x10, vtable at +0x98). flx player at +0x9C. Slots at +0xC0, 0x30C0 bytes each.
+    These match ours.
+  - **Slot clip list from +0x5C:** +0x5C root (`dmg_k`), +0x60 the faded element, +0x64 `face_mc`,
+    +0x68 `mark_mc`, +0x6C `name_bg_mc`, +0x70 `name_col_mc`, +0x74 `mii_name_mc`, +0x78 `num_mc`,
+    +0x18C `ko_mc`, +0x190 `shtdwn_mc`, +0x194 `pt_p_mc`, +0x1A8 `press_mc`; our +0x1A4 `mnd_mc` is
+    unnamed there.
+  - **`0x02661674(P, slot)`** is the slot's alpha fade (in / out). It sets the alpha of the +0x60
+    element, `face_mc`, `mark_mc` and `ko_mc`.
+  - **Vtable `0x100871D8`** (8-byte stride, function in the second word): +0x3C = `0x02661808`, the
+    update (ours); +0x4C = `0x02661A8C`. The draw pass `0x028FA188` calls +0x4C after the flx draw
+    `0x030923E4`, so it draws extra per-slot geometry (`0x0265A950`, 10 x 0x7C at slot +0x2A18).
+    Manifold changed clips in a +0x4C hook. Those changes show a frame late. **Our +0x3C hook
+    (after the flx advance `0x030920FC`, before the draw) is the better place for the badge.**
+  - **Element API (flx2 `MovieClip`, 0xEC bytes):** all ours confirmed: `0x032CCAA0` child,
+    `0x032CCC44` goto frame and play, `0x032CCCA0` goto label and play, `0x032CDFFC` visible,
+    `0x032CE00C` frame (`lhz +0x3C` + 1), `sth 1, 0x9C` = stopped (u16).
+
+    New: `0x032CDEDC` set rotation (degrees), `0x032CDF80` set colour transform (12 bytes: u8 mul
+    A/R/G/B, s16 add A/R/G/B; stored at +0x74).
+
+    Fields: +0x74 colour transform (our alpha byte is its multiplier A), +0xD8 / +0xDC x / y,
+    +0xE0 / +0xE4 scale x / y.
+
+    **Flags:**
+    - visible is bit `0x4000` of the word at +0xE8;
+    - x / y setters clear `0x2000` there;
+    - +0x8C is a dirty mask (2 colour, 4 transform);
+    - every setter ends with `b 0x03402B24`.
+
+    So a cave that writes fields directly must set +0x8C itself and make that call; using the
+    setters, as ours does, needs nothing more.
+  - **Other panel calls:** `0x0265B494(P, slot)` sets up the slot's player name;
+    `0x02663DD8(P, slot, id, costume, ?, ?, kind, use_character_name)` sets the name plate;
+    `0x0265F138(P, slot, is_stamina)` sets the damage display type. Names come from `0x0300074C`
+    (8 player slots of 0x1D00 bytes, UTF-16 name at +0x66).
+
+## Manifold cross-reference (other native findings)
+
+Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targets this same RPX
+(overview and file map: docs/manifold-notes.md). Native-code items not covered elsewhere:
+
+- **It confirms:**
+  - `BattleObject`: +4 kind, +0xC module accessor, +0x1E state byte (`>= 4` = live, the test the
+    Minecraft cave uses);
+  - the fighter kind name readers `0x0275DB24` / `0x0275DB38`;
+  - transform → base `0x030C1FDC`.
+- **Allocator:** `operator new` `0x03374578(size)`, `operator delete` `0x0337460C`, heap alloc
+  `0x03374530`.
+- **Resource API (`lib::Resource`, a one-word handle):**
+
+  | function | address |
+  |---|---|
+  | ctor (path, flags) | `0x032D7220` |
+  | `load` | `0x032D9434` |
+  | `is_exist` (the "file exists" test the fighter sound loaders use) | `0x032D9600` |
+  | `request` | `0x032D9894` |
+  | dtor (`(h, 2)` after use) | `0x032D4200` |
+
+  Loader internals:
+  - pack path `0x032D51D0`;
+  - patch list `0x032E0450`;
+  - name table `0x032EA7CC`;
+  - `ResourceContext` (0x133FC0 bytes; region code string "(us_en)" at +0x133EA0).
+- **Kind predicate `0x028E25C0`:** kind <= 2 (Mii fighters).
+- **Character id predicate `0x030A04C0`:** `ui_character_db` `+0x1C`, 104 callers.
+
+  See docs/new-fighter-slot.md for both.
+- **Not confirmed:** Manifold's `motionscript.hpp` treats the function table at `0x1012C220`
+  (built at `0x02E788B0`) as the MSC module table and labels `+0x1C4` (`0x02C489FC`) "WorkModule".
+  The WorkModule MSC handler is `0x0200E898` on `WorkModuleImpl`'s vtable `0x10003224` (above), so
+  those labels are guesses.
+- **Console addresses:** Manifold's console builds add `0x0A000000` to code and `0x00503000` to data
+  addresses; the addresses in these notes are the ELF / Cemu ones.

@@ -119,15 +119,24 @@ purin (4), donkey (5), samus and ganon (6), and mario (8, 169 instructions).
 
 - `0x41`:
   - random fighter pick `0x021ED1A0` (rand `0x41`, wraps at `0x41` `0x021ED1B0` / `0x021ED1E0`);
-  - kind → character id `0x0309FE50` (accepts `<= 0x41`);
+  - kind → character id `0x0309FE50` (accepts `<= 0x41`: `cmpwi r4, 0x41; ble` at `0x0309FE68`);
   - sound bank loader `0x02A79158` (character id → kind `0x0309FDC8`, then `kind < 0x41`);
-  - not classified (they look like kind checks or loops): `0x02761528`, `0x02AC3F7C`, `0x02FCD770`,
-    `0x029B7F14`, `0x02DE1DDC`; loops `0x0275233C` (12 x `li 0x41`, the AI arrays), `0x03B2EED4` /
-    `EF4`, `0x03B36454` / `0x03B36B5C`.
+  - kind → motion count `0x0275BAB0` (`0x0275BAC0`: `>= 0x41` → -1, else descriptor motion count),
+    used by the AI `attack_data.bin` check (found through Manifold, see below);
+  - AI file loader `0x02DE1DBC` (`0x02DE1DDC`: kind `[+0x1BB0] >= 0x41` → returns without loading);
+  - `0x02AC3F7C` and its twin `0x02761528`: the fighter resource holder `[[0x102F9028]+0x34]`
+    (`+0x20` kind, `+0x64` loaded) is used only for kind `< 0x41` (then loaded by Cap name);
+  - not classified: `0x02FCD770` (picks one of two counts by `r4 < 0x41`); `0x029B7F14` is a
+    range test `0x41 <= x <= 0x49`, probably not a fighter kind; loops `0x0275233C` (12 x
+    `li 0x41`, the AI arrays), `0x03B2EED4` / `EF4`, `0x03B36454` / `0x03B36B5C`.
 - `0x3A`: Kirby's `copy_grant` `0x02EFCDC8` (kinds `>= 0x3A` are never copied).
 - Kind predicates:
   - `0x02E694AC` isMii(kind, with_enemies): 0-2, plus `0x3E`-`0x40` when asked; 26 callers;
   - `0x02E694E8` isMiiEnemy; 8 callers;
+  - `0x028E25C0` kind `<= 2` (Mii fighters only); 4 callers (`0x02653F94`, `0x0265436C`,
+    `0x0265535C` in the damage panel, `0x02902C54`). Not true for `0x3E`-`0x40`;
+  - by **character id**, not kind: `0x030A04C0` is the `ui_character_db` entry's `+0x1C` (Mii)
+    byte; 104 callers (see "Manifold cross-reference");
   - `0x02E69510` has-transformation;
   - `0x02E69560` (`0x33`-`0x3C`);
   - `0x03058B6C`, `0x03058B8C` (`0x3A`-`0x3D` → 0);
@@ -187,11 +196,12 @@ Because a reused slot already has an entry in each of these, nothing needs resiz
 | `+0x0C` | 5 | is a fighter (kind → id search `0x0309FE50` skips 0) |
 | `+0x10` | 6 | **fighter kind** (`0x0309FDC8`) |
 | `+0x14` | 7 | costume count (Little Mac 16) |
-| `+0x1C` | 9 | Mii (skipped by the CSS list builder) |
+| `+0x18` | 8 | Manifold: "powerLimit" (Mario 25; not checked) |
+| `+0x1C` | 9 | Mii (skipped by the CSS list builder; read by `0x030A04C0`) |
 | `+0x1D` | 10 | DLC (`0x030A05D8`): second CSS list, unlock index `id - 0x34 + 8`, DLC content check |
 | `+0x20`-`+0x22` | 13-15 | sort keys |
-| `+0x2C`-`+0x33` | 21-28 | per-costume name index (`MmelCharaN_%02d_...`; Koopalings 1-8) |
-| `+0x3C`-`+0x43` | 37-44 | per-costume (voice) index |
+| `+0x2C`-`+0x3B` | 21-36 | per-costume name index (`MmelCharaN_%02d_...`; Koopalings 1-8); 16 bytes, vanilla uses the first 8 |
+| `+0x3C`-`+0x4B` | 37-52 | per-costume (voice) index; 16 bytes, likewise |
 
 - Character id → kind: `+0x10` via `0x0309FDC8`.
 - Kind → character id: `0x0309FE50`, the first entry with `+0x0C` set and the kind, so a new entry at
@@ -337,7 +347,8 @@ vl param shapes and AI files in detail; its section 9 checklist applies to the c
       entry SLOT = X's; `simple_character_db_cafe.bin` SLOT = X's;
    3. `fighter_param_vl_<name>.bin` = copy of X's;
    4. `ui_sound_call_voice_db.bin` (id 59), `ui_skill_db.bin` (id 59), `ui_sound_voice_chara_db.bin`:
-      copy X's;
+      copy X's. Also `ui_layout_db.bin` (X's rows with id 59) and `audience_ouen_param.bin`
+      (X's row with kind SLOT). Both are from Manifold's checklist; see "Manifold cross-reference";
    5. `melee.msbt` `MmelCharaN` / `C` / `A` / `R` `_01_<Name>`;
    6. portraits `chr_00` / `10` / `11` / `13` / `40` / `90`, `chrn_11` / `12` / `40` / `41`, `stock_90`
       (copies of X's, renamed, with unique texture ids as for stages);
@@ -363,7 +374,9 @@ steps 1-3: the switch redirects, the vl caves, the name table cave, and the data
   - The announcer needs a narration id; use X's or none.
 - **Inline `kind == X` checks** in X's native code don't fire for the clone. The effect depends on X,
   so audit X's sites.
-- **Mii-enemy sites:** the 10 inline sites and the equality compares need review. If SLOT is `0x3E`,
+- **Mii-enemy sites:** the 10 inline sites and the equality compares need review. (Manifold's
+  roughly 100 "is Mii" sites test the UI character id and are not needed; see "Manifold
+  cross-reference".) If SLOT is `0x3E`,
   the set-up at `0x02825CA8` (probably Fighting Mii Team) loads the new fighter as its Brawler.
   Patch it, or pick `0x40`.
 - **`ui_character_mask` / `show_character_mask`:** no loader string was found. If the mask
@@ -371,6 +384,136 @@ steps 1-3: the switch redirects, the vl caves, the name table cave, and the data
 - **Online, replays, amiibo / FP** (the AI arrays per kind) with an id or kind they don't expect:
   untested.
 - **Descriptor `+0`** holds X's kind. No caller seen reads it, but this wasn't exhaustive.
+
+## Manifold cross-reference
+
+**Manifold** by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, is a Wii U
+runtime mod framework for the same `cross_f.rpx`. It tried a real kind `0x41` (`src/cross/fighter.cpp`:
+"Wolf" redirected to Fox, mostly commented out, and the project was archived). Overview and file
+map: `docs/manifold-notes.md`. Every finding below was checked against our RPX. Manifold's code
+was read, not copied.
+
+**It confirms:**
+- the name tables and readers: `0x0275DB24` / `0x0275DB38`, and character id → name `0x0293DCCC`
+  → linear search `0x0293E92C`;
+- the descriptor getter `0x02E4313C` and the specializer factory `0x02E669F0`;
+- the vl loader `0x02EA6BC4` and transform → base `0x030C1FDC`;
+- the param-manager loops `0x02EA5C9C` / `0x02EA5CBC` / `0x02EA6B8C`;
+- the weapon tables (0x185 = 389 weapons).
+
+Its descriptor dump (Fox) has the same layout as ours. Descriptor `+0x1C` is filled at run time:
+`0x02EA9064(mgr, kind)` returns the kind's motion table, built once by `0x02EA9008` from vl group 1.
+A copied descriptor must start with `+0x1C` = 0.
+
+### Kind-count bounds: Manifold's 15 sites
+
+`fighter::AddPatches()` sets 15 instructions to the new kind count. Nine are in the list above:
+`0x021ED1A0` / `B0` / `E0`, `0x02A79158`, `0x02AC3F7C`, `0x02DE1DDC`, `0x02EA5C9C` / `CBC`,
+`0x02EA6B8C`. The other six, disassembled:
+
+| site | in | what it does | real `0x41` | clone (`0x3E`-`0x40`) |
+|---|---|---|---|---|
+| `0x0309FE68` | kind → character id `0x0309FE50` | `cmpwi r4, 0x41; ble`: kind `0x41` **already passes** (off by one in the game) | only for kinds `>= 0x42` | no |
+| `0x0275BAC0` | `0x0275BAB0(kind)` | `>= 0x41` → -1, else `[[descriptor+4]+4]`, the motion count. Only caller `0x02DFC8C4`: the AI `attack_data.bin` (`ATKD`) check `0x02DFC7A8`, called from the AI file set-up `0x02DE1C8C` | yes (with a descriptor case) | no |
+| `0x028BC434` | `0x028BC400` (character select) | **not a kind bound**: copies 0x41 words = 13 records of 0x14 bytes (`typ_N` / `step_N_mc` / `in_step_N` animation names) from `0x100AE4B8` to the stack | no (raising it copies one word too many) | no |
+| `0x02A61FCC`, `0x02A620B4` | `0x02A61F40` | **not a kind bound**: under a lock, copies a 0x118-byte request block from `+0x150` to `+0x38`: word 0 (an id, compared at `0x02A611EC`), then 0x41 words, then `+0x108`.... Only caller `0x0311A4C8`, in the BGM code (Manifold's `SoundBGM` functions are at `0x03118340`-`0x0311BD64`) | no | no |
+| `0x033F7A94` | `0x033F79EC` (library code; one call, at boot, `0x023A78F0`) | **not a kind bound**: zeroes 0x41 words (0x104 bytes) at `r1+0x3C`, then `0x0378DC80(buf, 0x101, 1, 0)`, a 0x101-byte buffer | no (raising it writes one word past the buffer) | no |
+
+The `0x0309FE68` compare is inside the function our list calls `0x0309FE50` (`mflr` prologue; the
+`stwu` is at `0x0309FE5C`). Manifold misses some of ours: the twin `0x02761528` of `0x02AC3F7C`,
+`0x02FCD770`, the AI loops `0x0275233C`, `0x03B2EED4` / `EF4`, `0x03B36454` / `B5C`, and above all
+the per-kind arrays. Without those, a kind `0x41` writes `mgr+0x111C+4*0x41` = `mgr+0x1220`, the
+refcount of kind 0. **This confirms Option A is impractical.** In its final commit the bounds are
+written back to 0x41 (65 names), so they do nothing.
+
+**For the clone plan none of the six is needed.** Kinds `0x3E`-`0x40` are inside every bound.
+
+### The "is Mii" sites (`miiBullshit()`)
+
+All 104 addresses in Manifold's list (70 active, 34 commented out) are `bl 0x030A04C0`. Those are
+**every** caller of that function. `0x030A04C0(db, character id)`:
+- looks up the `ui_character_db` entry (by position for ids `<= 0xC7`, else by search; a bad id
+  falls back to index 4);
+- returns its `+0x1C` (Mii) byte != 0.
+
+Manifold calls it `is_mii_character`. It tests the **UI character id**, not the kind. So it is
+neither the kind predicates (`0x02E694AC`, `0x02E694E8`, `0x028E25C0`) nor our 10 inline Mii-enemy
+kind checks, and none of those 10 is in Manifold's list. Manifold made every site return 1, so the
+UI treats every character as a Mii. Its comments mark some: Mii announcer call `0x0204C9F0` /
+`CA40` / `CAA0`, "always select Mii slot" `0x02052EC8`, CSS Mii portrait `0x02053C58`, "dynamic
+battle portraits" `0x028F9328`. The function holding that list is never called.
+
+Where the 104 calls are:
+
+| area | calls |
+|---|---|
+| character select scene `0x02035148`-`0x02053C58` | 12 |
+| menus `0x02192274`-`0x02270BB0` | 11 |
+| damage panel `0x02650A00` | 1 |
+| `0x02825098`, near the Fighting Mii Team preload `0x02825CA8` | 1 |
+| `0x028683F8` | 1 |
+| CSS player slots `0x028A3420`-`0x028B0280` | 32 |
+| our CSS functions: face binding `0x028BE920` (`0x028BEC70`), layout `0x028BEE20` (`0x028BF0BC`), list builder `0x028BF6AC` (`0x028BF760`) | 3 |
+| `0x028C9598`-`0x028C9D20` | 6 |
+| `0x028E2560` | 1 |
+| battle portraits `0x028F924C` / `0x028F9328` | 2 |
+| `0x0290A468`-`0x029B9478` | 19 |
+| random-select bitset `0x02FFB610` (`0x02FFB690`) | 1 |
+| `0x02FE57E0`-`0x0301F9BC` | 14 |
+
+**Assessment: the clone needs none of them.** Its new entry (id 59) has `+0x1C` = 0, so every one
+of these sites sees an ordinary fighter. They would matter only for reusing a Mii character id
+(1-3), or for a fighter shown with the Mii UI (generated portraits, Mii name plate). What makes
+kinds `0x3E`-`0x40` Mii-like is the kind predicates and inline checks above. The plan already
+handles those.
+
+### Checklist differences (`docs/add-new-fighter.md`)
+
+Manifold's checklist has three items ours lacked:
+- **`param/ui/ui_layout_db.bin`** (strings `0x10019ED4` / `0x100BB030`; loader `0x02941A40`, 0x11C
+  bytes an entry in RAM). It has 101 entries x 122 values, keyed by **(character id, variant)**.
+  Examples: Koopa Jr. 44/1-8, Robin 42/1-2, Olimar 27/1 and 27/5, Bayonetta 57/1 and 57/5; the
+  rest of the 122 values are the portrait layout. Lookup `0x0294194C(db, id, variant, use_variant)`:
+  1. the exact (id, variant);
+  2. else the first entry with the id;
+  3. else entry 0 (random).
+
+  A missing id 59 gets random's layout (misplaced portraits, not a crash). **Add X's rows with id 59.**
+- **`param/sound/audience_ouen_param.bin`**: 70 rows x 5 values, keyed by **fighter kind** and a
+  variant (Koopa Jr. 0x2E has 8 rows). Kinds `0x3A`-`0x40` have no row. The reader and its
+  fallback weren't traced. A row with kind SLOT copied from X's gives X's crowd-cheer timing.
+- **`chr_70`**: not loaded through the portrait function `0x0291673C` (its constant sets are 0,
+  10, 11, 13, 40, 90). The name appears only as the replace slot `sound_rep_chr_70` (string
+  `0x100168C8`, used at `0x0212C8A8` in `0x0212C71C`), probably the Vault sound test. Optional.
+
+Ours has items Manifold's lacks:
+- the vl name table `0x10353DB4` (Manifold redirected the vl load to Fox instead);
+- the kind switches;
+- `chr_40` / `chrn_41`;
+- `ui_sound_call_voice_db` / `ui_skill_db` / `ui_sound_voice_chara_db`;
+- `simple_character_db_cafe`;
+- the sound tables (`params/fighter_files.md` section 6).
+
+### Other functions in Manifold's fighter code
+
+- **Availability `0x0293FD40(db, id, type)`**, read from the code (Manifold's version differs; see
+  `manifold-notes.md`):
+  1. vt `+0x1C`(id) (usable) is false → 0.
+  2. Not DLC (vt `+0x24`): types 2-4 → vt `+0x6C` (unlocked); other types → 1.
+  3. DLC: type 0 → 1; 1, 2 → `+0x4C`; 3 → `+0x4C` && `+0x6C`; 4 → `+0x4C` && `+0x6C` && (`+0x74`
+     & 1); > 4 → 0.
+
+  For a non-DLC id 59 on the character select (type 4), only "usable" and "unlocked" count. It
+  isn't in `unlock_condition_of_fighters.bin`, so it is unlocked.
+- **`0x030C1B34(this, kind, costume)`**: the costume → voice-bank variant mapping (correct version
+  in `params/fighter_files.md`, section 2). Used by `0x030C1BBC` (result-screen resources, voice ID
+  `kind*9+5`) and `0x030C20F4` (common SE, `kind*9+4`). Kinds it doesn't list get variant 0. A clone
+  of X therefore keeps X's base voice bank in those two loaders.
+- **`0x02E3F32C`**: module set-up, called from the fighter set-up (`0x02E11CEC`) with the kind. It
+  is another of Manifold's Wolf → Fox redirect points. Our plan keeps the slot kind there (its
+  modules read the slot's own params).
+- **`0x0300074C`**: the player-slot singleton. 8 slots of 0x1D00 bytes; the UTF-16 player name is
+  at `+0x66` (10 characters).
 
 ## Tools
 

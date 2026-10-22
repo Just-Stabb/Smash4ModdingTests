@@ -46,6 +46,17 @@ Other limits on kinds:
   change. A stage with gimmicks needs its own class, as Manifold's `StageXMadein` (a ladder, a
   spring and a breakable pillar on `StageBaseCafe`).
 - Name -> kind lookups (`struct_03157edc` `0x031580EC`) loop over the count, so they follow it.
+- **More from Manifold** (checked against the RPX; class layouts in docs/manifold-notes.md and
+  docs/minecraft-world.md):
+  - `StageBaseCafe` vtable `0x1011D27C`. Slots (8-byte stride, function in the second word):
+    `+0x14` pre-setup `0x02D1A760`, `+0x1C` post-setup `0x02D1C65C`, `+0x2C` pre-update
+    `0x02D1CF9C`, `+0x34` post-update `0x02D1D11C`, `+0x44` render `0x02D1D308`. Shared
+    `StageBase` slots are `+0x2E4` `setup_collision` (`0x03142CC8`) to `+0x39C`; the
+    `StageBaseCafe` ones are `+0x3A4` / `+0x3AC`.
+  - The stage-select max-fighters getter `0x030A9354(db, cosmetic id, normal)` returns database
+    `+0x24` (normal) or `+0x28` (Omega). A bad id falls back to entry 1.
+  - The stage manager is at `[0x102F7020]` (0x110 bytes; `+0` current stage, `+8` the
+    `struct_03157edc` setting, `+0xF4` the value the stage's pre-setup copies to `+0xCC`).
 
 ## The stage-select screen is built from `ui_stage_db.bin`
 

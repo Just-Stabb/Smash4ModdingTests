@@ -742,6 +742,25 @@ notes in the scratchpad's `re_input/` and `re_stage/`):
   `0x40000` stage-wide visible, both for drawn); the game's per-model show / hide in setAllVisible
   `0x03159750` (scene add `0x03158994`, remove `0x031589E0`, render `0x032FF668` / `0x032FF68C` on
   `+0xDC`); OMO frame `0x0315871C(m, f1, 1)`.
+- **Manifold** (Fitz Null, zlib License, https://gitlab.com/fitz.lol/manifold, `StageDrawModel.hpp`,
+  `StageBase.*`, `StageBaseCafe.*`; docs/manifold-notes.md) confirms `0x03141D2C` =
+  `search_draw_model(stage, name)` and adds the following.
+  - `0x03142B48` = `instance_draw_model(stage, name)`.
+  - StageDrawModel (0x11C bytes): `0x03159248` set world matrix, `0x03159458` / `0x03159364`
+    turn off the motion / material-animation loop.
+  - **Naming disagreement:** Manifold calls `0x0315871C` `set_material_animation_current_frame`
+    and `0x031593FC(m, f1, bool)` `set_motion_current_frame`.
+    - `0x0315871C` works on the draw model at `+0xDC`, when flag `0x200000` of `+0x118` is set
+      (`0x032FFD58` / `0x032FFDD4` / `0x032FFD60`, animation slot -1, types 1 and 0).
+    - `0x031593FC` passes `f1` on to the object at `+0xF4`.
+    - So "OMO frame" above is unverified. No tool here uses either function.
+  - **LVD hooks:** the stage vtable has `notify_loaded_lvd_element` (`+0x34C`, `0x0314B9C8`) and
+    `filter_loaded_lvd_element` (`+0x354`, `0x0314B9CC`, returns keep / drop), taking
+    `{element*, kind}` (kind 0 = collision, name at `+8`, subname at `+0x40`). The filter is
+    called by `setup_collision` (`0x03142CC8`, at `0x03142F58`) and by `set_layout_data`
+    (`0x0314B060`, at `0x0314B350` / `0x0314B3E0`). Manifold's XMadein keeps one collision
+    this way. A stage class (or a vtable copy for kind 0x80) could drop the inactive biomes' collision
+    at load instead of moving it.
 
 Built:
 - `tools/biome_select_cave.py` (test: `tools/biome_select_test.py`, unicorn, 22 checks): kind 0x80's
@@ -913,6 +932,15 @@ Crew's parts.
   each hit's damage; `0x0313C35C` clears them each frame); `0x03134204(w)` the last attacker.
 - `0x03133DFC(w)` removes its battle object (no more hits), `0x03133DAC(w)` brings it back.
 - All are deleted with the stage (`0x03141020` -> `0x03134BCC`); 256 a battle.
+- **Manifold** (`gimmick/*`) names the wrapper `GimmickControllerBase` (0x34 bytes: battle object
+  at `+0xC`, active flag `+0x14`, vtable `+0x30`; ctor `0x03133A8C(w, kind, flags, groups)`):
+  - `0x03133DAC` = `activate`. Its ladder and spring call it and then `0x03133E4C(w, 0)`; its
+    pillar calls only `0x03133E4C`, as our cave does;
+  - `0x031343CC` = `as_set_attack_data` (a gimmick that attacks);
+  - classes: `GconEventLadder` (ctor `0x02A878D4`), `GconEventSpring` (ctor `0x0312B814`),
+    Luigi's Mansion's `GconXMansionPillar` (0x74 bytes, ctor `0x02D17220`, update
+    `0x02D17D90` = shake `0x02D1748C` + damage `0x02D17618` + matrix `0x02D17C7C`;
+    max HP at `+0x50`, HP `+0x54`).
 - LVD `damage_shapes` (section 12: type 2 sphere / 3 capsule, start, vector, radius; `lvd.py`
   `DamageShape`) are filed in links by subname; `0x03142A48(stage, name)` (= the mod's
   `search_damage_collision`) returns a link's shape list, which a gimmick takes with
