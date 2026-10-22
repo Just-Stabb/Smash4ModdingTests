@@ -377,7 +377,15 @@ produced are the files above): `emu_vl.py` (Unicorn run of the parser), `schema2
 `gen/evidence.py`, `gen/annotations.py` (hand-written descriptions), `gen/gen_csv.py`.
 Working notes: scratchpad `params/vl_notes.md`.
 
-## Which copy in the user's param dump is vanilla (no clean dump available)
+## Which copy in the user's param dump is vanilla
+
+**Settled (a vanilla data/param dump, the user's Drive `param-smash4-vanilla.zip`):** the top-level
+`fighter_param.bin` and `fighter_param_common.bin` are vanilla; of the top-level vl files 60 are
+vanilla and 7 are not (bayonetta, ganon, lizardon, **mario**, miigunner, ness, samus); 37 of the
+`fighter/` vl files are vanilla. Use the vanilla dump as the base for new fighters. The estimate below
+(made before it was available) was right for most files but not for those 7.
+
+### Earlier estimate (no clean dump yet)
 
 The user's `param - Copy/` has two sets of vl files: top level (dated 2026-02-10) and `fighter/`
 (2026-10-20); 28 differ. Compared with the community sheets' Default column
