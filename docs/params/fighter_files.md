@@ -239,8 +239,8 @@ points: HeadN (-0.5 x), RArmJ, LArmJ, RKneeJ, LKneeJ, HipN.
 
 0x10-byte entries, 4 floats. Set-up stores the group in GroundModule `+0xA8`; GroundModule's
 "use box n" (`0x02C36A34`) scales entry n by the fighter's scale (PostureModule) and a second
-factor, and writes it to the ground collision object (`+0x204`..`+0x218`; the back extent is
-also multiplied by a common param, GroundModule `+0xA4` = `fighter_param_common` word at
+factor, and writes it to the ground collision object (`+0x204`..`+0x218`; one copy of the third
+value is also multiplied by a common param, GroundModule `+0xA4` = `fighter_param_common` word at
 `mgr + 0x20C`). Entry 0 is the normal box, entry 1 the one used while tumbling (the community
 sheet's "usual" / "tumble"); some fighters have a third (tether reach). Marth: (0, 8, 16, 16)
 and (0, 4, 9.6, 9.6); the sheet calls the values X, Y, X2, Y2 (the tool calls them x y w h; the
@@ -253,8 +253,8 @@ exact meaning of each is **inferred**).
 | Attach points ("virtual bones") | vl groups 9 and 10: (u32 bone, f32 x y z, f32 rot x y z). The vl manager keeps them at `mgr + 0x1838 + kind * 0x24` as {group 9, count, **10000**}, {group 10, count, **11000**}, {-, -, 12000} (`0x02EA8D50`), and the fighter object copies them (`0x02E540D4`) | code; that 10000+n / 11000+n are joint IDs for these points is **inferred**. Marth's group 9: BustN, HeadN x3, HipN x2 (head ones: likely stars / sleep effects, hat); group 10: one per hurtbox bone |
 | Shield size, shield break size | `fighter_param.bin` (Shield Size, Shield Break Size words) | fighter_param write-up |
 | Camera box | `fighter_param.bin`: the set-up passes entry `+0x1E8` (words 0x7A-0x7E) and `+0x1FC` (words 0x7F-0x82: camera bone, x / y offset, multiplier) to CameraModule (accessor `+0x30`) at `0x02E13718`, and word 0x89 (`+0x224`) after; the sheet names 0x76-0x79 "Camera Size Front / Back / Top / Bottom" and 0x7B-0x7E "Zoom Camera Size" | code; which words are the box: fighter_param write-up |
-| Item grab box, magnifying-glass bubble, effect bones | `fighter_param.bin` (sheet columns 114-148, bone IDs) | fighter_param write-up |
-| Grab (catch) boxes | ACMD `Grab` commands in `game.bin` (`Catch`, `CatchDash`, `CatchTurn`) | per move, like hitboxes |
+| Item grab box, effect / KO-effect bones, hand bones | `fighter_param.bin` (sheet: words 0x8F-0x92 grounded and 0x93-0x96 aerial item grab box; bone-ID words 0x6A, 0x6D, 0x7F, 0x84, 0xA4 / 0xA5 hands, 0xCB, 0x128, 0x138 / 0x139) | fighter_param write-up |
+| Grab (catch) boxes | ACMD `Grab_Collision` / `Extended_Grab_Collision` in `game.bin` (`Catch`, `CatchDash`, `CatchTurn` scripts); `Allow/Disallow_Ledgegrab` turns ledge grabbing on / off | per move, like hitboxes |
 | Body push ("jostle") box | not found per fighter (JostleModule `jostle_module_impl.cpp` exists) | unknown |
 
 ### 3.5 Bone IDs and the bones the game needs (code + files)
