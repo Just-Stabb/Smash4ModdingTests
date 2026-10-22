@@ -342,7 +342,7 @@ The common kinds use **288 distinct animations** (Marth's main table), by animat
 | B00-B02 | GuardOn Guard GuardOff; GuardDamage; EscapeN EscapeF EscapeB EscapeAir Rebound |
 | C00-C05 | Attack11 Attack12 AttackDash; AttackS3S; AttackHi3 AttackLw3; AttackS4S AttackS4Charge; AttackHi4 AttackHi4Charge AttackLw4 AttackLw4Charge; AttackAirN/F/B/Hi/Lw, LandingAirN/F/B/Hi/Lw |
 | E00-E03 | Catch CatchDash CatchTurn CatchWait CatchAttack CatchCut; ThrowF/B/Hi/Lw, ThrownF/B/Hi/Lw, ThrownDxF/B/Hi/Lw, ThrownGirlF/B/Hi/Lw; CapturePulledHi CaptureWaitHi CaptureDamageHi; CapturePulledLw CaptureWaitLw CaptureDamageLw CaptureCut CaptureJump |
-| F00-F09 | DamageHi1-3 DamageN1-3 DamageLw1-3; DamageAir1-3 DamageFlyHi/N/Lw/Top/Roll; DamageElec; DownBoundU DownWaitU DownDamageU DownDamageU3 DownEatU DownStandU DownAttackU DownForwardU DownBackU DownSpotU (and the same with D); Passive PassiveStandF/B PassiveWall PassiveWallJump PassiveCeil; FuraFura FuraFuraStartU/D FuraFuraEnd; FuraSleepStart/Loop/End; Swallowed; CameraHit |
+| F00-F09 | DamageHi1-3 DamageN1-3 DamageLw1-3; DamageAir1-3 DamageFlyHi/N/Lw/Top/Roll; DamageElec; DownBoundU DownWaitU DownDamageU DownDamageU3 DownEatU DownStandU DownAttackU DownForwardU DownBackU DownSpotU (and the same with D, except DownSpot); Passive PassiveStandF/B PassiveWall PassiveWallJump PassiveCeil; FuraFura FuraFuraStartU/D FuraFuraEnd; FuraSleepStart/Loop/End; Swallowed; CameraHit |
 | G00-G03 | Pass Ottotto OttottoWait WallDamage StopWall StopCeil MissFoot; CliffCatch CliffWait; CliffClimbQuick CliffAttackQuick CliffEscapeQuick CliffJumpQuick1/2; SlipDown Slip SlipWait SlipStand SlipAttack SlipEscapeF/B |
 | H00-H16 | items: LightGet LightWalkGet LightEat LightWalkEat; LightThrowF/B/Hi/Lw/Dash/Drop, LightThrowAirF/B/Hi/Lw; HeavyGet HeavyWalk HeavyThrowF/B/Hi/Lw; Swing1 Swing3 Swing4 Swing4Charge SwingDash, Swing4Bat; ItemHammerWait/Move/Air; ItemScrew ItemScrewFall; ItemDragoonGet/Ride; ItemBig ItemSmall; ItemLegsWait/SlowF/MiddleF/FastF/BrakeF/DashF/SlowB/MiddleB/FastB/BrakeB/DashB/JumpSquat/Landing; ItemShoot ItemShootAir; ItemScope(Air)Start/Rapid/Fire/End; ItemAssist; ItemGenesisStart/Fall/Fire/Loop/End/AirFire/AirLoop/AirEnd; ItemGrassPull; GekikaraWait |
 | I00-I01 | SwimRise SwimUp SwimUpDamage Swim SwimF SwimEnd SwimTurn; SwimDrown SwimDrownOut |
@@ -356,8 +356,9 @@ the item swings of every weapon play `Swing1`...). Only the main part is needed 
 humanoid set; hand / extra-part animations only if the skeleton has those parts.
 
 Script names of the common kinds (what `motion.mtable` hashes) are in `tools/mtable.py`
-(294 of the 494 used ones named, e.g. 0x019 `JumpFront`, 0x03E `StepPoseAir`, 0x133
-`SwordSwing1`, 0x161 `Big`); the rest are shown with their animation.
+(294 of the 494 common kinds that have a script in Marth's, Luigi's or Kirby's table are named,
+e.g. 0x019 `JumpFront`, 0x03E `StepPoseAir`, 0x133 `SwordSwing1`, 0x161 `Big`); the rest are
+shown with their animation.
 
 ---
 
@@ -436,8 +437,8 @@ a fighter folder.
 - **Kirby's copy** of the fighter: Kirby's hat model `fighter/kirby/model/<name>cap/c00`
   (hat names table at `0x10159368`-`0x1015980C`: `marthcap`, `marthsword`, ...; held models
   `0x1041A8A0` + kind x 4), Kirby's animations `fighter/kirby/motion/<name>body/`, Kirby's motion
-  table and scripts for the copy (motions above `0x30A` in Kirby's 1222), the copy's neutral-special
-  params in Kirby's vl, and `snd_se_vc_Kirby_copy_<Name>.nus3bank` in the fighter's own sound
+  table and scripts for the copy (motions above `0x30A` in Kirby's 1222), the copied fighter's own
+  neutral-special block of its vl file (group 13, which Kirby loads with the copy: vl write-up), and `snd_se_vc_Kirby_copy_<Name>.nus3bank` in the fighter's own sound
   folder (`docs/native-notes.md` "Copy abilities"). In a slot replacement all of this stays the
   base fighter's copy unless replaced.
 
@@ -491,6 +492,6 @@ switches): see the new-slot write-up.
 - Unchecked against more fighters: everything here was compared on Marth, Mario, Kirby (and
   Luigi / Sonic scripts); the `l%02d` condition's player-count reading (`0x02FFD69C` > 4) is
   **inferred**.
-- 206 common motion script names are unnamed (their hashes and animations are listed by
+- 200 common motion script names are unnamed (their hashes and animations are listed by
   `mtable.py`); most are capture / thrown motions with no animation of their own.
 - Whether the game needs any fighter bone *by name* outside debug code: none found; not proven.

@@ -262,19 +262,19 @@ class VlFile:
 # ---------------------------------------------------------------- IDs
 def leaf_id(kind, path, tok):
     """WorkModule ID of a leaf, or None"""
-    m = re.match(r'm(\d+)(?:\[(\d+)\])?\.(\d+)$', path) or re.match(r'm(\d+)()$', path)
+    m = re.match(r'm(\d+)(?:\[(\d+)\])?(?:\.(\d+))?$', path)
     if not m:
         return None
     mi = int(m.group(1))
-    isint = tok.t in (5, 6)
-    mem = schema()[kind]['members'][mi]
-    if mi in SPECIAL_CAT and m.group(2) != '':
-        return (0x10000000 if isint else 0) | SPECIAL_CAT[mi] << 24 | int(m.group(3))
-    if mem.get('role') == 'cat4':
-        idx = int(m.group(3)) if m.lastindex and m.group(3) else 0
-        return (0x10000000 if isint else 0) | 4 << 24 | idx
-    if mem.get('role') == 'weapon' and m.group(2) != '':
-        return (0x10000000 if isint else 0) | 2 << 24 | int(m.group(3))
+    entry, field = m.group(2), int(m.group(3) or 0)
+    isint = 0x10000000 if tok.t in (5, 6) else 0
+    role = schema()[kind]['members'][mi].get('role')
+    if mi in SPECIAL_CAT and entry is not None:
+        return isint | SPECIAL_CAT[mi] << 24 | field
+    if role == 'cat4' and entry is None:
+        return isint | 4 << 24 | field
+    if role == 'weapon' and entry is not None:
+        return isint | 2 << 24 | field
     return None
 
 
