@@ -1,0 +1,13 @@
+{
+  "capacity": "0x60",
+  "kinds": [
+    {
+      "kind": "0x41",
+      "name": "supamario",
+      "cap": "Supamario",
+      "base": "mario",
+      "ai": "base",
+      "ui": {"id": 59, "name": "Supamario"}
+    }
+  ]
+}

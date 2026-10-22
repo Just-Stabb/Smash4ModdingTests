@@ -1175,13 +1175,14 @@ def imm_patch(img, a, delta):
     return (w & 0xFFFF0000) | (v & 0xFFFF)
 
 
-def plan(img, sc, n):
-    """The word patches of the relocate-and-mirror plan for the FighterParamManager (docs/kind-expansion-ram.md):
-    every per-kind access that computes its address from outside the block gets the new array's offset,
-    except the reads that have the kind built in (kinds 0x00-0x40, they keep reading the old arrays,
-    which stay a mirror) and the vanilla vl-load cases. Prints rpx_patch.py arguments. Untested."""
+def plan_sites(sc):
+    """The instructions the relocate-and-mirror plan rewrites (docs/kind-expansion-ram.md): every
+    per-kind access that computes its address from outside the block, except the reads that have the
+    kind built in (kinds 0x00-0x40, they keep reading the old arrays, which stay a mirror) and the
+    vanilla vl-load cases. Returns ([(address, instruction, array)], Counter of what was kept); the
+    new immediate is the old one + (the array's new start - its old start). tools/kind_expand.py
+    caches this list (tools/kind_expand_ram.json)."""
     rows = report_rows(sc, 'MGR', False)
-    lay, end = mgr_layout(n)
     names = [x[3] for x in LAYOUTS['MGR'][1]]
     out, keep = [], collections.Counter()
     for s, c in rows:
@@ -1203,7 +1204,6 @@ def plan(img, sc, n):
                         keep['loop bases of fields after the block (they do not move)'] += 1
                         continue
                     arr = nxt[0][3]
-        st, nst = lay[arr]
         store = s['ins'].startswith('st')
         if arr == 'vl' and c['cls'] == 'const' and not store and s['fn'] != VL_LOAD:
             keep['vl reads with the kind built in (mirror)'] += 1
@@ -1211,8 +1211,21 @@ def plan(img, sc, n):
         if s['fn'] == VL_LOAD and arr == 'vl' and s['addr'] != VL_DEFAULT and c['cls'] in ('const', 'addr'):
             keep['vanilla vl-load cases (old vl, mirrored at the tail)'] += 1
             continue
-        new = imm_patch(img, s['addr'], nst - st)
-        out.append((s['addr'], new, s['ins'], arr, nst - st))
+        out.append((s['addr'], s['ins'], arr))
+    return out, keep
+
+
+def plan(img, sc, n):
+    """The word patches of the relocate-and-mirror plan for the FighterParamManager (docs/kind-expansion-ram.md):
+    plan_sites() with the new offsets for N kinds, the sizes and loop counts. Prints rpx_patch.py
+    arguments (tools/kind_expand.py emits them together with the hooks and the rest)."""
+    lay, end = mgr_layout(n)
+    names = [x[3] for x in LAYOUTS['MGR'][1]]
+    sites, keep = plan_sites(sc)
+    out = []
+    for a, ins, arr in sites:
+        st, nst = lay[arr]
+        out.append((a, imm_patch(img, a, nst - st), ins, arr, nst - st))
     print('# FighterParamManager: relocate + mirror, N = 0x%X kinds; new block 0x25B0-0x%X' % (n, end))
     for nm in names:
         print('#   %-7s 0x%04X -> 0x%04X' % (nm, lay[nm][0], lay[nm][1]))

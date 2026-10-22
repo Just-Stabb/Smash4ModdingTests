@@ -119,6 +119,109 @@ First kind: **`supamario` / `Supamario`, kind `0x41`, character id 59, base Mari
 vanilla dump; `fighter/supamario/` is 213 files, and 212 of them are byte-identical to Mario's;
 `effect.bin` differs in 66 effect-ID words).
 
+## Implementation: the executable side
+
+`tools/kind_expand.py` reads `tools/extra_kinds.json` (the records `add_fighter.py` also reads) and
+prints one `rpx_patch.py` argument list for every new kind. **Unicorn-tested, not yet run in game.**
+
+```
+python3 tools/rpx_patch.py build/cross_f.rpx OUT.rpx $(python3 tools/biome_select_cave.py) \
+    $(python3 tools/monster_roll_cave.py) $(python3 tools/trait_badge_cave.py) $(python3 tools/kind_expand.py)
+python3 tools/kind_expand_test.py OUT.rpx build/cross_f.rpx \
+    --others <(python3 tools/biome_select_cave.py) --others <(python3 tools/monster_roll_cave.py) \
+    --others <(python3 tools/trait_badge_cave.py)
+```
+
+`--info` prints the cave layout; `--rescan-ram` refreshes `tools/kind_expand_ram.json` (below).
+
+### The JSON
+
+```json
+{"capacity": "0x60",
+ "kinds": [{"kind": "0x41", "name": "supamario", "cap": "Supamario", "base": "mario",
+            "ai": "base", "ui": {"id": 59, "name": "Supamario"}}]}
+```
+
+| key | meaning |
+|---|---|
+| `capacity` | how many kinds the per-kind arrays, tables and switches hold (default `0x60`, at most `0x13F`). Adding a fighter below it changes no RAM layout |
+| `kind` | consecutive from `0x41` |
+| `name` / `cap` | lowercase (folder, files) and Capitalised (sound banks, effects) names |
+| `base` | a game kind (name or number): its specializer, vl parser, size tables, sound class and AI |
+| `ai` | `base` (the base's cases in both AI switches, default) or `generic` (the switches' default) |
+| `ui.id` / `ui.name` | character id (59-199) and UI name (portraits, `MmelChara` labels); no `ui`: no character select entry |
+| `vl` | vl file name (default `fighter_param_vl_<name>`) |
+| `descriptor.from` | whose descriptor and motion table to copy (default the base) |
+
+`add_fighter.py`'s `n` key is ignored here; `ui.title`, `series`, `costumes`, `sort` are its own.
+
+### What each part does
+
+| part | sites | how |
+|---|---|---|
+| FighterParamManager | 2 sizes, 3 loop counts, 164 immediates, 2 hooks | strategy (d) of kind-expansion-ram.md: allocation `0x25B0` → `0x25B0 + capacity * 0x48` (`0x40B0`); the 9 per-kind arrays get a copy at `+0x25B0` (vl `0x25B0`, refcnt `0x2730`, x1324 `0x28B0`, x1428 `0x2A30`, x152C `0x2BB0`, fpidx `0x2D30`, vl50 `0x2EB0`, att `0x3030`, attp `0x3DB0` for `0x60`); every variable-kind access moves its immediate by its array's offset. The list comes from `kind_ram_scan.py plan_sites()`, cached with each site's original word in `tools/kind_expand_ram.json` (checked against the RPX at every run, so a changed base fails loudly). **Hook A** (vl load's common tail `0x02EA8D50`) copies old vl[k] → new vl[k] for k < 0x41; **hook B** (unload store `0x02EA6AF8`) clears both. The 928 kind-built-in reads of the old vl array keep working for vanilla kinds |
+| equipment-ability object | 2 | `0x424` → `0x320 + 4 * capacity` (`0x02EA5964`, `0x02EA5978`) |
+| AI amiibo learning | 15 words in place | the two increments (`0x02751B04` / `0x02751B28`) are rewritten in place with a `kind < 0x41` guard (the code is out of a branch's reach from the cave; the two blocks share one increment and the common continuation `0x02751B3C`) |
+| 6 kind switches | 3-4 words each | the `b` jump table becomes a table of **addresses** in the cave (`add r0, rK, r0` → `lwzx r0, rK, r0`, table address and bound changed; AI `0x02E02458`: `addis` / `addi` → `addis` / `lwz`), so a case can be anywhere. Entries 0x00-0x40 are the game's targets; a new kind: specializer = the base's case, descriptor / vl load / vl unload = its own cases, AI = the base's or the default. Unused kinds up to the capacity → the default. The dispatch now leaves the target in r0 (r12) instead of the table entry: no case reads it before writing it (tested) |
+| name tables, size tables, sound class | 18 reader words, 5 bounds | cave copies of `capacity` rows (new kind = the base's values; unused = `""` / 0), readers repointed |
+| character id → UI name | 3 | `0x1033BE68` copied with `{ui id, ui name}` added, count `0x53` → `0x54`; the first row's name, filled at run time in the old table only, is `""` in the copy |
+| immediates | 12 | random picks `0x021ED1A0` / `B0` / `E0`, `0x021E6E30`: the count (highest kind + 1); kind → character id `0x0309FE68`: capacity - 1; sound banks, AI motion count, AI files, resource holders: the capacity; random-select entries `0x02FFB644`: `0x51` + 1 a UI entry (≤ 96) |
+| relocations | 32 moved | every patched in-place word that carried a relocation (switch dispatch, table readers) has it moved to the dead word `0x037EE73C`, else the loader would put the old addresses back |
+| per new kind (cave) | | descriptor (`0x38` bytes: the base's, `+0` = kind, `+4` = its own motion info, `+0x1C` = 0) + motion info (`0x18`, its main table pointer) + main motion table (the base's `count * 8` bytes, written at run time by `0x02EA9008`); the descriptor case; the **vl load case** = the base's case copied (31 words; its `bl`s re-aimed), prefixed with `vl_load(mgr, base)` (the base's params, which the base's native code reads at fixed offsets), storing into the equipment object's `+0x320 + 4 * kind`, the new vl / vl50 arrays; the **vl unload case** = the base's (its kind's field), then `vl_unload(mgr, base)` |
+
+Space: `0x04B85000` up; one kind (Mario base) uses `0x04B85000-0x04B877C4` (~10 KB: ~5.5 KB of
+tables shared by all kinds, ~5 KB a Mario-sized kind). The code space ends at `0x04BB8000`: about 35
+more kinds. 247 words change in place; nothing overlaps biome_select / monster_roll /
+trait_badge (checked by the test).
+
+**Bases to avoid for now:** kinds 5, 6, 8, 0x17, 0x18, 0x19, 0x1C, 0x20, 0x21, 0x23, 0x26, 0x35. The vl
+tail stores an extra vector (x1324 / x152C) for those kinds only, keyed by the kind itself, so a new
+kind on such a base gets 0 there (the generator warns). Mario has none.
+
+### Adding the next fighter
+
+1. Append a record to `tools/extra_kinds.json` (next kind, next ui id).
+2. `add_fighter.py --kinds tools/extra_kinds.json ...` for the data files and the folder (all records
+   in one call on the vanilla files).
+3. Rebuild the RPX with the command above and run the test. No RAM change below the capacity.
+
+### Test results (`kind_expand_test.py`, unicorn)
+
+All 84 checks pass on base + biome + monster + trait + kind_expand (supamario), and 143 with a
+3-kind file (Mario, Fox with generic AI, kind 0x40 with no UI entry: the fall-through last case):
+- every generated word is in the RPX; the 247 in-place words decode (capstone) to the intended
+  instruction or the moved immediate; their originals were checked when generating; the copied
+  case words differ from the base's only in the planned fields; no relocation is left on a patched
+  word; no overlap with the other three caves;
+- the six switches: kinds 0x00-0x40 reach the same targets as unpatched; 0x41 reaches the planned
+  case; unused kinds and past the capacity reach the default;
+- specializer, descriptor (copy: `+0` 0x41, `+0x1C` 0, rest = Mario's; own main table = Mario's
+  bytes), names, size getters, sound class, character id → name (59 → "Supamario"), kind →
+  character id (fake database) for all game kinds = unpatched;
+- param manager with stubbed allocator / file binders and fake vl structs: constructor sizes
+  (`0x40B0`, equipment `0x4A0`); loader clears the new arrays for 0x00-0x5F and maps kinds to
+  fighter_param entries as unpatched (0x41 too); vl load / load / unload / unload of **every game
+  kind** gives the same calls, file names and per-kind values as unpatched, with the old vl array
+  mirroring the new one; kind 0x41 loads Mario's params then `param/fighter/fighter_param_vl_supamario.bin`
+  with Mario's parser, fills its own fields only (nothing written at the old `0x111C + 4 * 0x41`, which
+  is the old refcnt[0]), refcounts, frees with Mario's functions, releases Mario (not freed while a
+  Mario player holds it); unload-all reaches it;
+- `0x02EA9064(mgr, 0x41)` builds the motion table into supamario's copy (Mario's untouched);
+- AI guard: kinds 0x00-0x40 write exactly as unpatched, 0x41 / 0x5F write nothing (unpatched 0x41
+  wrote into the next record).
+
+### Not tested (in game only)
+
+- Everything at run time: the character select entry, loading a match, Supamario next to Mario.
+- The writable descriptor / motion table in the grown code space (fine on Cemu; maybe not on a console).
+- The game's real parsers and file loading (stubbed in the test), the fighter set-up path
+  (`0x02E11C60`, module set-up `0x02E3F32C`) with kind 0x41, and the 62 partial switches / predicates
+  that send new kinds to their defaults.
+- Resource-id collisions (`kind * 9 + n`, `kind * 0x11 + n`), the effect-id decoder, save data by id,
+  two banks with the same BINF id, the unverified `0x02FCD770` / `0x02748648` compares.
+- The 164 RAM immediates come from a static scan: a site it missed still works for vanilla kinds
+  (mirror), but would read stale or wrong values for kind 0x41.
+
 ## Open items
 
 - Save data keyed by character id (records, Classic clears): not traced. `record_vs_param.bin` (79
@@ -133,10 +236,9 @@ vanilla dump; `fighter/supamario/` is 213 files, and 212 of them are byte-identi
   without a bound would slip past the RAM searches.
 - A writable descriptor on a real console (the grown code space is writable on Cemu).
 
-## Next: first milestone
+## Next
 
-One new kind `0x41` = an exact copy of a base fighter under a new name (its own folder, params, UI
-entry), selectable and playable next to the base in Cemu. Then swap in the new model, motions, ACMD,
-MSC and params. Generator: an "extra kinds" JSON (kind-expansion-code.md) → the RAM plan
-(`kind_ram_scan.py --plan N`) + the code / table plan (`kind_code_scan.py --plan`) + the caves, as
-one `rpx_patch.py` argument list, with unicorn tests in the style of the other caves.
+The first milestone (kind `0x41` = Supamario, a copy of Mario) is built on both sides: data
+(`add_fighter.py`) and executable (`kind_expand.py`), unicorn-tested. Next: run it in Cemu (select
+Supamario, a match against Mario, CPU Supamario), then swap in the new model, motions, ACMD, MSC and
+params.
