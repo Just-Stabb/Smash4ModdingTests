@@ -125,10 +125,10 @@ model folder with its own `model.jtb`.
 |---|---|---|
 | `body/main.pac` | KCAP pack of OMO animations for battle, named `Fit<Name>Body<Part><Code><Motion>.omo` (`FitMarthBodyMainA00Wait1.omo`) | own |
 | `body/lhand.pac`, `rhand.pac` | hand-pose animations (parts 4 and 3) | own |
-| `body/<name>pt1.pac`, `<name>sw1.pac` / `pt2` | extra parts (6, 7): Marth's cape / sword, Kirby's `kirbypt1` / `kirbypt2` | own if the skeleton has such parts |
+| `body/<name>pt1.pac`, `<name>sw1.pac` / `pt2` | extra parts (6, 7): Marth's `marthpt1` / `marthsw1` (sword), Kirby's `kirbypt1` / `kirbypt2` | own if the skeleton has such parts |
 | `bodyentry/` | entrance (`EntryL`, `EntryR`) | own |
 | `bodyresult/` | results screen (`Win1`-`3`, `Win1Wait`.., `Lose`); `face.pac` = part 5 | own |
-| `bodyroutemap/` | `Wait1`-`3`, `AppealHi` (shown outside battles: map / menu figure) | own |
+| `bodyroutemap/` | `Wait1`-`3`, `AppealHi` (used outside battles, probably the route-map figures: **inferred**) | own |
 
 Animations are found by a hash of their **file name** (section 4), so the names matter.
 
