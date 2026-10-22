@@ -16,5 +16,9 @@ glow around it.
   streaming along it; a bulbous head at the front.
 - Impact: a blue-white burst with a shockwave ring and scattered sparks.
 
+Sounds (user's clips): `kame_charge` (6.2 s, the charge), `basicbeam_fire` (5.7 s, the beam firing),
+`beamhead` (3.3 s, the beam head), added to Supamario's own sound-effect bank (its own bank id and
+soundlabeltable row, instead of sharing Mario's) and played from the move's ACMD.
+
 Plan: a small self-authored test effect first (prove the chain in game), then the three parts, then
 the move (animations, ACMD hitboxes, MSC charge logic).
