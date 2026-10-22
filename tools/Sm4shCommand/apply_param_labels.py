@@ -8,7 +8,9 @@ param_labels.json: {command hash (hex): {"_command": its current name, "_name": 
 unk_XXXXXXXX commands), "_note": what the command does, "_format": [types, one per parameter: 0 int,
 1 float, 2 decimal, 3 variable] (only where the old types were wrong), "_size": parameter count + 1
 (only where the old size was wrong), "_desc_extra": text added to the command's description (its
-real name where the table's is wrong: names are kept, scripts use them), "<slot>": {"name", "desc", "values", "evidence",
+real name where the table's is wrong: names are kept, scripts use them), "_new": true (a command that
+isn't in the table: added with "_name", "_size", "_format", "_desc" and the slot names; see
+tools/acmd_ext_cave.py), "<slot>": {"name", "desc", "values", "evidence",
 "confidence": high | medium | low}}}.
 
 Writes:
@@ -75,6 +77,15 @@ def main():
     changes = 0
     for h, entry in sorted(labels.items()):
         crc = int(h, 16)
+        if entry.get('_new'):                                   # a new command (tools/acmd_ext_cave.py): (re)define it
+            n_new = entry['_size'] - 1
+            text = edit_table(text, 'CMD_NAMES', crc, clean(entry['_name']))
+            text = edit_table(text, 'CMD_SIZES', crc, entry['_size'], quote=False)
+            text = edit_table(text, 'PARAM_FORMAT', crc, ','.join(str(x) for x in entry['_format']) or 'NONE')
+            text = edit_table(text, 'PARAM_SYNTAX', crc, ','.join(clean(entry[str(k)]['name']) for k in range(n_new)) or 'NONE')
+            text = edit_table(text, 'CMD_DESC', crc, entry.get('_desc', 'NONE').replace('"', '\\"'))
+            names, syntax, fmt, sizes = (table(text, n) for n in ('CMD_NAMES', 'PARAM_SYNTAX', 'PARAM_FORMAT', 'CMD_SIZES'))
+            changes += 1
         if crc not in names:
             print('skip %s: not in the table' % h)
             continue
