@@ -360,3 +360,21 @@ produced are the files above): `emu_vl.py` (Unicorn run of the parser), `schema2
 `msc/scan2.py` (MSC reads; `reads2.json`), `gen/canon.py` (alignment with the community sheets),
 `gen/evidence.py`, `gen/annotations.py` (hand-written descriptions), `gen/gen_csv.py`.
 Working notes: scratchpad `params/vl_notes.md`.
+
+## Which copy in the user's param dump is vanilla (no clean dump available)
+
+The user's `param - Copy/` has two sets of vl files: top level (dated 2026-02-10) and `fighter/`
+(2026-10-20); 28 differ. Compared with the community sheets' Default column
+(reference/fighter_param_vl/*.csv, made from vanilla), at every value both can be checked:
+the top-level copy matches as well or better in all 27 comparable files (e.g. Mr. Game & Watch
+95 vs 75, Bowser Jr. 85 vs 64, R.O.B. 67 vs 51, Mega Man 50 vs 43). The differing fighters
+overlap the ones the user changed in fighter_param.bin (docs/params/fighter_param.md: there the top
+level is vanilla and `fighter/` is the user's experiment). So: **top level ≈ vanilla, `fighter/`
+= the user's edits**, for the vl files too. Neither matches the sheets fully (the sheets come from
+various game versions).
+
+Exception: the top-level `fighter_param_vl_bayonetta.bin` doesn't parse with this executable's
+layout (one extra string in member 18, her shooting-bone list: "ShootingArmL_AtkOn" before
+"ShootingLegR_AtkOn"), so it's likely from another game version; the `fighter/` one parses.
+The layouts in vl_schema.json come from the game's parser and don't depend on values. The values
+quoted in the CSVs' Default / Custom columns are the community's.
