@@ -76,6 +76,9 @@ script).
   - Steers the projectile's own movement (its first kinetic energy, the one its MSC sets when it's
     fired). Gravity stays as it was, so give a falling projectile enough Speed.
   - Never targets the fighter who fired it.
+  - **Reflected:** a reflected projectile goes back at the fighter who fired it, at any distance
+    (Range doesn't apply). If that fighter isn't there (KO'd), it goes for the nearest fighter
+    other than the one who reflected it. Reflected back again by its owner, it behaves normally.
 - **Fighters:**
   - Sets their speed the way Kirby's side-B homing does: X and Y speed, no braking and, unless
     horizontal only, no gravity while tracking.

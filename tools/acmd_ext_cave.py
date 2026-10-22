@@ -108,7 +108,8 @@ SM4SHCOMMAND_DESC = {
 }
 SM4SHCOMMAND_DESC['Track_Target'] = (
     'Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: '
-    'its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner. '
+    'its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; '
+    'a reflected one goes back at its original owner instead (any distance). '
     'Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
@@ -806,9 +807,10 @@ track_step:
         stwu r1, -0x90(r1)
         mflr r0
         stw r0, 0x94(r1)
-        stmw r22, 0x58(r1)
+        stmw r20, 0x58(r1)
         mr r31, r3
         mr r30, r4
+        li r21, -1                      # reflected: the original owner (the only target, if live)
         lwz r29, 0x34(r30)""" + fl('r29', 'ts_out') + """
         lwz r28, 0x18(r30)""" + fl('r28', 'ts_out') + """
         li r27, -1
@@ -846,6 +848,16 @@ ts_self_done:
         li r4, 0
         li r5, 1""" + vcall(0x6C) + """
         mr r27, r3
+        lwz r3, 0x6C(r30)               # reflected? the current owner (+0x34: the reflector, after a
+                                        # reflect) differs from link 0's (the original owner)""" + fl('r3', 'ts_vel') + """
+        lwz r3, 0x34(r3)
+        cmpw r3, r27
+        beq ts_vel
+        lis r0, 0x5000                  # (no object)
+        cmpw r3, r0
+        beq ts_vel
+        mr r21, r27                     # go for the original owner; skip the reflector
+        mr r27, r3
 ts_vel:
         cmpwi r26, 0
         beq ts_vel_w
@@ -865,6 +877,10 @@ ts_vel_w:
 ts_find:
         li r22, 0
         li r11, 0
+        li r20, 0                       # r20 = 1: first pass, the original owner only (any distance)
+        cmpwi r21, -1
+        beq ts_floop
+        li r20, 1
 ts_floop:
         cmpw r11, r25
         bge ts_fdone
@@ -875,8 +891,15 @@ ts_floop:
         cmplwi r0, 4
         blt ts_floop
         lwz r0, 0(r12)
+        cmpwi r20, 0
+        beq ts_any
+        cmpw r0, r21
+        bne ts_floop
+        b ts_id_ok
+ts_any:
         cmpw r0, r27
         beq ts_floop
+ts_id_ok:
         lwz r10, 0xC(r12)
         cmplw r10, r30
         beq ts_floop""" % dict(fe=FIGHTER_ENTRY) + fl('r10', 'ts_floop') + """
@@ -895,6 +918,8 @@ ts_floop:
 ts_d2:
         fmuls f3, f1, f1
         fmadds f3, f2, f2, f3           # d2
+        cmpwi r20, 0
+        bne ts_take                     # the original owner: whatever the range
         lfs f4, 0x18(r31)               # range squared (0 = any)
         lis r12, zero@ha
         lfs f5, zero@l(r12)
@@ -916,7 +941,13 @@ ts_take:
         b ts_floop
 ts_fdone:
         cmpwi r22, 0
+        bne ts_found
+        cmpwi r20, 0
         beq ts_out
+        li r20, 0                       # the original owner isn't there: the nearest other than the reflector
+        li r11, 0
+        b ts_floop
+ts_found:
         lfs f1, 0x48(r1)                # d^ = d / |d|
         bl fsqrt
         lis r12, tiny@ha
@@ -1007,7 +1038,7 @@ ts_face:
         fcmpu cr0, f1, f0
         bge ts_out""" + kcall(POSTURE_W, [0x2710]) + kcall(POSTURE_W, [0x2]) + """
 ts_out:
-        lmw r22, 0x58(r1)
+        lmw r20, 0x58(r1)
         lwz r0, 0x94(r1)
         mtlr r0
         addi r1, r1, 0x90

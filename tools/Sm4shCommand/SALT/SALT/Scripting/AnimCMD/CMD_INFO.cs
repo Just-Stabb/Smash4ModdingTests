@@ -2504,7 +2504,7 @@ namespace SALT.Moveset.AnimCMD
             {0x300A0A85,"NONE"},
             {0x5C8A67C9,"Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x974EA5BE,"Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
-            {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner. Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; a reflected one goes back at its original owner instead (any distance). Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

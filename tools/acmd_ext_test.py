@@ -220,6 +220,7 @@ wr_l:
         w32(pm, acc + 0x28, wm)
         w32(pm, acc + 0x34, km)
         w32(pm, acc + 0x68, lm)
+        w32(pm, acc + 0x6C, base + 0xA00)                 # owner module: +0x34 current owner's ID
         pm.mem_write(post + 0x10, struct.pack('>ff', x, y))
         pm.mem_write(post + 0x60, struct.pack('>f', 1.0))
         w32(pm, km, vt)
@@ -252,6 +253,7 @@ wr_l:
         w32(pm, e + 0xC, acc)
         pm.mem_write(e + 0x1E, b'\4')
     w32(pm, 0x7E001F00, 0x10000)                          # the weapon's owner: entry 0
+    w32(pm, me + 0xA00 + 0x34, 0x10000)                   # not reflected: current owner = link 0's
 
     V = lambda i: 0x0F000300 + i                          # noqa: E731
     check('user var unset -> 0', fcall(pm, FGET, me_wm, V(5)), 0.0)
@@ -310,6 +312,22 @@ wr_l:
     pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
     frame(me)
     check('frames run out -> no more steering', vel(me_km), (1.0, 0.0))
+    # reflected by the foe: current owner = the foe; goes back at the original owner (below), not the foe
+    w32(pm, me + 0xA00 + 0x34, 0x20000)
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 1.0, 0)                             # range 1: the owner is 3 away, still targeted
+    frame(me)
+    check('reflected: back at the original owner (any range)', vel(me_km), (0.0, -2.0))
+    pm.mem_write(ents + 0x1E, b'\0')                     # original owner not live: not the reflector either
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 0.0, 0)
+    frame(me)
+    check('reflected, owner gone: the reflector is skipped', vel(me_km), (1.0, 0.0))
+    pm.mem_write(ents + 0x1E, b'\4')
+    w32(pm, me + 0xA00 + 0x34, 0x10000)                   # reflected back by its owner: normal again
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    frame(me)
+    check('reflected back by the owner: at the foe again', vel(me_km), (0.0, 2.0))
     track(5, 2.0, 0.0, 0.0, 0)
     w32(pm, 0x10390000 + 0x28, me_wm)
     run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: 0x10390000})

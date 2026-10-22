@@ -1125,6 +1125,16 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   - A weapon's own movement is energy 0 and gravity is energy 2.
   - Set_Kinetic_Handler sends op 0 `{0, ID}` through vt `+0x114`, so it works on any object.
     Set_Kinetic_Handler_Aerial is fighter-only.
+- **Reflection:** the weapon's reflect module (accessor `+0x7C`, vtable `0x1010B00C`) records a hit
+  on a reflector (`0x02C6C7DC` / `0x02C6CA00`).
+  - Fields: `+8` reflector's ID (reset every frame), `+0xC` its team, `+0x10` / `+0x14` / `+0x18`
+    damage / speed / life ×, and `+0x1C` the reflect count (kept until set-up).
+  - The hit callback's result bit `0x8` then flips the facing, gives the weapon the reflector's
+    team, and sets owner module `+0x34` (accessor `+0x6C`, the current owner's ID) to the reflector
+    (`0x0200E13C`). It also reverses the speed (`0x0320EFF0`).
+  - LinkModule link 0 stays the original owner, so the projectile is reflected when `+0x34`
+    differs from link 0's ID.
+  - Weapon MSC isn't involved.
 - **A weapon's owner:** LinkModule (accessor `+0x68`) vt `+0x5C(0)` says whether it has a link 0.
   vt `+0x6C(0, 1)` gives that object's ID, which matches the fighter table entry's `+0`.
 - **DI isn't native.** Every fighter's MSC damage code (Kirby `func_885`) turns the launch angle by
