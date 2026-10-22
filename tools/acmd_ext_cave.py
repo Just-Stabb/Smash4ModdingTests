@@ -116,7 +116,7 @@ BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox':
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
     ('Extra_Special_Hitbox', 42 + N_EXTRA, 'h_extra', SPECIAL_HITBOX),
     ('Extra_Extended_Special_Hitbox', 44 + N_EXTRA, 'h_extra_ext', EXT_SPECIAL_HITBOX),
-    ('Track_Target', 6, 'h_track', None),
+    ('Track_Target', 8, 'h_track', None),
 ]
 TRACK_PARAMS = [
     ('Frames', 0, 'Frames to track for (counted while the object moves: not in hitlag). -1 = until a Track_Target with 0 frames (or the object is reset).'),
@@ -124,6 +124,8 @@ TRACK_PARAMS = [
     ('TurnRate', 1, 'Most the direction can turn per frame, in degrees. 0 (or 180+) = point straight at the target every frame.'),
     ('Range', 1, 'Only targets within this distance (X/Y). 0 = any distance.'),
     ('Mode', 0, 'Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).'),
+    ('TargetOwner', 0, '1 = a projectile may also target the fighter who fired it (normally skipped). Fighters: no effect.'),
+    ('TargetTeammates', 0, '1 = may target teammates even when team attack is off (normally skipped then; with team attack on they are always targets).'),
 ]
 
 
@@ -767,6 +769,16 @@ h_track:
         fmuls f1, f1, f1
         stfs f1, 0x18(r29)
         lwz r0, 0x10(r30)
+        lwz r11, 0x14(r30)              # TargetOwner -> mode bit 0x100
+        cmpwi r11, 0
+        beq ht_noown
+        ori r0, r0, 0x100
+ht_noown:
+        lwz r11, 0x18(r30)              # TargetTeammates -> mode bit 0x200
+        cmpwi r11, 0
+        beq ht_notm
+        ori r0, r0, 0x200
+ht_notm:
         stw r0, 0x1C(r29)               # mode
         lfs f1, 8(r30)                  # turn rate (degrees)
         lis r12, zero@ha
@@ -792,7 +804,7 @@ ht_step:
         cmpwi r0, -1
         bne ht_out
         lwz r11, 4(r31)
-        addi r11, r11, 24
+        addi r11, r11, 32               # 8 words
         stw r11, 4(r31)
 ht_out:
         li r3, 2
@@ -852,12 +864,18 @@ ts_self_done:
                                         # reflect) differs from link 0's (the original owner)""" + fl('r3', 'ts_vel') + """
         lwz r3, 0x34(r3)
         cmpw r3, r27
-        beq ts_vel
+        beq ts_ownbit
         lis r0, 0x5000                  # (no object)
         cmpw r3, r0
-        beq ts_vel
+        beq ts_ownbit
         mr r21, r27                     # go for the original owner; skip the reflector
         mr r27, r3
+        b ts_vel
+ts_ownbit:
+        lwz r0, 0x1C(r31)               # TargetOwner: the owner is a target like any other
+        andi. r0, r0, 0x100
+        beq ts_vel
+        li r27, -1
 ts_vel:
         cmpwi r26, 0
         beq ts_vel_w

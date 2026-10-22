@@ -281,8 +281,8 @@ wr_l:
     h = a.addr('h_track')
     state, flag, params = 0x10373000, 0x10374000, 0x10375000
 
-    def track(frames, speed, turn, rng, mode):
-        pm.mem_write(params, struct.pack('>iff', frames, speed, turn) + struct.pack('>fi', rng, mode))
+    def track(frames, speed, turn, rng, mode, owner=0, mates=0):
+        pm.mem_write(params, struct.pack('>iff', frames, speed, turn) + struct.pack('>fiii', rng, mode, owner, mates))
         w32(pm, state + 4, 0x1000)
         w32(pm, state + 8, -1)
         pm.mem_write(flag + 8, b'\1')
@@ -292,7 +292,7 @@ wr_l:
     def vel(km):
         return tuple(round(x, 3) for x in struct.unpack('>ff', pm.mem_read(km + 0x300, 8)))
     pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
-    check('Track_Target: returns 2, steps 6 words', track(3, 2.0, 0.0, 0.0, 0), (2, 24))
+    check('Track_Target: returns 2, steps 8 words', track(3, 2.0, 0.0, 0.0, 0), (2, 32))
     ent = [C.OBJS + C.OBJ_SIZE * k for k in range(C.OBJ_N) if r32(pm, C.OBJS + C.OBJ_SIZE * k) == me_wm]
     check('Track_Target: entry frames / speed / mode', ent and (r32(pm, ent[0] + 8), struct.unpack('>f', pm.mem_read(ent[0] + 0xC, 4))[0], r32(pm, ent[0] + 0x1C)), (3, 2.0, 0))
     frame(me)
@@ -328,6 +328,10 @@ wr_l:
     pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
     frame(me)
     check('reflected back by the owner: at the foe again', vel(me_km), (0.0, 2.0))
+    pm.mem_write(me_km + 0x300, struct.pack('>ff', 1.0, 0.0))
+    track(3, 2.0, 0.0, 0.0, 0, owner=1)
+    frame(me)
+    check('TargetOwner=1: the owner (nearest) is a target', vel(me_km), (0.0, -2.0))
     track(5, 2.0, 0.0, 0.0, 0)
     w32(pm, 0x10390000 + 0x28, me_wm)
     run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: 0x10390000})
@@ -338,7 +342,7 @@ wr_l:
     w32(pm, 0x7E001FF0, 0x7E002000)
     pm.mem_write(foe_km + 0x200, struct.pack('>ff', 0.0, 0.0))
     run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
-    pm.mem_write(params, struct.pack('>iff', 3, 1.5, 0.0) + struct.pack('>fi', 0.0, 0))
+    pm.mem_write(params, struct.pack('>iff', 3, 1.5, 0.0) + struct.pack('>fiii', 0.0, 0, 0, 0))
     run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
     frame(foe)
     log, p = [], 0x7E002000
