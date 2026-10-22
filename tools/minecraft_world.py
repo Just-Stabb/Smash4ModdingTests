@@ -2400,7 +2400,28 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             cols += block_collisions(blocks, occ, gx0, gy0, block_mats)
     else:
         cols = [direct_collision(c, k + 1) for k, c in enumerate(solid)]
-    floors = merged_floors([c for c in ucols if c['through']])
+    through = [c for c in ucols if c['through']]
+    branch_links = set()
+    if blocks and BREAKABLE:
+        # a pass-through piece on top of a throughable block (the trees' branch rows: their
+        # platforms) is that block's: rigged in its link, switched off when it breaks (v18d; v18c
+        # kept the platforms whole, floating after their branches broke)
+        flagged = {(x, y + 1): n for n, (_k, x, y, z, f) in enumerate(blocks) if z == 0 and f}
+        rest = []
+        for c in through:
+            (ax, ay), (bx, by) = sorted((tuple(c['verts'][0]), tuple(c['verts'][-1])))
+            n = flagged.get((int(round(ax / 10)), int(round(ay / 10))))
+            if n is None or ay != by or bx - ax != 10 or ax % 10 or ay % 10:
+                rest.append(c)
+                continue
+            col = lvd.collision('COL_00_Blk%02d_top' % n, [(ax, ay), (bx, by)], [(0, 1)], [mat_bytes(c['mats'][0])],
+                                drop_through=True)
+            col.subname = (BLOCK_LINK % n) + '__blk__'
+            col.flags[1] = 1                # rigged: in the link the cave switches off
+            cols.append(col)
+            branch_links.add(n)
+        through = rest
+    floors = merged_floors(through)
     for k, (verts, m) in enumerate(floors):
         c = lvd.collision('COL_00_Platform%02d_through' % (k + 1), verts, [(0, 1)] * (len(verts) - 1),
                           [mat_bytes(m)] * (len(verts) - 1), drop_through=True)
@@ -2414,8 +2435,9 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
         plane = {(x, y): i for i, (_k, x, y, z, _f) in enumerate(blocks) if z == 0}
         table = [dict(x=x * 10 + 5.0, y=y * 10 + 5.0, z=z * 10.0, life=float(info[k]['life']),
-                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and not f), leader=plane[(x, y)])
-                 for k, x, y, z, f in blocks]
+                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and (not f or n in branch_links)),
+                      leader=plane[(x, y)])
+                 for n, (k, x, y, z, f) in enumerate(blocks)]
     else:
         table = []
     return cols, blocks, sorted(events), table

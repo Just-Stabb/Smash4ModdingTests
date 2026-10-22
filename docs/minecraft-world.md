@@ -24,8 +24,8 @@ Deliverables (git-ignored `build/`):
 - `minecraft_world.zip`: both stage folders (Plains, hazards on) and the stage-select pictures
   (`ui/...`, same files / texture IDs / formats as `new_stage_pictures.zip`): Ultimate's own preview
   (`stage_2_pickel_world`) in the preview, tiles and icons, the "MINECRAFT" logo in the series logo
-  (`stagel_10`: red = the logo's fill, green = its silhouette, as the Smash Bros. logo there) and a
-  "Minecraft World" name banner.
+  (`stagel_10`; v18d: Ultimate's cube series symbol instead, `tools/stage_series_logo.py`) and a
+  name banner (v18d: "Minecraft").
 - `minecraft_world_biomes.zip`: every other biome / hazards combination (`<biome>_hazards_on|off`):
   the three model folders and `NewStage0100.lvd` that differ; copy one over `stage/melee/NewStage01`.
 - `moving_platform_test.zip`: the moving-platform test (below) on v6, with its RPX.
@@ -1006,6 +1006,28 @@ garbled ("the previous texture bug") and a broken block's collision stayed.
   grows the box to a power of two each way and names it `all_blocks_blk_<model>`: drawn 4x with
   nearest pixels, exact (every block model sampled at random points inside its triangles: the
   same texels as the atlas). 32 x 32 to 512 x 64 source pixels a block.
+
+
+### v18d: tree branches, the name and logo
+
+v18c in game (user): the textures and breaking work; the birch forest's trees collide
+inconsistently (no collision, walls, falling through). The user's rule: every block solid, the
+branches the trees' platforms, reached by breaking the leaves over them. Ultimate's data has it so:
+the branch rows are its only throughable blocks (`flags` 1: birch logs `_02`), under the lvd's two
+pass-through platforms (y 30 and 40, cut in 10-unit pieces, one a block), with solid leaves over
+them. v18c kept those platforms whole and static, so a broken branch's piece of platform stayed in
+the air. v18d makes each piece over a throughable block that block's (`COL_00_BlkNN_top`, rigged in
+its link, pass-through; the block table's link set), switched off with it when it breaks; pieces
+over no such block stay merged (stone shore's). Whether the trees now feel consistent is for the
+game to tell; the leaves over the branches are solid as asked.
+
+Name and logo (user: "Minecraft" with the Minecraft symbol): the name banner (`stagen_10`) says
+"Minecraft" (`tools/stage_name_banner.py`), `MmelStageN_` / `MmelStageG_NewStage01` = "Minecraft"
+(were "New Stage" / "Battlefield"), and the game-logo slot (`stagel_10`) has Ultimate's cube series
+symbol (`series_1_minecraft.bntx`): `tools/stage_series_logo.py` draws a white symbol the game's way,
+read off its own logos (red: a grayscale picture of the logo, white fill and black outline on white;
+green: the silhouette with a soft edge). v15-v18c's "MINECRAFT" wordmark had red the other way round
+(fill on black), which the green kept hidden.
 
 ## Freeze (user) and tests
 
