@@ -152,6 +152,9 @@ class Asm:
         if op in ("mr", "mr."):
             s = reg(args[1])
             return (31 << 26) | (s << 21) | (reg(args[0]) << 16) | (s << 11) | (444 << 1) | (op == "mr.")
+        if op in ("rlwimi", "rlwimi."):
+            ra, rs, sh, mb, me = reg(args[0]), reg(args[1]), num(args[2]), num(args[3]), num(args[4])
+            return (20 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | (op == "rlwimi.")
         if op in ("rlwinm", "rlwinm."):
             ra, rs, sh, mb, me = reg(args[0]), reg(args[1]), num(args[2]), num(args[3]), num(args[4])
             return (21 << 26) | (rs << 21) | (ra << 16) | (sh << 11) | (mb << 6) | (me << 1) | (op == "rlwinm.")
