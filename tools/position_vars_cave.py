@@ -91,7 +91,7 @@ STAT_CAVE = 0x037EE160     # kirby_stat_cave.py: the get_float path for every ot
 CAVE = 0x037EDC78          # free: 0x037EDC78-0x037EE098 (between the star cave's two parts)
 LIMIT = 0x037EE098
 CAVE2 = 0x037EE280         # free: after the stat cave's table, up to copy_custom_cave.py's CAVE_C
-LIMIT2 = 0x037EE400
+LIMIT2 = 0x037EE3F4         # 0x037EE3F4-0x037EE400: stage_omega_cave.py's trampolines
 # WorkModuleImpl add/sub/mul/div float (vtable +0x64/+0x6C/+0x74/+0x7C) work on the tables
 # directly; for these IDs they are turned into a read and a write. (hook, first instruction)
 ARITH = [(0x0200F73C, "rlwinm r12, r4, 8, 28, 31"), (0x0200F764, "rlwinm r12, r4, 8, 28, 31"),

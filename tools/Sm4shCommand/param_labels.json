@@ -1179,7 +1179,7 @@
   },
   "4": {
    "name": "Mode",
-   "desc": "Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).",
+   "desc": "Bits: 1 = horizontal only (ignore height), 2 = turn to face the target (fighters), 4 = no gravity while tracking (fighters; it comes back when tracking ends).",
    "confidence": "high"
   },
   "5": {
@@ -11731,7 +11731,7 @@
    "confidence": "high"
   },
   "_name": "CHANGE_KINETIC",
-  "_desc_extra": "(Descriptive name: the real name is unknown; was unk_92A88908.)"
+  "_desc_extra": "(Descriptive name: the real name is unknown; was unk_92A88908.) The kinetic types are listed in Set_Kinetic_Handler's description."
  },
  "932D9A40": {
   "_command": "ATK_POWER_ADD",

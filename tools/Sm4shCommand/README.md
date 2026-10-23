@@ -9,7 +9,7 @@ Sm4shCommand and the SALT library it builds on, copied from Sammi Husky's reposi
 Both are by Sammi Husky; see `SM4SHCommand/LICENSE.txt`, `SM4SHCommand/COPYING.txt` and
 `SALT/LICENSE`. Sm4shCommand uses FastColoredTextBox (LGPLv3), included as `FastColoredTextBox.dll`.
 
-**Version:** v1.4.1 (title bar and Help > About). v1.4.1: Hitbox Viewer fixes (Extra hitbox commands, fractional FRAME / WAIT timers, the selected tab's script) and a DI multiplier. v1.4.0: usage examples in View > Commands.
+**Version:** v1.4.2 (title bar and Help > About). v1.4.2: kinetic types listed in Set_Kinetic_Handler's description; Track_Target Mode bit 4 (no gravity). v1.4.1: Hitbox Viewer fixes (Extra hitbox commands, fractional FRAME / WAIT timers, the selected tab's script) and a DI multiplier. v1.4.0: usage examples in View > Commands.
 
 **Run:** needs .NET Framework 4 (built into Windows 10/11). Windows may warn that the exe is from an
 unknown publisher ("More info" > "Run anyway"); if the zip was downloaded, right-click it > Properties >

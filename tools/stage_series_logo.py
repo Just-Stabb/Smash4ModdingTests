@@ -3,6 +3,12 @@
 Ultimate's series symbols, ui/replace_patch/series/series_1/series_1_<series>.bntx: tools/bntx.py png).
 
   python3 tools/stage_series_logo.py SYMBOL.png TEMPLATE.nut OUT.nut [--png PREVIEW.png]
+  python3 tools/stage_series_logo.py --two-channel LOGO.png TEMPLATE.nut OUT.nut [--png PREVIEW.png]
+
+--two-channel: LOGO is already drawn the game's way (red the picture, green the alpha), e.g. Smash
+Ultimate's stage logos (ui/replace_patch/stage/stage_0/stage_0_<stage>.bntx: the "MINECRAFT" logo,
+tools/bntx.py png). It's cropped to its silhouette and scaled to fit WIDE x HEIGHT (the game's wide
+logos, Metroid / Pikmin / Pac-Land: ~215 px across), centred.
 
 The game's logos (stagel_10_*: BC5, 256x128) are drawn as two channels, read off its own (Battlefield's
 "Super Smash Bros. for Wii U", Mega Man, Fire Emblem): red a grayscale picture of the logo (white
@@ -25,6 +31,7 @@ HEIGHT = 112            # the symbol's height on the logo (the game's logos fill
 OUTLINE = 4             # px of black outline around the symbol (the game's logos: ~3-6)
 GLOW = 2.0              # the silhouette's soft edge (Gaussian radius)
 FACE = 40               # red inside the symbol's enclosed parts (dark)
+WIDE = 216              # --two-channel: the most a logo spans across (the game's: x 17-238)
 
 
 def filled(mask):
@@ -60,14 +67,34 @@ def logo(symbol):
     return out
 
 
+def fit(logo_img):
+    """a two-channel logo (red picture, green alpha) cropped to its silhouette, scaled into W x H"""
+    a = np.asarray(logo_img.convert('RGBA')).astype(float)
+    ys, xs = np.nonzero(a[..., 1] > 8)
+    a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    scale = min(WIDE / a.shape[1], HEIGHT / a.shape[0])
+    w, h = max(1, round(a.shape[1] * scale)), max(1, round(a.shape[0] * scale))
+
+    def sized(ch):
+        return np.asarray(Image.fromarray(ch.clip(0, 255).astype(np.uint8)).resize((w, h), Image.LANCZOS))
+    red, green = np.full((H, W), 255, np.uint8), np.zeros((H, W), np.uint8)
+    y0, x0 = (H - h) // 2, (W - w) // 2
+    red[y0:y0 + h, x0:x0 + w] = sized(a[..., 0])
+    green[y0:y0 + h, x0:x0 + w] = sized(a[..., 1])
+    out = np.zeros((H, W, 4), np.uint8)
+    out[..., 0], out[..., 1], out[..., 3] = red, green, 255
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('symbol')
     ap.add_argument('template')
     ap.add_argument('out')
     ap.add_argument('--png')
+    ap.add_argument('--two-channel', action='store_true')
     a = ap.parse_args()
-    img = logo(Image.open(a.symbol))
+    img = fit(Image.open(a.symbol)) if a.two_channel else logo(Image.open(a.symbol))
     d, texs = nut.load(a.template)
     t = texs[0]
     assert (t.w, t.h) == (W, H), (t.w, t.h)

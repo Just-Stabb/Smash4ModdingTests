@@ -72,7 +72,8 @@ OBJS = 0x04B94000                # OBJ_N entries of OBJ_SIZE (zero at load)
 OBJ_N = 48
 OBJ_SIZE = 0x100                 # +0 WorkModule, +4 accessor (last seen), +8 tracking frames left (int, < 0 = until
                                  # stopped), +0xC speed, +0x10 cos(turn) (< -1.5: turn at once), +0x14 sin(turn),
-                                 # +0x18 range squared (0 = any), +0x1C mode, +0x20 timers[16], +0x60 vars[32]
+                                 # +0x18 range squared (0 = any), +0x1C mode, +0x20 timers[16], +0x60 vars[32],
+                                 # +0xE0 no-gravity tracking: the vertical speed last set, +0xE4 1 = +0xE0 is set
 ACC_CACHE = 0x04B97000           # 64 x {WorkModule, accessor}, filled by the per-frame hook for every object
 THREADS = 0x04B98000             # THREAD_N slots of THREAD_SIZE: +0 accessor (0 = free), +4 script table (the
 THREAD_N = 32                    # handler's r4), +8 ID, +0xC flags (0x80000000 = stop after this frame),
@@ -92,6 +93,7 @@ FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0] = fighter table: +0 entries,
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object ID, +0xC accessor, byte +0x1E >= 4 = live
 KINETIC_W = 0x030B29D8           # MSC module wrappers: wrapper(ctx (+4 = accessor), {words, count})
 POSTURE_W = 0x030B2AB8
+KINETIC_FW = 0x030B2A10          # KineticModuleF (vt +0x11C, float result in f1): (0xB, energy) = its Y speed
 OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
 OBJ_ORIG.update({h: 0x9421FFC8 for h in STEP_HOOKS})
 
@@ -148,7 +150,7 @@ TRACK_PARAMS = [
     ('Speed', 1, 'Travel speed while tracking. 0 = keep the current speed (and turn it).'),
     ('TurnRate', 1, 'Most the direction can turn per frame, in degrees. 0 (or 180+) = point straight at the target every frame.'),
     ('Range', 1, 'Only targets within this distance (X/Y). 0 = any distance.'),
-    ('Mode', 0, 'Bits: 1 = horizontal only (ignore height; fighters keep gravity), 2 = turn to face the target (fighters).'),
+    ('Mode', 0, 'Bits: 1 = horizontal only (ignore height), 2 = turn to face the target (fighters), 4 = no gravity while tracking (fighters; it comes back when tracking ends).'),
     ('TargetOwner', 0, '1 = a projectile may also target the fighter who fired it (normally skipped). Fighters: no effect.'),
     ('TargetTeammates', 0, '1 = may target teammates. Normally a fighter this object can\'t hit because of teams (its hurt team = this object\'s attack team: a teammate with team attack off) is skipped.'),
 ]
@@ -870,6 +872,8 @@ ht_noown:
         ori r0, r0, 0x200
 ht_notm:
         stw r0, 0x1C(r29)               # mode
+        li r0, 0
+        stw r0, 0xE4(r29)               # no-gravity: nothing set yet
         lfs f1, 8(r30)                  # turn rate (degrees)
         lis r12, zero@ha
         lfs f0, zero@l(r12)
@@ -1148,8 +1152,34 @@ ts_fighter:""" + kcall(KINETIC_W, [0x11, 3, ('f', 0x20), 0]) + kcall(KINETIC_W, 
         + kcall(KINETIC_W, [0xB, 3]) + """
         lwz r0, 0x1C(r31)
         andi. r0, r0, 1
-        bne ts_face""" + kcall(KINETIC_W, [0x11, 1, ('f', 0x24)]) + kcall(KINETIC_W, [0xF, 1, 0])
-        + kcall(KINETIC_W, [0x14, 1, ('f', 0x4C)]) + kcall(KINETIC_W, [0xB, 1]) + """
+        bne ts_face
+        lwz r0, 0x1C(r31)
+        andi. r0, r0, 4                 # no gravity: put back what gravity took since the last frame
+        beq ts_vy                       # (the gravity energy's own acceleration and limit are left alone,
+        lwz r0, 0xE4(r31)               # so nothing has to be restored when tracking ends)
+        cmpwi r0, 0
+        beq ts_vy""" + kcall(KINETIC_FW, [0xB, 1]) + """
+        lfs f2, 0xE0(r31)               # set last frame - now = what gravity took
+        fsubs f2, f2, f1
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        fcmpu cr0, f2, f0
+        bge ts_gpos
+        fmr f2, f0
+ts_gpos:
+        lfs f0, gmax@l(r12)
+        fcmpu cr0, f2, f0
+        ble ts_gok
+        fmr f2, f0
+ts_gok:
+        lfs f3, 0x24(r1)
+        fadds f3, f3, f2
+        stfs f3, 0x24(r1)
+ts_vy:
+        lwz r0, 0x24(r1)
+        stw r0, 0xE0(r31)
+        li r0, 1
+        stw r0, 0xE4(r31)""" + kcall(KINETIC_W, [0x11, 1, ('f', 0x24)]) + kcall(KINETIC_W, [0xB, 1]) + """
 ts_face:
         lwz r0, 0x1C(r31)
         andi. r0, r0, 2
@@ -1179,6 +1209,8 @@ deg180:
         .float 180.0
 deg2rad:
         .float 0.017453292
+gmax:                                   # no-gravity tracking: the most it puts back a frame (gravity: < 0.2;
+        .float 1.0                      # more means landing or a status change reset the speed)
 obj_next:
         .word 0
 """ + ''.join("k_%d:\n        .float %r\n" % (d, 1.0 / d) for d in (72, 42, 20, 6, 56, 30, 12, 2)))

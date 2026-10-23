@@ -188,6 +188,10 @@ link_id:                        # vt +0x6C -> the owner's object ID
         lis r3, 0x7E00
         lwz r3, 0x1F00(r3)
         blr
+fwrapper:                       # KineticModuleF wrapper: f1 = the float at 0x7E001FE0 (energy 1's Y speed)
+        lis r11, 0x7E00
+        lfs f1, 0x1FE0(r11)
+        blr
 wrapper:                        # MSC module wrapper(ctx, {words, n}): log [n, words...] at 0x7E002000+
         lis r11, 0x7E00
         lwz r12, 0x1FF0(r11)
@@ -210,9 +214,9 @@ wr_l:
         w32(pm, 0x7E000000 + 4 * i, w)
     # the game's wrappers -> the logging stub
     wa = stubs.addr('wrapper')
-    for wrap in (C.KINETIC_W, C.POSTURE_W):                 # lis r12 / ori r12 / mtctr r12 / bctr
-        for i, wd in enumerate([0x3D800000 | (wa >> 16), 0x618C0000 | (wa & 0xFFFF), 0x7D8903A6, 0x4E800420]):
-            w32(pm, wrap + 4 * i, wd)
+    for wrap, to in ((C.KINETIC_W, wa), (C.POSTURE_W, wa), (C.KINETIC_FW, stubs.addr('fwrapper'))):
+        for i, wd in enumerate([0x3D800000 | (to >> 16), 0x618C0000 | (to & 0xFFFF), 0x7D8903A6, 0x4E800420]):
+            w32(pm, wrap + 4 * i, wd)       # lis r12 / ori r12 / mtctr r12 / bctr
     # objects: accessor +0x18 posture, +0x28 WorkModule, +0x34 KineticModule, +0x68 LinkModule
     def obj(base, x, y):
         acc, post, wm, km, lm, vt = base, base + 0x100, base + 0x200, base + 0x400, base + 0x800, base + 0x900
@@ -375,8 +379,36 @@ wr_l:
         log.append([r32(pm, p + 4 + 4 * i) for i in range(n)])
         p += 4 + 4 * n
     fb = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]      # noqa: E731
-    check('fighter: kinetic ops (as Kirby side B), straight down at speed 1.5', log,
-          [[0x11, 3, fb(0.0), 0], [0x10, 3, 0, 0], [0xB, 3], [0x11, 1, fb(-1.5)], [0xF, 1, 0], [0x14, 1, fb(1.5)], [0xB, 1]])
+    check('fighter: kinetic ops, straight down at speed 1.5 (gravity and its limit left alone)', log,
+          [[0x11, 3, fb(0.0), 0], [0x10, 3, 0, 0], [0xB, 3], [0x11, 1, fb(-1.5)], [0xB, 1]])
+
+    # Mode 4: no gravity. The gravity energy's Y speed set each frame gets back what gravity took
+    # since the last frame (KineticModuleF(0xB, 1) now vs what was set), 0..1
+    def ops():
+        log, p = [], 0x7E002000
+        while p < r32(pm, 0x7E001FF0):
+            n = r32(pm, p)
+            log.append([r32(pm, p + 4 + 4 * i) for i in range(n)])
+            p += 4 + 4 * n
+        return log
+
+    def vy_set(now):
+        w32(pm, 0x7E001FF0, 0x7E002000)
+        pm.mem_write(0x7E001FE0, struct.pack('>f', now))
+        frame(foe)
+        ys = [o for o in ops() if o[:2] == [0x11, 1]]
+        return round(struct.unpack('>f', struct.pack('>I', ys[0][2]))[0], 4) if ys else None
+    pm.mem_write(params, struct.pack('>iff', -1, 1.5, 0.0) + struct.pack('>fiii', 0.0, 4, 0, 0))
+    run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
+    check('no gravity, first frame: the speed as is', vy_set(0.0), -1.5)
+    check('no gravity: gravity took 0.1 -> set 0.1 more', vy_set(-1.6), -1.4)
+    check('no gravity: steady (took 0.1 again)', vy_set(-1.5), -1.4)
+    check('no gravity: a reset speed (landing) puts back at most 1', vy_set(-9.0), -0.5)
+    check('no gravity: speed gained (not lost) -> nothing put back', vy_set(5.0), -1.5)
+    check('no gravity: no gravity / limit ops', [o for o in ops() if o[0] in (0xF, 0x14)], [])
+    pm.mem_write(params, struct.pack('>iff', 0, 0.0, 0.0) + struct.pack('>fiii', 0.0, 0, 0, 0))
+    run(pm, h, RET, {UC_PPC_REG_3: foe, UC_PPC_REG_5: state, UC_PPC_REG_6: flag, UC_PPC_REG_7: params})
+    check('Track_Target(0) stops it: no more ops', vy_set(-1.0), None)
 
 
 def thread_tests(pm, om, a):

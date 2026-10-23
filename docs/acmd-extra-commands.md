@@ -68,7 +68,7 @@ script).
 | Speed | float | Travel speed while tracking. 0 keeps the current speed and only turns it. |
 | TurnRate | float | The most the direction can turn per frame, in degrees. 0 (or 180 and up) points straight at the target every frame. |
 | Range | float | Only targets within this X/Y distance count. 0 means any distance. With no target in range, the object keeps going as it was. |
-| Mode | int | Bit 1: horizontal only (height is ignored; fighters keep their gravity). Bit 2: fighters turn to face the target. |
+| Mode | int | Bit 1: horizontal only (height is ignored). Bit 2: fighters turn to face the target. Bit 4: no gravity while tracking (fighters). |
 | TargetOwner | int | 1: a projectile may also target the fighter who fired it (normally skipped). |
 | TargetTeammates | int | 1: teammates are targets too. Normally a fighter on the tracker's team is skipped when the game wouldn't let the tracker hit them. |
 
@@ -82,8 +82,15 @@ script).
     (Range doesn't apply). If that fighter isn't there (KO'd), it goes for the nearest fighter
     other than the one who reflected it. Reflected back again by its owner, it behaves normally.
 - **Fighters:**
-  - Sets their speed the way Kirby's side-B homing does: X and Y speed, no braking and, unless
-    horizontal only, no gravity while tracking.
+  - Sets their X and Y speed every frame (X through the same energy as `Add/Set_Momentum`, with no
+    braking; Y through the gravity energy).
+  - **Gravity** (user: Track_Target left Roy with no gravity after it): gravity keeps acting while
+    tracking, so a slow track sags a little each frame. Mode bit 4 cancels it: each frame the
+    vertical speed set gets back what gravity took since the last frame (at most 1; a landing or a
+    status change that resets the speed isn't "put back"). The gravity energy's own acceleration and
+    fall-speed limit are never changed, so nothing is left over when tracking ends. (Before this fix it
+    zeroed the acceleration and set the limit to Speed, the way Kirby's side-B homing does, and
+    never put them back: the fighter kept no gravity for the rest of the move.)
   - It works in the air. On the ground the fighter's status may move them its own way.
 - **Teams:** a fighter is skipped when their "hurt team" equals the tracker's "attack team". That
   is the pair the game compares when deciding whether an attack can hit someone, so these are the

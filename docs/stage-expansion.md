@@ -225,3 +225,34 @@ bytes changed).
   (`tools/minecraft_music.py`, `docs/minecraft-world.md`); untested in game yet.
 - **Online / replays** store stage ids; a modded stage there is untested.
 - Other `0x80` / `0x38` bounds checks on kinds or cosmetic ids that only show up in game.
+
+## Normal / Omega on the stage select (`tools/stage_omega_cave.py`)
+
+User: stages should start on their Omega form, as the modded stage select used to, except new stages
+(Minecraft World), which should start on their normal form.
+
+The stage select's form switch (StageSelectScene `+0x160`; label tables `0x103407A8` / `0x103407B4`):
+state `+8` is 0 normal ("normal"), 1 Omega ("terminate"), 2 My Music ("music"). `0x0298C948` gives the
+state shown (Omega falls back to normal where it isn't allowed), `0x0298C984(switch, state, sound)`
+sets it. The scene's setup (`0x022421F4`) starts it at `0x02242ABC`: rule modes 3 / 4 (scene `+0x1A4`)
+force normal / Omega, otherwise the player's remembered form (the rule's per-player block,
+`+0x74 + player * 0x80`, byte 2: 1 normal, 0 Omega), so the game itself starts on whatever form was
+picked last. The input handler `0x0298CA84` sets the state every frame (changed by the button; a touch
+path at `0x022466B8` too). The confirm, `0x02245B18(scene, stage, ..)`, reads the form from the switch
+(`form = !isOmega(scene)`, `0x022453D8`, called at `0x02245BB0` with r29 = the stage) into the block
+it hands the match setup (`0x030197FC` / `0x02FFC604`; the match picks the stage kind from it,
+`0x03019780` -> `0x030A9000(db, id, normal)`: `+0x10` normal kind, `+0x18` Omega kind).
+
+The cave:
+- the normal-play start always takes the Omega branch (`0x02242AC8` `beq` -> `b`) and clears a
+  "flipped" flag (`0x02242AD8` `li r4, 1` -> `bl entry`);
+- the two `0x0298C984` calls that follow input set "flipped" when the state asked for differs from the
+  current one;
+- the confirm's isOmega call gives 0 (normal) for a stage id `0x38`-`0xC7` (the new stages) while
+  "flipped" is clear. Flipping the switch (to Omega, or to normal and back) picks the form as usual.
+
+The code is in the grown space (`0x04B84800`); the stage select is more than 32 MB from it, so the
+patched calls go through three `b` trampolines at `0x037EE3F4` (`position_vars_cave.py`'s second area
+now stops there). `tools/stage_omega_test.py PATCHED.rpx ORIGINAL.rpx` checks it in unicorn. Untested
+in game: the switch's look while hovering a new stage still says Omega (only the confirmed form
+differs).

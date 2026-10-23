@@ -24,7 +24,8 @@ Deliverables (git-ignored `build/`):
 - `minecraft_world.zip`: both stage folders (Plains, hazards on) and the stage-select pictures
   (`ui/...`, same files / texture IDs / formats as `new_stage_pictures.zip`): Ultimate's own preview
   (`stage_2_pickel_world`) in the preview, tiles and icons, the "MINECRAFT" logo in the series logo
-  (`stagel_10`; v18d: Ultimate's cube series symbol instead, `tools/stage_series_logo.py`) and a
+  (`stagel_10`; v18d: Ultimate's cube series symbol instead, `tools/stage_series_logo.py`; v18h: the
+  "MINECRAFT" logo again, `--two-channel`) and a
   name banner (v18d: "Minecraft").
 - `minecraft_world_biomes.zip`: every other biome / hazards combination (`<biome>_hazards_on|off`):
   the three model folders and `NewStage0100.lvd` that differ; copy one over `stage/melee/NewStage01`.
@@ -1135,3 +1136,19 @@ is the stage's dump with its `param` folders (used above). `ui-SSBU.zip` has the
 (`ui/replace_patch/stage/stage_0`-`stage_4/stage_N_pickel_world.bntx`: the "MINECRAFT" logo, a small
 icon, the normal / Omega / Battlefield-form previews) and the series symbol
 (`ui/replace_patch/series/series_0|1/series_N_minecraft.bntx`, a cube).
+
+
+### v18h: the "MINECRAFT" logo, Omega by default
+
+User: the stage preview should have the Smash Minecraft logo, not the block symbol; stages should start
+on Omega, except new ones like Minecraft World. The game-logo slot (`stagel_10_NewStage01.nut`) is
+Ultimate's own stage logo again (`stage_0_pickel_world.bntx`, 160 x 80), which is drawn the Smash 4
+way already (red a grayscale picture, white around it; green the alpha): `tools/stage_series_logo.py
+--two-channel` crops it to its silhouette and scales it to the width of the game's wide logos (216 px,
+as Metroid / Pikmin 3), centred, keeping the template's texture ID:
+
+    python3 tools/bntx.py png stage_0_pickel_world.bntx s0.png
+    python3 tools/stage_series_logo.py --two-channel s0.png stagel_10_NewStage01.nut OUT.nut
+
+(v15-v18c's wordmark was a redrawn one with red inverted, hidden by its green.) The Omega default is
+`tools/stage_omega_cave.py` (docs/stage-expansion.md, "Normal / Omega on the stage select").
