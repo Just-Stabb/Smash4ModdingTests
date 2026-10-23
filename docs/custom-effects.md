@@ -114,10 +114,10 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   start frame (`0x04A64F70`), not an absolute frame. `xv2_to_ptcl` now writes both (and checks
   the buffer count per emitter: at most 196 here). Test 5: `build/supamario_kame_test5.zip`, the
   normal taunt layout.
-- Test 5 in game: no crash, all three taunts work. The beam head's models were back to front
-  against its particles (the white ball next to Supamario, the stream ahead): the converted EMOs
-  face their +Z, the particles' frame its -Z. Test 6 (`build/supamario_kame_test6.zip`): the
-  models not turned (`MODEL_YROT` 0), the particles still turned 180.
+- Test 5 in game: no crash, all three taunts work. The beam-head models sit back to front
+  against the particles (the white ball next to Supamario, the stream ahead): the user wants it
+  that way, as the beam's end will be a separate effect from the head so it can travel with the
+  beam body (for the move: head and end as separate effect ids).
 - Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
   an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
   (the cape at Z 9).

@@ -22,7 +22,7 @@ OUT_DIR/fighter/supamario/script/animcmd/body/effect.bin + sound.bin.
   4ptcl x1.6, LineAll, Hand model x0.45; the beam-head sound.
   All with Terminate = 1 (they end with the taunt; the beam parts loop until then, and the down
   taunt also stops its parts with Terminate_Graphic_Effect at frame 96). The beam-head parts are
-  turned 180 degrees (HEAD_YROT; the models MODEL_YROT, not turned); the models get MODEL_OPTS. The taunts'
+  turned 180 degrees (HEAD_YROT); the models get MODEL_OPTS. The taunts'
   own effect scripts (the up taunt's colour flashes) are replaced; their sound scripts keep their
   sounds, with ours at frame 0.
 """
@@ -47,9 +47,6 @@ FRONT = (0.0, 7.0, 14.0)          # the beam head: bone 0 (Top), 7 up, 14 in fro
 # the XV2 parts at TRS face their -Z (test 1, 2026-10-23: with +Z forward the head did not point the
 # way Supamario faces): turned 180 degrees about Y, so their z offsets change sign too
 HEAD_YROT = 180.0
-# test 5: the models came out back to front against the particles (the white ball next to
-# Supamario, the stream ahead of it): the converted EMOs face their +Z, so they are not turned
-MODEL_YROT = 0.0
 DOWN_END = 96                     # the down taunt (100 frames) ends its looping parts here
 # model conversion options (tools/xv2_to_nud.py): --plain 1 everywhere (only the material settings
 # the game's effect models use); Kmh_Hand without its subtractive 'hand' mesh. Test 1 crashed on the
@@ -104,8 +101,8 @@ def taunt_script(parts, ids, end=None):
         if bone == 0:
             off = off or (0, 0, 0)
             x, y = FRONT[0] + off[0] * UNIT, FRONT[1] + off[1] * UNIT
-            yrot = MODEL_YROT if name.startswith(MODEL_PREFIX) else HEAD_YROT
-            z = FRONT[2] + (-off[2] if yrot == 180.0 else off[2]) * UNIT
+            z = FRONT[2] + (-off[2] if HEAD_YROT == 180.0 else off[2]) * UNIT
+            yrot = HEAD_YROT
         else:
             x = y = z = 0.0
         out.append(cmd('external_graphic', (BANK << 16) | ids[name], bone, float(x), float(y), float(z),
