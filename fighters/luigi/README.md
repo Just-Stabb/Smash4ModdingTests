@@ -34,10 +34,8 @@ Same code as Captain Falcon's (the common function numbers match):
 
 ## Forward air
 
-No animation movement (user): the motion energy (energy 0, the animation's own movement) is turned
-off (`KineticModule(0x7, 0)`) when the aerial is forward air (motion `0x69`, `func_310`) and again
-every frame of it with its speed zeroed (AttackAir exec `func_340`). The jump / air speed (energies
-2 / 3) isn't touched, so forward air keeps Luigi's momentum.
+Normal movement again (user): the earlier change that turned its animation movement off (motion
+energy off in `func_310` and every frame in `func_340`) is removed; both are the game's own again.
 
 ## Melee air dodge / wavedash (from the modded MSC)
 
@@ -81,6 +79,12 @@ pieces below are ported from that decompile (and the bytecode where it still fai
   him `wavedash_snap_gap()` (0.1) above that floor and aims the dodge like the jumpsquat's (89° for
   straight left / right), so it lands at once (`wavedash_snap()`, in `func_62` before the stick-down
   code). Only after a jump, where the floor's height is known; stick up or neutral: a normal dodge.
+- **Backward wavedash** (user: it often came out as a back roll, or shielded from the same press):
+  a roll whose first `wavedash_early_frames()` (3) frames see a jump press (button or jump command)
+  turns into the jumpsquat with the dodge buffered (`wavedash_roll_jump()`, roll loops `func_370` /
+  `func_372`; `global72` tells the JumpSquat main). And the dodge's shield press, while still held,
+  doesn't shield, roll or spot dodge anywhere on the ground any more, not only in the wavedash's
+  landing (`wavedash_shield_blocked()`, `wavedash_escape_blocked()`); letting go clears it.
 - **No shield from the dodge's own press** (user: a buffered wavedash went into shield unless shield
   was let go at once, which stopped the slide): `global66` is set when a dodge starts and cleared
   when shield is released (`wavedash_shield_update()`, main loop `func_74`); while it's set, the

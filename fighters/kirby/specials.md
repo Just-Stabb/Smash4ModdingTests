@@ -982,6 +982,9 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   (`global96`), and an air dodge within 8 frames of a ground jump, at most 20 above the floor the jump
   left (`global95`), stick down or straight left / right, puts Kirby 0.1 above that floor so it lands
   at once (`wavedash_snap()`, in `melee_airdodge_entry()`).
+- **Backward wavedash** (Luigi copy, user): the same as Luigi's: a jump press in a roll's first 3
+  frames gives the buffered wavedash instead of the roll (`wavedash_roll_jump()`, `global97`), and the
+  dodge's held shield press doesn't shield / roll anywhere on the ground until it's let go.
 - **Overdrive roll** (Corrin copy, user): roll-off speed 2.8 instead of 2.1, x1.05 into the air
   (`overdrive_rolloff_air_mult()`). `rolloff_update()` sets status flag `0x2100001F` on every roll
   frame while Overdrive is on; the rolls' ACMD adds 2.8 when it's set, else 2.1

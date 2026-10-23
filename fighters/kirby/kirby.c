@@ -95,6 +95,7 @@ int global93;
 float global94;
 float global95;
 int global96;
+int global97;
 
 void func_0()
 {
@@ -8322,6 +8323,10 @@ void func_369()
 void func_370()
 {
     rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
+    if (kirby_melee_dodge() && wavedash_roll_jump()) // a jump right after the shield press: a wavedash, not a roll (user)
+    {
+        return;
+    }
     if (func_374())
     {
         return;
@@ -8354,6 +8359,10 @@ void func_371()
 void func_372()
 {
     rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held
+    if (kirby_melee_dodge() && wavedash_roll_jump()) // a jump right after the shield press: a wavedash, not a roll (user)
+    {
+        return;
+    }
     if (func_374())
     {
         return;
@@ -10157,10 +10166,11 @@ void func_487()
     int var0;
     int var1;
     global90 = 0; // no air dodge buffered in this jumpsquat yet...
-    if (global96 <= wavedash_early_frames()) // ...unless shield was pressed just before it (user: easier buffer)
-    {
+    if (global96 <= wavedash_early_frames() || global97) // ...unless shield was pressed just before it, or the roll
+    {                                                 // it made was turned into this jump (user: easier buffer)
         global90 = 1;
     }
+    global97 = 0;
     var0 = WorkModule(0x6, 0x1000007b);
     var1 = WorkModule(0x6, 0x12000020) + var0;
     if (global47 >= var1 || global49 <= 0)
@@ -73608,6 +73618,25 @@ float wavedash_snap_frames()  { return 8.0f; }
 float wavedash_snap_height()  { return 20.0f; }
 float wavedash_snap_gap()     { return 0.1f; }
 
+// A roll from the shield press of a buffered wavedash (user: a backward wavedash often came out as a
+// back roll: the shield press came first, with the stick held back, which rolls): a jump press in the
+// roll's first wavedash_early_frames() (3) frames turns it into the jumpsquat, with the air dodge
+// buffered (global97, read by the JumpSquat main), so it's a wavedash in the stick's direction.
+int wavedash_roll_jump()
+{
+    if (global18 != 0 || global9 > (float)wavedash_early_frames())
+    {
+        return 0;
+    }
+    if (!(global38 & 0x10) && !(global24 & 0x200000)) // jump pressed (button, or the jump command)
+    {
+        return 0;
+    }
+    global97 = 1;
+    func_16(0xa, 0x1); // JumpSquat
+    return 0x1;
+}
+
 int wavedash_snap()
 {
     float h;
@@ -73724,6 +73753,10 @@ int wavedash_shield_blocked()
     {
         return 0x1;
     }
+    if (global18 == 0) // and on the ground after it, as long as that press is held (user: a backward
+    {                  // wavedash often shielded from the same press once the landing ended)
+        return 0x1;
+    }
     return 0;
 }
 
@@ -73775,6 +73808,10 @@ int wavedash_escape_blocked()
         return 0;
     }
     if ((global4 == 0x16 || global4 == 0x17) && (WorkModule(0x10, 0x200000b5) || global5 == 0x22))
+    {
+        return 0x1;
+    }
+    if (global91 && global18 == 0) // the dodge's shield press still held: no roll / spot dodge from it either
     {
         return 0x1;
     }
