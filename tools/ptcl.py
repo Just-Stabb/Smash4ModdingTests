@@ -77,6 +77,7 @@ FIELDS = [
     (0x2F0, '>I', 'shader_param_pos', 'runtime'),  # into the shader parameter table
     (0x30C, '>I', 'enum_30c', 'corpus'),          # 0x30C-0x33C: small enums, shader-keyed (see doc)
     (0x31C, '>I', 'enum_31c', 'corpus'),
+    (0x324, '>I', 'blend_type', 'corpus'),         # 0 alpha, 1 add, 2 subtract (names: *_alpha 0, *add* 1)
     (0x340, '>I', 'volume_type', 'corpus'),       # 0 point, 2.. shapes (sphere / cylinder / box...)
     (0x348, '>3f', 'volume_radius', 'corpus'),
     (0x354, '>f', 'volume_sweep_start', 'corpus'),

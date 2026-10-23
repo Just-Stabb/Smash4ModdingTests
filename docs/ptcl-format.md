@@ -95,6 +95,7 @@ the writer recomputes them.)
 | 0x2DC | s32 | primitive index (−1 none) | verified |
 | 0x2EC / 0x2F0 | u32 | shader-param size / pos (into sparam table) | verified |
 | 0x2F8–0x33C | u32s | small enums (blend, display, z-mode, etc.) — shader-keyed | corpus |
+| 0x324 | u32 | blend: 0 alpha (normal), 1 additive, 2 subtract. Not shader-keyed: 352 of 5366 (file, shader) pairs use more than one; emitters named `*_alpha` are 0 (273 of 280), `*add*` mostly 1 | corpus |
 | 0x340 | u32 | volume type (0 point, 2+ shapes) | corpus |
 | 0x348 | 3f | volume radius | corpus |
 | 0x354 / 0x358 | f | volume sweep start / param | corpus |
