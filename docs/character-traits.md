@@ -56,7 +56,7 @@ trait badge: Kirby's panel shows the trait (icon + name, art from tools/trait_ba
 has a copy (tools/trait_badge_cave.py in the executable, tools/dmg_trait_badge.py adds the element to
 ui/info/dmg; docs/native-notes.md "Damage panel"). Badge colours: Normal grey, Rush blue, Shooter
 purple, Strike red, Juggernaut yellow, Technical black, Barrage orange (`TRAITS` in
-`tools/trait_badge_art.py`). Icons: the user's art in `tools/trait_icons/<trait>.png` (Barrage so far),
+`tools/trait_badge_art.py`). Icons: the user's art in `tools/trait_icons/<trait>.png` (all but Normal),
 else a drawn one. A new trait also needs its number in `trait_badge_cave.py` (`TRAITS`, the last
 frame) and `dmg_trait_badge.py` (`TRAITS`; seven 72-px rows fill the 512-px texture). A new trait with stat changes
 needs a profile in `PROFILES` in `tools/kirby_stat_cave.py` and in `kirby_trait_profile()`.
