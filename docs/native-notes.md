@@ -898,6 +898,11 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
   replaces the stick: smash -> `0x21` the first frames then `0x41`; attack (tilts) -> `0x1` with the
   stick at 105 x 0.32. Mapping state: 9 bytes a port at records +0x1E0 (C-stick 0-5, STANDARD 1 / 6 / 7,
   A+B latch 8; byte 2 unused: now the cave's attack-held-last-frame).
+- **Fighters' pad source** (vtable `0x101047E0`, 0x34 bytes: +4 port, +0x2C the port's frame
+  (`0x030BA208(mgr, port)` = mgr + 0x314 + port * 4); prepare `0x02C1B80C`): stick = byte / D,
+  clamped to +-1, then a dead zone (`0x02C1B75C`; D = float `[[0x102FDC70] + 0]`, dead zone +4),
+  buttons the frame's u16. The controller struct update `0x020035FC` (from `0x02E729E8`, sometimes
+  twice a frame) takes the stick (+0x24) and buttons (+0x34) from it.
 - **Fighter side** (`0x02E71774`, command flags at the control module +0x158; locals: +0x10 the
   common params (fighter_param_common at mgr+0x38), +0x14 pressed, +0x18 released, +0x1C held,
   +0x20 / +0x24 stick, +0x28 / +0x2C flick counters): side smash `0x02E71464`: the smash bit with

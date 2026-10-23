@@ -54,6 +54,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
+import strike_cave  # noqa: E402
 
 CAVE = 0x04B9A000               # grown .text after acmd_ext_cave.py (GROW 0x04B9A000)
 LIMIT = 0x04B9B000
@@ -69,7 +70,17 @@ DESC_TYPES = {'ctr': (0x100283FC, 0x10028534), 'gc': (0x10028560, 0x10028680),
               'standard': (0x100286C4, 0x100287FC)}
 DISPATCH = 0x030B8F08
 DISPATCH_CALLS = (0x030B9AB0, 0x030B9B00, 0x030BA2B0, 0x030BA300)
-XMAX, YMAX = 100, 80            # stick bytes (x 1/127) on an attack press with stick smash off
+# On an attack press with stick smash off the stick bytes are limited to XRATIO / YRATIO of the
+# stick scale D: the fighters' pad source (vtable 0x101047E0, prepare 0x02C1B80C) reads a port's
+# frame as stick = clamp(byte / D, -1, 1) (then a dead zone), D = the float at [STICK_SCALE] + 0.
+# The bytes are written as stick x 127, so with D < 127 a part-way stick reads full: fixed byte
+# limits (100 / 80, v1) still made smash attacks. Thresholds: side smash 0.83, up / down 0.66,
+# tilts 0.25 (fighter_param_common 0x1C / 0xE8 / 0xF0 / 0xC4). XMAX / YMAX: the limits when D
+# can't be read or is outside [D_MIN, D_MAX].
+STICK_SCALE = 0x102FDC70
+XRATIO, YRATIO = 0.79, 0.62
+D_MIN, D_MAX = 40.0, 200.0
+XMAX, YMAX = 100, 78
 SIDE_ENTRIES = 16
 
 # pad type (pad state +0x7C, the dispatcher's jump table) -> stick smash bit in record byte 0x3B
@@ -110,6 +121,15 @@ ORIGINAL = {
     0x030C83C0: 0x300CFFFF, 0x030C83C4: 0x7C606110,     # GC
     0x030C8840: 0x300CFFFF, 0x030C8844: 0x7C606110,     # STANDARD
 }
+
+
+def ha(v):
+    return ((v + 0x8000) >> 16) & 0xFFFF
+
+
+def lo(v):
+    v &= 0xFFFF
+    return v - 0x10000 if v & 0x8000 else v
 
 
 def far(target, link=False):
@@ -213,29 +233,60 @@ def build():
             lbz r10, 0x3B(r10)
             and. r10, r10, r9
             beq w_done                  # stick smash on
+            li r6, %(xmax)d               # the limits: XRATIO / YRATIO of the stick scale D, else
+            li r7, %(ymax)d               # XMAX / YMAX
+            lis r12, %(scale_hi)d
+            lwz r12, %(scale_lo)d(r12)''' % dict(dispatch=DISPATCH, xmax=XMAX, ymax=YMAX, scale_hi=ha(STICK_SCALE),
+                                          scale_lo=lo(STICK_SCALE)) + strike_cave.chk('r12', 'w_lim') + '''
+            lfs f0, 0(r12)
+            lis r11, ratios@ha
+            addi r11, r11, ratios@l
+            lfs f1, 8(r11)
+            fcmpu cr0, f0, f1
+            blt w_lim                   # D outside [D_MIN, D_MAX]: the fixed limits
+            lfs f1, 12(r11)
+            fcmpu cr0, f0, f1
+            bgt w_lim
+            lfs f1, 0(r11)
+            fmuls f1, f0, f1
+            fctiwz f1, f1
+            stfd f1, 8(r1)
+            lwz r6, 0xC(r1)
+            lfs f1, 4(r11)
+            fmuls f1, f0, f1
+            fctiwz f1, f1
+            stfd f1, 8(r1)
+            lwz r7, 0xC(r1)
+    w_lim:  li r0, 0
             lbz r10, 2(r29)
             extsb r10, r10
-            cmpwi r10, %(xmax)d
+            cmpw r10, r6
             ble w_x1
-            li r10, %(xmax)d
-    w_x1:   cmpwi r10, -%(xmax)d
+            mr r10, r6
+    w_x1:   subf r5, r6, r0
+            cmpw r10, r5
             bge w_x2
-            li r10, -%(xmax)d
+            mr r10, r5
     w_x2:   stb r10, 2(r29)
             lbz r10, 3(r29)
             extsb r10, r10
-            cmpwi r10, %(ymax)d
+            cmpw r10, r7
             ble w_y1
-            li r10, %(ymax)d
-    w_y1:   cmpwi r10, -%(ymax)d
+            mr r10, r7
+    w_y1:   subf r5, r7, r0
+            cmpw r10, r5
             bge w_y2
-            li r10, -%(ymax)d
+            mr r10, r5
     w_y2:   stb r10, 3(r29)
     w_done: lmw r28, 0x10(r1)
             lwz r0, 0x24(r1)
             mtlr r0
             addi r1, r1, 0x20
-            blr''' % dict(dispatch=DISPATCH, xmax=XMAX, ymax=YMAX))
+            blr
+    ratios: .float %(xr)r
+            .float %(yr)r
+            .float %(dmin)r
+            .float %(dmax)r''' % dict(xr=XRATIO, yr=YRATIO, dmin=D_MIN, dmax=D_MAX))
     # 3. the `stick_smash` property and its load / save
     src.append('''
     get:    lwz r11, 0x10(r3)           # this: the pad type's OptionPadAssign sub-struct

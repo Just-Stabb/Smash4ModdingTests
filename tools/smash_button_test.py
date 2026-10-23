@@ -6,7 +6,8 @@
 - the original words are the expected ones, the patched the cave's;
 - smash button: before each A+B flag getter, a smash bit (0x20) in the action bits gets attack (0x1);
 - stick smash off: on an attack press without the smash bit, the frame's stick is limited to
-  |x| <= XMAX, |y| <= YMAX, only for the pad types with their record bit set, only on the press;
+  XRATIO / YRATIO of the game's stick scale D (fixed XMAX / YMAX without one), only for the pad
+  types with their record bit set, only on the press;
 - the `stick_smash` property (get / set per object), its load from and save to the record's bit,
   and the bind stub (the class's own bind, then the two new members);
 - the Tap Jump getters (bit 0) and load_* clearing the Tap Jump byte's other bits.
@@ -21,7 +22,7 @@ import smash_button_cave as C  # noqa: E402
 from ppcasm import Asm  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
 from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_5, UC_PPC_REG_6,  # noqa: E402
-                               UC_PPC_REG_27, UC_PPC_REG_29, UC_PPC_REG_31, UC_PPC_REG_LR)
+                               UC_PPC_REG_27, UC_PPC_REG_29, UC_PPC_REG_31, UC_PPC_REG_LR, UC_PPC_REG_MSR)
 
 fails = 0
 MEM = 0x7F000000                # test memory (0x10000)
@@ -48,6 +49,7 @@ def main():
     patched, original = sys.argv[1:3]
     a, patches = C.build()
     om, mu = machine(original), machine(patched)
+    mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)     # FP on (the stick scale)
     check('original words', {k: r32(om, k) for k in C.ORIGINAL}, C.ORIGINAL)
     check('patched words', all(r32(mu, k) == v for k, v in patches.items()), True)
 
@@ -100,6 +102,23 @@ def main():
     check('CTR (type 9), off', frame_run(9, 0x08, 0x1, -127, 127, 0), (0x1, -X, Y, 1, 0x31313131))
     check('FREE_STYLE (type 4), off', frame_run(4, 0x02, 0x1, 127, 127, 0), (0x1, X, Y, 1, 0x31313131))
     check('REMOTE (type 3): nothing, state kept', frame_run(3, 0x0F, 0x1, 127, 127, 0), (0x1, 127, 127, 0, 0x31313131))
+
+    # the limits from the stick scale D ([STICK_SCALE] -> float): stick = byte / D in the game
+    SC = MEM + 0x7800
+    for d in (127.0, 105.0, 100.0, 80.0, 64.0):
+        mu.mem_write(C.STICK_SCALE, struct.pack('>I', SC))
+        mu.mem_write(SC, struct.pack('>f', d))
+        b, fx, fy, _p, _k = frame_run(5, 0x01, 0x1, 127, -127, 0)
+        check('D %.0f: limits (%d, %d) = %.3f / %.3f of full: under the smash thresholds 0.83 / 0.66, '
+              'over the tilt one 0.25' % (d, fx, -fy, fx / d, -fy / d),
+              (0.25 < fx / d < 0.83, 0.25 < -fy / d < 0.66, fx == int(d * C.XRATIO), -fy == int(d * C.YRATIO)),
+              (True, True, True, True))
+        check('D %.0f: a stick under the limits kept' % d, frame_run(5, 0x01, 0x1, 20, 15, 0)[1:3], (20, 15))
+    for d in (30.0, 250.0):
+        mu.mem_write(SC, struct.pack('>f', d))
+        check('D %.0f (out of range): the fixed limits' % d, frame_run(5, 0x01, 0x1, 127, 127, 0)[1:3], (X, Y))
+    mu.mem_write(C.STICK_SCALE, struct.pack('>I', 0))
+    check('no stick scale: the fixed limits', frame_run(5, 0x01, 0x1, -127, 127, 0)[1:3], (-X, Y))
 
     # Tap Jump getters: accessor word 0 -> the record
     ACC0, TREC = MEM + 0x7400, MEM + 0x7500

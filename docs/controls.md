@@ -29,8 +29,11 @@ so a name saved with that build keeps its Tap Jump setting.)
 ## How Stick Smash OFF works
 
 On the frame attack is pressed (not held from before) without a smash input, the control stick
-for that frame is limited to 0.79 sideways / 0.63 up-down (the game's smash thresholds are 0.83 /
-0.66, the tilt ones 0.25), so the press can only be a tilt or an aerial. Only that one frame is
+for that frame is limited to 0.79 of full sideways / 0.62 up-down (the game's smash thresholds are
+0.83 / 0.66, the tilt ones 0.25), so the press can only be a tilt or an aerial. "Full" is the game's
+own stick scale: the fighters read a frame's stick byte as byte / D, D a float in the game's data
+(`[0x102FDC70]`), read at run time, so the limit is right whatever D is (a first build used fixed
+bytes, 100 / 80 of 127, which still read as a smash for D under 127). Only that one frame is
 limited, and the stick stays past 0.25, so walking, dashing, jumping and fast falls aren't
 affected. The setting is applied to the inputs themselves (where the game applies Tap Jump and
 A+B), so replays play back as played.
