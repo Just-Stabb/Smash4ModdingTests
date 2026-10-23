@@ -204,3 +204,29 @@ Test 10: charge and release work, the charge effects at the hand. But:
 - "the charge effect has a hitbox": not found (no hitbox in SpecialN's game script; the beam's
   head hitbox is at the hand when it spawns at frame 14). Asked the user.
 
+
+### Test 11 in game, and test 12 (`build/supamario_kame_test12.zip`)
+
+Test 11: the head faces the flight now. But:
+- "the starting point of the beam is displaying at the end": the EEPK parts all sit on XV2's TRS bone,
+  but only Bas and Wav have `PositionUpdate` (they move with the head); Hand (the ball at the hands),
+  Fireptcl, 4ptcl and LineAll stay where they were spawned: the beam's start. Test 12: those are
+  `Graphic_Effect`s (non-following) at the spawn point; Bas / Wav `External_Graphic` on the head.
+- the start's colour ("lacking in color", the user's XV2 shot: a white core, a saturated cyan rim,
+  deep blue streaks): Kmh_Hand's subtractive `hand` mesh was left out and the ball tinted pale blue.
+  Test 12: `xv2_to_nud.py --subtract-as hand=0,0.3,1` (normal blend, the deep blue that subtracting
+  its orange leaves) and `--rim cor=0,0.8,1.8,1.3` (MatCol3's rim colour baked into the vertex
+  colours for the side camera: white in the middle, cyan at the edge).
+- the multi-hits didn't carry targets into the head, and hit for ever (an opponent right behind
+  him): the body capsule kept growing in the hold (the fly motion played on) past the spawn point.
+  Test 12: the hold freezes the fly motion (`MotionModule(0x4, 0)`): no more body pieces, the capsule
+  stays; the body's knockback pushes forward (angle 0, FKB 50) into the head (366 holds them).
+  Safety: removed `KAME_MAX` (155) frames after firing whatever happens; the hold removes it if the
+  finish doesn't start; a fly status asked for after the hit goes back to the hold / finish.
+- "the beam effect sometimes disappears after hitting": probably the head's Terminate-1 effects
+  ending with the hit's status change. Test 12: every beam effect has Terminate 0 and they all end
+  together: the finish's ACMD (Terminate_Graphic_Effect for each) and `kame_fx_off()` in the MSC
+  before any removal. The body pieces now come from the fly ACMD (frames 2, 4, ...), not the MSC.
+- the body "should disappear nearly all together": as above, all at once.
+- the charge effect should grow with the level (the user's XV2 shots): Crg x0.5 / 1.0 / 1.6 and
+  CrgON x1.0 / 1.6 at levels 2 / 3, the previous level's replaced, spawned again every 40 frames.

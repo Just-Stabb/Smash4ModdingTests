@@ -57,8 +57,12 @@ DOWN_END = 96                     # the down taunt (100 frames) ends its looping
 # second down taunt with the model renderer's skinned-vertex buffer overflowing (Cemu log:
 # GX2RSetAttributeBuffer offset exceeds buffer size, from NU::DeviceWiiU)
 # Test 2: the head read too white without the dark layer: the glow and the core tinted blue
+# Test 11: the start (Kmh_Hand) "lacking in color and the incorrect color" against XV2 (a white core,
+# a saturated cyan rim, deep blue streaks): its subtractive 'hand' mesh back as a normal-blended deep
+# blue (what subtracting its orange leaves), the 'cor' ball's MatCol3 rim (0, 0.7, 1) baked into
+# its vertex colours (--rim), no pale tint
 MODEL_OPTS = {'Kmh_Fire': ['--plain', '1'], 'Kmh_Bas': ['--plain', '1', '--tint', 'Cor=0.7,0.9,1.0'],
-              'Kmh_Hand': ['--plain', '1', '--skip', 'hand', '--tint', 'cor=0.45,0.75,1.0']}
+              'Kmh_Hand': ['--plain', '1', '--rim', 'cor=0.0,0.8,1.8,1.3', '--subtract-as', 'hand=0.0,0.3,1.0']}
 SND_CHARGE, SND_FIRE, SND_HEAD = 0x0CB1008B, 0x0CB1008C, 0x0CB1008D
 MODEL_PREFIX = 'EffSupamarioKame'
 
@@ -130,13 +134,19 @@ REHIT = 5
 HEAD_SIZE = (4.5, 5.5, 6.5)
 BODY_SIZE = (3.5, 4.0, 4.5)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
-BODY_ANGLE, BODY_FKB = 0, 15
+# test 11: the multi-hits should carry them into the head (which holds them): the body pushes
+# them forward along the beam
+BODY_ANGLE, BODY_FKB = 0, 50
 # one finish for every level (the fireball has four motion slots)
 FINISH = dict(Damage=8.0, KBG=90, BKB=55, Size=8.0)
 FINISH_FRAMES = 3
 # the charge (fighter MSC): Mario's throw frozen at HOLD_FRAME; level 2 at 42, 3 at 78 charge
 # frames (the XV2 charge effect's steps), fires by itself at 100; the beam comes out at FIRE_FRAME
 N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 10.0, 14.0, 42, 78, 100
+# the charge effect at each level (Crg, CrgON sizes; test 11: "should get larger" with the level, XV2
+# shows a bigger ball and rings), spawned again every N_REFX frames
+N_CRG = ((0.5, 0.0), (1.0, 1.0), (1.6, 1.6))
+N_REFX = 40
 
 
 def cmd(name, *params):
@@ -184,8 +194,11 @@ def hitbox(name, **kw):
 
 
 def head_parts(pkg):
-    """per charge level (EEPK effects with IndexNum 3 / 4 / 5): [(effect name, (x, y, z), scale)] of
-    the head (models and particle sets; 4ptcl's second half with it)"""
+    """per charge level (EEPK effects with IndexNum 3 / 4 / 5): [(effect name, (x, y, z), scale,
+    follows)] of the head (models and particle sets; 4ptcl's second half with it). follows: the part
+    has XV2's PositionUpdate (Bas, Wav: they move with the head); the others (Hand: the ball at the
+    hands, Fireptcl, 4ptcl, LineAll) stay where they were spawned, the beam's start (test 11: the
+    Hand ball at the head read as "the starting point of the beam displaying at the end")"""
     import xv2vfx
     eepk = pkg['eepk']
     names = {}
@@ -205,30 +218,53 @@ def head_parts(pkg):
                 n = 'PtcSupamario' + names[('EMP', p['AssetIndex'])].replace('_', '')
             else:
                 continue
-            parts.append((n, tuple(p['Position']), p['ScaleMin']))
+            follows = 'PositionUpdate' in (p.get('Flags1_names') or [])
+            parts.append((n, tuple(p['Position']), p['ScaleMin'], follows))
             if n.endswith('4ptcl'):
-                parts.append((n + '_2', tuple(p['Position']), p['ScaleMin']))
+                parts.append((n + '_2', tuple(p['Position']), p['ScaleMin'], follows))
         out.append(parts)
     return out
 
 
-def weapon_scripts(heads, ids):
-    """the kamehameha's game / effect / sound scripts and motion.mtable"""
+def beam_effects(heads, segs):
+    """every effect the beam leaves on (Terminate 0): the head / start parts and the body pieces"""
+    return list(dict.fromkeys([p[0] for h in heads for p in h] + list(segs)))
+
+
+def weapon_scripts(heads, ids, segs):
+    """the kamehameha's game / effect / sound scripts and motion.mtable. Its effects all have
+    Terminate 0 (test 11: the hit's status change may have ended Terminate-1 effects) and end
+    together in the finish (and in the MSC's kame_fx_off before any removal)"""
     eid = lambda n: (BANK << 16) | ids[n]   # noqa: E731
     game, effect, sound = {}, {}, {}
     for lv in range(3):
         name = MOTIONS[lv]
+        sp = KAME_SPEED[lv]
         tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
         g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], **tick)]
-        for f in range(4, KAME_LIFE[lv] + 1, 4):        # the body capsule grows with the flight
+        # the body capsule grows with the flight (the hold freezes the motion: it stops growing)
+        for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
             g.append(cmd('frame', float(f)))
-            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f,
+            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-sp * f,
                             Angle=BODY_ANGLE, FKB=BODY_FKB, **tick))
         game[name] = g
-        e = []
-        for n, (x, y, z), size in heads[lv]:
-            e.append(cmd('external_graphic', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT),
-                         float((-z if HEAD_YROT == 180.0 else z) * UNIT), 0.0, HEAD_YROT, 0.0, float(size), 1))
+        # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
+        # behind). Not at frame 0: a beam starts in status 0 (fly1) and is set to its level's
+        # status in the same frame, which plays its motion from 0 again
+        e = [cmd('frame', 1.0)]
+        for n, (x, y, z), size, follows in heads[lv]:
+            z = (-z if HEAD_YROT == 180.0 else z) * UNIT
+            if follows:
+                e.append(cmd('external_graphic', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT), float(z),
+                             0.0, HEAD_YROT, 0.0, float(size), 0))
+            else:
+                e.append(cmd('graphic_effect', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT), float(z - sp),
+                             0.0, HEAD_YROT, 0.0, float(size), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0))
+        # the body pieces, dropped at the head (they stay where they are)
+        for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
+            e.append(cmd('frame', float(f)))
+            e.append(cmd('graphic_effect', eid(segs[lv]), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0))
         effect[name] = e
         sound[name] = [cmd('sound_effect', SND_HEAD)]
     f = FINISH
@@ -236,9 +272,11 @@ def weapon_scripts(heads, ids):
                       hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0,
                              BKB=f['BKB'], Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2),
                       cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
-    effect['finish'] = [cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, 0)
-                        for n, size in ((MODEL_PREFIX + 'Fire', 1.8), ('PtcSupamarioKmhRing', 1.8),
-                                        ('PtcSupamarioKmhWav', 2.8))]
+    # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
+    # the burst
+    effect['finish'] = [cmd('terminate_graphic_effect', eid(n), 1, 1) for n in beam_effects(heads, segs)] + [
+        cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, 0)
+        for n, size in ((MODEL_PREFIX + 'Fire', 1.8), ('PtcSupamarioKmhRing', 1.8), ('PtcSupamarioKmhWav', 2.8))]
     sound['finish'] = [cmd('sound_effect', SND_FIRE)]
     files = {}
     for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
@@ -383,7 +421,9 @@ def main():
     compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'), {
         'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
         'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
-        'KAME_HAND': '0x%X' % HAND, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
+        'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
+        **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
+        **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
         'KAME_FX_CRG': eid('PtcSupamarioKmhCrg'), 'KAME_FX_TSUBU': eid('PtcSupamarioKmhtsubu')}),
         os.path.join(sup, 'script/msc/supamario.mscsb'), tmp)
 
@@ -394,17 +434,20 @@ def main():
     open(os.path.join(dst, 'model.nud'), 'wb').write(nud.hidden(os.path.join(src, 'model.nud')))
     os.makedirs(os.path.join(sup, 'motion/kamehameha'))
     shutil.copy(os.path.join(v5, 'motion/fireball/main.pac'), os.path.join(sup, 'motion/kamehameha/main.pac'))
-    vals = {'KAME_SEG_EVERY': str(SEG_EVERY), 'KAME_HOLD': str(KAME_HOLD), 'KAME_FINISH': str(KAME_FINISH)}
+    pkgd = xv2vfx.load_package(pkg)
+    heads = head_parts(pkgd)
+    vals = {'KAME_HOLD': str(KAME_HOLD), 'KAME_FINISH': str(KAME_FINISH),
+            'KAME_MAX': str(max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 20),
+            'KAME_FX_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n)
+                                      for n in beam_effects(heads, segs))}
     for lv in range(3):
         vals['KAME_SPEED_%d' % (lv + 1)] = fl(KAME_SPEED[lv])
         vals['KAME_LIFE_%d' % (lv + 1)] = str(KAME_LIFE[lv])
-        vals['KAME_SEG_%d' % (lv + 1)] = eid(segs[lv])
     compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/weapons/kamehameha.c'), vals),
                 os.path.join(sup, 'script/msc/kamehameha/kamehameha.mscsb'), tmp)
     wdir = os.path.join(sup, 'script/animcmd/weapon/kamehameha')
     os.makedirs(wdir)
-    pkgd = xv2vfx.load_package(pkg)
-    files, mtable = weapon_scripts(head_parts(pkgd), ids)
+    files, mtable = weapon_scripts(heads, ids, segs)
     for fn, f in files.items():
         f.save(os.path.join(wdir, fn + '.bin'))
     open(os.path.join(wdir, 'motion.mtable'), 'wb').write(mtable)

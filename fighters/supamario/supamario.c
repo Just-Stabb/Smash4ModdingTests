@@ -37203,7 +37203,9 @@ void func_2293()
 
 // ---- Kamehameha (neutral special, status 0x152; tools/supamario_kame_build.py replaces KAME_*)
 // Mario's fireball throw (motion 0x211 / 0x215) frozen at KAME_N_HOLD_FRAME while special is held:
-// the charge (0: level 1, KAME_N_LV2 frames: 2, KAME_N_LV3: 3), the XV2 charge effects at the hand;
+// the charge (0: level 1, KAME_N_LV2 frames: 2, KAME_N_LV3: 3), the XV2 charge effects at the hand,
+// bigger at each level (the previous level's replaced: user, test 11) and spawned again every
+// KAME_N_REFX frames (as XV2's charge effect 15 does);
 // released (or KAME_N_FULL frames) it plays on and at KAME_N_FIRE_FRAME generates the Kamehameha
 // (article KAME_ARTICLE) in status 0 / 1 / 2 = the level. In the air he falls as with the fireball
 // (test 10: the cape's air kinetic 0xA while charging left him in a T-pose). The fireball article (0)
@@ -37235,6 +37237,27 @@ void kame_n_fx(int id, float size)
     EffectModule(0x2711, id, KAME_HAND, 0, 0, 0, 0, 0, 0, size, 0, 0, 0, 0, 0, 0, 0x1);
 }
 
+// the charge effect for a level (0 / 1 / 2): the previous one replaced
+void kame_n_fx_level(int level)
+{
+    EffectModule(0x2723, KAME_FX_CRG, 0x1, 0x1);
+    EffectModule(0x2723, KAME_FX_CRGON, 0x1, 0x1);
+    if (level == 0x2)
+    {
+        kame_n_fx(KAME_FX_CRG, KAME_N_CRG_3);
+        kame_n_fx(KAME_FX_CRGON, KAME_N_CRGON_3);
+    }
+    else if (level == 0x1)
+    {
+        kame_n_fx(KAME_FX_CRG, KAME_N_CRG_2);
+        kame_n_fx(KAME_FX_CRGON, KAME_N_CRGON_2);
+    }
+    else
+    {
+        kame_n_fx(KAME_FX_CRG, KAME_N_CRG_1);
+    }
+}
+
 void kame_n_fx_off()
 {
     EffectModule(0x2723, KAME_FX_CRG, 0x1, 0x1);
@@ -37253,18 +37276,13 @@ void kame_n_loop()
                 MotionModule(0x4, 0);
                 if (kame_n_charge == 0)
                 {
-                    kame_n_fx(KAME_FX_CRG, 0.4f);
+                    kame_n_fx_level(0);
                     kame_n_fx(KAME_FX_TSUBU, 1.0f);
                 }
-                else if (kame_n_charge == KAME_N_LV2)
+                else if (kame_n_charge == KAME_N_LV2 || kame_n_charge == KAME_N_LV3 ||
+                         kame_n_charge % KAME_N_REFX == 0)
                 {
-                    kame_n_fx(KAME_FX_CRG, 0.6f);
-                    kame_n_fx(KAME_FX_CRGON, 0.8f);
-                }
-                else if (kame_n_charge == KAME_N_LV3)
-                {
-                    kame_n_fx(KAME_FX_CRG, 1.0f);
-                    kame_n_fx(KAME_FX_CRGON, 1.2f);
+                    kame_n_fx_level(kame_n_level());
                 }
                 kame_n_charge += 0x1;
             }

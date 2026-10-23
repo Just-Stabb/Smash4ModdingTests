@@ -560,18 +560,23 @@ int func_40(int arg0)
 // Supamario's Kamehameha (weapon kind 0x18B, article 5): a copy of the fireball's boilerplate
 // (func_0 - func_40) and its own statuses. tools/supamario_kame_build.py replaces the KAME_* names.
 //   0 / 1 / 2  fly (charge level 1 / 2 / 3): flies straight at KAME_SPEED_n for KAME_LIFE_n frames,
-//              motion fly1 / fly2 / fly3 (the head effects and its multi-hit hitboxes), and drops a
-//              body piece (effect KAME_SEG_n, KAME_SEG_EVERY frames apart) behind it every
-//              KAME_SEG_EVERY frames: the body stops where the head stops
+//              motion fly1 / fly2 / fly3: its ACMD has the head / start effects, drops the body
+//              pieces at the head and has the multi-hit hitboxes
 //   3          hold: the beam connected (native: weapon_expand's on_hit asks for status 3 instead of
-//              removing it), stays in place KAME_HOLD frames, still multi-hitting (fly motion)
-//   4          finish: motion finish (the launcher), removed after KAME_FINISH frames
+//              removing it), stays in place KAME_HOLD frames, still multi-hitting: the fly motion
+//              frozen (rate 0), so no more body pieces and the body hitbox stops growing
+//   4          finish: motion finish (its ACMD ends the beam's effects, the launcher), removed after
+//              KAME_FINISH frames
+// None of the beam's effects end by themselves (Terminate 0): the finish's ACMD and kame_fx_off()
+// (before any removal) end them all at once. KAME_MAX frames after it was fired it is removed
+// whatever happened.
 // kame_phase (0 fly, 1 hold, 2 finish) keeps hold / finish from restarting if their status is entered
 // again (test 10: the beam held and multi-hit for ever, never launched or went away)
 int kame_level;
 int kame_frame;
 int kame_life;
 int kame_phase;
+int kame_total;
 
 void main()
 {
@@ -589,6 +594,8 @@ void main()
 void kame_setup()
 {
     global7 = 0x5;
+    kame_phase = 0;
+    kame_total = 0;
     sv_set_mem(0x1, 0, 0, kame_pre);
     sv_set_mem(0x1, 0, 0x1, kame_pre);
     sv_set_mem(0x1, 0, 0x2, kame_pre);
@@ -631,30 +638,40 @@ float kame_speed()
     return KAME_SPEED_1;
 }
 
-int kame_seg_id()
+// every effect of the beam ends (the body pieces, the head, the start)
+void kame_fx_off()
 {
-    if (kame_level == 0x1)
-    {
-        return KAME_SEG_2;
-    }
-    else if (kame_level == 0x2)
-    {
-        return KAME_SEG_3;
-    }
-    return KAME_SEG_1;
+KAME_FX_OFF
 }
 
-// the body pieces end with the beam
-void kame_seg_off()
+void kame_remove()
 {
-    EffectModule(0x2723, kame_seg_id(), 0x1, 0x1);
+    kame_fx_off();
+    BattleObject(0x9);
+}
+
+// counts every frame of the beam's life: KAME_MAX frames, then it's removed
+int kame_expired()
+{
+    kame_total += 1;
+    if (kame_total > KAME_MAX)
+    {
+        kame_remove();
+        return 1;
+    }
+    return 0;
 }
 
 void kame_fly_main()
 {
+    if (kame_phase != 0)
+    {
+        // a fly status asked for again after the hit: back to the hold / finish
+        func_22(0x2 + kame_phase);
+        return;
+    }
     kame_level = global4;
     kame_frame = 0;
-    kame_phase = 0;
     if (kame_level == 0x1)
     {
         kame_life = KAME_LIFE_2;
@@ -674,15 +691,14 @@ void kame_fly_main()
 
 void kame_fly_loop()
 {
-    if (kame_frame >= kame_life)
+    if (kame_expired())
     {
-        kame_seg_off();
-        BattleObject(0x9);
         return;
     }
-    if (kame_frame > 0 && kame_frame % KAME_SEG_EVERY == 0)
+    if (kame_frame >= kame_life)
     {
-        EffectModule(0x2710, kame_seg_id(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
+        kame_remove();
+        return;
     }
     kame_move(kame_speed());
     kame_frame += 1;
@@ -695,14 +711,25 @@ void kame_hold_main()
         kame_phase = 0x1;
         kame_frame = 0;
     }
+    MotionModule(0x4, 0);
     kame_move(0);
     callFunc3(kame_hold_loop);
 }
 
 void kame_hold_loop()
 {
+    if (kame_expired())
+    {
+        return;
+    }
     kame_move(0);
     kame_frame += 1;
+    if (kame_frame >= KAME_HOLD + 0xa)
+    {
+        // the finish didn't start
+        kame_remove();
+        return;
+    }
     if (kame_frame >= KAME_HOLD)
     {
         func_22(0x4);
@@ -717,6 +744,7 @@ void kame_finish_main()
         kame_phase = 0x2;
         kame_frame = 0;
         func_24(0x3, 0, 1.0f);
+        MotionModule(0x4, 1.0f);
     }
     kame_move(0);
     callFunc3(kame_finish_loop);
@@ -724,12 +752,15 @@ void kame_finish_main()
 
 void kame_finish_loop()
 {
+    if (kame_expired())
+    {
+        return;
+    }
     kame_move(0);
     kame_frame += 1;
     if (kame_frame >= KAME_FINISH)
     {
-        kame_seg_off();
-        BattleObject(0x9);
+        kame_remove();
         return;
     }
 }

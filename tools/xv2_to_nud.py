@@ -12,6 +12,12 @@ model folders (model.nud / .nut / .vbn / .omo / .mta / .xmb), see docs/xv2-model
       --skip PART,...: leave these EMO parts out. --plain 1: only material settings the game's
       effect models use (cull none, no alpha test, subtractive drawn additive).
       --tint 'MAT=r,g,b;...': multiply EMM material MAT's colour gain (every frame) by r, g, b.
+      --rim 'MAT=r,g,b,p;...': XV2's incidence colour (MatCol3) baked into MAT's vertex colours for
+      the side camera: x mix(1, (r, g, b), (1 - |normal.x|)^p) (normal.x: the model's X, the game
+      camera's axis once the beam runs along its Z), white at the middle, the colour at the rim.
+      --subtract-as 'MAT=r,g,b;...': draw subtractive material MAT as normal alpha blend with
+      colour gain RGB (r, g, b) (what the subtraction leaves: 1 - its colour) instead of
+      additive (--plain) or subtractive.
   python3 tools/xv2_to_nud.py verify MODEL_DIR... [--preview DIR] [--src SRC_DIR]
       re-read every file with the repo readers (nud / nut / omo / mta / xmb / vbn), check the round
       trips (and, with --src, the textures and the bone animation against the XV2 files), render.
@@ -208,10 +214,11 @@ class Model:
     """one EMO with its EMM / EMB / obj.ema / mat.ema, converted"""
 
     def __init__(self, src, name, folder, tex_base, scale=SCALE, anim_index=0, matcol1='mean', skip=(),
-                 plain=False, tint=None):
+                 plain=False, tint=None, rim=None, subtract_as=None):
         p = os.path.join(src, name)
         self.name, self.folder, self.scale, self.matcol1 = name, folder, scale, matcol1
         self.skip, self.plain, self.tint = set(skip), plain, dict(tint or {})
+        self.rim, self.subtract_as = dict(rim or {}), dict(subtract_as or {})
         self.emo = xv2.Emo(open(p + '.emo', 'rb').read())
         self.emm = xv2.Emm(open(p + '.emm', 'rb').read()) if os.path.exists(p + '.emm') else None
         self.emb = list(Emb(open(p + '.emb', 'rb').read())) if os.path.exists(p + '.emb') else []
@@ -273,7 +280,10 @@ class Model:
                 b = (c1[0] + c1[1] + c1[2]) / 3.0
                 c1 = [b, b, b, c1[3]]
             t = self.tint.get(m['name'], (1.0, 1.0, 1.0))
-            gains.append([c1[k] * c2[k] * (t[k] if k < 3 else 1.0) for k in range(4)])
+            g = [c1[k] * c2[k] * (t[k] if k < 3 else 1.0) for k in range(4)]
+            if m['name'] in self.subtract_as:
+                g[:3] = self.subtract_as[m['name']]
+            gains.append(g)
             s = _sample_vec(a, mi, 4, 2, fr, scr)
             # a scroll component the mat.ema doesn't animate: the EMM's value read as UV / second
             s = [s[k] if k in animated else scr[k] * fr / 60.0 for k in range(2)]
@@ -284,6 +294,10 @@ class Model:
         p = m['params'] if m else {}
         blend = int(p.get('AlphaBlendType', 0)) if int(p.get('AlphaBlend', 0)) else -1
         src, dst = BLEND.get(blend, (0, 0))
+        if m and m['name'] in self.subtract_as and dst == 3:
+            src, dst = BLEND[0]
+            self.notes.append('%s: subtractive drawn as normal alpha blend, colour %s (--subtract-as)' % (
+                m['name'], self.subtract_as[m['name']]))
         # BackFace 1 (every open shell here: cones, domes) read as "draw the back faces too";
         # without it (the closed spheres) back faces culled
         cull = 0 if int(p.get('BackFace', 0)) or int(p.get('TwoSidedRender', 0)) else 1029
@@ -364,7 +378,14 @@ class Model:
                         remap = np.full(len(pos), -1)
                         remap[used] = np.arange(len(used))
                         poly = nud.Polygon()
-                        poly.pos, poly.col, poly.uvs = pos[used], col[used], [uv[used]]
+                        pcol = col[used].copy()
+                        if matname in self.rim and nrm is not None:
+                            r, gg, b, pw = self.rim[matname]
+                            w = (1.0 - np.abs(nrm[used][:, 0])) ** pw
+                            mix = 1.0 + w[:, None] * (np.array([r, gg, b]) - 1.0)
+                            pcol[:, :3] = np.clip(np.round(pcol[:, :3] * mix), 0, 255)
+                            self.notes.append('%s: rim colour %s baked (--rim)' % (matname, (r, gg, b)))
+                        poly.pos, poly.col, poly.uvs = pos[used], pcol, [uv[used]]
                         poly.nrm = nrm[used] if nrm is not None else np.tile([0.0, 1.0, 0.0], (len(used), 1))
                         poly.idx = remap[tris].reshape(-1)
                         emm_mat = self.emm.find(matname) if self.emm else None
@@ -681,7 +702,7 @@ def folder_name(name, prefix):
 
 
 def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim=0, preview_dir=None, matcol1='mean',
-            skip=(), plain=False, tint=None):
+            skip=(), plain=False, tint=None, rim=None, subtract_as=None):
     emos = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(src, '*.emo')))
     names = emos if pattern == 'all' else [n for n in emos if fnmatch.fnmatch(n, pattern)]
     if not names:
@@ -689,7 +710,8 @@ def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim
     done = []
     for name in names:
         k = emos.index(name)
-        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain, tint)
+        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain, tint,
+                  rim, subtract_as)
         d = m.write(out)
         meshes = m.meshes_written
         print('%s -> %s' % (name, d))
@@ -751,7 +773,11 @@ def main():
             int(opts.get('tex-base', hex(TEX_BASE)), 0), int(opts.get('anim', 0)), opts.get('preview'),
             opts.get('matcol1', 'mean'), [x for x in opts.get('skip', '').split(',') if x], opts.get('plain') == '1',
             {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
-             (t.split('=') for t in opts.get('tint', '').split(';') if t)})
+             (t.split('=') for t in opts.get('tint', '').split(';') if t)},
+            {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
+             (t.split('=') for t in opts.get('rim', '').split(';') if t)},
+            {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
+             (t.split('=') for t in opts.get('subtract-as', '').split(';') if t)})
 
 
 if __name__ == '__main__':
