@@ -844,7 +844,9 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
 - **Button bits** (MSC button → bit, table `0x10000670`): 0 attack `0x1`, 1 special `0x2`, 2 jump
   `0x4`, 3 shield `0x8`, 4 smash (A+B / C-stick) `0x20`, 5–8 d-pad up / down / left / right `0x400`
   / `0x1000` / `0x2000` / `0x4000` (taunts), 9 grab (Z) `0x10`, 10 / 11 C-stick `0x40` / `0x80`,
-  12 / 13 A+B `0x8000` / `0x100`, 14 `0x200`, 15 `0x800`.
+  12 `0x8000` (the tap jump setting is on: the input frame carries it), 13 `0x100` (A and B both
+  held), 14 `0x200` (attack, not taken by A+B smash), 15 `0x800` (special, ditto). See "Controls
+  settings and input frames" for where they come from.
 - **Update** `0x020035FC(struct, source, accumulate)`, called by the fighter control module's
   `0x02E729E4` (twice when accumulating). It reads the source and derives presses, releases and
   flicks from the result, so the hooks change the read values: buttons after `+0x34`
@@ -864,6 +866,55 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
   damage threshold.
 - Float_Var_Compare / the compare functions (`0x02BEE010`, table `0x10351804`): method 0 `==`,
   1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`.
+
+## Controls settings and input frames
+
+`tools/smash_button_cave.py` (user docs: `docs/controls.md`).
+
+- **Save records:** a name's controls are 0x3C bytes (save data, the per-port copies in the input
+  manager below): GC at +0x00 (12 bytes), REMOTE +0x0C, FREE_STYLE (Wii Remote + Nunchuk) +0x14,
+  STANDARD (Pro / GamePad / Classic) +0x21, CTR (3DS) +0x2E (13 bytes each; accessors `0x030C8A68`,
+  `0x030C8AAC`, `0x030C8ADC`, `0x030C8B24`, `0x030C8B6C`; the record at +0x2E also holds the flags
+  byte, 0x3B). Each
+  button byte is an action (`PAD_BUTTON_OPE_*`): 0 attack, 1 special, 2 jump, 3 shield, 4 grab,
+  5 smash, 6-8 smash up / side / down, 9 taunt, 10-12 taunt up / side / down. Byte 0x3B: A+B smash
+  ("Smash Attack") per type, 0x80 CTR, 0x40 GC, 0x20 FREE_STYLE, 0x10 STANDARD (getters `0x030C8A00`
+  / `0x030C83D8` / `0x030C86A0` / `0x030C8858`, setters +0x10 / +0x10 / +0x10 / +0x10); its low
+  four bits were unused (now Stick Smash off: 0x08 / 0x04 / 0x02 / 0x01).
+- **Input frames:** the input manager (`0x030B9A38`, and `0x030BA218`; per-port records at +0xC,
+  frames at +0x314, 4 bytes a port) calls `0x030B8F08(records, port, frame, pad, ..)` per port and
+  frame; it picks the mapping by the pad state's type (pad +4 vtable +0x1C, then +0x7C): 1 / 9 CTR
+  `0x030B6F7C`, 2 / 5 / 6 / 8 STANDARD `0x030B7330`, 3 REMOTE `0x030B7B58`, 4 FREE_STYLE
+  `0x030B8620`, 7 GC `0x030B76E8`. A frame is a u16 of action bits and the stick (s8, x 127). A
+  button's action gives bit `1 << op` (grab `0x18`); then attack -> +`0x200`, special -> +`0x800`;
+  A+B smash on: attack + special -> smash `0x20` (attack and special cleared, latched in the port's
+  mapping state byte 8 until both are released); tap jump on -> `0x8000`; A and B held -> `0x100`.
+  The C-stick (`0x030B6C54`, substick_parameter.bin: deadzone 50, length 105, tilt scale 0.32)
+  replaces the stick: smash -> `0x21` the first frames then `0x41`; attack (tilts) -> `0x1` with the
+  stick at 105 x 0.32. Mapping state: 9 bytes a port at records +0x1E0 (C-stick 0-5, STANDARD 1 / 6 / 7,
+  A+B latch 8; byte 2 unused: now the cave's attack-held-last-frame).
+- **Fighter side** (`0x02E71774`, command flags at the control module +0x158; locals: +0x10 the
+  common params (fighter_param_common at mgr+0x38), +0x14 pressed, +0x18 released, +0x1C held,
+  +0x20 / +0x24 stick, +0x28 / +0x2C flick counters): side smash `0x02E71464`: the smash bit with
+  the stick not up / down (common 0xE8 usmash 0.66 / 0xF0 dsmash -0.66), or attack with |x| >= 0.83
+  (0x1C) within 2 frames (0x20) of the stick crossing 0.25; up / down smash: the smash bit with the
+  stick up / down, or attack with the flick within 4 frames (0xEC / 0xF4). Tilts: 0.25 (0xC4 /
+  0xD0 / 0xD4). The flick counters (control struct +0x70..) restart when the stick crosses 0.25.
+- **Controls menu natives:** OptionPadAssign (`0x10303180` class) holds the five pad types'
+  bytes (CTR +0, GC +0xE, STANDARD +0x1C, FREE_STYLE +0x2B, REMOTE +0x3A); `gc` etc. return
+  OptionPadAssignGc ... objects on those (members bound by `0x033C4FB8(class, name, {fn, arg
+  types, flags})` in `0x021B6B9C` CTR / `0x021B6EA0` GC / `0x021B71A4` STANDARD / `0x021B7498` /
+  `0x021B778C`; a native's frame: +0x10 / +0x14 this, +0x18 the argument; bools are 2 / 3).
+  load_parameter_* / save_parameter_*: `0x021B49DC` / `0x021B53DC` CTR, `0x021B4B64` / `0x021B5568`
+  GC, `0x021B4CF4` / `0x021B56F4` STANDARD, `0x021B4E8C` / `0x021B588C` FREE_STYLE (r31 = the
+  OptionPadAssign data).
+- **The menu's script** is Xtal bytecode (`ui/script/app/option/option_view_button.xtal`,
+  `tools/xtal.py`): `equip_table` (pad -> key -> [popup window typ_NM, actions]) decides what a
+  button's popup lists (N = rows); BTN_NAME_TABLE / BTN_ID_TABLE / CURSOR_TABLE per pad;
+  refresh_key_assign / state_set / is_diff per pad type. Layout `ui/lumen/option_button/
+  option_button.lm`: toggle rows are instances of sprite 186 in btn_group (420) named sub_1 /
+  sub_2 / sub_10 / sub_3; their labels are frames of sprites 166 / 171 named like the row; a text
+  object's msbt label is its instance name (`MmenOption_button_17$0`).
 
 ## MotionModule rates (animation speed)
 
