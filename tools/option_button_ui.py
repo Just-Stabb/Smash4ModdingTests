@@ -17,8 +17,10 @@ on the Lumen layout option_button.lm:
   the key name STICK after SMASH in BTN_NAME_TABLE (null in BTN_ID_TABLE, its own cursor entry:
   SMASH -> STICK -> the key below), the row movie clip `sub_11` in the clip table, the value
   `stick_smash` in refresh_key_assign (an ON / OFF row as RUMBLE / FLICK / SMASH / SHAKE),
-  toggling it with A (as FLICK: set_stick_smash(!stick_smash)), the save prompt's is_diff, and
-  shown in state_set unless the pad is REMOTE / FREE_STYLE (whose SHAKE row is in its place).
+  toggling it with A (as FLICK: set_stick_smash(!stick_smash)), the save prompt's is_diff, shown
+  in state_set unless the pad is REMOTE / FREE_STYLE (whose SHAKE row is in its place), and one of
+  is_sub's items (the right-hand column: without it the hovered row was taken for a key button,
+  whose depth handling crashed the game).
 - Layout: the row is another instance of the toggle row sprite (186) in btn_group (420), named
   sub_11, at the SHAKE row's place (hidden for the pads that get the new row), above it in depth
   (8; the sprite header's depth count, word 6 >> 16, goes from 8 to 9: a placement past it overruns
@@ -64,6 +66,7 @@ VISIBLE_AT = 16073              # state_set: after the pad's frame (local -16 = 
 TOGGLE_AT, TOGGLE_END = 17291, 17911   # state_set: after the SHAKE toggle; the cases' common end
 SHAKE_SCOPE = 89
 IS_DIFF_ENDS = (13485, 13769, 14073)   # is_diff: the CTR / GC / DRC.. compare chains' ends
+IS_SUB_END = 16380              # is_sub(index): the Return after its RUMBLE .. BACK compares
 
 
 def table_end(c, start):
@@ -201,6 +204,20 @@ def patch_xtal(data):
         b.label('hide%d' % k).ins('LoadValue', result=1, value=2)
         b.label('set%d' % k).ins('SetProperty', primary=visible, target=0, stack_base=1)
     edits.append((VISIBLE_AT, VISIBLE_AT, b))
+
+    expect(c, IS_SUB_END, 'Return', base=0, result_count=1)
+    b = xtal.Block()                            # is_sub: index == name_index[row] for the new rows too
+    b.ins('If', target=0, address_true=('I', IS_SUB_END), address_false='cmp0')
+    for k, r in enumerate(ROWS):
+        b.label('cmp%d' % k).ins('LocalVariable', result=3, number=8, depth=1)
+        b.ins('LoadConstant', result=4, value_number=c.const(r[0]))
+        b.ins('At', result=2, target=3, index=4, stack_base=5)
+        b.ins('IfEq', lhs=-1, rhs=2, stack_base=3)
+        b.ins('If', target=1, address_true='t', address_false='cmp%d' % (k + 1) if k + 1 < len(ROWS) else 'f')
+    b.label('t').ins('LoadValue', result=0, value=3).ins('Goto', address=('I', IS_SUB_END))
+    b.label('f').ins('LoadValue', result=0, value=2)
+    edits.append((IS_SUB_END, IS_SUB_END, b))
+    expect(c, 16364, 'LoadConstant', result=4)     # is_sub's last compare ('BACK'), the pattern copied
 
     expect(c, TOGGLE_END, 'FilelocalVariableByName', result=0)
     b = xtal.Block()

@@ -102,6 +102,10 @@ def main():
                                                **{r[0]: r[1] for r in O.ROWS}))
     for name in [x for r in O.ROWS for x in r[2:4]]:
         check('identifier %s' % name, name in [new.resolve(v) for v in new.idents], True)
+    sub = [new.fmt(pc, op, f) for pc, op, f, _ in new.instructions()
+           if target(O.IS_SUB_END) <= pc < instr(O.IS_SUB_END) and xtal.INSTS[op][0] == 'LoadConstant']
+    check('is_sub: the new rows are right-hand items', [r[0] for r in O.ROWS if any("'%s'" % r[0] in x for x in sub)],
+          [r[0] for r in O.ROWS])
     for s, e, n in patched.edits:
         if s == e:
             print('---- inserted at %d (new %d):' % (s, target(s)))
