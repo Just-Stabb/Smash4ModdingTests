@@ -73855,9 +73855,10 @@ int marth_sword_motion(int motion)
     return motion;
 }
 
-// plays the motion (the Marth copy's sword slot for it if there is one) with the motion's own
-// game script (Kirby's, kind 8) and its effects / sounds with the sword's Sword_Trace (the
-// scripts of slot 0x301-0x303, tools/kirby_marth_sword.py; set 0x10 = copy_fx_all())
+// plays the motion (the Marth copy's sword slot for it if there is one) with the move's game
+// script plus hitboxes along the sword (tools/kirby_marth_sword_hitboxes.py) and its effects /
+// sounds with the sword's Sword_Trace (tools/kirby_marth_sword.py): the scripts of slot
+// 0x301-0x303 (kind 8; set 0x10 = copy_fx_all())
 void marth_sword_play(int motion)
 {
     int m;
@@ -73875,7 +73876,7 @@ void marth_sword_play(int motion)
         {
             fx = 0x303;
         }
-        MotionAnimcmdModule(0, 0, motion, 0x8);
+        MotionAnimcmdModule(0, 0, fx, 0x8);     // the move's game script with the sword's hitboxes (same slot)
         MotionAnimcmdModule(0, 0x10, fx, 0x8);
         MotionAnimcmdModule(0x1, 0);
     }

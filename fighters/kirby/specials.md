@@ -1115,3 +1115,21 @@ it; e.g. `MarthSpecialNStart` for `0x37D`). Animations aren't found by it (see a
   constant, interpolated (min + range × u16 / 65535) or raw per frame; KCAP packs name-sorted. All
   of Kirby's 188 packs and the 2185 animations with known track types read and write back byte
   for byte.
+
+### Sword hitboxes (Marth copy aerials)
+
+User: hitboxes along the sword in Strike nair, back air and up air, tipper style (the tipper hitting
+the other way from the rest), with their Marth's aerials as the comparison and Kirby's own hitboxes
+keeping priority. `tools/kirby_marth_sword_hitboxes.py KIRBY_GAME.bin MARTH_GAME.bin OUT.bin` adds
+game scripts `MarthSwordAttack12` / `MarthSwordAttackAirB` / `MarthSwordAttackAirHi` (the sword
+slots `0x301`-`0x303`' names): Kirby's move script plus three spheres on `LHaveN` (script bone
+`0x18`) at Y 5 / 11.5 / 18. The sword's blade is along the bone's +Y (the held model's `HaveN` bind
+rotation (90, 0, -90) turns its +Z blade onto +Y) at twice Marth's size: 3.6-21.4 from the grip; hitbox
+offsets are taken without the bone's scale (as Smash Forge draws them). Base and middle copy their
+Marth's blade hitbox of the same aerial, the tip his tipper (nair 6% at 0 / 7.7% at 150, bair 9% at
+361 / 12.5% at 180, uair 9.5% at 80 / 13% at 270). Same part as Kirby's, higher IDs. Bair: Marth turns
+around and hits in front (FacingRestrict 3); Kirby hits behind (4), which the sword's take. Timing:
+nair and uair with Kirby's hitboxes; bair from frame 7 (the sword appears) for Marth's 5 frames.
+`marth_sword_play()` binds the slot's game script instead of Kirby's (MSC: only that function differs,
+`msc_fingerprint.py`). Not checked in game: the offsets (if the game scales them with the bone's
+scale, the spheres land twice as far out).
