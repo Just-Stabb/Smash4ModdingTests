@@ -11,13 +11,15 @@ OUT_DIR/fighter/supamario/script/animcmd/body/effect.bin + sound.bin.
 
 - .ptcl: v4's + PtcSupamarioKameCharge (tools/supamario_kame_fx.py, set 19: keeps v5's entry
   0x16) + the EMPs (tools/xv2_to_ptcl.py: PtcSupamarioKmh*, one set each, 4ptcl in two);
-- effect models: the three EMOs (tools/xv2_to_nud.py: EffSupamarioKameFire / Bas / Hand);
+- effect models: the three EMOs (tools/xv2_to_nud.py: EffSupamarioKameFire / Bas / Hand) and the
+  three beam bodies (the ETR traces, tools/xv2_trace_to_nud.py: EffSupamarioKameBeam / 2 / 3);
 - .efc: one entry per new set and per model (ids 0x0341nnnn, printed);
 - taunts, timed as the XV2 effects (EEPK parts, their start frames and scales):
   up taunt (180 frames): the charge at the hand (EEPK effects 0 and 15): Crg x0.4 + tsubu at 0,
   Crg x0.6 + CrgON x0.8 at 42, Crg x1.0 + CrgON x1.2 at 78, Crg again at 118 and 158;
   the charge sound;
-  side taunt: the release at the hand (effect 1), at frame 0: the Fire model + Ring x0.8; the fire sound;
+  side taunt: the release at the hand (effect 1), at frame 0: the Fire model + Ring x0.8, and the
+  beam body (size 1) from in front of him forward; the fire sound;
   down taunt: the beam head (effect 3) in front of him: Bas model x1.6, Fireptcl x1.6, Wav x1.8,
   4ptcl x1.6, LineAll, Hand model x0.45; the beam-head sound.
   All with Terminate = 1 (they end with the taunt; the beam parts loop until then, and the down
@@ -38,6 +40,7 @@ import acmd  # noqa: E402
 import efc  # noqa: E402
 import ptcl  # noqa: E402
 import supamario_kame_fx  # noqa: E402
+import xv2_trace_to_nud  # noqa: E402
 import xv2_to_ptcl  # noqa: E402
 
 UNIT = xv2_to_ptcl.UNIT
@@ -63,7 +66,12 @@ UP = [(0, 'PtcSupamarioKmhCrg', HAND, None, 0.4), (0, 'PtcSupamarioKmhtsubu', HA
       (42, 'PtcSupamarioKmhCrg', HAND, None, 0.6), (42, 'PtcSupamarioKmhCrgON', HAND, None, 0.8),
       (78, 'PtcSupamarioKmhCrg', HAND, None, 1.0), (78, 'PtcSupamarioKmhCrgON', HAND, None, 1.2),
       (118, 'PtcSupamarioKmhCrg', HAND, None, 1.0), (158, 'PtcSupamarioKmhCrg', HAND, None, 1.0)]
-SIDE = [(0, MODEL_PREFIX + 'Fire', HAND, None, 1.0), (0, 'PtcSupamarioKmhRing', HAND, None, 0.8)]
+# the beam body (the ETR traces as models, tools/xv2_trace_to_nud.py): bone 0, from BODY_POS
+# forward (its models are built along +Z, not turned); BODY marks it in the part lists
+BODY, BODY_POS = -1, (0.0, 7.0, 3.0)
+TRACES = ('Beam', 'Beam2', 'Beam3')         # the three charge levels (EEPK effects 3 / 4 / 5)
+SIDE = [(0, MODEL_PREFIX + 'Fire', HAND, None, 1.0), (0, 'PtcSupamarioKmhRing', HAND, None, 0.8),
+        (0, MODEL_PREFIX + 'Beam', BODY, None, 1.0)]
 DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFireptcl', 0, (0, 0, -0.3), 1.6),
         (0, 'PtcSupamarioKmhWav', 0, (0, 0, 0), 1.8), (0, 'PtcSupamarioKmh4ptcl', 0, (0, 0, -0.15), 1.6),
         (0, 'PtcSupamarioKmh4ptcl_2', 0, (0, 0, -0.15), 1.6), (0, 'PtcSupamarioKmhLineAll', 0, (0, 0, 0), 1.0),
@@ -98,7 +106,9 @@ def taunt_script(parts, ids, end=None):
             out.append(cmd('frame', float(f)))
             frame = f
         yrot = 0.0
-        if bone == 0:
+        if bone == BODY:
+            bone, (x, y, z) = 0, BODY_POS
+        elif bone == 0:
             off = off or (0, 0, 0)
             x, y = FRONT[0] + off[0] * UNIT, FRONT[1] + off[1] * UNIT
             z = FRONT[2] + (-off[2] if HEAD_YROT == 180.0 else off[2]) * UNIT
@@ -140,7 +150,8 @@ def main():
     for name, opts in MODEL_OPTS.items():
         subprocess.run([sys.executable, os.path.join(HERE, 'xv2_to_nud.py'), pkg, name, os.path.join(fx, 'model'),
                         '--prefix', MODEL_PREFIX] + opts, check=True, capture_output=True)
-    for m in ('Fire', 'Bas', 'Hand'):
+    xv2_trace_to_nud.convert(pkg, os.path.join(fx, 'model'), MODEL_PREFIX)
+    for m in ('Fire', 'Bas', 'Hand') + TRACES:
         assert os.path.exists(os.path.join(fx, 'model', MODEL_PREFIX + m, 'model.nud')), m
     for m in os.listdir(os.path.join(v5, 'effect/supamario/model')):
         shutil.copytree(os.path.join(v5, 'effect/supamario/model', m), os.path.join(fx, 'model', m))
@@ -152,7 +163,7 @@ def main():
     for si, name, _chunk in made:
         assert q.set_name(si) == name
         ids[name] = e.add(si + 1)
-    for m in ('Fire', 'Bas', 'Hand'):
+    for m in ('Fire', 'Bas', 'Hand') + TRACES:
         ids[MODEL_PREFIX + m] = e.add(0, MODEL_PREFIX + m)
     open(os.path.join(fx, 'supamario.010d0000.efc'), 'wb').write(e.build())
 
@@ -172,7 +183,7 @@ def main():
 
     for si, name, chunk in made:
         print('0x%08X  %-26s set %d, %d emitters' % ((BANK << 16) | ids[name], name, si, len(chunk)))
-    for m in ('Fire', 'Bas', 'Hand'):
+    for m in ('Fire', 'Bas', 'Hand') + TRACES:
         print('0x%08X  %s (model)' % ((BANK << 16) | ids[MODEL_PREFIX + m], MODEL_PREFIX + m))
     for line in log:
         print(line)

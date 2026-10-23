@@ -121,5 +121,16 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
 - Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
   an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
   (the cape at Z 9).
-- Still to do: the beam body (the ETR traces `Kmh_Beam*.etr`: tubes along the beam), then the
-  move itself (projectile, hitboxes, charge logic).
+- **Beam body** (the ETR traces `Kmh_Beam*.etr`): `tools/xv2_trace_to_nud.py PKG OUT` (the
+  mapping in its docstring). Each trace node is a mesh 1 unit long along +Z on its own bone: the
+  shaped nodes (closed 25 / 13-point cross-sections) tubes of radius Scale, the flat
+  auto-oriented core two crossed ribbons; the bone's Z scale grows at `--speed` (default 2 Smash
+  units a frame: XV2's speed belongs to the skill, so the move's projectile should match) for
+  ExtrudeDuration frames, then holds while the DefaultEnd Scale / alpha keyframes thin and fade it;
+  ShapeStartToEnd alpha keyframes are the alpha along the length; textures BC3 with ScaleUV V
+  animated with the length (texture aspect kept) and TransUV at the sampler's scroll speed.
+  `EffSupamarioKameBeam` / `Beam2` / `Beam3` (79 / 103 / 125 frames, textures 0x15141A30 / 40 /
+  50), entries `0x03410023`-`0x03410025`. Test 7 (`build/supamario_kame_test7.zip`): the side
+  taunt adds the size-1 body from bone 0 (0, 7, 3) forward. The user wants the beam's end as a
+  separate effect from the head, travelling with the body.
+- Still to do: the move itself (projectile, hitboxes, charge logic).
