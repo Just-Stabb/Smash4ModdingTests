@@ -1,0 +1,373 @@
+diff --git a/src/Cafe/CMakeLists.txt b/src/Cafe/CMakeLists.txt
+index b509e72..5191357 100644
+--- a/src/Cafe/CMakeLists.txt
++++ b/src/Cafe/CMakeLists.txt
+@@ -24,6 +24,8 @@ add_library(CemuCafe
+   Filesystem/WUHB/WUHBReader.h
+   GamePatch.cpp
+   GamePatch.h
++  Smash4/Smash4Probe.cpp
++  Smash4/Smash4Probe.h
+   GameProfile/GameProfile.cpp
+   GameProfile/GameProfile.h
+   GraphicPack/GraphicPack2.cpp
+diff --git a/src/Cafe/GamePatch.cpp b/src/Cafe/GamePatch.cpp
+index f197d01..6fe03f2 100644
+--- a/src/Cafe/GamePatch.cpp
++++ b/src/Cafe/GamePatch.cpp
+@@ -3,6 +3,7 @@
+ #include "Cafe/HW/Espresso/Interpreter/PPCInterpreterInternal.h"
+ #include "CafeSystem.h"
+ #include "config/ActiveSettings.h" // Selectively add some patches based on network settings.
++#include "Cafe/Smash4/Smash4Probe.h"
+ 
+ void hleExport_breathOfTheWild_busyLoop(PPCInterpreter_t* hCPU)
+ {
+@@ -518,6 +519,8 @@ void GamePatch_scan()
+ 		memory_writeU32(hleAddr + 0x40, 0x38600001);
+ 	}
+ 
++	Smash4Probe::Install();
++
+ 	uint32 hleInstallEnd = GetTickCount();
+ 	cemuLog_log(LogType::Force, "HLE scan time: {}ms", hleInstallEnd-hleInstallStart);
+ }
+diff --git a/src/Cafe/OS/libs/coreinit/coreinit_MEM_ExpHeap.cpp b/src/Cafe/OS/libs/coreinit/coreinit_MEM_ExpHeap.cpp
+index 04cc5d8..42c7b78 100644
+--- a/src/Cafe/OS/libs/coreinit/coreinit_MEM_ExpHeap.cpp
++++ b/src/Cafe/OS/libs/coreinit/coreinit_MEM_ExpHeap.cpp
+@@ -1,3 +1,4 @@
++#include "Cafe/Smash4/Smash4Probe.h"
+ #include "Cafe/OS/common/OSCommon.h"
+ #include "Cafe/HW/Espresso/PPCCallback.h"
+ #include "Cafe/OS/libs/coreinit/coreinit_MEM_ExpHeap.h"
+@@ -852,6 +853,7 @@ void export_MEMCreateExpHeapEx(PPCInterpreter_t* hCPU)
+ 	ppcDefineParamU32(size, 1);
+ 	ppcDefineParamU16(options, 2);
+ 	MEMPTR<MEMHeapBase> heap = MEMCreateExpHeapEx(startAddress.GetPtr(), size, options);
++	Smash4Probe::OnHeapCreate(0, startAddress.GetMPTR(), size);
+ 	cemuLog_logDebug(LogType::CoreinitMem, "MEMCreateExpHeapEx(0x{:08x}, 0x{:x}, 0x{:x}) Result: 0x{:08x}", startAddress.GetMPTR(), size, options, heap.GetMPTR());
+ 	osLib_returnFromFunction(hCPU, heap.GetMPTR());
+ }
+diff --git a/src/Cafe/OS/libs/coreinit/coreinit_Time.cpp b/src/Cafe/OS/libs/coreinit/coreinit_Time.cpp
+index e4bc6aa..9968937 100644
+--- a/src/Cafe/OS/libs/coreinit/coreinit_Time.cpp
++++ b/src/Cafe/OS/libs/coreinit/coreinit_Time.cpp
+@@ -1,5 +1,6 @@
+ #include "Cafe/OS/common/OSCommon.h"
+ #include "Cafe/OS/libs/coreinit/coreinit_Time.h"
++#include "Cafe/Smash4/Smash4Probe.h"
+ 
+ namespace coreinit
+ {
+@@ -352,12 +353,18 @@ namespace coreinit
+ 		}
+ 	}
+ 
++	// the exports, counted by the Smash 4 probe (Cemu's own calls go to the functions above)
++	uint64 export_OSGetTime() { Smash4Probe::OnTimeRead(0); return OSGetTime(); }
++	uint64 export_OSGetSystemTime() { Smash4Probe::OnTimeRead(1); return OSGetSystemTime(); }
++	uint32 export_OSGetTick() { Smash4Probe::OnTimeRead(2); return OSGetTick(); }
++	uint32 export_OSGetSystemTick() { Smash4Probe::OnTimeRead(3); return OSGetSystemTick(); }
++
+ 	void InitializeTimeAndCalendar()
+ 	{
+-		cafeExportRegister("coreinit", OSGetTime, LogType::Placeholder);
+-		cafeExportRegister("coreinit", OSGetSystemTime, LogType::Placeholder);
+-		cafeExportRegister("coreinit", OSGetTick, LogType::Placeholder);
+-		cafeExportRegister("coreinit", OSGetSystemTick, LogType::Placeholder);
++		cafeExportRegisterFunc(export_OSGetTime, "coreinit", "OSGetTime", LogType::Placeholder);
++		cafeExportRegisterFunc(export_OSGetSystemTime, "coreinit", "OSGetSystemTime", LogType::Placeholder);
++		cafeExportRegisterFunc(export_OSGetTick, "coreinit", "OSGetTick", LogType::Placeholder);
++		cafeExportRegisterFunc(export_OSGetSystemTick, "coreinit", "OSGetSystemTick", LogType::Placeholder);
+ 
+ 		cafeExportRegister("coreinit", OSTicksToCalendarTime, LogType::Placeholder);
+ 		cafeExportRegister("coreinit", OSCalendarTimeToTicks, LogType::Placeholder);
+diff --git a/src/Cafe/OS/libs/vpad/vpad.cpp b/src/Cafe/OS/libs/vpad/vpad.cpp
+index dc6b6ad..e0a9333 100644
+--- a/src/Cafe/OS/libs/vpad/vpad.cpp
++++ b/src/Cafe/OS/libs/vpad/vpad.cpp
+@@ -1,3 +1,4 @@
++#include "Cafe/Smash4/Smash4Probe.h"
+ #include "Cafe/OS/common/OSCommon.h"
+ #include "Cafe/HW/Espresso/PPCCallback.h"
+ #include "Cafe/OS/libs/vpad/vpad.h"
+@@ -225,7 +226,8 @@ namespace vpad
+ 		ppcDefineParamU32(length, 2);
+ 		ppcDefineParamPtr(error, uint32be, 3);
+ 		cemuLog_log(LogType::InputAPI, "VPADRead({}, _, {})", channel, length);*/
+-	
++		Smash4Probe::OnPadRead(channel);
++
+ 		// default init which should be always set
+ 		memset(status, 0x00, sizeof(VPADStatus_t));
+ 
+diff --git a/src/Cafe/Smash4/Smash4Probe.cpp b/src/Cafe/Smash4/Smash4Probe.cpp
+new file mode 100644
+index 0000000..871a90c
+--- /dev/null
++++ b/src/Cafe/Smash4/Smash4Probe.cpp
+@@ -0,0 +1,244 @@
++#include "Cafe/OS/common/OSCommon.h"
++#include "Cafe/HW/Espresso/PPCState.h"
++#include "Cafe/HW/MMU/MMU.h"
++#include "Cafe/OS/libs/coreinit/coreinit_Thread.h"
++#include "config/ActiveSettings.h"
++#include "Cafe/Smash4/Smash4Probe.h"
++
++#include <bit>
++#include <chrono>
++#include <cstdlib>
++#include <fstream>
++#include <map>
++#include <mutex>
++#include <vector>
++
++// What it logs (smash4_probe.log in Cemu's user folder):
++// - every battle seed the game sets (0x02D87E00, RNG instance 0 at 0x105759C0) and every clock seed
++//   it takes (0x033740D8, RNG instance 1 and the boot seeding), with the caller;
++// - the active threads (name, entry point, priority) at each battle seed;
++// - per 60 input reads: host time per frame, RNG instance 0 / 1 state, time reads by caller;
++// - every N frames after a battle seed (CEMU_SMASH4_HASH_EVERY, default 600, 0 = off; each sample reads all 1 GiB of MEM2, a visible hitch): which 64 KiB
++//   blocks of MEM2 changed since the previous sample, coalesced into ranges: the memory a battle
++//   writes, i.e. what a rollback snapshot must cover;
++// - heap creations (start, size, caller).
++// Environment overrides for determinism tests: CEMU_SMASH4_SEED replaces every battle seed,
++// CEMU_SMASH4_CLOCKSEED the clock seed (numbers: decimal or 0x hex).
++
++namespace Smash4Probe
++{
++	constexpr uint32 SEED_SITE = 0x02D87E00;       // lis r3, 0x1057 ; addi r3, r3, 0x59C0 ; b 0x0337413C
++	constexpr uint32 SEED_WORDS[2] = { 0x3C601057, 0x386359C0 };
++	constexpr uint32 CLOCKSEED_SITE = 0x033740D8;  // mflr r0 ; stw r0, 4(r1) ; stwu r1, -0x10(r1)
++	constexpr uint32 CLOCKSEED_WORDS[2] = { 0x7C0802A6, 0x90010004 };
++	constexpr uint32 RNG_BASE = 0x105759C0;       // 4 x xorshift128 (16 bytes each)
++	constexpr uint32 BLOCK = 0x10000;
++
++	static bool s_active = false;
++	static std::mutex s_mutex;
++	static std::ofstream s_log;
++	static uint64 s_padReads = 0;
++	static uint64 s_battleSeedRead = 0;           // pad read count at the last battle seed (0 = none yet)
++	static std::chrono::steady_clock::time_point s_lastTick;
++	static double s_frameMsSum = 0, s_frameMsMax = 0;
++	static std::map<uint64, uint64> s_timeReads;  // (kind << 32 | caller) -> count
++	static uint32 s_hashEvery = 600;
++	static std::vector<uint64> s_blockHash;
++	static bool s_haveSeedOverride = false, s_haveClockOverride = false;
++	static uint32 s_seedOverride = 0, s_clockOverride = 0;
++
++	bool IsActive() { return s_active; }
++
++	template<typename... T>
++	static void Log(fmt::format_string<T...> f, T&&... args)
++	{
++		if (s_log.is_open())
++		{
++			s_log << fmt::format(f, std::forward<T>(args)...) << '\n';
++			s_log.flush();
++		}
++	}
++
++	static std::string RngState(sint32 instance)
++	{
++		uint32 a = RNG_BASE + 16 * instance;
++		return fmt::format("{:08x}{:08x}{:08x}{:08x}", memory_readU32(a), memory_readU32(a + 4), memory_readU32(a + 8), memory_readU32(a + 12));
++	}
++
++	static void LogThreads()
++	{
++		srwlock_activeThreadList.LockRead();
++		for (sint32 i = 0; i < activeThreadCount; i++)
++		{
++			auto* t = (OSThread_t*)memory_getPointerFromVirtualOffset(activeThread[i]);
++			const char* name = t->threadName.GetPtr() ? t->threadName.GetPtr() : "";
++			Log("  thread 0x{:08x} '{}' entry 0x{:08x} prio {} state {}", activeThread[i], name,
++				t->entrypoint.GetMPTR(), (sint32)t->basePriority, (uint32)(uint8)t->state.value());
++		}
++		srwlock_activeThreadList.UnlockRead();
++	}
++
++	static bool ParseEnv(const char* name, uint32& out)
++	{
++		const char* v = std::getenv(name);
++		if (!v || !*v)
++			return false;
++		out = (uint32)std::strtoul(v, nullptr, 0);
++		return true;
++	}
++
++	// HLE at SEED_SITE (replaces `lis r3, 0x1057`): r4 = the match's seed
++	static void HLE_BattleSeed(PPCInterpreter_t* hCPU)
++	{
++		{
++			std::unique_lock _l(s_mutex);
++			Log("[read {}] battle seed 0x{:08x} (caller 0x{:08x}){}", s_padReads, hCPU->gpr[4], hCPU->spr.LR,
++				s_haveSeedOverride ? fmt::format(" -> forced 0x{:08x}", s_seedOverride) : "");
++			if (s_haveSeedOverride)
++				hCPU->gpr[4] = s_seedOverride;
++			s_battleSeedRead = s_padReads ? s_padReads : 1;
++			s_blockHash.clear();
++			LogThreads();
++		}
++		hCPU->gpr[3] = 0x10570000;
++		hCPU->instructionPointer += 4;
++	}
++
++	// HLE at CLOCKSEED_SITE (replaces `mflr r0`): the clock-derived seed of RNG instance 1
++	static void HLE_ClockSeed(PPCInterpreter_t* hCPU)
++	{
++		{
++			std::unique_lock _l(s_mutex);
++			Log("[read {}] clock seed taken (caller 0x{:08x}){}", s_padReads, hCPU->spr.LR,
++				s_haveClockOverride ? fmt::format(" -> forced 0x{:08x}", s_clockOverride) : "");
++		}
++		if (s_haveClockOverride)
++		{
++			osLib_returnFromFunction(hCPU, s_clockOverride);
++			return;
++		}
++		hCPU->gpr[0] = hCPU->spr.LR;
++		hCPU->instructionPointer += 4;
++	}
++
++	static void SampleMemory()
++	{
++		const uint32 base = mmuRange_MEM2.getBase();
++		const uint32 size = mmuRange_MEM2.getSize();
++		const uint32 n = size / BLOCK;
++		std::vector<uint64> h(n);
++		for (uint32 b = 0; b < n; b++)
++		{
++			const uint64* p = (const uint64*)(memory_base + base + b * BLOCK);
++			uint64 a0 = 0x9E3779B97F4A7C15ull, a1 = 0xC2B2AE3D27D4EB4Full;
++			for (uint32 i = 0; i < BLOCK / 8; i += 2)
++			{
++				a0 = std::rotl(a0 ^ p[i], 23) * 0x9E3779B97F4A7C15ull;
++				a1 = std::rotl(a1 ^ p[i + 1], 29) * 0xC2B2AE3D27D4EB4Full;
++			}
++			uint64 acc = a0 ^ (a1 + 0x165667B19E3779F9ull);
++			h[b] = acc;
++		}
++		if (s_blockHash.size() == n)
++		{
++			uint32 changed = 0;
++			std::string ranges;
++			for (uint32 b = 0; b < n;)
++			{
++				if (h[b] == s_blockHash[b]) { b++; continue; }
++				uint32 e = b;
++				while (e < n && h[e] != s_blockHash[e]) e++;
++				changed += e - b;
++				ranges += fmt::format(" {:08x}-{:08x}", base + b * BLOCK, base + e * BLOCK);
++				b = e;
++			}
++			Log("[read {}] MEM2 changed: {} KiB in{}", s_padReads, changed * (BLOCK / 1024), ranges);
++		}
++		s_blockHash = std::move(h);
++	}
++
++	void OnPadRead(uint32 channel)
++	{
++		if (!s_active || channel != 0)
++			return;
++		std::unique_lock _l(s_mutex);
++		auto now = std::chrono::steady_clock::now();
++		if (s_padReads)
++		{
++			double ms = std::chrono::duration<double, std::milli>(now - s_lastTick).count();
++			s_frameMsSum += ms;
++			s_frameMsMax = std::max(s_frameMsMax, ms);
++		}
++		s_lastTick = now;
++		s_padReads++;
++		if (s_padReads % 60 == 0)
++		{
++			Log("[read {}] frame ms avg {:.2f} max {:.2f}; rng0 {} rng1 {}", s_padReads, s_frameMsSum / 60.0, s_frameMsMax,
++				RngState(0), RngState(1));
++			s_frameMsSum = s_frameMsMax = 0;
++			if (!s_timeReads.empty())
++			{
++				std::string t;
++				for (auto& [k, c] : s_timeReads)
++					t += fmt::format(" {}@{:08x}x{}", (uint32)(k >> 32), (uint32)k, c);
++				Log("  time reads (kind@caller x count, 0 GetTime 1 GetSystemTime 2 GetTick 3 GetSystemTick):{}", t);
++				s_timeReads.clear();
++			}
++		}
++		if (s_battleSeedRead && s_hashEvery && (s_padReads - s_battleSeedRead) % s_hashEvery == 0)
++			SampleMemory();
++	}
++
++	void OnTimeRead(uint32 kind)
++	{
++		if (!s_active)
++			return;
++		PPCInterpreter_t* hCPU = PPCInterpreter_getCurrentInstance();
++		if (!hCPU)
++			return;
++		std::unique_lock _l(s_mutex);
++		s_timeReads[((uint64)kind << 32) | hCPU->spr.LR]++;
++	}
++
++	void OnHeapCreate(uint32 kind, uint32 start, uint32 size)
++	{
++		if (!s_active)
++			return;
++		PPCInterpreter_t* hCPU = PPCInterpreter_getCurrentInstance();
++		std::unique_lock _l(s_mutex);
++		Log("[read {}] heap create kind {} 0x{:08x} size 0x{:x} (caller 0x{:08x})", s_padReads, kind, start, size, hCPU ? hCPU->spr.LR : 0);
++	}
++
++	static bool Matches(uint32 addr, const uint32 (&words)[2])
++	{
++		return memory_readU32(addr) == words[0] && memory_readU32(addr + 4) == words[1];
++	}
++
++	void Install()
++	{
++		s_active = false;
++		if (!Matches(SEED_SITE, SEED_WORDS) || !Matches(CLOCKSEED_SITE, CLOCKSEED_WORDS))
++			return;
++		if (std::getenv("CEMU_SMASH4_PROBE_OFF"))
++			return;
++		s_log.open(ActiveSettings::GetUserDataPath("smash4_probe.log"), std::ios::out | std::ios::trunc);
++		s_haveSeedOverride = ParseEnv("CEMU_SMASH4_SEED", s_seedOverride);
++		s_haveClockOverride = ParseEnv("CEMU_SMASH4_CLOCKSEED", s_clockOverride);
++		uint32 every;
++		if (ParseEnv("CEMU_SMASH4_HASH_EVERY", every))
++			s_hashEvery = every;
++		memory_writeU32(SEED_SITE, (1 << 26) | (uint32)osLib_getFunctionIndex("smash4probe", "battleSeed"));
++		memory_writeU32(CLOCKSEED_SITE, (1 << 26) | (uint32)osLib_getFunctionIndex("smash4probe", "clockSeed"));
++		s_padReads = 0;
++		s_battleSeedRead = 0;
++		s_active = true;
++		Log("Smash 4 probe installed: battle seed hook 0x{:08x}, clock seed hook 0x{:08x}, MEM2 0x{:08x}+0x{:x}, hash every {} reads",
++			SEED_SITE, CLOCKSEED_SITE, mmuRange_MEM2.getBase(), mmuRange_MEM2.getSize(), s_hashEvery);
++	}
++}
++
++RunAtCemuBoot _loadSmash4Probe([]()
++	{
++		osLib_addFunction("smash4probe", "battleSeed", Smash4Probe::HLE_BattleSeed);
++		osLib_addFunction("smash4probe", "clockSeed", Smash4Probe::HLE_ClockSeed);
++	});
+diff --git a/src/Cafe/Smash4/Smash4Probe.h b/src/Cafe/Smash4/Smash4Probe.h
+new file mode 100644
+index 0000000..eb8c1b2
+--- /dev/null
++++ b/src/Cafe/Smash4/Smash4Probe.h
+@@ -0,0 +1,13 @@
++#pragma once
++
++// Smash 4 (Wii U) rollback groundwork: a probe that logs what a rollback implementation has to
++// control (docs/rollback-netplay.md in the Smash4ModdingTests repository). Active only when the
++// running game's code matches Smash 4's executable (vanilla or modded) at the hooked addresses.
++namespace Smash4Probe
++{
++	void Install();                   // from GamePatch_scan(), after the game's code is loaded
++	bool IsActive();
++	void OnPadRead(uint32 channel);   // VPADRead entry: the game's per-frame input read
++	void OnTimeRead(uint32 kind);     // OSGetTime / OSGetSystemTime / OSGetTick / OSGetSystemTick
++	void OnHeapCreate(uint32 kind, uint32 start, uint32 size);
++}
