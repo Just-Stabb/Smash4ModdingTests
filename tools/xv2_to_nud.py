@@ -15,6 +15,10 @@ model folders (model.nud / .nut / .vbn / .omo / .mta / .xmb), see docs/xv2-model
       --rim 'MAT=r,g,b,p;...': XV2's incidence colour (MatCol3) baked into MAT's vertex colours for
       the side camera: x mix(1, (r, g, b), (1 - |normal.x|)^p) (normal.x: the model's X, the game
       camera's axis once the beam runs along its Z), white at the middle, the colour at the rim.
+      --bake-rot BONE,...: a bone whose rotation is constant (a multiple of 90 degrees about an axis):
+      the rotation goes into the vertices of the meshes under it (it and its descendants must have
+      no other rotation or offset), the bone keeps none and its scale axes follow (Kmh_Fire's TRS X
+      -90: in game the cone, along +Z only through that rotation, went into the screen, test 17).
       --subtract-as 'MAT=r,g,b;...': draw subtractive material MAT as normal alpha blend with
       colour gain RGB (r, g, b) (what the subtraction leaves: 1 - its colour) instead of
       additive (--plain) or subtractive.
@@ -214,11 +218,12 @@ class Model:
     """one EMO with its EMM / EMB / obj.ema / mat.ema, converted"""
 
     def __init__(self, src, name, folder, tex_base, scale=SCALE, anim_index=0, matcol1='mean', skip=(),
-                 plain=False, tint=None, rim=None, subtract_as=None):
+                 plain=False, tint=None, rim=None, subtract_as=None, bake_rot=()):
         p = os.path.join(src, name)
         self.name, self.folder, self.scale, self.matcol1 = name, folder, scale, matcol1
         self.skip, self.plain, self.tint = set(skip), plain, dict(tint or {})
         self.rim, self.subtract_as = dict(rim or {}), dict(subtract_as or {})
+        self.bake = set(bake_rot)
         self.emo = xv2.Emo(open(p + '.emo', 'rb').read())
         self.emm = xv2.Emm(open(p + '.emm', 'rb').read()) if os.path.exists(p + '.emm') else None
         self.emb = list(Emb(open(p + '.emb', 'rb').read())) if os.path.exists(p + '.emb') else []
@@ -235,9 +240,43 @@ class Model:
                                        for b in sk.bones]
         self.bones = [(n, p, zlib.crc32(n.encode()) & 0xFFFFFFFF) for n, p in self.bones]
         self.notes = []
+        self.baked = {}         # XV2 bone index -> 3x3 rotation baked into the vertices under it
+        for name in self.bake:
+            xb = [b.name for b in sk.bones].index(name)
+            qs = [self._raw_trs(xb, fr)[1] for fr in range(self.frames)]
+            assert all(np.allclose(q, qs[0], atol=1e-4) for q in qs), '%s: rotation not constant' % name
+            R = np.array(omo.qmat(qs[0]))[:3, :3]
+            assert np.allclose(np.abs(R).sum(0), 1, atol=1e-3), '%s: not a 90-degree rotation' % name
+            self.baked[xb] = R
+
+    def under_baked(self, xb):
+        """the baked rotation over XV2 bone xb (it or an ancestor), or None; the bones between must
+        be at rest (no offset / rotation)"""
+        sk = self.emo.skeleton
+        chain, b = [], xb
+        while b is not None and b >= 0:
+            if b in self.baked:
+                for c in chain:
+                    p, q, _s = self._raw_trs(c, 0)
+                    assert np.allclose(p, 0, atol=1e-4) and np.allclose(q, (0, 0, 0, 1), atol=1e-4), \
+                        '%s: offset / rotated under a baked bone' % sk.bones[c].name
+                return self.baked[b]
+            chain.append(b)
+            b = xv2._none(sk.bones[b].parent)
+        return None
 
     # -- bones
     def local_trs(self, xbone, frame):
+        """(pos, quaternion xyzw, scale) of XV2 bone index xbone at frame (Smash units); a baked
+        bone without its rotation, its scale axes moved with it (R S R^T)"""
+        p, q, s = self._raw_trs(xbone, frame)
+        if xbone in self.baked:
+            R = self.baked[xbone]
+            s = list(np.abs(R) @ np.array(s, float))
+            q = (0.0, 0.0, 0.0, 1.0)
+        return p, q, s
+
+    def _raw_trs(self, xbone, frame):
         """(pos, quaternion xyzw, scale) of XV2 bone index xbone at frame (Smash units)"""
         a = self.obj_anim
         name = self.emo.skeleton.bones[xbone].name
@@ -360,6 +399,11 @@ class Model:
                     nrm = m.attr('nrm')
                     nrm = nrm[:, :3] / np.maximum(np.linalg.norm(nrm[:, :3], axis=1, keepdims=True), 1e-9) \
                         if nrm is not None else None
+                    R = self.under_baked(xb) if xb is not None and xb < len(sk.bones) else None
+                    if R is not None:
+                        pos = pos @ R.T
+                        nrm = nrm @ R.T if nrm is not None else None
+                        self.notes.append('%s: rotation baked into its vertices (--bake-rot)' % part['name'])
                     col = m.attr('col')
                     col = np.round(col * 127.0 / 255.0) if col is not None else np.full((len(pos), 4), 127.0)
                     uv = m.attr('uv')
@@ -702,7 +746,7 @@ def folder_name(name, prefix):
 
 
 def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim=0, preview_dir=None, matcol1='mean',
-            skip=(), plain=False, tint=None, rim=None, subtract_as=None):
+            skip=(), plain=False, tint=None, rim=None, subtract_as=None, bake_rot=()):
     emos = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(src, '*.emo')))
     names = emos if pattern == 'all' else [n for n in emos if fnmatch.fnmatch(n, pattern)]
     if not names:
@@ -711,7 +755,7 @@ def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim
     for name in names:
         k = emos.index(name)
         m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain, tint,
-                  rim, subtract_as)
+                  rim, subtract_as, bake_rot)
         d = m.write(out)
         meshes = m.meshes_written
         print('%s -> %s' % (name, d))
@@ -777,7 +821,8 @@ def main():
             {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
              (t.split('=') for t in opts.get('rim', '').split(';') if t)},
             {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
-             (t.split('=') for t in opts.get('subtract-as', '').split(';') if t)})
+             (t.split('=') for t in opts.get('subtract-as', '').split(';') if t)},
+            [x for x in opts.get('bake-rot', '').split(',') if x])
 
 
 if __name__ == '__main__':

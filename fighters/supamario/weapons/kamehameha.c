@@ -670,7 +670,13 @@ int kame_dis_id()
     return KAME_DIS_1;
 }
 
-// every effect of the beam ends (the body pieces, the head, the start)
+// the head again, still, for the hold (its following effects ended with the status change: test 17)
+void kame_head_fx()
+{
+KAME_HEAD_FX
+}
+
+// every effect of the beam ends (the body pieces, the head)
 void kame_fx_off()
 {
 KAME_FX_OFF
@@ -787,6 +793,7 @@ void kame_hold_main()
         kame_phase = 0x1;
         kame_flown = kame_frame;
         kame_frame = 0;
+        kame_head_fx();
     }
     kame_move(0);
     callFunc3(kame_hold_loop);

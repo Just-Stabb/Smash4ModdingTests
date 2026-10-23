@@ -36967,6 +36967,7 @@ void func_2278()
 void func_2279()
 {
     kame_n_fx_off();
+    kame_n_start_off();
 }
 
 void func_2280()
@@ -37270,6 +37271,19 @@ void kame_n_fx_level(int level)
     }
 }
 
+// the beam's start at his hands (the XV2 parts that stay where the beam comes out), at the level's
+// sizes; they end with the pose (test 17: made by the beam, they stayed after it was removed past a
+// blast zone)
+void kame_n_start_fx()
+{
+KAME_N_START_FX
+}
+
+void kame_n_start_off()
+{
+KAME_N_START_OFF
+}
+
 void kame_n_fx_off()
 {
     EffectModule(0x2723, KAME_FX_CRG, 0x1, 0x1);
@@ -37312,6 +37326,7 @@ void kame_n_loop()
         {
             ArticleModule(0x2710, KAME_ARTICLE);
             ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
+            kame_n_start_fx();
             kame_n_state = 0x2;
         }
     }
@@ -37352,6 +37367,7 @@ void kame_n_hold_pose()
         if (kame_n_posed >= kame_n_pose_frames())
         {
             MotionModule(0x4, 1.0f);
+            kame_n_start_off();
             kame_n_pose = 0x2;
             if (global18 == 0x2)
             {

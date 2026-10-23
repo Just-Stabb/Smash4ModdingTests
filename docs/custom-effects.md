@@ -312,3 +312,21 @@ Test 16: the finish comes out. But:
   final smash) said no. Test 17: the pose holds for the level's flight + dissolve (81 / 91 / 100).
   ArticleModule's MSC handler: accessor `+0x4C` vt `+0x17C`; `0x2717` calls vt `+0xFC(id)`, which in
   the class at `0x10102B8C` returns 0 (the fighter's own class not found yet).
+
+### Test 17 in game, and test 18 (`build/supamario_kame_test18.zip`)
+
+Test 17: the blast-zone fix works for the head, but: the head vanished at the hit, the beam didn't
+multi-hit, the start parts stayed after a blast zone, and the light shaft was still on the wrong axis.
+What it shows about Terminate 1: a **following** effect ends at any status change of its owner (the
+hit's status 3) and with it; a **non-following** one doesn't end with it.
+- The head: following, Terminate 1 in the fly ACMD; at the hold the MSC puts its parts back, still
+  (`kame_head_fx`, EffectModule 0x2710, terminate 1); the finish's ACMD ends them.
+- The start parts (Hand ball, Fireptcl, 4ptcl, LineAll): now made by Supamario's MSC when he fires
+  (`kame_n_start_fx`, at bone 0 `START_POS` (0, 6.7, 14) + their EEPK offsets, turned 180, the level's
+  sizes) and ended with his pose or his status (`kame_n_start_off`).
+- The multi-hit: the head is PK Fire's pillar kind of hitbox (vanilla `pkfire` game.bin: 68-80
+  degrees, KBG 30, BKB 10, FacingRestrict 3, re-hit 11): 80 degrees, KBG 30, BKB 10, re-hit 6.
+- The light shaft: Kmh_Fire's cone runs along +Z only through its TRS bone's constant X -90; in game
+  it went into the screen. `xv2_to_nud.py --bake-rot TRS`: that rotation in the vertices, the bone
+  unrotated with its scale axes swapped (R S R^T); posed vertices identical to before at every frame.
+  (Kmh_Bas has animated bones under its TRS: not baked.)
