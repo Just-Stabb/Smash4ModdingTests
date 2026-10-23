@@ -2,16 +2,21 @@
 """Kirby's trait badges for the damage panel (docs/character-traits.md): a dark plate with the
 trait's colour, its icon and its name, one PNG a trait.
 
-  python3 tools/trait_badge_art.py OUT_DIR [--size 256x64] [--sheet sheet.png]
+  python3 tools/trait_badge_art.py OUT_DIR [--size 256x64] [--sheet sheet.png] [--icons tools/trait_icons]
 
 Writes OUT_DIR/trait_<name>.png (RGBA, transparent around the plate) for Normal, Rush, Shooter,
 Strike, Juggernaut and Technical, in the order of the trait numbers (1-6) Kirby's MSC writes to his
 marker int's bits 8-11. Drawn at 4x and scaled down. Replace any PNG with your own art of the same
 size to change a badge.
+
+A trait's icon is ICONS/<name>.png when that file is there (e.g. tools/trait_icons/strike.png; any
+size, best square with a transparent background), used as it is: scaled to fit the icon's spot,
+nothing drawn under or over it. Otherwise the drawn icon below.
 """
 import argparse
 import math
 import os
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -70,7 +75,17 @@ def icon(d, kind, cx, cy, r, colour):
         d.ellipse((cx - g * 0.3, cy - g * 0.3, cx + g * 0.3, cy + g * 0.3), fill=colour + (255,))
 
 
-def badge(name, colour, kind, size):
+def icon_file(img, path, cx, cy, r):
+    """the trait's own icon art, scaled (aspect kept) into the 2r x 2r square around (cx, cy)"""
+    art = Image.open(path).convert('RGBA')
+    if art.getextrema()[3][0] == 255:
+        sys.stderr.write('%s: no transparency; its background will show on the badge\n' % path)
+    k = 2 * r / max(art.size)
+    art = art.resize((max(1, round(art.width * k)), max(1, round(art.height * k))), Image.LANCZOS)
+    img.alpha_composite(art, (round(cx - art.width / 2), round(cy - art.height / 2)))
+
+
+def badge(name, colour, kind, size, icons=None):
     w, h = size[0] * SS, size[1] * SS
     img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -79,7 +94,11 @@ def badge(name, colour, kind, size):
                         outline=colour + (255,), width=SS * 3)
     r = (h - 2 * pad) * 0.42
     cx = pad + (h - 2 * pad) / 2
-    icon(d, kind, cx, h / 2, r, colour)
+    art = icons and os.path.join(icons, name.lower() + '.png')
+    if art and os.path.exists(art):
+        icon_file(img, art, cx, h / 2, r * 1.08)
+    else:
+        icon(d, kind, cx, h / 2, r, colour)
     text = name.upper()
     left, right = cx + r + SS * 6, w - pad - SS * 10
     fs = int((h - 2 * pad) * 0.5)
@@ -100,12 +119,14 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--size', default='256x64')
     ap.add_argument('--sheet', help='also a preview of every badge, one under the other')
+    ap.add_argument('--icons', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trait_icons'),
+                    help='folder of icon art, <trait>.png (default tools/trait_icons)')
     a = ap.parse_args()
     size = tuple(int(x) for x in a.size.split('x'))
     os.makedirs(a.out, exist_ok=True)
     imgs = []
     for name, colour, kind in TRAITS:
-        img = badge(name, colour, kind, size)
+        img = badge(name, colour, kind, size, a.icons)
         img.save(os.path.join(a.out, 'trait_%s.png' % name.lower()))
         imgs.append(img)
     if a.sheet:
