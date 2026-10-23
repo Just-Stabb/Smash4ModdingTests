@@ -1076,6 +1076,34 @@ User: Ultimate shows how damaged a block is (Minecraft's crack overlay). Its cra
 - Installing: the old `stc_blkNN_set` folders must go (a new build can't remove them: they'd stay
   drawn as unbreakable copies).
 
+### v18g: blocks regenerate each morning
+
+User: at morning the broken blocks come back one at a time (about 40 frames apart, stacking order),
+all blocks unbreakable until it's over, each fading in quickly with a loud break sound.
+`tools/monster_roll_cave.py` (`regen`, `bscale`, `boccupied`; executable only, no stage files):
+- **When**: the cycle counter wrapping (a new day) sets a request; if any block is broken the
+  regeneration starts (`rgdata`: +0 request, +4 active, +8 position in the order, +12 frames to the
+  next).
+- **Order**: each biome's block table carries an order after its entries (`block_tables`): by row,
+  then column, the plane block before the ones in front / behind (which break with it, and would be
+  broken again by a broken leader), then depth. A block every `REGEN_GAP` (40) updates.
+- **A block back**: state 3 (growing; `bfade` its frames), its life full again (`bmax`), its model
+  shown (as `apply` shows a folder), its gimmick's battle object back (`0x03133DAC` = Manifold's
+  `activate`, then `0x03133E4C`) on a plane block, its link's grounds on (`0x0315EDD8(list, 0)`), its
+  material's break sound. After `REGEN_FADE` (8) updates: state 0 (a plane block) / 2.
+- **The grow-in**: the blocks' material is alpha-tested (cut-out), so no real fade: the draw model's
+  world matrix (`0x03159248(m, float[12])` -> `0x032FF744`: a 3x4, rows, copied to the draw model's
+  `+0x34C`) scaled about the block's centre from `REGEN_SCALE0` (0.05, not 0: a singular matrix) to 1,
+  then identity (the block folders place nothing: their vertices are in world space).
+- **Unbreakable** while it's active (intact blocks skip the damage); it ends as soon as no block is
+  broken or growing.
+- **Nobody inside**: a block with collision waits while a live fighter's position (fighter table
+  entry `+0xC` accessor -> `+0x18` PostureModule `+0x10` / `+0x14`) is in its cell, `REGEN_MARGIN_X`
+  (4) to each side and `REGEN_MARGIN_Y` (16) below (a fighter's feet under it with the body inside).
+- `monster_roll_test.py`: 64 checks (10 new: the start at the wrap, the order, the gap, the grow-in's
+  matrices, the sound / collision / hurtbox back, unbreakable during it, waiting for a fighter, the end).
+  Two `addi r0, r0, n` slips (it reads 0) were caught by them.
+
 ## Freeze (user) and tests
 
 The moving-platform test build froze while loading the stage, and so did v4. Not the cause

@@ -171,6 +171,34 @@ yes:    lis r3, 0x7F00
         stw r4, 0x10(r7)
         blr""")
     stub(mu, C.BASE_UPDATE, 'li r3, 0x55\nblr')
+    # regeneration: set world matrix -> MATS (+0 count, then the model and 12 floats, 0x34 each, 16
+    # kept), the gimmick's battle object back -> BREC + 0x14 counted, + 0x18 its wrapper
+    stub(mu, C.SET_MATRIX, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xD000
+        lwz r6, 0(r7)
+        andi. r5, r6, 15
+        mulli r5, r5, 0x34
+        add r5, r5, r7
+        stw r3, 4(r5)
+        li r8, 12
+        mtctr r8
+        addi r4, r4, -4
+        addi r5, r5, 4
+mcopy:  lwzu r8, 4(r4)
+        stwu r8, 4(r5)
+        bdnz mcopy
+        addi r6, r6, 1
+        stw r6, 0(r7)
+        blr""")
+    stub(mu, C.GIM_RESTORE, """
+        lis r7, 0x7F00
+        ori r7, r7, 0xB000
+        lwz r6, 0x14(r7)
+        addi r6, r6, 1
+        stw r6, 0x14(r7)
+        stw r3, 0x18(r7)
+        blr""")
     stub(mu, C.SET_MOTION_FRAME, """
         lis r7, 0x7F00
         ori r7, r7, 0xC000
@@ -483,9 +511,91 @@ miss:   li r3, 0
     setw(REC + 0x30, 0)
     update()
     check('broken blocks: no more damage read, nothing played', plays(), [])
-    # the lives × Ultimate's rate by the number of live fighters, once there are any
+    # regeneration at the new day: order stone (its plane block, row 0) -> wood behind it -> grass (row 1)
     table = 0x7E000000                             # a fake fighter table (8 entries of 0x76B0)
     mu.mem_map(table, 0x50000)
+    rg = a.addr('rgdata')
+    MATS = 0x7F00D000
+
+    def mats():
+        n = word(MATS)
+        setw(MATS, 0)
+        return [(word(MATS + 4 + 0x34 * k) - block_model, [round(wf(MATS + 8 + 0x34 * k + 4 * j), 3) for j in range(12)])
+                for k in range(min(n, 16))]
+
+    def fighter_at(x, y):                          # one live fighter (accessor -> posture at x, y), or none
+        setw(0x1035184C, table + 0x100)
+        setw(table + 0x100, table + 0x200)
+        setw(table + 0x200, table + 0x1000)
+        setw(table + 0x208, 1)
+        mu.mem_write(table + 0x1000 + 0x1E, bytes([5 if x is not None else 0]))
+        setw(table + 0x1000 + 0xC, table + 0x40000)
+        setw(table + 0x40000 + 0x18, table + 0x40100)
+        mu.mem_write(table + 0x40100 + 0x10, struct.pack('>ff', x or 0.0, y or 0.0))
+
+    def scale_mat(s_, c):
+        f = lambda v: round(struct.unpack('>f', struct.pack('>f', v))[0], 3)     # float32, as the cave
+        s_ = f(s_)
+        return [s_, 0, 0, f(c[0] * (1 - s_)), 0, s_, 0, f(c[1] * (1 - s_)), 0, 0, s_, f(c[2] * (1 - s_))]
+
+    def near(got, want):
+        return all(len(g[1]) == len(w[1]) and all(abs(x - y) < 0.002 for x, y in zip(g[1], w[1])) and g[0] == w[0]
+                   for g, w in zip(got, want)) and len(got) == len(want)
+    fighter_at(-55.0, 12.0)                        # standing in the grass block's cell (x -60..-50, y 10..20)
+    breaks = [tone('block_break_%s' % m)[0] for m in ('stone', 'wood', 'grass')]
+    mats()
+    setw(REC + 0x30, 0)
+    setw(BREC + 8, 0)
+    setw(data, struct.unpack('>I', struct.pack('>f', C.CYCLE - 0.5))[0])
+    adds = word(REC + 4)
+    update()                                       # the cycle wraps: a new day
+    st = [word(bstate + 4 * i) for i in range(3)]
+    check('new day: regenerating; the stone block first (state 3), the break sound, its collision on, its hurtbox back',
+          (word(rg + 4), st, [p & 0xFFFF for p in plays()], (word(BREC + 8), word(BREC + 0x10)),
+           (word(BREC + 0x14), word(BREC + 0x18) - GIMS)),
+          (1, [1, 1, 3], [breaks[0] + 3], (1, 0), (1, 0x40)))
+    check('  its life full again, its model added to the scene (the test\'s blocks share one model: the broken'
+          ' ones hide it again), grown from %.2f about its centre (5, 5, 0)' % C.REGEN_SCALE0,
+          (wf(bhp + 8), word(REC + 4) - adds, mats()), (24.0, 1, [(0, scale_mat(C.REGEN_SCALE0, (5, 5, 0)))]))
+    grown = []
+    for n in range(C.REGEN_FADE):
+        damage(2, 50.0)                            # unbreakable while regenerating
+        update()
+        grown.append(mats())
+    damage(2, 0.0)
+    s1 = round(C.REGEN_SCALE0 + (1 - C.REGEN_SCALE0) / C.REGEN_FADE, 3)
+    check('  grows a step each update (%.3f, ...), full size (identity) after %d' % (s1, C.REGEN_FADE),
+          (near(grown[0], [(0, scale_mat(s1, (5, 5, 0)))]), near(grown[-1], [(0, scale_mat(1.0, (5, 5, 0)))])), (True, True))
+    check('  then intact (state 0), the 50-damage hits ignored, the wood block not yet', ([word(bstate + 4 * i) for i in range(3)], wf(bhp + 8)),
+          ([1, 1, 0], 24.0))
+    for n in range(C.REGEN_GAP - C.REGEN_FADE - 1):
+        update()
+    check('  the wood block (behind it) not before %d frames' % C.REGEN_GAP, word(bstate + 4), 1)
+    setw(REC + 0x30, 0)
+    update()
+    check('  then it (state 3, its break sound, no hurtbox or collision of its own)',
+          ([word(bstate + 4 * i) for i in range(3)], [p & 0xFFFF for p in plays()], word(BREC + 0x14)),
+          ([1, 3, 0], [breaks[1] + 3], 1))
+    for n in range(C.REGEN_GAP + 20):
+        update()
+    check('the grass block waits while a fighter is in its cell', (word(bstate), word(rg + 4)), (1, 1))
+    check('  the wood block grown and intact (state 2, behind its plane block)', word(bstate + 4), 2)
+    fighter_at(-30.0, 0.0)                         # moved away
+    update()
+    check('  comes back once the fighter is out of it', word(bstate), 3)
+    for n in range(C.REGEN_FADE):
+        update()
+    check('all back: regeneration over, every block intact', (word(rg + 4), [word(bstate + 4 * i) for i in range(3)]),
+          (0, [0, 2, 0]))
+    setw(REC + 0x30, 0)
+    damage(0, 5.0)
+    update()
+    damage(0, 0.0)
+    check('  breakable again (5 damage on the grass block)', round(wf(bhp), 3), 7.0)
+    setw(0x1035184C, 0)
+    frames()
+    mats()
+    # the lives × Ultimate's rate by the number of live fighters, once there are any
     for n, rate in ((5, 1.4), (4, 1.3), (2, 1.0), (8, 1.5)):
         setw(0x1035184C, table + 0x100)
         setw(table + 0x100, table + 0x200)

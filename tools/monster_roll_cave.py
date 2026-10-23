@@ -103,6 +103,20 @@ BLOCK_NAME, BLOCK_LINK = 'dyr_blk00_set', 'b00'
 # f1 x m+0xF8, which can't leave the window). Stage = floor(10 x damage / life) (Minecraft's), a follower
 # its column leader's.
 SET_MOTION_FRAME = 0x031593FC  # (m, f1 frame, r4 apply the pose now)
+# regeneration (user): at each new day (the cycle's wrap) the broken blocks come back one at a time,
+# REGEN_GAP frames apart, bottom row first (in a column the plane block before the ones behind / in
+# front of it, which break with it); each grows in from REGEN_SCALE0 of its size over REGEN_FADE frames
+# (StageDrawModel set world matrix 0x03159248(m, 3x4 rows): scaled about its centre; the blocks'
+# material is alpha-tested, so a true fade isn't possible) with its material's break sound; until the
+# last one is done every block takes no damage. A block with collision waits while a fighter is in
+# its cell (REGEN_MARGIN_X / _Y around it: feet up to _Y below it still count), so nobody ends up
+# inside one.
+GIM_RESTORE = 0x03133DAC       # (w): the gimmick's battle object back (Manifold's activate)
+SET_MATRIX = 0x03159248        # (m, float[12]): the draw model's world matrix
+REGEN_GAP = 40
+REGEN_FADE = 8
+REGEN_SCALE0 = 0.05
+REGEN_MARGIN_X, REGEN_MARGIN_Y = 4.0, 16.0
 CRACK_STEP = 10                # minecraft_world.CRACK_STEP
 CRACK_STAGES = 10
 CYCLE = 9000.0                 # minecraft_world.CYCLE
@@ -145,7 +159,8 @@ def event_tables(path=None):
 def block_tables(path=None):
     """([bytes] a table each biome (TABLES' melee ones): count, then 8 bytes a block: cell x, y, z
     (signed), life, material (minecraft_sound.BLOCK_MATERIALS), has a link, the index of its column's
-    plane block (its own if on the plane), 0), the materials'
+    plane block (its own if on the plane), 0; then the regeneration order (count bytes, padded to 4:
+    by row, then column, the plane block first, then depth)), the materials'
     sounds (8 bytes each: hit tone, variants, 0, broken tone, variants, 0)"""
     events = json.load(open(path or EVENTS)) if os.path.exists(path or EVENTS) else {}
     out = []
@@ -157,6 +172,10 @@ def block_tables(path=None):
             x, y, z = int((k['x'] - 5) // 10), int((k['y'] - 5) // 10), int(round(k['z'] / 10))
             b += struct.pack('>bbbBBBBB', x, y, z, int(round(k['life'])),
                          minecraft_sound.BLOCK_MATERIALS.index(k['sound']), int(k['link']), k.get('leader', i), 0)
+        lead = [k.get('leader', i) for i, k in enumerate(blocks)]
+        cells = [(int((k['x'] - 5) // 10), int((k['y'] - 5) // 10), int(round(k['z'] / 10))) for k in blocks]
+        order = sorted(range(len(blocks)), key=lambda i: (cells[i][1], cells[i][0], lead[i] != i, cells[i][2], i))
+        b += bytes(order) + b'\0' * (-len(order) % 4)    # regeneration order: bottom row first
         out.append(b)
     mats = b''
     for m in minecraft_sound.BLOCK_MATERIALS:
@@ -226,6 +245,9 @@ counting:
         li r0, 0
         stw r0, 0x10(r29)
         stw r0, -4(r29)
+        li r0, 1
+        lis r12, rgdata@ha
+        stw r0, rgdata@l(r12)
         b night
 nowrap:
         stfs f0, 0(r29)
@@ -500,6 +522,13 @@ blocks:
         addi r30, r30, 4
         stw r27, 4(r29)
         stw r30, 8(r29)
+        lis r12, rgdata@ha
+        addi r12, r12, rgdata@l
+        li r0, 0
+        stw r0, 0(r12)
+        stw r0, 4(r12)
+        stw r0, 8(r12)
+        stw r0, 12(r12)
         li r28, 0
 binit:
         cmpw r28, r27
@@ -684,6 +713,7 @@ bcmul:
         addi r9, r9, 1
         b bcmul
 bcounted:
+        bl regen
         li r28, 0
 bloop:
         cmpw r28, r27
@@ -694,6 +724,8 @@ bloop:
         lis r12, bstate@ha
         addi r12, r12, bstate@l
         lwzx r0, r12, r26
+        cmpwi r0, 3
+        beq bkeep
         cmpwi r0, 1
         beq bhide
         cmpwi r0, 2
@@ -707,6 +739,11 @@ bloop:
         stwx r0, r12, r26
         b bhide
 bintact:
+        lis r12, rgdata@ha
+        addi r12, r12, rgdata@l
+        lwz r0, 4(r12)
+        cmpwi r0, 0
+        bne bkeep                       # regenerating: every block unbreakable
         lis r12, bwrap@ha
         addi r12, r12, bwrap@l
         lwzx r3, r12, r26
@@ -800,6 +837,397 @@ bout:
         lwz r0, 0x84(r1)
         mtlr r0
         addi r1, r1, 0x80
+        blr
+regen:                                  # r31 stage, r30 table, r27 count (blocks' registers)
+        stwu r1, -0x90(r1)
+        mflr r0
+        stw r0, 0x94(r1)
+        stmw r20, 0x40(r1)
+        mr r20, r31
+        mr r21, r30
+        mr r22, r27
+        lis r23, rgdata@ha
+        addi r23, r23, rgdata@l
+        lwz r0, 0(r23)
+        cmpwi r0, 0
+        beq rgact
+        li r0, 0
+        stw r0, 0(r23)
+        li r24, 0
+rgany:                                  # a new day: start if any block is broken
+        cmpw r24, r22
+        bge rgact
+        slwi r12, r24, 2
+        lis r11, bstate@ha
+        addi r11, r11, bstate@l
+        lwzx r0, r11, r12
+        cmpwi r0, 1
+        beq rgstart
+        addi r24, r24, 1
+        b rgany
+rgstart:
+        li r0, 1
+        stw r0, 4(r23)
+        li r0, 0
+        stw r0, 8(r23)
+        stw r0, 12(r23)
+rgact:
+        lwz r0, 4(r23)
+        cmpwi r0, 0
+        beq rgout
+        li r24, 0
+rgf:                                    # the blocks growing in
+        cmpw r24, r22
+        bge rgfd
+        slwi r25, r24, 2
+        lis r11, bstate@ha
+        addi r11, r11, bstate@l
+        lwzx r0, r11, r25
+        cmpwi r0, 3
+        bne rgfn
+        lis r11, bfade@ha
+        addi r11, r11, bfade@l
+        lwzx r26, r11, r25
+        addi r26, r26, 1
+        stwx r26, r11, r25
+        mr r3, r24
+        mr r4, r26
+        bl bscale
+        cmpwi r26, %(fade)d
+        blt rgfn
+        slwi r12, r24, 3
+        add r12, r21, r12
+        lbz r0, 6(r12)
+        li r11, 2
+        cmpw r0, r24
+        bne rgfs
+        li r11, 0
+rgfs:
+        lis r10, bstate@ha
+        addi r10, r10, bstate@l
+        stwx r11, r10, r25
+rgfn:
+        addi r24, r24, 1
+        b rgf
+rgfd:                                   # done as soon as no block is broken or still growing
+        li r24, 0
+rgleft:
+        cmpw r24, r22
+        bge rgend
+        slwi r12, r24, 2
+        lis r11, bstate@ha
+        addi r11, r11, bstate@l
+        lwzx r0, r11, r12
+        cmpwi r0, 1
+        beq rgwait
+        cmpwi r0, 3
+        beq rgwait
+        addi r24, r24, 1
+        b rgleft
+rgwait:
+        lwz r12, 12(r23)
+        cmpwi r12, 0
+        ble rgnext
+        addi r12, r12, -1               # (not r0: addi r0, r0, n reads 0)
+        stw r12, 12(r23)
+        b rgout
+rgnext:
+        lwz r24, 8(r23)
+        slwi r11, r22, 3
+        add r11, r21, r11               # the order, after the entries
+rgfind:
+        cmpw r24, r22
+        bge rgdone
+        add r12, r11, r24
+        lbz r25, 0(r12)
+        slwi r26, r25, 2
+        lis r10, bstate@ha
+        addi r10, r10, bstate@l
+        lwzx r0, r10, r26
+        cmpwi r0, 1
+        beq rgcand
+        addi r24, r24, 1
+        b rgfind
+rgcand:
+        slwi r12, r25, 3
+        add r27, r21, r12
+        lbz r0, 5(r27)
+        cmpwi r0, 0
+        beq rggo
+        mr r3, r27
+        bl boccupied
+        cmpwi r3, 0
+        bne rgout                       # a fighter in its cell: wait
+rggo:
+        addi r0, r24, 1
+        stw r0, 8(r23)
+        li r0, %(gap1)d                 # the next one REGEN_GAP updates after this one
+        stw r0, 12(r23)
+        li r0, 3
+        lis r10, bstate@ha
+        addi r10, r10, bstate@l
+        stwx r0, r10, r26
+        li r0, 0
+        lis r10, bfade@ha
+        addi r10, r10, bfade@l
+        stwx r0, r10, r26
+        lis r10, bmax@ha
+        addi r10, r10, bmax@l
+        lfsx f0, r10, r26
+        lis r10, bhp@ha
+        addi r10, r10, bhp@l
+        stfsx f0, r10, r26
+        lis r10, bmodels@ha
+        addi r10, r10, bmodels@l
+        lwzx r28, r10, r26
+        cmpwi r28, 0
+        beq rgnomodel
+        lwz r5, 0x118(r28)
+        lis r6, 8
+        or r5, r5, r6
+        stw r5, 0x118(r28)
+        srwi r5, r5, 18
+        andi. r5, r5, 3
+        cmpwi r5, 3
+        bne rgscale
+        addi r3, r28, 0xDC
+        bl 0x%(isvis)08X
+        cmpwi r3, 0
+        bne rgsv
+        mr r3, r28
+        li r4, 0
+        bl 0x%(add)08X
+rgsv:
+        addi r3, r28, 0xDC
+        li r4, 1
+        bl 0x%(setvis)08X
+rgscale:
+        mr r3, r25
+        li r4, 0
+        bl bscale
+rgnomodel:
+        lbz r0, 6(r27)
+        cmpw r0, r25
+        bne rgnogim
+        lis r10, bwrap@ha
+        addi r10, r10, bwrap@l
+        lwzx r28, r10, r26
+        cmpwi r28, 0
+        beq rgnogim
+        mr r3, r28
+        bl 0x%(gim_restore)08X
+        mr r3, r28
+        li r4, 0
+        bl 0x%(gim_activate)08X
+rgnogim:
+        lbz r0, 5(r27)
+        cmpwi r0, 0
+        beq rgnocol
+        mr r3, r25
+        bl bnames
+        mr r3, r20
+        lis r4, blink@ha
+        addi r4, r4, blink@l
+        bl 0x%(link_find)08X
+        cmpwi r3, 0
+        beq rgnocol
+        li r4, 0
+        bl 0x%(grounds_off)08X
+rgnocol:
+        lbz r0, 4(r27)
+        slwi r0, r0, 3
+        lis r12, bmats@ha
+        addi r12, r12, bmats@l
+        add r12, r12, r0
+        mr r3, r20
+        lhz r4, 4(r12)
+        lbz r5, 6(r12)
+        bl playsnd
+        b rgout
+rgdone:                                 # every block back: done once none is still growing
+        li r24, 0
+rgd2:
+        cmpw r24, r22
+        bge rgend
+        slwi r12, r24, 2
+        lis r11, bstate@ha
+        addi r11, r11, bstate@l
+        lwzx r0, r11, r12
+        cmpwi r0, 3
+        beq rgout
+        addi r24, r24, 1
+        b rgd2
+rgend:
+        li r0, 0
+        stw r0, 4(r23)
+rgout:
+        lmw r20, 0x40(r1)
+        lwz r0, 0x94(r1)
+        mtlr r0
+        addi r1, r1, 0x90
+        blr
+bscale:                                 # r3 block, r4 frames grown (r21 table): its world matrix
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r28, 0x50(r1)
+        slwi r12, r3, 2
+        lis r11, bmodels@ha
+        addi r11, r11, bmodels@l
+        lwzx r29, r11, r12
+        cmpwi r29, 0
+        beq bsout
+        slwi r12, r3, 3
+        add r30, r21, r12
+        lis r28, rgconst@ha
+        addi r28, r28, rgconst@l
+        lis r0, 0x4330
+        stw r0, 0x40(r1)
+        stw r4, 0x44(r1)
+        lfd f1, 0x40(r1)
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfd f13, 16(r12)
+        fsub f1, f1, f13
+        frsp f1, f1
+        lfs f3, 4(r28)
+        fmuls f1, f1, f3
+        lfs f2, 0(r28)
+        fadds f1, f1, f2                # scale: REGEN_SCALE0 + t x (1 - it) / REGEN_FADE
+        lfs f4, 8(r28)
+        fcmpu cr0, f1, f4
+        ble bsmax
+        fmr f1, f4
+bsmax:
+        fsubs f5, f4, f1                # 1 - s
+        lfd f13, 0(r12)
+        lbz r0, 0(r30)
+        extsb r0, r0
+        mulli r11, r0, 10
+        addi r11, r11, 5
+        xoris r0, r11, 0x8000
+        stw r0, 0x44(r1)
+        lfd f6, 0x40(r1)
+        fsub f6, f6, f13
+        frsp f6, f6
+        lbz r0, 1(r30)
+        extsb r0, r0
+        mulli r11, r0, 10
+        addi r11, r11, 5
+        xoris r0, r11, 0x8000
+        stw r0, 0x44(r1)
+        lfd f7, 0x40(r1)
+        fsub f7, f7, f13
+        frsp f7, f7
+        lbz r0, 2(r30)
+        extsb r0, r0
+        mulli r0, r0, 10
+        xoris r0, r0, 0x8000
+        stw r0, 0x44(r1)
+        lfd f8, 0x40(r1)
+        fsub f8, f8, f13
+        frsp f8, f8
+        lfs f9, 12(r12)                 # 0
+        fmuls f6, f6, f5
+        fmuls f7, f7, f5
+        fmuls f8, f8, f5
+        stfs f1, 0x10(r1)
+        stfs f9, 0x14(r1)
+        stfs f9, 0x18(r1)
+        stfs f6, 0x1C(r1)
+        stfs f9, 0x20(r1)
+        stfs f1, 0x24(r1)
+        stfs f9, 0x28(r1)
+        stfs f7, 0x2C(r1)
+        stfs f9, 0x30(r1)
+        stfs f9, 0x34(r1)
+        stfs f1, 0x38(r1)
+        stfs f8, 0x3C(r1)
+        mr r3, r29
+        addi r4, r1, 0x10
+        bl 0x%(set_matrix)08X
+bsout:
+        lmw r28, 0x50(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+boccupied:                              # r3 block entry -> r3 1 if a live fighter is in its cell
+        stwu r1, -0x30(r1)
+        lis r12, bconst@ha
+        addi r12, r12, bconst@l
+        lfd f13, 0(r12)
+        lis r0, 0x4330
+        stw r0, 0x10(r1)
+        lbz r0, 0(r3)
+        extsb r0, r0
+        mulli r0, r0, 10
+        xoris r0, r0, 0x8000
+        stw r0, 0x14(r1)
+        lfd f6, 0x10(r1)
+        fsub f6, f6, f13
+        frsp f6, f6                     # the cell's left
+        lbz r0, 1(r3)
+        extsb r0, r0
+        mulli r0, r0, 10
+        xoris r0, r0, 0x8000
+        stw r0, 0x14(r1)
+        lfd f7, 0x10(r1)
+        fsub f7, f7, f13
+        frsp f7, f7                     # its bottom
+        lis r12, rgconst@ha
+        addi r12, r12, rgconst@l
+        lfs f10, 12(r12)                # margin x
+        lfs f11, 16(r12)                # margin y
+        lfs f12, 20(r12)                # 10
+        fsubs f2, f6, f10               # x from
+        fadds f3, f6, f12
+        fadds f3, f3, f10               # x to
+        fsubs f4, f7, f11               # y from
+        fadds f5, f7, f12               # y to
+        li r3, 0
+        lis r12, 0x%(fighters_hi)04X
+        lwz r12, 0x%(fighters_lo)04X(r12)
+        cmpwi r12, 0
+        beq boout
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq boout
+        lwz r11, 8(r12)
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq boout
+        li r9, 0
+boloop:
+        cmpw r9, r11
+        bge boout
+        lbz r0, 0x1E(r12)
+        cmplwi r0, 4
+        blt bonext
+        lwz r10, 0xC(r12)
+        cmpwi r10, 0
+        beq bonext
+        lwz r10, 0x18(r10)
+        cmpwi r10, 0
+        beq bonext
+        lfs f0, 0x10(r10)
+        fcmpu cr0, f0, f2
+        ble bonext
+        fcmpu cr0, f0, f3
+        bge bonext
+        lfs f0, 0x14(r10)
+        fcmpu cr0, f0, f4
+        ble bonext
+        fcmpu cr0, f0, f5
+        bge bonext
+        li r3, 1
+        b boout
+bonext:
+        addi r12, r12, %(entry)d
+        addi r9, r9, 1
+        b boloop
+boout:
+        addi r1, r1, 0x30
         blr
 bcrack:                                 # r3 block, r4 its column's leader: hold the block's crack state
         stwu r1, -0x20(r1)
@@ -943,7 +1371,8 @@ data:
            remove=SCENE_REMOVE, setvis=SET_VISIBLE, cycle=CYCLE, mframe=MONSTER_FRAME, fighters_hi=(FIGHTERS + 0x8000) >> 16,
            fighters_lo=FIGHTERS & 0xFFFF, entry=FIGHTER_ENTRY, gim_create=GIM_CREATE, gim_shape=GIM_SHAPE,
            gim_activate=GIM_ACTIVATE, gim_damage=GIM_DAMAGE, gim_remove=GIM_REMOVE, link_find=LINK_FIND,
-           grounds_off=GROUNDS_OFF, set_frame=SET_MOTION_FRAME, step=CRACK_STEP, half=CRACK_STEP // 2,
+           grounds_off=GROUNDS_OFF, set_frame=SET_MOTION_FRAME, gim_restore=GIM_RESTORE, set_matrix=SET_MATRIX,
+           fade=REGEN_FADE, gap1=REGEN_GAP - 1, step=CRACK_STEP, half=CRACK_STEP // 2,
            stages=CRACK_STAGES, stages1=CRACK_STAGES - 1, name_tens=BLOCK_NAME.index('00'), name_ones=BLOCK_NAME.index('00') + 1,
            monsters=MONSTERS, folders=len(FOLDERS), animal_total=sum(o for o, _f in ANIMAL_ODDS), end_table=len(TABLES) - 1, pick_hi=pick >> 16,
            pick_lo=pick & 0xFFFF, n_biomes=biome_select_cave.N_BIOMES, row=SOUND_ROW, play=PLAY_SE,
@@ -1003,9 +1432,14 @@ data:
     a.asm('brate:')
     for r in LIFE_RATE:
         a.asm('.word 0x%08X' % struct.unpack('>I', struct.pack('>f', r))[0])
+    a.asm('rgconst:')
+    for v in (REGEN_SCALE0, (1.0 - REGEN_SCALE0) / REGEN_FADE, 1.0, REGEN_MARGIN_X, REGEN_MARGIN_Y, 10.0):
+        a.asm('.word 0x%08X' % struct.unpack('>I', struct.pack('>f', v))[0])
     a.asm('bdata:')
     a.asm('.word 0\n.word 0\n.word 0\n.word 0')
-    for label in ('bwrap', 'bhp', 'bstate', 'bmodels', 'bmax'):
+    a.asm('rgdata:')                    # +0 a new day (request), +4 regenerating, +8 order position, +12 frames to the next
+    a.asm('.word 0\n.word 0\n.word 0\n.word 0')
+    for label in ('bwrap', 'bhp', 'bstate', 'bmodels', 'bmax', 'bfade'):
         a.asm(label + ':')
         for _ in range(MAX_BLOCKS):
             a.asm('.word 0')
