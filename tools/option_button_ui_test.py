@@ -7,7 +7,7 @@
   from the written file) with the same fields, its jumps to the relocated targets; the tables read
   back as wanted; the new identifiers and constants;
 - layout: the label sprites' new `sub_11` / `sub_12` frames (texts named MmenOption_button_85$0 /
-  _86$0), the btn_group rows sub_11 / sub_12 at depth 8 / 9 wherever sub_3 is, every toggle row
+  _86$0, each its own text object; the character counts and max id), the btn_group rows sub_11 / sub_12 at depth 8 / 9 wherever sub_3 is, every toggle row
   at ROW_SCALE and its ROW_YS, under the TRY button;
 - msbt: the new labels, every other text unchanged.
 """
@@ -160,6 +160,23 @@ def main():
             check('sprite %d: header depth count %d covers depth %d' % (cid, LM.words(T[si][1])[6] >> 16, max(depths)),
                   False, True)
     check('btn_group: header depth count', LM.words(T[i][1])[6] >> 16, 8 + len(O.ROWS))
+    texts = {LM.words(b)[0] for t, b in T if t == 0x25}
+    names = {}
+    for t, b in T:
+        w = LM.words(b) if t == LM.T_PLACE else None
+        if w and w[0] in texts and w[3]:
+            names.setdefault(w[0], set()).add(sy[w[3]])
+    check('every text object placed under one name (as every game layout)',
+          sorted(c for c, n in names.items() if len(n) > 1), [])
+    for r in O.ROWS:
+        check('%s$0: its own text object' % r[4], sum(1 for n in names.values() if n == {r[4] + '$0'}), 2)
+    ids = [LM.words(b)[0] for t, b in T if t in (LM.T_SPRITE, 0x25, 0xF022)]
+    sprites = [LM.words(b)[0] for t, b in T if t == LM.T_SPRITE]
+    props, counts = LM.words(T[lm.ti[0xF00C]][1]), LM.words(T[lm.ti[0xF00D]][1])
+    check('ids unique, root sprite last and highest (F00C max id / root)',
+          (len(ids) == len(set(ids)), props[3], props[5]), (True, max(ids), sprites[-1]))
+    check('F00D counts: shapes, sprites, texts', (counts[0], counts[2], counts[4]),
+          (sum(1 for t, b in T if t == 0xF022), len(sprites), len(texts)))
     check('layout parses back', LM.Lm(lm.data()).data() == lm.data(), True)
 
     # msbt

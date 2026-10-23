@@ -27,8 +27,9 @@ on the Lumen layout option_button.lm:
   a placement past it overruns the player's display list). Five rows don't fit above the TRY button at the game's size
   (104 high, 116 apart), so every toggle row is drawn at ROW_SCALE, ROW_YS apart (the top row's top
   edge where it was). Their label sprites (166 / 171, a frame per row name) get a frame per new
-  row: the Tap Jump text object again, named LABEL$0 (the game binds a text to the msbt label of
-  its instance name), MmenOption_button_85 = "Stick\\nSmash" / _86 = "Stick\\nF-Smash" in menu.msbt.
+  row: a copy of the Tap Jump text object (its own character: the game binds a text object to the
+  msbt label of its instance name, so one shared by two names flickers between them), named
+  LABEL$0, MmenOption_button_85 = "Stick\\nSmash" / _86 = "Stick\\nF-Smash" in menu.msbt.
 """
 import os
 import struct
@@ -265,6 +266,21 @@ def patch_lm(data):
     T = lm.tags
     syms = [(add_symbol(lm, 'sub_%d' % r[1]), add_symbol(lm, r[4] + '$0')) for r in ROWS]
     pid = max_place_id(lm)
+    # new characters: a text object per new label (the game binds a text object's string by its
+    # instance name: no layout places one text under two names). Ids from the root sprite's up, the
+    # root renumbered after them (in every layout the root is the last, highest id: F00C words 3
+    # (max id) and 5 (root); F00D word 4: the text count)
+    props, counts = T[lm.ti[0xF00C]], T[lm.ti[0xF00D]]
+    root = LM.words(props[1])[5]
+    next_id = [root]
+
+    def new_text(src):
+        k = next(n for n, (t, b) in enumerate(T) if t == 0x25 and LM.words(b)[0] == src)
+        w = LM.words(T[k][1])
+        w[0] = next_id[0]
+        next_id[0] += 1
+        T.insert(k + 1, [0x25, LM.pack(w)])
+        return w[0]
 
     # label sprites (a frame per row name): a new frame per row `sub_N`, the Tap Jump frame's (sub_2)
     # text object named LABEL$0
@@ -283,7 +299,7 @@ def patch_lm(data):
             assert LM.words(T[tap][1])[1] == 2 and rem[0] == LM.T_REMOVE and place[0] == LM.T_PLACE
             pw = LM.words(place[1])
             pid += 1
-            pw[1], pw[3] = pid, sym_text
+            pw[0], pw[1], pw[3] = new_text(pw[0]), pid, sym_text
             if pw[6]:
                 pw[6] = nframes << 16
             new_frame = [[LM.T_FRAME, LM.pack([nframes, 2])], [rem[0], bytearray(rem[1])], [LM.T_PLACE, LM.pack(pw)]]
@@ -295,6 +311,19 @@ def patch_lm(data):
             T[labels[-1] + 1:labels[-1] + 1] = [[LM.T_LABEL, LM.pack([sym_row, nframes])]]
             hdr[3], hdr[4], hdr[5] = nlabels + 1, nframes + 1, nkeys + 1
             T[i][1] = LM.pack(hdr)
+
+    new_root = next_id[0]
+    k = next(n for n, (t, b) in enumerate(T) if t == LM.T_SPRITE and LM.words(b)[0] == root)
+    w = LM.words(T[k][1])
+    w[0] = new_root
+    T[k][1] = LM.pack(w)
+    w = LM.words(props[1])
+    assert w[3] == w[5] == root, w
+    w[3] = w[5] = new_root
+    props[1] = LM.pack(w)
+    w = LM.words(counts[1])
+    w[4] += new_root - root
+    counts[1] = LM.pack(w)
 
     # btn_group: the rows sub_11 / sub_12 at depth 8 / 9 wherever the SHAKE row (sub_3, depth 3) is;
     # every toggle row's matrix: ROW_SCALE at its ROW_YS
