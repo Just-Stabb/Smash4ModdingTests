@@ -2,7 +2,8 @@
 """Xenoverse 2 ETR traces (the Kamehameha's beam body) -> Smash 4 effect model folders.
 
   python3 tools/xv2_trace_to_nud.py PKG_DIR OUT_DIR [--prefix EffSupamarioKame] [--speed 2.0]
-                                    [--scale 8.5] [--tex-base 0x15141A30] [--preview DIR]
+                                    [--scale 8.5] [--tex-base 0x15141A30] [--alpha 0=0.3]
+                                    [--preview DIR]
 
 Each .etr in the package (Kmh_Beam.etr -> OUT_DIR/EffSupamarioKameBeam/) becomes one model with a
 mesh per trace node. An XV2 trace is drawn behind its bone (TRS, the moving beam head) as the head
@@ -21,7 +22,8 @@ place, from the spawn point forward (+Z, the head's direction):
   the length) and scrolled at the sampler's ScrollSpeed (NU_effTransUV);
 - alpha: ShapeStartToEnd keyframes (times 0..HoldDuration read as the start..end of the trace) as
   the vertex alpha along the length; DefaultEnd Color1_Transparency over the hold as
-  NU_effColorGain's alpha (model.mta);
+  NU_effColorGain's alpha (model.mta), times --alpha's factor for the node (the core: 0.3 in
+  Supamario's build, test 7: "the white should be mostly transparent");
 - material: XV2 TraceNML / TraceNML2 are normal blend, two-sided: src 5 / dst 1, cull none, the
   effect shader with vertex colour (0xB0201100), as the game's alpha effect models.
 """
@@ -109,8 +111,10 @@ def ribbon(half, alpha_along):
 
 
 class Trace:
-    def __init__(self, pkg, etr_name, folder, tex_base, speed=SPEED, scale=SCALE):
+    def __init__(self, pkg, etr_name, folder, tex_base, speed=SPEED, scale=SCALE, alpha=None, white_fade=0.0):
         self.etr = pkg['etr'][etr_name]
+        self.alpha = dict(alpha or {})          # node index -> alpha multiplier
+        self.white_fade = white_fade
         self.name, self.folder, self.tex_base, self.speed, self.scale = etr_name, folder, tex_base, speed, scale
         c = xv2vfx._container(pkg, 'TBIND')
         self.emb = list(Emb(open(os.path.join(pkg['dir'], c['TextureEmbPath']), 'rb').read()))
@@ -177,7 +181,7 @@ class Trace:
             mat.textures.append(dict(hash=self.tex_base + emb_index, map_mode=0, wrap_s=1, wrap_t=1, min_f=3,
                                      mag_f=2, mip=6, unk=0, unk2=0))
             hbits, hval = float_hash('%s/%s' % (self.folder, i))
-            gains = [[1.0, 1.0, 1.0, a] for _l, _w, a in curves]
+            gains = [[1.0, 1.0, 1.0, a * self.alpha.get(i, 1.0)] for _l, _w, a in curves]
             scales = [[1.0, max(length * v_per_unit, 0.01), 0.0, 0.0] for length, _w, _a in curves]
             trans = [[su * fr, sv * fr, 0.0, 0.0] for fr in range(self.frames)]
             mat.props = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', list(scales[0])),
@@ -190,6 +194,15 @@ class Trace:
                 dict(name='NU_effScaleUV', values=scales, u2=0),
                 dict(name='NU_effTransUV', values=trans, u2=0)]))
         return meshes, anims, texs
+
+    def texture(self, emb_index):
+        """the trace texture, its near-white parts made mostly transparent (alpha x (1 - WHITE_FADE x
+        whiteness), whiteness = the darkest channel): in game the white cloud of T2_UV01 / the
+        core read as a solid white body (test 7)"""
+        img = dds_rgba(self.emb[emb_index][1]).astype(np.float32)
+        white = img[..., :3].min(2) / 255.0
+        img[..., 3] *= 1.0 - self.white_fade * white
+        return np.clip(img + 0.5, 0, 255).astype(np.uint8)
 
     def omo(self):
         o = omo_new(self.frames)
@@ -215,7 +228,7 @@ class Trace:
         struct.pack_into('>4f', data, 0x20, *nud._sphere(allp))
         open(d + '/model.nud', 'wb').write(bytes(data))
         open(d + '/model.nut', 'wb').write(nut.write_ntwu(
-            [(tid, 0x33, dds_rgba(self.emb[ei][1])) for ei, tid in sorted(texs.items())]))
+            [(tid, 0x33, self.texture(ei)) for ei, tid in sorted(texs.items())]))
         open(d + '/model.vbn', 'wb').write(vbn_le(self.bones))
         open(d + '/model.omo', 'wb').write(self.omo().encode())
         open(d + '/model.mta', 'wb').write(mta.write(self.frames, anims, rate=60, unk=1))
@@ -224,12 +237,13 @@ class Trace:
         return d
 
 
-def convert(pkg_dir, out_dir, prefix='EffSupamarioKame', speed=SPEED, scale=SCALE, tex_base=TEX_BASE):
+def convert(pkg_dir, out_dir, prefix='EffSupamarioKame', speed=SPEED, scale=SCALE, tex_base=TEX_BASE, alpha=None,
+            white_fade=0.0):
     pkg = xv2vfx.load_package(pkg_dir)
     done = []
     for k, name in enumerate(sorted(pkg['etr'])):
         folder = prefix + os.path.splitext(name)[0].split('_', 1)[-1]
-        t = Trace(pkg, name, folder, tex_base + 0x10 * k, speed, scale)
+        t = Trace(pkg, name, folder, tex_base + 0x10 * k, speed, scale, alpha, white_fade)
         d = t.write(out_dir)
         print('%s -> %s: %d frames, %d meshes, %.0f units long' % (
             name, d, t.frames, len(t.meshes_written), speed * max(n['ExtrudeDuration'] for n in t.etr['Nodes'])))
@@ -248,9 +262,13 @@ def main():
     ap.add_argument('--speed', type=float, default=SPEED)
     ap.add_argument('--scale', type=float, default=SCALE)
     ap.add_argument('--tex-base', type=lambda s: int(s, 0), default=TEX_BASE)
+    ap.add_argument('--alpha', default='', help="'NODE=factor,...': multiply a trace node's alpha (all traces)")
+    ap.add_argument('--white-fade', type=float, default=0.0,
+                    help='make the textures\' near-white parts this much more transparent (0..1)')
     ap.add_argument('--preview')
     a = ap.parse_args()
-    done = convert(a.pkg, a.out, a.prefix, a.speed, a.scale, a.tex_base)
+    alpha = {int(k): float(v) for k, v in (t.split('=') for t in a.alpha.split(',') if t)}
+    done = convert(a.pkg, a.out, a.prefix, a.speed, a.scale, a.tex_base, alpha, a.white_fade)
     if a.preview:
         import xv2_to_nud
         os.makedirs(a.preview, exist_ok=True)

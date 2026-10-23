@@ -70,6 +70,10 @@ UP = [(0, 'PtcSupamarioKmhCrg', HAND, None, 0.4), (0, 'PtcSupamarioKmhtsubu', HA
 # forward (its models are built along +Z, not turned); BODY marks it in the part lists
 BODY, BODY_POS = -1, (0.0, 7.0, 3.0)
 TRACES = ('Beam', 'Beam2', 'Beam3')         # the three charge levels (EEPK effects 3 / 4 / 5)
+# test 7: the body's white core ribbon (trace node 0, beam00) read too solid: mostly transparent
+TRACE_ALPHA = {0: 0.3}
+# ... and the white cloud of the tubes' textures (T2_UV01) too: near-white texels mostly transparent
+TRACE_WHITE_FADE = 0.85
 SIDE = [(0, MODEL_PREFIX + 'Fire', HAND, None, 1.0), (0, 'PtcSupamarioKmhRing', HAND, None, 0.8),
         (0, MODEL_PREFIX + 'Beam', BODY, None, 1.0)]
 DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFireptcl', 0, (0, 0, -0.3), 1.6),
@@ -150,7 +154,8 @@ def main():
     for name, opts in MODEL_OPTS.items():
         subprocess.run([sys.executable, os.path.join(HERE, 'xv2_to_nud.py'), pkg, name, os.path.join(fx, 'model'),
                         '--prefix', MODEL_PREFIX] + opts, check=True, capture_output=True)
-    xv2_trace_to_nud.convert(pkg, os.path.join(fx, 'model'), MODEL_PREFIX)
+    xv2_trace_to_nud.convert(pkg, os.path.join(fx, 'model'), MODEL_PREFIX, alpha=TRACE_ALPHA,
+                             white_fade=TRACE_WHITE_FADE)
     for m in ('Fire', 'Bas', 'Hand') + TRACES:
         assert os.path.exists(os.path.join(fx, 'model', MODEL_PREFIX + m, 'model.nud')), m
     for m in os.listdir(os.path.join(v5, 'effect/supamario/model')):

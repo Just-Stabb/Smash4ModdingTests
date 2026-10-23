@@ -133,4 +133,9 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   50), entries `0x03410023`-`0x03410025`. Test 7 (`build/supamario_kame_test7.zip`): the side
   taunt adds the size-1 body from bone 0 (0, 7, 3) forward. The user wants the beam's end as a
   separate effect from the head, travelling with the body.
+- Test 7 in game: the body shows and grows forward, but too white inside (the inner tube's
+  T2_UV01 white cloud and the core ribbon, both opaque). Test 8 (`build/supamario_kame_test8.zip`):
+  `xv2_trace_to_nud.py --alpha 0=0.3` (the core ribbon's alpha x 0.3) and `--white-fade 0.85`
+  (texel alpha x (1 - 0.85 x its darkest channel): near-white mostly transparent);
+  `TRACE_ALPHA` / `TRACE_WHITE_FADE` in the build.
 - Still to do: the move itself (projectile, hitboxes, charge logic).
