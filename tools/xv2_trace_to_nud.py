@@ -164,7 +164,7 @@ class Trace:
             along = kf_curve(find_kv(node, 'Color1_Transparency', 'ShapeStartToEnd'), h + 1, 1.0)
 
             def alpha_along(z, along=along, h=h):
-                return float(np.interp(z * h, np.arange(h + 1), along))
+                return float(np.interp(self.along_z(z) * h, np.arange(h + 1), along))
             radius = node['Scale'] * self.scale
             if node.get('ExtrudeShapePoints'):
                 pos, nrm, uv, al, tris = tube(node['ExtrudeShapePoints'], radius, alpha_along)
@@ -196,7 +196,7 @@ class Trace:
             hbits, hval = float_hash('%s/%s' % (self.folder, i))
             g = self.gain
             gains = [[g, g, g, a * self.alpha.get(i, 1.0)] for _l, _w, a in curves]
-            scales = [[1.0, max(length * v_per_unit, 0.01), 0.0, 0.0] for length, _w, _a in curves]
+            scales = [[1.0, self.v_repeat(length, v_per_unit, sv), 0.0, 0.0] for length, _w, _a in curves]
             trans = [[su * fr, sv * fr, 0.0, 0.0] for fr in range(self.frames)]
             mat.props = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', list(scales[0])),
                          ('NU_effTransUV', list(trans[0])), ('NU_effColorGain', list(gains[0])),
@@ -208,6 +208,18 @@ class Trace:
                 dict(name='NU_effScaleUV', values=scales, u2=0),
                 dict(name='NU_effTransUV', values=trans, u2=0)]))
         return meshes, anims, texs
+
+    def along_z(self, z):
+        """where on the trace (0 start .. 1 end) the mesh's z (0..1) is"""
+        return z
+
+    def v_repeat(self, length, v_per_unit, scroll_v):
+        """the texture's V repeats over the mesh (NU_effScaleUV V) at this length"""
+        return max(length * v_per_unit, 0.01)
+
+    def bone_z(self, length):
+        """the bone's Z translation at this length"""
+        return 0.0
 
     def texture(self, emb_index):
         """the trace texture, its near-white parts made mostly transparent (alpha x (1 - WHITE_FADE x
@@ -224,7 +236,8 @@ class Trace:
         omo_node(o, self.bones[0][2], [(0, 0, 0)] * f, [(0, 0, 0, 1)] * f, [(1, 1, 1)] * f)
         for i, node in enumerate(self.etr['Nodes']):
             curves = self.node_curves(node)
-            omo_node(o, self.bones[i + 1][2], [(0, 0, 0)] * f, [(0, 0, 0, 1)] * f,
+            omo_node(o, self.bones[i + 1][2], [(0, 0, self.bone_z(length)) for length, _w, _a in curves],
+                     [(0, 0, 0, 1)] * f,
                      [(max(w, 1e-3), max(w, 1e-3), length) for length, w, _a in curves])
         return o
 
@@ -233,12 +246,13 @@ class Trace:
         os.makedirs(d, exist_ok=True)
         meshes, anims, texs = self.meshes()
         maxlen = max(self.full_length(n) for n in self.etr['Nodes'])
+        zoff = self.bone_z(maxlen)
         for m in meshes:
             p = m.polygons[0].pos.copy()
-            p[:, 2] *= maxlen
+            p[:, 2] = p[:, 2] * maxlen + zoff
             m.sphere = nud._sphere(p)
         data = bytearray(nud.write(meshes))
-        allp = np.concatenate([m.polygons[0].pos * [1, 1, maxlen] for m in meshes])
+        allp = np.concatenate([m.polygons[0].pos * [1, 1, maxlen] + [0, 0, zoff] for m in meshes])
         struct.pack_into('>4f', data, 0x20, *nud._sphere(allp))
         open(d + '/model.nud', 'wb').write(bytes(data))
         open(d + '/model.nut', 'wb').write(nut.write_ntwu(
@@ -249,6 +263,56 @@ class Trace:
         open(d + '/model.xmb', 'wb').write(effect_xmb())
         self.meshes_written = meshes
         return d
+
+
+class Segment(Trace):
+    """a fixed piece of the trace's body for a moving projectile: `length` units behind its spawn
+    point (-Z: the projectile drops one every length / speed frames at its head, so they join up
+    behind it and stay where the head stopped), at the middle of the trace's alpha along its length,
+    full width for `hold` frames, then thinning and fading as the trace does over its HoldDuration
+    (DefaultEnd keyframes). Its texture's V repeats are -scroll_V x length / speed: with the
+    scrolling (scroll_V a frame) the texture is then continuous from one piece to the next, the
+    pieces spawned length / speed frames apart (it moves with the head)."""
+
+    def __init__(self, pkg, etr_name, folder, tex_base, length, speed, hold, **kw):
+        self.seg_length, self.hold = float(length), int(hold)
+        super().__init__(pkg, etr_name, folder, tex_base, speed=speed, **kw)
+        self.frames = self.hold + max(n['HoldDuration'] for n in self.etr['Nodes']) + 1
+
+    def full_length(self, node):
+        return self.seg_length
+
+    def along_z(self, z):
+        return 0.5
+
+    def v_repeat(self, length, v_per_unit, scroll_v):
+        return -scroll_v * self.seg_length / self.speed
+
+    def bone_z(self, length):
+        return -self.seg_length
+
+    def node_curves(self, node):
+        h = node['HoldDuration']
+        base = node['Scale'] or 1.0
+        scale_hold = kf_curve(find_kv(node, 'Scale', 'DefaultEnd'), h + 1, base)
+        alpha_hold = kf_curve(find_kv(node, 'Color1_Transparency', 'DefaultEnd'), h + 1, 1.0)
+        out = []
+        for fr in range(self.frames):
+            k = min(max(fr - self.hold, 0), h)
+            w, a = max(scale_hold[k] / base, 0.0), float(alpha_hold[k])
+            if fr - self.hold >= h:
+                w, a = 0.0, 0.0
+            out.append((self.seg_length, w, a))
+        return out
+
+
+def segment(pkg_dir, etr_name, out_dir, folder, length, speed, hold, tex_base=TEX_BASE, scale=SCALE, alpha=None,
+            white_fade=0.0, gain=1.0):
+    """one Segment model folder (OUT_DIR/folder) from the package's etr_name"""
+    pkg = xv2vfx.load_package(pkg_dir)
+    t = Segment(pkg, etr_name, folder, tex_base, length, speed, hold, scale=scale, alpha=alpha,
+                white_fade=white_fade, gain=gain)
+    return t.write(out_dir)
 
 
 def convert(pkg_dir, out_dir, prefix='EffSupamarioKame', speed=SPEED, scale=SCALE, tex_base=TEX_BASE, alpha=None,
