@@ -80,8 +80,10 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    `0x20` = common `func_362`, EscapeB `0x21` = `func_363`): `StatusModule(0x5, 0, 0x6, 0x2, …)`,
    kinetic `0x6` (the originals use `0xF`, motion movement).
 2. **ACMD speed** (`EscapeF`, `EscapeB`): `Add/Set_Momentum(0, 0, 1)` at frame 0,
-   `(SPEED, 0, 0)` at frame 5 (added once; the speed then changes however the game changes it),
-   `(0, 0, 1)` at 27. The back roll gets −SPEED.
+   `(0, 0, 1)` then `(SPEED, 0, 0)` at frame 5 (the speed is cleared first (user), so the roll-off
+   speed doesn't add to speed the fighter already has; added once, the speed then changes however
+   the game changes it), `(0, 0, 1)` at 27. The back roll gets −SPEED. For a game.bin made before
+   the clear: `tools/rolloff_acmd.py IN OUT --clear-first` (EscapeF and EscapeB).
    `tools/rolloff_acmd.py IN OUT --plain --add SPEED EscapeF EscapeB` (Captain Falcon 2.4, Kirby
    2.1; a roll that already has its own speed keeps it).
 3. **Sliding off from the speed frame, not while shielding.** Every roll frame

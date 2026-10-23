@@ -5,8 +5,8 @@
                                                                        (default script: EscapeF)
 
 --add gives each listed roll that doesn't have its own roll-off speed one first (like Captain
-Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (SPEED, 0, 0) at START (5), (0, 0, 1) at END
-(27); EscapeB (the back roll, which moves away from the facing direction) gets -SPEED. A missing
+Falcon's): Add/Set_Momentum(0, 0, 1) at frame 0, (0, 0, 1) then (SPEED, 0, 0) at START (5: the
+speed is cleared before the roll-off speed is added), (0, 0, 1) at END (27); EscapeB (the back roll, which moves away from the facing direction) gets -SPEED. A missing
 script is created (EscapeB often has none). A Set_Edge_Slide in the script is removed (the
 original roll's edge stop). Usually: --add SPEED EscapeF EscapeB. With no SPEED, --add uses
 DEFAULT_SPEED (2.2), the default for any character without a specified roll-off speed.
@@ -19,6 +19,10 @@ EscapeB gets -SPEED. If the roll turns around (Reverse_Direction, the forward ro
 20 / 21) the speed is only set up to that frame, so the turn can't flip it; the last setting
 carries on to END. A missing script is created. No shield-flag checks: the fighter's MSC
 handles edges (rolloff_update).
+
+--clear-first [script ...] (default EscapeF EscapeB): for rolls that already have their roll-off
+speed, puts Add/Set_Momentum(0, 0, 1) (clear the speed) right before it, on the same frame, if it
+isn't there yet. Nothing else changes.
 
 --plain (with --add): only add the speed, no shield-flag checks. That's the user's roll-off
 (Captain Falcon's latest MSC does the shield part itself, in the roll end scripts; see
@@ -100,7 +104,8 @@ EDGE = acmd.BY_NAME["set_edge_slide"]
 def add_speed(script, speed, start, end):
     """Give the roll a roll-off speed (Captain Falcon's pattern) and drop Set_Edge_Slide."""
     tl = [(f, c) for f, c in timeline(script) if c.ident != EDGE]
-    tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [speed, 0.0, 0])),
+    tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [0.0, 0.0, 1])),
+           (float(start), acmd.Command(MOM, [speed, 0.0, 0])),
            (float(end), acmd.Command(MOM, [0.0, 0.0, 1]))]
     tl.sort(key=lambda x: x[0])
     out = []
@@ -111,6 +116,21 @@ def add_speed(script, speed, start, end):
             cur = f
         out.append(c)
     script[:] = out + [acmd.Command(acmd.END)]
+
+
+def clear_first(script):
+    """Add/Set_Momentum(0, 0, 1) right before the roll's first added speed (SPEED, 0, 0), so the roll
+    starts that speed from 0 instead of adding it to whatever speed it has. False if already there."""
+    i = next((k for k, c in enumerate(script) if c.ident == MOM and float(c.params[0]) != 0), None)
+    if i is None:
+        raise SystemExit("no roll speed (Add/Set_Momentum) in this script")
+    if any(c.ident in (IS_FLAG, TRUE, FALSE) for c in script[:i]):
+        raise SystemExit("the speed is inside a condition block (not a --plain roll-off)")
+    prev = script[i - 1] if i else None
+    if prev is not None and prev.ident == MOM and float(prev.params[0]) == 0 and prev.params[2] == 1:
+        return False
+    script.insert(i, acmd.Command(MOM, [0.0, 0.0, 1]))
+    return True
 
 
 REVERSE = acmd.BY_NAME["reverse_direction"]
@@ -151,6 +171,15 @@ def main():
             sc = f.scripts.setdefault(key, [])
             sp = -nums[0] if n.lower() == "escapeb" else nums[0]
             hold_speed(sc, sp, *nums[1:])
+        f.save(dst)
+        return
+    if rest and rest[0] == "--clear-first":
+        f = acmd.ACMDFile.load(src)
+        for n in rest[1:] or ["EscapeF", "EscapeB"]:
+            key = int(n, 16) if n.startswith("0x") else acmd.crc(n)
+            if key not in f.scripts:
+                raise SystemExit("%s has no script" % n)
+            print("%s: %s" % (n, "cleared first" if clear_first(f.scripts[key]) else "already clears first"))
         f.save(dst)
         return
     plain = False
