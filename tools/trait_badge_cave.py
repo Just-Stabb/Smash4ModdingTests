@@ -30,6 +30,7 @@ Every pointer it follows is checked (word aligned, 0x10000000-0x8FFFFFFF); a bad
 and changes nothing.
 """
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -69,14 +70,38 @@ def chk(reg, fail):
     return strike_cave.chk(reg, fail)
 
 
+DEBUG = '--debug' in sys.argv     # count each step into the words at the `counters` label
+COUNTERS = ['hook calls', 'non-empty slots', 'trait_mc found', 'slot kind is Kirby', 'Kirby fighter found',
+            'last marker int', 'last trait shown', 'badge shown (count)', 'last slot kind', 'last panel clip',
+            'name atom', 'last hidden slot']
+
+
+def debug_expand(text):
+    """the source's "#DBG n" lines (counters[n] += 1) and "#DBG n reg" (counters[n] = reg): code with
+    --debug, nothing without (r8 / r9 are free everywhere they're used)"""
+    out = []
+    for line in text.split('\n'):
+        m = re.match(r'\s*#DBG (\d+)(?: (r\d+))?$', line)
+        if not m:
+            out.append(line)
+            continue
+        if DEBUG:
+            n = int(m.group(1))
+            out += ['        lis r9, counters@ha', '        addi r9, r9, counters@l']
+            out += ['        stw %s, %d(r9)' % (m.group(2), 4 * n)] if m.group(2) else \
+                ['        lwz r8, %d(r9)' % (4 * n), '        addi r8, r8, 1', '        stw r8, %d(r9)' % (4 * n)]
+    return '\n'.join(out)
+
+
 def build():
     a = Asm(CAVE)
-    a.asm("""
+    a.asm(debug_expand("""
         stwu r1, -0x40(r1)
         mflr r0
         stw r0, 0x44(r1)
         stmw r24, 0x18(r1)
         mr r31, r3
+#DBG 0
         lis r12, 0x%(upd_hi)04X
         addi r12, r12, %(upd_lo)d
         mtctr r12
@@ -92,6 +117,7 @@ slots:
         lha r0, 8(r3)
         cmpwi r0, 2
         beq next
+#DBG 1
         bl badge
 next:
         addi r26, r26, 1
@@ -110,6 +136,7 @@ badge:
         stmw r27, 0x18(r1)
         mr r29, r3
         lwz r30, 0x5C(r29)
+#DBG 9 r30
 """ % dict(slot=SLOT_SIZE, slots=SLOTS, upd_hi=ha(UPDATE), upd_lo=lo(UPDATE)) + chk('r30', 'out') + """
         lis r31, atom@ha
         addi r31, r31, atom@l
@@ -125,6 +152,7 @@ badge:
         li r5, %(len)d
         bl 0x%(intern)08X
         stw r3, 0(r31)
+#DBG 10 r3
         cmpwi r3, 0
         beq out
 have:
@@ -134,11 +162,14 @@ have:
         mr. r28, r3
         beq out
 """ % dict(len=len(NAME), intern=INTERN, find=FIND_CHILD) + chk('r28', 'out') + """
+#DBG 2
         li r27, 0
         lbz r0, 0xA(r29)
         extsb r0, r0
+#DBG 8 r0
         cmpwi r0, %(kirby)d
         bne show
+#DBG 3
         lha r5, 0(r29)
         cmpwi r5, 0
         blt show
@@ -163,6 +194,7 @@ have:
         lwz r0, 4(r12)
         cmpwi r0, %(kirby)d
         bne show
+#DBG 4
         lwz r12, 0xC(r12)
 """ % dict(kirby=KIRBY) + chk('r12', 'show') + """
         lwz r12, 0x28(r12)
@@ -178,6 +210,7 @@ have:
         lwz r11, 0xC(r11)
 """ % dict(n=strike_cave.INT_INDEX + 1) + chk('r11', 'show') + """
         lwz r11, %(off)d(r11)
+#DBG 5 r11
         srwi r10, r11, 16
         cmplwi r10, %(magic)d
         bne show
@@ -188,6 +221,8 @@ have:
 show:
         cmpwi r27, 0
         beq hide
+#DBG 6 r27
+#DBG 7
         mr r3, r28
         li r4, 1
         bl 0x%(vis)08X
@@ -209,6 +244,7 @@ alpha:
         bl 0x%(alpha)08X
         b out
 hide:
+#DBG 11 r29
         mr r3, r28
         li r4, 0
         bl 0x%(vis)08X
@@ -221,10 +257,12 @@ out:
 atom:
         .word 0
 name:
-""" % dict(alpha=SET_ALPHA, vis=SET_VISIBLE))
+""" % dict(alpha=SET_ALPHA, vis=SET_VISIBLE)))
     nm = NAME + b'\0' * (4 - len(NAME) % 4)
     for i in range(0, len(nm), 4):
         a.asm('.word 0x%08X' % int.from_bytes(nm[i:i + 4], 'big'))
+    if DEBUG:
+        a.asm('counters:\n' + '\n'.join('        .word 0' for _ in COUNTERS))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
     return a, words, [(VTABLE_UPDATE, CAVE)]
@@ -237,6 +275,11 @@ def main():
     out += ['0x%08X=0x%08X' % h for h in hooks]
     print(' '.join(out))
     sys.stderr.write('trait badge: %d words\n' % len(words))
+    if DEBUG:
+        base = a.labels['counters']
+        sys.stderr.write('debug counters at 0x%08X:\n' % base)
+        for i, n in enumerate(COUNTERS):
+            sys.stderr.write('  0x%08X  %s\n' % (base + 4 * i, n))
 
 
 if __name__ == '__main__':

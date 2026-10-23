@@ -26,6 +26,7 @@ FM = 0x7E100000                 # fighter manager; entries' FE at FM + 0x1000 + 
 OBJS = 0x7E200000               # battle objects (0x100 each) and their accessor / WorkModule / ints
 CLIPS = 0x7E300000              # panel clips (0x100 each): +0 the element find returns (0 = none)
 ELEMS = 0x7E400000              # elements (0x100 each)
+DEBUG_COUNTERS = 0x04B843B0     # where trait_badge_cave.py --debug puts its counters
 REC = 0x7F001000                # stub records: +0 update calls, +4 its r3, +8 intern calls,
                                 # +0xC goto calls, +0x10 last goto (elem), +0x14 last goto frame,
 ATOM = 0x7F002000               # the interned name
@@ -189,6 +190,10 @@ none:   li r3, 0
     fighter(0, 8, KI)
     update()
     check('the copy lost: hidden', state(elems[0])[0], False)
+    words = [r32(DEBUG_COUNTERS + 4 * i) for i in range(12)]
+    if any(words):                              # a --debug build (trait_badge_cave.py --debug)
+        print('debug counters: ' + ', '.join('%s %s' % (n, hex(w)) for n, w in zip(C.COUNTERS, words)))
+        check('debug: hook calls = updates run', words[0], 5)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 
