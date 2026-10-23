@@ -10,3 +10,6 @@
   default roll-off speed 2.2 and air speed multiplier 1.0 (`rolloff_air_speed_mult()`) unless the
   user gives them.
 - Fighter stat (`fighter_param`) names and indices: `reference/fighter_param_attributes.csv`.
+- **Script names:** every script or motion slot a mod adds (game / effect / sound / expression, any
+  fighter) gets its name in `tools/Sm4shCommand/SM4SHCommand/ModAnimNames.txt` (under the fighter's
+  heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes.

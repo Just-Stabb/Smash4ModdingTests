@@ -1,0 +1,15 @@
+// Script names for the scripts this project's mods add (shipped with Sm4shCommand; not written to).
+// Same format as AnimNames.txt: one animation name per line (its CRC32 is the script hash), or
+// "0xHASH = label". AnimNames.txt is read after this file, so your own labels there win.
+// When a mod adds a script or motion slot, its name goes here (CLAUDE.md).
+
+// ---- Kirby
+// Marth copy: the sword aerials (motion.mtable 0x301-0x303; game.bin with the sword's hitboxes,
+// effect.bin / sound.bin with its Sword_Trace): tools/kirby_marth_sword.py, kirby_marth_sword_hitboxes.py
+MarthSwordAttack12
+MarthSwordAttackAirB
+MarthSwordAttackAirHi
+// the first sword test's game scripts (v1; nothing plays them now)
+MarthAttack12
+MarthAttackAirB
+MarthAttackAirHi

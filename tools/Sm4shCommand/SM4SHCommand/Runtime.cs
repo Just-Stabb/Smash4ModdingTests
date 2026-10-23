@@ -29,16 +29,26 @@ namespace Sm4shCommand
         // to the exe, lists names to recognise: one animation name per line (hashed at startup), or
         // "0xHASH = label" for a label of your own (for hashes whose real name isn't known).
         // Parse Animations and Set Name add to it, so names only have to be found once.
+        // ModAnimNames.txt (same format, shipped with each version, never written to) names the
+        // scripts the mods add (e.g. Kirby's Marth-copy sword slots); it's read first, so a label
+        // of your own in AnimNames.txt for the same hash still wins.
 
         public static readonly Dictionary<uint, string> AnimNames = new Dictionary<uint, string>();
         public static string AnimNamesPath { get { return Path.Combine(Application.StartupPath, "AnimNames.txt"); } }
+        public static string ModAnimNamesPath { get { return Path.Combine(Application.StartupPath, "ModAnimNames.txt"); } }
 
         public static void LoadAnimNames()
         {
             AnimNames.Clear();
-            if (!File.Exists(AnimNamesPath))
+            LoadAnimNameFile(ModAnimNamesPath);
+            LoadAnimNameFile(AnimNamesPath);
+        }
+
+        static void LoadAnimNameFile(string path)
+        {
+            if (!File.Exists(path))
                 return;
-            foreach (var raw in File.ReadAllLines(AnimNamesPath))
+            foreach (var raw in File.ReadAllLines(path))
             {
                 var line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#"))
