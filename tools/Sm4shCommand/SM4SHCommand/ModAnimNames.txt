@@ -19,3 +19,19 @@ MarthAttackAirHi
 MarthSwordAttack12 -> marthbody/FitKirbyMarthBodyMainD00Attack12.omo + marthsword@LHaveN
 MarthSwordAttackAirB -> marthbody/FitKirbyMarthBodyMainD00AttackAirB.omo + marthsword@LHaveN
 MarthSwordAttackAirHi -> marthbody/FitKirbyMarthBodyMainD00AttackAirHi.omo + marthsword@LHaveN
+
+// ---- Supamario
+// Kamehameha projectile (weapon kamehameha, article 5; motion.mtable): fly1 / 2 / 3 = charge levels
+// 1 / 2 / 3 (multi-hits, head effects), finish1 / 2 / 3 = their launchers: tools/supamario_kame_build.py
+fly1
+fly2
+fly3
+finish1
+finish2
+finish3
+fly1 -> kamehameha/FitMarioFireballMain.omo
+fly2 -> kamehameha/FitMarioFireballMain.omo
+fly3 -> kamehameha/FitMarioFireballMain.omo
+finish1 -> kamehameha/FitMarioFireballMain.omo
+finish2 -> kamehameha/FitMarioFireballMain.omo
+finish3 -> kamehameha/FitMarioFireballMain.omo
