@@ -11,6 +11,7 @@ model folders (model.nud / .nut / .vbn / .omo / .mta / .xmb), see docs/xv2-model
       --matcol1 rgb: MatCol1 as an RGB multiplier (default mean: its RGB as one brightness).
       --skip PART,...: leave these EMO parts out. --plain 1: only material settings the game's
       effect models use (cull none, no alpha test, subtractive drawn additive).
+      --tint 'MAT=r,g,b;...': multiply EMM material MAT's colour gain (every frame) by r, g, b.
   python3 tools/xv2_to_nud.py verify MODEL_DIR... [--preview DIR] [--src SRC_DIR]
       re-read every file with the repo readers (nud / nut / omo / mta / xmb / vbn), check the round
       trips (and, with --src, the textures and the bone animation against the XV2 files), render.
@@ -207,10 +208,10 @@ class Model:
     """one EMO with its EMM / EMB / obj.ema / mat.ema, converted"""
 
     def __init__(self, src, name, folder, tex_base, scale=SCALE, anim_index=0, matcol1='mean', skip=(),
-                 plain=False):
+                 plain=False, tint=None):
         p = os.path.join(src, name)
         self.name, self.folder, self.scale, self.matcol1 = name, folder, scale, matcol1
-        self.skip, self.plain = set(skip), plain
+        self.skip, self.plain, self.tint = set(skip), plain, dict(tint or {})
         self.emo = xv2.Emo(open(p + '.emo', 'rb').read())
         self.emm = xv2.Emm(open(p + '.emm', 'rb').read()) if os.path.exists(p + '.emm') else None
         self.emb = list(Emb(open(p + '.emb', 'rb').read())) if os.path.exists(p + '.emb') else []
@@ -271,7 +272,8 @@ class Model:
                 # multiplier Kmh_Bas's core (MatCol1 G up to 2, B down to 0.5) turns yellow-green
                 b = (c1[0] + c1[1] + c1[2]) / 3.0
                 c1 = [b, b, b, c1[3]]
-            gains.append([c1[k] * c2[k] for k in range(4)])
+            t = self.tint.get(m['name'], (1.0, 1.0, 1.0))
+            gains.append([c1[k] * c2[k] * (t[k] if k < 3 else 1.0) for k in range(4)])
             s = _sample_vec(a, mi, 4, 2, fr, scr)
             # a scroll component the mat.ema doesn't animate: the EMM's value read as UV / second
             s = [s[k] if k in animated else scr[k] * fr / 60.0 for k in range(2)]
@@ -679,7 +681,7 @@ def folder_name(name, prefix):
 
 
 def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim=0, preview_dir=None, matcol1='mean',
-            skip=(), plain=False):
+            skip=(), plain=False, tint=None):
     emos = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(src, '*.emo')))
     names = emos if pattern == 'all' else [n for n in emos if fnmatch.fnmatch(n, pattern)]
     if not names:
@@ -687,7 +689,7 @@ def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim
     done = []
     for name in names:
         k = emos.index(name)
-        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain)
+        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain, tint)
         d = m.write(out)
         meshes = m.meshes_written
         print('%s -> %s' % (name, d))
@@ -747,7 +749,9 @@ def main():
         sys.exit(__doc__)
     convert(pos[0], pos[1], pos[2], opts.get('prefix'), float(opts.get('scale', SCALE)),
             int(opts.get('tex-base', hex(TEX_BASE)), 0), int(opts.get('anim', 0)), opts.get('preview'),
-            opts.get('matcol1', 'mean'), [x for x in opts.get('skip', '').split(',') if x], opts.get('plain') == '1')
+            opts.get('matcol1', 'mean'), [x for x in opts.get('skip', '').split(',') if x], opts.get('plain') == '1',
+            {k: tuple(float(v) for v in rgb.split(',')) for k, rgb in
+             (t.split('=') for t in opts.get('tint', '').split(';') if t)})
 
 
 if __name__ == '__main__':

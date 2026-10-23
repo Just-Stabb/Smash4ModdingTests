@@ -2,7 +2,7 @@
 """Supamario's Kamehameha effects from Dragon Ball Xenoverse 2's 000_GOK_KMH package, played from
 his taunts as an in-game test (before the move exists).
 
-  python3 tools/supamario_kame_build.py PKG_DIR SUPAMARIO_V4 SUPAMARIO_V5 OUT_DIR
+  python3 tools/supamario_kame_build.py PKG_DIR SUPAMARIO_V4 SUPAMARIO_V5 OUT_DIR [--diag]
 
 PKG_DIR: the extracted .vfxpackage. SUPAMARIO_V4 / _V5: the fighter/supamario folders of the v4 and
 v5 packages (v4's ptcl is the base; v5 has the .efc entry 0x16 and the scripts). Writes
@@ -52,8 +52,9 @@ DOWN_END = 96                     # the down taunt (100 frames) ends its looping
 # the game's effect models use); Kmh_Hand without its subtractive 'hand' mesh. Test 1 crashed on the
 # second down taunt with the model renderer's skinned-vertex buffer overflowing (Cemu log:
 # GX2RSetAttributeBuffer offset exceeds buffer size, from NU::DeviceWiiU)
-MODEL_OPTS = {'Kmh_Fire': ['--plain', '1'], 'Kmh_Bas': ['--plain', '1'],
-              'Kmh_Hand': ['--plain', '1', '--skip', 'hand']}
+# Test 2: the head read too white without the dark layer: the glow and the core tinted blue
+MODEL_OPTS = {'Kmh_Fire': ['--plain', '1'], 'Kmh_Bas': ['--plain', '1', '--tint', 'Cor=0.7,0.9,1.0'],
+              'Kmh_Hand': ['--plain', '1', '--skip', 'hand', '--tint', 'cor=0.45,0.75,1.0']}
 SND_CHARGE, SND_FIRE, SND_HEAD = 0x0CB1008B, 0x0CB1008C, 0x0CB1008D
 MODEL_PREFIX = 'EffSupamarioKame'
 
@@ -67,7 +68,14 @@ DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFirept
         (0, 'PtcSupamarioKmhWav', 0, (0, 0, 0), 1.8), (0, 'PtcSupamarioKmh4ptcl', 0, (0, 0, -0.15), 1.6),
         (0, 'PtcSupamarioKmh4ptcl_2', 0, (0, 0, -0.15), 1.6), (0, 'PtcSupamarioKmhLineAll', 0, (0, 0, 0), 1.0),
         (0, MODEL_PREFIX + 'Hand', 0, (0, 0, -0.3), 0.45)]
-TAUNTS = {'AppealHi': (UP, SND_CHARGE), 'AppealS': (SIDE, SND_FIRE), 'AppealLw': (DOWN, SND_HEAD)}
+# taunt -> (parts, sound, frame to terminate them or None)
+TAUNTS = {'AppealHi': (UP, SND_CHARGE, None), 'AppealS': (SIDE, SND_FIRE, None),
+          'AppealLw': (DOWN, SND_HEAD, DOWN_END)}
+# --diag (test 3): test 2 still crashed some time after a down taunt (one is enough; the side
+# taunt, with the Fire model, never): the down taunt's pieces one per taunt, to find the one
+DIAG = {'AppealHi': ([p for p in DOWN if p[1] == MODEL_PREFIX + 'Bas'], SND_HEAD, 176),
+        'AppealS': ([p for p in DOWN if p[1] == MODEL_PREFIX + 'Hand'], SND_HEAD, DOWN_END),
+        'AppealLw': ([p for p in DOWN if not p[1].startswith(MODEL_PREFIX)], SND_HEAD, DOWN_END)}
 
 
 def cmd(name, *params):
@@ -100,9 +108,11 @@ def taunt_script(parts, ids, end=None):
 
 
 def main():
-    if len(sys.argv) != 5:
+    args = [a for a in sys.argv[1:] if a != '--diag']
+    if len(args) != 4:
         sys.exit(__doc__)
-    pkg, v4, v5, out = sys.argv[1:]
+    pkg, v4, v5, out = args
+    taunts = DIAG if '--diag' in sys.argv else TAUNTS
     fx = os.path.join(out, 'fighter/supamario/effect/supamario')
     body = os.path.join(out, 'fighter/supamario/script/animcmd/body')
     shutil.rmtree(os.path.join(out, 'fighter'), ignore_errors=True)
@@ -142,10 +152,10 @@ def main():
     # taunts
     eff = acmd.ACMDFile.load(os.path.join(v5, 'script/animcmd/body/effect.bin'))
     snd = acmd.ACMDFile.load(os.path.join(v5, 'script/animcmd/body/sound.bin'))
-    for anim, (parts, sound) in TAUNTS.items():
+    for anim, (parts, sound, end) in taunts.items():
         for side in 'RL':
             name = anim + side
-            eff.scripts[acmd.crc(name)] = taunt_script(parts, ids, DOWN_END if anim == 'AppealLw' else None) + [
+            eff.scripts[acmd.crc(name)] = taunt_script(parts, ids, end) + [
                 acmd.Command(acmd.END)]
             s = [c for c in (snd.script(name) or []) if c.ident not in (acmd.BY_NAME['sound_effect'], acmd.END)
                  or (c.ident == acmd.BY_NAME['sound_effect'] and c.params[0] not in (SND_CHARGE, SND_FIRE, SND_HEAD))]

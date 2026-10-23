@@ -90,6 +90,13 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   (`xv2_to_nud.py --plain 1`: cull none, no alpha test, no subtractive, as every vanilla effect
   model; `--skip hand`: Kmh_Hand without its dark subtractive mesh), the down taunt terminating
   its effects at frame 96, the beam head turned 180 degrees (`HEAD_YROT`).
+- Test 2 in game: the beam head points the way Supamario faces (test 1's was reversed: the XV2
+  TRS parts face their -Z, `HEAD_YROT` 180 is right). The game still crashes some time after a
+  down taunt, even a single one; the side taunt (Fire model + Ring) never does. The head read too
+  white without Kmh_Hand's dark layer: `--tint` (xv2_to_nud.py) now tints Hand `cor` and Bas
+  `Cor` blue. Test 3 (`supamario_kame_build.py --diag`, `build/supamario_kame_test3.zip`): the
+  down taunt's pieces one per taunt (up: Bas model, side: Hand model, down: its particles) to
+  find the one that crashes.
 - Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
   an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
   (the cape at Z 9).
