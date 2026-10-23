@@ -72645,7 +72645,8 @@ void rolloff_update()
     if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
     {                                                // starts; the ACMD's clear didn't reach it), well before the
         KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
-    }
+        KineticModule(0x11, 0x2, 0, KineticModuleF(0xb, 0x2)); // and a dash's slide, energy 2 (user: a back roll
+    }                                                          // out of a dash went almost nowhere)
     if (global83) // Overdrive: the ACMD adds the Overdrive roll speed
     {
         WorkModule(0x2710, overdrive_roll_flag());

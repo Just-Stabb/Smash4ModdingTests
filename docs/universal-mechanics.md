@@ -35,6 +35,10 @@ Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2
 fighter (the four hand-done ones too). Clearing it up to `rolloff_start_frame()` (5) also wiped the
 ACMD's speed (user: rolls didn't move): the MSC's motion frame reads one less than the ACMD's frame
 when the speed is added, so the clear has to stop well before it. So the ACMD speed is in energy 3.
+A dash's speed is in **energy 2** (Dash's kinetic type `0x1b` sets up energy 2: `0x02E7A5B0` table →
+`0x02E7BBD8` → `0x02C5474C(2, ...)`); the roll's type `0x6` only sets up energy 3 and leaves energy 2
+running, so a roll out of a dash kept the dash's speed (user: a back roll out of a dash went almost
+nowhere). The clear also zeroes energy 2's X (`KineticModule(0x11, 2, 0, its Y)`).
 
 **Rolls that turn around early (user: Ryu's forward roll went backwards):** the speed is along the
 facing at the speed frame. Ryu (`Reverse_Direction` at frame 4), Samus, Mii Gunner and the Mii Team
