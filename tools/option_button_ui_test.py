@@ -153,6 +153,13 @@ def main():
         else:
             k += 1
     check('btn_group: frame child counts', ok, True)
+    for cid in sorted({LM.words(b)[0] for t, b in T if t == LM.T_SPRITE}):
+        si, sj = O.sprite_range(lm, cid)
+        depths = [LM.words(b)[5] >> 16 for t, b in T[si:sj] if t == LM.T_PLACE]
+        if depths and max(depths) >= LM.words(T[si][1])[6] >> 16:
+            check('sprite %d: header depth count %d covers depth %d' % (cid, LM.words(T[si][1])[6] >> 16, max(depths)),
+                  False, True)
+    check('btn_group: header depth count', LM.words(T[i][1])[6] >> 16, 8 + len(O.ROWS))
     check('layout parses back', LM.Lm(lm.data()).data() == lm.data(), True)
 
     # msbt

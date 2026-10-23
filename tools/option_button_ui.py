@@ -23,7 +23,8 @@ on the Lumen layout option_button.lm:
 - Stick F-Smash row (sub_12): the same, as SIDE after STICK, with the property `side_smash`.
 - Layout: the rows are other instances of the toggle row sprite (186) in btn_group (420): sub_11
   at the SHAKE row's place (hidden for the pads that get the new rows), above it in depth (8),
-  sub_12 one row lower (depth 9). Five rows don't fit above the TRY button at the game's size
+  sub_12 one row lower (depth 9; the sprite header's depth count, word 6 >> 16, goes from 8 to 10:
+  a placement past it overruns the player's display list). Five rows don't fit above the TRY button at the game's size
   (104 high, 116 apart), so every toggle row is drawn at ROW_SCALE, ROW_YS apart (the top row's top
   edge where it was). Their label sprites (166 / 171, a frame per row name) get a frame per new
   row: the Tap Jump text object again, named LABEL$0 (the game binds a text to the msbt label of
@@ -349,6 +350,10 @@ def patch_lm(data):
         else:
             out.append([t, bytearray(b)])
             k += 1
+    # the sprite header's word 6: its depth count << 16 (the player's display list size)
+    hdr = LM.words(out[i][1])
+    hdr[6] = max(hdr[6] >> 16, 8 + len(ROWS)) << 16
+    out[i][1] = LM.pack(hdr)
     lm.tags = out + T[j:]
     return lm.data()
 
