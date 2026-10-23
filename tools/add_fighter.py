@@ -154,7 +154,8 @@ def load_records(a):
         for k in ('series', 'costumes', 'sort'):
             rec[k] = ui.get(k)
         # weapons of its own (tools/weapon_expand.py): {article: new weapon kind}
-        rec['weapons'] = {art: num(wk) for art, wk in (r.get('weapons') or {}).items()}
+        # (a brand-new article, {"kind", "base", "max"}, has no base files to copy: left out here)
+        rec['weapons'] = {art: num(wk) for art, wk in (r.get('weapons') or {}).items() if not isinstance(wk, dict)}
         out.append(rec)
     return out, src
 

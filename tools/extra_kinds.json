@@ -17,7 +17,12 @@
         "pump": "0x187",
         "pumpwater": "0x188",
         "hugeflame": "0x189",
-        "dokan": "0x18A"
+        "dokan": "0x18A",
+        "kamehameha": {
+          "kind": "0x18B",
+          "base": "fireball",
+          "max": 1
+        }
       }
     }
   ],

@@ -160,7 +160,7 @@ def main():
             n = E0.w(s0 + 4)
             rows0 = [[E0.w(E0.w(s0) + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
             rows1 = [[E1.w(E1.w(s1) + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
-            remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr is r}
+            remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr is r and n2 not in rr.get('new_articles', {})}
             want = [[(e[0] & 0xC0000000) | remap.get(e[0] & 0x3FFFFFFF, e[0] & 0x3FFFFFFF)] + e[1:] for e in rows0]
             check('0x%X %s: sub-articles %s -> %s' % (nk, art, [hex(e[0]) for e in rows0], [hex(e[0]) for e in rows1]),
                   (E1.w(s1 + 4), rows1), (n, want))
@@ -215,7 +215,10 @@ def main():
             bad.append(hex(k))
     check('0x030BC8E4: every game kind unchanged', bad[:4], [])
     for nk, (bk, r, art) in sorted(new.items()):
-        check('0x030BC8E4 0x%X: the base\'s name / folder %s' % (nk, lists(E1, nk)), lists(E1, nk), lists(E0, bk))
+        own = r.get('new_articles', {}).get(nk)
+        want = [(own[0], own[0])] if own else lists(E0, bk)
+        check('0x030BC8E4 0x%X: %s name / folder %s' % (nk, 'its own' if own else 'the base\'s', lists(E1, nk)),
+              lists(E1, nk), want)
 
     def paths(E, k):
         rec = []
@@ -246,8 +249,12 @@ def main():
     for nk, (bk, r, art) in sorted(new.items()):
         p1, p0 = paths(E1, nk), paths(E0, bk)
         base_owner = img.cstr(img.w(0x10418FF0 + 4 * bk))
-        want = [[tuple(r['name'] if x == base_owner else x for x in call) for call in v] for v in p0]
-        check('0x030BCB10 0x%X %s: the base\'s paths with owner %s (%s)' % (nk, art, r['name'], p1[0][:1]), p1, want)
+        base_name = img.cstr(img.w(0x10419604 + 4 * bk))
+        own = r.get('new_articles', {}).get(nk)
+        want = [[tuple(r['name'] if x == base_owner else (own[0] if own and x == base_name else x) for x in call)
+                 for call in v] for v in p0]
+        check('0x030BCB10 0x%X %s: the base\'s paths with owner %s%s (%s)' % (
+            nk, art, r['name'], ', its own name' if own else '', p1[0][:1]), p1, want)
 
     # ---- the new fighter's article list
     for r in kinfo['kinds']:
@@ -260,8 +267,16 @@ def main():
         n = E0.w(base_list + 4)
         rows0 = [[E0.w(E0.w(base_list) + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
         rows1 = [[E1.w(E1.w(al) + 16 * i + 4 * j) for j in range(4)] for i in range(E1.w(al + 4))]
-        remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr['kind'] == r['kind']}
+        own = {}
+        for _n2, (_b, rr, _a) in new.items():
+            if rr['kind'] == r['kind']:
+                own = rr.get('new_articles', {})
+        remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr['kind'] == r['kind'] and n2 not in own}
         want = [[(e[0] & 0xC0000000) | remap.get(e[0] & 0x3FFFFFFF, e[0] & 0x3FFFFFFF)] + e[1:] for e in rows0]
+        for n2, (_aname, mx) in sorted(own.items()):          # brand-new articles: the base's row, own kind / max
+            b = new[n2][0]
+            src = [e for e in rows0 if e[0] & 0x3FFFFFFF == b][0]
+            want.append([(src[0] & 0xC0000000) | n2, mx] + src[2:])
         check('fighter 0x%X: articles %s' % (r['kind'], [hex(e[0]) for e in rows1]), rows1, want)
     # ---- the module set-up's row (0x02BCB5C0 .. the lwzu): r30 = kind -> r30 = its row, r10 = its first
     #      constructor; game kinds as unpatched, new kinds their base's row, unused kinds as unpatched

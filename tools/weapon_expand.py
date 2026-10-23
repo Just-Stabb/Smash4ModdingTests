@@ -9,7 +9,11 @@ them. Prints rpx_patch.py arguments (after tools/kind_expand.py's, which this ne
 
 extra_kinds.json: a record's "weapons": {"<article name>": "<new weapon kind>", ...} (the base fighter's
 article of that name is copied; kinds consecutive from 0x185 over all records), and the top-level
-"weapon_capacity" (default 0x1C0).
+"weapon_capacity" (default 0x1C0). A brand-new article: "<new name>": {"kind": "0x18B", "base":
+"<base article>", "max": 1}: a copy of the base article's kind (its native code, descriptor, params)
+under its own name and folder (fighter/<new>/model|motion/<name>/, script/.../<name>/), added to the
+new fighter's article list after the base's articles (its article id = its place there), with that
+max count.
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
 - 4 name tables (root / owner / name / folder, 389 pointers, contiguous: can't grow) read by the path
@@ -67,7 +71,8 @@ ARTICLE = 0x10                 # article list entry {flags | kind, max count, ca
 
 
 def load_weapons(path, img):
-    """[(fighter record, [(new kind, base kind, article name)])], capacity"""
+    """[(fighter record, [(new kind, base kind, article name)])], capacity; a brand-new article's
+    record also gets r['new_articles'] = {new kind: (name, max count)}"""
     raw = json.load(open(path))
     cap = K.num(raw.get('weapon_capacity', DEFAULT_CAPACITY))
     _fcap, kinds = K.load_spec(path)
@@ -78,10 +83,20 @@ def load_weapons(path, img):
     for r in kinds:
         ws = rawk[r['kind']].get('weapons') or {}
         lst = []
-        for art, nk in sorted(ws.items(), key=lambda kv: K.num(kv[1])):
-            nk = K.num(nk)
-            base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art]
-            assert len(base) == 1, '%s has no article %s' % (r['base'], art)
+        r['new_articles'] = {}
+
+        def kind_of(v):
+            return K.num(v['kind'] if isinstance(v, dict) else v)
+        for art, nk in sorted(ws.items(), key=lambda kv: kind_of(kv[1])):
+            spec = nk if isinstance(nk, dict) else None
+            nk = kind_of(nk)
+            if spec:
+                r['new_articles'][nk] = (art, int(spec.get('max', 1)))
+                art_base = spec['base']
+            else:
+                art_base = art
+            base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art_base]
+            assert len(base) == 1, '%s has no article %s' % (r['base'], art_base)
             assert nk == nxt, 'weapon kinds must be consecutive from 0x185 (%s is 0x%X)' % (art, nk)
             nxt += 1
             lst.append((nk, base[0], art))
@@ -224,7 +239,7 @@ def article_layout(img, recs):
         fdesc = fighter_descriptor(img, r)
         alist = img.w(fdesc + 8)
         entries, count = img.w(alist), img.w(alist + 4)
-        remap = {b: n for n, b, _a in lst}
+        remap = {b: n for n, b, _a in lst if n not in r.get('new_articles', {})}   # brand-new: added below
         rows = []
         for i in range(count):
             e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
@@ -232,8 +247,17 @@ def article_layout(img, recs):
             if kind in remap:
                 e[0] = (e[0] & 0xC0000000) | remap[kind]
             rows.append(e)
+        for nk, (_name, mx) in sorted(r.get('new_articles', {}).items()):
+            bk = [b for n, b, _a in lst if n == nk][0]
+            found = [i for i in range(count) if (img.w(entries + ARTICLE * i) & 0x3FFFFFFF) == bk]
+            assert found, 'the base fighter has no article of kind 0x%X' % bk
+            i = found[0]
+            e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
+            e[0] = (e[0] & 0xC0000000) | nk
+            e[1] = mx
+            rows.append(e)
         out[r['kind']] = (at, rows)
-        at += 8 + ARTICLE * count
+        at += 8 + ARTICLE * len(rows)
     return out, at
 
 
@@ -277,11 +301,15 @@ def build(spec_path=SPEC, rpx=RPX):
         B.data(at, blob, 'article list 0x%X' % fk)
     info['article_lists'] = {k: a for k, (a, _r) in lay.items()}
 
-    # ---- strings (the owners)
+    # ---- strings (the owners, and brand-new articles' names)
     sblob, sptr = bytearray(), {}
     for r, _lst in recs:
         sptr[r['name']] = len(sblob)
         sblob += r['name'].encode('ascii') + b'\0'
+        for _nk, (aname, _mx) in sorted(r.get('new_articles', {}).items()):
+            if aname not in sptr:
+                sptr[aname] = len(sblob)
+                sblob += aname.encode('ascii') + b'\0'
     s_at = B.alloc(len(sblob) + (-len(sblob) % 4))
     B.data(s_at, sblob, 'strings')
     sptr = {s: s_at + o for s, o in sptr.items()}
@@ -296,7 +324,13 @@ def build(spec_path=SPEC, rpx=RPX):
                 vals.append(img.w(addr + 4 * k))
             elif k in new:
                 bk, r, _a = new[k]
-                vals.append(sptr[r['name']] if nm == 'owner' else img.w(addr + 4 * bk))
+                own_name = r.get('new_articles', {}).get(k)
+                if nm == 'owner':
+                    vals.append(sptr[r['name']])
+                elif own_name and nm in ('name', 'folder'):
+                    vals.append(sptr[own_name[0]])     # a brand-new article: its own name / folder
+                else:
+                    vals.append(img.w(addr + 4 * bk))
             else:
                 vals.append(img.w(addr))           # unused: kind 0's strings (never asked for)
         B.data(at, b''.join(struct.pack('>I', v) for v in vals), 'table ' + nm)
@@ -354,7 +388,7 @@ def build(spec_path=SPEC, rpx=RPX):
         sub = img.w(d + 0x14)
         if sub:
             ents, cnt = img.w(sub), img.w(sub + 4)
-            remap = {b: n for n, (b, rr, _a) in new.items() if rr is r}
+            remap = {b: n for n, (b, rr, _a) in new.items() if rr is r and n not in r.get('new_articles', {})}
             rows = []
             for i in range(cnt):
                 e = [img.w(ents + ARTICLE * i + 4 * j) for j in range(4)]
