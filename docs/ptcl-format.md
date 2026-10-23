@@ -102,8 +102,10 @@ the writer recomputes them.)
 | 0x3D8 | 12f | emitter matrix, 3 rows of 4: Rz·Ry·Rx(rotation)·diag(scale), translation in the 4th column (all 8115 vanilla emitters agree; `Ptcl.set_emitter_srt` writes it with the three below) | corpus |
 | 0x408 / 0x414 / 0x420 | 3f each | emitter scale / rotation (radians) / translation | corpus |
 | 0x444 | f | emit rate | corpus |
-| 0x448 | s32 | start frame | corpus |
-| 0x450 | s32 | end frame (0x7FFFFFFF forever) | corpus |
+| 0x2FF | u8 | one-time: 1 = emits only until end frame, 0 = until killed. All 7982 vanilla emitters: 1 exactly when the end frame is finite. The particle buffer (128 bytes a particle, emitter +0x310, count +0x6C; 0x04A5BDCC) is sized ((end − emit start) / (interval + 1) + 1) × rate when set, else (life / (interval + 1)) × rate + rate: one-time with end 0x7FFFFFFF overflows it (Kamehameha test 4 crashed) | verified |
+| 0x448 | s32 | start frame (after the set starts) | corpus |
+| 0x44C | s32 | emit start: first emission, frames after the start frame | verified (0x04A6507C) |
+| 0x450 | s32 | end frame: with one-time, emission stops this many frames after the start frame (a duration: 49 vanilla emitters have it below their start frame); 0x7FFFFFFF without | verified (0x04A64F70) |
 | 0x454 / 0x458 | s32 | emit interval / random | corpus / guess |
 | 0x45C | f | figure (omni) velocity | guess |
 | 0x460 | f | emitter (directional) velocity | verified (read as float) |

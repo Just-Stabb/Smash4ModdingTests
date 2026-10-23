@@ -104,6 +104,16 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   emitter (vanilla p99 66, max 520). `xv2_to_ptcl.sanitize` now clamps them. Test 4
   (`--diag2`, `build/supamario_kame_test4.zip`): the whole beam head on the down taunt, its sets
   in two halves on the up / side taunts.
+- Test 4: the down taunt and both halves crashed (Fireptcl + Wav after longer). Cause: eft's
+  `one_time` byte (emitter +0x2FF). With it set, the particle buffer (128 bytes a particle) is
+  sized ((end frame - emit start) / (interval + 1) + 1) x rate (`0x04A5BDCC`); the templates had it
+  set and the looping emitters an end frame of 0x7FFFFFFF: counts of 10^8-10^9, sizes that wrap
+  to small or zero allocations (`count << 7`), then particles written past them, corrupting the
+  heap (the NU renderer's buffers among it: the GX2R warnings). Every vanilla emitter has
+  one_time set exactly when its end frame is finite. The end frame is also a duration after the
+  start frame (`0x04A64F70`), not an absolute frame. `xv2_to_ptcl` now writes both (and checks
+  the buffer count per emitter: at most 196 here). Test 5: `build/supamario_kame_test5.zip`, the
+  normal taunt layout.
 - Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
   an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
   (the cape at Z 9).

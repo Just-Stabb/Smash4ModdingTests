@@ -379,8 +379,15 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     # ---- timing
     loops = any('Loop' in n['NodeFlags_names'] for n in chain)
     start, end, interval, rate = schedule(spawn_times.get(id(node), []), loops)
+    # eft: the emitter starts start_frame after the set; it emits while (frames since its start)
+    # is below end_frame (a duration, 0x04A64F70) when one_time is set, else until it is killed;
+    # the particle buffer is sized from the duration for one_time emitters (0x04A5BEA8), so a
+    # one_time emitter must have a finite end (all 7982 vanilla emitters: one_time <=> finite end;
+    # test 4 crashed with template one_time flags left on looping emitters)
     p.set_field(em, 'start_frame', int(start))
-    p.set_field(em, 'end_frame', int(end))
+    p.set_field(em, 'end_frame', FOREVER if end == FOREVER else max(1, int(end - start)))
+    p.set_field(em, 'one_time', 0 if end == FOREVER else 1)
+    p.set_field(em, 'emit_start', 0)
     p.set_field(em, 'emit_interval', int(interval))
     p.set_field(em, 'emit_rate', float(rate))
     p.set_field(em, 'ptcl_life', max(1, int(node['Lifetime'])))
@@ -456,6 +463,15 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
 MAX_LIVE = 200      # particles alive at once per emitter (vanilla: p99 66, max 520)
 
 
+def buffer_count(p, em):
+    """the particle count eft sizes the emitter's buffer for (0x04A5BDCC)"""
+    iv = p.field(em, 'emit_interval') + 1
+    rate = p.field(em, 'emit_rate')
+    if p.field(em, 'one_time'):
+        return int(((p.field(em, 'end_frame') - p.field(em, 'emit_start')) // iv + 1) * rate)
+    return int((p.field(em, 'ptcl_life') // iv) * rate) + int(rate)
+
+
 def sanitize(p, em):
     """keep the emitter inside what the 7767 vanilla emitters do (test 3: a beam-head set crashed the
     game some time after it played; these were the values no vanilla emitter has):
@@ -465,6 +481,8 @@ def sanitize(p, em):
     - a circle / sphere volume of radius 0 is a point;
     - at most MAX_LIVE particles alive (the emission rate lowered)"""
     notes = []
+    assert bool(p.field(em, 'one_time')) == (p.field(em, 'end_frame') != FOREVER)
+    assert 0 < buffer_count(p, em) <= 4 * MAX_LIVE, buffer_count(p, em)
     life, rnd = p.field(em, 'ptcl_life'), p.field(em, 'ptcl_life_random')
     if rnd >= life:
         p.set_field(em, 'ptcl_life_random', max(0, life - 1))
@@ -545,7 +563,8 @@ def main():
             d = q.sets[si]['emitters'][[c[1] for c in chunk].index(en)]['data']
             print('   %-22s pt%d bl%d life %3d frames %d..%s every %d x%.3g  scale %s  %s' % (
                 en, q.field(d, 'particle_type'), q.field(d, 'blend_type'), q.field(d, 'ptcl_life'),
-                q.field(d, 'start_frame'), 'inf' if q.field(d, 'end_frame') == FOREVER else q.field(d, 'end_frame'),
+                q.field(d, 'start_frame'), 'inf' if q.field(d, 'end_frame') == FOREVER
+                else q.field(d, 'start_frame') + q.field(d, 'end_frame'),
                 q.field(d, 'emit_interval'), q.field(d, 'emit_rate'),
                 '%.2gx%.2g' % tuple(q.field(d, 'scale')), '; '.join(sorted(set(notes)))))
     for line in log:

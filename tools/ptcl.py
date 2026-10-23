@@ -75,6 +75,7 @@ FIELDS = [
     (0x2DC, '>i', 'primitive_index', 'runtime'),  # -1 none; else into the primitive table
     (0x2EC, '>I', 'shader_param_size', 'runtime'),
     (0x2F0, '>I', 'shader_param_pos', 'runtime'),  # into the shader parameter table
+    (0x2FF, '>B', 'one_time', 'runtime'),         # 1: emits from start_frame for end_frame frames (vanilla: 1 <=> finite end)
     (0x30C, '>I', 'enum_30c', 'corpus'),          # 0x30C-0x33C: small enums, shader-keyed (see doc)
     (0x31C, '>I', 'enum_31c', 'corpus'),
     (0x324, '>I', 'blend_type', 'corpus'),         # 0 alpha, 1 add, 2 subtract (names: *_alpha 0, *add* 1)
@@ -87,8 +88,10 @@ FIELDS = [
     (0x414, '>3f', 'emitter_rotation', 'corpus'),  # emitters agree; set_emitter_srt writes all four)
     (0x420, '>3f', 'emitter_translation', 'corpus'),
     (0x444, '>f', 'emit_rate', 'corpus'),
-    (0x448, '>i', 'start_frame', 'corpus'),
-    (0x450, '>i', 'end_frame', 'corpus'),         # 0x7FFFFFFF = forever
+    (0x448, '>i', 'start_frame', 'corpus'),       # after the set starts
+    (0x44C, '>i', 'emit_start', 'runtime'),       # first emission, frames after start_frame
+    (0x450, '>i', 'end_frame', 'runtime'),        # one_time: emission ends this many frames after
+                                                  # start_frame; 0x7FFFFFFF (never) without one_time
     (0x454, '>i', 'emit_interval', 'corpus'),
     (0x458, '>i', 'emit_interval_random', 'guess'),
     (0x45C, '>f', 'figure_velocity', 'guess'),    # all-direction speed
