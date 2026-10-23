@@ -138,4 +138,8 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   `xv2_trace_to_nud.py --alpha 0=0.3` (the core ribbon's alpha x 0.3) and `--white-fade 0.85`
   (texel alpha x (1 - 0.85 x its darkest channel): near-white mostly transparent);
   `TRACE_ALPHA` / `TRACE_WHITE_FADE` in the build.
+- Test 8 in game: the white is fixed; brighten a bit, and the beam projectile should be much
+  faster. Test 9 (`build/supamario_kame_test9.zip`): `--gain 1.3`, `--speed 6 --length-rate 2`
+  (grows 6 units a frame to the same 120 / 160 / 200 units: 20 / 27 / 34 frames). The move's
+  beam-head projectile should fly at `TRACE_SPEED` (6) to stay with the body.
 - Still to do: the move itself (projectile, hitboxes, charge logic).

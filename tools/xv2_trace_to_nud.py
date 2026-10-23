@@ -3,7 +3,7 @@
 
   python3 tools/xv2_trace_to_nud.py PKG_DIR OUT_DIR [--prefix EffSupamarioKame] [--speed 2.0]
                                     [--scale 8.5] [--tex-base 0x15141A30] [--alpha 0=0.3]
-                                    [--preview DIR]
+                                    [--white-fade 0.85] [--length-rate 2] [--gain 1.3] [--preview DIR]
 
 Each .etr in the package (Kmh_Beam.etr -> OUT_DIR/EffSupamarioKameBeam/) becomes one model with a
 mesh per trace node. An XV2 trace is drawn behind its bone (TRS, the moving beam head) as the head
@@ -14,8 +14,9 @@ place, from the spawn point forward (+Z, the head's direction):
   Scale; a node without (a flat ribbon, AutoOrientation: camera facing) -> two crossed ribbons of
   width 2 Scale, one upright (seen from the side camera) and one flat;
 - the mesh is 1 unit long along +Z on its own bone; model.omo scales the bone: Z = speed x frame
-  while extruding (speed in Smash units a frame: XV2's comes from the skill, not the effect; the
-  move's projectile should match it), then held; X / Y follow the node's Scale keyframes
+  (Smash units a frame: XV2's comes from the skill, not the effect; the move's projectile should
+  match it) up to the full length, length_rate x ExtrudeDuration (default: speed x, XV2's
+  timing), then held; X / Y follow the node's Scale keyframes
   (DefaultEnd: over the hold) relative to the base Scale;
 - texture: the node's sampler (beam00 / ring_beamCor / T2_UV01) as BC3, U around / across, V along
   the trace, repeated along the length to keep the texture's aspect (NU_effScaleUV V animated with
@@ -111,21 +112,33 @@ def ribbon(half, alpha_along):
 
 
 class Trace:
-    def __init__(self, pkg, etr_name, folder, tex_base, speed=SPEED, scale=SCALE, alpha=None, white_fade=0.0):
+    def __init__(self, pkg, etr_name, folder, tex_base, speed=SPEED, scale=SCALE, alpha=None, white_fade=0.0,
+                 length_rate=None, gain=1.0):
         self.etr = pkg['etr'][etr_name]
+        # the full length is length_rate x ExtrudeDuration (default: speed x it, XV2's timing); it
+        # grows at speed, so a faster beam reaches the same length in fewer frames
+        self.length_rate = length_rate or speed
+        self.gain = gain                        # RGB multiplier (brightness) of every node
         self.alpha = dict(alpha or {})          # node index -> alpha multiplier
         self.white_fade = white_fade
         self.name, self.folder, self.tex_base, self.speed, self.scale = etr_name, folder, tex_base, speed, scale
         c = xv2vfx._container(pkg, 'TBIND')
         self.emb = list(Emb(open(os.path.join(pkg['dir'], c['TextureEmbPath']), 'rb').read()))
         nodes = self.etr['Nodes']
-        self.frames = max(n['StartTime'] + n['ExtrudeDuration'] + n['HoldDuration'] for n in nodes) + 1
+        self.frames = max(n['StartTime'] + self.extrude(n) + n['HoldDuration'] for n in nodes) + 1
         self.bones = [('TopN', -1)] + [('Trace%d' % i, 0) for i in range(len(nodes))]
         self.bones = [(n, p, zlib.crc32(n.encode()) & 0xFFFFFFFF) for n, p in self.bones]
 
+    def full_length(self, node):
+        return self.length_rate * node['ExtrudeDuration']
+
+    def extrude(self, node):
+        """frames the node grows: its full length at speed"""
+        return max(1, int(math.ceil(self.full_length(node) / self.speed - 1e-6)))
+
     def node_curves(self, node):
         """per frame: (length, width scale, alpha) of a node"""
-        e, h, t0 = node['ExtrudeDuration'], node['HoldDuration'], node['StartTime']
+        e, h, t0 = self.extrude(node), node['HoldDuration'], node['StartTime']
         base = node['Scale'] or 1.0
         scale_hold = kf_curve(find_kv(node, 'Scale', 'DefaultEnd'), h + 1, base)
         alpha_hold = kf_curve(find_kv(node, 'Color1_Transparency', 'DefaultEnd'), h + 1, 1.0)
@@ -135,7 +148,7 @@ class Trace:
             if t < 0:
                 out.append((0.01, 1.0, 0.0))
                 continue
-            length = self.speed * max(min(t, e), 0.5)
+            length = min(self.speed * max(t, 0.5), self.full_length(node))
             k = min(max(t - e, 0), h)
             w = max(scale_hold[k] / base, 0.0)
             a = float(alpha_hold[k]) if t >= e else float(alpha_hold[0])
@@ -181,7 +194,8 @@ class Trace:
             mat.textures.append(dict(hash=self.tex_base + emb_index, map_mode=0, wrap_s=1, wrap_t=1, min_f=3,
                                      mag_f=2, mip=6, unk=0, unk2=0))
             hbits, hval = float_hash('%s/%s' % (self.folder, i))
-            gains = [[1.0, 1.0, 1.0, a * self.alpha.get(i, 1.0)] for _l, _w, a in curves]
+            g = self.gain
+            gains = [[g, g, g, a * self.alpha.get(i, 1.0)] for _l, _w, a in curves]
             scales = [[1.0, max(length * v_per_unit, 0.01), 0.0, 0.0] for length, _w, _a in curves]
             trans = [[su * fr, sv * fr, 0.0, 0.0] for fr in range(self.frames)]
             mat.props = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', list(scales[0])),
@@ -218,7 +232,7 @@ class Trace:
         d = os.path.join(out_dir, self.folder)
         os.makedirs(d, exist_ok=True)
         meshes, anims, texs = self.meshes()
-        maxlen = max(n['ExtrudeDuration'] for n in self.etr['Nodes']) * self.speed
+        maxlen = max(self.full_length(n) for n in self.etr['Nodes'])
         for m in meshes:
             p = m.polygons[0].pos.copy()
             p[:, 2] *= maxlen
@@ -238,15 +252,16 @@ class Trace:
 
 
 def convert(pkg_dir, out_dir, prefix='EffSupamarioKame', speed=SPEED, scale=SCALE, tex_base=TEX_BASE, alpha=None,
-            white_fade=0.0):
+            white_fade=0.0, length_rate=None, gain=1.0):
     pkg = xv2vfx.load_package(pkg_dir)
     done = []
     for k, name in enumerate(sorted(pkg['etr'])):
         folder = prefix + os.path.splitext(name)[0].split('_', 1)[-1]
-        t = Trace(pkg, name, folder, tex_base + 0x10 * k, speed, scale, alpha, white_fade)
+        t = Trace(pkg, name, folder, tex_base + 0x10 * k, speed, scale, alpha, white_fade, length_rate, gain)
         d = t.write(out_dir)
-        print('%s -> %s: %d frames, %d meshes, %.0f units long' % (
-            name, d, t.frames, len(t.meshes_written), speed * max(n['ExtrudeDuration'] for n in t.etr['Nodes'])))
+        print('%s -> %s: %d frames, %d meshes, %.0f units long, grows in %d frames' % (
+            name, d, t.frames, len(t.meshes_written), max(t.full_length(n) for n in t.etr['Nodes']),
+            max(t.extrude(n) for n in t.etr['Nodes'])))
         for m in t.meshes_written:
             p = m.polygons[0]
             print('   %-22s verts %4d tris %4d' % (m.name, len(p.pos), len(p.idx) // 3))
@@ -265,10 +280,12 @@ def main():
     ap.add_argument('--alpha', default='', help="'NODE=factor,...': multiply a trace node's alpha (all traces)")
     ap.add_argument('--white-fade', type=float, default=0.0,
                     help='make the textures\' near-white parts this much more transparent (0..1)')
+    ap.add_argument('--length-rate', type=float, help='full length = this x ExtrudeDuration (default: --speed)')
+    ap.add_argument('--gain', type=float, default=1.0, help='brightness (RGB multiplier)')
     ap.add_argument('--preview')
     a = ap.parse_args()
     alpha = {int(k): float(v) for k, v in (t.split('=') for t in a.alpha.split(',') if t)}
-    done = convert(a.pkg, a.out, a.prefix, a.speed, a.scale, a.tex_base, alpha, a.white_fade)
+    done = convert(a.pkg, a.out, a.prefix, a.speed, a.scale, a.tex_base, alpha, a.white_fade, a.length_rate, a.gain)
     if a.preview:
         import xv2_to_nud
         os.makedirs(a.preview, exist_ok=True)

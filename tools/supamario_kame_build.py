@@ -74,6 +74,10 @@ TRACES = ('Beam', 'Beam2', 'Beam3')         # the three charge levels (EEPK effe
 TRACE_ALPHA = {0: 0.3}
 # ... and the white cloud of the tubes' textures (T2_UV01) too: near-white texels mostly transparent
 TRACE_WHITE_FADE = 0.85
+# test 8: "brightened a bit", and the beam "much faster": grows at 6 units a frame (was 2) to the
+# same lengths (2 units per XV2 extrude frame: 120 / 160 / 200), so in 20 / 27 / 34 frames; the
+# move's projectile should fly at TRACE_SPEED too
+TRACE_GAIN, TRACE_SPEED, TRACE_LENGTH_RATE = 1.3, 6.0, 2.0
 SIDE = [(0, MODEL_PREFIX + 'Fire', HAND, None, 1.0), (0, 'PtcSupamarioKmhRing', HAND, None, 0.8),
         (0, MODEL_PREFIX + 'Beam', BODY, None, 1.0)]
 DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFireptcl', 0, (0, 0, -0.3), 1.6),
@@ -155,7 +159,8 @@ def main():
         subprocess.run([sys.executable, os.path.join(HERE, 'xv2_to_nud.py'), pkg, name, os.path.join(fx, 'model'),
                         '--prefix', MODEL_PREFIX] + opts, check=True, capture_output=True)
     xv2_trace_to_nud.convert(pkg, os.path.join(fx, 'model'), MODEL_PREFIX, alpha=TRACE_ALPHA,
-                             white_fade=TRACE_WHITE_FADE)
+                             white_fade=TRACE_WHITE_FADE, speed=TRACE_SPEED, length_rate=TRACE_LENGTH_RATE,
+                             gain=TRACE_GAIN)
     for m in ('Fire', 'Bas', 'Hand') + TRACES:
         assert os.path.exists(os.path.join(fx, 'model', MODEL_PREFIX + m, 'model.nud')), m
     for m in os.listdir(os.path.join(v5, 'effect/supamario/model')):
