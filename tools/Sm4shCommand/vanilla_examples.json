@@ -1,0 +1,1328 @@
+{
+ "0141BB6A": [
+  "// cloud, finalstart (effect)",
+  "EFFECT_SYNC_SCALE(Enable=0)"
+ ],
+ "01A5A27C": [
+  "// mario, dash (sound)",
+  "PLAY_STEP_FLIPPABLE(SoundID=0x20041, SoundIDFlip=0x20043)"
+ ],
+ "0202C138": [
+  "// mario, entryl (expression)",
+  "Article_Visibility(Article=4, State=0)"
+ ],
+ "040FD56E": [
+  "// mario, attackdash (expression)",
+  "Slope_Full2(SlopeStatus=1, Frames=4, Unknown=1)"
+ ],
+ "072D2AAD": [
+  "// kirby, attackairlw (effect)",
+  "EFFECT_FOLLOW_FLIP_RND(GFXRight=0x1000023, GFXLeft=0x1000023, Bone=2, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.8, RandomX=1, RandomY=1, RandomZ=1, RandomXRot=0, RandomYRot=90, RandomZRot=0, Terminate=1, FlipType=1)"
+ ],
+ "089EBF6C": [
+  "// mario, final (effect)",
+  "External_Graphic_Effect2(Graphic=0x4030001, Bone=0x11, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=1)"
+ ],
+ "08E67529": [
+  "// metaknight, attacks3s2 (game)",
+  "Disallow_Vertical_Movement(Energy=0)"
+ ],
+ "09C4CC49": [
+  "// bayonetta, attackairlw (effect)",
+  "LAST_EFFECT_SET_COLOR(Red=20, Green=115, Blue=255)"
+ ],
+ "0A539357": [
+  "// sonic, appealsr (effect)",
+  "EFFECT_FOLLOW_VARIATION(Graphic=0x3220009, Bone=0, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, Terminate=1, VariationVar=0x1000003C)"
+ ],
+ "0A7BF1D4": [
+  "// link, appealsl (game)",
+  "GENERATE_ARTICLE2(ArticleID=6, Flag=1)"
+ ],
+ "0CA3C450": [
+  "// diddy, finalendl (game)",
+  "EFFECT_REMOVE_COMMON(CommonEffectId=0x25)"
+ ],
+ "0EB375E3": [
+  "// ike sword, specialhi2 (effect)",
+  "Set_Loop(Iterations=2){",
+  "    WAIT(Frames=3)",
+  "    Goto(Offset=-2)",
+  "}"
+ ],
+ "0EDC8BFD": [
+  "// mario, specialairhi (effect)",
+  "Graphic_Effect4(Graphic=0x303000C, Bone=0x11, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=1)"
+ ],
+ "0F39EC70": [
+  "// mario, specialhi (game)",
+  "Allow/Disallow_Ledgegrab(State=1)"
+ ],
+ "104F0834": [
+  "// mario, appeallwr (effect)",
+  "Graphic_Effect3(Graphic=0x1000007, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.9, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)"
+ ],
+ "13B7328C": [
+  "// duckhunt finalgunman, 0x84232F33 (effect)",
+  "EFFECT_REQ_LINE_CIRCLE_OFFSET(Preset=0, Bone=0, SizeA=10, SizeB=10, X=0, Y=5, Z=50)"
+ ],
+ "14C10D92": [
+  "// mario, specialairs (expression)",
+  "Aesthetic_Wind_Effect(AreaIndex=0, Speed=1, Angle=0, Duration=300, Rate=0.5, X=12, Y=10, Width=30, Height=20, Unk=0x32)"
+ ],
+ "14FCC7E4": [
+  "// mario, attackairb (game)",
+  "Special_Hitbox(ID=0, Part=0, Bone=9, Damage=10.5, Angle=0x169, KBG=0x6A, FKB=0, BKB=0xC, Size=4.5, X=4.8, Y=0, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=2, Ground/Air=3, Direct/Indirect=1, Type=6, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=4, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0)"
+ ],
+ "1511931F": [
+  "// captain, entryl (expression)",
+  "SET_SHADOW(Visible=0)"
+ ],
+ "15670DCC": [
+  "// metaknight, specialairlwend (game)",
+  "UNABLE_ENERGY(EnergyID=2)"
+ ],
+ "15F0023E": [
+  "// gamewatch, attackairf (game)",
+  "VIS_SET_DEFAULT(Group=3, State=2)"
+ ],
+ "17232732": [
+  "// mario, attackairb (game)",
+  "OFF_FLAG(Variable=0x2100000D)"
+ ],
+ "1AFDA8E6": [
+  "// mario, 0x5F52B259 (game)",
+  "Move_Hitbox(ID=0, NewBone=0, X=0, Y=-1, Z=5.2)"
+ ],
+ "1B41048C": [
+  "// bayonetta, attack100 (game)",
+  "unk_1B41048C(Arg0=1, Arg1=1, Arg2=1, Arg3=1, Arg4=0xA, Arg5=0, Arg6=3, Arg7=0, Arg8=0)"
+ ],
+ "1CB9BEE8": [
+  "// donkey, specialairhi_c3 (effect)",
+  "Graphic_Effect5(Graphic=0x1000023, Bone=2, X=5, Y=7, Z=0, XRot=0, YRot=0, ZRot=0, Size=3.2, RandomX=0, RandomY=10, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)"
+ ],
+ "1CF1A390": [
+  "// yoshi, 0x2CF0167A (game)",
+  "STRANS_GROUP_ON(STransGroup=0x1F000008)"
+ ],
+ "1D09E516": [
+  "// samus, specialairnstart (game)",
+  "GENERATE_ARTICLE_ENABLE(ArticleID=0)"
+ ],
+ "1E3AB92A": [
+  "// kirby, specialsstart_c3 (game)",
+  "SET_FLOAT(Value=1.5, Variable=0x1000006)"
+ ],
+ "1EAF840C": [
+  "// captain, specialhi (game)",
+  "Grab_Collision2(ID=0, Bone=0, Size=4.5, X=0, Y=12, Z=7, TargetStatus=0xBD, SituationMask=3, CanGrabInvincible=1)"
+ ],
+ "2068DF37": [
+  "// rockman, attackhi4 (expression)",
+  "unk_2068DF37(Arg0=0, Arg1=1, Arg2=5, Arg3=0x78)"
+ ],
+ "20DB2106": [
+  "// ike, specialhi3 (game)",
+  "CAM_OFFSET(OffsetX=0, OffsetY=-20)"
+ ],
+ "227B36A1": [
+  "// link, throwb (expression)",
+  "FT_ATTACK_ABS_CAMERA_QUAKE(Kind=0, CameraQuake=0)"
+ ],
+ "23A9AC4B": [
+  "// mario, final (game)",
+  "GENERATE_ARTICLE(ID=3)"
+ ],
+ "252F2052": [
+  "// lucario, 0x293B9311 (game)",
+  "PASSABLE_CHECK(Enable=1)"
+ ],
+ "2558D7F3": [
+  "// mario, specialairn (effect)",
+  "Change_Flash_Light_Color(TransitionFrames=5, Red=255, Blue=255, Green=255, Alpha=0)"
+ ],
+ "26E9C6BE": [
+  "// koopa, attackairlw (game)",
+  "Add/Set_Momentum2(Horizontal=0, Vertical=3, Add/SetHorizontal=0, Add/SetVertical=1)"
+ ],
+ "26ED10F4": [
+  "// gamewatch, attackairn (game)",
+  "SET_RATE_ARTICLE_V(Article=6, ValueSrc=2)"
+ ],
+ "27213F09": [
+  "// link, entryr (expression)",
+  "Morph_Model_Event(Visible=0)"
+ ],
+ "2953BFDE": [
+  "// kirby ultrasword, 0x56A06E2E (effect)",
+  "Sword_Glow2(Color=0xC2, Unknown1=0xD7, BlurLength=0xE, Bone1=0, X=0, Y=0, Z=3, Bone2=0, X2=0, Y2=0, Z2=51, Anchored=1, Graphic=0x4080000, Bone3=0, X3=0, Y3=0, Z3=0, RotX=0, RotY=0, RotZ=0, Size=1, Unknown21=0, Unknown22=0, Unknown23=0, Unknown24=0xB, Unknown25=1, Unknown26=0)"
+ ],
+ "2988D50F": [
+  "// mario, downattackd (game)",
+  "Extended_Hitbox(ID=0, Part=0, Bone=0, Damage=7, Angle=0x30, KBG=0x30, FKB=0, BKB=0x50, Size=5, X=0, Y=5, Z=-12, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=8, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=4, X2=0, Y2=5, Z2=-5)"
+ ],
+ "29BC5960": [
+  "// zelda, final (effect)",
+  "EFFECT_DETACH_KIND(Graphic=0x4100000, EndFadeFrames=0xFFFFFFFF)"
+ ],
+ "2A25155D": [
+  "// mario, 0x192152A3 (game)",
+  "Set_Armor(State=1, Threshold=0)"
+ ],
+ "2B62F859": [
+  "// peach, specialhistart_c2 (game)",
+  "SET_RATE_ARTICLE(Article=0, Rate=0.001)"
+ ],
+ "2D942090": [
+  "// mario, 0x61C011E8 (game)",
+  "Pickup_Item(Unknown=1)"
+ ],
+ "2DA7E2B6": [
+  "// link bowarrow, 0xC47D38D7 (effect)",
+  "Float_Var_Compare(Variable=0x1, Method=3, Value=1)"
+ ],
+ "2E9BD610": [
+  "// mario, 0xFEB8A774 (game)",
+  "FT_MOTION_ANGLE(Angle=20, Mode=3)"
+ ],
+ "2ED684DE": [
+  "// mario, specialairs_c3 (effect)",
+  "EFFECT_FOLLOW_FLIP_ALPHA(GFXRight=0x3030014, GFXLeft=0x3030015, Bone=0, X=0, Y=8, Z=9, XRot=0, YRot=0, ZRot=0, Size=1.1, Terminate=1, FlipType=0, Alpha=60)"
+ ],
+ "2F08F54F": [
+  "// link, 0x140F41C6 (game)",
+  "Remove_Grab_Collision(ID=2)"
+ ],
+ "2F20B6C7": [
+  "// murabito, 0xA2F1A803 (game)",
+  "THROW_ITEM_OFFSET_MOTION(OffsetX=10, OffsetY=17.5, Motion=0x12B)"
+ ],
+ "300A0A85": [
+  "// pikachu dengeki, 0xEF0E6622 (game)",
+  "unk_300A0A85()"
+ ],
+ "30392B40": [
+  "// luigi, specialairhi_c2 (effect)",
+  "EFFECT_COLOR(Graphic=0x100000F, Bone=0x18, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.7, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1, Red=255, Green=100, Blue=100)"
+ ],
+ "31051FF6": [
+  "// yoshi tamago, 0x7D3EA0B0 (effect)",
+  "unk_31051FF6(Graphic=0x307002F, Bone=0, F2=0, F3=0, F4=0, F5=0, F6=0, F7=0, F8=1, F9=0, F10=0, F11=0, F12=0, F13=360, F14=0, Flag=0, VariationVar=0x10000007)"
+ ],
+ "315E8C48": [
+  "// mario, entryl (expression)",
+  "VIS_ATTACH_ITEM_GROUP(Group=0, State=1)"
+ ],
+ "323FB9D4": [
+  "// pikmin blue, catchdash (game)",
+  "Grab_Collision3(ID=0, Bone=0x7D1, Size=3, X=0, Y=1, Z=1, TargetStatus=0x3F, SituationMask=3, HitStatusExclude=0, Flag26=0)"
+ ],
+ "326E0EB5": [
+  "// lucario, specialairnshoot_c2 (game)",
+  "Set_ExAnchored_Article_Action(Article=0, Action=2)"
+ ],
+ "3341CBFE": [
+  "// lucas pkfreeze, 0xD1D6F351 (game)",
+  "unk_3341CBFE()"
+ ],
+ "34BCD3F7": [
+  "// link boomerang, turn (effect)",
+  "Float_Compare(Type=0, Method=4, Value=0)"
+ ],
+ "377D36CB": [
+  "// kirby, 0x2E643AAF (effect)",
+  "Float_Var_Compare_Var(Variable1=0x2F, Method=5, Variable2=0x5000005)"
+ ],
+ "37CA2121": [
+  "// littlemac, specialairn2 (game)",
+  "unk_37CA2121(Value=0.67)"
+ ],
+ "37ED7029": [
+  "// mario, final (game)",
+  "Time_Manipulation(Amount=0xA, Duration=0x3C)"
+ ],
+ "38A3EC78": [
+  "// ike sword, specialhi2 (effect)",
+  "Set_Loop(Iterations=2){",
+  "    WAIT(Frames=3)",
+  "    Goto(Offset=-2)",
+  "}"
+ ],
+ "395DA2D1": [
+  "// duckhunt, entryr (game)",
+  "SET_OFFSET_ARTICLE(Article=0xC, Arg1=0, Arg2=0, Offset=7.4)"
+ ],
+ "3A1C50C4": [
+  "// bayonetta, 0x5C5B987C (sound)",
+  "PLAY_DAMAGESTOP(SoundID=0xCA1002B)"
+ ],
+ "3A52D8B7": [
+  "// pacman, appeallwl (expression)",
+  "MATERIAL_ANIM_SET_RATE(Rate=0)"
+ ],
+ "3A775D26": [
+  "// mario, win1 (sound)",
+  "PLAY_SE_NO_3D(Se=0x5E0017)"
+ ],
+ "3AAAF7D0": [
+  "// sonic, finalstart (game)",
+  "Screen_Tint(Mode=0, TransitionFrames=0x1E, Red=0x40, Green=0x40, Blue=0, Alpha=0x80, Layer=0, Priority=0xFF)"
+ ],
+ "3B31D521": [
+  "// duckhunt, 0x7247EDBD (effect)",
+  "unk_3B31D521(Arg0=0, Arg1=0, Arg2=0, Arg3=1, Arg4=0, Arg5=0, Arg6=0, Arg7=0, Arg8=0)"
+ ],
+ "3BD9C23B": [
+  "// samus bomb, fall_c3 (game)",
+  "Set_Model_Scale(Scale=1.8)"
+ ],
+ "3C95CD87": [
+  "// link boomerang, turn (game)",
+  "Aesthetic_Wind_Effect2(AreaIndex=0, Speed=1, RadialUnk=0.05, Duration=20, Rate=1, X=0, Y=0, Radius=25, Unk=0x1E)"
+ ],
+ "3D155C42": [
+  "// sonic, attackairlw (game)",
+  "Enable_Certain_Movements(Type=2)"
+ ],
+ "3D2CFA86": [
+  "// mario, attack13 (sound)",
+  "Low_Voice_Clip(Sequence=0x80000007)"
+ ],
+ "3D753F5E": [
+  "// kirby, attacklw4 (effect)",
+  "EFFECT_LIGHT(Graphic=0x100000A, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0, Red=0, Green=255, Blue=0, LightIntensity=5, LightX=2, LightY=1, LightZ=0)"
+ ],
+ "40639C05": [
+  "// wiifit, attackhi4 (sound)",
+  "PLAY_SEQUENCE_DAMAGESTOP(Sequence=0x80140005)"
+ ],
+ "406D24BC": [
+  "// mario, appeallwl (expression)",
+  "Rumble(Kind=0xD, StartFrame=0)"
+ ],
+ "425848C8": [
+  "// link, appealsl (game)",
+  "Set_Anchored_Article_Action(Article=6, Action=0)"
+ ],
+ "4261788B": [
+  "// cloud, specialairs3 (effect)",
+  "EFFECT_FOLLOW_SYNC_PARENT(Graphic=0x337000D, Bone=0, X=0, Y=10, Z=17, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=1, ParentHandleWork=0x10000086)"
+ ],
+ "42998FB4": [
+  "// mario, 0x2DACD56A (game)",
+  "Fire_Item_Projectile(ShotKind=1)"
+ ],
+ "42ACFE7D": [
+  "// mario, attack11 (game)",
+  "FRAME(Frames=2)"
+ ],
+ "42D70BB3": [
+  "// mario, specialhi (game)",
+  "SA_SET(Situation=2)"
+ ],
+ "44081C21": [
+  "// kirby, specialnloop (game)",
+  "Search_Collision(ID=0, Part=0, Bone=0, Size=3, X=0, Y=6, Z=4, CollisionKindMask=2, HitStatusMask=1, SituationMask=7, Unused=0, CategoryMask=0xF, PartMask=0xF, IgnoreScale=0, RehitRate=0, Flag1C=1, ShapeType=0)"
+ ],
+ "448BBF07": [
+  "// lizardon, specialairlw (game)",
+  "unk_448BBF07()"
+ ],
+ "46396A70": [
+  "// duckhunt, win1 (game)",
+  "SET_ROT_ARTICLE(Article=0xC, Arg1=0, RotA=90, RotB=0)"
+ ],
+ "46596E40": [
+  "// mario, attackhi4 (effect)",
+  "EFFECT_FLIP(GFXRight=0x303000B, GFXLeft=0x303000B, Bone=0, X=1, Y=10, Z=-0.5, XRot=-10, YRot=-100, ZRot=-60, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1, FlipType=1)"
+ ],
+ "467A5ED5": [
+  "// bayonetta, attackhi4 (game)",
+  "unk_467A5ED5(Flag=1)"
+ ],
+ "46985674": [
+  "// mario, attack11 (effect)",
+  "Graphic_Effect2(Graphic=0x100008F, Bone=0, X=13.8, Y=5.7, Z=3.3, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=360, Terminate=0)"
+ ],
+ "46C4655C": [
+  "// koopa, specialscatch (effect)",
+  "EFFECT_FLIP_ALPHA(GFXRight=0x100008E, GFXLeft=0x100008E, Bone=0, X=0, Y=10.5, Z=3, XRot=18.7, YRot=-105.8, ZRot=2, Size=1.8, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1, FlipType=1, Alpha=50)"
+ ],
+ "46F15F52": [
+  "// koopag, specialscatch (game)",
+  "FT_CATCH_SP(ID=0, Bone=0, Size=15, X=0, Y=11, Z=52, TargetStatus=0xBE, SituationMask=1)"
+ ],
+ "477705C2": [
+  "// kirby, 0x26F3C826 (effect)",
+  "Int_Var_Compare(Variable=0x11000004, Method=0, Value=0)"
+ ],
+ "4882328E": [
+  "// sonic, 0x41532F48 (game)",
+  "ENABLE_AREA(AreaKind=2)"
+ ],
+ "4B7B6E51": [
+  "// mario, attack13 (game)",
+  "WAIT(Frames=2)"
+ ],
+ "4E761504": [
+  "// kirby, throwhi (expression)",
+  "CAMERA_SET_UPDATE_POS(Mode=7)"
+ ],
+ "4E94C51B": [
+  "// gamewatch, itemheavythrowb4 (sound)",
+  "ATTACK_SE()"
+ ],
+ "501A7157": [
+  "// link, specials2 (game)",
+  "Article_Event(Value=2)"
+ ],
+ "50730439": [
+  "// mario, itemheavythrowb (game)",
+  "THROW_ITEM_OFFSET(OffsetX=-11, OffsetY=16, Unused=1, Unused2=0, Unused3=2)"
+ ],
+ "50B5DFBD": [
+  "// donkey, 0x022F7B09 (expression)",
+  "START_CHARGE_2_joint_form(RateA1=0.8, RateA2=0.8, RateA3=-1, RateB1=0.8, RateB2=0.8, RateB3=-1, Joint1=0x3E8, Joint2=0x3E9)"
+ ],
+ "5121D3C3": [
+  "// fox, win1 (sound)",
+  "unk_5121D3C3(VoiceType=0, Compare=0, Value=1)"
+ ],
+ "5143DD2A": [
+  "// miienemyf, attack11 (game)",
+  "MII_ENABLE_RATE()"
+ ],
+ "515F97FF": [
+  "// mario, attacklw4 (effect)",
+  "LANDING_EFFECT_FLIP(GFXRight=0x100000D, GFXLeft=0x100000E, Bone=0, X=0, Y=0, Z=2, XRot=0, YRot=0, ZRot=0, Size=1.2, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0, FlipType=0)"
+ ],
+ "51BF42D5": [
+  "// purin, 0x00510331 (effect)",
+  "EFFECT_FLW_POS_NO_STOP(Effect=0x100008F, Bone=0, X=0, Y=5, Z=0, RotX=0, RotY=0, RotZ=0, Scale=8, Terminate=1)"
+ ],
+ "51EA2062": [
+  "// samus, throwb (game)",
+  "SET_RATE_ARTICLE_W(Article=7, RateVar=0x1000006)"
+ ],
+ "51FA432A": [
+  "// zelda phantom, dead (effect)",
+  "unk_51FA432A(Attr=0x10000, Arg2=5)"
+ ],
+ "522DBA37": [
+  "// captain, attack100 (game)",
+  "WAIT_LOOP_CLR()"
+ ],
+ "524EF3F5": [
+  "// zelda, specialairhistart_c2 (effect)",
+  "EFFECT_FLW_POS_UNSYNC_VIS(Effect=0x3100003, Bone=0, X=0, Y=10, Z=0, RotX=0, RotY=0, RotZ=0, Scale=2, Terminate=0)"
+ ],
+ "52CF42E0": [
+  "// mario, appealhir (effect)",
+  "Change_Overlay(Transition=3, Red=80, Green=80, Blue=80, Alpha=90)"
+ ],
+ "548F2D4C": [
+  "// link, catchdash (game)",
+  "Grab_Collision(ID=0, Bone=0x1A, Size=2.5, X=0, Y=0, Z=-1, TargetStatus=0x3F, SituationMask=3)"
+ ],
+ "54BA7357": [
+  "// captain, attackairb (effect)",
+  "Graphic_Effect6(Graphic=0x100008D, Bone=0, X=0, Y=10.5, Z=3, XRot=-195, YRot=0, ZRot=0, Size=1.1, Terminate=1, Alpha=80)"
+ ],
+ "5766F889": [
+  "// mario, attack11 (game)",
+  "Script_End()"
+ ],
+ "589A9DB3": [
+  "// mario, appealhir (effect)",
+  "Color_Overlay(Red=255, Green=255, Blue=128, Alpha=170)"
+ ],
+ "598D8CB8": [
+  "// mario, final (game)",
+  "Limited_Screen_Tint(TransitionInTime=0, Red=0x1E, Blue=0x40, Green=0, Alpha=0, Duration=0x80, TransitionOutTime=0)"
+ ],
+ "5A3B874D": [
+  "// link bowarrow, 0x4FBB2AD2 (effect)",
+  "EFFECT_OFF(AttrMask=0x10000, KillParticles=1)"
+ ],
+ "5BBFE217": [
+  "// link, specialhi_c3 (game)",
+  "SET_AIR()"
+ ],
+ "5BC50AA6": [
+  "// gamewatch, 0x2E34DC33 (game)",
+  "VIS_BACK_DEFAULT_ARTICLE(ArticleID=3, Group=0)"
+ ],
+ "5BE12AD0": [
+  "// mario, final (expression)",
+  "QUAKE(Kind=5)"
+ ],
+ "5C3C583E": [
+  "// mario, appealhir (effect)",
+  "Terminate_Overlays()"
+ ],
+ "5D5AF322": [
+  "// kirby finalcutter, 0x49C45923 (sound)",
+  "SET_TAKEOUT_SE_STATUS(Se=0xA0058)"
+ ],
+ "5DCECD64": [
+  "// captain, 0x8E49CB0C (game)",
+  "CAM_RESET()"
+ ],
+ "5E6C3483": [
+  "// link, specialairlw (sound)",
+  "Int_Compare(Type=2, Method=0, Value=115)"
+ ],
+ "5F4CF775": [
+  "// duckhunt, attack100 (game)",
+  "WAIT_LOOP()"
+ ],
+ "5FC8FA49": [
+  "// mario fireball, 0x4A7103D4 (sound)",
+  "SET_TAKEOUT_SE(Se=0x20036)"
+ ],
+ "606717F5": [
+  "// littlemacg, 0x7499EF77 (game)",
+  "ENABLE_CANCEL()"
+ ],
+ "61A23DF6": [
+  "// kirby, catchattack (effect)",
+  "EFFECT_FOLLOW_NO_STOP_FLIP(GFXRight=0x100008D, GFXLeft=0x100008D, Bone=0, X=-6.5, Y=6, Z=0, XRot=-10, YRot=20, ZRot=0, Size=0.9, Terminate=1, FlipType=1)"
+ ],
+ "61F36803": [
+  "// lucario, 0xC8FAA374 (game)",
+  "UPDATE_ROT()"
+ ],
+ "63623560": [
+  "// mario, escapef (game)",
+  "Reverse_Direction()"
+ ],
+ "6539137D": [
+  "// link, attack11 (effect)",
+  "Terminate_Sword_Glow(FadeTime=4)"
+ ],
+ "65F38512": [
+  "// ryu, final2 (expression)",
+  "QUAKE_STOP(Kind=1)"
+ ],
+ "661B30DA": [
+  "// mario, attack11 (game)",
+  "ON_FLAG(Variable=0x2100000D)"
+ ],
+ "663DE182": [
+  "// ike, specialhi3 (game)",
+  "ADD_SPEED_NO_LIMIT(SpeedX=0, SpeedY=-6)"
+ ],
+ "67E8E687": [
+  "// cloud, specialairlw (game)",
+  "unk_67E8E687()"
+ ],
+ "684264C9": [
+  "// pikachu, specials (game)",
+  "Change_Hitbox_Size(ID=0, Size=3)"
+ ],
+ "687F9320": [
+  "// mario, runbrakel (sound)",
+  "SET_PLAY_INHIVIT(Se=0x20013, Frames=0x14)"
+ ],
+ "692BBCFA": [
+  "// captain, specialairsend_c2 (game)",
+  "CLR_SPEED_ALL()"
+ ],
+ "6A441545": [
+  "// mario, 0xA448FE61 (effect)",
+  "DOWN_EFFECT(Graphic=0x100000A, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)"
+ ],
+ "6CD94C77": [
+  "// sonic, itemheavythrowb (game)",
+  "THROW_ITEM_OFFSET_4_arg_form(OffsetX=-16, OffsetY=16, Arg3=1, Arg4=0)"
+ ],
+ "6D8D18B7": [
+  "// sonic, attackairlw (game)",
+  "Disallow_Certain_Movements(Type=2)"
+ ],
+ "6E053790": [
+  "// link, 0x03B789CB (game)",
+  "Throw_Item2(Unused=1, Unused2=0, Unused3=2)"
+ ],
+ "6E332637": [
+  "// bayonetta bat, escapefl (effect)",
+  "LAST_EFFECT_SET_RATE_WORK(RateWork=2)"
+ ],
+ "6EFB0DB3": [
+  "// bayonetta, attackhi4 (game)",
+  "ATK_POWER_MUL_STATUS(Multiplier=1)"
+ ],
+ "6F4AACA8": [
+  "// kirby, specialairs (effect)",
+  "AFTER_IMAGE2_ON(Texture=6, BlurLength=5, Bone1=0x19, X1=-0.00896, Y1=9.02227, Z1=-1.89698, Bone2=0x19, X2=-0.01245, Y2=12.522, Z2=-1.85697, Terminate=1, Graphic=0, Bone3=0, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=8, Axis=2, Unused=4)"
+ ],
+ "6F52E135": [
+  "// cloud, specialairlw (game)",
+  "Set_Weight_Gravity_Fallspeed_All_Hitboxes(Frames=0x16)"
+ ],
+ "7002E722": [
+  "// bayonetta, attack100end (game)",
+  "unk_7002E722(Flag=1)"
+ ],
+ "70498D78": [
+  "// cloud, 0xCCE09237 (game)",
+  "CAM_ZOOM_IN_6_arg_form(Frames=0x1E, Arg1=0, Distance=1.3, RotX=0.6, RotY=-0.6, Flag=1)"
+ ],
+ "7075DC5A": [
+  "// mario, attacks4 (game)",
+  "Extended_Special_Hitbox(ID=0, Part=0, Bone=0x10, Damage=14, Angle=0x169, KBG=0x67, FKB=0, BKB=0x19, Size=2, X=-1, Y=0.7, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=4, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=-3, Y2=1, Z2=0)"
+ ],
+ "70FBED79": [
+  "// samus laser, 0x7044FCBE (effect)",
+  "LIGHT_AXIS_FRM(Frames=4, Unk1=100, Unk2=20, Unk3=-0.5)"
+ ],
+ "7172A764": [
+  "// mario, specialhi_c2 (game)",
+  "Set_Frame_Duration(Speed=0.5)"
+ ],
+ "73E2040C": [
+  "// cloud, win3 (effect)",
+  "AFTER_IMAGE_27_arg_sword_trail_form(TrailEffect=0xF2, TrailEffect2=0xF3, BlurLength=0xA, Bone1=0x19, X1=0, Y1=1.5, Z1=-1, Bone2=0x19, X2=0, Y2=20.5, Z2=-1.5, Anchored=1, Effect=0x10000088, Bone3=0x19, Ex=0, Ey=0, Ez=0, Erx=0, Ery=0, Erz=0, Size=1, Unk21=0, Unk22=0, Unk23=0, Unk24=0xB, Unk25=1, Extra=0)"
+ ],
+ "745B20A7": [
+  "// mario, 0x0CC803A3 (game)",
+  "Fire_Item_Projectile2(IntVar=0x11000010)"
+ ],
+ "74B61BAC": [
+  "// fox, appeallwl (expression)",
+  "SLOPE_TOE(SlopeStatus=4, MaxAngle=60)"
+ ],
+ "752E6714": [
+  "// pikmin, specialnstart (game)",
+  "MOT_SET_RATE_W(RateVar=0x1000006)"
+ ],
+ "7698BB42": [
+  "// luigi, specials (game)",
+  "ATK_CATEGORY(ID=0, HitBits=0x3F)"
+ ],
+ "79380B43": [
+  "// ike, specialsattack (expression)",
+  "AREA_WIND_2ND(AreaID=0, Speed=3, Angle=130, Unknown3=300, Unknown4=1, X=0, Y=12, Width=24, Height=24)"
+ ],
+ "7A128321": [
+  "// kamui dragonhand, 0x4A43B62A (game)",
+  "ATK_LERP_RATIO(RatioVar=1)"
+ ],
+ "7A34BE78": [
+  "// duckhunt, win1 (game)",
+  "SET_POS_ARTICLE(Article=0xC, Arg1=0, X=0, Y=6)"
+ ],
+ "7B48FE1C": [
+  "// mario, catch (game)",
+  "Extended_Grab_Collision(ID=0, Bone=0, Size=3.3, X=0, Y=6.6, Z=4, TargetStatus=0x3F, SituationMask=3, X2=0, Y2=6.6, Z2=8.7)"
+ ],
+ "7C37DF64": [
+  "// cloud, finalstart (effect)",
+  "EFFECT_GLOBAL(Graphic=0x4370000, X=960, Y=-120, Z=0, XRot=0, YRot=0, ZRot=0, Size=1)"
+ ],
+ "7D1058C3": [
+  "// shulk, specialairsfall (game)",
+  "ATTACK_SET_CHECK_BACK(Part=1)"
+ ],
+ "7E977FAA": [
+  "// koopa, 0x022F7B09 (expression)",
+  "START_CHARGE_6_joint_form(RateA1=0.9, RateA2=0.8, RateA3=-1, RateB1=0.9, RateB2=0.8, RateB3=-1, Joint1=0x3F2, Joint2=0x3F3, Joint3=0x3F4, Joint4=0x3F5, Joint5=0x3F6, Joint6=0x3F7)"
+ ],
+ "7EF50766": [
+  "// mario, attack11 (effect)",
+  "EFFECT_FOLLOW_FLIP(GFXRight=0x100008D, GFXLeft=0x100008D, Bone=0, X=0.5, Y=5.7, Z=0, XRot=0, YRot=-18, ZRot=0, Size=1, Terminate=1, FlipType=1)"
+ ],
+ "7F0F890E": [
+  "// mario, damageflyhi (sound)",
+  "PLAY_FLY_VOICE(Voice1=0x80000009, Voice2=0x8000000A)"
+ ],
+ "7F55AAA2": [
+  "// shulk, specialairsfall (game)",
+  "ATTACK_SET_CHECK_FRONT(Part=0)"
+ ],
+ "7FCE1BCF": [
+  "// koopajr, win1 (sound)",
+  "IF_SOUND_VARIATION(Variation=0, Compare=0, Value=1)"
+ ],
+ "83197B9A": [
+  "// bayonetta, attackhi3 (game)",
+  "Set_Weight_Hitbox(ID=1, Flag=1)"
+ ],
+ "838B5229": [
+  "// mario, 0x192152A3 (game)",
+  "ITEM_ACTION(Value=0x64)"
+ ],
+ "83A45688": [
+  "// gamewatch, attackairf (game)",
+  "VIS_RESET_DEFAULT(Group=3)"
+ ],
+ "84730CC5": [
+  "// pacman, appeallwl (expression)",
+  "MATERIAL_ANIM_SET_FRAME(Frame=2)"
+ ],
+ "853CD75E": [
+  "// link, specialairhi (game)",
+  "Set_Weight_All_Hitboxes(Flag=1)"
+ ],
+ "868F5AC3": [
+  "// link, specialairhi_c3 (effect)",
+  "Graphic_Effect7(Graphic=0x1000023, Bone=0, X=0, Y=15, Z=0, XRot=0, YRot=0, ZRot=180, Size=1.5, RandomX=0, RandomY=5, RandomZ=0, RandomXRot=20, RandomYRot=360, RandomZRot=20, Terminate=0, Alpha=70)"
+ ],
+ "86EB40DD": [
+  "// mario, final (game)",
+  "Normal_Camera()"
+ ],
+ "870CF021": [
+  "// mario, downwaitd (sound)",
+  "IS_FLAG(Variable=0x21000021)",
+  "False(Offset=4){",
+  "    Sound_Effect4(SFX=0x5F)",
+  "}"
+ ],
+ "87C50592": [
+  "// mario, downeatd (game)",
+  "Consume_Item(Unknown=2)"
+ ],
+ "8827F88C": [
+  "// pikachu, specialhiend (game)",
+  "INC_INT(Variable=0x11000006)"
+ ],
+ "887B430A": [
+  "// link bowarrow, 0x538A83B3 (effect)",
+  "Sword_Trace(TraceID=2, BlurLen=0xA, Bone1=0x7D3, X=0, Y=-0.6, Z=0, Bone2=0x7D3, X2=0, Y2=0.6, Z2=0, Anchored=1, Graphic=0x3050001, Bone3=0x7D3, X3=0, Y3=0, Z3=0, RotX=0, RotY=0, RotZ=0, Length=1)"
+ ],
+ "887C2271": [
+  "// kirby, finalstart (expression)",
+  "DISABLE_GOLD_EYE()"
+ ],
+ "895B9275": [
+  "// link, specialnend_c2 (sound)",
+  "IS_FLAG(Variable=0x2100000E)",
+  "True(Offset=6){",
+  "    Sound_Effect(SFX=0x300A0)",
+  "}",
+  "Else(Offset=4){",
+  "    Sound_Effect(SFX=0x3009C)",
+  "}"
+ ],
+ "8965B9D6": [
+  "// dedede, specialnloop (game)",
+  "SET_SEARCH_OPPONENT(ID=0, Part=0, Field=5, Value=2)"
+ ],
+ "89A772AC": [
+  "// mario, specialairn (effect)",
+  "Flash_Light_Effect(Red=255, Blue=230, Green=180, Alpha=160, SourceX=75, SourceY=-10)"
+ ],
+ "89CE242B": [
+  "// kirby, finalstart (game)",
+  "Set_Camera_Boundaries(Front=25, Back=0, Top=0, Bottom=0)"
+ ],
+ "89D3AD87": [
+  "// bayonetta, attack100end (effect)",
+  "EFFECT_OFF_KIND_WORK(GraphicWork=0x10000094, KillParticles=0, KillImmediately=0)"
+ ],
+ "8B298D04": [
+  "// metaknight, throwb (game)",
+  "GROUND_SHAPE_FLAG(Flag=8, Enable=1)"
+ ],
+ "8B925A6C": [
+  "// bayonetta, attacklw4 (game)",
+  "unk_8B925A6C(Value=0)"
+ ],
+ "8EB98BE7": [
+  "// bayonetta, finalend (game)",
+  "Terminate_Time_Manipulation()"
+ ],
+ "8F27D612": [
+  "// bayonetta, landingairlw (effect)",
+  "LAST_PARTICLE_SET_COLOR(R=0, G=0.55, B=1)"
+ ],
+ "8FE9E295": [
+  "// bayonetta, attack100 (effect)",
+  "EFFECT_WORK(GraphicWork=0x10000094, Bone=1, X=0, Y=10, Z=4, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=2, RandomXRot=0, RandomYRot=0, RandomZRot=20, Terminate=1)"
+ ],
+ "8FF62E3D": [
+  "// mario, appealsl (expression)",
+  "Item_Visibility(State=0)"
+ ],
+ "9126EBA2": [
+  "// mario, finalair (game)",
+  "JUMP(Hash=0xECD55CC6)"
+ ],
+ "91CF842D": [
+  "// gamewatch, attackhi3 (game)",
+  "VIS_BACK_DEFAULT(Group=3)"
+ ],
+ "9245E1A8": [
+  "// mario, attack11 (game)",
+  "Remove_All_Hitboxes()"
+ ],
+ "932D9A40": [
+  "// donkey, specialairn (game)",
+  "ATK_POWER_ADD(HitboxID=0, IntVar=0x11000005)"
+ ],
+ "950AEFC5": [
+  "// peach, 0x894F47B0 (game)",
+  "Generate_Item(ID=0x3E)"
+ ],
+ "95794508": [
+  "// kirby, specialnloop_c3 (game)",
+  "SET_LIMIT_SPEED_EX(Horizontal=1.6, Vertical=0)"
+ ],
+ "96114CFC": [
+  "// link, 0x22EE56C9 (game)",
+  "Model_Changer(ChangerID=0, ChangerState=0)"
+ ],
+ "961521C4": [
+  "// mario, appeallwl (expression)",
+  "Slope_Full(SlopeStatus=1, Frames=3)"
+ ],
+ "965E035A": [
+  "// mario, 0x0C660475 (game)",
+  "Fire_Weapon()"
+ ],
+ "97370496": [
+  "// bayonetta, finalend (game)",
+  "Time_Manipulation_Whole(Rate=4, Frames=0)"
+ ],
+ "979D8828": [
+  "// fox, specialairnstart_c3 (game)",
+  "IS_EXIST_ARTICLE(ArticleID=0)"
+ ],
+ "98203AF6": [
+  "// link, finalstart (game)",
+  "SCH_CLR_ALL()"
+ ],
+ "9860F55D": [
+  "// mario, throwb (effect)",
+  "EFFECT_FOLLOW_FLIP_COLOR(GFXRight=0x1000023, GFXLeft=0x1000023, Bone=2, X=0, Y=-3, Z=0, XRot=0, YRot=-90, ZRot=0, Size=1.5, Terminate=1, FlipType=1, Red=100, Green=180, Blue=255)"
+ ],
+ "9A5C9C1D": [
+  "// lucario, 0x212687CE (game)",
+  "IS_GENERATABLE_ARTICLE(ArticleID=1)"
+ ],
+ "9E3105F2": [
+  "// mewtwo, attackairb (effect)",
+  "EFFECT_FOLLOW_FLIP_work_form(EffectR=0x3330019, EffectL=0x3330019, Bone=0, X=0, Y=12, Z=-6.5, RotX=180, RotY=45, RotZ=90, Scale=1.6, Terminate=1, Arg11=1, WorkVar=0x1000003C)"
+ ],
+ "9FCB5AD5": [
+  "// bayonetta, specialairhi (effect)",
+  "EFFECT_DETACH_KIND_WORK(GraphicWork=0x10000099, EndFadeFrames=0xFFFFFFFF)"
+ ],
+ "A0FA2515": [
+  "// kirby, specialnloop (sound)",
+  "IF_STATUS_SE_PLAYING(Se=0xA007E, Compare=0, Value=0)"
+ ],
+ "A160AB16": [
+  "// link, specialhi_c3 (game)",
+  "Disallow_Horizontal_Movement(Energy=1)"
+ ],
+ "A1B6E607": [
+  "// link, attack11 (game)",
+  "ATK_RESERVE(ID=0, Bone=0x3E9, X=5.5, Y=0, Z=0)"
+ ],
+ "A21BC6EA": [
+  "// mario, downwaitd (sound)",
+  "IS_FLAG(Variable=0x21000021)"
+ ],
+ "A2BAB52A": [
+  "// samus, specialairnfire (game)",
+  "SHOOT_EXIST_ARTICLE(ArticleID=0)"
+ ],
+ "A30D3CA2": [
+  "// link, catch (game)",
+  "Set_Remote_Article_Action2(Article=5, Action=3)"
+ ],
+ "A4DE708D": [
+  "// mario, specialairhi_c3 (game)",
+  "Add/Set_Momentum(Horizontal=0, Vertical=0, Mode=1)"
+ ],
+ "A4F1B325": [
+  "// link, specials1 (game)",
+  "SHOOT_ARTICLE(Value=2)"
+ ],
+ "A5187BBC": [
+  "// mario, entryl (expression)",
+  "SET_CURSOR(Visible=0)"
+ ],
+ "A5303662": [
+  "// duckhunt, attack100 (game)",
+  "FRAME_CLR()"
+ ],
+ "A546845C": [
+  "// mario, 0x192152A3 (game)",
+  "Set_Frame_Speed(Multiplier=0.6)"
+ ],
+ "A5BD4F32": [
+  "// mario, cliffcatch (sound)",
+  "IS_RANDOM(Chance=2)",
+  "True(Offset=4){",
+  "    Sound_Effect(SFX=0x5E000A)",
+  "}"
+ ],
+ "A82038A0": [
+  "// captain, 0x9B244888 (expression)",
+  "unk_A82038A0()"
+ ],
+ "AA02262F": [
+  "// mewtwo, escapeair (game)",
+  "Set_Kinetic_Handler_Aerial(ID=0)"
+ ],
+ "AA8826A7": [
+  "// kirby, finalstart (game)",
+  "MOT_CHANGE_EXIST_ARTICLE(ArticleID=0x1C, Motion=0)"
+ ],
+ "AC811479": [
+  "// link, attack11 (game)",
+  "ATK_REFERENCE_NODE(Bone=0xE, Axis=0xFFFFFFFF)"
+ ],
+ "AE994DAF": [
+  "// link, entryr (expression)",
+  "unk_AE994DAF(Enable=0)"
+ ],
+ "AEAE97FF": [
+  "// ryu, speciallw (game)",
+  "ATTACK_SET_ATTACK_LEVEL(ID=0, Level=0)"
+ ],
+ "AECB846B": [
+  "// fox, specialairs (expression)",
+  "IGNORE_BOX2D_SHAPE(Enable=1)"
+ ],
+ "AF41E94E": [
+  "// link, catch (game)",
+  "Set_Remote_Article_Action(Article=5, Action=1)"
+ ],
+ "AF988735": [
+  "// mario, appealhil (expression)",
+  "SLOPE(SlopeStatus=6)"
+ ],
+ "B09F03B2": [
+  "// lucas, specialairhi (game)",
+  "unk_B09F03B2(HitboxId=0, Flag=1)"
+ ],
+ "B0AF39A6": [
+  "// koopa, finalstart (game)",
+  "Terminate_Instance()"
+ ],
+ "B208689A": [
+  "// purin, attacklw4 (effect)",
+  "FOOT_EFFECT_FLIP(GFXRight=0x100000E, GFXLeft=0x100000D, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.5, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0, FlipType=0)"
+ ],
+ "B2E91D0C": [
+  "// bayonetta, attack100end (game)",
+  "unk_B2E91D0C(Rate=1)"
+ ],
+ "B3480157": [
+  "// rockman, attackairlw (expression)",
+  "unk_B3480157(Part=0, State=2)"
+ ],
+ "B39C1A7C": [
+  "// bayonetta, speciallw (game)",
+  "SEARCH_CLR_ALL()"
+ ],
+ "B3EAA5C2": [
+  "// mario, dash (game)",
+  "STRANS_ON(STransID=0x1E00000A)"
+ ],
+ "B738EABD": [
+  "// mario, attack11 (game)",
+  "Hitbox(ID=0, Part=0, Bone=0xF, Damage=2.5, Angle=0x169, KBG=0x64, FKB=0xF, BKB=0, Size=3, X=1.2, Y=0, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=0, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=4)"
+ ],
+ "B73EF69C": [
+  "// mario, win1 (sound)",
+  "PLAY_SE_REMAIN(Se=0x72)"
+ ],
+ "B7458BB3": [
+  "// bayonetta, attack100end (effect)",
+  "EFFECT_FOLLOW_WORK(GraphicWork=0x10000096, Bone=1, X=1.5, Y=8, Z=0, XRot=0, YRot=0, ZRot=120, Size=1.3, Terminate=1)"
+ ],
+ "B89F681C": [
+  "// ike, appeallwl (game)",
+  "unk_B89F681C(Suspend=0, AttrMask=1)"
+ ],
+ "BB400CDA": [
+  "// mario, specials (game)",
+  "Shield_Off2(Unused=3, ID=0, Type=3)"
+ ],
+ "BBAD115E": [
+  "// murabito tree, 0x2447B579 (effect)",
+  "EFFECT_WORK_R(Graphic=0x32A000F, Bone=0x7D1, X=0, Y=13, Z=0, XRotWork=0xC, YRotWork=0xD, ZRotWork=0xE, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)"
+ ],
+ "BBB819D9": [
+  "// link, 0x88E566BC (expression)",
+  "unk_BBB819D9(Enable=1)"
+ ],
+ "BE0C4A94": [
+  "// rockman, appealhil (expression)",
+  "unk_BE0C4A94(Part=0, State=0, Frames=5)"
+ ],
+ "BF72BDCA": [
+  "// mario, specialairs_c2 (effect)",
+  "LAST_EFFECT_SET_ALPHA(Alpha=60)"
+ ],
+ "BFC0031F": [
+  "// wiifit, specialairnshoot (game)",
+  "SHOOT_EXIST_ARTICLE_2_arg_form(Article=1, Arg=2)"
+ ],
+ "BFE18BE1": [
+  "// reflet, 0xC2C13B23 (game)",
+  "THROW_ITEM_REFLET()"
+ ],
+ "C026EEC4": [
+  "// mario, attackhi4 (expression)",
+  "EXECUTE(Frame=7)"
+ ],
+ "C31ABACD": [
+  "// duckhunt, 0x0540DD2B (effect)",
+  "EFFECT_REMOVE_LINE_CIRCLE(FadeFrames=6, FadeFlag=1)"
+ ],
+ "C35E9B92": [
+  "// rockman, specialn_c2 (game)",
+  "GENERATE_ARTICLE_ENABLE_3_arg_form(Article=0xF, Arg1=0, Arg2=1)"
+ ],
+ "C436BF6E": [
+  "// link, appealsl (game)",
+  "Remove_Article(Article=6)"
+ ],
+ "C52B4328": [
+  "// mario, 0x022F7B09 (expression)",
+  "START_CHARGE(Charge1A=-1, Charge1B=-1, Charge1C=-1, Charge2A=-1, Charge2B=0.1, Charge2C=-1, Target=0xFFFFFFFF)"
+ ],
+ "C565EF20": [
+  "// sonic, finalstart (game)",
+  "End_Screen_Tint(ID=0, TransitionOutTime=0)"
+ ],
+ "C7B586AF": [
+  "// miienemyg, attackhi4 (expression)",
+  "MII_HEAD_OFFSET(OffsetA=-30, OffsetB=30, Frames=5)"
+ ],
+ "C84B610E": [
+  "// mario, attackdash (effect)",
+  "Graphic_Effect(Graphic=0x1000009, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.5, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)"
+ ],
+ "C93DA32A": [
+  "// marth, finalend (game)",
+  "Special_Hitbox2(ID=0, Part=0, Bone=0, Damage=60, Angle=0x169, KBG=0x78, FKB=0, BKB=0x78, Size=18, X=0, Y=8, Z=16, Effect=2, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=0, Ground/Air=3, Direct/Indirect=0, Type=0, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=0, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0)"
+ ],
+ "CA7748A5": [
+  "// gamewatch, damageflyhi (sound)",
+  "DAMAGEFLY_SE()"
+ ],
+ "CB59A07E": [
+  "// link, entryr (expression)",
+  "Visibility(State=0)"
+ ],
+ "CC26B487": [
+  "// samus cshot, 0x18DE2129 (game)",
+  "ATK_LERP(HitboxID1=0, HitboxID2=1)"
+ ],
+ "CC7CC705": [
+  "// lucario, specialsthrow (game)",
+  "Collateral_Hitbox(ID=0, Part=0, Bone=0, Damage=10, Angle=0x34, KBG=0x53, FKB=0, BKB=0x28, Size=5, X=0, Y=8.5, Z=14, Effect=0x15, Trip=0, Hitlag=1, SDI=0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=0x16, Ground/Air=3, Direct/Indirect=1, Type=0)"
+ ],
+ "CCD48E8A": [
+  "// diddy, finalendl (game)",
+  "EFFECT_REMOVE_ATTR(AttrMask=0x20000)"
+ ],
+ "CD0C1CC9": [
+  "// bayonetta, escapeair (game)",
+  "unk_CD0C1CC9(Enable=1)"
+ ],
+ "CD0D7079": [
+  "// mario, cliffcatch (sound)",
+  "IS_RANDOM(Chance=2)"
+ ],
+ "CD25726B": [
+  "// mario, furasleeploop (effect)",
+  "Loop_Rest()"
+ ],
+ "CDBE8A34": [
+  "// pikmin blue, throwb (game)",
+  "Special_Throw_Applier(Kind=0, Bone=0x7D9, TargetObjectVar=0x11000001, TargetHitGroupVar=0x11000002, TargetHitNoVar=0x11000003)"
+ ],
+ "CDBF3106": [
+  "// link, catchdash (sound)",
+  "Sound_Effect2(SFX=0x3003E)"
+ ],
+ "CE8ABAED": [
+  "// fox, specialairs (expression)",
+  "IGNORE_BOX2D_GROUND(Enable=1)"
+ ],
+ "CEDC237E": [
+  "// mario, attackhi4 (game)",
+  "Undo_Bone_Collision(State=0)"
+ ],
+ "D014D5A8": [
+  "// cloud, 0xCCE09237 (game)",
+  "unk_D014D5A8(Effect=0x1000005, Arg1=1, Arg2=1)"
+ ],
+ "D1B837C2": [
+  "// mario, specials (game)",
+  "SHIELD_ON(Unused=3, ID=0, Type=3)"
+ ],
+ "D2B4D575": [
+  "// cloud, 0xCCE09237 (game)",
+  "unk_D2B4D575(Arg0=8, Arg1=0x46)"
+ ],
+ "D3D9401B": [
+  "// koopajr, 0x3D09059F (game)",
+  "SET_SPEED_EX_2_arg_form(SpeedX=-0.5, SpeedY=2.2)"
+ ],
+ "D41DF827": [
+  "// mewtwo bindball, 0x7044FCBE (game)",
+  "ATTACK_SET_CHECK_FRONT_LR(Part=0)"
+ ],
+ "D4FC6AC3": [
+  "// kamui, entryr (effect)",
+  "EFFECT_FLW_UNSYNC_VIS(Effect=0x3390022, Bone=0xC, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Scale=1.1, Terminate=1)"
+ ],
+ "D5D67F56": [
+  "// mario, specialairs (expression)",
+  "Terminate_Wind_Effect(AreaIndex=0)"
+ ],
+ "D5F5735F": [
+  "// samus, attacklw3 (effect)",
+  "EFFECT_LIGHT_END(FadeFrames=0xA, AttrMask=0x10000)"
+ ],
+ "D5FC182B": [
+  "// cloud, specialairs1 (effect)",
+  "EFFECT_FOLLOW_NO_STOP_WITH_HANDLE(Graphic=0x3370009, Bone=0, X=0, Y=10, Z=17, XRot=0, YRot=100, ZRot=0, Size=1, Terminate=1, GraphicOffset=0, MaterialAnim=0, HandleWork=0x10000085)"
+ ],
+ "D7F6CBCD": [
+  "// link, attack11 (effect)",
+  "Sword_Glow(Texture1=1, Texture2=0x89, BlurLength=5, Bone1=0x3E8, X1=1, Y1=0, Z1=0, Bone2=0x3E8, X2=13, Y2=0, Z2=0, Terminate=1, Graphic=0x3050000, Bone3=0x3E8, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=0, Axis=0, Unused=0, BlendMode=0xB, Shader=1)"
+ ],
+ "D8B91949": [
+  "// diddy, 0x00EDCC6A (game)",
+  "Add/Subtract_Momentum(Horizontal=0.5, Vertical=3.6)"
+ ],
+ "D8D9A901": [
+  "// murabito firework, 0x7044FCBE (effect)",
+  "EFFECT_ATTR(Graphic=0x32A0001, Bone=0, X=4, Y=22, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.6, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1, Attribute=0x8000)"
+ ],
+ "D8DF1DCC": [
+  "// mario, throwb (game)",
+  "Throw_Applier(Kind=0, Bone=0x1A, TargetObjectVar=0x11000005, TargetHitGroupVar=0x11000006, TargetHitNoVar=0x11000007)"
+ ],
+ "D9CC663F": [
+  "// lucario, specialsthrow (effect)",
+  "LAST_EFFECT_SET_SCALE_W(ScaleXWork=0x1000006, ScaleYWork=0x1000006, ScaleZWork=0x1000006)"
+ ],
+ "DF057B20": [
+  "// mario, throwb (game)",
+  "Throw_Specifier(Kind=0, Part=0, Damage=11, Angle=0x2D, KBG=0x42, WBKB=0, BKB=0x46, Effect=0, Trip=0, HitlagMult=1, SDIMult=1, SFXLevel=0, SFXType=0, FacingRestriction=3, DisableHitlag=1, NoReaction=1, Type=8)"
+ ],
+ "DFA4517A": [
+  "// link, attackairhi (game)",
+  "Change_Hitbox_Damage(ID=0, Damage=13)"
+ ],
+ "E022FE8A": [
+  "// mario, landingairb (sound)",
+  "Sound_Effect3(SFX=0x2001C)"
+ ],
+ "E06A5D00": [
+  "// mario fireball, 0x4A7103D4 (sound)",
+  "REG_LANDING_SE(Se=0x20037)"
+ ],
+ "E0CF6FF1": [
+  "// mario, entryl (expression)",
+  "Tag_Visibility(State=0)"
+ ],
+ "E1D78BFB": [
+  "// cloud, attack13 (effect)",
+  "LAST_EFFECT_SET_OFFSET_TO_CAMERA_FLAT(Offset=0.4)"
+ ],
+ "E1E1ED52": [
+  "// mario, downeatd (game)",
+  "Pickup_Item2(Unknown0=0, Unknown1=2)"
+ ],
+ "E20C02D4": [
+  "// link bowarrow, 0xB37A0841 (effect)",
+  "EFFECT_FOLLOW_COLOR(Graphic=0x3050001, Bone=0x7D3, X=0.1, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=0, Red=255, Green=255, Blue=76)"
+ ],
+ "E2E96674": [
+  "// bayonetta, 0x0AE81022 (game)",
+  "unk_E2E96674(ID=7, Length=5, Width=4)"
+ ],
+ "E3C26DB5": [
+  "// murabito balloon, 0x7D3EA0B0 (effect)",
+  "EFFECT_COLOR_WORK(Graphic=0x32A0006, Bone=0, X=0, Y=15, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0, RedWork=1, GreenWork=2, BlueWork=3)"
+ ],
+ "E5751F0A": [
+  "// mario, appealhil (sound)",
+  "Sound_Effect(SFX=0x20001)"
+ ],
+ "E59FB667": [
+  "// rosetta tico, specials (effect)",
+  "unk_E59FB667(Value=6)"
+ ],
+ "E634F701": [
+  "// pikachu, specials (game)",
+  "ATK_KEEP_RUMBLE(HitboxID=0)"
+ ],
+ "E674F645": [
+  "// sonic, 0x41532F48 (game)",
+  "UNABLE_AREA(AreaKind=2)"
+ ],
+ "E74D94EE": [
+  "// mario, escapeair (game)",
+  "Set_Kinetic_Handler(ID=0)"
+ ],
+ "E8F38CA3": [
+  "// mario, attackhi3 (effect)",
+  "Terminate_Graphic_Effect(Graphic=0x100008E, KillParticles=1, KillImmediately=1)"
+ ],
+ "E940DCC2": [
+  "// mario, final (game)",
+  "Camera_Closeup(ZoomTime=5, Arg1=0, Distance=1.5, XRot=0, YRot=0)"
+ ],
+ "EBC717C8": [
+  "// metaknight, 0x530BF50C (game)",
+  "CAM_ZOOM_IN(Frames=0x64)"
+ ],
+ "ED67D5DA": [
+  "// mario, throwb (game)",
+  "Extended_Collateral_Hitbox(ID=0, Part=0, Bone=3, Damage=8, Angle=0x32, KBG=0x46, FKB=0, BKB=0x64, Size=4, X=2.5, Y=15, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=2, Ground/Air=3, Direct/Indirect=1, Type=8, X2=2.5, Y2=8, Z2=0)"
+ ],
+ "EE37008F": [
+  "// mario, final (expression)",
+  "unk_EE37008F()"
+ ],
+ "EF4016CA": [
+  "// samus, attacklw3 (effect)",
+  "EFFECT_FOLLOW_LIGHT(Graphic=0x1000022, Bone=0, X=0, Y=0, Z=11.4, XRot=0, YRot=0, ZRot=0, Size=0.9, Terminate=1, Red=180, Green=74, Blue=59, LightIntensity=20, LightX=1, LightY=1, LightZ=0)"
+ ],
+ "EF787D43": [
+  "// rockman, catch (game)",
+  "Extended_Grab_Collision2(ID=0, Bone=0, Size=3.6, X=0, Y=6.6, Z=4, TargetStatus=0x3F, SituationMask=3, X2=0, Y2=6.6, Z2=8.4, Flag26=1)"
+ ],
+ "F0D25BDA": [
+  "// mario, final (game)",
+  "Body_Collision(State=2)"
+ ],
+ "F0EF4C5F": [
+  "// bayonetta, finalend (game)",
+  "CAM_ZOOM_IN_FINAL(Frames=1, Unknown1=0, ZoomRate=2.6, X=0, Y=0, Unknown5=0, Unknown6=0, Distance=160, Flag=1, Variable=0x1100000C, Unknown10=0)"
+ ],
+ "F10FD85A": [
+  "// bayonetta, 0x471E3D1C (effect)",
+  "EFFECT_FOLLOW_RND_WORK(GraphicWork=0x10000092, Bone=0, X=0, Y=13.8, Z=0, XRot=0, YRot=90, ZRot=-90, Size=1.1, RandomX=0, RandomY=2, RandomZ=3, RandomXRot=10, RandomYRot=50, RandomZRot=20, Terminate=1)"
+ ],
+ "F13BFE8D": [
+  "// mario, attackhi4 (game)",
+  "Set_Bone_Intangibility(Bone=0x13, Mode=2)"
+ ],
+ "F1FBEFEE": [
+  "// link, 0xA718C725 (game)",
+  "Add_Momentum(Horizontal=0, Vertical=1.33)"
+ ],
+ "F38E805D": [
+  "// mario, 0xD8FF425B (game)",
+  "SET_INT(Value=2, Variable=0x11000003)"
+ ],
+ "F395CC2C": [
+  "// mario, appealhil (expression)",
+  "Rumble_Loop(Kind=2, StartFrame=0x32)"
+ ],
+ "F3A464AC": [
+  "// mario, catch (game)",
+  "Remove_All_Grab_Collisions()"
+ ],
+ "F3DD4ACD": [
+  "// diddy, 0x14720AA3 (effect)",
+  "COL_PRI(Priority=0x65)"
+ ],
+ "F45595A1": [
+  "// samus, specialnfire_c3 (game)",
+  "Set_Edge_Slide(State=2)"
+ ],
+ "F4940C87": [
+  "// murabito, entryr (expression)",
+  "VIS_SET_ARTICLE(Article=0x10, Group=1, State=0)"
+ ],
+ "F4B1C95B": [
+  "// link, specialhi (sound)",
+  "STOP_SE_STATUS()"
+ ],
+ "F615B1D5": [
+  "// gamewatch, 0xDA900D48 (sound)",
+  "ATTACK_SE_2()"
+ ],
+ "F6218798": [
+  "// bayonetta, attackhi4 (expression)",
+  "unk_F6218798(Frames=0x19, Value=-1, Mode=0)"
+ ],
+ "F6D9DCF6": [
+  "// mario, 0x22D587C4 (game)",
+  "Item_Property(Index=3, Value=1.1)"
+ ],
+ "F7016A91": [
+  "// mario, downdamageu (sound)",
+  "Sound_Effect4(SFX=0x5F)"
+ ],
+ "F707ECF8": [
+  "// miiswordsman, attack11 (effect)",
+  "AFTER_IMAGE3_ON_WORK(Texture1Work=0x10000084, Texture2Work=0x10000085, BlurLength=4, Bone1=0x19, X1=0, Y1=0.5, Z1=0, Bone2=0x19, X2=0xB727C5AC, Y2=13.5, Z2=0, Terminate=1, GraphicWork=0x10000083, Bone3=0x19, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=0, Axis=1, Unused=0, BlendMode=0xB, Shader=1)"
+ ],
+ "F7B97AC1": [
+  "// bayonetta, attack100 (game)",
+  "unk_F7B97AC1(Gun=0, Arg1=1, Arg2=1, Arg3=1, Frames=0xA)"
+ ],
+ "F885CB9C": [
+  "// kamui, attacks4 (game)",
+  "SET_FRAME_ARTICLE(Article=2, Frame=8)"
+ ],
+ "F920748A": [
+  "// mario, attackhi4 (sound)",
+  "Stop_Sound_Effect(SFX=0x69)"
+ ],
+ "FA1BC28A": [
+  "// mario, catch (game)",
+  "CALL(Hash=0x49FA5BDD)"
+ ],
+ "FA435729": [
+  "// yoshi, attackairlw (effect)",
+  "EFFECT_FOLLOW_NO_STOP_work_form(Effect=0x3070041, Bone=0, X=0, Y=-2, Z=0, RotX=0, RotY=0, RotZ=0, Scale=1, Terminate=1, WorkVar=0x1000003C)"
+ ],
+ "FAA85333": [
+  "// luigi obakyumu, 0x7844BEB0 (game)",
+  "Throw_Specifier2(Kind=0, Part=0, Damage=10, Angle=0x3C, KBG=0xA0, WBKB=0, BKB=0x50, Effect=0, Trip=0, HitlagMult=0, SDIMult=0, SFXLevel=2, SFXType=0, FacingRestriction=3, DisableHitlag=0, NoReaction=1, Type=0)"
+ ],
+ "FB98EE28": [
+  "// mario, entryl (sound)",
+  "Transient_Sound_Effect(SFX=0x20019)"
+ ],
+ "FC061097": [
+  "// mario, attackhi4 (effect)",
+  "External_Graphic(Graphic=0x303000D, Bone=0x13, X=4.5, Y=2, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=1)"
+ ],
+ "FC4BE069": [
+  "// metaknight, specialairlwstart_c3 (effect)",
+  "EFFECT_FOLLOW_UNSYNC_VIS_WHOLE(Graphic=0x3170016, Bone=0, X=0, Y=7, Z=0, XRot=0, YRot=-90, ZRot=0, Size=0.7, Terminate=1)"
+ ],
+ "FD1F7ECF": [
+  "// mario, attackhi4 (effect)",
+  "LAST_EFFECT_SET_RATE(Rate=0.8)"
+ ],
+ "FE036C47": [
+  "// samus laser, 0x7044FCBE (effect)",
+  "LIGHT_AXIS(Red=70, Green=50, Blue=160, Alpha=255, Unk4=0, Unk5=0, Unk6=0, Radius=10, Length=25, AxisX=0, AxisY=0, AxisZ=1, Unk12=0, Unk13=-1)"
+ ],
+ "FE73ACAA": [
+  "// samus bomb, 0x201FAC13 (game)",
+  "AREA_WIND_2ND_RAD(AreaID=0, Speed=0.5, Decay=0.02, Unknown3=1000, Unknown4=1, X=0, Y=0, Radius=18)"
+ ],
+ "FF379EB6": [
+  "// link, attackairlw (game)",
+  "Remove_Hitbox(ID=1)"
+ ],
+ "FFB519E1": [
+  "// miifighter, attack12 (game)",
+  "MII_UNABLE_RATE()"
+ ],
+ "FFF80BC2": [
+  "// mario, escapef (expression)",
+  "FLIP_HAVE_ITEM()"
+ ]
+}

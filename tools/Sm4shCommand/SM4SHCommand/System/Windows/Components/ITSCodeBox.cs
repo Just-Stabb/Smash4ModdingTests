@@ -141,13 +141,15 @@ namespace Sm4shCommand
 
         /// <summary>
         /// Adds a line below the caret's line (in its place if it's blank), indented like it, and selects
-        /// the new line's first parameter value. One undo step. Used by View > Commands.
+        /// the new line's first parameter value. One undo step. Used by View > Commands. Several lines
+        /// ("\n" separated, e.g. an example) are all indented like the caret's line.
         /// </summary>
         public void InsertCommandLine(string text)
         {
             int l = Math.Max(0, Math.Min(Selection.Start.iLine, LinesCount - 1));
             string cur = LinesCount > 0 ? Lines[l] : "";
             string indent = cur.Substring(0, cur.Length - cur.TrimStart().Length);
+            text = text.Replace("\r", "").Replace("\n", "\n" + indent);
             int target;
             if (cur.Trim().Length == 0)
             {

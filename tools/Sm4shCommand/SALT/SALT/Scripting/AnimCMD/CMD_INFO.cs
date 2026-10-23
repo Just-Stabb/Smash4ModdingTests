@@ -2527,6 +2527,18 @@ namespace SALT.Moveset.AnimCMD
         /// </summary>
         public static Dictionary<uint, string> CMD_CATEGORY = new Dictionary<uint, string>();
 
+        /// <summary>
+        /// Optional usage example of each command (lines of script, "//" lines being its comments), for the
+        /// command list.
+        /// </summary>
+        public static Dictionary<uint, List<string>> CMD_EXAMPLE = new Dictionary<uint, List<string>>();
+
+        public static List<string> GetExample(uint crc)
+        {
+            List<string> lines;
+            return CMD_EXAMPLE.TryGetValue(crc, out lines) ? lines : new List<string>();
+        }
+
         public static string GetCategory(uint crc)
         {
             string cat;
@@ -2619,6 +2631,7 @@ namespace SALT.Moveset.AnimCMD
         ///   description (optional, NONE = none)
         ///   "Category: group" (optional, the command list's group)
         ///   "Param: Name = description" lines (optional, one per parameter)
+        ///   "Example: line" lines (optional, a usage example; the indentation after "Example: " is kept)
         /// Lines starting with // are comments. Returns the number of definitions read;
         /// problems are added to <paramref name="errors"/> and that block is skipped.
         /// </summary>
@@ -2646,7 +2659,8 @@ namespace SALT.Moveset.AnimCMD
                 }
                 if (cur.Count == 0)
                     blockStart = lineNo;
-                cur.Add(line);
+                // an example keeps its indentation (the block inside a True or Thread_Start)
+                cur.Add(line.StartsWith("Example:", StringComparison.OrdinalIgnoreCase) ? rawLine.TrimStart().TrimEnd('\r', '\n') : line);
             }
             if (cur.Count > 0)
             {
@@ -2680,6 +2694,7 @@ namespace SALT.Moveset.AnimCMD
 
                     string desc = null, category = null;
                     var paramDesc = new Dictionary<string, string>();
+                    var example = new List<string>();
                     for (int i = 4; i < block.Count; i++)
                     {
                         var line = block[i];
@@ -2693,6 +2708,11 @@ namespace SALT.Moveset.AnimCMD
                         }
                         else if (line.StartsWith("Category:", StringComparison.OrdinalIgnoreCase))
                             category = line.Substring(9).Trim();
+                        else if (line.StartsWith("Example:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var text = line.Substring(8);
+                            example.Add((text.StartsWith(" ") ? text.Substring(1) : text).TrimEnd());
+                        }
                         else if (desc == null)
                             desc = line == "NONE" ? string.Empty : line;
                         else
@@ -2702,6 +2722,10 @@ namespace SALT.Moveset.AnimCMD
                     SetCMDInfo(crc, types.Length + 1, name, types, syntax, desc, paramDesc);
                     if (!string.IsNullOrEmpty(category))
                         CMD_CATEGORY[crc] = category;
+                    if (example.Count > 0)
+                        CMD_EXAMPLE[crc] = example;
+                    else
+                        CMD_EXAMPLE.Remove(crc);
                     count++;
                 }
                 catch (Exception e)
@@ -2733,6 +2757,8 @@ namespace SALT.Moveset.AnimCMD
             sb.AppendLine("//   description shown in tooltips (optional; NONE = no description)");
             sb.AppendLine("//   Category: group   (optional: the command list's group, View > Commands)");
             sb.AppendLine("//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)");
+            sb.AppendLine("//   Example: line   (optional, one per line of a usage example, shown in the command list;");
+            sb.AppendLine("//            indentation after \"Example: \" is kept, \"//\" lines are the example's comments)");
             sb.AppendLine("// Lines starting with // are comments. Tools > Command Definitions edits this file.");
             foreach (var pair in CMD_NAMES.OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase))
             {
@@ -2759,6 +2785,8 @@ namespace SALT.Moveset.AnimCMD
                 if (PARAM_DESC.TryGetValue(crc, out pd))
                     foreach (var p in pd)
                         sb.AppendLine($"Param: {p.Key} = {p.Value}");
+                foreach (var line in GetExample(crc))
+                    sb.AppendLine("Example: " + line);
             }
             File.WriteAllText(path, sb.ToString());
         }

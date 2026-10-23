@@ -9,9 +9,10 @@ namespace Sm4shCommand
 {
     /// <summary>
     /// View > Commands: every ACMD command, grouped by what it does (its "Category:" in Events.cfg),
-    /// with its description, parameters (type and meaning) and a template line. A search box filters
-    /// by name, identifier, description or parameter. Insert (or double-click) puts the template in
-    /// the open script at the caret; Copy puts it on the clipboard.
+    /// with its description, parameters (type and meaning), a template line and a usage example (its
+    /// "Example:" lines). A search box filters by name, identifier, description or parameter. Insert (or
+    /// double-click) puts the template in the open script at the caret, Insert Example the example;
+    /// Copy / Copy Example put them on the clipboard.
     /// </summary>
     public class CommandListForm : Form
     {
@@ -35,6 +36,8 @@ namespace Sm4shCommand
         };
         readonly Button btnInsert = new Button { Text = "Insert into Script", AutoSize = true };
         readonly Button btnCopy = new Button { Text = "Copy", AutoSize = true };
+        readonly Button btnInsertExample = new Button { Text = "Insert Example", AutoSize = true };
+        readonly Button btnCopyExample = new Button { Text = "Copy Example", AutoSize = true };
         readonly Label lblCount = new Label { AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left, Margin = new Padding(6, 8, 3, 0) };
         readonly Timer searchDelay = new Timer { Interval = 200 };
         uint? current;
@@ -64,6 +67,9 @@ namespace Sm4shCommand
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Padding = new Padding(4) };
             buttons.Controls.Add(btnInsert);
             buttons.Controls.Add(btnCopy);
+            buttons.Controls.Add(new Label { Width = 16 });
+            buttons.Controls.Add(btnInsertExample);
+            buttons.Controls.Add(btnCopyExample);
             var infoPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8), BackColor = SystemColors.Window };
             infoPanel.Controls.Add(info);
             split.Panel2.Controls.Add(infoPanel);
@@ -88,7 +94,11 @@ namespace Sm4shCommand
             tree.KeyDown += (o, e) => { if (e.KeyCode == Keys.Enter && tree.SelectedNode?.Tag is uint) { Insert(); e.Handled = true; } };
             btnInsert.Click += (o, e) => Insert();
             btnCopy.Click += (o, e) => { if (current.HasValue) Clipboard.SetText(Template(current.Value)); };
-            new ToolTip().SetToolTip(btnInsert, "Adds this command on a new line below the caret in the open script (or double-click / Enter in the list).");
+            btnInsertExample.Click += (o, e) => InsertExample();
+            btnCopyExample.Click += (o, e) => { if (current.HasValue) Clipboard.SetText(string.Join(Environment.NewLine, ACMD_INFO.GetExample(current.Value))); };
+            var tips = new ToolTip();
+            tips.SetToolTip(btnInsert, "Adds this command on a new line below the caret in the open script (or double-click / Enter in the list).");
+            tips.SetToolTip(btnInsertExample, "Adds the example (with its // comments) below the caret in the open script.");
             Activated += (o, e) => UpdateButtons();
             Load += (o, e) => split.SplitterDistance = 340;   // once the window has its size
 
@@ -226,7 +236,9 @@ namespace Sm4shCommand
                 add("Commands are grouped by what they do. Search finds a command by its name, identifier, " +
                     "description or parameters (e.g. \"knockback\", \"sound\", \"B738EABD\"). Gray commands " +
                     "(unk_) have no known name.\n\nInsert (or double-click, or Enter) adds the command to the " +
-                    "open script below the caret, with every parameter set to 0.", body, Color.DimGray);
+                    "open script below the caret, with every parameter set to 0. Most commands also have an example: " +
+                    "a real use from the game's scripts (or, for the new commands, a hand-written one), which " +
+                    "Insert Example adds to the script.", body, Color.DimGray);
                 UpdateButtons();
                 return;
             }
@@ -252,6 +264,13 @@ namespace Sm4shCommand
                 add("\n", body, SystemColors.WindowText);
             add("Template\n", bold, SystemColors.WindowText);
             add(Template(c) + "\n", mono, Color.DarkBlue);
+            var example = ACMD_INFO.GetExample(c);
+            if (example.Count > 0)
+            {
+                add("\nExample\n", bold, SystemColors.WindowText);
+                foreach (var line in example)
+                    add(line + "\n", mono, line.TrimStart().StartsWith("//") ? Color.SeaGreen : Color.DarkBlue);
+            }
             info.SelectionStart = 0;
             info.ScrollToCaret();
             UpdateButtons();
@@ -261,12 +280,25 @@ namespace Sm4shCommand
         {
             btnCopy.Enabled = current.HasValue;
             btnInsert.Enabled = current.HasValue && activeEditor?.Invoke() != null;
+            bool hasExample = current.HasValue && ACMD_INFO.GetExample(current.Value).Count > 0;
+            btnCopyExample.Enabled = hasExample;
+            btnInsertExample.Enabled = hasExample && activeEditor?.Invoke() != null;
         }
 
         void Insert()
         {
-            if (!current.HasValue)
-                return;
+            if (current.HasValue)
+                InsertText(Template(current.Value));
+        }
+
+        void InsertExample()
+        {
+            if (current.HasValue && ACMD_INFO.GetExample(current.Value).Count > 0)
+                InsertText(string.Join("\n", ACMD_INFO.GetExample(current.Value)));
+        }
+
+        void InsertText(string text)
+        {
             var editor = activeEditor?.Invoke();
             if (editor == null)
             {
@@ -274,7 +306,7 @@ namespace Sm4shCommand
                     "No script open", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            editor.InsertCommandLine(Template(current.Value));
+            editor.InsertCommandLine(text);
             editor.FindForm()?.Activate();
             editor.Focus();
         }

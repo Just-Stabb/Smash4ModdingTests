@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "SALT", "SALT", "Scripting", "AnimCMD", "CMD_INFO.cs")
 DST = os.path.join(HERE, "SM4SHCommand", "Events.cfg")
 LABELS = os.path.join(HERE, "param_labels.json")   # the parameter research (apply_param_labels.py)
+EXAMPLES = os.path.join(HERE, "vanilla_examples.json")   # a real use of each vanilla command (make_examples.py)
 
 
 def one_line(t):
@@ -103,6 +104,7 @@ def main():
     names, fmt, syn, desc = (table(text, n) for n in ("CMD_NAMES", "PARAM_FORMAT", "PARAM_SYNTAX", "CMD_DESC"))
     labels = {int(k, 16): v for k, v in json.load(open(LABELS)).items()} if os.path.exists(LABELS) else {}
     sizes = table(text, "CMD_SIZES")
+    vanilla = {int(k, 16): v for k, v in json.load(open(EXAMPLES)).items()} if os.path.exists(EXAMPLES) else {}
     out = [
         "// Sm4shCommand ACMD command definitions. Read at startup on top of the built-in ones.",
         "// One block per command, blocks separated by a blank line:",
@@ -113,6 +115,8 @@ def main():
         "//   description shown in tooltips (optional; NONE = no description)",
         "//   Category: group   (optional: the command list's group, View > Commands)",
         "//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)",
+        "//   Example: line   (optional, one per line of a usage example, shown in the command list;",
+        "//            indentation after \"Example: \" is kept, \"//\" lines are the example's comments)",
         "// Lines starting with // are comments. Tools > Command Definitions edits this file.",
     ]
     for crc, name in sorted(names.items(), key=lambda kv: kv[1].upper()):
@@ -139,6 +143,7 @@ def main():
             d = one_line(entry["_desc_extra"]) if d == "NONE" else "%s %s" % (d, one_line(entry["_desc_extra"]))
         out += ["", "%08X" % crc, name, f, s, d, "Category: " + category(name, entry)]
         out += param_lines(entry, [] if s == "NONE" else s.split(","))
+        out += ["Example: " + line for line in entry.get("_example") or vanilla.get(crc, [])]
     open(DST, "w", newline="\r\n").write("\n".join(out) + "\n")
     print("%d commands -> %s" % (len(names), DST))
 

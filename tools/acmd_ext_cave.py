@@ -1671,6 +1671,55 @@ def b(at, to):
     return 0x48000000 | (off & 0x3FFFFFC)
 
 
+# Usage examples for the command list (View > Commands; Events.cfg "Example:" lines). Each compiles in
+# Sm4shCommand as written; "//" lines are comments (not inserted with Insert Example).
+_HITBOX_HEAD = ('ID=0, Part=0, Bone=0, Damage=12, Angle=0x169, KBG=0x64, FKB=0, BKB=0x28, Size=5, X=0, Y=8, Z=6, '
+                'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, '
+                'Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, '
+                'Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, '
+                'NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, ')
+_EXTRAS = 'HitstunMul=0.5, HitstopMul=0, HitstopFrames=0x14, SelfHitstopMul=0, SelfHitstopFrames=0, DIMul=0.001'
+EXAMPLES = {
+    'Extra_Special_Hitbox': [
+        '// a 12% hit: half the hitstun, the opponent frozen 20 frames, (almost) no DI',
+        'FRAME(Frames=5)',
+        'Extra_Special_Hitbox(' + _HITBOX_HEAD + 'Shape=0, ' + _EXTRAS + ')',
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()'],
+    'Extra_Extended_Special_Hitbox': [
+        '// the same hit as a capsule from (0, 8, 6) to (0, 8, 14)',
+        'FRAME(Frames=5)',
+        'Extra_Extended_Special_Hitbox(' + _HITBOX_HEAD + 'X2=0, Y2=8, Z2=14, ' + _EXTRAS + ')',
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()'],
+    'Track_Target': [
+        '// in a projectile\'s script: home in on the nearest opponent for 60 frames at speed 1.8,',
+        '// turning at most 4 degrees a frame, at any distance',
+        'Track_Target(Frames=0x3C, Speed=1.8, TurnRate=4, Range=0, Mode=0, TargetOwner=0, TargetTeammates=0)',
+        '// stop tracking early (keeps flying straight)',
+        'FRAME(Frames=0x28)',
+        'Track_Target(Frames=0, Speed=0, TurnRate=0, Range=0, Mode=0, TargetOwner=0, TargetTeammates=0)'],
+    'Thread_Start': [
+        '// a lingering explosion 30 frames after the move starts, whatever the fighter is doing by then',
+        '// (Offset is worked out from the braces when the script compiles)',
+        'Thread_Start(Offset=0, ID=1, Flags=0){',
+        '    FRAME(Frames=0x1E)',
+        '    Graphic_Effect(Graphic=0x1000009, Bone=0, X=0, Y=8, Z=0, XRot=0, YRot=0, ZRot=0, Size=1.5, RandomX=0, '
+        'RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)',
+        '    Hitbox(ID=3, Part=0, Bone=0, Damage=8, Angle=0x169, KBG=0x50, FKB=0, BKB=0x32, Size=9, X=0, Y=8, Z=0, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, '
+        'Direct/Indirect=1, Type=1)',
+        '    WAIT(Frames=3)',
+        '    Remove_Hitbox(ID=3)',
+        '}'],
+    'Thread_Stop': [
+        '// stop thread 1 (started by Thread_Start(ID=1)) if it\'s still running',
+        'Thread_Stop(ID=1)',
+        '// or stop every thread this object started',
+        'Thread_Stop(ID=-1)'],
+}
+
+
 def labels(path):
     """add / update the new commands in tools/Sm4shCommand/param_labels.json (apply_param_labels.py then
     puts them in Sm4shCommand's table, tools/acmd_info.json and Events.cfg)"""
@@ -1685,6 +1734,7 @@ def labels(path):
             assert len(own[name]) == size - 1
             for k, (pname, _t, desc) in enumerate(own[name]):
                 e[str(k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
+            e['_example'] = EXAMPLES[name]
             d['%08X' % crc(name)] = e
             continue
         base = '%08X' % BASE_CRC[name]
@@ -1696,6 +1746,7 @@ def labels(path):
         for k, (pname, _t, desc) in enumerate(EXTRA_PARAMS):
             e[str(len(bi['syntax']) + k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
         assert len(e['_format']) == size - 1
+        e['_example'] = EXAMPLES[name]
         d['%08X' % crc(name)] = e
     json.dump(dict(sorted(d.items())), open(path, 'w'), indent=1)
 
