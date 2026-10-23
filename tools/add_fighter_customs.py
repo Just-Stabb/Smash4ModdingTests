@@ -2,6 +2,7 @@
 """Customize-menu data a new character is missing (add_fighter.py leaves them out; run it after add_fighter.py, with --used-ui its output's ui):
 
   python3 tools/add_fighter_customs.py --ui VANILLA_UI --menu USER_menu.msbt --used-ui BUILT_UI_DIR... --out OUT [--kinds K]
+          [--only NAME ...]   (records by name; e.g. a new fighter on a menu.msbt that has the others)
 
 - ui/message/menu.msbt: MmenSpN__<New>_<Nt|Sd|Up|Dw>_<1-3> (special names) and MmenSpI__... (their
   descriptions) = the base's, built on the given menu.msbt (the user's own, so nothing else changes);
@@ -27,11 +28,11 @@ NEW_TEXTURE_IDS = 0x28010000
 UI_NAMES = {'mario': 'Mario'}       # base fighter name -> its UI name, where the record doesn't say
 
 
-def records(path):
+def records(path, only=None):
     out = []
     for r in json.load(open(path))['kinds']:
         ui = r.get('ui') or {}
-        if ui.get('id') is None:
+        if ui.get('id') is None or (only and r['name'] not in only):
             continue
         out.append({'id': int(str(ui['id']), 0), 'name': ui.get('name') or r.get('cap'),
                     'base_ui': ui.get('base_name') or UI_NAMES.get(r['base'], r['base'].capitalize())})
@@ -45,8 +46,9 @@ def main():
     ap.add_argument('--used-ui', action='append', default=[], help='ui folders whose texture ids are taken')
     ap.add_argument('--kinds', default=os.path.join(HERE, 'extra_kinds.json'))
     ap.add_argument('--out', required=True)
+    ap.add_argument('--only', nargs='*', help='records (by name) to use')
     a = ap.parse_args()
-    recs = records(a.kinds)
+    recs = records(a.kinds, a.only)
     log = []
 
     data = open(a.menu, 'rb').read()

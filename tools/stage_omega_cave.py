@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
 
-CAVE = 0x04B84800               # free: trait_badge_cave.py ends at 0x04B84800, kind_expand.py starts at 0x04B85000
+CAVE = 0x04B84800               # free: trait_badge_cave.py ends at 0x04B84800, then free up to 0x04B88000 (kind_expand.py's old space)
 TRAMPOLINES = 0x037EE3F4        # 3 words (position_vars_cave.py's CAVE2 stops here): the grown space is out of
                                 # bl reach (32 MB) of the stage select code, the Havok cave is within it of both
 LIMIT = 0x04B84900

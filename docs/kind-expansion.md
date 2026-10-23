@@ -124,6 +124,10 @@ First kind: **`supamario` / `Supamario`, kind `0x41`, character id 59, base Mari
 vanilla dump; `fighter/supamario/` is 213 files, and 212 of them are byte-identical to Mario's;
 `effect.bin` differs in 66 effect-ID words).
 
+Second kind: **`edge` / `Edge` (UI name `Sephiroth`, subtitle "One-Winged Angel"), kind `0x42`,
+character id 60, base Zelda** (Sephiroth, a port from Ultimate; trait Technical). See
+[Adding a fighter to a pack that already has one](#adding-a-fighter-to-a-pack-that-already-has-one).
+
 ## Implementation: the executable side
 
 `tools/kind_expand.py` reads `tools/extra_kinds.json` (the records `add_fighter.py` also reads) and
@@ -174,10 +178,12 @@ python3 tools/kind_expand_test.py OUT.rpx build/cross_f.rpx \
 | relocations | 32 moved | every patched in-place word that carried a relocation (switch dispatch, table readers) has it moved to the dead word `0x037EE73C`, else the loader would put the old addresses back |
 | per new kind (cave) | | descriptor (`0x38` bytes: the base's, `+0` = kind, `+4` = its own motion info, `+0x1C` = 0) + motion info (`0x18`, its main table pointer) + main motion table (the base's `count * 8` bytes, written at run time by `0x02EA9008`); the descriptor case; the **vl load case** = the base's case copied (31 words; its `bl`s re-aimed), prefixed with `vl_load(mgr, base)` (the base's params, which the base's native code reads at fixed offsets), storing into the equipment object's `+0x320 + 4 * kind`, the new vl / vl50 arrays; the **vl unload case** = the base's (its kind's field), then `vl_unload(mgr, base)` |
 
-Space: `0x04B85000` up; one kind (Mario base) uses `0x04B85000-0x04B877C4` (~10 KB: ~5.5 KB of
-tables shared by all kinds, ~5 KB a Mario-sized kind). The code space ends at `0x04BB8000`: about 35
-more kinds. 247 words change in place; nothing overlaps biome_select / monster_roll /
-trait_badge (checked by the test).
+Space: `0x04BA0000` up (after smash_button_cave's `0x04B9B000`); ~5.5 KB of tables shared by all
+kinds, ~5 KB a kind (Mario base ~5 KB, Zelda ~5.3 KB: two kinds use `0x04BA0000-0x04BA3C00`). The
+code space ends at `0x04BB8000`: about 17 kinds. It started at `0x04B85000` (one kind,
+`0x04B85000-0x04B877C4`), but the second kind ran into base_effects_cave's `0x04B88000`; that space
+is unused now (stale words, nothing points there). 247 words change in place; nothing overlaps the
+other caves (checked by the test with `--others`).
 
 **Bases to avoid for now:** kinds 5, 6, 8, 0x17, 0x18, 0x19, 0x1C, 0x20, 0x21, 0x23, 0x26, 0x35. The vl
 tail stores an extra vector (x1324 / x152C) for those kinds only, keyed by the kind itself, so a new
@@ -189,6 +195,28 @@ kind on such a base gets 0 there (the generator warns). Mario has none.
 2. `add_fighter.py --kinds tools/extra_kinds.json ...` for the data files and the folder (all records
    in one call on the vanilla files).
 3. Rebuild the RPX with the command above and run the test. No RAM change below the capacity.
+
+### Adding a fighter to a pack that already has one
+
+How Sephiroth v1 (`build/sephiroth_v1_test.zip`) was built on top of Supamario (v5 data, test 18
+executable), without the vanilla-files-in-one-call rule (the positional files only need the new
+row to be next, which it is when the earlier fighters' rows are already there):
+
+1. Executable: the current pack's `cross_f.rpx` (the user's `controls_smash_button` build, which
+   test 18 extends with weapon_expand) + `kind_expand.py` (all records: its in-place words are
+   rewritten, its cave moves as a whole) + `base_effects_cave.py` + `base_customs_cave.py` +
+   `weapon_expand.py`. Checked: against test 18's executable only the words of those three
+   generators differ; `kind_expand_test.py` (with `--others` for every other cave),
+   `weapon_expand_test.py`, `base_effects_test.py`, `base_customs_test.py`: 0 failed.
+2. Data: `add_fighter.py --kinds tools/extra_kinds.json --only edge --param V5/param --param
+   USER_PARAM --param VANILLA_PARAM --ui USER_UI --msbt V5/ui/message/melee.msbt` (the edited
+   files come from the newest pack first, so Supamario's rows stay; each is re-read and checked);
+   `add_fighter.py --only edge --folder ZELDA OUT` with Zelda's universal-mechanics `game.bin` /
+   `zelda.mscsb` (`build/universal_mechanics_all.zip`) in place of the vanilla ones;
+   `add_fighter_customs.py --only edge --menu V5/ui/message/menu.msbt ...`;
+   `chara_layout.py USER_chara.lm OUT/ui/lumen/chara/chara.lm --last 59` (frames past `--last`
+   are deltas on the rewritten ones: only their keyframes, which the game jumps to, are held
+   unchanged).
 
 ### Test results (`kind_expand_test.py`, unicorn)
 

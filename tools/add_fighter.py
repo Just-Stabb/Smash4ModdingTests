@@ -49,7 +49,8 @@ The record (one per kind in extra_kinds.json "kinds"; docs/kind-expansion-code.m
    "ui": {"id": 59, "name": "Supamario", "title": "Supamario", "series": 9, "costumes": 8,
           "sort": [61, 61, 61]}}
 ui.name is the UI name (portrait files, MmelChara labels; the executable's character-name table);
-ui.title the displayed name (default ui.name); series / costumes / sort default to the base's
+ui.title the displayed name (default ui.name); ui.subtitle the MmelCharaA text (default the
+base's); series / costumes / sort default to the base's
 entry and to "after every fighter". Kinds must be consecutive from 0x41 and ids from 59 (both
 are positional in some files); run all records in one call (--kinds) on the vanilla files.
 """
@@ -151,6 +152,7 @@ def load_records(a):
                'id': num(ui['id']) if ui.get('id') is not None else None}
         rec['ui_name'] = ui.get('name') or rec['cap']
         rec['title'] = ui.get('title') or rec['ui_name']
+        rec['subtitle'] = ui.get('subtitle')           # MmelCharaA (default: the base's)
         for k in ('series', 'costumes', 'sort'):
             rec[k] = ui.get(k)
         # weapons of its own (tools/weapon_expand.py): {article: new weapon kind}
@@ -376,7 +378,9 @@ def edit_msbt(recs, a, log):
                 continue
             letter, idx, suffix = mm.group(1), mm.group(2), mm.group(3) or ''
             new = 'MmelChara%s_%s_%s%s' % (letter, idx, nn, suffix)
-            if suffix.endswith('snd') or letter == 'A':
+            if letter == 'A' and not suffix and r.get('subtitle'):
+                text = r['subtitle']
+            elif suffix.endswith('snd') or letter == 'A':
                 text = old[lab]                # title, sound-test names: the base's
             elif letter in 'CR':
                 text = r['title'].upper()

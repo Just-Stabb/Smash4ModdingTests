@@ -23,8 +23,23 @@
           "base": "fireball",
           "max": 1,
           "on_hit": 3,
-          "nop2": ["0x1C", "0x3C"]
+          "nop2": [
+            "0x1C",
+            "0x3C"
+          ]
         }
+      }
+    },
+    {
+      "kind": "0x42",
+      "name": "edge",
+      "cap": "Edge",
+      "base": "zelda",
+      "ai": "base",
+      "ui": {
+        "id": 60,
+        "name": "Sephiroth",
+        "subtitle": "One-Winged Angel"
       }
     }
   ],

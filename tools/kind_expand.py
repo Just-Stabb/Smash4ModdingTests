@@ -62,8 +62,9 @@ What it patches (addresses are the game's; docs/kind-expansion*.md have the rese
    fighter_param_vl_<name>.bin with the base's parser into the equipment object's +0x320 + 4 * kind and
    the new vl / vl50 arrays); its vl unload case (the base's, the kind's fields, then unloads the base).
 
-Space: the grown code space from 0x04B85000 (trait_badge_cave.py ends at 0x04B84800) to at most
-0x04BB8000 (the text region ends at 0x04BB8670).
+Space: the grown code space from 0x04BA0000 (smash_button_cave.py ends at 0x04B9B000) to at most
+0x04BB8000 (the text region ends at 0x04BB8670): ~5 KB a kind. Until the second kind it was at
+0x04B85000-0x04B88000 (now unused), which a Zelda-sized second kind outgrew.
 """
 import argparse
 import json
@@ -79,7 +80,7 @@ from ppcasm import Asm, ha  # noqa: E402
 RPX = os.path.join(HERE, '..', 'build', 'cross_f.rpx')
 SPEC = os.path.join(HERE, 'extra_kinds.json')
 RAM_CACHE = os.path.join(HERE, 'kind_expand_ram.json')
-CAVE = 0x04B85000
+CAVE = 0x04BA0000
 LIMIT = 0x04BB8000
 RELOC_DUMMY = 0x037EE73C       # dead word for moved relocations (starcopy_cave.py / stage_slot_cave.py)
 OLD_N = 0x41

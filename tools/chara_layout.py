@@ -186,8 +186,8 @@ class Lm:
         return out
 
 
-def keyframes_match(lm, states):
-    """every keyframe = the state its frames build (the user's file holds to it)"""
+def keyframes_match(lm, states, frames=None):
+    """every keyframe (of `frames`, default all) = the state its frames build (the user's file holds to it)"""
     pos = table(lm.tags[lm.ti[T_POSITIONS]][1], 2)
     xf = table(lm.tags[lm.ti[T_TRANSFORMS]][1], 6)
 
@@ -199,7 +199,7 @@ def keyframes_match(lm, states):
             return (1.0, 0.0, 0.0, 1.0, x, y)
         return xf[i]
     return all({d: mat(r) for d, r in lm.keyframe_state(f).items()} == {d: e['m'] for d, e in states[f].items()}
-               for f in range(len(states)))
+               for f in (range(len(states)) if frames is None else frames))
 
 
 def faces(st):
@@ -349,9 +349,13 @@ def main():
     def kept(fi):
         n = int(labels[fi][4:])
         return n < first or (last is not None and n > last)
+    # frames past --last are deltas on the rewritten ones, so their played-through state can move;
+    # the game jumps to num_<count> (its keyframe), and those keyframes are checked unchanged below
     same = sum(1 for fi in range(len(before)) if kept(fi) and before[fi] == after[fi])
-    assert same == sum(1 for fi in range(len(before)) if kept(fi)), 'a frame outside the range changed'
-    assert keyframes_match(Lm(out), after), 'a keyframe differs from its frame'
+    below = [fi for fi in range(len(before)) if int(labels[fi][4:]) < first]
+    assert all(before[fi] == after[fi] for fi in below), 'a frame below the range changed'
+    upto = [fi for fi in range(len(after)) if last is None or int(labels[fi][4:]) <= last]
+    assert keyframes_match(Lm(out), after, upto), 'a keyframe differs from its frame'
     assert all(Lm(out).keyframe_state(f) == lm0.keyframe_state(f) for f in range(len(before))
                if kept(f)), 'a keyframe outside the range changed'
     print('%s: %d frames rewritten (%s), %d other frames unchanged, %d -> %d bytes' % (
