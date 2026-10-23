@@ -16,10 +16,13 @@ new fighter's article list after the base's articles (its article id = its place
 max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
 vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x13,
 the ones the default method removes it for) asks for status N instead of removing it (left alone when
-the status is N or more already); other results go to the base's method. With it, "nop": ["0x44", ...]
-makes those vtable slots of its copy a `blr` (the fireball's +0x44 only sets its EffectModule's
-vt +0xD4 to 5, likely the effect a weapon removed before its time plays: test 13, the fireball's
-puff at Supamario's hand when the beam was fired against a wall). "motions": N (a brand-new article) gives its motion info N entries (the base's,
+the status is N or more already); other results go to the base's method. Its singleton has its own
+copy of the base's vtable 2 too: the base's methods that store the base singleton's +4 (its vtable 2
+part: the fireball's +0x1C puts it in the weapon, which calls it) are copied with the new one's.
+"nop": [...] / "nop2": [...] make those slots of the vtable / vtable 2 copies a `blr` (the
+fireball's vtable 2 +0x1C counts its life down and +0x3C, every frame, removes it at life 0 and on
+touching ground bounces it or, at a wall, plays Mario's puff 0x3030002 and removes it: test 14, the
+beam removed early, at its life or a wall; its MSC does both). "motions": N (a brand-new article) gives its motion info N entries (the base's,
 the last repeated: every one plays the base's animation; its motion.mtable names N scripts).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
@@ -109,6 +112,7 @@ def load_weapons(path, img):
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
                     r.setdefault('nop', {})[nk] = [K.num(x) for x in spec.get('nop', [])]
+                    r.setdefault('nop2', {})[nk] = [K.num(x) for x in spec.get('nop2', [])]
                 art_base = spec['base']
             else:
                 art_base = art
@@ -274,6 +278,35 @@ def singleton_of(img, kind):
         assert a - c < 0x80, 'no initializer after 0x%08X' % c
     assert at in stores and at + 4 in stores, 'singleton 0x%08X not initialized after 0x%08X' % (at, c)
     return at, stores[at], stores[at + 4]
+
+
+def sub_ref_copy(img, fn, old, new):
+    """a short straight-line method (no branch but its blr, at most 16 words) that builds `old` with
+    lis / addi or addic: its words with `new` instead; None otherwise"""
+    if not 0x02000000 <= fn < 0x10000000:
+        return None
+    ws = []
+    for i in range(16):
+        w = img.w(fn + 4 * i)
+        ws.append(w)
+        if w == 0x4E800020:
+            break
+        if w >> 26 in (16, 18, 19):
+            return None
+    else:
+        return None
+    for i, w in enumerate(ws):
+        if w >> 26 == 15 and (w >> 16) & 31 == 0:                 # lis rD, hi
+            d = (w >> 21) & 31
+            for j in range(i + 1, len(ws)):
+                w2 = ws[j]
+                if w2 >> 26 in (12, 14) and (w2 >> 16) & 31 == d:
+                    if (((w & 0xFFFF) << 16) + K.sx16(w2)) & 0xFFFFFFFF == old:
+                        ws[i] = (w & 0xFFFF0000) | ha(new)
+                        ws[j] = (w2 & 0xFFFF0000) | (new & 0xFFFF)
+                        return ws
+                    break
+    return None
 
 
 def vtable_size(img, vt):
@@ -510,22 +543,41 @@ def build(spec_path=SPEC, rpx=RPX):
             'base:\nb 0x%X') % (HIT_BITS, status, status, old_hit))
         assert len(hit.words()) <= 32
         nops = r.get('nop', {}).get(nk, [])
-        nop_at = 0
-        if nops:
-            nop_at = B.alloc(4)
-            B.code(nop_at, 'blr')
+        nops2 = r.get('nop2', {}).get(nk, [])
+        nop_at = B.alloc(4)
+        B.code(nop_at, 'blr')
+        o_at = B.alloc(8, 8)
         v_at = B.alloc(size, 8)
+        size2 = vtable_size(img, vt2)
+        v2_at = B.alloc(size2, 8)
         vb = bytearray(img.blob(vt, size))
         struct.pack_into(">I", vb, HIT_METHOD, fn)
         for off in nops:
             assert off % 8 == 4 and off < size and off != HIT_METHOD, 'vtable slot 0x%X' % off
             struct.pack_into(">I", vb, off, nop_at)
+        # methods storing the base singleton's +4 (the vtable 2 part): copies with the new one's
+        moved = []
+        for off in range(4, size, 8):
+            ws = sub_ref_copy(img, img.w(vt + off), _at + 4, o_at + 4)
+            if ws is None:
+                continue
+            m_at = B.alloc(4 * len(ws))
+            for i, w in enumerate(ws):
+                B.put(m_at + 4 * i, w, ('singleton +4 method copy', off, i))
+            struct.pack_into(">I", vb, off, m_at)
+            moved.append((off, m_at))
+        assert moved, 'no method of 0x%08X stores the singleton +4: vtable 2 not reachable' % vt
         B.data(v_at, vb, 'weapon 0x%X vtable (copy of 0x%08X)' % (nk, vt))
-        o_at = B.alloc(8, 8)
-        B.data(o_at, struct.pack('>II', v_at, vt2), 'weapon 0x%X singleton' % nk)
+        vb2 = bytearray(img.blob(vt2, size2))
+        for off in nops2:
+            assert off % 8 == 4 and off < size2, 'vtable 2 slot 0x%X' % off
+            struct.pack_into(">I", vb2, off, nop_at)
+        B.data(v2_at, vb2, 'weapon 0x%X vtable 2 (copy of 0x%08X)' % (nk, vt2))
+        B.data(o_at, struct.pack('>II', v_at, v2_at), 'weapon 0x%X singleton' % nk)
         scase[nk] = o_at
         info.setdefault('singletons', {})[nk] = (o_at, v_at, fn, status)
         info.setdefault('nops', {})[nk] = (nops, nop_at)
+        info.setdefault('vt2', {})[nk] = (v2_at, size2, nops2, moved)
     st = B.alloc(4 * (cap - OLD_N))
     B.data(st, b''.join(struct.pack('>I', scase.get(k, 0)) for k in range(OLD_N, cap)), 'singleton cases')
 

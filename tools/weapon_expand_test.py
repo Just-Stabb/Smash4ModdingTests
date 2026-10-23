@@ -145,15 +145,35 @@ def main():
     for nk, (o_at, v_at, fn, status) in sorted(info.get('singletons', {}).items()):
         art = new[nk][2]
         at0, vt, vt2 = W.singleton_of(img, new[nk][0])
-        check('0x%X %s: singleton {vtable copy, base vtable 2}' % (nk, art), (E1.w(o_at), E1.w(o_at + 4)), (v_at, vt2))
+        v2_at, size2, nops2, moved = info['vt2'][nk]
+        check('0x%X %s: singleton {vtable copy, vtable 2 copy}' % (nk, art), (E1.w(o_at), E1.w(o_at + 4)),
+              (v_at, v2_at))
         size = W.vtable_size(img, vt)
         diff = [o for o in range(0, size, 4) if E1.w(v_at + o) != img.w(vt + o)]
         nops, nop_at = info.get('nops', {}).get(nk, ([], 0))
+        mv = [o for o, _a in moved]
         check('0x%X %s: vtable copy = the base\'s but +0x%X%s' % (nk, art, W.HIT_METHOD, ''.join(
-            ', +0x%X' % o for o in nops)), diff, sorted([W.HIT_METHOD] + list(nops)))
-        if nops:
-            check('0x%X %s: the nop slots lead to a blr' % (nk, art),
-                  [E1.w(E1.w(v_at + o)) for o in nops], [0x4E800020] * len(nops))
+            ', +0x%X' % o for o in sorted(list(nops) + mv))), diff, sorted([W.HIT_METHOD] + list(nops) + mv))
+        diff2 = [o for o in range(0, size2, 4) if E1.w(v2_at + o) != img.w(vt2 + o)]
+        check('0x%X %s: vtable 2 copy = the base\'s (0x%08X) but %s' % (nk, art, vt2, [hex(o) for o in nops2]),
+              diff2, sorted(nops2))
+        check('0x%X %s: the nop slots lead to a blr' % (nk, art),
+              [E1.w(E1.w(v_at + o)) for o in nops] + [E1.w(E1.w(v2_at + o)) for o in nops2],
+              [0x4E800020] * (len(nops) + len(nops2)))
+        # each moved method, run on a fake weapon, stores the new singleton's +4 where the base's
+        # stores the base's
+        for off, m_at in moved:
+            got = []
+            for E, f, single in ((E0, img.w(vt + off), at0), (E1, m_at, o_at)):
+                weapon, acc, sub, slot = E.alloc(0x100), E.alloc(0x1B00), E.alloc(0x100), E.alloc(0x10)
+                E.setw(weapon + 0x28, acc)
+                E.setw(acc + 0x1A94, sub)
+                E.setw(sub + 0x44, slot)
+                E.setw(slot, 0)
+                E.call(f, single, weapon, 0)
+                got.append(E.w(slot))
+            check('0x%X %s: vtable +0x%X copy stores the singleton +4 (0x%08X; the base\'s 0x%08X)' % (
+                nk, art, off, o_at + 4, at0 + 4), got, [at0 + 4, o_at + 4])
         check('0x%X %s: +0x%X = the hit method' % (nk, art, W.HIT_METHOD), E1.w(v_at + W.HIT_METHOD), fn)
         old_hit = img.w(vt + W.HIT_METHOD)
         E = Run(patched)

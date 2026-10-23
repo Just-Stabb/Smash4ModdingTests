@@ -267,3 +267,20 @@ Test 11: the head faces the flight now. But:
   when status 0 is entered (weapons are pooled: a reused beam may still hold the last one's phase).
 - The charge effects stayed where they were made as he floated down (`EffectModule(0x2711)`): now
   `EffectModule(0x2717, id, bone, ...)`, the vanilla following form.
+
+### Test 14 in game, and test 15 (`build/supamario_kame_test15.zip`)
+
+Test 14: the charge effects stay on the hand now. But the multi-hit still dropped, the beam's
+effects stayed when it hit no one, Supamario's pose didn't hold until the beam ended, and the finish
+(light shaft etc.) never played: the user's read, "the beam is being killed immediately after
+hitting an opponent", was right. The fireball's **vtable 2** (`0x101791BC`, the weapon calls it
+through the pointer the vtable +0x1C method stores, the base singleton's +4) has the fireball's own
+per-frame logic: +0x1C counts its life (work int `0x10000004`, Mario's fireball life) down, +0x3C
+removes it at life 0 and, touching ground (GroundModule vt +0x2E4), bounces it (message 0xA) or at a
+wall plays Mario's puff (`0x3030002`, EffectModule vt +0x4C) and removes it. So the beam was removed
+at the fireball's life, whatever its MSC did, and at walls with the fireball's puff.
+Test 15: weapon_expand gives the Kamehameha's singleton its own vtable 2 copy with +0x1C / +0x3C as
+`blr` (`"nop2"`), and its vtable's +0x1C a copy storing its own singleton's +4 (unicorn: the copy
+stores `0x04B8F324` where the base's stores `0x1056AA04`). Its MSC does its range and walls. The
+test-14 `"nop": ["0x44"]` is undone (+0x44 sets the EffectModule's vt +0xD4 to 5: the weapon's
+effects end with it; without it they stayed).
