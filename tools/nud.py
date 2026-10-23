@@ -9,6 +9,10 @@ polygon, the materials (0x20 + 0x18 a texture + properties), then the index, ver
 as floats, normals as half floats (vertex type 6) or none (0), byte vertex colors (127 = 1.0),
 half float UVs, and single-bound to a bone (mesh bind method 0 / bone index) like Battlefield's
 static models.
+Rigged polygons (Polygon.bones set: 4 bone indices and 4 byte weights summing to 255 a vertex, with
+tangents and bitangents) are written as the game's fighters' (vertex type 0x47: the vertex section
+holds byte colors and half float UVs, the "vertex add" section positions, half float normal /
+bitangent / tangent with w 1, the bone bytes; the mesh bound with method 4).
 """
 import struct
 import sys
@@ -38,6 +42,9 @@ class Polygon:
         self.col = None         # [n, 4] 0-255 (128 = 1.0) or None
         self.uvs = []           # [[n, 2]]
         self.idx = None         # [m] triangle list
+        self.bones = None       # [n, 4] bone indices (rigged) or None
+        self.weights = None     # [n, 4] 0-255, summing to 255
+        self.tan = self.bit = None
         self.materials = []
         self.vert_size = 0      # as read
         self.uv_size = 0
@@ -165,6 +172,27 @@ def hidden(path):
 
 
 # ---------------------------------------------------------------- write
+def _rigged_bytes(p):
+    """(vertex section, vertex add section, vertex type, uv type) of a rigged polygon"""
+    n = len(p.pos)
+    vcols = [('col', 'u1', (4,))] + [('uv%d' % i, '>f2', (2,)) for i in range(len(p.uvs))]
+    v = np.zeros(n, dtype=vcols)
+    v['col'] = np.clip(np.round(p.col), 0, 255) if p.col is not None else 127
+    for i, uv in enumerate(p.uvs):
+        v['uv%d' % i] = uv
+    a = np.zeros(n, dtype=[('pos', '>f4', (3,)), ('nrm', '>f2', (4,)), ('bit', '>f2', (4,)), ('tan', '>f2', (4,)),
+                           ('bi', 'u1', (4,)), ('bw', 'u1', (4,))])
+    a['pos'] = p.pos
+    for k, src in (('nrm', p.nrm), ('bit', p.bit), ('tan', p.tan)):
+        q = np.ones((n, 4))
+        q[:, :3] = src
+        a[k] = q
+    assert np.asarray(p.bones).max() < 256 and (np.asarray(p.weights).sum(1) == 255).all()
+    a['bi'] = p.bones
+    a['bw'] = p.weights
+    return v.tobytes(), a.tobytes(), 0x47, (len(p.uvs) << 4) | 2
+
+
 def _vertex_bytes(p):
     n = len(p.pos)
     cols = [('pos', '>f4', (3,))]
@@ -193,7 +221,7 @@ def _vertex_bytes(p):
     return a.tobytes(), vs, us
 
 
-def write(meshes):
+def write(meshes, top_bone=None):
     strs = bytearray()
     name_offs = []
     for m in meshes:
@@ -202,7 +230,7 @@ def write(meshes):
         strs += b'\0' * (-len(strs) % 16)
     npoly = sum(len(m.polygons) for m in meshes)
     head_len = 0x30 + 0x30 * len(meshes) + 0x30 * npoly
-    objs, mats, polys, verts = bytearray(), bytearray(), bytearray(), bytearray()
+    objs, mats, polys, verts, vadd = bytearray(), bytearray(), bytearray(), bytearray(), bytearray()
     mesh_entries = bytearray()
     all_pos = []
     for m, no in zip(meshes, name_offs):
@@ -212,17 +240,24 @@ def write(meshes):
         mesh_entries += struct.pack('>8f', *sph, sph[0], sph[1], sph[2], m.sort_bias)
         mesh_entries += struct.pack('>iHHhhi', no, 0, m.bind, m.bone, len(m.polygons), 0x30 + 0x30 * len(meshes) + len(objs))
         for p in m.polygons:
-            vb, vs, us = _vertex_bytes(p)
+            if p.bones is not None:
+                vb, ab, vs, us = _rigged_bytes(p)
+            else:
+                (vb, vs, us), ab = _vertex_bytes(p), b''
             texoffs = []
             for mat in p.materials[:4]:
                 texoffs.append(head_len + len(mats))
                 mats += _material_bytes(mat, strs)
             texoffs += [0] * (4 - len(texoffs))
             assert len(p.pos) < 0x10000 and p.idx.max() < len(p.pos)
-            objs += struct.pack('>iiiHBB4iHHiii', len(polys), len(verts), 0, len(p.pos), vs, us, *texoffs,
-                                len(p.idx), 0x40 << 8, 0, 0, 0)
+            objs += struct.pack('>iiiHBB4iHHiii', len(polys), len(verts), len(vadd) if ab else 0, len(p.pos), vs, us,
+                                *texoffs, len(p.idx), 0x40 << 8, 0, 0, 0)
             polys += np.asarray(p.idx, dtype='>u2').tobytes()
+            polys += b'\0' * (-len(polys) % 16) if ab else b''
             verts += vb
+            verts += b'\0' * (-len(verts) % 16) if ab else b''
+            vadd += ab
+            vadd += b'\0' * (-len(vadd) % 16)
     body = bytes(objs) + bytes(mats)
     body += b'\0' * (-(0x30 + len(mesh_entries) + len(body)) % 16)
     pstart = len(mesh_entries) + len(body)
@@ -231,10 +266,11 @@ def write(meshes):
     sph = _sphere(np.concatenate(all_pos))
     # 0x0E: the highest bone index the meshes use (the game's fighters: bone count - 1; Battlefield's
     # one-bone stage models 0). Left 0 with meshes on bones 1-15, the stage froze loading (user).
-    top_bone = max([m.bone for m in meshes] + [0])
-    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), 0, top_bone, pstart, len(polys), len(verts), 0,
-                                          *sph))
-    out += mesh_entries + body + polys + verts + strs
+    if top_bone is None:
+        top_bone = max([m.bone for m in meshes] + [0])
+    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), 0, top_bone, pstart, len(polys), len(verts),
+                                          len(vadd), *sph))
+    out += mesh_entries + body + polys + verts + vadd + strs
     struct.pack_into('>I', out, 4, len(out))
     return bytes(out)
 

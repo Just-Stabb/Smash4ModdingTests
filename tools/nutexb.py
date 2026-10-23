@@ -7,7 +7,7 @@
 The footer (last 0x70 bytes, the mip sizes before it) and the Tegra X1 block-linear layout
 follow ssbh's nutexb / tegra_swizzle (MIT): GOBs of 64 bytes x 8 rows, stacked block_height GOBs
 high, the block height picked from the image's height. Formats: R8G8B8A8, B8G8R8A8, BC1-BC5
-(unorm / srgb alike; the values are returned as stored).
+(unorm / srgb alike; the values are returned as stored), BC7 (Pillow's BCn decoder).
 """
 import os
 import struct
@@ -25,6 +25,7 @@ FORMATS = {  # format: (bytes per element, block size, name)
     0x0490: (16, 4, 'BC2'), 0x0495: (16, 4, 'BC2_SRGB'),
     0x04A0: (16, 4, 'BC3'), 0x04A5: (16, 4, 'BC3_SRGB'),
     0x0180: (8, 4, 'BC4'), 0x0280: (16, 4, 'BC5'),
+    0x04E0: (16, 4, 'BC7'), 0x04E5: (16, 4, 'BC7_SRGB'),
 }
 
 
@@ -103,6 +104,10 @@ def decode(t):
         img = lin.reshape(t.h, t.w, 4)
         return (img[..., [2, 1, 0, 3]] if t.fmt in (0x0450, 0x0455) else img).copy()
     kind = t.fmt & 0xFFF0
+    if kind == 0x04E0:
+        from PIL import Image
+        img = np.asarray(Image.frombytes('RGBA', (ew * 4, eh * 4), lin.tobytes(), 'bcn', 7))
+        return img[:t.h, :t.w].copy()
     if kind == 0x0480:
         px = nut._bc1_colors(lin, True)
     elif kind == 0x0490:

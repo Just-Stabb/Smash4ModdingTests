@@ -9,7 +9,11 @@ material's NU_materialHash, its float's bits), property count and table offset, 
 byte, pattern offset (the end of the file without one), second name offset, second hash; its
 name; its property table; per property: name offset, 1, value count, frame count, 0 or 1 (UV
 properties 1), type (1 a value a frame, 2 constant), data offset, 8 zero bytes; its name; its
-values. Each block from a 32-byte boundary. Texture patterns and visibility entries: read only.
+values. Each block from a 32-byte boundary. Texture patterns: read only. Visibility (a fighter's
+material_anime_*.pac: mesh names, e.g. the eyelid / mouth meshes): after the materials, a table of
+entry offsets; per entry (from a 32-byte boundary) its name offset, 0, data offset, then the name
+(padded to 32), then frame count - 1, 1 (u16), key count (u16), key offset, then the keys
+(frame u16, state u8 0 / 1, 0).
 
   python3 tools/mta.py FILE...       what each animates
 """
@@ -62,9 +66,9 @@ def _pad(b, n=ALIGN):
     return b + b'\0' * (-len(b) % n)
 
 
-def write(frames, mats, rate=60, unk=9):
-    """mats: [{'name', 'hash', 'props': [{'name', 'values', 'u1'=1, 'u2'=0, 'type'=1 or 2}]}]
-    (no texture patterns, no visibility)"""
+def write(frames, mats, rate=60, unk=9, vis=()):
+    """mats: [{'name', 'hash', 'props': [{'name', 'values', 'u1'=1, 'u2'=0, 'type'=1 or 2}]}];
+    vis: [(mesh name, [(frame, 0 / 1)...])] (no texture patterns)"""
     out = bytearray(b'MTA4' + struct.pack('>9I', unk, frames, 0, frames - 1, rate, len(mats),
                                           0x38 if mats else 0, 0, 0) + b'\0' * 16)
     table = len(out)
@@ -97,6 +101,21 @@ def write(frames, mats, rate=60, unk=9):
             put(q + 20, '>I', len(out))             # the values
             out += b''.join(struct.pack('>%df' % count, *v) for v in vals)
         put(e + 20, '>I', len(out))                 # the pattern offset: the material's end, without one
+    if vis:
+        align()
+        vt = len(out)
+        put(0x20, '>II', len(vis), vt)
+        out += b'\0' * (4 * len(vis))
+        for i, (name, keys) in enumerate(vis):
+            align()
+            e = len(out)
+            put(vt + 4 * i, '>I', e)
+            nm = _pad(name.encode('latin1') + b'\0')
+            out += struct.pack('>III', e + 0x20, 0, e + 0x20 + len(nm)) + b'\0' * 0x14 + nm
+            ko = len(out) + 0x20
+            out += struct.pack('>IHhI', frames - 1, 1, len(keys), ko) + b'\0' * 0x14
+            out += b''.join(struct.pack('>hBB', f, v, 0) for f, v in keys)
+        align()
     return bytes(out)
 
 

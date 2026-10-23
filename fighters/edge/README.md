@@ -10,12 +10,20 @@ UI name `Sephiroth`, base Zelda (`tools/extra_kinds.json`; docs/kind-expansion.m
 A copy of Zelda in the new slot, with Zelda's universal-mechanics scripts (roll-off, reverse tilts,
 tilts / down smash / shield out of run). Its executable is Supamario test 18's plus kind 0x42.
 
+## v2 (`build/sephiroth_v2_test.zip`): his model and animations
+
+`tools/ultimate_fighter.py` (docs/ultimate-fighter-port.md): Ultimate's model for all 8 colours on
+his own skeleton (172 bones; the second outfit c06 / c07 124), all 299 battle motions plus entry /
+result / route-map ones, the swords' visibility per motion. Zelda's moves still. Built with:
+
+```
+python3 tools/ultimate_fighter.py model edge/model/body/c0N zelda/model/body/c0N OUT/c0N --empty EMPTY
+python3 tools/ultimate_fighter.py motions edge/motion/body/c00 edge/model/body/c06 zelda OUT
+```
+(each `c0N` also copied to `l0N`, the low-detail slot).
+
 ## Next
 
-1. Model: Ultimate's body (and Masamune) to NUD on Zelda's skeleton names where they match, all
-   eight colours (tools/ssbh_to_nud.py).
-2. Animations: nuanmb -> omo, mapped onto Zelda's motion list (Sephiroth has no counterpart for
-   some of Zelda's motions, and vice versa).
-3. Moves: ACMD / MSC from Ultimate's frame data (Ultimate's hitboxes are compiled code, not in the
+1. Moves: ACMD / MSC from Ultimate's frame data (Ultimate's hitboxes are compiled code, not in the
    files), his own specials and articles.
 4. Effects, sounds, portraits from the Ultimate zips.
