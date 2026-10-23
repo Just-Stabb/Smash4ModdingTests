@@ -29,6 +29,10 @@ Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
   fighter's vl slot (kind_expand's relocated array) instead of the base's, +0x1C the new kind);
 - per new fighter its article list (the base's entries, kinds remapped), at the cave's start so
   kind_expand.py can point its descriptor copy's +8 at it (article_lists()).
+- the module set-up 0x02BCB42C (an article's modules from its kind's row of 28 constructors, table
+  0x103464A8, 0x70 a row, 389 rows, with no bound: the rows after it are another table's, so the first
+  game test crashed on the fireball, kind 0x185, calling into them, user's Cemu log): `mulli r8, r30,
+  0x70` at MODULE_ROW becomes a call to a stub that swaps a new kind (r30) for its base first.
 """
 import argparse
 import json
@@ -55,6 +59,8 @@ DESC_SWITCH = 0x0320D934
 SWITCHES = (0x0320D934, 0x03210C30, 0x02B651AC, 0x02B6894C, 0x02B6B7A8, 0x02B6FD44, 0x02B73AA4, 0x02B75A88,
             0x02B77FAC, 0x02B7A4DC, 0x02B7D378, 0x02B80CF4, 0x02B83D58)
 INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jumping into 0x02B83D60
+MODULE_ROW = 0x02BCB5C0        # mulli r8, r30, 0x70 (r30 = the kind) / addis r30, r8, 0x1034 / lwzu r10, 0x64A8(r30)
+MODULE_TABLE = 0x103464A8      # 389 rows of 0x70 (28 module constructors)
 DESC_COPY_MAX = 0x140          # bytes of a weapon descriptor copied (up to the next descriptor)
 MINFO_SIZE = 0x20              # {entries, count, 0, 0, 0, 0, -90.0f, 90.0f}
 ARTICLE = 0x10                 # article list entry {flags | kind, max count, callback, extra}
@@ -429,6 +435,16 @@ def build(spec_path=SPEC, rpx=RPX):
         info['switches'].append(dict(sw, stub=stub))
     for a, reg in INTO_LAST:
         B.asm(a, 'cmplwi %s, %d' % (reg, cap - 1), 'cmplwi %s, 0x184' % reg)
+
+    # ---- the module set-up's row (r30 = kind -> r8 = row offset; a new kind uses its base's row).
+    #      r10 is free (the next lwzu writes it); the function saved LR at its start.
+    mr = B.alloc(4 * 12)
+    B.code(mr, ('cmplwi r30, 0x184\nble old\naddi r8, r30, -0x185\ncmplwi r8, %d\nbge old\nslwi r8, r8, 2\n'
+                'lis r10, 0x%X\naddi r10, r10, %d\nlwzx r8, r10, r8\ncmplwi r8, 0x184\nbgt old\nmr r30, r8\n'
+                'old:\nmulli r8, r30, 0x70\nblr') % (cap - OLD_N, ha(bt), K.slo(bt)))
+    assert B.pc - mr <= 4 * 14
+    B.asm(MODULE_ROW, 'bl 0x%X' % mr, 'mulli r8, r30, 0x70')
+    info['module_row'] = mr
     info['cave_end'] = B.pc
     return B, info
 

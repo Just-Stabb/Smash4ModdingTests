@@ -84,3 +84,20 @@ Mario's vl slot at fixed offsets; the copies' bound params are Supamario's.
 
 Build: the eight scripts' outputs to `rpx_patch.py` (biome_select, monster_roll, trait_badge,
 kind_expand, base_effects, base_customs, series, weapon_expand).
+
+## First game test (user's Cemu log): the module rows
+
+Supamario crashed in a match: Cemu stopped in the recompiler running `0x02BE5E4C` (an ACMD command
+handler), called from `0x02BCB5D4`, with r8 = `0xAA30` = `0x185 * 0x70`. `0x02BCB42C(object, kind)`
+(from `0x02BCB964`, an article's set-up, kind = descriptor `+0x4C`) builds the article's modules
+from its kind's row of 28 constructors, table `0x103464A8` (0x70 a row, 389 rows), with no bound. Row
+`0x185` is past the table, in the next one (whose rows also look like constructor rows: a scan for
+389-row tables misses it), so the fireball's set-up called a wrong function. The table's only
+reference is that `mulli r8, r30, 0x70` / `addis r30, r8, 0x1034` / `lwzu r10, 0x64A8(r30)`;
+`weapon_expand.py` now replaces the `mulli` (`MODULE_ROW`) with a call to a stub that swaps a new kind
+for its base (the base-kind table) first. `weapon_expand_test.py`: every kind 0-0x1C0 gets the row
+unpatched code gives it (a new kind its base's); kind 0x185 = row 0 (`0x103464A8`). The check fails
+on the previous build (rows past the table) and passes on this one.
+
+Still possible: other per-kind data indexed without a bound, met further into a match. A crash log
+with a different address would show the next one.

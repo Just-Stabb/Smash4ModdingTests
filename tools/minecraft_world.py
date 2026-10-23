@@ -579,14 +579,16 @@ def grid_collisions(loops):
 
 def block_collisions(blocks, occ, x0, y0, block_mats):
     """a rigged collision for each block on the fighting plane (BREAKABLE): its cell's sides that
-    aren't against the island (occ: the island's cells), clockwise, no ledges, in link BLOCK_LINK"""
+    aren't against the island (occ: the island's cells), clockwise, no ledges, in link BLOCK_LINK.
+    Every block is solid, the ones Ultimate marks throughable (the tree branches and leaves under a
+    pass-through platform) too (user: v18d's rule; until v18h they had none)"""
     ny, nx = occ.shape
 
     def ground(i, j):
         return 0 <= i < nx and 0 <= j < ny and occ[j, i] != 0
     cols = []
-    for n, (kind, x, y, z, flags) in enumerate(blocks):
-        if z != 0 or flags:
+    for n, (kind, x, y, z, _flags) in enumerate(blocks):
+        if z != 0:
             continue
         i, j = x - x0 // 10, y - y0 // 10
         X, Y = x * 10, y * 10
@@ -2489,7 +2491,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
         info = ult_prc('%s/normal/param/pickel_world.stdat' % src, labels)['block_info_table']
         plane = {(x, y): i for i, (_k, x, y, z, _f) in enumerate(blocks) if z == 0}
         table = [dict(x=x * 10 + 5.0, y=y * 10 + 5.0, z=z * 10.0, life=float(info[k]['life']),
-                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0 and not f),
+                      sound=BLOCK_SOUND[info[k]['material']], link=bool(z == 0),
                       leader=plane[(x, y)])
                  for n, (k, x, y, z, f) in enumerate(blocks)]
     else:

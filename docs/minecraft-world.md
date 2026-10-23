@@ -1087,7 +1087,7 @@ all blocks unbreakable until it's over, each fading in quickly with a loud break
   next).
 - **Order**: each biome's block table carries an order after its entries (`block_tables`): by row,
   then column, the plane block before the ones in front / behind (which break with it, and would be
-  broken again by a broken leader), then depth. A block every `REGEN_GAP` (40) updates.
+  broken again by a broken leader), then depth. A block every `REGEN_GAP` (40; v18i: 24) updates.
 - **A block back**: state 3 (growing; `bfade` its frames), its life full again (`bmax`), its model
   shown (as `apply` shows a folder), its gimmick's battle object back (`0x03133DAC` = Manifold's
   `activate`, then `0x03133E4C`) on a plane block, its link's grounds on (`0x0315EDD8(list, 0)`), its
@@ -1152,3 +1152,14 @@ as Metroid / Pikmin 3), centred, keeping the template's texture ID:
 
 (v15-v18c's wordmark was a redrawn one with red inverted, hidden by its green.) The Omega default is
 `tools/stage_omega_cave.py` (docs/stage-expansion.md, "Normal / Omega on the stage select").
+
+### v18i: the branches solid again
+
+User on v18h (birch forest): the tree trunks and leaves under the pass-through platforms had no
+collision, on every biome where blocks and a platform overlap. Since v18 each block on the fighting
+plane gets its own rigged collision (switched off when it breaks), but `block_collisions` and the
+block table's `link` still left out the blocks Ultimate marks throughable (`flags` 1: the rows under
+its pass-through platforms), a v18c rule v18d / v18e meant to drop ("every block solid"). Now every
+block on the plane is solid; the pass-through platforms over them are unchanged (they float once the
+blocks under them break). Affected: birch forest (9 blocks) and savanna (5); the other biomes have no
+throughable blocks on the plane, and their collision files are unchanged.

@@ -1589,7 +1589,7 @@
 {
 "leader": 73,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -85.0,
 "y": 25.0,
@@ -1598,7 +1598,7 @@
 {
 "leader": 74,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -75.0,
 "y": 25.0,
@@ -1643,7 +1643,7 @@
 {
 "leader": 79,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -65.0,
 "y": 25.0,
@@ -1652,7 +1652,7 @@
 {
 "leader": 80,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -55.0,
 "y": 25.0,
@@ -1661,7 +1661,7 @@
 {
 "leader": 81,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": 15.0,
 "y": 35.0,
@@ -1670,7 +1670,7 @@
 {
 "leader": 82,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": 25.0,
 "y": 35.0,
@@ -1679,7 +1679,7 @@
 {
 "leader": 83,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": 35.0,
 "y": 35.0,
@@ -1688,7 +1688,7 @@
 {
 "leader": 84,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": 55.0,
 "y": 35.0,
@@ -1697,7 +1697,7 @@
 {
 "leader": 85,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": 45.0,
 "y": 35.0,
@@ -2439,7 +2439,7 @@
 {
 "leader": 31,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -55.0,
 "y": 25.0,
@@ -2466,7 +2466,7 @@
 {
 "leader": 34,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -45.0,
 "y": 25.0,
@@ -2475,7 +2475,7 @@
 {
 "leader": 35,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -35.0,
 "y": 25.0,
@@ -2484,7 +2484,7 @@
 {
 "leader": 36,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -25.0,
 "y": 25.0,
@@ -2493,7 +2493,7 @@
 {
 "leader": 37,
 "life": 18.0,
-"link": false,
+"link": true,
 "sound": "wood",
 "x": -65.0,
 "y": 25.0,

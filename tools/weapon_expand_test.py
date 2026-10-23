@@ -263,6 +263,23 @@ def main():
         remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr['kind'] == r['kind']}
         want = [[(e[0] & 0xC0000000) | remap.get(e[0] & 0x3FFFFFFF, e[0] & 0x3FFFFFFF)] + e[1:] for e in rows0]
         check('fighter 0x%X: articles %s' % (r['kind'], [hex(e[0]) for e in rows1]), rows1, want)
+    # ---- the module set-up's row (0x02BCB5C0 .. the lwzu): r30 = kind -> r30 = its row, r10 = its first
+    #      constructor; game kinds as unpatched, new kinds their base's row, unused kinds as unpatched
+    def row(E, k):
+        E.mu.reg_write(REGS[30], k)
+        E.mu.reg_write(REGS[1], 0x7F00F000)
+        E.mu.reg_write(REGS[8], 0x5A5A0008)
+        E.mu.reg_write(REGS[10], 0x5A5A000A)
+        E.mu.emu_start(W.MODULE_ROW, W.MODULE_ROW + 12, count=40)
+        return E.r(30), E.r(10)
+    bad = []
+    for k in list(range(0, cap)) + [cap, 0x7FFF]:
+        want = row(E0, new[k][0] if k in new else k)
+        if row(E1, k) != want:
+            bad.append(hex(k))
+    check('module rows (0x%08X): every kind 0x0-0x%X, a new kind its base\'s' % (W.MODULE_ROW, cap), bad[:4], [])
+    check('module row of 0x185 = the fireball\'s (0x%08X), not past the table' % W.MODULE_TABLE, row(E1, 0x185)[0],
+          W.MODULE_TABLE)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 
