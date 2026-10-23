@@ -16,9 +16,9 @@ trait, named after it:
 The recoloured ones are made by `recolor.py` from the originals in `source/`, with a white outline
 like Strike's and Juggernaut's; run it again after changing a source or a colour.
 
-The badges in use set the names in TT Travels DemiBold, a trial font (TypeType's trial license:
+The badges in use set the names in TT Travels Bold (black, white outline), a trial font (TypeType's trial license:
 testing and evaluation only, not to be passed on), so it isn't in the repository:
-`python3 tools/trait_badge_art.py OUT_DIR --font "TT Travels Trial DemiBold.otf"`.
+`python3 tools/trait_badge_art.py OUT_DIR --font "TT Travels Trial Bold.otf"`.
 
 Each file is used as it is: scaled to fit the icon's spot on the left of the badge, with its aspect
 ratio kept. Any size works; square, with a transparent background, looks best. A trait without a

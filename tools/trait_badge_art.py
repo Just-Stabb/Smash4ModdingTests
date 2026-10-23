@@ -14,7 +14,7 @@ A trait's icon is ICONS/<name>.png when that file is there (e.g. tools/trait_ico
 size, best square with a transparent background), used as it is: scaled to fit the icon's spot,
 nothing drawn under or over it. Otherwise the drawn icon below.
 
-The names are in FONT (default Inter ExtraBold; the badges in use are TT Travels DemiBold, a trial
+The names are in FONT (default Inter ExtraBold; the badges in use are TT Travels Bold, a trial
 font that isn't in the repository), each as large as fits, all starting where the longest one
 (JUGGERNAUT) starts when centred.
 """
@@ -33,7 +33,8 @@ TRAITS = [('Normal', (200, 205, 215), 'star'), ('Rush', (40, 120, 255), 'chevron
           ('Juggernaut', (255, 222, 0), 'shield'), ('Technical', (0, 0, 0), 'gear'),
           ('Barrage', (255, 116, 0), 'star')]
 PLATE = (24, 28, 44, 235)
-TEXT = (255, 255, 255, 255)
+TEXT = (0, 0, 0, 255)                   # black names with a white outline, like the icons
+TEXT_OUTLINE = (255, 255, 255, 255)
 OUTLINE = (12, 14, 24, 255)
 
 
@@ -132,7 +133,7 @@ def badge(name, colour, kind, size, icons=None, font_path=FONT):
     x = text_start(size, font_path)
     box = font.getbbox(text)
     y = h / 2 - (box[1] + box[3]) / 2
-    d.text((x, y), text, font=font, fill=TEXT, stroke_width=SS * 2, stroke_fill=OUTLINE)
+    d.text((x, y), text, font=font, fill=TEXT, stroke_width=SS * 3, stroke_fill=TEXT_OUTLINE)
     return img.resize(size, Image.LANCZOS)
 
 
