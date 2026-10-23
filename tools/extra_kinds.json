@@ -40,6 +40,12 @@
         "id": 60,
         "name": "Sephiroth",
         "subtitle": "One-Winged Angel"
+      },
+      "motions": {
+        "0x51": {"anim": "FitZeldaBodyMainC00Attack12", "flags": "0x0", "motion": "attack12"},
+        "0x52": {"anim": "FitZeldaBodyMainC00Attack13", "flags": "0x4", "motion": "attack13"},
+        "0x65": {"flags": "0x4", "motion": "attacklw4: Ultimate's moves him"},
+        "0x6A": {"flags": "0x4", "motion": "attackairb: Ultimate's moves him"}
       }
     },
     {

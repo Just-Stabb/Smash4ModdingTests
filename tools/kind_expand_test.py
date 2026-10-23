@@ -23,6 +23,7 @@ What it checks (every game kind 0x00-0x40 against the unpatched RPX, the new kin
 """
 import os
 import struct
+import zlib
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -307,8 +308,18 @@ def main():
               ([P.w(mi + 4 * i) for i in range(6)][0] != O.w(bmi), [P.w(mi + 4 * i) for i in range(1, 6)]),
               (True, [O.w(bmi + 4 * i) for i in range(1, 6)]))
         n = O.w(bmi + 4)
-        check('  main motion table = the base\'s (%d motions)' % n,
-              bytes(P.mu.mem_read(P.w(mi), 8 * n)) == bytes(O.mu.mem_read(O.w(bmi), 8 * n)), True)
+        want = bytearray(O.mu.mem_read(O.w(bmi), 8 * n))
+        for i, m in r['motions'].items():
+            if m.get('anim'):
+                struct.pack_into('>I', want, 8 * i, zlib.crc32(m['anim'].encode(), 0xFFFFFFFF))
+            if m.get('flags') is not None:
+                struct.pack_into('>I', want, 8 * i + 4, K.num(m['flags']))
+        check('  main motion table = the base\'s (%d motions)%s' % (n, ', %d entries from the record (%s)' % (
+              len(r['motions']), ', '.join('0x%X' % i for i in sorted(r['motions']))) if r['motions'] else ''),
+              bytes(P.mu.mem_read(P.w(mi), 8 * n)) == bytes(want), True)
+        if r['motions']:
+            changed = [i for i in range(n) if want[8 * i:8 * i + 8] != bytes(O.mu.mem_read(O.w(bmi) + 8 * i, 8))]
+            check('  the record\'s entries differ from the base\'s', changed, sorted(r['motions']))
     for k in (count, cap - 1, cap):
         check('specializer 0x%X -> 0' % k, P.call(spec_fn, 0, k), 0)
     abort = 0x04ADC364
@@ -575,6 +586,12 @@ def main():
         check('  the base\'s table untouched', bytes(P.mu.mem_read(base_tbl, 8 * n)), before)
         got = [P.mu.mem_read(t + 8 * i + 4, 1)[0] for i in range(n)]
         check('  its table holds its vl group 1', got, [(i * 7 + k) & 0xFF for i in range(n)])
+        for i, m in sorted(r['motions'].items()):
+            # the build sets byte +4 from vl byte 1 and bit 0x80 of +7 from vl byte 0 (the loop flag)
+            check('  0x%X keeps the record\'s animation hash and flag bits after the build' % i,
+                  (P.w(t + 8 * i), (P.w(t + 8 * i + 4) & 0x00FFFF7F)),
+                  (zlib.crc32(m['anim'].encode(), 0xFFFFFFFF) if m.get('anim') else O.w(base_tbl + 8 * i),
+                   (K.num(m['flags']) if m.get('flags') is not None else O.w(base_tbl + 8 * i + 4)) & 0x00FFFF7F))
         tb, tbo = P.call(0x02EA9064, P.mgr, b), O.call(0x02EA9064, O.mgr, b)
         check('  the base\'s table built as unpatched', bytes(P.mu.mem_read(tb, 8 * n)), bytes(O.mu.mem_read(tbo, 8 * n)))
 

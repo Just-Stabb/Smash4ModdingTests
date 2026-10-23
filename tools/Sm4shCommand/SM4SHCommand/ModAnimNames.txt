@@ -35,3 +35,9 @@ fly3 -> kamehameha/FitMarioFireballMain.omo
 finish1 -> kamehameha/FitMarioFireballMain.omo
 finish2 -> kamehameha/FitMarioFireballMain.omo
 finish3 -> kamehameha/FitMarioFireballMain.omo
+
+// ---- Sephiroth (edge)
+// his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",
+// body/main.pac FitZeldaBodyMainC00Attack12 / 13), scripts from Ultimate's: tools/ultimate_acmd.py
+Attack12
+attack13

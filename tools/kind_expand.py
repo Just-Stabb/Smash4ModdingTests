@@ -57,7 +57,8 @@ What it patches (addresses are the game's; docs/kind-expansion*.md have the rese
    character-name count (0x0293DCD4) and the random-select entries (0x02FFB644) + 1 per UI entry.
 7. Per new kind, in the cave: its descriptor (a copy of the base's with +0 = kind, +4 = its own motion
    info and main motion table (written at run time by 0x02EA9008, so the cave must be writable:
-   it is on Cemu), +0x1C = 0); its descriptor case; its vl load case (the base's case copied: it
+   it is on Cemu), +0x1C = 0; the record's "motions" change entries: an animation the base has none
+   for, the move flag); its descriptor case; its vl load case (the base's case copied: it
    first loads the base's params (the base's native code reads the base's slot), then parses
    fighter_param_vl_<name>.bin with the base's parser into the equipment object's +0x320 + 4 * kind and
    the new vl / vl50 arrays); its vl unload case (the base's, the kind's fields, then unloads the base).
@@ -71,6 +72,7 @@ import json
 import os
 import struct
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -267,6 +269,8 @@ def load_spec(path):
         rec['ui_name'] = ui.get('name') or rec['cap']
         rec['vl'] = r.get('vl') or 'fighter_param_vl_' + rec['name']
         rec['desc_from'] = (r.get('descriptor') or {}).get('from', r['base'])
+        # motion table entries changed from the base's: {index: {"anim": main.pac name, "flags": word}}
+        rec['motions'] = {num(i): m for i, m in (r.get('motions') or {}).items()}
         assert rec['kind'] == OLD_N + i, 'kinds must be consecutive from 0x41 (record %d is 0x%X)' % (i, rec['kind'])
         assert rec['ai'] in ('base', 'generic'), rec['ai']
         assert len(rec['vl']) + len('param/fighter/.bin') < 0x64, 'vl file name too long'
@@ -680,7 +684,14 @@ inc:    lwzx r4, r5, r0
         struct.pack_into('>I', mi, 0, t_at)
         B.data(d_at, desc, 'descriptor 0x%X' % r['kind'])
         B.data(m_at, mi, 'motion info 0x%X' % r['kind'])
-        B.data(t_at, img.blob(main, 8 * mcount), 'motion table 0x%X' % r['kind'])
+        tbl = bytearray(img.blob(main, 8 * mcount))
+        for i, m in r['motions'].items():
+            assert i < mcount, 'motion 0x%X: the base has %d' % (i, mcount)
+            if m.get('anim'):
+                struct.pack_into('>I', tbl, 8 * i, zlib.crc32(m['anim'].encode(), 0xFFFFFFFF))
+            if m.get('flags') is not None:
+                struct.pack_into('>I', tbl, 8 * i + 4, num(m['flags']))
+        B.data(t_at, bytes(tbl), 'motion table 0x%X' % r['kind'])
         r.update(desc=d_at, minfo=m_at, mtable=t_at, mcount=mcount, base_desc=dbase)
 
     # ---- code: descriptor cases, vl load / unload cases, mirror hooks

@@ -161,6 +161,7 @@ python3 tools/kind_expand_test.py OUT.rpx build/cross_f.rpx \
 | `ui.id` / `ui.name` | character id (59-199) and UI name (portraits, `MmelChara` labels); no `ui`: no character select entry |
 | `vl` | vl file name (default `fighter_param_vl_<name>`) |
 | `descriptor.from` | whose descriptor and motion table to copy (default the base) |
+| `motions` | motion table entries changed from the base's: `{"0x51": {"anim": "FitZeldaBodyMainC00Attack12", "flags": "0x0"}}` (anim: the main.pac name it plays, hashed `zlib.crc32(name, 0xFFFFFFFF)`; flags: the entry's word, low byte 0x4 = the root moves the fighter, 0x1 = turn; byte +4 and bit 0x80 are set at run time from vl group 1). For a motion slot the base leaves empty (a 3-hit jab on a one-jab base) or a move flag that differs; other keys are comments |
 
 `add_fighter.py`'s `n` key is ignored here; `ui.title`, `series`, `costumes`, `sort` are its own.
 

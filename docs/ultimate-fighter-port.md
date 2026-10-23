@@ -5,8 +5,8 @@ SSBH files into a Smash 4 fighter's model folders and motion pacs, on the fighte
 inside a new kind built on a base fighter (docs/kind-expansion.md).
 
 ```
-python3 tools/ultimate_fighter.py model SRC/model/body/c0N BASE/model/body/c0N OUT/c0N --empty EMPTY_DIR
-python3 tools/ultimate_fighter.py motions SRC/motion/body/c00 SRC/model/body/c0K BASE OUT
+python3 tools/ultimate_fighter.py model SRC/model/body/c0N BASE/model/body/c0N OUT/c0N --empty EMPTY_DIR [--joints SwordL1,SwordR1]
+python3 tools/ultimate_fighter.py motions SRC/motion/body/c00 SRC/model/body/c0K BASE OUT [--add C00Attack12,...]
 ```
 
 `EMPTY_DIR`: Cloud's `model.sb` (12 bytes, no swing bones) and Kirby's `model.nhb` (64 bytes, no
@@ -66,6 +66,34 @@ Per motion, per frame: Ultimate's animated locals (bind where a bone has no trac
 multiplied, helper bones (`model.nuhlpb` orient constraints: a share, axis by axis, of the source
 bone's turn from its bind in the parent bone's frame) -> OMO (constant tracks stored constant,
 others interpolated 16-bit). Aim constraints are not done (H_Collarbone in the second outfit).
+
+## Moves (`tools/ultimate_acmd.py`)
+
+Ultimate's hitboxes are in its ACMD, decompiled to smashline Rust (WuBoytH/SSBU-Dumped-Scripts,
+`smashline/lua2cpp_<fighter>/<fighter>/<Motion>.txt`); `ultimate_acmd.py` turns the normals, grabs,
+throws and get-up / ledge attacks into the base's `game.bin` scripts (`TRANSLATE`):
+
+```
+python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/game.bin OUT_MODEL/c00 \
+    --others BASE/script/animcmd/body OUT --motion-list SRC/motion/body/c00/motion_list.bin \
+    --mtable BASE/.../motion.mtable OUT/motion.mtable --vl VL_IN VL_OUT --base-rpx RPX --base-kind 0x10
+```
+
+- `ATTACK` -> `Extended_Special_Hitbox` on the joint id of the same bone (`model.jtb`; the sword bones
+  are added to the joint table with `model --joints SwordL1,SwordR1`), `CATCH` -> `Extended_Grab_Collision`,
+  `ATTACK_ABS` / `ATK_HIT_ABS` -> `Throw_Specifier` / `Throw_Applier`, status flags -> the Smash 4
+  variables vanilla scripts set for the same thing. Frame numbers carry over as they are: both games
+  number the first active frame the same way (Mario's jab: `FRAME 2`, active on frame 2).
+- Smash 4 has one script name per side tilt / smash (`attacks3`, `attacks4`; `attacks3hi` / `lw`
+  are the angled tilts), not `attacks3s`.
+- Cancel frames: Ultimate's `motion_list.bin` extra bytes {intangible start, end, cancel frame} are
+  `fighter_param_vl` group 1 bytes 3 / 4 / 2 (Cloud's DownAttackU: 46 / 1 / 26 in both), so the
+  moves end when Ultimate's do without cutting the animations.
+- The base's effect / sound scripts of the translated motions are emptied (they'd play the base's).
+- A motion the base has no slot for (Attack12 / 13 on a one-jab base): `motions --add C00Attack12`
+  adds the animation to `body/main.pac`, the kind's `extra_kinds.json` "motions" points its motion
+  table entry at it, the translator adds its `motion.mtable` entry; the jab count is fighter_param
+  `attack_1_count` (read by the common MSC every fighter's `.mscsb` carries).
 
 ## Checked here
 

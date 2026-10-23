@@ -169,7 +169,7 @@ class Skeleton:
             out += struct.pack('<9f', *t, *euler_of(r), *s)
         return out
 
-    def jtb(self, base_jtb, base_vbn, standins=None):
+    def jtb(self, base_jtb, base_vbn, standins=None, extra=()):
         """the base's joint table with each bone index moved to ours (same name, else a stand-in,
         else the nearest standard bone above it in the base's skeleton)"""
         standins = JOINT_STANDINS if standins is None else standins
@@ -190,7 +190,16 @@ class Skeleton:
                 while base_vbn[b][0] not in self.by_name:
                     b = base_vbn[b][1]
                 out.append(self.by_name[base_vbn[b][0]])
-        return struct.pack('>HH', n1, n2) + struct.pack('>%dh' % len(out), *out) + d[4 + 2 * len(vals):]
+        # extra joints (bones the moves' scripts name, e.g. the sword): appended to table 0, so ACMD
+        # joint ID n1 + 1 + k is extra[k] (a bone this costume lacks: its nearest kept ancestor)
+        add = []
+        for name in extra:
+            u = name
+            while u not in self.index:
+                u = self.ult_parent[u]
+            add.append(self.index[u])
+        t0, t1 = out[:n1] + add, out[n1:]
+        return struct.pack('>HH', len(t0), n2) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
 
 
 def needed_bones(src_dirs, standins=None):
@@ -509,7 +518,7 @@ def empty_polygon(tmpl):
     return p
 
 
-def build_model(src, base, out, tex_id=TEX_ID, log=print):
+def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=()):
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model.vbn')
     base_nud = nud.read(base + '/model.nud')
@@ -543,7 +552,7 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print):
         if os.path.isfile(os.path.join(base, f)):
             shutil.copy(os.path.join(base, f), os.path.join(out, f))
     open(out + '/model.vbn', 'wb').write(sk.vbn())
-    open(out + '/model.jtb', 'wb').write(sk.jtb(open(base + '/model.jtb', 'rb').read(), base_vbn, prof['joints']))
+    open(out + '/model.jtb', 'wb').write(sk.jtb(open(base + '/model.jtb', 'rb').read(), base_vbn, prof['joints'], joints))
     open(out + '/model.nud', 'wb').write(nud.write(meshes, top_bone=len(sk.bones) - 1))
     # metal: the base's metal material on every polygon (its textures: the base's metal one, ours as normal)
     metal = nud.read(base + '/metal.nud')
@@ -835,10 +844,12 @@ def vis_keys(states):
     return keys
 
 
-def build_motions(motion_dir, src_model, base, out, log=print):
+def build_motions(motion_dir, src_model, base, out, log=print, add=()):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
     layers emptied (they turn the base's HandN / HaveN), and the material_anime face / eyelid pacs
-    of every costume with the swords' (and the wing's) visibility added"""
+    of every costume with the swords' (and the wing's) visibility added. add: motions the base has
+    no animation for (e.g. C00Attack12), added to body/main.pac as <prefix><name>.omo (the kind's
+    motion table must point at them: extra_kinds.json "motions")"""
     import omo
     import mta
     import ssbh_data_py as s
@@ -859,6 +870,8 @@ def build_motions(motion_dir, src_model, base, out, log=print):
         prefix = prefix[:prefix.index('Main') + 4]
         entries, missing = [], []
         head = omo.Omo(main[0][1]).head
+        if folder == 'body':
+            main = main + [(prefix + n + '.omo', None) for n in add if prefix + n + '.omo' not in dict(main)]
         for name, data in main:
             key = name[len(prefix):-4].lower()
             ult = key if key in have else prof['motions'].get(key)
@@ -930,16 +943,18 @@ def main():
     m.add_argument('out')
     m.add_argument('--tex-id', type=lambda v: int(v, 0), default=TEX_ID)
     m.add_argument('--empty', help='a folder with an empty model.sb / model.nhb to use')
+    m.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
     mo = sub.add_parser('motions')
     mo.add_argument('motion_dir')
     mo.add_argument('src_model')
     mo.add_argument('base')
     mo.add_argument('out')
+    mo.add_argument('--add', default='', help='motions to add to body/main.pac (comma separated, e.g. C00Attack12)')
     a = ap.parse_args()
     if a.cmd == 'motions':
-        build_motions(a.motion_dir, a.src_model, a.base, a.out)
+        build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n])
     if a.cmd == 'model':
-        build_model(a.src, a.base, a.out, a.tex_id)
+        build_model(a.src, a.base, a.out, a.tex_id, joints=[j for j in a.joints.split(',') if j])
         if a.empty:
             for f in ('model.sb', 'model.nhb'):
                 shutil.copy(os.path.join(a.empty, f), os.path.join(a.out, f))
