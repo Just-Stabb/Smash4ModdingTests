@@ -168,9 +168,9 @@ def main():
             return bytes(mu.mem_read(p, 32)).split(b'\0')[0].decode()
         check('bind_%s: own bind first' % name, calls[0], (0x1111, 0x2222, 0x3333))
         check('bind_%s: getter' % name, (calls[1][0], s(calls[1][1]), r32(mu, calls[1][2]), r32(mu, calls[1][2] + 4)),
-              (0xC1A55, 'stick_smash', a.addr('get'), C.GET_DESC_TYPES))
+              (0xC1A55, 'stick_smash', a.addr('get'), C.DESC_TYPES[name][0]))
         check('bind_%s: setter' % name, (calls[2][0], s(calls[2][1]), r32(mu, calls[2][2]), r32(mu, calls[2][2] + 4)),
-              (0xC1A55, 'set_stick_smash', a.addr('set'), C.SET_DESC_TYPES))
+              (0xC1A55, 'set_stick_smash', a.addr('set'), C.DESC_TYPES[name][1]))
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

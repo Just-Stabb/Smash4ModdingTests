@@ -57,8 +57,11 @@ TRAMPOLINES = 0x037EE3D0        # 9 words; position_vars_cave.py's CAVE2 ends at
 TRAMP_LIMIT = 0x037EE3F4        # stage_omega_cave.py's trampolines
 
 BIND = 0x033C4FB8               # bind(class, name, descriptor)
-GET_DESC_TYPES = 0x100283FC     # [this] : a getter's argument types
-SET_DESC_TYPES = 0x10028534     # [this, bool]
+# a member's argument types (the class's own type first: a descriptor of another class's member
+# fails the call for this one): [this] for a getter, [this, bool] for a setter, as the class's own
+# bool member (smash_attack)'s
+DESC_TYPES = {'ctr': (0x100283FC, 0x10028534), 'gc': (0x10028560, 0x10028680),
+              'standard': (0x100286C4, 0x100287FC)}
 DISPATCH = 0x030B8F08
 DISPATCH_CALLS = (0x030B9AB0, 0x030B9B00, 0x030BA2B0, 0x030BA300)
 XMAX, YMAX = 100, 80            # stick bytes (x 1/127) on an attack press with stick smash off
@@ -279,28 +282,28 @@ def build():
             mr r3, r31
             lis r4, name_get@ha
             addi r4, r4, name_get@l
-            lis r5, desc_get@ha
-            addi r5, r5, desc_get@l
+            lis r5, desc_get_%(n)s@ha
+            addi r5, r5, desc_get_%(n)s@l
             bl %(bind)d
             mr r3, r31
             lis r4, name_set@ha
             addi r4, r4, name_set@l
-            lis r5, desc_set@ha
-            addi r5, r5, desc_set@l
+            lis r5, desc_set_%(n)s@ha
+            addi r5, r5, desc_set_%(n)s@l
             bl %(bind)d
             lwz r0, 0x14(r1)
             mtlr r0
             addi r1, r1, 0x10
             blr''' % dict(n=name, bind=BIND))
     bits = [TYPE_BITS.get(t, 0) for t in range(12)]
-    src.append('''
-    desc_get: .word get
+    src.append(''.join('''
+    desc_get_%(n)s: .word get
             .word %(gt)d
             .word 0x01000000
-    desc_set: .word set
+    desc_set_%(n)s: .word set
             .word %(st)d
-            .word 0x01010000
-    type_bits:''' % dict(gt=GET_DESC_TYPES, st=SET_DESC_TYPES) + ''.join(
+            .word 0x01010000''' % dict(n=m[0], gt=DESC_TYPES[m[0]][0], st=DESC_TYPES[m[0]][1]) for m in MENU) + '''
+    type_bits:''' + ''.join(
         '\n            .word 0x%08X' % int.from_bytes(bytes(bits[i:i + 4]), 'big') for i in range(0, 12, 4)) + '''
     side_next: .word 0
     side:''' + '\n            .word 0' * (2 * SIDE_ENTRIES) + '''
@@ -310,8 +313,9 @@ def build():
     text = '\n'.join(src)
     a.asm(text.replace('.word get', '.word 0').replace('.word set', '.word 0'))
     words = a.words()
-    for lab, fn in (('desc_get', 'get'), ('desc_set', 'set')):
-        words[(a.addr(lab) - CAVE) // 4] = a.addr(fn)
+    for m in MENU:
+        for lab, fn in (('desc_get_', 'get'), ('desc_set_', 'set')):
+            words[(a.addr(lab + m[0]) - CAVE) // 4] = a.addr(fn)
     assert CAVE + 4 * len(words) <= LIMIT, 'smash button cave too big'
     patches = {CAVE + 4 * i: w for i, w in enumerate(words)}
 
