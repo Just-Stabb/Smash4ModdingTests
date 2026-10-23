@@ -41,9 +41,16 @@ running, so a roll out of a dash kept the dash's speed (user: a back roll out of
 nowhere). The clear also zeroes energy 2's X (`KineticModule(0x11, 2, 0, its Y)`).
 
 **Rolls that turn around early (user: Ryu's forward roll went backwards):** the speed is along the
-facing at the speed frame. Ryu (`Reverse_Direction` at frame 4), Samus, Mii Gunner and the Mii Team
-gunner (0) and Wii Fit Trainer (1) turn before frame 5, so `rolloff_acmd.py --add` flips the sign
-when the roll has turned an odd number of times by then.
+facing at the speed frame. Ryu (`Reverse_Direction` at frame 4) and Wii Fit Trainer (1) turn
+before frame 5, so `rolloff_acmd.py --add` flips the sign when the roll has turned an odd number of
+times by then.
+
+**Rolls that call waiting subroutines (user: Samus' rolls didn't move):** Samus', Mii Gunner's and
+the Mii Team gunner's rolls start with `CALL`s of scripts that wait (FRAME 1 / 2 / 18, then 30 / 34).
+A call runs in place and its waits hold up the caller, so the roll-off commands appended after
+them ran at frame 34: the speed was set and cleared at once (and their turn is at frame 18, not 0,
+so the forward roll's sign was flipped too). `rolloff_acmd.py --add` now inlines calls of scripts
+that wait before adding the speed, so it lands on frame 5 (`build/roll_fix_samus_miigunner.zip`).
 
 **Ground speed cap (picked fighters only, user):** on the ground the roll's speed (kinetic energy 3,
 the one type 0x6 sets up: `0x02E7A4DC` case 6 → `0x02C5474C(3, ...)`) is held to the energy's speed

@@ -101,15 +101,42 @@ def edit(script):
 EDGE = acmd.BY_NAME["set_edge_slide"]
 
 
-def add_speed(script, speed, start, end):
-    """Give the roll a roll-off speed (Captain Falcon's pattern) and drop Set_Edge_Slide."""
+CALL = acmd.BY_NAME["call"]
+
+
+def waits(scripts, script, depth=0):
+    """the script (or a script it calls) waits for frames"""
+    return any(c.ident in (FRAME, WAIT) or (c.ident == CALL and depth < 8 and
+               waits(scripts, scripts.get(c.params[0] & 0xFFFFFFFF, []), depth + 1)) for c in script)
+
+
+def inline_calls(scripts, script, depth=0):
+    """CALLs of scripts that wait for frames, replaced by their commands: a call runs in place and
+    its FRAME / WAIT hold up the caller (Samus' / Mii Gunner's rolls call two such scripts first, up
+    to frame 34), so commands after it only run then"""
+    out = []
+    for c in script:
+        sub = scripts.get(c.params[0] & 0xFFFFFFFF) if c.ident == CALL else None
+        if sub is not None and depth < 8 and waits(scripts, sub):
+            out += [x for x in inline_calls(scripts, sub, depth + 1) if x.name != "Script_End"]
+        else:
+            out.append(c)
+    return out
+
+
+def add_speed(script, speed, start, end, scripts=None):
+    """Give the roll a roll-off speed (Captain Falcon's pattern) and drop Set_Edge_Slide. scripts:
+    the file's scripts, for the CALLs that wait (inlined first)."""
+    if scripts is not None:
+        script[:] = inline_calls(scripts, script)
     blocks = {TRUE, FALSE, IS_FLAG, acmd.BY_NAME["else"], acmd.BY_NAME["set_loop"], acmd.BY_NAME["goto"]}
     if any(c.ident in blocks for c in script):
         raise SystemExit("the roll has condition / loop blocks: add its speed by hand")
     tl = [(f, c) for f, c in timeline(script) if c.ident != EDGE]
     # the speed is along the facing at the speed frame: a roll that has turned around by then
-    # (Reverse_Direction at or before it: Ryu's forward roll at frame 4, Samus' / Mii Gunner's at 0,
-    # Wii Fit Trainer's at 1) needs it the other way, or it rolls backwards (user: Ryu)
+    # (Reverse_Direction at or before it: Ryu's forward roll at frame 4, Wii Fit Trainer's at 1)
+    # needs it the other way, or it rolls backwards (user: Ryu). (Samus' / Mii Gunner's turn at 18:
+    # after their subroutines, which wait until then)
     if sum(1 for f, c in tl if c.ident == REVERSE and f <= start) % 2:
         speed = -speed
     tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [0.0, 0.0, 1])),
@@ -215,7 +242,7 @@ def main():
         has_speed = any(c.ident == MOM and float(c.params[0]) != 0 for _, c in timeline(sc))
         if add and not has_speed:
             speed = -add[0] if n.lower() == "escapeb" else add[0]
-            add_speed(sc, speed, *add[1:])
+            add_speed(sc, speed, *add[1:], scripts=f.scripts)
         if not plain:
             edit(sc)
     f.save(dst)
