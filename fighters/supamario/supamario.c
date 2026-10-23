@@ -37204,19 +37204,28 @@ void func_2293()
 // ---- Kamehameha (neutral special, status 0x152; tools/supamario_kame_build.py replaces KAME_*)
 // Mario's fireball throw (motion 0x211 / 0x215) frozen at KAME_N_HOLD_FRAME while special is held:
 // the charge (0: level 1, KAME_N_LV2 frames: 2, KAME_N_LV3: 3), the XV2 charge effects at the hand,
-// bigger at each level (the previous level's replaced: user, test 11) and spawned again every
-// KAME_N_REFX frames (as XV2's charge effect 15 does);
-// released (or KAME_N_FULL frames) it plays on and at KAME_N_FIRE_FRAME generates the Kamehameha
-// (article KAME_ARTICLE) in status 0 / 1 / 2 = the level. In the air he falls as with the fireball
-// (test 10: the cape's air kinetic 0xA while charging left him in a T-pose). The fireball article (0)
+// bigger at each level (the previous level's replaced) and spawned again every KAME_N_REFX frames
+// (as XV2's charge effect 15 does). Released (or after KAME_N_FULL frames) it plays on and at
+// KAME_N_FIRE_FRAME generates the Kamehameha (article KAME_ARTICLE) in status 0 / 1 / 2 = the
+// level. At KAME_N_POSE_FRAME the firing pose is held while the beam exists (travelling, holding
+// on a hit, the finish), at most KAME_N_POSE_MAX frames, then the throw plays to its end.
+// In the air (user, before test 12): he floats down while charging (fall acceleration
+// KAME_N_FALL_ACCEL, at most KAME_N_FALL_MAX a frame, his rise stopped), and floats in place while
+// the pose is held; then the normal fall again. Gravity is energy 1, as in the cape's air code
+// (func_2264: speed 0x11, acceleration 0xf, max fall 0x14); the kinetic type stays the fall's
+// (test 10: the cape's type 0xA while charging left him in a T-pose). The fireball article (0)
 // stays, unused by this move.
 int kame_n_charge;
 int kame_n_state;
+int kame_n_pose;
+int kame_n_posed;
 
 void kame_n_init()
 {
     kame_n_charge = 0;
     kame_n_state = 0;
+    kame_n_pose = 0;
+    kame_n_posed = 0;
 }
 
 int kame_n_level()
@@ -37302,5 +37311,59 @@ void kame_n_loop()
             ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
             kame_n_state = 0x2;
         }
+    }
+    else
+    {
+        kame_n_hold_pose();
+    }
+    kame_n_air();
+}
+
+// the firing pose while the beam exists (ArticleModule 0x2717: the article is there)
+void kame_n_hold_pose()
+{
+    if (kame_n_pose == 0)
+    {
+        if (MotionModuleF(0x1) >= KAME_N_POSE_FRAME)
+        {
+            MotionModule(0x4, 0);
+            kame_n_pose = 0x1;
+        }
+    }
+    if (kame_n_pose == 0x1)
+    {
+        kame_n_posed += 0x1;
+        if (!ArticleModule(0x2717, KAME_ARTICLE) || kame_n_posed >= KAME_N_POSE_MAX)
+        {
+            MotionModule(0x4, 1.0f);
+            kame_n_pose = 0x2;
+            if (global18 == 0x2)
+            {
+                KineticModule(0, 0);
+            }
+        }
+    }
+}
+
+void kame_n_air()
+{
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (kame_n_state < 0x2)
+    {
+        if (kame_n_charge == 0x1)
+        {
+            KineticModule(0x11, 0x1, 0);
+        }
+        KineticModule(0xf, 0x1, -KAME_N_FALL_ACCEL);
+        KineticModule(0x14, 0x1, KAME_N_FALL_MAX);
+    }
+    else if (kame_n_pose < 0x2)
+    {
+        KineticModule(0x11, 0x1, 0);
+        KineticModule(0xf, 0x1, 0);
+        KineticModule(0x14, 0x1, 0);
     }
 }

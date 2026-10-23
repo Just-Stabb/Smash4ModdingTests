@@ -230,3 +230,13 @@ Test 11: the head faces the flight now. But:
 - the body "should disappear nearly all together": as above, all at once.
 - the charge effect should grow with the level (the user's XV2 shots): Crg x0.5 / 1.0 / 1.6 and
   CrgON x1.0 / 1.6 at levels 2 / 3, the previous level's replaced, spawned again every 40 frames.
+
+### Test 13 (`build/supamario_kame_test13.zip`, test 12 + the user's notes before testing it)
+
+- After firing, the throw is frozen at frame 16 (the firing pose) while the beam exists
+  (`ArticleModule(0x2717, 5)`, the vanilla "article exists" check), at most 115 frames (the longest
+  beam), then plays to its end.
+- In the air: floats down while charging (his rise stopped; gravity energy 1: acceleration 0.02,
+  max fall 0.6 a frame) and floats in place while the pose is held (speed, acceleration and max fall
+  0), then the normal fall (kinetic type 0 set again). The calls are the cape's air code's
+  (`func_2264`: `KineticModule(0x11 / 0xf / 0x14, 1, ...)`).

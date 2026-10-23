@@ -147,6 +147,12 @@ N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 10.0, 14.0, 42, 78, 100
 # shows a bigger ball and rings), spawned again every N_REFX frames
 N_CRG = ((0.5, 0.0), (1.0, 1.0), (1.6, 1.6))
 N_REFX = 40
+# after firing he holds the pose from N_POSE_FRAME while the beam exists, at most N_POSE_MAX frames
+# (the longest beam: fly + hold + finish); in the air he floats down while charging (fall
+# acceleration / max fall a frame) and floats in place while posing (user, before test 12)
+N_POSE_FRAME = 16.0
+N_POSE_MAX = max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 6
+N_FALL_ACCEL, N_FALL_MAX = 0.02, 0.6
 
 
 def cmd(name, *params):
@@ -422,6 +428,8 @@ def main():
         'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
         'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
         'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
+        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME), 'KAME_N_POSE_MAX': str(N_POSE_MAX),
+        'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
         **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
         **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
         'KAME_FX_CRG': eid('PtcSupamarioKmhCrg'), 'KAME_FX_TSUBU': eid('PtcSupamarioKmhtsubu')}),
