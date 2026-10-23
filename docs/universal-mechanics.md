@@ -57,7 +57,7 @@ the one type 0x6 sets up: `0x02E7A4DC` case 6 → `0x02C5474C(3, ...)`) is held 
 limit, so a roll speed above it is cut down (Pikachu's 80 rolled like 8). `universal_mechanics.py
 --ground-uncapped` makes `rolloff_update()` call `KineticModule(0x15, 3, -1, -1)` every roll frame
 (no limit: the game's own pattern after resetting energy 3, `KineticModule(0xe, 3, ...)`). On:
-**Pikachu**. Not in game-tested yet: that op 0x15 is the limit that applies here.
+**Pikachu**, **Corrin** (user). Not in game-tested yet: that op 0x15 is the limit that applies here.
 
 ## Reverse tilts
 
