@@ -36368,6 +36368,7 @@ int func_2255()
 
 void func_2256()
 {
+    kame_n_init();
     func_78(func_2257);
 }
 
@@ -36377,6 +36378,7 @@ void func_2257()
     {
         func_2258();
     }
+    kame_n_loop();
     if (CancelModule(0x2713) == 0x1)
     {
         if (global18 == 0 && func_39() != 0)
@@ -36422,6 +36424,7 @@ void func_2258()
     else
     {
         KineticModule(0, 0);
+        kame_n_stall = 0;
         GroundModule(0x2710, 0x5);
         if (WorkModule(0x2712, 0x2100000d))
         {
@@ -36964,7 +36967,7 @@ void func_2278()
 
 void func_2279()
 {
-    
+    kame_n_fx_off();
 }
 
 void func_2280()
@@ -37199,3 +37202,99 @@ void func_2293()
     }
 }
 
+// ---- Kamehameha (neutral special, status 0x152; tools/supamario_kame_build.py replaces KAME_*)
+// Mario's fireball throw (motion 0x211 / 0x215) frozen at KAME_N_HOLD_FRAME while special is held:
+// the charge (0: level 1, KAME_N_LV2 frames: 2, KAME_N_LV3: 3), the XV2 charge effects at the hand;
+// released (or KAME_N_FULL frames) it plays on and at KAME_N_FIRE_FRAME generates the Kamehameha
+// (article KAME_ARTICLE) in status 0 / 1 / 2 = the level. In the air it stalls (kinetic 0xA, the
+// cape's) until the beam is out. The fireball article (0) stays, unused by this move.
+int kame_n_charge;
+int kame_n_state;
+int kame_n_stall;
+
+void kame_n_init()
+{
+    kame_n_charge = 0;
+    kame_n_state = 0;
+    kame_n_stall = 0;
+}
+
+int kame_n_level()
+{
+    if (kame_n_charge >= KAME_N_LV3)
+    {
+        return 0x2;
+    }
+    if (kame_n_charge >= KAME_N_LV2)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+void kame_n_fx(int id, float size)
+{
+    EffectModule(0x2711, id, KAME_HAND, 0, 0, 0, 0, 0, 0, size, 0, 0, 0, 0, 0, 0, 0x1);
+}
+
+void kame_n_fx_off()
+{
+    EffectModule(0x2723, KAME_FX_CRG, 0x1, 0x1);
+    EffectModule(0x2723, KAME_FX_CRGON, 0x1, 0x1);
+    EffectModule(0x2723, KAME_FX_TSUBU, 0x1, 0x1);
+}
+
+void kame_n_loop()
+{
+    if (kame_n_state == 0)
+    {
+        if (MotionModuleF(0x1) >= KAME_N_HOLD_FRAME)
+        {
+            if (ControlModule(0x2712, 0x1) && kame_n_charge < KAME_N_FULL)
+            {
+                MotionModule(0x4, 0);
+                if (kame_n_charge == 0)
+                {
+                    kame_n_fx(KAME_FX_CRG, 0.4f);
+                    kame_n_fx(KAME_FX_TSUBU, 1.0f);
+                }
+                else if (kame_n_charge == KAME_N_LV2)
+                {
+                    kame_n_fx(KAME_FX_CRG, 0.6f);
+                    kame_n_fx(KAME_FX_CRGON, 0.8f);
+                }
+                else if (kame_n_charge == KAME_N_LV3)
+                {
+                    kame_n_fx(KAME_FX_CRG, 1.0f);
+                    kame_n_fx(KAME_FX_CRGON, 1.2f);
+                }
+                kame_n_charge += 0x1;
+            }
+            else
+            {
+                kame_n_state = 0x1;
+                kame_n_fx_off();
+                MotionModule(0x4, 1.0f);
+            }
+        }
+    }
+    else if (kame_n_state == 0x1)
+    {
+        if (MotionModuleF(0x1) >= KAME_N_FIRE_FRAME)
+        {
+            ArticleModule(0x2710, KAME_ARTICLE);
+            ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
+            kame_n_state = 0x2;
+            if (global18 == 0x2)
+            {
+                KineticModule(0, 0);
+            }
+            return;
+        }
+    }
+    if (global18 == 0x2 && kame_n_state < 0x2 && kame_n_stall == 0)
+    {
+        KineticModule(0, 0xa);
+        kame_n_stall = 0x1;
+    }
+}

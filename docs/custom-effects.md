@@ -142,4 +142,42 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   faster. Test 9 (`build/supamario_kame_test9.zip`): `--gain 1.3`, `--speed 6 --length-rate 2`
   (grows 6 units a frame to the same 120 / 160 / 200 units: 20 / 27 / 34 frames). The move's
   beam-head projectile should fly at `TRACE_SPEED` (6) to stay with the body.
-- Still to do: the move itself (projectile, hitboxes, charge logic).
+- Test 9 in game: brightness right; the beam "slightly slower" and "about double the length": 5
+  units a frame to 240 / 320 / 400 units (`--speed 5 --length-rate 4`).
+
+## The move: neutral special (test 10, `build/supamario_kame_test10.zip`)
+
+The user's design: neutral special (the fireball article kept, no longer thrown); hold to charge,
+release fires; head and body multi-hit, the beam stops on what it hits (as in XV2) and ends with a
+launching hit; the same move in the air; each charge level a little faster. All built by
+`tools/supamario_kame_build.py ... --rpx IN.rpx` (its docstring lists the files).
+
+- **Charge** (`fighters/supamario/supamario.c`, status 0x152, `kame_n_*`): Mario's throw
+  (0x211 / 0x215) frozen at frame 10 while special is held (`ControlModule(0x2712, 1)`); level 2
+  after 42 charge frames, 3 after 78 (the XV2 charge effect's steps, `PtcSupamarioKmhCrg` /
+  `CrgON` / `tsubu` at the hand, following, killed on release or when the status ends); fires by
+  itself at 100. Released, the throw plays on and at frame 14 generates article 5 and sets its
+  status to the level. In the air it stalls (kinetic 0xA, the cape's) until the beam is out.
+  SpecialN / SpecialAirN ACMD: no GENERATE_ARTICLE, no fire / red flash; the release (Fire model,
+  Ring) at the hand at 14; charge sound from the start, stopped for the fire sound at 13.
+- **Projectile** (weapon kind 0x18B, `fighters/supamario/weapons/kamehameha.c`): statuses 0-2 fly
+  (level 1-3: 5.0 / 5.5 / 6.0 units a frame for 48 / 58 / 67 frames: 240 / 320 / 400 units),
+  3 hold (30 frames, still multi-hitting), 4 finish (12 frames). The hit -> hold switch is native:
+  the fireball's hit method removes the weapon on any hit, so weapon_expand's `on_hit` gives the
+  kind its own singleton whose hit method asks for status 3 instead (`docs/weapon-expansion.md`).
+  `"motions": 6` gives it six motion slots (all the fireball's animation): fly1-3, finish1-3.
+- **Body**: a trace can't stop where the head stops, so the projectile drops a body piece
+  (`EffSupamarioKameSeg1` / `2` / `3`, `xv2_trace_to_nud.Segment`: the level's trace, 2 x speed
+  long, behind its spawn point) every 2 frames at its head; they stay at full width for 125 frames
+  and are killed (`EffectModule(0x2723)`) when the beam ends. Their textures' V repeats are
+  -scroll x length / speed, so the scrolling texture continues from one piece to the next.
+- **Hitboxes** (weapon game.bin): head ID 0 (4.5 / 5.5 / 6.5) and a body capsule ID 1 (3.5 /
+  4.0 / 4.5, from the head back to the spawn point, regrown every 4 frames), 1.0 / 1.3 / 1.6%,
+  angle 366, KBG 100, FKB 30, Rehit 5; the finish, Part 1 (its own hit log): 6 / 8 / 10%, 40
+  degrees, KBG 85 / 90 / 95, BKB 50 / 55 / 60, size 7 / 8 / 9, frames 0-2.
+- **Effects** (weapon effect.bin): the head per level from EEPK effects 3 / 4 / 5 (Bas 1.6 / 2.0
+  / 2.5, Fireptcl, Wav, 4ptcl, Hand; LineAll at level 1), on bone 0x7D0 as the fireball's, turned
+  180; the finish: Fire, Ring, Wav. The taunts are back to normal (`--taunts` for the old test).
+- Unverified in game: the weapon's effect / hitbox frame (+Z forward assumed, as on fighters),
+  how the kill looks on the body pieces, kinetic 0xA in the charge.
+
