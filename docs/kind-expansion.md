@@ -92,6 +92,11 @@ builds with the names get the new name (`%L` = lowercase, `%C` = Capitalised):
 - `sound/snd_se_%C`, `snd_vc_%C`, `snd_vc_%C_ouen`, `soundseq_%C.sqb`, `voiceanim_%C.vat`
 - `snd_se_vc_Kirby_copy_%C`
 
+**Low models:** `model/body/l00`-`l07` (the base's low-poly models, `fighter/%s/model/body/l%02d/`,
+loaded in most battle modes, `0x030BB540`) must come along with `c00`-`c07`. Supamario v5 had only
+the `c` folders and showed nothing in the off-screen magnifying glass (most likely the low model
+is what the magnifier draws; not confirmed in game yet).
+
 Names that are found by listing, by hash or from inside another file are kept: `motion/*/<base>pt1.pac`
 (no `pt1` string in the executable), the `.omo` names inside the packs (the descriptor copy keeps the
 base's animation hashes), and the effect model folders `Eff<Base>*` (named in the `.efc`).
