@@ -30,3 +30,14 @@ Not known yet (in game): whether the controller's set-up runs only after the sav
 (the boot scenes come first by name), and the way back from Training to the menu without the title
 having run. Fallback if it misbehaves: hook the title's end (`0x0224B42C`) instead, so pressing
 start on the title with L held goes to Training.
+
+## In game: crash at boot (Sephiroth v3 executable, Cemu 2.6)
+
+The first in-game run crashed at boot: Cemu asserted on an HLE call at `0x04B85170` (LR `0x02C87648`,
+just before the first hook), i.e. execution reached stale words left from kind_expand.py's old space
+(`0x04B850A8`-`0x04B877C4`: its old tables, words like `0x04B85000` that decode as Cemu HLE opcodes).
+Nothing in the executable points there (no branch, pointer or lis/addi pair), the cave's own code is
+as assembled and its unicorn test passes, so the path is not known yet. Sent: the same executable
+without the shortcut (`build/sephiroth_v3_noboot.zip`; adding the shortcut back gives v3 byte for
+byte) to confirm the shortcut is the trigger. Next: move the cave to clean space away from the old
+kind_expand words (and clear those), keep the picked name in a data word instead of in the code.
