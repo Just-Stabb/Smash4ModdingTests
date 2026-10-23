@@ -33,3 +33,12 @@ the move (animations, ACMD hitboxes, MSC charge logic).
   8 emitters (blue colour keys, our own 64x64 orb texture, the templates' shaders), `.efc` entry
   `0x16` (effect id `0x03410016`), played from the up taunt (`External_Graphic` at bone 0x11,
   terminated with the animation) with the charge sound.
+- v5 in game: a big square sheet over Supamario. The orb texture was BC3 with white colour and
+  the shape only in alpha, but the game's fx textures (BC4 / BC5, component-selected R, R, R, 1)
+  carry the shape in the colour, which the template shaders read; and it was put on every
+  emitter, the refraction ones too (their texture is a distortion map, 128 grey = none).
+  Rebuilt with `tools/supamario_kame_fx.py BASE.ptcl OUT.ptcl` (from v4's file): the fireball's
+  sparks / ball / flash with their own textures, red and blue swapped in the colour keys; the
+  shimmer unchanged; our glow texture as the template's quarter glow (drawn mirrored), BC4, the
+  shape in R = G = B; no smoke. Rule for our own textures: match the template slot's format and
+  channel layout.
