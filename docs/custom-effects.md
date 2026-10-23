@@ -26,6 +26,9 @@ the move (animations, ACMD hitboxes, MSC charge logic).
 ## Built so far
 
 - Formats: `tools/ptcl.py` (docs/ptcl-format.md), `tools/efc.py` (docs/efc-format.md).
+- XV2's own Kamehameha models (Kmh_Fire / Kmh_Bas / Kmh_Hand) converted to effect model folders
+  `EffSupamarioKameFire / Bas / Hand`: `tools/xv2_to_nud.py` (docs/xv2-model-conversion.md); not
+  yet in an .efc / loaded in game.
 - Supamario's own sound bank: `tools/fighter_own_bank.py` (docs/kind-expansion.md): BINF id 2144,
   soundlabeltable row 3249; Kamehameha sounds `0x0CB1008B` charge, `0x0CB1008C` fire,
   `0x0CB1008D` beam head.
