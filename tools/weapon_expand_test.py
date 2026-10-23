@@ -22,8 +22,8 @@ PATCHED = ORIGINAL + kind_expand + weapon_expand (and any other caves). Checks:
   remapped;
 - an own singleton (on_hit): the singleton getter returns it for its kind; it is {the vtable copy, the
   base's vtable 2}; the copy is the base's vtable but +0xAC; the hit method asks a fake StatusModule
-  for status N on result bits 0x1 / 0x2 below N (none at N or more), returns 0, and leaves other
-  results to the base's method.
+  for status N on result bits 0x13 (W.HIT_BITS) below N (none at N or more), returns 0, and leaves
+  other results to the base's method.
 """
 import os
 import struct
@@ -148,7 +148,12 @@ def main():
         check('0x%X %s: singleton {vtable copy, base vtable 2}' % (nk, art), (E1.w(o_at), E1.w(o_at + 4)), (v_at, vt2))
         size = W.vtable_size(img, vt)
         diff = [o for o in range(0, size, 4) if E1.w(v_at + o) != img.w(vt + o)]
-        check('0x%X %s: vtable copy = the base\'s but +0x%X' % (nk, art, W.HIT_METHOD), diff, [W.HIT_METHOD])
+        nops, nop_at = info.get('nops', {}).get(nk, ([], 0))
+        check('0x%X %s: vtable copy = the base\'s but +0x%X%s' % (nk, art, W.HIT_METHOD, ''.join(
+            ', +0x%X' % o for o in nops)), diff, sorted([W.HIT_METHOD] + list(nops)))
+        if nops:
+            check('0x%X %s: the nop slots lead to a blr' % (nk, art),
+                  [E1.w(E1.w(v_at + o)) for o in nops], [0x4E800020] * len(nops))
         check('0x%X %s: +0x%X = the hit method' % (nk, art, W.HIT_METHOD), E1.w(v_at + W.HIT_METHOD), fn)
         old_hit = img.w(vt + W.HIT_METHOD)
         E = Run(patched)
@@ -174,7 +179,7 @@ def main():
         want = []
         for st, bits in ((0, 1), (2, 2), (0, 3), (status - 1, 0x11), (status, 1), (status + 1, 2), (0, 0x10), (0, 8),
                          (status, 4)):
-            if bits & 3:
+            if bits & W.HIT_BITS:
                 want.append((st, bits, 0, [('status', status)] if st < status else []))
             else:
                 want.append((st, bits, 0x77, [('base', o_at, weapon, bits)]))

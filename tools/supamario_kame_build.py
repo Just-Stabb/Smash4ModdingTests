@@ -126,6 +126,13 @@ WEAPON_BONE = 0
 # 4-6, never played and the beam was never removed)
 MOTIONS = ('fly1', 'fly2', 'fly3', 'finish')
 SEG_OVERLAP = 0.5                 # x the piece spacing: the pieces' ends cross-fade over this
+# the beam's end (user, test 13: "turn bright and transparent leaving a white line behind"): each body
+# piece replaced by a dissolving one (Segment dissolve: XV2's DefaultEnd thinning at DISSOLVE['rate'],
+# brightened, the tubes gone at 55 % of it, the core a white line)
+DISSOLVE = dict(rate=0.75, bright=2.5, ramp=4, fade=0.5, core=1.0, core_gain=1.6, tube_end=0.55)
+DIS_TEX_BASE = 0x15141A90         # after the body pieces' 0x15141A60-0x15141A8F
+# the start (Hand ball etc.) this far in front of the spawn point (test 13: "slightly too close")
+START_FORWARD = 5.0
 # hitboxes: head (ID 0) and body capsule (ID 1, from the head back to the spawn point) multi-hit
 # every REHIT frames while flying and holding; the finish (Part 1: its own hit log) launches. The
 # head drags (angle 366) so a held target stays on it; the body hits where they are (test 10: at
@@ -136,22 +143,24 @@ BODY_SIZE = (3.5, 4.0, 4.5)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
 # test 11: the multi-hits should carry them into the head (which holds them): the body pushes
 # them forward along the beam
-BODY_ANGLE, BODY_FKB = 0, 50
+BODY_ANGLE, BODY_FKB = 0, 35
 # one finish for every level (the fireball has four motion slots)
 FINISH = dict(Damage=8.0, KBG=90, BKB=55, Size=8.0)
+FINISH_BACK = 30.0
 FINISH_FRAMES = 3
 # the charge (fighter MSC): Mario's throw frozen at HOLD_FRAME; level 2 at 42, 3 at 78 charge
 # frames (the XV2 charge effect's steps), fires by itself at 100; the beam comes out at FIRE_FRAME
-N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 10.0, 14.0, 42, 78, 100
+# the charge pose: frame 6, the wind-up with the hands at head height, one forward, one back (user,
+# test 13: the pose of SpecialAirN they showed; frame 10 is mid-swing)
+N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 6.0, 14.0, 42, 78, 100
 # the charge effect at each level (Crg, CrgON sizes; test 11: "should get larger" with the level, XV2
 # shows a bigger ball and rings), spawned again every N_REFX frames
 N_CRG = ((0.5, 0.0), (1.0, 1.0), (1.6, 1.6))
 N_REFX = 40
-# after firing he holds the pose from N_POSE_FRAME while the beam exists, at most N_POSE_MAX frames
-# (the longest beam: fly + hold + finish); in the air he floats down while charging (fall
+# after firing he holds the pose from N_POSE_FRAME while the beam exists, at most the longest beam
+# (fly + hold + finish / dissolve); in the air he floats down while charging (fall
 # acceleration / max fall a frame) and floats in place while posing (user, before test 12)
 N_POSE_FRAME = 16.0
-N_POSE_MAX = max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 6
 N_FALL_ACCEL, N_FALL_MAX = 0.02, 0.6
 
 
@@ -248,10 +257,15 @@ def weapon_scripts(heads, ids, segs):
         sp = KAME_SPEED[lv]
         tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
         g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], **tick)]
-        # the body capsule grows with the flight (the hold freezes the motion: it stops growing)
+        # the body capsule grows with the flight (the hold freezes the motion: it stops growing); it
+        # starts behind the head's hitbox (test 13: overlapping it, its forward push knocked a held
+        # opponent out of the head before the finish)
+        z1 = -(HEAD_SIZE[lv] + BODY_SIZE[lv])
         for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
+            if -sp * f >= z1:
+                continue
             g.append(cmd('frame', float(f)))
-            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-sp * f,
+            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z=z1, Z2=-sp * f,
                             Angle=BODY_ANGLE, FKB=BODY_FKB, **tick))
         game[name] = g
         # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
@@ -264,7 +278,8 @@ def weapon_scripts(heads, ids, segs):
                 e.append(cmd('external_graphic', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT), float(z),
                              0.0, HEAD_YROT, 0.0, float(size), 0))
             else:
-                e.append(cmd('graphic_effect', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT), float(z - sp),
+                e.append(cmd('graphic_effect', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT),
+                             float(z - sp + START_FORWARD),
                              0.0, HEAD_YROT, 0.0, float(size), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0))
         # the body pieces, dropped at the head (they stay where they are)
         for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
@@ -274,9 +289,12 @@ def weapon_scripts(heads, ids, segs):
         effect[name] = e
         sound[name] = [cmd('sound_effect', SND_HEAD)]
     f = FINISH
+    # the launcher covers the head and FINISH_BACK of the body (test 13: "the multihit isn't
+    # connecting into the final hit")
     game['finish'] = [cmd('remove_all_hitboxes'),
-                      hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0,
-                             BKB=f['BKB'], Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2),
+                      hitbox('Extended_Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'],
+                             FKB=0, BKB=f['BKB'], Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2,
+                             Z2=-FINISH_BACK),
                       cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst
@@ -384,7 +402,7 @@ def main():
     xv2_trace_to_nud.convert(pkg, os.path.join(fx, 'model'), MODEL_PREFIX, alpha=TRACE_ALPHA,
                              white_fade=TRACE_WHITE_FADE, speed=TRACE_SPEED, length_rate=TRACE_LENGTH_RATE,
                              gain=TRACE_GAIN)
-    segs = []
+    segs, diss, dis_frames = [], [], 0
     for lv, trace in enumerate(TRACES):
         folder = MODEL_PREFIX + 'Seg%d' % (lv + 1)
         xv2_trace_to_nud.segment(pkg, 'Kmh_%s.etr' % trace, os.path.join(fx, 'model'), folder,
@@ -393,7 +411,15 @@ def main():
                                  white_fade=TRACE_WHITE_FADE, gain=TRACE_GAIN,
                                  overlap=SEG_OVERLAP * KAME_SPEED[lv] * SEG_EVERY)
         segs.append(folder)
-    models = [MODEL_PREFIX + m for m in ('Fire', 'Bas', 'Hand') + TRACES] + segs
+        dis_folder = MODEL_PREFIX + 'Dis%d' % (lv + 1)
+        dt = xv2_trace_to_nud.segment(pkg, 'Kmh_%s.etr' % trace, os.path.join(fx, 'model'), dis_folder,
+                                      KAME_SPEED[lv] * SEG_EVERY, KAME_SPEED[lv], 0,
+                                      tex_base=DIS_TEX_BASE + 0x10 * lv, alpha=TRACE_ALPHA,
+                                      white_fade=TRACE_WHITE_FADE, gain=TRACE_GAIN,
+                                      overlap=SEG_OVERLAP * KAME_SPEED[lv] * SEG_EVERY, dissolve=DISSOLVE)
+        diss.append(dis_folder)
+        dis_frames = max(dis_frames, dt.frames)
+    models = [MODEL_PREFIX + m for m in ('Fire', 'Bas', 'Hand') + TRACES] + segs + diss
     for m in models:
         assert os.path.exists(os.path.join(fx, 'model', m, 'model.nud')), m
     for m in os.listdir(os.path.join(v5, 'effect/supamario/model')):
@@ -428,7 +454,8 @@ def main():
         'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
         'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
         'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
-        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME), 'KAME_N_POSE_MAX': str(N_POSE_MAX),
+        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME),
+        'KAME_N_POSE_MAX': str(max(KAME_LIFE) + KAME_HOLD + max(KAME_FINISH, dis_frames) + 6),
         'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
         **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
         **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
@@ -444,13 +471,16 @@ def main():
     shutil.copy(os.path.join(v5, 'motion/fireball/main.pac'), os.path.join(sup, 'motion/kamehameha/main.pac'))
     pkgd = xv2vfx.load_package(pkg)
     heads = head_parts(pkgd)
-    vals = {'KAME_HOLD': str(KAME_HOLD), 'KAME_FINISH': str(KAME_FINISH),
-            'KAME_MAX': str(max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 20),
+    finish = max(KAME_FINISH, dis_frames)
+    vals = {'KAME_HOLD': str(KAME_HOLD), 'KAME_FINISH': str(finish), 'KAME_DISSOLVE': str(dis_frames),
+            'KAME_SEG_EVERY': str(SEG_EVERY),
+            'KAME_MAX': str(max(KAME_LIFE) + KAME_HOLD + finish + 20),
             'KAME_FX_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n)
                                       for n in beam_effects(heads, segs))}
     for lv in range(3):
         vals['KAME_SPEED_%d' % (lv + 1)] = fl(KAME_SPEED[lv])
         vals['KAME_LIFE_%d' % (lv + 1)] = str(KAME_LIFE[lv])
+        vals['KAME_DIS_%d' % (lv + 1)] = eid(diss[lv])
     compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/weapons/kamehameha.c'), vals),
                 os.path.join(sup, 'script/msc/kamehameha/kamehameha.mscsb'), tmp)
     wdir = os.path.join(sup, 'script/animcmd/weapon/kamehameha')

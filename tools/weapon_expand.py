@@ -14,9 +14,12 @@ article of that name is copied; kinds consecutive from 0x185 over all records), 
 under its own name and folder (fighter/<new>/model|motion/<name>/, script/.../<name>/), added to the
 new fighter's article list after the base's articles (its article id = its place there), with that
 max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
-vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x3) asks
-for status N instead of removing it (left alone when the status is N or more already); other results
-go to the base's method. "motions": N (a brand-new article) gives its motion info N entries (the base's,
+vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x13,
+the ones the default method removes it for) asks for status N instead of removing it (left alone when
+the status is N or more already); other results go to the base's method. With it, "nop": ["0x44", ...]
+makes those vtable slots of its copy a `blr` (the fireball's +0x44 only sets its EffectModule's
+vt +0xD4 to 5, likely the effect a weapon removed before its time plays: test 13, the fireball's
+puff at Supamario's hand when the beam was fired against a wall). "motions": N (a brand-new article) gives its motion info N entries (the base's,
 the last repeated: every one plays the base's animation; its motion.mtable names N scripts).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
@@ -66,6 +69,9 @@ BOUND = 0x0320E5AC             # addic r0, r4, -0x185 (kind < 0x185), the u32 / 
 DESC_SWITCH = 0x0320D934
 SINGLETON_SWITCH = 0x03210C30  # per-kind specializer singleton (leaf, r4 = kind)
 HIT_METHOD = 0xAC              # singleton vtable: hit result (r3 singleton, r4 weapon, r5 result bits)
+# result bits the on_hit method takes as a hit: the ones the default method (0x0320EE2C) removes the
+# weapon for (test 13: with only 0x3, a beam fired point-blank at an opponent vanished at once)
+HIT_BITS = 0x13
 SWITCHES = (0x0320D934, 0x03210C30, 0x02B651AC, 0x02B6894C, 0x02B6B7A8, 0x02B6FD44, 0x02B73AA4, 0x02B75A88,
             0x02B77FAC, 0x02B7A4DC, 0x02B7D378, 0x02B80CF4, 0x02B83D58)
 INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jumping into 0x02B83D60
@@ -102,6 +108,7 @@ def load_weapons(path, img):
                     r.setdefault('motions', {})[nk] = int(spec['motions'])
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
+                    r.setdefault('nop', {})[nk] = [K.num(x) for x in spec.get('nop', [])]
                 art_base = spec['base']
             else:
                 art_base = art
@@ -493,23 +500,32 @@ def build(spec_path=SPEC, rpx=RPX):
         assert size > HIT_METHOD and 0x02000000 <= old_hit < 0x10000000
         fn = B.alloc(4 * 32)
         hit = B.code(fn, (
-            'andi. r0, r5, 3\nbeq base\n'
+            'andi. r0, r5, %d\nbeq base\n'
             'mflr r0\nstwu r1, -0x18(r1)\nstw r0, 0x1C(r1)\nstw r31, 0x14(r1)\n'
             'lwz r12, 0x28(r4)\nlwz r31, 0x20(r12)\n'                    # StatusModule
             'lwz r12, 0(r31)\nlwz r12, 0x8C(r12)\nmtctr r12\nmr r3, r31\nbctrl\n'   # its status
             'cmpwi r3, %d\nbge done\n'
             'lwz r12, 0(r31)\nlwz r12, 0x2C(r12)\nmtctr r12\nmr r3, r31\nli r4, %d\nbctrl\n'  # change to N
             'done:\nlwz r0, 0x1C(r1)\nlwz r31, 0x14(r1)\nmtlr r0\naddi r1, r1, 0x18\nli r3, 0\nblr\n'
-            'base:\nb 0x%X') % (status, status, old_hit))
+            'base:\nb 0x%X') % (HIT_BITS, status, status, old_hit))
         assert len(hit.words()) <= 32
+        nops = r.get('nop', {}).get(nk, [])
+        nop_at = 0
+        if nops:
+            nop_at = B.alloc(4)
+            B.code(nop_at, 'blr')
         v_at = B.alloc(size, 8)
         vb = bytearray(img.blob(vt, size))
         struct.pack_into(">I", vb, HIT_METHOD, fn)
+        for off in nops:
+            assert off % 8 == 4 and off < size and off != HIT_METHOD, 'vtable slot 0x%X' % off
+            struct.pack_into(">I", vb, off, nop_at)
         B.data(v_at, vb, 'weapon 0x%X vtable (copy of 0x%08X)' % (nk, vt))
         o_at = B.alloc(8, 8)
         B.data(o_at, struct.pack('>II', v_at, vt2), 'weapon 0x%X singleton' % nk)
         scase[nk] = o_at
         info.setdefault('singletons', {})[nk] = (o_at, v_at, fn, status)
+        info.setdefault('nops', {})[nk] = (nops, nop_at)
     st = B.alloc(4 * (cap - OLD_N))
     B.data(st, b''.join(struct.pack('>I', scase.get(k, 0)) for k in range(OLD_N, cap)), 'singleton cases')
 

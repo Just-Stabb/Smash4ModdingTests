@@ -194,8 +194,8 @@ class Trace:
             mat.textures.append(dict(hash=self.tex_base + emb_index, map_mode=0, wrap_s=1, wrap_t=1, min_f=3,
                                      mag_f=2, mip=6, unk=0, unk2=0))
             hbits, hval = float_hash('%s/%s' % (self.folder, i))
-            g = self.gain
-            gains = [[g, g, g, a * self.alpha.get(i, 1.0)] for _l, _w, a in curves]
+            gains = [[self.gain_at(i, node, fr)] * 3 + [a * self.alpha_at(i, node, fr)]
+                     for fr, (_l, _w, a) in enumerate(curves)]
             scales = [[1.0, self.v_repeat(length, v_per_unit, sv), 0.0, 0.0] for length, _w, _a in curves]
             trans = [[su * fr, sv * fr, 0.0, 0.0] for fr in range(self.frames)]
             mat.props = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', list(scales[0])),
@@ -217,6 +217,18 @@ class Trace:
         """an alpha factor at the mesh's z (0..1)"""
         return 1.0
 
+    def gain_at(self, i, node, fr):
+        """node i's RGB gain at frame fr"""
+        return self.gain
+
+    def white_fade_for(self, emb_index):
+        """the --white-fade for a texture"""
+        return self.white_fade
+
+    def alpha_at(self, i, node, fr):
+        """node i's alpha factor at frame fr"""
+        return self.alpha.get(i, 1.0)
+
     def v_repeat(self, length, v_per_unit, scroll_v):
         """the texture's V repeats over the mesh (NU_effScaleUV V) at this length"""
         return max(length * v_per_unit, 0.01)
@@ -231,7 +243,7 @@ class Trace:
         core read as a solid white body (test 7)"""
         img = dds_rgba(self.emb[emb_index][1]).astype(np.float32)
         white = img[..., :3].min(2) / 255.0
-        img[..., 3] *= 1.0 - self.white_fade * white
+        img[..., 3] *= 1.0 - self.white_fade_for(emb_index) * white
         return np.clip(img + 0.5, 0, 255).astype(np.uint8)
 
     def omo(self):
@@ -280,11 +292,21 @@ class Segment(Trace):
     scrolling (scroll_V a frame) the texture is then continuous from one piece to the next, the
     pieces spawned length / speed frames apart (it moves with the head)."""
 
-    def __init__(self, pkg, etr_name, folder, tex_base, length, speed, hold, overlap=0.0, **kw):
+    def __init__(self, pkg, etr_name, folder, tex_base, length, speed, hold, overlap=0.0, dissolve=None, **kw):
         self.step, self.overlap, self.hold = float(length), float(overlap), int(hold)
         self.seg_length = self.step + self.overlap
+        # dissolve: {'rate', 'bright', 'ramp', 'fade', 'core', 'core_gain', 'tube_end'}: the piece the
+        # beam's end puts in each body piece's place: no hold, brightened (RGB x up to `bright` over
+        # `ramp` frames), the tubes more transparent (alpha x (1 - fade)) and gone at `tube_end` of
+        # its length, the core ribbon (no cross-section) at alpha `core`, RGB x `core_gain`, its
+        # texture's white kept: the DefaultEnd keyframes (played at `rate`) thin it to a white line
+        # (user, test 13: "turn bright and transparent leaving a white line behind")
+        self.dissolve = dict(dissolve or {})
+        if self.dissolve:
+            self.hold = 0
         super().__init__(pkg, etr_name, folder, tex_base, speed=speed, **kw)
-        self.frames = self.hold + max(n['HoldDuration'] for n in self.etr['Nodes']) + 1
+        rate = self.dissolve.get('rate', 1.0)
+        self.frames = self.hold + int(math.ceil(max(n['HoldDuration'] for n in self.etr['Nodes']) / rate)) + 1
 
     def full_length(self, node):
         return self.seg_length
@@ -304,28 +326,62 @@ class Segment(Trace):
         d = z * self.seg_length
         return float(np.clip(min(d, self.seg_length - d) / self.overlap, 0.0, 1.0))
 
+    def ramp(self, fr):
+        return min(fr / max(self.dissolve.get('ramp', 1.0), 1e-6), 1.0) if self.dissolve else 0.0
+
+    def gain_at(self, i, node, fr):
+        g = self.gain * (1.0 + (self.dissolve.get('bright', 1.0) - 1.0) * self.ramp(fr))
+        if self.dissolve and not node.get('ExtrudeShapePoints'):
+            g *= self.dissolve.get('core_gain', 1.0)
+        return g
+
+    def alpha_at(self, i, node, fr):
+        if not self.dissolve:
+            return self.alpha.get(i, 1.0)
+        if not node.get('ExtrudeShapePoints'):
+            return self.dissolve.get('core', 1.0)
+        end = self.dissolve.get('tube_end', 1.0) * self.frames
+        return self.alpha.get(i, 1.0) * (1.0 - self.dissolve.get('fade', 0.0) * self.ramp(fr)) * \
+            float(np.clip(1.0 - fr / max(end, 1.0), 0.0, 1.0))
+
+    def white_fade_for(self, emb_index):
+        if self.dissolve:
+            core = {self.etr['Textures'][n['TextureEntryRef'][0]]['EmbIndex'] for n in self.etr['Nodes']
+                    if not n.get('ExtrudeShapePoints') and n['TextureEntryRef']}
+            tubes = {self.etr['Textures'][n['TextureEntryRef'][0]]['EmbIndex'] for n in self.etr['Nodes']
+                     if n.get('ExtrudeShapePoints') and n['TextureEntryRef']}
+            if emb_index in core and emb_index not in tubes:
+                return 0.0
+        return self.white_fade
+
     def node_curves(self, node):
         h = node['HoldDuration']
         base = node['Scale'] or 1.0
         scale_hold = kf_curve(find_kv(node, 'Scale', 'DefaultEnd'), h + 1, base)
         alpha_hold = kf_curve(find_kv(node, 'Color1_Transparency', 'DefaultEnd'), h + 1, 1.0)
+        rate = self.dissolve.get('rate', 1.0)
         out = []
         for fr in range(self.frames):
-            k = min(max(fr - self.hold, 0), h)
-            w, a = max(scale_hold[k] / base, 0.0), float(alpha_hold[k])
-            if fr - self.hold >= h:
+            t = max(fr - self.hold, 0) * rate
+            k = min(t, h)
+            w = max(float(np.interp(k, np.arange(h + 1), scale_hold)) / base, 0.0)
+            a = float(np.interp(k, np.arange(h + 1), alpha_hold))
+            if t >= h:
                 w, a = 0.0, 0.0
             out.append((self.seg_length, w, a))
         return out
 
 
 def segment(pkg_dir, etr_name, out_dir, folder, length, speed, hold, tex_base=TEX_BASE, scale=SCALE, alpha=None,
-            white_fade=0.0, gain=1.0, overlap=0.0):
-    """one Segment model folder (OUT_DIR/folder) from the package's etr_name"""
+            white_fade=0.0, gain=1.0, overlap=0.0, dissolve=None):
+    """one Segment model folder (OUT_DIR/folder) from the package's etr_name; its frame count in
+    .frames of the returned Segment"""
     pkg = xv2vfx.load_package(pkg_dir)
-    t = Segment(pkg, etr_name, folder, tex_base, length, speed, hold, overlap=overlap, scale=scale, alpha=alpha,
+    t = Segment(pkg, etr_name, folder, tex_base, length, speed, hold, overlap=overlap, dissolve=dissolve,
+                scale=scale, alpha=alpha,
                 white_fade=white_fade, gain=gain)
-    return t.write(out_dir)
+    t.write(out_dir)
+    return t
 
 
 def convert(pkg_dir, out_dir, prefix='EffSupamarioKame', speed=SPEED, scale=SCALE, tex_base=TEX_BASE, alpha=None,

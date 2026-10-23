@@ -124,7 +124,8 @@ Two more options for it:
   bits `0x13` remove the weapon (`+0x1E14` / `+0x1E18`), `0x4` removes it unless byte `+0x46`,
   `0x8` the reflect / absorb checks (Mii Gunner's flame pillar overrides it the same way:
   `docs/miigunner-flame-pillar.md`). With `on_hit`, the kind gets its own singleton in the cave:
-  the base's vtable copied (`{0, fn}` pairs) with `+0xAC` = a method that, on bits `0x3`, asks the
+  the base's vtable copied (`{0, fn}` pairs) with `+0xAC` = a method that, on bits `0x13` (the
+  default's remove bits; test 13: with `0x3` only, a beam fired point-blank vanished), asks the
   StatusModule (`[[weapon+0x28]+0x20]`, vt `+0x8C` status, vt `+0x2C(N)` change) for status N
   unless it is N or more already, and returns 0 (not removed); other bits go to the base's method.
   The singleton getter's cave stub returns it for that kind (`singleton cases` table). The base's

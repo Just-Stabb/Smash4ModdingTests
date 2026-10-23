@@ -37241,9 +37241,11 @@ int kame_n_level()
     return 0;
 }
 
+// following the hand: EffectModule 0x2717 (id, bone, x, y, z, rx, ry, rz, size, 0) as the vanilla
+// call (test 13: with 0x2711 the charge balls stayed where they were made as he floated down)
 void kame_n_fx(int id, float size)
 {
-    EffectModule(0x2711, id, KAME_HAND, 0, 0, 0, 0, 0, 0, size, 0, 0, 0, 0, 0, 0, 0x1);
+    EffectModule(0x2717, id, KAME_HAND, 0, 0, 0, 0, 0, 0, size, 0);
 }
 
 // the charge effect for a level (0 / 1 / 2): the previous one replaced

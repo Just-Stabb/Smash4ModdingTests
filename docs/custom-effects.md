@@ -240,3 +240,30 @@ Test 11: the head faces the flight now. But:
   max fall 0.6 a frame) and floats in place while the pose is held (speed, acceleration and max fall
   0), then the normal fall (kinetic type 0 set again). The calls are the cape's air code's
   (`func_2264`: `KineticModule(0x11 / 0xf / 0x14, 1, ...)`).
+
+### Test 13 in game, and test 14 (`build/supamario_kame_test14.zip`)
+
+1. "The beam's end is slightly too close to the body": the start parts 5 units further forward
+   (`START_FORWARD`).
+2. "When the beam finishes, it should turn bright and transparent leaving a white line behind":
+   `Segment(dissolve=...)` pieces (`EffSupamarioKameDis1-3`, 31 frames): XV2's DefaultEnd thinning
+   at 0.75 speed, RGB up to x2.5 over 4 frames, the tubes half as opaque and gone at 55 %, the core
+   ribbon opaque, x1.6, with its texture's white kept: a white line. At the end (the finish, the
+   range, a wall) the MSC puts one in each body piece's place (`kame_dissolve`: from the frames
+   flown, `EffectModule(0x2710, id, 0, 0, 0, z)` behind the head) and ends the rest; the beam stays,
+   without hitboxes (`AttackModule(0x2719)`, the vanilla status-end clear), until they're done.
+3. The charge pose: SpecialAirN frame 6 (the user's shot; both hands at head height, one forward,
+   one back: frames 4-8 by the bones' world positions, `omo.world`), SpecialN too.
+4. The beam at a wall left its effects: the fly ends on `GroundModule(0x2722)` (the fireball MSC's
+   touch check) as at its range (dissolve, then removed).
+- "Fireball disappearing effects on the hand" fired against a wall: the fireball's specializer
+  +0x44 sets its EffectModule's vt +0xD4 to 5 (likely the effect of a weapon removed early): the
+  Kamehameha's vtable copy has it as a `blr` (weapon_expand `"nop"`).
+- "The multihit isn't connecting into the final hit": the body capsule overlapped the head and its
+  forward push (angle 0, FKB 50) knocked held opponents out. The capsule now starts behind the head
+  (Z -(head + body size)), FKB 35; the launcher is a capsule over the head and 30 units of body.
+- "Directly in front when he fires, it disappears at once": the hit method took only bits 0x3; the
+  default removes the weapon for 0x13. It now takes 0x13 (`HIT_BITS`). Also the MSC's state is reset
+  when status 0 is entered (weapons are pooled: a reused beam may still hold the last one's phase).
+- The charge effects stayed where they were made as he floated down (`EffectModule(0x2711)`): now
+  `EffectModule(0x2717, id, bone, ...)`, the vanilla following form.
