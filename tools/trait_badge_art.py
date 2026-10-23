@@ -14,7 +14,7 @@ A trait's icon is ICONS/<name>.png when that file is there (e.g. tools/trait_ico
 size, best square with a transparent background), used as it is: scaled to fit the icon's spot,
 nothing drawn under or over it. Otherwise the drawn icon below.
 
-The names are in FONT (default Inter ExtraBold; the badges in use are TT Travels Bold, a trial
+The names are in FONT (default Inter ExtraBold; the badges in use are TT Travels ExtraBold, a trial
 font that isn't in the repository), each as large as fits, all starting where the longest one
 (JUGGERNAUT) starts when centred.
 """
@@ -33,10 +33,10 @@ TRAITS = [('Normal', (200, 205, 215), 'star'), ('Rush', (40, 120, 255), 'chevron
           ('Juggernaut', (255, 222, 0), 'shield'), ('Technical', (0, 0, 0), 'gear'),
           ('Barrage', (255, 116, 0), 'star')]
 PLATE = (24, 28, 44, 235)
-TEXT = (0, 0, 0, 255)                   # black names with a white outline, like the icons
+TEXT = (255, 255, 255, 255)             # white names, no outline
 TEXT_OUTLINE = (255, 255, 255, 255)
-TEXT_OUTLINE_W = 7                      # at 4x: about as thick as the icons' white outlines
-TEXT_SIZE = 0.45                        # the names' largest size, of the plate's height
+TEXT_OUTLINE_W = 0                      # outline width at 4x (0: none)
+TEXT_SIZE = 0.5                         # the names' largest size, of the plate's height
 OUTLINE = (12, 14, 24, 255)
 
 
@@ -101,7 +101,6 @@ def text_layout(name, size, font_path):
     r = (h - 2 * pad) * 0.42
     cx = pad + (h - 2 * pad) / 2
     left, right = cx + r + SS * 6, w - pad - SS * 10
-    right -= (right - left) * 0.1          # the longest names a little smaller than the space allows
     fs = int((h - 2 * pad) * TEXT_SIZE)
     font = ImageFont.truetype(font_path, fs)
     while font.getlength(name.upper()) > right - left and fs > 8:
