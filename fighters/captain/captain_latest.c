@@ -38160,6 +38160,10 @@ void rolloff_update()
     {
         global62 = 0; // new roll
     }
+    if (MotionModuleF(0x1) < rolloff_start_frame()) // no speed carried into the roll: it starts from 0
+    {                                               // at the speed frame (user; the ACMD's clear didn't reach it)
+        KineticModule(0x11, 0x3, 0, 0);
+    }
     if (global62 < rolloff_lock_frames())
     {
         if (ControlModule(0x2712, 0x3))

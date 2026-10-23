@@ -26,7 +26,18 @@ with the tools:
    other script was checked identical, and a plain load / save gives every user file back byte for byte.
 
 Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2.1 / 1.0 (Overdrive
-2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.8** (user).
+2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.2** (user).
+
+**Speed cleared before the roll's speed (user: it wasn't, for anyone):** the roll's kinetic type
+`0x6` sets up energy 3 with the speed the fighter had (a dash, a run), and the ACMD's
+`Add/Set_Momentum(0, 0, 1)` didn't clear it. `rolloff_update()` now sets energy 3's speed to 0
+(`KineticModule(0x11, 3, 0, 0)`) on every roll frame before `rolloff_start_frame()`, in every
+fighter (the four hand-done ones too).
+
+**Rolls that turn around early (user: Ryu's forward roll went backwards):** the speed is along the
+facing at the speed frame. Ryu (`Reverse_Direction` at frame 4), Samus, Mii Gunner and the Mii Team
+gunner (0) and Wii Fit Trainer (1) turn before frame 5, so `rolloff_acmd.py --add` flips the sign
+when the roll has turned an odd number of times by then.
 
 **Ground speed cap (picked fighters only, user):** on the ground the roll's speed (kinetic energy 3,
 the one type 0x6 sets up: `0x02E7A4DC` case 6 → `0x02C5474C(3, ...)`) is held to the energy's speed

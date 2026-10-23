@@ -72642,6 +72642,10 @@ void rolloff_update()
     {
         global72 = 0; // new roll
     }
+    if (MotionModuleF(0x1) < rolloff_start_frame()) // no speed carried into the roll: it starts from 0
+    {                                               // at the speed frame (user; the ACMD's clear didn't reach it)
+        KineticModule(0x11, 0x3, 0, 0);
+    }
     if (global83) // Overdrive: the ACMD adds the Overdrive roll speed
     {
         WorkModule(0x2710, overdrive_roll_flag());

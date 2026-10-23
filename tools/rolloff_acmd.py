@@ -107,6 +107,11 @@ def add_speed(script, speed, start, end):
     if any(c.ident in blocks for c in script):
         raise SystemExit("the roll has condition / loop blocks: add its speed by hand")
     tl = [(f, c) for f, c in timeline(script) if c.ident != EDGE]
+    # the speed is along the facing at the speed frame: a roll that has turned around by then
+    # (Reverse_Direction at or before it: Ryu's forward roll at frame 4, Samus' / Mii Gunner's at 0,
+    # Wii Fit Trainer's at 1) needs it the other way, or it rolls backwards (user: Ryu)
+    if sum(1 for f, c in tl if c.ident == REVERSE and f <= start) % 2:
+        speed = -speed
     tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [0.0, 0.0, 1])),
            (float(start), acmd.Command(MOM, [speed, 0.0, 0])),
            (float(end), acmd.Command(MOM, [0.0, 0.0, 1]))]
