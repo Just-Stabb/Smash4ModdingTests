@@ -37207,8 +37207,9 @@ void func_2293()
 // bigger at each level (the previous level's replaced) and spawned again every KAME_N_REFX frames
 // (as XV2's charge effect 15 does). Released (or after KAME_N_FULL frames) it plays on and at
 // KAME_N_FIRE_FRAME generates the Kamehameha (article KAME_ARTICLE) in status 0 / 1 / 2 = the
-// level. At KAME_N_POSE_FRAME the firing pose is held while the beam exists (travelling, holding
-// on a hit, the finish), at most KAME_N_POSE_MAX frames, then the throw plays to its end.
+// level. At KAME_N_POSE_FRAME the firing pose is held for the beam's flight and dissolve at its
+// level (KAME_N_POSE_1 / 2 / 3 frames), then the throw plays to its end (test 16: held while
+// ArticleModule(0x2717, 5) said the beam was there, it was never held: that check is false for it).
 // In the air (user, before test 12): he floats down while charging (fall acceleration
 // KAME_N_FALL_ACCEL, at most KAME_N_FALL_MAX a frame, his rise stopped), and floats in place while
 // the pose is held; then the normal fall again. Gravity is energy 1, as in the cape's air code
@@ -37321,7 +37322,20 @@ void kame_n_loop()
     kame_n_air();
 }
 
-// the firing pose while the beam exists (ArticleModule 0x2717: the article is there)
+int kame_n_pose_frames()
+{
+    if (kame_n_level() == 0x2)
+    {
+        return KAME_N_POSE_3;
+    }
+    else if (kame_n_level() == 0x1)
+    {
+        return KAME_N_POSE_2;
+    }
+    return KAME_N_POSE_1;
+}
+
+// the firing pose for the beam's time
 void kame_n_hold_pose()
 {
     if (kame_n_pose == 0)
@@ -37335,7 +37349,7 @@ void kame_n_hold_pose()
     if (kame_n_pose == 0x1)
     {
         kame_n_posed += 0x1;
-        if (!ArticleModule(0x2717, KAME_ARTICLE) || kame_n_posed >= KAME_N_POSE_MAX)
+        if (kame_n_posed >= kame_n_pose_frames())
         {
             MotionModule(0x4, 1.0f);
             kame_n_pose = 0x2;

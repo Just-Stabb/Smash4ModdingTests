@@ -551,18 +551,20 @@ int func_40(int arg0)
 // (func_0 - func_40) and its own statuses. tools/supamario_kame_build.py replaces the KAME_* names.
 //   0 / 1 / 2  fly (charge level 1 / 2 / 3; it is generated in 0 and the fighter sets its level's
 //              status in the same frame): flies straight at KAME_SPEED_n for KAME_LIFE_n frames,
-//              motion fly1 / fly2 / fly3: its ACMD has the head / start effects, drops the body
-//              pieces at the head and has the multi-hit hitboxes. Its range reached, or touching a
-//              wall (GroundModule 0x2722, as the fireball's MSC checks it), it ends where it is.
+//              motion fly1 / fly2 / fly3: its ACMD has the head / start effects and the multi-hit
+//              hitboxes; this script drops a body piece (KAME_SEG_n) at the head every
+//              KAME_SEG_EVERY frames. Its range reached, or touching a wall (GroundModule 0x2722, as
+//              the fireball's MSC checks it), it ends where it is.
 //   3          hold: the beam connected (native: weapon_expand's on_hit asks for status 3 instead of
-//              removing it), stays in place KAME_HOLD frames, still multi-hitting: the fly motion
-//              frozen (rate 0), so no more body pieces and the body hitbox stops growing
+//              removing it), stays in place KAME_HOLD frames, still multi-hitting (the fly motion
+//              plays on: test 16, frozen it multi-hit only once; no more body pieces)
 //   4          finish: motion finish (its ACMD ends the beam's effects, the launcher)
 // The end (the finish, or the range / a wall): the body pieces are replaced by dissolving ones
 // (KAME_DIS_n, at the same places: they flash bright, go transparent and thin to a white line) and
-// every other effect of the beam ends (none ends by itself: Terminate 0); the beam stays, without
-// hitboxes, until they're done (KAME_DISSOLVE frames), then it is removed. KAME_MAX frames after it
-// was fired it is removed whatever happened.
+// every other effect of the beam ends; the beam stays, without hitboxes, until they're done
+// (KAME_DISSOLVE frames), then it is removed. The head / start / body effects have Terminate 1, so
+// they also end when the game removes the beam (test 16: past a blast zone they stayed). KAME_MAX
+// frames after it was fired it is removed whatever happened.
 // Status changes: kame_status() = StatusModule(0x3, status, 0) (func_18 / func_19, as the vanilla weapon
 // MSCs change theirs); the boilerplate's func_22 is StatusModule(0x2), the situation (tests 10 - 14
 // used it: the hold never became the finish, and since test 12 the fallback removed the beam).
@@ -640,6 +642,19 @@ float kame_speed()
         return KAME_SPEED_3;
     }
     return KAME_SPEED_1;
+}
+
+int kame_seg_id()
+{
+    if (kame_level == 0x1)
+    {
+        return KAME_SEG_2;
+    }
+    else if (kame_level == 0x2)
+    {
+        return KAME_SEG_3;
+    }
+    return KAME_SEG_1;
 }
 
 int kame_dis_id()
@@ -757,6 +772,10 @@ void kame_fly_loop()
         kame_end();
         return;
     }
+    if (kame_frame > 0 && kame_frame % KAME_SEG_EVERY == 0)
+    {
+        EffectModule(0x2710, kame_seg_id(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0x1);
+    }
     kame_move(kame_speed());
     kame_frame += 1;
 }
@@ -769,7 +788,6 @@ void kame_hold_main()
         kame_flown = kame_frame;
         kame_frame = 0;
     }
-    MotionModule(0x4, 0);
     kame_move(0);
     callFunc3(kame_hold_loop);
 }

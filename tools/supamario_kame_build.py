@@ -147,6 +147,7 @@ BODY_ANGLE, BODY_FKB = 0, 35
 # one finish for every level (the fireball has four motion slots)
 FINISH = dict(Damage=8.0, KBG=90, BKB=55, Size=8.0)
 FINISH_BACK = 30.0
+BODY_MAX = 40.0                   # the body capsule's longest (test 16: the hold plays the fly motion)
 FINISH_FRAMES = 3
 # the charge (fighter MSC): Mario's throw frozen at HOLD_FRAME; level 2 at 42, 3 at 78 charge
 # frames (the XV2 charge effect's steps), fires by itself at 100; the beam comes out at FIRE_FRAME
@@ -157,8 +158,7 @@ N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 6.0, 14.0, 42, 78, 100
 # shows a bigger ball and rings), spawned again every N_REFX frames
 N_CRG = ((0.5, 0.0), (1.0, 1.0), (1.6, 1.6))
 N_REFX = 40
-# after firing he holds the pose from N_POSE_FRAME while the beam exists, at most the longest beam
-# (fly + hold + finish / dissolve); in the air he floats down while charging (fall
+# after firing he holds the pose from N_POSE_FRAME for the beam's flight and dissolve at its level; in the air he floats down while charging (fall
 # acceleration / max fall a frame) and floats in place while posing (user, before test 12)
 N_POSE_FRAME = 16.0
 N_FALL_ACCEL, N_FALL_MAX = 0.02, 0.6
@@ -264,28 +264,27 @@ def weapon_scripts(heads, ids, segs):
         for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
             if -sp * f >= z1:
                 continue
+            if sp * (f - SEG_EVERY) >= BODY_MAX:      # it stays this long (the hold plays the motion on)
+                break
             g.append(cmd('frame', float(f)))
             g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z=z1, Z2=-sp * f,
                             Angle=BODY_ANGLE, FKB=BODY_FKB, **tick))
         game[name] = g
         # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
         # behind). Not at frame 0: a beam starts in status 0 (fly1) and is set to its level's
-        # status in the same frame, which plays its motion from 0 again
+        # status in the same frame, which plays its motion from 0 again. Terminate 1: they end when
+        # the game removes the beam (test 16: past a blast zone they stayed)
         e = [cmd('frame', 1.0)]
         for n, (x, y, z), size, follows in heads[lv]:
             z = (-z if HEAD_YROT == 180.0 else z) * UNIT
             if follows:
                 e.append(cmd('external_graphic', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT), float(z),
-                             0.0, HEAD_YROT, 0.0, float(size), 0))
+                             0.0, HEAD_YROT, 0.0, float(size), 1))
             else:
                 e.append(cmd('graphic_effect', eid(n), WEAPON_BONE, float(x * UNIT), float(y * UNIT),
                              float(z - sp + START_FORWARD),
-                             0.0, HEAD_YROT, 0.0, float(size), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0))
-        # the body pieces, dropped at the head (they stay where they are)
-        for f in range(SEG_EVERY, KAME_LIFE[lv] + 1, SEG_EVERY):
-            e.append(cmd('frame', float(f)))
-            e.append(cmd('graphic_effect', eid(segs[lv]), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0))
+                             0.0, HEAD_YROT, 0.0, float(size), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
+        # (the body pieces: the MSC drops them while it flies)
         effect[name] = e
         sound[name] = [cmd('sound_effect', SND_HEAD)]
     f = FINISH
@@ -299,7 +298,9 @@ def weapon_scripts(heads, ids, segs):
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst
     effect['finish'] = [cmd('terminate_graphic_effect', eid(n), 1, 1) for n in beam_effects(heads, segs)] + [
-        cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, 0)
+        # non-following (as the body pieces: test 16, following, the light shaft went into the screen),
+        # along the beam (the Fire cone runs along its +Z)
+        cmd('graphic_effect', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
         for n, size in ((MODEL_PREFIX + 'Fire', 1.8), ('PtcSupamarioKmhRing', 1.8), ('PtcSupamarioKmhWav', 2.8))]
     sound['finish'] = [cmd('sound_effect', SND_FIRE)]
     files = {}
@@ -455,7 +456,7 @@ def main():
         'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
         'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
         'KAME_N_POSE_FRAME': fl(N_POSE_FRAME),
-        'KAME_N_POSE_MAX': str(max(KAME_LIFE) + KAME_HOLD + max(KAME_FINISH, dis_frames) + 6),
+        **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i] + dis_frames) for i in range(3)},
         'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
         **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
         **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
@@ -481,6 +482,7 @@ def main():
         vals['KAME_SPEED_%d' % (lv + 1)] = fl(KAME_SPEED[lv])
         vals['KAME_LIFE_%d' % (lv + 1)] = str(KAME_LIFE[lv])
         vals['KAME_DIS_%d' % (lv + 1)] = eid(diss[lv])
+        vals['KAME_SEG_%d' % (lv + 1)] = eid(segs[lv])
     compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/weapons/kamehameha.c'), vals),
                 os.path.join(sup, 'script/msc/kamehameha/kamehameha.mscsb'), tmp)
     wdir = os.path.join(sup, 'script/animcmd/weapon/kamehameha')

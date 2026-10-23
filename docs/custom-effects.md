@@ -294,3 +294,21 @@ boilerplate `func_22` is `StatusModule(0x2, x)`, which sets the **situation**; a
 11: multi-hit for ever) and, from test 12, the hold's fallback removed the beam 10 frames later (no
 finish, no light shaft). Test 16: `kame_status()` = `StatusModule(0x3, status, 0)`. The test-15
 vtable 2 copy stays (the fireball's life / wall removal would cut the beam too).
+
+### Test 16 in game, and test 17 (`build/supamario_kame_test17.zip`)
+
+Test 16: the finish comes out. But:
+- the multi-hit hit once: the hold froze the fly motion (rate 0) and the re-hit timer stopped with it.
+  Test 17: the hold plays the fly motion on. The body pieces come from the MSC again (`EffectModule
+  0x2710`, every 2 frames, only while flying), and the fly ACMD's body capsule stops growing at 40
+  units (`BODY_MAX`), so the hold adds neither.
+- the beam's effects never ended past a blast zone (the game removes it there without its MSC):
+  the head / start / body effects now have Terminate 1 (test 11: Terminate-1 head effects lived
+  through the hit's status change and ended with the beam).
+- the light shaft (the Fire cone) went into the screen: following (`External_Graphic`) at the
+  weapon's bone 0 its rotation isn't the beam's; the finish's effects are now `Graphic_Effect`s like
+  the body pieces (which line up), the cone along the beam (the user's choice).
+- the pose was never held: `ArticleModule(0x2717, 5)` (vanilla's "article exists", e.g. Samus's
+  final smash) said no. Test 17: the pose holds for the level's flight + dissolve (81 / 91 / 100).
+  ArticleModule's MSC handler: accessor `+0x4C` vt `+0x17C`; `0x2717` calls vt `+0xFC(id)`, which in
+  the class at `0x10102B8C` returns 0 (the fighter's own class not found yet).
