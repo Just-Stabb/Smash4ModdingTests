@@ -74,10 +74,10 @@ TRACES = ('Beam', 'Beam2', 'Beam3')         # the three charge levels (EEPK effe
 TRACE_ALPHA = {0: 0.3}
 # ... and the white cloud of the tubes' textures (T2_UV01) too: near-white texels mostly transparent
 TRACE_WHITE_FADE = 0.85
-# test 8: "brightened a bit", and the beam "much faster": grows at 6 units a frame (was 2) to the
-# same lengths (2 units per XV2 extrude frame: 120 / 160 / 200), so in 20 / 27 / 34 frames; the
-# move's projectile should fly at TRACE_SPEED too
-TRACE_GAIN, TRACE_SPEED, TRACE_LENGTH_RATE = 1.3, 6.0, 2.0
+# test 8: "brightened a bit" (1.3, test 9: right) and "much faster"; test 9: "slightly slower" and
+# "about double the length": grows at 5 units a frame to 4 units per XV2 extrude frame
+# (240 / 320 / 400 units: 48 / 64 / 80 frames); the move's projectile flies at TRACE_SPEED too
+TRACE_GAIN, TRACE_SPEED, TRACE_LENGTH_RATE = 1.3, 5.0, 4.0
 SIDE = [(0, MODEL_PREFIX + 'Fire', HAND, None, 1.0), (0, 'PtcSupamarioKmhRing', HAND, None, 0.8),
         (0, MODEL_PREFIX + 'Beam', BODY, None, 1.0)]
 DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFireptcl', 0, (0, 0, -0.3), 1.6),
