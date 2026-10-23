@@ -77,5 +77,21 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   (Bas x1.6, Fireptcl, Wav, 4ptcl, LineAll, Hand x0.45, at their EEPK offsets). Package
   `build/supamario_kame_test.zip`. Not yet seen in game: sizes, the beam head's direction (XV2 +Z
   forward, taken as bone 0's +Z) and the model entries are the things to check.
+- Test 1 in game: particles and models show, blue, sized about right; the head model animates.
+  The beam head did not point the way Supamario faces, and the second down taunt crashed. The
+  Cemu log before the crash: `GX2RSetAttributeBuffer(): Offset exceeds buffer size` ~23 times a
+  frame. Its only caller is `0x036F3CE4` (vertex streams of `NU::DeviceWiiU` draw calls, the NU
+  model renderer: `NU::CommandBase` vtable `0x10207DCC`; eft draws with `GX2SetAttribBuffer`), so
+  the models, not the particles: a vertex buffer whose size is smaller than the stream offsets, as
+  when the NU buffer creator (`0x0372A468`, from the allocator at owner `+0x33C`) fails and leaves
+  the size 0. NU skins / streams model vertices into per-frame dynamic buffers
+  (`NU::DynamicVertexOffsetTable`, `CPUSkinningManager`, `GPUStreamOutSkinningManager`).
+  Not pinned down further. Test 2 (`build/supamario_kame_test2.zip`): lighter models
+  (`xv2_to_nud.py --plain 1`: cull none, no alpha test, no subtractive, as every vanilla effect
+  model; `--skip hand`: Kmh_Hand without its dark subtractive mesh), the down taunt terminating
+  its effects at frame 96, the beam head turned 180 degrees (`HEAD_YROT`).
+- Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
+  an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
+  (the cape at Z 9).
 - Still to do: the beam body (the ETR traces `Kmh_Beam*.etr`: tubes along the beam), then the
   move itself (projectile, hitboxes, charge logic).

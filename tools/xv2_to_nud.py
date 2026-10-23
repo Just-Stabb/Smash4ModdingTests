@@ -9,6 +9,8 @@ model folders (model.nud / .nut / .vbn / .omo / .mta / .xmb), see docs/xv2-model
       OUT_DIR/<prefix><Name>/ (Kmh_Fire -> EffSupamarioKameFire: the text after the first '_';
       without --prefix, Eff<Name>). --preview: verify the written folders and render them there.
       --matcol1 rgb: MatCol1 as an RGB multiplier (default mean: its RGB as one brightness).
+      --skip PART,...: leave these EMO parts out. --plain 1: only material settings the game's
+      effect models use (cull none, no alpha test, subtractive drawn additive).
   python3 tools/xv2_to_nud.py verify MODEL_DIR... [--preview DIR] [--src SRC_DIR]
       re-read every file with the repo readers (nud / nut / omo / mta / xmb / vbn), check the round
       trips (and, with --src, the textures and the bone animation against the XV2 files), render.
@@ -204,9 +206,11 @@ def _sample_vec(anim, mat_index, param, comps, frame, static):
 class Model:
     """one EMO with its EMM / EMB / obj.ema / mat.ema, converted"""
 
-    def __init__(self, src, name, folder, tex_base, scale=SCALE, anim_index=0, matcol1='mean'):
+    def __init__(self, src, name, folder, tex_base, scale=SCALE, anim_index=0, matcol1='mean', skip=(),
+                 plain=False):
         p = os.path.join(src, name)
         self.name, self.folder, self.scale, self.matcol1 = name, folder, scale, matcol1
+        self.skip, self.plain = set(skip), plain
         self.emo = xv2.Emo(open(p + '.emo', 'rb').read())
         self.emm = xv2.Emm(open(p + '.emm', 'rb').read()) if os.path.exists(p + '.emm') else None
         self.emb = list(Emb(open(p + '.emb', 'rb').read())) if os.path.exists(p + '.emb') else []
@@ -283,8 +287,15 @@ class Model:
         cull = 0 if int(p.get('BackFace', 0)) or int(p.get('TwoSidedRender', 0)) else 1029
         bias = float(p.get('IncidenceAlphaBias', 1.0))
         flags = FLAG_BASE | (FLAG_ANGLE_FADE if bias < 1.0 else 0)
+        if self.plain:
+            # only what the game's own effect models use: no culling, no alpha test, additive
+            # instead of subtractive (no vanilla effect model has dst 3 or an alpha test)
+            cull = 0
+            if dst == 3:
+                dst = 2
+                self.notes.append('%s: subtractive drawn additive (--plain)' % (m['name'] if m else '-'))
         mat = nud.Material(flags, src, dst, 0, 0, cull, 0, 0)
-        alpha_test = int(p.get('AlphaTest', 0))
+        alpha_test = 0 if self.plain else int(p.get('AlphaTest', 0))
         if alpha_test:
             mat.alpha_func, mat.ref_alpha = 0x204, alpha_test        # GL_GREATER, as the game's 4
         for s in samplers[:1]:
@@ -320,6 +331,9 @@ class Model:
         tex_ids = [self.tex_base + i for i in range(len(self.emb))]
         meshes, anims, seen = [], [], {}
         for part in self.emo.parts:
+            if part['name'] in self.skip:
+                self.notes.append('%s: left out (--skip)' % part['name'])
+                continue
             for g in part['emgs']:
                 xb = part['bone'] if part['bone'] is not None else g.bone
                 bone = xb + 1 if xb is not None and xb < len(sk.bones) else 0
@@ -664,7 +678,8 @@ def folder_name(name, prefix):
     return (prefix or 'Eff') + tail
 
 
-def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim=0, preview_dir=None, matcol1='mean'):
+def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim=0, preview_dir=None, matcol1='mean',
+            skip=(), plain=False):
     emos = sorted(os.path.basename(p)[:-4] for p in glob.glob(os.path.join(src, '*.emo')))
     names = emos if pattern == 'all' else [n for n in emos if fnmatch.fnmatch(n, pattern)]
     if not names:
@@ -672,7 +687,7 @@ def convert(src, pattern, out, prefix=None, scale=SCALE, tex_base=TEX_BASE, anim
     done = []
     for name in names:
         k = emos.index(name)
-        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1)
+        m = Model(src, name, folder_name(name, prefix), tex_base + 0x10 * k, scale, anim, matcol1, skip, plain)
         d = m.write(out)
         meshes = m.meshes_written
         print('%s -> %s' % (name, d))
@@ -732,7 +747,7 @@ def main():
         sys.exit(__doc__)
     convert(pos[0], pos[1], pos[2], opts.get('prefix'), float(opts.get('scale', SCALE)),
             int(opts.get('tex-base', hex(TEX_BASE)), 0), int(opts.get('anim', 0)), opts.get('preview'),
-            opts.get('matcol1', 'mean'))
+            opts.get('matcol1', 'mean'), [x for x in opts.get('skip', '').split(',') if x], opts.get('plain') == '1')
 
 
 if __name__ == '__main__':

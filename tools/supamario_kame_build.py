@@ -20,7 +20,9 @@ OUT_DIR/fighter/supamario/script/animcmd/body/effect.bin + sound.bin.
   side taunt: the release at the hand (effect 1), at frame 0: the Fire model + Ring x0.8; the fire sound;
   down taunt: the beam head (effect 3) in front of him: Bas model x1.6, Fireptcl x1.6, Wav x1.8,
   4ptcl x1.6, LineAll, Hand model x0.45; the beam-head sound.
-  All with Terminate = 1 (they end with the taunt; the beam parts loop until then). The taunts'
+  All with Terminate = 1 (they end with the taunt; the beam parts loop until then, and the down
+  taunt also stops its parts with Terminate_Graphic_Effect at frame 96). The beam-head parts are
+  turned 180 degrees (HEAD_YROT); the models get MODEL_OPTS. The taunts'
   own effect scripts (the up taunt's colour flashes) are replaced; their sound scripts keep their
   sounds, with ours at frame 0.
 """
@@ -42,6 +44,16 @@ UNIT = xv2_to_ptcl.UNIT
 BANK = 0x0341
 HAND = 0x11                       # the bone Mario's fireball throw uses (SpecialN)
 FRONT = (0.0, 7.0, 14.0)          # the beam head: bone 0 (Top), 7 up, 14 in front
+# the XV2 parts at TRS face their -Z (test 1, 2026-10-23: with +Z forward the head did not point the
+# way Supamario faces): turned 180 degrees about Y, so their z offsets change sign too
+HEAD_YROT = 180.0
+DOWN_END = 96                     # the down taunt (100 frames) ends its looping parts here
+# model conversion options (tools/xv2_to_nud.py): --plain 1 everywhere (only the material settings
+# the game's effect models use); Kmh_Hand without its subtractive 'hand' mesh. Test 1 crashed on the
+# second down taunt with the model renderer's skinned-vertex buffer overflowing (Cemu log:
+# GX2RSetAttributeBuffer offset exceeds buffer size, from NU::DeviceWiiU)
+MODEL_OPTS = {'Kmh_Fire': ['--plain', '1'], 'Kmh_Bas': ['--plain', '1'],
+              'Kmh_Hand': ['--plain', '1', '--skip', 'hand']}
 SND_CHARGE, SND_FIRE, SND_HEAD = 0x0CB1008B, 0x0CB1008C, 0x0CB1008D
 MODEL_PREFIX = 'EffSupamarioKame'
 
@@ -62,19 +74,28 @@ def cmd(name, *params):
     return acmd.Command(acmd.BY_NAME[name], list(params))
 
 
-def taunt_script(parts, ids):
-    """External_Graphic per part at its frame (XV2 offsets are units x UNIT, in front for bone 0)"""
+def taunt_script(parts, ids, end=None):
+    """External_Graphic per part at its frame (XV2 offsets are units x UNIT, in front for bone 0,
+    turned HEAD_YROT); with end, Terminate_Graphic_Effect for every part at that frame"""
     out, frame = [], 0
     for f, name, bone, off, size in sorted(parts, key=lambda x: x[0]):
         if f > frame:
             out.append(cmd('frame', float(f)))
             frame = f
+        yrot = 0.0
         if bone == 0:
-            x, y, z = (FRONT[i] + (off or (0, 0, 0))[i] * UNIT for i in range(3))
+            off = off or (0, 0, 0)
+            x, y = FRONT[0] + off[0] * UNIT, FRONT[1] + off[1] * UNIT
+            z = FRONT[2] + (-off[2] if HEAD_YROT == 180.0 else off[2]) * UNIT
+            yrot = HEAD_YROT
         else:
             x = y = z = 0.0
         out.append(cmd('external_graphic', (BANK << 16) | ids[name], bone, float(x), float(y), float(z),
-                       0.0, 0.0, 0.0, float(size), 1))
+                       0.0, float(yrot), 0.0, float(size), 1))
+    if end is not None:
+        out.append(cmd('frame', float(end)))
+        for name in dict.fromkeys(p[1] for p in parts):
+            out.append(cmd('terminate_graphic_effect', (BANK << 16) | ids[name], 1, 1))
     return out
 
 
@@ -99,9 +120,9 @@ def main():
     open(os.path.join(fx, 'supamario.010d0000.ptcl'), 'wb').write(data)
 
     # models
-    for name in ('Kmh_Fire', 'Kmh_Bas', 'Kmh_Hand'):
+    for name, opts in MODEL_OPTS.items():
         subprocess.run([sys.executable, os.path.join(HERE, 'xv2_to_nud.py'), pkg, name, os.path.join(fx, 'model'),
-                        '--prefix', MODEL_PREFIX], check=True, capture_output=True)
+                        '--prefix', MODEL_PREFIX] + opts, check=True, capture_output=True)
     for m in ('Fire', 'Bas', 'Hand'):
         assert os.path.exists(os.path.join(fx, 'model', MODEL_PREFIX + m, 'model.nud')), m
     for m in os.listdir(os.path.join(v5, 'effect/supamario/model')):
@@ -124,7 +145,8 @@ def main():
     for anim, (parts, sound) in TAUNTS.items():
         for side in 'RL':
             name = anim + side
-            eff.scripts[acmd.crc(name)] = taunt_script(parts, ids) + [acmd.Command(acmd.END)]
+            eff.scripts[acmd.crc(name)] = taunt_script(parts, ids, DOWN_END if anim == 'AppealLw' else None) + [
+                acmd.Command(acmd.END)]
             s = [c for c in (snd.script(name) or []) if c.ident not in (acmd.BY_NAME['sound_effect'], acmd.END)
                  or (c.ident == acmd.BY_NAME['sound_effect'] and c.params[0] not in (SND_CHARGE, SND_FIRE, SND_HEAD))]
             snd.scripts[acmd.crc(name)] = [cmd('sound_effect', sound)] + s + [acmd.Command(acmd.END)]
