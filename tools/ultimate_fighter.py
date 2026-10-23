@@ -169,8 +169,10 @@ class Skeleton:
             out += struct.pack('<9f', *t, *euler_of(r), *s)
         return out
 
-    def jtb(self, base_jtb, base_vbn):
-        """the base's joint table with each bone index moved to ours (same name, else a stand-in)"""
+    def jtb(self, base_jtb, base_vbn, standins=None):
+        """the base's joint table with each bone index moved to ours (same name, else a stand-in,
+        else the nearest standard bone above it in the base's skeleton)"""
+        standins = JOINT_STANDINS if standins is None else standins
         d = base_jtb
         n1, n2 = struct.unpack('>HH', d[:4])
         vals = list(struct.unpack('>%dh' % (n1 + n2), d[4:4 + 2 * (n1 + n2)]))
@@ -180,16 +182,23 @@ class Skeleton:
             if name in self.by_name:
                 out.append(self.by_name[name])
             else:
-                stand = JOINT_STANDINS[name]
-                out.append(self.index[stand])
+                stand = standins.get(name)
+                if stand in self.index:
+                    out.append(self.index[stand])
+                    continue
+                b = v
+                while base_vbn[b][0] not in self.by_name:
+                    b = base_vbn[b][1]
+                out.append(self.by_name[base_vbn[b][0]])
         return struct.pack('>HH', n1, n2) + struct.pack('>%dh' % len(out), *out) + d[4 + 2 * len(vals):]
 
 
-def needed_bones(src_dirs):
+def needed_bones(src_dirs, standins=None):
     """the Ultimate bones a Smash 4 skeleton needs: those the meshes of src_dirs are skinned or bound
     to, the standard ones, the shoulder pad helpers (the joint table's stand-ins), their ancestors"""
     import ssbh_data_py as s
-    need = set(u for _s4, u in STANDARD) | set(JOINT_STANDINS.values())
+    standins = JOINT_STANDINS if standins is None else standins
+    need = set(u for _s4, u in STANDARD) | set(standins.values())
     par = {}
     for d in src_dirs:
         sk = s.skel_data.read_skel(d + '/model.nusktb')
@@ -454,6 +463,9 @@ def material_for(tex, mat, tmpl, part):
         col = tex.color(tx['Texture0'], tx.get('Texture6'), tx.get('Texture5'))
     nor = tex.normal(tx['Texture4'], tx.get('Texture6')) if 'Texture4' in tx else None
     m = (tmpl['blend'] if blend else tmpl['opaque']).copy()
+    if not blend and 'punchthrough' in mat.material_label.lower():
+        m.alpha_func, m.ref_alpha = 518, 128             # alpha-tested (fur cards), as stage cut-outs
+
     m.textures[0]['hash'] = col
     if nor is not None:
         m.textures[1]['hash'] = nor
@@ -474,7 +486,7 @@ def templates(base_nud):
     for m in base_nud:
         for p in m.polygons:
             for mt in p.materials:
-                if mt.flags == 0x9A011063 and mt.src == 0 and len(mt.textures) == 3:
+                if mt.flags in (0x9A011063, 0x9A013063) and mt.src == 0 and len(mt.textures) == 3:
                     op = mt.copy()
                     bl = mt.copy()
                     bl.src, bl.dst = 1, 1
@@ -500,17 +512,16 @@ def empty_polygon(tmpl):
 def build_model(src, base, out, tex_id=TEX_ID, log=print):
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model.vbn')
-    sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn, needed_bones([src]))
+    base_nud = nud.read(base + '/model.nud')
+    pname, prof = profile_for(m.name for m in base_nud)
+    sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn, needed_bones([src], prof['joints']))
     world = sk.world()
     parts = mesh_parts(src)
-    base_nud = nud.read(base + '/model.nud')
-    base_names = [m.name for m in base_nud]
-    assert base_names == [n for n, _ in MESH_SLOTS], 'the base mesh list differs from MESH_SLOTS'
     tmpl = templates(base_nud)
     tex = Textures(src, tex_id)
     meshes = []
     used = set()
-    for slot, ults in MESH_SLOTS:
+    for slot, ults in prof['slots']:
         polys = []
         for u in ults:
             for part in parts.get(u, []):
@@ -525,18 +536,18 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print):
                 polys.append(p)
         meshes.append(nud.Mesh(slot, polys or [empty_polygon(tmpl)], bone=-1, bind=4))
     left = sorted(set(parts) - used)
-    log('skeleton: %d bones (of %d Ultimate, %s folded); meshes: %d slots, %d Ultimate meshes used, left out: %s' % (
-        len(sk.bones), len(sk.ult_names), '/'.join(FOLD), len(meshes), len(used), ', '.join(left)))
+    log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded); meshes: %d slots, %d Ultimate meshes used, left out: %s' % (
+        pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), len(meshes), len(used), ', '.join(left)))
     os.makedirs(out, exist_ok=True)
     for f in os.listdir(base):
         if os.path.isfile(os.path.join(base, f)):
             shutil.copy(os.path.join(base, f), os.path.join(out, f))
     open(out + '/model.vbn', 'wb').write(sk.vbn())
-    open(out + '/model.jtb', 'wb').write(sk.jtb(open(base + '/model.jtb', 'rb').read(), base_vbn))
+    open(out + '/model.jtb', 'wb').write(sk.jtb(open(base + '/model.jtb', 'rb').read(), base_vbn, prof['joints']))
     open(out + '/model.nud', 'wb').write(nud.write(meshes, top_bone=len(sk.bones) - 1))
     # metal: the base's metal material on every polygon (its textures: the base's metal one, ours as normal)
     metal = nud.read(base + '/metal.nud')
-    mm = metal[1].polygons[0].materials[0].copy()
+    mm = next(p.materials[0] for m in metal for p in m.polygons if len(p.materials[0].textures) >= 4).copy()
     metal_tex = tex.add(('metal',), base_texture(base + '/model.nut', mm.textures[0]['hash']), 256)
     for m in meshes:
         for p in m.polygons:
@@ -597,6 +608,72 @@ MOTION_STANDINS = {
 # Ultimate visibility -> the mesh slot it drives (MESH_SLOTS); slots listed with None are always hidden
 VIS_SLOTS = {'edge_swordL': 'skirt_VIS_O_OBJ16', 'edge_swordR': 'polySurface5817_VIS_O_OBJ'}
 HIDDEN_SLOTS = ('Zelda_DamageFlyFront_VIS_O_OBJ',)       # the wing (its own form, later)
+
+# Bowser's mesh slots for Incineroar: Bowser's faces are whole-face meshes, so the open eyelids go
+# with the body (always shown) and each mouth shape takes a face
+_NAILS = ['gaogaen_handnail_%s%s_VIS_O_OBJShape' % (s, c) for s in 'LR' for c in 'ABCDE'] + \
+         ['gaogaen_footnail_LA_VIS_O_OBJShape', 'gaogaen_footnail_RA_VIS_O_OBJShape']
+KOOPA_SLOTS = [
+    ('koopa_body_VIS_O_OBJ', ['GamemodelShape', 'gaogaen_fur_highShape', 'gaogaen_emissivefur_body_VIS_O_OBJShape',
+                              'gaogaen_belt_highShape', 'gaogaen_Openblink_VIS_O_OBJShape'] + _NAILS),
+    ('koopa_Eye_VIS_O_OBJ', ['gaogaen_Eye_VIS_O_OBJShape']),
+    ('koopa_faceN_VIS_O_OBJ', ['gaogaen_FaceN_Mouth_VIS_O_OBJShape']),
+    ('koopa_FaceOuchM_VIS_O_OBJ', ['gaogaen_Ouch_Mouth_VIS_O_OBJShape']),
+    ('koopa_FaceTalkM_VIS_O_OBJ', ['gaogaen_Talk_Mouth_VIS_O_OBJShape']),
+    ('koopa_FaceDownM_VIS_O_OBJ', ['gaogaen_Bound_Mouth_VIS_O_OBJShape']),
+    ('koopa_AttackM_VIS_O_OBJ', ['gaogaen_Attack_Mouth_VIS_O_OBJShape']),
+    ('koopa_Capture_VIS_O_OBJ', ['gaogaen_Capture_Mouth_VIS_O_OBJShape']),
+    ('koopa_HeavyOuch_VIS_O_OBJ', ['gaogaen_HeavyOuch_Mouth_VIS_O_OBJShape']),
+    ('koopa_Cliff_VIS_O_OBJ', ['gaogaen_Heavyattack_Mouth_VIS_O_OBJShape']),
+    ('koopa_Furafura_VIS_O_OBJ', ['gaogaen_Furafura_Mouth_VIS_O_OBJShape']),
+    ('koopa_Escape_VIS_O_OBJ', ['gaogaen_Escape_Mouth_VIS_O_OBJShape']),
+    ('koopa_Ottotto_VIS_O_OBJ', ['gaogaen_Ottotto_Mouth_VIS_O_OBJShape']),
+    ('koopa_NeckIron_VIS_O_OBJ', []),
+    ('koopa_LhornsM_VIS_O_OBJ', []),
+    ('koopa_RhornsM_VIS_O_OBJ', []),
+    ('koopa_ArmIron_VIS_O_OBJ', []),
+    ('koopa_HairA_VIS_O_OBJ', []),
+    ('koopa_ShellBodyM_VIS_O_OBJ', []),
+    ('koopa_ShellM1_VIS_O_OBJ', []),
+    ('koopa_Harfblink1_VIS_O_OBJ', ['gaogaen_Halfblink_VIS_O_OBJShape']),
+    ('koopa_Harfblink2_VIS_O_OBJ', ['gaogaen_Halfblink_VIS_O_OBJShape']),
+    ('koopa_Blink_VIS_O_OBJ', ['gaogaen_Blink_VIS_O_OBJShape']),
+    ('koopa_Shell_VIS_O_OBJ', []),
+]
+KOOPA_JOINTS = {'TailNa': 'Tail1', 'TailNb': 'Tail2', 'TailNc': 'Tail3', 'TailNd': 'Tail4',
+                'LHornN': 'EarL', 'RHornN': 'EarR', 'LToe1stN': 'ToeL', 'LToe2ndN': 'ToeL', 'LToe3rdN': 'ToeL',
+                'RToe1stN': 'ToeR', 'RToe2ndN': 'ToeR', 'RToe3rdN': 'ToeR'}
+KOOPA_MOTIONS = {
+    'd00specialnstart': 'd00specialn', 'd00specialnend': 'd00specialn',
+    'd00specialairnstart': 'd00specialairn', 'd00specialairnend': 'd00specialairn',
+    'd01specialssquat': 'd01specialsstart', 'd01specialscatch': 'd01specialslariat',
+    'd01specialsaircatch': 'd01specialairslariat', 'd01specialsjump': 'd01specialsthrow',
+    'd01specialsfall': 'd01specialairsthrow', 'd01specialslanding': 'd01specialsend',
+    'd02specialhi': 'd02specialhistart', 'd02specialairhi': 'd02specialairhistart',
+    'd03speciallw': 'd03speciallw', 'd03specialairlw': 'd03specialairlw', 'd03speciallwlanding': 'd03speciallwstart',
+    'd04finalstart': 'd04finalstart', 'd04finalend': 'd04finalend',
+    'd04finalairstart': 'd04finalairstart', 'd04finalairend': 'd04finalairend',
+    'a05squatb': 'a05squat', 'a05squatf': 'a05squat', 'e01specialszitabata': 'e01thrownf',
+    'e01specialsdxzitabata': 'e01throwndxf', 'e01specialsgirlzitabata': 'e01throwngirlf',
+    'i00swimend': 'i00swimrise', 'i00swimf': 'i00swim', 'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr',
+    'j00entry': 'j00entryr',
+}
+# a base fighter's profile: its mesh slots, joint-table stand-ins, motion stand-ins (its specials),
+# Ultimate visibility tracks driving slots (with the default where a motion has none), slots hidden
+PROFILES = {
+    'zelda': dict(slots=MESH_SLOTS, joints=JOINT_STANDINS, motions=MOTION_STANDINS, vis=VIS_SLOTS,
+                  vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
+    'koopa': dict(slots=KOOPA_SLOTS, joints=KOOPA_JOINTS, motions=dict(MOTION_STANDINS, **KOOPA_MOTIONS), vis={},
+                  vis_default={}, hidden=()),
+}
+
+
+def profile_for(base_mesh_names):
+    base_mesh_names = list(base_mesh_names)
+    for name, p in PROFILES.items():
+        if [n for n, _ in p['slots']] == list(base_mesh_names):
+            return name, p
+    raise SystemExit('no profile with the base mesh list %s' % list(base_mesh_names))
 
 
 def _quat_mat(q):
@@ -766,9 +843,10 @@ def build_motions(motion_dir, src_model, base, out, log=print):
     import mta
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model/body/c00/model.vbn')
+    _pn, prof = profile_for(m.name for m in nud.read(base + '/model/body/c00/model.nud'))
     costumes = [os.path.join(os.path.dirname(src_model), c) for c in sorted(os.listdir(os.path.dirname(src_model)))
                 if os.path.exists(os.path.join(os.path.dirname(src_model), c, 'model.numshb'))]
-    sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, needed_bones(costumes))
+    sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, needed_bones(costumes, prof['joints']))
     constraints = helper_constraints(src_model)
     have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}
     frames_of, vis_of = {}, {}
@@ -783,7 +861,7 @@ def build_motions(motion_dir, src_model, base, out, log=print):
         head = omo.Omo(main[0][1]).head
         for name, data in main:
             key = name[len(prefix):-4].lower()
-            ult = key if key in have else MOTION_STANDINS.get(key)
+            ult = key if key in have else prof['motions'].get(key)
             if ult not in have:
                 missing.append(key)
                 ult = 'a00wait1'
@@ -831,10 +909,10 @@ def build_motions(motion_dir, src_model, base, out, log=print):
                         ks = [(min(k[0], frames - 1), k[1]) for k in v['keys']]
                         vis.append((v['name'], sorted(set(ks))))
                 if pac == 'material_anime_face.pac':
-                    for uname, slot in VIS_SLOTS.items():
+                    for uname, slot in prof['vis'].items():
                         st = vis_of[mname].get(uname)
-                        vis.append((slot, vis_keys(st) if st is not None else [(0, 1 if slot == VIS_SLOTS['edge_swordL'] else 0)]))
-                    for slot in HIDDEN_SLOTS:
+                        vis.append((slot, vis_keys(st) if st is not None else [(0, prof['vis_default'].get(slot, 0))]))
+                    for slot in prof['hidden']:
                         vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))

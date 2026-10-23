@@ -41,6 +41,18 @@
         "name": "Sephiroth",
         "subtitle": "One-Winged Angel"
       }
+    },
+    {
+      "kind": "0x43",
+      "name": "gaogaen",
+      "cap": "Gaogaen",
+      "base": "koopa",
+      "ai": "base",
+      "ui": {
+        "id": 61,
+        "name": "Incineroar",
+        "subtitle": "Heel Pokémon"
+      }
     }
   ],
   "weapon_capacity": "0x1C0"

@@ -72807,6 +72807,7 @@ int kirby_copy_trait(int kind)
     if (kind == 0xb)  { return trait_technical(); } // Luigi
     if (kind == 0x41) { return trait_normal(); }    // Supamario (new kind, docs/kind-expansion.md)
     if (kind == 0x42) { return trait_technical(); } // Sephiroth (edge, new kind, Zelda base)
+    if (kind == 0x43) { return trait_juggernaut(); } // Incineroar (gaogaen, new kind, Bowser base)
     return trait_normal();                       // not listed yet
 }
 
