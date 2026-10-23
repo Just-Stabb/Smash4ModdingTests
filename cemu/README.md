@@ -10,7 +10,16 @@ as patches against one pinned Cemu commit; you build Cemu yourself.
 |---|---|
 | `patches/0001-smash4-rollback-probe.patch` | Phase 1 probe: logs battle seeds, clock seeds, threads, time reads, heap creation, frame times and which memory a battle writes; can force the seeds |
 
-## Build on Windows
+## Ready-made build (GitHub Actions)
+
+`.github/workflows/cemu-smash4.yml` builds Cemu at the commit above with every patch in `patches/`,
+on GitHub's Windows machines, whenever a patch changes (or by hand: Actions tab > "Cemu (Smash 4
+patches)" > Run workflow). On the finished run's page, under **Artifacts**, download
+`cemu-smash4-windows-x64`: `Cemu.exe` with its `gameProfiles` and `resources` folders. Unzip it to its
+own folder and run `Cemu.exe`; it uses your normal Cemu settings (`%APPDATA%\Cemu`). The first run
+takes about 1-2 hours (it builds Cemu's libraries; later runs reuse them from the cache).
+
+## Build on Windows yourself
 
 Needs git and Visual Studio 2022 with "C++ CMake tools for Windows" and a Windows 10/11 SDK (Cemu's
 BUILD.md).

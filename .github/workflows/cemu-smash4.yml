@@ -1,0 +1,83 @@
+# Builds Cemu for Windows with this repo's Smash 4 patches (cemu/README.md, docs/rollback-netplay.md).
+# Download the result from the run's page: Artifacts > cemu-smash4-windows-x64.
+name: Cemu (Smash 4 patches)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "cemu/patches/**"
+      - ".github/workflows/cemu-smash4.yml"
+
+env:
+  CEMU_COMMIT: 29f2f1fae4631e2317977debd9eacd55cc28dd7d   # keep in step with cemu/README.md
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Keep line endings as they are (the patches need LF)
+        run: git config --global core.autocrlf false
+
+      - name: Checkout this repo (patches)
+        uses: actions/checkout@v4
+        with:
+          path: mod
+
+      - name: Checkout Cemu
+        uses: actions/checkout@v4
+        with:
+          repository: cemu-project/Cemu
+          ref: ${{ env.CEMU_COMMIT }}
+          submodules: recursive
+          path: Cemu
+
+      - name: Apply patches
+        shell: bash
+        run: |
+          cd Cemu
+          for p in ../mod/cemu/patches/*.patch; do
+            echo "applying $p"
+            git apply --whitespace=nowarn "$p"
+          done
+          git status --short
+
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.29.0"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-win-${{ env.CEMU_COMMIT }}
+          restore-keys: vcpkg-win-
+
+      - name: Bootstrap vcpkg
+        run: ./Cemu/dependencies/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force vcpkg-cache | Out-Null
+          $env:VCPKG_DEFAULT_BINARY_CACHE = "$env:GITHUB_WORKSPACE\vcpkg-cache"
+          cmake -S Cemu -B Cemu/build -DCMAKE_BUILD_TYPE=release -DVCPKG_INSTALL_OPTIONS="--clean-after-build"
+
+      - name: Build
+        run: cmake --build Cemu/build --config release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item Cemu/bin/Cemu_release.exe out/Cemu.exe
+          Copy-Item -Recurse Cemu/bin/gameProfiles out/gameProfiles
+          Copy-Item -Recurse Cemu/bin/resources out/resources
+          Copy-Item mod/cemu/README.md out/README-smash4.md
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cemu-smash4-windows-x64
+          path: out/
