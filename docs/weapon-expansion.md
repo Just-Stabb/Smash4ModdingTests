@@ -105,5 +105,8 @@ kind 0x185 on any build without this fix (the unpatched code indexes the table w
 unconditionally), so the fix stays; whether the fireball runs on an older RPX with the files in
 place would tell whether something else gates that path.
 
+**In game (user, Minecraft World v18i's RPX with the fix and Supamario's files): every special works**
+(fireball, cape, F.L.U.D.D. and up special).
+
 Still possible: other per-kind data indexed without a bound, met further into a match. A crash log
 with a different address would show the next one.
