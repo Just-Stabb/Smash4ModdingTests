@@ -3,7 +3,13 @@
 reverse tilts, tilts / down smash / shield out of run (and out of the dash and the turns), and
 roll-off (the MSC side; the rolls' ACMD speed is tools/rolloff_acmd.py).
 
-  python3 tools/universal_mechanics.py IN.c OUT.c [--air-mult 1.0] [--name Fighter]
+  python3 tools/universal_mechanics.py IN.c OUT.c [--air-mult 1.0] [--name Fighter] [--ground-uncapped]
+
+--ground-uncapped (fighters the user picks): the roll's speed isn't held to the ground speed limit.
+Every roll frame, KineticModule(0x15, 3, -1, -1): no speed limit on energy 3 (the stick-driven
+energy kinetic type 0x6 sets up, which the roll's ACMD speed goes into), the game's own pattern
+after an energy reset (KineticModule(0xe, 3, ...) then (0x15, 3, -1, -1)). Without it a roll speed
+above the limit is cut down to it (user: Pikachu's 80 rolled like 8).
 
 Works on any fighter's common status scripts: the functions are found through the status table
 (sv_set_mem(0x1, kind, status, func_N): kind 0 pre, 1 main, 2 end) and the loops through the
@@ -124,7 +130,7 @@ class Fighter:
         return self.nl.join(self.lines)
 
 
-def patch(src, air_mult=1.0, name='the fighter'):
+def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
     f = Fighter(src)
     if any('rolloff_update()' in l for l in f.lines) or any('run_attack_update()' in l for l in f.lines):
         raise Fail('already has roll-off / run attacks (hand-patched fighter)')
@@ -249,8 +255,12 @@ def patch(src, air_mult=1.0, name='the fighter'):
     f.log.append('roll-off: Fall main %s, end %s' % (fall_main, fall_end))
 
     # --- the added functions (at the end, so the original functions keep their numbers)
+    uncap = ''
+    if ground_uncapped:
+        uncap = ('''    KineticModule(0x15, 0x3, -1.0f, -1.0f); // no ground speed limit on the roll's speed (user: %s)
+''' % name)
     helpers = HELPERS % dict(name=name, hold=g_hold, slid=g_slid, cap=g_cap, mult='%rf' % float(air_mult),
-                             change=change)
+                             change=change, uncap=uncap)
     while f.lines and f.lines[-1] == '':
         f.lines.pop()
     f.lines += [''] + helpers.split('\n')
@@ -296,7 +306,7 @@ void rolloff_update()
     {
         %(hold)s = 0; // new roll
     }
-    if (%(hold)s < rolloff_lock_frames())
+%(uncap)s    if (%(hold)s < rolloff_lock_frames())
     {
         if (ControlModule(0x2712, 0x3))
         {
@@ -374,9 +384,10 @@ def main():
     ap.add_argument('dst')
     ap.add_argument('--air-mult', type=float, default=1.0)
     ap.add_argument('--name', default='the fighter')
+    ap.add_argument('--ground-uncapped', action='store_true')
     a = ap.parse_args()
     try:
-        f = patch(open(a.src).read(), a.air_mult, a.name)
+        f = patch(open(a.src).read(), a.air_mult, a.name, a.ground_uncapped)
     except Fail as e:
         print('FAILED: %s' % e)
         sys.exit(1)

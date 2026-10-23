@@ -28,6 +28,13 @@ with the tools:
 Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2.1 / 1.0 (Overdrive
 2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.8** (user).
 
+**Ground speed cap (picked fighters only, user):** on the ground the roll's speed (kinetic energy 3,
+the one type 0x6 sets up: `0x02E7A4DC` case 6 → `0x02C5474C(3, ...)`) is held to the energy's speed
+limit, so a roll speed above it is cut down (Pikachu's 80 rolled like 8). `universal_mechanics.py
+--ground-uncapped` makes `rolloff_update()` call `KineticModule(0x15, 3, -1, -1)` every roll frame
+(no limit: the game's own pattern after resetting energy 3, `KineticModule(0xe, 3, ...)`). On:
+**Pikachu**. Not in game-tested yet: that op 0x15 is the limit that applies here.
+
 ## Reverse tilts
 
 Up tilt and down tilt can be done facing the other way: if the stick is held backward
