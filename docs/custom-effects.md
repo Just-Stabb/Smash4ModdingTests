@@ -97,6 +97,13 @@ Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `to
   `Cor` blue. Test 3 (`supamario_kame_build.py --diag`, `build/supamario_kame_test3.zip`): the
   down taunt's pieces one per taunt (up: Bas model, side: Hand model, down: its particles) to
   find the one that crashes.
+- Test 3: only the down taunt (the beam head's particle sets: Fireptcl, Wav, 4ptcl, 4ptcl_2,
+  LineAll) crashed; the Bas and Hand models alone did not. Values in those sets that no vanilla
+  emitter has (7767 checked): life random above life (`wev01_short` 8 +/- 10: XV2's
+  Lifetime_Variance exceeds Lifetime), negative emitter velocity (`ring_2`), and a 310-particle
+  emitter (vanilla p99 66, max 520). `xv2_to_ptcl.sanitize` now clamps them. Test 4
+  (`--diag2`, `build/supamario_kame_test4.zip`): the whole beam head on the down taunt, its sets
+  in two halves on the up / side taunts.
 - Orientation (from Mario's cape: `EffMarioSupermant1_L` is `EffMarioSupermant1` mirrored in Z):
   an effect at bone 0 is in the fighter's facing-turned frame, +Z forward, Z offsets in front
   (the cape at Z 9).

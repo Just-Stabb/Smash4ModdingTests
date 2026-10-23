@@ -449,7 +449,40 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     if p.field(em, 'keyanim_size'):
         notes.append('template key animation dropped')
         p.set_field(em, 'keyanim_size', 0)
+    notes += sanitize(p, em)
     return em, name, notes
+
+
+MAX_LIVE = 200      # particles alive at once per emitter (vanilla: p99 66, max 520)
+
+
+def sanitize(p, em):
+    """keep the emitter inside what the 7767 vanilla emitters do (test 3: a beam-head set crashed the
+    game some time after it played; these were the values no vanilla emitter has):
+    - life random <= life (vanilla: at most equal; XV2 Lifetime_Variance can exceed Lifetime and a
+      particle could get a negative life);
+    - no negative emitter velocity (none in vanilla): the direction reversed instead;
+    - a circle / sphere volume of radius 0 is a point;
+    - at most MAX_LIVE particles alive (the emission rate lowered)"""
+    notes = []
+    life, rnd = p.field(em, 'ptcl_life'), p.field(em, 'ptcl_life_random')
+    if rnd >= life:
+        p.set_field(em, 'ptcl_life_random', max(0, life - 1))
+        notes.append('life random %d -> %d' % (rnd, max(0, life - 1)))
+    v = p.field(em, 'emitter_velocity')
+    if v < 0:
+        p.set_field(em, 'emitter_velocity', -v)
+        p.set_field(em, 'emit_direction', [-c for c in p.field(em, 'emit_direction')])
+        notes.append('negative velocity reversed')
+    if p.field(em, 'volume_type') and max(p.field(em, 'volume_radius')) <= 0:
+        p.set_field(em, 'volume_type', 0)
+    iv = p.field(em, 'emit_interval') + 1
+    alive = p.field(em, 'emit_rate') * math.ceil((life + p.field(em, 'ptcl_life_random')) / iv)
+    if alive > MAX_LIVE:
+        rate = max(1.0, p.field(em, 'emit_rate') * MAX_LIVE / alive)
+        p.set_field(em, 'emit_rate', float(rate))
+        notes.append('rate capped to %.2g (%d alive)' % (rate, alive))
+    return notes
 
 
 def convert_emp(p, pkg, images, emp_name, prefix, unit, log):

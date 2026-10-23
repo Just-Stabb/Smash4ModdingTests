@@ -2,7 +2,7 @@
 """Supamario's Kamehameha effects from Dragon Ball Xenoverse 2's 000_GOK_KMH package, played from
 his taunts as an in-game test (before the move exists).
 
-  python3 tools/supamario_kame_build.py PKG_DIR SUPAMARIO_V4 SUPAMARIO_V5 OUT_DIR [--diag]
+  python3 tools/supamario_kame_build.py PKG_DIR SUPAMARIO_V4 SUPAMARIO_V5 OUT_DIR [--diag | --diag2]
 
 PKG_DIR: the extracted .vfxpackage. SUPAMARIO_V4 / _V5: the fighter/supamario folders of the v4 and
 v5 packages (v4's ptcl is the base; v5 has the .efc entry 0x16 and the scripts). Writes
@@ -71,6 +71,13 @@ DOWN = [(0, MODEL_PREFIX + 'Bas', 0, (0, 0, 0), 1.6), (0, 'PtcSupamarioKmhFirept
 # taunt -> (parts, sound, frame to terminate them or None)
 TAUNTS = {'AppealHi': (UP, SND_CHARGE, None), 'AppealS': (SIDE, SND_FIRE, None),
           'AppealLw': (DOWN, SND_HEAD, DOWN_END)}
+# --diag2 (test 4): test 3 crashed with the down taunt's particles (not the models); the
+# converter now keeps emitters inside the vanilla ranges (xv2_to_ptcl.sanitize). The down taunt
+# plays the whole beam head again; the up / side taunts its particle sets in two halves
+HEAD_SETS = [p for p in DOWN if not p[1].startswith(MODEL_PREFIX)]
+DIAG2 = {'AppealHi': ([p for p in HEAD_SETS if p[1].endswith(('Fireptcl', 'Wav'))], SND_HEAD, 176),
+         'AppealS': ([p for p in HEAD_SETS if not p[1].endswith(('Fireptcl', 'Wav'))], SND_HEAD, DOWN_END),
+         'AppealLw': (DOWN, SND_HEAD, DOWN_END)}
 # --diag (test 3): test 2 still crashed some time after a down taunt (one is enough; the side
 # taunt, with the Fire model, never): the down taunt's pieces one per taunt, to find the one
 DIAG = {'AppealHi': ([p for p in DOWN if p[1] == MODEL_PREFIX + 'Bas'], SND_HEAD, 176),
@@ -108,11 +115,11 @@ def taunt_script(parts, ids, end=None):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != '--diag']
+    args = [a for a in sys.argv[1:] if not a.startswith('--diag')]
     if len(args) != 4:
         sys.exit(__doc__)
     pkg, v4, v5, out = args
-    taunts = DIAG if '--diag' in sys.argv else TAUNTS
+    taunts = DIAG2 if '--diag2' in sys.argv else DIAG if '--diag' in sys.argv else TAUNTS
     fx = os.path.join(out, 'fighter/supamario/effect/supamario')
     body = os.path.join(out, 'fighter/supamario/script/animcmd/body')
     shutil.rmtree(os.path.join(out, 'fighter'), ignore_errors=True)
