@@ -36424,7 +36424,6 @@ void func_2258()
     else
     {
         KineticModule(0, 0);
-        kame_n_stall = 0;
         GroundModule(0x2710, 0x5);
         if (WorkModule(0x2712, 0x2100000d))
         {
@@ -37206,17 +37205,16 @@ void func_2293()
 // Mario's fireball throw (motion 0x211 / 0x215) frozen at KAME_N_HOLD_FRAME while special is held:
 // the charge (0: level 1, KAME_N_LV2 frames: 2, KAME_N_LV3: 3), the XV2 charge effects at the hand;
 // released (or KAME_N_FULL frames) it plays on and at KAME_N_FIRE_FRAME generates the Kamehameha
-// (article KAME_ARTICLE) in status 0 / 1 / 2 = the level. In the air it stalls (kinetic 0xA, the
-// cape's) until the beam is out. The fireball article (0) stays, unused by this move.
+// (article KAME_ARTICLE) in status 0 / 1 / 2 = the level. In the air he falls as with the fireball
+// (test 10: the cape's air kinetic 0xA while charging left him in a T-pose). The fireball article (0)
+// stays, unused by this move.
 int kame_n_charge;
 int kame_n_state;
-int kame_n_stall;
 
 void kame_n_init()
 {
     kame_n_charge = 0;
     kame_n_state = 0;
-    kame_n_stall = 0;
 }
 
 int kame_n_level()
@@ -37285,16 +37283,6 @@ void kame_n_loop()
             ArticleModule(0x2710, KAME_ARTICLE);
             ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
             kame_n_state = 0x2;
-            if (global18 == 0x2)
-            {
-                KineticModule(0, 0);
-            }
-            return;
         }
-    }
-    if (global18 == 0x2 && kame_n_state < 0x2 && kame_n_stall == 0)
-    {
-        KineticModule(0, 0xa);
-        kame_n_stall = 0x1;
     }
 }

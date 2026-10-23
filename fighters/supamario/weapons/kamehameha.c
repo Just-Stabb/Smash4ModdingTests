@@ -565,11 +565,13 @@ int func_40(int arg0)
 //              KAME_SEG_EVERY frames: the body stops where the head stops
 //   3          hold: the beam connected (native: weapon_expand's on_hit asks for status 3 instead of
 //              removing it), stays in place KAME_HOLD frames, still multi-hitting (fly motion)
-//   4          finish: motion finish1 / 2 / 3 (the level's launcher), removed after KAME_FINISH frames
-// (weapon_expand gives the kind 6 motions: fly1 - 3, finish1 - 3)
+//   4          finish: motion finish (the launcher), removed after KAME_FINISH frames
+// kame_phase (0 fly, 1 hold, 2 finish) keeps hold / finish from restarting if their status is entered
+// again (test 10: the beam held and multi-hit for ever, never launched or went away)
 int kame_level;
 int kame_frame;
 int kame_life;
+int kame_phase;
 
 void main()
 {
@@ -652,6 +654,7 @@ void kame_fly_main()
 {
     kame_level = global4;
     kame_frame = 0;
+    kame_phase = 0;
     if (kame_level == 0x1)
     {
         kame_life = KAME_LIFE_2;
@@ -687,7 +690,11 @@ void kame_fly_loop()
 
 void kame_hold_main()
 {
-    kame_frame = 0;
+    if (kame_phase == 0)
+    {
+        kame_phase = 0x1;
+        kame_frame = 0;
+    }
     kame_move(0);
     callFunc3(kame_hold_loop);
 }
@@ -705,9 +712,13 @@ void kame_hold_loop()
 
 void kame_finish_main()
 {
-    kame_frame = 0;
+    if (kame_phase != 0x2)
+    {
+        kame_phase = 0x2;
+        kame_frame = 0;
+        func_24(0x3, 0, 1.0f);
+    }
     kame_move(0);
-    func_24(0x3 + kame_level, 0, 1.0f);
     callFunc3(kame_finish_loop);
 }
 

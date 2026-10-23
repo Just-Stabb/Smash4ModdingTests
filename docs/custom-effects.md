@@ -181,3 +181,26 @@ launching hit; the same move in the air; each charge level a little faster. All 
 - Unverified in game: the weapon's effect / hitbox frame (+Z forward assumed, as on fighters),
   how the kill looks on the body pieces, kinetic 0xA in the charge.
 
+### Test 10 in game, and test 11 (`build/supamario_kame_test11.zip`)
+
+Test 10: charge and release work, the charge effects at the hand. But:
+- the head effects did not face the flight; they turned around the body's front end. They were on
+  bone 0x7D0 as the fireball's flame, and the fireball's animation spins that bone. The body pieces
+  (MSC, bone 0) faced right. Test 11: the head effects on bone 0 (`WEAPON_BONE`), still turned 180.
+- the beam stopped on a hit but multi-hit for ever, never launched, and it and its effects never
+  went away. So the MSC never finished the finish status (the removal, and the body pieces' kill,
+  are there). Likely cause: the finish played motion slots 4-6 (`"motions": 6`), past the
+  fireball's four, so its motion change failed and the fly motion's hitboxes stayed. Test 11: four
+  motions (fly1-3, one `finish` for every level: 8%, 40 degrees, KBG 90, BKB 55, size 8), and
+  `kame_phase` so hold / finish don't restart if their status is entered again. (The kill call is
+  right: ACMD Terminate_Graphic_Effect's handler `0x02BE25AC` builds `EffectModule(0x2723, id, a,
+  b)` and calls the same EffectModule MSC handler, accessor `+0xA0` vt `+0x2EC`.)
+- the body capsule (angle 366) pulled targets to its middle. Test 11: angle 0, FKB 15 (where they
+  are, pushed a little along the beam); the head keeps 366.
+- the joins between body pieces showed. Test 11: each piece is half a spacing longer and its ends
+  fade over that (`Segment` `overlap`, `SEG_OVERLAP` 0.5), so neighbours cross-fade.
+- T-pose charging in the air: test 11 drops the air stall (kinetic 0xA, the cape's); he falls as
+  with the fireball. The charge effects also end in the SpecialN effect script at frame 13.
+- "the charge effect has a hitbox": not found (no hitbox in SpecialN's game script; the beam's
+  head hitbox is at the hand when it spawns at frame 14). Asked the user.
+

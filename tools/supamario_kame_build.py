@@ -12,7 +12,7 @@ files). Writes under OUT_DIR/fighter/supamario/:
   two); effect models: the three EMOs (tools/xv2_to_nud.py: EffSupamarioKameFire / Bas / Hand), the
   three beam bodies (the ETR traces, tools/xv2_trace_to_nud.py: EffSupamarioKameBeam / 2 / 3, the
   taunt test's) and the projectile's body pieces (EffSupamarioKameSeg1 / 2 / 3, one per charge
-  level: Segment, KAME_SPEED x SEG_EVERY long); .efc: one entry per new set and model (0x0341nnnn);
+  level: Segment, KAME_SPEED x SEG_EVERY apart, cross-fading over SEG_OVERLAP of that); .efc: one entry per new set and model (0x0341nnnn);
 - the move: script/msc/supamario.mscsb from fighters/supamario/supamario.c (status 0x152: hold to
   charge, release fires; KAME_* replaced), script/animcmd/body/{game,effect,sound}.bin with
   SpecialN / SpecialAirN rewritten (no fireball: no GENERATE_ARTICLE, the XV2 release at the hand
@@ -20,8 +20,8 @@ files). Writes under OUT_DIR/fighter/supamario/:
 - the projectile, article 5 (weapon kind 0x18B "kamehameha", tools/weapon_expand.py; copy of the
   fireball): model/kamehameha/c00 (the fireball's, nothing drawn: nud.hidden), motion/kamehameha/
   (the fireball's main.pac), script/msc/kamehameha/kamehameha.mscsb (fighters/supamario/weapons/
-  kamehameha.c), script/animcmd/weapon/kamehameha/ (motion.mtable fly1 / fly2 / fly3 / finish1 / 2 / 3:
-  the multi-hits, the head effects per level (EEPK effects 3 / 4 / 5), the finishing launchers);
+  kamehameha.c), script/animcmd/weapon/kamehameha/ (motion.mtable fly1 / fly2 / fly3 / finish:
+  the multi-hits, the head effects per level (EEPK effects 3 / 4 / 5), the finishing launcher);
 - with --rpx: OUT_DIR/code/cross_f.rpx = IN.rpx + tools/weapon_expand.py (the 0x18B kind with
   its own hit method: a hit holds the beam instead of removing it);
 - with --taunts: the earlier taunt test too (up: charge, side: release + beam body, down: head).
@@ -115,16 +115,24 @@ KAME_FINISH = 12                  # the finish status: the launcher, then remove
 SEG_HOLD = max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 8
 SEG_TEX_BASE = 0x15141A60         # after the traces' 0x15141A30-0x15141A5F
 ARTICLE = 5                       # Supamario's article list: fireball .. dokan, kamehameha
-WEAPON_BONE = 0x7D0               # the fireball's own following effects use this bone
-MOTIONS = ('fly1', 'fly2', 'fly3', 'finish1', 'finish2', 'finish3')   # weapon_expand "motions": 6
+# the head effects follow bone 0 (test 10: on the fireball's 0x7D0, which its animation spins, they
+# turned around the head instead of facing the way the beam flies; the body pieces at 0 were right)
+WEAPON_BONE = 0
+# the fireball's four motion slots (test 10 used six, weapon_expand "motions": the finish, in slots
+# 4-6, never played and the beam was never removed)
+MOTIONS = ('fly1', 'fly2', 'fly3', 'finish')
+SEG_OVERLAP = 0.5                 # x the piece spacing: the pieces' ends cross-fade over this
 # hitboxes: head (ID 0) and body capsule (ID 1, from the head back to the spawn point) multi-hit
-# every REHIT frames while flying and holding; the finish (Part 1: its own hit log) launches
+# every REHIT frames while flying and holding; the finish (Part 1: its own hit log) launches. The
+# head drags (angle 366) so a held target stays on it; the body hits where they are (test 10: at
+# 366 it pulled them to the capsule's middle): angle 0 (along the beam), a small fixed knockback
 REHIT = 5
 HEAD_SIZE = (4.5, 5.5, 6.5)
 BODY_SIZE = (3.5, 4.0, 4.5)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
-FINISH = [dict(Damage=6.0, KBG=85, BKB=50, Size=7.0), dict(Damage=8.0, KBG=90, BKB=55, Size=8.0),
-          dict(Damage=10.0, KBG=95, BKB=60, Size=9.0)]
+BODY_ANGLE, BODY_FKB = 0, 15
+# one finish for every level (the fireball has four motion slots)
+FINISH = dict(Damage=8.0, KBG=90, BKB=55, Size=8.0)
 FINISH_FRAMES = 3
 # the charge (fighter MSC): Mario's throw frozen at HOLD_FRAME; level 2 at 42, 3 at 78 charge
 # frames (the XV2 charge effect's steps), fires by itself at 100; the beam comes out at FIRE_FRAME
@@ -214,7 +222,8 @@ def weapon_scripts(heads, ids):
         g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], **tick)]
         for f in range(4, KAME_LIFE[lv] + 1, 4):        # the body capsule grows with the flight
             g.append(cmd('frame', float(f)))
-            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, **tick))
+            g.append(hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f,
+                            Angle=BODY_ANGLE, FKB=BODY_FKB, **tick))
         game[name] = g
         e = []
         for n, (x, y, z), size in heads[lv]:
@@ -222,18 +231,15 @@ def weapon_scripts(heads, ids):
                          float((-z if HEAD_YROT == 180.0 else z) * UNIT), 0.0, HEAD_YROT, 0.0, float(size), 1))
         effect[name] = e
         sound[name] = [cmd('sound_effect', SND_HEAD)]
-    for lv in range(3):
-        f = FINISH[lv]
-        name = MOTIONS[3 + lv]
-        game[name] = [cmd('remove_all_hitboxes'),
+    f = FINISH
+    game['finish'] = [cmd('remove_all_hitboxes'),
                       hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0,
                              BKB=f['BKB'], Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2),
                       cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
-        scale = (1.0, 1.25, 1.5)[lv]
-        effect[name] = [cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size * scale, 0)
-                        for n, size in ((MODEL_PREFIX + 'Fire', 1.5), ('PtcSupamarioKmhRing', 1.5),
-                                        ('PtcSupamarioKmhWav', 2.3))]
-        sound[name] = [cmd('sound_effect', SND_FIRE)]
+    effect['finish'] = [cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, 0)
+                        for n, size in ((MODEL_PREFIX + 'Fire', 1.8), ('PtcSupamarioKmhRing', 1.8),
+                                        ('PtcSupamarioKmhWav', 2.8))]
+    sound['finish'] = [cmd('sound_effect', SND_FIRE)]
     files = {}
     for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         f = acmd.ACMDFile({acmd.crc(n): v + [acmd.Command(acmd.END)] for n, v in sc.items()})
@@ -262,6 +268,9 @@ def special_scripts(v5, ids):
         e = []
         if ground:      # the throw's dust
             e += [c for c in out['effect'].script(anim) if c.ident == acmd.BY_NAME['graphic_effect3']][:1]
+        # the charge effects end at the release (the MSC kills them too, kame_n_fx_off)
+        e += [cmd('frame', N_FIRE_FRAME - 1)] + [cmd('terminate_graphic_effect', eid(x), 1, 1) for x in (
+            'PtcSupamarioKmhCrg', 'PtcSupamarioKmhCrgON', 'PtcSupamarioKmhtsubu')]
         e += [cmd('frame', N_FIRE_FRAME)] + release
         out['effect'].scripts[acmd.crc(anim)] = e + [acmd.Command(acmd.END)]
     out['sound'].scripts[acmd.crc('SpecialN')] = [
@@ -337,7 +346,8 @@ def main():
         xv2_trace_to_nud.segment(pkg, 'Kmh_%s.etr' % trace, os.path.join(fx, 'model'), folder,
                                  KAME_SPEED[lv] * SEG_EVERY, KAME_SPEED[lv], SEG_HOLD,
                                  tex_base=SEG_TEX_BASE + 0x10 * lv, alpha=TRACE_ALPHA,
-                                 white_fade=TRACE_WHITE_FADE, gain=TRACE_GAIN)
+                                 white_fade=TRACE_WHITE_FADE, gain=TRACE_GAIN,
+                                 overlap=SEG_OVERLAP * KAME_SPEED[lv] * SEG_EVERY)
         segs.append(folder)
     models = [MODEL_PREFIX + m for m in ('Fire', 'Bas', 'Hand') + TRACES] + segs
     for m in models:

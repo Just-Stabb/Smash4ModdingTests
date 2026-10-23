@@ -22,8 +22,7 @@
           "kind": "0x18B",
           "base": "fireball",
           "max": 1,
-          "on_hit": 3,
-          "motions": 6
+          "on_hit": 3
         }
       }
     }

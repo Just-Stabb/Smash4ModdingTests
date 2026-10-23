@@ -131,7 +131,9 @@ Two more options for it:
   vtable 2 and its other methods are shared (the fireball's set-up stores the base singleton's
   `+4`: its vtable 2, the same).
 - **`"motions": N`.** Its motion info copy gets N entries (the base's, the last repeated: every
-  slot plays the base's animation), so its `motion.mtable` can name N scripts.
+  slot plays the base's animation), so its `motion.mtable` can name N scripts. **Not working in
+  game as far as test 10 shows:** the Kamehameha's finish in slots 4-6 never played (the beam never
+  ended). Not used now; slots past the base's count likely need more than the motion info.
 
 `weapon_expand_test.py` also checks: the getter returns the own singleton; it is {the copy, the
 base's vtable 2}; the copy differs from the base's only at `+0xAC`; the hit method against a fake

@@ -164,7 +164,7 @@ class Trace:
             along = kf_curve(find_kv(node, 'Color1_Transparency', 'ShapeStartToEnd'), h + 1, 1.0)
 
             def alpha_along(z, along=along, h=h):
-                return float(np.interp(self.along_z(z) * h, np.arange(h + 1), along))
+                return float(np.interp(self.along_z(z) * h, np.arange(h + 1), along)) * self.end_fade(z)
             radius = node['Scale'] * self.scale
             if node.get('ExtrudeShapePoints'):
                 pos, nrm, uv, al, tris = tube(node['ExtrudeShapePoints'], radius, alpha_along)
@@ -212,6 +212,10 @@ class Trace:
     def along_z(self, z):
         """where on the trace (0 start .. 1 end) the mesh's z (0..1) is"""
         return z
+
+    def end_fade(self, z):
+        """an alpha factor at the mesh's z (0..1)"""
+        return 1.0
 
     def v_repeat(self, length, v_per_unit, scroll_v):
         """the texture's V repeats over the mesh (NU_effScaleUV V) at this length"""
@@ -268,14 +272,17 @@ class Trace:
 class Segment(Trace):
     """a fixed piece of the trace's body for a moving projectile: `length` units behind its spawn
     point (-Z: the projectile drops one every length / speed frames at its head, so they join up
-    behind it and stay where the head stopped), at the middle of the trace's alpha along its length,
+    behind it and stay where the head stopped) plus `overlap` units shared with each neighbour
+    (overlap / 2 past each end) where its alpha fades to 0, so the pieces cross-fade (test 10: with
+    hard ends the joins showed), at the middle of the trace's alpha along its length,
     full width for `hold` frames, then thinning and fading as the trace does over its HoldDuration
     (DefaultEnd keyframes). Its texture's V repeats are -scroll_V x length / speed: with the
     scrolling (scroll_V a frame) the texture is then continuous from one piece to the next, the
     pieces spawned length / speed frames apart (it moves with the head)."""
 
-    def __init__(self, pkg, etr_name, folder, tex_base, length, speed, hold, **kw):
-        self.seg_length, self.hold = float(length), int(hold)
+    def __init__(self, pkg, etr_name, folder, tex_base, length, speed, hold, overlap=0.0, **kw):
+        self.step, self.overlap, self.hold = float(length), float(overlap), int(hold)
+        self.seg_length = self.step + self.overlap
         super().__init__(pkg, etr_name, folder, tex_base, speed=speed, **kw)
         self.frames = self.hold + max(n['HoldDuration'] for n in self.etr['Nodes']) + 1
 
@@ -289,7 +296,13 @@ class Segment(Trace):
         return -scroll_v * self.seg_length / self.speed
 
     def bone_z(self, length):
-        return -self.seg_length
+        return -(self.step + self.overlap / 2)
+
+    def end_fade(self, z):
+        if self.overlap <= 0:
+            return 1.0
+        d = z * self.seg_length
+        return float(np.clip(min(d, self.seg_length - d) / self.overlap, 0.0, 1.0))
 
     def node_curves(self, node):
         h = node['HoldDuration']
@@ -307,10 +320,10 @@ class Segment(Trace):
 
 
 def segment(pkg_dir, etr_name, out_dir, folder, length, speed, hold, tex_base=TEX_BASE, scale=SCALE, alpha=None,
-            white_fade=0.0, gain=1.0):
+            white_fade=0.0, gain=1.0, overlap=0.0):
     """one Segment model folder (OUT_DIR/folder) from the package's etr_name"""
     pkg = xv2vfx.load_package(pkg_dir)
-    t = Segment(pkg, etr_name, folder, tex_base, length, speed, hold, scale=scale, alpha=alpha,
+    t = Segment(pkg, etr_name, folder, tex_base, length, speed, hold, overlap=overlap, scale=scale, alpha=alpha,
                 white_fade=white_fade, gain=gain)
     return t.write(out_dir)
 
