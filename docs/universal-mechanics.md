@@ -26,7 +26,7 @@ with the tools:
    other script was checked identical, and a plain load / save gives every user file back byte for byte.
 
 Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2.1 / 1.0 (Overdrive
-2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.8** (user).
+2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 80 / 0.1** (user).
 
 ## Reverse tilts
 
