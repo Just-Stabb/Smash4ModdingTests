@@ -5,7 +5,7 @@ trait's changes (Kirby's MSC: `kirby_copy_trait()` / `kirby_trait_update()` at t
 `fighters/kirby/kirby.c`). **Add a character here (and to `kirby_copy_trait()`) the first time we
 work on them, with the trait the user specifies.**
 
-Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technical**.
+Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technical**, **Barrage**.
 
 | Character | Kind (ID) | Trait |
 |---|---|---|
@@ -32,6 +32,7 @@ Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy k
 | Juggernaut | none yet |
 | Normal | none yet |
 | Technical | none yet |
+| Barrage | none yet |
 
 Stat indices are `fighter_param` (`0x030000xx`), names in `reference/fighter_param_attributes.csv`.
 
@@ -50,10 +51,14 @@ writes that), it multiplies the stats of profile `xxxx & 0xF`:
 | 2 | Overdrive (below) | the Rush list | 1.25 × 1.2 = 1.5 |
 
 Kirby's MSC writes the int every frame (`kirby_trait_profile()`); bits 8-11 hold the trait number
-(0 none, 1 Normal, 2 Rush, 3 Shooter, 4 Strike, 5 Juggernaut, 6 Technical) for the damage panel's
+(0 none, 1 Normal, 2 Rush, 3 Shooter, 4 Strike, 5 Juggernaut, 6 Technical, 7 Barrage) for the damage panel's
 trait badge: Kirby's panel shows the trait (icon + name, art from tools/trait_badge_art.py) while he
-has a copy; icon art in tools/trait_icons/, else drawn (tools/trait_badge_cave.py in the executable, tools/dmg_trait_badge.py adds the element to
-ui/info/dmg; docs/native-notes.md "Damage panel"). A new trait with stat changes
+has a copy (tools/trait_badge_cave.py in the executable, tools/dmg_trait_badge.py adds the element to
+ui/info/dmg; docs/native-notes.md "Damage panel"). Badge colours: Normal grey, Rush blue, Shooter
+purple, Strike red, Juggernaut yellow, Technical black, Barrage orange (`TRAITS` in
+`tools/trait_badge_art.py`). Icons: the user's art in `tools/trait_icons/<trait>.png` (Barrage so far),
+else a drawn one. A new trait also needs its number in `trait_badge_cave.py` (`TRAITS`, the last
+frame) and `dmg_trait_badge.py` (`TRAITS`; seven 72-px rows fill the 512-px texture). A new trait with stat changes
 needs a profile in `PROFILES` in `tools/kirby_stat_cave.py` and in `kirby_trait_profile()`.
 Moveset changes (like Rush's neutral air) are MSC only (`global76` = current trait).
 

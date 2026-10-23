@@ -5,8 +5,9 @@ trait, named after it:
 
 | File | Trait |
 |---|---|
-| `strike.png` | Strike (the red burst) |
-| `juggernaut.png` | Juggernaut (the yellow shield) |
+| `barrage.png` | Barrage (the orange four-point star) |
+| `strike.png` | Strike (the red burst): to add |
+| `juggernaut.png` | Juggernaut (the yellow shield): to add |
 | `normal.png`, `rush.png`, `shooter.png`, `technical.png` | the other traits (optional) |
 
 Each file is used as it is: scaled to fit the icon's spot on the left of the badge, with its aspect

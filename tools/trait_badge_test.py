@@ -151,7 +151,7 @@ none:   li r3, 0
     fighter(4, 8, KI | 4 << 8)
     fighter(5, 8, KI | 6 << 8)                  # Technical
     fighter(6, 8, 0x12340400)                   # no magic
-    fighter(7, 8, KI | 7 << 8 | 0x18)           # trait 7: none such
+    fighter(7, 8, KI | 8 << 8 | 0x18)           # trait 8: none such
 
     def update():
         mu.reg_write(UC_PPC_REG_3, P)
@@ -175,7 +175,7 @@ none:   li r3, 0
     check('a clip without trait_mc: untouched', state(elems[4]), (True, 1, 0, 0))
     check('Kirby, Technical: frame 6', state(elems[5])[:2], (True, 6))
     check('no KI marker: hidden', state(elems[6])[0], False)
-    check('trait 7 (none such): hidden', state(elems[7])[0], False)
+    check('trait 8 (none such): hidden', state(elems[7])[0], False)
     gotos = r32(REC + 0xC)
     update()
     check('the same traits next frame: no goto', r32(REC + 0xC), gotos)
@@ -183,6 +183,9 @@ none:   li r3, 0
     fighter(0, 8, KI | 4 << 8 | 0x8)            # Rush -> Strike
     update()
     check('Rush -> Strike: one goto, frame 4', (r32(REC + 0xC) - gotos, state(elems[0])[:2]), (1, (True, 4)))
+    fighter(5, 8, KI | 7 << 8)                  # Technical -> Barrage (the last trait)
+    update()
+    check('Technical -> Barrage: frame 7', state(elems[5])[:2], (True, 7))
     fighter(0, 8, KI)
     update()
     check('the copy lost: hidden', state(elems[0])[0], False)

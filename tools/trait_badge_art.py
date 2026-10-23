@@ -5,7 +5,7 @@ trait's colour, its icon and its name, one PNG a trait.
   python3 tools/trait_badge_art.py OUT_DIR [--size 256x64] [--sheet sheet.png] [--icons tools/trait_icons]
 
 Writes OUT_DIR/trait_<name>.png (RGBA, transparent around the plate) for Normal, Rush, Shooter,
-Strike, Juggernaut and Technical, in the order of the trait numbers (1-6) Kirby's MSC writes to his
+Strike, Juggernaut, Technical and Barrage, in the order of the trait numbers (1-7) Kirby's MSC writes to his
 marker int's bits 8-11. Drawn at 4x and scaled down. Replace any PNG with your own art of the same
 size to change a badge.
 
@@ -23,9 +23,10 @@ from PIL import Image, ImageDraw, ImageFont
 FONT = '/usr/share/fonts/opentype/inter/Inter-ExtraBold.otf'
 SS = 4                                  # supersampling
 # (name, plate accent colour, icon)
-TRAITS = [('Normal', (200, 205, 215), 'star'), ('Rush', (255, 176, 32), 'chevrons'),
-          ('Shooter', (64, 200, 255), 'crosshair'), ('Strike', (255, 72, 64), 'burst'),
-          ('Juggernaut', (176, 120, 255), 'shield'), ('Technical', (80, 224, 120), 'gear')]
+TRAITS = [('Normal', (200, 205, 215), 'star'), ('Rush', (40, 120, 255), 'chevrons'),
+          ('Shooter', (160, 80, 240), 'crosshair'), ('Strike', (255, 40, 32), 'burst'),
+          ('Juggernaut', (255, 222, 0), 'shield'), ('Technical', (0, 0, 0), 'gear'),
+          ('Barrage', (255, 116, 0), 'star')]
 PLATE = (24, 28, 44, 235)
 TEXT = (255, 255, 255, 255)
 OUTLINE = (12, 14, 24, 255)

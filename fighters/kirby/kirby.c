@@ -72735,7 +72735,7 @@ void nair_rapid_drift()
 //         fall / fast fall speed; not jump height), and neutral air is the air rapid jab.
 //   Strike: x1.15 damage on Kirby's own hitboxes (not projectiles), x1.2 hitstop for the opponent,
 //         his own hitstop unchanged (tools/strike_cave.py, marker bit 0x8).
-//   Shooter, Juggernaut, Normal, Technical: no changes yet.
+//   Shooter, Juggernaut, Normal, Technical, Barrage: no changes yet.
 // Stat boosts need the patched cross_f.rpx (tools/kirby_stat_cave.py): the stats are shared data,
 // so the executable scales them when they're read, for an object whose int 0x1000008E holds
 // 0x4B49xxxx ("KI" + a profile number from kirby_trait_profile(); bits 8-11 the trait number).
@@ -72747,6 +72747,7 @@ int trait_shooter()    { return 3; }
 int trait_strike()     { return 4; }
 int trait_juggernaut() { return 5; }
 int trait_technical()  { return 6; }
+int trait_barrage()    { return 7; }
 
 int kirby_rapid_nair_without_copy() { return 0; } // 1 = Kirby's own neutral air is the rapid jab too
 

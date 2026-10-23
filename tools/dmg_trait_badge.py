@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flx  # noqa: E402
 import nut  # noqa: E402
 
-TRAITS = ['normal', 'rush', 'shooter', 'strike', 'juggernaut', 'technical']
-BADGE_W, BADGE_H, ROW = 256, 64, 80          # badges stacked in a 256x512 texture, 80 px apart
+TRAITS = ['normal', 'rush', 'shooter', 'strike', 'juggernaut', 'technical', 'barrage']
+BADGE_W, BADGE_H, ROW = 256, 64, 72          # badges stacked in a 256x512 texture, 72 px apart
 TEXTURE_ID = 0x2800FE00                      # unique GIDX (game UI uses 0x28000000-0x28006395)
 # panel sprite -> (x, y, scale) of trait_mc: above the damage percent, right of the CPU level,
 # in the band Little Mac's KO gauge (ko_mc) uses
