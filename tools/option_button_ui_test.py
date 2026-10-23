@@ -6,9 +6,9 @@
 - xtal: every original instruction outside the replaced tables is in the new code (decoded again
   from the written file) with the same fields, its jumps to the relocated targets; the tables read
   back as wanted; the new identifiers and constants;
-- layout: the label sprites' new `sub_11` / `sub_12` frames (texts named MmenOption_button_85$0 /
-  _86$0, each its own text object; the character counts and max id), the btn_group rows sub_11 / sub_12 at depth 8 / 9 wherever sub_3 is, every toggle row
-  at ROW_SCALE and its ROW_YS, under the TRY button;
+- layout: the label sprites' new frame per row (`sub_11`: the text named MmenOption_button_85$0, its
+  own text object; the character counts and max id), the btn_group row sub_11 at depth 8 wherever
+  sub_3 is (with O.ROW_LAYOUT: every toggle row at its scale and y, under the TRY button);
 - msbt: the new labels, every other text unchanged.
 """
 import os
@@ -64,25 +64,29 @@ def main():
         s = target(start)
         return xtal.read_table(new, s, O.table_end(new, s))[1]
     names = tab(O.NAMES_AT)
+    keys = [r[0] for r in O.ROWS]
     for p in O.ROW_PADS:
-        check('%s names: STICK, SIDE after SMASH' % p, names[p][names[p].index('SMASH') + 1:][:2], ['STICK', 'SIDE'])
+        check('%s names: %s after SMASH' % (p, keys), names[p][names[p].index('SMASH') + 1:][:len(keys)], keys)
     check('FREE_STYLE / REMOTE names unchanged', (names['FREE_STYLE'], names['REMOTE']),
           tuple(xtal.read_table(orig, O.NAMES_AT, O.table_end(orig, O.NAMES_AT))[1][p] for p in ('FREE_STYLE', 'REMOTE')))
     ids, cur, clips = tab(O.IDS_AT), tab(O.CURSOR_AT), tab(O.CLIPS_AT)
     for p in O.ROW_PADS:
         n = names[p]
         check('%s ids / cursor / clips aligned with names' % p, (len(ids[p]), len(cur[p]), len(clips[p])), (len(n),) * 3)
-        s, k, d = n.index('SMASH'), n.index('STICK'), n.index('SIDE')
-        check('%s cursor: SMASH <-> STICK <-> SIDE' % p, (cur[p][s][1], cur[p][k][0], cur[p][k][1], cur[p][d][0]),
-              ('STICK', 'SMASH', 'SIDE', 'STICK'))
-        below = cur[p][d][1]
+        chain = ['SMASH'] + keys
+        at = [n.index(x) for x in chain]
+        check('%s cursor: %s up / down in order' % (p, ' <-> '.join(chain)),
+              [(cur[p][at[q]][1], cur[p][at[q + 1]][0]) for q in range(len(keys))],
+              [(chain[q + 1], chain[q]) for q in range(len(keys))])
+        below = cur[p][at[-1]][1]
         ocur = xtal.read_table(orig, O.CURSOR_AT, O.table_end(orig, O.CURSOR_AT))[1][p]
         onames = xtal.read_table(orig, O.NAMES_AT, O.table_end(orig, O.NAMES_AT))[1][p]
-        check('%s cursor: SIDE down = what was below SMASH (%s)' % (p, below), below, ocur[onames.index('SMASH')][1])
+        check('%s cursor: %s down = what was below SMASH (%s)' % (p, keys[-1], below), below,
+              ocur[onames.index('SMASH')][1])
         if below is not None:
-            check('%s cursor: the key below SIDE goes up to it' % p, cur[p][n.index(below)][0], 'SIDE')
-        check('%s clips: sub_11, sub_12' % p, (clips[p][k], clips[p][d]), (('call', 4, 11), ('call', 4, 12)))
-        check('%s ids: null' % p, (ids[p][k], ids[p][d]), (None, None))
+            check('%s cursor: the key below %s goes up to it' % (p, keys[-1]), cur[p][n.index(below)][0], keys[-1])
+        check('%s clips' % p, [clips[p][q] for q in at[1:]], [('call', 4, r[1]) for r in O.ROWS])
+        check('%s ids: null' % p, [ids[p][q] for q in at[1:]], [None] * len(keys))
     equip = tab(O.EQUIP_AT)
     oequip = xtal.read_table(orig, O.EQUIP_AT, O.table_end(orig, O.EQUIP_AT))[1]
     missing = [(p, k) for p, keys in equip.items() for k, (w, ops) in keys.items() if O.OP_SMASH not in ops]
@@ -94,9 +98,9 @@ def main():
             if ops != oops:
                 assert ops == oops + [O.OP_SMASH] and w == ow + 10, (p, k)
     print('     e.g. GC A %s (was %s), GC UP %s (was %s)' % (equip['GC']['A'], oequip['GC']['A'], equip['GC']['UP'], oequip['GC']['UP']))
-    check('rows map', tab(O.ROWS_MAP_AT), {'RUMBLE': 1, 'FLICK': 2, 'SMASH': 10, 'SHAKE': 3, 'STICK': 11,
-                                         'SIDE': 12})
-    for name in ('stick_smash', 'set_stick_smash', 'side_smash', 'set_side_smash'):
+    check('rows map', tab(O.ROWS_MAP_AT), dict({'RUMBLE': 1, 'FLICK': 2, 'SMASH': 10, 'SHAKE': 3},
+                                               **{r[0]: r[1] for r in O.ROWS}))
+    for name in [x for r in O.ROWS for x in r[2:4]]:
         check('identifier %s' % name, name in [new.resolve(v) for v in new.idents], True)
     for s, e, n in patched.edits:
         if s == e:
@@ -129,19 +133,28 @@ def main():
     def places(tags, depth):
         return [LM.words(b) for t, b in tags if t == LM.T_PLACE and LM.words(b)[5] >> 16 == depth]
     ox = [opos[w[7] & 0xFFFF][0] for w in places(olm.tags[oi:oj], 3)]
-    for d, y in sorted(O.ROW_YS.items()):
-        got = [tuple(round(v, 4) for v in xf[w[7]]) for w in places(T[i:j], d)]
-        want = [tuple(round(v, 4) for v in (O.ROW_SCALE, 0.0, 0.0, O.ROW_SCALE, x, y)) for x in ox]
-        check('btn_group: depth %d at scale %.2f, y %.1f, x as the SHAKE row (%d placements)' % (d, O.ROW_SCALE, y, len(got)),
-              got, want)
+    if O.ROW_LAYOUT is None:
+        for d in (3, 4, 5, 6):
+            check('btn_group: depth %d as the game has it' % d, [w[7] for w in places(T[i:j], d)],
+                  [w[7] for w in places(olm.tags[oi:oj], d)])
+        for n, r in enumerate(O.ROWS):
+            check('btn_group: depth %d at the SHAKE row\'s places' % (8 + n), [w[7] for w in places(T[i:j], 8 + n)],
+                  [w[7] for w in places(olm.tags[oi:oj], 3)])
+    else:
+        scale, row_ys = O.ROW_LAYOUT
+        for d, y in sorted(row_ys.items()):
+            got = [tuple(round(v, 4) for v in xf[w[7]]) for w in places(T[i:j], d)]
+            want = [tuple(round(v, 4) for v in (scale, 0.0, 0.0, scale, x, y)) for x in ox]
+            check('btn_group: depth %d at scale %.2f, y %.1f, x as the SHAKE row (%d placements)' % (d, scale, y, len(got)),
+                  got, want)
+        half = 52 * scale                          # the row's background: -52..52
+        ys = sorted(set(row_ys.values()))
+        check('rows apart (%.1f) and under the old top edge' % (ys[1] - ys[0]),
+              (all(b - a > 2 * half for a, b in zip(ys, ys[1:])), ys[0] - half >= -429 - 52), (True, True))
+        check('last row above the TRY button (top 130 - 78)', ys[-1] + half < 130 - 78, True)
     for n, r in enumerate(O.ROWS):
         named = [sy[w[3]] for w in places(T[i:j], 8 + n) if w[0]]
         check('btn_group: depth %d is the row sub_%d' % (8 + n, r[1]), set(named), {'sub_%d' % r[1]})
-    half = 52 * O.ROW_SCALE                        # the row's background: -52..52
-    ys = sorted(set(O.ROW_YS.values()))
-    check('rows apart (%.1f) and under the old top edge' % (ys[1] - ys[0]),
-          (all(b - a > 2 * half for a, b in zip(ys, ys[1:])), ys[0] - half >= -429 - 52), (True, True))
-    check('last row above the TRY button (top 130 - 78)', ys[-1] + half < 130 - 78, True)
     k = i + 1
     ok = True
     while k < j:                                   # frame child counts

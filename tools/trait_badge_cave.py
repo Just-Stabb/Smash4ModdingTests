@@ -22,7 +22,9 @@ Native details (research: docs/flx2-format.md, docs/native-notes.md "Damage pane
   fighter     FM = [0x102F7024], FE = [FM + 0x24 + entry * 4] (entry < [FM + 0x18]),
               obj = [FE + 0xDC0 + 4 * lbz FE+0x14E9] (< [FE + 0xDB4]); obj +4 kind, +0xC accessor,
               accessor +0x28 WorkModule; the int is read as tools/strike_cave.py does
-  flx runtime 0x032CB1B8([0x102FCAA4] + 0x24, char*, len) -> name atom (interned once, cached);
+  flx runtime 0x032CB1B8([0x102FCAA4] + 0x24, char*, len) -> name atom (interned each frame, on
+              the first slot that needs it: a cached atom went stale after a Great Cave Offensive
+              match, so trait_mc wasn't found and the badges showed on every panel);
               0x032CCAA0(inst, &atom) child by instance name (0: none: a vanilla dmg.flx, nothing
               happens); 0x032CDFFC(inst, visible); 0x032CE00C(inst) frame (1-based);
               0x032CCC44(inst, frame) goto (then +0x9C = 1: stopped); 0x032CDF6C(inst, alpha)
@@ -107,6 +109,9 @@ def build():
         mtctr r12
         bctrl
         stw r3, 0x10(r1)
+        li r0, 0                    # intern the name again each frame (badge): the flx runtime's
+        lis r12, atom@ha            # name table can be rebuilt (it was after a Great Cave
+        stw r0, atom@l(r12)         # Offensive match: a stale atom found nothing, nothing hidden)
         li r26, 0
 slots:
         cmpwi r26, %(slots)d

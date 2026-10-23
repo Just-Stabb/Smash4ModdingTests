@@ -7,10 +7,9 @@
 - smash button: before each A+B flag getter, a smash bit (0x20) in the action bits gets attack (0x1);
 - stick smash off: on an attack press without the smash bit, the frame's stick is limited to
   |x| <= XMAX, |y| <= YMAX, only for the pad types with their record bit set, only on the press;
-- stick F-smash off (SIDE_BIT in the type's Tap Jump byte): the same, x only;
-- the Tap Jump getters (bit 0) and setters (keep the other bits);
-- the `stick_smash` / `side_smash` properties (get / set per object, a bit each), their load from
-  and save to the record's bits, and the bind stub (the class's own bind, then the four members).
+- the `stick_smash` property (get / set per object), its load from and save to the record's bit,
+  and the bind stub (the class's own bind, then the two new members);
+- the Tap Jump getters (bit 0) and load_* clearing the Tap Jump byte's other bits.
 """
 import os
 import struct
@@ -79,11 +78,9 @@ def main():
     rec_flags = cfg + port * 0x3C + 0x3B
     prev = cfg + 0x1E0 + port * 9 + 2
 
-    def frame_run(typ, flags, bits, x, y, prev_attack, taps=(0, 0, 0)):
+    def frame_run(typ, flags, bits, x, y, prev_attack):
         mu.mem_write(state + 0x7C, struct.pack('>I', typ))
         mu.mem_write(rec_flags, bytes([flags]))
-        for off, v in zip((0x0B, 0x2D, 0x3A), taps):          # Tap Jump bytes GC / STANDARD / CTR
-            mu.mem_write(rec_flags - 0x3B + off, bytes([v]))
         mu.mem_write(prev, bytes([prev_attack]))
         mu.mem_write(frame, struct.pack('>Hbb', bits, x, y))
         run(a.addr('wrap'), {UC_PPC_REG_3: cfg, UC_PPC_REG_4: port, UC_PPC_REG_5: frame, UC_PPC_REG_6: pad,
@@ -103,35 +100,17 @@ def main():
     check('CTR (type 9), off', frame_run(9, 0x08, 0x1, -127, 127, 0), (0x1, -X, Y, 1, 0x31313131))
     check('FREE_STYLE (type 4), off', frame_run(4, 0x02, 0x1, 127, 127, 0), (0x1, X, Y, 1, 0x31313131))
     check('REMOTE (type 3): nothing, state kept', frame_run(3, 0x0F, 0x1, 127, 127, 0), (0x1, 127, 127, 0, 0x31313131))
-    K = 0x31313131
-    check('GC, F-smash off: x only', frame_run(7, 0, 0x1, 127, 127, 0, (3, 0, 0)), (0x1, X, 127, 1, K))
-    check('GC, F-smash off: x left', frame_run(7, 0, 0x1, -127, -127, 0, (2, 0, 0)), (0x1, -X, -127, 1, K))
-    check('GC, F-smash off, held: kept', frame_run(7, 0, 0x1, 127, 127, 1, (2, 0, 0)), (0x1, 127, 127, 1, K))
-    check('GC, F-smash off, smash bit: kept', frame_run(7, 0, 0x21, 127, 0, 0, (2, 0, 0)), (0x21, 127, 0, 1, K))
-    check('GC, Tap Jump on only: kept', frame_run(7, 0, 0x1, 127, 127, 0, (1, 0, 0)), (0x1, 127, 127, 1, K))
-    check('GC, both off: x and y', frame_run(7, 0x04, 0x1, 127, 127, 0, (2, 0, 0)), (0x1, X, Y, 1, K))
-    check('GC, another type\'s F-smash bit: kept', frame_run(7, 0, 0x1, 127, 127, 0, (0, 2, 2)), (0x1, 127, 127, 1, K))
-    check('STANDARD (type 2), F-smash off', frame_run(2, 0, 0x1, 127, 127, 0, (0, 2, 0)), (0x1, X, 127, 1, K))
-    check('STANDARD (type 8), F-smash off', frame_run(8, 0, 0x1, -127, 90, 0, (0, 3, 0)), (0x1, -X, 90, 1, K))
-    check('CTR (type 1), F-smash off', frame_run(1, 0, 0x1, 127, -127, 0, (0, 0, 2)), (0x1, X, -127, 1, K))
-    check('FREE_STYLE (type 4): no F-smash setting', frame_run(4, 0, 0x1, 127, 127, 0, (2, 2, 2)), (0x1, 127, 127, 1, K))
 
-    # Tap Jump accessors: accessor word 0 -> the record
+    # Tap Jump getters: accessor word 0 -> the record
     ACC0, TREC = MEM + 0x7400, MEM + 0x7500
     mu.mem_write(ACC0, struct.pack('>I', TREC))
-    for name, (off, getter, setter) in C.TAP.items():
+    for name, (off, getter) in C.TAP.items():
         got = []
         for v in range(4):
             mu.mem_write(TREC + off, bytes([v]))
             run(getter, {UC_PPC_REG_3: ACC0})
             got.append(mu.reg_read(UC_PPC_REG_3))
         check('%s Tap Jump getter: bit 0' % name, got, [0, 1, 0, 1])
-        got = []
-        for v, arg in ((0, 1), (2, 1), (3, 0), (1, 0), (0xFF, 0)):
-            mu.mem_write(TREC + off, bytes([v]))
-            run(setter, {UC_PPC_REG_3: ACC0, UC_PPC_REG_4: arg})
-            got.append(mu.mem_read(TREC + off, 1)[0])
-        check('%s Tap Jump setter: bit 0, the rest kept' % name, got, [1, 3, 2, 0, 0xFE])
 
     # stick_smash property: call frame r3: +0x10 type tag, +0x14 value, +0x18 the argument
     fr = MEM + 0x5000
@@ -156,43 +135,29 @@ def main():
     for k in range(20):                                             # fill the table (round robin)
         prop('set', MEM + 0x8000 + 4 * k, 2)
     check('20 objects later, the latest kept', prop('get', MEM + 0x8000 + 4 * 19), (2, 0))
-    Q = MEM + 0x6800
-    check('side: get, unknown object: true (on)', prop('gets', Q), (3, 0))
-    check('side: set false', prop('sets', Q, 2), (2, 0))
-    check('side off: stick still on', (prop('gets', Q), prop('get', Q)), ((2, 0), (3, 0)))
-    check('stick: set false', prop('set', Q, 2), (2, 0))
-    check('both off', (prop('gets', Q), prop('get', Q)), ((2, 0), (2, 0)))
-    check('side: set true', prop('sets', Q, 3), (3, 0))
-    check('side on, stick still off', (prop('gets', Q), prop('get', Q)), ((3, 0), (2, 0)))
-    check('stick: set true', prop('set', Q, 3), (3, 0))
-    check('both on', (prop('gets', Q), prop('get', Q)), ((3, 0), (3, 0)))
 
     # load / save: accessor at ACC (+0 / +4 the flags record), getter / setter stubs
-    ACC, REC, TREC = MEM + 0x7000, MEM + 0x7100, MEM + 0x7200
+    ACC, REC = MEM + 0x7000, MEM + 0x7100
     for name, off, word, bit, _lc, getter, _sc, setter, _bc in C.MENU:
         # the getters are the A+B getters stubbed above (li r3, 7; unicorn keeps translated code)
         mu.mem_write(setter, code(setter, 'mr r5, r4\nblr'))
         mu.mem_write(ACC, struct.pack('>II', REC if word == 0 else TREC, 0))
         mu.mem_write(ACC + word, struct.pack('>I', REC))
         tap = (REC if word == 0 else TREC) + C.TAP[name][0]
-        for flags, tj in ((bit | 0x40, 1), (0xF0 & ~bit, 3), (bit, 2), (0, 0)):
+        for flags in (bit | 0x40, 0xF0 & ~bit):
             mu.mem_write(REC + 0xD, bytes([flags]))
+            tj = 3 if flags & bit else 2
             mu.mem_write(tap, bytes([tj]))
             run(a.addr('load_' + name), {UC_PPC_REG_3: ACC, UC_PPC_REG_31: P})
-            check('load_%s flags 0x%02X tap %d: getter result' % (name, flags, tj), mu.reg_read(UC_PPC_REG_3), 7)
-            check('load_%s flags 0x%02X tap %d: properties' % (name, flags, tj), (prop('get', P + off), prop('gets', P + off)),
-                  ((2 if flags & bit else 3, 0), (2 if tj & 2 else 3, 0)))
-        for stick, side, base, tj in ((False, True, 0x40, 3), (True, False, 0x4F, 1), (False, False, 0x40, 0),
-                                      (True, True, 0x4F, 2)):
-            prop('set', P + off, 3 if stick else 2)
-            prop('sets', P + off, 3 if side else 2)
+            check('load_%s: Tap Jump byte %d -> bit 0' % (name, tj), mu.mem_read(tap, 1)[0], tj & 1)
+            check('load_%s flags 0x%02X: getter result' % (name, flags), mu.reg_read(UC_PPC_REG_3), 7)
+            check('load_%s flags 0x%02X: property' % (name, flags), prop('get', P + off), (2 if flags & bit else 3, 0))
+        for on, base in ((False, 0x40), (True, 0x4F)):
+            prop('set', P + off, 3 if on else 2)
             mu.mem_write(REC + 0xD, bytes([base]))
-            mu.mem_write(tap, bytes([tj]))
             run(a.addr('save_' + name), {UC_PPC_REG_3: ACC, UC_PPC_REG_4: 0x55, UC_PPC_REG_31: P})
-            want = (base & ~bit) | (0 if stick else bit)
-            what = 'save_%s stick %s side %s' % (name, 'on' if stick else 'off', 'on' if side else 'off')
-            check(what + ': flags byte, Tap Jump byte', (mu.mem_read(REC + 0xD, 1)[0], mu.mem_read(tap, 1)[0]),
-                  (want, (tj & 1) | (0 if side else 2)))
+            want = (base & ~bit) | (0 if on else bit)
+            check('save_%s %s: flags byte' % (name, 'on' if on else 'off'), mu.mem_read(REC + 0xD, 1)[0], want)
             check('save_%s: setter gets r4' % name, mu.reg_read(UC_PPC_REG_5), 0x55)
 
     # bind stubs: BIND logs (r3, r4, r5) at LOG
@@ -213,18 +178,15 @@ def main():
         mu.mem_write(LOG, b'\0' * 0x40)
         run(a.addr('bind_' + name), {UC_PPC_REG_3: 0x1111, UC_PPC_REG_4: 0x2222, UC_PPC_REG_5: 0x3333,
                                      UC_PPC_REG_31: 0xC1A55})
-        calls = [struct.unpack('>III', mu.mem_read(LOG + 4 + 12 * i, 12)) for i in range(5)]
+        calls = [struct.unpack('>III', mu.mem_read(LOG + 4 + 12 * i, 12)) for i in range(3)]
 
         def s(p):
             return bytes(mu.mem_read(p, 32)).split(b'\0')[0].decode()
         check('bind_%s: own bind first' % name, calls[0], (0x1111, 0x2222, 0x3333))
-        n = 1
-        for g, st, prop_name, _sh in C.PROPS:
-            for k, (lab, nm) in enumerate(((g, prop_name), (st, 'set_' + prop_name))):
-                c = calls[n]
-                check('bind_%s: %s' % (name, nm), (c[0], s(c[1]), r32(mu, c[2]), r32(mu, c[2] + 4), r32(mu, c[2] + 8)),
-                      (0xC1A55, nm, a.addr(lab), C.DESC_TYPES[name][k], (0x01000000, 0x01010000)[k]))
-                n += 1
+        check('bind_%s: getter' % name, (calls[1][0], s(calls[1][1]), r32(mu, calls[1][2]), r32(mu, calls[1][2] + 4)),
+              (0xC1A55, 'stick_smash', a.addr('get'), C.DESC_TYPES[name][0]))
+        check('bind_%s: setter' % name, (calls[2][0], s(calls[2][1]), r32(mu, calls[2][2]), r32(mu, calls[2][2] + 4)),
+              (0xC1A55, 'set_stick_smash', a.addr('set'), C.DESC_TYPES[name][1]))
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

@@ -1,6 +1,6 @@
-# Controls: Smash Attack button, Stick Smash and Stick F-Smash
+# Controls: Smash Attack button and Stick Smash
 
-Three additions to the Controls menu (Options > Controls > a name):
+Two additions to the Controls menu (Options > Controls > a name):
 
 - **Smash Attack on any button.** Every button's popup now also lists *Smash Attack* (it was only
   on the C-stick / right stick). A button set to it works like the C-stick's smash attack, with
@@ -19,13 +19,12 @@ Three additions to the Controls menu (Options > Controls > a name):
   in the air) instead. Smash attacks then come from the Smash Attack button, the C-stick, or A+B
   (*Smash Attack* row). Default ON (the game as it was). The Wii Remote layouts keep their Shake to
   Smash row in that place and don't have the option.
-- **Stick F-Smash: ON / OFF** (the row under *Stick Smash*, same layouts). OFF: attack with the
-  control stick flicked sideways no longer makes a forward smash (including the dash forward
-  smash): it's a forward tilt. Up and down smash attacks from the stick stay. Stick Smash OFF
-  already covers this. Default ON.
 
-All are saved with the name's controls, like Tap Jump. The ON / OFF rows (Rumble, Tap Jump, Smash
-Attack, Stick Smash, Stick F-Smash) are drawn at 90% size so the five fit above the TRY button.
+Both are saved with the name's controls, like Tap Jump.
+
+(A test build also had a "Stick F-Smash" row, kept in bit 1 of the pad type's Tap Jump byte; it
+was taken out. The Tap Jump readers use bit 0 only and opening a name's controls clears the rest,
+so a name saved with that build keeps its Tap Jump setting.)
 
 ## How Stick Smash OFF works
 
@@ -36,19 +35,14 @@ limited, and the stick stays past 0.25, so walking, dashing, jumping and fast fa
 affected. The setting is applied to the inputs themselves (where the game applies Tap Jump and
 A+B), so replays play back as played.
 
-Stick F-Smash OFF is the same with only the sideways part limited (0.79): a sideways flick is
-under the forward smash threshold, while up / down flicks still reach 0.66. It's saved in bit 1 of
-the pad type's Tap Jump byte (the save record has no other free bits; the game reads that byte
-only through its accessors, which now use bit 0).
-
 ## Files
 
 | file | made by |
 |---|---|
 | `code/cross_f.rpx` | `tools/smash_button_cave.py` (with the rest of the build: `rpx_patch.py`) |
 | `ui/script/app/option/option_view_button.xtal` | `tools/option_button_ui.py` (the Controls screen's script) |
-| `ui/lumen/option_button/option_button.lm` | `tools/option_button_ui.py` (the new rows, the 90% rows) |
-| `ui/message/menu.msbt` | `tools/option_button_ui.py` (`MmenOption_button_85` = "Stick Smash", `_86` = "Stick F-Smash") |
+| `ui/lumen/option_button/option_button.lm` | `tools/option_button_ui.py` (the new row) |
+| `ui/message/menu.msbt` | `tools/option_button_ui.py` (`MmenOption_button_85` = "Stick Smash") |
 
 ```
 python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/smash_button_cave.py)
@@ -58,8 +52,8 @@ python3 tools/option_button_ui_test.py UI_DIR MENU_MSBT     # the menu files
 ```
 
 The menu.msbt in the package is the one from the earlier packages (Minecraft World / Supamario)
-with the two labels added; if yours has other changes, run `option_button_ui.py` on it (or add
-`MmenOption_button_85` / `_86` with `tools/msbt.py`).
+with the one label added; if yours has other changes, run `option_button_ui.py` on it (or add
+`MmenOption_button_85` with `tools/msbt.py`).
 
 Notes: `docs/native-notes.md` "Controls settings and input frames". The Controls script is Xtal
 bytecode; `tools/xtal.py` reads, disassembles and rewrites these (`dis` / `check`), with jump

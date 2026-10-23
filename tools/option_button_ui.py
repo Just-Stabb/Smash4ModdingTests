@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Controls menu: "Smash Attack" for every button, and the "Stick Smash" / "Stick F-Smash" ON / OFF
-rows.
+"""Controls menu: "Smash Attack" for every button, and the "Stick Smash" ON / OFF row.
 
   python3 tools/option_button_ui.py UI_DIR MENU_MSBT OUT_DIR
 
 UI_DIR: the game's ui folder (script/app/option/option_view_button.xtal, lumen/option_button/
 option_button.lm); MENU_MSBT: the menu.msbt to add the rows' text to. Writes OUT_DIR/ui/... (the
-three files). Needs the RPX side (tools/smash_button_cave.py: the `stick_smash` / `side_smash`
-properties and what the settings do in a match).
+three files). Needs the RPX side (tools/smash_button_cave.py: the `stick_smash` property and what
+the setting does in a match).
 
 The Controls screen is ui/script/app/option/option_view_button.xtal (compiled Xtal, tools/xtal.py)
 on the Lumen layout option_button.lm:
@@ -20,16 +19,15 @@ on the Lumen layout option_button.lm:
   `stick_smash` in refresh_key_assign (an ON / OFF row as RUMBLE / FLICK / SMASH / SHAKE),
   toggling it with A (as FLICK: set_stick_smash(!stick_smash)), the save prompt's is_diff, and
   shown in state_set unless the pad is REMOTE / FREE_STYLE (whose SHAKE row is in its place).
-- Stick F-Smash row (sub_12): the same, as SIDE after STICK, with the property `side_smash`.
-- Layout: the rows are other instances of the toggle row sprite (186) in btn_group (420): sub_11
-  at the SHAKE row's place (hidden for the pads that get the new rows), above it in depth (8),
-  sub_12 one row lower (depth 9; the sprite header's depth count, word 6 >> 16, goes from 8 to 10:
-  a placement past it overruns the player's display list). Five rows don't fit above the TRY button at the game's size
-  (104 high, 116 apart), so every toggle row is drawn at ROW_SCALE, ROW_YS apart (the top row's top
-  edge where it was). Their label sprites (166 / 171, a frame per row name) get a frame per new
-  row: a copy of the Tap Jump text object (its own character: the game binds a text object to the
-  msbt label of its instance name, so one shared by two names flickers between them), named
-  LABEL$0, MmenOption_button_85 = "Stick\\nSmash" / _86 = "Stick\\nF-Smash" in menu.msbt.
+- Layout: the row is another instance of the toggle row sprite (186) in btn_group (420), named
+  sub_11, at the SHAKE row's place (hidden for the pads that get the new row), above it in depth
+  (8; the sprite header's depth count, word 6 >> 16, goes from 8 to 9: a placement past it overruns
+  the player's display list). Its label sprites (166 / 171, a frame per row name) get a frame
+  `sub_11`: a copy of the Tap Jump text object (its own character: the game binds a text object to
+  the msbt label of its instance name, so one shared by two names flickers between them), named
+  MmenOption_button_85$0, MmenOption_button_85 = "Stick\\nSmash" in menu.msbt.
+(More rows: add them to ROWS, each after the one before; a fifth toggle row doesn't fit above the
+TRY button at the game's size: ROW_LAYOUT then draws the rows smaller.)
 """
 import os
 import struct
@@ -45,12 +43,11 @@ XTAL = 'script/app/option/option_view_button.xtal'
 LMB = 'lumen/option_button/option_button.lm'
 ROW_PADS = ('CTR', 'GC', 'DRC', 'URCC', 'CLASSIC')
 # the new rows: (key name, clip sub_N, property, setter, msbt label, text)
-ROWS = (('STICK', 11, 'stick_smash', 'set_stick_smash', 'MmenOption_button_85', 'Stick\nSmash'),
-        ('SIDE', 12, 'side_smash', 'set_side_smash', 'MmenOption_button_86', 'Stick\nF-Smash'))
-# btn_group depth -> the row's y: RUMBLE / FLICK / SMASH / SHAKE + STICK / SIDE (game: -429, -313,
-# -197, -81, 116 apart; the TRY button's top edge is at 52)
-ROW_SCALE = 0.9
-ROW_YS = {6: -434.0, 5: -326.5, 4: -219.0, 3: -111.5, 8: -111.5, 9: -4.0}
+ROWS = (('STICK', 11, 'stick_smash', 'set_stick_smash', 'MmenOption_button_85', 'Stick\nSmash'),)
+# None: the rows where the game has them (RUMBLE / FLICK / SMASH / SHAKE -429, -313, -197, -81, 104
+# high, 116 apart; the TRY button's top edge is at 52), the new row at SHAKE's. For five rows:
+# (0.9, {6: -434.0, 5: -326.5, 4: -219.0, 3: -111.5, 8: -111.5, 9: -4.0}): scale, btn_group depth -> y
+ROW_LAYOUT = None
 OP_SMASH = ('L', 51)            # the PAD_BUTTON_OPE_SMASH local of the top level
 WINDOWS = {5: 6, 6: 7}          # popup window sizes that have a bigger one
 
@@ -104,8 +101,8 @@ def patch_xtal(data):
         edits.append((start, end, xtal.gen_table(c, dest, value)))
         return value
 
-    # names, ids, cursor: STICK after SMASH, SIDE after STICK
-    order = [('SMASH', 'STICK'), ('STICK', 'SIDE')]
+    # names, ids, cursor: the new rows after SMASH
+    order = list(zip(['SMASH'] + [r[0] for r in ROWS], [r[0] for r in ROWS]))
 
     def names_(t):
         for p in ROW_PADS:
@@ -325,16 +322,17 @@ def patch_lm(data):
     w[4] += new_root - root
     counts[1] = LM.pack(w)
 
-    # btn_group: the rows sub_11 / sub_12 at depth 8 / 9 wherever the SHAKE row (sub_3, depth 3) is;
-    # every toggle row's matrix: ROW_SCALE at its ROW_YS
+    # btn_group: the rows sub_11.. at depth 8.. wherever the SHAKE row (sub_3, depth 3) is; with a
+    # ROW_LAYOUT, every toggle row's matrix: its scale at its y
     pos = LM.table(T[lm.ti[LM.T_POSITIONS]][1], 2)
     xf_tag = T[lm.ti[LM.T_TRANSFORMS]]
     xf = LM.table(xf_tag[1], 6)
     made = {}
 
     def row_matrix(m, depth):
-        if m == LM.NONE:
+        if m == LM.NONE or ROW_LAYOUT is None:
             return m
+        ROW_SCALE, ROW_YS = ROW_LAYOUT
         x = pos[m & 0xFFFF][0] if m & LM.POS_FLAG else xf[m][4]
         assert m & LM.POS_FLAG or xf[m][:4] == (1.0, 0.0, 0.0, 1.0), xf[m]
         key = (x, ROW_YS[depth])
@@ -361,7 +359,7 @@ def patch_lm(data):
                     continue
                 kw = LM.words(kb)
                 d = kw[5] >> 16
-                if d in ROW_YS:
+                if ROW_LAYOUT and d in ROW_LAYOUT[1]:
                     kw[7] = row_matrix(kw[7], d)
                 if d == 3:
                     for n, (sym_row, _t) in enumerate(syms):

@@ -8,7 +8,8 @@ stubbed flx runtime calls.
 Checks: the vtable entry is the cave; the original update runs once with the panel, its return
 value kept; Kirby with a trait: the badge shown at the trait's frame, the panel's alpha copied, the
 goto only when the trait changes; Kirby without a copy, another fighter, a wrong marker: hidden;
-an empty slot or a panel clip without trait_mc: untouched; the name interned once.
+an empty slot or a panel clip without trait_mc: untouched; the name interned once a frame (a new
+atom from the runtime, as after its name table is rebuilt, is used the next frame).
 """
 import os
 import struct
@@ -72,13 +73,12 @@ def main():
         lwz r6, 0x1008(r7)
         addi r6, r6, 1
         stw r6, 0x1008(r7)
-        lis r3, 0x7F00
-        ori r3, r3, 0x2000
+        lwz r3, 0x1018(r7)
         blr""")
     stub(mu, C.FIND_CHILD, """
         lwz r5, 0(r4)
         lis r6, 0x7F00
-        ori r6, r6, 0x2000
+        lwz r6, 0x1018(r6)
         cmpw r5, r6
         bne none
         lwz r3, 0(r3)
@@ -106,6 +106,7 @@ none:   li r3, 0
 
     check('vtable +0x3C is the cave', r32(C.VTABLE_UPDATE), C.CAVE)
 
+    w32(REC + 0x18, ATOM)                       # the atom the stub intern returns
     w32(C.ATOM_POOL, 0x7F003000)                # the game's string pool (set at boot)
     # FM (pointer at FIGHTER_MANAGER): count 8, FE for entries 0-7
     w32(C.FIGHTER_MANAGER, FM)
@@ -180,7 +181,11 @@ none:   li r3, 0
     gotos = r32(REC + 0xC)
     update()
     check('the same traits next frame: no goto', r32(REC + 0xC), gotos)
-    check('the name interned once', r32(REC + 8), 1)
+    check('the name interned once a frame', r32(REC + 8), 2)
+    w32(REC + 0x18, ATOM + 0x40)                # the runtime's names rebuilt: a new atom
+    mu.mem_write(elems[2] + 0xE8, struct.pack('>I', 0x4000))   # Mario's badge shown by the panel
+    update()
+    check('a new atom: used the next frame (Mario hidden again)', state(elems[2])[0], False)
     fighter(0, 8, KI | 4 << 8 | 0x8)            # Rush -> Strike
     update()
     check('Rush -> Strike: one goto, frame 4', (r32(REC + 0xC) - gotos, state(elems[0])[:2]), (1, (True, 4)))
@@ -193,7 +198,7 @@ none:   li r3, 0
     words = [r32(DEBUG_COUNTERS + 4 * i) for i in range(12)]
     if any(words):                              # a --debug build (trait_badge_cave.py --debug)
         print('debug counters: ' + ', '.join('%s %s' % (n, hex(w)) for n, w in zip(C.COUNTERS, words)))
-        check('debug: hook calls = updates run', words[0], 5)
+        check('debug: hook calls = updates run', words[0], 6)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

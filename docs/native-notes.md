@@ -882,9 +882,10 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
   / `0x030C83D8` / `0x030C86A0` / `0x030C8858`, setters +0x10 / +0x10 / +0x10 / +0x10); its low
   four bits were unused (now Stick Smash off: 0x08 / 0x04 / 0x02 / 0x01). Tap Jump: a bool byte per
   type, GC record byte 0x0B, STANDARD 0x2D, CTR 0x3A (getters `0x030C83B8` / `0x030C8838` /
-  `0x030C89E0`: `!= 0`; setters +0x14: the whole byte), used only through those accessors (the
-  load / save natives and the mapping functions); its bit 1 is now Stick F-Smash off (the getters
-  patched to return bit 0, the setters to keep the other bits).
+  `0x030C89E0`: originally `!= 0`, now bit 0; setters +0x14: the whole byte). A test build kept a
+  "Stick F-Smash" setting in its bit 1 (taken out; the load hook clears the other bits). Don't put
+  more settings in the record: with Stick Smash or that one OFF, exiting the Controls screen (the
+  save) crashed in the user's game (cause not found yet).
 - **Input frames:** the input manager (`0x030B9A38`, and `0x030BA218`; per-port records at +0xC,
   frames at +0x314, 4 bytes a port) calls `0x030B8F08(records, port, frame, pad, ..)` per port and
   frame; it picks the mapping by the pad state's type (pad +4 vtable +0x1C, then +0x7C): 1 / 9 CTR
