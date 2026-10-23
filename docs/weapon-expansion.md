@@ -99,5 +99,11 @@ for its base (the base-kind table) first. `weapon_expand_test.py`: every kind 0-
 unpatched code gives it (a new kind its base's); kind 0x185 = row 0 (`0x103464A8`). The check fails
 on the previous build (rows past the table) and passes on this one.
 
+User afterwards: that crashing build was also missing Supamario's parameters and other files, which
+they had forgotten to add (adding them fixed their crash). The out-of-table read above is real for
+kind 0x185 on any build without this fix (the unpatched code indexes the table with the kind
+unconditionally), so the fix stays; whether the fireball runs on an older RPX with the files in
+place would tell whether something else gates that path.
+
 Still possible: other per-kind data indexed without a bound, met further into a match. A crash log
 with a different address would show the next one.
