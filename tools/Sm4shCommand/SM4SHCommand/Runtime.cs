@@ -34,12 +34,22 @@ namespace Sm4shCommand
         // of your own in AnimNames.txt for the same hash still wins.
 
         public static readonly Dictionary<uint, string> AnimNames = new Dictionary<uint, string>();
+
+        /// <summary>The Hitbox Viewer's animation for a mod's script ("Name -> folder/File.omo [+ held@Bone]"
+        /// lines in the name files): the motion folder's animation it plays, and a held model shown on
+        /// a bone while it does (e.g. Kirby's Marth-copy sword on LHaveN).</summary>
+        public class ViewerAnim
+        {
+            public string Folder, File, Held, Bone;
+        }
+        public static readonly Dictionary<uint, ViewerAnim> ViewerAnims = new Dictionary<uint, ViewerAnim>();
         public static string AnimNamesPath { get { return Path.Combine(Application.StartupPath, "AnimNames.txt"); } }
         public static string ModAnimNamesPath { get { return Path.Combine(Application.StartupPath, "ModAnimNames.txt"); } }
 
         public static void LoadAnimNames()
         {
             AnimNames.Clear();
+            ViewerAnims.Clear();
             LoadAnimNameFile(ModAnimNamesPath);
             LoadAnimNameFile(AnimNamesPath);
         }
@@ -53,6 +63,25 @@ namespace Sm4shCommand
                 var line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith("//") || line.StartsWith("#"))
                     continue;
+                int arrow = line.IndexOf("->", StringComparison.Ordinal);
+                if (arrow > 0)
+                {
+                    var name = line.Substring(0, arrow).Trim();
+                    var rest = line.Substring(arrow + 2).Trim();
+                    var held = "";
+                    int plus = rest.IndexOf('+');
+                    if (plus >= 0) { held = rest.Substring(plus + 1).Trim(); rest = rest.Substring(0, plus).Trim(); }
+                    int slash = rest.LastIndexOf('/');
+                    int at = held.IndexOf('@');
+                    uint h = Crc32.Compute(name.ToLower());
+                    if (!AnimNames.ContainsKey(h)) AnimNames[h] = name;
+                    ViewerAnims[h] = new ViewerAnim
+                    {
+                        Folder = slash > 0 ? rest.Substring(0, slash) : "body", File = rest.Substring(slash + 1),
+                        Held = at > 0 ? held.Substring(0, at) : null, Bone = at > 0 ? held.Substring(at + 1) : null,
+                    };
+                    continue;
+                }
                 int eq = line.IndexOf('=');
                 if (eq > 0 && line.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                 {

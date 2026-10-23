@@ -13,3 +13,9 @@ MarthSwordAttackAirHi
 MarthAttack12
 MarthAttackAirB
 MarthAttackAirHi
+
+// The Hitbox Viewer: "Name -> motion folder/animation file + held model@bone" plays that animation for
+// the script (and shows the held model on the bone). Also names the script, like a plain line.
+MarthSwordAttack12 -> marthbody/FitKirbyMarthBodyMainD00Attack12.omo + marthsword@LHaveN
+MarthSwordAttackAirB -> marthbody/FitKirbyMarthBodyMainD00AttackAirB.omo + marthsword@LHaveN
+MarthSwordAttackAirHi -> marthbody/FitKirbyMarthBodyMainD00AttackAirHi.omo + marthsword@LHaveN

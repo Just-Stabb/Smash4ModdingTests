@@ -214,6 +214,21 @@ namespace Sm4shCommand.Viewer
             return tables;
         }
 
+        /// <summary>World matrices of a held model's bones (bind pose) with its root at `at` (the
+        /// holder's bone, e.g. Kirby's LHaveN, scale included): the game puts the root on the bone and
+        /// ignores the root's own local transform (Marth's sword: its HaveN's bind rotation turns the
+        /// +Z blade onto the bone's +Y, as in game).</summary>
+        public Mat4[] Attached(Mat4 at)
+        {
+            var w = new Mat4[Bones.Count];
+            for (int i = 0; i < Bones.Count; i++)
+            {
+                var b = Bones[i];
+                w[i] = b.Parent >= 0 && b.Parent < i ? w[b.Parent] * Mat4.TRS(b.Pos, b.Rot, b.Scale) : at;
+            }
+            return w;
+        }
+
         /// <summary>World matrices of every bone for an animation frame (anim null: the bind pose).
         /// Bones the animation doesn't move keep their bind pose.</summary>
         public Mat4[] World(Omo anim, float frame)

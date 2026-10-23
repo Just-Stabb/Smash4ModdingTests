@@ -95,12 +95,20 @@ namespace Sm4shCommand.Viewer
             return new PointF(Width / 2f + panX + x * zoom, Height * 0.72f + panY - y * zoom);
         }
 
+        /// <summary>A held model drawn on the fighter's bone HeldBone (e.g. Kirby's Marth-copy sword), or null.</summary>
+        public FighterAssets Held;
+        public int HeldBone = -1;
+        Skinned held;
+
         public void Recompute()
         {
             world = Assets != null ? Assets.Skeleton.World(Animation, AnimFrame) : null;
             attacker = null;
+            held = null;
             if (Assets != null && ShowModel)
                 attacker = Skin(Assets, world, 0, 0, false);
+            if (Assets != null && ShowModel && Held != null && HeldBone >= 0 && HeldBone < world.Length)
+                held = Skin(Held, Held.Skeleton.Attached(world[HeldBone]), 0, 0, false);
             enemy = null;
             if (Enemy != null && Enemy.Assets != null)
                 enemy = Skin(Enemy.Assets, Enemy.Assets.Skeleton.World(Enemy.Animation, Enemy.Frame), Enemy.Z, Enemy.Y, true);
@@ -167,6 +175,7 @@ namespace Sm4shCommand.Viewer
                 var zbuf = new float[w * h];
                 for (int i = 0; i < zbuf.Length; i++) zbuf[i] = float.MaxValue;
                 if (attacker != null) Rasterize(attacker, pix, zbuf, w, h, r, u, f);
+                if (held != null) Rasterize(held, pix, zbuf, w, h, r, u, f);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
                 var data = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 Marshal.Copy(pix, 0, data.Scan0, pix.Length);

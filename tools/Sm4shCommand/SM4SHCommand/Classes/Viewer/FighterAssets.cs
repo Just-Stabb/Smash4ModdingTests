@@ -40,6 +40,17 @@ namespace Sm4shCommand.Viewer
             string cdir = Path.Combine(body, costume);
             if (!File.Exists(Path.Combine(cdir, "model.nud")) && Directory.Exists(body))
                 cdir = Directory.GetDirectories(body).OrderBy(x => x).FirstOrDefault(x => File.Exists(Path.Combine(x, "model.nud"))) ?? cdir;
+            LoadModel(a, cdir);
+            string pac = Path.Combine(root, "motion", "body", "main.pac");
+            if (File.Exists(pac))
+                a.Animations = Pac.Load(pac);
+            a.MapScripts();
+            a.MapModScripts();
+            return a;
+        }
+
+        static void LoadModel(FighterAssets a, string cdir)
+        {
             a.ModelPath = cdir;
             a.Skeleton = Skeleton.Load(Path.Combine(cdir, "model.vbn"));
             a.Model = NudModel.Load(Path.Combine(cdir, "model.nud"));
@@ -61,11 +72,64 @@ namespace Sm4shCommand.Viewer
                             p.UV[i + 1] = p.UV[i + 1] * st[1] + st[3];
                         }
                 }
-            string pac = Path.Combine(root, "motion", "body", "main.pac");
-            if (File.Exists(pac))
-                a.Animations = Pac.Load(pac);
-            a.MapScripts();
-            return a;
+        }
+
+        // ---- mods' scripts (Runtime.ViewerAnims, from ModAnimNames.txt): their animation from another
+        //      motion folder (loaded with all its animations), and a held model shown while it plays
+        readonly Dictionary<string, Tuple<string, string>> heldFor = new Dictionary<string, Tuple<string, string>>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, FighterAssets> held = new Dictionary<string, FighterAssets>(StringComparer.OrdinalIgnoreCase);
+
+        void MapModScripts()
+        {
+            var folders = new Dictionary<string, Dictionary<string, byte[]>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in Runtime.ViewerAnims)
+            {
+                var v = kv.Value;
+                Dictionary<string, byte[]> anims;
+                if (!folders.TryGetValue(v.Folder, out anims))
+                {
+                    string pac = Path.Combine(Root, "motion", v.Folder, "main.pac");
+                    anims = null;
+                    try { if (File.Exists(pac)) anims = Pac.Load(pac); } catch (Exception) { }
+                    folders[v.Folder] = anims;
+                    if (anims != null)
+                        foreach (var e in anims)
+                            if (!Animations.ContainsKey(e.Key)) Animations[e.Key] = e.Value;
+                }
+                if (anims == null || !anims.ContainsKey(v.File)) continue;
+                byScript[kv.Key] = v.File;
+                if (!string.IsNullOrEmpty(v.Held) && !string.IsNullOrEmpty(v.Bone))
+                    heldFor[v.File] = Tuple.Create(v.Held, v.Bone);
+            }
+        }
+
+        /// <summary>The held model shown while an animation plays (model/NAME/c00 of this fighter)
+        /// and the bone (index in this skeleton) it's on, or null.</summary>
+        public Tuple<FighterAssets, int> HeldFor(string anim)
+        {
+            Tuple<string, string> h;
+            if (anim == null || !heldFor.TryGetValue(anim, out h)) return null;
+            int bone = Skeleton.Bones.FindIndex(b => b.Name == h.Item2);
+            if (bone < 0) return null;
+            FighterAssets m;
+            if (!held.TryGetValue(h.Item1, out m))
+            {
+                m = null;
+                try
+                {
+                    string dir = Path.Combine(Root, "model", h.Item1);
+                    string cdir = Directory.Exists(dir) ? Directory.GetDirectories(dir).OrderBy(x => x)
+                        .FirstOrDefault(x => File.Exists(Path.Combine(x, "model.nud"))) : null;
+                    if (cdir != null)
+                    {
+                        m = new FighterAssets { Root = Root, Name = h.Item1 };
+                        LoadModel(m, cdir);
+                    }
+                }
+                catch (Exception) { m = null; }
+                held[h.Item1] = m;
+            }
+            return m == null ? null : Tuple.Create(m, bone);
         }
 
         /// <summary>Expression variants of the face / eyes / body (shown instead of the normal mesh by

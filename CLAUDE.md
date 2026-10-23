@@ -12,4 +12,6 @@
 - Fighter stat (`fighter_param`) names and indices: `reference/fighter_param_attributes.csv`.
 - **Script names:** every script or motion slot a mod adds (game / effect / sound / expression, any
   fighter) gets its name in `tools/Sm4shCommand/SM4SHCommand/ModAnimNames.txt` (under the fighter's
-  heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes.
+  heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes. A script that plays
+  an animation from another motion folder (or shows a held model) gets a `Name -> folder/File.omo
+  [+ held@Bone]` line there too, so the Hitbox Viewer plays it.

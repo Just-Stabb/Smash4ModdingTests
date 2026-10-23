@@ -352,6 +352,9 @@ namespace Sm4shCommand.GUI
             frames = probe.Take(animCount).ToList();
             SetTimeline(animCount, null, 0);
             view.Animation = anim;
+            var hm = assets.HeldFor(animName);
+            view.Held = hm != null ? hm.Item1 : null;
+            view.HeldBone = hm != null ? hm.Item2 : -1;
             Text = "Hitbox Viewer - " + (currentCrc == 0 ? "(no script)" : Runtime.ScriptLabel(currentCrc)) +
                    (currentCrc != scriptCrc && currentCrc != 0 ? " (saved game.bin; edits follow the open script only)" : "");
             status.Text = (error != null ? "Doesn't compile (showing the last saved script): " + error + "   " : "") +
