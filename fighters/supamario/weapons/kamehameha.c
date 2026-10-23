@@ -563,6 +563,9 @@ int func_40(int arg0)
 // every other effect of the beam ends (none ends by itself: Terminate 0); the beam stays, without
 // hitboxes, until they're done (KAME_DISSOLVE frames), then it is removed. KAME_MAX frames after it
 // was fired it is removed whatever happened.
+// Status changes: kame_status() = StatusModule(0x3, status, 0) (func_18 / func_19, as the vanilla weapon
+// MSCs change theirs); the boilerplate's func_22 is StatusModule(0x2), the situation (tests 10 - 14
+// used it: the hold never became the finish, and since test 12 the fallback removed the beam).
 // kame_phase: 0 fly, 1 hold, 2 finish, 3 dissolving after the range / a wall. Reset when status 0 is
 // entered (a new beam: weapons are pooled, so the last beam's values may still be here); keeps hold /
 // finish from restarting if their status is entered again (test 10: the beam held and multi-hit for
@@ -605,6 +608,11 @@ void kame_setup()
     // motion indices as they are (no custom-variant offset: func_40 not installed)
     global11 = func_19;
     global21 = 0;
+}
+
+void kame_status(int status)
+{
+    StatusModule(0x3, status, 0);
 }
 
 int kame_pre()
@@ -694,7 +702,7 @@ void kame_fly_main()
     if (kame_phase != 0)
     {
         // a fly status asked for again after the hit: back to the hold / finish
-        func_22(0x2 + kame_phase);
+        kame_status(0x2 + kame_phase);
         return;
     }
     kame_level = global4;
@@ -783,7 +791,7 @@ void kame_hold_loop()
     }
     if (kame_frame >= KAME_HOLD)
     {
-        func_22(0x4);
+        kame_status(0x4);
         return;
     }
 }

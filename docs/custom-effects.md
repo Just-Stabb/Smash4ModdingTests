@@ -284,3 +284,13 @@ Test 15: weapon_expand gives the Kamehameha's singleton its own vtable 2 copy wi
 stores `0x04B8F324` where the base's stores `0x1056AA04`). Its MSC does its range and walls. The
 test-14 `"nop": ["0x44"]` is undone (+0x44 sets the EffectModule's vt +0xD4 to 5: the weapon's
 effects end with it; without it they stayed).
+
+### Test 15 in game, and test 16 (`build/supamario_kame_test16.zip`)
+
+Test 15: "the beam is still removed early". The cause was in the weapon MSC: in the weapon
+boilerplate `func_22` is `StatusModule(0x2, x)`, which sets the **situation**; a status change is
+`StatusModule(0x3, status, flag)` (`func_18` / `func_19`; vanilla weapons: Samus's wave
+`func_18(0x1)`). The hold's "go to the finish" used `func_22(4)`, so the hold never ended (tests 10 /
+11: multi-hit for ever) and, from test 12, the hold's fallback removed the beam 10 frames later (no
+finish, no light shaft). Test 16: `kame_status()` = `StatusModule(0x3, status, 0)`. The test-15
+vtable 2 copy stays (the fireball's life / wall removal would cut the beam too).
