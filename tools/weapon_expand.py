@@ -13,7 +13,11 @@ article of that name is copied; kinds consecutive from 0x185 over all records), 
 "<base article>", "max": 1}: a copy of the base article's kind (its native code, descriptor, params)
 under its own name and folder (fighter/<new>/model|motion/<name>/, script/.../<name>/), added to the
 new fighter's article list after the base's articles (its article id = its place there), with that
-max count.
+max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
+vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x3) asks
+for status N instead of removing it (left alone when the status is N or more already); other results
+go to the base's method. "motions": N (a brand-new article) gives its motion info N entries (the base's,
+the last repeated: every one plays the base's animation; its motion.mtable names N scripts).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
 - 4 name tables (root / owner / name / folder, 389 pointers, contiguous: can't grow) read by the path
@@ -60,6 +64,8 @@ NAME_TABLES = (('root', 0x104189DC), ('owner', 0x10418FF0), ('name', 0x10419604)
 STATIC_TABLES = (('u32', 0x1018A1D4, 4, 0), ('u8', 0x1018A7E8, 1, 6), ('u16', 0x1018A970, 2, 0))  # (.., invalid value)
 BOUND = 0x0320E5AC             # addic r0, r4, -0x185 (kind < 0x185), the u32 / u8 accessors' check
 DESC_SWITCH = 0x0320D934
+SINGLETON_SWITCH = 0x03210C30  # per-kind specializer singleton (leaf, r4 = kind)
+HIT_METHOD = 0xAC              # singleton vtable: hit result (r3 singleton, r4 weapon, r5 result bits)
 SWITCHES = (0x0320D934, 0x03210C30, 0x02B651AC, 0x02B6894C, 0x02B6B7A8, 0x02B6FD44, 0x02B73AA4, 0x02B75A88,
             0x02B77FAC, 0x02B7A4DC, 0x02B7D378, 0x02B80CF4, 0x02B83D58)
 INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jumping into 0x02B83D60
@@ -92,6 +98,10 @@ def load_weapons(path, img):
             nk = kind_of(nk)
             if spec:
                 r['new_articles'][nk] = (art, int(spec.get('max', 1)))
+                if 'motions' in spec:
+                    r.setdefault('motions', {})[nk] = int(spec['motions'])
+                if 'on_hit' in spec:
+                    r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
                 art_base = spec['base']
             else:
                 art_base = art
@@ -230,6 +240,41 @@ def copy_getter(img, src, base_fighter, new_vl_off):
         a += 4
         assert len(words) < 32
     return words if found == 1 else None
+
+
+def singleton_of(img, kind):
+    """the base kind's singleton {vtable, vtable 2}: its case (lis / addi r3; blr) gives the address in
+    .bss; the static initializer right after it (straight-line lis / addi / addic / stw) its words"""
+    if not hasattr(img, '_single_sw'):
+        img._single_sw = parse_switch(img, SINGLETON_SWITCH)
+    c = case_target(img, img._single_sw['table'], kind)
+    w1, w2, w3 = img.w(c), img.w(c + 4), img.w(c + 8)
+    assert w1 >> 26 == 15 and (w1 >> 21) & 31 == 3 and w2 >> 26 == 14 and w3 == 0x4E800020, 'singleton case 0x%08X' % c
+    at = (((w1 & 0xFFFF) << 16) + K.sx16(w2)) & 0xFFFFFFFF
+    regs, stores, a = {}, {}, c + 12
+    while img.w(a) != 0x4E800020:
+        w = img.w(a)
+        op, d, ra, imm = w >> 26, (w >> 21) & 31, (w >> 16) & 31, K.sx16(w)
+        if op == 15 and ra == 0:                                   # lis
+            regs[d] = (w & 0xFFFF) << 16
+        elif op in (12, 14) and ra in regs:                        # addic / addi
+            regs[d] = (regs[ra] + imm) & 0xFFFFFFFF
+        elif op == 36 and ra in regs and d in regs:                # stw
+            stores[(regs[ra] + imm) & 0xFFFFFFFF] = regs[d]
+        elif op not in (48, 52):                                   # lfs / stfs: the floats around it
+            regs.pop(d, None)
+        a += 4
+        assert a - c < 0x80, 'no initializer after 0x%08X' % c
+    assert at in stores and at + 4 in stores, 'singleton 0x%08X not initialized after 0x%08X' % (at, c)
+    return at, stores[at], stores[at + 4]
+
+
+def vtable_size(img, vt):
+    """bytes of a vtable of {0, code address} pairs"""
+    n = 8
+    while img.w(vt + n) == 0 and 0x02000000 <= img.w(vt + n + 4) < 0x10000000:
+        n += 8
+    return n
 
 
 def article_layout(img, recs):
@@ -377,13 +422,16 @@ def build(spec_path=SPEC, rpx=RPX):
         mi = img.w(d + 8)
         if mi:
             ents, cnt = img.w(mi), img.w(mi + 4)
+            n = r.get('motions', {}).get(nk, cnt)
+            assert cnt and n >= cnt or n == cnt, 'weapon 0x%X: %d motions (the base has %d)' % (nk, n, cnt)
             m_at = B.alloc(MINFO_SIZE, 8)
-            e_at = B.alloc(8 * cnt, 8) if cnt else 0
+            e_at = B.alloc(8 * n, 8) if n else 0
             mib = bytearray(img.blob(mi, MINFO_SIZE))
-            struct.pack_into('>I', mib, 0, e_at if cnt else ents)
+            struct.pack_into('>II', mib, 0, e_at if n else ents, n)
             B.data(m_at, mib, 'weapon 0x%X motion info' % nk)
-            if cnt:
-                B.data(e_at, img.blob(ents, 8 * cnt), 'weapon 0x%X motions' % nk)
+            if n:
+                blob_m = img.blob(ents, 8 * cnt)
+                B.data(e_at, blob_m + blob_m[-8:] * (n - cnt), 'weapon 0x%X motions' % nk)
             struct.pack_into('>I', blob, 8, m_at)
         sub = img.w(d + 0x14)
         if sub:
@@ -432,6 +480,39 @@ def build(spec_path=SPEC, rpx=RPX):
     B.data(dt, b''.join(struct.pack('>I', dcase.get(k, 0)) for k in range(OLD_N, cap)), 'descriptor cases')
     info['descriptor_cases'] = dt
 
+    # ---- own singletons (on_hit): the vtable copy, the hit method, the singleton {vtable, vtable 2}
+    scase = {}
+    for nk in sorted(new):
+        bk, r, _art = new[nk]
+        status = r.get('on_hit', {}).get(nk)
+        if status is None:
+            continue
+        _at, vt, vt2 = singleton_of(img, bk)
+        size = vtable_size(img, vt)
+        old_hit = img.w(vt + HIT_METHOD)          # the {0, fn} pair's fn word
+        assert size > HIT_METHOD and 0x02000000 <= old_hit < 0x10000000
+        fn = B.alloc(4 * 32)
+        hit = B.code(fn, (
+            'andi. r0, r5, 3\nbeq base\n'
+            'mflr r0\nstwu r1, -0x18(r1)\nstw r0, 0x1C(r1)\nstw r31, 0x14(r1)\n'
+            'lwz r12, 0x28(r4)\nlwz r31, 0x20(r12)\n'                    # StatusModule
+            'lwz r12, 0(r31)\nlwz r12, 0x8C(r12)\nmtctr r12\nmr r3, r31\nbctrl\n'   # its status
+            'cmpwi r3, %d\nbge done\n'
+            'lwz r12, 0(r31)\nlwz r12, 0x2C(r12)\nmtctr r12\nmr r3, r31\nli r4, %d\nbctrl\n'  # change to N
+            'done:\nlwz r0, 0x1C(r1)\nlwz r31, 0x14(r1)\nmtlr r0\naddi r1, r1, 0x18\nli r3, 0\nblr\n'
+            'base:\nb 0x%X') % (status, status, old_hit))
+        assert len(hit.words()) <= 32
+        v_at = B.alloc(size, 8)
+        vb = bytearray(img.blob(vt, size))
+        struct.pack_into(">I", vb, HIT_METHOD, fn)
+        B.data(v_at, vb, 'weapon 0x%X vtable (copy of 0x%08X)' % (nk, vt))
+        o_at = B.alloc(8, 8)
+        B.data(o_at, struct.pack('>II', v_at, vt2), 'weapon 0x%X singleton' % nk)
+        scase[nk] = o_at
+        info.setdefault('singletons', {})[nk] = (o_at, v_at, fn, status)
+    st = B.alloc(4 * (cap - OLD_N))
+    B.data(st, b''.join(struct.pack('>I', scase.get(k, 0)) for k in range(OLD_N, cap)), 'singleton cases')
+
     # ---- the 13 switches
     info['switches'] = []
     for a in SWITCHES:
@@ -451,12 +532,16 @@ def build(spec_path=SPEC, rpx=RPX):
                        ('lwzx r0, r{k}, r0' if t == 0 else 'lwzx {t}, {t}, r{k}') + '\n' +
                        ('cmpwi r0, 0' if t == 0 else 'cmpwi {t}, 0') + '\nbeq dflt\nmtctr {t}\nbctr')
         else:
-            newpath = ('addi r{k}, r{k}, -0x185\nslwi r{k}, r{k}, 2\n' + (hi_lo % (ha(bt), K.slo(bt))) + '\n' +
+            own = ''
+            if a == SINGLETON_SWITCH:              # leaf: r12 free; an own singleton is returned in r3
+                assert k != 12 and t != 12
+                own = ('lis r12, 0x%X\naddi r12, r12, %d\nlwzx r12, r12, r{k}\ncmpwi r12, 0\nbeq bas\n'
+                       'mr r3, r12\nblr\nbas:\n') % (ha(st), K.slo(st))
+            newpath = ('addi r{k}, r{k}, -0x185\nslwi r{k}, r{k}, 2\n' + own + (hi_lo % (ha(bt), K.slo(bt))) + '\n' +
                        ('lwzx r{k}, r{k}, r0' if t == 0 else 'lwzx r{k}, {t}, r{k}') + '\n'
                        'cmplwi r{k}, 0x184\nble orig\nb dflt')
         src = ('cmplwi r{k}, 0x184\nbgt new\norig:\n' + orig + '\nnew:\n' + newpath + '\ndflt:\n' + dflt)
-        B.code(stub, src.format(k=k, t=tk))
-        assert B.pc - stub >= 0
+        assert len(B.code(stub, src.format(k=k, t=tk)).words()) <= 32
         # in place: the bound, and the far jump after the bgt
         B.asm(a, 'cmplwi r%d, %d' % (k, cap - 1), 'cmplwi r%d, 0x184' % k)
         x = sw['x']
@@ -510,6 +595,10 @@ def main():
                       for off, _s, at in info['getters'].get(nk, []))
         print('  0x%X %s (copy of 0x%X, owner %s): descriptor 0x%08X (0x%X bytes of 0x%08X)%s' % (
             nk, art, bk, r['name'], d_at, size, d, '; ' + g if g else ''), file=err)
+        if nk in info.get('singletons', {}):
+            o_at, v_at, fn, status = info['singletons'][nk]
+            print('    own singleton 0x%08X (vtable 0x%08X, hit method 0x%08X: a hit -> status %d)' % (
+                o_at, v_at, fn, status), file=err)
     if a.info:
         for nm, (old, new_) in info['tables'].items():
             print('  table %-6s 0x%08X -> 0x%08X' % (nm, old, new_), file=err)

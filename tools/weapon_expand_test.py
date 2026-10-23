@@ -19,7 +19,11 @@ PATCHED = ORIGINAL + kind_expand + weapon_expand (and any other caves). Checks:
 - the path builders 0x030BC8E4 (name / folder lists) and 0x030BCB10 (every path type: the owner / name /
   folder strings it formats with): the base's with owner = the new fighter;
 - the new fighter's descriptor (kind_expand's copy) +8 = its article list: the base's entries, kinds
-  remapped.
+  remapped;
+- an own singleton (on_hit): the singleton getter returns it for its kind; it is {the vtable copy, the
+  base's vtable 2}; the copy is the base's vtable but +0xAC; the hit method asks a fake StatusModule
+  for status N on result bits 0x1 / 0x2 below N (none at N or more), returns 0, and leaves other
+  results to the base's method.
 """
 import os
 import struct
@@ -61,6 +65,7 @@ class Run(Emu):
             self.mu.reg_write(REGS[i], 0x5A5A0000 + i)
         self.mu.reg_write(REGS[0], 0x5A5A0000)
         self.mu.reg_write(REGS[sw['k']], k)
+        self.mu.reg_write(UC_PPC_REG_LR, RET)
         hit = []
 
         def cb(mu, a, size, ud):
@@ -115,7 +120,13 @@ def main():
                 stops.add(c)
         regs = (sw['k'], sw['t'])
         bad = []
+        own = info.get('singletons', {}) if sw['at'] == W.SINGLETON_SWITCH else {}
         for k in list(range(0, cap)) + [cap, cap + 1, 0x7FFF]:
+            if k in own:
+                got = E1.dispatch(sw, k, stops | {RET}, (3,))
+                if got != (RET, (own[k][0],)):
+                    bad.append((hex(k), 'own singleton', [hex(x) for x in (got[0] or 0, got[1][0])]))
+                continue
             got = E1.dispatch(sw, k, stops, regs)
             if k < W.OLD_N:
                 want = E0.dispatch(sw, k, stops, regs)
@@ -129,6 +140,45 @@ def main():
             if got[0] != want[0] or (k < W.OLD_N or (k in new and sw['at'] != W.DESC_SWITCH)) and got[1] != want[1]:
                 bad.append((hex(k), [hex(x) if x is not None else None for x in (got[0], want[0])]))
         check('switch 0x%08X: every kind 0x0-0x%X (+ past C)' % (sw['at'], cap), bad[:3], [])
+
+    # ---- own singletons and their hit method
+    for nk, (o_at, v_at, fn, status) in sorted(info.get('singletons', {}).items()):
+        art = new[nk][2]
+        at0, vt, vt2 = W.singleton_of(img, new[nk][0])
+        check('0x%X %s: singleton {vtable copy, base vtable 2}' % (nk, art), (E1.w(o_at), E1.w(o_at + 4)), (v_at, vt2))
+        size = W.vtable_size(img, vt)
+        diff = [o for o in range(0, size, 4) if E1.w(v_at + o) != img.w(vt + o)]
+        check('0x%X %s: vtable copy = the base\'s but +0x%X' % (nk, art, W.HIT_METHOD), diff, [W.HIT_METHOD])
+        check('0x%X %s: +0x%X = the hit method' % (nk, art, W.HIT_METHOD), E1.w(v_at + W.HIT_METHOD), fn)
+        old_hit = img.w(vt + W.HIT_METHOD)
+        E = Run(patched)
+        calls = []
+        cur = [0]
+        f_status, f_change = E.alloc(8), E.alloc(8)
+        E.stub(f_status, lambda e: cur[0])
+        E.stub(f_change, lambda e: calls.append(('status', e.r(4))))
+        E.stub(old_hit, lambda e: calls.append(('base', e.r(3), e.r(4), e.r(5))) or 0x77)
+        weapon, acc, sm, svt = E.alloc(0x100), E.alloc(0x100), E.alloc(0x10), E.alloc(0x100)
+        E.setw(weapon + 0x28, acc)
+        E.setw(acc + 0x20, sm)
+        E.setw(sm, svt)
+        E.setw(svt + 0x8C, f_status)
+        E.setw(svt + 0x2C, f_change)
+        res = []
+        for st, bits in ((0, 1), (2, 2), (0, 3), (status - 1, 0x11), (status, 1), (status + 1, 2), (0, 0x10), (0, 8),
+                         (status, 4)):
+            cur[0] = st
+            del calls[:]
+            ret = E.call(fn, o_at, weapon, bits)
+            res.append((st, bits, ret, list(calls)))
+        want = []
+        for st, bits in ((0, 1), (2, 2), (0, 3), (status - 1, 0x11), (status, 1), (status + 1, 2), (0, 0x10), (0, 8),
+                         (status, 4)):
+            if bits & 3:
+                want.append((st, bits, 0, [('status', status)] if st < status else []))
+            else:
+                want.append((st, bits, 0x77, [('base', o_at, weapon, bits)]))
+        check('0x%X %s: hit method (status, bits -> return, calls)' % (nk, art), res, want)
 
     # ---- the descriptor getter
     bad = []
@@ -151,10 +201,12 @@ def main():
         m0, m1 = E0.w(d0 + 8), E1.w(d1 + 8)
         if m0:
             n = E0.w(m0 + 4)
-            same = bytes(E0.mu.mem_read(m0 + 4, 0x1C)) == bytes(E1.mu.mem_read(m1 + 4, 0x1C))
-            ents = bytes(E0.mu.mem_read(E0.w(m0), 8 * n)) == bytes(E1.mu.mem_read(E1.w(m1), 8 * n))
-            check('0x%X %s: motion info copy (%d motions) = the base\'s, its own (0x%08X)' % (nk, art, n, m1),
-                  (same, ents, m1 != m0 and W.CAVE <= m1 < W.LIMIT), (True, True, True))
+            n1 = new[nk][1].get('motions', {}).get(nk, n)
+            same = bytes(E0.mu.mem_read(m0 + 8, 0x18)) == bytes(E1.mu.mem_read(m1 + 8, 0x18)) and E1.w(m1 + 4) == n1
+            e0 = bytes(E0.mu.mem_read(E0.w(m0), 8 * n))
+            ents = bytes(E1.mu.mem_read(E1.w(m1), 8 * n1)) == e0 + e0[-8:] * (n1 - n)
+            check('0x%X %s: motion info copy (%d motions: the base\'s %d, the last repeated), its own (0x%08X)' % (
+                nk, art, n1, n, m1), (same, ents, m1 != m0 and W.CAVE <= m1 < W.LIMIT), (True, True, True))
         s0, s1 = E0.w(d0 + 0x14), E1.w(d1 + 0x14)
         if s0:
             n = E0.w(s0 + 4)
