@@ -82,6 +82,10 @@ FIELDS = [
     (0x348, '>3f', 'volume_radius', 'corpus'),
     (0x354, '>f', 'volume_sweep_start', 'corpus'),
     (0x358, '>f', 'volume_sweep_param', 'corpus'),
+    (0x3D8, '>12f', 'emitter_matrix', 'corpus'),  # 3x4 rows: Rz.Ry.Rx(rotation) . diag(scale) | translation
+    (0x408, '>3f', 'emitter_scale', 'corpus'),    # (the matrix is derived from these three: all 8115 vanilla
+    (0x414, '>3f', 'emitter_rotation', 'corpus'),  # emitters agree; set_emitter_srt writes all four)
+    (0x420, '>3f', 'emitter_translation', 'corpus'),
     (0x444, '>f', 'emit_rate', 'corpus'),
     (0x448, '>i', 'start_frame', 'corpus'),
     (0x450, '>i', 'end_frame', 'corpus'),         # 0x7FFFFFFF = forever
@@ -293,6 +297,18 @@ class Ptcl:
         off, fmt, _n, _c = FIELD[name]
         vals = value if isinstance(value, (list, tuple)) else [value]
         struct.pack_into(fmt, em, off, *vals)
+
+    def set_emitter_srt(self, em, scale=(1, 1, 1), rotation=(0, 0, 0), translation=(0, 0, 0)):
+        """the emitter's transform (rotation in radians, applied X then Y then Z) and its matrix"""
+        cx, cy, cz = np.cos(rotation)
+        sx, sy, sz = np.sin(rotation)
+        r = (np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]]) @ np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+             @ np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])) * np.array(scale, float)[None, :]
+        m = np.concatenate([r, np.array(translation, float)[:, None]], 1)
+        self.set_field(em, 'emitter_matrix', [float(v) for v in m.ravel()])
+        self.set_field(em, 'emitter_scale', [float(v) for v in scale])
+        self.set_field(em, 'emitter_rotation', [float(v) for v in rotation])
+        self.set_field(em, 'emitter_translation', [float(v) for v in translation])
 
     def color_keys(self, em, track):
         k = self.field(em, 'color%d_keys' % track)

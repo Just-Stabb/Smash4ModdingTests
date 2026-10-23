@@ -96,9 +96,11 @@ the writer recomputes them.)
 | 0x2EC / 0x2F0 | u32 | shader-param size / pos (into sparam table) | verified |
 | 0x2F8–0x33C | u32s | small enums (blend, display, z-mode, etc.) — shader-keyed | corpus |
 | 0x324 | u32 | blend: 0 alpha (normal), 1 additive, 2 subtract. Not shader-keyed: 352 of 5366 (file, shader) pairs use more than one; emitters named `*_alpha` are 0 (273 of 280), `*add*` mostly 1 | corpus |
-| 0x340 | u32 | volume type (0 point, 2+ shapes) | corpus |
+| 0x340 | u32 | volume type (0 point, 1 circle (XZ plane, radius x / z), 2 circle (same divide), 3 circle fill, 4 sphere, 7 sphere fill, 8-9 cylinder, 10-11 box, 12-13 line, 14 rectangle: names and radii in the corpus fit NintendoWare's order) | corpus |
 | 0x348 | 3f | volume radius | corpus |
 | 0x354 / 0x358 | f | volume sweep start / param | corpus |
+| 0x3D8 | 12f | emitter matrix, 3 rows of 4: Rz·Ry·Rx(rotation)·diag(scale), translation in the 4th column (all 8115 vanilla emitters agree; `Ptcl.set_emitter_srt` writes it with the three below) | corpus |
+| 0x408 / 0x414 / 0x420 | 3f each | emitter scale / rotation (radians) / translation | corpus |
 | 0x444 | f | emit rate | corpus |
 | 0x448 | s32 | start frame | corpus |
 | 0x450 | s32 | end frame (0x7FFFFFFF forever) | corpus |

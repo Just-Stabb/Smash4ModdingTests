@@ -27,8 +27,7 @@ the move (animations, ACMD hitboxes, MSC charge logic).
 
 - Formats: `tools/ptcl.py` (docs/ptcl-format.md), `tools/efc.py` (docs/efc-format.md).
 - XV2's own Kamehameha models (Kmh_Fire / Kmh_Bas / Kmh_Hand) converted to effect model folders
-  `EffSupamarioKameFire / Bas / Hand`: `tools/xv2_to_nud.py` (docs/xv2-model-conversion.md); not
-  yet in an .efc / loaded in game.
+  `EffSupamarioKameFire / Bas / Hand`: `tools/xv2_to_nud.py` (docs/xv2-model-conversion.md).
 - Supamario's own sound bank: `tools/fighter_own_bank.py` (docs/kind-expansion.md): BINF id 2144,
   soundlabeltable row 3249; Kamehameha sounds `0x0CB1008B` charge, `0x0CB1008C` fire,
   `0x0CB1008D` beam head.
@@ -45,3 +44,38 @@ the move (animations, ACMD hitboxes, MSC charge logic).
   shimmer unchanged; our glow texture as the template's quarter glow (drawn mirrored), BC4, the
   shape in R = G = B; no smoke. Rule for our own textures: match the template slot's format and
   channel layout.
+
+## The Xenoverse 2 Kamehameha port (`000_GOK_KMH.vfxpackage`)
+
+Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `tools/xv2emb.py`,
+`tools/xv2model.py`. Converters:
+
+- **Particles**: `tools/xv2_to_ptcl.py PKG BASE.ptcl OUT.ptcl` (the mapping is in its docstring).
+  One emitter set per EMP (`PtcSupamarioKmh<Name>`, split at 16 emitters, the most any vanilla set
+  has): each EMP emission node becomes an emitter cloned from a template in Mario's file whose
+  shader fits the particle type: camera billboards (type 0) from `PtcMarioPumpMax/flare1` (additive)
+  or `PtcMarioFireball/PtcMarioFireballSmoke_Copy2` (normal blend), streaks along their velocity
+  (type 3, XV2 `AutoOriented_VisibleOnSpeed`) from `PtcMarioSupermant2/line1`, ShapeDraw rings
+  (type 1, a polygon turned by the emitter transform, the ring drawn into the texture) from
+  `PtcMarioFireballShoot/PtcMarioRireballShoot`. All four: one BC4 texture, no flipbook, colour
+  key-animated. Blend (0x324) is set per emitter (it is not shader-keyed). Textures: the
+  sampler's first sprite-sheet cell, BC4 with the shape in R, the texture's mean tint moved into
+  the particle colour. Timing: the XV2 spawn tree (bursts, frequencies, loops, `MaxInstances`)
+  is simulated and eft's start / end / interval / rate fitted to the spawn frames. Curves (colour,
+  alpha, scale) are least-squares fits of eft's 3-key ramps. 8.5 Smash units per XV2 unit (as the
+  models); XV2 velocities are per second. Not converted: ConeExtrude ribbons (2 in LineAll),
+  Vortex / Translation modifiers, sprite-sheet animation, the secondary colour.
+- **Models**: `tools/xv2_to_nud.py` (docs/xv2-model-conversion.md).
+- **Emitter transform** (found for this): emitter +0x3D8 is a 3x4 matrix Rz·Ry·Rx·scale with the
+  translation, from the scale / rotation / translation at +0x408 / +0x414 / +0x420
+  (`Ptcl.set_emitter_srt`; all 8115 vanilla emitters agree).
+- **Test build**: `tools/supamario_kame_build.py PKG V4 V5 OUT` (Supamario's v4 ptcl + v5 efc /
+  scripts): sets `0x03410017`-`0x0341001F`, models `0x03410020` Fire, `0x03410021` Bas,
+  `0x03410022` Hand. Up taunt: the charge at bone 0x11 (EEPK effects 0 / 15: Crg x0.4 + tsubu at
+  0, x0.6 + CrgON x0.8 at 42, x1.0 + CrgON x1.2 at 78, Crg again at 118 / 158); side taunt: the
+  release (Fire model + Ring x0.8); down taunt: the beam head at bone 0, 7 up and 14 in front
+  (Bas x1.6, Fireptcl, Wav, 4ptcl, LineAll, Hand x0.45, at their EEPK offsets). Package
+  `build/supamario_kame_test.zip`. Not yet seen in game: sizes, the beam head's direction (XV2 +Z
+  forward, taken as bone 0's +Z) and the model entries are the things to check.
+- Still to do: the beam body (the ETR traces `Kmh_Beam*.etr`: tubes along the beam), then the
+  move itself (projectile, hitboxes, charge logic).
