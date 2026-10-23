@@ -30,9 +30,11 @@ Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2
 
 **Speed cleared before the roll's speed (user: it wasn't, for anyone):** the roll's kinetic type
 `0x6` sets up energy 3 with the speed the fighter had (a dash, a run), and the ACMD's
-`Add/Set_Momentum(0, 0, 1)` didn't clear it. `rolloff_update()` now sets energy 3's speed to 0
-(`KineticModule(0x11, 3, 0, 0)`) on every roll frame before `rolloff_start_frame()`, in every
-fighter (the four hand-done ones too).
+`Add/Set_Momentum(0, 0, 1)` didn't clear it. `rolloff_update()` sets energy 3's speed to 0
+(`KineticModule(0x11, 3, 0, 0)`) on the roll's frames before `rolloff_clear_frames()` (3), in every
+fighter (the four hand-done ones too). Clearing it up to `rolloff_start_frame()` (5) also wiped the
+ACMD's speed (user: rolls didn't move): the MSC's motion frame reads one less than the ACMD's frame
+when the speed is added, so the clear has to stop well before it. So the ACMD speed is in energy 3.
 
 **Rolls that turn around early (user: Ryu's forward roll went backwards):** the speed is along the
 facing at the speed frame. Ryu (`Reverse_Direction` at frame 4), Samus, Mii Gunner and the Mii Team

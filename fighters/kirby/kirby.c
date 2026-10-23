@@ -72642,9 +72642,9 @@ void rolloff_update()
     {
         global72 = 0; // new roll
     }
-    if (MotionModuleF(0x1) < rolloff_start_frame()) // no speed carried into the roll: it starts from 0
-    {                                               // at the speed frame (user; the ACMD's clear didn't reach it)
-        KineticModule(0x11, 0x3, 0, 0);
+    if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
+    {                                                // starts; the ACMD's clear didn't reach it), well before the
+        KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
     }
     if (global83) // Overdrive: the ACMD adds the Overdrive roll speed
     {
@@ -73893,3 +73893,6 @@ void marth_full_charge_fx(int sub)
         MotionAnimcmdModule(0, 0x10, 0x384, 0x8);
     }
 }
+
+// roll-off (added after the rest, so the other functions keep their numbers)
+float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this

@@ -281,6 +281,7 @@ HELPERS = '''// ================================================================
 // %(cap)s: the roll-off took the air speed cap off (Fall's end puts it back).
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
 float rolloff_air_speed_mult() { return %(mult)s; } // speed carried off a ledge x this (1.0 = unchanged)
 
@@ -306,9 +307,9 @@ void rolloff_update()
     {
         %(hold)s = 0; // new roll
     }
-    if (MotionModuleF(0x1) < rolloff_start_frame()) // no speed carried into the roll: it starts from 0
-    {                                               // at the speed frame (user; the ACMD's clear didn't reach it)
-        KineticModule(0x11, 0x3, 0, 0);
+    if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
+    {                                                // starts; the ACMD's clear didn't reach it), well before the
+        KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
     }
 %(uncap)s    if (%(hold)s < rolloff_lock_frames())
     {
@@ -379,7 +380,7 @@ int dash_turn_attack_update()
 }
 '''
 
-ADDED_FUNCS = 9          # rolloff_start_frame ... dash_turn_attack_update (msc_fingerprint.py --added)
+ADDED_FUNCS = 10         # rolloff_start_frame ... dash_turn_attack_update (msc_fingerprint.py --added)
 
 
 def main():
