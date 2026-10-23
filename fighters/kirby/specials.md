@@ -975,6 +975,18 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
   jumpsquat wavedash and the stick-neutral air dodge). Kirby's collision is small, so it ended up under
   the stage and a buffered wavedash fell through it (user).
 
+## Added: easier buffered wavedash (Luigi copy) and the Overdrive roll
+
+- **Wavedash** (user: the input was very tight): the same as Luigi's (`fighters/luigi/README.md`,
+  "Easier buffered wavedash"): a shield press up to 3 frames before the jumpsquat counts
+  (`global96`), and an air dodge within 8 frames of a ground jump, at most 20 above the floor the jump
+  left (`global95`), stick down or straight left / right, puts Kirby 0.1 above that floor so it lands
+  at once (`wavedash_snap()`, in `melee_airdodge_entry()`).
+- **Overdrive roll** (Corrin copy, user): roll-off speed 2.8 instead of 2.1, x1.05 into the air
+  (`overdrive_rolloff_air_mult()`). `rolloff_update()` sets status flag `0x2100001F` on every roll
+  frame while Overdrive is on; the rolls' ACMD adds 2.8 when it's set, else 2.1
+  (`tools/kirby_overdrive_roll_acmd.py`, after `rolloff_acmd.py --clear-first`).
+
 ## Removed: Marth copy forward smash
 
 With Marth's copy Kirby's F-smash became Marth's (Roy-copy Flare Blade retimed, then Marth's own

@@ -68,6 +68,8 @@ int global66;
 int global67;
 int global68;
 float global69;
+float global70;
+int global71;
 
 void func_0()
 {
@@ -1407,6 +1409,10 @@ int func_62()
                 if (global32 < 0.01f && global5 != 0x57)
                 {
                     GroundModule(0x1a, GroundModuleF(0xa), GroundModuleF(0xb) - 2.5f);
+                }
+                if (wavedash_snap()) // a dodge just after the jump, close to the floor: a wavedash (user: easier buffer)
+                {
+                    return 0x1;
                 }
                 if (global32 < -0.18f)
                 {
@@ -10106,7 +10112,11 @@ void func_487()
 {
     int var0;
     int var1;
-    global65 = 0; // (Melee air dodge) no air dodge buffered in this jumpsquat yet
+    global65 = 0; // no air dodge buffered in this jumpsquat yet...
+    if (global71 <= wavedash_early_frames()) // ...unless shield was pressed just before it (user: easier buffer)
+    {
+        global65 = 1;
+    }
     var0 = WorkModule(0x6, 0x1000007b);
     var1 = WorkModule(0x6, 0x12000020) + var0;
     if (global47 >= var1 || global49 <= 0)
@@ -38269,9 +38279,62 @@ float wavedash_angle_cos() { return 0.0174524f; } // cos(89 degrees): the downwa
 float wavedash_straight_y() { return 0.25f; }
 float wavedash_straight_x() { return 0.5f; }
 
+// Easier buffered wavedash (user: the input was very tight). Two more ways in, on top of a shield
+// press during the jumpsquat:
+// - a shield press up to wavedash_early_frames() (3) frames before the jumpsquat started (global71:
+//   frames since the last press, counted in wavedash_shield_update);
+// - a late press, in the air: an air dodge within wavedash_snap_frames() (8) frames of the jump (Jump
+//   0xB, from the ground) while Luigi is at most wavedash_snap_height() (20) above the floor the
+//   jump left (global70, kept by the jumpsquat), with the stick down or straight left / right: Luigi is
+//   put wavedash_snap_gap() (0.1) above that floor and the dodge is aimed like the jumpsquat's (89
+//   degrees for straight left / right), so it lands at once: a wavedash. Only after a jump, where
+//   the floor's height is known; with the stick up or neutral it stays a normal air dodge.
+int   wavedash_early_frames() { return 3; }
+float wavedash_snap_frames()  { return 8.0f; }
+float wavedash_snap_height()  { return 20.0f; }
+float wavedash_snap_gap()     { return 0.1f; }
+
+int wavedash_snap()
+{
+    float h;
+    float x;
+    int straight;
+    if (global4 != 0xb || global9 > wavedash_snap_frames())
+    {
+        return 0;
+    }
+    straight = func_13(global32) < wavedash_straight_y() && func_13(global48) >= wavedash_straight_x();
+    if (!straight && global32 >= -0.18f)
+    {
+        return 0;
+    }
+    h = PostureModuleF(0x2) - global70;
+    if (h < 0 || h > wavedash_snap_height())
+    {
+        return 0;
+    }
+    PostureModule(0x3, PostureModuleF(0x1), global70 + wavedash_snap_gap(), PostureModuleF(0x3));
+    WorkModule(0x2710, 0x200000b5);
+    if (straight)
+    {
+        x = wavedash_angle_sin();
+        if (global48 < 0)
+        {
+            x = -x;
+        }
+        melee_airdodge_xy(x, -wavedash_angle_cos());
+    }
+    else
+    {
+        melee_airdodge_dir();
+    }
+    return 0x1;
+}
+
 int jumpsquat_airdodge()
 {
     float x;
+    global70 = PostureModuleF(0x2); // the floor the jump leaves (wavedash_snap)
     if (global38 & 0x40) // shield pressed this frame
     {
         global65 = 1;
@@ -38317,6 +38380,14 @@ int jumpsquat_airdodge()
 // shields as usual.
 void wavedash_shield_update()
 {
+    if (global38 & 0x40) // frames since shield was last pressed (a press just before the jumpsquat counts)
+    {
+        global71 = 0;
+    }
+    else if (global71 < 0x64)
+    {
+        global71++;
+    }
     if (global66 && !ControlModule(0x2712, 0x3))
     {
         global66 = 0;

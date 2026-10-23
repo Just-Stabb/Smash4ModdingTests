@@ -2,6 +2,32 @@
 
 These are the user's own mechanic changes. Every fighter should eventually get them.
 
+**Every fighter has them now** (user's `fighter-modded-scripts-only.zip`, 65 folders, Supamario left
+out for now): Captain Falcon, Kirby, Luigi and Sonic by hand (below); everyone else, the
+non-playable forms included (Giga Bowser, Wario-Man, Giga Mac, Mega Lucario, the Fighting Mii Team),
+with the tools:
+
+1. MSC: decompile (`tools/mscdec`; strings with raw line breaks need escaping), then
+   `python3 tools/universal_mechanics.py IN.c OUT.c [--air-mult M]`, then msclang. The patcher finds
+   every function through the status table (`sv_set_mem(0x1, kind, status, func_N)`; a fighter's own
+   script that calls the common one, like Palutena's EscapeF pre or Yoshi's roll main, is followed),
+   skips parts a fighter already has (Corrin's, Meta Knight's, Dr. Mario's and Mewtwo's own reverse
+   tilts), adds three globals and the helper functions at the end. Fall's end only puts the air speed
+   cap back when a roll-off took it off (the hand-done fighters clear it on every Fall end).
+2. Check: `python3 tools/msc_fingerprint.py ORIGINAL.mscsb REBUILT.mscsb --added 9` compares what each
+   function does (calls, constants, variables; not the bytes, which msclang lays out differently).
+   An unedited round trip was the same in every function for every fighter (a few layout-only
+   differences: an extra `else` jump, `-0.1` folded); after the patch exactly the patched functions
+   differ, and only by additions (plus the rolls' kinetic type `0xf` -> `0x6`). Corrin, Giga Mac,
+   Mega Lucario, Meta Knight and Ryu were patched from their sources in `fighters/` (each compiles to
+   the user's file exactly).
+3. ACMD: `tools/rolloff_acmd.py` on the user's `game.bin` (`--plain --add` for the default 2.2,
+   `--clear-first` where the roll-off speed was already there). Only EscapeF / EscapeB change; every
+   other script was checked identical, and a plain load / save gives every user file back byte for byte.
+
+Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2.1 / 1.0 (Overdrive
+2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.8** (user).
+
 ## Reverse tilts
 
 Up tilt and down tilt can be done facing the other way: if the stick is held backward

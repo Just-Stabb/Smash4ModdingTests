@@ -103,6 +103,9 @@ EDGE = acmd.BY_NAME["set_edge_slide"]
 
 def add_speed(script, speed, start, end):
     """Give the roll a roll-off speed (Captain Falcon's pattern) and drop Set_Edge_Slide."""
+    blocks = {TRUE, FALSE, IS_FLAG, acmd.BY_NAME["else"], acmd.BY_NAME["set_loop"], acmd.BY_NAME["goto"]}
+    if any(c.ident in blocks for c in script):
+        raise SystemExit("the roll has condition / loop blocks: add its speed by hand")
     tl = [(f, c) for f, c in timeline(script) if c.ident != EDGE]
     tl += [(0.0, acmd.Command(MOM, [0.0, 0.0, 1])), (float(start), acmd.Command(MOM, [0.0, 0.0, 1])),
            (float(start), acmd.Command(MOM, [speed, 0.0, 0])),

@@ -72,6 +72,15 @@ pieces below are ported from that decompile (and the bytecode where it still fai
   `melee_airdodge_xy(±sin 89°, −cos 89°)`), a perfect wavedash, without the mod's 0.1 raise so it
   lands at once. Other directions: the stick's, as in the mod. (The mod only did it on a press
   exactly on the last frame, and only for a jumpsquat of 6+ frames: Luigi's is 5.)
+- **Easier buffered wavedash** (user: the input was very tight): a shield press up to
+  `wavedash_early_frames()` (3) frames *before* the jumpsquat also counts (`global71`: frames since
+  the last shield press, `wavedash_shield_update()`; JumpSquat main `func_487`), and a late press in
+  the air does too: an air dodge within `wavedash_snap_frames()` (8) frames of a ground jump (Jump
+  `0xB`) while Luigi is at most `wavedash_snap_height()` (20) above the floor the jump left
+  (`global70`, kept by `jumpsquat_airdodge()`), with the stick down or straight left / right, puts
+  him `wavedash_snap_gap()` (0.1) above that floor and aims the dodge like the jumpsquat's (89° for
+  straight left / right), so it lands at once (`wavedash_snap()`, in `func_62` before the stick-down
+  code). Only after a jump, where the floor's height is known; stick up or neutral: a normal dodge.
 - **No shield from the dodge's own press** (user: a buffered wavedash went into shield unless shield
   was let go at once, which stopped the slide): `global66` is set when a dodge starts and cleared
   when shield is released (`wavedash_shield_update()`, main loop `func_74`); while it's set, the
