@@ -35,6 +35,8 @@ TRAITS = [('Normal', (200, 205, 215), 'star'), ('Rush', (40, 120, 255), 'chevron
 PLATE = (24, 28, 44, 235)
 TEXT = (0, 0, 0, 255)                   # black names with a white outline, like the icons
 TEXT_OUTLINE = (255, 255, 255, 255)
+TEXT_OUTLINE_W = 7                      # at 4x: about as thick as the icons' white outlines
+TEXT_SIZE = 0.45                        # the names' largest size, of the plate's height
 OUTLINE = (12, 14, 24, 255)
 
 
@@ -99,7 +101,8 @@ def text_layout(name, size, font_path):
     r = (h - 2 * pad) * 0.42
     cx = pad + (h - 2 * pad) / 2
     left, right = cx + r + SS * 6, w - pad - SS * 10
-    fs = int((h - 2 * pad) * 0.5)
+    right -= (right - left) * 0.1          # the longest names a little smaller than the space allows
+    fs = int((h - 2 * pad) * TEXT_SIZE)
     font = ImageFont.truetype(font_path, fs)
     while font.getlength(name.upper()) > right - left and fs > 8:
         fs -= SS
@@ -133,7 +136,7 @@ def badge(name, colour, kind, size, icons=None, font_path=FONT):
     x = text_start(size, font_path)
     box = font.getbbox(text)
     y = h / 2 - (box[1] + box[3]) / 2
-    d.text((x, y), text, font=font, fill=TEXT, stroke_width=SS * 3, stroke_fill=TEXT_OUTLINE)
+    d.text((x, y), text, font=font, fill=TEXT, stroke_width=TEXT_OUTLINE_W, stroke_fill=TEXT_OUTLINE)
     return img.resize(size, Image.LANCZOS)
 
 
