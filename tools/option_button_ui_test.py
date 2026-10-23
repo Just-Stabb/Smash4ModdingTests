@@ -124,6 +124,29 @@ def main():
         hdr = LM.words(T[i][1])
         check('sprite %d: header counts' % cid, (hdr[3], hdr[4], hdr[5]),
               (len(labels), len(frames), sum(1 for t, b in T[i:j] if t == LM.T_KEYFRAME)))
+    rowsprites = {}
+    cur = None
+    for t, b in T:
+        if t == LM.T_SPRITE:
+            cur = LM.words(b)[0]
+        elif t == LM.T_LABEL and sy[LM.words(b)[0]].startswith('sub_'):
+            rowsprites.setdefault(cur, set()).add(sy[LM.words(b)[0]])
+    for cid, labs in sorted(rowsprites.items()):
+        check('sprite %d (a frame per row name): has every new row' % cid,
+              sorted({'sub_%d' % r[1] for r in O.ROWS} - labs), [])
+    i, j = O.sprite_range(lm, O.ICON_SPRITE)
+    labels = {sy[LM.words(b)[0]]: LM.words(b)[1] for t, b in T[i:j] if t == LM.T_LABEL}
+    keys = {LM.words(b)[0]: k for k, (t, b) in enumerate(T[i:j], i) if t == LM.T_KEYFRAME}
+
+    def key_chars(f):
+        k = keys[f]
+        return [LM.words(b)[0] for t, b in T[k + 1:k + 1 + LM.words(T[k][1])[1]] if t == LM.T_PLACE]
+    for r in O.ROWS:
+        check('icon sprite: sub_%d shows the %s icon %s' % (r[1], O.ICON_FROM, key_chars(labels[O.ICON_FROM])),
+              key_chars(labels['sub_%d' % r[1]]), key_chars(labels[O.ICON_FROM]))
+    hdr = LM.words(T[i][1])
+    check('icon sprite: header counts', (hdr[3], hdr[4], hdr[5]),
+          (len(labels), sum(1 for t, b in T[i:j] if t == LM.T_FRAME), len(keys)))
     i, j = O.sprite_range(lm, 420)
     xf = LM.table(T[lm.ti[LM.T_TRANSFORMS]][1], 6)
     olm = LM.Lm(open(os.path.join(ui, O.LMB), 'rb').read())

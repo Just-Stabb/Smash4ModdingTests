@@ -25,7 +25,10 @@ on the Lumen layout option_button.lm:
   the player's display list). Its label sprites (166 / 171, a frame per row name) get a frame
   `sub_11`: a copy of the Tap Jump text object (its own character: the game binds a text object to
   the msbt label of its instance name, so one shared by two names flickers between them), named
-  MmenOption_button_85$0, MmenOption_button_85 = "Stick\\nSmash" in menu.msbt.
+  MmenOption_button_85$0, MmenOption_button_85 = "Stick\\nSmash" in menu.msbt. The row's icon
+  sprite (182, also a frame per row name: each of these sprites' first frame runs
+  gotoAndStop(_parent._name), and without the label it played through every icon and crashed the
+  menu when the row was selected) gets a frame `sub_11` with the Tap Jump row's stick icon (ICON_FROM).
 (More rows: add them to ROWS, each after the one before; a fifth toggle row doesn't fit above the
 TRY button at the game's size: ROW_LAYOUT then draws the rows smaller.)
 """
@@ -48,6 +51,7 @@ ROWS = (('STICK', 11, 'stick_smash', 'set_stick_smash', 'MmenOption_button_85', 
 # high, 116 apart; the TRY button's top edge is at 52), the new row at SHAKE's. For five rows:
 # (0.9, {6: -434.0, 5: -326.5, 4: -219.0, 3: -111.5, 8: -111.5, 9: -4.0}): scale, btn_group depth -> y
 ROW_LAYOUT = None
+ICON_SPRITE, ICON_FROM = 182, 'sub_2'   # the new rows' icon: the Tap Jump row's (the control stick)
 OP_SMASH = ('L', 51)            # the PAD_BUTTON_OPE_SMASH local of the top level
 WINDOWS = {5: 6, 6: 7}          # popup window sizes that have a bigger one
 
@@ -308,6 +312,34 @@ def patch_lm(data):
             T[labels[-1] + 1:labels[-1] + 1] = [[LM.T_LABEL, LM.pack([sym_row, nframes])]]
             hdr[3], hdr[4], hdr[5] = nlabels + 1, nframes + 1, nkeys + 1
             T[i][1] = LM.pack(hdr)
+
+    # the icon sprite: a frame per new row, the ICON_FROM frame's keyframe again (every depth the
+    # sprite uses removed first, so it reads the same played in order as gone to)
+    for sym_row, _t in syms:
+        i, j = sprite_range(lm, ICON_SPRITE)
+        hdr = LM.words(T[i][1])
+        nlabels, nframes, nkeys = hdr[3], hdr[4], hdr[5]
+        labels = [k for k in range(i + 1, j) if T[k][0] == LM.T_LABEL]
+        frames = [k for k in range(i + 1, j) if T[k][0] == LM.T_FRAME]
+        keys = [k for k in range(i + 1, j) if T[k][0] == LM.T_KEYFRAME]
+        src = next(LM.words(T[k][1])[1] for k in labels if lm.sy[LM.words(T[k][1])[0]] == ICON_FROM)
+        key = next(k for k in keys if LM.words(T[k][1])[0] == src)
+        places = [LM.words(b) for t, b in T[key + 1:key + 1 + LM.words(T[key][1])[1]] if t == LM.T_PLACE]
+        depths = sorted({LM.words(b)[5] >> 16 for t, b in T[i:j] if t == LM.T_PLACE})
+        for w in places:
+            pid += 1
+            w[1] = pid
+        removes = [[LM.T_REMOVE, LM.pack([0, d << 16])] for d in depths]
+        new_frame = [[LM.T_FRAME, LM.pack([nframes, len(removes) + len(places)])]] + removes + \
+            [[LM.T_PLACE, LM.pack(w)] for w in places]
+        new_key = [[LM.T_KEYFRAME, LM.pack([nframes, len(places)])]] + [[LM.T_PLACE, LM.pack(w)] for w in places]
+        last_key_end = keys[-1] + 1 + LM.words(T[keys[-1]][1])[1]
+        T[last_key_end:last_key_end] = new_key
+        last_frame_end = frames[-1] + 1 + LM.words(T[frames[-1]][1])[1]
+        T[last_frame_end:last_frame_end] = new_frame
+        T[labels[-1] + 1:labels[-1] + 1] = [[LM.T_LABEL, LM.pack([sym_row, nframes])]]
+        hdr[3], hdr[4], hdr[5] = nlabels + 1, nframes + 1, nkeys + 1
+        T[i][1] = LM.pack(hdr)
 
     new_root = next_id[0]
     k = next(n for n, (t, b) in enumerate(T) if t == LM.T_SPRITE and LM.words(b)[0] == root)
