@@ -3,6 +3,7 @@
 trait's colour, its icon and its name, one PNG a trait.
 
   python3 tools/trait_badge_art.py OUT_DIR [--size 256x64] [--sheet sheet.png] [--icons tools/trait_icons]
+                                           [--font FONT.otf]
 
 Writes OUT_DIR/trait_<name>.png (RGBA, transparent around the plate) for Normal, Rush, Shooter,
 Strike, Juggernaut, Technical and Barrage, in the order of the trait numbers (1-7) Kirby's MSC writes to his
@@ -12,6 +13,10 @@ size to change a badge.
 A trait's icon is ICONS/<name>.png when that file is there (e.g. tools/trait_icons/strike.png; any
 size, best square with a transparent background), used as it is: scaled to fit the icon's spot,
 nothing drawn under or over it. Otherwise the drawn icon below.
+
+The names are in FONT (default Inter ExtraBold; the badges in use are TT Travels DemiBold, a trial
+font that isn't in the repository), each as large as fits, all starting where the longest one
+(JUGGERNAUT) starts when centred.
 """
 import argparse
 import math
@@ -86,7 +91,29 @@ def icon_file(img, path, cx, cy, r):
     img.alpha_composite(art, (round(cx - art.width / 2), round(cy - art.height / 2)))
 
 
-def badge(name, colour, kind, size, icons=None):
+def text_layout(name, size, font_path):
+    """(font, left, right) for name on a badge of size: the text area and the largest font that fits"""
+    w, h = size[0] * SS, size[1] * SS
+    pad = SS * 2
+    r = (h - 2 * pad) * 0.42
+    cx = pad + (h - 2 * pad) / 2
+    left, right = cx + r + SS * 6, w - pad - SS * 10
+    fs = int((h - 2 * pad) * 0.5)
+    font = ImageFont.truetype(font_path, fs)
+    while font.getlength(name.upper()) > right - left and fs > 8:
+        fs -= SS
+        font = ImageFont.truetype(font_path, fs)
+    return font, left, right
+
+
+def text_start(size, font_path):
+    """where the longest name starts when centred: every name starts there"""
+    name = max((t[0] for t in TRAITS), key=len)
+    font, left, right = text_layout(name, size, font_path)
+    return left + (right - left - font.getlength(name.upper())) / 2
+
+
+def badge(name, colour, kind, size, icons=None, font_path=FONT):
     w, h = size[0] * SS, size[1] * SS
     img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -101,14 +128,8 @@ def badge(name, colour, kind, size, icons=None):
     else:
         icon(d, kind, cx, h / 2, r, colour)
     text = name.upper()
-    left, right = cx + r + SS * 6, w - pad - SS * 10
-    fs = int((h - 2 * pad) * 0.5)
-    font = ImageFont.truetype(FONT, fs)
-    while font.getlength(text) > right - left and fs > 8:
-        fs -= SS
-        font = ImageFont.truetype(FONT, fs)
-    tw = font.getlength(text)
-    x = left + (right - left - tw) / 2
+    font, _left, _right = text_layout(name, size, font_path)
+    x = text_start(size, font_path)
     box = font.getbbox(text)
     y = h / 2 - (box[1] + box[3]) / 2
     d.text((x, y), text, font=font, fill=TEXT, stroke_width=SS * 2, stroke_fill=OUTLINE)
@@ -122,12 +143,13 @@ def main():
     ap.add_argument('--sheet', help='also a preview of every badge, one under the other')
     ap.add_argument('--icons', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trait_icons'),
                     help='folder of icon art, <trait>.png (default tools/trait_icons)')
+    ap.add_argument('--font', default=FONT, help='font file for the names (default Inter ExtraBold)')
     a = ap.parse_args()
     size = tuple(int(x) for x in a.size.split('x'))
     os.makedirs(a.out, exist_ok=True)
     imgs = []
     for name, colour, kind in TRAITS:
-        img = badge(name, colour, kind, size, a.icons)
+        img = badge(name, colour, kind, size, a.icons, a.font)
         img.save(os.path.join(a.out, 'trait_%s.png' % name.lower()))
         imgs.append(img)
     if a.sheet:
