@@ -1044,6 +1044,8 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   0x037EE73C) points at the cave (0x04B84000; 0x02661674 is out of a branch's reach from the grown
   code), which calls the original update, then for each non-empty slot shows `trait_mc` at the
   frame of Kirby's trait (marker int 0x1000008E bits 8-11) or hides it.
+  **Works in game** (user, with the current executable, Kirby's latest MSC and the ui/info/dmg files
+  built in). `trait_badge_cave.py --debug` adds step counters (at `0x04B843B0`) for a future check.
 - **Manifold confirms / adds** (Manifold by Fitz Null, zlib License,
   https://gitlab.com/fitz.lol/manifold: `src/cross/flx2/InfoGadgetDmg.*`, `MovieClip.*`; overview
   in docs/manifold-notes.md; every item checked against the RPX):
