@@ -58,6 +58,7 @@ namespace Sm4shCommand.Viewer
         public float LaunchRate = 1;
         public bool UseDI;
         public float DIAngle;               // stick angle in degrees, full tilt
+        public float DIMultiplier = 1;      // how far DI turns the launch (x the hitbox's own DIMul)
     }
 
     /// <summary>The calculator's results.</summary>
@@ -103,10 +104,10 @@ namespace Sm4shCommand.Viewer
             return 1 + (percent - 35) * 0.15 / 115;
         }
 
-        public static int Hitstun(double kb, bool windbox, bool electric)
+        public static int Hitstun(double kb, bool windbox, bool electric, double mul = 1)
         {
             if (windbox) return 0;
-            int h = (int)Math.Floor(kb * HITSTUN) - 1;
+            int h = (int)Math.Floor(kb * HITSTUN * mul) - 1;    // mul: Extra hitboxes' HitstunMul
             if (kb * HITSTUN >= TUMBLE) h++;
             if (electric) h++;
             return Math.Max(0, h);
@@ -174,7 +175,7 @@ namespace Sm4shCommand.Viewer
                 double sx = Math.Cos(inp.DIAngle * Math.PI / 180), sy = Math.Sin(inp.DIAngle * Math.PI / 180);
                 bool check = sy * hx - sx * vy < 0;
                 double variation = Math.Abs(sx * vy - sy * hx) / Math.Max(total, 1e-6);
-                double a = Math.Atan2(vy, hx) + (check ? -1 : 1) * DI * variation;
+                double a = Math.Atan2(vy, hx) + (check ? -1 : 1) * DI * variation * inp.DIMultiplier * h.DIMultiplier;
                 angle = Deg(a);
                 double lsi = 1;
                 if (!(angle > 65 && angle < 115) && !(angle > 245 && angle < 295))
@@ -190,10 +191,13 @@ namespace Sm4shCommand.Viewer
             res.LaunchSpeed = (float)ls;
             res.LaunchSpeedX = (float)Math.Abs(hx);
             res.LaunchSpeedY = (float)Math.Abs(vy);
-            res.Hitstun = Hitstun(kb / inp.LaunchRate, windbox, h.Electric);
+            res.Hitstun = Hitstun(kb / inp.LaunchRate, windbox, h.Electric, h.HitstunMultiplier);
             res.Faf = res.Hitstun == 0 ? 0 : res.Hitstun + 1;
-            res.AttackerHitlag = Hitlag(res.Damage, h.Hitlag, h.Electric, 1);
-            res.TargetHitlag = Hitlag(res.Damage, h.Hitlag, h.Electric, inp.Crouching ? 0.67 : 1);
+            // Extra hitboxes: hitstop frames replace the computed hitstop (uncapped), multipliers go with Hitlag
+            res.AttackerHitlag = h.HasExtras && h.SelfHitstopFrames > 0 ? h.SelfHitstopFrames
+                : Hitlag(res.Damage, h.Hitlag * h.SelfHitstopMultiplier, h.Electric, 1);
+            res.TargetHitlag = h.HasExtras && h.HitstopFrames > 0 ? h.HitstopFrames
+                : Hitlag(res.Damage, h.Hitlag * h.HitstopMultiplier, h.Electric, inp.Crouching ? 0.67 : 1);
             res.ShieldStun = (int)Math.Floor(res.Damage * 0.58 + 3) - 1;
             double shl = h.Hitlag > 1 ? Math.Max(1, h.Hitlag * 0.8) : h.Hitlag;
             res.ShieldHitlag = Hitlag(res.Damage, shl, h.Electric, 1);

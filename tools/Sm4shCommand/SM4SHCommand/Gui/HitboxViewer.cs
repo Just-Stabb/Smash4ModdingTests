@@ -19,8 +19,8 @@ namespace Sm4shCommand.GUI
     public class HitboxViewer : Form
     {
         readonly FighterAssets assets;
-        readonly ITS_EDITOR editor;
-        readonly uint scriptCrc;
+        ITS_EDITOR editor;
+        uint scriptCrc;
         readonly Func<uint, IList<ICommand>> getScript;
         List<FrameState> frames = new List<FrameState>();
         List<FrameState> probe = new List<FrameState>();   // the script run long past the animation
@@ -72,7 +72,7 @@ namespace Sm4shCommand.GUI
         readonly ComboBox target = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
         readonly NumericUpDown targetPct = Num(0, 999, 0), attackerPct = Num(0, 999, 0), charge = Num(0, 60, 0),
             stale = Num(0, 9, 0), kbMult = Num(0, 10, 1, 2), launchRate = Num(0, 10, 1, 2), diAngle = Num(0, 359, 0),
-            hitstunMul = Num(0, 20, 1, 2), selfStopMul = Num(0, 20, 1, 2), enemyStopMul = Num(0, 20, 1, 2);
+            hitstunMul = Num(0, 20, 1, 2), selfStopMul = Num(0, 20, 1, 2), enemyStopMul = Num(0, 20, 1, 2), diMul = Num(0, 10, 1, 2);
         readonly CheckBox crouch = new CheckBox { Text = "Crouching", AutoSize = true };
         readonly CheckBox aerial = new CheckBox { Text = "Target in the air", AutoSize = true };
         readonly CheckBox useDI = new CheckBox { Text = "DI at", AutoSize = true };
@@ -86,10 +86,7 @@ namespace Sm4shCommand.GUI
         public HitboxViewer(FighterAssets assets, ITS_EDITOR editor, uint scriptCrc, string title, Func<uint, IList<ICommand>> getScript)
         {
             this.assets = assets;
-            this.editor = editor;
-            this.scriptCrc = scriptCrc;
             this.getScript = getScript;
-            Text = "Hitbox Viewer - " + title;
             Size = new Size(1150, 720);
             StartPosition = FormStartPosition.CenterParent;
             view.Assets = assets;
@@ -98,11 +95,9 @@ namespace Sm4shCommand.GUI
             target.SelectedIndex = Math.Max(0, target.Items.Cast<FighterAttributes>().ToList().FindIndex(x => x.Name == "Mario"));
             animBox.Items.Add("(none)");
             foreach (var n in assets.AnimationNames) animBox.Items.Add(n);
-            currentCrc = scriptCrc;
-            animName = assets.AnimationFor(scriptCrc);
-            animBox.SelectedItem = animName ?? "(none)";
             animBox.SelectedIndexChanged += (o, e) =>
             {
+                if (picking) return;
                 animName = animBox.SelectedIndex <= 0 ? null : (string)animBox.SelectedItem;
                 currentCrc = ScriptFor(animName);
                 Rerun();
@@ -110,11 +105,35 @@ namespace Sm4shCommand.GUI
             LoadEnemy(Runtime.GetSettingText("ViewerEnemyFolder", ""), false);
             timer.Tick += (o, e) => { bar.Value = bar.Value >= bar.Maximum ? bar.Minimum : bar.Value + 1; };
             editTimer.Tick += (o, e) => { editTimer.Stop(); Rerun(); };
-            if (editor != null)
-                editor.TextChanged += Editor_TextChanged;
-            FormClosed += (o, e) => { timer.Stop(); if (editor != null) editor.TextChanged -= Editor_TextChanged; };
+            FormClosed += (o, e) => { timer.Stop(); if (this.editor != null) this.editor.TextChanged -= Editor_TextChanged; };
+            ShowScript(scriptCrc, editor, title);
+        }
+
+        bool picking;           // ShowScript is setting the animation list
+
+        /// <summary>The game script this viewer is for (and the editor whose edits it follows): the
+        /// main window calls this again when another script's tab is picked. Shows the script's own
+        /// animation; with none known, the animation list says (none).</summary>
+        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title)
+        {
+            if (editor != null) editor.TextChanged -= Editor_TextChanged;
+            editor = scriptEditor;
+            if (editor != null) editor.TextChanged += Editor_TextChanged;
+            scriptCrc = crc;
+            currentCrc = crc;
+            Text = "Hitbox Viewer - " + title;
+            animName = assets.AnimationFor(crc);
+            picking = true;
+            animBox.SelectedIndex = animName != null ? Math.Max(0, animBox.Items.IndexOf(animName)) : 0;
+            picking = false;
             Rerun();
         }
+
+        /// <summary>The game script shown when it was opened for the script being edited (not one
+        /// picked through another animation).</summary>
+        public uint ScriptCrc { get { return scriptCrc; } }
+        public ITS_EDITOR Editor { get { return editor; } }
+        public FighterAssets Assets { get { return assets; } }
 
         void Editor_TextChanged(object sender, EventArgs e) { editTimer.Stop(); editTimer.Start(); }
 
@@ -221,11 +240,15 @@ namespace Sm4shCommand.GUI
             row("Launch rate", launchRate, "Hitstun x", hitstunMul);
             row("Attacker hitstop x", selfStopMul, "Enemy hitstop x", enemyStopMul);
             var flags = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-            flags.Controls.AddRange(new Control[] { crouch, aerial, useDI, diAngle, new Label { Text = "deg", AutoSize = true, Padding = new Padding(0, 5, 0, 0) } });
+            flags.Controls.AddRange(new Control[] { crouch, aerial, useDI, diAngle, new Label { Text = "deg", AutoSize = true, Padding = new Padding(0, 5, 0, 0) },
+                new Label { Text = "DI x", AutoSize = true, Padding = new Padding(8, 5, 0, 0) }, diMul });
             calc.Controls.Add(flags);
             calc.SetColumnSpan(flags, 4);
+            var tips = new ToolTip();
+            tips.SetToolTip(diMul, "DI multiplier: how far DI can turn the launch angle (1 = normal, 0.5 = half, 2 = double, 0 = no DI). " +
+                "Multiplies the hitbox's own DIMul (Extra hitboxes).");
             foreach (Control c in new Control[] { target, targetPct, attackerPct, charge, stale, kbMult, launchRate, diAngle, crouch, aerial, useDI,
-                                                  hitstunMul, selfStopMul, enemyStopMul })
+                                                  hitstunMul, selfStopMul, enemyStopMul, diMul })
             {
                 if (c is NumericUpDown) ((NumericUpDown)c).ValueChanged += (o, e) => Calc();
                 else if (c is CheckBox) ((CheckBox)c).CheckedChanged += (o, e) => Calc();
@@ -351,11 +374,11 @@ namespace Sm4shCommand.GUI
             grid.SuspendLayout();
             grid.Rows.Clear();
             if (grid.Columns.Count == 0)
-                foreach (var c in new[] { "ID", "Damage", "Angle", "KBG", "WBKB", "BKB", "Size", "Bone", "Hitlag", "SDI", "Effect", "Command" })
+                foreach (var c in new[] { "ID", "Damage", "Angle", "KBG", "WBKB", "BKB", "Size", "Bone", "Hitlag", "SDI", "Effect", "Extras", "Command" })
                     grid.Columns.Add(c, c);
             foreach (var h in f.Hitboxes)
             {
-                int r = grid.Rows.Add(h.Id, h.Damage, h.Angle, h.KBG, h.WBKB, h.BKB, h.Size, "0x" + h.Bone.ToString("X"), h.Hitlag, h.SDI, h.Effect, h.Command);
+                int r = grid.Rows.Add(h.Id, h.Damage, h.Angle, h.KBG, h.WBKB, h.BKB, h.Size, "0x" + h.Bone.ToString("X"), h.Hitlag, h.SDI, h.Effect, h.ExtrasText, h.Command);
                 var hc = Viewport.HitboxColors[((h.Id % 8) + 8) % 8];   // a light tint (cells can't be see-through)
                 grid.Rows[r].DefaultCellStyle.BackColor = Color.FromArgb(255 - (255 - hc.R) * 3 / 10, 255 - (255 - hc.G) * 3 / 10, 255 - (255 - hc.B) * 3 / 10);
             }
@@ -409,6 +432,7 @@ namespace Sm4shCommand.GUI
                 AttackerPercent = (float)attackerPct.Value, StaleCount = (int)stale.Value, ChargeFrames = (float)charge.Value,
                 Crouching = crouch.Checked, TargetAerial = aerial.Checked, KbMultiplier = (float)kbMult.Value,
                 LaunchRate = (float)launchRate.Value, UseDI = useDI.Checked, DIAngle = (float)diAngle.Value,
+                DIMultiplier = (float)diMul.Value,
             };
             var r = KnockbackCalc.Calculate(inp);
             // the viewer's own multipliers, before the script's changes
@@ -451,6 +475,11 @@ namespace Sm4shCommand.GUI
                 string.Format(ic, "Distance           {0:0.##} forward, {1:0.##} up at the end of hitstun", end[0], end[1]),
                 string.Format(ic, "Hits on game frame {0}; the enemy can act on game frame {1} of the script ({2} counting the hitlag freeze)", hitFrame, actsFrame, actsReal),
             };
+            if (hb.HasExtras)
+                lines.Add(string.Format(ic, "{0} extras     {1}", hb.Command, hb.ExtrasText.Length > 0 ? hb.ExtrasText : "none (all x1 / computed)"));
+            float diTotal = (float)diMul.Value * hb.DIMultiplier;
+            if (diTotal != 1)
+                lines.Add(string.Format(ic, "DI                 x{0:0.###}{1}", diTotal, useDI.Checked ? "" : "  (tick \"DI at\" to use it)"));
             if (r.ScriptNotes.Count > 0)
             {
                 lines.Add("");

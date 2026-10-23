@@ -197,6 +197,7 @@ namespace Sm4shCommand
             gotoId.ShortcutKeys = Keys.Control | Keys.Shift | Keys.G; // Ctrl+G is the editor's Go to line
             toolsToolStripMenuItem.DropDownItems.Add(gotoId);
 
+            Viewport.SelectedIndexChanged += (o, e) => FollowTabInViewer();
             var hitboxViewer = new ToolStripMenuItem("Hitbox Viewer..", null, hitboxViewer_Click);
             hitboxViewer.ShortcutKeys = Keys.Control | Keys.Shift | Keys.H;
             toolsToolStripMenuItem.DropDownItems.Add(hitboxViewer);
@@ -671,6 +672,7 @@ namespace Sm4shCommand
                 {
                     Viewport.TabPages.Insert(0, p);
                     Viewport.SelectTab(0);
+                    FollowTabInViewer();    // no SelectedIndexChanged when the selected index stays 0
                 }
             }
         }
@@ -1016,21 +1018,21 @@ namespace Sm4shCommand
         }
 
         /// <summary>
-        /// Tools > Hitbox Viewer: the open script's game hitboxes on the fighter's model and animation
+        /// Tools > Hitbox Viewer: the selected tab's game hitboxes on the fighter's model and animation
         /// (found from the game.bin's folder: fighter/NAME/model and motion), with a knockback calculator.
+        /// One viewer: it follows the script tab picked in this window.
         /// </summary>
         private void hitboxViewer_Click(object sender, EventArgs e)
         {
             var page = Viewport.SelectedTab as CodeEditor;
-            var node = page == null ? null : AllNodes(FileTree.Nodes).OfType<ScriptNode>()
-                .FirstOrDefault(x => page.Name == $"script_{x.Identifier:X8}");
-            if (node == null && FileTree.SelectedNode is ScriptNode && IsAcmdNode((ScriptNode)FileTree.SelectedNode))
+            uint crc = AcmdTabScript(page);
+            if (crc == 0 && FileTree.SelectedNode is ScriptNode && IsAcmdNode((ScriptNode)FileTree.SelectedNode))
             {
-                node = (ScriptNode)FileTree.SelectedNode;
-                OpenNode(node);
+                OpenNode(FileTree.SelectedNode);
                 page = Viewport.SelectedTab as CodeEditor;
+                crc = AcmdTabScript(page);
             }
-            if (node == null || page == null || !IsAcmdNode(node))
+            if (crc == 0)
             {
                 MessageBox.Show(this, "Open an ACMD script first (the viewer shows its game script).", "Hitbox Viewer",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1041,6 +1043,12 @@ namespace Sm4shCommand
             if (game.Value == null)
             {
                 MessageBox.Show(this, "No game.bin is open.", "Hitbox Viewer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed && hitboxViewerGame == game.Key)
+            {
+                hitboxViewerForm.ShowScript(crc, GameEditor(page), TabTitle(page, crc));
+                hitboxViewerForm.Activate();
                 return;
             }
             string root = Viewer.FighterAssets.FindRoot(game.Key);
@@ -1066,12 +1074,55 @@ namespace Sm4shCommand
             }
             finally { Cursor = Cursors.Default; }
             var file = (ACMDFile)game.Value;
-            Func<uint, IList<ICommand>> getScript = crc =>
+            Func<uint, IList<ICommand>> getScript = id =>
             {
                 IScript s;
-                return file.Scripts.TryGetValue(crc, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
+                return file.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
             };
-            new HitboxViewer(assets, page.EditorFor("game"), node.Identifier, node.Text, getScript).Show(this);
+            if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed)
+                hitboxViewerForm.Close();       // another fighter's
+            var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), getScript);
+            viewer.FormClosed += (o, a) => { if (hitboxViewerForm == viewer) hitboxViewerForm = null; };
+            hitboxViewerForm = viewer;
+            hitboxViewerGame = game.Key;
+            viewer.Show(this);
+        }
+
+        HitboxViewer hitboxViewerForm;
+        string hitboxViewerGame;        // the game.bin it shows
+
+        /// <summary>The ACMD script open in a tab (its hash, from the tab's name script_XXXXXXXX), or 0.</summary>
+        uint AcmdTabScript(CodeEditor page)
+        {
+            uint crc;
+            if (page == null || !page.Name.StartsWith("script_") ||
+                !uint.TryParse(page.Name.Substring(7), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out crc))
+                return 0;
+            return page.Editors.Any(x => x.Script is ACMDScript) ? crc : 0;
+        }
+
+        /// <summary>The tab's game script editor (the only one when a single game.bin is open), or null.</summary>
+        ITS_EDITOR GameEditor(CodeEditor page)
+        {
+            var ed = page?.EditorFor("game") ?? (IDEMode == IDE_MODE.File ? page?.EditorFor("Script") : null);
+            return ed != null && ed.Script is ACMDScript ? ed : null;
+        }
+
+        string TabTitle(CodeEditor page, uint crc)
+        {
+            return page != null && !string.IsNullOrEmpty(page.Text) ? page.Text : Runtime.ScriptLabel(crc);
+        }
+
+        /// <summary>The open hitbox viewer switches to the script of the tab picked here.</summary>
+        void FollowTabInViewer()
+        {
+            if (hitboxViewerForm == null || hitboxViewerForm.IsDisposed) return;
+            var page = Viewport.SelectedTab as CodeEditor;
+            uint crc = AcmdTabScript(page);
+            if (crc == 0) return;
+            var editor = GameEditor(page);
+            if (crc == hitboxViewerForm.ScriptCrc && editor == hitboxViewerForm.Editor) return;
+            hitboxViewerForm.ShowScript(crc, editor, TabTitle(page, crc));
         }
 
         CommandListForm commandList;
@@ -1138,6 +1189,8 @@ namespace Sm4shCommand
         public void Reset()
         {
             this.Text = $"{Program.Title} - ";
+            if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed)
+                hitboxViewerForm.Close();       // its scripts are gone
             FileTree.Nodes.Clear();
             ScriptFiles.Clear();
             Viewport.TabPages.Clear();

@@ -13,11 +13,40 @@ namespace Sm4shCommand.Viewer
         public float Damage, Size, X, Y, Z, X2, Y2, Z2, Hitlag = 1, SDI = 1;
         public bool Extended, Windbox, Special;
         public string Command;
+        // Extra_Special_Hitbox / Extra_Extended_Special_Hitbox's six extras (docs/acmd-extra-commands.md):
+        // multipliers of 0 or less are x1, frames of 0 are "computed"
+        public bool HasExtras;
+        public float HitstunMul, HitstopMul, SelfHitstopMul, DIMul;
+        public int HitstopFrames, SelfHitstopFrames;
 
         public HitboxData Clone() { return (HitboxData)MemberwiseClone(); }
 
         /// <summary>Electric hitboxes (effect 3) add hitlag and hitstun.</summary>
         public bool Electric { get { return Effect == 3; } }
+
+        static float Mul(float m) { return m > 0 ? m : 1; }
+        public float HitstunMultiplier { get { return HasExtras ? Mul(HitstunMul) : 1; } }
+        public float HitstopMultiplier { get { return HasExtras ? Mul(HitstopMul) : 1; } }
+        public float SelfHitstopMultiplier { get { return HasExtras ? Mul(SelfHitstopMul) : 1; } }
+        public float DIMultiplier { get { return HasExtras ? Mul(DIMul) : 1; } }
+
+        /// <summary>The extras that change anything, for the list ("" when none).</summary>
+        public string ExtrasText
+        {
+            get
+            {
+                if (!HasExtras) return "";
+                var ic = System.Globalization.CultureInfo.InvariantCulture;
+                var o = new List<string>();
+                if (HitstunMultiplier != 1) o.Add("hitstun x" + HitstunMultiplier.ToString("0.###", ic));
+                if (HitstopFrames > 0) o.Add("hitstop " + HitstopFrames + "f");
+                else if (HitstopMultiplier != 1) o.Add("hitstop x" + HitstopMultiplier.ToString("0.###", ic));
+                if (SelfHitstopFrames > 0) o.Add("self hitstop " + SelfHitstopFrames + "f");
+                else if (SelfHitstopMultiplier != 1) o.Add("self hitstop x" + SelfHitstopMultiplier.ToString("0.###", ic));
+                if (DIMultiplier != 1) o.Add("DI x" + DIMultiplier.ToString("0.###", ic));
+                return string.Join(", ", o.ToArray());
+            }
+        }
     }
 
     /// <summary>A SET_FLOAT the script does to a variable (e.g. LASTHIT_HITSTUN_MUL), and on which game frame.</summary>
@@ -53,6 +82,7 @@ namespace Sm4shCommand.Viewer
         const uint ASYNC = 0x42ACFE7D, SYNC = 0x4B7B6E51, FRAME_DURATION = 0x7172A764, FRAME_DURATION2 = 0xB2E91D0C,
             FRAME_MUL = 0xA546845C, CALL1 = 0x9126EBA2, CALL2 = 0xFA1BC28A, HITBOX = 0xB738EABD,
             EXT_HITBOX = 0x2988D50F, SPECIAL = 0x14FCC7E4, EXT_SPECIAL = 0x7075DC5A, COLLATERAL = 0xCC7CC705,
+            EXTRA_SPECIAL = 0x974EA5BE, EXTRA_EXT_SPECIAL = 0x5C8A67C9,
             EXT_COLLATERAL = 0xED67D5DA, CLEAR = 0x9245E1A8, DELETE = 0xFF379EB6, DEACTIVATE_LAST = 0x7698BB42,
             SIZE = 0x684264C9, DAMAGE = 0xDFA4517A, MOVE = 0x1AFDA8E6, SET_LOOP = 0x0EB375E3, GOTO = 0x38A3EC78,
             BODY = 0xF0D25BDA, SET_FLOAT = 0x1E3AB92A, ANIM_RATE = 0x0F000098, ARMOR = 0x2A25155D, TRUE = 0xA5BD4F32, ELSE = 0x895B9275, FALSE = 0x870CF021, END = 0x5766F889;
@@ -192,7 +222,7 @@ namespace Sm4shCommand.Viewer
                     {
                         if (syncFrames < 0) syncFrames = 0;
                         else syncFrames += Speed;
-                        double left = (int)F(p[0]) - syncFrames;
+                        double left = F(p[0]) - syncFrames;     // not rounded: WAIT(0.2) still takes a frame
                         if (Math.Abs(left) > 0.001 && left > 0)
                             return false;
                         syncFrames = -1;
@@ -218,14 +248,18 @@ namespace Sm4shCommand.Viewer
                         break;
                     }
                 case HITBOX: case EXT_HITBOX: case SPECIAL: case EXT_SPECIAL: case COLLATERAL: case EXT_COLLATERAL:
+                case EXTRA_SPECIAL: case EXTRA_EXT_SPECIAL:
                     {
                         if (p.Count < 12) break;
+                        bool extra = cmd.Ident == EXTRA_SPECIAL || cmd.Ident == EXTRA_EXT_SPECIAL;
+                        bool special = extra || cmd.Ident == SPECIAL || cmd.Ident == EXT_SPECIAL;
+                        bool extended = cmd.Ident == EXT_HITBOX || cmd.Ident == EXT_COLLATERAL || cmd.Ident == EXT_SPECIAL ||
+                                        cmd.Ident == EXTRA_EXT_SPECIAL;
                         var h = new HitboxData
                         {
                             Command = cmd.Name, Id = I(p[0]), Part = I(p[1]), Bone = I(p[2]), Damage = F(p[3]),
                             Angle = I(p[4]), KBG = I(p[5]), WBKB = I(p[6]), BKB = I(p[7]), Size = F(p[8]),
-                            X = F(p[9]), Y = F(p[10]), Z = F(p[11]),
-                            Special = cmd.Ident == SPECIAL || cmd.Ident == EXT_SPECIAL,
+                            X = F(p[9]), Y = F(p[10]), Z = F(p[11]), Special = special,
                         };
                         int e = ParamIndex(cmd, "Effect", 12), hl = ParamIndex(cmd, "Hitlag", 14), sdi = ParamIndex(cmd, "SDI", 15),
                             sd = ParamIndex(cmd, "ShieldDamage", 18);
@@ -233,14 +267,30 @@ namespace Sm4shCommand.Viewer
                         if (hl < p.Count) h.Hitlag = F(p[hl]);
                         if (sdi < p.Count) h.SDI = F(p[sdi]);
                         if (sd < p.Count) h.ShieldDamage = I(p[sd]);
-                        int x2 = -1;
-                        if (cmd.Ident == EXT_HITBOX || cmd.Ident == EXT_COLLATERAL) x2 = 24;
-                        if (cmd.Ident == EXT_SPECIAL) x2 = 40;
-                        if (h.Special && p.Count > 39 && I(p[39]) == 1) h.Windbox = true;
-                        if (x2 >= 0 && p.Count > x2 + 2)
+                        int flinchless = ParamIndex(cmd, "Flinchless", 39);
+                        if (special && flinchless < p.Count && I(p[flinchless]) == 1) h.Windbox = true;
+                        if (extended)
                         {
-                            h.Extended = true;
-                            h.X2 = F(p[x2]); h.Y2 = F(p[x2 + 1]); h.Z2 = F(p[x2 + 2]);
+                            int x2 = ParamIndex(cmd, "X2", cmd.Ident == EXT_SPECIAL || cmd.Ident == EXTRA_EXT_SPECIAL ? 40 : 24);
+                            if (p.Count > x2 + 2)
+                            {
+                                h.Extended = true;
+                                h.X2 = F(p[x2]); h.Y2 = F(p[x2 + 1]); h.Z2 = F(p[x2 + 2]);
+                            }
+                        }
+                        if (extra)
+                        {
+                            // the six extras end the command (Special_Hitbox's 41 / Extended_Special_Hitbox's 43, then these)
+                            int first = cmd.Ident == EXTRA_EXT_SPECIAL ? 43 : 41;
+                            Func<string, int, int> at = (n, k) => ParamIndex(cmd, n, first + k);
+                            int a = at("HitstunMul", 0), b = at("HitstopMul", 1), c = at("HitstopFrames", 2), d = at("SelfHitstopMul", 3),
+                                f = at("SelfHitstopFrames", 4), g = at("DIMul", 5);
+                            if (Math.Max(Math.Max(Math.Max(a, b), Math.Max(c, d)), Math.Max(f, g)) < p.Count)
+                            {
+                                h.HasExtras = true;
+                                h.HitstunMul = F(p[a]); h.HitstopMul = F(p[b]); h.HitstopFrames = (int)F(p[c]);
+                                h.SelfHitstopMul = F(p[d]); h.SelfHitstopFrames = (int)F(p[f]); h.DIMul = F(p[g]);
+                            }
                         }
                         hitboxes[h.Id] = h;
                         break;
