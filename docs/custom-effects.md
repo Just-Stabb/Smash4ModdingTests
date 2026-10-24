@@ -417,3 +417,9 @@ rather than ending when the beam hits (needs a signal from the beam to Supamario
 User, test 23: the start a bit too far forward; the first hit should pull in better (still targets
 sometimes not stunned). `START_FORWARD` 2.5 (was 5), head / body FKB 8, `REHIT` 5 (hold frames follow:
 20 / 30 / 45 for 4 / 6 / 9 hits).
+
+### Test 25 (`build/test25.zip`): sounds
+
+The user's Xenoverse 2 clips replace the Kamehameha's sounds (docs/kind-expansion.md, Supamario's
+bank): `syubi` on SpecialN / SpecialAirN frame 0, `basatame` the charge (frame 1, stopped at the
+release), `fire_1` the release, `fire_2` the finish; the beam's fly motions no longer play a sound.

@@ -286,6 +286,11 @@ labels + 3:
 | kame_fire (the beam firing) | 87 | 140 | `0x0CB1008C` | 5.70 s | +1 dB |
 | kame_beamhead (the beam head) | 88 | 141 | `0x0CB1008D` | 3.23 s | -2 dB |
 
+Test 25 (the user's Xenoverse 2 clips; rebuilt from vanilla `snd_se_Mario` with row 3249 emptied in the
+current table, `--bank-id 2144 --row 3249`): 139 `kame_charge` = burst_kamehameha_basatame (1.21 s),
+140 `kame_fire` = _fire_1 (1.95 s), 141 `kame_burst` = _fire_2 (2.69 s, the finish), 142 `kame_syubi` =
+_syubi (0.91 s, `0x0CB1008E`, SpecialN / SpecialAirN frame 0); all 0 dB.
+
 Encoded as Mario's se one-shots: Namco IDSP (DSP-ADPCM, 48000 Hz mono; header loop points 0, DSP loop
 flag 0; nibble count / loop end as the game's), each clip normalised to a -0.5 dBFS peak (Mario's
 special tones peak at ~0 dBFS; their RMS + TONE volume is -12 to -16 dB; these come to -15 / -12 /

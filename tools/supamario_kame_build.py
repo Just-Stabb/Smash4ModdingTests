@@ -68,7 +68,11 @@ DOWN_END = 96                     # the down taunt (100 frames) ends its looping
 MODEL_OPTS = {'Kmh_Fire': ['--plain', '1', '--bake-rot', 'TRS'],
               'Kmh_Bas': ['--plain', '1', '--tint', 'Cor=0.7,0.9,1.0'],
               'Kmh_Hand': ['--plain', '1', '--rim', 'cor=0.0,0.8,1.8,1.3', '--subtract-as', 'hand=0.0,0.3,1.0']}
-SND_CHARGE, SND_FIRE, SND_HEAD = 0x0CB1008B, 0x0CB1008C, 0x0CB1008D
+# Supamario's own bank (tools/fighter_own_bank.py, row 3249): the user's Xenoverse 2 clips (test 25):
+# burst_kamehameha_basatame (the charge), _fire_1 (the release), _fire_2 (the finishing burst),
+# _syubi (the move's first frame)
+SND_CHARGE, SND_FIRE, SND_BURST, SND_START = 0x0CB1008B, 0x0CB1008C, 0x0CB1008D, 0x0CB1008E
+SND_HEAD = SND_BURST              # the taunt tests'
 MODEL_PREFIX = 'EffSupamarioKame'
 
 # (frame, effect, bone, (x, y, z) offset, scale); effect = set name or model folder
@@ -363,7 +367,7 @@ def weapon_scripts(heads, ids, segs):
                              0.0, HEAD_YROT, 0.0, float(size), 1))
         # (the body pieces: the MSC drops them while it flies)
         effect[name] = e
-        sound[name] = [cmd('sound_effect', SND_HEAD)]
+        sound[name] = []                # the release's sound carries the flight (test 25)
     # the launcher, on the head, where the multi-hit holds the target (bigger than the head's), its
     # strength by the level
     game['finish'] = [cmd('remove_all_hitboxes')] + by_level([
@@ -380,7 +384,7 @@ def weapon_scripts(heads, ids, segs):
         cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, ry, 0.0, size, 1)
         for n, ry, size in ((MODEL_PREFIX + 'Fire', HEAD_YROT, 1.8), ('PtcSupamarioKmhRing', 0.0, 1.8),
                             ('PtcSupamarioKmhWav', 0.0, 2.8))]
-    sound['finish'] = [cmd('sound_effect', SND_FIRE)]
+    sound['finish'] = [cmd('sound_effect', SND_BURST)]
     files = {}
     for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         f = acmd.ACMDFile({acmd.crc(n): v + [acmd.Command(acmd.END)] for n, v in sc.items()})
@@ -414,9 +418,11 @@ def special_scripts(v5, ids):
             'PtcSupamarioKmhCrg', 'PtcSupamarioKmhCrgON', 'PtcSupamarioKmhtsubu')]
         e += [cmd('frame', N_FIRE_FRAME)] + release
         out['effect'].scripts[acmd.crc(anim)] = e + [acmd.Command(acmd.END)]
-    out['sound'].scripts[acmd.crc('SpecialN')] = [
-        cmd('sound_effect', SND_CHARGE), cmd('frame', N_FIRE_FRAME - 1), cmd('stop_sound_effect', SND_CHARGE),
-        cmd('sound_effect', SND_FIRE), acmd.Command(acmd.END)]
+    for anim in ('SpecialN', 'SpecialAirN'):
+        out['sound'].scripts[acmd.crc(anim)] = [
+            cmd('sound_effect', SND_START), cmd('frame', 1.0), cmd('sound_effect', SND_CHARGE),
+            cmd('frame', N_FIRE_FRAME - 1), cmd('stop_sound_effect', SND_CHARGE), cmd('sound_effect', SND_FIRE),
+            acmd.Command(acmd.END)]
     return out
 
 
@@ -525,7 +531,7 @@ def main():
                 sp['effect'].scripts[acmd.crc(name)] = taunt_script(parts, ids, end) + [acmd.Command(acmd.END)]
                 s = [c for c in (sp['sound'].script(name) or [])
                      if c.ident not in (acmd.BY_NAME['sound_effect'], acmd.END)
-                     or (c.ident == acmd.BY_NAME['sound_effect'] and c.params[0] not in (SND_CHARGE, SND_FIRE, SND_HEAD))]
+                     or (c.ident == acmd.BY_NAME['sound_effect'] and c.params[0] not in (SND_CHARGE, SND_FIRE, SND_BURST, SND_START))]
                 sp['sound'].scripts[acmd.crc(name)] = [cmd('sound_effect', sound)] + s + [acmd.Command(acmd.END)]
     for fn, f in sp.items():
         f.save(os.path.join(body, fn + '.bin'))

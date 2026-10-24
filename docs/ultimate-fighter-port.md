@@ -64,6 +64,19 @@ follow the sword exactly; a held item takes the sword's angle. `ultimate_acmd.py
 spheres as `Special_Hitbox` / `Grab_Collision` (vanilla has zero-length extended ones too, so that
 wasn't the cause).
 
+**Effects** (`ultimate_acmd.py --effects IDS_JSON NUSKTB`, with `--others`): every `effect_*`
+function becomes the effect script of the same Smash 4 name (`TRANSLATE`'s for the translated
+moves), replacing the base's; not specials / Final Smash (still the base's moves). Macros:
+`EFFECT_MACROS` (EFFECT -> Graphic_Effect2, EFFECT_FOLLOW -> External_Graphic, FOOT_EFFECT ->
+Graphic_Effect, LANDING_EFFECT -> Graphic_Effect3, ..., EFFECT_OFF_KIND -> Terminate_Graphic_Effect;
+alpha x 100, colour x 255), matched on 10 fighters both games have. `sys_*` names -> Smash 4 common
+ids: `reference/ultimate_sys_effects.json` (`tools/ultimate_sys_effect_map.py`: the same moves'
+scripts aligned by frame, 47 names). Bones without a joint id use their nearest jointed ancestor
+(Ultimate skeleton). The facing-left branch is taken (the dumps nest the right-facing one inside it);
+looping motions get `Loop_Rest` + `JUMP` to themselves when the base's script loops. Not yet: the
+fighter's own effects (`edge_*`: their bank comes from Ultimate's .eff), LAST_EFFECT_SET_*, sword
+trails (AFTER_IMAGE), FLASH / BURN_COLOR.
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).

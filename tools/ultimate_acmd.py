@@ -205,8 +205,12 @@ def statements(body):
     return out
 
 
+LR_LEFT = 'get_value_float(agent.lua_state_agent, *SO_VAR_FLOAT_LR) < 0.0'
+EFFECT_CONDS = ()
+
+
 def cond_true(cond):
-    if cond == 'macros::is_excute(agent)':
+    if cond == 'macros::is_excute(agent)' or cond in EFFECT_CONDS:
         return True
     if cond.startswith('!'):
         return not cond_true(cond[1:].strip())
@@ -344,6 +348,113 @@ def capsule_end(x, y, z, x2, y2, z2):
     return None if end == (float(x), float(y), float(z)) else end
 
 
+# ---------------------------------------------------------------- effects
+# Ultimate effect macro -> Smash 4 command and the shape of its arguments (matched on the vanilla
+# fighters both games share: tools/ultimate_sys_effect_map.py): 'full' = name, bone, x, y, z, rx, ry,
+# rz, size, 6 random ranges, terminate; 'follow' = name, bone, x .. rz, size, terminate; '+alpha' /
+# '+color' = then an alpha (x 100) / r, g, b (x 255)
+EFFECT_MACROS = {
+    'EFFECT': ('Graphic_Effect2', 'full'), 'FOOT_EFFECT': ('Graphic_Effect', 'full'),
+    'LANDING_EFFECT': ('Graphic_Effect3', 'full'), 'DOWN_EFFECT': ('DOWN_EFFECT', 'full'),
+    'EFFECT_ALPHA': ('Graphic_Effect7', 'full+alpha'),
+    'EFFECT_FOLLOW': ('External_Graphic', 'follow'), 'EFFECT_FOLLOW_NO_STOP': ('Graphic_Effect4', 'follow'),
+    'EFFECT_FLW_POS': ('External_Graphic_Effect2', 'follow'),
+    'EFFECT_FLW_POS_NO_STOP': ('External_Graphic_Effect2', 'follow'),
+    'EFFECT_FOLLOW_ALPHA': ('Graphic_Effect6', 'follow+alpha'),
+    'EFFECT_FOLLOW_COLOR': ('EFFECT_FOLLOW_COLOR', 'follow+color'),
+}
+
+
+class EffectTranslator(Translator):
+    """effect_* functions -> Smash 4 effect scripts. ids: Ultimate effect name -> Smash 4 effect id
+    (the common bank's for sys_*; a fighter bank's once converted); other names are left out and
+    counted. Bones without a joint id use their nearest ancestor that has one (parents: Ultimate's
+    skeleton, lower-case names)."""
+
+    def __init__(self, joints, ids, parents):
+        super().__init__(joints)
+        self.ids, self.parents = ids, parents
+        self.missing = {}
+
+    def bone(self, name):
+        n = name.lower()
+        while n not in self.joints and n != 'top' and n in self.parents:
+            n = self.parents[n]
+        return super().bone(n)
+
+    def call(self, name, a, raw):
+        short = name.split('::')[-1]
+        if short in ('frame', 'wait'):
+            return super().call(name, a, raw)
+        if short == 'EFFECT_OFF_KIND':
+            eid = self.ids.get(a[1])
+            if eid is None:
+                self.missing[a[1]] = self.missing.get(a[1], 0) + 1
+                return []
+            return [cmd('Terminate_Graphic_Effect', eid, int(bool(a[2])), int(bool(a[3])))]
+        if short not in EFFECT_MACROS:
+            self.skip(short)
+            return []
+        target, shape = EFFECT_MACROS[short]
+        eid = self.ids.get(a[1])
+        if eid is None:
+            if a[1] != 'null':
+                self.missing[a[1]] = self.missing.get(a[1], 0) + 1
+            return []
+        place = [float(v) for v in a[3:10]]                      # x, y, z, rx, ry, rz, size
+        if shape.startswith('full'):
+            rest = [float(v) for v in a[10:16]] + [int(bool(a[16]))]
+            extra = a[17:]
+        else:
+            rest = [int(bool(a[10]))]
+            extra = a[11:]
+        if shape.endswith('+alpha'):
+            rest.append(float(extra[0]) * 100.0)
+        elif shape.endswith('+color'):
+            rest += [min(255.0, float(v) * 255.0) for v in extra[:3]]
+        return [cmd(target, eid, self.bone(a[2]), *place, *rest)]
+
+
+def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final')):
+    """every effect_* function of the dump -> the effect script of the same Smash 4 name (TRANSLATE's
+    for the translated moves), replacing the base's (its own effects, e.g. Zelda's sparkles); not the
+    moves still the base's (specials, Final Smash). Returns {Smash 4 name: commands}, {missing name:
+    count}"""
+    global EFFECT_CONDS
+    # the facing-left branch: in the dumps the facing-right one is often nested inside it (a misplaced
+    # else), so it's the one that always holds the effect; Smash 4 places effects by the bones anyway
+    EFFECT_CONDS = (LR_LEFT,)
+    tr = EffectTranslator(joints, ids, parents)
+    out = {}
+    for path in sorted(os.listdir(scripts_dir)):
+        if not path.endswith('.txt'):
+            continue
+        src = path[:-4]
+        for fn, body in functions(open(os.path.join(scripts_dir, path)).read()).items():
+            if not fn.startswith('effect_'):
+                continue
+            name = fn[len('effect_'):]
+            if name == src.lower():
+                name = TRANSLATE.get(src, name)
+            if name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts and name not in TRANSLATE.values():
+                continue
+            cmds = tr.script(body)
+            # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
+            base = [c.name for c in effect_bin.scripts.get(acmd.crc(name), [])]
+            if 'Loop_Rest' in base:
+                cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
+            out[name] = cmds
+    EFFECT_CONDS = ()
+    return out, tr.missing
+
+
+def skeleton_parents(nusktb):
+    import ssbh_data_py as s
+    sk = s.skel_data.read_skel(nusktb)
+    return {b.name.lower(): sk.bones[b.parent_index].name.lower() for b in sk.bones
+            if b.parent_index is not None and b.parent_index >= 0}
+
+
 # ---------------------------------------------------------------- joints
 def joint_ids(model_dir):
     """Ultimate bone name (lower case) -> ACMD joint ID, from the converted model's vbn + jtb (the
@@ -442,6 +553,9 @@ def main():
     ap.add_argument('--base-rpx', help='with --motion-list: an executable to compare the move flags with')
     ap.add_argument('--base-kind', type=lambda v: int(v, 0))
     ap.add_argument('--have', help='LEFT,RIGHT as the model was built with (ultimate_fighter.py --have)')
+    ap.add_argument('--effects', nargs=2, metavar=('IDS_JSON', 'NUSKTB'),
+                    help='with --others: translate the effect scripts too (IDS_JSON: Ultimate effect name -> '
+                         'Smash 4 id, e.g. reference/ultimate_sys_effects.json; NUSKTB: Ultimate skeleton)')
     a = ap.parse_args()
     f = acmd.ACMDFile.load(a.game_bin)
     if a.have:
@@ -477,6 +591,15 @@ def main():
             for _s, name in done:
                 if fn != 'expression.bin' or acmd.crc(name) not in o.scripts:
                     o.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
+            if fn == 'effect.bin' and a.effects:
+                ids = {}
+                for path in a.effects[0].split(','):
+                    ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
+                fx, missing = translate_effects(a.scripts, o, tr.joints, ids, skeleton_parents(a.effects[1]))
+                for name, cmds in fx.items():
+                    o.scripts[acmd.crc(name)] = cmds
+                print('%d effect scripts translated; effects without an id (left out): %s' % (
+                    len(fx), ', '.join('%s x%d' % kv for kv in sorted(missing.items(), key=lambda kv: -kv[1]))))
             o.save(os.path.join(a.others[1], fn))
     if a.motion_list:
         moves = motion_frames(a, done)
