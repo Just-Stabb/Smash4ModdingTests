@@ -20,6 +20,9 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Supamario (new kind, Mario copy) | `0x41` | Normal |
 | Sephiroth (`edge`, new kind, Ultimate port on Zelda's base) | `0x42` | Technical |
 | Incineroar (`gaogaen`, new kind, Ultimate port on Bowser's base) | `0x43` | Juggernaut |
+| Meta Knight | `0x17` | Normal |
+| Samus | `0x06` | Shooter |
+| Roy | `0x36` | Technical |
 
 Kirby himself (no copy) has no trait. A copied character that isn't listed counts as Normal.
 Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy kind int `0x100000A4`.
