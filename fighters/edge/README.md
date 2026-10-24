@@ -111,10 +111,10 @@ purple and black; arcs out of place). `vfxb_to_ptcl.py`:
 User, test 32: "Effects are still distorted and displaced. Sword attacks seem to have weird
 displaced trailing"; "Neutral air isn't hitting an opponent, it's just incorrectly orange."
 - Orange: `edge_light_impact2`'s blend-0 meshes (rings, circles, the dark flare) took
-  `PtcFinIkeCloud`'s `FNSmoke` as their template, a shader with 32 bytes of parameters and user
-  shader setting 9 (Ike's Final Smash cloud) that tints them. Templates now prefer plain shaders
-  (no parameters, setting 0); the two keys without one (type-4 blend-0 sprites, type-4 blend-2
-  meshes) take the plain blend-1 template of their type.
+  `PtcFinIkeCloud`'s `FNSmoke` as their template, a shader with 32 bytes of parameters (Ike's
+  Final Smash cloud) that tints them. Templates now prefer plain shaders (no parameters). (Test 33
+  also required word 0x340 to be 0, read then as a shader setting: it is the volume shape; dropped
+  in test 34.)
 - Sword glows (`edge_sword_flare` / `_light*` / `_smash_flash`) and slash arcs (`edge_slash_light`)
   are Ultimate type 3 (directional) meshes at rest: Smash 4's type 3 turned them by their zero
   velocity (the glow below the sword, the up-air arc lying flat). Now type 4 (32 emitters), which
@@ -124,6 +124,31 @@ displaced trailing"; "Neutral air isn't hitting an opponent, it's just incorrect
   bones play LHaveN / RHaveN (joints 24 / 25, the same frames), so the sword effects' angles were
   already right; both games use R = Rz Ry Rx.
 Package: the ptcl / efc and effect.bin (6 scripts changed); game / sound / expression unchanged.
+
+## Test 34 (`build/sephiroth_test34.zip`): UV animation, fade on turn-off, wrap
+
+User, test 33 (shots, with Ultimate's neutral air for comparison): the back-air arc a huge flat
+white disc, the up-smash arc a solid white crescent, white L-shaped corners, neutral air a purple
+haze instead of Ultimate's spiky burst, and its burst too short; "sword glows forever during back
+air, even after the animation, same thing with up air and up smash". `vfxb_to_ptcl.py`:
+- UV animation (eft2's per-sampler shift / scale / rotation: initial, random, a frame) wasn't
+  converted. His slash arcs are full discs (`p_edgeslasharc_slash1`) that the scrolling texture
+  cuts into a swing, neutral air's burst is a circle whose line texture tiled 4 x 0.5 makes the
+  spikes (offline render: `edge_light_impact2` circle1 with and without). Now slot 0's eft UV block
+  (corpus: 0x510 mode, bits 1 scroll / 2 scale / 4 rotate, each set exactly where its values are;
+  0x514-0x54C the values, the same order as eft2's) is written, and templates are picked for the
+  mode bits needed; meshes whose template can't animate UVs get the starting transform baked into
+  their UVs (9 emitters).
+- The fade when turned off: 0x82C (1 / frames) is set on all vanilla infinite-life emitters, 0 on
+  most others. Converted emitters kept their template's: 0 on the sword flare's infinite-life glow
+  (never ended), 1 on some of neutral air's (cut the frame it was turned off). Now 1 / eft2's
+  alpha fade time where eft2 fades (and on infinite life), else 0.
+- The follow byte 0x2F9 (0 on 86% of vanilla's infinite-life glows, 1 on 88% of the rest, taken
+  as particles following the emitter) is matched to eft2's follow type in the template choice.
+- Sampler wrap per axis (U bits 28-31, V 24-27; eft2 0 mirror / 1 repeat / 2 clamp -> GX2 1 / 0 / 2);
+  test 33 only clamped when both axes clamped.
+- Alpha erosion: the fade follows the texture's remaining ink (texture - (1 - alpha)).
+Package: the ptcl / efc (effect.bin as test 33's).
 
 ## Next
 

@@ -94,18 +94,23 @@ base's ptcl / efc, whose sets stay for the base's specials), one efc entry each 
 the ids merged into the fighter's ids file for `--effects`. Per emitter, from a template emitter of
 the same particle type, blend and mesh-ness (the base's own, else one from any vanilla ptcl with its
 shader, shader parameters and textures imported: `Ptcl.import_emitter`; plain shaders first, i.e. no
-shader parameters and user shader setting 0 (+0x340): Ike's FS cloud shader tinted Sephiroth's meshes
-orange, test 32): its texture (BNTX with the
+shader parameters (Ike's FS cloud shader tinted Sephiroth's meshes orange, test 32), then the UV
+animation the emitter needs (mode word 0x510) and the follow byte 0x2F9): its texture (BNTX with the
 channel selection applied: Ultimate's BC5 textures are luminance + alpha) as a BC4 shape with the
 colour moved into the particle's, colour / alpha / scale keys fitted to eft's 3-key ramps, life,
 emission, velocity, gravity, volume, rotation, the emitter transform. Meshes (a primitive id) come
 from the VFXB's BFRES (`tools/bfres_switch.py`) into the ptcl's primitive table
 (`Ptcl.add_primitive`). Identical textures are shared (Sephiroth's bank: 4.1 MB; Bayonetta's
-vanilla one is 4.6 MB). Not converted: stripes (ribbon trails: the speed lines), texture scroll /
-flipbook animation (the first cell), the second colour track and multi-texture combiners, end fades,
+vanilla one is 4.6 MB). Not converted: stripes (ribbon trails: the speed lines), flipbook
+animation (the first cell), the second colour track and multi-texture combiners, end fades,
 emitter animations, child emitters. A directional (type 3) mesh at rest becomes type 4: Smash 4's
 type 3 turns a mesh by its velocity, and with none his sword glows and slash arcs pointed the wrong
 way (test 32); type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love crystals).
+UV shift / scale / rotation (initial, random, per frame) go to slot 0's UV block (0x510-0x54C;
+a mesh whose template can't animate UVs gets the starting transform baked into its UVs): Ultimate's
+slash arcs are full discs that the scrolling texture cuts into a swing, neutral air's burst a circle
+whose tiled line texture makes the spikes. The fade when turned off (0x82C = 1 / eft2's alpha fade
+time) ends infinite-life glows; the sampler's wrap is per axis.
 
 **Effect angles** are the same in both games: R = Rz Ry Rx (X turned first; his sword glows lie along
 the blade, his up-air arc faces the camera only so, and the moves both games share keep their angles

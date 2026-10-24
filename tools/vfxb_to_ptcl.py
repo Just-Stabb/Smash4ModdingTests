@@ -19,8 +19,9 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
-  selection applied (tools/vfxb.py images), the first flipbook cell (uv_div); clamped when the
-  sampler clamps;
+  selection applied (tools/vfxb.py images), the first flipbook cell (uv_div); the sampler's wrap
+  per axis; its UV shift / scale / rotation (initial, random, a frame) into slot 0's UV block
+  (set_uv_anim; baked into a mesh's UVs when the template can't animate them);
 - colour / alpha: eft2's combiner (colour modes 0-3: colour 0, x texture, + colour 1 x (1 -
   texture), + colour 1; alpha modes 0-4) folded into a BC4 shape and one particle colour (combine):
   each pixel's brightness kept, the hue averaged; the 3-key colour and alpha fits; colour scale;
@@ -30,8 +31,9 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
   forever, interval, rate), velocity (all-direction -> figure velocity, designated direction x
   scale -> emitter velocity / direction, diffusion angle, random %), gravity (scale x direction),
   air resistance, volume (same 0-14 shape list; radius x form scale), rotation (init / random /
-  add, radians), the emitter transform (translate / rotate / scale);
-- not converted: texture scroll / pattern animation, the second colour track and multi-texture
+  add, radians), the emitter transform (translate / rotate / scale); the fade when turned off
+  (0x82C: 1 / alpha fade time; infinite life fades too);
+- not converted: pattern (flipbook) animation, the second colour track and multi-texture
   combiners, alpha / scale fades at the end, emitter animations (EAA0 / EAA1 ...), child emitters.
 """
 import argparse
@@ -49,7 +51,7 @@ if HERE not in sys.path:
 import efc  # noqa: E402
 import ptcl  # noqa: E402
 import vfxb  # noqa: E402
-from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, SAMPLER_CLAMP, buffer_count, color_fit,  # noqa: E402
+from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, color_fit,  # noqa: E402
                          pow2, resize, sanitize, three_key)
 
 NONE64 = 2 ** 64 - 1
@@ -59,14 +61,24 @@ NONE64 = 2 ** 64 - 1
 TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
-PLAIN = 10              # a plain-shader template beats any other
+UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
+FOLLOW = 0x2F9
+FADE_ALPHA = 0x82C      # alpha lost a frame once the set is turned off (1 / frames); 0 lives on
+# eft2 sampler wrap (0 mirror, 1 repeat, 2 clamp) -> GX2 (0 repeat, 1 mirror, 2 clamp); the eft
+# sampler word: U wrap in bits 28-31, V in 24-27 (clamped vanilla textures: 0x22000100)
+WRAP = {0: 1, 1: 0, 2: 2}
 
 
 class Templates:
     """template emitters by (eft particle type, blend 0 / 1 / 2, mesh): simple emitters with one BC4
-    texture (slot 0; slots 1 / 2 unused), preferring plain shaders (PLAIN), then animated colour
-    tracks (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus (Ptcl.import_emitter: their
-    shader, shader parameters and textures copied)"""
+    texture (slot 0; slots 1 / 2 unused). Among them, in this order: a plain shader (no shader
+    parameters: Ike's FS cloud shader, FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's
+    meshes orange), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
+    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, the follow
+    byte 0x2F9 wanted (0 on 86% of vanilla's infinite-life glows, 1 on 88% of the rest: taken as
+    particles following the emitter; also shader-keyed: 41 groups mix), then animated colour tracks
+    (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
+    (Ptcl.import_emitter: their shader, shader parameters and textures copied)"""
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
@@ -84,31 +96,37 @@ class Templates:
                         continue
                     key = (p.field(em, 'particle_type'), p.field(em, 'blend_type'), p.field(em, 'primitive_index') >= 0)
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
-                    # a plain shader first: no shader parameters and no user shader setting (+0x340;
-                    # e.g. Ike's FS cloud, FinIkeCloud FNSmoke, 9 and a 32-byte parameter block:
-                    # tinted its meshes orange)
-                    plain = not p.field(em, 'shader_param_size') and not struct.unpack_from('>I', em, 0x340)[0]
-                    score = (PLAIN if plain else 0) + (2 if c == (2, 2) else 1 if c[0] == 2 else 0) \
-                        + (BASE_FIRST if path is None else 0) - (1 if p.field(em, 'keyanim_size') else 0)
-                    if key not in self.found or score > self.found[key][0]:
-                        self.found[key] = (score, path, si, k)
+                    score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0) \
+                        - (1 if p.field(em, 'keyanim_size') else 0)
+                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
+                              em[FOLLOW] == 0)
+                    self.found.setdefault(key, {})
+                    if traits not in self.found[key] or score > self.found[key][traits][0]:
+                        self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, notes):
-        order = [k for k in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)) if k in self.found]
-        # a plain shader of another blend beats a special one of this blend
-        order = [k for k in order if self.found[k][0] >= PLAIN] + [k for k in order if self.found[k][0] < PLAIN]
-        if not order:
-            raise KeyError((typ, blend, mesh))
-        key = order[0]
-        if key != (typ, blend, mesh):
-            notes.append('no template (type %d blend %d%s): type %d blend %d' % (
-                typ, blend, ' mesh' if mesh else '', key[0], key[1]))
-        _score, path, si, k = self.found[key]
-        if path is None:
-            em = self.base.emitter_bytes(si, k)
-            struct.pack_into('>II', em, 0x2CC, 0, 0)
-            return em
-        return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,))
+    def get(self, typ, blend, mesh, uv_mode, follow, notes):
+        """the best template for this particle type / blend / mesh-ness, UV mode bits and follow;
+        another blend (add), then type 0, when there's none"""
+        def rank(item):
+            (plain, mode, fol), (score, *_r) = item
+            return (plain, mode & uv_mode == uv_mode, fol == follow, mode == uv_mode, score)
+        for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
+            if key not in self.found:
+                continue
+            (plain, mode, fol), (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            if key != (typ, blend, mesh):
+                notes.append('no template (type %d blend %d%s): type %d blend %d' % (
+                    typ, blend, ' mesh' if mesh else '', key[0], key[1]))
+            if mode & uv_mode != uv_mode:
+                notes.append('UV animation %d: template has %d' % (uv_mode, mode))
+            if fol != follow:
+                notes.append('template follow byte %d' % (0 if fol else 1))
+            if path is None:
+                em = self.base.emitter_bytes(si, k)
+                struct.pack_into('>II', em, 0x2CC, 0, 0)
+                return em
+            return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,))
+        raise KeyError((typ, blend, mesh))
 
 
 def mesh(model):
@@ -170,7 +188,7 @@ def combine(img, e, notes):
     means, weighted by the texture's alpha: their mean is the particle colour, each pixel's
     brightness against it the shape (the hue across the texture is lost, its brightness kept); the
     colour over life is the same mix of the tracks at the texture's mean. Alpha modes (alpha_process):
-    0 / 1 texture alpha x alpha 0 (1 erodes the texture by alpha 0 in eft2: here it fades), 2 / 3 the
+    0 / 1 texture alpha x alpha 0 (1 erodes the texture by alpha 0: a fade by the ink left), 2 / 3 the
     same with the texture's red, 4 texture alpha x alpha 0 x alpha 1."""
     st, col, cb, info = e['static'], e['color'], e['combiner'], e['info']
     c0, a0 = track(st, col, 0)
@@ -210,8 +228,50 @@ def combine(img, e, notes):
     colour = colour * peak * float(cmean @ LUMA > 0)
     alpha = a0 * info['color0'][3] * (a1 * info['color1'][3] if am == 4 else 1.0)
     if am in (1, 3):
-        notes.append('alpha erosion as a fade')
+        # erosion: each pixel is texture - (1 - alpha), so the faint parts go first and the bright
+        # strokes last (the texture can't change over life here): the fade kept is the texture's
+        # remaining ink against its full ink
+        t = atex[::max(1, atex.shape[0] // 64), ::max(1, atex.shape[1] // 64)].ravel()
+        ink = max(float(t.sum()), 1e-6)
+        alpha = np.array([np.clip(t - (1 - a), 0, 1).sum() / ink for a in np.clip(alpha, 0, 1)])
+        notes.append('alpha erosion: fade by the remaining ink')
     return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1)
+
+
+def uv_mode(ts):
+    """the UV animation bits (1 scroll, 2 scale, 4 rotate) a sampler's eft2 UV parameters need"""
+    if ts is None:
+        return 0
+    nz = lambda v: any(abs(x) > 1e-6 for x in (v if isinstance(v, list) else [v]))  # noqa: E731
+    return (1 if nz(ts['scroll']) or nz(ts['scroll_add']) or nz(ts['scroll_random']) else 0) \
+        | (2 if nz([x - 1 for x in ts['scale']]) or nz(ts['scale_add']) or nz(ts['scale_random']) else 0) \
+        | (4 if nz(ts['rotation']) or nz(ts['rotation_add']) or nz(ts['rotation_random']) else 0)
+
+
+def uv_transform(uv, scale, scroll, rotation):
+    """eft2's starting UV transform: scaled and turned about the texture's centre, then shifted"""
+    c, s = math.cos(rotation), math.sin(rotation)
+    q = (uv - 0.5) * np.array(scale, np.float32)
+    return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5
+            + np.array(scroll, np.float32)).astype(np.float32)
+
+
+def set_uv_anim(em, ts):
+    """eft2's UV parameters (shift / scale / rotation: initial, random, per frame) -> slot 0's eft
+    block: 0x510 mode (bits 1 / 2 / 4; the template's, at least the bits needed), 0x514 scroll a
+    frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
+    scale random, 0x544 rotation a frame, 0x548 rotation init, 0x54C rotation random (the vanilla
+    corpus: each mode bit set exactly where those values are). Unused ones are left neutral."""
+    if ts is None:
+        ts = {'scroll': [0, 0], 'scroll_add': [0, 0], 'scroll_random': [0, 0], 'scale': [1, 1],
+              'scale_add': [0, 0], 'scale_random': [0, 0], 'rotation': 0, 'rotation_add': 0, 'rotation_random': 0}
+    struct.pack_into('>2f', em, 0x514, *ts['scroll_add'])
+    struct.pack_into('>2f', em, 0x51C, *ts['scroll'])
+    struct.pack_into('>2f', em, 0x524, *ts['scroll_random'])
+    struct.pack_into('>2f', em, 0x52C, *ts['scale_add'])
+    struct.pack_into('>2f', em, 0x534, *ts['scale'])
+    struct.pack_into('>2f', em, 0x53C, *ts['scale_random'])
+    struct.pack_into('>3f', em, 0x544, ts['rotation_add'], ts['rotation'], ts['rotation_random'])
 
 
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
@@ -232,7 +292,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         typ = 4
         notes.append('directional mesh at rest: type 4')
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
-    em = templates.get(typ, BLEND[blend], is_mesh, notes)
+    ti, smp = main_texture(e, names)
+    ts = e['static']['tex_scroll'][ti] if smp else None
+    em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'] == 0, notes)
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
         # size with scale 1): an uneven 3D scale goes into the mesh (one primitive per mesh and
@@ -242,16 +304,26 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         is_mesh = 'even' if max(s3) - min(s3) < 1e-3 else True
         if is_mesh == 'even':
             s3 = (1.0, 1.0, 1.0)
-        key = (pt['primitive_id'], s3)
+        # a template without the UV animation needed: the starting UV transform goes into the mesh's
+        # UVs (the shift / scale / rotation over life is lost)
+        need = uv_mode(ts)
+        bake = None
+        if struct.unpack_from('>I', em, UV_MODE)[0] & need != need:
+            bake = (tuple(ts['scale']), tuple(ts['scroll']), ts['rotation'])
+            notes.append('UV transform baked into the mesh')
+        key = (pt['primitive_id'], s3, bake)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']])
+            if bake:
+                uv = np.concatenate([uv_transform(uv[:, :2], *bake), uv[:, 2:]], 1)
             prim_index[key] = p.add_primitive(pos * np.array(s3, np.float32), nrm, col_, uv, idx)
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
+        if bake:
+            ts = None
     # the blend is shader-keyed: the template's (the same unless none had this one)
     blend = {0: 'normal', 1: 'add', 2: 'sub'}[p.field(em, 'blend_type')]
 
     # ---- texture
-    ti, smp = main_texture(e, names)
     img = images.get(smp['texture_id']) if smp else None
     if img is None:
         img = np.full((16, 16, 4), 255, np.uint8)
@@ -265,9 +337,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
     p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34)
-    if smp and smp['wrap_u'] == 2 and smp['wrap_v'] == 2:
-        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, SAMPLER_CLAMP)
+    if smp:
+        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C,
+                         WRAP.get(smp['wrap_u'], 0) << 28 | WRAP.get(smp['wrap_v'], 0) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [1.0, 1.0])
+    set_uv_anim(em, ts)
 
     # ---- blend, colour, alpha
     st, col = e['static'], e['color']
@@ -341,6 +415,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)))
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
     p.set_field(em, 'ptcl_life', life)
+    # turned off (Terminate_Graphic_Effect): eft2 fades the alpha over alpha_fade_time frames when
+    # asked (and drops infinite-life particles); eft's 0x82C is that rate (1 / frames: vanilla's
+    # infinite-life glows all have it), 0 lets them live on (test 33's glow outlived the move, and
+    # templates carrying 1 cut neutral air's burst the frame it was turned off)
+    info = e['info']
+    fade = 1.0 / max(1, info['alpha_fade_time']) if info['is_fade_alpha_fade'] or life == FOREVER else 0.0
+    struct.pack_into('>f', em, FADE_ALPHA, fade)
     p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else int(pt['life'] * pt['life_random'] / 100))
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)

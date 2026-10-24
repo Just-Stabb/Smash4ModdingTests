@@ -117,7 +117,11 @@ the writer recomputes them.)
 | 0x4A4 | 3f | gravity | corpus |
 | 0x4B0 / 0x4B4 | s32 | particle life / random (frames) | verified |
 | 0x4BC | u32 | particle type (billboard / polygon / directional / stripe…) — shader-keyed | corpus |
-| 0x4D4 | 3 × 0x7C | per-slot UV params (scale at +0x34 for slot 0 → 0x508, flipbook / scroll) | corpus |
+| 0x4D4 | 3 × 0x7C | per-slot UV params (scale at +0x34 for slot 0 → 0x508, flipbook / scroll; slot 0's below) | corpus |
+| 0x510 | u32 | slot 0 UV animation mode, bits: 1 scroll, 2 scale, 4 rotate (each bit set exactly where its values below are non-neutral; shader-keyed: 8 of 4291 shader groups mix values) | corpus |
+| 0x514 / 0x51C / 0x524 | 2f each | slot 0 UV scroll a frame / initial / random | corpus |
+| 0x52C / 0x534 / 0x53C | 2f each | slot 0 UV scale a frame / initial (1) / random | corpus |
+| 0x544 / 0x548 / 0x54C | f each | slot 0 UV rotation a frame / initial / random (radians) | corpus |
 | 0x648 / 0x64C | u32 | color0 / color1 type (0 const, 1 random, 2 key anim) | corpus |
 | 0x650 / 0x6D0 | 32f | color0 / color1 keys (8 × rgba-ish) | corpus |
 | 0x750–0x768 | 2i each | color sections 1–3 (% of life), repeat | corpus |
@@ -128,6 +132,7 @@ the writer recomputes them.)
 | 0x7E4 / 0x7EC | 2f | scale diffs | guess |
 | 0x7F8 / 0x804 / 0x810 / 0x81C | 3f | rotation init / random / velocity / velocity random (rad) | corpus |
 | 0x828 | f | rotation attenuation | corpus |
+| 0x82C | f | alpha lost a frame once the set is turned off (1 / frames: 1/11, 1/4, 1/7...); set on vanilla's infinite-life emitters (the only way they end), 0 on 84% of the rest (they live out their life) | corpus |
 | 0x830 | u32 | flags (shader-keyed) | corpus |
 | 0x844 | u32 | shader index (into shader table) | verified |
 
@@ -140,7 +145,7 @@ Everything not listed is copied verbatim.
 | 0x00 | u16 width, u16 height |
 | 0x04 | GX2 tile mode (4 = 2D thin1 in vanilla) |
 | 0x08 | swizzle (0) |
-| 0x0C | sampler (wrap / filter bits) |
+| 0x0C | sampler: U wrap in bits 28-31, V wrap in 24-27 (GX2: 0 repeat, 1 mirror, 2 clamp), 0x100 filter (vanilla: 0x100, 0x22000100, 0x11000100...) |
 | 0x10 | mip levels |
 | 0x14 | component selector (one byte per output channel: 0 R 1 G 2 B 3 A 4 zero 5 one; BC4 = R,R,R,1; BC5 = R,R,R,G) |
 | 0x18 | enable mip level (f) |
