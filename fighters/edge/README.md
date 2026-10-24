@@ -462,3 +462,14 @@ purple effects flat and still; a pink diamond around the held opponent). Ultimat
   a flipbook and a mask, often scrolled; Smash 4's templates draw one texture in one colour, and
   many lose their UV scroll ("UV animation: template has 0").
 Bank 6.50 MB; ids / efc and effect.bin (test 49's) unchanged. Package: the ptcl / efc.
+
+## Test 51 (`build/sephiroth_test51.zip`): a quad's samplers multiplied into its texture
+
+User chose to keep converting Ultimate's purple effects (rather than rebuild them from Smash 4's).
+- `bake_samplers` (quads; combiner blends 0): every other sampler of the emitter except distortion
+  maps ('indirect') is sampled where Ultimate puts it on the quad (repeat, starting scale / shift /
+  turn, wrap; a flipbook sampler's first cell) and multiplied into the channel the shape is read from,
+  per cell of a flipbook main texture; the fill isn't folded in as a mean then. 29 emitters: the
+  hand / entry / dash / throw auras and fire, the throws' smoke, the victory backdrop. Their scroll
+  stays lost (frozen at the start).
+Bank 6.56 MB; ids / efc and effect.bin (test 49's) unchanged. Package: the ptcl / efc.

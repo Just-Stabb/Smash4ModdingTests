@@ -267,6 +267,56 @@ def shape_sampler(e, ti, images, notes):
     return best, factor
 
 
+def wrap_uv(t, mode):
+    """eft2 / eft wrap codes: 0 mirror, 1 repeat, 2 clamp"""
+    if mode == 2:
+        return np.clip(t, 0, 1 - 1e-6)
+    if mode == 0:
+        t = np.mod(t, 2)
+        return np.clip(np.where(t > 1, 2 - t, t), 0, 1 - 1e-6)
+    return np.mod(t, 1)
+
+
+def bake_samplers(e, ti, img, ptn, images, names, notes):
+    """img (the main sampler's picture: one cell, or the whole sheet of a flipbook) with the
+    emitter's other samplers multiplied into the channel its shape is read from, each sampled as
+    Ultimate places it on the quad (its repeat, starting scale / shift / turn, wrap; a flipbook's
+    first cell): eft2 multiplies its textures (combiner blends 0). Smash 4's templates draw one
+    texture, so his fire / aura / smoke (a flipbook or a mask times a tiling noise times a square
+    fade) drew as one flat shape; now the product, frozen at its start (the other samplers' scroll
+    is lost). Distortion maps ('indirect': they move the picture) are left out. None when nothing
+    is multiplied"""
+    cb = e['combiner']
+    if any(cb[k] for k in ('tex1_color_blend', 'tex2_color_blend', 'tex1_alpha_blend', 'tex2_alpha_blend')):
+        return None
+    others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
+              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    if not others:
+        return None
+    out = img.astype(np.float32).copy()
+    am = cb['alpha_process']
+    ch = 0 if am in (2, 3) or cb['tex_alpha_input'][ti] == 1 else 3
+    nx, ny = ((max(1, int(round(v))) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else (1, 1))
+    h, w = out.shape[0] // ny, out.shape[1] // nx
+    yy, xx = np.mgrid[0:h, 0:w]
+    quad = np.stack([(xx.ravel() + 0.5) / w, (yy.ravel() + 0.5) / h], 1).astype(np.float32)
+    product = np.ones(h * w, np.float32)
+    for j, s in others:
+        ts = e['static']['tex_scroll'][j]
+        src = first_cell(images[s['texture_id']], ts, shown_cell(e, j))
+        c = sampler_channel(e, j, src)
+        uv = uv_transform(quad * np.array(REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), np.float32),
+                          ts['scale'], ts['scroll'], ts['rotation'])
+        sh, sw = c.shape
+        product *= c[(wrap_uv(uv[:, 1], s['wrap_v']) * sh).astype(int), (wrap_uv(uv[:, 0], s['wrap_u']) * sw).astype(int)]
+    product = product.reshape(h, w)
+    for cy in range(ny):
+        for cx in range(nx):
+            out[cy * h:(cy + 1) * h, cx * w:(cx + 1) * w, ch] *= product
+    notes.append('samplers %s multiplied in' % ','.join(str(j) for j, _s in others))
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def first_cell(img, scroll, cell=0):
     """a flipbook's cell (row-major, uv_div columns x rows)"""
     nx, ny = (int(round(v)) if v and v >= 1 else 1 for v in scroll['uv_div'])
@@ -620,6 +670,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     else:
         if not ptn:
             img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
+        if not is_mesh:
+            baked = bake_samplers(e, ti, img, ptn, images, names, notes)
+            if baked is not None:
+                img, fill = baked, 1.0
     shape, rgb, alpha = combine(img, e, notes, ti, fill)
     if not is_mesh:
         shape = radial_gradient(shape, notes)
