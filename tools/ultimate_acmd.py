@@ -176,8 +176,8 @@ def statements(body):
             if body.startswith('else', j):
                 k = body.index('{', j)
                 cond = body[j + 4:k].strip()
-                if cond.startswith('if '):
-                    out.append(('elseif', cond[3:].strip()))
+                if cond.startswith(('if ', 'if(')):
+                    out.append(('elseif', cond[2:].strip()))
                 else:
                     out.append(('else',))
                 i = k + 1
@@ -185,13 +185,24 @@ def statements(body):
                 out.append(('end',))
                 i += 1
             continue
-        if body.startswith('if ', i):
-            k = i + 3
+        if body.startswith('if ', i) or body.startswith('if(', i):     # Steve's dump: `if(0x370870(...)){`
+            k = i + 2
             depth = 0
             while not (body[k] == '{' and depth == 0):
                 depth += {'(': 1, ')': -1}.get(body[k], 0)
                 k += 1
-            out.append(('if', body[i + 3:k].strip()))
+            cond = body[i + 2:k].strip()
+            # Steve's dump: each material test comes twice, `if(M){ operatorbool()const(is_excute); }
+            # else { if(M){ <the hitboxes> } ...`: the first a decompiler stub, taken as false so the
+            # real block (in its else) runs
+            e, depth = k + 1, 1
+            while e < n and depth:
+                depth += {'{': 1, '}': -1}.get(body[e], 0)
+                e += 1
+            inner = body[k + 1:e - 1].strip()
+            if inner.startswith('methodlib::L2CValue::operatorbool') and inner.count(';') == 1:
+                cond = '__decompiler_stub__'
+            out.append(('if', cond))
             i = k + 1
             continue
         m = re.match(r'for _ in (\d+)\.\.(\d+) \{', body[i:])
@@ -218,12 +229,55 @@ def statements(body):
     return out
 
 
+def fix_misplaced_else(out):
+    """the dump's `if C { if is_excute { A } else { B } }`, where the else is C's (Steve's material
+    tests: B, the rest of the move, never ran) -> `if C { A } else { B }`"""
+    exc = 'macros::is_excute(agent)'
+
+    def close(i):                       # index of the ('else',) / ('end',) closing the block opened at i
+        d = 0
+        for j in range(i + 1, len(out)):
+            k = out[j][0]
+            if k == 'if':
+                d += 1
+            elif k == 'end':
+                if d == 0:
+                    return j
+                d -= 1
+            elif k in ('else', 'elseif') and d == 0:
+                return j
+        return None
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(out) - 1):
+            if out[i][0] != 'if' or out[i][1] == exc or out[i + 1] != ('if', exc):
+                continue
+            e = close(i + 1)
+            if e is None or out[e] != ('else',):
+                continue
+            x = close(e)
+            if x is None or out[x] != ('end',) or x + 1 >= len(out) or out[x + 1] != ('end',):
+                continue
+            out[:] = out[:i + 1] + out[i + 2:e] + [('else',)] + out[e + 1:x] + [('end',)] + out[x + 2:]
+            changed = True
+            break
+    return out
+
+
 LR_LEFT = 'get_value_float(agent.lua_state_agent, *SO_VAR_FLOAT_LR) < 0.0'
 EFFECT_CONDS = ()
 
 
+# --cond: conditions taken as true, by substring (Steve: his tool's material, e.g.
+# 'MATERIAL_KIND_IRON)'; any other condition is false, its else branch runs)
+TRUE_CONDS = []
+
+
 def cond_true(cond):
     if cond == 'macros::is_excute(agent)' or cond in EFFECT_CONDS:
+        return True
+    if any(c in cond for c in TRUE_CONDS):
         return True
     if cond.startswith('!'):
         return not cond_true(cond[1:].strip())
@@ -235,6 +289,8 @@ class Translator:
     def __init__(self, joints):
         self.joints = joints            # Ultimate bone name (lower case) -> ACMD joint ID
         self.skipped = {}
+        self.frame = 0.0                # the script's frame at the current statement
+        self.events = []                # (frame, call, args) of the WorkModule sets (Steve's tool requests)
 
     def bone(self, name):
         if name == 'top':
@@ -248,9 +304,10 @@ class Translator:
 
     def script(self, body):
         cmds = []
+        self.frame, self.events = 0.0, []
         live = [True]              # a stack of "this block runs"
         taken = [False]
-        for st in statements(body):
+        for st in fix_misplaced_else(statements(body)):
             kind = st[0]
             if kind == 'if':
                 c = live[-1] and cond_true(st[1])
@@ -282,9 +339,13 @@ class Translator:
     def call(self, name, a, raw):
         short = name.split('::')[-1]
         if short == 'frame':
+            self.frame = max(self.frame, float(a[1]))
             return [cmd('FRAME', int(round(a[1])))]
         if short == 'wait':
+            self.frame += float(a[1])
             return [cmd('WAIT', int(round(a[1])))]
+        if name in ('WorkModule::set_int', 'WorkModule::on_flag', 'WorkModule::off_flag'):
+            self.events.append((self.frame, name, a))
         if short == 'FT_MOTION_RATE':
             return [cmd('Set_Frame_Duration', float(a[1]))]
         if short == 'ATTACK':
@@ -702,7 +763,10 @@ def main():
                     'this run (e.g. a fighter\'s specials; names starting with "special" are kept), a "slot" '
                     'naming the motion whose motion.mtable entry gets the new name (empty scripts when the dump '
                     'has none for it)')
+    ap.add_argument('--cond', action='append', default=[], help='a condition taken as true (substring of the '
+                    'dump\'s condition, e.g. MATERIAL_KIND_IRON) for Steve\'s tool material); repeatable')
     a = ap.parse_args()
+    TRUE_CONDS[:] = a.cond
     if a.translate:
         for src, v in json.load(open(a.translate)).items():
             if src.startswith('_'):

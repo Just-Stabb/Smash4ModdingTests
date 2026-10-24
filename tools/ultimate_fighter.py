@@ -29,6 +29,7 @@ triangle. Materials: the base's body / alpha-blended material layouts, textures 
 onto the white (Ultimate maps it with a second UV set).
 """
 import argparse
+import json
 import os
 import shutil
 import struct
@@ -349,12 +350,15 @@ class Textures:
     def __init__(self, src, base_id):
         self.src, self.base_id = src, base_id
         self.ids, self.images = {}, []
+        self.extra = []                 # other folders to find textures in (held article models)
 
     def load(self, name):
-        p = os.path.join(self.src, name + '.nutexb')
-        if not os.path.exists(p):
-            p = os.path.join(self.src, name.lower() + '.nutexb')
-        return nutexb.decode(nutexb.Nutexb(p))
+        for d in [self.src] + self.extra:
+            for n in (name, name.lower()):
+                p = os.path.join(d, n + '.nutexb')
+                if os.path.exists(p):
+                    return nutexb.decode(nutexb.Nutexb(p))
+        raise FileNotFoundError(name)
 
     def add(self, key, img, top=1024):
         if key not in self.ids:
@@ -631,6 +635,22 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     parts = mesh_parts(src)
     tmpl = templates(base_nud)
     tex = Textures(src, tex_id)
+    # "<article>/<mesh>@<bone>": an article model's mesh held rigidly on a fighter bone (Steve's tools:
+    # Ultimate links the article's root bone to the hand's, so the mesh's own positions are relative
+    # to that bone), from the article's folder of the same costume; its textures from there too
+    for slot, ults in prof['slots']:
+        for u in ults:
+            if '/' not in u or u in parts:
+                continue
+            art, rest = u.split('/', 1)
+            mname, bone = rest.split('@')
+            adir = os.path.join(src, '..', '..', art, os.path.basename(os.path.normpath(src)))
+            if not os.path.exists(adir + '/model.numshb'):
+                continue
+            tex.extra.append(adir)
+            for part in mesh_parts(adir).get(mname, []):
+                part['parent'], part['infl'] = bone, []
+                parts.setdefault(u, []).append(part)
     meshes = []
     used = set()
     for slot, ults in prof['slots']:
@@ -788,10 +808,16 @@ KOOPA_MOTIONS = {
 # mouths, wings, bow / weapons, bracelets, boots and blush are left empty. Steve's held items (flint,
 # buckets, blocks ...) are left out
 _PO, _PB = 'pickel_Openblink_VIS_O_OBJShape', 'pickel_Blink_VIS_O_OBJShape'
+STEVE_MATERIAL = 'iron'
 PIT_SLOTS = [
     ('Boot_HB15_O_OBJ', []), ('Boot_HB16_O_OBJ', []), ('Udewa19_O_OBJ2', []),
-    ('pit_YumiRM_VIS_O_OBJ', []), ('pit_WeaponRM_VIS_O_OBJ', []), ('pit_WpnNagiRM_VIS_O_OBJ', []),
-    ('pit_WeaponLM_VIS_O_OBJ', []), ('pit_Arm_VIS_O_OBJ', []), ('pit_LBit_VIS_O_OBJ', []), ('pit_RBit_VIS_O_OBJ', []),
+    # his tools (Ultimate's articles, in the iron version: no material system yet) on his right hand,
+    # in Pit's bow / blade slots; shown by the moves that hold them (STEVE_TOOLS)
+    ('pit_YumiRM_VIS_O_OBJ', ['axe/axe%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('pit_WeaponRM_VIS_O_OBJ', ['sword/sword%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('pit_WpnNagiRM_VIS_O_OBJ', ['pick/pick%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('pit_WeaponLM_VIS_O_OBJ', ['shovel/shovel%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('pit_Arm_VIS_O_OBJ', []), ('pit_LBit_VIS_O_OBJ', []), ('pit_RBit_VIS_O_OBJ', []),
     ('polySurface287_O_OBJ', []), ('polySurface286_O_OBJ', []),
     ('Pit_Eye_VIS_O_OBJ', []), ('Pit_FaceN_VIS_O_OBJ', []),
     ('Pit_Openblink_VIS_O_OBJ', [_PO]),
@@ -813,6 +839,9 @@ PIT_SLOTS = [
 ]
 # Pit's motions Steve has no animation for (his own kinds that share one resolve through his
 # motion_list.bin first: motion_aliases); Pit's glide (unused in Smash 4) -> the Elytra
+# Steve's tools: the visibility names tools/pickel_build.py writes (from his scripts' tool requests)
+PIT_TOOL_VIS = {'tool_axe': 'pit_YumiRM_VIS_O_OBJ', 'tool_sword': 'pit_WeaponRM_VIS_O_OBJ',
+                'tool_pick': 'pit_WpnNagiRM_VIS_O_OBJ', 'tool_shovel': 'pit_WeaponLM_VIS_O_OBJ'}
 PIT_MOTIONS = {
     'a00wait2': 'a00wait1', 'a00wait3': 'a00wait1', 'a03jumpaerialf2': 'a03jumpf', 'a03jumpaerialf3': 'a03jumpf',
     'a04runfalll': 'a03jumpf', 'a04runfallr': 'a03jumpf', 'a04walkfalll': 'a03jumpf', 'a04walkfallr': 'a03jumpf',
@@ -930,8 +959,8 @@ PROFILES = {
                   vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
     'koopa': dict(slots=KOOPA_SLOTS, joints=KOOPA_JOINTS, motions=dict(MOTION_STANDINS, **KOOPA_MOTIONS), vis={},
                   vis_default={}, hidden=()),
-    'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis={}, vis_default={},
-                hidden=()),
+    'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis=PIT_TOOL_VIS,
+                vis_default={}, hidden=()),
     'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
                    vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
@@ -1132,12 +1161,15 @@ def motion_aliases(motion_dir):
     return out
 
 
-def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=()):
+def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=(),
+                  extra_vis=None):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
     layers emptied (they turn the base's HandN / HaveN), and the material_anime face / eyelid pacs
     of every costume with the swords' (and the wing's) visibility added. add: motions the base has
     no animation for (e.g. C00Attack12), added to body/main.pac as <prefix><name>.omo (the kind's
-    motion table must point at them: extra_kinds.json "motions")"""
+    motion table must point at them: extra_kinds.json "motions"). extra_vis: {Ultimate animation:
+    {visibility name: [[frame, 0 / 1], ...]}}, visibility the motions don't carry themselves (Steve's
+    tools, which his scripts ask for: tools/pickel_build.py), for the profile's "vis" slots"""
     import omo
     import mta
     import ssbh_data_py as s
@@ -1176,6 +1208,11 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             anim = s.anim_data.read_anim(os.path.join(motion_dir, have[ult]))
             frames = int(round(anim.final_frame_index)) + 1
             tracks, vis = ult_tracks(anim, frames)
+            for uname, keys in (extra_vis or {}).get(ult, {}).items():
+                st = np.zeros(frames, bool)
+                for f, on in sorted(keys):
+                    st[min(int(f), frames - 1):] = bool(on)
+                vis[uname] = st
             locs = pose(sk, tracks, frames, constraints)
             entries.append((name, omo_bytes(head, locs, sk, frames)))
             if folder == 'body':
@@ -1264,6 +1301,7 @@ def main():
     mo.add_argument('base')
     mo.add_argument('out')
     mo.add_argument('--add', default='', help='motions to add to body/main.pac (comma separated, e.g. C00Attack12)')
+    mo.add_argument('--extra-vis', help='JSON {Ultimate animation: {visibility: [[frame, 0/1], ...]}} (Steve\'s tools)')
     for q in (m, mo):
         q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
         q.add_argument('--max-bones', type=int, help='merge bones into their parents down to this many per costume '
@@ -1282,7 +1320,8 @@ def main():
             animated = animated_bones(mdir, a.src_model if a.cmd == 'motions' else a.src, a.anim_cache)
     if a.cmd == 'motions':
         build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n],
-                      max_bones=a.max_bones, animated=animated, joints=joints)
+                      max_bones=a.max_bones, animated=animated, joints=joints,
+                      extra_vis=json.load(open(a.extra_vis)) if a.extra_vis else None)
     if a.cmd == 'model':
         global PIXEL_ART
         PIXEL_ART = a.pixel_art
