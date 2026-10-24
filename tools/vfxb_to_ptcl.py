@@ -225,6 +225,34 @@ def mesh(model, uv_channel=0):
 HELPER_TEXTURES = ('indirect', 'grade', 'noise', 'mask')
 
 
+
+LATTE_DIS = os.path.join(HERE, 'latte_dis', 'latte-dis')
+_alpha_mask = {}
+
+
+def alpha_mask_shader(p, si):
+    """True when shader si's pixel program samples only the texture's alpha (SAMPLE Rn.___w): a mask
+    over a mesh its own view-angle falloff shapes (123: the sword flares, down throw's ring1). Such a
+    shader wants vanilla's alpha 1 (R R R 1); every other one gets the shape in every channel. None
+    when tools/latte_dis/latte-dis is missing (then R R R R)."""
+    import hashlib
+    import subprocess
+    import tempfile
+    from trail_shader import gsh_blocks
+    b = bytes(p.shader_binary(si))
+    key = hashlib.md5(b).hexdigest()
+    if key not in _alpha_mask:
+        if not os.path.exists(LATTE_DIS):
+            return None
+        blk = [x for x in gsh_blocks(b, 0) if x[0] == 7][0]
+        with tempfile.NamedTemporaryFile(suffix='.gsh', delete=False) as t:
+            t.write(b)
+        out = subprocess.run([LATTE_DIS, t.name, str(blk[2]), str(blk[3])], capture_output=True, text=True).stdout
+        os.unlink(t.name)
+        masks = [ln.split()[2].split('.')[1].rstrip(',') for ln in out.splitlines() if 'SAMPLE' in ln]
+        _alpha_mask[key] = bool(masks) and all(m == '___w' for m in masks)
+    return _alpha_mask[key]
+
 def keys(table, n, comps=3):
     """an eft2 key table (8 x (x, y, z, time 0-1)) -> [101, comps] samples over the particle's life"""
     k = np.array(table['keys'], float).reshape(8, 4)[:max(1, n)]
@@ -732,7 +760,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # red, some from alpha (Koopa's pointlight1 / Pikachu's spark1, picked for the hand / throw auras
     # and back throw's aura2), which with vanilla's R R R 1 drew the whole quad (test 52's colour
     # check: back throw's yellow square, the grab's purple one)
-    p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34, comp_sel=SHAPE_SEL)
+    # (not for a template that reads only the texture's alpha as a mask, alpha_mask_shader: with the
+    # shape there forward smash's sword flare drew a dark band along the blade, test 53)
+    mask_only = alpha_mask_shader(p, struct.unpack_from('>I', em, 0x844)[0])
+    p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34,
+                  comp_sel=None if mask_only else SHAPE_SEL)
+    if mask_only:
+        notes.append('template reads the texture alpha as a mask: its channel selectors kept')
     if smp:
         struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])

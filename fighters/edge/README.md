@@ -513,3 +513,23 @@ User, test 52 colour check (back / down / forward throw, grab shots): back throw
   max are camera-distance limits, off); left as is.
 Bank 6.56 MB; ids / efc unchanged; effect.bin: test 49's with the 9 tints. Package: the ptcl / efc
 and effect.bin.
+
+## Test 54 (`build/sephiroth_test54.zip`): channel selectors by the template's sampling
+
+User, test 53 (shots): grab right; forward smash a dark band along the blade (it was right before);
+down throw / pummel too faint; back throw better but magenta light everywhere; dash attack still
+the white line; down air bright (its data is test 52's: Ultimate's has a bright blue-white streak
+down the blade too).
+- R R R R suits every template but one kind: a pixel shader that samples only the texture's alpha
+  (`SAMPLE Rn.___w`, shader 123: the sword flares' `swordflare2`, down throw's `ring1`) uses it as
+  a mask over a mesh shaped by its own view-angle falloff, and wants vanilla's alpha 1; with the
+  shape there forward smash's flare drew a dark band. `alpha_mask_shader` reads the template's
+  sample masks with tools/latte_dis/latte-dis; those keep the template's selectors.
+- Shader 133 (back throw's flare discs) also reads alpha but colours by the texture: R R R R stays
+  (with R R R 1 its 83-unit `flareAdd1` drew one flat magenta disc: test 52's pink haze).
+- Dash attack's `FlashLine1`: Ultimate draws it lerp(colour 1, colour 0, texture rgb) x texture
+  alpha, `ef_cmn_line06`'s rgb a white core ~1 unit wide and its alpha a wide glow (blue there:
+  colour 1). `combine` folds both into one bluish white, the glow as bright as Ultimate's but
+  white. Not changed: a two-colour fit (colour 0 / 1 from the texture's rgb against its alpha) would
+  also change the approved sword flares.
+Bank 6.56 MB; effect.bin test 53's. Package: the ptcl / efc and effect.bin.
