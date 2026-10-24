@@ -1227,6 +1227,20 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the
   hitbox's SDI.
 
+## EffectModule requests (effect placement)
+
+- Class vtables `0x10105FE8` / `0x101228F8` (+ `0x101545A0`, another layout); MSC handler (vt
+  `+0x2EC`) `0x02C2CEC8` (ops `0x2710`-`0x2742`); request on a bone vt `+0x4C` `0x02C29F50` →
+  vt `+0x54` `0x02C2A040` (hash, bone, &pos, &rot, &random pos, &random rot, flag, size in f1).
+- ACMD `Graphic_Effect` (`0x02BE1444`) calls vt `+0x4C` with its parameters unchanged; External_Graphic
+  `0x02BDF7DC`, Graphic_Effect2 `0x02BDEBAC`, EFFECT_FLIP `0x02BE0EA8`, EFFECT_FOLLOW_FLIP `0x02BE0710`,
+  Terminate_Graphic_Effect `0x02BE25AC` (builds `EffectModule(0x2723, ...)`).
+- The flag (Graphic_Effect's / 0x2710's last argument): 1 = the bone's full matrix (vt `+0xDC`):
+  offsets and rotation in the bone's frame; 0 = the bone's position (vt `+0xEC`), X offset x the
+  owner's facing (PostureModule vt `+0x74`), Y rotation + pi/2 x the facing, Z offset = world depth.
+- The random ranges step the battle RNG (instance 0, `0x105759C0`) on every request, even when 0
+  (rollback: effects are part of the simulated state).
+
 ## Manifold cross-reference (other native findings)
 
 Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targets this same RPX

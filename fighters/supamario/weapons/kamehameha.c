@@ -556,8 +556,11 @@ int func_40(int arg0)
 //              KAME_SEG_EVERY frames. Its range reached, or touching a wall (GroundModule 0x2722, as
 //              the fireball's MSC checks it), it ends where it is.
 //   3          hold: the beam connected (native: weapon_expand's on_hit asks for status 3 instead of
-//              removing it), stays in place KAME_HOLD frames, still multi-hitting (the fly motion
-//              plays on: test 16, frozen it multi-hit only once; no more body pieces)
+//              removing it), stays in place KAME_HOLD_n frames (more hits the longer the charge), still
+//              multi-hitting: its fly motion starts again (test 18: its following head effects ended
+//              with the status change and the MSC's still copies stayed after the beam; the fly ACMD
+//              puts the head back, following, and its head hitbox, which holds the target, hits every
+//              REHIT frames; no more body pieces)
 //   4          finish: motion finish (its ACMD ends the beam's effects, the launcher)
 // The end (the finish, or the range / a wall): the body pieces are replaced by dissolving ones
 // (KAME_DIS_n, at the same places: they flash bright, go transparent and thin to a white line) and
@@ -670,10 +673,17 @@ int kame_dis_id()
     return KAME_DIS_1;
 }
 
-// the head again, still, for the hold (its following effects ended with the status change: test 17)
-void kame_head_fx()
+int kame_hold_frames()
 {
-KAME_HEAD_FX
+    if (kame_level == 0x1)
+    {
+        return KAME_HOLD_2;
+    }
+    else if (kame_level == 0x2)
+    {
+        return KAME_HOLD_3;
+    }
+    return KAME_HOLD_1;
 }
 
 // every effect of the beam ends (the body pieces, the head)
@@ -683,18 +693,19 @@ KAME_FX_OFF
 }
 
 // the body pieces (dropped at the head every KAME_SEG_EVERY frames of the flight) replaced by
-// dissolving ones at the same places, behind the head where it stopped
+// dissolving ones at the same places, behind the head where it stopped. The last argument 1 puts
+// them in the bone's frame (Z along the beam); with 0, Z was screen depth (test 18: a diagonal line)
 void kame_dissolve()
 {
     int f;
     int id;
     float z;
     id = kame_dis_id();
-    f = KAME_SEG_EVERY;
+    f = KAME_SEG_FIRST;
     while (f <= kame_flown)
     {
         z = -(float)(kame_flown - f) * kame_speed();
-        EffectModule(0x2710, id, 0, 0, 0, z, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
+        EffectModule(0x2710, id, 0, 0, 0, z, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0x1);
         f += KAME_SEG_EVERY;
     }
     kame_fx_off();
@@ -778,7 +789,7 @@ void kame_fly_loop()
         kame_end();
         return;
     }
-    if (kame_frame > 0 && kame_frame % KAME_SEG_EVERY == 0)
+    if (kame_frame >= KAME_SEG_FIRST && kame_frame % KAME_SEG_EVERY == 0)
     {
         EffectModule(0x2710, kame_seg_id(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0x1);
     }
@@ -793,7 +804,7 @@ void kame_hold_main()
         kame_phase = 0x1;
         kame_flown = kame_frame;
         kame_frame = 0;
-        kame_head_fx();
+        func_24(kame_level, 0, 1.0f);
     }
     kame_move(0);
     callFunc3(kame_hold_loop);
@@ -807,14 +818,14 @@ void kame_hold_loop()
     }
     kame_move(0);
     kame_frame += 1;
-    if (kame_frame >= KAME_HOLD + 0xa)
+    if (kame_frame >= kame_hold_frames() + 0xa)
     {
         // the finish didn't start
         kame_fx_off();
         BattleObject(0x9);
         return;
     }
-    if (kame_frame >= KAME_HOLD)
+    if (kame_frame >= kame_hold_frames())
     {
         kame_status(0x4);
         return;

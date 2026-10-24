@@ -202,27 +202,81 @@ class Skeleton:
         return struct.pack('>HH', len(t0), n2) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
 
 
-def needed_bones(src_dirs, standins=None):
+def needed_bones(src_dirs, standins=None, max_bones=None, animated=None, protect=()):
     """the Ultimate bones a Smash 4 skeleton needs: those the meshes of src_dirs are skinned or bound
-    to, the standard ones, the shoulder pad helpers (the joint table's stand-ins), their ancestors"""
+    to, the standard ones, the shoulder pad helpers (the joint table's stand-ins), their ancestors.
+    max_bones: merge bones into their parents until that many are left (the game's fighters go up to
+    138 bones; past that it misdraws or crashes): leaves only, first the ones no motion moves
+    (animated: the set of bones that do; merging those is exact), then the ones with the fewest
+    vertices; never the standard bones, the stand-ins, the folded ones or protect (e.g. the swords)"""
     import ssbh_data_py as s
     standins = JOINT_STANDINS if standins is None else standins
     need = set(u for _s4, u in STANDARD) | set(standins.values())
     par = {}
+    verts = {}
     for d in src_dirs:
         sk = s.skel_data.read_skel(d + '/model.nusktb')
         par.update({b.name: (sk.bones[b.parent_index].name if b.parent_index is not None else None) for b in sk.bones})
         for o in s.mesh_data.read_mesh(d + '/model.numshb').objects:
             if o.bone_influences:
-                need |= {bi.bone_name for bi in o.bone_influences if any(w.vertex_weight > 0 for w in bi.vertex_weights)}
+                for bi in o.bone_influences:
+                    n = sum(1 for w in bi.vertex_weights if w.vertex_weight > 0)
+                    if n:
+                        need.add(bi.bone_name)
+                        verts[bi.bone_name] = verts.get(bi.bone_name, 0) + n
             elif o.parent_bone_name:
                 need.add(o.parent_bone_name)
-    for n in list(need):
+                verts[o.parent_bone_name] = verts.get(o.parent_bone_name, 0) + (len(o.positions[0].data) if o.positions else 0)
+    for n in list(need) + list(protect):
         p = par.get(n)
+        if n in par:
+            need.add(n)
         while p:
             need.add(p)
             p = par.get(p)
+    if max_bones and len(need) > max_bones:
+        fixed = set(u for _s4, u in STANDARD) | set(standins.values()) | set(FOLD) | set(protect)
+
+        def depth(u):
+            k = 0
+            while par.get(u):
+                u, k = par[u], k + 1
+            return k
+        while len(need) > max_bones:
+            has_child = {par.get(u) for u in need}
+            leaves = [u for u in need if u not in has_child and u not in fixed]
+            if not leaves:
+                break
+            leaves.sort(key=lambda u: (animated is None or u in animated, verts.get(u, 0), -depth(u), u))
+            need.discard(leaves[0])
     return need
+
+
+def animated_bones(motion_dir, src_model, cache=None):
+    """the Ultimate bones some motion of motion_dir moves away from their bind (or a helper
+    constraint turns); cache: a JSON file to keep the answer in"""
+    import json
+    import ssbh_data_py as s
+    if cache and os.path.exists(cache):
+        return set(json.load(open(cache)))
+    sk = s.skel_data.read_skel(src_model + '/model.nusktb')
+    bind = {b.name: np.array(b.transform, dtype=np.float64).T for b in sk.bones}
+    moved = set(c.target_bone_name for c in helper_constraints(src_model))
+    for f in sorted(os.listdir(motion_dir)):
+        if not f.endswith('.nuanmb'):
+            continue
+        anim = s.anim_data.read_anim(os.path.join(motion_dir, f))
+        frames = int(round(anim.final_frame_index)) + 1
+        tracks, _vis = ult_tracks(anim, frames)
+        for name, m in tracks.items():
+            if name in moved:
+                continue
+            ref = bind.get(name, m[0])
+            if not np.allclose(m, ref[None], atol=1e-4):
+                moved.add(name)
+    if cache:
+        json.dump(sorted(moved), open(cache, 'w'))
+    return moved
 
 
 def read_vbn(path):
@@ -431,21 +485,26 @@ def skin(part, sk, world):
     sign = part['tan'][:, 3:4] if part['tan'] is not None else np.ones((n, 1))
     idx = np.zeros((n, 4), np.int64)
     wt = np.zeros((n, 4))
+    def kept(u):
+        while u not in sk.index:
+            u = sk.ult_parent[u]
+        # no vertex on TransN / RotN (no vanilla fighter has any; the model's bone range starts at HipN)
+        return sk.index[u] if sk.index[u] >= 2 else sk.by_name['HipN']
     if not part['infl']:
-        b = sk.index[part['parent']]
+        b = kept(part['parent'])
         m = world[b]
         pos = (np.c_[pos, np.ones(n)] @ m.T)[:, :3]
         nrm = nrm @ m[:3, :3].T
         tan = tan @ m[:3, :3].T
         idx[:, 0], wt[:, 0] = b, 1.0
     else:
-        per = [[] for _ in range(n)]
+        per = [{} for _ in range(n)]
         for bone, ws in part['infl']:
-            b = sk.index[bone]
+            b = kept(bone)
             for v, w in ws:
-                per[v].append((w, b))
-        for v, lst in enumerate(per):
-            lst.sort(reverse=True)
+                per[v][b] = per[v].get(b, 0.0) + w
+        for v, d in enumerate(per):
+            lst = sorted(((w, b) for b, w in d.items()), reverse=True)
             lst = lst[:4] or [(1.0, sk.by_name['HipN'])]
             for k, (w, b) in enumerate(lst):
                 idx[v, k], wt[v, k] = b, w
@@ -509,7 +568,7 @@ def empty_polygon(tmpl):
     p.nrm = np.tile([0.0, 1.0, 0.0], (3, 1))
     p.tan = np.tile([1.0, 0.0, 0.0], (3, 1))
     p.bit = np.tile([0.0, 0.0, 1.0], (3, 1))
-    p.bones = np.zeros((3, 4), np.int64)
+    p.bones = np.full((3, 4), 2, np.int64)      # HipN: no vertex on TransN / RotN (the header's bone range)
     p.weights = np.tile([255, 0, 0, 0], (3, 1))
     p.uvs = [np.zeros((3, 2))]
     p.col = np.full((3, 4), WHITE)
@@ -518,12 +577,13 @@ def empty_polygon(tmpl):
     return p
 
 
-def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=()):
+def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=None, animated=None):
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model.vbn')
     base_nud = nud.read(base + '/model.nud')
     pname, prof = profile_for(m.name for m in base_nud)
-    sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn, needed_bones([src], prof['joints']))
+    sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn,
+                  needed_bones([src], prof['joints'], max_bones, animated, joints))
     world = sk.world()
     parts = mesh_parts(src)
     tmpl = templates(base_nud)
@@ -844,7 +904,7 @@ def vis_keys(states):
     return keys
 
 
-def build_motions(motion_dir, src_model, base, out, log=print, add=()):
+def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=()):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
     layers emptied (they turn the base's HandN / HaveN), and the material_anime face / eyelid pacs
     of every costume with the swords' (and the wing's) visibility added. add: motions the base has
@@ -857,7 +917,11 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=()):
     _pn, prof = profile_for(m.name for m in nud.read(base + '/model/body/c00/model.nud'))
     costumes = [os.path.join(os.path.dirname(src_model), c) for c in sorted(os.listdir(os.path.dirname(src_model)))
                 if os.path.exists(os.path.join(os.path.dirname(src_model), c, 'model.numshb'))]
-    sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, needed_bones(costumes, prof['joints']))
+    keep = set()
+    for c in costumes:
+        keep |= needed_bones([c], prof['joints'], max_bones, animated, joints)
+    sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, keep)
+    log('motion skeleton: %d bones (every costume\'s)' % len(sk.bones))
     constraints = helper_constraints(src_model)
     have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}
     frames_of, vis_of = {}, {}
@@ -943,18 +1007,30 @@ def main():
     m.add_argument('out')
     m.add_argument('--tex-id', type=lambda v: int(v, 0), default=TEX_ID)
     m.add_argument('--empty', help='a folder with an empty model.sb / model.nhb to use')
-    m.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
     mo = sub.add_parser('motions')
     mo.add_argument('motion_dir')
     mo.add_argument('src_model')
     mo.add_argument('base')
     mo.add_argument('out')
     mo.add_argument('--add', default='', help='motions to add to body/main.pac (comma separated, e.g. C00Attack12)')
+    for q in (m, mo):
+        q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
+        q.add_argument('--max-bones', type=int, help='merge bones into their parents down to this many per costume '
+                                                     '(fighters go up to 138; use 136)')
+        q.add_argument('--anim-cache', help='JSON file keeping which bones the motions move')
+    m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
     a = ap.parse_args()
+    joints = [j for j in a.joints.split(',') if j]
+    animated = None
+    if a.max_bones:
+        mdir = a.motion_dir if a.cmd == 'motions' else a.motions
+        if mdir:
+            animated = animated_bones(mdir, a.src_model if a.cmd == 'motions' else a.src, a.anim_cache)
     if a.cmd == 'motions':
-        build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n])
+        build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n],
+                      max_bones=a.max_bones, animated=animated, joints=joints)
     if a.cmd == 'model':
-        build_model(a.src, a.base, a.out, a.tex_id, joints=[j for j in a.joints.split(',') if j])
+        build_model(a.src, a.base, a.out, a.tex_id, joints=joints, max_bones=a.max_bones, animated=animated)
         if a.empty:
             for f in ('model.sb', 'model.nhb'):
                 shutil.copy(os.path.join(a.empty, f), os.path.join(a.out, f))

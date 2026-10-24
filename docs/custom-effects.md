@@ -330,3 +330,36 @@ hit's status 3) and with it; a **non-following** one doesn't end with it.
   it went into the screen. `xv2_to_nud.py --bake-rot TRS`: that rotation in the vertices, the bone
   unrotated with its scale axes swapped (R S R^T); posed vertices identical to before at every frame.
   (Kmh_Bas has animated bones under its TRS: not baked.)
+
+### Test 18 in game, and test 19 (`build/fighters_fix_test19.zip`, with the fighter fixes)
+
+Test 18: the body started behind the beam's base, the light shaft and the base's blue swirls were on
+the wrong axis, a hit left the head's blue flame behind, and the multi-hit hit "only behind the beam,
+behind supamario and into the wrong direction" (the body capsule); the user wants more hits the longer
+the charge, then the finisher releasing them.
+
+**How the game places a non-following effect** (EffectModule's request, `0x02C29F50` → vt `+0x54`
+`0x02C2A040`; the class's vtables `0x10105FE8` / `0x101228F8`, MSC handler `0x02C2CEC8`; the ACMD
+Graphic_Effect handler `0x02BE1444` passes its values straight to vt `+0x4C`). The last argument of
+`Graphic_Effect` / MSC `EffectModule(0x2710, ...)`:
+- **1**: the bone's full transform (`vt +0xDC` matrix); offsets and rotation in the bone's frame. On
+  the beam (and on fighters) +Z is forward, as for the following forms (`External_Graphic`, 0x2717;
+  vanilla Fox's laser effects sit at +Z on the weapon's bone 0).
+- **0**: the bone's position only (`vt +0xEC`); X offset x the facing (PostureModule vt `+0x74`), Z
+  offset = screen depth, Y rotation + 90 degrees x the facing (vanilla MSC uses `90 * LR` on top).
+The dissolve pieces (flag 0, Z offsets behind the head) ran into the screen: a diagonal line. With
+either flag, an emitter pointing up stays up whatever the yaw: the swirls stood up. Also: the request
+steps the battle RNG (instance 0) for its random ranges even when they are 0.
+
+Test 19:
+- Hitboxes: the head only (366, re-hit 6), no body capsule; the hold restarts the fly motion and
+  lasts `REHIT x HOLD_HITS` = 24 / 36 / 54 frames (4 / 6 / 9 hits) by charge level; the finish is a
+  size 9 sphere at the head.
+- Effects: the dissolve pieces flag 1 (Z along the beam); the light shaft flag 1, turned 180 as the
+  head's XV2 parts (it pointed ahead of the head: XV2's forward is -Z); the start parts made with the
+  following form at Supamario's bone 0 (0x2717: 0x2723 ends it), particle sets turned X +90 (up ->
+  forward); the hold no longer puts a still copy of the head in place (the restarted fly motion
+  brings the following head back), so nothing is left after the finish.
+- The first body piece at frame 4 (`SEG_FIRST`): from then a piece no longer reaches back past the
+  start ball.
+- The beam's motion is the fireball's held at its frame-0 pose (the fireball's spins `KaitenN`).

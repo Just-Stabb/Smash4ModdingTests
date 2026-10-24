@@ -20,7 +20,11 @@ Training entry does (launch case 0x5F of 0x02C881D4: the menu mode 0xB through 0
 "SingleTrainingSeqCtrlScene") and returns that name instead; the second returns the same pick.
 Leaving Training goes back through the controller as from the menu's Training.
 
-Space: 0x04B85000-0x04B85400 (kind_expand.py's old space, unused since it moved).
+Space: 0x04B84A00-0x04B85000 (zeros after stage_omega_cave.py's 0x04B84900). The first version sat
+at 0x04B85000, on kind_expand.py's old space, and crashed the game at boot on Cemu (Cemu asserted on
+an HLE call at 0x04B85170, in the old space's stale words, just before the first hook; the same
+executable without the shortcut booted). The old space (0x04B85000-0x04B877C4: kind_expand's tables
+from when it had one kind there; nothing refers to it any more) is now cleared to zeros too.
 """
 import os
 import sys
@@ -28,8 +32,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
-CAVE = 0x04B85000
-LIMIT = 0x04B85400
+CAVE = 0x04B84A00
+LIMIT = 0x04B85000
+OLD_SPACE = (0x04B85000, 0x04B877C4)   # kind_expand.py's first space: stale words, cleared
 NAME_SITE = 0x02C87650          # addi r3, r29, -0x24E0
 NAME_SITE_WORD = 0x387DDB20
 NAME2_SITE = 0x02C87660         # addi r5, r29, -0x24E0
@@ -110,6 +115,7 @@ sel:
 def main():
     a, words, hooks = build()
     out = ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    out += ['0x%08X=0x00000000' % a for a in range(OLD_SPACE[0], OLD_SPACE[1], 4)]
     out += ['0x%08X=0x%08X' % h for h in hooks]
     print(' '.join(out))
     sys.stderr.write('boot training: %d words at 0x%08X, pick at 0x%08X\n' % (len(words), CAVE, a.addr('sel')))

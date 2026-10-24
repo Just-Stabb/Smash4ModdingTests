@@ -5,8 +5,10 @@ SSBH files into a Smash 4 fighter's model folders and motion pacs, on the fighte
 inside a new kind built on a base fighter (docs/kind-expansion.md).
 
 ```
-python3 tools/ultimate_fighter.py model SRC/model/body/c0N BASE/model/body/c0N OUT/c0N --empty EMPTY_DIR [--joints SwordL1,SwordR1]
-python3 tools/ultimate_fighter.py motions SRC/motion/body/c00 SRC/model/body/c0K BASE OUT [--add C00Attack12,...]
+python3 tools/ultimate_fighter.py model SRC/model/body/c0N BASE/model/body/c0N OUT/c0N --empty EMPTY_DIR [--joints SwordL1,SwordR1] \
+    --max-bones 136 --motions SRC/motion/body/c00 --anim-cache CACHE.json
+python3 tools/ultimate_fighter.py motions SRC/motion/body/c00 SRC/model/body/c0K BASE OUT [--add C00Attack12,...] \
+    [--joints ...] --max-bones 136 --anim-cache CACHE.json
 ```
 
 `EMPTY_DIR`: Cloud's `model.sb` (12 bytes, no swing bones) and Kirby's `model.nhb` (64 bytes, no
@@ -36,6 +38,21 @@ and the legs and `ClavicleC` between `Bust` and the clavicles; Smash 4 hangs leg
 x child's local), and stay as extra bones for the vertices weighted to them. Then Ultimate's other
 bones, parents first, leaving out bones nothing is skinned to (end markers, unused helpers): vanilla
 fighters have at most 138 bones (Dr. Mario), Sephiroth 172 (124 in his second outfit).
+
+**Bone budget** (`--max-bones 136`, Zelda's count): past it, leaf bones are merged into their parents
+(their vertices re-weighted there), the ones no motion moves first (`--motions`: the Ultimate motions
+read once, cached in `--anim-cache`), then those with the fewest vertices; never the standard bones,
+the folded ones or `--joints`. The motions use every costume's kept bones (Sephiroth: 154 animated
+nodes; a costume ignores the ones it lacks, as Bowser Jr's motions do for the Koopalings).
+
+**NUD header 0x0C / 0x0E** (`nud.write`): the first and last bone index the vertices use. Every vanilla
+fighter: 2 to N (Zelda 2-135, Bowser 2-78), no vertex on TransN / RotN. Ours were 0 to bone count - 1:
+Incineroar (0-142) drew as a stretched red pillar, Sephiroth (0-171) crashed on loading. Now: vertices
+on bone 0 / 1 go to HipN (including the empty meshes that fill unused slots), and the header holds
+the range the vertices really use (Sephiroth 2-131 / 2-109, Incineroar 2-135).
+
+Packaging: leave out `model.sbwl`; keep the base's other motion pacs (`zeldasw1 / sw2 / pt1.pac`,
+`koopapt1-3.pac`) next to the new `main.pac` / `lhand` / `rhand`.
 
 VBN bind: position, Euler angles with R = Rz Ry Rx (Sm4shCommand's `EulerToQuat`), scale.
 
@@ -103,5 +120,6 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
 
 ## Not known yet (in game)
 
-- Whether 172 bones skin right (vanilla fighters stop at 138); if not, fold the face and finger bones.
+- Test 19 (`build/fighters_fix_test19.zip`): whether the 2-N header and the 136-bone budget fix the
+  pillar / crash.
 - Whether the empty `.sb` / `.nhb` and a model without `.sbwl` load.

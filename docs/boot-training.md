@@ -22,7 +22,7 @@
 
 ## The patch
 
-The two loads of the title's name in the set-up become `bl` into the cave (`0x04B85000`): with L held
+The two loads of the title's name in the set-up become `bl` into the cave (`0x04B84A00`; first `0x04B85000`, see below): with L held
 on any controller (the pad slot array `0x1057581C`, as biome_select_cave.py reads it) it sets the menu
 mode to 0xB and starts `SingleTrainingSeqCtrlScene` instead, as the menu's Training entry does.
 
@@ -41,3 +41,7 @@ as assembled and its unicorn test passes, so the path is not known yet. Sent: th
 without the shortcut (`build/sephiroth_v3_noboot.zip`; adding the shortcut back gives v3 byte for
 byte) to confirm the shortcut is the trigger. Next: move the cave to clean space away from the old
 kind_expand words (and clear those), keep the picked name in a data word instead of in the code.
+
+The no-shortcut executable booted (user). Fixed version (`build/fighters_fix_test19.zip`): the cave
+moved to `0x04B84A00`-`0x04B85000` (zeros after stage_omega_cave.py's), and the old kind_expand space
+`0x04B85000`-`0x04B877C4` cleared to zeros. Not yet run in game.

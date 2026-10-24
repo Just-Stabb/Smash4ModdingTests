@@ -264,12 +264,20 @@ def write(meshes, top_bone=None):
     polys += b'\0' * (-len(polys) % 16)
     verts += b'\0' * (-len(verts) % 16)
     sph = _sphere(np.concatenate(all_pos))
-    # 0x0E: the highest bone index the meshes use (the game's fighters: bone count - 1; Battlefield's
-    # one-bone stage models 0). Left 0 with meshes on bones 1-15, the stage froze loading (user).
-    if top_bone is None:
+    # 0x0C / 0x0E: the first and last bone index the meshes use. Rigged models: the range of the vertex
+    # bone indices with a weight (every vanilla fighter: 2-135 Zelda, 2-78 Bowser; never TransN / RotN);
+    # one-bone stage models: 0 and the highest mesh bone (left 0 with meshes on bones 1-15, the stage
+    # froze loading, user). A fighter model written with 0 and its bone count - 1 (0-142) drew as a
+    # stretched pillar, and with 0-171 crashed.
+    first_bone = 0
+    rigged = [p for m in meshes for p in m.polygons if p.bones is not None]
+    if rigged:
+        used = np.concatenate([np.asarray(p.bones)[np.asarray(p.weights) > 0] for p in rigged])
+        first_bone, top_bone = int(used.min()), int(used.max())
+    elif top_bone is None:
         top_bone = max([m.bone for m in meshes] + [0])
-    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), 0, top_bone, pstart, len(polys), len(verts),
-                                          len(vadd), *sph))
+    out = bytearray(b'NDP3' + struct.pack('>IHhhhiiii4f', 0, 0x0200, len(meshes), first_bone, top_bone, pstart, len(polys),
+                                          len(verts), len(vadd), *sph))
     out += mesh_entries + body + polys + verts + vadd + strs
     struct.pack_into('>I', out, 4, len(out))
     return bytes(out)
