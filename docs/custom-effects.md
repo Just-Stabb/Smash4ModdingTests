@@ -458,3 +458,8 @@ and emits along its local Z, so a ring faces the way it moves (LineAll's, Firept
 release Ring's, and the charge rings at the hand). Type 2 itself would need another compiled
 shader (none in Mario's file).
 
+### Test 29 (`build/supamario_kame_test29.zip`): a bigger charge ball
+
+User: "increase the size of the kamehameha ball when charging": the charge effects' sizes per level
+(`N_CRG`, Crg / CrgON) x1.5: (0.75, 0), (1.5, 1.5), (2.4, 2.4).
+

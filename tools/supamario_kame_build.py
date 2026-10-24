@@ -209,7 +209,8 @@ FINISH_FRAMES = 3
 N_HOLD_FRAME, N_FIRE_FRAME, N_LV2, N_LV3, N_FULL = 6.0, 14.0, 42, 78, 100
 # the charge effect at each level (Crg, CrgON sizes; test 11: "should get larger" with the level, XV2
 # shows a bigger ball and rings), spawned again every N_REFX frames
-N_CRG = ((0.5, 0.0), (1.0, 1.0), (1.6, 1.6))
+# user, after test 28: "increase the size of the kamehameha ball when charging": x1.5
+N_CRG = ((0.75, 0.0), (1.5, 1.5), (2.4, 2.4))
 N_REFX = 40
 # after firing he holds the pose from N_POSE_FRAME for the beam's flight and dissolve at its level; in the air he floats down while charging (fall
 # acceleration / max fall a frame) and floats in place while posing (user, before test 12)
