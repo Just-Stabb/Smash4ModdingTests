@@ -105,6 +105,12 @@ ROTATION_ATTR = b'v_inRot'
 # what an emitter's rotation needs of a template: none; a fixed one the converter can bake (a mesh's
 # into its vertices, a quad's quarter turns about Z into its texture); one only a turning shader draws
 ROT_NONE, ROT_FIXED, ROT_ANIMATED = 0, 1, 2
+# eft's directional type (3) comes in two shader kinds: one aligns the particle with its own velocity
+# (this attribute; 535 of 1732 vanilla type-3 emitters), the other with its change in world
+# position (v_inWldPosDf), which on a following emitter includes the bone's motion. Ultimate aligns
+# with the velocity: down smash's speed lines, slow (0.1) on the swinging sword, stood across the
+# blade as a 23 x 180 bar (test 46); in Ultimate they lie along it. No emitter byte selects it alone
+VELOCITY_ATTR = b'v_inVec'
 
 
 class Templates:
@@ -141,12 +147,12 @@ class Templates:
                     si_ = struct.unpack_from('>I', em, 0x844)[0]
                     if si_ not in screen:
                         b = p.shader_binary(si_)
-                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b)
+                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b)
                     if screen[si_][0]:
                         continue
                     traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
                               struct.unpack_from('>I', em, FOLLOW)[0], struct.unpack_from('>I', em, PTN_MODE)[0],
-                              screen[si_][1])
+                              screen[si_][1], screen[si_][2])
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
@@ -158,17 +164,17 @@ class Templates:
         without is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
         which it can't (only freeze); one it can't, before"""
         def rank(item):
-            (plain, mode, fol, pm, turns), (score, *_r) = item
+            (plain, mode, fol, pm, turns, by_vel), (score, *_r) = item
             # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
             # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
             return (plain, pm in (ptn, 0), fol == follow, turns or rot != ROT_ANIMATED or mesh,
-                    follow == 2 and fol == 0, pm == ptn, mode & uv_mode == uv_mode, mode == uv_mode,
+                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode & uv_mode == uv_mode, mode == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
                 continue
-            (plain, mode, fol, pm, turns), (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            (plain, mode, fol, pm, turns, by_vel), (_score, path, si, k) = max(self.found[key].items(), key=rank)
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
@@ -178,6 +184,8 @@ class Templates:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
             if pm != ptn:
                 notes.append('flipbook mode %d: template has %d (one cell shown)' % (ptn, pm))
+            if key[0] == 3 and not by_vel:
+                notes.append('directional by world motion: template has no v_inVec')
             if rot == ROT_ANIMATED and not turns:
                 notes.append('rotation: template has none' + (' (the spin lost)' if mesh else ''))
             if path is None:
@@ -455,6 +463,15 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     ti, smp = main_texture(e, names)
     ts = e['static']['tex_scroll'][ti] if smp else None
+    uv_quarter = 0
+    if ts is not None and pt['primitive_id'] == NONE64 and uv_mode(ts) == 4 and not ts['rotation_add'] \
+            and not ts['rotation_random']:
+        # a quad's texture turned a fixed number of quarter turns (and nothing else): turned in the
+        # image, so no template needs UV rotation (down smash's speed lines, Octaslash's lines)
+        q = ts['rotation'] / (math.pi / 2)
+        if abs(q - round(q)) < 1e-3:
+            uv_quarter = int(round(q)) % 4
+            ts = dict(ts, rotation=0.0)
     ptn_want = PTN_FROM_EFT2.get(e['tex_anim'][ti]['pattern_type'], 0) if smp else 0
     if ptn_want and all(int(round(v or 1)) <= 1 for v in e['static']['tex_scroll'][ti]['uv_div']):
         # a one-cell sheet plays nothing; as a flipbook its UV scale (1 / cells) would replace the
@@ -524,6 +541,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         if not ptn:
             img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
     shape, rgb, alpha = combine(img, e, notes)
+    if uv_quarter:
+        # eft2 samples at R(rotation) (uv - 0.5) + 0.5: the picture turns counter-clockwise as shown
+        shape = np.ascontiguousarray(np.rot90(shape, uv_quarter))
+        notes.append('UV rotation: %d quarter turn(s) baked into the texture' % uv_quarter)
     if quarter:
         # no template turns this quad: a fixed quarter turn goes into the texture (and the scale)
         shape = np.ascontiguousarray(np.rot90(shape, quarter))

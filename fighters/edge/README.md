@@ -383,3 +383,18 @@ white bar.
 Open: down smash's bar (likely `edge_smashlw_speedline` line3, a 23 x ~150 stripe quad at speed
 0.1, converted as a directional quad); asked for an Ultimate shot. Bank 6.29 MB; ids / efc and
 effect.bin unchanged. Package: the ptcl / efc.
+
+## Test 47 (`build/sephiroth_test47.zip`): directional pieces by their own velocity
+
+User: an official down smash clip. Ultimate: the speed lines lie along the sword as it comes down
+(a thin streak and a wide faint band, `edge_smashlw_speedline` line1-3); no upright bar.
+- eft's directional type 3 has two shader kinds: `v_inVec` (the particle's own velocity: 535 of
+  1732 vanilla type-3 emitters) and `v_inWldPosDf` (its change in world position, which on a
+  following emitter includes the bone's motion). No single emitter byte selects them. line3
+  (23 x 180, speed 0.1) on the swinging sword had the second kind, so the sweep stood it upright.
+  `Templates` now prefers `v_inVec` for type 3 (`VELOCITY_ATTR`). 3 emitters have no such template
+  (Octaslash's sword flares, the pummel's ring).
+- A quad's fixed quarter-turn UV rotation (nothing else animated) is turned in the image
+  (down smash's lines 90 degrees, Octaslash's 90 / 180), so no template needs UV rotation.
+Cost: the throws' flash lines lost their flipbook (one cell). Bank 6.28 MB; ids / efc and
+effect.bin unchanged. Package: the ptcl / efc.
