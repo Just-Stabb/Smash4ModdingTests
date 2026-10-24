@@ -14,7 +14,8 @@ fighter kind (ids 0x3KKnnnn). EFFECT: Ultimate effect names (default: all).
 Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/xv2_to_ptcl.py:
 - template: Templates (the base's own or one imported from --templates files) of the eft particle
   type (eft2's numbers: 0 billboard, 1 / 2 plate XY / XZ, 3 directional, 4 directional polygon, 8 Y
-  billboard; 7 primitive as a billboard mesh), blend and mesh-ness. Stripes (5 / 6) are skipped;
+  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4), blend and mesh-ness,
+  plain shaders first. Stripes (5 / 6) are skipped;
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
@@ -58,12 +59,13 @@ NONE64 = 2 ** 64 - 1
 TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
+PLAIN = 10              # a plain-shader template beats any other
 
 
 class Templates:
     """template emitters by (eft particle type, blend 0 / 1 / 2, mesh): simple emitters with one BC4
-    texture (slot 0; slots 1 / 2 unused), preferring animated colour tracks (2 / 2, then 2 / x) and
-    the base's own (no import); others are imported from the corpus (Ptcl.import_emitter: their
+    texture (slot 0; slots 1 / 2 unused), preferring plain shaders (PLAIN), then animated colour
+    tracks (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus (Ptcl.import_emitter: their
     shader, shader parameters and textures copied)"""
 
     def __init__(self, base, corpus):
@@ -82,24 +84,31 @@ class Templates:
                         continue
                     key = (p.field(em, 'particle_type'), p.field(em, 'blend_type'), p.field(em, 'primitive_index') >= 0)
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
-                    score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0) \
-                        - (1 if p.field(em, 'keyanim_size') else 0)
+                    # a plain shader first: no shader parameters and no user shader setting (+0x340;
+                    # e.g. Ike's FS cloud, FinIkeCloud FNSmoke, 9 and a 32-byte parameter block:
+                    # tinted its meshes orange)
+                    plain = not p.field(em, 'shader_param_size') and not struct.unpack_from('>I', em, 0x340)[0]
+                    score = (PLAIN if plain else 0) + (2 if c == (2, 2) else 1 if c[0] == 2 else 0) \
+                        + (BASE_FIRST if path is None else 0) - (1 if p.field(em, 'keyanim_size') else 0)
                     if key not in self.found or score > self.found[key][0]:
                         self.found[key] = (score, path, si, k)
 
     def get(self, typ, blend, mesh, notes):
-        for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
-            if key in self.found:
-                if key != (typ, blend, mesh):
-                    notes.append('no template (type %d blend %d%s): type %d blend %d' % (
-                        typ, blend, ' mesh' if mesh else '', key[0], key[1]))
-                _score, path, si, k = self.found[key]
-                if path is None:
-                    em = self.base.emitter_bytes(si, k)
-                    struct.pack_into('>II', em, 0x2CC, 0, 0)
-                    return em
-                return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,))
-        raise KeyError((typ, blend, mesh))
+        order = [k for k in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)) if k in self.found]
+        # a plain shader of another blend beats a special one of this blend
+        order = [k for k in order if self.found[k][0] >= PLAIN] + [k for k in order if self.found[k][0] < PLAIN]
+        if not order:
+            raise KeyError((typ, blend, mesh))
+        key = order[0]
+        if key != (typ, blend, mesh):
+            notes.append('no template (type %d blend %d%s): type %d blend %d' % (
+                typ, blend, ' mesh' if mesh else '', key[0], key[1]))
+        _score, path, si, k = self.found[key]
+        if path is None:
+            em = self.base.emitter_bytes(si, k)
+            struct.pack_into('>II', em, 0x2CC, 0, 0)
+            return em
+        return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,))
 
 
 def mesh(model):
@@ -215,6 +224,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if is_mesh and pt['primitive_id'] not in prims:
         notes.append('primitive %d not in the file: skipped' % pt['primitive_id'])
         return None
+    vel = e['velocity']
+    if is_mesh and typ == 3 and abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3:
+        # a directional mesh at rest (his sword glows, slash arcs) lies in the emitter's frame in
+        # Ultimate; eft's directional type 3 turns it by its (zero) velocity (test 32: the up-air arc
+        # lay flat), type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love crystals)
+        typ = 4
+        notes.append('directional mesh at rest: type 4')
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     em = templates.get(typ, BLEND[blend], is_mesh, notes)
     if is_mesh:

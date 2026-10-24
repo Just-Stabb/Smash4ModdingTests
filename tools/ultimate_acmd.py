@@ -43,6 +43,7 @@ the slots the base leaves empty, as the "motions" of the kind's extra_kinds.json
 """
 import argparse
 import json
+import math
 import os
 import re
 import struct
@@ -365,6 +366,30 @@ EFFECT_MACROS = {
 }
 
 
+def euler_matrix(rot):
+    """effect angles (degrees) -> rotation matrix (column vectors): R = Rz Ry Rx, X turned first.
+    Both games: Ultimate's own data needs it (Sephiroth's sword glows, meshes along +Y, lie along the
+    blade, +X of swordl2, only so with (0, 180, -90); his up-air arc, a disc about Y, faces the
+    camera only so with (2.5, 120, 90)), and the moves both games share keep their angles in this
+    convention better than in the other orders (scratch comparison of sys_* effect angles)"""
+    import numpy as np
+    a, b, c = (math.radians(v) for v in rot)
+    rx = np.array([[1, 0, 0], [0, math.cos(a), -math.sin(a)], [0, math.sin(a), math.cos(a)]])
+    ry = np.array([[math.cos(b), 0, math.sin(b)], [0, 1, 0], [-math.sin(b), 0, math.cos(b)]])
+    rz = np.array([[math.cos(c), -math.sin(c), 0], [math.sin(c), math.cos(c), 0], [0, 0, 1]])
+    return rz @ ry @ rx
+
+
+def euler_xyz(m):
+    """euler_matrix's inverse (degrees, rounded to 0.01)"""
+    b = math.asin(max(-1.0, min(1.0, -m[2, 0])))
+    if abs(m[2, 0]) < 1 - 1e-6:
+        a, c = math.atan2(m[2, 1], m[2, 2]), math.atan2(m[1, 0], m[0, 0])
+    else:                                                   # gimbal lock: all of it in x
+        a, c = math.atan2(-m[1, 2], m[1, 1]), 0.0
+    return [round(math.degrees(v), 2) + 0.0 for v in (a, b, c)]
+
+
 # Ultimate trail blend -> Smash 4 Sword_Glow BlendMode / Shader (Ike's, Marth's and Link's trails:
 # 11 / 1 in every vanilla Sword_Glow of theirs)
 TRAIL_BLEND = (11, 1)
@@ -386,16 +411,35 @@ class EffectTranslator(Translator):
     def bone(self, name):
         return self.bone_at(name, (0.0, 0.0, 0.0))[0]
 
+    def bone_chain(self, name):
+        """(joint id, bone `name`'s frame in that joint's: 4 x 4, row vectors)"""
+        import numpy as np
+        n = name.lower()
+        m = np.eye(4)
+        while n not in self.joints and n != 'top' and n in self.parents:
+            if n in self.locals:
+                m = m @ self.locals[n]
+            n = self.parents[n]
+        return super().bone(n), m
+
     def bone_at(self, name, xyz):
         """(joint id, the point xyz of bone `name` in that joint's frame)"""
         import numpy as np
-        n = name.lower()
-        p = np.array([float(v) for v in xyz] + [1.0])
-        while n not in self.joints and n != 'top' and n in self.parents:
-            if n in self.locals:
-                p = p @ self.locals[n]
-            n = self.parents[n]
-        return super().bone(n), [float(v) for v in p[:3]]
+        jid, m = self.bone_chain(name)
+        p = np.array([float(v) for v in xyz] + [1.0]) @ m
+        return jid, [float(v) for v in p[:3]]
+
+    def place(self, name, xyz, rot):
+        """(joint id, x, y, z, rx, ry, rz) of an effect at xyz / rot (degrees) in bone `name`'s frame,
+        in the joint's frame: a bone without a joint id (e.g. Sephiroth's swordl2, 90 degrees off
+        his hand's frame) turns the effect too"""
+        import numpy as np
+        jid, m = self.bone_chain(name)
+        p = np.array([float(v) for v in xyz] + [1.0]) @ m
+        rot = [float(v) for v in rot]
+        if not np.allclose(m[:3, :3], np.eye(3), atol=1e-5):
+            rot = euler_xyz(m[:3, :3].T @ euler_matrix(rot))
+        return [jid] + [float(v) for v in p[:3]] + rot
 
     def trail(self, a):
         """AFTER_IMAGE4_ON(_arg29)(agent, tex1, tex2, blur, bone1, x1, y1, z1, bone2, x2, y2, z2,
@@ -435,8 +479,8 @@ class EffectTranslator(Translator):
             if a[1] != 'null':
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
             return []
-        bone, xyz = self.bone_at(a[2], a[3:6])
-        place = xyz + [float(v) for v in a[6:10]]               # x, y, z, rx, ry, rz, size
+        bone, *place = self.place(a[2], a[3:6], a[6:9])
+        place.append(float(a[9]))                               # x, y, z, rx, ry, rz, size
         if shape.startswith('full'):
             rest = [float(v) for v in a[10:16]] + [int(bool(a[16]))]
             extra = a[17:]

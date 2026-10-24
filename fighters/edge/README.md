@@ -104,8 +104,26 @@ purple and black; arcs out of place). `vfxb_to_ptcl.py`:
   axes: an uneven scale is built into the mesh (scale 1), an even one stays the particle's.
 - missing mesh normals filled (every vanilla primitive has them), all-white vertex colours dropped,
   textures at most 128 px: the bank is 4.9 MB.
-The orange spiky burst in the first shot is most likely Smash 4's normal hit effect (60 of his
-hitboxes are `normal`, `magic` maps to it too).
+(The orange burst in the first shot was neutral air's own effect: see test 33.)
+
+## Test 33 (`build/sephiroth_test33.zip`): plain shaders, sword glows and arcs turned
+
+User, test 32: "Effects are still distorted and displaced. Sword attacks seem to have weird
+displaced trailing"; "Neutral air isn't hitting an opponent, it's just incorrectly orange."
+- Orange: `edge_light_impact2`'s blend-0 meshes (rings, circles, the dark flare) took
+  `PtcFinIkeCloud`'s `FNSmoke` as their template, a shader with 32 bytes of parameters and user
+  shader setting 9 (Ike's Final Smash cloud) that tints them. Templates now prefer plain shaders
+  (no parameters, setting 0); the two keys without one (type-4 blend-0 sprites, type-4 blend-2
+  meshes) take the plain blend-1 template of their type.
+- Sword glows (`edge_sword_flare` / `_light*` / `_smash_flash`) and slash arcs (`edge_slash_light`)
+  are Ultimate type 3 (directional) meshes at rest: Smash 4's type 3 turned them by their zero
+  velocity (the glow below the sword, the up-air arc lying flat). Now type 4 (32 emitters), which
+  keeps the emitter's frame at rest (as Zelda's Nayru's Love crystals).
+- `ultimate_acmd.py`: an effect on a bone without a joint id now turns with that bone's bind frame
+  too (`place`; the grab's `edge_catch_handaura` on `haver`, 90 degrees off his hand). His sword
+  bones play LHaveN / RHaveN (joints 24 / 25, the same frames), so the sword effects' angles were
+  already right; both games use R = Rz Ry Rx.
+Package: the ptcl / efc and effect.bin (6 scripts changed); game / sound / expression unchanged.
 
 ## Next
 

@@ -93,7 +93,9 @@ emitter layout ported from KillzXGaming's EffectLibrary) -> new sets in the figh
 base's ptcl / efc, whose sets stay for the base's specials), one efc entry each (ids `0x3KKnnnn`),
 the ids merged into the fighter's ids file for `--effects`. Per emitter, from a template emitter of
 the same particle type, blend and mesh-ness (the base's own, else one from any vanilla ptcl with its
-shader, shader parameters and textures imported: `Ptcl.import_emitter`): its texture (BNTX with the
+shader, shader parameters and textures imported: `Ptcl.import_emitter`; plain shaders first, i.e. no
+shader parameters and user shader setting 0 (+0x340): Ike's FS cloud shader tinted Sephiroth's meshes
+orange, test 32): its texture (BNTX with the
 channel selection applied: Ultimate's BC5 textures are luminance + alpha) as a BC4 shape with the
 colour moved into the particle's, colour / alpha / scale keys fitted to eft's 3-key ramps, life,
 emission, velocity, gravity, volume, rotation, the emitter transform. Meshes (a primitive id) come
@@ -101,7 +103,14 @@ from the VFXB's BFRES (`tools/bfres_switch.py`) into the ptcl's primitive table
 (`Ptcl.add_primitive`). Identical textures are shared (Sephiroth's bank: 4.1 MB; Bayonetta's
 vanilla one is 4.6 MB). Not converted: stripes (ribbon trails: the speed lines), texture scroll /
 flipbook animation (the first cell), the second colour track and multi-texture combiners, end fades,
-emitter animations, child emitters.
+emitter animations, child emitters. A directional (type 3) mesh at rest becomes type 4: Smash 4's
+type 3 turns a mesh by its velocity, and with none his sword glows and slash arcs pointed the wrong
+way (test 32); type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love crystals).
+
+**Effect angles** are the same in both games: R = Rz Ry Rx (X turned first; his sword glows lie along
+the blade, his up-air arc faces the camera only so, and the moves both games share keep their angles
+in this order better than in the others). An effect on a bone without a joint id goes to the nearest
+ancestor that has one, the offset and the angles carried through the bind pose (`EffectTranslator.place`).
 
 Not yet in the scripts: LAST_EFFECT_SET_* (rate, colour, alpha), FLASH / BURN_COLOR.
 
