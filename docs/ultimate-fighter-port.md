@@ -209,6 +209,17 @@ Smash 4's shader 1 about 1.5x the colour, close to the 1.4 gain. Not carried ove
 Ultimate trail still fades out at its tail; the converted one ends wherever A's U stops), and the
 retracting ending (Smash 4 fades).
 
+**Shader 3: the retracting trail in Smash 4** (test 42). Smash 4's trail keeps the same fade value
+(+0x30, 1 -> 0 over `Terminate_Sword_Glow`'s frames) and the same t; it only lacked a way to hand
+them to the shader (docs/native-notes.md "The trail shaders"). `tools/trail_shader.py` adds trail
+shader 3 to `shader/effect_trail.nsh` (Ultimate's 101: mask at U = 1 - t / fade, colour slid by
+(1 - fade) / 2, colour x gain, the alpha the colour's alpha x the mask) and patches two stores of the
+executable's vertex writer so the vertex colour (whose rgb no vanilla trail shader reads) carries t
+and the fade. Converted trails use it: `tools/ultimate_acmd.py` writes Shader 3, and
+`tools/ultimate_trails.py --shader 3` keeps A as is and packs B's mask (alpha) with the gain / 2
+(rgb, arg 28) into the second texture, so the mask follows the trail's length as in Ultimate (the
+short-trail case too). Still not carried over: the depth offset (arg 29).
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).

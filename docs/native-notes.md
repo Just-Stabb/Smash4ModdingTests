@@ -1257,6 +1257,32 @@ trail's two textures, v = the vertex colour, `hdrRange` a constant of the frame)
 The vertex colour's rgb is never used: a trail's colour is its textures' alone; v.a is the trail's
 fade along its length. No brightness or scroll constant: Ultimate's two `AFTER_IMAGE4_ON` floats
 (1.4 / 0.1, its own trail shader's) have nowhere to go but the textures.
+
+**The trail's code** (the same design as Ultimate's, docs/ultimate-fighter-port.md):
+- Tick `0x032F6624` (from `0x032F9000`, each trail of the list; f1 = the frame step): step =
+  max(step x rate +0x3C, 1/16); a delay +0x24 counts down (step / 60) and then sets the fading flag
+  +0xCC; while fading, +0x28 (seconds left) counts down the same way (at 0 the trail ends) and
+  **+0x30 -= +0x2C x step, +0x34 += +0x2C x step**. `Terminate_Sword_Glow(n, delay)`
+  (`0x032F5DF8`): +0x28 = n / 60, +0x24 = delay / 60, +0x2C = 1 / n; set-up: +0x30 = 1, +0x34 = 0. So +0x30 is the fade
+  (1 -> 0 over the n frames) and +0x34 = 1 - fade.
+- Draw `0x032F877C`: +0x14 (a ring count) != 0 -> `0x032F7608` (tube trails), else `0x032F804C`.
+  The set-up's +0xC2 = how many trail textures (0 / 1 / 2). Untextured (0): vertices of 0x20
+  bytes (position, w = 1, colour). Textured, `0x032F84D0`: 4 vertices a point across the blade
+  (0x28 bytes): position (x, y, z, 1), colour (**1, 1, 1, (1 - t) x fade**), texcoord (**1 -
+  min(slide + p, 1)**, 1 - k / 3), with t = the time so far / the trail's whole time (f30) and p =
+  the time so far / (blur - 1) frames, from slide = +0x34 (f24): the texture slides off by 1 - fade
+  as the trail fades.
+
+**Shader 3** (`tools/trail_shader.py`, for trails converted from Ultimate): Ultimate's 101 on these
+vertices. Two stores of the textured vertex writer (`0x032F8520` / `0x032F8538`) put t and the fade
+in the colour's red and green (unused by 1, 2, 1001, 1002: `tools/trail_shader_test.py` checks);
+`tools/shaders/trail_retract.psh` (assembled with `tools/latte_dis/latte-asm`, decaf-emu's
+latte-assembler: `tools/latte_dis/build_asm.sh`) samples the mask (the second texture's alpha) at
+U = 1 - t / fade and the colour texture at U + (1 - fade) / 2, so the trail retracts into the sword
+as Ultimate's does, and takes the colour gain from the second texture's rgb (x 2). The nsh's header
+word 2 is 0x02000000 + the record count (every nsh); records are self-relative (id, program count,
+descriptor offsets, size; a descriptor: GX2 file offset, 1, size) and the game finds a trail shader
+by its name `0x4f%06x` (`0x032F5640`), so shader 3 is a new record (after 2, ids sorted).
 (`texas_cross.nsh`, the model shaders, lays its records out differently: not read by `nsh_dump.py` yet.)
 
 ## SoundModule (MSC)

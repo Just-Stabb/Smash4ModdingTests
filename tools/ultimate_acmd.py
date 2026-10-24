@@ -395,9 +395,10 @@ def euler_xyz(m):
     return [round(math.degrees(v), 2) + 0.0 for v in (a, b, c)]
 
 
-# Ultimate trail blend -> Smash 4 Sword_Glow BlendMode / Shader (Ike's, Marth's and Link's trails:
-# 11 / 1 in every vanilla Sword_Glow of theirs)
-TRAIL_BLEND = (11, 1)
+# Ultimate trail blend -> Smash 4 Sword_Glow BlendMode / Shader: Ike's, Marth's and Link's blend 11,
+# and trail shader 3, Ultimate's retracting one (tools/trail_shader.py: needs its effect_trail.nsh,
+# its executable patch and tools/ultimate_trails.py --shader 3 textures; vanilla trails use 1)
+TRAIL_BLEND = (11, 3)
 
 
 class EffectTranslator(Translator):

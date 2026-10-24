@@ -274,3 +274,31 @@ Package: `model/body/c00-c07` model.nud / model.nut / metal.nud.
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the
    One-Winged Angel form; Final Smash.
 2. Effects, sounds, portraits from the Ultimate zips.
+
+## Test 42 (`build/sephiroth_test42.zip`): trails retract like Ultimate's
+
+User: "Patch Smash 4's trail shader to retract like Ultimate's for Ultimate trails only". Ultimate's
+trail shader samples its mask at U = 1 - t / fade, so as `AFTER_IMAGE_OFF` fades it the trail is cut
+back from its tail into the sword (docs/ultimate-fighter-port.md); Smash 4's fades in place. Smash
+4's trail keeps the same t and fade but no shader can see them; now (`tools/trail_shader.py`):
+- `shader/effect_trail.nsh`: + trail shader 3 (Ultimate's 101), `tools/shaders/trail_retract.psh`.
+- `code/cross_f.rpx` (on the latest, v19b): two stores of the trail vertex writer put t and the
+  fade in the vertex colour's red / green, which the vanilla trail shaders never read.
+- His 8 `Sword_Glow`s: Shader 3 (`tools/trail_shader.py acmd`; `tools/ultimate_acmd.py` now
+  writes 3); his trail textures as Ultimate's pair (`tools/ultimate_trails.py --shader 3`: the
+  colour texture as is, the mask in the second one's alpha with the 1.4 colour gain).
+Vanilla trails keep shader 1 / 2 / 1001 and are unchanged. `tools/trail_shader_test.py`: the nsh
+(other records byte for byte), the vanilla shaders' vertex-colour reads, shader 3's program run on a
+Latte interpreter against Ultimate's formula (220 samples), the patched stores in Unicorn.
+
+```
+tools/latte_dis/build_asm.sh
+python3 tools/trail_shader.py nsh VANILLA/shader/effect_trail.nsh OUT/shader/effect_trail.nsh
+python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/trail_shader.py rpx IN.rpx)
+python3 tools/trail_shader.py acmd test40/effect.bin OUT/fighter/edge/script/animcmd/body/effect.bin
+python3 tools/ultimate_trails.py --shader 3 ULT/effect/fighter/edge/trail OUT/fighter/edge/effect/edge/trail \
+    tex_edge_sword1.nutexb,tex_edge_sword2.nutexb=TexEdgeSwordTrace tex_edge_sword3.nutexb,tex_edge_sword4.nutexb=TexEdgeSwordTrace2
+python3 tools/trail_shader_test.py VANILLA/shader/effect_trail.nsh OUT.rpx
+```
+Package: `shader/effect_trail.nsh`, `code/cross_f.rpx`, `fighter/edge/script/animcmd/body/effect.bin`,
+`fighter/edge/effect/edge/trail/*.nut`.

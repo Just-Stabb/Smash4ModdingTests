@@ -1,0 +1,42 @@
+; Trail shader 3 (0x4F000003PS): Ultimate's trail pixel shader 101 on Smash 4's trail vertices, for
+; trails converted from Ultimate (tools/trail_shader.py puts it in shader/effect_trail.nsh).
+; Inputs (tools/trail_shader.py's vertex patch, docs/native-notes.md "The trail shaders"):
+;   R0 = vertex colour: x = t (0 at the blade, 1 at the tail), y = the trail's fade (1 -> 0 over
+;        Terminate_Sword_Glow's frames), w = (1 - t) x fade (unused: Ultimate's 101 doesn't fade by it)
+;   R1 = texcoord: x = Smash 4's U (1 - min(p + (1 - fade), 1)), y = V across the blade
+; t0 = Ultimate's colour texture A, t1 = its mask B: alpha = the mask, green = the colour gain / 2.
+;   mask U = fade > 0 ? 1 - t / fade : 1       (Ultimate's attribute 9: the trail retracts)
+;   A's U  = U + (1 - fade) / 2                (Ultimate slides A by up to half, Smash 4 by all of it)
+;   out    = A.rgb x gain x hdrRange x a, a = A.a x mask (premultiplied, as shader 1's)
+; $MODE = "UniformBlock"
+; $SQ_PGM_RESOURCES_PS.NUM_GPRS = 5
+; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2
+; $SPI_PS_IN_CONTROL_0.NUM_INTERP = 2
+; $NUM_SPI_PS_INPUT_CNTL = 2
+; $SPI_PS_INPUT_CNTL[0].SEMANTIC = 0
+; $SPI_PS_INPUT_CNTL[1].SEMANTIC = 1
+
+00 ALU:
+  0   t: RECIP_IEEE      R2.x, R0.y
+  1   x: MUL             R2.x, R0.x, R2.x
+  2   x: ADD             R2.x, -R2.x, 1.0f
+  3   x: CNDGT           R2.x, R0.y, R2.x, 1.0f
+  4   w: SETGE           R4.w, R2.x, 0.0f
+  5   y: MOV             R2.y, R1.y
+  6   z: MULADD          R3.z, R0.y, -0.5f, 0.5f
+  7   x: ADD             R3.x, R1.x, R3.z
+  8   y: MOV             R3.y, R1.y
+01 TEX: VALID_PIX
+  9      SAMPLE          R3.xyzw, R3.xy0x, t0, s0
+ 10      SAMPLE          R2.xyzw, R2.xy0x, t1, s1
+02 ALU: KCACHE0(CB9:0-15)
+ 11   w: MUL             R3.w, R3.w, R2.w
+ 12   w: MUL             R3.w, R3.w, R4.w
+ 13   y: ADD             R2.y, R2.y, R2.y
+ 14   z: MUL             R2.z, R2.y, KC0[0].x
+ 15   z: MUL             R2.z, R2.z, R3.w
+ 16   x: MUL             R3.x, R3.x, R2.z
+ 17   y: MUL             R3.y, R3.y, R2.z
+ 18   z: MUL             R3.z, R3.z, R2.z
+03 EXP_DONE: PIX0, R3.xyzw
+END_OF_PROGRAM
