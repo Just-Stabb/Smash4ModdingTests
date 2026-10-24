@@ -41,3 +41,21 @@ finish3 -> kamehameha/FitMarioFireballMain.omo
 // body/main.pac FitZeldaBodyMainC00Attack12 / 13), scripts from Ultimate's: tools/ultimate_acmd.py
 Attack12
 attack13
+// his neutral special (Flare / Megaflare / Gigaflare, status 0x152): Zelda's custom-move slots
+// 0x212-0x214 / 0x216-0x218 (extra_kinds.json "motions", body/main.pac FitZeldaBodyMainD00SpecialNStart
+// ...), scripts from Ultimate's: tools/edge_specials_build.py (fighters/edge/specials_acmd.json)
+SpecialNStart
+SpecialN2
+SpecialNCancel
+SpecialAirNStart
+SpecialAirN2
+SpecialAirNCancel
+// the fire article (weapon kind 0x18C, his article 5; motion.mtable): SpecialN1 / 2 / 3 the flight
+// at charge level S / M / L, BurstS / M / L their explosions, FireNone3 / 7 empty slots
+SpecialN1
+SpecialN3
+BurstS
+BurstM
+BurstL
+FireNone3
+FireNone7

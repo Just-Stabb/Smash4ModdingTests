@@ -11,7 +11,7 @@ PATCHED = ORIGINAL + kind_expand + weapon_expand (and any other caves). Checks:
   and kinds >= C the default;
 - the descriptor getter for every kind: the game's descriptors as before; a new kind's copy is the base's
   bytes but +8 (its own motion info: the base's, entries copied), +0x14 (sub-articles, kinds remapped),
-  +0x18 / +0x24 (the param getter copies), +0x1C (its kind);
+  +0x18 / +0x24 (the param getter copies), +0x1C (its kind where the base's held the base kind);
 - the param getter copies read the new fighter's vl slot (kind_expand's array) where the base's read the
   base fighter's, same fields and sizes;
 - the static accessors (u32 / u8 with the bound, the 12 flag bits): as before for 0x000-0x184, the base's
@@ -146,17 +146,18 @@ def main():
         art = new[nk][2]
         at0, vt, vt2 = W.singleton_of(img, new[nk][0])
         v2_at, size2, nops2, moved = info['vt2'][nk]
-        check('0x%X %s: singleton {vtable copy, vtable 2 copy}' % (nk, art), (E1.w(o_at), E1.w(o_at + 4)),
-              (v_at, v2_at))
+        check('0x%X %s: singleton {vtable copy, %s}' % (nk, art, 'vtable 2 copy' if vt2 else '0: its base has none'),
+              (E1.w(o_at), E1.w(o_at + 4)), (v_at, v2_at))
         size = W.vtable_size(img, vt)
         diff = [o for o in range(0, size, 4) if E1.w(v_at + o) != img.w(vt + o)]
         nops, nop_at = info.get('nops', {}).get(nk, ([], 0))
         mv = [o for o, _a in moved]
         check('0x%X %s: vtable copy = the base\'s but +0x%X%s' % (nk, art, W.HIT_METHOD, ''.join(
             ', +0x%X' % o for o in sorted(list(nops) + mv))), diff, sorted([W.HIT_METHOD] + list(nops) + mv))
-        diff2 = [o for o in range(0, size2, 4) if E1.w(v2_at + o) != img.w(vt2 + o)]
-        check('0x%X %s: vtable 2 copy = the base\'s (0x%08X) but %s' % (nk, art, vt2, [hex(o) for o in nops2]),
-              diff2, sorted(nops2))
+        if vt2:
+            diff2 = [o for o in range(0, size2, 4) if E1.w(v2_at + o) != img.w(vt2 + o)]
+            check('0x%X %s: vtable 2 copy = the base\'s (0x%08X) but %s' % (nk, art, vt2, [hex(o) for o in nops2]),
+                  diff2, sorted(nops2))
         check('0x%X %s: the nop slots lead to a blr' % (nk, art),
               [E1.w(E1.w(v_at + o)) for o in nops] + [E1.w(E1.w(v2_at + o)) for o in nops2],
               [0x4E800020] * (len(nops) + len(nops2)))
@@ -218,11 +219,13 @@ def main():
         size = info['descriptors'][nk][2]
         b0, b1 = bytes(E0.mu.mem_read(d0, size)), bytes(E1.mu.mem_read(d1, size))
         diff = [o for o in range(0, size, 4) if b0[o:o + 4] != b1[o:o + 4]]
-        expect = [0x1C] + ([8] if E0.w(d0 + 8) else []) + ([0x14] if E0.w(d0 + 0x14) else []) + \
-            [off for off, _s, at in info['getters'].get(nk, []) if at]
+        own_1c = E0.w(d0 + 0x1C) == bk         # +0x1C: the new kind only where the base held its own
+        expect = ([0x1C] if own_1c else []) + ([8] if E0.w(d0 + 8) else []) + \
+            ([0x14] if E0.w(d0 + 0x14) else []) + [off for off, _s, at in info['getters'].get(nk, []) if at]
         check('0x%X %s: descriptor 0x%08X differs from the base\'s in %s' % (nk, art, d1, sorted(expect)),
               diff, sorted(expect))
-        check('0x%X %s: +0x1C = its kind' % (nk, art), E1.w(d1 + 0x1C), nk)
+        check('0x%X %s: +0x1C = %s' % (nk, art, 'its kind' if own_1c else "the base's"), E1.w(d1 + 0x1C),
+              nk if own_1c else E0.w(d0 + 0x1C))
         m0, m1 = E0.w(d0 + 8), E1.w(d1 + 8)
         if m0:
             n = E0.w(m0 + 4)

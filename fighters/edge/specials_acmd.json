@@ -1,0 +1,11 @@
+{
+  "_about": "Sephiroth's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in Zelda's special motion slots (the custom-move ones 0x212-0x214 / 0x216-0x218 named by extra_kinds.json); fighters/edge/specials.md",
+  "SpecialN1": "specialn",
+  "SpecialNStart": {"name": "specialnstart", "slot": "0x212"},
+  "SpecialN2": {"name": "specialn2", "slot": "0x213"},
+  "SpecialNCancel": {"name": "specialncancel", "slot": "0x214", "_note": "no script in the dump: empty"},
+  "SpecialAirN1": "specialairn",
+  "SpecialAirNStart": {"name": "specialairnstart", "slot": "0x216"},
+  "SpecialAirN2": {"name": "specialairn2", "slot": "0x217"},
+  "SpecialAirNCancel": {"name": "specialairncancel", "slot": "0x218", "_note": "no script in the dump: empty"}
+}

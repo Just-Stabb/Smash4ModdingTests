@@ -45,7 +45,24 @@
         "0x51": {"anim": "FitZeldaBodyMainC00Attack12", "flags": "0x0", "motion": "attack12"},
         "0x52": {"anim": "FitZeldaBodyMainC00Attack13", "flags": "0x4", "motion": "attack13"},
         "0x65": {"flags": "0x4", "motion": "attacklw4: Ultimate's moves him"},
-        "0x6A": {"flags": "0x4", "motion": "attackairb: Ultimate's moves him"}
+        "0x6A": {"flags": "0x4", "motion": "attackairb: Ultimate's moves him"},
+        "0x212": {"anim": "FitZeldaBodyMainD00SpecialNStart", "flags": "0x0", "motion": "specialnstart (custom-move slot reused)"},
+        "0x213": {"anim": "FitZeldaBodyMainD00SpecialN2", "flags": "0x0", "motion": "specialn2"},
+        "0x214": {"anim": "FitZeldaBodyMainD00SpecialNCancel", "flags": "0x0", "motion": "specialncancel"},
+        "0x216": {"anim": "FitZeldaBodyMainD00SpecialAirNStart", "flags": "0x0", "motion": "specialairnstart"},
+        "0x217": {"anim": "FitZeldaBodyMainD00SpecialAirN2", "flags": "0x0", "motion": "specialairn2"},
+        "0x218": {"anim": "FitZeldaBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel"},
+        "0x236": {"anim": "FitZeldaBodyMainD02SpecialHi1End", "flags": "0x0", "motion": "specialhi1end"},
+        "0x237": {"anim": "FitZeldaBodyMainD02SpecialHi2", "flags": "0x0", "motion": "specialhi2"},
+        "0x238": {"anim": "FitZeldaBodyMainD02SpecialHi2End", "flags": "0x0", "motion": "specialhi2end"},
+        "0x23E": {"anim": "FitZeldaBodyMainD02SpecialAirHi1End", "flags": "0x0", "motion": "specialairhi1end"},
+        "0x23F": {"anim": "FitZeldaBodyMainD02SpecialAirHi2End", "flags": "0x0", "motion": "specialairhi2end"}
+      },
+      "weapons": {
+        "fire": {"kind": "0x18C", "base": "dein", "max": 3, "on_hit": 1},
+        "flare1": {"kind": "0x18D", "base": "dein", "max": 3},
+        "flare2": {"kind": "0x18E", "base": "dein", "max": 3},
+        "flash": {"kind": "0x18F", "base": "dein", "max": 1}
       }
     },
     {

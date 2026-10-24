@@ -255,7 +255,8 @@ def copy_getter(img, src, base_fighter, new_vl_off):
 
 def singleton_of(img, kind):
     """the base kind's singleton {vtable, vtable 2}: its case (lis / addi r3; blr) gives the address in
-    .bss; the static initializer right after it (straight-line lis / addi / addic / stw) its words"""
+    .bss; the static initializer right after it (straight-line lis / addi / addic / stw) its words
+    (vtable 2 None when the initializer doesn't set it)"""
     if not hasattr(img, '_single_sw'):
         img._single_sw = parse_switch(img, SINGLETON_SWITCH)
     c = case_target(img, img._single_sw['table'], kind)
@@ -276,8 +277,9 @@ def singleton_of(img, kind):
             regs.pop(d, None)
         a += 4
         assert a - c < 0x80, 'no initializer after 0x%08X' % c
-    assert at in stores and at + 4 in stores, 'singleton 0x%08X not initialized after 0x%08X' % (at, c)
-    return at, stores[at], stores[at + 4]
+    # Zelda's dein stores its vtable only: its +4 (no vtable 2) stays 0 in .bss -> None
+    assert at in stores, 'singleton 0x%08X not initialized after 0x%08X' % (at, c)
+    return at, stores[at], stores.get(at + 4)
 
 
 def sub_ref_copy(img, fn, old, new):
@@ -457,8 +459,11 @@ def build(spec_path=SPEC, rpx=RPX):
         size = min(DESC_COPY_MAX, (nxt[0] - d) if nxt else DESC_COPY_MAX)
         assert size >= 0x28, 'descriptor of 0x%X too small' % bk
         blob = bytearray(img.blob(d, size))
-        assert struct.unpack_from('>I', blob, 0x1C)[0] == bk, 'descriptor +0x1C of 0x%X' % bk
-        struct.pack_into('>I', blob, 0x1C, nk)
+        # +0x1C: an index of its own numbering, not the kind (Link's bow 0x8 at kind 7, Kirby's hammer
+        # 0x72, 157 kinds 0xFFFFFFFF: Zelda's dein); Mario's 0-5 equal their kinds, and their copies
+        # get the new kind there (as built for Supamario); any other value is kept
+        if struct.unpack_from('>I', blob, 0x1C)[0] == bk:
+            struct.pack_into('>I', blob, 0x1C, nk)
         mi = img.w(d + 8)
         if mi:
             ents, cnt = img.w(mi), img.w(mi + 4)
@@ -548,8 +553,8 @@ def build(spec_path=SPEC, rpx=RPX):
         B.code(nop_at, 'blr')
         o_at = B.alloc(8, 8)
         v_at = B.alloc(size, 8)
-        size2 = vtable_size(img, vt2)
-        v2_at = B.alloc(size2, 8)
+        size2 = vtable_size(img, vt2) if vt2 else 0
+        v2_at = B.alloc(size2, 8) if vt2 else 0
         vb = bytearray(img.blob(vt, size))
         struct.pack_into(">I", vb, HIT_METHOD, fn)
         for off in nops:
@@ -566,13 +571,15 @@ def build(spec_path=SPEC, rpx=RPX):
                 B.put(m_at + 4 * i, w, ('singleton +4 method copy', off, i))
             struct.pack_into(">I", vb, off, m_at)
             moved.append((off, m_at))
-        assert moved, 'no method of 0x%08X stores the singleton +4: vtable 2 not reachable' % vt
+        assert moved or not vt2, 'no method of 0x%08X stores the singleton +4: vtable 2 not reachable' % vt
         B.data(v_at, vb, 'weapon 0x%X vtable (copy of 0x%08X)' % (nk, vt))
-        vb2 = bytearray(img.blob(vt2, size2))
-        for off in nops2:
-            assert off % 8 == 4 and off < size2, 'vtable 2 slot 0x%X' % off
-            struct.pack_into(">I", vb2, off, nop_at)
-        B.data(v2_at, vb2, 'weapon 0x%X vtable 2 (copy of 0x%08X)' % (nk, vt2))
+        assert vt2 or not nops2, 'weapon 0x%X: nop2 but its base has no vtable 2' % nk
+        if vt2:
+            vb2 = bytearray(img.blob(vt2, size2))
+            for off in nops2:
+                assert off % 8 == 4 and off < size2, 'vtable 2 slot 0x%X' % off
+                struct.pack_into(">I", vb2, off, nop_at)
+            B.data(v2_at, vb2, 'weapon 0x%X vtable 2 (copy of 0x%08X)' % (nk, vt2))
         B.data(o_at, struct.pack('>II', v_at, v2_at), 'weapon 0x%X singleton' % nk)
         scase[nk] = o_at
         info.setdefault('singletons', {})[nk] = (o_at, v_at, fn, status)

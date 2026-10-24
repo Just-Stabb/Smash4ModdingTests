@@ -558,3 +558,17 @@ repeat 2) sampled clamped across U.
 Bank 6.56 MB; effect.bin test 53's. Package: the ptcl / efc and effect.bin.
 
 User, test 56: dash attack's line gone; everything else looks right except jab and the throws.
+
+## Test 57 (`build/sephiroth_test57.zip`): neutral special (Flare / Megaflare / Gigaflare)
+
+The first of his specials (fighters/edge/specials.md: the plan, the move's logic, the build).
+- Executable: test 42's + the four new article kinds (fire 0x18C, flare1 0x18D, flare2 0x18E, flash
+  0x18F after Zelda's five; `weapon_expand.py` takes a base without a vtable 2 (dein's) now) and
+  the 11 new motion slots' animations (`extra_kinds.json`). `kind_expand_test.py` /
+  `weapon_expand_test.py`: 0 failed.
+- `edge.mscsb`: `fighters/edge/edge.c` (vanilla Zelda + the universal mechanics, as shipped: only
+  the status table functions differ, `msc_fingerprint.py --added 9`) with the move in status 0x152.
+- Scripts: test 22's game / test 53's effect scripts plus the 8 special ones; `main.pac` test 22's
+  plus 11 animations; effect bank test 56's plus the 20 Flare effects and 7 turned copies.
+- No sounds (none of his are converted yet).
+

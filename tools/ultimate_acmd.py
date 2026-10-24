@@ -4,7 +4,7 @@ smashline/lua2cpp_<fighter>/<fighter>/<Motion>.txt) -> Smash 4 game.bin scripts
 (docs/ultimate-fighter-port.md, "Moves").
 
   python3 tools/ultimate_acmd.py SCRIPT_DIR GAME_BIN OUT_GAME_BIN MODEL_DIR [--only NAME...] [--list]
-      [--others IN_DIR OUT_DIR] [--motion-list MOTION_LIST --mtable IN OUT --vl IN OUT]
+      [--others IN_DIR OUT_DIR] [--motion-list MOTION_LIST --mtable IN OUT --vl IN OUT] [--translate JSON]
 
 MODEL_DIR: the fighter's converted model/body/c00 (model.vbn + model.jtb: Ultimate bone names ->
 ACMD joint IDs). Every script in TRANSLATE is converted and replaces the base's script of the same
@@ -16,7 +16,8 @@ What maps to what:
   start: in game that hit the whole stage), with the value tables below
   (effect, sound, region, facing, clank, situation, categories; taken from vanilla scripts:
   Cloud / Marth / Ike / Ganondorf / Pikachu); set_weight -> Set_Weight_Hitbox
-- AttackModule::clear_all / clear(id) -> Remove_All_Hitboxes / Remove_Hitbox
+- AttackModule::clear_all / clear(id) / set_size(id, size) -> Remove_All_Hitboxes / Remove_Hitbox /
+  Change_Hitbox_Size
 - CATCH -> Grab_Collision / Extended_Grab_Collision (sphere / capsule); grab clear -> Remove_All_Grab_Collisions; the common capture
   cut -> CALL 0x49FA5BDD (as Cloud's catches)
 - ATTACK_ABS -> Throw_Specifier; ATK_HIT_ABS -> Throw_Applier (the throw work ints 0x11000005-7)
@@ -67,6 +68,8 @@ TRANSLATE = {
     'CliffAttack': 'cliffattackquick', 'DownAttackU': 'downattacku', 'DownAttackD': 'downattackd',
     'SlipAttack': 'slipattack',
 }
+# --translate: script name -> motion slot for the run's extra translations
+SLOTS = {}
 # base scripts emptied (they'd run the base's moves on a motion we replaced without a script of ours)
 EMPTY = ['attacks4hi', 'attacks4lw', 'landingairn', 'landingairf', 'landingairb', 'landingairhi']
 
@@ -191,6 +194,15 @@ def statements(body):
             out.append(('if', body[i + 3:k].strip()))
             i = k + 1
             continue
+        m = re.match(r'for _ in (\d+)\.\.(\d+) \{', body[i:])
+        if m:       # a counted loop (the charge's dust puffs, SpecialNStart): unrolled
+            k, depth = i + m.end(), 1
+            while depth:
+                depth += {'{': 1, '}': -1}.get(body[k], 0)
+                k += 1
+            out += statements(body[i + m.end():k - 1]) * (int(m.group(2)) - int(m.group(1)))
+            i = k
+            continue
         # a statement up to its ';' at depth 0
         k, depth = i, 0
         while k < n and not (body[k] == ';' and depth == 0):
@@ -281,6 +293,8 @@ class Translator:
             return [cmd('Remove_All_Hitboxes')]
         if name == 'AttackModule::clear':
             return [cmd('Remove_Hitbox', int(a[1]))]
+        if name == 'AttackModule::set_size':
+            return [cmd('Change_Hitbox_Size', int(a[1]), float(a[2]))]
         if name in ('WorkModule::on_flag', 'WorkModule::off_flag'):
             f = FLAGS.get(a[1])
             if f is None:
@@ -549,7 +563,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             name = fn[len('effect_'):]
             if name == src.lower():
                 name = TRANSLATE.get(src, name)
-            if name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts and name not in TRANSLATE.values():
+            if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts):
                 continue
             tr.last = False
             tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
@@ -638,7 +652,12 @@ def motion_frames(args, done):
         if name.startswith('landing'):          # landing lag: fighter_param's landing frames
             continue
         h = acmd.crc(name)
-        if h in mt:
+        if name in SLOTS:                       # --translate: a motion slot of its own (a custom-move slot)
+            i = SLOTS[name]
+            if mt[i] != h:
+                mt[i] = h
+                byte(i, 0, 1)
+        elif h in mt:
             i = mt.index(h)
         else:
             i = common[name]
@@ -679,7 +698,19 @@ def main():
                     help='with --others: translate the effect scripts too (IDS_JSON: Ultimate effect name -> '
                          'Smash 4 id, e.g. reference/ultimate_sys_effects.json, comma-separated files merged; trail '
                          'texture names -> trail ids too; NUSKTB: Ultimate skeleton)')
+    ap.add_argument('--translate', help='JSON {Ultimate file: Smash 4 name or {"name", "slot"}}: more scripts for '
+                    'this run (e.g. a fighter\'s specials; names starting with "special" are kept), a "slot" '
+                    'naming the motion whose motion.mtable entry gets the new name (empty scripts when the dump '
+                    'has none for it)')
     a = ap.parse_args()
+    if a.translate:
+        for src, v in json.load(open(a.translate)).items():
+            if src.startswith('_'):
+                continue
+            name = v['name'] if isinstance(v, dict) else v
+            TRANSLATE[src] = name
+            if isinstance(v, dict) and 'slot' in v:
+                SLOTS[name] = int(v['slot'], 0)
     f = acmd.ACMDFile.load(a.game_bin)
     if a.have:
         import ultimate_fighter as U
@@ -690,14 +721,15 @@ def main():
         if a.only and src not in a.only:
             continue
         path = os.path.join(a.scripts, src + '.txt')
-        if not os.path.exists(path):
-            continue
-        fns = functions(open(path).read())
-        body = fns.get('game_' + src.lower())
-        if body is None:
+        body = None
+        if os.path.exists(path):
+            body = functions(open(path).read()).get('game_' + src.lower())
+        if body is None and name not in SLOTS:
             continue
         tr.skipped = {}
-        cmds = tr.script(body)
+        # a slot of ours with no game script in the dump (SpecialNCancel): empty scripts, so the
+        # slot's base move (a custom-move variant) doesn't run on it
+        cmds = tr.script(body) if body is not None else [acmd.Command(acmd.END)]
         f.scripts[acmd.crc(name)] = cmds
         done.append((src, name))
         if a.list:
