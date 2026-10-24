@@ -126,6 +126,10 @@ whole star (his X flashes). Flipbooks show the cell Ultimate's pattern table pla
 the blade, his up-air arc faces the camera only so, and the moves both games share keep their angles
 in this order better than in the others). An effect on a bone without a joint id goes to the nearest
 ancestor that has one, the offset and the angles carried through the bind pose (`EffectTranslator.place`).
+Smash 4 flips an effect's angles on a bone for one facing direction (the bone frame's X changes sign
+in the turn), so a turned effect on a bone is right facing one way only: `tools/effect_variants.py`
+moves the turn into a turned copy of the set (`vfxb_to_ptcl.py --variants`) and places it with angles
+0 (fighters/edge/README.md test 49).
 
 **Last-effect settings**: `LAST_EFFECT_SET_RATE` / `_ALPHA` / `_COLOR` -> Smash 4's commands of the
 same name (rate as is, alpha x 100, colour x 255), left out with the effect they follow when that one

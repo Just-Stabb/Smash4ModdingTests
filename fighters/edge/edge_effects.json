@@ -49,5 +49,18 @@
  "edge_win_burst2": "0x3420054",
  "edge_attack_speedline": "0x342002E",
  "edge_gokumon_wind": "0x342003D",
- "edge_smashlw_speedline": "0x3420045"
+ "edge_smashlw_speedline": "0x3420045",
+ "edge_catch_handaura@90,0,90": "0x3420055",
+ "edge_sword_smash_flash@0,180,-90": "0x3420056",
+ "edge_sword_flare@0,180,-90": "0x3420057",
+ "edge_sword_light3@0,180,-90": "0x3420058",
+ "edge_sword_light2@0,180,-90": "0x3420059",
+ "edge_attack_speedline@90,0,180": "0x342005A",
+ "edge_sword_flash2@0,0,90": "0x342005B",
+ "edge_entry_wing@0,0,-90": "0x342005C",
+ "edge_entry_darkaura@0,0,-90": "0x342005D",
+ "edge_sword_light@0,180,-90": "0x342005E",
+ "edge_smashlw_speedline@0,-90,0": "0x342005F",
+ "edge_smashlw_swordflare@0,-90,0": "0x3420060",
+ "edge_sword_light3@0,-180,-90": "0x3420061"
 }

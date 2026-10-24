@@ -425,3 +425,25 @@ test 44's effect.bin without it in forward / up / down air, to confirm); neutral
 Bank 6.37 MB; ids / efc unchanged. Package: the ptcl / efc, `optional_no_blade_glow/`.
 
 User, test 48: up air, up smash and forward smash look right.
+
+## Test 49 (`build/sephiroth_test49.zip`): bone effects turned in their sets (the facing flip)
+
+User, test 48 (with `optional_no_blade_glow/`, then without, then facing each way): forward /
+down air's blob is the blade glow (`edge_sword_light3`), only facing right; facing left it lies
+along the blade. Up air / forward smash were right in the shots taken facing left.
+- Smash 4 flips the angles of an effect on a bone for one facing direction. The flip changes the
+  sign of the bone frame's X in the turn, so no angles put his glow (mesh +Y) along his blade
+  (joint 24's +X) for both facings (vanilla sword effects lie along an axis the flip keeps).
+  `tools/effect_variants.py` lists the fighter's own effects placed on a bone other than 0 with a
+  turn (`scan`), `vfxb_to_ptcl.py --variants` adds a copy of each set with every emitter's
+  transform turned by the script's angles (R = Rz Ry Rx: `turn_set`), and `apply` points the
+  commands at the copies with angles 0 (which the flip keeps), copying the commands that name the
+  effect (Terminate_Graphic_Effect, EFFECT_DETACH_KIND) for the copy in the same script.
+  13 variants, 52 placements; ids "name@rx,ry,rz" (0x3420055-0x3420061) in `edge_effects.json`.
+- Effects on bone 0 (his top: the slash arcs, down air's wind) look right in both facings: left.
+```
+python3 tools/effect_variants.py scan EFFECT_BIN fighters/edge/edge_effects.json VARIANTS.json
+python3 tools/vfxb_to_ptcl.py ... --variants VARIANTS.json          (adds the "name@rx,ry,rz" ids)
+python3 tools/effect_variants.py apply EFFECT_BIN fighters/edge/edge_effects.json OUT/effect.bin
+```
+Bank 6.50 MB, 97 efc entries. Package: the ptcl / efc and effect.bin.

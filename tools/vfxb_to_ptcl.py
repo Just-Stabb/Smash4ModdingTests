@@ -739,6 +739,34 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     return em
 
 
+def turn_set(p, si, rot_deg):
+    """every emitter of set si turned by an effect's angles (degrees, R = Rz Ry Rx: Smash 4's effect
+    turn, cross_f.rpx 0x03373478) on top of its own transform: the effect then needs no angles
+    (tools/effect_variants.py)"""
+    r = rotation_xyz([math.radians(v) for v in rot_deg])
+    for e in p.sets[si]['emitters']:
+        em = e['data']
+        if em is None:
+            continue
+        own = rotation_xyz(p.field(em, 'emitter_rotation'))
+        m = r @ own
+        y = math.asin(max(-1.0, min(1.0, -m[2, 0])))
+        if abs(m[2, 0]) < 1 - 1e-6:
+            x, z = math.atan2(m[2, 1], m[2, 2]), math.atan2(m[1, 0], m[0, 0])
+        else:
+            x, z = math.atan2(-m[1, 2], m[1, 1]), 0.0
+        t = r @ np.array(p.field(em, 'emitter_translation'), float)
+        p.set_emitter_srt(em, tuple(p.field(em, 'emitter_scale')), (x, y, z), tuple(float(v) for v in t))
+
+
+def rotation_xyz(rot):
+    """R = Rz Ry Rx (radians): eft's emitter turn, X first"""
+    a, b, c = (float(v) for v in rot)
+    ca, sa, cb, sb, cc, sc = math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(c), math.sin(c)
+    return (np.array([[cc, -sc, 0], [sc, cc, 0], [0, 0, 1]]) @ np.array([[cb, 0, sb], [0, 1, 0], [-sb, 0, cb]])
+            @ np.array([[1, 0, 0], [0, ca, -sa], [0, sa, ca]]))
+
+
 def set_name(prefix, ult):
     return prefix + ult[len('P_Edge'):] if ult.startswith('P_Edge') else prefix + ult.replace('P_', '')
 
@@ -754,6 +782,8 @@ def main():
     ap.add_argument('--prefix', default='PtcEdge')
     ap.add_argument('--templates', nargs='*', default=[],
                     help='vanilla .ptcl files to take template emitters from (the base\'s own first)')
+    ap.add_argument('--variants', help='JSON [{"effect", "rot"}] (tools/effect_variants.py scan): a copy of '
+                    'each effect\'s set turned by rot (degrees, R = Rz Ry Rx), id "effect@rx,ry,rz"')
     a = ap.parse_args()
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
@@ -789,6 +819,18 @@ def main():
         ids[name] = done[si_ult] = (0x300 + a.kind) << 16 | ef.add(si + 1)
         print('%-30s %-28s -> %-28s 0x%07X  %d emitters' % (name, eff.sets[si_ult], sname, ids[name], len(made)))
         print('\n'.join(log))
+    if a.variants:
+        import effect_variants
+        for v in json.load(open(a.variants)):
+            if v['effect'] not in ids:
+                continue
+            entry = ef.entries[ids[v['effect']] & 0xFFFF]          # [flags, set (1-based), ...]
+            sname = p.name_at(p.sets[entry[1] - 1]['name_pos']) + 'R%d' % len(ids)
+            si = p.clone_set(entry[1] - 1, sname)
+            turn_set(p, si, v['rot'])
+            key = effect_variants.variant_key(v['effect'], v['rot'])
+            ids[key] = (0x300 + a.kind) << 16 | ef.add(si + 1, flags=entry[0])
+            print('%-44s -> %-28s 0x%07X' % (key, sname, ids[key]))
     out = p.build()
     q = ptcl.Ptcl(out)
     assert q.validate() == [], q.validate()
