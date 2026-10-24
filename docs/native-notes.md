@@ -1302,3 +1302,27 @@ Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targ
   those labels are guesses.
 - **Console addresses:** Manifold's console builds add `0x0A000000` to code and `0x00503000` to data
   addresses; the addresses in these notes are the ELF / Cemu ones.
+
+## Effect requests and following (EffectModule, effect manager)
+
+- ACMD `EFFECT_FOLLOW` (0xFC061097, handler `0x02BDF7DC`) calls EffectModule (accessor `+0xA0`)
+  vt `+0x2EC` with an 11-word request; `EFFECT_FLW_POS` (0x089EBF6C, `0x02BE0334`) calls vt `+0x64`
+  (`0x02C2AF98`; the vtable at `0x10105FE8`, (function, 0) pairs) with flags 0x8000 (| 0x4000 with
+  Terminate) and 1 in r8.
+- `0x02C2AF98` creates the effect (`0x0334C5C0`) and hands the follow set-up to the effect manager
+  (`0x032F0508` via `0x0334C79C`): each effect's 0x1C0-byte record (manager `+0x1540` + index × 0x1C0)
+  takes the follow target (`+0x34`), bone (`+0x38`) and flags (`+0x144`): r8 = 1 (position only) ->
+  0x1000.
+- Per frame (`0x0334E4A8`): with 0x1000 the effect's matrix is the bone's translation plus the
+  effect's offset *unturned* (and its own rotation: `0x03373478`); without it the bone's whole
+  matrix times the offset. So Smash 4's `EFFECT_FLW_POS` offsets don't turn with the bone (Ultimate's
+  do): `tools/ultimate_acmd.py` follows fully when the offset isn't zero.
+
+## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
+
+- Emitter set-up `0x04A5BDCC` (buffer sizing), GPU uniforms `0x04A5AA30` (per texture slot
+  `0x04A5A6AC`, flipbook `0x04A5A858`), particle emission `0x04A5C628` (r29 emitter instance, r30
+  particle, r31 emitter data = instance `+0x140`), emitter calc `0x04A64CE8` / `0x04A65FC0` (fade,
+  emission). Field meanings found there: `docs/ptcl-format.md` (0x2F9, 0x2FC-0x2FE, 0x310, 0x82C,
+  flipbook block, complex header).
+

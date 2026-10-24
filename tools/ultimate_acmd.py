@@ -474,6 +474,11 @@ class EffectTranslator(Translator):
             self.skip(short)
             return []
         target, shape = EFFECT_MACROS[short]
+        if short.startswith('EFFECT_FLW_POS') and any(abs(float(v)) > 1e-6 for v in a[3:6]):
+            # Smash 4's position-only follow adds the offset unturned to the bone's position
+            # (cross_f.rpx 0x0334E4B0: effect record +0x144 bit 0x1000), Ultimate turns it with the
+            # bone (down air's flash 22 along the blade sat above his head): follow fully instead
+            target = 'External_Graphic' if short == 'EFFECT_FLW_POS' else 'Graphic_Effect4'
         eid = self.ids.get(a[1])
         if eid is None:
             if a[1] != 'null':

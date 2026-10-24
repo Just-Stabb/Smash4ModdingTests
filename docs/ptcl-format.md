@@ -118,10 +118,11 @@ the writer recomputes them.)
 | 0x4B0 / 0x4B4 | s32 | particle life / random (frames) | verified |
 | 0x4BC | u32 | particle type (billboard / polygon / directional / stripe…) — shader-keyed | corpus |
 | 0x4D4 | 3 × 0x7C | per-slot UV params (scale at +0x34 for slot 0 → 0x508, flipbook / scroll; slot 0's below) | corpus |
-| 0x4D5 / 0x4D7 / 0x4D8 | u8 | slot 0 flipbook: pattern table used / cells across / cells down | corpus |
-| 0x4E0 | 32 × u8 | slot 0 flipbook pattern table | corpus |
-| 0x500 | u32 | slot 0 flipbook mode (0 none; 1-5; on / off shader-keyed: no shader group mixes) | corpus |
-| 0x504 | u32 | slot 0 flipbook: low 16 bits pattern count / table entries used, high 16 a frame rate | corpus |
+| 0x4D5 / 0x4D7 / 0x4D8 / 0x4D9 | u8 | slot 0 flipbook: pattern table used / cells across / cells down / random start cells (a particle starts on a random cell below this, 0x04A54A88) | verified (0x04A5A6AC, 0x04A5A858: the emitter's uniforms) |
+| 0x4DA / 0x4DB / 0x4DC | u8 | slot 0 flags (shader feature bits 0x400 / 0x800 / 0x10000 for slot 0) | verified (use) |
+| 0x4E0 | 32 × u8 | slot 0 flipbook pattern table | verified |
+| 0x500 | u32 | slot 0 flipbook mode: 0 none, 1 life fit, 4 clamp, 2 loop, 3 random (shader bits 0x4 / 0x8 / 0x10 / 0x20 in that order, eft2's; 5 -> 0x10000000, explosions); shader-keyed (no group mixes on / off) | verified (bits) / corpus (names: 1 / 3 / 5 have no frame rate, 2 / 4 do) |
+| 0x504 / 0x506 | s16 each | slot 0 flipbook frames a cell / cells (or table entries) | verified |
 | 0x508 / 0x50C | 2f | slot 0 UV scale = repeat (1 / 2) / cells (2, 1/2, 1/3, 1/4 seen) | corpus |
 | 0x510 | u32 | slot 0 UV animation mode, bits: 1 scroll, 2 scale, 4 rotate (each bit set exactly where its values below are non-neutral; shader-keyed: 8 of 4291 shader groups mix values) | corpus |
 | 0x514 / 0x51C / 0x524 | 2f each | slot 0 UV scroll a frame / initial / random | corpus |
@@ -142,15 +143,25 @@ on it this way; 20 of 20 clamped turned ones about the centre). Ultimate's eft2 
 | 0x7E4 / 0x7EC | 2f | scale diffs | guess |
 | 0x7F8 / 0x804 / 0x810 / 0x81C | 3f | rotation init / random / velocity / velocity random (rad) | corpus |
 | 0x828 | f | rotation attenuation | corpus |
-| 0x82C | f | fade rate: while the emitter set fades (turned off), each particle's alpha (+0x58) drops by this x the frame step and the particle dies at the threshold; otherwise it climbs back by it (1 / frames: 1/11, 1/4, 1/7...; set on vanilla's infinite-life emitters, the only way they end; 0 on 84% of the rest) | verified (0x04A64F00, 0x04A661D8) |
+| 0x82C | f | fade rate: while the emitter set fades (turned off), the emitter instance's alpha (+0x58) drops by this x the frame step, the emitter (with its particles) ending at the threshold; otherwise it climbs back by it (1 / frames: 1/11, 1/4, 1/7...; set on vanilla's infinite-life emitters, the only way they end; 0 on 84% of the rest) | verified (0x04A64F00, 0x04A661D8) |
 | 0x2F8 | u8 | read with the gravity vector (0x4A4) at 0x04A62620 | verified (use) |
-| 0x2F9 | u8 | read in the fade code right after 0x82C (== 0 test) | verified (use) |
+| 0x2F9 | u8 | stop emitting while the set fades (eft2's is_fade_emit): the emitter calc 0x04A65034 skips emission when fading only if this is set; with it 0 and 0x82C 0 a turned-off emitter emits on for good | verified |
+| 0x2FC / 0x2FD / 0x2FE | u8 | random rotation direction per axis X / Y / Z: at emission (0x04A5DBCC) a random roll negates that axis's initial rotation and rotation speed | verified |
+| 0x310 | u32 | follow type (eft2's numbers): 0 the particle points at the emitter's live matrices (instance +0x84 / +0xB4: follows it), else they are copied at emission (0x04A5C89C, from the instance's +0x12C = this); 1 none, 2 position only. Shader-keyed: no vanilla shader group mixes values (5136 / 2822 / 157) | verified |
 | 0x830 | u32 | flags (shader-keyed) | corpus |
 | 0x844 | u32 | shader index (into shader table) | verified |
 
 Everything not listed is copied verbatim.
 
-### TexRes (0xD8; only the first 0x38 bytes are stored, the rest are runtime zeros) — verified
+### Complex emitters (header after the simple 0x8BC bytes)
+
+u16s from `+0x8C0`: field flags (bits 0-2 add 0x10 / 0x18 / 0xC-byte field blocks, read at 0x04A5BFF4),
+`+0x8C8` child data offset (0x308 bytes), `+0x8CA` field blocks, `+0x8CC` fluctuation (0x20),
+`+0x8CE` stripe (0x34), `+0x8D0` total size. The stripe block (eft's own ribbons, types 5 / 6:
+90 / 31 vanilla) is 13 words: type, option, connect, texture coordinates, history length,
+divisions, start / end alpha (f), UV scroll (2f), history step, history / direction interpolation (f).
+
+## TexRes (0xD8; only the first 0x38 bytes are stored, the rest are runtime zeros) — verified
 
 | off | meaning |
 |-----|---------|

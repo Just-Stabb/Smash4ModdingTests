@@ -220,6 +220,27 @@ effects out of step, down air's flash high up and white; up air / up smash nearl
   speed-line ids would otherwise name other effects' sets now).
 Package: the ptcl / efc and effect.bin (test 33's again).
 
+## Test 39 (`build/sephiroth_test39.zip`): Smash 4's effect runtime mapped (cross_f.rpx)
+
+User, test 37 (shots, before test 38): forward-air glow faint, speed lines never ending, neutral
+air round, back / down air's sword effects out of step, down air's flash high up, a white line on
+dash attack. Read from the executable (docs/native-notes.md, docs/ptcl-format.md):
+- Follow type is 0x310 (0 follow the emitter, 1 not, 2 position only; eft2's numbers), set at
+  emission (0x04A5C89C), shader-keyed. 71 of his emitters had a template of another follow type;
+  now ranked on it (17 position-only ones follow fully: vanilla has few).
+- 0x2F9 = stop emitting when the set is turned off (eft2's is_fade_emit; test 37's speed lines kept
+  emitting: 0 there, with no fade); 0x82C is the emitter's fade (the emitter ends at 0).
+- Flipbooks: the block at 0x4D4 decoded (cells, table, frames a cell, random start, mode -> shader
+  bit); 67 of his flipbook emitters now animate (18 without a matching template show one cell).
+- eft2's "stripe" types carry no ribbon data (its ribbons are emitter plugins): directional quads
+  again (test 37's never ended because of 0x2F9).
+- `EFFECT_FLW_POS`: Smash 4 adds the offset to the bone's position unturned (0x0334E4B0), Ultimate
+  turns it with the bone; with an offset it now follows fully (down / forward air's flash).
+- Textures: BC4 aligned 0x1000 as vanilla's (not 0x2000), smooth ones halved when that changes them
+  under 1%; flipbook sheets with 4+ cells a side up to 256 px. Bank 6.3 MB (test 37: 6.0 loaded).
+Trails: no change found (swordl2 isn't animated; the joint is right).
+Package: the ptcl / efc and effect.bin.
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

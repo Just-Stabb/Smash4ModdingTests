@@ -375,7 +375,7 @@ class Ptcl:
         key = (bytes(data), w, h, gx2fmt)
         if key in self._tex_added:
             return self._tex_added[key], len(data), {'w': w, 'h': h, 'gx2': gx2fmt}
-        pos = align(len(self.tex), max(GX2_ALIGN[gx2fmt], 0x2000))
+        pos = align(len(self.tex), GX2_ALIGN[gx2fmt])      # vanilla's: BC4 0x1000 (2588 of them), BC3 0x2000
         self._tex_added[key] = pos
         self.tex += bytes(pos - len(self.tex)) + data
         self.dirty_layout = True

@@ -14,8 +14,8 @@ fighter kind (ids 0x3KKnnnn). EFFECT: Ultimate effect names (default: all).
 Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/xv2_to_ptcl.py:
 - template: Templates (the base's own or one imported from --templates files) of the eft particle
   type (eft2's numbers: 0 billboard, 1 / 2 plate XY / XZ, 3 directional, 4 directional polygon, 8 Y
-  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4), blend and
-  mesh-ness, plain shaders first, never one reading the screen. Stripes (5 / 6) are skipped;
+  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4; 5 / 6 as type 3),
+  blend and mesh-ness, plain shaders first, never one reading the screen;
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
@@ -57,16 +57,35 @@ from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, c
 
 NONE64 = 2 ** 64 - 1
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
-# 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. Stripes
-# (5 / 6, ribbons) are skipped: eft has them only as complex emitters (90 / 31 vanilla), not
-# converted yet; test 37's directional quads drew solid bars
-TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
+# 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
+# 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
+# EP01-EP04, on other types; 1825 + 289 type-5 / 6 emitters in 31 fighters' files have none), all
+# move, and are scaled long (his speed lines 2.5 x 36): quads stretched along their motion, as
+# eft's directional type 3. (eft's own stripes are complex emitters with a 0x34-byte history block.)
+TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 3, 6: 3, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
+# follow type (eft2's numbers: 0 follow the emitter, 1 not, 2 its position only): at emission
+# (cross_f.rpx 0x04A5C89C, from the emitter's +0x12C = this) 0 points the particle at the emitter's
+# live matrices, else copies them; shader-keyed (no vanilla shader group mixes values)
+FOLLOW = 0x310
+# slot 0's flipbook (cross_f.rpx 0x04A5A858 / 0x04A5A6AC, the emitter's uniforms; 0x04A54A88 the
+# random start cell): 0x4D5 table used, 0x4D7 / 0x4D8 cells across / down, 0x4D9 random start cells,
+# 0x4E0 32-byte table, 0x500 mode, 0x504 s16 frames a cell, 0x506 s16 cells (or table entries),
+# 0x508 / 0x50C UV scale (1 / cells). The mode sets a shader feature bit (shader-keyed): 1 -> 0x4,
+# 4 -> 0x8, 2 -> 0x10, 3 -> 0x20, 5 -> 0x10000000; in that bit order eft2's life-fit / clamp / loop /
+# random, as vanilla's numbers agree (1 / 3 / 5 have no frame rate, 2 / 4 do: 4 plays once over the
+# life, 2 loops: Bayonetta's bats)
+PTN_MODE = 0x500
+PTN_FROM_EFT2 = {1: 1, 2: 4, 3: 2, 4: 3}
 UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
-# the alpha a particle loses a frame while its set fades (Terminate), dying at 0; and gains back
-# to 1 otherwise (cross_f.rpx 0x04A64F00 / 0x04A661D8: particle +0x58 -= / += this x the frame step)
+# the alpha an emitter loses a frame while its set fades (Terminate_Graphic_Effect), the emitter and
+# its particles ending at 0; it climbs back to 1 otherwise (cross_f.rpx 0x04A64F00 / 0x04A661D8:
+# emitter instance +0x58 -= / += this x the frame step)
 FADE_ALPHA = 0x82C
+# while its set fades, an emitter stops emitting only when this byte is set (0x04A65034: eft2's
+# is_fade_emit); with it 0 and FADE_ALPHA 0 it emits on for good (test 37's speed lines)
+FADE_EMIT = 0x2F9
 # the eft sampler word: U wrap in bits 28-31, V in 24-27, the same codes as eft2's (0 mirror,
 # 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0)
 # eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
@@ -84,7 +103,8 @@ class Templates:
     texture (slot 0; slots 1 / 2 unused). Among them, in this order: a plain shader (no shader
     parameters: Ike's FS cloud shader, FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's
     meshes orange), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
-    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, then
+    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, the follow
+    type (FOLLOW; ranked before the UV mode: a glow left behind by the sword shows more), then
     animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
     (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
@@ -115,26 +135,34 @@ class Templates:
                         screen[si_] = any(t in b for t in SCREEN_SAMPLERS)
                     if screen[si_]:
                         continue
-                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7)
+                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
+                              struct.unpack_from('>I', em, FOLLOW)[0], struct.unpack_from('>I', em, PTN_MODE)[0])
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, uv_mode, notes):
-        """the best template for this particle type / blend / mesh-ness and UV mode bits; another
-        blend (add), then type 0, when there's none"""
+    def get(self, typ, blend, mesh, uv_mode, follow, ptn, notes):
+        """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
+        (eft's, 0 none) and UV mode bits; another blend (add), then type 0, when there's none. A
+        template with another flipbook mode than wanted is never taken when one without is there"""
         def rank(item):
-            (plain, mode), (score, *_r) = item
-            return (plain, mode & uv_mode == uv_mode, mode == uv_mode, score)
+            (plain, mode, fol, pm), (score, *_r) = item
+            # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
+            return (plain, pm in (ptn, 0), fol == follow, follow == 2 and fol == 0, pm == ptn,
+                    mode & uv_mode == uv_mode, mode == uv_mode, score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
                 continue
-            (plain, mode), (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            (plain, mode, fol, pm), (_score, path, si, k) = max(self.found[key].items(), key=rank)
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
+            if fol != follow:
+                notes.append('follow %d: template has %d' % (follow, fol))
             if mode & uv_mode != uv_mode:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
+            if pm != ptn:
+                notes.append('flipbook mode %d: template has %d (one cell shown)' % (ptn, pm))
             if path is None:
                 em = self.base.emitter_bytes(si, k)
                 struct.pack_into('>II', em, 0x2CC, 0, 0)
@@ -293,6 +321,23 @@ def uv_transform(uv, scale, scroll, rotation):
     return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5).astype(np.float32)
 
 
+def set_flipbook(em, ptn, ts, tp):
+    """slot 0's flipbook from eft2's pattern animation (PTN_MODE); ptn 0: none (one cell shown,
+    first_cell). Cells across / down from eft2's uv_div, the UV scale 1 / cells, its table (eft2's
+    num entries of it), frames a cell (frequency) and random start cells (num_random)"""
+    struct.pack_into('>I', em, PTN_MODE, ptn)
+    if not ptn:
+        return
+    nx, ny = (max(1, int(round(v))) for v in ts['uv_div'])
+    num = int(tp['num']) if tp['num'] else nx * ny
+    em[0x4D5] = 1 if tp['num'] else 0
+    em[0x4D7], em[0x4D8] = nx, ny
+    em[0x4D9] = max(1, int(tp['num_random']))
+    em[0x4E0:0x500] = bytes(min(255, max(0, int(v))) for v in tp['table'][:32])
+    struct.pack_into('>hh', em, 0x504, max(1, int(round(tp['frequency']))) if ptn in (2, 4) else 0, num)
+    struct.pack_into('>2f', em, 0x508, 1.0 / nx, 1.0 / ny)
+
+
 def set_uv_anim(em, ts):
     """eft2's UV parameters (shift / scale / rotation: initial, random, per frame) -> slot 0's eft
     block: 0x510 mode (bits 1 / 2 / 4; the template's, at least the bits needed), 0x514 scroll a
@@ -332,7 +377,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     ti, smp = main_texture(e, names)
     ts = e['static']['tex_scroll'][ti] if smp else None
-    em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), notes)
+    ptn_want = PTN_FROM_EFT2.get(e['tex_anim'][ti]['pattern_type'], 0) if smp else 0
+    tp = e['static']['tex_pat'][ti] if smp else None
+    em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, notes)
+    ptn = ptn_want if ptn_want and struct.unpack_from('>I', em, PTN_MODE)[0] == ptn_want else 0
     repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
@@ -371,18 +419,31 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         img = np.full((16, 16, 4), 255, np.uint8)
         notes.append('no texture: white')
     else:
-        img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
+        if not ptn:
+            img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
     shape, rgb, alpha = combine(img, e, notes)
     h, w = shape.shape
-    tw, th = pow2(w, hi=TEX_MAX), pow2(h, hi=TEX_MAX)
+    # a whole flipbook sheet of 4+ cells a side gets twice the size, cells keeping 64 px
+    grid = max(int(round(v)) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else 1
+    tmax = TEX_MAX * 2 if grid >= 4 else TEX_MAX
+    tw, th = pow2(w, hi=tmax), pow2(h, hi=tmax)
     if (tw, th) != (w, h):
         shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
+    # smooth textures (glows, gradients) at half size while that changes them by under 1% (the
+    # bank's size: test 37's 6.0 MB loaded)
+    while min(tw, th) > 16:
+        half = resize(shape[..., None].astype(np.float32), tw // 2, th // 2)
+        back = resize(half, tw, th)[..., 0]
+        if float(np.abs(back - shape).mean()) > 0.01 * max(float(shape.mean()), 0.05):
+            break
+        shape, tw, th = half[..., 0], tw // 2, th // 2
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
     p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34)
     if smp:
         struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
+    set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp)
 
     # ---- blend, colour, alpha
     st, col = e['static'], e['color']
@@ -457,12 +518,14 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
     p.set_field(em, 'ptcl_life', life)
     # turned off (Terminate_Graphic_Effect): eft2 fades the alpha over alpha_fade_time frames when
-    # asked (and drops infinite-life particles); eft's 0x82C is that rate (1 / frames: vanilla's
-    # infinite-life glows all have it), 0 lets them live on (test 33's glow outlived the move, and
-    # templates carrying 1 cut neutral air's burst the frame it was turned off)
+    # asked (and drops infinite-life particles); eft's FADE_ALPHA is that rate (1 / frames:
+    # vanilla's infinite-life glows all have it), 0 lets the particles live out their life (test
+    # 33's glow outlived the move; templates carrying 1 cut neutral air's burst at once); emission
+    # stops as eft2's is_fade_emit says (always when nothing would end the emitter)
     info = e['info']
     fade = 1.0 / max(1, info['alpha_fade_time']) if info['is_fade_alpha_fade'] or life == FOREVER else 0.0
     struct.pack_into('>f', em, FADE_ALPHA, fade)
+    em[FADE_EMIT] = 1 if info['is_fade_emit'] or not fade else 0
     p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else int(pt['life'] * pt['life_random'] / 100))
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)
