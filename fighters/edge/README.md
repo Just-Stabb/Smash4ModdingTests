@@ -311,3 +311,30 @@ the RGBA PRM with Pillow, which resizes RGBA premultiplied by alpha, and the PRM
 is ~0 on the sword (def_edge_002: mean 0.5) and parts of the coat, so blue came out as black /
 white blocks (sword normal alpha mean 59 instead of 230). `resized()` now scales channel by
 channel. Package: `model/body/c00-c07/model.nut` (model.nud / metal.nud unchanged).
+
+## Test 44 (`build/sephiroth_test44.zip`): emitter rotation order, endless speed lines
+
+User, test 43 (shots): forward air's speed lines on the wrong plane, the effect around its cross
+wrong, the lines never ending; neutral air a purple disc near the end; up air's trail jagged and
+late; back air showing the whole swing at once; down air three crosses with a blue trail between.
+- eft2 turns an emitter Z first (R = Rx Ry Rz), eft X first (R = Rz Ry Rx, as stored in vanilla's
+  matrices): of 86 streak emitters in 31 fighters' VFXBs rotated about 2+ axes, the offset lies
+  across the motion in 53 with Z first (13 with X first), along it in 10 (51). `vfxb_to_ptcl.py`
+  (`eft_rotation`) re-expresses eft2's angles: forward air's lines (90, 0, 90) and the cross's
+  rainbow ring (90, 0, 45), and 19 more emitters (dash attack, down smash, down throw, victory).
+- An endless emitter that is turned off (Terminate_Graphic_Effect) with no fade rate stayed alive;
+  it now gets one. `ultimate_acmd.py`: a NO_STOP follow that its own script turns off later is
+  the plain follow (External_Graphic), so a script cut before the EFFECT_OFF_KIND (forward air
+  landing before frame 17) still ends it (forward air's lines, neutral air's burst).
+- EffectLibrary (KillzXGaming, the EffectConverter build the user sent, decompiled): eft2's
+  particle types 0 billboard, 1 / 2 plates XY / XZ, 3 directional, 4 directional polygon, 5 / 6
+  stripes, 7 primitive, 8 Y billboard (as converted); its v22 emitter layout matches `vfxb.py`.
+- Checked, not changed: Graphic_Effect4 is EffectModule op 0x271A, a follow without the 0x8000
+  (motion-bound) flag, and Terminate_Graphic_Effect reaches it (the manager's kill loop
+  `0x032F0454` matches every record by id); eft's particle types 3 / 4 orient by the particle's
+  world motion (v_inWldPosDf) and the eye vector / the emitter's Y (vertex shaders, uniforms read
+  from the GX2 headers: `vm` 0, `pm` 4, `vpm` 8, `bm` 12, `ev` 16, `ep` 17 in the view block); UV
+  scroll adds are per frame in both games (vanilla medians 0.04-0.05 vs 0.05-0.06).
+Open: neutral air's disc, back / up air's trails, down air's crosses (the converted values match
+Ultimate's; asked for Ultimate shots). `optional_old_trails/`: the trails on shader 1 to compare.
+Package: the ptcl / efc and effect.bin.

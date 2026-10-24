@@ -414,6 +414,7 @@ class EffectTranslator(Translator):
         self.ids, self.parents, self.locals = ids, parents, locals_ or {}
         self.missing = {}
         self.last = False
+        self.turned_off = set()
 
     def bone(self, name):
         return self.bone_at(name, (0.0, 0.0, 0.0))[0]
@@ -499,6 +500,11 @@ class EffectTranslator(Translator):
             # (cross_f.rpx 0x0334E4B0: effect record +0x144 bit 0x1000), Ultimate turns it with the
             # bone (down air's flash 22 along the blade sat above his head): follow fully instead
             target = 'External_Graphic' if short == 'EFFECT_FLW_POS' else 'Graphic_Effect4'
+        if target == 'Graphic_Effect4' and a[1] in self.turned_off:
+            # a NO_STOP effect its own script turns off: the plain follow (killed with the motion
+            # too), or a script cut before the EFFECT_OFF_KIND (forward air landing early) leaves an
+            # endless emitter on for good (Graphic_Effect4: EffectModule 0x271A, no 0x8000 flag)
+            target = 'External_Graphic'
         eid = self.ids.get(a[1])
         self.last = eid is not None
         if eid is None:
@@ -544,6 +550,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             if name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts and name not in TRANSLATE.values():
                 continue
             tr.last = False
+            tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
             cmds = tr.script(body)
             # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
             base = [c.name for c in effect_bin.scripts.get(acmd.crc(name), [])]

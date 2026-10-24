@@ -220,6 +220,10 @@ and the fade. Converted trails use it: `tools/ultimate_acmd.py` writes Shader 3,
 (rgb, arg 28) into the second texture, so the mask follows the trail's length as in Ultimate (the
 short-trail case too). Still not carried over: the depth offset (arg 29).
 
+**Emitter rotation order**: eft2 turns an emitter Z first (R = Rx Ry Rz), Smash 4's eft X first
+(R = Rz Ry Rx); `tools/vfxb_to_ptcl.py` re-expresses the angles (`eft_rotation`; evidence and the
+emitters it changed: fighters/edge/README.md test 44).
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).

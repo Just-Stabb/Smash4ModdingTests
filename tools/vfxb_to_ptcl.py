@@ -296,6 +296,27 @@ def combine(img, e, notes):
     return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1)
 
 
+def eft_rotation(rot):
+    """eft2's emitter rotation (radians, applied Z then Y then X: R = Rx Ry Rz) as eft's angles
+    (applied X then Y then Z: R = Rz Ry Rx, Ptcl.set_emitter_srt). eft2's order, from 86 streak
+    emitters (types 5 / 6 moving along a designated direction, rotated about 2+ axes) in 31
+    fighters' VFXBs: their offset lies across their motion in 53 with Z first (13 with X first),
+    along it in 10 (51): layered speed lines side by side, not one behind the other. Sephiroth's
+    forward-air lines (90, 0, 90 degrees) ran along their own offset (test 43: "the wrong plane")"""
+    a, b, c = (float(v) for v in rot[:3])
+    if sum(abs(v) > 1e-6 for v in (a, b, c)) < 2:
+        return a, b, c
+    ca, sa, cb, sb, cc, sc = math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(c), math.sin(c)
+    r = (np.array([[1, 0, 0], [0, ca, -sa], [0, sa, ca]]) @ np.array([[cb, 0, sb], [0, 1, 0], [-sb, 0, cb]])
+         @ np.array([[cc, -sc, 0], [sc, cc, 0], [0, 0, 1]]))
+    y = math.asin(max(-1.0, min(1.0, -r[2, 0])))
+    if abs(r[2, 0]) < 1 - 1e-6:
+        x, z = math.atan2(r[2, 1], r[2, 2]), math.atan2(r[1, 0], r[0, 0])
+    else:                                                   # gimbal lock: all of it in x
+        x, z = math.atan2(-r[1, 2], r[1, 1]), 0.0
+    return x, y, z
+
+
 def uv_mode(ts):
     """the UV animation bits (1 scroll, 2 scale, 4 rotate) a sampler's eft2 UV parameters need"""
     if ts is None:
@@ -500,7 +521,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'gravity', [float(ems['gravity_scale'] * g) for g in ems['gravity_dir']])
     p.set_field(em, 'air_resistance', float(st['air_res']))
     info = e['info']
-    p.set_emitter_srt(em, tuple(info['scale']), tuple(info['rotate']), tuple(info['trans']))
+    p.set_emitter_srt(em, tuple(info['scale']), eft_rotation(info['rotate']), tuple(info['trans']))
 
     # ---- timing
     one = bool(ems['one_time'])
@@ -524,6 +545,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # stops as eft2's is_fade_emit says (always when nothing would end the emitter)
     info = e['info']
     fade = 1.0 / max(1, info['alpha_fade_time']) if info['is_fade_alpha_fade'] or life == FOREVER else 0.0
+    if not one and not fade:
+        # an endless emitter with no fade never ends once turned off (its instance stays, not
+        # emitting); the rate ends it, its particles gone by then (forward air's speed lines)
+        fade = 1.0 / max(1, info['alpha_fade_time'] or min(life, 10))
     struct.pack_into('>f', em, FADE_ALPHA, fade)
     em[FADE_EMIT] = 1 if info['is_fade_emit'] or not fade else 0
     p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else int(pt['life'] * pt['life_random'] / 100))
