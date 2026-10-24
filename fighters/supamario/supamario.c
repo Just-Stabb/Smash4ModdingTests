@@ -37434,4 +37434,11 @@ void kame_n_air()
         KineticModule(0xf, 0x1, 0);
         KineticModule(0x14, 0x1, 0);
     }
+    // no drift once released (user, after test 26): the air control (energy 2) off for the rest of
+    // the move, every frame (the pose's end sets the kinetic type again); the next status's type
+    // turns it back on
+    if (kame_n_state != 0)
+    {
+        KineticModule(0xc, 0x2);
+    }
 }

@@ -432,3 +432,19 @@ frame 0. The sounds now play from status 0x152 (`kame_n_init` / `kame_n_sounds`,
 at the start, the charge from frame 1, at frame 13 the charge stopped and `fire_1` played; the
 status end stops the charge too), and the SpecialN / SpecialAirN sound scripts are empty.
 MSC SoundModule ops (handler `0x02C73C34`, docs/native-notes.md): `0x2710` play, `0x2714` stop.
+
+### Test 27 (`build/supamario_kame_test27.zip`): the start's streaks, no drift after the release
+
+User, test 26: thin cyan vertical lines and a spiral at the beam's start when firing. The start's
+particle sets were turned X +90 since test 19 (for test 18's "blue swirls near the base" standing
+up), but their emitters already carry XV2's node rotations onto the beam's axis (X -90: Fireptcl /
+4ptcl along the beam; X +90: LineAll's speed lines back along it), so that turn stood every streak
+up (`tools/ptcl.py`: the emitters' `emitter_rotation`). Test 27: the particle sets turned Y 180 as the
+models (`START_PTCL_ROT`). Test 18's swirls were most likely Kmh_Hand's `cor` / `hand` meshes, which
+lie along the beam only through their bones' constant X 90 (obj.ema): baked into the vertices
+(`--bake-rot cor,hand`), as Kmh_Fire's TRS was for the light shaft (either way the model looks the
+same if the game applies the bone rotation).
+
+Also (user): no air drift once the Kamehameha is released: `kame_n_air` turns the air control
+(kinetic energy 2) off every frame from the release to the status's end.
+

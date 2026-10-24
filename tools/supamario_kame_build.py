@@ -64,10 +64,11 @@ DOWN_END = 96                     # the down taunt (100 frames) ends its looping
 # its vertex colours (--rim), no pale tint
 # Test 17: Kmh_Fire's cone (along +Z only through its TRS bone's X -90) went into the screen in game:
 # that rotation baked into the vertices (--bake-rot). (Kmh_Bas has animated bones under its TRS: kept;
-# the head ball looks right in game)
+# the head ball looks right in game.) Test 26: Kmh_Hand's 'cor' / 'hand' X 90 baked the same way
 MODEL_OPTS = {'Kmh_Fire': ['--plain', '1', '--bake-rot', 'TRS'],
               'Kmh_Bas': ['--plain', '1', '--tint', 'Cor=0.7,0.9,1.0'],
-              'Kmh_Hand': ['--plain', '1', '--rim', 'cor=0.0,0.8,1.8,1.3', '--subtract-as', 'hand=0.0,0.3,1.0']}
+              'Kmh_Hand': ['--plain', '1', '--rim', 'cor=0.0,0.8,1.8,1.3', '--subtract-as', 'hand=0.0,0.3,1.0',
+                           '--bake-rot', 'cor,hand']}
 # Supamario's own bank (tools/fighter_own_bank.py, row 3249): the user's Xenoverse 2 clips (test 25):
 # burst_kamehameha_basatame (the charge), _fire_1 (the release), _fire_2 (the finishing burst),
 # _syubi (the move's first frame)
@@ -193,10 +194,13 @@ START_POS = (0.0, 6.7, 9.0 + START_FORWARD)
 # test 21: from frame 4 a gap showed between the start ball and the body (the ball had moved with
 # Supamario); test 22 at 3, with the ball fixed, the body reached back past it to his hands
 SEG_FIRST = 4
-# the start's particle sets stream along the beam (XV2: UseBoneDirection; their emitters point up):
-# turned X +90 (up -> forward) instead of the models' Y 180 (test 18: "the blue swirls near the base"
-# stood up)
-START_PTCL_ROT = (90.0, 0.0, 0.0)
+# the start's particle sets: turned as the models (Y 180, XV2's forward is -Z). Their emitters already
+# carry XV2's node rotations (X -90: up -> -Z, along the beam, Fireptcl / 4ptcl; X +90: back along
+# it, LineAll's speed lines), so the X +90 of tests 19-26 (for test 18's "blue swirls near the base"
+# standing up) stood every streak up (user, test 26: vertical cyan lines and a spiral at firing).
+# Those swirls were most likely Kmh_Hand's: its 'cor' / 'hand' meshes lie along the beam only
+# through their bones' constant X 90, now baked (MODEL_OPTS), as Kmh_Fire's TRS was
+START_PTCL_ROT = (0.0, HEAD_YROT, 0.0)
 FINISH_FRAMES = 3
 # the charge (fighter MSC): Mario's throw frozen at HOLD_FRAME; level 2 at 42, 3 at 78 charge
 # frames (the XV2 charge effect's steps), fires by itself at 100; the beam comes out at FIRE_FRAME
@@ -315,7 +319,7 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
     """C statements: per level (kame level var `lv`), EffectModule 0x2710 at bone 0 in the bone's frame
     (last argument 1, BONE_FRAME), not following (test 21: following, the start moved with Supamario),
     for the head parts that follow (or the start parts that don't), at base + their EEPK offsets:
-    models turned HEAD_YROT, particle sets START_PTCL_ROT (they stream along the beam). 0x2723 ends
+    models turned HEAD_YROT, particle sets START_PTCL_ROT (the same turn). 0x2723 ends
     them (test 18's leftover was the finish's looping Wav, made after its kill, not a kill that
     failed)"""
     out = []
