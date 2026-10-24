@@ -159,7 +159,11 @@ Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_of
   axis X, `TRAIL_BLEND_ALPHA`, 101, `TRAIL_CULL_NONE`: the converted ones keep Marth's / Ike's / Link's
   Smash 4 blend 11 and shader 1. The two floats (1.4 / 0.1 for Sephiroth; 1.2-2 / -0.1-0.7 across the
   dumps) go only into the trail shader's constant block (with the fade and a global time, update
-  0x355BF9C): Ultimate's trail shader, not in the ExeFS, so they have no Smash 4 counterpart.
+  0x355BF9C): Ultimate's trail shader, not in the ExeFS, so they have no Smash 4 counterpart. Not in
+`render/shader` either (nufxlb / nushdb: model and post-effect programs only), nor `effect/system`
+(ef_common / ef_item, the item trail textures), `common/shader/sfxpbs` (default textures) or
+`fighter/common` (params: `effect.prc` holds colours and effect ids, no trail or lighting values).
+Smash 4's own trail shader is `shader/effect_trail.nsh` (GX2 microcode).
 
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
