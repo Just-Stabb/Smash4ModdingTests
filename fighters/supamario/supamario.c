@@ -36968,6 +36968,7 @@ void func_2279()
 {
     kame_n_fx_off();
     kame_n_start_off();
+    SoundModule(0x2714, KAME_SND_CHARGE);
 }
 
 void func_2280()
@@ -37217,10 +37218,16 @@ void func_2293()
 // (func_2264: speed 0x11, acceleration 0xf, max fall 0x14); the kinetic type stays the fall's
 // (test 10: the cape's type 0xA while charging left him in a T-pose). The fireball article (0)
 // stays, unused by this move.
+// Its sounds play from here, not from the motions' sound scripts (test 25: landing while charging
+// changes SpecialAirN to SpecialN, which ran the new motion's sound script again from its start):
+// KAME_SND_START at the status start, KAME_SND_CHARGE from frame 1, at KAME_N_FIRE_FRAME - 1 the
+// charge's stopped (SoundModule 0x2714, as ACMD's Stop_Sound_Effect) and KAME_SND_FIRE plays.
+// kame_n_snd: 0 = the start's played, 1 = the charge's, 2 = the fire's.
 int kame_n_charge;
 int kame_n_state;
 int kame_n_pose;
 int kame_n_posed;
+int kame_n_snd;
 
 void kame_n_init()
 {
@@ -37228,6 +37235,8 @@ void kame_n_init()
     kame_n_state = 0;
     kame_n_pose = 0;
     kame_n_posed = 0;
+    kame_n_snd = 0;
+    SoundModule(0x2710, KAME_SND_START);
 }
 
 int kame_n_level()
@@ -37291,8 +37300,24 @@ void kame_n_fx_off()
     EffectModule(0x2723, KAME_FX_TSUBU, 0x1, 0x1);
 }
 
+void kame_n_sounds()
+{
+    if (kame_n_snd == 0 && MotionModuleF(0x1) >= 1.0f)
+    {
+        SoundModule(0x2710, KAME_SND_CHARGE);
+        kame_n_snd = 0x1;
+    }
+    else if (kame_n_snd == 0x1 && kame_n_state != 0 && MotionModuleF(0x1) >= KAME_N_FIRE_FRAME - 1.0f)
+    {
+        SoundModule(0x2714, KAME_SND_CHARGE);
+        SoundModule(0x2710, KAME_SND_FIRE);
+        kame_n_snd = 0x2;
+    }
+}
+
 void kame_n_loop()
 {
+    kame_n_sounds();
     if (kame_n_state == 0)
     {
         if (MotionModuleF(0x1) >= KAME_N_HOLD_FRAME)

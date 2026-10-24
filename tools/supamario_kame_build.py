@@ -16,7 +16,7 @@ files). Writes under OUT_DIR/fighter/supamario/:
 - the move: script/msc/supamario.mscsb from fighters/supamario/supamario.c (status 0x152: hold to
   charge, release fires; KAME_* replaced), script/animcmd/body/{game,effect,sound}.bin with
   SpecialN / SpecialAirN rewritten (no fireball: no GENERATE_ARTICLE, the XV2 release at the hand
-  at frame 14, the charge / fire sounds);
+  at frame 14, no sounds: the MSC plays them);
 - the projectile, article 5 (weapon kind 0x18B "kamehameha", tools/weapon_expand.py; copy of the
   fireball): model/kamehameha/c00 (the fireball's, nothing drawn: nud.hidden), motion/kamehameha/
   (the fireball's main.pac), script/msc/kamehameha/kamehameha.mscsb (fighters/supamario/weapons/
@@ -395,8 +395,8 @@ def weapon_scripts(heads, ids, segs):
 
 def special_scripts(v5, ids):
     """SpecialN / SpecialAirN: the fireball's throw without the fireball and its fire; the release
-    (Fire model + Ring) at the hand at frame 14; the charge sound from the start, the fire sound at
-    the release (stopping the charge's)"""
+    (Fire model + Ring) at the hand at frame 14; no sounds: the MSC plays them (kame_n_sounds), as
+    landing re-ran the sound script from its start (test 25)"""
     eid = lambda n: (BANK << 16) | ids[n]   # noqa: E731
     body = os.path.join(v5, 'script/animcmd/body')
     out = {}
@@ -419,10 +419,7 @@ def special_scripts(v5, ids):
         e += [cmd('frame', N_FIRE_FRAME)] + release
         out['effect'].scripts[acmd.crc(anim)] = e + [acmd.Command(acmd.END)]
     for anim in ('SpecialN', 'SpecialAirN'):
-        out['sound'].scripts[acmd.crc(anim)] = [
-            cmd('sound_effect', SND_START), cmd('frame', 1.0), cmd('sound_effect', SND_CHARGE),
-            cmd('frame', N_FIRE_FRAME - 1), cmd('stop_sound_effect', SND_CHARGE), cmd('sound_effect', SND_FIRE),
-            acmd.Command(acmd.END)]
+        out['sound'].scripts[acmd.crc(anim)] = [acmd.Command(acmd.END)]
     return out
 
 
@@ -540,7 +537,8 @@ def main():
         'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
         'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
         'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
-        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME),
+        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME), 'KAME_SND_START': '0x%X' % SND_START,
+        'KAME_SND_CHARGE': '0x%X' % SND_CHARGE, 'KAME_SND_FIRE': '0x%X' % SND_FIRE,
         'KAME_N_START_FX': msc_effects(heads, ids, False, START_POS).replace('LV', 'kame_n_level()'),
         'KAME_N_START_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n) for n in
                                        dict.fromkeys(p[0] for h in heads for p in h if not p[3])),

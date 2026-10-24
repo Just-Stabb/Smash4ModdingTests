@@ -1227,6 +1227,17 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the
   hitbox's SDI.
 
+## SoundModule (MSC)
+
+- The MSC wrapper (syscall 0x1E, `0x030B2D58`) calls SoundModule (accessor `+0xA4`) vtable `+0x18C`,
+  the handler `0x02C73C34` (`sound_module_impl.cpp`): ops `0x2710`-`0x272F`, jump table at
+  `0x02C73CA4`. `0x2710` (id[, ...]) = play (vt `+0x54`); `0x2714` (id[, n]) = stop (vt `+0x11C`, the
+  same call as ACMD's Stop_Sound_Effect handler `0x02BED1D8`); `0x272C` (id) is vt `+0x5C`, another
+  play (vanilla uses it at status starts), not a stop.
+- A motion change inside a status (e.g. landing: SpecialAirN -> SpecialN) runs the new motion's
+  sound script from its start, so a move that keeps its status across it plays its sounds from the
+  MSC (Supamario's Kamehameha, test 26).
+
 ## EffectModule requests (effect placement)
 
 - Class vtables `0x10105FE8` / `0x101228F8` (+ `0x101545A0`, another layout); MSC handler (vt

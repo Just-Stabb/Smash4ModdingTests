@@ -159,7 +159,7 @@ launching hit; the same move in the air; each charge level a little faster. All 
   itself at 100. Released, the throw plays on and at frame 14 generates article 5 and sets its
   status to the level. In the air it stalls (kinetic 0xA, the cape's) until the beam is out.
   SpecialN / SpecialAirN ACMD: no GENERATE_ARTICLE, no fire / red flash; the release (Fire model,
-  Ring) at the hand at 14; charge sound from the start, stopped for the fire sound at 13.
+  Ring) at the hand at 14, no sounds (the MSC plays them, test 26).
 - **Projectile** (weapon kind 0x18B, `fighters/supamario/weapons/kamehameha.c`): statuses 0-2 fly
   (level 1-3: 5.0 / 5.5 / 6.0 units a frame for 48 / 58 / 67 frames: 240 / 320 / 400 units),
   3 hold (30 frames, still multi-hitting), 4 finish (12 frames). The hit -> hold switch is native:
@@ -423,3 +423,12 @@ sometimes not stunned). `START_FORWARD` 2.5 (was 5), head / body FKB 8, `REHIT` 
 The user's Xenoverse 2 clips replace the Kamehameha's sounds (docs/kind-expansion.md, Supamario's
 bank): `syubi` on SpecialN / SpecialAirN frame 0, `basatame` the charge (frame 1, stopped at the
 release), `fire_1` the release, `fire_2` the finish; the beam's fly motions no longer play a sound.
+
+### Test 26 (`build/supamario_kame_test26.zip`): sounds from the MSC
+
+User, test 25: landing during the Kamehameha replayed its sounds from the start. Landing changes
+SpecialAirN to SpecialN inside the same status, and the new motion's sound script ran again from
+frame 0. The sounds now play from status 0x152 (`kame_n_init` / `kame_n_sounds`, same timing: `syubi`
+at the start, the charge from frame 1, at frame 13 the charge stopped and `fire_1` played; the
+status end stops the charge too), and the SpecialN / SpecialAirN sound scripts are empty.
+MSC SoundModule ops (handler `0x02C73C34`, docs/native-notes.md): `0x2710` play, `0x2714` stop.
