@@ -1359,7 +1359,8 @@ Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targ
   takes the follow target (`+0x34`), bone (`+0x38`) and flags (`+0x144`): r8 = 1 (position only) ->
   0x1000.
 - Per frame (`0x0334E4A8`): with 0x1000 the effect's matrix is the bone's translation plus the
-  effect's offset *unturned* (and its own rotation: `0x03373478`); without it the bone's whole
+  effect's offset *unturned* (and its own rotation: `0x03373478`, R = Rz Ry Rx of the angles,
+  sincos `0x033723D8` writing sin to r3, cos to r4); without it the bone's whole
   matrix times the offset. So Smash 4's `EFFECT_FLW_POS` offsets don't turn with the bone (Ultimate's
   do): `tools/ultimate_acmd.py` follows fully when the offset isn't zero.
 

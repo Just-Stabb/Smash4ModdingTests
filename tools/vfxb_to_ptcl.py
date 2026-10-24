@@ -232,6 +232,41 @@ def main_texture(e, names):
     return smp[0] if smp else (None, None)
 
 
+def sampler_channel(e, i, img):
+    """the channel eft2 takes a sampler's alpha from (combiner tex_alpha_input: 1 red; Ultimate's
+    flares are opaque, their round shape in red), 0-1"""
+    f = img.astype(np.float32) / 255
+    return f[..., 0] if e['combiner']['tex_alpha_input'][i] == 1 else f[..., 3]
+
+
+def shape_sampler(e, ti, images, notes):
+    """(sampler, alpha factor): the sampler that holds the piece's shape when the one main_texture
+    picked is a tiling fill. eft2 multiplies its textures (combiner blends 0); his auras / fire /
+    smoke (the throws, dash attack, Shadow Flare) put a tiling fire / noise (edges 0.13-0.45) first and
+    the shape (edges 0) second or third: drawn from the first alone each was a tinted rectangle up
+    to 16 units across (test 47: "lights most of the stage"). The fill is folded in as its mean"""
+    cb = e['combiner']
+    if any(cb[k] for k in ('tex1_color_blend', 'tex2_color_blend', 'tex1_alpha_blend', 'tex2_alpha_blend')):
+        return ti, 1.0
+    stats = {}
+    for i, s in enumerate(e['sampler']):
+        img = images.get(s['texture_id']) if s['texture_id'] != NONE64 else None
+        if img is None:
+            continue
+        c = sampler_channel(e, i, img)
+        border = np.concatenate([c[0], c[-1], c[:, 0], c[:, -1]])
+        stats[i] = (float(border.mean()), float(c.mean()))
+    if ti not in stats or len(stats) < 2 or stats[ti][0] < 0.1:
+        return ti, 1.0
+    shaped = [i for i, (edge, mean) in stats.items() if edge < 0.05 and mean > 0.01]
+    if not shaped:
+        return ti, 1.0
+    best = shaped[0]
+    factor = float(np.prod([mean for i, (edge, mean) in stats.items() if edge >= 0.1]))
+    notes.append('shape from sampler %d (sampler %d a fill: x %.2f)' % (best, ti, factor))
+    return best, factor
+
+
 def first_cell(img, scroll, cell=0):
     """a flipbook's cell (row-major, uv_div columns x rows)"""
     nx, ny = (int(round(v)) if v and v >= 1 else 1 for v in scroll['uv_div'])
@@ -263,7 +298,7 @@ def track(st, col, n):
     return c, a
 
 
-def combine(img, e, notes):
+def combine(img, e, notes, ti=0, fill=1.0):
     """eft2's combiner on the main texture, folded into what a one-colour eft template draws (a BC4
     shape x the particle colour): (shape [h, w] 0-1, colour [101, 3], alpha [101]).
     Colour modes (combiner color_process): 0 colour 0; 1 colour 0 x texture; 2 colour 0 x texture +
@@ -281,7 +316,7 @@ def combine(img, e, notes):
     f = img.astype(np.float32) / 255
     rgb = f[..., :3]
     am = cb['alpha_process']
-    atex = f[..., 0] if am in (2, 3) else f[..., 3]
+    atex = f[..., 0] if am in (2, 3) or cb['tex_alpha_input'][ti] == 1 else f[..., 3]
     cm = cb['color_process']
     m0, m1 = c0.mean(0), c1.mean(0)
     if cm == 0:
@@ -309,7 +344,7 @@ def combine(img, e, notes):
     else:
         colour = c0 * tm + c1
     colour = colour * peak * float(cmean @ LUMA > 0)
-    alpha = a0 * info['color0'][3] * (a1 * info['color1'][3] if am == 4 else 1.0)
+    alpha = a0 * info['color0'][3] * (a1 * info['color1'][3] if am == 4 else 1.0) * fill
     if am in (1, 3):
         # erosion: each pixel is texture - (1 - alpha), so the faint parts go first and the bright
         # strokes last (the texture can't change over life here): the fade kept is the texture's
@@ -340,6 +375,22 @@ def eft_rotation(rot):
     else:                                                   # gimbal lock: all of it in x
         x, z = math.atan2(-r[1, 2], r[1, 1]), 0.0
     return x, y, z
+
+
+def crossed_ribbon(pos, nrm, col, uv, idx, notes):
+    """a flat ribbon along Y (his sword glows: 25.5 long, 2 wide, ~0 thick) with a copy turned 90
+    degrees about Y. Ultimate's directional type keeps such a mesh facing the camera round its Y
+    (the glow shows along the blade in every move); held in the sword's frame it went edge-on at
+    some rolls (test 47: forward air without a glow). Crossed, one of the two always faces it"""
+    span = pos.max(0) - pos.min(0)
+    if span[1] <= 0 or min(span[0], span[2]) > 0.1 * span[1] or max(span[0], span[2]) > 0.3 * span[1]:
+        return pos, nrm, col, uv, idx
+    turn = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], np.float32)
+    notes.append('ribbon crossed')
+    idx = np.asarray(idx).reshape(-1)
+    return (np.concatenate([pos, pos @ turn.T]), np.concatenate([nrm, nrm @ turn.T]),
+            None if col is None else np.concatenate([col, col]), np.concatenate([uv, uv]),
+            np.concatenate([idx, idx + len(pos)]))
 
 
 def rotation_need(st, is_mesh):
@@ -437,6 +488,12 @@ def set_uv_anim(em, ts):
 
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     pt = e['particle']
+    if e['combiner']['shader_type'] == 1:
+        # a refraction piece (it bends the picture behind it: back throw's indirect1, the entry's
+        # rifrection1): no template reads the screen (SCREEN_SAMPLERS), and drawn plain its
+        # normal-map texture is a tinted blob
+        notes.append('refraction: skipped')
+        return None
     typ = TYPES.get(pt['billboard_type'])
     if typ is None:
         notes.append('billboard type %d: skipped' % pt['billboard_type'])
@@ -462,6 +519,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         notes.append('stripe mesh: type 4')
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     ti, smp = main_texture(e, names)
+    fill = 1.0
+    if smp:
+        ti, fill = shape_sampler(e, ti, images, notes)
+        smp = e['sampler'][ti]
     ts = e['static']['tex_scroll'][ti] if smp else None
     uv_quarter = 0
     if ts is not None and pt['primitive_id'] == NONE64 and uv_mode(ts) == 4 and not ts['rotation_add'] \
@@ -513,9 +574,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             repeat = (1, 1)
             notes.append('UV transform baked into the mesh')
         channel = e['tex_anim'][ti]['uv_channel'] if smp else 0
-        key = (pt['primitive_id'], s3, bake, channel, mesh_rot)
+        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
+            if rest_dir:
+                pos, nrm, col_, uv, idx = crossed_ribbon(pos, nrm, col_, uv, idx, notes)
             if bake:
                 uv = np.concatenate([uv_transform(uv[:, :2] * np.array(bake[0], np.float32), *bake[1:]),
                                      uv[:, 2:]], 1)
@@ -540,7 +603,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     else:
         if not ptn:
             img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
-    shape, rgb, alpha = combine(img, e, notes)
+    shape, rgb, alpha = combine(img, e, notes, ti, fill)
     if uv_quarter:
         # eft2 samples at R(rotation) (uv - 0.5) + 0.5: the picture turns counter-clockwise as shown
         shape = np.ascontiguousarray(np.rot90(shape, uv_quarter))

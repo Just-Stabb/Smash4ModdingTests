@@ -398,3 +398,28 @@ User: an official down smash clip. Ultimate: the speed lines lie along the sword
   (down smash's lines 90 degrees, Octaslash's 90 / 180), so no template needs UV rotation.
 Cost: the throws' flash lines lost their flipbook (one cell). Bank 6.28 MB; ids / efc and
 effect.bin unchanged. Package: the ptcl / efc.
+
+## Test 48 (`build/sephiroth_test48.zip`): refraction left out, shapes from the shaping texture
+
+User, test 47 (shots and Ultimate clips of neutral, forward, back, up and down air): back / forward /
+down throw and dash attack light up the stage; neutral air still off; forward air without its blade
+glow and few speed lines; a blue-purple blob below him in forward / up / down air; back air a whole
+flat ellipse (Ultimate: a short swoosh behind him).
+- eft2 combiner shader type 1 (refraction: back throw's `indirect1` x2, the entry's `rifrection1`)
+  is left out; drawn plain each was a tinted mesh.
+- `shape_sampler`: when the texture `main_texture` picks fills the quad (border >= 0.1: Ultimate's
+  tiling fire `ef_edge_fire05`, the slash glows' `swordflare03`) and another of the emitter's
+  textures has a shape (border < 0.05; eft2 multiplies them, combiner blends 0), the shape is drawn
+  and the fill folded in as its mean. 10 emitters: the hand / entry / throw auras, neutral air's
+  wind-up fire, and the slash arcs' glows `light1` / `light3` (`edge_slash_arc`, `edge_slash_light`).
+  Those glows are full discs (3,077 vertices, out to the rim) that Ultimate cuts to a band; uncut
+  they made back air's and forward tilt's bright flat ellipse.
+- A sampler's alpha comes from red when its combiner alpha input is 1 (`ef_cmn_grade00` flares:
+  opaque alpha, the round shape in red).
+- Directional meshes at rest that are flat ribbons along Y (the blade glows: 25.5 x 2 x ~0) get a
+  copy crossed at 90 degrees about Y (`crossed_ribbon`), so the glow can't go edge-on.
+- Checked: Smash 4's effect rotation (`0x03373478`, sincos `0x033723D8` run in Unicorn: sin to the
+  first pointer) is R = Rz Ry Rx of the script's angles, as `ultimate_acmd.py` assumes.
+Open: the blob (likely `edge_sword_light3`, the blade glow, misplaced: `optional_no_blade_glow/` has
+test 44's effect.bin without it in forward / up / down air, to confirm); neutral air's burst.
+Bank 6.37 MB; ids / efc unchanged. Package: the ptcl / efc, `optional_no_blade_glow/`.
