@@ -706,7 +706,12 @@ void kame_dissolve()
     {
         z = -(float)(kame_flown - f) * kame_speed();
         EffectModule(0x2710, id, 0, 0, 0, z, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0x1);
-        f += KAME_SEG_EVERY;
+        // the pieces' frames: KAME_SEG_FIRST, then every KAME_SEG_EVERY-th
+        f += 0x1;
+        while (f % KAME_SEG_EVERY != 0)
+        {
+            f += 0x1;
+        }
     }
     kame_fx_off();
 }
@@ -792,7 +797,7 @@ void kame_fly_loop()
         kame_end();
         return;
     }
-    if (kame_frame >= KAME_SEG_FIRST && kame_frame % KAME_SEG_EVERY == 0)
+    if (kame_frame == KAME_SEG_FIRST || (kame_frame > KAME_SEG_FIRST && kame_frame % KAME_SEG_EVERY == 0))
     {
         EffectModule(0x2710, kame_seg_id(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0x1);
     }

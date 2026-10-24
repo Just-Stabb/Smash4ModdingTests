@@ -12,11 +12,12 @@ Smash 4 name; the rest of GAME_BIN stays.
 
 What maps to what:
 - frame(n) / wait(n) -> FRAME / WAIT; FT_MOTION_RATE(r) -> Set_Frame_Duration(r)
-- ATTACK -> Extended_Special_Hitbox (a sphere: the end = the start), with the value tables below
+- ATTACK -> Special_Hitbox for a sphere, Extended_Special_Hitbox for a capsule (never with its end at its
+  start: in game that hit the whole stage), with the value tables below
   (effect, sound, region, facing, clank, situation, categories; taken from vanilla scripts:
   Cloud / Marth / Ike / Ganondorf / Pikachu); set_weight -> Set_Weight_Hitbox
 - AttackModule::clear_all / clear(id) -> Remove_All_Hitboxes / Remove_Hitbox
-- CATCH -> Extended_Grab_Collision; grab clear -> Remove_All_Grab_Collisions; the common capture
+- CATCH -> Grab_Collision / Extended_Grab_Collision (sphere / capsule); grab clear -> Remove_All_Grab_Collisions; the common capture
   cut -> CALL 0x49FA5BDD (as Cloud's catches)
 - ATTACK_ABS -> Throw_Specifier; ATK_HIT_ABS -> Throw_Applier (the throw work ints 0x11000005-7)
 - HIT_NODE / WHOLE_HIT -> Set_Bone_Intangibility / Body_Collision; REVERSE_LR -> Reverse_Direction
@@ -305,33 +306,42 @@ class Translator:
          set_weight, shield_dmg, trip, rehit, reflect, absorb, flinchless, no_hitlag, direct, situation, category,
          partmask, friendly, effect, lvl, attr, region) = a[:37]
         clang, rebound = SETOFF[setoff]
-        x2 = x if x2 is None else x2
-        y2 = y if y2 is None else y2
-        z2 = z if z2 is None else z2
-        out = [cmd('Extended_Special_Hitbox', int(hid), int(part), self.bone(bone), float(dmg), int(angle), int(kbg),
-                   int(fkb), int(bkb), float(size), float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip),
-                   float(hitlag), float(sdi), clang, rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0),
-                   SITUATION[situation], 1 if direct else 0, REGION.get(region, 0), CATEGORY.get(category, 0x3F),
-                   0, 0xF, 0, 1, 1 if reflect else 0, 1 if absorb else 0, int(rehit), 0, 0, FACING.get(lr, 3), 0,
-                   1 if friendly else 0, 1 if no_hitlag else 0, 0, 1 if flinchless else 0,
-                   float(x2), float(y2), float(z2))]
+        common = [int(hid), int(part), self.bone(bone), float(dmg), int(angle), int(kbg), int(fkb), int(bkb), float(size),
+                  float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
+                  rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0), SITUATION[situation],
+                  1 if direct else 0, REGION.get(region, 0), CATEGORY.get(category, 0x3F), 0, 0xF, 0, 1,
+                  1 if reflect else 0, 1 if absorb else 0, int(rehit), 0, 0, FACING.get(lr, 3), 0, 1 if friendly else 0,
+                  1 if no_hitlag else 0, 0, 1 if flinchless else 0]
+        if capsule_end(x, y, z, x2, y2, z2) is None:
+            # a sphere: Special_Hitbox (Shape 0). As an Extended_Special_Hitbox with its end = its start, every
+            # one of Sephiroth's hit the whole stage (test 20: the zero-length capsule's direction is 0 / 0)
+            out = [cmd('Special_Hitbox', *common, 0)]
+        else:
+            out = [cmd('Extended_Special_Hitbox', *common, *capsule_end(x, y, z, x2, y2, z2))]
         if set_weight:
             out.append(cmd('Set_Weight_Hitbox', int(hid), 1))
         return out
 
     def catch(self, a):
         _ag, cid, bone, size, x, y, z, x2, y2, z2, status, situation = a[:12]
-        x2 = x if x2 is None else x2
-        y2 = y if y2 is None else y2
-        z2 = z if z2 is None else z2
-        return [cmd('Extended_Grab_Collision', int(cid), self.bone(bone), float(size), float(x), float(y), float(z),
-                    CAPTURE_STATUS.get(status, 0x3F), SITUATION[situation], float(x2), float(y2), float(z2))]
+        common = [int(cid), self.bone(bone), float(size), float(x), float(y), float(z), CAPTURE_STATUS.get(status, 0x3F),
+                  SITUATION[situation]]
+        end = capsule_end(x, y, z, x2, y2, z2)
+        if end is None:
+            return [cmd('Grab_Collision', *common)]
+        return [cmd('Extended_Grab_Collision', *common, *end)]
 
     def attack_abs(self, a):
         _ag, kind, part, dmg, angle, kbg, fkb, bkb, trip, hitlag, lr, _unk, no_reaction, effect, lvl, attr, region = a[:17]
         return [cmd('Throw_Specifier', ABS_KIND[kind], int(part), float(dmg), int(angle), int(kbg), int(fkb), int(bkb),
                     EFFECT.get(effect, 0), float(trip), float(hitlag), 1.0, SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0),
                     FACING.get(lr, 3), 1, 1 if no_reaction else 0, REGION.get(region, 8))]
+
+
+def capsule_end(x, y, z, x2, y2, z2):
+    """the capsule's other end (Ultimate leaves it None for a sphere), or None for a sphere"""
+    end = tuple(float(a if b is None else b) for a, b in ((x, x2), (y, y2), (z, z2)))
+    return None if end == (float(x), float(y), float(z)) else end
 
 
 # ---------------------------------------------------------------- joints
@@ -431,8 +441,12 @@ def main():
     ap.add_argument('--vl-kind', default='zelda', help='the vl file\'s layout (the base fighter)')
     ap.add_argument('--base-rpx', help='with --motion-list: an executable to compare the move flags with')
     ap.add_argument('--base-kind', type=lambda v: int(v, 0))
+    ap.add_argument('--have', help='LEFT,RIGHT as the model was built with (ultimate_fighter.py --have)')
     a = ap.parse_args()
     f = acmd.ACMDFile.load(a.game_bin)
+    if a.have:
+        import ultimate_fighter as U
+        U.set_have(*a.have.split(','))
     tr = Translator(joint_ids(a.model_dir))
     done = []
     for src, name in TRANSLATE.items():

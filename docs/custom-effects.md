@@ -381,3 +381,17 @@ damage; the pose stayed for the whole move after a hit.
 - The pose: held for the flight only (`KAME_LIFE`); Supamario still can't see the beam end
   (ArticleModule 0x2717 is 0 for it). Next: a signal from the beam (vanilla weapons send their linked
   owner events with `LinkModule(0x2713, link, event)`).
+
+### Test 21 in game, and test 22 (`build/test22.zip`)
+
+Test 21: the multi-hit sometimes pushed targets out after the first hit; charge still changed
+nothing; the finish sometimes launched back toward Supamario; the start moved with him (and a gap
+showed between the ball and the body, the user's shot). Asked for: a body hitbox that lingers.
+- Charge: `ArticleModule(0x2713, 5, level)` sent in the frame of the generation never reached the
+  beam (Ryu sends his Hadoken's to one that already exists): sent the next frame (`kame_n_sent`).
+- Finish: FacingRestrict 3 (the Hadoken's, PK Fire's, Fox's laser's) instead of the fireball's 1.
+- Multi-hit: FKB 10 (366 carried a target on with the moving head, which then stopped).
+- Body: `LINGER` (4) frames of the head's path, an Extended_Special_Hitbox ID 1 from the head back
+  to speed x frame (grows from the spawn), the head's multi-hit, same part (one hit log).
+- Start parts: EffectModule 0x2710 in Supamario's bone-0 frame (flag 1), not following; the first body
+  piece at frame 3 (then the even frames).

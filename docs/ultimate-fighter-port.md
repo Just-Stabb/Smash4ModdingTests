@@ -56,6 +56,18 @@ the range the vertices really use (Sephiroth 2-131 / 2-109, Incineroar 2-135).
 game drew them unskinned: Incineroar a stretched pillar, Sephiroth invisible (with the 2-N header
 too). `nud.write` sets it from test 20.
 
+**Joint table: 26 entries, never more** (every vanilla fighter's). Test 20 appended Sephiroth's
+swords as joints 27 / 28 (`--joints`): his hitboxes hit the whole stage. `--have LEFT,RIGHT` (both
+tools) makes those Ultimate bones play `LHaveN` / `RHaveN` instead of `HaveL` / `HaveR` (Sephiroth's
+`SwordL1` / `SwordR1` hang from the same hand bones), so the sword hitboxes use joints 24 / 25 and
+follow the sword exactly; a held item takes the sword's angle. `ultimate_acmd.py` also writes
+spheres as `Special_Hitbox` / `Grab_Collision` (vanilla has zero-length extended ones too, so that
+wasn't the cause).
+
+**Material animation pacs**: keep the base's `default.mta`, `default_temporarily.mta`, `display.mta`
+and `material_anime.lst` (a hash of the base's motion names, not CRC32); the face defaults get the
+swords' keys. Test 20 left them out and the sword didn't show in attacks.
+
 Packaging: leave out `model.sbwl`; keep the base's other motion pacs (`zeldasw1 / sw2 / pt1.pac`,
 `koopapt1-3.pac`) next to the new `main.pac` / `lhand` / `rhand`.
 

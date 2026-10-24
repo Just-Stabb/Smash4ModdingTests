@@ -52,6 +52,18 @@ STANDARD = [('TransN', 'Trans'), ('RotN', 'Rot'), ('HipN', 'Hip'), ('LLegJ', 'Le
             ('HeadN', 'Head'), ('RHaveN', 'HaveR'), ('LHaveN', 'HaveL'), ('ThrowN', 'Throw')]
 FOLD = ('LegC', 'ClavicleC')
 
+
+def set_have(left, right):
+    """the Ultimate bones that play LHaveN / RHaveN (default HaveL / HaveR). Sephiroth: SwordL1 / SwordR1
+    (same parents, HandL / HandR), so the moves' sword hitboxes use the base's joints 24 / 25: every
+    vanilla fighter's joint table has 26 entries, and the swords appended as joints 27 / 28 (test 20)
+    gave hitboxes that hit the whole stage. A held item then takes the sword's orientation."""
+    for i, (s4, _u) in enumerate(STANDARD):
+        if s4 == 'LHaveN':
+            STANDARD[i] = (s4, left)
+        elif s4 == 'RHaveN':
+            STANDARD[i] = (s4, right)
+
 # the base's joint-table bones that aren't standard -> the Ultimate bone that plays the part
 JOINT_STANDINS = {'Larmor': 'H_ShoulderpadL', 'Rarmor': 'H_ShoulderpadR', 'Bustarmor': 'Bust'}
 
@@ -993,6 +1005,20 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                         vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
+            # the base's other entries (default / default_temporarily / display.mta, material_anime.lst:
+            # its own hash of the motion names, which are the base's): kept, the defaults with the swords'
+            # (and the wing's) keys too. Left out up to test 20 (the sword didn't show in attacks)
+            for name, d in omo.pac_read(src):
+                if name[:-4] in frames_of:
+                    continue
+                if name.endswith('.mta') and d[:4] == b'MTA4' and pac == 'material_anime_face.pac':
+                    m = mta.read(d)
+                    vis = [(v['name'], sorted(set((min(k[0], m['frames'] - 1), k[1]) for k in v['keys'])))
+                           for v in m['vis'] if v['name'] not in prof['hidden'] and v['name'] not in prof['vis'].values()]
+                    vis += [(slot, [(0, prof['vis_default'].get(slot, 0))]) for slot in prof['vis'].values()]
+                    vis += [(slot, [(0, 0)]) for slot in prof['hidden']]
+                    d = mta.write(m['frames'], [], m['rate'], m['unk'], vis)
+                ents.append((name, d))
             os.makedirs(out + '/model/body/' + cdir, exist_ok=True)
             omo.pac_write(os.path.join(out, 'model/body', cdir, pac), ents)
     return sk
@@ -1018,9 +1044,12 @@ def main():
         q.add_argument('--max-bones', type=int, help='merge bones into their parents down to this many per costume '
                                                      '(fighters go up to 138; use 136)')
         q.add_argument('--anim-cache', help='JSON file keeping which bones the motions move')
+        q.add_argument('--have', help='LEFT,RIGHT: the Ultimate bones that play LHaveN / RHaveN (set_have)')
     m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
     a = ap.parse_args()
     joints = [j for j in a.joints.split(',') if j]
+    if a.have:
+        set_have(*a.have.split(','))
     animated = None
     if a.max_bones:
         mdir = a.motion_dir if a.cmd == 'motions' else a.motions

@@ -156,6 +156,12 @@ START_FORWARD = 5.0
 # ticks (smash DI moved them out of the head between hits)
 HEAD_SIZE = (5.5, 6.5, 7.5)
 TICK_SDI = 0.0
+# the body (user, test 21: "make the body hitbox for the beam linger for a few frames"): a capsule from
+# the head back over the ground the head covered in its last LINGER frames (it grows to that from the
+# spawn, so it never reaches behind the start: test 18's grew to 40 units and hit behind Supamario);
+# the head's multi-hit, ID 1 in the same part (one hit log: one hit a tick for both)
+LINGER = 4
+BODY_SIZE = (4.0, 4.5, 5.0)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
 # the finish per level (test 20: "charge time doesn't seem to increase ... final hit damage"): one
 # motion slot for every level (the fireball has four), so its script picks the hitbox by the level
@@ -165,12 +171,19 @@ FINISH = (dict(Damage=7.0, KBG=85, BKB=50, Size=8.0), dict(Damage=10.0, KBG=90, 
 LEVEL_VAR = 0x10000004
 # test 18: the head pulls a target to its middle (366) so it keeps hitting it while the beam holds;
 # test 17's PK Fire hop (80 degrees) knocked them out of it after one hit
-HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 20, 0
+# test 21: "sometimes the multihit pushes opponents out after the first hit": 366 carries a target
+# with the moving head, then the head stops at the hit and they flew on: a smaller fixed push
+HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 10, 0
+# the finish launches the way the beam faces (FacingRestrict 3, as the Hadoken, PK Fire and Fox's
+# laser; test 21 with 1, the fireball's: a target behind the head's middle went back toward Supamario)
+FINISH_FACING = 3
 # the beam's start (Supamario's MSC, bone 0): where the beam comes out, in front of his hands
 START_POS = (0.0, 6.7, 9.0 + START_FORWARD)
 # the first body piece: the frame from which a piece (SEG_EVERY x speed long, SEG_OVERLAP more at its
 # end) no longer reaches back past the start (test 18: "the body is behind the base of the beam")
-SEG_FIRST = 4
+# test 21: from frame 4 a gap showed between the start ball and the body: the first piece at 3, then
+# the even frames
+SEG_FIRST = 3
 # the start's particle sets stream along the beam (XV2: UseBoneDirection; their emitters point up):
 # turned X +90 (up -> forward) instead of the models' Y 180 (test 18: "the blue swirls near the base"
 # stood up)
@@ -290,10 +303,12 @@ def beam_effects(heads, segs):
 
 
 def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
-    """C statements: per level (kame level var `lv`), EffectModule 0x2717 (the following form, which
-    0x2723 ends: test 18, the hold's 0x2710 copies of the head stayed after it) at bone 0 for the head
-    parts that follow (or the start parts that don't), at base + their EEPK offsets: models turned
-    HEAD_YROT, particle sets START_PTCL_ROT (they stream along the beam)"""
+    """C statements: per level (kame level var `lv`), EffectModule 0x2710 at bone 0 in the bone's frame
+    (last argument 1, BONE_FRAME), not following (test 21: following, the start moved with Supamario),
+    for the head parts that follow (or the start parts that don't), at base + their EEPK offsets:
+    models turned HEAD_YROT, particle sets START_PTCL_ROT (they stream along the beam). 0x2723 ends
+    them (test 18's leftover was the finish's looping Wav, made after its kill, not a kill that
+    failed)"""
     out = []
     for lv in range(3):
         lines = []
@@ -303,8 +318,8 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
             z = (-z if HEAD_YROT == 180.0 else z) * UNIT
             rot = (0.0, HEAD_YROT, 0.0) if n.startswith(MODEL_PREFIX) else START_PTCL_ROT
             pos = (base[0] + x * UNIT, base[1] + y * UNIT, base[2] + z)
-            lines.append('        EffectModule(0x2717, 0x%08X, 0, %s, %s, %s, %s, %s, %s, %s, 0);' % (
-                (BANK << 16) | ids[n], *map(fl, pos), *map(fl, rot), fl(size)))
+            lines.append('        EffectModule(0x2710, 0x%08X, 0, %s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0, 0, %d);' % (
+                (BANK << 16) | ids[n], *map(fl, pos), *map(fl, rot), fl(size), BONE_FRAME))
         out.append(('    %sif (LV == 0x%X)\n    {\n' % ('else ' if lv else '', lv)) + '\n'.join(lines) + '\n    }')
     return '\n'.join(out)
 
@@ -322,6 +337,10 @@ def weapon_scripts(heads, ids, segs):
         # REHIT x HOLD_HITS frames give the charge levels 4 / 6 / 9 hits there (test 18)
         g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
                     BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
+        for f in range(1, LINGER + 1):
+            g += [cmd('frame', float(f)),
+                  hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, Angle=HEAD_ANGLE,
+                         KBG=HEAD_KBG, FKB=HEAD_FKB, BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
         game[name] = g
         # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
         # behind). Not at frame 0: a beam starts in status 0 (fly1) and is set to its level's
@@ -344,7 +363,7 @@ def weapon_scripts(heads, ids, segs):
     # strength by the level
     game['finish'] = [cmd('remove_all_hitboxes')] + by_level([
         [hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0, BKB=f['BKB'],
-                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2)] for f in FINISH]) + [
+                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2, FacingRestrict=FINISH_FACING)] for f in FINISH]) + [
         cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst

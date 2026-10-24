@@ -37221,11 +37221,13 @@ int kame_n_charge;
 int kame_n_state;
 int kame_n_pose;
 int kame_n_posed;
+int kame_n_sent;
 
 void kame_n_init()
 {
     kame_n_charge = 0;
     kame_n_state = 0;
+    kame_n_sent = 0;
     kame_n_pose = 0;
     kame_n_posed = 0;
 }
@@ -37325,13 +37327,20 @@ void kame_n_loop()
         if (MotionModuleF(0x1) >= KAME_N_FIRE_FRAME)
         {
             ArticleModule(0x2710, KAME_ARTICLE);
-            ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
             kame_n_start_fx();
             kame_n_state = 0x2;
         }
     }
     else
     {
+        // the level, as the beam's status, the frame after it was made (test 21: sent in the same
+        // frame as the generation, the charge never changed the beam; Ryu sends his Hadoken's to one
+        // that already exists)
+        if (kame_n_sent == 0)
+        {
+            ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
+            kame_n_sent = 0x1;
+        }
         kame_n_hold_pose();
     }
     kame_n_air();
