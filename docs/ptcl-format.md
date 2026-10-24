@@ -127,6 +127,11 @@ the writer recomputes them.)
 | 0x514 / 0x51C / 0x524 | 2f each | slot 0 UV scroll a frame / initial / random | corpus |
 | 0x52C / 0x534 / 0x53C | 2f each | slot 0 UV scale a frame / initial (1) / random | corpus |
 | 0x544 / 0x548 / 0x54C | f each | slot 0 UV rotation a frame / initial / random (radians) | corpus |
+
+Slot 0's UV transform: uv x (0x508 repeat / cells) x scale + shift, turned about the texture's centre
+(from where vanilla's clamped, shifted meshes land on their texture: 373 of 375 shifted axes partly
+on it this way; 20 of 20 clamped turned ones about the centre). Ultimate's eft2 subtracts the shift
+(1652 of 1700 in 31 fighters' VFXBs): `tools/vfxb_to_ptcl.py` flips its sign.
 | 0x648 / 0x64C | u32 | color0 / color1 type (0 const, 1 random, 2 key anim) | corpus |
 | 0x650 / 0x6D0 | 32f | color0 / color1 keys (8 × rgba-ish) | corpus |
 | 0x750–0x768 | 2i each | color sections 1–3 (% of life), repeat | corpus |

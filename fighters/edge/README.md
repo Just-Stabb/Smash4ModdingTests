@@ -168,6 +168,23 @@ Trails: positions come from the sword joint itself (LHaveN plays swordl1, the sa
 blade's X); a frame's lag would be the engine's sampling (to compare with Cloud's trail).
 Package: the ptcl / efc (effect.bin as test 33's).
 
+## Test 36 (`build/sephiroth_test36.zip`): UV shift direction
+
+User, test 35 (shots): forward air's X flash right; back air's arc still a whole flat ring (Ultimate:
+a crescent sweeping round); neutral air still wrong. The UV transform's form, tested on each game's
+own effects (how many clamped, shifted meshes land partly on their texture over their life):
+- Smash 4 (117 vanilla files): uv x scale + shift (373 of 375 axes; centred or subtracted forms
+  262-282), turned about the texture's centre (20 of 20 clamped turned ones).
+- Ultimate (31 fighters' VFXBs from the effect zip): uv x scale - shift (1652 of 1700; the others
+  1183-1277), turned about the centre (223 of 224).
+Test 34 / 35 wrote the shifts with eft2's sign (back air's arc then sat off the texture's clamped
+edge: the whole ring) and baked meshes with a centred form. Now the shifts are negated and bakes use
+eft2's form. Offline, frame by frame over the particle's life, the converted back-air arc
+(`edge_slash_arc` line_white1, light1) sweeps exactly as Ultimate's.
+Not yet: LAST_EFFECT_SET_RATE (back air's arc plays at 1.7x in Ultimate; rates differ per use, so
+it needs a set per rate), flipbook animation, stripes.
+Package: the ptcl / efc (effect.bin as test 33's).
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

@@ -266,12 +266,19 @@ def uv_mode(ts):
         | (4 if nz(ts['rotation']) or nz(ts['rotation_add']) or nz(ts['rotation_random']) else 0)
 
 
+# How each game moves a texture (slot 0), from where the clamped, shifted meshes of each game's own
+# effects land on their texture over their life (scratch tests: Smash 4's 117 vanilla files, 375
+# clamped shifted axes; Ultimate's 31 fighters' VFXBs, 1700): Smash 4 uv x scale + shift (373 of
+# 375 partly on the texture), Ultimate uv x scale - shift (1652 of 1700; centred or added forms
+# 1183-1277); both turn about the texture's centre (Smash 4 20 of 20 clamped turned ones, Ultimate
+# 223 of 224). Ultimate's back-air arc, a disc, only sweeps round as a crescent so. The shifts
+# change sign on the way.
 def uv_transform(uv, scale, scroll, rotation):
-    """eft2's starting UV transform: scaled and turned about the texture's centre, then shifted"""
+    """eft2's starting UV transform (repeat already applied): uv x scale - shift, turned about the
+    texture's centre"""
     c, s = math.cos(rotation), math.sin(rotation)
-    q = (uv - 0.5) * np.array(scale, np.float32)
-    return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5
-            + np.array(scroll, np.float32)).astype(np.float32)
+    q = uv * np.array(scale, np.float32) - np.array(scroll, np.float32) - 0.5
+    return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5).astype(np.float32)
 
 
 def set_uv_anim(em, ts):
@@ -279,12 +286,13 @@ def set_uv_anim(em, ts):
     block: 0x510 mode (bits 1 / 2 / 4; the template's, at least the bits needed), 0x514 scroll a
     frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
     scale random, 0x544 rotation a frame, 0x548 rotation init, 0x54C rotation random (the vanilla
-    corpus: each mode bit set exactly where those values are). Unused ones are left neutral."""
+    corpus: each mode bit set exactly where those values are). Unused ones are left neutral. The
+    shifts change sign (eft adds them, eft2 subtracts: above)."""
     if ts is None:
         ts = {'scroll': [0, 0], 'scroll_add': [0, 0], 'scroll_random': [0, 0], 'scale': [1, 1],
               'scale_add': [0, 0], 'scale_random': [0, 0], 'rotation': 0, 'rotation_add': 0, 'rotation_random': 0}
-    struct.pack_into('>2f', em, 0x514, *ts['scroll_add'])
-    struct.pack_into('>2f', em, 0x51C, *ts['scroll'])
+    struct.pack_into('>2f', em, 0x514, *(-v for v in ts['scroll_add']))
+    struct.pack_into('>2f', em, 0x51C, *(-v for v in ts['scroll']))
     struct.pack_into('>2f', em, 0x524, *ts['scroll_random'])
     struct.pack_into('>2f', em, 0x52C, *ts['scale_add'])
     struct.pack_into('>2f', em, 0x534, *ts['scale'])
