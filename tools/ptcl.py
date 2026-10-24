@@ -369,7 +369,14 @@ class Ptcl:
         h, w = rgba.shape[:2]
         s = self.surface(w, h, gx2fmt)
         data = nut.encode(np.ascontiguousarray(rgba, dtype=np.uint8), s)
+        # the same image added again (e.g. emitters sharing a texture): the first copy's place
+        if not hasattr(self, '_tex_added'):
+            self._tex_added = {}
+        key = (bytes(data), w, h, gx2fmt)
+        if key in self._tex_added:
+            return self._tex_added[key], len(data), {'w': w, 'h': h, 'gx2': gx2fmt}
         pos = align(len(self.tex), max(GX2_ALIGN[gx2fmt], 0x2000))
+        self._tex_added[key] = pos
         self.tex += bytes(pos - len(self.tex)) + data
         self.dirty_layout = True
         return pos, len(data), {'w': w, 'h': h, 'gx2': gx2fmt}
@@ -445,6 +452,68 @@ class Ptcl:
         struct.pack_into('>I', self.shader, 4, len(self.shader))
         self.dirty_layout = True
         return n
+
+    def import_emitter(self, other, set_index, k, skip_slots=(), _shaders={}):
+        """emitter k of another Ptcl's set, adapted to this one: its shader imported (once per source
+        shader), its shader-parameter range copied, its used texture slots' data copied (not
+        skip_slots': the caller replaces them), no key animation, no primitive (-1). Returns the
+        bytes (for new_set / set_texture)."""
+        em = other.emitter_bytes(set_index, k)
+        key = (id(other), be32(em, 0x844))
+        if key not in _shaders or _shaders[key][0] is not self:
+            _shaders[key] = (self, self.import_shader(other, be32(em, 0x844)))
+        struct.pack_into('>I', em, 0x844, _shaders[key][1])
+        size, pos = be32(em, 0x2EC), be32(em, 0x2F0)
+        if size:
+            at = align(len(self.sparam), 4)
+            self.sparam += bytes(at - len(self.sparam)) + other.sparam[pos:pos + size]
+            struct.pack_into('>I', em, 0x2F0, at)
+        struct.pack_into('>II', em, 0x2CC, 0, 0)
+        struct.pack_into('>i', em, 0x2DC, -1)
+        for slot in range(TEX_SLOTS):
+            o = TEXRES + TEXRES_SIZE * slot
+            t = self.texres(em, slot)
+            if t['native_size'] and slot not in skip_slots:
+                data = other.tex[t['native_pos']:t['native_pos'] + t['native_size']]
+                at = align(len(self.tex), 0x2000)
+                self.tex += bytes(at - len(self.tex)) + data
+                struct.pack_into('>I', em, o + 0x34, at)
+        self.dirty_layout = True
+        return em
+
+    def add_primitive(self, pos, nrm, col, uv, idx):
+        """a mesh appended to the primitive table: its index. pos / nrm [n, 3], col [n, 4] (RGBA 0-1),
+        uv [n, 2] or [n, 4] (two UV sets), idx [m] triangle list; nrm / col may be None.
+        Table: u32 count, u32 total size, u32 entry offset (0xC); 0x50 entries of five
+        (float count, components, offset, byte size) attributes: position, normal, colour, UV (4),
+        index (u32); offsets from the data after the entries; big-endian floats."""
+        pos = np.asarray(pos, '>f4').reshape(-1, 3)
+        n = len(pos)
+        uv = np.asarray(uv, np.float32).reshape(n, -1)
+        if uv.shape[1] == 2:
+            uv = np.concatenate([uv, uv], 1)
+        attrs = [(pos, 3), (None if nrm is None else np.asarray(nrm, '>f4').reshape(n, 3), 3),
+                 (None if col is None else np.asarray(col, '>f4').reshape(n, 4), 4),
+                 (uv.astype('>f4'), 4), (np.asarray(idx, '>u4').reshape(-1), 1)]
+        if self.prim:
+            count, _total, eo = struct.unpack_from('>3I', self.prim, 0)
+            entries = bytes(self.prim[eo:eo + 0x50 * count])
+            data = bytes(self.prim[eo + 0x50 * count:])
+        else:
+            count, entries, data = 0, b'', b''
+        data = bytearray(data)
+        entry = b''
+        for arr, comps in attrs:
+            if arr is None:
+                entry += struct.pack('>4I', 0, 0, 0, 0)
+                continue
+            raw = arr.tobytes()
+            entry += struct.pack('>4I', arr.size, comps, len(data), len(raw))
+            data += raw
+        body = entries + entry + bytes(data)
+        self.prim = bytearray(struct.pack('>3I', count + 1, 12 + len(body), 12)) + body
+        self.dirty_layout = True
+        return count
 
     def primitive_count(self):
         return be32(self.prim, 0) if self.prim else 0

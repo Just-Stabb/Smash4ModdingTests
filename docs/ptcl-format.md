@@ -169,10 +169,14 @@ entries: count × 0x78 key records; +0x68 binary size, +0x6C binary offset (from
 The runtime builds one 0x6E8-byte shader object per entry at load. Emitters choose one by
 index (0x844); the key record encodes the emitter configuration the shader was generated for.
 
-## Primitive table (structure verified, content read-only)
+## Primitive table (meshes; authoring: `Ptcl.add_primitive`)
 
-`+0` count, entries of 0x50 from `+8` (vertex attribute pos/size pairs into the table).
-Emitter 0x2DC indexes it ("Primitive Index is Error" if out of range). No mesh authoring yet.
+`+0` u32 count, `+4` u32 total size, `+8` u32 entry offset (0xC); then count entries of 0x50: five
+attributes of (u32 float count, u32 components, u32 offset, u32 byte size): position (3), normal
+(3), colour (4, RGBA 0-1), UV (4: two UV sets), index (1, u32, triangle list). Offsets are from the
+data after the entries; values big endian. An absent attribute is four zeros (Zelda's quad has no
+colour). Emitter 0x2DC indexes the table ("Primitive Index is Error" if out of range); vanilla
+draws meshes with particle types 0 / 2 / 3 / 4 (the type orients the mesh as it would a quad).
 
 ## Key-animation and shader-parameter tables
 

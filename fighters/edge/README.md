@@ -78,6 +78,20 @@ python3 tools/ultimate_acmd.py ... --effects reference/ultimate_sys_effects.json
 python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/trail_table_cave.py IN.rpx)
 ```
 
+## Test 31 (`build/sephiroth_test31.zip`): his own effects
+
+Ultimate's `ef_edge.eff` converted (`tools/vfxb_to_ptcl.py`): 43 of the 46 effects his translated
+scripts use (sword flares and glows on the blade, slash arcs and lights, the grab's hand aura,
+throw bursts, entry / victory effects), particles and meshes; the three speed-line effects are
+stripes only (not converted). Bank: Zelda's sets + his (entries 0x27-0x51, ids 0x3420027-0x3420051,
+`fighters/edge/edge_effects.json`).
+
+```
+python3 tools/vfxb_to_ptcl.py ULT/effect/fighter/edge/ef_edge.eff ZELDA/effect/zelda OUT 0x42 \
+    fighters/edge/edge_effects.json EFFECT... --templates VANILLA/fighter/*/effect/*/*.ptcl
+# OUT/zelda.010d0000.{ptcl,efc} -> fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}
+```
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

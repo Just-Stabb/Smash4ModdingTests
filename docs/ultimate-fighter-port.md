@@ -87,8 +87,23 @@ into the executable's table of 259 names (`0x10423E60`, docs/native-notes.md "Sw
 pairs, and the ids file maps Ultimate's texture names to them (`fighters/edge/edge_effects.json`,
 merged with the sys map: `--effects A.json,B.json NUSKTB`).
 
-Not yet: the fighter's own effects (`edge_*`: their bank comes from Ultimate's .eff, a VFXB),
-LAST_EFFECT_SET_*, FLASH / BURN_COLOR.
+**The fighter's own effects** (`tools/vfxb_to_ptcl.py`): Ultimate's `ef_<name>.eff` (EFFN header:
+effect names -> 1-based emitter set index; a VFXB, Switch eft2 version 22: `tools/vfxb.py`, the
+emitter layout ported from KillzXGaming's EffectLibrary) -> new sets in the fighter's bank (the
+base's ptcl / efc, whose sets stay for the base's specials), one efc entry each (ids `0x3KKnnnn`),
+the ids merged into the fighter's ids file for `--effects`. Per emitter, from a template emitter of
+the same particle type, blend and mesh-ness (the base's own, else one from any vanilla ptcl with its
+shader, shader parameters and textures imported: `Ptcl.import_emitter`): its texture (BNTX with the
+channel selection applied: Ultimate's BC5 textures are luminance + alpha) as a BC4 shape with the
+colour moved into the particle's, colour / alpha / scale keys fitted to eft's 3-key ramps, life,
+emission, velocity, gravity, volume, rotation, the emitter transform. Meshes (a primitive id) come
+from the VFXB's BFRES (`tools/bfres_switch.py`) into the ptcl's primitive table
+(`Ptcl.add_primitive`). Identical textures are shared (Sephiroth's bank: 4.1 MB; Bayonetta's
+vanilla one is 4.6 MB). Not converted: stripes (ribbon trails: the speed lines), texture scroll /
+flipbook animation (the first cell), the second colour track and multi-texture combiners, end fades,
+emitter animations, child emitters.
+
+Not yet in the scripts: LAST_EFFECT_SET_* (rate, colour, alpha), FLASH / BURN_COLOR.
 
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
