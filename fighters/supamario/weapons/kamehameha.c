@@ -692,15 +692,13 @@ void kame_fx_off()
 KAME_FX_OFF
 }
 
-// the body pieces (dropped at the head every KAME_SEG_EVERY frames of the flight) replaced by
-// dissolving ones at the same places, behind the head where it stopped. The last argument 1 puts
-// them in the bone's frame (Z along the beam); with 0, Z was screen depth (test 18: a diagonal line)
-void kame_dissolve()
+// effect `id` at every body piece's place (dropped at the head every KAME_SEG_EVERY frames of the
+// flight), behind the head where it stopped. The last argument 1 puts them in the bone's frame (Z
+// along the beam); with 0, Z was screen depth (test 18: a diagonal line)
+void kame_pieces(int id)
 {
     int f;
-    int id;
     float z;
-    id = kame_dis_id();
     f = KAME_SEG_FIRST;
     while (f <= kame_flown)
     {
@@ -713,6 +711,12 @@ void kame_dissolve()
             f += 0x1;
         }
     }
+}
+
+// the end: the body pieces replaced by dissolving ones
+void kame_dissolve()
+{
+    kame_pieces(kame_dis_id());
     kame_fx_off();
 }
 
@@ -821,6 +825,11 @@ void kame_hold_main()
         kame_flown = kame_frame;
         kame_frame = 0;
         func_24(kame_level, 0, 1.0f);
+        // fresh body pieces: theirs last the flight only (KAME_SEG_n's hold, so a beam the game
+        // removes at a blast zone leaves its body half as long: user, test 29), these the hold and
+        // the finish
+        EffectModule(0x2723, kame_seg_id(), 0x1, 0x1);
+        kame_pieces(kame_seg_id());
     }
     kame_move(0);
     callFunc3(kame_hold_loop);

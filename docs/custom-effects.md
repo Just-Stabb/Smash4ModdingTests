@@ -463,3 +463,11 @@ shader (none in Mario's file).
 User: "increase the size of the kamehameha ball when charging": the charge effects' sizes per level
 (`N_CRG`, Crg / CrgON) x1.5: (0.75, 0), (1.5, 1.5), (2.4, 2.4).
 
+### Kamehameha test 30 (`build/supamario_kame_test30.zip`): the body after a blast zone
+
+User, test 29: a beam that misses and goes into the blast zone stays a while before it disappears
+("I like this"), wanted half as long. The game removes the beam there without its MSC, and its body
+pieces (non-following effects) stay until their own time ends: `SEG_HOLD`, which covered the longest
+flight + hold + finish (141 frames). Now the longest flight + 8 (75 frames); a hit's hold puts fresh
+pieces in their place (`kame_pieces`, killing the old ones by id) for the hold and the finish.
+

@@ -131,8 +131,12 @@ REHIT = 5
 KAME_HOLDS = tuple(n * REHIT for n in HOLD_HITS)    # 24 / 36 / 54 frames
 KAME_HOLD = max(KAME_HOLDS)
 KAME_FINISH = 12                  # the finish status: the launcher, then removed
-# body pieces stay at full width this long (the longest beam: fly + hold + finish), then fade
-SEG_HOLD = max(KAME_LIFE) + KAME_HOLD + KAME_FINISH + 8
+# body pieces stay at full width this long, then fade: the longest flight (+ 8). A hit's hold puts
+# fresh pieces in (kamehameha.c kame_hold_main) for the hold and the finish (both shorter than this).
+# User, test 29: a beam the game removes at a blast zone leaves its body behind for its pieces' time,
+# wanted half as long: it was fly + hold + finish + 8 (141 frames), now 75
+SEG_HOLD = max(KAME_LIFE) + 8
+assert KAME_HOLD + KAME_FINISH <= SEG_HOLD
 SEG_TEX_BASE = 0x15141A60         # after the traces' 0x15141A30-0x15141A5F
 ARTICLE = 5                       # Supamario's article list: fireball .. dokan, kamehameha
 # the head effects follow bone 0 (test 10: on the fireball's 0x7D0, which its animation spins, they
