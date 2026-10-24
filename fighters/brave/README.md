@@ -43,3 +43,43 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 69 264=0
 
 Not yet: the side tilt's second hit (`AttackS3S2`, a second press), the critical hits, his sword
 trails (`tex_brave_sword1 / 2`: trail textures to add, as Sephiroth's) and effects, sounds, specials.
+
+## v3 (`build/hero_v3.zip`): effects, sword trails, neutral special
+
+```
+python3 tools/ultimate_trails.py --shader 3 HERO_FX/trail TRAILS tex_brave_sword1.nutexb,tex_brave_sword2.nutexb=TexBraveSwordTrace \
+    tex_brave_firesword1.nutexb,tex_brave_sword2.nutexb=TexBraveFireSwordTrace ...   (the other three the same; only TexBraveSwordTraceAdd kept)
+python3 tools/vfxb_to_ptcl.py HERO_FX/ef_brave.eff REFLET/effect/reflet FXDIR 0x45 IDS.json EFFECTS --prefix PtcBrave \
+    --templates VANILLA/fighter/*/effect/*/*.ptcl [--variants VARIANTS.json]
+python3 tools/ultimate_fighter.py motions HERO/motion/body/c00 HERO/model/body/c00 REFLET MOTIONDIR --have Shield,Sword1 --max-bones 120 \
+    --add D00SpecialN2,D00SpecialN3,D00SpecialNCancel,D00SpecialAirN2,D00SpecialAirN3,D00SpecialAirNCancel --anim-cache CACHE.json
+python3 tools/brave_build.py DUMP/lua2cpp_brave HERO BRAVE_BODY fighter_param_vl_reflet.bin OUT/c00 PKG \
+    --rpx TEST42/cross_f.rpx --bank FXDIR --trails TRAILS --motions MOTIONDIR
+```
+- Effects: 17 of `ef_brave.eff`'s 103 (the ones his moves so far use: shield bash / impact, smash
+  ground, sword light, the chant and Frizz's hand / shot / bullet / hit / burst effects) after Robin's
+  38 sets (`effect/brave/brave.010d0000`, 4.9 MB; all 103 were 12.4 MB). Two are on his hand turned
+  (-90, 0, -90): `effect_variants.py` copies (`brave_effects.json`). Left out (no move uses them yet):
+  `brave_tension`, `brave_flying`, `brave_entry`, `sys_misfire` (the MP-failed puff).
+- Sword trails: Ultimate's `AFTER_IMAGE4_ON` -> `Sword_Glow` shader 3 (Sephiroth's retracting trail,
+  `shader/effect_trail.nsh` + the executable patch) with his textures, trail ids 264-269
+  (`trail_table_cave.py` NEW_TRAILS; it now also re-applies over an executable that has the table).
+- Neutral special (status 0x152, Robin's Thunder; `brave.c` `brave_n_*`): SpecialNStart, then
+  SpecialNHold while special is held; Frizzle from 18 frames held, Kafrizz from 81. Released (a tap
+  too) -> SpecialN1 / N2 / N3, the fireball out at frame 10 / 11 / 16; shield while holding ->
+  SpecialNCancel, the charge kept for the next one (lost if he's hit while charging, or loses a
+  stock). Actionable from Ultimate's cancel frames (44 / 52 / 68, cancel 6) through Robin's
+  `func_2246`; the air motions are swapped in by Robin's `func_2245`. Air: the fall slowed while
+  charging and through Frizz (x0.8). Motions: Robin's 0x21F start, 0x223 hold, 0x227 N1, the shoot's
+  custom-move variants 0x228 / 0x229 N2 / N3, Thoron's start 0x22F cancel (air + 0x1C; extra_kinds.json
+  "motions", `specials_acmd.json`).
+- Fireball (weapon kind 0x190, a copy of Robin's thunder, article 7; `weapons/fireball.c`): the level
+  from the custom N slot; Frizz 1.6 (slowing from frame 30), Frizzle 2.4, Kafrizz 0.3 + 0.1 a frame
+  up to 4.0; life 56 / 46 / 58 (`param_fireball`); bursts on a hit, a wall / the floor or at its
+  life's end (BurstS / M: the hit effect; BurstL: the explosion's hits at 1 and 19). Its scripts are
+  Ultimate's `brave_fireball` ones on its bone 0 (Frizzle's two balls in one place).
+
+Not yet: MP (every spell works; Ultimate's MP checks taken as passed), Zap / Woosh / Command
+Selection, the stored-charge glow on his hand (`brave_fire2_hold_flash` / `fire3_hold_flash`, status
+code in Ultimate), Frizz's damage drop at frame 30 (`ATK_POWER` 9 -> 6), the air shoot hop, his sounds
+(Robin's charge sound plays in the hold).

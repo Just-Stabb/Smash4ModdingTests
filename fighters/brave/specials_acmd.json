@@ -1,0 +1,15 @@
+{
+  "_about": "Hero's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in Robin's neutral special motion slots (Thunder's start / hold / shoot; the shoot's custom-move variants 0x228 / 0x229 and Thoron's start 0x22F take the extra animations, named by extra_kinds.json \"motions\"); fighters/brave/README.md",
+  "SpecialNStart": "specialnstart",
+  "SpecialNHold": "specialnhold",
+  "SpecialN1": "specialnshoot",
+  "SpecialN2": {"name": "specialn2", "slot": "0x228"},
+  "SpecialN3": {"name": "specialn3", "slot": "0x229"},
+  "SpecialNCancel": {"name": "specialncancel", "slot": "0x22F"},
+  "SpecialAirNStart": "specialairnstart",
+  "SpecialAirNHold": "specialairnhold",
+  "SpecialAirN1": "specialairnshoot",
+  "SpecialAirN2": {"name": "specialairn2", "slot": "0x244"},
+  "SpecialAirN3": {"name": "specialairn3", "slot": "0x245"},
+  "SpecialAirNCancel": {"name": "specialairncancel", "slot": "0x24B"}
+}

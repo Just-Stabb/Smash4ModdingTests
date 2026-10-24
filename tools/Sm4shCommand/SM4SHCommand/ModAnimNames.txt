@@ -59,3 +59,39 @@ BurstM
 BurstL
 FireNone3
 FireNone7
+
+// ---- Hero (brave)
+// his neutral special (Frizz / Frizzle / Kafrizz, status 0x152): Robin's Thunder shoot's custom-move
+// slots 0x228 / 0x229 and Thoron's start 0x22F (air 0x244 / 0x245 / 0x24B; extra_kinds.json "motions",
+// body/main.pac FitRefletBodyMainD00SpecialN2 ...), scripts from Ultimate's: tools/brave_build.py
+// (fighters/brave/specials_acmd.json)
+SpecialN2
+SpecialN3
+SpecialNCancel
+SpecialAirN2
+SpecialAirN3
+SpecialAirNCancel
+// the fireball article (weapon kind 0x190, his article 7; motion.mtable): SpecialN1 / 2 / 3 the flight
+// (Frizz / Frizzle / Kafrizz), BurstS / M / L their bursts, FireballNone6-23 empty slots (thunder's 24)
+SpecialN1
+BurstS
+BurstM
+BurstL
+FireballNone6
+FireballNone7
+FireballNone8
+FireballNone9
+FireballNone10
+FireballNone11
+FireballNone12
+FireballNone13
+FireballNone14
+FireballNone15
+FireballNone16
+FireballNone17
+FireballNone18
+FireballNone19
+FireballNone20
+FireballNone21
+FireballNone22
+FireballNone23

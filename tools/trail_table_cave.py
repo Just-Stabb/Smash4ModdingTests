@@ -11,7 +11,8 @@ name among the loaded trail textures (`effect/<fighter>/trail/*.nut`). It indexe
 bound (`lwzx` from `0x10423E5C`, built at `0x032F53A4` / `0x032F53B0`, its only reference), and the
 words after it are other variables, so the table can't grow in place: the copy gets the new names
 (ids 260 on, NEW_TRAILS) and those two instructions point at it (their relocations moved to a dead
-word, as the other caves do: the loader would otherwise rewrite them).
+word, as the other caves do: the loader would otherwise rewrite them). Over an executable that has
+the cave already (an earlier test's) the game's names are read from the copy, so it re-applies.
 """
 import os
 import struct
@@ -30,7 +31,10 @@ LIS = 0x032F53A4                # lis r25, 0x1042
 ADDI = 0x032F53B0               # addi r25, r25, 0x3E5C  (the table - 4: ids are 1-based)
 RELOC_DUMMY = 0x037EE73C        # dead word for moved relocations (kind_expand.py, starcopy_cave.py)
 # new trail textures, in id order (260, 261, ...): effect/<fighter>/trail/<name>.nut
-NEW_TRAILS = ['TexEdgeSwordTrace', 'TexEdgeSwordTraceAdd', 'TexEdgeSwordTrace2', 'TexEdgeSwordTrace2Add']
+NEW_TRAILS = ['TexEdgeSwordTrace', 'TexEdgeSwordTraceAdd', 'TexEdgeSwordTrace2', 'TexEdgeSwordTrace2Add',
+              # Hero (brave): his trails all take tex_brave_sword2 as the mask (one Add)
+              'TexBraveSwordTrace', 'TexBraveSwordTraceAdd', 'TexBraveFireSwordTrace', 'TexBraveLightningSwordTrace',
+              'TexBraveFinalSwordTrace', 'TexBraveSwordTrace3']
 FIRST_NEW = OLD_N + 1
 
 
@@ -41,11 +45,17 @@ def trail_id(name):
 def build(rpx):
     d, _shoff, _ent, secs = rpx_patch.load(rpx)
     cache = {}
-    assert rpx_patch.read_u32(d, secs, LIS, cache) == 0x3F201042, hex(rpx_patch.read_u32(d, secs, LIS, cache))
-    assert rpx_patch.read_u32(d, secs, ADDI, cache) == 0x3B393E5C, hex(rpx_patch.read_u32(d, secs, ADDI, cache))
-    old = [rpx_patch.read_u32(d, secs, TABLE + 4 * i, cache) for i in range(OLD_N)]
-    assert all(old) and rpx_patch.read_u32(d, secs, TABLE + 4 * OLD_N, cache) == 0
     table = CAVE
+    base = table - 4
+    ha, lo = (base + 0x8000) >> 16, base & 0xFFFF
+    lis, addi = rpx_patch.read_u32(d, secs, LIS, cache), rpx_patch.read_u32(d, secs, ADDI, cache)
+    if (lis, addi) == (0x3F200000 | ha, 0x3B390000 | lo):
+        src = CAVE              # an executable that has the cave (an earlier test's): its names are rewritten
+    else:
+        assert (lis, addi) == (0x3F201042, 0x3B393E5C), (hex(lis), hex(addi))
+        src = TABLE
+    old = [rpx_patch.read_u32(d, secs, src + 4 * i, cache) for i in range(OLD_N)]
+    assert all(old) and (src == CAVE or rpx_patch.read_u32(d, secs, TABLE + 4 * OLD_N, cache) == 0)
     strings = table + 4 * (OLD_N + len(NEW_TRAILS))
     blob, ptrs = b'', []
     for n in NEW_TRAILS:
@@ -55,8 +65,6 @@ def build(rpx):
     words = old + ptrs + list(struct.unpack('>%dI' % (len(blob) // 4), blob))
     assert CAVE + 4 * len(words) <= GROW <= LIMIT
     patches = {CAVE + 4 * i: w for i, w in enumerate(words)}
-    base = table - 4
-    ha, lo = (base + 0x8000) >> 16, base & 0xFFFF
     patches[LIS] = 0x3F200000 | ha                    # lis r25, ha
     patches[ADDI] = 0x3B390000 | lo                   # addi r25, r25, lo
     return patches

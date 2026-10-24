@@ -99,6 +99,17 @@
         "id": 63,
         "name": "Hero",
         "subtitle": "The Luminary"
+      },
+      "motions": {
+        "0x228": {"anim": "FitRefletBodyMainD00SpecialN2", "flags": "0x0", "motion": "specialn2 (Frizzle; custom-move slot)"},
+        "0x229": {"anim": "FitRefletBodyMainD00SpecialN3", "flags": "0x0", "motion": "specialn3 (Kafrizz)"},
+        "0x22F": {"anim": "FitRefletBodyMainD00SpecialNCancel", "flags": "0x0", "motion": "specialncancel"},
+        "0x244": {"anim": "FitRefletBodyMainD00SpecialAirN2", "flags": "0x0", "motion": "specialairn2"},
+        "0x245": {"anim": "FitRefletBodyMainD00SpecialAirN3", "flags": "0x0", "motion": "specialairn3"},
+        "0x24B": {"anim": "FitRefletBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel"}
+      },
+      "weapons": {
+        "fireball": {"kind": "0x190", "base": "thunder", "max": 3, "on_hit": 1}
       }
     }
   ],
