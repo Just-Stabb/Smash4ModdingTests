@@ -543,3 +543,16 @@ User, test 54: option 2, the two-colour fit for dash attack's line only.
   with colour 0 = Ultimate's colour 0 track (white, lilac at the end) and colour 1 its colour 1
   (blue 0.13, 0.11, 1.0): a white core in a blue glow. Each track gets its own key fit / sections.
 Bank 6.56 MB, the one emitter changed; effect.bin test 53's. Package: the ptcl / efc and effect.bin.
+
+## Test 56 (`build/sephiroth_test56.zip`): the sampler's U / V wraps the right way round
+
+User, test 55 (shot): dash attack still a band: as wide as the quad (6 units), solid to one sharp
+edge, soft on the other: `ef_cmn_line06` (half a line, dark to bright across U, mirrored by the
+repeat 2) sampled clamped across U.
+- The eft sampler word holds U's wrap in bits 24-27 and V's in 28-31 (docs/ptcl-format.md), not
+  the reverse: in the 374 vanilla emitters repeated along U only, bits 24-27 are always mirror and
+  28-31 mirror / repeat / clamp (47 clamp: the other axis); the V-only ones agree. Every emitter
+  with different wraps had them swapped since test 31 (124 here: the sword glows, slash arcs, the
+  throws' rings). An odd number of quarter turns baked into a texture also swaps its repeat and
+  wraps now.
+Bank 6.56 MB; effect.bin test 53's. Package: the ptcl / efc and effect.bin.

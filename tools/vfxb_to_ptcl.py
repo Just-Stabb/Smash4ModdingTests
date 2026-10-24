@@ -101,8 +101,11 @@ FADE_ALPHA = 0x82C
 # while its set fades, an emitter stops emitting only when this byte is set (0x04A65034: eft2's
 # is_fade_emit); with it 0 and FADE_ALPHA 0 it emits on for good (test 37's speed lines)
 FADE_EMIT = 0x2F9
-# the eft sampler word: U wrap in bits 28-31, V in 24-27, the same codes as eft2's (0 mirror,
-# 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0)
+# the eft sampler word: U wrap in bits 24-27, V in 28-31, the same codes as eft2's (0 mirror,
+# 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0;
+# the axes from the 374 vanilla emitters repeated along U only: bits 24-27 always mirror, 28-31
+# any, the other way round for V. Tests 31-55 had them swapped: dash attack's line, a half profile
+# mirrored across U, drew clamped, a solid band)
 # eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
 REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
 
@@ -761,6 +764,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         # no template turns this quad: a fixed quarter turn goes into the texture (and the scale)
         shape = np.ascontiguousarray(np.rot90(shape, quarter))
         notes.append('rotation: %d quarter turn(s) baked into the texture' % quarter)
+    # an odd number of baked quarter turns swaps the texture's U and V: their repeat and wraps too
+    swap_uv = ((uv_quarter or 0) + (quarter or 0)) % 2 == 1
+    if swap_uv:
+        repeat = (repeat[1], repeat[0])
     h, w = shape.shape
     # a whole flipbook sheet of 4+ cells a side gets twice the size, cells keeping 64 px
     grid = max(int(round(v)) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else 1
@@ -789,7 +796,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if mask_only:
         notes.append('template reads the texture alpha as a mask: its channel selectors kept')
     if smp:
-        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
+        wu, wv = (smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])
+        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (wv & 0xF) << 28 | (wu & 0xF) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
     set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
