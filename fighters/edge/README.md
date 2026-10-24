@@ -423,3 +423,5 @@ flat ellipse (Ultimate: a short swoosh behind him).
 Open: the blob (likely `edge_sword_light3`, the blade glow, misplaced: `optional_no_blade_glow/` has
 test 44's effect.bin without it in forward / up / down air, to confirm); neutral air's burst.
 Bank 6.37 MB; ids / efc unchanged. Package: the ptcl / efc, `optional_no_blade_glow/`.
+
+User, test 48: up air, up smash and forward smash look right.
