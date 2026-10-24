@@ -408,3 +408,6 @@ body reached back past the start ball (frame 3); multi-hits rarely let a target 
   beam reads `WorkModule(0x6, 0x10000005)`. (The fireball's param block for slots 0-2 exists, and
   the boilerplate's motion offset by it, `func_40`, isn't installed.)
 - `SEG_FIRST` back to 4 (the ball no longer moves with him); head / body FKB 6.
+
+Test 23 in game (user): charge works, the Kamehameha is fixed. Left: the pose still lasts the flight
+rather than ending when the beam hits (needs a signal from the beam to Supamario).

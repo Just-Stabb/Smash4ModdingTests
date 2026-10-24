@@ -141,6 +141,6 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
 
 ## Not known yet (in game)
 
-- Test 20 (`build/fighters_fix_test20.zip`): whether the rigged-polygon flag fixes the pillar and the
-  invisible Sephiroth (test 19's header / budget fix alone didn't).
+- Confirmed in game: the rigged-polygon flag (test 20: both load and draw), the 26-joint table with
+  `--have` (test 22: hitboxes right), the sword's swapped copies (test 23: the sword shows).
 - Whether the empty `.sb` / `.nhb` and a model without `.sbwl` load.
