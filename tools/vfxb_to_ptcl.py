@@ -391,9 +391,9 @@ def uv_transform(uv, scale, scroll, rotation):
     return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5).astype(np.float32)
 
 
-def set_flipbook(em, ptn, ts, tp):
+def set_flipbook(em, ptn, ts, tp, rep=(1, 1)):
     """slot 0's flipbook from eft2's pattern animation (PTN_MODE); ptn 0: none (one cell shown,
-    first_cell). Cells across / down from eft2's uv_div, the UV scale 1 / cells, its table (eft2's
+    first_cell). Cells across / down from eft2's uv_div, the UV scale repeat / cells, its table (eft2's
     num entries of it), frames a cell (frequency) and random start cells (num_random)"""
     struct.pack_into('>I', em, PTN_MODE, ptn)
     if not ptn:
@@ -405,7 +405,7 @@ def set_flipbook(em, ptn, ts, tp):
     em[0x4D9] = max(1, int(tp['num_random']))
     em[0x4E0:0x500] = bytes(min(255, max(0, int(v))) for v in tp['table'][:32])
     struct.pack_into('>hh', em, 0x504, max(1, int(round(tp['frequency']))) if ptn in (2, 4) else 0, num)
-    struct.pack_into('>2f', em, 0x508, 1.0 / nx, 1.0 / ny)
+    struct.pack_into('>2f', em, 0x508, rep[0] / nx, rep[1] / ny)
 
 
 def set_uv_anim(em, ts):
@@ -438,11 +438,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         notes.append('primitive %d not in the file: skipped' % pt['primitive_id'])
         return None
     vel = e['velocity']
+    rest_dir = False
     if is_mesh and typ == 3 and abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3:
         # a directional mesh at rest (his sword glows, slash arcs) lies in the emitter's frame in
         # Ultimate; eft's directional type 3 turns it by its (zero) velocity (test 32: the up-air arc
         # lay flat), type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love crystals)
         typ = 4
+        rest_dir = True
         notes.append('directional mesh at rest: type 4')
     elif is_mesh and pt['billboard_type'] in (5, 6):
         # a "stripe" mesh (no ribbon data: its shape is the mesh) keeps the emitter's frame: neutral
@@ -454,9 +456,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     ti, smp = main_texture(e, names)
     ts = e['static']['tex_scroll'][ti] if smp else None
     ptn_want = PTN_FROM_EFT2.get(e['tex_anim'][ti]['pattern_type'], 0) if smp else 0
+    if ptn_want and all(int(round(v or 1)) <= 1 for v in e['static']['tex_scroll'][ti]['uv_div']):
+        # a one-cell sheet plays nothing; as a flipbook its UV scale (1 / cells) would replace the
+        # repeat (forward air's X, a quarter texture repeated 2 x 2 mirrored, drew one quarter from
+        # test 39 on: a ">" at the blade tip)
+        ptn_want = 0
     tp = e['static']['tex_pat'][ti] if smp else None
     st = e['static']
-    rot = rotation_need(st, is_mesh)
+    # a directional mesh at rest keeps no particle rotation: his slash arcs (all turned Z 180,
+    # their glows Y -20 too, spinning) looked right unturned (test 36: back / up air "nearly
+    # right") and wrong turned (tests 44 / 45: the arc a whole disc, behind him too). Ultimate's
+    # directional basis at rest evidently undoes it (his sword glows, unturned, extend along +Y,
+    # so it isn't a plain flip of every such mesh); not derived, only observed
+    rot = ROT_NONE if rest_dir else rotation_need(st, is_mesh)
     em, turns = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot, notes)
     # a rotation no template draws: baked (a quad's fixed quarter turns; a mesh's starting rotation)
     baked_rot = rot != ROT_NONE and not turns and (is_mesh or rot == ROT_FIXED)
@@ -537,7 +549,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
-    set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp)
+    set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
 
     # ---- blend, colour, alpha
     st, col = e['static'], e['color']
@@ -576,7 +588,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
 
     # ---- rotation
     # (a template that doesn't turn: none, as vanilla's; what could be baked was)
-    unturned = rot != ROT_NONE and not turns
+    unturned = rest_dir or (rot != ROT_NONE and not turns)
     p.set_field(em, 'rotation_init', [0.0] * 3 if unturned else [float(v) for v in st['rotate_init'][:3]])
     p.set_field(em, 'rotation_random', [0.0] * 3 if unturned else [float(v) for v in st['rotate_init_rand'][:3]])
     p.set_field(em, 'rotation_velocity', [0.0] * 3 if unturned else [float(v) for v in st['rotate_add']])

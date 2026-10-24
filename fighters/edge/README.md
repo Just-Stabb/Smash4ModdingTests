@@ -365,3 +365,21 @@ that swings round, its neutral air a burst with no disc.
 Bank 6.31 MB (test 44: 6.33); ids and .efc unchanged; effect.bin is test 44's. Still open: up air's
 trail jagged / late (Sword_Glow arguments of the same kind as Marth's / Ike's / Cloud's).
 Package: the ptcl / efc and effect.bin, `optional_old_trails/` as test 44.
+
+## Test 46 (`build/sephiroth_test46.zip`): forward air's X, slash arcs unturned again
+
+User, test 45 (shots, with Ultimate's for comparison): forward tilt's arc a wide flat disc reaching
+behind him (Ultimate: one swoosh in front); forward air's X drawn as a ">"; down smash a vertical
+white bar.
+- Forward air's X (`edge_sword_flash2` flash3 / flash3_b): eft2 pattern type 2 on a 1 x 1 sheet.
+  Since test 39 it converted to a flipbook, whose UV scale (1 / cells) replaced the 2 x 2 mirrored
+  repeat (test 35), so one quarter showed. A one-cell sheet is no flipbook now, and a flipbook's UV
+  scale is repeat / cells. Only these two emitters changed.
+- Directional meshes at rest (type 4) keep no particle rotation. The slash arcs are all turned Z
+  180 (glows also Y -20 and a -15 degree a frame spin); unturned in test 36 ("nearly right"),
+  turned in tests 44 / 45 (wrong: a disc, behind him too). Observed, not derived: Ultimate's
+  directional basis at rest evidently cancels it (the sword glows, unturned, extend along +Y, so
+  it isn't a flip of every such mesh).
+Open: down smash's bar (likely `edge_smashlw_speedline` line3, a 23 x ~150 stripe quad at speed
+0.1, converted as a directional quad); asked for an Ultimate shot. Bank 6.29 MB; ids / efc and
+effect.bin unchanged. Package: the ptcl / efc.
