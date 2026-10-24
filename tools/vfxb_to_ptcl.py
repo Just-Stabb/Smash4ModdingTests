@@ -18,11 +18,12 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
-  selection applied (tools/vfxb.py images), the first flipbook cell (uv_div), as a BC4 shape with
-  the mean colour moved into the particle colour (xv2_to_ptcl.shape_texture); clamped when the
+  selection applied (tools/vfxb.py images), the first flipbook cell (uv_div); clamped when the
   sampler clamps;
-- colour: colour 0 (constant, or its keys) x the emitter colour, the 3-key colour fit; alpha 0
-  (constant or keys, clamped to 1) as the 3-key alpha; colour scale as eft's;
+- colour / alpha: eft2's combiner (colour modes 0-3: colour 0, x texture, + colour 1 x (1 -
+  texture), + colour 1; alpha modes 0-4) folded into a BC4 shape and one particle colour (combine):
+  each pixel's brightness kept, the hue averaged; the 3-key colour and alpha fits; colour scale;
+- meshes: the particle's 3D scale baked into the mesh, the emitter's scale 1 (x the animation);
 - scale: the particle scale x the scale keys (3-key fit), random % -> fraction;
 - life (+ random % -> frames; infinite -> 0x7FFFFFFF, emitted once), emission (start, duration when one-time, else
   forever, interval, rate), velocity (all-direction -> figure velocity, designated direction x
@@ -48,13 +49,14 @@ import efc  # noqa: E402
 import ptcl  # noqa: E402
 import vfxb  # noqa: E402
 from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, SAMPLER_CLAMP, buffer_count, color_fit,  # noqa: E402
-                         pow2, resize, sanitize, shape_texture, three_key)
+                         pow2, resize, sanitize, three_key)
 
 NONE64 = 2 ** 64 - 1
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh; 5 / 6
 # (stripes) have no eft counterpart here
 TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
+TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
 
 
@@ -101,14 +103,18 @@ class Templates:
 
 
 def mesh(model):
-    """(pos, nrm, col, uv, idx) of a BFRES model's first shape"""
+    """(pos, nrm, col, uv, idx) of a BFRES model's first shape. Every vanilla primitive has normals
+    (825 of them; 106 have no colour): missing ones are +Z; an all-white colour is left out"""
     shp = model['shapes'][0]
     a = model['vertex_buffers'][shp['vertex_buffer']]['attrs']
     n = len(a['_p0'])
     uv0 = a.get('_u0', np.zeros((n, 2), np.float32))[:, :2]
     uv1 = a.get('_u1', uv0)[:, :2]
-    return (a['_p0'][:, :3], a['_n0'][:, :3] if '_n0' in a else None, a['_c0'][:, :4] if '_c0' in a else None,
-            np.concatenate([uv0, uv1], 1), shp['meshes'][0]['indices'])
+    nrm = a['_n0'][:, :3] if '_n0' in a else np.tile(np.array([0, 0, 1], np.float32), (n, 1))
+    col = a['_c0'][:, :4] if '_c0' in a else None
+    if col is not None and col.min() >= 0.99:
+        col = None
+    return (a['_p0'][:, :3], nrm, col, np.concatenate([uv0, uv1], 1), shp['meshes'][0]['indices'])
 
 
 HELPER_TEXTURES = ('indirect', 'grade', 'noise', 'mask')
@@ -135,6 +141,70 @@ def first_cell(img, scroll):
     return img[:max(4, h // ny), :max(4, w // nx)]
 
 
+LUMA = np.array([0.299, 0.587, 0.114])
+
+
+def track(st, col, n):
+    """colour track n (0 / 1) over the particle's life [101, 3] and alpha track n [101]"""
+    c = keys(st['color%d' % n], st['num_color%d_keys' % n]) if col['color%d_type' % n] == 2 else \
+        np.tile(np.array(col['color%d' % n][:3], float), (101, 1))
+    a = keys(st['alpha%d' % n], st['num_alpha%d_keys' % n], 1)[:, 0] if col['alpha%d_type' % n] == 2 else \
+        np.full(101, float(col['color%d' % n][3]))
+    return c, a
+
+
+def combine(img, e, notes):
+    """eft2's combiner on the main texture, folded into what a one-colour eft template draws (a BC4
+    shape x the particle colour): (shape [h, w] 0-1, colour [101, 3], alpha [101]).
+    Colour modes (combiner color_process): 0 colour 0; 1 colour 0 x texture; 2 colour 0 x texture +
+    colour 1 x (1 - texture); 3 colour 0 x texture + colour 1. Each pixel's colour at the tracks' life
+    means, weighted by the texture's alpha: their mean is the particle colour, each pixel's
+    brightness against it the shape (the hue across the texture is lost, its brightness kept); the
+    colour over life is the same mix of the tracks at the texture's mean. Alpha modes (alpha_process):
+    0 / 1 texture alpha x alpha 0 (1 erodes the texture by alpha 0 in eft2: here it fades), 2 / 3 the
+    same with the texture's red, 4 texture alpha x alpha 0 x alpha 1."""
+    st, col, cb, info = e['static'], e['color'], e['combiner'], e['info']
+    c0, a0 = track(st, col, 0)
+    c1, a1 = track(st, col, 1)
+    c0 = c0 * np.array(info['color0'][:3])
+    c1 = c1 * np.array(info['color1'][:3])
+    f = img.astype(np.float32) / 255
+    rgb = f[..., :3]
+    am = cb['alpha_process']
+    atex = f[..., 0] if am in (2, 3) else f[..., 3]
+    cm = cb['color_process']
+    m0, m1 = c0.mean(0), c1.mean(0)
+    if cm == 0:
+        pix = np.broadcast_to(m0, rgb.shape)
+    elif cm == 1:
+        pix = rgb * m0
+    elif cm == 2:
+        pix = rgb * m0 + (1 - rgb) * m1
+    else:
+        pix = rgb * m0 + m1
+    w = atex[..., None]
+    wsum = max(float(w.sum()), 1e-6)
+    tm = (rgb * w).reshape(-1, 3).sum(0) / wsum                     # the texture's mean (per channel)
+    cmean = (pix * w).reshape(-1, 3).sum(0) / wsum
+    lc = max(float(cmean @ LUMA), 1e-4)
+    shape = atex * (pix @ LUMA) / lc
+    peak = max(float(shape.max()), 1e-4)
+    shape = shape / peak
+    if cm == 0:
+        colour = c0
+    elif cm == 1:
+        colour = c0 * tm
+    elif cm == 2:
+        colour = c0 * tm + c1 * (1 - tm)
+    else:
+        colour = c0 * tm + c1
+    colour = colour * peak * float(cmean @ LUMA > 0)
+    alpha = a0 * info['color0'][3] * (a1 * info['color1'][3] if am == 4 else 1.0)
+    if am in (1, 3):
+        notes.append('alpha erosion as a fade')
+    return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1)
+
+
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     pt = e['particle']
     typ = TYPES.get(pt['billboard_type'])
@@ -148,10 +218,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     em = templates.get(typ, BLEND[blend], is_mesh, notes)
     if is_mesh:
-        pid = pt['primitive_id']
-        if pid not in prim_index:
-            prim_index[pid] = p.add_primitive(*mesh(prims[pid]))
-        struct.pack_into('>i', em, 0x2DC, prim_index[pid])
+        # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
+        # size with scale 1): an uneven 3D scale goes into the mesh (one primitive per mesh and
+        # scale) and the emitter scales by 1 (x its scale animation); an even one stays the
+        # particle's (the mesh shared)
+        s3 = tuple(round(float(v), 4) for v in e['scale']['scale'])
+        is_mesh = 'even' if max(s3) - min(s3) < 1e-3 else True
+        if is_mesh == 'even':
+            s3 = (1.0, 1.0, 1.0)
+        key = (pt['primitive_id'], s3)
+        if key not in prim_index:
+            pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']])
+            prim_index[key] = p.add_primitive(pos * np.array(s3, np.float32), nrm, col_, uv, idx)
+        struct.pack_into('>i', em, 0x2DC, prim_index[key])
     # the blend is shader-keyed: the template's (the same unless none had this one)
     blend = {0: 'normal', 1: 'add', 2: 'sub'}[p.field(em, 'blend_type')]
 
@@ -163,9 +242,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         notes.append('no texture: white')
     else:
         img = first_cell(img, e['static']['tex_scroll'][ti])
-    shape, tint = shape_texture(img.astype(np.float32) / 255)
+    shape, rgb, alpha = combine(img, e, notes)
     h, w = shape.shape
-    tw, th = pow2(w, hi=256), pow2(h, hi=256)
+    tw, th = pow2(w, hi=TEX_MAX), pow2(h, hi=TEX_MAX)
     if (tw, th) != (w, h):
         shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
@@ -177,9 +256,6 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # ---- blend, colour, alpha
     st, col = e['static'], e['color']
     p.set_field(em, 'blend_type', BLEND[blend])
-    rgb = keys(st['color0'], st['num_color0_keys']) if col['color0_type'] == 2 else \
-        np.tile(np.array(col['color0'][:3], float), (101, 1))
-    rgb = np.clip(rgb * np.array(e['info']['color0'][:3]) * tint[None, :], 0, None)
     cks, secs = color_fit(rgb)
     for track in (0, 1):
         if p.field(em, 'color%d_type' % track) == 2:
@@ -191,9 +267,6 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'color_section3', [secs[2]] * 2)
     p.set_field(em, 'color_repeat', [1, 1])
     p.set_field(em, 'color_scale', float(st['color_scale'] or 1.0))
-    alpha = keys(st['alpha0'], st['num_alpha0_keys'], 1)[:, 0] if col['alpha0_type'] == 2 else \
-        np.full(101, float(col['color0'][3]))
-    alpha = np.clip(alpha * e['info']['color0'][3], 0, 1)
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
@@ -204,7 +277,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # ---- scale
     sc = e['scale']
     curve = keys(st['scale_anim'], st['num_scale_keys'], 2)
-    base = np.array([max(sc['scale'][0], 1e-4), max(sc['scale'][1], 1e-4)])
+    base = np.ones(2) if is_mesh is True else np.array([max(sc['scale'][0], 1e-4), max(sc['scale'][1], 1e-4)])
     peak = np.maximum(curve.max(0), 1e-4)
     v0, v1, v2, s1, s2 = three_key(curve / peak)
     p.set_field(em, 'scale', [float(b * m) for b, m in zip(base, peak)])

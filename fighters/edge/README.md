@@ -92,6 +92,21 @@ python3 tools/vfxb_to_ptcl.py ULT/effect/fighter/edge/ef_edge.eff ZELDA/effect/z
 # OUT/zelda.010d0000.{ptcl,efc} -> fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}
 ```
 
+## Test 32 (`build/sephiroth_test32.zip`): effect colours and mesh proportions
+
+User, test 31 (shots): effects displaced and discoloured (white / grey where Ultimate's are blue,
+purple and black; arcs out of place). `vfxb_to_ptcl.py`:
+- eft2's combiner: most of his emitters draw colour 0 x texture + colour 1 x (1 - texture), so the
+  hue was mostly colour 1 (blue / purple) and test 31 used colour 0 alone (often white). Now each
+  pixel's colour per mode is folded into the BC4 shape (its brightness) and one particle colour
+  (the alpha-weighted mean); alpha from the channel the alpha mode reads (`combine`).
+- meshes: Ultimate scales them in 3D (the arcs 30 x 0.1 x 30, 30 x 65 x 30), eft's scale has two
+  axes: an uneven scale is built into the mesh (scale 1), an even one stays the particle's.
+- missing mesh normals filled (every vanilla primitive has them), all-white vertex colours dropped,
+  textures at most 128 px: the bank is 4.9 MB.
+The orange spiky burst in the first shot is most likely Smash 4's normal hit effect (60 of his
+hitboxes are `normal`, `magic` maps to it too).
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the
