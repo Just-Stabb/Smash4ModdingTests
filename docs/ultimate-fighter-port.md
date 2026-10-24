@@ -51,6 +51,11 @@ Incineroar (0-142) drew as a stretched red pillar, Sephiroth (0-171) crashed on 
 on bone 0 / 1 go to HipN (including the empty meshes that fill unused slots), and the header holds
 the range the vertices really use (Sephiroth 2-131 / 2-109, Incineroar 2-135).
 
+**Polygon flags** (+0x22 of each polygon entry): 0x40 << 8, low byte **4 on every rigged polygon**
+(all 288 in the vanilla fighters; 0 on all 640 single-bound ones). Ours had 0 up to test 19, and the
+game drew them unskinned: Incineroar a stretched pillar, Sephiroth invisible (with the 2-N header
+too). `nud.write` sets it from test 20.
+
 Packaging: leave out `model.sbwl`; keep the base's other motion pacs (`zeldasw1 / sw2 / pt1.pac`,
 `koopapt1-3.pac`) next to the new `main.pac` / `lhand` / `rhand`.
 
@@ -120,6 +125,6 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
 
 ## Not known yet (in game)
 
-- Test 19 (`build/fighters_fix_test19.zip`): whether the 2-N header and the 136-bone budget fix the
-  pillar / crash.
+- Test 20 (`build/fighters_fix_test20.zip`): whether the rigged-polygon flag fixes the pillar and the
+  invisible Sephiroth (test 19's header / budget fix alone didn't).
 - Whether the empty `.sb` / `.nhb` and a model without `.sbwl` load.

@@ -45,3 +45,9 @@ kind_expand words (and clear those), keep the picked name in a data word instead
 The no-shortcut executable booted (user). Fixed version (`build/fighters_fix_test19.zip`): the cave
 moved to `0x04B84A00`-`0x04B85000` (zeros after stage_omega_cave.py's), and the old kind_expand space
 `0x04B85000`-`0x04B877C4` cleared to zeros. Not yet run in game.
+
+Test 19 in game: froze after the title; the same files with the no-shortcut executable got past it.
+The shortcut's set-up hook runs before the title (the title showed, so it took the normal path), and
+nothing refers to the cleared space or the cave's space (scanned: branches, data pointers, lis/addi
+and lis/ori pairs with matching registers). Test 20 sends one executable per change
+(`shortcut_check/A_cleared_space_only`, `B_shortcut_only`) to tell which one freezes.

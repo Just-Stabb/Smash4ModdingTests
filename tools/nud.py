@@ -250,8 +250,11 @@ def write(meshes, top_bone=None):
                 mats += _material_bytes(mat, strs)
             texoffs += [0] * (4 - len(texoffs))
             assert len(p.pos) < 0x10000 and p.idx.max() < len(p.pos)
+            # +0x22: 0x40 (triangles) << 8, low byte 4 on every rigged polygon (all 288 in the vanilla
+            # fighters; 0 on all 640 single-bound ones). Without it the game drew our rigged fighters
+            # unskinned: Incineroar a stretched pillar, Sephiroth invisible (tests 18 / 19)
             objs += struct.pack('>iiiHBB4iHHiii', len(polys), len(verts), len(vadd) if ab else 0, len(p.pos), vs, us,
-                                *texoffs, len(p.idx), 0x40 << 8, 0, 0, 0)
+                                *texoffs, len(p.idx), 0x40 << 8 | (4 if ab else 0), 0, 0, 0)
             polys += np.asarray(p.idx, dtype='>u2').tobytes()
             polys += b'\0' * (-len(polys) % 16) if ab else b''
             verts += vb
