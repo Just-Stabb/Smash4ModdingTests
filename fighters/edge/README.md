@@ -145,9 +145,27 @@ air, even after the animation, same thing with up air and up smash". `vfxb_to_pt
   alpha fade time where eft2 fades (and on infinite life), else 0.
 - The follow byte 0x2F9 (0 on 86% of vanilla's infinite-life glows, 1 on 88% of the rest, taken
   as particles following the emitter) is matched to eft2's follow type in the template choice.
-- Sampler wrap per axis (U bits 28-31, V 24-27; eft2 0 mirror / 1 repeat / 2 clamp -> GX2 1 / 0 / 2);
-  test 33 only clamped when both axes clamped.
+- Sampler wrap per axis (U bits 28-31, V 24-27); test 33 only clamped when both axes clamped.
+  (Test 34 translated the codes to GX2's, swapping mirror and repeat: eft's are eft2's; test 35.)
 - Alpha erosion: the fade follows the texture's remaining ink (texture - (1 - alpha)).
+Package: the ptcl / efc (effect.bin as test 33's).
+
+## Test 35 (`build/sephiroth_test35.zip`): texture repeat, mirror, flipbook cells
+
+User, test 34 (shots, Ultimate's forward air for comparison): forward / down air draw a box at
+the blade tip where Ultimate draws an X flash; neutral air still big flat shards; sword trails
+slightly behind the sword (forward smash, up / back air). Checked against an offline side-by-side
+of each Ultimate emitter and the converted one (scratch renderer: same UV maths both sides).
+- The X flash (`edge_sword_flash2` flash3 / flash3_b, `ef_cmn_flash04`) is a quarter texture that
+  eft2 repeats 2 x 2 (tex_anim repeat 3) with mirror wrap: one quarter made the box. eft2's repeat
+  now goes to 0x508 / 0x50C (vanilla: 2.0 on 16% of emitters, all with mirror wrap 0x0), and the
+  wrap codes are copied as they are (eft's are eft2's: test 34 had mirror and repeat swapped).
+- Flipbook cells: neutral air's impact rings (`burst_ring2`, `ring2`: cmn impact00 / ring04, 4
+  cells) start at cell 1 in Ultimate's pattern table; cell 0, the full solid shape, was shown. Now
+  the table's first cell (flipbooks themselves aren't converted: on / off is shader-keyed).
+- Meshes take the UV set eft2's uv_channel names.
+Trails: positions come from the sword joint itself (LHaveN plays swordl1, the same frame and the
+blade's X); a frame's lag would be the engine's sampling (to compare with Cloud's trail).
 Package: the ptcl / efc (effect.bin as test 33's).
 
 ## Next

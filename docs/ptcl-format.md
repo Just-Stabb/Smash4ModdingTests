@@ -118,6 +118,11 @@ the writer recomputes them.)
 | 0x4B0 / 0x4B4 | s32 | particle life / random (frames) | verified |
 | 0x4BC | u32 | particle type (billboard / polygon / directional / stripe…) — shader-keyed | corpus |
 | 0x4D4 | 3 × 0x7C | per-slot UV params (scale at +0x34 for slot 0 → 0x508, flipbook / scroll; slot 0's below) | corpus |
+| 0x4D5 / 0x4D7 / 0x4D8 | u8 | slot 0 flipbook: pattern table used / cells across / cells down | corpus |
+| 0x4E0 | 32 × u8 | slot 0 flipbook pattern table | corpus |
+| 0x500 | u32 | slot 0 flipbook mode (0 none; 1-5; on / off shader-keyed: no shader group mixes) | corpus |
+| 0x504 | u32 | slot 0 flipbook: low 16 bits pattern count / table entries used, high 16 a frame rate | corpus |
+| 0x508 / 0x50C | 2f | slot 0 UV scale = repeat (1 / 2) / cells (2, 1/2, 1/3, 1/4 seen) | corpus |
 | 0x510 | u32 | slot 0 UV animation mode, bits: 1 scroll, 2 scale, 4 rotate (each bit set exactly where its values below are non-neutral; shader-keyed: 8 of 4291 shader groups mix values) | corpus |
 | 0x514 / 0x51C / 0x524 | 2f each | slot 0 UV scroll a frame / initial / random | corpus |
 | 0x52C / 0x534 / 0x53C | 2f each | slot 0 UV scale a frame / initial (1) / random | corpus |
@@ -145,7 +150,7 @@ Everything not listed is copied verbatim.
 | 0x00 | u16 width, u16 height |
 | 0x04 | GX2 tile mode (4 = 2D thin1 in vanilla) |
 | 0x08 | swizzle (0) |
-| 0x0C | sampler: U wrap in bits 28-31, V wrap in 24-27 (GX2: 0 repeat, 1 mirror, 2 clamp), 0x100 filter (vanilla: 0x100, 0x22000100, 0x11000100...) |
+| 0x0C | sampler: U wrap in bits 28-31, V wrap in 24-27 (eft's codes, as eft2's: 0 mirror, 1 repeat, 2 clamp; every vanilla 2 x 2 repeat is 0x0, mirroring a quarter texture into a whole), 0x100 filter (vanilla: 0x100, 0x22000100, 0x11000100...) |
 | 0x10 | mip levels |
 | 0x14 | component selector (one byte per output channel: 0 R 1 G 2 B 3 A 4 zero 5 one; BC4 = R,R,R,1; BC5 = R,R,R,G) |
 | 0x18 | enable mip level (f) |

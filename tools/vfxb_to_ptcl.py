@@ -19,7 +19,8 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
-  selection applied (tools/vfxb.py images), the first flipbook cell (uv_div); the sampler's wrap
+  selection applied (tools/vfxb.py images), the flipbook cell its pattern table shows first
+  (uv_div; shown_cell), its repeat (0x508), UV set (uv_channel); the sampler's wrap
   per axis; its UV shift / scale / rotation (initial, random, a frame) into slot 0's UV block
   (set_uv_anim; baked into a mesh's UVs when the template can't animate them);
 - colour / alpha: eft2's combiner (colour modes 0-3: colour 0, x texture, + colour 1 x (1 -
@@ -64,9 +65,10 @@ BASE_FIRST = 2          # a template of the base's own beats an imported one thi
 UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
 FOLLOW = 0x2F9
 FADE_ALPHA = 0x82C      # alpha lost a frame once the set is turned off (1 / frames); 0 lives on
-# eft2 sampler wrap (0 mirror, 1 repeat, 2 clamp) -> GX2 (0 repeat, 1 mirror, 2 clamp); the eft
-# sampler word: U wrap in bits 28-31, V in 24-27 (clamped vanilla textures: 0x22000100)
-WRAP = {0: 1, 1: 0, 2: 2}
+# the eft sampler word: U wrap in bits 28-31, V in 24-27, the same codes as eft2's (0 mirror,
+# 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0)
+# eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
+REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
 
 
 class Templates:
@@ -129,14 +131,17 @@ class Templates:
         raise KeyError((typ, blend, mesh))
 
 
-def mesh(model):
+def mesh(model, uv_channel=0):
     """(pos, nrm, col, uv, idx) of a BFRES model's first shape. Every vanilla primitive has normals
-    (825 of them; 106 have no colour): missing ones are +Z; an all-white colour is left out"""
+    (825 of them; 106 have no colour): missing ones are +Z; an all-white colour is left out. The UV
+    set the texture reads (eft2's uv_channel) comes first"""
     shp = model['shapes'][0]
     a = model['vertex_buffers'][shp['vertex_buffer']]['attrs']
     n = len(a['_p0'])
     uv0 = a.get('_u0', np.zeros((n, 2), np.float32))[:, :2]
     uv1 = a.get('_u1', uv0)[:, :2]
+    if uv_channel == 1:
+        uv0, uv1 = uv1, uv0
     nrm = a['_n0'][:, :3] if '_n0' in a else np.tile(np.array([0, 0, 1], np.float32), (n, 1))
     col = a['_c0'][:, :4] if '_c0' in a else None
     if col is not None and col.min() >= 0.99:
@@ -162,10 +167,23 @@ def main_texture(e, names):
     return smp[0] if smp else (None, None)
 
 
-def first_cell(img, scroll):
+def first_cell(img, scroll, cell=0):
+    """a flipbook's cell (row-major, uv_div columns x rows)"""
     nx, ny = (int(round(v)) if v and v >= 1 else 1 for v in scroll['uv_div'])
     h, w = img.shape[:2]
-    return img[:max(4, h // ny), :max(4, w // nx)]
+    ch, cw = max(4, h // ny), max(4, w // nx)
+    cy, cx = divmod(int(cell) % (nx * ny), nx)
+    return img[cy * ch:(cy + 1) * ch, cx * cw:(cx + 1) * cw]
+
+
+def shown_cell(e, ti):
+    """the flipbook cell to show (eft's flipbooks aren't converted): the first one Ultimate's
+    pattern animation plays (its table's first entry; e.g. neutral air's impact rings start at cell
+    1, cell 0 being the full solid shape)"""
+    if not e['tex_anim'][ti]['pattern_type']:
+        return 0
+    tp = e['static']['tex_pat'][ti]
+    return tp['table'][0] if tp['num'] else 0
 
 
 LUMA = np.array([0.299, 0.587, 0.114])
@@ -295,6 +313,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     ti, smp = main_texture(e, names)
     ts = e['static']['tex_scroll'][ti] if smp else None
     em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'] == 0, notes)
+    repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
         # size with scale 1): an uneven 3D scale goes into the mesh (one primitive per mesh and
@@ -309,13 +328,16 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         need = uv_mode(ts)
         bake = None
         if struct.unpack_from('>I', em, UV_MODE)[0] & need != need:
-            bake = (tuple(ts['scale']), tuple(ts['scroll']), ts['rotation'])
+            bake = (repeat, tuple(ts['scale']), tuple(ts['scroll']), ts['rotation'])
+            repeat = (1, 1)
             notes.append('UV transform baked into the mesh')
-        key = (pt['primitive_id'], s3, bake)
+        channel = e['tex_anim'][ti]['uv_channel'] if smp else 0
+        key = (pt['primitive_id'], s3, bake, channel)
         if key not in prim_index:
-            pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']])
+            pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
             if bake:
-                uv = np.concatenate([uv_transform(uv[:, :2], *bake), uv[:, 2:]], 1)
+                uv = np.concatenate([uv_transform(uv[:, :2] * np.array(bake[0], np.float32), *bake[1:]),
+                                     uv[:, 2:]], 1)
             prim_index[key] = p.add_primitive(pos * np.array(s3, np.float32), nrm, col_, uv, idx)
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
         if bake:
@@ -329,7 +351,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         img = np.full((16, 16, 4), 255, np.uint8)
         notes.append('no texture: white')
     else:
-        img = first_cell(img, e['static']['tex_scroll'][ti])
+        img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
     shape, rgb, alpha = combine(img, e, notes)
     h, w = shape.shape
     tw, th = pow2(w, hi=TEX_MAX), pow2(h, hi=TEX_MAX)
@@ -338,9 +360,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
     p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34)
     if smp:
-        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C,
-                         WRAP.get(smp['wrap_u'], 0) << 28 | WRAP.get(smp['wrap_v'], 0) << 24 | 0x100)
-    p.set_field(em, 'tex0_uv_scale', [1.0, 1.0])
+        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
+    p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
 
     # ---- blend, colour, alpha
