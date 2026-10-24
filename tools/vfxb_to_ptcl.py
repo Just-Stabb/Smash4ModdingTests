@@ -14,8 +14,8 @@ fighter kind (ids 0x3KKnnnn). EFFECT: Ultimate effect names (default: all).
 Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/xv2_to_ptcl.py:
 - template: Templates (the base's own or one imported from --templates files) of the eft particle
   type (eft2's numbers: 0 billboard, 1 / 2 plate XY / XZ, 3 directional, 4 directional polygon, 8 Y
-  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4), blend and mesh-ness,
-  plain shaders first. Stripes (5 / 6) are skipped;
+  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4; stripes 5 / 6 as
+  directional quads), blend and mesh-ness, plain shaders first, never one reading the screen;
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
@@ -58,8 +58,9 @@ from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, c
 NONE64 = 2 ** 64 - 1
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh; 5 / 6
-# (stripes) have no eft counterpart here
-TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
+# (stripes: ribbons along the particle's path) as directional quads, scaled as eft2 scales them
+# (his speed lines: 2.5 x 36 moving along their length)
+TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 3, 6: 3, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
 UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
@@ -71,6 +72,12 @@ FADE_ALPHA = 0x82C      # alpha lost a frame once the set is turned off (1 / fra
 REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
 
 
+# shaders that read the screen behind them (refraction: Zelda's Nayru's Love crystal, test 35's type-4
+# templates, drew his sword glows and neutral air as see-through distortion; 56 of 1797 vanilla
+# shaders) or texture arrays: never templates
+SCREEN_SAMPLERS = (b'frameBufferTexture_CROSS', b'depthBufferTexture_CROSS', b'textureArraySampler')
+
+
 class Templates:
     """template emitters by (eft particle type, blend 0 / 1 / 2, mesh): simple emitters with one BC4
     texture (slot 0; slots 1 / 2 unused). Among them, in this order: a plain shader (no shader
@@ -80,7 +87,8 @@ class Templates:
     byte 0x2F9 wanted (0 on 86% of vanilla's infinite-life glows, 1 on 88% of the rest: taken as
     particles following the emitter; also shader-keyed: 41 groups mix), then animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
-    (Ptcl.import_emitter: their shader, shader parameters and textures copied)"""
+    (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
+    screen or texture arrays (SCREEN_SAMPLERS) are left out."""
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
@@ -88,6 +96,7 @@ class Templates:
             p = base if path is None else ptcl.Ptcl(open(path, 'rb').read())
             if path is not None:
                 self.files[path] = p
+            screen = {}
             for si, s in enumerate(p.sets):
                 for k, x in enumerate(s['emitters']):
                     em = x['data']
@@ -100,6 +109,12 @@ class Templates:
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
                     score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0) \
                         - (1 if p.field(em, 'keyanim_size') else 0)
+                    si_ = struct.unpack_from('>I', em, 0x844)[0]
+                    if si_ not in screen:
+                        b = p.shader_binary(si_)
+                        screen[si_] = any(t in b for t in SCREEN_SAMPLERS)
+                    if screen[si_]:
+                        continue
                     traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
                               em[FOLLOW] == 0)
                     self.found.setdefault(key, {})
@@ -304,8 +319,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     pt = e['particle']
     typ = TYPES.get(pt['billboard_type'])
     if typ is None:
-        notes.append('billboard type %d (stripe): skipped' % pt['billboard_type'])
+        notes.append('billboard type %d: skipped' % pt['billboard_type'])
         return None
+    if pt['billboard_type'] in (5, 6):
+        notes.append('stripe %d as a directional quad' % pt['billboard_type'])
     is_mesh = pt['primitive_id'] != NONE64
     if is_mesh and pt['primitive_id'] not in prims:
         notes.append('primitive %d not in the file: skipped' % pt['primitive_id'])

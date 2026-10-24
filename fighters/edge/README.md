@@ -185,6 +185,24 @@ Not yet: LAST_EFFECT_SET_RATE (back air's arc plays at 1.7x in Ultimate; rates d
 it needs a set per rate), flipbook animation, stripes.
 Package: the ptcl / efc (effect.bin as test 33's).
 
+## Test 37 (`build/sephiroth_test37.zip`): no screen-reading templates, stripes as directional quads
+
+User, test 36 (shots): forward air only the X flash (no blade glow, no wind lines); back / up air
+nearly right (trail off / too sharp); neutral air see-through, refracting the stage behind; down air
+jagged, the glow not covering the sword.
+- 33 converted emitters (all blend-0 meshes: his blade glows `edge_sword_light3`, the slash arcs,
+  neutral air's burst ring, the throws' bursts...) had templates whose shader reads the frame
+  buffer (`frameBufferTexture_CROSS` in the GX2 binary: refraction / distortion, 56 of 1797
+  vanilla shaders): drawn as see-through distortion. Shaders reading the frame / depth buffer or
+  texture arrays are no longer templates (none left in the bank).
+- Stripes (eft2 types 5 / 6: his speed lines, the forward-air wind) -> directional quads (type 3,
+  eft2's 2.5 x 36 scale, along their motion): `edge_attack_speedline`, `edge_gokumon_wind`,
+  `edge_smashlw_speedline` now convert (46 of 46 effects); ids from 0x342002E on shift, so the
+  effect scripts are rebuilt (game / sound / expression unchanged).
+Bank 6.0 MB (meshes 1.9, textures 2.3; vanilla's largest, Bayonetta's, 4.6; tests 34-36's 5.2
+loaded). Trails unchanged (Sword_Glow from the sword joint, as Corrin's / Kirby's).
+Package: the ptcl / efc and effect.bin.
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

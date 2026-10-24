@@ -109,7 +109,9 @@ way (test 32); type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love cr
 UV shift / scale / rotation (initial, random, per frame) go to slot 0's UV block (0x510-0x54C;
 a mesh whose template can't animate UVs gets the starting transform baked into its UVs): Ultimate's
 slash arcs are full discs that the scrolling texture cuts into a swing, neutral air's burst a circle
-whose tiled line texture makes the spikes. Smash 4 adds the UV shift (uv x scale + shift), Ultimate
+whose tiled line texture makes the spikes. Templates never use a shader that reads the frame / depth buffer (refraction: they drew glows
+see-through, test 36) or texture arrays. Stripes (ribbons) become directional quads along their
+motion. Smash 4 adds the UV shift (uv x scale + shift), Ultimate
 subtracts it; both turn about the texture's centre (found from each game's own effects: the shifts
 are written negated). The fade when turned off (0x82C = 1 / eft2's alpha fade
 time) ends infinite-life glows; the sampler's wrap is per axis (eft's codes are eft2's) and eft2's
