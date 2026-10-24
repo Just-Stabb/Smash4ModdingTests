@@ -688,6 +688,11 @@ MOTION_STANDINS = {
 }
 # Ultimate visibility -> the mesh slot it drives (MESH_SLOTS); slots listed with None are always hidden
 VIS_SLOTS = {'edge_swordL': 'skirt_VIS_O_OBJ16', 'edge_swordR': 'polySurface5817_VIS_O_OBJ'}
+# other Ultimate meshes of the same thing: the slot shows while any of them does. Ultimate swaps the
+# sword for its bright (or dark) copy during swings (forward smash: 45 of 106 frames); those copies
+# aren't converted, so with the plain sword's track alone the sword vanished in attacks (test 22)
+VIS_ALSO = {'edge_swordL': ('edge_brightswordL', 'edge_darkswordL'),
+            'edge_swordR': ('edge_brightswordR', 'edge_darkswordR')}
 HIDDEN_SLOTS = ('Zelda_DamageFlyFront_VIS_O_OBJ',)       # the wing (its own form, later)
 
 # Bowser's mesh slots for Incineroar: Bowser's faces are whole-face meshes, so the open eyelids go
@@ -1000,6 +1005,10 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 if pac == 'material_anime_face.pac':
                     for uname, slot in prof['vis'].items():
                         st = vis_of[mname].get(uname)
+                        for other in VIS_ALSO.get(uname, ()):
+                            o = vis_of[mname].get(other)
+                            if o is not None:
+                                st = o if st is None else (np.asarray(st) | np.asarray(o))
                         vis.append((slot, vis_keys(st) if st is not None else [(0, prof['vis_default'].get(slot, 0))]))
                     for slot in prof['hidden']:
                         vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]

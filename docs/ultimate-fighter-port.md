@@ -64,6 +64,10 @@ follow the sword exactly; a held item takes the sword's angle. `ultimate_acmd.py
 spheres as `Special_Hitbox` / `Grab_Collision` (vanilla has zero-length extended ones too, so that
 wasn't the cause).
 
+**Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
+the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
+vanished in attacks (test 22).
+
 **Material animation pacs**: keep the base's `default.mta`, `default_temporarily.mta`, `display.mta`
 and `material_anime.lst` (a hash of the base's motion names, not CRC32); the face defaults get the
 swords' keys. Test 20 left them out and the sword didn't show in attacks.

@@ -395,3 +395,16 @@ showed between the ball and the body, the user's shot). Asked for: a body hitbox
   to speed x frame (grows from the spawn), the head's multi-hit, same part (one hit log).
 - Start parts: EffectModule 0x2710 in Supamario's bone-0 frame (flag 1), not following; the first body
   piece at frame 3 (then the even frames).
+
+### Test 22 in game, and test 23 (`build/test23.zip`)
+
+Test 22: charge still changed nothing (always 6 hits, the same finish damage, the same speed); the
+body reached back past the start ball (frame 3); multi-hits rarely let a target fall out.
+- Charge: `ArticleModule(0x2713)` can't reach the beam at all (as `0x2717` "exists" says no for it,
+  the fighter keeps no handle to a fired article). The level now rides the weapon custom number:
+  the game copies the owner's custom N slot (int `0x10000048`) into a new weapon's `0x10000005`
+  (init struct `+0x5C`, `0x02F062C0`; docs/native-notes.md "Weapon custom number"), so Supamario's
+  `kame_n_generate` sets the slot to the level around `ArticleModule(0x2710)` and puts it back; the
+  beam reads `WorkModule(0x6, 0x10000005)`. (The fireball's param block for slots 0-2 exists, and
+  the boilerplate's motion offset by it, `func_40`, isn't installed.)
+- `SEG_FIRST` back to 4 (the ball no longer moves with him); head / body FKB 6.

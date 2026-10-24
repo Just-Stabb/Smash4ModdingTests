@@ -172,8 +172,9 @@ LEVEL_VAR = 0x10000004
 # test 18: the head pulls a target to its middle (366) so it keeps hitting it while the beam holds;
 # test 17's PK Fire hop (80 degrees) knocked them out of it after one hit
 # test 21: "sometimes the multihit pushes opponents out after the first hit": 366 carries a target
-# with the moving head, then the head stops at the hit and they flew on: a smaller fixed push
-HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 10, 0
+# with the moving head, then the head stops at the hit and they flew on: a smaller fixed push (10;
+# test 22, 6: "rarely still cause an opponent to fall out")
+HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 6, 0
 # the finish launches the way the beam faces (FacingRestrict 3, as the Hadoken, PK Fire and Fox's
 # laser; test 21 with 1, the fireball's: a target behind the head's middle went back toward Supamario)
 FINISH_FACING = 3
@@ -181,9 +182,9 @@ FINISH_FACING = 3
 START_POS = (0.0, 6.7, 9.0 + START_FORWARD)
 # the first body piece: the frame from which a piece (SEG_EVERY x speed long, SEG_OVERLAP more at its
 # end) no longer reaches back past the start (test 18: "the body is behind the base of the beam")
-# test 21: from frame 4 a gap showed between the start ball and the body: the first piece at 3, then
-# the even frames
-SEG_FIRST = 3
+# test 21: from frame 4 a gap showed between the start ball and the body (the ball had moved with
+# Supamario); test 22 at 3, with the ball fixed, the body reached back past it to his hands
+SEG_FIRST = 4
 # the start's particle sets stream along the beam (XV2: UseBoneDirection; their emitters point up):
 # turned X +90 (up -> forward) instead of the models' Y 180 (test 18: "the blue swirls near the base"
 # stood up)

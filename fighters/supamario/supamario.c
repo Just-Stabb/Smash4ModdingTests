@@ -37221,13 +37221,11 @@ int kame_n_charge;
 int kame_n_state;
 int kame_n_pose;
 int kame_n_posed;
-int kame_n_sent;
 
 void kame_n_init()
 {
     kame_n_charge = 0;
     kame_n_state = 0;
-    kame_n_sent = 0;
     kame_n_pose = 0;
     kame_n_posed = 0;
 }
@@ -37326,24 +37324,28 @@ void kame_n_loop()
     {
         if (MotionModuleF(0x1) >= KAME_N_FIRE_FRAME)
         {
-            ArticleModule(0x2710, KAME_ARTICLE);
+            kame_n_generate();
             kame_n_start_fx();
             kame_n_state = 0x2;
         }
     }
     else
     {
-        // the level, as the beam's status, the frame after it was made (test 21: sent in the same
-        // frame as the generation, the charge never changed the beam; Ryu sends his Hadoken's to one
-        // that already exists)
-        if (kame_n_sent == 0)
-        {
-            ArticleModule(0x2713, KAME_ARTICLE, kame_n_level());
-            kame_n_sent = 0x1;
-        }
         kame_n_hold_pose();
     }
     kame_n_air();
+}
+
+// the beam, told its level: the game copies the custom slot (int 0x10000048) into a new weapon's
+// 0x10000005, so the slot holds the level while it is generated, then goes back (tests 21 / 22:
+// ArticleModule 0x2713 on the beam did nothing: this fighter keeps no handle to it)
+void kame_n_generate()
+{
+    int slot;
+    slot = WorkModule(0x6, 0x10000048);
+    WorkModule(0x7, kame_n_level(), 0x10000048);
+    ArticleModule(0x2710, KAME_ARTICLE);
+    WorkModule(0x7, slot, 0x10000048);
 }
 
 int kame_n_pose_frames()

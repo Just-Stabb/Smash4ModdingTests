@@ -742,7 +742,15 @@ void kame_fly_main()
         kame_status(0x2 + kame_phase);
         return;
     }
-    kame_level = global4;
+    // the charge level: Supamario's custom slot (int 0x10000048), which the game copies into a new
+    // weapon's 0x10000005 (init struct +0x5C, 0x02F062C0), set to the level while he generates it
+    // (tests 21 / 22: ArticleModule 0x2713 from him never changed the status: he doesn't keep the
+    // beam's handle, as 0x2717 "exists" says no for it)
+    kame_level = WorkModule(0x6, 0x10000005);
+    if (kame_level < 0 || kame_level > 0x2)
+    {
+        kame_level = 0;
+    }
     // for the finish's ACMD (its one script picks the launcher by it): 1 / 2 / 3, in the fireball's
     // life variable (nothing counts it down since test 15)
     WorkModule(0x7, kame_level + 0x1, 0x10000004);
