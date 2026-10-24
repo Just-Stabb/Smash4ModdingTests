@@ -20,3 +20,26 @@ Built as Steve's (fighters/pickel/README.md), from Robin:
 
 Not yet: his own moves, spells (articles), stats, sounds, effects, portraits. Robin's tome article
 shows in her specials.
+
+## v2 (`build/hero_v2.zip`): his attacks
+
+```
+python3 tools/ultimate_fighter.py model HERO/model/body/c0N REFLET/model/body/c0N OUT/c0N --empty EMPTY --max-bones 120 \
+    --have Shield,Sword1 --motions HERO/motion/body/c00 --anim-cache CACHE.json
+python3 tools/ultimate_fighter.py motions HERO/motion/body/c00 HERO/model/body/c00 REFLET OUT --max-bones 120 --have Shield,Sword1 ...
+python3 tools/ultimate_acmd.py DUMP/lua2cpp_brave/brave BRAVE_BODY/game.bin OUT/game.bin OUT/c00 --have Shield,Sword1 \
+    --others BRAVE_BODY OUT --motion-list HERO/motion/body/c00/motion_list.bin --mtable BRAVE_BODY/motion.mtable OUT/motion.mtable \
+    --vl fighter_param_vl_brave.bin OUT/fighter_param_vl_brave.bin --vl-kind reflet --effects reference/ultimate_sys_effects.json NUSKTB
+python3 tools/fighter_param.py set fighter_param.bin OUT 69 264=0
+```
+- His hitboxes are on `sword1` (36) and `shield` (2): `--have Shield,Sword1` makes those bones play
+  LHaveN / RHaveN (both hang from the hands, as HaveL / HaveR), as Sephiroth's swords.
+- 27 scripts: jab 3 / 3 / 4, dash attack, tilts, smashes (forward 18 / 16, up 14 / 16, down 11 / 13
+  in front at 9 then behind at 20), aerials, grabs, pummel, throws, get-up / ledge / trip attacks.
+- Smash attacks: `lot_critical` / `is_flag(CRITICAL_HIT)` taken as false (the normal hits). Down
+  smash's dump splits its critical branch (`if crit { A } B; operatorbool(); D`):
+  `ultimate_acmd.fix_split_flag_branch` puts B back in the branch and D in its else.
+- Jab: 3 hits, no rapid jab (fighter_param 264 = 0; Robin has one).
+
+Not yet: the side tilt's second hit (`AttackS3S2`, a second press), the critical hits, his sword
+trails (`tex_brave_sword1 / 2`: trail textures to add, as Sephiroth's) and effects, sounds, specials.

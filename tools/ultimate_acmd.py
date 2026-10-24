@@ -265,6 +265,50 @@ def fix_misplaced_else(out):
     return out
 
 
+def fix_split_flag_branch(out):
+    """the dump's `if is_flag(F) { A } B; operatorbool()const(is_excute); D` (Hero's down smash: its
+    critical hit's second part B outside the if, the else marked by the stray operatorbool line) ->
+    `if is_flag(F) { A B } else { D }`, D up to the end of the enclosing block"""
+    def is_stray(st):
+        return st[0] in ('call', 'other') and 'L2CValue::operatorbool' in str(st[1])
+    i = 0
+    while i < len(out):
+        if out[i][0] == 'if' and 'is_flag' in out[i][1]:
+            d, end = 0, None
+            for j in range(i + 1, len(out)):
+                k = out[j][0]
+                if k == 'if':
+                    d += 1
+                elif k == 'end':
+                    if d == 0:
+                        end = j
+                        break
+                    d -= 1
+                elif k in ('else', 'elseif') and d == 0:
+                    break
+            mark = close = None
+            if end is not None:
+                d = 0
+                for j in range(end + 1, len(out)):
+                    k = out[j][0]
+                    if k == 'if':
+                        d += 1
+                    elif k in ('else', 'elseif') and d == 0:
+                        break
+                    elif k == 'end':
+                        if d == 0:
+                            close = j
+                            break
+                        d -= 1
+                    elif is_stray(out[j]) and d == 0 and mark is None:
+                        mark = j
+            if mark is not None:
+                close = len(out) if close is None else close
+                out[:] = out[:end] + out[end + 1:mark] + [('else',)] + out[mark + 1:close] + [('end',)] + out[close:]
+        i += 1
+    return out
+
+
 LR_LEFT = 'get_value_float(agent.lua_state_agent, *SO_VAR_FLOAT_LR) < 0.0'
 EFFECT_CONDS = ()
 
@@ -307,7 +351,7 @@ class Translator:
         self.frame, self.events = 0.0, []
         live = [True]              # a stack of "this block runs"
         taken = [False]
-        for st in fix_misplaced_else(statements(body)):
+        for st in fix_split_flag_branch(fix_misplaced_else(statements(body))):
             kind = st[0]
             if kind == 'if':
                 c = live[-1] and cond_true(st[1])
