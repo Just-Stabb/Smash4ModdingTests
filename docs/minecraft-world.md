@@ -1187,3 +1187,12 @@ stage folders, Omega, the pictures / logo / banner / series files, the sound tab
   outputs gives v18i's file byte for byte, so nothing else changes). The cave's event / block tables
   (`tools/minecraft_sound_events.json`) match all six rebuilt biomes.
 - The name banner is regenerated ("Minecraft World", `stage_name_banner.py`; v18e's was lost).
+
+v19b (user: v19 replaced newer UI): v19's executable was v18i's plus the changes, and its
+`menu.msbt` / `melee.msbt` were the Supamario-era copies, without Sephiroth's / Incineroar's
+names (Incineroar v1's) or the "Stick Smash" text (`MmenOption_button_85`, the smash-button
+package's). `build/minecraft_world_v19b_update.zip`: the two caves' outputs over Sephiroth test 30's
+executable (the newest; re-applying v18i's outputs gives it back byte for byte, so it already had
+them; only 0x04B7F134-0x04B7FF00 changes), and Incineroar v1's text files with `MmenOption_button_85`
+added (`tools/msbt.py` `set`). The stage params (`ui_stage_db.bin`, `ui_mark_db.bin`) were already
+the newest. Lesson: build stage packages on the newest executable / UI files, not the stage's last.
