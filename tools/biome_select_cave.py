@@ -55,9 +55,9 @@ BIOMES = [('plains', 'NewStage01'), ('birchforest', 'NewStage01_forest'), ('sava
 OFF = ZL | Z
 BIOMES += [(b, f + '_off') for b, f in BIOMES]
 N_BIOMES = len(BIOMES) // 2
-# the hazards-off folders are packaged only once the hazards are finished (user): until then
-# (False) OFF is ignored and only the first N_BIOMES folders are listed; main's --hazards-off sets it
-HAZARDS_OFF = False
+# the hazards-off folders (packaged since v19, user; v17c-v18i: False, OFF ignored and only the
+# first N_BIOMES folders listed)
+HAZARDS_OFF = True
 # with L held: (buttons, biome index), the first that's held wins
 BUTTONS = [(R, 1), (STICK_UP | DPAD_UP, 2), (STICK_RIGHT | DPAD_RIGHT, 3), (STICK_DOWN | DPAD_DOWN, 4),
            (STICK_LEFT | DPAD_LEFT, 5)]
@@ -166,7 +166,7 @@ data:
 
 
 def main():
-    a, words, hooks = build('--hazards-off' in sys.argv[1:])
+    a, words, hooks = build(True if '--hazards-off' in sys.argv[1:] else None)
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % h for h in hooks]

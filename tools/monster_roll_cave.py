@@ -113,7 +113,7 @@ SET_MOTION_FRAME = 0x031593FC  # (m, f1 frame, r4 apply the pose now)
 # inside one.
 GIM_RESTORE = 0x03133DAC       # (w): the gimmick's battle object back (Manifold's activate)
 SET_MATRIX = 0x03159248        # (m, float[12]): the draw model's world matrix
-REGEN_GAP = 24                  # (v18g: 40; user: 24)
+REGEN_GAP = 8                   # (v18g: 40; v18i: 24; user: 8)
 REGEN_FADE = 8
 REGEN_SCALE0 = 0.05
 REGEN_MARGIN_X, REGEN_MARGIN_Y = 4.0, 16.0

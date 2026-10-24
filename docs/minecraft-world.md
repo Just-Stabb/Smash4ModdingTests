@@ -1163,3 +1163,27 @@ its pass-through platforms), a v18c rule v18d / v18e meant to drop ("every block
 block on the plane is solid; the pass-through platforms over them are unchanged (they float once the
 blocks under them break). Affected: birch forest (9 blocks) and savanna (5); the other biomes have no
 throughable blocks on the plane, and their collision files are unchanged.
+
+## v19: hazards toggle, unlit doors, faster regeneration, the enderman
+
+User: unlight the doors, block regeneration 24 -> 8 frames, the enderman invisible, package with the
+hazardless version and the toggle. `build/minecraft_world_v19.zip` is a full install (all twelve
+stage folders, Omega, the pictures / logo / banner / series files, the sound table, the executable).
+- **Doors**: no torch light on them (`torch_light` on the door meshes removed; `DOOR_LIGHT_MAX` gone).
+- **Regeneration**: `REGEN_GAP` 8 (= `REGEN_FADE`: the next block starts on the update the last one
+  finishes growing). `monster_roll_test.py`'s regeneration checks follow the timing for any gap (they
+  assumed gap > fade); 64 checks, also with the old 24.
+- **Enderman**: its folder (`dyr_n1_sunset_set`, a Battlefield folder) kept Battlefield's sunset
+  backdrop's `model.xmb` (light set 14, draw range 4, drawing order 4); the zombie's / animals' folders
+  have light set 8, draw range 2, order 5. Its model, textures, animation (shown 4200-7800) and
+  material curve were all fine, so the far-backdrop draw settings are taken as the reason it wasn't
+  drawn: the build copies the zombie's `model.xmb` into it (as the animals' folders get). Not yet seen
+  in game.
+- **Hazards off**: `biome_select_cave.HAZARDS_OFF` True: the twelve folders listed, ZL (GameCube Z)
+  held picks the `_off` ones (the biome by the same buttons, or random). Its `main()` now keeps the
+  module default unless `--hazards-off` is given (it passed False before). `biome_select_test.py`:
+  0 failed.
+- Executable: v18i's `cross_f.rpx` with the two caves' new outputs over it (re-applying v18i's own
+  outputs gives v18i's file byte for byte, so nothing else changes). The cave's event / block tables
+  (`tools/minecraft_sound_events.json`) match all six rebuilt biomes.
+- The name banner is regenerated ("Minecraft World", `stage_name_banner.py`; v18e's was lost).

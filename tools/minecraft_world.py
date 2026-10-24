@@ -1119,7 +1119,6 @@ def torch_points(src, labels, row):
 # at the torch), the curve 'torchlight' fading it in as the island darkens
 TORCH_LIGHT_RANGE, TORCH_LIGHT, TORCH_LIGHT_MAX = 45.0, 1.8, 0.8     # the most: 1.6 blew out Omega's lamp post (four torches on it, user)
 TORCH_LIGHT_COLOR = (1.0, 0.7, 0.4)
-DOOR_LIGHT_MAX = 0.18               # the doors' corners are next to their torches: at the cap far too bright, at 0.35 still a bit (user)
 TORCH_LIGHT_LIFT = 0.25             # the copy this far out along its normals, in front of the island
                                     # (0.05 flickered against it with the camera's distance, user)
 
@@ -2365,8 +2364,7 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
                 for k in range(len(villagers)):
                     events += [(f, SOUND_VOICE['villager'], 'always')
                                for f in sound_times(*VILLAGER_OUT, SOUND_EVERY['villager'], 100 + k)]
-                if points:                  # the torches' light on them too (user)
-                    dm += torch_light(dm, points, DOOR_LIGHT_MAX)
+                # no torch light on the doors (user): at 0.5 / 0.35 / 0.18 (v15b-v17c) still too bright
                 for mesh in dm:
                     mesh.bone += len(b) - 1
                 m, b = m + dm, b + db[1:]
@@ -2452,6 +2450,11 @@ def build_form(src, base_dir, out_dir, form, biome, hazards, yamlvd, labels, eff
             tracks.update(t)
         write_rig(model_dir, anim_dir, folder, meshes, bones, tracks, (CYCLE if daynight else ANIMAL_FRAMES) + 1,
                   tex, curves)
+        if folder == MONSTER_SETS['enderman']:
+            # Battlefield's sunset backdrop's model.xmb (light set 14, draw range 4, drawing order 4) left
+            # the enderman undrawn (user: invisible); drawn as the zombie's folder (8 / 2 / 5), as the
+            # animals' folders are
+            shutil.copy('%s/%s/model.xmb' % (model_dir, ANIMAL_BASE), '%s/%s/model.xmb' % (model_dir, folder))
 
     light = out_dir + '/animation/light.bin'
     data = (cycle_light(light, fighter=chr_light(src), island=curves['island'][:, :3] if ISLAND_FLAGS else None)

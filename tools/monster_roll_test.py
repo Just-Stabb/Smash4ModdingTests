@@ -557,25 +557,27 @@ miss:   li r3, 0
     check('  its life full again, its model added to the scene (the test\'s blocks share one model: the broken'
           ' ones hide it again), grown from %.2f about its centre (5, 5, 0)' % C.REGEN_SCALE0,
           (wf(bhp + 8), word(REC + 4) - adds, mats()), (24.0, 1, [(0, scale_mat(C.REGEN_SCALE0, (5, 5, 0)))]))
-    grown = []
-    for n in range(C.REGEN_FADE):
-        damage(2, 50.0)                            # unbreakable while regenerating
+    grown, wood = [], None                         # wood: (updates after the stone's start, its state then)
+    for n in range(max(C.REGEN_FADE, C.REGEN_GAP)):
+        if n + 1 == C.REGEN_GAP:
+            setw(REC + 0x30, 0)                    # the sounds of the update the wood block should start on
+        if n < C.REGEN_FADE:
+            damage(2, 50.0)                        # unbreakable while regenerating
         update()
-        grown.append(mats())
-    damage(2, 0.0)
+        if n < C.REGEN_FADE:
+            grown.append(mats())
+        if n + 1 == C.REGEN_FADE:
+            damage(2, 0.0)
+            stone = ([word(bstate + 4 * i) for i in (0, 2)], wf(bhp + 8))
+        if wood is None and word(bstate + 4) != 1:
+            wood = (n + 1, [word(bstate + 4 * i) for i in range(3)], [p & 0xFFFF for p in plays()], word(BREC + 0x14))
     s1 = round(C.REGEN_SCALE0 + (1 - C.REGEN_SCALE0) / C.REGEN_FADE, 3)
     check('  grows a step each update (%.3f, ...), full size (identity) after %d' % (s1, C.REGEN_FADE),
-          (near(grown[0], [(0, scale_mat(s1, (5, 5, 0)))]), near(grown[-1], [(0, scale_mat(1.0, (5, 5, 0)))])), (True, True))
-    check('  then intact (state 0), the 50-damage hits ignored, the wood block not yet', ([word(bstate + 4 * i) for i in range(3)], wf(bhp + 8)),
-          ([1, 1, 0], 24.0))
-    for n in range(C.REGEN_GAP - C.REGEN_FADE - 1):
-        update()
-    check('  the wood block (behind it) not before %d frames' % C.REGEN_GAP, word(bstate + 4), 1)
-    setw(REC + 0x30, 0)
-    update()
-    check('  then it (state 3, its break sound, no hurtbox or collision of its own)',
-          ([word(bstate + 4 * i) for i in range(3)], [p & 0xFFFF for p in plays()], word(BREC + 0x14)),
-          ([1, 3, 0], [breaks[1] + 3], 1))
+          (near(grown[0][:1], [(0, scale_mat(s1, (5, 5, 0)))]), near(grown[-1][:1], [(0, scale_mat(1.0, (5, 5, 0)))])),
+          (True, True))
+    check('  then intact (state 0), the 50-damage hits ignored', stone, ([1, 0], 24.0))
+    check('  the wood block (behind it) %d updates after it (state 3, its break sound, no hurtbox or collision of its own)'
+          % C.REGEN_GAP, wood, (C.REGEN_GAP, [1, 3, 0], [breaks[1] + 3], 1))
     for n in range(C.REGEN_GAP + 20):
         update()
     check('the grass block waits while a fighter is in its cell', (word(bstate), word(rg + 4)), (1, 1))
