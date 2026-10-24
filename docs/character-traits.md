@@ -20,6 +20,8 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Supamario (new kind, Mario copy) | `0x41` | Normal |
 | Sephiroth (`edge`, new kind, Ultimate port on Zelda's base) | `0x42` | Technical |
 | Incineroar (`gaogaen`, new kind, Ultimate port on Bowser's base) | `0x43` | Juggernaut |
+| Steve (`pickel`, new kind, Ultimate port on Pit's base) | `0x44` | Technical |
+| Hero (`brave`, new kind, Ultimate port on Robin's base) | `0x45` | Shooter |
 | Meta Knight | `0x17` | Normal |
 | Samus | `0x06` | Shooter |
 | Roy | `0x36` | Technical |

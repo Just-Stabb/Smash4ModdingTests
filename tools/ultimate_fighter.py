@@ -68,6 +68,7 @@ def set_have(left, right):
 JOINT_STANDINS = {'Larmor': 'H_ShoulderpadL', 'Rarmor': 'H_ShoulderpadR', 'Bustarmor': 'Bust'}
 
 TEX_ID = 0x40EB0000
+PIXEL_ART = 0                   # model --pixel-art N: textures smaller than N blown up to it, nearest
 WHITE = 127                     # vertex color 1.0
 
 
@@ -358,6 +359,12 @@ class Textures:
     def add(self, key, img, top=1024):
         if key not in self.ids:
             h, w = img.shape[:2]
+            if PIXEL_ART and max(w, h) < PIXEL_ART:
+                # pixel art (Steve's 64 x 64 skins): blown up with nearest pixels so the game's linear
+                # filtering and BC blocks don't blur it (as tools/minecraft_world.py does for blocks)
+                k = PIXEL_ART // max(w, h)
+                img = np.repeat(np.repeat(img, k, axis=0), k, axis=1)
+                h, w = img.shape[:2]
             img = resized(img, pow2(w, top), pow2(h, top))
             self.ids[key] = self.base_id + len(self.ids)
             self.images.append((self.ids[key], img))
@@ -776,6 +783,146 @@ KOOPA_MOTIONS = {
     'i00swimend': 'i00swimrise', 'i00swimf': 'i00swim', 'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr',
     'j00entry': 'j00entryr',
 }
+# Pit's mesh slots for Steve: his body is one mesh (the face is in its texture; the eyes open / shut
+# are two small meshes); Pit's eyes, half blinks and expression eyes take one or the other; his
+# mouths, wings, bow / weapons, bracelets, boots and blush are left empty. Steve's held items (flint,
+# buckets, blocks ...) are left out
+_PO, _PB = 'pickel_Openblink_VIS_O_OBJShape', 'pickel_Blink_VIS_O_OBJShape'
+PIT_SLOTS = [
+    ('Boot_HB15_O_OBJ', []), ('Boot_HB16_O_OBJ', []), ('Udewa19_O_OBJ2', []),
+    ('pit_YumiRM_VIS_O_OBJ', []), ('pit_WeaponRM_VIS_O_OBJ', []), ('pit_WpnNagiRM_VIS_O_OBJ', []),
+    ('pit_WeaponLM_VIS_O_OBJ', []), ('pit_Arm_VIS_O_OBJ', []), ('pit_LBit_VIS_O_OBJ', []), ('pit_RBit_VIS_O_OBJ', []),
+    ('polySurface287_O_OBJ', []), ('polySurface286_O_OBJ', []),
+    ('Pit_Eye_VIS_O_OBJ', []), ('Pit_FaceN_VIS_O_OBJ', []),
+    ('Pit_Openblink_VIS_O_OBJ', [_PO]),
+    ('Pit_Halfblink05_VIS_O_OBJ', [_PO]), ('Pit_Halfblink1_VIS_O_OBJ', [_PO]),
+    ('Pit_Halfblink15_VIS_O_OBJ', [_PB]), ('Pit_Halfblink2_VIS_O_OBJ', [_PB]), ('Pit_Halfblink25_VIS_O_OBJ', [_PB]),
+    ('Pit_Blink_VIS_O_OBJ', [_PB]),
+    ('Pit_Eye_Ouch_VIS_O_OBJ', [_PB]), ('Pit_Eye_Talk_VIS_O_OBJ', [_PO]), ('Pit_Eye_Down_VIS_O_OBJ', [_PB]),
+    ('Pit_Eye_HeavyAttack_VIS_O_OBJ', [_PO]), ('Pit_Eye_Attack_VIS_O_OBJ', [_PO]), ('Pit_Eye_Capture_VIS_O_OBJ', [_PB]),
+    ('Pit_Eye_Ottotto_VIS_O_OBJ', [_PO]), ('Pit_Eye_Furafura_VIS_O_OBJ', [_PB]), ('Pit_Eye_Catch_VIS_O_OBJ', [_PO]),
+    ('Pit_Eye_Hot_VIS_O_OBJ', [_PO]),
+    ('Pit_Mouth_Ouch_VIS_O_OBJ', []), ('Pit_Mouth_Talk_VIS_O_OBJ', []), ('Pit_Mouth_Down_VIS_O_OBJ', []),
+    ('Pit_Mouth_HeavyAttack_VIS_O_OBJ', []), ('Pit_Mouth_Escape_VIS_O_OBJ', []), ('Pit_Mouth_Attack_VIS_O_OBJ', []),
+    ('Pit_Mouth_Ottotto_VIS_O_OBJ', []), ('Pit_Mouth_Furafura_VIS_O_OBJ', []), ('Pit_Mouth_VoiceA_VIS_O_OBJ', []),
+    ('Pit_Mouth_VoiceB_VIS_O_OBJ', []), ('Pit_Mouth_Catch_VIS_O_OBJ', []), ('Pit_Red_Capture_VIS_O_OBJ', []),
+    ('Pit_Red_Hot_VIS_O_OBJ', []), ('Pit_Result_VIS_O_OBJ', []), ('Pit_Mouth_laugh_VIS_O_OBJ', []),
+    ('pasted__R_hane_out3_N14_O_OBJ_O_SORTEACHNODE', []), ('pasted__R_hane_out3_N15_O_OBJ_O_SORTEACHNODE', []),
+    ('L_Arm_VIS_O_OBJ', []), ('Udewa19_O_OBJ', []),
+    ('Gamemodel', ['pickel_VIS_O_OBJ_NSCShape']),
+]
+# Pit's motions Steve has no animation for (his own kinds that share one resolve through his
+# motion_list.bin first: motion_aliases); Pit's glide (unused in Smash 4) -> the Elytra
+PIT_MOTIONS = {
+    'a00wait2': 'a00wait1', 'a00wait3': 'a00wait1', 'a03jumpaerialf2': 'a03jumpf', 'a03jumpaerialf3': 'a03jumpf',
+    'a04runfalll': 'a03jumpf', 'a04runfallr': 'a03jumpf', 'a04walkfalll': 'a03jumpf', 'a04walkfallr': 'a03jumpf',
+    'a06stepfall': 'a03jumpf',
+    'a07glidestart': 'd02specialairhistart', 'a07glidewing': 'd02specialairhi', 'a07glidedirection': 'd02specialairhi',
+    'a07glideattack': 'd02specialairhimax', 'a07glideend': 'a03jumpf', 'a07glidelanding': 'd02specialairhilanding',
+    'c00attack12': 'c00attack11', 'c00attack13': 'c00attack11', 'c00attack100start': 'c00attack11',
+    'c00attack100': 'c00attack11', 'c00attackend': 'c00attack11',
+    'd00specialnstart': 'd00specialn1', 'd00specialnholds': 'd00specialn1', 'd00specialnholdhi': 'd00specialn1',
+    'd00specialnfires': 'd00specialn1', 'd00specialnfirehi': 'd00specialn1', 'd00specialnstos': 'd00specialn1',
+    'd00specialnstohi': 'd00specialn1', 'd00specialnhitos': 'd00specialn1',
+    'd00specialairnstart': 'd00specialairn3', 'd00specialairnholds': 'd00specialairn3',
+    'd00specialairnholdhi': 'd00specialairn3', 'd00specialairnfires': 'd00specialairn3',
+    'd00specialairnfirehi': 'd00specialairn3', 'd00specialairnstos': 'd00specialairn3',
+    'd00specialairnstohi': 'd00specialairn3', 'd00specialairnhitos': 'd00specialairn3',
+    'd01specialsend': 'd01specialsfailure', 'd01specialairsend': 'd01specialairsfailure',
+    'd02specialhi': 'd02specialairhi', 'd02specialairhiend': 'd02specialairhilanding',
+    'd03speciallwstartl': 'd03speciallw', 'd03speciallwstartr': 'd03speciallw',
+    'd03speciallwendl': 'd03speciallwend', 'd03speciallwendr': 'd03speciallwend',
+    'd03specialairlwstartl': 'd03specialairlw', 'd03specialairlwstartr': 'd03specialairlw',
+    'd03specialairlwendl': 'd03specialairlwfailure', 'd03specialairlwendr': 'd03specialairlwfailure',
+    'd04finalstartl': 'd04final', 'd04finalstartr': 'd04final', 'd04finalendl': 'd04finalend',
+    'd04finalendr': 'd04finalend', 'd04finalairstartl': 'd04finalair', 'd04finalairstartr': 'd04finalair',
+    'd04finalairendl': 'd04finalairend', 'd04finalairendr': 'd04finalairend',
+    'j03appealsstartl': 'j01appealsr', 'j03appealsstartr': 'j01appealsr', 'j03appealsendl': 'j01appealsr',
+    'j03appealsendr': 'j01appealsr',
+    'k00laddercatchairl': 'k00laddercatchairr', 'k00laddercatchendl': 'k00laddercatchendr',
+    'k00laddercatchl': 'k00laddercatchr',
+}
+# Robin's mesh slots for Hero: body, hand, sword, shield and scabbard in her body slot (always shown:
+# Hero keeps his sword and shield out); the face meshes by expression; his hair (the other outfits')
+# in hers; her swords and tome empty. Not used: his shield on the back, the sheathed hilt, the thrown sword and the low-detail meshes
+REFLET_SLOTS = [
+    ('bronzeswordM_VIS_O_OBJ', []), ('thunderswordM_VIS_O_OBJ', []), ('hair_O_OBJ_O_SORTEACHNODE', ['hair_highShape']),
+    ('Reflet_Eye_VIS_O_OBJ', ['brave_Eye_VIS_O_OBJShape']),
+    ('Reflet_Openblink_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Openblink_VIS_O_OBJShape']),
+    ('Reflet_Mouth_FaceN_VIS_O_OBJ', ['brave_Mouth_FaceN_VIS_O_OBJShape']),
+    ('Reflet_Halfblink_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Halfblink02_VIS_O_OBJShape']),
+    ('Reflet_Blink_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_VIS_O_OBJShape']),
+    ('Reflet_Blink_Talk_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Talk_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Talk_VIS_O_OBJ', ['brave_Mouth_Talk_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Final_VIS_O_OBJ', ['brave_Mouth_Final_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Outh_VIS_O_OBJ', ['brave_Mouth_Ouch_VIS_O_OBJShape']),
+    ('Reflet_Blink_Outh_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Ouch_VIS_O_OBJShape']),
+    ('Reflet_Blink_Down_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Down_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Down_VIS_O_OBJ', ['brave_Mouth_Down_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Heavyattack_VIS_O_OBJ', ['brave_Mouth_Heavyattack_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Escape_VIS_O_OBJ', ['brave_Mouth_VoiceB_VIS_O_OBJShape']),
+    ('Reflet_Blink_Capture_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Capture_VIS_O_OBJShape']),
+    ('Reflet_Blink_Ottotto_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Ottotto_VIS_O_OBJShape']),
+    ('Reflet_Eye_Ottotto_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Eye_Ottotto_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Ottotto_VIS_O_OBJ', ['brave_Mouth_Ottotto_VIS_O_OBJShape']),
+    ('Reflet_Blink_Furafura_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_HeavyOuch_VIS_O_OBJShape']),
+    ('Reflet_Mouth_VoiceA_VIS_O_OBJ', ['brave_Mouth_Attack_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Hot_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Mouth_HeavyOuch_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Bound_VIS_O_OBJ', ['brave_Mouth_Bound_VIS_O_OBJShape1']),
+    ('Reflet_Mouth_Result_VIS_O_OBJ', ['brave_Mouth_PatternA_VIS_O_OBJShape']),
+    ('Reflet_Hoho_Hot_VIS_O_OBJ', ['brave_Hot_VIS_O_OBJShape']),
+    ('book_VIS_O_OBJ', []),
+    ('fullhands', ['body_highShape', 'hand_L1_highShape', 'brave_sword_VIS_O_OBJShape', 'brave_shield_VIS_O_OBJShape',
+                   'brave_scabbard_VIS_O_OBJShape',
+                   # the other outfits' own pieces (capes, headdress, bandana, the slime, rings)
+                   'Mantle_highShape', 'mant_emblam_highShape', 'mant_shadow_highShape', 'HeaddressShape',
+                   'slime_highShape', 'bandana_highShape', 'topoShape', 'scabbardRingLShape', 'scabbardRingRShape',
+                   'sword_RingShape']),
+]
+# female Robin's (her costumes 1 / 3 / 5 / 7): the same parts under her own names
+_RF = 'Reflet_f_%s_VIS_O_OBJ'
+_RFS = 'Reflet_f_%s_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE'
+REFLET_F_SLOTS = [
+    ('bronzeswordM_VIS_O_OBJ', []), ('thunderswordM_VIS_O_OBJ', []), ('group7_O_OBJ_O_SORTEACHNODE', ['hair_highShape']),
+    (_RF % 'Eye', ['brave_Eye_VIS_O_OBJShape']),
+    (_RFS % 'Openblink', ['brave_Openblink_VIS_O_OBJShape']),
+    (_RF % 'Mouth_FaceN', ['brave_Mouth_FaceN_VIS_O_OBJShape']),
+    (_RFS % 'Halfblink', ['brave_Halfblink02_VIS_O_OBJShape']),
+    (_RFS % 'Blink', ['brave_Blink_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Talk', ['brave_Blink_Talk_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Talk', ['brave_Mouth_Talk_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Final', ['brave_Mouth_Final_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Outh', ['brave_Mouth_Ouch_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Ouch', ['brave_Blink_Ouch_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Down', ['brave_Blink_Down_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Down', ['brave_Mouth_Down_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Heavyattack', ['brave_Mouth_Heavyattack_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Capture', ['brave_Blink_Capture_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Ottotto', ['brave_Blink_Ottotto_VIS_O_OBJShape']),
+    (_RF % 'Eye_Ottotto', ['brave_Eye_Ottotto_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Ottotto', ['brave_Mouth_Ottotto_VIS_O_OBJShape']),
+    (_RFS % 'Blink_Furafura', ['brave_Blink_HeavyOuch_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Furafura', ['brave_Mouth_Furafura_VIS_O_OBJShape']),
+    (_RF % 'Cheek_Hot', ['brave_Hot_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Bound', ['brave_Mouth_Bound_VIS_O_OBJShape1']),
+    (_RF % 'Eye_Heavyattack', ['brave_Eye_Heavyattack_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Result', ['brave_Mouth_PatternA_VIS_O_OBJShape']),
+    ('book_VIS_O_OBJ', []),
+    ('fullhands', next(us for sl, us in REFLET_SLOTS if sl == 'fullhands')),
+]
+REFLET_MOTIONS = {
+    'c00attack100start': 'c00attack11', 'c00attack100': 'c00attack11', 'c00attackend': 'c00attack11',
+    'd00specialnshoot': 'd00specialn1', 'd00specialntronstart': 'd00specialn3', 'd00specialntronhold': 'd00specialnhold',
+    'd00specialntronend': 'd00specialn3', 'd00specialairnshoot': 'd00specialairn1',
+    'd00specialairntronstart': 'd00specialairn3', 'd00specialairntronhold': 'd00specialairnhold',
+    'd00specialairntronend': 'd00specialairn3',
+    'd01specials': 'd01specials1', 'd01specialairs': 'd01specialairs1',
+    'd02specialhifail': 'd02specialhiempty', 'd02specialairhifail': 'd02specialairhiempty',
+    'd03speciallwcapture': 'd03speciallwskill1', 'd03speciallwend': 'd03speciallwcancel',
+    'd03specialairlwcapture': 'd03specialairlwskill1', 'd03specialairlwend': 'd03specialairlwcancel',
+    'd04finalready': 'd04finalstart', 'd04finaldash': 'd04finalstart', 'd04final': 'd04finalend',
+    'd04finalfail': 'd04finalend', 'l00resurrectionbook': 'a00wait1', 'l00resurrectionthundersword': 'a00wait1',
+}
 # a base fighter's profile: its mesh slots, joint-table stand-ins, motion stand-ins (its specials),
 # Ultimate visibility tracks driving slots (with the default where a motion has none), slots hidden
 PROFILES = {
@@ -783,6 +930,12 @@ PROFILES = {
                   vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
     'koopa': dict(slots=KOOPA_SLOTS, joints=KOOPA_JOINTS, motions=dict(MOTION_STANDINS, **KOOPA_MOTIONS), vis={},
                   vis_default={}, hidden=()),
+    'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis={}, vis_default={},
+                hidden=()),
+    'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
+                   vis_default={}, hidden=()),
+    'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
+                     vis_default={}, hidden=()),
 }
 
 
@@ -953,6 +1106,32 @@ def vis_keys(states):
     return keys
 
 
+def motion_aliases(motion_dir):
+    """{motion kind without underscores (e.g. 'fall', 'jumpaerialf'): the animation file (stem) it plays}
+    from the fighter's motion_list.bin: Ultimate's motion kinds can share an animation (Steve's fall,
+    jump_b and jump_aerial_f all play a03jumpf), which then has no file of their own name. Names:
+    reference/ultimate_motion_kinds.txt (motion list keys are hash40s of them)"""
+    import ultimate_acmd
+    path = os.path.join(motion_dir, 'motion_list.bin')
+    if not os.path.exists(path):
+        return {}
+    files = {}
+    for f in os.listdir(motion_dir):
+        if f.endswith('.nuanmb'):
+            files[ultimate_acmd.hash40(f)] = f[:-7]
+            files[ultimate_acmd.hash40(f[:-7])] = f[:-7]
+    by_key = {e['key']: e for e in ultimate_acmd.read_motion_list(path)}
+    out = {}
+    for line in open(os.path.join(HERE, '..', 'reference', 'ultimate_motion_kinds.txt')):
+        name = line.strip()
+        if not name or name.startswith('#'):
+            continue
+        e = by_key.get(ultimate_acmd.hash40(name))
+        if e and e['anims'] and e['anims'][0] in files:
+            out.setdefault(name.replace('_', ''), files[e['anims'][0]])
+    return out
+
+
 def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=()):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
     layers emptied (they turn the base's HandN / HaveN), and the material_anime face / eyelid pacs
@@ -973,6 +1152,7 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
     log('motion skeleton: %d bones (every costume\'s)' % len(sk.bones))
     constraints = helper_constraints(src_model)
     have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}
+    aliases = motion_aliases(motion_dir)
     frames_of, vis_of = {}, {}
     for folder in ('body', 'bodyentry', 'bodyresult', 'bodyroutemap'):
         mdir = base + '/motion/' + folder
@@ -988,6 +1168,8 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
         for name, data in main:
             key = name[len(prefix):-4].lower()
             ult = key if key in have else prof['motions'].get(key)
+            if ult not in have:
+                ult = aliases.get(key[3:])          # a motion kind playing another's animation
             if ult not in have:
                 missing.append(key)
                 ult = 'a00wait1'
@@ -1074,6 +1256,8 @@ def main():
     m.add_argument('out')
     m.add_argument('--tex-id', type=lambda v: int(v, 0), default=TEX_ID)
     m.add_argument('--empty', help='a folder with an empty model.sb / model.nhb to use')
+    m.add_argument('--pixel-art', type=int, default=0, help='blow textures smaller than this up to it with nearest '
+                   'pixels (Steve: 512)')
     mo = sub.add_parser('motions')
     mo.add_argument('motion_dir')
     mo.add_argument('src_model')
@@ -1100,6 +1284,8 @@ def main():
         build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n],
                       max_bones=a.max_bones, animated=animated, joints=joints)
     if a.cmd == 'model':
+        global PIXEL_ART
+        PIXEL_ART = a.pixel_art
         build_model(a.src, a.base, a.out, a.tex_id, joints=joints, max_bones=a.max_bones, animated=animated)
         if a.empty:
             for f in ('model.sb', 'model.nhb'):

@@ -289,6 +289,17 @@ and AO floor). Textures (`0x40EB0000` up, power-of-two, one mip):
 
 ## Motions
 
+**Shared animations**: Ultimate's motion kinds can play another kind's animation (Steve's fall,
+jump_b and jump_aerial_f all play `a03jumpf`; no file of their own name). A base motion with no
+file of its name and no stand-in resolves through the fighter's `motion_list.bin`
+(`motion_aliases`: the kind names in `reference/ultimate_motion_kinds.txt`, from ParamLabels.csv,
+since the list keys are hash40s).
+
+**Base profiles** (`PROFILES`): zelda (Sephiroth), koopa (Incineroar), pit (Steve), reflet / reflet_f
+(Hero: Robin's male and female costumes have different mesh lists). A costume picks its profile by
+its base model's mesh list. `model --pixel-art 512` blows small textures up with nearest pixels
+(Steve's 64 x 64 skins).
+
 Per motion, per frame: Ultimate's animated locals (bind where a bone has no track), the folded chains
 multiplied, helper bones (`model.nuhlpb` orient constraints: a share, axis by axis, of the source
 bone's turn from its bind in the parent bone's frame) -> OMO (constant tracks stored constant,
