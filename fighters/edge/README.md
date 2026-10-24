@@ -203,6 +203,23 @@ Bank 6.0 MB (meshes 1.9, textures 2.3; vanilla's largest, Bayonetta's, 4.6; test
 loaded). Trails unchanged (Sword_Glow from the sword joint, as Corrin's / Kirby's).
 Package: the ptcl / efc and effect.bin.
 
+## Test 38 (`build/sephiroth_test38.zip`): stripes out again; 0x82C / 0x2F9 read from the code
+
+User, test 37 (shots): forward-air glow shows a little; the speed lines are solid bars that never
+go away (and a white bar on dash attack); neutral air round, not a burst; back / down air's sword
+effects out of step, down air's flash high up and white; up air / up smash nearly right.
+- Stripes are skipped again (the directional-quad stand-ins drew solid bars). eft has stripes as
+  complex emitters only (types 5 / 6: 90 / 31 vanilla, Bayonetta's Witch Twist lines, Ness's PK
+  Thunder): converting them needs the complex emitter's stripe block, next.
+- From cross_f.rpx (0x04A64F00, 0x04A661D8): while an emitter set fades, each particle's alpha
+  (+0x58) drops by 0x82C x the frame step and the particle dies at the threshold; otherwise it
+  climbs back by the same rate. 0x2F9 is read right there (whether it is 0), so it belongs to the
+  fade, not to following the emitter as test 34 assumed: the template choice no longer looks at
+  it. 0x2F8 is read with the gravity vector (0x4A4).
+- vfxb_to_ptcl: an effect that converts to nothing loses its id in the ids file (test 37's
+  speed-line ids would otherwise name other effects' sets now).
+Package: the ptcl / efc and effect.bin (test 33's again).
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

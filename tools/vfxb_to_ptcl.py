@@ -14,8 +14,8 @@ fighter kind (ids 0x3KKnnnn). EFFECT: Ultimate effect names (default: all).
 Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/xv2_to_ptcl.py:
 - template: Templates (the base's own or one imported from --templates files) of the eft particle
   type (eft2's numbers: 0 billboard, 1 / 2 plate XY / XZ, 3 directional, 4 directional polygon, 8 Y
-  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4; stripes 5 / 6 as
-  directional quads), blend and mesh-ness, plain shaders first, never one reading the screen;
+  billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4), blend and
+  mesh-ness, plain shaders first, never one reading the screen. Stripes (5 / 6) are skipped;
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
@@ -57,15 +57,16 @@ from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, c
 
 NONE64 = 2 ** 64 - 1
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
-# 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh; 5 / 6
-# (stripes: ribbons along the particle's path) as directional quads, scaled as eft2 scales them
-# (his speed lines: 2.5 x 36 moving along their length)
-TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 3, 6: 3, 7: 0, 8: 8}
+# 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. Stripes
+# (5 / 6, ribbons) are skipped: eft has them only as complex emitters (90 / 31 vanilla), not
+# converted yet; test 37's directional quads drew solid bars
+TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
 UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
-FOLLOW = 0x2F9
-FADE_ALPHA = 0x82C      # alpha lost a frame once the set is turned off (1 / frames); 0 lives on
+# the alpha a particle loses a frame while its set fades (Terminate), dying at 0; and gains back
+# to 1 otherwise (cross_f.rpx 0x04A64F00 / 0x04A661D8: particle +0x58 -= / += this x the frame step)
+FADE_ALPHA = 0x82C
 # the eft sampler word: U wrap in bits 28-31, V in 24-27, the same codes as eft2's (0 mirror,
 # 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0)
 # eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
@@ -83,9 +84,8 @@ class Templates:
     texture (slot 0; slots 1 / 2 unused). Among them, in this order: a plain shader (no shader
     parameters: Ike's FS cloud shader, FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's
     meshes orange), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
-    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, the follow
-    byte 0x2F9 wanted (0 on 86% of vanilla's infinite-life glows, 1 on 88% of the rest: taken as
-    particles following the emitter; also shader-keyed: 41 groups mix), then animated colour tracks
+    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, then
+    animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
     (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
     screen or texture arrays (SCREEN_SAMPLERS) are left out."""
@@ -115,29 +115,26 @@ class Templates:
                         screen[si_] = any(t in b for t in SCREEN_SAMPLERS)
                     if screen[si_]:
                         continue
-                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
-                              em[FOLLOW] == 0)
+                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7)
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, uv_mode, follow, notes):
-        """the best template for this particle type / blend / mesh-ness, UV mode bits and follow;
-        another blend (add), then type 0, when there's none"""
+    def get(self, typ, blend, mesh, uv_mode, notes):
+        """the best template for this particle type / blend / mesh-ness and UV mode bits; another
+        blend (add), then type 0, when there's none"""
         def rank(item):
-            (plain, mode, fol), (score, *_r) = item
-            return (plain, mode & uv_mode == uv_mode, fol == follow, mode == uv_mode, score)
+            (plain, mode), (score, *_r) = item
+            return (plain, mode & uv_mode == uv_mode, mode == uv_mode, score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
                 continue
-            (plain, mode, fol), (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            (plain, mode), (_score, path, si, k) = max(self.found[key].items(), key=rank)
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
             if mode & uv_mode != uv_mode:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
-            if fol != follow:
-                notes.append('template follow byte %d' % (0 if fol else 1))
             if path is None:
                 em = self.base.emitter_bytes(si, k)
                 struct.pack_into('>II', em, 0x2CC, 0, 0)
@@ -321,8 +318,6 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if typ is None:
         notes.append('billboard type %d: skipped' % pt['billboard_type'])
         return None
-    if pt['billboard_type'] in (5, 6):
-        notes.append('stripe %d as a directional quad' % pt['billboard_type'])
     is_mesh = pt['primitive_id'] != NONE64
     if is_mesh and pt['primitive_id'] not in prims:
         notes.append('primitive %d not in the file: skipped' % pt['primitive_id'])
@@ -337,7 +332,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     ti, smp = main_texture(e, names)
     ts = e['static']['tex_scroll'][ti] if smp else None
-    em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'] == 0, notes)
+    em = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), notes)
     repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
@@ -508,7 +503,7 @@ def main():
     ef = efc.Efc(open(os.path.join(a.base_dir, base + '.efc'), 'rb').read())
     templates = Templates(p, a.templates)
     prims, prim_index = eff.primitives(), {}
-    ids, done = {}, {}
+    ids, done, dropped = {}, {}, []
     for name in (a.effects or sorted(eff.effects)):
         si_ult = eff.effects[name]
         if si_ult in done:
@@ -524,6 +519,7 @@ def main():
         if not made:
             print('%-30s %s: nothing convertible' % (name, eff.sets[si_ult]))
             print('\n'.join(log))
+            dropped.append(name)
             continue
         if len(made) > MAX_EMITTERS:
             log.append('    %d emitters: the first %d kept' % (len(made), MAX_EMITTERS))
@@ -541,6 +537,8 @@ def main():
     open(os.path.join(a.out_dir, base + '.efc'), 'wb').write(ef.build())
     old = json.load(open(a.ids)) if os.path.exists(a.ids) else {}
     old.update({k: '0x%07X' % v for k, v in ids.items()})
+    for k in dropped:       # an id from an earlier run would now name another effect's set
+        old.pop(k, None)
     json.dump(old, open(a.ids, 'w'), indent=1)
     print('%d effects -> %d sets; %s' % (len(ids), len(set(done.values())), a.ids))
 

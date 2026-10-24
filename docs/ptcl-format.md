@@ -142,7 +142,9 @@ on it this way; 20 of 20 clamped turned ones about the centre). Ultimate's eft2 
 | 0x7E4 / 0x7EC | 2f | scale diffs | guess |
 | 0x7F8 / 0x804 / 0x810 / 0x81C | 3f | rotation init / random / velocity / velocity random (rad) | corpus |
 | 0x828 | f | rotation attenuation | corpus |
-| 0x82C | f | alpha lost a frame once the set is turned off (1 / frames: 1/11, 1/4, 1/7...); set on vanilla's infinite-life emitters (the only way they end), 0 on 84% of the rest (they live out their life) | corpus |
+| 0x82C | f | fade rate: while the emitter set fades (turned off), each particle's alpha (+0x58) drops by this x the frame step and the particle dies at the threshold; otherwise it climbs back by it (1 / frames: 1/11, 1/4, 1/7...; set on vanilla's infinite-life emitters, the only way they end; 0 on 84% of the rest) | verified (0x04A64F00, 0x04A661D8) |
+| 0x2F8 | u8 | read with the gravity vector (0x4A4) at 0x04A62620 | verified (use) |
+| 0x2F9 | u8 | read in the fade code right after 0x82C (== 0 test) | verified (use) |
 | 0x830 | u32 | flags (shader-keyed) | corpus |
 | 0x844 | u32 | shader index (into shader table) | verified |
 
