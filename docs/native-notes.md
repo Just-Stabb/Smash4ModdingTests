@@ -1240,6 +1240,25 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
 - The words after the table are other variables (referenced by code), so new names need a copy of
   the table: `tools/trail_table_cave.py`.
 
+### The trail shaders (`shader/effect_trail.nsh`)
+
+`Sword_Glow`'s Shader argument n loads shader `0x4F000000 + n`; the game's `shader/effect_trail.nsh`
+has four (`tools/nsh_dump.py`, disassembled with `tools/latte_dis`, decaf-emu's Latte disassembler:
+`tools/latte_dis/build.sh` builds it). One vertex program for all: the position through
+`LocalToProjectionMatrix`, the vertex colour and UV passed on. The pixel programs (t0 / t1 = the
+trail's two textures, v = the vertex colour, `hdrRange` a constant of the frame):
+- **1** (almost every trail): rgb = (t0.rgb x t0.a + t1.rgb x t1.a) x v.a x hdrRange,
+  a = t0.a x v.a. The two textures add (each premultiplied by its own alpha).
+- **2** (one Roy set): rgb = (t0.rgb x t0.a x (1 - t1.a) + t1.rgb x t1.a) x v.a x hdrRange,
+  a = t1.a x v.a: the second texture over the first.
+- **1001 / 1002** (the second shader loaded for 1001: Greninja): one texture's alpha x v.a bends the
+  frame buffer behind the trail (`Sampler11` = FB3: uv = screen position + alpha x (-0.026, -0.046)),
+  x2 x hdrRange: a refraction pass.
+The vertex colour's rgb is never used: a trail's colour is its textures' alone; v.a is the trail's
+fade along its length. No brightness or scroll constant: Ultimate's two `AFTER_IMAGE4_ON` floats
+(1.4 / 0.1, its own trail shader's) have nowhere to go but the textures.
+(`texas_cross.nsh`, the model shaders, lays its records out differently: not read by `nsh_dump.py` yet.)
+
 ## SoundModule (MSC)
 
 - The MSC wrapper (syscall 0x1E, `0x030B2D58`) calls SoundModule (accessor `+0xA4`) vtable `+0x18C`,
