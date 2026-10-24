@@ -556,3 +556,5 @@ repeat 2) sampled clamped across U.
   throws' rings). An odd number of quarter turns baked into a texture also swaps its repeat and
   wraps now.
 Bank 6.56 MB; effect.bin test 53's. Package: the ptcl / efc and effect.bin.
+
+User, test 56: dash attack's line gone; everything else looks right except jab and the throws.
