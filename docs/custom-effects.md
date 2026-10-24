@@ -448,3 +448,13 @@ same if the game applies the bone rotation).
 Also (user): no air drift once the Kamehameha is released: `kame_n_air` turns the air control
 (kinetic energy 2) off every frame from the release to the status's end.
 
+### Test 28 (`build/supamario_kame_test28.zip`): the rings around the beam
+
+User, test 27 (shot): the circular effect on the wrong axis, lying flat. XV2 draws a ShapeDraw ring
+in its node's XZ plane, around the node's up axis that it travels along (`BillboardType` None);
+eft's type 1 polygon lies in the emitter's XY plane (vanilla: type 2 is the XZ one, e.g. the shield's
+ground rings `ShieldSmokeRing1/2`). `tools/xv2_to_ptcl.py` now turns each ring emitter X -90 more
+and emits along its local Z, so a ring faces the way it moves (LineAll's, Fireptcl's, 4ptcl's, the
+release Ring's, and the charge rings at the hand). Type 2 itself would need another compiled
+shader (none in Mario's file).
+

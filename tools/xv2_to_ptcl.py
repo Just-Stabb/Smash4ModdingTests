@@ -12,7 +12,8 @@ Mapping (docs/xv2-vfx-format.md for the EMP side, docs/ptcl-format.md for the ef
 - every EMP Emission node becomes one emitter, cloned from a template emitter in BASE whose shader
   fits: AutoOriented (camera billboard) -> particle type 0, AutoOriented_VisibleOnSpeed (streak along
   its velocity) -> type 3, ShapeDraw (a ring / arc drawn as a strip) -> type 1 (a polygon in the
-  emitter's XY plane, turned by the emitter transform) with the ring drawn into the texture.
+  emitter's XY plane, turned by the emitter transform: X -90 more, as XV2 draws it in the node's
+  XZ plane) with the ring drawn into the texture.
   ConeExtrude ribbons and Mesh emissions are skipped (listed). Normal-blend camera billboards use a
   normal-blend template; everything else an additive one, blend set from the EMM material
   (normal blend on streaks / rings becomes additive: no normal template of those types in Mario's
@@ -451,6 +452,16 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     pos = pos + m @ np.array(node['Position'], float)
     if kind == 1:
         m = m @ euler_matrix(node['Rotation'])
+        # XV2 draws a ShapeDraw ring in its node's XZ plane (around the node's up axis, the way it
+        # travels: Kmh_LineAll's rings move along the beam); eft's type 1 polygon lies in the
+        # emitter's XY plane. So the emitter is turned X -90 (local Z -> the node's up) and emits
+        # along local Z (-> the node's up again). Supamario test 27: without this, the rings lay
+        # flat instead of around the beam. A ring with a disc volume (XZ) isn't turned: none here.
+        if p.field(em, 'volume_type') == 0:
+            m = m @ euler_matrix([-90.0, 0.0, 0.0])
+            p.set_field(em, 'emit_direction', [0.0, 0.0, 1.0])
+        else:
+            notes.append('ring with a volume: left in the XY plane')
     p.set_emitter_srt(em, (1, 1, 1), matrix_euler(m), [float(v * unit) for v in pos])
     # the template's own key animations (emission rate / scale curves) would fight these values
     if p.field(em, 'keyanim_size'):
