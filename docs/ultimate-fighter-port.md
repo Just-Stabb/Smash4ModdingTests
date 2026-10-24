@@ -165,6 +165,31 @@ Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_of
 `fighter/common` (params: `effect.prc` holds colours and effect ids, no trail or lighting values).
 Smash 4's own trail shader is `shader/effect_trail.nsh` (GX2 microcode).
 
+**Ultimate's trail shaders, found and decoded.** The executable names them as Smash 4 does
+(`"0x4f%06x"` + `VS` / `PS`); the programs are in `render/shader/bin/nusampleshaderlist.N.nushdb`
+(`0x4f000000PS` .3, `0x4f000001VS` .2 (the vertex program for all but the 1000s), `0x4f000001PS` .4,
+`0x4f000002PS` .5, **`0x4f000065PS` (101, every Ultimate trail) .6**, `0x4f0003e9VS` / `PS` .7 / .8).
+`tools/nush_dis.py NAME FILES` disassembles one (Maxwell, envytools' `envydis -m gm107`:
+`tools/maxwell_dis/build.sh`). The trail's constant buffer c4 is the update's block (0x355BF9C):
+c4[0x0] = `AFTER_IMAGE4_ON` arg 29 (0.1), c4[0x4] = arg 28 (1.4), c4[0x8] = the trail's +0x44, then
+a global time and +0x2A0; c13[0x0] the frame's HDR range.
+- **101 PS**: colour = A(u - c4[0x8], v).rgb x **c4[0x4]** x c13[0x0]; alpha = A.a x **B(u2, v).r**
+  (A = the first trail texture, sampler 8; B = the second, sampler 0xA, sampled at its own U: the
+  vertex's attribute 9, not the texture coordinate). The vertex colour isn't used. So arg 28 is a
+  plain **colour gain** (Sephiroth 1.4), and the mask is B's red channel.
+- **1 VS**: world z -= **c4[0x0]** before the view-projection: arg 29 is a **depth offset** (0.1: a
+  little behind the fighter; negative values in the dumps pull trails in front).
+- **Turning it off**: `AFTER_IMAGE_OFF(agent, n)` -> EffectModule vt+0x138 (0x4511D0): the trail
+  (0x2B0 bytes) gets +0x38 = n / 60, +0x3C = 1 / n, its counter +0x34 = 0 and the fading flag +0x2A8.
+  The fade progress reaches the 101 shader as c4[0x8] (the "+100" in 101 is the mode that keeps it
+  out of the vertices' alpha), so an Ultimate trail **slides its texture off along U** as it ends,
+  rather than fading out.
+For the conversion (`tools/ultimate_trails.py`): alpha = A.a x B.r is what it does already; its
+"Add" texture (x0.5) gives Smash 4's shader 1 about 1.5x the colour, close to the 1.4 gain. Not
+carried over: the depth offset (Smash 4 trails have none), B's separate U (the converter multiplies
+the two in A's UV space), and the slide-off ending (Smash 4 fades). Open: what the update writes to
+the trail's +0x40 / +0x44 frame by frame and to attribute 9 (B's U).
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).
