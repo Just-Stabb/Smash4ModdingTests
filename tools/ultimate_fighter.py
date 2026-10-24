@@ -357,11 +357,14 @@ class Textures:
             self.images.append((self.ids[key], img))
         return self.ids[key]
 
-    def color(self, col, prm=None, emi=None):
-        key = ('col', col, prm, emi)
+    def color(self, col, prm=None, emi=None, gain=(1.0, 1.0, 1.0)):
+        """the colour map times the material's colour gain, with the emissive map over it; the
+        ambient occlusion (PRM blue) baked in only when given a PRM (no normal map to carry it)"""
+        key = ('col', col, prm, emi, tuple(gain))
         if key in self.ids:
             return self.ids[key]
         img = self.load(col).astype(np.float64)
+        img[..., :3] *= np.asarray(gain, np.float64)
         if prm:
             p = resized(self.load(prm), img.shape[1], img.shape[0]).astype(np.float64)
             ao = p[..., 2:3] / 255
@@ -384,8 +387,11 @@ class Textures:
         img[..., 0], img[..., 1], img[..., 2] = src[..., 0], src[..., 1], (z + 1) * 127.5
         img[..., 3] = 128
         if prm:
+            # Smash 4 reads the normal map's alpha as ambient occlusion (gamma 2.2, floored by
+            # NU_aoMinGain; it also masks specular and rim): Ultimate's AO (PRM blue), so the shader
+            # sees the same value
             p = resized(self.load(prm), img.shape[1], img.shape[0]).astype(np.float64)
-            img[..., 3] = (255 - p[..., 1]) * 0.75          # glossy where Ultimate is smooth
+            img[..., 3] = 255 * (p[..., 2] / 255) ** (1 / 2.2)
         return self.add(key, np.clip(np.round(img), 0, 255).astype(np.uint8))
 
     def eye(self, white, iris, part):
@@ -540,9 +546,15 @@ def material_for(tex, mat, tmpl, part):
     if 'Texture1' in tx and 'uvSet' in part['uvs']:
         col = tex.eye(tx['Texture0'], tx['Texture1'], (part['uvs']['map1'], part['uvs']['uvSet'], part['idx']))
     else:
-        col = tex.color(tx['Texture0'], tx.get('Texture6'), tx.get('Texture5'))
+        # CustomVector8 / 13: Ultimate's colour / diffuse gain (his def_edge_005: 0.588)
+        vec = {str(v.param_id).split('.')[-1].split(':')[0]: v.data for v in mat.vectors}
+        gain = [a * b for a, b in zip(vec.get('CustomVector8', [1.0] * 3)[:3], vec.get('CustomVector13', [1.0] * 3)[:3])]
+        col = tex.color(tx['Texture0'], None if 'Texture4' in tx else tx.get('Texture6'), tx.get('Texture5'), gain)
     nor = tex.normal(tx['Texture4'], tx.get('Texture6')) if 'Texture4' in tx else None
-    m = (tmpl['blend'] if blend else tmpl['opaque']).copy()
+    # Ultimate's skin (subsurface: CustomVector30 / 11) -> the base's skin material, eyes aside
+    skin = ('skin' in tmpl and not blend and any('CustomVector30' in str(v.param_id) for v in mat.vectors)
+            and not mat.material_label.lower().startswith('eye'))
+    m = (tmpl['skin'] if skin else tmpl['blend'] if blend else tmpl['opaque']).copy()
     if not blend and 'punchthrough' in mat.material_label.lower():
         m.alpha_func, m.ref_alpha = 518, 128             # alpha-tested (fur cards), as stage cut-outs
 
@@ -562,16 +574,22 @@ def float_hash(name):
 
 
 def templates(base_nud):
-    """the base's skinned body material (0x9A011063: color, normal, ramp) opaque and alpha-blended"""
+    """the base's skinned body material (0x9A011063: color, normal, ramp) opaque and alpha-blended,
+    and its skin material when it has one (0x9A211067, Zelda's face and arms: color, normal, a skin
+    ramp, the ramp; warm rim, specular and AO floor)"""
+    out = {}
     for m in base_nud:
         for p in m.polygons:
             for mt in p.materials:
-                if mt.flags in (0x9A011063, 0x9A013063) and mt.src == 0 and len(mt.textures) == 3:
-                    op = mt.copy()
-                    bl = mt.copy()
-                    bl.src, bl.dst = 1, 1
-                    return dict(opaque=op, blend=bl)
-    raise SystemExit('no 0x9A011063 material in the base')
+                if 'opaque' not in out and mt.flags in (0x9A011063, 0x9A013063) and mt.src == 0 and len(mt.textures) == 3:
+                    out['opaque'] = mt.copy()
+                    out['blend'] = mt.copy()
+                    out['blend'].src, out['blend'].dst = 1, 1
+                if 'skin' not in out and mt.flags == 0x9A211067 and mt.src == 0 and len(mt.textures) == 4:
+                    out['skin'] = mt.copy()
+    if 'opaque' not in out:
+        raise SystemExit('no 0x9A011063 material in the base')
+    return out
 
 
 def empty_polygon(tmpl):
@@ -616,6 +634,14 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
                 p.materials = [material_for(tex, part['mat'], tmpl, part)]
                 polys.append(p)
         meshes.append(nud.Mesh(slot, polys or [empty_polygon(tmpl)], bone=-1, bind=4))
+    if 'skin' in tmpl:          # the skin ramp is the base's own texture: a copy in ours, numbered last
+        base_ramp = tmpl['skin'].textures[2]['hash']
+        ramp = tex.add(('skin ramp',), base_texture(base + '/model.nut', base_ramp), 256)
+        for m in meshes:
+            for p in m.polygons:
+                for t in p.materials[0].textures[2:3]:
+                    if p.materials[0].flags == 0x9A211067 and t['hash'] == base_ramp:
+                        t['hash'] = ramp
     left = sorted(set(parts) - used)
     log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded); meshes: %d slots, %d Ultimate meshes used, left out: %s' % (
         pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), len(meshes), len(used), ', '.join(left)))

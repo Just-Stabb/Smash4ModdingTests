@@ -187,10 +187,20 @@ in `polySurface5817_VIS_O_OBJ`, the wing in `Zelda_DamageFlyFront_VIS_O_OBJ`); a
 empty triangle.
 
 Materials: the base's skinned body material (`0x9A011063`: color, normal, ramp `0x10080000`), opaque
-or alpha-blended (src / dst 1). Textures (`0x40EB0000` up, power-of-two, one mip):
-- color: Ultimate's col x ambient occlusion (prm blue) brightened by emission; cut-out texels get
-  their neighbours' color (BC7 leaves noise there);
-- normal: Ultimate's XY, Z rebuilt, alpha = smoothness (prm green inverted);
+or alpha-blended (src / dst 1); Ultimate's skin (the materials with subsurface settings,
+`CustomVector30` / `11`, eyes aside) the base's skin material when it has one (Zelda's `0x9A211067`:
+color, normal, her 32 x 256 skin ramp copied in as the last texture, the ramp; warm rim, specular
+and AO floor). Textures (`0x40EB0000` up, power-of-two, one mip):
+- color: Ultimate's col x `CustomVector8` x `CustomVector13` (colour / diffuse gain: his
+  `def_edge_005` 0.588), brightened by emission; cut-out texels get their neighbours' color (BC7
+  leaves noise there). No AO in it (only without a normal map);
+- normal: Ultimate's XY, Z rebuilt, alpha = Ultimate's AO (prm blue) ^ (1 / 2.2). Smash 4 reads the
+  normal map's alpha as AO: diffuse x (aoMinGain + (1 - aoMinGain) x alpha^2.2), specular and rim x
+  (alpha^2.2 + aoMinGain.w) (Smash Forge's SmashShader.frag, from Link's face shader in Cemu; Zelda's
+  alpha is AO with a shine mask: mid-grey cloth, dark folds, bright trims). Tests up to 40 put the
+  smoothness there (prm green inverted) and the AO in the color as well: his rough coat came out at
+  about a quarter of its diffuse (alpha ~0.13), the whole model ~4x darker than now in diffuse
+  (colours 5 / 6: ~20x);
 - eyes: the iris (second UV set) drawn onto the white.
 
 `tools/nutexb.py` decodes BC7 now (Pillow's BCn decoder).

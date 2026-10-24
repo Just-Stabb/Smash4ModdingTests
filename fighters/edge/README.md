@@ -256,6 +256,19 @@ Read from Ultimate's `main` (docs/ultimate-fighter-port.md "Ultimate's effect co
   shader, so nothing to carry over; the trail's look and lag aren't from the arguments.
 Package: effect.bin (the bank is test 39's).
 
+## Test 41 (`build/sephiroth_test41.zip`): materials closer to Ultimate's shading (he was dark)
+
+User: "make Sephiroth more closely match Smash Ultimate's shader", "he's a bit dark by comparison to
+other characters". His colour maps are dark (coat ~5% luminance; Zelda's 50-70%), but the conversion
+darkened them twice more: Ultimate's AO baked into the colour (x0.45-1), and the normal map's alpha,
+which Smash 4 reads as AO (docs/ultimate-fighter-port.md "Materials"), holding smoothness instead
+(coat alpha ~0.13: diffuse at ~23%). Now the alpha is Ultimate's AO (gamma-encoded) and the colour
+isn't darkened; Ultimate's per-material colour gain (`CustomVector8`) applied; his skin uses Zelda's
+skin material (warm rim / specular / AO floor, her skin ramp). Estimated diffuse (linear colour x
+the AO term, Smash Forge's formula) over the model: 0.011 -> 0.047 (c00), 0.002 -> 0.049 (c04),
+Zelda 0.14. Skeleton files unchanged.
+Package: `model/body/c00-c07` model.nud / model.nut / metal.nud.
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the
