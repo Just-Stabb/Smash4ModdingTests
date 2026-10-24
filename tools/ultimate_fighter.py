@@ -313,7 +313,13 @@ def resized(img, w, h):
     from PIL import Image
     if img.shape[1] == w and img.shape[0] == h:
         return img
-    return np.asarray(Image.fromarray(img).resize((w, h), Image.LANCZOS))
+    if img.ndim == 2:
+        return np.asarray(Image.fromarray(img).resize((w, h), Image.LANCZOS))
+    # channel by channel: Pillow resizes RGBA premultiplied by alpha, which wipes the other channels
+    # of data maps (PRM: specular in alpha, ~0 on Sephiroth's sword and coat, so its AO came out as
+    # noise; normal maps: AO in alpha)
+    return np.dstack([np.asarray(Image.fromarray(np.ascontiguousarray(img[..., c])).resize((w, h), Image.LANCZOS))
+                      for c in range(img.shape[2])])
 
 
 def bleed(img, steps=24):

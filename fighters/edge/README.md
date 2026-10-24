@@ -302,3 +302,12 @@ python3 tools/trail_shader_test.py VANILLA/shader/effect_trail.nsh OUT.rpx
 ```
 Package: `shader/effect_trail.nsh`, `code/cross_f.rpx`, `fighter/edge/script/animcmd/body/effect.bin`,
 `fighter/edge/effect/edge/trail/*.nut`.
+
+## Test 43 (`build/sephiroth_test43.zip`): white patches on the sword and trims
+
+User (shots): small parts of the model white and patchy (the sword, shoulder / sleeve trims, wrist
+bands). Test 41's normal-map alpha (Ultimate's AO, PRM blue) was noise there: `resized()` scaled
+the RGBA PRM with Pillow, which resizes RGBA premultiplied by alpha, and the PRM's alpha (specular)
+is ~0 on the sword (def_edge_002: mean 0.5) and parts of the coat, so blue came out as black /
+white blocks (sword normal alpha mean 59 instead of 230). `resized()` now scales channel by
+channel. Package: `model/body/c00-c07/model.nut` (model.nud / metal.nud unchanged).
