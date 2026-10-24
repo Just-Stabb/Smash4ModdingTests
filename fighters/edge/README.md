@@ -533,3 +533,13 @@ down the blade too).
   white. Not changed: a two-colour fit (colour 0 / 1 from the texture's rgb against its alpha) would
   also change the approved sword flares.
 Bank 6.56 MB; effect.bin test 53's. Package: the ptcl / efc and effect.bin.
+
+## Test 55 (`build/sephiroth_test55.zip`): dash attack's line in two colours
+
+User, test 54: option 2, the two-colour fit for dash attack's line only.
+- `TWO_COLOUR` (one entry: `P_EdgeAttackDash2` / `FlashLine1`): `combine` keeps the alpha shape
+  (the glow) and fits the texture's rgb against it (r ~ k1 + (k0 - k1) x shape, weighted by the
+  shape: k0 1.00, k1 0.00), so the lerp template draws colour 1 + (colour 0 - colour 1) x shape
+  with colour 0 = Ultimate's colour 0 track (white, lilac at the end) and colour 1 its colour 1
+  (blue 0.13, 0.11, 1.0): a white core in a blue glow. Each track gets its own key fit / sections.
+Bank 6.56 MB, the one emitter changed; effect.bin test 53's. Package: the ptcl / efc and effect.bin.

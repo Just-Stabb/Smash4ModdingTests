@@ -66,6 +66,11 @@ COLOR_MODE = 0x314
 # Ultimate custom shader (index, flag bit) whose colour goes out x its alpha shape x 2 (vfxb shader
 # custom_shader_index / custom_shader_flag; Sephiroth's ef_edge.eff)
 PREMULT_SHADER = (4, 64)
+# (Ultimate set, emitter) drawn with two colours, not one: lerp(colour 1, colour 0, texture rgb) x
+# texture alpha where the rgb is a thin core inside a wide alpha glow (ef_cmn_line06: a white core,
+# a blue glow); one colour drew the glow as bright as the core, dash attack's thick white band
+# (tests 51-54). Listed one by one: the sword flares fit the same way would change too
+TWO_COLOUR = {('P_EdgeAttackDash2', 'FlashLine1')}
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -384,7 +389,7 @@ def track(st, col, n):
     return c, a
 
 
-def combine(img, e, notes, ti=0, fill=1.0):
+def combine(img, e, notes, ti=0, fill=1.0, two_colour=False):
     """eft2's combiner on the main texture, folded into what a one-colour eft template draws (a BC4
     shape x the particle colour): (shape [h, w] 0-1, colour [101, 3], alpha [101]).
     Colour modes (combiner color_process): 0 colour 0; 1 colour 0 x texture; 2 colour 0 x texture +
@@ -401,7 +406,11 @@ def combine(img, e, notes, ti=0, fill=1.0):
     2: colour 1 + (colour 0 - colour 1) x shape), and goes out x the shape x 2 before blending (which
     multiplies by it again): a mostly faint shape (ef_cmn_fire00) draws dark, his black flames. Then
     the shape is the alpha shape and the 4th value the shape's mean (the colour isn't x 2 yet: the
-    template's colour mode decides how the x shape is drawn); else None."""
+    template's colour mode decides how the x shape is drawn); else None.
+    two_colour (colour mode 2; TWO_COLOUR): the shape is the alpha shape and the texture's rgb is
+    fitted against it (r ~ k1 + (k0 - k1) x shape, weighted by the shape), so a lerp template draws
+    colour 1 + (colour 0 - colour 1) x shape with colour 0 / 1 the tracks' mix at k0 / k1: the 5th
+    value is that colour 1 [101, 3] (else None)."""
     st, col, cb, info = e['static'], e['color'], e['combiner'], e['info']
     c0, a0 = track(st, col, 0)
     c1, a1 = track(st, col, 1)
@@ -413,7 +422,7 @@ def combine(img, e, notes, ti=0, fill=1.0):
     atex = f[..., 0] if am in (2, 3) or cb['tex_alpha_input'][ti] == 1 else f[..., 3]
     cm = cb['color_process']
     m0, m1 = c0.mean(0), c1.mean(0)
-    premult = None
+    premult, colour1 = None, None
     sh = e['shader']
     if (sh['custom_shader_index'], sh['custom_shader_flag'] & PREMULT_SHADER[1]) == PREMULT_SHADER:
         premult = float((atex * atex).sum() / max(float(atex.sum()), 1e-6))
@@ -421,6 +430,16 @@ def combine(img, e, notes, ti=0, fill=1.0):
         colour = c0 * k + c1 * ((1 - k) if cm == 2 else 1.0 if cm == 3 else 0.0)
         shape = atex
         notes.append('custom shader: colour by the shape (%.2f), x the shape x 2' % premult)
+    elif two_colour and cm == 2:
+        r, u = rgb.mean(-1), atex
+        sw, su, sr = float(u.sum()), float((u * u).sum()), float((u * r).sum())
+        suu, sur = float((u ** 3).sum()), float((u * u * r).sum())
+        b = (sw * sur - su * sr) / max(sw * suu - su * su, 1e-9)
+        k1 = float(np.clip((sr - b * su) / max(sw, 1e-9), 0, 1))
+        k0 = float(np.clip(k1 + b, 0, 1))
+        colour, colour1 = c1 + (c0 - c1) * k0, c1 + (c0 - c1) * k1
+        shape = atex
+        notes.append('two colours: texture rgb ~ %.2f at the shape\'s peak, %.2f at its edge' % (k0, k1))
     else:
         if cm == 0:
             pix = np.broadcast_to(m0, rgb.shape)
@@ -456,7 +475,8 @@ def combine(img, e, notes, ti=0, fill=1.0):
         ink = max(float(t.sum()), 1e-6)
         alpha = np.array([np.clip(t - (1 - a), 0, 1).sum() / ink for a in np.clip(alpha, 0, 1)])
         notes.append('alpha erosion: fade by the remaining ink')
-    return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1), premult
+    return (shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1), premult,
+            None if colour1 is None else np.clip(colour1, 0, None))
 
 
 def eft_rotation(rot):
@@ -729,7 +749,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             baked = bake_samplers(e, ti, img, ptn, images, names, notes)
             if baked is not None:
                 img, fill = baked, 1.0
-    shape, rgb, alpha, premult = combine(img, e, notes, ti, fill)
+    shape, rgb, alpha, premult, rgb1 = combine(img, e, notes, ti, fill,
+                                               (e.get('_set'), e['name']) in TWO_COLOUR)
     if not is_mesh:
         shape = radial_gradient(shape, notes)
     if uv_quarter:
@@ -786,17 +807,21 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         rgb = rgb * 2 * (premult if mode == 0 else 1.0)
         black1 = mode == 2
         notes.append('template colour mode %d' % mode)
-    cks, secs = color_fit(rgb)
+    if rgb1 is not None and struct.unpack_from('>I', em, COLOR_MODE)[0] != 2:
+        rgb, rgb1 = (rgb + rgb1) / 2, None          # no lerp template: their mean
+        notes.append('two colours: template not a lerp, their mean')
+    fits = [color_fit(rgb), color_fit(rgb if rgb1 is None else rgb1)]
     for track in (0, 1):
+        cks, track_rgb = fits[track][0], (rgb if rgb1 is None or track == 0 else rgb1)
         if black1 and track == 1:
             p.set_color_keys(em, track, [(0.0, 0.0, 0.0, 1.0)] * (len(cks) if p.field(em, 'color1_type') == 2 else 1))
         elif p.field(em, 'color%d_type' % track) == 2:
             p.set_color_keys(em, track, [(*map(float, c), 1.0) for c in cks])
         else:
-            p.set_color_keys(em, track, [(*map(float, rgb.mean(0)), 1.0)])
-    p.set_field(em, 'color_section1', [secs[0]] * 2)
-    p.set_field(em, 'color_section2', [secs[1]] * 2)
-    p.set_field(em, 'color_section3', [secs[2]] * 2)
+            p.set_color_keys(em, track, [(*map(float, track_rgb.mean(0)), 1.0)])
+    p.set_field(em, 'color_section1', [fits[0][1][0], fits[1][1][0]])
+    p.set_field(em, 'color_section2', [fits[0][1][1], fits[1][1][1]])
+    p.set_field(em, 'color_section3', [fits[0][1][2], fits[1][1][2]])
     p.set_field(em, 'color_repeat', [1, 1])
     p.set_field(em, 'color_scale', float(st['color_scale'] or 1.0))
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
@@ -952,6 +977,7 @@ def main():
         made, log = [], []
         for e in eff.emitters(si_ult):
             notes = []
+            e['_set'] = eff.sets[si_ult]
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             if em is not None:
                 made.append((em, e['name']))
