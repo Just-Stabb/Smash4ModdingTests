@@ -152,10 +152,17 @@ START_FORWARD = 5.0
 # 366) so a caught target stays on it; the finish (Part 1: its own hit log) launches, at the head too.
 # No body capsule since test 19 (test 18: "the beam does multihit, but only behind the beam, behind
 # supamario and into the wrong direction": the capsule hit where the target wasn't held)
-HEAD_SIZE = (4.5, 5.5, 6.5)
+# test 20: "somewhat inconsistent on moving targets": a unit bigger than test 19's, and no SDI on the
+# ticks (smash DI moved them out of the head between hits)
+HEAD_SIZE = (5.5, 6.5, 7.5)
+TICK_SDI = 0.0
 TICK_DAMAGE = (1.0, 1.3, 1.6)
-# one finish for every level (the fireball has four motion slots)
-FINISH = dict(Damage=8.0, KBG=90, BKB=55, Size=9.0)
+# the finish per level (test 20: "charge time doesn't seem to increase ... final hit damage"): one
+# motion slot for every level (the fireball has four), so its script picks the hitbox by the level
+# the MSC stores in LEVEL_VAR (the fireball's life, unused since test 15's vtable 2 copy) as 1 / 2 / 3
+FINISH = (dict(Damage=7.0, KBG=85, BKB=50, Size=8.0), dict(Damage=10.0, KBG=90, BKB=55, Size=9.0),
+          dict(Damage=13.0, KBG=95, BKB=60, Size=10.0))
+LEVEL_VAR = 0x10000004
 # test 18: the head pulls a target to its middle (366) so it keeps hitting it while the beam holds;
 # test 17's PK Fire hop (80 degrees) knocked them out of it after one hit
 HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 20, 0
@@ -186,6 +193,22 @@ N_FALL_ACCEL, N_FALL_MAX = 0.02, 0.6
 
 def cmd(name, *params):
     return acmd.Command(acmd.BY_NAME[name], list(params))
+
+
+def cmd_size(cmds):
+    return sum(acmd.INFO[c.ident]['size'] for c in cmds)
+
+
+def by_level(blocks):
+    """ACMD picking one of three command lists by LEVEL_VAR (1 / 2 / 3), as Ryu's charged moves do:
+    Int_Var_Compare(var, ==, 3) True(skip) [level 3] Else(skip) Int_Var_Compare(var, ==, 2) True(skip)
+    [level 2] Else(skip) [level 1]; the jumps count words from the jump itself"""
+    lv1, lv2, lv3 = blocks
+    els = 2
+    inner = [cmd('int_var_compare', LEVEL_VAR, 0, 2), cmd('true', 2 + cmd_size(lv2) + els)] + lv2 + [
+        cmd('else', els + cmd_size(lv1))]
+    return [cmd('int_var_compare', LEVEL_VAR, 0, 3), cmd('true', 2 + cmd_size(lv3) + els)] + lv3 + [
+        cmd('else', els + cmd_size(inner) - els)] + inner + lv1
 
 
 def taunt_script(parts, ids, end=None):
@@ -298,7 +321,7 @@ def weapon_scripts(heads, ids, segs):
         # the head: multi-hits what it caught (366) while flying and through the hold, whose
         # REHIT x HOLD_HITS frames give the charge levels 4 / 6 / 9 hits there (test 18)
         g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
-                    BKB=HEAD_BKB, **tick)]
+                    BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
         game[name] = g
         # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
         # behind). Not at frame 0: a beam starts in status 0 (fly1) and is set to its level's
@@ -317,20 +340,20 @@ def weapon_scripts(heads, ids, segs):
         # (the body pieces: the MSC drops them while it flies)
         effect[name] = e
         sound[name] = [cmd('sound_effect', SND_HEAD)]
-    f = FINISH
-    # the launcher, on the head, where the multi-hit holds the target (bigger than the head's)
-    game['finish'] = [cmd('remove_all_hitboxes'),
-                      hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'],
-                             FKB=0, BKB=f['BKB'], Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2),
-                      cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
+    # the launcher, on the head, where the multi-hit holds the target (bigger than the head's), its
+    # strength by the level
+    game['finish'] = [cmd('remove_all_hitboxes')] + by_level([
+        [hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0, BKB=f['BKB'],
+                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2)] for f in FINISH]) + [
+        cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst
     effect['finish'] = [cmd('terminate_graphic_effect', eid(n), 1, 1) for n in beam_effects(heads, segs)] + [
-        # non-following, in the bone's frame (last argument 1, BONE_FRAME); the Fire cone runs along
-        # its +Z, turned HEAD_YROT as the head's parts: it trails back along the beam (test 18: with 0
-        # it pointed ahead of the head)
-        cmd('graphic_effect', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, ry, 0.0, size, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            BONE_FRAME)
+        # following (they end when the beam is removed; test 20: made non-following, the Wav / Ring
+        # particle sets stayed after it, "these effects are left behind"); the Fire cone runs along its
+        # +Z, turned HEAD_YROT as the head's parts: it trails back along the beam (test 18: with 0 it
+        # pointed ahead of the head)
+        cmd('external_graphic', eid(n), WEAPON_BONE, 0.0, 0.0, 0.0, 0.0, ry, 0.0, size, 1)
         for n, ry, size in ((MODEL_PREFIX + 'Fire', HEAD_YROT, 1.8), ('PtcSupamarioKmhRing', 0.0, 1.8),
                             ('PtcSupamarioKmhWav', 0.0, 2.8))]
     sound['finish'] = [cmd('sound_effect', SND_FIRE)]
@@ -491,7 +514,9 @@ def main():
         'KAME_N_START_FX': msc_effects(heads, ids, False, START_POS).replace('LV', 'kame_n_level()'),
         'KAME_N_START_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n) for n in
                                        dict.fromkeys(p[0] for h in heads for p in h if not p[3])),
-        **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i] + dis_frames) for i in range(3)},
+        # the pose: the level's flight (test 20: held through the dissolve too, it stayed long after a
+        # hit; Supamario can't see the beam end: ArticleModule 0x2717 is 0 for it, test 16)
+        **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i]) for i in range(3)},
         'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
         **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
         **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),

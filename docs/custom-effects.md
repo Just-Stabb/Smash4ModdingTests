@@ -363,3 +363,21 @@ Test 19:
 - The first body piece at frame 4 (`SEG_FIRST`): from then a piece no longer reaches back past the
   start ball.
 - The beam's motion is the fireball's held at its frame-0 pose (the fireball's spins `KaitenN`).
+
+### Tests 19 / 20 in game, and test 21 (`build/supamario_kame_test21.zip`)
+
+Test 20 (test 19's Kamehameha): the multi-hit works, "somewhat inconsistent on moving targets"; a hit
+still left a blue flame with a white glow behind; charge didn't seem to change the hits or the final
+damage; the pose stayed for the whole move after a hit.
+- Left behind: the finish's Ring / Wav particle sets were non-following Graphic_Effects that nothing
+  ended (the Wav loops). Test 21: the finish's Fire / Ring / Wav are External_Graphic (following, on
+  bone 0, the Fire turned 180): they end with the beam.
+- Charge: one finish script serves every level (four motion slots), so it now picks its launcher with
+  `Int_Var_Compare` / `True` / `Else` (as Ryu's charged moves; the jumps count words from the jump
+  command, `by_level`) on the weapon's int `0x10000004` (the fireball's life, unused since test 15),
+  which the MSC sets to level + 1 at the fly status: 7 / 10 / 13 %, KBG 85 / 90 / 95, BKB 50 / 55 / 60,
+  size 8 / 9 / 10. The hold's 4 / 6 / 9 hits by level were already there.
+- Moving targets: head size 5.5 / 6.5 / 7.5, SDI 0 on the ticks.
+- The pose: held for the flight only (`KAME_LIFE`); Supamario still can't see the beam end
+  (ArticleModule 0x2717 is 0 for it). Next: a signal from the beam (vanilla weapons send their linked
+  owner events with `LinkModule(0x2713, link, event)`).

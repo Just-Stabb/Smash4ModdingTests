@@ -738,6 +738,9 @@ void kame_fly_main()
         return;
     }
     kame_level = global4;
+    // for the finish's ACMD (its one script picks the launcher by it): 1 / 2 / 3, in the fireball's
+    // life variable (nothing counts it down since test 15)
+    WorkModule(0x7, kame_level + 0x1, 0x10000004);
     kame_frame = 0;
     if (kame_level == 0x1)
     {
