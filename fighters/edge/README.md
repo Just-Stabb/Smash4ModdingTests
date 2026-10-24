@@ -338,3 +338,30 @@ late; back air showing the whole swing at once; down air three crosses with a bl
 Open: neutral air's disc, back / up air's trails, down air's crosses (the converted values match
 Ultimate's; asked for Ultimate shots). `optional_old_trails/`: the trails on shader 1 to compare.
 Package: the ptcl / efc and effect.bin.
+
+## Test 45 (`build/sephiroth_test45.zip`): particle rotation, stripe meshes
+
+Checked against the Ultimate moveset video (the user's Drive upload), frame by frame. Ultimate's
+down air draws one tall thin spike above him and a star at the blade tip, its back air a crescent
+that swings round, its neutral air a burst with no disc.
+- Particle rotation is shader-keyed: a template turns its particles only if its vertex shader has
+  `v_inRot` (all 3165 vanilla emitters with a rotation do). The templates ignored it: 92 of his 179
+  turning emitters drew unturned. They included down air's flares, turned -90 degrees in Ultimate
+  so their long axis runs along the plunge, which lay across it as crosses. Back air's slash arc
+  (180 degrees, spinning) was unturned too. So were neutral air's rings (random turns), forward
+  air's speed lines, up air's slash glow, and pieces of the throws and specials.
+  `Templates` now ranks on rotation. One it can't bake ranks first; a fixed one (and any mesh's)
+  ranks after the UV animation, which can only be frozen into a new mesh copy (his 240 KB arc
+  glows: four copies, +0.7 MB). What no template draws is baked: a mesh's starting rotation into
+  its vertices, a quad's fixed quarter turns into its texture and scale. Unturned now: 0. The
+  mesh order is read from a turning mesh shader's vertex program: R = Rx Rz Ry (Y, then Z, then
+  X), unlike the emitter's Rz Ry Rx. Lost: the spin of back / up air's arc glows (no template
+  both spins a mesh and scrolls its UVs).
+- eft2 stripe types (5 / 6) on a mesh -> type 4 (the emitter's frame), not type 3. Neutral air's
+  `edge_light_impact` rainbow1 is a flat 69-unit disc, laid level (emitter X 90) and sent off in a
+  random direction (all_dir 0.2); as type 3 it faced its motion, so it could face the camera as
+  the purple disc. Also changed: the victory feathers and impact flashes (down smash, pummel,
+  Gokumon impact).
+Bank 6.31 MB (test 44: 6.33); ids and .efc unchanged; effect.bin is test 44's. Still open: up air's
+trail jagged / late (Sword_Glow arguments of the same kind as Marth's / Ike's / Cloud's).
+Package: the ptcl / efc and effect.bin, `optional_old_trails/` as test 44.

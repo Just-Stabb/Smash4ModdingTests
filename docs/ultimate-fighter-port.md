@@ -224,6 +224,13 @@ short-trail case too). Still not carried over: the depth offset (arg 29).
 (R = Rz Ry Rx); `tools/vfxb_to_ptcl.py` re-expresses the angles (`eft_rotation`; evidence and the
 emitters it changed: fighters/edge/README.md test 44).
 
+**Particle rotation is shader-keyed** in Smash 4: only a template whose vertex shader has `v_inRot`
+turns its particles (docs/ptcl-format.md 0x7F8). `vfxb_to_ptcl.py` ranks templates on it (a turn
+it can't bake first, a fixed one after the UV animation) and bakes what no template draws: a mesh's
+starting rotation into its vertices (eft's particle order, Rx Rz Ry), a quad's fixed quarter turns
+into its texture and scale. eft2's "stripe" types (5 / 6) on a mesh keep the emitter's frame (type 4).
+Test 45 (fighters/edge/README.md).
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).
