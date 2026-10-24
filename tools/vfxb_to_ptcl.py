@@ -455,6 +455,8 @@ def radial_gradient(shape, notes, n=64):
             r = np.clip(np.hypot(xx - n / 2, yy - n / 2) / (n / 2), 0, 1)
             if prof[0] < prof[-1]:
                 prof = prof[::-1]
+            # to 0 at the rim (grade00's dark end is ~0.1: a faint lit square on a bright piece)
+            prof = np.clip((prof - prof[-1]) / max(float(prof[0] - prof[-1]), 1e-6), 0, 1) * prof[0]
             notes.append('gradient on a quad: read from the centre')
             return np.interp(r, np.linspace(0, 1, len(prof)), prof).astype(np.float32)
     return shape

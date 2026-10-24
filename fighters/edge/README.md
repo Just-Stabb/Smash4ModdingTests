@@ -473,3 +473,19 @@ User chose to keep converting Ultimate's purple effects (rather than rebuild the
   hand / entry / dash / throw auras and fire, the throws' smoke, the victory backdrop. Their scroll
   stays lost (frozen at the start).
 Bank 6.56 MB; ids / efc and effect.bin (test 49's) unchanged. Package: the ptcl / efc.
+
+## Test 52 (`build/sephiroth_test52.zip`): gradient glows fade to 0; a colour check for back throw
+
+User, test 51 (shots): dash attack, grab, down / back / forward throw still off: translucent pink and
+blue squares and a pink haze in back throw, a long white band in dash attack.
+- `radial_gradient` rescales the profile to 0 at the rim (grade00's dark end is ~0.1: the down
+  throw's bright `pointlight1` still lit a faint square).
+- Checked statically, no cause found for back throw's squares: every quad's texture is ~0 at its
+  border (cells of flipbooks included), every mesh has a mesh shader, blend 2 is subtract (vanilla
+  `*_sub`). `optional_colour_check/`: the bank with `PtcEdgeThrowBBom` / `PtcEdgeThrowBBom2`
+  emitters each in its own colour (legend in the commit's scratch log: red flare1, green ring1
+  (subtract: shows pink), blue smokeBase, yellow aura2, cyan flareAdd1, magenta fire_g, orange
+  particle1, white sparks1, lime line2_bk, sky line2 (Bom2); pink fireImpact1_g, brown aura1, teal
+  smoke1_normal, violet lightning_ring1, gold lightning_ring1_bk, grey flashCenter_b, navy
+  flashLine1_b, maroon flashLine1_f, olive flashCenter_f (Bom)).
+Package: the ptcl / efc, `optional_colour_check/`.
