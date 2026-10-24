@@ -180,15 +180,34 @@ a global time and +0x2A0; c13[0x0] the frame's HDR range.
 - **1 VS**: world z -= **c4[0x0]** before the view-projection: arg 29 is a **depth offset** (0.1: a
   little behind the fighter; negative values in the dumps pull trails in front).
 - **Turning it off**: `AFTER_IMAGE_OFF(agent, n)` -> EffectModule vt+0x138 (0x4511D0): the trail
-  (0x2B0 bytes) gets +0x38 = n / 60, +0x3C = 1 / n, its counter +0x34 = 0 and the fading flag +0x2A8.
-  The fade progress reaches the 101 shader as c4[0x8] (the "+100" in 101 is the mode that keeps it
-  out of the vertices' alpha), so an Ultimate trail **slides its texture off along U** as it ends,
-  rather than fading out.
-For the conversion (`tools/ultimate_trails.py`): alpha = A.a x B.r is what it does already; its
-"Add" texture (x0.5) gives Smash 4's shader 1 about 1.5x the colour, close to the 1.4 gain. Not
-carried over: the depth offset (Smash 4 trails have none), B's separate U (the converter multiplies
-the two in A's UV space), and the slide-off ending (Smash 4 fades). Open: what the update writes to
-the trail's +0x40 / +0x44 frame by frame and to attribute 9 (B's U).
+  (0x2B0 bytes) gets +0x38 = n / 60 (seconds left), +0x3C = 1 / n, its delay +0x34 = 0 and the fading
+  flag +0x2A8. A trail starts (0x3569600) with +0x40 = 1, +0x44 = 0.
+- **The calc** (0x1356124, a walk of the global trail list, once a frame; step = game speed (global
+  +0x148) x the trail's rate +0x4C): a +0x34 above 0 counts down (step / 60) and sets the fading flag
+  at 0 (a delayed off). While fading, +0x38 counts down the same way (at 0 the trail goes to the
+  dying list, state 5) and each frame **+0x40 -= step / n** (1 -> 0 over the n frames) and **+0x44 +=
+  step / n x 0.5** (0 -> 0.5). It also keeps the history: one 64-byte entry a frame the blade moved
+  (+0x00 / +0x10 the two blade points, +0x30 how many points the segment is split into: 1, 2, 4 ..
+  from how far it swung (thresholds 1/8, 1/4, 1/2), +0x34 its time in frames x rate; a frame whose
+  step is under 1/16 (all but frozen) adds its time to the last entry instead).
+- **Attribute 9 (B's U)**: the update (0x355C344, the 101 / mode-2 path) walks the history from the
+  newest point with t = the time so far / the trail's whole time (each entry's +0x34 / its point
+  count / the sum of +0x34) and writes **U = 1 - t / +0x40** (1 if +0x40 is 0). A's U is 1 - p with
+  p = the time so far / (blur - 1) frames, clamped at 1. So with the history full (a swing longer
+  than the blur) the two run together, 1 at the blade to 0 at the tail, and A x B is the same
+  picture as one texture; on a shorter trail A shows only its blade end while B still spans the
+  whole of it (B's tail is 0: the short trail still fades out at its end). The vertex colour (alpha
+  (1 - t) x +0x40) is written but unused by 101.
+- **The ending**, put together: over AFTER_IMAGE_OFF's n frames +0x40 shrinks, so B's U reaches 0 at
+  t = +0x40 and goes below it past there: the mask (0 at U = 0: Sephiroth's tex_edge_sword2 / 4) **cuts the trail back from its tail to the blade**, while A slides
+  by +0x44 (c4[0x8]: up to half the texture) toward the blade. An Ultimate trail **retracts into the
+  sword** as it ends; a Smash 4 one fades out in place (vertex alpha).
+For the conversion (`tools/ultimate_trails.py`): alpha = A.a x B.r in A's UV space is what Ultimate
+draws while the swing is longer than the blur (B's U = A's U then); its "Add" texture (x0.5) gives
+Smash 4's shader 1 about 1.5x the colour, close to the 1.4 gain. Not carried over (Smash 4's shader
+1 has no second U nor a fade constant): the depth offset, B spanning a short trail on its own (a short
+Ultimate trail still fades out at its tail; the converted one ends wherever A's U stops), and the
+retracting ending (Smash 4 fades).
 
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
