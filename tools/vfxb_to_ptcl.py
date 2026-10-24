@@ -58,6 +58,14 @@ from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, c
                          pow2, resize, sanitize, three_key)
 
 NONE64 = 2 ** 64 - 1
+SHAPE_SEL = 0x00000000          # a BC4 shape's channel selectors: R R R R
+# eft's colour combiner (shader-keyed; read off the vanilla pixel shaders): 0 colour 0 (alpha from
+# the texture's red), 1 colour 0 x texture (alpha from its alpha), 2 colour 1 + (colour 0 - colour 1)
+# x texture (alpha from red)
+COLOR_MODE = 0x314
+# Ultimate custom shader (index, flag bit) whose colour goes out x its alpha shape x 2 (vfxb shader
+# custom_shader_index / custom_shader_flag; Sephiroth's ef_edge.eff)
+PREMULT_SHADER = (4, 64)
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -357,7 +365,15 @@ def combine(img, e, notes, ti=0, fill=1.0):
     brightness against it the shape (the hue across the texture is lost, its brightness kept); the
     colour over life is the same mix of the tracks at the texture's mean. Alpha modes (alpha_process):
     0 / 1 texture alpha x alpha 0 (1 erodes the texture by alpha 0: a fade by the ink left), 2 / 3 the
-    same with the texture's red, 4 texture alpha x alpha 0 x alpha 1."""
+    same with the texture's red, 4 texture alpha x alpha 0 x alpha 1.
+    Custom shader 4 with flag 64 (PREMULT_SHADER: his dark fire / aura, read off its Maxwell code in
+    the file's BNSH, all 13 of them; flags 32 / 1, his smoke / planes, and the 125 shader_type 2
+    emitters without a custom shader don't): the colour is the tracks' mix by the alpha shape, not
+    the texture's colour (0: colour 0;
+    2: colour 1 + (colour 0 - colour 1) x shape), and goes out x the shape x 2 before blending (which
+    multiplies by it again): a mostly faint shape (ef_cmn_fire00) draws dark, his black flames. Then
+    the shape is the alpha shape and the 4th value the shape's mean (the colour isn't x 2 yet: the
+    template's colour mode decides how the x shape is drawn); else None."""
     st, col, cb, info = e['static'], e['color'], e['combiner'], e['info']
     c0, a0 = track(st, col, 0)
     c1, a1 = track(st, col, 1)
@@ -369,31 +385,40 @@ def combine(img, e, notes, ti=0, fill=1.0):
     atex = f[..., 0] if am in (2, 3) or cb['tex_alpha_input'][ti] == 1 else f[..., 3]
     cm = cb['color_process']
     m0, m1 = c0.mean(0), c1.mean(0)
-    if cm == 0:
-        pix = np.broadcast_to(m0, rgb.shape)
-    elif cm == 1:
-        pix = rgb * m0
-    elif cm == 2:
-        pix = rgb * m0 + (1 - rgb) * m1
+    premult = None
+    sh = e['shader']
+    if (sh['custom_shader_index'], sh['custom_shader_flag'] & PREMULT_SHADER[1]) == PREMULT_SHADER:
+        premult = float((atex * atex).sum() / max(float(atex.sum()), 1e-6))
+        k = premult if cm in (2, 3) else 1.0
+        colour = c0 * k + c1 * ((1 - k) if cm == 2 else 1.0 if cm == 3 else 0.0)
+        shape = atex
+        notes.append('custom shader: colour by the shape (%.2f), x the shape x 2' % premult)
     else:
-        pix = rgb * m0 + m1
-    w = atex[..., None]
-    wsum = max(float(w.sum()), 1e-6)
-    tm = (rgb * w).reshape(-1, 3).sum(0) / wsum                     # the texture's mean (per channel)
-    cmean = (pix * w).reshape(-1, 3).sum(0) / wsum
-    lc = max(float(cmean @ LUMA), 1e-4)
-    shape = atex * (pix @ LUMA) / lc
-    peak = max(float(shape.max()), 1e-4)
-    shape = shape / peak
-    if cm == 0:
-        colour = c0
-    elif cm == 1:
-        colour = c0 * tm
-    elif cm == 2:
-        colour = c0 * tm + c1 * (1 - tm)
-    else:
-        colour = c0 * tm + c1
-    colour = colour * peak * float(cmean @ LUMA > 0)
+        if cm == 0:
+            pix = np.broadcast_to(m0, rgb.shape)
+        elif cm == 1:
+            pix = rgb * m0
+        elif cm == 2:
+            pix = rgb * m0 + (1 - rgb) * m1
+        else:
+            pix = rgb * m0 + m1
+        w = atex[..., None]
+        wsum = max(float(w.sum()), 1e-6)
+        tm = (rgb * w).reshape(-1, 3).sum(0) / wsum                     # the texture's mean (per channel)
+        cmean = (pix * w).reshape(-1, 3).sum(0) / wsum
+        lc = max(float(cmean @ LUMA), 1e-4)
+        shape = atex * (pix @ LUMA) / lc
+        peak = max(float(shape.max()), 1e-4)
+        shape = shape / peak
+        if cm == 0:
+            colour = c0
+        elif cm == 1:
+            colour = c0 * tm
+        elif cm == 2:
+            colour = c0 * tm + c1 * (1 - tm)
+        else:
+            colour = c0 * tm + c1
+        colour = colour * peak * float(cmean @ LUMA > 0)
     alpha = a0 * info['color0'][3] * (a1 * info['color1'][3] if am == 4 else 1.0) * fill
     if am in (1, 3):
         # erosion: each pixel is texture - (1 - alpha), so the faint parts go first and the bright
@@ -403,7 +428,7 @@ def combine(img, e, notes, ti=0, fill=1.0):
         ink = max(float(t.sum()), 1e-6)
         alpha = np.array([np.clip(t - (1 - a), 0, 1).sum() / ink for a in np.clip(alpha, 0, 1)])
         notes.append('alpha erosion: fade by the remaining ink')
-    return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1)
+    return shape, np.clip(colour, 0, None), np.clip(alpha, 0, 1), premult
 
 
 def eft_rotation(rot):
@@ -676,7 +701,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             baked = bake_samplers(e, ti, img, ptn, images, names, notes)
             if baked is not None:
                 img, fill = baked, 1.0
-    shape, rgb, alpha = combine(img, e, notes, ti, fill)
+    shape, rgb, alpha, premult = combine(img, e, notes, ti, fill)
     if not is_mesh:
         shape = radial_gradient(shape, notes)
     if uv_quarter:
@@ -703,7 +728,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             break
         shape, tw, th = half[..., 0], tw // 2, th // 2
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
-    p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34)
+    # the shape in every channel (selectors R R R R): most templates' pixel shaders take alpha from
+    # red, some from alpha (Koopa's pointlight1 / Pikachu's spark1, picked for the hand / throw auras
+    # and back throw's aura2), which with vanilla's R R R 1 drew the whole quad (test 52's colour
+    # check: back throw's yellow square, the grab's purple one)
+    p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34, comp_sel=SHAPE_SEL)
     if smp:
         struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (smp['wrap_u'] & 0xF) << 28 | (smp['wrap_v'] & 0xF) << 24 | 0x100)
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
@@ -713,9 +742,21 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # ---- blend, colour, alpha
     st, col = e['static'], e['color']
     p.set_field(em, 'blend_type', BLEND[blend])
+    black1 = False
+    if premult is not None:
+        # the custom shader's colour x shape x 2: the shape is in every channel (SHAPE_SEL), so a
+        # template whose colour mode (COLOR_MODE) takes the texture draws the x shape per pixel
+        # (1: colour 0 x texture; 2: colour 1 + (colour 0 - colour 1) x texture, colour 1 black);
+        # one that doesn't (0: colour 0) gets the shape's mean
+        mode = struct.unpack_from('>I', em, COLOR_MODE)[0]
+        rgb = rgb * 2 * (premult if mode == 0 else 1.0)
+        black1 = mode == 2
+        notes.append('template colour mode %d' % mode)
     cks, secs = color_fit(rgb)
     for track in (0, 1):
-        if p.field(em, 'color%d_type' % track) == 2:
+        if black1 and track == 1:
+            p.set_color_keys(em, track, [(0.0, 0.0, 0.0, 1.0)] * (len(cks) if p.field(em, 'color1_type') == 2 else 1))
+        elif p.field(em, 'color%d_type' % track) == 2:
             p.set_color_keys(em, track, [(*map(float, c), 1.0) for c in cks])
         else:
             p.set_color_keys(em, track, [(*map(float, rgb.mean(0)), 1.0)])

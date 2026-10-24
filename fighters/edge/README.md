@@ -489,3 +489,27 @@ blue squares and a pink haze in back throw, a long white band in dash attack.
   smoke1_normal, violet lightning_ring1, gold lightning_ring1_bk, grey flashCenter_b, navy
   flashLine1_b, maroon flashLine1_f, olive flashCenter_f (Bom)).
 Package: the ptcl / efc, `optional_colour_check/`.
+
+## Test 53 (`build/sephiroth_test53.zip`): shape in every channel, uncapped tints, the dark-fire shader
+
+User, test 52 colour check (back / down / forward throw, grab shots): back throw's square is yellow
+(`aura2`); the grab's hand has a purple square behind it; jab (test 51 shots): lines too pink.
+- The squares: two templates' pixel shaders take alpha from the texture's alpha, not its red
+  (Pikachu's `spark1`, colour mode 1, and Koopa's `pointlight1`, a mode-2 shader with distortion:
+  the grab / forward throw hand `fire1` and `aura2`, the entry `aura2`, back throw's `aura2`, 9
+  emitters with the turned copies), and vanilla's BC4 channel selectors (R R R 1) gave them alpha 1
+  over the whole quad. Shapes now select R R R R
+  (`SHAPE_SEL`): every template reads the shape, from red or alpha.
+- Jab's tint: `ultimate_acmd.py` capped EFFECT_FOLLOW_COLOR at 255 per channel, so (0.75, 0.5, 1.5)
+  became (191, 127, 255), pink. Uncapped (vanilla goes to 714: Falco); 9 commands (jab 1 / 3,
+  ledge, getup and trip attacks), patched into test 49's effect.bin in place.
+- Ultimate's own shaders, read from the effect file's BNSH (`tools/eft_shader_dis.py`; the user
+  pointed to SSBU shader tools): custom shader 4 with flag 64 (dash attack's fires, aura and spark,
+  the dash aura, Shadow Flare's finger aura, his aura: 13 emitters) colours by its alpha shape and
+  outputs colour x shape x 2. `combine` does the same (`PREMULT_SHADER`), the x shape per pixel
+  through the template's colour mode (2: colour 1 black; 1: as is; 0: the shape's mean).
+  (`fireBlack`'s orange in the earlier dump was its unused constant; its keys are dark violet.)
+- Dash attack's `FlashLine1` (the long white band) is as long as Ultimate's (55 x 1.61; scale_min /
+  max are camera-distance limits, off); left as is.
+Bank 6.56 MB; ids / efc unchanged; effect.bin: test 49's with the 9 tints. Package: the ptcl / efc
+and effect.bin.

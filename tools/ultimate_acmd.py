@@ -522,7 +522,9 @@ class EffectTranslator(Translator):
         if shape.endswith('+alpha'):
             rest.append(float(extra[0]) * 100.0)
         elif shape.endswith('+color'):
-            rest += [min(255.0, float(v) * 255.0) for v in extra[:3]]
+            # not capped at 255: vanilla passes more (Falco 714 / 76 / 280); capping one channel shifts
+            # the hue (his jab tint (0.75, 0.5, 1.5) drew pink as (191, 127, 255), test 51)
+            rest += [float(v) * 255.0 for v in extra[:3]]
         return [cmd(target, eid, bone, *place, *rest)]
 
 

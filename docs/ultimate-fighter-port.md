@@ -235,6 +235,14 @@ starting rotation into its vertices (eft's particle order, Rx Rz Ry), a quad's f
 into its texture and scale. eft2's "stripe" types (5 / 6) on a mesh keep the emitter's frame (type 4).
 Test 45 (fighters/edge/README.md).
 
+**Effect shaders are readable**: Ultimate's `ef_<name>.eff` carries its compiled shaders (a BNSH
+after the GRSN section); an emitter's shader_index picks the variation, and `tools/eft_shader_dis.py`
+disassembles its Maxwell code (tools/maxwell_dis). Read so far (Sephiroth): the standard pixel shader
+draws colour 1 + (colour 0 - colour 1) x texture rgb, alpha the texture's alpha (color_process 2, as
+Cafe eft); custom shader 4 with flag 64 (his dark fire / aura, 13 emitters) lerps the colours by the
+alpha shape instead and outputs colour x shape x 2 (before blending), so faint parts go dark. A
+template's own colour mode (docs/ptcl-format.md 0x314) decides how that converts. Test 53.
+
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it
 vanished in attacks (test 22).

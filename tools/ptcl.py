@@ -381,7 +381,8 @@ class Ptcl:
         self.dirty_layout = True
         return pos, len(data), {'w': w, 'h': h, 'gx2': gx2fmt}
 
-    def set_texture(self, em, slot, rgba, gx2fmt=None, child=False):
+    def set_texture(self, em, slot, rgba, gx2fmt=None, child=False, comp_sel=None):
+        """comp_sel: the channel selectors to store (default: the format's, or the template's own)"""
         o = (CHILD_TEXRES if child else TEXRES + TEXRES_SIZE * slot)
         t = self.texres(em, slot, child)
         if gx2fmt is None:
@@ -393,8 +394,10 @@ class Ptcl:
             struct.pack_into('>I', em, o + 0x0C, 0x100)           # the common sampler word
             struct.pack_into('>f', em, o + 0x18, 15.99)
         struct.pack_into('>I', em, o + 0x10, 1)                   # one mip
-        struct.pack_into('>I', em, o + 0x14, COMP_SEL[gx2fmt] if t['comp_sel'] == 0 or gx2fmt != (
-            EFT_GX2.get(t['native_format'], 0) & 0x3F) else t['comp_sel'])
+        if comp_sel is None:
+            comp_sel = COMP_SEL[gx2fmt] if t['comp_sel'] == 0 or gx2fmt != (
+                EFT_GX2.get(t['native_format'], 0) & 0x3F) else t['comp_sel']
+        struct.pack_into('>I', em, o + 0x14, comp_sel)
         struct.pack_into('>IIIIII', em, o + 0x20, 2, 0, w * h * 4, GX2_EFT[gx2fmt], size, pos)
         return pos
 
