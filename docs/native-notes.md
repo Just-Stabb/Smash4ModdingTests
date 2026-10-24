@@ -1227,6 +1227,19 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the
   hitbox's SDI.
 
+## Sword trails (trail textures by id)
+
+- `Sword_Glow` / `Sword_Glow2` / `Sword_Trace` take trail texture ids (Ike 4 / 143, Marth 9 / 144,
+  Cloud 242...): a 1-based index into a table of 259 name pointers at `0x10423E60` (`TexLinkSwordTrace`,
+  `TexLinkArrowTrace`, `TexPitSwordTrace`, `TexIkeSwordTrace`, ... `TexKamuiSpearTrace07`).
+- The trail set-up `0x032F515C` reads `table[id]` with `lwzx` from `0x10423E5C` (`lis` / `addi r25`
+  at `0x032F53A4` / `0x032F53B0`, the table's only reference), no bound check, formats `"%s.nut"`
+  (`0x10192344`) and looks the texture up by that name through the manager at `[0x10423DC8]`
+  (vt `+0x4C`): the textures are the fighters' `effect/<name>/trail/*.nut` (vanilla: NTP3, one mip,
+  128 x 128, DXT5 / DXT1 for the "Add" ones, id 0).
+- The words after the table are other variables (referenced by code), so new names need a copy of
+  the table: `tools/trail_table_cave.py`.
+
 ## SoundModule (MSC)
 
 - The MSC wrapper (syscall 0x1E, `0x030B2D58`) calls SoundModule (accessor `+0xA4`) vtable `+0x18C`,

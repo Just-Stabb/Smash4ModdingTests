@@ -1,5 +1,5 @@
 {
- "_about": "Ultimate sys_* effect -> Smash 4 common effect id (tools/ultimate_sys_effect_map.py, fighters: mario, zelda, marth, link, captain, fox, samus, kirby, pikachu, ike)",
+ "_about": "Ultimate sys_* effect -> Smash 4 common effect id (tools/ultimate_sys_effect_map.py, fighters: mario, zelda, marth, link, captain, fox, samus, kirby, pikachu, ike; by name where one matches)",
  "sys_down_smoke": "0x100000A",
  "sys_final_aura2": "0x10000F7",
  "sys_turn_smoke": "0x100001B",
@@ -36,14 +36,14 @@
  "sys_action_smoke_v": "0x1000024",
  "sys_v_smoke_a": "0x1000028",
  "sys_counter_flash": "0x1000027",
- "sys_sp_flash": "0x1000009",
+ "sys_sp_flash": "0x100007C",
  "sys_guard_mark": "0x100001F",
- "sys_bomb_a": "0x1000008",
+ "sys_bomb_a": "0x1000017",
  "sys_attack_arc_c": "0x100008D",
  "sys_warpstar": "0x100006A",
- "sys_bomb_b": "0x1000008",
+ "sys_bomb_b": "0x1000022",
  "sys_sleep": "0x100002E",
- "sys_sliding_smoke": "0x1000009",
+ "sys_sliding_smoke": "0x100008C",
  "sys_catch": "0x1000033",
- "sys_spin_wind_s": "0x1000023"
+ "sys_spin_wind_s": "0x1000045"
 }

@@ -62,6 +62,22 @@ Left out of the scripts (counted by `--list`): Ultimate-only module calls (jostl
 frames, throw camera zoom, finish camera), the down smash ground check, forward air's
 platform pierce flag.
 
+## Test 30 (`build/sephiroth_test30.zip`): sword trails, universal effects
+
+- Sword trails: Ultimate's `AFTER_IMAGE4_ON` in forward / up / down tilt, forward / up smash, back /
+  up air -> `Sword_Glow` with his own trail textures (`effect/edge/trail/TexEdgeSwordTrace*.nut`,
+  ids 260-263 through the executable's trail table, `tools/trail_table_cave.py`).
+- Universal effects: the sys map now matches names (slide attack's smoke was the dash's).
+
+```
+python3 tools/ultimate_trails.py ULT/effect/fighter/edge/trail OUT/fighter/edge/effect/edge/trail \
+    tex_edge_sword1.nutexb,tex_edge_sword2.nutexb=TexEdgeSwordTrace tex_edge_sword3.nutexb,tex_edge_sword4.nutexb=TexEdgeSwordTrace2
+python3 tools/ultimate_sys_effect_map.py DUMPS VANILLA reference/ultimate_sys_effects.json \
+    --common effect/common/common.010d0000.efc effect/common/common.010d0000.ptcl
+python3 tools/ultimate_acmd.py ... --effects reference/ultimate_sys_effects.json,fighters/edge/edge_effects.json edge/model/body/c00/model.nusktb
+python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/trail_table_cave.py IN.rpx)
+```
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

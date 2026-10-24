@@ -71,11 +71,24 @@ moves), replacing the base's; not specials / Final Smash (still the base's moves
 Graphic_Effect, LANDING_EFFECT -> Graphic_Effect3, ..., EFFECT_OFF_KIND -> Terminate_Graphic_Effect;
 alpha x 100, colour x 255), matched on 10 fighters both games have. `sys_*` names -> Smash 4 common
 ids: `reference/ultimate_sys_effects.json` (`tools/ultimate_sys_effect_map.py`: the same moves'
-scripts aligned by frame, 47 names). Bones without a joint id use their nearest jointed ancestor
-(Ultimate skeleton). The facing-left branch is taken (the dumps nest the right-facing one inside it);
-looping motions get `Loop_Rest` + `JUMP` to themselves when the base's script loops. Not yet: the
-fighter's own effects (`edge_*`: their bank comes from Ultimate's .eff), LAST_EFFECT_SET_*, sword
-trails (AFTER_IMAGE), FLASH / BURN_COLOR.
+scripts aligned by frame, 47 names). Since Sephiroth test 30 a name matching a common
+emitter set or model by name takes that entry (`--common EFC PTCL`: `sys_bomb_a`, `sys_sp_flash`,
+`sys_sliding_smoke`, `sys_spin_wind_s` had another effect's id). Bones without a joint id use their
+nearest jointed ancestor (Ultimate skeleton), the offset carried through the bind pose
+(`skeleton_locals`). The facing-left branch is taken (the dumps nest the right-facing one inside it);
+looping motions get `Loop_Rest` + `JUMP` to themselves when the base's script loops.
+
+**Sword trails**: `AFTER_IMAGE4_ON(_arg29)` -> `Sword_Glow` (texture pair, blur length, the two
+blade points, the effect bone, size; blend mode / shader 11 / 1 as Ike's, Marth's and Link's),
+`AFTER_IMAGE_OFF` -> `Terminate_Sword_Glow`. Trail textures are numbered: an id is a 1-based index
+into the executable's table of 259 names (`0x10423E60`, docs/native-notes.md "Sword trails");
+`tools/trail_table_cave.py` copies it into the grown code space with new names (Sephiroth's 260-263),
+`tools/ultimate_trails.py` makes the `.nut` pairs (`effect/<name>/trail/`) from Ultimate's nutexb
+pairs, and the ids file maps Ultimate's texture names to them (`fighters/edge/edge_effects.json`,
+merged with the sys map: `--effects A.json,B.json NUSKTB`).
+
+Not yet: the fighter's own effects (`edge_*`: their bank comes from Ultimate's .eff, a VFXB),
+LAST_EFFECT_SET_*, FLASH / BURN_COLOR.
 
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it

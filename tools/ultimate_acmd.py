@@ -365,22 +365,52 @@ EFFECT_MACROS = {
 }
 
 
+# Ultimate trail blend -> Smash 4 Sword_Glow BlendMode / Shader (Ike's, Marth's and Link's trails:
+# 11 / 1 in every vanilla Sword_Glow of theirs)
+TRAIL_BLEND = (11, 1)
+
+
 class EffectTranslator(Translator):
     """effect_* functions -> Smash 4 effect scripts. ids: Ultimate effect name -> Smash 4 effect id
-    (the common bank's for sys_*; a fighter bank's once converted); other names are left out and
-    counted. Bones without a joint id use their nearest ancestor that has one (parents: Ultimate's
-    skeleton, lower-case names)."""
+    (the common bank's for sys_*; a fighter bank's once converted), and trail texture name -> Smash 4
+    trail id (tools/trail_table_cave.py); other names are left out and counted. Bones without a joint
+    id use their nearest ancestor that has one (parents: Ultimate's skeleton, lower-case names), the
+    offset carried into the ancestor's frame through the bind pose (locals: each bone's local
+    transform, row vectors) when it's known."""
 
-    def __init__(self, joints, ids, parents):
+    def __init__(self, joints, ids, parents, locals_=None):
         super().__init__(joints)
-        self.ids, self.parents = ids, parents
+        self.ids, self.parents, self.locals = ids, parents, locals_ or {}
         self.missing = {}
 
     def bone(self, name):
+        return self.bone_at(name, (0.0, 0.0, 0.0))[0]
+
+    def bone_at(self, name, xyz):
+        """(joint id, the point xyz of bone `name` in that joint's frame)"""
+        import numpy as np
         n = name.lower()
+        p = np.array([float(v) for v in xyz] + [1.0])
         while n not in self.joints and n != 'top' and n in self.parents:
+            if n in self.locals:
+                p = p @ self.locals[n]
             n = self.parents[n]
-        return super().bone(n)
+        return super().bone(n), [float(v) for v in p[:3]]
+
+    def trail(self, a):
+        """AFTER_IMAGE4_ON(_arg29)(agent, tex1, tex2, blur, bone1, x1, y1, z1, bone2, x2, y2, z2,
+        terminate, effect, bone3, x, y, z, rx, ry, rz, size, mode, axis, _, blend, ...) -> Sword_Glow"""
+        t1, t2 = self.ids.get(a[1]), self.ids.get(a[2])
+        if t1 is None or t2 is None:
+            for t in (a[1], a[2]):
+                if t not in self.ids:
+                    self.missing[t] = self.missing.get(t, 0) + 1
+            return []
+        b1, p1 = self.bone_at(a[4], a[5:8])
+        b2, p2 = self.bone_at(a[8], a[9:12])
+        b3, p3 = self.bone_at(a[14], a[15:18])
+        return [cmd('Sword_Glow', t1, t2, int(float(a[3])), b1, *p1, b2, *p2, int(a[12] in ('true', True)), 0,
+                    b3, *p3, *[float(v) for v in a[18:21]], float(a[21]), 0, 0, 0, *TRAIL_BLEND)]
 
     def call(self, name, a, raw):
         short = name.split('::')[-1]
@@ -392,6 +422,10 @@ class EffectTranslator(Translator):
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
                 return []
             return [cmd('Terminate_Graphic_Effect', eid, int(bool(a[2])), int(bool(a[3])))]
+        if short.startswith('AFTER_IMAGE4_ON'):
+            return self.trail(a)
+        if short == 'AFTER_IMAGE_OFF':
+            return [cmd('Terminate_Sword_Glow', int(float(a[1])))]
         if short not in EFFECT_MACROS:
             self.skip(short)
             return []
@@ -401,7 +435,8 @@ class EffectTranslator(Translator):
             if a[1] != 'null':
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
             return []
-        place = [float(v) for v in a[3:10]]                      # x, y, z, rx, ry, rz, size
+        bone, xyz = self.bone_at(a[2], a[3:6])
+        place = xyz + [float(v) for v in a[6:10]]               # x, y, z, rx, ry, rz, size
         if shape.startswith('full'):
             rest = [float(v) for v in a[10:16]] + [int(bool(a[16]))]
             extra = a[17:]
@@ -412,10 +447,10 @@ class EffectTranslator(Translator):
             rest.append(float(extra[0]) * 100.0)
         elif shape.endswith('+color'):
             rest += [min(255.0, float(v) * 255.0) for v in extra[:3]]
-        return [cmd(target, eid, self.bone(a[2]), *place, *rest)]
+        return [cmd(target, eid, bone, *place, *rest)]
 
 
-def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final')):
+def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final'), locals_=None):
     """every effect_* function of the dump -> the effect script of the same Smash 4 name (TRANSLATE's
     for the translated moves), replacing the base's (its own effects, e.g. Zelda's sparkles); not the
     moves still the base's (specials, Final Smash). Returns {Smash 4 name: commands}, {missing name:
@@ -424,7 +459,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
     # the facing-left branch: in the dumps the facing-right one is often nested inside it (a misplaced
     # else), so it's the one that always holds the effect; Smash 4 places effects by the bones anyway
     EFFECT_CONDS = (LR_LEFT,)
-    tr = EffectTranslator(joints, ids, parents)
+    tr = EffectTranslator(joints, ids, parents, locals_)
     out = {}
     for path in sorted(os.listdir(scripts_dir)):
         if not path.endswith('.txt'):
@@ -446,6 +481,13 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             out[name] = cmds
     EFFECT_CONDS = ()
     return out, tr.missing
+
+
+def skeleton_locals(nusktb):
+    """{bone (lower case): its local transform (4 x 4, row vectors: translation in the 4th row)}"""
+    import numpy as np
+    import ssbh_data_py as s
+    return {b.name.lower(): np.array(b.transform, float) for b in s.skel_data.read_skel(nusktb).bones}
 
 
 def skeleton_parents(nusktb):
@@ -555,7 +597,8 @@ def main():
     ap.add_argument('--have', help='LEFT,RIGHT as the model was built with (ultimate_fighter.py --have)')
     ap.add_argument('--effects', nargs=2, metavar=('IDS_JSON', 'NUSKTB'),
                     help='with --others: translate the effect scripts too (IDS_JSON: Ultimate effect name -> '
-                         'Smash 4 id, e.g. reference/ultimate_sys_effects.json; NUSKTB: Ultimate skeleton)')
+                         'Smash 4 id, e.g. reference/ultimate_sys_effects.json, comma-separated files merged; trail '
+                         'texture names -> trail ids too; NUSKTB: Ultimate skeleton)')
     a = ap.parse_args()
     f = acmd.ACMDFile.load(a.game_bin)
     if a.have:
@@ -595,7 +638,8 @@ def main():
                 ids = {}
                 for path in a.effects[0].split(','):
                     ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
-                fx, missing = translate_effects(a.scripts, o, tr.joints, ids, skeleton_parents(a.effects[1]))
+                fx, missing = translate_effects(a.scripts, o, tr.joints, ids, skeleton_parents(a.effects[1]),
+                                                locals_=skeleton_locals(a.effects[1]))
                 for name, cmds in fx.items():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (

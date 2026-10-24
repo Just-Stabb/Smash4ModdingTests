@@ -1,0 +1,7 @@
+{
+ "_about": "Sephiroth's own effect ids for tools/ultimate_acmd.py --effects (with reference/ultimate_sys_effects.json): Ultimate trail textures -> Smash 4 trail ids (tools/trail_table_cave.py NEW_TRAILS: 260 TexEdgeSwordTrace, 261 its Add, 262 TexEdgeSwordTrace2, 263 its Add; tools/ultimate_trails.py makes the .nut files)",
+ "tex_edge_sword1": "260",
+ "tex_edge_sword2": "261",
+ "tex_edge_sword3": "262",
+ "tex_edge_sword4": "263"
+}
