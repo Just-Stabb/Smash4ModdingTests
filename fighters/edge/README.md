@@ -241,6 +241,21 @@ dash attack. Read from the executable (docs/native-notes.md, docs/ptcl-format.md
 Trails: no change found (swordl2 isn't animated; the joint is right).
 Package: the ptcl / efc and effect.bin.
 
+## Test 40 (`build/sephiroth_test40.zip`): Ultimate's effect commands read from its ExeFS
+
+Read from Ultimate's `main` (docs/ultimate-fighter-port.md "Ultimate's effect commands"):
+- `LAST_EFFECT_SET_RATE` is the set's playback speed (effect record +0x264), as Smash 4's command of
+  the same name; `LAST_EFFECT_SET_ALPHA` the set's alpha (0-1; Smash 4: percent). Both were left
+  out: now 44 rates and 18 alphas in his scripts (only after an effect that was converted).
+- `EFFECT_DETACH_KIND` -> `EFFECT_DETACH_KIND` (6 new): neutral air's finger-snap light, up air's
+  slash light, forward / down air's sword flash, back air's arc and down smash's speed lines detach
+  and play out instead of being cut with the move.
+- `EFFECT_OFF_KIND`'s flags are Smash 4's `Terminate_Graphic_Effect` ones in the same order (as was).
+- Trails: `AFTER_IMAGE4_ON_arg29`'s arguments are Smash 4's `Sword_Glow` ones in the same order, the
+  history the same (frames x 16 + 1); Ultimate's last two numbers (1.4 / 0.1) only feed its own trail
+  shader, so nothing to carry over; the trail's look and lag aren't from the arguments.
+Package: effect.bin (the bank is test 39's).
+
 ## Next
 
 1. Specials: Flare / Megaflare / Gigaflare, Blade Dash / Octaslash, Scintilla, Shadow Flare; the

@@ -127,7 +127,39 @@ the blade, his up-air arc faces the camera only so, and the moves both games sha
 in this order better than in the others). An effect on a bone without a joint id goes to the nearest
 ancestor that has one, the offset and the angles carried through the bind pose (`EffectTranslator.place`).
 
-Not yet in the scripts: LAST_EFFECT_SET_* (rate, colour, alpha), FLASH / BURN_COLOR.
+**Last-effect settings**: `LAST_EFFECT_SET_RATE` / `_ALPHA` / `_COLOR` -> Smash 4's commands of the
+same name (rate as is, alpha x 100, colour x 255), left out with the effect they follow when that one
+wasn't converted (they would land on the one before). `EFFECT_DETACH_KIND` -> `EFFECT_DETACH_KIND`
+(neutral air's burst detaches and plays out after the move). Read from Ultimate's executable below.
+Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_offset_last` /
+`enable_sync_init_pos_last`.
+
+### Ultimate's effect commands (ExeFS `main`, version used: the NSO's dynsym names them)
+
+`app::sv_animcmd::*` read their lua arguments and call EffectModule (accessor +0x140) virtuals
+(FighterEffectModule's vtable 0x4F6BCB8 in the decompressed image; `.rela.dyn` holds the pointers):
+- `LAST_EFFECT_SET_RATE` (0x22A49A0) -> vt+0x338 = `set_rate(last handle (module +0x24), rate)`
+  (vt+0x330): the rate goes to the effect record's +0x264 (records of 0x300 bytes, handle >> 24 =
+  index): the set's playback speed, as Smash 4's command of the same name. `LAST_EFFECT_SET_ALPHA` ->
+  vt+0x348, alpha as is (0-1; Smash 4 takes a percent).
+- `EFFECT_OFF_KIND(name, a, b)` -> vt+0xE0 `kill_kind(name, a, b)`, the flags in the order of Smash 4's
+  `Terminate_Graphic_Effect(Graphic, KillParticles, KillImmediately)`. `EFFECT_DETACH_KIND(name, n)` ->
+  vt+0x100 `(name, n, 0)`.
+- `AFTER_IMAGE4_ON_arg29` (0x22A76D0, the parser 0x22A6420) fills a 0xB0-byte request and calls
+  vt+0x120: tex1 +0x10, tex2 +0x18, blur frames +0x20, bone1 +0x00 / offset +0x30, bone2 +0x08 /
+  offset +0x40, terminate +0x50 (ORed with 0x10000 into the trail flags), effect +0x58 ("null" -> none),
+  bone3 +0x60, offset +0x70, rotation +0x80 (degrees -> radians), size +0x90, mode +0x94, axis +0x95
+  (0 X, 1 Y, else Z: unit vectors), arg 24 +0x98, blend +0x9C, shader +0xA0, cull +0xA4, then two
+  floats +0xA8 / +0xAC (defaults 1 / 0). The trail (0x2B0 bytes, built at 0x35670E0) keeps a history
+  of blur x 16 + 1 points as Smash 4's, and the arguments are Smash 4's `Sword_Glow` ones in the same
+  order (texture pair .. size, TrailMode, Axis, Unused, BlendMode, Shader); Ultimate added the cull
+  and the two floats. The shader number: >= 1000 subtracts 1000 and loads a second shader (as Smash
+  4's); then >= 100 subtracts 100 and sets trail +0x64 = 2 (else 1), which only stops the update
+  (0x355B540) writing the fade (+0x44) into the vertices. Every Ultimate trail in the dumps passes
+  axis X, `TRAIL_BLEND_ALPHA`, 101, `TRAIL_CULL_NONE`: the converted ones keep Marth's / Ike's / Link's
+  Smash 4 blend 11 and shader 1. The two floats (1.4 / 0.1 for Sephiroth; 1.2-2 / -0.1-0.7 across the
+  dumps) go only into the trail shader's constant block (with the fade and a global time, update
+  0x355BF9C): Ultimate's trail shader, not in the ExeFS, so they have no Smash 4 counterpart.
 
 **Swapped meshes**: Ultimate swaps Sephiroth's sword for a bright copy during swings (`VIS_ALSO`:
 the slot shows while the sword or its bright / dark copy does); with the plain sword's track alone it

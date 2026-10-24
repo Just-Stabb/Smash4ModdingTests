@@ -365,6 +365,11 @@ EFFECT_MACROS = {
     'EFFECT_FOLLOW_COLOR': ('EFFECT_FOLLOW_COLOR', 'follow+color'),
 }
 
+# LAST_EFFECT_SET_* -> the Smash 4 command of the same name, its arguments scaled: Ultimate passes
+# rate / alpha / colour as is (app::sv_animcmd -> EffectModule vt+0x338 / +0x348 ...: rate lands in
+# the effect record +0x264, a per-set playback speed), Smash 4's alpha is a percent and its colour 0-255
+LAST_EFFECT = {'LAST_EFFECT_SET_RATE': 1.0, 'LAST_EFFECT_SET_ALPHA': 100.0, 'LAST_EFFECT_SET_COLOR': 255.0}
+
 
 def euler_matrix(rot):
     """effect angles (degrees) -> rotation matrix (column vectors): R = Rz Ry Rx, X turned first.
@@ -407,6 +412,7 @@ class EffectTranslator(Translator):
         super().__init__(joints)
         self.ids, self.parents, self.locals = ids, parents, locals_ or {}
         self.missing = {}
+        self.last = False
 
     def bone(self, name):
         return self.bone_at(name, (0.0, 0.0, 0.0))[0]
@@ -470,6 +476,19 @@ class EffectTranslator(Translator):
             return self.trail(a)
         if short == 'AFTER_IMAGE_OFF':
             return [cmd('Terminate_Sword_Glow', int(float(a[1])))]
+        if short in LAST_EFFECT:
+            # the last effect's handle (EffectModule +0x24 in Ultimate; a trail doesn't set it): left
+            # out with that effect when it wasn't converted, or it would land on the one before
+            if not self.last:
+                return []
+            scale = LAST_EFFECT[short]
+            return [cmd(short, *[float(v) * scale for v in a[1:]])]
+        if short == 'EFFECT_DETACH_KIND':
+            eid = self.ids.get(a[1])
+            if eid is None:
+                self.missing[a[1]] = self.missing.get(a[1], 0) + 1
+                return []
+            return [cmd('EFFECT_DETACH_KIND', eid, int(float(a[2])) & 0xFFFFFFFF)]
         if short not in EFFECT_MACROS:
             self.skip(short)
             return []
@@ -480,6 +499,7 @@ class EffectTranslator(Translator):
             # bone (down air's flash 22 along the blade sat above his head): follow fully instead
             target = 'External_Graphic' if short == 'EFFECT_FLW_POS' else 'Graphic_Effect4'
         eid = self.ids.get(a[1])
+        self.last = eid is not None
         if eid is None:
             if a[1] != 'null':
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
@@ -522,6 +542,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
                 name = TRANSLATE.get(src, name)
             if name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts and name not in TRANSLATE.values():
                 continue
+            tr.last = False
             cmds = tr.script(body)
             # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
             base = [c.name for c in effect_bin.scripts.get(acmd.crc(name), [])]
