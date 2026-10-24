@@ -447,3 +447,18 @@ python3 tools/vfxb_to_ptcl.py ... --variants VARIANTS.json          (adds the "n
 python3 tools/effect_variants.py apply EFFECT_BIN fighters/edge/edge_effects.json OUT/effect.bin
 ```
 Bank 6.50 MB, 97 efc entries. Package: the ptcl / efc and effect.bin.
+
+## Test 50 (`build/sephiroth_test50.zip`): gradients on quads read from the centre
+
+User, test 49: almost every move right; dash attack, neutral air, the throws and the grab not (the
+purple effects flat and still; a pink diamond around the held opponent). Ultimate clip of the throws.
+- `radial_gradient`: a quad whose texture is a one-way gradient (`ef_cmn_grade00`) draws it outward
+  from the centre, as the flare meshes' polar UVs read it; flat, it lit a square (the pummel's and
+  down throw's `pointlight1`). 2 emitters.
+- Checked: eft's flipbook modes against vanilla (1 fit-to-life, frames 0; 2 loop and 4 once with
+  frames a cell; 3 random, 4 random cells): his fire / smoke sheets (eft2 1 -> 1) do animate. What
+  his purple effects lack is Ultimate's custom shaders: 38 emitters carry CADP / 21 CSDP (custom
+  shader / action parameters), the fire / aura ones (combiner shader type 2) mix a tiling noise,
+  a flipbook and a mask, often scrolled; Smash 4's templates draw one texture in one colour, and
+  many lose their UV scroll ("UV animation: template has 0").
+Bank 6.50 MB; ids / efc and effect.bin (test 49's) unchanged. Package: the ptcl / efc.

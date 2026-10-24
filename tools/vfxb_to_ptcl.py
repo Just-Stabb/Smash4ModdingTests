@@ -393,6 +393,23 @@ def crossed_ribbon(pos, nrm, col, uv, idx, notes):
             np.concatenate([idx, idx + len(pos)]))
 
 
+def radial_gradient(shape, notes, n=64):
+    """a one-way gradient (Ultimate's ef_cmn_grade00: bright at V 0, gone by V 0.4; the same in every
+    column) read outward from the centre. The flare meshes read it so (their UVs polar: V the radius);
+    on a quad it was a lit square (the pummel's / down throw's pointlight1: test 49's pink diamond)"""
+    if shape.shape[0] < 4 or shape.shape[1] < 4:
+        return shape
+    for prof, flat in ((shape.mean(1), shape.std(1).max()), (shape.mean(0), shape.std(0).max())):
+        if flat < 0.02 and prof.max() - prof.min() > 0.5:
+            yy, xx = np.mgrid[0:n, 0:n] + 0.5
+            r = np.clip(np.hypot(xx - n / 2, yy - n / 2) / (n / 2), 0, 1)
+            if prof[0] < prof[-1]:
+                prof = prof[::-1]
+            notes.append('gradient on a quad: read from the centre')
+            return np.interp(r, np.linspace(0, 1, len(prof)), prof).astype(np.float32)
+    return shape
+
+
 def rotation_need(st, is_mesh):
     """ROT_NONE / ROT_FIXED / ROT_ANIMATED for an emitter's particle rotation"""
     init, rand, add = st['rotate_init'][:3], st['rotate_init_rand'][:3], st['rotate_add'][:3]
@@ -604,6 +621,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         if not ptn:
             img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
     shape, rgb, alpha = combine(img, e, notes, ti, fill)
+    if not is_mesh:
+        shape = radial_gradient(shape, notes)
     if uv_quarter:
         # eft2 samples at R(rotation) (uv - 0.5) + 0.5: the picture turns counter-clockwise as shown
         shape = np.ascontiguousarray(np.rot90(shape, uv_quarter))
