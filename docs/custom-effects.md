@@ -411,3 +411,9 @@ body reached back past the start ball (frame 3); multi-hits rarely let a target 
 
 Test 23 in game (user): charge works, the Kamehameha is fixed. Left: the pose still lasts the flight
 rather than ending when the beam hits (needs a signal from the beam to Supamario).
+
+### Test 24 (`build/supamario_kame_test24.zip`)
+
+User, test 23: the start a bit too far forward; the first hit should pull in better (still targets
+sometimes not stunned). `START_FORWARD` 2.5 (was 5), head / body FKB 8, `REHIT` 5 (hold frames follow:
+20 / 30 / 45 for 4 / 6 / 9 hits).

@@ -121,7 +121,8 @@ SEG_EVERY = 2                     # a body piece every 2 frames, KAME_SPEED x 2 
 # the hold on what it hit: HOLD_HITS[level] multi-hits REHIT frames apart (user, test 18: "the charge
 # time should increase the number of multihits and then the finisher should release the opponent")
 HOLD_HITS = (4, 6, 9)
-REHIT = 6
+# test 23: still targets sometimes weren't kept in hitstun between ticks: every 5 frames (was 6)
+REHIT = 5
 KAME_HOLDS = tuple(n * REHIT for n in HOLD_HITS)    # 24 / 36 / 54 frames
 KAME_HOLD = max(KAME_HOLDS)
 KAME_FINISH = 12                  # the finish status: the launcher, then removed
@@ -147,7 +148,8 @@ SEG_OVERLAP = 0.5                 # x the piece spacing: the pieces' ends cross-
 DISSOLVE = dict(rate=0.75, bright=2.5, ramp=4, fade=0.5, core=1.0, core_gain=1.6, tube_end=0.55)
 DIS_TEX_BASE = 0x15141A90         # after the body pieces' 0x15141A60-0x15141A8F
 # the start (Hand ball etc.) this far in front of the spawn point (test 13: "slightly too close")
-START_FORWARD = 5.0
+# (test 24: "the base of the beam is still a bit too far forward": 2.5, was 5)
+START_FORWARD = 2.5
 # hitboxes: the head (ID 0) multi-hits every REHIT frames while flying and holding, and drags (angle
 # 366) so a caught target stays on it; the finish (Part 1: its own hit log) launches, at the head too.
 # No body capsule since test 19 (test 18: "the beam does multihit, but only behind the beam, behind
@@ -174,7 +176,9 @@ LEVEL_VAR = 0x10000004
 # test 21: "sometimes the multihit pushes opponents out after the first hit": 366 carries a target
 # with the moving head, then the head stops at the hit and they flew on: a smaller fixed push (10;
 # test 22, 6: "rarely still cause an opponent to fall out")
-HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 6, 0
+# test 23 at 6: "the initial hit should pull in slightly better; on still targets they sometimes
+# don't get stunned and pulled in": 8
+HEAD_ANGLE, HEAD_KBG, HEAD_FKB, HEAD_BKB = 366, 100, 8, 0
 # the finish launches the way the beam faces (FacingRestrict 3, as the Hadoken, PK Fire and Fox's
 # laser; test 21 with 1, the fireball's: a target behind the head's middle went back toward Supamario)
 FINISH_FACING = 3
