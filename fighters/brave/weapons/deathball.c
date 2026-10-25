@@ -1,4 +1,4 @@
-// Whack / Thwack's curse (weapon kind 0x195, article 12; shot.c): Whack a ball at 1.3 a frame for 120 frames,
+// Whack / Thwack's curse (weapon kind 0x195, article 11; shot.c): Whack a ball at 1.3 a frame for 120 frames,
 // Thwack a wide field that barely moves for 20 (Ultimate's param_deathball). Each fighter it touches is
 // KO'd outright with a chance of (1 + 200 x (t - 20) / 280 + 20 x u / 300) % (t its damage, 20-300; u
 // Hero's, at most 300: SmashWiki's Whack formula), rolled once a fighter a cast: the curse goes onto that

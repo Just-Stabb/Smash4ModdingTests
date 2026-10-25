@@ -2,8 +2,8 @@
 // placed_config(): the wait and the levels; placed_life(level)), as tools/brave_build.py does.
 
 // ---- Articles put on a fighter (copies of Robin's thunder): spark (Zap's lightning on the fighter the bolt
-// hit, his article 8), tornado (Woosh's whirlwind where he starts, article 9) and crash (Magic Burst /
-// Kamikazee on him, article 13). The owner's custom N slot (int 0x10000048, which the game copies into this
+// hit, his article 7), tornado (Woosh's whirlwind where he starts, article 8) and crash (Magic Burst /
+// Kamikazee on him, article 12). The owner's custom N slot (int 0x10000048, which the game copies into this
 // weapon's 0x10000005) = level + pl_levels (4; crash's 8) x a player slot (0-7):
 // the article moves to that slot's fighter (the position variables 0x0F000020 + 4 x slot, X / Y / Z /
 // facing: tools/position_vars_cave.py), waits pl_wait frames on an empty motion, plays motion `level` (its

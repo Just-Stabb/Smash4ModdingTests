@@ -1,4 +1,4 @@
-// Woosh's whirlwind (weapon kind 0x192, article 9; placed.c): where Hero is when he makes it, for 24 / 33 / 52
+// Woosh's whirlwind (weapon kind 0x192, article 8; placed.c): where Hero is when he makes it, for 24 / 33 / 52
 // frames (param_tornado life_*). Motions 0 / 1 / 2: Ultimate's brave_tornado SpecialHi1 / Hi2 / Hi3 (Woosh,
 // Swoosh, Kaswoosh).
 void placed_config()

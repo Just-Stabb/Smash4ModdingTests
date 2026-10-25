@@ -1,4 +1,4 @@
-// Bang / Kaboom's bomb (weapon kind 0x194, article 11; shot.c): 2.2 / 3.7 a frame for 35 / 22 frames
+// Bang / Kaboom's bomb (weapon kind 0x194, article 10; shot.c): 2.2 / 3.7 a frame for 35 / 22 frames
 // (Ultimate's param_explosion speed / life), then, or on a hit, it explodes where it is (Explode1 / 2: 32 /
 // 45 frames). Motions 0 / 1: Ultimate's brave_explosion Move1 / Move2, 2 / 3: Explode1 / Explode2.
 void shot_config()

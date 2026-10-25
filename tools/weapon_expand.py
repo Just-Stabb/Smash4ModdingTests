@@ -12,8 +12,9 @@ article of that name is copied; kinds consecutive from 0x185 over all records), 
 "weapon_capacity" (default 0x1C0). A brand-new article: "<new name>": {"kind": "0x18B", "base":
 "<base article>", "max": 1}: a copy of the base article's kind (its native code, descriptor, params)
 under its own name and folder (fighter/<new>/model|motion/<name>/, script/.../<name>/), added to the
-new fighter's article list after the base's articles (its article id = its place there), with that
-max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
+new fighter's article list after the base's normal articles, before its first special entry (bit 31:
+the ArticleModule makes instances only for the entries before that one), so its article id = its place
+there and the special entries move up; with that max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
 vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x13,
 the ones the default method removes it for) asks for status N instead of removing it (left alone when
 the status is N or more already); other results go to the base's method. Its singleton has its own
@@ -337,6 +338,11 @@ def article_layout(img, recs):
             if kind in remap:
                 e[0] = (e[0] & 0xC0000000) | remap[kind]
             rows.append(e)
+        # brand-new articles go before the base's first special entry (bit 31: Robin's 6, kind 0x80):
+        # the ArticleModule pools instances only for the entries before it (0x02C02600 counts them into
+        # +0x110), so Hero's spells after Robin's 6 were never made
+        special = next((i for i, e in enumerate(rows) if e[0] & 0x80000000), len(rows))
+        added = []
         for nk, (_name, mx) in sorted(r.get('new_articles', {}).items()):
             bk = [b for n, b, _a in lst if n == nk][0]
             found = [i for i in range(count) if (img.w(entries + ARTICLE * i) & 0x3FFFFFFF) == bk]
@@ -345,7 +351,8 @@ def article_layout(img, recs):
             e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
             e[0] = (e[0] & 0xC0000000) | nk
             e[1] = mx
-            rows.append(e)
+            added.append(e)
+        rows[special:special] = added
         out[r['kind']] = (at, rows)
         at += 8 + ARTICLE * len(rows)
     return out, at

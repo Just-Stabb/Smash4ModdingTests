@@ -65,7 +65,7 @@ python3 tools/brave_build.py DUMP/lua2cpp_brave HERO BRAVE_BODY fighter_param_vl
   `shader/effect_trail.nsh` + the executable patch) with his textures, trail ids 264-269
   (`trail_table_cave.py` NEW_TRAILS; it now also re-applies over an executable that has the table).
 - Neutral special (status 0x152, Robin's Thunder; `brave.c` `brave_n_*`): SpecialNStart, then
-  SpecialNHold while special is held; Frizzle from 18 frames held, Kafrizz from 81. Released (a tap
+  SpecialNHold while special is held; Frizzle from 18 frames held, Kafrizz from 81 (fix 15: going off by itself there). Released (a tap
   too) -> SpecialN1 / N2 / N3, the fireball out at frame 10 / 11 / 16; shield while holding ->
   SpecialNCancel, the charge kept for the next one (lost if he's hit while charging, or loses a
   stock). Actionable from Ultimate's cancel frames (44 / 52 / 68, cancel 6) through Robin's
@@ -73,7 +73,7 @@ python3 tools/brave_build.py DUMP/lua2cpp_brave HERO BRAVE_BODY fighter_param_vl
   charging and through Frizz (x0.8). Motions: Robin's 0x21F start, 0x223 hold, 0x227 N1, the shoot's
   custom-move variants 0x228 / 0x229 N2 / N3, Thoron's start 0x22F cancel (air + 0x1C; extra_kinds.json
   "motions", `specials_acmd.json`).
-- Fireball (weapon kind 0x190, a copy of Robin's thunder, article 7; `weapons/fireball.c`): the level
+- Fireball (weapon kind 0x190, a copy of Robin's thunder, article 6; `weapons/fireball.c`): the level
   from the custom N slot; Frizz 1.6 (slowing from frame 30), Frizzle 2.4, Kafrizz 0.3 + 0.1 a frame
   up to 4.0; life 56 / 46 / 58 (`param_fireball`); bursts on a hit, a wall / the floor or at its
   life's end (BurstS / M: the hit effect; BurstL: the explosion's hits at 1 and 19). Its scripts are
@@ -92,13 +92,13 @@ turned variants; motions `--add` the side / up special animations too, extra_kin
   held (Zapple from 9 frames, Kazap at 26, which goes off by itself), released -> SpecialS1 (Zap) /
   S2 (Zapple); Kazap: SpecialS3 (the sword raised) then SpecialS32 at its frame 19 (the strike; Ultimate's
   lightning starts 85 above at frame 10 and falls 10 a frame). The bolts are his own hitboxes. When one
-  hits, Zap's lightning lands on that fighter: the spark article (weapon kind 0x191, article 8) at its
+  hits, Zap's lightning lands on that fighter: the spark article (weapon kind 0x191, article 7) at its
   player slot, once a fighter per cast. The slot is found from the last fighter hit's offset and the slot
   positions (docs/position-variables.md); the spark waits 3 frames (activate_wait_frame) and hits for 8.
   Motions: start 0x258 / 0x25C, hold 0x259 / 0x25D, Zap 0x257 / 0x25B, Zapple 0x25A / 0x25E, Kazap
   0x230 + 0x231 / 0x24C + 0x24D (Thoron's slots).
 - Up special (status 0x154, Robin's Elwind; `brave_hi_*`): SpecialHiStart, SpecialHiHold (Swoosh from 10,
-  Kaswoosh at 28, by itself), then SpecialHi1 / 2 / 3: the tornado article (0x192, article 9) at his own
+  Kaswoosh at 28, by itself), then SpecialHi1 / 2 / 3: the tornado article (0x192, article 8) at his own
   slot's position at frame 4 / 6 / 8 (24 / 33 / 52 frames, param_tornado), the rise from frame 5 / 12 / 11.
   Ultimate's rise is jump_distance 42 / 64 / 99 at jump_accel_y 0.145 / 0.16 / 0.1. Here it starts at
   sqrt(2 x distance x accel) and slows by that accel to 0. Then the slowed fall (end_accel_y x0.96,
@@ -201,12 +201,12 @@ with a short vertical stretch (5 + 4 frames).
 
 **The spells** (`brave_lw_cast`; Ultimate's scripts for the motions, extra_kinds.json "motions" in
 Robin's free slots `0x220`-`0x26A`):
-- Heal: 11% healed. Sizz / Sizzle, Bang / Kaboom, Whack / Thwack, Snooze: articles 10 / 11 / 12 / 14
+- Heal: 11% healed. Sizz / Sizzle, Bang / Kaboom, Whack / Thwack, Snooze: articles 9 / 10 / 11 / 13
   (`weapons/shot.c` + `flash.c` / `explosion.c` / `deathball.c` / `sleep.c`, weapon kinds 0x193-0x195,
   0x197): a flame that bursts into a pillar on a hit, a bomb that explodes at its range's end or on a
   hit, a curse that KOs a fighter it touches with Ultimate's chance (sent below the blast line), a gust
   whose hitboxes put fighters to sleep (Effect 9).
-- Magic Burst (all his MP) / Kamikazee: the crash article (13, `placed.c` + `crash.c`) on him; Magic
+- Magic Burst (all his MP) / Kamikazee: the crash article (12, `placed.c` + `crash.c`) on him; Magic
   Burst holds him in the air to frame 136; Kamikazee KOs him at its end (v8: flag 0x20000043).
 - Kaclang: invincible steel for 300 frames. Acceleratle: 600 frames of x2 speeds (`kirby_stat_cave.py`
   profile 3 through the marker int `0x1000008E`, which Robin's Levin Sword code no longer touches).
@@ -271,3 +271,14 @@ frame of neutral / side / up special and the menu (`brave_*_hold_level`, `brave_
 `tools/msclang_nested_call.patch` (applied by `tools/setup_toolchain.sh`); `tools/msc_stack_check.py`
 (the stack depth along every path of every script) found these 9 and nothing else in any fighter
 but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
+
+## Fix 15 (`build/hero_fix15.zip`): his spells appear
+
+- None of his articles past Robin's were ever made: the ArticleModule makes instances only for the
+  article-list entries before the first special one (bit 31; Robin's id 6, kind `0x80`), and his 8 were
+  added after it (docs/weapon-expansion-code.md section 2). `weapon_expand.py` now puts a fighter's new
+  articles before its base's first special entry, so his are ids 6-13 (fireball 6, spark 7, tornado 8,
+  flash 9, explosion 10, deathball 11, crash 12, sleep 13) and Robin's special one is 14; `brave.c`'s
+  `brave_generate` ids follow. Only his list changes (Supamario's and Sephiroth's have no special entry
+  before their new ones).
+- Neutral special: fully charged (81 frames: Kafrizz) it goes off by itself.

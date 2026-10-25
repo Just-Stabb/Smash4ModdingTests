@@ -1,4 +1,4 @@
-// Sizz / Sizzle's flame (weapon kind 0x193, article 10; shot.c): 6 / 8 a frame for 14 / 12 frames (Ultimate's
+// Sizz / Sizzle's flame (weapon kind 0x193, article 9; shot.c): 6 / 8 a frame for 14 / 12 frames (Ultimate's
 // param_flash speed / life); a hit stops it in a pillar of fire (FlashHit1 / 2, pillar_life 25 frames).
 // Motions 0 / 1: Ultimate's brave_flash Flash1 / Flash2, 2 / 3: FlashHit1 / FlashHit2.
 void shot_config()

@@ -1,7 +1,7 @@
 // Hero's fireball article: compiled after thunder_base.c (Robin's thunder MSC up to func_40, decompiled), as
 // tools/brave_build.py does.
 
-// ---- Hero's Frizz / Frizzle / Kafrizz (weapon kind 0x190, a copy of Robin's thunder; his article 7). The
+// ---- Hero's Frizz / Frizzle / Kafrizz (weapon kind 0x190, a copy of Robin's thunder; his article 6). The
 // scaffolding (thunder_base.c) is thunder's MSC; its statuses are replaced (fighters/brave/README.md). Level 0 / 1 / 2
 // (S / M / L): Hero's custom N slot (int 0x10000048) while he generates it, which the game copies into the
 // new weapon's 0x10000005. Motions: 0 / 1 / 2 the flight (Ultimate's brave_fireball SpecialN1 / N2 / N3:

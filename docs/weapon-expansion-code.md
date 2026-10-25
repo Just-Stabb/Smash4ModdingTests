@@ -73,6 +73,12 @@ Pumpwater isn't listed: it's pump's sub-article (descriptor `+0x14`).
 - At run time the ArticleModule (ctor `0x02C01254`, `0x148` bytes) holds the table at `+0x130` and reads
   `entries[id * 16]` (`0x02C01B38`, `0x02C01C7C`, `0x02C01854`); `generate_article(id)` from MSC / ACMD /
   native code is fighter-relative.
+- Only the entries **before the first special one** get instances: `0x02C02600` counts the entries up to
+  the first with bit 31 into `+0x110`, `0x02C02310` pre-creates instances (pooled holders) for those, and
+  `0x02C01B38` creates a normal entry only through its holder (`0x02C010BC` -> `0x02C00FE0`, looked up by
+  id); a special entry is made directly (`0x02C01854`). A normal entry after a special one has no holder
+  and never appears (Hero's spells after Robin's id 6, kind `0x80`, until `weapon_expand.py` put new
+  articles before it).
 - Resources: the per-fighter request (`0x030C0BB0`, unload `0x030BFA90`, `0x030C184C`, `0x030C1A78`,
   `0x030C1E2C`) passes descriptor `+8` to `0x030C3E7C`, which flattens it (`0x030C37AC`, recursive through
   each weapon descriptor's `+0x14`, filtered by the flags table, up to `0x30` kinds) and loads each kind

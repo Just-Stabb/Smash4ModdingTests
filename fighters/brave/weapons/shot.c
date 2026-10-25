@@ -3,7 +3,7 @@
 // part (sh_tick: 1 holds it there)), as tools/brave_build.py does.
 
 // ---- Command Selection's projectiles (copies of Robin's thunder, fighters/brave/README.md): Sizz / Sizzle
-// (flash, article 10), Bang / Kaboom (explosion, 11), Whack / Thwack (deathball, 12), Snooze (sleep, 14).
+// (flash, article 9), Bang / Kaboom (explosion, 10), Whack / Thwack (deathball, 11), Snooze (sleep, 13).
 // The owner's custom N slot (int 0x10000048, which the game copies into this weapon's 0x10000005) = level
 // (0 / 1) + 4 x his player slot. Status 0 flies straight ahead at sh_speed for sh_life frames playing motion
 // `level` (Ultimate's scripts: its hitboxes and effects), then sh_end(); status 1 (a hit: extra_kinds.json

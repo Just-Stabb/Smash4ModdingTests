@@ -38795,8 +38795,8 @@ void brave_reflect(int on)
 
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
 // Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) while special is held; the charge
-// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz). Released (at any
-// time, a tap included) -> SpecialN1 / N2 / N3, which fire the fireball (article 7, weapon kind 0x190,
+// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz, which goes off by
+// itself). Released (at any time, a tap included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
 // fighters/brave/weapons/fireball.c) at frame 10 / 11 / 16; shield while holding -> SpecialNCancel, the
 // charge kept for the next one (brave_n_stored; a stock lost clears it, func_235). The fireball learns its
 // level through the custom N slot (int 0x10000048 -> the weapon's 0x10000005), set while it is generated (as
@@ -38895,7 +38895,7 @@ void brave_generate(int article, int custom)
 
 void brave_n_generate()
 {
-    brave_generate(0x7, brave_n_level);
+    brave_generate(0x6, brave_n_level);
     brave_n_fired = 0x1;
 }
 
@@ -38959,9 +38959,9 @@ void brave_n_loop()
             brave_n_stored = brave_n_hold;
             brave_n_change(0x3);
         }
-        else if (brave_n_released)
+        else if (brave_n_released || brave_n_hold >= 0x51)
         {
-            brave_n_level = brave_n_hold_level();
+            brave_n_level = brave_n_hold_level();   // fully charged (Kafrizz) it goes off by itself
             if (brave_can_pay(brave_n_cost(brave_n_level)))
             {
                 brave_pay(brave_n_cost(brave_n_level));
@@ -39022,7 +39022,7 @@ void brave_n_end()
 // (param_special_s hold_frame_m / _l; hold_frame_max 26: it goes off by itself). Released -> SpecialS1 (Zap)
 // / S2 (Zapple); Kazap: SpecialS3 (the sword raised; Ultimate's lightning reaches him at about frame 19: it
 // starts 85 above at frame 10, 10 a frame) then SpecialS32 (the strike). The bolts are his own hitboxes; when
-// one hits a fighter, Zap's lightning lands on that fighter: the spark article (article 8, weapon kind 0x191,
+// one hits a fighter, Zap's lightning lands on that fighter: the spark article (article 7, weapon kind 0x191,
 // weapons/spark.c) at its player slot (custom number level + 4 x slot; the slot found from the last fighter
 // hit's offset, docs/position-variables.md), once a fighter per cast. Motions (ground / air): start 0x258 /
 // 0x25C, hold 0x259 / 0x25D, Zap 0x257 / 0x25B, Zapple 0x25A / 0x25E, Kazap 0x230 / 0x24C and 0x231 / 0x24D.
@@ -39177,7 +39177,7 @@ void brave_s_spark()
         return;
     }
     brave_s_sparked = brave_s_sparked + b;
-    brave_generate(0x8, brave_s_level + 0x4 * s);
+    brave_generate(0x7, brave_s_level + 0x4 * s);
 }
 
 // the level held so long, lowered to one his MP pays for
@@ -39297,7 +39297,7 @@ void brave_s_main()
 // ---- Hero's up special: Woosh / Swoosh / Kaswoosh (status 0x154, Robin's Elwind; fighters/brave/README.md).
 // SpecialHiStart (4 frames), then SpecialHiHold while special is held; Swoosh from 10 frames held, Kaswoosh
 // at 28 (param_special_hi hold_frame_m / _l; hold_frame_max 28: it goes off by itself). Then SpecialHi1 / 2 / 3:
-// the whirlwind (the tornado article, article 9, weapon kind 0x192, weapons/tornado.c, put at his own player
+// the whirlwind (the tornado article, article 8, weapon kind 0x192, weapons/tornado.c, put at his own player
 // slot) at frame 4 / 6 / 8, and he rises from frame 5 / 12 / 11 (the game script's JUMP_START): Ultimate's
 // rise is jump_distance_* 42 / 64 / 99 at jump_accel_y_* 0.145 / 0.16 / 0.1 a frame, here a start speed of
 // sqrt(2 x distance x accel) slowed by that accel to 0, then end_accel_y 0.96 x his gravity with
@@ -39528,7 +39528,7 @@ void brave_hi_loop()
         {
             s = brave_self_slot();
             brave_hi_tornado = 0x1;
-            brave_generate(0x9, brave_hi_level + 0x4 * s);
+            brave_generate(0x8, brave_hi_level + 0x4 * s);
         }
         if (brave_hi_launched == 0 && f >= (float)brave_hi_frame(0x1))
         {
@@ -39603,11 +39603,11 @@ void brave_hi_main()
 // 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, then spell n at its slot (brave_lw_spell_motion,
 // extra_kinds.json "motions"). In the air the fall is held to 0.45 while choosing. The spells (brave_lw_cast):
 //  1 Heal          11% healed at frame 6 (param_special_lw cure_add_life)
-//  2 / 3 Sizz / Sizzle      the flash article (10, weapons/shot.c) at frame 6
-//  4 / 5 Bang / Kaboom      the explosion article (11) at frame 6
-//  6 / 7 Whack / Thwack     the deathball article (12) at frame 6: a fighter it hits may be KO'd outright
+//  2 / 3 Sizz / Sizzle      the flash article (9, weapons/shot.c) at frame 6
+//  4 / 5 Bang / Kaboom      the explosion article (10) at frame 6
+//  6 / 7 Whack / Thwack     the deathball article (11) at frame 6: a fighter it hits may be KO'd outright
 //                  (a Death hitbox, effect 0x10: weapons/deathball.c)
-//  8 Magic Burst   all his MP; the crash article (13, weapons/crash.c) on him at frame 20, its damage x the MP
+//  8 Magic Burst   all his MP; the crash article (12, weapons/crash.c) on him at frame 20, its damage x the MP
 //                  spent / 100 (in fifths: brave_burst_motion), held in the air
 //                  until frame 136 (FULLBURST_INTERRUPT / ENABLE_GRAVITY)
 //  9 Kamikazee     the crash article's blast (level 1) at frame 20, then he's KO'd on the spot (DEATH_RESERVE:
@@ -39617,7 +39617,7 @@ void brave_hi_main()
 // 11 Acceleratle   600 frames faster (speed_up_frame; tools/kirby_stat_cave.py profile 3)
 // 12 Oomph         720 frames of x1.15 damage (attack_up_frame; tools/strike_cave.py)
 // 13 Bounce        720 frames of a reflector (reflect_frame; brave_reflect)
-// 14 Snooze        the sleep article (14) at frame 6: its gust puts fighters to sleep
+// 14 Snooze        the sleep article (13) at frame 6: its gust puts fighters to sleep
 // 15 Hocus Pocus   Ultimate's outcomes and odds (brave_hocus_pocus): giant, Starman, full MP, timer, no MP,
 //                  poison, sleep, small, flower, invisible, or another spell cast for its 4 MP
 // 16 Zoom          up off the screen (SpecialLw16Hi, flying_speed_y 9, intangible), then down (SpecialLw16Lw,
@@ -40161,28 +40161,28 @@ int brave_lw_cast(float f)
     {
         if (f >= 6.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xa, n - 0x2);
+            brave_generate(0x9, n - 0x2);
         }
     }
     else if (n == 0x4 || n == 0x5)
     {
         if (f >= 6.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xb, n - 0x4);
+            brave_generate(0xa, n - 0x4);
         }
     }
     else if (n == 0x6 || n == 0x7)
     {
         if (f >= 6.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xc, n - 0x6 + 0x4 * brave_lw_slot());
+            brave_generate(0xb, n - 0x6 + 0x4 * brave_lw_slot());
         }
     }
     else if (n == 0x8)
     {
         if (f >= 20.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xd, brave_burst_motion() + 0x8 * brave_lw_slot());
+            brave_generate(0xc, brave_burst_motion() + 0x8 * brave_lw_slot());
         }
         if (global18 == 0x2 && f >= 20.0f && f < 136.0f)
         {
@@ -40199,7 +40199,7 @@ int brave_lw_cast(float f)
     {
         if (f >= 20.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xd, 0x1 + 0x8 * brave_lw_slot());
+            brave_generate(0xc, 0x1 + 0x8 * brave_lw_slot());
         }
         if (MotionModule(0x2712) == 0x1 && brave_lw_once(0x2))
         {
@@ -40236,7 +40236,7 @@ int brave_lw_cast(float f)
     {
         if (f >= 6.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xe, 0);
+            brave_generate(0xd, 0);
         }
     }
     else if (n == 0xf)
