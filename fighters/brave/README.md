@@ -207,7 +207,7 @@ Robin's free slots `0x220`-`0x26A`):
   hit, a curse that KOs a fighter it touches with Ultimate's chance (sent below the blast line), a gust
   whose hitboxes put fighters to sleep (Effect 9).
 - Magic Burst (all his MP) / Kamikazee: the crash article (13, `placed.c` + `crash.c`) on him; Magic
-  Burst holds him in the air to frame 136; Kamikazee KOs him at its end.
+  Burst holds him in the air to frame 136; Kamikazee KOs him at its end (v8: flag 0x20000043).
 - Kaclang: invincible steel for 300 frames. Acceleratle: 600 frames of x2 speeds (`kirby_stat_cave.py`
   profile 3 through the marker int `0x1000008E`, which Robin's Levin Sword code no longer touches).
   Oomph: 720 frames of x1.15 damage; Psyche Up: x1.15 until his next hit lands (`strike_cave.py`'s
@@ -230,4 +230,18 @@ effects (75 sets; 10.9 MB, Robin's 2.5 MB included).
 
 Not checked in game: everything above (the executable caves are emulator-tested, the MSC isn't).
 Approximations: Oomph / Psyche Up are x1.15 damage (Ultimate: x1.2 and x1.1 knockback), Acceleratle one x2
-on every speed, Magic Burst doesn't scale with the MP spent, Whack's chance formula is used for Thwack.
+on every speed, Whack's chance formula is used for Thwack.
+
+## v8 (`build/hero_v8.zip`): Magic Burst scales, on-the-spot KOs
+
+- **Magic Burst** scales with the MP it takes: the crash article has four weaker copies of Crash1 (each
+  hit x 0.2 / 0.4 / 0.6 / 0.8: `tools/brave_build.py` `CRASH_TIERS`), Hero picks one from the MP spent
+  rounded up to the next 20 (`brave_burst_motion`; over 80: the full 44.6%). `placed.c` now takes each
+  article's level count and lives from it (`pl_levels`, `placed_life`).
+- **Whack / Thwack** KO with the game's own instant KO: a successful roll puts the curse on that fighter
+  for 3 frames playing `deathballko`, its hitbox with effect 0x10 (Death: "instantly KO fighters", Smash
+  Run's Orne; the hitbox effects sheet in `docs/resources.md`), its own hit group, unblockable, fighters
+  only; then it goes back on its way (`deathball.c` `sh_tick`).
+- **Kamikazee** KOs Hero at its end with instance flag `0x20000043` ("causes KO": he explodes as if KO'd,
+  as in Stamina mode; `reference/msc-note-sheet/Variables.csv`), as the user's Captain Falcon's 1-in-100
+  jab does (`ON_FLAG 0x20000043`).

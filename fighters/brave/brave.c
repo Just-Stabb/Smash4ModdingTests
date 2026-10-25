@@ -39574,10 +39574,12 @@ void brave_hi_main()
 //  2 / 3 Sizz / Sizzle      the flash article (10, weapons/shot.c) at frame 6
 //  4 / 5 Bang / Kaboom      the explosion article (11) at frame 6
 //  6 / 7 Whack / Thwack     the deathball article (12) at frame 6: a fighter it hits may be KO'd outright
+//                  (a Death hitbox, effect 0x10: weapons/deathball.c)
 //  8 Magic Burst   all his MP; the crash article (13, weapons/crash.c) on him at frame 20, its damage x the MP
 //                  spent / 100 (in fifths: brave_burst_motion), held in the air
 //                  until frame 136 (FULLBURST_INTERRUPT / ENABLE_GRAVITY)
-//  9 Kamikazee     the crash article's blast (level 1) at frame 20, then he's KO'd (DEATH_RESERVE)
+//  9 Kamikazee     the crash article's blast (level 1) at frame 20, then he's KO'd on the spot (DEATH_RESERVE:
+//                  brave_self_ko)
 // 10 Kaclang       steel from SpecialLw10Start's end: invincible for 300 frames (steel_frame) in
 //                  SpecialLw10 (falling fast in the air), then SpecialLw10End
 // 11 Acceleratle   600 frames faster (speed_up_frame; tools/kirby_stat_cave.py profile 3)
@@ -39857,13 +39859,11 @@ void brave_heal(float v)
     WorkModule(0, d, 0x0f000117);
 }
 
-// Kamikazee: below the stage's blast line, falling
+// Kamikazee: KO'd on the spot, as in Stamina mode (instance flag 0x20000043, "causes KO": the fighter
+// explodes as if KO'd; the user's Captain Falcon's 1-in-100 jab sets it the same way)
 void brave_self_ko()
 {
-    func_20(0x2);
-    GroundModule(0x2710, 0x5);
-    WorkModule(0, -3000.0f, 0x0f000001);
-    func_16(0xe, 0);
+    WorkModule(0x2710, 0x20000043);
 }
 
 // Zoom's landing place: above a fighter on the ground (at random), else the stage's middle
@@ -40112,10 +40112,9 @@ int brave_lw_cast(float f)
         {
             brave_generate(0xd, 0x1 + 0x8 * brave_lw_slot());
         }
-        if (MotionModule(0x2712) == 0x1)
+        if (MotionModule(0x2712) == 0x1 && brave_lw_once(0x2))
         {
-            brave_self_ko();
-            return 0x1;
+            brave_self_ko();    // DEATH_RESERVE: at the motion's end
         }
     }
     else if (n == 0xa)
