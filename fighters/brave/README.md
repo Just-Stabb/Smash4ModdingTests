@@ -346,3 +346,12 @@ Sword `0x1000008c`) and clears the bits; `func_2254` never changes status. Only 
   cleared their hitboxes: Swoosh / Kaswoosh (Ultimate's re-hit 7) hit once. `weapons/placed.c` goes
   to status 1 at once from status 0; status 1 places the article and plays its motion, and a hit then
   changes nothing.
+
+## Fix 21 (`build/hero_fix21.zip`): effect brightness
+
+The Frizz test (`hero_frizz_test`: each charge level's fireball with one group of Fire1Bullet's
+emitters: glows, sparks, fire) showed the purple in all three, always at the brightest spot: Smash 4's
+bloom / glare on colours far over 1 (Frizz's spark1 4.4 = colour x `color_scale` 4.0; 86 of Hero's 840
+emitters over 2.5, vanilla's 99th percentile 2.0). `tools/vfxb_to_ptcl.py hdr_scale` compresses a
+particle's peak over `HDR_START` 1.2 to a quarter (4.4 -> 2.0), hue kept, through `color_scale`: 387
+emitters change.

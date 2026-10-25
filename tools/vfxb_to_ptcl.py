@@ -108,6 +108,9 @@ FADE_EMIT = 0x2F9
 # mirrored across U, drew clamped, a solid band)
 # eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
 REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
+# brightness over HDR_START kept at HDR_KNEE of itself (hdr_scale): 4.4 -> 2.0, 2.4 -> 1.5, 1.7 ->
+# 1.33; vanilla's glows sit at 1.2 - 1.5 (90% of its emitters at 1.2 or less, 99% at 2.0)
+HDR_START, HDR_KNEE = 1.2, 0.25
 
 
 # shaders that read the screen behind them (refraction: Zelda's Nayru's Love crystal, test 35's type-4
@@ -260,6 +263,21 @@ def alpha_mask_shader(p, si):
         masks = [ln.split()[2].split('.')[1].rstrip(',') for ln in out.splitlines() if 'SAMPLE' in ln]
         _alpha_mask[key] = bool(masks) and all(m == '___w' for m in masks)
     return _alpha_mask[key]
+
+def hdr_scale(p, em, scale, notes):
+    """the colour scale with the particle's brightest channel (its colour keys x scale) compressed
+    above HDR_START: HDR_START + (peak - HDR_START) x HDR_KNEE, the hue kept. Ultimate's colours are
+    for its own bloom and tone mapping (Frizz's sparks peak at 4.4, 86 of Hero's 840 emitters over
+    2.5); vanilla Smash 4's stay low (99% of its 8115 emitters at 2.0 or less), and its bloom /
+    glare turns anything far over 1 into a wide pink-white haze with blue-purple fringes (the Frizz
+    test: each part of the fireball alone, every bright one purple at its core)"""
+    peak = scale * max(max(c[:3]) for track in (0, 1) for c in p.color_keys(em, track))
+    if peak <= HDR_START:
+        return scale
+    out = scale * (HDR_START + (peak - HDR_START) * HDR_KNEE) / peak
+    notes.append('brightness %.2f -> %.2f' % (peak, peak * out / scale))
+    return out
+
 
 def keys(table, n, comps=3):
     """an eft2 key table (8 x (x, y, z, time 0-1)) -> [101, comps] samples over the particle's life"""
@@ -842,7 +860,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'color_section2', [fits[0][1][1], fits[1][1][1]])
     p.set_field(em, 'color_section3', [fits[0][1][2], fits[1][1][2]])
     p.set_field(em, 'color_repeat', [1, 1])
-    p.set_field(em, 'color_scale', float(st['color_scale'] or 1.0))
+    p.set_field(em, 'color_scale', hdr_scale(p, em, float(st['color_scale'] or 1.0), notes))
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
