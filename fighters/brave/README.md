@@ -368,3 +368,15 @@ emitters change.
   smoothstep(near, far, |N . V|); on a billboard mesh (types 0 / 7) turning only about Z, V is the
   mesh's Z, so `fresnel_bake` puts it in the vertex alpha. 8 emitters (the ball, Bounce's barrier,
   Acceleratle / Oomph's flare3); the other ~90 fresnel emitters need a shader with the view vector.
+
+## Fix 23 (`build/hero_fix23.zip`): whirlwinds upright, colours held near 1
+
+The whirlwind test (each Woosh level one part: meshes red, particles red, meshes opaque): the meshes
+drew as a flat red ring at his feet, the whirlwind end-on (eft's type 3 on a mesh); the particles
+drew; the opaque pale-blue meshes glowed purple. So:
+- `vfxb_to_ptcl.py`: a directional mesh whose velocity is only along the emitter's Y (no
+  all-direction speed or spread) is type 4, the emitter's frame (48 emitters).
+- `HDR_START, HDR_KNEE = 1.0, 0.05`: vanilla fire keeps its colour keys at 1.0 - 1.05 (the colour in
+  its textures); colours over that glowed purple in the bloom.
+- `fresnel_bake` takes the normals from the triangles (`face_normals`): Kafrizz's `sphere1` model has
+  none, and the +Z default baked a flat 1.

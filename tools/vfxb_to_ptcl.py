@@ -108,9 +108,11 @@ FADE_EMIT = 0x2F9
 # mirrored across U, drew clamped, a solid band)
 # eft2 texture repeat (tex_anim repeat) -> UV repeat; eft's 0x508 / 0x50C hold repeat / cells
 REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
-# brightness over HDR_START kept at HDR_KNEE of itself (hdr_scale): 4.4 -> 2.0, 2.4 -> 1.5, 1.7 ->
-# 1.33; vanilla's glows sit at 1.2 - 1.5 (90% of its emitters at 1.2 or less, 99% at 2.0)
-HDR_START, HDR_KNEE = 1.2, 0.25
+# brightness over HDR_START kept at HDR_KNEE of itself (hdr_scale): 4.4 -> 1.16, 2 -> 1.05, 1.3 ->
+# 1.02. Vanilla's fire keeps its colour keys at 1.0 - 1.05 (its colour is in its textures: Mario's
+# fireball, Charizard's flamethrower, Robin's Arcfire); fix 21's 1.2 / 0.25 (peaks up to 2) still
+# glowed purple in Smash 4's bloom (the whirlwind test: pale blue meshes at 1.3 too)
+HDR_START, HDR_KNEE = 1.0, 0.05
 
 
 # shaders that read the screen behind them (refraction: Zelda's Nayru's Love crystal, test 35's type-4
@@ -213,6 +215,17 @@ class Templates:
                 return em, turns
             return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,)), turns
         raise KeyError((typ, blend, mesh))
+
+
+def face_normals(pos, idx):
+    """unit vertex normals of a triangle list: the area-weighted sum of the faces' at each vertex"""
+    tri = np.asarray(idx, np.int64).reshape(-1, 3)
+    p0, p1, p2 = (pos[tri[:, k]].astype(np.float64) for k in range(3))
+    fn = np.cross(p1 - p0, p2 - p0)
+    out = np.zeros((len(pos), 3))
+    for k in range(3):
+        np.add.at(out, tri[:, k], fn)
+    return out / np.maximum(np.linalg.norm(out, axis=1, keepdims=True), 1e-9)
 
 
 def fresnel_bake(e, notes):
@@ -695,6 +708,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         typ = 4
         rest_dir = True
         notes.append('directional mesh at rest: type 4')
+    elif is_mesh and typ == 3 and abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3 \
+            and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion']] + list(vel['diffusion'])):
+        # a directional mesh moving straight along the emitter's Y (Woosh's whirlwinds, rising) stands
+        # along it in Ultimate, which is the emitter's frame; eft's type 3 turned it end-on to the camera
+        # (the whirlwind test: a flat red ring at his feet). Type 4 keeps the emitter's frame
+        typ = 4
+        notes.append('directional mesh moving along Y: type 4')
     elif is_mesh and pt['billboard_type'] in (5, 6):
         # a "stripe" mesh (no ribbon data: its shape is the mesh) keeps the emitter's frame: neutral
         # air's rainbow1, a flat 69-unit disc laid level (emitter X 90) and sent off in a random
@@ -785,9 +805,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
                 pos, nrm = pos @ r.T, nrm @ r.T
                 notes.append('rotation baked into the mesh')
             if fres:
-                # the normals as the scaled mesh's (inverse transpose), facing the camera along Z
-                nz = np.abs((nrm / np.array(s3, np.float32))[:, 2]) / np.maximum(
-                    np.linalg.norm(nrm / np.array(s3, np.float32), axis=1), 1e-6)
+                # the scaled mesh's normals from its triangles (Kafrizz's sphere1 has none: the +Z
+                # default baked nothing), facing the camera along Z
+                nz = np.abs(face_normals(pos, idx)[:, 2])
                 t = np.clip((nz - fres[0]) / (fres[1] - fres[0]), 0, 1)
                 col_ = np.ones((len(pos), 4), np.float32) if col_ is None else np.array(col_, np.float32)
                 col_[:, 3] *= t * t * (3 - 2 * t)
