@@ -86,3 +86,16 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 68 1=0 2=0.85 3=0.85 7=
   binds them. `--own-joints all` builds the other way (the package's optional folder).
 - fighter_param 268 (aerial jump type) 2 -> 1: Pit's multi-jump (his own aerial jump status 0xD, a
   motion per jump: `func_499`) off, a normal double jump (status 0xC) as Ultimate's.
+
+## Fix 12 (`build/steve_fix12.zip`)
+
+- Ultimate's walks / run / dash / jumps move only his root (`a01walkmiddle`: 1 of 68 tracks changes);
+  his limbs swing by `a01walk`, a layer. `ultimate_fighter.py` profile `layers` (`PIT_LAYERS`,
+  `add_layers`): a01walk over the walks (one cycle), run and dash (two), jumps / step jump (weight 0.6).
+- Tools out of Pit's bow / blade slots (Pit's `Model_Changer` / `VIS_SET_DEFAULT` groups switch those:
+  the sword showed always) into four mouth slots (`Pit_Mouth_Ouch / Talk / Down / HeavyAttack`); the
+  base's own face keys for the slots we drive are dropped per motion.
+- `pickel_build.py with_removal`: side tilt / jab, neutral / forward / back air never removed their
+  hitboxes (the dump keeps the materials' shared `wait; clear_all` in the last nested branch only);
+  added at the dump's own wait after the last hitbox (frames 7, 7, 13, 15).
+- `own_joints` back to all for Pit (fresh hashes, so `pitpt1.pac` binds none: fix 10's optional).

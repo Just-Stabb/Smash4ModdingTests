@@ -871,12 +871,10 @@ _PO, _PB = 'pickel_Openblink_VIS_O_OBJShape', 'pickel_Blink_VIS_O_OBJShape'
 STEVE_MATERIAL = 'iron'
 PIT_SLOTS = [
     ('Boot_HB15_O_OBJ', []), ('Boot_HB16_O_OBJ', []), ('Udewa19_O_OBJ2', []),
-    # his tools (Ultimate's articles, in the iron version: no material system yet) on his right hand,
-    # in Pit's bow / blade slots; shown by the moves that hold them (STEVE_TOOLS)
-    ('pit_YumiRM_VIS_O_OBJ', ['axe/axe%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
-    ('pit_WeaponRM_VIS_O_OBJ', ['sword/sword%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
-    ('pit_WpnNagiRM_VIS_O_OBJ', ['pick/pick%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
-    ('pit_WeaponLM_VIS_O_OBJ', ['shovel/shovel%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    # Pit's bow / blade slots: empty (his own code shows and hides them, model changers: Steve's tools
+    # there showed the sword all the time and the others never)
+    ('pit_YumiRM_VIS_O_OBJ', []), ('pit_WeaponRM_VIS_O_OBJ', []), ('pit_WpnNagiRM_VIS_O_OBJ', []),
+    ('pit_WeaponLM_VIS_O_OBJ', []),
     ('pit_Arm_VIS_O_OBJ', []), ('pit_LBit_VIS_O_OBJ', []), ('pit_RBit_VIS_O_OBJ', []),
     ('polySurface287_O_OBJ', []), ('polySurface286_O_OBJ', []),
     ('Pit_Eye_VIS_O_OBJ', []), ('Pit_FaceN_VIS_O_OBJ', []),
@@ -888,8 +886,14 @@ PIT_SLOTS = [
     ('Pit_Eye_HeavyAttack_VIS_O_OBJ', [_PO]), ('Pit_Eye_Attack_VIS_O_OBJ', [_PO]), ('Pit_Eye_Capture_VIS_O_OBJ', [_PB]),
     ('Pit_Eye_Ottotto_VIS_O_OBJ', [_PO]), ('Pit_Eye_Furafura_VIS_O_OBJ', [_PB]), ('Pit_Eye_Catch_VIS_O_OBJ', [_PO]),
     ('Pit_Eye_Hot_VIS_O_OBJ', [_PO]),
-    ('Pit_Mouth_Ouch_VIS_O_OBJ', []), ('Pit_Mouth_Talk_VIS_O_OBJ', []), ('Pit_Mouth_Down_VIS_O_OBJ', []),
-    ('Pit_Mouth_HeavyAttack_VIS_O_OBJ', []), ('Pit_Mouth_Escape_VIS_O_OBJ', []), ('Pit_Mouth_Attack_VIS_O_OBJ', []),
+    # his tools (Ultimate's articles, in the iron version: no material system yet) on his right hand, in
+    # four of Pit's mouth slots (Steve has no mouths): shown only by the face material animations, by the
+    # moves that hold them (PIT_TOOL_VIS)
+    ('Pit_Mouth_Ouch_VIS_O_OBJ', ['axe/axe%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('Pit_Mouth_Talk_VIS_O_OBJ', ['sword/sword%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('Pit_Mouth_Down_VIS_O_OBJ', ['pick/pick%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('Pit_Mouth_HeavyAttack_VIS_O_OBJ', ['shovel/shovel%s_VIS_O_OBJShape@HaveR' % STEVE_MATERIAL]),
+    ('Pit_Mouth_Escape_VIS_O_OBJ', []), ('Pit_Mouth_Attack_VIS_O_OBJ', []),
     ('Pit_Mouth_Ottotto_VIS_O_OBJ', []), ('Pit_Mouth_Furafura_VIS_O_OBJ', []), ('Pit_Mouth_VoiceA_VIS_O_OBJ', []),
     ('Pit_Mouth_VoiceB_VIS_O_OBJ', []), ('Pit_Mouth_Catch_VIS_O_OBJ', []), ('Pit_Red_Capture_VIS_O_OBJ', []),
     ('Pit_Red_Hot_VIS_O_OBJ', []), ('Pit_Result_VIS_O_OBJ', []), ('Pit_Mouth_laugh_VIS_O_OBJ', []),
@@ -900,8 +904,16 @@ PIT_SLOTS = [
 # Pit's motions Steve has no animation for (his own kinds that share one resolve through his
 # motion_list.bin first: motion_aliases); Pit's glide (unused in Smash 4) -> the Elytra
 # Steve's tools: the visibility names tools/pickel_build.py writes (from his scripts' tool requests)
-PIT_TOOL_VIS = {'tool_axe': 'pit_YumiRM_VIS_O_OBJ', 'tool_sword': 'pit_WeaponRM_VIS_O_OBJ',
-                'tool_pick': 'pit_WpnNagiRM_VIS_O_OBJ', 'tool_shovel': 'pit_WeaponLM_VIS_O_OBJ'}
+PIT_TOOL_VIS = {'tool_axe': 'Pit_Mouth_Ouch_VIS_O_OBJ', 'tool_sword': 'Pit_Mouth_Talk_VIS_O_OBJ',
+                'tool_pick': 'Pit_Mouth_Down_VIS_O_OBJ', 'tool_shovel': 'Pit_Mouth_HeavyAttack_VIS_O_OBJ'}
+# Steve's limb swing (Ultimate layers a01walk, his Minecraft walk cycle, over motions that only move his
+# root): one cycle a walk (each is one stride), two in the run and the dash, at 0.6 through his jumps
+# (they're still in Ultimate's files)
+PIT_LAYERS = dict(
+    [(w, [('a01walk', 1, 1.0)]) for w in ('a01walkslow', 'a01walkmiddle', 'a01walkfast')] +
+    [(w, [('a01walkb', 1, 1.0)]) for w in ('a01walkbslow', 'a01walkbmiddle', 'a01walkbfast')] +
+    [(r, [('a01walk', 2, 1.0)]) for r in ('a02run', 'a02dash')] +
+    [(j, [('a01walk', 1, 0.6)]) for j in ('a03jumpf', 'a06stepjump')])
 PIT_MOTIONS = {
     'a00wait2': 'a00wait1', 'a00wait3': 'a00wait1', 'a03jumpaerialf2': 'a03jumpf', 'a03jumpaerialf3': 'a03jumpf',
     'a04runfalll': 'a03jumpf', 'a04runfallr': 'a03jumpf', 'a04walkfalll': 'a03jumpf', 'a04walkfallr': 'a03jumpf',
@@ -1020,10 +1032,9 @@ PROFILES = {
     'koopa': dict(slots=KOOPA_SLOTS, joints=KOOPA_JOINTS, motions=dict(MOTION_STANDINS, **KOOPA_MOTIONS), vis={},
                   vis_default={}, hidden=()),
     # own_joints: the joint table bones that get a bone of their own (Skeleton.add_joint_bones; default
-    # all). Pit: FaceN only (his wings, Orbitars and bow as before, on BustN / RotN / the Have bones:
-    # Steve with bones of their own didn't animate in game)
+    # all). layers: Ultimate motions with another one baked over them (add_layers)
     'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis=PIT_TOOL_VIS,
-                vis_default={}, hidden=(), own_joints=('FaceN',)),
+                vis_default={}, hidden=(), layers=PIT_LAYERS),
     'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
                    vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
@@ -1104,6 +1115,41 @@ def ult_tracks(anim, frames):
                 elif kind == 'Visibility':
                     vis[n.name] = np.array(vals, dtype=bool)[idx]
     return out, vis
+
+
+def _blend(a, b, t):
+    """[F, 4, 4] locals a -> b by t ([F] or a number): translation and scale lerped, rotation nlerped"""
+    t = np.broadcast_to(np.asarray(t, dtype=np.float64), (len(a),))[:, None]
+    sa, sb = np.linalg.norm(a[:, :3, :3], axis=1), np.linalg.norm(b[:, :3, :3], axis=1)
+    qa, qb = _mat_quat(a[:, :3, :3] / sa[:, None, :]), _mat_quat(b[:, :3, :3] / sb[:, None, :])
+    qb[np.sum(qa * qb, axis=1) < 0] *= -1
+    q = qa * (1 - t) + qb * t
+    q /= np.linalg.norm(q, axis=1, keepdims=True)
+    m = np.zeros(a.shape)
+    m[:, :3, :3] = _quat_mat(q) * (sa * (1 - t) + sb * t)[:, None, :]
+    m[:, :3, 3] = a[:, :3, 3] * (1 - t) + b[:, :3, 3] * t
+    m[:, 3, 3] = 1
+    return m
+
+
+def add_layers(tracks, frames, layers, motion_dir, have):
+    """Ultimate's layers baked in: [(layer animation, cycles, weight)] played over the motion's frames
+    (looping, cycles times), on the bones the layer moves, weight of the way from the motion's own pose.
+    Steve's walks, run, dash and jumps move only his root: his limbs swing by a separate walk cycle
+    (a01walk) the game layers on (PIT_LAYERS)"""
+    import ssbh_data_py as s
+    for lname, cycles, weight in layers:
+        la = s.anim_data.read_anim(os.path.join(motion_dir, have[lname]))
+        lf = int(round(la.final_frame_index)) + 1
+        ltr, _ = ult_tracks(la, lf)
+        pos = (np.arange(frames) * cycles * (lf - 1) / float(frames)) % (lf - 1)
+        i0 = np.floor(pos).astype(int)
+        for b, m in ltr.items():
+            if np.allclose(m, m[0], atol=1e-4) or b not in tracks:
+                continue
+            lm = _blend(m[i0], m[i0 + 1], pos - i0)
+            tracks[b] = lm if weight >= 1 else _blend(np.array(tracks[b]), lm, weight)
+    return tracks
 
 
 def helper_constraints(src):
@@ -1277,6 +1323,8 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             anim = s.anim_data.read_anim(os.path.join(motion_dir, have[ult]))
             frames = int(round(anim.final_frame_index)) + 1
             tracks, vis = ult_tracks(anim, frames)
+            if ult in prof.get('layers', {}):
+                tracks = add_layers(tracks, frames, prof['layers'][ult], motion_dir, have)
             for uname, keys in (extra_vis or {}).get(ult, {}).items():
                 st = np.zeros(frames, bool)
                 for f, on in sorted(keys):
@@ -1323,6 +1371,8 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                         ks = [(min(k[0], frames - 1), k[1]) for k in v['keys']]
                         vis.append((v['name'], sorted(set(ks))))
                 if pac == 'material_anime_face.pac':
+                    # the base's own keys for the slots we drive go (Pit's mouths: they'd show the tools)
+                    vis = [v for v in vis if v[0] not in prof['vis'].values()]
                     for uname, slot in prof['vis'].items():
                         st = vis_of[mname].get(uname)
                         for other in VIS_ALSO.get(uname, ()):

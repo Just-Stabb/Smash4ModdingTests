@@ -18,8 +18,11 @@ OUT/fighter_param_vl_pickel.bin and OUT/tool_vis.json (for ultimate_fighter.py m
   are articles in Ultimate; their hitboxes go into his own scripts at where the article appears
   (ARTICLE_HITS: an estimate, the spawn points are in Ultimate's code).
 - Tools: his game scripts ask for a tool (WorkModule set_int CRAFT_WEAPON_KIND_*, at a frame) and put
-  it away (on_flag REQUEST_REMOVE_HAVE_CRAFT_WEAPON); tool_vis.json shows that tool's mesh (in Pit's
-  bow / blade slots, ultimate_fighter.py PIT_TOOL_VIS) from that frame to the end of the animation.
+  it away (on_flag REQUEST_REMOVE_HAVE_CRAFT_WEAPON); tool_vis.json shows that tool's mesh (in four of
+  Pit's mouth slots, ultimate_fighter.py PIT_TOOL_VIS) from that frame to the end of the animation.
+- Hitbox removal: the dump puts the end the materials share (wait, clear_all) in its last nested
+  material test only; where the branch taken never removes its hitboxes, they go after the dump's own
+  wait from its hitboxes to that clear_all (with_removal).
 - His jab is his side tilt in Ultimate (no game_attack11 in the dump): attack11 = attacks3, one jab and
   no rapid jab (JAB_PARAMS, set with tools/fighter_param.py). Walking during it and up tilt (Ultimate's
   arm / upper-body layers) isn't done: they play standing.
@@ -87,6 +90,49 @@ def hitboxes(cmds):
     return [c for c in cmds if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox')]
 
 
+def removes(c):
+    return 'Hitbox' in c.name and ('Remove' in c.name or 'Delete' in c.name)
+
+
+def last_hit_removal(cmds):
+    """(frame of the last hitbox, frame of the first removal after it or None) of a script"""
+    ev = timeline(cmds)
+    k = max((i for i, (_f, c) in enumerate(ev) if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox')), default=None)
+    if k is None:
+        return None, None
+    return ev[k][0], next((f for f, c in ev[k + 1:] if removes(c)), None)
+
+
+def removal_wait(fn_text):
+    """frames from the hitboxes to their removal in the dump: the waits between the first clear_all and
+    the nearest ATTACK before it (None: a frame() between, or no clear_all)"""
+    lines = fn_text.split('\n')
+    k = next((i for i, l in enumerate(lines) if 'AttackModule::clear_all' in l), None)
+    if k is None:
+        return None
+    total = 0.0
+    for l in reversed(lines[:k]):
+        if 'macros::ATTACK(' in l:
+            return total
+        if 'frame(agent.lua_state_agent' in l:
+            return None
+        if 'wait(agent.lua_state_agent' in l:
+            total += float(l.split(',')[1].split(')')[0])
+    return None
+
+
+def with_removal(cmds, fn_text):
+    """cmds with a hitbox removal where they never remove theirs. The dump puts the end every material
+    shares (side tilt's wait(3) clear_all) in the last of its nested material tests only, so the branch
+    taken (iron / wood) ended with its hitboxes out for good: the dump's own wait from its hitboxes to
+    the clear_all, after our last hitbox"""
+    hit, rm = last_hit_removal(cmds)
+    wait = removal_wait(fn_text)
+    if hit is None or rm is not None or wait is None:
+        return cmds, None
+    return script_of(timeline(cmds) + [(hit + wait, U.cmd('Remove_All_Hitboxes'))]), hit + wait
+
+
 def moved(c, z, y, mirror):
     """an article's hitbox on its top -> on his top, z / y further; mirrored (behind him)"""
     c = acmd.Command(c.ident, list(c.params))
@@ -150,6 +196,11 @@ def main():
                     c.params[3] = round(float(c.params[3]) * WOOD_TO_IRON, 3)
                 game.scripts[acmd.crc(name)] = wood
                 log.append('%s: wood x%g' % (name, WOOD_TO_IRON))
+        if acmd.crc(name) in game.scripts:
+            fixed, at = with_removal(game.scripts[acmd.crc(name)], body_fn)
+            if at is not None:
+                game.scripts[acmd.crc(name)] = fixed
+                log.append('%s: hitboxes removed at frame %g (the dump\'s clear_all, in another branch)' % (name, at))
         # the tool: shown from its request to the end, hidden from a removal request
         keys = {}
         for fr, call, a in events:
