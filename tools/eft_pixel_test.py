@@ -115,7 +115,10 @@ def expected(cm, am, gain, c0, c1, t, vc, hdr):
 LAYOUTS = {
     'quad (0, 1, 9)': {'regs': 3, 'c0': 0, 'c1': 1, 'vc': None, 'uv': (2, 'xy'), 'sems': [0, 1, 9]},
     'mesh (0, 1, 6, 10)': {'regs': 4, 'c0': 0, 'c1': 1, 'vc': 2, 'uv': (3, 'zw'), 'sems': [0, 1, 6, 10]},
+    'mesh without colour 1 (0, 6, 10), colour 1 constant': {'regs': 3, 'c0': 0, 'c1': None, 'vc': 1, 'uv': (2, 'xy'),
+                                                            'sems': [0, 6, 10]},
 }
+C1_CONST = (0.37, 0.0, 1.25)
 
 
 def test_variants():
@@ -124,7 +127,8 @@ def test_variants():
         for cm in range(4):
             for am in (0, 1):
                 for gain in (1.0, 4.0):
-                    prog, gprs = E.program(lay, cm, am, gain)
+                    c1k = C1_CONST if lay['c1'] is None else None
+                    prog, gprs = E.program(lay, cm, am, gain, c1k)
                     lines = disasm(prog)
                     worst = 0.0
                     for _ in range(40):
@@ -134,8 +138,11 @@ def test_variants():
                         texel = [rnd.uniform(0, 1) for _ in range(4)]
                         uv = [rnd.uniform(0, 1) for _ in range(4)]
                         hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
-                        regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['c1']: list(c1),
-                                'R%d' % lay['uv'][0]: list(uv)}
+                        if c1k:
+                            c1 = list(c1k) + [0.0]
+                        regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['uv'][0]: list(uv)}
+                        if not c1k:
+                            regs['R%d' % lay['c1']] = list(c1)
                         if vc is not None:
                             regs['R%d' % lay['vc']] = list(vc)
                         seen = []

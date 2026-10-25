@@ -429,3 +429,15 @@ dull grey with dark tips; in Ultimate the product runs past 1 and saturates yell
 programs the colour scale is now Ultimate's and the program clamps the drawn colour to 0 - 1 where
 it's last written (nothing past 1 reaches Smash 4's bloom, the purple haze `hdr_scale` was for).
 Template programs (`--no-exact`) still get `hdr_scale`.
+
+## Fix 28 (`build/hero_fix28.zip`): hidden emitters, colour 1 on every template, mesh samplers
+
+- F-smash's solid yellow zigzag was `impact2_frontL`, which has eft2's `is_particle_draw` 0: Ultimate
+  never draws it (no child emitters either). Such emitters are skipped (4 in Hero's bank: Tornado3
+  rock1, Flash1 / Flash2 flare2 too).
+- Kafrizz's black ball: `sphere1` / `spherering1` / `flare1` (colour mode 2) got templates whose
+  programs pass colour 0 only (inputs 0, 6, 10); `eft_pixel.source` fell back to colour 0 x texture,
+  and sphere1's `ef_cmn_grade00` (alpha 1 everywhere, rgb a dark-ended gradient) at alpha 2 drew an
+  opaque black ball. Templates are now ranked by passing colour 1 when the mode needs it, and a
+  program on one that doesn't gets colour 1 as constants (its life mean x the colour scale).
+- A mesh's other samplers (sphere1's `ef_brave_mask02`) come in as their mean (they read other UVs).

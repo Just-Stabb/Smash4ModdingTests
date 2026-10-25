@@ -183,7 +183,9 @@ class Templates:
                         screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b)
                     if screen[si_][0]:
                         continue
-                    own = EXACT and eft_pixel.layout(bytes(p.shader_binary(si_))) is not None
+                    # 0 no own program, 1 one without colour 1, 2 with it
+                    lay = eft_pixel.layout(bytes(p.shader_binary(si_))) if EXACT else None
+                    own = 0 if lay is None else 2 if lay['c1'] is not None else 1
                     if t[0]['native_format'] != 9 and not own:
                         continue
                     traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
@@ -193,7 +195,7 @@ class Templates:
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False)):
+    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A template with another flipbook mode than wanted is never taken when one
@@ -206,7 +208,7 @@ class Templates:
             # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
             # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
-            return (plain, pm in (ptn, 0), own, fol == follow, an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
+            return (plain, pm in (ptn, 0), own if need_c1 else min(own, 1), fol == follow, an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
                     by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode & uv_mode == uv_mode, mode == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
@@ -446,15 +448,25 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
     input in rgb and its alpha input in a, sampler ti's (img: one cell or the flipbook sheet) with
     the emitter's other samplers combined in as eft2 does (tex1 / tex2 colour and alpha blends: 0
     multiply, 1 add), each sampled over sampler ti's quad as bake_samplers places it (frozen at its
-    start). Distortion maps ('indirect') only move the picture: left out. A mesh's samplers keep
-    their own UVs: sampler ti alone"""
+    start). Distortion maps ('indirect') only move the picture: left out. A mesh's other samplers
+    read their own UVs: they come in as their mean (Kafrizz's sphere1, a gradient x ef_brave_mask02:
+    left out, the ball drew at the gradient's full alpha)"""
     rgb, a = sampler_inputs(e, ti, img)
     cb = e['combiner']
-    others = [] if is_mesh else [
-        (j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
-        and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
+              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
+    if is_mesh:
+        for j, s in others:
+            orgb, oa = sampler_inputs(e, j, first_cell(images[s['texture_id']], e['static']['tex_scroll'][j],
+                                                      shown_cell(e, j)))
+            k = 2 if j == 2 or (j == 0 and ti == 2) else 1
+            m_rgb, m_a = orgb.reshape(-1, 3).mean(0), float(oa.mean())
+            rgb = rgb + m_rgb if cb['tex%d_color_blend' % k] == 1 else rgb * m_rgb
+            a = a + m_a if cb['tex%d_alpha_blend' % k] == 1 else a * m_a
+        notes.append('samplers %s in as their mean (mesh)' % ','.join(str(j) for j, _s in others))
+        return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
     nx, ny = ((max(1, int(round(v))) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else (1, 1))
     h, w = rgb.shape[0] // ny, rgb.shape[1] // nx
     yy, xx = np.mgrid[0:h, 0:w]
@@ -493,13 +505,18 @@ def exact_combiner(p, em, e, alpha, notes):
     am = cb['alpha_process']
     erode = am in (1, 3)
     gain = 1.0 if erode else max(1.0, float(np.max(alpha)))
+    # colour 1 at its life mean x the colour scale, for a template that doesn't pass colour 1
+    c1 = track(e['static'], e['color'], 1)[0].mean(0) * np.array(e['info']['color1'][:3]) \
+        * float(e['static']['color_scale'] or 1.0)
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain)
+                              1 if erode else 0, gain, c1)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
-    notes.append('own pixel program (colour %d, alpha %d%s)' % (
-        cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else ''))
+    lay = eft_pixel.layout(bytes(p.shader_binary(si)))
+    notes.append('own pixel program (colour %d, alpha %d%s%s)' % (
+        cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else '',
+        ', colour 1 constant' if lay['c1'] is None and cb['color_process'] in (2, 3) else ''))
     return si, np.clip(alpha / gain, 0, 1), gain
 
 
@@ -775,6 +792,11 @@ def set_uv_anim(em, ts):
 
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     pt = e['particle']
+    if not e['info']['is_particle_draw']:
+        # Ultimate doesn't draw it (eft2's is_particle_draw; none of Hero's 5 has child emitters):
+        # F-smash's impact2_frontL, a solid yellow zigzag over the ground spikes in fix 27
+        notes.append('not drawn in Ultimate (is_particle_draw 0): skipped')
+        return None
     if e['combiner']['shader_type'] == 1:
         # a refraction piece (it bends the picture behind it: back throw's indirect1, the entry's
         # rifrection1): no template reads the screen (SCREEN_SAMPLERS), and drawn plain its
@@ -855,7 +877,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     anim = tuple(e['color']['color%d_type' % n] == 2 and float(np.ptp(track(e['static'], e['color'], n)[0], 0).max()) > 0.05
                  for n in (0, 1))
     em, turns = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot, notes,
-                              anim)
+                              anim, e['combiner']['color_process'] in (2, 3))
     # a rotation no template draws: baked (a quad's fixed quarter turns; a mesh's starting rotation)
     baked_rot = rot != ROT_NONE and not turns and (is_mesh or rot == ROT_FIXED)
     quarter = fixed_quarter_turn(st) if baked_rot and not is_mesh else None

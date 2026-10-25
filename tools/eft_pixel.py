@@ -99,19 +99,28 @@ def layout_of(binary):
 
 def lit(v):
     """an ALU literal operand"""
-    if v in (0.0, 1.0, 0.5, -1.0, -0.5):
+    if v == 0:
+        return '0.0f'
+    if v in (1.0, 0.5, -1.0, -0.5):
         return '%sf' % ('%.1f' % v)
     return '(0x%08X, %r)' % (struct.unpack('>I', struct.pack('>f', v))[0], float(v))
 
 
-def source(lay, color_mode, alpha_mode, alpha_gain=1.0):
-    """the program's latte-asm source"""
+def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None):
+    """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
+    it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
+    texture, an opaque black ball where its gradient texture is dark)"""
     n = lay['regs']
     c0, c1, vc = 'R%d' % lay['c0'], ('R%d' % lay['c1']) if lay['c1'] is not None else None, lay['vc']
     uvr, uvc = lay['uv']
     t, d = 'R%d' % n, 'R%d' % (n + 1)          # the texel, the colour's work register
-    if color_mode in (2, 3) and c1 is None:
+    if color_mode in (2, 3) and c1 is None and c1_const is None:
         color_mode = 1
+
+    def c1op(ch, neg=False):
+        if c1 is not None:
+            return '%s%s.%s' % ('-' if neg else '', c1, ch)
+        return lit(-c1_const['xyz'.index(ch)] if neg else c1_const['xyz'.index(ch)])
     head = ['; eft pixel program (tools/eft_pixel.py): colour mode %d, alpha mode %d, alpha x %g'
             % (color_mode, alpha_mode, alpha_gain),
             '; $MODE = "UniformBlock"',
@@ -132,9 +141,9 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0):
         elif color_mode == 1:
             g.append('%s: MUL             %s.%s, %s.%s, %s.%s' % (ch, d, ch, c0, ch, t, ch))
         elif color_mode == 2:
-            g.append('%s: ADD             %s.%s, %s.%s, -%s.%s' % (ch, d, ch, c0, ch, c1, ch))
+            g.append('%s: ADD             %s.%s, %s.%s, %s' % (ch, d, ch, c0, ch, c1op(ch, True)))
         else:
-            g.append('%s: MULADD          %s.%s, %s.%s, %s.%s, %s.%s' % (ch, d, ch, c0, ch, t, ch, c1, ch))
+            g.append('%s: MULADD          %s.%s, %s.%s, %s.%s, %s' % (ch, d, ch, c0, ch, t, ch, c1op(ch)))
     if alpha_mode in (1, 3):
         g.append('w: ADD             %s.w, %s.w, %s.w' % (d, c0, t))
     else:
@@ -144,7 +153,7 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0):
     g = []
     if color_mode == 2:
         for ch in 'xyz':
-            g.append('%s: MULADD          %s.%s, %s.%s, %s.%s, %s.%s' % (ch, d, ch, d, ch, t, ch, c1, ch))
+            g.append('%s: MULADD          %s.%s, %s.%s, %s.%s, %s' % (ch, d, ch, d, ch, t, ch, c1op(ch)))
     a_ops = []
     if alpha_mode in (1, 3):
         a_ops.append(('ADD', lit(-1.0)))
@@ -184,9 +193,9 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0):
 _programs = {}
 
 
-def program(lay, color_mode, alpha_mode, alpha_gain=1.0):
+def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None):
     """(program bytes, GPR count), assembled once per variant"""
-    src = source(lay, color_mode, alpha_mode, alpha_gain)
+    src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -205,16 +214,21 @@ def with_program(binary, prog, gprs):
 _shaders = {}
 
 
-def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0):
+def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None):
     """the index of shader si of Ptcl p with one of these pixel programs (added once per variant),
-    or None when its pixel program isn't one this module can stand in for"""
+    or None when its pixel program isn't one this module can stand in for. c1_const: colour 1 (rgb,
+    x the colour scale) for a template that doesn't pass it"""
     b = bytes(p.shader_binary(si))
     lay = layout(b)
     if lay is None:
         return None
-    key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4))
+    if lay['c1'] is not None or color_mode not in (2, 3):
+        c1_const = None
+    elif c1_const is not None:
+        c1_const = tuple(round(float(v), 3) for v in c1_const)
+    key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const)
     if key not in _shaders or _shaders[key][0] is not p:
-        prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain)
+        prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const)
         _shaders[key] = (p, p.add_shader(p.shader_entry(si), with_program(b, prog, gprs)))
     return _shaders[key][1]
 
