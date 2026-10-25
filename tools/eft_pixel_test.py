@@ -109,7 +109,7 @@ def expected(cm, am, gain, c0, c1, t, vc, hdr):
     if vc is not None:
         rgb = [x * y for x, y in zip(rgb, vc[:3])]
         a *= vc[3]
-    return [x * hdr[0] + hdr[3] for x in rgb] + [min(max(a, 0.0), 1.0)]
+    return [min(max(x, 0.0), 1.0) * hdr[0] + hdr[3] for x in rgb] + [min(max(a, 0.0), 1.0)]
 
 
 LAYOUTS = {

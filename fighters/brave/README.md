@@ -419,3 +419,13 @@ words 0x32C - 0x33C (0x04A62744 ff.); value 2 animates by the key-animation tabl
 ground flare among them); templates with key animation are now left out. Converted meshes also always
 get normals (from their triangles) and a vertex colour: an absent attribute is an empty buffer, which
 a template reading it hits ("GX2RSetAttributeBuffer(): Offset exceeds buffer size").
+
+## Fix 27 (`build/hero_fix27.zip`): Ultimate's brightness, clamped in the pixel program
+
+F-smash on fix 26 against Ultimate's: the ground spikes (`impact2_frontL`: colour mode 1, colour 0 x
+`ef_donkey_line01`'s rgb, grey bands 0.2 - 0.8 under a solid spike alpha, colour scale 2.0) drew
+dull grey with dark tips; in Ultimate the product runs past 1 and saturates yellow. `hdr_scale`
+(fix 21 - 23) had squeezed the colour to ~1.05 before the texture multiplied it. With own pixel
+programs the colour scale is now Ultimate's and the program clamps the drawn colour to 0 - 1 where
+it's last written (nothing past 1 reaches Smash 4's bloom, the purple haze `hdr_scale` was for).
+Template programs (`--no-exact`) still get `hdr_scale`.

@@ -18,7 +18,9 @@ written here:
   rgb = colour mode 0: c0; 1: c0 x t.rgb; 2: c1 + (c0 - c1) x t.rgb; 3: c0 x t.rgb + c1
   a   = alpha mode 0: c0.a x t.a; 1: t.a + c0.a - 1 (erosion: the texture eaten away by the fading
         alpha); x ALPHA_GAIN (Ultimate's alphas go past 1: its whirlwinds' at 2 - 4), clamped
-  (a mesh layout: rgb x v.rgb, a x v.a), then rgb x hdr.x + hdr.w.
+  (a mesh layout: rgb x v.rgb, a x v.a), rgb clamped to 0 - 1 (the colours keep Ultimate's
+  brightness past 1: what Ultimate's tone mapping shows saturated, not Smash 4's bloom), then
+  rgb x hdr.x + hdr.w.
 """
 import hashlib
 import os
@@ -161,6 +163,12 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0):
         groups.append(['w: %-15s %s.w, %s.w, %s%s' % (op, d, d, arg, '' if a_ops else ' CLAMP')])
     if vc is not None:
         groups.append(['%s: MUL             %s.%s, %s.%s, R%d.%s' % (ch, d, ch, d, ch, vc, ch) for ch in 'xyz'])
+    # the colour clamped to 0 - 1 where it's last written (Ultimate's colours run past 1 for its tone
+    # mapping: kept so, a bright yellow over a grey band texture saturates to yellow as in Ultimate,
+    # where scaled down to 1 first it drew a dull grey band; past 1 Smash 4's bloom turns it into a
+    # purple haze, fix 21)
+    last = max(i for i, g in enumerate(groups) if any(ln[0] in 'xyz' for ln in g))
+    groups[last] = [ln + ' CLAMP' if ln[0] in 'xyz' and not ln.endswith('CLAMP') else ln for ln in groups[last]]
     # out: rgb x hdr.x + hdr.w, alpha
     groups.append(['%s: MULADD          R0.%s, %s.%s, KC0[8].x, KC0[8].w' % (ch, ch, d, ch) for ch in 'xyz']
                   + ['w: MOV             R0.w, %s.w' % d])

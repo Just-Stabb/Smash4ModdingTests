@@ -1032,7 +1032,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'color_section2', [fits[0][1][1], fits[1][1][1]])
     p.set_field(em, 'color_section3', [fits[0][1][2], fits[1][1][2]])
     p.set_field(em, 'color_repeat', [1, 1])
-    p.set_field(em, 'color_scale', hdr_scale(p, em, float(st['color_scale'] or 1.0), notes))
+    # an own pixel program clamps the colour it draws to 1 (tools/eft_pixel.py): Ultimate's brightness
+    # kept, what goes past 1 saturating as in Ultimate (F-smash's yellow spikes over grey bands, fix 25:
+    # dull grey; Frizz's flames red); a template's own program gets it compressed (hdr_scale)
+    p.set_field(em, 'color_scale', float(st['color_scale'] or 1.0) if exact else
+                hdr_scale(p, em, float(st['color_scale'] or 1.0), notes))
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
