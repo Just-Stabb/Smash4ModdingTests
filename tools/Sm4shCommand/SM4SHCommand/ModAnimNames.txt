@@ -161,3 +161,18 @@ TornadoNone20
 TornadoNone21
 TornadoNone22
 TornadoNone23
+// his down special (Command Selection, status 0x155): Robin's Nosferatu slots 0x277-0x27D / 0x283-0x289:
+// the menu (start, select, cancel) and the spells, SpecialLwN = Ultimate's command N (17 Flame Slash,
+// 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man)
+SpecialLwSelect
+SpecialLwCancel
+SpecialLw17
+SpecialLw18
+SpecialLw19
+SpecialLw20
+SpecialAirLwSelect
+SpecialAirLwCancel
+SpecialAirLw17
+SpecialAirLw18
+SpecialAirLw19
+SpecialAirLw20

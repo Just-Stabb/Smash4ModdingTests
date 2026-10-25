@@ -123,3 +123,33 @@ tests didn't see it: they compare the caves' outputs with `--others`, and acmd_e
 weapon_expand.py's cave is now 0x04BB0000-0x04BB8000 (kind_expand.py's ends at 0x04BB0000). Test with
 `--others` for every cave in the executable (acmd_ext, series, smash_button too) and run
 `acmd_ext_test.py PATCHED build/cross_f.rpx`.
+
+## v5 (`build/hero_v5.zip`): Command Selection, with its menu in the damage panel
+
+```
+python3 tools/brave_build.py ... --menu TRAIT_DMG_DIR       (v4's command + the damage panel with the trait badge)
+```
+- Down special (status 0x155, Robin's Nosferatu; `brave.c` `brave_lw_*`): SpecialLwStart, then
+  SpecialLwSelect with the menu open. Four spells are drawn at random, weighted by Ultimate's
+  `param_special_lw_command_data` lot_prob, among the spells made so far (`brave_lw_weight`). The stick
+  moves the cursor (up / down past 0.5, again every 12 frames while held). Attack, or special once it
+  has been let go, casts; the cast spell's row stays up 30 frames. Shield or 480 frames
+  (command_select_time_limit) -> SpecialLwCancel. The air fall is held to 0.45 while choosing. Spells so
+  far: 17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man (Ultimate's SpecialLw17-20 /
+  SpecialAirLw17-20, their sword hitboxes and effects).
+- The menu: Ultimate draws it next to Hero; here it is four rows above his damage panel
+  (`ui/info/dmg`): `tools/brave_menu_art.py` draws a plate for each of the 21 spells, plain and highlighted
+  (name, MP cost); `tools/dmg_brave_menu.py` adds a row sprite (frame n = spell n, 21 + n highlighted)
+  placed four times (`spell0_mc`-`spell3_mc`) in each panel layout, on texture slot 134
+  (`img-00134.nut`, BC3 512x1024). `tools/trait_badge_cave.py`'s menu routine (0x04B85000, run for every
+  panel slot after the trait badge) shows them for a Hero (the fighter object's kind 0x45) from his
+  work ints 0x1000009E (0x4845xxxx: bit 2 open, bits 0-1 the cursor's row) and 0x1000009F (0x48xxxxxx:
+  the rows' spells, 5 bits each), and hides them everywhere else. `tools/trait_badge_test.py` covers it.
+- Motions: start 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, spells 17-20 0x27A-0x27D /
+  0x286-0x289 (Robin's Nosferatu slots; Ultimate's spell animations are shared: Flame and Kacrackle
+  Slash both play `skill3`).
+
+Not yet: the other 17 spells (Heal, Sizz / Sizzle, Bang / Kaboom, Whack / Thwack, Magic Burst,
+Kamikazee, Kaclang, Acceleratle, Oomph, Bounce, Snooze, Hocus Pocus, Zoom, Psyche Up), MP (the costs
+are on the plates; nothing is spent or greyed out yet), Metal Slash's metal KO, the menu blinking near
+its time limit.

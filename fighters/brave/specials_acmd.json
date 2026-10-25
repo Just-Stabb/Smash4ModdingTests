@@ -105,5 +105,55 @@
   "SpecialAirHi3": {
     "name": "specialairhi3",
     "slot": "0x26F"
+  },
+  "SpecialLwStart": "speciallwstart",
+  "SpecialLwSelect": {
+    "name": "speciallwselect",
+    "slot": "0x278"
+  },
+  "SpecialLwCancel": {
+    "name": "speciallwcancel",
+    "slot": "0x279"
+  },
+  "SpecialLw17": {
+    "name": "speciallw17",
+    "slot": "0x27A"
+  },
+  "SpecialLw18": {
+    "name": "speciallw18",
+    "slot": "0x27B"
+  },
+  "SpecialLw19": {
+    "name": "speciallw19",
+    "slot": "0x27C"
+  },
+  "SpecialLw20": {
+    "name": "speciallw20",
+    "slot": "0x27D"
+  },
+  "SpecialAirLwStart": "specialairlwstart",
+  "SpecialAirLwSelect": {
+    "name": "specialairlwselect",
+    "slot": "0x284"
+  },
+  "SpecialAirLwCancel": {
+    "name": "specialairlwcancel",
+    "slot": "0x285"
+  },
+  "SpecialAirLw17": {
+    "name": "specialairlw17",
+    "slot": "0x286"
+  },
+  "SpecialAirLw18": {
+    "name": "specialairlw18",
+    "slot": "0x287"
+  },
+  "SpecialAirLw19": {
+    "name": "specialairlw19",
+    "slot": "0x288"
+  },
+  "SpecialAirLw20": {
+    "name": "specialairlw20",
+    "slot": "0x289"
   }
 }

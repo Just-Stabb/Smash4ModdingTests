@@ -68,20 +68,35 @@ def main():
         lis r3, 0x%04X
         ori r3, r3, 0x%04X
         blr""" % (RETVAL >> 16, RETVAL & 0xFFFF))
+    # intern: the atom + the name's 6th byte ('_' for trait_mc, '0'-'3' for spell0_mc-spell3_mc);
+    # intern calls counted for trait_mc only. find: trait_mc -> the clip's +0, spellK_mc -> +4 + 4K
     stub(mu, C.INTERN, """
         lis r7, 0x7F00
+        lbz r8, 5(r4)
+        cmpwi r8, 0x5F
+        bne nocount
         lwz r6, 0x1008(r7)
         addi r6, r6, 1
         stw r6, 0x1008(r7)
+nocount:
         lwz r3, 0x1018(r7)
+        add r3, r3, r8
         blr""")
     stub(mu, C.FIND_CHILD, """
         lwz r5, 0(r4)
         lis r6, 0x7F00
         lwz r6, 0x1018(r6)
-        cmpw r5, r6
-        bne none
+        subf r5, r6, r5
+        cmpwi r5, 0x5F
+        bne menu
         lwz r3, 0(r3)
+        blr
+menu:   addi r5, r5, -0x30
+        cmplwi r5, 3
+        bgt none
+        slwi r5, r5, 2
+        add r3, r3, r5
+        lwz r3, 4(r3)
         blr
 none:   li r3, 0
         blr""")
@@ -112,7 +127,7 @@ none:   li r3, 0
     w32(C.FIGHTER_MANAGER, FM)
     w32(FM + 0x18, 8)
 
-    def fighter(entry, kind, marker):
+    def fighter(entry, kind, marker, menu=0, spells=0):
         fe = FM + 0x1000 + 0x2000 * entry
         w32(FM + 0x24 + 4 * entry, fe)
         w32(fe + 0xDB4, 1)
@@ -128,6 +143,8 @@ none:   li r3, 0
         w32(cat0 + 8, 0x200)
         w32(cat0 + 0xC, ints)
         w32(ints + 4 * 0x8E, marker)
+        w32(ints + 4 * C.MENU_INT, menu)
+        w32(ints + 4 * C.SPELL_INT, spells)
 
     def slot(i, entry, kind, elem=True, empty=False):
         s = P + 0xC0 + C.SLOT_SIZE * i
@@ -141,7 +158,15 @@ none:   li r3, 0
         mu.mem_write(sib + 0x74, bytes([0x40 + i]))
         mu.mem_write(e, b'\0' * 0x100)
         w32(e + 0xE8, 0x4000)                   # visible, as placed
+        for k in range(C.ROWS):                 # the menu rows (elements after the badges)
+            r = ELEMS + 0x40000 + 0x400 * i + 0x100 * k
+            w32(clip + 4 + 4 * k, r)
+            mu.mem_write(r, b'\0' * 0x100)
+            w32(r + 0xE8, 0x4000)
         return e
+
+    def rows(i):
+        return [ELEMS + 0x40000 + 0x400 * i + 0x100 * k for k in range(C.ROWS)]
 
     KI = 0x4B490000
     elems = [slot(0, 0, 8), slot(1, 1, 8), slot(2, 2, 1), slot(3, 3, 8, empty=True),
@@ -195,10 +220,32 @@ none:   li r3, 0
     fighter(0, 8, KI)
     update()
     check('the copy lost: hidden', state(elems[0])[0], False)
+    # Hero's menu: slot 1 a Hero with the menu open (cursor on row 2), slot 2 one with it shut, slot 6 a
+    # Hero with a wrong marker; the Kirbys' rows hidden
+    def menu_state(i):
+        return [(state(r)[0], state(r)[1]) if state(r)[0] else False for r in rows(i)]
+    HM, HS = C.MENU_MAGIC << 16, C.SPELL_MAGIC << 24
+    # the slots' kind bytes are left as they were (Kirby's 8): the menu goes by the fighter object's kind
+    fighter(1, C.BRAVE, 0, HM | 4 | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
+    fighter(2, C.BRAVE, 0, HM | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
+    fighter(6, C.BRAVE, 0, 0x12340004, HS | 1)
+    update()
+    check('Hero, menu open: rows 17, 18, 19 + 21 (the cursor), 20, the panel alpha',
+          [state(r)[:2] + (state(r)[3],) for r in rows(1)],
+          [(True, 17, 0x41), (True, 18, 0x41), (True, 40, 0x41), (True, 20, 0x41)])
+    check('Hero, menu shut: rows hidden', menu_state(2), [False] * 4)
+    check('Hero, no marker: rows hidden', menu_state(6), [False] * 4)
+    check('Kirby: rows hidden', menu_state(0), [False] * 4)
+    check('Hero: the trait badge hidden', state(elems[1])[0], False)
+    check('an empty slot: rows untouched', [state(r)[:3] for r in rows(3)], [(True, 1, 0)] * 4)
+    fighter(1, C.BRAVE, 0, HM | 4 | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)
+    update()
+    check('cursor on row 0, a row with no spell / spell 30: hidden, spell 21',
+          menu_state(1), [(True, 26), False, False, (True, 21)])
     words = [r32(DEBUG_COUNTERS + 4 * i) for i in range(12)]
     if any(words):                              # a --debug build (trait_badge_cave.py --debug)
         print('debug counters: ' + ', '.join('%s %s' % (n, hex(w)) for n, w in zip(C.COUNTERS, words)))
-        check('debug: hook calls = updates run', words[0], 6)
+        check('debug: hook calls = updates run', words[0], 8)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

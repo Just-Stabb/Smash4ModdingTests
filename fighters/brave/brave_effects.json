@@ -41,9 +41,16 @@
  "brave_tornado2_wind": "0x3450046",
  "brave_tornado3": "0x3450047",
  "brave_tornado3_wind": "0x3450048",
- "brave_fire1_hold@-90,0,-90": "0x3450049",
- "brave_fire1_flame@-90,0,-90": "0x345004A",
- "brave_lightning3_sword@0,0,-90": "0x345004B",
- "brave_lightning3_swordspark@0,0,-90": "0x345004C",
- "brave_lightning3_hit2@0,0,-90": "0x345004D"
+ "brave_devil_ground": "0x3450049",
+ "brave_devil_sword": "0x345004A",
+ "brave_fire_sword": "0x345004B",
+ "brave_ice_sword": "0x345004C",
+ "brave_fire1_hold@-90,0,-90": "0x345004D",
+ "brave_devil_sword@0,0,-90": "0x345004E",
+ "brave_fire1_flame@-90,0,-90": "0x345004F",
+ "brave_lightning3_sword@0,0,-90": "0x3450050",
+ "brave_lightning3_swordspark@0,0,-90": "0x3450051",
+ "brave_ice_sword@0,0,-90": "0x3450052",
+ "brave_lightning3_hit2@0,0,-90": "0x3450053",
+ "brave_fire_sword@0,0,-90": "0x3450054"
 }

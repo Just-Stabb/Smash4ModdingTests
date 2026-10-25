@@ -17,8 +17,11 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
   from fighters/brave/weapons/ (thunder_base.c + fireball.c, or + placed.c + spark.c / tornado.c) and
   script/animcmd/weapon/<name>/ (Ultimate's brave_<name> scripts: ARTICLES);
 - --rpx: code/cross_f.rpx = IN.rpx + kind_expand / weapon_expand / base_effects_cave / base_customs_cave /
+  trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu) /
   trail_table_cave (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
+- --menu DIR: ui/info/dmg/ = DIR (the damage panel with the trait badge) + Hero's menu rows
+  (tools/brave_menu_art.py, tools/dmg_brave_menu.py);
 - --bank: effect/brave/brave.010d0000.{ptcl,efc} from DIR/reflet.010d0000.* (tools/vfxb_to_ptcl.py);
 - --trails: effect/brave/trail/ from DIR (tools/ultimate_trails.py --shader 3);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
@@ -52,7 +55,7 @@ ARTICLES = {
     'spark': (_slots('spark', ('specials1', 'specials2', 'specials32')), {}),
     'tornado': (_slots('tornado', ('specialhi1', 'specialhi2', 'specialhi3')), {'tornado1': 0, 'tornado2': 0}),
 }
-CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave')
+CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave')
 
 
 def run(*argv):
@@ -140,6 +143,7 @@ def main():
     ap.add_argument('--bank')
     ap.add_argument('--trails')
     ap.add_argument('--motions')
+    ap.add_argument('--menu')
     a = ap.parse_args()
     fighter = os.path.join(a.out, 'fighter/brave')
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
@@ -166,6 +170,12 @@ def main():
             shutil.copy(os.path.join(a.bank, 'reflet.010d0000.' + ext), os.path.join(d, 'brave.010d0000.' + ext))
     if a.trails:
         shutil.copytree(a.trails, os.path.join(fighter, 'effect/brave/trail'), dirs_exist_ok=True)
+    if a.menu:
+        import dmg_brave_menu
+        with tempfile.TemporaryDirectory() as art:
+            run(os.path.join(HERE, 'brave_menu_art.py'), art)
+            print('menu: sprite 0x%X, texture slot %d' % dmg_brave_menu.build(
+                a.menu, art, os.path.join(a.out, 'ui/info/dmg')))
     if a.motions:
         d = os.path.join(fighter, 'motion/body')
         os.makedirs(d, exist_ok=True)

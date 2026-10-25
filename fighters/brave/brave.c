@@ -6120,6 +6120,7 @@ void func_235()
 {
     printf("status_Rebirth sub_end_move");
     brave_n_stored = 0;     // Hero: a stored Frizz charge doesn't outlive the stock
+    WorkModule(0x7, 0, 0x1000009e);     // nor an open Command Selection menu
     WorkModule(0x11, 0x2100000d);
     WorkModule(0x12, 0x20000001);
     GroundModule(0x2710, 0x5);
@@ -36381,9 +36382,9 @@ void func_2243()
     sv_set_mem(0x1, 0, 0x15d, func_2328);
     sv_set_mem(0x1, 0x1, 0x15d, func_2329);
     sv_set_mem(0x1, 0x2, 0x15d, func_2331);
-    sv_set_mem(0x1, 0, 0x155, func_2332);
-    sv_set_mem(0x1, 0x1, 0x155, func_2333);
-    sv_set_mem(0x1, 0x2, 0x155, func_2335);
+    sv_set_mem(0x1, 0, 0x155, brave_lw_pre);  // Hero: Command Selection (was Nosferatu func_2332-func_2335)
+    sv_set_mem(0x1, 0x1, 0x155, brave_lw_main);
+    sv_set_mem(0x1, 0x2, 0x155, brave_lw_end);
     sv_set_mem(0x1, 0, 0x15e, func_2336);
     sv_set_mem(0x1, 0x1, 0x15e, func_2337);
     sv_set_mem(0x1, 0x2, 0x15e, func_2340);
@@ -39112,4 +39113,307 @@ void brave_hi_main()
     WorkModule(0x7, 0x5, 0x11000007);
     func_2245(0x1);
     func_78(brave_hi_loop);
+}
+
+// ---- Hero's down special: Command Selection (status 0x155, Robin's Nosferatu; fighters/brave/README.md).
+// SpecialLwStart (20 frames) then SpecialLwSelect (a loop) with the menu open: four spells drawn at random,
+// weighted by Ultimate's param_special_lw_command_data lot_prob, among the ones made so far
+// (brave_lw_weight), shown in his damage panel (tools/trait_badge_cave.py's menu, tools/dmg_brave_menu.py)
+// through two work ints: 0x1000009E = 0x48450000 + 4 (open) + the cursor's row, 0x1000009F = 0x48000000 +
+// the rows' spells (1-21) x 1 / 32 / 1024 / 32768. The stick (up / down past 0.5, again every 12 frames
+// while held) moves the cursor; attack, or special once it has been let go, casts the spell (its row
+// stays up 30 frames); shield, or 480 frames (command_select_time_limit), shuts it: SpecialLwCancel. The
+// spells' motions, ground / air: start 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, then
+// spell n at its slot (brave_lw_spell_motion). In the air the fall is held to 0.45 while choosing.
+// Spells: 17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man (sword moves: their hitboxes
+// are in their scripts, Ultimate's SpecialLw17-20). No MP yet.
+int brave_lw_state;
+int brave_lw_frame;
+int brave_lw_cursor;
+int brave_lw_spells;
+int brave_lw_spell;
+int brave_lw_released;
+int brave_lw_stick;
+int brave_lw_repeat;
+
+// a spell's draw weight (Ultimate's lot_prob); 0: not made yet
+int brave_lw_weight(int n)
+{
+    if (n == 0x11 || n == 0x12 || n == 0x14)
+    {
+        return 0x12;
+    }
+    if (n == 0x13)
+    {
+        return 0x7;
+    }
+    return 0;
+}
+
+// a spell's motion (0 ground, 1 air)
+int brave_lw_spell_motion(int n, int air)
+{
+    int m;
+    m = 0;
+    if (n == 0x11)
+    {
+        m = 0x27a;
+    }
+    else if (n == 0x12)
+    {
+        m = 0x27b;
+    }
+    else if (n == 0x13)
+    {
+        m = 0x27c;
+    }
+    else if (n == 0x14)
+    {
+        m = 0x27d;
+    }
+    if (air && m != 0)
+    {
+        m = m + 0xc;
+    }
+    return m;
+}
+
+// row k's spell (0-3)
+int brave_lw_row(int k)
+{
+    int v;
+    int i;
+    v = brave_lw_spells;
+    i = 0;
+    while (i < k)
+    {
+        v = v / 0x20;
+        i += 1;
+    }
+    return v % 0x20;
+}
+
+// four spells, weighted, no repeats
+void brave_lw_draw()
+{
+    int k;
+    int n;
+    int total;
+    int r;
+    int taken;
+    int pick;
+    int mul;
+    brave_lw_spells = 0;
+    taken = 0;
+    mul = 0x1;
+    k = 0;
+    while (k < 0x4)
+    {
+        total = 0;
+        n = 0x1;
+        while (n <= 0x15)
+        {
+            if ((taken / brave_bit(n)) % 0x2 == 0)
+            {
+                total = total + brave_lw_weight(n);
+            }
+            n += 1;
+        }
+        pick = 0;
+        if (total > 0)
+        {
+            r = randi(0, total);
+            n = 0x1;
+            while (n <= 0x15 && pick == 0)
+            {
+                if ((taken / brave_bit(n)) % 0x2 == 0)
+                {
+                    r = r - brave_lw_weight(n);
+                    if (r < 0)
+                    {
+                        pick = n;
+                    }
+                }
+                n += 1;
+            }
+        }
+        if (pick != 0)
+        {
+            taken = taken + brave_bit(pick);
+            brave_lw_spells = brave_lw_spells + pick * mul;
+        }
+        mul = mul * 0x20;
+        k += 1;
+    }
+}
+
+// the panel's menu: open with the cursor, or (shown) only the cast spell's row, or shut
+void brave_lw_show(int open)
+{
+    int v;
+    if (open == 0)
+    {
+        WorkModule(0x7, 0, 0x1000009e);
+        WorkModule(0x7, 0, 0x1000009f);
+        return;
+    }
+    WorkModule(0x7, 0x48450004 + brave_lw_cursor, 0x1000009e);
+    v = brave_lw_spells;
+    if (brave_lw_state == 0x2)
+    {
+        v = brave_lw_spell;
+        if (brave_lw_cursor >= 0x1)
+        {
+            v = v * 0x20;
+        }
+        if (brave_lw_cursor >= 0x2)
+        {
+            v = v * 0x20;
+        }
+        if (brave_lw_cursor >= 0x3)
+        {
+            v = v * 0x20;
+        }
+    }
+    WorkModule(0x7, 0x48000000 + v, 0x1000009f);
+}
+
+void brave_lw_change(int state, int g, int a)
+{
+    brave_lw_state = state;
+    brave_lw_frame = 0;
+    WorkModule(0x7, g, 0x11000002);
+    WorkModule(0x7, a, 0x11000003);
+    if (global18 == 0x2)
+    {
+        g = a;
+    }
+    func_22(g, 0, 1.0f);
+}
+
+// the cursor: up / down past half, again every 12 frames held; rows with no spell skipped
+void brave_lw_move()
+{
+    int dir;
+    int i;
+    dir = 0;
+    if (global32 > 0.5f)
+    {
+        dir = -1;
+    }
+    else if (global32 < -0.5f)
+    {
+        dir = 0x1;
+    }
+    if (dir == 0)
+    {
+        brave_lw_stick = 0;
+        return;
+    }
+    if (dir == brave_lw_stick)
+    {
+        brave_lw_repeat += 1;
+        if (brave_lw_repeat < 0xc)
+        {
+            return;
+        }
+    }
+    brave_lw_stick = dir;
+    brave_lw_repeat = 0;
+    i = 0;
+    while (i < 0x4)
+    {
+        brave_lw_cursor = (brave_lw_cursor + dir + 0x4) % 0x4;
+        if (brave_lw_row(brave_lw_cursor) != 0)
+        {
+            return;
+        }
+        i += 1;
+    }
+}
+
+void brave_lw_loop()
+{
+    int n;
+    int g;
+    int a;
+    func_2245(StatusModule(0x6));
+    brave_lw_frame += 1;
+    if (ControlModule(0x2712, 0x1) == 0)
+    {
+        brave_lw_released = 0x1;
+    }
+    if (brave_lw_state < 0x2)
+    {
+        if (brave_lw_state == 0 && MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_change(0x1, 0x278, 0x284);
+        }
+        brave_lw_move();
+        n = brave_lw_row(brave_lw_cursor);
+        if (ControlModule(0x2710, 0x3) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
+        {
+            brave_lw_show(0);
+            brave_lw_change(0x3, 0x279, 0x285);
+            return;
+        }
+        if (n != 0 && (ControlModule(0x2710, 0) || brave_lw_released && ControlModule(0x2710, 0x1)))
+        {
+            brave_lw_spell = n;
+            g = brave_lw_spell_motion(n, 0);
+            a = brave_lw_spell_motion(n, 0x1);
+            brave_lw_change(0x2, g, a);
+            brave_lw_show(0x1);
+            return;
+        }
+        brave_lw_show(0x1);
+        if (global18 == 0x2)
+        {
+            KineticModule(0x14, 0x1, 0.45f);
+        }
+        return;
+    }
+    if (brave_lw_state == 0x2)
+    {
+        brave_lw_show(brave_lw_frame < 0x1e);
+    }
+    if (func_2246())
+    {
+        return;
+    }
+}
+
+int brave_lw_pre()
+{
+    printf("status_pre_SpecialLw (Hero)");
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1190, 0x1000, 0x80, 0x1000);
+    return 0;
+}
+
+void brave_lw_main()
+{
+    printf("status_SpecialLw (Hero)");
+    brave_lw_state = 0;
+    brave_lw_frame = 0;
+    brave_lw_cursor = 0;
+    brave_lw_spell = 0;
+    brave_lw_released = 0;
+    brave_lw_stick = 0;
+    brave_lw_repeat = 0;
+    brave_lw_draw();
+    WorkModule(0x7, 0x277, 0x11000002);
+    WorkModule(0x7, 0x283, 0x11000003);
+    WorkModule(0x7, 0x6, 0x11000004);
+    WorkModule(0x7, 0xa, 0x11000005);
+    WorkModule(0x7, 0x2, 0x11000006);
+    WorkModule(0x7, 0x5, 0x11000007);
+    func_2245(0x1);
+    brave_lw_show(0x1);
+    func_78(brave_lw_loop);
+}
+
+void brave_lw_end()
+{
+    brave_lw_show(0);
 }

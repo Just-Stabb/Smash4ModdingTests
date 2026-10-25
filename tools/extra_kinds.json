@@ -126,7 +126,19 @@
         "0x26C": {"anim": "FitRefletBodyMainD02SpecialAirHiStart", "flags": "0x0", "motion": "specialairhistart"},
         "0x26D": {"anim": "FitRefletBodyMainD02SpecialAirHiHold", "flags": "0x0", "motion": "specialairhihold"},
         "0x26E": {"anim": "FitRefletBodyMainD02SpecialAirHi2", "flags": "0x0", "motion": "specialairhi2"},
-        "0x26F": {"anim": "FitRefletBodyMainD02SpecialAirHi3", "flags": "0x0", "motion": "specialairhi3"}
+        "0x26F": {"anim": "FitRefletBodyMainD02SpecialAirHi3", "flags": "0x0", "motion": "specialairhi3"},
+        "0x278": {"anim": "FitRefletBodyMainD03SpecialLwSelect", "flags": "0x0", "motion": "speciallwselect (Command Selection: the menu open)"},
+        "0x279": {"anim": "FitRefletBodyMainD03SpecialLwCancel", "flags": "0x0", "motion": "speciallwcancel"},
+        "0x27A": {"anim": "FitRefletBodyMainD03SpecialLwSkill3", "flags": "0x0", "motion": "speciallw17 (Flame Slash)"},
+        "0x27B": {"anim": "FitRefletBodyMainD03SpecialLwSkill3", "flags": "0x0", "motion": "speciallw18 (Kacrackle Slash)"},
+        "0x27C": {"anim": "FitRefletBodyMainD03SpecialLwSkill1", "flags": "0x0", "motion": "speciallw19 (Metal Slash)"},
+        "0x27D": {"anim": "FitRefletBodyMainD03SpecialLwSkill2", "flags": "0x0", "motion": "speciallw20 (Hatchet Man)"},
+        "0x284": {"anim": "FitRefletBodyMainD03SpecialAirLwSelect", "flags": "0x0", "motion": "specialairlwselect"},
+        "0x285": {"anim": "FitRefletBodyMainD03SpecialAirLwCancel", "flags": "0x0", "motion": "specialairlwcancel"},
+        "0x286": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill3", "flags": "0x0", "motion": "specialairlw17"},
+        "0x287": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill3", "flags": "0x0", "motion": "specialairlw18"},
+        "0x288": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill1", "flags": "0x0", "motion": "specialairlw19"},
+        "0x289": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill2", "flags": "0x0", "motion": "specialairlw20"}
       },
       "weapons": {
         "fireball": {"kind": "0x190", "base": "thunder", "max": 3, "on_hit": 1},

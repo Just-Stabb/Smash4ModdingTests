@@ -30,6 +30,15 @@ Native details (research: docs/flx2-format.md, docs/native-notes.md "Damage pane
               0x032CCC44(inst, frame) goto (then +0x9C = 1: stopped); 0x032CDF6C(inst, alpha)
 Every pointer it follows is checked (word aligned, 0x10000000-0x8FFFFFFF); a bad one hides nothing
 and changes nothing.
+
+Hero's Command Selection menu (MENU, called for each slot after the badge; fighters/brave/README.md):
+dmg.flx's spell0_mc ... spell3_mc (tools/dmg_brave_menu.py: frame n = spell n, 21 + n = spell n on the
+cursor's row) show the rows of a Hero panel (its fighter object's kind 0x45; the panel slot's kind byte
+isn't trusted for an added kind) while his MSC
+(fighters/brave/brave.c brave_lw_*) has the menu open: int 0x1000009E = 0x4845xxxx, bit 2 open, bits
+0-1 the cursor's row; int 0x1000009F = 0x48xxxxxx, the rows' spells (1-21, 0 none) in bits 0-4,
+5-9, 10-14, 15-19. Otherwise (another fighter, no marker, the menu shut, a row with no spell) the rows
+are hidden. The names are interned for every slot (four a slot, no cache: see the badge's atom).
 """
 import os
 import re
@@ -57,6 +66,14 @@ SET_VISIBLE = 0x032CDFFC
 GET_FRAME = 0x032CE00C
 GOTO_FRAME = 0x032CCC44
 SET_ALPHA = 0x032CDF6C
+MENU = 0x04B85000               # free grown space (kind_expand.py's old 0x04B85000-0x04B88000)
+MENU_LIMIT = 0x04B85800
+BRAVE = 0x45
+MENU_INT, SPELL_INT = 0x9E, 0x9F
+MENU_MAGIC, SPELL_MAGIC = 0x4845, 0x48
+ROWS = 4
+SPELLS = 21
+ROW_NAME = b'spell%d_mc'
 
 
 def ha(v):
@@ -124,6 +141,10 @@ slots:
         beq next
 #DBG 1
         bl badge
+        mulli r3, r26, %(slot)d
+        add r3, r3, r31
+        addi r3, r3, 0xC0
+        bl 0x%(menu)08X
 next:
         addi r26, r26, 1
         b slots
@@ -142,7 +163,7 @@ badge:
         mr r29, r3
         lwz r30, 0x5C(r29)
 #DBG 9 r30
-""" % dict(slot=SLOT_SIZE, slots=SLOTS, upd_hi=ha(UPDATE), upd_lo=lo(UPDATE)) + chk('r30', 'out') + """
+""" % dict(slot=SLOT_SIZE, slots=SLOTS, upd_hi=ha(UPDATE), upd_lo=lo(UPDATE), menu=MENU) + chk('r30', 'out') + """
         lis r31, atom@ha
         addi r31, r31, atom@l
         lwz r0, 0(r31)
@@ -270,16 +291,168 @@ name:
         a.asm('counters:\n' + '\n'.join('        .word 0' for _ in COUNTERS))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
-    return a, words, [(VTABLE_UPDATE, CAVE)]
+    m = build_menu()
+    return a, words, [(VTABLE_UPDATE, CAVE)], m
+
+
+def build_menu():
+    """Hero's menu rows for the panel slot in r3 (see the docstring)"""
+    m = Asm(MENU)
+    m.asm("""
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r24, 0x18(r1)
+        mr r29, r3
+        lwz r30, 0x5C(r29)
+""" + chk('r30', 'mout') + """
+        li r25, 0
+        li r24, 0
+        lha r5, 0(r29)
+        cmpwi r5, 0
+        blt rows
+        lis r12, %(fm_hi)d
+        lwz r12, %(fm_lo)d(r12)
+""" % dict(fm_hi=ha(FIGHTER_MANAGER), fm_lo=lo(FIGHTER_MANAGER)) + chk('r12', 'rows') + """
+        lwz r0, 0x18(r12)
+        cmplw r5, r0
+        bge rows
+        slwi r5, r5, 2
+        add r12, r12, r5
+        lwz r12, 0x24(r12)
+""" + chk('r12', 'rows') + """
+        lbz r5, 0x14E9(r12)
+        lwz r0, 0xDB4(r12)
+        cmplw r5, r0
+        bge rows
+        slwi r5, r5, 2
+        add r12, r12, r5
+        lwz r12, 0xDC0(r12)
+""" + chk('r12', 'rows') + """
+        lwz r0, 4(r12)
+        cmpwi r0, %(brave)d
+        bne rows
+        lwz r12, 0xC(r12)
+""" % dict(brave=BRAVE) + chk('r12', 'rows') + """
+        lwz r12, 0x28(r12)
+""" + chk('r12', 'rows') + """
+        lwz r10, 8(r12)
+""" + chk('r10', 'rows') + """
+        lwz r11, 0(r10)
+""" + chk('r11', 'rows') + """
+        lwz r10, 8(r11)
+        rlwinm r10, r10, 0, 2, 31
+        cmplwi r10, %(n)d
+        blt rows
+        lwz r11, 0xC(r11)
+""" % dict(n=SPELL_INT + 1) + chk('r11', 'rows') + """
+        lwz r25, %(aoff)d(r11)
+        lwz r24, %(boff)d(r11)
+        srwi r0, r25, 16
+        cmplwi r0, %(amagic)d
+        bne shut
+        srwi r0, r24, 24
+        cmplwi r0, %(bmagic)d
+        bne shut
+        andi. r0, r25, 4
+        bne rows
+shut:
+        li r25, 0
+rows:
+        li r26, 0
+row:
+        cmpwi r26, %(rows)d
+        bge mout
+        lis r3, %(pool_hi)d
+        lwz r3, %(pool_lo)d(r3)
+""" % dict(aoff=MENU_INT * 4, boff=SPELL_INT * 4, amagic=MENU_MAGIC, bmagic=SPELL_MAGIC, rows=ROWS,
+           pool_hi=ha(ATOM_POOL), pool_lo=lo(ATOM_POOL)) + chk('r3', 'mout') + """
+        addi r3, r3, 0x24
+        lis r4, names@ha
+        addi r4, r4, names@l
+        mulli r0, r26, 12
+        add r4, r4, r0
+        li r5, %(len)d
+        bl 0x%(intern)08X
+        stw r3, 0x10(r1)
+        cmpwi r3, 0
+        beq nextrow
+        mr r3, r30
+        addi r4, r1, 0x10
+        bl 0x%(find)08X
+        mr. r28, r3
+        beq nextrow
+""" % dict(len=len(ROW_NAME % 0), intern=INTERN, find=FIND_CHILD) + chk('r28', 'nextrow') + """
+        li r27, 0
+        cmpwi r25, 0
+        beq apply
+        mulli r0, r26, 5
+        srw r27, r24, r0
+        andi. r27, r27, 31
+        beq apply
+        cmplwi r27, %(spells)d
+        ble known
+        li r27, 0
+        b apply
+known:
+        andi. r0, r25, 3
+        cmpw r0, r26
+        bne apply
+        addi r27, r27, %(spells)d
+apply:
+        cmpwi r27, 0
+        beq rhide
+        mr r3, r28
+        li r4, 1
+        bl 0x%(vis)08X
+        mr r3, r28
+        bl 0x%(getf)08X
+        cmpw r3, r27
+        beq ralpha
+        mr r3, r28
+        mr r4, r27
+        bl 0x%(gotof)08X
+        li r0, 1
+        sth r0, 0x9C(r28)
+ralpha:
+        lwz r12, 0x60(r29)
+""" % dict(spells=SPELLS, vis=SET_VISIBLE, getf=GET_FRAME, gotof=GOTO_FRAME) + chk('r12', 'nextrow') + """
+        lbz r4, 0x74(r12)
+        mr r3, r28
+        bl 0x%(alpha)08X
+        b nextrow
+rhide:
+        mr r3, r28
+        li r4, 0
+        bl 0x%(vis)08X
+nextrow:
+        addi r26, r26, 1
+        b row
+mout:
+        lmw r24, 0x18(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+names:
+""" % dict(alpha=SET_ALPHA, vis=SET_VISIBLE))
+    for k in range(ROWS):
+        nm = (ROW_NAME % k).ljust(12, b'\0')
+        for i in range(0, 12, 4):
+            m.asm('.word 0x%08X' % int.from_bytes(nm[i:i + 4], 'big'))
+    words = m.words()
+    assert MENU + 4 * len(words) <= MENU_LIMIT
+    return words
 
 
 def main():
-    a, words, hooks = build()
-    out = ['grow:0x%08X' % LIMIT, 'reloc:0x%08X-0x%08X=0x%08X' % (VTABLE_UPDATE, VTABLE_UPDATE + 4, RELOC_DUMMY)]
+    a, words, hooks, menu = build()
+    out = ['grow:0x%08X' % MENU_LIMIT, 'reloc:0x%08X-0x%08X=0x%08X' % (VTABLE_UPDATE, VTABLE_UPDATE + 4, RELOC_DUMMY)]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    out += ['0x%08X=0x%08X' % (MENU + 4 * i, w) for i, w in enumerate(menu)]
     out += ['0x%08X=0x%08X' % h for h in hooks]
     print(' '.join(out))
-    sys.stderr.write('trait badge: %d words\n' % len(words))
+    sys.stderr.write('trait badge: %d words; Hero menu: %d words\n' % (len(words), len(menu)))
     if DEBUG:
         base = a.labels['counters']
         sys.stderr.write('debug counters at 0x%08X:\n' % base)
