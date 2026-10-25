@@ -215,6 +215,27 @@ class Templates:
         raise KeyError((typ, blend, mesh))
 
 
+def fresnel_bake(e, notes):
+    """(near, far) of a camera-facing mesh's view-angle alpha (eft2's fresnel alpha), to bake into its
+    vertex alpha, else None. Ultimate's vertex program (Kafrizz's sphere1, read with the WindowSmash
+    shader translator) gives the pixel alpha x smoothstep(near, far, |N . V|): opaque where the mesh
+    faces the camera, gone at its outline (or the other way round, near > far). On a billboard mesh
+    (eft2 types 0 / 7) V is the mesh's Z whatever the camera does, so it bakes exactly while the mesh
+    turns only about Z; drawn without it Kafrizz's ball was a hard solid disc. Other types need a
+    shader that has the view vector"""
+    pt, st = e['particle'], e['static']
+    if not e['color']['fresnel_alpha'] or pt['billboard_type'] not in (0, 7):
+        return None
+    if any(abs(st[k][a]) > 1e-6 for k in ('rotate_init', 'rotate_init_rand', 'rotate_add') for a in (0, 1)):
+        notes.append('fresnel alpha: turns off Z, not baked')
+        return None
+    near, far = (float(v) for v in st['fresnel_alpha'][:2])
+    if abs(far - near) < 1e-6:
+        return None
+    notes.append('fresnel alpha %.2f - %.2f baked into the vertex alpha' % (near, far))
+    return near, far
+
+
 def mesh(model, uv_channel=0):
     """(pos, nrm, col, uv, idx) of a BFRES model's first shape. Every vanilla primitive has normals
     (825 of them; 106 have no colour): missing ones are +Z; an all-white colour is left out. The UV
@@ -748,7 +769,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             repeat = (1, 1)
             notes.append('UV transform baked into the mesh')
         channel = e['tex_anim'][ti]['uv_channel'] if smp else 0
-        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir)
+        fres = fresnel_bake(e, notes)
+        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
             if rest_dir:
@@ -762,6 +784,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
                 r = rotation_matrix(mesh_rot).astype(np.float32)
                 pos, nrm = pos @ r.T, nrm @ r.T
                 notes.append('rotation baked into the mesh')
+            if fres:
+                # the normals as the scaled mesh's (inverse transpose), facing the camera along Z
+                nz = np.abs((nrm / np.array(s3, np.float32))[:, 2]) / np.maximum(
+                    np.linalg.norm(nrm / np.array(s3, np.float32), axis=1), 1e-6)
+                t = np.clip((nz - fres[0]) / (fres[1] - fres[0]), 0, 1)
+                col_ = np.ones((len(pos), 4), np.float32) if col_ is None else np.array(col_, np.float32)
+                col_[:, 3] *= t * t * (3 - 2 * t)
             prim_index[key] = p.add_primitive(pos, nrm, col_, uv, idx)
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
         if bake:
@@ -996,6 +1025,9 @@ def main():
                     help='vanilla .ptcl files to take template emitters from (the base\'s own first)')
     ap.add_argument('--variants', help='JSON [{"effect", "rot"}] (tools/effect_variants.py scan): a copy of '
                     'each effect\'s set turned by rot (degrees, R = Rz Ry Rx), id "effect@rx,ry,rz"')
+    ap.add_argument('--empty', default='', help="comma-separated base bank entries (hex) to empty: effects "
+                    "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
+                    "orbs on Hero's Thunder-based articles)")
     a = ap.parse_args()
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
@@ -1003,6 +1035,8 @@ def main():
     base = [f for f in os.listdir(a.base_dir) if f.endswith('.010d0000.ptcl')][0][:-len('.ptcl')]
     p = ptcl.Ptcl(open(os.path.join(a.base_dir, base + '.ptcl'), 'rb').read())
     ef = efc.Efc(open(os.path.join(a.base_dir, base + '.efc'), 'rb').read())
+    for i in (int(v, 16) for v in a.empty.split(',') if v):
+        ef.entries[i][1:] = [0, 0, 0, 0]    # no emitter set, model or meshes (403 vanilla entries)
     templates = Templates(p, a.templates)
     prims, prim_index = eff.primitives(), {}
     ids, done, dropped = {}, {}, []

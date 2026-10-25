@@ -355,3 +355,16 @@ bloom / glare on colours far over 1 (Frizz's spark1 4.4 = colour x `color_scale`
 emitters over 2.5, vanilla's 99th percentile 2.0). `tools/vfxb_to_ptcl.py hdr_scale` compresses a
 particle's peak over `HDR_START` 1.2 to a quarter (4.4 -> 2.0), hue kept, through `color_scale`: 387
 emitters change.
+
+## Fix 22 (`build/hero_fix22.zip`): Robin's Thunder orbs, Kafrizz's ball
+
+- The purple crescent on every Frizz level (the Frizz test, then fix 21, kept it) is Robin's own
+  Thunder orb: the fireball is a Thunder copy and the game's code plays the base bank's entries 1-3
+  (Thunder / Elthunder / Gigathunder bullet) on it. `tools/vfxb_to_ptcl.py --empty 1,2,3,4,6,7,b`
+  empties those entries (set, model, meshes 0, as 403 vanilla entries): Thunder bullets / hit,
+  Thoron, the Levin Sword's sparkle and flare model.
+- Kafrizz's solid yellow disc: `sphere1` has eft2's fresnel alpha (0.3 - 1.0). Ultimate's vertex
+  program (the WindowSmash shader translator on `ef_brave.eff`) multiplies the alpha by
+  smoothstep(near, far, |N . V|); on a billboard mesh (types 0 / 7) turning only about Z, V is the
+  mesh's Z, so `fresnel_bake` puts it in the vertex alpha. 8 emitters (the ball, Bounce's barrier,
+  Acceleratle / Oomph's flare3); the other ~90 fresnel emitters need a shader with the view vector.
