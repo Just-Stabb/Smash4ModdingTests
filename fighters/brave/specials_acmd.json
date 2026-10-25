@@ -155,5 +155,185 @@
   "SpecialAirLw20": {
     "name": "specialairlw20",
     "slot": "0x289"
+  },
+  "SpecialLwFail": {
+    "name": "speciallwfail",
+    "slot": "0x220"
+  },
+  "SpecialHiEmpty": {
+    "name": "specialhiempty",
+    "slot": "0x221"
+  },
+  "SpecialLw1": {
+    "name": "speciallw1",
+    "slot": "0x222"
+  },
+  "SpecialLw2": {
+    "name": "speciallw2",
+    "slot": "0x224"
+  },
+  "SpecialLw3": {
+    "name": "speciallw3",
+    "slot": "0x225"
+  },
+  "SpecialLw4": {
+    "name": "speciallw4",
+    "slot": "0x226"
+  },
+  "SpecialLw5": {
+    "name": "speciallw5",
+    "slot": "0x22A"
+  },
+  "SpecialLw6": {
+    "name": "speciallw6",
+    "slot": "0x22B"
+  },
+  "SpecialLw7": {
+    "name": "speciallw7",
+    "slot": "0x22C"
+  },
+  "SpecialLw8": {
+    "name": "speciallw8",
+    "slot": "0x22D"
+  },
+  "SpecialLw9": {
+    "name": "speciallw9",
+    "slot": "0x22E"
+  },
+  "SpecialLw10Start": {
+    "name": "speciallw10start",
+    "slot": "0x232"
+  },
+  "SpecialLw10": {
+    "name": "speciallw10",
+    "slot": "0x233"
+  },
+  "SpecialLw10End": {
+    "name": "speciallw10end",
+    "slot": "0x234"
+  },
+  "SpecialLw11": {
+    "name": "speciallw11",
+    "slot": "0x235"
+  },
+  "SpecialLw12": {
+    "name": "speciallw12",
+    "slot": "0x236"
+  },
+  "SpecialLw13": {
+    "name": "speciallw13",
+    "slot": "0x237"
+  },
+  "SpecialLw14": {
+    "name": "speciallw14",
+    "slot": "0x238"
+  },
+  "SpecialLw15Positive": {
+    "name": "speciallw15positive",
+    "slot": "0x239"
+  },
+  "SpecialLw16Start": {
+    "name": "speciallw16start",
+    "slot": "0x23A"
+  },
+  "SpecialLw16Hi": {
+    "name": "speciallw16hi",
+    "slot": "0x23C"
+  },
+  "SpecialLw16Lw": {
+    "name": "speciallw16lw",
+    "slot": "0x23D"
+  },
+  "SpecialLw16End": {
+    "name": "speciallw16end",
+    "slot": "0x23E"
+  },
+  "SpecialLw21": {
+    "name": "speciallw21",
+    "slot": "0x240"
+  },
+  "SpecialAirLwFail": {
+    "name": "specialairlwfail",
+    "slot": "0x246"
+  },
+  "SpecialAirHiEmpty": {
+    "name": "specialairhiempty",
+    "slot": "0x247"
+  },
+  "SpecialAirLw1": {
+    "name": "specialairlw1",
+    "slot": "0x248"
+  },
+  "SpecialAirLw2": {
+    "name": "specialairlw2",
+    "slot": "0x249"
+  },
+  "SpecialAirLw3": {
+    "name": "specialairlw3",
+    "slot": "0x24A"
+  },
+  "SpecialAirLw4": {
+    "name": "specialairlw4",
+    "slot": "0x24E"
+  },
+  "SpecialAirLw5": {
+    "name": "specialairlw5",
+    "slot": "0x24F"
+  },
+  "SpecialAirLw6": {
+    "name": "specialairlw6",
+    "slot": "0x250"
+  },
+  "SpecialAirLw7": {
+    "name": "specialairlw7",
+    "slot": "0x251"
+  },
+  "SpecialAirLw8": {
+    "name": "specialairlw8",
+    "slot": "0x252"
+  },
+  "SpecialAirLw9": {
+    "name": "specialairlw9",
+    "slot": "0x253"
+  },
+  "SpecialAirLw10Start": {
+    "name": "specialairlw10start",
+    "slot": "0x254"
+  },
+  "SpecialAirLw10": {
+    "name": "specialairlw10",
+    "slot": "0x255"
+  },
+  "SpecialAirLw10End": {
+    "name": "specialairlw10end",
+    "slot": "0x256"
+  },
+  "SpecialAirLw11": {
+    "name": "specialairlw11",
+    "slot": "0x264"
+  },
+  "SpecialAirLw12": {
+    "name": "specialairlw12",
+    "slot": "0x265"
+  },
+  "SpecialAirLw13": {
+    "name": "specialairlw13",
+    "slot": "0x266"
+  },
+  "SpecialAirLw14": {
+    "name": "specialairlw14",
+    "slot": "0x267"
+  },
+  "SpecialAirLw15Positive": {
+    "name": "specialairlw15positive",
+    "slot": "0x268"
+  },
+  "SpecialAirLw16Start": {
+    "name": "specialairlw16start",
+    "slot": "0x269"
+  },
+  "SpecialAirLw21": {
+    "name": "specialairlw21",
+    "slot": "0x26A"
   }
 }

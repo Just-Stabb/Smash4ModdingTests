@@ -13,15 +13,18 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
   his effects (fighters/brave/brave_effects.json), the bone-turned ones moved to their variants
   (tools/effect_variants.py apply); param/fighter/fighter_param_vl_brave.bin;
 - fighter/brave/script/msc/brave.mscsb from fighters/brave/brave.c;
-- his articles (tools/extra_kinds.json "weapons": fireball, spark, tornado): script/msc/<name>/<name>.mscsb
-  from fighters/brave/weapons/ (thunder_base.c + fireball.c, or + placed.c + spark.c / tornado.c) and
+- his articles (tools/extra_kinds.json "weapons": fireball, spark, tornado, flash, explosion, deathball, crash,
+  sleep): script/msc/<name>/<name>.mscsb from fighters/brave/weapons/ (thunder_base.c + fireball.c, or +
+  placed.c + spark.c / tornado.c / crash.c, or + shot.c + flash.c / explosion.c / deathball.c / sleep.c) and
   script/animcmd/weapon/<name>/ (Ultimate's brave_<name> scripts: ARTICLES);
 - --rpx: code/cross_f.rpx = IN.rpx + kind_expand / weapon_expand / base_effects_cave / base_customs_cave /
-  trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu) /
-  trail_table_cave (re-applying them over an executable that has them gives it back, so IN can be the
+  trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu and MP gauge) /
+  brave_reflect_cave (a reflector group for Robin's kind: Bounce) /
+  trail_table_cave / kirby_stat_cave's profile table (Acceleratle's speeds) (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
-- --menu DIR [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait badge) + Hero's
-  Command Selection window (tools/brave_menu_art.py, tools/dmg_brave_menu.py);
+- --menu DIR --menu-layout ARC [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait
+  badge) + Hero's Command Selection window and MP gauge from Ultimate's (ARC: its info_melee layout.arc;
+  tools/brave_menu_art.py, tools/dmg_brave_menu.py);
 - --bank: effect/brave/brave.010d0000.{ptcl,efc} from DIR/reflet.010d0000.* (tools/vfxb_to_ptcl.py);
 - --trails: effect/brave/trail/ from DIR (tools/ultimate_trails.py --shader 3);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
@@ -41,7 +44,7 @@ import acmd  # noqa: E402
 import ultimate_acmd as U  # noqa: E402
 
 BRAVE = os.path.join(ROOT, 'fighters', 'brave')
-CONDS = ['SUCCESS_SP']          # the MP checks: no MP yet, every cast works
+CONDS = ['SUCCESS_SP']          # the scripts' MP checks: his MSC decides (brave_cost), a script runs as cast
 # the articles' motion slots (thunder's motion info has 24 entries, the rest name empty scripts): the fireball
 # (fireball.c: func_24(level) flies, func_24(3 + level) bursts), spark / tornado (placed.c: func_24(level),
 # 23 while the spark waits)
@@ -54,8 +57,20 @@ ARTICLES = {
                  {'fireball1': 0, 'fireball2': 0}),             # Frizzle's two balls
     'spark': (_slots('spark', ('specials1', 'specials2', 'specials32')), {}),
     'tornado': (_slots('tornado', ('specialhi1', 'specialhi2', 'specialhi3')), {'tornado1': 0, 'tornado2': 0}),
+    # Command Selection's (shot.c: motion level flies, 2 + level the hit's; crash: placed.c)
+    'flash': (_slots('flash', ('flash1', 'flash2', 'flashhit1', 'flashhit2')), {}),
+    'explosion': (_slots('explosion', ('move1', 'move2', 'explode1', 'explode2')), {}),
+    'deathball': (_slots('deathball', ('deathball1', 'deathball2')), {'deathball': 0}),
+    'crash': (_slots('crash', ('crash1', 'crash2', 'crashend1')), {}),
+    'sleep': (_slots('sleep', ('sleep',)), {}),
 }
-CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave')
+# each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
+ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
+                'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
+# motions whose effects play out after the article is removed (its explosions)
+LASTING = ('burst', 'flashhit', 'explode', 'crash')
+CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave',
+         'brave_reflect_cave')
 
 
 def run(*argv):
@@ -118,9 +133,9 @@ def article_scripts(a, name, wdir):
         game[mo] = gtr.script(fns['game_' + mo]) if 'game_' + mo in fns else [acmd.Command(acmd.END)]
         etr.last = False
         effect[mo] = etr.script(fns['effect_' + mo]) if 'effect_' + mo in fns else [acmd.Command(acmd.END)]
-        if mo.startswith('burst'):
-            # the explosion plays out after the article is removed (fireball.c removes it after the
-            # burst's frames; Ultimate's scripts at a notify)
+        if mo.startswith(LASTING):
+            # the explosion plays out after the article is removed (fireball.c / shot.c remove it after
+            # the burst's frames; Ultimate's scripts at a notify)
             for c in effect[mo]:
                 if c.name.startswith('Graphic_Effect'):
                     c.params[-1] = 0
@@ -146,6 +161,8 @@ def main():
     ap.add_argument('--menu')
     ap.add_argument('--menu-font', help='the font for the menu (the Wii U shared font: Cemu\'s '
                     'resources/sharedFonts/CafeStd.ttf)')
+    ap.add_argument('--menu-layout', help="with --menu: Ultimate's ui/layout/info/info_melee/info_melee/layout.arc "
+                    '(the window, pointer and gauge are its)')
     a = ap.parse_args()
     fighter = os.path.join(a.out, 'fighter/brave')
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
@@ -154,7 +171,8 @@ def main():
     compile_msc([os.path.join(BRAVE, 'brave.c')], os.path.join(msc, 'brave.mscsb'))
     w = os.path.join(BRAVE, 'weapons')
     for name in ARTICLES:
-        srcs = [os.path.join(w, 'thunder_base.c')] + ([os.path.join(w, 'placed.c')] if name != 'fireball' else [])
+        base = ARTICLE_BASE[name]
+        srcs = [os.path.join(w, 'thunder_base.c')] + ([os.path.join(w, base + '.c')] if base else [])
         compile_msc(srcs + [os.path.join(w, name + '.c')], os.path.join(msc, name, name + '.mscsb'))
         print(article_scripts(a, name, os.path.join(fighter, 'script/animcmd/weapon', name)))
 
@@ -164,6 +182,7 @@ def main():
         for g in CAVES:
             argv += run(os.path.join(HERE, g + '.py')).split()
         argv += run(os.path.join(HERE, 'trail_table_cave.py'), a.rpx).split()
+        argv += run(os.path.join(HERE, 'kirby_stat_cave.py'), '--table').split()    # Acceleratle's profile 3
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'), *argv)
     if a.bank:
         d = os.path.join(fighter, 'effect/brave')
@@ -175,7 +194,8 @@ def main():
     if a.menu:
         import dmg_brave_menu
         with tempfile.TemporaryDirectory() as art:
-            run(os.path.join(HERE, 'brave_menu_art.py'), art, *(['--font', a.menu_font] if a.menu_font else []))
+            run(os.path.join(HERE, 'brave_menu_art.py'), a.menu_layout, art,
+                *(['--font', a.menu_font] if a.menu_font else []))
             print('menu: sprites from 0x%X, texture slot %d' % dmg_brave_menu.build(
                 a.menu, art, os.path.join(a.out, 'ui/info/dmg')))
     if a.motions:

@@ -75,7 +75,9 @@ EMPTY = ['attacks4hi', 'attacks4lw', 'landingairn', 'landingairf', 'landingairb'
 
 EFFECT = {'collision_attr_normal': 0, 'collision_attr_cutup': 2, 'collision_attr_sting': 2,
           'collision_attr_elec': 3, 'collision_attr_fire': 5, 'collision_attr_purple': 0x13,
-          'collision_attr_magic': 0, 'collision_attr_paralyze': 0x14, 'collision_attr_sleep': 9}
+          'collision_attr_magic': 0, 'collision_attr_paralyze': 0x14, 'collision_attr_sleep': 9,
+          'collision_attr_sleep_ex': 9, 'collision_attr_ice': 4,          # freezing (Lucas's PK Freeze)
+          'collision_attr_cutup_metal': 2, 'collision_attr_deathball': 0}
 SFX_LEVEL = {'ATTACK_SOUND_LEVEL_S': 0, 'ATTACK_SOUND_LEVEL_M': 1, 'ATTACK_SOUND_LEVEL_L': 2, 'ATTACK_SOUND_LEVEL_LL': 3}
 SFX_TYPE = {'COLLISION_SOUND_ATTR_NONE': 0, 'COLLISION_SOUND_ATTR_PUNCH': 1, 'COLLISION_SOUND_ATTR_KICK': 2,
             'COLLISION_SOUND_ATTR_CUTUP': 3, 'COLLISION_SOUND_ATTR_ELEC': 7, 'COLLISION_SOUND_ATTR_FIRE': 8,
@@ -101,6 +103,8 @@ FLAGS = {'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_COMBO': 0x2100000D,
          'FIGHTER_STATUS_ATTACK_AIR_FLAG_ENABLE_LANDING': 0x2100000D,
          'FIGHTER_STATUS_CATCH_FLAG_CATCH_WAIT': 0x2100000D}
 THROW_VARS = (0x11000005, 0x11000006, 0x11000007)
+# Ultimate's helper bones a converted model lacks -> the bone that stands in (virtualcenter: the body's middle)
+BONE_ALIAS = {'virtualcenter': 'hip'}
 CAPTURE_CUT_CALL = 0x49FA5BDD
 
 
@@ -339,6 +343,8 @@ class Translator:
     def bone(self, name):
         if name == 'top':
             return 0
+        if name not in self.joints and name in BONE_ALIAS and BONE_ALIAS[name] in self.joints:
+            name = BONE_ALIAS[name]
         if name not in self.joints:
             raise KeyError('bone %r has no joint ID' % name)
         return self.joints[name]
@@ -430,6 +436,8 @@ class Translator:
          set_weight, shield_dmg, trip, rehit, reflect, absorb, flinchless, no_hitlag, direct, situation, category,
          partmask, friendly, effect, lvl, attr, region) = a[:37]
         clang, rebound = SETOFF[setoff]
+        if not isinstance(shield_dmg, (int, float)) or shield_dmg != shield_dmg:
+            shield_dmg = 0              # f32::NAN (Kamikazee's blast): none
         common = [int(hid), int(part), self.bone(bone), float(dmg), int(angle), int(kbg), int(fkb), int(bkb), float(size),
                   float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
                   rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0), SITUATION[situation],

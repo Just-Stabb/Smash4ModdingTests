@@ -31,15 +31,24 @@ Native details (research: docs/flx2-format.md, docs/native-notes.md "Damage pane
 Every pointer it follows is checked (word aligned, 0x10000000-0x8FFFFFFF); a bad one hides nothing
 and changes nothing.
 
-Hero's Command Selection window (MENU, called for each slot after the badge; fighters/brave/README.md):
-dmg.flx's cmdwin_mc (the window), spell0_mc ... spell3_mc (the names: frame n = spell n, 21 + n greyed:
-int 0x1000009F bit 20 + row), cmdcur0_mc ... cmdcur3_mc (the pointer, shown on the cursor's row) and
-cmdmp_mc (frame n = spell n's cost, the cursor's spell) (tools/dmg_brave_menu.py) show the window of a Hero panel (its fighter object's kind 0x45; the panel slot's kind byte
-isn't trusted for an added kind) while his MSC
-(fighters/brave/brave.c brave_lw_*) has the menu open: int 0x1000009E = 0x4845xxxx, bit 2 open, bits
-0-1 the cursor's row; int 0x1000009F = 0x48xxxxxx, the rows' spells (1-21, 0 none) in bits 0-4,
-5-9, 10-14, 15-19. Otherwise (another fighter, no marker, the menu shut, a row with no spell) the rows
-are hidden. The names are interned for every slot (four a slot, no cache: see the badge's atom).
+Hero's Command Selection window and MP gauge (MENU, called for each slot after the badge;
+fighters/brave/README.md), dmg.flx's elements from tools/dmg_brave_menu.py, on a Hero panel (its fighter
+object's kind 0x45; the panel slot's kind byte isn't trusted for an added kind), from his MSC's ints
+(fighters/brave/brave.c brave_frame):
+  0x1000009E = 0x4845xxxx  the window: bit 2 shown, bits 0-1 the cursor's row, bit 3 closing, bit 4
+                           blinking off, bit 5 a spell cast (its row's window), bits 8-10 the open /
+                           close animation's frame, bits 11-14 the pointer's frame
+  0x1000009F = 0x48xxxxxx  the rows' spells (1-21, 0 none) in bits 0-4, 5-9, 10-14, 15-19; bit 20 + row:
+                           greyed (not enough MP)
+  0x1000009C = 0x4D50GGBB  the gauge: G his MP (0-100), B the part of it left after the cost in view
+cmdwin_mc: opening frames 1-5 (animation frame 0-4, then 5; open with the cursor's spell greyed: 14),
+closing 6-9 (hidden after), cast 10 + the cursor's row; spell0_mc ... spell3_mc: row K's spell (+ 21
+greyed), cmdcur0_mc ... cmdcur3_mc: the pointer on the cursor's row (its frame + 1), cmdmp_mc: the
+cursor's spell's cost (+ 21 greyed), these only when the window is open (opening from
+its frame 3, not closing); mpgauge_mc / mplabel_mc frame 1, mpblue_mc B + 1, mpgreen_mc G + 1 (when G > B),
+mpnum_mc G + 1. Otherwise (another fighter, no marker, the window shut, a row with no spell) they are
+hidden; the gauge goes by its own int. The names are interned for every slot (no cache: see the badge's
+atom).
 """
 import os
 import re
@@ -68,15 +77,16 @@ GET_FRAME = 0x032CE00C
 GOTO_FRAME = 0x032CCC44
 SET_ALPHA = 0x032CDF6C
 MENU = 0x04B85000               # free grown space (kind_expand.py's old 0x04B85000-0x04B88000)
-MENU_LIMIT = 0x04B85800
+MENU_LIMIT = 0x04B85600           # tools/brave_reflect_cave.py from here
 BRAVE = 0x45
-MENU_INT, SPELL_INT = 0x9E, 0x9F
+MENU_INT, SPELL_INT, MP_INT = 0x9E, 0x9F, 0x9C
+MP_MAGIC = 0x4D50
 MENU_MAGIC, SPELL_MAGIC = 0x4845, 0x48
 ROWS = 4
 SPELLS = 21
 # the window's elements (tools/dmg_brave_menu.py), in the order the routine goes through them
 ELEMENTS = [b'cmdwin_mc'] + [b'spell%d_mc' % k for k in range(4)] + [b'cmdcur%d_mc' % k for k in range(4)] + \
-    [b'cmdmp_mc']
+    [b'cmdmp_mc', b'mpgauge_mc', b'mpgreen_mc', b'mpblue_mc', b'mplabel_mc', b'mpnum_mc']
 
 
 def ha(v):
@@ -299,18 +309,19 @@ name:
 
 
 def build_menu():
-    """Hero's menu rows for the panel slot in r3 (see the docstring)"""
+    """Hero's Command Selection window and MP gauge for the panel slot in r3 (see the docstring)"""
     m = Asm(MENU)
     m.asm("""
         stwu r1, -0x40(r1)
         mflr r0
         stw r0, 0x44(r1)
-        stmw r24, 0x18(r1)
+        stmw r23, 0x14(r1)
         mr r29, r3
         lwz r30, 0x5C(r29)
 """ + chk('r30', 'mout') + """
-        li r25, 0
-        li r24, 0
+        li r25, 0                   # menu int (0: shut / not Hero)
+        li r24, 0                   # spells int
+        li r23, 0                   # MP int (0: no gauge)
         lha r5, 0(r29)
         cmpwi r5, 0
         blt rows
@@ -349,6 +360,12 @@ def build_menu():
         blt rows
         lwz r11, 0xC(r11)
 """ % dict(n=SPELL_INT + 1) + chk('r11', 'rows') + """
+        lwz r23, %(coff)d(r11)
+        srwi r0, r23, 16
+        cmplwi r0, %(cmagic)d
+        beq gauge_ok
+        li r23, 0
+gauge_ok:
         lwz r25, %(aoff)d(r11)
         lwz r24, %(boff)d(r11)
         srwi r0, r25, 16
@@ -368,8 +385,8 @@ row:
         bge mout
         lis r3, %(pool_hi)d
         lwz r3, %(pool_lo)d(r3)
-""" % dict(aoff=MENU_INT * 4, boff=SPELL_INT * 4, amagic=MENU_MAGIC, bmagic=SPELL_MAGIC, nel=len(ELEMENTS),
-           pool_hi=ha(ATOM_POOL), pool_lo=lo(ATOM_POOL)) + chk('r3', 'mout') + """
+""" % dict(aoff=MENU_INT * 4, boff=SPELL_INT * 4, coff=MP_INT * 4, amagic=MENU_MAGIC, bmagic=SPELL_MAGIC,
+           cmagic=MP_MAGIC, nel=len(ELEMENTS), pool_hi=ha(ATOM_POOL), pool_lo=lo(ATOM_POOL)) + chk('r3', 'mout') + """
         addi r3, r3, 0x24
         lis r4, names@ha
         addi r4, r4, names@l
@@ -387,13 +404,44 @@ row:
         beq nextrow
 """ % dict(intern=INTERN, find=FIND_CHILD) + chk('r28', 'nextrow') + """
         li r27, 0                   # the frame (0: hidden)
-        cmpwi r25, 0
+        cmpwi r26, 10
+        bge gauge
+        cmpwi r25, 0                # the window and its contents: open, not blinking off
         beq apply
+        andi. r0, r25, 0x10
+        bne apply
+        rlwinm r8, r25, 24, 29, 31  # r8 = the open / close animation's frame (0-7)
         cmpwi r26, 0
-        bne notwin
-        li r27, 1                   # the window
+        bne contents
+        andi. r0, r25, 8            # the window: opening 1-5, closing 6-9
+        bne closing
+        andi. r0, r25, 0x20         # a spell cast: its row's window, 10-13
+        bne decided
+        cmplwi r8, 4
+        ble wopen
+        li r8, 4
+wopen:  addi r27, r8, 1
+        cmpwi r27, 5                # open: 14 if the cursor's spell is greyed
+        bne apply
+        andi. r9, r25, 3
+        bl greyrow
+        beq apply
+        li r27, 14
         b apply
-notwin:
+decided:
+        andi. r27, r25, 3
+        addi r27, r27, 10
+        b apply
+closing:
+        cmplwi r8, 3
+        bgt apply
+        addi r27, r8, 6
+        b apply
+contents:
+        andi. r0, r25, 8            # nothing in it while it opens or closes
+        bne apply
+        cmplwi r8, 3
+        blt apply
         cmpwi r26, 4
         bgt notrow
         addi r9, r26, -1            # spellK_mc: row K's spell, + 21 greyed (B bit 20 + K)
@@ -410,19 +458,52 @@ notwin:
 notrow:
         cmpwi r26, 8
         bgt mp
-        addi r9, r26, -5            # cmdcurK_mc: shown on the cursor's row (if it has a spell)
+        addi r9, r26, -5            # cmdcurK_mc: on the cursor's row (if it has a spell), its sway frame
         andi. r0, r25, 3
         cmpw r0, r9
         bne apply
         bl spell
         cmpwi r3, 0
         beq apply
-        li r27, 1
+        rlwinm r27, r25, 21, 28, 31
+        addi r27, r27, 1
         b apply
 mp:
-        andi. r9, r25, 3            # cmdmp_mc: the cost of the cursor's spell
+        andi. r9, r25, 3            # cmdmp_mc: the cost of the cursor's spell (+ 21 greyed)
         bl spell
-        mr r27, r3
+        mr. r27, r3
+        beq apply
+        bl greyrow
+        beq apply
+        addi r27, r27, %(spells)d
+        b apply
+gauge:
+        cmpwi r23, 0                # the gauge: MP int 0x4D50GGBB (G MP, B the blue part)
+        beq apply
+        rlwinm r9, r23, 24, 25, 31  # r9 = G
+        andi. r10, r23, 0x7F        # r10 = B
+        cmplwi r9, 100
+        ble g_ok
+        li r9, 100
+g_ok:   cmplw r10, r9
+        ble b_ok
+        mr r10, r9
+b_ok:   li r27, 1
+        cmpwi r26, 10               # mpgauge_mc
+        beq apply
+        cmpwi r26, 13               # mplabel_mc
+        beq apply
+        addi r27, r9, 1
+        cmpwi r26, 14               # mpnum_mc: G
+        beq apply
+        cmpwi r26, 12               # mpblue_mc: B
+        bne green
+        addi r27, r10, 1
+        b apply
+green:  li r27, 0                   # mpgreen_mc: G, shown when there is a cost in view (G > B)
+        cmplw r9, r10
+        ble apply
+        addi r27, r9, 1
 apply:
         cmpwi r27, 0
         beq rhide
@@ -453,10 +534,15 @@ nextrow:
         addi r26, r26, 1
         b row
 mout:
-        lmw r24, 0x18(r1)
+        lmw r23, 0x14(r1)
         lwz r0, 0x44(r1)
         mtlr r0
         addi r1, r1, 0x40
+        blr
+greyrow:                            # cr0 ne: row r9 greyed (B bit 20 + r9) (uses r0, r3)
+        addi r0, r9, 20
+        srw r3, r24, r0
+        andi. r3, r3, 1
         blr
 spell:                              # r3 = row r9's spell (1-21), 0 for none (uses r0)
         mulli r0, r9, 5

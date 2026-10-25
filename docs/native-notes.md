@@ -1198,6 +1198,17 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   - LinkModule link 0 stays the original owner, so the projectile is reflected when `+0x34`
     differs from link 0's ID.
   - Weapon MSC isn't involved.
+- **Reflector groups** (a fighter's own reflector, ShieldModule kind 3): ACMD REFLECTOR (`0x412fe17`,
+  handler `0x02BDA27C`, op `0x2717`), SHIELD_ON (`0x02BDA1C0`, op `0x2710`) and Shield_Off2 (`0x02BD6F8C`,
+  `0x2711`) go through the ShieldModule handler (accessor `+0x80`, vt `+0x16C`); the fighter's (`0x02E60FCC`)
+  sends kind 3 to the reflector module at `fighter+0x72F8` (kind 4: `+0x72FC`); MSC `ShieldModule(0x2717 /
+  0, 3, ...)` takes the same path.
+  - Storage for every fighter (the constructor `0x02E52960`): 20 shapes of 0x24 bytes at `+0x4E90`, 5
+    groups of 0x34 at `+0x58A4`; a group starts empty (first shape -1, `0x02C6F45C`).
+  - Only the kind's own setup gives a group its shape(s) (`0x02C6F5FC`): Kirby's `0x02EF57E8` (group 3,
+    one shape, at `0x02EF5A94`-`0x02EF5B04`), Zelda's; Robin's (`0x02F60194`) none. Without one, the
+    commands write slot -1 (`fighter+0x4E6C`-`0x4E8F`, unused) and the per-frame update (`0x02C6F794`)
+    skips the group: no reflector, no crash. `tools/brave_reflect_cave.py` gives Robin's kind (Hero) one.
 - **Teams:** the team module is at accessor `+0x6C` (vtable `0x10002EC8`, 8-byte vtable entries).
   - It holds three team objects (vtable `0x10002E70`, each with its id at `+4`). Getters: vt `+0x34`
     → `+4`, team (id `+8`); vt `+0x44` → `+0x14`, hurt team (id `+0x18`); vt `+0x54` → `+0x24`, attack

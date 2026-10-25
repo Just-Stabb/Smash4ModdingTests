@@ -6120,7 +6120,7 @@ void func_235()
 {
     printf("status_Rebirth sub_end_move");
     brave_n_stored = 0;     // Hero: a stored Frizz charge doesn't outlive the stock
-    WorkModule(0x7, 0, 0x1000009e);     // nor an open Command Selection menu
+    brave_rebirth();        // nor his MP spent, buffs or an open Command Selection menu
     WorkModule(0x11, 0x2100000d);
     WorkModule(0x12, 0x20000001);
     GroundModule(0x2710, 0x5);
@@ -36301,7 +36301,7 @@ void func_2241()
     global37 = 0;
     global11 = func_79;
     global12 = func_80;
-    global14 = func_82;
+    global14 = brave_frame;     // Hero: func_82, then his MP, buffs and panel (brave_frame)
     global13 = func_81;
     global21 = func_107;
     sys_0(0x7, func_36);
@@ -36531,8 +36531,8 @@ void func_2247()
     }
     else
     {
+        // Hero: int 0x1000008E is his buffs' marker (brave_frame), not Robin's Levin Sword recharge
         var1 = WorkModule(0x6, 0x14000003);
-        WorkModule(0x7, WorkModule(0x6, 0x1000008e) - var1, 0x1000008e);
     }
 }
 
@@ -38431,6 +38431,336 @@ int dash_turn_attack_update()
     return run_attack_update();
 }
 
+// ---- Hero's MP (fighters/brave/README.md "MP"): Ultimate's param_mp. 100 at most, full at the start and
+// after each stock; 1 back a second (sp_recover_frame 60) but not while a special is charging or the
+// menu is open (brave_mp_pause, set by those loops each frame); 0.8 x the damage his other moves deal
+// (sp_attack_mul; the damage the other fighters took while his attack had hit, his own specials not
+// counted). Each special costs MP (brave_cost / brave_n_cost / ...): what he can't pay for doesn't come
+// out. Shown under his damage (tools/trait_badge_cave.py's gauge: int 0x1000009C = 0x4D50GGBB, G his MP,
+// B what's left after the cost in view, brave_cost_view, set by the loops each frame).
+// brave_frame (global14, every frame) also keeps his buffs (int 0x1000008E: tools/kirby_stat_cave.py's
+// stat profile, tools/strike_cave.py's damage bit) and the Command Selection window's ints.
+float brave_mp;
+int brave_mp_init;
+int brave_mp_pause;
+int brave_cost_view;
+float brave_dmg_seen;
+int brave_slot;
+// buffs: frames left (Acceleratle, Oomph, Bounce), Psyche Up until a hit lands, Hocus Pocus's invisibility
+int brave_speed_t;
+int brave_attack_t;
+int brave_reflect_t;
+int brave_psyche;
+int brave_invisible_t;
+// the window (brave_lw_*): 0 shut, 1 open (choosing), 2 cast (the spell's row only), 3 closing
+int brave_menu;
+int brave_menu_anim;
+int brave_menu_t;
+int brave_menu_rows;
+int brave_menu_cursor;
+int brave_menu_grey;
+
+// spell n's cost (Ultimate's param_special_lw_command_data sp); Magic Burst (8) takes all there is (at least 1)
+int brave_cost(int n)
+{
+    int c;
+    c = 0;
+    if (n == 0x1) { c = 0x7; }
+    else if (n == 0x2) { c = 0x8; }
+    else if (n == 0x3) { c = 0x14; }
+    else if (n == 0x4) { c = 0x9; }
+    else if (n == 0x5) { c = 0x25; }
+    else if (n == 0x6) { c = 0xa; }
+    else if (n == 0x7) { c = 0x1e; }
+    else if (n == 0x8)
+    {
+        c = (int)brave_mp;
+        if (c < 0x1)
+        {
+            c = 0x1;
+        }
+    }
+    else if (n == 0x9) { c = 0x1; }
+    else if (n == 0xa) { c = 0x6; }
+    else if (n == 0xb) { c = 0xd; }
+    else if (n == 0xc) { c = 0x10; }
+    else if (n == 0xd) { c = 0xe; }
+    else if (n == 0xe) { c = 0x10; }
+    else if (n == 0xf) { c = 0x4; }
+    else if (n == 0x10) { c = 0x8; }
+    else if (n == 0x11) { c = 0xc; }
+    else if (n == 0x12) { c = 0xb; }
+    else if (n == 0x13) { c = 0x6; }
+    else if (n == 0x14) { c = 0xf; }
+    else if (n == 0x15) { c = 0xe; }
+    return c;
+}
+
+// Frizz / Frizzle / Kafrizz, Zap / Zapple / Kazap, Woosh / Swoosh / Kaswoosh (param_special_n / s / hi sp_*)
+int brave_n_cost(int level)
+{
+    if (level == 0x1) { return 0x10; }
+    if (level == 0x2) { return 0x24; }
+    return 0x6;
+}
+
+int brave_s_cost(int level)
+{
+    if (level == 0x1) { return 0x12; }
+    if (level == 0x2) { return 0x2a; }
+    return 0x8;
+}
+
+int brave_hi_cost(int level)
+{
+    if (level == 0x1) { return 0x9; }
+    if (level == 0x2) { return 0x12; }
+    return 0x5;
+}
+
+int brave_can_pay(int cost)
+{
+    return (float)cost <= brave_mp;
+}
+
+void brave_pay(int cost)
+{
+    brave_mp = brave_mp - (float)cost;
+    if (brave_mp < 0)
+    {
+        brave_mp = 0;
+    }
+}
+
+void brave_add_mp(float v)
+{
+    brave_mp = brave_mp + v;
+    if (brave_mp > 100.0f)
+    {
+        brave_mp = 100.0f;
+    }
+}
+
+// the other fighters' damage in all (the position variables' slot DAMAGE, docs/position-variables.md)
+float brave_others_damage()
+{
+    int s;
+    float d;
+    s = 0;
+    d = 0;
+    while (s < 0x8)
+    {
+        if (s != brave_slot && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            d = d + WorkModuleF(0, 0x0f000177 + 0x20 * s);
+        }
+        s += 1;
+    }
+    return d;
+}
+
+int brave_special_status()
+{
+    return global4 >= 0x152 && global4 <= 0x155;
+}
+
+void brave_buffs_off()
+{
+    brave_speed_t = 0;
+    brave_attack_t = 0;
+    brave_reflect_t = 0;
+    brave_psyche = 0;
+    if (brave_invisible_t > 0)
+    {
+        VisibilityModule(0x2710, 0x1);
+    }
+    brave_invisible_t = 0;
+    brave_reflect(0);
+}
+
+// a new stock (Rebirth, func_235) or the match's start: full MP, no buffs, the window shut
+void brave_rebirth()
+{
+    brave_mp = 100.0f;
+    brave_mp_init = 0x1;
+    brave_slot = -1;
+    brave_menu = 0;
+    brave_menu_anim = 0;
+    brave_buffs_off();
+    WorkModule(0x7, 0, 0x1000009e);
+}
+
+void brave_mp_update()
+{
+    float d;
+    if (brave_mp_init == 0 || global4 == 0x14f)
+    {
+        brave_rebirth();    // the match's start (Entry)
+    }
+    if (brave_mp_pause == 0)
+    {
+        brave_add_mp(1.0f / 60.0f);
+    }
+    brave_mp_pause = 0;
+    if (brave_slot < 0)
+    {
+        brave_slot = brave_self_slot();
+    }
+    d = brave_others_damage();
+    if (d > brave_dmg_seen && WorkModuleF(0, 0x0f0000a0) >= 0.5f && brave_special_status() == 0)
+    {
+        brave_add_mp(0.8f * (d - brave_dmg_seen));
+    }
+    brave_dmg_seen = d;
+}
+
+// buffs: the marker int 0x1000008E = 0x4B49xxxx (tools/kirby_stat_cave.py profile 3 in bits 0-2:
+// Acceleratle's speeds; tools/strike_cave.py's bit 0x8: x1.15 damage, Oomph or Psyche Up), 0 without one
+void brave_buff_update()
+{
+    int m;
+    if (brave_speed_t > 0) { brave_speed_t -= 1; }
+    if (brave_attack_t > 0) { brave_attack_t -= 1; }
+    if (brave_reflect_t > 0)
+    {
+        brave_reflect_t -= 1;
+        if (brave_reflect_t == 0)
+        {
+            brave_reflect(0);
+        }
+    }
+    if (brave_invisible_t > 0)
+    {
+        brave_invisible_t -= 1;
+        if (brave_invisible_t == 0)
+        {
+            VisibilityModule(0x2710, 0x1);
+        }
+    }
+    if (brave_psyche && brave_special_status() == 0 && WorkModuleF(0, 0x0f0000a1) >= 0.5f)
+    {
+        brave_psyche = 0;   // Psyche Up: spent on the hit that landed
+    }
+    m = 0;
+    if (brave_speed_t > 0)
+    {
+        m = m + 0x3;
+    }
+    if (brave_attack_t > 0 || brave_psyche)
+    {
+        m = m + 0x8;
+    }
+    if (m == 0)
+    {
+        WorkModule(0x7, 0, 0x1000008e);
+    }
+    else
+    {
+        WorkModule(0x7, 0x4b490000 + m, 0x1000008e);
+    }
+}
+
+// the window and the gauge (tools/trait_badge_cave.py): int 0x1000009E = 0x4845xxxx (bit 2 shown, bits 0-1
+// the cursor, bit 3 closing, bit 4 blinking off, bit 5 cast, bits 8-10 the animation's frame, 11-14 the
+// pointer's frame: Ultimate's spin, 2 frames each),
+// 0x1000009F = 0x48xxxxxx (the rows' spells, bit 20 + row greyed), 0x1000009C = 0x4D50GGBB
+void brave_panel_update()
+{
+    int a;
+    int g;
+    int b;
+    g = (int)brave_mp;
+    b = g;
+    if (brave_cost_view > 0 && brave_cost_view <= g)
+    {
+        b = g - brave_cost_view;
+    }
+    brave_cost_view = 0;
+    WorkModule(0x7, 0x4d500000 + g * 0x100 + b, 0x1000009c);
+    if (brave_menu == 0)
+    {
+        WorkModule(0x7, 0, 0x1000009e);
+        WorkModule(0x7, 0, 0x1000009f);
+        return;
+    }
+    if (brave_menu_anim < 0x7)
+    {
+        brave_menu_anim += 1;
+    }
+    brave_menu_t += 1;
+    if (brave_menu == 0x3 && brave_menu_anim > 0x4)
+    {
+        brave_menu = 0;     // closed
+        WorkModule(0x7, 0, 0x1000009e);
+        WorkModule(0x7, 0, 0x1000009f);
+        return;
+    }
+    a = 0x48450004 + brave_menu_cursor + (brave_menu_anim - 0x1) * 0x100 + (brave_menu_t / 0x2 % 0x10) * 0x800;
+    if (brave_menu == 0x3)
+    {
+        a = a + 0x8;
+    }
+    if (brave_menu == 0x2)
+    {
+        a = a + 0x20;   // the cast spell's row window
+    }
+    // the last 2 seconds of the time limit (480 frames, command_select_blink_frame 360): blinking
+    if (brave_menu == 0x1 && brave_menu_t >= 0x168 && brave_menu_t / 0x4 % 0x2 == 0x1)
+    {
+        a = a + 0x10;
+    }
+    WorkModule(0x7, a, 0x1000009e);
+    WorkModule(0x7, 0x48000000 + brave_menu_rows + brave_menu_grey * 0x100000, 0x1000009f);
+}
+
+void brave_menu_open(int rows, int cursor)
+{
+    brave_menu = 0x1;
+    brave_menu_anim = 0;
+    brave_menu_t = 0;
+    brave_menu_rows = rows;
+    brave_menu_cursor = cursor;
+    brave_menu_grey = 0;
+}
+
+// shut: the menu closes (its animation); a cast spell's row window just goes (view_wnd_hide)
+void brave_menu_close()
+{
+    if (brave_menu == 0x1)
+    {
+        brave_menu = 0x3;
+        brave_menu_anim = 0;
+    }
+    else if (brave_menu == 0x2)
+    {
+        brave_menu = 0;
+    }
+}
+
+void brave_frame()
+{
+    func_82();
+    brave_mp_update();
+    brave_buff_update();
+    brave_panel_update();
+}
+
+// Bounce's reflector (as Kirby's air side B, tools/kirby_sideb_reflect_acmd.py: kind 3, ID 0, group 3; the
+// group made for Robin's kind by tools/brave_reflect_cave.py): a capsule around him, x1.5 damage, x1.2 speed
+// and life, no threshold
+void brave_reflect(int on)
+{
+    if (on)
+    {
+        ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
+        ShieldModule(0, 0x3, 0, 0x1, 0x3);
+    }
+    else
+    {
+        ShieldModule(0, 0x3, 0, 0, 0x3);
+    }
+}
+
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
 // Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) while special is held; the charge
 // is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz). Released (at any
@@ -38474,6 +38804,10 @@ int brave_n_ground_motion()
     {
         return 0x22f;               // SpecialNCancel
     }
+    if (brave_n_state == 0x4)
+    {
+        return 0x220;               // not enough MP: SpecialLwFail
+    }
     return 0x21f;                   // SpecialNStart
 }
 
@@ -38481,13 +38815,19 @@ int brave_n_ground_motion()
 void brave_n_change(int state)
 {
     int m;
+    int a;
     brave_n_state = state;
     m = brave_n_ground_motion();
+    a = m + 0x1c;
+    if (state == 0x4)
+    {
+        a = 0x246;
+    }
     WorkModule(0x7, m, 0x11000002);
-    WorkModule(0x7, m + 0x1c, 0x11000003);
+    WorkModule(0x7, a, 0x11000003);
     if (global18 == 0x2)
     {
-        m = m + 0x1c;
+        m = a;
     }
     func_22(m, 0, 1.0f);
     if (global18 == 0x2 && state == 0x2 && brave_n_level != 0)
@@ -38527,6 +38867,26 @@ void brave_n_generate()
     brave_n_fired = 0x1;
 }
 
+// the level held so long (0 / 1 / 2), lowered to one his MP pays for
+int brave_n_hold_level()
+{
+    int level;
+    level = 0;
+    if (brave_n_hold >= 0x51)
+    {
+        level = 0x2;
+    }
+    else if (brave_n_hold >= 0x12)
+    {
+        level = 0x1;
+    }
+    while (level > 0 && brave_can_pay(brave_n_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
 int brave_n_fire_frame()
 {
     if (brave_n_level == 0x1)
@@ -38551,6 +38911,7 @@ void brave_n_loop()
     f = MotionModuleF(0x1);
     if (brave_n_state == 0)
     {
+        brave_mp_pause = 0x1;
         if (MotionModule(0x2712) == 0x1)
         {
             brave_n_change(0x1);
@@ -38559,6 +38920,8 @@ void brave_n_loop()
     else if (brave_n_state == 0x1)
     {
         brave_n_hold += 1;
+        brave_mp_pause = 0x1;
+        brave_cost_view = brave_n_cost(brave_n_hold_level());
         if (ControlModule(0x2710, 0x3))
         {
             brave_n_stored = brave_n_hold;
@@ -38566,16 +38929,16 @@ void brave_n_loop()
         }
         else if (brave_n_released)
         {
-            brave_n_level = 0;
-            if (brave_n_hold >= 0x51)
+            brave_n_level = brave_n_hold_level();
+            if (brave_can_pay(brave_n_cost(brave_n_level)))
             {
-                brave_n_level = 0x2;
+                brave_pay(brave_n_cost(brave_n_level));
+                brave_n_change(0x2);
             }
-            else if (brave_n_hold >= 0x12)
+            else
             {
-                brave_n_level = 0x1;
+                brave_n_change(0x4);
             }
-            brave_n_change(0x2);
         }
         else if (MotionModule(0x2712) == 0x1)
         {
@@ -38706,6 +39069,10 @@ int brave_s_ground_motion()
     {
         return 0x231;
     }
+    if (brave_s_state == 0x5)
+    {
+        return 0x220;   // not enough MP: SpecialLwFail
+    }
     return 0x258;
 }
 
@@ -38730,6 +39097,10 @@ int brave_s_air_motion()
     if (brave_s_state == 0x4)
     {
         return 0x24d;
+    }
+    if (brave_s_state == 0x5)
+    {
+        return 0x246;
     }
     return 0x25c;
 }
@@ -38777,6 +39148,26 @@ void brave_s_spark()
     brave_generate(0x8, brave_s_level + 0x4 * s);
 }
 
+// the level held so long, lowered to one his MP pays for
+int brave_s_hold_level()
+{
+    int level;
+    level = 0;
+    if (brave_s_hold >= 0x1a)
+    {
+        level = 0x2;
+    }
+    else if (brave_s_hold >= 0x9)
+    {
+        level = 0x1;
+    }
+    while (level > 0 && brave_can_pay(brave_s_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
 void brave_s_loop()
 {
     float f;
@@ -38788,6 +39179,7 @@ void brave_s_loop()
     f = MotionModuleF(0x1);
     if (brave_s_state == 0)
     {
+        brave_mp_pause = 0x1;
         if (MotionModule(0x2712) == 0x1)
         {
             brave_s_change(0x1);
@@ -38796,19 +39188,30 @@ void brave_s_loop()
     else if (brave_s_state == 0x1)
     {
         brave_s_hold += 1;
-        if (brave_s_hold >= 0x1a)
+        brave_mp_pause = 0x1;
+        if (brave_s_hold > 0x1a)
+        {
+            brave_s_hold = 0x1a;    // Kazap held back for want of MP: on to the release
+        }
+        brave_cost_view = brave_s_cost(brave_s_hold_level());
+        if (brave_s_hold >= 0x1a && brave_s_hold_level() == 0x2)
         {
             brave_s_level = 0x2;
+            brave_pay(brave_s_cost(0x2));
             brave_s_change(0x3);
         }
         else if (brave_s_released)
         {
-            brave_s_level = 0;
-            if (brave_s_hold >= 0x9)
+            brave_s_level = brave_s_hold_level();
+            if (brave_can_pay(brave_s_cost(brave_s_level)))
             {
-                brave_s_level = 0x1;
+                brave_pay(brave_s_cost(brave_s_level));
+                brave_s_change(0x2);
             }
-            brave_s_change(0x2);
+            else
+            {
+                brave_s_change(0x5);
+            }
         }
         else if (MotionModule(0x2712) == 0x1)
         {
@@ -38878,9 +39281,18 @@ int brave_hi_released;
 int brave_hi_tornado;
 int brave_hi_launched;
 int brave_hi_rising;
+int brave_hi_empty;
 
 int brave_hi_jump_motion(int air)
 {
+    if (brave_hi_empty)
+    {
+        if (air)
+        {
+            return 0x247;   // not enough MP: SpecialAirHiEmpty (a hop)
+        }
+        return 0x221;
+    }
     if (brave_hi_level == 0x1)
     {
         if (air)
@@ -38974,7 +39386,11 @@ void brave_hi_launch()
     float a;
     v = 3.49f;
     a = 0.145f;
-    if (brave_hi_level == 0x1)
+    if (brave_hi_empty)
+    {
+        v = 1.7f;
+    }
+    else if (brave_hi_level == 0x1)
     {
         v = 4.525f;
         a = 0.16f;
@@ -39009,6 +39425,26 @@ void brave_hi_fall()
     KineticModule(0x14, 0x1, m);
 }
 
+// the level held so long, lowered to one his MP pays for
+int brave_hi_hold_level()
+{
+    int level;
+    level = 0;
+    if (brave_hi_hold >= 0x1c)
+    {
+        level = 0x2;
+    }
+    else if (brave_hi_hold >= 0xa)
+    {
+        level = 0x1;
+    }
+    while (level > 0 && brave_can_pay(brave_hi_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
 void brave_hi_loop()
 {
     float f;
@@ -39024,6 +39460,7 @@ void brave_hi_loop()
     f = MotionModuleF(0x1);
     if (brave_hi_state == 0)
     {
+        brave_mp_pause = 0x1;
         if (MotionModule(0x2712) == 0x1)
         {
             brave_hi_change(0x1);
@@ -39032,23 +39469,30 @@ void brave_hi_loop()
     else if (brave_hi_state == 0x1)
     {
         brave_hi_hold += 1;
-        if (brave_hi_hold >= 0x1c || brave_hi_released)
+        brave_mp_pause = 0x1;
+        if (brave_hi_hold > 0x1c)
         {
-            brave_hi_level = 0;
-            if (brave_hi_hold >= 0x1c)
+            brave_hi_hold = 0x1c;   // Kaswoosh held back for want of MP: on to the release
+        }
+        brave_cost_view = brave_hi_cost(brave_hi_hold_level());
+        if (brave_hi_hold >= 0x1c && brave_hi_hold_level() == 0x2 || brave_hi_released)
+        {
+            brave_hi_level = brave_hi_hold_level();
+            if (brave_can_pay(brave_hi_cost(brave_hi_level)))
             {
-                brave_hi_level = 0x2;
+                brave_pay(brave_hi_cost(brave_hi_level));
             }
-            else if (brave_hi_hold >= 0xa)
+            else
             {
-                brave_hi_level = 0x1;
+                brave_hi_empty = 0x1;
+                brave_hi_level = 0;
             }
             brave_hi_change(0x2);
         }
     }
     else
     {
-        if (brave_hi_tornado == 0 && f >= (float)brave_hi_frame(0))
+        if (brave_hi_tornado == 0 && brave_hi_empty == 0 && f >= (float)brave_hi_frame(0))
         {
             s = brave_self_slot();
             brave_hi_tornado = 0x1;
@@ -39105,6 +39549,7 @@ void brave_hi_main()
     brave_hi_tornado = 0;
     brave_hi_launched = 0;
     brave_hi_rising = 0;
+    brave_hi_empty = 0;
     WorkModule(0x7, 0x260, 0x11000002);
     WorkModule(0x7, 0x26c, 0x11000003);
     WorkModule(0x7, 0x6, 0x11000004);
@@ -39116,18 +39561,35 @@ void brave_hi_main()
 }
 
 // ---- Hero's down special: Command Selection (status 0x155, Robin's Nosferatu; fighters/brave/README.md).
-// SpecialLwStart (20 frames) then SpecialLwSelect (a loop) with the menu open: four spells drawn at random,
-// weighted by Ultimate's param_special_lw_command_data lot_prob, among the ones made so far
-// (brave_lw_weight), shown in his damage panel (tools/trait_badge_cave.py's menu, tools/dmg_brave_menu.py)
-// through two work ints: 0x1000009E = 0x48450000 + 4 (open) + the cursor's row, 0x1000009F = 0x48000000 +
-// the rows' spells (1-21) x 1 / 32 / 1024 / 32768 (+ 0x100000 << row: greyed, for MP). The stick (up / down past 0.5, again every 12 frames
-// while held) moves the cursor; attack, or special once it has been let go, casts the spell (its row
-// stays up 70 frames, decided_command_window_close_frame); shield, jump, or 480 frames
-// (command_select_time_limit) shuts it: SpecialLwCancel. The
-// spells' motions, ground / air: start 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, then
-// spell n at its slot (brave_lw_spell_motion). In the air the fall is held to 0.45 while choosing.
-// Spells: 17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man (sword moves: their hitboxes
-// are in their scripts, Ultimate's SpecialLw17-20). No MP yet.
+// SpecialLwStart (20 frames) then SpecialLwSelect (a loop) with the menu open: four of the 21 spells drawn at
+// random, weighted by Ultimate's param_special_lw_command_data lot_prob (brave_lw_weight), the ones his MP
+// doesn't pay for greyed out and put last; shown in his damage panel (brave_panel_update). The stick (up /
+// down past 0.5, again every 12 frames while held) moves the cursor; attack, or special once it has been
+// let go, casts the spell (its row stays up 70 frames, decided_command_window_close_frame; a greyed one:
+// SpecialLwFail); shield, jump, or 480 frames (command_select_time_limit, blinking from 360) shuts it:
+// SpecialLwCancel. His MP doesn't come back while the menu is open. The spells' motions, ground / air: start
+// 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, then spell n at its slot (brave_lw_spell_motion,
+// extra_kinds.json "motions"). In the air the fall is held to 0.45 while choosing. The spells (brave_lw_cast):
+//  1 Heal          11% healed at frame 6 (param_special_lw cure_add_life)
+//  2 / 3 Sizz / Sizzle      the flash article (10, weapons/shot.c) at frame 6
+//  4 / 5 Bang / Kaboom      the explosion article (11) at frame 6
+//  6 / 7 Whack / Thwack     the deathball article (12) at frame 6: a fighter it hits may be KO'd outright
+//  8 Magic Burst   all his MP; the crash article (13, weapons/crash.c) on him at frame 20, held in the air
+//                  until frame 136 (FULLBURST_INTERRUPT / ENABLE_GRAVITY)
+//  9 Kamikazee     the crash article's blast (level 1) at frame 20, then he's KO'd (DEATH_RESERVE)
+// 10 Kaclang       steel from SpecialLw10Start's end: invincible for 300 frames (steel_frame) in
+//                  SpecialLw10 (falling fast in the air), then SpecialLw10End
+// 11 Acceleratle   600 frames faster (speed_up_frame; tools/kirby_stat_cave.py profile 3)
+// 12 Oomph         720 frames of x1.15 damage (attack_up_frame; tools/strike_cave.py)
+// 13 Bounce        720 frames of a reflector (reflect_frame; brave_reflect)
+// 14 Snooze        the sleep article (14) at frame 6: its gust puts fighters to sleep
+// 15 Hocus Pocus   one of: full MP, no MP, 600 frames invincible, 600 frames invisible, Oomph,
+//                  Acceleratle, Psyche Up, a Kaboom, a Sizzle
+// 16 Zoom          up off the screen (SpecialLw16Hi, flying_speed_y 9, intangible), then down (SpecialLw16Lw,
+//                  flying_down_speed_y 7) above a fighter on the ground, landing with SpecialLw16End
+// 17 - 20 Flame Slash, Kacrackle Slash, Metal Slash, Hatchet Man (sword moves: their hitboxes are in
+//                  their scripts, Ultimate's SpecialLw17-20)
+// 21 Psyche Up     x1.15 damage until his next hit lands
 int brave_lw_state;
 int brave_lw_frame;
 int brave_lw_cursor;
@@ -39136,47 +39598,57 @@ int brave_lw_spell;
 int brave_lw_released;
 int brave_lw_stick;
 int brave_lw_repeat;
+int brave_lw_done;
+int brave_lw_sub;
+int brave_lw_t;
 
-// a spell's draw weight (Ultimate's lot_prob); 0: not made yet
+// a spell's draw weight (Ultimate's lot_prob)
 int brave_lw_weight(int n)
 {
-    if (n == 0x11 || n == 0x12 || n == 0x14)
-    {
-        return 0x12;
-    }
-    if (n == 0x13)
-    {
-        return 0x7;
-    }
+    if (n == 0x1) { return 0x7; }
+    if (n == 0x2 || n == 0x4 || n == 0xb || n == 0xc || n == 0xd || n == 0x15) { return 0x10; }
+    if (n == 0x3 || n == 0x5) { return 0x14; }
+    if (n == 0x6) { return 0xc; }
+    if (n == 0x7) { return 0x8; }
+    if (n == 0x8 || n == 0x9 || n == 0xa) { return 0x5; }
+    if (n == 0xe) { return 0x11; }
+    if (n == 0xf) { return 0x3; }
+    if (n == 0x10) { return 0xf; }
+    if (n == 0x11 || n == 0x12 || n == 0x14) { return 0x12; }
+    if (n == 0x13) { return 0x7; }
     return 0;
 }
 
-// a spell's motion (0 ground, 1 air)
+// a spell's motion (0 ground, 1 air); 0 = SpecialLwFail's
 int brave_lw_spell_motion(int n, int air)
 {
-    int m;
-    m = 0;
-    if (n == 0x11)
+    int g;
+    int a;
+    g = 0x220;
+    a = 0x246;
+    if (n == 0x1) { g = 0x222; a = 0x248; }
+    else if (n == 0x2) { g = 0x224; a = 0x249; }
+    else if (n == 0x3) { g = 0x225; a = 0x24a; }
+    else if (n == 0x4) { g = 0x226; a = 0x24e; }
+    else if (n == 0x5) { g = 0x22a; a = 0x24f; }
+    else if (n == 0x6) { g = 0x22b; a = 0x250; }
+    else if (n == 0x7) { g = 0x22c; a = 0x251; }
+    else if (n == 0x8) { g = 0x22d; a = 0x252; }
+    else if (n == 0x9) { g = 0x22e; a = 0x253; }
+    else if (n == 0xa) { g = 0x232; a = 0x254; }
+    else if (n == 0xb) { g = 0x235; a = 0x264; }
+    else if (n == 0xc) { g = 0x236; a = 0x265; }
+    else if (n == 0xd) { g = 0x237; a = 0x266; }
+    else if (n == 0xe) { g = 0x238; a = 0x267; }
+    else if (n == 0xf) { g = 0x239; a = 0x268; }
+    else if (n == 0x10) { g = 0x23a; a = 0x269; }
+    else if (n >= 0x11 && n <= 0x14) { g = 0x27a + n - 0x11; a = g + 0xc; }
+    else if (n == 0x15) { g = 0x240; a = 0x26a; }
+    if (air)
     {
-        m = 0x27a;
+        return a;
     }
-    else if (n == 0x12)
-    {
-        m = 0x27b;
-    }
-    else if (n == 0x13)
-    {
-        m = 0x27c;
-    }
-    else if (n == 0x14)
-    {
-        m = 0x27d;
-    }
-    if (air && m != 0)
-    {
-        m = m + 0xc;
-    }
-    return m;
+    return g;
 }
 
 // row k's spell (0-3)
@@ -39194,7 +39666,27 @@ int brave_lw_row(int k)
     return v % 0x20;
 }
 
-// four spells, weighted, no repeats
+// the rows his MP doesn't pay for (bit k: row k)
+int brave_lw_grey()
+{
+    int k;
+    int n;
+    int g;
+    g = 0;
+    k = 0;
+    while (k < 0x4)
+    {
+        n = brave_lw_row(k);
+        if (n != 0 && brave_can_pay(brave_cost(n)) == 0)
+        {
+            g = g + brave_bit(k);
+        }
+        k += 1;
+    }
+    return g;
+}
+
+// four spells, weighted, no repeats; then the ones he can pay for first
 void brave_lw_draw()
 {
     int k;
@@ -39204,6 +39696,8 @@ void brave_lw_draw()
     int taken;
     int pick;
     int mul;
+    int pass;
+    int drawn;
     brave_lw_spells = 0;
     taken = 0;
     mul = 0x1;
@@ -39246,43 +39740,30 @@ void brave_lw_draw()
         mul = mul * 0x20;
         k += 1;
     }
+    drawn = brave_lw_spells;
+    brave_lw_spells = 0;
+    mul = 0x1;
+    pass = 0;
+    while (pass < 0x2)
+    {
+        k = 0;
+        while (k < 0x4)
+        {
+            n = (drawn / brave_bit(0x5 * k)) % 0x20;
+            if (n != 0 && brave_can_pay(brave_cost(n)) == 1 - pass)
+            {
+                brave_lw_spells = brave_lw_spells + n * mul;
+                mul = mul * 0x20;
+            }
+            k += 1;
+        }
+        pass += 1;
+    }
 }
 
-// the panel's menu: open with the cursor, or (shown) only the cast spell's row, or shut
-void brave_lw_show(int open)
+// the state's motions from frame 0 (ground / air: func_2245 swaps them)
+void brave_lw_motion(int g, int a)
 {
-    int v;
-    if (open == 0)
-    {
-        WorkModule(0x7, 0, 0x1000009e);
-        WorkModule(0x7, 0, 0x1000009f);
-        return;
-    }
-    WorkModule(0x7, 0x48450004 + brave_lw_cursor, 0x1000009e);
-    v = brave_lw_spells;
-    if (brave_lw_state == 0x2)
-    {
-        v = brave_lw_spell;
-        if (brave_lw_cursor >= 0x1)
-        {
-            v = v * 0x20;
-        }
-        if (brave_lw_cursor >= 0x2)
-        {
-            v = v * 0x20;
-        }
-        if (brave_lw_cursor >= 0x3)
-        {
-            v = v * 0x20;
-        }
-    }
-    WorkModule(0x7, 0x48000000 + v, 0x1000009f);
-}
-
-void brave_lw_change(int state, int g, int a)
-{
-    brave_lw_state = state;
-    brave_lw_frame = 0;
     WorkModule(0x7, g, 0x11000002);
     WorkModule(0x7, a, 0x11000003);
     if (global18 == 0x2)
@@ -39290,6 +39771,13 @@ void brave_lw_change(int state, int g, int a)
         g = a;
     }
     func_22(g, 0, 1.0f);
+}
+
+void brave_lw_change(int state, int g, int a)
+{
+    brave_lw_state = state;
+    brave_lw_frame = 0;
+    brave_lw_motion(g, a);
 }
 
 // the cursor: up / down past half, again every 12 frames held; rows with no spell skipped
@@ -39333,11 +39821,336 @@ void brave_lw_move()
     }
 }
 
+// the first time this cast gets here (bit: 1, 2, 4, ...)
+int brave_lw_once(int bit)
+{
+    if ((brave_lw_done / bit) % 0x2 == 0x1)
+    {
+        return 0;
+    }
+    brave_lw_done = brave_lw_done + bit;
+    return 0x1;
+}
+
+// his player slot for an article put on him (placed.c: 8 = none, it stays where it's made)
+int brave_lw_slot()
+{
+    int s;
+    s = brave_self_slot();
+    if (s < 0)
+    {
+        s = 0x8;
+    }
+    return s;
+}
+
+void brave_heal(float v)
+{
+    float d;
+    d = WorkModuleF(0, 0x0f000117) - v;
+    if (d < 0)
+    {
+        d = 0;
+    }
+    WorkModule(0, d, 0x0f000117);
+}
+
+// Kamikazee: below the stage's blast line, falling
+void brave_self_ko()
+{
+    func_20(0x2);
+    GroundModule(0x2710, 0x5);
+    WorkModule(0, -3000.0f, 0x0f000001);
+    func_16(0xe, 0);
+}
+
+// Zoom's landing place: above a fighter on the ground (at random), else the stage's middle
+void brave_zoom_place()
+{
+    int s;
+    int count;
+    int pick;
+    float x;
+    float y;
+    count = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != brave_slot && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f000176 + 0x20 * s) < 0.5f)
+        {
+            count += 1;
+        }
+        s += 1;
+    }
+    x = 0;
+    y = 60.0f;
+    if (count > 0)
+    {
+        pick = randi(0, count);
+        s = 0;
+        while (s < 0x8)
+        {
+            if (s != brave_slot && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f000176 + 0x20 * s) < 0.5f)
+            {
+                if (pick == 0)
+                {
+                    x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+                    y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+                }
+                pick -= 1;
+            }
+            s += 1;
+        }
+    }
+    WorkModule(0, x, 0x0f000000);
+    WorkModule(0, y + 120.0f, 0x0f000001);
+}
+
+// flying straight up / down at v (no gravity)
+void brave_fly(float v)
+{
+    KineticModule(0xf, 0x1, 0);
+    KineticModule(0x14, 0x1, 10.0f);
+    KineticModule(0x11, 0x1, v);
+}
+
+void brave_hocus_pocus()
+{
+    int r;
+    r = randi(0, 0x9);
+    if (r == 0) { brave_mp = 100.0f; }
+    else if (r == 0x1) { brave_mp = 0; }
+    else if (r == 0x2) { WorkModule(0, 600.0f, 0x0f00011c); }
+    else if (r == 0x3)
+    {
+        VisibilityModule(0x2710, 0);
+        brave_invisible_t = 0x258;
+    }
+    else if (r == 0x4) { brave_attack_t = 0x2d0; }
+    else if (r == 0x5) { brave_speed_t = 0x258; }
+    else if (r == 0x6) { brave_psyche = 0x1; }
+    else if (r == 0x7) { brave_generate(0xb, 0x1); }
+    else { brave_generate(0xa, 0x1); }
+}
+
+// Kaclang: 0 SpecialLw10Start (steel from frame 20), 1 SpecialLw10 for 300 frames, 2 SpecialLw10End
+int brave_kaclang(float f)
+{
+    if (brave_lw_sub < 0x2 && (brave_lw_sub == 0x1 || f >= 20.0f))
+    {
+        WorkModule(0, 2.0f, 0x0f00011c);    // invincible, renewed each frame
+    }
+    if (brave_lw_sub == 0)
+    {
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_sub = 0x1;
+            brave_lw_t = 0;
+            brave_lw_motion(0x233, 0x255);
+        }
+        return 0x2;
+    }
+    if (brave_lw_sub == 0x1)
+    {
+        brave_lw_t += 1;
+        if (global18 == 0x2)
+        {
+            KineticModule(0xf, 0x1, -0.2f);
+            KineticModule(0x14, 0x1, 3.0f);
+        }
+        if (brave_lw_t >= 0x12c)
+        {
+            brave_lw_sub = 0x2;
+            brave_lw_motion(0x234, 0x256);
+            KineticModule(0xf, 0x1, -0.089f);
+            KineticModule(0x14, 0x1, 1.5f);
+        }
+        else if (MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_motion(0x233, 0x255);  // the loop
+        }
+        return 0x2;
+    }
+    return 0;
+}
+
+// Zoom: 0 SpecialLw16Start, 1 SpecialLw16Hi (up for 40 frames), 2 SpecialLw16Lw (down to the ground), 3 End
+int brave_zoom(float f)
+{
+    if (brave_lw_sub == 0x1 || brave_lw_sub == 0x2)
+    {
+        WorkModule(0, 2.0f, 0x0f00011b);    // intangible, renewed each frame
+    }
+    if (brave_lw_sub == 0)
+    {
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_sub = 0x1;
+            brave_lw_t = 0;
+            brave_lw_motion(0x23c, 0x23c);
+            func_20(0x2);
+            GroundModule(0x2710, 0x5);
+            KineticModule(0, 0xa);
+            brave_fly(9.0f);
+        }
+        return 0x2;
+    }
+    if (brave_lw_sub == 0x1)
+    {
+        brave_lw_t += 1;
+        brave_fly(9.0f);
+        if (brave_lw_t >= 0x28)
+        {
+            brave_lw_sub = 0x2;
+            brave_lw_t = 0;
+            brave_zoom_place();
+            brave_lw_motion(0x23d, 0x23d);
+            brave_fly(-7.0f);
+        }
+        return 0x2;
+    }
+    if (brave_lw_sub == 0x2)
+    {
+        brave_lw_t += 1;
+        if (global18 == 0)
+        {
+            brave_lw_sub = 0x3;
+            brave_lw_motion(0x23e, 0x23e);
+            return 0x2;
+        }
+        if (brave_lw_t > 0x96)
+        {
+            KineticModule(0xf, 0x1, -0.089f);
+            KineticModule(0x14, 0x1, 1.5f);
+            func_16(0xe, 0);    // no ground under him: falling
+            return 0x1;
+        }
+        brave_fly(-7.0f);
+        return 0x2;
+    }
+    return 0;
+}
+
+// the spell's own part, each frame of the cast: 0 on as usual, 1 the status changed, 2 its motion goes on
+int brave_lw_cast(float f)
+{
+    int n;
+    n = brave_lw_spell;
+    if (n == 0x1)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_heal(11.0f);
+        }
+    }
+    else if (n == 0x2 || n == 0x3)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xa, n - 0x2);
+        }
+    }
+    else if (n == 0x4 || n == 0x5)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xb, n - 0x4);
+        }
+    }
+    else if (n == 0x6 || n == 0x7)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xc, n - 0x6 + 0x4 * brave_lw_slot());
+        }
+    }
+    else if (n == 0x8)
+    {
+        if (f >= 20.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xd, 0x4 * brave_lw_slot());
+        }
+        if (global18 == 0x2 && f >= 20.0f && f < 136.0f)
+        {
+            KineticModule(0xf, 0x1, 0);
+            KineticModule(0x11, 0x1, 0);
+        }
+        if (f >= 136.0f && brave_lw_once(0x2))
+        {
+            KineticModule(0xf, 0x1, -0.089f);
+            KineticModule(0x14, 0x1, 1.5f);
+        }
+    }
+    else if (n == 0x9)
+    {
+        if (f >= 20.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xd, 0x1 + 0x4 * brave_lw_slot());
+        }
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_self_ko();
+            return 0x1;
+        }
+    }
+    else if (n == 0xa)
+    {
+        return brave_kaclang(f);
+    }
+    else if (n == 0xb)
+    {
+        if (f >= 11.0f && brave_lw_once(0x1))
+        {
+            brave_speed_t = 0x258;
+        }
+    }
+    else if (n == 0xc)
+    {
+        if (f >= 11.0f && brave_lw_once(0x1))
+        {
+            brave_attack_t = 0x2d0;
+        }
+    }
+    else if (n == 0xd)
+    {
+        if (f >= 11.0f && brave_lw_once(0x1))
+        {
+            brave_reflect_t = 0x2d0;
+            brave_reflect(0x1);
+        }
+    }
+    else if (n == 0xe)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_generate(0xe, 0);
+        }
+    }
+    else if (n == 0xf)
+    {
+        if (f >= 1.0f && brave_lw_once(0x1))
+        {
+            brave_hocus_pocus();
+        }
+    }
+    else if (n == 0x10)
+    {
+        return brave_zoom(f);
+    }
+    else if (n == 0x15)
+    {
+        if (f >= 6.0f && brave_lw_once(0x1))
+        {
+            brave_psyche = 0x1;
+        }
+    }
+    return 0;
+}
+
 void brave_lw_loop()
 {
     int n;
-    int g;
-    int a;
+    int r;
     func_2245(StatusModule(0x6));
     brave_lw_frame += 1;
     if (ControlModule(0x2712, 0x1) == 0)
@@ -39346,28 +40159,47 @@ void brave_lw_loop()
     }
     if (brave_lw_state < 0x2)
     {
+        brave_mp_pause = 0x1;
         if (brave_lw_state == 0 && MotionModule(0x2712) == 0x1)
         {
             brave_lw_change(0x1, 0x278, 0x284);
         }
         brave_lw_move();
         n = brave_lw_row(brave_lw_cursor);
+        brave_menu_cursor = brave_lw_cursor;
+        brave_menu_grey = brave_lw_grey();
+        brave_cost_view = brave_cost(n);
         if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
         {
-            brave_lw_show(0);
+            brave_menu_close();
             brave_lw_change(0x3, 0x279, 0x285);
             return;
         }
         if (n != 0 && (ControlModule(0x2710, 0) || brave_lw_released && ControlModule(0x2710, 0x1)))
         {
+            // the cast: only its row stays up
+            brave_menu = 0x2;
+            brave_menu_rows = n * brave_bit(0x5 * brave_lw_cursor);
+            brave_menu_grey = (brave_menu_grey / brave_bit(brave_lw_cursor)) % 0x2 * brave_bit(brave_lw_cursor);
+            if (brave_can_pay(brave_cost(n)))
+            {
+                brave_pay(brave_cost(n));
+                if (n == 0x8)
+                {
+                    brave_mp = 0;
+                }
+            }
+            else
+            {
+                n = 0;      // SpecialLwFail
+            }
             brave_lw_spell = n;
-            g = brave_lw_spell_motion(n, 0);
-            a = brave_lw_spell_motion(n, 0x1);
-            brave_lw_change(0x2, g, a);
-            brave_lw_show(0x1);
+            brave_lw_done = 0;
+            brave_lw_sub = 0;
+            brave_lw_t = 0;
+            brave_lw_change(0x2, brave_lw_spell_motion(n, 0), brave_lw_spell_motion(n, 0x1));
             return;
         }
-        brave_lw_show(0x1);
         if (global18 == 0x2)
         {
             KineticModule(0x14, 0x1, 0.45f);
@@ -39376,7 +40208,19 @@ void brave_lw_loop()
     }
     if (brave_lw_state == 0x2)
     {
-        brave_lw_show(brave_lw_frame < 0x46);
+        if (brave_lw_frame >= 0x46)
+        {
+            brave_menu_close();
+        }
+        r = brave_lw_cast(MotionModuleF(0x1));
+        if (r == 0x1)
+        {
+            return;
+        }
+        if (r == 0x2)
+        {
+            return;
+        }
     }
     if (func_2246())
     {
@@ -39402,6 +40246,9 @@ void brave_lw_main()
     brave_lw_released = 0;
     brave_lw_stick = 0;
     brave_lw_repeat = 0;
+    brave_lw_done = 0;
+    brave_lw_sub = 0;
+    brave_lw_t = 0;
     brave_lw_draw();
     WorkModule(0x7, 0x277, 0x11000002);
     WorkModule(0x7, 0x283, 0x11000003);
@@ -39410,11 +40257,18 @@ void brave_lw_main()
     WorkModule(0x7, 0x2, 0x11000006);
     WorkModule(0x7, 0x5, 0x11000007);
     func_2245(0x1);
-    brave_lw_show(0x1);
+    brave_menu_open(brave_lw_spells, 0);
+    brave_menu_grey = brave_lw_grey();
     func_78(brave_lw_loop);
 }
 
 void brave_lw_end()
 {
-    brave_lw_show(0);
+    brave_menu_close();
+    if (brave_lw_spell == 0x8 || brave_lw_spell == 0xa || brave_lw_spell == 0x10)
+    {
+        // out of Magic Burst's hover / Kaclang's fall / Zoom's flight early (hit): his own fall again
+        KineticModule(0xf, 0x1, -0.089f);
+        KineticModule(0x14, 0x1, 1.5f);
+    }
 }

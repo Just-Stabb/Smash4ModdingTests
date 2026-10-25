@@ -141,7 +141,7 @@ none:   li r3, 0
     w32(C.FIGHTER_MANAGER, FM)
     w32(FM + 0x18, 8)
 
-    def fighter(entry, kind, marker, menu=0, spells=0):
+    def fighter(entry, kind, marker, menu=0, spells=0, mp=0):
         fe = FM + 0x1000 + 0x2000 * entry
         w32(FM + 0x24 + 4 * entry, fe)
         w32(fe + 0xDB4, 1)
@@ -159,6 +159,7 @@ none:   li r3, 0
         w32(ints + 4 * 0x8E, marker)
         w32(ints + 4 * C.MENU_INT, menu)
         w32(ints + 4 * C.SPELL_INT, spells)
+        w32(ints + 4 * C.MP_INT, mp)
 
     def slot(i, entry, kind, elem=True, empty=False):
         s = P + 0xC0 + C.SLOT_SIZE * i
@@ -238,36 +239,70 @@ none:   li r3, 0
     update()
     check('the copy lost: hidden', state(elems[0])[0], False)
     # Hero's menu: slot 1 a Hero with the menu open (cursor on row 2), slot 2 one with it shut, slot 6 a
-    # Hero with a wrong marker; the Kirbys' rows hidden
+    # Hero with a wrong marker; the Kirbys' rows hidden. Elements (C.ELEMENTS): 0 the window, 1-4 the
+    # names, 5-8 the pointers, 9 the MP window, 10 the gauge, 11 green, 12 blue, 13 "MP", 14 the number
     def menu_state(i):
         return [(state(r)[0], state(r)[1]) if state(r)[0] else False for r in menu_elems(i)]
-    HM, HS = C.MENU_MAGIC << 16, C.SPELL_MAGIC << 24
+    HM, HS, HC = C.MENU_MAGIC << 16, C.SPELL_MAGIC << 24, C.MP_MAGIC << 16
+    SP = HS | 17 | 18 << 5 | 19 << 10 | 20 << 15
+    T, F = True, False
+    NOGAUGE = [F] * 5
+
+    def hero(menu, spells=SP, mp=0):
+        fighter(1, C.BRAVE, 0, menu, spells, mp)
+        update()
+        return menu_state(1)
     # the slots' kind bytes are left as they were (Kirby's 8): the menu goes by the fighter object's kind
-    fighter(1, C.BRAVE, 0, HM | 4 | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
-    fighter(2, C.BRAVE, 0, HM | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
+    fighter(2, C.BRAVE, 0, HM | 2, SP)
     fighter(6, C.BRAVE, 0, 0x12340004, HS | 1)
-    update()
-    T = True
-    check('Hero, menu open: the window, names 17-20, the pointer on row 2, MP of spell 19',
-          menu_state(1), [(T, 1), (T, 17), (T, 18), (T, 19), (T, 20), False, False, (T, 1), False, (T, 19)])
+    OPEN = HM | 4 | 7 << 8                      # open, its animation done
+    check('Hero, menu open: the window, names 17-20, the pointer on row 2 (sway frame 4), MP of spell 19',
+          hero(OPEN | 2 | 3 << 11), [(T, 5), (T, 17), (T, 18), (T, 19), (T, 20), F, F, (T, 4), F, (T, 19)] + NOGAUGE)
     check('the panel alpha on them', [state(r)[3] for r in menu_elems(1)][:2], [0x41, 0x41])
-    check('Hero, menu shut: all hidden', menu_state(2), [False] * 10)
-    check('Hero, no marker: all hidden', menu_state(6), [False] * 10)
-    check('Kirby: all hidden', menu_state(0), [False] * 10)
-    check('Hero: the trait badge hidden', state(elems[1])[0], False)
-    check('an empty slot: untouched', [state(r)[:3] for r in menu_elems(3)], [(True, 1, 0)] * 10)
-    fighter(1, C.BRAVE, 0, HM | 4 | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15 | 1 << 23)
-    update()
+    check('Hero, menu shut: all hidden', menu_state(2), [F] * 15)
+    check('Hero, no marker: all hidden', menu_state(6), [F] * 15)
+    check('Kirby: all hidden', menu_state(0), [F] * 15)
+    check('Hero: the trait badge hidden', state(elems[1])[0], F)
+    check('an empty slot: untouched', [state(r)[:3] for r in menu_elems(3)], [(T, 1, 0)] * 15)
     check('pointer on row 0; row 1 none, row 2 spell 30 (none such): hidden; row 3 greyed (21 + 21)',
-          menu_state(1), [(T, 1), (T, 5), False, False, (T, 42), (T, 1), False, False, False, (T, 5)])
-    fighter(1, C.BRAVE, 0, HM | 4 | 1, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)
-    update()
+          hero(OPEN | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15 | 1 << 23),
+          [(T, 5), (T, 5), F, F, (T, 42), (T, 1), F, F, F, (T, 5)] + NOGAUGE)
+    check('the cursor on a greyed spell (row 3: 21): the window greyed (14), its cost greyed (21 + 21)',
+          [hero(OPEN | 3, HS | 5 | 6 << 5 | 7 << 10 | 21 << 15 | 1 << 23)[i] for i in (0, 4, 8, 9)],
+          [(T, 14), (T, 42), (T, 1), (T, 42)])
+    check('cast (bit 5) on row 2: its row window (12), the spell, no greyed window',
+          [hero(OPEN | 0x20 | 2, HS | 19 << 10 | 1 << 22)[i] for i in (0, 3)], [(T, 12), (T, 40)])
+    check('cast while closing: the closing frames', hero(HM | 4 | 0x20 | 8 | 1 << 8 | 2)[0], (T, 7))
     check('the pointer on a row with no spell: no pointer, no MP window',
-          [menu_state(1)[i] for i in (5, 6, 9)], [False, False, False])
+          [hero(OPEN | 1, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)[i] for i in (5, 6, 9)], [F, F, F])
+    # the animation: opening frames 1-5, the contents from its frame 3; closing 6-9, then hidden
+    check('opening, frame 0: the window at 1, nothing in it', hero(HM | 4)[:10], [(T, 1)] + [F] * 9)
+    check('opening, frame 2: window 3, still empty', hero(HM | 4 | 2 << 8)[:10], [(T, 3)] + [F] * 9)
+    check('opening, frame 3: window 4, the names in', hero(HM | 4 | 3 << 8)[:5],
+          [(T, 4), (T, 17), (T, 18), (T, 19), (T, 20)])
+    check('the sway: frame 15 -> 16', hero(OPEN | 15 << 11)[5], (T, 16))
+    check('closing, frame 0: window 6, empty', hero(HM | 4 | 8)[:10], [(T, 6)] + [F] * 9)
+    check('closing, frame 3: window 9', hero(HM | 4 | 8 | 3 << 8)[0], (T, 9))
+    check('closing, frame 4: gone', hero(HM | 4 | 8 | 4 << 8)[:10], [F] * 10)
+    check('blinking off: the window hidden', hero(OPEN | 0x10)[:10], [F] * 10)
+    # the gauge (MP int 0x4D50GGBB)
+    check('gauge 73 MP, 62 blue: the pill, green 73, blue 62, "MP", 73',
+          hero(OPEN, mp=HC | 73 << 8 | 62)[10:], [(T, 1), (T, 74), (T, 63), (T, 1), (T, 74)])
+    check('no cost in view (B = G): no green', hero(OPEN, mp=HC | 40 << 8 | 40)[10:],
+          [(T, 1), F, (T, 41), (T, 1), (T, 41)])
+    check('the menu shut: the gauge still shown, the window not',
+          hero(0, mp=HC | 100 << 8 | 100), [F] * 10 + [(T, 1), F, (T, 101), (T, 1), (T, 101)])
+    check('0 MP: blue at its empty frame 1, no green, the number 0', hero(0, mp=HC)[10:], [(T, 1), F, (T, 1), (T, 1), (T, 1)])
+    check('over 100 (G 120, B 110): 100, blue 100', hero(0, mp=HC | 120 << 8 | 110)[10:],
+          [(T, 1), F, (T, 101), (T, 1), (T, 101)])
+    check('B over G (50 / 60): blue G', hero(0, mp=HC | 50 << 8 | 60)[10:], [(T, 1), F, (T, 51), (T, 1), (T, 51)])
+    check('a wrong gauge marker: no gauge', hero(OPEN, mp=0x12340000 | 50 << 8 | 50)[10:], NOGAUGE)
+    check('blinking off: the gauge stays', hero(OPEN | 0x10, mp=HC | 73 << 8 | 62)[10:],
+          [(T, 1), (T, 74), (T, 63), (T, 1), (T, 74)])
     words = [r32(DEBUG_COUNTERS + 4 * i) for i in range(12)]
     if any(words):                              # a --debug build (trait_badge_cave.py --debug)
         print('debug counters: ' + ', '.join('%s %s' % (n, hex(w)) for n, w in zip(C.COUNTERS, words)))
-        check('debug: hook calls = updates run', words[0], 9)
+        check('debug: hook calls = updates run', words[0], 28)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

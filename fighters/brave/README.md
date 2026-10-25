@@ -173,3 +173,61 @@ window stays up 70 frames (decided_command_window_close_frame).
 
 Not yet: the MP bar above the panel (Ultimate's blue "MP 100" bar) and MP itself; the window's
 opening / closing animation.
+
+## v7 (`build/hero_v7.zip`): MP, the other 17 spells, Ultimate's menu
+
+**MP** (`brave.c` "Hero's MP", `brave_frame` in place of the per-frame `func_82`): 100 at most, full at the
+match's start (Entry) and after each stock (Rebirth, `func_235` → `brave_rebirth`); 1 back a second
+(`sp_recover_frame` 60), not while a special charges or the menu is open; 0.8x the damage his other
+moves deal (the other fighters' damage, through the position variables' slot `DAMAGE`, taken while his
+attack has hit; his specials don't count). Costs (Ultimate's `sp`): Frizz / Frizzle / Kafrizz 6 / 16 /
+36, Zap / Zapple / Kazap 8 / 18 / 42, Woosh / Swoosh / Kaswoosh 5 / 9 / 18; a charge pays for the highest
+level his MP covers (Kazap / Kaswoosh wait for the release instead of going off by themselves); with
+none, the spell fizzles: `SpecialLwFail` (N, S) or `SpecialHiEmpty` (a hop, no whirlwind). The menu
+greys out the spells he can't pay for and puts them last; choosing one: `SpecialLwFail`.
+
+**The gauge and the menu, from Ultimate's files**: `tools/brave_menu_art.py` reads Ultimate's battle
+HUD (`ui/layout/info/info_melee/info_melee/layout.arc`, `--menu-layout`; `tools/sarc.py`,
+`tools/bntx.py`): the part `p4_info_melee_lct_brave` gives the window, the one-row window of a cast spell,
+the cost window, the 16-frame spinning pointer, the gauge's pill and its blue / green fills, and their
+places (its panes) and behaviour (its animations: the pointer's spin, 2 frames a texture; names greyed
+x 107/255; the window greyed when the spell at the cursor is too dear; the fills stretched 1-159 px for
+0-100 MP; the cast spell's row window). The text (names, "MP", numbers) is the Wii U's FOT-Rodin, at
+Ultimate's sizes. The MSC writes three ints the panel cave reads (`tools/trait_badge_cave.py`):
+`0x1000009C` the gauge (MP, and what's left after the cost in view: green), `0x1000009E` the window
+(shown, cursor, opening / closing frame, cast, blinking in the last 2 seconds of the 8-second limit,
+the pointer's frame) and `0x1000009F` the rows' spells and which are greyed. The window opens and closes
+with a short vertical stretch (5 + 4 frames).
+
+**The spells** (`brave_lw_cast`; Ultimate's scripts for the motions, extra_kinds.json "motions" in
+Robin's free slots `0x220`-`0x26A`):
+- Heal: 11% healed. Sizz / Sizzle, Bang / Kaboom, Whack / Thwack, Snooze: articles 10 / 11 / 12 / 14
+  (`weapons/shot.c` + `flash.c` / `explosion.c` / `deathball.c` / `sleep.c`, weapon kinds 0x193-0x195,
+  0x197): a flame that bursts into a pillar on a hit, a bomb that explodes at its range's end or on a
+  hit, a curse that KOs a fighter it touches with Ultimate's chance (sent below the blast line), a gust
+  whose hitboxes put fighters to sleep (Effect 9).
+- Magic Burst (all his MP) / Kamikazee: the crash article (13, `placed.c` + `crash.c`) on him; Magic
+  Burst holds him in the air to frame 136; Kamikazee KOs him at its end.
+- Kaclang: invincible steel for 300 frames. Acceleratle: 600 frames of x2 speeds (`kirby_stat_cave.py`
+  profile 3 through the marker int `0x1000008E`, which Robin's Levin Sword code no longer touches).
+  Oomph: 720 frames of x1.15 damage; Psyche Up: x1.15 until his next hit lands (`strike_cave.py`'s
+  bit). Bounce: 720 frames of a reflector (x1.5 damage, x1.2 speed). Hocus Pocus: one of full MP, no
+  MP, 600 frames invincible or invisible, Oomph, Acceleratle, Psyche Up, a Kaboom, a Sizzle. Zoom: up
+  off the screen (intangible), then down above a fighter on the ground.
+
+**Bounce's reflector** (`tools/brave_reflect_cave.py`, tested by `tools/brave_reflect_test.py`): every
+fighter has room for reflector groups, but only a kind's own setup gives one a shape (Kirby's and
+Zelda's do, Robin's doesn't, so a reflector on Robin's kind wrote into an unused slot and nothing
+reflected). The first instruction of Robin's setup (`0x02F60194`) now goes through a cave that sets up
+reflector group 3 with one shape as Kirby's setup does (`REFL_GROUP_INIT` `0x02C6F5FC`, then
+`0x0200BD8C`); the MSC (`brave_reflect`) gives it its shape (`ShieldModule(0x2717, 3, ...)`) and turns
+it on / off. Robin gets the (unused) group too.
+
+Smaller: `tools/ultimate_acmd.py` maps `collision_attr_ice` to Smash 4's freezing (4, Lucas's PK
+Freeze: Kacrackle Slash freezes), `sleep_ex` to sleep, `virtualcenter` to the hip; Ultimate's `f32::NAN`
+shield damage is 0; `sys_misfire` (a spell failing) is the attack smoke. The effect bank has the spells'
+effects (75 sets; 10.9 MB, Robin's 2.5 MB included).
+
+Not checked in game: everything above (the executable caves are emulator-tested, the MSC isn't).
+Approximations: Oomph / Psyche Up are x1.15 damage (Ultimate: x1.2 and x1.1 knockback), Acceleratle one x2
+on every speed, Magic Burst doesn't scale with the MP spent, Whack's chance formula is used for Thwack.

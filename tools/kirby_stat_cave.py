@@ -2,6 +2,7 @@
 """Copy-ability trait stat boosts for Kirby: prints rpx_patch.py args (ADDR=VALUE words).
 
   python3 tools/rpx_patch.py IN.rpx OUT.rpx <other patches> $(python3 tools/kirby_stat_cave.py)
+  python3 tools/kirby_stat_cave.py --table     (the profile table's words only)
 
 Every fighter stat ("fighter_param", WorkModule category 3, e.g. 0x03000016 max air speed) is read
 through WorkModuleImpl::get_float (0x0200F628, vtable 0x10003224 +0x44), by the native movement code
@@ -21,12 +22,15 @@ Profiles (keep in sync with kirby_trait_profile() in fighters/kirby/kirby.c):
   1 = Rush: x1.25 on walk, dash, run, jump horizontal, air speed / acceleration, fall and fast fall
       speed. Not jump height, gravity, traction or landing lag.
   2 = Overdrive (Kirby's Corrin copy after 3 pummels): the Rush stats x1.25 x1.2 = x1.5.
+  3 = Hero's Acceleratle (any fighter writing the marker: fighters/brave/brave.c): walk, dash, run, jump
+      horizontal and air speeds x2.
 
 The cave sits in the free part of the dead Havok function used by the other Kirby caves
 (starcopy_cave.py zero-fills 0x037ED898-0x037EE740 and moves its relocations away, so this must come
 after it on the command line).
 """
 import struct
+import sys
 
 HOOK = 0x0200F628          # WorkModuleImpl::get_float
 # get_float of the WorkModuleImpl subclasses (identical code; fighters use 0x02F1DBE4), all hooked
@@ -46,6 +50,8 @@ FALL = (0x19, 0x1B)                    # max fall speed, fast fall speed
 PROFILES = {
     1: (WALK + DASH_RUN + JUMP_H + AIR + FALL, 1.25),   # Rush
     2: (WALK + DASH_RUN + JUMP_H + AIR + FALL, 1.25 * 1.2),   # Overdrive (Corrin copy): Rush x1.2
+    3: (WALK + DASH_RUN + JUMP_H + AIR, 2.0),   # Hero's Acceleratle (fighters/brave/brave.c brave_buff_update;
+                                                # Ultimate's speed_up_* x2-2.5, one multiplier here)
 }
 TABLE_ENTRIES = 8          # profiles 0-7 (the profile is masked to 3 bits); position_vars_cave.py uses the space after
 
@@ -152,8 +158,18 @@ def words():
     return out
 
 
+def table_words():
+    """the profile table alone: for an executable whose get_float path later caves have changed
+    (tools/position_vars_cave.py, acmd_ext_cave.py), e.g. tools/brave_build.py's"""
+    w = words()
+    n = len(code(0))
+    table = (CAVE + n * 4 + 7) & ~7
+    return {a: v for a, v in w.items() if table <= a < table + TABLE_ENTRIES * 8}
+
+
 def main():
-    print(" ".join("0x%08X=0x%08X" % (a, v) for a, v in sorted(words().items())))
+    w = table_words() if "--table" in sys.argv else words()
+    print(" ".join("0x%08X=0x%08X" % (a, v) for a, v in sorted(w.items())))
 
 
 if __name__ == "__main__":

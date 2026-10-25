@@ -1,5 +1,5 @@
 {
- "_about": "Ultimate sys_* effect -> Smash 4 common effect id (tools/ultimate_sys_effect_map.py, fighters: mario, zelda, marth, link, captain, fox, samus, kirby, pikachu, ike; by name where one matches)",
+ "_about": "Ultimate sys_* effect -> Smash 4 common effect id (tools/ultimate_sys_effect_map.py, fighters: mario, zelda, marth, link, captain, fox, samus, kirby, pikachu, ike; by name where one matches); sys_misfire (a spell failing: Hero) by hand: the attack smoke",
  "sys_down_smoke": "0x100000A",
  "sys_final_aura2": "0x10000F7",
  "sys_turn_smoke": "0x100001B",
@@ -45,5 +45,6 @@
  "sys_sleep": "0x100002E",
  "sys_sliding_smoke": "0x100008C",
  "sys_catch": "0x1000033",
- "sys_spin_wind_s": "0x1000045"
+ "sys_spin_wind_s": "0x1000045",
+ "sys_misfire": "0x1000020"
 }

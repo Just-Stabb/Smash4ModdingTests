@@ -1,154 +1,187 @@
 #!/usr/bin/env python3
-"""Hero's Command Selection window for the damage panel (fighters/brave/README.md), drawn after Ultimate's
-(the international version, as on SmashWiki's Hero_MP_Comparison.png): a translucent black window with
-rounded corners and a dark brown frame over the left of the panel, the four spell names in white, the gold
-pointer by the chosen one, and a small window "MP nn" (the chosen spell's cost) at its bottom right.
+"""Hero's Command Selection window and MP gauge for the damage panel (fighters/brave/README.md), from
+Ultimate's own: its battle HUD layout (ui/layout/info/info_melee/info_melee/layout.arc: the part
+p4_info_melee_lct_brave, its textures in timg/__Combined.bntx) gives the pieces and where they go.
 
-  python3 tools/brave_menu_art.py OUT_DIR [--font FONT.ttf]
+  python3 tools/brave_menu_art.py LAYOUT_ARC OUT_DIR [--font FONT.ttf]
 
-Writes OUT_DIR/window.png, cursor.png, name_<n>.png / name_<n>_grey.png (the 21 spells, n in the
-order of Ultimate's commands, param_special_lw_command_data: SPELLS; grey: not enough MP) and
-mp_<n>.png, all at ART_SCALE x the panel's units (LAYOUT: the 1-4 player panel's; tools/dmg_brave_menu.py
-places them). Drawn at 4x and scaled down. The font: give the Wii U's shared font, FOT-Rodin (Cemu's
-resources/sharedFonts/CafeStd.ttf), Ultimate's UI font family; without it Inter Medium stands in.
+Writes OUT_DIR/ (tools/dmg_brave_menu.py puts them on the panel):
+  window.png, window_grey.png  wnd_open_00 (p4_rep_info_melee_lct_brave_wind_00), grey: its white x 60/255
+                               (wnd_color_gray_out: the spell at the cursor costs more MP than he has)
+  hold.png                     wnd_hold_00 (wind_01): the cast spell's row alone (view_wnd_hold_0K)
+  cursor_<k>.png               arrow_00's 16 textures (p4_info_brave_cursor_*) in the order
+                               loop_anim_arrow shows them (15 down to 0, 2 frames each)
+  name_<n>.png / name_<n>_grey.png   the 21 spells' names (SPELLS, Ultimate's command order), white /
+                               x 107/255 (txt_gray_out), as set_txt_00 (FOT-Rodin, its size 22.08 x 33.12)
+  mp_<n>.png / mp_<n>_grey.png the cost window (wnd_cost_00: wind_02) with "MP" and spell n's cost as
+                               txt_cost_mp / set_txt_cost_mp place them (bottom aligned); grey as above
+  gauge.png                    the gauge's pill: bg_gauge_00 then frame_gauge_00 (windows of one frame
+                               texture, mp_gauge_00 / 03, mirrored on the right, its last column between)
+  fill_blue.png, fill_green.png  gauge_00 / gauge_01 (mp_gauge_04 / 05), stretched to 1 + 1.58 x MP px
+                               (guage_00 / 01: 1 at 0, 159 at 100)
+  gauge_label.png, digit_<d>.png  stxt_mp ("MP") and set_txt_mp's digits
+  layout.json                  where they go, in the 1-4 player panel's units (x right, y down): Ultimate's
+                               pane positions (y up, px) with the window's top left at WINDOW_AT and
+                               UNIT units a px (the earlier drawn window's place and size)
+The images are at Ultimate's pixel size (art_scale px a unit). The font: the Wii U's shared font,
+FOT-Rodin as Ultimate's (Cemu's resources/sharedFonts/CafeStd.ttf; not in the repository); without it
+Inter Medium stands in.
 """
 import argparse
+import json
 import os
+import sys
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-# the Wii U's shared font (FOT-Rodin, as Cemu's resources/sharedFonts/CafeStd.ttf; not in the repository):
-# --font; without it a close stand-in
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bntx  # noqa: E402
+import sarc  # noqa: E402
+
 FONT = '/usr/share/fonts/opentype/inter/Inter-Medium.otf'
 SS = 4
-ART_SCALE = 1.25
 # (name, MP cost: param_special_lw_command_data sp; Magic Burst uses all of it)
 SPELLS = [('Heal', 7), ('Sizz', 8), ('Sizzle', 20), ('Bang', 9), ('Kaboom', 37), ('Whack', 10),
           ('Thwack', 30), ('Magic Burst', None), ('Kamikazee', 1), ('Kaclang', 6), ('Acceleratle', 13),
           ('Oomph', 16), ('Bounce', 14), ('Snooze', 16), ('Hocus Pocus', 4), ('Zoom', 8),
           ('Flame Slash', 12), ('Kacrackle Slash', 11), ('Metal Slash', 6), ('Hatchet Man', 15),
           ('Psyche Up', 14)]
-# the 1-4 player panel's units (sprite 3 / 4; x right, y down; the panel is about x -230..200,
-# y -100..95): Ultimate's proportions (its window 410 x 243 over a panel ~520 wide)
-LAYOUT = dict(window=(-228, -100, 288, 172),     # left, top, w, h
-              name_x=-194, rows=(-71.6, -32.8, 6.1, 45.2), name_h=32, name_w=256,
-              cursor=(-224.5, 50, 24),           # centre x, w, h
-              mp=(122, 44, 114, 56))             # centre x, y, w, h
-WINDOW_FILL = (6, 4, 2, 132)
-FRAME_OUT = (22, 10, 6, 255)
-FRAME = (70, 36, 24, 255)
-FRAME_IN = (26, 12, 8, 230)
+TEX = 'p4_info_melee_lct_brave_%s^u'
+# p4_info_melee_lct_brave.bflyt's panes (px, y up, from the part's origin)
+WINDOW = (47, -13, 278, 168)                    # wnd_open_00: centre, size
+HOLD_H = 64                                     # wnd_hold_00
+ROWS = (42, 5, -31, -67)                        # set_parts_cmd_00-03 (select_00-03 put the arrow there)
+NAME_X = 13 - 68                                # set_txt_00 (left origin) in its part
+ARROW_X = -84                                   # nul_arrow_00 (arrow_00: 50 x 50)
+COST = (174, -67, 116, 64)                      # wnd_cost_00
+COST_NUM = (190 + 35 / 2.0, -67 - 20)           # set_txt_cost_mp: right, bottom (its 35 x 40 box)
+COST_LABEL = (157 - 38 / 2.0, -65 - 20)         # txt_cost_mp: left, bottom (38 x 40)
+COST_NUM_H, COST_LABEL_H = 36.92, 31.03
+GAUGE = (-8, 83, 172, 32)                       # null_gauge: bg_gauge_00 / frame_gauge_00
+FILL = (-8 - 80, 20, 1.0, 159.0)                # gauge_00 / 01: left, height, width at 0 / 100 MP
+GAUGE_NUM = (-8 + 73, 83 + 13)                  # set_txt_mp: right, centre
+GAUGE_LABEL = (-8 - 54, 83 + 10)                # stxt_mp: centre
+GAUGE_NUM_H, GAUGE_LABEL_H = 41.73, 31.03
+NAME_H = 33.12
+GREY_TEXT = 107.23 / 255                        # txt_gray_out / wnd_color_gray_out (the text)
+GREY_WINDOW = 59.898 / 255                      # wnd_color_gray_out (the windows' white)
+# the panel: the window's top left and the units a px
+WINDOW_AT = (-228, -100)
+UNIT = 288 / 278.0
 WHITE = (255, 255, 255, 255)
-GREY = (120, 120, 120, 255)
 
 
-def font(path, px):
-    return ImageFont.truetype(path, int(px))
+def units(x, y):
+    """Ultimate px (y up) -> the panel's units (y down)"""
+    left, top = WINDOW[0] - WINDOW[2] / 2.0, WINDOW[1] + WINDOW[3] / 2.0
+    return WINDOW_AT[0] + (x - left) * UNIT, WINDOW_AT[1] + (top - y) * UNIT
 
 
-def panel_window(w, h, radius):
-    """a translucent black window, rounded, with Ultimate's dark brown frame (an outer dark line, the
-    brown band, a dark inner line)"""
-    W, H, r = w * SS, h * SS, radius * SS
-    im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    o = int(0.9 * SS)
-    d.rounded_rectangle([o, o, W - 1 - o, H - 1 - o], r, fill=WINDOW_FILL, outline=FRAME_OUT, width=int(3.4 * SS))
-    b = int(2.9 * SS)
-    d.rounded_rectangle([o + b, o + b, W - 1 - o - b, H - 1 - o - b], r - b, outline=FRAME, width=int(2.8 * SS))
-    b2 = b + int(2.8 * SS)
-    d.rounded_rectangle([o + b2, o + b2, W - 1 - o - b2, H - 1 - o - b2], r - b2, outline=FRAME_IN, width=int(0.8 * SS))
-    return im.resize((w, h), Image.LANCZOS)
+def textures(arc):
+    files = sarc.read(open(arc, 'rb').read())
+    return {n: Image.fromarray(px, 'RGBA') for n, px in bntx.read_all(files['timg/__Combined.bntx']).items()}
 
 
-def window(scale):
-    _l, _t, w, h = LAYOUT['window']
-    return panel_window(round(w * scale), round(h * scale), 9 * scale)
+def tint(im, k):
+    """a material's white colour x k (black stays black)"""
+    r, g, b, a = im.split()
+    r, g, b = (c.point(lambda v: int(v * k + 0.5)) for c in (r, g, b))
+    return Image.merge('RGBA', (r, g, b, a))
 
 
-def mp_box(cost, path, scale):
-    _x, _y, w, h = LAYOUT['mp']
-    w, h = round(w * scale), round(h * scale)
-    im = panel_window(w, h, 8 * scale).resize((w * SS, h * SS), Image.LANCZOS)
-    d = ImageDraw.Draw(im)
-    big = font(path, h * SS * 0.56)
-    small = font(path, h * SS * 0.40)
-    num = 'ALL' if cost is None else str(cost)
-    gap = h * SS * 0.16
-    ws, wn = d.textlength('MP', font=small), d.textlength(num, font=big)
-    x = (w * SS - ws - gap - wn) / 2
-    y = h * SS * 0.53
-    st = int(h * SS * 0.05)
-    d.text((x, y), 'MP', font=small, fill=WHITE, anchor='lm', stroke_width=st, stroke_fill=(20, 10, 8, 255))
-    d.text((x + ws + gap, y), num, font=big, fill=WHITE, anchor='lm', stroke_width=st, stroke_fill=(20, 10, 8, 255))
-    return im.resize((w, h), Image.LANCZOS)
+def font_for(path, line_h):
+    """the font sized so that its line (ascent + descent) is line_h px, as a text pane's font size"""
+    f = ImageFont.truetype(path, 100)
+    a, d = f.getmetrics()
+    return ImageFont.truetype(path, max(1, int(round(100.0 * line_h * SS / (a + d)))))
 
 
-def name(text, colour, path, scale):
-    """the spell's name, left aligned and vertically centred, with a soft dark shadow"""
-    w, h = round(LAYOUT['name_w'] * scale), round(LAYOUT['name_h'] * scale)
-    W, H = w * SS, h * SS
-    f = font(path, H * 0.72)
-    txt = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(txt).text((SS * 2, H * 0.5), text, font=f, fill=colour, anchor='lm', stroke_width=int(SS * 0.15),
-                             stroke_fill=colour)
-    shadow = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).text((SS * 2 + SS, H * 0.5 + SS), text, font=f, fill=(0, 0, 0, 170), anchor='lm',
-                                stroke_width=SS, stroke_fill=(0, 0, 0, 170))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(SS * 0.8))
-    shadow.alpha_composite(txt)
-    return shadow.resize((w, h), Image.LANCZOS)
+def text(s, path, line_h, colour, outline=None, shadow=False):
+    """s in one line, its line box line_h high (plus the outline / shadow's margins)"""
+    f = font_for(path, line_h)
+    st = int(outline * SS) if outline else 0
+    d0 = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
+    w = int(d0.textlength(s, font=f)) + 2 * st + 4 * SS
+    a, dsc = f.getmetrics()
+    h = a + dsc + 2 * st + 2 * SS
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    if shadow:
+        sh = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(sh).text((st + 3 * SS, st + 2 * SS), s, font=f, fill=(0, 0, 0, 170))
+        im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(SS * 0.8)))
+    ImageDraw.Draw(im).text((st + 2 * SS, st + SS), s, font=f, fill=colour, stroke_width=st,
+                            stroke_fill=(16, 16, 20, 255))
+    return im.resize((max(1, w // SS), max(1, h // SS)), Image.LANCZOS)
 
 
-def cursor(scale):
-    """Dragon Quest's gold pointer: two round knobs and a tapered blade, pointing right"""
-    _x, w, h = LAYOUT['cursor']
-    w, h = round(w * scale), round(h * scale)
-    W, H = w * SS, h * SS
-    im = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    cy = H / 2
-    dark, mid, light, hi = (92, 52, 8, 255), (196, 128, 24, 255), (240, 190, 60, 255), (255, 240, 170, 255)
+def window_of_frame(tex, w, h):
+    """a window pane of one frame texture (its top left corner): the texture on the left, mirrored on the
+    right, its last column stretched between (the pill-shaped gauge: the texture is the full height)"""
+    cw = tex.width
+    t = tex.resize((cw, h), Image.LANCZOS) if tex.height != h else tex
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    im.alpha_composite(t, (0, 0))
+    im.alpha_composite(t.transpose(Image.FLIP_LEFT_RIGHT), (w - cw, 0))
+    im.alpha_composite(t.crop((cw - 1, 0, cw, h)).resize((w - 2 * cw, h)), (cw, 0))
+    return im
 
-    def ball(cx, r):
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=dark)
-        r2 = r * 0.84
-        d.ellipse([cx - r2, cy - r2, cx + r2, cy + r2], fill=mid)
-        d.ellipse([cx - r2 * 0.75, cy - r2 * 0.8, cx + r2 * 0.45, cy + r2 * 0.25], fill=light)
-        d.ellipse([cx - r2 * 0.45, cy - r2 * 0.6, cx - r2 * 0.05, cy - r2 * 0.25], fill=hi)
-    r1 = H * 0.34
-    ball(W * 0.15, r1)
-    ball(W * 0.33, r1 * 1.1)
-    x0, x1 = W * 0.40, W * 0.97
-    t = H * 0.20
-    d.polygon([(x0, cy - t), (x0 + (x1 - x0) * 0.55, cy - t * 0.85), (x1, cy), (x0 + (x1 - x0) * 0.55, cy + t * 0.85),
-               (x0, cy + t)], fill=dark)
-    t2 = t * 0.7
-    d.polygon([(x0 + SS, cy - t2), (x0 + (x1 - x0) * 0.55, cy - t2 * 0.85), (x1 - SS * 2, cy),
-               (x0 + (x1 - x0) * 0.55, cy + t2 * 0.85), (x0 + SS, cy + t2)], fill=light)
-    d.polygon([(x0 + SS, cy - t2), (x1 - SS * 2, cy), (x0 + SS, cy)], fill=hi)
-    shadow = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    shadow.putalpha(im.getchannel('A').point(lambda v: v * 3 // 5))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(SS))
-    base = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    base.alpha_composite(shadow, (SS, SS))
-    base.alpha_composite(im)
-    return base.resize((w, h), Image.LANCZOS)
+
+def cost_window(base, cost, path, colour):
+    im = base.copy()
+    left, top = COST[0] - COST[2] / 2.0, COST[1] + COST[3] / 2.0
+    num = text('ALL' if cost is None else str(cost), path, COST_NUM_H, colour)
+    lab = text('MP', path, COST_LABEL_H, colour)
+    # bottom aligned: the line boxes' bottoms where the panes put them
+    im.alpha_composite(num, (int(round(COST_NUM[0] - left - num.width + 2)), int(round(top - COST_NUM[1] - num.height))))
+    im.alpha_composite(lab, (int(round(COST_LABEL[0] - left - 2)), int(round(top - COST_LABEL[1] - lab.height))))
+    return im
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('layout_arc', help="Ultimate's ui/layout/info/info_melee/info_melee/layout.arc")
     ap.add_argument('out')
     ap.add_argument('--font', default=FONT)
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    s = ART_SCALE
-    window(s).save(os.path.join(a.out, 'window.png'))
-    cursor(s).save(os.path.join(a.out, 'cursor.png'))
-    for i, (nm, cost) in enumerate(SPELLS, 1):
-        name(nm, WHITE, a.font, s).save(os.path.join(a.out, 'name_%d.png' % i))
-        name(nm, GREY, a.font, s).save(os.path.join(a.out, 'name_%d_grey.png' % i))
-        mp_box(cost, a.font, s).save(os.path.join(a.out, 'mp_%d.png' % i))
+    tx = textures(a.layout_arc)
+
+    def save(im, name):
+        im.save(os.path.join(a.out, name))
+    wnd = tx['p4_rep_info_melee_lct_brave_wind_00^u']
+    save(wnd, 'window.png')
+    save(tint(wnd, GREY_WINDOW), 'window_grey.png')
+    save(tx['p4_rep_info_melee_lct_brave_wind_01^u'], 'hold.png')
+    for k in range(16):
+        save(tx['p4_info_brave_cursor_%02d^u' % (15 - k)], 'cursor_%d.png' % k)
+    grey = tuple(int(255 * GREY_TEXT + 0.5) for _ in range(3)) + (255,)
+    cost = tx['p4_rep_info_melee_lct_brave_wind_02^u']
+    for i, (nm, c) in enumerate(SPELLS, 1):
+        save(text(nm, a.font, NAME_H, WHITE, shadow=True), 'name_%d.png' % i)
+        save(text(nm, a.font, NAME_H, grey, shadow=True), 'name_%d_grey.png' % i)
+        save(cost_window(cost, c, a.font, WHITE), 'mp_%d.png' % i)
+        save(cost_window(tint(cost, GREY_WINDOW), c, a.font, grey), 'mp_%d_grey.png' % i)
+    gx, gy, gw, gh = GAUGE
+    pill = window_of_frame(tx[TEX % 'mp_gauge_00'], gw, gh)
+    pill.alpha_composite(window_of_frame(tx[TEX % 'mp_gauge_03'], gw, gh))
+    save(pill, 'gauge.png')
+    save(tx[TEX % 'mp_gauge_04'], 'fill_blue.png')
+    save(tx[TEX % 'mp_gauge_05'], 'fill_green.png')
+    save(text('MP', a.font, GAUGE_LABEL_H, WHITE, outline=2.2), 'gauge_label.png')
+    for dg in range(10):
+        save(text(str(dg), a.font, GAUGE_NUM_H, WHITE, outline=2.6), 'digit_%d.png' % dg)
+    wl, wt = units(WINDOW[0] - WINDOW[2] / 2.0, WINDOW[1] + WINDOW[3] / 2.0)
+    layout = dict(
+        art_scale=1.0 / UNIT,
+        window=[wl, wt, WINDOW[2] * UNIT, WINDOW[3] * UNIT],
+        hold_tops=[units(0, r + HOLD_H / 2.0)[1] for r in ROWS],
+        name_x=units(NAME_X, 0)[0], rows=[units(0, r)[1] for r in ROWS],
+        cursor_x=units(ARROW_X, 0)[0],
+        mp=list(units(COST[0], COST[1])) + [COST[2] * UNIT, COST[3] * UNIT],
+        gauge=[units(gx - gw / 2.0, 0)[0], units(0, gy)[1], gw * UNIT, gh * UNIT],
+        fill_left=units(FILL[0], 0)[0], fill_w=[FILL[2], FILL[3]],
+        gauge_label=list(units(*GAUGE_LABEL)), gauge_num=list(units(*GAUGE_NUM)))
+    json.dump(layout, open(os.path.join(a.out, 'layout.json'), 'w'), indent=1)
     print('%d spells -> %s' % (len(SPELLS), a.out))
 
 
