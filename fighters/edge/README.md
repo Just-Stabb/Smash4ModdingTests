@@ -572,3 +572,9 @@ The first of his specials (fighters/edge/specials.md: the plan, the move's logic
   plus 11 animations; effect bank test 56's plus the 20 Flare effects and 7 turned copies.
 - No sounds (none of his are converted yet).
 
+
+## Fix 11 (`build/hero_seph_fix11.zip`)
+
+`edge.mscsb` rebuilt with the fixed msclang (`tools/msclang_nested_call.patch`, fighters/brave/README.md
+fix 11): `edge_n_change` / `edge_n_loop`'s `MotionModule(..., edge_n_motion(edge_n_ground_motion()), ...)`
+never got `edge_n_motion`'s value (the stack a value off in his neutral special).

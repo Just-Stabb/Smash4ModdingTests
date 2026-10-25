@@ -13,7 +13,7 @@ how to write the same thing in MSC-C.
 ## 1. Workflow
 
 ```sh
-./tools/setup_toolchain.sh                         # once: clones mscdec + msclang, installs pycparser
+./tools/setup_toolchain.sh                         # once: clones mscdec + msclang (+ our fix), installs pycparser
 python3 tools/mscdec/mscdec.py -x tools/mscinfo.xml fighter.mscsb -o fighter.c
 # ...edit fighter.c...
 python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighter.c -o fighter.mscsb
@@ -296,3 +296,10 @@ global16 = myCancelCheck;
 
 `SPECIAL_HI_ACTION` is a placeholder: replace it with the fighter's SpecialHi
 action ID, from the decompiled file or the Actions tab.
+
+## Checking compiled scripts
+
+`python3 tools/msc_stack_check.py FILE.mscsb [SOURCE.c ...]` follows the value stack along every path of
+every script (the VM checks nothing: a script that leaves a value too many or too few corrupts what
+runs after it). Stock msclang got one case wrong: a call whose value is used, with calls in its own
+arguments (`f(g(x))`), never pushed `f`'s value; `tools/msclang_nested_call.patch` fixes it.

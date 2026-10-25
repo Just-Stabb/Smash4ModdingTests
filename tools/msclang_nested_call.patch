@@ -1,0 +1,32 @@
+diff --git a/msclang.py b/msclang.py
+index f960262..baebc17 100644
+--- a/msclang.py
++++ b/msclang.py
+@@ -351,11 +351,24 @@ def compileNode(node, loopParent=None, parentLoopCondition=None):
+                     nodeOut[-i].pushBit = True
+                     return
+                 elif type(nodeOut[-i]) == Command and not nodeOut[-i].command in range(0x38,0x3a):
++                    # a call's value: its own try pushes it. Only callFunc (0x2f) has one (set_main /
++                    # callFunc3 return nothing); the calls in its arguments come between the two with
++                    # theirs, so skip one try per callFunc passed (f(g(x)) used to mark g's try, and
++                    # f's value was never pushed)
++                    if nodeOut[-i].command != 0x2f:
++                        return
++                    depth = 0
++                    i += 1
+                     while i <= len(nodeOut):
+-                        if type(nodeOut[-i]) == Command and nodeOut[-i].command == 0x2e:
+-                            nodeOut[-i].pushBit = True
+-                            return
++                        if type(nodeOut[-i]) == Command and nodeOut[-i].command == 0x2f:
++                            depth += 1
++                        elif type(nodeOut[-i]) == Command and nodeOut[-i].command == 0x2e:
++                            if depth == 0:
++                                nodeOut[-i].pushBit = True
++                                return
++                            depth -= 1
+                         i += 1
++                    return
+                 i += 1
+ 
+     t = type(node)

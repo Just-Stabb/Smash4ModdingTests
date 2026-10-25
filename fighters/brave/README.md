@@ -260,3 +260,14 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 69 1=0.16 2=0.08 3=0.98
     31=8 32=18 33=101 34=2
 ```
 - Fix 10 (`build/steve_fix10.zip`): jump squat 3 frames (Ultimate's; Robin's 6): fighter_param 12.
+
+## Fix 11 (`build/hero_seph_fix11.zip`): the compiler bug behind his specials
+
+msclang compiled a call whose value is used and whose arguments call functions too (`f(g(x))`) with
+the push bit on the inner call's `try` instead of its own (`addArg` took the nearest `try` back), so
+`f`'s value never reached the stack. His MP checks are all `brave_can_pay(brave_*_cost(level))`: every
+frame of neutral / side / up special and the menu (`brave_*_hold_level`, `brave_*_loop`, `brave_lw_grey`
+/ `_draw` / `_loop`) left the VM stack a value off (no spells, wrong motions, no menu). Fixed in
+`tools/msclang_nested_call.patch` (applied by `tools/setup_toolchain.sh`); `tools/msc_stack_check.py`
+(the stack depth along every path of every script) found these 9 and nothing else in any fighter
+but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
