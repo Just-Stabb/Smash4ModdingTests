@@ -106,10 +106,32 @@
         "0x22F": {"anim": "FitRefletBodyMainD00SpecialNCancel", "flags": "0x0", "motion": "specialncancel"},
         "0x244": {"anim": "FitRefletBodyMainD00SpecialAirN2", "flags": "0x0", "motion": "specialairn2"},
         "0x245": {"anim": "FitRefletBodyMainD00SpecialAirN3", "flags": "0x0", "motion": "specialairn3"},
-        "0x24B": {"anim": "FitRefletBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel"}
+        "0x24B": {"anim": "FitRefletBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel"},
+        "0x230": {"anim": "FitRefletBodyMainD01SpecialS3", "flags": "0x0", "motion": "specials3 (Kazap: the sword raised; Thoron start variant slot)"},
+        "0x231": {"anim": "FitRefletBodyMainD01SpecialS32", "flags": "0x0", "motion": "specials32 (Kazap: the strike)"},
+        "0x24C": {"anim": "FitRefletBodyMainD01SpecialAirS3", "flags": "0x0", "motion": "specialairs3"},
+        "0x24D": {"anim": "FitRefletBodyMainD01SpecialAirS32", "flags": "0x0", "motion": "specialairs32"},
+        "0x257": {"anim": "FitRefletBodyMainD01SpecialS1", "flags": "0x0", "motion": "specials (Zap)"},
+        "0x258": {"anim": "FitRefletBodyMainD01SpecialSStart", "flags": "0x0", "motion": "specialsstart (custom-move slot)"},
+        "0x259": {"anim": "FitRefletBodyMainD01SpecialSHold", "flags": "0x0", "motion": "specialshold"},
+        "0x25A": {"anim": "FitRefletBodyMainD01SpecialS2", "flags": "0x0", "motion": "specials2 (Zapple)"},
+        "0x25B": {"anim": "FitRefletBodyMainD01SpecialAirS1", "flags": "0x0", "motion": "specialairs"},
+        "0x25C": {"anim": "FitRefletBodyMainD01SpecialAirSStart", "flags": "0x0", "motion": "specialairsstart"},
+        "0x25D": {"anim": "FitRefletBodyMainD01SpecialAirSHold", "flags": "0x0", "motion": "specialairshold"},
+        "0x25E": {"anim": "FitRefletBodyMainD01SpecialAirS2", "flags": "0x0", "motion": "specialairs2"},
+        "0x260": {"anim": "FitRefletBodyMainD02SpecialHiStart", "flags": "0x0", "motion": "specialhistart (custom-move slot)"},
+        "0x261": {"anim": "FitRefletBodyMainD02SpecialHiHold", "flags": "0x0", "motion": "specialhihold"},
+        "0x262": {"anim": "FitRefletBodyMainD02SpecialHi2", "flags": "0x0", "motion": "specialhi2 (Swoosh)"},
+        "0x263": {"anim": "FitRefletBodyMainD02SpecialHi3", "flags": "0x0", "motion": "specialhi3 (Kaswoosh; Elwind 2 slot)"},
+        "0x26C": {"anim": "FitRefletBodyMainD02SpecialAirHiStart", "flags": "0x0", "motion": "specialairhistart"},
+        "0x26D": {"anim": "FitRefletBodyMainD02SpecialAirHiHold", "flags": "0x0", "motion": "specialairhihold"},
+        "0x26E": {"anim": "FitRefletBodyMainD02SpecialAirHi2", "flags": "0x0", "motion": "specialairhi2"},
+        "0x26F": {"anim": "FitRefletBodyMainD02SpecialAirHi3", "flags": "0x0", "motion": "specialairhi3"}
       },
       "weapons": {
-        "fireball": {"kind": "0x190", "base": "thunder", "max": 3, "on_hit": 1}
+        "fireball": {"kind": "0x190", "base": "thunder", "max": 3, "on_hit": 1},
+        "spark": {"kind": "0x191", "base": "thunder", "max": 4, "on_hit": 1},
+        "tornado": {"kind": "0x192", "base": "thunder", "max": 2, "on_hit": 1}
       }
     }
   ],

@@ -83,3 +83,33 @@ Not yet: MP (every spell works; Ultimate's MP checks taken as passed), Zap / Woo
 Selection, the stored-charge glow on his hand (`brave_fire2_hold_flash` / `fire3_hold_flash`, status
 code in Ultimate), Frizz's damage drop at frame 30 (`ATK_POWER` 9 -> 6), the air shoot hop, his sounds
 (Robin's charge sound plays in the hold).
+
+## v4 (`build/hero_v4.zip`): Zap and Woosh
+
+Built as v3 (`tools/brave_build.py`, the effect bank with 18 more effects: 35 of his 103, 6.4 MB, five
+turned variants; motions `--add` the side / up special animations too, extra_kinds.json "motions").
+- Side special (status 0x153, Robin's Arcfire; `brave.c` `brave_s_*`): SpecialSStart, SpecialSHold while
+  held (Zapple from 9 frames, Kazap at 26, which goes off by itself), released -> SpecialS1 (Zap) /
+  S2 (Zapple); Kazap: SpecialS3 (the sword raised) then SpecialS32 at its frame 19 (the strike; Ultimate's
+  lightning starts 85 above at frame 10 and falls 10 a frame). The bolts are his own hitboxes. When one
+  hits, Zap's lightning lands on that fighter: the spark article (weapon kind 0x191, article 8) at its
+  player slot, once a fighter per cast. The slot is found from the last fighter hit's offset and the slot
+  positions (docs/position-variables.md); the spark waits 3 frames (activate_wait_frame) and hits for 8.
+  Motions: start 0x258 / 0x25C, hold 0x259 / 0x25D, Zap 0x257 / 0x25B, Zapple 0x25A / 0x25E, Kazap
+  0x230 + 0x231 / 0x24C + 0x24D (Thoron's slots).
+- Up special (status 0x154, Robin's Elwind; `brave_hi_*`): SpecialHiStart, SpecialHiHold (Swoosh from 10,
+  Kaswoosh at 28, by itself), then SpecialHi1 / 2 / 3: the tornado article (0x192, article 9) at his own
+  slot's position at frame 4 / 6 / 8 (24 / 33 / 52 frames, param_tornado), the rise from frame 5 / 12 / 11.
+  Ultimate's rise is jump_distance 42 / 64 / 99 at jump_accel_y 0.145 / 0.16 / 0.1. Here it starts at
+  sqrt(2 x distance x accel) and slows by that accel to 0. Then the slowed fall (end_accel_y x0.96,
+  end_max_speed_y) runs to the motion's end -> SpecialFall; landing -> LandingFallSpecial. Ledges from
+  frame 11 / 20 / 18 (Robin's `func_56`); the charge's air fall held to 0.45. Motions: start 0x260 / 0x26C,
+  hold 0x261 / 0x26D, Woosh 0x25F / 0x26B, Swoosh 0x262 / 0x26E, Kaswoosh 0x263 / 0x26F.
+- Articles: `weapons/thunder_base.c` (Robin's thunder MSC up to `func_40`) + `fireball.c`, or + `placed.c`
+  + `spark.c` / `tornado.c`. Placed articles read level + 4 x slot from their custom number and move to
+  that slot's fighter (the position variables). A hit keeps them on ("on_hit": 1, instead of thunder's
+  removal). Their scripts are Ultimate's `brave_spark` / `brave_tornado`.
+
+Not yet: Command Selection (down special: still Robin's Nosferatu), MP, Kazap's armour (15 damage), the
+air hop when Zap hits, Woosh's sideways speed params (his normal air control), the special-fall landing
+lag per level (12 / 22 / 29), sounds.

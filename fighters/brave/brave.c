@@ -36369,12 +36369,12 @@ void func_2243()
     sv_set_mem(0x1, 0, 0x15b, func_2312);
     sv_set_mem(0x1, 0x1, 0x15b, func_2313);
     sv_set_mem(0x1, 0x2, 0x15b, func_2315);
-    sv_set_mem(0x1, 0, 0x153, func_2316);
-    sv_set_mem(0x1, 0x1, 0x153, func_2317);
-    sv_set_mem(0x1, 0x2, 0x153, func_2319);
-    sv_set_mem(0x1, 0, 0x154, func_2320);
-    sv_set_mem(0x1, 0x1, 0x154, func_2321);
-    sv_set_mem(0x1, 0x2, 0x154, func_2323);
+    sv_set_mem(0x1, 0, 0x153, brave_s_pre);   // Hero: Zap / Zapple / Kazap (was Arcfire func_2316-func_2319)
+    sv_set_mem(0x1, 0x1, 0x153, brave_s_main);
+    sv_set_mem(0x1, 0x2, 0x153, brave_n_end);
+    sv_set_mem(0x1, 0, 0x154, brave_hi_pre);  // Hero: Woosh / Swoosh / Kaswoosh (was Elwind func_2320-func_2323)
+    sv_set_mem(0x1, 0x1, 0x154, brave_hi_main);
+    sv_set_mem(0x1, 0x2, 0x154, brave_n_end);
     sv_set_mem(0x1, 0, 0x15c, func_2324);
     sv_set_mem(0x1, 0x1, 0x15c, func_2325);
     sv_set_mem(0x1, 0x2, 0x15c, func_2327);
@@ -38510,13 +38510,19 @@ void brave_n_air()
     }
 }
 
-void brave_n_generate()
+// an article with its custom number (the custom N slot while it's generated: the weapon's 0x10000005)
+void brave_generate(int article, int custom)
 {
     int slot;
     slot = WorkModule(0x6, 0x10000048);
-    WorkModule(0x7, brave_n_level, 0x10000048);
-    ArticleModule(0x2710, 0x7);
+    WorkModule(0x7, custom, 0x10000048);
+    ArticleModule(0x2710, article);
     WorkModule(0x7, slot, 0x10000048);
+}
+
+void brave_n_generate()
+{
+    brave_generate(0x7, brave_n_level);
     brave_n_fired = 0x1;
 }
 
@@ -38613,4 +38619,497 @@ void brave_n_main()
 void brave_n_end()
 {
     
+}
+
+// ---- Hero's side special: Zap / Zapple / Kazap (status 0x153, Robin's Arcfire; fighters/brave/README.md).
+// SpecialSStart (8 frames), then SpecialSHold while special is held; Zapple from 9 frames held, Kazap at 26
+// (param_special_s hold_frame_m / _l; hold_frame_max 26: it goes off by itself). Released -> SpecialS1 (Zap)
+// / S2 (Zapple); Kazap: SpecialS3 (the sword raised; Ultimate's lightning reaches him at about frame 19: it
+// starts 85 above at frame 10, 10 a frame) then SpecialS32 (the strike). The bolts are his own hitboxes; when
+// one hits a fighter, Zap's lightning lands on that fighter: the spark article (article 8, weapon kind 0x191,
+// weapons/spark.c) at its player slot (custom number level + 4 x slot; the slot found from the last fighter
+// hit's offset, docs/position-variables.md), once a fighter per cast. Motions (ground / air): start 0x258 /
+// 0x25C, hold 0x259 / 0x25D, Zap 0x257 / 0x25B, Zapple 0x25A / 0x25E, Kazap 0x230 / 0x24C and 0x231 / 0x24D.
+int brave_s_state;
+int brave_s_hold;
+int brave_s_level;
+int brave_s_released;
+int brave_s_sparked;
+
+// the player slot (0-7) of the fighter at (x, y), -1 if none (an empty slot reads facing 0)
+int brave_slot_of(float x, float y)
+{
+    int s;
+    float dx;
+    float dy;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - x;
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - y;
+            if (dx < 1.0f && dx > -1.0f && dy < 1.0f && dy > -1.0f)
+            {
+                return s;
+            }
+        }
+        s += 1;
+    }
+    return -1;
+}
+
+int brave_self_slot()
+{
+    float x;
+    float y;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    return brave_slot_of(x, y);
+}
+
+// 1 << s for s 0-7
+int brave_bit(int s)
+{
+    int b;
+    int i;
+    b = 0x1;
+    i = 0;
+    while (i < s)
+    {
+        b = b * 0x2;
+        i += 1;
+    }
+    return b;
+}
+
+int brave_s_ground_motion()
+{
+    if (brave_s_state == 0x1)
+    {
+        return 0x259;
+    }
+    if (brave_s_state == 0x2)
+    {
+        if (brave_s_level == 0)
+        {
+            return 0x257;
+        }
+        return 0x25a;
+    }
+    if (brave_s_state == 0x3)
+    {
+        return 0x230;
+    }
+    if (brave_s_state == 0x4)
+    {
+        return 0x231;
+    }
+    return 0x258;
+}
+
+int brave_s_air_motion()
+{
+    if (brave_s_state == 0x1)
+    {
+        return 0x25d;
+    }
+    if (brave_s_state == 0x2)
+    {
+        if (brave_s_level == 0)
+        {
+            return 0x25b;
+        }
+        return 0x25e;
+    }
+    if (brave_s_state == 0x3)
+    {
+        return 0x24c;
+    }
+    if (brave_s_state == 0x4)
+    {
+        return 0x24d;
+    }
+    return 0x25c;
+}
+
+void brave_s_change(int state)
+{
+    int g;
+    int a;
+    brave_s_state = state;
+    g = brave_s_ground_motion();
+    a = brave_s_air_motion();
+    WorkModule(0x7, g, 0x11000002);
+    WorkModule(0x7, a, 0x11000003);
+    if (global18 == 0x2)
+    {
+        g = a;
+    }
+    func_22(g, 0, 1.0f);
+}
+
+// the bolt hit a fighter: the lightning on it (once a fighter)
+void brave_s_spark()
+{
+    float x;
+    float y;
+    int s;
+    int b;
+    if (WorkModuleF(0, 0x0f0000a0) < 0.5f)
+    {
+        return;
+    }
+    x = WorkModuleF(0, 0x0f000055) * WorkModuleF(0, 0x0f000003) + WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000056) + WorkModuleF(0, 0x0f000001);
+    s = brave_slot_of(x, y);
+    if (s < 0)
+    {
+        return;
+    }
+    b = brave_bit(s);
+    if ((brave_s_sparked / b) % 0x2 == 0x1)
+    {
+        return;
+    }
+    brave_s_sparked = brave_s_sparked + b;
+    brave_generate(0x8, brave_s_level + 0x4 * s);
+}
+
+void brave_s_loop()
+{
+    float f;
+    func_2245(StatusModule(0x6));
+    if (ControlModule(0x2712, 0x1) == 0)
+    {
+        brave_s_released = 0x1;
+    }
+    f = MotionModuleF(0x1);
+    if (brave_s_state == 0)
+    {
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_s_change(0x1);
+        }
+    }
+    else if (brave_s_state == 0x1)
+    {
+        brave_s_hold += 1;
+        if (brave_s_hold >= 0x1a)
+        {
+            brave_s_level = 0x2;
+            brave_s_change(0x3);
+        }
+        else if (brave_s_released)
+        {
+            brave_s_level = 0;
+            if (brave_s_hold >= 0x9)
+            {
+                brave_s_level = 0x1;
+            }
+            brave_s_change(0x2);
+        }
+        else if (MotionModule(0x2712) == 0x1)
+        {
+            brave_s_change(0x1);    // the hold loops
+        }
+    }
+    else if (brave_s_state == 0x3)
+    {
+        if (f >= 19.0f)
+        {
+            brave_s_change(0x4);
+        }
+    }
+    else
+    {
+        brave_s_spark();
+        if (func_2246())
+        {
+            return;
+        }
+    }
+}
+
+int brave_s_pre()
+{
+    printf("status_pre_SpecialS (Hero)");
+    func_69();
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1190, 0x1000, 0x80, 0x1000);
+    return 0;
+}
+
+void brave_s_main()
+{
+    printf("status_SpecialS (Hero)");
+    brave_s_state = 0;
+    brave_s_hold = 0;
+    brave_s_level = 0;
+    brave_s_released = 0;
+    brave_s_sparked = 0;
+    WorkModule(0x7, 0x258, 0x11000002);
+    WorkModule(0x7, 0x25c, 0x11000003);
+    WorkModule(0x7, 0x6, 0x11000004);
+    WorkModule(0x7, 0xa, 0x11000005);
+    WorkModule(0x7, 0x2, 0x11000006);
+    WorkModule(0x7, 0x5, 0x11000007);
+    func_2245(0x1);
+    func_78(brave_s_loop);
+}
+
+// ---- Hero's up special: Woosh / Swoosh / Kaswoosh (status 0x154, Robin's Elwind; fighters/brave/README.md).
+// SpecialHiStart (4 frames), then SpecialHiHold while special is held; Swoosh from 10 frames held, Kaswoosh
+// at 28 (param_special_hi hold_frame_m / _l; hold_frame_max 28: it goes off by itself). Then SpecialHi1 / 2 / 3:
+// the whirlwind (the tornado article, article 9, weapon kind 0x192, weapons/tornado.c, put at his own player
+// slot) at frame 4 / 6 / 8, and he rises from frame 5 / 12 / 11 (the game script's JUMP_START): Ultimate's
+// rise is jump_distance_* 42 / 64 / 99 at jump_accel_y_* 0.145 / 0.16 / 0.1 a frame, here a start speed of
+// sqrt(2 x distance x accel) slowed by that accel to 0, then end_accel_y 0.96 x his gravity with
+// end_max_speed_y_* 0.955 / 0.828 / 0.86 x his fall speed (Robin's 0.089 / 1.5) to the motion's end, then
+// SpecialFall (0x10); landing -> LandingFallSpecial (0x19). Ledges from frame 11 / 20 / 18 (the game
+// script's cliff check; Robin's func_56). In the air while charging: the fall held to 0.3 x (start_max_speed_y_mul_air).
+// Motions (ground / air): start 0x260 / 0x26C, hold 0x261 / 0x26D, Woosh 0x25F / 0x26B, Swoosh 0x262 /
+// 0x26E, Kaswoosh 0x263 / 0x26F.
+int brave_hi_state;
+int brave_hi_hold;
+int brave_hi_level;
+int brave_hi_released;
+int brave_hi_tornado;
+int brave_hi_launched;
+int brave_hi_rising;
+
+int brave_hi_jump_motion(int air)
+{
+    if (brave_hi_level == 0x1)
+    {
+        if (air)
+        {
+            return 0x26e;
+        }
+        return 0x262;
+    }
+    if (brave_hi_level == 0x2)
+    {
+        if (air)
+        {
+            return 0x26f;
+        }
+        return 0x263;
+    }
+    if (air)
+    {
+        return 0x26b;
+    }
+    return 0x25f;
+}
+
+void brave_hi_change(int state)
+{
+    int g;
+    int a;
+    brave_hi_state = state;
+    g = 0x260;
+    a = 0x26c;
+    if (state == 0x1)
+    {
+        g = 0x261;
+        a = 0x26d;
+    }
+    else if (state == 0x2)
+    {
+        g = brave_hi_jump_motion(0);
+        a = brave_hi_jump_motion(0x1);
+    }
+    WorkModule(0x7, g, 0x11000002);
+    WorkModule(0x7, a, 0x11000003);
+    if (global18 == 0x2)
+    {
+        g = a;
+    }
+    func_22(g, 0, 1.0f);
+}
+
+// the level's frames: kind 0 the whirlwind, 1 the rise, 2 ledges
+int brave_hi_frame(int kind)
+{
+    if (brave_hi_level == 0x1)
+    {
+        if (kind == 0)
+        {
+            return 0x6;
+        }
+        if (kind == 0x1)
+        {
+            return 0xc;
+        }
+        return 0x14;
+    }
+    if (brave_hi_level == 0x2)
+    {
+        if (kind == 0)
+        {
+            return 0x8;
+        }
+        if (kind == 0x1)
+        {
+            return 0xb;
+        }
+        return 0x12;
+    }
+    if (kind == 0)
+    {
+        return 0x4;
+    }
+    if (kind == 0x1)
+    {
+        return 0x5;
+    }
+    return 0xb;
+}
+
+void brave_hi_launch()
+{
+    float v;
+    float a;
+    v = 3.49f;
+    a = 0.145f;
+    if (brave_hi_level == 0x1)
+    {
+        v = 4.525f;
+        a = 0.16f;
+    }
+    else if (brave_hi_level == 0x2)
+    {
+        v = 4.45f;
+        a = 0.1f;
+    }
+    func_20(0x2);
+    GroundModule(0x2710, 0x5);
+    KineticModule(0, 0xa);
+    KineticModule(0x11, 0x1, v);
+    KineticModule(0xf, 0x1, -a);
+    brave_hi_launched = 0x1;
+    brave_hi_rising = 0x1;
+}
+
+void brave_hi_fall()
+{
+    float m;
+    m = 1.4325f;
+    if (brave_hi_level == 0x1)
+    {
+        m = 1.242f;
+    }
+    else if (brave_hi_level == 0x2)
+    {
+        m = 1.29f;
+    }
+    KineticModule(0xf, 0x1, -0.08544f);
+    KineticModule(0x14, 0x1, m);
+}
+
+void brave_hi_loop()
+{
+    float f;
+    int s;
+    if (brave_hi_state < 0x2)
+    {
+        func_2245(StatusModule(0x6));
+    }
+    if (ControlModule(0x2712, 0x1) == 0)
+    {
+        brave_hi_released = 0x1;
+    }
+    f = MotionModuleF(0x1);
+    if (brave_hi_state == 0)
+    {
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_hi_change(0x1);
+        }
+    }
+    else if (brave_hi_state == 0x1)
+    {
+        brave_hi_hold += 1;
+        if (brave_hi_hold >= 0x1c || brave_hi_released)
+        {
+            brave_hi_level = 0;
+            if (brave_hi_hold >= 0x1c)
+            {
+                brave_hi_level = 0x2;
+            }
+            else if (brave_hi_hold >= 0xa)
+            {
+                brave_hi_level = 0x1;
+            }
+            brave_hi_change(0x2);
+        }
+    }
+    else
+    {
+        if (brave_hi_tornado == 0 && f >= (float)brave_hi_frame(0))
+        {
+            s = brave_self_slot();
+            brave_hi_tornado = 0x1;
+            brave_generate(0x9, brave_hi_level + 0x4 * s);
+        }
+        if (brave_hi_launched == 0 && f >= (float)brave_hi_frame(0x1))
+        {
+            brave_hi_launch();
+        }
+        else if (brave_hi_rising && KineticModuleF(0x1, 0x1) <= 0)
+        {
+            brave_hi_rising = 0;
+            brave_hi_fall();
+        }
+        if (brave_hi_launched)
+        {
+            if (f >= (float)brave_hi_frame(0x2) && func_56())
+            {
+                return;
+            }
+            if (global19 != 0 && global18 == 0)
+            {
+                func_16(0x19, 0);
+                return;
+            }
+        }
+        if (MotionModule(0x2712) == 0x1)
+        {
+            func_16(0x10, 0);
+            return;
+        }
+    }
+    if (brave_hi_state < 0x2 && global18 == 0x2)
+    {
+        KineticModule(0x14, 0x1, 0.45f);
+    }
+}
+
+int brave_hi_pre()
+{
+    printf("status_pre_SpecialHi (Hero)");
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x11422, 0x1000, 0x100, 0x1000);
+    return 0;
+}
+
+void brave_hi_main()
+{
+    printf("status_SpecialHi (Hero)");
+    brave_hi_state = 0;
+    brave_hi_hold = 0;
+    brave_hi_level = 0;
+    brave_hi_released = 0;
+    brave_hi_tornado = 0;
+    brave_hi_launched = 0;
+    brave_hi_rising = 0;
+    WorkModule(0x7, 0x260, 0x11000002);
+    WorkModule(0x7, 0x26c, 0x11000003);
+    WorkModule(0x7, 0x6, 0x11000004);
+    WorkModule(0x7, 0xa, 0x11000005);
+    WorkModule(0x7, 0x2, 0x11000006);
+    WorkModule(0x7, 0x5, 0x11000007);
+    func_2245(0x1);
+    func_78(brave_hi_loop);
 }

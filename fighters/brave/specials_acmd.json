@@ -1,15 +1,109 @@
 {
-  "_about": "Hero's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in Robin's neutral special motion slots (Thunder's start / hold / shoot; the shoot's custom-move variants 0x228 / 0x229 and Thoron's start 0x22F take the extra animations, named by extra_kinds.json \"motions\"); fighters/brave/README.md",
+  "_about": "Hero's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in Robin's special motion slots (a \"slot\" names the slot whose motion.mtable entry gets the script: the custom-move variants of Robin's specials and Thoron's slots take the extra animations, named by extra_kinds.json \"motions\"); fighters/brave/README.md",
   "SpecialNStart": "specialnstart",
   "SpecialNHold": "specialnhold",
   "SpecialN1": "specialnshoot",
-  "SpecialN2": {"name": "specialn2", "slot": "0x228"},
-  "SpecialN3": {"name": "specialn3", "slot": "0x229"},
-  "SpecialNCancel": {"name": "specialncancel", "slot": "0x22F"},
+  "SpecialN2": {
+    "name": "specialn2",
+    "slot": "0x228"
+  },
+  "SpecialN3": {
+    "name": "specialn3",
+    "slot": "0x229"
+  },
+  "SpecialNCancel": {
+    "name": "specialncancel",
+    "slot": "0x22F"
+  },
   "SpecialAirNStart": "specialairnstart",
   "SpecialAirNHold": "specialairnhold",
   "SpecialAirN1": "specialairnshoot",
-  "SpecialAirN2": {"name": "specialairn2", "slot": "0x244"},
-  "SpecialAirN3": {"name": "specialairn3", "slot": "0x245"},
-  "SpecialAirNCancel": {"name": "specialairncancel", "slot": "0x24B"}
+  "SpecialAirN2": {
+    "name": "specialairn2",
+    "slot": "0x244"
+  },
+  "SpecialAirN3": {
+    "name": "specialairn3",
+    "slot": "0x245"
+  },
+  "SpecialAirNCancel": {
+    "name": "specialairncancel",
+    "slot": "0x24B"
+  },
+  "SpecialS1": "specials",
+  "SpecialSStart": {
+    "name": "specialsstart",
+    "slot": "0x258"
+  },
+  "SpecialSHold": {
+    "name": "specialshold",
+    "slot": "0x259"
+  },
+  "SpecialS2": {
+    "name": "specials2",
+    "slot": "0x25A"
+  },
+  "SpecialS3": {
+    "name": "specials3",
+    "slot": "0x230"
+  },
+  "SpecialS32": {
+    "name": "specials32",
+    "slot": "0x231"
+  },
+  "SpecialAirS1": "specialairs",
+  "SpecialAirSStart": {
+    "name": "specialairsstart",
+    "slot": "0x25C"
+  },
+  "SpecialAirSHold": {
+    "name": "specialairshold",
+    "slot": "0x25D"
+  },
+  "SpecialAirS2": {
+    "name": "specialairs2",
+    "slot": "0x25E"
+  },
+  "SpecialAirS3": {
+    "name": "specialairs3",
+    "slot": "0x24C"
+  },
+  "SpecialAirS32": {
+    "name": "specialairs32",
+    "slot": "0x24D"
+  },
+  "SpecialHi1": "specialhi",
+  "SpecialHiStart": {
+    "name": "specialhistart",
+    "slot": "0x260"
+  },
+  "SpecialHiHold": {
+    "name": "specialhihold",
+    "slot": "0x261"
+  },
+  "SpecialHi2": {
+    "name": "specialhi2",
+    "slot": "0x262"
+  },
+  "SpecialHi3": {
+    "name": "specialhi3",
+    "slot": "0x263"
+  },
+  "SpecialAirHi1": "specialairhi",
+  "SpecialAirHiStart": {
+    "name": "specialairhistart",
+    "slot": "0x26C"
+  },
+  "SpecialAirHiHold": {
+    "name": "specialairhihold",
+    "slot": "0x26D"
+  },
+  "SpecialAirHi2": {
+    "name": "specialairhi2",
+    "slot": "0x26E"
+  },
+  "SpecialAirHi3": {
+    "name": "specialairhi3",
+    "slot": "0x26F"
+  }
 }

@@ -13,9 +13,9 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
   his effects (fighters/brave/brave_effects.json), the bone-turned ones moved to their variants
   (tools/effect_variants.py apply); param/fighter/fighter_param_vl_brave.bin;
 - fighter/brave/script/msc/brave.mscsb from fighters/brave/brave.c;
-- the fireball article (tools/extra_kinds.json "weapons"): script/msc/fireball/fireball.mscsb from
-  fighters/brave/weapons/fireball.c and script/animcmd/weapon/fireball/ (Ultimate's brave_fireball
-  scripts: FIREBALL_MOTIONS);
+- his articles (tools/extra_kinds.json "weapons": fireball, spark, tornado): script/msc/<name>/<name>.mscsb
+  from fighters/brave/weapons/ (thunder_base.c + fireball.c, or + placed.c + spark.c / tornado.c) and
+  script/animcmd/weapon/<name>/ (Ultimate's brave_<name> scripts: ARTICLES);
 - --rpx: code/cross_f.rpx = IN.rpx + kind_expand / weapon_expand / base_effects_cave / base_customs_cave /
   trail_table_cave (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
@@ -39,10 +39,19 @@ import ultimate_acmd as U  # noqa: E402
 
 BRAVE = os.path.join(ROOT, 'fighters', 'brave')
 CONDS = ['SUCCESS_SP']          # the MP checks: no MP yet, every cast works
-# the fireball's motion slots (fireball.c: func_24(level) flies, func_24(3 + level) bursts); thunder's
-# motion info has 24 entries, the rest name empty scripts
-FIREBALL_MOTIONS = ('specialn1', 'specialn2', 'specialn3', 'bursts', 'burstm', 'burstl') + tuple(
-    'fireballnone%d' % i for i in range(6, 24))
+# the articles' motion slots (thunder's motion info has 24 entries, the rest name empty scripts): the fireball
+# (fireball.c: func_24(level) flies, func_24(3 + level) bursts), spark / tornado (placed.c: func_24(level),
+# 23 while the spark waits)
+def _slots(name, used):
+    return tuple(used) + tuple('%snone%d' % (name, i) for i in range(len(used), 24))
+
+
+ARTICLES = {
+    'fireball': (_slots('fireball', ('specialn1', 'specialn2', 'specialn3', 'bursts', 'burstm', 'burstl')),
+                 {'fireball1': 0, 'fireball2': 0}),             # Frizzle's two balls
+    'spark': (_slots('spark', ('specials1', 'specials2', 'specials32')), {}),
+    'tornado': (_slots('tornado', ('specialhi1', 'specialhi2', 'specialhi3')), {'tornado1': 0, 'tornado2': 0}),
+}
 CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave')
 
 
@@ -53,9 +62,16 @@ def run(*argv):
     return r.stdout
 
 
-def compile_msc(src, out_path):
+def compile_msc(srcs, out_path):
+    """srcs compiled as one file (an article's: weapons/thunder_base.c then its own)"""
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    run(os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'), src, '-o', out_path)
+    with tempfile.NamedTemporaryFile('w', suffix='.c', delete=False) as f:
+        for src in srcs:
+            f.write(open(src).read() + '\n')
+    try:
+        run(os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'), f.name, '-o', out_path)
+    finally:
+        os.unlink(f.name)
     assert os.path.getsize(out_path) > 0
 
 
@@ -81,28 +97,28 @@ def body_scripts(a, fighter, param):
     return log
 
 
-def fireball_scripts(a, wdir):
-    """the fireball's game / effect scripts from Ultimate's brave_fireball ones (hitboxes and effects on its
-    bone 0: it has no model, Frizzle's two balls are one); sound empty (his sounds aren't converted yet)"""
+def article_scripts(a, name, wdir):
+    """an article's game / effect scripts from Ultimate's brave_<name> ones (hitboxes and effects on its bone
+    0: it has no model); sound empty (his sounds aren't converted yet)"""
+    motions, joints = ARTICLES[name]
     ids = {}
     for path in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(BRAVE, 'brave_effects.json')):
         ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
     game, effect = {}, {}
     U.EFFECT_CONDS = (U.LR_LEFT,)
-    joints = {'fireball1': 0, 'fireball2': 0}       # Frizzle's two balls (bones of Ultimate's article model)
     gtr, etr = U.Translator(joints), U.EffectTranslator(joints, ids, {})
-    src_dir = os.path.join(a.dump, 'brave_fireball')
+    src_dir = os.path.join(a.dump, 'brave_' + name)
     for fname in sorted(os.listdir(src_dir)):
-        name = fname[:-4].lower()
+        mo = fname[:-4].lower()
         fns = U.functions(open(os.path.join(src_dir, fname)).read())
-        assert name in FIREBALL_MOTIONS, name
-        game[name] = gtr.script(fns['game_' + name]) if 'game_' + name in fns else [acmd.Command(acmd.END)]
+        assert mo in motions, mo
+        game[mo] = gtr.script(fns['game_' + mo]) if 'game_' + mo in fns else [acmd.Command(acmd.END)]
         etr.last = False
-        effect[name] = etr.script(fns['effect_' + name])
-        if name.startswith('burst'):
+        effect[mo] = etr.script(fns['effect_' + mo]) if 'effect_' + mo in fns else [acmd.Command(acmd.END)]
+        if mo.startswith('burst'):
             # the explosion plays out after the article is removed (fireball.c removes it after the
             # burst's frames; Ultimate's scripts at a notify)
-            for c in effect[name]:
+            for c in effect[mo]:
                 if c.name.startswith('Graphic_Effect'):
                     c.params[-1] = 0
     U.EFFECT_CONDS = ()
@@ -110,10 +126,10 @@ def fireball_scripts(a, wdir):
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
     for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
-        acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in FIREBALL_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
+        acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in motions}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
-        f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FIREBALL_MOTIONS))
-    return 'fireball: %s; left out %s %s' % (', '.join(sorted(game)), gtr.skipped, etr.skipped)
+        f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in motions))
+    return '%s: %s; left out %s %s' % (name, ', '.join(sorted(game)), gtr.skipped, etr.skipped)
 
 
 def main():
@@ -129,9 +145,12 @@ def main():
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
 
     msc = os.path.join(fighter, 'script/msc')
-    compile_msc(os.path.join(BRAVE, 'brave.c'), os.path.join(msc, 'brave.mscsb'))
-    compile_msc(os.path.join(BRAVE, 'weapons/fireball.c'), os.path.join(msc, 'fireball/fireball.mscsb'))
-    print(fireball_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/fireball')))
+    compile_msc([os.path.join(BRAVE, 'brave.c')], os.path.join(msc, 'brave.mscsb'))
+    w = os.path.join(BRAVE, 'weapons')
+    for name in ARTICLES:
+        srcs = [os.path.join(w, 'thunder_base.c')] + ([os.path.join(w, 'placed.c')] if name != 'fireball' else [])
+        compile_msc(srcs + [os.path.join(w, name + '.c')], os.path.join(msc, name, name + '.mscsb'))
+        print(article_scripts(a, name, os.path.join(fighter, 'script/animcmd/weapon', name)))
 
     if a.rpx:
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)
