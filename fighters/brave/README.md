@@ -259,3 +259,4 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 69 1=0.16 2=0.08 3=0.98
     14=0.8 15=1.2 16=1 17=23.8 18=13.95 19=31 20=0.045 21=0.01 22=1.01 23=0.008 24=0.094 25=1.57 27=2.512 28=10 29=12 30=14 \
     31=8 32=18 33=101 34=2
 ```
+- Fix 10 (`build/steve_fix10.zip`): jump squat 3 frames (Ultimate's; Robin's 6): fighter_param 12.

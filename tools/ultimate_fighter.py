@@ -184,22 +184,25 @@ class Skeleton:
             out += struct.pack('<9f', *t, *euler_of(r), *s)
         return out
 
-    def add_joint_bones(self, base_jtb, base_vbn, standins=None):
+    def add_joint_bones(self, base_jtb, base_vbn, standins=None, only=None):
         """the bones of the base's joint table 1 (the ones its own code drives: Robin's / Pit's
         FaceN, Pit's wings, Orbitars and bow) we have no bone or stand-in for: leaf bones of their
-        own (the base's name and hash, at the nearest kept bone above, no chain: the identity), so
-        what the game does to them moves nothing of ours (stood in by HeadN, the game's own turns
-        of FaceN pulled the head off the neck). Returns their names."""
+        own (the base's name, at the nearest kept bone above, no chain: the identity), so what the
+        game does to them moves nothing of ours (stood in by HeadN, the game's own turns of FaceN
+        pulled the head off the neck). Their hashes are new ones (CRC32 of "<name>#jtb"), not the
+        base's: the base's motion pacs (pitpt1.pac: Pit's wings, Orbitars, bow) animate those, and
+        Steve with them bound didn't animate at all and crashed jumping. only: these names only (the
+        profile's own_joints; the rest stood in as before). Returns their names."""
         standins = JOINT_STANDINS if standins is None else standins
         added = []
         names = [n for n, _p, _h in base_vbn]
         for name in joint_bone_names(base_jtb, base_vbn):
-            if name in self.by_name or standins.get(name) in self.index:
+            if name in self.by_name or standins.get(name) in self.index or only is not None and name not in only:
                 continue
-            i = b = names.index(name)
+            b = names.index(name)
             while base_vbn[b][0] not in self.by_name:
                 b = base_vbn[b][1]
-            self.bones.append([name, self.by_name[base_vbn[b][0]], base_vbn[i][2], []])
+            self.bones.append([name, self.by_name[base_vbn[b][0]], zlib.crc32((name + '#jtb').encode()) & 0xFFFFFFFF, []])
             self.by_name[name] = len(self.bones) - 1
             added.append(name)
         assert len(set(h for _n, _p, h, _c in self.bones)) == len(self.bones), 'bone hash collision'
@@ -238,6 +241,17 @@ class Skeleton:
         return struct.pack('>HH', len(t0), n2) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
 
 
+OWN_JOINTS = None           # --own-joints (None: the profile's own_joints)
+
+
+class _All:
+    def __contains__(self, _name):
+        return True
+
+
+ALL_JOINTS = _All()
+
+
 def joint_bone_names(base_jtb, base_vbn):
     """the base bones model.jtb's table 1 names (IDs 1000 + n)"""
     n1, n2 = struct.unpack('>HH', base_jtb[:4])
@@ -245,7 +259,7 @@ def joint_bone_names(base_jtb, base_vbn):
     return [base_vbn[v][0] for v in vals[n1:]]
 
 
-def joint_bone_budget(src_dirs, base_jtb, base_vbn, standins, max_bones):
+def joint_bone_budget(src_dirs, base_jtb, base_vbn, standins, max_bones, only=None):
     """max_bones less the joint table's bones of their own to come (Skeleton.add_joint_bones), so
     the skeleton stays within max_bones"""
     if not max_bones:
@@ -255,7 +269,7 @@ def joint_bone_budget(src_dirs, base_jtb, base_vbn, standins, max_bones):
     for d in src_dirs:
         names |= set(b.name for b in s.skel_data.read_skel(d + '/model.nusktb').bones)
     return max_bones - sum(1 for n in joint_bone_names(base_jtb, base_vbn)
-                           if n not in names and standins.get(n) not in names)
+                           if n not in names and standins.get(n) not in names and (only is None or n in only))
 
 
 def needed_bones(src_dirs, standins=None, max_bones=None, animated=None, protect=()):
@@ -673,9 +687,9 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     pname, prof = profile_for(m.name for m in base_nud)
     base_jtb = open(base + '/model.jtb', 'rb').read()
     sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn,
-                  needed_bones([src], prof['joints'], joint_bone_budget([src], base_jtb, base_vbn, prof['joints'], max_bones),
+                  needed_bones([src], prof['joints'], joint_bone_budget([src], base_jtb, base_vbn, prof['joints'], max_bones, OWN_JOINTS or prof.get('own_joints')),
                                animated, joints))
-    own = sk.add_joint_bones(base_jtb, base_vbn, prof['joints'])
+    own = sk.add_joint_bones(base_jtb, base_vbn, prof['joints'], OWN_JOINTS or prof.get('own_joints'))
     world = sk.world()
     parts = mesh_parts(src)
     tmpl = templates(base_nud)
@@ -1005,8 +1019,11 @@ PROFILES = {
                   vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
     'koopa': dict(slots=KOOPA_SLOTS, joints=KOOPA_JOINTS, motions=dict(MOTION_STANDINS, **KOOPA_MOTIONS), vis={},
                   vis_default={}, hidden=()),
+    # own_joints: the joint table bones that get a bone of their own (Skeleton.add_joint_bones; default
+    # all). Pit: FaceN only (his wings, Orbitars and bow as before, on BustN / RotN / the Have bones:
+    # Steve with bones of their own didn't animate in game)
     'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis=PIT_TOOL_VIS,
-                vis_default={}, hidden=()),
+                vis_default={}, hidden=(), own_joints=('FaceN',)),
     'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
                    vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
@@ -1229,10 +1246,10 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
     base_jtb = open(base + '/model/body/c00/model.jtb', 'rb').read()
     keep = set()
     for c in costumes:
-        keep |= needed_bones([c], prof['joints'], joint_bone_budget([c], base_jtb, base_vbn, prof['joints'], max_bones),
+        keep |= needed_bones([c], prof['joints'], joint_bone_budget([c], base_jtb, base_vbn, prof['joints'], max_bones, OWN_JOINTS or prof.get('own_joints')),
                              animated, joints)
     sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, keep)
-    sk.add_joint_bones(base_jtb, base_vbn, prof['joints'])
+    sk.add_joint_bones(base_jtb, base_vbn, prof['joints'], OWN_JOINTS or prof.get('own_joints'))
     log('motion skeleton: %d bones (every costume\'s)' % len(sk.bones))
     constraints = helper_constraints(src_model)
     have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}
@@ -1356,6 +1373,8 @@ def main():
     mo.add_argument('--extra-vis', help='JSON {Ultimate animation: {visibility: [[frame, 0/1], ...]}} (Steve\'s tools)')
     for q in (m, mo):
         q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
+        q.add_argument('--own-joints', help='the base joint table bones to give bones of their own (comma separated, '
+                                            'or "all"; default: the profile\'s own_joints, else all)')
         q.add_argument('--max-bones', type=int, help='merge bones into their parents down to this many per costume '
                                                      '(fighters go up to 138; use 136)')
         q.add_argument('--anim-cache', help='JSON file keeping which bones the motions move')
@@ -1363,6 +1382,9 @@ def main():
     m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
     a = ap.parse_args()
     joints = [j for j in a.joints.split(',') if j]
+    global OWN_JOINTS
+    if a.own_joints:
+        OWN_JOINTS = ALL_JOINTS if a.own_joints == 'all' else tuple(a.own_joints.split(','))
     if a.have:
         set_have(*a.have.split(','))
     animated = None

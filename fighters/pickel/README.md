@@ -64,7 +64,7 @@ material system (mining / crafting), the articles themselves, his specials, effe
   `LBitN` / `RBitN`, `WeaponLN` / `WeaponRN`, `WpnYumiLN` / `WpnYumiRN` / `WpnNagiRN`, `FaceN`) had been
   pointed at the nearest bone Steve has (wings -> BustN, Orbitars -> RotN, bow -> the Have bones,
   FaceN -> HeadN: in game his head floated off his body). `ultimate_fighter.py` now gives each a bone
-  of its own (`Skeleton.add_joint_bones`: the base's name and hash, at that bone, nothing skinned to
+  of its own (`Skeleton.add_joint_bones`: the base's name, at that bone, nothing skinned to
   it): 46 bones. Only `model.vbn` / `model.jtb` change (the motions bind by hash; the new bones have no
   tracks and stay put).
 - Stats (fighter_param kind 0x44; they were Pit's): Ultimate's `fighter_param.prc`, as Sephiroth's:
@@ -76,3 +76,13 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 68 1=0 2=0.85 3=0.85 7=
   2 jumps (Pit's 4), ground / short hop heights Ultimate's x0.82 / x0.9 (Sephiroth's ratios, for
   Ultimate's faster full hop), the double jump's as it is; ground friction x0.45 (Smash 4's values are
   about that share of Ultimate's: Mario, Zelda, Pit, Robin); jump squat left at Pit's.
+
+## Fix 10 (`build/steve_fix10.zip`)
+
+- Fix 9's bones of his own for Pit's wings / Orbitars / bow gave Pit's `pitpt1.pac` (330 layer
+  animations on exactly those 15 bones) something to drive, and in game Steve didn't animate at all
+  and crashed jumping. The `pit` profile's `own_joints` is now `FaceN` only (the rest stood in as
+  before fix 9: 31 bones); the new bones' hashes are new ones (CRC32 of `<name>#jtb`) so no base pac
+  binds them. `--own-joints all` builds the other way (the package's optional folder).
+- fighter_param 268 (aerial jump type) 2 -> 1: Pit's multi-jump (his own aerial jump status 0xD, a
+  motion per jump: `func_499`) off, a normal double jump (status 0xC) as Ultimate's.
