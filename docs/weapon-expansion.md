@@ -61,7 +61,7 @@ Supamario) in one match sharing fixed load pools, CPU projectile handling by kin
 
 `tools/weapon_expand.py` (records' `weapons` maps in `tools/extra_kinds.json`, `weapon_capacity`
 0x1C0): Supamario's weapons `0x185`-`0x18A` = Mario's fireball, mantle, pump, pumpwater, hugeflame,
-dokan, owner "supamario". Cave `0x04B8C000`-`0x04B8F804`: Supamario's article list first (Mario's
+dokan, owner "supamario". Cave `0x04B8C000`-`0x04B8F804` (now `0x04BB0000`-`0x04BB8000`: with Hero's articles the old one, up to `0x04B92000`, ran into acmd_ext_cave.py's code at `0x04B90000`): Supamario's article list first (Mario's
 order; `kind_expand.py` sets its descriptor copy's `+8` to it via `weapon_expand.article_lists()`),
 the 4 name tables and 3 static tables with 0x1C0 entries (27 HA/LO pairs repointed, the `0x0320E5AC`
 bound raised), the 13 switches' bounds raised in place (and `0x02B83B84` / `0x02B83C74`) with a far

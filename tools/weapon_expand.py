@@ -61,8 +61,11 @@ from ppcasm import Asm, ha  # noqa: E402
 
 RPX = K.RPX
 SPEC = K.SPEC
-CAVE = 0x04B8C000
-LIMIT = 0x04B92000
+# grown code space after kind_expand.py's (its LIMIT); it was 0x04B8C000-0x04B92000, which ran into
+# acmd_ext_cave.py's code (0x04B90000) once a third fighter's articles were added (Hero, from Steve /
+# Hero v1): the old space is left as it is
+CAVE = 0x04BB0000
+LIMIT = 0x04BB8000
 OLD_N = 0x185
 DEFAULT_CAPACITY = 0x1C0
 FIGHTER_VL = 0x111C            # FighterParamManager: vl slot of fighter kind k at +0x111C + 4 * k

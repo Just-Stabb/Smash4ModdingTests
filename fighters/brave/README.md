@@ -113,3 +113,13 @@ turned variants; motions `--add` the side / up special animations too, extra_kin
 Not yet: Command Selection (down special: still Robin's Nosferatu), MP, Kazap's armour (15 damage), the
 air hop when Zap hits, Woosh's sideways speed params (his normal air control), the special-fall landing
 lag per level (12 / 22 / 29), sounds.
+
+### v4b: the executable fixed (`build/hero_v4b.zip`)
+
+From v1 on, the new fighters' articles made `weapon_expand.py`'s cave (0x04B8C000, its LIMIT
+0x04B92000) run past 0x04B90000 into `acmd_ext_cave.py`'s code (the ACMD extra commands): 893 of its
+1627 words overwritten in v4's executable (`tools/acmd_ext_test.py` crashes on it; the kind / weapon
+tests didn't see it: they compare the caves' outputs with `--others`, and acmd_ext's wasn't passed).
+weapon_expand.py's cave is now 0x04BB0000-0x04BB8000 (kind_expand.py's ends at 0x04BB0000). Test with
+`--others` for every cave in the executable (acmd_ext, series, smash_button too) and run
+`acmd_ext_test.py PATCHED build/cross_f.rpx`.

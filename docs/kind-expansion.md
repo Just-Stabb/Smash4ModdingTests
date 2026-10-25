@@ -180,8 +180,9 @@ python3 tools/kind_expand_test.py OUT.rpx build/cross_f.rpx \
 | per new kind (cave) | | descriptor (`0x38` bytes: the base's, `+0` = kind, `+4` = its own motion info, `+0x1C` = 0) + motion info (`0x18`, its main table pointer) + main motion table (the base's `count * 8` bytes, written at run time by `0x02EA9008`); the descriptor case; the **vl load case** = the base's case copied (31 words; its `bl`s re-aimed), prefixed with `vl_load(mgr, base)` (the base's params, which the base's native code reads at fixed offsets), storing into the equipment object's `+0x320 + 4 * kind`, the new vl / vl50 arrays; the **vl unload case** = the base's (its kind's field), then `vl_unload(mgr, base)` |
 
 Space: `0x04BA0000` up (after smash_button_cave's `0x04B9B000`); ~5.5 KB of tables shared by all
-kinds, ~5 KB a kind (Mario base ~5 KB, Zelda ~5.3 KB: two kinds use `0x04BA0000-0x04BA3C00`). The
-code space ends at `0x04BB8000`: about 17 kinds. It started at `0x04B85000` (one kind,
+kinds, ~5 KB a kind (Mario base ~5 KB, Zelda ~5.3 KB: two kinds use `0x04BA0000-0x04BA3C00`; five
+`0x04BA0000-0x04BA7EAC`). It ends at `0x04BB0000` (weapon_expand.py's cave follows, to `0x04BB8000`;
+the text region ends at `0x04BB8670`): about 10 more kinds. It started at `0x04B85000` (one kind,
 `0x04B85000-0x04B877C4`), but the second kind ran into base_effects_cave's `0x04B88000`; that space
 is unused now (stale words, nothing points there). 247 words change in place; nothing overlaps the
 other caves (checked by the test with `--others`).
