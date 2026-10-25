@@ -36625,11 +36625,8 @@ void func_2253()
 
 int func_2254()
 {
-    if (0 != WorkModule(0x6, 0x10000091))
-    {
-        StatusModule(0x2711, 0x8c);
-        return 0x1;
-    }
+    // Hero: no tome or Levin Sword to throw away (brave_keep_items)
+    WorkModule(0x7, 0, 0x10000091);
     return 0;
 }
 
@@ -38769,9 +38766,24 @@ void brave_menu_close()
     }
 }
 
+// Robin's tome and Levin Sword uses (Thunder 0x10000083, Elwind float 0x2f, Arcfire 0x1000008a, Nosferatu
+// 0x10000086, the Levin Sword 0x1000008c): Robin's attacks still count them down, and a spent one
+// (BattleObject 0x3ec: bits in 0x10000091) sent Hero into her discard status 0x8c, a tome or the sword
+// thrown away, then her pick-up one. Hero has neither: kept full every frame, nothing spent
+void brave_keep_items()
+{
+    WorkModule(0x7, 0x63, 0x10000083);
+    WorkModule(0, 99.0f, 0x2f);
+    WorkModule(0x7, 0x63, 0x1000008a);
+    WorkModule(0x7, 0x63, 0x10000086);
+    WorkModule(0x7, 0x63, 0x1000008c);
+    WorkModule(0x7, 0, 0x10000091);
+}
+
 void brave_frame()
 {
     func_82();
+    brave_keep_items();
     brave_mp_update();
     brave_buff_update();
     brave_panel_update();

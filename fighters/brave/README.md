@@ -325,3 +325,12 @@ blends, `ports_dash_fix`): Ultimate's 11 hurtboxes (Robin's 7) and their hit poi
 points (head -0.5 x, shoulders, knees, hip; Robin's had the forearms) and ledge box (0, 10.5, 16.5,
 16; Robin's (0, 8, 16, 16)), the tumbling box (0, 4, 9.9, 9.6).
 
+
+## Fix 19 (`build/hero_fix19.zip`): no tomes or Levin Sword thrown away
+
+Robin's code still counted her tome and Levin Sword uses down (her jab, smashes, aerials and the
+special statuses Hero's moves sit on): a spent one set a bit in `0x10000091` (`BattleObject 0x3ec`) and
+the status check `func_2254` sent him into her discard status `0x8c`, the tome or sword thrown, then
+her pick-up status. `brave_keep_items()` (in `brave_frame`) keeps the five counters full every frame
+(Thunder `0x10000083`, Elwind float `0x2f`, Arcfire `0x1000008a`, Nosferatu `0x10000086`, the Levin
+Sword `0x1000008c`) and clears the bits; `func_2254` never changes status. Only `brave.mscsb` changes.
