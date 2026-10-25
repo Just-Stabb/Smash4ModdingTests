@@ -286,7 +286,10 @@ LShoulderJ LArmJ LHandN NeckN HeadN RShoulderN RShoulderJ RArmJ RHandN LHaveN RH
 vl, fighter_param, ACMD and MSC of the base fighter all use these IDs, so a new fighter must ship
 a `model.jtb` that maps the same IDs to its own equivalent bones (it can have any number of
 other bones; animations bind by bone-name hash, so its own animations must use its own
-skeleton's names).
+skeleton's names). Table 1's bones are ones the base's own code drives (Robin's and Pit's `FaceN`,
+Pit's wings and Orbitars): mapped onto a bone the new model needs (Hero's and Steve's `FaceN` ->
+`HeadN`), the game's moves of it moved that bone (their heads came off their necks in game), so a
+port gives each of them a bone of its own instead (`ultimate_fighter.py` `Skeleton.add_joint_bones`).
 
 Names: the executable does not look fighter bones up by name in battle code. The only fighter
 bone-name list (`TopN TransN RotN HipN LLegJ ... BustN EyeN1-3 LShoulderN ... RHandN`, 27 names at

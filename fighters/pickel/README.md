@@ -57,3 +57,22 @@ his own moves, stats, sounds, effects, portraits. Pit's bow article may show in 
 
 Not yet: walking during jab / up tilt (user; Ultimate's arm / upper-body layer animations), the
 material system (mining / crafting), the articles themselves, his specials, effects, sounds.
+
+## Fix 9 (`build/hero_steve_fix9.zip`, with Hero's): his head, his stats
+
+- Head: Pit's `model.jtb` table 1 (the bones Pit's own code drives: `Lwing01-04N` / `Rwing01-04N`,
+  `LBitN` / `RBitN`, `WeaponLN` / `WeaponRN`, `WpnYumiLN` / `WpnYumiRN` / `WpnNagiRN`, `FaceN`) had been
+  pointed at the nearest bone Steve has (wings -> BustN, Orbitars -> RotN, bow -> the Have bones,
+  FaceN -> HeadN: in game his head floated off his body). `ultimate_fighter.py` now gives each a bone
+  of its own (`Skeleton.add_joint_bones`: the base's name and hash, at that bone, nothing skinned to
+  it): 46 bones. Only `model.vbn` / `model.jtb` change (the motions bind by hash; the new bones have no
+  tracks and stay put).
+- Stats (fighter_param kind 0x44; they were Pit's): Ultimate's `fighter_param.prc`, as Sephiroth's:
+```
+python3 tools/fighter_param.py set fighter_param.bin OUT 68 1=0 2=0.85 3=0.85 7=0.043 8=1.45 9=0 10=0.115 11=1.45 13=0.85 \
+    14=0.8 15=1.0 16=1 17=13.5 18=9 19=22.5 20=0.04 21=0.01 22=0.86 23=0.0075 24=0.07 25=1.42 27=2.272 28=6 29=12 30=12 31=10 \
+    32=18 33=92 34=2
+```
+  2 jumps (Pit's 4), ground / short hop heights Ultimate's x0.82 / x0.9 (Sephiroth's ratios, for
+  Ultimate's faster full hop), the double jump's as it is; ground friction x0.45 (Smash 4's values are
+  about that share of Ultimate's: Mario, Zelda, Pit, Robin); jump squat left at Pit's.

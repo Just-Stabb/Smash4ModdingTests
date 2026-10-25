@@ -17,7 +17,8 @@ then every other Ultimate bone (its own name, a CRC32 hash), parents first. Ulti
 between Hip and the legs and ClavicleC between Bust and the clavicles; Smash 4's legs and shoulders
 hang from HipN / BustN, so those two are folded: a leg's bind (and every frame of it) is LegC's
 times the leg's, and LegC / ClavicleC stay as extra bones under HipN / BustN for the vertices
-weighted to them.
+weighted to them. Last, the base's joint table 1 bones (the ones its own code drives, e.g. FaceN)
+we have nothing for: bones of their own, nothing skinned to them.
 
 Meshes: every mesh skinned (bind 4, four byte weights a vertex, as the base's body), positions in
 bind space (a mesh Ultimate binds to one bone is weighted 1.0 to it). The NUD's mesh list is the
@@ -183,6 +184,27 @@ class Skeleton:
             out += struct.pack('<9f', *t, *euler_of(r), *s)
         return out
 
+    def add_joint_bones(self, base_jtb, base_vbn, standins=None):
+        """the bones of the base's joint table 1 (the ones its own code drives: Robin's / Pit's
+        FaceN, Pit's wings, Orbitars and bow) we have no bone or stand-in for: leaf bones of their
+        own (the base's name and hash, at the nearest kept bone above, no chain: the identity), so
+        what the game does to them moves nothing of ours (stood in by HeadN, the game's own turns
+        of FaceN pulled the head off the neck). Returns their names."""
+        standins = JOINT_STANDINS if standins is None else standins
+        added = []
+        names = [n for n, _p, _h in base_vbn]
+        for name in joint_bone_names(base_jtb, base_vbn):
+            if name in self.by_name or standins.get(name) in self.index:
+                continue
+            i = b = names.index(name)
+            while base_vbn[b][0] not in self.by_name:
+                b = base_vbn[b][1]
+            self.bones.append([name, self.by_name[base_vbn[b][0]], base_vbn[i][2], []])
+            self.by_name[name] = len(self.bones) - 1
+            added.append(name)
+        assert len(set(h for _n, _p, h, _c in self.bones)) == len(self.bones), 'bone hash collision'
+        return added
+
     def jtb(self, base_jtb, base_vbn, standins=None, extra=()):
         """the base's joint table with each bone index moved to ours (same name, else a stand-in,
         else the nearest standard bone above it in the base's skeleton)"""
@@ -214,6 +236,26 @@ class Skeleton:
             add.append(self.index[u])
         t0, t1 = out[:n1] + add, out[n1:]
         return struct.pack('>HH', len(t0), n2) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
+
+
+def joint_bone_names(base_jtb, base_vbn):
+    """the base bones model.jtb's table 1 names (IDs 1000 + n)"""
+    n1, n2 = struct.unpack('>HH', base_jtb[:4])
+    vals = struct.unpack('>%dh' % (n1 + n2), base_jtb[4:4 + 2 * (n1 + n2)])
+    return [base_vbn[v][0] for v in vals[n1:]]
+
+
+def joint_bone_budget(src_dirs, base_jtb, base_vbn, standins, max_bones):
+    """max_bones less the joint table's bones of their own to come (Skeleton.add_joint_bones), so
+    the skeleton stays within max_bones"""
+    if not max_bones:
+        return max_bones
+    import ssbh_data_py as s
+    names = set()
+    for d in src_dirs:
+        names |= set(b.name for b in s.skel_data.read_skel(d + '/model.nusktb').bones)
+    return max_bones - sum(1 for n in joint_bone_names(base_jtb, base_vbn)
+                           if n not in names and standins.get(n) not in names)
 
 
 def needed_bones(src_dirs, standins=None, max_bones=None, animated=None, protect=()):
@@ -629,8 +671,11 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     base_vbn = read_vbn(base + '/model.vbn')
     base_nud = nud.read(base + '/model.nud')
     pname, prof = profile_for(m.name for m in base_nud)
+    base_jtb = open(base + '/model.jtb', 'rb').read()
     sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn,
-                  needed_bones([src], prof['joints'], max_bones, animated, joints))
+                  needed_bones([src], prof['joints'], joint_bone_budget([src], base_jtb, base_vbn, prof['joints'], max_bones),
+                               animated, joints))
+    own = sk.add_joint_bones(base_jtb, base_vbn, prof['joints'])
     world = sk.world()
     parts = mesh_parts(src)
     tmpl = templates(base_nud)
@@ -676,14 +721,15 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
                     if p.materials[0].flags == 0x9A211067 and t['hash'] == base_ramp:
                         t['hash'] = ramp
     left = sorted(set(parts) - used)
-    log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded); meshes: %d slots, %d Ultimate meshes used, left out: %s' % (
-        pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), len(meshes), len(used), ', '.join(left)))
+    log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded; joint table bones of their own: %s); meshes: %d slots, '
+        '%d Ultimate meshes used, left out: %s' % (pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), ', '.join(own) or '-',
+                                                 len(meshes), len(used), ', '.join(left)))
     os.makedirs(out, exist_ok=True)
     for f in os.listdir(base):
         if os.path.isfile(os.path.join(base, f)):
             shutil.copy(os.path.join(base, f), os.path.join(out, f))
     open(out + '/model.vbn', 'wb').write(sk.vbn())
-    open(out + '/model.jtb', 'wb').write(sk.jtb(open(base + '/model.jtb', 'rb').read(), base_vbn, prof['joints'], joints))
+    open(out + '/model.jtb', 'wb').write(sk.jtb(base_jtb, base_vbn, prof['joints'], joints))
     open(out + '/model.nud', 'wb').write(nud.write(meshes, top_bone=len(sk.bones) - 1))
     # metal: the base's metal material on every polygon (its textures: the base's metal one, ours as normal)
     metal = nud.read(base + '/metal.nud')
@@ -1086,6 +1132,9 @@ def pose(sk, tracks, frames, constraints):
             loc[c.target_bone_name] = m
     out = []
     for name, _p, _h, chain in sk.bones:
+        if not chain:           # a joint table bone of its own (Skeleton.add_joint_bones)
+            out.append(np.broadcast_to(np.eye(4), (frames, 4, 4)))
+            continue
         m = loc[chain[0]]
         for u in chain[1:]:
             m = m @ loc[u]
@@ -1177,10 +1226,13 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
     _pn, prof = profile_for(m.name for m in nud.read(base + '/model/body/c00/model.nud'))
     costumes = [os.path.join(os.path.dirname(src_model), c) for c in sorted(os.listdir(os.path.dirname(src_model)))
                 if os.path.exists(os.path.join(os.path.dirname(src_model), c, 'model.numshb'))]
+    base_jtb = open(base + '/model/body/c00/model.jtb', 'rb').read()
     keep = set()
     for c in costumes:
-        keep |= needed_bones([c], prof['joints'], max_bones, animated, joints)
+        keep |= needed_bones([c], prof['joints'], joint_bone_budget([c], base_jtb, base_vbn, prof['joints'], max_bones),
+                             animated, joints)
     sk = Skeleton(s.skel_data.read_skel(src_model + '/model.nusktb'), base_vbn, keep)
+    sk.add_joint_bones(base_jtb, base_vbn, prof['joints'])
     log('motion skeleton: %d bones (every costume\'s)' % len(sk.bones))
     constraints = helper_constraints(src_model)
     have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}

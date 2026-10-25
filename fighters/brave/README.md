@@ -245,3 +245,17 @@ on every speed, Whack's chance formula is used for Thwack.
 - **Kamikazee** KOs Hero at its end with instance flag `0x20000043` ("causes KO": he explodes as if KO'd,
   as in Stamina mode; `reference/msc-note-sheet/Variables.csv`), as the user's Captain Falcon's 1-in-100
   jab does (`ON_FLAG 0x20000043`).
+
+## Fix 9 (`build/hero_steve_fix9.zip`, with Steve's): his head, his stats
+
+- Head: Robin's `model.jtb` table 1 (`SwordN`, `FaceN`: bones Robin's own code drives) had been pointed
+  at RHaveN / HeadN, and in game his head came off his neck. Each is now a bone of its own
+  (`ultimate_fighter.py` `Skeleton.add_joint_bones`, as Steve's; fighters/pickel/README.md); his
+  `--max-bones 120` now counts them, so the costumes at the cap merge two more skirt tips
+  (`S_SkirtRB3` / `RB4`; c00 / c03 / c04 / c07 change their NUDs).
+- Stats (fighter_param kind 0x45; they were Robin's), Ultimate's, as Steve's:
+```
+python3 tools/fighter_param.py set fighter_param.bin OUT 69 1=0.16 2=0.08 3=0.98 7=0.05 8=1.88 9=0.08 10=0.03 11=1.84 13=0.95 \
+    14=0.8 15=1.2 16=1 17=23.8 18=13.95 19=31 20=0.045 21=0.01 22=1.01 23=0.008 24=0.094 25=1.57 27=2.512 28=10 29=12 30=14 \
+    31=8 32=18 33=101 34=2
+```
