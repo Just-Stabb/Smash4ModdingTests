@@ -38452,6 +38452,8 @@ int brave_attack_t;
 int brave_reflect_t;
 int brave_psyche;
 int brave_invisible_t;
+int brave_poison_t;     // Hocus Pocus's poison: frames left (1.1% every 20 frames, 27.5% in all)
+int brave_metal_on;
 // the window (brave_lw_*): 0 shut, 1 open (choosing), 2 cast (the spell's row only), 3 closing
 int brave_menu;
 int brave_menu_anim;
@@ -38575,7 +38577,29 @@ void brave_buffs_off()
         VisibilityModule(0x2710, 0x1);
     }
     brave_invisible_t = 0;
+    brave_poison_t = 0;
     brave_reflect(0);
+    brave_metal(0);
+}
+
+// Kaclang's metal (and Hocus Pocus's states): see brave_state
+void brave_metal(int on)
+{
+    brave_metal_on = on;
+}
+
+// Hocus Pocus's item-like states on him: 0 giant, 1 Starman, 3 timer, 6 sleep, 7 small, 8 flower, 9 invisible
+void brave_state(int o)
+{
+    if (o == 0x1)
+    {
+        WorkModule(0, 600.0f, 0x0f00011c);
+    }
+    else if (o == 0x9)
+    {
+        VisibilityModule(0x2710, 0);
+        brave_invisible_t = 0x258;
+    }
 }
 
 // a new stock (Rebirth, func_235) or the match's start: full MP, no buffs, the window shut
@@ -38635,6 +38659,14 @@ void brave_buff_update()
         if (brave_invisible_t == 0)
         {
             VisibilityModule(0x2710, 0x1);
+        }
+    }
+    if (brave_poison_t > 0)
+    {
+        brave_poison_t -= 1;
+        if (brave_poison_t % 0x14 == 0)
+        {
+            WorkModule(0x2, 1.1f, 0x0f000117);     // his damage + 1.1
         }
     }
     if (brave_psyche && brave_special_status() == 0 && WorkModuleF(0, 0x0f0000a1) >= 0.5f)
@@ -39586,8 +39618,8 @@ void brave_hi_main()
 // 12 Oomph         720 frames of x1.15 damage (attack_up_frame; tools/strike_cave.py)
 // 13 Bounce        720 frames of a reflector (reflect_frame; brave_reflect)
 // 14 Snooze        the sleep article (14) at frame 6: its gust puts fighters to sleep
-// 15 Hocus Pocus   one of: full MP, no MP, 600 frames invincible, 600 frames invisible, Oomph,
-//                  Acceleratle, Psyche Up, a Kaboom, a Sizzle
+// 15 Hocus Pocus   Ultimate's outcomes and odds (brave_hocus_pocus): giant, Starman, full MP, timer, no MP,
+//                  poison, sleep, small, flower, invisible, or another spell cast for its 4 MP
 // 16 Zoom          up off the screen (SpecialLw16Hi, flying_speed_y 9, intangible), then down (SpecialLw16Lw,
 //                  flying_down_speed_y 7) above a fighter on the ground, landing with SpecialLw16End
 // 17 - 20 Flame Slash, Kacrackle Slash, Metal Slash, Hatchet Man (sword moves: their hitboxes are in
@@ -39916,34 +39948,86 @@ void brave_fly(float v)
     KineticModule(0x11, 0x1, v);
 }
 
-void brave_hocus_pocus()
+// Hocus Pocus (Ultimate's outcomes and odds, SmashWiki "Hocus Pocus effects", in 1/100 %): giant 4.88, Starman
+// 1.22, full MP 3.96, timer 6.10, no MP 6.10, poison 6.10, sleep 6.10, small 5.49, flower 6.10, invisible 6.10;
+// or another spell, cast for the 4 MP Hocus Pocus took (Heal / Kaclang 1.52, Kamikazee 0.91, every other one
+// 2.44; Magic Burst still takes all the MP): he casts it then and there (its motion and its part)
+int brave_hp_weight(int o)
 {
-    int r;
-    r = randi(0, 0x9);
-    if (r == 0) { brave_mp = 100.0f; }
-    else if (r == 0x1) { brave_mp = 0; }
-    else if (r == 0x2) { WorkModule(0, 600.0f, 0x0f00011c); }
-    else if (r == 0x3)
-    {
-        VisibilityModule(0x2710, 0);
-        brave_invisible_t = 0x258;
-    }
-    else if (r == 0x4) { brave_attack_t = 0x2d0; }
-    else if (r == 0x5) { brave_speed_t = 0x258; }
-    else if (r == 0x6) { brave_psyche = 0x1; }
-    else if (r == 0x7) { brave_generate(0xb, 0x1); }
-    else { brave_generate(0xa, 0x1); }
+    if (o == 0) { return 0x1e8; }               // giant 488
+    if (o == 0x1) { return 0x7a; }              // Starman 122
+    if (o == 0x2) { return 0x18c; }             // full MP 396
+    if (o == 0x7) { return 0x225; }             // small 549
+    if (o <= 0x9) { return 0x262; }             // timer, no MP, poison, sleep, flower, invisible: 610
+    o = o - 0x9;                                // 10 + the spell (1-21)
+    if (o == 0x1 || o == 0xa) { return 0x98; }  // Heal, Kaclang 152
+    if (o == 0x9) { return 0x5b; }              // Kamikazee 91
+    if (o == 0xf) { return 0; }                 // not itself
+    return 0xf4;                                // 244
 }
 
-// Kaclang: 0 SpecialLw10Start (steel from frame 20), 1 SpecialLw10 for 300 frames, 2 SpecialLw10End
+// a spell picked by Hocus Pocus: from its frame 0, as if chosen
+void brave_hp_cast(int n)
+{
+    if (n == 0x8)
+    {
+        brave_lw_burst = (int)(brave_mp + 0.999f) + 0x4;
+        brave_mp = 0;
+    }
+    brave_lw_spell = n;
+    brave_lw_done = 0;
+    brave_lw_sub = 0;
+    brave_lw_t = 0;
+    brave_lw_motion(brave_lw_spell_motion(n, 0), brave_lw_spell_motion(n, 0x1));
+}
+
+void brave_hocus_pocus()
+{
+    int o;
+    int r;
+    int total;
+    total = 0;
+    o = 0;
+    while (o <= 0x1e)
+    {
+        total = total + brave_hp_weight(o);
+        o += 1;
+    }
+    r = randi(0, total);
+    o = 0;
+    while (o < 0x1e && r >= brave_hp_weight(o))
+    {
+        r = r - brave_hp_weight(o);
+        o += 1;
+    }
+    if (o >= 0xa)
+    {
+        brave_hp_cast(o - 0x9);
+        return;
+    }
+    if (o == 0x2) { brave_mp = 100.0f; }
+    else if (o == 0x4) { brave_mp = 0; }
+    else if (o == 0x5) { brave_poison_t = 0x1f4; }
+    else { brave_state(o); }    // the item-like states (brave_state)
+}
+
+// Kaclang: 0 SpecialLw10Start (steel from frame 20; in the air a hop of 3.4 at frame 10), 1 SpecialLw10
+// for 300 frames (5 seconds): metal, invincible, no action; in the air SpecialAirLw10 (its hitbox) falling
+// with left / right control (kinetic type 0, Ultimate's ENABLE_CONTROL_ENERGY) until he lands; 2
+// SpecialLw10End
 int brave_kaclang(float f)
 {
     if (brave_lw_sub < 0x2 && (brave_lw_sub == 0x1 || f >= 20.0f))
     {
         WorkModule(0, 2.0f, 0x0f00011c);    // invincible, renewed each frame
+        brave_metal(0x1);
     }
     if (brave_lw_sub == 0)
     {
+        if (global18 == 0x2 && f >= 10.0f && brave_lw_once(0x1))
+        {
+            KineticModule(0x11, 0x1, 3.4f);
+        }
         if (MotionModule(0x2712) == 0x1)
         {
             brave_lw_sub = 0x1;
@@ -39957,12 +40041,17 @@ int brave_kaclang(float f)
         brave_lw_t += 1;
         if (global18 == 0x2)
         {
+            if (brave_lw_once(0x2))
+            {
+                KineticModule(0, 0);        // FALL: left / right control
+            }
             KineticModule(0xf, 0x1, -0.2f);
             KineticModule(0x14, 0x1, 3.0f);
         }
         if (brave_lw_t >= 0x12c)
         {
             brave_lw_sub = 0x2;
+            brave_metal(0);
             brave_lw_motion(0x234, 0x256);
             KineticModule(0xf, 0x1, -0.089f);
             KineticModule(0x14, 0x1, 1.5f);
