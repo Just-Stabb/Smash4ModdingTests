@@ -4,7 +4,9 @@
 void placed_config()
 {
     pl_wait = 0x3;
-    pl_life_s = 0x8;
-    pl_life_m = 0x8;
-    pl_life_l = 0x8;
+}
+
+int placed_life(int level)
+{
+    return 0x8;
 }

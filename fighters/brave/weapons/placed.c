@@ -1,9 +1,10 @@
-// Hero's placed articles: compiled after thunder_base.c and before spark.c / tornado.c (their
-// placed_config(): the wait and the lives), as tools/brave_build.py does.
+// Hero's placed articles: compiled after thunder_base.c and before spark.c / tornado.c / crash.c (their
+// placed_config(): the wait and the levels; placed_life(level)), as tools/brave_build.py does.
 
 // ---- Articles put on a fighter (copies of Robin's thunder): spark (Zap's lightning on the fighter the bolt
-// hit, his article 8) and tornado (Woosh's whirlwind where he starts, article 9). The owner's custom N slot
-// (int 0x10000048, which the game copies into this weapon's 0x10000005) = level + 4 x a player slot (0-7):
+// hit, his article 8), tornado (Woosh's whirlwind where he starts, article 9) and crash (Magic Burst /
+// Kamikazee on him, article 13). The owner's custom N slot (int 0x10000048, which the game copies into this
+// weapon's 0x10000005) = level + pl_levels (4; crash's 8) x a player slot (0-7):
 // the article moves to that slot's fighter (the position variables 0x0F000020 + 4 x slot, X / Y / Z /
 // facing: tools/position_vars_cave.py), waits pl_wait frames on an empty motion, plays motion `level` (its
 // hitboxes and effects: Ultimate's brave_spark / brave_tornado scripts) for its life and is removed. Status
@@ -15,9 +16,7 @@ int pl_frame;
 int pl_total;
 int pl_wait;
 int pl_life;
-int pl_life_s;
-int pl_life_m;
-int pl_life_l;
+int pl_levels;
 
 // thunder's own (func_47)
 int pl_pre()
@@ -77,21 +76,9 @@ void pl_main()
     {
         c = 0;
     }
-    pl_slot = c / 0x4;
-    pl_level = c - pl_slot * 0x4;
-    if (pl_level > 0x2)
-    {
-        pl_level = 0x2;
-    }
-    pl_life = pl_life_s;
-    if (pl_level == 0x1)
-    {
-        pl_life = pl_life_m;
-    }
-    else if (pl_level == 0x2)
-    {
-        pl_life = pl_life_l;
-    }
+    pl_slot = c / pl_levels;
+    pl_level = c - pl_slot * pl_levels;
+    pl_life = placed_life(pl_level);
     pl_frame = 0;
     pl_total = 0;
     pl_place();
@@ -131,6 +118,7 @@ void main()
     func_0();
     global0 = sys_7(0);
     global1 = sys_7(0x1);
+    pl_levels = 0x4;
     placed_config();
     pl_setup();
     sys_0(0x2, func_3);

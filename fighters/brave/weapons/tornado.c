@@ -4,7 +4,17 @@
 void placed_config()
 {
     pl_wait = 0;
-    pl_life_s = 0x18;
-    pl_life_m = 0x21;
-    pl_life_l = 0x34;
+}
+
+int placed_life(int level)
+{
+    if (level == 0x1)
+    {
+        return 0x21;
+    }
+    if (level == 0x2)
+    {
+        return 0x34;
+    }
+    return 0x18;
 }

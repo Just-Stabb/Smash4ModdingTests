@@ -39574,7 +39574,8 @@ void brave_hi_main()
 //  2 / 3 Sizz / Sizzle      the flash article (10, weapons/shot.c) at frame 6
 //  4 / 5 Bang / Kaboom      the explosion article (11) at frame 6
 //  6 / 7 Whack / Thwack     the deathball article (12) at frame 6: a fighter it hits may be KO'd outright
-//  8 Magic Burst   all his MP; the crash article (13, weapons/crash.c) on him at frame 20, held in the air
+//  8 Magic Burst   all his MP; the crash article (13, weapons/crash.c) on him at frame 20, its damage x the MP
+//                  spent / 100 (in fifths: brave_burst_motion), held in the air
 //                  until frame 136 (FULLBURST_INTERRUPT / ENABLE_GRAVITY)
 //  9 Kamikazee     the crash article's blast (level 1) at frame 20, then he's KO'd (DEATH_RESERVE)
 // 10 Kaclang       steel from SpecialLw10Start's end: invincible for 300 frames (steel_frame) in
@@ -39601,6 +39602,7 @@ int brave_lw_repeat;
 int brave_lw_done;
 int brave_lw_sub;
 int brave_lw_t;
+int brave_lw_burst;     // Magic Burst: the MP it took
 
 // a spell's draw weight (Ultimate's lot_prob)
 int brave_lw_weight(int n)
@@ -40031,6 +40033,29 @@ int brave_zoom(float f)
     return 0;
 }
 
+// Magic Burst's blast for the MP it took (weapons/crash.c): 81-100 the full one (motion 0), else 20 / 40 / 60 /
+// 80 % of its damage (motions 3-6), the MP rounded up to the next 20
+int brave_burst_motion()
+{
+    if (brave_lw_burst > 0x50)
+    {
+        return 0;
+    }
+    if (brave_lw_burst > 0x3c)
+    {
+        return 0x6;
+    }
+    if (brave_lw_burst > 0x28)
+    {
+        return 0x5;
+    }
+    if (brave_lw_burst > 0x14)
+    {
+        return 0x4;
+    }
+    return 0x3;
+}
+
 // the spell's own part, each frame of the cast: 0 on as usual, 1 the status changed, 2 its motion goes on
 int brave_lw_cast(float f)
 {
@@ -40068,7 +40093,7 @@ int brave_lw_cast(float f)
     {
         if (f >= 20.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xd, 0x4 * brave_lw_slot());
+            brave_generate(0xd, brave_burst_motion() + 0x8 * brave_lw_slot());
         }
         if (global18 == 0x2 && f >= 20.0f && f < 136.0f)
         {
@@ -40085,7 +40110,7 @@ int brave_lw_cast(float f)
     {
         if (f >= 20.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xd, 0x1 + 0x4 * brave_lw_slot());
+            brave_generate(0xd, 0x1 + 0x8 * brave_lw_slot());
         }
         if (MotionModule(0x2712) == 0x1)
         {
@@ -40183,6 +40208,7 @@ void brave_lw_loop()
             brave_menu_grey = (brave_menu_grey / brave_bit(brave_lw_cursor)) % 0x2 * brave_bit(brave_lw_cursor);
             if (brave_can_pay(brave_cost(n)))
             {
+                brave_lw_burst = (int)(brave_mp + 0.999f);  // Magic Burst: all of it, rounded up
                 brave_pay(brave_cost(n));
                 if (n == 0x8)
                 {

@@ -61,12 +61,15 @@ ARTICLES = {
     'flash': (_slots('flash', ('flash1', 'flash2', 'flashhit1', 'flashhit2')), {}),
     'explosion': (_slots('explosion', ('move1', 'move2', 'explode1', 'explode2')), {}),
     'deathball': (_slots('deathball', ('deathball1', 'deathball2')), {'deathball': 0}),
-    'crash': (_slots('crash', ('crash1', 'crash2', 'crashend1')), {}),
+    'crash': (_slots('crash', ('crash1', 'crash2', 'crashend1', 'crash1mp20', 'crash1mp40', 'crash1mp60',
+                               'crash1mp80')), {}),
     'sleep': (_slots('sleep', ('sleep',)), {}),
 }
 # each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
 ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
+# Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100
+CRASH_TIERS = {'crash1mp%d' % m: m / 100.0 for m in (20, 40, 60, 80)}
 # motions whose effects play out after the article is removed (its explosions)
 LASTING = ('burst', 'flashhit', 'explode', 'crash')
 CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave',
@@ -141,6 +144,13 @@ def article_scripts(a, name, wdir):
                     c.params[-1] = 0
     U.EFFECT_CONDS = ()
     assert not etr.missing, etr.missing
+    if name == 'crash':
+        for mo, k in CRASH_TIERS.items():
+            game[mo] = [acmd.Command(c.ident, list(c.params)) for c in game['crash1']]
+            for c in game[mo]:
+                if c.name in ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox'):
+                    c.params[3] = round(c.params[3] * k, 2)
+            effect[mo] = effect['crash1']
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
     for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
