@@ -20,6 +20,7 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
 - --rpx: code/cross_f.rpx = IN.rpx + kind_expand / weapon_expand / base_effects_cave / base_customs_cave /
   trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu and MP gauge) /
   brave_reflect_cave (a reflector group for Robin's kind: Bounce) /
+  thunder_orb_cave (Robin's native Thunder orb only on his own Thunder, not on Hero's copies) /
   trail_table_cave / kirby_stat_cave's profile table (Acceleratle's speeds) (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
 - --menu DIR --menu-layout ARC [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait
@@ -66,6 +67,8 @@ ARTICLES = {
     'sleep': (_slots('sleep', ('sleep',)), {}),
 }
 # each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
+KASWOOSH_SPREAD = 7.0      # half the two whirlwinds' distance (their mean orbit radius, 3 - 12)
+KASWOOSH_LAUNCH = 50       # Kaswoosh's launching hit: 2 frames before its 52 (weapons/tornado.c)
 ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
 # Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100
@@ -79,7 +82,7 @@ KO_HITBOX = {0: 2, 1: 2, 3: 1.0, 4: 361, 5: 0, 6: 0, 7: 0, 8: 10.0, 9: 0.0, 10: 
 # motions whose effects play out after the article is removed (its explosions)
 LASTING = ('burst', 'flashhit', 'explode', 'crash')
 CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave',
-         'brave_reflect_cave')
+         'brave_reflect_cave', 'thunder_orb_cave')
 
 
 def run(*argv):
@@ -157,6 +160,38 @@ def article_scripts(a, name, wdir):
                 if c.name in ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox'):
                     c.params[3] = round(c.params[3] * k, 2)
             effect[mo] = effect['crash1']
+    if name == 'tornado':
+        # Kaswoosh's two whirlwinds: Ultimate's on the article's bones Tornado1 / Tornado2, which its
+        # d02specialhi3 animation sends round each other (3 - 12 units out, a 17-frame loop); without a
+        # model both sat on bone 0 as one. Moved KASWOOSH_SPREAD apart along Z (the article's screen
+        # axis: Robin's Arcthunder spreads its hitboxes along Z), their hitboxes (IDs 0 / 2 / 4 on
+        # Tornado1, 1 / 3 / 5 on Tornado2; 6, on top, stays) with them
+        for c in game['specialhi3']:
+            if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox') and c.params[0] < 6:
+                dz = KASWOOSH_SPREAD * (-1 if c.params[0] % 2 == 0 else 1)
+                c.params[11] += dz
+                if c.name == 'Extended_Special_Hitbox':
+                    c.params[-1] += dz
+        # its launch: Ultimate's second set of hitboxes (part 1) is under `if life <= 2`, which the
+        # translator drops; tornado.c gives Kaswoosh 52 frames (placed_life), so at frame 50. Swoosh's
+        # converted launcher as the template, Ultimate's values (4%, 120, KBG 125, BKB 85, size 8.5)
+        tpl = next(c for c in game['specialhi2'] if c.name == 'Extended_Special_Hitbox' and c.params[1] == 1)
+        launch = [acmd.Command(acmd.BY_NAME['frame'], [KASWOOSH_LAUNCH])]
+        for i, y, z, y2 in ((0, 4.5, -1, 4.5), (1, 4.5, 1, 4.5), (2, 12.5, -1, 12.5), (3, 12.5, 1, 12.5),
+                            (4, 21.0, -1, 21.0), (5, 21.0, 1, 21.0), (6, 5.0, 0, 20.0)):
+            hb = acmd.Command(tpl.ident, list(tpl.params))
+            hb.params[0], hb.params[1] = i, 1
+            hb.params[3:9] = [4.0, 120, 125, 0, 85, 8.5]
+            hb.params[9:12] = [0.0, y, z * KASWOOSH_SPREAD]
+            hb.params[14] = 0.6
+            hb.params[-3:] = [0.0, y2, z * KASWOOSH_SPREAD]
+            launch.append(hb)
+        end = [c for c in game['specialhi3'] if c.ident == acmd.END]
+        game['specialhi3'] = [c for c in game['specialhi3'] if c.ident != acmd.END] + launch + end
+        whirls = [c for c in effect['specialhi3'] if c.name == 'External_Graphic']
+        assert len(whirls) == 2, whirls
+        whirls[0].params[4] -= KASWOOSH_SPREAD
+        whirls[1].params[4] += KASWOOSH_SPREAD
     if name == 'deathball':
         hb = next(c for c in game['deathball1'] if c.name == 'Extended_Special_Hitbox')
         ko = acmd.Command(hb.ident, list(hb.params))

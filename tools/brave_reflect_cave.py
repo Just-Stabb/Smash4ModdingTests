@@ -27,7 +27,7 @@ from ppcasm import Asm  # noqa: E402
 HOOK = 0x02F60194               # Robin's per-kind setup: lwz r10, 0x28(r4)
 HOOK_WORD = 0x8144_0028
 CAVE = 0x04B85600               # trait_badge_cave.py's MENU_LIMIT to its grow's end
-LIMIT = 0x04B85800
+LIMIT = 0x04B85780               # tools/thunder_orb_cave.py from here
 REFL_GROUP_INIT = 0x02C6F5FC
 GROUP_STATE = 0x0200BD8C
 REFLECTOR = 0x72F8              # the fighter's reflector module (shield kind 3)

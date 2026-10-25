@@ -380,3 +380,16 @@ drew; the opaque pale-blue meshes glowed purple. So:
   its textures); colours over that glowed purple in the bloom.
 - `fresnel_bake` takes the normals from the triangles (`face_normals`): Kafrizz's `sphere1` model has
   none, and the +Z default baked a flat 1.
+
+## Fix 24 (`build/hero_fix24.zip`): Kaswoosh's two whirlwinds, no Thunder orb on Frizz
+
+- Kaswoosh: Ultimate's two whirlwinds sit on the article's bones Tornado1 / Tornado2, which its
+  `d02specialhi3` animation sends round each other (3 - 12 units out); with no model here both
+  drew on bone 0, the same as Swoosh's one. `brave_build.py` puts them `KASWOOSH_SPREAD` (7) either
+  side along Z with their hitboxes (IDs 0 / 2 / 4 and 1 / 3 / 5), and adds the launch Ultimate has
+  under `if life <= 2` (dropped by the translator) at frame 50 of its 52.
+- Frizz's purple-blue orb, every level, through fixes 21 - 23: Robin's own Thunder orb, played by
+  the game's native Thunder code (0x031DBDF4: effect `0x032C0001` - `3` by charge level) from
+  Robin's real bank, which `base_effects_cave.py` loads for Hero too; Hero's articles are copies of
+  the Thunder, so they ran it. `tools/thunder_orb_cave.py` gives every other kind effect id 0 (as
+  the code does itself for levels over 2).
