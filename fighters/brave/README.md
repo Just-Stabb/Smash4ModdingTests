@@ -65,7 +65,7 @@ python3 tools/brave_build.py DUMP/lua2cpp_brave HERO BRAVE_BODY fighter_param_vl
   `shader/effect_trail.nsh` + the executable patch) with his textures, trail ids 264-269
   (`trail_table_cave.py` NEW_TRAILS; it now also re-applies over an executable that has the table).
 - Neutral special (status 0x152, Robin's Thunder; `brave.c` `brave_n_*`): SpecialNStart, then
-  SpecialNHold while special is held; Frizzle from 18 frames held, Kafrizz from 81 (fix 15: going off by itself there). Released (a tap
+  SpecialNHold while special is held; Frizzle from 18 frames held, Kafrizz from 81 (held as long as special is, stored by shielding). Released (a tap
   too) -> SpecialN1 / N2 / N3, the fireball out at frame 10 / 11 / 16; shield while holding ->
   SpecialNCancel, the charge kept for the next one (lost if he's hit while charging, or loses a
   stock). Actionable from Ultimate's cancel frames (44 / 52 / 68, cancel 6) through Robin's
@@ -281,7 +281,8 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
   flash 9, explosion 10, deathball 11, crash 12, sleep 13) and Robin's special one is 14; `brave.c`'s
   `brave_generate` ids follow. Only his list changes (Supamario's and Sephiroth's have no special entry
   before their new ones).
-- Neutral special: fully charged (81 frames: Kafrizz) it goes off by itself.
+- Neutral special: fully charged (81 frames: Kafrizz) it went off by itself; undone after (Ultimate's
+  holds it, and shielding stores it).
 
 ## Fix 16 (`build/hero_fix16.zip`): the side tilt's second hit, his shield on his back
 

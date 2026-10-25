@@ -38795,8 +38795,8 @@ void brave_reflect(int on)
 
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
 // Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) while special is held; the charge
-// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz, which goes off by
-// itself). Released (at any time, a tap included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
+// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz, held as long as
+// special is; Ultimate's doesn't go off by itself). Released (at any time, a tap included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
 // fighters/brave/weapons/fireball.c) at frame 10 / 11 / 16; shield while holding -> SpecialNCancel, the
 // charge kept for the next one (brave_n_stored; a stock lost clears it, func_235). The fireball learns its
 // level through the custom N slot (int 0x10000048 -> the weapon's 0x10000005), set while it is generated (as
@@ -38959,9 +38959,9 @@ void brave_n_loop()
             brave_n_stored = brave_n_hold;
             brave_n_change(0x3);
         }
-        else if (brave_n_released || brave_n_hold >= 0x51)
+        else if (brave_n_released)
         {
-            brave_n_level = brave_n_hold_level();   // fully charged (Kafrizz) it goes off by itself
+            brave_n_level = brave_n_hold_level();
             if (brave_can_pay(brave_n_cost(brave_n_level)))
             {
                 brave_pay(brave_n_cost(brave_n_level));
