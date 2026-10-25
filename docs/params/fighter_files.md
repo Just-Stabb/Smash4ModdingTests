@@ -257,8 +257,13 @@ factor, and writes it to the ground collision object (`+0x204`..`+0x218`; one co
 value is also multiplied by a common param, GroundModule `+0xA4` = `fighter_param_common` word at
 `mgr + 0x20C`). Entry 0 is the normal box, entry 1 the one used while tumbling (the community
 sheet's "usual" / "tumble"); some fighters have a third (tether reach). Marth: (0, 8, 16, 16)
-and (0, 4, 9.6, 9.6); the sheet calls the values X, Y, X2, Y2 (the tool calls them x y w h; the
-exact meaning of each is **inferred**).
+and (0, 4, 9.6, 9.6); the sheet calls the values X, Y, X2, Y2 (the tool calls them x y w h).
+The use-box code stores x, y (x scale) at `+0x204` / `+0x208`, w and h (x scale x the size factor,
+vtable `+0x174`) at `+0x20C` / `+0x210`, and w x `fighter_param_common` word 0x75
+(`reverse_ledge_grab_range_multiplier`, 0.6) at `+0x214`, h again at `+0x218`: w is the reach in
+front, 0.6 w the reach behind, h the height, y its bottom (**inferred** from these stores and from
+Ultimate's own boxes, two corners, matching: Hero's x -9..16.5, y 10.5..26.5 against Robin's
+-9.6..16, 8..24). Every vanilla tumbling box (entry 1) is (0, 4, 0.6 w, 0.6 h).
 
 ### 3.4 Other per-fighter shapes
 

@@ -351,6 +351,10 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
   values for the same motions). `tools/ultimate_vl_blend.py` (also run by the translator with
   `--motion-list`) writes Ultimate's into every common motion found by its game script, where
   Ultimate's isn't 0 (0: its status code passes one). Robin's Run 0 -> 3, Falls 0 -> 8.
+- Collision shapes: `tools/ultimate_vl_shapes.py` writes Ultimate's `param/vl.prc` `hit_data`
+  (hurtboxes), `virtual_node_data_hit` (their hit points, vl group 10), `map_coll_data` (ECB points)
+  and `cliff_hang_data` (ledge box) into the port's vl (groups 5 / 10 / 4 / 7), the bones by joint id
+  (converted bones keep Ultimate's local axes, so offsets carry over).
 - Statuses written for a port (its specials' MSC) must check the cancel frame themselves:
   `CancelModule(0x2713) == 1 && (func_39() || func_41())` (Robin's `func_2246`); Sephiroth's Flare
   waited for the animation's end (test 59).

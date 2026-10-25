@@ -317,3 +317,11 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
 - Mouth: fix 16 gave every motion a face entry (for the shields), and an entry replaces `default.mta`,
   so the motions Robin has none for lost the default mouth. `ultimate_fighter.py` now starts those
   entries from the default's keys (Steve's tools, the same mechanism, get it too on his next rebuild).
+
+## Fix 18 (`build/hero_fix18.zip`): his hurtboxes, ECB and ledge-grab boxes
+
+`tools/ultimate_vl_shapes.py VL_IN VL_OUT HERO/param/vl.prc MODEL/c00` (over the vl with Ultimate's
+blends, `ports_dash_fix`): Ultimate's 11 hurtboxes (Robin's 7) and their hit points (group 10), its ECB
+points (head -0.5 x, shoulders, knees, hip; Robin's had the forearms) and ledge box (0, 10.5, 16.5,
+16; Robin's (0, 8, 16, 16)), the tumbling box (0, 4, 9.9, 9.6).
+
