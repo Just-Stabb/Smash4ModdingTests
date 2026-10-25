@@ -67,7 +67,16 @@ TRANSLATE = {
     'ThrowF': 'throwf', 'ThrowB': 'throwb', 'ThrowHi': 'throwhi', 'ThrowLw': 'throwlw',
     'CliffAttack': 'cliffattackquick', 'DownAttackU': 'downattacku', 'DownAttackD': 'downattackd',
     'SlipAttack': 'slipattack',
+    # the dash's run transition (Ultimate's frame: 11 for the four ported so far; the base's was for its
+    # own animation, Robin 17 / Zelda 16 / Pit 13 / Bowser 14, so the run cut in mid-stride; Smash 4 has
+    # no TurnDash motion, its turn dash plays Dash). Game script only: the base's sound / expression
+    # scripts (steps) aren't emptied for them (effects: translate_effects as before), and the dash's
+    # motion_list frames aren't vl cancel frames
+    'Dash': 'dash',
 }
+GAME_ONLY = {'dash'}
+# Ultimate transition term -> Smash 4 STRANS id (vanilla dash scripts: STRANS_ON(0x1E00000A) at the run frame)
+TERMS = {'FIGHTER_STATUS_TRANSITION_TERM_ID_DASH_TO_RUN': 0x1E00000A}
 # --translate: script name -> motion slot for the run's extra translations
 SLOTS = {}
 # base scripts emptied (they'd run the base's moves on a motion we replaced without a script of ours)
@@ -406,6 +415,12 @@ class Translator:
             return [cmd('Remove_Hitbox', int(a[1]))]
         if name == 'AttackModule::set_size':
             return [cmd('Change_Hitbox_Size', int(a[1]), float(a[2]))]
+        if name == 'WorkModule::enable_transition_term':
+            t = TERMS.get(a[1])
+            if t is None:
+                self.skip(name + ' ' + str(a[1]))
+                return []
+            return [cmd('STRANS_ON', t)]
         if name in ('WorkModule::on_flag', 'WorkModule::off_flag'):
             f = FLAGS.get(a[1])
             if f is None:
@@ -762,7 +777,7 @@ def motion_frames(args, done):
         return t.value
     moves = {}
     for src, name in done:
-        if name.startswith('landing'):          # landing lag: fighter_param's landing frames
+        if name.startswith('landing') or name in GAME_ONLY:   # landing lag: fighter_param's landing frames
             continue
         h = acmd.crc(name)
         if name in SLOTS:                       # --translate: a motion slot of its own (a custom-move slot)
@@ -786,6 +801,8 @@ def motion_frames(args, done):
             byte(i, k, v)
         moves[i] = (name, ent[0]['flags'] & 4)
         print('  0x%03X %-16s cancel %2d, intangible %d-%d, move %d' % (i, name, cancel, xs, xe, bool(ent[0]['flags'] & 4)))
+    import ultimate_vl_blend
+    ultimate_vl_blend.apply_blends(vf, ml)      # Ultimate's blend into each common motion (byte 1)
     open(args.mtable[1], 'wb').write(struct.pack('>%dI' % len(mt), *mt))
     open(args.vl[1], 'wb').write(vf.build())
     return moves
@@ -851,15 +868,18 @@ def main():
         if a.list:
             print('%s -> %s: %d commands; left out %s' % (src, name, len(cmds), tr.skipped))
             print(acmd.fmt_script(cmds))
-    for name in EMPTY:
+    for name in EMPTY if not a.only else ():    # --only: those scripts alone (a fighter on its base's moves keeps them)
         f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
     f.save(a.out)
-    print('%d scripts translated (%s), %d emptied' % (len(done), ', '.join(n for _s, n in done), len(EMPTY)))
+    print('%d scripts translated (%s), %d emptied' % (len(done), ', '.join(n for _s, n in done),
+                                                     0 if a.only else len(EMPTY)))
     if a.others:
         os.makedirs(a.others[1], exist_ok=True)
         for fn in ('effect.bin', 'sound.bin', 'expression.bin'):
             o = acmd.ACMDFile.load(os.path.join(a.others[0], fn))
             for _s, name in done:
+                if name in GAME_ONLY:
+                    continue
                 if fn != 'expression.bin' or acmd.crc(name) not in o.scripts:
                     o.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
             if fn == 'effect.bin' and a.effects:

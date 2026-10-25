@@ -340,6 +340,20 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
   adds the animation to `body/main.pac`, the kind's `extra_kinds.json` "motions" points its motion
   table entry at it, the translator adds its `motion.mtable` entry; the jab count is fighter_param
   `attack_1_count` (read by the common MSC every fighter's `.mscsb` carries).
+- Dash: `dash`'s game script (game only: the base's dash dust / steps stay) is Ultimate's, i.e.
+  `enable_transition_term(DASH_TO_RUN)` -> `STRANS_ON(0x1E00000A)` at its frame (11 for Hero, Sephiroth,
+  Steve, Incineroar). The Dash status (Robin's `func_715`) goes to Run once that term is on, and Run
+  starts its animation at frame 0 (`func_716`): the base's frame suits the base's dash animation
+  (Robin 17, Zelda 16, Pit 13, Bowser 14), so with Ultimate's animations the run cut in mid-stride.
+  Smash 4 has no TurnDash motion (no `turndash` script slot), so Ultimate's isn't carried over.
+- Motion blends: `fighter_param_vl` group 1 byte 1 is the frames the game blends into the motion
+  (vanilla: Wait1 / walks 6, brakes 3, DamageFall 10; Ultimate's `motion_list` `blend` has the same
+  values for the same motions). `tools/ultimate_vl_blend.py` (also run by the translator with
+  `--motion-list`) writes Ultimate's into every common motion found by its game script, where
+  Ultimate's isn't 0 (0: its status code passes one). Robin's Run 0 -> 3, Falls 0 -> 8.
+- Statuses written for a port (its specials' MSC) must check the cancel frame themselves:
+  `CancelModule(0x2713) == 1 && (func_39() || func_41())` (Robin's `func_2246`); Sephiroth's Flare
+  waited for the animation's end (test 59).
 
 ## Checked here
 

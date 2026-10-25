@@ -37751,6 +37751,12 @@ void edge_n_loop()
         }
     }
     edge_n_air();
+    // actionable from the motion's cancel frame (vl group 1: Ultimate's, Flare 56, Megaflare 70,
+    // Gigaflare 172, cancel 8), as Zelda's own statuses (func_39: ground, func_41: air)
+    if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
+    {
+        return;
+    }
     if (MotionModule(0x2712) == 0x1)
     {
         if (global18 == 0)
