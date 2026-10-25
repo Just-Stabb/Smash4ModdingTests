@@ -943,9 +943,11 @@ PIT_MOTIONS = {
     'k00laddercatchairl': 'k00laddercatchairr', 'k00laddercatchendl': 'k00laddercatchendr',
     'k00laddercatchl': 'k00laddercatchr',
 }
-# Robin's mesh slots for Hero: body, hand, sword, shield and scabbard in her body slot (always shown:
-# Hero keeps his sword and shield out); the face meshes by expression; his hair (the other outfits')
-# in hers; her swords and tome empty. Not used: his shield on the back, the sheathed hilt, the thrown sword and the low-detail meshes
+# Robin's mesh slots for Hero: body, hand, sword and scabbard in her body slot (always shown: Hero keeps
+# his sword out); the face meshes by expression; his hair (the other outfits') in hers; her swords and
+# tome empty. His shield in hand and the one on his back go in her Final / Result mouths (never shown in
+# battle), driven by Ultimate's brave_shield / brave_shieldb (REFLET_VIS: the back one in his smash
+# charges, specials, Command Selection...). Not used: the sheathed hilt, the thrown sword, the low-detail meshes
 REFLET_SLOTS = [
     ('bronzeswordM_VIS_O_OBJ', []), ('thunderswordM_VIS_O_OBJ', []), ('hair_O_OBJ_O_SORTEACHNODE', ['hair_highShape']),
     ('Reflet_Eye_VIS_O_OBJ', ['brave_Eye_VIS_O_OBJShape']),
@@ -955,7 +957,7 @@ REFLET_SLOTS = [
     ('Reflet_Blink_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_VIS_O_OBJShape']),
     ('Reflet_Blink_Talk_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Talk_VIS_O_OBJShape']),
     ('Reflet_Mouth_Talk_VIS_O_OBJ', ['brave_Mouth_Talk_VIS_O_OBJShape']),
-    ('Reflet_Mouth_Final_VIS_O_OBJ', ['brave_Mouth_Final_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Final_VIS_O_OBJ', ['brave_shield_VIS_O_OBJShape']),
     ('Reflet_Mouth_Outh_VIS_O_OBJ', ['brave_Mouth_Ouch_VIS_O_OBJShape']),
     ('Reflet_Blink_Outh_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Ouch_VIS_O_OBJShape']),
     ('Reflet_Blink_Down_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Blink_Down_VIS_O_OBJShape']),
@@ -970,11 +972,10 @@ REFLET_SLOTS = [
     ('Reflet_Mouth_VoiceA_VIS_O_OBJ', ['brave_Mouth_Attack_VIS_O_OBJShape']),
     ('Reflet_Mouth_Hot_VIS_O_OBJ_O_NOSORT_FAR_O_SORTEACHNODE', ['brave_Mouth_HeavyOuch_VIS_O_OBJShape']),
     ('Reflet_Mouth_Bound_VIS_O_OBJ', ['brave_Mouth_Bound_VIS_O_OBJShape1']),
-    ('Reflet_Mouth_Result_VIS_O_OBJ', ['brave_Mouth_PatternA_VIS_O_OBJShape']),
+    ('Reflet_Mouth_Result_VIS_O_OBJ', ['brave_shieldb_VIS_O_OBJShape']),
     ('Reflet_Hoho_Hot_VIS_O_OBJ', ['brave_Hot_VIS_O_OBJShape']),
     ('book_VIS_O_OBJ', []),
-    ('fullhands', ['body_highShape', 'hand_L1_highShape', 'brave_sword_VIS_O_OBJShape', 'brave_shield_VIS_O_OBJShape',
-                   'brave_scabbard_VIS_O_OBJShape',
+    ('fullhands', ['body_highShape', 'hand_L1_highShape', 'brave_sword_VIS_O_OBJShape', 'brave_scabbard_VIS_O_OBJShape',
                    # the other outfits' own pieces (capes, headdress, bandana, the slime, rings)
                    'Mantle_highShape', 'mant_emblam_highShape', 'mant_shadow_highShape', 'HeaddressShape',
                    'slime_highShape', 'bandana_highShape', 'topoShape', 'scabbardRingLShape', 'scabbardRingRShape',
@@ -992,7 +993,7 @@ REFLET_F_SLOTS = [
     (_RFS % 'Blink', ['brave_Blink_VIS_O_OBJShape']),
     (_RFS % 'Blink_Talk', ['brave_Blink_Talk_VIS_O_OBJShape']),
     (_RF % 'Mouth_Talk', ['brave_Mouth_Talk_VIS_O_OBJShape']),
-    (_RF % 'Mouth_Final', ['brave_Mouth_Final_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Final', ['brave_shield_VIS_O_OBJShape']),
     (_RF % 'Mouth_Outh', ['brave_Mouth_Ouch_VIS_O_OBJShape']),
     (_RFS % 'Blink_Ouch', ['brave_Blink_Ouch_VIS_O_OBJShape']),
     (_RFS % 'Blink_Down', ['brave_Blink_Down_VIS_O_OBJShape']),
@@ -1007,10 +1008,12 @@ REFLET_F_SLOTS = [
     (_RF % 'Cheek_Hot', ['brave_Hot_VIS_O_OBJShape']),
     (_RF % 'Mouth_Bound', ['brave_Mouth_Bound_VIS_O_OBJShape1']),
     (_RF % 'Eye_Heavyattack', ['brave_Eye_Heavyattack_VIS_O_OBJShape']),
-    (_RF % 'Mouth_Result', ['brave_Mouth_PatternA_VIS_O_OBJShape']),
+    (_RF % 'Mouth_Result', ['brave_shieldb_VIS_O_OBJShape']),
     ('book_VIS_O_OBJ', []),
     ('fullhands', next(us for sl, us in REFLET_SLOTS if sl == 'fullhands')),
 ]
+REFLET_VIS = {'brave_shield': 'Reflet_Mouth_Final_VIS_O_OBJ', 'brave_shieldb': 'Reflet_Mouth_Result_VIS_O_OBJ'}
+REFLET_F_VIS = {'brave_shield': _RF % 'Mouth_Final', 'brave_shieldb': _RF % 'Mouth_Result'}
 REFLET_MOTIONS = {
     'c00attack100start': 'c00attack11', 'c00attack100': 'c00attack11', 'c00attackend': 'c00attack11',
     'd00specialnshoot': 'd00specialn1', 'd00specialntronstart': 'd00specialn3', 'd00specialntronhold': 'd00specialnhold',
@@ -1035,10 +1038,10 @@ PROFILES = {
     # all). layers: Ultimate motions with another one baked over them (add_layers)
     'pit': dict(slots=PIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **PIT_MOTIONS), vis=PIT_TOOL_VIS,
                 vis_default={}, hidden=(), layers=PIT_LAYERS),
-    'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
-                   vis_default={}, hidden=()),
-    'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS), vis={},
-                     vis_default={}, hidden=()),
+    'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
+                   vis=REFLET_VIS, vis_default={REFLET_VIS['brave_shield']: 1}, hidden=()),
+    'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
+                     vis=REFLET_F_VIS, vis_default={REFLET_F_VIS['brave_shield']: 1}, hidden=()),
 }
 
 
@@ -1356,6 +1359,9 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
         cpath = base + '/model/body/' + cdir
         if not cdir.startswith('c') or not os.path.isdir(cpath):
             continue
+        # each costume's own slot names (female Robin's: reflet_f)
+        cprof = profile_for(m.name for m in nud.read(cpath + '/model.nud'))[1] \
+            if os.path.exists(cpath + '/model.nud') else prof
         for pac in ('material_anime_face.pac', 'material_anime_eyelid.pac'):
             src = os.path.join(cpath, pac)
             if not os.path.exists(src):
@@ -1372,15 +1378,15 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                         vis.append((v['name'], sorted(set(ks))))
                 if pac == 'material_anime_face.pac':
                     # the base's own keys for the slots we drive go (Pit's mouths: they'd show the tools)
-                    vis = [v for v in vis if v[0] not in prof['vis'].values()]
-                    for uname, slot in prof['vis'].items():
+                    vis = [v for v in vis if v[0] not in cprof['vis'].values()]
+                    for uname, slot in cprof['vis'].items():
                         st = vis_of[mname].get(uname)
                         for other in VIS_ALSO.get(uname, ()):
                             o = vis_of[mname].get(other)
                             if o is not None:
                                 st = o if st is None else (np.asarray(st) | np.asarray(o))
-                        vis.append((slot, vis_keys(st) if st is not None else [(0, prof['vis_default'].get(slot, 0))]))
-                    for slot in prof['hidden']:
+                        vis.append((slot, vis_keys(st) if st is not None else [(0, cprof['vis_default'].get(slot, 0))]))
+                    for slot in cprof['hidden']:
                         vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
@@ -1393,9 +1399,9 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 if name.endswith('.mta') and d[:4] == b'MTA4' and pac == 'material_anime_face.pac':
                     m = mta.read(d)
                     vis = [(v['name'], sorted(set((min(k[0], m['frames'] - 1), k[1]) for k in v['keys'])))
-                           for v in m['vis'] if v['name'] not in prof['hidden'] and v['name'] not in prof['vis'].values()]
-                    vis += [(slot, [(0, prof['vis_default'].get(slot, 0))]) for slot in prof['vis'].values()]
-                    vis += [(slot, [(0, 0)]) for slot in prof['hidden']]
+                           for v in m['vis'] if v['name'] not in cprof['hidden'] and v['name'] not in cprof['vis'].values()]
+                    vis += [(slot, [(0, cprof['vis_default'].get(slot, 0))]) for slot in cprof['vis'].values()]
+                    vis += [(slot, [(0, 0)]) for slot in cprof['hidden']]
                     d = mta.write(m['frames'], [], m['rate'], m['unk'], vis)
                 ents.append((name, d))
             os.makedirs(out + '/model/body/' + cdir, exist_ok=True)

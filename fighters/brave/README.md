@@ -12,7 +12,7 @@ Built as Steve's (fighters/pickel/README.md), from Robin:
   (female Robin, 1 / 3 / 5 / 7: her own mesh names): Hero's body, hand, sword, shield and scabbard
   (and the other outfits' capes, headdress, bandana, slime, rings) in Robin's always-shown
   `fullhands`; his hair in her hair slot; his face meshes in hers by expression; her swords and
-  tome empty. 110-120 bones (Robin's count).
+  tome empty. (Fix 16: the shield left `fullhands` for her Final / Result mouths.) 110-120 bones (Robin's count).
 - motions: 316, 3 item ones on Wait1; Robin's specials on Hero's (Thunder -> Frizz, Arcfire ->
   Zap, Elwind -> Woosh, Nosferatu -> the command menu's first skill).
 - melee.msbt: the sound-test names copied from Robin's ("Robin (Male)" / "(Female)") renamed
@@ -41,7 +41,7 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 69 264=0
   `ultimate_acmd.fix_split_flag_branch` puts B back in the branch and D in its else.
 - Jab: 3 hits, no rapid jab (fighter_param 264 = 0; Robin has one).
 
-Not yet: the side tilt's second hit (`AttackS3S2`, a second press), the critical hits, his sword
+Not yet: the side tilt's second hit (`AttackS3S2`, a second press: fix 16), the critical hits, his sword
 trails (`tex_brave_sword1 / 2`: trail textures to add, as Sephiroth's) and effects, sounds, specials.
 
 ## v3 (`build/hero_v3.zip`): effects, sword trails, neutral special
@@ -282,3 +282,20 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
   `brave_generate` ids follow. Only his list changes (Supamario's and Sephiroth's have no special entry
   before their new ones).
 - Neutral special: fully charged (81 frames: Kafrizz) it goes off by itself.
+
+## Fix 16 (`build/hero_fix16.zip`): the side tilt's second hit, his shield on his back
+
+- Side tilt 2: the game's own side-tilt combo (status 0x28, `func_276`: a second attack press once the
+  script sets `0x2100000D`, Ultimate's `ENABLE_COMBO` at frame 16, plays motion 0x59 `AttackS3S2`)
+  up to fighter_param 265 (`attack_s3_count`) = 2. Motion 0x59 (empty in Robin's table) plays
+  Ultimate's `c01attacks32` (extra_kinds.json "motions", `--add C01AttackS32`); its script from
+  Ultimate's `AttackS3S2` (specials_acmd.json, slot 0x59; the vl's cancel frame 48 for it).
+- Shield: Ultimate hides `brave_shield` and shows `brave_shieldb` (on his back) in 180 motions (smash
+  charges, specials, Command Selection). Robin's Final / Result mouths are never shown in battle (her
+  face material animations never key them on), so they now hold the shield in hand / on his back
+  (`ultimate_fighter.py` `REFLET_VIS` / `REFLET_F_VIS`), driven per motion by those two tracks (the hand
+  one shown where a motion has none); the motion step reads each costume's own slot names (male and
+  female Robin's differ). Her two mouth meshes (`brave_Mouth_Final`, `PatternA`) are left out.
+- Built as before, with BRAVE_BODY = Robin's vanilla `script/animcmd/body` with the universal-mechanics
+  `game.bin` (the roll-off scripts): a body folder whose effect.bin already has Robin's effects moved to
+  kind 0x45 (`0x445....`) would point her leftover effects at Hero's bank instead of hers.

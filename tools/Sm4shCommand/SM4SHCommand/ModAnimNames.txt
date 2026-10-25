@@ -71,7 +71,7 @@ SpecialNCancel
 SpecialAirN2
 SpecialAirN3
 SpecialAirNCancel
-// the fireball article (weapon kind 0x190, his article 7; motion.mtable): SpecialN1 / 2 / 3 the flight
+// the fireball article (weapon kind 0x190, his article 6; motion.mtable): SpecialN1 / 2 / 3 the flight
 // (Frizz / Frizzle / Kafrizz), BurstS / M / L their bursts, FireballNone6-23 empty slots (thunder's 24)
 SpecialN1
 BurstS
@@ -114,8 +114,8 @@ SpecialHi3
 SpecialAirHiStart
 SpecialAirHiHold
 SpecialAirHi3
-// the spark article (weapon kind 0x191, his article 8: Zap's lightning on the fighter hit) and the tornado
-// (0x192, article 9: Woosh's whirlwind); motion.mtable: their three levels, then empty slots (thunder's 24)
+// the spark article (weapon kind 0x191, his article 7: Zap's lightning on the fighter hit) and the tornado
+// (0x192, article 8: Woosh's whirlwind); motion.mtable: their three levels, then empty slots (thunder's 24)
 SpecialS1
 SpecialHi1
 SpecialHi2
@@ -224,7 +224,10 @@ SpecialAirLw14
 SpecialAirLw15Positive
 SpecialAirLw16Start
 SpecialAirLw21
-// the spells' articles (weapon kinds 0x193-0x197, his articles 10-14: flash Sizz / Sizzle, explosion Bang /
+// the side tilt's second hit (the game's side-tilt combo, fighter_param 265 = 2): motion 0x59, Ultimate's
+// c01attacks32 animation (extra_kinds.json "motions")
+AttackS3S2 -> body/FitRefletBodyMainC01AttackS32.omo
+// the spells' articles (weapon kinds 0x193-0x197, his articles 9-13: flash Sizz / Sizzle, explosion Bang /
 // Kaboom, deathball Whack / Thwack, crash Magic Burst / Kamikazee, sleep Snooze); motion.mtable: Ultimate's
 // brave_<article> scripts, then empty slots (thunder's 24)
 Flash1

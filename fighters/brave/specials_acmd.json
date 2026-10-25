@@ -335,5 +335,9 @@
   "SpecialAirLw21": {
     "name": "specialairlw21",
     "slot": "0x26A"
+  },
+  "AttackS3S2": {
+    "name": "attacks3s2",
+    "slot": "0x59"
   }
 }

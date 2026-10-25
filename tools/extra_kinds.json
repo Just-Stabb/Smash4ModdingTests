@@ -143,6 +143,7 @@
         "0x287": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill3", "flags": "0x0", "motion": "specialairlw18"},
         "0x288": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill1", "flags": "0x0", "motion": "specialairlw19"},
         "0x289": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill2", "flags": "0x0", "motion": "specialairlw20"},
+        "0x59": {"anim": "FitRefletBodyMainC01AttackS32", "flags": "0x0", "motion": "attacks3s2 (the side tilt's second hit: fighter_param 265 = 2)"},
         "0x220": {"anim": "FitRefletBodyMainD03SpecialLwFail", "flags": "0x0", "motion": "speciallwfail"},
         "0x221": {"anim": "FitRefletBodyMainD02SpecialHiEmpty", "flags": "0x0", "motion": "specialhiempty"},
         "0x222": {"anim": "FitRefletBodyMainD03SpecialLwSpell1", "flags": "0x0", "motion": "speciallw1"},
