@@ -285,6 +285,14 @@ and AO floor). Textures (`0x40EB0000` up, power-of-two, one mip):
   (colours 5 / 6: ~20x);
 - eyes: the iris (second UV set) drawn onto the white.
 
+Specular and rim: the base's (Zelda's body: `NU_specularColor` (1, 1, 1) x 2 over a broad lobe,
+`NU_fresnelColor` 0.91) are added over the colour whatever it is, so a near-black material came out
+as a light grey sheen (Sephiroth's coat under neutral light, test 58). Each material with a PRM (eyes
+and skin aside) has them scaled by Ultimate's reflectance, k = mean(0.16 spec^2) / 0.04 (PRM alpha,
+against a plain dielectric's spec 0.5), at most 1: specular x max(k, 0.1), rim x max(sqrt k, 0.35).
+His coat (spec ~0.08, k ~0.03): specular 0.1, rim 0.32. Hero / Steve / Incineroar take it on their
+next model rebuild.
+
 `tools/nutexb.py` decodes BC7 now (Pillow's BCn decoder).
 
 ## Motions

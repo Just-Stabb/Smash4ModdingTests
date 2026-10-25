@@ -586,3 +586,12 @@ Every charge fired a Flare: Din's Fire's creation callback (`0x02F97C90`, shared
 `lwz r0, 0x124(ints)` -> the creation info's byte `+0x5C`, which becomes the weapon's `0x10000005`), not
 the neutral one `edge_n_generate` set. It sets `0x10000049` now. (Robin's thunder callback copies
 `0x10000048`, `+0x120`: Hero's slot is right.)
+
+## Test 58 (`build/sephiroth_test58.zip`): his clothes less washed out
+
+User (shot, neutral lighting): "Sephiroth's clothes are a bit too light". His materials are Zelda's body
+material, whose specular (white x2, a broad lobe) and rim (0.91) are added over any colour: on his
+coat (colour ~0.05) a light grey sheen. Now scaled by Ultimate's reflectance per material
+(docs/ultimate-fighter-port.md "Specular and rim"): coat / skirt specular 1 -> 0.1 (c04: 1.8 -> 0.18),
+rim 0.91 -> 0.32. Package: `model/body/c00-c07/model.nud` (textures as test 43's).
+

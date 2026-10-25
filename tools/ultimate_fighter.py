@@ -407,6 +407,7 @@ class Textures:
         self.src, self.base_id = src, base_id
         self.ids, self.images = {}, []
         self.extra = []                 # other folders to find textures in (held article models)
+        self.cache = {}                 # values measured from textures (reflectance)
 
     def load(self, name):
         for d in [self.src] + self.extra:
@@ -448,6 +449,14 @@ class Textures:
         if (img[..., 3] < 128).any():
             img = bleed(img)
         return self.add(key, np.clip(np.round(img), 0, 255).astype(np.uint8))
+
+    def reflectance(self, prm):
+        """the PRM's mean F0 (0.16 spec^2, alpha) against a plain dielectric's 0.04, at most 1"""
+        key = ('refl', prm)
+        if key not in self.cache:
+            spec = self.load(prm)[..., 3].astype(np.float64) / 255
+            self.cache[key] = float(min(1.0, (0.16 * spec * spec).mean() / 0.04))
+        return self.cache[key]
 
     def normal(self, nor, prm=None):
         key = ('nor', nor, prm)
@@ -638,6 +647,14 @@ def material_for(tex, mat, tmpl, part):
         m.textures[1]['hash'] = col
     bits, val = float_hash(mat.material_label)
     m.props = [(n, ([val, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else v)) for n, v in m.props]
+    if not skin and 'Texture6' in tx and 'eye' not in mat.material_label.lower():
+        # the base's specular and rim (added over the colour whatever it is: Zelda's white x2, a broad
+        # lobe, rim 0.91) scaled by Ultimate's reflectance, F0 = 0.16 spec^2 (PRM alpha), against a
+        # plain surface's 0.04 (spec 0.5): Sephiroth's coat (spec 0.08: 1/40) was a light grey sheen.
+        # Floors keep some of both (the rim outlines him on dark stages); the eyes keep their glint
+        k = tex.reflectance(tx['Texture6'])
+        scale = {'NU_specularColor': max(k, 0.1), 'NU_fresnelColor': max(k ** 0.5, 0.35)}
+        m.props = [(n, ([x * scale[n] for x in v[:3]] + list(v[3:]) if n in scale else v)) for n, v in m.props]
     return m
 
 
