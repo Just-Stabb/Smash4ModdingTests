@@ -548,8 +548,8 @@ int func_40(int arg0)
 
 // ---- Sephiroth's Flare / Megaflare / Gigaflare (weapon kind 0x18C, a copy of Zelda's dein; his article
 // 5). The scaffolding above is dein's MSC; its statuses are replaced (fighters/edge/specials.md).
-// Level 0 / 1 / 2 (S / M / L): Sephiroth's custom slot (int 0x10000048) while he generates it, which
-// the game copies into the new weapon's 0x10000005 (as Supamario's Kamehameha). Motions: 0 / 1 / 2 the
+// Level 0 / 1 / 2 (S / M / L): Sephiroth's side special custom slot (int 0x10000049) while he generates
+// it, which dein's creation callback copies into the new weapon's 0x10000005. Motions: 0 / 1 / 2 the
 // flight (Ultimate's edge_fire SpecialN1 / N2 / N3: a small hitbox, its bullet effect), 4 / 5 / 6 the
 // burst (BurstS / M / L: the explosion's hitboxes). Status 0 flies (Ultimate's param_fire: speed 0.01
 // growing by accel_x_* a frame up to max_speed_x_*, life_*), status 1 bursts where it is: at its life's

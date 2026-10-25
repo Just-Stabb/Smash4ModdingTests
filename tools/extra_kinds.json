@@ -87,6 +87,10 @@
         "id": 62,
         "name": "Steve",
         "subtitle": "Minecraft"
+      },
+      "motions": {
+        "0x1D": {"anim": "FitPitBodyMainA03JumpAerialF", "flags": "0x0", "motion": "jumpaerialfront (a normal double jump, jump type 1: Pit has none, his are 0x1F-0x21)"},
+        "0x1E": {"anim": "FitPitBodyMainA03JumpAerialF", "flags": "0x0", "motion": "jumpaerialback"}
       }
     },
     {

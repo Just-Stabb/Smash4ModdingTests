@@ -99,3 +99,10 @@ python3 tools/fighter_param.py set fighter_param.bin OUT 68 1=0 2=0.85 3=0.85 7=
   hitboxes (the dump keeps the materials' shared `wait; clear_all` in the last nested branch only);
   added at the dump's own wait after the last hitbox (frames 7, 7, 13, 15).
 - `own_joints` back to all for Pit (fresh hashes, so `pitpt1.pac` binds none: fix 10's optional).
+
+## Fix 13 (`build/fix13_diag.zip`): double jump
+
+Jump type 1 (fix 10) plays motion slots 0x1D / 0x1E (jump aerial front / back, Mario's table); Pit's
+have no animation (his multi-jumps are 0x1F-0x21): he T-posed. `extra_kinds.json` `motions` points both
+at `FitPitBodyMainA03JumpAerialF`; the shipped executable was patched with the same words (Steve's
+motion table `0x04BA4520`, entries `+0xE8` / `+0xF0`).

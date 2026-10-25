@@ -37622,8 +37622,9 @@ int dash_turn_attack_update()
 // before 100 (and from frame 20, cancel_start_frame) it goes to SpecialN1 (Flare, level S) or
 // SpecialN2 (Megaflare, level M), which fire at frame 13; shield while charging -> SpecialNCancel.
 // The fire article (article 5, weapon kind 0x18C, fighters/edge/weapons/fire.c) learns its level
-// through Zelda's custom slot (int 0x10000048, which the game copies into a new weapon's 0x10000005),
-// set while it is generated (as Supamario's Kamehameha). Motions straight through MotionModule (not
+// through Zelda's side special's custom slot (int 0x10000049: Din's Fire's creation callback 0x02F97C90
+// copies it into the new weapon's 0x10000005; the neutral one, 0x10000048, isn't read: every charge
+// fired a Flare), set while it is generated. Motions straight through MotionModule (not
 // func_22 / func_23: they add Zelda's custom-move offset, global21). In the air (param_special_n):
 // the fall slowed while charging (gravity x start_accel_y_mul_air 0.7, max fall x
 // start_max_speed_y_mul_air 0.55) until the fire motion's ENABLE_FALL_SPEED frame (NStart 140, N1 35,
@@ -37692,10 +37693,10 @@ void edge_n_air()
 void edge_n_generate()
 {
     int slot;
-    slot = WorkModule(0x6, 0x10000048);
-    WorkModule(0x7, edge_n_level, 0x10000048);
+    slot = WorkModule(0x6, 0x10000049);
+    WorkModule(0x7, edge_n_level, 0x10000049);
     ArticleModule(0x2710, 0x5);
-    WorkModule(0x7, slot, 0x10000048);
+    WorkModule(0x7, slot, 0x10000049);
     edge_n_fired = 0x1;
 }
 

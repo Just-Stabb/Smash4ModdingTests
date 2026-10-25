@@ -578,3 +578,11 @@ The first of his specials (fighters/edge/specials.md: the plan, the move's logic
 `edge.mscsb` rebuilt with the fixed msclang (`tools/msclang_nested_call.patch`, fighters/brave/README.md
 fix 11): `edge_n_change` / `edge_n_loop`'s `MotionModule(..., edge_n_motion(edge_n_ground_motion()), ...)`
 never got `edge_n_motion`'s value (the stack a value off in his neutral special).
+
+## Fix 13 (`build/fix13_diag.zip`): Megaflare / Gigaflare
+
+Every charge fired a Flare: Din's Fire's creation callback (`0x02F97C90`, shared by his `fire` /
+`flare1` / `flare2` / `flash`) copies the owner's int `0x10000049` (Zelda's side special custom slot:
+`lwz r0, 0x124(ints)` -> the creation info's byte `+0x5C`, which becomes the weapon's `0x10000005`), not
+the neutral one `edge_n_generate` set. It sets `0x10000049` now. (Robin's thunder callback copies
+`0x10000048`, `+0x120`: Hero's slot is right.)
