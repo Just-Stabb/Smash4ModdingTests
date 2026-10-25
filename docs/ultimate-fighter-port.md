@@ -354,7 +354,9 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
 - Collision shapes: `tools/ultimate_vl_shapes.py` writes Ultimate's `param/vl.prc` `hit_data`
   (hurtboxes), `virtual_node_data_hit` (their hit points, vl group 10), `map_coll_data` (ECB points)
   and `cliff_hang_data` (ledge box) into the port's vl (groups 5 / 10 / 4 / 7), the bones by joint id
-  (converted bones keep Ultimate's local axes, so offsets carry over).
+  (converted bones keep Ultimate's local axes, so offsets carry over). Done for all four ports
+  (Hero fix 18, `ports_shapes`: Sephiroth 11 hurtboxes, Steve 10, Incineroar 11; every bone was in
+  the base's joint table).
 - Statuses written for a port (its specials' MSC) must check the cancel frame themselves:
   `CancelModule(0x2713) == 1 && (func_39() || func_41())` (Robin's `func_2246`); Sephiroth's Flare
   waited for the animation's end (test 59).
