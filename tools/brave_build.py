@@ -60,7 +60,7 @@ ARTICLES = {
     # Command Selection's (shot.c: motion level flies, 2 + level the hit's; crash: placed.c)
     'flash': (_slots('flash', ('flash1', 'flash2', 'flashhit1', 'flashhit2')), {}),
     'explosion': (_slots('explosion', ('move1', 'move2', 'explode1', 'explode2')), {}),
-    'deathball': (_slots('deathball', ('deathball1', 'deathball2')), {'deathball': 0}),
+    'deathball': (_slots('deathball', ('deathball1', 'deathball2', 'deathballko')), {'deathball': 0}),
     'crash': (_slots('crash', ('crash1', 'crash2', 'crashend1', 'crash1mp20', 'crash1mp40', 'crash1mp60',
                                'crash1mp80')), {}),
     'sleep': (_slots('sleep', ('sleep',)), {}),
@@ -70,6 +70,12 @@ ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
 # Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100
 CRASH_TIERS = {'crash1mp%d' % m: m / 100.0 for m in (20, 40, 60, 80)}
+# Whack's KO (weapons/deathball.c): DeathBall1's hitbox as ID 2, hit group 2, effect 0x10 (Death: Smash Run's
+# Orne, a KO on the spot), 1 damage, radius 10 around Y 8, no clank / rebound, fighters only, unblockable,
+# not reflectable / absorbable, for 2 frames
+DEATH = 0x10
+KO_HITBOX = {0: 2, 1: 2, 3: 1.0, 4: 361, 5: 0, 6: 0, 7: 0, 8: 10.0, 9: 0.0, 10: 8.0, 11: 0.0, 12: DEATH, 16: 0,
+             17: 0, 24: 1, 28: 0, 29: 0, 30: 0}
 # motions whose effects play out after the article is removed (its explosions)
 LASTING = ('burst', 'flashhit', 'explode', 'crash')
 CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave',
@@ -151,6 +157,14 @@ def article_scripts(a, name, wdir):
                 if c.name in ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox'):
                     c.params[3] = round(c.params[3] * k, 2)
             effect[mo] = effect['crash1']
+    if name == 'deathball':
+        hb = next(c for c in game['deathball1'] if c.name == 'Extended_Special_Hitbox')
+        ko = acmd.Command(hb.ident, list(hb.params))
+        for i, v in KO_HITBOX.items():
+            ko.params[i] = v
+        ko.params[-3:] = [0.0, 8.0, 0.5]            # the capsule's other end (never its start: that hits the whole stage)
+        game['deathballko'] = [ko, acmd.Command(acmd.BY_NAME['wait'], [2]),
+                               acmd.Command(acmd.BY_NAME['remove_all_hitboxes'], []), acmd.Command(acmd.END)]
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
     for fn, sc in (('game', game), ('effect', effect), ('sound', {})):

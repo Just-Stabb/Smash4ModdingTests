@@ -30,3 +30,8 @@ void sh_end()
 {
     sh_explode();
 }
+
+int sh_tick()
+{
+    return 0;
+}

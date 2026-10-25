@@ -1,5 +1,6 @@
 // Hero's flying spell articles: compiled after thunder_base.c and before flash.c / explosion.c / deathball.c /
-// sleep.c (their shot_config(): speeds, lives, what a hit does), as tools/brave_build.py does.
+// sleep.c (their shot_config(): speeds, lives, what a hit does (sh_hit), its end (sh_end), each frame's own
+// part (sh_tick: 1 holds it there)), as tools/brave_build.py does.
 
 // ---- Command Selection's projectiles (copies of Robin's thunder, fighters/brave/README.md): Sizz / Sizzle
 // (flash, article 10), Bang / Kaboom (explosion, 11), Whack / Thwack (deathball, 12), Snooze (sleep, 14).
@@ -72,6 +73,10 @@ void sh_loop()
             sh_remove();
         }
         return;
+    }
+    if (sh_tick())
+    {
+        return;         // the article's own part this frame (deathball.c: a KO) holds it
     }
     if (sh_frame >= sh_life || sh_frame > 0x1 && GroundModule(0x2722))
     {

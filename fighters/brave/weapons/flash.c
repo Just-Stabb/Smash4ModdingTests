@@ -17,3 +17,8 @@ void sh_hit()
 void sh_end()
 {
 }
+
+int sh_tick()
+{
+    return 0;
+}
