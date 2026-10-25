@@ -409,3 +409,13 @@ colour (the life mean: red). Now (`tools/eft_pixel.py`, docs/ptcl-format.md "Pix
 - templates: any slot-0 format (the program is ours), ranked first by whether ours can replace
   theirs, then by animated colour tracks where Ultimate's change (fire1's white flash at birth was
   lost to a constant template). All 563 of Hero's emitters take the new path (`--no-exact`: the old).
+
+## Fix 26 (`build/hero_fix26.zip`): F-smash crash
+
+Fix 25 crashed on F-smash's ground hit (Cemu log: PPC 0x04A5E154, a null read of the emitter
+instance's +0x2A0, from 0x04A63A20). The runtime calls a per-particle hook for each of the emitter's
+words 0x32C - 0x33C (0x04A62744 ff.); value 2 animates by the key-animation table, which
+`Ptcl.import_emitter` doesn't copy. Fix 25's colour-track ranking picked seven such templates (the
+ground flare among them); templates with key animation are now left out. Converted meshes also always
+get normals (from their triangles) and a vertex colour: an absent attribute is an empty buffer, which
+a template reading it hits ("GX2RSetAttributeBuffer(): Offset exceeds buffer size").

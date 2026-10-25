@@ -168,10 +168,15 @@ class Templates:
                     t = [p.texres(em, j) for j in range(3)]
                     if t[1]['native_size'] or t[2]['native_size']:
                         continue
+                    if p.field(em, 'keyanim_size'):
+                        # its key animation isn't imported (Ptcl.import_emitter), but its per-particle
+                        # hooks (0x32C - 0x33C: 2 = by key animation, 0x04A627A0) still read it: fix 25's
+                        # F-smash ground flare (a key-animated template, picked for its colour tracks)
+                        # crashed on the null table (0x04A5E154)
+                        continue
                     key = (p.field(em, 'particle_type'), p.field(em, 'blend_type'), p.field(em, 'primitive_index') >= 0)
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
-                    score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0) \
-                        - (1 if p.field(em, 'keyanim_size') else 0)
+                    score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0)
                     si_ = struct.unpack_from('>I', em, 0x844)[0]
                     if si_ not in screen:
                         b = p.shader_binary(si_)
@@ -899,6 +904,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
                 t = np.clip((nz - fres[0]) / (fres[1] - fres[0]), 0, 1)
                 col_ = np.ones((len(pos), 4), np.float32) if col_ is None else np.array(col_, np.float32)
                 col_[:, 3] *= t * t * (3 - 2 * t)
+            # every attribute present: a template's vertex program may read normals / vertex colour
+            # (an absent one is an empty buffer: Cemu's "GX2RSetAttributeBuffer(): Offset exceeds
+            # buffer size", fix 25's F-smash rocks)
+            if nrm is None:
+                nrm = face_normals(pos, idx).astype(np.float32)
+            if col_ is None:
+                col_ = np.ones((len(pos), 4), np.float32)
             prim_index[key] = p.add_primitive(pos, nrm, col_, uv, idx)
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
         if bake:
