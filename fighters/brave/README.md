@@ -441,3 +441,13 @@ Template programs (`--no-exact`) still get `hdr_scale`.
   opaque black ball. Templates are now ranked by passing colour 1 when the mode needs it, and a
   program on one that doesn't gets colour 1 as constants (its life mean x the colour scale).
 - A mesh's other samplers (sphere1's `ef_brave_mask02`) come in as their mean (they read other UVs).
+
+## Fix 29 (`build/hero_fix29.zip`): flipbooks shown as one cell fade by their cells' ink
+
+F-smash on fix 28: the spike burst and ring still solid where Ultimate's are see-through. Their
+flipbooks (`ef_cmn_impact00`, `ef_brave_ring00`: eft2 pattern 1 / 2) have no template with the mode,
+so the first (thickest) cell showed all life. `flipbook_fade` scales the alpha track by each cell's
+mean alpha as Ultimate plays the table (life-fit: spread over the life; clamp / loop: a cell each
+`frequency` frames) against the shown cell's: 104 of Hero's emitters (impact1 ends at 0.14, the ring
+at 0.17). The crown (`crown2_back`) is as opaque in Ultimate's data (texture red x vertex alpha x
+alpha 1, emitter alpha cb10[48] = 1 with no LAST_EFFECT_SET_ALPHA in the script).

@@ -520,6 +520,39 @@ def exact_combiner(p, em, e, alpha, notes):
     return si, np.clip(alpha / gain, 0, 1), gain
 
 
+def flipbook_fade(e, ti, sheet, notes):
+    """[101] the alpha over life of a flipbook shown as one cell (no template plays its mode): each
+    cell's ink (mean alpha) as Ultimate plays them, against the shown cell's. F-smash's impact1 runs
+    ef_cmn_impact00 from a thick burst to thin wisps once over its life; frozen on its first cell it
+    stayed a solid band. Life-fit (1) spreads the table over the life, clamp / loop (2 / 3) step a cell
+    each frequency frames (clamp holds the last); random (4): no fade"""
+    if sheet is None:
+        return np.ones(101)
+    ts, tp, kind = e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti], e['tex_anim'][ti]['pattern_type']
+    nx, ny = (max(1, int(round(v or 1))) for v in ts['uv_div'])
+    cells = nx * ny
+    table = [int(v) % cells for v in tp['table'][:int(tp['num'])]] if tp['num'] else list(range(cells))
+    if kind not in (1, 2, 3) or len(table) < 2:
+        return np.ones(101)
+    f = sheet.astype(np.float32) / 255
+    a = f[..., 0] if e['combiner']['tex_alpha_input'][ti] == 1 or e['combiner']['alpha_process'] in (2, 3) else f[..., 3]
+    h, w = a.shape[0] // ny, a.shape[1] // nx
+    ink = np.array([float(a[(c // nx) * h:(c // nx + 1) * h, (c % nx) * w:(c % nx + 1) * w].mean()) for c in range(cells)])
+    shown = ink[shown_cell(e, ti)]
+    if shown <= 1e-6:
+        return np.ones(101)
+    t = np.linspace(0, 1, 101)
+    if kind == 1:
+        idx = np.minimum((t * len(table)).astype(int), len(table) - 1)
+    else:
+        life = max(1, int(e['particle'].get('life') or 1))
+        step = (t * life / max(float(tp['frequency'] or 1), 1e-3)).astype(int)
+        idx = np.minimum(step, len(table) - 1) if kind == 2 else step % len(table)
+    fade = np.clip(ink[np.array(table)[idx]] / shown, 0, 1)
+    notes.append('flipbook as one cell: alpha x the cells\' ink over life (%.2f at the end)' % fade[-1])
+    return fade
+
+
 def first_cell(img, scroll, cell=0):
     """a flipbook's cell (row-major, uv_div columns x rows)"""
     nx, ny = (int(round(v)) if v and v >= 1 else 1 for v in scroll['uv_div'])
@@ -952,6 +985,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     a_track = track(st_, col_, 0)[1] * e['info']['color0'][3]
     if e['combiner']['alpha_process'] == 4:
         a_track = a_track * track(st_, col_, 1)[1] * e['info']['color1'][3]
+    if smp and ptn_want and not ptn:
+        a_track = a_track * flipbook_fade(e, ti, images.get(smp['texture_id']), notes)
     exact = exact_combiner(p, em, e, a_track, notes)
     if exact:
         pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh)
