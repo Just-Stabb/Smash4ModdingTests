@@ -286,9 +286,10 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
 
 ## Fix 16 (`build/hero_fix16.zip`): the side tilt's second hit, his shield on his back
 
-- Side tilt 2: the game's own side-tilt combo (status 0x28, `func_276`: a second attack press once the
-  script sets `0x2100000D`, Ultimate's `ENABLE_COMBO` at frame 16, plays motion 0x59 `AttackS3S2`)
-  up to fighter_param 265 (`attack_s3_count`) = 2. Motion 0x59 (empty in Robin's table) plays
+- Side tilt 2 (fix 16 tried the game's own side-tilt combo, status 0x28 `func_276`: a second press once
+  the script sets `0x2100000D`, Ultimate's `ENABLE_COMBO` at frame 16, plays motion 0x59 up to
+  fighter_param 265 `attack_s3_count`, set to 2; in game the first hit only repeated. Fix 17: Hero's
+  own loop, `brave_s3_*`, and 265 back to 1). Motion 0x59 (empty in Robin's table) plays
   Ultimate's `c01attacks32` (extra_kinds.json "motions", `--add C01AttackS32`); its script from
   Ultimate's `AttackS3S2` (specials_acmd.json, slot 0x59; the vl's cancel frame 48 for it).
 - Shield: Ultimate hides `brave_shield` and shows `brave_shieldb` (on his back) in 180 motions (smash
@@ -300,3 +301,13 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
 - Built as before, with BRAVE_BODY = Robin's vanilla `script/animcmd/body` with the universal-mechanics
   `game.bin` (the roll-off scripts): a body folder whose effect.bin already has Robin's effects moved to
   kind 0x45 (`0x445....`) would point her leftover effects at Hero's bank instead of hers.
+
+## Fix 17 (`build/hero_fix17.zip`): his textures, side tilt 2, the held Kafrizz
+
+- Fix 16 shipped the rebuilt models without their `model.nut`: the shields' new slots change the
+  texture list's order (same size, other ids), so every costume drew the old textures in the wrong
+  places. Ship a costume's `model.nut` whenever its `model.nud` is rebuilt.
+- Side tilt: status 0x28's main is Hero's `brave_s3_main` (Robin's `func_275` with its own loop):
+  an attack press from the status's third frame on is kept, and from motion frame 16 the loop plays
+  motion 0x59 (`AttackS3S2`) once, then hands on to Robin's `func_277`.
+- Neutral special: the full charge is held again (fix 15's auto-release undone).

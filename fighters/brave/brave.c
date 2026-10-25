@@ -36886,7 +36886,7 @@ void func_2279()
 void func_2280()
 {
     func_2250();
-    func_275();
+    brave_s3_main();
 }
 
 void func_2281()
@@ -38791,6 +38791,62 @@ void brave_reflect(int on)
     {
         ShieldModule(0, 0x3, 0, 0, 0x3);
     }
+}
+
+// ---- Hero's side tilt (status 0x28, Robin's func_275 / func_277): Ultimate's shield bash (AttackS3, motion
+// 0x58), then on a second attack press its sword slash AttackS3S2 (motion 0x59, Ultimate's c01attacks32):
+// Ultimate enables it from frame 16 (ENABLE_COMBO). The game's own side-tilt combo (func_276, fighter_param
+// 265) didn't take for him in game, so Hero's loop does it: a press from frame 3 on (the one that started
+// the tilt is past by then: the status's third frame on) is kept, and from motion frame 16 it plays the
+// slash (once; fighter_param 265 stays Robin's 1, so func_276 doesn't also try).
+int brave_s3_pressed;
+int brave_s3_second;
+int brave_s3_t;
+
+void brave_s3_loop()
+{
+    float f;
+    brave_s3_t += 1;
+    f = MotionModuleF(0x1);
+    if (brave_s3_second == 0 && brave_s3_t > 0x2)
+    {
+        if (global38 & 0x1)
+        {
+            brave_s3_pressed = 0x1;
+        }
+        if (brave_s3_pressed && f >= 16.0f && global18 != 0x2)
+        {
+            brave_s3_second = 0x1;
+            func_22(0x59, 0, 1.0f);
+            return;
+        }
+    }
+    func_277();
+}
+
+void brave_s3_main()
+{
+    brave_s3_pressed = 0;
+    brave_s3_second = 0;
+    brave_s3_t = 0;
+    if (global5 == 0x8)
+    {
+        KineticModule(0, 0x7);
+        if (global1 == 0x38)
+        {
+            KineticModule(0xe, 0, 0x2, 0, 0, 0, 0, 0);
+            KineticModule(0xb, 0);
+        }
+    }
+    ControlModule(0x271b);
+    if (!StopModule(0x1))
+    {
+        func_274();
+    }
+    global16 = func_274;
+    func_33();
+    KineticModule(0x13, 0, PostureModuleF(0));
+    func_78(brave_s3_loop);
 }
 
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
