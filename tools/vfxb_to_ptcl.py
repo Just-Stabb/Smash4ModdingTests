@@ -810,12 +810,15 @@ def set_uv_anim(em, ts):
     frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
     scale random, 0x544 rotation a frame, 0x548 rotation init, 0x54C rotation random (the vanilla
     corpus: each mode bit set exactly where those values are). Unused ones are left neutral. The
-    shifts change sign (eft adds them, eft2 subtracts: above)."""
+    shifts keep their sign: eft subtracts them as eft2 does (cross_f.rpx 0x04A5A6AC copies 0x514-0x54C
+    into the static uniforms' shtAnim0 unchanged; the vertex programs draw s (uv x repeat - 0.5) -
+    (t x a frame + initial +- random) + 0.5 on both axes). Fix 29 and before negated them: every
+    scroll ran backwards (F-smash's crown2_back: its band climbed the cone instead of sinking)."""
     if ts is None:
         ts = {'scroll': [0, 0], 'scroll_add': [0, 0], 'scroll_random': [0, 0], 'scale': [1, 1],
               'scale_add': [0, 0], 'scale_random': [0, 0], 'rotation': 0, 'rotation_add': 0, 'rotation_random': 0}
-    struct.pack_into('>2f', em, 0x514, *(-v for v in ts['scroll_add']))
-    struct.pack_into('>2f', em, 0x51C, *(-v for v in ts['scroll']))
+    struct.pack_into('>2f', em, 0x514, *ts['scroll_add'])
+    struct.pack_into('>2f', em, 0x51C, *ts['scroll'])
     struct.pack_into('>2f', em, 0x524, *ts['scroll_random'])
     struct.pack_into('>2f', em, 0x52C, *ts['scale_add'])
     struct.pack_into('>2f', em, 0x534, *ts['scale'])

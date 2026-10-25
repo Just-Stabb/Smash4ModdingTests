@@ -451,3 +451,17 @@ mean alpha as Ultimate plays the table (life-fit: spread over the life; clamp / 
 `frequency` frames) against the shown cell's: 104 of Hero's emitters (impact1 ends at 0.14, the ring
 at 0.17). The crown (`crown2_back`) is as opaque in Ultimate's data (texture red x vertex alpha x
 alpha 1, emitter alpha cb10[48] = 1 with no LAST_EFFECT_SET_ALPHA in the script).
+
+## Fix 30 (`build/hero_fix30.zip`): UV scrolls run Ultimate's way
+
+F-smash on fix 29 (colour test: `crown2_back` green): the crown's band is a wide solid wave that stays
+up all life; Ultimate's is a thin crown of spikes that sinks into the floor in its 8 frames. Its UVs
+scroll V by 0.09 + 0.07 a frame with the scale growing 0.7 + 0.08 a frame (V clamped): in Ultimate,
+scale (v - 0.5) - shift + 0.5 moves the texture's white band down the cone (v = 1 is its foot) and
+under it, leaving the spikes. The converter wrote the shifts negated, so the band climbed the cone
+and stayed. eft subtracts them as eft2 does: cross_f.rpx 0x04A5A6AC copies 0x514-0x54C into the
+static uniforms (shtAnim0) unchanged, and every vanilla vertex program that scrolls (621) draws
+s (uv x repeat - 0.5) - (frame x rate + initial +- random) + 0.5 on U and V. `set_uv_anim` now
+writes eft2's values as they are: every scrolling part of every converted effect turns round (the
+fire's flow, the whirlwinds, F-smash's crown). The earlier corpus reading (`docs/ptcl-format.md`) is
+corrected; Sephiroth's bank still has the negated shifts until it is rebuilt.

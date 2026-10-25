@@ -129,10 +129,15 @@ the writer recomputes them.)
 | 0x52C / 0x534 / 0x53C | 2f each | slot 0 UV scale a frame / initial (1) / random | corpus |
 | 0x544 / 0x548 / 0x54C | f each | slot 0 UV rotation a frame / initial / random (radians) | corpus |
 
-Slot 0's UV transform: uv x (0x508 repeat / cells) x scale + shift, turned about the texture's centre
-(from where vanilla's clamped, shifted meshes land on their texture: 373 of 375 shifted axes partly
-on it this way; 20 of 20 clamped turned ones about the centre). Ultimate's eft2 subtracts the shift
-(1652 of 1700 in 31 fighters' VFXBs): `tools/vfxb_to_ptcl.py` flips its sign.
+Slot 0's UV transform (GPU particles): scale x (uv x 0x508 repeat / cells - 0.5), turned about the
+texture's centre, - shift + 0.5, shift = frame x 0x514 + 0x51C +- 0x524 (random), the same on U and
+V and the same as Ultimate's eft2, so `tools/vfxb_to_ptcl.py` copies eft2's values unchanged. Verified:
+0x04A5A6AC copies 0x514-0x54C, 0x508 / 0x50C and the cells into the static uniforms' shtAnim0 (pm0
+rate u v, initial u v; pm1 random, scale rate; pm2 scale initial, random; pm3 rotation; pm4 repeat,
+cells) unchanged, and the vertex programs subtract the shift (shader 142's groups 37-47). An earlier
+reading from the vanilla corpus (clamped, shifted meshes landing partly on their texture) had eft
+adding it; the converter negated every shift up to Hero's fix 29. (A CPU-side UV path, 0x04A6C26C,
+adds U's and subtracts V's rate; no converted emitter uses it.)
 | 0x648 / 0x64C | u32 | color0 / color1 type (0 const, 1 random, 2 key anim) | corpus |
 | 0x650 / 0x6D0 | 32f | color0 / color1 keys (8 × rgba-ish) | corpus |
 | 0x750–0x768 | 2i each | color sections 1–3 (% of life), repeat | corpus |
