@@ -31,9 +31,10 @@ Native details (research: docs/flx2-format.md, docs/native-notes.md "Damage pane
 Every pointer it follows is checked (word aligned, 0x10000000-0x8FFFFFFF); a bad one hides nothing
 and changes nothing.
 
-Hero's Command Selection menu (MENU, called for each slot after the badge; fighters/brave/README.md):
-dmg.flx's spell0_mc ... spell3_mc (tools/dmg_brave_menu.py: frame n = spell n, 21 + n = spell n on the
-cursor's row) show the rows of a Hero panel (its fighter object's kind 0x45; the panel slot's kind byte
+Hero's Command Selection window (MENU, called for each slot after the badge; fighters/brave/README.md):
+dmg.flx's cmdwin_mc (the window), spell0_mc ... spell3_mc (the names: frame n = spell n, 21 + n greyed:
+int 0x1000009F bit 20 + row), cmdcur0_mc ... cmdcur3_mc (the pointer, shown on the cursor's row) and
+cmdmp_mc (frame n = spell n's cost, the cursor's spell) (tools/dmg_brave_menu.py) show the window of a Hero panel (its fighter object's kind 0x45; the panel slot's kind byte
 isn't trusted for an added kind) while his MSC
 (fighters/brave/brave.c brave_lw_*) has the menu open: int 0x1000009E = 0x4845xxxx, bit 2 open, bits
 0-1 the cursor's row; int 0x1000009F = 0x48xxxxxx, the rows' spells (1-21, 0 none) in bits 0-4,
@@ -73,7 +74,9 @@ MENU_INT, SPELL_INT = 0x9E, 0x9F
 MENU_MAGIC, SPELL_MAGIC = 0x4845, 0x48
 ROWS = 4
 SPELLS = 21
-ROW_NAME = b'spell%d_mc'
+# the window's elements (tools/dmg_brave_menu.py), in the order the routine goes through them
+ELEMENTS = [b'cmdwin_mc'] + [b'spell%d_mc' % k for k in range(4)] + [b'cmdcur%d_mc' % k for k in range(4)] + \
+    [b'cmdmp_mc']
 
 
 def ha(v):
@@ -361,18 +364,18 @@ shut:
 rows:
         li r26, 0
 row:
-        cmpwi r26, %(rows)d
+        cmpwi r26, %(nel)d
         bge mout
         lis r3, %(pool_hi)d
         lwz r3, %(pool_lo)d(r3)
-""" % dict(aoff=MENU_INT * 4, boff=SPELL_INT * 4, amagic=MENU_MAGIC, bmagic=SPELL_MAGIC, rows=ROWS,
+""" % dict(aoff=MENU_INT * 4, boff=SPELL_INT * 4, amagic=MENU_MAGIC, bmagic=SPELL_MAGIC, nel=len(ELEMENTS),
            pool_hi=ha(ATOM_POOL), pool_lo=lo(ATOM_POOL)) + chk('r3', 'mout') + """
         addi r3, r3, 0x24
         lis r4, names@ha
         addi r4, r4, names@l
-        mulli r0, r26, 12
+        slwi r0, r26, 4
         add r4, r4, r0
-        li r5, %(len)d
+        lwz r5, 12(r4)              # the name's length (the slot's last word)
         bl 0x%(intern)08X
         stw r3, 0x10(r1)
         cmpwi r3, 0
@@ -382,23 +385,44 @@ row:
         bl 0x%(find)08X
         mr. r28, r3
         beq nextrow
-""" % dict(len=len(ROW_NAME % 0), intern=INTERN, find=FIND_CHILD) + chk('r28', 'nextrow') + """
-        li r27, 0
+""" % dict(intern=INTERN, find=FIND_CHILD) + chk('r28', 'nextrow') + """
+        li r27, 0                   # the frame (0: hidden)
         cmpwi r25, 0
         beq apply
-        mulli r0, r26, 5
-        srw r27, r24, r0
-        andi. r27, r27, 31
-        beq apply
-        cmplwi r27, %(spells)d
-        ble known
-        li r27, 0
+        cmpwi r26, 0
+        bne notwin
+        li r27, 1                   # the window
         b apply
-known:
-        andi. r0, r25, 3
-        cmpw r0, r26
-        bne apply
+notwin:
+        cmpwi r26, 4
+        bgt notrow
+        addi r9, r26, -1            # spellK_mc: row K's spell, + 21 greyed (B bit 20 + K)
+        bl spell
+        mr r27, r3
+        cmpwi r27, 0
+        beq apply
+        addi r0, r9, 20
+        srw r0, r24, r0
+        andi. r0, r0, 1
+        beq apply
         addi r27, r27, %(spells)d
+        b apply
+notrow:
+        cmpwi r26, 8
+        bgt mp
+        addi r9, r26, -5            # cmdcurK_mc: shown on the cursor's row (if it has a spell)
+        andi. r0, r25, 3
+        cmpw r0, r9
+        bne apply
+        bl spell
+        cmpwi r3, 0
+        beq apply
+        li r27, 1
+        b apply
+mp:
+        andi. r9, r25, 3            # cmdmp_mc: the cost of the cursor's spell
+        bl spell
+        mr r27, r3
 apply:
         cmpwi r27, 0
         beq rhide
@@ -434,12 +458,22 @@ mout:
         mtlr r0
         addi r1, r1, 0x40
         blr
+spell:                              # r3 = row r9's spell (1-21), 0 for none (uses r0)
+        mulli r0, r9, 5
+        srw r3, r24, r0
+        andi. r3, r3, 31
+        cmplwi r3, %(spells)d
+        blelr
+        li r3, 0
+        blr
 names:
-""" % dict(alpha=SET_ALPHA, vis=SET_VISIBLE))
-    for k in range(ROWS):
-        nm = (ROW_NAME % k).ljust(12, b'\0')
+""" % dict(alpha=SET_ALPHA, vis=SET_VISIBLE, spells=SPELLS))
+    for nm in ELEMENTS:                     # 16 bytes each: the name (NUL-padded, 12) and its length
+        assert len(nm) < 12
+        b = nm.ljust(12, b'\0')
         for i in range(0, 12, 4):
-            m.asm('.word 0x%08X' % int.from_bytes(nm[i:i + 4], 'big'))
+            m.asm('.word 0x%08X' % int.from_bytes(b[i:i + 4], 'big'))
+        m.asm('.word %d' % len(nm))
     words = m.words()
     assert MENU + 4 * len(words) <= MENU_LIMIT
     return words

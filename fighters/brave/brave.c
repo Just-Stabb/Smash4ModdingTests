@@ -39120,9 +39120,10 @@ void brave_hi_main()
 // weighted by Ultimate's param_special_lw_command_data lot_prob, among the ones made so far
 // (brave_lw_weight), shown in his damage panel (tools/trait_badge_cave.py's menu, tools/dmg_brave_menu.py)
 // through two work ints: 0x1000009E = 0x48450000 + 4 (open) + the cursor's row, 0x1000009F = 0x48000000 +
-// the rows' spells (1-21) x 1 / 32 / 1024 / 32768. The stick (up / down past 0.5, again every 12 frames
+// the rows' spells (1-21) x 1 / 32 / 1024 / 32768 (+ 0x100000 << row: greyed, for MP). The stick (up / down past 0.5, again every 12 frames
 // while held) moves the cursor; attack, or special once it has been let go, casts the spell (its row
-// stays up 30 frames); shield, or 480 frames (command_select_time_limit), shuts it: SpecialLwCancel. The
+// stays up 70 frames, decided_command_window_close_frame); shield, jump, or 480 frames
+// (command_select_time_limit) shuts it: SpecialLwCancel. The
 // spells' motions, ground / air: start 0x277 / 0x283, select 0x278 / 0x284, cancel 0x279 / 0x285, then
 // spell n at its slot (brave_lw_spell_motion). In the air the fall is held to 0.45 while choosing.
 // Spells: 17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man (sword moves: their hitboxes
@@ -39351,7 +39352,7 @@ void brave_lw_loop()
         }
         brave_lw_move();
         n = brave_lw_row(brave_lw_cursor);
-        if (ControlModule(0x2710, 0x3) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
+        if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
         {
             brave_lw_show(0);
             brave_lw_change(0x3, 0x279, 0x285);
@@ -39375,7 +39376,7 @@ void brave_lw_loop()
     }
     if (brave_lw_state == 0x2)
     {
-        brave_lw_show(brave_lw_frame < 0x1e);
+        brave_lw_show(brave_lw_frame < 0x46);
     }
     if (func_2246())
     {

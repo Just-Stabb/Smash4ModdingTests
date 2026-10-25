@@ -20,8 +20,8 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
   trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu) /
   trail_table_cave (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
-- --menu DIR: ui/info/dmg/ = DIR (the damage panel with the trait badge) + Hero's menu rows
-  (tools/brave_menu_art.py, tools/dmg_brave_menu.py);
+- --menu DIR [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait badge) + Hero's
+  Command Selection window (tools/brave_menu_art.py, tools/dmg_brave_menu.py);
 - --bank: effect/brave/brave.010d0000.{ptcl,efc} from DIR/reflet.010d0000.* (tools/vfxb_to_ptcl.py);
 - --trails: effect/brave/trail/ from DIR (tools/ultimate_trails.py --shader 3);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
@@ -144,6 +144,8 @@ def main():
     ap.add_argument('--trails')
     ap.add_argument('--motions')
     ap.add_argument('--menu')
+    ap.add_argument('--menu-font', help='the font for the menu (the Wii U shared font: Cemu\'s '
+                    'resources/sharedFonts/CafeStd.ttf)')
     a = ap.parse_args()
     fighter = os.path.join(a.out, 'fighter/brave')
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
@@ -173,8 +175,8 @@ def main():
     if a.menu:
         import dmg_brave_menu
         with tempfile.TemporaryDirectory() as art:
-            run(os.path.join(HERE, 'brave_menu_art.py'), art)
-            print('menu: sprite 0x%X, texture slot %d' % dmg_brave_menu.build(
+            run(os.path.join(HERE, 'brave_menu_art.py'), art, *(['--font', a.menu_font] if a.menu_font else []))
+            print('menu: sprites from 0x%X, texture slot %d' % dmg_brave_menu.build(
                 a.menu, art, os.path.join(a.out, 'ui/info/dmg')))
     if a.motions:
         d = os.path.join(fighter, 'motion/body')

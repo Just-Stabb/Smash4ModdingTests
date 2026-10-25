@@ -68,12 +68,24 @@ def main():
         lis r3, 0x%04X
         ori r3, r3, 0x%04X
         blr""" % (RETVAL >> 16, RETVAL & 0xFFFF))
-    # intern: the atom + the name's 6th byte ('_' for trait_mc, '0'-'3' for spell0_mc-spell3_mc);
-    # intern calls counted for trait_mc only. find: trait_mc -> the clip's +0, spellK_mc -> +4 + 4K
+    # intern: the atom + the sum of the name's bytes; intern calls counted for trait_mc only. find:
+    # trait_mc -> the clip's +0, menu element i (C.ELEMENTS) -> +4 + 4i (a table of the sums at TABLE)
+    TABLE = 0x7F004000
+    sums = [sum(b'trait_mc')] + [sum(n) for n in C.ELEMENTS]
+    for i, v in enumerate(sums):
+        w32(TABLE + 4 * i, v)
+    w32(TABLE + 4 * len(sums), 0xFFFFFFFF)
     stub(mu, C.INTERN, """
         lis r7, 0x7F00
-        lbz r8, 5(r4)
-        cmpwi r8, 0x5F
+        li r8, 0
+        li r9, 0
+sum:    cmpw r9, r5
+        bge done
+        lbzx r10, r4, r9
+        add r8, r8, r10
+        addi r9, r9, 1
+        b sum
+done:   cmpwi r8, %d
         bne nocount
         lwz r6, 0x1008(r7)
         addi r6, r6, 1
@@ -81,22 +93,24 @@ def main():
 nocount:
         lwz r3, 0x1018(r7)
         add r3, r3, r8
-        blr""")
+        blr""" % sums[0])
     stub(mu, C.FIND_CHILD, """
         lwz r5, 0(r4)
         lis r6, 0x7F00
         lwz r6, 0x1018(r6)
         subf r5, r6, r5
-        cmpwi r5, 0x5F
-        bne menu
-        lwz r3, 0(r3)
-        blr
-menu:   addi r5, r5, -0x30
-        cmplwi r5, 3
-        bgt none
-        slwi r5, r5, 2
-        add r3, r3, r5
-        lwz r3, 4(r3)
+        lis r7, 0x7F00
+        ori r7, r7, 0x4000
+        li r8, 0
+look:   lwz r9, 0(r7)
+        cmpwi r9, -1
+        beq none
+        cmpw r9, r5
+        beq found
+        addi r7, r7, 4
+        addi r8, r8, 4
+        b look
+found:  lwzx r3, r3, r8
         blr
 none:   li r3, 0
         blr""")
@@ -158,15 +172,18 @@ none:   li r3, 0
         mu.mem_write(sib + 0x74, bytes([0x40 + i]))
         mu.mem_write(e, b'\0' * 0x100)
         w32(e + 0xE8, 0x4000)                   # visible, as placed
-        for k in range(C.ROWS):                 # the menu rows (elements after the badges)
-            r = ELEMS + 0x40000 + 0x400 * i + 0x100 * k
+        for k in range(len(C.ELEMENTS)):        # the menu's elements (after the badges)
+            r = ELEMS + 0x40000 + 0x1000 * i + 0x100 * k
             w32(clip + 4 + 4 * k, r)
             mu.mem_write(r, b'\0' * 0x100)
             w32(r + 0xE8, 0x4000)
         return e
 
+    def menu_elems(i):
+        return [ELEMS + 0x40000 + 0x1000 * i + 0x100 * k for k in range(len(C.ELEMENTS))]
+
     def rows(i):
-        return [ELEMS + 0x40000 + 0x400 * i + 0x100 * k for k in range(C.ROWS)]
+        return menu_elems(i)[1:5]
 
     KI = 0x4B490000
     elems = [slot(0, 0, 8), slot(1, 1, 8), slot(2, 2, 1), slot(3, 3, 8, empty=True),
@@ -223,29 +240,34 @@ none:   li r3, 0
     # Hero's menu: slot 1 a Hero with the menu open (cursor on row 2), slot 2 one with it shut, slot 6 a
     # Hero with a wrong marker; the Kirbys' rows hidden
     def menu_state(i):
-        return [(state(r)[0], state(r)[1]) if state(r)[0] else False for r in rows(i)]
+        return [(state(r)[0], state(r)[1]) if state(r)[0] else False for r in menu_elems(i)]
     HM, HS = C.MENU_MAGIC << 16, C.SPELL_MAGIC << 24
     # the slots' kind bytes are left as they were (Kirby's 8): the menu goes by the fighter object's kind
     fighter(1, C.BRAVE, 0, HM | 4 | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
     fighter(2, C.BRAVE, 0, HM | 2, HS | 17 | 18 << 5 | 19 << 10 | 20 << 15)
     fighter(6, C.BRAVE, 0, 0x12340004, HS | 1)
     update()
-    check('Hero, menu open: rows 17, 18, 19 + 21 (the cursor), 20, the panel alpha',
-          [state(r)[:2] + (state(r)[3],) for r in rows(1)],
-          [(True, 17, 0x41), (True, 18, 0x41), (True, 40, 0x41), (True, 20, 0x41)])
-    check('Hero, menu shut: rows hidden', menu_state(2), [False] * 4)
-    check('Hero, no marker: rows hidden', menu_state(6), [False] * 4)
-    check('Kirby: rows hidden', menu_state(0), [False] * 4)
+    T = True
+    check('Hero, menu open: the window, names 17-20, the pointer on row 2, MP of spell 19',
+          menu_state(1), [(T, 1), (T, 17), (T, 18), (T, 19), (T, 20), False, False, (T, 1), False, (T, 19)])
+    check('the panel alpha on them', [state(r)[3] for r in menu_elems(1)][:2], [0x41, 0x41])
+    check('Hero, menu shut: all hidden', menu_state(2), [False] * 10)
+    check('Hero, no marker: all hidden', menu_state(6), [False] * 10)
+    check('Kirby: all hidden', menu_state(0), [False] * 10)
     check('Hero: the trait badge hidden', state(elems[1])[0], False)
-    check('an empty slot: rows untouched', [state(r)[:3] for r in rows(3)], [(True, 1, 0)] * 4)
-    fighter(1, C.BRAVE, 0, HM | 4 | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)
+    check('an empty slot: untouched', [state(r)[:3] for r in menu_elems(3)], [(True, 1, 0)] * 10)
+    fighter(1, C.BRAVE, 0, HM | 4 | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15 | 1 << 23)
     update()
-    check('cursor on row 0, a row with no spell / spell 30: hidden, spell 21',
-          menu_state(1), [(True, 26), False, False, (True, 21)])
+    check('pointer on row 0; row 1 none, row 2 spell 30 (none such): hidden; row 3 greyed (21 + 21)',
+          menu_state(1), [(T, 1), (T, 5), False, False, (T, 42), (T, 1), False, False, False, (T, 5)])
+    fighter(1, C.BRAVE, 0, HM | 4 | 1, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)
+    update()
+    check('the pointer on a row with no spell: no pointer, no MP window',
+          [menu_state(1)[i] for i in (5, 6, 9)], [False, False, False])
     words = [r32(DEBUG_COUNTERS + 4 * i) for i in range(12)]
     if any(words):                              # a --debug build (trait_badge_cave.py --debug)
         print('debug counters: ' + ', '.join('%s %s' % (n, hex(w)) for n, w in zip(C.COUNTERS, words)))
-        check('debug: hook calls = updates run', words[0], 8)
+        check('debug: hook calls = updates run', words[0], 9)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

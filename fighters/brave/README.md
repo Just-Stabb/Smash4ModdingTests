@@ -153,3 +153,23 @@ Not yet: the other 17 spells (Heal, Sizz / Sizzle, Bang / Kaboom, Whack / Thwack
 Kamikazee, Kaclang, Acceleratle, Oomph, Bounce, Snooze, Hocus Pocus, Zoom, Psyche Up), MP (the costs
 are on the plates; nothing is spent or greyed out yet), Metal Slash's metal KO, the menu blinking near
 its time limit.
+
+## v6 (`build/hero_v6.zip`): the window drawn like Ultimate's
+
+Ultimate's window, from SmashWiki's screenshots (`Hero_MP_Comparison.png`: the international version;
+the Japanese one has a white frame): one translucent black window with rounded corners and a dark brown
+frame over the left two thirds of the panel, the four names in white (no costs on the lines), Dragon
+Quest's gold pointer (two knobs and a tapered blade) over the window's left edge by the chosen line, and
+a small window "MP nn" with the chosen spell's cost at its bottom right. `tools/brave_menu_art.py` draws
+them to Ultimate's proportions (`LAYOUT`, in the 1-4 player panel's units) at 1.25x, in the Wii U's
+shared font (FOT-Rodin: `--menu-font` Cemu's `resources/sharedFonts/CafeStd.ttf`; not in the repository,
+Inter Medium stands in without it). `tools/dmg_brave_menu.py` puts them on one 1024x1024 texture (slot
+134) and places `cmdwin_mc`, `spell0_mc`-`spell3_mc` (names, + 21 greyed for MP), `cmdcur0_mc`-
+`cmdcur3_mc` and `cmdmp_mc` in each panel layout (the 5-8 player and small panels at 0.8, moved as the
+trait badge is). `tools/trait_badge_cave.py`'s menu routine goes through the ten elements (window: open;
+names: the row's spell, greyed by int 0x1000009F bit 20 + row; pointer: the cursor's row if it has a
+spell; MP window: the cursor's spell). Shield or jump shuts the menu (SmashWiki); the chosen spell's
+window stays up 70 frames (decided_command_window_close_frame).
+
+Not yet: the MP bar above the panel (Ultimate's blue "MP 100" bar) and MP itself; the window's
+opening / closing animation.
