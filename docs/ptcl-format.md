@@ -198,6 +198,32 @@ entries: count × 0x78 key records; +0x68 binary size, +0x6C binary offset (from
 The runtime builds one 0x6E8-byte shader object per entry at load. Emitters choose one by
 index (0x844); the key record encodes the emitter configuration the shader was generated for.
 
+## Pixel programs (verified: disassembly of the corpus' 1336 distinct shaders)
+
+Each shader binary is a GX2 file: vertex header (block 3) + program (5), pixel header (6) +
+program (7). The pixel inputs are named by GX2 semantic (pixel header word 4 = count, words 5+ =
+`SPI_PS_INPUT_CNTL`, semantic in the low byte), in register order R0, R1, ...:
+
+| semantic | contents |
+|---|---|
+| 0 | colour 0: rgb the colour track 0, a the alpha track |
+| 1 | colour 1 (rgb) |
+| 6 | a mesh's vertex colour (rgb and a multiply in) |
+| 9 / 10 | texture coordinates: slot 0 in .xy and slot 1 in .zw of one of them, slot 2 in the other's .xy (which is which varies with the vertex program: slot 0 reads 9 in 766 shaders, 10 in 450) |
+| 3, 2 / 5, 11, 12 | view / depth (soft particles, fresnel), the flipbook cross-fade (FRACT of a cell index, texture arrays) |
+
+The common programs (layout 0, 1, 9: 469 shaders; 0, 1, 6, 10: 271) are: sample slot 0, colour =
+colour 1 + (colour 0 − colour 1) × texture rgb, alpha = colour 0 alpha × texture red (or alpha, by
+template) clamped, × the vertex colour on a mesh, then rgb × `u_nwColorHdrRange` (CB9 [8]: × .x
++ .w). Robin's `fire1` (shader 95, layout 0, 1, 3, 9, 10) is Ultimate's fire combiner: texture 0
+offsets texture 1's UVs (distortion, × CB2 [12].xy × semantic 3's .w), colour by texture 1 × 2's
+rgb, alpha by their red.
+
+Replacing only the pixel program (block 7; the header's GPR count and program size updated, its
+inputs, samplers and uniform blocks kept) leaves the emitter's vertex program (particle type,
+flipbook, UV animation) as the template's: `tools/eft_pixel.py` writes eft2's combiner this way for
+every converted emitter (`tools/eft_pixel_test.py` checks each variant against the formula).
+
 ## Primitive table (meshes; authoring: `Ptcl.add_primitive`)
 
 `+0` u32 count, `+4` u32 total size, `+8` u32 entry offset (0xC); then count entries of 0x50: five

@@ -51,6 +51,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
+import eft_pixel  # noqa: E402
 import efc  # noqa: E402
 import ptcl  # noqa: E402
 import vfxb  # noqa: E402
@@ -59,6 +60,8 @@ from xv2_to_ptcl import (BLEND, FOREVER, MAX_EMITTERS, MAX_LIVE, buffer_count, c
 
 NONE64 = 2 ** 64 - 1
 SHAPE_SEL = 0x00000000          # a BC4 shape's channel selectors: R R R R
+RGBA_SEL = 0x00010203           # R G B A
+GREY_ALPHA_SEL = 0x00000001     # a BC5's R R R G: a grey colour input in R, the alpha in G
 # eft's colour combiner (shader-keyed; read off the vanilla pixel shaders): 0 colour 0 (alpha from
 # the texture's red), 1 colour 0 x texture (alpha from its alpha), 2 colour 1 + (colour 0 - colour 1)
 # x texture (alpha from red)
@@ -71,6 +74,10 @@ PREMULT_SHADER = (4, 64)
 # a blue glow); one colour drew the glow as bright as the core, dash attack's thick white band
 # (tests 51-54). Listed one by one: the sword flares fit the same way would change too
 TWO_COLOUR = {('P_EdgeAttackDash2', 'FlashLine1')}
+# a pixel program of our own (tools/eft_pixel.py) for each emitter whose template layout allows it:
+# eft2's combiner exactly (colour from the texture's rgb, alpha from its alpha, both colours, alpha
+# past 1); off (--no-exact), the one-shape fold of combine()
+EXACT = True
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -159,7 +166,7 @@ class Templates:
                     if em is None or len(em) != ptcl.SIMPLE_SIZE:
                         continue
                     t = [p.texres(em, j) for j in range(3)]
-                    if t[0]['native_format'] != 9 or t[1]['native_size'] or t[2]['native_size']:
+                    if t[1]['native_size'] or t[2]['native_size']:
                         continue
                     key = (p.field(em, 'particle_type'), p.field(em, 'blend_type'), p.field(em, 'primitive_index') >= 0)
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
@@ -171,31 +178,37 @@ class Templates:
                         screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b)
                     if screen[si_][0]:
                         continue
+                    own = EXACT and eft_pixel.layout(bytes(p.shader_binary(si_))) is not None
+                    if t[0]['native_format'] != 9 and not own:
+                        continue
                     traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
                               struct.unpack_from('>I', em, FOLLOW)[0], struct.unpack_from('>I', em, PTN_MODE)[0],
-                              screen[si_][1], screen[si_][2])
+                              screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2)
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes):
+    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False)):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A template with another flipbook mode than wanted is never taken when one
         without is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
-        which it can't (only freeze); one it can't, before"""
+        which it can't (only freeze); one it can't, before. With own pixel programs (EXACT) a template
+        they can stand in for comes first, then animated colour tracks where anim (colour 0 / 1 change
+        over the particle's life: a constant track is their mean, Frizzle's white flash at birth went)"""
         def rank(item):
-            (plain, mode, fol, pm, turns, by_vel), (score, *_r) = item
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1), (score, *_r) = item
             # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
             # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
-            return (plain, pm in (ptn, 0), fol == follow, turns or rot != ROT_ANIMATED or mesh,
+            return (plain, pm in (ptn, 0), own, fol == follow, an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
                     by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode & uv_mode == uv_mode, mode == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
                 continue
-            (plain, mode, fol, pm, turns, by_vel), (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1), (_score, path, si, k) = max(
+                self.found[key].items(), key=rank)
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
@@ -411,6 +424,78 @@ def bake_samplers(e, ti, img, ptn, images, names, notes):
             out[cy * h:(cy + 1) * h, cx * w:(cx + 1) * w, ch] *= product
     notes.append('samplers %s multiplied in' % ','.join(str(j) for j, _s in others))
     return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def sampler_inputs(e, i, img):
+    """sampler i's colour and alpha inputs to eft2's combiner (tex_color_input: 0 rgb, 1 its alpha
+    in rgb; tex_alpha_input: 0 alpha, 1 red; alpha modes 2 / 3 red), [h, w, 3] and [h, w], 0-1"""
+    f = img.astype(np.float32) / 255
+    cb = e['combiner']
+    rgb = np.repeat(f[..., 3:4], 3, -1) if cb['tex_color_input'][i] == 1 else f[..., :3]
+    red = cb['tex_alpha_input'][i] == 1 or cb['alpha_process'] in (2, 3)
+    return rgb, (f[..., 0] if red else f[..., 3])
+
+
+def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
+    """the texture an own pixel program (tools/eft_pixel.py) reads, [h, w, 4] 0-1: Ultimate's colour
+    input in rgb and its alpha input in a, sampler ti's (img: one cell or the flipbook sheet) with
+    the emitter's other samplers combined in as eft2 does (tex1 / tex2 colour and alpha blends: 0
+    multiply, 1 add), each sampled over sampler ti's quad as bake_samplers places it (frozen at its
+    start). Distortion maps ('indirect') only move the picture: left out. A mesh's samplers keep
+    their own UVs: sampler ti alone"""
+    rgb, a = sampler_inputs(e, ti, img)
+    cb = e['combiner']
+    others = [] if is_mesh else [
+        (j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
+        and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    if not others:
+        return np.concatenate([rgb, a[..., None]], -1)
+    nx, ny = ((max(1, int(round(v))) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else (1, 1))
+    h, w = rgb.shape[0] // ny, rgb.shape[1] // nx
+    yy, xx = np.mgrid[0:h, 0:w]
+    quad = np.stack([(xx.ravel() + 0.5) / w, (yy.ravel() + 0.5) / h], 1).astype(np.float32)
+    for j, s in others:
+        ts = e['static']['tex_scroll'][j]
+        src = first_cell(images[s['texture_id']], ts, shown_cell(e, j))
+        orgb, oa = sampler_inputs(e, j, src)
+        uv = uv_transform(quad * np.array(REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), np.float32),
+                          ts['scale'], ts['scroll'], ts['rotation'])
+        sh, sw = oa.shape
+        iy = (wrap_uv(uv[:, 1], s['wrap_v']) * sh).astype(int)
+        ix = (wrap_uv(uv[:, 0], s['wrap_u']) * sw).astype(int)
+        orgb, oa = orgb[iy, ix].reshape(h, w, 3), oa[iy, ix].reshape(h, w)
+        k = 2 if j == 2 or (j == 0 and ti == 2) else 1     # the blend that brings sampler 1 / 2 in
+        add_c, add_a = cb['tex%d_color_blend' % k] == 1, cb['tex%d_alpha_blend' % k] == 1
+        for cy in range(ny):
+            for cx in range(nx):
+                ys, xs = slice(cy * h, (cy + 1) * h), slice(cx * w, (cx + 1) * w)
+                rgb[ys, xs] = rgb[ys, xs] + orgb if add_c else rgb[ys, xs] * orgb
+                a[ys, xs] = a[ys, xs] + oa if add_a else a[ys, xs] * oa
+    notes.append('samplers %s combined in' % ','.join(str(j) for j, _s in others))
+    return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
+
+
+def exact_combiner(p, em, e, alpha, notes):
+    """(shader index, alpha keys, alpha gain) when the template's pixel program can be replaced by
+    one of tools/eft_pixel.py's for this emitter's combiner (EXACT), else None. alpha: the alpha
+    track [101] (alpha 0, x alpha 1 for alpha mode 4: folded into the keys). Ultimate's alphas past 1
+    (its whirlwinds' 2 - 4) go into the program's gain, the keys / gain"""
+    if not EXACT:
+        return None
+    sh, cb = e['shader'], e['combiner']
+    if (sh['custom_shader_index'], sh['custom_shader_flag'] & PREMULT_SHADER[1]) == PREMULT_SHADER:
+        return None
+    am = cb['alpha_process']
+    erode = am in (1, 3)
+    gain = 1.0 if erode else max(1.0, float(np.max(alpha)))
+    si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
+                              1 if erode else 0, gain)
+    if si is None:
+        notes.append('own pixel program: template layout not supported')
+        return None
+    notes.append('own pixel program (colour %d, alpha %d%s)' % (
+        cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else ''))
+    return si, np.clip(alpha / gain, 0, 1), gain
 
 
 def first_cell(img, scroll, cell=0):
@@ -762,7 +847,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # directional basis at rest evidently undoes it (his sword glows, unturned, extend along +Y,
     # so it isn't a plain flip of every such mesh); not derived, only observed
     rot = ROT_NONE if rest_dir else rotation_need(st, is_mesh)
-    em, turns = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot, notes)
+    anim = tuple(e['color']['color%d_type' % n] == 2 and float(np.ptp(track(e['static'], e['color'], n)[0], 0).max()) > 0.05
+                 for n in (0, 1))
+    em, turns = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot, notes,
+                              anim)
     # a rotation no template draws: baked (a quad's fixed quarter turns; a mesh's starting rotation)
     baked_rot = rot != ROT_NONE and not turns and (is_mesh or rot == ROT_FIXED)
     quarter = fixed_quarter_turn(st) if baked_rot and not is_mesh else None
@@ -823,56 +911,79 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if img is None:
         img = np.full((16, 16, 4), 255, np.uint8)
         notes.append('no texture: white')
+    elif not ptn:
+        img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
+    # the alpha track (x alpha 1 in alpha mode 4), for an own pixel program
+    st_, col_ = e['static'], e['color']
+    a_track = track(st_, col_, 0)[1] * e['info']['color0'][3]
+    if e['combiner']['alpha_process'] == 4:
+        a_track = a_track * track(st_, col_, 1)[1] * e['info']['color1'][3]
+    exact = exact_combiner(p, em, e, a_track, notes)
+    if exact:
+        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh)
+        rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
+        rgb1 = track(st_, col_, 1)[0] * np.array(e['info']['color1'][:3])
+        alpha, premult = exact[1], None
     else:
-        if not ptn:
-            img = first_cell(img, e['static']['tex_scroll'][ti], shown_cell(e, ti))
         if not is_mesh:
             baked = bake_samplers(e, ti, img, ptn, images, names, notes)
             if baked is not None:
                 img, fill = baked, 1.0
-    shape, rgb, alpha, premult, rgb1 = combine(img, e, notes, ti, fill,
-                                               (e.get('_set'), e['name']) in TWO_COLOUR)
+        shape, rgb, alpha, premult, rgb1 = combine(img, e, notes, ti, fill,
+                                                   (e.get('_set'), e['name']) in TWO_COLOUR)
+        pix = shape[..., None].astype(np.float32)
     if not is_mesh:
-        shape = radial_gradient(shape, notes)
+        pix = np.stack([radial_gradient(pix[..., c], notes if c == pix.shape[-1] - 1 else [])
+                        for c in range(pix.shape[-1])], -1)
     if uv_quarter:
         # eft2 samples at R(rotation) (uv - 0.5) + 0.5: the picture turns counter-clockwise as shown
-        shape = np.ascontiguousarray(np.rot90(shape, uv_quarter))
+        pix = np.ascontiguousarray(np.rot90(pix, uv_quarter))
         notes.append('UV rotation: %d quarter turn(s) baked into the texture' % uv_quarter)
     if quarter:
         # no template turns this quad: a fixed quarter turn goes into the texture (and the scale)
-        shape = np.ascontiguousarray(np.rot90(shape, quarter))
+        pix = np.ascontiguousarray(np.rot90(pix, quarter))
         notes.append('rotation: %d quarter turn(s) baked into the texture' % quarter)
     # an odd number of baked quarter turns swaps the texture's U and V: their repeat and wraps too
     swap_uv = ((uv_quarter or 0) + (quarter or 0)) % 2 == 1
     if swap_uv:
         repeat = (repeat[1], repeat[0])
-    h, w = shape.shape
+    h, w = pix.shape[:2]
     # a whole flipbook sheet of 4+ cells a side gets twice the size, cells keeping 64 px
     grid = max(int(round(v)) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else 1
     tmax = TEX_MAX * 2 if grid >= 4 else TEX_MAX
     tw, th = pow2(w, hi=tmax), pow2(h, hi=tmax)
     if (tw, th) != (w, h):
-        shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
+        pix = resize(pix.astype(np.float32), tw, th)
     # smooth textures (glows, gradients) at half size while that changes them by under 1% (the
     # bank's size: test 37's 6.0 MB loaded)
     while min(tw, th) > 16:
-        half = resize(shape[..., None].astype(np.float32), tw // 2, th // 2)
-        back = resize(half, tw, th)[..., 0]
-        if float(np.abs(back - shape).mean()) > 0.01 * max(float(shape.mean()), 0.05):
+        half = resize(pix.astype(np.float32), tw // 2, th // 2)
+        back = resize(half, tw, th)
+        if float(np.abs(back - pix).mean()) > 0.01 * max(float(pix.mean()), 0.05):
             break
-        shape, tw, th = half[..., 0], tw // 2, th // 2
-    r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
-    # the shape in every channel (selectors R R R R): most templates' pixel shaders take alpha from
-    # red, some from alpha (Koopa's pointlight1 / Pikachu's spark1, picked for the hand / throw auras
-    # and back throw's aura2), which with vanilla's R R R 1 drew the whole quad (test 52's colour
-    # check: back throw's yellow square, the grab's purple one)
-    # (not for a template that reads only the texture's alpha as a mask, alpha_mask_shader: with the
-    # shape there forward smash's sword flare drew a dark band along the blade, test 53)
-    mask_only = alpha_mask_shader(p, struct.unpack_from('>I', em, 0x844)[0])
-    p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34,
-                  comp_sel=None if mask_only else SHAPE_SEL)
-    if mask_only:
-        notes.append('template reads the texture alpha as a mask: its channel selectors kept')
+        pix, tw, th = half, tw // 2, th // 2
+    q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
+    if exact:
+        struct.pack_into('>I', em, 0x844, exact[0])
+        if int(np.abs(q8[..., :3].astype(int) - q8[..., :1]).max()) <= 2:
+            # grey colour input: BC5, R the colour (every rgb channel), G the alpha
+            p.set_texture(em, 0, np.stack([q8[..., 0], q8[..., 3], np.zeros_like(q8[..., 0]),
+                                           np.full_like(q8[..., 0], 255)], 2), 0x35, comp_sel=GREY_ALPHA_SEL)
+        else:
+            p.set_texture(em, 0, q8, 0x33, comp_sel=RGBA_SEL)
+    else:
+        r8 = q8[..., 0]
+        # the shape in every channel (selectors R R R R): most templates' pixel shaders take alpha
+        # from red, some from alpha (Koopa's pointlight1 / Pikachu's spark1, picked for the hand /
+        # throw auras and back throw's aura2), which with vanilla's R R R 1 drew the whole quad
+        # (test 52's colour check: back throw's yellow square, the grab's purple one)
+        # (not for a template that reads only the texture's alpha as a mask, alpha_mask_shader: with
+        # the shape there forward smash's sword flare drew a dark band along the blade, test 53)
+        mask_only = alpha_mask_shader(p, struct.unpack_from('>I', em, 0x844)[0])
+        p.set_texture(em, 0, np.stack([r8, r8, r8, np.full_like(r8, 255)], 2), 0x34,
+                      comp_sel=None if mask_only else SHAPE_SEL)
+        if mask_only:
+            notes.append('template reads the texture alpha as a mask: its channel selectors kept')
     if smp:
         wu, wv = (smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])
         struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (wv & 0xF) << 28 | (wu & 0xF) << 24 | 0x100)
@@ -893,18 +1004,18 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         rgb = rgb * 2 * (premult if mode == 0 else 1.0)
         black1 = mode == 2
         notes.append('template colour mode %d' % mode)
-    if rgb1 is not None and struct.unpack_from('>I', em, COLOR_MODE)[0] != 2:
+    if rgb1 is not None and not exact and struct.unpack_from('>I', em, COLOR_MODE)[0] != 2:
         rgb, rgb1 = (rgb + rgb1) / 2, None          # no lerp template: their mean
         notes.append('two colours: template not a lerp, their mean')
     fits = [color_fit(rgb), color_fit(rgb if rgb1 is None else rgb1)]
-    for track in (0, 1):
-        cks, track_rgb = fits[track][0], (rgb if rgb1 is None or track == 0 else rgb1)
-        if black1 and track == 1:
-            p.set_color_keys(em, track, [(0.0, 0.0, 0.0, 1.0)] * (len(cks) if p.field(em, 'color1_type') == 2 else 1))
-        elif p.field(em, 'color%d_type' % track) == 2:
-            p.set_color_keys(em, track, [(*map(float, c), 1.0) for c in cks])
+    for tr in (0, 1):
+        cks, track_rgb = fits[tr][0], (rgb if rgb1 is None or tr == 0 else rgb1)
+        if black1 and tr == 1:
+            p.set_color_keys(em, tr, [(0.0, 0.0, 0.0, 1.0)] * (len(cks) if p.field(em, 'color1_type') == 2 else 1))
+        elif p.field(em, 'color%d_type' % tr) == 2:
+            p.set_color_keys(em, tr, [(*map(float, c), 1.0) for c in cks])
         else:
-            p.set_color_keys(em, track, [(*map(float, track_rgb.mean(0)), 1.0)])
+            p.set_color_keys(em, tr, [(*map(float, track_rgb.mean(0)), 1.0)])
     p.set_field(em, 'color_section1', [fits[0][1][0], fits[1][1][0]])
     p.set_field(em, 'color_section2', [fits[0][1][1], fits[1][1][1]])
     p.set_field(em, 'color_section3', [fits[0][1][2], fits[1][1][2]])
@@ -1048,7 +1159,11 @@ def main():
     ap.add_argument('--empty', default='', help="comma-separated base bank entries (hex) to empty: effects "
                     "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
                     "orbs on Hero's Thunder-based articles)")
+    ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
+                    'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
+    global EXACT
+    EXACT = not a.no_exact
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()

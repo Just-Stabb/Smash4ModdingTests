@@ -441,7 +441,11 @@ class Ptcl:
 
     def import_shader(self, other, i):
         """shader i of another Ptcl (its key entry + GFX2 binary) appended here: its new index"""
-        entry, binary = bytearray(other.shader_entry(i)), other.shader_binary(i)
+        return self.add_shader(other.shader_entry(i), other.shader_binary(i))
+
+    def add_shader(self, entry, binary):
+        """a shader (0x78 key entry, GFX2 vertex + pixel binary) appended: its index"""
+        entry = bytearray(entry)
         n, base, eo = be32(self.shader, 0), be32(self.shader, 0x10), be32(self.shader, 0x14)
         bins = self.shader[base:eo]
         entries = self.shader[eo:eo + SHADER_ENTRY * n]

@@ -393,3 +393,19 @@ drew; the opaque pale-blue meshes glowed purple. So:
   Robin's real bank, which `base_effects_cave.py` loads for Hero too; Hero's articles are copies of
   the Thunder, so they ran it. `tools/thunder_orb_cave.py` gives every other kind effect id 0 (as
   the code does itself for levels over 2).
+
+## Fix 25 (`build/hero_fix25.zip`): own pixel programs for every effect part (test)
+
+The fix 24 videos against Ultimate's: Frizzle's flames dark red blots (Ultimate's white-yellow to
+orange), the whirlwinds faint. Ultimate's `ef_cmn_fire00` is a flipbook whose alpha is the flame and
+whose rgb its hot core, coloured colour 1 -> colour 0 by it; Smash 4's stock pixel programs take a
+texture's colour and alpha from one channel, so `combine()` folded every part into one shape and one
+colour (the life mean: red). Now (`tools/eft_pixel.py`, docs/ptcl-format.md "Pixel programs"):
+- every emitter keeps its template's vertex program and gets a pixel program of its own: eft2's
+  colour modes 0-3 and alpha modes (erosion included) exactly, from an RGBA texture (BC5 R R R G
+  when the colour input is grey) holding Ultimate's colour input in rgb and its alpha input in a,
+  the other samplers combined in with eft2's own multiply / add (`exact_texture`);
+- alphas past 1 (the whirlwind body's custom shader 8 at 2 - 4x) become the program's gain;
+- templates: any slot-0 format (the program is ours), ranked first by whether ours can replace
+  theirs, then by animated colour tracks where Ultimate's change (fire1's white flash at birth was
+  lost to a constant template). All 563 of Hero's emitters take the new path (`--no-exact`: the old).
