@@ -686,6 +686,17 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         ptn_want = 0
     tp = e['static']['tex_pat'][ti] if smp else None
     st = e['static']
+    if is_mesh and pt['billboard_type'] == 3 and not all(pt['is_rotate']):
+        # a directional mesh turns only about the axes its is_rotate enables: Woosh's whirlwinds
+        # (is_rotate 0 1 0, rotate_init X 180: turned so, the mesh hung upside down under the stage,
+        # nothing of it showed) spin about Y and stand upright in Ultimate. Observed on them, not
+        # derived, so kept to directional meshes: billboards keep their rotation whatever is_rotate
+        # says (96 Z-turning ones have it all 0), and the chant's crossed rings (type 4, X 45 with X
+        # disabled) look right turned
+        st = dict(st, **{k: [0.0 if a < 3 and not pt['is_rotate'][a] else v for a, v in enumerate(st[k])]
+                         for k in ('rotate_init', 'rotate_init_rand', 'rotate_add', 'rotate_add_rand')})
+        if any(abs(a - b) > 1e-6 for a, b in zip(st['rotate_init'], e['static']['rotate_init'])):
+            notes.append('rotation about disabled axes dropped (is_rotate %s)' % ''.join(map(str, pt['is_rotate'])))
     # a directional mesh at rest keeps no particle rotation: his slash arcs (all turned Z 180,
     # their glows Y -20 too, spinning) looked right unturned (test 36: back / up air "nearly
     # right") and wrong turned (tests 44 / 45: the arc a whole disc, behind him too). Ultimate's
@@ -803,7 +814,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
 
     # ---- blend, colour, alpha
-    st, col = e['static'], e['color']
+    col = e['color']     # (st: the static block, its rotation masked above)
     p.set_field(em, 'blend_type', BLEND[blend])
     black1 = False
     if premult is not None:

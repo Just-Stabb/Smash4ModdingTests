@@ -334,3 +334,15 @@ the status check `func_2254` sent him into her discard status `0x8c`, the tome o
 her pick-up status. `brave_keep_items()` (in `brave_frame`) keeps the five counters full every frame
 (Thunder `0x10000083`, Elwind float `0x2f`, Arcfire `0x1000008a`, Nosferatu `0x10000086`, the Levin
 Sword `0x1000008c`) and clears the bits; `func_2254` never changes status. Only `brave.mscsb` changes.
+
+## Fix 20 (`build/hero_fix20.zip`): Woosh's whirlwinds, multi-hit placed articles
+
+- Whirlwinds: their meshes are directional (velocity-aligned) with `rotate_init` X 180 but
+  `is_rotate` 0 1 0; turned so they hung upside down under the stage. `tools/vfxb_to_ptcl.py` drops a
+  directional mesh's rotation about the axes `is_rotate` disables (observed on these; billboards and
+  the chant's type-4 rings keep theirs). 32 emitters change: the three Woosh sets, Acceleratle /
+  Oomph's whirlwinds, the charge wind, the smash crown's Z wobble.
+- Multi-hit: the placed articles' first hit asked for status 1 (`"on_hit": 1`), and the status change
+  cleared their hitboxes: Swoosh / Kaswoosh (Ultimate's re-hit 7) hit once. `weapons/placed.c` goes
+  to status 1 at once from status 0; status 1 places the article and plays its motion, and a hit then
+  changes nothing.
