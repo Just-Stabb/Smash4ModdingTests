@@ -208,12 +208,18 @@ class Eff:
         idx = [struct.unpack_from('<I', d, 0x10 + 16 * i + 4)[0] for i in range(n)]
         names = d[0x10 + 16 * n:].split(b'\0')[:n]
         # emitter set indices are 1-based (0: none)
-        self.effects = {nm.decode().lower(): i - 1 for nm, i in zip(names, idx)}
+        try:
+            self.effects = {nm.decode().lower(): i - 1 for nm, i in zip(names, idx)}
+        except UnicodeDecodeError:
+            self.effects = None         # ef_common.eff: effects named by hash only, no name table
         self.vfxb = d[d.find(b'VFXB'):]
         assert struct.unpack_from('<H', self.vfxb, 10)[0] == 22, 'VFX version'
         self.top = top_sections(self.vfxb)
         self.set_sections = self.top['ESTA'].children(self.vfxb)
         self.sets = [self.vfxb[s.o + s.data + 16:s.o + s.data + 80].split(b'\0')[0].decode() for s in self.set_sections]
+        if self.effects is None:
+            # by emitter set name instead (P_CmnAttackLine), lower case
+            self.effects = {n.lower(): i for i, n in enumerate(self.sets)}
 
     def emitters(self, set_index):
         v = self.vfxb
