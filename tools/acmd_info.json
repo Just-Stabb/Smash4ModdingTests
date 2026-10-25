@@ -10186,6 +10186,56 @@
 "ID",
 "Flags"
 ]
+},
+"43D5B75B": {
+"size": 4,
+"name": "Input_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Input",
+"Variable"
+]
+},
+"58FABCF7": {
+"size": 4,
+"name": "Input_Set",
+"format": [
+0,
+0,
+1
+],
+"syntax": [
+"Target",
+"Input",
+"Value"
+]
+},
+"D41CE3F4": {
+"size": 5,
+"name": "Input_Compare",
+"format": [
+0,
+0,
+0,
+1
+],
+"syntax": [
+"Target",
+"Input",
+"Method",
+"Value"
+]
+},
+"FE66276F": {
+"size": 1,
+"name": "Hit_Reset",
+"format": [],
+"syntax": []
 }
 }
 }

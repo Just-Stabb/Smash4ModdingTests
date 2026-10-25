@@ -93,6 +93,12 @@ FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0] = fighter table: +0 entries,
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object ID, +0xC accessor, byte +0x1E >= 4 = live
 KINETIC_W = 0x030B29D8           # MSC module wrappers: wrapper(ctx (+4 = accessor), {words, count})
 POSTURE_W = 0x030B2AB8
+CONTROL_W = 0x030B2968           # ControlModule (vt +0x2F4): (0x2710 pressed / 0x2712 held, MSC button) -> r3
+ATTACK_W = 0x030B50F0            # AttackModule (vt +0x334): (0x2724) clears "has hit" (+0xC8, what 0x2727 reads)
+COMPARE = 0x02BEE010             # Float_Var_Compare's compare(r3 method, f1 value, f2 against) -> r3
+DBG = 0x04B93900                 # debug counters (zero at load; docs/acmd-extra-commands.md "Debug counters")
+INPUT_BASE = 0x0F000100          # position_vars_cave.py's input / state variables: + 0x20 * target + input
+INPUT_RAW = 0x0F000260           # raw stick X: + 2 * target (+1 C-stick)
 KINETIC_FW = 0x030B2A10          # KineticModuleF (vt +0x11C, float result in f1): (0xB, energy) = its Y speed
 OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
 OBJ_ORIG.update({h: 0x9421FFC8 for h in STEP_HOOKS})
@@ -128,6 +134,19 @@ SM4SHCOMMAND_DESC['Thread_Start'] = (
     'character is KO\'d, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from '
     'the thread\'s start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
 SM4SHCOMMAND_DESC['Thread_Stop'] = 'Stops this object\'s thread ID (-1 = all of them). New command: needs the patched cross_f.rpx.'
+SM4SHCOMMAND_DESC['Input_Compare'] = (
+    'Compares a fighter\'s input (a button held / pressed, a stick) with Value; True / Else after it run on the result, '
+    'like Float_Var_Compare. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
+SM4SHCOMMAND_DESC['Input_Get'] = (
+    'Stores a fighter\'s input (1 / 0 for a button, -1 to 1 for a stick) in a float variable (e.g. VAR_0). New command: '
+    'needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
+SM4SHCOMMAND_DESC['Input_Set'] = (
+    'Forces a fighter\'s input as if its controller did it: hold or tap a button, tilt a stick, or ignore its controller. '
+    'Forced inputs last until changed and are cleared when it is KO\'d. New command: needs the patched cross_f.rpx '
+    '(docs/acmd-extra-commands.md).')
+SM4SHCOMMAND_DESC['Hit_Reset'] = (
+    'Clears this object\'s "attack has hit" flag (variable SELF_HIT, 0x0F0000A0, reads 0 again until another hitbox '
+    'connects), so a later hitbox of the move can be checked on its own. New command: needs the patched cross_f.rpx.')
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
@@ -136,11 +155,39 @@ COMMANDS = [                     # name, size (words, header included), handler 
     ('Track_Target', 8, 'h_track', None),
     ('Thread_Start', 4, 'h_thread', None),
     ('Thread_Stop', 2, 'h_thread_stop', None),
+    ('Input_Compare', 5, 'h_icmp', None),
+    ('Input_Get', 4, 'h_iget', None),
+    ('Input_Set', 4, 'h_iset', None),
+    ('Hit_Reset', 1, 'h_hreset', None),
 ]
 THREAD_PARAMS = [
     ('Offset', 0, 'Words to the end of the block (Sm4shCommand works it out from the braces, like True).'),
     ('ID', 0, 'This thread\'s number (any). Starting it again restarts it; Thread_Stop(ID) stops it.'),
     ('Flags', 0, 'Bits: 1 = keep running during hitlag (normally the thread pauses with the object).'),
+]
+_TARGET = ('Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8 '
+           '(as the input variables, docs/position-variables.md).')
+_INPUT = ('Which input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 / 6 / 7 taunt up / side / down (held); '
+          '8-15 the same buttons pressed this frame; 16 / 17 stick X (forward +) / Y, 18 / 19 C-stick X (forward +) / Y '
+          '(-1 to 1); 20 a stick is forced; 21 inputs off; 22-31 the state quantities of the input variables '
+          '(22 situation, 23 damage, ...); 32 / 33 stick / C-stick X on screen (right +).')
+INPUT_CMP_PARAMS = [
+    ('Target', 0, _TARGET),
+    ('Input', 0, _INPUT),
+    ('Method', 0, 'Comparison, as Float_Var_Compare: 0 ==, 1 !=, 2 <=, 3 >=, 4 <, 5 > (input Method Value).'),
+    ('Value', 1, 'What the input is compared with (buttons: 1 = held / pressed, 0 = not).'),
+]
+INPUT_GET_PARAMS = [
+    ('Target', 0, _TARGET),
+    ('Input', 0, _INPUT),
+    ('Variable', 0, 'Float variable that gets the value (this object\'s own, e.g. VAR_0 0x0F000300; any float variable).'),
+]
+INPUT_SET_PARAMS = [
+    ('Target', 0, _TARGET),
+    ('Input', 0, _INPUT),
+    ('Value', 1, 'Buttons (0-15): 1 hold it until 0 is set, 2 press it for one frame, 0 stop forcing it. Sticks (16-19, '
+                 '32 / 33): force the stick to this value until Input 20 is set (any value). 21: 1 ignore its own '
+                 'controller, 0 back on. 22-31: as the input variables.'),
 ]
 THREAD_STOP_PARAMS = [
     ('ID', 0, 'The thread to stop (Thread_Start\'s ID); -1 = every thread of this object.'),
@@ -254,6 +301,13 @@ f_orig:
         lbz r0, 8(r29)                  # executed (not skipped)?
         cmpwi r0, 0
         beq %(label)s_step
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 60(r12)
+        addi r11, r11, 1
+        stw r11, 60(r12)
+        lwz r11, 0(r28)
+        stw r11, 0x40(r12)
         mr r3, r31
         mr r4, r28
         addi r5, r28, %(extra)d         # the extra parameters
@@ -336,6 +390,11 @@ er_have:                                # r10 = entry number, r11 = entry, r8 = 
 """ + mul('0x14', '0x28', 'di') + """
         ori r0, r10, %(TAG)d
         sth r0, %(tag)d(r8)
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r9, 0(r12)
+        addi r9, r9, 1
+        stw r9, 0(r12)
 er_out:
         blr
 """) % dict(tag=TAG_OFF, TAG=TAG, entries=ENTRIES, entry=ENTRY))
@@ -397,6 +456,7 @@ next_entry:
     hit_code(a)
     obj_code(a)
     thread_code(a)
+    input_code(a)
     if a.pc % 8:
         a.asm('.word 0')
     a.asm("""
@@ -414,7 +474,8 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     a.labels['objs'] = OBJS
     a.labels['acc_cache'] = ACC_CACHE
     a.labels['threads'] = THREADS
-    assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= OBJS
+    a.labels['dbg'] = DBG
+    assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= DBG and DBG + 0x100 <= OBJS
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
@@ -1474,6 +1535,228 @@ hs%(k)d_out:
 """ % dict(k=k, back=h + 4))
 
 
+def input_code(a):
+    """Input_Compare / Input_Get / Input_Set / Hit_Reset (docs/acmd-extra-commands.md "Inputs"). A self button
+    (inputs 0-15, target 0) is read with the game's own ControlModule(0x2712 held / 0x2710 pressed, MSC
+    button), as fighter MSC does; anything else, and every write, goes through position_vars_cave.py's input
+    variables (0x0F000100 + 0x20 * target + input; 32 / 33 the raw X ones, 0x0F000260 + 2 * target)."""
+    a.asm("""
+# --- in_id(r4 target, r5 input) -> r4 variable ID (0 = none); leaf: r0 -------------------------------------
+in_id:
+        cmplwi r4, 10
+        bgt iid_none
+        cmplwi r5, 0x20
+        blt iid_q
+        cmplwi r5, 0x22
+        bge iid_none
+        slwi r4, r4, 1
+        add r4, r4, r5
+        addis r4, r4, 0x%(hi)04X
+        addi r4, r4, 0x%(raw)X
+        blr
+iid_q:
+        slwi r4, r4, 5
+        add r4, r4, r5
+        addis r4, r4, 0x%(hi)04X
+        addi r4, r4, 0x%(q)X
+        blr
+iid_none:
+        li r4, 0
+        blr
+
+# --- in_read(r3 accessor, r4 target, r5 input) -> f1 ---------------------------------------------------
+# frame: 0x28 args {words, count}, 0x30 words, 0x40 ctx (+4 accessor); r31 button, r30 accessor,
+# r29 target, r28 input, r27 op
+in_read:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r27, 0x4C(r1)
+        mr r30, r3
+        mr r29, r4
+        mr r28, r5""" % dict(hi=0x0F00, raw=(INPUT_RAW & 0xFFFF) - 0x20, q=INPUT_BASE & 0xFFFF) + chk_t('r30', 'r0', 'ir_zero') + """
+        cmpwi r29, 0
+        bne ir_var
+        cmplwi r28, 0x10
+        bge ir_var
+        li r27, 0x2712                  # 0-7 held, 8-15 pressed
+        cmplwi r28, 8
+        blt ir_held
+        li r27, 0x2710
+        addi r28, r28, -8
+ir_held:
+        lis r12, ir_btns@ha
+        addi r12, r12, ir_btns@l
+        lbzx r31, r12, r28
+        bl ir_btn
+        cmpwi r3, 0
+        bne ir_one
+        cmpwi r28, 6                    # taunt side: d-pad left or right
+        bne ir_zero
+        li r31, 8
+        bl ir_btn
+        cmpwi r3, 0
+        beq ir_zero
+ir_one:
+        lis r12, one@ha
+        lfs f1, one@l(r12)
+        b ir_out
+ir_var:
+        mr r4, r29
+        mr r5, r28
+        bl in_id
+        cmpwi r4, 0
+        beq ir_zero
+        lwz r3, 0x28(r30)""" + chk_t('r3', 'r0', 'ir_zero') + vcall(0x44) + """
+        b ir_out
+ir_zero:
+        lis r12, zero@ha
+        lfs f1, zero@l(r12)
+ir_out:
+        lmw r27, 0x4C(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+ir_btn:                                 # (in in_read's frame) r3 = ControlModule(r27, r31) of r30
+        mflr r0
+        stw r0, 0x48(r1)
+        li r0, 0
+        stw r0, 0x40(r1)
+        stw r30, 0x44(r1)
+        stw r27, 0x30(r1)
+        stw r31, 0x34(r1)
+        addi r0, r1, 0x30
+        stw r0, 0x28(r1)
+        li r0, 2
+        stw r0, 0x2C(r1)
+        addi r3, r1, 0x40
+        addi r4, r1, 0x28
+        bl 0x%(control)08X
+        lwz r0, 0x48(r1)
+        mtlr r0
+        blr
+ir_btns:                                # input -> MSC button: attack, special, jump, shield, grab (9), d-pad
+        .word 0x00010203                # up (5), left (7; right 8 too), down (6)
+        .word 0x09050706
+
+# --- Input_Compare(Target, Input, Method, Value): state +0xC = input Method Value (as Float_Var_Compare) --
+h_icmp:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x24(r1)
+        mr r31, r5
+        mr r30, r7
+        lwz r4, 0(r30)
+        lwz r5, 4(r30)
+        bl in_read
+        lwz r3, 8(r30)
+        cmplwi r3, 5
+        li r3, 0
+        bgt ic_set
+        lwz r3, 8(r30)
+        lfs f2, 0xC(r30)
+        bl 0x%(compare)08X
+ic_set:
+        stw r3, 0xC(r31)
+        li r29, 20                      # 5 words
+        b in_step
+
+# --- Input_Get(Target, Input, Variable): float variable Variable (of this object) = the input -----------
+h_iget:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x24(r1)
+        mr r31, r5
+        mr r30, r7
+        li r29, 16
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq in_step""" % dict(control=CONTROL_W, compare=COMPARE) + chk_t('r3', 'r0', 'in_step') + """
+        stw r3, 0x8(r1)
+        lwz r4, 0(r30)
+        lwz r5, 4(r30)
+        bl in_read
+        lwz r3, 0x8(r1)
+        lwz r3, 0x28(r3)""" + chk_t('r3', 'r0', 'in_step') + """
+        lwz r4, 8(r30)""" + vcall(0x4C) + """
+        b in_step
+
+# --- Input_Set(Target, Input, Value): the input variable = Value (forces it) --------------------------------
+h_iset:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x24(r1)
+        mr r31, r5
+        mr r30, r7
+        li r29, 16
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq in_step""" + chk_t('r3', 'r0', 'in_step') + """
+        lwz r3, 0x28(r3)""" + chk_t('r3', 'r0', 'in_step') + """
+        lwz r4, 0(r30)
+        lwz r5, 4(r30)
+        bl in_id
+        cmpwi r4, 0
+        beq in_step
+        lfs f1, 8(r30)""" + vcall(0x4C) + """
+in_step:                                # r29 = the command's bytes, r31 = script state
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne in_ret
+        lwz r11, 4(r31)
+        add r11, r11, r29
+        stw r11, 4(r31)
+        li r3, 2
+in_ret:
+        lmw r29, 0x24(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- Hit_Reset(): AttackModule(0x2724), "has hit" (+0xC8) back to 0 -------------------------------------
+h_hreset:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r29, 0x54(r1)
+        mr r31, r5
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq hr_step""" + chk_t('r3', 'r0', 'hr_step') + """
+        li r0, 0
+        stw r0, 0x40(r1)
+        stw r3, 0x44(r1)
+        li r0, 0x2724
+        stw r0, 0x30(r1)
+        addi r0, r1, 0x30
+        stw r0, 0x28(r1)
+        li r0, 1
+        stw r0, 0x2C(r1)
+        addi r3, r1, 0x40
+        addi r4, r1, 0x28
+        bl 0x%(attack)08X
+hr_step:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne hr_ret
+        lwz r11, 4(r31)
+        addi r11, r11, 4
+        stw r11, 4(r31)
+        li r3, 2
+hr_ret:
+        lmw r29, 0x54(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+""" % dict(attack=ATTACK_W))
+
+
 def hit_code(a):
     """find_copy, the four hit-time hooks, the DI table and the DI stat read"""
     sig = ''.join("""
@@ -1526,12 +1809,22 @@ scale_int:                              # r3 = floor(r3 x f13) (r3 >= 0); uses r
 
 hk_stun:                                # victim's hitstun (f28) x HitstunMul; this hit's DI x for the victim
         mfcr r9
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r10, 52(r12)
+        addi r10, r10, 1
+        stw r10, 52(r12)
         addi r5, r28, 0x44
         bl find_copy
         lis r12, one@ha
         lfs f9, one@l(r12)              # DI x (1 for any other hit)
         cmpwi r5, 0
         beq st_di
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r10, 56(r12)
+        addi r10, r10, 1
+        stw r10, 56(r12)
         lfs f10, 0x14(r5)
         fmuls f28, f28, f10
         lfs f9, 0x28(r5)
@@ -1603,10 +1896,21 @@ dc_found:
         blr
 
 hk_vstop:                               # victim's hitstop (r20): HitstopFrames, else x HitstopMul
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 4(r12)
+        addi r11, r11, 1
+        stw r11, 4(r12)
+        stw r20, 0xC(r12)
         addi r5, r28, 0x44
         bl find_copy
         cmpwi r5, 0
         beq vs_out
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 8(r12)
+        addi r11, r11, 1
+        stw r11, 8(r12)
         lwz r0, 0x1C(r5)
         cmpwi r0, 0
         ble vs_mul
@@ -1618,16 +1922,30 @@ vs_mul:
         bl scale_int
         mr r20, r3
 vs_out:
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        stw r20, 16(r12)
         cmpwi r19, 2
         b 0x%(vstop_back)08X
 
 hk_amul:                                # attacker's hitstop before the rate (r3): x SelfHitstopMul
         mfcr r9
         mr r27, r3
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 20(r12)
+        addi r11, r11, 1
+        stw r11, 20(r12)
+        stw r27, 0x1C(r12)
         addi r5, r30, 0x44
         bl find_copy
         cmpwi r5, 0
         beq am_out
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 24(r12)
+        addi r11, r11, 1
+        stw r11, 24(r12)
         mr r8, r5
         lfs f13, 0x20(r8)
         mr r3, r27
@@ -1640,6 +1958,9 @@ hk_amul:                                # attacker's hitstop before the rate (r3
         bgt am_out
         li r27, 1
 am_out:
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        stw r27, 32(r12)
         mtcrf 0xFF, r9
         mr r3, r27
         or. r27, r27, r27
@@ -1648,15 +1969,29 @@ am_out:
 hk_afix:                                # attacker's hitstop after the rate: SelfHitstopFrames
         lwz r27, 0x10(r1)
         mfcr r9
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 36(r12)
+        addi r11, r11, 1
+        stw r11, 36(r12)
+        stw r27, 0x2C(r12)
         addi r5, r30, 0x44
         bl find_copy
         cmpwi r5, 0
         beq af_out
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        lwz r11, 40(r12)
+        addi r11, r11, 1
+        stw r11, 40(r12)
         lwz r0, 0x24(r5)
         cmpwi r0, 0
         ble af_out
         mr r27, r0
 af_out:
+        lis r12, dbg@ha
+        addi r12, r12, dbg@l
+        stw r27, 48(r12)
         mtcrf 0xFF, r9
         b 0x%(afix_back)08X
 
@@ -1744,6 +2079,35 @@ EXAMPLES = {
         '    WAIT(Frames=3)',
         '    Remove_Hitbox(ID=3)',
         '}'],
+    'Input_Compare': [
+        '// on frame 12: if special is held, a stronger hitbox',
+        'FRAME(Frames=0xC)',
+        'Input_Compare(Target=0, Input=1, Method=0, Value=1)',
+        'True(Offset=0){',
+        '    Hitbox(ID=0, Part=0, Bone=0, Damage=14, Angle=0x169, KBG=0x64, FKB=0, BKB=0x32, Size=6, X=0, Y=8, Z=8, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, '
+        'Direct/Indirect=1, Type=1)',
+        '}',
+        '// the stick held forward past halfway (Method 5: >)',
+        'Input_Compare(Target=0, Input=0x10, Method=5, Value=0.5)'],
+    'Input_Get': [
+        '// stick Y into VAR_0 (0x0F000300), then test it later with Float_Var_Compare',
+        'Input_Get(Target=0, Input=0x11, Variable=0x0F000300)'],
+    'Input_Set': [
+        '// make the fighter just hit jump (one frame) and ignore its controller for 30 frames',
+        'Input_Set(Target=2, Input=0x15, Value=1)',
+        'Input_Set(Target=2, Input=2, Value=2)',
+        'WAIT(Frames=0x1E)',
+        'Input_Set(Target=2, Input=0x15, Value=0)'],
+    'Hit_Reset': [
+        '// first hit, then check the second hitbox on its own',
+        'FRAME(Frames=0x14)',
+        'Hit_Reset()',
+        'Hitbox(ID=0, Part=0, Bone=0, Damage=6, Angle=0x169, KBG=0x64, FKB=0, BKB=0x28, Size=5, X=0, Y=8, Z=8, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, '
+        'Direct/Indirect=1, Type=1)',
+        'WAIT(Frames=3)',
+        'Float_Var_Compare(Variable=0x0F0000A0, Method=0, Value=1)'],
     'Thread_Stop': [
         '// stop thread 1 (started by Thread_Start(ID=1)) if it\'s still running',
         'Thread_Stop(ID=1)',
@@ -1759,7 +2123,9 @@ def labels(path):
     d = json.load(open(path))
     info = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'acmd_info.json')))['commands']
     for name, size, _label, _base in COMMANDS:
-        own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS}
+        own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS,
+               'Input_Compare': INPUT_CMP_PARAMS, 'Input_Get': INPUT_GET_PARAMS, 'Input_Set': INPUT_SET_PARAMS,
+               'Hit_Reset': []}
         if name in own:
             e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
                  '_format': [t for _n, t, _d in own[name]]}

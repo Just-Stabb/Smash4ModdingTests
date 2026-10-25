@@ -5945,6 +5945,37 @@
    1
   ]
  },
+ "43D5B75B": {
+  "_command": "Input_Get",
+  "_new": true,
+  "_name": "Input_Get",
+  "_size": 4,
+  "_desc": "Stores a fighter's input (1 / 0 for a button, -1 to 1 for a stick) in a float variable (e.g. VAR_0). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8 (as the input variables, docs/position-variables.md).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Input",
+   "desc": "Which input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 / 6 / 7 taunt up / side / down (held); 8-15 the same buttons pressed this frame; 16 / 17 stick X (forward +) / Y, 18 / 19 C-stick X (forward +) / Y (-1 to 1); 20 a stick is forced; 21 inputs off; 22-31 the state quantities of the input variables (22 situation, 23 damage, ...); 32 / 33 stick / C-stick X on screen (right +).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (this object's own, e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// stick Y into VAR_0 (0x0F000300), then test it later with Float_Var_Compare",
+   "Input_Get(Target=0, Input=0x11, Variable=0x0F000300)"
+  ]
+ },
  "44081C21": {
   "_command": "Search_Collision",
   "0": {
@@ -7524,6 +7555,40 @@
    "evidence": "op 7 = START_CHARGE, op 8 = STOP_CHARGE; unused in vanilla",
    "confidence": "low"
   }
+ },
+ "58FABCF7": {
+  "_command": "Input_Set",
+  "_new": true,
+  "_name": "Input_Set",
+  "_size": 4,
+  "_desc": "Forces a fighter's input as if its controller did it: hold or tap a button, tilt a stick, or ignore its controller. Forced inputs last until changed and are cleared when it is KO'd. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8 (as the input variables, docs/position-variables.md).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Input",
+   "desc": "Which input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 / 6 / 7 taunt up / side / down (held); 8-15 the same buttons pressed this frame; 16 / 17 stick X (forward +) / Y, 18 / 19 C-stick X (forward +) / Y (-1 to 1); 20 a stick is forced; 21 inputs off; 22-31 the state quantities of the input variables (22 situation, 23 damage, ...); 32 / 33 stick / C-stick X on screen (right +).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Value",
+   "desc": "Buttons (0-15): 1 hold it until 0 is set, 2 press it for one frame, 0 stop forcing it. Sticks (16-19, 32 / 33): force the stick to this value until Input 20 is set (any value). 21: 1 ignore its own controller, 0 back on. 22-31: as the input variables.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// make the fighter just hit jump (one frame) and ignore its controller for 30 frames",
+   "Input_Set(Target=2, Input=0x15, Value=1)",
+   "Input_Set(Target=2, Input=2, Value=2)",
+   "WAIT(Frames=0x1E)",
+   "Input_Set(Target=2, Input=0x15, Value=0)"
+  ]
  },
  "5961371C": {
   "_command": "unk_5961371C",
@@ -15869,6 +15934,49 @@
   "_name": "SET_SPEED_EX_2_arg_form",
   "_desc_extra": "(Descriptive name: the real name is unknown; was unk_D3D9401B.)"
  },
+ "D41CE3F4": {
+  "_command": "Input_Compare",
+  "_new": true,
+  "_name": "Input_Compare",
+  "_size": 5,
+  "_desc": "Compares a fighter's input (a button held / pressed, a stick) with Value; True / Else after it run on the result, like Float_Var_Compare. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8 (as the input variables, docs/position-variables.md).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Input",
+   "desc": "Which input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 / 6 / 7 taunt up / side / down (held); 8-15 the same buttons pressed this frame; 16 / 17 stick X (forward +) / Y, 18 / 19 C-stick X (forward +) / Y (-1 to 1); 20 a stick is forced; 21 inputs off; 22-31 the state quantities of the input variables (22 situation, 23 damage, ...); 32 / 33 stick / C-stick X on screen (right +).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Method",
+   "desc": "Comparison, as Float_Var_Compare: 0 ==, 1 !=, 2 <=, 3 >=, 4 <, 5 > (input Method Value).",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Value",
+   "desc": "What the input is compared with (buttons: 1 = held / pressed, 0 = not).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// on frame 12: if special is held, a stronger hitbox",
+   "FRAME(Frames=0xC)",
+   "Input_Compare(Target=0, Input=1, Method=0, Value=1)",
+   "True(Offset=0){",
+   "    Hitbox(ID=0, Part=0, Bone=0, Damage=14, Angle=0x169, KBG=0x64, FKB=0, BKB=0x32, Size=6, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
+   "}",
+   "// the stick held forward past halfway (Method 5: >)",
+   "Input_Compare(Target=0, Input=0x10, Method=5, Value=0.5)"
+  ]
+ },
  "D41DF827": {
   "_command": "ATTACK_SET_CHECK_FRONT_LR",
   "0": {
@@ -20201,6 +20309,22 @@
    1,
    0,
    1
+  ]
+ },
+ "FE66276F": {
+  "_command": "Hit_Reset",
+  "_new": true,
+  "_name": "Hit_Reset",
+  "_size": 1,
+  "_desc": "Clears this object's \"attack has hit\" flag (variable SELF_HIT, 0x0F0000A0, reads 0 again until another hitbox connects), so a later hitbox of the move can be checked on its own. New command: needs the patched cross_f.rpx.",
+  "_format": [],
+  "_example": [
+   "// first hit, then check the second hitbox on its own",
+   "FRAME(Frames=0x14)",
+   "Hit_Reset()",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=6, Angle=0x169, KBG=0x64, FKB=0, BKB=0x28, Size=5, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
+   "WAIT(Frames=3)",
+   "Float_Var_Compare(Variable=0x0F0000A0, Method=0, Value=1)"
   ]
  },
  "FE6B9F2F": {

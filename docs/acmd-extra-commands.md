@@ -5,7 +5,8 @@ These are new commands for game, effect, sound and expression scripts. They need
 them won't load properly, so ship the executable with any script that uses them.
 
 Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes
-under Hitboxes and Track_Target under Traces & targeting.
+and Hit_Reset under Hitboxes, the Input commands under Variables & compares and Track_Target under
+Traces & targeting.
 `tools/acmd.py` reads and writes them too.
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -155,6 +156,105 @@ Thread_Start(Offset=0, ID=1, Flags=0){
 - **Kirby:** don't leave a thread running in a copy ability's script when Kirby can lose the copy.
   The script it runs may be unloaded with the copy, and the game would crash.
 - **Untested in game:** whether a respawn counts as "set up again" and ends the threads.
+
+## Input_Compare / Input_Get / Input_Set
+
+Commands for a fighter's controller: check an input, copy it into a variable, or force it.
+
+| Command | Does |
+|---|---|
+| `Input_Compare(Target, Input, Method, Value)` | Compares the input with Value. `True` / `Else` after it run on the result, like `Float_Var_Compare`. |
+| `Input_Get(Target, Input, Variable)` | Stores the input in a float variable, e.g. `VAR_0` (`0x0F000300`). |
+| `Input_Set(Target, Input, Value)` | Forces the input, as if the controller did it. |
+
+**Target:** 0 self, 1 the nearest opponent, 2 the last fighter hit, 3–10 player slots 1–8.
+
+**Input:**
+
+| Input | What | Read | `Input_Set` Value |
+|---|---|---|---|
+| 0–7 | attack, special, jump, shield, grab, taunt up, taunt side, taunt down: **held** | 1 / 0 | 1 hold it until 0 is set, 2 press it for one frame, 0 stop forcing it |
+| 8–15 | the same buttons, **pressed** this frame | 1 / 0 | as above |
+| 16 / 17 | stick X (along the fighter's facing: + = forward) / Y | −1 to 1 | force the stick to the value until input 20 is set |
+| 18 / 19 | C-stick X (forward +) / Y | −1 to 1 | force the C-stick |
+| 20 | a stick is forced | 1 / 0 | any value: stop forcing both sticks |
+| 21 | the fighter's own inputs are ignored | 1 / 0 | 1 ignore its controller (forced inputs still work), 0 back on |
+| 22–31 | the state quantities of the input variables (22 situation, 23 damage, 24 / 25 jumps used / max, 26 shield HP, 27 intangible, 28 invincible, 29 / 30 armor and threshold) | as there | as there |
+| 32 / 33 | stick / C-stick X **on screen** (+ = right) | −1 to 1 | force it |
+
+**Method** (`Input_Compare`): 0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>` (input Method Value).
+
+- **Reading:** the fighter's own buttons (Target 0, inputs 0–15) are read with the game's own
+  `ControlModule(0x2712 held / 0x2710 pressed, button)`, as fighter MSC reads them. Everything else
+  is read through the input variables (`docs/position-variables.md`, "Inputs and state").
+- **Forcing** goes in where the game reads the controller, so a forced press counts as a real press
+  next frame (the inputs for this frame were read before the script ran). Forced inputs last until
+  changed, and are cleared when the fighter is KO'd. Details: `docs/position-variables.md`.
+- `Input_Compare` stores 0 for an unknown Method, and compares 0 for an unknown Target or Input.
+  `Input_Get` / `Input_Set` do nothing in a skipped block.
+
+Examples:
+
+```
+// on frame 12: a stronger hit if special is still held
+FRAME(Frames=12)
+Input_Compare(Target=0, Input=1, Method=0, Value=1)
+True(Offset=0){
+    Hitbox(ID=0, Part=0, Bone=0, Damage=14.0, ...)
+}
+
+// the stick held forward past halfway
+Input_Compare(Target=0, Input=16, Method=5, Value=0.5)
+
+// make the fighter just hit jump and ignore its controller for 30 frames
+Input_Set(Target=2, Input=21, Value=1)
+Input_Set(Target=2, Input=2, Value=2)
+WAIT(Frames=30)
+Input_Set(Target=2, Input=21, Value=0)
+```
+
+## Hit_Reset
+
+`Hit_Reset()` sets this object's "attack has hit" flag back to 0: the `SELF_HIT` variable
+(`0x0F0000A0`), which otherwise stays 1 from the first connecting hitbox until the move ends. Use it
+between hitboxes to check whether a later one connects on its own. Writing any value to `SELF_HIT`
+does the same (`SET_FLOAT(Value=0, Variable=SELF_HIT)`).
+
+It is the game's own `AttackModule(0x2724)`. Only the flag is cleared: the game's "already hit this
+fighter" record (which stops one hitbox ID hitting the same fighter twice) isn't changed.
+
+```
+FRAME(Frames=5)
+Hitbox(ID=0, ...)                       // first hit
+WAIT(Frames=3)
+Remove_All_Hitboxes()
+Hit_Reset()
+FRAME(Frames=20)
+Hitbox(ID=0, ...)                       // second hit
+WAIT(Frames=3)
+Float_Var_Compare(Variable=SELF_HIT, Method=0, Value=1)
+True(Offset=0){
+    // only if the second hitbox connected
+}
+```
+
+## Debug counters
+
+Words at `0x04B93900` (Cemu: Debug > Memory, go to the address), all 0 at boot, counting up across
+the whole session. They show where an Extra hitbox's hitstop extras stop working.
+
+| Offset | Word |
+|---|---|
+| `+0x00` | Extra hitboxes recorded (their slot tagged) |
+| `+0x04` / `+0x08` | victim hitstop hook: runs / an Extra hit found |
+| `+0x0C` / `+0x10` | last victim hitstop: before / after the extras (frames) |
+| `+0x14` / `+0x18` | attacker hitstop hook (before the slowdown rate): runs / found |
+| `+0x1C` / `+0x20` | last attacker hitstop there: before / after |
+| `+0x24` / `+0x28` | attacker hitstop hook (after the rate): runs / found |
+| `+0x2C` / `+0x30` | last attacker hitstop there: before / after |
+| `+0x34` / `+0x38` | hitstun hook: runs / found |
+| `+0x3C` | Extra hitbox commands run |
+| `+0x40` | the last one's ID |
 
 ## Variables, timers and the kinetic type
 

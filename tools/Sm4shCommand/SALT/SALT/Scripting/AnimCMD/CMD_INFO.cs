@@ -134,7 +134,11 @@ namespace SALT.Moveset.AnimCMD
             {0x974EA5BE,48},
             {0x113030DB,8},
             {0x1B492AD1,2},
-            {0x4C0DBE48,4}
+            {0x4C0DBE48,4},
+            {0x43D5B75B,4},
+            {0x58FABCF7,4},
+            {0xD41CE3F4,5},
+            {0xFE66276F,1}
         };
         #endregion
         #region Names
@@ -729,6 +733,10 @@ namespace SALT.Moveset.AnimCMD
             {0x113030DB,"Track_Target"},
             {0x1B492AD1,"Thread_Stop"},
             {0x4C0DBE48,"Thread_Start"},
+            {0x43D5B75B,"Input_Get"},
+            {0x58FABCF7,"Input_Set"},
+            {0xD41CE3F4,"Input_Compare"},
+            {0xFE66276F,"Hit_Reset"},
         };
         #endregion
         #region Params
@@ -1325,6 +1333,10 @@ namespace SALT.Moveset.AnimCMD
             {0x113030DB,"0,1,1,1,0,0,0"},
             {0x1B492AD1,"0"},
             {0x4C0DBE48,"0,0,0"},
+            {0x43D5B75B,"0,0,0"},
+            {0x58FABCF7,"0,0,1"},
+            {0xD41CE3F4,"0,0,0,1"},
+            {0xFE66276F,"NONE"},
         };
         #endregion
         #region syntax
@@ -1919,6 +1931,10 @@ namespace SALT.Moveset.AnimCMD
             {0x113030DB,"Frames,Speed,TurnRate,Range,Mode,TargetOwner,TargetTeammates"},
             {0x1B492AD1,"ID"},
             {0x4C0DBE48,"Offset,ID,Flags"},
+            {0x43D5B75B,"Target,Input,Variable"},
+            {0x58FABCF7,"Target,Input,Value"},
+            {0xD41CE3F4,"Target,Input,Method,Value"},
+            {0xFE66276F,"NONE"},
         };
         #endregion
 
@@ -2515,6 +2531,10 @@ namespace SALT.Moveset.AnimCMD
             {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; a reflected one goes back at its original owner instead (any distance). Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x1B492AD1,"Stops this object's thread ID (-1 = all of them). New command: needs the patched cross_f.rpx."},
             {0x4C0DBE48,"Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x43D5B75B,"Stores a fighter's input (1 / 0 for a button, -1 to 1 for a stick) in a float variable (e.g. VAR_0). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x58FABCF7,"Forces a fighter's input as if its controller did it: hold or tap a button, tilt a stick, or ignore its controller. Forced inputs last until changed and are cleared when it is KO'd. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0xD41CE3F4,"Compares a fighter's input (a button held / pressed, a stick) with Value; True / Else after it run on the result, like Float_Var_Compare. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0xFE66276F,"Clears this object's \"attack has hit\" flag (variable SELF_HIT, 0x0F0000A0, reads 0 again until another hitbox connects), so a later hitbox of the move can be checked on its own. New command: needs the patched cross_f.rpx."},
         };
         #endregion
         /// <summary>

@@ -147,7 +147,7 @@ def position():
 
 # 0x0F0000A0 + 8 * target + q (tools/position_vars_cave.py)
 STATE_QUANTITIES = [
-    ("HIT", "Read: 1 once its current attack has connected (until the move ends), else 0."),
+    ("HIT", "Read: 1 once its current attack has connected (until the move ends or it is reset), else 0.\\nWrite (any value): back to 0, so a later hitbox can be checked on its own (as ACMD Hit_Reset)."),
     ("HIT_NOW", "Read: 1 only on the frame its attack connects, else 0."),
     ("STATUS", "Read: its status kind (e.g. 0x59 shield break).\\nWrite: change its status to the value (e.g. 0x59 = shield break, 0x5D = dizzy)."),
     ("MOTION", "Read: its motion kind (its own motion list's number).\\nWrite: play that motion from frame 0 (the motion number is per fighter)."),

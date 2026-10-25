@@ -96,7 +96,7 @@ fighter hit, 3–10 player slots 1–8), so `0x0F0000A0`–`0x0F0000F7`.
 
 | quantity | read | write |
 |---|---|---|
-| +0 hit | 1 once its current attack has connected (stays 1 until the move ends), else 0 | ignored |
+| +0 hit | 1 once its current attack has connected (stays 1 until the move ends or it's reset), else 0 | any value: back to 0 (`AttackModule(0x2724)`, as ACMD `Hit_Reset`), so a later hitbox can be checked on its own |
 | +1 hit now | 1 only on the frame its attack connects | ignored |
 | +2 status | its status kind | change its status (`StatusModule(3, status, 0)`), e.g. `0x59` shield break, `0x5D` dizzy |
 | +3 motion | its motion kind | play that motion from frame 0 at rate 1 (`MotionModule(1, ...)`; motion numbers are per fighter) |
@@ -122,6 +122,9 @@ second hitbox comes out and the fighter it hit goes into shield break (status `0
 change takes effect on the fighter's next frame.
 
 ## Inputs and state
+
+(ACMD also has commands for these: `Input_Compare`, `Input_Get`, `Input_Set`,
+`docs/acmd-extra-commands.md`.)
 
 `0x0F000100 + 0x20 × target + quantity`, same targets as above (0 self, 1 nearest opponent, 2 last
 fighter hit, 3–10 player slots 1–8), so `0x0F000100`–`0x0F00025F`. Sm4shCommand names them

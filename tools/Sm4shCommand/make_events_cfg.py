@@ -43,9 +43,9 @@ CATEGORIES = [
      r"ENDSWITCH|Goto|CALL|JUMP|Script_End|END|EXECUTE|NOP|True|False|Is_Bool|Is_Not_Bool|IS_RANDOM|"
      r"Set_Frame_Duration|Set_Frame_Speed|POOL)$"),
     ("Variables & compares", r"^(SET_INT|ADD_INT|INC_INT|SET_FLOAT|ADD_FLOAT|SUB_FLOAT\w*|ON_FLAG|OFF_FLAG|IS_FLAG)$|"
-     r"^(?i:int|float)_\w*(?i:compare)|_VAR_COMPARE|COMPARE_VAR"),
+     r"^(?i:int|float)_\w*(?i:compare)|_VAR_COMPARE|COMPARE_VAR|^Input_"),
     ("Item scripts (IT_)", r"^IT_"),
-    ("Hitboxes", r"Hitbox|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
+    ("Hitboxes", r"Hitbox|^Hit_Reset$|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
     ("Grabs & throws", r"Grab_Collision|Throw_(Specifier|Applier)|^FT_CATCH|^CTH_"),
     ("Search boxes, areas & shields", r"^Search_Collision$|^SCH_|^SEARCH_|^SET_SEARCH|AREA|Wind_Effect|^REFLECTOR$|^SHIELD_|^Shield_"),
     ("Hurtboxes & body", r"^Body_Collision$|Intangibility|Bone_Collision|^Set_Armor$|^COL_PRI$"),

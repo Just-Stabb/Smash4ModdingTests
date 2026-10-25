@@ -45,8 +45,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
   0x0F000040-0x0F000097      hitstun / hitstop / offsets for self, the nearest opponent, the last
                             fighter hit and each slot (see "Combat variables" below and
                             docs/position-variables.md)
-  0x0F0000A0 + 8*target + q   hit / status / motion (q 0 attack has connected, 1 connected this
-              frame, 2 status (write: change status), 3 motion (write: play it), 4 motion frame);
+  0x0F0000A0 + 8*target + q   hit / status / motion (q 0 attack has connected (write: back to 0,
+              AttackModule(0x2724)), 1 connected this frame, 2 status (write: change status), 3 motion (write: play it), 4 motion frame);
               targets as for the combat variables (0x0F0000A0-0x0F0000F7)
   0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
               (1.0 normally)                      multiplies every animation, ACMD timing too)
@@ -1003,15 +1003,21 @@ ext_q2:                                 # r22 = q + 8, r24 = the target's access
         bge inp_have
         cmpwi r22, 0xA
         bge ext_q2_sm
-        cmpwi r29, 0                    # q0 / q1: its attack has connected (this move / this frame)
+        li r0, 0x272F                   # q0 / q1: its attack has connected (this move / this frame):
+        subf r0, r22, r0                # AttackModule(0x2727) / AttackModule(0x2726)
+        cmpwi r29, 0
+        beq ext_hit_r
+        cmpwi r22, 8                    # write q0: "has hit" back to 0 (AttackModule(0x2724))
         bne ext_zero
-        li r0, 0x272F                   # AttackModule(0x2727) / AttackModule(0x2726)
-        subf r0, r22, r0
+        li r0, 0x2724
+ext_hit_r:
         stw r0, 0x20(r1)
         li r4, 1
         lis r5, %(AT_HI)s
         ori r5, r5, %(AT_LO)s
         bl ext_msc
+        cmpwi r29, 0
+        bne ext_zero
         b ext_ret_int
 ext_q2_sm:
         cmpwi r22, 0xB

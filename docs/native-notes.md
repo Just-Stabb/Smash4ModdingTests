@@ -1171,6 +1171,22 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     record `+0x30` (= `DamageModuleF(1)`).
   - Final hitstop frames in r20 at `0x02C25A78` (after the slowdown rate).
 - **Attacker:** `0x02C2639C`. Hitstop before the rate in r3 at `0x02C2645C`, after it at `0x02C264C4`.
+- **Hitstop setter:** StopModule (accessor `+0x48`) vt `+0x8C(frames, r5)`. In the fighters' vtable
+  it is `0x02E8991C`, which (frames > 0) calls `0x0200DDB4` (`+4` = max(frames, `+8`), `+8` = 0,
+  `+0x11` = 1, `+0x12` = r5) and stops the motion if `+0x10` was 0. The base vtable's `+0x8C`
+  (`0x0200DDA4`) only tail-calls vt `+0xA4`. (The notes above called `0x0200DDB4` the vtable entry.)
+- **Hit info:** `0x02C21360` fills an array of 0xE4-byte hit infos (`+0x44` the slot copy, `+0x2C` the
+  attacker's object ID, `+0x3A` the hitbox ID, `+0xB0`-`+0xD4` the rest); `0x02C251D8` passes one as r5
+  to the victim handler (vt `+0xD4` = `0x02C25318`, fighters too: vtables `0x1012B9A4` /
+  `0x10130DD8`) and the attacker handler (vt `+0xEC` = `0x02C2639C`).
+- **Input commands:** `Input_Compare` / `Input_Get` / `Input_Set` read a fighter's own buttons with
+  the ControlModule MSC wrapper `0x030B2968` (vt `+0x2F4`; ops `0x2710` pressed, `0x2712` held, MSC
+  button 0 attack, 1 special, 2 jump, 3 shield, 9 grab, 5-8 d-pad up / down / left / right; the
+  float one is `0x030B29A0`), everything else through the input variables' `get_float` /
+  `set_float`. The compare is `Float_Var_Compare`'s (`0x02BEE010`), its result at script state `+0xC`.
+- **Hit_Reset:** AttackModule MSC (wrapper `0x030B50F0`, vt `+0x334` = `0x02C0ACFC`) op `0x2724`
+  (case at `0x02C0BC18`) stores 0 to `+0xC8`, which `0x2727` reads.
+- **Debug counters** at `0x04B93900` (after the DI table): `docs/acmd-extra-commands.md`.
 - **Per frame:** every object's motion step (fighters `0x02E408B8`, weapons `0x02BAD64C`, a third
   class `0x03048064`) calls `0x02C5F3BC` when it isn't stopped (StopModule byte `+0x10`). That runs the
   frame's ACMD (accessor `+0xC4` → `0x02C2986C` → the interpreter).

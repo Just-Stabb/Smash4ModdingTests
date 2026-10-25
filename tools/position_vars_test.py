@@ -160,12 +160,17 @@ mo1: lwz r7, 4(r5)
     0x030B50F0: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
- cmpwi r6, 0x2727
+ cmpwi r6, 0x2724
+ bne at7
+ li r3, 0
+ stw r3, 0xA34(r12)
+ blr
+at7: cmpwi r6, 0x2727
  bne at6
  lwz r3, 0xA34(r12)
  blr
 at6: lwz r3, 0xA38(r12)
- blr""",                                       # AttackModule(0x2727) / (0x2726)
+ blr""",                                       # AttackModule(0x2724) clear / (0x2727) / (0x2726)
     0x030B5C50: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r7, 8(r5)
@@ -341,7 +346,10 @@ check('self: attack has connected', call(mu, FGET2, w0, hid(0, 0)), 1)
 check('self: connected this frame', call(mu, FGET2, w0, hid(0, 1)), 0)
 wi(mu, 2, 0xA34, 0)
 check('opp (slot 2): attack has connected', call(mu, FGET2, w0, hid(1, 0)), 0)
-check('has connected: writes ignored', (call(mu, FSET2, w0, hid(0, 0), 5.0), ri(mu, 0, 0xA34)), (0, 1))
+check('connected this frame: writes ignored', (call(mu, FSET2, w0, hid(0, 1), 5.0), ri(mu, 0, 0xA34)), (0, 1))
+check('has connected: a write clears it (AttackModule(0x2724))', (call(mu, FSET2, w0, hid(0, 0), 0.0), ri(mu, 0, 0xA34)), (0, 0))
+check('  then reads 0', call(mu, FGET2, w0, hid(0, 0)), 0)
+wi(mu, 0, 0xA34, 1)
 wi(mu, 2, 0xA1C, 0x45)
 check('opp status read', call(mu, FGET2, w0, hid(1, 2)), 0x45)
 call(mu, FSET2, w0, hid(1, 2), float(0x59))

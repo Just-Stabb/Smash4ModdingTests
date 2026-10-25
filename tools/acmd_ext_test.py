@@ -510,6 +510,141 @@ def thread_tests(pm, om, a):
     check('fast-forward: no thread started', slots(), [])
 
 
+def input_tests(pm, a):
+    """Input_Compare / Input_Get / Input_Set / Hit_Reset with stubbed WorkModule (get: f1 = (ID & 0xFFFF) / 16,
+    set: logs ID and f1), ControlModule wrapper (1 for one (op, button) pair) and AttackModule wrapper (logs)"""
+    from ppcasm import Asm
+    B = 0x7D000000
+    pm.mem_map(B, 0x10000)
+    st = Asm(B)
+    st.asm("""
+get:                            # WorkModule vt +0x44(wm, id) -> f1 = (id & 0xFFFF) / 16
+        lis r11, 0x7D00
+        clrlwi r4, r4, 16
+        stw r4, 0x1104(r11)
+        lis r0, 0x4330
+        stw r0, 0x1100(r11)
+        lfd f1, 0x1100(r11)
+        lfd f0, 0x1108(r11)
+        fsub f1, f1, f0
+        lfs f0, 0x1110(r11)
+        fmul f1, f1, f0
+        frsp f1, f1
+        blr
+set:                            # vt +0x4C(wm, id, f1): log id, f1, count
+        lis r11, 0x7D00
+        stw r4, 0x1000(r11)
+        stfs f1, 0x1004(r11)
+        lwz r12, 0x1008(r11)
+        addi r12, r12, 1
+        stw r12, 0x1008(r11)
+        blr
+control:                        # ControlModule wrapper(ctx, {words, n}) -> 1 when (op, button) = the pair at 0x1010
+        lis r11, 0x7D00
+        lwz r9, 0(r4)
+        lwz r10, 0(r9)
+        lwz r12, 0x1010(r11)
+        li r3, 0
+        cmpw r10, r12
+        bnelr
+        lwz r10, 4(r9)
+        lwz r12, 0x1014(r11)
+        cmpw r10, r12
+        bnelr
+        li r3, 1
+        blr
+attack:                         # AttackModule wrapper: log the op and n, count
+        lis r11, 0x7D00
+        lwz r9, 0(r4)
+        lwz r10, 0(r9)
+        stw r10, 0x1020(r11)
+        lwz r10, 4(r4)
+        stw r10, 0x1024(r11)
+        lwz r12, 0x1028(r11)
+        addi r12, r12, 1
+        stw r12, 0x1028(r11)
+        blr
+""")
+    for i, w in enumerate(st.words()):
+        w32(pm, B + 4 * i, w)
+    pm.mem_write(B + 0x1108, struct.pack('>Qf', f2bits(2.0 ** 52), 1 / 16))
+    for wrap, to in ((C.CONTROL_W, st.addr('control')), (C.ATTACK_W, st.addr('attack'))):
+        for i, wd in enumerate([0x3D800000 | (to >> 16), 0x618C0000 | (to & 0xFFFF), 0x7D8903A6, 0x4E800420]):
+            w32(pm, wrap + 4 * i, wd)
+    acc, wm, vt = B + 0x2000, B + 0x2100, B + 0x2200
+    w32(pm, acc + 0x28, wm)
+    w32(pm, wm, vt)
+    w32(pm, vt + 0x44, st.addr('get'))
+    w32(pm, vt + 0x4C, st.addr('set'))
+    state, ctx, prm = B + 0x3000, B + 0x3100, B + 0x3200
+
+    def go(name, params, exe=1, pair=(0, -1)):
+        w32(pm, B + 0x1010, pair[0])
+        w32(pm, B + 0x1014, pair[1])
+        for k in (0x1000, 0x1004, 0x1008, 0x1020, 0x1024, 0x1028):
+            w32(pm, B + k, 0)
+        for i, v in enumerate(params):
+            pm.mem_write(prm + 4 * i, struct.pack('>f' if isinstance(v, float) else '>i', v))
+        w32(pm, state + 4, 0x1000)
+        w32(pm, state + 8, -1)
+        w32(pm, state + 0xC, 0x55)
+        pm.mem_write(ctx + 8, bytes([exe]))
+        lab = dict((c[0], c[2]) for c in C.COMMANDS)[name]
+        run(pm, a.addr(lab), RET, {UC_PPC_REG_3: acc, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx, UC_PPC_REG_7: prm})
+        return pm.reg_read(UC_PPC_REG_3), r32(pm, state + 4) - 0x1000, r32(pm, state + 0xC)
+
+    def logged():
+        return r32(pm, B + 0x1008), r32(pm, B + 0x1000), round(struct.unpack('>f', pm.mem_read(B + 0x1004, 4))[0], 4)
+
+    check('Input_Compare jump held (ControlModule(0x2712, 2)): true, steps 5 words',
+          go('Input_Compare', [0, 2, 0, 1.0], pair=(0x2712, 2)), (2, 20, 1))
+    check('Input_Compare jump held, ControlModule says no: false', go('Input_Compare', [0, 2, 0, 1.0], pair=(0x2712, 3))[2], 0)
+    check('Input_Compare jump pressed (0x2710, 2)', go('Input_Compare', [0, 10, 0, 1.0], pair=(0x2710, 2))[2], 1)
+    check('Input_Compare jump pressed: held only -> false', go('Input_Compare', [0, 10, 0, 1.0], pair=(0x2712, 2))[2], 0)
+    check('Input_Compare grab -> MSC button 9', go('Input_Compare', [0, 4, 0, 1.0], pair=(0x2712, 9))[2], 1)
+    check('Input_Compare taunt up -> d-pad up 5', go('Input_Compare', [0, 5, 0, 1.0], pair=(0x2712, 5))[2], 1)
+    check('Input_Compare taunt side: d-pad left 7', go('Input_Compare', [0, 6, 0, 1.0], pair=(0x2712, 7))[2], 1)
+    check('Input_Compare taunt side: d-pad right 8', go('Input_Compare', [0, 6, 0, 1.0], pair=(0x2712, 8))[2], 1)
+    check('Input_Compare taunt down -> d-pad down 6', go('Input_Compare', [0, 7, 0, 1.0], pair=(0x2712, 6))[2], 1)
+    check('Input_Compare button != 1 when not held', go('Input_Compare', [0, 1, 1, 1.0])[2], 1)
+    # stick (variable 0x0F000110 -> stub 0x110 / 16 = 17): 17 > 16.5 and not < 16.5
+    check('Input_Compare stick X via the variable: >', go('Input_Compare', [0, 0x10, 5, 16.5])[2], 1)
+    check('Input_Compare stick X via the variable: <', go('Input_Compare', [0, 0x10, 4, 16.5])[2], 0)
+    check('Input_Compare opponent attack held: the variable 0x0F000120 (== 18)', go('Input_Compare', [1, 0, 0, 18.0])[2], 1)
+    check('Input_Compare bad method: false', go('Input_Compare', [0, 0x10, 9, 0.0])[2], 0)
+    check('Input_Compare target 11: reads 0', go('Input_Compare', [11, 0x10, 0, 0.0])[2], 1)
+    ret, step, _ = go('Input_Compare', [0, 2, 0, 1.0])
+    w32(pm, state + 8, 0)
+    check('Input_Compare steps 5 words', step, 20)
+
+    go('Input_Get', [1, 0x11, 0x0F000300])
+    check('Input_Get opponent stick Y (0x0F000131) -> VAR_0', logged(), (1, 0x0F000300, round(0x131 / 16, 4)))
+    go('Input_Get', [2, 0x21, 0x0F000301])
+    check('Input_Get last hit raw C-stick X (0x0F000265)', logged(), (1, 0x0F000301, round(0x265 / 16, 4)))
+    go('Input_Get', [0, 1, 0x0F000302], pair=(0x2712, 1))
+    check('Input_Get self special held -> 1.0', logged(), (1, 0x0F000302, 1.0))
+    check('Input_Get skipped: steps 4 words, no write', (go('Input_Get', [0, 1, 0x0F000302], exe=0)[1], logged()[0]), (16, 0))
+
+    check('Input_Set steps 4 words', go('Input_Set', [3, 2, 2.0])[1], 16)
+    check('Input_Set slot 1 jump tap -> 0x0F000162 = 2', logged(), (1, 0x0F000162, 2.0))
+    go('Input_Set', [0, 0x20, -0.75])
+    check('Input_Set self raw stick X -> 0x0F000260', logged(), (1, 0x0F000260, -0.75))
+    go('Input_Set', [10, 0x15, 1.0])
+    check('Input_Set slot 8 inputs off -> 0x0F000255', logged(), (1, 0x0F000255, 1.0))
+    go('Input_Set', [0, 0x22, 1.0])
+    check('Input_Set input 0x22: nothing', logged()[0], 0)
+    go('Input_Set', [11, 0, 1.0])
+    check('Input_Set target 11: nothing', logged()[0], 0)
+    go('Input_Set', [0, 2, 1.0], exe=0)
+    check('Input_Set skipped: nothing', logged()[0], 0)
+
+    ret, step, _ = go('Hit_Reset', [])
+    check('Hit_Reset: AttackModule(0x2724) once, steps 1 word',
+          (r32(pm, B + 0x1028), r32(pm, B + 0x1020), r32(pm, B + 0x1024), ret, step), (1, 0x2724, 1, 2, 4))
+    go('Hit_Reset', [], exe=0)
+    check('Hit_Reset skipped: nothing', r32(pm, B + 0x1028), 0)
+
+
 def main():
     patched, original = sys.argv[1:3]
     a, words, hooks = C.build()
@@ -616,8 +751,14 @@ def main():
         check('%s: bad pointer: no crash, nothing' % name, find(0x00001234), 0)
 
     hit_tests(pm, om, a, slot, acc)
+    d = [r32(pm, C.DBG + 4 * i) for i in range(17)]
+    check('debug: Extra commands run / tagged, last ID', (d[15] > 0, d[0] > 0, d[16]), (True, True, 3))
+    check('debug: victim hitstop calls / found, attacker calls / found, hitstun calls / found',
+          tuple(x > 0 for x in (d[1], d[2], d[5], d[6], d[13], d[14])), (True,) * 6)
+    check('debug: last victim hitstop before / after (frames 20 replace 7)', (d[3], d[4]), (7, 20))
     obj_tests(pm, om, a)
     thread_tests(pm, om, a)
+    input_tests(pm, a)
     print('%d failures' % fails)
     sys.exit(1 if fails else 0)
 
