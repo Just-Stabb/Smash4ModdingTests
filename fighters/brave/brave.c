@@ -38851,8 +38851,9 @@ void brave_s3_main()
 
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
 // Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) while special is held; the charge
-// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz, held as long as
-// special is; Ultimate's doesn't go off by itself). Released (at any time, a tap included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
+// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz: then the flash and
+// the charge is stored, as Ultimate's; a stored Kafrizz is cast at once). Released (at any time, a tap
+// included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
 // fighters/brave/weapons/fireball.c) at frame 10 / 11 / 16; shield while holding -> SpecialNCancel, the
 // charge kept for the next one (brave_n_stored; a stock lost clears it, func_235). The fireball learns its
 // level through the custom N slot (int 0x10000048 -> the weapon's 0x10000005), set while it is generated (as
@@ -39028,6 +39029,14 @@ void brave_n_loop()
                 brave_n_change(0x4);
             }
         }
+        else if (brave_n_hold >= 0x51)
+        {
+            // fully charged (Kafrizz): Ultimate's SpecialNHoldMax flash (brave_chant_finish on top, as
+            // its script), then the charge is stored and he stops, as a shield cancel
+            EffectModule(0x2717, 0x345002b, 0, 0, 9.0f, 0, 0, -1.0472f, 0, 1.0f, 0);
+            brave_n_stored = brave_n_hold;
+            brave_n_change(0x3);
+        }
         else if (MotionModule(0x2712) == 0x1)
         {
             brave_n_change(0x1);    // the hold loops
@@ -39056,6 +39065,10 @@ void brave_n_main()
     brave_n_released = 0;
     brave_n_hold = brave_n_stored;  // a stored charge goes on from where it was (and is lost if he's hit)
     brave_n_stored = 0;
+    if (brave_n_hold >= 0x51)
+    {
+        brave_n_released = 0x1;     // a stored Kafrizz is cast at once
+    }
     WorkModule(0x7, 0, 0x10000090);
     WorkModule(0x7, 0x21f, 0x11000002);
     WorkModule(0x7, 0x23b, 0x11000003);

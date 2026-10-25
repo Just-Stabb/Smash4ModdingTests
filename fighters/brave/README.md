@@ -310,4 +310,10 @@ but Sephiroth's two (`edge_n_change` / `edge_n_loop`).
 - Side tilt: status 0x28's main is Hero's `brave_s3_main` (Robin's `func_275` with its own loop):
   an attack press from the status's third frame on is kept, and from motion frame 16 the loop plays
   motion 0x59 (`AttackS3S2`) once, then hands on to Robin's `func_277`.
-- Neutral special: the full charge is held again (fix 15's auto-release undone).
+- Neutral special: at 81 frames (Kafrizz) the flash (`brave_chant_finish`, `EffectModule(0x2717, ...)`;
+  Ultimate's `SpecialNHoldMax` also has `brave_fire3_hold_flash`, not in his bank yet) and the charge is
+  stored as a shield cancel's (`brave_n_change(3)`); a stored Kafrizz is cast at once (fix 15's
+  auto-release undone).
+- Mouth: fix 16 gave every motion a face entry (for the shields), and an entry replaces `default.mta`,
+  so the motions Robin has none for lost the default mouth. `ultimate_fighter.py` now starts those
+  entries from the default's keys (Steve's tools, the same mechanism, get it too on his next rebuild).

@@ -1377,6 +1377,10 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                         ks = [(min(k[0], frames - 1), k[1]) for k in v['keys']]
                         vis.append((v['name'], sorted(set(ks))))
                 if pac == 'material_anime_face.pac':
+                    if d is None and cprof['vis'] and old.get('default.mta', b'')[:4] == b'MTA4':
+                        # a motion the base has no entry for plays default.mta; an entry of ours (for the
+                        # slots below) replaces it, so it starts from the default's keys (else no mouth)
+                        vis = [(v['name'], [(0, v['keys'][0][1])]) for v in mta.read(old['default.mta'])['vis']]
                     # the base's own keys for the slots we drive go (Pit's mouths: they'd show the tools)
                     vis = [v for v in vis if v[0] not in cprof['vis'].values()]
                     for uname, slot in cprof['vis'].items():
