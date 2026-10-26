@@ -38791,17 +38791,22 @@ void brave_frame()
 
 // Bounce's reflector (as Kirby's air side B, tools/kirby_sideb_reflect_acmd.py: kind 3, ID 0, group 3; the
 // group made for Robin's kind by tools/brave_reflect_cave.py): a capsule around him, x1.5 damage, x1.2 speed
-// and life, no threshold
+// and life, no threshold. Its barrier (brave_reflect, 0x3450066: Ultimate plays it from its status code,
+// not a script) follows the hip (bone 3, as the scripts' brave_reflect_start) for as long as the reflector
+// is up; its loop parts never end on their own, so it's killed when the reflector goes
 void brave_reflect(int on)
 {
     if (on)
     {
         ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
         ShieldModule(0, 0x3, 0, 0x1, 0x3);
+        EffectModule(0x2723, 0x3450066, 0x1, 0x1);
+        EffectModule(0x2717, 0x3450066, 0x3, 0, 0, 0, 0, 0, 0, 1.0f, 0);
     }
     else
     {
         ShieldModule(0, 0x3, 0, 0, 0x3);
+        EffectModule(0x2723, 0x3450066, 0x1, 0x1);
     }
 }
 

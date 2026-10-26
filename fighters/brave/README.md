@@ -693,3 +693,12 @@ Hero, fix 42 -> fix 43: the 83 parts on premultiplied templates (40 effects): th
 auras and barriers on the same kind of template (`lightning1/2_spark`, `lightning3_rolllightning`,
 `reflect*`, `deathball*`, `smash_ground`, `shield_bash` / `_impact`, `fullburst_*` and others).
 Nothing else changed.
+
+## Fix 44 (`build/hero_fix44.zip`): Bounce's barrier
+
+Bounce's barrier (`brave_reflect`) never showed: Ultimate plays it from its status code, not a script,
+so only `brave_reflect_start` (the cast's script) ever played. `brave_reflect` (MSC) now starts it with
+the reflector, following his hip (bone 3, where the script puts the start effect; scale 1, the effect's
+own -0.5 offset), Terminate 0 so it outlasts his status changes, and kills it (`EffectModule(0x2723)`,
+particles too: its loop parts never end) when the reflector goes (720 frames, a recast, death). Not
+yet: `brave_reflect_flash` on a reflection (Ultimate's, also status code).
