@@ -277,14 +277,14 @@ class Templates:
                     # what its vertex program draws (not the mode words: tools/eft_vertex.py)
                     traits = (plain, feat['uv'][0], feat['follow'], feat['flipbook'][0],
                               screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2,
-                              two, feat['uv'][1] if two else 0)
+                              two, feat['uv'][1] if two else 0, not screen[si_][2] or feat['fluc'])
                     self.found.setdefault(key, {})
                     variants = [(traits, False)]
                     if GRAFT and TWO_TEXTURES and not two and graftable(bytes(p.shader_binary(si_)), lay):
                         # also a two-texture template once grafted (two_texture_shader): slot 1's UV
                         # animation all there (eft's own code, or the program's); 2: a three-texture
                         # one too (three_texture_shader)
-                        variants.append((traits[:9] + (True, 7),
+                        variants.append((traits[:9] + (True, 7) + traits[11:],
                                          2 if three_graftable(bytes(p.shader_binary(si_)), lay) else 1))
                     for tr, grafted in variants:
                         # (a vanilla two-texture program over a grafted one drawing as much)
@@ -293,7 +293,7 @@ class Templates:
                             self.found[key][tr] = (score, path, si, k, grafted)
 
     def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False,
-            want2=False, uv_mode1=0, swap_ok=False, need_thr=0, want3=False, fields=False):
+            want2=False, uv_mode1=0, swap_ok=False, need_thr=0, want3=False, fields=False, fluc=False):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A flipbook template is never taken for no flipbook when another is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
@@ -304,8 +304,9 @@ class Templates:
         slots (texture 0 x / + texture 1 either way round) when the template animates them better so.
         need_thr: a dissolve's threshold over life wants an animated colour track, 1: colour 1's, 2:
         either (colour 0's rgb constant). fields: particle fields (FIELD_SECTIONS), which want the CPU's
-        particles (no v_inVec), ranked after the main texture's UV animation. Returns (emitter bytes,
-        turns, swapped)"""
+        particles (no v_inVec), ranked after the main texture's UV animation; fluc: fluctuation, which
+        wants the CPU's particles or a GPU program reading flucX / flucY, after the colour tracks.
+        Returns (emitter bytes, turns, swapped)"""
         def assign(t):
             """(main's UV mode met, the second's met, swapped): the better way round"""
             mode, two, mode1 = t[1], t[9], t[10]
@@ -317,7 +318,8 @@ class Templates:
             return max(ways, key=lambda w: (w[0], w[1], not w[2]))
 
         def rank(item):
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), (score, grafted) = item[0][1:], item[1][::4]
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1, fluc_ok), (score, grafted) = \
+                item[0][1:], item[1][::4]
             same_blend = item[0][0] == blend
             fit0, fit1, swapped = assign(item[0][1:])
             # a mesh's UV animation first: freezing it bakes the mesh again (his slash arcs'
@@ -339,7 +341,7 @@ class Templates:
             return (plain, not pm or bool(ptn), own if need_c1 else min(own, 1), follow in fol, pm == bool(ptn),
                     fit0, not fields or not by_vel, two == want2, fit1, not want3 or grafted == 2,
                     not need_thr or an1 or (need_thr == 2 and an0),
-                    turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1],
+                    turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1], fluc_ok or not fluc,
                     by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), not grafted, same_blend, score)
         # the blend is the emitter's (0x324: not the program's, 352 vanilla file / shader pairs use
@@ -353,7 +355,7 @@ class Templates:
             key = (t, b, mesh)
             traits, (_score, path, si, k, _grafted) = max(cands.items(), key=rank)
             traits = traits[1:]
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1) = traits
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1, fluc_ok) = traits
             swapped = assign(traits)[2]
             if swapped:
                 mode, mode1 = mode1, mode
@@ -369,6 +371,8 @@ class Templates:
                 notes.append('flipbook mode %d: template plays none (one cell shown)' % ptn)
             if fields and by_vel:
                 notes.append('fields lost: the template moves its particles on the GPU')
+            if fluc and not fluc_ok:
+                notes.append('fluctuation lost: the template\'s GPU program draws none')
             if key[0] == 3 and not by_vel and follow != 1:
                 # (unfollowing particles' world motion is their velocity; every vanilla v_inVec
                 # program moves its particles on the GPU)
@@ -1319,11 +1323,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if live3:
         live, swap_ok = 1, False
     fblocks, fanims, fdone = particle_fields(e)
+    fluct = fluctuation(e)
     em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
                                        notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
                                        live is not None,
                                        uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
-                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None, bool(fblocks))
+                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None, bool(fblocks),
+                                       fluct is not None)
     if swapped:
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
@@ -1714,10 +1720,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     for a in anims:         # an animated rate lowered with the emitter's (its peak)
         if a['target'] == 0:
             a['keys'] = [(t, v * p.field(em, 'emit_rate') / before) for t, v in a['keys']]
+    if fblocks or fluct:
+        em = ptcl.Ptcl.with_fields(em, fblocks, fluct)
     if fblocks:
-        em = ptcl.Ptcl.with_fields(em, fblocks)
         notes.append('fields: %s%s' % (', '.join(sorted(fblocks)), ' (animated %s)' % ', '.join(
             '0x%X' % a['target'] for a in fanims) if fanims else ''))
+    if fluct:
+        notes.append('fluctuation 0x%X' % fluct[0])
     p.set_key_anims(em, anims + fanims)
     return em
 
@@ -1821,6 +1830,23 @@ def particle_fields(e):
         blocks['random'] = struct.pack('>i3f', interval, vx, vy, vz)
         anims += field_anim(r, 4, (0x1C, 0x1D, 0x1E))
     return blocks, anims, done
+
+
+def fluctuation(e):
+    """Ultimate's fluctuation (eft2's: emitter fluc flags, static amplitude / cycle / phase_rnd / phase_init,
+    x then y) as eft's (ptcl.FLUCT_FMT: the same wave types (8 / 16 / 32) and 1 - wave x amplitude; Bayonetta's
+    flares and bats agree in both games): (flags, block), or None when it changes nothing"""
+    fl, st = e['fluc'], e['static']
+    if not (fl['apply_alpha'] or fl['apply_scale']):
+        return None
+    flags = 1 | (2 if fl['apply_alpha'] else 0) | (4 if fl['apply_scale'] else 0) | (fl['wave_type'] & 0x38 or 8) \
+        | (0x40 if fl['apply_scale'] and fl['apply_scale_y'] else 0)
+    ch = []
+    for a in range(2):
+        cycle = max(st['cycle'][a], 1.0)
+        # (the phase: degrees of the cycle, read off its values (360 on 12, the rest small); unverified)
+        ch += [st['amplitude'][a], 128.0 / cycle, 1 if st['phase_rnd'][a] else 0, st['phase_init'][a] / 360.0 * cycle]
+    return flags, struct.pack(ptcl.FLUCT_FMT, *ch)
 
 
 def turn_set(p, si, rot_deg):

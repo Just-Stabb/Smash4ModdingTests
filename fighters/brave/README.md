@@ -752,3 +752,14 @@ fields on the CPU's particles only, so these parts now take CPU templates (three
 Kaswoosh's / Swoosh's wind and Kafrizz's appearance line, now face their world motion, spin included, rather
 than their velocity). Not yet: FRND (Ultimate's sine-noise random: Bounce's start, Snooze) and FCOL
 (collision; none of Hero's). Only the `.ptcl` changed.
+
+## Fix 48 (`build/hero_fix48.zip`): fluctuation
+
+Ultimate pulses many glows' alpha / size with a wave (eft2's fluctuation: sine, saw or square, an
+amplitude and a cycle in frames); eft has the same thing (complex emitters' fluctuation block, decoded
+in `docs/ptcl-format.md`), the same wave types and formula, so it now converts (`vfxb_to_ptcl.py`
+`fluctuation`): 104 parts, mostly flares and point lights (Frizz family, Kaboom, Zap, Kaclang, the
+spell flashes). eft draws it on the CPU's particles, or on the GPU's when their vertex program reads
+`flucX` / `flucY`; templates are ranked for that after the colour tracks, and every one of the 104 found
+one (18 glows moved to premultiplied templates, which draw the same since fix 43). Only the `.ptcl`
+changed.

@@ -148,7 +148,8 @@ _features = {}
 def features(b):
     """{'uv': uv_caps, 'flipbook': (slot 0, slot 1) read ptnAnm0 / ptnAnm1, 'follow': the follow types
     it draws right, 'rot': reads v_inRot, 'vec': reads v_inVec, 'shader_param': reads u_shaderParam /
-    u_shaderParamAnim0 / 1 (vec4 76-78; 162 of 675 vanilla programs)}, cached by program"""
+    u_shaderParamAnim0 / 1 (vec4 76-78; 162 of 675 vanilla programs), 'fluc': reads flucX / flucY (vec4 34 /
+    35: a GPU program draws fluctuation only so; 128 vanilla emitters with it)}, cached by program"""
     key = program_key(b)
     if key not in _features:
         r = uniform_reads(disassemble(b))
@@ -159,7 +160,8 @@ def features(b):
             'flipbook': tuple(any(cb == CB_STATIC and v == base for cb, v, _c in r) for base in (16, 25)),
             'follow': frozenset((0, 2) if 'v_inEmtMat0' in used else (0,)) if emm else frozenset((0, 1, 2)),
             'rot': 'v_inRot' in used, 'vec': 'v_inVec' in used,
-            'shader_param': any(cb == CB_STATIC and 76 <= v <= 78 for cb, v, _c in r)}
+            'shader_param': any(cb == CB_STATIC and 76 <= v <= 78 for cb, v, _c in r),
+            'fluc': any(cb == CB_STATIC and v in (34, 35) for cb, v, _c in r)}
     return _features[key]
 
 

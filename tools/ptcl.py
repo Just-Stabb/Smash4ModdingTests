@@ -170,6 +170,11 @@ FIELD_BLOCKS = [
     (5, 'position_add', 0x10, '>3fB3x', ('position', 'world')),
     (6, 'curl_noise', 0x24, '>BB2x8f', ('interpolate', 'base_random', 'speed', 'scale', 'offset', 'power'))]
 COMPLEX_FLAGS = 0xC00050                # +0x8BC on every vanilla complex emitter without a child
+# fluctuation (+0x8C2 flags, +0x8CC the block; cross_f 0x04A622C4 on the CPU's particles, flucX / flucY,
+# vec4 34 / 35, on the GPU's): flags bit 0 on, 1 alpha, 2 scale, 3 / 4 / 5 the wave (three 128-entry
+# tables), 6 scale y from its own channel (else x's); the value 1 - wave x amplitude. A channel (x, then y):
+# f amplitude, f 128 / cycle frames, u32 random phase (a random cycle's worth), f phase (frames)
+FLUCT_FMT, FLUCT_SIZE, FLUCT_OFF = '>2fIf2fIf', 0x20, 0xE
 TEX_FIELDS = [            # within a TexRes (only these 0x38 bytes are stored; the rest is runtime)
     (0x00, '>2H', 'size'), (0x04, '>I', 'tile_mode'), (0x08, '>I', 'swizzle'), (0x0C, '>I', 'sampler'),
     (0x10, '>I', 'mip_levels'), (0x14, '>I', 'comp_sel'), (0x18, '>f', 'enable_mip_level'),
@@ -406,9 +411,10 @@ class Ptcl:
         return out
 
     @staticmethod
-    def with_fields(em, blocks):
-        """a simple emitter made complex with these field blocks ({name: raw bytes}, FIELD_BLOCKS' sizes):
-        a new bytearray, the header as vanilla's with no child, fluctuation or stripe"""
+    def with_fields(em, blocks, fluct=None):
+        """a simple emitter made complex with these field blocks ({name: raw bytes}, FIELD_BLOCKS' sizes) and
+        fluctuation ((flags, FLUCT_FMT block) or None): a new bytearray, the header as vanilla's with no
+        child or stripe"""
         assert len(em) == SIMPLE_SIZE, 'only a simple emitter'
         flags, body = 0, b''
         for bit, name, size, _fmt, _names in FIELD_BLOCKS:
@@ -417,8 +423,14 @@ class Ptcl:
                 flags |= 1 << bit
                 body += blocks[name]
         out = bytearray(em) + bytes(0x8D4 - SIMPLE_SIZE) + body
+        fl_flags, fl_pos = FLUCT_OFF, 0
+        if fluct is not None:
+            fl_flags, fl_pos = fluct[0], len(out)
+            assert len(fluct[1]) == FLUCT_SIZE
+            out += fluct[1]
         struct.pack_into('>I', out, 0, 1)
-        struct.pack_into('>IHHHHHHHHI', out, SIMPLE_SIZE, COMPLEX_FLAGS, flags, 0xE, 0, 0, 0, 0x8D4, 0, 0, len(out))
+        struct.pack_into('>IHHHHHHHHI', out, SIMPLE_SIZE, COMPLEX_FLAGS, flags, fl_flags, 0, 0, 0,
+                         0x8D4 if flags else 0, fl_pos, 0, len(out))
         return out
 
     def texres(self, em, slot, child=False):

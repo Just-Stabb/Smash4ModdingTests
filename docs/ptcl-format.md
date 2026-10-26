@@ -186,6 +186,16 @@ magnet (71): fields need the CPU's particles.
 | 5 | position add | 0x10 | vec3, u8 world |
 | 6 | curl noise | 0x24 | u8, u8, 2 pad, f, vec3, vec3, f (uniforms: vec4 74 = the first vec3 and f, 75 = the second and the last f) |
 
+Fluctuation (`+0x8C2` flags, `+0x8CC` a 0x20-byte block; `ptcl.FLUCT_FMT`): cross_f 0x04A622C4 on the
+CPU's particles, `flucX` / `flucY` (vec4 34 / 35) on the GPU's, which only the 128 vanilla emitters' GPU
+programs reading them draw. Flags: bit 0 on, 1 alpha, 2 scale, 3 / 4 / 5 the wave (one of three
+128-entry tables at 0x1046D830 ...), 6 scale y from the second channel (else the first's). Each
+channel: f amplitude, f 128 / cycle (frames), u32 random phase (a random cycle's worth), f phase
+(frames); the value 1 - table[(age + phase) x 128 / cycle & 127] x amplitude multiplies alpha / scale.
+Ultimate's (emitter `fluc` flags, `static` amplitude / cycle / phase_rnd / phase_init for x and y) is the
+same: its wave types are the same bits (8 / 16 / 32), and Bayonetta's flares and bats agree in both
+games (`vfxb_to_ptcl.fluctuation`; Ultimate's phase is taken as degrees of the cycle, unverified).
+
 Per-particle key animations (targets above 0x1B, see the key-animation section) animate them: 0x1C - 0x1E
 the random velocity, 0x1F magnet power, 0x20 spin rate (keyed as an int, the block's units), 0x21 spin
 outward speed, 0x22 convergence ratio, 0x23 - 0x25 position add.
