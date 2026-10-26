@@ -1739,6 +1739,8 @@ def main():
     ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
     ap.add_argument('--test-skip-for', default='', help='as --no-graft-for: the emitters left out (tests)')
     ap.add_argument('--test-no-light-for', default='', help='as --no-graft-for: no effect light (tests)')
+    ap.add_argument('--test-tint', default='', help='comma-separated EFFECT/EMITTER=RRGGBB: those emitters drawn in '
+                    'that flat colour (tests: which part is which on screen)')
     ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
                     "grade / flare texture) at this x their alpha (tests)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
@@ -1765,6 +1767,8 @@ def main():
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
+    tint = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
+            for k, v in (x.split('=') for x in a.test_tint.split(',') if x)}
     prims, prim_index = eff.primitives(), {}
     ids, done, dropped = {}, {}, []
     for name in (a.effects or sorted(eff.effects)):
@@ -1790,6 +1794,12 @@ def main():
                                  [e['info']['color0'][3] * a.test_glow_alpha])
                 notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
+            key = '%s/%s' % (name, e['name'])
+            if em is not None and key in tint:
+                for tr in (0, 1):
+                    p.set_field(em, 'color%d_type' % tr, 0)
+                    p.set_color_keys(em, tr, [tint[key] + (1.0,)])
+                notes.append('tinted %02X%02X%02X (--test-tint)' % tuple(int(v * 255) for v in tint[key]))
             if em is not None:
                 made.append((em, e['name']))
             log.append('    %-24s %s' % (e['name'], '; '.join(dict.fromkeys(notes))))
