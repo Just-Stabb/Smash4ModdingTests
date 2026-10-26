@@ -80,6 +80,16 @@ COLOR_MODE = 0x314
 # Ultimate custom shader (index, flag bit) whose colour goes out x its alpha shape x 2 (vfxb shader
 # custom_shader_index / custom_shader_flag; Sephiroth's ef_edge.eff)
 PREMULT_SHADER = (4, 64)
+# Ultimate's emitter animations (VFXB sub-sections, little endian: u8 on, u8 loop, u16, u32 key count,
+# u32, then keys of x, y, z, frame; from the emitter's start) -> eft's key-animation targets
+# (ptcl.KEYA_TARGETS), read off their values: EAER turns tornadoes (degrees), EAET slides Hero's sword
+# light 11.8 along the blade, EAES / EASS grow emitters / their shapes, EATR / EAPL ramp the rate / life
+EMITTER_ANIMS = {
+    'EATR': (0,), 'EAPL': (1,), 'EAES': (2, 3, 4), 'EAER': (5, 6, 7), 'EAET': (8, 9, 10), 'EAC0': (11, 12, 13),
+    'EAA0': (14,), 'EAOV': (15,), 'EASL': (17, 18), 'EAC1': (19, 20, 21), 'EASS': (22, 23, 24)}
+# shape scale, colour 0, colour 1, alpha (0x378 - 0x3A4): what the animations replace, 1 when none (a
+# template's own otherwise: Kaboom's flareBase had a shape scale of 10)
+EMITTER_DEFAULTS = 0x378
 # Ultimate's custom shader 8, a dissolve (Woosh's whirlwinds, the spell flashes' ring2; read from
 # their Maxwell code with the WindowSmash translator): pixels whose sampler 1 alpha is under colour 1's
 # alpha are dropped, alpha x (mask - threshold) / width over the edge (width: the emitter's CSDP's
@@ -1651,7 +1661,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         p.set_field(em, 'keyanim_size', 0)
     if e['children']:
         notes.append('%d child emitters not converted' % len(e['children']))
-    left = set(e['subsections'])
+    anims, done = emitter_anims(p, em, e, notes)
+    left = set(e['subsections']) - done
     if struct.unpack_from('>I', em, USER_CALLBACK)[0] == LIGHT_CALLBACK:
         em[USER_DATA:USER_CALLBACK + 4] = bytes(USER_CALLBACK + 4 - USER_DATA)
     if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20 and \
@@ -1677,12 +1688,56 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if left:
         notes.append('not converted: ' + ', '.join(sorted(left)))
     n = buffer_count(p, em)
+    before = p.field(em, 'emit_rate')
     if n > 4 * MAX_LIVE:
         # fewer particles a burst (eft sizes the emitter's buffer from it; vanilla stays far below)
-        p.set_field(em, 'emit_rate', max(1.0, p.field(em, 'emit_rate') * 4 * MAX_LIVE / n))
+        p.set_field(em, 'emit_rate', max(1.0, before * 4 * MAX_LIVE / n))
         notes.append('buffer %d: rate lowered' % n)
     notes += sanitize(p, em)
+    for a in anims:         # an animated rate lowered with the emitter's (its peak)
+        if a['target'] == 0:
+            a['keys'] = [(t, v * p.field(em, 'emit_rate') / before) for t, v in a['keys']]
+    p.set_key_anims(em, anims)
     return em
+
+
+def emitter_anims(p, em, e, notes):
+    """the emitter's animations (EMITTER_ANIMS) as eft key animations (Ptcl.set_key_anims' form) and the
+    sections taken; the rate's and life's peaks become the emitter's own (eft sizes the particle buffer
+    from them). Rotation in radians, eft's order; colour 0 / 1 and alpha over Ultimate's emitter colours
+    (folded into the colour / alpha keys already); the rate x what conversion did to it"""
+    struct.pack_into('>12f', em, EMITTER_DEFAULTS, *([1.0] * 12))
+    out, done, info = [], set(), e['info']
+    for sec, targets in EMITTER_ANIMS.items():
+        raw = bytes.fromhex(e['subsections'].get(sec, ''))
+        if len(raw) < 12:
+            continue
+        on, loop, _pad, nk, _z = struct.unpack_from('<BBHII', raw, 0)
+        keys = [struct.unpack_from('<4f', raw, 12 + 16 * k) for k in range(nk)]
+        if not on or not keys:
+            continue
+        vals = [list(k[:3]) for k in keys]
+        if sec == 'EAER':
+            vals = [list(eft_rotation([math.radians(v) for v in x])) for x in vals]
+        elif sec in ('EAC0', 'EAC1'):
+            c = info['color0' if sec == 'EAC0' else 'color1']
+            vals = [[v / c[i] if c[i] else v for i, v in enumerate(x)] for x in vals]
+        elif sec == 'EAA0':
+            vals = [[x[0] / info['color0'][3] if info['color0'][3] else x[0]] for x in vals]
+        elif sec == 'EATR':
+            k = p.field(em, 'emit_rate') / max(e['emission']['rate'], 0.01)
+            vals = [[x[0] * k] for x in vals]
+            p.set_field(em, 'emit_rate', max(p.field(em, 'emit_rate'), max(x[0] for x in vals)))
+        elif sec == 'EAPL':
+            if p.field(em, 'ptcl_life') == FOREVER:
+                continue
+            p.set_field(em, 'ptcl_life', max(p.field(em, 'ptcl_life'), int(math.ceil(max(x[0] for x in vals)))))
+        for i, t in enumerate(targets):
+            out.append({'target': t, 'loop': loop, 'keys': [(float(k[3]), float(x[i])) for k, x in zip(keys, vals)]})
+        done.add(sec)
+    if done:
+        notes.append('emitter animations: ' + ', '.join(sorted(done)))
+    return out, done
 
 
 def turn_set(p, si, rot_deg):
@@ -1703,6 +1758,65 @@ def turn_set(p, si, rot_deg):
             x, z = math.atan2(-m[1, 2], m[1, 1]), 0.0
         t = r @ np.array(p.field(em, 'emitter_translation'), float)
         p.set_emitter_srt(em, tuple(p.field(em, 'emitter_scale')), (x, y, z), tuple(float(v) for v in t))
+        anims = p.key_anims(em)
+        if any(5 <= a['target'] <= 10 for a in anims):
+            p.set_key_anims(em, turn_anims(anims, r, p.field(em, 'emitter_rotation'),
+                                           p.field(em, 'emitter_translation'), r.T))
+
+
+def key_value(keys, t):
+    """a key animation's value at frame t (linear, held past either end)"""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for (t0, v0), (t1, v1) in zip(keys, keys[1:]):
+        if t <= t1:
+            return v0 + (v1 - v0) * (t - t0) / (t1 - t0) if t1 > t0 else v1
+    return keys[-1][1]
+
+
+def euler_xyz(m):
+    """rotation_xyz's angles of m"""
+    y = math.asin(max(-1.0, min(1.0, -m[2, 0])))
+    if abs(m[2, 0]) < 1 - 1e-6:
+        return math.atan2(m[2, 1], m[2, 2]), y, math.atan2(m[1, 0], m[0, 0])
+    return math.atan2(-m[1, 2], m[1, 1]), y, 0.0
+
+
+def turn_anims(anims, r, rot, trans, r_inv):
+    """an emitter's key animations with its translation (targets 8 - 10) and rotation (5 - 7) turned by r
+    as turn_set turns its own: a translation key's vector by r, a rotation's angles composed with r
+    (sampled at most 0.2 radians apart and unwrapped, so a looped 360 degree spin keeps its turns). rot /
+    trans: the turned emitter's own (r_inv brings them back), for an axis without keys"""
+    own_rot = euler_xyz(r_inv @ rotation_xyz(rot))
+    own_trans = r_inv @ np.array(trans, float)
+    out = [a for a in anims if not 5 <= a['target'] <= 10]
+    for base, own in ((8, own_trans), (5, own_rot)):
+        group = {a['target'] - base: a for a in anims if base <= a['target'] < base + 3}
+        if not group:
+            continue
+        times = sorted({t for a in group.values() for t, _v in a['keys']})
+        vec = [lambda t, i=i: key_value(group[i]['keys'], t) if i in group else own[i] for i in range(3)]
+        if base == 5:
+            dense = [times[0]]
+            for t0, t1 in zip(times, times[1:]):
+                step = max(abs(vec[i](t1) - vec[i](t0)) for i in range(3))
+                n = max(1, int(math.ceil(step / 0.2)))
+                dense += [t0 + (t1 - t0) * (k + 1) / n for k in range(n)]
+            times = dense
+        vals = []
+        for t in times:
+            v = np.array([vec[i](t) for i in range(3)], float)
+            if base == 8:
+                vals.append(r @ v)
+                continue
+            e = np.array(euler_xyz(r @ rotation_xyz(v)))
+            if vals:                                   # unwrapped against the previous sample
+                e += 2 * math.pi * np.round((vals[-1] - e) / (2 * math.pi))
+            vals.append(e)
+        loop = any(a['loop'] for a in group.values())
+        out += [{'target': base + i, 'loop': loop, 'keys': [(t, float(v[i])) for t, v in zip(times, vals)]}
+                for i in range(3)]
+    return out
 
 
 def rotation_xyz(rot):

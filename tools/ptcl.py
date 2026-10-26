@@ -105,7 +105,7 @@ FIELDS = [
     (0x4B0, '>i', 'ptcl_life', 'runtime'),        # frames; 0x7FFFFFFF = infinite
     (0x4B4, '>i', 'ptcl_life_random', 'runtime'),
     (0x4BC, '>I', 'particle_type', 'corpus'),     # billboard / polygon / directional / stripe...: shader-keyed
-    (0x4D0, '>f', 'camera_offset', 'verified'),   # depth offset toward the camera (eft2's offset): static CB2 vec4 36 .z
+    (0x4D0, '>f', 'camera_offset', 'verified'),   # depth offset toward the camera (eft2's offset): CB2 vec4 36 .z
     (0x508, '>2f', 'tex0_uv_scale', 'corpus'),    # texture slot UV params: 3 x 0x7C from 0x4D4
     (0x648, '>I', 'color0_type', 'corpus'),       # 0 constant, 1 random, 2 key animation
     (0x64C, '>I', 'color1_type', 'corpus'),
@@ -135,6 +135,22 @@ FIELDS = [
     (0x844, '>I', 'shader_index', 'runtime'),     # into the shader table (shader-keyed fields must match it)
 ]
 FIELD = {f[2]: f for f in FIELDS}
+# emitter key animations (0x2CC / 0x2D0 into the key-animation table): b'KEYA', u32 count, then count
+# blocks of u32 key count, interpolation (0 linear, 1 smoothstep), target, loop (the frame taken modulo the
+# last key's), 100 (1 on 9 vanilla blocks), 0 (1 on 3), block size (0x1C + 8 x keys), then the keys
+# (frame f32, value f32). Before the first key its value, after the last (no loop) the last's (cross_f
+# 0x04A6DA70, which reads neither the 100 nor the 0). Targets under 0x1C are the emitter's own, written
+# each frame (0x04A64444) over the defaults of its instance's float array (+0x1EC + 4 x target, from
+# 0x04A5C048): KEYA_TARGETS; 2 / 5 / 8 also rebuild the emitter matrix. Higher ones are per particle
+# (the 0x32C hooks)
+KEYA_TARGETS = {
+    0: 'emission rate (0x444)', 1: 'particle life (0x4B0)', 2: 'emitter scale x', 3: 'emitter scale y',
+    4: 'emitter scale z', 5: 'emitter rotation x (radians)', 6: 'emitter rotation y', 7: 'emitter rotation z',
+    8: 'emitter translation x', 9: 'emitter translation y', 10: 'emitter translation z',
+    11: 'colour 0 r (0x384)', 12: 'colour 0 g', 13: 'colour 0 b', 14: 'alpha (0x3A4)',
+    15: 'all-direction velocity (0x45C)', 16: 'directional velocity (0x464)', 17: 'particle scale x (1)',
+    18: 'particle scale y (1)', 19: 'colour 1 r (0x394)', 20: 'colour 1 g', 21: 'colour 1 b',
+    22: 'shape scale x (0x378)', 23: 'shape scale y', 24: 'shape scale z'}
 TEX_FIELDS = [            # within a TexRes (only these 0x38 bytes are stored; the rest is runtime)
     (0x00, '>2H', 'size'), (0x04, '>I', 'tile_mode'), (0x08, '>I', 'swizzle'), (0x0C, '>I', 'sampler'),
     (0x10, '>I', 'mip_levels'), (0x14, '>I', 'comp_sel'), (0x18, '>f', 'enable_mip_level'),
@@ -325,6 +341,36 @@ class Ptcl:
         self.set_field(em, 'color%d_keys' % track, flat)
         if typ is not None:
             self.set_field(em, 'color%d_type' % track, typ)
+
+    def key_anims(self, em):
+        """the emitter's key animations: [{'target', 'interp', 'loop', 'keys': [(frame, value)]}]"""
+        pos, size = struct.unpack_from('>II', em, 0x2CC)
+        if not size:
+            return []
+        b = bytes(self.keyanim[pos:pos + size])
+        assert b[:4] == b'KEYA', b[:4]
+        out, o = [], 8
+        for _ in range(be32(b, 4)):
+            nk, interp, target, loop, w4, w5, blk = struct.unpack_from('>7I', b, o)
+            out.append({'target': target, 'interp': interp, 'loop': loop, 'w4': w4, 'w5': w5,
+                        'keys': [struct.unpack_from('>2f', b, o + 0x1C + 8 * k) for k in range(nk)]})
+            o += blk
+        return out
+
+    def set_key_anims(self, em, anims):
+        """the emitter's key animations (key_anims' form), appended to the table (none: no table range)"""
+        if not anims:
+            struct.pack_into('>II', em, 0x2CC, 0, 0)
+            return
+        b = b'KEYA' + struct.pack('>I', len(anims))
+        for a in anims:
+            keys = b''.join(struct.pack('>2f', t, v) for t, v in a['keys'])
+            b += struct.pack('>7I', len(a['keys']), a.get('interp', 0), a['target'], 1 if a.get('loop') else 0,
+                             a.get('w4', 100), a.get('w5', 0), 0x1C + len(keys)) + keys
+        pos = (len(self.keyanim) + 3) & ~3
+        self.keyanim = bytearray(self.keyanim) + bytes(pos - len(self.keyanim)) + b
+        struct.pack_into('>II', em, 0x2CC, pos, len(b))
+        self.dirty_layout = True
 
     def texres(self, em, slot, child=False):
         o = (CHILD_TEXRES if child else TEXRES + TEXRES_SIZE * slot)

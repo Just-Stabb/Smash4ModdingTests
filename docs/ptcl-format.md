@@ -364,8 +364,52 @@ order; they were the premultiplied blend, "Pixel programs".)
 
 ## Key-animation and shader-parameter tables
 
-Opaque blobs; emitters reference ranges by pos/size (0x2CC/0x2D0, 0x2F0/0x2EC). Cloned
-emitters share their source's ranges.
+Emitters reference ranges by pos/size (0x2CC/0x2D0 key animations, 0x2F0/0x2EC shader parameters,
+still opaque). Cloned emitters share their source's ranges.
+
+A key-animation range is `b'KEYA'`, a u32 block count, then the blocks (`Ptcl.key_anims` /
+`set_key_anims`):
+
+| Offset | Type | Meaning |
+|--------|------|---------|
+| 0x00 | u32 | key count *n* |
+| 0x04 | u32 | interpolation: 0 linear, 1 smoothstep |
+| 0x08 | u32 | target (below) |
+| 0x0C | u32 | loop: the frame is taken modulo the last key's |
+| 0x10 | u32 | 100 (1 on 9 vanilla blocks); not read by the player |
+| 0x14 | u32 | 0 (1 on 3 vanilla blocks); not read by the player |
+| 0x18 | u32 | block size, 0x1C + 8*n* |
+| 0x1C | f32 pairs | keys: frame, value |
+
+Before the first key the value is the first key's; after the last (no loop) the last's (cross_f
+0x04A6DA70). The pointer is resolved at load (0x04A5A5A0, into emitter +0x2C8); each frame (0x04A64444)
+targets below 0x1C are written into the emitter instance's float array (+0x1EC + 4 x target), over the
+defaults 0x04A5C048 sets from the emitter's fields; targets 2, 5 and 8 also flag the emitter matrix for a
+rebuild. Higher targets are per particle (the 0x32C hooks).
+
+| Target | Animates | Default |
+|--------|----------|---------|
+| 0 | emission rate | 0x444 |
+| 1 | particle life | 0x4B0 |
+| 2-4 | emitter scale | 0x408 |
+| 5-7 | emitter rotation (radians) | 0x414 |
+| 8-10 | emitter translation | 0x420 |
+| 11-13 | colour 0 | 0x384 |
+| 14 | alpha | 0x3A4 |
+| 15 | all-direction velocity | 0x45C |
+| 16 | directional velocity | 0x464 |
+| 17-18 | particle scale | 1 |
+| 19-21 | colour 1 | 0x394 |
+| 22-24 | shape scale | 0x378 |
+
+The colour, alpha and shape-scale defaults (the twelve floats 0x378 - 0x3A7) act as multipliers: the
+converter writes 1.0 over all of them (a template's own otherwise: Kaboom's flareBase had a shape scale
+of 10) and keys Ultimate's colour / alpha values divided by the emitter's own colours.
+
+Ultimate's emitter animations are the `EA**` subsections (little endian: u8 on, u8 loop, u16, u32 key
+count, u32, then keys of x, y, z, frame): EATR 0, EAPL 1, EAES 2-4, EAER 5-7 (degrees), EAET 8-10, EAC0
+11-13, EAA0 14, EAOV 15, EASL 17-18, EAC1 19-21, EASS 22-24. EAA1 and EADV have no eft target and stay
+unconverted.
 
 ## Shaders: which fields are tied to the shader
 

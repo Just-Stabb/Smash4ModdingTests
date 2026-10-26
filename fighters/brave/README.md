@@ -721,3 +721,18 @@ yet: `brave_reflect_flash` on a reflection (Ultimate's, also status code).
   at once on a KO.
 - Not found: what fades the barrier near its end in Ultimate (not in `main`; probably Hero's status
   code, `lua2cpp_brave.nro` in romfs).
+
+## Fix 46 (`build/hero_fix46.zip`): emitter animations
+
+Ultimate animates many emitters over their life (the `EA**` sub-sections: rate, life, scale,
+rotation, translation, colours, alpha, speed, particle and shape scale); the converter had dropped
+them all. eft has the same thing (the `KEYA` key-animation table, decoded in `docs/ptcl-format.md`),
+so `vfxb_to_ptcl.py` now converts them: 92 parts across 34 effects. For example, Swoosh's / Kaswoosh's
+tornadoes spin and fade (`EAER`, `EAA0`), the sword light slides along the blade (`EAET`), Zap's
+discharge and the pillars move and ramp their rate, Kaclang's steel ramps up, Psyche Up's aura ramps
+its rate and life, Bounce's barrier fades its inner loop in (frames 25 - 35) and its reflection
+flash shifts colour. The colour,
+alpha and shape-scale defaults the animations multiply are now 1 on every converted emitter: a
+template's own had been left (Kaboom's `flareBase` and Bounce's `pointlight1` had a shape scale of
+10). Turned variants (`tools/effect_variants.py`) turn the rotation and translation keys too. Not
+converted: `EAA1` (alpha 1) and `EADV` (no eft equivalent). Only the `.ptcl` changed.
