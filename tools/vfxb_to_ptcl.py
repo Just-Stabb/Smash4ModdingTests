@@ -1523,6 +1523,7 @@ def main():
     images = eff.images()
     base = [f for f in os.listdir(a.base_dir) if f.endswith('.010d0000.ptcl')][0][:-len('.ptcl')]
     p = ptcl.Ptcl(open(os.path.join(a.base_dir, base + '.ptcl'), 'rb').read())
+    base_shaders = p.shader_count()
     ef = efc.Efc(open(os.path.join(a.base_dir, base + '.efc'), 'rb').read())
     for i in (int(v, 16) for v in a.empty.split(',') if v):
         ef.entries[i][1:] = [0, 0, 0, 0]    # no emitter set, model or meshes (403 vanilla entries)
@@ -1567,9 +1568,12 @@ def main():
             key = effect_variants.variant_key(v['effect'], v['rot'])
             ids[key] = (0x300 + a.kind) << 16 | ef.add(si + 1, flags=entry[0])
             print('%-44s -> %-28s 0x%07X' % (key, sname, ids[key]))
+    # the imported templates whose pixel program was replaced leave their shader unused
+    dropped = p.drop_unused_shaders(base_shaders)
     out = p.build()
     q = ptcl.Ptcl(out)
     assert q.validate() == [], q.validate()
+    print('%d unused shaders dropped; bank %.2f MB' % (dropped, len(out) / 1e6))
     os.makedirs(a.out_dir, exist_ok=True)
     open(os.path.join(a.out_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(a.out_dir, base + '.efc'), 'wb').write(ef.build())

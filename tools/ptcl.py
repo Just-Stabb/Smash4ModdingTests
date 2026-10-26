@@ -460,6 +460,39 @@ class Ptcl:
         self.dirty_layout = True
         return n
 
+    def drop_unused_shaders(self, first):
+        """shaders from index `first` on that no emitter uses removed and the rest renumbered (a
+        converter's imported templates whose pixel program it replaced: 51 of Hero's 320, 0.5 MB):
+        how many. Those below `first` stay whatever uses them (complex emitters' children carry
+        their own indices)"""
+        n = self.shader_count()
+        used = {be32(x['data'], 0x844) for s in self.sets for x in s['emitters'] if x['data'] is not None}
+        keep = [i for i in range(n) if i < first or i in used]
+        if len(keep) == n:
+            return 0
+        base = be32(self.shader, 0x10)
+        head = bytearray(self.shader[:base])
+        bins, entries, remap, placed = bytearray(), bytearray(), {}, {}
+        for new, i in enumerate(keep):
+            entry, binary = bytearray(self.shader_entry(i)), self.shader_binary(i)
+            key = struct.unpack_from('>II', entry, 0x68)
+            if key not in placed:               # entries sharing a binary keep sharing it
+                placed[key] = align(len(bins), 0x100)       # as add_shader
+                bins += bytes(placed[key] - len(bins)) + binary
+            struct.pack_into('>II', entry, 0x68, len(binary), placed[key])
+            entries += entry
+            remap[i] = new
+        struct.pack_into('>I', head, 0, len(keep))
+        struct.pack_into('>I', head, 0x14, base + len(bins))
+        self.shader = head + bins + entries
+        struct.pack_into('>I', self.shader, 4, len(self.shader))
+        for s in self.sets:
+            for x in s['emitters']:
+                if x['data'] is not None:
+                    struct.pack_into('>I', x['data'], 0x844, remap[be32(x['data'], 0x844)])
+        self.dirty_layout = True
+        return n - len(keep)
+
     def import_emitter(self, other, set_index, k, skip_slots=(), _shaders={}):
         """emitter k of another Ptcl's set, adapted to this one: its shader imported (once per source
         shader), its shader-parameter range copied, its used texture slots' data copied (not
