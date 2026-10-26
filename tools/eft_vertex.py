@@ -222,7 +222,7 @@ def _alu(lines, kcache=None):
     return [w0 & ~0x3FFFFF, w1], prog[8 * addr:8 * (addr + count)]
 
 
-def uv1_lines(t, rnd, e, o, a, b, c, mesh=True):
+def uv1_lines(t, rnd, e, o, a, b, c, mesh=True, slot=1):
     """slot 1's UV animation, eft's own slot-0 code over again (fitted against it: Bayonetta's ring1
     mesh program and Bunner's smoke quad program, within 2e-5, repeats included; tools/
     eft_vertex_test.py): shift = frame x rate + initial + random x (1 - 2r), scale likewise, the turn
@@ -232,8 +232,8 @@ def uv1_lines(t, rnd, e, o, a, b, c, mesh=True):
     a quad's corner (x, y) = (e.z / repeat - 0.5, 0.5 - e.w / repeat), turned to (Ru, Rv):
         U = Ru (repeat - 1 + scaleU) + repeat / 2 - shiftU,  V = Rv (1 - scaleV - repeat) + repeat / 2 - shiftV
     One operation a group; out o = (e.xy, U, V). t: the frame (in .x), rnd: v_inRandom; a, b, c
-    scratch GPRs; KC0 = CB2 0-15"""
-    pm = lambda k, ch: 'KC0[%d].%s' % (SLOT1_PM + k, ch)
+    scratch GPRs; KC0 = CB2 0-15; slot: whose block (shtAnim1 / 2, CB2 vec4 6-10 / 11-15)"""
+    pm = lambda k, ch: 'KC0[%d].%s' % (SLOT1_PM + 5 * (slot - 1) + k, ch)
     T, D, E, O, A, B, C = ('R%d' % r for r in (t, rnd, e, o, a, b, c))
     two, rev = '(0xC0000000, -2)', '(0xBE22F983, -0.15915494)'
     L = ['t: FLT_TO_INT      %s.x, %s' % (B, pm(3, 'w')),
@@ -297,6 +297,21 @@ def uv1_lines(t, rnd, e, o, a, b, c, mesh=True):
     return L
 
 
+def uv2_lines(t, rnd, e, o, a, b, c, e2, mesh=True):
+    """slot 2's UV animation into o.zw (uv1_lines on shtAnim2), its still UV made from slot 1's in
+    e.zw: / slot 1's repeat x slot 2's (the base UV with slot 1's inverse-random flips: slot 2's own
+    flags aren't drawn); e2: a GPR for it"""
+    E, E2 = 'R%d' % e, 'R%d' % e2
+    rep1, rep2 = 'KC0[%d]' % (SLOT1_PM + 4), 'KC0[%d]' % (SLOT1_PM + 9)
+    return ['t: RECIP_IEEE      %s.x, %s.x' % (E2, rep1),
+            't: RECIP_IEEE      %s.y, %s.y' % (E2, rep1),
+            'z: MUL             %s.z, %s.z, %s.x' % (E2, E, E2),
+            'z: MUL             %s.z, %s.z, %s.x' % (E2, E2, rep2),
+            'w: MUL             %s.w, %s.w, %s.y' % (E2, E, E2),
+            'w: MUL             %s.w, %s.w, %s.y' % (E2, E2, rep2)] + \
+        uv1_lines(t, rnd, e2, o, a, b, c, mesh, slot=2)
+
+
 def _param_semantic(regs, p):
     return (regs[SPI_VS_OUT_ID + p // 4] >> (8 * (p % 4))) & 0xFF
 
@@ -337,13 +352,15 @@ def uv1_graft_point_of(b, uv_sem):
     return None
 
 
-def graft_uv1(b, uv_sem):
+def graft_uv1(b, uv_sem, uv2_sem=None):
     """the shader binary b (vertex + pixel GX2 file) with slot 1's UV animation grafted into its
     vertex program (uv1_lines, written into the texcoord parameter's .zw), or None (uv1_graft_point).
     Two clauses go in: after CALL_FS, saving the frame and v_inRandom in GPRs past the program's own
     (the inputs' GPRs are reused later); before the parameter's EXP, the animation into a fresh GPR,
     which the EXP then exports. Jumps past either point move with them; the clause code moves down
-    when the CF list outgrows the space before it"""
+    when the CF list outgrows the space before it. uv2_sem: slot 2 as well (uv2_lines, a clause of
+    its own), exported in .zw of a new parameter of that semantic (SPI_VS_OUT_CONFIG's count and
+    SPI_VS_OUT_ID's byte for it), its EXP just before the texture coordinates'"""
     point = uv1_graft_point(b, uv_sem)
     if point is None:
         return None
@@ -351,9 +368,11 @@ def graft_uv1(b, uv_sem):
     h = vertex_header(b)
     used = used_attributes(b)
     n = h['regs'][0] & 0xFF
-    if n + 6 > 120:
+    extra = 8 if uv2_sem is not None else 6
+    if n + extra > 120:
         return None
     t, rnd, o, a, bb, c = range(n, n + 6)
+    e2, o2 = n + 6, n + 7
     w_t, w_r = used.index('v_inWldPos') + 1, used.index('v_inRandom') + 1
     # the particle's age: v_inWldPos.w on the CPU's particles; on the GPU's (programs reading
     # v_inVec: all 438 graftable vanilla ones) .w is its birth, the age the emitter's time
@@ -365,13 +384,19 @@ def graft_uv1(b, uv_sem):
         save = _alu(['x: MOV             R%d.x, R%d.w' % (t, w_t)] +
                     ['%s: MOV             R%d.%s, R%d.%s' % (ch, rnd, ch, w_r, ch) for ch in 'xyzw'])
     anim = _alu(uv1_lines(t, rnd, e, o, a, bb, c, 'v_inTexCoord' in used), (CB_STATIC, 0, 15))
+    anim2 = _alu(uv2_lines(t, rnd, e, o2, a, bb, c, e2, 'v_inTexCoord' in used), (CB_STATIC, 0, 15)) \
+        if uv2_sem is not None else None
+    params = 1 + ((h['regs'][2] >> 1) & 0x1F)
+    if uv2_sem is not None and params >= 32:
+        return None
     prog = [b[o_:o_ + s] for t_, _h, o_, s in gsh_blocks(b, 0) if t_ == VS_PROGRAM][0]
     cf = _cf(prog)
     code_at = min(w0 & (0x3FFFFF if _is_alu(w1) else 0xFFFFFFFF) for w0, w1 in cf
                   if _is_alu(w1) or _op(w1) in (CF_TEX, CF_VTX, CF_VTX_TC))
-    shift = max(0, len(cf) + 2 - code_at)
+    added = 2 + (2 if anim2 else 0)             # (save, anim; anim2 and its EXP)
+    shift = max(0, len(cf) + added - code_at)
     shift += shift & 1                          # TEX / VTX clauses stay 16-byte aligned
-    new_index = lambda i: i + (i >= 1) + (i >= at)
+    new_index = lambda i: i + (i >= 1) + (i >= at) * (added - 1)
     out = []
     for i, (w0, w1) in enumerate(cf):
         if _is_alu(w1):
@@ -379,7 +404,7 @@ def graft_uv1(b, uv_sem):
         elif _op(w1) in (CF_TEX, CF_VTX, CF_VTX_TC):
             w0 += shift
         elif _op(w1) in CF_TARGETS and w0 >= 1:
-            w0 = new_index(w0) - (1 if w0 == at else 0)     # (a jump to the EXP runs the graft first)
+            w0 = new_index(w0) - (added - 1 if w0 == at else 0)     # (a jump to the EXP runs the graft first)
         if i == at:
             w0 = (w0 & ~(0x7F << 15)) | (o << 15)
         out.append([w0, w1])
@@ -387,19 +412,26 @@ def graft_uv1(b, uv_sem):
     base = code_at + shift
     end = base + len(code) // 8
     end += end & 1
-    for k, (cfw, alu) in enumerate((save, anim)):
-        cfw = [cfw[0] | end, cfw[1]]
+    inserts = []
+    for cfw, alu in [save, anim] + ([anim2] if anim2 else []):
+        inserts.append([cfw[0] | end, cfw[1]])
         code += bytes(8 * (end - base) - len(code)) + alu
         end += len(alu) // 8
         end += end & 1
-        out.insert(1 if k == 0 else new_index(at) - 1, cfw)
+    out.insert(1, inserts[0])
+    before_exp = inserts[1:]
+    if anim2:
+        # its parameter: EXP (39), type 2, the GPR, xyzw, barrier
+        before_exp.append([params | (2 << 13) | (o2 << 15), 0x93800688])
+    for k, w in enumerate(before_exp):
+        out.insert(at + 1 + k, w)
     head = b''.join(struct.pack('<II', *w) for w in out)
     prog2 = head + bytes(8 * base - len(head)) + bytes(code)
     prog2 += bytes(-len(prog2) % 256)
-    return _replace_vertex_program(b, prog2, n + 6)
+    return _replace_vertex_program(b, prog2, n + extra, (params, uv2_sem) if anim2 else None)
 
 
-def _replace_vertex_program(b, prog, gprs):
+def _replace_vertex_program(b, prog, gprs, new_param=None):
     out = bytearray()
     for typ, hdr, o, size in gsh_blocks(b, 0):
         head, data = bytearray(b[hdr:o]), bytearray(b[o:o + size])
@@ -407,8 +439,40 @@ def _replace_vertex_program(b, prog, gprs):
             res = struct.unpack_from('>I', data, 0)[0]
             struct.pack_into('>I', data, 0, (res & ~0xFF) | gprs)
             struct.pack_into('>I', data, 4 * VS_SIZE, len(prog))
+            if new_param:
+                p, sem = new_param
+                cfg = struct.unpack_from('>I', data, 8)[0]
+                struct.pack_into('>I', data, 8, (cfg & ~(0x1F << 1)) | (p << 1))     # count - 1
+                struct.pack_into('>I', data, 12, p // 4 + 1)
+                w = SPI_VS_OUT_ID + p // 4
+                ids = struct.unpack_from('>I', data, 4 * w)[0]
+                ids = (ids & ~(0xFF << (8 * (p % 4)))) | (sem << (8 * (p % 4)))
+                struct.pack_into('>I', data, 4 * w, ids)
         elif typ == VS_PROGRAM:
             data = bytearray(prog)
+        struct.pack_into('>I', head, 0x14, len(data))
+        out += head + data
+    first = next(h for _t, h, _o, _s in gsh_blocks(b, 0))
+    return bytes(b[:first]) + bytes(out)
+
+
+PS_IN_CONTROL_0, PS_NUM_INPUTS, PS_INPUT_CNTL = 2, 4, 5
+
+
+def add_pixel_input(b, like_sem, sem):
+    """the shader binary b with an input of semantic sem added to its pixel header (interpolated as
+    its input of semantic like_sem): the new input's register is the old input count"""
+    out = bytearray()
+    for typ, hdr, o, size in gsh_blocks(b, 0):
+        head, data = bytearray(b[hdr:o]), bytearray(b[o:o + size])
+        if typ == 6:
+            n = struct.unpack_from('>I', data, 4 * PS_NUM_INPUTS)[0]
+            cntl = [struct.unpack_from('>I', data, 4 * (PS_INPUT_CNTL + k))[0] for k in range(n)]
+            like = next(c for c in cntl if c & 0xFF == like_sem)
+            struct.pack_into('>I', data, 4 * (PS_INPUT_CNTL + n), (like & ~0xFF) | sem)
+            struct.pack_into('>I', data, 4 * PS_NUM_INPUTS, n + 1)
+            c0 = struct.unpack_from('>I', data, 4 * PS_IN_CONTROL_0)[0]
+            struct.pack_into('>I', data, 4 * PS_IN_CONTROL_0, (c0 & ~0x3F) | ((c0 & 0x3F) + 1))
         struct.pack_into('>I', head, 0x14, len(data))
         out += head + data
     first = next(h for _t, h, _o, _s in gsh_blocks(b, 0))

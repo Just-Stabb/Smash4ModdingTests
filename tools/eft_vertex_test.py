@@ -215,14 +215,37 @@ def test_uv1():
     return fails
 
 
+def test_uv2():
+    """slot 2: its still UV from slot 1's (/ repeat 1 x repeat 2), then the transform on shtAnim2"""
+    rng = random.Random(2)
+    fails = 0
+    for k in range(200):
+        chan, mesh = k % 3, k % 2 == 0
+        pm = [[rng.uniform(-2, 2) for _ in range(4)] for _ in range(4)]
+        pm[3][3] = float(chan)
+        rep1 = [rng.choice([0.5, 1.0, 2.0]), rng.choice([1.0, 2.0])]
+        rep2 = [rng.choice([0.5, 1.0, 3.0]), rng.choice([1.0, 2.0])]
+        kc = {11 + i: pm[i] for i in range(4)}
+        kc[10], kc[15] = rep1 + [1.0, 1.0], rep2 + [1.0, 1.0]
+        t, rnd = rng.uniform(0, 60), [rng.random() for _ in range(4)]
+        base = [rng.uniform(0, 1), rng.uniform(0, 1)]
+        gpr = {20: [t, 0, 0, 0], 21: rnd, 5: [0.25, 0.75, base[0] * rep1[0], base[1] * rep1[1]]}
+        out = run(eft_vertex.uv2_lines(20, 21, 5, 22, 23, 24, 25, 26, mesh), gpr, kc)[22]
+        want = reference(t, rnd, [base[0] * rep2[0], base[1] * rep2[1]], pm, chan, rep2, mesh)
+        if abs(out[2] - want[0]) > 1e-3 * (1 + abs(want[0])) or abs(out[3] - want[1]) > 1e-3 * (1 + abs(want[1])):
+            fails += 1
+            print('FAIL uv2', k, mesh, out, want)
+    return fails
+
+
 def test_assembles():
     """latte-asm takes each variant: its disassembly has each line's operation and destination, in
     one clause of at most 128 slots"""
     import subprocess
     import tempfile
     fails = 0
-    for mesh in (True, False):
-        lines = eft_vertex.uv1_lines(20, 21, 5, 22, 23, 24, 25, mesh)
+    for mesh, lines in [(m, eft_vertex.uv1_lines(20, 21, 5, 22, 23, 24, 25, m)) for m in (True, False)] + \
+            [(m, eft_vertex.uv2_lines(20, 21, 5, 22, 23, 24, 25, 26, m)) for m in (True, False)]:
         cf, code = eft_vertex._alu(lines, (eft_vertex.CB_STATIC, 0, 15))
         if len(code) > 8 * 128:
             print('FAIL clause size', mesh, len(code) // 8)
@@ -245,6 +268,6 @@ def test_assembles():
 
 
 if __name__ == '__main__':
-    n = test_uv1() + test_assembles()
+    n = test_uv1() + test_uv2() + test_assembles()
     print('%d failure(s)' % n)
     sys.exit(1 if n else 0)

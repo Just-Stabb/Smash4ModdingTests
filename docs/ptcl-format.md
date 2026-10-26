@@ -301,6 +301,19 @@ textures past the first (eft looks up textureSampler1 / 2, by name through the r
 pointers, 0x04A59E54, only for them; 5397 vanilla keys all match their pixel samplers), 0x3B /
 0x3C slot 0 / 1 a texture array (textureArraySampler).
 
+The slot-2 graft (graft_uv1 with a second semantic): one-texture programs work out nothing of slot
+2, so its still UV is slot 1's / slot 1's repeat x slot 2's (CB2 vec4 10 / 15; slot 1's
+inverse-random flips kept), animated by a third clause on shtAnim2 (vec4 11 - 15) and exported in
+.zw of a new parameter: an EXP (opcode 39, type 2, the next PARAM index, barrier) just before the
+texture coordinates', SPI_VS_OUT_CONFIG's VS_EXPORT_COUNT (bits 5:1, the count - 1) and
+NUM_SPI_VS_OUT_ID (words, 4 parameters each) raised, the semantic (0x0B on, one the program doesn't
+use) in its SPI_VS_OUT_ID byte (unused bytes 0xFF). The pixel header takes it as a new input: the
+input count (word 4) and SPI_PS_IN_CONTROL_0's NUM_INTERP (bits 5:0) raised, its SPI_PS_INPUT_CNTL
+entry the texture coordinates' with the semantic swapped (0x100 | semantic). With
+`textureSampler2` and key byte 0x29 = 2 it draws a third texture. eft2's texture blends
+(tex1 / tex2): 0 multiply, 1 add, 2 subtract (t - texture n: Ultimate's own program for Hero's
+ChantFinish light1, alpha = t0 x t1 - t2).
+
 Colour 1 is scaled like colour 0: the particle's colour 1 (+0x88) x the set's colour (+0x278) x
 the colour scale (0x778) x the emitter instance's colour 1 (+0x238), cross_f 0x04A588CC (colour 0:
 0x04A58830).

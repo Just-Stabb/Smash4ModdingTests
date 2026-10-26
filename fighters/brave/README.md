@@ -636,3 +636,18 @@ scale) reach at most 108 (median 20, 330 non-Final lights); Kaboom's `flareBase`
 260 for 55 frames. Those lights are capped at 70 (Mii Gunner's Stealth Bomb): Kaboom 260 -> 70,
 Magic Burst 220, Kamikazee 113, Bang 87, Kafrizz's burst 82 -> 70.
 
+## Fix 40 (`build/hero_fix40.zip`): third textures drawn live
+
+The slot-2 graft (`docs/ptcl-format.md` "Grafts"): a one-texture template's vertex program gets slots
+1 and 2's UV animation, slot 2's in a parameter of its own (a new export, the vertex header's
+counts and semantics, a pixel input for it), and `textureSampler1 / 2`; our pixel programs take a
+third texture in eft2's order ((t0 . t1) . t2). Checked like slot 1's on all 739 graftable vanilla
+programs (clauses, jumps, both exports, the header registers) and its clause against eft's formula.
+eft2's texture blend 2 is subtract (Ultimate's own `light1` program: alpha = t0 x t1 - t2); the
+converter folded it as multiply before.
+
+Hero, fix 39 -> fix 40: samplers folded in as their mean 11 -> 3 (13 parts draw three textures:
+the sword light, Kafrizz's / Frizzle's rings and flare lines, the chant's `light1` / `light2`,
+Zap's discharge line, Magic Burst's impact, Bounce's parts). Left: Kaboom's / Kafrizz's wind rings
+(`wind1`, `wind2`: their main texture is sampler 1, so eft2's order puts the folded one first).
+

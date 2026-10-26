@@ -260,8 +260,10 @@ class Templates:
                     variants = [(traits, False)]
                     if GRAFT and TWO_TEXTURES and not two and graftable(bytes(p.shader_binary(si_)), lay):
                         # also a two-texture template once grafted (two_texture_shader): slot 1's UV
-                        # animation all there (eft's own code, or the program's)
-                        variants.append((traits[:9] + (True, 7), True))
+                        # animation all there (eft's own code, or the program's); 2: a three-texture
+                        # one too (three_texture_shader)
+                        variants.append((traits[:9] + (True, 7),
+                                         2 if three_graftable(bytes(p.shader_binary(si_)), lay) else 1))
                     for tr, grafted in variants:
                         # (a vanilla two-texture program over a grafted one drawing as much)
                         old = self.found[key].get(tr)
@@ -269,7 +271,7 @@ class Templates:
                             self.found[key][tr] = (score, path, si, k, grafted)
 
     def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False,
-            want2=False, uv_mode1=0, swap_ok=False, need_thr=0):
+            want2=False, uv_mode1=0, swap_ok=False, need_thr=0, want3=False):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A flipbook template is never taken for no flipbook when another is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
@@ -308,8 +310,9 @@ class Templates:
             # slot 0's UVs, and texture 1 then can't be drawn live either: Hero's ring2 / wind1)
             # (a spin before the colour tracks: a mesh's can't be baked, only its starting rotation,
             # and stood still Woosh's rings / wind lost their whole motion for colour 1's mean)
+            # (a third texture (want3) wants a template whose slot 1 can be grafted: slot 2 is made from it)
             return (plain, not pm or bool(ptn), own if need_c1 else min(own, 1), follow in fol, pm == bool(ptn),
-                    fit0, two == want2, fit1, not need_thr or an1 or (need_thr == 2 and an0),
+                    fit0, two == want2, fit1, not want3 or grafted == 2, not need_thr or an1 or (need_thr == 2 and an0),
                     turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1],
                     by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), not grafted, same_blend, score)
@@ -690,16 +693,49 @@ def two_texture_shader(p, si):
             _two[key] = None
         else:
             nb = eft_vertex.add_pixel_sampler(nb, 'textureSampler1', 1)
-            eft_pixel.UV1_GRAFTED.add(hashlib.md5(nb).hexdigest())
+            eft_pixel.GRAFTED[hashlib.md5(nb).hexdigest()] = None
             entry = bytearray(p.shader_entry(si))
             entry[KEY_TEXTURES], entry[KEY_ARRAY1] = 1, 0
             _two[key] = p.add_shader(bytes(entry), nb)
     return _two[key]
 
 
-def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None):
-    """texture 1 of a two-texture template: sampler j as Ultimate places it (its first cell, repeat,
-    wrap, UV animation in slot 1's block); white (x 1: nothing) without one"""
+def three_graftable(b, lay):
+    """a one-texture template whose slot-1 UV can be grafted from the still one (graft_uv1, not one
+    already animating slot 1): slot 2 is made from it too (three_texture_shader)"""
+    return graftable(b, lay) and not eft_vertex.uv_caps(b)[1]
+
+
+def three_texture_shader(p, si):
+    """shader si (three_graftable) drawing three textures, added once: slots 1 and 2's UV animation
+    grafted (slot 2 exported in a parameter of its own, a semantic the program doesn't use), a pixel
+    input for it, 2D textureSampler1 / 2, its key's texture count 2. None when the graft doesn't take"""
+    key = (id(p), si, 3)
+    if key not in _two:
+        b = bytes(p.shader_binary(si))
+        lay = eft_pixel.layout(b)
+        sem = lay['sems'][lay['uv'][0]]
+        h = eft_vertex.vertex_header(b)
+        params = 1 + ((h['regs'][2] >> 1) & 0x1F)
+        used = {eft_vertex._param_semantic(h['regs'], q) for q in range(params)} | set(lay['sems'])
+        sem2 = next(s for s in range(11, 64) if s not in used)
+        nb = eft_vertex.graft_uv1(b, sem, sem2)
+        if nb is None:
+            _two[key] = None
+        else:
+            nb = eft_vertex.add_pixel_input(nb, sem, sem2)
+            nb = eft_vertex.add_pixel_sampler(nb, 'textureSampler1', 1)
+            nb = eft_vertex.add_pixel_sampler(nb, 'textureSampler2', 2)
+            eft_pixel.GRAFTED[hashlib.md5(nb).hexdigest()] = sem2
+            entry = bytearray(p.shader_entry(si))
+            entry[KEY_TEXTURES], entry[KEY_ARRAY1], entry[KEY_ARRAY1 + 1] = 2, 0, 0
+            _two[key] = p.add_shader(bytes(entry), nb)
+    return _two[key]
+
+
+def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1):
+    """texture 1 (slot: 2) of a two- (three-) texture template: sampler j as Ultimate places it (its
+    first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one"""
     if j is None:
         pix, ts, rep, wrap = np.ones((16, 16, 4), np.float32), None, (1, 1), (1, 1)
     else:
@@ -709,17 +745,22 @@ def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None):
         pix = fit_texture(np.concatenate([rgb, a[..., None]], -1))
         rep, wrap = REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), (s['wrap_u'], s['wrap_v'])
         cbl, abl = tex_blend(e, ti, j)
-        notes.append('sampler %d drawn live as texture 1 (colour %s, alpha %s, UV mode %d)' % (
-            j, ('x', '+')[cbl], ('x', '+')[abl], uv_mode(ts)))
-    set_exact_texture(p, em, 1, pix)
-    set_wrap(em, 1, *wrap)
-    struct.pack_into('>2f', em, 0x508 + SLOT1, float(rep[0]), float(rep[1]))
-    em[0x4D7 + SLOT1], em[0x4D8 + SLOT1] = 1, 1
-    struct.pack_into('>I', em, PTN_MODE + SLOT1, 0)
-    set_uv_anim(em, ts, slot=1)
+        notes.append('sampler %d drawn live as texture %d (colour %s, alpha %s, UV mode %d)' % (
+            j, slot, 'x+-'[cbl % 3], 'x+-'[abl % 3], uv_mode(ts)))
+    set_exact_texture(p, em, slot, pix)
+    set_wrap(em, slot, *wrap)
+    struct.pack_into('>2f', em, 0x508 + SLOT1 * slot, float(rep[0]), float(rep[1]))
+    em[0x4D7 + SLOT1 * slot], em[0x4D8 + SLOT1 * slot] = 1, 1
+    struct.pack_into('>I', em, PTN_MODE + SLOT1 * slot, 0)
+    set_uv_anim(em, ts, slot=slot)
 
 
-def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None):
+def _texblend(x, y, mode):
+    """eft2's texture blend: 0 multiply, 1 add, 2 subtract (x - y: tools/eft_pixel.py _blend)"""
+    return x + y if mode == 1 else x - y if mode == 2 else x * y
+
+
+def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, live2=None):
     """the texture an own pixel program (tools/eft_pixel.py) reads, [h, w, 4] 0-1: Ultimate's colour
     input in rgb and its alpha input in a, sampler ti's (img: one cell or the flipbook sheet) with
     the emitter's other samplers combined in as eft2 does (tex1 / tex2 colour and alpha blends: 0
@@ -729,7 +770,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None):
     left out, the ball drew at the gradient's full alpha)"""
     rgb, a = sampler_inputs(e, ti, img)
     cb = e['combiner']
-    others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and j != live and s['texture_id'] != NONE64
+    others = [(j, s) for j, s in enumerate(e['sampler']) if j not in (ti, live, live2) and s['texture_id'] != NONE64
               and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
@@ -747,8 +788,8 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None):
             else:
                 m_rgb, m_a = orgb.reshape(-1, 3).mean(0), float(oa.mean())
                 meaned.append(j)
-            rgb = rgb + m_rgb if cb['tex%d_color_blend' % k] == 1 else rgb * m_rgb
-            a = a + m_a if cb['tex%d_alpha_blend' % k] == 1 else a * m_a
+            rgb = _texblend(rgb, m_rgb, cb['tex%d_color_blend' % k])
+            a = _texblend(a, m_a, cb['tex%d_alpha_blend' % k])
         if same:
             notes.append('samplers %s combined texel by texel (same UVs)' % ','.join(map(str, same)))
         if meaned:
@@ -769,17 +810,17 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None):
         ix = (wrap_uv(uv[:, 0], s['wrap_u']) * sw).astype(int)
         orgb, oa = orgb[iy, ix].reshape(h, w, 3), oa[iy, ix].reshape(h, w)
         k = 2 if j == 2 or (j == 0 and ti == 2) else 1     # the blend that brings sampler 1 / 2 in
-        add_c, add_a = cb['tex%d_color_blend' % k] == 1, cb['tex%d_alpha_blend' % k] == 1
+        bc, ba = cb['tex%d_color_blend' % k], cb['tex%d_alpha_blend' % k]
         for cy in range(ny):
             for cx in range(nx):
                 ys, xs = slice(cy * h, (cy + 1) * h), slice(cx * w, (cx + 1) * w)
-                rgb[ys, xs] = rgb[ys, xs] + orgb if add_c else rgb[ys, xs] * orgb
-                a[ys, xs] = a[ys, xs] + oa if add_a else a[ys, xs] * oa
+                rgb[ys, xs] = _texblend(rgb[ys, xs], orgb, bc)
+                a[ys, xs] = _texblend(a[ys, xs], oa, ba)
     notes.append('samplers %s combined in' % ','.join(str(j) for j, _s in others))
     return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
 
 
-def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False):
+def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False, blend2=(0, 0)):
     """(shader index, alpha keys, alpha gain) when the template's pixel program can be replaced by
     one of tools/eft_pixel.py's for this emitter's combiner (EXACT), else None. alpha: the alpha
     track [101] (alpha 0, x alpha 1 for alpha mode 4: folded into the keys). Ultimate's alphas past 1
@@ -800,7 +841,7 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
     c0 = track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]) \
         * float(e['static']['color_scale'] or 1.0) if dissolve is not None and dissolve_c0 else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain, c1, blend1, dissolve, c0)
+                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
@@ -1213,19 +1254,44 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     dis_moving = dis is not None and float(np.ptp(dis[1])) > 0.01
     live = live_sampler(e, ti, images, names, is_mesh) if EXACT and TWO_TEXTURES and smp and not uv_quarter and \
         dis is None else None
+    # samplers 1 and 2 both drawn live by a three-texture graft (three_texture_shader), in eft2's order
+    # (t0 . t1) . t2: sampler 0 the main one, the other two its UV set's on a mesh
+    live3 = None
+    if EXACT and TWO_TEXTURES and GRAFT and not templates.no_graft and smp and not uv_quarter and dis is None \
+            and ti == 0:
+        usable = [j for j in (1, 2) if e['sampler'][j]['texture_id'] != NONE64 and e['sampler'][j]['texture_id'] in images
+                  and 'indirect' not in names.get(e['sampler'][j]['texture_id'], '')
+                  and not e['tex_anim'][j]['pattern_type']
+                  and (not is_mesh or e['tex_anim'][j]['uv_channel'] == e['tex_anim'][0]['uv_channel'])]
+        if usable == [1, 2] and not (live is not None and same_uv(e, 0, 3 - live)):
+            live3 = (1, 2)
     # the two may trade slots: no flipbook either side (slot 1 has none), nothing else combined in
     swap_ok = live is not None and not ptn_want and not e['tex_anim'][live]['pattern_type'] and not [
         j for j, s in enumerate(e['sampler']) if j not in (ti, live) and s['texture_id'] != NONE64
         and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    if live3:
+        live, swap_ok = 1, False
     em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
                                        notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
                                        live is not None,
                                        uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
-                                       (2 if c0_flat else 1) if dis_moving else 0)
+                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None)
     if swapped:
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
     lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) if EXACT else None
+    live2 = None
+    if live3 and lay_t is not None and 'uv1' not in lay_t and \
+            three_graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
+        si3 = three_texture_shader(p, struct.unpack_from('>I', em, 0x844)[0])
+        if si3 is not None:
+            struct.pack_into('>I', em, 0x844, si3)
+            lay_t = eft_pixel.layout(bytes(p.shader_binary(si3)))
+            live2 = 2
+            notes.append('vertex program grafted: slot 1 and 2 UV animation')
+    if live3 and live2 is None:
+        # no three-texture template: as before (one live sampler, if the blends allow)
+        live = live_sampler(e, ti, images, names, is_mesh)
     if live is not None and GRAFT and not templates.no_graft and lay_t is not None and 'uv1' not in lay_t and \
             graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
         # a one-texture template taken for two (Templates): its vertex program grafted
@@ -1350,12 +1416,15 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         notes.append('sampler %d not drawn live (%s)' % (live, 'no two-texture template' if not two_tpl else
                                                           'UVs baked' if bake is not None else 'turn baked'))
         live = None
+    if live2 is not None and live is None:
+        live2 = None
     exact = exact_combiner(p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
-                           dis[0] if dis is not None else None, dis_in == 0)
+                           dis[0] if dis is not None else None, dis_in == 0,
+                           tex_blend(e, ti, live2) if live2 is not None else (0, 0))
     if not exact:
-        live = dis = None
+        live = live2 = dis = None
     if exact:
-        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live)
+        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live, live2)
         rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
         rgb1 = track(st_, col_, 1)[0] * np.array(e['info']['color1'][:3])
         alpha, premult = exact[1], None
@@ -1399,6 +1468,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if two_tpl:
         # texture 1: the live sampler, else white (x 1)
         set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes)
+        if lay_t is not None and 'uv2' in lay_t:
+            set_slot1(p, em, e, ti, live2, images, notes, slot=2)
     if exact:
         struct.pack_into('>I', em, 0x844, exact[0])
         if dis is not None:

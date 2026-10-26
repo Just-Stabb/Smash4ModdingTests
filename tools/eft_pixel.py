@@ -66,22 +66,27 @@ def disassemble(b):
 
 
 _layouts = {}
-# shaders given texture 1 by a graft (tools/vfxb_to_ptcl.py two_texture_shader: slot 1's UV in .zw of
-# the texture coordinates, a textureSampler1): their layouts read texture 1 there (md5s)
-UV1_GRAFTED = set()
+# shaders given textures by a graft (tools/vfxb_to_ptcl.py two_texture_shader / three_texture_shader):
+# md5 -> the semantic of slot 2's input (None: texture 1 only). Texture 1 reads slot 1's UV in .zw of
+# the texture coordinates, texture 2 slot 2's in .zw of its own input
+GRAFTED = {}
 
 
 def layout(binary):
     """layout_of, cached by the binary's hash"""
     key = hashlib.md5(binary).hexdigest()
     if key not in _layouts:
-        _layouts[key] = layout_of(binary)
-        if key in UV1_GRAFTED and _layouts[key] is not None:
-            _layouts[key] = dict(_layouts[key], uv1=(_layouts[key]['uv'][0], 'zw'))
+        sem2 = GRAFTED.get(key)
+        lay = layout_of(binary, ignore=(sem2,) if sem2 is not None else ())
+        if key in GRAFTED and lay is not None:
+            lay = dict(lay, uv1=(lay['uv'][0], 'zw'))
+            if sem2 is not None:
+                lay['uv2'] = (lay['sems'].index(sem2), 'zw')
+        _layouts[key] = lay
     return _layouts[key]
 
 
-def layout_of(binary):
+def layout_of(binary, ignore=()):
     """the template pixel program's inputs, or None when it isn't one this module can stand in for:
     {'regs': number of input registers, 'c0', 'c1' (None without colour 1), 'vc' (None, or the
     vertex colour's register), 'uv': (register, 'xy' / 'zw')} -- the texture coordinates as the
@@ -94,17 +99,17 @@ def layout_of(binary):
     sems = [q[INPUT_CNTL + k] & 0xFF for k in range(q[NUM_INPUTS])]
     text = disassemble(binary)
     samples = re.findall(r'SAMPLE\w*\s+R\d+\.\S+,\s+R(\d+)\.(\w\w)\w\w,\s+t(\d+),\s+s(\d+)', text)
-    if 'DENORM' in text or sorted(t for _r, _c, t, _s in samples) not in (['0'], ['0', '1']) \
+    if 'DENORM' in text or sorted(t for _r, _c, t, _s in samples) not in (['0'], ['0', '1'], ['0', '1', '2']) \
             or any(t != sm for _r, _c, t, sm in samples):
         return None
     uvs = {}
     for reg, comps, t, _s in samples:
         reg = int(reg)
-        if comps not in ('xy', 'zw') or reg >= len(sems) or sems[reg] not in UV_SEMS:
+        if comps not in ('xy', 'zw') or reg >= len(sems) or sems[reg] not in UV_SEMS + tuple(ignore):
             return None
         uvs[int(t)] = (reg, comps)
     used = {sems[r] for r, _c in uvs.values()}
-    if SEM_COLOR0 not in sems or set(sems) - {SEM_COLOR0, SEM_COLOR1, SEM_VCOLOR} - used:
+    if SEM_COLOR0 not in sems or set(sems) - {SEM_COLOR0, SEM_COLOR1, SEM_VCOLOR} - used - set(ignore):
         return None
     out = {'regs': len(sems), 'c0': sems.index(SEM_COLOR0),
            'c1': sems.index(SEM_COLOR1) if SEM_COLOR1 in sems else None,
@@ -112,6 +117,8 @@ def layout_of(binary):
            'uv': uvs[0], 'sems': sems}
     if 1 in uvs:
         out['uv1'] = uvs[1]
+    if 2 in uvs:
+        out['uv2'] = uvs[2]
     return out
 
 
@@ -124,18 +131,28 @@ def lit(v):
     return '(0x%08X, %r)' % (struct.unpack('>I', struct.pack('>f', v))[0], float(v))
 
 
+def _blend(ch, mode, t, other):
+    """eft2's texture blend of one channel into the texel: 0 multiply, 1 add, 2 subtract, t - other
+    (Ultimate's own program for Hero's ChantFinish light1, tex1 alpha 0 / tex2 alpha 2: alpha =
+    t0 x t1 - t2, `ffma r6 = r2 x r0 - r9`, tools/eft_shader_dis.py)"""
+    op, neg = (('MUL', ''), ('ADD', ''), ('ADD', '-'))[mode if mode in (0, 1, 2) else 0]
+    return '%s: %-15s %s.%s, %s.%s, %s%s.%s' % (ch, op, t, ch, t, ch, neg, other, ch)
+
+
 def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-           c0_const=None):
+           c0_const=None, tex_blend2=(0, 0)):
     """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
     it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
     texture, an opaque black ball where its gradient texture is dark). tex_blend (colour, alpha):
     how a two-texture layout's texture 1 comes in, 0 multiply, 1 add. dissolve (edge width): Ultimate's
     custom shader 8 on a one-texture layout: texture 0 grey (colour in .x and .z), its mask in .y;
+    tex_blend2: a three-texture layout's texture 2 after texture 1 (eft2's order: (t0 . t1) . t2);
     the threshold colour 1's red (the converter's colour-1 track: Ultimate's colour 1 alpha over
     life), colour 1 itself c1_const; or, c0_const given (colour 0's rgb; its alpha stays the
     track's), colour 0's red; alpha x clamp((mask - threshold) / width)"""
     n = lay['regs']
     two = 'uv1' in lay
+    three = 'uv2' in lay
     c0, c1, vc = 'R%d' % lay['c0'], ('R%d' % lay['c1']) if lay['c1'] is not None else None, lay['vc']
     uvr, uvc = lay['uv']
     t, d = 'R%d' % n, 'R%d' % (n + 1)          # the texel, the colour's work register
@@ -161,10 +178,11 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
         return lit(-c1_const['xyz'.index(ch)] if neg else c1_const['xyz'.index(ch)])
     head = ['; eft pixel program (tools/eft_pixel.py): colour mode %d, alpha mode %d, alpha x %g%s%s'
             % (color_mode, alpha_mode, alpha_gain, ', texture 1 %s / %s' % tuple(
-                ('x', '+')[b] for b in tex_blend) if two else '',
+                'x+-'[b % 3] for b in tex_blend) + (', texture 2 %s / %s' % tuple(
+                    'x+-'[b % 3] for b in tex_blend2) if three else '') if two else '',
                ', dissolve %g by colour %d' % (dissolve, thr != c0) if thr else ''),
             '; $MODE = "UniformBlock"',
-            '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 3 if two or thr else n + 2),
+            '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 4 if three else n + 3 if two or thr else n + 2),
             '; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2',
             '; $SPI_PS_IN_CONTROL_0.NUM_INTERP = %d' % n,
             '; $NUM_SPI_PS_INPUT_CNTL = %d' % n]
@@ -176,9 +194,13 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
         t1 = 'R%d' % (n + 2)
         r1, c1c = lay['uv1']
         body.append('  1      SAMPLE          %s.xyzw, R%d.%s0%s, t1, s1' % (t1, r1, c1c, c1c[0]))
-        # texture 1 into the texel first: t = t0 x / + t1 (colour, alpha)
-        groups.append(['%s: %-15s %s.%s, %s.%s, %s.%s' % (ch, ('MUL', 'ADD')[tex_blend[ch == 'w']], t, ch, t, ch, t1, ch)
-                       for ch in 'xyzw'])
+        # texture 1 into the texel first: t = t0 x / + / - t1 (colour, alpha)
+        groups.append([_blend(ch, tex_blend[ch == 'w'], t, t1) for ch in 'xyzw'])
+    if three:
+        t2 = 'R%d' % (n + 3)
+        r2, c2c = lay['uv2']
+        body.append('  2      SAMPLE          %s.xyzw, R%d.%s0%s, t2, s2' % (t2, r2, c2c, c2c[0]))
+        groups.append([_blend(ch, tex_blend2[ch == 'w'], t, t2) for ch in 'xyzw'])
     if thr:
         # the dissolve's ramp from the untouched mask
         groups.append(['x: ADD             %s.x, %s.y, -%s.x' % (ramp, t, thr)])
@@ -235,7 +257,7 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     # out: rgb x hdr.x + hdr.w, alpha
     groups.append(['%s: MULADD          R0.%s, %s.%s, KC0[8].x, KC0[8].w' % (ch, ch, d, ch) for ch in 'xyz']
                   + ['w: MOV             R0.w, %s.w' % d])
-    k = 2 if two else 1                 # instruction slots count on from the samples
+    k = 3 if three else 2 if two else 1        # instruction slots count on from the samples
     for g in groups:
         for j, ln in enumerate(g):
             body.append(('  %-3d ' % k if j == 0 else '      ') + ln)
@@ -248,9 +270,9 @@ _programs = {}
 
 
 def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-            c0_const=None):
+            c0_const=None, tex_blend2=(0, 0)):
     """(program bytes, GPR count), assembled once per variant"""
-    src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const)
+    src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -270,7 +292,7 @@ _shaders = {}
 
 
 def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-               c0_const=None):
+               c0_const=None, tex_blend2=(0, 0)):
     """the index of shader si of Ptcl p with one of these pixel programs (added once per variant),
     or None when its pixel program isn't one this module can stand in for. c1_const: colour 1 (rgb,
     x the colour scale) for a template that doesn't pass it, or that passes the dissolve's
@@ -294,11 +316,17 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
         c1_const = tuple(round(float(v), 3) for v in c1_const)
     if 'uv1' not in lay:
         tex_blend = (0, 0)
+    if 'uv2' not in lay:
+        tex_blend2 = (0, 0)
     key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const, tuple(tex_blend),
-           dissolve, c0_const)
+           dissolve, c0_const, tuple(tex_blend2))
     if key not in _shaders or _shaders[key][0] is not p:
-        prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const)
-        _shaders[key] = (p, p.add_shader(p.shader_entry(si), with_program(b, prog, gprs)))
+        prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const,
+                             tuple(tex_blend2))
+        nb = with_program(b, prog, gprs)
+        if hashlib.md5(b).hexdigest() in GRAFTED:          # (a grafted layout stays one)
+            GRAFTED[hashlib.md5(nb).hexdigest()] = GRAFTED[hashlib.md5(b).hexdigest()]
+        _shaders[key] = (p, p.add_shader(p.shader_entry(si), nb))
     return _shaders[key][1]
 
 
