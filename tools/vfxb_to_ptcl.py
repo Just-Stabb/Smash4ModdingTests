@@ -52,6 +52,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import struct
 import sys
 
@@ -1738,6 +1739,8 @@ def main():
     ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
     ap.add_argument('--test-skip-for', default='', help='as --no-graft-for: the emitters left out (tests)')
     ap.add_argument('--test-no-light-for', default='', help='as --no-graft-for: no effect light (tests)')
+    ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
+                    "grade / flare texture) at this x their alpha (tests)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
@@ -1780,6 +1783,12 @@ def main():
             if name in skip or '%s/%s' % (name, e['name']) in skip:
                 log.append('    %-24s left out (--test-skip-for)' % e['name'])
                 continue
+            tex0 = names.get(e['sampler'][0]['texture_id'], '')
+            if a.test_glow_alpha != 1.0 and e['info']['draw_path'] == 21 and \
+                    re.match(r'ef_cmn_(grade|flare)', tex0):
+                e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) +
+                                 [e['info']['color0'][3] * a.test_glow_alpha])
+                notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             if em is not None:
                 made.append((em, e['name']))
