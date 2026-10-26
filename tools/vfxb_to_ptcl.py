@@ -92,6 +92,7 @@ TWO_COLOUR = {('P_EdgeAttackDash2', 'FlashLine1')}
 # eft2's combiner exactly (colour from the texture's rgb, alpha from its alpha, both colours, alpha
 # past 1); off (--no-exact), the one-shape fold of combine()
 EXACT = True
+TWO_TEXTURES = True     # two-texture templates (a second sampler drawn live: live_sampler)
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -209,7 +210,7 @@ class Templates:
                     # coordinates its vertex program works out with slot 1's UV animation), no
                     # flipbook on slot 1
                     feat = screen[si_][3]
-                    if two != (lay is not None and 'uv1' in lay) or (two and feat['flipbook'][1]):
+                    if two != (lay is not None and 'uv1' in lay) or (two and (feat['flipbook'][1] or not TWO_TEXTURES)):
                         continue
                     # parameters a vertex program doesn't read do nothing once the pixel program is
                     # ours (853 of 1055 vanilla emitters with them; half the two-texture templates)
@@ -1127,7 +1128,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # a dissolve's threshold rides in colour 1's track, or colour 0's when its rgb is constant
     c0_flat = float(np.ptp(track(e['static'], e['color'], 0)[0], 0).max()) <= 0.01
     dis_moving = dis is not None and float(np.ptp(dis[1])) > 0.01
-    live = live_sampler(e, ti, images, names, is_mesh) if EXACT and smp and not uv_quarter and dis is None else None
+    live = live_sampler(e, ti, images, names, is_mesh) if EXACT and TWO_TEXTURES and smp and not uv_quarter and \
+        dis is None else None
     # the two may trade slots: no flipbook either side (slot 1 has none), nothing else combined in
     swap_ok = live is not None and not ptn_want and not e['tex_anim'][live]['pattern_type'] and not [
         j for j, s in enumerate(e['sampler']) if j not in (ti, live) and s['texture_id'] != NONE64
@@ -1509,11 +1511,13 @@ def main():
     ap.add_argument('--empty', default='', help="comma-separated base bank entries (hex) to empty: effects "
                     "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
                     "orbs on Hero's Thunder-based articles)")
+    ap.add_argument('--no-two', action='store_true', help='no two-texture templates: every emitter draws one texture')
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
-    global EXACT
+    global EXACT, TWO_TEXTURES
     EXACT = not a.no_exact
+    TWO_TEXTURES = not a.no_two
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()
