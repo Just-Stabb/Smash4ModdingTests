@@ -465,3 +465,25 @@ s (uv x repeat - 0.5) - (frame x rate + initial +- random) + 0.5 on U and V. `se
 writes eft2's values as they are: every scrolling part of every converted effect turns round (the
 fire's flow, the whirlwinds, F-smash's crown). The earlier corpus reading (`docs/ptcl-format.md`) is
 corrected; Sephiroth's bank still has the negated shifts until it is rebuilt.
+
+## Fix 31 (`build/hero_fix31.zip`): whirlwinds move and show
+
+Test 30 (Woosh / Swoosh / Kaswoosh against the Ultimate video): the whirlwinds thin, faint blue
+arcs at the floor; Ultimate's thick white columns of rising streaks.
+- **UV animation ranks before the colour tracks** (`Templates.get`). Woosh's `tornado1_*` (their
+  streaks stretch over life: UV scale animation) took templates without it, picked for follow type 2
+  (position only) and animated colour, and stood still. Position-only following now takes a
+  fully-following template (no type-4 mesh template with follow 2 animates UVs), then the UV
+  animation decides. Bakes frozen at their start: 145 -> 76 of Hero's emitters.
+- **What a template can animate keeps animating.** A scroll-only template for a part wanting scroll
+  and scale (Swoosh's `tornado2`) had the whole UV transform frozen into the mesh; now only the
+  starting scale (or rotation) is, and the scroll runs (7 emitters).
+- **Bakes about the texture's centre:** `uv_transform` scaled about the corner (uv x scale - shift);
+  both games scale about the centre (the same reading as fix 30's), so every baked mesh with a UV
+  scale was offset.
+- **Alpha input 2 is "one":** Ultimate's shader for `tornado1_f2` (WindowSmash) never reads its second
+  texture's alpha; taken as that alpha (mean 0.34), it dimmed the whirlwind to a third.
+- **Same-UV samplers combine texel by texel** on meshes: Swoosh / Kaswoosh's columns multiply
+  `ef_cmn_wind00` by itself through identical UVs (red x alpha), which had come in as its mean
+  (x 0.39, flat). 14 emitters.
+Still missing on the columns: the dissolve threshold (custom shader 8, `CSDP`).

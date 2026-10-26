@@ -208,8 +208,15 @@ class Templates:
             # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
             # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
-            return (plain, pm in (ptn, 0), own if need_c1 else min(own, 1), fol == follow, an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
-                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode & uv_mode == uv_mode, mode == uv_mode,
+            # the UV animation before the colour tracks: frozen, a scrolling texture is a still picture
+            # (test 30: Woosh's whirlwinds, whose rising streaks are the whole look, stood still and
+            # thin for a template with animated colour); a colour track's mean loses less
+            # (position-only following (2) takes a template that follows fully: few have 2, none with UV
+            # animation on a mesh; one left in place (1) or following (0) needs its own)
+            return (plain, pm in (ptn, 0), own if need_c1 else min(own, 1), fol == follow or (follow == 2 and fol == 0),
+                    mode & uv_mode == uv_mode, fol == follow,
+                    an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
+                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
@@ -435,12 +442,26 @@ def bake_samplers(e, ti, img, ptn, images, names, notes):
 
 def sampler_inputs(e, i, img):
     """sampler i's colour and alpha inputs to eft2's combiner (tex_color_input: 0 rgb, 1 its alpha
-    in rgb; tex_alpha_input: 0 alpha, 1 red; alpha modes 2 / 3 red), [h, w, 3] and [h, w], 0-1"""
+    in rgb; tex_alpha_input: 0 alpha, 1 red, 2 one: the sampler leaves the alpha alone (Woosh's
+    tornado1_f2, read with the WindowSmash translator: alpha = texture 0's x colour 0's, texture 1's
+    alpha never read; taken as its alpha, its mean 0.34 dimmed the whirlwind); alpha modes 2 / 3
+    red), [h, w, 3] and [h, w], 0-1"""
     f = img.astype(np.float32) / 255
     cb = e['combiner']
     rgb = np.repeat(f[..., 3:4], 3, -1) if cb['tex_color_input'][i] == 1 else f[..., :3]
+    if cb['tex_alpha_input'][i] == 2:
+        return rgb, np.ones_like(f[..., 0])
     red = cb['tex_alpha_input'][i] == 1 or cb['alpha_process'] in (2, 3)
     return rgb, (f[..., 0] if red else f[..., 3])
+
+
+def same_uv(e, i, j):
+    """samplers i and j read the same UVs all life: the same UV set, repeat and UV animation"""
+    ta, ts_ = e['tex_anim'], e['static']['tex_scroll']
+    keys = ('scroll', 'scroll_add', 'scroll_random', 'scale', 'scale_add', 'scale_random', 'rotation',
+            'rotation_add', 'rotation_random', 'uv_div')
+    return (ta[i]['uv_channel'] == ta[j]['uv_channel'] and ta[i]['repeat'] == ta[j]['repeat']
+            and all(np.allclose(ts_[i][k], ts_[j][k]) for k in keys))
 
 
 def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
@@ -458,14 +479,25 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
     if is_mesh:
+        meaned, same = [], []
         for j, s in others:
             orgb, oa = sampler_inputs(e, j, first_cell(images[s['texture_id']], e['static']['tex_scroll'][j],
                                                       shown_cell(e, j)))
             k = 2 if j == 2 or (j == 0 and ti == 2) else 1
-            m_rgb, m_a = orgb.reshape(-1, 3).mean(0), float(oa.mean())
+            if same_uv(e, ti, j) and not ptn:
+                # the same UVs as sampler ti all life (Swoosh's whirlwind columns: ef_cmn_wind00 in
+                # both, its red x its alpha): their product texel by texel is exact
+                m_rgb, m_a = resize(orgb, rgb.shape[1], rgb.shape[0]), resize(oa[..., None], a.shape[1], a.shape[0])[..., 0]
+                same.append(j)
+            else:
+                m_rgb, m_a = orgb.reshape(-1, 3).mean(0), float(oa.mean())
+                meaned.append(j)
             rgb = rgb + m_rgb if cb['tex%d_color_blend' % k] == 1 else rgb * m_rgb
             a = a + m_a if cb['tex%d_alpha_blend' % k] == 1 else a * m_a
-        notes.append('samplers %s in as their mean (mesh)' % ','.join(str(j) for j, _s in others))
+        if same:
+            notes.append('samplers %s combined texel by texel (same UVs)' % ','.join(map(str, same)))
+        if meaned:
+            notes.append('samplers %s in as their mean (mesh)' % ','.join(map(str, meaned)))
         return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
     nx, ny = ((max(1, int(round(v))) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else (1, 1))
     h, w = rgb.shape[0] // ny, rgb.shape[1] // nx
@@ -772,19 +804,19 @@ def uv_mode(ts):
         | (4 if nz(ts['rotation']) or nz(ts['rotation_add']) or nz(ts['rotation_random']) else 0)
 
 
-# How each game moves a texture (slot 0), from where the clamped, shifted meshes of each game's own
-# effects land on their texture over their life (scratch tests: Smash 4's 117 vanilla files, 375
-# clamped shifted axes; Ultimate's 31 fighters' VFXBs, 1700): Smash 4 uv x scale + shift (373 of
-# 375 partly on the texture), Ultimate uv x scale - shift (1652 of 1700; centred or added forms
-# 1183-1277); both turn about the texture's centre (Smash 4 20 of 20 clamped turned ones, Ultimate
-# 223 of 224). Ultimate's back-air arc, a disc, only sweeps round as a crescent so. The shifts
-# change sign on the way.
+# How both games move a texture (slot 0): about its centre, scale (rotation (uv x repeat - 0.5)) -
+# shift + 0.5 (Smash 4: every vanilla vertex program that scrolls, shader 142's groups 37-47, the
+# uniforms copied unchanged at 0x04A5A6AC, docs/ptcl-format.md; Ultimate: its vertex programs
+# subtract 0.5 before the scale and add it back after). An earlier reading from where clamped,
+# shifted meshes land on their texture had Smash 4 adding the shift and both scaling about the
+# corner (uv x scale - shift); test 30 showed the scrolls that came of it running backwards.
 def uv_transform(uv, scale, scroll, rotation):
-    """eft2's starting UV transform (repeat already applied): uv x scale - shift, turned about the
-    texture's centre"""
+    """the UV transform at a time (repeat already applied): turned and scaled about the texture's
+    centre, then shifted, as both games' vertex programs draw it"""
     c, s = math.cos(rotation), math.sin(rotation)
-    q = uv * np.array(scale, np.float32) - np.array(scroll, np.float32) - 0.5
-    return (np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1) + 0.5).astype(np.float32)
+    q = uv - 0.5
+    r = np.stack([q[:, 0] * c - q[:, 1] * s, q[:, 0] * s + q[:, 1] * c], 1)
+    return (r * np.array(scale, np.float32) - np.array(scroll, np.float32) + 0.5).astype(np.float32)
 
 
 def set_flipbook(em, ptn, ts, tp, rep=(1, 1)):
@@ -931,14 +963,31 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         is_mesh = 'even' if max(s3) - min(s3) < 1e-3 else True
         if is_mesh == 'even':
             s3 = (1.0, 1.0, 1.0)
-        # a template without the UV animation needed: the starting UV transform goes into the mesh's
-        # UVs (the shift / scale / rotation over life is lost)
+        # a template without all the UV animation needed: what it can't animate goes into the mesh's
+        # UVs at its starting value (its change over life is lost), what it can keeps running (test
+        # 30: Woosh's whirlwinds, wanting scroll and scale from a scroll-only template, stood still
+        # with all of it baked)
         need = uv_mode(ts)
         bake = None
-        if struct.unpack_from('>I', em, UV_MODE)[0] & need != need:
-            bake = (repeat, tuple(ts['scale']), tuple(ts['scroll']), ts['rotation'])
+        have = struct.unpack_from('>I', em, UV_MODE)[0] & 7
+        if have & need != need:
+            keep = have & need
+            bake = (repeat, tuple(ts['scale']) if not keep & 2 else (1.0, 1.0),
+                    tuple(ts['scroll']) if not keep & 1 else (0.0, 0.0), ts['rotation'] if not keep & 4 else 0.0)
             repeat = (1, 1)
-            notes.append('UV transform baked into the mesh')
+            if keep:
+                ts = dict(ts)
+                if not keep & 1:
+                    ts.update(scroll=[0, 0], scroll_add=[0, 0], scroll_random=[0, 0])
+                if not keep & 2:
+                    ts.update(scale=[1, 1], scale_add=[0, 0], scale_random=[0, 0])
+                if not keep & 4:
+                    ts.update(rotation=0, rotation_add=0, rotation_random=0)
+                notes.append('UV %s baked into the mesh at the start, %s kept' % (
+                    '/'.join(n for b, n in ((1, 'scroll'), (2, 'scale'), (4, 'rotation')) if need & b and not keep & b),
+                    '/'.join(n for b, n in ((1, 'scroll'), (2, 'scale'), (4, 'rotation')) if keep & b)))
+            else:
+                notes.append('UV transform baked into the mesh')
         channel = e['tex_anim'][ti]['uv_channel'] if smp else 0
         fres = fresnel_bake(e, notes)
         key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres)
@@ -971,7 +1020,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
                 col_ = np.ones((len(pos), 4), np.float32)
             prim_index[key] = p.add_primitive(pos, nrm, col_, uv, idx)
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
-        if bake:
+        if bake and not have & need:
             ts = None
     # the blend is shader-keyed: the template's (the same unless none had this one)
     blend = {0: 'normal', 1: 'add', 2: 'sub'}[p.field(em, 'blend_type')]
