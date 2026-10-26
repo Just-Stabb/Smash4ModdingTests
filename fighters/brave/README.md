@@ -580,8 +580,8 @@ flag bits 0x20 - 0x80 Smash 4 doesn't use.
 ## Fix 36 (`build/hero_fix36.zip`): step 3, spins and directional parts
 
 - **Spins:** a mesh's spin ranked after everything else (from when its UV animation had to come
-  first, which the UV term now covers): Woosh's rings (`ring1`, `ring2`) and `wind1` stood still for
-  a template that animates colour 1. A spin now ranks before the colour tracks (a constant colour
+  first, which the UV term now covers): Kafrizz's burst rings (`ring1`, `ring2`) and Kaboom's
+  warning `wind1` stood still for a template that animates colour 1. A spin now ranks before the colour tracks (a constant colour
   track is drawn as its mean; a lost spin is the whole motion); they turn again, colour 1 at its
   mean. Still unturned: `impact2` x 2 (no spinning stripe-mesh template plays a flipbook) and one
   quad, `splash1`.
