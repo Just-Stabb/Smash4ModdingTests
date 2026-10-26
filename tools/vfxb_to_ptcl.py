@@ -198,6 +198,7 @@ class Templates:
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
         self.no_graft = False       # (--no-graft-for: no grafted templates for the emitter at hand)
+        self.test_white1 = self.test_mean_colour = False    # (--test-white1-for, --test-mean-colour-for)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
         for path in [None] + list(corpus):
@@ -1384,7 +1385,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
     if two_tpl:
         # texture 1: the live sampler, else white (x 1)
-        set_slot1(p, em, e, ti, live, images, notes)
+        set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes)
     if exact:
         struct.pack_into('>I', em, 0x844, exact[0])
         if dis is not None:
@@ -1432,6 +1433,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if rgb1 is not None and not exact and struct.unpack_from('>I', em, COLOR_MODE)[0] != 2:
         rgb, rgb1 = (rgb + rgb1) / 2, None          # no lerp template: their mean
         notes.append('two colours: template not a lerp, their mean')
+    if templates.test_mean_colour:
+        p.set_field(em, 'color0_type', 0)
+        p.set_field(em, 'color1_type', 0)
     fits = [color_fit(rgb), color_fit(rgb if rgb1 is None else rgb1)]
     for tr in (0, 1):
         cks, track_rgb = fits[tr][0], (rgb if rgb1 is None or tr == 0 else rgb1)
@@ -1613,6 +1617,8 @@ def main():
     ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
     ap.add_argument('--no-graft-for', default='', help='comma-separated EFFECT or EFFECT/EMITTER (Ultimate names): no '
                     'grafted templates for them (A / B tests)')
+    ap.add_argument('--test-white1-for', default='', help='as --no-graft-for: texture 1 white (tests)')
+    ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
@@ -1633,6 +1639,8 @@ def main():
         ef.entries[i][1:] = [0, 0, 0, 0]    # no emitter set, model or meshes (403 vanilla entries)
     templates = Templates(p, a.templates)
     no_graft = set(v for v in a.no_graft_for.split(',') if v)
+    white1 = set(v for v in a.test_white1_for.split(',') if v)
+    mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     prims, prim_index = eff.primitives(), {}
     ids, done, dropped = {}, {}, []
     for name in (a.effects or sorted(eff.effects)):
@@ -1645,6 +1653,8 @@ def main():
             notes = []
             e['_set'] = eff.sets[si_ult]
             templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
+            templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
+            templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             if em is not None:
                 made.append((em, e['name']))
