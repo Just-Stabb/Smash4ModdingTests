@@ -288,8 +288,9 @@ own (the inputs' GPRs are reused later); before the texture coordinates' EXP a c
 slot 1's animated UV from the still one in .zw into a fresh GPR, which the EXP then exports. With a
 `textureSampler1` (2D, location 1) added to the pixel header (its relocation table: '}BLK' with
 the data and text regions and the pointer patch list, 0 entries for null pointers, extended) and
-the shader key's texture count set, the program draws a second texture: 739 of 810 vanilla
-one-texture own templates take the graft (the other 71 already animate slot 1). The shader key
+the shader key's texture count set, the program draws a second texture: 739 vanilla one-texture
+programs take the graft (all checked: their clauses unchanged, jumps moved, the export re-pointed,
+the relocation table whole); the few that already animate slot 1 need only the sampler. The shader key
 (0x78 record) is copied to the shader object at +0x47C (cross_f 0x04A5779C): key byte 0x29 = the
 textures past the first (eft looks up textureSampler1 / 2, by name through the relocated
 pointers, 0x04A59E54, only for them; 5397 vanilla keys all match their pixel samplers), 0x3B /
