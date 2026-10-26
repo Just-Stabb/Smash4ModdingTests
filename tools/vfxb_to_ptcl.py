@@ -94,6 +94,7 @@ TWO_COLOUR = {('P_EdgeAttackDash2', 'FlashLine1')}
 EXACT = True
 TWO_TEXTURES = True     # two-texture templates (a second sampler drawn live: live_sampler)
 DISSOLVE = True         # Ultimate's dissolve (dissolve_of)
+WRITE_FOLLOW = True     # Ultimate's follow type over the template's
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -301,7 +302,7 @@ class Templates:
                 struct.pack_into('>II', em, 0x2CC, 0, 0)
             else:
                 em = self.base.import_emitter(self.files[path], si, k, skip_slots=(0, 1))
-            if follow in fol:
+            if follow in fol and WRITE_FOLLOW:
                 # the CPU's (0x04A5C89C): Ultimate's
                 struct.pack_into('>I', em, FOLLOW, follow)
             # a key-animated template's key animation isn't imported (Ptcl.import_emitter), but its
@@ -1514,13 +1515,15 @@ def main():
                     "orbs on Hero's Thunder-based articles)")
     ap.add_argument('--no-two', action='store_true', help='no two-texture templates: every emitter draws one texture')
     ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
+    ap.add_argument('--keep-follow', action='store_true', help="keep each template's follow type (not Ultimate's)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES, DISSOLVE
+    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
     DISSOLVE = not a.no_dissolve
+    WRITE_FOLLOW = not a.keep_follow
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()
