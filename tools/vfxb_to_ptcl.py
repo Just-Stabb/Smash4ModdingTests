@@ -1743,6 +1743,8 @@ def main():
                     'that flat colour (tests: which part is which on screen)')
     ap.add_argument('--test-checker-for', default='', help='as --no-graft-for: texture 0 an 8 x 8 checkerboard '
                     '(tests: does the texture map in game)')
+    ap.add_argument('--test-tint-texture', default='', help='comma-separated TEXTURE=RRGGBB: every mesh emitter '
+                    'whose main texture that is, drawn in that flat colour (tests)')
     ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
                     "grade / flare texture) at this x their alpha (tests)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
@@ -1770,6 +1772,8 @@ def main():
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
     checker = set(v for v in a.test_checker_for.split(',') if v)
+    tint_tex = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
+                for k, v in (x.split('=') for x in a.test_tint_texture.split(',') if x)}
     tint = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
             for k, v in (x.split('=') for x in a.test_tint.split(',') if x)}
     prims, prim_index = eff.primitives(), {}
@@ -1798,6 +1802,8 @@ def main():
                 notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             key = '%s/%s' % (name, e['name'])
+            if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
+                tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
             if em is not None and key in checker:
                 c = ((np.indices((64, 64)) // 8).sum(0) % 2).astype(np.float32)
                 set_exact_texture(p, em, 0, np.stack([c, c, c, c], -1))
