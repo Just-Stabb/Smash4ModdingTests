@@ -145,6 +145,12 @@ HDR_START, HDR_KNEE = 1.0, 0.05
 # templates, drew his sword glows and neutral air as see-through distortion; 56 of 1797 vanilla
 # shaders) or texture arrays: never templates
 SCREEN_SAMPLERS = (b'frameBufferTexture_CROSS', b'depthBufferTexture_CROSS', b'textureArraySampler')
+# shader modes (the shader key's first word, low byte; the emitter's 0x831 the same) drawn in another
+# pass: 5 and 6 write a screen offset (x 1/960, 1/540) for the distortion pass, not a colour
+# (Bayonetta's ciecle1_rif, Shulk's rifraction2, Ryu's rifraction1), 7 Fox / Falco's Illusion.
+# Never templates: an own pixel program's colour there bends the picture behind instead (fix 33's
+# Frizz / Zap charge flare1, a see-through lens at the hand; fix 32's sword light and explosions)
+PASS_MODES = (5, 6, 7)
 # a particle's rotation is shader-keyed: the vertex program turns it from this attribute, and a
 # shader without it draws every particle unturned (vanilla: all 3165 emitters with a rotation have
 # it; down air's flares, turned -90 degrees in Ultimate, lay across the plunge as crosses)
@@ -174,7 +180,7 @@ class Templates:
     Then animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
     (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
-    screen or texture arrays (SCREEN_SAMPLERS) are left out."""
+    screen or texture arrays (SCREEN_SAMPLERS) or drawn in another pass (PASS_MODES) are left out."""
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
@@ -199,8 +205,9 @@ class Templates:
                     si_ = struct.unpack_from('>I', em, 0x844)[0]
                     if si_ not in screen:
                         b = p.shader_binary(si_)
-                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b,
-                                       eft_vertex.features(bytes(b)))
+                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS)
+                                       or struct.unpack_from('>I', p.shader_entry(si_), 0)[0] & 0xFF in PASS_MODES,
+                                       ROTATION_ATTR in b, VELOCITY_ATTR in b, eft_vertex.features(bytes(b)))
                     if screen[si_][0]:
                         continue
                     # 0 no own program, 1 one without colour 1, 2 with it

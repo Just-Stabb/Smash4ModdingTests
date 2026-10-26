@@ -547,3 +547,21 @@ with UVs baked 62 -> 0; flipbooks frozen on one cell 147 -> 0; second textures d
 directional parts turned by their world motion (no `v_inVec`) 11 -> 17. Every mesh now has a vanilla
 vertex program that draws what it needs, so no program of our own was written; what's left
 (directional parts without `v_inVec`, 6 spins) is quads and directional types (step 3).
+
+## Fix 34 (`build/hero_fix34.zip`): Frizz / Zap's see-through lens
+
+Fix 33 showed a see-through, bending "lens" at Hero's hand while Frizz and Zap charged, lingering
+after the shot. Their charge flare (`flare1`) had a refraction part's template (Bayonetta's
+`ciecle1_rif`, Shulk's `rifraction2`): once a template's pixel program is ours its blend no longer
+mattered (fix 33), and those two, drawn with another blend, became candidates. Their shader mode (byte 0x831,
+the shader key's first word: `docs/ptcl-format.md` 0x830) is 5: the game draws them in the
+distortion pass, whose output is a screen offset, so the flare's colour bent the picture instead of
+showing. Fix 33 had 10 such parts: the charge flares of Frizz, Frizzle, Zap and Woosh, Zap's
+release flare, Kafrizz's ball (`sphere1`, mode 6), Bounce's barrier, Snooze's flare and the
+no-MP flare; fix 32 had 30 (the sword light, explosions, impacts), short or small enough to miss. Shaders of modes 5, 6 (distortion) and 7 (Fox / Falco's Illusion) are never
+templates now (`PASS_MODES`); every Hero part uses a mode 0, 4 or 8 shader. Nothing else changes
+from fix 33.
+
+Ruled out on the way (round 1-6 tests): Robin's own refraction sets, the second textures, the
+dissolve, the chant, the bank's size, follow types, and `light1`.
+

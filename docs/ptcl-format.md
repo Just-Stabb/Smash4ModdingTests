@@ -155,7 +155,7 @@ adds U's and subtracts V's rate; no converted emitter uses it.)
 | 0x2F9 | u8 | stop emitting while the set fades (eft2's is_fade_emit): the emitter calc 0x04A65034 skips emission when fading only if this is set; with it 0 and 0x82C 0 a turned-off emitter emits on for good | verified |
 | 0x2FC / 0x2FD / 0x2FE | u8 | random rotation direction per axis X / Y / Z: at emission (0x04A5DBCC) a random roll negates that axis's initial rotation and rotation speed | verified |
 | 0x310 | u32 | follow type (eft2's numbers): 0 the particle points at the emitter's live matrices (instance +0x84 / +0xB4: follows it), else they are copied at emission (0x04A5C89C, from the instance's +0x12C = this); 1 none, 2 position only. No vanilla shader group mixes values (5136 / 2822 / 157), but one vertex program serves all three (positions come in as `v_inWldPos`), save those reading the live emitter matrix (`emm`), whose emitters all follow (0; 2 with `v_inEmtMat` too) | verified |
-| 0x830 | u32 | flags (shader-keyed) | corpus |
+| 0x830 | u32 | flags (shader-keyed). Byte 0x831 is the shader's mode, the same as the low byte of its key record's first word: 0 / 4 / 8 draw colour (CB9's colours); 5 and 6 write a screen offset (x 1/960, 1/540, from CB4) for the distortion pass, not a colour (mode 5's 7 vanilla emitters are all refraction parts, Bayonetta's `ciecle1_rif` and Shulk's `rifraction2`; mode 6's 3 Ryu's and Robin's Final Smash `rifraction1` / `buller1`); 7 Fox / Falco's Illusion. A pixel program of a mode-5 template replaced by a colour one still draws in that pass: the colour bends the picture behind it (Hero fix 33's lens) | corpus / verified (disassembly) |
 | 0x844 | u32 | shader index (into shader table) | verified |
 
 Everything not listed is copied verbatim.
