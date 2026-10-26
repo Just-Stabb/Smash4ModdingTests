@@ -1748,7 +1748,8 @@ def main():
     ap.add_argument('--test-alpha-for', default='', help='comma-separated EFFECT/EMITTER=FACTOR: those emitters\' '
                     'alpha x FACTOR (tests)')
     ap.add_argument('--test-texture-for', default='', help='comma-separated EFFECT/EMITTER=core|solid: texture 0 '
-                    'white, its alpha 1 where V < 0.3 (core) or everywhere (solid) (tests)')
+                    'white, its alpha 1 where V < 0.3 (core) or everywhere (solid); or its own texture as a '
+                    'private copy (private) or as RGBA8 (rgba) (tests)')
     ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
                     "grade / flare texture) at this x their alpha (tests)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
@@ -1814,7 +1815,16 @@ def main():
             key = '%s/%s' % (name, e['name'])
             if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
                 tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
-            if em is not None and key in tex_for:
+            if em is not None and tex_for.get(key) in ('private', 'rgba'):
+                cur = np.asarray(p.decode_texture(em, 0)).astype(np.uint8).copy()
+                if tex_for[key] == 'private':
+                    cur[-1, -1, 3] ^= 1                 # the same image, its own copy
+                    q = cur.astype(np.float32) / 255
+                    set_exact_texture(p, em, 0, q)
+                else:
+                    p.set_texture(em, 0, cur, 0x1A, comp_sel=0x00010203)
+                notes.append('texture 0 %s (--test-texture-for)' % tex_for[key])
+            elif em is not None and key in tex_for:
                 al = np.ones((64, 64), np.float32)
                 if tex_for[key] == 'core':
                     al[int(64 * 0.3):] = 0
