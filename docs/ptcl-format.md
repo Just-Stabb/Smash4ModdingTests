@@ -119,6 +119,7 @@ the writer recomputes them.)
 | 0x4A4 | 3f | gravity | corpus |
 | 0x4B0 / 0x4B4 | s32 | particle life / random (frames) | verified |
 | 0x4BC | u32 | particle type (billboard / polygon / directional / stripe…) — shader-keyed | corpus |
+| 0x4D0 | f | camera offset: the static uniforms' vec4 36 .z (`rotBasis` is .xy; 0x04A5AB04), every vertex program then moves the clip-space z by -offset × (1 − z/w): positive draws the particle in front of what's near it. Vanilla: 5, 1.5, 3, 1, -3, -5, 10 ... (the same units as eft2's `offset`, Bounce's barrier 10) | verified (fill, programs) |
 | 0x4D4 | 3 × 0x7C | per-slot UV params (scale at +0x34 for slot 0 → 0x508, flipbook / scroll; slot 0's below) | corpus |
 | 0x4D5 / 0x4D7 / 0x4D8 / 0x4D9 | u8 | slot 0 flipbook: pattern table used / cells across / cells down / random start cells (a particle starts on a random cell below this, 0x04A54A88) | verified (0x04A5A6AC, 0x04A5A858: the emitter's uniforms) |
 | 0x4DA / 0x4DB / 0x4DC | u8 | slot 0 flags (shader feature bits 0x400 / 0x800 / 0x10000 for slot 0) | verified (use) |

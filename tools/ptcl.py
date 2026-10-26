@@ -105,6 +105,7 @@ FIELDS = [
     (0x4B0, '>i', 'ptcl_life', 'runtime'),        # frames; 0x7FFFFFFF = infinite
     (0x4B4, '>i', 'ptcl_life_random', 'runtime'),
     (0x4BC, '>I', 'particle_type', 'corpus'),     # billboard / polygon / directional / stripe...: shader-keyed
+    (0x4D0, '>f', 'camera_offset', 'verified'),   # depth offset toward the camera (eft2's offset): static CB2 vec4 36 .z
     (0x508, '>2f', 'tex0_uv_scale', 'corpus'),    # texture slot UV params: 3 x 0x7C from 0x4D4
     (0x648, '>I', 'color0_type', 'corpus'),       # 0 constant, 1 random, 2 key animation
     (0x64C, '>I', 'color1_type', 'corpus'),

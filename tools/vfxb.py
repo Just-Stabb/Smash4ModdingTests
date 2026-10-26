@@ -265,7 +265,8 @@ class Eff:
     def images(self):
         """{texture id: RGBA uint8} with each texture's BNTX channel selection applied (BRTI +0x58: per
         output channel 0 zero, 1 one, 2-5 R G B A: the BC5 ones are (R, R, R, G), luminance + alpha;
-        the BC4 ones (R, R, R, R))"""
+        the BC4 ones (R, R, R, R)). A format tools/bntx.py can't decode leaves its texture out (ef_common.eff
+        has a few, kind 7)"""
         import numpy as np
         import bntx
         names, b = self.textures()
@@ -275,7 +276,11 @@ class Eff:
         while i >= 0:
             name_ptr, = struct.unpack('<Q', d[i + 0x60:i + 0x68])
             n, = struct.unpack('<H', d[name_ptr:name_ptr + 2])
-            img = bntx._brti(d, i)
+            try:
+                img = bntx._brti(d, i)
+            except KeyError:
+                i = d.find(b'BRTI', i + 4)
+                continue
             src = [np.zeros_like(img[..., 0]), np.full_like(img[..., 0], 255)] + [img[..., c] for c in range(4)]
             by_name[d[name_ptr + 2:name_ptr + 2 + n].decode()] = np.stack([src[s] for s in d[i + 0x58:i + 0x5C]], 2)
             i = d.find(b'BRTI', i + 4)

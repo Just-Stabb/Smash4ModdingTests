@@ -38563,6 +38563,24 @@ int brave_special_status()
     return global4 >= 0x152 && global4 <= 0x155;
 }
 
+// the buffs' glows: Ultimate's game code plays them (FighterSpecializer_Brave::special_lw_active_command:
+// req_follow on virtualcenter, his hip, bone 3, at his effect_scale 0.95, Y 180 facing left): Oomph's
+// sys_special_attack_up and Acceleratle's sys_special_speed_up (ef_common's, 0x345007A / B) and Bounce's barrier
+// brave_reflect (0x3450066), for as long as the buff lasts. A recast starts it again; the end lets its
+// particles finish (the effects' own fade); a KO kills it at once
+void brave_glow(int id, int on)
+{
+    if (on)
+    {
+        EffectModule(0x2723, id, 0x1, 0x1);
+        EffectModule(0x2717, id, 0x3, 0, 0, 0, 0, 0, 0, 0.95f, 0);
+    }
+    else
+    {
+        EffectModule(0x2723, id, 0, 0);
+    }
+}
+
 void brave_buffs_off()
 {
     brave_speed_t = 0;
@@ -38577,6 +38595,9 @@ void brave_buffs_off()
     brave_poison_t = 0;
     brave_reflect(0);
     brave_metal(0);
+    EffectModule(0x2723, 0x3450066, 0x1, 0x1);
+    EffectModule(0x2723, 0x345007a, 0x1, 0x1);
+    EffectModule(0x2723, 0x345007b, 0x1, 0x1);
 }
 
 // Kaclang's metal (and Hocus Pocus's states): see brave_state
@@ -38640,8 +38661,22 @@ void brave_mp_update()
 void brave_buff_update()
 {
     int m;
-    if (brave_speed_t > 0) { brave_speed_t -= 1; }
-    if (brave_attack_t > 0) { brave_attack_t -= 1; }
+    if (brave_speed_t > 0)
+    {
+        brave_speed_t -= 1;
+        if (brave_speed_t == 0)
+        {
+            brave_glow(0x345007b, 0);
+        }
+    }
+    if (brave_attack_t > 0)
+    {
+        brave_attack_t -= 1;
+        if (brave_attack_t == 0)
+        {
+            brave_glow(0x345007a, 0);
+        }
+    }
     if (brave_reflect_t > 0)
     {
         brave_reflect_t -= 1;
@@ -38791,22 +38826,19 @@ void brave_frame()
 
 // Bounce's reflector (as Kirby's air side B, tools/kirby_sideb_reflect_acmd.py: kind 3, ID 0, group 3; the
 // group made for Robin's kind by tools/brave_reflect_cave.py): a capsule around him, x1.5 damage, x1.2 speed
-// and life, no threshold. Its barrier (brave_reflect, 0x3450066: Ultimate plays it from its status code,
-// not a script) follows the hip (bone 3, as the scripts' brave_reflect_start) for as long as the reflector
-// is up; its loop parts never end on their own, so it's killed when the reflector goes
+// and life, no threshold; its barrier with it (brave_glow)
 void brave_reflect(int on)
 {
     if (on)
     {
         ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
         ShieldModule(0, 0x3, 0, 0x1, 0x3);
-        EffectModule(0x2723, 0x3450066, 0x1, 0x1);
-        EffectModule(0x2717, 0x3450066, 0x3, 0, 0, 0, 0, 0, 0, 1.0f, 0);
+        brave_glow(0x3450066, 0x1);
     }
     else
     {
         ShieldModule(0, 0x3, 0, 0, 0x3);
-        EffectModule(0x2723, 0x3450066, 0x1, 0x1);
+        brave_glow(0x3450066, 0);
     }
 }
 
@@ -40301,6 +40333,7 @@ int brave_lw_cast(float f)
         if (f >= 11.0f && brave_lw_once(0x1))
         {
             brave_speed_t = 0x258;
+            brave_glow(0x345007b, 0x1);
         }
     }
     else if (n == 0xc)
@@ -40308,6 +40341,7 @@ int brave_lw_cast(float f)
         if (f >= 11.0f && brave_lw_once(0x1))
         {
             brave_attack_t = 0x2d0;
+            brave_glow(0x345007a, 0x1);
         }
     }
     else if (n == 0xd)

@@ -1535,6 +1535,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     # ---- blend, colour, alpha
     col = e['color']     # (st: the static block, its rotation masked above)
     p.set_field(em, 'blend_type', BLEND[blend])
+    # pulled toward the camera (or pushed back) by eft2's offset, as eft's 0x4D0 does (the same units:
+    # Bounce's barrier 10, drawn over Hero; the glow discs -2)
+    p.set_field(em, 'camera_offset', float(e['static']['offset']))
     black1 = False
     if premult is not None:
         # the custom shader's colour x shape x 2: the shape is in every channel (SHAPE_SEL), so a
@@ -1753,6 +1756,9 @@ def main():
                     'private copy (private) or as RGBA8 (rgba) (tests)')
     ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
                     "grade / flare texture) at this x their alpha (tests)")
+    ap.add_argument('--extra-eff', nargs='+', action='append', default=[], metavar=('EFF', 'NAME=SET'),
+                    help="effects from another Ultimate file, named as the game plays them: e.g. ef_common.eff "
+                         "sys_special_attack_up=p_cmnspecialattackup (Hero's Oomph glow, played by his game code)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
@@ -1784,78 +1790,85 @@ def main():
                 for k, v in (x.split('=') for x in a.test_tint_texture.split(',') if x)}
     tint = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
             for k, v in (x.split('=') for x in a.test_tint.split(',') if x)}
-    prims, prim_index = eff.primitives(), {}
+    sources = [(eff, names, images, [(n, eff.effects[n]) for n in (a.effects or sorted(eff.effects))])]
+    for path, *wanted in a.extra_eff:
+        x = vfxb.Eff(path)
+        sources.append((x, x.textures()[0], x.images(),
+                        [(n, x.effects[sname.lower()]) for n, sname in (w.split('=') for w in wanted)]))
     ids, done, dropped = {}, {}, []
-    for name in (a.effects or sorted(eff.effects)):
-        si_ult = eff.effects[name]
-        if si_ult in done:
-            ids[name] = done[si_ult]
-            continue
-        made, log = [], []
-        for e in eff.emitters(si_ult):
-            notes = []
-            e['_set'] = eff.sets[si_ult]
-            templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
-            templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
-            templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
-            templates.test_no_light = name in no_light or '%s/%s' % (name, e['name']) in no_light
-            if name in skip or '%s/%s' % (name, e['name']) in skip:
-                log.append('    %-24s left out (--test-skip-for)' % e['name'])
+
+    def convert_source(src, eff, names, images, wanted):
+        prims, prim_index = eff.primitives(), {}
+        for name, si_ult in wanted:
+            if (src, si_ult) in done:
+                ids[name] = done[src, si_ult]
                 continue
-            if '%s/%s' % (name, e['name']) in alpha_for:
-                f = alpha_for['%s/%s' % (name, e['name'])]
-                e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) + [e['info']['color0'][3] * f])
-                notes.append('alpha x %g (--test-alpha-for)' % f)
-            tex0 = names.get(e['sampler'][0]['texture_id'], '')
-            if a.test_glow_alpha != 1.0 and e['info']['draw_path'] == 21 and \
-                    re.match(r'ef_cmn_(grade|flare)', tex0):
-                e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) +
-                                 [e['info']['color0'][3] * a.test_glow_alpha])
-                notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
-            em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
-            key = '%s/%s' % (name, e['name'])
-            if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
-                tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
-            if em is not None and tex_for.get(key) in ('private', 'rgba'):
-                cur = np.asarray(p.decode_texture(em, 0)).astype(np.uint8).copy()
-                if tex_for[key] == 'private':
-                    cur[-1, -1, 3] ^= 1                 # the same image, its own copy
-                    q = cur.astype(np.float32) / 255
-                    set_exact_texture(p, em, 0, q)
-                else:
-                    p.set_texture(em, 0, cur, 0x1A, comp_sel=0x00010203)
-                notes.append('texture 0 %s (--test-texture-for)' % tex_for[key])
-            elif em is not None and key in tex_for:
-                al = np.ones((64, 64), np.float32)
-                if tex_for[key] == 'core':
-                    al[int(64 * 0.3):] = 0
-                set_exact_texture(p, em, 0, np.stack([np.ones_like(al)] * 3 + [al], -1))
-                notes.append('texture 0 %s (--test-texture-for)' % tex_for[key])
-            if em is not None and key in checker:
-                c = ((np.indices((64, 64)) // 8).sum(0) % 2).astype(np.float32)
-                set_exact_texture(p, em, 0, np.stack([c, c, c, c], -1))
-                notes.append('texture 0 a checkerboard (--test-checker-for)')
-            if em is not None and key in tint:
-                for tr in (0, 1):
-                    p.set_field(em, 'color%d_type' % tr, 0)
-                    p.set_color_keys(em, tr, [tint[key] + (1.0,)])
-                notes.append('tinted %02X%02X%02X (--test-tint)' % tuple(int(v * 255) for v in tint[key]))
-            if em is not None:
-                made.append((em, e['name']))
-            log.append('    %-24s %s' % (e['name'], '; '.join(dict.fromkeys(notes))))
-        if not made:
-            print('%-30s %s: nothing convertible' % (name, eff.sets[si_ult]))
+            made, log = [], []
+            for e in eff.emitters(si_ult):
+                notes = []
+                e['_set'] = eff.sets[si_ult]
+                templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
+                templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
+                templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
+                templates.test_no_light = name in no_light or '%s/%s' % (name, e['name']) in no_light
+                if name in skip or '%s/%s' % (name, e['name']) in skip:
+                    log.append('    %-24s left out (--test-skip-for)' % e['name'])
+                    continue
+                if '%s/%s' % (name, e['name']) in alpha_for:
+                    f = alpha_for['%s/%s' % (name, e['name'])]
+                    e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) + [e['info']['color0'][3] * f])
+                    notes.append('alpha x %g (--test-alpha-for)' % f)
+                tex0 = names.get(e['sampler'][0]['texture_id'], '')
+                if a.test_glow_alpha != 1.0 and e['info']['draw_path'] == 21 and \
+                        re.match(r'ef_cmn_(grade|flare)', tex0):
+                    e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) +
+                                     [e['info']['color0'][3] * a.test_glow_alpha])
+                    notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
+                em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
+                key = '%s/%s' % (name, e['name'])
+                if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
+                    tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
+                if em is not None and tex_for.get(key) in ('private', 'rgba'):
+                    cur = np.asarray(p.decode_texture(em, 0)).astype(np.uint8).copy()
+                    if tex_for[key] == 'private':
+                        cur[-1, -1, 3] ^= 1                 # the same image, its own copy
+                        q = cur.astype(np.float32) / 255
+                        set_exact_texture(p, em, 0, q)
+                    else:
+                        p.set_texture(em, 0, cur, 0x1A, comp_sel=0x00010203)
+                    notes.append('texture 0 %s (--test-texture-for)' % tex_for[key])
+                elif em is not None and key in tex_for:
+                    al = np.ones((64, 64), np.float32)
+                    if tex_for[key] == 'core':
+                        al[int(64 * 0.3):] = 0
+                    set_exact_texture(p, em, 0, np.stack([np.ones_like(al)] * 3 + [al], -1))
+                    notes.append('texture 0 %s (--test-texture-for)' % tex_for[key])
+                if em is not None and key in checker:
+                    c = ((np.indices((64, 64)) // 8).sum(0) % 2).astype(np.float32)
+                    set_exact_texture(p, em, 0, np.stack([c, c, c, c], -1))
+                    notes.append('texture 0 a checkerboard (--test-checker-for)')
+                if em is not None and key in tint:
+                    for tr in (0, 1):
+                        p.set_field(em, 'color%d_type' % tr, 0)
+                        p.set_color_keys(em, tr, [tint[key] + (1.0,)])
+                    notes.append('tinted %02X%02X%02X (--test-tint)' % tuple(int(v * 255) for v in tint[key]))
+                if em is not None:
+                    made.append((em, e['name']))
+                log.append('    %-24s %s' % (e['name'], '; '.join(dict.fromkeys(notes))))
+            if not made:
+                print('%-30s %s: nothing convertible' % (name, eff.sets[si_ult]))
+                print('\n'.join(log))
+                dropped.append(name)
+                continue
+            if len(made) > MAX_EMITTERS:
+                log.append('    %d emitters: the first %d kept' % (len(made), MAX_EMITTERS))
+                made = made[:MAX_EMITTERS]
+            sname = set_name(a.prefix, eff.sets[si_ult])
+            si = p.new_set(sname, [m[0] for m in made], [m[1] for m in made])
+            ids[name] = done[src, si_ult] = (0x300 + a.kind) << 16 | ef.add(si + 1)
+            print('%-30s %-28s -> %-28s 0x%07X  %d emitters' % (name, eff.sets[si_ult], sname, ids[name], len(made)))
             print('\n'.join(log))
-            dropped.append(name)
-            continue
-        if len(made) > MAX_EMITTERS:
-            log.append('    %d emitters: the first %d kept' % (len(made), MAX_EMITTERS))
-            made = made[:MAX_EMITTERS]
-        sname = set_name(a.prefix, eff.sets[si_ult])
-        si = p.new_set(sname, [m[0] for m in made], [m[1] for m in made])
-        ids[name] = done[si_ult] = (0x300 + a.kind) << 16 | ef.add(si + 1)
-        print('%-30s %-28s -> %-28s 0x%07X  %d emitters' % (name, eff.sets[si_ult], sname, ids[name], len(made)))
-        print('\n'.join(log))
+    convert_source(0, *sources[0])
     if a.variants:
         import effect_variants
         for v in json.load(open(a.variants)):
@@ -1868,6 +1881,9 @@ def main():
             key = effect_variants.variant_key(v['effect'], v['rot'])
             ids[key] = (0x300 + a.kind) << 16 | ef.add(si + 1, flags=entry[0])
             print('%-44s -> %-28s 0x%07X' % (key, sname, ids[key]))
+    # the other files' effects after the variants: every id the base file's effects had stays
+    for src, source in enumerate(sources[1:], 1):
+        convert_source(src, *source)
     # the imported templates whose pixel program was replaced leave their shader unused
     unused = p.drop_unused_shaders(base_shaders)
     out = p.build()

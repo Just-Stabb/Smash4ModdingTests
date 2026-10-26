@@ -702,3 +702,22 @@ the reflector, following his hip (bone 3, where the script puts the start effect
 own -0.5 offset), Terminate 0 so it outlasts his status changes, and kills it (`EffectModule(0x2723)`,
 particles too: its loop parts never end) when the reflector goes (720 frames, a recast, death). Not
 yet: `brave_reflect_flash` on a reflection (Ultimate's, also status code).
+
+## Fix 45 (`build/hero_fix45.zip`): parts in front, Oomph's and Acceleratle's glows
+
+- eft2's camera offset (the static `offset` beside the fluctuation's; `offset_type` 0) is eft's 0x4D0
+  (`docs/ptcl-format.md`): every emitter now gets Ultimate's (the converter had left the template's).
+  Bounce's barrier is 10, so it's drawn over Hero as in Ultimate (fix 44's cut through him); the glow
+  discs -2, Zap's flash 2, and so on.
+- Ultimate's game code (`FighterSpecializer_Brave::special_lw_active_command`, ExeFS `main`
+  0x0085A9D0, its effects found by their Hash40 constants) starts three glows with `req_follow` on
+  `virtualcenter` at his `effect_scale` (0.95), Y 180 facing left, keeping their handles for the buff's length: Bounce's `brave_reflect`, and the common
+  `sys_special_attack_up` (Oomph) / `sys_special_speed_up` (Acceleratle), `ef_common.eff`'s
+  `p_cmnspecialattackup` / `p_cmnspecialspeedup`. Those two are in the bank now
+  (`vfxb_to_ptcl.py --extra-eff ef_common.eff sys_special_attack_up=p_cmnspecialattackup
+  sys_special_speed_up=p_cmnspecialspeedup`: another file's effects, added after the variants so
+  every earlier id stays; 0x345007A / B), and the MSC (`brave_glow`) plays all three the same way,
+  ending them gently when the buff ends (their particles finish, the barrier's own 3-frame fade) and
+  at once on a KO.
+- Not found: what fades the barrier near its end in Ultimate (not in `main`; probably Hero's status
+  code, `lua2cpp_brave.nro` in romfs).
