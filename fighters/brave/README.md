@@ -665,3 +665,14 @@ would otherwise be lost.
 
 Hero, fix 40 -> fix 41: Zap's / Zapple's `impact2` stripes (random 0 - 360 degrees about Z in
 Ultimate, all one way on Pikachu's template before) turn. No spin is lost now.
+
+## Fix 42 (`build/hero_fix42.zip`): the orbs
+
+The flat discs on Frizz, Zap, Kazap, Zoom, Kacrackle / Flame Slash, Snooze and the rest were
+Hero's glow parts on Ultimate's 16-sided flare disc (73 parts): in Ultimate a soft glow, its vertex
+alpha fading the rim to nothing. Found by elimination in game (tests: lights off, glow alpha
+cut, parts tinted, the disc's texture swapped for a checkerboard / a core / a solid fill): the
+texture mapped right but the vertex alpha never did. Every vanilla mesh stores its data position,
+normal, UV, colour; `Ptcl.add_primitive` stored colour before UV, and eft read our UVs as the
+vertex colour. The primitive data now goes in vanilla's order (the same 147 meshes, byte for byte,
+read by offset), which fixes the vertex colour of every converted mesh, not only the discs.

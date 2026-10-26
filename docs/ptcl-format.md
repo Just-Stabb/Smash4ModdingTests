@@ -344,6 +344,10 @@ attributes of (u32 float count, u32 components, u32 offset, u32 byte size): posi
 data after the entries; values big endian. An absent attribute is four zeros (Zelda's quad has no
 colour). Emitter 0x2DC indexes the table ("Primitive Index is Error" if out of range); vanilla
 draws meshes with particle types 0 / 2 / 3 / 4 (the type orients the mesh as it would a quad).
+The data must be stored in vanilla's order whatever the offsets say: position, normal, UV, colour,
+index, contiguous (all 825 vanilla meshes). Stored colour-then-UV (`add_primitive` up to Hero's
+fix 41), the UVs drew right but the vertex colour came out as the UVs (alpha = V): Hero's glow
+discs, whose vertex alpha fades their rim to 0, drew as flat orbs, more opaque at the rim.
 
 ## Key-animation and shader-parameter tables
 

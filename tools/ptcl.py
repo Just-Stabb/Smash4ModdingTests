@@ -526,7 +526,8 @@ class Ptcl:
         uv [n, 2] or [n, 4] (two UV sets), idx [m] triangle list; nrm / col may be None.
         Table: u32 count, u32 total size, u32 entry offset (0xC); 0x50 entries of five
         (float count, components, offset, byte size) attributes: position, normal, colour, UV (4),
-        index (u32); offsets from the data after the entries; big-endian floats."""
+        index (u32); offsets from the data after the entries; big-endian floats. The data goes in
+        vanilla's order: position, normal, UV, colour, index."""
         pos = np.asarray(pos, '>f4').reshape(-1, 3)
         n = len(pos)
         uv = np.asarray(uv, np.float32).reshape(n, -1)
@@ -542,14 +543,20 @@ class Ptcl:
         else:
             count, entries, data = 0, b'', b''
         data = bytearray(data)
-        entry = b''
-        for arr, comps in attrs:
+        # stored as every vanilla mesh is (all 825: position, normal, UV, colour, index, contiguous),
+        # whatever the entry's slot order: eft reads the colour as if it followed the UVs (stored
+        # colour-then-UV, a disc's vertex alpha came out as its V, every glow disc of Hero's fix
+        # 33 - 41 a flat orb)
+        slots = [None] * 5
+        for k in (0, 1, 3, 2, 4):
+            arr, comps = attrs[k]
             if arr is None:
-                entry += struct.pack('>4I', 0, 0, 0, 0)
+                slots[k] = struct.pack('>4I', 0, 0, 0, 0)
                 continue
             raw = arr.tobytes()
-            entry += struct.pack('>4I', arr.size, comps, len(data), len(raw))
+            slots[k] = struct.pack('>4I', arr.size, comps, len(data), len(raw))
             data += raw
+        entry = b''.join(slots)
         body = entries + entry + bytes(data)
         self.prim = bytearray(struct.pack('>3I', count + 1, 12 + len(body), 12)) + body
         self.dirty_layout = True
