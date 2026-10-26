@@ -6,6 +6,7 @@ these, its vertex program and header the template's.
 
   python3 tools/eft_pixel_test.py [BANK.ptcl]
 """
+import itertools
 import os
 import random
 import re
@@ -95,7 +96,7 @@ def run(lines, regs, kc0, tex):
     return out
 
 
-def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=None):
+def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=None, premult=False):
     if dissolve is not None:
         # (width, threshold): texture grey in .x, the mask in .y
         width, thr = dissolve
@@ -118,7 +119,8 @@ def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=N
     if vc is not None:
         rgb = [x * y for x, y in zip(rgb, vc[:3])]
         a *= vc[3]
-    return [min(max(x, 0.0), 1.0) * hdr[0] + hdr[3] for x in rgb] + [min(max(a, 0.0), 1.0)]
+    a = min(max(a, 0.0), 1.0)
+    return [(min(max(x, 0.0), 1.0) * hdr[0] + hdr[3]) * (a if premult else 1.0) for x in rgb] + [a]
 
 
 LAYOUTS = {
@@ -140,39 +142,39 @@ def test_variants():
     rnd = random.Random(1)
     for name, lay in LAYOUTS.items():
         for cm in range(4):
-            for am in (0, 1):
-                for gain in (1.0, 4.0):
-                    c1k = C1_CONST if lay['c1'] is None else None
-                    prog, gprs = E.program(lay, cm, am, gain, c1k)
-                    lines = disasm(prog)
-                    worst = 0.0
-                    for _ in range(40):
-                        c0 = [rnd.uniform(0, 1.5) for _ in range(3)] + [rnd.uniform(0, 1)]
-                        c1 = [rnd.uniform(0, 1.5) for _ in range(4)]
-                        vc = [rnd.uniform(0, 1) for _ in range(4)] if lay['vc'] is not None else None
-                        texel = [rnd.uniform(0, 1) for _ in range(4)]
-                        uv = [rnd.uniform(0, 1) for _ in range(4)]
-                        hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
-                        if c1k:
-                            c1 = list(c1k) + [0.0]
-                        regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['uv'][0]: list(uv)}
-                        if not c1k:
-                            regs['R%d' % lay['c1']] = list(c1)
-                        if vc is not None:
-                            regs['R%d' % lay['vc']] = list(vc)
-                        seen = []
+            for am, gain, premult in itertools.product((0, 1), (1.0, 4.0), (False, True)):
+                c1k = C1_CONST if lay['c1'] is None else None
+                prog, gprs = E.program(lay, cm, am, gain, c1k, premult=premult)
+                lines = disasm(prog)
+                worst = 0.0
+                for _ in range(40):
+                    c0 = [rnd.uniform(0, 1.5) for _ in range(3)] + [rnd.uniform(0, 1)]
+                    c1 = [rnd.uniform(0, 1.5) for _ in range(4)]
+                    vc = [rnd.uniform(0, 1) for _ in range(4)] if lay['vc'] is not None else None
+                    texel = [rnd.uniform(0, 1) for _ in range(4)]
+                    uv = [rnd.uniform(0, 1) for _ in range(4)]
+                    hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
+                    if c1k:
+                        c1 = list(c1k) + [0.0]
+                    regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['uv'][0]: list(uv)}
+                    if not c1k:
+                        regs['R%d' % lay['c1']] = list(c1)
+                    if vc is not None:
+                        regs['R%d' % lay['vc']] = list(vc)
+                    seen = []
 
-                        def tex(u, v, k=0):
-                            seen.append((u, v))
-                            return texel
-                        got = run(lines, regs, {8: hdr}, tex)
-                        want = expected(cm, am, gain, c0, c1, texel, vc, hdr)
-                        k = (0, 1) if lay['uv'][1] == 'xy' else (2, 3)
-                        if seen != [(uv[k[0]], uv[k[1]])]:
-                            worst = float('inf')
-                        worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
-                    check(worst < 1e-5 and gprs == lay['regs'] + 2,
-                          '%s colour %d alpha %d x %g: max error %.2g (%d GPRs)' % (name, cm, am, gain, worst, gprs))
+                    def tex(u, v, k=0):
+                        seen.append((u, v))
+                        return texel
+                    got = run(lines, regs, {8: hdr}, tex)
+                    want = expected(cm, am, gain, c0, c1, texel, vc, hdr, premult=premult)
+                    k = (0, 1) if lay['uv'][1] == 'xy' else (2, 3)
+                    if seen != [(uv[k[0]], uv[k[1]])]:
+                        worst = float('inf')
+                    worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+                check(worst < 1e-5 and gprs == lay['regs'] + 2,
+                      '%s colour %d alpha %d x %g%s: max error %.2g (%d GPRs)' % (
+                          name, cm, am, gain, ', premultiplied' if premult else '', worst, gprs))
 
 
 def test_two():

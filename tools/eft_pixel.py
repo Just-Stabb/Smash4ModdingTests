@@ -6,7 +6,7 @@ Smash 4's eft pixel programs are small and alike (docs/ptcl-format.md "Pixel pro
 GX2 semantic, 0 = colour 0 (rgba: the colour and alpha tracks), 1 = colour 1, 6 = a mesh's vertex
 colour (rgb and alpha multiply in), the texture coordinates on another (9 or 10, slot 0 in .xy);
 then colour 1 + (colour 0 - colour 1) x texture rgb, alpha = colour 0 alpha x the texture's red or
-alpha (template by template), x u_nwColorHdrRange (CB9 [8]: rgb x .x + .w). They can't take a
+alpha (template by template), x u_nwHdrRange (CB9 [8]: rgb x .x + .w). They can't take a
 texture's colour from one channel and its alpha from another unless the template happens to read
 alpha (Frizz's fire: Ultimate's ef_cmn_fire00 is a flipbook whose alpha is the flame and whose rgb
 its hot core, coloured colour 1 -> colour 0 by it; through a red-alpha template every flame was one
@@ -23,7 +23,9 @@ written here:
         alpha); x ALPHA_GAIN (Ultimate's alphas go past 1: its whirlwinds' at 2 - 4), clamped
   (a mesh layout: rgb x v.rgb, a x v.a), rgb clamped to 0 - 1 (the colours keep Ultimate's
   brightness past 1: what Ultimate's tone mapping shows saturated, not Smash 4's bloom), then
-  rgb x hdr.x + hdr.w.
+  rgb x hdr.x + hdr.w (u_nwHdrRange, CB9 [8]); x a on a premultiplied template (premultiplied():
+  the game blends those ONE / INV_SRC_ALPHA, so rgb not x a there is drawn at full strength over
+  the whole shape, Hero's glow discs through fix 42).
 """
 import hashlib
 import os
@@ -42,6 +44,16 @@ SEM_COLOR0, SEM_COLOR1, SEM_VCOLOR = 0, 1, 6
 UV_SEMS = (9, 10)
 # GX2PixelShader words: input count, then the input controls (semantic in the low byte)
 NUM_INPUTS, INPUT_CNTL = 4, 5
+# the shader key record's word +0x40 (the shader object's +0x4BC: the record is copied to +0x47C):
+# bit 0x40 makes shader mode 4's draw callback (cross_f 0x032F4814) blend ONE / INV_SRC_ALPHA, and
+# its pixel program premultiplies (rgb x hdr x 2 x a; all 543 vanilla programs with the bit, none
+# without it)
+PREMULT_WORD, PREMULT_BIT = 0x40, 0x40
+
+
+def premultiplied(p, si):
+    """whether shader si of Ptcl p is drawn premultiplied (PREMULT_WORD / PREMULT_BIT)"""
+    return bool(struct.unpack_from('>I', bytes(p.shader_entry(si)), PREMULT_WORD)[0] & PREMULT_BIT)
 
 
 def header_words(b, typ):
@@ -140,7 +152,7 @@ def _blend(ch, mode, t, other):
 
 
 def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-           c0_const=None, tex_blend2=(0, 0)):
+           c0_const=None, tex_blend2=(0, 0), premult=False):
     """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
     it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
     texture, an opaque black ball where its gradient texture is dark). tex_blend (colour, alpha):
@@ -149,7 +161,8 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     tex_blend2: a three-texture layout's texture 2 after texture 1 (eft2's order: (t0 . t1) . t2);
     the threshold colour 1's red (the converter's colour-1 track: Ultimate's colour 1 alpha over
     life), colour 1 itself c1_const; or, c0_const given (colour 0's rgb; its alpha stays the
-    track's), colour 0's red; alpha x clamp((mask - threshold) / width)"""
+    track's), colour 0's red; alpha x clamp((mask - threshold) / width). premult: rgb out x alpha
+    out (a premultiplied template's; not its x 2, so the part is as bright as on any other)"""
     n = lay['regs']
     two = 'uv1' in lay
     three = 'uv2' in lay
@@ -180,7 +193,8 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
             % (color_mode, alpha_mode, alpha_gain, ', texture 1 %s / %s' % tuple(
                 'x+-'[b % 3] for b in tex_blend) + (', texture 2 %s / %s' % tuple(
                     'x+-'[b % 3] for b in tex_blend2) if three else '') if two else '',
-               ', dissolve %g by colour %d' % (dissolve, thr != c0) if thr else ''),
+               ', dissolve %g by colour %d' % (dissolve, thr != c0) if thr else '')
+            + (', premultiplied' if premult else ''),
             '; $MODE = "UniformBlock"',
             '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 4 if three else n + 3 if two or thr else n + 2),
             '; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2',
@@ -257,6 +271,8 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     # out: rgb x hdr.x + hdr.w, alpha
     groups.append(['%s: MULADD          R0.%s, %s.%s, KC0[8].x, KC0[8].w' % (ch, ch, d, ch) for ch in 'xyz']
                   + ['w: MOV             R0.w, %s.w' % d])
+    if premult:
+        groups.append(['%s: MUL             R0.%s, R0.%s, R0.w' % (ch, ch, ch) for ch in 'xyz'])
     k = 3 if three else 2 if two else 1        # instruction slots count on from the samples
     for g in groups:
         for j, ln in enumerate(g):
@@ -270,9 +286,10 @@ _programs = {}
 
 
 def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-            c0_const=None, tex_blend2=(0, 0)):
+            c0_const=None, tex_blend2=(0, 0), premult=False):
     """(program bytes, GPR count), assembled once per variant"""
-    src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2)
+    src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2,
+                 premult)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -298,11 +315,13 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     x the colour scale) for a template that doesn't pass it, or that passes the dissolve's
     threshold in it (dissolve: its edge width; on a one-texture layout with colour 1 only); c0_const:
     colour 0's rgb, the dissolve's threshold in colour 0's track instead (a layout without colour 1
-    then only in colour modes 0 / 1)"""
+    then only in colour modes 0 / 1). A premultiplied template (premultiplied()) gets a
+    premultiplying program"""
     b = bytes(p.shader_binary(si))
     lay = layout(b)
     if lay is None:
         return None
+    premult = premultiplied(p, si)
     if dissolve is None or 'uv1' in lay or (c0_const is None and lay['c1'] is None) or (
             c0_const is not None and lay['c1'] is None and color_mode in (2, 3)):
         dissolve = c0_const = None
@@ -319,10 +338,10 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     if 'uv2' not in lay:
         tex_blend2 = (0, 0)
     key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const, tuple(tex_blend),
-           dissolve, c0_const, tuple(tex_blend2))
+           dissolve, c0_const, tuple(tex_blend2), premult)
     if key not in _shaders or _shaders[key][0] is not p:
         prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const,
-                             tuple(tex_blend2))
+                             tuple(tex_blend2), premult)
         nb = with_program(b, prog, gprs)
         if hashlib.md5(b).hexdigest() in GRAFTED:          # (a grafted layout stays one)
             GRAFTED[hashlib.md5(nb).hexdigest()] = GRAFTED[hashlib.md5(b).hexdigest()]

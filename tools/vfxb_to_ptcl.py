@@ -866,11 +866,12 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         notes.append('own pixel program: template layout not supported')
         return None
     lay = eft_pixel.layout(bytes(p.shader_binary(si)))
-    notes.append('own pixel program (colour %d, alpha %d%s%s%s)' % (
+    notes.append('own pixel program (colour %d, alpha %d%s%s%s%s)' % (
         cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else '',
         ', colour 1 constant' if (lay['c1'] is None or (dissolve is not None and not dissolve_c0))
         and cb['color_process'] in (2, 3) else '',
-        ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else ''))
+        ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else '',
+        ', premultiplied' if eft_pixel.premultiplied(p, si) else ''))
     return si, np.clip(alpha / gain, 0, 1), gain
 
 

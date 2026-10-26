@@ -670,9 +670,26 @@ Ultimate, all one way on Pikachu's template before) turn. No spin is lost now.
 
 The flat discs on Frizz, Zap, Kazap, Zoom, Kacrackle / Flame Slash, Snooze and the rest were
 Hero's glow parts on Ultimate's 16-sided flare disc (73 parts): in Ultimate a soft glow, its vertex
-alpha fading the rim to nothing. Found by elimination in game (tests: lights off, glow alpha
-cut, parts tinted, the disc's texture swapped for a checkerboard / a core / a solid fill): the
-texture mapped right but the vertex alpha never did. Every vanilla mesh stores its data position,
-normal, UV, colour; `Ptcl.add_primitive` stored colour before UV, and eft read our UVs as the
-vertex colour. The primitive data now goes in vanilla's order (the same 147 meshes, byte for byte,
-read by offset), which fixes the vertex colour of every converted mesh, not only the discs.
+alpha fading the rim to nothing. The primitive data now goes in vanilla's order (position, normal,
+UV, colour). That was not the cause (fix 43): eft reads each attribute at its own offset, and in
+game the discs stayed.
+
+## Fix 43 (`build/hero_fix43.zip`): the orbs, premultiplied
+
+The orbs were the blend. Their templates are shader mode 4 with the premultiplied key bit
+(`docs/ptcl-format.md` "Pixel programs"): the game draws those ONE / INV_SRC_ALPHA, and their own
+programs multiply rgb by alpha. Ours didn't, so a disc's colour went on at full strength over the
+whole mesh while only the picture behind faded with alpha: a flat disc of colour out to the mesh's
+rim. Read off the tests' screenshots: the checkerboard disc's rings faded with the vertex alpha as
+they should (alpha 0.53 / 0.47 / 0.24 / 0.06 out from the middle, vertex alpha 1 / 0.79 / 0.42 /
+0.08), yet the red disc's red channel was saturated where its alpha was 0.005 and the green under
+it untouched. Our programs on such templates now premultiply (rgb x hdr x alpha, not vanilla's
+extra x 2, so these parts are as bright as the rest).
+
+Hero, fix 42 -> fix 43: the 83 parts on premultiplied templates (40 effects): the glow discs
+(`fire1_hold` / `fire2_hold` / `lightning1_hold` / `tornado1_hold` `flare1`, `lightning1_discharge`
+`flare2`, the sword effects' `lightning_flare2` / `flareline1`, `sleep` `flare3_loop`, `flying`,
+`flash1_pillar`, `fire3_bullet` `flare3`, `various_magic_empty`), and the rings, impacts, arcs,
+auras and barriers on the same kind of template (`lightning1/2_spark`, `lightning3_rolllightning`,
+`reflect*`, `deathball*`, `smash_ground`, `shield_bash` / `_impact`, `fullburst_*` and others).
+Nothing else changed.

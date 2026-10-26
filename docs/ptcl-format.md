@@ -221,10 +221,21 @@ program (7). The pixel inputs are named by GX2 semantic (pixel header word 4 = c
 
 The common programs (layout 0, 1, 9: 469 shaders; 0, 1, 6, 10: 271) are: sample slot 0, colour =
 colour 1 + (colour 0 − colour 1) × texture rgb, alpha = colour 0 alpha × texture red (or alpha, by
-template) clamped, × the vertex colour on a mesh, then rgb × `u_nwColorHdrRange` (CB9 [8]: × .x
-+ .w). Robin's `fire1` (shader 95, layout 0, 1, 3, 9, 10) is Ultimate's fire combiner: texture 0
-offsets texture 1's UVs (distortion, × CB2 [12].xy × semantic 3's .w), colour by texture 1 × 2's
-rgb, alpha by their red.
+template) clamped, × the vertex colour on a mesh, then rgb × `u_nwHdrRange` (CB9 [8]: × .x
++ .w; `userUniformBlock`, the game's: `u_nwColorHdrRange` is [9]). Robin's `fire1` (shader 95,
+layout 0, 1, 3, 9, 10) is Ultimate's fire combiner: texture 0 offsets texture 1's UVs
+(distortion, × CB2 [12].xy × semantic 3's .w), colour by texture 1 × 2's rgb, alpha by their red.
+
+Premultiplied programs: a shader whose key record has bit 0x40 in its word +0x40 (the shader
+object's +0x4BC; the 0x78 record is copied to +0x47C) is drawn by shader mode 4's draw callback
+(the game's, cross_f 0x032F4814: per mode, registered at 0x032F4B8C) with blend ONE /
+INV_SRC_ALPHA (alpha ZERO / INV_SRC_ALPHA), whatever the emitter's blend (0x324), and its program
+premultiplies: rgb × hdr × 2 (`MULADD_M2`) × alpha. All 543 vanilla programs with the bit do, none
+without it (all mode 4: 543 of its 774). A replacement program on such a template must
+premultiply too: unmultiplied, its colour is added at full strength over the whole shape and only
+the picture behind is scaled by alpha (Hero's glow discs, fix 33 - 42: flat orbs to the mesh's
+rim, rgb saturated where alpha was 0.005). The emitter's blend 0 (alpha) / 1 (add) both draw
+"over" there, as vanilla's do (`impact3`, blend 1).
 
 Replacing only the pixel program (block 7; the header's GPR count and program size updated, its
 inputs, samplers and uniform blocks kept) leaves the emitter's vertex program (particle type,
@@ -344,10 +355,11 @@ attributes of (u32 float count, u32 components, u32 offset, u32 byte size): posi
 data after the entries; values big endian. An absent attribute is four zeros (Zelda's quad has no
 colour). Emitter 0x2DC indexes the table ("Primitive Index is Error" if out of range); vanilla
 draws meshes with particle types 0 / 2 / 3 / 4 (the type orients the mesh as it would a quad).
-The data must be stored in vanilla's order whatever the offsets say: position, normal, UV, colour,
-index, contiguous (all 825 vanilla meshes). Stored colour-then-UV (`add_primitive` up to Hero's
-fix 41), the UVs drew right but the vertex colour came out as the UVs (alpha = V): Hero's glow
-discs, whose vertex alpha fades their rim to 0, drew as flat orbs, more opaque at the rim.
+eft's loader (cross_f 0x04A6CF74) reads each attribute at its own offset, so the storage order is
+free; an attribute whose offset is 0 counts as absent there (a missing colour is filled with a
+constant). `add_primitive` stores them in vanilla's order (position, normal, UV, colour, index,
+contiguous: all 825 vanilla meshes) for likeness only. (Hero's fix 42 put the orbs down to the
+order; they were the premultiplied blend, "Pixel programs".)
 
 ## Key-animation and shader-parameter tables
 

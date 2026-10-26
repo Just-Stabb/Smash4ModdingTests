@@ -544,9 +544,8 @@ class Ptcl:
             count, entries, data = 0, b'', b''
         data = bytearray(data)
         # stored as every vanilla mesh is (all 825: position, normal, UV, colour, index, contiguous),
-        # whatever the entry's slot order: eft reads the colour as if it followed the UVs (stored
-        # colour-then-UV, a disc's vertex alpha came out as its V, every glow disc of Hero's fix
-        # 33 - 41 a flat orb)
+        # whatever the entry's slot order (eft reads each attribute at its own offset, 0x04A6CF74:
+        # the order is only for likeness)
         slots = [None] * 5
         for k in (0, 1, 3, 2, 4):
             arr, comps = attrs[k]
