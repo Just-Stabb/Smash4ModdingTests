@@ -615,3 +615,17 @@ animation a template lacked 16 -> 3; samplers folded in as their mean 22 -> 11; 
 turned by world motion instead of velocity 12 -> 0. 84 parts use a grafted program. Left: 11 third
 samplers (their mean: a slot-2 graft), 2 spins (`impact2`), `Light`'s quad UV animation.
 
+## Fix 38 (`build/hero_fix38.zip`): no lit smoke templates; spell lights within 1
+
+- **Dark flames:** Kafrizz's trail stayed black-red through tests A - F (its second texture off,
+  its colour averaged) and orange only on fix 36's template: the grafted template was Mario's
+  fireball smoke, whose vertex program lights its particles (colour x max(normal . light, 0) x the
+  light colour + ambient, from the game's `userUniformBlockParam`, CB4). 245 vanilla emitters (all
+  shader mode 4) have such programs; fixes 33 - 37 used them for 71 - 102 of Hero's parts (Frizz's
+  and Frizzle's flames, the fire hits, the sword spells, the lightning flashes). They are never
+  templates now (`LIT_BLOCK`), at no cost: every count of fix 37 holds.
+- **Lights:** a light left to the particle's colour took its colour scale (2 on most of Ultimate's
+  flares; vanilla lights stay within 1, 99% of 599): Kaboom's stacked lights were blinding. Each light
+  now has its own colour, the particle's mean within 1, x CADP's last value (the light's strength).
+- Kafrizz's core sphere keeps its grafted (GPU) template: test A's fireball, the best of A - D.
+

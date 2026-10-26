@@ -251,6 +251,11 @@ frame; pm2 = scale initial, scale random; pm3 = rotation a frame, initial, rando
 random channel); pm4 = repeat / cells (0x508), cells across / down; uboFlag 0x400 << 2 x slot /
 0x800 << 2 x slot from the slot's inverse-random bytes (0x4DA / 0x4DB).
 
+Vertex programs declaring `userUniformBlockParam` (CB4, 8 vec4s the game fills: a light's
+direction and colour, ambient) light their particles: colour x max(normal . light, 0) x the light's
+colour + ambient (Mario's fireball smoke, Dedede's swing smoke; 245 vanilla emitters, all shader mode
+4, the other 798 of mode 4 unlit): flames on them burn dark away from the light.
+
 What a template draws is read from its program, not its mode words: the UV animation of each slot
 (all or none), whether it plays a flipbook (any mode), the follow types it draws right, `v_inRot` /
 `v_inVec`, and whether it reads the shader parameters (162 of 675 vanilla programs: a template

@@ -164,6 +164,11 @@ SCREEN_SAMPLERS = (b'frameBufferTexture_CROSS', b'depthBufferTexture_CROSS', b't
 # Never templates: an own pixel program's colour there bends the picture behind instead (fix 33's
 # Frizz / Zap charge flare1, a see-through lens at the hand; fix 32's sword light and explosions)
 PASS_MODES = (5, 6, 7)
+# vertex programs lighting their particles (smoke's: colour x max(normal . light, 0) x the light's
+# colour + ambient, from the game's userUniformBlockParam, CB4; 245 vanilla emitters, all shader mode
+# 4): never templates. Ultimate's parts aren't lit so: Frizz's / Kafrizz's flames on smoke templates
+# (Mario's fireball smoke) burned dark red to black away from the light (fixes 33 - 37: 71 - 102 parts)
+LIT_BLOCK = 'userUniformBlockParam'
 # a particle's rotation is shader-keyed: the vertex program turns it from this attribute, and a
 # shader without it draws every particle unturned (vanilla: all 3165 emitters with a rotation have
 # it; down air's flares, turned -90 degrees in Ultimate, lay across the plunge as crosses)
@@ -193,7 +198,8 @@ class Templates:
     Then animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
     (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
-    screen or texture arrays (SCREEN_SAMPLERS) or drawn in another pass (PASS_MODES) are left out."""
+    screen or texture arrays (SCREEN_SAMPLERS), drawn in another pass (PASS_MODES) or lighting their
+    particles (LIT_BLOCK) are left out."""
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
@@ -220,8 +226,10 @@ class Templates:
                     si_ = struct.unpack_from('>I', em, 0x844)[0]
                     if si_ not in screen:
                         b = p.shader_binary(si_)
+                        hdr = eft_vertex.vertex_header(bytes(b))
                         screen[si_] = (any(t in b for t in SCREEN_SAMPLERS)
-                                       or struct.unpack_from('>I', p.shader_entry(si_), 0)[0] & 0xFF in PASS_MODES,
+                                       or struct.unpack_from('>I', p.shader_entry(si_), 0)[0] & 0xFF in PASS_MODES
+                                       or hdr is not None and any(n == LIT_BLOCK for n, _cb, _s in hdr['blocks']),
                                        ROTATION_ATTR in b, VELOCITY_ATTR in b, eft_vertex.features(bytes(b)))
                     if screen[si_][0]:
                         continue
