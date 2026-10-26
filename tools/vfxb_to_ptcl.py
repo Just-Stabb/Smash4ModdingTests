@@ -93,6 +93,7 @@ TWO_COLOUR = {('P_EdgeAttackDash2', 'FlashLine1')}
 # past 1); off (--no-exact), the one-shape fold of combine()
 EXACT = True
 TWO_TEXTURES = True     # two-texture templates (a second sampler drawn live: live_sampler)
+DISSOLVE = True         # Ultimate's dissolve (dissolve_of)
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -557,7 +558,7 @@ def dissolve_of(e, ti, images, names, ptn):
     (DISSOLVE_SHADER), else None. The mask is sampler 1's alpha as stored (whatever its alpha input
     to the combiner), so it must read sampler ti's UVs (it rides in texture 0's green); the colour
     input grey (texture 0 carries it in red and blue: eft_pixel's dissolve programs); no flipbook"""
-    if e['shader']['custom_shader_index'] != DISSOLVE_SHADER or 'CSDP' not in e['subsections']:
+    if not DISSOLVE or e['shader']['custom_shader_index'] != DISSOLVE_SHADER or 'CSDP' not in e['subsections']:
         return None
     s = e['sampler'][1]
     if s['texture_id'] == NONE64 or s['texture_id'] not in images or ptn or not (ti == 1 or same_uv(e, ti, 1)):
@@ -1512,12 +1513,14 @@ def main():
                     "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
                     "orbs on Hero's Thunder-based articles)")
     ap.add_argument('--no-two', action='store_true', help='no two-texture templates: every emitter draws one texture')
+    ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES
+    global EXACT, TWO_TEXTURES, DISSOLVE
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
+    DISSOLVE = not a.no_dissolve
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()
@@ -1569,11 +1572,11 @@ def main():
             ids[key] = (0x300 + a.kind) << 16 | ef.add(si + 1, flags=entry[0])
             print('%-44s -> %-28s 0x%07X' % (key, sname, ids[key]))
     # the imported templates whose pixel program was replaced leave their shader unused
-    dropped = p.drop_unused_shaders(base_shaders)
+    unused = p.drop_unused_shaders(base_shaders)
     out = p.build()
     q = ptcl.Ptcl(out)
     assert q.validate() == [], q.validate()
-    print('%d unused shaders dropped; bank %.2f MB' % (dropped, len(out) / 1e6))
+    print('%d unused shaders dropped; bank %.2f MB' % (unused, len(out) / 1e6))
     os.makedirs(a.out_dir, exist_ok=True)
     open(os.path.join(a.out_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(a.out_dir, base + '.efc'), 'wb').write(ef.build())
