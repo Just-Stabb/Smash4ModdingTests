@@ -736,3 +736,19 @@ alpha and shape-scale defaults the animations multiply are now 1 on every conver
 template's own had been left (Kaboom's `flareBase` and Bounce's `pointlight1` had a shape scale of
 10). Turned variants (`tools/effect_variants.py`) turn the rotation and translation keys too. Not
 converted: `EAA1` (alpha 1) and `EADV` (no eft equivalent). Only the `.ptcl` changed.
+
+## Fix 47 (`build/hero_fix47.zip`): particle fields
+
+Ultimate moves many particles with "fields": spin about an axis, curl noise (a swirling drift),
+convergence toward a point, magnet, random kicks. The converter had dropped them. Smash 4's eft has the
+same fields (complex emitters' field blocks, decoded in `docs/ptcl-format.md`), with per-particle key
+animations for their strengths, and eft2 kept eft's units, so they now convert (`vfxb_to_ptcl.py`
+`particle_fields`): 47 parts. Spin: Woosh / Swoosh / Kaswoosh's tornado particles and wind (their spin
+slowing over the particle's life, as in Ultimate: e.g. 24.65 down to 8.6 degrees a frame), Zoom, the
+Frizz / Frizzle / Kafrizz hits, Kaboom's omen debris, Magic Burst; curl noise: the Frizz family's
+flames, sparks and smoke, Bang / Kaboom, Kamikazee's bomb, Flame Slash, the Thwack hit; convergence:
+Kaboom's omen lines, Kafrizz's appearance; Oomph / Acceleratle's glows: curl noise and magnet. eft runs
+fields on the CPU's particles only, so these parts now take CPU templates (three directional ones,
+Kaswoosh's / Swoosh's wind and Kafrizz's appearance line, now face their world motion, spin included, rather
+than their velocity). Not yet: FRND (Ultimate's sine-noise random: Bounce's start, Snooze) and FCOL
+(collision; none of Hero's). Only the `.ptcl` changed.

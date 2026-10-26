@@ -87,6 +87,16 @@ PREMULT_SHADER = (4, 64)
 EMITTER_ANIMS = {
     'EATR': (0,), 'EAPL': (1,), 'EAES': (2, 3, 4), 'EAER': (5, 6, 7), 'EAET': (8, 9, 10), 'EAC0': (11, 12, 13),
     'EAA0': (14,), 'EAOV': (15,), 'EASL': (17, 18), 'EAC1': (19, 20, 21), 'EASS': (22, 23, 24)}
+# Ultimate's particle fields (VFXB sub-sections, little endian; main's section table 0x8CB00, its CPU
+# fields 0x955F0) -> eft's complex-emitter field blocks (ptcl.FIELD_BLOCKS: the same fields, eft2 having
+# kept eft's units) and per-particle key animations (ptcl.INT_TARGETS / KEYA_TARGETS 0x1C - 0x25). eft
+# runs them on the CPU's particles only (no vanilla GPU program reads them but spin / magnet), so an
+# emitter with any wants a template whose particles the CPU moves (no v_inVec). Each section ends in
+# 8-key animations of 37 words: on, loop, random, key count, period (100), 8 keys of x, y, z, time 0 - 1
+# of the life (main 0x93C80; eft's keys 0 - 100 the same). FRND (eft2's sine-noise random) and FCOL have
+# no eft equivalent worked out yet
+FIELD_SECTIONS = ('FSPN', 'FCLN', 'FCOV', 'FMAG', 'FRN1')
+SPIN_UNITS = 2 ** 32 / 360.0        # eft's spin rate: 2^32 a full turn a frame (cross_f 0x04A6EC2C)
 # shape scale, colour 0, colour 1, alpha (0x378 - 0x3A4): what the animations replace, 1 when none (a
 # template's own otherwise: Kaboom's flareBase had a shape scale of 10)
 EMITTER_DEFAULTS = 0x378
@@ -283,7 +293,7 @@ class Templates:
                             self.found[key][tr] = (score, path, si, k, grafted)
 
     def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False,
-            want2=False, uv_mode1=0, swap_ok=False, need_thr=0, want3=False):
+            want2=False, uv_mode1=0, swap_ok=False, need_thr=0, want3=False, fields=False):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A flipbook template is never taken for no flipbook when another is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
@@ -293,7 +303,9 @@ class Templates:
         want2: a second texture drawn live (uv_mode1 its UV mode bits); swap_ok: the two may trade
         slots (texture 0 x / + texture 1 either way round) when the template animates them better so.
         need_thr: a dissolve's threshold over life wants an animated colour track, 1: colour 1's, 2:
-        either (colour 0's rgb constant). Returns (emitter bytes, turns, swapped)"""
+        either (colour 0's rgb constant). fields: particle fields (FIELD_SECTIONS), which want the CPU's
+        particles (no v_inVec), ranked after the main texture's UV animation. Returns (emitter bytes,
+        turns, swapped)"""
         def assign(t):
             """(main's UV mode met, the second's met, swapped): the better way round"""
             mode, two, mode1 = t[1], t[9], t[10]
@@ -323,8 +335,10 @@ class Templates:
             # (a spin before the colour tracks: a mesh's can't be baked, only its starting rotation,
             # and stood still Woosh's rings / wind lost their whole motion for colour 1's mean)
             # (a third texture (want3) wants a template whose slot 1 can be grafted: slot 2 is made from it)
+            # (fields before the second texture: Woosh's tornado particles are their spin)
             return (plain, not pm or bool(ptn), own if need_c1 else min(own, 1), follow in fol, pm == bool(ptn),
-                    fit0, two == want2, fit1, not want3 or grafted == 2, not need_thr or an1 or (need_thr == 2 and an0),
+                    fit0, not fields or not by_vel, two == want2, fit1, not want3 or grafted == 2,
+                    not need_thr or an1 or (need_thr == 2 and an0),
                     turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1],
                     by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), not grafted, same_blend, score)
@@ -353,6 +367,8 @@ class Templates:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
             if ptn and not pm:
                 notes.append('flipbook mode %d: template plays none (one cell shown)' % ptn)
+            if fields and by_vel:
+                notes.append('fields lost: the template moves its particles on the GPU')
             if key[0] == 3 and not by_vel and follow != 1:
                 # (unfollowing particles' world motion is their velocity; every vanilla v_inVec
                 # program moves its particles on the GPU)
@@ -1302,11 +1318,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
     if live3:
         live, swap_ok = 1, False
+    fblocks, fanims, fdone = particle_fields(e)
     em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
                                        notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
                                        live is not None,
                                        uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
-                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None)
+                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None, bool(fblocks))
     if swapped:
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
@@ -1662,7 +1679,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     if e['children']:
         notes.append('%d child emitters not converted' % len(e['children']))
     anims, done = emitter_anims(p, em, e, notes)
-    left = set(e['subsections']) - done
+    left = set(e['subsections']) - done - fdone
     if struct.unpack_from('>I', em, USER_CALLBACK)[0] == LIGHT_CALLBACK:
         em[USER_DATA:USER_CALLBACK + 4] = bytes(USER_CALLBACK + 4 - USER_DATA)
     if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20 and \
@@ -1697,7 +1714,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     for a in anims:         # an animated rate lowered with the emitter's (its peak)
         if a['target'] == 0:
             a['keys'] = [(t, v * p.field(em, 'emit_rate') / before) for t, v in a['keys']]
-    p.set_key_anims(em, anims)
+    if fblocks:
+        em = ptcl.Ptcl.with_fields(em, fblocks)
+        notes.append('fields: %s%s' % (', '.join(sorted(fblocks)), ' (animated %s)' % ', '.join(
+            '0x%X' % a['target'] for a in fanims) if fanims else ''))
+    p.set_key_anims(em, anims + fanims)
     return em
 
 
@@ -1738,6 +1759,68 @@ def emitter_anims(p, em, e, notes):
     if done:
         notes.append('emitter animations: ' + ', '.join(sorted(done)))
     return out, done
+
+
+def field_anim(raw, word, targets, scale=1.0, to_int=False):
+    """an Ultimate field's 8-key animation (FIELD_SECTIONS' note) at this word as eft per-particle key
+    animations of these targets (its x / y / z), x scale; [] when off"""
+    on, loop, rnd, nk, period = struct.unpack_from('<5I', raw, 4 * word)
+    if not on or not nk:
+        return []
+    keys = [struct.unpack_from('<4f', raw, 4 * (word + 5) + 16 * k) for k in range(min(nk, 8))]
+    out = []
+    for i, t in enumerate(targets):
+        vals = [k[i] * scale for k in keys]
+        if to_int:
+            vals = [(int(round(v)) + 2 ** 31) % 2 ** 32 - 2 ** 31 for v in vals]
+        out.append({'target': t, 'loop': loop, 'w4': period, 'w5': rnd,
+                    'keys': [(k[3] * 100.0, v) for k, v in zip(keys, vals)]})
+    return out
+
+
+def particle_fields(e):
+    """the emitter's Ultimate fields (FIELD_SECTIONS) as eft field blocks ({name: bytes}), their
+    per-particle key animations and the sections taken"""
+    subs = e['subsections']
+    blocks, anims, done = {}, [], set()
+
+    def raw(k, n):
+        r = bytes.fromhex(subs.get(k, ''))
+        if len(r) < n:
+            return None
+        done.add(k)
+        return r
+    r = raw('FSPN', 308)
+    if r:
+        # rate (radians a frame; its animation, when on, degrees a frame and in its place: main
+        # 0x944B0), axis (0 - 2 both), outward speed (its animation x pi / 180, as Ultimate's code does)
+        rate, axis, outward = struct.unpack_from('<fIf', r, 0)
+        blocks['spin'] = struct.pack('>IIf', int(round(math.degrees(rate) * SPIN_UNITS)) % 2 ** 32, axis, outward)
+        anims += field_anim(r, 3, (0x20,), SPIN_UNITS, True) + field_anim(r, 40, (0x21,), math.pi / 180)
+    r = raw('FCLN', 36)
+    if r:
+        # the same numbers in another order (Bayonetta's butterflies and bats, in both games)
+        v = struct.unpack_from('<8f', r, 4)
+        blocks['curl_noise'] = struct.pack('>BB2x8f', r[0], r[1], v[6], *(v[3:6] + v[0:3] + v[7:8]))
+    r = raw('FCOV', 168)
+    if r:
+        # type 1 converges on the emitter (eft: any non-zero word; vanilla 0x01000000), 0 on the position
+        typ, x, y, z, ratio = struct.unpack_from('<I4f', r, 0)
+        blocks['convergence'] = struct.pack('>I4f', 0x01000000 if typ else 0, x, y, z, ratio)
+        anims += field_anim(r, 5, (0x22,))
+    r = raw('FMAG', 168)
+    if r:
+        # bytes: follows the emitter, then x / y / z on (Mii Gunner's absorber, Mega Man's KO lines)
+        power, x, y, z = struct.unpack_from('<4f', r, 4)
+        blocks['magnet'] = struct.pack('>4fIB3x', power, x, y, z, (r[1] & 1) | (r[2] & 1) << 1 | (r[3] & 1) << 2, r[0])
+        anims += field_anim(r, 5, (0x1F,))
+    r = raw('FRN1', 164)
+    if r:
+        # eft's own random (eft2's "random fe1"): velocity += rand x it every interval frames
+        vx, vy, vz, interval = struct.unpack_from('<3fI', r, 0)
+        blocks['random'] = struct.pack('>i3f', interval, vx, vy, vz)
+        anims += field_anim(r, 4, (0x1C, 0x1D, 0x1E))
+    return blocks, anims, done
 
 
 def turn_set(p, si, rot_deg):

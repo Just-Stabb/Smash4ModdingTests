@@ -164,9 +164,40 @@ Everything not listed is copied verbatim.
 
 ### Complex emitters (header after the simple 0x8BC bytes)
 
-u16s from `+0x8C0`: field flags (bits 0-2 add 0x10 / 0x18 / 0xC-byte field blocks, read at 0x04A5BFF4),
-`+0x8C8` child data offset (0x308 bytes), `+0x8CA` field blocks, `+0x8CC` fluctuation (0x20),
-`+0x8CE` stripe (0x34), `+0x8D0` total size. The stripe block (eft's own ribbons, types 5 / 6:
+`+0x8BC` u32 (0xC00050 on every vanilla complex emitter without a child), then u16s from `+0x8C0`:
+field flags, fluctuation flags (bit 0 on; 0xE when off), stripe flags, pad, `+0x8C8` child data offset
+(0x308 bytes), `+0x8CA` field blocks, `+0x8CC` fluctuation (0x20), `+0x8CE` stripe (0x34), `+0x8D0`
+total size (`Ptcl.with_fields` rebuilds the 95 vanilla field-only emitters byte for byte).
+
+The field blocks follow each other in flag-bit order (`ptcl.FIELD_BLOCKS`, big endian). cross_f 0x04A62E4C
+runs them each frame on the CPU's particles (0x04A6E56C random, 0x04A6E6EC magnet, 0x04A6EB3C spin,
+0x04A6EFC4 collision, 0x04A6F90C convergence, 0x04A6FD40 position add, 0x04A610AC curl noise);
+0x04A5AF90 also copies them into the vertex programs' uniforms (`fieldRandomParam` vec4 67 ...
+`fieldCurlNoise1` 75), but the only vanilla GPU programs (`v_inVec`) reading any read spin (72) and
+magnet (71): fields need the CPU's particles.
+
+| Bit | Field | Size | Layout |
+|-----|-------|------|--------|
+| 0 | random | 0x10 | s32 interval, vec3 velocity (every interval frames velocity += rand x it) |
+| 1 | magnet | 0x18 | f power, vec3 position, u32 axes (x 1, y 2, z 4), u8 follows the emitter |
+| 2 | spin | 0x0C | u32 rate (2^32 = 360 degrees a frame), u32 axis (0-2), f outward speed |
+| 3 | collision | 0x14 | u8 type, u8 world, f plane, f bounce, s32 count (-1), f friction (read at 0x04A5BFF4) |
+| 4 | convergence | 0x14 | u32 0 (to the position) / non-zero (to the emitter; vanilla 0x01000000), vec3 position, f ratio |
+| 5 | position add | 0x10 | vec3, u8 world |
+| 6 | curl noise | 0x24 | u8, u8, 2 pad, f, vec3, vec3, f (uniforms: vec4 74 = the first vec3 and f, 75 = the second and the last f) |
+
+Per-particle key animations (targets above 0x1B, see the key-animation section) animate them: 0x1C - 0x1E
+the random velocity, 0x1F magnet power, 0x20 spin rate (keyed as an int, the block's units), 0x21 spin
+outward speed, 0x22 convergence ratio, 0x23 - 0x25 position add.
+
+Ultimate's fields are the same with their own sections (little endian; main 0x8CB00 reads the tags,
+0x955F0 runs them on the CPU) and 37-word 8-key animations (on, loop, random, key count, period 100,
+then 8 keys of x, y, z, time 0 - 1 of the life; 0x93C80): FRN1 = random (velocity, interval, its
+animation at word 4), FMAG (bytes follow / x / y / z, power, position, animation at word 5), FSPN (rate in
+radians, axis, outward; the rate's animation at word 3 in degrees and replacing it, the outward speed's at
+word 40 x pi / 180 as Ultimate's code does), FCOV (type, position, ratio, animation at word 5), FCLN (the
+curl noise's numbers reordered: eft's f = word 7, first vec3 = words 4 - 6, second = 1 - 3, last f =
+word 8; flags bytes 0 / 1 the same). FRND (eft2's sine-noise random) and FCOL aren't mapped yet. The stripe block (eft's own ribbons, types 5 / 6:
 90 / 31 vanilla) is 13 words: type, option, connect, texture coordinates, history length,
 divisions, start / end alpha (f), UV scroll (2f), history step, history / direction interpolation (f).
 
@@ -382,7 +413,8 @@ A key-animation range is `b'KEYA'`, a u32 block count, then the blocks (`Ptcl.ke
 | 0x1C | f32 pairs | keys: frame, value |
 
 Before the first key the value is the first key's; after the last (no loop) the last's (cross_f
-0x04A6DA70). The pointer is resolved at load (0x04A5A5A0, into emitter +0x2C8); each frame (0x04A64444)
+0x04A6DA70). Targets above 0x1B are per particle: their blocks are kept at +0x1E8 + 4 x target and read
+at frame 100 x age / life (0x04A5E148): the complex emitters' fields (above). The pointer is resolved at load (0x04A5A5A0, into emitter +0x2C8); each frame (0x04A64444)
 targets below 0x1C are written into the emitter instance's float array (+0x1EC + 4 x target), over the
 defaults 0x04A5C048 sets from the emitter's fields; targets 2, 5 and 8 also flag the emitter matrix for a
 rebuild. Higher targets are per particle (the 0x32C hooks).

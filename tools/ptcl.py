@@ -141,8 +141,10 @@ FIELD = {f[2]: f for f in FIELDS}
 # (frame f32, value f32). Before the first key its value, after the last (no loop) the last's (cross_f
 # 0x04A6DA70, which reads neither the 100 nor the 0). Targets under 0x1C are the emitter's own, written
 # each frame (0x04A64444) over the defaults of its instance's float array (+0x1EC + 4 x target, from
-# 0x04A5C048): KEYA_TARGETS; 2 / 5 / 8 also rebuild the emitter matrix. Higher ones are per particle
-# (the 0x32C hooks)
+# 0x04A5C048): KEYA_TARGETS; 2 / 5 / 8 also rebuild the emitter matrix. Higher ones are per particle,
+# their blocks kept at +0x1E8 + 4 x target (0x04A5A684) and read over the particle's life (frame 0 - 100:
+# 100 x age / life, 0x04A5E148; looped, the 100 word is the period): the complex emitters' fields
+# (FIELD_TARGETS) and the 0x32C hooks. Spin's rate (0x20) is keyed as an int, the block's own units
 KEYA_TARGETS = {
     0: 'emission rate (0x444)', 1: 'particle life (0x4B0)', 2: 'emitter scale x', 3: 'emitter scale y',
     4: 'emitter scale z', 5: 'emitter rotation x (radians)', 6: 'emitter rotation y', 7: 'emitter rotation z',
@@ -150,7 +152,24 @@ KEYA_TARGETS = {
     11: 'colour 0 r (0x384)', 12: 'colour 0 g', 13: 'colour 0 b', 14: 'alpha (0x3A4)',
     15: 'all-direction velocity (0x45C)', 16: 'directional velocity (0x464)', 17: 'particle scale x (1)',
     18: 'particle scale y (1)', 19: 'colour 1 r (0x394)', 20: 'colour 1 g', 21: 'colour 1 b',
-    22: 'shape scale x (0x378)', 23: 'shape scale y', 24: 'shape scale z'}
+    22: 'shape scale x (0x378)', 23: 'shape scale y', 24: 'shape scale z',
+    0x1C: 'random field velocity x', 0x1D: 'random field velocity y', 0x1E: 'random field velocity z',
+    0x1F: 'magnet field power', 0x20: 'spin field rate (int)', 0x21: 'spin field outward speed',
+    0x22: 'convergence field ratio', 0x23: 'position-add field x', 0x24: 'position-add field y',
+    0x25: 'position-add field z'}
+INT_TARGETS = {0x20}
+# complex emitters' fields (+0x8C0 flags, +0x8CA the blocks, in bit order; cross_f 0x04A62E4C runs them on
+# the CPU's particles, 0x04A5AF90 sets the vertex programs' field uniforms, which vanilla GPU programs
+# read for spin / magnet only): (bit, name, size, struct, field names)
+FIELD_BLOCKS = [
+    (0, 'random', 0x10, '>i3f', ('interval', 'velocity')),          # every interval frames velocity += rand x it
+    (1, 'magnet', 0x18, '>4fIB3x', ('power', 'position', 'axes', 'follow_emitter')),
+    (2, 'spin', 0x0C, '>IIf', ('rate', 'axis', 'outward')),         # rate: 2^32 = 360 degrees a frame
+    (3, 'collision', 0x14, '>BB2xffif', ('type', 'world', 'coord', 'bounce', 'count', 'friction')),
+    (4, 'convergence', 0x14, '>I4f', ('to_emitter', 'position', 'ratio')),   # to_emitter: vanilla 0x01000000
+    (5, 'position_add', 0x10, '>3fB3x', ('position', 'world')),
+    (6, 'curl_noise', 0x24, '>BB2x8f', ('interpolate', 'base_random', 'speed', 'scale', 'offset', 'power'))]
+COMPLEX_FLAGS = 0xC00050                # +0x8BC on every vanilla complex emitter without a child
 TEX_FIELDS = [            # within a TexRes (only these 0x38 bytes are stored; the rest is runtime)
     (0x00, '>2H', 'size'), (0x04, '>I', 'tile_mode'), (0x08, '>I', 'swizzle'), (0x0C, '>I', 'sampler'),
     (0x10, '>I', 'mip_levels'), (0x14, '>I', 'comp_sel'), (0x18, '>f', 'enable_mip_level'),
@@ -352,8 +371,9 @@ class Ptcl:
         out, o = [], 8
         for _ in range(be32(b, 4)):
             nk, interp, target, loop, w4, w5, blk = struct.unpack_from('>7I', b, o)
+            fmt = '>fi' if target in INT_TARGETS else '>2f'
             out.append({'target': target, 'interp': interp, 'loop': loop, 'w4': w4, 'w5': w5,
-                        'keys': [struct.unpack_from('>2f', b, o + 0x1C + 8 * k) for k in range(nk)]})
+                        'keys': [struct.unpack_from(fmt, b, o + 0x1C + 8 * k) for k in range(nk)]})
             o += blk
         return out
 
@@ -364,13 +384,42 @@ class Ptcl:
             return
         b = b'KEYA' + struct.pack('>I', len(anims))
         for a in anims:
-            keys = b''.join(struct.pack('>2f', t, v) for t, v in a['keys'])
+            fmt = '>fi' if a['target'] in INT_TARGETS else '>2f'
+            keys = b''.join(struct.pack(fmt, t, v) for t, v in a['keys'])
             b += struct.pack('>7I', len(a['keys']), a.get('interp', 0), a['target'], 1 if a.get('loop') else 0,
                              a.get('w4', 100), a.get('w5', 0), 0x1C + len(keys)) + keys
         pos = (len(self.keyanim) + 3) & ~3
         self.keyanim = bytearray(self.keyanim) + bytes(pos - len(self.keyanim)) + b
         struct.pack_into('>II', em, 0x2CC, pos, len(b))
         self.dirty_layout = True
+
+    def fields(self, em):
+        """a complex emitter's field blocks: {name: raw bytes}"""
+        if be32(em, 0) != 1:
+            return {}
+        flags, o = struct.unpack_from('>H', em, 0x8C0)[0], struct.unpack_from('>H', em, 0x8CA)[0]
+        out = {}
+        for bit, name, size, _fmt, _names in FIELD_BLOCKS:
+            if flags >> bit & 1:
+                out[name] = bytes(em[o:o + size])
+                o += size
+        return out
+
+    @staticmethod
+    def with_fields(em, blocks):
+        """a simple emitter made complex with these field blocks ({name: raw bytes}, FIELD_BLOCKS' sizes):
+        a new bytearray, the header as vanilla's with no child, fluctuation or stripe"""
+        assert len(em) == SIMPLE_SIZE, 'only a simple emitter'
+        flags, body = 0, b''
+        for bit, name, size, _fmt, _names in FIELD_BLOCKS:
+            if name in blocks:
+                assert len(blocks[name]) == size, name
+                flags |= 1 << bit
+                body += blocks[name]
+        out = bytearray(em) + bytes(0x8D4 - SIMPLE_SIZE) + body
+        struct.pack_into('>I', out, 0, 1)
+        struct.pack_into('>IHHHHHHHHI', out, SIMPLE_SIZE, COMPLEX_FLAGS, flags, 0xE, 0, 0, 0, 0x8D4, 0, 0, len(out))
+        return out
 
     def texres(self, em, slot, child=False):
         o = (CHILD_TEXRES if child else TEXRES + TEXRES_SIZE * slot)
