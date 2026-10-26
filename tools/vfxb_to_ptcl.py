@@ -733,6 +733,24 @@ def three_texture_shader(p, si):
     return _two[key]
 
 
+def turning_shader(p, si):
+    """shader si turning its particles, added once: v_inRot and the turn grafted into its vertex
+    program (eft_vertex.graft_rot; its pixel program's layout kept: eft_pixel.GRAFTED). None when the
+    graft doesn't take"""
+    key = (id(p), si, 'rot')
+    if key not in _two:
+        b = bytes(p.shader_binary(si))
+        nb = eft_vertex.graft_rot(b)
+        if nb is None:
+            _two[key] = None
+        else:
+            old = hashlib.md5(b).hexdigest()
+            if old in eft_pixel.GRAFTED:
+                eft_pixel.GRAFTED[hashlib.md5(nb).hexdigest()] = eft_pixel.GRAFTED[old]
+            _two[key] = p.add_shader(bytes(p.shader_entry(si)), nb)
+    return _two[key]
+
+
 def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1):
     """texture 1 (slot: 2) of a two- (three-) texture template: sampler j as Ultimate places it (its
     first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one"""
@@ -1300,6 +1318,16 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             struct.pack_into('>I', em, 0x844, si2)
             lay_t = eft_pixel.layout(bytes(p.shader_binary(si2)))
             notes.append('vertex program grafted: slot 1 UV animation')
+    if is_mesh and rot == ROT_ANIMATED and not turns and GRAFT and not templates.no_graft:
+        # a mesh's spin (or random starting turn) its template can't draw: its vertex program
+        # grafted to turn the mesh (Zap's impact2 stripes, each turned at random about Z in
+        # Ultimate, all lay one way on Pikachu's template)
+        si_r = turning_shader(p, struct.unpack_from('>I', em, 0x844)[0])
+        if si_r is not None:
+            struct.pack_into('>I', em, 0x844, si_r)
+            turns = True
+            notes[:] = [n for n in notes if not n.startswith('rotation: template has none')]
+            notes.append('vertex program grafted: rotation')
     two_tpl = lay_t is not None and 'uv1' in lay_t
     dis_in = None       # the colour track carrying the dissolve's threshold
     if dis is not None and lay_t is not None and not two_tpl:

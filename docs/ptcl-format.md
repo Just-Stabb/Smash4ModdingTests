@@ -262,7 +262,7 @@ What a template draws is read from its program, not its mode words: the UV anima
 with parameters its program doesn't read is plain once its pixel program is ours). No vertex
 program reads the colour keys: colour animation is the CPU's (`v_inColor0` / `v_inColor1`).
 
-### Grafts (`tools/eft_vertex.py` graft_uv1)
+### Grafts (`tools/eft_vertex.py` graft_uv1, graft_rot)
 
 Code of our own goes into a vanilla vertex program as extra ALU clauses (assembled by latte-asm),
 the program's own clauses untouched. The control flow (CF) words are little-endian pairs: an ALU
@@ -313,6 +313,24 @@ entry the texture coordinates' with the semantic swapped (0x100 | semantic). Wit
 `textureSampler2` and key byte 0x29 = 2 it draws a third texture. eft2's texture blends
 (tex1 / tex2): 0 multiply, 1 add, 2 subtract (t - texture n: Ultimate's own program for Hero's
 ChantFinish light1, alpha = t0 x t1 - t2).
+
+The rotation graft (graft_rot): eft's turning mesh programs work out R (S (pos + rotBasis)), S the
+particle's scale (`v_inScl` x / y; z by x, or by y where uboFlag has 0x08000000), rotBasis CB2
+vec4 36 .xy (z none), R = Rx·Rz·Ry from `v_inRot` (radians; fitted on Little Mac's Final program
+through the interpreter, 1e-5); the programs without `v_inRot` work out S (pos + rotBasis) alike.
+So a clause after CALL_FS rewrites the position in place, pos' = S⁻¹ R S (pos + rotBasis) -
+rotBasis (a zero scale: RECIP_CLAMPED, which the program's own x 0 takes back to 0), and the
+attribute comes in through the header: an entry ('v_inRot', type 11 float4, count 0, the next free
+location) appended to the attribute array (copied past the data with the relocation table
+extended, as for samplers: count / pointer at header word 0xD0 / 4 + 13 / 14), and an
+SQ_VTX_SEMANTIC entry (word 16 the count, 17 on each input GPR's location: R1 on) mapping the
+location to the GPR after the inputs. eft feeds a stream to every attribute a program's header
+names (by name, cross_f 0x04A59FC8; vanilla programs reach 14 attributes). A program takes the
+graft when its ALU clauses before the POS0 export (run through the interpreter, branches or not)
+give the same POS0 for pos as for S (pos + rotBasis) - rotBasis at scale 1, random inputs, both z
+scales: 49 of the 126 vanilla mesh programs without `v_inRot` (the rest scale otherwise, as by
+x mirrored on a view-block flag, or lack `v_inScl`), each grafted one checked end to end against
+R S (pos + rotBasis), within 2e-6.
 
 Colour 1 is scaled like colour 0: the particle's colour 1 (+0x88) x the set's colour (+0x278) x
 the colour scale (0x778) x the emitter instance's colour 1 (+0x238), cross_f 0x04A588CC (colour 0:

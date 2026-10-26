@@ -651,3 +651,17 @@ the sword light, Kafrizz's / Frizzle's rings and flare lines, the chant's `light
 Zap's discharge line, Magic Burst's impact, Bounce's parts). Left: Kaboom's / Kafrizz's wind rings
 (`wind1`, `wind2`: their main texture is sampler 1, so eft2's order puts the folded one first).
 
+
+## Fix 41 (`build/hero_fix41.zip`): spins grafted
+
+The rotation graft (`docs/ptcl-format.md` "Grafts"): a mesh template without `v_inRot` gets the
+attribute (a header entry at a new location, an input GPR) and a clause turning its position in
+place, pos' = S⁻¹ R S (pos + rotBasis) - rotBasis, so its own S (pos' + rotBasis) is eft's
+R S (pos + rotBasis) (R = Rx·Rz·Ry, fitted on Little Mac's Final program). A program takes it when
+its clauses before the position export, run through the interpreter (`tools/latte_interp.py`),
+work the position out so; 49 of 126 vanilla mesh programs without `v_inRot` do, each grafted one
+checked end to end. The converter grafts the template it picked when a mesh's spin or random turn
+would otherwise be lost.
+
+Hero, fix 40 -> fix 41: Zap's / Zapple's `impact2` stripes (random 0 - 360 degrees about Z in
+Ultimate, all one way on Pikachu's template before) turn. No spin is lost now.

@@ -198,15 +198,17 @@ def _op(w1):
     return (w1 >> 23) & 0x7F
 
 
-def _alu(lines, kcache=None):
+def _alu(lines, kcache=None, kcache1=None):
     """(CF words, code) of an ALU clause written in latte-asm's syntax (assembled in a throwaway
-    pixel program: ALU code is the same in both stages)"""
+    pixel program: ALU code is the same in both stages); kcache / kcache1: (CB, first, last vec4)
+    of KC0 / KC1"""
     from trail_shader import LATTE_ASM
     regs = [int(r) for r in re.findall(r'R(\d+)\.', '\n'.join(lines))]
     src = ['; $MODE = "UniformBlock"', '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (max(regs) + 1),
            '; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2', '; $SPI_PS_IN_CONTROL_0.NUM_INTERP = 1',
            '; $NUM_SPI_PS_INPUT_CNTL = 1', '; $SPI_PS_INPUT_CNTL[0].SEMANTIC = 0', '',
-           '00 ALU:' + (' KCACHE0(CB%d:%d-%d)' % kcache if kcache else '')]
+           '00 ALU:' + (' KCACHE0(CB%d:%d-%d)' % kcache if kcache else '')
+           + (' KCACHE1(CB%d:%d-%d)' % kcache1 if kcache1 else '')]
     src += ['  %d   %s' % (i, l) for i, l in enumerate(lines)]
     src += ['01 EXP_DONE: PIX0, R0.xyzw', 'END_OF_PROGRAM']
     with tempfile.TemporaryDirectory() as tmp:
@@ -479,37 +481,242 @@ def add_pixel_input(b, like_sem, sem):
     return bytes(b[:first]) + bytes(out)
 
 
+def _append_named(data, at, size, fields, name):
+    """a GX2 shader header block (data: its '}BLK' relocation table kept whole) with an entry added
+    to the array whose count and pointer words are at byte at: the array copied past the data with
+    the new entry (a name pointer, then the u32 fields) after it, the name after that, every name
+    pointer (and the array pointer) in the patch list"""
+    rel = data.rindex(b'}BLK')
+    (_m, _sz, _z, dsize, doff, tsize, toff, pbase, pcount, poff) = struct.unpack_from('>10I', data, rel)
+    patches = data[poff & 0xFFFFF:(poff & 0xFFFFF) + 4 * pcount]
+    body = data[:dsize]
+    n, ptr = struct.unpack_from('>II', body, at)
+    entries = body[ptr & 0xFFFFF:(ptr & 0xFFFFF) + size * n] if n else b''
+    arr = len(body)
+    name_at = arr + size * (n + 1)
+    body += entries + struct.pack('>I%dI' % len(fields), 0xCA700000 | name_at, *fields)
+    body += name.encode() + b'\0'
+    body += bytes(-len(body) % 8)
+    struct.pack_into('>II', body, at, n + 1, 0xD0600000 | arr)
+    new = [0xD0600000 | (arr + size * k) for k in range(n + 1)]
+    if struct.pack('>I', 0xD0600000 | (at + 4)) not in [patches[i:i + 4] for i in range(0, len(patches), 4)]:
+        new.append(0xD0600000 | (at + 4))
+    new_patches = patches + b''.join(struct.pack('>I', v) for v in new)
+    poff2 = len(body)
+    tail = new_patches + bytes(-len(new_patches) % 8)
+    rel_hdr = struct.pack('>10I', 0x7D424C4B, 0x28, 0, len(body), doff, len(body) - (toff & 0xFFFFF),
+                          toff, pbase, pcount + len(new), 0xD0600000 | poff2)
+    return body + tail + rel_hdr
+
+
+def _edit_blocks(b, typ, fn):
+    """the shader binary b with the data of its blocks of type typ replaced by fn(data)"""
+    out = bytearray()
+    for t, hdr, o, size in gsh_blocks(b, 0):
+        head, data = bytearray(b[hdr:o]), bytearray(b[o:o + size])
+        if t == typ:
+            data = bytearray(fn(data))
+        struct.pack_into('>I', head, 0x14, len(data))
+        out += head + data
+    first = next(h for _t, h, _o, _s in gsh_blocks(b, 0))
+    return bytes(b[:first]) + bytes(out)
+
+
 def add_pixel_sampler(b, name, location):
     """the shader binary b with a pixel sampler variable (2D) added to its pixel header, its
     relocation table ('}BLK': data / text regions, the pointer patch list) kept whole: eft finds a
     slot's sampler by name (cross_f 0x04A59E54, through the relocated pointers) and binds the slot's
     texture only where it does"""
-    out = bytearray()
-    for typ, hdr, o, size in gsh_blocks(b, 0):
-        head, data = bytearray(b[hdr:o]), bytearray(b[o:o + size])
-        if typ == 6:
-            rel = data.rindex(b'}BLK')
-            (_m, _sz, _z, dsize, doff, tsize, toff, pbase, pcount, poff) = struct.unpack_from('>10I', data, rel)
-            patches = data[poff & 0xFFFFF:(poff & 0xFFFFF) + 4 * pcount]
-            body = data[:dsize]
-            n, ptr = struct.unpack_from('>II', body, 4 * PS_NSAMPLER)
-            entries = body[ptr & 0xFFFFF:(ptr & 0xFFFFF) + 12 * n]
-            arr = len(body)
-            name_at = arr + 12 * (n + 1)
-            body += entries + struct.pack('>3I', 0xCA700000 | name_at, 1, location)
-            body += name.encode() + b'\0'
-            body += bytes(-len(body) % 8)
-            struct.pack_into('>II', body, 4 * PS_NSAMPLER, n + 1, 0xD0600000 | arr)
-            new_patches = patches + b''.join(struct.pack('>I', 0xD0600000 | (arr + 12 * k)) for k in range(n + 1))
-            poff2 = len(body)
-            tail = new_patches + bytes(-len(new_patches) % 8)
-            rel_hdr = struct.pack('>10I', 0x7D424C4B, 0x28, 0, len(body), doff, len(body) - (toff & 0xFFFFF),
-                                  toff, pbase, pcount + n + 1, 0xD0600000 | poff2)
-            data = body + tail + rel_hdr
-        struct.pack_into('>I', head, 0x14, len(data))
-        out += head + data
-    first = next(h for _t, h, _o, _s in gsh_blocks(b, 0))
-    return bytes(b[:first]) + bytes(out)
+    return _edit_blocks(b, 6, lambda d: _append_named(d, 4 * PS_NSAMPLER, 12, (1, location), name))
+
+
+# ---------------------------------------------------------------- the rotation graft
+# eft's turning mesh programs (v_inRot: radians) work out R (S (pos + rotBasis)): S the particle's
+# scale (v_inScl x / y, z by x, or by y where uboFlag has 0x08000000), rotBasis CB2 vec4 36 (x, y),
+# R = Rx Rz Ry (Y, then Z, then X; fitted on Little Mac's Final program, 1e-5). A program without
+# v_inRot works out S (pos + rotBasis) alike, so a graft turns it by rewriting the position:
+# pos' = S^-1 R S (pos + rotBasis) - rotBasis. The attribute is eft's by name (cross_f 0x04A59FC8:
+# the streams a program's header names are fed, float4 at the header's location)
+ROT_ATTR, ROT_ATTR_TYPE = 'v_inRot', 11           # (GX2 float4)
+ROT_BASIS, SCALE_Z_BY_Y = 4, 0x08000000           # (KC0 = CB2 32-47: rotBasis; uboFlag's bit)
+VS_ATTRIBS = 0xD0 + 4 * 13                        # GX2VertexShader: attribute count, pointer
+
+
+def rot_lines(pos, scl, rot, a, q, sn, cs):
+    """the position GPR pos turned in place (above): scl v_inScl, rot v_inRot; a, q, sn, cs scratch.
+    One operation a group; KC0 = CB2 32-47, KC1 = CB2 0-15"""
+    P, S, R, A, Q, SN, CS = ('R%d' % r for r in (pos, scl, rot, a, q, sn, cs))
+    rev = '(0x3E22F983, 0.15915494)'
+    L = ['x: AND_INT         %s.x, KC1[0].x, (0x%08X, 0)' % (A, SCALE_Z_BY_Y),
+         'y: CNDE_INT        %s.y, %s.x, %s.x, %s.y' % (A, A, S, S),
+         # q = S (pos + rotBasis)
+         'x: ADD             %s.x, %s.x, KC0[%d].x' % (Q, P, ROT_BASIS),
+         'x: MUL             %s.x, %s.x, %s.x' % (Q, Q, S),
+         'y: ADD             %s.y, %s.y, KC0[%d].y' % (Q, P, ROT_BASIS),
+         'y: MUL             %s.y, %s.y, %s.y' % (Q, Q, S),
+         'z: MUL             %s.z, %s.z, %s.y' % (Q, P, A)]
+    # each angle in revolutions, wrapped to [-0.5, 0.5) (SIN / COS take revolutions)
+    for ch in 'xyz':
+        L += ['%s: MULADD          %s.%s, %s.%s, %s, 0.5f' % (ch, SN, ch, R, ch, rev),
+              '%s: FRACT           %s.%s, %s.%s' % (ch, SN, ch, SN, ch),
+              '%s: ADD             %s.%s, %s.%s, -0.5f' % (ch, SN, ch, SN, ch),
+              't: COS             %s.%s, %s.%s' % (CS, ch, SN, ch),
+              't: SIN             %s.%s, %s.%s' % (SN, ch, SN, ch)]
+    # Y: x = cy x + sy z, z = cy z - sy x
+    L += ['w: MUL             %s.w, %s.y, %s.x' % (A, CS, Q),
+          'w: MULADD          %s.w, %s.y, %s.z, %s.w' % (A, SN, Q, A),
+          'z: MUL             %s.z, %s.y, %s.z' % (Q, CS, Q),
+          'z: MULADD          %s.z, -%s.y, %s.x, %s.z' % (Q, SN, Q, Q),
+          'x: MOV             %s.x, %s.w' % (Q, A),
+          # Z: x = cz x - sz y, y = cz y + sz x
+          'w: MUL             %s.w, %s.z, %s.x' % (A, CS, Q),
+          'w: MULADD          %s.w, -%s.z, %s.y, %s.w' % (A, SN, Q, A),
+          'y: MUL             %s.y, %s.z, %s.y' % (Q, CS, Q),
+          'y: MULADD          %s.y, %s.z, %s.x, %s.y' % (Q, SN, Q, Q),
+          'x: MOV             %s.x, %s.w' % (Q, A),
+          # X: y = cx y - sx z, z = cx z + sx y
+          'w: MUL             %s.w, %s.x, %s.y' % (A, CS, Q),
+          'w: MULADD          %s.w, -%s.x, %s.z, %s.w' % (A, SN, Q, A),
+          'z: MUL             %s.z, %s.x, %s.z' % (Q, CS, Q),
+          'z: MULADD          %s.z, %s.x, %s.y, %s.z' % (Q, SN, Q, Q),
+          'y: MOV             %s.y, %s.w' % (Q, A)]
+    # back through the program's own S (+ rotBasis): pos = q / S - rotBasis (a zero scale: the
+    # clamped reciprocal, which the program's x 0 takes back to 0)
+    L += ['t: RECIP_CLAMPED   %s.x, %s.x' % (A, S),
+          'x: MULADD          %s.x, %s.x, %s.x, -KC0[%d].x' % (P, Q, A, ROT_BASIS),
+          't: RECIP_CLAMPED   %s.x, %s.y' % (A, S),
+          'y: MULADD          %s.y, %s.y, %s.x, -KC0[%d].y' % (P, Q, A, ROT_BASIS),
+          't: RECIP_CLAMPED   %s.x, %s.y' % (A, A),
+          'z: MUL             %s.z, %s.z, %s.x' % (P, Q, A)]
+    return L
+
+
+def _pos_export(text):
+    """(the GPR POS0 is exported from, the CF index of its EXP) in a disassembly"""
+    m = re.search(r'^(\d+) EXP(?:_DONE)?: POS0, R(\d+)\.', text, re.M)
+    return (int(m.group(2)), int(m.group(1))) if m else (None, None)
+
+
+def _rot_trial(cl, used, n_in, rng, pos, scl, flag, rb, extra=None):
+    """the GPRs after a program's clauses cl on random inputs (rng: the same draw for the same
+    seed) with v_inPos pos, v_inScl scl, uboFlag flag, rotBasis rb; extra: GPRs of its own"""
+    from latte_interp import run_clause
+    gpr = {r: [rng.uniform(-1, 1) for _ in range(4)] for r in range(1, n_in + 1)}
+    gpr[used.index('v_inPos') + 1][:3] = list(pos)
+    gpr[used.index('v_inScl') + 1][:3] = list(scl)
+    cb2 = {v: [rng.uniform(-1, 1) for _ in range(4)] for v in range(64)}
+    cb2[0] = [flag, 0, 0, 0]
+    cb2[32 + ROT_BASIS][:2] = list(rb)
+    cbs = {1: {v: [rng.uniform(-1, 1) for _ in range(4)] for v in range(16)}, 2: cb2,
+           3: {v: [rng.uniform(-1, 1) for _ in range(4)] for v in range(16)}}
+    if extra:
+        gpr.update(extra)
+    for c in cl:
+        gpr = run_clause(c, gpr, cbs)
+    return gpr
+
+
+_rot_points = {}
+
+
+def rot_graft_point(b):
+    """the GPRs (v_inPos, v_inScl) of a program that can take the rotation graft, else None: no
+    v_inRot, starts with CALL_FS, and its position worked out by S (pos + rotBasis) (above): its ALU
+    clauses before the POS0 export give the same POS0 for pos and for S (pos + rotBasis) - rotBasis
+    at scale 1 (random inputs, both z scales). Cached by program"""
+    key = program_key(b) + hashlib.md5(b).hexdigest()
+    if key in _rot_points:
+        return _rot_points[key]
+    _rot_points[key] = None
+    h = vertex_header(b)
+    used = used_attributes(b)
+    if h is None or ROT_ATTR in used or 'v_inPos' not in used or 'v_inScl' not in used:
+        return None
+    prog = [b[o:o + s] for t, _h, o, s in gsh_blocks(b, 0) if t == VS_PROGRAM][0]
+    cf = _cf(prog)
+    if _is_alu(cf[0][1]) or _op(cf[0][1]) != CF_CALL_FS:
+        return None
+    text = disassemble(b)
+    from latte_interp import clauses
+    g, at = _pos_export(text)
+    # every ALU clause before the export, branches or not (the two runs below take the same path)
+    cl = [t for i, hdr, t in clauses(text)[1:] if i < at and hdr.startswith('ALU')]
+    if g is None or not cl:
+        return None
+    import random
+    rng = random.Random(5)
+    n_in = h['regs'][NUM_SEMANTIC]
+    for trial in range(6):
+        pos = [rng.uniform(-3, 3) for _ in range(3)]
+        scl = [rng.uniform(0.3, 3) for _ in range(3)]
+        rb = [rng.uniform(-1, 1) for _ in range(2)]
+        flag = SCALE_Z_BY_Y if trial % 2 else 0
+        sz = scl[1] if flag else scl[0]
+        want = [scl[0] * (pos[0] + rb[0]) - rb[0], scl[1] * (pos[1] + rb[1]) - rb[1], sz * pos[2]]
+        seed = rng.random()
+        try:
+            out = _rot_trial(cl, used, n_in, random.Random(seed), pos, scl, flag, rb)[g]
+            ref = _rot_trial(cl, used, n_in, random.Random(seed), want, (1.0, 1.0, 1.0), flag, rb)[g]
+        except (KeyError, ValueError, OverflowError, ZeroDivisionError):     # (an operation it lacks)
+            return None
+        if any(not isinstance(u, float) or not abs(u - v) <= 1e-3 * (1 + abs(v)) for u, v in zip(out, ref)):
+            return None
+    _rot_points[key] = (used.index('v_inPos') + 1, used.index('v_inScl') + 1)
+    return _rot_points[key]
+
+
+def graft_rot(b):
+    """the shader binary b (rot_graft_point) turning its particles: v_inRot added to its vertex
+    header (an attribute at a new location, read into the GPR after its inputs: SQ_VTX_SEMANTIC),
+    and a clause after CALL_FS turning the position in place (rot_lines); jumps past it move with
+    it, the clause code moves down when the CF list outgrows the space before it. None when it
+    can't"""
+    point = rot_graft_point(b)
+    if point is None:
+        return None
+    pos, scl = point
+    h = vertex_header(b)
+    n_in = h['regs'][NUM_SEMANTIC]
+    if n_in >= 32:
+        return None
+    rot = n_in + 1
+    n = max(h['regs'][0] & 0xFF, rot + 1)
+    if n + 4 > 120:
+        return None
+    a, q, sn, cs = range(n, n + 4)
+    clause = _alu(rot_lines(pos, scl, rot, a, q, sn, cs), (CB_STATIC, 32, 47), (CB_STATIC, 0, 15))
+    prog = [b[o_:o_ + s] for t_, _h, o_, s in gsh_blocks(b, 0) if t_ == VS_PROGRAM][0]
+    cf = _cf(prog)
+    code_at = min(w0 & (0x3FFFFF if _is_alu(w1) else 0xFFFFFFFF) for w0, w1 in cf
+                  if _is_alu(w1) or _op(w1) in (CF_TEX, CF_VTX, CF_VTX_TC))
+    shift = max(0, len(cf) + 1 - code_at)
+    shift += shift & 1                          # TEX / VTX clauses stay 16-byte aligned
+    out = []
+    for w0, w1 in cf:
+        if _is_alu(w1):
+            w0 = (w0 & ~0x3FFFFF) | ((w0 & 0x3FFFFF) + shift)
+        elif _op(w1) in (CF_TEX, CF_VTX, CF_VTX_TC):
+            w0 += shift
+        elif _op(w1) in CF_TARGETS and w0 >= 1:
+            w0 += 1
+        out.append([w0, w1])
+    code = bytearray(prog[8 * code_at:])
+    base = code_at + shift
+    end = base + len(code) // 8
+    end += end & 1
+    cfw, alu = clause
+    out.insert(1, [cfw[0] | end, cfw[1]])
+    code += bytes(8 * (end - base) - len(code)) + alu
+    head = b''.join(struct.pack('<II', *w) for w in out)
+    prog2 = head + bytes(8 * base - len(head)) + bytes(code)
+    prog2 += bytes(-len(prog2) % 256)
+    loc = max(at[3] for at in h['attribs']) + 1
+
+    def header(d):
+        struct.pack_into('>I', d, 4 * NUM_SEMANTIC, n_in + 1)
+        struct.pack_into('>I', d, 4 * (SEMANTIC + n_in), loc)
+        return _append_named(d, VS_ATTRIBS, 16, (ROT_ATTR_TYPE, 0, loc), ROT_ATTR)
+    return _replace_vertex_program(_edit_blocks(b, VS_HEADER, header), prog2, n + 4)
 
 
 if __name__ == '__main__':
