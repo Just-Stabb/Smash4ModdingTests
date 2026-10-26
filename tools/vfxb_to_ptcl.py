@@ -140,6 +140,11 @@ FADE_EMIT = 0x2F9
 # 15 x 1.3 / 0.5 x 30), Smash 4 without the flag bits from 0x20 up. Templates' own lights are cleared
 USER_DATA, USER_FLOATS, USER_CALLBACK = 0x0C, 0x14, 0x34
 LIGHT_CALLBACK, LIGHT_FLAGS = 1, 0x1F
+# flag 0x10: the radius a multiple of the particle's scale (vanilla's: x scale at most 108, median 20, of
+# 330 non-Final lights; without it the radius stands alone, 100s - 2100). Ultimate's go further
+# (Kaboom's 60 x 4.3 = 260 lit the whole stage for 55 frames, far too bright): capped at Mii
+# Gunner's Stealth Bomb's 70
+LIGHT_SCALED, LIGHT_RADIUS_MAX = 0x10, 70.0
 # the eft sampler word: U wrap in bits 24-27, V in 28-31, the same codes as eft2's (0 mirror,
 # 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0;
 # the axes from the 374 vanilla emitters repeated along U only: bits 24-27 always mirror, 28-31
@@ -1555,6 +1560,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
             r, g, b = np.clip(track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]), 0, 1)
         k = struct.unpack_from('<f', cadp, 20)[0] if len(cadp) >= 24 else 1.0
         r, g, b = (float(min(1.0, v) * max(0.0, min(1.0, k))) for v in (r, g, b))
+        reach = radius * max(p.field(em, 'scale')[0], 1e-4)       # (the scale at its peak)
+        if flags & LIGHT_SCALED and reach > LIGHT_RADIUS_MAX:
+            radius *= LIGHT_RADIUS_MAX / reach
         struct.pack_into('>2I', em, USER_DATA, (flags & LIGHT_FLAGS) << 16, 0)
         struct.pack_into('>8f', em, USER_FLOATS, r, g, b, radius, 0, 0, 0, 0)
         struct.pack_into('>I', em, USER_CALLBACK, LIGHT_CALLBACK)

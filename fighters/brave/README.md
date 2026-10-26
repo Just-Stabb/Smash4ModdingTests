@@ -629,3 +629,10 @@ samplers (their mean: a slot-2 graft), 2 spins (`impact2`), `Light`'s quad UV an
   now has its own colour, the particle's mean within 1, x CADP's last value (the light's strength).
 - Kafrizz's core sphere keeps its grafted (GPU) template: test A's fireball, the best of A - D.
 
+## Fix 39 (`build/hero_fix39.zip`): light reach capped
+
+Kaboom stayed far too bright in fix 38. Vanilla lights with flag 0x10 (radius x the particle's
+scale) reach at most 108 (median 20, 330 non-Final lights); Kaboom's `flareBase` reached 60 x 4.3 =
+260 for 55 frames. Those lights are capped at 70 (Mii Gunner's Stealth Bomb): Kaboom 260 -> 70,
+Magic Burst 220, Kamikazee 113, Bang 87, Kafrizz's burst 82 -> 70.
+
