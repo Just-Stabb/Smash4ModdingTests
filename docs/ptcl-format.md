@@ -257,6 +257,44 @@ What a template draws is read from its program, not its mode words: the UV anima
 with parameters its program doesn't read is plain once its pixel program is ours). No vertex
 program reads the colour keys: colour animation is the CPU's (`v_inColor0` / `v_inColor1`).
 
+### Grafts (`tools/eft_vertex.py` graft_uv1)
+
+Code of our own goes into a vanilla vertex program as extra ALU clauses (assembled by latte-asm),
+the program's own clauses untouched. The control flow (CF) words are little-endian pairs: an ALU
+clause has word 1 bits 29:28 = 2 / 3, its code address (64-bit units) in word 0 bits 21:0; other
+instructions a 7-bit opcode in word 1 bits 29:23 (1 / 2 / 3 TEX / VTX clauses, word 0 their code
+address; 4 - 18 loops, jumps, else, pop, call, word 0 a CF index; 19 CALL_FS; 39 / 40 EXP /
+EXP_DONE: word 0 bits 12:0 the array base (PARAMn: n), 14:13 the type (1 position, 2 parameter),
+21:15 the GPR, word 1 bits 20:17 the burst count, bit 21 END_OF_PROGRAM). The CF list is padded
+before the first clause (vanilla: 32+ slots); the GX2VertexShader header's SQ_PGM_RESOURCES_VS
+(word 0, NUM_GPRS in bits 7:0) and program size (word 52) follow the program; SPI_VS_OUT_ID
+(words 4 - 13) gives each parameter's semantic (PARAM 4n + k in byte k of word 4 + n).
+
+What every vanilla program exports in the texture coordinates' parameter: slot 0's UV in .xy and
+slot 1's in .zw, animated where the program has slot 1's UV animation, else still (x slot 1's
+repeat, inverse-random flips done): a one-texture program computes it and nothing reads it. The
+particle's age: `v_inWldPos.w` on the CPU's particles; on the GPU's (programs reading `v_inVec`)
+`.w` is its birth and the age emitterDynamicUniformBlock vec4 2 .x less it (438 / 301 graftable
+vanilla programs, no exception). eft's UV transform of a slot (fitted against vanilla clauses run
+through an interpreter, `tools/eft_vertex_test.py`; r the random channel pm3.w picks): shift =
+age x rate + initial + random x (1 - 2r), scale likewise, a = -(age x turn rate + initial +
+random x (1 - 2r)); a mesh: u' / v' = the still UV - 0.5, U = scaleU (cos a u' - sin a v') -
+shiftU + 0.5, V = scaleV (cos a v' + sin a u') - shiftV + 0.5; a quad (corner x, y = U / repeat
+- 0.5, 0.5 - V / repeat; turned to Ru, Rv): U = Ru (repeat - 1 + scaleU) + repeat / 2 - shiftU,
+V = Rv (1 - scaleV - repeat) + repeat / 2 - shiftV.
+
+The slot-1 graft: after CALL_FS a clause saves the age and `v_inRandom` in GPRs past the program's
+own (the inputs' GPRs are reused later); before the texture coordinates' EXP a clause works out
+slot 1's animated UV from the still one in .zw into a fresh GPR, which the EXP then exports. With a
+`textureSampler1` (2D, location 1) added to the pixel header (its relocation table: '}BLK' with
+the data and text regions and the pointer patch list, 0 entries for null pointers, extended) and
+the shader key's texture count set, the program draws a second texture: 739 of 810 vanilla
+one-texture own templates take the graft (the other 71 already animate slot 1). The shader key
+(0x78 record) is copied to the shader object at +0x47C (cross_f 0x04A5779C): key byte 0x29 = the
+textures past the first (eft looks up textureSampler1 / 2, by name through the relocated
+pointers, 0x04A59E54, only for them; 5397 vanilla keys all match their pixel samplers), 0x3B /
+0x3C slot 0 / 1 a texture array (textureArraySampler).
+
 Colour 1 is scaled like colour 0: the particle's colour 1 (+0x88) x the set's colour (+0x278) x
 the colour scale (0x778) x the emitter instance's colour 1 (+0x238), cross_f 0x04A588CC (colour 0:
 0x04A58830).

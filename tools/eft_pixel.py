@@ -66,6 +66,9 @@ def disassemble(b):
 
 
 _layouts = {}
+# shaders given texture 1 by a graft (tools/vfxb_to_ptcl.py two_texture_shader: slot 1's UV in .zw of
+# the texture coordinates, a textureSampler1): their layouts read texture 1 there (md5s)
+UV1_GRAFTED = set()
 
 
 def layout(binary):
@@ -73,6 +76,8 @@ def layout(binary):
     key = hashlib.md5(binary).hexdigest()
     if key not in _layouts:
         _layouts[key] = layout_of(binary)
+        if key in UV1_GRAFTED and _layouts[key] is not None:
+            _layouts[key] = dict(_layouts[key], uv1=(_layouts[key]['uv'][0], 'zw'))
     return _layouts[key]
 
 

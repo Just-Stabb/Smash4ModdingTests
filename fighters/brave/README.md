@@ -599,3 +599,19 @@ flag bits 0x20 - 0x80 Smash 4 doesn't use.
 What's left (following directional parts, the 20 second textures, 3 spins) needs vertex programs
 of our own: template choice has gone as far as the vanilla programs go.
 
+## Fix 37 (`build/hero_fix37.zip`): vertex programs grafted
+
+The first vertex program code of our own (`tools/eft_vertex.py` graft_uv1, `docs/ptcl-format.md`
+"Grafts"): a one-texture template's program gets slot 1's UV animation (eft's own transform, fitted
+against vanilla code run through an interpreter, `tools/eft_vertex_test.py`), its pixel header a
+`textureSampler1`, its key a texture count of 1, and so draws a second texture. Every vanilla
+one-texture template we can stand in for (739 programs, all checked: clauses unchanged, jumps
+moved, the export re-pointed, relocation tables whole) can now be a two-texture one, a vanilla
+two-texture template still taken over a grafted one drawing as much. The GPU templates that turn
+particles by their velocity were all one-texture: grafted, they serve the directional parts too.
+
+Hero, fix 36 -> fix 37: second textures not drawn live 20 -> 0 (drawn live 122 -> 142); UV
+animation a template lacked 16 -> 3; samplers folded in as their mean 22 -> 11; directional parts
+turned by world motion instead of velocity 12 -> 0. 84 parts use a grafted program. Left: 11 third
+samplers (their mean: a slot-2 graft), 2 spins (`impact2`), `Light`'s quad UV animation.
+

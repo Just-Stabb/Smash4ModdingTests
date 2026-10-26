@@ -48,6 +48,7 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
   emitters.
 """
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -95,6 +96,11 @@ EXACT = True
 TWO_TEXTURES = True     # two-texture templates (a second sampler drawn live: live_sampler)
 DISSOLVE = True         # Ultimate's dissolve (dissolve_of)
 WRITE_FOLLOW = True     # Ultimate's follow type over the template's
+GRAFT = True            # vertex programs given slot 1's UV animation (tools/eft_vertex.py graft_uv1)
+# a shader key's texture bytes (copied to the shader object at +0x47C, cross_f 0x04A5779C): 0x29 the
+# textures past the first (eft looks up textureSampler1 / 2 only for them: 5397 vanilla keys, all
+# matching their pixel samplers), 0x3B / 0x3C slot 0 / 1 a texture array
+KEY_TEXTURES, KEY_ARRAY1 = 0x29, 0x3C
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -236,8 +242,16 @@ class Templates:
                               screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2,
                               two, feat['uv'][1] if two else 0)
                     self.found.setdefault(key, {})
-                    if traits not in self.found[key] or score > self.found[key][traits][0]:
-                        self.found[key][traits] = (score, path, si, k)
+                    variants = [(traits, False)]
+                    if GRAFT and TWO_TEXTURES and not two and graftable(bytes(p.shader_binary(si_)), lay):
+                        # also a two-texture template once grafted (two_texture_shader): slot 1's UV
+                        # animation all there (eft's own code, or the program's)
+                        variants.append((traits[:9] + (True, 7), True))
+                    for tr, grafted in variants:
+                        # (a vanilla two-texture program over a grafted one drawing as much)
+                        old = self.found[key].get(tr)
+                        if old is None or (not grafted, score) > (not old[4], old[0]):
+                            self.found[key][tr] = (score, path, si, k, grafted)
 
     def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False,
             want2=False, uv_mode1=0, swap_ok=False, need_thr=0):
@@ -262,7 +276,7 @@ class Templates:
             return max(ways, key=lambda w: (w[0], w[1], not w[2]))
 
         def rank(item):
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), score = item[0][1:], item[1][0]
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), (score, grafted) = item[0][1:], item[1][::4]
             same_blend = item[0][0] == blend
             fit0, fit1, swapped = assign(item[0][1:])
             # a mesh's UV animation first: freezing it bakes the mesh again (his slash arcs'
@@ -283,7 +297,7 @@ class Templates:
                     fit0, two == want2, fit1, not need_thr or an1 or (need_thr == 2 and an0),
                     turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1],
                     by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
-                    turns or rot == ROT_NONE, turns == (rot != ROT_NONE), same_blend, score)
+                    turns or rot == ROT_NONE, turns == (rot != ROT_NONE), not grafted, same_blend, score)
         # the blend is the emitter's (0x324: not the program's, 352 vanilla file / shader pairs use
         # more than one): any blend's template whose pixel program is ours (it draws rgb and alpha
         # for whichever), the same blend's otherwise; then another blend's (add), then type 0
@@ -293,7 +307,7 @@ class Templates:
             if not cands:
                 continue
             key = (t, b, mesh)
-            traits, (_score, path, si, k) = max(cands.items(), key=rank)
+            traits, (_score, path, si, k, _grafted) = max(cands.items(), key=rank)
             traits = traits[1:]
             (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1) = traits
             swapped = assign(traits)[2]
@@ -632,6 +646,40 @@ def set_exact_texture(p, em, slot, pix):
 
 def set_wrap(em, slot, wu, wv):
     struct.pack_into('>I', em, ptcl.TEXRES + ptcl.TEXRES_SIZE * slot + 0x0C, (wv & 0xF) << 28 | (wu & 0xF) << 24 | 0x100)
+
+
+def graftable(b, lay):
+    """a one-texture template whose program can draw a second texture once grafted (two_texture_shader):
+    its pixel program ours, the texture coordinates in .xy, its vertex program taking the slot-1
+    graft or already animating slot 1 (639 + 71 of 710 vanilla one-texture own templates)"""
+    if lay is None or 'uv1' in lay or lay['uv'][1] != 'xy':
+        return False
+    if eft_vertex.uv_caps(b)[1]:
+        return True
+    return eft_vertex.uv1_graft_point(b, lay['sems'][lay['uv'][0]]) is not None
+
+
+_two = {}
+
+
+def two_texture_shader(p, si):
+    """shader si (a graftable one-texture template) as a two-texture one, added once: slot 1's UV
+    animation grafted into its vertex program (unless it has it), a 2D textureSampler1 in its pixel
+    header, its key's texture count 1. None when the graft doesn't take"""
+    key = (id(p), si)
+    if key not in _two:
+        b = bytes(p.shader_binary(si))
+        lay = eft_pixel.layout(b)
+        nb = b if eft_vertex.uv_caps(b)[1] else eft_vertex.graft_uv1(b, lay['sems'][lay['uv'][0]])
+        if nb is None:
+            _two[key] = None
+        else:
+            nb = eft_vertex.add_pixel_sampler(nb, 'textureSampler1', 1)
+            eft_pixel.UV1_GRAFTED.add(hashlib.md5(nb).hexdigest())
+            entry = bytearray(p.shader_entry(si))
+            entry[KEY_TEXTURES], entry[KEY_ARRAY1] = 1, 0
+            _two[key] = p.add_shader(bytes(entry), nb)
+    return _two[key]
 
 
 def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None):
@@ -1163,6 +1211,14 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
     lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) if EXACT else None
+    if live is not None and GRAFT and lay_t is not None and 'uv1' not in lay_t and \
+            graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
+        # a one-texture template taken for two (Templates): its vertex program grafted
+        si2 = two_texture_shader(p, struct.unpack_from('>I', em, 0x844)[0])
+        if si2 is not None:
+            struct.pack_into('>I', em, 0x844, si2)
+            lay_t = eft_pixel.layout(bytes(p.shader_binary(si2)))
+            notes.append('vertex program grafted: slot 1 UV animation')
     two_tpl = lay_t is not None and 'uv1' in lay_t
     dis_in = None       # the colour track carrying the dissolve's threshold
     if dis is not None and lay_t is not None and not two_tpl:
@@ -1546,14 +1602,16 @@ def main():
     ap.add_argument('--no-two', action='store_true', help='no two-texture templates: every emitter draws one texture')
     ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
     ap.add_argument('--keep-follow', action='store_true', help="keep each template's follow type (not Ultimate's)")
+    ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW
+    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
     DISSOLVE = not a.no_dissolve
     WRITE_FOLLOW = not a.keep_follow
+    GRAFT = not a.no_graft
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()
