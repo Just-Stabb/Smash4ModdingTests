@@ -82,11 +82,12 @@ def run(lines, regs, kc0, tex):
             group.append((args[0], m.group(3), [src(a) for a in args[1:]], clamp))
             continue
         flush()
-        m = re.match(r'\s*\d+\s+SAMPLE\s+(R\d+)\.xyzw,\s+(R\d+)\.(xy|zw)0[xz],\s+t0,\s+s0', line)
+        m = re.match(r'\s*\d+\s+SAMPLE\s+(R\d+)\.xyzw,\s+(R\d+)\.(xy|zw)0[xz],\s+t(\d),\s+s(\d)', line)
         if m:
+            assert m.group(4) == m.group(5), line
             r = get(m.group(2))
             u, v = (r[0], r[1]) if m.group(3) == 'xy' else (r[2], r[3])
-            regs[m.group(1)] = list(tex(u, v))
+            regs[m.group(1)] = list(tex(u, v, int(m.group(4))))
             continue
         m = re.match(r'\s*\d+\s+EXP_DONE: PIX0, (R\d+)\.xyzw', line)
         if m:
@@ -94,7 +95,15 @@ def run(lines, regs, kc0, tex):
     return out
 
 
-def expected(cm, am, gain, c0, c1, t, vc, hdr):
+def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=None):
+    if dissolve is not None:
+        # (width, threshold): texture grey in .x, the mask in .y
+        width, thr = dissolve
+        ramp = min(max((t[1] - thr) / width, 0.0), 1.0)
+        out = expected(cm, am, gain, c0, c1, [t[0], t[0], t[0], t[3]], vc, hdr)
+        return out[:3] + [out[3] * ramp]
+    if t1 is not None:
+        t = [(a + b) if blend[k == 3] else a * b for k, (a, b) in enumerate(zip(t, t1))]
     c0_, c1_, t_ = c0[:3], c1[:3], t[:3]
     if cm == 0:
         rgb = c0_
@@ -117,6 +126,12 @@ LAYOUTS = {
     'mesh (0, 1, 6, 10)': {'regs': 4, 'c0': 0, 'c1': 1, 'vc': 2, 'uv': (3, 'zw'), 'sems': [0, 1, 6, 10]},
     'mesh without colour 1 (0, 6, 10), colour 1 constant': {'regs': 3, 'c0': 0, 'c1': None, 'vc': 1, 'uv': (2, 'xy'),
                                                             'sems': [0, 6, 10]},
+}
+TWO = {
+    'quad, two textures (0, 1, 9): t0 .xy, t1 .zw': {'regs': 3, 'c0': 0, 'c1': 1, 'vc': None, 'uv': (2, 'xy'),
+                                                    'uv1': (2, 'zw'), 'sems': [0, 1, 9]},
+    'mesh, two textures (0, 1, 6, 10)': {'regs': 4, 'c0': 0, 'c1': 1, 'vc': 2, 'uv': (3, 'xy'), 'uv1': (3, 'zw'),
+                                         'sems': [0, 1, 6, 10]},
 }
 C1_CONST = (0.37, 0.0, 1.25)
 
@@ -147,7 +162,7 @@ def test_variants():
                             regs['R%d' % lay['vc']] = list(vc)
                         seen = []
 
-                        def tex(u, v):
+                        def tex(u, v, k=0):
                             seen.append((u, v))
                             return texel
                         got = run(lines, regs, {8: hdr}, tex)
@@ -158,6 +173,81 @@ def test_variants():
                         worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
                     check(worst < 1e-5 and gprs == lay['regs'] + 2,
                           '%s colour %d alpha %d x %g: max error %.2g (%d GPRs)' % (name, cm, am, gain, worst, gprs))
+
+
+def test_two():
+    """two-texture layouts: each texture sampled from its own coordinates, combined per blend"""
+    rnd = random.Random(2)
+    for name, lay in TWO.items():
+        for cm in range(4):
+            for am in (0, 1):
+                for blend in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                    prog, gprs = E.program(lay, cm, am, 2.0, None, blend)
+                    lines = disasm(prog)
+                    worst = 0.0
+                    for _ in range(30):
+                        c0 = [rnd.uniform(0, 1.5) for _ in range(3)] + [rnd.uniform(0, 1)]
+                        c1 = [rnd.uniform(0, 1.5) for _ in range(4)]
+                        vc = [rnd.uniform(0, 1) for _ in range(4)] if lay['vc'] is not None else None
+                        texels = [[rnd.uniform(0, 1) for _ in range(4)] for _ in range(2)]
+                        uv = [rnd.uniform(0, 1) for _ in range(4)]
+                        hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
+                        regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['c1']: list(c1), 'R%d' % lay['uv'][0]: list(uv)}
+                        if vc is not None:
+                            regs['R%d' % lay['vc']] = list(vc)
+                        seen = []
+
+                        def tex(u, v, k):
+                            seen.append((k, u, v))
+                            return texels[k]
+                        got = run(lines, regs, {8: hdr}, tex)
+                        want = expected(cm, am, 2.0, c0, c1, texels[0], vc, hdr, texels[1], blend)
+                        if sorted(seen) != [(0, uv[0], uv[1]), (1, uv[2], uv[3])]:
+                            worst = float('inf')
+                        worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+                    check(worst < 1e-5 and gprs == lay['regs'] + 3,
+                          '%s colour %d alpha %d blend %s: max error %.2g (%d GPRs)' % (name, cm, am, blend, worst, gprs))
+
+
+C0_CONST = (0.9, 0.25, 1.5)
+
+
+def test_dissolve():
+    """Ultimate's custom shader 8: alpha x clamp((mask - threshold) / width), the threshold colour 1's
+    red (colour 1 constant) or colour 0's (colour 0's rgb constant, its alpha the register's)"""
+    rnd = random.Random(3)
+    for (name, lay), by in [(x, b) for x in list(LAYOUTS.items())[:2] for b in (1, 0)]:
+        for cm in range(4):
+            for am in (0, 1):
+                for width in (0.05, 0.3):
+                    prog, gprs = E.program(lay, cm, am, 2.0, C1_CONST if by else None, (0, 0), width,
+                                           None if by else C0_CONST)
+                    lines = disasm(prog)
+                    worst = 0.0
+                    for _ in range(40):
+                        c0 = [rnd.uniform(0, 1.5) for _ in range(3)] + [rnd.uniform(0, 1)]
+                        thr = rnd.uniform(0, 1)
+                        vc = [rnd.uniform(0, 1) for _ in range(4)] if lay['vc'] is not None else None
+                        g = rnd.uniform(0, 1)
+                        texel = [g, rnd.uniform(0, 1), g, rnd.uniform(0, 1)]
+                        uv = [rnd.uniform(0, 1) for _ in range(4)]
+                        hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
+                        c1 = [rnd.uniform(0, 1.5) for _ in range(3)] + [0.9]
+                        if by:
+                            regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['c1']: [thr, 0.7, 0.2, 0.9]}
+                            c0w, c1w = c0, list(C1_CONST) + [0.0]
+                        else:
+                            regs = {'R%d' % lay['c0']: [thr, 0.4, 0.1, c0[3]], 'R%d' % lay['c1']: list(c1)}
+                            c0w, c1w = list(C0_CONST) + [c0[3]], c1
+                        regs['R%d' % lay['uv'][0]] = list(uv)
+                        if vc is not None:
+                            regs['R%d' % lay['vc']] = list(vc)
+                        got = run(lines, regs, {8: hdr}, lambda u, v, k=0: texel)
+                        want = expected(cm, am, 2.0, c0w, c1w, texel, vc, hdr, dissolve=(width, thr))
+                        worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+                    check(worst < 1e-5 and gprs == lay['regs'] + 3,
+                          '%s colour %d alpha %d dissolve %g by colour %d: max error %.2g (%d GPRs)' % (
+                              name, cm, am, width, by, worst, gprs))
 
 
 def test_bank(path):
@@ -175,7 +265,9 @@ def test_bank(path):
         prog = [b[o:o + s] for t, _h, o, s in E.gsh_blocks(b, 0) if t == E.PS_PROGRAM][0]
         gains = {1.0} | {struct.unpack('>f', struct.pack('>I', int(m, 16)))[0]
                          for m in re.findall(r'MUL\s+R\d+\.w, R\d+\.w, \((0x[0-9A-F]+)', '\n'.join(disasm(prog)))}
-        if any(E.program(lay, cm, am, g)[0] == prog for cm in range(4) for am in (0, 1) for g in gains):
+        blends = ((0, 0), (1, 0), (0, 1), (1, 1)) if 'uv1' in lay else ((0, 0),)
+        if any(E.program(lay, cm, am, g, None, bl)[0] == prog for cm in range(4) for am in (0, 1) for g in gains
+               for bl in blends):
             own += 1
         else:
             other += 1
@@ -185,6 +277,8 @@ def test_bank(path):
 
 if __name__ == '__main__':
     test_variants()
+    test_two()
+    test_dissolve()
     if len(sys.argv) > 1:
         test_bank(sys.argv[1])
     print('%d failure(s)' % len(FAILS))

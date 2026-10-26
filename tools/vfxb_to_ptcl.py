@@ -28,6 +28,10 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
 - colour / alpha: eft2's combiner (colour modes 0-3: colour 0, x texture, + colour 1 x (1 -
   texture), + colour 1; alpha modes 0-4) folded into a BC4 shape and one particle colour (combine):
   each pixel's brightness kept, the hue averaged; the 3-key colour and alpha fits; colour scale;
+  with own pixel programs (EXACT, tools/eft_pixel.py) the combiner itself: the other samplers
+  combined into texture 0 (exact_texture), or one moving apart from it drawn live as texture 1 of a
+  two-texture template (live_sampler: its own UV animation in slot 1's block, set_slot1); Ultimate's
+  dissolve (custom shader 8, dissolve_of: the threshold in a colour track, the mask in texture 0);
 - meshes: the particle's 3D scale baked into the mesh, the emitter's scale 1 (x the animation);
 - scale: the particle scale x the scale keys (3-key fit), random % -> fraction;
 - life (+ random % -> frames; infinite -> 0x7FFFFFFF, emitted once), emission (start, duration when one-time, else
@@ -36,8 +40,9 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
   air resistance, volume (same 0-14 shape list; radius x form scale), rotation (init / random /
   add, radians), the emitter transform (translate / rotate / scale); the fade when turned off
   (0x82C: 1 / alpha fade time; infinite life fades too);
-- not converted: pattern (flipbook) animation, the second colour track and multi-texture
-  combiners, alpha / scale fades at the end, emitter animations (EAA0 / EAA1 ...), child emitters.
+- not converted: pattern (flipbook) animation where no template plays its mode, a third sampler
+  moving on its own, alpha / scale fades at the end, emitter animations (EAA0 / EAA1 ...), child
+  emitters.
 """
 import argparse
 import json
@@ -69,6 +74,11 @@ COLOR_MODE = 0x314
 # Ultimate custom shader (index, flag bit) whose colour goes out x its alpha shape x 2 (vfxb shader
 # custom_shader_index / custom_shader_flag; Sephiroth's ef_edge.eff)
 PREMULT_SHADER = (4, 64)
+# Ultimate's custom shader 8, a dissolve (Woosh's whirlwinds, the spell flashes' ring2; read from
+# their Maxwell code with the WindowSmash translator): pixels whose sampler 1 alpha is under colour 1's
+# alpha are dropped, alpha x (mask - threshold) / width over the edge (width: the emitter's CSDP's
+# first float, 0.05 / 0.12)
+DISSOLVE_SHADER = 8
 # (Ultimate set, emitter) drawn with two colours, not one: lerp(colour 1, colour 0, texture rgb) x
 # texture alpha where the rgb is a thin core inside a wide alpha glow (ef_cmn_line06: a white core,
 # a blue glow); one colour drew the glow as bright as the core, dash attack's thick white band
@@ -101,6 +111,7 @@ FOLLOW = 0x310
 PTN_MODE = 0x500
 PTN_FROM_EFT2 = {1: 1, 2: 4, 3: 2, 4: 3}
 UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
+SLOT1 = 0x7C            # slot 1's UV block: slot 0's + this (0x550; 0x04A5A6AC reads each slot's so)
 # the alpha an emitter loses a frame while its set fades (Terminate_Graphic_Effect), the emitter and
 # its particles ending at 0; it climbs back to 1 otherwise (cross_f.rpx 0x04A64F00 / 0x04A661D8:
 # emitter instance +0x58 -= / += this x the frame step)
@@ -143,9 +154,10 @@ VELOCITY_ATTR = b'v_inVec'
 
 class Templates:
     """template emitters by (eft particle type, blend 0 / 1 / 2, mesh): simple emitters with one BC4
-    texture (slot 0; slots 1 / 2 unused). Among them, in this order: a plain shader (no shader
-    parameters: Ike's FS cloud shader, FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's
-    meshes orange), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
+    texture (slot 0; slot 2 unused, slot 1 only on a two-texture template whose pixel program is
+    ours). Among them, in this order: a plain shader (no shader parameters: Ike's FS cloud shader,
+    FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's meshes orange; or, its pixel
+    program ours, a vertex program parameter-free emitters run too), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
     scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, the follow
     type (FOLLOW; ranked before the UV mode: a glow left behind by the sword shows more), then
     animated colour tracks
@@ -155,10 +167,22 @@ class Templates:
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
+        for path in corpus:
+            self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
+        # the vertex programs emitters without shader parameters run: a template with parameters
+        # whose vertex program is one of them needs none once its pixel program is ours (half the
+        # two-texture templates, all ranked after plain ones: 109 of Hero's 134 second samplers went
+        # without one)
+        plain_vs = set()
+        if EXACT:
+            for p in [base] + list(self.files.values()):
+                for s in p.sets:
+                    for x in s['emitters']:
+                        em = x['data']
+                        if em is not None and len(em) == ptcl.SIMPLE_SIZE and not p.field(em, 'shader_param_size'):
+                            plain_vs.add(eft_pixel.vertex_key(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))))
         for path in [None] + list(corpus):
-            p = base if path is None else ptcl.Ptcl(open(path, 'rb').read())
-            if path is not None:
-                self.files[path] = p
+            p = base if path is None else self.files[path]
             screen = {}
             for si, s in enumerate(p.sets):
                 for k, x in enumerate(s['emitters']):
@@ -166,8 +190,10 @@ class Templates:
                     if em is None or len(em) != ptcl.SIMPLE_SIZE:
                         continue
                     t = [p.texres(em, j) for j in range(3)]
-                    if t[1]['native_size'] or t[2]['native_size']:
+                    # slot 2 never; slot 1 only as a two-texture own pixel program's (below)
+                    if t[2]['native_size']:
                         continue
+                    two = bool(t[1]['native_size'])
                     if p.field(em, 'keyanim_size'):
                         # its key animation isn't imported (Ptcl.import_emitter), but its per-particle
                         # hooks (0x32C - 0x33C: 2 = by key animation, 0x04A627A0) still read it: fix 25's
@@ -188,23 +214,46 @@ class Templates:
                     own = 0 if lay is None else 2 if lay['c1'] is not None else 1
                     if t[0]['native_format'] != 9 and not own:
                         continue
-                    traits = (not p.field(em, 'shader_param_size'), struct.unpack_from('>I', em, UV_MODE)[0] & 7,
+                    # a two-texture template: its pixel program ours (texture 1 sampled from the
+                    # coordinates its vertex program works out with slot 1's UV animation), no
+                    # flipbook on slot 1
+                    if two != (lay is not None and 'uv1' in lay) or \
+                            (two and struct.unpack_from('>I', em, PTN_MODE + SLOT1)[0]):
+                        continue
+                    plain = not p.field(em, 'shader_param_size') or bool(own) and eft_pixel.vertex_key(
+                        bytes(p.shader_binary(si_))) in plain_vs
+                    traits = (plain, struct.unpack_from('>I', em, UV_MODE)[0] & 7,
                               struct.unpack_from('>I', em, FOLLOW)[0], struct.unpack_from('>I', em, PTN_MODE)[0],
-                              screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2)
+                              screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2,
+                              two, struct.unpack_from('>I', em, UV_MODE + SLOT1)[0] & 7 if two else 0)
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
 
-    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False):
+    def get(self, typ, blend, mesh, uv_mode, follow, ptn, rot, notes, anim=(False, False), need_c1=False,
+            want2=False, uv_mode1=0, swap_ok=False, need_thr=0):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
         there's none. A template with another flipbook mode than wanted is never taken when one
         without is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
         which it can't (only freeze); one it can't, before. With own pixel programs (EXACT) a template
         they can stand in for comes first, then animated colour tracks where anim (colour 0 / 1 change
-        over the particle's life: a constant track is their mean, Frizzle's white flash at birth went)"""
+        over the particle's life: a constant track is their mean, Frizzle's white flash at birth went).
+        want2: a second texture drawn live (uv_mode1 its UV mode bits); swap_ok: the two may trade
+        slots (texture 0 x / + texture 1 either way round) when the template animates them better so.
+        need_thr: a dissolve's threshold over life wants an animated colour track, 1: colour 1's, 2:
+        either (colour 0's rgb constant). Returns (emitter bytes, turns, swapped)"""
+        def assign(t):
+            """(main's UV mode met, the second's met, swapped): the better way round"""
+            mode, two, mode1 = t[1], t[9], t[10]
+            ways = [(mode & uv_mode == uv_mode, not two or mode1 & uv_mode1 == uv_mode1, False)]
+            if swap_ok and two:
+                ways.append((mode1 & uv_mode == uv_mode, mode & uv_mode1 == uv_mode1, True))
+            return max(ways, key=lambda w: (w[0], w[1], not w[2]))
+
         def rank(item):
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1), (score, *_r) = item
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), (score, *_r) = item
+            fit0, fit1, swapped = assign(item[0])
             # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
             # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
@@ -213,16 +262,23 @@ class Templates:
             # thin for a template with animated colour); a colour track's mean loses less
             # (position-only following (2) takes a template that follows fully: few have 2, none with UV
             # animation on a mesh; one left in place (1) or following (0) needs its own)
+            # (two textures where a second one is wanted, its UV animation in slot 1 too)
+            # (a dissolve's threshold rides in a colour track: an animated one after the UV animation,
+            # need_thr: Woosh's whirlwinds kept their rising streaks over the dissolve)
             return (plain, pm in (ptn, 0), own if need_c1 else min(own, 1), fol == follow or (follow == 2 and fol == 0),
-                    mode & uv_mode == uv_mode, fol == follow,
+                    two == want2, fit0, fit1, not need_thr or an1 or (need_thr == 2 and an0), fol == follow,
                     an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
-                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, mode == uv_mode,
+                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, (mode1 if swapped else mode) == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
         for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
             if key not in self.found:
                 continue
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1), (_score, path, si, k) = max(
-                self.found[key].items(), key=rank)
+            traits, (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1) = traits
+            swapped = assign(traits)[2]
+            if swapped:
+                mode, mode1 = mode1, mode
+                notes.append('texture slots swapped (the template animates them so)')
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
@@ -239,8 +295,8 @@ class Templates:
             if path is None:
                 em = self.base.emitter_bytes(si, k)
                 struct.pack_into('>II', em, 0x2CC, 0, 0)
-                return em, turns
-            return self.base.import_emitter(self.files[path], si, k, skip_slots=(0,)), turns
+                return em, turns, swapped
+            return self.base.import_emitter(self.files[path], si, k, skip_slots=(0, 1)), turns, swapped
         raise KeyError((typ, blend, mesh))
 
 
@@ -464,7 +520,109 @@ def same_uv(e, i, j):
             and all(np.allclose(ts_[i][k], ts_[j][k]) for k in keys))
 
 
-def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
+def live_sampler(e, ti, images, names, is_mesh):
+    """the sampler a two-texture own pixel program draws as texture 1, or None: one that moves apart
+    from sampler ti (its own UV animation, repeat or UV set; same-UV ones combine exactly in
+    exact_texture), as Ultimate draws it rather than frozen (bake_samplers) or as its mean (a mesh).
+    A mesh's two-texture vertex programs read one UV set for both: the same set only. With three
+    samplers the one baked into texture 0 must combine as the live one does (eft2's order 0, 1, 2
+    otherwise matters)"""
+    cb = e['combiner']
+    others = [j for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
+              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    moving = [j for j in others if not same_uv(e, ti, j)
+              and (not is_mesh or e['tex_anim'][j]['uv_channel'] == e['tex_anim'][ti]['uv_channel'])]
+    if not moving or len(others) > 1 and (cb['tex1_color_blend'], cb['tex1_alpha_blend']) != (
+            cb['tex2_color_blend'], cb['tex2_alpha_blend']):
+        return None
+    return moving[-1]
+
+
+def dissolve_of(e, ti, images, names, ptn):
+    """(edge width, threshold over life [101], mask [h, w] 0-1) for Ultimate's dissolve
+    (DISSOLVE_SHADER), else None. The mask is sampler 1's alpha as stored (whatever its alpha input
+    to the combiner), so it must read sampler ti's UVs (it rides in texture 0's green); the colour
+    input grey (texture 0 carries it in red and blue: eft_pixel's dissolve programs); no flipbook"""
+    if e['shader']['custom_shader_index'] != DISSOLVE_SHADER or 'CSDP' not in e['subsections']:
+        return None
+    s = e['sampler'][1]
+    if s['texture_id'] == NONE64 or s['texture_id'] not in images or ptn or not (ti == 1 or same_uv(e, ti, 1)):
+        return None
+    for j, x in enumerate(e['sampler']):
+        if x['texture_id'] != NONE64 and x['texture_id'] in images and 'indirect' not in names.get(x['texture_id'], ''):
+            rgb, _a = sampler_inputs(e, j, images[x['texture_id']])
+            if float(np.abs(rgb - rgb[..., :1]).max()) > 2.5 / 255:
+                return None
+    width = struct.unpack('<f', bytes.fromhex(e['subsections']['CSDP'][:8]))[0]
+    thr = track(e['static'], e['color'], 1)[1] * e['info']['color1'][3]
+    mask = first_cell(images[s['texture_id']], e['static']['tex_scroll'][1], shown_cell(e, 1))[..., 3] / 255.0
+    return width, thr, mask.astype(np.float32)
+
+
+def tex_blend(e, ti, j):
+    """(colour, alpha) blend bringing sampler j in (0 multiply, 1 add): eft2's tex1 for sampler 1,
+    tex2 for 2"""
+    k = 2 if 2 in (ti, j) else 1
+    cb = e['combiner']
+    return cb['tex%d_color_blend' % k], cb['tex%d_alpha_blend' % k]
+
+
+def fit_texture(pix, tmax=None):
+    """pix at power-of-two sizes up to tmax (TEX_MAX), halved while that changes it by under 1%"""
+    h, w = pix.shape[:2]
+    tmax = tmax or TEX_MAX
+    tw, th = pow2(w, hi=tmax), pow2(h, hi=tmax)
+    if (tw, th) != (w, h):
+        pix = resize(pix.astype(np.float32), tw, th)
+    # smooth textures (glows, gradients) at half size while that changes them by under 1% (the
+    # bank's size: test 37's 6.0 MB loaded)
+    while min(tw, th) > 16:
+        half = resize(pix.astype(np.float32), tw // 2, th // 2)
+        back = resize(half, tw, th)
+        if float(np.abs(back - pix).mean()) > 0.01 * max(float(pix.mean()), 0.05):
+            break
+        pix, tw, th = half, tw // 2, th // 2
+    return pix
+
+
+def set_exact_texture(p, em, slot, pix):
+    """an own pixel program's texture (colour input in rgb, alpha input in a, 0-1) in a slot"""
+    q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
+    if int(np.abs(q8[..., :3].astype(int) - q8[..., :1]).max()) <= 2:
+        # grey colour input: BC5, R the colour (every rgb channel), G the alpha
+        p.set_texture(em, slot, np.stack([q8[..., 0], q8[..., 3], np.zeros_like(q8[..., 0]),
+                                          np.full_like(q8[..., 0], 255)], 2), 0x35, comp_sel=GREY_ALPHA_SEL)
+    else:
+        p.set_texture(em, slot, q8, 0x33, comp_sel=RGBA_SEL)
+
+
+def set_wrap(em, slot, wu, wv):
+    struct.pack_into('>I', em, ptcl.TEXRES + ptcl.TEXRES_SIZE * slot + 0x0C, (wv & 0xF) << 28 | (wu & 0xF) << 24 | 0x100)
+
+
+def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None):
+    """texture 1 of a two-texture template: sampler j as Ultimate places it (its first cell, repeat,
+    wrap, UV animation in slot 1's block); white (x 1: nothing) without one"""
+    if j is None:
+        pix, ts, rep, wrap = np.ones((16, 16, 4), np.float32), None, (1, 1), (1, 1)
+    else:
+        s = e['sampler'][j]
+        ts = e['static']['tex_scroll'][j]
+        rgb, a = sampler_inputs(e, j, first_cell(images[s['texture_id']], ts, shown_cell(e, j)))
+        pix = fit_texture(np.concatenate([rgb, a[..., None]], -1))
+        rep, wrap = REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), (s['wrap_u'], s['wrap_v'])
+        cbl, abl = tex_blend(e, ti, j)
+        notes.append('sampler %d drawn live as texture 1 (colour %s, alpha %s, UV mode %d)' % (
+            j, ('x', '+')[cbl], ('x', '+')[abl], uv_mode(ts)))
+    set_exact_texture(p, em, 1, pix)
+    set_wrap(em, 1, *wrap)
+    struct.pack_into('>2f', em, 0x508 + SLOT1, float(rep[0]), float(rep[1]))
+    em[0x4D7 + SLOT1], em[0x4D8 + SLOT1] = 1, 1
+    struct.pack_into('>I', em, PTN_MODE + SLOT1, 0)
+    set_uv_anim(em, ts, slot=1)
+
+
+def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None):
     """the texture an own pixel program (tools/eft_pixel.py) reads, [h, w, 4] 0-1: Ultimate's colour
     input in rgb and its alpha input in a, sampler ti's (img: one cell or the flipbook sheet) with
     the emitter's other samplers combined in as eft2 does (tex1 / tex2 colour and alpha blends: 0
@@ -474,7 +632,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
     left out, the ball drew at the gradient's full alpha)"""
     rgb, a = sampler_inputs(e, ti, img)
     cb = e['combiner']
-    others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
+    others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and j != live and s['texture_id'] != NONE64
               and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
@@ -524,11 +682,13 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh):
     return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
 
 
-def exact_combiner(p, em, e, alpha, notes):
+def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False):
     """(shader index, alpha keys, alpha gain) when the template's pixel program can be replaced by
     one of tools/eft_pixel.py's for this emitter's combiner (EXACT), else None. alpha: the alpha
     track [101] (alpha 0, x alpha 1 for alpha mode 4: folded into the keys). Ultimate's alphas past 1
-    (its whirlwinds' 2 - 4) go into the program's gain, the keys / gain"""
+    (its whirlwinds' 2 - 4) go into the program's gain, the keys / gain. blend1: how a two-texture
+    template's texture 1 combines (tex_blend); dissolve: the dissolve's edge width (dissolve_of), its
+    threshold in colour 0's track (dissolve_c0: colour 0 then constants) or colour 1's"""
     if not EXACT:
         return None
     sh, cb = e['shader'], e['combiner']
@@ -540,15 +700,19 @@ def exact_combiner(p, em, e, alpha, notes):
     # colour 1 at its life mean x the colour scale, for a template that doesn't pass colour 1
     c1 = track(e['static'], e['color'], 1)[0].mean(0) * np.array(e['info']['color1'][:3]) \
         * float(e['static']['color_scale'] or 1.0)
+    c0 = track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]) \
+        * float(e['static']['color_scale'] or 1.0) if dissolve is not None and dissolve_c0 else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain, c1)
+                              1 if erode else 0, gain, c1, blend1, dissolve, c0)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
     lay = eft_pixel.layout(bytes(p.shader_binary(si)))
-    notes.append('own pixel program (colour %d, alpha %d%s%s)' % (
+    notes.append('own pixel program (colour %d, alpha %d%s%s%s)' % (
         cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else '',
-        ', colour 1 constant' if lay['c1'] is None and cb['color_process'] in (2, 3) else ''))
+        ', colour 1 constant' if (lay['c1'] is None or (dissolve is not None and not dissolve_c0))
+        and cb['color_process'] in (2, 3) else '',
+        ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else ''))
     return si, np.clip(alpha / gain, 0, 1), gain
 
 
@@ -836,7 +1000,7 @@ def set_flipbook(em, ptn, ts, tp, rep=(1, 1)):
     struct.pack_into('>2f', em, 0x508, rep[0] / nx, rep[1] / ny)
 
 
-def set_uv_anim(em, ts):
+def set_uv_anim(em, ts, slot=0):
     """eft2's UV parameters (shift / scale / rotation: initial, random, per frame) -> slot 0's eft
     block: 0x510 mode (bits 1 / 2 / 4; the template's, at least the bits needed), 0x514 scroll a
     frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
@@ -849,13 +1013,14 @@ def set_uv_anim(em, ts):
     if ts is None:
         ts = {'scroll': [0, 0], 'scroll_add': [0, 0], 'scroll_random': [0, 0], 'scale': [1, 1],
               'scale_add': [0, 0], 'scale_random': [0, 0], 'rotation': 0, 'rotation_add': 0, 'rotation_random': 0}
-    struct.pack_into('>2f', em, 0x514, *ts['scroll_add'])
-    struct.pack_into('>2f', em, 0x51C, *ts['scroll'])
-    struct.pack_into('>2f', em, 0x524, *ts['scroll_random'])
-    struct.pack_into('>2f', em, 0x52C, *ts['scale_add'])
-    struct.pack_into('>2f', em, 0x534, *ts['scale'])
-    struct.pack_into('>2f', em, 0x53C, *ts['scale_random'])
-    struct.pack_into('>3f', em, 0x544, ts['rotation_add'], ts['rotation'], ts['rotation_random'])
+    o = SLOT1 * slot
+    struct.pack_into('>2f', em, o + 0x514, *ts['scroll_add'])
+    struct.pack_into('>2f', em, o + 0x51C, *ts['scroll'])
+    struct.pack_into('>2f', em, o + 0x524, *ts['scroll_random'])
+    struct.pack_into('>2f', em, o + 0x52C, *ts['scale_add'])
+    struct.pack_into('>2f', em, o + 0x534, *ts['scale'])
+    struct.pack_into('>2f', em, o + 0x53C, *ts['scale_random'])
+    struct.pack_into('>3f', em, o + 0x544, ts['rotation_add'], ts['rotation'], ts['rotation_random'])
 
 
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
@@ -944,8 +1109,37 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     rot = ROT_NONE if rest_dir else rotation_need(st, is_mesh)
     anim = tuple(e['color']['color%d_type' % n] == 2 and float(np.ptp(track(e['static'], e['color'], n)[0], 0).max()) > 0.05
                  for n in (0, 1))
-    em, turns = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot, notes,
-                              anim, e['combiner']['color_process'] in (2, 3))
+    # a second sampler moving apart from the main one: drawn live by a two-texture template
+    dis = dissolve_of(e, ti, images, names, ptn_want) if EXACT and smp else None
+    # a dissolve's threshold rides in colour 1's track, or colour 0's when its rgb is constant
+    c0_flat = float(np.ptp(track(e['static'], e['color'], 0)[0], 0).max()) <= 0.01
+    dis_moving = dis is not None and float(np.ptp(dis[1])) > 0.01
+    live = live_sampler(e, ti, images, names, is_mesh) if EXACT and smp and not uv_quarter and dis is None else None
+    # the two may trade slots: no flipbook either side (slot 1 has none), nothing else combined in
+    swap_ok = live is not None and not ptn_want and not e['tex_anim'][live]['pattern_type'] and not [
+        j for j, s in enumerate(e['sampler']) if j not in (ti, live) and s['texture_id'] != NONE64
+        and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+    em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
+                                       notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
+                                       live is not None,
+                                       uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
+                                       (2 if c0_flat else 1) if dis_moving else 0)
+    if swapped:
+        ti, live = live, ti
+        smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
+    lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) if EXACT else None
+    two_tpl = lay_t is not None and 'uv1' in lay_t
+    dis_in = None       # the colour track carrying the dissolve's threshold
+    if dis is not None and lay_t is not None and not two_tpl:
+        if lay_t['c1'] is not None and (p.field(em, 'color1_type') == 2 or not dis_moving):
+            dis_in = 1
+        elif c0_flat and (p.field(em, 'color0_type') == 2 or not dis_moving) and (
+                lay_t['c1'] is not None or e['combiner']['color_process'] not in (2, 3)):
+            dis_in = 0
+    if dis is not None and dis_in is None:
+        notes.append('dissolve not drawn (template: %s)' % (
+            'not ours' if lay_t is None else 'two textures' if two_tpl else 'no animated colour track for it'))
+        dis = None
     # a rotation no template draws: baked (a quad's fixed quarter turns; a mesh's starting rotation)
     baked_rot = rot != ROT_NONE and not turns and (is_mesh or rot == ROT_FIXED)
     quarter = fixed_quarter_turn(st) if baked_rot and not is_mesh else None
@@ -954,6 +1148,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         mesh_rot = None
     ptn = ptn_want if ptn_want and struct.unpack_from('>I', em, PTN_MODE)[0] == ptn_want else 0
     repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
+    bake = None
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
         # size with scale 1): an uneven 3D scale goes into the mesh (one primitive per mesh and
@@ -1039,12 +1234,31 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         a_track = a_track * track(st_, col_, 1)[1] * e['info']['color1'][3]
     if smp and ptn_want and not ptn:
         a_track = a_track * flipbook_fade(e, ti, images.get(smp['texture_id']), notes)
-    exact = exact_combiner(p, em, e, a_track, notes)
+    if live is not None and not (two_tpl and bake is None and not quarter):
+        # texture 1 reads slot 0's UVs before its transform: not once they're baked into the mesh;
+        # nor a texture 0 turned in the image
+        notes.append('sampler %d not drawn live (%s)' % (live, 'no two-texture template' if not two_tpl else
+                                                          'UVs baked' if bake is not None else 'turn baked'))
+        live = None
+    exact = exact_combiner(p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
+                           dis[0] if dis is not None else None, dis_in == 0)
+    if not exact:
+        live = dis = None
     if exact:
-        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh)
+        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live)
         rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
         rgb1 = track(st_, col_, 1)[0] * np.array(e['info']['color1'][:3])
         alpha, premult = exact[1], None
+        if dis is not None:
+            # texture 0: grey colour in red and blue, the mask in green, alpha; colour 1's track the
+            # threshold (Smash 4 scales colour 1 by the colour scale too, cross_f 0x04A588CC)
+            m = resize(dis[2][..., None], pix.shape[1], pix.shape[0])
+            pix = np.concatenate([pix[..., :1], m, pix[..., :1], pix[..., 3:]], -1)
+            thr = np.repeat(dis[1][:, None] / float(e['static']['color_scale'] or 1.0), 3, 1)
+            if dis_in == 0:
+                rgb = thr
+            else:
+                rgb1 = thr
     else:
         if not is_mesh:
             baked = bake_samplers(e, ti, img, ptn, images, names, notes)
@@ -1068,30 +1282,20 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     swap_uv = ((uv_quarter or 0) + (quarter or 0)) % 2 == 1
     if swap_uv:
         repeat = (repeat[1], repeat[0])
-    h, w = pix.shape[:2]
     # a whole flipbook sheet of 4+ cells a side gets twice the size, cells keeping 64 px
     grid = max(int(round(v)) for v in e['static']['tex_scroll'][ti]['uv_div']) if ptn else 1
-    tmax = TEX_MAX * 2 if grid >= 4 else TEX_MAX
-    tw, th = pow2(w, hi=tmax), pow2(h, hi=tmax)
-    if (tw, th) != (w, h):
-        pix = resize(pix.astype(np.float32), tw, th)
-    # smooth textures (glows, gradients) at half size while that changes them by under 1% (the
-    # bank's size: test 37's 6.0 MB loaded)
-    while min(tw, th) > 16:
-        half = resize(pix.astype(np.float32), tw // 2, th // 2)
-        back = resize(half, tw, th)
-        if float(np.abs(back - pix).mean()) > 0.01 * max(float(pix.mean()), 0.05):
-            break
-        pix, tw, th = half, tw // 2, th // 2
+    pix = fit_texture(pix, TEX_MAX * 2 if grid >= 4 else TEX_MAX)
     q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
+    if two_tpl:
+        # texture 1: the live sampler, else white (x 1)
+        set_slot1(p, em, e, ti, live, images, notes)
     if exact:
         struct.pack_into('>I', em, 0x844, exact[0])
-        if int(np.abs(q8[..., :3].astype(int) - q8[..., :1]).max()) <= 2:
-            # grey colour input: BC5, R the colour (every rgb channel), G the alpha
-            p.set_texture(em, 0, np.stack([q8[..., 0], q8[..., 3], np.zeros_like(q8[..., 0]),
-                                           np.full_like(q8[..., 0], 255)], 2), 0x35, comp_sel=GREY_ALPHA_SEL)
+        if dis is not None:
+            # uncompressed: BC3's colour endpoints would tie the mask to the colour
+            p.set_texture(em, 0, q8, 0x1A, comp_sel=RGBA_SEL)
         else:
-            p.set_texture(em, 0, q8, 0x33, comp_sel=RGBA_SEL)
+            set_exact_texture(p, em, 0, pix)
     else:
         r8 = q8[..., 0]
         # the shape in every channel (selectors R R R R): most templates' pixel shaders take alpha
@@ -1106,8 +1310,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         if mask_only:
             notes.append('template reads the texture alpha as a mask: its channel selectors kept')
     if smp:
-        wu, wv = (smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])
-        struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, (wv & 0xF) << 28 | (wu & 0xF) << 24 | 0x100)
+        set_wrap(em, 0, *((smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])))
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
     set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)

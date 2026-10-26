@@ -487,3 +487,32 @@ arcs at the floor; Ultimate's thick white columns of rising streaks.
   `ef_cmn_wind00` by itself through identical UVs (red x alpha), which had come in as its mean
   (x 0.39, flat). 14 emitters.
 Still missing on the columns: the dissolve threshold (custom shader 8, `CSDP`).
+
+## Fix 32 (`build/hero_fix32.zip`): second textures drawn live, the dissolve
+
+Step 1 of "a template for every Ultimate effect": own pixel programs that read two textures, each
+with its own coordinates and UV animation, and Ultimate's dissolve.
+- **Two-texture templates** (`tools/eft_pixel.py`): a vanilla program sampling slots 0 and 1
+  straight from its inputs is replaced by one that samples both and combines them as Ultimate does
+  (texture 0 x or + texture 1, colour and alpha each by eft2's tex1 / tex2 blend), then the colour /
+  alpha combiner. The vertex program is the template's: slot 1's UV block (0x550) gets the second
+  sampler's repeat, scroll, scale and rotation (`set_uv_anim(..., slot=1)`).
+- **Which sampler goes live** (`live_sampler`): one moving apart from the main one (its own UV
+  animation, repeat or UV set; a mesh: the same UV set only). The two trade slots when the template
+  animates them better that way round (texture 0 x texture 1 either way), 15 emitters. 81 of Hero's
+  emitters now draw a second texture moving as Ultimate's does (fire's flow over its shape, the
+  whirlwinds' second layer, the auras' noise) where it came in frozen at its start or as its mean.
+  Still frozen / meaned: 27 whose mesh UVs are baked (the template can't animate slot 0's UVs; slot
+  1 would read the baked ones), 34 with no two-texture template of their type, blend, follow and
+  flipbook mode.
+- **Templates with shader parameters** whose vertex program parameter-free emitters run too count
+  as plain once their pixel program is ours (half the two-texture templates had parameters).
+- **Dissolve** (Ultimate's custom shader 8, read from Woosh's / ring2's Maxwell code): a pixel goes
+  where sampler 1's alpha is under colour 1's alpha (over life: the whirlwinds eat away from 7% to
+  100%), alpha x (mask - threshold) / width over the edge (width: the `CSDP`'s first float, 0.05 /
+  0.12). Our program reads the mask from texture 0's green (grey colour in red and blue; RGBA8,
+  uncompressed) and the threshold from a colour track: colour 1's (colour 1 then a constant in the
+  program), or colour 0's when its rgb is constant (6 emitters). Smash 4 scales colour tracks by the
+  colour scale (cross_f 0x04A588CC): the threshold is written divided by it. 14 of 18 dissolve;
+  Woosh's `tornado2_f` (and the three Wind ones) don't: no template animates both its scroll and a
+  colour track, and the scroll ranks first.

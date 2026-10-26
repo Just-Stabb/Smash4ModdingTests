@@ -229,6 +229,17 @@ inputs, samplers and uniform blocks kept) leaves the emitter's vertex program (p
 flipbook, UV animation) as the template's: `tools/eft_pixel.py` writes eft2's combiner this way for
 every converted emitter (`tools/eft_pixel_test.py` checks each variant against the formula).
 
+Two-texture templates (19 quad and 50 mesh vanilla pixel programs sample slot 0 and slot 1 each
+straight from an input, semantic 9 on quads, 10 on meshes: slot 0 in `.xy`, slot 1 in `.zw`) work
+out slot 1's coordinates in the vertex program from the same UVs (a mesh's one UV set) with slot 1's
+own block (0x550 = 0x4D4 + 0x7C: repeat / cells at 0x584, UV mode 0x58C, scroll / scale / rotation
+from 0x590; 0x04A5A6AC copies it into shtAnim1 as slot 0's into shtAnim0). The converter draws a
+second Ultimate sampler there, live (`live_sampler`), when it moves apart from the main one.
+
+Colour 1 is scaled like colour 0: the particle's colour 1 (+0x88) x the set's colour (+0x278) x
+the colour scale (0x778) x the emitter instance's colour 1 (+0x238), cross_f 0x04A588CC (colour 0:
+0x04A58830).
+
 ## Primitive table (meshes; authoring: `Ptcl.add_primitive`)
 
 `+0` u32 count, `+4` u32 total size, `+8` u32 entry offset (0xC); then count entries of 0x50: five
