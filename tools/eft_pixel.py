@@ -37,7 +37,7 @@ sys.path.insert(0, HERE)
 
 from trail_shader import assemble, gsh_blocks, pixel_gsh  # noqa: E402
 
-VS_PROGRAM, PS_HEADER, PS_PROGRAM = 5, 6, 7
+PS_HEADER, PS_PROGRAM = 6, 7
 SEM_COLOR0, SEM_COLOR1, SEM_VCOLOR = 0, 1, 6
 UV_SEMS = (9, 10)
 # GX2PixelShader words: input count, then the input controls (semantic in the low byte)
@@ -49,12 +49,6 @@ def header_words(b, typ):
         if t == typ:
             return [struct.unpack_from('>I', b, o + 4 * i)[0] for i in range(s // 4)]
     return None
-
-
-def vertex_key(b):
-    """a hash of the shader binary's vertex program (two emitters with the same one place and animate
-    their particles alike, whatever their pixel programs)"""
-    return hashlib.md5(b''.join(b[o:o + s] for t, _h, o, s in gsh_blocks(b, 0) if t == VS_PROGRAM)).hexdigest()
 
 
 def disassemble(b):

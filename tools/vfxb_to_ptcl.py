@@ -15,9 +15,12 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
 - template: Templates (the base's own or one imported from --templates files) of the eft particle
   type (eft2's numbers: 0 billboard, 1 / 2 plate XY / XZ, 3 directional, 4 directional polygon, 8 Y
   billboard; 7 primitive as a billboard mesh; a type-3 mesh at rest as type 4; 5 / 6 as type 3,
-  as type 4 on a mesh), blend and mesh-ness, plain shaders first, never one reading the screen,
-  one that turns its particles (v_inRot) when they turn (a fixed turn no template draws is baked:
-  a mesh's into its vertices, a quad's quarter turns into its texture);
+  as type 4 on a mesh) and mesh-ness (the blend too unless its pixel program is ours: the blend
+  is the emitter's), plain shaders first, never one reading the screen, ranked by what its vertex
+  program draws (tools/eft_vertex.py: UV animation, flipbook, follow types, rotation), one that
+  turns its particles (v_inRot) when they turn (a fixed turn no template draws is baked: a mesh's
+  into its vertices, a quad's quarter turns into its texture); Ultimate's follow type, flipbook
+  mode and blend written over the template's;
 - meshes (a primitive id): the VFXB's model (G3PR BFRES, tools/bfres_switch.py; first shape)
   written to the primitive table (Ptcl.add_primitive, once per id);
 - texture: the first sampler that isn't an indirect / grade / noise / mask helper, its BNTX channel
@@ -57,6 +60,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
 import eft_pixel  # noqa: E402
+import eft_vertex  # noqa: E402
 import efc  # noqa: E402
 import ptcl  # noqa: E402
 import vfxb  # noqa: E402
@@ -99,18 +103,19 @@ TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's 
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
 # follow type (eft2's numbers: 0 follow the emitter, 1 not, 2 its position only): at emission
 # (cross_f.rpx 0x04A5C89C, from the emitter's +0x12C = this) 0 points the particle at the emitter's
-# live matrices, else copies them; shader-keyed (no vanilla shader group mixes values)
+# live matrices, else copies them. No vanilla shader group mixes values, but one vertex program
+# serves all three (tools/eft_vertex.py): the converter writes Ultimate's
 FOLLOW = 0x310
+KEY_HOOKS = (0x32C, 0x330, 0x334, 0x338, 0x33C)
 # slot 0's flipbook (cross_f.rpx 0x04A5A858 / 0x04A5A6AC, the emitter's uniforms; 0x04A54A88 the
 # random start cell): 0x4D5 table used, 0x4D7 / 0x4D8 cells across / down, 0x4D9 random start cells,
 # 0x4E0 32-byte table, 0x500 mode, 0x504 s16 frames a cell, 0x506 s16 cells (or table entries),
-# 0x508 / 0x50C UV scale (1 / cells). The mode sets a shader feature bit (shader-keyed): 1 -> 0x4,
+# 0x508 / 0x50C UV scale (1 / cells). The mode sets a uboFlag bit every flipbook program tests: 1 -> 0x4,
 # 4 -> 0x8, 2 -> 0x10, 3 -> 0x20, 5 -> 0x10000000; in that bit order eft2's life-fit / clamp / loop /
 # random, as vanilla's numbers agree (1 / 3 / 5 have no frame rate, 2 / 4 do: 4 plays once over the
 # life, 2 loops: Bayonetta's bats)
 PTN_MODE = 0x500
 PTN_FROM_EFT2 = {1: 1, 2: 4, 3: 2, 4: 3}
-UV_MODE = 0x510         # slot 0's UV animation (0x4D4 + 0x3C; the block below, docs/ptcl-format.md)
 SLOT1 = 0x7C            # slot 1's UV block: slot 0's + this (0x550; 0x04A5A6AC reads each slot's so)
 # the alpha an emitter loses a frame while its set fades (Terminate_Graphic_Effect), the emitter and
 # its particles ending at 0; it climbs back to 1 otherwise (cross_f.rpx 0x04A64F00 / 0x04A661D8:
@@ -157,10 +162,13 @@ class Templates:
     texture (slot 0; slot 2 unused, slot 1 only on a two-texture template whose pixel program is
     ours). Among them, in this order: a plain shader (no shader parameters: Ike's FS cloud shader,
     FinIkeCloud FNSmoke with 32 bytes of them, tinted Sephiroth's meshes orange; or, its pixel
-    program ours, a vertex program parameter-free emitters run too), the UV animation the emitter needs (slot 0's mode word 0x510: 1 scroll, 2
-    scale, 4 rotate; shader-keyed: 8 of 4291 vanilla shader groups mix values) or more, the follow
-    type (FOLLOW; ranked before the UV mode: a glow left behind by the sword shows more), then
-    animated colour tracks
+    program ours, a vertex program parameter-free emitters run too), a flipbook program only for a
+    flipbook, the follow type, the UV animation the emitter needs, then animated colour tracks. What a
+    template draws is read from its vertex program (tools/eft_vertex.py features), not its mode
+    words: the UV animation (none or all of it, by slot), whether it plays a flipbook (then any
+    mode: the converter writes the wanted one), the follow types it draws right (all but for programs
+    reading the live emitter matrix; the converter writes the wanted one, 0x310 being the CPU's).
+    Then animated colour tracks
     (2 / 2, then 2 / x) and the base's own (no import); others are imported from the corpus
     (Ptcl.import_emitter: their shader, shader parameters and textures copied). Shaders reading the
     screen or texture arrays (SCREEN_SAMPLERS) are left out."""
@@ -169,18 +177,6 @@ class Templates:
         self.base, self.files, self.found = base, {}, {}
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
-        # the vertex programs emitters without shader parameters run: a template with parameters
-        # whose vertex program is one of them needs none once its pixel program is ours (half the
-        # two-texture templates, all ranked after plain ones: 109 of Hero's 134 second samplers went
-        # without one)
-        plain_vs = set()
-        if EXACT:
-            for p in [base] + list(self.files.values()):
-                for s in p.sets:
-                    for x in s['emitters']:
-                        em = x['data']
-                        if em is not None and len(em) == ptcl.SIMPLE_SIZE and not p.field(em, 'shader_param_size'):
-                            plain_vs.add(eft_pixel.vertex_key(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))))
         for path in [None] + list(corpus):
             p = base if path is None else self.files[path]
             screen = {}
@@ -194,19 +190,14 @@ class Templates:
                     if t[2]['native_size']:
                         continue
                     two = bool(t[1]['native_size'])
-                    if p.field(em, 'keyanim_size'):
-                        # its key animation isn't imported (Ptcl.import_emitter), but its per-particle
-                        # hooks (0x32C - 0x33C: 2 = by key animation, 0x04A627A0) still read it: fix 25's
-                        # F-smash ground flare (a key-animated template, picked for its colour tracks)
-                        # crashed on the null table (0x04A5E154)
-                        continue
                     key = (p.field(em, 'particle_type'), p.field(em, 'blend_type'), p.field(em, 'primitive_index') >= 0)
                     c = (p.field(em, 'color0_type'), p.field(em, 'color1_type'))
                     score = (2 if c == (2, 2) else 1 if c[0] == 2 else 0) + (BASE_FIRST if path is None else 0)
                     si_ = struct.unpack_from('>I', em, 0x844)[0]
                     if si_ not in screen:
                         b = p.shader_binary(si_)
-                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b)
+                        screen[si_] = (any(t in b for t in SCREEN_SAMPLERS), ROTATION_ATTR in b, VELOCITY_ATTR in b,
+                                       eft_vertex.features(bytes(b)))
                     if screen[si_][0]:
                         continue
                     # 0 no own program, 1 one without colour 1, 2 with it
@@ -217,15 +208,16 @@ class Templates:
                     # a two-texture template: its pixel program ours (texture 1 sampled from the
                     # coordinates its vertex program works out with slot 1's UV animation), no
                     # flipbook on slot 1
-                    if two != (lay is not None and 'uv1' in lay) or \
-                            (two and struct.unpack_from('>I', em, PTN_MODE + SLOT1)[0]):
+                    feat = screen[si_][3]
+                    if two != (lay is not None and 'uv1' in lay) or (two and feat['flipbook'][1]):
                         continue
-                    plain = not p.field(em, 'shader_param_size') or bool(own) and eft_pixel.vertex_key(
-                        bytes(p.shader_binary(si_))) in plain_vs
-                    traits = (plain, struct.unpack_from('>I', em, UV_MODE)[0] & 7,
-                              struct.unpack_from('>I', em, FOLLOW)[0], struct.unpack_from('>I', em, PTN_MODE)[0],
+                    # parameters a vertex program doesn't read do nothing once the pixel program is
+                    # ours (853 of 1055 vanilla emitters with them; half the two-texture templates)
+                    plain = not p.field(em, 'shader_param_size') or bool(own) and not feat['shader_param']
+                    # what its vertex program draws (not the mode words: tools/eft_vertex.py)
+                    traits = (plain, feat['uv'][0], feat['follow'], feat['flipbook'][0],
                               screen[si_][1], screen[si_][2], own, c[0] == 2, c[1] == 2,
-                              two, struct.unpack_from('>I', em, UV_MODE + SLOT1)[0] & 7 if two else 0)
+                              two, feat['uv'][1] if two else 0)
                     self.found.setdefault(key, {})
                     if traits not in self.found[key] or score > self.found[key][traits][0]:
                         self.found[key][traits] = (score, path, si, k)
@@ -234,8 +226,7 @@ class Templates:
             want2=False, uv_mode1=0, swap_ok=False, need_thr=0):
         """the best template for this particle type / blend / mesh-ness, follow type, flipbook mode
         (eft's, 0 none), rotation (ROT_*) and UV mode bits; another blend (add), then type 0, when
-        there's none. A template with another flipbook mode than wanted is never taken when one
-        without is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
+        there's none. A flipbook template is never taken for no flipbook when another is there. A rotation the converter can bake (ROT_FIXED) ranks after the UV mode,
         which it can't (only freeze); one it can't, before. With own pixel programs (EXACT) a template
         they can stand in for comes first, then animated colour tracks where anim (colour 0 / 1 change
         over the particle's life: a constant track is their mean, Frizzle's white flash at birth went).
@@ -247,33 +238,44 @@ class Templates:
             """(main's UV mode met, the second's met, swapped): the better way round"""
             mode, two, mode1 = t[1], t[9], t[10]
             ways = [(mode & uv_mode == uv_mode, not two or mode1 & uv_mode1 == uv_mode1, False)]
-            if swap_ok and two:
-                ways.append((mode1 & uv_mode == uv_mode, mode & uv_mode1 == uv_mode1, True))
+            # only when both fit so (half a fit bakes slot 0's UVs into a mesh, and texture 1 then
+            # can't be drawn live: Hero's ring2 / wind1 lost both)
+            if swap_ok and two and mode1 & uv_mode == uv_mode and mode & uv_mode1 == uv_mode1:
+                ways.append((True, True, True))
             return max(ways, key=lambda w: (w[0], w[1], not w[2]))
 
         def rank(item):
-            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), (score, *_r) = item
-            fit0, fit1, swapped = assign(item[0])
-            # position-only (2) is rare in vanilla: following fully keeps up with a moving bone too
-            # a mesh's UV animation first even so: freezing it bakes the mesh again (his slash arcs'
+            (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1), score = item[0][1:], item[1][0]
+            same_blend = item[0][0] == blend
+            fit0, fit1, swapped = assign(item[0][1:])
+            # a mesh's UV animation first: freezing it bakes the mesh again (his slash arcs'
             # glows: four 240 KB copies), and its starting rotation bakes into the one copy
             # the UV animation before the colour tracks: frozen, a scrolling texture is a still picture
             # (test 30: Woosh's whirlwinds, whose rising streaks are the whole look, stood still and
             # thin for a template with animated colour); a colour track's mean loses less
-            # (position-only following (2) takes a template that follows fully: few have 2, none with UV
-            # animation on a mesh; one left in place (1) or following (0) needs its own)
             # (two textures where a second one is wanted, its UV animation in slot 1 too)
             # (a dissolve's threshold rides in a colour track: an animated one after the UV animation,
             # need_thr: Woosh's whirlwinds kept their rising streaks over the dissolve)
-            return (plain, pm in (ptn, 0), own if need_c1 else min(own, 1), fol == follow or (follow == 2 and fol == 0),
-                    two == want2, fit0, fit1, not need_thr or an1 or (need_thr == 2 and an0), fol == follow,
+            # (a flipbook played before the UV animation: frozen on one cell, fire and smoke sheets
+            # were a still picture faded by their cells' ink)
+            # (the main texture's UV animation before a second texture: missing on a mesh, it bakes
+            # slot 0's UVs, and texture 1 then can't be drawn live either: Hero's ring2 / wind1)
+            return (plain, not pm or bool(ptn), own if need_c1 else min(own, 1), follow in fol, pm == bool(ptn),
+                    fit0, two == want2, fit1, not need_thr or an1 or (need_thr == 2 and an0),
                     an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
-                    by_vel or typ != 3, follow == 2 and fol == 0, pm == ptn, (mode1 if swapped else mode) == uv_mode,
-                    turns or rot == ROT_NONE, turns == (rot != ROT_NONE), score)
-        for key in ((typ, blend, mesh), (typ, 1, mesh), (0, blend, mesh), (0, 1, mesh)):
-            if key not in self.found:
+                    by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
+                    turns or rot == ROT_NONE, turns == (rot != ROT_NONE), same_blend, score)
+        # the blend is the emitter's (0x324: not the program's, 352 vanilla file / shader pairs use
+        # more than one): any blend's template whose pixel program is ours (it draws rgb and alpha
+        # for whichever), the same blend's otherwise; then another blend's (add), then type 0
+        for t, b in ((typ, blend), (typ, 1), (0, blend), (0, 1)):
+            cands = {(b_,) + traits: v for b_ in (0, 1, 2) for traits, v in self.found.get((t, b_, mesh), {}).items()
+                     if b_ == b or (EXACT and traits[6])}
+            if not cands:
                 continue
-            traits, (_score, path, si, k) = max(self.found[key].items(), key=rank)
+            key = (t, b, mesh)
+            traits, (_score, path, si, k) = max(cands.items(), key=rank)
+            traits = traits[1:]
             (plain, mode, fol, pm, turns, by_vel, own, an0, an1, two, mode1) = traits
             swapped = assign(traits)[2]
             if swapped:
@@ -282,12 +284,12 @@ class Templates:
             if key != (typ, blend, mesh):
                 notes.append('no template (type %d blend %d%s): type %d blend %d' % (
                     typ, blend, ' mesh' if mesh else '', key[0], key[1]))
-            if fol != follow:
-                notes.append('follow %d: template has %d' % (follow, fol))
+            if follow not in fol:
+                notes.append('follow %d: template draws only %s' % (follow, '/'.join(map(str, sorted(fol)))))
             if mode & uv_mode != uv_mode:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
-            if pm != ptn:
-                notes.append('flipbook mode %d: template has %d (one cell shown)' % (ptn, pm))
+            if ptn and not pm:
+                notes.append('flipbook mode %d: template plays none (one cell shown)' % ptn)
             if key[0] == 3 and not by_vel:
                 notes.append('directional by world motion: template has no v_inVec')
             if rot == ROT_ANIMATED and not turns:
@@ -295,8 +297,19 @@ class Templates:
             if path is None:
                 em = self.base.emitter_bytes(si, k)
                 struct.pack_into('>II', em, 0x2CC, 0, 0)
-                return em, turns, swapped
-            return self.base.import_emitter(self.files[path], si, k, skip_slots=(0, 1)), turns, swapped
+            else:
+                em = self.base.import_emitter(self.files[path], si, k, skip_slots=(0, 1))
+            if follow in fol:
+                # the CPU's (0x04A5C89C): Ultimate's
+                struct.pack_into('>I', em, FOLLOW, follow)
+            # a key-animated template's key animation isn't imported (Ptcl.import_emitter), but its
+            # per-particle hooks (0x32C - 0x33C, cross_f 0x04A627A0: function tables, 2 = by key
+            # animation, only ever on key-animated emitters) would read it: fix 25's F-smash ground
+            # flare crashed on the null table (0x04A5E154). 1, the hook every other emitter has
+            for o in KEY_HOOKS:
+                if struct.unpack_from('>I', em, o)[0] == 2:
+                    struct.pack_into('>I', em, o, 1)
+            return em, turns, swapped
         raise KeyError((typ, blend, mesh))
 
 
@@ -1002,10 +1015,10 @@ def set_flipbook(em, ptn, ts, tp, rep=(1, 1)):
 
 def set_uv_anim(em, ts, slot=0):
     """eft2's UV parameters (shift / scale / rotation: initial, random, per frame) -> slot 0's eft
-    block: 0x510 mode (bits 1 / 2 / 4; the template's, at least the bits needed), 0x514 scroll a
-    frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
-    scale random, 0x544 rotation a frame, 0x548 rotation init, 0x54C rotation random (the vanilla
-    corpus: each mode bit set exactly where those values are). Unused ones are left neutral. The
+    block: 0x514 scroll a frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
+    scale random, 0x544 rotation a frame, 0x548 rotation init, 0x54C rotation random; the template's
+    vertex program draws all of them or none (eft_vertex.uv_caps; the mode word 0x510 is read by
+    nothing). Unused ones are left neutral. The
     shifts keep their sign: eft subtracts them as eft2 does (cross_f.rpx 0x04A5A6AC copies 0x514-0x54C
     into the static uniforms' shtAnim0 unchanged; the vertex programs draw s (uv x repeat - 0.5) -
     (t x a frame + initial +- random) + 0.5 on both axes). Fix 29 and before negated them: every
@@ -1146,7 +1159,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     mesh_rot = tuple(float(v) for v in st['rotate_init'][:3]) if baked_rot and is_mesh else None
     if mesh_rot and not any(abs(v) > 1e-6 for v in mesh_rot):
         mesh_rot = None
-    ptn = ptn_want if ptn_want and struct.unpack_from('>I', em, PTN_MODE)[0] == ptn_want else 0
+    # a flipbook program plays any mode (the CPU sets its flags from the mode word: tools/eft_vertex.py)
+    flip = eft_vertex.features(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])))['flipbook'][0]
+    ptn = ptn_want if ptn_want and flip else 0
     repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
     bake = None
     if is_mesh:
@@ -1164,7 +1179,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         # with all of it baked)
         need = uv_mode(ts)
         bake = None
-        have = struct.unpack_from('>I', em, UV_MODE)[0] & 7
+        have = eft_vertex.uv_caps(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])))[0]
         if have & need != need:
             keep = have & need
             bake = (repeat, tuple(ts['scale']) if not keep & 2 else (1.0, 1.0),
@@ -1217,8 +1232,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         struct.pack_into('>i', em, 0x2DC, prim_index[key])
         if bake and not have & need:
             ts = None
-    # the blend is shader-keyed: the template's (the same unless none had this one)
-    blend = {0: 'normal', 1: 'add', 2: 'sub'}[p.field(em, 'blend_type')]
+    # the blend: Ultimate's on a template whose pixel program is ours (any blend's: Templates.get),
+    # else the template's
+    if lay_t is None:
+        blend = {0: 'normal', 1: 'add', 2: 'sub'}[p.field(em, 'blend_type')]
 
     # ---- texture
     img = images.get(smp['texture_id']) if smp else None
@@ -1313,7 +1330,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         set_wrap(em, 0, *((smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])))
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
-    set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
+    if ptn or not flip:
+        set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
+    else:
+        # a flipbook program for no flipbook: one cell, played as any mode
+        set_flipbook(em, 1, {'uv_div': [1, 1]}, {'num': 1, 'num_random': 1, 'table': [0] * 32, 'frequency': 1}, repeat)
+        notes.append('flipbook template: one cell')
 
     # ---- blend, colour, alpha
     col = e['color']     # (st: the static block, its rotation masked above)

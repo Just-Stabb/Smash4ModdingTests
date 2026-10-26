@@ -95,6 +95,7 @@ the writer recomputes them.)
 | 0x2DC | s32 | primitive index (−1 none) | verified |
 | 0x2EC / 0x2F0 | u32 | shader-param size / pos (into sparam table) | verified |
 | 0x2F8–0x33C | u32s | small enums (blend, display, z-mode, etc.) — shader-keyed | corpus |
+| 0x32C–0x33C | 5 u32 | per-particle hooks (0x04A627A0: function tables, 0 none); 2 = by key animation, only ever on key-animated emitters (it reads the key table: null once the table is dropped, a crash at 0x04A5E154); 1 everywhere else | verified (calls) / corpus |
 | 0x324 | u32 | blend: 0 alpha (normal), 1 additive, 2 subtract. Not shader-keyed: 352 of 5366 (file, shader) pairs use more than one; emitters named `*_alpha` are 0 (273 of 280), `*add*` mostly 1 | corpus |
 | 0x340 | u32 | volume type (0 point, 1 circle (XZ plane, radius x / z), 2 circle (same divide), 3 circle fill, 4 sphere, 7 sphere fill, 8-9 cylinder, 10-11 box, 12-13 line, 14 rectangle: names and radii in the corpus fit NintendoWare's order) | corpus |
 | 0x348 | 3f | volume radius | corpus |
@@ -121,10 +122,10 @@ the writer recomputes them.)
 | 0x4D5 / 0x4D7 / 0x4D8 / 0x4D9 | u8 | slot 0 flipbook: pattern table used / cells across / cells down / random start cells (a particle starts on a random cell below this, 0x04A54A88) | verified (0x04A5A6AC, 0x04A5A858: the emitter's uniforms) |
 | 0x4DA / 0x4DB / 0x4DC | u8 | slot 0 flags (shader feature bits 0x400 / 0x800 / 0x10000 for slot 0) | verified (use) |
 | 0x4E0 | 32 × u8 | slot 0 flipbook pattern table | verified |
-| 0x500 | u32 | slot 0 flipbook mode: 0 none, 1 life fit, 4 clamp, 2 loop, 3 random (shader bits 0x4 / 0x8 / 0x10 / 0x20 in that order, eft2's; 5 -> 0x10000000, explosions); shader-keyed (no group mixes on / off) | verified (bits) / corpus (names: 1 / 3 / 5 have no frame rate, 2 / 4 do) |
+| 0x500 | u32 | slot 0 flipbook mode: 0 none, 1 life fit, 4 clamp, 2 loop, 3 random (uboFlag bits 0x4 / 0x8 / 0x10 / 0x20 in that order, eft2's; 5 -> 0x10000000, explosions; 0x04A5A858). Read by the CPU; every vanilla vertex program that plays flipbooks tests all five bits, so any of them plays any mode (no group mixes on / off: a program with no flipbook can't play one) | verified (bits, programs) / corpus (names: 1 / 3 / 5 have no frame rate, 2 / 4 do) |
 | 0x504 / 0x506 | s16 each | slot 0 flipbook frames a cell / cells (or table entries) | verified |
 | 0x508 / 0x50C | 2f | slot 0 UV scale = repeat (1 / 2) / cells (2, 1/2, 1/3, 1/4 seen) | corpus |
-| 0x510 | u32 | slot 0 UV animation mode, bits: 1 scroll, 2 scale, 4 rotate (each bit set exactly where its values below are non-neutral; shader-keyed: 8 of 4291 shader groups mix values) | corpus |
+| 0x510 | u32 | slot 0 UV animation mode, bits: 1 scroll, 2 scale, 4 rotate (each bit set exactly where its values below are non-neutral). Read by nothing: not the uniform fill (0x04A5A6AC), no vertex program; a program draws all of a slot's UV animation or none (`tools/eft_vertex.py`; 2900 vanilla slots run a full program under a narrower word) | verified |
 | 0x514 / 0x51C / 0x524 | 2f each | slot 0 UV scroll a frame / initial / random | corpus |
 | 0x52C / 0x534 / 0x53C | 2f each | slot 0 UV scale a frame / initial (1) / random | corpus |
 | 0x544 / 0x548 / 0x54C | f each | slot 0 UV rotation a frame / initial / random (radians) | corpus |
@@ -153,7 +154,7 @@ adds U's and subtracts V's rate; no converted emitter uses it.)
 | 0x2F8 | u8 | read with the gravity vector (0x4A4) at 0x04A62620 | verified (use) |
 | 0x2F9 | u8 | stop emitting while the set fades (eft2's is_fade_emit): the emitter calc 0x04A65034 skips emission when fading only if this is set; with it 0 and 0x82C 0 a turned-off emitter emits on for good | verified |
 | 0x2FC / 0x2FD / 0x2FE | u8 | random rotation direction per axis X / Y / Z: at emission (0x04A5DBCC) a random roll negates that axis's initial rotation and rotation speed | verified |
-| 0x310 | u32 | follow type (eft2's numbers): 0 the particle points at the emitter's live matrices (instance +0x84 / +0xB4: follows it), else they are copied at emission (0x04A5C89C, from the instance's +0x12C = this); 1 none, 2 position only. Shader-keyed: no vanilla shader group mixes values (5136 / 2822 / 157) | verified |
+| 0x310 | u32 | follow type (eft2's numbers): 0 the particle points at the emitter's live matrices (instance +0x84 / +0xB4: follows it), else they are copied at emission (0x04A5C89C, from the instance's +0x12C = this); 1 none, 2 position only. No vanilla shader group mixes values (5136 / 2822 / 157), but one vertex program serves all three (positions come in as `v_inWldPos`), save those reading the live emitter matrix (`emm`), whose emitters all follow (0; 2 with `v_inEmtMat` too) | verified |
 | 0x830 | u32 | flags (shader-keyed) | corpus |
 | 0x844 | u32 | shader index (into shader table) | verified |
 
@@ -235,6 +236,25 @@ out slot 1's coordinates in the vertex program from the same UVs (a mesh's one U
 own block (0x550 = 0x4D4 + 0x7C: repeat / cells at 0x584, UV mode 0x58C, scroll / scale / rotation
 from 0x590; 0x04A5A6AC copies it into shtAnim1 as slot 0's into shtAnim0). The converter draws a
 second Ultimate sampler there, live (`live_sampler`), when it moves apart from the main one.
+
+## Vertex programs (`tools/eft_vertex.py`)
+
+The GX2 vertex header names the uniform blocks (CB1 `viewUniformBlock`, CB2
+`emitterStaticUniformBlock`, CB3 `emitterDynamicUniformBlock`), uniforms and attributes; its
+`SQ_VTX_SEMANTIC` words map input GPRs (R1 on) to attribute locations (attributes are declared only
+where read). CB2 vec4s: 0 `uboFlag`, 1-15 `shtAnim0-2.pm0-pm4` (the per-slot UV block below), 16 /
+25 `ptnAnm0 / 1` (frames a cell, cells, random start cells; tables after), 36 `rotBasis`, 46-61
+`col0 / col1` keys, 76-78 `u_shaderParam*`. The uniform fill (0x04A5A6AC, a slot at a time from the
+emitter's 0x4D4 + 0x7C x slot): pm0 = scroll a frame, scroll initial; pm1 = scroll random, scale a
+frame; pm2 = scale initial, scale random; pm3 = rotation a frame, initial, random, the slot (its
+random channel); pm4 = repeat / cells (0x508), cells across / down; uboFlag 0x400 << 2 x slot /
+0x800 << 2 x slot from the slot's inverse-random bytes (0x4DA / 0x4DB).
+
+What a template draws is read from its program, not its mode words: the UV animation of each slot
+(all or none), whether it plays a flipbook (any mode), the follow types it draws right, `v_inRot` /
+`v_inVec`, and whether it reads the shader parameters (162 of 675 vanilla programs: a template
+with parameters its program doesn't read is plain once its pixel program is ours). No vertex
+program reads the colour keys: colour animation is the CPU's (`v_inColor0` / `v_inColor1`).
 
 Colour 1 is scaled like colour 0: the particle's colour 1 (+0x88) x the set's colour (+0x278) x
 the colour scale (0x778) x the emitter instance's colour 1 (+0x238), cross_f 0x04A588CC (colour 0:

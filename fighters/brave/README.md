@@ -513,6 +513,37 @@ with its own coordinates and UV animation, and Ultimate's dissolve.
   0.12). Our program reads the mask from texture 0's green (grey colour in red and blue; RGBA8,
   uncompressed) and the threshold from a colour track: colour 1's (colour 1 then a constant in the
   program), or colour 0's when its rgb is constant (6 emitters). Smash 4 scales colour tracks by the
-  colour scale (cross_f 0x04A588CC): the threshold is written divided by it. 14 of 18 dissolve;
-  Woosh's `tornado2_f` (and the three Wind ones) don't: no template animates both its scroll and a
-  colour track, and the scroll ranks first.
+  colour scale (cross_f 0x04A588CC): the threshold is written divided by it. 10 of the 14
+  converted dissolve parts (fix 32's notes said 14 of 18, counting the undrawn ones twice); Woosh's
+  `tornado2_f` (and the three Wind ones) don't: no template animates both its scroll and a colour
+  track, and the scroll ranks first. (Fix 33: all 14.)
+
+## Fix 33 (`build/hero_fix33.zip`): templates chosen by what their vertex programs draw
+
+Step 2 was to be vertex programs of our own for meshes. Reading the vanilla ones first
+(`tools/eft_vertex.py`, `docs/ptcl-format.md` "Vertex programs") showed most of the template limits
+the converter worked around aren't in the programs at all:
+- **UV animation:** the slot's mode word (0x510) is read by nothing (not the uniform fill, no
+  vertex program); a program draws all of a slot's scroll, scale and rotation or none (13022
+  vanilla emitters checked; 2900 slots run a full program under a narrower word). Templates were
+  ranked by the word: "UV animation 7: template has 2" and its mesh bakes mostly weren't real.
+- **Flipbooks:** the CPU turns the mode word (0x500) into flags every flipbook program tests, all
+  five modes; any flipbook template plays any mode once the word is Ultimate's.
+- **Follow types:** the CPU's (0x310); one program serves 0, 1 and 2 (only programs reading the live
+  emitter matrix need 0). The converter now writes Ultimate's; it kept the template's before.
+- **Blend:** the emitter's (0x324); a template whose pixel program is ours serves any blend.
+- **Shader parameters** a template's vertex program doesn't read don't count against it once its
+  pixel program is ours.
+- **Key-animated templates** are usable: their per-particle hooks (0x32C - 0x33C) set to 2 (by key
+  animation, which reads the dropped table: fix 25's crash) are written as 1, as on every other
+  emitter. Pikachu's type-4 mesh is the only flipbook template of its kind.
+- Ranking: a flipbook played before the UV animation, the main texture's UV animation before a
+  second texture (missing on a mesh, it bakes slot 0's UVs and the second texture is lost too); the
+  two textures trade slots only when both fit so.
+
+Hero, fix 32 -> fix 33: follow mismatches 63 -> 0; UV animation a template lacked 97 -> 1; meshes
+with UVs baked 62 -> 0; flipbooks frozen on one cell 147 -> 0; second textures drawn live 81 ->
+122; samplers folded in as their mean 45 -> 22; dissolves 10 -> 14 of 14; spins lost 33 -> 6. Worse:
+directional parts turned by their world motion (no `v_inVec`) 11 -> 17. Every mesh now has a vanilla
+vertex program that draws what it needs, so no program of our own was written; what's left
+(directional parts without `v_inVec`, 6 spins) is quads and directional types (step 3).
