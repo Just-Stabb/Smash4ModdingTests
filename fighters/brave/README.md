@@ -565,3 +565,15 @@ from fix 33.
 Ruled out on the way (round 1-6 tests): Robin's own refraction sets, the second textures, the
 dissolve, the chant, the bank's size, follow types, and `light1`.
 
+## Fix 35 (`build/hero_fix35.zip`): effect lights
+
+Ultimate's "custom action 1" data (CADP), left out until now, is an effect light: the glow of a
+spell lights up the fighters near it. Smash 4 has the same light, eft's user callback 1 and its user
+data (`docs/ptcl-format.md` 0x00C), with the same flags and a radius that is likewise a multiple of
+the particle's scale: the common effects both games share (FliesUp, SpecialSpeedUp, AssistOut)
+match. 54 of Hero's parts now light their surroundings as in Ultimate (the Frizz / Zap / Woosh charge
+flares, radius 20 x 0.5; Kaboom 800 x 0.1; Kamikazee, the explosions, the sword spells' glows...),
+and 6 parts no longer carry a light their template had (Ultimate gives them none). Not converted:
+CADP's last value (0.2 - 1.0; maybe the light's strength: Smash 4's light has no such slot) and the
+flag bits 0x20 - 0x80 Smash 4 doesn't use.
+

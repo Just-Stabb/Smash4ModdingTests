@@ -127,6 +127,13 @@ FADE_ALPHA = 0x82C
 # while its set fades, an emitter stops emitting only when this byte is set (0x04A65034: eft2's
 # is_fade_emit); with it 0 and FADE_ALPHA 0 it emits on for good (test 37's speed lines)
 FADE_EMIT = 0x2F9
+# an effect light (it shines on fighters): eft's user callback (0x34) 1 with its user data, the flags
+# in 0x0C's top half, colour (0x14-0x1C: 0 the particle's) and radius x the particle's scale (0x20);
+# eft2's custom action 1, CADP: u32 flags, 3 x colour, radius, a factor with no slot here. The
+# common effects both games share match so (FliesUp: 0x1B, 0.5 / 0x1B, 0.5; SpecialSpeedUp's radius
+# 15 x 1.3 / 0.5 x 30), Smash 4 without the flag bits from 0x20 up. Templates' own lights are cleared
+USER_DATA, USER_FLOATS, USER_CALLBACK = 0x0C, 0x14, 0x34
+LIGHT_CALLBACK, LIGHT_FLAGS = 1, 0x1F
 # the eft sampler word: U wrap in bits 24-27, V in 28-31, the same codes as eft2's (0 mirror,
 # 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0;
 # the axes from the 374 vanilla emitters repeated along U only: bits 24-27 always mirror, 28-31
@@ -1461,8 +1468,20 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         p.set_field(em, 'keyanim_size', 0)
     if e['children']:
         notes.append('%d child emitters not converted' % len(e['children']))
-    if e['subsections']:
-        notes.append('not converted: ' + ', '.join(sorted(e['subsections'])))
+    left = set(e['subsections'])
+    if struct.unpack_from('>I', em, USER_CALLBACK)[0] == LIGHT_CALLBACK:
+        em[USER_DATA:USER_CALLBACK + 4] = bytes(USER_CALLBACK + 4 - USER_DATA)
+    if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20:
+        cadp = bytes.fromhex(e['subsections']['CADP'])
+        flags, r, g, b, radius = struct.unpack_from('<I4f', cadp)
+        radius *= max(e['scale']['scale'][0], 1e-4) / base[0]
+        struct.pack_into('>2I', em, USER_DATA, (flags & LIGHT_FLAGS) << 16, 0)
+        struct.pack_into('>8f', em, USER_FLOATS, r, g, b, radius, 0, 0, 0, 0)
+        struct.pack_into('>I', em, USER_CALLBACK, LIGHT_CALLBACK)
+        left.discard('CADP')
+        notes.append('light (flags 0x%X, radius %.3g)' % (flags & LIGHT_FLAGS, radius))
+    if left:
+        notes.append('not converted: ' + ', '.join(sorted(left)))
     n = buffer_count(p, em)
     if n > 4 * MAX_LIVE:
         # fewer particles a burst (eft sizes the emitter's buffer from it; vanilla stays far below)
