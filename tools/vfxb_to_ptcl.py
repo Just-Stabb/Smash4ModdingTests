@@ -1745,6 +1745,8 @@ def main():
                     '(tests: does the texture map in game)')
     ap.add_argument('--test-tint-texture', default='', help='comma-separated TEXTURE=RRGGBB: every mesh emitter '
                     'whose main texture that is, drawn in that flat colour (tests)')
+    ap.add_argument('--test-alpha-for', default='', help='comma-separated EFFECT/EMITTER=FACTOR: those emitters\' '
+                    'alpha x FACTOR (tests)')
     ap.add_argument('--test-glow-alpha', type=float, default=1.0, help="Ultimate's glow parts (draw path 21, a "
                     "grade / flare texture) at this x their alpha (tests)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
@@ -1772,6 +1774,7 @@ def main():
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
     checker = set(v for v in a.test_checker_for.split(',') if v)
+    alpha_for = {k: float(v) for k, v in (x.split('=') for x in a.test_alpha_for.split(',') if x)}
     tint_tex = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
                 for k, v in (x.split('=') for x in a.test_tint_texture.split(',') if x)}
     tint = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
@@ -1794,6 +1797,10 @@ def main():
             if name in skip or '%s/%s' % (name, e['name']) in skip:
                 log.append('    %-24s left out (--test-skip-for)' % e['name'])
                 continue
+            if '%s/%s' % (name, e['name']) in alpha_for:
+                f = alpha_for['%s/%s' % (name, e['name'])]
+                e['info'] = dict(e['info'], color0=list(e['info']['color0'][:3]) + [e['info']['color0'][3] * f])
+                notes.append('alpha x %g (--test-alpha-for)' % f)
             tex0 = names.get(e['sampler'][0]['texture_id'], '')
             if a.test_glow_alpha != 1.0 and e['info']['draw_path'] == 21 and \
                     re.match(r'ef_cmn_(grade|flare)', tex0):
@@ -1807,9 +1814,7 @@ def main():
             if em is not None and key in checker:
                 c = ((np.indices((64, 64)) // 8).sum(0) % 2).astype(np.float32)
                 set_exact_texture(p, em, 0, np.stack([c, c, c, c], -1))
-                p.set_field(em, 'emit_rate', 1.0)       # one particle, to see it alone
-                p.set_field(em, 'end_frame', 1)
-                notes.append('texture 0 a checkerboard, one particle (--test-checker-for)')
+                notes.append('texture 0 a checkerboard (--test-checker-for)')
             if em is not None and key in tint:
                 for tr in (0, 1):
                     p.set_field(em, 'color%d_type' % tr, 0)
