@@ -210,6 +210,7 @@ class Templates:
         self.base, self.files, self.found = base, {}, {}
         self.no_graft = False       # (--no-graft-for: no grafted templates for the emitter at hand)
         self.test_white1 = self.test_mean_colour = False    # (--test-white1-for, --test-mean-colour-for)
+        self.test_no_light = False                          # (--test-no-light-for)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
         for path in [None] + list(corpus):
@@ -1648,7 +1649,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     left = set(e['subsections'])
     if struct.unpack_from('>I', em, USER_CALLBACK)[0] == LIGHT_CALLBACK:
         em[USER_DATA:USER_CALLBACK + 4] = bytes(USER_CALLBACK + 4 - USER_DATA)
-    if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20:
+    if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20 and \
+            not templates.test_no_light:
         cadp = bytes.fromhex(e['subsections']['CADP'])
         flags, r, g, b, radius = struct.unpack_from('<I4f', cadp)
         radius *= max(e['scale']['scale'][0], 1e-4) / base[0]
@@ -1734,6 +1736,8 @@ def main():
                     'grafted templates for them (A / B tests)')
     ap.add_argument('--test-white1-for', default='', help='as --no-graft-for: texture 1 white (tests)')
     ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
+    ap.add_argument('--test-skip-for', default='', help='as --no-graft-for: the emitters left out (tests)')
+    ap.add_argument('--test-no-light-for', default='', help='as --no-graft-for: no effect light (tests)')
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
@@ -1756,6 +1760,8 @@ def main():
     no_graft = set(v for v in a.no_graft_for.split(',') if v)
     white1 = set(v for v in a.test_white1_for.split(',') if v)
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
+    skip = set(v for v in a.test_skip_for.split(',') if v)
+    no_light = set(v for v in a.test_no_light_for.split(',') if v)
     prims, prim_index = eff.primitives(), {}
     ids, done, dropped = {}, {}, []
     for name in (a.effects or sorted(eff.effects)):
@@ -1770,6 +1776,10 @@ def main():
             templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
             templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
             templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
+            templates.test_no_light = name in no_light or '%s/%s' % (name, e['name']) in no_light
+            if name in skip or '%s/%s' % (name, e['name']) in skip:
+                log.append('    %-24s left out (--test-skip-for)' % e['name'])
+                continue
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             if em is not None:
                 made.append((em, e['name']))
