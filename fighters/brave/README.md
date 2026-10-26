@@ -577,3 +577,25 @@ and 6 parts no longer carry a light their template had (Ultimate gives them none
 CADP's last value (0.2 - 1.0; maybe the light's strength: Smash 4's light has no such slot) and the
 flag bits 0x20 - 0x80 Smash 4 doesn't use.
 
+## Fix 36 (`build/hero_fix36.zip`): step 3, spins and directional parts
+
+- **Spins:** a mesh's spin ranked after everything else (from when its UV animation had to come
+  first, which the UV term now covers): Woosh's rings (`ring1`, `ring2`) and `wind1` stood still for
+  a template that animates colour 1. A spin now ranks before the colour tracks (a constant colour
+  track is drawn as its mean; a lost spin is the whole motion); they turn again, colour 1 at its
+  mean. Still unturned: `impact2` x 2 (no spinning stripe-mesh template plays a flipbook) and one
+  quad, `splash1`.
+- **Directional parts:** every vanilla vertex program that reads `v_inVec` moves its particles on
+  the GPU (141 of 141: air resistance and gravity worked out from the velocity); the CPU's
+  directional programs turn a particle by its world motion (`v_inWldPosDf`). That is its velocity
+  unless the emitter follows (the bone's motion adds in), so the 5 unfollowing parts were never
+  off. The 12 following ones (Zap's / Kazap's bolts, lines, flashes) keep their templates: a GPU
+  one would cost them their second texture's motion or their colour animation, seen all the
+  time, for a tilt seen only while Hero's hand moves.
+- **Second textures not drawn live (20):** no vanilla two-texture program draws what these need:
+  a flipbook (8: no two-texture mesh program plays one), the main texture's UV animation (9), or
+  that quad type at all (3).
+
+What's left (following directional parts, the 20 second textures, 3 spins) needs vertex programs
+of our own: template choice has gone as far as the vanilla programs go.
+

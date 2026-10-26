@@ -277,9 +277,11 @@ class Templates:
             # were a still picture faded by their cells' ink)
             # (the main texture's UV animation before a second texture: missing on a mesh, it bakes
             # slot 0's UVs, and texture 1 then can't be drawn live either: Hero's ring2 / wind1)
+            # (a spin before the colour tracks: a mesh's can't be baked, only its starting rotation,
+            # and stood still Woosh's rings / wind lost their whole motion for colour 1's mean)
             return (plain, not pm or bool(ptn), own if need_c1 else min(own, 1), follow in fol, pm == bool(ptn),
                     fit0, two == want2, fit1, not need_thr or an1 or (need_thr == 2 and an0),
-                    an0 or not anim[0], an1 or not anim[1], turns or rot != ROT_ANIMATED or mesh,
+                    turns or rot != ROT_ANIMATED, an0 or not anim[0], an1 or not anim[1],
                     by_vel or typ != 3, (mode1 if swapped else mode) == uv_mode,
                     turns or rot == ROT_NONE, turns == (rot != ROT_NONE), same_blend, score)
         # the blend is the emitter's (0x324: not the program's, 352 vanilla file / shader pairs use
@@ -307,7 +309,9 @@ class Templates:
                 notes.append('UV animation %d: template has %d' % (uv_mode, mode))
             if ptn and not pm:
                 notes.append('flipbook mode %d: template plays none (one cell shown)' % ptn)
-            if key[0] == 3 and not by_vel:
+            if key[0] == 3 and not by_vel and follow != 1:
+                # (unfollowing particles' world motion is their velocity; every vanilla v_inVec
+                # program moves its particles on the GPU)
                 notes.append('directional by world motion: template has no v_inVec')
             if rot == ROT_ANIMATED and not turns:
                 notes.append('rotation: template has none' + (' (the spin lost)' if mesh else ''))
