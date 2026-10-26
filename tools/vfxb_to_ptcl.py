@@ -135,7 +135,7 @@ FADE_ALPHA = 0x82C
 FADE_EMIT = 0x2F9
 # an effect light (it shines on fighters): eft's user callback (0x34) 1 with its user data, the flags
 # in 0x0C's top half, colour (0x14-0x1C: 0 the particle's) and radius x the particle's scale (0x20);
-# eft2's custom action 1, CADP: u32 flags, 3 x colour, radius, a factor with no slot here. The
+# eft2's custom action 1, CADP: u32 flags, 3 x colour, radius, a strength (folded into the colour). The
 # common effects both games share match so (FliesUp: 0x1B, 0.5 / 0x1B, 0.5; SpecialSpeedUp's radius
 # 15 x 1.3 / 0.5 x 30), Smash 4 without the flag bits from 0x20 up. Templates' own lights are cleared
 USER_DATA, USER_FLOATS, USER_CALLBACK = 0x0C, 0x14, 0x34
@@ -197,6 +197,7 @@ class Templates:
 
     def __init__(self, base, corpus):
         self.base, self.files, self.found = base, {}, {}
+        self.no_graft = False       # (--no-graft-for: no grafted templates for the emitter at hand)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
         for path in [None] + list(corpus):
@@ -303,7 +304,7 @@ class Templates:
         # for whichever), the same blend's otherwise; then another blend's (add), then type 0
         for t, b in ((typ, blend), (typ, 1), (0, blend), (0, 1)):
             cands = {(b_,) + traits: v for b_ in (0, 1, 2) for traits, v in self.found.get((t, b_, mesh), {}).items()
-                     if b_ == b or (EXACT and traits[6])}
+                     if (b_ == b or (EXACT and traits[6])) and not (self.no_graft and v[4])}
             if not cands:
                 continue
             key = (t, b, mesh)
@@ -1211,7 +1212,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
     lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) if EXACT else None
-    if live is not None and GRAFT and lay_t is not None and 'uv1' not in lay_t and \
+    if live is not None and GRAFT and not templates.no_graft and lay_t is not None and 'uv1' not in lay_t and \
             graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
         # a one-texture template taken for two (Templates): its vertex program grafted
         si2 = two_texture_shader(p, struct.unpack_from('>I', em, 0x844)[0])
@@ -1535,11 +1536,18 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         cadp = bytes.fromhex(e['subsections']['CADP'])
         flags, r, g, b, radius = struct.unpack_from('<I4f', cadp)
         radius *= max(e['scale']['scale'][0], 1e-4) / base[0]
+        # the colour given, not left to the particle's (0: x its colour scale, Ultimate's 2 on most
+        # flares; vanilla lights stay within 1, 99% of 599: Kaboom's stacked lights were blinding),
+        # x CADP's factor (the light's strength)
+        if not (r or g or b):
+            r, g, b = np.clip(track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]), 0, 1)
+        k = struct.unpack_from('<f', cadp, 20)[0] if len(cadp) >= 24 else 1.0
+        r, g, b = (float(min(1.0, v) * max(0.0, min(1.0, k))) for v in (r, g, b))
         struct.pack_into('>2I', em, USER_DATA, (flags & LIGHT_FLAGS) << 16, 0)
         struct.pack_into('>8f', em, USER_FLOATS, r, g, b, radius, 0, 0, 0, 0)
         struct.pack_into('>I', em, USER_CALLBACK, LIGHT_CALLBACK)
         left.discard('CADP')
-        notes.append('light (flags 0x%X, radius %.3g)' % (flags & LIGHT_FLAGS, radius))
+        notes.append('light (flags 0x%X, radius %.3g, colour %.2f %.2f %.2f)' % (flags & LIGHT_FLAGS, radius, r, g, b))
     if left:
         notes.append('not converted: ' + ', '.join(sorted(left)))
     n = buffer_count(p, em)
@@ -1603,6 +1611,8 @@ def main():
     ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
     ap.add_argument('--keep-follow', action='store_true', help="keep each template's follow type (not Ultimate's)")
     ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
+    ap.add_argument('--no-graft-for', default='', help='comma-separated EFFECT or EFFECT/EMITTER (Ultimate names): no '
+                    'grafted templates for them (A / B tests)')
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
     a = ap.parse_args()
@@ -1622,6 +1632,7 @@ def main():
     for i in (int(v, 16) for v in a.empty.split(',') if v):
         ef.entries[i][1:] = [0, 0, 0, 0]    # no emitter set, model or meshes (403 vanilla entries)
     templates = Templates(p, a.templates)
+    no_graft = set(v for v in a.no_graft_for.split(',') if v)
     prims, prim_index = eff.primitives(), {}
     ids, done, dropped = {}, {}, []
     for name in (a.effects or sorted(eff.effects)):
@@ -1633,6 +1644,7 @@ def main():
         for e in eff.emitters(si_ult):
             notes = []
             e['_set'] = eff.sets[si_ult]
+            templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
             em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
             if em is not None:
                 made.append((em, e['name']))
