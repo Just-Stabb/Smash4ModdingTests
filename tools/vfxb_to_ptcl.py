@@ -1875,6 +1875,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # fix 63's up air). Observed, not derived
         em_rot = tuple(float(v) for v in info['rotate'][:3])
         notes.append('directional quad: emitter turned X first')
+    else:
+        em_rot = eft_rotation(info['rotate'])
+    p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
     if typ == 3 and not is_mesh and pt['billboard_type'] == 3:
         # eft2's particle centre (static `center`) as eft's rotBasis (0x4C4, docs/ptcl-format.md: the
         # vertex programs draw S (pos + rotBasis)): sys_attack_line's lines (0, 0.8) grow up from the
@@ -1883,9 +1886,6 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # bolts, ...) are as tested without it
         struct.pack_into('>2f', em, ROT_BASIS, *(float(v) for v in e['static']['center'][:2]))
         notes.append('particle centre %g %g' % tuple(e['static']['center'][:2]))
-    else:
-        em_rot = eft_rotation(info['rotate'])
-    p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
 
     # ---- timing
     one = bool(ems['one_time'])
