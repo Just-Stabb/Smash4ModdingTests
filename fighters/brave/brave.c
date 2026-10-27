@@ -36297,7 +36297,7 @@ void func_2241()
     global28 = 0;
     global25 = 0;
     global27 = 0;
-    global26 = 0;
+    global26 = brave_hi_can;    // Hero: Woosh once per airtime (brave_hi_can)
     global37 = 0;
     global11 = func_79;
     global12 = func_80;
@@ -38708,6 +38708,7 @@ void brave_rebirth()
     brave_slot = -1;
     brave_menu = 0;
     brave_menu_anim = 0;
+    brave_hi_used = 0;
     brave_buffs_off();
     WorkModule(0x7, 0, 0x1000009e);
 }
@@ -38945,6 +38946,7 @@ void brave_frame()
     brave_keep_items();
     brave_mp_update();
     brave_crit_update();
+    brave_hi_refresh();
     brave_buff_update();
     brave_sleep_update();
     brave_panel_update();
@@ -39613,7 +39615,8 @@ void brave_s_main()
 // rise is jump_distance_* 42 / 64 / 99 at jump_accel_y_* 0.145 / 0.16 / 0.1 a frame, here a start speed of
 // sqrt(2 x distance x accel) slowed by that accel to 0, then end_accel_y 0.96 x his gravity with
 // end_max_speed_y_* 0.955 / 0.828 / 0.86 x his fall speed (Robin's 0.089 / 1.5) to the motion's end, then
-// SpecialFall (0x10); landing -> LandingFallSpecial (0x19). Ledges from frame 11 / 20 / 18 (the game
+// a plain Fall (0xE; fix 60: no SpecialFall, user); landing during it -> LandingFallSpecial (0x19, his
+// landing lag). Once per airtime, shared by the three (brave_hi_used: brave_hi_can, global26). Ledges from frame 11 / 20 / 18 (the game
 // script's cliff check; Robin's func_56). In the air while charging: the fall held to 0.3 x (start_max_speed_y_mul_air).
 // Motions (ground / air): start 0x260 / 0x26C, hold 0x261 / 0x26D, Woosh 0x25F / 0x26B, Swoosh 0x262 /
 // 0x26E, Kaswoosh 0x263 / 0x26F.
@@ -39626,6 +39629,26 @@ int brave_hi_launched;
 int brave_hi_rising;
 int brave_hi_empty;
 int brave_hi_cliff;
+int brave_hi_used;      // Woosh / Swoosh / Kaswoosh taken off this airtime (fix 60)
+
+// up special allowed (global26, func_72 in the special input checks): once per airtime, back on landing,
+// on a ledge, when hit (Damage 0x45 - DamageFall 0x4C) or a new stock (brave_hi_refresh, brave_rebirth)
+int brave_hi_can()
+{
+    if (brave_hi_used)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+void brave_hi_refresh()
+{
+    if (global18 != 0x2 || global4 >= 0x45 && global4 <= 0x4c)
+    {
+        brave_hi_used = 0;
+    }
+}
 
 int brave_hi_jump_motion(int air)
 {
@@ -39751,6 +39774,7 @@ void brave_hi_launch()
     KineticModule(0xf, 0x1, -a);
     brave_hi_launched = 0x1;
     brave_hi_rising = 0x1;
+    brave_hi_used = 0x1;
 }
 
 void brave_hi_fall()
@@ -39898,8 +39922,8 @@ void brave_hi_loop()
         }
         if (MotionModule(0x2712) == 0x1)
         {
-            func_16(0x10, 0);
-            return;
+            func_16(0xe, 0);    // a plain Fall: his jumps, attacks and specials (fix 60; Woosh itself waits
+            return;             // for the next airtime)
         }
     }
     if (brave_hi_state < 0x2 && global18 == 0x2)

@@ -985,3 +985,15 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   each with the item's own duration. With fix 58's sleep, every outcome is now in.
 - Not traced in game: the functions and their arguments are read from the code (the item calls), and
   the cave's calls are tested in unicorn against stubs.
+
+## Fix 60 (`build/hero_fix60.zip`): Woosh without SpecialFall, once per airtime
+
+- User: no SpecialFall after Woosh / Swoosh / Kaswoosh. At the motion's end he goes to a plain Fall
+  (0xE: his jumps, attacks, air dodge and other specials). Landing during the move still has its landing
+  lag (LandingFallSpecial 0x19).
+- Instead, up special is once per airtime, shared by the three: taking off uses it (`brave_hi_used`,
+  set in `brave_hi_launch`, the empty no-MP hop too), and it comes back on landing, on a ledge, when
+  he's hit (Damage 0x45 - DamageFall 0x4C) or on a new stock (`brave_hi_refresh` every frame,
+  `brave_rebirth`). The block is the game's own hook for it: Robin's special input checks run
+  `func_72(global26)` before up special, and global26 (0 for Robin) is now `brave_hi_can`.
+- Changed: `brave.mscsb` only.
