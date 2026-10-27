@@ -52,3 +52,77 @@ timings, params (`fighter_param_vl_pzenigame.bin` is Mario's), effects, sounds a
 Known / next: Mario's specials run (fireball, cape, Super Jump Punch, FLUDD) under Squirtle's
 animations; his own moveset (ACMD from Ultimate's scripts, Water Gun / Withdraw / Waterfall,
 Pokémon Change with no swap), params, effects and sounds come next.
+
+## v2 (`build/squirtle_v2.zip`): colours, his moves, stats, effects, specials
+
+User (v1, in game): "Squirtle's colors seem a bit washed out. Can you add Squirtle's hitboxes, stats,
+timings, code and effects?"
+
+```
+python3 tools/ultimate_fighter.py model ULT/model/body/c0N MARIO/model/body/c0N OUT/c0N --empty EMPTY --max-bones 136 \
+    --motions ULT/motion/body/c00 --anim-cache CACHE.json --joints Tail1,Tail2
+python3 tools/ultimate_fighter.py motions ULT/motion/body/c00 ULT/model/body/c00 MARIO OUT --max-bones 136 --anim-cache CACHE.json \
+    --joints Tail1,Tail2 --add D00SpecialNHold,D00SpecialNShot,D00SpecialAirNHold,D00SpecialAirNShot,D01SpecialSLoop,D01SpecialSEnd,\
+D01SpecialAirSHit,D01SpecialAirSLoop,D01SpecialAirSEnd
+python3 tools/vfxb_to_ptcl.py ef_pzenigame.eff FOLDER/effect/pzenigame FXDIR 0x46 fighters/pzenigame/pzenigame_effects.json \
+    <the 26 pzenigame_* effects his scripts use> --prefix PtcPzenigame --templates VANILLA/fighter/*/effect/*/*.ptcl
+python3 tools/pzenigame_build.py DUMP/lua2cpp_pzenigame ULT FOLDER/script/animcmd/body fighter_param_vl_pzenigame.bin OUT/c00 \
+    MARIO PKG --param fighter_param.bin --bank FXDIR
+```
+
+- **Colours** (`ultimate_fighter.py` `material_for` / `skin_ramp`): his whole body is Ultimate skin
+  (subsurface: CustomVector30 / 11), so it took Mario's skin material: a human one, rim (0.96, 0.57,
+  0.57) x 1.5, specular (1, 0.67, 0.55), AO floor (0.58, 0.32, 0.18) and a ramp going red into the
+  shadow. Its tints are now Ultimate's own at the base's brightness: the subsurface colour
+  (CustomVector11: body blue (0.007, 0.175, 0.279), shell brown (0.233, 0.141, 0.088)) for the AO floor
+  and the ramp (one ramp per colour: the base ramp's luminance, its tint turned to that colour at the
+  same strength), the rim colour (CustomVector14: 0.75 grey body, 1 shell) for the rim, a neutral
+  specular. Hero's / Sephiroth's skin (faces) gets the same on their next rebuild.
+- **Normals, grabs, throws** (`tools/ultimate_acmd.py`): 30 scripts, Ultimate's frames, damage, angles,
+  knockback and sizes, on his own bones (the tail: `--joints Tail1,Tail2`, joint ids of their own);
+  cancel / intangible frames into the vl file; effect scripts (102 with the specials': his own 26 and
+  the common ones, `reference/ultimate_sys_effects.json`). Their sound scripts are emptied (Mario's
+  would play); his own sounds aren't in yet.
+- **Stats** (fighter_param kind 0x46: `tools/pzenigame_build.py` STATS): Ultimate's `fighter_param.prc`,
+  Hero's / Steve's mapping: walk 0.1575 / 0.1575 / 1.281, ground friction 0.088 x 0.45, dash 1.936, run
+  0.088 / 0.044 / 1.76, jump squat 3, jump x 0.95 / 0.9 / 1.3 / 1, jumps 35.35 x 0.82 / 17.03 x 0.9 /
+  35.35, air 0.095 / 0.01 / 1.01 / 0.018, gravity 0.128, fall 1.35 / fast fall 2.16, landing lag n 8 /
+  f 6 / b 18 / hi 6 / lw 16, weight 75, 2 jumps.
+- **Effects**: 26 of `ef_pzenigame.eff`'s sets (every pzenigame_* effect his and the water's scripts
+  name) after Mario's sets in `effect/pzenigame/pzenigame.010d0000` (3.4 MB); ids in
+  `fighters/pzenigame/pzenigame_effects.json`.
+- **Specials** (`fighters/pzenigame/pzenigame.c`: Mario's decompiled MSC + `universal_mechanics.py`, the
+  same bytes as v1's, then his specials in Mario's special statuses; `specials_acmd.json`: Ultimate's
+  scripts in Mario's special slots, the extra animations in his custom-move slots, extra_kinds.json
+  "motions"):
+  - Water Gun (0x152): SpecialNStart, SpecialNHold while special is held (up to Ultimate's
+    charge_frame 45), SpecialNShot: six waters at its frames 7, 11 ... 27 (Ultimate's script), each
+    told the charge through the custom slot (as the Kamehameha's level). The water: new article 5,
+    weapon kind 0x198 on Mario's fireball (`extra_kinds.json` "weapons", on hit -> status 1: gone),
+    `weapons/water.c`: Ultimate's param_water (speed 2.0 + 2.2 x charge / 45, 20 frames, falling 0.01 a
+    frame up to 1.2), its ACMD Ultimate's pzenigame_water push (0%, 45 degrees, KBG 100) with fixed
+    knockback 40 + reaction_add 75 x the charge (40 / 78 / 115 by thirds) and size x 0.8 - 1.5 (the
+    effect too); model: Mario's fireball's, hidden (`nud.hidden`); motion: the fireball's.
+  - Withdraw (0x153): SpecialSStart in place, the slide (SpecialS, Ultimate's 8% hitbox) 40 frames
+    speeding up 1.2 -> 2.4 over 10, then SpecialSEnd slowing (x 0.9 a frame); a hit bounces him back
+    (1.0, SpecialAirSHit's animation), then the end. **Approximations**: Ultimate's speeds are in its
+    status code (`param_special_s` is empty), not its data. Speed: kinetic energy 3, along the facing
+    (as Mario's func_137 sets it from his params). No turn-around (SpecialSOverturn) yet.
+  - Waterfall (0x154, Mario's Super Jump Punch status): Ultimate's script; its rise is the animation's
+    (TransN: 50 up, 25 forward, motion-driven like Mario's); Ultimate's FIGHTER_STATUS_SUPER_JUMP_PUNCH
+    flags REVERSE_LR / MOVE_TRANS -> Mario's 0x2100000F / 0x2100000D (his script sets them at the same
+    frames, 4 and 6), the ledge-check notify -> Allow/Disallow_Ledgegrab 1 / 2 (`ultimate_acmd.py`).
+  - Pokemon Change (0x155): SpecialLwOut then SpecialLwIn, no swap (the user's call); FLUDD's pump
+    isn't made, its statuses 0x157 / 0x158 aren't entered.
+  Mario's fireball / cape scripts in the slots whose Ultimate motion has no game script
+  (SpecialNStart, SpecialSStart) are emptied; the special slots' sounds too (`special_slots`).
+- **Executable**: rpx64 + every cave again with the water (`weapon_expand.py`: his article list =
+  Mario's 5 + the water; `kind_expand.py`: 10 motion slots from the record). Tests: kind_expand 0
+  failed, base_effects / base_customs 0, copy_custom 0, weapon_expand only Hero's article-order check
+  (the same as before).
+
+Sources: as v1, plus Ultimate's `lua2cpp_pzenigame` scripts (body and pzenigame_water),
+`fighter_param.prc` (`fighter-common-SSBU.zip`), `vl.prc` (param_special_n, param_water),
+`ef_pzenigame.eff` (`effect-fighter-SSBU.zip`). Approximated: Withdraw's speeds, the water's spawn
+point (the fireball's, at his hand; Ultimate's from his mouth), Water Gun's aim (Ultimate's angle
+range not done).

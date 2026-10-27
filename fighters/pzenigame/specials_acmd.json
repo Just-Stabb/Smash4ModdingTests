@@ -1,0 +1,22 @@
+{
+  "_about": "Squirtle's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in Mario's special motion slots (a \"slot\" names the slot whose motion.mtable entry gets the script: Mario's custom-move slots take the extra animations, named by extra_kinds.json \"motions\"); fighters/pzenigame/README.md",
+  "SpecialNStart": "specialn",
+  "SpecialNHold": {"name": "specialnhold", "slot": "0x212"},
+  "SpecialNShot": {"name": "specialnshot", "slot": "0x213"},
+  "SpecialAirNStart": "specialairn",
+  "SpecialAirNHold": {"name": "specialairnhold", "slot": "0x216"},
+  "SpecialAirNShot": {"name": "specialairnshot", "slot": "0x217"},
+  "SpecialSStart": "specials",
+  "SpecialS": {"name": "specialsloop", "slot": "0x21A"},
+  "SpecialSEnd": {"name": "specialsend", "slot": "0x21B"},
+  "SpecialAirSStart": "specialairs",
+  "SpecialAirS": {"name": "specialairsloop", "slot": "0x21E"},
+  "SpecialAirSEnd": {"name": "specialairsend", "slot": "0x21F"},
+  "SpecialAirSHit": {"name": "specialairshit", "slot": "0x220"},
+  "SpecialHi": "specialhi",
+  "SpecialAirHi": "specialairhi",
+  "SpecialLwOut": "speciallwstart",
+  "SpecialLwIn": "speciallwhold",
+  "SpecialAirLwOut": "specialairlwstart",
+  "SpecialAirLwIn": "specialairlwhold"
+}

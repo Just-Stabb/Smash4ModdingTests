@@ -211,6 +211,21 @@
         "id": 64,
         "name": "Squirtle",
         "subtitle": "Tiny Turtle Pok\u00e9mon"
+      },
+      "motions": {
+        "0x212": {"anim": "FitMarioBodyMainD00SpecialNHold", "flags": "0x0", "motion": "specialnhold (Water Gun's charge; custom-move slot reused)"},
+        "0x213": {"anim": "FitMarioBodyMainD00SpecialNShot", "flags": "0x0", "motion": "specialnshot"},
+        "0x216": {"anim": "FitMarioBodyMainD00SpecialAirNHold", "flags": "0x0", "motion": "specialairnhold"},
+        "0x217": {"anim": "FitMarioBodyMainD00SpecialAirNShot", "flags": "0x0", "motion": "specialairnshot"},
+        "0x21A": {"anim": "FitMarioBodyMainD01SpecialSLoop", "flags": "0x0", "motion": "specialsloop (Withdraw's slide)"},
+        "0x21B": {"anim": "FitMarioBodyMainD01SpecialSEnd", "flags": "0x0", "motion": "specialsend"},
+        "0x21C": {"anim": "FitMarioBodyMainD01SpecialAirSHit", "flags": "0x0", "motion": "specialshit (the air one's animation)"},
+        "0x21E": {"anim": "FitMarioBodyMainD01SpecialAirSLoop", "flags": "0x0", "motion": "specialairsloop"},
+        "0x21F": {"anim": "FitMarioBodyMainD01SpecialAirSEnd", "flags": "0x0", "motion": "specialairsend"},
+        "0x220": {"anim": "FitMarioBodyMainD01SpecialAirSHit", "flags": "0x0", "motion": "specialairshit"}
+      },
+      "weapons": {
+        "water": {"kind": "0x198", "base": "fireball", "max": 6, "on_hit": 1}
       }
     }
   ],

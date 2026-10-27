@@ -660,6 +660,23 @@ def material_for(tex, mat, tmpl, part):
             t['wrap_s'], t['wrap_t'] = wrap[n]
     bits, val = float_hash(mat.material_label)
     m.props = [(n, ([val, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else v)) for n, v in m.props]
+    if skin:
+        # the base's skin is human (Mario's: rim (0.96, 0.57, 0.57) x 1.5, specular (1, 0.67, 0.55), AO floor
+        # (0.58, 0.32, 0.18), a ramp going red into the shadow): its tints from Ultimate's own instead,
+        # the subsurface colour (CustomVector11: Squirtle's body blue, his shell brown) for the AO floor
+        # and the ramp (skin_ramp below), the rim colour (CustomVector14) for the rim, a neutral
+        # specular; each keeps the base's brightness. Squirtle in Mario's came out pale (user, v1)
+        vec = {str(v.param_id).split('.')[-1].split(':')[0]: v.data for v in mat.vectors}
+        sss = vec.get('CustomVector11', [0.25, 0.02, 0.01])[:3]
+        rim = vec.get('CustomVector14', [1.0, 1.0, 1.0])[:3]
+        m.sss = tuple(round(x, 4) for x in sss)
+
+        def lum(c):
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        hue = [x / max(lum(sss), 1e-4) for x in sss]
+        tint = {'NU_fresnelColor': rim, 'NU_specularColor': [1.0, 1.0, 1.0], 'NU_aoMinGain': hue}
+        m.props = [(n, ([min(1.0, lum(v[:3]) * t) for t in tint[n]] + list(v[3:]) if n in tint else v))
+                   for n, v in m.props]
     if not skin and 'Texture6' in tx and 'eye' not in mat.material_label.lower():
         # the base's specular and rim (added over the colour whatever it is: Zelda's white x2, a broad
         # lobe, rim 0.91) scaled by Ultimate's reflectance, F0 = 0.16 spec^2 (PRM alpha), against a
@@ -756,14 +773,16 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
                 p.materials = [material_for(tex, part['mat'], tmpl, part)]
                 polys.append(p)
         meshes.append(nud.Mesh(slot, polys or [empty_polygon(tmpl)], bone=-1, bind=4))
-    if 'skin' in tmpl:          # the skin ramp is the base's own texture: a copy in ours, numbered last
-        base_ramp = tmpl['skin'].textures[2]['hash']
-        ramp = tex.add(('skin ramp',), base_texture(base + '/model.nut', base_ramp), 256)
+    if 'skin' in tmpl:          # the skin ramp is the base's own texture: a copy in ours (one per subsurface
+        base_ramp = tmpl['skin'].textures[2]['hash']        # colour, skin_ramp), numbered last
+        base_img = base_texture(base + '/model.nut', base_ramp)
         for m in meshes:
             for p in m.polygons:
-                for t in p.materials[0].textures[2:3]:
-                    if p.materials[0].flags == 0x9A211067 and t['hash'] == base_ramp:
-                        t['hash'] = ramp
+                mt = p.materials[0]
+                for t in mt.textures[2:3]:
+                    if mt.flags == 0x9A211067 and t['hash'] == base_ramp:
+                        sss = getattr(mt, 'sss', None)
+                        t['hash'] = tex.add(('skin ramp', sss), skin_ramp(base_img, sss), 256)
     left = sorted(set(parts) - used)
     log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded; joint table bones of their own: %s); meshes: %d slots, '
         '%d Ultimate meshes used, left out: %s' % (pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), ', '.join(own) or '-',
@@ -803,6 +822,26 @@ def _with(p, mats):
     q.__dict__.update(p.__dict__)
     q.materials = mats
     return q
+
+
+def skin_ramp(img, sss):
+    """the base's skin ramp (lit -> shadow along x) with its shadow tint turned to the subsurface colour
+    sss: each texel = its luminance x (1 + w (hue - 1)), w its share of the base's most saturated tint,
+    hue sss over its luminance scaled to the base tint's strength; None: the base's as it is"""
+    if sss is None:
+        return img
+    f = img[..., :3].astype(np.float64) / 255
+    L = f @ np.array([0.2126, 0.7152, 0.0722])
+    T = f / np.maximum(L, 1e-3)[..., None] - 1                 # the tint, per texel
+    ok = L > 0.02
+    k = np.argmax(np.where(ok, np.linalg.norm(T, axis=-1), 0))
+    hb = T.reshape(-1, 3)[k]                                   # the base's own tint (Mario's: red)
+    w = np.clip((T @ hb) / (hb @ hb), 0, None) * ok
+    h = np.array(sss, dtype=np.float64) / max(float(np.dot(sss, [0.2126, 0.7152, 0.0722])), 1e-4) - 1
+    h *= np.linalg.norm(hb) / max(np.linalg.norm(h), 1e-6)
+    out = img.copy()
+    out[..., :3] = np.clip(np.round(L[..., None] * (1 + w[..., None] * h) * 255), 0, 255).astype(np.uint8)
+    return out
 
 
 def base_texture(path, tex_id):
@@ -1108,12 +1147,16 @@ MARIO_SLOTS = [
 # Mario's specials -> Squirtle's: Fireball -> Water Gun (its shot), Cape -> Withdraw (its start), Super Jump
 # Punch -> Waterfall, F.L.U.D.D. -> Pokemon Change (out, then back in: no swap); appeals: the facing-right ones
 MARIO_MOTIONS = {
-    'd00specialn': 'd00specialnshot', 'd00specialairn': 'd00specialairnshot',
+    # Water Gun's start in Mario's fireball slots (the hold / shot in its custom-move slots: extra_kinds.json
+    # "motions", fighters/pzenigame/README.md); Withdraw's start; Pokemon Change's out / in in FLUDD's
+    # start / hold slots (light / heavy: the in, unused)
+    'd00specialn': 'd00specialnstart', 'd00specialairn': 'd00specialairnstart',
     'd01specials': 'd01specialsstart', 'd01specialairs': 'd01specialairsstart',
+    'd01specialsloop': 'd01specials', 'd01specialairsloop': 'd01specials',
     'd02specialhi': 'd02specialhi', 'd02specialairhi': 'd02specialairhi',
-    'd03speciallwstart': 'd03speciallwout', 'd03speciallwhold': 'd03speciallwout',
+    'd03speciallwstart': 'd03speciallwout', 'd03speciallwhold': 'd03speciallwin',
     'd03speciallwlight': 'd03speciallwin', 'd03speciallwheavy': 'd03speciallwin',
-    'd03specialairlwstart': 'd03specialairlwout', 'd03specialairlwhold': 'd03specialairlwout',
+    'd03specialairlwstart': 'd03specialairlwout', 'd03specialairlwhold': 'd03specialairlwin',
     'd03specialairlwlight': 'd03specialairlwin', 'd03specialairlwheavy': 'd03specialairlwin',
     'd04final': 'd04final', 'd04finalair': 'd04finalair',
     'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr', 'j01appeallw': 'j01appeallwr',

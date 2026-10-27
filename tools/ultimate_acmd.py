@@ -110,8 +110,18 @@ FLAGS = {'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_COMBO': 0x2100000D,
          'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_NO_HIT_COMBO': 0x21000013,
          'FIGHTER_STATUS_ATTACK_FLAG_START_SMASH_HOLD': 0x2100001B,
          'FIGHTER_STATUS_ATTACK_AIR_FLAG_ENABLE_LANDING': 0x2100000D,
-         'FIGHTER_STATUS_CATCH_FLAG_CATCH_WAIT': 0x2100000D}
+         'FIGHTER_STATUS_CATCH_FLAG_CATCH_WAIT': 0x2100000D,
+         # the common up-special status (Mario's Super Jump Punch: its script turns these on at Ultimate's
+         # frames, 4 and 6): the turn with the stick, then the rise by the animation's TransN
+         'FIGHTER_STATUS_SUPER_JUMP_PUNCH_FLAG_REVERSE_LR': 0x2100000F,
+         'FIGHTER_STATUS_SUPER_JUMP_PUNCH_FLAG_MOVE_TRANS': 0x2100000D}
+# notify_event_msc_cmd 0x2127e37c07 (the ledge check) -> Allow/Disallow_Ledgegrab's state (Mario's up special:
+# 1 from the rise, 2 at its end)
+CLIFF_CHECK = {'GROUND_CLIFF_CHECK_KIND_ALWAYS': 1, 'GROUND_CLIFF_CHECK_KIND_ALWAYS_BOTH_SIDES': 2}
+SITUATIONS = {'SITUATION_KIND_GROUND': 0, 'SITUATION_KIND_AIR': 2}
 THROW_VARS = (0x11000005, 0x11000006, 0x11000007)
+# Ultimate article -> the fighter's Smash 4 article id (--articles NAME=ID,...)
+ARTICLES = {}
 # Ultimate's helper bones a converted model lacks -> the bone that stands in (virtualcenter: the body's middle)
 BONE_ALIAS = {'virtualcenter': 'hip'}
 CAPTURE_CUT_CALL = 0x49FA5BDD
@@ -486,6 +496,12 @@ class Translator:
                 self.skip(name + ' ' + str(a[1]))
                 return []
             return [cmd('ON_FLAG' if name.endswith('on_flag') else 'OFF_FLAG', f)]
+        if short == 'SA_SET' and str(a[1]) in SITUATIONS:
+            return [cmd('SA_SET', SITUATIONS[str(a[1])])]
+        if short == 'notify_event_msc_cmd!' and str(a[1]).endswith('0x2127e37c07)') and str(a[2]) in CLIFF_CHECK:
+            return [cmd('Allow/Disallow_Ledgegrab', CLIFF_CHECK[str(a[2])])]
+        if name == 'ArticleModule::generate_article' and str(a[1]) in ARTICLES:
+            return [cmd('GENERATE_ARTICLE', ARTICLES[str(a[1])])]
         if short == 'CATCH':
             return self.catch(a)
         if short == 'grab!' or name == 'GrabModule::clear_all':
