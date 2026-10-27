@@ -645,6 +645,16 @@ def material_for(tex, mat, tmpl, part):
         m.textures[1]['hash'] = nor
     else:
         m.textures[1]['hash'] = col
+    # Ultimate's own wrap modes (NUD: 1 repeat, 2 mirror, 3 clamp), not the base's: female Robin's
+    # body clamps U, and Hero's mirrored halves (Erdrick's leg, Eight's sleeves: U < 0) took the
+    # texture's dark edge
+    wrap = {}
+    for sm in mat.samplers:
+        n = str(sm.param_id).split('.')[-1].split(':')[0]
+        wrap[n] = [{'Repeat': 1, 'MirroredRepeat': 2}.get(w.name, 3) for w in (sm.data.wraps, sm.data.wrapt)]
+    for t, n in zip(m.textures[:2], ('Sampler0', 'Sampler4' if nor is not None else 'Sampler0')):
+        if n in wrap:
+            t['wrap_s'], t['wrap_t'] = wrap[n]
     bits, val = float_hash(mat.material_label)
     m.props = [(n, ([val, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else v)) for n, v in m.props]
     if not skin and 'Texture6' in tx and 'eye' not in mat.material_label.lower():

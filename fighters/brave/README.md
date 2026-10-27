@@ -1163,3 +1163,21 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   past 35 degrees from level (`rolloff_stick_dir`; was 45). Smash 4's own aerial pick is 50
   (docs/native-notes.md "The aerial kind"): this is wider on request.
 - Changed: `brave.mscsb`.
+
+## Fix 70 (`build/hero_fix70.zip`): Erdrick's and Eight's black patches, up air's exact blue
+
+- **Erdrick (c01 / c05: one leg black) and Eight (c03 / c07: black sleeves):** their meshes have
+  mirrored halves whose UVs run below 0 (Erdrick's body 805 vertices, Eight's 1791 + 503), sampled
+  with Ultimate's `Repeat` wrap. `ultimate_fighter.py` took the wrap from the base's material
+  template, and female Robin's (the odd costumes' base, profile `reflet_f`) clamps U: those halves read
+  the texture's dark edge. Each material now takes Ultimate's own sampler wrap (NUD 1 repeat,
+  2 mirror, 3 clamp; Eight's eyelashes keep Ultimate's clamp). Checked: positions, normals and every
+  texture id match Ultimate per vertex; a bind-pose raster of the textures shows both legs yellow and
+  blue sleeves. All 8 costumes rebuilt (`l0N` = `c0N`): the build also carries every converter change
+  since fix 16 (the shield on his back, specular / rim from Ultimate's reflectance).
+- **Up air's line, from the game's files:** Ultimate tints `sys_attack_line` (and `_b`, `sys_attack_arc`
+  `_b` - `_d`) by the attacker's fighter param `common_effect_0`, Hero's (0.4, 0.9, 3.0), multiplied in
+  linear light (docs/ultimate-fighter-port.md "Effects recoloured at run time"). The bank now uses that
+  (`--tint-for sys_attack_line=0.4:0.9:3.0`; fix 68's A6D9FF was read off a clip). Bank 86 = 85 but
+  those colour keys.
+- Changed: `model/body/c00`-`c07`, `l00`-`l07`; the `.ptcl` (`.efc` unchanged).

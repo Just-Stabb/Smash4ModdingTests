@@ -151,10 +151,20 @@ Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_of
 `_d`; `direction_effect_color` next to it holds 9 colours: red (1, 0.056, 0.056), blue (0.056, 0.238,
 1), yellow-orange (1, 0.584, 0.04), green (0.085, 0.627, 0.102), orange (1, 0.236, 0), cyan (0.127,
 0.848, 0.944), pink (1, 0.429, 0.603), purple (0.345, 0.222, 1), grey (0.5): the player-port colours.
-These effects are all white / grey in `ef_common.eff`; in game they take the attacker's port colour
-(Hero's up air, P2: soft blue). How strongly (and on which colour track) is being traced in the
-ExeFS; meanwhile Hero's bank tints `sys_attack_line` with `--tint-for sys_attack_line=A6D9FF` (read
-off a P2 clip). The file also holds `team_edge_color`, `dead_effect_color`, `shield_effect_color`,
+These effects are all white / grey in `ef_common.eff`. **The tint is per fighter, not per port**
+(ExeFS, traced): the fighter EffectModule's `init` (0x6C9280) reads the fighter's
+`fighter_param_table[kind].common_effect_0_r / _g / _b` (`fighter_param.prc`; entry +0x47C / +0x480 /
++0x484) and maps each of the six names to (r, g, b, 1). Every `req` / `req_on_joint` / `req_follow`
+ends in vt+0x4B8 (0x6C9A40), which looks the name up and calls the same colour setter as
+`LAST_EFFECT_SET_COLOR` (0x3563F40): eft2 multiplies both colour0 and colour1 by it (linear, before
+the frame's sRGB encode; values may pass 1). A later `LAST_EFFECT_SET_COLOR` replaces it. Values:
+Hero / Pikachu / Joker / Banjo / Terry / Piranha Plant (0.4, 0.9, 3.0); Sephiroth / Marth / Steve /
+Sora (0.5, 1.0, 3.0); Mario / Luigi / Sonic (3.0, 0.7, 0.2); Kirby / Peach (0.25, 1.3, 2.5); most
+others 1.3 grey. `direction_effect_color` (the port colours) has no reader on this path. Converted:
+`tools/vfxb_to_ptcl.py --tint-for sys_attack_line=R:G:B` (linear; applied to our display-encoded keys
+as m^(1/2.2)). Depth: no game-side layer change; the eft2 `draw_path` bit picks the render pass, and
+the static camera offset (-5) is a shader push (our bank uses -15 to draw it behind him).
+The file also holds `team_edge_color`, `dead_effect_color`, `shield_effect_color`,
 `color_blend_camera_depth_min / max` and more: check it for any common effect a port uses.
 
 ### Ultimate's effect commands (ExeFS `main`, version used: the NSO's dynsym names them)
