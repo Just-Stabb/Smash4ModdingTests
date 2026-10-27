@@ -72,20 +72,19 @@ def _xcorr(img, tmp):
     return r[:H, :W]
 
 
-def ncc_map(img, tmp, wmask=None):
-    """normalised correlation of tmp (features [th, tw, c]) at every offset over img; wmask
-    weights the template's pixels"""
-    if wmask is None:
-        wmask = np.ones(tmp.shape[:2], np.float32)
+def ncc_map(img, tmp, wmask):
+    """normalised correlation of tmp (features [th, tw, c], weights wmask) at every offset over img;
+    windows with much less energy than the template score low (no 0 / 0 peaks on empty canvas)"""
     t = tmp * wmask[..., None]
     num = _xcorr(img, t)
     e_img = _xcorr((img ** 2).sum(2), wmask)
     e_t = float((t * tmp).sum())
-    return num / np.sqrt(np.maximum(e_img, 1e-6) * max(e_t, 1e-9))
+    return num / np.sqrt(np.maximum(e_img, 0.25 * e_t) * max(e_t, 1e-9))
 
 
 def _peak(m):
     iy, ix = np.unravel_index(np.argmax(m), m.shape)
+
     def sub(a, b, c):
         d = a - 2 * b + c
         return 0.0 if abs(d) < 1e-12 else 0.5 * (a - c) / d
@@ -94,35 +93,86 @@ def _peak(m):
     return float(m[iy, ix]), iy + fy, ix + fx
 
 
-def match(big, tmp, scales, wmask=None, min_cover=0.6, sy_ratio=1.0, mode='feat'):
-    """where does tmp (premultiplied RGBA) sit in big, at which scale: big resized by s (s * sy_ratio
-    vertically) puts tmp's pixel u at u + o. Returns (score, sx, sy, ox, oy) of the best scale:
-    tmp pixel (x, y) = big pixel ((x + ox) / sx, (y + oy) / sy)."""
-    T = _feat(tmp)
-    w = np.ones(tmp.shape[:2], np.float32) if wmask is None else wmask.astype(np.float32)
+class Fit:
+    """tmp pixel (x, y) = big pixel (ax * x + bx, ay * y + by); score = normalised correlation"""
+    def __init__(self, score, ax, bx, ay, by):
+        self.score, self.ax, self.bx, self.ay, self.by = score, ax, bx, ay, by
+
+    def __repr__(self):
+        return 'Fit(score %.4f, scale %.4f x %.4f, offset %.1f, %.1f)' % (
+            self.score, 1 / self.ax, 1 / self.ay, self.bx, self.by)
+
+
+def zncc_map(img, tmp, wmask):
+    """zero-mean normalised correlation (one channel each, weights wmask): matches shading / edges,
+    not brightness, so different renders of a face can line up"""
+    img = img.sum(2) if img.ndim == 3 else img
+    tmp = tmp.sum(2) if tmp.ndim == 3 else tmp
+    sw = float(wmask.sum())
+    mt = float((tmp * wmask).sum()) / sw
+    t = (tmp - mt) * wmask
+    num = _xcorr(img, t)
+    s1 = _xcorr(img, wmask)
+    s2 = _xcorr(img ** 2, wmask)
+    var_i = np.maximum(s2 - s1 ** 2 / sw, 1e-6)
+    var_t = float((t * (tmp - mt)).sum())
+    return num / np.sqrt(var_i * max(var_t, 1e-9))
+
+
+def _search(big, T, w, scales, ratios, min_cover, zero_mean=False):
+    """big and T at one working resolution; scales: big pixels -> T pixels"""
     best = None
+    th, tw = T.shape[:2]
     for s in scales:
-        sx, sy = s, s * sy_ratio
-        W, H = max(8, int(round(big.shape[1] * sx))), max(8, int(round(big.shape[0] * sy)))
-        sx, sy = W / big.shape[1], H / big.shape[0]
-        I = _feat(resize_f(big, W, H))
-        m = ncc_map(I, T, w)
-        cover = _xcorr(np.ones((H, W), np.float32), w) / w.sum()
-        m = np.where(cover >= min_cover, m, -1)
-        sc, py, px = _peak(m)
-        th, tw = tmp.shape[:2]
-        r = (sc, sx, sy, px - (tw - 1), py - (th - 1))
-        if best is None or r[0] > best[0]:
-            best = r
+        for r in ratios:
+            W = max(4, int(round(big.shape[1] * s)))
+            H = max(4, int(round(big.shape[0] * s * r)))
+            sx, sy = W / big.shape[1], H / big.shape[0]
+            I = _feat(resize_f(big, W, H))
+            if zero_mean:
+                m = zncc_map(I[..., 0], T[..., 0], w)
+            else:
+                m = ncc_map(I, T, w)
+            cover = _xcorr(np.ones((H, W), np.float32), w) / w.sum()
+            m = np.where(cover >= min_cover, m, -1)
+            sc, py, px = _peak(m)
+            ox, oy = px - (tw - 1), py - (th - 1)        # T pixel u = I pixel u + o
+            if best is None or sc > best.score:
+                best = Fit(sc, 1 / sx, ox / sx, 1 / sy, oy / sy)
     return best
 
 
-def match_refine(big, tmp, s0, wmask=None, span=1.12, steps=9, rounds=3, sy_ratio=1.0, **kw):
-    """match() around scale s0, narrowing the scale range each round"""
-    best = None
-    for _ in range(rounds):
-        scales = s0 * np.exp(np.linspace(-np.log(span), np.log(span), steps))
-        best = match(big, tmp, scales, wmask, sy_ratio=sy_ratio, **kw)
-        s0 = best[1]
-        span = span ** (2.0 / (steps - 1))
-    return best
+def register(big, tmp, s_lo, s_hi, wmask=None, aniso=(1.0, 1.0), min_cover=0.6, steps=40, max_side=768, zero_mean=False):
+    """find where tmp (premultiplied RGBA) appears in big (same art, other size / crop): scale
+    (tmp px per big px) in [s_lo, s_hi], vertical / horizontal scale ratio in aniso, translation.
+    Coarse to fine: a ~64 px template first, then ~200 px, then full size on a crop of big."""
+    w0 = np.ones(tmp.shape[:2], np.float32) if wmask is None else wmask.astype(np.float32)
+    th, tw = tmp.shape[:2]
+    fit = None
+    for side, span, n in ((64, None, steps), (200, 1.06, 7), (max_side, 1.015, 5)):
+        q = min(1.0, max(float(side) / max(th, tw), 0.4 * side / min(th, tw)))   # thin templates keep detail
+        qw, qh = max(4, int(round(tw * q))), max(4, int(round(th * q)))
+        T = _feat(resize_f(tmp, qw, qh))
+        w = np.asarray(Image.fromarray(w0, 'F').resize((qw, qh), Image.BILINEAR))
+        qx, qy = qw / tw, qh / th
+        if fit is None:
+            scales = np.exp(np.linspace(np.log(s_lo), np.log(s_hi), n)) * qx
+            ratios = np.exp(np.linspace(np.log(aniso[0]), np.log(aniso[1]), 1 if aniso[0] == aniso[1] else 12)) * qy / qx
+            x0 = y0 = 0
+            sub = big
+        else:
+            s0x, s0y = 1 / fit.ax, 1 / fit.ay
+            scales = s0x * qx * np.exp(np.linspace(-np.log(span), np.log(span), n))
+            r0 = (s0y * qy) / (s0x * qx)
+            ratios = [r0] if aniso[0] == aniso[1] else r0 * np.exp(np.linspace(-np.log(span), np.log(span), 5))
+            # crop big around the current fit (template's area + a margin)
+            mx, my = 0.15 * tw * fit.ax + 8, 0.15 * th * fit.ay + 8
+            x0 = int(max(0, np.floor(fit.bx - mx)))
+            y0 = int(max(0, np.floor(fit.by - my)))
+            x1 = int(min(big.shape[1], np.ceil(fit.bx + tw * fit.ax + mx)))
+            y1 = int(min(big.shape[0], np.ceil(fit.by + th * fit.ay + my)))
+            sub = big[y0:y1, x0:x1]
+        f = _search(sub, T, w, scales, ratios, min_cover, zero_mean)
+        # back to full-size template pixels and big pixels
+        fit = Fit(f.score, f.ax * qx, f.bx + x0, f.ay * qy, f.by + y0)
+    return fit
