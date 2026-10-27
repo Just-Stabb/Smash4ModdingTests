@@ -1944,6 +1944,11 @@ def emitter_anims(p, em, e, notes):
             vals = [[v / c[i] if c[i] else v for i, v in enumerate(x)] for x in vals]
         elif sec == 'EAA0':
             vals = [[x[0] / info['color0'][3] if info['color0'][3] else x[0]] for x in vals]
+        elif sec == 'EASL':
+            # Ultimate's keys are the particle scale itself (Kaswoosh's rings: 2.5 x 1.56, its own scale,
+            # to 7 at the end); eft's targets multiply the particle's (or the mesh's, built at size)
+            b = e['scale']['scale']
+            vals = [[v / b[i] if b[i] else v for i, v in enumerate(x)] for x in vals]
         elif sec == 'EATR':
             k = p.field(em, 'emit_rate') / max(e['emission']['rate'], 0.01)
             vals = [[x[0] * k] for x in vals]
@@ -2153,6 +2158,64 @@ def turn_set(p, si, rot_deg):
                                            p.field(em, 'emitter_translation'), r.T))
 
 
+def bone_path(skel, anim, bone):
+    """an Ultimate bone's translation in its model's space over an animation ([F + 1, 3], frame 0 to the
+    last) and whether it loops (its last frame back at its first): the skeleton's rest pose under the
+    animation's tracks, the bone's chain composed"""
+    import ssbh_data_py as s
+    sk = s.skel_data.read_skel(skel)
+    an = s.anim_data.read_anim(anim)
+    frames = int(round(an.final_frame_index)) + 1
+    tracks = {}
+    for g in an.groups:
+        if g.group_type.name == 'Transform':
+            for n in g.nodes:
+                for t in n.tracks:
+                    tracks[n.name.lower()] = t.values
+    bones = {b.name.lower(): b for b in sk.bones}
+    chain, b = [], bones[bone.lower()]
+    while b is not None:
+        chain.append(b)
+        b = sk.bones[b.parent_index] if b.parent_index is not None else None
+    out = []
+    for f in range(frames):
+        m = np.eye(4)
+        for b in chain:
+            vals = tracks.get(b.name.lower())
+            if vals:
+                v = vals[min(f, len(vals) - 1)]
+                x, y, z, w = v.rotation
+                r = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                              [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                              [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+                local = np.eye(4)
+                local[:3, :3] = r * np.array(v.scale)[None, :]
+                local[:3, 3] = v.translation
+            else:
+                local = np.array(b.transform, float).T      # ssbh's rows: translation in the last
+            m = local @ m
+        out.append(m[:3, 3])
+    out = np.array(out)
+    return out, bool(np.allclose(out[0], out[-1], atol=0.05))
+
+
+def path_set(p, si, path, loop):
+    """every emitter of set si moved along path ([F, 3], one per frame: bone_path) by translation key
+    animations (targets 8 - 10) on top of its own translation: Ultimate's EFFECT_FOLLOW on an animated
+    bone of an article without a model here (Woosh's whirlwinds go round on Tornado1 / Tornado2). An
+    emitter's particles follow as its follow type says, as Ultimate's follow the bone"""
+    for e in p.sets[si]['emitters']:
+        em = e['data']
+        if em is None:
+            continue
+        anims = p.key_anims(em)
+        assert not any(8 <= a['target'] <= 10 for a in anims), 'a translation animation already'
+        own = p.field(em, 'emitter_translation')
+        anims += [{'target': 8 + i, 'loop': loop, 'keys': [(float(t), float(own[i] + v[i])) for t, v in enumerate(path)]}
+                  for i in range(3)]
+        p.set_key_anims(em, anims)
+
+
 def key_value(keys, t):
     """a key animation's value at frame t (linear, held past either end)"""
     if t <= keys[0][0]:
@@ -2264,6 +2327,10 @@ def main():
                          "sys_special_attack_up=p_cmnspecialattackup (Hero's Oomph glow, played by his game code)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
+    ap.add_argument('--bone-path', action='append', default=[], metavar='EFFECT=SKEL,ANIM,BONE',
+                    help="EFFECT's emitters moved as an Ultimate article's BONE moves in ANIM (.nusktb, .nuanmb; "
+                         "looped if it ends where it starts): its scripts' EFFECT_FOLLOW on that bone, for an "
+                         "article without its model (Woosh's whirlwind on Tornado1). Repeatable")
     ap.add_argument('--no-linear', action='store_true', help="Ultimate's linear colours as they are (not "
                     "display-encoded: LINEAR_DISPLAY)")
     a = ap.parse_args()
@@ -2377,6 +2444,16 @@ def main():
             print('%-30s %-28s -> %-28s 0x%07X  %d emitters' % (name, eff.sets[si_ult], sname, ids[name], len(made)))
             print('\n'.join(log))
     convert_source(0, *sources[0])
+    for bp in a.bone_path:
+        name, rest = bp.split('=', 1)
+        skel, anim, bone = rest.split(',')
+        if name not in ids:
+            continue
+        path, loop = bone_path(skel, anim, bone)
+        path_set(p, ef.entries[ids[name] & 0xFFFF][1] - 1, path, loop)
+        print('%-30s on %s (%s): %d frames%s, %.1f - %.1f out' % (
+            name, bone, os.path.basename(anim), len(path), ', looped' if loop else '',
+            min(np.hypot(path[:, 0], path[:, 2])), max(np.hypot(path[:, 0], path[:, 2]))))
     if a.variants:
         import effect_variants
         for v in json.load(open(a.variants)):

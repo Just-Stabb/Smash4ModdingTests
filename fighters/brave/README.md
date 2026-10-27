@@ -867,3 +867,26 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
   layers x 0.19 - 0.22. 48 parts in all (most x 0.9+; Psych Up's `impact_M_front` x 0.17, the ice
   sword fragments x 0.60).
 - Only the `.ptcl` changed.
+
+## Fix 55 (`build/hero_fix55.zip`): Kaswoosh's ring size, the whirlwinds' wander
+
+- User's video (fix 54): colour and see-through now close, but Kaswoosh a wide squat swirl about 1.5 -
+  2x Ultimate's size; Ultimate's are two tall funnels, narrow at the ground, that wander about.
+- Size: Kaswoosh's rings have an emitter particle-scale animation (`EASL`: 2.5 x 1.56 until frame 42,
+  then to 6 - 7 x 1.7), whose keys are the particle scale itself (the first is the emitter's own scale).
+  eft's targets 17 - 18 multiply the particle's scale, and the rings' uneven 3D scale is built into
+  the mesh (`s3`), so the rings drew 2.5x too wide and 1.56x too tall. `EASL` keys now go over the
+  base scale (1 to 2.4 - 2.8 x 1.09). Swoosh's rings (no `EASL`) were right.
+- Wander: Ultimate's brave_tornado article has a model (bones Trans / Rot / Tornado1 / Tornado2; we
+  have none, effects on bone 0) whose motions move the bones the effects follow (`EFFECT_FOLLOW` on
+  tornado1 / tornado2), unscaled: Woosh's Tornado1 round a 3 x 4 ellipse, Swoosh's 4 x 10, and
+  Kaswoosh's Tornado1 / Tornado2 round one each, centred 7.4 either side along Z (+-9.7 along Z, +-3.8
+  along X); every 16 frames, looping. `vfxb_to_ptcl.py --bone-path EFFECT=SKEL,ANIM,BONE` bakes such a
+  bone's path into the effect's emitters as looped translation key animations (targets 8 - 10) on their
+  own: the rings (follow type 2) ride along, the dissolving tornado meshes (type 1) stay where they
+  were emitted, as in Ultimate. So Kaswoosh's two effects now sit on bone 0 (`brave_build.py`; the
+  second turned 180 about Y, as Ultimate's: the other ellipse), not moved 7 apart; its hitboxes stay 7
+  either side (the ellipses' centres), Tornado1's (IDs 0 / 2 / 4) on +Z with its effect.
+- Build: the README's v3 converter command with, for i in 1 2 3,
+  `--bone-path brave_tornado$i=HERO/model/tornado/c00/model.nusktb,HERO/motion/tornado/c00/d02specialhi$i.nuanmb,tornado1`.
+- Changed: the `.ptcl` and the tornado article's scripts (`script/animcmd/weapon/tornado`).

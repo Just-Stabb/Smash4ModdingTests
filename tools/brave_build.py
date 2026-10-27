@@ -67,7 +67,7 @@ ARTICLES = {
     'sleep': (_slots('sleep', ('sleep',)), {}),
 }
 # each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
-KASWOOSH_SPREAD = 7.0      # half the two whirlwinds' distance (their mean orbit radius, 3 - 12)
+KASWOOSH_SPREAD = 7.0      # half the two whirlwinds' distance (their ellipses' centres, 7.4 out)
 KASWOOSH_LAUNCH = 50       # Kaswoosh's launching hit: 2 frames before its 52 (weapons/tornado.c)
 ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
@@ -162,13 +162,15 @@ def article_scripts(a, name, wdir):
             effect[mo] = effect['crash1']
     if name == 'tornado':
         # Kaswoosh's two whirlwinds: Ultimate's on the article's bones Tornado1 / Tornado2, which its
-        # d02specialhi3 animation sends round each other (3 - 12 units out, a 17-frame loop); without a
-        # model both sat on bone 0 as one. Moved KASWOOSH_SPREAD apart along Z (the article's screen
-        # axis: Robin's Arcthunder spreads its hitboxes along Z), their hitboxes (IDs 0 / 2 / 4 on
-        # Tornado1, 1 / 3 / 5 on Tornado2; 6, on top, stays) with them
+        # d02specialhi3 animation sends round an ellipse each, 7.4 out along Z (the article's screen axis:
+        # Robin's Arcthunder spreads its hitboxes along Z) either side, +-9.7 along Z and +-3.8 along X,
+        # every 16 frames. The effects move so in the bank (vfxb_to_ptcl.py --bone-path: the README's
+        # build), on bone 0 here as Ultimate's on theirs (the second turned 180 about Y: the other
+        # ellipse); the hitboxes (IDs 0 / 2 / 4 on Tornado1, 1 / 3 / 5 on Tornado2; 6, on top, stays)
+        # KASWOOSH_SPREAD apart along Z, the ellipses' centres
         for c in game['specialhi3']:
             if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox') and c.params[0] < 6:
-                dz = KASWOOSH_SPREAD * (-1 if c.params[0] % 2 == 0 else 1)
+                dz = KASWOOSH_SPREAD * (1 if c.params[0] % 2 == 0 else -1)   # Tornado1's on +Z
                 c.params[11] += dz
                 if c.name == 'Extended_Special_Hitbox':
                     c.params[-1] += dz
@@ -177,8 +179,8 @@ def article_scripts(a, name, wdir):
         # converted launcher as the template, Ultimate's values (4%, 120, KBG 125, BKB 85, size 8.5)
         tpl = next(c for c in game['specialhi2'] if c.name == 'Extended_Special_Hitbox' and c.params[1] == 1)
         launch = [acmd.Command(acmd.BY_NAME['frame'], [KASWOOSH_LAUNCH])]
-        for i, y, z, y2 in ((0, 4.5, -1, 4.5), (1, 4.5, 1, 4.5), (2, 12.5, -1, 12.5), (3, 12.5, 1, 12.5),
-                            (4, 21.0, -1, 21.0), (5, 21.0, 1, 21.0), (6, 5.0, 0, 20.0)):
+        for i, y, z, y2 in ((0, 4.5, 1, 4.5), (1, 4.5, -1, 4.5), (2, 12.5, 1, 12.5), (3, 12.5, -1, 12.5),
+                            (4, 21.0, 1, 21.0), (5, 21.0, -1, 21.0), (6, 5.0, 0, 20.0)):
             hb = acmd.Command(tpl.ident, list(tpl.params))
             hb.params[0], hb.params[1] = i, 1
             hb.params[3:9] = [4.0, 120, 125, 0, 85, 8.5]
@@ -190,8 +192,6 @@ def article_scripts(a, name, wdir):
         game['specialhi3'] = [c for c in game['specialhi3'] if c.ident != acmd.END] + launch + end
         whirls = [c for c in effect['specialhi3'] if c.name == 'External_Graphic']
         assert len(whirls) == 2, whirls
-        whirls[0].params[4] -= KASWOOSH_SPREAD
-        whirls[1].params[4] += KASWOOSH_SPREAD
     if name == 'deathball':
         hb = next(c for c in game['deathball1'] if c.name == 'Extended_Special_Hitbox')
         ko = acmd.Command(hb.ident, list(hb.params))

@@ -504,7 +504,8 @@ of 10) and keys Ultimate's colour / alpha values divided by the emitter's own co
 Ultimate's emitter animations are the `EA**` subsections (little endian: u8 on, u8 loop, u16, u32 key
 count, u32, then keys of x, y, z, frame): EATR 0, EAPL 1, EAES 2-4, EAER 5-7 (degrees), EAET 8-10, EAC0
 11-13, EAA0 14, EAOV 15, EASL 17-18, EAC1 19-21, EASS 22-24. EAA1 and EADV have no eft target and stay
-unconverted.
+unconverted. EASL's keys are the particle scale itself (its first is usually the emitter's own),
+where targets 17-18 multiply it: the converter divides them by the base scale.
 
 ## Shaders: which fields are tied to the shader
 
