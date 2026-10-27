@@ -205,9 +205,11 @@ own durations:
 | 5 | Super Star (invincible, flashing) | `0x02E16F4C(F, 1, -1, 0)` |
 | 6 | Lip's Stick flower on its head | `0x02E1FB78(F, 1, 0, 0, 0.0, 0.0)` |
 | 7 | the Timer's slow on every other fighter (half speed, 450 frames) | `0x02E16A14(F, 1, 2, 450, none)` each |
+| 8 | the camera closes in on this fighter (ACMD `Camera_Closeup(3, 0, 2.0, 0, 0)`'s call) | CameraModule vt `+0xE4` |
+| 9 | the camera back to normal (ACMD `Normal_Camera`'s call) | CameraModule vt `+0xEC(0)` |
 
 F is the fighter object (its module accessor − 0x230). The mushroom refuses while flag `0x20000025`,
-`0x20000037` or `0x2000001B` is set. Used by Hero's Kaclang (metal) and Hocus Pocus
+`0x20000037` or `0x2000001B` is set. Used by Hero's Kaclang (metal), Hocus Pocus and critical hits (8 / 9)
 (`fighters/brave/brave.c`). Research: docs/native-notes.md "Item states".
 
     SET_FLOAT(Value=1, Variable=0x0F000099)    // metal

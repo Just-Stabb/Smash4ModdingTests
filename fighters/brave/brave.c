@@ -8489,7 +8489,8 @@ void func_381()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global64 = 1; // roll-off: Fall's end puts the cap back
+        global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
+        rolloff_dir = PostureModuleF(0x7);  // Hero's test: the forward roll's way on screen
     }
     func_383();
 }
@@ -8500,7 +8501,8 @@ void func_382()
     {
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global64 = 1; // roll-off: Fall's end puts the cap back
+        global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
+        rolloff_dir = -PostureModuleF(0x7); // Hero's test: the back roll goes away from his facing
     }
     func_383();
 }
@@ -10998,12 +11000,8 @@ void func_534()
 
 void func_535()
 {
-    if (global64) // roll-off: Fall over, the air speed cap is back (universal mechanics)
-    {
-        global64 = 0;
-        WorkModule(0x14, 0x20000044);
-    }
-    
+    // roll-off (Hero's test, user): Fall's end no longer puts the air speed cap back; it stays off into
+    // the next air action for as long as the stick holds the roll's way (rolloff_hold_update)
 }
 
 void func_536()
@@ -38332,6 +38330,29 @@ float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
 float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+float rolloff_hold_x() { return 0.3f; } // Hero's test: the stick past this, on screen, the roll's way keeps the cap off
+
+// Hero's test of a new roll-off (user): the speed carried off a ledge isn't held to the air speed cap
+// (flag 0x20000044 off) until the stick stops holding the roll's way (its screen X, the position
+// variable 0x0F000260, times rolloff_dir under rolloff_hold_x()), whatever he's doing in the air; it's
+// also back on landing or a ledge (situation not air) and when he's hit (Damage 0x45 - DamageFall 0x4C).
+// Before: Fall's end put it back. rolloff_dir: the roll's way on screen (1 right, -1 left), set at the
+// slide-off (func_381 / func_382); global64: the cap is off from a roll-off.
+float rolloff_dir;
+
+void rolloff_hold_update()
+{
+    if (global64 == 0)
+    {
+        return;
+    }
+    if (global18 != 0x2 || global4 >= 0x45 && global4 <= 0x4c || WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x())
+    {
+        global64 = 0;
+        rolloff_dir = 0;
+        WorkModule(0x14, 0x20000044);
+    }
+}
 
 void rolloff_fall_speed()
 {
@@ -38709,6 +38730,11 @@ void brave_rebirth()
     brave_menu = 0;
     brave_menu_anim = 0;
     brave_hi_used = 0;
+    if (brave_crit_cam > 0)
+    {
+        brave_item(9.0f);   // KO'd during a crit's closeup: the camera back
+    }
+    brave_crit_cam = 0;
     brave_buffs_off();
     WorkModule(0x7, 0, 0x1000009e);
 }
@@ -38940,13 +38966,52 @@ void brave_crit_update()
     WorkModule(0x7, brave_crit, 0x1000009a);
 }
 
+// the critical hit's show (Ultimate's param_critical: the game slowed to 1/4 for critical_frame 40, the
+// camera in on him; it plays when the crit hitboxes connect): a smash attack that rolled it (brave_crit) or
+// Hatchet Man (spell 20, always critical). The hit: self's HIT variable (0x0F0000A0, on until the move
+// ends); the slow: SlowModule(0, rate, frames) (ACMD Time_Manipulation_Whole's call); the camera: the ITEM
+// variable's 8 (closeup) / 9 (back) (tools/position_vars_cave.py, ACMD Camera_Closeup / Normal_Camera's calls)
+int brave_crit_shown;
+int brave_crit_cam;
+
+void brave_crit_show()
+{
+    int crit;
+    crit = brave_crit;
+    if (global4 == 0x155 && brave_lw_spell == 0x14)
+    {
+        crit = 0x1;
+    }
+    if (crit == 0)
+    {
+        brave_crit_shown = 0;
+    }
+    else if (brave_crit_shown == 0 && WorkModuleF(0, 0x0f0000a0) >= 0.5f)
+    {
+        brave_crit_shown = 0x1;
+        SlowModule(0, 0x4, 0x28);
+        brave_item(8.0f);
+        brave_crit_cam = 0x28;
+    }
+    if (brave_crit_cam > 0)
+    {
+        brave_crit_cam -= 1;
+        if (brave_crit_cam == 0)
+        {
+            brave_item(9.0f);
+        }
+    }
+}
+
 void brave_frame()
 {
     func_82();
     brave_keep_items();
     brave_mp_update();
     brave_crit_update();
+    brave_crit_show();
     brave_hi_refresh();
+    rolloff_hold_update();
     brave_buff_update();
     brave_sleep_update();
     brave_panel_update();
@@ -39201,7 +39266,6 @@ int brave_n_fire_frame()
 void brave_n_loop()
 {
     float f;
-    int top;
     func_2245(StatusModule(0x6));
     f = MotionModuleF(0x1);
     if (brave_n_state == 0)
@@ -39217,16 +39281,12 @@ void brave_n_loop()
         brave_n_hold += 1;
         brave_mp_pause = 0x1;
         brave_cost_view = brave_n_cost(brave_n_hold_level());
-        top = brave_n_max_level();
         if (ControlModule(0x2710, 0x1))
         {
             brave_n_released = 0x1;     // Ultimate's: special pressed again fires (a release doesn't)
         }
-        if (top >= 0 && top < 0x2 && brave_n_hold >= brave_n_level_frame(top))
-        {
-            brave_n_released = 0x1;     // as charged as his MP allows: cast it (with no level paid for he
-                                        // charges on until special, then misfires; fix 58)
-        }
+        // fix 61 (user): no casting by itself when his MP runs short of the next level (fix 57 did): he
+        // charges on, and the press casts the strongest level held that he pays for (brave_n_hold_level)
         if (ControlModule(0x2710, 0x3))
         {
             brave_n_stored = brave_n_hold;
@@ -39534,10 +39594,10 @@ void brave_s_loop()
         brave_mp_pause = 0x1;
         brave_cost_view = brave_s_cost(brave_s_hold_level());
         top = brave_s_max_level();
-        if (top >= 0 && top < 0x2 && brave_s_hold >= brave_s_level_frame(top))
+        if (top < 0x2 && brave_s_hold >= brave_s_level_frame(top))
         {
-            brave_s_released = 0x1;     // as charged as his MP allows: cast it (none paid for: he charges
-                                        // on until the release, then misfires)
+            brave_s_released = 0x1;     // as charged as his MP allows: cast it; none paid for: the misfire
+                                        // at once (fix 61: fix 58 had him charge on; only Zap does this)
         }
         if (brave_s_hold >= 0x1a && brave_s_hold_level() == 0x2)
         {
@@ -39866,10 +39926,10 @@ void brave_hi_loop()
         brave_mp_pause = 0x1;
         brave_cost_view = brave_hi_cost(brave_hi_hold_level());
         top = brave_hi_max_level();
-        if (top >= 0 && top < 0x2 && brave_hi_hold >= brave_hi_level_frame(top))
+        if (top < 0)
         {
-            brave_hi_released = 0x1;    // as charged as his MP allows: cast it (none paid for: he charges
-                                        // on until the release, then the empty jump)
+            brave_hi_released = 0x1;    // no level paid for: the empty jump at once (fix 61); otherwise he
+                                        // charges on (no casting by itself short of the full hold, 28)
         }
         if (brave_hi_hold >= 0x1c && brave_hi_hold_level() == 0x2 || brave_hi_released)
         {

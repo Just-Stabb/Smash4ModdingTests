@@ -53,7 +53,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
   0x0F000099  0                                   an item's own state on self (the game's function
                                                   the item calls): 1 metal on, 2 metal off, 3 giant,
                                                   4 small, 5 Super Star, 6 flower, 7 the Timer's slow
-                                                  on every other fighter (ext_item)
+                                                  on every other fighter, 8 camera closeup on self,
+                                                  9 camera back (ext_item)
   0x0F000100 + 0x20*target + q   inputs and state: buttons held / pressed (write: force), sticks,
               inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
               combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
@@ -335,6 +336,7 @@ consts:
         .float 0.5
         .float 1.5
         .float -1.0                     # +0xC: "the item's own value" (ext_item)
+        .float 2.0                      # +0x10: the crit closeup's distance (ext_item 8)
 """
 
 ARITH_STUB = """
@@ -1021,6 +1023,10 @@ ext_item:                               # 0x99: self's item states, the game's o
         beq it_flower
         cmpwi r22, 7
         beq it_slow
+        cmpwi r22, 8                    # the camera on self: 8 closeup (ACMD Camera_Closeup's call: CameraModule
+        beq it_cam_in                   # vt +0xE4(3 frames, 0, f1 2.0, &(0, 0), 0)), 9 back (Normal_Camera:
+        cmpwi r22, 9                    # vt +0xEC(0)); Hero's critical hits
+        beq it_cam_out
         b ext_zero
 it_metal_on:
         li r4, 1
@@ -1054,6 +1060,43 @@ it_flower:
         li r5, 0
         li r6, 0
         bl 0x02E1FB78
+        b ext_zero
+it_cam_in:
+        lwz r3, 0x30(r27)               # CameraModule
+        mr r9, r3
+        bl ext_chk
+        bne ext_zero
+        lwz r12, 0(r3)
+        mr r9, r12
+        bl ext_chk
+        bne ext_zero
+        lwz r12, 0xE4(r12)
+        lis r11, consts@ha
+        addi r11, r11, consts@l
+        lfs f1, 0x10(r11)
+        li r0, 0
+        stw r0, 0x40(r1)
+        stw r0, 0x44(r1)
+        addi r6, r1, 0x40
+        li r4, 3
+        li r5, 0
+        li r7, 0
+        mtctr r12
+        bctrl
+        b ext_zero
+it_cam_out:
+        lwz r3, 0x30(r27)
+        mr r9, r3
+        bl ext_chk
+        bne ext_zero
+        lwz r12, 0(r3)
+        mr r9, r12
+        bl ext_chk
+        bne ext_zero
+        lwz r12, 0xEC(r12)
+        li r4, 0
+        mtctr r12
+        bctrl
         b ext_zero
 it_slow:                                # the Timer: 0x02E16A14(F, on, rate 2 (half), 450 frames, owner
         li r25, 0                       # none 0x50000000) on every other live fighter (Hocus Pocus)

@@ -636,7 +636,7 @@ check('target past the end: 0', call(mu, FGET, w0, 0x0F000280), 0)
 check('position IDs still fine', call(mu, FGET, w0, 0x0F00000C), 30)
 # 0x0F000099: self's item states through the game's own functions (stubbed here: each logs its
 # arguments r3-r7, f1, f2)
-ITEM_FNS = [0x02E15DE4, 0x02E1E148, 0x02E16F4C, 0x02E1FB78, 0x02E16A14]
+ITEM_FNS = [0x02E15DE4, 0x02E1E148, 0x02E16F4C, 0x02E1FB78, 0x02E16A14, 0x02E18000, 0x02E18100]  # + 2 fake camera methods
 mu.mem_map(0x02E10000, 0x10000)
 for k, fn in enumerate(ITEM_FNS):
     L = 0x104F0000 + 0x200 * k
@@ -678,7 +678,7 @@ F0 = 0x10370000 - 0x230
 ITEM = 0x0F000099
 check('ITEM: reads 0', call(mu, FGET, w0, ITEM), 0)
 call(mu, FSET, w0, ITEM, 0.0)
-check_eq('ITEM 0: nothing', [item_log(k) for k in range(5)], [[]] * 5)
+check_eq('ITEM 0: nothing', [item_log(k) for k in range(7)], [[]] * 7)
 call(mu, FSET, w0, ITEM, 1.0)
 check_eq('ITEM 1 metal on: (F, on 1, frames -1), f1 -1', [x[:3] + x[5:6] for x in item_log(0)], [(F0, 1, -1, -1.0)])
 call(mu, FSET, w0, ITEM, 2.0)
@@ -693,7 +693,20 @@ call(mu, FSET, w1, ITEM, 7.0)
 F1 = 0x10371000 - 0x230
 check_eq('ITEM 7 Timer from slot 1: every other live fighter, (F, 1, 2, 450, none)',
       [x[:5] for x in item_log(4)], [(F0, 1, 2, 450, 0x50000000)])
+
+# 8 / 9: the camera on self (fake CameraModule at accessor +0x30, its vtable +0xE4 / +0xEC the stubs)
+CAM, CAMVT = 0x10380000, 0x10381000
+mu.mem_write(0x10370000 + 0x30, struct.pack('>I', CAM)); mu.mem_write(CAM, struct.pack('>I', CAMVT))
+mu.mem_write(CAMVT + 0xE4, struct.pack('>I', 0x02E18000)); mu.mem_write(CAMVT + 0xEC, struct.pack('>I', 0x02E18100))
+call(mu, FSET, w0, ITEM, 8.0)
+log = item_log(5)
+check_eq('ITEM 8 closeup: vt+0xE4(CM, 3, 0, &rot, 0), f1 2.0', [(x[0], x[1], x[2], x[4], x[5]) for x in log], [(CAM, 3, 0, 0, 2.0)])
+check_eq('ITEM 8: the rotation (0, 0)', struct.unpack('>ff', mu.mem_read(log[0][3], 8)), (0.0, 0.0))
 call(mu, FSET, w0, ITEM, 9.0)
-check_eq('ITEM 9: nothing', [item_log(k) for k in range(5)], [[]] * 5)
+check_eq('ITEM 9 camera back: vt+0xEC(CM, 0)', [x[:2] for x in item_log(6)], [(CAM, 0)])
+call(mu, FSET, w0, ITEM, 10.0)
+check_eq('ITEM 10: nothing', [item_log(k) for k in range(7)], [[]] * 7)
+call(mu, FSET, w0, ITEM, 9.0)
+
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

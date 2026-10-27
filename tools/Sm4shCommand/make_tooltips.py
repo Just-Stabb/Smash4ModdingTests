@@ -229,7 +229,7 @@ def _position_lines():
         for q, (qn, qd) in enumerate(quantities):
             out.append((0x0F000040 + 8 * t + q, "%s %s" % (tn, qn), "Target: %s.\\n%s" % (td, qd)))
     out.append((0x0F000098, "Self animation rate x", "Read: this fighter's animation rate multiplier (1.0 normally).\\nWrite: set it; every animation (and its ACMD timing) runs that many times faster, until set back to 1. (MotionModule's second rate, the one Mii Fighters' MII_ENABLE_RATE uses.)"))
-    out.append((0x0F000099, "Self item state", "Read: 0.\\nWrite a code: the item's own state on this fighter (the game's function, the item's durations): 1 metal on (Metal Box look, physics, KB resistance), 2 metal off, 3 giant (Super Mushroom), 4 small (Poison Mushroom), 5 Super Star, 6 Lip's Stick flower, 7 the Timer's slow on every other fighter (half speed, 450 frames)."))
+    out.append((0x0F000099, "Self item state", "Read: 0.\\nWrite a code: the item's own state on this fighter (the game's function, the item's durations): 1 metal on (Metal Box look, physics, KB resistance), 2 metal off, 3 giant (Super Mushroom), 4 small (Poison Mushroom), 5 Super Star, 6 Lip's Stick flower, 7 the Timer's slow on every other fighter (half speed, 450 frames), 8 the camera closes in on this fighter (Camera_Closeup), 9 the camera back (Normal_Camera)."))
     # per-object variables, timers, kinetic type, tracking (tools/acmd_ext_cave.py, docs/acmd-extra-commands.md)
     for i in range(32):
         out.append((0x0F000300 + i, "User variable %d" % i, "Read / write: a float of this object's own (fighter or projectile), kept until the object is reset (KO / a projectile's next use). Starts at 0. Needs tools/acmd_ext_cave.py."))
@@ -297,7 +297,7 @@ def alias_lines():
         out.append(("%s_STICK_X_RAW" % tn, 0x0F000260 + 2 * t, ""))
         out.append(("%s_CSTICK_X_RAW" % tn, 0x0F000261 + 2 * t, ""))
     out.append(("SELF_ANIM_RATE", 0x0F000098, "animation rate multiplier (1.0 normally)"))
-    out.append(("SELF_ITEM", 0x0F000099, "write: 1 metal on, 2 off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 Timer on the others"))
+    out.append(("SELF_ITEM", 0x0F000099, "write: 1 metal on, 2 off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 Timer on the others, 8 camera closeup, 9 camera back"))
     out += [("VAR_%d" % i, 0x0F000300 + i, "user variable (per object)" if i == 0 else "") for i in range(32)]
     out += [("TIMER_%d" % i, 0x0F000320 + i, "counts down each frame to 0 (per object)" if i == 0 else "") for i in range(16)]
     out += [("KINETIC_TYPE", 0x0F000330, "read / set the kinetic type"), ("TRACK_FRAMES", 0x0F000331, "Track_Target frames left; 0 stops"),

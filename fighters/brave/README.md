@@ -997,3 +997,21 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   `brave_rebirth`). The block is the game's own hook for it: Robin's special input checks run
   `func_72(global26)` before up special, and global26 (0 for Robin) is now `brave_hi_can`.
 - Changed: `brave.mscsb` only.
+
+## Fix 61 (`build/hero_fix61.zip`): critical hits shown, the specials' MP rules, a roll-off test
+
+- **Critical hits:** fix 57 already gave the 1-in-8 smash attacks Ultimate's crit hitboxes, but with
+  nothing to show it they read as strong hits. Now when the crit connects (self's HIT variable
+  `0x0F0000A0`), as Ultimate's param_critical: the whole game slowed to 1/4 (`SlowModule(0, 4, 40)`,
+  ACMD Time_Manipulation_Whole's call) and the camera in on him for 40 frames (ITEM variable codes 8 /
+  9: ACMD Camera_Closeup's / Normal_Camera's calls through `tools/position_vars_cave.py`). Hatchet
+  Man (always critical in Ultimate) gets it too. No crit sound (his bank is Robin's).
+- **MP rules (user):** only Zap casts the strongest level he can pay for by itself, and with none paid
+  for it misfires at once. Frizz never casts by itself: he charges on, and the second press casts the
+  strongest level held that he pays for (no MP: the misfire). Woosh: no MP at all, the empty jump at
+  once; otherwise the charge as usual (Ultimate's full hold, 28, goes off by itself).
+- **Roll-off test (user, Hero only):** the speed carried off a ledge keeps the air speed cap off
+  (flag `0x20000044`) for as long as the stick holds the roll's way on screen (raw stick X `0x0F000260`
+  x the roll's way past 0.3), through Fall and whatever he does next in the air; letting go, turning
+  the stick, landing, a ledge or a hit puts it back (`rolloff_hold_update`). Before, Fall's end did.
+- Changed: `brave.mscsb`, `cross_f.rpx` (ITEM codes 8 / 9).
