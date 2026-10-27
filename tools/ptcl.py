@@ -95,8 +95,13 @@ FIELDS = [
     (0x454, '>i', 'emit_interval', 'corpus'),
     (0x458, '>i', 'emit_interval_random', 'guess'),
     (0x45C, '>f', 'figure_velocity', 'guess'),    # all-direction speed
-    (0x460, '>f', 'emitter_velocity', 'runtime'),  # read as a float with the life code
-    (0x464, '>f', 'init_velocity_random', 'guess'),
+    # 0x460 is the random fraction, 0x464 the speed: in all 8115 vanilla emitters 0x460 lies in [0, 1]
+    # (2484 non-zero) and 0x464 reaches 218 (991 over 1); the key animation's target 16 (directional
+    # velocity) writes 0x464. The names were the other way round until Hero fix 53: converted parts lost
+    # their directional speed (Kaswoosh's rings, emitted every frame to rise into a funnel, stayed in
+    # one flat swirl)
+    (0x460, '>f', 'init_velocity_random', 'corpus'),
+    (0x464, '>f', 'emitter_velocity', 'corpus'),    # directional speed along emit_direction
     (0x468, '>3f', 'emit_direction', 'corpus'),
     (0x474, '>f', 'dispersion_angle', 'corpus'),   # degrees
     (0x478, '>3f', 'spread_vec', 'guess'),

@@ -110,8 +110,8 @@ the writer recomputes them.)
 | 0x450 | s32 | end frame: with one-time, emission stops this many frames after the start frame (a duration: 49 vanilla emitters have it below their start frame); 0x7FFFFFFF without | verified (0x04A64F70) |
 | 0x454 / 0x458 | s32 | emit interval / random | corpus / guess |
 | 0x45C | f | figure (omni) velocity | guess |
-| 0x460 | f | emitter (directional) velocity | verified (read as float) |
-| 0x464 | f | initial velocity random | guess |
+| 0x460 | f | velocity random (fraction): all 8115 vanilla values in [0, 1] | corpus |
+| 0x464 | f | directional velocity (speed along the emit direction): vanilla up to 218, the key animation's target 16. (Swapped with 0x460 until Hero fix 53.) | corpus |
 | 0x468 | 3f | emit direction | corpus |
 | 0x474 | f | dispersion angle (deg) | corpus |
 | 0x478 | 3f | spread vector | guess |

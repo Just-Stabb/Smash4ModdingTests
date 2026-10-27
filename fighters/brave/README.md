@@ -831,3 +831,20 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
 - This is global for alpha-blended parts (Swoosh / Kaswoosh / Zoom, smoke, Kaboom's cloud, the spell
   rings ...): they get lighter and less saturated, as in Ultimate. `--no-linear` builds the old way.
 - Only the `.ptcl` changed.
+
+## Fix 53 (`build/hero_fix53.zip`): directional speed in the right field
+
+- User's video (fix 52): colours now close to Ultimate's, but Kaswoosh is still a wide flat swirl at
+  ground level where Ultimate shows a tall funnel. The funnel is built from `tornado1*` rings: a
+  squat mesh (19 x 12 x 20, scale 2.5 x 1.56 x 2.5), one emitted every frame for 65 - 90 frames,
+  each rising at 1.1 / 1.5 a frame (air resistance 0.97) for its 16 / 20 frames and growing as it
+  rises (X x0.11 -> 0.39): small rings at the bottom, wide ones at the top, about 14 - 23 units tall.
+  In the mod they never rose, so they all drew at one height: one flat swirl.
+- Cause: `ptcl.py` had eft's directional velocity and its random fraction swapped (0x460 / 0x464).
+  In all 8115 vanilla emitters 0x460 lies in [0, 1] and 0x464 reaches 218, and the key animation's
+  directional-velocity target writes 0x464. The converter wrote Ultimate's speed into the random
+  fraction and the random (mostly 0) into the speed: 222 of his 687 parts lost their directional
+  motion (the Woosh family, Gigaslash, the Zap / Kazap sparks, the Oomph / Acceleratle / psych-up
+  auras, the sword enchantments ...). The names are fixed in `ptcl.py` (docs/ptcl-format.md), so
+  every tool writing them by name is right now (`xv2_to_ptcl.py`'s Kamehameha too, on its next build).
+- Only the `.ptcl` changed.
