@@ -72813,6 +72813,8 @@ int kirby_copy_trait(int kind)
     if (kind == 0x17) { return trait_normal(); }    // Meta Knight
     if (kind == 0x6)  { return trait_shooter(); }   // Samus
     if (kind == 0x36) { return trait_technical(); } // Roy
+    if (kind == 0x24) { return trait_normal(); }    // Dr. Mario
+    if (kind == 0x1b) { return trait_rush(); }      // Diddy Kong
     return trait_normal();                       // not listed yet
 }
 

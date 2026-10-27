@@ -39,7 +39,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ppcasm import Asm  # noqa: E402
 
-CAVE = 0x037EE430           # free: 0x037EE428-0x037EE5A0 (copy_held_cave.py from 0x037EE5A0)
+CAVE = 0x037EE430           # free: 0x037EE428-0x037EE5A0 (copy_held_cave.py from 0x037EE5A0); copy_custom_cave.py's
+                            # CAVE_D / CAVE_E now use 0x037EE428-0x037EE478: a debug build only, not with the standard one
 LIMIT = 0x037EE5A0
 TABLE = 0x04B7E000          # grown code space after stage_slot_cave.py's (ends at 0x04B7E000)
 GROW_END = 0x04B7F000

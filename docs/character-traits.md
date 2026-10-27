@@ -25,6 +25,8 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Meta Knight | `0x17` | Normal |
 | Samus | `0x06` | Shooter |
 | Roy | `0x36` | Technical |
+| Dr. Mario | `0x24` | Normal |
+| Diddy Kong | `0x1B` | Rush |
 
 Kirby himself (no copy) has no trait. A copied character that isn't listed counts as Normal.
 Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy kind int `0x100000A4`.

@@ -22,6 +22,16 @@ the weapon's getter, e.g. Bowser breath 0x031ABB8C, and its motion = ACMD varian
 owner's int 0x10000048 ([int array]+0x120). For Kirby (kind 8) with a copy (int 0xA4 < 0x3A)
 it uses 0x1000009F instead. Found with a Cemu breakpoint on the breath getter: LR 0x02BCC414
 (0x02BCC3BC, r5 = custom) <- 0x02B61A94 (custom = (s8)[init+0x5C]) <- 0x02C073DC <- 0x02F062D8.
+That hook is in Bowser's breath spawner (0x02F0601C), not a shared one: every weapon kind has its own
+spawner (its article record {kind, max count, spawner}: reference/FighterArticles.xml CountAddr - 4 /
++ 4; Kirby's copies use the copied fighter's records and spawners), and 36 of the 329 read the owner's
+0x10000048 there themselves. CAVE_D / CAVE_E do the same for Samus's charge shot (0x02F75F8C, read at
+0x02F7609C) and Dr. Mario's capsule (0x027B1E14, read at 0x027B1F94): on Kirby they read his own
+Inhale custom, so Kirby's copy fired his slot's variant (Dense / Melee Charge Shot, Fast / Mega
+Capsule) instead of the swallowed fighter's. Diddy Kong's gun / peanut / explosion spawners pass 0
+(as for Diddy himself): his variants come from the neutral-B params, already the copy's (CAVE_B).
+CAVE_D / CAVE_E sit after CAVE_C (0x037EE428-0x037EE478, free in the standard build); the debug-only
+stage_select_debug_cave.py uses the same words and can't be combined with this.
 """
 CAVE_A = 0x037EE680
 SLOT = 0x1000009F
@@ -34,6 +44,14 @@ WM_GET, WM_SET = 0x84, 0x8C
 LIMIT = 0x037EE73C
 CAVE_C = 0x037EE400  # free (zero) part of the Havok cave
 HOOK_C, RET_C = 0x02F062C0, 0x02F062C4  # last word of the Havok cave takes moved relocations (starcopy_cave.py)
+# spawners reading the owner's custom slot: (hook: lwz DST, 0x120(INTS), DST, INTS = owner's int array,
+# OWNER = owner object), each with its own cave after CAVE_C
+SPAWNERS = [
+    (0x02F062C0, 0, 9, 26),     # CAVE_C: Bowser's Fire Breath (koopa breath, kind 0x5F)
+    (0x02F7609C, 10, 6, 29),    # CAVE_D: Samus's Charge Shot (samus cshot, kind 0x46)
+    (0x027B1F94, 8, 5, 29),     # CAVE_E: Dr. Mario's Megavitamins (mariod drcapsule, kind 0xBE)
+]
+SPAWN_LIMIT = 0x037EE5A0       # copy_held_cave.py from here
 
 
 def D(op, rd, ra, imm): return (op << 26) | (rd << 21) | (ra << 16) | (imm & 0xFFFF)
@@ -127,19 +145,23 @@ def patches():
     p = cave_a + cave_b
     p.append((HOOK_A, b(HOOK_A, CAVE_A)))
     p.append((CLEAR_COUNT, li(11, 0x1C)))
-    # r9 = owner's int array, r26 = owner (its WorkModule at +0x726C; r26 is NOT the fighter
-    # base, so [r26+4] isn't the kind: v4 checked that and never fired). WM+0x18 = fighter kind.
-    cave_c, end3 = assemble(CAVE_C, [
-        lwz(0, 0x120, 9),                             # replaced: owner's 0x10000048
-        lwz(12, 0x726C, 26), lwz(12, 0x18, 12), cmpwi(12, 8), ('bc', BNE, 'done'),
-        lwz(12, 0x290, 9), cmplwi(12, 0x3A), ('bc', BGE, 'done'),
-        lwz(0, (SLOT & 0xFFFF) * 4, 9),               # Kirby with a copy: the copied custom slot
-        'done',
-        ('b', RET_C),
-    ])
-    assert end3 <= 0x037EE5F0   # copy_fx_cave.py's trampoline from here
-    p += cave_c
-    p.append((HOOK_C, b(HOOK_C, CAVE_C)))
+    # each spawner: INTS = owner's int array, OWNER = owner (its WorkModule at +0x726C; OWNER is NOT
+    # the fighter base, so [OWNER+4] isn't the kind: v4 checked that and never fired). WM+0x18 =
+    # fighter kind. r12 is free at every hook (nothing reads it before the weapon create call).
+    at = CAVE_C
+    for hook, dst, ints, owner in SPAWNERS:
+        cave, end3 = assemble(at, [
+            lwz(dst, 0x120, ints),                    # replaced: owner's 0x10000048
+            lwz(12, 0x726C, owner), lwz(12, 0x18, 12), cmpwi(12, 8), ('bc', BNE, 'done'),
+            lwz(12, 0x290, ints), cmplwi(12, 0x3A), ('bc', BGE, 'done'),
+            lwz(dst, (SLOT & 0xFFFF) * 4, ints),      # Kirby with a copy: the copied custom slot
+            'done',
+            ('b', hook + 4),
+        ])
+        p += cave
+        p.append((hook, b(hook, at)))
+        at = end3
+    assert at <= SPAWN_LIMIT, hex(at)
     p.append((HOOK_B, b(HOOK_B, end)))
     return p
 
