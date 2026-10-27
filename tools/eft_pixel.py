@@ -152,7 +152,7 @@ def _blend(ch, mode, t, other):
 
 
 def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-           c0_const=None, tex_blend2=(0, 0), premult=False):
+           c0_const=None, tex_blend2=(0, 0), premult=False, distort=None):
     """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
     it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
     texture, an opaque black ball where its gradient texture is dark). tex_blend (colour, alpha):
@@ -162,7 +162,11 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     the threshold colour 1's red (the converter's colour-1 track: Ultimate's colour 1 alpha over
     life), colour 1 itself c1_const; or, c0_const given (colour 0's rgb; its alpha stays the
     track's), colour 0's red; alpha x clamp((mask - threshold) / width). premult: rgb out x alpha
-    out (a premultiplied template's; not its x 2, so the part is as bright as on any other)"""
+    out (a premultiplied template's; not its x 2, so the part is as bright as on any other).
+    distort (sx, sy), a two- / three-texture layout: Ultimate's combiner shader_type 2, texture 1 a
+    distortion map moving texture 0's UVs, u + (2 t1.x - 1) sx, v + (2 t1.w - 1) sy (its fire /
+    smoke programs, read with the WindowSmash translator: sampler 0's red and alpha x the static
+    coefficient x the param animation's x), sampled first; texture 1 then isn't blended in"""
     n = lay['regs']
     two = 'uv1' in lay
     three = 'uv2' in lay
@@ -192,25 +196,48 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     head = ['; eft pixel program (tools/eft_pixel.py): colour mode %d, alpha mode %d, alpha x %g%s%s'
             % (color_mode, alpha_mode, alpha_gain, ', texture 1 %s / %s' % tuple(
                 'x+-'[b % 3] for b in tex_blend) + (', texture 2 %s / %s' % tuple(
-                    'x+-'[b % 3] for b in tex_blend2) if three else '') if two else '',
+                    'x+-'[b % 3] for b in tex_blend2) if three else '') if two and not distort else '',
                ', dissolve %g by colour %d' % (dissolve, thr != c0) if thr else '')
-            + (', premultiplied' if premult else ''),
+            + (', premultiplied' if premult else '')
+            + (', distorted by texture 1 (%g, %g)' % tuple(distort) if distort and two else ''),
             '; $MODE = "UniformBlock"',
             '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 4 if three else n + 3 if two or thr else n + 2),
             '; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2',
             '; $SPI_PS_IN_CONTROL_0.NUM_INTERP = %d' % n,
             '; $NUM_SPI_PS_INPUT_CNTL = %d' % n]
     head += ['; $SPI_PS_INPUT_CNTL[%d].SEMANTIC = %d' % (k, s) for k, s in enumerate(lay['sems'])]
-    body = ['00 TEX: VALID_PIX',
-            '  0      SAMPLE          %s.xyzw, R%d.%s0%s, t0, s0' % (t, uvr, uvc, uvc[0])]
     groups = []
-    if two:
+    if distort and two:
+        # the map first, texture 0 at the moved UVs (d: free till the colour); every pixel sampled
+        # (no VALID_PIX: the quad's helper pixels give the second sample its gradients)
+        t1 = 'R%d' % (n + 2)
+        r1, c1c = lay['uv1']
+        sx, sy = (float(v) for v in distort)
+        body = ['00 TEX:',
+                '  0      SAMPLE          %s.xyzw, R%d.%s0%s, t1, s1' % (t1, r1, c1c, c1c[0]),
+                '01 ALU:',
+                '  1      x: MULADD          %s.x, %s.x, %s, %s' % (d, t1, lit(2 * sx), lit(-sx)),
+                '         y: MULADD          %s.y, %s.w, %s, %s' % (d, t1, lit(2 * sy), lit(-sy)),
+                '  2      x: ADD             %s.x, %s.x, R%d.%s' % (d, d, uvr, uvc[0]),
+                '         y: ADD             %s.y, %s.y, R%d.%s' % (d, d, uvr, uvc[1]),
+                '02 TEX:',
+                '  3      SAMPLE          %s.xyzw, %s.xy0x, t0, s0' % (t, d)]
+        if three:
+            t2 = 'R%d' % (n + 3)
+            r2, c2c = lay['uv2']
+            body.append('  4      SAMPLE          %s.xyzw, R%d.%s0%s, t2, s2' % (t2, r2, c2c, c2c[0]))
+            groups.append([_blend(ch, tex_blend2[ch == 'w'], t, t2) for ch in 'xyzw'])
+    else:
+        distort = None
+        body = ['00 TEX: VALID_PIX',
+                '  0      SAMPLE          %s.xyzw, R%d.%s0%s, t0, s0' % (t, uvr, uvc, uvc[0])]
+    if two and not distort:
         t1 = 'R%d' % (n + 2)
         r1, c1c = lay['uv1']
         body.append('  1      SAMPLE          %s.xyzw, R%d.%s0%s, t1, s1' % (t1, r1, c1c, c1c[0]))
         # texture 1 into the texel first: t = t0 x / + / - t1 (colour, alpha)
         groups.append([_blend(ch, tex_blend[ch == 'w'], t, t1) for ch in 'xyzw'])
-    if three:
+    if three and not distort:
         t2 = 'R%d' % (n + 3)
         r2, c2c = lay['uv2']
         body.append('  2      SAMPLE          %s.xyzw, R%d.%s0%s, t2, s2' % (t2, r2, c2c, c2c[0]))
@@ -219,7 +246,7 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
         # the dissolve's ramp from the untouched mask
         groups.append(['x: ADD             %s.x, %s.y, -%s.x' % (ramp, t, thr)])
         groups.append(['x: MUL             %s.x, %s.x, %s CLAMP' % (ramp, ramp, lit(1.0 / max(dissolve, 1e-3)))])
-    body.append('01 ALU: KCACHE0(CB9:0-15)')
+    body.append('%02d ALU: KCACHE0(CB9:0-15)' % (3 if distort else 1))
     # group 1: the colour's first step, the alpha's first step
     g = []
     for i, ch in enumerate('xyz'):
@@ -273,12 +300,12 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
                   + ['w: MOV             R0.w, %s.w' % d])
     if premult:
         groups.append(['%s: MUL             R0.%s, R0.%s, R0.w' % (ch, ch, ch) for ch in 'xyz'])
-    k = 3 if three else 2 if two else 1        # instruction slots count on from the samples
+    k = (5 if three else 4) if distort else 3 if three else 2 if two else 1    # slots count on from the samples
     for g in groups:
         for j, ln in enumerate(g):
             body.append(('  %-3d ' % k if j == 0 else '      ') + ln)
         k += 1
-    body += ['02 EXP_DONE: PIX0, R0.xyzw', 'END_OF_PROGRAM', '']
+    body += ['%02d EXP_DONE: PIX0, R0.xyzw' % (4 if distort else 2), 'END_OF_PROGRAM', '']
     return '\n'.join(head + [''] + body)
 
 
@@ -286,10 +313,10 @@ _programs = {}
 
 
 def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-            c0_const=None, tex_blend2=(0, 0), premult=False):
+            c0_const=None, tex_blend2=(0, 0), premult=False, distort=None):
     """(program bytes, GPR count), assembled once per variant"""
     src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2,
-                 premult)
+                 premult, distort)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -309,14 +336,14 @@ _shaders = {}
 
 
 def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-               c0_const=None, tex_blend2=(0, 0)):
+               c0_const=None, tex_blend2=(0, 0), distort=None):
     """the index of shader si of Ptcl p with one of these pixel programs (added once per variant),
     or None when its pixel program isn't one this module can stand in for. c1_const: colour 1 (rgb,
     x the colour scale) for a template that doesn't pass it, or that passes the dissolve's
     threshold in it (dissolve: its edge width; on a one-texture layout with colour 1 only); c0_const:
     colour 0's rgb, the dissolve's threshold in colour 0's track instead (a layout without colour 1
     then only in colour modes 0 / 1). A premultiplied template (premultiplied()) gets a
-    premultiplying program"""
+    premultiplying program. distort (sx, sy): texture 1 a distortion map (source()), two textures up"""
     b = bytes(p.shader_binary(si))
     lay = layout(b)
     if lay is None:
@@ -334,17 +361,22 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     elif c1_const is not None:
         c1_const = tuple(round(float(v), 3) for v in c1_const)
     if 'uv1' not in lay:
-        tex_blend = (0, 0)
+        tex_blend, distort = (0, 0), None
+    if distort is not None:
+        distort, tex_blend = tuple(round(float(v), 4) for v in distort), (0, 0)
     if 'uv2' not in lay:
         tex_blend2 = (0, 0)
     key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const, tuple(tex_blend),
-           dissolve, c0_const, tuple(tex_blend2), premult)
+           dissolve, c0_const, tuple(tex_blend2), premult, distort)
     if key not in _shaders or _shaders[key][0] is not p:
         prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const,
-                             tuple(tex_blend2), premult)
+                             tuple(tex_blend2), premult, distort)
         nb = with_program(b, prog, gprs)
         if hashlib.md5(b).hexdigest() in GRAFTED:          # (a grafted layout stays one)
             GRAFTED[hashlib.md5(nb).hexdigest()] = GRAFTED[hashlib.md5(b).hexdigest()]
+        if distort is not None:
+            # (its texture 0 sampled from a register, not an input: layout_of can't read it back)
+            _layouts[hashlib.md5(nb).hexdigest()] = lay
         _shaders[key] = (p, p.add_shader(p.shader_entry(si), nb))
     return _shaders[key][1]
 

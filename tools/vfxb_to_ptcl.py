@@ -521,12 +521,42 @@ def keys(table, n, comps=3):
     return np.stack([np.interp(t, k[:, 3], k[:, c]) for c in range(comps)], 1)
 
 
+def is_indirect(e, j, names):
+    """sampler j only moves the picture (a distortion map): named so ('indirect'), or sampler 0 of a
+    combiner shader_type 2 (Ultimate's programs read it for the UV offset alone, whatever it holds:
+    Kamera's sphere1 ef_brave_mask02, the spell rings' ef_cmn_cloud00; distortion())"""
+    return 'indirect' in names.get(e['sampler'][j]['texture_id'], '') or (
+        j == 0 and e['combiner']['shader_type'] == 2)
+
+
+def distortion(e, ti, images, is_mesh):
+    """(sx, sy): Ultimate's combiner shader_type 2, sampler ti's UVs moved by sampler 0 (a map):
+    u + (2 r - 1) sx, v + (2 a - 1) sy, sx / sy the static coefficient x the param animation's x
+    (per particle over its life in Ultimate: here its mean over the life weighted by alpha 0, while
+    the part shows; Kaboom's smokeBase 0.05 -> 0.5 -> 0.1, his flames 1). Read off its fire / smoke pixel programs with the WindowSmash translator: sampler 1
+    moved, a third sampler not (Frizz's grade05 at its own UVs). None when there's nothing to move
+    or the map can't be drawn: a mesh's two-texture programs read one UV set"""
+    s0 = e['sampler'][0]
+    if e['combiner']['shader_type'] != 2 or ti in (None, 0) or s0['texture_id'] == NONE64 or s0['texture_id'] not in images:
+        return None
+    if is_mesh and e['tex_anim'][0]['uv_channel'] != e['tex_anim'][ti]['uv_channel']:
+        return None
+    st = e['static']
+    w = track(st, e['color'], 0)[1] + 1e-3
+    k = float((keys(st['param_anim'], int(st['num_param_keys']), 1)[:, 0] * w).sum() / w.sum())
+    sx, sy = (float(c) * k for c in st['coefficient'])
+    if max(abs(sx), abs(sy)) < 1e-3:
+        return None
+    return sx, sy
+
+
 def main_texture(e, names):
     smp = [(i, s) for i, s in enumerate(e['sampler']) if s['texture_id'] != NONE64]
     for i, s in smp:
-        if not any(h in names.get(s['texture_id'], '') for h in HELPER_TEXTURES):
+        if not any(h in names.get(s['texture_id'], '') for h in HELPER_TEXTURES) and not is_indirect(e, i, names):
             return i, s
-    return smp[0] if smp else (None, None)
+    drawn = [(i, s) for i, s in smp if not is_indirect(e, i, names)]
+    return (drawn or smp)[0] if smp else (None, None)
 
 
 def sampler_channel(e, i, img):
@@ -536,7 +566,7 @@ def sampler_channel(e, i, img):
     return f[..., 0] if e['combiner']['tex_alpha_input'][i] == 1 else f[..., 3]
 
 
-def shape_sampler(e, ti, images, notes):
+def shape_sampler(e, ti, images, notes, names=None):
     """(sampler, alpha factor): the sampler that holds the piece's shape when the one main_texture
     picked is a tiling fill. eft2 multiplies its textures (combiner blends 0); his auras / fire /
     smoke (the throws, dash attack, Shadow Flare) put a tiling fire / noise (edges 0.13-0.45) first and
@@ -548,7 +578,7 @@ def shape_sampler(e, ti, images, notes):
     stats = {}
     for i, s in enumerate(e['sampler']):
         img = images.get(s['texture_id']) if s['texture_id'] != NONE64 else None
-        if img is None:
+        if img is None or (names is not None and is_indirect(e, i, names)):
             continue
         c = sampler_channel(e, i, img)
         border = np.concatenate([c[0], c[-1], c[:, 0], c[:, -1]])
@@ -587,7 +617,7 @@ def bake_samplers(e, ti, img, ptn, images, names, notes):
     if any(cb[k] for k in ('tex1_color_blend', 'tex2_color_blend', 'tex1_alpha_blend', 'tex2_alpha_blend')):
         return None
     others = [(j, s) for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
-              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+              and s['texture_id'] in images and not is_indirect(e, j, names)]
     if not others:
         return None
     out = img.astype(np.float32).copy()
@@ -647,7 +677,7 @@ def live_sampler(e, ti, images, names, is_mesh):
     otherwise matters)"""
     cb = e['combiner']
     others = [j for j, s in enumerate(e['sampler']) if j != ti and s['texture_id'] != NONE64
-              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+              and s['texture_id'] in images and not is_indirect(e, j, names)]
     moving = [j for j in others if not same_uv(e, ti, j)
               and (not is_mesh or e['tex_anim'][j]['uv_channel'] == e['tex_anim'][ti]['uv_channel'])]
     if not moving or len(others) > 1 and (cb['tex1_color_blend'], cb['tex1_alpha_blend']) != (
@@ -667,7 +697,7 @@ def dissolve_of(e, ti, images, names, ptn):
     if s['texture_id'] == NONE64 or s['texture_id'] not in images or ptn or not (ti == 1 or same_uv(e, ti, 1)):
         return None
     for j, x in enumerate(e['sampler']):
-        if x['texture_id'] != NONE64 and x['texture_id'] in images and 'indirect' not in names.get(x['texture_id'], ''):
+        if x['texture_id'] != NONE64 and x['texture_id'] in images and not is_indirect(e, j, names):
             rgb, _a = sampler_inputs(e, j, images[x['texture_id']])
             if float(np.abs(rgb - rgb[..., :1]).max()) > 2.5 / 255:
                 return None
@@ -803,20 +833,32 @@ def turning_shader(p, si):
     return _two[key]
 
 
-def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1):
+def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=False):
     """texture 1 (slot: 2) of a two- (three-) texture template: sampler j as Ultimate places it (its
-    first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one"""
+    first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one.
+    raw: a distortion map (distortion()): R R R A, the channels Ultimate's program reads for U and V"""
     if j is None:
         pix, ts, rep, wrap = np.ones((16, 16, 4), np.float32), None, (1, 1), (1, 1)
     else:
         s = e['sampler'][j]
         ts = e['static']['tex_scroll'][j]
-        rgb, a = sampler_inputs(e, j, first_cell(images[s['texture_id']], ts, shown_cell(e, j)))
-        pix = fit_texture(np.concatenate([rgb, a[..., None]], -1))
+        cell = first_cell(images[s['texture_id']], ts, shown_cell(e, j))
+        if raw:
+            # U from its red (its alpha with colour input 1), V from its alpha input (0 alpha, 1 red,
+            # 2 one: Kaboom's smokeBase, its V moved by the coefficient alone)
+            f = cell.astype(np.float32) / 255
+            cb = e['combiner']
+            u = f[..., 3] if cb['tex_color_input'][j] == 1 else f[..., 0]
+            v = (np.ones_like(u), f[..., 0], f[..., 3])[{2: 0, 1: 1}.get(cb['tex_alpha_input'][j], 2)]
+            pix = fit_texture(np.stack([u, u, u, v], -1))
+            notes.append('sampler %d drawn live as texture %d (distortion map, UV mode %d)' % (j, slot, uv_mode(ts)))
+        else:
+            rgb, a = sampler_inputs(e, j, cell)
+            pix = fit_texture(np.concatenate([rgb, a[..., None]], -1))
+            cbl, abl = tex_blend(e, ti, j)
+            notes.append('sampler %d drawn live as texture %d (colour %s, alpha %s, UV mode %d)' % (
+                j, slot, 'x+-'[cbl % 3], 'x+-'[abl % 3], uv_mode(ts)))
         rep, wrap = REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), (s['wrap_u'], s['wrap_v'])
-        cbl, abl = tex_blend(e, ti, j)
-        notes.append('sampler %d drawn live as texture %d (colour %s, alpha %s, UV mode %d)' % (
-            j, slot, 'x+-'[cbl % 3], 'x+-'[abl % 3], uv_mode(ts)))
     set_exact_texture(p, em, slot, pix)
     set_wrap(em, slot, *wrap)
     struct.pack_into('>2f', em, 0x508 + SLOT1 * slot, float(rep[0]), float(rep[1]))
@@ -841,7 +883,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
     rgb, a = sampler_inputs(e, ti, img)
     cb = e['combiner']
     others = [(j, s) for j, s in enumerate(e['sampler']) if j not in (ti, live, live2) and s['texture_id'] != NONE64
-              and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+              and s['texture_id'] in images and not is_indirect(e, j, names)]
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
     if is_mesh:
@@ -890,13 +932,15 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
     return np.clip(np.concatenate([rgb, a[..., None]], -1), 0, 1)
 
 
-def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False, blend2=(0, 0)):
+def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False, blend2=(0, 0),
+                   distort=None):
     """(shader index, alpha keys, alpha gain) when the template's pixel program can be replaced by
     one of tools/eft_pixel.py's for this emitter's combiner (EXACT), else None. alpha: the alpha
     track [101] (alpha 0, x alpha 1 for alpha mode 4: folded into the keys). Ultimate's alphas past 1
     (its whirlwinds' 2 - 4) go into the program's gain, the keys / gain. blend1: how a two-texture
     template's texture 1 combines (tex_blend); dissolve: the dissolve's edge width (dissolve_of), its
-    threshold in colour 0's track (dissolve_c0: colour 0 then constants) or colour 1's"""
+    threshold in colour 0's track (dissolve_c0: colour 0 then constants) or colour 1's; distort:
+    texture 1 a distortion map (distortion())"""
     if not EXACT:
         return None
     sh, cb = e['shader'], e['combiner']
@@ -911,7 +955,7 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
     c0 = track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]) \
         * float(e['static']['color_scale'] or 1.0) if dissolve is not None and dissolve_c0 else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2)
+                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
@@ -921,7 +965,8 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         ', colour 1 constant' if (lay['c1'] is None or (dissolve is not None and not dissolve_c0))
         and cb['color_process'] in (2, 3) else '',
         ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else '',
-        ', premultiplied' if eft_pixel.premultiplied(p, si) else ''))
+        ', premultiplied' if eft_pixel.premultiplied(p, si) else '')
+        + (', UVs distorted by texture 1 (%.3f, %.3f)' % tuple(distort) if distort is not None and 'uv1' in lay else ''))
     return si, np.clip(alpha / gain, 0, 1), gain
 
 
@@ -1268,10 +1313,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         rest_dir = True
         notes.append('directional mesh at rest: type 4')
     elif is_mesh and typ == 3 and abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3 \
-            and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion']] + list(vel['diffusion'])):
+            and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
+                                                vel['diffusion'][2]]):
         # a directional mesh moving straight along the emitter's Y (Woosh's whirlwinds, rising) stands
         # along it in Ultimate, which is the emitter's frame; eft's type 3 turned it end-on to the camera
-        # (the whirlwind test: a flat red ring at his feet). Type 4 keeps the emitter's frame
+        # (the whirlwind test: a flat red ring at his feet). Type 4 keeps the emitter's frame. A spread
+        # along Y alone keeps it on Y (Swoosh / Kaswoosh's big funnels, diffusion 0 0.1 0, following the
+        # moving projectile: as type 3 eft aimed them along its travel, a flat blue disc, fix 51)
         typ = 4
         notes.append('directional mesh moving along Y: type 4')
     elif is_mesh and pt['billboard_type'] in (5, 6):
@@ -1284,7 +1332,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     ti, smp = main_texture(e, names)
     fill = 1.0
     if smp:
-        ti, fill = shape_sampler(e, ti, images, notes)
+        ti, fill = shape_sampler(e, ti, images, notes, names)
         smp = e['sampler'][ti]
     ts = e['static']['tex_scroll'][ti] if smp else None
     uv_quarter = 0
@@ -1330,23 +1378,35 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     dis_moving = dis is not None and float(np.ptp(dis[1])) > 0.01
     live = live_sampler(e, ti, images, names, is_mesh) if EXACT and TWO_TEXTURES and smp and not uv_quarter and \
         dis is None and not as_child else None
+    # Ultimate's distortion (shader_type 2): its map, sampler 0, drawn live as texture 1 moving texture
+    # 0's UVs (Bang / Kaboom's smoke, his fire spells' flames waver); a third sampler as texture 2
+    warp = distortion(e, ti, images, is_mesh) if EXACT and TWO_TEXTURES and smp and not uv_quarter and \
+        dis is None and not as_child else None
+    if warp is not None:
+        live = 0
     # samplers 1 and 2 both drawn live by a three-texture graft (three_texture_shader), in eft2's order
     # (t0 . t1) . t2: sampler 0 the main one, the other two its UV set's on a mesh
     live3 = None
-    if EXACT and TWO_TEXTURES and GRAFT and not templates.no_graft and smp and not uv_quarter and dis is None \
+    if warp is not None and GRAFT and not templates.no_graft and ti == 1:
+        s2 = e['sampler'][2]
+        if s2['texture_id'] != NONE64 and s2['texture_id'] in images and not e['tex_anim'][2]['pattern_type'] \
+                and not same_uv(e, ti, 2) \
+                and (not is_mesh or e['tex_anim'][2]['uv_channel'] == e['tex_anim'][ti]['uv_channel']):
+            live3 = (0, 2)
+    elif EXACT and TWO_TEXTURES and GRAFT and not templates.no_graft and smp and not uv_quarter and dis is None \
             and ti == 0 and not as_child:
         usable = [j for j in (1, 2) if e['sampler'][j]['texture_id'] != NONE64 and e['sampler'][j]['texture_id'] in images
-                  and 'indirect' not in names.get(e['sampler'][j]['texture_id'], '')
+                  and not is_indirect(e, j, names)
                   and not e['tex_anim'][j]['pattern_type']
                   and (not is_mesh or e['tex_anim'][j]['uv_channel'] == e['tex_anim'][0]['uv_channel'])]
         if usable == [1, 2] and not (live is not None and same_uv(e, 0, 3 - live)):
             live3 = (1, 2)
     # the two may trade slots: no flipbook either side (slot 1 has none), nothing else combined in
-    swap_ok = live is not None and not ptn_want and not e['tex_anim'][live]['pattern_type'] and not [
+    swap_ok = live is not None and warp is None and not ptn_want and not e['tex_anim'][live]['pattern_type'] and not [
         j for j, s in enumerate(e['sampler']) if j not in (ti, live) and s['texture_id'] != NONE64
-        and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
+        and s['texture_id'] in images and not is_indirect(e, j, names)]
     if live3:
-        live, swap_ok = 1, False
+        live, swap_ok = live3[0], False
     fblocks, fanims, fdone = particle_fields(e) if not as_child else ({}, [], set())
     fluct = fluctuation(e) if not as_child else None
     child, child_e = None, (e['children'] or [None])[0] if not as_child else None
@@ -1370,8 +1430,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             live2 = 2
             notes.append('vertex program grafted: slot 1 and 2 UV animation')
     if live3 and live2 is None:
-        # no three-texture template: as before (one live sampler, if the blends allow)
-        live = live_sampler(e, ti, images, names, is_mesh)
+        # no three-texture template: as before (one live sampler, if the blends allow; the map)
+        live = 0 if warp is not None else live_sampler(e, ti, images, names, is_mesh)
     if live is not None and GRAFT and not templates.no_graft and lay_t is not None and 'uv1' not in lay_t and \
             graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
         # a one-texture template taken for two (Templates): its vertex program grafted
@@ -1508,11 +1568,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         live = None
     if live2 is not None and live is None:
         live2 = None
+    if live != 0:
+        warp = None
     exact = exact_combiner(p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
                            dis[0] if dis is not None else None, dis_in == 0,
-                           tex_blend(e, ti, live2) if live2 is not None else (0, 0))
+                           tex_blend(e, ti, live2) if live2 is not None else (0, 0), warp)
     if not exact:
-        live = live2 = dis = None
+        live = live2 = dis = warp = None
     if exact:
         pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live, live2)
         rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
@@ -1557,7 +1619,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
     if two_tpl:
         # texture 1: the live sampler, else white (x 1)
-        set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes)
+        set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes, raw=warp is not None)
         if lay_t is not None and 'uv2' in lay_t:
             set_slot1(p, em, e, ti, live2, images, notes, slot=2)
     if exact:

@@ -792,3 +792,21 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
   the same (it was a cap at 70): Frizz / Frizzle's flares 35 -> 23, Kaboom's 48 -> 35, Magic Burst's
   45 -> 32, Whack's aura 140 -> 116 ... Kacrackle Slash's light reaches about 28 (its 70 x a small
   particle scale), so it's unchanged. Only the `.ptcl` changed.
+
+## Fix 51 (`build/hero_fix51.zip`): the fire / smoke warp, Swoosh's funnels upright
+
+- Ultimate's distortion (combiner `shader_type` 2, 97 of his emitters: Frizz / Frizzle / Kafrizz's
+  flames, Bang / Kaboom's smoke, Kafrizz's rings, the auras with `ef_cmn_indirect00`): its programs
+  move the main texture's UVs by a map (sampler 0) each frame, which makes flames lick and smoke
+  churn. The converter drew the main texture alone, unmoving. Now the map is texture 1 (its own
+  scroll kept) and `eft_pixel` writes a program that samples it first and reads texture 0 at the
+  moved UVs (`distortion`, docs/ptcl-format.md); a third sampler (the flames' `grade05` fade) is
+  texture 2, unmoved as in Ultimate. The strength is the coefficient × the param animation's mean
+  (Kaboom's smoke 0.016 in U, the flames 0.05). Sampler 0 of these emitters is never taken as the
+  picture any more (Kafrizz's start sphere drew its map, `ef_brave_mask02` like its picture). `tools/eft_pixel_test.py`
+  checks the 48 new program variants. Fix 50's README guessed custom shader 4 flag 0x20 was this
+  warp: it is the same `shader_type` 2 warp; its CSDP stays unconverted.
+- Swoosh / Kaswoosh's big funnels (`tornado2`, `tornado3_front` / `_back`): their spread is along Y
+  only (diffusion 0 0.1 0), so like the other Y-moving directional meshes they stay upright (type 4).
+  As type 3 eft aimed them along the moving projectile's travel: a flat blue disc instead of a funnel.
+- Only the `.ptcl` changed.

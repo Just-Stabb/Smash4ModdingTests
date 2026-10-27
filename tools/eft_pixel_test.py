@@ -252,6 +252,50 @@ def test_dissolve():
                               name, cm, am, width, by, worst, gprs))
 
 
+def test_distort():
+    """Ultimate's shader_type 2: texture 1 sampled first, texture 0 at uv + (2 t1.x - 1, 2 t1.w - 1) x
+    (sx, sy), texture 1 not blended in; a three-texture layout's texture 2 still is"""
+    rnd = random.Random(4)
+    three = dict(list(TWO.values())[0], regs=4, uv2=(3, 'xy'), sems=[0, 1, 9, 11])
+    for name, lay in list(TWO.items()) + [('quad, three textures (0, 1, 9, 11)', three)]:
+        for cm in range(4):
+            for am in (0, 1):
+                for warp in ((0.05, 0.06), (0.0, 0.55)):
+                    blend2 = (1, 0) if 'uv2' in lay else (0, 0)
+                    prog, gprs = E.program(lay, cm, am, 2.0, None, (0, 0), None, None, blend2, False, warp)
+                    lines = disasm(prog)
+                    worst = 0.0
+                    for _ in range(30):
+                        c0 = [rnd.uniform(0, 1.5) for _ in range(3)] + [rnd.uniform(0, 1)]
+                        c1 = [rnd.uniform(0, 1.5) for _ in range(4)]
+                        vc = [rnd.uniform(0, 1) for _ in range(4)] if lay['vc'] is not None else None
+                        texels = [[rnd.uniform(0, 1) for _ in range(4)] for _ in range(3)]
+                        uv = [rnd.uniform(0, 1) for _ in range(4)]
+                        uv2 = [rnd.uniform(0, 1) for _ in range(4)]
+                        hdr = [rnd.uniform(0.5, 2), 0, 0, rnd.uniform(0, 0.1)]
+                        regs = {'R%d' % lay['c0']: list(c0), 'R%d' % lay['c1']: list(c1), 'R%d' % lay['uv'][0]: list(uv)}
+                        if 'uv2' in lay:
+                            regs['R%d' % lay['uv2'][0]] = list(uv2)
+                        if vc is not None:
+                            regs['R%d' % lay['vc']] = list(vc)
+                        seen = []
+
+                        def tex(u, v, k):
+                            seen.append((k, u, v))
+                            return texels[k]
+                        got = run(lines, regs, {8: hdr}, tex)
+                        moved = (uv[0] + (2 * texels[1][0] - 1) * warp[0], uv[1] + (2 * texels[1][3] - 1) * warp[1])
+                        want = expected(cm, am, 2.0, c0, c1, texels[0], vc, hdr,
+                                        texels[2] if 'uv2' in lay else None, blend2)
+                        order = [(1, uv[2], uv[3]), (0,) + moved] + ([(2, uv2[0], uv2[1])] if 'uv2' in lay else [])
+                        if len(seen) != len(order) or any(a[0] != b[0] or max(abs(x - y) for x, y in zip(a[1:], b[1:])) > 1e-5
+                                                          for a, b in zip(seen, order)):
+                            worst = float('inf')
+                        worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
+                    check(worst < 1e-5 and gprs == lay['regs'] + (4 if 'uv2' in lay else 3),
+                          '%s colour %d alpha %d distort %s: max error %.2g (%d GPRs)' % (name, cm, am, warp, worst, gprs))
+
+
 def test_bank(path):
     """every shader in the bank whose pixel program is one of ours (rebuilt from its layout, colour /
     alpha mode and gain literal: the same bytes)"""
@@ -281,6 +325,7 @@ if __name__ == '__main__':
     test_variants()
     test_two()
     test_dissolve()
+    test_distort()
     if len(sys.argv) > 1:
         test_bank(sys.argv[1])
     print('%d failure(s)' % len(FAILS))

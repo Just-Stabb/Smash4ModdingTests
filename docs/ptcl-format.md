@@ -329,6 +329,20 @@ own block (0x550 = 0x4D4 + 0x7C: repeat / cells at 0x584, UV mode 0x58C, scroll 
 from 0x590; 0x04A5A6AC copies it into shtAnim1 as slot 0's into shtAnim0). The converter draws a
 second Ultimate sampler there, live (`live_sampler`), when it moves apart from the main one.
 
+Distortion (Ultimate's combiner `shader_type` 2; 97 of Hero's emitters: his fire spells, Bang /
+Kaboom's smoke, the spell rings): Ultimate's programs (the WindowSmash translator on Frizz's
+`fire1` / `fire2` and Kaboom's `smokeBase`) sample sampler 0 first, only for the UV offset, and
+sample sampler 1 at `uv1 + (2 t0.r - 1, 2 t0.a - 1) × coefficient × k` (the static `coefficient`,
+cb9 256 / 260; k per particle, the param animation's x over life, cb9 1664 on); a third sampler
+reads its own UVs, unmoved. t0's r / a follow the combiner's inputs (alpha input 2 = one:
+`smokeBase`'s V moves by the coefficient alone). Sampler 0 is never colour, whatever its texture
+(`ef_brave_mask02`, `ef_cmn_cloud00` on some). The converter (`distortion`) puts the map in slot 1
+(R R R A, its UV animation in slot 1's block), sampler 1 in slot 0 and a third sampler in slot 2
+(three-texture graft), and `eft_pixel` writes the program as two TEX clauses: slot 1 from its UVs,
+an ALU clause moving slot 0's, slot 0 (and slot 2) sampled, then the combiner (no `VALID_PIX` on
+either clause: the quad's helper pixels give the second sample its gradients). k is a constant
+there: its mean over the life, weighted by alpha 0.
+
 ## Vertex programs (`tools/eft_vertex.py`)
 
 The GX2 vertex header names the uniform blocks (CB1 `viewUniformBlock`, CB2
