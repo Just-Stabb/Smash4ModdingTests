@@ -324,6 +324,10 @@ entries with the volume in dB at +12 of the data block; a random container has +
   = 0x44-0x46 `futtobi`, `dizzy` = 0x61 `furafura`; `se_common_sleep` has none). The dump loses the first
   `if` of the voice-region chains (`GET_VOICE_REGION`): the first block (English) is kept. A condition
   taken as true (`--cond`) whose failed branch's sounds the dump leaves unbraced: `--fail-sounds`.
+- **Status-code sounds**: a fighter's own status code (`lua2cpp_<name>.nro`) isn't in the ExeFS, but its
+  specializer (`FighterSpecializer_<Name>`, called from it) is: scan `main.bin` for the hash40s built with
+  `movz` / `movk` (crc low / high 16 bits, then the length) and the SoundModule calls (accessor +0x148;
+  vt +0xA8 `play_se`, +0xB0 `play_se_no3d`, +0x190 `stop_se`). Hero's: fighters/brave/README.md fix 72.
 - **Expression scripts** (`--expressions`, same map, by aligning the ten shared fighters' scripts):
   `set_rumble` -> Rumble (one-shot) or Rumble_Loop (RUMBLE_STATUS: walk / run / dash / landing / holds;
   the length carried when Ultimate loops it) by kind (`nohits` 16, `nohitm` 17, `nohitl` 18, `walk` 20,

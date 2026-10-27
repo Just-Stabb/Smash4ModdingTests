@@ -39051,6 +39051,14 @@ void brave_buff_update()
 // the cursor, bit 3 closing, bit 4 blinking off, bit 5 cast, bits 8-10 the animation's frame, 11-14 the
 // pointer's frame: Ultimate's spin, 2 frames each),
 // 0x1000009F = 0x48xxxxxx (the rows' spells, bit 20 + row greyed), 0x1000009C = 0x4D50GGBB
+// The sounds Ultimate plays from his status code (FighterSpecializer_Brave in its main.bin, not his
+// scripts; docs/ultimate-fighter-port.md "Sounds"): ids on snd_se_Brave's row 1892 (tools/ultimate_sound.py
+// sound_ids.json), the common bank's row 0 for the fire ones; one-shots
+void brave_se(int id)
+{
+    SoundModule(0x2710, id);
+}
+
 void brave_panel_update()
 {
     int a;
@@ -39188,6 +39196,7 @@ void brave_crit_show()
     else if (brave_crit_shown == 0 && WorkModuleF(0, 0x0f0000a0) >= 0.5f)
     {
         brave_crit_shown = 0x1;
+        brave_se(0x7640112);        // se_brave_criticalhit: Ultimate's crit hitboxes' hit sound
         SlowModule(0, 0x4, 0x28);
         brave_item(8.0f);
         brave_crit_cam = 0x28;
@@ -40540,6 +40549,7 @@ void brave_heal(float v)
     }
     WorkModule(0, d, 0x0f000117);
     EffectModule(0x2717, 0x1000035, 0x3, 0, 0, 0, 0, 0, 0, 1.0f, 0);
+    brave_se(0x76400d4);            // se_brave_special_l12 (Ultimate's heal routine 0x6645D0, Heal's case)
 }
 
 // Kamikazee: KO'd on the spot, as in Stamina mode (instance flag 0x20000043, "causes KO": the fighter
@@ -40656,10 +40666,17 @@ void brave_hocus_pocus()
         brave_hp_cast(o - 0x9);
         return;
     }
-    if (o == 0x2) { brave_mp = 100.0f; }
-    else if (o == 0x4) { brave_mp = 0; }
-    else if (o == 0x5) { brave_poison_t = 0x1f4; }
-    else { brave_state(o); }    // the item-like states (brave_state)
+    // the outcomes' sounds (active_command case 14, vl.prc param_special_lw_various_data): full MP l25,
+    // timer l26, invisible l24, poison / no MP the common fire_s / fire_l; the others none
+    if (o == 0x2) { brave_mp = 100.0f; brave_se(0x76400ea); }
+    else if (o == 0x4) { brave_mp = 0; brave_se(0x4d); }
+    else if (o == 0x5) { brave_poison_t = 0x1f4; brave_se(0x4b); }
+    else
+    {
+        brave_state(o);         // the item-like states (brave_state)
+        if (o == 0x3) { brave_se(0x76400eb); }
+        else if (o == 0x9) { brave_se(0x76400e9); }
+    }
 }
 
 // Kaclang: 0 SpecialLw10Start (steel from frame 20; in the air a hop of 3.4 at frame 10), 1 SpecialLw10
@@ -40937,6 +40954,10 @@ void brave_lw_loop()
         brave_menu_cursor = brave_lw_cursor;
         brave_menu_grey = brave_lw_grey();
         brave_cost_view = brave_cost(n);
+        if (brave_lw_frame == 0x168 && brave_lw_state == 0x1)
+        {
+            brave_se(0x76400c1);    // se_brave_special_l01_02: the cursor blinks, 2 s left (command_select_blink_start_frame 360 of 480)
+        }
         if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
         {
             brave_clear_input();
@@ -40949,6 +40970,7 @@ void brave_lw_loop()
             // the cast: only its row stays up; he turns round to a stick held back (Ultimate's command
             // spells do)
             brave_clear_input();
+            brave_se(0x76400c0);    // se_brave_special_l01: a spell chosen (special_lw_cursor_decide)
             if (ControlModuleF(0) * PostureModuleF(0) < -0.5f)
             {
                 PostureModule(0, -PostureModuleF(0));   // fix 68: was -PostureModuleF(0x7) (minus his scale:
@@ -41036,6 +41058,7 @@ void brave_lw_main()
     func_2245(0x1);
     brave_menu_open(brave_lw_spells, 0);
     brave_menu_grey = brave_lw_grey();
+    brave_se(0x76400dd);            // se_brave_special_l18: the window opens (special_lw_open_command)
     func_78(brave_lw_loop);
 }
 

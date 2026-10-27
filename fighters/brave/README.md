@@ -1209,3 +1209,23 @@ From Ultimate's own audio (the user's `sound-full-ssbu.zip`: `se_brave*`, `vc_br
 - Install: also `sound/config/soundlabeltable.bin` (it carries Minecraft World's and Supamario's rows).
 - Changed: `fighter/brave/sound/` (15 files), the body's `sound.bin` / `expression.bin`, the articles'
   `sound.bin`, `sound/config/soundlabeltable.bin`.
+
+## Fix 72 (`build/hero_fix72.zip`): the sounds Ultimate plays from his status code
+
+Found in Ultimate's ExeFS (`FighterSpecializer_Brave`, its sounds' hash40s built in code; the status
+scripts themselves, `lua2cpp_brave.nro`, aren't in the files we have), played from `brave.c` (`brave_se`):
+
+| sound | Ultimate | here |
+|---|---|---|
+| `se_brave_special_l18` | `special_lw_open_command` | Command Selection's window opens |
+| `se_brave_special_l01` | `special_lw_cursor_decide` | a spell chosen (also one he can't pay for) |
+| `se_brave_special_l01_02` | `special_lw_start_cursor_blink` (vl `command_select_blink_start_frame` 360 of 480) | frame 360 of the window: 2 s left |
+| `se_brave_special_l12` | the heal routine (0x6645D0), Heal | Heal |
+| `l25` / `l26` / `l24`, common `fire_s` / `fire_l` | Hocus Pocus (`active_command` case 14, `vl.prc` `param_special_lw_various_data`) | full MP / timer / invisible / poison / no MP |
+| `se_brave_criticalhit` | the crit hitboxes' hit sound (`COLLISION_SOUND_ATTR_BRAVE_CRITICALHIT`) | the crit landing (`brave_crit_show`) |
+
+Moving the cursor plays nothing in Ultimate. Not here yet: Bounce's reflect (`se_brave_special_l13_02`,
+Ultimate's reflect handler; ours reflects in native code), Metal Slash on a metal fighter
+(`se_brave_criticalhit`). Not in the ExeFS at all (the status scripts'): `l17`, `l18_02`,
+`vc_brave_special_l14`, `se_brave_dead`, `se_brave_escapeair`.
+- Changed: `brave.mscsb`.
