@@ -483,8 +483,9 @@ def fresnel_bake(e, notes):
 def fresnel_mean(e, model, s3, st, notes):
     """the mean of a mesh's fresnel alpha (eft2's view-angle alpha, as fresnel_bake) over what of it
     shows, for a mesh fresnel_bake can't bake (a directional type: its faces turn against the view),
-    else None. Each face weighted by its area on screen (camera along Z), only the faces Ultimate
-    draws (display_side), averaged over the turns it takes (its spin / random start about each axis
+    else None. N the mesh's normals (a face's mean); each face weighted by its area on screen (camera
+    along Z), only the faces Ultimate draws (display_side), averaged over the turns it takes (its
+    spin / random start about each axis
     it turns about: Kaswoosh's rings spin 30 degrees a frame about Y, so a bake would sweep round
     with them). Smash 4's templates have no view vector for it: the alpha goes x this mean instead
     (Kaswoosh's front rings fade where they face the camera, 0.53 of them showing on average; drawn at
@@ -494,10 +495,13 @@ def fresnel_mean(e, model, s3, st, notes):
     near, far = (float(v) for v in e['static']['fresnel_alpha'][:2])
     if abs(far - near) < 1e-6:
         return None
-    pos, _n, _c, _u, idx = mesh(model, 0)
+    pos, nrm, _c, _u, idx = mesh(model, 0)
     pos = pos.astype(np.float64) * np.array(s3, np.float64)
     tri = np.asarray(idx, np.int64).reshape(-1, 3)
     fn = np.cross(pos[tri[:, 1]] - pos[tri[:, 0]], pos[tri[:, 2]] - pos[tri[:, 0]])     # 2 x area, outward
+    # the shader's N: the mesh's own normals (a face's three), scaled as the mesh is
+    vn = nrm.astype(np.float64)[tri].mean(axis=1) / np.array(s3, np.float64)
+    vn /= np.maximum(np.linalg.norm(vn, axis=1, keepdims=True), 1e-12)
     base = rotation_matrix([float(v) for v in st['rotate_init'][:3]])
     axes = [a for a in range(3) if any(abs(float(st[k][a])) > 1e-6
                                        for k in ('rotate_add', 'rotate_add_rand', 'rotate_init_rand'))]
@@ -508,11 +512,12 @@ def fresnel_mean(e, model, s3, st, notes):
         ang = [0.0, 0.0, 0.0]
         for k, a in enumerate(axes):
             ang[a] = 2 * np.pi * (j / 64 if k == 0 else rng.random())
-        n = fn @ (rotation_matrix(ang) @ base).T
+        r = rotation_matrix(ang) @ base
+        n = fn @ r.T
         area = np.linalg.norm(n, axis=1)
         nz = n[:, 2] / np.maximum(area, 1e-12)
         vis = np.ones(len(nz), bool) if side == 0 else (nz > 0 if side == 1 else nz < 0)
-        t = np.clip((np.abs(nz) - near) / (far - near), 0, 1)
+        t = np.clip((np.abs((vn @ r.T)[:, 2]) - near) / (far - near), 0, 1)
         w = area * np.abs(nz) * vis
         num += float((w * t * t * (3 - 2 * t)).sum())
         den += float(w.sum())

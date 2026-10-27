@@ -32,6 +32,9 @@ FORMATS = {0x518: ('<f4', 3, None), 0x519: ('<f4', 4, None), 0x517: ('<f4', 2, N
            0x215: ('<i2', 4, 32767.0)}
 
 
+PACKED_10_10_10_2 = 0x20E
+
+
 class Bfres:
     def __init__(self, data):
         self.d = d = data
@@ -76,11 +79,19 @@ class Bfres:
             name = self.string(self.u64(a))
             fmt = struct.unpack_from('>H', d, a + 8)[0]
             aoff, buf = struct.unpack_from('<HH', d, a + 0xC)
+            raw = np.frombuffer(d, np.uint8, strides[buf] * count, starts[buf])
+            if fmt == PACKED_10_10_10_2:
+                # signed 10 / 10 / 10 / 2 bits in a little-endian word (every effect mesh's normals, _n0)
+                w = np.frombuffer(raw.reshape(count, strides[buf])[:, aoff:aoff + 4].tobytes(), '<u4').astype(np.int64)
+                comp = [(w >> sh & 0x3FF) for sh in (0, 10, 20)] + [w >> 30 & 3]
+                comp = [np.where(c >= 512, c - 1024, c) / 511.0 for c in comp[:3]] + \
+                       [np.where(comp[3] >= 2, comp[3] - 4, comp[3]).astype(np.float64)]
+                attrs[name] = np.clip(np.stack(comp, 1), -1, 1).astype(np.float32)
+                continue
             if fmt not in FORMATS:
                 continue
             dt, comps, div = FORMATS[fmt]
             item = np.dtype(dt).itemsize * comps
-            raw = np.frombuffer(d, np.uint8, strides[buf] * count, starts[buf])
             vals = np.stack([np.frombuffer(raw.reshape(count, strides[buf])[:, aoff:aoff + item].tobytes(), dt)
                              .reshape(count, comps)], 0)[0].astype(np.float32)
             attrs[name] = vals / div if div else vals

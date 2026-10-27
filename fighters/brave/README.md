@@ -890,3 +890,20 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
 - Build: the README's v3 converter command with, for i in 1 2 3,
   `--bone-path brave_tornado$i=HERO/model/tornado/c00/model.nusktb,HERO/motion/tornado/c00/d02specialhi$i.nuanmb,tornado1`.
 - Changed: the `.ptcl` and the tornado article's scripts (`script/animcmd/weapon/tornado`).
+
+## Fix 56 (`build/hero_fix56.zip`): the whirlwinds' wind left behind, mesh normals
+
+- User's fix 55 video: Kaswoosh's two funnels weave like Ultimate's now. The user's Ultimate video
+  (all three spells): every Woosh leaves its wind behind, where ours vanished at once; Woosh's flat
+  whirl and Swoosh's funnel are clearly pale cyan there, faint white streaks here.
+- Wind left behind: the article's effects had Terminate 1, so they ended with it (Woosh 24 frames,
+  Swoosh 33, Kaswoosh 52), cutting short what starts late: Swoosh's / Kaswoosh's dissolving tornado3
+  meshes (from frames 26 / 50, 30 / 36 frames long), Woosh's smoke (44 - 46 frames). `brave_build.py`
+  now gives the tornado article's `External_Graphic`s Terminate 0 (as the bursts' effects): they play
+  out. Every emitter of brave_tornado1 - 3 is one-time and finite (all done by frame 110).
+- Normals: Ultimate's effect meshes keep their normals (`_n0`) as format 0x20E, signed 10 / 10 / 10 /
+  2 bits in a word (93 of ef_brave's primitives, all of them), which `bfres_switch.py` skipped as
+  unknown, so every converted mesh had +Z normals. Now decoded (unit length, 0.93 with the faces).
+  `fresnel_mean` takes N from them (the shader's), the faces still giving screen area and culling:
+  Woosh's cyan `tornado1_f2` x 0.18 -> 0.28, Swoosh's x 0.31, the white fronts x 0.69 - 0.78.
+- Changed: the `.ptcl` and the tornado article's scripts.

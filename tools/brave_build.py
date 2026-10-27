@@ -161,6 +161,14 @@ def article_scripts(a, name, wdir):
                     c.params[3] = round(c.params[3] * k, 2)
             effect[mo] = effect['crash1']
     if name == 'tornado':
+        # the whirlwinds play out after the article goes (Terminate 0), as Ultimate's: their wind is
+        # left behind (Swoosh's / Kaswoosh's dissolving tornado3 meshes start at frames 26 / 50, 30 / 36
+        # frames long, Woosh's smoke lives 44 frames; the article's 33 / 52 / 24 cut them short). Every
+        # emitter's emission is finite (done by frame 110)
+        for sc in effect.values():
+            for c in sc:
+                if c.name == 'External_Graphic':
+                    c.params[-1] = 0
         # Kaswoosh's two whirlwinds: Ultimate's on the article's bones Tornado1 / Tornado2, which its
         # d02specialhi3 animation sends round an ellipse each, 7.4 out along Z (the article's screen axis:
         # Robin's Arcthunder spreads its hitboxes along Z) either side, +-9.7 along Z and +-3.8 along X,
