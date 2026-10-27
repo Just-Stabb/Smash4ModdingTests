@@ -1884,8 +1884,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # kick in Ultimate; centred on it (the template's) they hung below his feet (Hero fix 65). Kept to
         # directional quads so far: the stripes and meshes that have one (lightning sparks, Kazap's
         # bolts, ...) are as tested without it
-        struct.pack_into('>2f', em, ROT_BASIS, *(float(v) for v in e['static']['center'][:2]))
-        notes.append('particle centre %g %g' % tuple(e['static']['center'][:2]))
+        # Half of it: the full centre put the line a length too high (fix 66, user: "too high"), above
+        # his foot where Ultimate's runs along the leg; eft2's centre evidently counts half-sizes (its
+        # quad -1..1, eft's -0.5..0.5). Observed on this one effect
+        c = [0.5 * float(v) for v in e['static']['center'][:2]]
+        struct.pack_into('>2f', em, ROT_BASIS, *c)
+        notes.append('particle centre %g %g (x 0.5)' % tuple(e['static']['center'][:2]))
 
     # ---- timing
     one = bool(ems['one_time'])

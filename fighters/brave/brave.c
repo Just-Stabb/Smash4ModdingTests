@@ -8492,6 +8492,7 @@ void func_381()
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
         rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
         rolloff_air_t = 0x8;
+        rolloff_airborne = 0x1;
     }
     else
     {
@@ -8509,6 +8510,7 @@ void func_382()
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
         rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
         rolloff_air_t = 0x8;
+        rolloff_airborne = 0x1;
     }
     else
     {
@@ -38364,6 +38366,8 @@ float rolloff_last_x;
 // when he pressed.
 int rolloff_cstick;
 int rolloff_air_t;
+int rolloff_fast;       // Hero: the roll's speed scaled this roll (brave_roll_mult)
+int rolloff_airborne;   // the first aerial of a roll-off's airtime goes by the stick as it starts (fix 66)
 
 // the main stick now, as rolloff_cstick's codes: raw X on screen and Y, neutral (5) below 0.3 either way
 int rolloff_stick_dir()
@@ -38432,14 +38436,21 @@ int rolloff_aerial(int kind)
     rolloff_cstick = 0;
     if (rolloff_air_t <= 0)
     {
-        return kind;
+        c = 0;      // a press / flick kept from the roll counts only for the slide-off's 8 frames
     }
     if (c == 0)
     {
+        if (rolloff_airborne == 0)
+        {
+            return kind;
+        }
         // pressed after the slide-off (fix 65, user: fix 64 changed nothing for the control stick): the
-        // game's kind still went by the stick held in the roll; the stick now instead
+        // game's kind still went by the stick held in the roll; the stick now instead. For the airtime's
+        // first aerial, not only the first 8 frames (fix 66, user: inconsistent facing against his
+        // motion: past the 8 frames the game's kind was back)
         c = rolloff_stick_dir();
     }
+    rolloff_airborne = 0;
     if (c == 0x5)
     {
         return 0x1;
@@ -38485,6 +38496,10 @@ void rolloff_hold_update()
         }
     }
     rolloff_last_x = x;
+    if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c)
+    {
+        rolloff_airborne = 0;   // landed, grabbed the ledge or hit
+    }
     if (rolloff_air_t > 0)
     {
         rolloff_air_t -= 1;
@@ -38513,12 +38528,31 @@ void rolloff_fall_speed()
 
 void rolloff_update()
 {
+    float x;
+    float m;
     if (MotionModuleF(0x1) < 1.0f)
     {
         global62 = 0; // new roll
         rolloff_cstick = 0;
+        rolloff_fast = 0;
     }
     rolloff_cstick_update();
+    if (rolloff_fast == 0 && MotionModuleF(0x1) >= 6.0f)
+    {
+        // Hero: the roll's speed (the ACMD's momentum at frame 5, energy 3) x2 under Acceleratle (fix 66,
+        // user); carried off an edge the same
+        rolloff_fast = 0x1;
+        m = brave_roll_mult();
+        if (m != 1.0f)
+        {
+            x = KineticModuleF(0xa, 0x3);
+            KineticModule(0x11, 0x3, x * m, KineticModuleF(0xb, 0x3));
+        }
+    }
+    if (rolloff_fast && brave_roll_mult() != 1.0f)
+    {
+        KineticModule(0x15, 0x3, -1.0f, -1.0f);    // its ground speed limit off (universal-mechanics.md
+    }                                               // "Ground speed cap"), so the x2 isn't cut back
     if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
     {                                                // starts; the ACMD's clear didn't reach it), well before the
         KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
@@ -38609,6 +38643,16 @@ float brave_dmg_seen;
 int brave_slot;
 // buffs: frames left (Acceleratle, Oomph, Bounce), Psyche Up until a hit lands, Hocus Pocus's invisibility
 int brave_speed_t;
+
+// the roll's speed under Acceleratle (rolloff_update)
+float brave_roll_mult()
+{
+    if (brave_speed_t > 0)
+    {
+        return 2.0f;
+    }
+    return 1.0f;
+}
 int brave_attack_t;
 int brave_reflect_t;
 int brave_psyche;

@@ -1105,3 +1105,19 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   (lightning sparks, Kazap's bolts, explosion flashes, ...: types 5 / 6 / 7 and meshes) are left as
   tested so far.
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).
+
+## Fix 66 (`build/hero_fix66.zip`): roll-off aerials facing against his motion, up air's line lower, Acceleratle's roll
+
+- **Roll-off test (user: aerials inconsistent when he faces against his motion):** fix 65's stick read
+  covered only the slide-off's 8 frames; past them the game's kind came back, which went wrong when
+  he faced away from his movement. The airtime's first aerial after a roll-off now goes by the stick
+  as it starts (`rolloff_airborne`, cleared on landing, the ledge or a hit); a press or C-stick flick
+  kept from the roll still counts only within the 8 frames.
+- **Up air's line (user: too high):** fix 65 wrote eft2's particle centre (0, 0.8) as eft's rotBasis
+  as it is, which put the line a length above his foot; it's now half of it (eft2's centre evidently
+  in half-sizes: its quad -1..1, eft's -0.5..0.5), so the line runs along the leg. Observed on this
+  effect only.
+- **Acceleratle (user):** his roll's speed ×2 while it lasts (`brave_roll_mult`: the roll script's
+  momentum, energy 3, doubled on its frame 6, carried off an edge the same), with energy 3's ground
+  speed limit lifted for that roll so the 4.4 isn't cut back.
+- Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).
