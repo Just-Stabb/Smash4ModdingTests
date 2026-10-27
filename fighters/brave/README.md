@@ -1037,3 +1037,27 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   (on screen) and an aerial within 8 frames of the slide-off takes it as forward / back / up / down
   (`rolloff_cstick_update`, `rolloff_aerial`).
 - Changed: `brave.mscsb`, `animcmd/body/game.bin`.
+
+## Fix 63 (`build/hero_fix63.zip`): C-stick roll-off aerials, up air's line, Magic Burst, the menu loop
+
+- **Roll-off test: C-stick aerials followed the control stick (user):** fix 62 read the C-stick
+  through `ControlModuleF(7 / 8)`, which are the main stick's. `rolloff_cstick_update` now reads the
+  raw C-stick position variables (`0x0F000261`, X on screen; `0x0F000113`, Y).
+- **Up air (user):** Ultimate's `sys_attack_line` (`ef_common.eff`'s `P_CmnAttackLine`, the pale blue
+  streak) is converted into his bank (`0x345007C`, `brave_effects.json`, which overrides the sys map's
+  Smash 4 white line `0x100008D` for him); up air is the only move of his that plays it.
+- **Magic Burst (user: dark purple, Ultimate's bright pink-white):** two converter fixes.
+  - The converter's particle cap counted a one-time emitter as if it emitted every frame of its
+    particles' life: the finish's 32 stripes (`impact1`, all in one frame) were cut to 5, the burst's
+    lights from 3 to 2, its sparkles from 15 a frame to 1 (`xv2_to_ptcl.sanitize`; every bank built
+    from now on, other fighters' too).
+  - Its colours are HDR (violet × 3: `(1.29, 0.54, 2.46)`), which Ultimate's tone mapping draws near
+    white; our own pixel programs clamped each channel to 1, keeping it violet. `--hdr-white-for`
+    bakes the colour scale into the keys and spills half of each channel's excess over 1 into every
+    channel (`white_spill`): for `brave_fullburst`, `_start`, `_finish`, `_end`.
+- **Command Selection's loop (user: the menu animation, ground and air, didn't loop):** Smash 4 loops a
+  motion when byte 0 of its `fighter_param_vl` group 1 entry is 0; the translator wrote 1 for every new
+  motion slot. It now writes 0 where Ultimate's `motion_list` flags the motion looping (`0x2`):
+  `SpecialLwSelect` / `SpecialAirLwSelect` (`0x278` / `0x284`) and the other holds on new slots.
+- Changed: `brave.mscsb`, `animcmd/body/effect.bin`, `fighter_param_vl_brave.bin`, the `.ptcl` /
+  `.efc`.

@@ -38356,8 +38356,8 @@ float rolloff_last_x;
 // Hero's test: an aerial buffered with the C-stick in a roll that rolls off came out neutral (user): on
 // the ground the C-stick is a smash input, so the buffered command had no air direction and the aerial
 // kind (ControlModule(0x10), func_311) went by the main stick. The roll keeps the last C-stick flick
-// (past 0.5) on screen (rolloff_cstick: 1 right, 2 left, 3 up, 4 down; ControlModuleF(7 / 8) along his
-// facing x his facing); an aerial out of the roll-off (rolloff_air_t, frames since the slide-off, up to
+// (past 0.5) on screen (rolloff_cstick: 1 right, 2 left, 3 up, 4 down; the
+// position variables' raw C-stick, SELF_CSTICK_X_RAW 0x0F000261 / SELF_CSTICK_Y 0x0F000113); an aerial out of the roll-off (rolloff_air_t, frames since the slide-off, up to
 // 8) takes it as forward / back / up / down with the facing it has then.
 int rolloff_cstick;
 int rolloff_air_t;
@@ -38366,8 +38366,8 @@ void rolloff_cstick_update()
 {
     float x;
     float y;
-    x = ControlModuleF(0x7);
-    y = ControlModuleF(0x8);
+    x = WorkModuleF(0, 0x0f000261);     // the C-stick: raw X on screen, and Y (fix 63: ControlModuleF(7 / 8)
+    y = WorkModuleF(0, 0x0f000113);     // followed the control stick, user)
     if (y > 0.5f && y * y > x * x)
     {
         rolloff_cstick = 0x3;
@@ -38378,7 +38378,7 @@ void rolloff_cstick_update()
     }
     else if (x * x > 0.25f)
     {
-        if (x * PostureModuleF(0x7) > 0)
+        if (x > 0)
         {
             rolloff_cstick = 0x1;
         }

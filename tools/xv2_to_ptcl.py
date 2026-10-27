@@ -507,6 +507,10 @@ def sanitize(p, em):
         p.set_field(em, 'volume_type', 0)
     iv = p.field(em, 'emit_interval') + 1
     alive = p.field(em, 'emit_rate') * math.ceil((life + p.field(em, 'ptcl_life_random')) / iv)
+    if p.field(em, 'one_time'):
+        # a one-time emitter emits only over its frames (Hero fix 63: Magic Burst's 32 finishing
+        # stripes, emitted in one frame, were capped to 5 as if emitted every frame of their life)
+        alive = min(alive, buffer_count(p, em))
     if alive > MAX_LIVE:
         rate = max(1.0, p.field(em, 'emit_rate') * MAX_LIVE / alive)
         p.set_field(em, 'emit_rate', float(rate))

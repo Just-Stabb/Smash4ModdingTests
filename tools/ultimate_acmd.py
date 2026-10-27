@@ -36,7 +36,7 @@ motion, the motion_list entry whose game script is game_<file>: its cancel frame
 frames go into fighter_param_vl group 1 (bytes 2 / 3 / 4: the same three numbers, e.g. Cloud's
 DownAttackU 46 / 1 / 26 in both games); a common motion the base has no script for (attack12 /
 attack13 for a one-jab base) gets its motion.mtable entry (and vl byte 0 = 1, as non-looping
-motions). Landing motions are left as they are (their lag is fighter_param's). With --base-rpx /
+motions; 0 where Ultimate's motion_list flags it looping, 0x2). Landing motions are left as they are (their lag is fighter_param's). With --base-rpx /
 --base-kind, prints the motions whose Ultimate "move" flag (0x4, the root moves the fighter; the
 same bit as the low byte of a Smash 4 motion table entry's flags) differs from the base's, and
 the slots the base leaves empty, as the "motions" of the kind's extra_kinds.json record
@@ -860,6 +860,11 @@ def motion_frames(args, done):
         if not ent or len(ent[0]['extra']) < 3:
             print('  %s: no motion_list entry / frames' % name)
             continue
+        if ent[0]['flags'] & 2 and byte(i, 0):
+            # Ultimate's loop flag (motion_list 0x2): byte 0 is 0 on looping motions (Hero's
+            # SpecialLwSelect, a new slot, held its last frame)
+            byte(i, 0, 0)
+            print('  0x%03X %-16s loops' % (i, name))
         xs, xe, cancel = ent[0]['extra'][:3]
         for k, v in ((2, cancel), (3, xs), (4, xe)):
             byte(i, k, v)

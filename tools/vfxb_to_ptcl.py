@@ -211,6 +211,19 @@ def display(x):
     return np.sign(x) * np.abs(x) ** DISPLAY_GAMMA
 
 
+# --hdr-white-for: Ultimate draws in HDR and tone-maps, so a colour past 1 (Magic Burst's violet x 3:
+# (1.29, 0.54, 2.46)) turns towards white on screen, with bloom round it; an own pixel program clamps
+# each channel to 1, which keeps it violet (Hero fix 63: a dark purple burst). WHITE_SPILL of each channel's
+# excess over 1 (display-encoded) is added to every channel instead
+WHITE_SPILL = 0.5
+
+
+def white_spill(rgb):
+    """display-encoded colour key(s) with their excess over 1 spilled into every channel"""
+    rgb = np.asarray(rgb, dtype=np.float64)
+    return rgb + WHITE_SPILL * np.clip(rgb - 1.0, 0.0, None).sum(-1, keepdims=True)
+
+
 def written_scale(e):
     """the colour scale written for e (display-encoded for a display_space emitter)"""
     cs = float(e['static']['color_scale'] or 1.0)
@@ -268,6 +281,7 @@ class Templates:
         self.base, self.files, self.found = base, {}, {}
         self.no_graft = False       # (--no-graft-for: no grafted templates for the emitter at hand)
         self.test_white1 = self.test_mean_colour = False    # (--test-white1-for, --test-mean-colour-for)
+        self.hdr_white = False                              # (--hdr-white-for)
         self.test_no_light = False                          # (--test-no-light-for)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
@@ -1775,6 +1789,16 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             rgb = display(rgb)
         if rgb1 is not None and not (dis is not None and dis_in == 1):
             rgb1 = display(rgb1)
+    hdr_white = templates.hdr_white and exact and display_space(e)
+    if hdr_white:
+        # --hdr-white-for: the colour scale baked into the keys and what goes past 1 spilled into
+        # every channel (white_spill), the scale then 1
+        cs = written_scale(e)
+        if not (dis is not None and dis_in == 0):
+            rgb = white_spill(rgb * cs)
+        if rgb1 is not None and not (dis is not None and dis_in == 1):
+            rgb1 = white_spill(rgb1 * cs)
+        notes.append('HDR colours whitened (x %.2f baked in)' % cs)
     fits = [(threshold_fit if dis is not None and dis_in == 0 else color_fit)(rgb),
             (threshold_fit if dis is not None and dis_in == 1 else color_fit)(rgb if rgb1 is None else rgb1)]
     for tr in (0, 1):
@@ -1792,7 +1816,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # an own pixel program clamps the colour it draws to 1 (tools/eft_pixel.py): Ultimate's brightness
     # kept, what goes past 1 saturating as in Ultimate (F-smash's yellow spikes over grey bands, fix 25:
     # dull grey; Frizz's flames red); a template's own program gets it compressed (hdr_scale)
-    p.set_field(em, 'color_scale', written_scale(e) if exact else hdr_scale(p, em, written_scale(e), notes))
+    p.set_field(em, 'color_scale', 1.0 if hdr_white else written_scale(e) if exact else
+                hdr_scale(p, em, written_scale(e), notes))
     if display_space(e):
         notes.append('colours display-encoded (linear -> sRGB)')
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
@@ -2310,6 +2335,8 @@ def main():
     ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
     ap.add_argument('--no-graft-for', default='', help='comma-separated EFFECT or EFFECT/EMITTER (Ultimate names): no '
                     'grafted templates for them (A / B tests)')
+    ap.add_argument('--hdr-white-for', default='', help='as --no-graft-for: their HDR colours (past 1) whitened '
+                    'as Ultimate\'s tone mapping shows them (white_spill), not clamped per channel')
     ap.add_argument('--test-white1-for', default='', help='as --no-graft-for: texture 1 white (tests)')
     ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
     ap.add_argument('--test-skip-for', default='', help='as --no-graft-for: the emitters left out (tests)')
@@ -2359,6 +2386,7 @@ def main():
     templates = Templates(p, a.templates)
     no_graft = set(v for v in a.no_graft_for.split(',') if v)
     white1 = set(v for v in a.test_white1_for.split(',') if v)
+    hdr_white = set(v for v in a.hdr_white_for.split(',') if v)
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
@@ -2389,6 +2417,7 @@ def main():
                 e['_set'] = eff.sets[si_ult]
                 templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
                 templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
+                templates.hdr_white = name in hdr_white or '%s/%s' % (name, e['name']) in hdr_white
                 templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
                 templates.test_no_light = name in no_light or '%s/%s' % (name, e['name']) in no_light
                 if name in skip or '%s/%s' % (name, e['name']) in skip:
