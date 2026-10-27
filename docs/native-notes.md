@@ -996,7 +996,10 @@ Overdrive (×1.2 animations).
 - **Throws:** `Throw_Specifier` (`0x02BE6E88`), `Throw_Specifier2`, `Intensity_Throw_Specifier`
   pack their parameters as MSC arguments and call AttackModule's MSC handler (vtable `+0x334`,
   `0x02C0ACFC`) with op `0x2716` / `0x2717`; that case builds the throw's attack data at `0x78(r1)`
-  (damage first, from argument 3) and passes it to vtable `+0x64` at `0x02C0B790`.
+  (damage first, from argument 3) and passes it to vtable `+0x64` at `0x02C0B790`. Its layout: `+0`
+  damage (float), then ints `+4` angle, `+8` knockback growth, `+0xC` set knockback, `+0x10` base
+  knockback (`0x02C0B5A0`-`0x02C0B650`; `0x2717`'s extra floats are added onto growth / set / base as
+  ints by `0x02C0ACAC`).
 - `tools/strike_cave.py` (cave `0x04B78A00`, tested in `tools/strike_test.py`) hooks `0x02C08730`
   (in set_attack, after the copy: Strike Kirby's slot damage ×1.15, hitlag ×1.2; crit bit `0x10`:
   damage ×2 more, hitlag ×2 × (s·k + 5) / (2s·k + 5) so the opponent's hitstop is exactly 2× the

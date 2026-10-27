@@ -231,10 +231,27 @@ fighter(mu, hero, 3, 0x4B490008)                      # Strike Kirby: still his,
 check("Strike Kirby through the hero cave: x1.15 / x1.2 only", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (11.5, 60, 76, 0, 0, 1.2))
 fighter(mu, hero, 3, 0x12340020)
 check("other marker: unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0)[:3], (10.0, 60, 76))
+
+
+def run_hero_throw(mu, obj, damage, kbg, wkb, bkb):
+    """the throw's damage and knockback ints (growth 0x80, set 0x84, base 0x88; the angle 0x7C kept)"""
+    sp = 0x104E0000
+    for off, v in ((0x7C, 45), (0x80, kbg), (0x84, wkb), (0x88, bkb)):
+        mu.mem_write(sp + off, struct.pack(">i", v))
+    d = run_throw(mu, obj, damage)
+    rd = lambda off: struct.unpack(">i", mu.mem_read(sp + off, 4))[0]
+    return (d, rd(0x7C), rd(0x80), rd(0x84), rd(0x88))
+
+
 fighter(mu, hero, 3, 0x4B490020)
-check("Oomph throw: x1.6", run_throw(mu, hero, 10.0), 16.0)
+check("Oomph throw: x1.6 damage, x1.1 knockback", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (16.0, 45, 66, 0, 77))
 fighter(mu, hero, 3, 0x4B490040)
-check("Psyche Up throw: unchanged", run_throw(mu, hero, 10.0), 10.0)
+check("Psyche Up throw: x1.2 knockback", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (10.0, 45, 72, 0, 84))
+check("Psyche Up throw: a set knockback", run_hero_throw(mu, hero, 3.0, 100, 90, 0), (3.0, 45, 120, 108, 0))
+fighter(mu, hero, 3, 0x4B490060)
+check("Oomph + Psyche Up throw: x1.32 knockback", run_hero_throw(mu, hero, 10.0, 100, 0, 50), (16.0, 45, 132, 0, 66))
+fighter(mu, hero, 3, 0x4B490080)
+check("damage-taken bit alone: throw unchanged", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (10.0, 45, 60, 0, 70))
 
 
 def run_vic(mu, acc, damage):

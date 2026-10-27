@@ -8,8 +8,9 @@
 Hero's MSC (fighters/brave/brave.c brave_buff_update) keeps bits in the trait marker (WorkModule int
 0x1000008E = 0x4B49xxxx, as Kirby's, tools/strike_cave.py):
 - OOMPH_BIT (0x20), Oomph on his physical attacks (not while in a special): hitbox damage x1.6 and
-  knockback x1.1 (Ultimate's special_lw attack_up: attack x1.6, reaction x1.1); throws x1.6 damage;
-- PSYCHE_BIT (0x40), Psyche Up's next physical hit: knockback x1.2 and shield damage x1.65;
+  knockback x1.1 (Ultimate's special_lw attack_up: attack x1.6, reaction x1.1), throws too;
+- PSYCHE_BIT (0x40), Psyche Up's next physical hit: knockback x1.2 and shield damage x1.65 (a throw:
+  knockback x1.2);
 - TAKEN_BIT (0x80), Oomph's downside: the damage he takes x1.2.
 
 1. Hitboxes (HB_ATK, after strike_cave.py's set_attack hook; r26 = the hitbox's slot, r28 its
@@ -17,7 +18,9 @@ Hero's MSC (fighters/brave/brave.c brave_buff_update) keeps bits in the trait ma
    (110 / 120 / 132), rounded; Oomph's damage (+0x18); Psyche Up's shield damage: the slot's added shield
    damage (+0x58, a signed half) made so damage + it is x1.65 (the Hitbox command's ShieldDamage,
    parameter 18). Offsets: the ACMD Hitbox handler 0x02BDB0EC (docs/native-notes.md).
-2. Throws (HB_THROW, after strike_cave.py's throw hook): the throw's damage (0x78(r1)) x1.6.
+2. Throws (HB_THROW, after strike_cave.py's throw hook; the throw's attack data at 0x78(r1): damage, a
+   float, then ints angle, growth, set, base knockback): Oomph's damage x1.6, and both buffs' knockback
+   (110 / 120 / 132 percent) on growth, set and base, as on hitboxes (Hero fix 64, user).
 3. Damage taken (HOOK_VIC, the victim hit handler 0x02C25318's first word: r4 = the victim's module
    accessor, r5 = the hit info): the hit info's damage (+0xC) x1.2 when the victim has TAKEN_BIT. Its
    knockback (+0x10) is already worked out by then: only the percent grows.
@@ -93,14 +96,27 @@ atk_out:
         lwz r8, 0(r28)                  # set_attack's own instruction
         b %(ATK_BACK)s
 
-hb_throw:                               # r30 = AttackModule, the throw's attack data at 0x78(r1)
+hb_throw:                               # r30 = AttackModule, the throw's attack data at 0x78(r1):
 %(o_throw)s
 %(m_throw)s
+        li r10, 100                     # damage (float), then ints: angle +4, growth +8, set +0xC, base +0x10
+        li r8, 100
+        andi. r0, r11, %(OOMPH)d
+        beq throw_ps
+        mulli r10, r10, %(OKB)d
+        divwu r10, r10, r8
         lis r12, consts@ha
         lfs f13, consts@l(r12)
         lfs f0, 0x78(r1)                # damage x1.6
         fmuls f0, f0, f13
         stfs f0, 0x78(r1)
+throw_ps:
+        andi. r0, r11, %(PSYCHE)d
+        beq throw_kb
+        mulli r10, r10, %(PKB)d
+        divwu r10, r10, r8
+throw_kb:
+%(TKB)s
 throw_out:
         lwz r12, 0(r30)                 # the handler's own instruction
         b %(THROW_BACK)s
@@ -138,13 +154,22 @@ def kb_lines():
     return "\n".join(out)
 
 
+def throw_kb_lines():
+    """the throw's knockback ints (growth 0x80(r1), set 0x84, base 0x88) x r10 / 100 (r8), rounded"""
+    out = []
+    for off in (0x80, 0x84, 0x88):
+        out += ["        lwz r12, 0x%X(r1)" % off, "        mullw r12, r12, r10", "        addi r12, r12, 50",
+                "        divwu r12, r12, r8", "        stw r12, 0x%X(r1)" % off]
+    return "\n".join(out)
+
+
 def assemble():
     a = Asm(CAVE)
     a.asm(SOURCE % dict(
         o_atk=S.owner_wm("r28", "atk_out"), m_atk=S.marker("r12", "atk_out", bit=OOMPH_BIT | PSYCHE_BIT),
-        o_throw=S.owner_wm("r30", "throw_out"), m_throw=S.marker("r12", "throw_out", bit=OOMPH_BIT),
+        o_throw=S.owner_wm("r30", "throw_out"), m_throw=S.marker("r12", "throw_out", bit=OOMPH_BIT | PSYCHE_BIT),
         c4=S.chk("r4", "vic_out"), c5=S.chk("r5", "vic_out"), m_vic=S.marker("r12", "vic_out", bit=TAKEN_BIT),
-        OOMPH=OOMPH_BIT, PSYCHE=PSYCHE_BIT, OKB=OOMPH_KB, PKB=PSYCHE_KB, PSH=PSYCHE_SHIELD, KB=kb_lines(),
+        OOMPH=OOMPH_BIT, PSYCHE=PSYCHE_BIT, OKB=OOMPH_KB, PKB=PSYCHE_KB, PSH=PSYCHE_SHIELD, KB=kb_lines(), TKB=throw_kb_lines(),
         ATK_BACK="0x%08X" % ATK_BACK, THROW_BACK="0x%08X" % THROW_BACK, VIC_BACK="0x%08X" % (HOOK_VIC + 4),
         OD=OOMPH_DAMAGE, TK=TAKEN))
     words = a.words()

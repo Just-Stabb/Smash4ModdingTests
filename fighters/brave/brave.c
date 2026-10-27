@@ -38358,7 +38358,10 @@ float rolloff_last_x;
 // kind (ControlModule(0x10), func_311) went by the main stick. The roll keeps the last C-stick flick
 // (past 0.5) on screen (rolloff_cstick: 1 right, 2 left, 3 up, 4 down; the
 // position variables' raw C-stick, SELF_CSTICK_X_RAW 0x0F000261 / SELF_CSTICK_Y 0x0F000113); an aerial out of the roll-off (rolloff_air_t, frames since the slide-off, up to
-// 8) takes it as forward / back / up / down with the facing it has then.
+// 8) takes it as forward / back / up / down with the facing it has then. The attack button pressed in the
+// roll keeps the main stick as it is then (SELF_STICK_X_RAW 0x0F000260 / SELF_STICK_Y 0x0F000111; 5:
+// neutral): fix 64, user: the buffered aerial went by the stick held before the roll-off, whatever it was
+// when he pressed.
 int rolloff_cstick;
 int rolloff_air_t;
 
@@ -38366,6 +38369,29 @@ void rolloff_cstick_update()
 {
     float x;
     float y;
+    if (ControlModule(0x2710, 0))
+    {
+        x = WorkModuleF(0, 0x0f000260); // attack pressed: the main stick now, raw X on screen, and Y
+        y = WorkModuleF(0, 0x0f000111);
+        rolloff_cstick = 0x5;           // neutral below 0.3 either way
+        if (y > 0.3f && y * y > x * x)
+        {
+            rolloff_cstick = 0x3;
+        }
+        else if (y < -0.3f && y * y > x * x)
+        {
+            rolloff_cstick = 0x4;
+        }
+        else if (x > 0.3f)
+        {
+            rolloff_cstick = 0x1;
+        }
+        else if (x < -0.3f)
+        {
+            rolloff_cstick = 0x2;
+        }
+        return;
+    }
     x = WorkModuleF(0, 0x0f000261);     // the C-stick: raw X on screen, and Y (fix 63: ControlModuleF(7 / 8)
     y = WorkModuleF(0, 0x0f000113);     // followed the control stick, user)
     if (y > 0.5f && y * y > x * x)
@@ -38389,7 +38415,8 @@ void rolloff_cstick_update()
     }
 }
 
-// the aerial kind (ControlModule(0x10): 1 neutral, 2 forward, 3 back, 4 up, 5 down)
+// the aerial kind (ControlModule(0x10): 1 neutral, 2 forward, 3 back, 4 up, 5 down); rolloff_cstick 1 right,
+// 2 left, 3 up, 4 down, 5 neutral
 int rolloff_aerial(int kind)
 {
     int c;
@@ -38398,6 +38425,10 @@ int rolloff_aerial(int kind)
     if (c == 0 || rolloff_air_t <= 0)
     {
         return kind;
+    }
+    if (c == 0x5)
+    {
+        return 0x1;
     }
     if (c == 0x3)
     {
@@ -38913,9 +38944,14 @@ void brave_buff_update()
             WorkModule(0x2, 1.1f, 0x0f000117);     // his damage + 1.1
         }
     }
-    if (brave_psyche && brave_special_status() == 0 && WorkModuleF(0, 0x0f0000a1) >= 0.5f)
+    // Psyche Up: spent on the hit that landed, or by a throw (fix 64, user: throws take it, cave's throw
+    // path): a grab's pummels (catch statuses 0x35-0x3D) and the throw's own hits keep it for the throw,
+    // spent when the throw (0x3E) ends
+    if (brave_psyche && brave_special_status() == 0
+        && (WorkModuleF(0, 0x0f0000a1) >= 0.5f && (global4 < 0x35 || global4 > 0x3e)
+            || global5 == 0x3e && global4 != 0x3e))
     {
-        brave_psyche = 0;   // Psyche Up: spent on the hit that landed
+        brave_psyche = 0;
         brave_glow(0x345004e, 0);
     }
     // the marker's bits (tools/strike_cave.py, tools/hero_buff_cave.py): 3 Acceleratle's speeds, 0x20

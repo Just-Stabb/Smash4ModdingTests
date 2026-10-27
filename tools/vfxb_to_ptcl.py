@@ -986,7 +986,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
         for j, s in others:
             orgb, oa = sampler_inputs(e, j, first_cell(images[s['texture_id']], e['static']['tex_scroll'][j],
                                                       shown_cell(e, j)))
-            k = 2 if j == 2 or (j == 0 and ti == 2) else 1
+            k = 2 if 2 in (ti, j) else 1        # tex_blend: sampler 2 comes in by tex2's blend
             if same_uv(e, ti, j) and not ptn:
                 # the same UVs as sampler ti all life (Swoosh's whirlwind columns: ef_cmn_wind00 in
                 # both, its red x its alpha): their product texel by texel is exact
@@ -1016,7 +1016,10 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
         iy = (wrap_uv(uv[:, 1], s['wrap_v']) * sh).astype(int)
         ix = (wrap_uv(uv[:, 0], s['wrap_u']) * sw).astype(int)
         orgb, oa = orgb[iy, ix].reshape(h, w, 3), oa[iy, ix].reshape(h, w)
-        k = 2 if j == 2 or (j == 0 and ti == 2) else 1     # the blend that brings sampler 1 / 2 in
+        # the blend that brings sampler 1 / 2 in (tex_blend): with sampler 2 the main one, sampler 1
+        # joins it by tex2's (Magic Burst's finishing smoke: smoke01 x mask02, tex1's add (the
+        # distortion map's) drew its quads square, Hero fix 64)
+        k = 2 if 2 in (ti, j) else 1
         bc, ba = cb['tex%d_color_blend' % k], cb['tex%d_alpha_blend' % k]
         for cy in range(ny):
             for cx in range(nx):
@@ -1864,7 +1867,16 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'gravity', [float(ems['gravity_scale'] * g) for g in ems['gravity_dir']])
     p.set_field(em, 'air_resistance', float(st['air_res']))
     info = e['info']
-    p.set_emitter_srt(em, tuple(info['scale']), eft_rotation(info['rotate']), tuple(info['trans']))
+    if typ == 3 and not is_mesh and sum(abs(v) > 1e-6 for v in info['rotate'][:3]) >= 2:
+        # a directional quad (eft2 type 3) turns X first, as eft does: Ultimate's sys_attack_line
+        # (lines along Y, emitter turn 90 0 90, played turned X -90) stands up along the kick in
+        # Ultimate; Z first (eft_rotation, the streak types' order) laid it level at his feet (Hero
+        # fix 63's up air). Observed, not derived
+        em_rot = tuple(float(v) for v in info['rotate'][:3])
+        notes.append('directional quad: emitter turned X first')
+    else:
+        em_rot = eft_rotation(info['rotate'])
+    p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
 
     # ---- timing
     one = bool(ems['one_time'])

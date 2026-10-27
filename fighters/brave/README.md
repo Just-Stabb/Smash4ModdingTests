@@ -1066,3 +1066,27 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   list and `--hdr-white-for brave_fullburst,brave_fullburst_start,brave_fullburst_finish,brave_fullburst_end`.
 - Changed: `brave.mscsb`, `animcmd/body/effect.bin`, `fighter_param_vl_brave.bin`, the `.ptcl` /
   `.efc`.
+
+## Fix 64 (`build/hero_fix64.zip`): roll-off stick aerials, up air's line standing, Magic Burst's smoke, buffed throws
+
+- **Roll-off test: control-stick aerials (user: the aerial went by the stick held before the roll-off,
+  whatever it was when he pressed):** the attack pressed in the roll now keeps the main stick as it is
+  then (raw X on screen `0x0F000260`, Y `0x0F000111`; neutral under 0.3), taken by the aerial out of the
+  roll-off as the C-stick flick is (`rolloff_cstick_update`, `rolloff_aerial`).
+- **Up air's line (user: still not right):** it drew, but lying level at his feet. Ultimate's attack
+  line is a directional quad (eft2 type 3) turned 90, 0, 90 in its emitter; turned Z first (the order
+  the converter takes for eft2's streak types, `eft_rotation`) its lines ran along X, which the
+  script's X -90 leaves level. Turned X first (eft's own order) they run along Z, which X -90 stands up
+  along the kick, as in Ultimate. `vfxb_to_ptcl.py` now does that for directional quads turned about two
+  or more axes (here the attack lines; 3 of Sephiroth's emitters on its next bank).
+- **Magic Burst's square smoke (user's clip: lilac squares tumbling after the burst):** the finish's
+  `smoke1` reads `ef_brave_smoke01` (sampler 2) masked by `ef_brave_mask02` (sampler 1). The converter
+  joined them with tex1's blend (add: the distortion map's), not tex2's (multiply), so the mask added
+  alpha at the quad's edges. Sampler 2 now comes in by tex2's blend whichever is the main one
+  (`exact_texture`, as `tex_blend`).
+- **Oomph and Psyche Up on throws (user):** the throw's attack data (`0x78(r1)` at the hook: damage, a
+  float, then ints angle `+4`, growth `+8`, set `+0xC`, base `+0x10`) gets both buffs' knockback (Oomph
+  ×1.1, Psyche Up ×1.2, both ×1.32) besides Oomph's ×1.6 damage (`tools/hero_buff_cave.py`, tested in
+  `tools/strike_test.py`). Psyche Up is no longer spent by a grab's pummels (catch statuses
+  `0x35`-`0x3D`) or the throw's own hits; the throw (`0x3E`) spends it when it ends.
+- Changed: `brave.mscsb`, the `.ptcl` / `.efc`, `code/cross_f.rpx` (fix 61's + the new buff cave).
