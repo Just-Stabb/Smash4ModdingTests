@@ -37324,17 +37324,23 @@ void pz_motion(int m)
 // -- Water Gun (status 0x152): SpecialNStart (0x211 / air 0x215), then SpecialNHold (0x212 / 0x216)
 // while special is held, up to Ultimate's charge_frame (PZ_N_CHARGE_MAX), then SpecialNShot (0x213 /
 // 0x217): the water (article 5) at its frames 7, 11 ... 27 (Ultimate's SpecialNShot: six, 4 frames
-// apart), each told the charge through the custom slot (int 0x10000048 while it's generated: the game
-// copies it into the weapon's 0x10000005; Supamario's Kamehameha does the same)
+// apart), each told the charge and the aim through the custom slot (int 0x10000048 while it's
+// generated: the game copies it into the weapon's 0x10000005; Supamario's Kamehameha does the same):
+// charge + 0x40 x (aim in degrees + 0x40).
+// Aim (Ultimate's SHOOT_ANGLE_ENABLE, SpecialNShot frames PZ_N_AIM_START - PZ_N_AIM_END; param_special_n):
+// the stick's Y picks a target angle, up to angle_up (PZ_N_AIM_UP) up and angle_down (PZ_N_AIM_DOWN)
+// down, and the aim turns toward it angle_speed (PZ_N_AIM_SPEED) degrees a frame
 int pz_n_phase;
 int pz_n_charge;
 int pz_n_shots;
+float pz_n_aim;
 
 void pz_n_init()
 {
     pz_n_phase = 0;
     pz_n_charge = 0;
     pz_n_shots = 0;
+    pz_n_aim = 0;
 }
 
 int pz_n_motion()
@@ -37356,7 +37362,7 @@ void pz_n_shoot()
 {
     int slot;
     slot = WorkModule(0x6, 0x10000048);
-    WorkModule(0x7, pz_n_charge, 0x10000048);
+    WorkModule(0x7, pz_n_charge + 0x40 * ((int)pz_n_aim + 0x40), 0x10000048);
     ArticleModule(0x2710, PZ_WATER_ARTICLE);
     WorkModule(0x7, slot, 0x10000048);
 }
@@ -37385,10 +37391,46 @@ void pz_n_loop()
             pz_n_set(0x2);
         }
     }
-    else if (pz_n_shots < PZ_N_SHOTS && MotionModuleF(0x1) >= PZ_N_SHOT_FRAME + PZ_N_SHOT_EVERY * (float)pz_n_shots)
+    else
     {
-        pz_n_shoot();
-        pz_n_shots += 0x1;
+        pz_n_aim_update();
+        if (pz_n_shots < PZ_N_SHOTS && MotionModuleF(0x1) >= PZ_N_SHOT_FRAME + PZ_N_SHOT_EVERY * (float)pz_n_shots)
+        {
+            pz_n_shoot();
+            pz_n_shots += 0x1;
+        }
+    }
+}
+
+void pz_n_aim_update()
+{
+    float y;
+    float target;
+    if (MotionModuleF(0x1) < PZ_N_AIM_START || MotionModuleF(0x1) > PZ_N_AIM_END)
+    {
+        return;
+    }
+    y = ControlModuleF(0x1);
+    target = 0;
+    if (y > PZ_N_AIM_DEAD)
+    {
+        target = PZ_N_AIM_UP * (y - PZ_N_AIM_DEAD) / (1.0f - PZ_N_AIM_DEAD);
+    }
+    else if (y < -PZ_N_AIM_DEAD)
+    {
+        target = PZ_N_AIM_DOWN * (y + PZ_N_AIM_DEAD) / (1.0f - PZ_N_AIM_DEAD);
+    }
+    if (pz_n_aim < target - PZ_N_AIM_SPEED)
+    {
+        pz_n_aim += PZ_N_AIM_SPEED;
+    }
+    else if (pz_n_aim > target + PZ_N_AIM_SPEED)
+    {
+        pz_n_aim -= PZ_N_AIM_SPEED;
+    }
+    else
+    {
+        pz_n_aim = target;
     }
 }
 

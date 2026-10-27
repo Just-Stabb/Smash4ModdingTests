@@ -19,7 +19,11 @@ script/animcmd/body (Mario's, universal-mechanics game.bin); VL: his fighter_par
   fireball model, hidden: nud.hidden) and motion/water/main.pac (the fireball's);
 - --param: param/fighter/fighter_param.bin with his stats (STATS: Ultimate's fighter_param.prc, as
   Hero's / Steve's);
-- --bank: effect/pzenigame/pzenigame.010d0000.{ptcl,efc} from DIR (tools/vfxb_to_ptcl.py's output).
+- --bank: effect/pzenigame/pzenigame.010d0000.{ptcl,efc} from DIR (tools/vfxb_to_ptcl.py's output);
+- --sound DIR: tools/ultimate_sound.py's output (his Ultimate se / voice banks, cheer, sequences, the label
+  table, sound_ids.json; the base's rows kept, so no ids move): the body's sound and expression scripts
+  translated from Ultimate's (tools/ultimate_acmd.py --sound-ids / --expressions), fighter/pzenigame/sound/
+  and sound/config/soundlabeltable.bin written.
 """
 import argparse
 import json
@@ -43,9 +47,16 @@ KIND = 0x46
 CONSTS = dict(PZ_WATER_ARTICLE='0x5', PZ_N_CHARGE_MAX='45', PZ_N_SHOTS='6', PZ_N_SHOT_FRAME='7.0f',
               PZ_N_SHOT_EVERY='4.0f', PZ_S_SPEED_START='1.2f', PZ_S_SPEED_MAX='2.4f', PZ_S_ACCEL='10',
               PZ_S_SLIDE='40', PZ_S_BRAKE='0.9f', PZ_S_BOUNCE='1.0f',
+              # Water Gun's aim: Ultimate's SHOOT_ANGLE_ENABLE frames (SpecialNShot 5 - 40) and
+              # param_special_n angle_up 40 / angle_down 25 / angle_speed 2; the stick's dead zone mine
+              PZ_N_AIM_START='5.0f', PZ_N_AIM_END='40.0f', PZ_N_AIM_UP='40.0f', PZ_N_AIM_DOWN='25.0f',
+              PZ_N_AIM_SPEED='2.0f', PZ_N_AIM_DEAD='0.2f',
               # the water: Ultimate's param_water (vl.prc)
               WATER_SPEED_MIN='2.0f', WATER_SPEED_ADD='2.2f', WATER_CHARGE_MAX='45', WATER_LIFE='20',
-              WATER_ACCEL_Y='0.01f', WATER_FALL_MAX='1.2f')
+              WATER_ACCEL_Y='0.01f', WATER_FALL_MAX='1.2f',
+              # the mouth from the hand the game places it at (his SpecialNShot pose, frames 7 - 27:
+              # mouth ~(forward 9.5, up 5), left hand ~(8.0, 2.2))
+              WATER_MOUTH_FWD='1.5f', WATER_MOUTH_UP='2.8f')
 PZDIR = os.path.join(ROOT, 'fighters', 'pzenigame')
 # the water's motions: charge level 0 / 1 / 2 (water.c water_level: thirds of the charge) at the charge
 # ratio 0 / 0.5 / 1: Ultimate's reaction_add 75 x it on the push's knockback (fixed 40), its
@@ -102,7 +113,8 @@ def body_scripts(a, fighter, param):
                '--vl', a.vl, os.path.join(param, 'fighter_param_vl_pzenigame.bin'), '--vl-kind', 'mario',
                '--effects', os.path.join(ROOT, 'reference/ultimate_sys_effects.json') + ',' +
                os.path.join(PZDIR, 'pzenigame_effects.json'), os.path.join(a.ult, 'model/body/c00/model.nusktb'),
-               '--translate', os.path.join(PZDIR, 'specials_acmd.json'))
+               '--translate', os.path.join(PZDIR, 'specials_acmd.json'),
+               *(['--sound-ids', os.path.join(a.sound, 'sound_ids.json'), '--expressions'] if a.sound else []))
 
 
 # the special slots his moves use (pzenigame.c): Mario's scripts there go. Ultimate's start motions have no
@@ -114,7 +126,7 @@ EMPTY_GAME = (0x211, 0x215, 0x219, 0x21D)
 SAME_AS = {0x21C: 0x220}
 
 
-def special_slots(fighter):
+def special_slots(fighter, body):
     import struct
     d = os.path.join(fighter, 'script/animcmd/body')
     mt = open(os.path.join(d, 'motion.mtable'), 'rb').read()
@@ -127,9 +139,11 @@ def special_slots(fighter):
         if fn == 'game':
             for i in EMPTY_GAME:
                 f.scripts[h[i]] = list(end)
-        if fn == 'sound':            # Mario's (the fireball's, the cape's, his voice): his own come later
+        if fn == 'sound':            # Mario's left there (the fireball's, the cape's, his voice): gone
+            base = acmd.ACMDFile.load(os.path.join(body, 'sound.bin')).scripts
             for i in SPECIAL_SLOTS:
-                f.scripts[h[i]] = list(end)
+                if h[i] not in f.scripts or (h[i] in base and [str(c) for c in f.scripts[h[i]]] == [str(c) for c in base[h[i]]]):
+                    f.scripts[h[i]] = list(end)
         f.save(os.path.join(d, fn + '.bin'))
     return 'specials: game emptied %s, %s' % (', '.join('0x%X' % i for i in EMPTY_GAME),
                                               ', '.join('0x%X = 0x%X' % kv for kv in SAME_AS.items()))
@@ -179,11 +193,12 @@ def main():
         ap.add_argument(n)
     ap.add_argument('--param', help="the fighter_param.bin to give his stats (written to OUT/param/fighter)")
     ap.add_argument('--bank', help="tools/vfxb_to_ptcl.py's output folder (pzenigame.010d0000.ptcl / .efc)")
+    ap.add_argument('--sound', help="tools/ultimate_sound.py's output folder")
     a = ap.parse_args()
     fighter = os.path.join(a.out, 'fighter/pzenigame')
     param = os.path.join(a.out, 'param/fighter')
     print(body_scripts(a, fighter, param))
-    print(special_slots(fighter))
+    print(special_slots(fighter, a.body))
     msc = os.path.join(fighter, 'script/msc')
     compile_msc(os.path.join(PZDIR, 'pzenigame.c'), os.path.join(msc, 'pzenigame.mscsb'))
     compile_msc(os.path.join(PZDIR, 'weapons/water.c'), os.path.join(msc, 'water/water.mscsb'))
@@ -191,6 +206,10 @@ def main():
     if a.param:
         run(os.path.join(HERE, 'fighter_param.py'), 'set', a.param, os.path.join(param, 'fighter_param.bin'),
             str(KIND), *STATS)
+    if a.sound:
+        assert not json.load(open(os.path.join(a.sound, 'sound_ids.json')))['_rows'], 'ids would move: not done here'
+        shutil.copytree(os.path.join(a.sound, 'fighter/pzenigame/sound'), os.path.join(fighter, 'sound'), dirs_exist_ok=True)
+        shutil.copytree(os.path.join(a.sound, 'sound'), os.path.join(a.out, 'sound'), dirs_exist_ok=True)
     if a.bank:
         d = os.path.join(fighter, 'effect/pzenigame')
         os.makedirs(d, exist_ok=True)

@@ -126,3 +126,32 @@ Sources: as v1, plus Ultimate's `lua2cpp_pzenigame` scripts (body and pzenigame_
 `ef_pzenigame.eff` (`effect-fighter-SSBU.zip`). Approximated: Withdraw's speeds, the water's spawn
 point (the fireball's, at his hand; Ultimate's from his mouth), Water Gun's aim (Ultimate's angle
 range not done).
+
+## v3 (`build/squirtle_v3.zip`): Water Gun from his mouth, aimable; his sounds
+
+User: "Can you fix Water Gun, make it aimable, and add sounds?"
+
+```
+python3 tools/ultimate_sound.py ULT_SOUND FOLDER SOUNDLABELTABLE SND --name Pzenigame --ult-name pzenigame \
+    --dump DUMP/lua2cpp_pzenigame        (SOUNDLABELTABLE: Hero fix 71's; vc_pzenigame_cheer = Ultimate's _c00)
+python3 tools/pzenigame_build.py ... --sound SND
+```
+
+- **Where the water starts**: the article's native generate (`0x02F1AC88`, Mario's fireball's) puts it
+  at the thrower's joint `0x11` (`0x02F1ACEC`: `li r4, 0x11` into the model's joint position call):
+  LHandN in Mario's table and so in Squirtle's. Remapping the joint would move everything else on it,
+  so `water.c` moves itself on its first frame: `WATER_MOUTH_FWD` 1.5 forward, `WATER_MOUTH_UP` 2.8 up
+  (his SpecialNShot pose, frames 7 - 27, through `ultimate_fighter.py`'s own pose code: mouth (jaw) ~
+  forward 9.5 / up 5, left hand ~ 8.0 / 2.2).
+- **Aim**: Ultimate's `FIGHTER_PZENIGAME_STATUS_SPECIAL_N_FLAG_SHOOT_ANGLE_ENABLE` window (SpecialNShot frames
+  5 - 40) and `param_special_n` angle_up 40 / angle_down 25 / angle_speed 2: the stick's Y (past a 0.2
+  dead zone, mine) sets the target, the aim turns 2 degrees a frame toward it (`pz_n_aim_update`). Each
+  water gets it with the charge (custom slot: charge + 0x40 x (aim + 0x40)); it flies along it (speed x
+  cos / sin) and is turned to it (`PostureModule(0x4, -aim, 0, 0)`). Not done: `param_special_n`
+  angle 12 / offset_y / speed_add (their use not known), his body tilting with the aim.
+- **Sounds** (`tools/ultimate_sound.py`, base rows kept: no ids move): se 60 tones, voice 29 (23 of
+  Mario's labelled voice tones the game plays itself take Squirtle's), the cheer, 5 voice sequences;
+  `soundlabeltable.bin` built on Hero fix 71's. Sound scripts (160) and expression scripts (217)
+  translated from Ultimate's, the specials' too; the special slots' leftover Mario sounds emptied
+  (only where the script is still Mario's: v3's first build also emptied the new Water Gun slots'
+  translated ones). Left out: three common sounds with no Smash 4 id, the water's take-out sound.
