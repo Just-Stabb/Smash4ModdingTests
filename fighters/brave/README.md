@@ -1249,3 +1249,13 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
   below the waist where Ultimate's big render is cut off, the full-body one enlarged (softer); costumes
   5 - 8's lower bodies recoloured from 1 - 4's.
 - Changed: `ui/replace/chr/` (49 files). `build/hero_fix73_portraits.png`: old / fit check / new.
+
+## Fix 74 (`build/hero_fix74.zip`): his shield back
+
+- **User: every costume lost the shield, in animations and attacks (since fix 70).** Fix 70 shipped
+  the costume folders of `ultimate_fighter.py model`, whose `material_anime_face.pac` /
+  `material_anime_eyelid.pac` are Robin's own. The shields' visibility (fix 16: in Robin's Final /
+  Result mouth slots, driven per motion) is in the ones `ultimate_fighter.py motions` writes, so Robin's
+  never showed them. Back to fix 17's (the last motions build), every costume and its `l0N`. The
+  `model` command now notes it when the profile drives slots.
+- Changed: `model/body/c00`-`c07`, `l00`-`l07`: `material_anime_face.pac`, `material_anime_eyelid.pac`.

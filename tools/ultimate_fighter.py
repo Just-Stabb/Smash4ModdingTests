@@ -769,6 +769,10 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     for f in os.listdir(base):
         if os.path.isfile(os.path.join(base, f)):
             shutil.copy(os.path.join(base, f), os.path.join(out, f))
+    if prof.get('vis'):
+        # the base's own: the `motions` command writes this fighter's (the slots it drives, e.g. Hero's
+        # shields); shipping these (Hero fix 70) hid them in every motion
+        log('NOTE: material_anime_face / eyelid.pac here are the base\'s: ship the `motions` output\'s')
     open(out + '/model.vbn', 'wb').write(sk.vbn())
     open(out + '/model.jtb', 'wb').write(sk.jtb(base_jtb, base_vbn, prof['joints'], joints))
     open(out + '/model.nud', 'wb').write(nud.write(meshes, top_bone=len(sk.bones) - 1))
