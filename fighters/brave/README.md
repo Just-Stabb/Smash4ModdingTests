@@ -1090,3 +1090,18 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   `tools/strike_test.py`). Psyche Up is no longer spent by a grab's pummels (catch statuses
   `0x35`-`0x3D`) or the throw's own hits; the throw (`0x3E`) spends it when it ends.
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc`, `code/cross_f.rpx` (fix 61's + the new buff cave).
+
+## Fix 65 (`build/hero_fix65.zip`): roll-off aerials pressed after the slide-off, up air's line upward
+
+- **Roll-off test: control-stick aerials (user: fix 64 changed nothing; maybe the 8-frame hold):** fix 64
+  only caught an attack pressed during the roll. One pressed after the slide-off, inside the 8 frames
+  (`rolloff_air_t`), still took the game's kind (`ControlModule(0x10)`), which went by the stick held
+  in the roll. In that window `rolloff_aerial` now reads the main stick as the aerial starts
+  (`rolloff_stick_dir`: raw X on screen, Y; neutral under 0.3) when no press or C-stick flick was kept.
+- **Up air's line (fix 64's clip: upright now, but hanging below him):** Ultimate's lines have a
+  particle centre of (0, 0.8) (eft2's static `center`), so each grows up from the kick; the converter
+  left eft's matching `rotBasis` (`0x4C4`) as the template's, centring them on a point 3 below his feet.
+  It now writes the centre there for directional quads (eft2 type 3). Other emitters with a centre
+  (lightning sparks, Kazap's bolts, explosion flashes, ...: types 5 / 6 / 7 and meshes) are left as
+  tested so far.
+- Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).

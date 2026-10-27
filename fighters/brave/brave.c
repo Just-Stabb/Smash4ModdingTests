@@ -38365,31 +38365,39 @@ float rolloff_last_x;
 int rolloff_cstick;
 int rolloff_air_t;
 
+// the main stick now, as rolloff_cstick's codes: raw X on screen and Y, neutral (5) below 0.3 either way
+int rolloff_stick_dir()
+{
+    float x;
+    float y;
+    x = WorkModuleF(0, 0x0f000260);
+    y = WorkModuleF(0, 0x0f000111);
+    if (y > 0.3f && y * y > x * x)
+    {
+        return 0x3;
+    }
+    if (y < -0.3f && y * y > x * x)
+    {
+        return 0x4;
+    }
+    if (x > 0.3f)
+    {
+        return 0x1;
+    }
+    if (x < -0.3f)
+    {
+        return 0x2;
+    }
+    return 0x5;
+}
+
 void rolloff_cstick_update()
 {
     float x;
     float y;
     if (ControlModule(0x2710, 0))
     {
-        x = WorkModuleF(0, 0x0f000260); // attack pressed: the main stick now, raw X on screen, and Y
-        y = WorkModuleF(0, 0x0f000111);
-        rolloff_cstick = 0x5;           // neutral below 0.3 either way
-        if (y > 0.3f && y * y > x * x)
-        {
-            rolloff_cstick = 0x3;
-        }
-        else if (y < -0.3f && y * y > x * x)
-        {
-            rolloff_cstick = 0x4;
-        }
-        else if (x > 0.3f)
-        {
-            rolloff_cstick = 0x1;
-        }
-        else if (x < -0.3f)
-        {
-            rolloff_cstick = 0x2;
-        }
+        rolloff_cstick = rolloff_stick_dir();   // attack pressed in the roll: the main stick then
         return;
     }
     x = WorkModuleF(0, 0x0f000261);     // the C-stick: raw X on screen, and Y (fix 63: ControlModuleF(7 / 8)
@@ -38422,9 +38430,15 @@ int rolloff_aerial(int kind)
     int c;
     c = rolloff_cstick;
     rolloff_cstick = 0;
-    if (c == 0 || rolloff_air_t <= 0)
+    if (rolloff_air_t <= 0)
     {
         return kind;
+    }
+    if (c == 0)
+    {
+        // pressed after the slide-off (fix 65, user: fix 64 changed nothing for the control stick): the
+        // game's kind still went by the stick held in the roll; the stick now instead
+        c = rolloff_stick_dir();
     }
     if (c == 0x5)
     {

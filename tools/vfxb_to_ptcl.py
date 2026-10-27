@@ -136,6 +136,7 @@ BASE_FIRST = 2          # a template of the base's own beats an imported one thi
 # live matrices, else copies them. No vanilla shader group mixes values, but one vertex program
 # serves all three (tools/eft_vertex.py): the converter writes Ultimate's
 FOLLOW = 0x310
+ROT_BASIS = 0x4C4       # eft's rotBasis (2 floats): the particle's centre (eft2's static `center`)
 KEY_HOOKS = (0x32C, 0x330, 0x334, 0x338, 0x33C)
 # slot 0's flipbook (cross_f.rpx 0x04A5A858 / 0x04A5A6AC, the emitter's uniforms; 0x04A54A88 the
 # random start cell): 0x4D5 table used, 0x4D7 / 0x4D8 cells across / down, 0x4D9 random start cells,
@@ -1874,6 +1875,14 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # fix 63's up air). Observed, not derived
         em_rot = tuple(float(v) for v in info['rotate'][:3])
         notes.append('directional quad: emitter turned X first')
+    if typ == 3 and not is_mesh and pt['billboard_type'] == 3:
+        # eft2's particle centre (static `center`) as eft's rotBasis (0x4C4, docs/ptcl-format.md: the
+        # vertex programs draw S (pos + rotBasis)): sys_attack_line's lines (0, 0.8) grow up from the
+        # kick in Ultimate; centred on it (the template's) they hung below his feet (Hero fix 65). Kept to
+        # directional quads so far: the stripes and meshes that have one (lightning sparks, Kazap's
+        # bolts, ...) are as tested without it
+        struct.pack_into('>2f', em, ROT_BASIS, *(float(v) for v in e['static']['center'][:2]))
+        notes.append('particle centre %g %g' % tuple(e['static']['center'][:2]))
     else:
         em_rot = eft_rotation(info['rotate'])
     p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
