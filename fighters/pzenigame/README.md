@@ -155,3 +155,20 @@ python3 tools/pzenigame_build.py ... --sound SND
   translated from Ultimate's, the specials' too; the special slots' leftover Mario sounds emptied
   (only where the script is still Mario's: v3's first build also emptied the new Water Gun slots'
   translated ones). Left out: three common sounds with no Smash 4 id, the water's take-out sound.
+
+## v4 (`build/squirtle_v4.zip`): the water's launch sound, the last common sounds
+
+- **Common sounds** matched in `reference/ultimate_sound_map.json` `common_se` (Ultimate's
+  `se_common.nus3bank` against Smash 4's `snd_se_joucyu`):
+
+  | Ultimate | Smash 4 index | Smash 4 tone | Match |
+  |---|---|---|---|
+  | `se_common_slip_01` | 163 | `snd_se_common_058` | same sample count (3467), next to slip_02 = 164 (`_059`) |
+  | `se_common_falldown_01` | 159 | `snd_se_common_054` | same sample count (25584), next to falldown_02 = 160 (`_055`) |
+  | `se_common_down_soil_ss` | 95 | `snd_se_common_down_Soil_ss` | name (Ultimate's re-recorded) |
+  | `se_common_c_water_m` | 354 | `snd_se_common_C_Water_m` | name |
+
+  They are used by DownBound/DownDamage/DownSpot/Slip/SlipDown; every sound in his scripts has an id now.
+- **Water's sound script**: Ultimate's `pzenigame_water` `sound_regular` (`SET_TAKEOUT_SE
+  se_common_c_water_m`), translated by `ultimate_acmd.SoundTranslator` into all three water motions
+  (`SET_TAKEOUT_SE(Se=0x162)`, the command Mario's fireball / pump water use).

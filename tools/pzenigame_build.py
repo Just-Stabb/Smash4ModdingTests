@@ -169,10 +169,20 @@ def water_scripts(a, fighter):
         assert not etr.missing, etr.missing
         game[WATER_SLOTS[lv]], effect[WATER_SLOTS[lv]] = g, e
     U.EFFECT_CONDS = ()
+    # its sound (SET_TAKEOUT_SE se_common_c_water_m: the launch), one for every level
+    smap = json.load(open(os.path.join(ROOT, 'reference/ultimate_sound_map.json')))
+    sids = {k: v for k, (v, _c) in smap['common_se'].items()}
+    if a.sound:
+        sids.update({k: v for k, v in json.load(open(os.path.join(a.sound, 'sound_ids.json'))).items()
+                     if not k.startswith('_')})
+    st = U.SoundTranslator(sids)
+    snd = st.script(fns['sound_regular'])
+    assert not st.missing, st.missing
+    sound = {WATER_SLOTS[lv]: [acmd.Command(c.ident, list(c.params)) for c in snd] for lv in range(len(WATER_LEVELS))}
     wdir = os.path.join(fighter, 'script/animcmd/weapon/water')
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
-    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+    for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in WATER_SLOTS}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
         f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in WATER_SLOTS))
@@ -183,8 +193,9 @@ def water_scripts(a, fighter):
     open(os.path.join(mdir, 'model.nud'), 'wb').write(hidden)
     os.makedirs(os.path.join(fighter, 'motion/water'), exist_ok=True)
     shutil.copy(os.path.join(a.mario, 'motion/fireball/main.pac'), os.path.join(fighter, 'motion/water/main.pac'))
-    return 'water: %s; game %s' % (', '.join(WATER_SLOTS[:len(WATER_LEVELS)]),
-                                   '; '.join(str(c) for c in game['water2'])[:300])
+    return 'water: %s; game %s; sound %s' % (', '.join(WATER_SLOTS[:len(WATER_LEVELS)]),
+                                             '; '.join(str(c) for c in game['water2'])[:300],
+                                             '; '.join(str(c) for c in snd))
 
 
 def main():
