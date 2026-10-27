@@ -848,3 +848,22 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
   auras, the sword enchantments ...). The names are fixed in `ptcl.py` (docs/ptcl-format.md), so
   every tool writing them by name is right now (`xv2_to_ptcl.py`'s Kamehameha too, on its next build).
 - Only the `.ptcl` changed.
+
+## Fix 54 (`build/hero_fix54.zip`): face culling, fresnel fades on turning meshes
+
+- User's video (fix 53): Kaswoosh rises into a tall layered tornado now, but nearly solid sky blue
+  where Ultimate's is see-through white streaks.
+- Faces: eft's emitter word 0x320 is the faces drawn (0 both, 1 front, 2 back: vanilla meshes named
+  `*_front` mostly 1, `*_back` 2 or 0), Ultimate's `display_side` with the same values. The converter
+  left the template's: Kaswoosh's `*_back` layers (dark, meant for the inside of the funnel) drew front
+  faces over the pale front layers, and `f2` both sides. Meshes now take Ultimate's (383 of his: 314
+  both, 44 front, 25 back); camera-facing quads keep the template's.
+- Fresnel: the front rings fade by view angle (`tornado1_front` 1.1 -> 0.6: gone where they face the
+  camera; `tornado1_f2` 0.5 -> 1.1, the cyan layer: only where they do). Only camera-facing meshes
+  could be baked (`fresnel_bake`); the rings spin 30 degrees a frame about Y, so a per-vertex bake
+  would sweep round with them, and their UVs don't run round the funnel (no spin-as-scroll). Their
+  alpha now goes x the fade's mean over what of the mesh shows (`fresnel_mean`: each face by its
+  screen area, only the faces drawn, over the mesh's turns): the front rings x 0.87, the `f2` cyan
+  layers x 0.19 - 0.22. 48 parts in all (most x 0.9+; Psych Up's `impact_M_front` x 0.17, the ice
+  sword fragments x 0.60).
+- Only the `.ptcl` changed.

@@ -78,6 +78,9 @@ FIELDS = [
     (0x2FF, '>B', 'one_time', 'runtime'),         # 1: emits from start_frame for end_frame frames (vanilla: 1 <=> finite end)
     (0x30C, '>I', 'enum_30c', 'corpus'),          # 0x30C-0x33C: small enums, shader-keyed (see doc)
     (0x31C, '>I', 'enum_31c', 'corpus'),
+    # faces drawn: 0 both, 1 front, 2 back (vanilla meshes named *_front: 30 of 45 1; *_back: 33 of 82 2,
+    # the rest 0; Ultimate's render display_side, same values)
+    (0x320, '>I', 'display_side', 'corpus'),
     (0x324, '>I', 'blend_type', 'corpus'),         # 0 alpha, 1 add, 2 subtract (names: *_alpha 0, *add* 1)
     (0x340, '>I', 'volume_type', 'corpus'),       # 0 point, 2.. shapes (sphere / cylinder / box...)
     (0x348, '>3f', 'volume_radius', 'corpus'),

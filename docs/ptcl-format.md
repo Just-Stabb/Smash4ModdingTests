@@ -97,6 +97,7 @@ the writer recomputes them.)
 | 0x2EC / 0x2F0 | u32 | shader-param size / pos (into sparam table) | verified |
 | 0x2F8–0x33C | u32s | small enums (blend, display, z-mode, etc.) — shader-keyed | corpus |
 | 0x32C–0x33C | 5 u32 | per-particle hooks (0x04A627A0: function tables, 0 none); 2 = by key animation, only ever on key-animated emitters (it reads the key table: null once the table is dropped, a crash at 0x04A5E154); 1 everywhere else | verified (calls) / corpus |
+| 0x320 | u32 | faces drawn: 0 both, 1 front, 2 back (vanilla meshes named `*_front`: 30 of 45 1; `*_back`: 33 of 82 2, the rest 0); Ultimate's render `display_side`, same values | corpus |
 | 0x324 | u32 | blend: 0 alpha (normal), 1 additive, 2 subtract. Not shader-keyed: 352 of 5366 (file, shader) pairs use more than one; emitters named `*_alpha` are 0 (273 of 280), `*add*` mostly 1 | corpus |
 | 0x340 | u32 | volume type (0 point, 1 circle (XZ plane, radius x / z), 2 circle (same divide), 3 circle fill, 4 sphere, 7 sphere fill, 8-9 cylinder, 10-11 box, 12-13 line, 14 rectangle: names and radii in the corpus fit NintendoWare's order) | corpus |
 | 0x348 | 3f | volume radius | corpus |

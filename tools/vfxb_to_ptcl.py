@@ -480,6 +480,49 @@ def fresnel_bake(e, notes):
     return near, far
 
 
+def fresnel_mean(e, model, s3, st, notes):
+    """the mean of a mesh's fresnel alpha (eft2's view-angle alpha, as fresnel_bake) over what of it
+    shows, for a mesh fresnel_bake can't bake (a directional type: its faces turn against the view),
+    else None. Each face weighted by its area on screen (camera along Z), only the faces Ultimate
+    draws (display_side), averaged over the turns it takes (its spin / random start about each axis
+    it turns about: Kaswoosh's rings spin 30 degrees a frame about Y, so a bake would sweep round
+    with them). Smash 4's templates have no view vector for it: the alpha goes x this mean instead
+    (Kaswoosh's front rings fade where they face the camera, 0.53 of them showing on average; drawn at
+    full alpha their stack hid what's behind, fix 54)"""
+    if not e['color']['fresnel_alpha']:
+        return None
+    near, far = (float(v) for v in e['static']['fresnel_alpha'][:2])
+    if abs(far - near) < 1e-6:
+        return None
+    pos, _n, _c, _u, idx = mesh(model, 0)
+    pos = pos.astype(np.float64) * np.array(s3, np.float64)
+    tri = np.asarray(idx, np.int64).reshape(-1, 3)
+    fn = np.cross(pos[tri[:, 1]] - pos[tri[:, 0]], pos[tri[:, 2]] - pos[tri[:, 0]])     # 2 x area, outward
+    base = rotation_matrix([float(v) for v in st['rotate_init'][:3]])
+    axes = [a for a in range(3) if any(abs(float(st[k][a])) > 1e-6
+                                       for k in ('rotate_add', 'rotate_add_rand', 'rotate_init_rand'))]
+    rng = np.random.default_rng(0)
+    side = e['render']['display_side']
+    num = den = 0.0
+    for j in range(64 if axes else 1):
+        ang = [0.0, 0.0, 0.0]
+        for k, a in enumerate(axes):
+            ang[a] = 2 * np.pi * (j / 64 if k == 0 else rng.random())
+        n = fn @ (rotation_matrix(ang) @ base).T
+        area = np.linalg.norm(n, axis=1)
+        nz = n[:, 2] / np.maximum(area, 1e-12)
+        vis = np.ones(len(nz), bool) if side == 0 else (nz > 0 if side == 1 else nz < 0)
+        t = np.clip((np.abs(nz) - near) / (far - near), 0, 1)
+        w = area * np.abs(nz) * vis
+        num += float((w * t * t * (3 - 2 * t)).sum())
+        den += float(w.sum())
+    if den <= 0:
+        return None
+    m = num / den
+    notes.append('fresnel alpha %.2f - %.2f: x %.2f, its mean over the mesh%s' % (near, far, m, "'s turns" if axes else ''))
+    return m
+
+
 def mesh(model, uv_channel=0):
     """(pos, nrm, col, uv, idx) of a BFRES model's first shape. Every vanilla primitive has normals
     (825 of them; 106 have no colour): missing ones are +Z; an all-white colour is left out. The UV
@@ -1509,6 +1552,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     ptn = ptn_want if ptn_want and flip else 0
     repeat = REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1)) if smp else (1, 1)
     bake = None
+    fres_mean = None     # a mesh's fresnel alpha as a mean (fresnel_mean)
     if is_mesh:
         # eft's particle scale has two axes (vanilla 3D meshes, e.g. Zelda's smash arc, are built at
         # size with scale 1): an uneven 3D scale goes into the mesh (one primitive per mesh and
@@ -1545,6 +1589,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                 notes.append('UV transform baked into the mesh')
         channel = e['tex_anim'][ti]['uv_channel'] if smp else 0
         fres = fresnel_bake(e, notes)
+        if fres is None:
+            fres_mean = fresnel_mean(e, prims[pt['primitive_id']], s3, st, notes)
         key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
@@ -1592,6 +1638,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # the alpha track (x alpha 1 in alpha mode 4), for an own pixel program
     st_, col_ = e['static'], e['color']
     a_track = track(st_, col_, 0)[1] * e['info']['color0'][3]
+    if fres_mean is not None:
+        a_track = a_track * fres_mean
     if e['combiner']['alpha_process'] == 4:
         a_track = a_track * track(st_, col_, 1)[1] * e['info']['color1'][3]
     if smp and ptn_want and not ptn:
@@ -1692,6 +1740,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # ---- blend, colour, alpha
     col = e['color']     # (st: the static block, its rotation masked above)
     p.set_field(em, 'blend_type', BLEND[blend])
+    if is_mesh:
+        # the faces Ultimate draws (0 both, 1 front, 2 back), not the template's: Kaswoosh's funnel has
+        # front and back layers (its *_back ones dark, inside), all drawn front-only from their templates
+        # in fix 53, the dark layers over the pale ones (fix 54). Quads face the camera: theirs is kept
+        p.set_field(em, 'display_side', int(e['render']['display_side']))
     # pulled toward the camera (or pushed back) by eft2's offset, as eft's 0x4D0 does (the same units:
     # Bounce's barrier 10, drawn over Hero; the glow discs -2)
     p.set_field(em, 'camera_offset', float(e['static']['offset']))
