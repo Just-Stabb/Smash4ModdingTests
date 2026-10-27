@@ -2385,6 +2385,10 @@ def main():
                     'grafted templates for them (A / B tests)')
     ap.add_argument('--hdr-white-for', default='', help='as --no-graft-for: their HDR colours (past 1) whitened '
                     'as Ultimate\'s tone mapping shows them (white_spill), not clamped per channel')
+    ap.add_argument('--tint-for', default='', help='comma-separated EFFECT[/EMITTER]=RRGGBB: both colour tracks x that '
+                    'colour (a tint Ultimate gives at run time: up air\'s sys_attack_line, soft blue)')
+    ap.add_argument('--camera-offset-for', default='', help='comma-separated EFFECT[/EMITTER]=OFFSET: its camera '
+                    'offset (negative: drawn behind what is near it, as up air\'s line behind him)')
     ap.add_argument('--upright-for', default='', help='as --no-graft-for: directional quads stood straight up from '
                     'the emitter, growing up from it (Kazap\'s bolt streaks)')
     ap.add_argument('--test-white1-for', default='', help='as --no-graft-for: texture 1 white (tests)')
@@ -2438,6 +2442,9 @@ def main():
     white1 = set(v for v in a.test_white1_for.split(',') if v)
     hdr_white = set(v for v in a.hdr_white_for.split(',') if v)
     upright = set(v for v in a.upright_for.split(',') if v)
+    tint_for = {k: tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4))
+                for k, v in (x.split('=') for x in a.tint_for.split(',') if x)}
+    cam_for = {k: float(v) for k, v in (x.split('=') for x in a.camera_offset_for.split(',') if x)}
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
@@ -2508,6 +2515,15 @@ def main():
                     c = ((np.indices((64, 64)) // 8).sum(0) % 2).astype(np.float32)
                     set_exact_texture(p, em, 0, np.stack([c, c, c, c], -1))
                     notes.append('texture 0 a checkerboard (--test-checker-for)')
+                for k in (name, key):
+                    if em is not None and k in tint_for:
+                        for tr in (0, 1):
+                            p.set_color_keys(em, tr, [(r * tint_for[k][0], g * tint_for[k][1], b * tint_for[k][2], a_)
+                                                      for r, g, b, a_ in p.color_keys(em, tr)])
+                        notes.append('tinted x %02X%02X%02X (--tint-for)' % tuple(int(v * 255) for v in tint_for[k]))
+                    if em is not None and k in cam_for:
+                        p.set_field(em, 'camera_offset', cam_for[k])
+                        notes.append('camera offset %g (--camera-offset-for)' % cam_for[k])
                 if em is not None and key in tint:
                     for tr in (0, 1):
                         p.set_field(em, 'color%d_type' % tr, 0)

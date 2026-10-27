@@ -1150,4 +1150,9 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   lay level. `--upright-for` stands them straight up from the hit point, growing up from it (their
   centre, 0 1, halved as the attack line's). Fix 67's quarter turn of billboard meshes is taken back
   (the thunder meshes keep their centre: from 17 to 95 up).
+- **Up air's line (user: a soft blue, in the layer behind him):** Ultimate's `sys_attack_line` is all
+  grey / white in its data (colours, textures); the soft blue (core near white, edges about 0.65 0.85
+  1.0 in the user's clip) is a tint the game gives it at run time. `--tint-for sys_attack_line=A6D9FF`
+  multiplies its colour tracks by it; `--camera-offset-for sys_attack_line=-15` draws it behind him
+  (Ultimate's own -5 left it in front of his body here).
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).
