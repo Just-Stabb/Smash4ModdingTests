@@ -489,6 +489,9 @@ class Textures:
         px = np.c_[(xs.ravel() + 0.5) / wd, (ys.ravel() + 0.5) / h]
         for a, b, c in tri.reshape(-1, 3):
             p0, p1, p2 = uv1[a], uv1[b], uv1[c]
+            # the white repeats (Squirtle's map1 V runs -1.85..-1.15): draw in the [0, 1) tile
+            o = np.floor(np.minimum(np.minimum(p0, p1), p2))
+            p0, p1, p2 = p0 - o, p1 - o, p2 - o
             lo, hi = np.minimum(np.minimum(p0, p1), p2), np.maximum(np.maximum(p0, p1), p2)
             sel = np.where((px[:, 0] >= lo[0]) & (px[:, 0] <= hi[0]) & (px[:, 1] >= lo[1]) & (px[:, 1] <= hi[1]))[0]
             if not len(sel):
@@ -1060,6 +1063,62 @@ REFLET_MOTIONS = {
 }
 # a base fighter's profile: its mesh slots, joint-table stand-ins, motion stand-ins (its specials),
 # Ultimate visibility tracks driving slots (with the default where a motion has none), slots hidden
+# Mario's mesh slots for Squirtle (pzenigame). Mario's face is driven by his two material animations: the
+# eyelid one (the upper face: FaceN, Eye, the blinks and the expression faces) and the face one (the mouth
+# shapes). Squirtle's face is likewise in pieces: an eye / eyelid shape per expression (_Blink, the face's
+# skin with it), the pupils (Eye1), the mouths. Ultimate's blink (a00defaulteyelid) is Openblink -> Harfblink
+# (1 frame) -> Down_Blink (5) -> Harfblink -> Openblink, as Mario's FaceN -> Halfblink -> Blink
+_PZ = 'pzenigame_%s_VIS_O_OBJShape'
+MARIO_SLOTS = [
+    ('Mario_FaceN_VIS_O_OBJ', [_PZ % 'FaceN_Openblink']),
+    ('Mario_FaceNMClose_VIS_O_OBJ', [_PZ % 'FaceN_Mouth']),
+    ('Mario_FaceNMHalf_VIS_O_OBJ', [_PZ % 'PatternB_Mouth']),
+    ('Mario_FaceNMOpen_VIS_O_OBJ', [_PZ % 'VoiceB_Mouth']),
+    ('Mario_Hathead_VIS_O_OBJ', []),
+    ('Mario_Nohat_VIS_O_OBJ', []),
+    ('Mario_Eye_VIS_O_OBJ', [_PZ % 'FaceN_Eye1']),
+    ('Mario_Halfblink1_VIS_O_OBJ', [_PZ % 'Harfblink_Blink']),
+    ('Mario_Halfblink2_VIS_O_OBJ', [_PZ % 'Harfblink_Blink']),
+    ('Mario_Halfblink3_VIS_O_OBJ', [_PZ % 'Harfblink_Blink']),
+    ('Mario_Blink_VIS_O_OBJ', [_PZ % 'Down_Blink']),
+    ('Mario_Ouch_VIS_O_OBJ', [_PZ % 'Ouch_Blink']),
+    ('Mario_OuchMOpen_VIS_O_OBJ', [_PZ % 'HeavyHit_Mouth']),
+    ('Mario_OuchMHalf_VIS_O_OBJ', [_PZ % 'Ottoto_Mouth']),
+    ('Mario_OuchMClose_VIS_O_OBJ', [_PZ % 'PatternA_Mouth']),
+    ('Mario_Down_VIS_O_OBJ', [_PZ % 'Down_Blink']),
+    ('Mario_Talk_VIS_O_OBJ', [_PZ % 'Talk_Blink']),
+    ('Mario_TalkMOpen_VIS_O_OBJ', [_PZ % 'Heavyattack_Mouth']),
+    ('Mario_TalkMHalf_VIS_O_OBJ', [_PZ % 'PatternB_Mouth']),
+    ('Mario_TalkMClose_VIS_O_OBJ', [_PZ % 'Talk_Mouth']),
+    ('Mario_Attack_VIS_O_OBJ', [_PZ % 'Attack_Blink']),
+    ('Mario_Capture_VIS_O_OBJ', [_PZ % 'Capture_Blink']),
+    ('Mario_Bound_VIS_O_OBJ', [_PZ % 'Heavyouch_Blink']),
+    ('Mario_Heavyouch_VIS_O_OBJ', [_PZ % 'Heavyouch_Blink']),
+    ('Mario_Furafura_VIS_O_OBJ', [_PZ % 'Furafura_Blink']),
+    ('Mario_Cliff_VIS_O_OBJ', [_PZ % 'Cliff_Blink']),
+    ('Mario_Sorori_VIS_O_OBJ', [_PZ % 'PatternA_Blink']),
+    ('Mario_Final_VIS_O_OBJ', [_PZ % 'Hot_Blink']),
+    ('Mario_Escape_VIS_O_OBJ', [_PZ % 'Heavyattack_Blink']),
+    ('Mario_Ottotto_VIS_O_OBJ', [_PZ % 'PatternA_Blink']),
+    ('Mario_Damageflyfront_VIS_O_OBJ', [_PZ % 'Heavyhit_Blink']),
+    ('Mario_Result_VIS_O_OBJ', [_PZ % 'Catch_Mouth']),
+    ('Mario_Hair_VIS_O_OBJ', []),
+    ('Gamemodel', ['GamemodelShape']),
+]
+# Mario's specials -> Squirtle's: Fireball -> Water Gun (its shot), Cape -> Withdraw (its start), Super Jump
+# Punch -> Waterfall, F.L.U.D.D. -> Pokemon Change (out, then back in: no swap); appeals: the facing-right ones
+MARIO_MOTIONS = {
+    'd00specialn': 'd00specialnshot', 'd00specialairn': 'd00specialairnshot',
+    'd01specials': 'd01specialsstart', 'd01specialairs': 'd01specialairsstart',
+    'd02specialhi': 'd02specialhi', 'd02specialairhi': 'd02specialairhi',
+    'd03speciallwstart': 'd03speciallwout', 'd03speciallwhold': 'd03speciallwout',
+    'd03speciallwlight': 'd03speciallwin', 'd03speciallwheavy': 'd03speciallwin',
+    'd03specialairlwstart': 'd03specialairlwout', 'd03specialairlwhold': 'd03specialairlwout',
+    'd03specialairlwlight': 'd03specialairlwin', 'd03specialairlwheavy': 'd03specialairlwin',
+    'd04final': 'd04final', 'd04finalair': 'd04finalair',
+    'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr', 'j01appeallw': 'j01appeallwr',
+}
+
 PROFILES = {
     'zelda': dict(slots=MESH_SLOTS, joints=JOINT_STANDINS, motions=MOTION_STANDINS, vis=VIS_SLOTS,
                   vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
@@ -1071,6 +1130,8 @@ PROFILES = {
                 vis_default={}, hidden=(), layers=PIT_LAYERS),
     'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                    vis=REFLET_VIS, vis_default={REFLET_VIS['brave_shield']: 1}, hidden=()),
+    'mario': dict(slots=MARIO_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **MARIO_MOTIONS), vis={},
+                  vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                      vis=REFLET_F_VIS, vis_default={REFLET_F_VIS['brave_shield']: 1}, hidden=()),
 }

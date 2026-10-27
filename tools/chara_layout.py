@@ -2,7 +2,7 @@
 """Character select grid arrangements in ui/lumen/chara/chara.lm (Lumen LMB): rewrite the
 `num_NNN` frames of the face-layout sprite so every count from FIRST up has a clean grid.
 
-  python3 tools/chara_layout.py IN.lm OUT.lm [--first 58] [--last N] [--style user4] [--png sheet.png]
+  python3 tools/chara_layout.py IN.lm OUT.lm [--first 58] [--last N] [--style user4|user5] [--png sheet.png]
 
 --last: only the counts up to N (the file grows ~3 KB a count; all of 58-96 is +130 KB)
 
@@ -20,6 +20,10 @@ Style user4 (the user's honeycomb CSS): 4 rows, odd rows from x -869.5, even row
 124.5 apart, rows at y -156.5 / -51 / 54.5 / 160 (their num_057); 15 + 14 + 15 + 14 = 58 fit at
 scale 1, the last two entries at the right end of rows 3 and 4 (as their num_057). Above 58 the
 grid gets more columns and is scaled down to the same width (transform matrices).
+
+Style user5 (Squirtle on, `--first 63`): 5 rows in the 4 rows' height, icons at 0.75, rows of c / c - 1
+(c >= 13) centred on the 4-row grid's centre, the last two entries at the right ends of rows 4 and 5;
+past 19 columns (93 entries) narrower again to the 4-row grid's width.
 """
 import math
 import struct
@@ -236,7 +240,31 @@ def user4(n):
     return [(x, y, s) for x, y in out + ends]
 
 
-STYLES = {'user4': user4}
+def user5(n):
+    """[(x, y, scale)] for faces 1..n: the honeycomb in 5 rows in the 4 rows' height (icons at 0.75),
+    rows of c / c - 1 centred on the 4-row grid's centre, narrower still past 19 columns"""
+    c = max(13, math.ceil((n + 2) / 5))           # odd-row columns; capacity 5c - 2
+    s = min(0.75, 14.0 / (c - 1))
+    cx, cy = (ODD_X0 + ODD_X0 + 14 * DX) / 2, (ROWS_Y[0] + ROWS_Y[3]) / 2
+    dx, dy = DX * s, (ROWS_Y[3] - ROWS_Y[0]) / 4
+
+    def slot(r, k):
+        x0 = cx - (c - 1) * dx / 2 + (dx / 2 if r % 2 else 0)
+        return (x0 + k * dx, cy + (r - 2) * dy)
+    caps = [c, c - 1, c, c - 1, c]
+    # the last two entries at the right ends of rows 4 and 5, as user4 keeps them on its last two rows
+    ends = [slot(3, caps[3] - 1), slot(4, caps[4] - 1)]
+    fill = caps[:3] + [caps[3] - 1, caps[4] - 1]
+    out, rest = [], n - 2
+    for r in range(5):
+        for k in range(fill[r]):
+            if len(out) < rest:
+                out.append(slot(r, k))
+    assert len(out) == rest, (n, len(out))
+    return [(x, y, s) for x, y in out + ends]
+
+
+STYLES = {'user4': user4, 'user5': user5}
 
 
 def relayout(lm, first, style, last=None):

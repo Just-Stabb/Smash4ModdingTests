@@ -5,6 +5,7 @@ Smash 4 frames the base fighter's.
   python3 tools/ultimate_portraits.py --ult-ui ULT_UI --s4-chr S4_CHR --templates TEMPLATES
           --ult brave --ult-base reflet --ui-name Hero --s4-base Reflet --out OUT
           [--extra-out DIR] [--contact PNG] [--sets chr_00,chr_13,...] [--costumes 1-8] [--fits FITS.json]
+          [--cross SCALE,X,Y] [--stock-whole]
           [--name-text TEXT]
 
 ULT_UI     Ultimate's ui folder, or a zip holding it (ui/replace[_patch]/chara/chara_N/chara_N_<name>_CC.bntx)
@@ -44,6 +45,8 @@ Per kind of set (the parts measured on the base's own pictures):
          r1), k * shift(dilate(head, r2)))). The face goes where the base's face is; the scale is the
          face frame's unless the head would leave the base head's box (+3 px), then smaller (Smash 4
          fits each stock icon's head to the icon; Hero's hair and the other heroes' helmets are bigger).
+         --stock-whole, where chara_4 isn't a cut of chara_3's render (Squirtle's upper body, turned):
+         chara_4 whole, fitted into the base head's box.
   plate  chrn_11 / chrn_12 / chrn_40: the name in the game's lettering: glyphs cut from the other
          fighters' plates (SHEIK, BOWSER, ROBIN, DUCK HUNT...), long names' condensing undone, letter
          spacing from the same pair on a plate where there is one, outline / shadow refitted on the
@@ -913,6 +916,36 @@ def segment(fill, n):
     return out
 
 
+def glyph_q(cond, gm, ui, img, cl, cr):
+    """an O glyph with a Q's tail: a stroke of the O's own thickness from inside its lower right to its
+    bottom right corner, in the letter's colour row by row"""
+    gm, img = gm.copy(), img.copy()
+    ys, xs = np.flatnonzero(gm.max(1) > 0.5), np.flatnonzero(gm.max(0) > 0.5)
+    t, bt, l, r = ys[0], ys[-1], xs[0], xs[-1]
+    mid = gm[(t + bt) // 2] > 0.5
+    th = max(2.0, float(np.argmin(mid[l:]) if not mid[l:].all() else 2))      # the left stroke's width
+    p0 = np.array([l + 0.58 * (r - l), t + 0.62 * (bt - t)])
+    p1 = np.array([r + 0.5, bt + 0.5])
+    yy, xx = np.mgrid[0:gm.shape[0], 0:gm.shape[1]].astype(np.float64)
+    q = np.stack([xx, yy], -1) - p0
+    d = p1 - p0
+    u = np.clip((q @ d) / (d @ d), 0, 1)
+    dist = np.linalg.norm(q - u[..., None] * d, axis=-1)
+    cov = np.clip(th / 2 + 0.5 - dist, 0, 1).astype(np.float32)
+    cov[bt + 1:] = 0                    # on the baseline: the glyph checks hold the letters to it
+    cov[:, r + 2:] = 0
+    rows = {}
+    for y in range(gm.shape[0]):
+        on = gm[y] > 0.5
+        if on.any():
+            rows[y] = img[y][on].mean(0)
+    new = (cov > 0) & (gm < 0.5)
+    for y, x in zip(*np.nonzero(new)):
+        ny = min(rows, key=lambda k: abs(k - y))
+        img[y, x] = np.round(rows[ny]).astype(img.dtype)
+    return (cond, np.maximum(gm, cov), ui, img, cl, cr)
+
+
 class GlyphLib:
     """the letters of one plate set (chrn_11: capitals; chrn_12 / chrn_40: big + small capitals)"""
     def __init__(self, st, s4chr, log):
@@ -976,6 +1009,13 @@ class GlyphLib:
                 self.glyphs.setdefault((c.upper(), b), []).append((cond, gm, ui, img[:, x0:x1], c0 - x0, c1 - x0))
                 if i + 1 < len(chars) and not self.space_after(text, i):
                     self.pairs.setdefault((c.upper(), b, chars[i + 1].upper(), bigs[i + 1]), []).append((runs[i + 1][3] - c1) / cond)
+        # no Smash 4 name has a Q (Squirtle's): the O with a tail across its lower right
+        for b in (True, False):
+            if ('O', b) in self.glyphs and ('Q', b) not in self.glyphs:
+                self.glyphs[('Q', b)] = [glyph_q(*g) for g in self.glyphs[('O', b)]]
+                nat[('Q', b)] = nat[('O', b)]
+                log.append('%s: Q (%s) made from the O (%s)' % (st, 'big' if b else 'small',
+                                                              ', '.join(g[2] for g in self.glyphs[('O', b)])))
         self.nat = nat
         log.append('%s: glyphs from %d plates (%s); left out, a glyph off the line: %s; %s' % (
             st, len(raw), ', '.join(r[0] for r in raw), ', '.join(r[0] for r in dropped) or 'none',
@@ -1145,6 +1185,10 @@ def main():
     ap.add_argument('--sets')
     ap.add_argument('--costumes', default='1-8')
     ap.add_argument('--fits')
+    ap.add_argument('--stock-whole', action='store_true', help="stock_90: the port's chara_4 whole, fitted into "
+                    "the base head's box (where chara_4 isn't the head of chara_3's render)")
+    ap.add_argument('--cross', help='SCALE,X,Y: C (the base\'s chara_0 c00 pixel -> its Smash 4 chr_90_01 pixel) '
+                    'set by hand instead of matched (Mario: the poses differ; from eyes, nose and cap emblem)')
     ap.add_argument('--no-tone', action='store_true', help="Ultimate's art as it is (not brightened as Smash 4's "
                     'renders: TONE_*)')
     a = ap.parse_args()
@@ -1164,8 +1208,12 @@ def main():
     ref90 = to_float(load_s4(base_file(REF_SET)))
     base = Fighter(ult, a.ult_base, 0, cache, log)
     # C: the base's Ultimate face frame (chara_0 c00) in its Smash 4 chr_90 (different art)
-    C = cached(cache, 'cross/%s_chara_0_in_%s' % (a.ult_base, REF_SET),
-               lambda: register(ref90, base.c0, 1.0, 6.0, zero_mean=True, min_cover=0.9))
+    if a.cross:         # set by hand (landmarks), where the two games' arts differ too much to match
+        sc, bx, by = (float(v) for v in a.cross.split(','))
+        C = Fit(0.0, sc, bx, sc, by)
+    else:
+        C = cached(cache, 'cross/%s_chara_0_in_%s' % (a.ult_base, REF_SET),
+                   lambda: register(ref90, base.c0, 1.0, 6.0, zero_mean=True, min_cover=0.9))
     log.append('CROSS-GAME: Ultimate %s chara_0 c00 in Smash 4 %s %s_01: %s' % (a.ult_base, a.s4_base, REF_SET, C))
 
     fighters = {}
@@ -1222,6 +1270,19 @@ def main():
             cut = head_cut(f, cache, key, log)
             if cut is None:
                 head = f.render(to3, ref.w, ref.h)
+            elif a.stock_whole and key.startswith(a.ult + '_'):
+                # chara_4 isn't a cut of chara_3's render (Squirtle's: his upper body, turned): the icon
+                # art as it is, its box fitted into the base head's box (+3 px), centred
+                c4 = f.c4
+                x0, y0, x1, y1 = box_of(c4[..., 3])
+                ux0, uy0 = max(2.0, stock_box[0] - 3), max(2.0, stock_box[1] - 3)
+                ux1, uy1 = min(ref.w - 2.0, stock_box[2] + 3), min(ref.h - 2.0, stock_box[3] + 2)
+                sc = max((x1 - x0) / (ux1 - ux0), (y1 - y0) / (uy1 - uy0))      # chara_4 px a pixel
+                bx = (x0 + x1) / 2 - sc * (ux0 + ux1) / 2
+                by = (y0 + y1) / 2 - sc * (uy0 + uy1) / 2
+                log.append('%s_%02d (%s): chara_4 whole (its fit in chara_3: %.2f), %.2f px a pixel' % (
+                    st, nn, key, cut[0].score, sc))
+                head = tone(warp(c4, sc, bx, sc, by, ref.w, ref.h))
             else:
                 f4, m4, hbox = cut
                 fc = ref.F.then(C.inv())                       # stock px -> face frame px

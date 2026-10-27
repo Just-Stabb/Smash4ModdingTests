@@ -365,7 +365,8 @@ and AO floor). Textures (`0x40EB0000` up, power-of-two, one mip):
   smoothness there (prm green inverted) and the AO in the color as well: his rough coat came out at
   about a quarter of its diffuse (alpha ~0.13), the whole model ~4x darker than now in diffuse
   (colours 5 / 6: ~20x);
-- eyes: the iris (second UV set) drawn onto the white.
+- eyes: the iris (second UV set) drawn onto the white, each triangle in its [0, 1) tile of the white (the
+  white repeats: Squirtle's V runs -1.85..-1.15).
 
 Specular and rim: the base's (Zelda's body: `NU_specularColor` (1, 1, 1) x 2 over a broad lobe,
 `NU_fresnelColor` 0.91) are added over the colour whatever it is, so a near-black material came out
