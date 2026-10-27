@@ -571,6 +571,7 @@ SLOT7_CSTICK_X_RAW     = 0x0F000273
 SLOT8_STICK_X_RAW      = 0x0F000274
 SLOT8_CSTICK_X_RAW     = 0x0F000275
 SELF_ANIM_RATE         = 0x0F000098   # animation rate multiplier (1.0 normally)
+SELF_ITEM              = 0x0F000099   # write: 1 metal on, 2 off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 Timer on the others
 VAR_0                  = 0x0F000300   # user variable (per object)
 VAR_1                  = 0x0F000301
 VAR_2                  = 0x0F000302

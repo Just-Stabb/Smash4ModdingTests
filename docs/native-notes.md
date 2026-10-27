@@ -1061,8 +1061,40 @@ speeds and weight are × common params `0x2DE`-`0x2E4`), `0x02E76320` (knockback
 param `0x241`, except for hitbox effects 9 / 0xA / 0xB / 0x16) and `0x027625C8` / `0x02762674` (the
 metal footsteps). So MSC can give a fighter the Metal Box's physics with `WorkModule(0x2710,
 0x20000012)` (Hero's Kaclang). No code builds `0x20000012` to set it (the item sets it some other way),
-and the metal look (the `metal.nud` / `metal.nut` the loader `0x03303144` files away) wasn't found
-to follow it: untested.
+and the metal look doesn't follow it (user: Kaclang with only the flag had no metal look). See "Item
+states" below.
+
+### Item states (the items' own functions; fix 59)
+
+Static research (not traced in game). The fighter object F is the fighter-table entry (0x76B0 bytes);
+its module accessor A = [F+0xC] = F+0x230 (so F = A - 0x230). The item pickup dispatcher
+`0x02E30D00(F, item)` switches on the item kind (table `0x10415A00`, 0x24-byte entries: curry 0xF,
+metalblock 0x13, mushd 0x14, mushroom 0x15, slow (Timer) 0x16, superstar 0x17, thunder 0x18,
+ripstickflower 0x36). Work flags are set as bits in the flag words (`oris`), not through on_flag, so
+no code builds the constant 0x20000012 (WorkModule vt on_flag `+0xEC`, off_flag `+0xFC`, set_flag `+0x10C`).
+
+- **Metal** `0x02E15DE4(F, f1, r4 on, r5 frames)`; the item: (F, -1.0, 1, -1), then sound `0x350042`.
+  On: flag `0x20000012`, int `0x10000027` = frames (-1: common int 0x23F x fighter float 0xEE),
+  float `0x0000000C` = f1 (-1: common float 0x240, the metal HP), ModelModule byte `+0x6D` = 1 then
+  `0x020078D4(MM)` (the metal model / shader; `+0x6E` blocks it, `+0x71` overrides). Event 0x59; the
+  specializer ([F+0x7538] vt `+0x23C`) can veto. `0x02E228C0` counts it down each frame and turns it off
+  (F, -1.0, 0, -1) at 0 or when the HP float runs out. No ModelModule MSC op (`0x02007A84`: ops
+  0/1/2/6/7/0xA/0xB) touches `+0x6D`.
+- **Super / Poison Mushroom** `0x02E1E148(F, cause, dir)`: mushroom (F, 1, 0), poison (F, 1, 1), lightning
+  (F, 2, 1). Ints `0x10000026` = cause, `0x10000025` = 4 / 6, status `0xDD` / `0xDE` (refused with flag
+  0x25, 0x37 or 0x1B); the statuses' native helpers (enter `0x02FA2D04`, exit `0x02FA39A0`) grow / shrink
+  and on exit call `0x02E1F3B4` (the scale at [F+0x7514]+0x5C, flag 0x17 / 0x18, timer int `0x10000022`,
+  counted down by `0x02E24270`, reverted by `0x02E1EF30`).
+- **Super Star** `0x02E16F4C(F, on, frames, r6)`; the item (F, 1, -1, 0): int `0x1000001F` frames,
+  invincibility `0x02C43188`, effect `0x1000054`; counted down by `0x02E22838`.
+- **Lip's Stick** `0x02E1FB78(F, on, owner, r6, f1 extra frames, f2 growth)` (fighter vt `+0x17C`): attaches the
+  ripstickflower item (ItemModule `0x02C48294(IM, 0x36, 0, owner)`), or with one on (flag 0x20000009)
+  extends it.
+- **Timer** `0x02E16A14(F, on, rate, frames, owner)`: SlowModule slot 3 (owner 0x50000000 none); the item
+  goes through `0x02E47968(entry, on, owner, rate, frames)` per player.
+
+`tools/position_vars_cave.py` calls these from MSC / ACMD: variable `0x0F000099` (docs/position-variables.md
+"Item states").
 
 ## Copy abilities: ACMD script sets
 

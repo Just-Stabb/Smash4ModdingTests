@@ -38605,29 +38605,53 @@ void brave_buffs_off()
     EffectModule(0x2723, 0x345004e, 0x1, 0x1);
 }
 
-// Kaclang's metal (and Hocus Pocus's states): see brave_state. Work flag 0x20000012 is the Metal Box
-// item's ("Has Metal Box Item"): the game's own fighter code reads it for the metal physics
-// (0x02F1CC4C: run speed, jumps, gravity, fall speeds, weight, common params 0x2DE-0x2E4), knockback
-// resistance (0x02E76320, param 0x241) and the metal steps (0x027625C8). Set again each frame while on.
+// Kaclang's metal: the Metal Box's own (fix 59; tools/position_vars_cave.py's ITEM variable 0x0F000099:
+// 1 on, 2 off, through the game's 0x02E15DE4): the metal look (ModelModule +0x6D), its physics and
+// knockback resistance (work flag 0x20000012) and its footsteps. Fix 57's flag alone gave no look.
+// Called every frame while he's steel: only a change reaches the game
 void brave_metal(int on)
 {
-    if (on)
+    if (on && brave_metal_on == 0)
     {
-        WorkModule(0x2710, 0x20000012);
+        WorkModule(0, 1.0f, 0x0f000099);
     }
-    else if (brave_metal_on)
+    else if (on == 0 && brave_metal_on)
     {
-        WorkModule(0x2711, 0x20000012);
+        WorkModule(0, 2.0f, 0x0f000099);
     }
     brave_metal_on = on;
+}
+
+// Hocus Pocus's item states (the ITEM variable, 0x0F000099): 3 giant (Super Mushroom), 4 small (Poison
+// Mushroom), 5 Super Star, 6 Lip's Stick flower, 7 the Timer's slow on every other fighter. The game's
+// own functions, with the items' own durations
+void brave_item(float code)
+{
+    WorkModule(0, code, 0x0f000099);
 }
 
 // Hocus Pocus's item-like states on him: 0 giant, 1 Starman, 3 timer, 6 sleep, 7 small, 8 flower, 9 invisible
 void brave_state(int o)
 {
-    if (o == 0x1)
+    if (o == 0)
     {
-        WorkModule(0, 600.0f, 0x0f00011c);
+        brave_item(3.0f);
+    }
+    else if (o == 0x1)
+    {
+        brave_item(5.0f);
+    }
+    else if (o == 0x3)
+    {
+        brave_item(7.0f);
+    }
+    else if (o == 0x7)
+    {
+        brave_item(4.0f);
+    }
+    else if (o == 0x8)
+    {
+        brave_item(6.0f);
     }
     else if (o == 0x9)
     {

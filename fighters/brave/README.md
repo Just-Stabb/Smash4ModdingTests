@@ -970,3 +970,18 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
 - **Hocus Pocus sleep:** the game's own sleep (FuraSleepStart `0x5F` -> loop `0x60` -> FuraSleepEnd
   `0x62`), its length the mash counter (`ControlModule(0x6, 240, 1, 8, 1)`: 240 frames, 8 off per
   press, the sleep hit's own rates); in the air on landing.
+
+## Fix 59 (`build/hero_fix59.zip`): Kaclang's metal look, Hocus Pocus's item states
+
+- The items' own functions (docs/native-notes.md "Item states"; found by reading the item pickup
+  dispatcher `0x02E30D00`) are called from MSC through a new variable, `0x0F000099` (`SELF_ITEM`,
+  `tools/position_vars_cave.py` `ext_item`; docs/position-variables.md "Item states").
+- **Kaclang:** the Metal Box's own metal (`0x02E15DE4`): the metal look (ModelModule `+0x6D`), which
+  fix 57's flag alone didn't give, with its physics and knockback resistance; on when he turns to
+  steel, off at the end (or when the move is cut short).
+- **Hocus Pocus:** giant (Super Mushroom, its grow status `0xDD`), small (Poison Mushroom, `0xDE`),
+  Super Star (invincible, flashing; was 600 frames of plain invincibility), Lip's Stick flower on his
+  head, the Timer's slow on every other fighter (half speed, 450 frames: Ultimate's `various_frame`),
+  each with the item's own duration. With fix 58's sleep, every outcome is now in.
+- Not traced in game: the functions and their arguments are read from the code (the item calls), and
+  the cave's calls are tested in unicorn against stubs.

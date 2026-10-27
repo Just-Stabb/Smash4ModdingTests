@@ -50,6 +50,10 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
               targets as for the combat variables (0x0F0000A0-0x0F0000F7)
   0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
               (1.0 normally)                      multiplies every animation, ACMD timing too)
+  0x0F000099  0                                   an item's own state on self (the game's function
+                                                  the item calls): 1 metal on, 2 metal off, 3 giant,
+                                                  4 small, 5 Super Star, 6 flower, 7 the Timer's slow
+                                                  on every other fighter (ext_item)
   0x0F000100 + 0x20*target + q   inputs and state: buttons held / pressed (write: force), sticks,
               inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
               combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
@@ -330,6 +334,7 @@ consts:
         .float 0.0
         .float 0.5
         .float 1.5
+        .float -1.0                     # +0xC: "the item's own value" (ext_item)
 """
 
 ARITH_STUB = """
@@ -527,6 +532,8 @@ ext:
         bge ext_b2
         cmplwi r30, 0x98
         beq ext_mrate
+        cmplwi r30, 0x99
+        beq ext_item
         bge ext_zero
         addi r3, r30, -0x40
         clrlwi r0, r3, 29
@@ -984,6 +991,89 @@ ext_mrate_set:
         lfs f1, 0x10(r1)
         mtctr r12
         bctrl
+        b ext_zero
+""", False),
+("""
+ext_item:                               # 0x99: self's item states, the game's own (write a code; reads 0):
+        cmpwi r28, 0                    # 1 metal on, 2 metal off, 3 giant, 4 small, 5 Super Star, 6 Lip's
+        beq ext_zero                    # Stick flower, 7 the Timer's slow on every other fighter
+        cmpwi r29, 0
+        beq ext_zero
+        bl ext_value_int
+        mr r22, r3
+        addi r26, r27, -0x230           # the fighter object (accessor = fighter + 0x230)
+        lis r12, consts@ha
+        addi r12, r12, consts@l
+        lfs f1, 0xC(r12)                # -1.0
+        lfs f2, 0(r12)                  # 0.0
+        mr r3, r26
+        cmpwi r22, 1                    # metal (Metal Box: 0x02E15DE4(F, f1 -1 = its HP param, on,
+        beq it_metal_on                 # frames -1 = its time param)): look, physics, flag 0x20000012
+        cmpwi r22, 2
+        beq it_metal_off
+        cmpwi r22, 3                    # Super / Poison Mushroom: 0x02E1E148(F, cause 1, 0 grow / 1 shrink)
+        beq it_big
+        cmpwi r22, 4
+        beq it_small
+        cmpwi r22, 5                    # Super Star: 0x02E16F4C(F, on, frames -1, 0)
+        beq it_star
+        cmpwi r22, 6                    # Lip's Stick: 0x02E1FB78(F, on, owner 0, 0, f1 0, f2 0)
+        beq it_flower
+        cmpwi r22, 7
+        beq it_slow
+        b ext_zero
+it_metal_on:
+        li r4, 1
+        li r5, -1
+        bl 0x02E15DE4
+        b ext_zero
+it_metal_off:
+        li r4, 0
+        li r5, -1
+        bl 0x02E15DE4
+        b ext_zero
+it_big:
+        li r4, 1
+        li r5, 0
+        bl 0x02E1E148
+        b ext_zero
+it_small:
+        li r4, 1
+        li r5, 1
+        bl 0x02E1E148
+        b ext_zero
+it_star:
+        li r4, 1
+        li r5, -1
+        li r6, 0
+        bl 0x02E16F4C
+        b ext_zero
+it_flower:
+        fmr f1, f2
+        li r4, 1
+        li r5, 0
+        li r6, 0
+        bl 0x02E1FB78
+        b ext_zero
+it_slow:                                # the Timer: 0x02E16A14(F, on, rate 2 (half), 450 frames, owner
+        li r25, 0                       # none 0x50000000) on every other live fighter (Hocus Pocus)
+it_slow_loop:
+        mr r3, r25
+        bl slot
+        cmpwi r3, 0
+        beq it_slow_next
+        cmplw r12, r27
+        beq it_slow_next
+        addi r3, r12, -0x230
+        li r4, 1
+        li r5, 2
+        li r6, 450
+        lis r7, 0x5000
+        bl 0x02E16A14
+it_slow_next:
+        addi r25, r25, 1
+        cmpwi r25, %(S)d
+        blt it_slow_loop
         b ext_zero
 """, False),
 ("""

@@ -634,5 +634,66 @@ check('raw past the end: 0', call(mu, FGET, w0, 0x0F000276), 0)
 check('slot 3 (empty): 0', call(mu, FGET, w0, iid(6, 0)), 0)
 check('target past the end: 0', call(mu, FGET, w0, 0x0F000280), 0)
 check('position IDs still fine', call(mu, FGET, w0, 0x0F00000C), 30)
+# 0x0F000099: self's item states through the game's own functions (stubbed here: each logs its
+# arguments r3-r7, f1, f2)
+ITEM_FNS = [0x02E15DE4, 0x02E1E148, 0x02E16F4C, 0x02E1FB78, 0x02E16A14]
+mu.mem_map(0x02E10000, 0x10000)
+for k, fn in enumerate(ITEM_FNS):
+    L = 0x104F0000 + 0x200 * k
+    a = Asm(fn)
+    a.asm("""
+        lis r11, 0x%X
+        ori r11, r11, 0x%X
+        lwz r12, 0(r11)
+        addi r0, r12, 1
+        stw r0, 0(r11)
+        mulli r12, r12, 0x20
+        add r11, r11, r12
+        stw r3, 0x10(r11)
+        stw r4, 0x14(r11)
+        stw r5, 0x18(r11)
+        stw r6, 0x1C(r11)
+        stw r7, 0x20(r11)
+        stfs f1, 0x24(r11)
+        stfs f2, 0x28(r11)
+        li r3, 1
+        blr
+""" % (L >> 16, L & 0xFFFF))
+    mu.mem_write(fn, b''.join(struct.pack('>I', w) for w in a.words()))
+def item_log(k):
+    L = 0x104F0000 + 0x200 * k
+    n = struct.unpack('>I', mu.mem_read(L, 4))[0]
+    out = []
+    for i in range(n):
+        r = struct.unpack('>5i2f', mu.mem_read(L + 0x10 + 0x20 * i, 0x1C))
+        out.append(tuple(r[:5]) + tuple(round(x, 3) for x in r[5:]))
+    mu.mem_write(L, b'\0' * 4)
+    return out
+def check_eq(name, got, want):
+    global fails
+    ok = got == want
+    fails += not ok
+    print('%-50s got %-28s want %-28s %s' % (name, got, want, 'OK' if ok else 'FAIL'))
+F0 = 0x10370000 - 0x230
+ITEM = 0x0F000099
+check('ITEM: reads 0', call(mu, FGET, w0, ITEM), 0)
+call(mu, FSET, w0, ITEM, 0.0)
+check_eq('ITEM 0: nothing', [item_log(k) for k in range(5)], [[]] * 5)
+call(mu, FSET, w0, ITEM, 1.0)
+check_eq('ITEM 1 metal on: (F, on 1, frames -1), f1 -1', [x[:3] + x[5:6] for x in item_log(0)], [(F0, 1, -1, -1.0)])
+call(mu, FSET, w0, ITEM, 2.0)
+check_eq('ITEM 2 metal off', [x[:3] + x[5:6] for x in item_log(0)], [(F0, 0, -1, -1.0)])
+call(mu, FSET, w0, ITEM, 3.0); call(mu, FSET, w0, ITEM, 4.0)
+check_eq('ITEM 3 / 4 giant / small: (F, 1, 0 / 1)', [x[:3] for x in item_log(1)], [(F0, 1, 0), (F0, 1, 1)])
+call(mu, FSET, w0, ITEM, 5.0)
+check_eq('ITEM 5 Super Star: (F, 1, -1, 0)', [x[:4] for x in item_log(2)], [(F0, 1, -1, 0)])
+call(mu, FSET, w0, ITEM, 6.0)
+check_eq('ITEM 6 flower: (F, 1, 0, 0), f1 f2 0', [x[:4] + x[5:] for x in item_log(3)], [(F0, 1, 0, 0, 0.0, 0.0)])
+call(mu, FSET, w1, ITEM, 7.0)
+F1 = 0x10371000 - 0x230
+check_eq('ITEM 7 Timer from slot 1: every other live fighter, (F, 1, 2, 450, none)',
+      [x[:5] for x in item_log(4)], [(F0, 1, 2, 450, 0x50000000)])
+call(mu, FSET, w0, ITEM, 9.0)
+check_eq('ITEM 9: nothing', [item_log(k) for k in range(5)], [[]] * 5)
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

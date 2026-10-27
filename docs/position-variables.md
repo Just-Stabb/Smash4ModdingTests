@@ -190,6 +190,28 @@ Used by Kirby's Overdrive (`fighters/kirby/kirby.c`).
     SET_FLOAT(Value=1.2, Variable=0x0F000098)  // everything 1.2x faster
     SET_FLOAT(Value=1, Variable=0x0F000098)    // back to normal
 
+## Item states
+
+`0x0F000099` (`SELF_ITEM`), self only. Reads 0; writing a code puts one of the items' own states on
+this fighter through the game's function for it (the one the item's pickup calls), with the item's
+own durations:
+
+| code | state | game function |
+|---|---|---|
+| 1 | metal on (Metal Box: the metal look, its physics and knockback resistance, flag `0x20000012`) | `0x02E15DE4(F, -1.0, 1, -1)` |
+| 2 | metal off | `0x02E15DE4(F, -1.0, 0, -1)` |
+| 3 | giant (Super Mushroom: its grow status `0xDD`) | `0x02E1E148(F, 1, 0)` |
+| 4 | small (Poison Mushroom: `0xDE`) | `0x02E1E148(F, 1, 1)` |
+| 5 | Super Star (invincible, flashing) | `0x02E16F4C(F, 1, -1, 0)` |
+| 6 | Lip's Stick flower on its head | `0x02E1FB78(F, 1, 0, 0, 0.0, 0.0)` |
+| 7 | the Timer's slow on every other fighter (half speed, 450 frames) | `0x02E16A14(F, 1, 2, 450, none)` each |
+
+F is the fighter object (its module accessor − 0x230). The mushroom refuses while flag `0x20000025`,
+`0x20000037` or `0x2000001B` is set. Used by Hero's Kaclang (metal) and Hocus Pocus
+(`fighters/brave/brave.c`). Research: docs/native-notes.md "Item states".
+
+    SET_FLOAT(Value=1, Variable=0x0F000099)    // metal
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:
@@ -227,7 +249,7 @@ Sm4shCommand shows and accepts names for all of these (`tools/Sm4shCommand/SM4SH
 variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`,
 `HITSTUN_DEALT`, `HITSTUN_MUL`, `HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`,
 `HIT`, `HIT_NOW`, `STATUS`, `MOTION`, `MOTION_FRAME`), e.g. `LASTHIT_HITSTUN_MUL` = `0x0F000052`,
-`OPP_STATUS` = `0x0F0000AA`; and `SELF_ANIM_RATE` = `0x0F000098`.
+`OPP_STATUS` = `0x0F0000AA`; `SELF_ANIM_RATE` = `0x0F000098`; and `SELF_ITEM` = `0x0F000099`.
 
     SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)
     SET_FLOAT(Value=12, Variable=POS_OPP_OFFSET_X)
