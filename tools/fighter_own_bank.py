@@ -151,6 +151,13 @@ class Table:
         _b, n, off, _z = self.rows[row]
         return list(struct.unpack('<%di' % n, self.labels[off:off + 4 * n]))
 
+    def set_row(self, row, tones):
+        """a row in use given a new label list (appended; the old list stays as unused bytes)"""
+        assert self.rows[row][0] != 0xFFFFFFFF and len(self.labels) % 4 == 0
+        off = len(self.labels)
+        self.labels.extend(struct.pack('<%di' % len(tones), *tones))
+        self.rows[row][1:3] = [len(tones), off]
+
     def add_row(self, row, bank_id, tones):
         assert self.rows[row][0] == 0xFFFFFFFF, 'row %d is in use' % row
         assert len(self.labels) % 4 == 0
@@ -185,7 +192,8 @@ def sound_arg(cmds, k):
     0x27xx, e.g. 0x2710 play) and, past any further pushed arguments, the call is sys 0x1E
     (fireball: sys_1E(0x2710, 0x20037)); flag words like sys_18(0x2713, ..., 0x20001, ...) are not"""
     prev = cmds[k - 1] if k else None
-    if not (prev and prev.command == 0xA and prev.parameters and 0x2700 <= prev.parameters[0] < 0x2800):
+    # the selector pushed as an int (0xA, the game's own scripts) or a short (0xD, tools/mscdec's compiler)
+    if not (prev and prev.command in (0xA, 0xD) and prev.parameters and 0x2700 <= prev.parameters[0] < 0x2800):
         return False
     for c in cmds[k + 1:]:
         if c.command in (0xA, 0xD):

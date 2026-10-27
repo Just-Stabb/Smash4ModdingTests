@@ -1,0 +1,510 @@
+{
+ "_how": "Ultimate expression / sound script values -> Smash 4 (Wii U) ACMD, from aligning lua2cpp scripts with vanilla Smash 4 scripts of the same motion on captain, fox, ike, kirby, link, mario, marth, pikachu, samus, zelda (crc32 of the Ultimate macro name = the Smash 4 command id for most). Confidence per entry: high / medium / low / inferred (rumble kinds never in the shared scripts: matched by GameCube rumble pattern). docs/ultimate-fighter-port.md \"Sounds and expressions\".",
+ "common_se": {
+  "se_common_blowaway_l": [
+   70,
+   "high"
+  ],
+  "se_common_blowaway_m": [
+   69,
+   "high"
+  ],
+  "se_common_blowaway_s": [
+   68,
+   "high"
+  ],
+  "se_common_cliff_catch": [
+   83,
+   "high"
+  ],
+  "se_common_dizzy": [
+   97,
+   "high"
+  ],
+  "se_common_down_m_01": [
+   94,
+   "medium"
+  ],
+  "se_common_down_m_02": [
+   95,
+   "medium"
+  ],
+  "se_common_down_soil_s": [
+   94,
+   "high"
+  ],
+  "se_common_dragoon_ride": [
+   218,
+   "high"
+  ],
+  "se_common_falldown_02": [
+   160,
+   "high"
+  ],
+  "se_common_guardoff": [
+   99,
+   "high"
+  ],
+  "se_common_guardon": [
+   100,
+   "high"
+  ],
+  "se_common_kick_hit_m": [
+   63,
+   "high"
+  ],
+  "se_common_ladderstep_s": [
+   396,
+   "high"
+  ],
+  "se_common_metal_landing_m": [
+   212,
+   "medium"
+  ],
+  "se_common_sheildguard": [
+   193,
+   "high"
+  ],
+  "se_common_slip_02": [
+   164,
+   "high"
+  ],
+  "se_common_smash_start": [
+   105,
+   "high"
+  ],
+  "se_common_smash_start_02": [
+   274,
+   "medium"
+  ],
+  "se_common_step_jump": [
+   174,
+   "high"
+  ],
+  "se_common_swim_high_01": [
+   180,
+   "high"
+  ],
+  "se_common_swim_high_02": [
+   181,
+   "high"
+  ],
+  "se_common_swim_low_01": [
+   176,
+   "high"
+  ],
+  "se_common_swim_low_02": [
+   177,
+   "high"
+  ],
+  "se_common_swim_middle_01": [
+   178,
+   "high"
+  ],
+  "se_common_swim_middle_02": [
+   179,
+   "high"
+  ],
+  "se_common_swimattack_middle": [
+   183,
+   "high"
+  ],
+  "se_common_swimdrown": [
+   185,
+   "high"
+  ],
+  "se_common_swing_05": [
+   110,
+   "high"
+  ],
+  "se_common_throw_01": [
+   288,
+   "high"
+  ],
+  "se_common_throw_02": [
+   289,
+   "high"
+  ],
+  "se_common_wallhit": [
+   296,
+   "high"
+  ],
+  "se_item_metalbox": [
+   3473474,
+   "medium"
+  ]
+ },
+ "quake": {
+  "L": [
+   5,
+   "high"
+  ],
+  "M": [
+   4,
+   "high"
+  ],
+  "S": [
+   3,
+   "medium"
+  ],
+  "XL": [
+   6,
+   "inferred"
+  ]
+ },
+ "rumble": {
+  "rbkind_01_fireballsp": [
+   "RUMBLE_STATUS",
+   34,
+   "low"
+  ],
+  "rbkind_28_soaring": [
+   "RUMBLE_STATUS",
+   5,
+   "inferred"
+  ],
+  "rbkind_32_hold_lv1": [
+   "RUMBLE_STATUS",
+   9,
+   "low"
+  ],
+  "rbkind_32_hold_lv2": [
+   "RUMBLE_STATUS",
+   9,
+   "inferred"
+  ],
+  "rbkind_aerial": [
+   "RUMBLE",
+   20,
+   "inferred"
+  ],
+  "rbkind_attack_critical": [
+   "RUMBLE",
+   3,
+   "medium"
+  ],
+  "rbkind_attackl": [
+   "RUMBLE",
+   13,
+   "medium"
+  ],
+  "rbkind_attackll": [
+   "RUMBLE",
+   14,
+   "medium"
+  ],
+  "rbkind_attackm": [
+   "RUMBLE",
+   13,
+   "high"
+  ],
+  "rbkind_attacks": [
+   "RUMBLE",
+   12,
+   "low"
+  ],
+  "rbkind_awaken": [
+   "RUMBLE",
+   13,
+   "inferred"
+  ],
+  "rbkind_beaml": [
+   "RUMBLE",
+   14,
+   "low"
+  ],
+  "rbkind_beams": [
+   "RUMBLE",
+   13,
+   "medium"
+  ],
+  "rbkind_beamss": [
+   "RUMBLE",
+   14,
+   "medium"
+  ],
+  "rbkind_counter": [
+   "RUMBLE",
+   14,
+   "low"
+  ],
+  "rbkind_damage_critical": [
+   "RUMBLE",
+   15,
+   "low"
+  ],
+  "rbkind_damage_paralyze": [
+   "RUMBLE_STATUS",
+   2,
+   "inferred"
+  ],
+  "rbkind_dash": [
+   "RUMBLE_STATUS",
+   21,
+   "high"
+  ],
+  "rbkind_down": [
+   "RUMBLE",
+   10,
+   "high"
+  ],
+  "rbkind_drgn_start": [
+   "RUMBLE",
+   12,
+   "high"
+  ],
+  "rbkind_elecattack": [
+   "RUMBLE_STATUS",
+   34,
+   "low"
+  ],
+  "rbkind_elecattacks": [
+   "RUMBLE_STATUS",
+   34,
+   "low"
+  ],
+  "rbkind_escape": [
+   "RUMBLE",
+   13,
+   "inferred"
+  ],
+  "rbkind_explosion": [
+   "RUMBLE",
+   14,
+   "low"
+  ],
+  "rbkind_explosionl": [
+   "RUMBLE",
+   19,
+   "low"
+  ],
+  "rbkind_explosionm": [
+   "RUMBLE_STATUS",
+   15,
+   "medium"
+  ],
+  "rbkind_fly": [
+   "RUMBLE_STATUS",
+   8,
+   "low"
+  ],
+  "rbkind_gene_blast": [
+   "RUMBLE",
+   15,
+   "low"
+  ],
+  "rbkind_genesis": [
+   "RUMBLE_STATUS",
+   2,
+   "high"
+  ],
+  "rbkind_getbonus": [
+   "RUMBLE",
+   12,
+   "high"
+  ],
+  "rbkind_getbonusl": [
+   "RUMBLE",
+   12,
+   "inferred"
+  ],
+  "rbkind_grapple": [
+   "RUMBLE",
+   12,
+   "medium"
+  ],
+  "rbkind_impact": [
+   "RUMBLE",
+   13,
+   "low"
+  ],
+  "rbkind_jet": [
+   "RUMBLE_STATUS",
+   2,
+   "low"
+  ],
+  "rbkind_jump": [
+   "RUMBLE",
+   20,
+   "inferred"
+  ],
+  "rbkind_justshield": [
+   "RUMBLE",
+   13,
+   "low"
+  ],
+  "rbkind_landl": [
+   "RUMBLE",
+   13,
+   "low"
+  ],
+  "rbkind_landl_hv": [
+   "RUMBLE",
+   23,
+   "medium"
+  ],
+  "rbkind_lands": [
+   "RUMBLE",
+   16,
+   "high"
+  ],
+  "rbkind_loopattack": [
+   "RUMBLE",
+   8,
+   "low"
+  ],
+  "rbkind_nohit_attacks": [
+   "RUMBLE_STATUS",
+   18,
+   "low"
+  ],
+  "rbkind_nohit_beams": [
+   "RUMBLE",
+   18,
+   "inferred"
+  ],
+  "rbkind_nohit_explosion": [
+   "RUMBLE",
+   18,
+   "medium"
+  ],
+  "rbkind_nohitl": [
+   "RUMBLE",
+   18,
+   "medium"
+  ],
+  "rbkind_nohitl_l": [
+   "RUMBLE",
+   18,
+   "high"
+  ],
+  "rbkind_nohitll": [
+   "RUMBLE",
+   18,
+   "high"
+  ],
+  "rbkind_nohitll_l": [
+   "RUMBLE",
+   14,
+   "low"
+  ],
+  "rbkind_nohitm": [
+   "RUMBLE",
+   17,
+   "high"
+  ],
+  "rbkind_nohitm_l": [
+   "RUMBLE",
+   17,
+   "high"
+  ],
+  "rbkind_nohits": [
+   "RUMBLE",
+   16,
+   "high"
+  ],
+  "rbkind_nohits_l": [
+   "RUMBLE",
+   16,
+   "high"
+  ],
+  "rbkind_run": [
+   "RUMBLE_STATUS",
+   22,
+   "medium"
+  ],
+  "rbkind_rush": [
+   "RUMBLE",
+   13,
+   "low"
+  ],
+  "rbkind_shield_on": [
+   "RUMBLE",
+   13,
+   "low"
+  ],
+  "rbkind_slashl": [
+   "RUMBLE",
+   15,
+   "low"
+  ],
+  "rbkind_slashm": [
+   "RUMBLE",
+   18,
+   "low"
+  ],
+  "rbkind_smashhold1": [
+   "RUMBLE_STATUS",
+   34,
+   "high"
+  ],
+  "rbkind_spinattacks": [
+   "RUMBLE_STATUS",
+   18,
+   "low"
+  ],
+  "rbkind_stg_power_up": [
+   "RUMBLE",
+   24,
+   "inferred"
+  ],
+  "rbkind_swim": [
+   "RUMBLE",
+   17,
+   "high"
+  ],
+  "rbkind_walk": [
+   "RUMBLE_STATUS",
+   20,
+   "high"
+  ],
+  "rbkind_walk_hv": [
+   "RUMBLE",
+   12,
+   "medium"
+  ],
+  "rbkind_waterjetl": [
+   "RUMBLE_STATUS",
+   15,
+   "low"
+  ],
+  "rbkind_waterjets": [
+   "RUMBLE_STATUS",
+   14,
+   "low"
+  ]
+ },
+ "rumble_helpers": {
+  "DownBoundDRumble": [
+   "RUMBLE(Kind=10, 0)"
+  ],
+  "DownBoundURumble": [
+   "RUMBLE(Kind=10, 0)"
+  ],
+  "GuardOffRumble": [
+   "RUMBLE(Kind=4, 0)"
+  ],
+  "GuardOnRumble": [
+   "RUMBLE(Kind=4, 0)"
+  ],
+  "LandingFallSpecialRumble": [
+   "RUMBLE(Kind=23, 0)"
+  ],
+  "LandingHeavyRumble": [
+   "RUMBLE_STATUS(Kind=23, 0)"
+  ],
+  "LandingLightRumble": [
+   "RUMBLE_STATUS(Kind=16, 0)"
+  ],
+  "StepPoseRumble": [
+   "RUMBLE(Kind=17, 0)"
+  ]
+ },
+ "slope_status": {
+  "L": 2,
+  "LR": 6,
+  "NONE": 0,
+  "R": 4,
+  "TOP": 1
+ }
+}

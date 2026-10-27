@@ -318,6 +318,11 @@ one sound finds no bank 2004 and is silent; ids built at run time from tables we
 it matters: load the base's se bank for the clone too (as `base_effects_cave.py` does effect banks), or
 a weapon_expand hook rewriting the id for the copied kind.
 
+**Later finding (Hero, docs/ultimate-fighter-port.md "Sounds, voice and expressions"):** a sound id's bank
+is matched against the banks of the fighter playing it (each fighter's 7 bank slots, `0x03120978`), not
+the match's, so a renamed copy keeping its base's id doesn't mix with the base in one match; Hero's banks
+keep Robin's ids and grow her rows.
+
 Only the game can confirm: the bank with id 2144 loading and playing (Supamario's moves' sounds), the
 three new sounds from ACMD (`Sound_Effect` 0x0CB1008B...), the fireball bounce, Mario and Supamario
 together (now separate banks).

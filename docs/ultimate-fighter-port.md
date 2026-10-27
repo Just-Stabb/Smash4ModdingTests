@@ -285,6 +285,55 @@ Packaging: leave out `model.sbwl`; keep the base's other motion pacs (`zeldasw1 
 
 VBN bind: position, Euler angles with R = Rz Ry Rx (Sm4shCommand's `EulerToQuat`), scale.
 
+## Sounds, voice and expressions (`tools/ultimate_sound.py`, `tools/ultimate_acmd.py`)
+
+Ultimate's fighter audio is in `sound/bank/fighter/se_<name>[_cNN]` and `sound/bank/fighter_voice/
+vc_<name>[_cNN]`, `vc_<name>_cheer` (`.nus3audio`: `NMOF` names, `ADOF` blobs; `.nus3bank`: TONE
+entries with the volume in dB at +12 of the data block; a random container has +4 = 0x7F, its name at
++8, no data), and the voice picks in `sound/sequence/fighter/<name>.sqb`. The audio is Namco IDSP
+(DSP-ADPCM), Smash 4's own codec: copied byte for byte.
+
+- **Banks** (`ultimate_sound.py`): the slot's renamed base banks keep their BINF ids and rows; the rows
+  grow by the Ultimate tones. A sound id's bank is matched against the banks **the playing fighter**
+  loaded (`0x0312093C`: row -> bank id; `0x03120978`: a fighter's 7 bank slots, own id or alias), so
+  the base fighter and the port in one match don't mix. Costume banks `_cNN` are loaded by file name
+  for that costume (`0x030C0C34`; Robin / Wii Fit / Cloud / Corrin take costume & 1, Olimar / Bayonetta
+  >= 4, Little Mac >= 8, every other kind, the new ones included, the costume number as is) and fall
+  back to the main file; they must have the main bank's tone order and id (or an alias in
+  `sound/config/fightermodelbanktable.mtb`: `MTB\0`, entries name[16] (the first 13 named by the
+  executable's table at `0x10340CA4`), base id, type (1 se, 2 vc, 3 vc_ouen, 4 se_common), alt ids).
+  The result-screen voice and `snd_se_<Name>_common_cNN` use a second costume map (`0x030C1B34`) that
+  gives kinds past 0x39 the main bank.
+- **Voice the game plays itself**: the base's labelled voice tones (damage, jump, teeter, ledge, KO,
+  appeals, results) get the port's voice of the same use (`VOICE_ALIASES`), so the base's own sequences
+  (`soundseq`, set 0x3B for Robin) and the executable's ids speak with the port's voice.
+- **Sequences**: Ultimate's `.sqb` (version 1: offsets from the table's end; a sequence: hash40 name,
+  u16 2, u16 n, u32 0, n x 20-byte choices: hash40 sound, u16 1, u16 weight; hash40 "none" = silence)
+  appended to the base's (version 4, 16-byte choices: u32 id or -1, u16 1, u16 weight, u32 0, u16 0,
+  u16 0x4A; a sequence's fourth u16 0x15); ACMD plays `0x80000000 | set << 16 | index`. The names come
+  from the dump's scripts (`Hash40::new("seq_...")`); Hero's `_jp` spell shouts name sounds no bank
+  holds: they take their `_en` twin's picks.
+- **Sound scripts** (`ultimate_acmd.py --sound-ids`): crc32 of the Ultimate macro name is the Smash 4
+  command id: `PLAY_SE` -> Sound_Effect, `STOP_SE` -> Stop_Sound_Effect, `PLAY_STEP` -> Sound_Effect2,
+  `PLAY_LANDING_SE` -> Sound_Effect3, `PLAY_DOWN_SE` -> Sound_Effect4, `PLAY_STATUS` ->
+  Transient_Sound_Effect, `PLAY_SEQUENCE` -> Low_Voice_Clip; `PLAY_FLY_VOICE`, `PLAY_SE_NO_3D`,
+  `PLAY_SE_REMAIN`, `SET_PLAY_INHIVIT`, `PLAY_STEP_FLIPPABLE`, `SET_TAKEOUT_SE` by name.
+  `wait_loop_sync_mot()` -> the script ends `Loop_Rest(); JUMP(itself)`. The names are lower case in the
+  scripts (upper case in some banks). Common sounds: `reference/ultimate_sound_map.json` "common_se"
+  (Smash 4's labels are often numbered: `se_common_swing_05` = 0x6E `snd_se_common_005`, `blowaway_s/m/l`
+  = 0x44-0x46 `futtobi`, `dizzy` = 0x61 `furafura`; `se_common_sleep` has none). The dump loses the first
+  `if` of the voice-region chains (`GET_VOICE_REGION`): the first block (English) is kept. A condition
+  taken as true (`--cond`) whose failed branch's sounds the dump leaves unbraced: `--fail-sounds`.
+- **Expression scripts** (`--expressions`, same map, by aligning the ten shared fighters' scripts):
+  `set_rumble` -> Rumble (one-shot) or Rumble_Loop (RUMBLE_STATUS: walk / run / dash / landing / holds;
+  the length carried when Ultimate loops it) by kind (`nohits` 16, `nohitm` 17, `nohitl` 18, `walk` 20,
+  `dash` 21, `run` 22, `smashhold1` 34, ...; kinds the shared fighters never use matched by their
+  GameCube rumble pattern); `RUMBLE_HIT` has no Smash 4 form (vanilla rumbles once per swing): dropped
+  when the script rumbles anyway; `slope!` -> SLOPE / Slope_Full (`SLOPE_INTP`) / Slope_Full2 (its
+  4-argument form), statuses NONE 0, TOP 1, L 2, R 4, LR 6; `QUAKE` S / M / L -> 3 / 4 / 5;
+  `set_have_item_visibility` -> Item_Visibility; the common helpers (`expression_LandingHeavyRumble`...)
+  -> vanilla's. `set_attack_reference_joint_id` has no Smash 4 form; erase rumbles have no stop command.
+
 ## Meshes and materials
 
 Every polygon rigged as the base's body (vertex type `0x47`: byte colors and half UVs in the vertex

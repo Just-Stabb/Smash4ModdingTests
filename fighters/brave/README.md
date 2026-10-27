@@ -1181,3 +1181,31 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   (`--tint-for sys_attack_line=0.4:0.9:3.0`; fix 68's A6D9FF was read off a clip). Bank 86 = 85 but
   those colour keys.
 - Changed: `model/body/c00`-`c07`, `l00`-`l07`; the `.ptcl` (`.efc` unchanged).
+
+## Fix 71 (`build/hero_fix71.zip`): his sounds, voices (all four heroes), cheer and expressions
+
+From Ultimate's own audio (the user's `sound-full-ssbu.zip`: `se_brave*`, `vc_brave*`, `vc_brave_cheer`,
+`sequence/fighter/brave.sqb`), `tools/ultimate_sound.py` and `tools/ultimate_acmd.py --sound-ids /
+--expressions` (docs/ultimate-fighter-port.md "Sounds, voice and expressions"):
+- **Banks:** `snd_se_Brave` (Robin's 163 tones + his 167, 6 loops: the spells' charges) and `snd_vc_Brave`
+  (Robin's + his 71) keep Robin's ids (2051 / 6059) and rows (1892 / 1904, grown to 275 / 117 labels):
+  banks are matched per fighter, so Robin and Hero in one match keep their own. The voices the game
+  plays itself (damage, jump, teeter, ledge, KO, appeals, results) are his on Robin's labels.
+- **Costumes:** `snd_vc_Brave_c01` / `_c02` / `_c03` = Erdrick / Solo / Eight's voices, `_c05` - `_c07` the
+  same again (a new kind loads `_cNN` by the costume number); `snd_se_Brave_c01` - `_c07` their own
+  sound effects (Ultimate's per-costume se banks). Costumes 0 / 4: the main banks.
+- **Cheer:** `snd_vc_Brave_ouen`'s chant = `vc_brave_cheer` (4 s).
+- **Sequences:** his 24 (random attack / damage / jump / teeter voices, the spell shouts) after Robin's 12
+  in `soundseq_Brave.sqb` (set 0x3B).
+- **Scripts:** 206 sound scripts (body) and the articles' (fireball, spark, tornado, flash, explosion,
+  deathball, sleep) from Ultimate's: every sound named maps (his, the common ones of
+  `reference/ultimate_sound_map.json`); a spell's fizzle (`se_brave_miss`, `vc_brave_mp_lost`) only in
+  SpecialLwFail, the cast he can't pay for. 284 expression scripts (rumble, camera quake, slope, item
+  visibility); left out: `rbkind_erase` x2 (no stop rumble in Smash 4), `rbkind_gene_charge` x2,
+  `rbkind_furafura` (no match), `set_attack_reference_joint_id` x12.
+- Not yet: the sounds Ultimate plays from its status code rather than scripts (Command Selection's
+  menu: `se_brave_special_l01` / `_l01_02`, `l12`, `l17`, `l18`, `l24` - `l26`; the critical hit; KO);
+  the Kirby copy's voice; the announcer's call.
+- Install: also `sound/config/soundlabeltable.bin` (it carries Minecraft World's and Supamario's rows).
+- Changed: `fighter/brave/sound/` (15 files), the body's `sound.bin` / `expression.bin`, the articles'
+  `sound.bin`, `sound/config/soundlabeltable.bin`.

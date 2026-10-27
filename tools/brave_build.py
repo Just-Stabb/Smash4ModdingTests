@@ -26,11 +26,16 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
 - --menu DIR --menu-layout ARC [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait
   badge) + Hero's Command Selection window and MP gauge from Ultimate's (ARC: its info_melee layout.arc;
   tools/brave_menu_art.py, tools/dmg_brave_menu.py);
+- --sound DIR: tools/ultimate_sound.py's output (his Ultimate sound / voice banks, sequences, the label
+  table, sound_ids.json): the body's and articles' sound scripts and the body's expression scripts
+  translated from Ultimate's (tools/ultimate_acmd.py --sound-ids / --expressions), Robin's ids moved to
+  the new rows, fighter/brave/sound/ and sound/config/soundlabeltable.bin written;
 - --bank: effect/brave/brave.010d0000.{ptcl,efc} from DIR/reflet.010d0000.* (tools/vfxb_to_ptcl.py);
 - --trails: effect/brave/trail/ from DIR (tools/ultimate_trails.py --shader 3);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
 """
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -49,6 +54,8 @@ BRAVE = os.path.join(ROOT, 'fighters', 'brave')
 # brave_crit_update) into this instance int, his smash scripts keep both of Ultimate's hitbox sets on it
 CRIT_INT = 0x1000009A
 CONDS = ['SUCCESS_SP']          # the scripts' MP checks: his MSC decides (brave_cost), a script runs as cast
+# the spells' fizzle (a cast he can't pay for: SpecialLwFail, its own script), dropped from the casts' sound scripts
+FAIL_SOUNDS = 'SUCCESS_SP=se_brave_miss,vc_brave_mp_lost'
 # the articles' motion slots (thunder's motion info has 24 entries, the rest name empty scripts): the fireball
 # (fireball.c: func_24(level) flies, func_24(3 + level) bursts), spark / tornado (placed.c: func_24(level),
 # 23 while the spark waits)
@@ -106,6 +113,35 @@ def compile_msc(srcs, out_path):
     assert os.path.getsize(out_path) > 0
 
 
+def sound_ids_path(a):
+    return os.path.join(a.sound, 'sound_ids.json')
+
+
+def sound_ids(a):
+    """Ultimate sound name -> Smash 4 id: his banks (tools/ultimate_sound.py) and the common sounds"""
+    ids = {k: v for k, (v, _c) in json.load(open(os.path.join(ROOT, 'reference/ultimate_sound_map.json')))[
+        'common_se'].items()}
+    ids.update({k: v for k, v in json.load(open(sound_ids_path(a))).items() if not k.startswith('_')})
+    return ids
+
+
+def sound_rows(a, fighter):
+    """the base's (Robin's) sound ids in every script onto his banks' new rows (same labels:
+    tools/ultimate_sound.py keeps the base's labels first), and his banks, sequences and label table in"""
+    import fighter_own_bank as fb
+    log = []
+    rows = json.load(open(sound_ids_path(a)))['_rows']
+    for src in sorted(glob.glob(os.path.join(fighter, 'script/animcmd/**/*.bin'), recursive=True)):
+        for r0, n0, r1 in rows:
+            fb.acmd_rewrite(src, os.path.basename(src), r0, n0, r1, log)
+    for src in sorted(glob.glob(os.path.join(fighter, 'script/msc/**/*.mscsb'), recursive=True)):
+        for r0, n0, r1 in rows:             # SoundModule calls' ids (Robin's own code paths still in brave.c)
+            fb.msc_rewrite(src, r0, [0] * n0, r1, log)
+    shutil.copytree(os.path.join(a.sound, 'fighter/brave/sound'), os.path.join(fighter, 'sound'), dirs_exist_ok=True)
+    shutil.copytree(os.path.join(a.sound, 'sound'), os.path.join(a.out, 'sound'), dirs_exist_ok=True)
+    return '\n'.join(log)
+
+
 def body_scripts(a, fighter, param):
     out = os.path.join(fighter, 'script/animcmd/body')
     os.makedirs(out, exist_ok=True)
@@ -121,7 +157,8 @@ def body_scripts(a, fighter, param):
                   '--effects', os.path.join(ROOT, 'reference/ultimate_sys_effects.json') + ',' + ids,
                   os.path.join(a.hero, 'model/body/c00/model.nusktb'),
                   '--translate', os.path.join(BRAVE, 'specials_acmd.json'), *sum((['--cond', c] for c in CONDS), []),
-                  '--dyn-cond', 'FLAG_CRITICAL_HIT=0x%X' % CRIT_INT)
+                  '--dyn-cond', 'FLAG_CRITICAL_HIT=0x%X' % CRIT_INT,
+                  *(['--sound-ids', sound_ids_path(a), '--expressions', '--fail-sounds', FAIL_SOUNDS] if a.sound else []))
         log += run(os.path.join(HERE, 'effect_variants.py'), 'apply', os.path.join(tmp, 'effect.bin'), ids,
                    os.path.join(out, 'effect.bin'))
         for fn in ('sound.bin', 'expression.bin'):
@@ -131,14 +168,15 @@ def body_scripts(a, fighter, param):
 
 def article_scripts(a, name, wdir):
     """an article's game / effect scripts from Ultimate's brave_<name> ones (hitboxes and effects on its bone
-    0: it has no model); sound empty (his sounds aren't converted yet)"""
+    0: it has no model); sound from Ultimate's brave_<name> sound scripts with --sound (else empty)"""
     motions, joints = ARTICLES[name]
     ids = {}
     for path in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(BRAVE, 'brave_effects.json')):
         ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
-    game, effect = {}, {}
+    game, effect, sound = {}, {}, {}
     U.EFFECT_CONDS = (U.LR_LEFT,)
     gtr, etr = U.Translator(joints), U.EffectTranslator(joints, ids, {})
+    str_ = U.SoundTranslator(sound_ids(a)) if a.sound else None
     src_dir = os.path.join(a.dump, 'brave_' + name)
     for fname in sorted(os.listdir(src_dir)):
         mo = fname[:-4].lower()
@@ -147,6 +185,8 @@ def article_scripts(a, name, wdir):
         game[mo] = gtr.script(fns['game_' + mo]) if 'game_' + mo in fns else [acmd.Command(acmd.END)]
         etr.last = False
         effect[mo] = etr.script(fns['effect_' + mo]) if 'effect_' + mo in fns else [acmd.Command(acmd.END)]
+        if str_ and 'sound_' + mo in fns:
+            sound[mo] = str_.script(fns['sound_' + mo])
         if mo.startswith(LASTING):
             # the explosion plays out after the article is removed (fireball.c / shot.c remove it after
             # the burst's frames; Ultimate's scripts at a notify)
@@ -211,7 +251,7 @@ def article_scripts(a, name, wdir):
         assert len(whirls) == 2, whirls
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
-    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+    for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in motions}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
         f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in motions))
@@ -226,6 +266,8 @@ def main():
     ap.add_argument('--bank')
     ap.add_argument('--trails')
     ap.add_argument('--motions')
+    ap.add_argument('--sound', help="tools/ultimate_sound.py's output: his banks, sequences, label table and "
+                    'sound_ids.json; the sound and expression scripts translated from Ultimate\'s')
     ap.add_argument('--menu')
     ap.add_argument('--menu-font', help='the font for the menu (the Wii U shared font: Cemu\'s '
                     'resources/sharedFonts/CafeStd.ttf)')
@@ -243,6 +285,8 @@ def main():
         srcs = [os.path.join(w, 'thunder_base.c')] + ([os.path.join(w, base + '.c')] if base else [])
         compile_msc(srcs + [os.path.join(w, name + '.c')], os.path.join(msc, name, name + '.mscsb'))
         print(article_scripts(a, name, os.path.join(fighter, 'script/animcmd/weapon', name)))
+    if a.sound:
+        print(sound_rows(a, fighter))
 
     if a.rpx:
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)

@@ -769,6 +769,146 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
     return out, tr.missing
 
 
+class SoundTranslator(Translator):
+    """sound_* functions -> Smash 4 sound scripts. ids: Ultimate name (se_ / vc_ / seq_, lower case) -> Smash
+    4 sound id (tools/ultimate_sound.py's sound_ids.json, the fighter's own banks and sequences) and the
+    common sounds (reference/ultimate_sound_map.json "common_se"); other names are left out and counted.
+    The commands are Smash 4's of the same macro (crc32 of the macro name = the ACMD id)."""
+    SAME = {'PLAY_SE': 'Sound_Effect', 'STOP_SE': 'Stop_Sound_Effect', 'PLAY_STEP': 'Sound_Effect2',
+            'PLAY_LANDING_SE': 'Sound_Effect3', 'PLAY_DOWN_SE': 'Sound_Effect4', 'PLAY_STATUS': 'Transient_Sound_Effect',
+            'PLAY_SEQUENCE': 'Low_Voice_Clip', 'PLAY_SE_NO_3D': 'PLAY_SE_NO_3D', 'PLAY_SE_REMAIN': 'PLAY_SE_REMAIN',
+            'SET_TAKEOUT_SE': 'SET_TAKEOUT_SE', 'STOP_SE_STATUS': 'STOP_SE_STATUS'}
+
+    def __init__(self, ids, fail=None):
+        super().__init__({})
+        self.ids, self.missing = ids, {}
+        self.loop = False
+        self.fail = fail or {}          # --fail-sounds: {condition: sounds of its failed branch}
+        self.drop = set()
+
+    def sid(self, name):
+        v = self.ids.get(name.lower()) if isinstance(name, str) else None
+        if v is None:
+            self.missing[name] = self.missing.get(name, 0) + 1
+        return v
+
+    def call(self, name, a, raw):
+        short = name.split('::')[-1]
+        if short in ('frame', 'wait'):
+            return super().call(name, a, raw)
+        if short == 'wait_loop_sync_mot':
+            self.loop = True
+            return []
+        if short in self.SAME and isinstance(a[1], str) and a[1].lower() in self.drop:
+            return []
+        if short in self.SAME:
+            v = self.sid(a[1])
+            return [] if v is None else [cmd(self.SAME[short], v)]
+        if short in ('PLAY_FLY_VOICE', 'PLAY_STEP_FLIPPABLE'):
+            v = [self.sid(x) for x in a[1:3]]
+            return [] if None in v else [cmd(short, *v)]
+        if short == 'SET_PLAY_INHIVIT':
+            v = self.sid(a[1])
+            return [] if v is None else [cmd('SET_PLAY_INHIVIT', v, int(float(a[2])))]
+        self.skip(short)
+        return []
+
+
+class ExpressionTranslator(Translator):
+    """expression_* functions -> Smash 4 expression scripts (rumble, camera quake, slope, item visibility),
+    reference/ultimate_sound_map.json: ControlModule::set_rumble -> Rumble (RUMBLE) or Rumble_Loop
+    (RUMBLE_STATUS: the length carried when Ultimate loops it) by kind; RUMBLE_HIT (on hit only) has no
+    Smash 4 form: vanilla rumbles once per swing, so it's dropped when the script rumbles anyway, else
+    played as a plain one; slope! -> SLOPE / Slope_Full (SLOPE_INTP) / Slope_Full2 (its 4-argument form);
+    QUAKE -> QUAKE by size; the common helpers (expression_LandingHeavyRumble...) -> what vanilla plays."""
+
+    def __init__(self, table):
+        super().__init__({})
+        self.t, self.missing = table, {}
+        self.loop = False
+        self.has_rumble = False
+
+    def rumble(self, kind, n, loop):
+        k = self.t['rumble'].get(kind)
+        if k is None:
+            self.missing[kind] = self.missing.get(kind, 0) + 1
+            return []
+        status = k[0] == 'RUMBLE_STATUS'
+        return [cmd('Rumble_Loop' if status else 'Rumble', k[1], int(float(n)) if status and loop else 0)]
+
+    def call(self, name, a, raw):
+        short = name.split('::')[-1]
+        if short in ('frame', 'wait'):
+            return super().call(name, a, raw)
+        if short == 'wait_loop_sync_mot':
+            self.loop = True
+            return []
+        if name in ('ControlModule::set_rumble', 'RUMBLE_FINAL_TARGET') or short == 'RUMBLE_FINAL_TARGET':
+            if short == 'RUMBLE_FINAL_TARGET':
+                return self.rumble(a[1], 0, False)
+            return self.rumble(a[1], a[2], bool(a[3]))
+        if short == 'RUMBLE_HIT':
+            return [] if self.has_rumble else self.rumble(a[1], 0, False)
+        if short == 'slope!':
+            st = self.t['slope_status'][str(a[2]).replace('SLOPE_STATUS_', '')]
+            if str(a[1]).endswith('SLOPE_INTP'):
+                if len(a) > 4 and a[4] is True:
+                    return [cmd('Slope_Full2', st, int(float(a[3])), 1)]
+                return [cmd('Slope_Full', st, int(float(a[3])))]
+            return [cmd('SLOPE', st)]
+        if short == 'QUAKE':
+            k = self.t['quake'].get(str(a[1]).replace('CAMERA_QUAKE_KIND_', ''))
+            return [] if k is None else [cmd('QUAKE', k[0])]
+        if short == 'FT_ATTACK_ABS_CAMERA_QUAKE':
+            return [cmd('FT_ATTACK_ABS_CAMERA_QUAKE', 0, 0)]
+        if name == 'ItemModule::set_have_item_visibility':
+            return [cmd('Item_Visibility', int(bool(a[1])))]
+        m = re.search(r'expression_(\w+Rumble)$', name)
+        if m:
+            out = []
+            for c in self.t['rumble_helpers'].get(m.group(1), []):
+                k = re.match(r'(\w+)\(Kind=(\d+), (\d+)\)', c)
+                out.append(cmd('Rumble_Loop' if k.group(1) == 'RUMBLE_STATUS' else 'Rumble', int(k.group(2)),
+                               int(k.group(3))))
+            return out
+        self.skip(short)
+        return []
+
+
+def first_voice_region(body):
+    """the dump's sound scripts with Ultimate's voice-region chain (a spell shout per language): its first
+    block (English: the _en sequences); the chain's own first `if` is lost in the dump, leaving a stray
+    `} else {` at the left margin"""
+    i = body.find('\n}\nelse {')
+    return body[:i] if i >= 0 and 'GET_VOICE_REGION' in body[i:] else body
+
+
+def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final')):
+    """every sound_* / expression_* function (kind) of the dump -> the script of the same Smash 4 name, as
+    translate_effects; a looping one (wait_loop_sync_mot) ends Loop_Rest, JUMP(itself) as vanilla's do"""
+    out = {}
+    for path in sorted(os.listdir(scripts_dir)):
+        if not path.endswith('.txt'):
+            continue
+        src = path[:-4]
+        for fn, body in functions(open(os.path.join(scripts_dir, path)).read()).items():
+            if not fn.startswith(kind + '_'):
+                continue
+            name = fn[len(kind) + 1:]
+            if name == src.lower():
+                name = TRANSLATE.get(src, name)
+            if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in base_bin.scripts):
+                continue
+            tr.loop = False
+            tr.has_rumble = 'set_rumble' in body
+            tr.drop = set(n for k, v in getattr(tr, 'fail', {}).items() if k in body for n in v)
+            cmds = tr.script(first_voice_region(body) if kind == 'sound' else body)
+            if tr.loop:
+                cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
+            out[name] = cmds
+    return out
+
+
 def skeleton_locals(nusktb):
     """{bone (lower case): its local transform (4 x 4, row vectors: translation in the 4th row)}"""
     import numpy as np
@@ -897,6 +1037,15 @@ def main():
                     help='with --others: translate the effect scripts too (IDS_JSON: Ultimate effect name -> '
                          'Smash 4 id, e.g. reference/ultimate_sys_effects.json, comma-separated files merged; trail '
                          'texture names -> trail ids too; NUSKTB: Ultimate skeleton)')
+    ap.add_argument('--sound-ids', help='with --others: translate the sound scripts too (JSON: Ultimate sound name -> '
+                    'Smash 4 id, tools/ultimate_sound.py\'s sound_ids.json; comma-separated files merged; the '
+                    'common sounds come from reference/ultimate_sound_map.json)')
+    ap.add_argument('--fail-sounds', action='append', default=[], metavar='SUBSTRING=NAME,NAME',
+                    help='with --sound-ids: in sound scripts testing that condition (one taken as true, --cond), '
+                    'these sounds are its failed branch\'s (the dump loses those braces): left out (Hero: '
+                    'SUCCESS_SP=se_brave_miss,vc_brave_mp_lost; a cast he can\'t pay for is SpecialLwFail)')
+    ap.add_argument('--expressions', action='store_true', help='with --others: translate the expression scripts '
+                    '(rumble, quake, slope, item visibility: reference/ultimate_sound_map.json)')
     ap.add_argument('--translate', help='JSON {Ultimate file: Smash 4 name or {"name", "slot"}}: more scripts for '
                     'this run (e.g. a fighter\'s specials; names starting with "special" are kept), a "slot" '
                     'naming the motion whose motion.mtable entry gets the new name (empty scripts when the dump '
@@ -967,6 +1116,24 @@ def main():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (
                     len(fx), ', '.join('%s x%d' % kv for kv in sorted(missing.items(), key=lambda kv: -kv[1]))))
+            smap = json.load(open(os.path.join(HERE, '..', 'reference', 'ultimate_sound_map.json')))
+            if fn == 'sound.bin' and a.sound_ids:
+                ids = {k: v for k, (v, _c) in smap['common_se'].items()}
+                for path in a.sound_ids.split(','):
+                    ids.update({k: v for k, v in json.load(open(path)).items() if not k.startswith('_')})
+                st = SoundTranslator(ids, {k: v.split(',') for k, v in (x.split('=') for x in a.fail_sounds)})
+                sc = translate_others('sound', a.scripts, o, st)
+                o.scripts.update({acmd.crc(n): c for n, c in sc.items()})
+                print('%d sound scripts translated; sounds without an id (left out): %s; calls left out: %s' % (
+                    len(sc), ', '.join('%s x%d' % kv for kv in sorted(st.missing.items(), key=lambda kv: -kv[1])) or '-',
+                    ', '.join('%s x%d' % kv for kv in sorted(st.skipped.items(), key=lambda kv: -kv[1])) or '-'))
+            if fn == 'expression.bin' and a.expressions:
+                et = ExpressionTranslator(smap)
+                sc = translate_others('expression', a.scripts, o, et)
+                o.scripts.update({acmd.crc(n): c for n, c in sc.items()})
+                print('%d expression scripts translated; rumble kinds without a match: %s; calls left out: %s' % (
+                    len(sc), ', '.join('%s x%d' % kv for kv in sorted(et.missing.items(), key=lambda kv: -kv[1])) or '-',
+                    ', '.join('%s x%d' % kv for kv in sorted(et.skipped.items(), key=lambda kv: -kv[1])) or '-'))
             o.save(os.path.join(a.others[1], fn))
     if a.motion_list:
         moves = motion_frames(a, done)
