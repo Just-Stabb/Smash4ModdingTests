@@ -1259,3 +1259,14 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
   never showed them. Back to fix 17's (the last motions build), every costume and its `l0N`. The
   `model` command now notes it when the profile drives slots.
 - Changed: `model/body/c00`-`c07`, `l00`-`l07`: `material_anime_face.pac`, `material_anime_eyelid.pac`.
+
+## Fix 75 (`build/hero_fix75.zip`): his portraits brighter
+
+- **User: Hero's select-screen art darker than the others'.** Smash 4's portrait renders are brighter
+  than Ultimate's: over the 39 fighters in both games (Ultimate `chara_3` c00, Smash 4 `chr_90` _01,
+  opaque pixels) the median luminance at each quantile goes 0.04 -> 0.18, 0.14 -> 0.36, 0.25 -> 0.44,
+  0.48 -> 0.66, 0.72 -> 0.82, 0.91 -> 0.95, the colour strength (max - min of the channels) about the
+  same. `ultimate_portraits.py` maps Ultimate's luminance through that curve (`TONE_ULT` / `TONE_S4`,
+  `--no-tone` for the old look), the chroma scaled by the square root of the change (kept as is, his
+  hair turned grey; scaled fully, oversaturated). The name plates are unchanged.
+- Changed: `ui/replace/chr/` (46 pictures; the 3 plates are as fix 73's).

@@ -507,6 +507,30 @@ def load_s4(path):
 
 
 # ================================================================ the Ultimate side
+# Smash 4's portrait renders are brighter than Ultimate's (shadows and midtones lifted; colour strength,
+# max - min of a pixel's channels, about the same): the median, over 39 fighters in both games (Ultimate
+# chara_3 c00 vs Smash 4 chr_90 _01, opaque pixels), of their luminance at each quantile (2 - 98 %),
+# Ultimate -> Smash 4. Applied to the luminance (tone())
+TONE_ULT = [0.0, 0.036, 0.072, 0.103, 0.144, 0.193, 0.252, 0.309, 0.401, 0.48, 0.563, 0.719, 0.91, 1.0]
+TONE_S4 = [0.03, 0.184, 0.252, 0.302, 0.357, 0.395, 0.436, 0.51, 0.582, 0.655, 0.737, 0.823, 0.948, 1.0]
+TONE = [True]
+
+
+def tone(f):
+    """premultiplied art toned as Smash 4's renders (TONE_*)"""
+    if not TONE[0]:
+        return f
+    a = f[..., 3:4]
+    rgb = np.where(a > 1e-4, f[..., :3] / np.maximum(a, 1e-4), 0)
+    lum = rgb @ np.array([0.299, 0.587, 0.114], np.float32)
+    lum2 = np.interp(lum, TONE_ULT, TONE_S4).astype(np.float32)
+    # chroma scaled by sqrt(L' / L): kept as is (+ (L' - L)) greys the lifted darks (his hair), scaled with
+    # the luminance over-saturates them
+    k = np.sqrt(np.clip(lum2 / np.maximum(lum, 1e-3), 1.0, 4.0))[..., None]
+    rgb = np.clip(lum2[..., None] + (rgb - lum[..., None]) * k, 0, 1)
+    return np.concatenate([rgb * a, a], -1).astype(np.float32)
+
+
 class Fighter:
     """one Ultimate costume's art: chara_3, chara_5 (the whole render) under it, the face frame chara_0"""
     def __init__(self, ult, name, c, cache, log):
@@ -543,7 +567,7 @@ class Fighter:
         """the art of a (w, h) picture whose pixel p is chara_3 pixel to3(p)"""
         a3 = warp(self.c3, to3.ax, to3.bx, to3.ay, to3.by, w, h)
         if self.c5 is None:
-            return a3
+            return tone(a3)
         to5 = to3.then(self.f5)
         a5 = warp(self.c5, to5.ax, to5.bx, to5.ay, to5.by, w, h)
         # chara_3 inside its own rectangle (feathered inward a few output pixels), chara_5 outside
@@ -554,7 +578,7 @@ class Fighter:
         wy = np.clip(np.minimum(ys + 0.5, H3 - 0.5 - ys) / fy, 0, 1)
         wx = np.clip(np.minimum(xs + 0.5, W3 - 0.5 - xs) / fx, 0, 1)
         wgt = (wy[:, None] * wx[None, :])[..., None].astype(np.float32)
-        return a3 * wgt + a5 * (1 - wgt)
+        return tone(a3 * wgt + a5 * (1 - wgt))
 
 
 def recolour(c5, src3, dst3, bins=24):
@@ -1121,7 +1145,10 @@ def main():
     ap.add_argument('--sets')
     ap.add_argument('--costumes', default='1-8')
     ap.add_argument('--fits')
+    ap.add_argument('--no-tone', action='store_true', help="Ultimate's art as it is (not brightened as Smash 4's "
+                    'renders: TONE_*)')
     a = ap.parse_args()
+    TONE[0] = not a.no_tone
 
     log = []
     cache = json.load(open(a.fits)) if a.fits and os.path.exists(a.fits) else {}
