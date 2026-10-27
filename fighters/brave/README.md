@@ -1129,10 +1129,25 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   meshes (`brave_lightning3_lightning2`: `thunder1`, `thunder1b`, `thunder2`, eft2 type 7, a primitive
   drawn as a billboard) hang 36 down from their origin (×2.1), with a particle centre of (0, 93). Two
   things were wrong:
-  - eft draws a billboard mesh a quarter turned (its -Y to screen left: the bolt lay along the ground
-    leftwards from his feet; the stored mesh was upright). It's now stored turned the other way, its
-    scale's x / y swapped with it (`bb_turn_xy`, `BB_TURN`). Observed on this bolt only.
+  - (taken back in fix 68) a quarter turn of billboard meshes: the leftward streak wasn't these
+    meshes but `brave_lightning3_hit`'s.
   - the centre wasn't converted: Ultimate adds it after the scale (36 × 2.1 down from 93 up: from the
     raised sword's tip, 17 up, to 95), eft scales rotBasis with the particle, so rotBasis = centre /
     scale (turned as the mesh is).
 - Changed: the `.ptcl` / `.efc` only (fix 66's `brave.mscsb`, fix 64's `code/cross_f.rpx` stay).
+
+## Fix 68 (`build/hero_fix68.zip`): roll-off aerials' direction, Kazap's bolt streaks
+
+- **Roll-off aerials (user: every input came out as "right": facing right a forward air, facing left
+  a back air, up / down too):** `rolloff_aerial` took his facing from `PostureModuleF(0x7)`, which is
+  the model's scale (always > 0), not the facing (`PostureModuleF(0)`, -1 / 1: the MSC note sheet's
+  "Get posture data"). The stick is now read as the game's own MSC reads it (`ControlModuleF(0)` /
+  `(1)`, on screen, as `global48` / `global32`). The same mix-up turned Command Selection's cast round
+  to face left whatever the stick: now it turns round when the stick is held back against his facing.
+- **Kazap's bolt (user, fix 67's clip: still off to the left):** the leftward streak was
+  `brave_lightning3_hit`'s `lightning2` / `lightning3` (stripes 48 / 70 long, eft2 type 5, turned Z
+  ±90 with a random drift, on `top` 10.2 up), not the thunder meshes. Converted as directional quads they
+  lay level. `--upright-for` stands them straight up from the hit point, growing up from it (their
+  centre, 0 1, halved as the attack line's). Fix 67's quarter turn of billboard meshes is taken back
+  (the thunder meshes keep their centre: from 17 to 95 up).
+- Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).

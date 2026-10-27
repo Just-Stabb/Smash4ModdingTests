@@ -138,14 +138,6 @@ BASE_FIRST = 2          # a template of the base's own beats an imported one thi
 FOLLOW = 0x310
 ROT_BASIS = 0x4C4       # eft's rotBasis (2 floats): the particle's centre (eft2's static `center`)
 
-
-def bb_turn_xy(v):
-    """BB_TURN: eft draws a billboard mesh (eft2 type 7) a quarter turned, its -Y to screen left
-    (Kazap's bolt, hanging down from its origin, lay along the ground leftwards from his feet: Hero fix
-    67); stored turned the other way (x, y) -> (-y, x) it stands as in Ultimate. Its scale's x / y and
-    its centre turn with it. Observed on that bolt"""
-    v = np.asarray(v, np.float32)
-    return np.stack([-v[:, 1], v[:, 0], v[:, 2]], 1)
 KEY_HOOKS = (0x32C, 0x330, 0x334, 0x338, 0x33C)
 # slot 0's flipbook (cross_f.rpx 0x04A5A858 / 0x04A5A6AC, the emitter's uniforms; 0x04A54A88 the
 # random start cell): 0x4D5 table used, 0x4D7 / 0x4D8 cells across / down, 0x4D9 random start cells,
@@ -292,6 +284,7 @@ class Templates:
         self.no_graft = False       # (--no-graft-for: no grafted templates for the emitter at hand)
         self.test_white1 = self.test_mean_colour = False    # (--test-white1-for, --test-mean-colour-for)
         self.hdr_white = False                              # (--hdr-white-for)
+        self.upright = False                                # (--upright-for)
         self.test_no_light = False                          # (--test-no-light-for)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
@@ -1623,8 +1616,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         fres = fresnel_bake(e, notes)
         if fres is None:
             fres_mean = fresnel_mean(e, prims[pt['primitive_id']], s3, st, notes)
-        bb_turn = pt['billboard_type'] == 7     # a billboard mesh: turned a quarter (BB_TURN)
-        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres, bb_turn)
+        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
             if rest_dir:
@@ -1638,10 +1630,6 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                 r = rotation_matrix(mesh_rot).astype(np.float32)
                 pos, nrm = pos @ r.T, nrm @ r.T
                 notes.append('rotation baked into the mesh')
-            if bb_turn:
-                pos = bb_turn_xy(pos)
-                nrm = None if nrm is None else bb_turn_xy(nrm)
-                notes.append('billboard mesh: a quarter turn baked in')
             if fres:
                 # the scaled mesh's normals from its triangles (Kafrizz's sphere1 has none: the +Z
                 # default baked nothing), facing the camera along Z
@@ -1851,8 +1839,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     base = np.ones(2) if is_mesh is True else np.array([max(sc['scale'][0], 1e-4), max(sc['scale'][1], 1e-4)])
     peak = np.maximum(curve.max(0), 1e-4)
     v0, v1, v2, s1, s2 = three_key(curve / peak)
-    bb_turned = is_mesh and pt['billboard_type'] == 7
-    xy = (lambda v: [v[1], v[0]]) if quarter in (1, 3) or bb_turned else (lambda v: list(v))
+    xy = (lambda v: [v[1], v[0]]) if quarter in (1, 3) else (lambda v: list(v))
     p.set_field(em, 'scale', xy([float(b * m) for b, m in zip(base, peak)]))
     p.set_field(em, 'scale_init_ratio', xy([float(v) for v in v0]))
     p.set_field(em, 'scale_diff21', xy([float(v) for v in v1 - v0]))
@@ -1862,10 +1849,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # a billboard mesh's particle centre: Ultimate adds it after the scale (Kazap's bolt, a mesh
         # hanging 36 down from its origin x 2.1, centre 0 93: from the raised sword's tip, 17 up, to 95);
         # eft scales rotBasis with the particle (S (pos + rotBasis)), so it gets centre / scale (at the
-        # scale's peak). Without it the bolt hung into the stage (Hero fix 67, user: "offset to the left")
-        scl = p.field(em, 'scale')                         # (stored turned: BB_TURN)
-        cx, cy = (float(v) for v in bb_turn_xy(np.array([[st['center'][0], st['center'][1], 0.0]]))[0][:2])
-        rb = [cx / max(abs(float(scl[0])), 1e-4), cy / max(abs(float(scl[1])), 1e-4)]
+        # scale's peak). Without it the bolt hung into the stage (Hero fix 67; fix 67's quarter turn of
+        # billboard meshes was wrong: the leftward streak the user saw was brave_lightning3_hit's, fix 68)
+        scl = p.field(em, 'scale')
+        rb = [float(st['center'][i]) / max(abs(float(scl[i])), 1e-4) for i in (0, 1)]
         struct.pack_into('>2f', em, ROT_BASIS, *rb)
         notes.append('billboard mesh centre %g %g (rotBasis %g %g)' % (st['center'][0], st['center'][1], rb[0], rb[1]))
     p.set_field(em, 'scale_random', xy([min(1.0, sc['scale_random'][0] / 100), min(1.0, sc['scale_random'][1] / 100)]))
@@ -1902,8 +1889,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         notes.append('directional quad: emitter turned X first')
     else:
         em_rot = eft_rotation(info['rotate'])
+    if templates.upright and not is_mesh and typ == 3:
+        # --upright-for: standing straight up from the emitter, growing up from it (its centre, as the
+        # attack lines'): Kazap's bolt streaks (brave_lightning3_hit lightning2 / 3, eft2 type 5 turned
+        # Z +-90 with a random drift) lay level, leftwards from his waist, where Ultimate's bolt rises
+        # from the hit to the sky (Hero fix 68, user). Observed, not derived
+        em_rot = (0.0, 0.0, 0.0)
+        p.set_field(em, 'emit_direction', [0.0, 1.0, 0.0])
+        p.set_field(em, 'emitter_velocity', max(0.01, abs(float(p.field(em, 'emitter_velocity')))))
+        p.set_field(em, 'figure_velocity', 0.0)
+        p.set_field(em, 'init_velocity_random', 0.0)
+        notes.append('upright (--upright-for)')
     p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
-    if typ == 3 and not is_mesh and pt['billboard_type'] == 3:
+    if typ == 3 and not is_mesh and (pt['billboard_type'] == 3 or templates.upright):
         # eft2's particle centre (static `center`) as eft's rotBasis (0x4C4, docs/ptcl-format.md: the
         # vertex programs draw S (pos + rotBasis)): sys_attack_line's lines (0, 0.8) grow up from the
         # kick in Ultimate; centred on it (the template's) they hung below his feet (Hero fix 65). Kept to
@@ -2387,6 +2385,8 @@ def main():
                     'grafted templates for them (A / B tests)')
     ap.add_argument('--hdr-white-for', default='', help='as --no-graft-for: their HDR colours (past 1) whitened '
                     'as Ultimate\'s tone mapping shows them (white_spill), not clamped per channel')
+    ap.add_argument('--upright-for', default='', help='as --no-graft-for: directional quads stood straight up from '
+                    'the emitter, growing up from it (Kazap\'s bolt streaks)')
     ap.add_argument('--test-white1-for', default='', help='as --no-graft-for: texture 1 white (tests)')
     ap.add_argument('--test-mean-colour-for', default='', help='as --no-graft-for: colour tracks as their means (tests)')
     ap.add_argument('--test-skip-for', default='', help='as --no-graft-for: the emitters left out (tests)')
@@ -2437,6 +2437,7 @@ def main():
     no_graft = set(v for v in a.no_graft_for.split(',') if v)
     white1 = set(v for v in a.test_white1_for.split(',') if v)
     hdr_white = set(v for v in a.hdr_white_for.split(',') if v)
+    upright = set(v for v in a.upright_for.split(',') if v)
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     skip = set(v for v in a.test_skip_for.split(',') if v)
     no_light = set(v for v in a.test_no_light_for.split(',') if v)
@@ -2468,6 +2469,7 @@ def main():
                 templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
                 templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1
                 templates.hdr_white = name in hdr_white or '%s/%s' % (name, e['name']) in hdr_white
+                templates.upright = name in upright or '%s/%s' % (name, e['name']) in upright
                 templates.test_mean_colour = name in mean_colour or '%s/%s' % (name, e['name']) in mean_colour
                 templates.test_no_light = name in no_light or '%s/%s' % (name, e['name']) in no_light
                 if name in skip or '%s/%s' % (name, e['name']) in skip:

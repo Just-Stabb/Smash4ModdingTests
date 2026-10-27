@@ -1500,3 +1500,11 @@ Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targ
   emission). Field meanings found there: `docs/ptcl-format.md` (0x2F9, 0x2FC-0x2FE, 0x310, 0x82C,
   flipbook block, complex header).
 
+
+### PostureModuleF arguments (Hero fix 68)
+
+`PostureModuleF(0)` is the facing (LR, -1 / 1), `1` - `3` the position, `7` the model's scale (the MSC
+note sheet's "Get posture data"); `PostureModule(0, lr)` sets the facing. Hero's roll-off aerial and
+Command Selection's turn round used `0x7` as the facing (always > 0: every input read as facing right).
+`ControlModuleF(0)` / `(1)` are the stick on screen (X, Y; `7` / `8` unclamped); the game turns X along
+the facing with `x PostureModuleF(0)` (`global48`).

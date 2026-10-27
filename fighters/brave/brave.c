@@ -38369,13 +38369,13 @@ int rolloff_air_t;
 int rolloff_fast;       // Hero: the roll's speed scaled this roll (brave_roll_mult)
 int rolloff_airborne;   // the first aerial of a roll-off's airtime goes by the stick as it starts (fix 66)
 
-// the main stick now, as rolloff_cstick's codes: raw X on screen and Y, neutral (5) below 0.3 either way
+// the main stick now, as rolloff_cstick's codes: X on screen and Y, neutral (5) below 0.3 either way
 int rolloff_stick_dir()
 {
     float x;
     float y;
-    x = WorkModuleF(0, 0x0f000260);
-    y = WorkModuleF(0, 0x0f000111);
+    x = ControlModuleF(0);      // the game's own stick X (on screen) and Y (as global48 / global32)
+    y = ControlModuleF(0x1);
     if (y > 0.3f && y * y > x * x)
     {
         return 0x3;
@@ -38463,7 +38463,8 @@ int rolloff_aerial(int kind)
     {
         return 0x5;
     }
-    if ((c == 0x1) == (PostureModuleF(0x7) > 0))
+    if ((c == 0x1) == (PostureModuleF(0) > 0))  // his facing (fix 68: 0x7 is the model's scale, always > 0:
+                                                // every left / right input read as facing right, user)
     {
         return 0x2;
     }
@@ -40945,10 +40946,10 @@ void brave_lw_loop()
             // the cast: only its row stays up; he turns round to a stick held back (Ultimate's command
             // spells do)
             brave_clear_input();
-            if (ControlModuleF(0) < -0.5f)
+            if (ControlModuleF(0) * PostureModuleF(0) < -0.5f)
             {
-                PostureModule(0, -PostureModuleF(0x7));
-                PostureModule(0x2);
+                PostureModule(0, -PostureModuleF(0));   // fix 68: was -PostureModuleF(0x7) (minus his scale:
+                PostureModule(0x2);                     // always facing left), on a stick held left
             }
             brave_menu = 0x2;
             brave_menu_rows = n * brave_bit(0x5 * brave_lw_cursor);
