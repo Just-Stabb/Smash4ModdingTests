@@ -1156,3 +1156,10 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   multiplies its colour tracks by it; `--camera-offset-for sys_attack_line=-15` draws it behind him
   (Ultimate's own -5 left it in front of his body here).
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).
+
+## Fix 69 (`build/hero_fix69.zip`): roll-off aerials' up / down zone wider
+
+- **Roll-off aerials (user: only a stick held straight up / down gave up / down air):** up / down now
+  past 35 degrees from level (`rolloff_stick_dir`; was 45). Smash 4's own aerial pick is 50
+  (docs/native-notes.md "The aerial kind"): this is wider on request.
+- Changed: `brave.mscsb`.

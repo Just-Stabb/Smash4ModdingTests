@@ -1508,3 +1508,15 @@ note sheet's "Get posture data"); `PostureModule(0, lr)` sets the facing. Hero's
 Command Selection's turn round used `0x7` as the facing (always > 0: every input read as facing right).
 `ControlModuleF(0)` / `(1)` are the stick on screen (X, Y; `7` / `8` unclamped); the game turns X along
 the facing with `x PostureModuleF(0)` (`global48`).
+
+### The aerial kind (`ControlModule(0x10)`, Hero fix 69)
+
+The MSC's `ControlModule(0x10)` (int handler `0x02C1C7D0` -> vt `+0x284`) returns the fighter control
+module's `+0x1A8` (`0x02E74AA4`): the aerial kind (1 neutral, 2 forward, 3 back, 4 up, 5 down) kept
+from the frame attack was taken, not the stick now (why an aerial buffered in a roll took the roll's
+stick). It's worked out in the update `0x02E71774` (from `0x02E71B78`): neutral when two stick
+measures (`0x02E71458`, `0x02E71514`) are under the params at `+0x100` / `+0x104` of the block at
+`0x10(r1)`; else a side aerial when |angle| < 50 degrees (`0x1055113C` = 0.8727 rad, set by the static
+initialiser `0x02C1D790` with 90 / -90 beside it; the angle is vt `+0x3C` `0x02E73608` = atan2(y, |x|)),
+forward / back by stick X x facing; else up / down by Y's sign. Statuses `1`, `2`, `0xA`, `0x71`,
+`0xAE` keep a kind already set.

@@ -38376,11 +38376,14 @@ int rolloff_stick_dir()
     float y;
     x = ControlModuleF(0);      // the game's own stick X (on screen) and Y (as global48 / global32)
     y = ControlModuleF(0x1);
-    if (y > 0.3f && y * y > x * x)
+    // up / down past 35 degrees from level (y^2 > x^2 tan^2 35); Smash 4's own aerial pick (0x02E71774:
+    // atan2(|y|, |x|) < 50 degrees is a side aerial) is stricter, fix 68's 45 too (user, fix 69: only
+    // a stick held straight up / down gave up / down air)
+    if (y > 0.3f && y * y > x * x * 0.49f)
     {
         return 0x3;
     }
-    if (y < -0.3f && y * y > x * x)
+    if (y < -0.3f && y * y > x * x * 0.49f)
     {
         return 0x4;
     }
