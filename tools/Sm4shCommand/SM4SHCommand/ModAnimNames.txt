@@ -350,3 +350,24 @@ SleepNone20
 SleepNone21
 SleepNone22
 SleepNone23
+
+// ---- Squirtle (pzenigame)
+// his specials' extra motions in Mario's custom-move slots (extra_kinds.json "motions", body/main.pac
+// FitMarioBodyMainD00SpecialNHold ...), scripts from Ultimate's: tools/pzenigame_build.py
+// (fighters/pzenigame/specials_acmd.json): Water Gun's charge / shot 0x212 / 0x213 (air 0x216 / 0x217),
+// Withdraw's slide / end 0x21A / 0x21B (air 0x21E / 0x21F), its hit 0x220 (0x21C keeps Mario's name)
+SpecialNHold
+SpecialNShot
+SpecialAirNHold
+SpecialAirNShot
+SpecialSLoop
+SpecialSEnd
+SpecialAirSLoop
+SpecialAirSEnd
+SpecialAirSHit
+// the water article (weapon kind 0x198, his article 5; motion.mtable): Water0 / 1 / 2 the flight at the
+// charge's thirds, WaterNone the fireball's fourth slot
+Water0
+Water1
+Water2
+WaterNone
