@@ -200,6 +200,18 @@
         "crash": {"kind": "0x196", "base": "thunder", "max": 1, "on_hit": 1},
         "sleep": {"kind": "0x197", "base": "thunder", "max": 2, "on_hit": 1}
       }
+    },
+    {
+      "kind": "0x46",
+      "name": "pzenigame",
+      "cap": "Pzenigame",
+      "base": "mario",
+      "ai": "base",
+      "ui": {
+        "id": 64,
+        "name": "Squirtle",
+        "subtitle": "Tiny Turtle Pok\u00e9mon"
+      }
     }
   ],
   "weapon_capacity": "0x1C0"

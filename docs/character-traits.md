@@ -22,6 +22,7 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Incineroar (`gaogaen`, new kind, Ultimate port on Bowser's base) | `0x43` | Juggernaut |
 | Steve (`pickel`, new kind, Ultimate port on Pit's base) | `0x44` | Technical |
 | Hero (`brave`, new kind, Ultimate port on Robin's base) | `0x45` | Shooter |
+| Squirtle (`pzenigame`, new kind, Ultimate port on Mario's base) | `0x46` | Shooter |
 | Meta Knight | `0x17` | Normal |
 | Samus | `0x06` | Shooter |
 | Roy | `0x36` | Technical |
