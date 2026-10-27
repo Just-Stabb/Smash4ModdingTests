@@ -91,5 +91,6 @@
  "brave_fire_sword@0,0,-90": "0x3450078",
  "brave_reflect_start@0,180,0": "0x3450079",
  "sys_special_attack_up": "0x345007A",
- "sys_special_speed_up": "0x345007B"
+ "sys_special_speed_up": "0x345007B",
+ "sys_attack_line": "0x345007C"
 }

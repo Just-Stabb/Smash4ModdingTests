@@ -1058,6 +1058,11 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
 - **Command Selection's loop (user: the menu animation, ground and air, didn't loop):** Smash 4 loops a
   motion when byte 0 of its `fighter_param_vl` group 1 entry is 0; the translator wrote 1 for every new
   motion slot. It now writes 0 where Ultimate's `motion_list` flags the motion looping (`0x2`):
-  `SpecialLwSelect` / `SpecialAirLwSelect` (`0x278` / `0x284`) and the other holds on new slots.
+  `SpecialLwSelect` / `SpecialAirLwSelect` (`0x278` / `0x284`), and Zap's / Woosh's holds (`0x259`,
+  `0x25D`, `0x261`, `0x26D`), Kaclang's loop (`0x233` / `0x255`) and Zoom's flights (`0x23C` / `0x23D`),
+  all driven by the MSC's own frame counts, so nothing waited on those motions ending.
+- The cap fix lifts 36 of his emitters (3 are still over 200 particles alive).
+- Build: the bank as fix 56's, with `sys_attack_line=p_cmnattackline` added to the `--extra-eff`
+  list and `--hdr-white-for brave_fullburst,brave_fullburst_start,brave_fullburst_finish,brave_fullburst_end`.
 - Changed: `brave.mscsb`, `animcmd/body/effect.bin`, `fighter_param_vl_brave.bin`, the `.ptcl` /
   `.efc`.
