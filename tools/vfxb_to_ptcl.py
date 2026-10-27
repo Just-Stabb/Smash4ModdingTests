@@ -234,6 +234,19 @@ class Templates:
         self.test_no_light = False                          # (--test-no-light-for)
         for path in corpus:
             self.files[path] = ptcl.Ptcl(open(path, 'rb').read())
+        # vanilla child blocks by (blend, particle type): what child_block starts from (none with a
+        # shader parameter range of their own)
+        self.children = {}
+        for path in [None] + list(corpus):
+            p = base if path is None else self.files[path]
+            for s in p.sets:
+                for x in s['emitters']:
+                    em = x['data']
+                    if em is not None and ptcl.Ptcl.has_child(em):
+                        c = bytes(em[ptcl.CHILD:ptcl.CHILD + ptcl.CHILD_SIZE])
+                        if not any(struct.unpack_from('>4I', c, 0x2DC)):
+                            self.children.setdefault((struct.unpack_from('>I', c, 0x3C)[0],
+                                                      struct.unpack_from('>I', c, 0x44)[0]), c)
         for path in [None] + list(corpus):
             p = base if path is None else self.files[path]
             screen = {}
@@ -1212,7 +1225,9 @@ def set_uv_anim(em, ts, slot=0):
     struct.pack_into('>3f', em, o + 0x544, ts['rotation_add'], ts['rotation'], ts['rotation_random'])
 
 
-def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
+def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as_child=False):
+    """one Ultimate emitter as an eft emitter (bytes; None when skipped). as_child: a child emitter's,
+    for child_block to take its drawing from: one texture, the CPU's particles, nothing complex"""
     pt = e['particle']
     if not e['info']['is_particle_draw']:
         # Ultimate doesn't draw it (eft2's is_particle_draw; none of Hero's 5 has child emitters):
@@ -1230,6 +1245,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         notes.append('billboard type %d: skipped' % pt['billboard_type'])
         return None
     is_mesh = pt['primitive_id'] != NONE64
+    if is_mesh and as_child:
+        notes.append('child mesh: skipped (eft\'s children are quads)')
+        return None
     if is_mesh and pt['primitive_id'] not in prims:
         notes.append('primitive %d not in the file: skipped' % pt['primitive_id'])
         return None
@@ -1299,17 +1317,17 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     anim = tuple(e['color']['color%d_type' % n] == 2 and float(np.ptp(track(e['static'], e['color'], n)[0], 0).max()) > 0.05
                  for n in (0, 1))
     # a second sampler moving apart from the main one: drawn live by a two-texture template
-    dis = dissolve_of(e, ti, images, names, ptn_want) if EXACT and smp else None
+    dis = dissolve_of(e, ti, images, names, ptn_want) if EXACT and smp and not as_child else None
     # a dissolve's threshold rides in colour 1's track, or colour 0's when its rgb is constant
     c0_flat = float(np.ptp(track(e['static'], e['color'], 0)[0], 0).max()) <= 0.01
     dis_moving = dis is not None and float(np.ptp(dis[1])) > 0.01
     live = live_sampler(e, ti, images, names, is_mesh) if EXACT and TWO_TEXTURES and smp and not uv_quarter and \
-        dis is None else None
+        dis is None and not as_child else None
     # samplers 1 and 2 both drawn live by a three-texture graft (three_texture_shader), in eft2's order
     # (t0 . t1) . t2: sampler 0 the main one, the other two its UV set's on a mesh
     live3 = None
     if EXACT and TWO_TEXTURES and GRAFT and not templates.no_graft and smp and not uv_quarter and dis is None \
-            and ti == 0:
+            and ti == 0 and not as_child:
         usable = [j for j in (1, 2) if e['sampler'][j]['texture_id'] != NONE64 and e['sampler'][j]['texture_id'] in images
                   and 'indirect' not in names.get(e['sampler'][j]['texture_id'], '')
                   and not e['tex_anim'][j]['pattern_type']
@@ -1322,14 +1340,15 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
         and s['texture_id'] in images and 'indirect' not in names.get(s['texture_id'], '')]
     if live3:
         live, swap_ok = 1, False
-    fblocks, fanims, fdone = particle_fields(e)
-    fluct = fluctuation(e)
+    fblocks, fanims, fdone = particle_fields(e) if not as_child else ({}, [], set())
+    fluct = fluctuation(e) if not as_child else None
+    child, child_e = None, (e['children'] or [None])[0] if not as_child else None
     em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
                                        notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
                                        live is not None,
                                        uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
-                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None, bool(fblocks),
-                                       fluct is not None)
+                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None,
+                                       bool(fblocks) or as_child or child_e is not None, fluct is not None)
     if swapped:
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
@@ -1682,10 +1701,15 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else int(pt['life'] * pt['life_random'] / 100))
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)
-    if e['children']:
-        notes.append('%d child emitters not converted' % len(e['children']))
-    anims, done = emitter_anims(p, em, e, notes)
+    if child_e is not None:
+        child = child_block(p, e, child_e, names, images, notes, templates, prims, prim_index)
+        if len(e['children']) > 1:
+            notes.append('%d more child emitters not converted (eft has one)' % (len(e['children']) - 1))
+    anims, done = emitter_anims(p, em, e, notes) if not as_child else ([], set())
     left = set(e['subsections']) - done - fdone
+    if as_child:
+        p.set_key_anims(em, [])
+        return em
     if struct.unpack_from('>I', em, USER_CALLBACK)[0] == LIGHT_CALLBACK:
         em[USER_DATA:USER_CALLBACK + 4] = bytes(USER_CALLBACK + 4 - USER_DATA)
     if e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20 and \
@@ -1720,8 +1744,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index):
     for a in anims:         # an animated rate lowered with the emitter's (its peak)
         if a['target'] == 0:
             a['keys'] = [(t, v * p.field(em, 'emit_rate') / before) for t, v in a['keys']]
-    if fblocks or fluct:
-        em = ptcl.Ptcl.with_fields(em, fblocks, fluct)
+    if fblocks or fluct or child:
+        em = ptcl.Ptcl.with_fields(em, fblocks, fluct, *(child or (None, 0)))
     if fblocks:
         notes.append('fields: %s%s' % (', '.join(sorted(fblocks)), ' (animated %s)' % ', '.join(
             '0x%X' % a['target'] for a in fanims) if fanims else ''))
@@ -1830,6 +1854,75 @@ def particle_fields(e):
         blocks['random'] = struct.pack('>i3f', interval, vx, vy, vz)
         anims += field_anim(r, 4, (0x1C, 0x1D, 0x1E))
     return blocks, anims, done
+
+
+# a child emitter's block (ptcl.CHILD; docs/ptcl-format.md) from Ultimate's child: its drawing taken from the
+# child converted as an emitter of its own (convert_emitter as_child: shader, texture, colours, alpha,
+# scale, rotation, UV block; the child's fields where they mirror the emitter's, cross_f 0x04A5B308 /
+# 0x04A5AA00 filling the same uniforms from them), its emission from Ultimate's child: count = rate, step =
+# interval, start % of the parent's life (0x04A5EC6C), as Duck Hunt's final smash has them in both games
+CHILD_FROM_EMITTER = [      # (child offset, emitter offset, size)
+    (0x3C, 0x324, 4), (0x40, 0x4B8, 4), (0x44, 0x4BC, 4), (0x48, 0x328, 4), (0x4C, 0x40, 0x38), (0x124, 0x320, 4),
+    (0x140, 0x778, 4),
+    (0x154, 0x784, 0x14), (0x190, 0x7F8, 0xC), (0x19C, 0x804, 0xC), (0x1A8, 0x810, 0xC), (0x1B4, 0x81C, 0xC),
+    (0x1C8, 0x4C4, 8), (0x1D0, 0x4A4, 0xC), (0x1E8, 0x4D4, 0x7C), (0x26C, 0x484, 4), (0x270, 0x830, 0x38),
+    (0x2A8, 0x86C, 0x10), (0x2B8, 0x868, 4), (0x2F4, 0x8A8, 0x14)]
+# Ultimate's inherit flags (by index) -> ptcl.INHERIT (Duck Hunt's final-smash children agree bit for bit)
+CHILD_INHERIT = ['velocity', 'scale', 'rotation', None, 'color0', 'color1', 'alpha0', 'alpha1', 'draw_path', 'pre_draw']
+
+
+def child_block(p, parent, c, names, images, notes, templates, prims, prim_index):
+    """Ultimate child emitter c of parent as (eft child block, inherit bits), or None"""
+    cnotes = []
+    em = convert_emitter(p, c, names, images, cnotes, templates, prims, prim_index, as_child=True)
+    if em is None:
+        notes.append('child %s: %s' % (c['name'], '; '.join(cnotes)))
+        return None
+    key = struct.unpack_from('>II', em, 0x324)[0], p.field(em, 'particle_type')
+    tpl = templates.children.get(key) or next(iter(templates.children.values()))
+    b = bytearray(tpl)
+    for co, eo, n in CHILD_FROM_EMITTER:
+        b[co:co + n] = em[eo:eo + n]
+    struct.pack_into('>i', b, 0x34, -1)
+    for k, base in ((0, 0x650), (1, 0x6D0)):      # colours: the tracks' mean (a child's is constant)
+        keys = np.array(struct.unpack_from('>32f', em, base)).reshape(8, 4)[:, :3]
+        struct.pack_into('>3f', b, 0x128 + 0xC * k, *map(float, keys.mean(0)))
+    struct.pack_into('>2I', b, 0x14C, 1, 0)         # alpha 0 as the emitter's sections, alpha 1 constant 1
+    struct.pack_into('>2f', b, 0x168, 1.0, 0.0)
+    sc, v0 = np.array(p.field(em, 'scale')), np.maximum(np.array(p.field(em, 'scale_init_ratio')), 0.01)
+    end = v0 + np.array(p.field(em, 'scale_diff21')) + np.array(p.field(em, 'scale_diff32'))
+    struct.pack_into('>3f', b, 0x180, *(sc * v0), float(p.field(em, 'scale_random')[0]))
+    struct.pack_into('>i2f', b, 0x1DC, 0, *map(float, end / v0))       # from birth to its end scale
+    rr = c['particle']['rot_rev_rand']
+    b[0x1C4:0x1C7] = bytes(int(bool(v)) for v in rr)
+    rot = any(p.field(em, 'rotation_velocity')) or any(p.field(em, 'rotation_velocity_random'))
+    flags = struct.unpack_from('>I', b, 0x10)[0] & ~7
+    flags |= (1 if abs(p.field(em, 'air_resistance') - 1) > 1e-6 else 0) | (2 if any(p.field(em, 'gravity')) else 0) \
+        | (4 if rot else 0)
+    struct.pack_into('>I', b, 0x10, flags)
+    ems, vel, pt, inh = c['emission'], c['velocity'], c['particle'], c['inherit']
+    rate, interval = float(ems['rate']), max(0, int(ems['interval']))
+    if rate >= 1:
+        count, step = int(round(rate)), interval
+    else:
+        # fewer than one a spawn: one every so many frames (eft: count is whole)
+        count, step = 1, max(0, int(round((interval + 1) / max(rate, 0.01))) - 1)
+    sh = c['shape']
+    pos_rand = float(max(sh['volume_radius']) * max(sh['volume_form_scale'])) if sh['volume_type'] else 0.0
+    struct.pack_into('>4i', b, 0, count, min(100, max(0, int(ems['start']))), int(pt['life']), step)
+    struct.pack_into('>5f', b, 0x14, float(inh['velocity_rate']), float(vel['all_direction']), 0.0, 0.0, 0.0)
+    struct.pack_into('>f', b, 0x28, pos_rand)
+    struct.pack_into('>f', b, 0x38, float(pt['momentum_random']) / 100)
+    struct.pack_into('>f', b, 0x17C, float(inh['scale_rate']))
+    inherit = 0x40
+    for i, name in enumerate(CHILD_INHERIT):
+        if name and inh['flags'][i]:
+            inherit |= ptcl.INHERIT[name]
+    if abs(vel['designated_dir_scale']) > 1e-3:
+        cnotes.append('directional velocity dropped')
+    notes.append('child %s: %d every %d frames from %d%%, life %d; %s' % (
+        c['name'], count, step + 1, ems['start'], pt['life'], '; '.join(cnotes)))
+    return bytes(b), inherit
 
 
 def fluctuation(e):

@@ -175,6 +175,11 @@ COMPLEX_FLAGS = 0xC00050                # +0x8BC on every vanilla complex emitte
 # tables), 6 scale y from its own channel (else x's); the value 1 - wave x amplitude. A channel (x, then y):
 # f amplitude, f 128 / cycle frames, u32 random phase (a random cycle's worth), f phase (frames)
 FLUCT_FMT, FLUCT_SIZE, FLUCT_OFF = '>2fIf2fIf', 0x20, 0xE
+# child emitter: +0x8BC bit 0, its block at +0x8D4 (CHILD_SIZE; layout in docs/ptcl-format.md, CHILD_SHADERS
+# its shader indices) and these +0x8BC bits what each child takes from its parent particle
+CHILD, CHILD_SIZE, CHILD_SHADERS = 0x8D4, 0x308, (0x284, 0x288, 0x28C)
+INHERIT = {'velocity': 0x20, 'scale': 0x8, 'rotation': 0x10, 'color0': 0x2, 'color1': 0x8000, 'alpha0': 0x400000,
+           'alpha1': 0x800000, 'draw_path': 0x800, 'pre_draw': 0x1000}
 TEX_FIELDS = [            # within a TexRes (only these 0x38 bytes are stored; the rest is runtime)
     (0x00, '>2H', 'size'), (0x04, '>I', 'tile_mode'), (0x08, '>I', 'swizzle'), (0x0C, '>I', 'sampler'),
     (0x10, '>I', 'mip_levels'), (0x14, '>I', 'comp_sel'), (0x18, '>f', 'enable_mip_level'),
@@ -411,10 +416,10 @@ class Ptcl:
         return out
 
     @staticmethod
-    def with_fields(em, blocks, fluct=None):
-        """a simple emitter made complex with these field blocks ({name: raw bytes}, FIELD_BLOCKS' sizes) and
-        fluctuation ((flags, FLUCT_FMT block) or None): a new bytearray, the header as vanilla's with no
-        child or stripe"""
+    def with_fields(em, blocks, fluct=None, child=None, inherit=0):
+        """a simple emitter made complex with these field blocks ({name: raw bytes}, FIELD_BLOCKS' sizes),
+        fluctuation ((flags, FLUCT_FMT block) or None) and child (a CHILD_SIZE block, its INHERIT bits): a
+        new bytearray, the header as vanilla's (no stripe)"""
         assert len(em) == SIMPLE_SIZE, 'only a simple emitter'
         flags, body = 0, b''
         for bit, name, size, _fmt, _names in FIELD_BLOCKS:
@@ -422,15 +427,21 @@ class Ptcl:
                 assert len(blocks[name]) == size, name
                 flags |= 1 << bit
                 body += blocks[name]
-        out = bytearray(em) + bytes(0x8D4 - SIMPLE_SIZE) + body
+        out = bytearray(em) + bytes(0x8D4 - SIMPLE_SIZE)
+        if child is not None:
+            assert len(child) == CHILD_SIZE
+            out += child
+        field_pos = len(out)
+        out += body
         fl_flags, fl_pos = FLUCT_OFF, 0
         if fluct is not None:
             fl_flags, fl_pos = fluct[0], len(out)
             assert len(fluct[1]) == FLUCT_SIZE
             out += fluct[1]
         struct.pack_into('>I', out, 0, 1)
-        struct.pack_into('>IHHHHHHHHI', out, SIMPLE_SIZE, COMPLEX_FLAGS, flags, fl_flags, 0, 0, 0,
-                         0x8D4 if flags else 0, fl_pos, 0, len(out))
+        struct.pack_into('>IHHHHHHHHI', out, SIMPLE_SIZE, COMPLEX_FLAGS if child is None else inherit | 1, flags,
+                         fl_flags, 0, 0, 0x8D4 if child is not None else 0, field_pos if flags else 0, fl_pos, 0,
+                         len(out))
         return out
 
     def texres(self, em, slot, child=False):
@@ -574,7 +585,7 @@ class Ptcl:
         how many. Those below `first` stay whatever uses them (complex emitters' children carry
         their own indices)"""
         n = self.shader_count()
-        used = {be32(x['data'], 0x844) for s in self.sets for x in s['emitters'] if x['data'] is not None}
+        used = {be32(em, o) for em in self.shader_users() for o in self.shader_slots(em)}
         keep = [i for i in range(n) if i < first or i in used]
         if len(keep) == n:
             return 0
@@ -594,12 +605,27 @@ class Ptcl:
         struct.pack_into('>I', head, 0x14, base + len(bins))
         self.shader = head + bins + entries
         struct.pack_into('>I', self.shader, 4, len(self.shader))
-        for s in self.sets:
-            for x in s['emitters']:
-                if x['data'] is not None:
-                    struct.pack_into('>I', x['data'], 0x844, remap[be32(x['data'], 0x844)])
+        for em in self.shader_users():
+            for o in self.shader_slots(em):
+                struct.pack_into('>I', em, o, remap[be32(em, o)])
         self.dirty_layout = True
         return n - len(keep)
+
+    def shader_users(self):
+        return [x['data'] for s in self.sets for x in s['emitters'] if x['data'] is not None]
+
+    @staticmethod
+    def has_child(em):
+        return be32(em, 0) == 1 and be32(em, 0x8BC) & 1 and struct.unpack_from('>H', em, 0x8C8)[0] == CHILD
+
+    @classmethod
+    def shader_slots(cls, em):
+        """the offsets in an emitter holding shader indices: its own (0x844) and its child's (0 = none
+        for the child's second and third)"""
+        out = [0x844]
+        if cls.has_child(em):
+            out += [CHILD + o for k, o in enumerate(CHILD_SHADERS) if k == 0 or be32(em, CHILD + o)]
+        return out
 
     def import_emitter(self, other, set_index, k, skip_slots=(), _shaders={}):
         """emitter k of another Ptcl's set, adapted to this one: its shader imported (once per source
@@ -707,7 +733,7 @@ class Ptcl:
                     errs.append(tag + ': key animation past the table')
                 if be32(em, 0x2EC) and be32(em, 0x2F0) + be32(em, 0x2EC) > len(self.sparam):
                     errs.append(tag + ': shader params past the table')
-                if be32(em, 0x844) >= nsh:
+                if any(be32(em, o) >= nsh for o in self.shader_slots(em)):
                     errs.append(tag + ': shader index')
                 pi = struct.unpack_from('>i', em, 0x2DC)[0]
                 if pi >= npr:

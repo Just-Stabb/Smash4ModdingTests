@@ -763,3 +763,16 @@ spell flashes). eft draws it on the CPU's particles, or on the GPU's when their 
 `flucX` / `flucY`; templates are ranked for that after the colour tracks, and every one of the 104 found
 one (18 glows moved to premultiplied templates, which draw the same since fix 43). Only the `.ptcl`
 changed.
+
+## Fix 49 (`build/hero_fix49.zip`): child emitters
+
+eft's child emitters are decoded (`docs/ptcl-format.md`: the 0x308-byte child block, its spawn timing
+and inherit flags, its fields matched to the emitter's through the uniform fills) and Ultimate's now
+convert (`vfxb_to_ptcl.py` `child_block`): the child converted as an emitter of its own (one texture,
+the CPU's particles), its drawing copied into a vanilla child block of the same blend and type, its
+emission from Ultimate's (count = rate, step = interval, start % of the parent's life; under one a spawn,
+one every so many frames). Hero's: Kacrackle Slash's ice fragments trail flashes (flash2 / flash3, one
+every 3 / 2 frames, inheriting 0.8 of the fragment's velocity), and Oomph / Acceleratle's glow particles
+spawn their sparkles (2 every 5 frames). Parents with children take CPU templates too (children spawn
+at their particles' CPU positions). Not yet: a second child (eft has one), mesh children, and parents
+Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.

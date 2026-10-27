@@ -186,6 +186,44 @@ magnet (71): fields need the CPU's particles.
 | 5 | position add | 0x10 | vec3, u8 world |
 | 6 | curl noise | 0x24 | u8, u8, 2 pad, f, vec3, vec3, f (uniforms: vec4 74 = the first vec3 and f, 75 = the second and the last f) |
 
+Child emitter (`+0x8BC` bit 0; its 0x308-byte block at `+0x8D4`, the child offset, before the fields;
+`ptcl.CHILD`): each parent particle, once its age reaches `+0x04` % of its life, queues `+0x00` children
+every `+0x0C` + 1 frames (cross_f 0x04A5EC6C; 0x04A5FCBC spawns them). Read off the code (the spawn,
+the child particles' calc 0x04A63224 and the child uniform fill 0x04A5B308, which fills the same
+uniforms as the emitter's 0x04A5AA00 does from the emitter's own fields):
+
+| Offset | Meaning | Emitter counterpart |
+|--------|---------|---------------------|
+| 0x00 / 0x04 / 0x08 / 0x0C | s32 count, start (% of the parent's life), life, step | |
+| 0x10 | flags: 1 air resistance, 2 gravity, 4 rotation (vanilla: with 0x40, 0x4000) | |
+| 0x14 / 0x18 / 0x1C | f velocity inherit rate, all-direction speed, vec3 random velocity | |
+| 0x28 / 0x38 | f position random, f dynamics random (x 1 +- it) | |
+| 0x34 | s32 primitive (-1) | 0x2DC |
+| 0x3C / 0x40 / 0x44 / 0x48 | blend, ?, particle type, ? | 0x324 / 0x4B8 / 0x4BC / 0x328 |
+| 0x4C | TexRes (its own texture) | slot 0's 0x40 |
+| 0x124 | ? (drawing) | 0x320 |
+| 0x128 / 0x134 / 0x140 | colour 0 / 1 (constant rgb), colour scale | 0x778 |
+| 0x14C / 0x150 | alpha 0 / 1 type (0 constant: init + diff21, 1 the three sections) | |
+| 0x154 / 0x168 | alpha 0 / 1: init, diff21, diff32, section 1, 2 | 0x784 |
+| 0x17C | f scale inherit rate | |
+| 0x180 / 0x188 | vec2 scale, f random | |
+| 0x18C | rotation inherit type (1 x, 2 y, 3 z, else all) | |
+| 0x190 / 0x19C / 0x1A8 / 0x1B4 | rotation init, random, velocity, velocity random | 0x7F8 / 0x804 / 0x810 / 0x81C |
+| 0x1C4 | 3 bytes: rotation direction random | |
+| 0x1C8 / 0x1D0 | rotBasis, gravity | 0x4C4 / 0x4A4 |
+| 0x1DC / 0x1E0 | s32 scale start frame, vec2 end scale (x the start's, by death) | |
+| 0x1E8 | UV block (0x7C) | slot 0's 0x4D4 |
+| 0x26C | air resistance | 0x484 |
+| 0x270 - 0x2A7 | shader-keyed fields; 0x271 the shader mode, 0x284 / 0x288 / 0x28C its shader indices | 0x830 - 0x867 (0x844 ...) |
+| 0x2A8 / 0x2B8 / 0x2F4 | | 0x86C (0x10) / 0x868 / 0x8A8 (0x14) |
+
+`+0x8BC` then says what a child takes from its parent particle (`ptcl.INHERIT`): 0x20 velocity (x 0x14),
+0x8 scale (x 0x17C), 0x10 rotation, 0x2 / 0x8000 colour 0 / 1, 0x400000 / 0x800000 alpha 0 / 1, 0x800 and
+0x1000 Ultimate's draw-path / pre-draw (Duck Hunt's final-smash children agree bit for bit), 0x40 always.
+Children are the CPU's particles; the parent must be too (they spawn at its particles' CPU positions).
+`vfxb_to_ptcl.child_block` converts Ultimate's child as an emitter of its own (one texture, the CPU's
+particles) and copies its fields across from a vanilla child block of the same blend and type.
+
 Fluctuation (`+0x8C2` flags, `+0x8CC` a 0x20-byte block; `ptcl.FLUCT_FMT`): cross_f 0x04A622C4 on the
 CPU's particles, `flucX` / `flucY` (vec4 34 / 35) on the GPU's, which only the 128 vanilla emitters' GPU
 programs reading them draw. Flags: bit 0 on, 1 alpha, 2 scale, 3 / 4 / 5 the wave (one of three
