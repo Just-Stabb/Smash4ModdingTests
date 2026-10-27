@@ -23,7 +23,7 @@ sys.path.insert(0, HERE)
 import rpx_patch  # noqa: E402
 
 CAVE = 0x04B9B000               # free grown space: smash_button_cave.py ends here, kind_expand.py starts at 0x04BA0000
-LIMIT = 0x04BA0000
+LIMIT = 0x04B9E000               # copy_custom_cave.py from here (SPAWNERS), kind_expand.py from 0x04BA0000
 GROW = 0x04B9C000
 TABLE = 0x10423E60
 OLD_N = 259

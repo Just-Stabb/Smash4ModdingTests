@@ -667,19 +667,29 @@ hit states oddly. In the user's setup these characters never detransform, so thi
   (below).
 - Star-missile copies: the star cave (`starcopy_cave.py`, 12th hit) writes the hit fighter's
   `0x10000048` to Kirby's `0x9F` before it hands the copy over. Confirmed working.
-- **Weapon spawners** (Samus / Dr. Mario / Diddy check): every weapon kind has its own spawner, named
-  by its article record `{kind, max count, spawner, extra}` (`reference/FighterArticles.xml`:
-  CountAddr - 4 / + 4). Kirby's copies use the copied fighter's records, so the copied fighter's
-  spawner runs with Kirby as the owner. CAVE_C's hook (`0x02F062C0`) is in Bowser's breath spawner
-  (`0x02F0601C`, kind `0x5F`), not a shared one. 36 of the 329 spawners (357 calls to the weapon
-  create `0x02C073A8`) read the owner's `0x10000048` themselves (`lwz rX, 0x120(int array)` into
-  the init block's `+0x5C`), so on Kirby they read his own Inhale custom. Samus's charge shot
-  (`0x02F75F8C`, read at `0x02F7609C`, kind `0x46`) and Dr. Mario's capsule (`0x027B1E14`, read at
-  `0x027B1F94`, kind `0xBE`) are two of them: CAVE_D / CAVE_E (`copy_custom_cave.py` `SPAWNERS`,
-  `0x037EE428`-`0x037EE478`) do what CAVE_C does there. Diddy Kong's gun (`0x02ED13C0`), peanuts
-  (`0x02ED1634`) and explosion (`0x02ED1294`) spawners leave `+0x5C` at the init block's 0 (as for
-  Diddy himself), and the weapon init (`0x02B61A64`) has no fallback, so his variants come from the
-  neutral-B params (CAVE_B: already the copy's). Unicorn test: `tools/copy_custom_cave_test.py`.
+- **Weapon spawners**: every weapon kind has its own spawner, named by its article record
+  `{kind, max count, spawner, extra}` (`reference/FighterArticles.xml`: CountAddr - 4 / + 4). Kirby's
+  copies use the copied fighter's records (Kirby's copy tables, `0x10135000`-`0x10136D20`), so the
+  copied fighter's spawner runs with Kirby as the owner. CAVE_C's hook (`0x02F062C0`) is in Bowser's
+  breath spawner (`0x02F0601C`, kind `0x5F`), not a shared one. 36 of the 329 spawners (357 calls to
+  the weapon create `0x02C073A8`) read the owner's `0x10000048` themselves (`lwz rX, 0x120(int
+  array)` into the init block's `+0x5C`), so on Kirby they read his own Inhale custom; 32 reads are
+  in spawners his copy tables use (31 fighters' neutral-B weapons: Mario / Luigi fireball, Samus
+  charge shot, Dr. Mario capsule, Link / Toon Link bow and arrow, Pit / Dark Pit arrow, Pikachu Thunder
+  Jolt, Ness PK Flash, Lucas PK Freeze, Sheik needles, Falco blaster, ZSS paralyzer, Peach Toad,
+  Lucario aura sphere, Mewtwo shadow ball, Game & Watch chef, Olimar Pikmin (2 reads), Dedede star
+  (2), R.O.B. beam, Charizard breath, Wii Fit sun salutation, Robin thunder, Duck Hunt can, Bowser Jr.
+  cannonball, Greninja shuriken, and Kirby's own Rosalina-copy Luma shot), plus Kirby's star missile
+  (left alone). `copy_custom_cave.py` `SPAWNERS` gives each of them CAVE_C's check (owner Kirby with a
+  copy: the copied slot `0x1000009F`). Per site: the owner register (forward dataflow from r4 at
+  entry, matching the int array's `[[[OWNER+0x726C]+8]+0]+0xC` chain), a volatile scratch register
+  and cr0 dead on every path from the hook to the create call (a path-following liveness pass). Hooks
+  below `0x02B00000` use the Havok cave (`0x037EE400`-`0x037EE4DC`), the rest the grown code space at
+  `0x04B9E000` (`trail_table_cave.py`'s limit lowered to it). Diddy Kong's gun / peanuts / explosion
+  spawners leave `+0x5C` at the init block's 0 (as for Diddy himself), and the weapon init
+  (`0x02B61A64`) has no fallback, so his variants come from the neutral-B params (CAVE_B: already the
+  copy's). Unicorn test: `tools/copy_custom_cave_test.py` (every site, 4 owners each, no register
+  other than the result and the scratch changed).
 
     python3 tools/rpx_patch.py build/cave_fix_s4/cross_f.rpx build/copy_custom/cross_f.rpx \
       $(python3 tools/starcopy_cave.py) 0x02C24CA8=0x60000000 $(python3 tools/transform_grab_cave.py) \

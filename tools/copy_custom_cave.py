@@ -25,13 +25,19 @@ it uses 0x1000009F instead. Found with a Cemu breakpoint on the breath getter: L
 That hook is in Bowser's breath spawner (0x02F0601C), not a shared one: every weapon kind has its own
 spawner (its article record {kind, max count, spawner}: reference/FighterArticles.xml CountAddr - 4 /
 + 4; Kirby's copies use the copied fighter's records and spawners), and 36 of the 329 read the owner's
-0x10000048 there themselves. CAVE_D / CAVE_E do the same for Samus's charge shot (0x02F75F8C, read at
-0x02F7609C) and Dr. Mario's capsule (0x027B1E14, read at 0x027B1F94): on Kirby they read his own
-Inhale custom, so Kirby's copy fired his slot's variant (Dense / Melee Charge Shot, Fast / Mega
-Capsule) instead of the swallowed fighter's. Diddy Kong's gun / peanut / explosion spawners pass 0
-(as for Diddy himself): his variants come from the neutral-B params, already the copy's (CAVE_B).
-CAVE_D / CAVE_E sit after CAVE_C (0x037EE428-0x037EE478, free in the standard build); the debug-only
-stage_select_debug_cave.py uses the same words and can't be combined with this.
+0x10000048 there themselves (lwz rX, 0x120(owner's int array) into the init block's +0x5C), so
+on Kirby they read his own Inhale custom and Kirby's copy fired his slot's variant instead of the
+swallowed fighter's. SPAWNERS covers all 32 of those reads in the spawners Kirby's copy tables use
+(0x10135000-0x10136D20; Kirby's own star missile left out): each gets a cave doing what CAVE_C does.
+Per site (checked with a path-following liveness pass over each spawner, kept in the table): the
+owner register (the int array's [[[OWNER+0x726C]+8]+0]+0xC chain, and r4 at entry on every path), a
+volatile scratch register dead on every path from the hook to the weapon create call, and cr0 dead
+there too. Diddy Kong's gun / peanut / explosion spawners pass 0 (as for Diddy himself): his
+variants come from the neutral-B params, already the copy's (CAVE_B).
+Caves: hooks below 0x02B00000 (out of a branch's reach of the grown code) after CAVE_C in the Havok
+cave (0x037EE400-0x037EE4F0, free in the standard build; the debug-only stage_select_debug_cave.py uses
+the same words and can't be combined with this), the rest in the grown code space at 0x04B9E000
+(trail_table_cave.py's limit lowered to it).
 """
 CAVE_A = 0x037EE680
 SLOT = 0x1000009F
@@ -44,13 +50,47 @@ WM_GET, WM_SET = 0x84, 0x8C
 LIMIT = 0x037EE73C
 CAVE_C = 0x037EE400  # free (zero) part of the Havok cave
 HOOK_C, RET_C = 0x02F062C0, 0x02F062C4  # last word of the Havok cave takes moved relocations (starcopy_cave.py)
-# spawners reading the owner's custom slot: (hook: lwz DST, 0x120(INTS), DST, INTS = owner's int array,
-# OWNER = owner object), each with its own cave after CAVE_C
+# spawners reading the owner's custom slot: (hook: lwz DST, 0x120(INTS); DST, INTS = owner's int array,
+# OWNER = owner object, SCRATCH = a volatile register dead from the hook to the create call, weapon kind,
+# fighter/weapon)
 SPAWNERS = [
-    (0x02F062C0, 0, 9, 26),     # CAVE_C: Bowser's Fire Breath (koopa breath, kind 0x5F)
-    (0x02F7609C, 10, 6, 29),    # CAVE_D: Samus's Charge Shot (samus cshot, kind 0x46)
-    (0x027B1F94, 8, 5, 29),     # CAVE_E: Dr. Mario's Megavitamins (mariod drcapsule, kind 0xBE)
+    (0x02F062C0, 0, 9, 26, 12, 0x05F, 'koopa/breath'),     # CAVE_C
+    (0x027B1F94, 8, 5, 29, 12, 0x0BE, 'mariod/drcapsule'),
+    (0x0279B2FC, 10, 11, 29, 12, 0x134, 'koopajr/cannonball'),
+    (0x027AA040, 10, 10, 28, 12, 0x16E, 'lucas/pkfreeze'),
+    (0x027B3F00, 11, 10, 29, 12, 0x166, 'mewtwo/shadowball'),
+    (0x027BF508, 0, 8, 31, 9, 0x15E, 'pitb/bowarrow'),
+    (0x02F7609C, 10, 6, 29, 12, 0x046, 'samus/cshot'),
+    (0x02F19054, 0, 8, 26, 11, 0x064, 'luigi/fireball'),
+    (0x02F4783C, 11, 10, 31, 12, 0x051, 'peach/kinopio'),
+    (0x02F540D8, 0, 8, 31, 9, 0x04F, 'pit/bowarrow'),
+    (0x02F122A0, 0, 7, 30, 12, 0x053, 'lucario/auraball'),
+    (0x02F1ADC8, 11, 9, 29, 12, 0x000, 'mario/fireball'),
+    (0x02F09CC8, 0, 7, 31, 11, 0x007, 'link/bow'),
+    (0x02F09E08, 10, 9, 30, 12, 0x008, 'link/bowarrow'),
+    (0x02F4B530, 8, 8, 28, 12, 0x014, 'pikachu/dengekidama'),
+    (0x02F3B0F0, 10, 10, 28, 12, 0x055, 'ness/pkflash'),
+    (0x02F77B2C, 0, 6, 27, 12, 0x041, 'sheik/needle'),
+    (0x02EE64BC, 12, 6, 30, 11, 0x0E5, 'gamewatch/food'),
+    (0x02EE1634, 8, 5, 27, 12, 0x01F, 'falco/blaster_bullet'),
+    (0x02F816B8, 0, 12, 28, 11, 0x037, 'szerosuit/paralyzer_bullet'),
+    (0x02F50134, 6, 8, 28, 12, 0x03C, 'pikmin/pikmin'),
+    (0x02F50140, 0, 8, 28, 12, 0x03C, 'pikmin/pikmin'),
+    (0x02ECA9F0, 11, 8, 27, 12, 0x028, 'dedede/starmissile'),
+    (0x02ECAC30, 11, 8, 27, 12, 0x028, 'dedede/starmissile'),
+    (0x02F6887C, 0, 5, 29, 12, 0x0C7, 'robot/beam'),
+    (0x02F843F4, 0, 7, 31, 11, 0x0CF, 'toonlink/bow'),
+    (0x02F84534, 10, 9, 30, 12, 0x0D0, 'toonlink/bowarrow'),
+    (0x02F0F678, 27, 7, 29, 11, 0x0DD, 'lizardon/breath'),
+    (0x02F8D1B4, 0, 11, 27, 12, 0x074, 'wiifit/sunbullet'),
+    (0x02F64650, 12, 9, 27, 11, 0x0B6, 'reflet/thunder'),
+    (0x02EDF080, 11, 12, 28, 10, 0x10B, 'duckhunt/can'),
+    (0x02EF1340, 0, 8, 30, 12, 0x0F9, 'gekkouga/shuriken'),
+    (0x02EFC864, 0, 9, 29, 12, 0x013, 'kirby/rosettaticomissile'),   # Kirby's own article: his Rosalina copy's
 ]
+GROWN = 0x04B9E000             # grown code space (trail_table_cave.py's LIMIT)
+GROWN_LIMIT = 0x04BA0000       # kind_expand.py from here
+NEAR = 0x02B00000              # hooks below this use the Havok cave
 SPAWN_LIMIT = 0x037EE5A0       # copy_held_cave.py from here
 
 
@@ -147,20 +187,27 @@ def patches():
     p.append((CLEAR_COUNT, li(11, 0x1C)))
     # each spawner: INTS = owner's int array, OWNER = owner (its WorkModule at +0x726C; OWNER is NOT
     # the fighter base, so [OWNER+4] isn't the kind: v4 checked that and never fired). WM+0x18 =
-    # fighter kind. r12 is free at every hook (nothing reads it before the weapon create call).
-    at = CAVE_C
-    for hook, dst, ints, owner in SPAWNERS:
-        cave, end3 = assemble(at, [
-            lwz(dst, 0x120, ints),                    # replaced: owner's 0x10000048
-            lwz(12, 0x726C, owner), lwz(12, 0x18, 12), cmpwi(12, 8), ('bc', BNE, 'done'),
-            lwz(12, 0x290, ints), cmplwi(12, 0x3A), ('bc', BGE, 'done'),
+    # fighter kind. DST is loaded last, so INTS may be DST (Pikachu, Ness, Lucas); SCRATCH is never r0
+    # (as a base register r0 reads as 0).
+    at = {True: CAVE_C, False: GROWN}
+    for hook, dst, ints, owner, scr, _kind, _name in SPAWNERS:
+        assert scr not in (0, ints, owner)
+        near = hook < NEAR
+        cave, end3 = assemble(at[near], [
+            lwz(scr, 0x726C, owner), lwz(scr, 0x18, scr), cmpwi(scr, 8), ('bc', BNE, 'own'),
+            lwz(scr, 0x290, ints), cmplwi(scr, 0x3A), ('bc', BGE, 'own'),
             lwz(dst, (SLOT & 0xFFFF) * 4, ints),      # Kirby with a copy: the copied custom slot
-            'done',
+            ('b', hook + 4),
+            'own',
+            lwz(dst, 0x120, ints),                    # replaced: the owner's 0x10000048
             ('b', hook + 4),
         ])
+        assert abs(at[near] - hook) < 0x1FFFFF0, (hex(hook), hex(at[near]))
         p += cave
-        p.append((hook, b(hook, at)))
-        at = end3
+        p.append((hook, b(hook, at[near])))
+        at[near] = end3
+    assert at[False] <= GROWN_LIMIT, hex(at[False])
+    at = at[True]
     assert at <= SPAWN_LIMIT, hex(at)
     p.append((HOOK_B, b(HOOK_B, end)))
     return p
