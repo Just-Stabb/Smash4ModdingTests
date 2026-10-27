@@ -1229,3 +1229,23 @@ Ultimate's reflect handler; ours reflects in native code), Metal Slash on a meta
 (`se_brave_criticalhit`). Not in the ExeFS at all (the status scripts'): `l17`, `l18_02`,
 `vc_brave_special_l14`, `se_brave_dead`, `se_brave_escapeair`.
 - Changed: `brave.mscsb`.
+
+## Fix 73 (`build/hero_fix73.zip`): his portraits and name plates from Ultimate's
+
+`tools/ultimate_portraits.py --ult brave --ult-base reflet --ui-name Hero --s4-base Reflet` (Ultimate's
+`ui/replace[_patch]/chara/chara_N_brave_CC.bntx`, the user's `ui-SSBU.zip`): all 49 files Robin's slot
+gives Hero (`chr_00`, `chr_11`, `chr_12`, `chr_13`, `stock_90` _01 - _08; `chr_10`, `chr_70`, `chr_90`
+_01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size and texture id.
+- Framing: within each game a fighter's portraits are crops of one render (Smash 4: of `chr_90`, fits
+  0.98 - 0.998; Ultimate: `chara_0` / `chara_5` of `chara_3`, 0.99+); the two games are linked through
+  Robin's Ultimate face icon fitted onto his Smash 4 `chr_90` (0.62: different renders), and Hero's face
+  put where Robin's is. `chr_00` / `chr_10` keep Robin's hexagon ring; `stock_90` is `chara_4`'s head with
+  Robin's outline and shadow; `chr_12` squeezed 8:1 as Robin's.
+- Name plates: each letter cut from Smash 4's own plates (`chrn_11` HERO: H Peach, E Ike, R Kirby, O
+  Falco; the small-caps `chrn_12` / `chrn_40`: the H from Duck Hunt's, un-squeezed), Robin's outline and
+  shadow redrawn round them.
+- Approximate: `chr_10` / `chr_70` / `chr_90` are chosen by Robin's male / female parity (_01 Luminary,
+  _02 Erdrick): Solo and Eight show one of those there (their own are built: not loaded by the game);
+  below the waist where Ultimate's big render is cut off, the full-body one enlarged (softer); costumes
+  5 - 8's lower bodies recoloured from 1 - 4's.
+- Changed: `ui/replace/chr/` (49 files). `build/hero_fix73_portraits.png`: old / fit check / new.

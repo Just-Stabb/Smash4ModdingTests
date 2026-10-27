@@ -915,6 +915,27 @@ class GlyphLib:
             runs = segment(fill, len(chars))
             if runs is not None:
                 raw.append((ui, text, chars, runs, fill, img))
+        # every glyph sits on the common baseline, small capitals at their common height: a plate with
+        # a glyph off that (two-line names, a letter cut wrong: Ike's "e" took part of the "k" and
+        # came out 5 px too tall) gives nothing
+        ext = {}
+        for ui, text, chars, runs, fill, img in raw:
+            for (_x0, _x1, gm, _c0, _c1), big in zip(runs, self.bigs(text)):
+                ys = np.flatnonzero(gm.max(1) > 0.5)
+                ext.setdefault(big, []).append((ys[0], ys[-1] + 1))
+        line = {b: (float(np.median([e[0] for e in v])), float(np.median([e[1] for e in v]))) for b, v in ext.items()}
+        tol = max(2.0, 0.07 * (line[False][1] - line[False][0])) if False in line else 2.0   # ~2 px on chrn_12
+        kept, dropped = [], []
+        for r in raw:
+            ui, text, chars, runs, fill, img = r
+            ok = True
+            for (_x0, _x1, gm, _c0, _c1), big in zip(runs, self.bigs(text)):
+                ys = np.flatnonzero(gm.max(1) > 0.5)
+                # (big letters' height varies from plate to plate, 36-46 px on chrn_12: bottoms only)
+                ok &= abs(ys[-1] + 1 - line[big][1]) <= tol and (big or abs(ys[0] - line[big][0]) <= tol)
+            (kept if ok else dropped).append(r)
+        raw = kept
+        self.line = line
         widths = {}
         for ui, text, chars, runs, fill, img in raw:
             for c, (_x0, _x1, _m, c0, c1), big in zip(chars, runs, self.bigs(text)):
@@ -931,7 +952,10 @@ class GlyphLib:
                 self.glyphs.setdefault((c.upper(), b), []).append((cond, gm, ui, img[:, x0:x1], c0 - x0, c1 - x0))
                 if i + 1 < len(chars) and not self.space_after(text, i):
                     self.pairs.setdefault((c.upper(), b, chars[i + 1].upper(), bigs[i + 1]), []).append((runs[i + 1][3] - c1) / cond)
-        log.append('%s: glyphs from %d plates (%s)' % (st, len(raw), ', '.join(r[0] for r in raw)))
+        self.nat = nat
+        log.append('%s: glyphs from %d plates (%s); left out, a glyph off the line: %s; %s' % (
+            st, len(raw), ', '.join(r[0] for r in raw), ', '.join(r[0] for r in dropped) or 'none',
+            '; '.join('%s letters rows %.0f-%.0f' % ('big' if b else 'small', t, bt) for b, (t, bt) in sorted(line.items()))))
 
     def bigs(self, text):
         return [(not self.small_caps) or c.isupper() or not c.isalpha() for c in text if c != ' ']
@@ -955,7 +979,8 @@ class GlyphLib:
             opts = self.glyphs.get((c.upper(), b))
             if not opts:
                 raise SystemExit('%s: no plate has the letter %r (%s)' % (self.st, c, 'big' if b else 'small'))
-            cond, fill, ui, img, cl, cr = max(opts, key=lambda o: o[0])       # the least condensed
+            # the least condensed; of those, the one nearest the letter's usual width
+            cond, fill, ui, img, cl, cr = max(opts, key=lambda o: (o[0], -abs((o[5] - o[4]) / o[0] - self.nat[(c.upper(), b)])))
             if cond < 1.0:
                 nw = max(1, int(round(fill.shape[1] / cond)))
                 cl, cr = cl * nw / fill.shape[1], cr * nw / fill.shape[1]
@@ -999,7 +1024,8 @@ class GlyphLib:
             sel = np.clip(fill[:, x0 - xi:x1 - xi], 0, 1)
             fillc[:, x0:x1] = np.maximum(fillc[:, x0:x1], sel)
             colc[:, x0:x1] = colc[:, x0:x1] * (1 - sel[..., None]) + img[:, x0 - xi:x1 - xi].astype(np.float32) / 255 * sel[..., None]
-            used.append('%s (%s) from %s%s' % (chars[i], 'big' if bigs[i] else 'small', ui,
+            ys = np.flatnonzero(fill.max(1) > 0.5)
+            used.append('%s (%s, rows %d-%d) from %s%s' % (chars[i], 'big' if bigs[i] else 'small', ys[0], ys[-1] + 1, ui,
                                                '' if c0 == 1.0 else ', its plate condensed x%.2f, undone' % c0))
             x += (cr - cl) + (gaps[i][0] * cond if i < len(gaps) else 0)
         log.append('%s: %r: %s; spacing: %s; %.0f px wide at x %.0f%s' % (
