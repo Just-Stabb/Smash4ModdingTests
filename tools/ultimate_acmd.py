@@ -332,8 +332,10 @@ TRUE_CONDS = []
 
 
 # --dyn-cond: conditions decided in game, not here (substring of the dump's condition -> an int variable):
-# the `if` becomes Int_Var_Compare(variable == 1) then True { the if's body } Else { the else's }, both
-# kept (Hero's critical hit: FIGHTER_BRAVE_INSTANCE_WORK_ID_FLAG_CRITICAL_HIT, rolled by his MSC)
+# the `if` becomes Int_Var_Compare(variable != 0) then True { the if's body } Else { the else's }, both
+# kept (Hero's critical hit: FIGHTER_BRAVE_INSTANCE_WORK_ID_FLAG_CRITICAL_HIT, rolled by his MSC). != 0, not
+# == 1: Robin's native code counts some of his ints down every frame (0x10000098-0x1000009C, the tomes'
+# recharge; 0x02F635F0), so the MSC writes a big value and a tick can't clear it (fix 62)
 DYNAMIC_CONDS = {}
 
 
@@ -419,7 +421,7 @@ class Translator:
                         else:
                             body_t, body_e = cmds[at:els], cmds[els:]
                             self.frame = max(self.frame, other)
-                        block = [cmd('Int_Var_Compare', var, 0, 1),
+                        block = [cmd('Int_Var_Compare', var, 1, 0),     # method 1: !=
                                  cmd('True', 2 + words(body_t) + (2 if body_e else 0))] + body_t
                         if body_e:
                             block += [cmd('Else', 2 + words(body_e))] + body_e
@@ -897,7 +899,7 @@ def main():
     ap.add_argument('--cond', action='append', default=[], help='a condition taken as true (substring of the '
                     'dump\'s condition, e.g. MATERIAL_KIND_IRON) for Steve\'s tool material); repeatable')
     ap.add_argument('--dyn-cond', action='append', default=[], metavar='SUBSTRING=VAR',
-                    help="a condition decided in game: the if / else kept as Int_Var_Compare(VAR == 1) True / Else "
+                    help="a condition decided in game: the if / else kept as Int_Var_Compare(VAR != 0) True / Else "
                          "(e.g. FLAG_CRITICAL_HIT=0x1000009A, Hero's critical hit); repeatable")
     a = ap.parse_args()
     TRUE_CONDS[:] = a.cond

@@ -1015,3 +1015,20 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   x the roll's way past 0.3), through Fall and whatever he does next in the air; letting go, turning
   the stick, landing, a ledge or a hit puts it back (`rolloff_hold_update`). Before, Fall's end did.
 - Changed: `brave.mscsb`, `cross_f.rpx` (ITEM codes 8 / 9).
+
+## Fix 62 (`build/hero_fix62.zip`): crit damage, Woosh without MP, roll-off direction
+
+- **Crit damage (user: the camera came, the damage didn't):** Robin's native per-frame code
+  (`0x02F635F0`) counts his ints `0x10000098`-`0x1000009C` (his tomes' recharge) down by 1 while
+  positive. The crit flag at `0x1000009A` was written 1, so it read 0 by the hit and the smash
+  scripts took the normal hitboxes (the camera goes by the MSC's own copy). Now the MSC writes 1000 and
+  the scripts compare `!= 0` (`ultimate_acmd.py --dyn-cond`). Also hits the MP gauge's int `0x9C`
+  (a tick off: harmless so far).
+- **Woosh (user):** the charge level is no longer lowered to one he pays for (that auto-cast the cheaper
+  one, and with Kaswoosh never paid for the full-charge check never came true, so the charge looped).
+  The level held when he lets go (or the full charge, 28 frames) is the one tried; one he can't pay for
+  is the empty hop, which spends the airtime's use like any Woosh. No MP at all: the hop at once.
+- **Roll-off test (user):** the way that counts is the way his speed goes (his X against the last
+  frame's once he's off), not his facing (a roll turns him round); and an attack buffered off the edge
+  (no Fall) lifts the air speed cap too (the roll end checks his situation, not only for Fall).
+- Changed: `brave.mscsb`, `animcmd/body/game.bin`.

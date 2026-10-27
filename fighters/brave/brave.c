@@ -8485,24 +8485,24 @@ void func_380()
 
 void func_381()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap (universal mechanics)
-    {
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off: slid off an edge (into Fall, or an attack
+    {                                               // buffered off the edge: Hero's test, fix 62) -> no air speed cap
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
-        rolloff_dir = PostureModuleF(0x7);  // Hero's test: the forward roll's way on screen
+        rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
     }
     func_383();
 }
 
 void func_382()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap (universal mechanics)
-    {
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off: slid off an edge (into Fall, or an attack
+    {                                               // buffered off the edge: Hero's test, fix 62) -> no air speed cap
         WorkModule(0x13, 0x1, 0x20000044);
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
-        rolloff_dir = -PostureModuleF(0x7); // Hero's test: the back roll goes away from his facing
+        rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
     }
     func_383();
 }
@@ -38333,25 +38333,42 @@ float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x t
 float rolloff_hold_x() { return 0.3f; } // Hero's test: the stick past this, on screen, the roll's way keeps the cap off
 
 // Hero's test of a new roll-off (user): the speed carried off a ledge isn't held to the air speed cap
-// (flag 0x20000044 off) until the stick stops holding the roll's way (its screen X, the position
-// variable 0x0F000260, times rolloff_dir under rolloff_hold_x()), whatever he's doing in the air; it's
-// also back on landing or a ledge (situation not air) and when he's hit (Damage 0x45 - DamageFall 0x4C).
-// Before: Fall's end put it back. rolloff_dir: the roll's way on screen (1 right, -1 left), set at the
-// slide-off (func_381 / func_382); global64: the cap is off from a roll-off.
+// (flag 0x20000044 off) until the stick stops holding the way that speed goes (its screen X, the position
+// variable 0x0F000260, times rolloff_dir under rolloff_hold_x()), whatever he's doing in the air (Fall or
+// an attack buffered off the edge); it's also back on landing or a ledge (situation not air) and when he's
+// hit (Damage 0x45 - DamageFall 0x4C). Before: Fall's end put it back. rolloff_dir: the way his speed goes
+// on screen (1 right, -1 left), from his movement (X, position variable 0x0F000000, against the last
+// frame's) once he's off (fix 62, user: fix 61 took his facing, which a roll's turn can flip); global64:
+// the cap is off from a roll-off.
 float rolloff_dir;
+float rolloff_last_x;
 
 void rolloff_hold_update()
 {
-    if (global64 == 0)
+    float x;
+    x = WorkModuleF(0, 0x0f000000);
+    if (global64)
     {
-        return;
+        if (rolloff_dir == 0)
+        {
+            if (x > rolloff_last_x + 0.01f)
+            {
+                rolloff_dir = 1.0f;
+            }
+            else if (x < rolloff_last_x - 0.01f)
+            {
+                rolloff_dir = -1.0f;
+            }
+        }
+        if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
+            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x())
+        {
+            global64 = 0;
+            rolloff_dir = 0;
+            WorkModule(0x14, 0x20000044);
+        }
     }
-    if (global18 != 0x2 || global4 >= 0x45 && global4 <= 0x4c || WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x())
-    {
-        global64 = 0;
-        rolloff_dir = 0;
-        WorkModule(0x14, 0x20000044);
-    }
+    rolloff_last_x = x;
 }
 
 void rolloff_fall_speed()
@@ -38963,7 +38980,9 @@ void brave_crit_update()
             brave_crit = 0x1;
         }
     }
-    WorkModule(0x7, brave_crit, 0x1000009a);
+    WorkModule(0x7, brave_crit * 0x3e8, 0x1000009a);   // 1000 (fix 62): Robin's native code counts this int
+                                                        // down a frame at a time (0x02F635F0: ints 0x98-0x9C,
+                                                        // his tomes' recharge), which made 1 read 0 by the hit
 }
 
 // the critical hit's show (Ultimate's param_critical: the game slowed to 1/4 for critical_frame 40, the
@@ -39853,7 +39872,8 @@ void brave_hi_fall()
     KineticModule(0x14, 0x1, m);
 }
 
-// the level held so long, lowered to one his MP pays for
+// the level held so long (fix 62: not lowered to one his MP pays for, user: that was auto-casting the
+// cheaper one, and with Kaswoosh never paid for the charge looped; one he can't pay for is the empty hop)
 int brave_hi_hold_level()
 {
     int level;
@@ -39865,10 +39885,6 @@ int brave_hi_hold_level()
     else if (brave_hi_hold >= 0xa)
     {
         level = 0x1;
-    }
-    while (level > 0 && brave_can_pay(brave_hi_cost(level)) == 0)
-    {
-        level -= 1;
     }
     return level;
 }
@@ -39931,7 +39947,7 @@ void brave_hi_loop()
             brave_hi_released = 0x1;    // no level paid for: the empty jump at once (fix 61); otherwise he
                                         // charges on (no casting by itself short of the full hold, 28)
         }
-        if (brave_hi_hold >= 0x1c && brave_hi_hold_level() == 0x2 || brave_hi_released)
+        if (brave_hi_hold >= 0x1c || brave_hi_released)
         {
             brave_hi_level = brave_hi_hold_level();
             if (brave_can_pay(brave_hi_cost(brave_hi_level)))

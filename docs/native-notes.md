@@ -1053,6 +1053,13 @@ this (`tools/kirby_stat_test.py` now tests it).
   hooked: with bit `0x80` the damage is ×1.2.
 - PPC trap met again here: `addi rD, r0, imm` reads 0, not r0, so the arithmetic is in r12.
 
+### Robin's int countdown (Hero's ints)
+
+Robin's specializer per-frame code (`0x02F635F0`, his vtable entry at `0x1014186C`) decrements his
+instance ints `0x10000098`-`0x1000009C` by 1 each frame while they're positive (his tomes' recharge
+timers). Anything Hero (built on Robin's kind) keeps there loses 1 a frame: the crit flag (`0x9A`) read
+0 by the hit when written 1 (fix 62: written 1000, compared `!= 0`). The MP gauge int `0x9C` loses one too.
+
 ### The Metal Box flag
 
 Work flag `0x20000012` ("Has Metal Box Item", note sheet) is read every frame by fighter code:
