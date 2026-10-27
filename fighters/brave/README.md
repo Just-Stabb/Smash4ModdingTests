@@ -810,3 +810,24 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
   only (diffusion 0 0.1 0), so like the other Y-moving directional meshes they stay upright (type 4).
   As type 3 eft aimed them along the moving projectile's travel: a flat blue disc instead of a funnel.
 - Only the `.ptcl` changed.
+
+## Fix 52 (`build/hero_fix52.zip`): Ultimate's colours as it displays them
+
+- Ultimate draws effects in linear light and encodes the frame to sRGB at the end: its colour textures
+  are sRGB formats (BC1 / BC3 / BC7 SRGB), its shape textures BC4 / BC5 UNORM, its colour keys linear
+  values. Smash 4 draws effect colours as they are (6590 + 1650 of its 8121 vanilla effect textures
+  are BC4 / BC5, 355 sRGB). The converter wrote Ultimate's linear values unchanged, so mid colours drew
+  darker and more saturated than in Ultimate: Kaswoosh's funnel layer `tornado1_f2` lerps from pale
+  cyan to colour 1 (0.09, 0.33, 0.50) x 1.2, drawn (27, 102, 153) saturated blue; the Ultimate video
+  has no funnel pixel bluer than (122, 161, 178). Its back layers were near-black navy (31, 46, 61).
+- Now an alpha-blended part's colour keys, colour scale (and constant colours in own programs) and
+  its UNORM textures' colour channels are encoded (`display()`: x ^ (1 / 2.2), a power law, so a
+  product encodes factor by factor); sRGB textures stay as stored, alpha (coverage) and dissolve
+  thresholds are unchanged. At full opacity this is exactly what Ultimate shows. `tornado1_f2`'s dark
+  end is (91, 168, 202), its back layers (98, 117, 133) - (130, 152, 168).
+- Additive parts (133 of his 687) keep the raw values: Ultimate adds in linear light, which over a
+  mid-bright stage adds about the raw value; encoded, every glow would add far more. Subtractive ones
+  (6) too. 458 parts in the bank changed; lights are unchanged.
+- This is global for alpha-blended parts (Swoosh / Kaswoosh / Zoom, smoke, Kaboom's cloud, the spell
+  rings ...): they get lighter and less saturated, as in Ultimate. `--no-linear` builds the old way.
+- Only the `.ptcl` changed.

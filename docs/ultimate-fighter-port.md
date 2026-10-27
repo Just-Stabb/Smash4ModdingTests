@@ -87,6 +87,13 @@ into the executable's table of 259 names (`0x10423E60`, docs/native-notes.md "Sw
 pairs, and the ids file maps Ultimate's texture names to them (`fighters/edge/edge_effects.json`,
 merged with the sys map: `--effects A.json,B.json NUSKTB`).
 
+**Colour space:** Ultimate draws effects in linear light and encodes the frame to sRGB (its colour
+textures are sRGB formats, its shape textures BC4 / BC5 UNORM, its colour keys linear); Smash 4 draws
+effect colours as they are. The converter encodes an alpha-blended part's colour keys, colour scale
+and UNORM texture colour (`LINEAR_DISPLAY`, `display()`: x ^ (1 / 2.2)); additive parts keep the raw
+values (Ultimate's linear add over a mid-bright stage adds about the raw value). `--no-linear` turns
+it off.
+
 **The fighter's own effects** (`tools/vfxb_to_ptcl.py`): Ultimate's `ef_<name>.eff` (EFFN header:
 effect names -> 1-based emitter set index; a VFXB, Switch eft2 version 22: `tools/vfxb.py`, the
 emitter layout ported from KillzXGaming's EffectLibrary) -> new sets in the fighter's bank (the

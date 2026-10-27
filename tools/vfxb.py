@@ -262,6 +262,20 @@ class Eff:
             o += nxt
         return out
 
+    def formats(self):
+        """{texture id: BNTX format} (high byte the kind, e.g. 0x1E BC5 / 0x1D BC4 / 0x1A BC1 / 0x1C BC3 /
+        0x20 BC7; low byte the type: 1 UNORM, 6 SRGB)"""
+        names, b = self.textures()
+        d = b[b.index(b'BNTX'):]
+        by_name = {}
+        i = d.find(b'BRTI')
+        while i >= 0:
+            name_ptr, = struct.unpack('<Q', d[i + 0x60:i + 0x68])
+            n, = struct.unpack('<H', d[name_ptr:name_ptr + 2])
+            by_name[d[name_ptr + 2:name_ptr + 2 + n].decode()] = struct.unpack('<I', d[i + 0x1C:i + 0x20])[0]
+            i = d.find(b'BRTI', i + 4)
+        return {tid: by_name[name] for tid, name in names.items() if name in by_name}
+
     def images(self):
         """{texture id: RGBA uint8} with each texture's BNTX channel selection applied (BRTI +0x58: per
         output channel 0 zero, 1 one, 2-5 R G B A: the BC5 ones are (R, R, R, G), luminance + alpha;

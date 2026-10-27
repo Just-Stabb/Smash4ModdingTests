@@ -185,6 +185,36 @@ REPEAT = {0: (1, 1), 1: (2, 1), 2: (1, 2), 3: (2, 2)}
 # fireball, Charizard's flamethrower, Robin's Arcfire); fix 21's 1.2 / 0.25 (peaks up to 2) still
 # glowed purple in Smash 4's bloom (the whirlwind test: pale blue meshes at 1.3 too)
 HDR_START, HDR_KNEE = 1.0, 0.05
+# Ultimate draws effects in linear light and encodes the frame to sRGB: its colour textures are sRGB
+# formats (BC1 / BC3 / BC7 SRGB, decoded to linear when sampled), its shape textures (BC4 / BC5)
+# UNORM, its colour keys linear. Smash 4 draws effect colours as they are (6590 + 1650 of its 8121
+# vanilla effect textures are BC4 / BC5, 355 sRGB). So an alpha-blended part's colour keys, colour
+# scale and UNORM texture colour channels are encoded (display(): x ^ (1 / 2.2), a power law so a
+# product encodes factor by factor), its sRGB textures kept as stored: at full opacity Ultimate shows
+# exactly that. Kaswoosh's funnel: colour 1 (0.09, 0.33, 0.50) x 1.2 drew saturated blue (28, 102,
+# 153); Ultimate's video shows none bluer than (122, 161, 178) (fix 52). Additive parts aren't: Ultimate
+# adds in linear light, which over a mid-bright stage (0.4 - 0.7) adds about the raw value (the
+# encoding's slope there is 0.8 - 1.3); encoded, every glow would add far more. Lights aren't colours
+LINEAR_DISPLAY = True
+DISPLAY_GAMMA = 1 / 2.2
+SRGB_TEXTURES = set()      # texture ids stored sRGB (main(): vfxb.Eff.formats(), type 6)
+
+
+def display_space(e):
+    """this emitter's colours are encoded for display (LINEAR_DISPLAY): an alpha-blended one"""
+    return LINEAR_DISPLAY and e['render']['blend_type'] == 0
+
+
+def display(x):
+    """Ultimate's linear colour value(s) as displayed (sRGB as a 2.2 power law)"""
+    x = np.asarray(x, dtype=np.float64)
+    return np.sign(x) * np.abs(x) ** DISPLAY_GAMMA
+
+
+def written_scale(e):
+    """the colour scale written for e (display-encoded for a display_space emitter)"""
+    cs = float(e['static']['color_scale'] or 1.0)
+    return float(display(cs)) if display_space(e) else cs
 
 
 # shaders that read the screen behind them (refraction: Zelda's Nayru's Love crystal, test 35's type-4
@@ -653,6 +683,9 @@ def sampler_inputs(e, i, img):
     f = img.astype(np.float32) / 255
     cb = e['combiner']
     rgb = np.repeat(f[..., 3:4], 3, -1) if cb['tex_color_input'][i] == 1 else f[..., :3]
+    if display_space(e) and e['sampler'][i]['texture_id'] not in SRGB_TEXTURES:
+        # a linear (UNORM) texture's colour as displayed (LINEAR_DISPLAY); its alpha stays coverage
+        rgb = (rgb ** DISPLAY_GAMMA).astype(np.float32)
     if cb['tex_alpha_input'][i] == 2:
         return rgb, np.ones_like(f[..., 0])
     red = cb['tex_alpha_input'][i] == 1 or cb['alpha_process'] in (2, 3)
@@ -954,6 +987,9 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         * float(e['static']['color_scale'] or 1.0)
     c0 = track(e['static'], e['color'], 0)[0].mean(0) * np.array(e['info']['color0'][:3]) \
         * float(e['static']['color_scale'] or 1.0) if dissolve is not None and dissolve_c0 else None
+    if display_space(e):
+        c1 = display(c1)
+        c0 = display(c0) if c0 is not None else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
                               1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort)
     if si is None:
@@ -1585,7 +1621,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             # threshold (Smash 4 scales colour 1 by the colour scale too, cross_f 0x04A588CC)
             m = resize(dis[2][..., None], pix.shape[1], pix.shape[0])
             pix = np.concatenate([pix[..., :1], m, pix[..., :1], pix[..., 3:]], -1)
-            thr = np.repeat(dis[1][:, None] / float(e['static']['color_scale'] or 1.0), 3, 1)
+            thr = np.repeat(dis[1][:, None] / written_scale(e), 3, 1)
             if dis_in == 0:
                 rgb = thr
             else:
@@ -1675,6 +1711,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     if templates.test_mean_colour:
         p.set_field(em, 'color0_type', 0)
         p.set_field(em, 'color1_type', 0)
+    if display_space(e):
+        # Ultimate's linear colours as displayed (LINEAR_DISPLAY); a dissolve's threshold track isn't one
+        if not (dis is not None and dis_in == 0):
+            rgb = display(rgb)
+        if rgb1 is not None and not (dis is not None and dis_in == 1):
+            rgb1 = display(rgb1)
     fits = [(threshold_fit if dis is not None and dis_in == 0 else color_fit)(rgb),
             (threshold_fit if dis is not None and dis_in == 1 else color_fit)(rgb if rgb1 is None else rgb1)]
     for tr in (0, 1):
@@ -1692,8 +1734,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # an own pixel program clamps the colour it draws to 1 (tools/eft_pixel.py): Ultimate's brightness
     # kept, what goes past 1 saturating as in Ultimate (F-smash's yellow spikes over grey bands, fix 25:
     # dull grey; Frizz's flames red); a template's own program gets it compressed (hdr_scale)
-    p.set_field(em, 'color_scale', float(st['color_scale'] or 1.0) if exact else
-                hdr_scale(p, em, float(st['color_scale'] or 1.0), notes))
+    p.set_field(em, 'color_scale', written_scale(e) if exact else hdr_scale(p, em, written_scale(e), notes))
+    if display_space(e):
+        notes.append('colours display-encoded (linear -> sRGB)')
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
@@ -2168,8 +2211,11 @@ def main():
                          "sys_special_attack_up=p_cmnspecialattackup (Hero's Oomph glow, played by his game code)")
     ap.add_argument('--no-exact', action='store_true', help='no pixel programs of our own (tools/eft_pixel.py): '
                     'each emitter folded into one shape on its template\'s program, as before')
+    ap.add_argument('--no-linear', action='store_true', help="Ultimate's linear colours as they are (not "
+                    "display-encoded: LINEAR_DISPLAY)")
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT
+    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT, LINEAR_DISPLAY
+    LINEAR_DISPLAY = not a.no_linear
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
     DISSOLVE = not a.no_dissolve
@@ -2178,6 +2224,7 @@ def main():
     eff = vfxb.Eff(a.eff)
     names, _ = eff.textures()
     images = eff.images()
+    SRGB_TEXTURES.update(t for t, f in eff.formats().items() if f & 0xFF == 6)
     base = [f for f in os.listdir(a.base_dir) if f.endswith('.010d0000.ptcl')][0][:-len('.ptcl')]
     p = ptcl.Ptcl(open(os.path.join(a.base_dir, base + '.ptcl'), 'rb').read())
     base_shaders = p.shader_count()
@@ -2200,6 +2247,7 @@ def main():
     sources = [(eff, names, images, [(n, eff.effects[n]) for n in (a.effects or sorted(eff.effects))])]
     for path, *wanted in a.extra_eff:
         x = vfxb.Eff(path)
+        SRGB_TEXTURES.update(t for t, f in x.formats().items() if f & 0xFF == 6)
         sources.append((x, x.textures()[0], x.images(),
                         [(n, x.effects[sname.lower()]) for n, sname in (w.split('=') for w in wanted)]))
     ids, done, dropped = {}, {}, []
