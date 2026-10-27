@@ -27,7 +27,7 @@ fake = Asm(SETPOS); fake.asm('''
  stw r12,0x70(r3)
  blr''')
 # Stand-ins for the game's MSC module wrappers (ctx +4 = accessor, args {ptr, count}); their state
-# lives in the fake accessor: +0x800 + 4 * (ID & 0xFF) WorkModule ints, +0xA00 DamageModuleF(1),
+# lives in the fake accessor: +0x800 + 4 * (ID & 0xFF) WorkModule ints (and flags turned on), +0xA00 DamageModuleF(1),
 # +0xA04 DamageModule(8), +0xA08 StopModule(1), +0xA0C StopModule(2) frames, +0xA10 / +0xA14 / +0xA18
 # ShakeModule frames / intensity / argument count.
 FAKES = {
@@ -35,6 +35,8 @@ FAKES = {
  lwz r5, 0(r4)
  lwz r6, 0(r5)
  lwz r7, 4(r5)
+ cmpwi r6, 0x2710
+ beq won
  cmpwi r6, 6
  bne w7
  clrlwi r7, r7, 24
@@ -47,6 +49,13 @@ w7: lwz r8, 8(r5)
  slwi r8, r8, 2
  add r8, r8, r12
  stw r7, 0x800(r8)
+ li r3, 0
+ blr
+won: clrlwi r7, r7, 24
+ slwi r7, r7, 2
+ add r7, r7, r12
+ li r8, 1
+ stw r8, 0x800(r7)
  li r3, 0
  blr""",
     0x030B2FC4: """lwz r12, 4(r3)
@@ -606,7 +615,10 @@ check('ARMOR threshold (damage)', call(mu, FGET, w0, iid(0, 0x1E)), 20)
 call(mu, FSET, w0, iid(0, 0x1E), 15.0); call(mu, FSET, w0, iid(0, 0x1D), 2.0)
 check('ARMOR set knockback, 15', (ri(mu, 0, 0xD14), struct.unpack('>f', mu.mem_read(0x10370000 + 0xD18, 4))[0]), (2, 15))
 check('ARMOR set 1 (super armor)', (call(mu, FSET, w0, iid(0, 0x1D), 1.0), ri(mu, 0, 0xD14))[1], 1)
-check('q 0x1F: 0', call(mu, FGET, w0, iid(0, 0x1F)), 0)
+check('KO: reads 0', call(mu, FGET, w0, iid(0, 0x1F)), 0)
+wi(mu, 0, 0x90C, 0)
+call(mu, FSET, w0, iid(0, 0x1F), 0.0); check('KO 0: no flag', ri(mu, 0, 0x90C), 0)
+call(mu, FSET, w0, iid(0, 0x1F), 1.0); check('KO 1: flag 0x20000043 on', ri(mu, 0, 0x90C), 1)
 def rid(target, n): return 0x0F000260 + 2 * target + n
 pad(mu, sx=0.4, cx=-0.6)
 update(mu, 1)

@@ -55,6 +55,11 @@ DAMAGE_MULT = 1.15
 HITSTOP_MULT = 1.2
 CRIT_MULT = 2.0
 BIAS = 1.00001              # so damage / 1.15 x 1.15 and x1.2 / 1.2 don't land just below a whole frame
+# tools/hero_buff_cave.py's jump table: the hitbox and throw paths go on there (and back from there), so
+# the two must be patched together
+HERO_CAVE = 0x04B9F000
+HB_ATK = HERO_CAVE
+HB_THROW = HERO_CAVE + 4
 
 
 def chk(reg, fail):
@@ -68,9 +73,10 @@ def chk(reg, fail):
         bne %s""" % (reg, fail, reg, fail)
 
 
-def marker(wm, fail, save=False):
-    """r11 = the trait marker of WorkModule wm (int 0x1000008E) with the Strike bit, else branch to
-    fail. Uses r0, r10, r11 (and r12 with save: debug words DBG_MARKER / DBG_KI / DBG_KI_COUNT)."""
+def marker(wm, fail, save=False, bit=STRIKE_BIT):
+    """r11 = the trait marker of WorkModule wm (int 0x1000008E) with one of `bit`'s bits (the Strike bit),
+    else branch to fail. Uses r0, r10, r11 (and r12 with save: debug words DBG_MARKER / DBG_KI /
+    DBG_KI_COUNT)."""
     return chk(wm, fail) + """
         lwz r10, 8(%(wm)s)              # category table
 %(c10)s
@@ -91,7 +97,7 @@ def marker(wm, fail, save=False):
 %(save_ki)s
         andi. r0, r11, %(bit)d
         beq %(fail)s""" % dict(wm=wm, fail=fail, c10=chk("r10", fail), c11=chk("r11", fail),
-                               n=INT_INDEX + 1, off=INT_INDEX * 4, magic=MAGIC, bit=STRIKE_BIT,
+                               n=INT_INDEX + 1, off=INT_INDEX * 4, magic=MAGIC, bit=bit,
                                save=dbg_store("r11", DBG_MARKER) if save else "",
                                save_ki=(dbg_store("r11", DBG_KI) + "\n" + inc(DBG_KI_COUNT)) if save else "")
 
@@ -199,8 +205,8 @@ atk_store:
         stfs f12, 0x34(r26)
 %(INC1)s
 atk_done:
-        lwz r8, 0(r28)                  # set_attack's own instruction
-        b %(ATK_BACK)s
+        b %(HB_ATK)s                    # on to Hero's buffs (hero_buff_cave.py: it ends with set_attack's
+                                        # own lwz r8, 0(r28) and the way back)
 
 strike_hs:                              # r4 accessor, r5 hit info, r6 1 = attacker side, f1 mult
         cmpwi r6, 1
@@ -255,8 +261,7 @@ strike_throw:                           # r30 = AttackModule, throw attack data 
         stfs f0, 0x78(r1)
 %(INC3)s
 throw_done:
-        lwz r12, 0(r30)                 # the handler's own instruction
-        b %(THROW_BACK)s
+        b %(HB_THROW)s                  # Hero's buffs, then the handler's own lwz r12, 0(r30) and back
 
 counters:                               # debug counts (see docs/native-notes.md): hitboxes seen, hitboxes
         .word 0                         # scaled, own-hitstop adjustments, throws scaled, then the
@@ -291,9 +296,10 @@ def assemble():
         INC0=inc(0), INC1=inc(1), INC2=inc(2), INC3=inc(3),
         o_atk=owner_wm("r28", "atk_done", save=True), m12_atk=marker("r12", "atk_done", save=True),
         o_throw=owner_wm("r30", "throw_done"), m12_throw=marker("r12", "throw_done"), CRIT=CRIT_BIT,
-        THROW_BACK="0x%08X" % (HOOK_THROW + 4), CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
+        CM=CRIT_MULT, ICM=BIAS / (DAMAGE_MULT * CRIT_MULT), BIAS=BIAS,
         c4_hs=chk("r4", "hs_orig"), m12_hs=marker("r12", "hs_orig"),
-        ATK_BACK="0x%08X" % (HOOK_ATK + 4), HS_BACK="0x%08X" % (HOOK_HS + 4), CALC="0x%08X" % CALC_HITLAG,
+        HS_BACK="0x%08X" % (HOOK_HS + 4), CALC="0x%08X" % CALC_HITLAG,
+        HB_ATK="0x%08X" % HB_ATK, HB_THROW="0x%08X" % HB_THROW,
         DM=DAMAGE_MULT, HM=HITSTOP_MULT, IDM=BIAS / DAMAGE_MULT, IHM=1.0 / HITSTOP_MULT))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, "strike cave too big: %d words" % len(words)

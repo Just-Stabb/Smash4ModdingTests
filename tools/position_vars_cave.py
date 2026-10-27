@@ -1189,7 +1189,7 @@ inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 post
         cmplwi r22, 0x1F
         blt inp_armor
         cmplwi r22, 0x20
-        blt ext_zero
+        blt inp_ko
         cmplwi r22, 0x22
         blt inp_raw
         b ext_zero
@@ -1438,6 +1438,16 @@ inp_hit_set:
         b ext_zero
 inp_inv_set:
 %(SET_INVINCIBLE)s
+        b ext_zero
+""", False),
+("""
+inp_ko:                                 # q 0x1F KO: a non-zero write KOs it on the spot (flag 0x20000043,
+        cmpwi r29, 0                    # "causes KO", as Stamina mode); reads 0
+        beq ext_zero
+        bl ext_value_int
+        cmpwi r3, 0
+        beq ext_zero
+%(KO)s
         b ext_zero
 """, False),
 ("""
@@ -1692,7 +1702,7 @@ inp_state:                              # per slot: held, tapped, inputs off, st
         GET_WORK_R26=msc(MSC_WORK, 6, "r26"), SET_WORK_R26=msc(MSC_WORK, 7, "r22", "r26"),
         GET_SHIELD=msc(MSC_WORK_F, 0, SHIELD_HP), SET_SHIELD=msc(MSC_WORK, 0, "r22", SHIELD_HP),
         SET_INTANGIBLE=msc(MSC_HIT, 2, "r22"), SET_INVINCIBLE=msc(MSC_HIT, 1, "r22", 0),
-        SET_ARMOR=msc(MSC_DAMAGE, 0xB, "r22", "r26"),
+        SET_ARMOR=msc(MSC_DAMAGE, 0xB, "r22", "r26"), KO=msc(MSC_WORK, 0x2710, 0x20000043),
         INP_RET="\n".join("        .word 0x%08X" % r for _h, r, _i in INP_HOOKS),
         INP_STATE="\n".join(["        .word 0"] * (8 * SLOTS)))
 

@@ -520,9 +520,13 @@ apply:
         li r0, 1
         sth r0, 0x9C(r28)
 ralpha:
-        lwz r12, 0x60(r29)
+        li r4, 255                  # the window (elements 0-9): never faded, as Ultimate's (the panel
+        cmpwi r26, 10               # fades when fighters come near; the window stayed see-through)
+        blt setalpha
+        lwz r12, 0x60(r29)          # the MP gauge: the panel's fade
 """ % dict(spells=SPELLS, vis=SET_VISIBLE, getf=GET_FRAME, gotof=GOTO_FRAME) + chk('r12', 'nextrow') + """
         lbz r4, 0x74(r12)
+setalpha:
         mr r3, r28
         bl 0x%(alpha)08X
         b nextrow

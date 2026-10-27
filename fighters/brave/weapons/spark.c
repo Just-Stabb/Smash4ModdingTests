@@ -10,3 +10,7 @@ int placed_life(int level)
 {
     return 0x8;
 }
+
+void placed_tick(int level, int frame)
+{
+}

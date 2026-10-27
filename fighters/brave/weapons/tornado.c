@@ -18,3 +18,13 @@ int placed_life(int level)
     }
     return 0x18;
 }
+
+// Kaswoosh's launch (Ultimate's second hitboxes, `if life <= 2`): 2 frames before its end, motion slot 3
+// (tools/brave_build.py specialhi3launch: its hitboxes at once)
+void placed_tick(int level, int frame)
+{
+    if (level == 0x2 && frame == 0x32)
+    {
+        func_24(0x3, 0, 1.0f);
+    }
+}

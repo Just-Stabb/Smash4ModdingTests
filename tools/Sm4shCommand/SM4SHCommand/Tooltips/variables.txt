@@ -113,7 +113,7 @@
 0x2000000E = Has Starman Item |  (documented by Stinny)
 0x2000000F = Has Screw Attack Item |  (documented by Stinny)
 0x20000011 = Used for communicating with objects? | Used in: Used in Pikmin SpSThrown (documented by Stabb)
-0x20000012 = Has Metal Box Item |  (documented by Stinny)
+0x20000012 = Has Metal Box Item |  (documented by Stinny)\nWhile set: the Metal Box's physics (run speed, jumps, gravity, fall speeds, weight: common params 0x2DE-0x2E4), knockback resistance (param 0x241) and metal footsteps, read every frame by the fighter code (0x02F1CC4C, 0x02E76320, 0x027625C8). Hero's Kaclang sets it. The metal look isn't known to come from it.
 0x20000016 = Has Bunny Hood Item |  (documented by Stinny)
 0x20000017 = Has Super/Poison mushroom |  (documented by Ben Hall)
 0x20000018 = Has Lightning |  (documented by Ben Hall)

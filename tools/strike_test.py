@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Emulator test (Unicorn) for tools/strike_cave.py: runs the cave's two hooks on fake objects.
+"""Emulator test (Unicorn) for tools/strike_cave.py and tools/hero_buff_cave.py (which its hitbox and
+throw paths go on to): runs the hooks on fake objects.
     python3 tools/strike_test.py"""
 import os
 import struct
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import strike_cave as S
+import hero_buff_cave as H
 from unicorn import Uc, UC_ARCH_PPC, UC_MODE_PPC32, UC_MODE_BIG_ENDIAN
 from unicorn.ppc_const import *
 
 a, words = S.assemble()
+ha, hwords = H.assemble()
 fails = 0
 
 
@@ -24,6 +27,8 @@ def fresh():
     mu = Uc(UC_ARCH_PPC, UC_MODE_PPC32 | UC_MODE_BIG_ENDIAN)
     mu.mem_map(0x04B70000, 0x10000)
     mu.mem_write(S.CAVE, b"".join(struct.pack(">I", w) for w in words))
+    mu.mem_map(0x04B90000, 0x10000)
+    mu.mem_write(H.CAVE, b"".join(struct.pack(">I", w) for w in hwords))
     mu.mem_map(0x02C00000, 0x40000)
     mu.mem_map(0x10100000, 0x10000)
     mu.mem_write(0x10105D98, struct.pack(">f", 0.0))
@@ -188,5 +193,68 @@ check("Rush Kirby throw: unchanged", run_throw(mu, kirby, 10.0), 10.0)
 fighter(mu, kirby, 0x10000003, STRIKE)
 check("throw, accessor holds another AttackModule: unchanged", run_throw(mu, kirby, 10.0), 10.0)
 check("bad owner: unchanged", run_throw(mu, 0x7, 10.0), 10.0)
+
+
+# --- Hero's buffs (hero_buff_cave.py: marker bits 0x20 Oomph, 0x40 Psyche Up, 0x80 damage taken) ---
+def run_hero_atk(mu, obj, damage, bkb, kbg, fkb, shield):
+    am, slot = AM, 0x10481000
+    mu.mem_write(am, struct.pack(">I", 0x1234))
+    mu.mem_write(am + 4, struct.pack(">I", owner(obj)))
+    mu.mem_write(slot + 0x18, struct.pack(">f", damage))
+    mu.mem_write(slot + 0x34, struct.pack(">f", 1.0))
+    for off, v in ((0x2C, bkb), (0x24, kbg), (0x28, fkb)):
+        mu.mem_write(slot + off, struct.pack(">i", v))
+    mu.mem_write(slot + 0x58, struct.pack(">h", shield))
+    mu.reg_write(UC_PPC_REG_26, slot)
+    mu.reg_write(UC_PPC_REG_28, am)
+    mu.emu_start(a.labels["strike_atk"], S.HOOK_ATK + 4)
+    check("  (set_attack's own lwz r8, 0(r28))", mu.reg_read(UC_PPC_REG_8), 0x1234)
+    rd = lambda off, fmt: struct.unpack(fmt, mu.mem_read(slot + off, struct.calcsize(fmt)))[0]
+    return (round(rd(0x18, ">f"), 4), rd(0x2C, ">i"), rd(0x24, ">i"), rd(0x28, ">i"), rd(0x58, ">h"),
+            round(rd(0x34, ">f"), 4))
+
+
+hero = 0x10400000
+mu = fresh()
+fighter(mu, hero, 3, 0x4B490023)                      # Acceleratle's speeds + Oomph
+check("Oomph hitbox: x1.6 damage, x1.1 knockback", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (16.0, 66, 84, 0, 0, 1.0))
+fighter(mu, hero, 3, 0x4B490040)                      # Psyche Up
+check("Psyche Up: x1.2 knockback, shield (d + s) x1.65", run_hero_atk(mu, hero, 10.0, 62, 76, 0, 0), (10.0, 74, 91, 0, 7, 1.0))
+check("Psyche Up: a set knockback and shield damage 4", run_hero_atk(mu, hero, 12.0, 0, 100, 50, 4)[1:5], (0, 120, 60, 14))
+fighter(mu, hero, 3, 0x4B490060)                      # both
+check("Oomph + Psyche Up: x1.32 knockback", run_hero_atk(mu, hero, 10.0, 50, 100, 0, 0)[:3], (16.0, 66, 132))
+fighter(mu, hero, 3, 0x4B490080)                      # only the damage-taken bit
+check("damage-taken bit alone: hitbox unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (10.0, 60, 76, 0, 0, 1.0))
+fighter(mu, hero, 3, 0x4B490000)
+check("no buff: unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (10.0, 60, 76, 0, 0, 1.0))
+fighter(mu, hero, 3, 0x4B490008)                      # Strike Kirby: still his, knockback alone
+check("Strike Kirby through the hero cave: x1.15 / x1.2 only", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (11.5, 60, 76, 0, 0, 1.2))
+fighter(mu, hero, 3, 0x12340020)
+check("other marker: unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0)[:3], (10.0, 60, 76))
+fighter(mu, hero, 3, 0x4B490020)
+check("Oomph throw: x1.6", run_throw(mu, hero, 10.0), 16.0)
+fighter(mu, hero, 3, 0x4B490040)
+check("Psyche Up throw: unchanged", run_throw(mu, hero, 10.0), 10.0)
+
+
+def run_vic(mu, acc, damage):
+    hit = 0x10490000
+    mu.mem_write(hit + 0xC, struct.pack(">f", damage))
+    for r, v in ((1, 0x104F0000), (3, 0x333), (4, acc), (5, hit), (6, 0x666), (7, 0x777)):
+        mu.reg_write(getattr(sys.modules["unicorn.ppc_const"], "UC_PPC_REG_%d" % r), v)
+    mu.emu_start(ha.labels["hb_vic"], H.HOOK_VIC + 4)
+    regs = tuple(mu.reg_read(getattr(sys.modules["unicorn.ppc_const"], "UC_PPC_REG_%d" % r)) for r in (1, 3, 4, 5, 6, 7))
+    check("  (stwu r1, -0x110(r1); r3-r7 kept)", regs, (0x104F0000 - 0x110, 0x333, acc, hit, 0x666, 0x777))
+    return round(struct.unpack(">f", mu.mem_read(hit + 0xC, 4))[0], 4)
+
+
+mu = fresh()
+acc = fighter(mu, hero, 3, 0x4B4900A0)
+check("Oomph'd Hero hit: damage taken x1.2", run_vic(mu, acc, 10.0), 12.0)
+acc = fighter(mu, hero, 3, 0x4B490020)
+check("Oomph bit without the taken bit: unchanged", run_vic(mu, acc, 10.0), 10.0)
+acc = fighter(mu, hero, 3, 0x12340080)
+check("other marker: unchanged", run_vic(mu, acc, 10.0), 10.0)
+check("bad accessor: unchanged", run_vic(mu, 0x02000001, 10.0), 10.0)
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

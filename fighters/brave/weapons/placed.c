@@ -1,5 +1,6 @@
 // Hero's placed articles: compiled after thunder_base.c and before spark.c / tornado.c / crash.c (their
-// placed_config(): the wait and the levels; placed_life(level)), as tools/brave_build.py does.
+// placed_config(): the wait and the levels; placed_life(level); placed_tick(level, frame): each frame of
+// its life), as tools/brave_build.py does.
 
 // ---- Articles put on a fighter (copies of Robin's thunder): spark (Zap's lightning on the fighter the bolt
 // hit, his article 7), tornado (Woosh's whirlwind where he starts, article 8) and crash (Magic Burst /
@@ -64,6 +65,7 @@ void pl_loop()
     {
         func_24(pl_level, 0, 1.0f);
     }
+    placed_tick(pl_level, pl_frame - pl_wait);  // the article's own (tornado.c: Kaswoosh's launch)
     if (pl_frame >= pl_wait + pl_life)
     {
         BattleObject(0x9);

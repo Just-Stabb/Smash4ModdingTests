@@ -147,7 +147,7 @@ fighter hit, 3–10 player slots 1–8), so `0x0F000100`–`0x0F00025F`. Sm4shCo
 | +0x1C `INVINCIBLE` | 1 while invincible | invincible for N frames (`HitModule(1, N, 0)`) |
 | +0x1D `ARMOR` | 0 none, 1 super armor, 2 knockback-based, 3 damage-based | set it (`DamageModule(0xB, type, threshold)`, threshold from `ARMOR_THRESHOLD`) |
 | +0x1E `ARMOR_THRESHOLD` | the threshold (knockback for 2, damage for 3) | set it; write it before `ARMOR` |
-| +0x1F | 0 | ignored |
+| +0x1F `KO` | 0 | any value but 0: KO it at once (its work flag `0x20000043`, "Causes KO": it explodes as if KO'd; Hero's Whack / Thwack) |
 
 Raw stick X, on screen whichever way the fighter faces (positive = right): `0x0F000260 + 2 × target`
 (`STICK_X_RAW`) and `+1` (`CSTICK_X_RAW`), e.g. `SELF_STICK_X_RAW` = `0x0F000260`,

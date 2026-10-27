@@ -124,6 +124,12 @@ def hit_tests(pm, om, a, slot, acc):
     check('get_float fighter stat unchanged', get_float(0x03000016), 1.1)
     check('untagged hit: hitstun unchanged', stun(plain, 20.0), 20.0)
     check('untagged hit resets DI x', get_float(0x0200011A), 18.0)
+    for v, want, what in ((-2.0, 22.0, 'HitstunMul -2: 2 frames more'), (0.0, 20.0, 'HitstunMul 0: x1')):
+        record([v] + ext_vals[1:])
+        pm.mem_write(hi + 0x44, bytes(pm.mem_read(slot, 0x68)))
+        check(what, stun(hi, 20.0), want)
+    record(ext_vals)
+    pm.mem_write(hi + 0x44, bytes(pm.mem_read(slot, 0x68)))
 
     def vstop(info, frames):
         run(pm, C.HIT_VSTOP, C.HIT_VSTOP + 4, {UC_PPC_REG_20: frames, UC_PPC_REG_19: 2, 28 + UC_PPC_REG_27 - 27: info})

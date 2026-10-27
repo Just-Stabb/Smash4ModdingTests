@@ -907,3 +907,48 @@ Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
   `fresnel_mean` takes N from them (the shader's), the faces still giving screen area and culling:
   Woosh's cyan `tornado1_f2` x 0.18 -> 0.28, Swoosh's x 0.31, the white fronts x 0.69 - 0.78.
 - Changed: the `.ptcl` and the tornado article's scripts.
+
+## Fix 57 (`build/hero_fix57.zip`): the user's bug list
+
+Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx`. The effect bank is fix
+56's.
+
+- **Whack / Thwack crash** (Cemu log: `GX2RSetAttributeBuffer(): Offset exceeds buffer size` five times
+  a frame, then the crash, when the instant KO landed): the KO hitbox used effect 0x10 (Smash Run's
+  Orne "death"), whose effect isn't loaded in a normal match. The deathball's roll now KOs through a new
+  position variable, `KO` (q `0x1F`, `0x0F00017F + 0x20 × slot`: work flag `0x20000043`, "Causes KO"),
+  and the KO hitbox and its script are gone (`deathball.c`, `position_vars_cave.py`).
+- **Frizz** fires on the second press of special while charging (Ultimate), not on release.
+- **MP-capped charges:** Frizz / Zap / Woosh stop charging at the strongest level he can afford and cast
+  it (auto-release there), instead of looping the charge and then casting the weaker one.
+- **Menu input:** cancelling with shield or picking a spell clears the input buffer (no shield or
+  Frizzle right after, e.g. after Hocus Pocus); the menu waits for the stick to come back to neutral, so
+  a held down from down special doesn't skip to the second spell. Holding the stick away when a spell
+  is cast turns him around.
+- **Kamikazee** can't be cancelled by moving before it explodes.
+- **Woosh family:** after the launch he drifts left / right (FALL) and can grab the ledge from the
+  move's IASA frame, not only after the animation.
+- **Heal / Psyche Up effects:** Heal plays the common heal effect; Psyche Up's aura is Ultimate's
+  (its `_FLIP` effect macros are now translated) and he glows while it's held.
+- **Critical hits:** 1 in 8 smash attacks (rolled when it starts) uses Ultimate's crit hitboxes: his
+  smash scripts keep both sets behind a compare of int `0x1000009A` (`ultimate_acmd.py --dyn-cond`).
+- **Oomph and Psyche Up** are now separate (`tools/hero_buff_cave.py`): Oomph's physical hitboxes
+  ×1.6 damage and ×1.1 knockback, throws ×1.6, and he takes ×1.2 damage while it lasts; Psyche Up's
+  next physical hit ×1.2 knockback and ×1.65 shield damage (both: knockback ×1.32). Specials aren't
+  changed. Not Kirby's Strike any more.
+- **Kaswoosh's last hit:** the launch hitboxes are in their own article motion (`SpecialHi3Launch`),
+  played when the whirlwind ends, so they're not cut by the article's removal.
+- **Magic Burst:** the burst's size and damage scale with the MP spent (four tiers, `Crash1Mp20`-`80`:
+  damage × MP / 100, size × 0.4 + 0.6 × MP / 100), and each hit gives 2 more hitstun frames (Ultimate's
+  `set_add_reaction_frame(2)`: a negative Extra hitbox HitstunMul now adds frames), so it multihits.
+- **Menu fading:** the menu's plates stay opaque when fighters come close; only the gauge fades with
+  the damage panel (as the nameplates).
+- **Kaclang:** sets the Metal Box item's work flag (`0x20000012`) while he's steel. The game's own
+  code then gives him the Metal Box's physics (gravity / fall speed ×1.7, weight ×4.5, ...), knockback
+  resistance and metal footsteps (docs/native-notes.md "The Metal Box flag"). The metal look didn't
+  follow from the flag in the code read so far: test whether he turns metal.
+- Sm4shCommand: `SpecialHi3Launch`, `Crash1Mp20`-`80` named; the KO variable; HitstunMul's
+  tooltip.
+- **Still open:** Bounce doesn't reflect (does Kirby's air side B reflect projectiles? the same
+  native path; docs/native-notes.md); the up air's effect and the Woosh family's softness (item 17);
+  Hocus Pocus's giant, small, timer, sleep and flower do nothing yet (only Starman and invisible).

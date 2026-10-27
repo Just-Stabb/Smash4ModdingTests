@@ -529,16 +529,60 @@ namespace Sm4shCommand
                 string pname = spot.Param;
                 e.ToolTipTitle = $"{spot.Command} \u2192 {pname}";
                 string pdesc = ACMD_INFO.GetParamDescription(crc, pname);
+                string vline = ValueLine(ACMD_INFO.GetDescription(crc), spot.Token);
                 e.ToolTipText = $"Parameter {spot.ParamIndex + 1} of {spot.Syntax.Length}, {TypeName(spot.Types[spot.ParamIndex])}" +
-                    (pdesc.Length > 0 ? "\n" + pdesc : "") + note;
+                    (pdesc.Length > 0 ? "\n" + pdesc : "") + (vline.Length > 0 ? "\n\nThis value: " + vline : "") + note;
                 return;
             }
 
             e.ToolTipTitle = $"{spot.Command}  (0x{crc:X8})";
-            string desc = ACMD_INFO.GetDescription(crc);
+            string desc = ShortDescription(ACMD_INFO.GetDescription(crc));
             string sig = spot.Syntax.Length == 0 ? "No parameters" :
                 string.Join(", ", spot.Syntax.Select((x, i) => $"{x}: {TypeName(i < spot.Types.Length ? spot.Types[i] : "0")}").ToArray());
             e.ToolTipText = (desc.Length > 0 ? desc + "\n\n" : "") + sig + note;
+        }
+
+        const int TooltipDescLines = 24;
+
+        /// <summary>A long description (a list, one entry per line) cut to its first lines for the tooltip.</summary>
+        static string ShortDescription(string desc)
+        {
+            var lines = desc.Replace("\r", "").Split('\n');
+            if (lines.Length <= TooltipDescLines)
+                return desc;
+            return string.Join("\n", lines.Take(TooltipDescLines).ToArray()) +
+                $"\n\u2026 {lines.Length - TooltipDescLines} more lines: View > Commands, or hover the value.";
+        }
+
+        /// <summary>
+        /// The description's list line for a parameter's value: lines like "0x0A  AIR_STOP - ..." (hex or
+        /// decimal number first), e.g. Set_Kinetic_Handler's kinetic types. Empty when there is none.
+        /// </summary>
+        static string ValueLine(string desc, string token)
+        {
+            if (string.IsNullOrEmpty(desc) || string.IsNullOrEmpty(token))
+                return "";
+            int eq = token.IndexOf('=');
+            long value;
+            if (!ParseNumber(eq >= 0 ? token.Substring(eq + 1) : token, out value))
+                return "";
+            foreach (var raw in desc.Replace("\r", "").Split('\n'))
+            {
+                var line = raw.Trim();
+                int sp = line.IndexOfAny(new[] { ' ', '\t' });
+                long v;
+                if (sp > 0 && ParseNumber(line.Substring(0, sp), out v) && v == value)
+                    return line;
+            }
+            return "";
+        }
+
+        static bool ParseNumber(string text, out long value)
+        {
+            text = text.Trim().TrimEnd(',', ')');
+            if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                return long.TryParse(text.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out value);
+            return long.TryParse(text, out value);
         }
 
         // ------------------------------------------------------- editing tooltips

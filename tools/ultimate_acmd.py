@@ -331,6 +331,20 @@ EFFECT_CONDS = ()
 TRUE_CONDS = []
 
 
+# --dyn-cond: conditions decided in game, not here (substring of the dump's condition -> an int variable):
+# the `if` becomes Int_Var_Compare(variable == 1) then True { the if's body } Else { the else's }, both
+# kept (Hero's critical hit: FIGHTER_BRAVE_INSTANCE_WORK_ID_FLAG_CRITICAL_HIT, rolled by his MSC)
+DYNAMIC_CONDS = {}
+
+
+def dynamic_var(cond):
+    return next((v for k, v in DYNAMIC_CONDS.items() if k in cond), None)
+
+
+def words(cmds):
+    return sum(len(c.encode()) // 4 for c in cmds)
+
+
 def cond_true(cond):
     if cond == 'macros::is_excute(agent)' or cond in EFFECT_CONDS:
         return True
@@ -363,27 +377,53 @@ class Translator:
 
     def script(self, body):
         cmds = []
+        self.made = []             # the commands made so far (the same objects as in cmds)
         self.frame, self.events = 0.0, []
         live = [True]              # a stack of "this block runs"
         taken = [False]
+        dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
         for st in fix_split_flag_branch(fix_misplaced_else(statements(body))):
             kind = st[0]
             if kind == 'if':
+                var = dynamic_var(st[1]) if live[-1] else None
+                if var is not None:
+                    live.append(True)
+                    taken.append('dyn')
+                    dyn.append([len(cmds), None, var, self.frame])
+                    continue
                 c = live[-1] and cond_true(st[1])
                 live.append(c)
                 taken.append(c)
                 continue
             if kind == 'elseif':
+                assert taken[-1] != 'dyn', 'elseif after a dynamic condition'
                 c = live[-2] and not taken[-1] and cond_true(st[1])
                 live[-1] = c
                 taken[-1] = taken[-1] or c
                 continue
             if kind == 'else':
+                if taken[-1] == 'dyn':
+                    dyn[-1][1] = len(cmds)
+                    end_true, self.frame = self.frame, dyn[-1][3]   # the else starts where the if did
+                    dyn[-1][3] = end_true
+                    continue
                 live[-1] = live[-2] and not taken[-1]
                 taken[-1] = True
                 continue
             if kind == 'end':
                 if len(live) > 1:
+                    if taken[-1] == 'dyn':
+                        at, els, var, other = dyn.pop()
+                        if els is None:
+                            body_t, body_e = cmds[at:], []
+                        else:
+                            body_t, body_e = cmds[at:els], cmds[els:]
+                            self.frame = max(self.frame, other)
+                        block = [cmd('Int_Var_Compare', var, 0, 1),
+                                 cmd('True', 2 + words(body_t) + (2 if body_e else 0))] + body_t
+                        if body_e:
+                            block += [cmd('Else', 2 + words(body_e))] + body_e
+                        cmds[at:] = block
                     live.pop()
                     taken.pop()
                 continue
@@ -392,8 +432,20 @@ class Translator:
             if kind == 'other':
                 self.skip(st[1].split('(')[0][:40])
                 continue
-            cmds += self.call(st[1], [value(a) for a in st[2]], st[2])
+            got = self.call(st[1], [value(a) for a in st[2]], st[2])
+            self.made += got
+            cmds += got
         return cmds + [acmd.Command(acmd.END)]
+
+    def add_reaction(self, hid, frames):
+        extra = {'Special_Hitbox': 'Extra_Special_Hitbox', 'Extended_Special_Hitbox': 'Extra_Extended_Special_Hitbox'}
+        for c in reversed(self.made):
+            if c.name in extra and int(c.params[0]) == hid:
+                c.ident = acmd.BY_NAME[extra[c.name].lower()]
+                c.params = list(c.params) + [-frames, 0.0, 0, 0.0, 0, 0.0]
+                return []
+        self.skip('AttackModule::set_add_reaction_frame (no hitbox %d)' % hid)
+        return []
 
     def call(self, name, a, raw):
         short = name.split('::')[-1]
@@ -409,6 +461,11 @@ class Translator:
             return [cmd('Set_Frame_Duration', float(a[1]))]
         if short == 'ATTACK':
             return self.attack(a)
+        if name == 'AttackModule::set_add_reaction_frame':
+            # frames more hitstun for hitbox ID (Magic Burst's 2, so its hits hold): that hitbox (the last
+            # made with the ID, in this script so far) as its Extra_ form, HitstunMul = -frames (tools/
+            # acmd_ext_cave.py: a negative one adds frames)
+            return self.add_reaction(int(a[1]), float(a[2]))
         if name == 'AttackModule::clear_all':
             return [cmd('Remove_All_Hitboxes')]
         if name == 'AttackModule::clear':
@@ -633,6 +690,11 @@ class EffectTranslator(Translator):
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
                 return []
             return [cmd('EFFECT_DETACH_KIND', eid, int(float(a[2])) & 0xFFFFFFFF)]
+        if short.endswith('_FLIP') and short[:-len('_FLIP')] in EFFECT_MACROS:
+            # the macro with a mirrored twin effect (its second name) and a flip axis (last): Smash 4
+            # turns effects with the facing, so the plain one (Psyche Up's aura was left out)
+            short = short[:-len('_FLIP')]
+            a = a[:2] + a[3:]
         if short not in EFFECT_MACROS:
             self.skip(short)
             return []
@@ -834,8 +896,14 @@ def main():
                     'has none for it)')
     ap.add_argument('--cond', action='append', default=[], help='a condition taken as true (substring of the '
                     'dump\'s condition, e.g. MATERIAL_KIND_IRON) for Steve\'s tool material); repeatable')
+    ap.add_argument('--dyn-cond', action='append', default=[], metavar='SUBSTRING=VAR',
+                    help="a condition decided in game: the if / else kept as Int_Var_Compare(VAR == 1) True / Else "
+                         "(e.g. FLAG_CRITICAL_HIT=0x1000009A, Hero's critical hit); repeatable")
     a = ap.parse_args()
     TRUE_CONDS[:] = a.cond
+    for d in a.dyn_cond:
+        k, v = d.split('=')
+        DYNAMIC_CONDS[k] = int(v, 0)
     if a.translate:
         for src, v in json.load(open(a.translate)).items():
             if src.startswith('_'):

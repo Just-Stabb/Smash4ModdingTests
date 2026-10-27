@@ -23,7 +23,7 @@ D_OPS = {"lwz": 32, "lbz": 34, "lbzu": 35, "lhz": 40, "lha": 42, "sth": 44, "lwz
          "lfs": 48, "stfs": 52, "lfd": 50, "stfd": 54}
 IMM_OPS = {"addi": 14, "addic": 12, "addis": 15, "mulli": 7, "ori": 24, "oris": 25, "xori": 26, "xoris": 27,
            "andi.": 28, "cmpwi": 11, "cmplwi": 10}
-X_OPS = {"add": 266, "subf": 40, "mullw": 235, "divwu": 459, "and": 28, "andc": 60, "or": 444, "xor": 316,
+X_OPS = {"add": 266, "subf": 40, "mullw": 235, "divwu": 459, "divw": 491, "and": 28, "andc": 60, "or": 444, "xor": 316,
          "slw": 24, "srw": 536, "lwzx": 23, "stwx": 151, "lbzx": 87, "stbx": 215, "lfsx": 535, "stfsx": 663}
 FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59, 18),
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),

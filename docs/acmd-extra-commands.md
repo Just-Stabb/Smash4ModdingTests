@@ -19,14 +19,14 @@ The hitbox itself is made exactly as the original command makes it.
 
 | Extra parameter | Type | Meaning |
 |---|---|---|
-| HitstunMul | float | Multiplies the hitstun this hit gives (knockback × 0.4). |
+| HitstunMul | float | Multiplies the hitstun this hit gives (knockback × 0.4). A negative value adds that many frames instead: −2 gives 2 frames more (Ultimate's `set_add_reaction_frame`). |
 | HitstopMul | float | Multiplies the opponent's hitstop (hitlag), on top of the hitbox's own Hitlag multiplier. |
 | HitstopFrames | int | The opponent's hitstop in frames, replacing the computed one. HitstopMul is then ignored. |
 | SelfHitstopMul | float | Multiplies the attacker's own hitstop. |
 | SelfHitstopFrames | int | The attacker's own hitstop in frames, replacing the computed one. |
 | DIMul | float | Multiplies how far DI can turn this hit's launch angle: 0.5 is half the DI, 2 is double. |
 
-- **Multipliers:** 0 or less means ×1 (unchanged), so a template with zeros behaves like
+- **Multipliers:** 0 or less means ×1 (unchanged; HitstunMul's negative values add frames, above), so a template with zeros behaves like
   `Special_Hitbox`. For no DI at all, use a tiny value such as 0.001.
 - **Frames:** 0 means "computed". The frame values aren't capped at 30 like the computed hitstop is.
   For no hitstop, use the hitbox's DisableHitlag parameter.

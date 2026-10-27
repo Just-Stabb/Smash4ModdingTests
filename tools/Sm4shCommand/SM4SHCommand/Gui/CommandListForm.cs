@@ -195,6 +195,9 @@ namespace Sm4shCommand
         {
             if (string.IsNullOrEmpty(text))
                 return null;
+            int br = text.IndexOfAny(new[] { '\r', '\n' });
+            if (br > 0)
+                text = text.Substring(0, br);
             int i = text.IndexOf(". ", StringComparison.Ordinal);
             text = i > 0 ? text.Substring(0, i + 1) : text;
             return text.Length > 200 ? text.Substring(0, 200) + "…" : text;

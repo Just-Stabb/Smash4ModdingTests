@@ -45,6 +45,9 @@ import acmd  # noqa: E402
 import ultimate_acmd as U  # noqa: E402
 
 BRAVE = os.path.join(ROOT, 'fighters', 'brave')
+# Hero's critical hit (Ultimate's lot_critical: 1 in 8 smash attacks): his MSC rolls it (brave.c
+# brave_crit_update) into this instance int, his smash scripts keep both of Ultimate's hitbox sets on it
+CRIT_INT = 0x1000009A
 CONDS = ['SUCCESS_SP']          # the scripts' MP checks: his MSC decides (brave_cost), a script runs as cast
 # the articles' motion slots (thunder's motion info has 24 entries, the rest name empty scripts): the fireball
 # (fireball.c: func_24(level) flies, func_24(3 + level) bursts), spark / tornado (placed.c: func_24(level),
@@ -57,28 +60,26 @@ ARTICLES = {
     'fireball': (_slots('fireball', ('specialn1', 'specialn2', 'specialn3', 'bursts', 'burstm', 'burstl')),
                  {'fireball1': 0, 'fireball2': 0}),             # Frizzle's two balls
     'spark': (_slots('spark', ('specials1', 'specials2', 'specials32')), {}),
-    'tornado': (_slots('tornado', ('specialhi1', 'specialhi2', 'specialhi3')), {'tornado1': 0, 'tornado2': 0}),
+    'tornado': (_slots('tornado', ('specialhi1', 'specialhi2', 'specialhi3', 'specialhi3launch')),
+                {'tornado1': 0, 'tornado2': 0}),
     # Command Selection's (shot.c: motion level flies, 2 + level the hit's; crash: placed.c)
     'flash': (_slots('flash', ('flash1', 'flash2', 'flashhit1', 'flashhit2')), {}),
     'explosion': (_slots('explosion', ('move1', 'move2', 'explode1', 'explode2')), {}),
-    'deathball': (_slots('deathball', ('deathball1', 'deathball2', 'deathballko')), {'deathball': 0}),
+    'deathball': (_slots('deathball', ('deathball1', 'deathball2')), {'deathball': 0}),
     'crash': (_slots('crash', ('crash1', 'crash2', 'crashend1', 'crash1mp20', 'crash1mp40', 'crash1mp60',
                                'crash1mp80')), {}),
     'sleep': (_slots('sleep', ('sleep',)), {}),
 }
 # each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
 KASWOOSH_SPREAD = 7.0      # half the two whirlwinds' distance (their ellipses' centres, 7.4 out)
-KASWOOSH_LAUNCH = 50       # Kaswoosh's launching hit: 2 frames before its 52 (weapons/tornado.c)
 ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
-# Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100
-CRASH_TIERS = {'crash1mp%d' % m: m / 100.0 for m in (20, 40, 60, 80)}
-# Whack's KO (weapons/deathball.c): DeathBall1's hitbox as ID 2, hit group 2, effect 0x10 (Death: Smash Run's
-# Orne, a KO on the spot), 1 damage, radius 10 around Y 8, no clank / rebound, fighters only, unblockable,
-# not reflectable / absorbable, for 2 frames
-DEATH = 0x10
-KO_HITBOX = {0: 2, 1: 2, 3: 1.0, 4: 361, 5: 0, 6: 0, 7: 0, 8: 10.0, 9: 0.0, 10: 8.0, 11: 0.0, 12: DEATH, 16: 0,
-             17: 0, 24: 1, 28: 0, 29: 0, 30: 0}
+# Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100 and its size (hitboxes
+# and effects) x 0.4 + 0.6 x MP / 100 (Ultimate's param_crash: 0.4 at none, its full size at 100 MP)
+CRASH_TIERS = {'crash1mp%d' % m: (m / 100.0, 0.4 + 0.6 * m / 100.0) for m in (20, 40, 60, 80)}
+HITBOXES = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox', 'Extra_Special_Hitbox',
+            'Extra_Extended_Special_Hitbox')
+EFFECTS = ('External_Graphic', 'Graphic_Effect', 'Graphic_Effect2', 'Graphic_Effect3', 'Graphic_Effect4')
 # motions whose effects play out after the article is removed (its explosions)
 LASTING = ('burst', 'flashhit', 'explode', 'crash')
 CAVES = ('kind_expand', 'weapon_expand', 'base_effects_cave', 'base_customs_cave', 'trait_badge_cave',
@@ -119,7 +120,8 @@ def body_scripts(a, fighter, param):
                   '--vl', a.vl, os.path.join(param, 'fighter_param_vl_brave.bin'), '--vl-kind', 'reflet',
                   '--effects', os.path.join(ROOT, 'reference/ultimate_sys_effects.json') + ',' + ids,
                   os.path.join(a.hero, 'model/body/c00/model.nusktb'),
-                  '--translate', os.path.join(BRAVE, 'specials_acmd.json'), *sum((['--cond', c] for c in CONDS), []))
+                  '--translate', os.path.join(BRAVE, 'specials_acmd.json'), *sum((['--cond', c] for c in CONDS), []),
+                  '--dyn-cond', 'FLAG_CRITICAL_HIT=0x%X' % CRIT_INT)
         log += run(os.path.join(HERE, 'effect_variants.py'), 'apply', os.path.join(tmp, 'effect.bin'), ids,
                    os.path.join(out, 'effect.bin'))
         for fn in ('sound.bin', 'expression.bin'):
@@ -154,12 +156,16 @@ def article_scripts(a, name, wdir):
     U.EFFECT_CONDS = ()
     assert not etr.missing, etr.missing
     if name == 'crash':
-        for mo, k in CRASH_TIERS.items():
+        for mo, (k, size) in CRASH_TIERS.items():
             game[mo] = [acmd.Command(c.ident, list(c.params)) for c in game['crash1']]
             for c in game[mo]:
-                if c.name in ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox'):
+                if c.name in HITBOXES:
                     c.params[3] = round(c.params[3] * k, 2)
-            effect[mo] = effect['crash1']
+                    c.params[8] = round(c.params[8] * size, 2)     # its radius
+            effect[mo] = [acmd.Command(c.ident, list(c.params)) for c in effect['crash1']]
+            for c in effect[mo]:
+                if c.name in EFFECTS:
+                    c.params[8] = round(c.params[8] * size, 3)
     if name == 'tornado':
         # the whirlwinds play out after the article goes (Terminate 0), as Ultimate's: their wind is
         # left behind (Swoosh's / Kaswoosh's dissolving tornado3 meshes start at frames 26 / 50, 30 / 36
@@ -183,10 +189,12 @@ def article_scripts(a, name, wdir):
                 if c.name == 'Extended_Special_Hitbox':
                     c.params[-1] += dz
         # its launch: Ultimate's second set of hitboxes (part 1) is under `if life <= 2`, which the
-        # translator drops; tornado.c gives Kaswoosh 52 frames (placed_life), so at frame 50. Swoosh's
-        # converted launcher as the template, Ultimate's values (4%, 120, KBG 125, BKB 85, size 8.5)
+        # translator drops; tornado.c gives Kaswoosh 52 frames (placed_life), so at frame 50: weapons/tornado.c
+        # switches to motion slot 3 (specialhi3launch) then, whose script puts them up at once (fix 57: a
+        # FRAME(50) in specialhi3 was never reached, the article's motion being shorter). Swoosh's converted
+        # launcher as the template, Ultimate's values (4%, 120, KBG 125, BKB 85, size 8.5)
         tpl = next(c for c in game['specialhi2'] if c.name == 'Extended_Special_Hitbox' and c.params[1] == 1)
-        launch = [acmd.Command(acmd.BY_NAME['frame'], [KASWOOSH_LAUNCH])]
+        launch = []
         for i, y, z, y2 in ((0, 4.5, 1, 4.5), (1, 4.5, -1, 4.5), (2, 12.5, 1, 12.5), (3, 12.5, -1, 12.5),
                             (4, 21.0, 1, 21.0), (5, 21.0, -1, 21.0), (6, 5.0, 0, 20.0)):
             hb = acmd.Command(tpl.ident, list(tpl.params))
@@ -196,18 +204,11 @@ def article_scripts(a, name, wdir):
             hb.params[14] = 0.6
             hb.params[-3:] = [0.0, y2, z * KASWOOSH_SPREAD]
             launch.append(hb)
-        end = [c for c in game['specialhi3'] if c.ident == acmd.END]
-        game['specialhi3'] = [c for c in game['specialhi3'] if c.ident != acmd.END] + launch + end
+        game['specialhi3launch'] = launch + [acmd.Command(acmd.BY_NAME['wait'], [2]),
+                                             acmd.Command(acmd.BY_NAME['remove_all_hitboxes'], []),
+                                             acmd.Command(acmd.END)]
         whirls = [c for c in effect['specialhi3'] if c.name == 'External_Graphic']
         assert len(whirls) == 2, whirls
-    if name == 'deathball':
-        hb = next(c for c in game['deathball1'] if c.name == 'Extended_Special_Hitbox')
-        ko = acmd.Command(hb.ident, list(hb.params))
-        for i, v in KO_HITBOX.items():
-            ko.params[i] = v
-        ko.params[-3:] = [0.0, 8.0, 0.5]            # the capsule's other end (never its start: that hits the whole stage)
-        game['deathballko'] = [ko, acmd.Command(acmd.BY_NAME['wait'], [2]),
-                               acmd.Command(acmd.BY_NAME['remove_all_hitboxes'], []), acmd.Command(acmd.END)]
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
     for fn, sc in (('game', game), ('effect', effect), ('sound', {})):

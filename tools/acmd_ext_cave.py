@@ -29,7 +29,8 @@ Commands (CRC = zlib.crc32 of the name as written, like the game's own):
   time only if the tag, the slot and the check words all still match (a later plain hitbox in that
   slot has different data / tag).
 EXTRA = HitstunMul, HitstopMul, HitstopFrames, SelfHitstopMul, SelfHitstopFrames, DIMul: multipliers
-<= 0 mean 1 (unchanged), frames 0 mean "computed" (> 0 replaces the hitstop).
+<= 0 mean 1 (unchanged; a negative HitstunMul adds that many hitstun frames instead), frames 0 mean
+"computed" (> 0 replaces the hitstop).
 The hit-time hooks that use them are in this file too (HIT_* below), see docs/acmd-extra-commands.md.
 """
 import os
@@ -109,7 +110,7 @@ N_EXTRA = 6
 
 # the extra parameters of the Extra hitbox commands: name, type (0 int, 1 float), description
 EXTRA_PARAMS = [
-    ('HitstunMul', 1, 'Multiplies the hitstun this hit gives the opponent (the game\'s own: knockback x 0.4). 0 or less = x1 (normal).'),
+    ('HitstunMul', 1, 'Multiplies the hitstun this hit gives the opponent (the game\'s own: knockback x 0.4). 0 = x1 (normal); a negative value adds that many frames instead (-2: 2 frames more, as Ultimate\'s set_add_reaction_frame).'),
     ('HitstopMul', 1, 'Multiplies the opponent\'s hitstop (hitlag) from this hit, on top of the Hitlag parameter. 0 or less = x1.'),
     ('HitstopFrames', 0, 'The opponent\'s hitstop in frames, replacing the computed one (HitstopMul is then ignored). 0 = computed.'),
     ('SelfHitstopMul', 1, 'Multiplies the attacker\'s own hitstop from this hit. 0 or less = x1.'),
@@ -381,7 +382,7 @@ er_have:                                # r10 = entry number, r11 = entry, r8 = 
         lis r12, one@ha
         lfs f0, one@l(r12)              # 1.0
         lfs f2, zero@l(r12)             # 0.0 (next to it)
-""" + mul('0', '0x14', 'hs') + mul('4', '0x18', 'hp') + """
+""" + mul('0', '0x14', 'hs', signed=True) + mul('4', '0x18', 'hp') + """
         lwz r0, 8(r5)                   # hitstop frames
         stw r0, 0x1C(r11)
 """ + mul('0xC', '0x20', 'sp') + """
@@ -1825,8 +1826,15 @@ hk_stun:                                # victim's hitstun (f28) x HitstunMul; t
         lwz r10, 56(r12)
         addi r10, r10, 1
         stw r10, 56(r12)
-        lfs f10, 0x14(r5)
+        lfs f10, 0x14(r5)               # HitstunMul: x it, or a negative one: that many frames more
+        fsubs f9, f10, f10              # 0.0 (f9 / f10 are this hook's own: other float registers may be live)
+        fcmpu cr1, f10, f9
+        blt cr1, st_add
         fmuls f28, f28, f10
+        b st_mul
+st_add:
+        fsubs f28, f28, f10
+st_mul:
         lfs f9, 0x28(r5)
 st_di:""" + chk_t('r27', 'r12', 'st_out') + """
         lwz r8, 0x28(r27)               # the victim's WorkModule""" + chk_t('r8', 'r12', 'st_out') + """
@@ -2011,15 +2019,16 @@ def chk_t(reg, tmp, fail):
         bne %(f)s""" % dict(t=tmp, r=reg, f=fail)
 
 
-def mul(src, dst, k):
-    """copy the float multiplier at src(r5) to dst(r11); <= 0 or NaN -> 1.0 (f0 = 1.0, f2 = 0.0)"""
+def mul(src, dst, k, signed=False):
+    """copy the float multiplier at src(r5) to dst(r11); <= 0 or NaN -> 1.0 (f0 = 1.0, f2 = 0.0). signed:
+    a negative one is kept (HitstunMul: that many frames added), only 0 / NaN -> 1.0"""
     return """
         lfs f1, %s(r5)
         fcmpu cr1, f1, f2
-        bgt cr1, er_%s
+        bgt cr1, er_%s%s
         fmr f1, f0
 er_%s:
-        stfs f1, %s(r11)""" % (src, k, k, dst)
+        stfs f1, %s(r11)""" % (src, k, ("\n        blt cr1, er_%s" % k) if signed else "", k, dst)
 
 
 def chk(reg, fail):

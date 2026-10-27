@@ -38598,11 +38598,23 @@ void brave_buffs_off()
     EffectModule(0x2723, 0x3450066, 0x1, 0x1);
     EffectModule(0x2723, 0x345007a, 0x1, 0x1);
     EffectModule(0x2723, 0x345007b, 0x1, 0x1);
+    EffectModule(0x2723, 0x345004e, 0x1, 0x1);
 }
 
-// Kaclang's metal (and Hocus Pocus's states): see brave_state
+// Kaclang's metal (and Hocus Pocus's states): see brave_state. Work flag 0x20000012 is the Metal Box
+// item's ("Has Metal Box Item"): the game's own fighter code reads it for the metal physics
+// (0x02F1CC4C: run speed, jumps, gravity, fall speeds, weight, common params 0x2DE-0x2E4), knockback
+// resistance (0x02E76320, param 0x241) and the metal steps (0x027625C8). Set again each frame while on.
 void brave_metal(int on)
 {
+    if (on)
+    {
+        WorkModule(0x2710, 0x20000012);
+    }
+    else if (brave_metal_on)
+    {
+        WorkModule(0x2711, 0x20000012);
+    }
     brave_metal_on = on;
 }
 
@@ -38704,15 +38716,27 @@ void brave_buff_update()
     if (brave_psyche && brave_special_status() == 0 && WorkModuleF(0, 0x0f0000a1) >= 0.5f)
     {
         brave_psyche = 0;   // Psyche Up: spent on the hit that landed
+        brave_glow(0x345004e, 0);
     }
+    // the marker's bits (tools/strike_cave.py, tools/hero_buff_cave.py): 3 Acceleratle's speeds, 0x20
+    // Oomph (x1.6 damage, x1.1 knockback) and 0x40 Psyche Up (x1.2 knockback, x1.65 shield damage) on his
+    // physical attacks (not his specials), 0x80 Oomph's x1.2 damage taken, 0x10 a critical smash attack
     m = 0;
     if (brave_speed_t > 0)
     {
         m = m + 0x3;
     }
-    if (brave_attack_t > 0 || brave_psyche)
+    if (brave_attack_t > 0)
     {
-        m = m + 0x8;
+        m = m + 0x80;
+        if (brave_special_status() == 0)
+        {
+            m = m + 0x20;
+        }
+    }
+    if (brave_psyche && brave_special_status() == 0)
+    {
+        m = m + 0x40;
     }
     if (m == 0)
     {
@@ -38815,11 +38839,37 @@ void brave_keep_items()
     WorkModule(0x7, 0, 0x10000091);
 }
 
+// Ultimate's lot_critical: each smash attack (statuses 0x2B-0x33, from the windup) is a critical hit 1 time
+// in 8, rolled when it starts; int 0x1000009A is 1 for the whole of it, and his smash scripts take
+// Ultimate's critical hitboxes on it (tools/brave_build.py CRIT_INT)
+int brave_crit_rolled;
+int brave_crit;
+
+void brave_crit_update()
+{
+    if (global4 < 0x2b || global4 > 0x33)
+    {
+        brave_crit_rolled = 0;
+        brave_crit = 0;
+    }
+    else if (brave_crit_rolled == 0)
+    {
+        brave_crit_rolled = 0x1;
+        brave_crit = 0;
+        if (randi(0, 0x8) == 0)
+        {
+            brave_crit = 0x1;
+        }
+    }
+    WorkModule(0x7, brave_crit, 0x1000009a);
+}
+
 void brave_frame()
 {
     func_82();
     brave_keep_items();
     brave_mp_update();
+    brave_crit_update();
     brave_buff_update();
     brave_panel_update();
 }
@@ -38899,11 +38949,12 @@ void brave_s3_main()
 }
 
 // ---- Hero's neutral special: Frizz / Frizzle / Kafrizz (status 0x152, Robin's Thunder; fighters/brave/README.md).
-// Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) while special is held; the charge
-// is the frames held (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz: then the flash and
-// the charge is stored, as Ultimate's; a stored Kafrizz is cast at once). Released (at any time, a tap
-// included) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
-// fighters/brave/weapons/fireball.c) at frame 10 / 11 / 16; shield while holding -> SpecialNCancel, the
+// Ultimate's SpecialNStart (8 frames) then SpecialNHold (a 101-frame loop) until it's fired; the charge is
+// the frames charging (param_special_n hold_frame_m 18: Frizzle, hold_frame_l 81: Kafrizz: then the flash
+// and the charge is stored, as Ultimate's; a stored Kafrizz is cast at once). Special pressed again (not
+// released: fix 57) -> SpecialN1 / N2 / N3, which fire the fireball (article 6, weapon kind 0x190,
+// fighters/brave/weapons/fireball.c) at frame 10 / 11 / 16; the charge stops at the strongest level his MP
+// pays for and casts it (brave_n_max_level); shield while charging -> SpecialNCancel, the
 // charge kept for the next one (brave_n_stored; a stock lost clears it, func_235). The fireball learns its
 // level through the custom N slot (int 0x10000048 -> the weapon's 0x10000005), set while it is generated (as
 // Sephiroth's Flare). Robin's motion slots: 0x21F start, 0x223 hold, 0x227 / 0x228 / 0x229 N1 / N2 / N3 (the
@@ -39025,6 +39076,32 @@ int brave_n_hold_level()
     return level;
 }
 
+// the strongest level his MP pays for (-1: none); the charge stops there (fix 57: it went on charging for
+// a level he couldn't pay, then gave the one he could on release)
+int brave_n_max_level()
+{
+    int level;
+    level = 0x2;
+    while (level >= 0 && brave_can_pay(brave_n_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
+int brave_n_level_frame(int level)
+{
+    if (level == 0x2)
+    {
+        return 0x51;
+    }
+    if (level == 0x1)
+    {
+        return 0x12;
+    }
+    return 0;
+}
+
 int brave_n_fire_frame()
 {
     if (brave_n_level == 0x1)
@@ -39041,11 +39118,8 @@ int brave_n_fire_frame()
 void brave_n_loop()
 {
     float f;
+    int top;
     func_2245(StatusModule(0x6));
-    if (ControlModule(0x2712, 0x1) == 0)
-    {
-        brave_n_released = 0x1;
-    }
     f = MotionModuleF(0x1);
     if (brave_n_state == 0)
     {
@@ -39060,6 +39134,15 @@ void brave_n_loop()
         brave_n_hold += 1;
         brave_mp_pause = 0x1;
         brave_cost_view = brave_n_cost(brave_n_hold_level());
+        top = brave_n_max_level();
+        if (ControlModule(0x2710, 0x1))
+        {
+            brave_n_released = 0x1;     // Ultimate's: special pressed again fires (a release doesn't)
+        }
+        if (top < 0x2 && brave_n_hold >= brave_n_level_frame(top))
+        {
+            brave_n_released = 0x1;     // as charged as his MP allows: cast it (none: the misfire)
+        }
         if (ControlModule(0x2710, 0x3))
         {
             brave_n_stored = brave_n_hold;
@@ -39318,9 +39401,35 @@ int brave_s_hold_level()
     return level;
 }
 
+// the strongest level his MP pays for (-1: none); the charge stops there and casts it (fix 57)
+int brave_s_max_level()
+{
+    int level;
+    level = 0x2;
+    while (level >= 0 && brave_can_pay(brave_s_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
+int brave_s_level_frame(int level)
+{
+    if (level == 0x2)
+    {
+        return 0x1a;
+    }
+    if (level == 0x1)
+    {
+        return 0x9;
+    }
+    return 0;
+}
+
 void brave_s_loop()
 {
     float f;
+    int top;
     func_2245(StatusModule(0x6));
     if (ControlModule(0x2712, 0x1) == 0)
     {
@@ -39339,11 +39448,12 @@ void brave_s_loop()
     {
         brave_s_hold += 1;
         brave_mp_pause = 0x1;
-        if (brave_s_hold > 0x1a)
-        {
-            brave_s_hold = 0x1a;    // Kazap held back for want of MP: on to the release
-        }
         brave_cost_view = brave_s_cost(brave_s_hold_level());
+        top = brave_s_max_level();
+        if (top < 0x2 && brave_s_hold >= brave_s_level_frame(top))
+        {
+            brave_s_released = 0x1;     // as charged as his MP allows: cast it (none: the misfire)
+        }
         if (brave_s_hold >= 0x1a && brave_s_hold_level() == 0x2)
         {
             brave_s_level = 0x2;
@@ -39432,6 +39542,7 @@ int brave_hi_tornado;
 int brave_hi_launched;
 int brave_hi_rising;
 int brave_hi_empty;
+int brave_hi_cliff;
 
 int brave_hi_jump_motion(int air)
 {
@@ -39552,7 +39663,7 @@ void brave_hi_launch()
     }
     func_20(0x2);
     GroundModule(0x2710, 0x5);
-    KineticModule(0, 0xa);
+    KineticModule(0, 0);            // FALL: he drifts as he rises (Ultimate's jump_accel_x_*; AIR_STOP held him)
     KineticModule(0x11, 0x1, v);
     KineticModule(0xf, 0x1, -a);
     brave_hi_launched = 0x1;
@@ -39595,10 +39706,36 @@ int brave_hi_hold_level()
     return level;
 }
 
+// the strongest level his MP pays for (-1: none); the charge stops there and casts it (fix 57)
+int brave_hi_max_level()
+{
+    int level;
+    level = 0x2;
+    while (level >= 0 && brave_can_pay(brave_hi_cost(level)) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
+int brave_hi_level_frame(int level)
+{
+    if (level == 0x2)
+    {
+        return 0x1c;
+    }
+    if (level == 0x1)
+    {
+        return 0xa;
+    }
+    return 0;
+}
+
 void brave_hi_loop()
 {
     float f;
     int s;
+    int top;
     if (brave_hi_state < 0x2)
     {
         func_2245(StatusModule(0x6));
@@ -39620,11 +39757,12 @@ void brave_hi_loop()
     {
         brave_hi_hold += 1;
         brave_mp_pause = 0x1;
-        if (brave_hi_hold > 0x1c)
-        {
-            brave_hi_hold = 0x1c;   // Kaswoosh held back for want of MP: on to the release
-        }
         brave_cost_view = brave_hi_cost(brave_hi_hold_level());
+        top = brave_hi_max_level();
+        if (top < 0x2 && brave_hi_hold >= brave_hi_level_frame(top))
+        {
+            brave_hi_released = 0x1;    // as charged as his MP allows: cast it (none: the empty jump)
+        }
         if (brave_hi_hold >= 0x1c && brave_hi_hold_level() == 0x2 || brave_hi_released)
         {
             brave_hi_level = brave_hi_hold_level();
@@ -39659,7 +39797,12 @@ void brave_hi_loop()
         }
         if (brave_hi_launched)
         {
-            if (f >= (float)brave_hi_frame(0x2) && func_56())
+            if (f >= (float)brave_hi_frame(0x2) && brave_hi_cliff == 0)
+            {
+                func_100(0x2);      // the game script's cliff check (ALWAYS_BOTH_SIDES): ledges from here
+                brave_hi_cliff = 0x1;
+            }
+            if (brave_hi_cliff && func_56())
             {
                 return;
             }
@@ -39700,6 +39843,7 @@ void brave_hi_main()
     brave_hi_launched = 0;
     brave_hi_rising = 0;
     brave_hi_empty = 0;
+    brave_hi_cliff = 0;
     WorkModule(0x7, 0x260, 0x11000002);
     WorkModule(0x7, 0x26c, 0x11000003);
     WorkModule(0x7, 0x6, 0x11000004);
@@ -39935,6 +40079,19 @@ void brave_lw_change(int state, int g, int a)
 }
 
 // the cursor: up / down past half, again every 12 frames held; rows with no spell skipped
+// the buttons buffered so far dropped (as Robin's item pick-up, func_103): the menu's shield cancel was
+// shielding afterwards, and the special press picking a spell (Hocus Pocus) starting Frizz after it
+void brave_clear_input()
+{
+    ControlModule(0x271b);
+    ControlModule(0x271f);
+    global24 = 0;
+    global31 = 0;
+    global29 = 0;
+    global45 = 0;
+    global38 = 0;
+}
+
 void brave_lw_move()
 {
     int dir;
@@ -39947,6 +40104,15 @@ void brave_lw_move()
     else if (global32 < -0.5f)
     {
         dir = 0x1;
+    }
+    if (brave_lw_stick == 0x2)
+    {
+        // the stick still held from down special's input: nothing until it's let go
+        if (dir == 0)
+        {
+            brave_lw_stick = 0;
+        }
+        return;
     }
     if (dir == 0)
     {
@@ -39998,6 +40164,8 @@ int brave_lw_slot()
     return s;
 }
 
+// Heal: his damage down by v, with the common healing sparkle (GFX 0x35, a food's) on his hip: Ultimate
+// plays its glow from the status code, not the script (fix 57: none showed)
 void brave_heal(float v)
 {
     float d;
@@ -40007,6 +40175,7 @@ void brave_heal(float v)
         d = 0;
     }
     WorkModule(0, d, 0x0f000117);
+    EffectModule(0x2717, 0x1000035, 0x3, 0, 0, 0, 0, 0, 0, 1.0f, 0);
 }
 
 // Kamikazee: KO'd on the spot, as in Stamina mode (instance flag 0x20000043, "causes KO": the fighter
@@ -40323,6 +40492,7 @@ int brave_lw_cast(float f)
         {
             brave_self_ko();    // DEATH_RESERVE: at the motion's end
         }
+        return 0x1;             // no acting out of it (func_2246's cancel frame let him escape the blast, fix 57)
     }
     else if (n == 0xa)
     {
@@ -40375,6 +40545,7 @@ int brave_lw_cast(float f)
         if (f >= 6.0f && brave_lw_once(0x1))
         {
             brave_psyche = 0x1;
+            brave_glow(0x345004e, 0x1);     // brave_charge_hold, until the hit that spends it
         }
     }
     return 0;
@@ -40404,13 +40575,21 @@ void brave_lw_loop()
         brave_cost_view = brave_cost(n);
         if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || brave_lw_frame >= 0x1e0 && brave_lw_state == 0x1)
         {
+            brave_clear_input();
             brave_menu_close();
             brave_lw_change(0x3, 0x279, 0x285);
             return;
         }
         if (n != 0 && (ControlModule(0x2710, 0) || brave_lw_released && ControlModule(0x2710, 0x1)))
         {
-            // the cast: only its row stays up
+            // the cast: only its row stays up; he turns round to a stick held back (Ultimate's command
+            // spells do)
+            brave_clear_input();
+            if (ControlModuleF(0) < -0.5f)
+            {
+                PostureModule(0, -PostureModuleF(0x7));
+                PostureModule(0x2);
+            }
             brave_menu = 0x2;
             brave_menu_rows = n * brave_bit(0x5 * brave_lw_cursor);
             brave_menu_grey = (brave_menu_grey / brave_bit(brave_lw_cursor)) % 0x2 * brave_bit(brave_lw_cursor);
@@ -40478,7 +40657,7 @@ void brave_lw_main()
     brave_lw_cursor = 0;
     brave_lw_spell = 0;
     brave_lw_released = 0;
-    brave_lw_stick = 0;
+    brave_lw_stick = 0x2;           // brave_lw_move: wait for the stick to come back first
     brave_lw_repeat = 0;
     brave_lw_done = 0;
     brave_lw_sub = 0;
@@ -40499,6 +40678,7 @@ void brave_lw_main()
 void brave_lw_end()
 {
     brave_menu_close();
+    brave_metal(0);         // out of Kaclang early: the Metal Box flag off
     if (brave_lw_spell == 0x8 || brave_lw_spell == 0xa || brave_lw_spell == 0x10)
     {
         // out of Magic Burst's hover / Kaclang's fall / Zoom's flight early (hit): his own fall again

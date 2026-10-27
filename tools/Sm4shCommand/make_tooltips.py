@@ -107,6 +107,8 @@ def variables():
         if not nm and not usage:
             continue
         add(vid, nm or "(unnamed)", ("Used in: " + usage if usage else "") + (" (documented by %s)" % who if who else ""))
+    for vid, desc in VARIABLE_NOTES.items():
+        add(vid, "", desc)
 
     # fighter_param (category 3): names from Sammi Husky's sheet
     fp = rows(os.path.join(REF, "fighter_param_attributes.csv"))
@@ -145,6 +147,15 @@ def position():
                  [(["[type variable]"], POSITION_LINES)])
 
 
+# this project's findings on the note sheet's variables (docs/native-notes.md), after its own text
+VARIABLE_NOTES = {
+    0x20000012: "While set: the Metal Box's physics (run speed, jumps, gravity, fall speeds, weight: common params "
+                "0x2DE-0x2E4), knockback resistance (param 0x241) and metal footsteps, read every frame by the fighter "
+                "code (0x02F1CC4C, 0x02E76320, 0x027625C8). Hero's Kaclang sets it. The metal look isn't known to "
+                "come from it.",
+}
+
+
 # 0x0F0000A0 + 8 * target + q (tools/position_vars_cave.py)
 STATE_QUANTITIES = [
     ("HIT", "Read: 1 once its current attack has connected (until the move ends or it is reset), else 0.\\nWrite (any value): back to 0, so a later hitbox can be checked on its own (as ACMD Hit_Reset)."),
@@ -176,6 +187,7 @@ INPUT_QUANTITIES = (
      ("INVINCIBLE", "Read: 1 while invincible (body state 1).\\nWrite: invincible for N frames."),
      ("ARMOR", "Read: armor: 0 none, 1 super armor, 2 knockback-based, 3 damage-based.\\nWrite: set it (with ARMOR_THRESHOLD's value for 2 / 3)."),
      ("ARMOR_THRESHOLD", "Read: the armor's threshold (knockback for 2, damage for 3).\\nWrite: set it (write it before ARMOR)."),
+     ("KO", "Read: 0.\\nWrite: any value but 0 KOs the fighter at once (its work flag 0x20000043, 'Causes KO': it explodes as if KO'd, no effect hitbox). Hero's Whack / Thwack use it."),
      ])
 
 

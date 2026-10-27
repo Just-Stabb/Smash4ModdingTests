@@ -258,7 +258,7 @@ none:   li r3, 0
     OPEN = HM | 4 | 7 << 8                      # open, its animation done
     check('Hero, menu open: the window, names 17-20, the pointer on row 2 (sway frame 4), MP of spell 19',
           hero(OPEN | 2 | 3 << 11), [(T, 5), (T, 17), (T, 18), (T, 19), (T, 20), F, F, (T, 4), F, (T, 19)] + NOGAUGE)
-    check('the panel alpha on them', [state(r)[3] for r in menu_elems(1)][:2], [0x41, 0x41])
+    check('the window never fades (alpha 255, not the panel\'s 0x41)', [state(r)[3] for r in menu_elems(1)][:2], [255, 255])
     check('Hero, menu shut: all hidden', menu_state(2), [F] * 15)
     check('Hero, no marker: all hidden', menu_state(6), [F] * 15)
     check('Kirby: all hidden', menu_state(0), [F] * 15)
@@ -293,6 +293,7 @@ none:   li r3, 0
     check('the menu shut: the gauge still shown, the window not',
           hero(0, mp=HC | 100 << 8 | 100), [F] * 10 + [(T, 1), F, (T, 101), (T, 1), (T, 101)])
     check('0 MP: blue at its empty frame 1, no green, the number 0', hero(0, mp=HC)[10:], [(T, 1), F, (T, 1), (T, 1), (T, 1)])
+    check('the gauge fades with the panel (0x41)', [state(r)[3] for r in menu_elems(1)][10], 0x41)
     check('over 100 (G 120, B 110): 100, blue 100', hero(0, mp=HC | 120 << 8 | 110)[10:],
           [(T, 1), F, (T, 101), (T, 1), (T, 101)])
     check('B over G (50 / 60): blue G', hero(0, mp=HC | 50 << 8 | 60)[10:], [(T, 1), F, (T, 51), (T, 1), (T, 51)])

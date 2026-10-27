@@ -2774,7 +2774,7 @@ namespace SALT.Moveset.AnimCMD
             sb.AppendLine("//   name");
             sb.AppendLine("//   parameter types, comma separated: 0 int, 1 float, 2 decimal, 3 variable (or NONE)");
             sb.AppendLine("//   parameter names, comma separated (or NONE)");
-            sb.AppendLine("//   description shown in tooltips (optional; NONE = no description)");
+            sb.AppendLine("//   description shown in tooltips (optional; NONE = no description; more lines = line breaks)");
             sb.AppendLine("//   Category: group   (optional: the command list's group, View > Commands)");
             sb.AppendLine("//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)");
             sb.AppendLine("//   Example: line   (optional, one per line of a usage example, shown in the command list;");
@@ -2797,7 +2797,12 @@ namespace SALT.Moveset.AnimCMD
                 sb.AppendLine(format);
                 sb.AppendLine(syntax);
                 var desc = GetDescription(crc);
-                sb.AppendLine(string.IsNullOrEmpty(desc) ? "NONE" : desc.Replace("\r", "").Replace("\n", " "));
+                // one line per description line (blank lines would end the block; OverrideInfo joins them again)
+                var descLines = (desc ?? "").Replace("\r", "").Split('\n').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                if (descLines.Count == 0)
+                    descLines.Add("NONE");
+                foreach (var line in descLines)
+                    sb.AppendLine(line);
                 string cat;
                 if (CMD_CATEGORY.TryGetValue(crc, out cat) && !string.IsNullOrEmpty(cat))
                     sb.AppendLine("Category: " + cat);

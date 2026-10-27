@@ -1039,6 +1039,31 @@ the Strike cave and `tools/kirby_stat_cave.py` read category 1 (`[table + 4]`, t
 Both now read `[table]`. So the Rush / Overdrive stat scaling never worked in game either before
 this (`tools/kirby_stat_test.py` now tests it).
 
+### Hero's buffs and Oomph's downside (`tools/hero_buff_cave.py`)
+
+- More of the attack data (the 0x68 bytes set_attack copies): `+0x20` angle, `+0x24` knockback
+  growth, `+0x28` set (weight-based) knockback, `+0x2C` base knockback (ints), `+0x58` the added shield
+  damage (signed half; the Hitbox command's ShieldDamage, its parameter 18).
+- strike_cave.py's set_attack and throw paths end by branching to the jump table at `0x04B9F000`
+  (`HB_ATK`, `HB_THROW`); the cave scales the slot by Hero's marker bits (int `0x1000008E`, `0x4B49xxxx`):
+  `0x20` Oomph (damage ×1.6, knockback ×1.1), `0x40` Psyche Up (knockback ×1.2, damage + shield damage
+  ×1.65), both together knockback ×1.32; throws ×1.6 with Oomph.
+- **Damage taken:** the victim hit handler `0x02C25318` (first word `stwu r1, -0x110(r1)`; `r4` the
+  victim's accessor, `r5` the hit info: `+0xC` damage, `+0x10` knockback, already worked out) is
+  hooked: with bit `0x80` the damage is ×1.2.
+- PPC trap met again here: `addi rD, r0, imm` reads 0, not r0, so the arithmetic is in r12.
+
+### The Metal Box flag
+
+Work flag `0x20000012` ("Has Metal Box Item", note sheet) is read every frame by fighter code:
+`0x02F1CC4C` (the movement params: with it, run speed, jump / hop speeds, gravity, fall / fast-fall
+speeds and weight are × common params `0x2DE`-`0x2E4`), `0x02E76320` (knockback resistance, common
+param `0x241`, except for hitbox effects 9 / 0xA / 0xB / 0x16) and `0x027625C8` / `0x02762674` (the
+metal footsteps). So MSC can give a fighter the Metal Box's physics with `WorkModule(0x2710,
+0x20000012)` (Hero's Kaclang). No code builds `0x20000012` to set it (the item sets it some other way),
+and the metal look (the `metal.nud` / `metal.nut` the loader `0x03303144` files away) wasn't found
+to follow it: untested.
+
 ## Copy abilities: ACMD script sets
 
 `MotionAnimcmdModule(0, set, motion, kind)` (MSC handler `0x02760F4C`, FighterMotionAnimcmdModuleImpl
@@ -1248,6 +1273,12 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     one shape, at `0x02EF5A94`-`0x02EF5B04`), Zelda's; Robin's (`0x02F60194`) none. Without one, the
     commands write slot -1 (`fighter+0x4E6C`-`0x4E8F`, unused) and the per-frame update (`0x02C6F794`)
     skips the group: no reflector, no crash. `tools/brave_reflect_cave.py` gives Robin's kind (Hero) one.
+  - Hero's Bounce still doesn't reflect in game (fix 56 test: items and projectiles hit him, the barrier
+    shows). Checked statically: the cave's setup matches Kirby's call for call, MSC `ShieldModule(0x2717,
+    ...)` packs its arguments as ACMD REFLECTOR does and op 0 is SHIELD_ON's. No vanilla ACMD uses
+    REFLECTOR (every reflector's shape comes from its kind's setup), so giving a shape at run time is
+    unproven. Next: check whether Kirby's own air side B reflects (the same path); if not, build the
+    shape into the cave's setup (Zelda-style) and use MSC only to turn it on and off.
 - **Teams:** the team module is at accessor `+0x6C` (vtable `0x10002EC8`, 8-byte vtable entries).
   - It holds three team objects (vtable `0x10002E70`, each with its id at `+4`). Getters: vt `+0x34`
     → `+4`, team (id `+8`); vt `+0x44` → `+0x14`, hurt team (id `+0x18`); vt `+0x54` → `+0x24`, attack

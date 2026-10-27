@@ -140,7 +140,7 @@ SparkNone20
 SparkNone21
 SparkNone22
 SparkNone23
-TornadoNone3
+SpecialHi3Launch
 TornadoNone4
 TornadoNone5
 TornadoNone6
@@ -305,10 +305,10 @@ DeathballNone23
 Crash1
 Crash2
 CrashEnd1
-CrashNone3
-CrashNone4
-CrashNone5
-CrashNone6
+Crash1Mp20
+Crash1Mp40
+Crash1Mp60
+Crash1Mp80
 CrashNone7
 CrashNone8
 CrashNone9
