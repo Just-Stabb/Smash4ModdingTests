@@ -1119,5 +1119,6 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   effect only.
 - **Acceleratle (user):** his roll's speed ×2 while it lasts (`brave_roll_mult`: the roll script's
   momentum, energy 3, doubled on its frame 6, carried off an edge the same), with energy 3's ground
-  speed limit lifted for that roll so the 4.4 isn't cut back.
+  speed limit lifted on every roll frame while Acceleratle lasts (user: uncapped), so the 4.4 isn't cut
+  back.
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).

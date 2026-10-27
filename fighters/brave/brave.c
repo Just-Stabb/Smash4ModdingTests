@@ -38549,10 +38549,11 @@ void rolloff_update()
             KineticModule(0x11, 0x3, x * m, KineticModuleF(0xb, 0x3));
         }
     }
-    if (rolloff_fast && brave_roll_mult() != 1.0f)
+    if (brave_roll_mult() != 1.0f)
     {
-        KineticModule(0x15, 0x3, -1.0f, -1.0f);    // its ground speed limit off (universal-mechanics.md
-    }                                               // "Ground speed cap"), so the x2 isn't cut back
+        KineticModule(0x15, 0x3, -1.0f, -1.0f);    // under Acceleratle, every roll frame: energy 3's ground
+    }                                               // speed limit off (universal-mechanics.md "Ground speed
+                                                    // cap"), so the x2 isn't cut back (user)
     if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
     {                                                // starts; the ACMD's clear didn't reach it), well before the
         KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
