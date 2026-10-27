@@ -15,3 +15,9 @@
   heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes. A script that plays
   an animation from another motion folder (or shows a held model) gets a `Name -> folder/File.omo
   [+ held@Bone]` line there too, so the Hitbox Viewer plays it.
+- **Ultimate ports: check the game files for full accuracy.** For every new Ultimate port (and every
+  fix to one), take effects, moveset, hitboxes, parameters etc. from Ultimate's own files rather than
+  eyeballing: the fighter's scripts (lua2cpp dumps), motion_list, `vl.prc` / fighter params, the effect
+  files (`.eff`) and `fighter/common/param/*.prc` (e.g. `effect.prc`'s run-time effect colours), and
+  the ExeFS (`exefs/main.bin`, docs/ultimate-fighter-port.md) for behaviour the data doesn't hold.
+  Note in the fighter's README where each value came from, and anything still approximated.

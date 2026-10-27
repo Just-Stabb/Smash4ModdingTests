@@ -145,6 +145,18 @@ wasn't converted (they would land on the one before). `EFFECT_DETACH_KIND` -> `E
 Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_offset_last` /
 `enable_sync_init_pos_last`.
 
+### Effects recoloured at run time (`fighter/common/param/effect.prc`)
+
+`change_color_effect_id` lists `sys_attack_line`, `sys_attack_line_b`, `sys_attack_arc`, `_b`, `_c`,
+`_d`; `direction_effect_color` next to it holds 9 colours: red (1, 0.056, 0.056), blue (0.056, 0.238,
+1), yellow-orange (1, 0.584, 0.04), green (0.085, 0.627, 0.102), orange (1, 0.236, 0), cyan (0.127,
+0.848, 0.944), pink (1, 0.429, 0.603), purple (0.345, 0.222, 1), grey (0.5): the player-port colours.
+These effects are all white / grey in `ef_common.eff`; in game they take the attacker's port colour
+(Hero's up air, P2: soft blue). How strongly (and on which colour track) is being traced in the
+ExeFS; meanwhile Hero's bank tints `sys_attack_line` with `--tint-for sys_attack_line=A6D9FF` (read
+off a P2 clip). The file also holds `team_edge_color`, `dead_effect_color`, `shield_effect_color`,
+`color_blend_camera_depth_min / max` and more: check it for any common effect a port uses.
+
 ### Ultimate's effect commands (ExeFS `main`, version used: the NSO's dynsym names them)
 
 `app::sv_animcmd::*` read their lua arguments and call EffectModule (accessor +0x140) virtuals
