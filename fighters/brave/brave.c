@@ -7395,7 +7395,7 @@ int func_311()
     int var0;
     int var1;
     var0 = 0x68;
-    var1 = ControlModule(0x10);
+    var1 = rolloff_aerial(ControlModule(0x10));  // Hero: a C-stick flick buffered in a roll-off (fix 62)
     if (var1 == 0x1)
     {
         BattleObject(0xd, 0x2, 0xe);
@@ -8491,6 +8491,11 @@ void func_381()
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
         rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
+        rolloff_air_t = 0x8;
+    }
+    else
+    {
+        rolloff_cstick = 0;
     }
     func_383();
 }
@@ -8503,6 +8508,11 @@ void func_382()
         global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
         global64 = 1; // roll-off: the cap comes back when the stick lets go of the roll's way (rolloff_hold_update)
         rolloff_dir = 0;    // Hero's test: the way his speed goes, from his movement (rolloff_hold_update)
+        rolloff_air_t = 0x8;
+    }
+    else
+    {
+        rolloff_cstick = 0;
     }
     func_383();
 }
@@ -38343,6 +38353,67 @@ float rolloff_hold_x() { return 0.3f; } // Hero's test: the stick past this, on 
 float rolloff_dir;
 float rolloff_last_x;
 
+// Hero's test: an aerial buffered with the C-stick in a roll that rolls off came out neutral (user): on
+// the ground the C-stick is a smash input, so the buffered command had no air direction and the aerial
+// kind (ControlModule(0x10), func_311) went by the main stick. The roll keeps the last C-stick flick
+// (past 0.5) on screen (rolloff_cstick: 1 right, 2 left, 3 up, 4 down; ControlModuleF(7 / 8) along his
+// facing x his facing); an aerial out of the roll-off (rolloff_air_t, frames since the slide-off, up to
+// 8) takes it as forward / back / up / down with the facing it has then.
+int rolloff_cstick;
+int rolloff_air_t;
+
+void rolloff_cstick_update()
+{
+    float x;
+    float y;
+    x = ControlModuleF(0x7);
+    y = ControlModuleF(0x8);
+    if (y > 0.5f && y * y > x * x)
+    {
+        rolloff_cstick = 0x3;
+    }
+    else if (y < -0.5f && y * y > x * x)
+    {
+        rolloff_cstick = 0x4;
+    }
+    else if (x * x > 0.25f)
+    {
+        if (x * PostureModuleF(0x7) > 0)
+        {
+            rolloff_cstick = 0x1;
+        }
+        else
+        {
+            rolloff_cstick = 0x2;
+        }
+    }
+}
+
+// the aerial kind (ControlModule(0x10): 1 neutral, 2 forward, 3 back, 4 up, 5 down)
+int rolloff_aerial(int kind)
+{
+    int c;
+    c = rolloff_cstick;
+    rolloff_cstick = 0;
+    if (c == 0 || rolloff_air_t <= 0)
+    {
+        return kind;
+    }
+    if (c == 0x3)
+    {
+        return 0x4;
+    }
+    if (c == 0x4)
+    {
+        return 0x5;
+    }
+    if ((c == 0x1) == (PostureModuleF(0x7) > 0))
+    {
+        return 0x2;
+    }
+    return 0x3;
+}
+
 void rolloff_hold_update()
 {
     float x;
@@ -38369,6 +38440,14 @@ void rolloff_hold_update()
         }
     }
     rolloff_last_x = x;
+    if (rolloff_air_t > 0)
+    {
+        rolloff_air_t -= 1;
+        if (rolloff_air_t == 0)
+        {
+            rolloff_cstick = 0;
+        }
+    }
 }
 
 void rolloff_fall_speed()
@@ -38392,7 +38471,9 @@ void rolloff_update()
     if (MotionModuleF(0x1) < 1.0f)
     {
         global62 = 0; // new roll
+        rolloff_cstick = 0;
     }
+    rolloff_cstick_update();
     if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
     {                                                // starts; the ACMD's clear didn't reach it), well before the
         KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)

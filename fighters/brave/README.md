@@ -1031,4 +1031,9 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
 - **Roll-off test (user):** the way that counts is the way his speed goes (his X against the last
   frame's once he's off), not his facing (a roll turns him round); and an attack buffered off the edge
   (no Fall) lifts the air speed cap too (the roll end checks his situation, not only for Fall).
+- **Roll-off test: C-stick aerials came out neutral (user):** on the ground the C-stick is a smash
+  input, so the attack buffered in the roll had no air direction, and the aerial kind
+  (`ControlModule(0x10)`, `func_311`) went by the main stick. The roll now keeps its last C-stick flick
+  (on screen) and an aerial within 8 frames of the slide-off takes it as forward / back / up / down
+  (`rolloff_cstick_update`, `rolloff_aerial`).
 - Changed: `brave.mscsb`, `animcmd/body/game.bin`.
