@@ -163,9 +163,16 @@ USER_DATA, USER_FLOATS, USER_CALLBACK = 0x0C, 0x14, 0x34
 LIGHT_CALLBACK, LIGHT_FLAGS = 1, 0x1F
 # flag 0x10: the radius a multiple of the particle's scale (vanilla's: x scale at most 108, median 20, of
 # 330 non-Final lights; without it the radius stands alone, 100s - 2100). Ultimate's go further
-# (Kaboom's 60 x 4.3 = 260 lit the whole stage for 55 frames, far too bright): capped at Mii
-# Gunner's Stealth Bomb's 70
-LIGHT_SCALED, LIGHT_RADIUS_MAX = 0x10, 70.0
+# (Kaboom's 60 x 4.3 = 260 lit the whole stage for 55 frames, far too bright). Smash 4's designers drew
+# the same lights in both games' effects (60 pairs: the colour the same, Ultimate's factor aside) at the
+# same reach up to about 30, and pulled the bigger ones in (Ultimate 40 -> 30, 50 -> 29, 75 -> 50; none
+# past 50): light_reach does so (fix 50: Kacrackle Slash's 70 washed Hero out)
+LIGHT_SCALED, LIGHT_KNEE, LIGHT_SLOPE, LIGHT_RADIUS_MAX = 0x10, 30.0, 0.4, 50.0
+
+
+def light_reach(reach):
+    """an Ultimate light's reach (radius, x the particle's scale with LIGHT_SCALED) as Smash 4's"""
+    return reach if reach <= LIGHT_KNEE else min(LIGHT_RADIUS_MAX, LIGHT_KNEE + LIGHT_SLOPE * (reach - LIGHT_KNEE))
 # the eft sampler word: U wrap in bits 24-27, V in 28-31, the same codes as eft2's (0 mirror,
 # 1 repeat, 2 clamp: vanilla's 2 x 2 repeats, quarter textures mirrored into a star, are all 0x0;
 # the axes from the 374 vanilla emitters repeated along U only: bits 24-27 always mirror, 28-31
@@ -1606,7 +1613,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     if templates.test_mean_colour:
         p.set_field(em, 'color0_type', 0)
         p.set_field(em, 'color1_type', 0)
-    fits = [color_fit(rgb), color_fit(rgb if rgb1 is None else rgb1)]
+    fits = [(threshold_fit if dis is not None and dis_in == 0 else color_fit)(rgb),
+            (threshold_fit if dis is not None and dis_in == 1 else color_fit)(rgb if rgb1 is None else rgb1)]
     for tr in (0, 1):
         cks, track_rgb = fits[tr][0], (rgb if rgb1 is None or tr == 0 else rgb1)
         if black1 and tr == 1:
@@ -1706,7 +1714,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         if len(e['children']) > 1:
             notes.append('%d more child emitters not converted (eft has one)' % (len(e['children']) - 1))
     anims, done = emitter_anims(p, em, e, notes) if not as_child else ([], set())
-    left = set(e['subsections']) - done - fdone
+    left = set(e['subsections']) - done - fdone - ({'CSDP'} if dis is not None else set())   # (a dissolve's edge)
     if as_child:
         p.set_key_anims(em, [])
         return em
@@ -1725,8 +1733,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         k = struct.unpack_from('<f', cadp, 20)[0] if len(cadp) >= 24 else 1.0
         r, g, b = (float(min(1.0, v) * max(0.0, min(1.0, k))) for v in (r, g, b))
         reach = radius * max(p.field(em, 'scale')[0], 1e-4)       # (the scale at its peak)
-        if flags & LIGHT_SCALED and reach > LIGHT_RADIUS_MAX:
-            radius *= LIGHT_RADIUS_MAX / reach
+        if flags & LIGHT_SCALED:
+            radius *= light_reach(reach) / reach
         struct.pack_into('>2I', em, USER_DATA, (flags & LIGHT_FLAGS) << 16, 0)
         struct.pack_into('>8f', em, USER_FLOATS, r, g, b, radius, 0, 0, 0, 0)
         struct.pack_into('>I', em, USER_CALLBACK, LIGHT_CALLBACK)
@@ -1923,6 +1931,27 @@ def child_block(p, parent, c, names, images, notes, templates, prims, prim_index
     notes.append('child %s: %d every %d frames from %d%%, life %d; %s' % (
         c['name'], count, step + 1, ems['start'], pt['life'], '; '.join(cnotes)))
     return bytes(b), inherit
+
+
+def threshold_fit(rgb):
+    """color_fit's 3-key track (k0 until s1, -> k1 at s2, -> k2 at s3), least-squares on a 2% grid: for a
+    dissolve's threshold, whose edge (0.05 wide) moves with it (color_fit's keys sampled on a 10% grid
+    missed Swoosh's whirlwinds' by up to 0.08)"""
+    f = np.asarray(rgb, float)
+    t = np.arange(101.0)
+    best = None
+    grid = range(0, 101, 2)
+    for s1 in grid:
+        for s2 in range(s1, 101, 2):
+            for s3 in range(s2, 101, 2):
+                b1 = np.clip((t - s1) / (s2 - s1), 0, 1) if s2 > s1 else (t >= s1).astype(float)
+                b2 = np.clip((t - s2) / (s3 - s2), 0, 1) if s3 > s2 else (t >= s2).astype(float)
+                basis = np.stack([1 - b1, b1 - b2, b2], 1)
+                k, res, _r, _s = np.linalg.lstsq(basis, f, rcond=None)
+                err = float(((basis @ k - f) ** 2).sum())
+                if best is None or err < best[0] - 1e-12:
+                    best = (err, [k[0], k[1], k[2]], [s1, s2, s3])
+    return best[1], best[2]
 
 
 def fluctuation(e):

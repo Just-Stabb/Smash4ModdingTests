@@ -776,3 +776,19 @@ every 3 / 2 frames, inheriting 0.8 of the fragment's velocity), and Oomph / Acce
 spawn their sparkles (2 every 5 frames). Parents with children take CPU templates too (children spawn
 at their particles' CPU positions). Not yet: a second child (eft has one), mesh children, and parents
 Ultimate doesn't draw (spawners only; still skipped). Only the `.ptcl` changed.
+
+## Fix 50 (`build/hero_fix50.zip`): the dissolve edge, light reach
+
+- Dissolves (Ultimate's custom shader 8: the Woosh family's whirlwinds, Zoom, the Oomph / Acceleratle /
+  spell-hold start rings) carry their threshold over life in a colour track; `color_fit`'s keys,
+  sampled on a 10% grid, missed it by up to 0.08, more than the 0.05-wide edge, so the dissolve edge ran
+  ahead of / behind Ultimate's. `threshold_fit` fits that track least-squares on a 2% grid (0.045 at
+  worst). The stale "not converted: CSDP" note on drawn dissolves is gone (their CSDP is the edge
+  width). What still says CSDP is Ultimate's custom shader 4: flag 0x20 a noise-texture UV warp on
+  Bang / Kaboom's smoke and fire and Oomph / Acceleratle's rings, flag 2 the ice fragments' shading.
+- Lights (the CADP light shining on fighters): 60 lights both games' effects share give the same colour
+  in both (Ultimate's factor aside, applied as before) and the same reach up to about 30, Smash 4's
+  pulling the bigger ones in (Ultimate 40 -> 30, 50 -> 29, 75 -> 50, none past 50). `light_reach` does
+  the same (it was a cap at 70): Frizz / Frizzle's flares 35 -> 23, Kaboom's 48 -> 35, Magic Burst's
+  45 -> 32, Whack's aura 140 -> 116 ... Kacrackle Slash's light reaches about 28 (its 70 x a small
+  particle scale), so it's unchanged. Only the `.ptcl` changed.
