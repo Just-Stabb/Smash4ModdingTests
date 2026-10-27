@@ -258,7 +258,7 @@ none:   li r3, 0
     OPEN = HM | 4 | 7 << 8                      # open, its animation done
     check('Hero, menu open: the window, names 17-20, the pointer on row 2 (sway frame 4), MP of spell 19',
           hero(OPEN | 2 | 3 << 11), [(T, 5), (T, 17), (T, 18), (T, 19), (T, 20), F, F, (T, 4), F, (T, 19)] + NOGAUGE)
-    check('the window never fades (alpha 255, not the panel\'s 0x41)', [state(r)[3] for r in menu_elems(1)][:2], [255, 255])
+    check('the window never fades (alpha 100, full on the panel\'s 0-100 scale, not its 0x41)', [state(r)[3] for r in menu_elems(1)][:2], [100, 100])
     check('Hero, menu shut: all hidden', menu_state(2), [F] * 15)
     check('Hero, no marker: all hidden', menu_state(6), [F] * 15)
     check('Kirby: all hidden', menu_state(0), [F] * 15)

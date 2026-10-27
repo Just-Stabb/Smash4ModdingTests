@@ -520,8 +520,10 @@ apply:
         li r0, 1
         sth r0, 0x9C(r28)
 ralpha:
-        li r4, 255                  # the window (elements 0-9): never faded, as Ultimate's (the panel
-        cmpwi r26, 10               # fades when fighters come near; the window stayed see-through)
+        li r4, 100                  # the window (elements 0-9): never faded, as Ultimate's (the panel
+        cmpwi r26, 10               # fades when fighters come near; the window stayed see-through).
+                                    # Alpha is 0-100 (the panel's own: its opacity x 100, 0x02661744);
+                                    # fix 57's 255 hid the window
         blt setalpha
         lwz r12, 0x60(r29)          # the MP gauge: the panel's fade
 """ % dict(spells=SPELLS, vis=SET_VISIBLE, getf=GET_FRAME, gotof=GOTO_FRAME) + chk('r12', 'nextrow') + """

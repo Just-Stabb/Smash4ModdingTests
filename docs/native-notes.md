@@ -1277,8 +1277,13 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     shows). Checked statically: the cave's setup matches Kirby's call for call, MSC `ShieldModule(0x2717,
     ...)` packs its arguments as ACMD REFLECTOR does and op 0 is SHIELD_ON's. No vanilla ACMD uses
     REFLECTOR (every reflector's shape comes from its kind's setup), so giving a shape at run time is
-    unproven. Next: check whether Kirby's own air side B reflects (the same path); if not, build the
-    shape into the cave's setup (Zelda-style) and use MSC only to turn it on and off.
+    unproven. User: Kirby's air side B (ACMD REFLECTOR + SHIELD_ON in one status) does reflect. The
+    MSC op 0x2717 reads its arguments as ACMD's (`0x0200C478`: 4-byte slots, floats with lfs, the group
+    the last) and op 0 / 0x2710 both end in vt `+0x6C` (`0x0200BD8C`, the group state); setting a shape
+    writes the group's own slot (`0x02E566EC` -> `0x02C6F640`). Fix 58 turns Hero's on again every
+    frame while Bounce lasts (it went on once at the cast and then lived through status changes).
+- **Panel alpha** (the damage panel's elements, `0x032CDF6C(inst, alpha)` stores the byte at `+0x74`):
+  0-100, not 0-255 (the panel's fade writes its opacity x 100, `0x02661744`). 255 hid Hero's menu.
 - **Teams:** the team module is at accessor `+0x6C` (vtable `0x10002EC8`, 8-byte vtable entries).
   - It holds three team objects (vtable `0x10002E70`, each with its id at `+4`). Getters: vt `+0x34`
     → `+4`, team (id `+8`); vt `+0x44` → `+0x14`, hurt team (id `+0x18`); vt `+0x54` → `+0x24`, attack

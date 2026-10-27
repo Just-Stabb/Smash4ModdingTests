@@ -952,3 +952,21 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
 - **Still open:** Bounce doesn't reflect (does Kirby's air side B reflect projectiles? the same
   native path; docs/native-notes.md); the up air's effect and the Woosh family's softness (item 17);
   Hocus Pocus's giant, small, timer, sleep and flower do nothing yet (only Starman and invisible).
+
+## Fix 58 (`build/hero_fix58.zip`): the menu back, roll-off back, Frizz without MP, Bounce, Hocus Pocus
+
+- **Command Selection didn't show (fix 57):** its window was set to alpha 255 so it wouldn't fade with
+  the damage panel, but the panel's alpha is 0-100 (its opacity x 100, `0x02661744`); 255 hid it. Now
+  100 (`trait_badge_cave.py`, one word: `0x04B853BC` `li r4, 100`).
+- **Roll-off missing (fix 57):** the build used Robin's vanilla body `game.bin`; it takes the
+  universal-mechanics one (EscapeF / EscapeB 2.2) again, as the README's build line says.
+- **Frizz / Zap / Woosh with too little MP:** fix 57's "cast the strongest level he can pay for" took
+  "none" as level 0 and fired at once. With nothing paid for he now charges on until special is pressed
+  (Frizz) or released, then misfires as before.
+- **Bounce:** the same calls as Kirby's air side B (which reflects: user), which turns its reflector on
+  inside one status; Hero's went on once at the cast, then 720 frames over many statuses. It's now on
+  again every frame while Bounce lasts (setting the shape writes the group's own slot, `0x02E566EC`, so
+  nothing piles up).
+- **Hocus Pocus sleep:** the game's own sleep (FuraSleepStart `0x5F` -> loop `0x60` -> FuraSleepEnd
+  `0x62`), its length the mash counter (`ControlModule(0x6, 240, 1, 8, 1)`: 240 frames, 8 off per
+  press, the sleep hit's own rates); in the air on landing.

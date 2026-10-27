@@ -38450,6 +38450,8 @@ int brave_reflect_t;
 int brave_psyche;
 int brave_invisible_t;
 int brave_poison_t;     // Hocus Pocus's poison: frames left (1.1% every 20 frames, 27.5% in all)
+int brave_sleep_pending; // Hocus Pocus's sleep cast in the air: frames left to land and fall asleep
+int brave_sleep_arm;    // the sleep status started: its time still to set (brave_sleep_update)
 int brave_metal_on;
 // the window (brave_lw_*): 0 shut, 1 open (choosing), 2 cast (the spell's row only), 3 closing
 int brave_menu;
@@ -38593,6 +38595,8 @@ void brave_buffs_off()
     }
     brave_invisible_t = 0;
     brave_poison_t = 0;
+    brave_sleep_pending = 0;
+    brave_sleep_arm = 0;
     brave_reflect(0);
     brave_metal(0);
     EffectModule(0x2723, 0x3450066, 0x1, 0x1);
@@ -38629,6 +38633,46 @@ void brave_state(int o)
     {
         VisibilityModule(0x2710, 0);
         brave_invisible_t = 0x258;
+    }
+    else if (o == 0x6)
+    {
+        brave_sleep_start();
+    }
+}
+
+// Hocus Pocus's sleep: the game's own sleep (FuraSleepStart 0x5F -> FuraSleepLoop 0x60 -> FuraSleepEnd 0x62,
+// as a sleep hit gives), lasting until the mash counter (ControlModule 0x6 sets it, ControlModuleF(0x5)
+// reads it: func_96) runs out: 240 frames, 1 a frame and 8 a press off (the sleep hit's common params
+// 0x15C / 0x15D). In the air he falls asleep when he lands (within various_frame, 450)
+void brave_sleep_start()
+{
+    if (global18 == 0)
+    {
+        brave_sleep_arm = 0x1;
+        func_16(0x5f, 0);
+    }
+    else
+    {
+        brave_sleep_pending = 0x1c2;
+    }
+}
+
+void brave_sleep_update()
+{
+    if (brave_sleep_arm && (global4 == 0x5f || global4 == 0x60))
+    {
+        ControlModule(0x6, 240.0f, 1.0f, 8.0f, 0x1);
+        brave_sleep_arm = 0;
+    }
+    if (brave_sleep_pending > 0)
+    {
+        brave_sleep_pending -= 1;
+        if (global18 == 0 && (global4 == 0 || global4 >= 0x16 && global4 <= 0x1a))
+        {
+            brave_sleep_pending = 0;
+            brave_sleep_arm = 0x1;
+            func_16(0x5f, 0);
+        }
     }
 }
 
@@ -38695,6 +38739,13 @@ void brave_buff_update()
         if (brave_reflect_t == 0)
         {
             brave_reflect(0);
+        }
+        else
+        {
+            // fix 58: on again every frame. Bounce lasts 720 frames over many statuses; Kirby's air side B
+            // (which reflects) turns its reflector on inside the one status, Hero's went once at the cast
+            // and didn't reflect: the same calls, so a status change most likely shuts it
+            brave_reflect_shape();
         }
     }
     if (brave_invisible_t > 0)
@@ -38871,18 +38922,24 @@ void brave_frame()
     brave_mp_update();
     brave_crit_update();
     brave_buff_update();
+    brave_sleep_update();
     brave_panel_update();
 }
 
 // Bounce's reflector (as Kirby's air side B, tools/kirby_sideb_reflect_acmd.py: kind 3, ID 0, group 3; the
 // group made for Robin's kind by tools/brave_reflect_cave.py): a capsule around him, x1.5 damage, x1.2 speed
 // and life, no threshold; its barrier with it (brave_glow)
+void brave_reflect_shape()
+{
+    ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
+    ShieldModule(0, 0x3, 0, 0x1, 0x3);
+}
+
 void brave_reflect(int on)
 {
     if (on)
     {
-        ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
-        ShieldModule(0, 0x3, 0, 0x1, 0x3);
+        brave_reflect_shape();
         brave_glow(0x3450066, 0x1);
     }
     else
@@ -39139,9 +39196,10 @@ void brave_n_loop()
         {
             brave_n_released = 0x1;     // Ultimate's: special pressed again fires (a release doesn't)
         }
-        if (top < 0x2 && brave_n_hold >= brave_n_level_frame(top))
+        if (top >= 0 && top < 0x2 && brave_n_hold >= brave_n_level_frame(top))
         {
-            brave_n_released = 0x1;     // as charged as his MP allows: cast it (none: the misfire)
+            brave_n_released = 0x1;     // as charged as his MP allows: cast it (with no level paid for he
+                                        // charges on until special, then misfires; fix 58)
         }
         if (ControlModule(0x2710, 0x3))
         {
@@ -39450,9 +39508,10 @@ void brave_s_loop()
         brave_mp_pause = 0x1;
         brave_cost_view = brave_s_cost(brave_s_hold_level());
         top = brave_s_max_level();
-        if (top < 0x2 && brave_s_hold >= brave_s_level_frame(top))
+        if (top >= 0 && top < 0x2 && brave_s_hold >= brave_s_level_frame(top))
         {
-            brave_s_released = 0x1;     // as charged as his MP allows: cast it (none: the misfire)
+            brave_s_released = 0x1;     // as charged as his MP allows: cast it (none paid for: he charges
+                                        // on until the release, then misfires)
         }
         if (brave_s_hold >= 0x1a && brave_s_hold_level() == 0x2)
         {
@@ -39759,9 +39818,10 @@ void brave_hi_loop()
         brave_mp_pause = 0x1;
         brave_cost_view = brave_hi_cost(brave_hi_hold_level());
         top = brave_hi_max_level();
-        if (top < 0x2 && brave_hi_hold >= brave_hi_level_frame(top))
+        if (top >= 0 && top < 0x2 && brave_hi_hold >= brave_hi_level_frame(top))
         {
-            brave_hi_released = 0x1;    // as charged as his MP allows: cast it (none: the empty jump)
+            brave_hi_released = 0x1;    // as charged as his MP allows: cast it (none paid for: he charges
+                                        // on until the release, then the empty jump)
         }
         if (brave_hi_hold >= 0x1c && brave_hi_hold_level() == 0x2 || brave_hi_released)
         {
