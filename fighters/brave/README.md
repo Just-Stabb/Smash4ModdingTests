@@ -1122,3 +1122,17 @@ Install over fix 56: `fighter/brave/script` (MSC and ACMD) and `code/cross_f.rpx
   speed limit lifted on every roll frame while Acceleratle lasts (user: uncapped), so the 4.4 isn't cut
   back.
 - Changed: `brave.mscsb`, the `.ptcl` / `.efc` (fix 64's `code/cross_f.rpx` stays).
+
+## Fix 67 (`build/hero_fix67.zip`): Kazap's bolt onto the sword
+
+- **Kazap's bolt (user: it should come down onto the raised sword, not lie off to the left):** its three
+  meshes (`brave_lightning3_lightning2`: `thunder1`, `thunder1b`, `thunder2`, eft2 type 7, a primitive
+  drawn as a billboard) hang 36 down from their origin (×2.1), with a particle centre of (0, 93). Two
+  things were wrong:
+  - eft draws a billboard mesh a quarter turned (its -Y to screen left: the bolt lay along the ground
+    leftwards from his feet; the stored mesh was upright). It's now stored turned the other way, its
+    scale's x / y swapped with it (`bb_turn_xy`, `BB_TURN`). Observed on this bolt only.
+  - the centre wasn't converted: Ultimate adds it after the scale (36 × 2.1 down from 93 up: from the
+    raised sword's tip, 17 up, to 95), eft scales rotBasis with the particle, so rotBasis = centre /
+    scale (turned as the mesh is).
+- Changed: the `.ptcl` / `.efc` only (fix 66's `brave.mscsb`, fix 64's `code/cross_f.rpx` stay).
