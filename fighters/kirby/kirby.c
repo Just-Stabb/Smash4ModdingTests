@@ -57189,7 +57189,12 @@ void func_3419(int arg0, int arg1, int arg2)
     var3 = 0x1f;
     var4 = func_3418(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
+    // a custom runs R.O.B.'s own ACMD; the default keeps Kirby's RobotSpecialN / RobotSpecialAirN
+    // (the user's laser on Kirby's HeadN: R.O.B.'s joint 0x42B is another bone on Kirby) (added)
+    if (copy_custom_index(arg0, var3) != arg0)
+    {
+        MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3);
+    }
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -57205,7 +57210,10 @@ void func_3420(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
+    if (copy_custom_index(arg0, var1) != arg0) // a custom: R.O.B.'s ACMD (as func_3419) (added)
+    {
+        MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1);
+    }
     if (MotionModule(0x20))
     {
         var3 += 1.0f;

@@ -83,3 +83,22 @@ and nail until they're right in front of him; Jab 2 with Wario's fart.
 
 Status `0x1BA` (the copy's Giant Punch, `fighters/kirby/kirby.c` `func_2649`): at its motion's end
 in the air it went to `0x10` (SpecialFall); now `0xE` (Fall), as its cancel `0x1B9` already did.
+
+## Kirby's R.O.B. copy: R.O.B.'s laser at Kirby's height (`build/kirby_robot_laser.zip`)
+
+User: the copy's neutral special from R.O.B.'s (user-edited) SpecialN / SpecialAirN, hitbox lowered to
+Kirby. Vanilla Kirby's game.bin has no `RobotSpecialN` / `RobotSpecialAirN` (motions `0x3A2` / `0x3A3`):
+the copy's motion helpers (`func_3419` / `func_3420`) ran R.O.B.'s own game script
+(`MotionAnimcmdModule(0, 0, 0x211 / 0x215, 0x1F)`), whose joint `0x42B` (R.O.B.'s table 1, his head)
+is another bone on Kirby. Kirby's own effect script for it uses `0x13` (HeadN: table 0 id n = entry
+n - 1, TransN ... HeadN 19 ... ThrowN 26 as in every vanilla jtb seen) with R.O.B.'s offsets and angles.
+
+- `tools/kirby_robot_laser_acmd.py`: R.O.B.'s specialn / specialairn into Kirby's game.bin (added),
+  effect.bin and expression.bin (replaced) as robotspecialn / robotspecialairn, joints `0x42B` /
+  `0x42C` -> `0x13`, JUMPs to specialn -> robotspecialn. sound.bin kept (R.O.B. has no SpecialN
+  sound script; Kirby's plays `0x7F0000`).
+- Height (frame 24 of each one's animation): the hitbox line (1.5, 0, 0) -> (51.1, 290, 0) starts at
+  6.9 on Kirby (R.O.B.'s Head1N / Head2N: 11.9 / 14.6) and ends at 37 (R.O.B. about 60), same angle.
+- `func_3419` / `func_3420`: R.O.B.'s game script only for customs (`copy_custom_index != motion`).
+- The user's effect script plays `0x250032` (R.O.B.'s FinalEnd sound, his se bank row `0x25`), which
+  Kirby's banks don't hold (sound ids match the playing fighter's banks): likely silent on Kirby.
