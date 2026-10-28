@@ -67,3 +67,14 @@ at the throw's init (the victim already Thrown); vanilla does neither. v3:
 - `func_2299` / `func_2302`: posture pop removed (v2).
 - Four globals added after `global64`; fingerprint: 5 functions differ (`func_2296`, `func_2299`,
   `func_2302`, `func_2412`, `func_2418`); `msc_stack_check.py` clean.
+
+## v4 (`build/ganon_upb_v4.zip`): the victim T-posed and didn't move (user, v3)
+
+The link event's motion (arg 2) is what Thrown (`0x44`) plays (`func_1130`: `func_22(0x11000002)`);
+Ganondorf's `func_2261(0xb, -1)` sends none, never seen in vanilla (launched on frame 0). Every
+thrown motion carries the victim's own `ThrowN` (0 for normal fighters, -10.7 in the `Dx` variants:
+the victim's `ThrowN` is lined up with the thrower's, so the hanging body sits below it): with no
+motion, no pose and no position. v4: `func_2261(0xb, 0x1be)` in the catch, `0x1be` = the Dark Dive
+capture motion `0xB8` plays (`func_1584`; its Dx / Girl variants are picked by Thrown's slot-3
+`MotionModule(0x29, ...)`). Generic alternatives: ThrownF / B / Hi / Lw `0x7c`-`0x7f`. The throw
+init's vanilla fallback keeps -1 (only used if the catch didn't send it).
