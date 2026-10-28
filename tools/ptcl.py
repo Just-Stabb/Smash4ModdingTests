@@ -663,6 +663,40 @@ class Ptcl:
         self.dirty_layout = True
         return em
 
+    def primitive(self, i):
+        """primitive i's attributes: (pos, nrm, col, uv, idx) as add_primitive takes them (None when absent)"""
+        count, _total, eo = struct.unpack_from('>3I', self.prim, 0)
+        assert i < count
+        base = eo + 0x50 * count
+        out = []
+        for k, (comps_default, dt) in enumerate(((3, '>f4'), (3, '>f4'), (4, '>f4'), (4, '>f4'), (1, '>u4'))):
+            n, comps, off, size = struct.unpack_from('>4I', self.prim, eo + 0x50 * i + 16 * k)
+            if not size:
+                out.append(None)
+                continue
+            arr = np.frombuffer(bytes(self.prim[base + off:base + off + size]), dt)
+            out.append(arr.reshape(-1, comps) if comps > 1 else arr)
+        pos, nrm, col, uv, idx = out
+        return pos, nrm, col, uv, idx
+
+    def import_set(self, other, set_index, new_name=None):
+        """another Ptcl's emitter set copied into this one (import_emitter for each emitter, plus its
+        primitive mesh: copied once per source primitive). Returns the new set's index."""
+        prims = self.__dict__.setdefault('_imported_prims', {})
+        ems, names = [], []
+        for k, e in enumerate(other.sets[set_index]['emitters']):
+            src = other.emitter_bytes(set_index, k)
+            em = self.import_emitter(other, set_index, k)
+            pi = struct.unpack_from('>i', src, 0x2DC)[0]
+            if pi >= 0:
+                key = (id(other), pi)
+                if key not in prims:
+                    prims[key] = self.add_primitive(*other.primitive(pi))
+                struct.pack_into('>i', em, 0x2DC, prims[key])
+            ems.append(em)
+            names.append(other.emitter_name(src))
+        return self.new_set(new_name or other.set_name(set_index), ems, names)
+
     def add_primitive(self, pos, nrm, col, uv, idx):
         """a mesh appended to the primitive table: its index. pos / nrm [n, 3], col [n, 4] (RGBA 0-1),
         uv [n, 2] or [n, 4] (two UV sets), idx [m] triangle list; nrm / col may be None.

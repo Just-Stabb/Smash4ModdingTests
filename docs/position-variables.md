@@ -129,7 +129,7 @@ change takes effect on the fighter's next frame.
 `0x0F000100 + 0x20 × target + quantity`, same targets as above (0 self, 1 nearest opponent, 2 last
 fighter hit, 3–10 player slots 1–8), so `0x0F000100`–`0x0F00025F`. Sm4shCommand names them
 `TARGET_QUANTITY`, e.g. `SELF_ATTACK`, `OPP_INPUT_OFF`, `SLOT2_DAMAGE`. Test them with
-**`Float_Var_Compare`** and set them with **`SET_FLOAT`** (`ADD_FLOAT` etc. work too).
+**`Float_Var_Compare`** and set them with **`SET_FLOAT`**. To add, use **`SUB_FLOAT_2(Variable, SourceVariable)`** (Variable -= SourceVariable, through WorkModule's add: hooked) with a variable holding the negative step, e.g. `SET_FLOAT(-2, VAR_0)` then `SUB_FLOAT_2(0x0F000055, VAR_0)`. **`ADD_FLOAT` does nothing in this game:** its handler (`0x02BE6E80`) is `li r3, 0; blr`.
 
 | quantity | read | write |
 |---|---|---|

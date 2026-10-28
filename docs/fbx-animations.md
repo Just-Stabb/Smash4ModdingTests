@@ -49,3 +49,37 @@ User: hitboxes matching LIndex3N, from the finger to the nail Jab 1 stretches ou
 - **The fart:** `EFFECT_COLOR` common smoke puff `0x1000021` at TailNa (table-1 joint 1006) at
   frames 20 (size 1.6) and 24 (1.1), tint (150, 200, 40), as Jab 2's tail lifts (tip 1.6 -> 11
   up over frames 6-20).
+
+## Bowser jabs v3 (`build/bowser_jabs_v3.zip`): weak pull-in, a tipper, Wario's fart
+
+User: the nail's end a lower-priority 8% tipper that launches; the rest of the nail and the finger a
+3% `Extra_Extended_Special_Hitbox` with 1.4x hitstun that pulls the opponent in through the finger
+and nail until they're right in front of him; Jab 2 with Wario's fart.
+
+- **Hitboxes** (frames 7-39, every frame from the pose, on LHandN): ID 0 finger, ID 1 nail from
+  LIndex3N to `tip - 2r` (so it doesn't cover the tipper: a lower ID wins where they overlap), both
+  3%, angle 180 (toward Bowser), KBG 100, FKB 50, `HitstunMul` 1.4; ID 2 `Special_Hitbox` sphere at
+  the tip (radius = the nail's), 8%, angle 40, KBG 80, BKB 105.
+- **The pull** (frames 7-68): `Float_Var_Compare(0x0F000050 > 0)` (the last fighter hit is in
+  hitstun) and `0x0F000051 <= 37.5` (the hitstun it dealt: the weak FKB 50 hit gives about 27-35
+  with x1.4 across weights; the tipper's BKB 105 at least 42), then: on the first such frame their
+  Y offset is kept in `VAR_1` (`SET_FLOAT 0`, `SUB_FLOAT_2(VAR_1, 0x0F000056)`: -Y), each frame
+  `SUB_FLOAT_2(0x0F000055, VAR_0)` with `VAR_0` = 3.5 (3.5 closer), clamped at 15 in front
+  (`SET_FLOAT`), Y put back (`SET_FLOAT 0` then `SUB_FLOAT_2(0x0F000056, VAR_1)`), and while further
+  than 15 their hitstun left set to 6. The nail is within 9 degrees of horizontal over frames 7-39
+  (tip up to 138 in front), so the pull is horizontal. `ADD_FLOAT`'s handler is empty in this game
+  (`0x02BE6E80`), hence `SUB_FLOAT_2` (WorkModule add, hooked by `position_vars_cave.py`).
+- **The fart:** `Ptcl.import_set` (new: `import_emitter` per emitter plus the primitive mesh,
+  `Ptcl.primitive` reading it) copied Wario's `PtcWarioPpeL` / `PtcWarioPpeL2` into Bowser's bank
+  (sets 20 / 21, `.efc` entries 0x15 / 0x16 with Wario's 0x100 flags: `0x30F0015` / `0x30F0016`),
+  validated. Scripted as Wario's big waft (`0x430A9E8F`: PpeL `EFFECT_COLOR` (0, -90, 0) on bone 0,
+  common `0x1000008`, PpeL2 `EFFECT_FOLLOW_COLOR` on his HipN at (-90, -90, 0), his colours) at
+  Jab 2 frame 20 / 21, at Bowser's TailNa (TransN (-0.5, 7.5, 4.5): he has turned his back to the
+  front there, head at Z -4.4), turned 180 degrees about Y, size 1.8 (hip heights 10 / 4.2); PpeL2's
+  angles are Wario's hip (SpecialLwLR frame 7) x the script's turn on TransN, turned: (-176.1, -55.5,
+  149). No sound (user).
+
+## Kirby's Donkey Kong copy: no special fall (`build/kirby_dk_copy_nofall.zip`)
+
+Status `0x1BA` (the copy's Giant Punch, `fighters/kirby/kirby.c` `func_2649`): at its motion's end
+in the air it went to `0x10` (SpecialFall); now `0xE` (Fall), as its cancel `0x1B9` already did.

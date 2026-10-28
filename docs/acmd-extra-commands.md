@@ -263,8 +263,9 @@ the whole session. They show where an Extra hitbox's hitstop extras stop working
 ## Variables, timers and the kinetic type
 
 These are ordinary float variables in the same `0x0F000xxx` range as the position variables
-(`docs/position-variables.md`). Use them with `SET_FLOAT`, `ADD_FLOAT`, `Float_Var_Compare` and
-the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`.
+(`docs/position-variables.md`). Use them with `SET_FLOAT`, `SUB_FLOAT_2`, `Float_Var_Compare` and
+the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`. (`ADD_FLOAT` does
+nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable holding a negative value.)
 
 - **Floats only.** `SET_INT` and the int compares don't work on them.
 - **Each object has its own,** fighters and projectiles alike, up to 48 objects using them at

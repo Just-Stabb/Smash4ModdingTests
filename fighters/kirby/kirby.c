@@ -44507,7 +44507,7 @@ void func_2649()
         }
         if (global18 == 0x2)
         {
-            func_16(0x10, 0);
+            func_16(0xe, 0);
             return 0x1;
         }
     }
