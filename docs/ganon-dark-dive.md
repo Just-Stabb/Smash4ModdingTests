@@ -27,3 +27,26 @@ Invincibility (user: no trades once it connects): `Body_Collision(State=1)` (sta
 vanilla Ike's counter hit, Lucas' up smash; 2 = intangible: air dodges, ledge options) at frame 0 of
 SpecialHiCatch (the user had it at frame 1), and in SpecialHiThrow from frame 0 to the launch, then
 `State=0`. The frame the grab connects is still SpecialHi's, before any of it.
+
+## v2 (`build/ganon_upb_v2.zip`): the drag during SpecialHiCatch
+
+User (v1): no upward drag; Ganondorf "appears behind the opponent". While caught the victim is in
+`0xB8`, held at a fixed point (vanilla: in front of his hand; vanilla SpecialHiCatch keeps `ThrowN`
+at his feet, unused); only Thrown (`0x44`) follows `ThrowN`. The user's SpecialHiCatch carries
+`ThrowN` 67 up / 60 ahead over frames 0-28 with his body still, so the victim stayed put, then
+jumped there when SpecialHiThrow sent the thrown event.
+
+- `func_2412` (status `0x15C` slot 3, empty in vanilla) now sends the thrown event,
+  `func_2261(0xb, -1)` (= `BattleObject(0x3e9, 0xb, -1)`, what `0x15D`'s `func_2418` does): the
+  victim is thrown from the catch's first frame. `0xB8`'s exit (`func_1593`) only releases the
+  capture for a status other than `0x44`. `0x15D` still sends it (it is what sets the
+  `Throw_Applier` target, `0x11000005-7`; not traced natively). Hitboxes hit a thrown victim
+  (Pikachu ThrowF, Kirby ThrowLw, Bowser ThrowHi loop `Special_Hitbox`es), so the catch's
+  multi-hits stay.
+- `func_2299` / `func_2302`: vanilla's posture pop at the throw's start (-7 x LR, then +14 on frame
+  1: vanilla's catch and throw animations' offset) removed; the user's two animations are continuous.
+- The turn near the end is the user's animation (bust yaw 146 -> 27 degrees over SpecialHiThrow
+  frames 28-40).
+- `msc_fingerprint.py`: 2449 functions, only `func_2299`, `func_2302`, `func_2412` differ. If the
+  event at the catch's init comes too early in game (before the capture link), the fallback is to
+  send it on the catch's first main frame.
