@@ -57,7 +57,11 @@ game drew them unskinned: Incineroar a stretched pillar, Sephiroth invisible (wi
 too). `nud.write` sets it from test 20.
 
 **Joint table: 26 entries, never more** (every vanilla fighter's). Test 20 appended Sephiroth's
-swords as joints 27 / 28 (`--joints`): his hitboxes hit the whole stage. `--have LEFT,RIGHT` (both
+swords as joints 27 / 28: his hitboxes hit the whole stage; Squirtle v2-v4's tail the same (Tail1 /
+Tail2 as 27 / 28: the tail drew stretched to the stage's origin, its hitboxes off). `--joints` now
+appends to table 1 instead (IDs 1000 + its base length + k: Squirtle's tail 1002 / 1003): its length
+differs per fighter (Mario 2, Pit 15) and vanilla hitboxes use it (Robin's SwordN, joint 1000, 39
+hitboxes); `ultimate_acmd.joint_ids` reads both tables. `--have LEFT,RIGHT` (both
 tools) makes those Ultimate bones play `LHaveN` / `RHaveN` instead of `HaveL` / `HaveR` (Sephiroth's
 `SwordL1` / `SwordR1` hang from the same hand bones), so the sword hitboxes use joints 24 / 25 and
 follow the sword exactly; a held item takes the sword's angle. `ultimate_acmd.py` also writes

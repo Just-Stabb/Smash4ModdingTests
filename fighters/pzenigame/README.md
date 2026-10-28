@@ -79,7 +79,7 @@ python3 tools/pzenigame_build.py DUMP/lua2cpp_pzenigame ULT FOLDER/script/animcm
   same strength), the rim colour (CustomVector14: 0.75 grey body, 1 shell) for the rim, a neutral
   specular. Hero's / Sephiroth's skin (faces) gets the same on their next rebuild.
 - **Normals, grabs, throws** (`tools/ultimate_acmd.py`): 30 scripts, Ultimate's frames, damage, angles,
-  knockback and sizes, on his own bones (the tail: `--joints Tail1,Tail2`, joint ids of their own);
+  knockback and sizes, on his own bones (the tail: `--joints Tail1,Tail2`, joint ids of their own: 27 / 28 up to v4, 1002 / 1003 from v5);
   cancel / intangible frames into the vl file; effect scripts (102 with the specials': his own 26 and
   the common ones, `reference/ultimate_sys_effects.json`). Their sound scripts are emptied (Mario's
   would play); his own sounds aren't in yet.
@@ -172,3 +172,16 @@ python3 tools/pzenigame_build.py ... --sound SND
 - **Water's sound script**: Ultimate's `pzenigame_water` `sound_regular` (`SET_TAKEOUT_SE
   se_common_c_water_m`), translated by `ultimate_acmd.SoundTranslator` into all three water motions
   (`SET_TAKEOUT_SE(Se=0x162)`, the command Mario's fireball / pump water use).
+
+
+## v5 (`build/squirtle_v5.zip`): the tail
+
+User (v3, in game, screenshot): his tail stretched out across the stage, "breaking a lot of his
+hitboxes". v2 put `Tail1` / `Tail2` in Mario's joint table 0 as joints 27 / 28 (`--joints`), past the
+26 every vanilla fighter has, already known to break (Sephiroth's swords, test 20: hitboxes over the
+whole stage): the tail drew stretched to the stage's origin and its 18 hitboxes (Attack13, the
+AttackS3s, AttackAirB...: Ultimate's `tail1` / `tail2`) were off. `ultimate_fighter.py --joints` now
+appends to table 1 (Mario's HatN 1000, FaceN 1001; the tail 1002 / 1003; table 1's length differs
+per fighter and Robin's vanilla hitboxes use its SwordN, 1000). Rebuilt: every costume's
+`model.jtb` (nothing else in the model changes), the game script (`ultimate_acmd.joint_ids` reads
+both tables). Untested in game.

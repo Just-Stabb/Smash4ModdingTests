@@ -229,16 +229,20 @@ class Skeleton:
                 while base_vbn[b][0] not in self.by_name:
                     b = base_vbn[b][1]
                 out.append(self.by_name[base_vbn[b][0]])
-        # extra joints (bones the moves' scripts name, e.g. the sword): appended to table 0, so ACMD
-        # joint ID n1 + 1 + k is extra[k] (a bone this costume lacks: its nearest kept ancestor)
+        # extra joints (bones the moves' scripts name, e.g. Squirtle's tail): appended to table 1, so
+        # ACMD joint ID 1000 + n2 + k is extra[k] (a bone this costume lacks: its nearest kept
+        # ancestor). Table 0 stays at its 26 (every vanilla fighter's): appended there (Sephiroth's
+        # swords, test 20; Squirtle's tail, v2) hitboxes on them hit the whole stage and the tail drew
+        # stretched to the stage's origin. Table 1's length differs per fighter (Mario 2, Pit 15) and
+        # vanilla hitboxes use its joints (Robin's SwordN, joint 1000)
         add = []
         for name in extra:
             u = name
             while u not in self.index:
                 u = self.ult_parent[u]
             add.append(self.index[u])
-        t0, t1 = out[:n1] + add, out[n1:]
-        return struct.pack('>HH', len(t0), n2) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
+        t0, t1 = out[:n1], out[n1:] + add
+        return struct.pack('>HH', n1, len(t1)) + struct.pack('>%dh' % len(t0 + t1), *(t0 + t1)) + d[4 + 2 * len(vals):]
 
 
 OWN_JOINTS = None           # --own-joints (None: the profile's own_joints)
@@ -1567,7 +1571,8 @@ def main():
     mo.add_argument('--add', default='', help='motions to add to body/main.pac (comma separated, e.g. C00Attack12)')
     mo.add_argument('--extra-vis', help='JSON {Ultimate animation: {visibility: [[frame, 0/1], ...]}} (Steve\'s tools)')
     for q in (m, mo):
-        q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table (comma separated)')
+        q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table, table 1 (ACMD joint '
+                                                       'IDs 1000 + its base length + k; comma separated)')
         q.add_argument('--own-joints', help='the base joint table bones to give bones of their own (comma separated, '
                                             'or "all"; default: the profile\'s own_joints, else all)')
         q.add_argument('--max-bones', type=int, help='merge bones into their parents down to this many per costume '

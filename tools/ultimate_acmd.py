@@ -946,10 +946,14 @@ def joint_ids(model_dir):
     import ultimate_fighter as U
     vbn = U.read_vbn(os.path.join(model_dir, 'model.vbn'))
     d = open(os.path.join(model_dir, 'model.jtb'), 'rb').read()
-    n1, _n2 = struct.unpack('>HH', d[:4])
+    n1, n2 = struct.unpack('>HH', d[:4])
     table0 = struct.unpack('>%dh' % n1, d[4:4 + 2 * n1])
+    table1 = struct.unpack('>%dh' % n2, d[4 + 2 * n1:4 + 2 * (n1 + n2)])
     s4_to_ult = {s: u for s, u in U.STANDARD}
     out = {}
+    # table 1 (IDs 1000 + k): the base's own (FaceN...) and model --joints' (Squirtle's tail); table 0's win
+    for k in range(n2 - 1, -1, -1):
+        out[vbn[table1[k]][0].lower()] = 1000 + k
     for jid in range(n1, 0, -1):
         name = vbn[table0[jid - 1]][0]
         out[s4_to_ult.get(name, name).lower()] = jid
