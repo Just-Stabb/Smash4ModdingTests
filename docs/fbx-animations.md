@@ -102,3 +102,25 @@ n - 1, TransN ... HeadN 19 ... ThrowN 26 as in every vanilla jtb seen) with R.O.
 - `func_3419` / `func_3420`: R.O.B.'s game script only for customs (`copy_custom_index != motion`).
 - The user's effect script plays `0x250032` (R.O.B.'s FinalEnd sound, his se bank row `0x25`), which
   Kirby's banks don't hold (sound ids match the playing fighter's banks): likely silent on Kirby.
+
+## Bowser jabs v4 (`build/bowser_jabs_v4.zip`, `tools/bowser_jab1_acmd.py`): v3 fixes (user)
+
+User (v3): the tipper was out for the whole move and on the finger, not the nail's tip; the opponent
+wasn't pulled in; the roll broke (no roll speed).
+
+- **Base files:** v2 / v3 were built on vanilla game.bin / effect.bin, dropping the roll-off
+  (EscapeF / EscapeB, `universal_mechanics_all`) and the user's own edits (koopa.zip: game 3
+  scripts, effect 1). v4: game = `universal_mechanics_all`'s (the user's + roll-off) with only
+  Attack11 replaced; effect = the user's with only Attack12 (the fart) replaced.
+- **Offsets:** the game (and Smash Forge, the Hitbox Viewer's `ClearScale`) puts a hitbox at its
+  bone's rotation and position, not its scale. LHandN's world scale is 1.32 in this animation and
+  v2 / v3 inverted the full matrix, so every offset was 1.32x short (frame-16 tip: 111 in front
+  instead of 139). Now from LHandN with its scale removed; sizes stay world sizes.
+- **Tipper:** frames 14-18 only (tip 127.8 / 135.7 / 138.7 in front); at frame 7 the nail isn't
+  stretched yet (tip 37.7, at the finger). The skinned mesh's furthest point (all clusters,
+  frame 17: 138.6) is LIndex3N (2.895, 0, 0), the tip used. Turned off with `Remove_Hitbox(2)`.
+- **Pull:** v3 sorted the hit by `0x0F000051` (hitstun dealt, `DamageModuleF(1)`, never checked in
+  game). v4 sorts on the first frame the last fighter hit has hitstun left (`0x0F000050`, int
+  `0x1000003E`): above 40 = the tipper (at least 47), else the weak hit (at most ~36 with x1.4),
+  stored in `VAR_2`. The Y save / restore is gone: the offset write replaces only X (the cave
+  keeps the target's Y / Z).
