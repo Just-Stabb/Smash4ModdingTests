@@ -91,3 +91,17 @@ this result, not traced natively): in those six, "ThrowN" was another bone's tra
 `tools/omo_sort.py IN.pac MODEL.vbn OUT.pac` puts each motion's tracks in vbn order (only the
 order: every track samples the same on every frame, asserted); here only those six change, the
 rest of `main.pac` is byte for byte the user's.
+
+## v6 (`build/ganon_upb_v6.zip`): still not following (user, v5)
+
+The capturer starts a catch hold with `CatchModule(0x2710)` at the status init (slot 3) of every
+vanilla status whose victim follows its `ThrowN`: CatchPull / CatchDashPull (`func_1038`), Flame
+Choke ground `0x158` (`func_2430`, SpecialS: `ThrowN` moves 26) and air `0x159` (`func_2394`,
+SpecialAirSCatch: 22); they end it with `CatchModule(0x2711)` (exit, slot 6: `0x158`'s `func_2435`
+after its frame-31 `Throw_Applier`, CatchWait, Throw). Dark Dive (`0x154` / `0x15C` / `0x15D`) never
+calls `0x2710`: the victim stays where it was grabbed, whatever its status (`0xB8`, Thrown).
+(Victim sides compared: Flame Choke's `0xB9` -> `0xBC` sets up like Thrown, `CaptureModule(0x2)` +
+`LinkModule(0x2716, 0, 3)`; the `0x4000000` status attribute of CatchPull / Throw isn't on DK's
+cargo statuses, so it isn't what makes victims follow.) v6: `func_2412` (catch init)
+`CatchModule(0x2710)`; `func_2423` (throw exit, empty in vanilla) `CatchModule(0x2711)`. Both used
+only by those statuses. Fingerprint vs the user's: 6 functions differ.
