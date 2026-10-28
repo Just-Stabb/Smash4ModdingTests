@@ -50,3 +50,20 @@ jumped there when SpecialHiThrow sent the thrown event.
 - `msc_fingerprint.py`: 2449 functions, only `func_2299`, `func_2302`, `func_2412` differ. If the
   event at the catch's init comes too early in game (before the capture link), the fallback is to
   send it on the catch's first main frame.
+
+## v3 (`build/ganon_upb_v3.zip`): v2 crashed (user)
+
+Ganondorf's `BattleObject` handler (`fighter_ganon.cpp`, `0x02EEC46C`: `cmplwi 0x3e8 / 0x3e9`): both
+build a link-event record (event = arg 1, motion = arg 2, the rest -1) and send it through
+`0x02C55B04(obj+0x7294, 0, &rec)`; `0x3e9` then reads the linked object (`0x02C55CB4`) and writes it
+and the record's hit group / no into the current status's work ints `0x11000005-7` (what
+`Throw_Applier` reads). v2 sent it at the catch's init (the victim still entering `0xB8`) and again
+at the throw's init (the victim already Thrown); vanilla does neither. v3:
+
+- `func_2412` (catch init): `global65 = 0`. `func_2296` (catch main, every frame): from motion
+  frame 1, once, `func_2261(0xb, -1)`, then `global66-68` = `0x11000005-7`, `global65 = 1`.
+- `func_2418` (throw init): if `global65`, `0x11000005-7` = `global66-68` (no second event); else
+  vanilla's `func_2261(0xb, -1)`.
+- `func_2299` / `func_2302`: posture pop removed (v2).
+- Four globals added after `global64`; fingerprint: 5 functions differ (`func_2296`, `func_2299`,
+  `func_2302`, `func_2412`, `func_2418`); `msc_stack_check.py` clean.
