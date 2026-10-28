@@ -85,15 +85,22 @@ class ACMDFile:
         if d[4] != 0:
             sys.exit("%s: little-endian (3DS) ACMD not supported" % path)
         count, = struct.unpack(">I", d[8:12])
+        table = [struct.unpack(">II", d[0x10 + i * 8:0x18 + i * 8]) for i in range(count)]
+        starts = sorted(set(off for _h, off in table)) + [len(d)]
         scripts = {}
-        for i in range(count):
-            h, off = struct.unpack(">II", d[0x10 + i * 8:0x18 + i * 8])
+        for h, off in table:
+            # a script runs to the next one's start, not its first Script_End: a Thread_Start
+            # block ends with its own (Marth's SpecialHi_C2: the thread's, then the script's)
+            bound = starts[starts.index(off) + 1]
             cmds = []
             a = off
             while True:
                 ident, = struct.unpack(">I", d[a:a + 4])
                 if ident == END:
                     cmds.append(Command(END))
+                    a += 4
+                    if a + 4 <= bound and struct.unpack(">I", d[a:a + 4])[0] in INFO:
+                        continue
                     break
                 if ident not in INFO:
                     sys.exit("unknown command 0x%08X in script 0x%08X at 0x%X" % (ident, h, a))

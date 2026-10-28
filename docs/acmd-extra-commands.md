@@ -137,6 +137,10 @@ the script goes on past the block.
 
 Sm4shCommand ends the block with a `Script_End` when it compiles, and doesn't show it when it
 decompiles. The script itself jumps over the block, so it never reaches that `Script_End`.
+`tools/acmd.py` reads each script up to the next one's start, so a block at the very end of a script
+(the thread's `Script_End`, then the script's) keeps both: it used to stop at the first, dropping the
+script's own end, so the jump past the block landed in the next script (the user's Marth,
+`SpecialHi_C2`, through `rolloff_acmd.py`; caught before delivery).
 
 Example: a lingering explosion 30 frames after the move, whatever the fighter is doing by then.
 
