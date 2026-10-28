@@ -78,3 +78,16 @@ motion, no pose and no position. v4: `func_2261(0xb, 0x1be)` in the catch, `0x1b
 capture motion `0xB8` plays (`func_1584`; its Dx / Girl variants are picked by Thrown's slot-3
 `MotionModule(0x29, ...)`). Generic alternatives: ThrownF / B / Hi / Lw `0x7c`-`0x7f`. The throw
 init's vanilla fallback keeps -1 (only used if the catch didn't send it).
+
+## v5 (`build/ganon_upb_v5.zip`): the victim didn't follow ThrowN (user, v4)
+
+The user's six edited body motions (SpecialHiCatch, SpecialHiThrow, SpecialAirHi, AttackLw3,
+AttackAirHi, SpecialLw) have 101 tracks in hierarchy order (`ThrowN` last, index 100). Every vanilla
+body motion has its 26 tracks in vbn order (TransN ... ThrowN = 0-25, the joint table's bones), as
+do this repo's converted fighters (`ultimate_fighter.py omo_bytes`: every bone in vbn order; their
+hitboxes and throws work). The model draws by hash, so the animations looked right; the gameplay
+joints (hitboxes, `ThrowN`) are taken to be read by position (inferred from the vanilla layout and
+this result, not traced natively): in those six, "ThrowN" was another bone's track.
+`tools/omo_sort.py IN.pac MODEL.vbn OUT.pac` puts each motion's tracks in vbn order (only the
+order: every track samples the same on every frame, asserted); here only those six change, the
+rest of `main.pac` is byte for byte the user's.
