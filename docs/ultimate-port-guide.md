@@ -74,7 +74,8 @@ over the 51 fighters both have:
 - 264 rapid jab, 268 jump type (fly = Pit's multi-jump) from Ultimate's; 265 (side tilt count) never:
   the common combo repeats the first hit (Hero fix 16), the port writes its own loop.
 - **Jump heights:** Smash 4's full / short hops equal Ultimate's for 48 / 47 of 51 fighters, so the data
-  says x1; the ports so far used x0.82 / x0.9 (`jump_scale`, default kept until the user decides).
+  says x1: the default (user's call). Hero / Steve / Squirtle / Sephiroth were made at x0.82 / x0.9 and keep it
+  in their port.json (`stats.jump_scale`).
 
 ## Bug catalogue
 
@@ -108,13 +109,11 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | base counters / native per-frame code acting on the port | Hero fixes 19, 62 | `reference/port_bases.json` traps |
 | articles after the base's special entry never spawned | Hero fix 15 | weapon_expand.py |
 | caves overlapping | Hero v4b | cave tests with `--others` |
-| stock icon = the select render shrunk | Squirtle | `--stock-icon` (Ultimate's chara_2) |
+| stock icon = the select render shrunk | Squirtle | `--stock-icon` (Ultimate's chara_2; its icons have no eyes: user) |
 | portraits darker than Smash 4's | Hero fix 75 | ultimate_portraits.py tone curve |
 | mirrored UVs black (sampler wrap) | Hero fix 70 | converter (Ultimate's wrap) |
 
 ## Open
 
 - Mario's fireball native code (Squirtle's water): find what it plays, as Robin's Thunder orb was.
-- `--stock-icon`: Ultimate's chara_2 in the user's UI zip decodes without eyes (Mario's too): confirm
-  against the game before making it the only path.
 - Statuses written by hand still need the status code for accuracy (Withdraw's speeds): ssbu-recomp.

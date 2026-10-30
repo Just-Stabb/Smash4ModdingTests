@@ -26,7 +26,8 @@ The rules (MAP below) come from comparing the two games' tables over the 51 figh
   fix 16); a port with s3_combo_max > 1 needs its own loop (Hero's brave_s3_*), reported below.
 --jump-scale A,B: full hop x A, short hop x B. Hero / Steve / Squirtle / Sephiroth used 0.82 / 0.9
 ("for Ultimate's faster full hop"); in the tables Smash 4's heights equal Ultimate's for 48 / 47 of
-51 fighters, so 1,1 is the data's answer. Default: 0.82,0.9 (the ports so far).
+51 fighters, so 1,1 is the data's answer, and the default (user, for new ports); Hero / Steve / Squirtle /
+Sephiroth keep 0.82,0.9 in their port.json.
 """
 import argparse
 import json
@@ -71,7 +72,7 @@ def entry(prc_path, labels_path, ult):
     sys.exit('no fighter_param entry for fighter_kind_%s' % ult)
 
 
-def values(e, jump_scale=(0.82, 0.9)):
+def values(e, jump_scale=(1.0, 1.0)):
     """{index: (value, Ultimate name, rule text)}"""
     out = {}
     for i, (name, rule) in MAP.items():
@@ -109,7 +110,7 @@ def main():
     ap = argparse.ArgumentParser()
     for n in ('prc', 'labels', 'ult', 'fighter_param', 'out', 'kind'):
         ap.add_argument(n)
-    ap.add_argument('--jump-scale', default='0.82,0.9')
+    ap.add_argument('--jump-scale', default='1,1')
     ap.add_argument('--json')
     a = ap.parse_args()
     e = entry(a.prc, a.labels, a.ult)

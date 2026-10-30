@@ -168,7 +168,8 @@
   "jump_scale": [
    0.82,
    0.9
-  ]
+  ],
+  "_jump_scale": "the ports made before the framework keep 0.82 / 0.9 (user: new ports use Ultimate's heights, 1 / 1)"
  },
  "portraits": {
   "cross": null,

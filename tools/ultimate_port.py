@@ -153,7 +153,7 @@ def cmd_init(a):
         'model': {'max_bones': 136, 'joints': sorted(joints), 'have': None},
         'motions': {'add': []},
         'effects': {'own': own, 'common': common, 'tint_for': {}, 'hdr_white_for': [], 'bone_path': {}},
-        'stats': {'jump_scale': [0.82, 0.9]},
+        'stats': {'jump_scale': [1.0, 1.0]},
         'portraits': {'cross': None, 'stock_icon': True},
         'specials': {'msc': '%s.c' % a.name, 'acmd': 'specials_acmd.json', 'build': None},
     }
@@ -183,7 +183,7 @@ def cmd_effects(a):
 def cmd_stats(a):
     src = port_sources.load()
     cfg = load_cfg(a.name)
-    js = ','.join(str(x) for x in cfg.get('stats', {}).get('jump_scale', [0.82, 0.9]))
+    js = ','.join(str(x) for x in cfg.get('stats', {}).get('jump_scale', [1.0, 1.0]))
     prc = src.find('ult_common', 'param/fighter_param.prc')
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     r = subprocess.run([sys.executable, os.path.join(HERE, 'ultimate_stats.py'), prc, src['labels'], cfg['ult'],
