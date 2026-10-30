@@ -42,11 +42,14 @@ import ultimate_acmd as U  # noqa: E402
 
 KIND = 0x46
 # pzenigame.c's specials. Ultimate's numbers where its data has them (vl.prc param_special_n
-# charge_frame; SpecialNShot's six waters 4 frames apart from frame 7); Withdraw's speeds are in
-# Ultimate's status code, not its data: approximations (README)
+# charge_frame; SpecialNShot's six waters 4 frames apart from frame 7)
 CONSTS = dict(PZ_WATER_ARTICLE='0x5', PZ_N_CHARGE_MAX='45', PZ_N_SHOTS='6', PZ_N_SHOT_FRAME='7.0f',
-              PZ_N_SHOT_EVERY='4.0f', PZ_S_SPEED_START='1.2f', PZ_S_SPEED_MAX='2.4f', PZ_S_ACCEL='10',
-              PZ_S_SLIDE='40', PZ_S_BRAKE='0.9f', PZ_S_BOUNCE='1.0f',
+              PZ_N_SHOT_EVERY='4.0f',
+              # Withdraw: Ultimate's param_special_s (vl.prc, ParamLabels' names; v2-v5 had estimates)
+              PZ_S_SPEED='2.8f', PZ_S_SPEED_AIR='2.3f', PZ_S_ACCEL_AIR='0.01f', PZ_S_ACCEL='0.02f',
+              PZ_S_STABLE='3.5f', PZ_S_LIMIT_MIN='20', PZ_S_LIMIT_MAX='40', PZ_S_END_STICK='-0.5f',
+              PZ_S_HIT_X='0.6f', PZ_S_HIT_Y='2.0f', PZ_S_END_MUL_AIR='0.7f', PZ_S_END_MUL='0.8f',
+              PZ_S_END_BRAKE_AIR='0.015f', PZ_S_END_BRAKE='0.07f',
               # Water Gun's aim: Ultimate's SHOOT_ANGLE_ENABLE frames (SpecialNShot 5 - 40) and
               # param_special_n angle_up 40 / angle_down 25 / angle_speed 2; the stick's dead zone mine
               PZ_N_AIM_START='5.0f', PZ_N_AIM_END='40.0f', PZ_N_AIM_UP='40.0f', PZ_N_AIM_DOWN='25.0f',

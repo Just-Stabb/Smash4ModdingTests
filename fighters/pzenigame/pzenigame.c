@@ -37435,13 +37435,15 @@ void pz_n_aim_update()
 }
 
 // -- Withdraw (status 0x153): SpecialSStart (0x219 / air 0x21D) in place, then the shell slide
-// SpecialS (0x21A / 0x21E, its ACMD the hitbox: Ultimate's 8%) for PZ_S_SLIDE frames, speeding up from
-// PZ_S_SPEED_START to PZ_S_SPEED_MAX over PZ_S_ACCEL frames; then SpecialSEnd (0x21B / 0x21F), slowing
-// down (x PZ_S_BRAKE a frame). A hit (AttackModule 0x2727: a hitbox connected) bounces him back
-// (PZ_S_BOUNCE, SpecialAirSHit's animation: 0x21C / 0x220), then the end. Ultimate's speeds are in its
-// status code, not its data: these are approximations. The speed is kinetic energy 3's, along the
-// facing (as Mario's own code sets it from his params: func_137); his gravity is the cape's air
-// physics (func_2264) without the cape's stall
+// SpecialS (0x21A / 0x21E, its ACMD the hitbox: Ultimate's 8%), then SpecialSEnd (0x21B / 0x21F).
+// Ultimate's vl.prc param_special_s (named by ParamLabels): the slide starts at speed_x (air
+// speed_x_air) and speeds up accel_x (air accel_x_air) a frame to stable_speed_x; it lasts
+// limit_frame_min frames, up to limit_frame_max while special is held, and ends early (after the
+// minimum) when the stick is pulled back past end_stick_x (the NRO's status code reads those three
+// together: tools/recomp_hashes.py). A hit (AttackModule 0x2727: a hitbox connected) bounces him back
+// hit_speed_x (and, in the air, up hit_speed_y: SpecialAirSHit's animation, 0x21C / 0x220), then the
+// end: the speed x end_x_speed_mul (air _air), less end_x_brake (air _air) a frame. The speed is
+// kinetic energy 3's, along the facing; his gravity is the cape's air physics (func_2264)
 int pz_s_phase;
 int pz_s_frame;
 float pz_s_speed;
@@ -37486,8 +37488,39 @@ void pz_s_finish()
     func_16(0xe, 0);
 }
 
+int pz_s_slide_over()
+{
+    if (pz_s_frame >= PZ_S_LIMIT_MAX)
+    {
+        return 0x1;
+    }
+    if (pz_s_frame < PZ_S_LIMIT_MIN)
+    {
+        return 0;
+    }
+    if (ControlModuleF(0) * PostureModuleF(0) < PZ_S_END_STICK)
+    {
+        return 0x1;
+    }
+    return !ControlModule(0x2712, 0x1);
+}
+
+void pz_s_end()
+{
+    pz_s_set(0x2);
+    if (global18 == 0x2)
+    {
+        pz_s_speed *= PZ_S_END_MUL_AIR;
+    }
+    else
+    {
+        pz_s_speed *= PZ_S_END_MUL;
+    }
+}
+
 void pz_s_loop()
 {
+    float brake;
     pz_s_frame += 0x1;
     if (pz_s_phase == 0)
     {
@@ -37495,7 +37528,14 @@ void pz_s_loop()
         if (MotionModule(0x2712))
         {
             pz_s_set(0x1);
-            pz_s_speed = PZ_S_SPEED_START;
+            if (global18 == 0x2)
+            {
+                pz_s_speed = PZ_S_SPEED_AIR;
+            }
+            else
+            {
+                pz_s_speed = PZ_S_SPEED;
+            }
         }
     }
     else if (pz_s_phase == 0x1)
@@ -37504,20 +37544,53 @@ void pz_s_loop()
         {
             AttackModule(0x2719);
             pz_s_set(0x3);
-            pz_s_speed = -PZ_S_BOUNCE;
+            pz_s_speed = -PZ_S_HIT_X;
+            if (global18 == 0x2)
+            {
+                KineticModule(0x11, 0x3, pz_s_speed * PostureModuleF(0), PZ_S_HIT_Y);
+                KineticModule(0x15, 0x3, -1.0f, -1.0f);
+                return;
+            }
         }
-        else if (pz_s_frame >= PZ_S_SLIDE)
+        else if (pz_s_slide_over())
         {
-            pz_s_set(0x2);
+            pz_s_end();
         }
-        else if (pz_s_frame <= PZ_S_ACCEL)
+        else
         {
-            pz_s_speed = PZ_S_SPEED_START + (PZ_S_SPEED_MAX - PZ_S_SPEED_START) * (float)pz_s_frame / PZ_S_ACCEL;
+            if (global18 == 0x2)
+            {
+                pz_s_speed += PZ_S_ACCEL_AIR;
+            }
+            else
+            {
+                pz_s_speed += PZ_S_ACCEL;
+            }
+            if (pz_s_speed > PZ_S_STABLE)
+            {
+                pz_s_speed = PZ_S_STABLE;
+            }
         }
     }
     else
     {
-        pz_s_speed *= PZ_S_BRAKE;
+        brake = PZ_S_END_BRAKE;
+        if (global18 == 0x2)
+        {
+            brake = PZ_S_END_BRAKE_AIR;
+        }
+        if (pz_s_speed > brake)
+        {
+            pz_s_speed -= brake;
+        }
+        else if (pz_s_speed < -brake)
+        {
+            pz_s_speed += brake;
+        }
+        else
+        {
+            pz_s_speed = 0;
+        }
         if (MotionModule(0x2712))
         {
             if (pz_s_phase == 0x3)

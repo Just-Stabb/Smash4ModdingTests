@@ -2374,6 +2374,8 @@ def main():
                     help='vanilla .ptcl files to take template emitters from (the base\'s own first)')
     ap.add_argument('--variants', help='JSON [{"effect", "rot"}] (tools/effect_variants.py scan): a copy of '
                     'each effect\'s set turned by rot (degrees, R = Rz Ry Rx), id "effect@rx,ry,rz"')
+    ap.add_argument('--variants-last', action='store_true', help='the variants after every file\'s effects '
+                    '(--extra-eff ones too, which then get variants as well): no other id moves when they are added')
     ap.add_argument('--empty', default='', help="comma-separated base bank entries (hex) to empty: effects "
                     "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
                     "orbs on Hero's Thunder-based articles)")
@@ -2562,6 +2564,9 @@ def main():
         print('%-30s on %s (%s): %d frames%s, %.1f - %.1f out' % (
             name, bone, os.path.basename(anim), len(path), ', looped' if loop else '',
             min(np.hypot(path[:, 0], path[:, 2])), max(np.hypot(path[:, 0], path[:, 2]))))
+    if a.variants_last:     # every file's effects first: the variants move no id (tools/ultimate_port.py)
+        for src, source in enumerate(sources[1:], 1):
+            convert_source(src, *source)
     if a.variants:
         import effect_variants
         for v in json.load(open(a.variants)):
@@ -2574,9 +2579,11 @@ def main():
             key = effect_variants.variant_key(v['effect'], v['rot'])
             ids[key] = (0x300 + a.kind) << 16 | ef.add(si + 1, flags=entry[0])
             print('%-44s -> %-28s 0x%07X' % (key, sname, ids[key]))
-    # the other files' effects after the variants: every id the base file's effects had stays
-    for src, source in enumerate(sources[1:], 1):
-        convert_source(src, *source)
+    # the other files' effects after the variants: every id the base file's effects had stays (Hero's
+    # packages; --variants-last: the other way round)
+    if not a.variants_last:
+        for src, source in enumerate(sources[1:], 1):
+            convert_source(src, *source)
     # the imported templates whose pixel program was replaced leave their shader unused
     unused = p.drop_unused_shaders(base_shaders)
     out = p.build()

@@ -227,6 +227,9 @@ def plan(name, out):
     e = cfg.get('effects', {})
     ids = os.path.join(ROOT, 'fighters', name, '%s_effects.json' % name)
     fx = os.path.join(work, 'fx')
+    base_fx = os.path.join(base_dir, 'effect', base)          # the base's bank: its folder, else vanilla's
+    if not os.path.isdir(base_fx):
+        base_fx = os.path.join(src.get('vanilla', '?VANILLA'), 'fighter', base, 'effect', base)
     common_eff = src.find('ult_effects', 'system/common/ef_common.eff') or src.get('ef_common')
     extra = []
     if common_eff and e.get('common'):
@@ -235,20 +238,37 @@ def plan(name, out):
     tint = [x for k, v in e.get('tint_for', {}).items() for x in ('--tint-for', '%s=%s' % (k, v))]
     hdr = ['--hdr-white-for', ','.join(e['hdr_white_for'])] if e.get('hdr_white_for') else []
     steps.append(('effects', 'his effect bank: his own sets, Ultimate\'s common ones (variants: after the scripts)',
-                  [py, t('vfxb_to_ptcl.py'), eff, os.path.join(base_dir, 'effect', base), fx, kind, ids, *e.get('own', []),
-                   '--prefix', 'Ptc' + name.capitalize(), '--templates', src.get('vanilla', '?') + '/fighter/*/effect/*/*.ptcl',
-                   *extra, *tint, *hdr]))
+                  [py, t('vfxb_to_ptcl.py'), eff, base_fx, fx, kind, ids, *e.get('own', []),
+                   '--prefix', 'Ptc' + name.capitalize(), '--templates',
+                   *(sorted(glob.glob(src.get('vanilla', '?') + '/fighter/*/effect/*/*.ptcl')) or ['?TEMPLATES']),
+                   '--variants-last', *extra, *tint, *hdr]))
+    snd = [r for r in src.roots('ult_sound') if os.path.exists(os.path.join(r, 'bank/fighter/se_%s.nus3audio' % ult))]
+    steps.append(('sound', 'his se / voice banks, sequences, label table',
+                  [py, t('ultimate_sound.py'), snd[0] if snd else '?SOUND',
+                   # the base's banks renamed for him: add_fighter.py's folder (port_sources kind_folders)
+                   src.get('kind_folders', {}).get(name) or '?KIND_FOLDER/fighter/' + name, src.get('soundlabeltable', '?LABELS'),
+                   os.path.join(work, 'sound'), '--name', name.capitalize(), '--ult-name', ult, '--dump', dump]))
+    snd_ids = os.path.join(work, 'sound', 'sound_ids.json')
     steps.append(('scripts', 'Ultimate\'s scripts into the base\'s slots (game / effect / sound / expression, vl frames)',
                   [py, t('ultimate_acmd.py'), os.path.join(dump, ult), os.path.join(body, 'game.bin'),
                    os.path.join(fighter, 'script/animcmd/body/game.bin'), os.path.join(fighter, 'model/body/c00'),
                    '--others', body, os.path.join(fighter, 'script/animcmd/body'),
                    '--motion-list', os.path.join(U, 'motion/body/c00/motion_list.bin'),
                    '--mtable', os.path.join(body, 'motion.mtable'), os.path.join(fighter, 'script/animcmd/body/motion.mtable'),
-                   '--vl', os.path.join(work, 'vl_in.bin'), os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name),
+                   '--vl', os.path.join(body, 'vl.bin'), os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name),
                    '--vl-kind', bases().get(base, {}).get('vl_kind', base),
                    '--effects', 'reference/ultimate_sys_effects.json,' + ids, os.path.join(U, 'model/body/c00/model.nusktb')]
                   + (['--translate', os.path.join('fighters', name, e2)] if (e2 := cfg.get('specials', {}).get('acmd'))
-                     and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])))
+                     and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])
+                  + ['--sound-ids', snd_ids, '--expressions']))
+    # the fighter's own build (MSC, articles, special slots): port.json specials.build + build_args, with
+    # {dump} {ult} {body} {vl} {model} {base} {pkg} {work} {fx} {sound}
+    sp = cfg.get('specials', {})
+    if sp.get('build'):
+        fill = dict(dump=dump, ult=U, body=body, vl=os.path.join(body, 'vl.bin'), model=os.path.join(fighter, 'model/body/c00'),
+                    base=base_dir, pkg=pkg, work=work, fx=fx, sound=os.path.join(work, 'sound'))
+        steps.append(('specials', 'his specials (MSC, articles): the fighter\'s own build script',
+                      [py, sp['build']] + ([x.format(**fill) for x in sp['build_args']] if sp.get('build_args') else ['...'])))
     # the turned effects are only known once the scripts are translated: scan them, rebuild the bank with
     # the variants, point the scripts at them (the effects step alone has none: Squirtle's dash attack)
     steps.append(('variants', 'turned effects on bones: scan the translated effect.bin, rebuild the bank with variants, apply',
@@ -260,20 +280,16 @@ def plan(name, out):
     steps.append(('stats', 'stats from Ultimate\'s fighter_param.prc',
                   [py, t('ultimate_port.py'), 'stats', name, src.get('fighter_param', '?CURRENT/fighter_param.bin'),
                    os.path.join(pkg, 'param/fighter/fighter_param.bin')]))
-    snd = src.roots('ult_sound')
-    steps.append(('sound', 'his se / voice banks, sequences, label table',
-                  [py, t('ultimate_sound.py'), snd[0] if snd else '?SOUND', fighter, src.get('soundlabeltable', '?LABELS'),
-                   os.path.join(work, 'sound'), '--name', name.capitalize(), '--ult-name', ult, '--dump', dump]))
     p = cfg.get('portraits', {})
     steps.append(('portraits', 'portraits, stock icons (Ultimate\'s), name plates',
                   [py, t('ultimate_portraits.py'), '--ult-ui', (src.roots('ult_ui') or ['?UI'])[0], '--s4-chr',
-                   src.get('s4_chr', '?S4_CHR'), '--templates', src.get('templates', '?TEMPLATES'), '--ult', ult,
+                   src.get('s4_chr', '?S4_CHR'), '--templates',
+                   # add_fighter.py's portraits for him (the base's art, his ids): port_sources templates.NAME
+                   (src.get('templates') or {}).get(name, '?TEMPLATES'), '--ult', ult,
                    '--ult-base', bases().get(base, {}).get('ult', base), '--ui-name', cfg['ui_name'],
                    '--s4-base', base.capitalize(), '--out', pkg] + (['--stock-icon'] if p.get('stock_icon', True) else [])
-                  + (['--cross', p['cross']] if p.get('cross') else [])))
-    if cfg.get('specials', {}).get('build'):
-        steps.append(('specials', 'his specials (MSC, articles): the fighter\'s own build script',
-                      [py, cfg['specials']['build'], '...']))
+                  + (['--cross', p['cross']] if p.get('cross') else [])
+                  + (['--sets', ','.join(p['sets'])] if p.get('sets') else [])))
     steps.append(('check', 'the package against every bug class so far', [py, t('port_check.py'), name, pkg]))
     return steps
 
@@ -319,6 +335,15 @@ def cmd_variants(a):
         print('-- ' + ' '.join(shlex.quote(x) for x in argv), flush=True)
         if subprocess.run(argv, cwd=ROOT).returncode:
             sys.exit('variants: %s failed' % os.path.basename(argv[1]))
+    # the bank into the package, named for the fighter (vfxb_to_ptcl names it after the base's)
+    import shutil
+    fx = os.path.join(a.out, 'work', 'fx')
+    dest = os.path.join(fighter, 'effect', a.name)
+    os.makedirs(dest, exist_ok=True)
+    for f in os.listdir(fx):
+        if f.endswith(('.010d0000.ptcl', '.010d0000.efc')):
+            shutil.copy(os.path.join(fx, f), os.path.join(dest, a.name + f[f.index('.010d0000'):]))
+    print('bank -> %s' % dest)
 
 
 def cmd_unpack_body(a):
@@ -338,7 +363,9 @@ def cmd_unpack_body(a):
     if not want:
         sys.exit('build/universal_mechanics_all.zip has no %s game.bin' % base)
     open(os.path.join(a.dest, 'game.bin'), 'wb').write(z.read(want[0]))
-    print('%s: vanilla effect / sound / expression / motion.mtable, universal-mechanics game.bin' % a.dest)
+    vk = bases().get(base, {}).get('vl_kind', base)
+    shutil.copy(os.path.join(src['vanilla'], 'param/fighter/fighter_param_vl_%s.bin' % vk), os.path.join(a.dest, 'vl.bin'))
+    print('%s: vanilla effect / sound / expression / motion.mtable / vl (vl.bin), universal-mechanics game.bin' % a.dest)
 
 
 def cmd_check(a):

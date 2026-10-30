@@ -56,6 +56,10 @@ def joint_ids(model_dir):
     names, tables = vl_shapes.load_bones(model_dir)
     to_ult = {s: u for s, u in U.STANDARD}
     out = {}
+    # table 1 (1000 + k, as ACMD: tools/vl_shapes.py): the port's own joints (Squirtle's tail, --joints)
+    for k, idx in enumerate(tables[1] if len(tables) > 1 else []):
+        if 0 <= idx < len(names):
+            out.setdefault(hash40(to_ult.get(names[idx], names[idx]).lower()), 1000 + k)
     for k, idx in enumerate(tables[0]):
         if 0 <= idx < len(names):
             out[hash40(to_ult.get(names[idx], names[idx]).lower())] = k + 1

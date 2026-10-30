@@ -81,6 +81,9 @@ TERMS = {'FIGHTER_STATUS_TRANSITION_TERM_ID_DASH_TO_RUN': 0x1E00000A}
 SLOTS = {}
 # base scripts emptied (they'd run the base's moves on a motion we replaced without a script of ours)
 EMPTY = ['attacks4hi', 'attacks4lw', 'landingairn', 'landingairf', 'landingairb', 'landingairhi']
+# TRANSLATE names emptied when Ultimate has no game script for them (the base's landing hit stayed on
+# Squirtle's down air: port_check S7)
+EMPTY_IF_ABSENT = {'landingairlw'}
 
 EFFECT = {'collision_attr_normal': 0, 'collision_attr_cutup': 2, 'collision_attr_sting': 2,
           'collision_attr_elec': 3, 'collision_attr_fire': 5, 'collision_attr_purple': 0x13,
@@ -1052,6 +1055,29 @@ def motion_frames(args, done):
     return moves
 
 
+def common_to_own(o, translated, ids, own_ids_path):
+    """in the base's effect scripts the port keeps (no Ultimate script for them: ledge quick options,
+    sleep...), each Smash 4 common effect that stands for an Ultimate sys_* effect the port converted
+    (its ids file: vfxb_to_ptcl.py --extra-eff) becomes that one, so they match his own moves (port_check E3)"""
+    s4 = {k: int(v, 0) for k, v in json.load(open(os.path.join(HERE, '..', 'reference', 'ultimate_sys_effects.json'))).items()
+          if not k.startswith('_')}
+    own = {k for k in json.load(open(own_ids_path)) if k.startswith('sys_') and '@' not in k}
+    to = {}
+    for name in sorted(own):
+        if name in s4 and name in ids:
+            to.setdefault(s4[name], ids[name])
+    n = 0
+    for h, cmds in o.scripts.items():
+        if h in translated:
+            continue
+        for c in cmds:
+            syn = (acmd.INFO.get(c.ident) or {}).get('syntax', [])
+            if syn[:1] == ['Graphic'] and c.params and c.params[0] in to:
+                c.params[0] = to[c.params[0]]
+                n += 1
+    return n
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('scripts')
@@ -1117,6 +1143,8 @@ def main():
         if os.path.exists(path):
             body = functions(open(path).read()).get('game_' + src.lower())
         if body is None and name not in SLOTS:
+            if name in EMPTY_IF_ABSENT and not a.only:
+                f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
             continue
         tr.skipped = {}
         # a slot of ours with no game script in the dump (SpecialNCancel): empty scripts, so the
@@ -1151,6 +1179,8 @@ def main():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (
                     len(fx), ', '.join('%s x%d' % kv for kv in sorted(missing.items(), key=lambda kv: -kv[1]))))
+                n = common_to_own(o, {acmd.crc(nm) for nm in fx}, ids, a.effects[0].split(',')[-1])
+                print('%d Smash 4 common effects in the base\'s scripts kept -> his Ultimate ones' % n)
             smap = json.load(open(os.path.join(HERE, '..', 'reference', 'ultimate_sound_map.json')))
             if fn == 'sound.bin' and a.sound_ids:
                 ids = {k: v for k, (v, _c) in smap['common_se'].items()}

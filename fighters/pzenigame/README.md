@@ -203,3 +203,45 @@ both tables). Untested in game.
   "mario"), the stock icon (portraits `--stock-icon`).
 - `fighters/pzenigame/port.json`: his settings for `tools/ultimate_port.py`. To rebuild: his Ultimate
   `fighter/pzenigame` (model, motion, param) again (deleted for disk space).
+
+## v6 (`build/squirtle_v6.zip`): rebuilt through the framework
+
+User: the list above (effects turning / bleak, hidden face, side-B bias, Water Gun "Mario's fireball
+with a windbox at close range", Smash 4 common effects, Waterfall multi-hit, throws, stock icon); his
+fighter file again (Drive); "use Ultimate's real jump heights for new ports" (Squirtle keeps 0.82 /
+0.9: port.json); the icons have no eyes in Ultimate's files.
+
+Built with `tools/ultimate_port.py run pzenigame body model-c00..c07 motions effects sound specials
+variants shapes stats portraits --out DIR` (port.json, port_sources.json), executable as below.
+`port_check.py` over v1-v6 as installed: 0 errors (E3: 5 Smash 4 effects with no Ultimate set left in
+Mario's custom-move / item scripts; S7: `specialhi_c3`, a custom-move slot).
+
+- **Face** (F1 0): the motions step drives Mario's mouth slots (material_anime_face.pac) per frame from
+  Ultimate's visibility tracks (`ultimate_fighter.py` profile `drive`, `MARIO_MOUTHS`), after the model
+  step (whose pacs would overwrite it).
+- **Water Gun**: the water (a copy of Mario's fireball) ran the fireball's native vtable 2 code: its life
+  counter (no param for the new kind: removed at once), the ground bounce, the wall puff. `extra_kinds.json`
+  `"nop2": ["0x1C", "0x3C"]` as the Kamehameha (test 15); water.c moves it. Executable: v3's (= v2's)
+  + `weapon_expand.py` again: 2 words differ (the water's vtable 2 +0x1C / +0x3C -> blr);
+  `weapon_expand_test.py`: the water's checks pass, the one known failure (Hero's article order) as before.
+- **Withdraw**: the facing (C4), and Ultimate's `param_special_s` (vl.prc; ParamLabels names it now):
+  speed_x 2.8 / air 2.3, accel_x 0.02 / air 0.01 up to stable_speed_x 3.5, limit_frame_min 20 / max 40
+  (held special), end_stick_x -0.5 (pulled back: ends after the minimum), hit_speed_x 0.6 back /
+  hit_speed_y 2.0 up in the air, end_x_speed_mul 0.8 / 0.7 and end_x_brake 0.07 / 0.015 a frame.
+  ssbu-recomp (the user's `lua2cpp_pzenigame`, `tools/recomp_hashes.py`): the NRO's status code reads
+  limit_frame_min / max with end_stick_x (f_720cc09070), attack_speed_mul, and rot / mot speeds for the
+  animation (f_720cc04480); speed_x / accel / hit speeds are not in the NRO (read in the executable's
+  native code), so their use above is by name. Approximated: no smash_speed_x (a flicked start), no
+  slope speeds (slant_*), the over-turn (turn-around) status not made.
+- **Effects**: his 26 + 31 of Ultimate's 32 common effects (`sys_screw` has no ef_common set) in his
+  bank (`--extra-eff`), turned variants after the scripts (`variants` step, `--variants-last`: 10
+  variants, `sys_piyo` included, no id moves); the base scripts he keeps (ledge quick options, sleep,
+  ...) remapped to his Ultimate ones (43 commands, `ultimate_acmd.common_to_own`). An Ultimate
+  `sys_piyo` emitter with rate 0.4 once (a buffer of 0) emits one particle. Still: Ultimate's
+  refraction emitters (the water's screen warp) are skipped, and the dissolve (CSDP) of some parts.
+- **Scripts**: Waterfall 367 -> 366, throws NoGrabRelease (translator), LandingAirLw emptied (no
+  Ultimate script: `EMPTY_IF_ABSENT`).
+- **Hurtboxes**: 12 (Ultimate's vl.prc), the tail's two on table-1 joints 1003 (vanilla Charizard /
+  Bowser / Falco use table-1 hurtbox bones too).
+- **Stock icons**: Ultimate's chara_2 (`--stock-icon`, `portraits.sets` stock_90 only).
+- Stats: Ultimate's (`ultimate_stats.py`), jumps x 0.82 / 0.9 as before.

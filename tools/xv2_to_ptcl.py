@@ -493,6 +493,12 @@ def sanitize(p, em):
     - at most MAX_LIVE particles alive (the emission rate lowered)"""
     notes = []
     assert bool(p.field(em, 'one_time')) == (p.field(em, 'end_frame') != FOREVER)
+    rate = p.field(em, 'emit_rate')
+    if 0 < rate < 1 and buffer_count(p, em) == 0:
+        # a fractional rate emitted too few times to make one particle (Ultimate's sys_piyo: 0.4 once):
+        # eft would size the buffer for none; one particle an emission instead
+        p.set_field(em, 'emit_rate', 1.0)
+        notes.append('rate %g -> 1 (a buffer of 0)' % rate)
     assert 0 < buffer_count(p, em) <= 4 * MAX_LIVE, buffer_count(p, em)
     life, rnd = p.field(em, 'ptcl_life'), p.field(em, 'ptcl_life_random')
     if rnd >= life:

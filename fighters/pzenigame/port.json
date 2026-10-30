@@ -116,11 +116,26 @@
  },
  "portraits": {
   "cross": "3.71,790.8,24.6",
-  "stock_icon": true
+  "stock_icon": true,
+  "sets": [
+   "stock_90"
+  ],
+  "_sets": "v6 remade the stock icons only (Ultimate's chara_2); the rest are v1's"
  },
  "specials": {
   "msc": "pzenigame.c",
   "acmd": "specials_acmd.json",
-  "build": "tools/pzenigame_build.py"
+  "build": "tools/pzenigame_build.py",
+  "build_args": [
+   "{dump}",
+   "{ult}",
+   "{body}",
+   "{vl}",
+   "{model}",
+   "{base}",
+   "{pkg}",
+   "--sound",
+   "{sound}"
+  ]
  }
 }

@@ -35,10 +35,27 @@ python3 tools/ultimate_port.py init NAME --base BASE --kind 0x47 --ui-name "Name
 python3 tools/ultimate_port.py status NAME            # sources + the base's known traps
 python3 tools/ultimate_port.py effects NAME           # his effects; Ultimate's common ones -> ef_common sets
 python3 tools/ultimate_port.py plan NAME --out DIR    # every command, in order; '?' = an input missing
-python3 tools/ultimate_port.py run NAME body model-c00 ... motions effects scripts shapes stats sound portraits --out DIR
-   (specials: the fighter's MSC / articles: fighters/NAME/NAME.c, weapons/, specials_acmd.json, its build script)
+python3 tools/ultimate_port.py run NAME body model-c00 ... motions effects sound scripts specials variants shapes stats portraits --out DIR
+   (specials: the fighter's MSC / articles: fighters/NAME/NAME.c, weapons/, specials_acmd.json, its build script
+    with port.json specials.build_args)
 python3 tools/ultimate_port.py check NAME PKG [later packages ...]
 ```
+
+The order matters: the models before the motions (the model step writes the base's material pacs: Hero
+fix 74); the effects before the scripts (the scripts take the bank's ids); `variants` after the scripts and
+specials (it scans the translated effect.bin, rebuilds the bank with the turned copies at the end, so no
+other id moves, `--variants-last`, points the scripts at them and installs the bank); `shapes` after
+anything that rewrites the vl file (the scripts / specials steps start from the base's).
+
+Sources (`port_sources.json`): `kind_folders.NAME` (add_fighter.py's folder: the base's sound banks under
+his name), `soundlabeltable` (the user's current one), `s4_chr` (the user's ui/replace/chr) and
+`templates.NAME` (add_fighter.py's portraits, a folder or ZIP:PREFIX), besides the Ultimate ones.
+
+**The status code** (ssbu-recomp on the user's dump: `lua2cpp_<name>/c_*.c`, the NRO translated
+instruction by instruction, no names, no data): `tools/recomp_hashes.py DUMP VL_PRC LABELS` lists which
+function builds which hash40 (vl.prc labels, status / motion names). Most specials' numbers are in vl.prc
+under ParamLabels' names (Squirtle's Withdraw: `param_special_s`); the NRO tells which status reads them.
+Params it never builds (Withdraw's speed_x) are read in the executable's native code.
 
 The slot itself (kind record in `tools/extra_kinds.json`, `add_fighter.py`, the executable caves) is
 docs/kind-expansion.md; run every cave test with `--others` (Hero v4b).
@@ -106,6 +123,11 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | Smash 4 common effects standing in for Ultimate's | Squirtle (all), Hero's up air (fix 63-70) | plan converts `sys_*` from ef_common.eff [E3] |
 | washed out / dark / purple effects | Hero fixes 21-52 | converter (own pixel programs, linear -> display, no HDR purple) |
 | base native code playing its effects on copied articles | Hero (Robin's Thunder orb) | `reference/port_bases.json` traps; per base cave (thunder_orb_cave.py) |
+| the base's landing hit left on a move Ultimate has no script for | Squirtle's down air | translator `EMPTY_IF_ABSENT` [S7] |
+| the base's scripts the port keeps (ledge quick options, sleep) with Smash 4's common effects | Squirtle | translator `common_to_own` [E3] |
+| variants inserted before the common effects: their ids moved under the translated scripts | Squirtle v6 build | `--variants-last` |
+| an emitter with a fractional rate emitted once: a particle buffer of 0 | Ultimate's sys_piyo | converter: one particle |
+| hurtboxes on the port's own joints (table 1) | Squirtle's tail | ultimate_vl_shapes.py: 1000 + k |
 | a copied article keeps its base's native per-frame code: Squirtle's water bounced like Mario's fireball and died at close range | Squirtle v2-v5, Supamario's Kamehameha | `"nop2"` in the record (port_bases.json `weapon_nop2`) [W1] |
 | base counters / native per-frame code acting on the port | Hero fixes 19, 62 | `reference/port_bases.json` traps |
 | articles after the base's special entry never spawned | Hero fix 15 | weapon_expand.py |

@@ -394,13 +394,18 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             vgame = acmd.ACMDFile.load(vg).scripts
             hashes = struct.unpack('>%dI' % (len(mt) // 4), mt)
             names = {i: (mtable.COMMON[i] if i < len(mtable.COMMON) else '') for i in range(len(hashes))}
-            same = []
+            vocab = {acmd.crc(n): n for n in vocabulary()}
+            same, custom = [], []
             for i, h in enumerate(hashes):
                 if h and h in vgame and h in game and [str(c) for c in game[h]] == [str(c) for c in vgame[h]]:
                     if any(str(c).startswith(('Hitbox', 'Special_Hitbox', 'Extended')) for c in game[h]):
-                        same.append(names.get(i) or '0x%X' % i)
+                        n = names.get(i) or vocab.get(h) or '0x%X' % i
+                        (custom if re.search(r'_c[23]$', n) else same).append(n)
             if same:
                 rep.add('WARN', 'S7 base-moves', '%d moves still the base\'s hitboxes: %s' % (len(same), ', '.join(same[:20])))
+            if custom:
+                rep.add('INFO', 'S7 base-customs', '%d custom-move slots keep the base\'s (only with custom moves '
+                        'equipped: base_customs_cave): %s' % (len(custom), ', '.join(custom[:20])))
 
 
 # ------------------------------------------------------------------ params
@@ -444,7 +449,11 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
                     'equal) in %s: tools/ultimate_stats.py' % (kind, base['base'], inst.where('param/fighter/fighter_param.bin')))
     if ult_param and labels:
         import ultimate_stats as US
-        want = US.values(US.entry(ult_param, labels, base.get('ult', name)))
+        try:        # the port's jump scale (port.json stats.jump_scale: the ports made before the framework)
+            js = tuple(json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))['stats']['jump_scale'])
+        except (OSError, KeyError, ValueError):
+            js = (1.0, 1.0)
+        want = US.values(US.entry(ult_param, labels, base.get('ult', name)), js)
         diff = ['%d %s %s->%s' % (i, w[1], row.get(i), w[0]) for i, w in sorted(want.items())
                 if i in row and abs(row[i] - float(w[0])) > 0.011 * max(1, abs(float(w[0])))]
         if diff:
@@ -481,10 +490,21 @@ def check_vl(inst, name, base, motion_list, rep):
         return
     hashes = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
     loops = {e['game'] for e in UA.read_motion_list(motion_list) if e['flags'] & 2}
+    # the fighter's --translate map: a Smash 4 slot can hold another Ultimate script than its name's
+    # (Squirtle's specials = Ultimate's SpecialSStart, not its looping SpecialS)
+    ult_of = {}
+    try:
+        cfg = json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))
+        tr = json.load(open(os.path.join(ROOT, 'fighters', name, cfg['specials']['acmd'])))
+        for u, v in tr.items():
+            if not u.startswith('_'):
+                ult_of[(v['name'] if isinstance(v, dict) else v).lower()] = u
+    except (OSError, KeyError, ValueError):
+        pass
     wrong = []
     for n in vocabulary():
         h = acmd.crc(n)
-        if h in hashes and UA.hash40('game_' + n.lower()) in loops:
+        if h in hashes and UA.hash40('game_' + ult_of.get(n.lower(), n).lower()) in loops:
             i = hashes.index(h)
             try:
                 (_p, t), = V.find(vf, 'm0[%d].0' % i, '0', {})
