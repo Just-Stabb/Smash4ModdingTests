@@ -48,14 +48,23 @@ BG = np.array([0.62, 0.62, 0.64])
 
 
 # ------------------------------------------------------------------ maths
-def rot_xyz(r):
-    """R = Rz Ry Rx (radians): eft's emitter matrix order, and the scripts' XRot / YRot / ZRot"""
+def rot_xyz(r, order='zyx'):
+    """'zyx': R = Rz Ry Rx (radians: eft's emitter matrix order, and the scripts' XRot / YRot / ZRot);
+    'xyz': R = Rx Ry Rz (eft2's emitter rotation: vfxb_to_ptcl.eft_rotation)"""
     cx, cy, cz = np.cos(r)
     sx, sy, sz = np.sin(r)
     rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
     ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
     rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
-    return rz @ ry @ rx
+    return rx @ ry @ rz if order == 'xyz' else rz @ ry @ rx
+
+
+def anim_value(keys, loop, frame):
+    """an emitter key animation [(frame, value)] at this emitter frame (linear; held past the ends)"""
+    fr = [k[0] for k in keys]
+    if loop and fr[-1] > 0:
+        frame = frame % fr[-1]
+    return float(np.interp(frame, fr, [k[1] for k in keys]))
 
 
 def three(v0, v1, v2, s1, s2, t):
@@ -104,7 +113,9 @@ class Emitter:
     interval = 0
     rate = 1.0
     life = 10
-    matrix = np.eye(4)        # emitter -> effect
+    srt = ((1, 1, 1), (0, 0, 0), (0, 0, 0))     # emitter scale, rotation (radians), translation
+    rot_order = 'zyx'
+    anims = {}                # key-animation target (ptcl.KEYA_TARGETS) -> (keys [(frame, value)], loop)
     volume = (0, (0, 0, 0))
     all_dir = 0.0
     dir_speed = 0.0
@@ -112,6 +123,7 @@ class Emitter:
     dispersion = 0.0
     vel_random = 0.0
     gravity = np.zeros(3)
+    world_gravity = False     # gravity straight down in top's frame, not turned with the emitter
     air = 1.0
     size = (1.0, 1.0)
     size_random = 0.0
@@ -140,23 +152,26 @@ def simulate(em, call, frames, seed=1):
     out = {f: [] for f in frames}
     live = []
     carry = 0.0
-    m = cm @ em.matrix
-    lin = m[:3, :3]
     last = max(frames)
     for f in range(f0, last + 1):
         k = f - f0 - em.start
+        m = cm @ emitter_matrix(em, f - f0)
+        lin = m[:3, :3]
+        a = lambda t, d, k=f - f0: anim_value(*em.anims[t], k) if t in em.anims else d    # noqa: E731
         if 0 <= k < em.duration and k % (em.interval + 1) == 0:
-            carry += em.rate
+            carry += a(0, em.rate)
             while carry >= 1 - 1e-6:
                 carry -= 1
                 p = shape_point(rng, *em.volume)
                 d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)
                 outward = p / np.linalg.norm(p) if np.linalg.norm(p) > 1e-6 else spread(rng, np.array([0, 1.0, 0]), 180)
-                v = outward * em.all_dir + d * em.dir_speed
+                v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
                 v = v * (1 - em.vel_random * rng.uniform())
                 sr = 1 - em.size_random * rng.uniform()
+                sa = (a(17, 1.0), a(18, 1.0))
                 rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
-                live.append({'p': (m @ np.append(p, 1))[:3], 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot})
+                live.append({'p': (m @ np.append(p, 1))[:3], 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
+                             'sa': sa, 'lin': lin})
         keep = []
         for q in live:
             if q['age'] >= em.life:
@@ -166,16 +181,33 @@ def simulate(em, call, frames, seed=1):
                 sx, sy = em.size_curve(t) if em.size_curve else (1, 1)
                 rgb = em.colour_curve(t) if em.colour_curve else np.ones(3)
                 rgb1 = em.colour1_curve(t) if em.colour1_curve else None
-                out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * csize,
-                                                                    em.size[1] * sy * q['sr'] * csize),
+                out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * q['sa'][0] * csize,
+                                                                    em.size[1] * sy * q['sr'] * q['sa'][1] * csize),
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
                                rgb, rgb1))
-            q['v'] = q['v'] * em.air + lin @ em.gravity / max(np.linalg.norm(lin[:, 1]), 1e-6) * csize
+            g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
+            q['v'] = q['v'] * em.air + g * csize
             q['p'] = q['p'] + q['v']
             q['age'] += 1
             keep.append(q)
         live = keep
     return out
+
+
+def emitter_matrix(em, frame):
+    """emitter -> effect at this frame of the effect (its SRT, key animations 2 - 10 over it)"""
+    s, r, t = (list(v) for v in em.srt)
+    for i in range(3):
+        if 2 + i in em.anims:
+            s[i] = anim_value(*em.anims[2 + i], frame)
+        if 5 + i in em.anims:
+            r[i] = anim_value(*em.anims[5 + i], frame)
+        if 8 + i in em.anims:
+            t[i] = anim_value(*em.anims[8 + i], frame)
+    m = np.eye(4)
+    m[:3, :3] = rot_xyz(np.array(r, float), em.rot_order) @ np.diag(s)
+    m[:3, 3] = t
+    return m
 
 
 # ------------------------------------------------------------------ drawing
@@ -248,7 +280,7 @@ def basis(em, vel, cm):
         return np.array([[0, 0, -1.0], [0, 1.0, 0], [1.0, 0, 0]]).T
     if em.ptype == 8:                 # upright, turned to the camera about Y
         return np.array([[0, 0, -1.0], [0, 1.0, 0], [1.0, 0, 0]]).T
-    frame = (cm @ em.matrix)[:3, :3]
+    frame = (cm @ emitter_matrix(em, 0))[:3, :3]
     frame = frame / np.maximum(np.linalg.norm(frame, axis=0), 1e-9)
     if em.ptype == 1:
         return frame
@@ -280,6 +312,32 @@ def draw(canvas, em, parts, cm):
 
 
 # ------------------------------------------------------------------ Ultimate (eft2)
+def ult_anims(e):
+    """Ultimate's emitter animations (VFXB EA** sections: vfxb_to_ptcl.EMITTER_ANIMS) by eft target,
+    in eft2's own terms (rotation in radians, eft2's order; EASL the particle scale over its base)"""
+    import vfxb_to_ptcl as V
+    out = {}
+    for sec, targets in V.EMITTER_ANIMS.items():
+        raw = bytes.fromhex(e['subsections'].get(sec, ''))
+        if len(raw) < 12:
+            continue
+        on, loop, _pad, nk, _z = struct.unpack_from('<BBHII', raw, 0)
+        keys = [struct.unpack_from('<4f', raw, 12 + 16 * k) for k in range(nk)]
+        if not on or not keys:
+            continue
+        for i, t in enumerate(targets):
+            vals = [k[i] for k in keys]
+            if sec == 'EAER':
+                vals = [math.radians(v) for v in vals]
+            elif sec == 'EASL':
+                b = e['scale']['scale'][i] or 1.0
+                vals = [v / b for v in vals]
+            elif sec in ('EAC0', 'EAC1', 'EAA0'):
+                continue
+            out[t] = ([(k[3], v) for k, v in zip(keys, vals)], loop)
+    return out
+
+
 def ult_emitters(eff, set_index, images, names, prims):
     import vfxb_to_ptcl as V
     out = []
@@ -295,10 +353,9 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.rate = float(ems['rate'])
         em.life = int(pt['life']) if not pt['infinite_life'] else 600
         info = e['info']
-        m = np.eye(4)
-        m[:3, :3] = rot_xyz(np.array(info['rotate'])) @ np.diag(info['scale'])
-        m[:3, 3] = info['trans']
-        em.matrix = m
+        em.srt = (tuple(info['scale']), tuple(info['rotate']), tuple(info['trans']))
+        em.rot_order = 'xyz'
+        em.anims = ult_anims(e)
         sh = e['shape']
         em.volume = (sh['volume_type'], np.array(sh['volume_radius']) * np.array(sh['volume_form_scale']))
         em.all_dir, em.dir_speed = float(vel['all_direction']), float(vel['designated_dir_scale'])
@@ -306,6 +363,7 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.dispersion = float(vel['diffusion_dir_angle'])
         em.vel_random = float(vel['vel_random']) / 100
         em.gravity = np.array(ems['gravity_dir'], float) * float(ems['gravity_scale'])
+        em.world_gravity = bool(ems['world_gravity'])
         em.air = float(st['air_res'])
         sc = e['scale']
         em.size = (float(sc['scale'][0]), float(sc['scale'][1]))
@@ -360,16 +418,15 @@ def s4_emitters(p, set_index):
         em.duration = f('end_frame') if f('one_time') else FOREVER
         em.rate = f('emit_rate')
         em.life = f('ptcl_life') if f('ptcl_life') != FOREVER else 600
-        mx = np.array(f('emitter_matrix')).reshape(3, 4)
-        m = np.eye(4)
-        m[:3, :] = mx
-        em.matrix = m
+        em.srt = (tuple(f('emitter_scale')), tuple(f('emitter_rotation')), tuple(f('emitter_translation')))
+        em.anims = {a['target']: (a['keys'], a['loop']) for a in p.key_anims(d) if a['target'] < 0x1C}
         em.volume = (f('volume_type'), np.array(f('volume_radius')))
         em.all_dir, em.dir_speed = f('figure_velocity'), f('emitter_velocity')
         em.direction = np.array(f('emit_direction'), float)
         em.dispersion = f('dispersion_angle')
         em.vel_random = f('init_velocity_random')
         em.gravity = np.array(f('gravity'), float)
+        em.world_gravity = bool(f('world_gravity'))
         em.air = f('air_resistance')
         em.size = tuple(f('scale'))
         em.size_random = f('scale_random')[0]

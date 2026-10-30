@@ -1966,6 +1966,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'dispersion_angle', float(vel['diffusion_dir_angle']))
     p.set_field(em, 'init_velocity_random', min(1.0, vel['vel_random'] / 100))
     p.set_field(em, 'gravity', [float(ems['gravity_scale'] * g) for g in ems['gravity_dir']])
+    # eft2's world gravity (down whatever the emitter's turn) as eft's: the template's byte was kept, so
+    # Squirtle's down-smash water, emitted by sweeping emitters, fell along their turn (up and sideways)
+    p.set_field(em, 'world_gravity', 1 if ems['world_gravity'] else 0)
     p.set_field(em, 'air_resistance', float(st['air_res']))
     info = e['info']
     if typ == 3 and not is_mesh and sum(abs(v) > 1e-6 for v in info['rotate'][:3]) >= 2:
@@ -2104,7 +2107,20 @@ def emitter_anims(p, em, e, notes):
             continue
         vals = [list(k[:3]) for k in keys]
         if sec == 'EAER':
-            vals = [list(eft_rotation([math.radians(v) for v in x])) for x in vals]
+            # eft2 blends its own angles (R = Rx Ry Rz) between keys; eft blends eft's (Rz Ry Rx), so
+            # converted at the keys alone the turn between them took another path (Squirtle's down smash:
+            # the water emitters, emitting while they swept, off by up to 0.4 between keys 2 and 6, the
+            # splash standing up instead of along the ground; tools/fx_render.py). Every frame between
+            # keys converted, the angles kept continuous (no 2 pi jumps for eft to blend across)
+            fr = [k[3] for k in keys]
+            if fr[-1] - fr[0] >= 1:
+                dense = np.arange(math.floor(fr[0]), math.ceil(fr[-1]) + 1, 1.0)
+                ang = np.array([[np.interp(t, fr, [k[i] for k in keys]) for i in range(3)] for t in dense])
+                conv = np.unwrap(np.array([eft_rotation(np.radians(a)) for a in ang]), axis=0)
+                keys = [(0.0, 0.0, 0.0, float(t)) for t in dense]
+                vals = [list(c) for c in conv]
+            else:
+                vals = [list(eft_rotation([math.radians(v) for v in x])) for x in vals]
         elif sec in ('EAC0', 'EAC1'):
             c = info['color0' if sec == 'EAC0' else 'color1']
             vals = [[v / c[i] if c[i] else v for i, v in enumerate(x)] for x in vals]

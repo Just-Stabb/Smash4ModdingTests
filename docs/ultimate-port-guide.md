@@ -109,6 +109,11 @@ both columns agree but the game doesn't, our reading of an Ultimate field is wro
 the dash's droplets rise ~14 units in both columns, low behind his feet in Ultimate's footage; the down
 smash fans upward in both, flat along the ground in the footage): check the Ultimate column against
 Ultimate footage (the user's recordings, its grid) before trusting it for a new kind of effect.
+Calibration so far: over 485 effects both games share (same set / emitter names in 12 fighters' banks),
+velocity, gravity, air resistance and life are the same numbers (median ratio 1.000): no unit change.
+Emitter animations (EA**) and eft2's rotation order (Rx Ry Rz) and world gravity are modelled; with them
+the down smash's columns parted and the converter's two bugs showed (catalogue). Still open: the dash's
+droplets fly higher in both columns than in Ultimate's footage.
 
 ## Bug catalogue
 
@@ -144,6 +149,8 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | variants inserted before the common effects: their ids moved under the translated scripts | Squirtle v6 build | `--variants-last` |
 | an emitter with a fractional rate emitted once: a particle buffer of 0 | Ultimate's sys_piyo | converter: one particle |
 | hurtboxes on the port's own joints (table 1) | Squirtle's tail | ultimate_vl_shapes.py: 1000 + k |
+| an emitter turning while it emits, converted at its keys only: another path between them | Squirtle's down smash (the water stood up) | converter: every frame between keys (found with fx_render.py) |
+| eft2's world gravity not set on eft's emitters: gravity turned with the emitter | Squirtle's down smash | converter writes ptcl `world_gravity` (0x2F8, cross_f 0x04A62620) |
 | a copied article keeps its base's native per-frame code: Squirtle's water bounced like Mario's fireball and died at close range | Squirtle v2-v5, Supamario's Kamehameha | `"nop2"` in the record (port_bases.json `weapon_nop2`) [W1] |
 | base counters / native per-frame code acting on the port | Hero fixes 19, 62 | `reference/port_bases.json` traps |
 | articles after the base's special entry never spawned | Hero fix 15 | weapon_expand.py |

@@ -270,3 +270,12 @@ is the game's: strength to tune in game. Ids unchanged from v6 (`--variants-last
   pale water sheets stand upright (`ripple1`, `waterline*`, directional meshes with a -50 degree Z turn
   the converter drops: "rotation about disabled axes dropped", a rule from Hero's Woosh); a flat white
   quad at the dash's start (`waterline3`, a stripe quad).
+
+## v6 effects test (`build/squirtle_v6_effects_test.zip`, the effect bank only)
+
+Found with tools/fx_render.py against the user's Ultimate clips: down smash's water emitters turn while
+they emit (EAER), and the converter turned eft2's angles into eft's at the keys only, so between keys
+(eft blending eft's angles) the emitter took another path (up to 0.41 off at frame 4); and the emitters'
+world gravity (eft2 emission `world_gravity`, eft byte 0x2F8) wasn't set, so gravity turned with them.
+Both fixed in vfxb_to_ptcl.py (rotation keys every frame, angles unwrapped; `world_gravity` written).
+Includes the refraction test. Open: the dash's droplets (both columns agree, Ultimate's footage is lower).

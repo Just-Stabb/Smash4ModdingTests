@@ -75,6 +75,10 @@ FIELDS = [
     (0x2DC, '>i', 'primitive_index', 'runtime'),  # -1 none; else into the primitive table
     (0x2EC, '>I', 'shader_param_size', 'runtime'),
     (0x2F0, '>I', 'shader_param_pos', 'runtime'),  # into the shader parameter table
+    # gravity in world space: the emitter calc (cross_f 0x04A62620) turns the gravity vector into the
+    # particle's frame first when set (eft2's emission world_gravity); 0 adds it to the local velocity, so
+    # it turns with the emitter (vanilla: 825 emitters 1, 7290 0)
+    (0x2F8, '>B', 'world_gravity', 'verified'),
     (0x2FF, '>B', 'one_time', 'runtime'),         # 1: emits from start_frame for end_frame frames (vanilla: 1 <=> finite end)
     (0x30C, '>I', 'enum_30c', 'corpus'),          # 0x30C-0x33C: small enums, shader-keyed (see doc)
     (0x31C, '>I', 'enum_31c', 'corpus'),
