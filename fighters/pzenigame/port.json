@@ -1,0 +1,125 @@
+{
+ "_comment": "tools/ultimate_port.py; fields: docs/ultimate-port-guide.md \"port.json\"",
+ "ult": "pzenigame",
+ "kind": "0x46",
+ "base": "mario",
+ "ui_name": "Squirtle",
+ "trait": "shooter",
+ "rolloff": {
+  "speed": 2.2,
+  "air_mult": 1.0
+ },
+ "costumes": [
+  "c00",
+  "c01",
+  "c02",
+  "c03",
+  "c04",
+  "c05",
+  "c06",
+  "c07"
+ ],
+ "model": {
+  "max_bones": 136,
+  "joints": [
+   "Tail1",
+   "Tail2"
+  ],
+  "have": null
+ },
+ "motions": {
+  "add": [
+   "D00SpecialNHold",
+   "D00SpecialNShot",
+   "D00SpecialAirNHold",
+   "D00SpecialAirNShot",
+   "D01SpecialSLoop",
+   "D01SpecialSEnd",
+   "D01SpecialAirSHit",
+   "D01SpecialAirSLoop",
+   "D01SpecialAirSEnd"
+  ]
+ },
+ "effects": {
+  "own": [
+   "pzenigame_atk_hi4",
+   "pzenigame_brake",
+   "pzenigame_dash",
+   "pzenigame_dash_atk",
+   "pzenigame_karanikomoru",
+   "pzenigame_karanikomoru_line",
+   "pzenigame_mizuteppo",
+   "pzenigame_mizuteppo_hit",
+   "pzenigame_mizuteppo_hold",
+   "pzenigame_mizuteppo_max",
+   "pzenigame_mizuteppo_shoot",
+   "pzenigame_mouth_water",
+   "pzenigame_run",
+   "pzenigame_takinobori",
+   "pzenigame_takinobori_end",
+   "pzenigame_takinobori_splash",
+   "pzenigame_takinobori_start",
+   "pzenigame_throw_b",
+   "pzenigame_water_attack",
+   "pzenigame_water_attack_spin",
+   "pzenigame_water_cutter",
+   "pzenigame_water_cutter_r",
+   "pzenigame_water_ripple",
+   "pzenigame_water_smash",
+   "pzenigame_water_smash_r",
+   "pzenigame_win"
+  ],
+  "common": [
+   "sys_action_smoke_h",
+   "sys_atk_smoke",
+   "sys_attack_arc",
+   "sys_attack_arc_c",
+   "sys_attack_arc_d",
+   "sys_attack_impact",
+   "sys_attack_line",
+   "sys_attack_speedline",
+   "sys_cliff_catch",
+   "sys_crown",
+   "sys_dash_smoke",
+   "sys_down_smoke",
+   "sys_erace_smoke",
+   "sys_h_smoke_a",
+   "sys_jump_aerial",
+   "sys_jump_smoke",
+   "sys_landing_smoke",
+   "sys_landing_smoke_s",
+   "sys_mball",
+   "sys_piyo",
+   "sys_piyopiyo",
+   "sys_run_smoke",
+   "sys_screw",
+   "sys_sleep",
+   "sys_smash_flash",
+   "sys_smash_flash_s",
+   "sys_spin_wind",
+   "sys_spin_wind_s",
+   "sys_step_jump",
+   "sys_turn_smoke",
+   "sys_whirlwind_l",
+   "sys_whirlwind_r"
+  ],
+  "tint_for": {},
+  "hdr_white_for": [],
+  "bone_path": {}
+ },
+ "stats": {
+  "jump_scale": [
+   0.82,
+   0.9
+  ]
+ },
+ "portraits": {
+  "cross": "3.71,790.8,24.6",
+  "stock_icon": true
+ },
+ "specials": {
+  "msc": "pzenigame.c",
+  "acmd": "specials_acmd.json",
+  "build": "tools/pzenigame_build.py"
+ }
+}

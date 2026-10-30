@@ -97,6 +97,11 @@ REGIONS = ['NONE', 'HEAD', 'BODY', 'HIP', 'PUNCH', 'ELBOW', 'KICK', 'KNEE', 'THR
 REGION = {'ATTACK_REGION_' + r: i for i, r in enumerate(REGIONS)}
 FACING = {'ATTACK_LR_CHECK_F': 3, 'ATTACK_LR_CHECK_B': 4, 'ATTACK_LR_CHECK_POS': 0, 'ATTACK_LR_CHECK_SPEED': 0,
           'ATTACK_LR_CHECK_LR': 3}
+# Ultimate's special angles past Smash 4's: 367 (to the hitbox's centre, with the attacker's motion) and
+# 368 (to a set point) don't exist in Smash 4, whose last is 366 (to the hitbox's centre: Supamario's
+# Kamehameha holds targets with it). As they were, the multi-hits let go (Squirtle's Waterfall, 367)
+ANGLE = {367: 366, 368: 366}
+
 SETOFF = {'ATTACK_SETOFF_KIND_ON': (1, 1), 'ATTACK_SETOFF_KIND_OFF': (1, 0), 'ATTACK_SETOFF_KIND_THRU': (0, 0)}
 SITUATION = {'COLLISION_SITUATION_MASK_G': 1, 'COLLISION_SITUATION_MASK_A': 2, 'COLLISION_SITUATION_MASK_GA': 3}
 CATEGORY = {'COLLISION_CATEGORY_MASK_ALL': 0x3F, 'COLLISION_CATEGORY_MASK_NO_STAGE_GIMMICK': 0x1F,
@@ -478,6 +483,16 @@ class Translator:
             # made with the ID, in this script so far) as its Extra_ form, HitstunMul = -frames (tools/
             # acmd_ext_cave.py: a negative one adds frames)
             return self.add_reaction(int(a[1]), float(a[2]))
+        if name == 'AttackModule::set_catch_only_all':
+            # throws: the hitbox hits only the held fighter and keeps the grab. Smash 4's vanilla throw
+            # hitboxes on the victim say so with NoGrabRelease 1 (Pikachu's ThrowF); with 0 the hit freed
+            # Squirtle's thrown opponent before Throw_Applier (his throws "released" them)
+            if a[1]:
+                for c in self.made:
+                    syn = c.info.get('syntax', [])
+                    if 'NoGrabRelease' in syn:
+                        c.params[syn.index('NoGrabRelease')] = 1
+            return []
         if name == 'AttackModule::clear_all':
             return [cmd('Remove_All_Hitboxes')]
         if name == 'AttackModule::clear':
@@ -528,7 +543,7 @@ class Translator:
         clang, rebound = SETOFF[setoff]
         if not isinstance(shield_dmg, (int, float)) or shield_dmg != shield_dmg:
             shield_dmg = 0              # f32::NAN (Kamikazee's blast): none
-        common = [int(hid), int(part), self.bone(bone), float(dmg), int(angle), int(kbg), int(fkb), int(bkb), float(size),
+        common = [int(hid), int(part), self.bone(bone), float(dmg), ANGLE.get(int(angle), int(angle)), int(kbg), int(fkb), int(bkb), float(size),
                   float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
                   rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0), SITUATION[situation],
                   1 if direct else 0, REGION.get(region, 0), CATEGORY.get(category, 0x3F), 0, 0xF, 0, 1,

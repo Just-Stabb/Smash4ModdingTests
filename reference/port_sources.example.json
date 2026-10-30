@@ -1,0 +1,31 @@
+{
+ "vanilla": "/path/to/van",
+ "labels": "/path/to/ref/param-labels/ParamLabels.csv",
+ "ult_common": [
+  "/path/to/fcommon/common"
+ ],
+ "ult_fighters": [
+  "/path/to/hero_dl",
+  "/path/to/edge_dl",
+  "/path/to/steve_dl",
+  "/path/to/gaogaen_dl"
+ ],
+ "dumps": [
+  "/path/to/ultdump/repo/smashline"
+ ],
+ "ult_effects": [
+  "/path/to/ufx2/fighter"
+ ],
+ "ult_sound": [
+  "/path/to/sfull/x/sound",
+  "/path/to/sqsnd/x/sound",
+  "/path/to/snd/sound"
+ ],
+ "ult_ui": [
+  "/path/to/ultui_dl/ui-SSBU.zip"
+ ],
+ "vbn": [
+  "/path/to/vbnscan/fighter"
+ ],
+ "_comment": "Copy to port_sources.json at the repository root (not committed) with this machine's paths: tools/port_sources.py"
+}

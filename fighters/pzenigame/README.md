@@ -185,3 +185,21 @@ appends to table 1 (Mario's HatN 1000, FaceN 1001; the tail 1002 / 1003; table 1
 per fighter and Robin's vanilla hitboxes use its SwordN, 1000). Rebuilt: every costume's
 `model.jtb` (nothing else in the model changes), the game script (`ultimate_acmd.joint_ids` reads
 both tables). Untested in game.
+
+## Port framework check (docs/ultimate-port-guide.md): v1-v5 as installed
+
+`tools/port_check.py pzenigame build/squirtle_v1.zip ... squirtle_v5.zip`, against the user's bug list:
+- F1 face: 58 motions where Mario's mouth keys hide every mouth slot (Mario's expression meshes carry his
+  mouth; Squirtle's mouths are his lower face): the hole / black face. Fix: drive the slots from Ultimate's
+  visibility tracks (needs his Ultimate motions again).
+- S4: Waterfall's angle 367 (Ultimate-only): it let go. Translator now writes 366.
+- S5: ThrowF / ThrowHi / ThrowLw hitboxes freed the held opponent (NoGrabRelease 0). Translator now sets it.
+- C4: Withdraw (`pz_s_move`) set energy 3's X to a positive speed whatever his facing: the right-side bias.
+- E1: 13 effect scripts turn his own effects on a bone (dash attack among them): no variants were made.
+- E3: 29 Smash 4 common effects stand in for Ultimate's in 113 scripts; 30 of his 32 `sys_*` map to
+  ef_common.eff sets (`ultimate_port.py effects pzenigame`).
+- S7: Mario's LandingAirLw landing hitbox and special slot 0x223 still Mario's.
+- Not found by a check: the water showing Mario's fireball (the fireball's native code: reference/port_bases.json
+  "mario"), the stock icon (portraits `--stock-icon`).
+- `fighters/pzenigame/port.json`: his settings for `tools/ultimate_port.py`. To rebuild: his Ultimate
+  `fighter/pzenigame` (model, motion, param) again (deleted for disk space).

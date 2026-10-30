@@ -21,3 +21,9 @@
   files (`.eff`) and `fighter/common/param/*.prc` (e.g. `effect.prc`'s run-time effect colours), and
   the ExeFS (`exefs/main.bin`, docs/ultimate-fighter-port.md) for behaviour the data doesn't hold.
   Note in the fighter's README where each value came from, and anything still approximated.
+- **Ultimate ports go through the framework** (`docs/ultimate-port-guide.md`): `tools/ultimate_port.py`
+  (init / plan / run, `fighters/NAME/port.json`), stats from `tools/ultimate_stats.py`, the base's traps in
+  `reference/port_bases.json`. Before sending any port package, run `tools/port_check.py NAME` over the
+  install as the user will have it (the full package, then every fix package after it, in order): no ERROR
+  goes out. A new bug found in game gets a check in `port_check.py` (or a default in the pipeline) and a
+  row in the guide's bug catalogue, so the next port can't repeat it.

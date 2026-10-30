@@ -419,6 +419,12 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
   number the first active frame the same way (Mario's jab: `FRAME 2`, active on frame 2).
 - Smash 4 has one script name per side tilt / smash (`attacks3`, `attacks4`; `attacks3hi` / `lw`
   are the angled tilts), not `attacks3s`.
+- Angles: Ultimate's 367 / 368 (to the hitbox's centre with the attacker's motion / to a set point) don't
+  exist in Smash 4 (its last is 366, to the hitbox's centre): written as 366 (`ANGLE`); as they were,
+  Squirtle's Waterfall and Hero's Swoosh let their targets go.
+- `AttackModule::set_catch_only_all` (throw hitboxes that hit only the held fighter) -> NoGrabRelease 1 on
+  the script's hitboxes, as Smash 4's own throw hitboxes (Pikachu's ThrowF); with 0 Squirtle's throws freed
+  the opponent before the release.
 - Cancel frames: Ultimate's `motion_list.bin` extra bytes {intangible start, end, cancel frame} are
   `fighter_param_vl` group 1 bytes 3 / 4 / 2 (Cloud's DownAttackU: 46 / 1 / 26 in both), so the
   moves end when Ultimate's do without cutting the animations.

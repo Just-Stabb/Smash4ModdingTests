@@ -1,0 +1,54 @@
+{
+ "_comment": "What each base fighter's own code and files do to an Ultimate port built on it, learned from the ports so far (docs/ultimate-port-guide.md). tools/ultimate_port.py reads it: 'profile' / 'vl_kind' for the converters, 'fighter_param' set on every port of the base, 'traps' printed by plan / check. Add to it whenever a base surprises us.",
+ "reflet": {
+  "fighter": "Robin (male costumes 0/2/4/6, female 1/3/5/7)", "profile": "reflet / reflet_f (by costume)", "vl_kind": "reflet",
+  "ports": ["brave"],
+  "fighter_param": {"264": "Ultimate attack100_type (Robin has a rapid jab: Hero fix v2)"},
+  "traps": [
+   "Native Thunder code plays Robin's orb (effect 0x032C0001-3, her real bank, loaded by base_effects_cave.py) on every article copied from her Thunder: tools/thunder_orb_cave.py (Hero fixes 22-24).",
+   "Her tome / Levin Sword use counters (ints 0x10000083, 0x1000008A, 0x10000086, 0x1000008C, float 0x2F) send the port into her discard status 0x8C: keep them full every frame (brave_keep_items, Hero fix 19).",
+   "Native per-frame code (0x02F635F0) counts ints 0x10000098-0x1000009C down by 1: don't keep flags there (Hero fix 62: the crit flag read 0 by the hit).",
+   "Her kind has no reflector group: tools/brave_reflect_cave.py (Hero's Bounce).",
+   "model.jtb table 1 (SwordN, FaceN) are bones her own code drives: they need bones of their own (Skeleton.add_joint_bones), not stand-ins (Hero fix 9: the head came off).",
+   "Her article list ends in a special entry (bit 31): new articles go before it (weapon_expand.py does; Hero fix 15).",
+   "Final / Result mouth slots are never shown in battle: usable for extra driven meshes (Hero's shields, fix 16)."
+  ]
+ },
+ "mario": {
+  "fighter": "Mario", "profile": "mario", "vl_kind": "mario",
+  "ports": ["pzenigame"],
+  "traps": [
+   "His face slots: expression meshes (Ouch, Talk, ...) include Mario's mouth, so his face pac hides every mouth during them. A port whose mouth meshes are part of its face skin shows a hole / black face: drive the face slots from Ultimate's own visibility tracks (port_check F1; Squirtle).",
+   "Hat / hair slots left empty keep his hat textures (0x4011xx0B / 0C) on empty triangles (port_check M5 warning only).",
+   "Articles copied from his fireball (weapon kind 0x?? via extra_kinds.json) run the fireball's native code: Squirtle's water still showed Mario's fireball (user, v5). Not traced yet: find the fireball's native effect / model play as Robin's Thunder orb was (thunder_orb_cave.py) and give other kinds none.",
+   "The fireball's native generate puts it at the thrower's joint 0x11 (LHandN): move it in the article's MSC (Squirtle's water.c).",
+   "His LandingAirLw has a landing hitbox: empty it when Ultimate's has none (Squirtle: port_check S7)."
+  ]
+ },
+ "pit": {
+  "fighter": "Pit", "profile": "pit", "vl_kind": "pit",
+  "ports": ["pickel"],
+  "fighter_param": {"268": "1 unless Ultimate's aerial_type is fly (Pit's multi-jump: Steve fix 10)"},
+  "traps": [
+   "pitpt1.pac drives 15 table-1 bones (wings, Orbitars, bow): own joints need fresh hashes (CRC32 of '<name>#jtb') or the port doesn't animate and crashes jumping (Steve fix 10).",
+   "Jump type 1 plays motion slots 0x1D / 0x1E, empty in Pit's table: point them at a jump animation in extra_kinds.json motions (Steve fix 13: T-pose).",
+   "Pit's walks / runs are root-only plus a layer (a01walk): profile layers (Steve fix 12)."
+  ]
+ },
+ "zelda": {
+  "fighter": "Zelda", "profile": "zelda", "vl_kind": "zelda",
+  "ports": ["edge"],
+  "traps": [
+   "One jab: Attack12 / 13 need motion slots of their own (motions --add, extra_kinds.json motions, fighter_param 263).",
+   "Swords / extra joints go to table 1 (--joints), never table 0 (Sephiroth test 20: hitboxes over the whole stage).",
+   "Statuses written for a port check the cancel frame themselves (CancelModule(0x2713)): Sephiroth's Flare waited for the animation's end (test 59)."
+  ]
+ },
+ "koopa": {
+  "fighter": "Bowser", "profile": "koopa", "vl_kind": "koopa",
+  "ports": ["gaogaen"],
+  "traps": [
+   "Part pacs koopapt1-3 / lhand / rhand are his own bones: keep them next to the new main.pac."
+  ]
+ }
+}

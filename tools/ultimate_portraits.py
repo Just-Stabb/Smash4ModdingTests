@@ -5,7 +5,7 @@ Smash 4 frames the base fighter's.
   python3 tools/ultimate_portraits.py --ult-ui ULT_UI --s4-chr S4_CHR --templates TEMPLATES
           --ult brave --ult-base reflet --ui-name Hero --s4-base Reflet --out OUT
           [--extra-out DIR] [--contact PNG] [--sets chr_00,chr_13,...] [--costumes 1-8] [--fits FITS.json]
-          [--cross SCALE,X,Y] [--stock-whole]
+          [--cross SCALE,X,Y] [--stock-whole] [--stock-icon]
           [--name-text TEXT]
 
 ULT_UI     Ultimate's ui folder, or a zip holding it (ui/replace[_patch]/chara/chara_N/chara_N_<name>_CC.bntx)
@@ -539,6 +539,7 @@ class Fighter:
     def __init__(self, ult, name, c, cache, log):
         self.name, self.c = name, c
         self.c3, self.c0, self.c4 = ult.chara(3, name, c), ult.chara(0, name, c), ult.chara(4, name, c)
+        self.c2 = ult.chara(2, name, c)         # Ultimate's stock icon (--stock-icon)
         if self.c3 is None or self.c0 is None:
             raise SystemExit('no chara_3 / chara_0 for %s c%02d' % (name, c))
         key = '%s_c%02d' % (name, c)
@@ -1185,6 +1186,8 @@ def main():
     ap.add_argument('--sets')
     ap.add_argument('--costumes', default='1-8')
     ap.add_argument('--fits')
+    ap.add_argument('--stock-icon', action='store_true', help="stock_90: Ultimate's own stock icon (chara_2), fitted "
+                    "into the base head's box (the default for ports: tools/ultimate_port.py)")
     ap.add_argument('--stock-whole', action='store_true', help="stock_90: the port's chara_4 whole, fitted into "
                     "the base head's box (where chara_4 isn't the head of chara_3's render)")
     ap.add_argument('--cross', help='SCALE,X,Y: C (the base\'s chara_0 c00 pixel -> its Smash 4 chr_90_01 pixel) '
@@ -1267,6 +1270,19 @@ def main():
             # stock: the face where the base's face is (the face frame, as everywhere), but small enough
             # that the head (chara_4's cut, down to the bottom of the face frame chara_0) stays inside the
             # base head's box (+3 px): Smash 4 fits each icon's head to the icon
+            if a.stock_icon and key.startswith(a.ult + '_') and f.c2 is not None:
+                # Ultimate's own stock icon (chara_2: the finished icon, outline and all), whole, its box
+                # fitted into the base head's box (+3 px), centred; no Smash 4 outline over its own.
+                # Squirtle's chara_4 cut (--stock-whole) was his select-screen art shrunk (user)
+                c2 = f.c2
+                x0, y0, x1, y1 = box_of(c2[..., 3])
+                ux0, uy0 = max(1.0, stock_box[0] - 3), max(1.0, stock_box[1] - 3)
+                ux1, uy1 = min(ref.w - 1.0, stock_box[2] + 3), min(ref.h - 1.0, stock_box[3] + 3)
+                sc = max((x1 - x0) / (ux1 - ux0), (y1 - y0) / (uy1 - uy0))
+                bx = (x0 + x1) / 2 - sc * (ux0 + ux1) / 2
+                by = (y0 + y1) / 2 - sc * (uy0 + uy1) / 2
+                log.append('%s_%02d (%s): chara_2 (Ultimate\'s stock icon), %.2f px a pixel' % (st, nn, key, sc))
+                return tone(warp(c2, sc, bx, sc, by, ref.w, ref.h))
             cut = head_cut(f, cache, key, log)
             if cut is None:
                 head = f.render(to3, ref.w, ref.h)
