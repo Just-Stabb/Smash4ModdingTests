@@ -94,6 +94,22 @@ over the 51 fighters both have:
   says x1: the default (user's call). Hero / Steve / Squirtle / Sephiroth were made at x0.82 / x0.9 and keep it
   in their port.json (`stats.jump_scale`).
 
+## Checking effects offline: tools/fx_render.py
+
+`python3 tools/fx_render.py NAME MOVE [MOVE ...] --build DIR --out OUT [--frames 0-40] [--every 4]`
+draws a move's effects as Ultimate's files describe them (its .eff, its effect script) beside the converted
+ones (the package's .ptcl / .efc, the translated effect.bin), a row per frame (side view of "top": forward
+right, 5-unit grid). Stage 1: the particles' motion, shape, type, mesh, scale / alpha / colour over life
+and their textures (first flipbook cell, a plain colour x texture combine: the converted side's colours
+are approximate, its textures being made for our own pixel programs). Stage 2 (to do): the converted
+particles through their real vertex / pixel programs (tools/latte_interp.py).
+
+It shows where the converter changed something (a dropped rotation, a lost texture, a wrong type). Where
+both columns agree but the game doesn't, our reading of an Ultimate field is wrong in both (Squirtle v6:
+the dash's droplets rise ~14 units in both columns, low behind his feet in Ultimate's footage; the down
+smash fans upward in both, flat along the ground in the footage): check the Ultimate column against
+Ultimate footage (the user's recordings, its grid) before trusting it for a new kind of effect.
+
 ## Bug catalogue
 
 Each row: the bug, where it happened, and what now stops it. `port_check` codes in brackets.
