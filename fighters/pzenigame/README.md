@@ -245,3 +245,28 @@ Mario's custom-move / item scripts; S7: `specialhi_c3`, a custom-move slot).
   Bowser / Falco use table-1 hurtbox bones too).
 - **Stock icons**: Ultimate's chara_2 (`--stock-icon`, `portraits.sets` stock_90 only).
 - Stats: Ultimate's (`ultimate_stats.py`), jumps x 0.82 / 0.9 as before.
+
+## v6 refraction test (`build/squirtle_v6_refraction_test.zip`, the effect bank only)
+
+User: can Smash 4 draw Ultimate's screen-warp layer? Smash 4 has a distortion pass (shader modes 5 / 6:
+Bayonetta's `ciecle1_rif` / `ring_rif1_f`, Shulk's `rifraction1` / `2`, Ryu's and Robin's Final Smash),
+whose vanilla pixel program writes `(colour 1 + (colour 0 - colour 1) x texture - 0.5) x alpha x
+CB4[0].x / (960, 540)` as the screen offset. Ultimate's refraction (combiner `shader_type` 1) offsets its
+screen read by `(d x 50 - 25) x coefficient` (d the texture's alpha, the static block's `coefficient`:
+c9 +0x100 / +0x104 in its pixel shader, tools/eft_shader_dis.py). The converter (`Templates.refraction`,
+`refraction_map`) now draws them on a vanilla mode-5 template with its own program: colour 0 white,
+colour 1 black, the map 0.5 + (d - 0.5) x coefficient / REFRACT_FULL (0.3) per axis, Ultimate's alpha
+fade, sampler 0 (Waterfall's `ef_cmn_indirect03`). Converted: the 7 mesh parts (dash, up smash, Waterfall
+start / rise, water attack, ripple; 0.15 -> map x 0.5, Waterfall 0.5 / 0.7 -> x 2.33); the 2 quads (run,
+Withdraw's line) still skipped (every vanilla distortion emitter is a mesh). CB4[0].x (the pass's scale)
+is the game's: strength to tune in game. Ids unchanged from v6 (`--variants-last`), so the bank ships alone.
+
+## In-game comparison (user's videos, v6 vs Ultimate): open
+
+- Smash attacks: up smash a wide low burst with blue haze (Ultimate: a narrow tall column); down smash
+  splashes upward (Ultimate: flat along the ground to both sides); forward smash bigger and more vertical;
+  a blue ring / glow on all three that Ultimate doesn't show.
+- Dash / run: white droplets (`splash1` / `parts1`) fly high above him (Ultimate: low, behind his feet);
+  pale water sheets stand upright (`ripple1`, `waterline*`, directional meshes with a -50 degree Z turn
+  the converter drops: "rotation about disabled axes dropped", a rule from Hero's Woosh); a flat white
+  quad at the dash's start (`waterline3`, a stripe quad).

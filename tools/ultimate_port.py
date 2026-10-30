@@ -329,8 +329,16 @@ def cmd_variants(a):
     eff_bin = os.path.join(fighter, 'script/animcmd/body/effect.bin')
     ids = os.path.join(ROOT, 'fighters', a.name, '%s_effects.json' % a.name)
     var = os.path.join(a.out, 'work', 'variants.json')
-    for argv in ([sys.executable, os.path.join(HERE, 'effect_variants.py'), 'scan', eff_bin, ids, var],
-                 steps['effects'] + ['--variants', var],
+    # the scan finds no turned effect in scripts already pointed at their variants (a second run): the
+    # variants found before are kept, so the step can run again without the bank losing them
+    old = json.load(open(var)) if os.path.exists(var) else []
+    if subprocess.run([sys.executable, os.path.join(HERE, 'effect_variants.py'), 'scan', eff_bin, ids, var],
+                      cwd=ROOT).returncode:
+        sys.exit('variants: the scan failed')
+    found = json.load(open(var))
+    keys = {(v['effect'], tuple(v['rot'])) for v in found}
+    json.dump(found + [v for v in old if (v['effect'], tuple(v['rot'])) not in keys], open(var, 'w'), indent=1)
+    for argv in (steps['effects'] + ['--variants', var],
                  [sys.executable, os.path.join(HERE, 'effect_variants.py'), 'apply', eff_bin, ids, eff_bin]):
         print('-- ' + ' '.join(shlex.quote(x) for x in argv), flush=True)
         if subprocess.run(argv, cwd=ROOT).returncode:

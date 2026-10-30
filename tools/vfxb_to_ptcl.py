@@ -242,6 +242,12 @@ SCREEN_SAMPLERS = (b'frameBufferTexture_CROSS', b'depthBufferTexture_CROSS', b't
 # Never templates: an own pixel program's colour there bends the picture behind instead (fix 33's
 # Frizz / Zap charge flare1, a see-through lens at the hand; fix 32's sword light and explosions)
 PASS_MODES = (5, 6, 7)
+# the distortion-pass modes refraction parts are drawn with (Templates.refraction), and the Ultimate
+# refraction coefficient whose map spans the whole 0 - 1 (a vanilla ripple's bend: refraction_map).
+# Squirtle's water parts are 0.15, Waterfall's 0.5 / 0.7; to tune in game (Squirtle's refraction test)
+REFRACT_MODES = (5, 6)
+REFRACTION = True          # --no-refraction: skip them, as before
+REFRACT_FULL = 0.3
 # vertex programs lighting their particles (smoke's: colour x max(normal . light, 0) x the light's
 # colour + ambient, from the game's userUniformBlockParam, CB4; 245 vanilla emitters, all shader mode
 # 4): never templates. Ultimate's parts aren't lit so: Frizz's / Kafrizz's flames on smoke templates
@@ -301,6 +307,10 @@ class Templates:
                         if not any(struct.unpack_from('>4I', c, 0x2DC)):
                             self.children.setdefault((struct.unpack_from('>I', c, 0x3C)[0],
                                                       struct.unpack_from('>I', c, 0x44)[0]), c)
+        # distortion-pass templates (shader mode REFRACT_MODES, a mesh each: every vanilla one is), only for
+        # Ultimate's refraction parts (Templates.refraction): [(path, set, emitter, mode, particle type,
+        # UV animation bits, second texture)]
+        self.refract = []
         for path in [None] + list(corpus):
             p = base if path is None else self.files[path]
             screen = {}
@@ -326,6 +336,10 @@ class Templates:
                                        or hdr is not None and any(n == LIT_BLOCK for n, _cb, _s in hdr['blocks']),
                                        ROTATION_ATTR in b, VELOCITY_ATTR in b, eft_vertex.features(bytes(b)))
                     if screen[si_][0]:
+                        mode_ = struct.unpack_from('>I', p.shader_entry(si_), 0)[0] & 0xFF
+                        if mode_ in REFRACT_MODES and p.field(em, 'primitive_index') >= 0:
+                            self.refract.append((path, si, k, mode_, p.field(em, 'particle_type'),
+                                                 screen[si_][3]['uv'][0], two))
                         continue
                     # 0 no own program, 1 one without colour 1, 2 with it
                     lay = eft_pixel.layout(bytes(p.shader_binary(si_))) if EXACT else None
@@ -463,6 +477,49 @@ class Templates:
                     struct.pack_into('>I', em, o, 1)
             return em, turns, swapped
         raise KeyError((typ, blend, mesh))
+
+
+    def refraction(self, typ, uv_mode, notes):
+        """a distortion-pass template for an Ultimate refraction part (a mesh): mode 5 first (the
+        refraction parts': Bayonetta's ciecle1_rif / ring_rif1_f, Shulk's rifraction1 / 2), its particle
+        type, its UV animation, one texture. Returns the emitter's bytes, its vanilla pixel program kept:
+        offset = (colour 1 + (colour 0 - colour 1) x texture - 0.5) x alpha x CB4[0].x / (960, 540)"""
+        if not self.refract:
+            raise KeyError('no distortion-pass template in the corpus')
+        path, si, k, mode, ptype, uv, two = max(self.refract, key=lambda r: (
+            r[3] == 5, r[4] == typ, r[5] & uv_mode == uv_mode, not r[6], r[0] is None))
+        if ptype != typ:
+            notes.append('refraction template type %d for %d' % (ptype, typ))
+        if uv & uv_mode != uv_mode:
+            notes.append('UV animation %d: refraction template has %d' % (uv_mode, uv))
+        if path is None:
+            em = self.base.emitter_bytes(si, k)
+            struct.pack_into('>II', em, 0x2CC, 0, 0)
+        else:
+            em = self.base.import_emitter(self.files[path], si, k, skip_slots=(0, 1))
+        for o in KEY_HOOKS:
+            if struct.unpack_from('>I', em, o)[0] == 2:
+                struct.pack_into('>I', em, o, 1)
+        return em, two
+
+
+def refraction_map(e, img, notes):
+    """Ultimate's refraction amount (the texture's alpha, d: its shader offsets the screen read by
+    (d x 50 - 25) x coefficient, c9 +0x100 / +0x104 = the static block's `coefficient`) as a Smash 4
+    distortion map: rgb 0.5 + (d - 0.5) x coefficient / REFRACT_FULL per axis (mid grey bends nothing;
+    the bend in the map, so parts keep Ultimate's ratios: a low-contrast map with a big coefficient,
+    Waterfall's, bends as much as Ultimate's does against the dash's; scaled down to fit when it would
+    clip), and the alpha factor (1: the alpha is Ultimate's fade)"""
+    cx, cy = (abs(float(v)) for v in e['static']['coefficient'][:2])
+    d = np.asarray(img, np.float32)[..., 3] / 255.0
+    dev = float(np.abs(d - 0.5).max()) or 1.0
+    # a map that would go past 0 / 1 is scaled down to fit (none of Squirtle's)
+    k = max(cx, cy) / REFRACT_FULL
+    fit = min(1.0, 0.5 / (dev * k)) if k > 0 else 1.0
+    pix = np.stack([0.5 + (d - 0.5) * cx / REFRACT_FULL * fit, 0.5 + (d - 0.5) * cy / REFRACT_FULL * fit,
+                    np.full_like(d, 0.5), np.ones_like(d)], -1)
+    notes.append('refraction: distortion pass (coefficient %g %g, map x %.2f)' % (cx, cy, k * fit))
+    return pix, 1.0
 
 
 def face_normals(pos, idx):
@@ -1390,11 +1447,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # F-smash's impact2_frontL, a solid yellow zigzag over the ground spikes in fix 27
         notes.append('not drawn in Ultimate (is_particle_draw 0): skipped')
         return None
-    if e['combiner']['shader_type'] == 1:
-        # a refraction piece (it bends the picture behind it: back throw's indirect1, the entry's
-        # rifrection1): no template reads the screen (SCREEN_SAMPLERS), and drawn plain its
-        # normal-map texture is a tinted blob
-        notes.append('refraction: skipped')
+    # a refraction piece (it bends the picture behind it: Squirtle's water, Hero's back throw indirect1):
+    # drawn by a vanilla distortion-pass template (Templates.refraction), its own program kept, a
+    # mesh's only (every vanilla one is a mesh); drawn plain, its map was a tinted blob
+    refract = e['combiner']['shader_type'] == 1
+    if refract and (as_child or pt['primitive_id'] == NONE64 or not REFRACTION):
+        notes.append('refraction: skipped' + (' (a quad: no vanilla distortion quad)' if REFRACTION else ''))
         return None
     typ = TYPES.get(pt['billboard_type'])
     if typ is None:
@@ -1435,7 +1493,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
     ti, smp = main_texture(e, names)
     fill = 1.0
-    if smp:
+    if refract:
+        # the distortion map is sampler 0 (an indirect one, which main_texture passes over: Waterfall's
+        # ef_cmn_indirect03 beside a gradient)
+        ti, smp = 0, e['sampler'][0]
+    elif smp:
         ti, fill = shape_sampler(e, ti, images, notes, names)
         smp = e['sampler'][ti]
     ts = e['static']['tex_scroll'][ti] if smp else None
@@ -1511,19 +1573,27 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         and s['texture_id'] in images and not is_indirect(e, j, names)]
     if live3:
         live, swap_ok = live3[0], False
+    if refract:
+        dis = live = warp = live3 = None
+        swap_ok = dis_moving = False
     fblocks, fanims, fdone = particle_fields(e) if not as_child else ({}, [], set())
     fluct = fluctuation(e) if not as_child else None
     child, child_e = None, (e['children'] or [None])[0] if not as_child else None
-    em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
-                                       notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
-                                       live is not None,
-                                       uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
-                                       (2 if c0_flat else 1) if dis_moving else 0, live3 is not None,
-                                       bool(fblocks) or as_child or child_e is not None, fluct is not None)
+    if refract:
+        em, refract_two = templates.refraction(typ, uv_mode(ts), notes)
+        turns, swapped = False, False
+    else:
+        em, turns, swapped = templates.get(typ, BLEND[blend], is_mesh, uv_mode(ts), e['info']['follow_type'], ptn_want, rot,
+                                           notes, anim, e['combiner']['color_process'] in (2, 3) or dis is not None,
+                                           live is not None,
+                                           uv_mode(e['static']['tex_scroll'][live]) if live is not None else 0, swap_ok,
+                                           (2 if c0_flat else 1) if dis_moving else 0, live3 is not None,
+                                           bool(fblocks) or as_child or child_e is not None, fluct is not None)
     if swapped:
         ti, live = live, ti
         smp, ts, tp = e['sampler'][ti], e['static']['tex_scroll'][ti], e['static']['tex_pat'][ti]
-    lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) if EXACT else None
+    lay_t = eft_pixel.layout(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0]))) \
+        if EXACT and not refract else None
     live2 = None
     if live3 and lay_t is not None and 'uv1' not in lay_t and \
             three_graftable(bytes(p.shader_binary(struct.unpack_from('>I', em, 0x844)[0])), lay_t):
@@ -1544,7 +1614,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             struct.pack_into('>I', em, 0x844, si2)
             lay_t = eft_pixel.layout(bytes(p.shader_binary(si2)))
             notes.append('vertex program grafted: slot 1 UV animation')
-    if is_mesh and rot == ROT_ANIMATED and not turns and GRAFT and not templates.no_graft:
+    if is_mesh and rot == ROT_ANIMATED and not turns and GRAFT and not templates.no_graft and not refract:
         # a mesh's spin (or random starting turn) its template can't draw: its vertex program
         # grafted to turn the mesh (Zap's impact2 stripes, each turned at random about Z in
         # Ultimate, all lay one way on Pikachu's template)
@@ -1679,9 +1749,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         live2 = None
     if live != 0:
         warp = None
-    exact = exact_combiner(p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
-                           dis[0] if dis is not None else None, dis_in == 0,
-                           tex_blend(e, ti, live2) if live2 is not None else (0, 0), warp)
+    exact = None if refract else exact_combiner(
+        p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
+        dis[0] if dis is not None else None, dis_in == 0, tex_blend(e, ti, live2) if live2 is not None else (0, 0), warp)
     if not exact:
         live = live2 = dis = warp = None
     if exact:
@@ -1751,6 +1821,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                       comp_sel=None if mask_only else SHAPE_SEL)
         if mask_only:
             notes.append('template reads the texture alpha as a mask: its channel selectors kept')
+    if refract:
+        rmap, rstrength = refraction_map(e, img, notes)
+        p.set_texture(em, 0, (np.clip(fit_texture(rmap, TEX_MAX), 0, 1) * 255 + 0.5).astype(np.uint8), 0x1A,
+                      comp_sel=RGBA_SEL)
+        if refract_two:
+            # its second texture multiplies the first: white
+            p.set_texture(em, 1, np.full((8, 8, 4), 255, np.uint8), 0x1A, comp_sel=RGBA_SEL)
     if smp:
         set_wrap(em, 0, *((smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])))
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
@@ -1764,6 +1841,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
 
     # ---- blend, colour, alpha
     col = e['color']     # (st: the static block, its rotation masked above)
+    template_blend = p.field(em, 'blend_type')
     p.set_field(em, 'blend_type', BLEND[blend])
     if is_mesh:
         # the faces Ultimate draws (0 both, 1 front, 2 back), not the template's: Kaswoosh's funnel has
@@ -1826,6 +1904,16 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                 hdr_scale(p, em, written_scale(e), notes))
     if display_space(e):
         notes.append('colours display-encoded (linear -> sRGB)')
+    if refract:
+        # the map is the colour (colour 0 white, colour 1 black: colour = texture), the template's blend,
+        # the bend's strength in the alpha
+        p.set_field(em, 'color0_type', 0)
+        p.set_field(em, 'color1_type', 0)
+        p.set_color_keys(em, 0, [(1.0, 1.0, 1.0, 1.0)])
+        p.set_color_keys(em, 1, [(0.0, 0.0, 0.0, 1.0)])
+        p.set_field(em, 'color_scale', 1.0)
+        p.set_field(em, 'blend_type', template_blend)
+        alpha = np.clip(a_track * rstrength, 0, 1)
     a0, a1, a2, s1, s2 = (float(np.squeeze(v)) for v in three_key(alpha))
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
@@ -2380,6 +2468,8 @@ def main():
                     "the base fighter's game code plays on its own that the new one hasn't (Robin's Thunder "
                     "orbs on Hero's Thunder-based articles)")
     ap.add_argument('--no-two', action='store_true', help='no two-texture templates: every emitter draws one texture')
+    ap.add_argument('--no-refraction', action='store_true', help='skip Ultimate\'s refraction parts (before '
+                    'Squirtle\'s refraction test: they were never drawn)')
     ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
     ap.add_argument('--keep-follow', action='store_true', help="keep each template's follow type (not Ultimate's)")
     ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
@@ -2423,10 +2513,11 @@ def main():
     ap.add_argument('--no-linear', action='store_true', help="Ultimate's linear colours as they are (not "
                     "display-encoded: LINEAR_DISPLAY)")
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT, LINEAR_DISPLAY
+    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT, LINEAR_DISPLAY, REFRACTION
     LINEAR_DISPLAY = not a.no_linear
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
+    REFRACTION = not a.no_refraction
     DISSOLVE = not a.no_dissolve
     WRITE_FOLLOW = not a.keep_follow
     GRAFT = not a.no_graft
