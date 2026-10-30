@@ -225,7 +225,7 @@
         "0x220": {"anim": "FitMarioBodyMainD01SpecialAirSHit", "flags": "0x0", "motion": "specialairshit"}
       },
       "weapons": {
-        "water": {"kind": "0x198", "base": "fireball", "max": 6, "on_hit": 1}
+        "water": {"kind": "0x198", "base": "fireball", "max": 6, "on_hit": 1, "nop2": ["0x1C", "0x3C"]}
       }
     }
   ],

@@ -17,10 +17,11 @@
  "mario": {
   "fighter": "Mario", "profile": "mario", "vl_kind": "mario",
   "ports": ["pzenigame"],
+  "weapon_nop2": {"fireball": ["0x1C", "0x3C"]},
   "traps": [
    "His face slots: expression meshes (Ouch, Talk, ...) include Mario's mouth, so his face pac hides every mouth during them. A port whose mouth meshes are part of its face skin shows a hole / black face: drive the face slots from Ultimate's own visibility tracks (port_check F1; Squirtle).",
    "Hat / hair slots left empty keep his hat textures (0x4011xx0B / 0C) on empty triangles (port_check M5 warning only).",
-   "Articles copied from his fireball (weapon kind 0x?? via extra_kinds.json) run the fireball's native code: Squirtle's water still showed Mario's fireball (user, v5). Not traced yet: find the fireball's native effect / model play as Robin's Thunder orb was (thunder_orb_cave.py) and give other kinds none.",
+   "Articles copied from his fireball run the fireball's native per-frame code (its vtable 2: +0x1C counts its life down, +0x3C removes it at life 0, bounces it on the ground and at a wall plays his puff 0x3030002): a new article's MSC moves it, so its record needs \"nop2\": [\"0x1C\", \"0x3C\"] (weapon_nop2 below; port_check W1). Squirtle v2-v5's water had none: it bounced like a fireball and died at close range (user: 'Mario's fireball with a windbox at close range'); Supamario's Kamehameha test 15.",
    "The fireball's native generate puts it at the thrower's joint 0x11 (LHandN): move it in the article's MSC (Squirtle's water.c).",
    "His LandingAirLw has a landing hitbox: empty it when Ultimate's has none (Squirtle: port_check S7)."
   ]

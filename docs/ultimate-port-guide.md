@@ -105,7 +105,8 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | turned effects on bones flip for one facing | Sephiroth t49, Squirtle's dash attack | `--variants` in the plan [E1] |
 | Smash 4 common effects standing in for Ultimate's | Squirtle (all), Hero's up air (fix 63-70) | plan converts `sys_*` from ef_common.eff [E3] |
 | washed out / dark / purple effects | Hero fixes 21-52 | converter (own pixel programs, linear -> display, no HDR purple) |
-| base native code playing its effects on copied articles | Hero (Robin's Thunder orb), Squirtle (Mario's fireball) | `reference/port_bases.json` traps; per base cave (thunder_orb_cave.py) |
+| base native code playing its effects on copied articles | Hero (Robin's Thunder orb) | `reference/port_bases.json` traps; per base cave (thunder_orb_cave.py) |
+| a copied article keeps its base's native per-frame code: Squirtle's water bounced like Mario's fireball and died at close range | Squirtle v2-v5, Supamario's Kamehameha | `"nop2"` in the record (port_bases.json `weapon_nop2`) [W1] |
 | base counters / native per-frame code acting on the port | Hero fixes 19, 62 | `reference/port_bases.json` traps |
 | articles after the base's special entry never spawned | Hero fix 15 | weapon_expand.py |
 | caves overlapping | Hero v4b | cave tests with `--others` |
@@ -115,5 +116,4 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 
 ## Open
 
-- Mario's fireball native code (Squirtle's water): find what it plays, as Robin's Thunder orb was.
 - Statuses written by hand still need the status code for accuracy (Withdraw's speeds): ssbu-recomp.

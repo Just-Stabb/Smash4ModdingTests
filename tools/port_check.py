@@ -567,6 +567,22 @@ def check_repo(name, kind, rep):
         rep.add('WARN', 'K2 readme', 'no fighters/%s/README.md (sources of every value: CLAUDE.md)' % name)
 
 
+def check_weapons(name, rec, rep):
+    """W1: a brand-new article copied from a base article with native per-frame code (port_bases.json
+    weapon_nop2: Mario's fireball's life / bounce / wall puff) keeps that code unless its record turns
+    those vtable 2 slots off (Squirtle v2-v5's water: a fireball's bounce, gone at close range)"""
+    bases = json.load(open(os.path.join(ROOT, 'reference/port_bases.json')))
+    want = bases.get(rec['base'], {}).get('weapon_nop2', {})
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or w.get('base') not in want:
+            continue
+        have = {int(x, 0) for x in w.get('nop2', [])}
+        miss = [x for x in want[w['base']] if int(x, 0) not in have]
+        if miss:
+            rep.add('ERROR', 'W1 weapon-native', '%s (copy of %s): its base\'s native vtable 2 slots %s still run '
+                    '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
+
+
 def check_assets(inst, name, base, rep):
     ui = (base.get('ui') or {}).get('name') or base.get('cap') or name.capitalize()
     for s in ('chr_00', 'chr_11', 'chr_12', 'chr_13', 'stock_90'):
@@ -609,6 +625,7 @@ def main():
     check_vl(inst, a.name, base, motion_list, rep)
     check_msc(inst, a.name, rep)
     check_repo(a.name, kind, rep)
+    check_weapons(a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
