@@ -10,6 +10,7 @@ with every rule the ports so far learned the hard way applied by default.
   python3 tools/ultimate_port.py stats NAME FIGHTER_PARAM_BIN OUT_BIN
   python3 tools/ultimate_port.py plan NAME [--out DIR] every step's command, in order, with its inputs
   python3 tools/ultimate_port.py run NAME STEP [STEP ...] [--out DIR]   run steps of the plan
+  python3 tools/ultimate_port.py variants NAME [--out DIR]               (the plan's 'variants' step)
   python3 tools/ultimate_port.py check NAME PKG [PKG ...]               tools/port_check.py
 
 Sources (Ultimate's files, the vanilla game): port_sources.json (tools/port_sources.py). Per fighter:
@@ -233,10 +234,10 @@ def plan(name, out):
         extra = ['--extra-eff', common_eff] + pairs if pairs else []
     tint = [x for k, v in e.get('tint_for', {}).items() for x in ('--tint-for', '%s=%s' % (k, v))]
     hdr = ['--hdr-white-for', ','.join(e['hdr_white_for'])] if e.get('hdr_white_for') else []
-    steps.append(('effects', 'his effect bank: his own sets, Ultimate\'s common ones, turned variants',
+    steps.append(('effects', 'his effect bank: his own sets, Ultimate\'s common ones (variants: after the scripts)',
                   [py, t('vfxb_to_ptcl.py'), eff, os.path.join(base_dir, 'effect', base), fx, kind, ids, *e.get('own', []),
                    '--prefix', 'Ptc' + name.capitalize(), '--templates', src.get('vanilla', '?') + '/fighter/*/effect/*/*.ptcl',
-                   '--variants', os.path.join(work, 'variants.json'), *extra, *tint, *hdr]))
+                   *extra, *tint, *hdr]))
     steps.append(('scripts', 'Ultimate\'s scripts into the base\'s slots (game / effect / sound / expression, vl frames)',
                   [py, t('ultimate_acmd.py'), os.path.join(dump, ult), os.path.join(body, 'game.bin'),
                    os.path.join(fighter, 'script/animcmd/body/game.bin'), os.path.join(fighter, 'model/body/c00'),
@@ -248,6 +249,10 @@ def plan(name, out):
                    '--effects', 'reference/ultimate_sys_effects.json,' + ids, os.path.join(U, 'model/body/c00/model.nusktb')]
                   + (['--translate', os.path.join('fighters', name, e2)] if (e2 := cfg.get('specials', {}).get('acmd'))
                      and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])))
+    # the turned effects are only known once the scripts are translated: scan them, rebuild the bank with
+    # the variants, point the scripts at them (the effects step alone has none: Squirtle's dash attack)
+    steps.append(('variants', 'turned effects on bones: scan the translated effect.bin, rebuild the bank with variants, apply',
+                  [py, t('ultimate_port.py'), 'variants', name, '--out', out]))
     steps.append(('shapes', 'hurtboxes, ECB, ledge box from Ultimate\'s vl.prc',
                   [py, t('ultimate_vl_shapes.py'), os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name),
                    os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name), os.path.join(U, 'param/vl.prc'),
@@ -299,6 +304,21 @@ def cmd_run(a):
         r = subprocess.run(argv, cwd=ROOT)
         if r.returncode:
             sys.exit('%s failed (%d)' % (s, r.returncode))
+
+
+def cmd_variants(a):
+    """effect_variants.py scan -> the effects step again with --variants -> apply, on the translated effect.bin"""
+    steps = {s: argv for s, _d, argv in plan(a.name, a.out)}
+    fighter = os.path.join(a.out, a.name, 'fighter', a.name)
+    eff_bin = os.path.join(fighter, 'script/animcmd/body/effect.bin')
+    ids = os.path.join(ROOT, 'fighters', a.name, '%s_effects.json' % a.name)
+    var = os.path.join(a.out, 'work', 'variants.json')
+    for argv in ([sys.executable, os.path.join(HERE, 'effect_variants.py'), 'scan', eff_bin, ids, var],
+                 steps['effects'] + ['--variants', var],
+                 [sys.executable, os.path.join(HERE, 'effect_variants.py'), 'apply', eff_bin, ids, eff_bin]):
+        print('-- ' + ' '.join(shlex.quote(x) for x in argv), flush=True)
+        if subprocess.run(argv, cwd=ROOT).returncode:
+            sys.exit('variants: %s failed' % os.path.basename(argv[1]))
 
 
 def cmd_unpack_body(a):
@@ -356,6 +376,10 @@ def main():
             p.add_argument('steps', nargs='+')
         p.add_argument('--out', default=os.path.join(ROOT, 'build', 'port'))
         p.set_defaults(fn=fn)
+    p = sub.add_parser('variants')
+    p.add_argument('name')
+    p.add_argument('--out', default=os.path.join(ROOT, 'build', 'port'))
+    p.set_defaults(fn=cmd_variants)
     p = sub.add_parser('unpack-body')
     p.add_argument('name')
     p.add_argument('dest')

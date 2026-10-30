@@ -1148,6 +1148,24 @@ MARIO_SLOTS = [
     ('Mario_Hair_VIS_O_OBJ', []),
     ('Gamemodel', ['GamemodelShape']),
 ]
+# Squirtle's mouths, driven per frame by Ultimate's own visibility tracks (profile "drive"): Mario's face pac
+# keys his ten mouth slots by Mario's expressions, and where Mario's expression meshes carry his mouth it
+# hides them all: Squirtle's mouths are his lower face, so those frames showed a hole (the black face,
+# port_check F1, 58 motions). Each frame the slot of the mouth Ultimate shows is on, the rest off; a mouth
+# with no slot of its own (Capture / Cliff) shows the closed one; TalkMHalf repeats FaceNMHalf: always off
+MARIO_MOUTHS = {
+    'Mario_FaceNMClose_VIS_O_OBJ': ['pzenigame_FaceN_Mouth', 'pzenigame_Capture_Mouth', 'pzenigame_Cliff_Mouth',
+                                    'pzenigame_Cliff_MouthFLIP'],
+    'Mario_FaceNMHalf_VIS_O_OBJ': ['pzenigame_PatternB_Mouth'],
+    'Mario_FaceNMOpen_VIS_O_OBJ': ['pzenigame_VoiceB_Mouth'],
+    'Mario_OuchMOpen_VIS_O_OBJ': ['pzenigame_HeavyHit_Mouth'],
+    'Mario_OuchMHalf_VIS_O_OBJ': ['pzenigame_Ottoto_Mouth'],
+    'Mario_OuchMClose_VIS_O_OBJ': ['pzenigame_PatternA_Mouth'],
+    'Mario_TalkMOpen_VIS_O_OBJ': ['pzenigame_Heavyattack_Mouth'],
+    'Mario_TalkMHalf_VIS_O_OBJ': [],
+    'Mario_TalkMClose_VIS_O_OBJ': ['pzenigame_Talk_Mouth'],
+    'Mario_Result_VIS_O_OBJ': ['pzenigame_Catch_Mouth'],
+}
 # Mario's specials -> Squirtle's: Fireball -> Water Gun (its shot), Cape -> Withdraw (its start), Super Jump
 # Punch -> Waterfall, F.L.U.D.D. -> Pokemon Change (out, then back in: no swap); appeals: the facing-right ones
 MARIO_MOTIONS = {
@@ -1178,6 +1196,7 @@ PROFILES = {
     'reflet': dict(slots=REFLET_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                    vis=REFLET_VIS, vis_default={REFLET_VIS['brave_shield']: 1}, hidden=()),
     'mario': dict(slots=MARIO_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **MARIO_MOTIONS), vis={},
+                  drive={'material_anime_face.pac': (MARIO_MOUTHS, 'Mario_FaceNMClose_VIS_O_OBJ')},
                   vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                      vis=REFLET_F_VIS, vis_default={REFLET_F_VIS['brave_shield']: 1}, hidden=()),
@@ -1415,6 +1434,25 @@ def motion_aliases(motion_dir):
     return out
 
 
+def drive_slots(vis, drive, ult_vis, frames):
+    """a pac entry's keys with the driven slots replaced: per frame, the slot carrying the Ultimate mesh
+    shown (the first listed), else the fallback slot (profile "drive": ({slot: [Ultimate meshes]}, fallback))"""
+    slots, fallback = drive
+    on = {slot: np.zeros(frames, bool) for slot in slots}
+    taken = np.zeros(frames, bool)
+    for slot, names in slots.items():
+        for n in names:
+            st = ult_vis.get(n)
+            if st is None:
+                continue
+            st = np.asarray(st[:frames], bool) & ~taken
+            on[slot] |= st
+            taken |= st
+    on[fallback] |= ~taken
+    vis = [v for v in vis if v[0] not in slots]
+    return vis + [(slot, vis_keys(st)) for slot, st in on.items()]
+
+
 def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=(),
                   extra_vis=None):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
@@ -1531,6 +1569,9 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                         vis.append((slot, vis_keys(st) if st is not None else [(0, cprof['vis_default'].get(slot, 0))]))
                     for slot in cprof['hidden']:
                         vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
+                drive = cprof.get('drive', {}).get(pac)
+                if drive and vis_of.get(mname):
+                    vis = drive_slots(vis, drive, vis_of[mname], frames)
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
             # the base's other entries (default / default_temporarily / display.mta, material_anime.lst:

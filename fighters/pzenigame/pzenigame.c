@@ -37471,7 +37471,8 @@ void pz_s_set(int phase)
 
 void pz_s_move()
 {
-    KineticModule(0x11, 0x3, pz_s_speed, KineticModuleF(0xb, 0x3));
+    // energy 3's X is world X: times the facing (PostureModuleF(0), 1 / -1), or he always slid right (v6)
+    KineticModule(0x11, 0x3, pz_s_speed * PostureModuleF(0), KineticModuleF(0xb, 0x3));
     KineticModule(0x15, 0x3, -1.0f, -1.0f);
 }
 
