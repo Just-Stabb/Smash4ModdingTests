@@ -196,7 +196,7 @@ both tables). Untested in game.
 - S5: ThrowF / ThrowHi / ThrowLw hitboxes freed the held opponent (NoGrabRelease 0). Translator now sets it.
 - C4: Withdraw (`pz_s_move`) set energy 3's X to a positive speed whatever his facing: the right-side bias.
 - E1: 13 effect scripts turn his own effects on a bone (dash attack among them): no variants were made.
-- E3: 29 Smash 4 common effects stand in for Ultimate's in 113 scripts; 30 of his 32 `sys_*` map to
+- E3: 29 Smash 4 common effects stand in for Ultimate's in 113 scripts; 31 of his 32 `sys_*` map to
   ef_common.eff sets (`ultimate_port.py effects pzenigame`).
 - S7: Mario's LandingAirLw landing hitbox and special slot 0x223 still Mario's.
 - Not found by a check: the water showing Mario's fireball (the fireball's native code: reference/port_bases.json
