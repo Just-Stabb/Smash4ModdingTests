@@ -20,6 +20,14 @@ fighter's "top" frame (forward = right, up = up), 5-unit grid, the ground at 0. 
 move and bones other than top are taken at top (noted). Stage 2: the converted particles through
 their own vertex / pixel programs (tools/latte_interp.py).
 
+Modelled since Squirtle's effects test 4: a non-following particle keeps the emitter's frame from its
+birth (an emitter turned by its key animation lays each new sheet further round); Ultimate's
+directional meshes turn only about their is_rotate axes; EFFECT_OFF_KIND / Terminate_Graphic_Effect stop
+an effect's emission (its particles live on); the particle rotation order is eft's (Rx Rz Ry) on both
+sides unless --ult-prot-order says otherwise. Test switches for open questions about eft2: --ult-rt
+(emitter translation turned by its rotation), --ult-drop (key-animation targets left out), --only
+(emitters by name).
+
 What each game does here is what we know of it: Ultimate's side is the reference only as far as that
 goes. Check it once against Ultimate footage (the user's recordings) when a rule is new; the converted
 side reads the same fields the game does (docs/ptcl-format.md).
@@ -49,14 +57,16 @@ BG = np.array([0.62, 0.62, 0.64])
 
 # ------------------------------------------------------------------ maths
 def rot_xyz(r, order='zyx'):
-    """'zyx': R = Rz Ry Rx (radians: eft's emitter matrix order, and the scripts' XRot / YRot / ZRot);
-    'xyz': R = Rx Ry Rz (eft2's emitter rotation: vfxb_to_ptcl.eft_rotation)"""
+    """R as the product of the axis rotations in the order named, left to right (radians): 'zyx'
+    R = Rz Ry Rx (eft's emitter matrix order, and the scripts' XRot / YRot / ZRot); 'xyz' R = Rx Ry Rz
+    (eft2's emitter rotation: vfxb_to_ptcl.eft_rotation); 'xzy' R = Rx Rz Ry (eft's particle rotation,
+    vfxb_to_ptcl.rotation_matrix)"""
     cx, cy, cz = np.cos(r)
     sx, sy, sz = np.sin(r)
-    rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
-    ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
-    rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
-    return rx @ ry @ rz if order == 'xyz' else rz @ ry @ rx
+    m = {'x': np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]]),
+         'y': np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]]),
+         'z': np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])}
+    return m[order[0]] @ m[order[1]] @ m[order[2]]
 
 
 def anim_value(keys, loop, frame):
@@ -115,6 +125,8 @@ class Emitter:
     life = 10
     srt = ((1, 1, 1), (0, 0, 0), (0, 0, 0))     # emitter scale, rotation (radians), translation
     rot_order = 'zyx'
+    rt = False
+    prot_order = 'xzy'        # the particle's own rotation (eft: Rx Rz Ry)
     anims = {}                # key-animation target (ptcl.KEYA_TARGETS) -> (keys [(frame, value)], loop)
     volume = (0, (0, 0, 0))
     all_dir = 0.0
@@ -154,7 +166,7 @@ def simulate(em, call, frames, seed=1):
     """{frame: [(pos, vel, age_t, size, rot, alpha, rgb)]} of one emitter played by a script call
     (call: (frame, matrix effect -> top, size))"""
     rng = np.random.default_rng(seed)
-    f0, cm, csize = call
+    f0, cm, csize, off = call
     out = {f: [] for f in frames}
     live = []
     carry = 0.0
@@ -164,7 +176,7 @@ def simulate(em, call, frames, seed=1):
         m = cm @ emitter_matrix(em, f - f0)
         lin = m[:3, :3]
         a = lambda t, d, k=f - f0: anim_value(*em.anims[t], k) if t in em.anims else d    # noqa: E731
-        if 0 <= k < em.duration and k % (em.interval + 1) == 0:
+        if 0 <= k < em.duration and k % (em.interval + 1) == 0 and (off is None or f < off):
             carry += a(0, em.rate)
             while carry >= 1 - 1e-6:
                 carry -= 1
@@ -176,6 +188,9 @@ def simulate(em, call, frames, seed=1):
                 sr = 1 - em.size_random * rng.uniform()
                 sa = (a(17, 1.0), a(18, 1.0))
                 rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
+                # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
+                # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
+                # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
                 live.append({'p': (m @ np.append(p, 1))[:3], 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
                              'sa': sa, 'lin': lin})
         keep = []
@@ -190,7 +205,7 @@ def simulate(em, call, frames, seed=1):
                 out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * q['sa'][0] * csize,
                                                                     em.size[1] * sy * q['sr'] * q['sa'][1] * csize),
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
-                               rgb, rgb1))
+                               rgb, rgb1, q['lin']))
             g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
             q['v'] = q['v'] * em.air + g * csize
             q['p'] = q['p'] + q['v']
@@ -211,8 +226,10 @@ def emitter_matrix(em, frame):
         if 8 + i in em.anims:
             t[i] = anim_value(*em.anims[8 + i], frame)
     m = np.eye(4)
-    m[:3, :3] = rot_xyz(np.array(r, float), em.rot_order) @ np.diag(s)
-    m[:3, 3] = t
+    rm = rot_xyz(np.array(r, float), em.rot_order)
+    m[:3, :3] = rm @ np.diag(s)
+    # T R S, or with em.rt the translation turned by the rotation (R T S: --ult-rt, a test)
+    m[:3, 3] = rm @ np.asarray(t, float) if em.rt else t
     return m
 
 
@@ -324,13 +341,14 @@ QUAD = (np.array([[-0.5, 0.5, 0], [0.5, 0.5, 0], [0.5, -0.5, 0], [-0.5, -0.5, 0]
 TO_SCREEN = np.array([[0, 0, 1.0], [0, 1.0, 0], [-1.0, 0, 0]])
 
 
-def basis(em, vel, cm):
-    """the particle's frame (3x3, columns its X Y Z in top's frame) before its own rotation"""
+def basis(em, vel, cm, lin=None):
+    """the particle's frame (3x3, columns its X Y Z in top's frame) before its own rotation; lin: the
+    emitter's frame (call x emitter matrix) when the particle was born, else the emitter's at frame 0"""
     if em.ptype in (0, 7):            # facing the camera: its X right, Y up, Z toward the camera
         return np.array([[0, 0, -1.0], [0, 1.0, 0], [1.0, 0, 0]]).T
     if em.ptype == 8:                 # upright, turned to the camera about Y
         return np.array([[0, 0, -1.0], [0, 1.0, 0], [1.0, 0, 0]]).T
-    frame = (cm @ emitter_matrix(em, 0))[:3, :3]
+    frame = (cm @ emitter_matrix(em, 0))[:3, :3] if lin is None else np.asarray(lin, float)
     frame = frame / np.maximum(np.linalg.norm(frame, axis=0), 1e-9)
     if em.ptype == 1:
         return frame
@@ -351,6 +369,10 @@ def basis(em, vel, cm):
     return frame
 
 
+ULT_RT = False
+ULT_DROP = ()            # --ult-drop: key-animation targets left out (tests)
+ULT_PROT_ORDER = 'xzy'     # eft2's particle rotation order (--ult-prot-order)
+ONLY = ''                  # --only: emitter names containing this (both sides)
 HDR_RANGE = (1.0, 0.0, 0.0, 0.0)    # u_nwHdrRange (CB9 [8]): rgb x .x + .w, the game's own at run time
 
 
@@ -372,8 +394,8 @@ def draw(canvas, em, parts, cm):
     pos, uv, idx = em.mesh[:3] if em.mesh is not None else QUAD
     vcol = em.mesh[3] if em.mesh is not None and len(em.mesh) > 3 and em.mesh[3] is not None else None
     items = []
-    for p, v, t, (sx, sy), rot, alpha, rgb, rgb1 in parts:
-        b = basis(em, v, cm) @ rot_xyz(rot)
+    for p, v, t, (sx, sy), rot, alpha, rgb, rgb1, lin in parts:
+        b = basis(em, v, cm, lin) @ rot_xyz(rot, em.prot_order)
         w = (b @ (pos * np.array([sx, sy, sx])).T).T + p
         items.append((-(w[:, 0].mean()), w, alpha, rgb, rgb1))
     for _d, w, alpha, rgb, rgb1 in sorted(items, key=lambda x: x[0]):
@@ -438,7 +460,9 @@ def ult_emitters(eff, set_index, images, names, prims):
         info = e['info']
         em.srt = (tuple(info['scale']), tuple(info['rotate']), tuple(info['trans']))
         em.rot_order = 'xyz'
-        em.anims = ult_anims(e)
+        em.prot_order = ULT_PROT_ORDER
+        em.rt = ULT_RT
+        em.anims = {k: v for k, v in ult_anims(e).items() if k not in ULT_DROP}
         sh = e['shape']
         em.volume = (sh['volume_type'], np.array(sh['volume_radius']) * np.array(sh['volume_form_scale']))
         em.all_dir, em.dir_speed = float(vel['all_direction']), float(vel['designated_dir_scale'])
@@ -470,6 +494,10 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.rot_init = np.array(st['rotate_init'][:3], float)
         em.rot_rand = np.array(st['rotate_init_rand'][:3], float)
         em.rot_add = np.array(st['rotate_add'][:3], float)
+        if pt['primitive_id'] != NONE64 and pt['billboard_type'] == 3 and not all(pt['is_rotate']):
+            # a directional mesh turns only about the axes its is_rotate enables (vfxb_to_ptcl)
+            on = np.array([float(bool(v)) for v in pt['is_rotate'][:3]])
+            em.rot_init, em.rot_rand, em.rot_add = em.rot_init * on, em.rot_rand * on, em.rot_add * on
         em.ptype = {5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])
         em.mesh_frame = True
         if pt['primitive_id'] != NONE64 and pt['primitive_id'] in prims:
@@ -595,7 +623,7 @@ def ult_calls(path, move):
     if not m:
         m = re.search(r'fn effect_\w*\(.*?\n\}', text, re.S)
     body = m.group(0) if m else text
-    frame, out = 0, []
+    frame, out, offs = 0, [], []
     for line in body.splitlines():
         fm = re.search(r'\bframe\(\s*[\w.]+\s*,\s*([\d.]+)\s*\)', line)
         if fm:
@@ -606,6 +634,9 @@ def ult_calls(path, move):
             frame += int(float(wm.group(1)))
             continue
         em = re.search(r'macros::(\w+)\(agent,\s*(.*)\);', line)
+        if em and em.group(1) == 'EFFECT_OFF_KIND':
+            offs += [(frame, n) for n in re.findall(r'Hash40::new\("([^"]+)"\)', em.group(2))[:1]]
+            continue
         if em and em.group(1) in EFFECT_MACROS:
             names = re.findall(r'Hash40::new\("([^"]+)"\)', em.group(2))
             rest = re.sub(r'Hash40::new\("[^"]+"\)\s*,?', '', em.group(2))
@@ -616,14 +647,20 @@ def ult_calls(path, move):
                 out.append((frame, names[0], names[1], tuple(nums[:3]), tuple(nums[3:6]), nums[6]))
             elif len(names) >= 2 and em.group(1) in ('LANDING_EFFECT', 'FOOT_EFFECT') and len(nums) >= 7:
                 out.append((frame, names[0], names[1], tuple(nums[:3]), tuple(nums[3:6]), nums[6]))
-    return out
+    return with_offs(out, offs)
+
+
+def with_offs(calls, offs):
+    """each call with the frame its effect is turned off (EFFECT_OFF_KIND / Terminate_Graphic_Effect: its
+    emitters stop emitting, the particles live on), else None"""
+    return [c + (min((f for f, n in offs if n == c[1] and f >= c[0]), default=None),) for c in calls]
 
 
 def s4_calls(effect_bin, move):
     """the same from the translated effect.bin (Graphic, Bone, X..ZRot, Size; frames from FRAME / WAIT)"""
     f = acmd.ACMDFile.load(effect_bin)
     cmds = f.scripts.get(acmd.crc(move.lower()), [])
-    frame, out = 0, []
+    frame, out, offs = 0, [], []
     for c in cmds:
         info = acmd.INFO.get(c.ident) or {}
         name, syn = info.get('name', ''), info.get('syntax', [])
@@ -631,11 +668,13 @@ def s4_calls(effect_bin, move):
             frame = max(frame, int(c.params[0]))
         elif name == 'WAIT':
             frame += int(c.params[0])
+        elif name == 'Terminate_Graphic_Effect':
+            offs.append((frame, c.params[0]))
         elif syn[:2] == ['Graphic', 'Bone'] and 'Size' in syn:
             g = dict(zip(syn, c.params))
             out.append((frame, g['Graphic'], g['Bone'], (g.get('X', 0), g.get('Y', 0), g.get('Z', 0)),
                         (g.get('XRot', 0), g.get('YRot', 0), g.get('ZRot', 0)), g['Size']))
-    return out
+    return with_offs(out, offs)
 
 
 def call_matrix(xyz, rot_deg, size):
@@ -654,7 +693,7 @@ def render_move(args, move, ult, s4, out_png):
     log = []
     for side, calls in (('Ultimate', ucalls), ('Smash 4', scalls)):
         canvases = {fr: Canvas(*args.view, args.scale) for fr in frames}
-        for fr0, name, bone, xyz, rot, size in calls:
+        for fr0, name, bone, xyz, rot, size, off in calls:
             if side == 'Ultimate':
                 ems = ult.get(name)
                 if ems is None:
@@ -671,7 +710,9 @@ def render_move(args, move, ult, s4, out_png):
                     log.append('%s f%d 0x%X on bone %d: drawn at top' % (side, fr0, name, bone))
             cm = call_matrix(xyz, rot, size)
             for k, em in enumerate(ems):
-                sim = simulate(em, (fr0, cm, size), frames, seed=k + 1)
+                if ONLY and not any(o in em.name for o in ONLY.split(',')):
+                    continue
+                sim = simulate(em, (fr0, cm, size, off), frames, seed=k + 1)
                 for fr in frames:
                     if sim[fr]:
                         draw(canvases[fr], em, sim[fr], cm)
@@ -704,7 +745,18 @@ def main():
     ap.add_argument('--view', default='-25,25,-6,34', help='x0,x1,y0,y1 in units (x: forward)')
     ap.add_argument('--stage', type=int, default=2, help='1: the converted parts drawn as colour x texture; '
                     '2 (default): by their own pixel programs (tools/latte_pixel.py)')
+    ap.add_argument('--ult-prot-order', default='xzy', help="eft2's particle rotation order for Ultimate's side "
+                    '(the product left to right, e.g. xzy = Rx Rz Ry)')
+    ap.add_argument('--ult-rt', action='store_true', help="test: Ultimate's emitter translation turned by its "
+                    'rotation (R T S, not T R S)')
+    ap.add_argument('--ult-drop', default='', help='test: comma-separated key-animation targets left out on '
+                    "Ultimate's side (5-7 EAER, 8-10 EAET, 17-18 EASL)")
+    ap.add_argument('--only', default='', help='comma-separated substrings: only emitters whose name has one')
     a = ap.parse_args()
+    global ULT_PROT_ORDER, ONLY, ULT_RT
+    ULT_PROT_ORDER, ONLY, ULT_RT = a.ult_prot_order, a.only, a.ult_rt
+    global ULT_DROP
+    ULT_DROP = tuple(int(v) for v in a.ult_drop.split(',') if v)
     import port_sources
     src = port_sources.load()
     cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
