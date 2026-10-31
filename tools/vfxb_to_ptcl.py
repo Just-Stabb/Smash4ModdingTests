@@ -128,7 +128,13 @@ KEY_TEXTURES, KEY_ARRAY1 = 0x29, 0x3C
 # EP01-EP04, on other types; 1825 + 289 type-5 / 6 emitters in 31 fighters' files have none), all
 # move, and are scaled long (his speed lines 2.5 x 36): quads stretched along their motion, as
 # eft's directional type 3. (eft's own stripes are complex emitters with a 0x34-byte history block.)
-TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 3, 6: 3, 7: 0, 8: 8}
+# eft2 particle type -> eft's. eft2's 4 lays the particle flat (an XZ polygon: an XY mesh or quad laid on
+# the emitter's XZ plane), eft's 2 (the XZ plate); until Squirtle's effects test 6 it went to eft's 4
+# (the emitter's frame), standing his up-smash ripple's 30-unit flare1 glow (an XY disc) upright as a
+# blue haze. Evidence: Ultimate's type-4 vertex program negates the mesh's Y where type 3's doesn't
+# (flare1 / rifraction1, P_PzenigameWaterRipple); type-4 meshes are authored in XY (141 of 147 flat
+# ones), type-3 flat ones in XZ (504 of 806); the user's clip of test 5 (no glow in Ultimate)
+TYPES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3, 7: 0, 8: 8}
 TEX_MAX = 128           # vanilla effect textures are mostly 64-128 (the bank's size: Bayonetta's is 4.6 MB)
 BASE_FIRST = 2          # a template of the base's own beats an imported one this much
 # follow type (eft2's numbers: 0 follow the emitter, 1 not, 2 its position only): at emission
@@ -1524,13 +1530,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         ptn_want = 0
     tp = e['static']['tex_pat'][ti] if smp else None
     st = e['static']
-    if is_mesh and pt['billboard_type'] == 3 and not all(pt['is_rotate']):
-        # a directional mesh turns only about the axes its is_rotate enables: Woosh's whirlwinds
-        # (is_rotate 0 1 0, rotate_init X 180: turned so, the mesh hung upside down under the stage,
-        # nothing of it showed) spin about Y and stand upright in Ultimate. Observed on them, not
-        # derived, so kept to directional meshes: billboards keep their rotation whatever is_rotate
-        # says (96 Z-turning ones have it all 0), and the chant's crossed rings (type 4, X 45 with X
-        # disabled) look right turned
+    if not all(pt['is_rotate']):
+        # a particle turns only about the axes its is_rotate enables: Ultimate's emitter setup (exefs
+        # main.bin 0x8B8A0 - 0x8B910) zeroes rotate_init, its random, rotate_add and its random on
+        # each disabled axis, whatever the particle type. Woosh's whirlwinds (0 1 0, X 180 dropped)
+        # stand upright; Squirtle's up-smash columns (type 5 meshes, 0 0 0: X 15 and -10 a frame
+        # dropped) rise straight instead of splaying (effects test 5). Until then only directional
+        # meshes (type 3) were cut, by observation
         st = dict(st, **{k: [0.0 if a < 3 and not pt['is_rotate'][a] else v for a, v in enumerate(st[k])]
                          for k in ('rotate_init', 'rotate_init_rand', 'rotate_add', 'rotate_add_rand')})
         if any(abs(a - b) > 1e-6 for a, b in zip(st['rotate_init'], e['static']['rotate_init'])):

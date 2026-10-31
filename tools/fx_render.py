@@ -493,11 +493,11 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.rot_init = np.array(st['rotate_init'][:3], float)
         em.rot_rand = np.array(st['rotate_init_rand'][:3], float)
         em.rot_add = np.array(st['rotate_add'][:3], float)
-        if pt['primitive_id'] != NONE64 and pt['billboard_type'] == 3 and not all(pt['is_rotate']):
-            # a directional mesh turns only about the axes its is_rotate enables (vfxb_to_ptcl)
+        if not all(pt['is_rotate']):
+            # a particle turns only about the axes its is_rotate enables (main.bin 0x8B8A0: vfxb_to_ptcl)
             on = np.array([float(bool(v)) for v in pt['is_rotate'][:3]])
             em.rot_init, em.rot_rand, em.rot_add = em.rot_init * on, em.rot_rand * on, em.rot_add * on
-        em.ptype = {5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])
+        em.ptype = {4: 2, 5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])   # vfxb_to_ptcl.TYPES
         em.mesh_frame = True
         if pt['primitive_id'] != NONE64 and pt['primitive_id'] in prims:
             pos, _n, col, uv, idx = V.mesh(prims[pt['primitive_id']], e['tex_anim'][0]['uv_channel'])
