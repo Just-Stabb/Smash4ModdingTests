@@ -1107,6 +1107,13 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
     am = cb['alpha_process']
     erode = am in (1, 3)
     gain = 1.0 if erode else max(1.0, float(np.max(alpha)))
+    if am == 4:
+        # Ultimate's alpha_process 4 (its pixel shaders): sat(sat((tex.a - alpha 0) x 4) x alpha 1): alpha 0 a
+        # threshold rising over life (the part dissolves), alpha 1 a gain; read as tex.a x alpha 0 x alpha 1
+        # Squirtle's splashes grew solid as they flew and hung on as big white flecks (eft_pixel alpha mode 4)
+        st_, col_ = e['static'], e['color']
+        alpha = np.clip(track(st_, col_, 0)[1] * e['info']['color0'][3], 0, 1)
+        gain = float(np.mean(track(st_, col_, 1)[1] * e['info']['color1'][3]))
     # colour 1 at its life mean x the colour scale, for a template that doesn't pass colour 1
     c1 = track(e['static'], e['color'], 1)[0].mean(0) * np.array(e['info']['color1'][:3]) \
         * float(e['static']['color_scale'] or 1.0)
@@ -1116,7 +1123,7 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         c1 = display(c1)
         c0 = display(c0) if c0 is not None else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort,
+                              4 if am == 4 else 1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort,
                               additive=e['render']['blend_type'] == 1)
     if si is None:
         notes.append('own pixel program: template layout not supported')
@@ -1130,7 +1137,7 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         (', premultiplied, added' if e['render']['blend_type'] == 1 else ', premultiplied')
         if eft_pixel.premultiplied(p, si) else '')
         + (', UVs distorted by texture 1 (%.3f, %.3f)' % tuple(distort) if distort is not None and 'uv1' in lay else ''))
-    return si, np.clip(alpha / gain, 0, 1), gain
+    return si, np.clip(alpha if am == 4 else alpha / gain, 0, 1), gain
 
 
 def flipbook_fade(e, ti, sheet, notes):

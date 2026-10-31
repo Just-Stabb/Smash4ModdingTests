@@ -298,3 +298,17 @@ template was premultiplied (ONE / INV_SRC_ALPHA, the shader key's bit), so they 
 pixel program now writes alpha 0 for an additive part on such a template, so the blend adds (8 emitters:
 the flash's rainbows, additive parts of landing / jump / run smoke, attack arcs, piyo, sleep, the win pose).
 tools/eft_pixel_test.py covers it. Renderer stage 2 (tools/latte_pixel.py) shows the flash matching.
+
+## v6 effects test 4 (`build/squirtle_v6_effects_test4.zip`)
+
+User's clips of test 3 against native Ultimate: Ultimate's down smash is a low opaque sheet that is gone
+quickly, with tiny droplets; ours left big white flecks lingering (the dash too). Ultimate's
+alpha_process 4 (read from the vfxb shader binaries' combiner) is an erosion, not a transparency:
+alpha = sat(sat((tex.a - alpha0) x 4) x alpha1) x fade, where alpha0 (the alpha-0 colour track) is a
+threshold that rises over the particle's life and alpha1 a gain. The converter read it as tex.a x a0 x a1.
+eft_pixel's own programs now have alpha mode 4 (ADD t.w, -c0.w; x4 clamp; x gain clamp; x vertex alpha),
+vfxb_to_ptcl.py sends the alpha-0 track as the threshold and the alpha-1 mean as the gain. 89 converted
+emitters (down smash sheet and droplets, dash / run splashes, Water Gun spray, landings); ids unchanged.
+491 emitters across 20 Ultimate fighters use it. tools/eft_pixel_test.py covers it; fx_render shows both
+columns dissolving alike (down smash, dash). Still open: the charge flash's ring, washed out by Ultimate's
+screen bloom, which Smash 4 lacks.

@@ -133,6 +133,7 @@ class Emitter:
     colour1_curve = None
     combine = 1               # 0 colour, 1 colour x tex, 2 c0 x tex + c1 x (1 - tex)
     alpha_from_red = False
+    alpha_erode = None        # Ultimate's alpha_process 4: sat(sat((tex.a - alpha 0) x 4) x this gain)
     rot_init = np.zeros(3)
     rot_rand = np.zeros(3)
     rot_add = np.zeros(3)
@@ -230,7 +231,7 @@ class Canvas:
         return (np.asarray((np.asarray(x) - self.x0) * self.ppu).astype(int),
                 np.asarray((self.y1 - np.asarray(y)) * self.ppu).astype(int))
 
-    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend, VC=None):
+    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend, VC=None, erode=None):
         """one triangle: P [3, 2] world (screen x = top's Z, y = Y), UV [3, 2], VC [3, 4] a mesh's vertex
         colours (x the colour and alpha, as both games' mesh programs do)"""
         X = (P[:, 0] - self.x0) * self.ppu
@@ -263,6 +264,8 @@ class Canvas:
         else:
             c = rgb * t[:, :3]
         a = alpha * (t[:, 0] if alpha_red else t[:, 3])
+        if erode is not None:
+            a = np.clip(np.clip((t[:, 3] - alpha) * 4, 0, 1) * erode, 0, 1)
         if VC is not None:
             vc = np.stack([l0[inside], l1[inside], l2[inside]], 1) @ np.asarray(VC, float)
             c = c * vc[:, :3]
@@ -388,7 +391,7 @@ def draw(canvas, em, parts, cm):
                                    em.blend_mode)
             else:
                 canvas.tri(s[tri, :2], uv[tri, :2], em.tex, rgb, rgb1, alpha, em.combine, em.alpha_from_red,
-                           em.blend, vcol[tri] if vcol is not None else None)
+                           em.blend, vcol[tri] if vcol is not None else None, em.alpha_erode)
 
 
 # ------------------------------------------------------------------ Ultimate (eft2)
@@ -455,7 +458,9 @@ def ult_emitters(eff, set_index, images, names, prims):
         cs = float(st['color_scale'] or 1.0)
         rgb0 = c0 * np.array(info['color0'][:3]) * cs
         rgb1 = c1 * np.array(info['color1'][:3]) * cs
-        al = a0 * info['color0'][3] * (a1 * info['color1'][3] if e['combiner']['alpha_process'] == 4 else 1)
+        al = a0 * info['color0'][3]
+        if e['combiner']['alpha_process'] == 4:
+            em.alpha_erode = float(np.mean(a1 * info['color1'][3]))
         em.colour_curve = lambda t, c=rgb0: c[int(round(t * 100))]
         em.colour1_curve = lambda t, c=rgb1: c[int(round(t * 100))]
         em.alpha_curve = lambda t, a=al: a[int(round(t * 100))]

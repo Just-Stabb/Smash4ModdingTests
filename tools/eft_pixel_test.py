@@ -114,8 +114,11 @@ def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=N
         rgb = [b + (a - b) * x for a, b, x in zip(c0_, c1_, t_)]
     else:
         rgb = [a * x + b for a, b, x in zip(c0_, c1_, t_)]
-    a = (t[3] + c0[3] - 1) if am == 1 else c0[3] * t[3]
-    a *= gain
+    if am == 4:
+        a = min(max(min(max((t[3] - c0[3]) * 4, 0.0), 1.0) * gain, 0.0), 1.0)
+    else:
+        a = (t[3] + c0[3] - 1) if am == 1 else c0[3] * t[3]
+        a *= gain
     if vc is not None:
         rgb = [x * y for x, y in zip(rgb, vc[:3])]
         a *= vc[3]
@@ -144,7 +147,7 @@ def test_variants():
     rnd = random.Random(1)
     for name, lay in LAYOUTS.items():
         for cm in range(4):
-            for am, gain, (premult, additive) in itertools.product((0, 1), (1.0, 4.0),
+            for am, gain, (premult, additive) in itertools.product((0, 1, 4), (1.0, 4.0, 0.6),
                                                                    ((False, False), (True, False), (True, True))):
                 c1k = C1_CONST if lay['c1'] is None else None
                 prog, gprs = E.program(lay, cm, am, gain, c1k, premult=premult, additive=additive)

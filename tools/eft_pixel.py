@@ -20,7 +20,9 @@ written here:
         each as Ultimate's tex1 colour / alpha blend (0 multiply, 1 add)
   rgb = colour mode 0: c0; 1: c0 x t.rgb; 2: c1 + (c0 - c1) x t.rgb; 3: c0 x t.rgb + c1
   a   = alpha mode 0: c0.a x t.a; 1: t.a + c0.a - 1 (erosion: the texture eaten away by the fading
-        alpha); x ALPHA_GAIN (Ultimate's alphas go past 1: its whirlwinds' at 2 - 4), clamped
+        alpha); x ALPHA_GAIN (Ultimate's alphas go past 1: its whirlwinds' at 2 - 4), clamped;
+        4: sat(sat((t.a - c0.a) x 4) x ALPHA_GAIN), Ultimate's alpha_process 4 (its pixel shaders: alpha 0
+        a threshold the texture's alpha must pass, x 4, then x alpha 1; Squirtle's splashes dissolve so)
   (a mesh layout: rgb x v.rgb, a x v.a), rgb clamped to 0 - 1 (the colours keep Ultimate's
   brightness past 1: what Ultimate's tone mapping shows saturated, not Smash 4's bloom), then
   rgb x hdr.x + hdr.w (u_nwHdrRange, CB9 [8]); x a on a premultiplied template (premultiplied():
@@ -263,6 +265,8 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
             g.append('%s: MULADD          %s.%s, %s, %s.%s, %s' % (ch, d, ch, c0op(ch), t, tc(ch), c1op(ch)))
     if alpha_mode in (1, 3):
         g.append('w: ADD             %s.w, %s.w, %s.w' % (d, c0, t))
+    elif alpha_mode == 4:
+        g.append('w: ADD             %s.w, %s.w, -%s.w' % (d, t, c0))
     else:
         g.append('w: MUL             %s.w, %s.w, %s.w' % (d, c0, t))
     groups.append(g)
@@ -271,22 +275,24 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     if color_mode == 2:
         for ch in 'xyz':
             g.append('%s: MULADD          %s.%s, %s.%s, %s.%s, %s' % (ch, d, ch, d, ch, t, tc(ch), c1op(ch)))
-    a_ops = []
+    a_ops = []          # (op, operand, clamped there: the last one always)
     if alpha_mode in (1, 3):
-        a_ops.append(('ADD', lit(-1.0)))
+        a_ops.append(('ADD', lit(-1.0), False))
+    if alpha_mode == 4:
+        a_ops.append(('MUL', lit(4.0), True))
     if alpha_gain != 1.0:
-        a_ops.append(('MUL', lit(alpha_gain)))
+        a_ops.append(('MUL', lit(alpha_gain), alpha_mode == 4))
     if vc is not None:
-        a_ops.append(('MUL', 'R%d.w' % vc))
+        a_ops.append(('MUL', 'R%d.w' % vc, False))
     if a_ops:
-        op, arg = a_ops.pop(0)
-        g.append('w: %-15s %s.w, %s.w, %s%s' % (op, d, d, arg, '' if a_ops else ' CLAMP'))
+        op, arg, cl = a_ops.pop(0)
+        g.append('w: %-15s %s.w, %s.w, %s%s' % (op, d, d, arg, '' if a_ops and not cl else ' CLAMP'))
     else:
         g.append('w: MOV             %s.w, %s.w CLAMP' % (d, d))
     groups.append(g)
     while a_ops:
-        op, arg = a_ops.pop(0)
-        groups.append(['w: %-15s %s.w, %s.w, %s%s' % (op, d, d, arg, '' if a_ops else ' CLAMP')])
+        op, arg, cl = a_ops.pop(0)
+        groups.append(['w: %-15s %s.w, %s.w, %s%s' % (op, d, d, arg, '' if a_ops and not cl else ' CLAMP')])
     if thr:
         # after the clamp, as Ultimate's: saturate(alpha) x the ramp
         groups.append(['w: MUL             %s.w, %s.w, %s.x' % (d, d, ramp)])
