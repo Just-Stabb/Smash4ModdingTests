@@ -257,9 +257,12 @@ and the fade. Converted trails use it: `tools/ultimate_acmd.py` writes Shader 3,
 (rgb, arg 28) into the second texture, so the mask follows the trail's length as in Ultimate (the
 short-trail case too). Still not carried over: the depth offset (arg 29).
 
-**Emitter rotation order**: eft2 turns an emitter Z first (R = Rx Ry Rz), Smash 4's eft X first
-(R = Rz Ry Rx); `tools/vfxb_to_ptcl.py` re-expresses the angles (`eft_rotation`; evidence and the
-emitters it changed: fighters/edge/README.md test 44).
+**Emitter rotation order**: both games turn an emitter X first (R = Rz Ry Rx). Read from Ultimate's
+code (exefs main.bin): the instance copies the data's rotate (+0x788) at 0x87C70; the static matrix
+(0x88320) and the animated one (0x8D0A0, EAER angles in degrees) both map X to (cy cz, cy sz, -sy), and
+0x8D838 composes v . M with the set's matrix. `tools/vfxb_to_ptcl.py` (`eft_rotation`) keeps the angles;
+until Squirtle's effects test 5 it re-expressed them as Z first (an inference from streak emitters,
+fighters/edge/README.md test 44), which stood his down-smash water up instead of sweeping it low.
 
 **Particle rotation is shader-keyed** in Smash 4: only a template whose vertex shader has `v_inRot`
 turns its particles (docs/ptcl-format.md 0x7F8). `vfxb_to_ptcl.py` ranks templates on it (a turn

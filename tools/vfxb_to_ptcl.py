@@ -1295,24 +1295,15 @@ def combine(img, e, notes, ti=0, fill=1.0, two_colour=False):
 
 
 def eft_rotation(rot):
-    """eft2's emitter rotation (radians, applied Z then Y then X: R = Rx Ry Rz) as eft's angles
-    (applied X then Y then Z: R = Rz Ry Rx, Ptcl.set_emitter_srt). eft2's order, from 86 streak
-    emitters (types 5 / 6 moving along a designated direction, rotated about 2+ axes) in 31
-    fighters' VFXBs: their offset lies across their motion in 53 with Z first (13 with X first),
-    along it in 10 (51): layered speed lines side by side, not one behind the other. Sephiroth's
-    forward-air lines (90, 0, 90 degrees) ran along their own offset (test 43: "the wrong plane")"""
-    a, b, c = (float(v) for v in rot[:3])
-    if sum(abs(v) > 1e-6 for v in (a, b, c)) < 2:
-        return a, b, c
-    ca, sa, cb, sb, cc, sc = math.cos(a), math.sin(a), math.cos(b), math.sin(b), math.cos(c), math.sin(c)
-    r = (np.array([[1, 0, 0], [0, ca, -sa], [0, sa, ca]]) @ np.array([[cb, 0, sb], [0, 1, 0], [-sb, 0, cb]])
-         @ np.array([[cc, -sc, 0], [sc, cc, 0], [0, 0, 1]]))
-    y = math.asin(max(-1.0, min(1.0, -r[2, 0])))
-    if abs(r[2, 0]) < 1 - 1e-6:
-        x, z = math.atan2(r[2, 1], r[2, 2]), math.atan2(r[1, 0], r[0, 0])
-    else:                                                   # gimbal lock: all of it in x
-        x, z = math.atan2(-r[1, 2], r[1, 1]), 0.0
-    return x, y, z
+    """eft2's emitter rotation (radians) as eft's angles: the same. Both turn an emitter X first
+    (R = Rz Ry Rx). From Ultimate's code (exefs main.bin): the emitter instance takes the data's
+    rotate (+0x788, x y z) at 0x87C70; its static matrix (0x88320, with the random rotation) and its
+    animated one (0x8D0A0, the EAER angles in degrees x pi / 180) both put (cy cz, cy sz, -sy) as the
+    image of X, and 0x8D838 composes them v . M with the set's matrix: R = Rz Ry Rx, eft's order
+    (Ptcl.set_emitter_srt). Until Squirtle's effects test 5 this re-expressed the angles as if eft2
+    turned Z first (an inference from 86 streak emitters, Sephiroth test 44): his down-smash water
+    (EAER Y and Z turning together) stood up instead of sweeping low (tools/fx_render.py)"""
+    return tuple(float(v) for v in rot[:3])
 
 
 def crossed_ribbon(pos, nrm, col, uv, idx, notes):
@@ -1987,10 +1978,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'air_resistance', float(st['air_res']))
     info = e['info']
     if typ == 3 and not is_mesh and sum(abs(v) > 1e-6 for v in info['rotate'][:3]) >= 2:
-        # a directional quad (eft2 type 3) turns X first, as eft does: Ultimate's sys_attack_line
-        # (lines along Y, emitter turn 90 0 90, played turned X -90) stands up along the kick in
-        # Ultimate; Z first (eft_rotation, the streak types' order) laid it level at his feet (Hero
-        # fix 63's up air). Observed, not derived
+        # a directional quad (eft2 type 3) turns X first, as every eft2 emitter does (eft_rotation):
+        # Ultimate's sys_attack_line (lines along Y, emitter turn 90 0 90, played turned X -90) stands
+        # up along the kick (Hero fix 63's up air: observed first, then read from the code)
         em_rot = tuple(float(v) for v in info['rotate'][:3])
         notes.append('directional quad: emitter turned X first')
     else:
@@ -2122,11 +2112,8 @@ def emitter_anims(p, em, e, notes):
             continue
         vals = [list(k[:3]) for k in keys]
         if sec == 'EAER':
-            # eft2 blends its own angles (R = Rx Ry Rz) between keys; eft blends eft's (Rz Ry Rx), so
-            # converted at the keys alone the turn between them took another path (Squirtle's down smash:
-            # the water emitters, emitting while they swept, off by up to 0.4 between keys 2 and 6, the
-            # splash standing up instead of along the ground; tools/fx_render.py). Every frame between
-            # keys converted, the angles kept continuous (no 2 pi jumps for eft to blend across)
+            # both games blend the angles between keys and turn X first (eft_rotation), so the keys
+            # carry over; sampled every frame, the angles kept continuous (no 2 pi jumps to blend across)
             fr = [k[3] for k in keys]
             if fr[-1] - fr[0] >= 1:
                 dense = np.arange(math.floor(fr[0]), math.ceil(fr[-1]) + 1, 1.0)

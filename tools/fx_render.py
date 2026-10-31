@@ -58,8 +58,7 @@ BG = np.array([0.62, 0.62, 0.64])
 # ------------------------------------------------------------------ maths
 def rot_xyz(r, order='zyx'):
     """R as the product of the axis rotations in the order named, left to right (radians): 'zyx'
-    R = Rz Ry Rx (eft's emitter matrix order, and the scripts' XRot / YRot / ZRot); 'xyz' R = Rx Ry Rz
-    (eft2's emitter rotation: vfxb_to_ptcl.eft_rotation); 'xzy' R = Rx Rz Ry (eft's particle rotation,
+    R = Rz Ry Rx (eft's emitter matrix order, and the scripts' XRot / YRot / ZRot); 'xyz' R = Rx Ry Rz; 'xzy' R = Rx Rz Ry (eft's particle rotation,
     vfxb_to_ptcl.rotation_matrix)"""
     cx, cy, cz = np.cos(r)
     sx, sy, sz = np.sin(r)
@@ -459,7 +458,7 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.life = int(pt['life']) if not pt['infinite_life'] else 600
         info = e['info']
         em.srt = (tuple(info['scale']), tuple(info['rotate']), tuple(info['trans']))
-        em.rot_order = 'xyz'
+        em.rot_order = 'zyx'          # eft2 turns an emitter X first too (vfxb_to_ptcl.eft_rotation)
         em.prot_order = ULT_PROT_ORDER
         em.rt = ULT_RT
         em.anims = {k: v for k, v in ult_anims(e).items() if k not in ULT_DROP}

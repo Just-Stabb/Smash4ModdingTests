@@ -157,6 +157,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | hurtboxes on the port's own joints (table 1) | Squirtle's tail | ultimate_vl_shapes.py: 1000 + k |
 | an additive part on a premultiplied template drawn as a covering blend (the rainbow over the smash flash) | Squirtle (sys_smash_flash) | eft_pixel: alpha out 0 for Ultimate's additive parts (ONE / INV_SRC_ALPHA then adds) |
 | Ultimate's alpha_process 4 (erosion: sat((tex.a - alpha0) x 4) x alpha1) read as tex.a x a0 x a1: splashes solid and lingering | Squirtle (down smash, dash) | eft_pixel alpha mode 4; vfxb_to_ptcl sends alpha0 as the threshold, mean alpha1 as the gain |
+| emitter angles re-expressed as Z first (eft2 turns X first, as eft: main.bin 0x88320 / 0x8D0A0): multi-axis and EAER-swept emitters on the wrong plane | Squirtle (down smash water standing up), Sephiroth since test 44 | `eft_rotation` keeps the angles |
 | an emitter turning while it emits, converted at its keys only: another path between them | Squirtle's down smash (the water stood up) | converter: every frame between keys (found with fx_render.py) |
 | eft2 directional meshes sent along a fixed emitter axis drawn as eft type 3 (turned upright to face the camera) | Squirtle's down-smash / run waves (curtains, user's test 1 clip) | converter: type 4 (the emitter's frame), as Hero's whirlwinds |
 | eft2's world gravity not set on eft's emitters: gravity turned with the emitter | Squirtle's down smash | converter writes ptcl `world_gravity` (0x2F8, cross_f 0x04A62620) |
