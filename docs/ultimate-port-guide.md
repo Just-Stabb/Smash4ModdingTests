@@ -101,8 +101,14 @@ draws a move's effects as Ultimate's files describe them (its .eff, its effect s
 ones (the package's .ptcl / .efc, the translated effect.bin), a row per frame (side view of "top": forward
 right, 5-unit grid). Stage 1: the particles' motion, shape, type, mesh, scale / alpha / colour over life
 and their textures (first flipbook cell, a plain colour x texture combine: the converted side's colours
-are approximate, its textures being made for our own pixel programs). Stage 2 (to do): the converted
-particles through their real vertex / pixel programs (tools/latte_interp.py).
+are approximate, its textures being made for our own pixel programs). Stage 2 (default, `--stage 1` for the
+old drawing): each converted part drawn by its own pixel program (tools/latte_pixel.py: the latte-dis
+disassembly run over every pixel of a triangle with numpy; checked against eft_pixel_test's reference on
+1440 cases, and runs all 1336 unique vanilla programs) on its inputs (colour 0 / 1 = keys x colour scale,
+alpha; a mesh's vertex colours; UVs x the slot's repeat), blended as the game does (ONE / INV_SRC_ALPHA on a
+premultiplied template, else the emitter's blend). Not yet: the vertex programs (UV scroll / flipbooks are
+the first cell), u_nwHdrRange taken as (1, 0, 0, 0), no bloom, the distortion pass not drawn. Both sides
+apply a mesh's vertex colours (Ultimate's smash flash disc fades to its edge so).
 
 It shows where the converter changed something (a dropped rotation, a lost texture, a wrong type). Where
 both columns agree but the game doesn't, our reading of an Ultimate field is wrong in both (Squirtle v6:
@@ -149,6 +155,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | variants inserted before the common effects: their ids moved under the translated scripts | Squirtle v6 build | `--variants-last` |
 | an emitter with a fractional rate emitted once: a particle buffer of 0 | Ultimate's sys_piyo | converter: one particle |
 | hurtboxes on the port's own joints (table 1) | Squirtle's tail | ultimate_vl_shapes.py: 1000 + k |
+| an additive part on a premultiplied template drawn as a covering blend (the rainbow over the smash flash) | Squirtle (sys_smash_flash) | eft_pixel: alpha out 0 for Ultimate's additive parts (ONE / INV_SRC_ALPHA then adds) |
 | an emitter turning while it emits, converted at its keys only: another path between them | Squirtle's down smash (the water stood up) | converter: every frame between keys (found with fx_render.py) |
 | eft2 directional meshes sent along a fixed emitter axis drawn as eft type 3 (turned upright to face the camera) | Squirtle's down-smash / run waves (curtains, user's test 1 clip) | converter: type 4 (the emitter's frame), as Hero's whirlwinds |
 | eft2's world gravity not set on eft's emitters: gravity turned with the emitter | Squirtle's down smash | converter writes ptcl `world_gravity` (0x2F8, cross_f 0x04A62620) |

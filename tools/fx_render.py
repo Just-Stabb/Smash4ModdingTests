@@ -139,6 +139,10 @@ class Emitter:
     ptype = 0                 # 0 billboard, 1 plate XY, 2 plate XZ, 3 directional, 4 directional polygon, 8 Y billboard
     mesh = None               # (pos [n, 3], uv [n, 2], idx [m])
     mesh_frame = False        # a directional mesh kept in the emitter's frame (eft2's: Ultimate's footage)
+    program = None            # stage 2: its pixel program (latte_pixel.Program), sample, consts, blend_mode
+    sample = None
+    consts = None
+    blend_mode = 'alpha'
     tex = None                # [h, w, 4] 0-1
     blend = 0                 # 0 alpha, 1 add
     follow = True
@@ -226,8 +230,9 @@ class Canvas:
         return (np.asarray((np.asarray(x) - self.x0) * self.ppu).astype(int),
                 np.asarray((self.y1 - np.asarray(y)) * self.ppu).astype(int))
 
-    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend):
-        """one triangle: P [3, 2] world (screen x = top's Z, y = Y), UV [3, 2]"""
+    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend, VC=None):
+        """one triangle: P [3, 2] world (screen x = top's Z, y = Y), UV [3, 2], VC [3, 4] a mesh's vertex
+        colours (x the colour and alpha, as both games' mesh programs do)"""
         X = (P[:, 0] - self.x0) * self.ppu
         Y = (self.y1 - P[:, 1]) * self.ppu
         xa, xb = max(int(X.min()), 0), min(int(X.max()) + 1, self.w)
@@ -258,12 +263,53 @@ class Canvas:
         else:
             c = rgb * t[:, :3]
         a = alpha * (t[:, 0] if alpha_red else t[:, 3])
+        if VC is not None:
+            vc = np.stack([l0[inside], l1[inside], l2[inside]], 1) @ np.asarray(VC, float)
+            c = c * vc[:, :3]
+            a = a * vc[:, 3]
         a = np.clip(a, 0, 1)[:, None]
         c = np.clip(c, 0, 1)
         ys, xs = np.nonzero(inside)
         ys, xs = ys + ya, xs + xa
         dst = self.rgb[ys, xs]
         self.rgb[ys, xs] = dst + c * a if blend == 1 else dst * (1 - a) + c * a
+
+    def tri_program(self, P, attrs, shade, blend):
+        """one triangle drawn by a pixel program (stage 2): attrs {semantic: [3, 4]} per vertex,
+        interpolated over its pixels; shade(inputs {semantic: [4, n]}) -> rgba [4, n]; blend: 'premult'
+        (ONE / INV_SRC_ALPHA: the premultiplied templates), 'alpha', 'add' or 'sub' (the emitter's)"""
+        X = (P[:, 0] - self.x0) * self.ppu
+        Y = (self.y1 - P[:, 1]) * self.ppu
+        xa, xb = max(int(X.min()), 0), min(int(X.max()) + 1, self.w)
+        ya, yb = max(int(Y.min()), 0), min(int(Y.max()) + 1, self.h)
+        if xa >= xb or ya >= yb:
+            return
+        den = (Y[1] - Y[2]) * (X[0] - X[2]) + (X[2] - X[1]) * (Y[0] - Y[2])
+        if abs(den) < 1e-9:
+            return
+        gx, gy = np.meshgrid(np.arange(xa, xb) + 0.5, np.arange(ya, yb) + 0.5)
+        l0 = ((Y[1] - Y[2]) * (gx - X[2]) + (X[2] - X[1]) * (gy - Y[2])) / den
+        l1 = ((Y[2] - Y[0]) * (gx - X[2]) + (X[0] - X[2]) * (gy - Y[2])) / den
+        l2 = 1 - l0 - l1
+        inside = (l0 >= 0) & (l1 >= 0) & (l2 >= 0)
+        if not inside.any():
+            return
+        b = np.stack([l0[inside], l1[inside], l2[inside]])            # [3, n]
+        inputs = {sem: (np.asarray(v, float).T @ b) for sem, v in attrs.items()}
+        out = shade(inputs)
+        c = np.clip(out[:3].T, 0, None)
+        a = np.clip(out[3], 0, 1)[:, None]
+        ys, xs = np.nonzero(inside)
+        ys, xs = ys + ya, xs + xa
+        dst = self.rgb[ys, xs]
+        if blend == 'premult':
+            self.rgb[ys, xs] = c + dst * (1 - a)
+        elif blend == 'add':
+            self.rgb[ys, xs] = dst + c * a
+        elif blend == 'sub':
+            self.rgb[ys, xs] = dst - c * a
+        else:
+            self.rgb[ys, xs] = dst * (1 - a) + c * a
 
     def image(self):
         return (np.clip(self.rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
@@ -302,8 +348,26 @@ def basis(em, vel, cm):
     return frame
 
 
+HDR_RANGE = (1.0, 0.0, 0.0, 0.0)    # u_nwHdrRange (CB9 [8]): rgb x .x + .w, the game's own at run time
+
+
+def sampler(textures, scales):
+    """sample(slot, u, v) for latte_pixel: nearest texel, repeat wrap, the slot's UV repeat"""
+    def sample(slot, u, v):
+        tex = textures[slot] if slot < len(textures) else None
+        if tex is None:
+            return np.ones((4, len(u)))
+        sx, sy = scales[slot] if slot < len(scales) else (1, 1)
+        th, tw = tex.shape[:2]
+        iu = ((np.asarray(u) * sx % 1) * tw).astype(int).clip(0, tw - 1)
+        iv = ((np.asarray(v) * sy % 1) * th).astype(int).clip(0, th - 1)
+        return tex[iv, iu].T
+    return sample
+
+
 def draw(canvas, em, parts, cm):
-    pos, uv, idx = em.mesh if em.mesh is not None else QUAD
+    pos, uv, idx = em.mesh[:3] if em.mesh is not None else QUAD
+    vcol = em.mesh[3] if em.mesh is not None and len(em.mesh) > 3 and em.mesh[3] is not None else None
     items = []
     for p, v, t, (sx, sy), rot, alpha, rgb, rgb1 in parts:
         b = basis(em, v, cm) @ rot_xyz(rot)
@@ -313,7 +377,18 @@ def draw(canvas, em, parts, cm):
         s = w @ TO_SCREEN.T
         for k in range(0, len(idx) - 2, 3):
             tri = idx[k:k + 3]
-            canvas.tri(s[tri, :2], uv[tri, :2], em.tex, rgb, rgb1, alpha, em.combine, em.alpha_from_red, em.blend)
+            if em.program is not None:
+                # stage 2: the part's own pixel program (tools/latte_pixel.py) on its inputs
+                c0 = np.append(np.asarray(rgb, float), alpha)
+                c1 = np.append(np.asarray(rgb1 if rgb1 is not None else (0, 0, 0), float), 1.0)
+                uvs = np.concatenate([uv[tri, :2], uv[tri, :2]], 1)
+                attrs = {0: np.tile(c0, (3, 1)), 1: np.tile(c1, (3, 1)), 9: uvs, 10: uvs,
+                         6: vcol[tri] if vcol is not None else np.ones((3, 4))}
+                canvas.tri_program(s[tri, :2], attrs, lambda inp: em.program.run(inp, em.consts, em.sample),
+                                   em.blend_mode)
+            else:
+                canvas.tri(s[tri, :2], uv[tri, :2], em.tex, rgb, rgb1, alpha, em.combine, em.alpha_from_red,
+                           em.blend, vcol[tri] if vcol is not None else None)
 
 
 # ------------------------------------------------------------------ Ultimate (eft2)
@@ -393,9 +468,10 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.ptype = {5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])
         em.mesh_frame = True
         if pt['primitive_id'] != NONE64 and pt['primitive_id'] in prims:
-            pos, _n, _c, uv, idx = V.mesh(prims[pt['primitive_id']], e['tex_anim'][0]['uv_channel'])
+            pos, _n, col, uv, idx = V.mesh(prims[pt['primitive_id']], e['tex_anim'][0]['uv_channel'])
             em.mesh = (np.asarray(pos, float) * np.array(sc['scale']) / np.array([em.size[0], em.size[1], em.size[0]]),
-                       np.asarray(uv, float)[:, :2], np.asarray(idx).ravel())
+                       np.asarray(uv, float)[:, :2], np.asarray(idx).ravel(),
+                       None if col is None else np.asarray(col, float))
         ti, smp = V.main_texture(e, names)
         if smp and smp['texture_id'] in images:
             img = V.first_cell(images[smp['texture_id']], st['tex_scroll'][ti], V.shown_cell(e, ti))
@@ -410,7 +486,7 @@ def ult_emitters(eff, set_index, images, names, prims):
 
 
 # ------------------------------------------------------------------ Smash 4 (eft)
-def s4_emitters(p, set_index):
+def s4_emitters(p, set_index, program_cache=None):
     out = []
     for e in p.sets[set_index]['emitters']:
         d = e['data']
@@ -465,14 +541,33 @@ def s4_emitters(p, set_index):
         em.rot_add = np.array(f('rotation_velocity'))
         em.ptype = f('particle_type')
         if f('primitive_index') >= 0:
-            pos, _n, _c, uv, idx = p.primitive(f('primitive_index'))
-            em.mesh = (np.asarray(pos, float), np.asarray(uv, float)[:, :2], np.asarray(idx).ravel())
-        try:
-            em.tex = np.asarray(p.decode_texture(d, 0), float) / 255
-        except Exception:                       # noqa: BLE001
-            em.tex = None
+            pos, _n, col, uv, idx = p.primitive(f('primitive_index'))
+            em.mesh = (np.asarray(pos, float), np.asarray(uv, float)[:, :2], np.asarray(idx).ravel(),
+                       None if col is None else np.asarray(col, float))
+        texs = []
+        for slot in range(3):
+            try:
+                t = p.decode_texture(d, slot)
+                texs.append(None if t is None else np.asarray(t, float) / 255)
+            except Exception:                   # noqa: BLE001
+                texs.append(None)
+        em.tex = texs[0]
         em.blend = 1 if f('blend_type') == 1 else 0
         sh = p.field(d, 'shader_index')
+        if program_cache is not None:
+            import eft_pixel
+            import latte_pixel
+            key = bytes(p.shader_binary(sh))
+            if key not in program_cache:
+                try:
+                    program_cache[key] = latte_pixel.Program(key)
+                except NotImplementedError:
+                    program_cache[key] = None
+            em.program = program_cache[key]
+            em.sample = sampler(texs, [tuple(f('tex0_uv_scale'))] + [(1, 1)] * 2)
+            em.consts = {8: HDR_RANGE}
+            em.blend_mode = 'premult' if eft_pixel.premultiplied(p, sh) else \
+                {0: 'alpha', 1: 'add', 2: 'sub'}.get(f('blend_type'), 'alpha')
         if struct.unpack_from('>I', bytes(p.shader_entry(sh)), 0)[0] & 0xFF in (5, 6):
             em.alpha_curve = lambda t: 0.0
             em.notes = ['distortion pass (not drawn)']
@@ -602,6 +697,8 @@ def main():
     ap.add_argument('--every', type=int, default=4)
     ap.add_argument('--scale', type=float, default=6.0, help='pixels a unit')
     ap.add_argument('--view', default='-25,25,-6,34', help='x0,x1,y0,y1 in units (x: forward)')
+    ap.add_argument('--stage', type=int, default=2, help='1: the converted parts drawn as colour x texture; '
+                    '2 (default): by their own pixel programs (tools/latte_pixel.py)')
     a = ap.parse_args()
     import port_sources
     src = port_sources.load()
@@ -634,12 +731,13 @@ def main():
     p = ptcl.Ptcl(open(os.path.join(edir, '%s.010d0000.ptcl' % a.name), 'rb').read())
     ef = efc.Efc(open(os.path.join(edir, '%s.010d0000.efc' % a.name), 'rb').read())
     s4 = {}
+    programs = {}
     for nm, v in ids.items():
         if nm.startswith('_'):
             continue
         i = int(v, 0) & 0xFFFF
         if i < len(ef.entries) and ef.entries[i][1]:
-            s4[int(v, 0)] = s4_emitters(p, ef.entries[i][1] - 1)
+            s4[int(v, 0)] = s4_emitters(p, ef.entries[i][1] - 1, None if a.stage == 1 else programs)
     os.makedirs(a.out, exist_ok=True)
     for move in a.moves:
         out = os.path.join(a.out, '%s.png' % move.lower())

@@ -289,3 +289,12 @@ vfxb_to_ptcl.py: a directional mesh sent along any fixed emitter direction (no s
 part the lesser) is type 4 (the emitter's frame), beside the old moving-along-Y rule (Woosh). 26 of
 Squirtle's parts (74 converted emitters with the variants and both sides); Hero's bank has 5 such parts,
 changed only when it is rebuilt.
+
+## v6 effects test 3 (`build/squirtle_v6_effects_test3.zip`)
+
+User's clip of test 2: the smash charge flash showed a strong rainbow band (Ultimate: a white flash, the
+rainbow lost in it). sys_smash_flash's rainbow1 / rainbow2 are additive in Ultimate; the converter's
+template was premultiplied (ONE / INV_SRC_ALPHA, the shader key's bit), so they covered the flash. Our
+pixel program now writes alpha 0 for an additive part on such a template, so the blend adds (8 emitters:
+the flash's rainbows, additive parts of landing / jump / run smoke, attack arcs, piyo, sleep, the win pose).
+tools/eft_pixel_test.py covers it. Renderer stage 2 (tools/latte_pixel.py) shows the flash matching.

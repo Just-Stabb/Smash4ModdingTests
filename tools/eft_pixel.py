@@ -152,7 +152,7 @@ def _blend(ch, mode, t, other):
 
 
 def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-           c0_const=None, tex_blend2=(0, 0), premult=False, distort=None):
+           c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False):
     """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
     it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
     texture, an opaque black ball where its gradient texture is dark). tex_blend (colour, alpha):
@@ -162,7 +162,10 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     the threshold colour 1's red (the converter's colour-1 track: Ultimate's colour 1 alpha over
     life), colour 1 itself c1_const; or, c0_const given (colour 0's rgb; its alpha stays the
     track's), colour 0's red; alpha x clamp((mask - threshold) / width). premult: rgb out x alpha
-    out (a premultiplied template's; not its x 2, so the part is as bright as on any other).
+    out (a premultiplied template's; not its x 2, so the part is as bright as on any other); additive,
+    with premult: alpha out 0, so the template's ONE / INV_SRC_ALPHA blend adds (rgb x a + dst), as the
+    part's own additive blend in Ultimate (sys_smash_flash's rainbows laid a rainbow over the white flash
+    as a covering blend; added, they vanish into it as in Ultimate's footage).
     distort (sx, sy), a two- / three-texture layout: Ultimate's combiner shader_type 2, texture 1 a
     distortion map moving texture 0's UVs, u + (2 t1.x - 1) sx, v + (2 t1.w - 1) sy (its fire /
     smoke programs, read with the WindowSmash translator: sampler 0's red and alpha x the static
@@ -300,6 +303,8 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
                   + ['w: MOV             R0.w, %s.w' % d])
     if premult:
         groups.append(['%s: MUL             R0.%s, R0.%s, R0.w' % (ch, ch, ch) for ch in 'xyz'])
+        if additive:
+            groups.append(['w: MOV             R0.w, 0.0f'])
     k = (5 if three else 4) if distort else 3 if three else 2 if two else 1    # slots count on from the samples
     for g in groups:
         for j, ln in enumerate(g):
@@ -313,10 +318,10 @@ _programs = {}
 
 
 def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-            c0_const=None, tex_blend2=(0, 0), premult=False, distort=None):
+            c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False):
     """(program bytes, GPR count), assembled once per variant"""
     src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2,
-                 premult, distort)
+                 premult, distort, additive)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -336,7 +341,7 @@ _shaders = {}
 
 
 def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-               c0_const=None, tex_blend2=(0, 0), distort=None):
+               c0_const=None, tex_blend2=(0, 0), distort=None, additive=False):
     """the index of shader si of Ptcl p with one of these pixel programs (added once per variant),
     or None when its pixel program isn't one this module can stand in for. c1_const: colour 1 (rgb,
     x the colour scale) for a template that doesn't pass it, or that passes the dissolve's
@@ -349,6 +354,7 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     if lay is None:
         return None
     premult = premultiplied(p, si)
+    additive = bool(additive and premult)
     if dissolve is None or 'uv1' in lay or (c0_const is None and lay['c1'] is None) or (
             c0_const is not None and lay['c1'] is None and color_mode in (2, 3)):
         dissolve = c0_const = None
@@ -367,10 +373,10 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     if 'uv2' not in lay:
         tex_blend2 = (0, 0)
     key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const, tuple(tex_blend),
-           dissolve, c0_const, tuple(tex_blend2), premult, distort)
+           dissolve, c0_const, tuple(tex_blend2), premult, distort, additive)
     if key not in _shaders or _shaders[key][0] is not p:
         prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const,
-                             tuple(tex_blend2), premult, distort)
+                             tuple(tex_blend2), premult, distort, additive)
         nb = with_program(b, prog, gprs)
         if hashlib.md5(b).hexdigest() in GRAFTED:          # (a grafted layout stays one)
             GRAFTED[hashlib.md5(nb).hexdigest()] = GRAFTED[hashlib.md5(b).hexdigest()]

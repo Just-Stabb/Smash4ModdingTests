@@ -1116,7 +1116,8 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         c1 = display(c1)
         c0 = display(c0) if c0 is not None else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
-                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort)
+                              1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort,
+                              additive=e['render']['blend_type'] == 1)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
@@ -1126,7 +1127,8 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         ', colour 1 constant' if (lay['c1'] is None or (dissolve is not None and not dissolve_c0))
         and cb['color_process'] in (2, 3) else '',
         ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else '',
-        ', premultiplied' if eft_pixel.premultiplied(p, si) else '')
+        (', premultiplied, added' if e['render']['blend_type'] == 1 else ', premultiplied')
+        if eft_pixel.premultiplied(p, si) else '')
         + (', UVs distorted by texture 1 (%.3f, %.3f)' % tuple(distort) if distort is not None and 'uv1' in lay else ''))
     return si, np.clip(alpha / gain, 0, 1), gain
 

@@ -96,7 +96,7 @@ def run(lines, regs, kc0, tex):
     return out
 
 
-def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=None, premult=False):
+def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=None, premult=False, additive=False):
     if dissolve is not None:
         # (width, threshold): texture grey in .x, the mask in .y
         width, thr = dissolve
@@ -120,7 +120,9 @@ def expected(cm, am, gain, c0, c1, t, vc, hdr, t1=None, blend=(0, 0), dissolve=N
         rgb = [x * y for x, y in zip(rgb, vc[:3])]
         a *= vc[3]
     a = min(max(a, 0.0), 1.0)
-    return [(min(max(x, 0.0), 1.0) * hdr[0] + hdr[3]) * (a if premult else 1.0) for x in rgb] + [a]
+    # additive (premultiplied): alpha out 0, so ONE / INV_SRC_ALPHA adds
+    return [(min(max(x, 0.0), 1.0) * hdr[0] + hdr[3]) * (a if premult else 1.0) for x in rgb] + [
+        0.0 if premult and additive else a]
 
 
 LAYOUTS = {
@@ -142,9 +144,10 @@ def test_variants():
     rnd = random.Random(1)
     for name, lay in LAYOUTS.items():
         for cm in range(4):
-            for am, gain, premult in itertools.product((0, 1), (1.0, 4.0), (False, True)):
+            for am, gain, (premult, additive) in itertools.product((0, 1), (1.0, 4.0),
+                                                                   ((False, False), (True, False), (True, True))):
                 c1k = C1_CONST if lay['c1'] is None else None
-                prog, gprs = E.program(lay, cm, am, gain, c1k, premult=premult)
+                prog, gprs = E.program(lay, cm, am, gain, c1k, premult=premult, additive=additive)
                 lines = disasm(prog)
                 worst = 0.0
                 for _ in range(40):
@@ -167,14 +170,15 @@ def test_variants():
                         seen.append((u, v))
                         return texel
                     got = run(lines, regs, {8: hdr}, tex)
-                    want = expected(cm, am, gain, c0, c1, texel, vc, hdr, premult=premult)
+                    want = expected(cm, am, gain, c0, c1, texel, vc, hdr, premult=premult, additive=additive)
                     k = (0, 1) if lay['uv'][1] == 'xy' else (2, 3)
                     if seen != [(uv[k[0]], uv[k[1]])]:
                         worst = float('inf')
                     worst = max(worst, max(abs(a - b) for a, b in zip(got, want)))
                 check(worst < 1e-5 and gprs == lay['regs'] + 2,
                       '%s colour %d alpha %d x %g%s: max error %.2g (%d GPRs)' % (
-                          name, cm, am, gain, ', premultiplied' if premult else '', worst, gprs))
+                          name, cm, am, gain, (', premultiplied, added' if additive else ', premultiplied')
+                          if premult else '', worst, gprs))
 
 
 def test_two():
