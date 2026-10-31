@@ -337,6 +337,7 @@ class Canvas:
 QUAD = (np.array([[-0.5, 0.5, 0], [0.5, 0.5, 0], [0.5, -0.5, 0], [-0.5, -0.5, 0]]),
         np.array([[0, 0], [1, 0], [1, 1], [0, 1.0]]), np.array([0, 1, 2, 0, 2, 3]))
 # top's axes on screen: Z right, Y up; X away from the camera (depth)
+XZ_PLATE = np.array([[1, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])   # a plate's Y onto the emitter's Z
 TO_SCREEN = np.array([[0, 0, 1.0], [0, 1.0, 0], [-1.0, 0, 0]])
 
 
@@ -352,7 +353,7 @@ def basis(em, vel, cm, lin=None):
     if em.ptype == 1:
         return frame
     if em.ptype == 2:                 # XZ plate: the quad's Y along the emitter's Z
-        return frame @ np.array([[1, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])
+        return frame @ XZ_PLATE
     s = np.linalg.norm(vel)
     if em.ptype == 4 or (em.ptype == 3 and em.mesh is not None and em.mesh_frame):
         # eft's type 4 (directional polygon) keeps the emitter's frame (Zelda's crystals, Hero's whirlwinds);
@@ -394,7 +395,13 @@ def draw(canvas, em, parts, cm):
     vcol = em.mesh[3] if em.mesh is not None and len(em.mesh) > 3 and em.mesh[3] is not None else None
     items = []
     for p, v, t, (sx, sy), rot, alpha, rgb, rgb1, lin in parts:
-        b = basis(em, v, cm, lin) @ rot_xyz(rot, em.prot_order)
+        b = basis(em, v, cm, lin)
+        if em.ptype == 2:
+            # an XZ plate is laid flat first, then turned (its Y the plate's normal): Squirtle's up-smash
+            # ripple ring1 (is_rotate 0 1 0, a random Y turn) spins about the vertical, flat
+            b = b @ XZ_PLATE.T @ rot_xyz(rot, em.prot_order) @ XZ_PLATE
+        else:
+            b = b @ rot_xyz(rot, em.prot_order)
         w = (b @ (pos * np.array([sx, sy, sx])).T).T + p
         items.append((-(w[:, 0].mean()), w, alpha, rgb, rgb1))
     for _d, w, alpha, rgb, rgb1 in sorted(items, key=lambda x: x[0]):

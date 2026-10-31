@@ -326,3 +326,19 @@ Rx), as eft does; vfxb_to_ptcl's eft_rotation had re-expressed the angles as Z f
 birth-frame emitter frames, is_rotate axes and effect off-switches; its down / forward smash renders
 put the sheets low and forward, both columns alike. Effect ids unchanged.
 
+## v6 effects test 6 (`build/squirtle_v6_effects_test6.zip`)
+
+User's clip of test 5 against native Ultimate: down smash better (both sides, lower) but still higher
+than Ultimate's band; forward smash's wave rising in front instead of running along the ground; up
+smash a V of splayed columns (Ultimate: two straight columns) inside a big blue haze. From main.bin:
+the emitter setup (0x8B8A0 - 0x8B910) zeroes rotate_init / random / add / random on every particle's
+disabled is_rotate axes, not only directional meshes' (the converter's old rule): the up-smash waves
+(type 5 meshes, is_rotate 000, X 15 and -10 a frame) rise straight now (30 emitters cut, 14 before).
+Ultimate's particle type 4 lays the particle flat (an XZ polygon: its vertex program negates the mesh's
+Y, type 3's doesn't; type-4 meshes are authored in XY, 141 of 147 flat ones) and maps to eft's type 2,
+not 4: the ripple's flare1, a 30-unit XY glow disc, stood up as the haze. Smash 4's own emitter matrix
+rebuild (cross_f 0x04A644E0) is X first too (R = Rz Ry Rx), so test 5's angle change stands.
+Open: whether eft's type 2 with a grafted rotation turns ring1 (a random Y turn) before laying it flat
+(it would tilt); the forward / down smash waves higher than in Ultimate (Ultimate's EAET translation
+and key evaluation (0x933D0) read as ours); fx_render doesn't draw the up-smash wave meshes.
+
