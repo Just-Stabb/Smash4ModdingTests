@@ -354,3 +354,14 @@ the excess is Smash 4 playing the converted bank bigger or higher than modelled.
 each test 6 plus one change): 7a drops water_smash's translation keys (targets 8-10), 7b the
 particle-scale keys (17-18) of water_smash / water_cutter.
 
+Diagnostics 7a / 7b (user's clips): without water_smash's translation keys (7a) the forward / down smash
+water stays at Squirtle's height, curling round him; without the scale keys (7b) it still rises in
+high crescents. So the lift is the emitter translation (EAET). In Ultimate water_smash's wave and splash
+emitters (all but splash3) emit by distance (emit_dist_enabled, dist_unit 1-3.5, max 10), which the
+converter doesn't convert (it emits by time). main.bin: distance emission (0x8D340) counts the emitter's
+own movement this frame (+0x3D0, the current and previous positions through the inverted matrix,
+0x8E040 - 0x8E124; the animated translation included), places the particles along the path (+0x3C0 to
++0x370), and runs only when a byte on the emitter set (+0x265) is set; otherwise those emitters emit
+nothing. That byte is written from a list lookup (0xF70BC / 0xFEE78) not yet placed. Diagnostic 8: the
+ten distance emitters of water_smash / water_smash_r silenced (emit_rate 0).
+
