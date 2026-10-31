@@ -279,3 +279,13 @@ they emit (EAER), and the converter turned eft2's angles into eft's at the keys 
 world gravity (eft2 emission `world_gravity`, eft byte 0x2F8) wasn't set, so gravity turned with them.
 Both fixed in vfxb_to_ptcl.py (rotation keys every frame, angles unwrapped; `world_gravity` written).
 Includes the refraction test. Open: the dash's droplets (both columns agree, Ultimate's footage is lower).
+
+## v6 effects test 2 (`build/squirtle_v6_effects_test2.zip`)
+
+User's clip of test 1: down smash's water to both sides, but two tall curtains (Ultimate: one low wide
+wave). The waves are flat sheets (Y 0, 8.2 units along -Z) sent along -Z; Ultimate keeps directional
+meshes in the emitter's frame, eft's type 3 turns the mesh's Y onto the motion and faces the camera.
+vfxb_to_ptcl.py: a directional mesh sent along any fixed emitter direction (no spread, the all-direction
+part the lesser) is type 4 (the emitter's frame), beside the old moving-along-Y rule (Woosh). 26 of
+Squirtle's parts (74 converted emitters with the variants and both sides); Hero's bank has 5 such parts,
+changed only when it is rebuilt.

@@ -138,6 +138,7 @@ class Emitter:
     rot_add = np.zeros(3)
     ptype = 0                 # 0 billboard, 1 plate XY, 2 plate XZ, 3 directional, 4 directional polygon, 8 Y billboard
     mesh = None               # (pos [n, 3], uv [n, 2], idx [m])
+    mesh_frame = False        # a directional mesh kept in the emitter's frame (eft2's: Ultimate's footage)
     tex = None                # [h, w, 4] 0-1
     blend = 0                 # 0 alpha, 1 add
     follow = True
@@ -287,7 +288,11 @@ def basis(em, vel, cm):
     if em.ptype == 2:                 # XZ plate: the quad's Y along the emitter's Z
         return frame @ np.array([[1, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])
     s = np.linalg.norm(vel)
-    if em.ptype in (3, 4) and s > 1e-4:
+    if em.ptype == 4 or (em.ptype == 3 and em.mesh is not None and em.mesh_frame):
+        # eft's type 4 (directional polygon) keeps the emitter's frame (Zelda's crystals, Hero's whirlwinds);
+        # so does eft2's directional mesh (Squirtle's down-smash waves in Ultimate's footage)
+        return frame
+    if em.ptype == 3 and s > 1e-4:
         y = vel / s
         x = np.cross(y, frame[:, 2])
         if np.linalg.norm(x) < 1e-6:
@@ -386,6 +391,7 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.rot_rand = np.array(st['rotate_init_rand'][:3], float)
         em.rot_add = np.array(st['rotate_add'][:3], float)
         em.ptype = {5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])
+        em.mesh_frame = True
         if pt['primitive_id'] != NONE64 and pt['primitive_id'] in prims:
             pos, _n, _c, uv, idx = V.mesh(prims[pt['primitive_id']], e['tex_anim'][0]['uv_channel'])
             em.mesh = (np.asarray(pos, float) * np.array(sc['scale']) / np.array([em.size[0], em.size[1], em.size[0]]),

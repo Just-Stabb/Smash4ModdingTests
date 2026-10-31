@@ -1474,16 +1474,22 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         typ = 4
         rest_dir = True
         notes.append('directional mesh at rest: type 4')
-    elif is_mesh and typ == 3 and abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3 \
+    elif is_mesh and typ == 3 and ((
+            abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3
             and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
-                                                vel['diffusion'][2]]):
+                                                vel['diffusion'][2]])) or (
+            abs(vel['all_direction']) <= abs(vel['designated_dir_scale']) and abs(vel['designated_dir_scale']) > 1e-3
+            and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], *vel['diffusion']]))):
         # a directional mesh moving straight along the emitter's Y (Woosh's whirlwinds, rising) stands
         # along it in Ultimate, which is the emitter's frame; eft's type 3 turned it end-on to the camera
         # (the whirlwind test: a flat red ring at his feet). Type 4 keeps the emitter's frame. A spread
         # along Y alone keeps it on Y (Swoosh / Kaswoosh's big funnels, diffusion 0 0.1 0, following the
         # moving projectile: as type 3 eft aimed them along its travel, a flat blue disc, fix 51)
+        # Any fixed direction of the emitter's (no spread, the all-direction part the lesser): Squirtle's
+        # down-smash waves, flat sheets 8 units long along -Z sent along -Z, lie flat along the ground in
+        # Ultimate's footage and stood up as eft's type 3 curtains (facing the camera about their motion)
         typ = 4
-        notes.append('directional mesh moving along Y: type 4')
+        notes.append('directional mesh moving along an emitter axis: type 4')
     elif is_mesh and pt['billboard_type'] in (5, 6):
         # a "stripe" mesh (no ribbon data: its shape is the mesh) keeps the emitter's frame: neutral
         # air's rainbow1, a flat 69-unit disc laid level (emitter X 90) and sent off in a random

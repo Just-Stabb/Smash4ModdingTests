@@ -150,6 +150,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | an emitter with a fractional rate emitted once: a particle buffer of 0 | Ultimate's sys_piyo | converter: one particle |
 | hurtboxes on the port's own joints (table 1) | Squirtle's tail | ultimate_vl_shapes.py: 1000 + k |
 | an emitter turning while it emits, converted at its keys only: another path between them | Squirtle's down smash (the water stood up) | converter: every frame between keys (found with fx_render.py) |
+| eft2 directional meshes sent along a fixed emitter axis drawn as eft type 3 (turned upright to face the camera) | Squirtle's down-smash / run waves (curtains, user's test 1 clip) | converter: type 4 (the emitter's frame), as Hero's whirlwinds |
 | eft2's world gravity not set on eft's emitters: gravity turned with the emitter | Squirtle's down smash | converter writes ptcl `world_gravity` (0x2F8, cross_f 0x04A62620) |
 | a copied article keeps its base's native per-frame code: Squirtle's water bounced like Mario's fireball and died at close range | Squirtle v2-v5, Supamario's Kamehameha | `"nop2"` in the record (port_bases.json `weapon_nop2`) [W1] |
 | base counters / native per-frame code acting on the port | Hero fixes 19, 62 | `reference/port_bases.json` traps |
