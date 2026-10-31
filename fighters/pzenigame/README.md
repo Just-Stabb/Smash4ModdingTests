@@ -312,3 +312,17 @@ emitters (down smash sheet and droplets, dash / run splashes, Water Gun spray, l
 491 emitters across 20 Ultimate fighters use it. tools/eft_pixel_test.py covers it; fx_render shows both
 columns dissolving alike (down smash, dash). Still open: the charge flash's ring, washed out by Ultimate's
 screen bloom, which Smash 4 lacks.
+
+## v6 effects test 5 (`build/squirtle_v6_effects_test5.zip`)
+
+User's clip of test 4 against native Ultimate: down smash "separate textures blended together" where
+Ultimate shows one wave splashing round in rotation; forward smash's wave curling up. The down-smash
+water is one flat sheet mesh per frame (follow type 1: each keeps the emitter's frame from its birth)
+from emitters swept by EAER (water_smash: Y 89 -> -120 while Z tilts 0 -> 70; water_cutter: Y -130 ->
+-440), and the script turns water_smash off at frame 19. Ultimate's emitter matrices, read from
+exefs main.bin (static 0x88320, animated 0x8D0A0, composed v . M at 0x8D838), turn X first (R = Rz Ry
+Rx), as eft does; vfxb_to_ptcl's eft_rotation had re-expressed the angles as Z first (Sephiroth test
+44's inference), standing the swept sheets up. It keeps the angles now. tools/fx_render.py also gained
+birth-frame emitter frames, is_rotate axes and effect off-switches; its down / forward smash renders
+put the sheets low and forward, both columns alike. Effect ids unchanged.
+
