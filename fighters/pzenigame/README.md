@@ -342,3 +342,15 @@ Open: whether eft's type 2 with a grafted rotation turns ring1 (a random Y turn)
 (it would tilt); the forward / down smash waves higher than in Ultimate (Ultimate's EAET translation
 and key evaluation (0x933D0) read as ours); fx_render doesn't draw the up-smash wave meshes.
 
+## Scale check and diagnostics 7a / 7b
+
+User's clip of test 6: up smash right (two straight columns, rings flat; the flare now a pale patch on
+the floor from Cemu's raised camera); forward / down smash water still about twice Squirtle's height
+(Ultimate: about his height). Scale ruled out: Ultimate's fighter_param.prc has Squirtle scale 0.94 and
+effect_scale 0.85; the port keeps Mario's (Smash 4 fighter_param 44 scale 1.0, 49 effect_scale 0.95, the
+latter the common effects' size: landing / water splash, KO, burial), 6 / 10 percent, not 2x. Ultimate's
+height for him is 10 units, and fx_render puts the forward-smash wave tops at about 10 on both columns, so
+the excess is Smash 4 playing the converted bank bigger or higher than modelled. Diagnostics (not fixes,
+each test 6 plus one change): 7a drops water_smash's translation keys (targets 8-10), 7b the
+particle-scale keys (17-18) of water_smash / water_cutter.
+
