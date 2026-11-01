@@ -340,6 +340,92 @@ def fix_split_flag_branch(out):
     return out
 
 
+def _units(seq):
+    """statements -> units: a lone statement, or an `if ... end` block (nested blocks inside)"""
+    out, i = [], 0
+    while i < len(seq):
+        if seq[i][0] == 'if':
+            d, j = 0, i
+            while j < len(seq):
+                d += {'if': 1, 'end': -1}.get(seq[j][0], 0)
+                if d == 0:
+                    break
+                j += 1
+            if j >= len(seq):
+                return None
+            out.append(seq[i:j + 1])
+            i = j + 1
+        elif seq[i][0] in ('else', 'elseif', 'end'):
+            return None
+        else:
+            out.append(seq[i:i + 1])
+            i += 1
+    return out
+
+
+LR_TAG = 'LR_IN_GAME '          # a facing condition fix_lr_split laid out: decided in game (LR_FACING)
+
+
+def fix_lr_split(out, cond_text):
+    """the dump's facing split `if LR { A } R; ... else { B } R'` (the else hung on R's last is_excute
+    block; R' the facing-right copy of R, the same shape: Squirtle's smash attacks' water_smash /
+    water_smash_r) -> `if LR { A } else { B }`, then R and R' paired unit by unit: a frame (or any
+    unit the two share) once, a differing block as `if LR { r } else { r' }`. Waits stay outside the
+    condition. Left as it is when the shapes don't match"""
+    out = list(out)
+    for i, st in enumerate(out):
+        if st[0] != 'if' or cond_text not in st[1]:
+            continue
+        d, j = 0, i
+        while j < len(out):
+            d += {'if': 1, 'end': -1}.get(out[j][0], 0)
+            if d == 0:
+                break
+            j += 1
+        if j >= len(out):
+            continue
+        if any(x[0] == 'else' for x in out[i:j]):
+            # a well-formed `if LR { A } else { B }`: decided in game as it is
+            out[i] = ('if', LR_TAG + st[1])
+            continue
+        # the misplaced else: the first else after j at the depth of a block opened after j
+        d, e = 0, None
+        for k in range(j + 1, len(out)):
+            d += {'if': 1, 'end': -1}.get(out[k][0], 0)
+            if d < 0:
+                break
+            if out[k][0] == 'else' and d == 1:
+                e = k
+                break
+        if e is None:
+            continue
+        r = out[j + 1:e] + [('end',)]                     # R, its last block closed
+        d, x = 1, None
+        for k in range(e + 1, len(out)):
+            d += {'if': 1, 'end': -1}.get(out[k][0], 0)
+            if d == 0:
+                x = k
+                break
+        if x is None:
+            continue
+        b = out[e + 1:x]                                     # B (the else's own blocks)
+        ur = _units(r)
+        rest = out[x + 1:]
+        ur2 = _units(rest[:len(r)]) if len(rest) >= len(r) else None
+        if not ur or not ur2 or len(ur) != len(ur2) or \
+                any((len(p) > 1) != (len(q) > 1) for p, q in zip(ur, ur2)):
+            continue
+        tagged = ('if', LR_TAG + st[1])
+        new = out[:i] + [tagged] + out[i + 1:j] + [('else',)] + b + [('end',)]
+        for p, q in zip(ur, ur2):
+            if p == q or len(p) == 1:
+                new += p
+            else:
+                new += [tagged] + p[1:-1] + [('else',)] + q[1:-1] + [('end',)]
+        return fix_lr_split(new + rest[len(r):], cond_text)
+    return out
+
+
 LR_LEFT = 'get_value_float(agent.lua_state_agent, *SO_VAR_FLOAT_LR) < 0.0'
 EFFECT_CONDS = ()
 
@@ -358,7 +444,13 @@ DYNAMIC_CONDS = {}
 
 
 def dynamic_var(cond):
+    """an int variable (tested != 0) or ('float', variable, method, value) (Float_Var_Compare)"""
     return next((v for k, v in DYNAMIC_CONDS.items() if k in cond), None)
+
+
+# the facing in game: position variable 0x0F000003 (1 right, -1 left; docs/position-variables.md),
+# method 4 (<): the facing-left branch of Ultimate's `if LR < 0` (its mirrored _r effects in the else)
+LR_FACING = ('float', 0x0F000003, 4, 0.0)
 
 
 def words(cmds):
@@ -402,7 +494,10 @@ class Translator:
         live = [True]              # a stack of "this block runs"
         taken = [False]
         dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
-        for st in fix_split_flag_branch(fix_misplaced_else(statements(body))):
+        sts = fix_split_flag_branch(fix_misplaced_else(statements(body)))
+        if LR_TAG in DYNAMIC_CONDS:
+            sts = fix_lr_split(sts, 'SO_VAR_FLOAT_LR) < 0')
+        for st in sts:
             kind = st[0]
             if kind == 'if':
                 var = dynamic_var(st[1]) if live[-1] else None
@@ -439,8 +534,9 @@ class Translator:
                         else:
                             body_t, body_e = cmds[at:els], cmds[els:]
                             self.frame = max(self.frame, other)
-                        block = [cmd('Int_Var_Compare', var, 1, 0),     # method 1: !=
-                                 cmd('True', 2 + words(body_t) + (2 if body_e else 0))] + body_t
+                        test = cmd('Float_Var_Compare', *var[1:]) if isinstance(var, tuple) else \
+                            cmd('Int_Var_Compare', var, 1, 0)                 # method 1: !=
+                        block = [test, cmd('True', 2 + words(body_t) + (2 if body_e else 0))] + body_t
                         if body_e:
                             block += [cmd('Else', 2 + words(body_e))] + body_e
                         cmds[at:] = block
@@ -777,6 +873,13 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
     # the facing-left branch: in the dumps the facing-right one is often nested inside it (a misplaced
     # else), so it's the one that always holds the effect; Smash 4 places effects by the bones anyway
     EFFECT_CONDS = (LR_LEFT,)
+    # Ultimate turns an effect on top with the facing and mirrors nothing: an asymmetric one has a
+    # mirrored _r copy that the script picks when facing right (Squirtle's water_smash / _r, water_cutter
+    # / _r, with mirrored angles). Smash 4 turns top's effects with the facing too (effect_variants.py), so
+    # the choice is made in game (LR_FACING) wherever fix_lr_split could lay the split out; elsewhere the
+    # facing-left branch, as before. Until Squirtle's effects test 9 it was always the facing-left one: his
+    # forward smash wave curled up over him facing right instead of running along the ground
+    DYNAMIC_CONDS[LR_TAG] = LR_FACING
     tr = EffectTranslator(joints, ids, parents, locals_)
     out = {}
     for path in sorted(os.listdir(scripts_dir)):
@@ -800,6 +903,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
             out[name] = cmds
     EFFECT_CONDS = ()
+    DYNAMIC_CONDS.pop(LR_TAG, None)
     return out, tr.missing
 
 
