@@ -167,9 +167,9 @@ class Emitter:
     notes = ()
 
 
-def simulate(em, call, frames, seed=1):
+def simulate(em, call, frames, seed=1, births_only=False):
     """{frame: [(pos, vel, age_t, size, rot, alpha, rgb)]} of one emitter played by a script call
-    (call: (frame, matrix effect -> top, size))"""
+    (call: (frame, matrix effect -> top, size)); births_only: {frame: particles born} (tools/vfx_trace.py)"""
     rng = np.random.default_rng(seed)
     f0, cm, csize, off = call
     out = {f: [] for f in frames}
@@ -216,6 +216,9 @@ def simulate(em, call, frames, seed=1):
                     carry -= 1
                     births.append(cur)
         prev = cur
+        if births_only:
+            out[f] = len(births)
+            continue
         for org in births:
             p = shape_point(rng, *em.volume)
             d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)

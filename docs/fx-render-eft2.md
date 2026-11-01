@@ -60,6 +60,12 @@ frame.
 | blending | approx | alpha or add; draw order by depth only |
 | refraction, bloom, soft particles, depth | missing | |
 
+## Checking against the engine itself
+
+docs/vfx-trace.md: an OpenSmash-Ultimate mod records the engine's own emitters and particles (births,
+every frame, its random state), and `tools/vfx_trace.py births` compares fx_render's births with them.
+Each stage above moves to **exact** once it matches the trace, not only the code read.
+
 ## Next, in order
 
 1. Velocity and emission shapes from main.bin (they decide where every particle goes).
