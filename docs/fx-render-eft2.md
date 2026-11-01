@@ -132,10 +132,38 @@ smash's dust is low translucent puffs; both as the shader-run side draws them. N
 per-effect colour / alpha (c16, EFFECT_SET_COLOR...), depth / soft particles, refraction (shader_type 1,
 left out), sort order (far particles first).
 
-The Smash 4 side is still fx_render's model with the converted parts' own pixel programs: it plays no
-flipbook and no UV scroll / scale, so differences there (Squirtle's dust impacts as solid sheets, the
-smash ring as a full ring) are the renderer's, not the bank's (its flipbooks / scrolls are set: check
-footage).
+## Smash 4's side drawn by the converted parts' own vertex programs (default; `--s4-model` for the old placement)
+
+`tools/latte_exec.py` turns a Latte vertex program (latte-dis text) into C++, one vertex at a time with the
+program's own control flow (R600 predication as one lane: ALU_PUSH_BEFORE saves the active flag, PRED_SET
+with UPDATE_EXEC_MASK sets it at the clause's end, JUMP / ELSE / POP and the POP_AFTER clauses restore it),
+integer and float operations bit-exact (MUL / MULADD / DOT4 non-IEEE, SIN / COS in revolutions), KCACHE
+banks, buffer fetches (b130 = CB2 at an integer index). All 171 programs of Squirtle's bank compile. The
+pixel programs stay latte_pixel's, fed the vertex program's PARAMn by semantic (SPI_VS_OUT_ID).
+
+Inputs:
+- CB2 emitterStaticUniformBlock: built by Smash 4's own code (`tools/eft_static.py`: cross_f 0x04A5AA00 in
+  unicorn, PowerPC; it clears 0x500 bytes, fills shtAnim0-2 (0x04A5A6AC), ptnAnm0-1 (0x04A5A858), uboFlag,
+  rotBasis, the scale / alpha / colour animation tables, and swaps every word for the GPU).
+- CB1 viewUniformBlock: vm, pm, vpm (world -> fx_render's screen), bm (billboards), ev, ep, vp, crossflg 0.
+- CB3 emitterDynamicUniformBlock (cross_f 0x04A65A08 fills it each frame from the live instance): emc0 /
+  emc1 1, emp0 = (the emitter's time, 1, 1, 1), emp1 1, emm / emmrt the emitter matrix. Not modelled: the
+  set's and instance's colours, emp0.yz / emp1 (set values).
+- the particle record (eft binds its streams by name, cross_f 0x04A59FC8: buffer 5, 0xB0 bytes a particle:
+  WldPos, Scl, Vec, Random, Rot, EmtMat0-2, Color0, Color1, WldPosDf); the mesh in buffers 0-4 (Pos w 1,
+  TexCoord, Normal, Color, Index), or eft's quad (cross_f 0x04A66B9C: corners -+0.5, w 0, indices 0-3).
+  The GPU programs (those reading v_inVec: 93 of the bank's 171) take the particle as born and work out
+  the rest themselves: v_inWldPos.w its birth (age = emp0.x - it), v_inRandom.w its life (their scale,
+  alpha and colour sections are fractions of it), v_inScl only the random factor (the base scale and its
+  curve are CB2's scaleAnim0-2): found by running smoke3's program, whose size follows its keys only so.
+  The CPU's programs take its current values (v_inWldPos.w the age). A program reading the live emitter
+  matrix (CB3 emm: sys_smash_flash's ring and lines, following) takes positions in the emitter's space.
+  Still fx_render's: the CPU particles' motion and colour curves (eft's CPU calc), emission.
+
+Checked (Squirtle's forward / down smash): the smash ring now plays its flipbook into the crescent, as
+Ultimate's; the dust is translucent puffs on both sides; the flash lands where Ultimate's does once the
+following programs get local positions (world positions put it 8 units off). Open: down smash's dust crown
+(Ultimate's impact meshes) missing on the Smash 4 side, its spray a few units higher.
 
 ## The first trace (Squirtle, user's run, 162 emitter runs)
 
