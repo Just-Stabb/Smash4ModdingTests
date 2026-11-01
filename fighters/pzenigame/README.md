@@ -581,3 +581,17 @@ Waterfall, compared emitter by emitter in fx_render:
 Still different: the start spikes (wave1) look about 1.7x fuller than Ultimate's. The geometry is no
 bigger (Ultimate's reaches 34 units, ours 20), but Ultimate's dissolve eats more of it. Threshold, edge,
 mask UVs and formula all match, so that cause is still open.
+
+## v6 effects test 18 (`build/squirtle_v6_effects_test18.zip`)
+
+Waterfall's spikes (TakinoboriStart wave1). With their spin forced to zero, both sides matched within 5%
+at every age, which put the difference in the random parts. Ultimate's programs take sampler 0's scroll
+random from the particle's random x, and sampler 1's (the dissolve mask's) from its y, which also drives
+the Y spin. eft's programs do the same per slot (both swept in mx_exec / latte_exec).
+- same_uv took two samplers with equal UV settings as one UV set. It no longer does when either has a
+  random scroll, scale or turn. The mask is now drawn live as texture 1 (23 emitters). The texel-by-texel
+  combine had laid the mask's empty parts over the texture's own, so it cut nothing.
+- exact_texture no longer combines a dissolve's mask into colour / alpha.
+- Random life: Ultimate's curves run on floor(life x (1 - r U)) (thresholds identical for lives
+  6.0 - 6.7). eft's life is now ceil(life) - 1, with random frames chosen for the same mean.
+- Result: wave1 covers 38.9k px against Ultimate's 40.5k (three seeds; it was 53.5k).

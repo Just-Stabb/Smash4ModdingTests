@@ -838,8 +838,15 @@ def same_uv(e, i, j):
     ta, ts_ = e['tex_anim'], e['static']['tex_scroll']
     keys = ('scroll', 'scroll_add', 'scroll_random', 'scale', 'scale_add', 'scale_random', 'rotation',
             'rotation_add', 'rotation_random', 'uv_div')
+    # a random UV part draws its own random per sampler: eft2's programs take sampler 0's scroll random from
+    # the particle's random x, sampler 1's from its y (Waterfall's wave1, run in tools/mx_exec.py with each
+    # component swept), so two samplers with a random scroll / scale / turn are offset apart. Taken as the same
+    # UVs, the dissolve mask was laid over the colour exactly where its own empty parts are: it cut nothing at
+    # threshold 0 and Waterfall's spikes stood 1.3x as full as Ultimate's
+    rnd = any(np.any(np.abs(np.asarray(ts_[n][k], float)) > 1e-6) for n in (i, j)
+              for k in ('scroll_random', 'scale_random', 'rotation_random'))
     return (ta[i]['uv_channel'] == ta[j]['uv_channel'] and ta[i]['repeat'] == ta[j]['repeat']
-            and all(np.allclose(ts_[i][k], ts_[j][k]) for k in keys))
+            and all(np.allclose(ts_[i][k], ts_[j][k]) for k in keys) and not rnd)
 
 
 def live_sampler(e, ti, images, names, is_mesh):
@@ -1097,7 +1104,7 @@ def _texblend(x, y, mode):
     return x + y if mode == 1 else x - y if mode == 2 else x * y
 
 
-def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, live2=None):
+def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, live2=None, mask=None):
     """the texture an own pixel program (tools/eft_pixel.py) reads, [h, w, 4] 0-1: Ultimate's colour
     input in rgb and its alpha input in a, sampler ti's (img: one cell or the flipbook sheet) with
     the emitter's other samplers combined in as eft2 does (tex1 / tex2 colour and alpha blends: 0
@@ -1107,7 +1114,10 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
     left out, the ball drew at the gradient's full alpha)"""
     rgb, a = sampler_inputs(e, ti, img)
     cb = e['combiner']
-    others = [(j, s) for j, s in enumerate(e['sampler']) if j not in (ti, live, live2) and s['texture_id'] != NONE64
+    # mask: a dissolve's mask sampler (1), which Ultimate's dissolve program reads only as the mask (Waterfall's
+    # wave1: its pixel program samples it for the discard alone). Combined in as well, its alpha (0.1 - 0.2)
+    # filled the main texture's empty parts: the spikes' tips stood 1.6x taller, faint, past Ultimate's cut
+    others = [(j, s) for j, s in enumerate(e['sampler']) if j not in (ti, live, live2, mask) and s['texture_id'] != NONE64
               and s['texture_id'] in images and not is_indirect(e, j, names)]
     if not others:
         return np.concatenate([rgb, a[..., None]], -1)
@@ -1895,7 +1905,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     if not exact:
         live = live2 = dis = warp = None
     if exact:
-        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live, live2)
+        pix = exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live, live2,
+                            mask=1 if dis is not None else None)
         rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
         rgb1 = track(st_, col_, 1)[0] * np.array(e['info']['color1'][:3])
         alpha, premult = exact[1], None
@@ -2218,6 +2229,18 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'emit_interval_random', max(0, int(ems['interval_random'])))
     p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)))
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
+    life_rand = 0
+    if life != FOREVER and pt['life_random'] > 0:
+        # eft2 gives a particle life x (1 - random% x U) and runs its curves on whole frames: Waterfall's spikes
+        # (life 7, 30%), lives 5.2 - 6.7, took the thresholds of life 6 at 6.0 - 6.7 and of 5 at 5.2 - 5.7 (their
+        # own vertex programs): floor(life x (1 - r U)), never the full life once r > 0. eft takes int(U x R)
+        # whole frames off (cross_f 0x04A5C8BC): its life the most eft2 reaches (ceil - 1), R for the same mean.
+        # As life 7 - int(U x 2) the spikes lived 6.5 frames to Ultimate's 5.45: eroded slower, more alive
+        # at once (1.7x Ultimate's cover)
+        u = (np.arange(4096) + 0.5) / 4096
+        mean = float(np.floor(pt['life'] * (1 - pt['life_random'] / 100 * u) + 1e-6).mean())
+        life = max(1, int(math.ceil(pt['life'] - 1e-6)) - 1)
+        life_rand = int(min(life, max(1, round(2 * (life - mean) + 1))))
     p.set_field(em, 'ptcl_life', life)
     # turned off (Terminate_Graphic_Effect): eft2 fades the alpha over alpha_fade_time frames when
     # asked (and drops infinite-life particles); eft's FADE_ALPHA is that rate (1 / frames:
@@ -2232,7 +2255,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         fade = 1.0 / max(1, info['alpha_fade_time'] or min(life, 10))
     struct.pack_into('>f', em, FADE_ALPHA, fade)
     em[FADE_EMIT] = 1 if info['is_fade_emit'] or not fade else 0
-    p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else int(pt['life'] * pt['life_random'] / 100))
+    p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else life_rand)
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)
     if child_e is not None:
