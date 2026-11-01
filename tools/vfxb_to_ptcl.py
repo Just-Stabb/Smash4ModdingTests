@@ -1970,6 +1970,20 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     vt = sh['volume_type'] if sh['volume_type'] <= 14 else 0
     p.set_field(em, 'volume_type', vt)
     p.set_field(em, 'volume_radius', [float(r * f) for r, f in zip(sh['volume_radius'], sh['volume_form_scale'])])
+    if vt in (1, 2):
+        # circles: eft2 centres the sweep on its start (main.bin 0x90C40 / 0x90E20: start + sweep x i / n -
+        # sweep / 2), eft starts at it (cross_f 0x04A4B818 / 0x04A4BF18) and spreads an even circle over the
+        # emission's own particles, not a division count; the template's sweep was kept before (Squirtle's
+        # down / forward smash splashes, one division -> all born at one point in Ultimate, spread round a
+        # 9 - 15 unit circle here: the vfx_trace births). One division: sweep 0, exact
+        sweep = float(sh['sweep_longitude'])
+        n = max(1, int(sh['num_divide_circle']))
+        p.set_field(em, 'volume_sweep_start', float(sh['sweep_start']) - sweep / 2)
+        p.set_field(em, 'volume_sweep_param', 0.0 if vt == 2 and n == 1 else sweep)
+        p.set_field(em, 'volume_sweep_start_random', 1 if sh['sweep_start_random'] else 0)
+        p.set_field(em, 'volume_surface_random', math.degrees(float(sh['surface_pos_rand'])))
+        if vt == 2 and n > 1:
+            notes.append('even circle of %d: eft divides by the particles of an emission' % n)
     p.set_field(em, 'figure_velocity', float(vel['all_direction']))
     d = np.array(vel['designated_dir'], float)
     n = np.linalg.norm(d)

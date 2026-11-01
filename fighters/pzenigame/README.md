@@ -411,3 +411,20 @@ The byte on the emitter set that gates distance emission is copied from the set'
 (0x112C64). Diagnostic 8 showed these emitters do emit in Ultimate, so it is on for them.
 docs/fx-render-eft2.md lists what fx_render's Ultimate side does exactly and what it still approximates.
 Package: the bank and script/animcmd/body/effect.bin (test 9's).
+
+## v6 effects test 11 (`build/squirtle_v6_effects_test11.zip`)
+
+First run of the OpenSmash trace mod (docs/vfx-trace.md, the user's run: forward / down smash both
+facings, 162 emitter runs). Births per frame matched fx_render for every water_smash(_r), water_cutter(_r)
+and mouth_water emitter: distance emission (test 10) is what the engine does. Down smash's water_smash
+emits for one frame only (its script turns it off at 19, two frames after it starts: 4 splash1 particles,
+forward smash 14).
+
+The births also showed water_smash / water_cutter's splashes all born at ONE point, (0, 0, -radius):
+volume type 2 (even circle) with one division. main.bin 0x90E20: angle = start + sweep x i / n - sweep / 2,
+the point (sin a rx, 0, cos a rz). eft (cross_f 0x04A4BF18) has no division count: it starts at the sweep
+start and spreads an emission's own particles over the sweep. The converter had kept a template's
+sweep, so each frame's splashes (up to 4) spread round a 9 - 15 unit circle: the water in separate
+pieces. It now writes the sweep (start - sweep / 2; 0 for one division: exact). fx_render does both
+engines' circles exactly now; its down-smash render shows the converted water as one body.
+Still different in the render: Ultimate's wave stands taller at frames 24 - 28, its colour denser.

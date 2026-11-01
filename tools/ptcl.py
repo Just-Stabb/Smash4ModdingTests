@@ -89,7 +89,12 @@ FIELDS = [
     (0x340, '>I', 'volume_type', 'corpus'),       # 0 point, 2.. shapes (sphere / cylinder / box...)
     (0x348, '>3f', 'volume_radius', 'corpus'),
     (0x354, '>f', 'volume_sweep_start', 'corpus'),
-    (0x358, '>f', 'volume_sweep_param', 'corpus'),
+    # circles (cross_f 0x04A4B818 random, 0x04A4BF18 even; shape table 0x104557C8): particle i of an emission of
+    # n at sweep_start + i x param / n (full turn; else / (n - 1)), random: + U x param; the point
+    # (sin a x radius x, 0, cos a x radius z). Radians; 0x35C in degrees
+    (0x358, '>f', 'volume_sweep_param', 'runtime'),
+    (0x35C, '>f', 'volume_surface_random', 'runtime'),   # + U(-1, 1) x this degrees on the angle
+    (0x303, '>B', 'volume_sweep_start_random', 'runtime'),   # 1: the start at random (2 pi x U)
     (0x3D8, '>12f', 'emitter_matrix', 'corpus'),  # 3x4 rows: Rz.Ry.Rx(rotation) . diag(scale) | translation
     (0x408, '>3f', 'emitter_scale', 'corpus'),    # (the matrix is derived from these three: all 8115 vanilla
     (0x414, '>3f', 'emitter_rotation', 'corpus'),  # emitters agree; set_emitter_srt writes all four)

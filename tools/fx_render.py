@@ -87,7 +87,7 @@ def three(v0, v1, v2, s1, s2, t):
     return v1 + (v2 - v1) * ((t - s2) / (1 - s2) if s2 < 1 else 0)
 
 
-def shape_point(rng, vt, radius, sweep=None, sh=None, number=0):
+def shape_point(rng, vt, radius, sweep=None, sh=None, number=0, eft=None, count=1):
     """a point of an emitter volume (eft / eft2 share the numbers for these): 0 point, 1 circle,
     2 circle (even), 3 / 4 filled circle, 5 / 6 sphere, 7 / 8 filled sphere ... the rest as a sphere.
     sh: an Ultimate emitter's shape (its circles exact, main.bin: below); number: the particle's place in
@@ -117,6 +117,20 @@ def shape_point(rng, vt, radius, sweep=None, sh=None, number=0):
                 n -= 1
             i = int(rng.uniform() * n) if mode == 1 else number % n
             a = start + sweep / n * i - sweep / 2 + float(sh['surface_pos_rand']) * (rng.uniform() - 0.5) * 2
+        return np.array([math.sin(a) * r[0], 0.0, math.cos(a) * r[2]])
+    if eft is not None and vt in (1, 2):
+        # eft's circles (ptcl.py volume_sweep_param): start + U x param, or particle i of an emission of n at
+        # start + i x param / n (full turn; else / (n - 1)); + surface random degrees
+        start, param, rnd, surf = eft
+        if rnd:
+            start = 2 * math.pi * rng.uniform()
+        if vt == 1:
+            a = start + rng.uniform() * param
+        else:
+            full = abs(param - 2 * math.pi) < 1e-4
+            step = 0.0 if count <= 1 else param / (count if full else count - 1)
+            a = start + number * step
+        a += math.radians(surf) * (rng.uniform() * 2 - 1) if surf else 0.0
         return np.array([math.sin(a) * r[0], 0.0, math.cos(a) * r[2]])
     if vt in (1, 2, 3, 4):           # circle in XZ
         a = rng.uniform(0, 2 * math.pi)
@@ -159,6 +173,7 @@ class Emitter:
     anims = {}                # key-animation target (ptcl.KEYA_TARGETS) -> (keys [(frame, value)], loop)
     volume = (0, (0, 0, 0))
     shape = None              # an Ultimate emitter's shape section (shape_point: its circles exactly)
+    eft_shape = None          # a ptcl emitter's circle: sweep start, param, random start, surface random
     all_dir = 0.0
     dir_speed = 0.0
     direction = np.array([0.0, 1.0, 0.0])
@@ -246,7 +261,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
             out[f] = len(births)
             continue
         for org, number in births:
-            p = shape_point(rng, *em.volume, sh=em.shape, number=number)
+            p = shape_point(rng, *em.volume, sh=em.shape, number=number, eft=em.eft_shape, count=len(births))
             d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)
             outward = p / np.linalg.norm(p) if np.linalg.norm(p) > 1e-6 else spread(rng, np.array([0, 1.0, 0]), 180)
             v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
@@ -617,6 +632,7 @@ def s4_emitters(p, set_index, program_cache=None):
         em.srt = (tuple(f('emitter_scale')), tuple(f('emitter_rotation')), tuple(f('emitter_translation')))
         em.anims = {a['target']: (a['keys'], a['loop']) for a in p.key_anims(d) if a['target'] < 0x1C}
         em.volume = (f('volume_type'), np.array(f('volume_radius')))
+        em.eft_shape = (f('volume_sweep_start'), f('volume_sweep_param'), f('volume_sweep_start_random'), f('volume_surface_random'))
         em.all_dir, em.dir_speed = f('figure_velocity'), f('emitter_velocity')
         em.direction = np.array(f('emit_direction'), float)
         em.dispersion = f('dispersion_angle')
