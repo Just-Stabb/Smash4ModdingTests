@@ -58,12 +58,13 @@
  "sys_whirlwind_r": "0x346004E",
  "pzenigame_mouth_water@-80,0,0": "0x346004F",
  "pzenigame_mizuteppo_shoot@0,0,-13": "0x3460050",
- "pzenigame_mouth_water@-60,0,0": "0x3460051",
- "sys_piyo@0,0,-80": "0x3460052",
- "pzenigame_mizuteppo_shoot@-70,0,20": "0x3460053",
- "pzenigame_win@-70,0,20": "0x3460054",
- "pzenigame_mizuteppo_shoot@-70,0,10": "0x3460055",
- "pzenigame_win@-70,0,10": "0x3460056",
- "pzenigame_mizuteppo_shoot@-70,0,-10": "0x3460057",
- "pzenigame_win@-70,0,-10": "0x3460058"
+ "pzenigame_mouth_water@-60,0,0": "0x3460052",
+ "sys_piyo@0,0,-80": "0x3460053",
+ "pzenigame_mizuteppo_shoot@-70,0,20": "0x3460054",
+ "pzenigame_win@-70,0,20": "0x3460055",
+ "pzenigame_mizuteppo_shoot@-70,0,10": "0x3460056",
+ "pzenigame_win@-70,0,10": "0x3460057",
+ "pzenigame_mizuteppo_shoot@-70,0,-10": "0x3460058",
+ "pzenigame_win@-70,0,-10": "0x3460059",
+ "pzenigame_mizuteppo_shoot@0,0,13": "0x3460051"
 }
