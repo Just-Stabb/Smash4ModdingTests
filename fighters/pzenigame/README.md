@@ -504,3 +504,9 @@ close, so the difference was in a stage it modelled on an assumption. Read from 
   then, so the CPU must feed v_inWldPosDf something there (not read).
 port_check: 0 errors. Asked: forward / down smash both ways on Final Destination, run, dash attack,
 Water Gun, Waterfall.
+
+Test 14 (user's clips): forward / down smash's water now one low connected sweep in game, as Ultimate's;
+run's splashes low at his feet, Water Gun's shot a thin cone of streaks. fx_render now draws Ultimate's side
+with Ultimate's own shaders (docs/fx-render-eft2.md); against the native clip it shows the smash-charge ring
+as a crescent and the dust as translucent puffs, as Ultimate does. The converted ring plays the same 7-cell
+table (mode 4, a cell a frame); the dust impacts (2-cell flipbook + scroll) are set too: footage decides.

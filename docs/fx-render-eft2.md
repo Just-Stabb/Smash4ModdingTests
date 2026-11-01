@@ -55,8 +55,8 @@ frame.
 | stage | status | notes |
 |---|---|---|
 | particle types (billboard, Y billboard, XY / XZ plates, directional, meshes) | data; type 3 meshes exact | eft2's type 3 is the XY polygon: a mesh's vertex program (variations 131 / 141, tools/ult_shader_glsl.py) is the birth emitter matrix (columns normalised) x rotation (X Z Y) x scale x (vertex + pivot), no velocity; 4 = XZ polygon (its vertex program flattens Y); 5 / 6 directional. The Smash 4 side's type 4 is drawn by its decoded program (Y along the world motion, X = emitter Y x motion) |
-| texture | approx | the first flipbook cell only; no UV scroll / rotation / scale animation |
-| combiner (colour / alpha process) | approx | colour 0 / colour x texture / c0 x tex + c1 x (1 - tex); alpha from red; alpha_process 4 erosion exact |
+| texture | exact (shaders) | Ultimate's own programs (above); `--ult-model`: the first flipbook cell only, no UV animation |
+| combiner (colour / alpha process) | exact (shaders) | Ultimate's own pixel programs; `--ult-model`: colour 0 / colour x texture / c0 x tex + c1 x (1 - tex) |
 | second / third texture, custom shaders | missing | the converted side runs its own pixel programs (stage 2); Ultimate's Maxwell programs are not run |
 | blending | approx | alpha or add; draw order by depth only |
 | colour space | data | an alpha-blended part's colours (and its linear textures) shown display-encoded, as Ultimate's frame is (the converter's LINEAR_DISPLAY rule): before, the Ultimate side drew linear values, a deep blue where Ultimate shows pale cyan-white |
@@ -94,8 +94,48 @@ Checked with it:
   alpha (the threshold), alpha x (tex1.a - threshold) / c13[0] within the edge. eft_pixel's `mask1` matches
   (every dissolve's texture 1 is white in rgb, so writing it as white + the mask is exact).
 
-Next: run these programs in fx_render (the GLSL is C-like: c9 from the file, the attributes from the
-simulation or a vfx_trace record), so the Ultimate side draws with the engine's own vertex and pixel code.
+## Ultimate's side drawn by Ultimate's shaders (default; `--ult-model` for the old model)
+
+Since this step fx_render draws every Ultimate emitter with its own programs (tools/mx_exec.py): the
+translated GLSL compiled as C++ behind a small GLSL layer (vec2 / vec4, half floats, carries, bitfields,
+`texture()` a bilinear sampler with eft2's wrap modes), the vertex program run on each particle x mesh
+vertex, the pixel program on every pixel the triangles cover, blended in primitive order in linear light
+(the frame encoded for display at the end, as Ultimate does). So scale / colour / alpha curves, UV
+scroll / scale / flipbooks, rotation, motion under gravity and air resistance, dissolves and combiners are
+the engine's own code. What fx_render still supplies is the emission: the births (exact, vfx_trace) and
+each particle's arrays as born.
+
+Inputs, all by name from each program's reflection (BNSH program +0x78: per stage, _DIC tables of inputs,
+outputs, samplers, constant buffers and a slot table; constant buffer slot k = the shader's c(3 + k)):
+- attributes: sysPosAttr / sysTexCoordAttr (the mesh, or eft2's quad), sysLocalPosAttr (emitter-local
+  position at birth, w life x (1 - life_random x U)), sysLocalVecAttr (velocity, w birth time),
+  sysScaleAttr (scale x (1 - scale_random x U) on all axes x EASL), sysRandomAttr (4 uniforms),
+  sysInitRotateAttr (rotate_init on is_rotate's axes; the random part is the program's), sysEmtMat0-2Attr
+  (the emitter matrix at birth, rows). Every one of Squirtle's 164 emitters is a GPU emitter (calc 0): the
+  arrays hold the particle as born (the engine's birth records, docs/vfx-trace.md).
+- c9 sysEmitterStaticUniformBlock: the emitter data after eft2's load-time pass, run from main.bin itself
+  (tools/eft2_resolve.py, unicorn: 0x8B480, then the first 0x750 bytes, as the memcpy at 0x8C204 copies
+  them). The file alone is not it: e.g. every UV repeat is 0 in the file (1 after the pass, from the
+  repeat byte's two tables), the key tables are padded, the shader flag words +0x50 / +0x54 set (0x8C660).
+- c10 sysEmitterDynamicUniformBlock: colour 0 / 1 (info colours), time (8), step (11), alpha (12), scale
+  (13-15: the call's size, the fighter's 0.94 with it: the birth matrices carry it but the program
+  normalises them), the emitter matrix (16-27, rows) and its rotation (32-43).
+- c8 sysViewUniformBlock: view 0-15 (to_screen()), projection 16-31, view-projection 32-47 (straight to
+  canvas pixels), billboard matrix 48-59, eye vector 64, eye position 68, near / far 72.
+- c13 sysCustomShaderReservedUniformBlockParam: the emitter's CSDP (the dissolve's edge); c16
+  sysCustomShaderUniformBlock2: the game's per-effect block, neutral (colour / alpha x 1, no depth shift);
+  c2: texture unit u at word 8 + 2u; c1: the program's immediates (NVN control section +0x6FC / +0x700).
+
+Checked against Ultimate's own footage (Squirtle's native clip): the smash-charge ring is a crescent
+(sys_smash_flash ring1's 5-cell flipbook, which the old model froze on its full first cell) and down
+smash's dust is low translucent puffs; both as the shader-run side draws them. Not modelled: the game's
+per-effect colour / alpha (c16, EFFECT_SET_COLOR...), depth / soft particles, refraction (shader_type 1,
+left out), sort order (far particles first).
+
+The Smash 4 side is still fx_render's model with the converted parts' own pixel programs: it plays no
+flipbook and no UV scroll / scale, so differences there (Squirtle's dust impacts as solid sheets, the
+smash ring as a full ring) are the renderer's, not the bank's (its flipbooks / scrolls are set: check
+footage).
 
 ## The first trace (Squirtle, user's run, 162 emitter runs)
 
