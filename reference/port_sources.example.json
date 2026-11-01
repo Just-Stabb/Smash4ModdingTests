@@ -29,5 +29,6 @@
  ],
  "opensmash": "/path/to/ssbu-recomp",
  "ult_exefs": "/path/to/exefs/main.bin",
+ "s4_rpx": "/path/to/code/cross_f.rpx",
  "_comment": "Copy to port_sources.json at the repository root (not committed) with this machine's paths: tools/port_sources.py"
 }

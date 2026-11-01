@@ -19,6 +19,7 @@ list is searched in order:
   vbn            folders holding <name>/model/body/c00/model.vbn (vanilla Smash 4 skeletons)
   opensmash      an OpenSmash-Ultimate (ssbu-recomp) checkout: its shader translator (ult_shader_glsl.py)
   ult_exefs      Ultimate 13.0.4's exefs main.bin (decompressed NSO, flat image): eft2_resolve.py runs its code
+  s4_rpx         Smash 4's cross_f.rpx (1.1.7): eft_static.py runs eft's uniform-block builder from it
 """
 import json
 import os

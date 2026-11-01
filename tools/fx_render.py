@@ -208,6 +208,7 @@ class Emitter:
     dist = None               # eft2's distance emission (unit, min, max, margin): simulate()
     notes = ()
     ult = None                # Ultimate's own shaders (--ult-model off): {'e', 'vfxb', 'images', 'srgb', 'prim'}
+    s4 = None                 # Smash 4's own vertex programs (--s4-model off): {'p', 'd', 'sh', 'texs'}
     life_random = 0.0         # eft2: a particle's life x (1 - this x U) (the engine's birth records)
 
 
@@ -273,6 +274,15 @@ def simulate(em, call, frames, seed=1, births_only=False):
             sa = (a(17, 1.0), a(18, 1.0))
             rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
             born = None
+            if em.s4 is not None and S4_SHADERS:
+                # what eft's particle record holds (cross_f 0x04A59FC8's streams: v_inWldPos, v_inScl, v_inVec,
+                # v_inRandom, v_inRot, v_inEmtMat0-2, ...): the GPU programs (those reading v_inVec) get the
+                # particle as born, world position and velocity, birth time in v_inVec.w
+                mb = np.zeros((3, 4))
+                mb[:, :3], mb[:, 3] = lin, org
+                born = {'p': lin @ p + org, 'v': lin @ v, 'pl': p.copy(), 'vl': v.copy(), 'birth': float(f - f0),
+                        'random': rng.uniform(size=3),
+                        'scale': (sr * sa[0] * csize, sr * sa[1] * csize), 'm': mb, 'rot0': rot.copy()}
             if em.ult is not None and ULT_SHADERS:
                 # the particle arrays as eft2 fills them at birth (vfx_trace B records: a GPU emitter's
                 # arrays hold the particle as born, its vertex program works out the rest each frame):
@@ -807,6 +817,133 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     return True
 
 
+# ------------------------------------------------------------------ Smash 4's own vertex programs
+S4_SHADERS = True        # --s4-model: Smash 4's side placed by fx_render's model of eft instead
+_s4_programs, _s4_static = {}, {}
+EFT_QUAD = np.array([[-0.5, 0.5, 0, 0], [-0.5, -0.5, 0, 0], [0.5, -0.5, 0, 0], [0.5, 0.5, 0, 0]], np.float32)  # cross_f 0x04A66B9C
+EFT_QUAD_IDX = np.array([0, 1, 2, 0, 2, 3])
+
+
+def s4_view_block():
+    """eft's viewUniformBlock (CB1) for fx_render's camera: vm 0, pm 16, vpm 32 (world -> fx_render's screen x, y,
+    depth, w 1), bm 48 (view -> world: billboards), ev 64, ep 68, vp 80, crossflg 84 (0)"""
+    S = to_screen()
+    v = np.zeros(88, np.float32)
+    m = np.eye(4)
+    m[:3, :3] = S
+    v[0:16] = m.ravel()
+    v[16:32] = np.eye(4).ravel()
+    v[32:48] = m.ravel()
+    bm = np.eye(4)
+    bm[:3, :3] = S.T
+    v[48:64] = bm.ravel()
+    v[64:67] = S.T @ np.array([0, 0, 1.0])
+    v[68:71] = S.T @ np.array([0, 0, 1000.0])
+    v[80:84] = (1.0, 10000.0, 1.0, 1.0)
+    return v
+
+
+def s4_program(em):
+    import latte_exec
+    b = bytes(em.s4['p'].shader_binary(em.s4['sh']))
+    if b not in _s4_programs:
+        try:
+            _s4_programs[b] = latte_exec.VertexProgram(b)
+        except Exception as ex:          # noqa: BLE001
+            print('  %s: vertex program not run (%s)' % (em.name, str(ex).splitlines()[0][:120]))
+            _s4_programs[b] = None
+    return _s4_programs[b]
+
+
+def draw_s4(canvas, em, parts, mnow, time):
+    """one converted emitter's live particles placed by its own vertex program (tools/latte_exec.py) on eft's
+    uniform blocks (CB2 built by cross_f's own code: tools/eft_static.py) and drawn by its pixel program"""
+    vs = s4_program(em)
+    if vs is None or em.program is None:
+        return False
+    born = [q for q in parts if len(q) > 9 and q[9] is not None]
+    if not born:
+        return True
+    d = em.s4['d']
+    if id(d) not in _s4_static:
+        import eft_static
+        _s4_static[id(d)] = np.frombuffer(eft_static.build(d), np.float32).copy()
+    cb2 = _s4_static[id(d)]
+    gpu = 'v_inVec' in vs.attributes
+    # a program reading the live emitter matrix (CB3 emm) takes its particles in the emitter's own space and turns
+    # them by it each frame (the flash ring / lines of sys_smash_flash, following): fed world positions, the
+    # emitter's offset counted twice
+    local = any(cb == 3 and 4 <= v <= 7 for cb, v, _c in vs.reads)
+    mesh = em.s4['mesh']
+    if mesh is not None:
+        pos = np.concatenate([np.asarray(mesh[0], np.float32), np.ones((len(mesh[0]), 1), np.float32)], 1)
+        nrm = np.zeros((len(pos), 4), np.float32) if mesh[1] is None else np.concatenate([mesh[1], np.zeros((len(pos), 1))], 1)
+        col = np.ones((len(pos), 4), np.float32) if mesh[2] is None else np.asarray(mesh[2], np.float32)
+        uv = np.zeros((len(pos), 4), np.float32) if mesh[3] is None else np.asarray(mesh[3], np.float32).reshape(len(pos), -1)
+        if uv.shape[1] == 2:
+            uv = np.concatenate([uv, uv], 1)
+        idx = np.asarray(mesh[4]).ravel()
+    else:
+        pos, idx = EFT_QUAD, EFT_QUAD_IDX
+        nrm = np.tile(np.array([0, 0, 1, 0], np.float32), (4, 1))
+        col = np.ones((4, 4), np.float32)
+        uv = np.zeros((4, 4), np.float32)
+    nv = len(pos)
+    follow_live = em.s4['follow'] == 0
+    rows = np.asarray(mnow[:3, :4], np.float32)
+    A = np.zeros((len(born), nv, len(vs.attributes), 4), np.float32)
+    for k, name in enumerate(vs.attributes):
+        for j, q in enumerate(born):
+            pw, vw, t, (sx, sy), rot, alpha, rgb, rgb1, _lin, b = q[:10]
+            age = t * em.life
+            m = rows if follow_live else b['m']
+            # the GPU programs (reading v_inVec) take the particle as born and work out the rest: v_inWldPos.w its
+            # birth time (age = emp0.x - it), v_inRandom.w its life (the scale / alpha / colour sections are
+            # fractions of it), v_inScl only the random x EASL factor (x the base scale and its curve, CB2
+            # scaleAnim0-2, in the program); the CPU's programs take its current values, v_inWldPos.w the age
+            # (tools/latte_exec.py runs of smoke3: the sizes come out as its keys say only so)
+            per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age),
+                   'v_inVec': np.append(b['vl' if local else 'v'], 0.0),
+                   'v_inScl': (b['scale'][0], b['scale'][1], b['scale'][0], 1) if gpu else (sx, sy, sx, 1),
+                   'v_inRandom': np.append(b['random'], float(em.life)), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
+                   'v_inEmtMat0': m[0], 'v_inEmtMat1': m[1], 'v_inEmtMat2': m[2],
+                   'v_inColor0': np.append(rgb, alpha), 'v_inColor1': np.append(rgb1 if rgb1 is not None else (0, 0, 0), 1.0),
+                   'v_inWldPosDf': np.append(vw, 0)}
+            if name in per:
+                A[j, :, k] = per[name]
+        if name == 'v_inPos':
+            A[:, :, k] = pos
+        elif name == 'v_inNormal':
+            A[:, :, k] = nrm
+        elif name == 'v_inColor':
+            A[:, :, k] = col
+        elif name == 'v_inTexCoord':
+            A[:, :, k] = uv
+        elif name == 'v_inIndex':
+            A[:, :, k, 0] = np.arange(nv)
+    cb3 = np.zeros(48, np.float32)
+    cb3[0:8] = 1.0                           # emc0 / emc1: the set's and instance's colours (x 1 here)
+    cb3[8:12] = (time, 1.0, 1.0, 1.0)        # emp0: the emitter's time (the GPU programs' age = this - birth)
+    cb3[12:16] = 1.0
+    full = np.eye(4)
+    full[:3, :4] = mnow[:3, :4]
+    cb3[16:32] = full.ravel()
+    rt = full.copy()
+    rt[:3, :3] /= np.maximum(np.linalg.norm(rt[:3, :3], axis=0), 1e-9)
+    cb3[32:48] = rt.ravel()
+    gp, par = vs.run(A.reshape(-1, len(vs.attributes), 4), {1: s4_view_block(), 2: cb2, 3: cb3},
+                     np.tile(np.arange(nv), len(born)))
+    gp, par = gp.reshape(len(born), nv, 4), par.reshape(len(born), nv, -1, 4)
+    order = np.argsort(gp[:, :, 2].mean(1))           # far first (depth: toward the eye is +)
+    tri = idx[:len(idx) // 3 * 3].reshape(-1, 3)
+    for j in order:
+        for t3 in tri:
+            P = gp[j, t3, :2] / np.where(np.abs(gp[j, t3, 3:4]) > 1e-9, gp[j, t3, 3:4], 1.0)
+            attrs = {sem: par[j, t3, k] for k, sem in vs.params.items()}
+            canvas.tri_program(P, attrs, lambda inp: em.program.run(inp, em.consts, em.s4['sample']), em.blend_mode)
+    return True
+
+
 # ------------------------------------------------------------------ Smash 4 (eft)
 def s4_emitters(p, set_index, program_cache=None):
     out = []
@@ -892,6 +1029,11 @@ def s4_emitters(p, set_index, program_cache=None):
             em.consts = {8: HDR_RANGE}
             em.blend_mode = 'premult' if eft_pixel.premultiplied(p, sh) else \
                 {0: 'alpha', 1: 'add', 2: 'sub'}.get(f('blend_type'), 'alpha')
+        if S4_SHADERS:
+            em.s4 = {'p': p, 'd': bytes(d), 'sh': sh, 'follow': struct.unpack_from('>I', bytes(d), 0x310)[0],
+                     'mesh': p.primitive(f('primitive_index')) if f('primitive_index') >= 0 else None,
+                     # the vertex program works out the UVs (repeat, flipbook cells, scroll): sampled as they are
+                     'sample': sampler(texs, [(1, 1)] * 3)}
         if struct.unpack_from('>I', bytes(p.shader_entry(sh)), 0)[0] & 0xFF in (5, 6):
             em.alpha_curve = lambda t: 0.0
             em.notes = ['distortion pass (not drawn)']
@@ -1013,6 +1155,9 @@ def render_move(args, move, ult, s4, out_png):
                         if em.ult is not None and draw_ult(canvases[fr], em, sim[fr],
                                                            cm @ emitter_matrix(em, fr - fr0), float(fr - fr0), size):
                             continue
+                        if em.s4 is not None and draw_s4(canvases[fr], em, sim[fr], cm @ emitter_matrix(em, fr - fr0),
+                                                         float(fr - fr0)):
+                            continue
                         draw(canvases[fr], em, sim[fr], cm)
         cols.append([canvases[fr].image() for fr in frames])
         log.append('%s: %d calls' % (side, len(calls)))
@@ -1056,9 +1201,12 @@ def main():
     ap.add_argument('--only', default='', help='comma-separated substrings: only emitters whose name has one')
     ap.add_argument('--ult-model', action='store_true', help="Ultimate's side drawn by fx_render's own model "
                     "of eft2 instead of Ultimate's shaders run through tools/mx_exec.py")
+    ap.add_argument('--s4-model', action='store_true', help="Smash 4's side placed by fx_render's own model of eft "
+                    "instead of the converted parts' vertex programs run through tools/latte_exec.py")
     a = ap.parse_args()
-    global ULT_SHADERS
+    global ULT_SHADERS, S4_SHADERS
     ULT_SHADERS = not a.ult_model
+    S4_SHADERS = not a.s4_model
     global ULT_PROT_ORDER, ONLY, ULT_RT
     ULT_PROT_ORDER, ONLY, ULT_RT = a.ult_prot_order, a.only, a.ult_rt
     global ULT_DROP, ULT_TIME_EMIT, PITCH
