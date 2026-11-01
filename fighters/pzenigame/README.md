@@ -479,3 +479,28 @@ camera looks down ~18 degrees, which opens the ring of sheets (fx_render --pitch
 both sides). The renders put our bank and Ultimate's close in either view, so what remains is in eft's
 drawing of these parts that fx_render doesn't model; footage of both games from comparable cameras
 (a level stage in Smash 4) is the next check.
+
+## v6 effects test 14 (`build/squirtle_v6_effects_test14.zip`)
+
+Test 13 (user's clip on Final Destination, level camera): forward / down smash's waves still stood up
+as separate fanned curtains; Ultimate's (native clip) lie in one low band. fx_render had both sides
+close, so the difference was in a stage it modelled on an assumption. Read from the shaders themselves:
+- Ultimate (ef_pzenigame.eff, WaterSmash wave1, BNSH variation 141, tools/eft_shader_dis.py): world =
+  the emitter's matrix at birth (columns normalised) x the particle's rotation (X Z Y) x scale x
+  (vertex + pivot) + position. No velocity input (type 5 directional programs load three more vec3s).
+  So eft2's billboard type 3 is the XY polygon (4 the XZ one, already mapped to eft's XZ plate).
+- Smash 4 (the converted bank's shader 112, type 4, tools/eft_vertex.py disassembly): Y = the particle's
+  world motion normalised (v_inWldPosDf), X = normalize(emitter Y x motion), Z = X x motion; world =
+  [X Y Z] x rotation x scale x (vertex + rotBasis) + v_inWldPos. Not the emitter's frame: each sheet,
+  8 units long along -Z and sent along -Z, had its length turned up (Z -> -emitter Y), and each one
+  fanned by its own velocity spread and gravity.
+- eft's type 1 programs (135 vanilla mesh emitters) are v_inEmtMat x the turned, scaled vertex +
+  v_inWldPos: Ultimate's formula. The converter now sends every eft2 type-3 mesh that moves to eft type 1
+  (61 emitters: the smash waves, run / dash waves and smoke, Water Gun's crowns, Waterfall, Withdraw,
+  common smokes); their templates (shaders 111 / 112 now) read v_inRot, so the rotations stay live.
+- fx_render's Smash 4 side draws eft type 4 by the decoded program. With it, test 13's bank renders as
+  the curtains seen in game (the check that the decode is right); test 14's renders as Ultimate's band.
+  Types 4 at rest (crossed ribbons, Zelda's crystals) are left as they were: the program's basis is zero
+  then, so the CPU must feed v_inWldPosDf something there (not read).
+port_check: 0 errors. Asked: forward / down smash both ways on Final Destination, run, dash attack,
+Water Gun, Waterfall.

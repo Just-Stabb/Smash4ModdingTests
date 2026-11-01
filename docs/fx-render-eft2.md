@@ -54,7 +54,7 @@ frame.
 
 | stage | status | notes |
 |---|---|---|
-| particle types (billboard, Y billboard, XY / XZ plates, directional, meshes) | data | type 4 = XZ polygon (its vertex program flattens Y); type 5 / 6 directional meshes |
+| particle types (billboard, Y billboard, XY / XZ plates, directional, meshes) | data; type 3 meshes exact | eft2's type 3 is the XY polygon: a mesh's vertex program (variation 141) is the birth emitter matrix (columns normalised) x rotation (X Z Y) x scale x (vertex + pivot), no velocity; 4 = XZ polygon (its vertex program flattens Y); 5 / 6 directional. The Smash 4 side's type 4 is drawn by its decoded program (Y along the world motion, X = emitter Y x motion) |
 | texture | approx | the first flipbook cell only; no UV scroll / rotation / scale animation |
 | combiner (colour / alpha process) | approx | colour 0 / colour x texture / c0 x tex + c1 x (1 - tex); alpha from red; alpha_process 4 erosion exact |
 | second / third texture, custom shaders | missing | the converted side runs its own pixel programs (stage 2); Ultimate's Maxwell programs are not run |

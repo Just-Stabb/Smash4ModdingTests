@@ -1539,6 +1539,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         typ = 4
         rest_dir = True
         notes.append('directional mesh at rest: type 4')
+    elif is_mesh and pt['billboard_type'] == 3:
+        # eft2's type 3 is the XY polygon: its vertex program (Squirtle's wave1, BNSH variation 141) places
+        # the mesh by the emitter's matrix at birth, columns normalised, times its own rotation (X Z Y)
+        # and scale, and reads no velocity. eft's own XY polygon is type 1 (its programs: v_inEmtMat x
+        # the scaled vertex + v_inWldPos, no v_inWldPosDf / v_inVec). eft's type 4 is not the emitter's
+        # frame: its program (cross_f, Squirtle's shader 112) aims the mesh's Y along the particle's
+        # world motion (v_inWldPosDf) with X = normalize(emitter Y x motion), Z = X x motion, so the
+        # down / forward smash waves (flat sheets 8 units long along -Z, sent along -Z) stood on end,
+        # each turned by its own spread and gravity: separate fanned curtains (tests 11-13) where
+        # Ultimate shows one low band. (Woosh's whirlwinds and Swoosh's funnels, rising along the
+        # emitter's Y, came out right as type 4 only because they are round about Y.)
+        typ = 1
+        notes.append('XY polygon mesh (eft2 type 3): type 1, the emitter\'s frame')
     elif is_mesh and typ == 3 and ((
             abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3
             and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
@@ -1553,6 +1566,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # Any fixed direction of the emitter's (no spread, the all-direction part the lesser): Squirtle's
         # down-smash waves, flat sheets 8 units long along -Z sent along -Z, lie flat along the ground in
         # Ultimate's footage and stood up as eft's type 3 curtains (facing the camera about their motion)
+        # (Since test 14 eft2 type-3 meshes stop at the branch above: only the stripe types 5 / 6 reach here.)
         typ = 4
         notes.append('directional mesh moving along an emitter axis: type 4')
     elif is_mesh and pt['billboard_type'] in (5, 6):

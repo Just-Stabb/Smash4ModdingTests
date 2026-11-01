@@ -452,9 +452,20 @@ def basis(em, vel, cm, lin=None):
     if em.ptype == 2:                 # XZ plate: the quad's Y along the emitter's Z
         return frame @ XZ_PLATE
     s = np.linalg.norm(vel)
+    if em.ptype == 4 and s > 1e-4:
+        # eft's type 4 (directional polygon), from its vertex program (cross_f; Squirtle's shader 112 before
+        # test 14): Y along the particle's world motion (v_inWldPosDf), X = normalize(emitter Y x motion),
+        # Z = X x motion. Not the emitter's frame: a sheet lying along its own motion stands on end
+        y = vel / s
+        x = np.cross(frame[:, 1], y)
+        if np.linalg.norm(x) < 1e-6:
+            x = frame[:, 0].copy()        # motion along the emitter's Y: the program's X is undefined
+        x /= np.linalg.norm(x)
+        return np.stack([x, y, np.cross(x, y)], 1)
     if em.ptype == 4 or (em.ptype == 3 and em.mesh is not None and em.mesh_frame):
-        # eft's type 4 (directional polygon) keeps the emitter's frame (Zelda's crystals, Hero's whirlwinds);
-        # so does eft2's directional mesh (Squirtle's down-smash waves in Ultimate's footage)
+        # type 4 at rest: taken as the emitter's frame (Zelda's crystals looked right; the program's own
+        # basis is zero then, so the CPU must feed it something: not read). eft2's type 3 (the XY
+        # polygon, Squirtle's waves: its vertex program, variation 141) is the emitter's frame
         return frame
     if em.ptype == 3 and s > 1e-4:
         # directional: Y along the motion, turned about it to face the camera (eft's type 3; eft2's
