@@ -639,6 +639,26 @@ def check_effects(inst, name, rep):
                     continue
                 label = '%s/%s' % (p.set_name(si), p.emitter_name(d))
                 (follow if st.unpack_from('>I', bytes(d), 0x310)[0] == 0 else still).append(label)
+        # E5: a type-4 mesh that only ever moves along its emitter's Y (no all-direction speed, no spread,
+        # emitted along +-Y, gravity along Y, the emitter unturned): X = emitter Y x motion is zero, every
+        # vertex of its width on one line: drawn as nothing (Squirtle's up-smash water columns, eft2 type-5
+        # meshes, test 15; convert as type 3, eft2's type 5 being a directional billboard)
+        upright = []
+        for si in range(len(p.sets)):
+            for x in p.sets[si]['emitters']:
+                d = x['data']
+                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0:
+                    continue
+                dr, g = p.field(d, 'emit_direction'), p.field(d, 'gravity')
+                if abs(p.field(d, 'figure_velocity')) > 1e-4 or abs(p.field(d, 'emitter_velocity')) < 1e-4 \
+                        or abs(dr[0]) > 1e-3 or abs(dr[2]) > 1e-3 or abs(p.field(d, 'dispersion_angle')) > 1e-3 \
+                        or abs(g[0]) > 1e-6 or abs(g[2]) > 1e-6 or any(abs(v) > 1e-4 for v in p.field(d, 'emitter_rotation')):
+                    continue
+                upright.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
+        if upright:
+            rep.add('ERROR', 'E5 upright-type4-mesh', '%d type-4 meshes move only along their emitter\'s Y: '
+                    'eft\'s X (emitter Y x motion) is zero, drawn as nothing (eft2 type 5: convert as type 3): %s'
+                    % (len(upright), ', '.join(upright[:8])))
         if still:
             rep.add('ERROR', 'E4 still-type4-mesh', '%d type-4 meshes never move (no velocity, gravity, follow): eft '
                     'draws each as a point (convert as type 1, the emitter\'s frame): %s' % (len(still), ', '.join(still[:8])))

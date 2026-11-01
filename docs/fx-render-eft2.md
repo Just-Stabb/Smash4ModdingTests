@@ -54,7 +54,7 @@ frame.
 
 | stage | status | notes |
 |---|---|---|
-| particle types (billboard, Y billboard, XY / XZ plates, directional, meshes) | data; type 3 meshes exact | eft2's type 3 is the XY polygon: a mesh's vertex program (variations 131 / 141, tools/ult_shader_glsl.py) is the birth emitter matrix (columns normalised) x rotation (X Z Y) x scale x (vertex + pivot), no velocity; 4 = XZ polygon (its vertex program flattens Y); 5 / 6 directional. The Smash 4 side's type 4 is drawn by its decoded program (Y along the world motion, X = emitter Y x motion) |
+| particle types (billboard, Y billboard, XY / XZ plates, directional, meshes) | data; type 3 meshes exact | eft2's type 3 is the XY polygon (quads too: the common smoke's smoke1 draws the same square whatever its motion): a mesh's vertex program (variations 131 / 141, tools/ult_shader_glsl.py) is the birth emitter matrix (columns normalised) x rotation (X Z Y) x scale x (vertex + pivot), no velocity; 4 = XZ polygon (its vertex program flattens Y); 5 a directional billboard (Y along sysLocalDiffAttr, X = it x the eye vector, Z = X x Y: as eft's type-3 programs; no speed stretch unless add_vel_to_scale under add_scale_y), 6 Y along it, X = it x Y, Z = X x it (eft's type 4 turned 180 degrees about the motion): run on up smash's wave2_1 / wave4 with set inputs. The Smash 4 side's type 4 is drawn by its decoded program (Y along the world motion, X = emitter Y x motion) |
 | texture | exact (shaders) | Ultimate's own programs (above); `--ult-model`: the first flipbook cell only, no UV animation |
 | combiner (colour / alpha process) | exact (shaders) | Ultimate's own pixel programs; `--ult-model`: colour 0 / colour x texture / c0 x tex + c1 x (1 - tex) |
 | second / third texture, custom shaders | missing | the converted side runs its own pixel programs (stage 2); Ultimate's Maxwell programs are not run |
@@ -111,7 +111,9 @@ outputs, samplers, constant buffers and a slot table; constant buffer slot k = t
   position at birth, w life x (1 - life_random x U)), sysLocalVecAttr (velocity, w birth time),
   sysScaleAttr (scale x (1 - scale_random x U) on all axes x EASL), sysRandomAttr (4 uniforms),
   sysInitRotateAttr (rotate_init on is_rotate's axes; the random part is the program's), sysEmtMat0-2Attr
-  (the emitter matrix at birth, rows). Every one of Squirtle's 164 emitters is calc type 0, the CPU's:
+  (the emitter matrix at birth, rows), sysLocalDiffAttr (the particle's last movement, position now - a
+  frame ago: the trace's vec2; the directional types' axis: left 0, up smash's rising columns lay flat).
+  Every one of Squirtle's 164 emitters is calc type 0, the CPU's:
   eft2 moves the particle and rewrites its position / velocity arrays every frame (the trace's per-frame
   records move; the programs read no velocity xyz), so the program gets the particle's current place and
   velocity in its birth frame, life / birth time / scale / random / rotation / matrix as born (the engine's

@@ -300,8 +300,10 @@ def simulate(em, call, frames, seed=1, births_only=False):
             # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
             # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
             # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
+            # 'd': its last frame's movement (eft2's sysLocalDiffAttr, the trace's vec2: position now - a frame
+            # ago; on its birth frame the slot holds a stale value, the birth velocity here)
             live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
-                         'sa': sa, 'lin': lin, 'born': born})
+                         'sa': sa, 'lin': lin, 'born': born, 'd': lin @ v})
         keep = []
         for q in live:
             if q['age'] >= em.life:
@@ -314,7 +316,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * q['sa'][0] * csize,
                                                                     em.size[1] * sy * q['sr'] * q['sa'][1] * csize),
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
-                               rgb, rgb1, q['lin'], q['born']))
+                               rgb, rgb1, q['lin'], q['born'], q['d'].copy()))
             g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
             # moved by the velocity it had, then air and gravity (vfx_trace of down smash's splash2: born at
             # z -0.1 with v -1.965, next frame at -2.065 with v -1.965 x 0.96, gravity in it but not yet in
@@ -322,6 +324,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
             # through its program lands on the trace's z to 0.001). Air first, as this had it, every particle
             # fell short by one air step and took its gravity a frame early
             q['p'] = q['p'] + q['v']
+            q['d'] = q['v']
             q['v'] = q['v'] * em.air + g * csize
             q['age'] += 1
             keep.append(q)
@@ -781,6 +784,7 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
             c = dict(b)
             c['pos'] = np.append(np.linalg.solve(lin, q[0] - org), b['pos'][3])
             c['vec'] = np.append(np.linalg.solve(lin, q[1]), b['vec'][3])
+            c['diff'] = np.append(np.linalg.solve(lin, q[10]), 0.0)
             cur.append(c)
         born = cur
     import vfxb_to_ptcl as V
@@ -802,8 +806,10 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     if 'sysVertexColor0Attr' in slot:
         A[:, :, slot['sysVertexColor0Attr']] = col
     for name, key in (('sysLocalPosAttr', 'pos'), ('sysLocalVecAttr', 'vec'), ('sysScaleAttr', 'scale'),
-                      ('sysRandomAttr', 'random'), ('sysInitRotateAttr', 'rot')):
-        if name in slot:
+                      ('sysRandomAttr', 'random'), ('sysInitRotateAttr', 'rot'), ('sysLocalDiffAttr', 'diff')):
+        # sysLocalDiffAttr: the directional types' (5 / 6) axis, the particle's last movement (left 0, up
+        # smash's rising columns lay flat)
+        if name in slot and all(key in b for b in born):
             A[:, :, slot[name]] = np.array([b[key] for b in born], np.float32)[:, None]
     for r, name in enumerate(('sysEmtMat0Attr', 'sysEmtMat1Attr', 'sysEmtMat2Attr')):
         if name in slot:

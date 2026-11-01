@@ -86,7 +86,8 @@ PREMULT_SHADER = (4, 64)
 # light 11.8 along the blade, EAES / EASS grow emitters / their shapes, EATR / EAPL ramp the rate / life
 EMITTER_ANIMS = {
     'EATR': (0,), 'EAPL': (1,), 'EAES': (2, 3, 4), 'EAER': (5, 6, 7), 'EAET': (8, 9, 10), 'EAC0': (11, 12, 13),
-    'EAA0': (14,), 'EAOV': (15,), 'EASL': (17, 18), 'EAC1': (19, 20, 21), 'EASS': (22, 23, 24)}
+    'EAA0': (14,), 'EAOV': (15,), 'EADV': (16,), 'EASL': (17, 18), 'EAC1': (19, 20, 21), 'EASS': (22, 23, 24)}
+# (EADV: the directional speed itself, as eft's 0x464: Squirtle's up-smash columns 3 -> 2.2 over frames 3 - 5)
 # Ultimate's particle fields (VFXB sub-sections, little endian; main's section table 0x8CB00, its CPU
 # fields 0x955F0) -> eft's complex-emitter field blocks (ptcl.FIELD_BLOCKS: the same fields, eft2 having
 # kept eft's units) and per-particle key animations (ptcl.INT_TARGETS / KEYA_TARGETS 0x1C - 0x25). eft
@@ -606,6 +607,14 @@ def fresnel_mean(e, model, s3, st, notes):
     m = num / den
     notes.append('fresnel alpha %.2f - %.2f: x %.2f, its mean over the mesh%s' % (near, far, m, "'s turns" if axes else ''))
     return m
+
+
+def flat_mesh(model):
+    """a mesh lying in its own XY plane (its Z extent under 2 % of its width / height): eft's type-3 mesh
+    programs scale Z by a template constant (vanilla 0 - 6), harmless only to these"""
+    pos = np.asarray(mesh(model, 0)[0], float)
+    ext = pos.max(0) - pos.min(0)
+    return bool(ext[2] <= 0.02 * max(ext[0], ext[1], 1e-6))
 
 
 def mesh(model, uv_channel=0):
@@ -1558,6 +1567,26 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         typ = 1
         notes.append('XY polygon mesh (eft2 type 3): type 1, the emitter\'s frame%s' % (
             ' (at rest)' if abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3 else ''))
+    elif not is_mesh and pt['billboard_type'] == 3:
+        # an eft2 type-3 quad is the XY polygon too, as its meshes (above): Ultimate's own vertex program for
+        # the common attack smoke's smoke1 (P_CmnAttackSmoke, turned X 180 Y -90), run in tools/mx_exec.py
+        # with its motion along X, Y and Z, drew the same square each time, in the emitter's frame turned by
+        # its rotation (facing the camera). As eft's directional type 3 its Y followed the motion: the dust
+        # plumes of the attack / dash / run / turn / landing smokes went edge-on, thin or nothing (test 15's
+        # forward smash: smoke1 / smoke2 drew nothing). eft's XY plate is type 1
+        typ = 1
+        notes.append('XY polygon quad (eft2 type 3): type 1')
+    elif is_mesh and pt['billboard_type'] == 5 and flat_mesh(prims[pt['primitive_id']]):
+        # eft2's type 5 is a directional billboard: its vertex program (Squirtle's up-smash columns, run in
+        # tools/mx_exec.py on their own inputs) lays the mesh's Y along the particle's last movement
+        # (sysLocalDiffAttr) and X along movement x the vector to the eye, Z = X x Y: turned about its
+        # motion to face the camera. eft's type-3 mesh programs (vanilla impact1 / line1 / line2 run in
+        # tools/latte_exec.py) give the same frame for the same motion; only their Z is scaled by v_inScl.x x
+        # a constant of the template's own (6, 2, 0 in those three), nothing to a flat mesh. Type 4 is
+        # X = emitter Y x motion: the columns rise along the emitter's Y, so every vertex of their
+        # width fell on one line and they drew nothing (test 15: up smash without its water columns)
+        typ = 3
+        notes.append('directional billboard mesh (eft2 type 5, flat): type 3')
     elif is_mesh and typ == 3 and ((
             abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3
             and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
@@ -2063,10 +2092,21 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # ---- rotation
     # (a template that doesn't turn: none, as vanilla's; what could be baked was)
     unturned = rest_dir or (rot != ROT_NONE and not turns)
-    p.set_field(em, 'rotation_init', [0.0] * 3 if unturned else [float(v) for v in st['rotate_init'][:3]])
-    p.set_field(em, 'rotation_random', [0.0] * 3 if unturned else [float(v) for v in st['rotate_init_rand'][:3]])
-    p.set_field(em, 'rotation_velocity', [0.0] * 3 if unturned else [float(v) for v in st['rotate_add']])
-    p.set_field(em, 'rotation_velocity_random', [0.0] * 3 if unturned else [float(v) for v in st['rotate_add_rand'][:3]])
+    axes = lambda v: [float(x) for x in v[:3]]     # noqa: E731
+    if is_mesh and typ == 2 and pt['billboard_type'] == 4:
+        # an XZ polygon turns after it is laid flat in Ultimate (its program, run in tools/mx_exec.py on up
+        # smash's ring1: a turn about Y keeps it on the floor), before in eft (its XZ-plate program,
+        # tools/latte_exec.py: the mesh turned in its own XY, then Y -> -Z): eft's (x, y, z) = Ultimate's
+        # (x, -z, y), exact while one of Ultimate's y / z is 0. Turned as they were, his up-smash and ripple
+        # rings (a random turn about Y) stood up to 90 degrees off the floor: grey ellipses Ultimate never shows
+        axes = lambda v: [float(v[0]), -float(v[2]), float(v[1])]     # noqa: E731
+        if any(abs(float(st[k][1])) > 1e-6 and abs(float(st[k][2])) > 1e-6
+               for k in ('rotate_init', 'rotate_init_rand', 'rotate_add', 'rotate_add_rand')):
+            notes.append('XZ polygon turned about Y and Z: eft\'s order differs (approximate)')
+    p.set_field(em, 'rotation_init', [0.0] * 3 if unturned else axes(st['rotate_init']))
+    p.set_field(em, 'rotation_random', [0.0] * 3 if unturned else axes(st['rotate_init_rand']))
+    p.set_field(em, 'rotation_velocity', [0.0] * 3 if unturned else axes(st['rotate_add']))
+    p.set_field(em, 'rotation_velocity_random', [0.0] * 3 if unturned else axes(st['rotate_add_rand']))
 
     # ---- shape and motion
     sh, vel, ems = e['shape'], e['velocity'], e['emission']
@@ -2099,6 +2139,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     # Squirtle's down-smash water, emitted by sweeping emitters, fell along their turn (up and sideways)
     p.set_field(em, 'world_gravity', 1 if ems['world_gravity'] else 0)
     p.set_field(em, 'air_resistance', float(st['air_res']))
+    # the particle lengthened by its speed: eft's 0x7F4 (CB2 gravityParam.w, read by the directional programs:
+    # Y = scale + it x speed, tools/latte_exec.py), eft2's add_vel_to_scale under add_scale_y (Squirtle's
+    # up-smash water3 at speed 1 / 3: 2.0 / 4.7 long in Ultimate's own program). Left as the template had it,
+    # his up-smash columns (none in Ultimate) took a template's 1: 13 units stood 40 high at speed 3
+    p.set_field(em, 'velocity_stretch', float(st['add_vel_to_scale']) if e['scale']['add_scale_y'] else 0.0)
     info = e['info']
     if typ == 3 and not is_mesh and sum(abs(v) > 1e-6 for v in info['rotate'][:3]) >= 2:
         # a directional quad (eft2 type 3) turns X first, as every eft2 emitter does (eft_rotation):
@@ -2120,7 +2165,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         p.set_field(em, 'init_velocity_random', 0.0)
         notes.append('upright (--upright-for)')
     p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
-    if typ == 3 and not is_mesh and (pt['billboard_type'] == 3 or templates.upright):
+    if typ in (1, 3) and not is_mesh and (pt['billboard_type'] == 3 or templates.upright):
         # eft2's particle centre (static `center`) as eft's rotBasis (0x4C4, docs/ptcl-format.md: the
         # vertex programs draw S (pos + rotBasis)): sys_attack_line's lines (0, 0.8) grow up from the
         # kick in Ultimate; centred on it (the template's) they hung below his feet (Hero fix 65). Kept to

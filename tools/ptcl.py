@@ -144,6 +144,8 @@ FIELDS = [
     (0x7DC, '>2f', 'scale_init_ratio', 'corpus'),
     (0x7E4, '>2f', 'scale_diff21', 'guess'),
     (0x7EC, '>2f', 'scale_diff32', 'guess'),
+    (0x7F4, '>f', 'velocity_stretch', 'verified'),  # CB2 gravityParam.w: directional programs lengthen Y
+                                                    # by it x speed (latte_exec, Squirtle's up-smash columns)
     (0x7F8, '>3f', 'rotation_init', 'corpus'),    # radians
     (0x804, '>3f', 'rotation_random', 'corpus'),
     (0x810, '>3f', 'rotation_velocity', 'corpus'),

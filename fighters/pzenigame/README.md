@@ -535,3 +535,29 @@ world values. With all three fixed, the splash emitters' heights agree (docs/fx-
 bank's GPU motion, run on that splash2, lands on Ultimate's traced positions; its gravity integrates
 as a trapezoid, so a particle sits up to 0.3 units lower by the end of its life. eft has no constant
 world velocity that could offset this, so it is left.
+
+## v6 effects test 16 (`build/squirtle_v6_effects_test16.zip`)
+
+Every water move was compared in fx_render with both games' own shaders. Each converter change below was
+derived by running Ultimate's vertex programs (tools/mx_exec.py) and eft's (tools/latte_exec.py) on the
+same inputs:
+- eft2 type 5 is a directional billboard. Y follows the last movement (`sysLocalDiffAttr`) and
+  X = movement × eye, which is eft's type-3 mesh frame. As eft type 4 (X = emitter Y × motion), the
+  up-smash columns, the crown and the double-jump ring rose along the emitter's Y with zero width.
+  Flat type-5 meshes are now type 3, and port_check E5 catches the case.
+- eft2 type-3 quads are XY polygons, like its type-3 meshes (the common smokes' smoke1 / smoke2 draw
+  the same square whatever their motion). They were eft's directional type 3 and drew edge-on; they
+  are now type 1.
+- eft's speed stretch (ptcl 0x7F4, CB2 gravityParam.w) was left as each template had it. It now
+  takes eft2's add_vel_to_scale under add_scale_y, else 0. One template's stretch of 1 had made the
+  13-unit columns 40 tall.
+- XZ polygons turn after they are laid flat in Ultimate, but before it in eft. Rotation axes are now
+  mapped (x, y, z) -> (x, -z, y), which is exact while one of y / z is 0. The up-smash and ripple
+  rings had stood off the floor.
+- EADV (the animated directional speed) becomes eft key target 16: the columns' 3 -> 2.2.
+
+Still different in the renders:
+- Up smash: its base band (wave4, eft2 type 6) is wider, and its side spikes are larger.
+- Waterfall: dark streaks and more upright spikes, where Ultimate's sheet is flat and dense.
+- Forward smash: the impact wedges cover about half of Ultimate's area.
+- Splashes: whites cap at 1 (Ultimate's go past it into its bloom).
