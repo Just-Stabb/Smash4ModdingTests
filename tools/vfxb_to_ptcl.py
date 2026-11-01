@@ -2028,6 +2028,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'one_time', 1 if one else 0)
     p.set_field(em, 'emit_start', 0)
     p.set_field(em, 'emit_interval', int(ems['interval']))
+    # the same random gap in both (eft2 main.bin 0x88750, eft cross_f 0x04A65350: + (rand x it) >> 32)
+    p.set_field(em, 'emit_interval_random', max(0, int(ems['interval_random'])))
     p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)))
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
     p.set_field(em, 'ptcl_life', life)
@@ -2052,6 +2054,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         if len(e['children']) > 1:
             notes.append('%d more child emitters not converted (eft has one)' % (len(e['children']) - 1))
     anims, done = emitter_anims(p, em, e, notes) if not as_child else ([], set())
+    dist = dist_emission(e) if not as_child else None
+    if dist is not None:
+        # eft has no distance emission: the counts eft2's would give along the emitter's own path
+        # (dist_emission) as a rate key a frame, every frame of the window (interval 0)
+        anims = [a for a in anims if a['target'] != 0]
+        p.set_field(em, 'emit_interval', 0)
+        p.set_field(em, 'emit_rate', float(max(1, max(n for _f, n in dist))))
+        anims.append({'target': 0, 'loop': 0, 'keys': [(float(f), float(n)) for f, n in dist]})
+        notes.append('distance emission (unit %g): %d particles over its path, as rate keys' % (
+            e['emission']['dist_unit'], sum(n for _f, n in dist)))
+    elif e['emission']['emit_dist_enabled'] and not as_child:
+        notes.append('distance emission (unit %g) by time: its movement is the fighter\'s or the article\'s' %
+                     e['emission']['dist_unit'])
     left = set(e['subsections']) - done - fdone - ({'CSDP'} if dis is not None else set())   # (a dissolve's edge)
     if as_child:
         p.set_key_anims(em, [])
@@ -2099,6 +2114,42 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         notes.append('fluctuation 0x%X' % fluct[0])
     p.set_key_anims(em, anims + fanims)
     return em
+
+
+def dist_emission(e):
+    """[(frame, particles)] eft2's distance emission gives this emitter along its own translation
+    animation (EAET), frame by frame from the effect's start, or None (off, or no path of its own: the
+    fighter's or an article's movement, known only in game). main.bin 0x8D340, every frame of the
+    window (start .. start + duration) instead of the rate: the emitter's movement this frame in its
+    own frame (0x8E040: through the inverse of its matrix, so / its scale), 0 under dist_marg; 0 ->
+    dist_min, else clamped to dist_min .. dist_max; added to a carry that gives one particle a
+    dist_unit. The emitter stands still at time 0 (0x8DFA4: the previous position set to the current)"""
+    ems = e['emission']
+    raw = bytes.fromhex(e['subsections'].get('EAET', ''))
+    if not ems['emit_dist_enabled'] or len(raw) < 12 or ems['dist_unit'] <= 0:
+        return None
+    on, _loop, _pad, nk, _z = struct.unpack_from('<BBHII', raw, 0)
+    keys = [struct.unpack_from('<4f', raw, 12 + 16 * k) for k in range(nk)]
+    if not on or not keys:
+        return None
+    fr = [k[3] for k in keys]
+    scale = float(np.mean(np.abs(e['info']['scale']))) or 1.0
+
+    def at(t):
+        return np.array([np.interp(t, fr, [k[i] for k in keys]) for i in range(3)])
+    start = int(ems['start'])
+    end = start + (max(1, int(ems['duration'])) if ems['one_time'] else int(math.ceil(fr[-1])) + 1)
+    unit, dmin, dmax, marg = (float(ems[k]) for k in ('dist_unit', 'dist_min', 'dist_max', 'dist_marg'))
+    out, carry = [], 0.0
+    for f in range(start, end):
+        move = float(np.linalg.norm(at(f) - at(f - 1))) / scale if f > 0 else 0.0
+        s9 = 0.0 if move < marg else move
+        s9 = dmin if s9 == 0 or s9 < dmin else min(s9, dmax)
+        carry += s9
+        n = int(carry / unit)
+        carry -= n * unit
+        out.append((f, n))
+    return out
 
 
 def emitter_anims(p, em, e, notes):

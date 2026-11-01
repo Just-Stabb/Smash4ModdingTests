@@ -376,3 +376,38 @@ facing right, and turns top's effects with the facing without mirroring anything
 took the facing-left branch. ultimate_acmd.fix_lr_split + LR_FACING: the split is laid out and decided
 in game (Float_Var_Compare(0x0F000003 < 0)), 12 compares in his effect.bin. Package: the bank (test 6's
 plus nothing new) and script/animcmd/body/effect.bin.
+
+Test 9 (user's clip, down and forward smash facing right and left): both attacks now mirror with
+his facing. Down smash splashes in front first and then the wave runs round behind him; forward smash
+puts the water in front and the dust cloud behind, both ways.
+
+## v6 effects test 10 (`build/squirtle_v6_effects_test10.zip`)
+
+Distance emission. In Ultimate, water_smash's splash1, wave1, wave2, wave3 and splash2 (and their _r
+copies) emit one particle for every dist_unit (1, 2, 3, 3.5, 2) of the emitter's own movement, and the
+emitter moves along its EAET path ((-3, 1, -10) -> (3, 7, -9) -> (0, 9, 3) over 6 frames). main.bin
+0x8D340, run every frame of the emission window instead of the rate:
+- The movement is measured in the emitter's own frame (0x8E040: through the inverse of its matrix).
+- dist_min / dist_max / dist_marg (0 / 10 / 0 here) clamp it.
+- A carry gives one particle per unit, each placed back along the path.
+- The previous position starts at the set's (0x874E0), so the first frame emits nothing.
+
+Converted by time, these emitters had given about half the particles (splash1 a fifth: 3 rather than 14).
+vfxb_to_ptcl's `dist_emission` works out the per-frame counts along the path (splash1 0, 4, 4, 3, 3; wave1
+and splash2 0, 2, 2, 1, 2; wave2 and wave3 1 a frame) and writes them as rate keys, one per frame,
+with interval 0. eft can't lay a frame's particles back along the path, so they all start where the
+emitter is at that frame. fx_render's Ultimate side now runs the exact routine; `--ult-time-emit`
+shows the old way.
+
+Also from main.bin (all fighters):
+- The first time-based emission comes on the window's first frame (the threshold starts at 0, 0x874D8).
+- Each next gap is interval + 1 + a random 0 .. interval_random - 1 (0x88750). eft does the same
+  (cross_f 0x04A65350), so the converter now writes ptcl `emit_interval_random` (0x458), which before
+  kept the template's value.
+- Each emission adds rate x rate_random % x a random 0 - 1 (0x8D408).
+- vfxb.py read rate_random and interval_random as floats; they are ints.
+
+The byte on the emitter set that gates distance emission is copied from the set's creation arguments
+(0x112C64). Diagnostic 8 showed these emitters do emit in Ultimate, so it is on for them.
+docs/fx-render-eft2.md lists what fx_render's Ultimate side does exactly and what it still approximates.
+Package: the bank and script/animcmd/body/effect.bin (test 9's).

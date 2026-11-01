@@ -100,7 +100,7 @@ FIELDS = [
     (0x450, '>i', 'end_frame', 'runtime'),        # one_time: emission ends this many frames after
                                                   # start_frame; 0x7FFFFFFF (never) without one_time
     (0x454, '>i', 'emit_interval', 'corpus'),
-    (0x458, '>i', 'emit_interval_random', 'guess'),
+    (0x458, '>i', 'emit_interval_random', 'runtime'),   # next gap + (rand x this) >> 32 (cross_f 0x04A65350)
     (0x45C, '>f', 'figure_velocity', 'guess'),    # all-direction speed
     # 0x460 is the random fraction, 0x464 the speed: in all 8115 vanilla emitters 0x460 lies in [0, 1]
     # (2484 non-zero) and 0x464 reaches 218 (991 over 1); the key animation's target 16 (directional

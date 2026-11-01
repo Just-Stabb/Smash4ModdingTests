@@ -24,7 +24,9 @@ Modelled since Squirtle's effects test 4: a non-following particle keeps the emi
 birth (an emitter turned by its key animation lays each new sheet further round); Ultimate's
 directional meshes turn only about their is_rotate axes; EFFECT_OFF_KIND / Terminate_Graphic_Effect stop
 an effect's emission (its particles live on); the particle rotation order is eft's (Rx Rz Ry) on both
-sides unless --ult-prot-order says otherwise. Test switches for open questions about eft2: --ult-rt
+sides unless --ult-prot-order says otherwise. Since test 10 Ultimate's emission (time and distance) is
+main.bin's (docs/fx-render-eft2.md: what is exact, what is still approximate; --ult-time-emit emits
+distance emitters by their rate, as eft does). Test switches for open questions about eft2: --ult-rt
 (emitter translation turned by its rotation), --ult-drop (key-animation targets left out), --only
 (emitters by name).
 
@@ -120,7 +122,10 @@ class Emitter:
     start = 0                 # frames after the call
     duration = 1              # emitting frames (FOREVER: while the effect lives)
     interval = 0
+    interval_random = 0       # extra frames a gap, 0 .. this - 1 at random (eft2 0x88750, eft 0x04A65350)
     rate = 1.0
+    rate_random = 0.0         # eft2: rate x this x U(0, 1) more particles an emission (0x8D408)
+    rate_from_data = False    # eft2: volume types 5 / 6 take the data's rate, not the animated one (0x8D44C)
     life = 10
     srt = ((1, 1, 1), (0, 0, 0), (0, 0, 0))     # emitter scale, rotation (radians), translation
     rot_order = 'zyx'
@@ -158,6 +163,7 @@ class Emitter:
     tex = None                # [h, w, 4] 0-1
     blend = 0                 # 0 alpha, 1 add
     follow = True
+    dist = None               # eft2's distance emission (unit, min, max, margin): simulate()
     notes = ()
 
 
@@ -169,29 +175,61 @@ def simulate(em, call, frames, seed=1):
     out = {f: [] for f in frames}
     live = []
     carry = 0.0
+    next_emit = 0
     last = max(frames)
     for f in range(f0, last + 1):
         k = f - f0 - em.start
         m = cm @ emitter_matrix(em, f - f0)
         lin = m[:3, :3]
         a = lambda t, d, k=f - f0: anim_value(*em.anims[t], k) if t in em.anims else d    # noqa: E731
-        if 0 <= k < em.duration and k % (em.interval + 1) == 0 and (off is None or f < off):
-            carry += a(0, em.rate)
-            while carry >= 1 - 1e-6:
-                carry -= 1
-                p = shape_point(rng, *em.volume)
-                d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)
-                outward = p / np.linalg.norm(p) if np.linalg.norm(p) > 1e-6 else spread(rng, np.array([0, 1.0, 0]), 180)
-                v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
-                v = v * (1 - em.vel_random * rng.uniform())
-                sr = 1 - em.size_random * rng.uniform()
-                sa = (a(17, 1.0), a(18, 1.0))
-                rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
-                # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
-                # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
-                # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
-                live.append({'p': (m @ np.append(p, 1))[:3], 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
-                             'sa': sa, 'lin': lin})
+        cur = m[:3, 3].copy()
+        if f == f0:
+            prev = cur
+        births = []                 # emitter origins (top's frame) of this frame's new particles
+        if 0 <= k < em.duration and (off is None or f < off):
+            if em.dist is not None:
+                # eft2's distance emission (main.bin 0x8D340, run every frame of the window instead of
+                # the rate): the emitter's movement this frame in its own frame (0x8E040: both positions
+                # through the inverse of its current matrix, so / its scale and the call's), 0 under the
+                # margin; 0 -> min (emitting where it stands), else clamped to min - max; carried, one
+                # particle per unit, each laid back along prev -> cur by what is left of the carry
+                unit, dmin, dmax, marg = em.dist
+                move = float(np.linalg.norm(np.linalg.solve(lin, cur - prev)))
+                s9 = 0.0 if move < marg else move
+                if s9 == 0:
+                    s9 = dmin
+                elif s9 < dmin:
+                    s9 = dmin
+                elif s9 > dmax:
+                    s9 = dmax
+                carry += s9
+                if unit > 0:
+                    for _ in range(int(carry / unit)):
+                        carry -= unit
+                        births.append(cur + (prev - cur) * (carry / s9 if s9 else 0.0))
+            elif k >= next_emit:
+                # emitted when the gap has run out (the first on the window's first frame: the threshold
+                # starts at 0, main.bin 0x874D8), then every interval + 1 (+ random) frames
+                next_emit = k + em.interval + 1 + (int(rng.uniform() * em.interval_random) if em.interval_random else 0)
+                carry += (em.rate if em.rate_from_data else a(0, em.rate)) + em.rate * em.rate_random * rng.uniform()
+                while carry >= 1 - 1e-6:
+                    carry -= 1
+                    births.append(cur)
+        prev = cur
+        for org in births:
+            p = shape_point(rng, *em.volume)
+            d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)
+            outward = p / np.linalg.norm(p) if np.linalg.norm(p) > 1e-6 else spread(rng, np.array([0, 1.0, 0]), 180)
+            v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
+            v = v * (1 - em.vel_random * rng.uniform())
+            sr = 1 - em.size_random * rng.uniform()
+            sa = (a(17, 1.0), a(18, 1.0))
+            rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
+            # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
+            # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
+            # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
+            live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
+                         'sa': sa, 'lin': lin})
         keep = []
         for q in live:
             if q['age'] >= em.life:
@@ -371,6 +409,7 @@ def basis(em, vel, cm, lin=None):
 
 ULT_RT = False
 ULT_DROP = ()            # --ult-drop: key-animation targets left out (tests)
+ULT_TIME_EMIT = False    # --ult-time-emit: distance emitters emit by their rate instead (a comparison)
 ULT_PROT_ORDER = 'xzy'     # eft2's particle rotation order (--ult-prot-order)
 ONLY = ''                  # --only: emitter names containing this (both sides)
 HDR_RANGE = (1.0, 0.0, 0.0, 0.0)    # u_nwHdrRange (CB9 [8]): rgb x .x + .w, the game's own at run time
@@ -462,6 +501,11 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.start, em.interval = int(ems['start']), int(ems['interval'])
         em.duration = max(1, int(ems['duration'])) if ems['one_time'] else FOREVER
         em.rate = float(ems['rate'])
+        em.interval_random = max(0, int(ems['interval_random']))
+        em.rate_random = max(0, int(ems['rate_random'])) / 100
+        em.rate_from_data = e['shape']['volume_type'] in (5, 6)
+        if ems['emit_dist_enabled'] and not ULT_TIME_EMIT:
+            em.dist = tuple(float(ems[k]) for k in ('dist_unit', 'dist_min', 'dist_max', 'dist_marg'))
         em.life = int(pt['life']) if not pt['infinite_life'] else 600
         info = e['info']
         em.srt = (tuple(info['scale']), tuple(info['rotate']), tuple(info['trans']))
@@ -536,6 +580,7 @@ def s4_emitters(p, set_index, program_cache=None):
         em.name = p.emitter_name(d)
         em.start = f('start_frame') + f('emit_start')
         em.interval = f('emit_interval')
+        em.interval_random = max(0, f('emit_interval_random'))
         em.duration = f('end_frame') if f('one_time') else FOREVER
         em.rate = f('emit_rate')
         em.life = f('ptcl_life') if f('ptcl_life') != FOREVER else 600
@@ -757,11 +802,14 @@ def main():
                     'rotation (R T S, not T R S)')
     ap.add_argument('--ult-drop', default='', help='test: comma-separated key-animation targets left out on '
                     "Ultimate's side (5-7 EAER, 8-10 EAET, 17-18 EASL)")
+    ap.add_argument('--ult-time-emit', action='store_true', help="comparison: Ultimate's distance emitters "
+                    'emitted by their rate instead (what eft does)')
     ap.add_argument('--only', default='', help='comma-separated substrings: only emitters whose name has one')
     a = ap.parse_args()
     global ULT_PROT_ORDER, ONLY, ULT_RT
     ULT_PROT_ORDER, ONLY, ULT_RT = a.ult_prot_order, a.only, a.ult_rt
-    global ULT_DROP
+    global ULT_DROP, ULT_TIME_EMIT
+    ULT_TIME_EMIT = a.ult_time_emit
     ULT_DROP = tuple(int(v) for v in a.ult_drop.split(',') if v)
     import port_sources
     src = port_sources.load()

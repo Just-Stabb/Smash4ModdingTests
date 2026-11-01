@@ -58,8 +58,8 @@ INFO = [
 INHERIT = [('flags', '13B'), ('_pad', '3B'), ('velocity_rate', 'f'), ('scale_rate', 'f')]
 EMISSION = [
     ('one_time', 'B'), ('world_gravity', 'B'), ('emit_dist_enabled', 'B'), ('world_oriented_velocity', 'B'),
-    ('start', 'I'), ('timing', 'I'), ('duration', 'I'), ('rate', 'f'), ('rate_random', 'f'), ('interval', 'i'),
-    ('interval_random', 'f'), ('position_random', 'f'), ('gravity_scale', 'f'), ('gravity_dir', '3f'),
+    ('start', 'I'), ('timing', 'I'), ('duration', 'I'), ('rate', 'f'), ('rate_random', 'i'), ('interval', 'i'),
+    ('interval_random', 'i'), ('position_random', 'f'), ('gravity_scale', 'f'), ('gravity_dir', '3f'),
     ('dist_unit', 'f'), ('dist_min', 'f'), ('dist_max', 'f'), ('dist_marg', 'f'), ('dist_particles_max', 'i')]
 SHAPE = [
     ('volume_type', 'B'), ('sweep_start_random', 'B'), ('arc_type', 'B'), ('latitude_enabled', 'B'),
