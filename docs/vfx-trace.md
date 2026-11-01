@@ -8,16 +8,18 @@ the renderer's Ultimate side can be made to match the engine itself rather than 
 
 ## Running it (Windows, OpenSmash 13.0.4)
 
-1. Put `vfx_trace.dll` in a folder of its own, e.g. `C:\vfxtrace`.
-2. Start the game from a command prompt in the OpenSmash folder:
-   ```
-   set SSBU_MODS=C:\vfxtrace
-   set VFX_TRACE_SETS=PZenigame
-   "Play SSBU.bat"
-   ```
-   The log shows `[vfx_trace] hooks installed`, and the output path.
+1. Put `tools/opensmash/play_with_vfx_trace.bat` (shipped as "Play SSBU with vfx_trace.bat") and a
+   `vfx_trace` folder holding `vfx_trace.dll` in the OpenSmash folder, next to "Play SSBU.bat".
+2. Double-click the .bat. The game's log (`build\logs\game_*.log`) shows `mod: vfx_trace.dll loaded, 2 hooks`
+   and `[vfx_trace] hooks installed`.
 3. Play the moves (e.g. Training with Squirtle: forward smash and down smash, facing both ways), then
-   close the game normally. The file is `C:\vfxtrace\vfx_trace.bin` unless `VFX_TRACE_OUT` names another.
+   close the game normally. The file is `vfx_trace\vfx_trace.bin` unless `VFX_TRACE_OUT` names another.
+
+`set SSBU_MODS=...` before "Play SSBU.bat" does NOT work: the .bat runs `scripts\run.py`, which removes
+every `SSBU_*` (and `RECOMP_*`) variable from the environment it gives the game; a variable has to go
+through `run.py --env NAME=VALUE`, which is what the .bat does (`--env "SSBU_MODS=<folder>"`). The mod's
+own `VFX_TRACE_*` variables pass through as they are. The port loads every DLL of the `SSBU_MODS` folder
+before the game starts (fighter_sdk/hook_host.c `hook_load_mods`).
 
 Settings: `VFX_TRACE_SETS` (comma-separated, case-insensitive parts of effect-set names, e.g.
 `PZenigame,Brave`; `*` everything), `VFX_TRACE_OUT` (file), `VFX_TRACE_MB` (stop at this size, default 400).
