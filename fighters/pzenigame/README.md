@@ -436,3 +436,12 @@ renderer's: it read Ultimate's effect function only up to the first column-0 bra
 facing split puts mid-function, so forward smash's EFFECT_OFF_KIND of mouth_water (frame 23) was lost
 (the vfx_trace showed its crowns living 10 frames). Fixed; the forward-smash renders now differ in the
 water's colour only (Ultimate a deeper blue, ours paler): next.
+
+Colour and wave height (after test 11, no new package): the trace's emitter matrices match fx_render's
+exactly (the left-over transform a pure facing turn, 0.01 degrees), the wave particles' positions within
+about 6%. The native Ultimate clip's water is a pale cyan-white and its down-smash wave about 5 units
+high, with a level side camera. The port's colours already were Ultimate's as displayed (the converter
+display-encodes them); fx_render's Ultimate side had drawn the linear values (deep blue) and now encodes
+them too. The wave: both renders stand about 5 units high with a level camera; drawn with Cemu's
+downward-looking camera (fx_render --pitch 18) the ring round Squirtle (13 units out) stands up into the
+tall arc of the Smash 4 footage. Its height in game is the camera's, not the bank's.

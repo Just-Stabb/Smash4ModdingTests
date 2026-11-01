@@ -421,6 +421,13 @@ QUAD = (np.array([[-0.5, 0.5, 0], [0.5, 0.5, 0], [0.5, -0.5, 0], [-0.5, -0.5, 0]
 # top's axes on screen: Z right, Y up; X away from the camera (depth)
 XZ_PLATE = np.array([[1, 0, 0], [0, 0, -1.0], [0, 1.0, 0]])   # a plate's Y onto the emitter's Z
 TO_SCREEN = np.array([[0, 0, 1.0], [0, 1.0, 0], [-1.0, 0, 0]])
+PITCH = 0.0              # --pitch: degrees the camera looks down (Smash 4's training camera ~15-20; Ultimate's side view 0)
+
+
+def to_screen():
+    """top frame -> screen (x forward, y up, depth): +x is away from the camera, seen higher when looking down"""
+    p = math.radians(PITCH)
+    return np.array([[0, 0, 1.0], [math.sin(p), math.cos(p), 0], [-math.cos(p), math.sin(p), 0]])
 
 
 def basis(em, vel, cm, lin=None):
@@ -488,7 +495,7 @@ def draw(canvas, em, parts, cm):
         w = (b @ (pos * np.array([sx, sy, sx])).T).T + p
         items.append((-(w[:, 0].mean()), w, alpha, rgb, rgb1))
     for _d, w, alpha, rgb, rgb1 in sorted(items, key=lambda x: x[0]):
-        s = w @ TO_SCREEN.T
+        s = w @ to_screen().T
         for k in range(0, len(idx) - 2, 3):
             tri = idx[k:k + 3]
             if em.program is not None:
@@ -535,6 +542,7 @@ def ult_anims(e):
 def ult_emitters(eff, set_index, images, names, prims):
     import vfxb_to_ptcl as V
     out = []
+    srgb = {t for t, f in eff.formats().items() if f & 0xFF == 6}     # textures stored sRGB
     for e in eff.emitters(set_index):
         em = Emitter()
         em.name = e['name']
@@ -580,6 +588,12 @@ def ult_emitters(eff, set_index, images, names, prims):
         al = a0 * info['color0'][3]
         if e['combiner']['alpha_process'] == 4:
             em.alpha_erode = float(np.mean(a1 * info['color1'][3]))
+        if V.display_space(e):
+            # Ultimate draws an alpha-blended part in linear light and encodes the frame for the screen at
+            # the end; drawn here on a display-space canvas, its colours are shown encoded (the converter's
+            # LINEAR_DISPLAY rule, vfxb_to_ptcl.display): without it the water was a deep blue where
+            # Ultimate's (native clips) is a pale cyan-white
+            rgb0, rgb1 = V.display(np.clip(rgb0, 0, None)), V.display(np.clip(rgb1, 0, None))
         em.colour_curve = lambda t, c=rgb0: c[int(round(t * 100))]
         em.colour1_curve = lambda t, c=rgb1: c[int(round(t * 100))]
         em.alpha_curve = lambda t, a=al: a[int(round(t * 100))]
@@ -604,6 +618,8 @@ def ult_emitters(eff, set_index, images, names, prims):
         if smp and smp['texture_id'] in images:
             img = V.first_cell(images[smp['texture_id']], st['tex_scroll'][ti], V.shown_cell(e, ti))
             em.tex = np.asarray(img, float) / 255
+            if V.display_space(e) and smp['texture_id'] not in srgb:
+                em.tex[..., :3] = em.tex[..., :3] ** V.DISPLAY_GAMMA     # a linear (UNORM) texture as shown
         em.blend = 1 if e['render']['blend_type'] == 1 else 0
         if e['combiner']['shader_type'] == 1:
             em.alpha_curve = lambda t: 0.0
@@ -853,11 +869,14 @@ def main():
                     "Ultimate's side (5-7 EAER, 8-10 EAET, 17-18 EASL)")
     ap.add_argument('--ult-time-emit', action='store_true', help="comparison: Ultimate's distance emitters "
                     'emitted by their rate instead (what eft does)')
+    ap.add_argument('--pitch', type=float, default=0.0, help='degrees the camera looks down (Cemu footage of '
+                    "Smash 4's training stage: about 15 - 20; Ultimate's side view: 0)")
     ap.add_argument('--only', default='', help='comma-separated substrings: only emitters whose name has one')
     a = ap.parse_args()
     global ULT_PROT_ORDER, ONLY, ULT_RT
     ULT_PROT_ORDER, ONLY, ULT_RT = a.ult_prot_order, a.only, a.ult_rt
-    global ULT_DROP, ULT_TIME_EMIT
+    global ULT_DROP, ULT_TIME_EMIT, PITCH
+    PITCH = a.pitch
     ULT_TIME_EMIT = a.ult_time_emit
     ULT_DROP = tuple(int(v) for v in a.ult_drop.split(',') if v)
     import port_sources

@@ -13,7 +13,7 @@ code that uses them hasn't been read; **approx** = a stand-in; **missing** = not
 
 | stage | status | notes |
 |---|---|---|
-| emitter matrix (scale, rotation, translation) | exact | R = Rz Ry Rx, T R S; static 0x88320, animated 0x8D0A0 (EAER degrees x pi / 180), composed v . M 0x8D838 |
+| emitter matrix (scale, rotation, translation) | exact, matches the engine | R = Rz Ry Rx, T R S; static 0x88320, animated 0x8D0A0 (EAER degrees x pi / 180), composed v . M 0x8D838 |
 | emitter animations EAES / EAER / EAET / EASL / EATR ... | exact | parsed 0x8CB00 (EAES +0x290, EAER +0x298, EAET +0x2A0), applied 0x8DE1C, linear keys 0x933D0, matrix rebuilt every frame 0x8D770 |
 | time emission: first emission, gaps | exact | the threshold starts at 0 (0x874D8): the first particles on the window's first frame; the next gap interval + 1 + (rand x interval_random) >> 32 (0x88750) |
 | time emission: count | exact, matches the engine | carry += rate (animated, EATR; the data's own for volume types 5 / 6) + rate x rate_random / 100 x U (0x8D408); one particle a whole unit |
@@ -59,6 +59,8 @@ frame.
 | combiner (colour / alpha process) | approx | colour 0 / colour x texture / c0 x tex + c1 x (1 - tex); alpha from red; alpha_process 4 erosion exact |
 | second / third texture, custom shaders | missing | the converted side runs its own pixel programs (stage 2); Ultimate's Maxwell programs are not run |
 | blending | approx | alpha or add; draw order by depth only |
+| colour space | data | an alpha-blended part's colours (and its linear textures) shown display-encoded, as Ultimate's frame is (the converter's LINEAR_DISPLAY rule): before, the Ultimate side drew linear values, a deep blue where Ultimate shows pale cyan-white |
+| camera | approx | orthographic side view; `--pitch` looks down (Cemu's training camera ~18 degrees, Ultimate's side view 0) |
 | refraction, bloom, soft particles, depth | missing | |
 
 ## Checking against the engine itself
@@ -74,6 +76,17 @@ Births a frame matched for every emitter of water_smash(_r), water_cutter(_r) an
 water_smash / water_cutter's splashes are born at ONE point, (0, 0, -radius) (even circle, one division),
 not spread round the circle as fx_render had them; eft has no division count we know of, so the
 converted bank still spreads them (next: eft's circle routine in cross_f).
+
+## Second check (matrices, positions, colour, camera)
+
+The trace's emitter matrices against fx_render's (script call x emitter SRT and key animations, read at
+the frame's own time): what is left is a pure facing turn and Squirtle's slide (tilt 0.01 degrees), for
+forward and down smash, both facings: the call rotation order (Z Y X), the 0.94 fighter scale and the
+key animations all as the engine has them. The wave particles' positions over their lives match within
+about 6% (their speeds' random). Their scale and rotation arrays don't change on the CPU (the curves are
+the GPU's). Down smash's wave stands about 5 units high with a level camera on both sides, as in the
+native clip; with Cemu's camera (--pitch 18) the ring's far half stands up into the tall arc of the
+Smash 4 footage: a camera difference, not the bank's.
 
 ## Next, in order
 
