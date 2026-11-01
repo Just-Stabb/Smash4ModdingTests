@@ -365,3 +365,14 @@ own movement this frame (+0x3D0, the current and previous positions through the 
 nothing. That byte is written from a list lookup (0xF70BC / 0xFEE78) not yet placed. Diagnostic 8: the
 ten distance emitters of water_smash / water_smash_r silenced (emit_rate 0).
 
+
+## v6 effects test 9 (`build/squirtle_v6_effects_test9.zip`)
+
+Diagnostic 8 (user's clip): with water_smash's distance emitters silenced forward smash lost nearly
+all its water, so they do emit in Ultimate. Side by side with native (Squirtle facing left there,
+right in ours) our forward-smash water stood up over him where Ultimate's runs low and forward. Ultimate
+picks water_smash / water_cutter facing left and their mirrored _r copies (with mirrored angles)
+facing right, and turns top's effects with the facing without mirroring anything; the translator always
+took the facing-left branch. ultimate_acmd.fix_lr_split + LR_FACING: the split is laid out and decided
+in game (Float_Var_Compare(0x0F000003 < 0)), 12 compares in his effect.bin. Package: the bank (test 6's
+plus nothing new) and script/animcmd/body/effect.bin.
