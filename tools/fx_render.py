@@ -207,6 +207,8 @@ class Emitter:
     follow = True
     dist = None               # eft2's distance emission (unit, min, max, margin): simulate()
     notes = ()
+    ult = None                # Ultimate's own shaders (--ult-model off): {'e', 'vfxb', 'images', 'srgb', 'prim'}
+    life_random = 0.0         # eft2: a particle's life x (1 - this x U) (the engine's birth records)
 
 
 def simulate(em, call, frames, seed=1, births_only=False):
@@ -270,11 +272,26 @@ def simulate(em, call, frames, seed=1, births_only=False):
             sr = 1 - em.size_random * rng.uniform()
             sa = (a(17, 1.0), a(18, 1.0))
             rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
+            born = None
+            if em.ult is not None and ULT_SHADERS:
+                # the particle arrays as eft2 fills them at birth (vfx_trace B records: a GPU emitter's
+                # arrays hold the particle as born, its vertex program works out the rest each frame):
+                # emitter-local position (w: life x (1 - life_random x U)) and velocity (w: birth time),
+                # scale x (1 - scale_random x U) on every axis x the EASL value, four uniforms, rotate_init
+                # (is_rotate's axes; the random part is the program's, from the uniforms), the emitter's
+                # matrix at birth (rows, its translation where the particle came from)
+                mb = np.zeros((3, 4))
+                mb[:, :3], mb[:, 3] = lin, org
+                born = {'pos': np.append(p, em.life * (1 - em.life_random * rng.uniform())),
+                        'vec': np.append(v, float(f - f0)),
+                        'scale': np.array([em.size[0] * sr * sa[0], em.size[1] * sr * sa[1],
+                                           em.size[0] * sr * sa[0], 1.0]),
+                        'random': rng.uniform(size=4), 'rot': np.append(em.rot_init, 0.0), 'm': mb}
             # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
             # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
             # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
             live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
-                         'sa': sa, 'lin': lin})
+                         'sa': sa, 'lin': lin, 'born': born})
         keep = []
         for q in live:
             if q['age'] >= em.life:
@@ -287,7 +304,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * q['sa'][0] * csize,
                                                                     em.size[1] * sy * q['sr'] * q['sa'][1] * csize),
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
-                               rgb, rgb1, q['lin']))
+                               rgb, rgb1, q['lin'], q['born']))
             g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
             q['v'] = q['v'] * em.air + g * csize
             q['p'] = q['p'] + q['v']
@@ -507,7 +524,7 @@ def draw(canvas, em, parts, cm):
     pos, uv, idx = em.mesh[:3] if em.mesh is not None else QUAD
     vcol = em.mesh[3] if em.mesh is not None and len(em.mesh) > 3 and em.mesh[3] is not None else None
     items = []
-    for p, v, t, (sx, sy), rot, alpha, rgb, rgb1, lin in parts:
+    for p, v, t, (sx, sy), rot, alpha, rgb, rgb1, lin, *_born in parts:
         b = basis(em, v, cm, lin)
         if em.ptype == 2:
             # an XZ plate is laid flat first, then turned (its Y the plate's normal): Squirtle's up-smash
@@ -658,9 +675,136 @@ def ult_emitters(eff, set_index, images, names, prims):
         if e['combiner']['shader_type'] == 1:
             em.alpha_curve = lambda t: 0.0
             notes.append('refraction (not drawn)')
+        em.life_random = max(0, int(pt['life_random'])) / 100
+        if ULT_SHADERS and not e['combiner']['shader_type'] == 1:
+            em.ult = {'e': e, 'vfxb': eff.vfxb, 'images': images, 'srgb': srgb,
+                      'prim': prims.get(pt['primitive_id']) if pt['primitive_id'] != NONE64 else None}
         em.notes = notes
         out.append(em)
     return out
+
+
+# ------------------------------------------------------------------ Ultimate's own shaders
+ULT_SHADERS = True       # --ult-model: Ultimate's side drawn by fx_render's reimplementation instead
+_programs = {}
+
+
+def ult_programs(em):
+    """(vertex, pixel) mx_exec.Program of an Ultimate emitter, or None when they can't be run"""
+    import mx_exec
+    idx = em.ult['e']['shader']['shader_index']
+    key = (id(em.ult['vfxb']), idx)
+    if key not in _programs:
+        try:
+            _programs[key] = (mx_exec.Program(em.ult['vfxb'], idx, 'vs'), mx_exec.Program(em.ult['vfxb'], idx, 'ps'))
+        except Exception as ex:          # noqa: BLE001 (a program the translator or the shim can't take)
+            print('  %s: shader variation %d not run (%s)' % (em.name, idx, str(ex).splitlines()[0][:120]))
+            _programs[key] = None
+    return _programs[key]
+
+
+def srgb_to_linear(x):
+    x = np.asarray(x, np.float32)
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4).astype(np.float32)
+
+
+def view_block(canvas):
+    """eft2's sysViewUniformBlock (c8) for this canvas: viewMat 0-15, projMat 16-31, vpMat 32-47 (world ->
+    canvas pixels: gl_Position.xy, w 1), bldMat 48-59 (view -> world: billboards face the camera), eyeVec
+    64, eyePos 68, viewParam 72 (near, far). The view is to_screen(): x right, y up, z toward the eye"""
+    S = to_screen()
+    v = np.zeros(80, np.float32)
+    view = np.eye(4)
+    view[:3, :3] = S
+    v[0:16] = view.ravel()
+    v[16:32] = np.eye(4).ravel()
+    vp = np.zeros((4, 4))
+    vp[0, :3], vp[0, 3] = canvas.ppu * S[0], -canvas.x0 * canvas.ppu
+    vp[1, :3], vp[1, 3] = -canvas.ppu * S[1], canvas.y1 * canvas.ppu
+    vp[2, :3], vp[3, 3] = S[2], 1.0
+    v[32:48] = vp.ravel()
+    bld = np.zeros((3, 4))
+    bld[:, :3] = S.T
+    v[48:60] = bld.ravel()
+    v[64:67] = S.T @ np.array([0, 0, 1.0])
+    v[68:71] = S.T @ np.array([0, 0, 1000.0])
+    v[72:76] = (1.0, 10000.0, 1.0 * 10000.0, 10000.0 - 1.0)
+    return v
+
+
+def draw_ult(canvas, em, parts, mnow, time, csize):
+    """one Ultimate emitter's live particles drawn by its own vertex and pixel programs (tools/mx_exec.py),
+    blended in linear light into the canvas (Ultimate encodes its finished frame for display)"""
+    progs = ult_programs(em)
+    if progs is None:
+        return False
+    vs, ps = progs
+    e = em.ult['e']
+    born = [q[9] for q in parts if len(q) > 9 and q[9] is not None]
+    if not born:
+        return True
+    import vfxb_to_ptcl as V
+    if em.ult['prim'] is not None:
+        pos, _n, col, uv, idx = V.mesh(em.ult['prim'], 0)
+        pos, uv, idx = np.asarray(pos, np.float32), np.asarray(uv, np.float32), np.asarray(idx).ravel()
+        col = np.ones((len(pos), 4), np.float32) if col is None else np.asarray(col, np.float32)
+    else:
+        pos, uv2, idx = QUAD
+        uv = np.concatenate([uv2, uv2], 1).astype(np.float32)
+        col = np.ones((4, 4), np.float32)
+    nv = len(pos)
+    A = np.zeros((len(born), nv, 16, 4), np.float32)
+    slot = vs.inputs
+    if 'sysPosAttr' in slot:
+        A[:, :, slot['sysPosAttr'], :3], A[:, :, slot['sysPosAttr'], 3] = pos, 1.0
+    if 'sysTexCoordAttr' in slot:
+        A[:, :, slot['sysTexCoordAttr'], :uv.shape[1]] = uv[:, :4]
+    if 'sysVertexColor0Attr' in slot:
+        A[:, :, slot['sysVertexColor0Attr']] = col
+    for name, key in (('sysLocalPosAttr', 'pos'), ('sysLocalVecAttr', 'vec'), ('sysScaleAttr', 'scale'),
+                      ('sysRandomAttr', 'random'), ('sysInitRotateAttr', 'rot')):
+        if name in slot:
+            A[:, :, slot[name]] = np.array([b[key] for b in born], np.float32)[:, None]
+    for r, name in enumerate(('sysEmtMat0Attr', 'sysEmtMat1Attr', 'sysEmtMat2Attr')):
+        if name in slot:
+            A[:, :, slot[name]] = np.array([b['m'][r] for b in born], np.float32)[:, None]
+    info = e['info']
+    c10 = np.zeros(48, np.float32)
+    c10[0:4], c10[4:8] = info['color0'], info['color1']
+    c10[8], c10[11], c10[12], c10[13:16] = time, 1.0, 1.0, csize
+    c10[16:28] = mnow[:3, :4].ravel()
+    rt = mnow[:3, :4].copy()
+    rt[:, :3] /= np.maximum(np.linalg.norm(rt[:, :3], axis=0), 1e-9)
+    c10[32:44] = rt.ravel()
+    c16 = np.zeros(32, np.float32)
+    c16[[0, 4, 5, 6, 8, 10, 18]] = 1.0          # the game's own per-effect block: colour / alpha x 1, no depth shift
+    csdp = bytes.fromhex(e['subsections'].get('CSDP', ''))
+    import eft2_resolve
+    cbs = {8: view_block(canvas), 9: np.frombuffer(eft2_resolve.static_block(e), np.uint32), 10: c10, 16: c16,
+           13: np.frombuffer(csdp[:len(csdp) // 4 * 4], np.uint32) if csdp else np.zeros(4, np.uint32)}
+    gp, out = vs.run(A.reshape(-1, 16, 4), cbs)
+    gp, out = gp.reshape(len(born), nv, 4), out.reshape(len(born), nv, -1, 4)
+    # far particles first (as fx_render's own drawing); a particle's triangles in index order
+    order = np.argsort(gp[:, :, 2].mean(1))
+    tri = idx[:len(idx) // 3 * 3].reshape(-1, 3)
+    vpos = np.concatenate([gp[k][tri] for k in order])
+    vout = np.concatenate([out[k][tri] for k in order])
+    wrap = {0: 1, 1: 0, 2: 2}                     # eft2 0 mirror, 1 repeat, 2 clamp -> mx_exec's
+    tex = {}
+    for name, unit in ps.samplers.items():
+        k = int(name[-1])
+        smp = e['sampler'][k]
+        img = em.ult['images'].get(smp['texture_id'])
+        if img is None:
+            continue
+        rgba = np.asarray(img, np.float32) / 255
+        if smp['texture_id'] in em.ult['srgb']:
+            rgba[..., :3] = srgb_to_linear(rgba[..., :3])
+        tex[unit] = (rgba, wrap.get(smp['wrap_u'], 0), wrap.get(smp['wrap_v'], 0))
+    lin = (np.clip(canvas.rgb, 0, None) ** (1 / V.DISPLAY_GAMMA)).astype(np.float32)
+    ps.draw(vpos, vout, cbs, tex, lin, {1: 1, 2: 2}.get(e['render']['blend_type'], 0))
+    canvas.rgb = np.clip(lin, 0, None) ** V.DISPLAY_GAMMA
+    return True
 
 
 # ------------------------------------------------------------------ Smash 4 (eft)
@@ -866,6 +1010,9 @@ def render_move(args, move, ult, s4, out_png):
                 sim = simulate(em, (fr0, cm, size, off), frames, seed=k + 1)
                 for fr in frames:
                     if sim[fr]:
+                        if em.ult is not None and draw_ult(canvases[fr], em, sim[fr],
+                                                           cm @ emitter_matrix(em, fr - fr0), float(fr - fr0), size):
+                            continue
                         draw(canvases[fr], em, sim[fr], cm)
         cols.append([canvases[fr].image() for fr in frames])
         log.append('%s: %d calls' % (side, len(calls)))
@@ -907,7 +1054,11 @@ def main():
     ap.add_argument('--pitch', type=float, default=0.0, help='degrees the camera looks down (Cemu footage of '
                     "Smash 4's training stage: about 15 - 20; Ultimate's side view: 0)")
     ap.add_argument('--only', default='', help='comma-separated substrings: only emitters whose name has one')
+    ap.add_argument('--ult-model', action='store_true', help="Ultimate's side drawn by fx_render's own model "
+                    "of eft2 instead of Ultimate's shaders run through tools/mx_exec.py")
     a = ap.parse_args()
+    global ULT_SHADERS
+    ULT_SHADERS = not a.ult_model
     global ULT_PROT_ORDER, ONLY, ULT_RT
     ULT_PROT_ORDER, ONLY, ULT_RT = a.ult_prot_order, a.only, a.ult_rt
     global ULT_DROP, ULT_TIME_EMIT, PITCH

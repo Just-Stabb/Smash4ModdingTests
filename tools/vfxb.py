@@ -197,6 +197,7 @@ def read_emitter(v, s):
     e = read_layout(v, s.o + s.data, EMITTER)
     e['children'] = [read_emitter(v, c) for c in s.children(v)]
     e['subsections'] = {a.magic: v[a.o + a.data:a.o + a.size].hex() for a in s.attrs(v)}
+    e['_raw'] = bytes(v[s.o + s.data:s.o + s.data + EMITTER_SIZE])     # the shaders' c9 (tools/mx_exec.py)
     return e
 
 

@@ -5,7 +5,7 @@
 
 The emitter's shader_index (vfxb.py: shader) picks a BNSH variation: grsc at +0x60 of the BNSH,
 variations (0x40 bytes) from +0xC0, each +0x10 the binary program's offset; that holds the code
-records' offsets, vertex at +0x08, pixel at +0x28; a record +0x10 the code's offset, +0x1C its size
+records' offsets, vertex at +0x08, pixel at +0x28; a record +0x10 the code's offset, +0x18 its size (+0x1C is not: it cut the vertex programs short)
 (offsets from the BNSH). The code is NVN (0x12345678, the SPH 0x30 after it, the instructions from
 +0x80), disassembled with tools/maxwell_dis/envydis as tools/nush_dis.py does. In a pixel shader
 a[0x80] / a[0x90] are colour 0 / 1 (rgb), a[0x8c] alpha, c9 the emitter's constants.
@@ -29,7 +29,7 @@ def code(d, index, stage):
     b = d.find(b'BNSH')
     prog = b + struct.unpack_from('<Q', d, b + 0xC0 + 0x40 * index + 0x10)[0]
     rec = b + struct.unpack_from('<Q', d, prog + 8 + 8 * stage)[0]
-    off, size = struct.unpack_from('<Q', d, rec + 0x10)[0], struct.unpack_from('<I', d, rec + 0x1C)[0]
+    off, size = struct.unpack_from('<Q', d, rec + 0x10)[0], struct.unpack_from('<I', d, rec + 0x18)[0]
     return b + off + 0x80, b + off + size
 
 

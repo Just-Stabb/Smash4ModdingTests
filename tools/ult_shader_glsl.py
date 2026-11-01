@@ -20,6 +20,7 @@ What the inputs are (eft2, read from these programs and main.bin; docs/fx-render
 """
 import argparse
 import os
+import struct
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,6 @@ import vfxb  # noqa: E402
 
 BIN = os.path.join(ROOT, 'build', 'mx_glsl')
 MAIN = os.path.join(HERE, 'opensmash', 'mx_glsl_main.c')
-HEADER = 0x50                    # the Maxwell program header (SPH) before the instructions
 
 
 def recomp():
@@ -56,26 +56,49 @@ def build():
     return BIN
 
 
-def glsl(path, set_name, emitter, stage='vs'):
-    """(GLSL text, summary line) of the emitter's vertex or pixel program"""
-    d = open(path, 'rb').read()
+def program(d, index, stage):
+    """(code: the program header + instructions, cdata: constant buffer 1) of BNSH variation index's
+    stage ('vs' / 'ps'). The code record (eft_shader_dis.code): +0x08 NVN's control section (0x850 bytes:
+    +0x6F8 the code's length, +0x6FC / +0x700 the immediates' size / offset, as ssbu-recomp's mxtest.c
+    reads it), +0x10 the code section (a 0x30-byte header, the 0x50-byte SPH, the instructions; the
+    immediates further on), +0x18 its size"""
+    b = d.find(b'BNSH')
+    prog = b + struct.unpack_from('<Q', d, b + 0xC0 + 0x40 * index + 0x10)[0]
+    rec = b + struct.unpack_from('<Q', d, prog + 8 + 8 * eft_shader_dis.STAGE[stage])[0]
+    ctl = b + struct.unpack_from('<Q', d, rec + 0x08)[0]
+    data = b + struct.unpack_from('<Q', d, rec + 0x10)[0]
+    code_len, c_size, c_off = struct.unpack_from('<3I', d, ctl + 0x6F8)
+    return d[data + 0x30:data + 0x30 + code_len], d[data + c_off:data + c_off + c_size]
+
+
+def emitter_data(path, set_name, emitter):
     eff = vfxb.Eff(path)
     if set_name not in eff.sets:
         raise SystemExit('%s: no set %s' % (path, set_name))
     em = [x for x in eff.emitters(eff.sets.index(set_name)) if x['name'] == emitter]
     if not em:
         raise SystemExit('%s: no emitter %s' % (set_name, emitter))
-    start, end = eft_shader_dis.code(d, em[0]['shader']['shader_index'], eft_shader_dis.STAGE[stage])
-    with tempfile.NamedTemporaryFile(suffix='.sph', delete=False) as f:
-        f.write(d[start - HEADER:end])
-    try:
-        r = subprocess.run([build(), f.name, '0' if stage == 'vs' else '1'], capture_output=True, text=True)
-    finally:
-        os.unlink(f.name)
+    return em[0]
+
+
+def translate(code, cdata, stage):
+    """GLSL text and the translator's summary line"""
+    with tempfile.TemporaryDirectory() as t:
+        open(os.path.join(t, 'code'), 'wb').write(code)
+        open(os.path.join(t, 'cdata'), 'wb').write(cdata)
+        r = subprocess.run([build(), os.path.join(t, 'code'), '0' if stage == 'vs' else '1']
+                           + ([os.path.join(t, 'cdata')] if cdata else []), capture_output=True, text=True)
     if r.returncode:
         raise SystemExit('translation failed: ' + r.stderr.strip())
-    return r.stdout, '// %s %s %s: variation %d; %s' % (set_name, emitter, stage, em[0]['shader']['shader_index'],
-                                                        r.stderr.strip())
+    return r.stdout, r.stderr.strip()
+
+
+def glsl(path, set_name, emitter, stage='vs'):
+    """(GLSL text, summary line) of the emitter's vertex or pixel program"""
+    em = emitter_data(path, set_name, emitter)
+    code, cdata = program(open(path, 'rb').read(), em['shader']['shader_index'], stage)
+    text, summary = translate(code, cdata, stage)
+    return text, '// %s %s %s: variation %d; %s' % (set_name, emitter, stage, em['shader']['shader_index'], summary)
 
 
 def main():
