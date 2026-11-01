@@ -445,3 +445,19 @@ display-encodes them); fx_render's Ultimate side had drawn the linear values (de
 them too. The wave: both renders stand about 5 units high with a level camera; drawn with Cemu's
 downward-looking camera (fx_render --pitch 18) the ring round Squirtle (13 units out) stands up into the
 tall arc of the Smash 4 footage. Its height in game is the camera's, not the bank's.
+
+## v6 effects test 12 (`build/squirtle_v6_effects_test12.zip`)
+
+Dissolves. Ultimate's custom shader 8 eats a part away by a mask (sampler 1's alpha) against a threshold
+rising in colour 1's alpha (CSDP: the edge width). 18 more of Squirtle's parts dissolve now (24 -> 42):
+- the dissolve wanted texture 0's colour grey; his water lines are BC-compressed linear textures whose
+  channels sit 5 - 10 / 255 apart once display-encoded (the 2.5 / 255 test failed them): 12 / 255 now;
+- the smash waves, Waterfall's water and Water Gun's crowns scroll the colour texture over a still mask
+  (their own UV animations): the mask was packed into texture 0's green and had to share its UVs, so the
+  dissolve was dropped. eft_pixel's `mask1` programs read the mask from texture 1 (sampler 1's alpha,
+  its own UVs and animation, set_slot1(mask=True)) and keep texture 0's colour.
+fx_render: Ultimate's dissolve drawn (mask x threshold over life); eft2's stripe meshes (types 5 / 6:
+up smash's columns) face the camera about their motion, where they had been drawn edge-on (invisible).
+Still not modelled in fx_render: eft's type 4 meshes' orientation (the converted up-smash columns render
+edge-on; in game they face the camera, test 11's clip). Left: EAA1 (colour 1's alpha animated, 1.5 -> 1
+over 4 frames) on 23 emitters, most of them distortion parts.

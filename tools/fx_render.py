@@ -190,6 +190,7 @@ class Emitter:
     colour1_curve = None
     combine = 1               # 0 colour, 1 colour x tex, 2 c0 x tex + c1 x (1 - tex)
     alpha_from_red = False
+    dissolve = None           # Ultimate's custom shader 8: (mask [h, w], edge width, threshold curve t -> value)
     alpha_erode = None        # Ultimate's alpha_process 4: sat(sat((tex.a - alpha 0) x 4) x this gain)
     rot_init = np.zeros(3)
     rot_rand = np.zeros(3)
@@ -329,7 +330,7 @@ class Canvas:
         return (np.asarray((np.asarray(x) - self.x0) * self.ppu).astype(int),
                 np.asarray((self.y1 - np.asarray(y)) * self.ppu).astype(int))
 
-    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend, VC=None, erode=None):
+    def tri(self, P, UV, tex, rgb, rgb1, alpha, combine, alpha_red, blend, VC=None, erode=None, dissolve=None):
         """one triangle: P [3, 2] world (screen x = top's Z, y = Y), UV [3, 2], VC [3, 4] a mesh's vertex
         colours (x the colour and alpha, as both games' mesh programs do)"""
         X = (P[:, 0] - self.x0) * self.ppu
@@ -364,6 +365,13 @@ class Canvas:
         a = alpha * (t[:, 0] if alpha_red else t[:, 3])
         if erode is not None:
             a = np.clip(np.clip((t[:, 3] - alpha) * 4, 0, 1) * erode, 0, 1)
+        if dissolve is not None:
+            # Ultimate's custom shader 8 (vfxb_to_ptcl.DISSOLVE_SHADER): sampler 1's alpha the mask, colour
+            # 1's alpha the threshold, alpha x (mask - threshold) / width over the edge
+            mask, width, thr = dissolve
+            mh, mw = mask.shape
+            m = mask[((v % 1) * mh).astype(int).clip(0, mh - 1), ((u % 1) * mw).astype(int).clip(0, mw - 1)]
+            a = a * np.clip((m - thr) / max(width, 1e-4), 0, 1)
         if VC is not None:
             vc = np.stack([l0[inside], l1[inside], l2[inside]], 1) @ np.asarray(VC, float)
             c = c * vc[:, :3]
@@ -449,10 +457,14 @@ def basis(em, vel, cm, lin=None):
         # so does eft2's directional mesh (Squirtle's down-smash waves in Ultimate's footage)
         return frame
     if em.ptype == 3 and s > 1e-4:
+        # directional: Y along the motion, turned about it to face the camera (eft's type 3; eft2's
+        # stripe types 5 / 6: Squirtle's up-smash columns, XY sheets drawn edge-on before)
         y = vel / s
-        x = np.cross(y, frame[:, 2])
+        p = math.radians(PITCH)
+        to_cam = np.array([-math.cos(p), math.sin(p), 0.0])
+        x = np.cross(y, to_cam)
         if np.linalg.norm(x) < 1e-6:
-            x = np.cross(y, [1.0, 0, 0])
+            x = np.cross(y, frame[:, 2])
         x /= np.linalg.norm(x)
         return np.stack([x, y, np.cross(x, y)], 1)
     return frame
@@ -493,8 +505,8 @@ def draw(canvas, em, parts, cm):
         else:
             b = b @ rot_xyz(rot, em.prot_order)
         w = (b @ (pos * np.array([sx, sy, sx])).T).T + p
-        items.append((-(w[:, 0].mean()), w, alpha, rgb, rgb1))
-    for _d, w, alpha, rgb, rgb1 in sorted(items, key=lambda x: x[0]):
+        items.append((-(w[:, 0].mean()), w, alpha, rgb, rgb1, t))
+    for _d, w, alpha, rgb, rgb1, age in sorted(items, key=lambda x: x[0]):
         s = w @ to_screen().T
         for k in range(0, len(idx) - 2, 3):
             tri = idx[k:k + 3]
@@ -509,7 +521,8 @@ def draw(canvas, em, parts, cm):
                                    em.blend_mode)
             else:
                 canvas.tri(s[tri, :2], uv[tri, :2], em.tex, rgb, rgb1, alpha, em.combine, em.alpha_from_red,
-                           em.blend, vcol[tri] if vcol is not None else None, em.alpha_erode)
+                           em.blend, vcol[tri] if vcol is not None else None, em.alpha_erode,
+                           (em.dissolve[0], em.dissolve[1], em.dissolve[2](age)) if em.dissolve else None)
 
 
 # ------------------------------------------------------------------ Ultimate (eft2)
@@ -608,7 +621,9 @@ def ult_emitters(eff, set_index, images, names, prims):
             on = np.array([float(bool(v)) for v in pt['is_rotate'][:3]])
             em.rot_init, em.rot_rand, em.rot_add = em.rot_init * on, em.rot_rand * on, em.rot_add * on
         em.ptype = {4: 2, 5: 3, 6: 3, 7: 0}.get(pt['billboard_type'], pt['billboard_type'])   # vfxb_to_ptcl.TYPES
-        em.mesh_frame = True
+        # a type-3 directional mesh keeps the emitter's frame (Squirtle's down-smash waves, footage); the
+        # stripe types 5 / 6 face the camera about their motion
+        em.mesh_frame = pt['billboard_type'] == 3
         if pt['primitive_id'] != NONE64 and pt['primitive_id'] in prims:
             pos, _n, col, uv, idx = V.mesh(prims[pt['primitive_id']], e['tex_anim'][0]['uv_channel'])
             em.mesh = (np.asarray(pos, float) * np.array(sc['scale']) / np.array([em.size[0], em.size[1], em.size[0]]),
@@ -621,6 +636,14 @@ def ult_emitters(eff, set_index, images, names, prims):
             if V.display_space(e) and smp['texture_id'] not in srgb:
                 em.tex[..., :3] = em.tex[..., :3] ** V.DISPLAY_GAMMA     # a linear (UNORM) texture as shown
         em.blend = 1 if e['render']['blend_type'] == 1 else 0
+        if e['shader']['custom_shader_index'] == V.DISSOLVE_SHADER and 'CSDP' in e['subsections']:
+            s1 = e['sampler'][1]
+            if s1['texture_id'] in images:
+                width = struct.unpack('<f', bytes.fromhex(e['subsections']['CSDP'][:8]))[0]
+                thr = V.track(st, e['color'], 1)[1] * info['color1'][3]
+                mask = np.asarray(V.first_cell(images[s1['texture_id']], st['tex_scroll'][1], V.shown_cell(e, 1)),
+                                  float)[..., 3] / 255
+                em.dissolve = (mask, width, lambda t, c=thr: float(c[int(round(t * 100))]))
         if e['combiner']['shader_type'] == 1:
             em.alpha_curve = lambda t: 0.0
             notes.append('refraction (not drawn)')

@@ -848,24 +848,37 @@ def live_sampler(e, ti, images, names, is_mesh):
 
 
 def dissolve_of(e, ti, images, names, ptn):
-    """(edge width, threshold over life [101], mask [h, w] 0-1) for Ultimate's dissolve
+    """(edge width, threshold over life [101], mask [h, w] 0-1, mask on its own UVs) for Ultimate's dissolve
     (DISSOLVE_SHADER), else None. The mask is sampler 1's alpha as stored (whatever its alpha input
     to the combiner), so it must read sampler ti's UVs (it rides in texture 0's green); the colour
-    input grey (texture 0 carries it in red and blue: eft_pixel's dissolve programs); no flipbook"""
+    input grey (texture 0 carries it in red and blue: eft_pixel's dissolve programs); a flipbook on
+    texture 0 gets the mask in every cell; not on sampler 1 itself"""
     if not DISSOLVE or e['shader']['custom_shader_index'] != DISSOLVE_SHADER or 'CSDP' not in e['subsections']:
         return None
     s = e['sampler'][1]
-    if s['texture_id'] == NONE64 or s['texture_id'] not in images or ptn or not (ti == 1 or same_uv(e, ti, 1)):
+    # a flipbook on texture 0 is fine: the mask goes into every cell of its sheet (below), so whichever
+    # cell plays, its green is the mask where sampler 1 reads it (29 of Squirtle's 42 dissolves: his
+    # ripples, crowns, wave lines; the mask on its own UVs)
+    if s['texture_id'] == NONE64 or s['texture_id'] not in images or (ptn and ti == 1):
+        return None
+    # the mask on UVs of its own (its own scroll / scale animation: Squirtle's smash waves, a waterline
+    # scrolling over a still mask): drawn live as texture 1 (mask1, eft_pixel), texture 0 its colour
+    own = not (ti == 1 or same_uv(e, ti, 1))
+    if own and (not TWO_TEXTURES or not GRAFT or e['tex_anim'][1]['pattern_type'] or
+                [j for j, x in enumerate(e['sampler']) if j not in (ti, 1) and x['texture_id'] != NONE64
+                 and x['texture_id'] in images and not is_indirect(e, j, names)]):
         return None
     for j, x in enumerate(e['sampler']):
         if x['texture_id'] != NONE64 and x['texture_id'] in images and not is_indirect(e, j, names):
             rgb, _a = sampler_inputs(e, j, images[x['texture_id']])
-            if float(np.abs(rgb - rgb[..., :1]).max()) > 2.5 / 255:
+            # grey within compression noise: Squirtle's water lines (BC-compressed linear textures, their
+            # channels 5 - 10 / 255 apart once display-encoded) had their dissolves dropped at 2.5 / 255
+            if float(np.abs(rgb - rgb[..., :1]).max()) > 12 / 255:
                 return None
     width = struct.unpack('<f', bytes.fromhex(e['subsections']['CSDP'][:8]))[0]
     thr = track(e['static'], e['color'], 1)[1] * e['info']['color1'][3]
     mask = first_cell(images[s['texture_id']], e['static']['tex_scroll'][1], shown_cell(e, 1))[..., 3] / 255.0
-    return width, thr, mask.astype(np.float32)
+    return width, thr, mask.astype(np.float32), own
 
 
 def tex_blend(e, ti, j):
@@ -994,7 +1007,7 @@ def turning_shader(p, si):
     return _two[key]
 
 
-def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=False):
+def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=False, mask=False):
     """texture 1 (slot: 2) of a two- (three-) texture template: sampler j as Ultimate places it (its
     first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one.
     raw: a distortion map (distortion()): R R R A, the channels Ultimate's program reads for U and V"""
@@ -1004,7 +1017,12 @@ def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=
         s = e['sampler'][j]
         ts = e['static']['tex_scroll'][j]
         cell = first_cell(images[s['texture_id']], ts, shown_cell(e, j))
-        if raw:
+        if mask:
+            # a dissolve's mask: the sampler's alpha as stored (dissolve_of), white colour
+            a = cell.astype(np.float32)[..., 3] / 255
+            pix = fit_texture(np.stack([np.ones_like(a)] * 3 + [a], -1))
+            notes.append('sampler %d drawn live as texture %d (dissolve mask, UV mode %d)' % (j, slot, uv_mode(ts)))
+        elif raw:
             # U from its red (its alpha with colour input 1), V from its alpha input (0 alpha, 1 red,
             # 2 one: Kaboom's smokeBase, its V moved by the coefficient alone)
             f = cell.astype(np.float32) / 255
@@ -1097,7 +1115,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
 
 
 def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolve_c0=False, blend2=(0, 0),
-                   distort=None):
+                   distort=None, mask1=False):
     """(shader index, alpha keys, alpha gain) when the template's pixel program can be replaced by
     one of tools/eft_pixel.py's for this emitter's combiner (EXACT), else None. alpha: the alpha
     track [101] (alpha 0, x alpha 1 for alpha mode 4: folded into the keys). Ultimate's alphas past 1
@@ -1130,7 +1148,7 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         c0 = display(c0) if c0 is not None else None
     si = eft_pixel.own_shader(p, struct.unpack_from('>I', em, 0x844)[0], cb['color_process'],
                               4 if am == 4 else 1 if erode else 0, gain, c1, blend1, dissolve, c0, blend2, distort,
-                              additive=e['render']['blend_type'] == 1)
+                              additive=e['render']['blend_type'] == 1, mask1=mask1)
     if si is None:
         notes.append('own pixel program: template layout not supported')
         return None
@@ -1139,7 +1157,8 @@ def exact_combiner(p, em, e, alpha, notes, blend1=(0, 0), dissolve=None, dissolv
         cb['color_process'], am, ', x %.2f' % gain if gain != 1.0 else '',
         ', colour 1 constant' if (lay['c1'] is None or (dissolve is not None and not dissolve_c0))
         and cb['color_process'] in (2, 3) else '',
-        ', dissolve (edge %.2f, threshold in colour %d)' % (dissolve, not dissolve_c0) if dissolve is not None else '',
+        ', dissolve (edge %.2f, threshold in colour %d%s)' % (dissolve, not dissolve_c0, ', mask texture 1' if mask1 else '')
+        if dissolve is not None else '',
         (', premultiplied, added' if e['render']['blend_type'] == 1 else ', premultiplied')
         if eft_pixel.premultiplied(p, si) else '')
         + (', UVs distorted by texture 1 (%.3f, %.3f)' % tuple(distort) if distort is not None and 'uv1' in lay else ''))
@@ -1562,6 +1581,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         dis is None and not as_child else None
     if warp is not None:
         live = 0
+    mask1 = dis is not None and dis[3]
+    if mask1:
+        live = 1            # the mask, sampler 1, drawn live as texture 1 (not blended into the colour)
     # samplers 1 and 2 both drawn live by a three-texture graft (three_texture_shader), in eft2's order
     # (t0 . t1) . t2: sampler 0 the main one, the other two its UV set's on a mesh
     live3 = None
@@ -1585,9 +1607,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         and s['texture_id'] in images and not is_indirect(e, j, names)]
     if live3:
         live, swap_ok = live3[0], False
+    if mask1:
+        swap_ok = False     # slot 1 is the mask
     if refract:
         dis = live = warp = live3 = None
-        swap_ok = dis_moving = False
+        swap_ok = dis_moving = mask1 = False
     fblocks, fanims, fdone = particle_fields(e) if not as_child else ({}, [], set())
     fluct = fluctuation(e) if not as_child else None
     child, child_e = None, (e['children'] or [None])[0] if not as_child else None
@@ -1638,7 +1662,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             notes.append('vertex program grafted: rotation')
     two_tpl = lay_t is not None and 'uv1' in lay_t
     dis_in = None       # the colour track carrying the dissolve's threshold
-    if dis is not None and lay_t is not None and not two_tpl:
+    if dis is not None and lay_t is not None and (not two_tpl if not mask1 else 'uv2' not in lay_t):
         if lay_t['c1'] is not None and (p.field(em, 'color1_type') == 2 or not dis_moving):
             dis_in = 1
         elif c0_flat and (p.field(em, 'color0_type') == 2 or not dis_moving) and (
@@ -1646,8 +1670,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
             dis_in = 0
     if dis is not None and dis_in is None:
         notes.append('dissolve not drawn (template: %s)' % (
-            'not ours' if lay_t is None else 'two textures' if two_tpl else 'no animated colour track for it'))
+            'not ours' if lay_t is None else 'two textures' if two_tpl and not mask1 else 'no animated colour track for it'))
         dis = None
+        if mask1:
+            mask1, live = False, None
     # a rotation no template draws: baked (a quad's fixed quarter turns; a mesh's starting rotation)
     baked_rot = rot != ROT_NONE and not turns and (is_mesh or rot == ROT_FIXED)
     quarter = fixed_quarter_turn(st) if baked_rot and not is_mesh else None
@@ -1763,7 +1789,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         warp = None
     exact = None if refract else exact_combiner(
         p, em, e, a_track, notes, tex_blend(e, ti, live) if live is not None else (0, 0),
-        dis[0] if dis is not None else None, dis_in == 0, tex_blend(e, ti, live2) if live2 is not None else (0, 0), warp)
+        dis[0] if dis is not None else None, dis_in == 0, tex_blend(e, ti, live2) if live2 is not None else (0, 0), warp,
+        mask1=bool(mask1 and dis is not None))
     if not exact:
         live = live2 = dis = warp = None
     if exact:
@@ -1771,10 +1798,25 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         rgb = track(st_, col_, 0)[0] * np.array(e['info']['color0'][:3])
         rgb1 = track(st_, col_, 1)[0] * np.array(e['info']['color1'][:3])
         alpha, premult = exact[1], None
-        if dis is not None:
+        if dis is not None and mask1:
+            thr = np.repeat(dis[1][:, None] / written_scale(e), 3, 1)
+            if dis_in == 0:
+                rgb = thr
+            else:
+                rgb1 = thr
+        elif dis is not None:
             # texture 0: grey colour in red and blue, the mask in green, alpha; colour 1's track the
             # threshold (Smash 4 scales colour 1 by the colour scale too, cross_f 0x04A588CC)
-            m = resize(dis[2][..., None], pix.shape[1], pix.shape[0])
+            if ptn:
+                # a flipbook sheet: the mask in each of its nx x ny cells (sampler 1 reads the quad's UVs
+                # whichever cell texture 0 shows)
+                nx, ny = (max(1, int(round(v))) for v in e['static']['tex_scroll'][ti]['uv_div'])
+                cell = resize(dis[2][..., None], pix.shape[1] // nx, pix.shape[0] // ny)
+                m = np.tile(cell, (ny, nx, 1))
+                m = np.pad(m, ((0, pix.shape[0] - m.shape[0]), (0, pix.shape[1] - m.shape[1]), (0, 0)), mode='edge')
+                notes.append('dissolve mask in each of the flipbook\'s %d x %d cells' % (nx, ny))
+            else:
+                m = resize(dis[2][..., None], pix.shape[1], pix.shape[0])
             pix = np.concatenate([pix[..., :1], m, pix[..., :1], pix[..., 3:]], -1)
             thr = np.repeat(dis[1][:, None] / written_scale(e), 3, 1)
             if dis_in == 0:
@@ -1810,12 +1852,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     q8 = (np.clip(pix, 0, 1) * 255 + 0.5).astype(np.uint8)
     if two_tpl:
         # texture 1: the live sampler, else white (x 1)
-        set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes, raw=warp is not None)
+        set_slot1(p, em, e, ti, None if templates.test_white1 else live, images, notes, raw=warp is not None,
+                  mask=bool(mask1 and dis is not None))
         if lay_t is not None and 'uv2' in lay_t:
             set_slot1(p, em, e, ti, live2, images, notes, slot=2)
     if exact:
         struct.pack_into('>I', em, 0x844, exact[0])
-        if dis is not None:
+        if dis is not None and not mask1:
             # uncompressed: BC3's colour endpoints would tie the mask to the colour
             p.set_texture(em, 0, q8, 0x1A, comp_sel=RGBA_SEL)
         else:

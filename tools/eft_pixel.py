@@ -154,7 +154,7 @@ def _blend(ch, mode, t, other):
 
 
 def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-           c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False):
+           c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False, mask1=False):
     """the program's latte-asm source. c1_const (rgb): colour 1 as constants, for a layout without
     it (colour modes 2 / 3 on a template that passes colour 0 only: Kafrizz's sphere1 drew colour 0 x
     texture, an opaque black ball where its gradient texture is dark). tex_blend (colour, alpha):
@@ -171,7 +171,10 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     distort (sx, sy), a two- / three-texture layout: Ultimate's combiner shader_type 2, texture 1 a
     distortion map moving texture 0's UVs, u + (2 t1.x - 1) sx, v + (2 t1.w - 1) sy (its fire /
     smoke programs, read with the WindowSmash translator: sampler 0's red and alpha x the static
-    coefficient x the param animation's x), sampled first; texture 1 then isn't blended in"""
+    coefficient x the param animation's x), sampled first; texture 1 then isn't blended in.
+    mask1, with dissolve on a two-texture layout: the dissolve's mask is texture 1's alpha (Ultimate's
+    sampler 1 on its own UVs: Squirtle's smash waves, their waterline scrolling over a still mask);
+    texture 1 isn't blended in and texture 0 keeps its colour"""
     n = lay['regs']
     two = 'uv1' in lay
     three = 'uv2' in lay
@@ -179,18 +182,19 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
     uvr, uvc = lay['uv']
     t, d = 'R%d' % n, 'R%d' % (n + 1)          # the texel, the colour's work register
     thr = None
-    if dissolve is not None and not two:
+    mask1 = bool(mask1 and two and not three and not distort)
+    if dissolve is not None and (not two or mask1):
         if c0_const is not None and (c1 is not None or c1_const is None or color_mode not in (2, 3)):
             thr = c0
         elif c0_const is None and c1 is not None:
             thr, c1 = c1, None
-        ramp = 'R%d' % (n + 2)
+        ramp = 'R%d' % (n + 3 if mask1 else n + 2)
     if thr != c0:
         c0_const = None
 
     def c0op(ch):
         return lit(c0_const['xyz'.index(ch)]) if c0_const is not None else '%s.%s' % (c0, ch)
-    tc = (lambda ch: 'x' if ch == 'y' else ch) if thr else (lambda ch: ch)     # the texel's colour channels
+    tc = (lambda ch: 'x' if ch == 'y' else ch) if thr and not mask1 else (lambda ch: ch)     # the texel's colour
     if color_mode in (2, 3) and c1 is None and c1_const is None:
         color_mode = 1
 
@@ -202,11 +206,13 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
             % (color_mode, alpha_mode, alpha_gain, ', texture 1 %s / %s' % tuple(
                 'x+-'[b % 3] for b in tex_blend) + (', texture 2 %s / %s' % tuple(
                     'x+-'[b % 3] for b in tex_blend2) if three else '') if two and not distort else '',
-               ', dissolve %g by colour %d' % (dissolve, thr != c0) if thr else '')
+               ', dissolve %g by colour %d%s' % (dissolve, thr != c0, ', mask texture 1' if mask1 else '')
+               if thr else '')
             + (', premultiplied' if premult else '')
             + (', distorted by texture 1 (%g, %g)' % tuple(distort) if distort and two else ''),
             '; $MODE = "UniformBlock"',
-            '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 4 if three else n + 3 if two or thr else n + 2),
+            '; $SQ_PGM_RESOURCES_PS.NUM_GPRS = %d' % (n + 4 if three or (thr and mask1) else n + 3 if two or thr
+                                                      else n + 2),
             '; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2',
             '; $SPI_PS_IN_CONTROL_0.NUM_INTERP = %d' % n,
             '; $NUM_SPI_PS_INPUT_CNTL = %d' % n]
@@ -240,8 +246,9 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
         t1 = 'R%d' % (n + 2)
         r1, c1c = lay['uv1']
         body.append('  1      SAMPLE          %s.xyzw, R%d.%s0%s, t1, s1' % (t1, r1, c1c, c1c[0]))
-        # texture 1 into the texel first: t = t0 x / + / - t1 (colour, alpha)
-        groups.append([_blend(ch, tex_blend[ch == 'w'], t, t1) for ch in 'xyzw'])
+        # texture 1 into the texel first: t = t0 x / + / - t1 (colour, alpha); a dissolve's mask stays apart
+        if not mask1:
+            groups.append([_blend(ch, tex_blend[ch == 'w'], t, t1) for ch in 'xyzw'])
     if three and not distort:
         t2 = 'R%d' % (n + 3)
         r2, c2c = lay['uv2']
@@ -249,7 +256,7 @@ def source(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend
         groups.append([_blend(ch, tex_blend2[ch == 'w'], t, t2) for ch in 'xyzw'])
     if thr:
         # the dissolve's ramp from the untouched mask
-        groups.append(['x: ADD             %s.x, %s.y, -%s.x' % (ramp, t, thr)])
+        groups.append(['x: ADD             %s.x, %s, -%s.x' % (ramp, ('R%d.w' % (n + 2)) if mask1 else '%s.y' % t, thr)])
         groups.append(['x: MUL             %s.x, %s.x, %s CLAMP' % (ramp, ramp, lit(1.0 / max(dissolve, 1e-3)))])
     body.append('%02d ALU: KCACHE0(CB9:0-15)' % (3 if distort else 1))
     # group 1: the colour's first step, the alpha's first step
@@ -324,10 +331,10 @@ _programs = {}
 
 
 def program(lay, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-            c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False):
+            c0_const=None, tex_blend2=(0, 0), premult=False, distort=None, additive=False, mask1=False):
     """(program bytes, GPR count), assembled once per variant"""
     src = source(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const, tex_blend2,
-                 premult, distort, additive)
+                 premult, distort, additive, mask1)
     if src not in _programs:
         with tempfile.NamedTemporaryFile('w', suffix='.psh', delete=False) as f:
             f.write(src)
@@ -347,7 +354,7 @@ _shaders = {}
 
 
 def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex_blend=(0, 0), dissolve=None,
-               c0_const=None, tex_blend2=(0, 0), distort=None, additive=False):
+               c0_const=None, tex_blend2=(0, 0), distort=None, additive=False, mask1=False):
     """the index of shader si of Ptcl p with one of these pixel programs (added once per variant),
     or None when its pixel program isn't one this module can stand in for. c1_const: colour 1 (rgb,
     x the colour scale) for a template that doesn't pass it, or that passes the dissolve's
@@ -361,9 +368,11 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
         return None
     premult = premultiplied(p, si)
     additive = bool(additive and premult)
-    if dissolve is None or 'uv1' in lay or (c0_const is None and lay['c1'] is None) or (
+    mask1 = bool(mask1 and dissolve is not None and 'uv1' in lay and 'uv2' not in lay)
+    if dissolve is None or ('uv1' in lay and not mask1) or (c0_const is None and lay['c1'] is None) or (
             c0_const is not None and lay['c1'] is None and color_mode in (2, 3)):
         dissolve = c0_const = None
+        mask1 = False
     if dissolve is not None:
         dissolve = round(float(dissolve), 4)
     if c0_const is not None:
@@ -379,10 +388,10 @@ def own_shader(p, si, color_mode, alpha_mode, alpha_gain=1.0, c1_const=None, tex
     if 'uv2' not in lay:
         tex_blend2 = (0, 0)
     key = (id(p), hashlib.md5(b).hexdigest(), color_mode, alpha_mode, round(alpha_gain, 4), c1_const, tuple(tex_blend),
-           dissolve, c0_const, tuple(tex_blend2), premult, distort, additive)
+           dissolve, c0_const, tuple(tex_blend2), premult, distort, additive, mask1)
     if key not in _shaders or _shaders[key][0] is not p:
         prog, gprs = program(lay, color_mode, alpha_mode, alpha_gain, c1_const, tex_blend, dissolve, c0_const,
-                             tuple(tex_blend2), premult, distort, additive)
+                             tuple(tex_blend2), premult, distort, additive, mask1)
         nb = with_program(b, prog, gprs)
         if hashlib.md5(b).hexdigest() in GRAFTED:          # (a grafted layout stays one)
             GRAFTED[hashlib.md5(nb).hexdigest()] = GRAFTED[hashlib.md5(b).hexdigest()]
