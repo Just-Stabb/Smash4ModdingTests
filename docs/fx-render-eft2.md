@@ -45,7 +45,7 @@ frame.
 | gravity, world gravity, air resistance | data, exact | p += v, then v = v x air + g (vfx_trace, down smash's splash2: born at z -0.1, v -1.965; next frame z -2.065, v -1.965 x 0.96 with gravity in it, not yet in the position). Until the spray-height check fx_render had air first: every particle one air step short, its gravity a frame early |
 | scale curve, scale random | data | only the X random |
 | colour 0 / 1 and alpha over life | data | 8-key tracks read with `vfxb_to_ptcl.track`; evaluator not checked |
-| rotation (init, random, add) | data | is_rotate axes zeroed per particle: exact (0x8B8A0); order taken as eft's Rx Rz Ry (--ult-prot-order) |
+| rotation (init, random, add) | data; random exact for both | eft2: init + random x (U - 1/2) (its programs); eft: init + U x random (cross_f 0x04A5DAB4); life: eft2 life x (1 - random x U), eft life - int(U x random frames) (0x04A5C8BC), both per particle | is_rotate axes zeroed per particle: exact (0x8B8A0); order taken as eft's Rx Rz Ry (--ult-prot-order) |
 | following (follow_type) | approx | particles keep the emitter's frame from their birth (follow 1); 0 and 2 not told apart |
 | fields (spin, collision, convergence, magnet, random) | missing | converted (vfxb_to_ptcl), not simulated here |
 | child emitters, fluctuation | missing | |

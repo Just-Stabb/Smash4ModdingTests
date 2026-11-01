@@ -561,3 +561,23 @@ Still different in the renders:
 - Waterfall: dark streaks and more upright spikes, where Ultimate's sheet is flat and dense.
 - Forward smash: the impact wedges cover about half of Ultimate's area.
 - Splashes: whites cap at 1 (Ultimate's go past it into its bloom).
+
+## v6 effects test 17 (`build/squirtle_v6_effects_test17.zip`)
+
+Waterfall, compared emitter by emitter in fx_render:
+- waveline1_1 / 1_2 (eft2 type-5 meshes, slightly curved: 1.8 deep in 13.6) stayed eft type 4. They move
+  along the emitter's -Z under the call's -50 degree turn, so type 4's X (emitter Y x motion) pointed
+  into the screen: edge-on streaks. Every type-5 mesh is now type 3. eft's type-3 mesh programs scale Z
+  by a template constant, but Z points toward the eye, so the silhouette is unchanged.
+- rifraction1 (the refraction along the column, about 80 units) has no type-3 distortion template in
+  the corpus. On the billboard one it stood upright. It is now skipped.
+- Random rotation: eft2 turns init + random x (U - 1/2) (wave1's program run with U 0 / 0.5 / 1:
+  -0.61 / 0 / +0.61 rad). eft turns init + U x random (cross_f 0x04A5DAB4, U a u32 x 2^-32). eft's init
+  is now init - random / 2. eft2's rot_rev_rand goes to ptcl 0x2FC - 0x2FE.
+- fx_render's Smash 4 side now gives particles eft's random life (life - int(U x 0x4B4), cross_f
+  0x04A5C8BC) and eft's rotation range. Distortion passes are no longer drawn there; they were drawn
+  black.
+
+Still different: the start spikes (wave1) look about 1.7x fuller than Ultimate's. The geometry is no
+bigger (Ultimate's reaches 34 units, ours 20), but Ultimate's dissolve eats more of it. Threshold, edge,
+mask UVs and formula all match, so that cause is still open.

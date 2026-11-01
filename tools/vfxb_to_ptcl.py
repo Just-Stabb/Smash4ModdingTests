@@ -486,6 +486,10 @@ class Templates:
         raise KeyError((typ, blend, mesh))
 
 
+    def has_refraction(self, typ):
+        """a distortion-pass template of this particle type in the corpus"""
+        return any(r[4] == typ for r in self.refract)
+
     def refraction(self, typ, uv_mode, notes):
         """a distortion-pass template for an Ultimate refraction part (a mesh): mode 5 first (the
         refraction parts': Bayonetta's ciecle1_rif / ring_rif1_f, Shulk's rifraction1 / 2), its particle
@@ -1576,17 +1580,18 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # forward smash: smoke1 / smoke2 drew nothing). eft's XY plate is type 1
         typ = 1
         notes.append('XY polygon quad (eft2 type 3): type 1')
-    elif is_mesh and pt['billboard_type'] == 5 and flat_mesh(prims[pt['primitive_id']]):
+    elif is_mesh and pt['billboard_type'] == 5:
         # eft2's type 5 is a directional billboard: its vertex program (Squirtle's up-smash columns, run in
         # tools/mx_exec.py on their own inputs) lays the mesh's Y along the particle's last movement
         # (sysLocalDiffAttr) and X along movement x the vector to the eye, Z = X x Y: turned about its
         # motion to face the camera. eft's type-3 mesh programs (vanilla impact1 / line1 / line2 run in
         # tools/latte_exec.py) give the same frame for the same motion; only their Z is scaled by v_inScl.x x
-        # a constant of the template's own (6, 2, 0 in those three), nothing to a flat mesh. Type 4 is
+        # a constant of the template's own (6, 2, 0 in those three): only the depth toward the eye, which the
+        # silhouette doesn't show (Waterfall's waveline1, 1.8 deep, as type 4 went edge-on: streaks). Type 4 is
         # X = emitter Y x motion: the columns rise along the emitter's Y, so every vertex of their
         # width fell on one line and they drew nothing (test 15: up smash without its water columns)
         typ = 3
-        notes.append('directional billboard mesh (eft2 type 5, flat): type 3')
+        notes.append('directional billboard mesh (eft2 type 5): type 3')
     elif is_mesh and typ == 3 and ((
             abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3
             and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
@@ -1704,6 +1709,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     fblocks, fanims, fdone = particle_fields(e) if not as_child else ({}, [], set())
     fluct = fluctuation(e) if not as_child else None
     child, child_e = None, (e['children'] or [None])[0] if not as_child else None
+    if refract and typ in (3, 4) and not templates.has_refraction(typ):
+        # a directional refraction piece on a billboard template stands upright where Ultimate lays it along
+        # its motion: Waterfall's rifraction1 (eft2 type 5, an 80-unit sheet along the diagonal column) bent
+        # an upright 80-unit band beside it (the streaks in tests 15 / 16; fx_render drew it black). The
+        # corpus has distortion templates of types 0 - 2 only
+        notes.append('refraction: no distortion template of type %d (directional): skipped' % typ)
+        return None
     if refract:
         em, refract_two = templates.refraction(typ, uv_mode(ts), notes)
         turns, swapped = False, False
@@ -2103,10 +2115,22 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         if any(abs(float(st[k][1])) > 1e-6 and abs(float(st[k][2])) > 1e-6
                for k in ('rotate_init', 'rotate_init_rand', 'rotate_add', 'rotate_add_rand')):
             notes.append('XZ polygon turned about Y and Z: eft\'s order differs (approximate)')
-    p.set_field(em, 'rotation_init', [0.0] * 3 if unturned else axes(st['rotate_init']))
+    # a random turn: Ultimate's init + random x (U - 1/2) (its vertex program, run on Waterfall's wave1 with
+    # U = 0 / 0.5 / 1: -0.61 / 0 / +0.61 rad for a random of 1.22), eft's init + U x random (cross_f 0x04A5DAB4:
+    # U = a u32 x 2^-32, 0 - 1): eft's init = Ultimate's - random / 2. As the init alone, every randomly
+    # turned particle was turned half its range one way (Waterfall's spikes swung behind, 14 units wide)
+    half = [float(a) - 0.5 * float(r) for a, r in zip(st['rotate_init'][:3], st['rotate_init_rand'][:3])]
+    p.set_field(em, 'rotation_init', [0.0] * 3 if unturned else axes(half))
     p.set_field(em, 'rotation_random', [0.0] * 3 if unturned else axes(st['rotate_init_rand']))
     p.set_field(em, 'rotation_velocity', [0.0] * 3 if unturned else axes(st['rotate_add']))
     p.set_field(em, 'rotation_velocity_random', [0.0] * 3 if unturned else axes(st['rotate_add_rand']))
+    # eft2's rot_rev_rand (a random roll reverses that axis's turn) as eft's 0x2FC - 0x2FE (docs/ptcl-format.md:
+    # negates the axis's initial rotation and speed at emission); left as the template had it, 800 vanilla
+    # templates reverse some axis at random
+    rev = [int(bool(v)) for v in pt['rot_rev_rand'][:3]]
+    if is_mesh and typ == 2 and pt['billboard_type'] == 4:
+        rev = [rev[0], rev[2], rev[1]]                  # the XZ polygon's axes (above)
+    struct.pack_into('>3B', em, 0x2FC, *([0, 0, 0] if unturned else rev))
 
     # ---- shape and motion
     sh, vel, ems = e['shape'], e['velocity'], e['emission']

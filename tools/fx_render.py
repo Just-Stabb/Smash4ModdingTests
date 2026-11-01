@@ -210,6 +210,7 @@ class Emitter:
     ult = None                # Ultimate's own shaders (--ult-model off): {'e', 'vfxb', 'images', 'srgb', 'prim'}
     s4 = None                 # Smash 4's own vertex programs (--s4-model off): {'p', 'd', 'sh', 'texs'}
     life_random = 0.0         # eft2: a particle's life x (1 - this x U) (the engine's birth records)
+    life_random_frames = 0    # eft: life - int(U x this) (cross_f 0x04A5C8BC: mulhwu of the u32 random)
 
 
 def simulate(em, call, frames, seed=1, births_only=False):
@@ -272,7 +273,12 @@ def simulate(em, call, frames, seed=1, births_only=False):
             v = v * (1 - em.vel_random * rng.uniform())
             sr = 1 - em.size_random * rng.uniform()
             sa = (a(17, 1.0), a(18, 1.0))
-            rot = em.rot_init + em.rot_rand * rng.uniform(-1, 1, 3)
+            # eft: init + U x random (cross_f 0x04A5DAB4, U 0 - 1); eft2: init + random x (U - 1/2) (its programs)
+            rot = em.rot_init + em.rot_rand * (rng.uniform(0, 1, 3) if em.s4 is not None else rng.uniform(-0.5, 0.5, 3))
+            # the particle's own life: eft takes whole frames off, eft2 a fraction (its curves, dissolves and
+            # death run on it: Waterfall's spikes, life 7, erode by 61% at frame 3 of a 4.9-frame life)
+            plife = (em.life - int(rng.uniform() * em.life_random_frames)) if em.s4 is not None else \
+                em.life * (1 - em.life_random * rng.uniform())
             born = None
             if em.s4 is not None and S4_SHADERS:
                 # what eft's particle record holds (cross_f 0x04A59FC8's streams: v_inWldPos, v_inScl, v_inVec,
@@ -282,7 +288,8 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 mb[:, :3], mb[:, 3] = lin, org
                 born = {'p': lin @ p + org, 'v': lin @ v, 'pl': p.copy(), 'vl': v.copy(), 'birth': float(f - f0),
                         'random': rng.uniform(size=3),
-                        'scale': (sr * sa[0] * csize, sr * sa[1] * csize), 'm': mb, 'rot0': rot.copy()}
+                        'scale': (sr * sa[0] * csize, sr * sa[1] * csize), 'm': mb, 'rot0': rot.copy(),
+                        'life': float(max(plife, 1))}
             if em.ult is not None and ULT_SHADERS:
                 # the particle arrays as eft2 fills them at birth (vfx_trace B records: a GPU emitter's
                 # arrays hold the particle as born, its vertex program works out the rest each frame):
@@ -292,7 +299,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 # matrix at birth (rows, its translation where the particle came from)
                 mb = np.zeros((3, 4))
                 mb[:, :3], mb[:, 3] = lin, org
-                born = {'pos': np.append(p, em.life * (1 - em.life_random * rng.uniform())),
+                born = {'pos': np.append(p, plife),
                         'vec': np.append(v, float(f - f0)),
                         'scale': np.array([em.size[0] * sr * sa[0], em.size[1] * sr * sa[1],
                                            em.size[0] * sr * sa[0], 1.0]),
@@ -303,12 +310,12 @@ def simulate(em, call, frames, seed=1, births_only=False):
             # 'd': its last frame's movement (eft2's sysLocalDiffAttr, the trace's vec2: position now - a frame
             # ago; on its birth frame the slot holds a stale value, the birth velocity here)
             live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
-                         'sa': sa, 'lin': lin, 'born': born, 'd': lin @ v})
+                         'sa': sa, 'lin': lin, 'born': born, 'd': lin @ v, 'life': max(plife, 1)})
         keep = []
         for q in live:
-            if q['age'] >= em.life:
+            if q['age'] >= q['life']:
                 continue
-            t = q['age'] / max(em.life, 1)
+            t = q['age'] / max(q['life'], 1)
             if f in out:
                 sx, sy = em.size_curve(t) if em.size_curve else (1, 1)
                 rgb = em.colour_curve(t) if em.colour_curve else np.ones(3)
@@ -897,6 +904,8 @@ def draw_s4(canvas, em, parts, mnow, time):
     vs = s4_program(em)
     if vs is None or em.program is None:
         return False
+    if 'distortion pass (not drawn)' in getattr(em, 'notes', ()):
+        return True                         # it bends the picture behind it; drawn, its map came out black
     born = [q for q in parts if len(q) > 9 and q[9] is not None]
     if not born:
         return True
@@ -938,7 +947,7 @@ def draw_s4(canvas, em, parts, mnow, time):
     for k, name in enumerate(vs.attributes):
         for j, q in enumerate(born):
             pw, vw, t, (sx, sy), rot, alpha, rgb, rgb1, _lin, b = q[:10]
-            age = t * em.life
+            age = t * b.get('life', em.life)
             m = rows if follow_live else b['m']
             # the GPU programs (reading v_inVec) take the particle as born and work out the rest: v_inWldPos.w its
             # birth time (age = emp0.x - it), v_inRandom.w its life (the scale / alpha / colour sections are
@@ -948,7 +957,7 @@ def draw_s4(canvas, em, parts, mnow, time):
             per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age),
                    'v_inVec': np.append(b['vl' if local else 'v'], 1.0),
                    'v_inScl': (b['scale'][0], b['scale'][1], b['scale'][0], 1) if gpu else (sx, sy, sx, 1),
-                   'v_inRandom': np.append(b['random'], float(em.life)), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
+                   'v_inRandom': np.append(b['random'], b.get('life', float(em.life))), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
                    'v_inEmtMat0': m[0], 'v_inEmtMat1': m[1], 'v_inEmtMat2': m[2],
                    'v_inColor0': np.append(rgb, alpha), 'v_inColor1': np.append(rgb1 if rgb1 is not None else (0, 0, 0), 1.0),
                    'v_inWldPosDf': np.append(vw, 0)}
@@ -1003,6 +1012,7 @@ def s4_emitters(p, set_index, program_cache=None):
         em.duration = f('end_frame') if f('one_time') else FOREVER
         em.rate = f('emit_rate')
         em.life = f('ptcl_life') if f('ptcl_life') != FOREVER else 600
+        em.life_random_frames = max(0, f('ptcl_life_random')) if f('ptcl_life') != FOREVER else 0
         em.srt = (tuple(f('emitter_scale')), tuple(f('emitter_rotation')), tuple(f('emitter_translation')))
         em.anims = {a['target']: (a['keys'], a['loop']) for a in p.key_anims(d) if a['target'] < 0x1C}
         em.volume = (f('volume_type'), np.array(f('volume_radius')))
