@@ -614,6 +614,39 @@ def check_assets(inst, name, base, rep):
         rep.add('WARN', 'A1 labels', 'sound banks without sound/config/soundlabeltable.bin (Hero fix 71)')
 
 
+def check_effects(inst, name, rep):
+    """E4: a mesh of eft's particle type 4 aims its Y along the particle's world motion (cross_f's type-4
+    vertex programs: X = normalize(emitter Y x motion), Z = X x motion); a particle that never moves has no
+    frame and every vertex lands on its position: drawn as nothing (Squirtle's down-smash dust crown,
+    sys_whirlwind_l / r, test 14). Non-following, with no velocity and no gravity: always so (ERROR);
+    following the fighter (follow type 0): whenever the bone stands still (WARN)"""
+    import ptcl
+    import struct as st
+    for path in inst.glob(r'fighter/%s/effect/[^/]+/[^/]+\.ptcl' % re.escape(name)):
+        try:
+            p = ptcl.Ptcl(inst.get(path))
+        except Exception:                     # noqa: BLE001
+            continue
+        still, follow = [], []
+        for si in range(len(p.sets)):
+            for x in p.sets[si]['emitters']:
+                d = x['data']
+                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0:
+                    continue
+                speed = abs(p.field(d, 'figure_velocity')) + abs(p.field(d, 'emitter_velocity'))
+                grav = sum(abs(v) for v in p.field(d, 'gravity'))
+                if speed > 1e-4 or grav > 1e-6:
+                    continue
+                label = '%s/%s' % (p.set_name(si), p.emitter_name(d))
+                (follow if st.unpack_from('>I', bytes(d), 0x310)[0] == 0 else still).append(label)
+        if still:
+            rep.add('ERROR', 'E4 still-type4-mesh', '%d type-4 meshes never move (no velocity, gravity, follow): eft '
+                    'draws each as a point (convert as type 1, the emitter\'s frame): %s' % (len(still), ', '.join(still[:8])))
+        if follow:
+            rep.add('WARN', 'E4 still-type4-mesh', '%d type-4 meshes move only with their bone: drawn as a point '
+                    'while it stands still: %s' % (len(follow), ', '.join(follow[:8])))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
@@ -647,6 +680,7 @@ def main():
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
+    check_effects(inst, a.name, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

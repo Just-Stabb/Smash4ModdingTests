@@ -516,16 +516,27 @@ ONLY = ''                  # --only: emitter names containing this (both sides)
 HDR_RANGE = (1.0, 0.0, 0.0, 0.0)    # u_nwHdrRange (CB9 [8]): rgb x .x + .w, the game's own at run time
 
 
-def sampler(textures, scales):
-    """sample(slot, u, v) for latte_pixel: nearest texel, repeat wrap, the slot's UV repeat"""
+def _wrap(t, mode):
+    """eft / eft2 wrap codes: 0 mirror, 1 repeat, 2 clamp"""
+    if mode == 2:
+        return np.clip(t, 0, 1 - 1e-6)
+    if mode == 0:
+        t = np.mod(t, 2)
+        return np.clip(np.where(t > 1, 2 - t, t), 0, 1 - 1e-6)
+    return np.mod(t, 1)
+
+
+def sampler(textures, scales, wraps=None):
+    """sample(slot, u, v) for latte_pixel: nearest texel, the slot's UV repeat and wrap (default repeat)"""
     def sample(slot, u, v):
         tex = textures[slot] if slot < len(textures) else None
         if tex is None:
             return np.ones((4, len(u)))
         sx, sy = scales[slot] if slot < len(scales) else (1, 1)
+        wu, wv = wraps[slot] if wraps and slot < len(wraps) else (1, 1)
         th, tw = tex.shape[:2]
-        iu = ((np.asarray(u) * sx % 1) * tw).astype(int).clip(0, tw - 1)
-        iv = ((np.asarray(v) * sy % 1) * th).astype(int).clip(0, th - 1)
+        iu = (_wrap(np.asarray(u) * sx, wu) * tw).astype(int).clip(0, tw - 1)
+        iv = (_wrap(np.asarray(v) * sy, wv) * th).astype(int).clip(0, th - 1)
         return tex[iv, iu].T
     return sample
 
@@ -1033,7 +1044,10 @@ def s4_emitters(p, set_index, program_cache=None):
             em.s4 = {'p': p, 'd': bytes(d), 'sh': sh, 'follow': struct.unpack_from('>I', bytes(d), 0x310)[0],
                      'mesh': p.primitive(f('primitive_index')) if f('primitive_index') >= 0 else None,
                      # the vertex program works out the UVs (repeat, flipbook cells, scroll): sampled as they are
-                     'sample': sampler(texs, [(1, 1)] * 3)}
+                     'sample': sampler(texs, [(1, 1)] * 3, [(
+                         (struct.unpack_from('>I', bytes(d), ptcl.TEXRES + ptcl.TEXRES_SIZE * k + 0x0C)[0] >> 24) & 0xF,
+                         (struct.unpack_from('>I', bytes(d), ptcl.TEXRES + ptcl.TEXRES_SIZE * k + 0x0C)[0] >> 28) & 0xF)
+                         for k in range(3)])}
         if struct.unpack_from('>I', bytes(p.shader_entry(sh)), 0)[0] & 0xFF in (5, 6):
             em.alpha_curve = lambda t: 0.0
             em.notes = ['distortion pass (not drawn)']

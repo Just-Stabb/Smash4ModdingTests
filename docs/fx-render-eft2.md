@@ -162,8 +162,13 @@ Inputs:
 
 Checked (Squirtle's forward / down smash): the smash ring now plays its flipbook into the crescent, as
 Ultimate's; the dust is translucent puffs on both sides; the flash lands where Ultimate's does once the
-following programs get local positions (world positions put it 8 units off). Open: down smash's dust crown
-(Ultimate's impact meshes) missing on the Smash 4 side, its spray a few units higher.
+following programs get local positions (world positions put it 8 units off). Down smash's dust crown
+(sys_whirlwind_l / r's impact meshes) was missing on the Smash 4 side because the bank had it as type 4 at
+rest, which eft draws as a point (the vertex program run on it: every vertex at the particle): converted as
+type 1 since test 15 it matches Ultimate's (its last frames a little wider: eft's three scale keys for
+Ultimate's four). The Smash 4 sampler honours each slot's wrap mode (ptcl texture word 0x0C: u bits 24-27,
+v 28-31; repeat everywhere before put a scrolled crown's base back over its top as a grey band). Open: the
+spray a few units higher.
 
 ## The first trace (Squirtle, user's run, 162 emitter runs)
 

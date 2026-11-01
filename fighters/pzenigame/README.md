@@ -510,3 +510,17 @@ run's splashes low at his feet, Water Gun's shot a thin cone of streaks. fx_rend
 with Ultimate's own shaders (docs/fx-render-eft2.md); against the native clip it shows the smash-charge ring
 as a crescent and the dust as translucent puffs, as Ultimate does. The converted ring plays the same 7-cell
 table (mode 4, a cell a frame); the dust impacts (2-cell flipbook + scroll) are set too: footage decides.
+
+## v6 effects test 15 (`build/squirtle_v6_effects_test15.zip`)
+
+fx_render now runs both games' own vertex programs (docs/fx-render-eft2.md). Down smash's dust crown
+(sys_whirlwind_l / r: impact1 / impact2 / circle1 meshes, eft2 type 3, still) was missing on the Smash 4
+side: the converter sent eft2 type-3 meshes at rest to eft type 4, and eft's type-4 program aims a mesh's Y
+along the particle's motion, so a still one put every vertex on the particle (latte_exec run: extent 0).
+They now go to type 1 like the moving ones since test 14 (the emitter's frame, Ultimate's formula), 54
+emitters in all: the crown, his ripples (up smash, dash, Waterfall start, Withdraw / run waterlines),
+landing smoke, attack arcs, the dizzy crown. The crown now matches Ultimate's (a little wider at its end:
+the three eft scale keys fitted to Ultimate's four). port_check E4 catches still type-4 meshes (test 14:
+1 error, 49 warnings; test 15: none). 0 errors.
+Note for other ports: the same branch built Sephiroth's (edge) still sword arcs as type 4 crossed ribbons;
+their next build takes type 1 and needs an in-game look.

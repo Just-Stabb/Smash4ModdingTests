@@ -1532,7 +1532,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         return None
     vel = e['velocity']
     rest_dir = False
-    if is_mesh and typ == 3 and abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3:
+    if is_mesh and typ == 3 and abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3 \
+            and pt['billboard_type'] != 3:
+        # (an eft2 type-3 mesh at rest takes the next branch: eft's type 4 aims the mesh's Y along the particle's
+        # motion, so a still one has no frame at all: its vertex program, run through tools/latte_exec.py, puts
+        # every vertex on the particle's position. Squirtle's down-smash dust crown, sys_whirlwind_l / r's
+        # impact and circle meshes, all still and all type 3, were drawn as nothing)
         # a directional mesh at rest (his sword glows, slash arcs) lies in the emitter's frame in
         # Ultimate; eft's directional type 3 turns it by its (zero) velocity (test 32: the up-air arc
         # lay flat), type 4 keeps the emitter's frame at rest (Zelda's Nayru's Love crystals)
@@ -1551,7 +1556,8 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # Ultimate shows one low band. (Woosh's whirlwinds and Swoosh's funnels, rising along the
         # emitter's Y, came out right as type 4 only because they are round about Y.)
         typ = 1
-        notes.append('XY polygon mesh (eft2 type 3): type 1, the emitter\'s frame')
+        notes.append('XY polygon mesh (eft2 type 3): type 1, the emitter\'s frame%s' % (
+            ' (at rest)' if abs(vel['all_direction']) + abs(vel['designated_dir_scale']) < 1e-3 else ''))
     elif is_mesh and typ == 3 and ((
             abs(vel['all_direction']) < 1e-3 and abs(abs(vel['designated_dir'][1]) - 1) < 1e-3
             and not any(abs(v) > 1e-3 for v in [vel['diffusion_dir_angle'], vel['xz_diffusion'], vel['diffusion'][0],
