@@ -716,7 +716,10 @@ def ult_calls(path, move):
     if not os.path.exists(path):
         return []
     text = open(path, errors='replace').read()
-    m = re.search(r'unsafe extern "C" fn effect_%s\b.*?\n\}' % re.escape(move.lower()), text, re.S | re.I)
+    # up to the next function: the dumps' facing split leaves an else block whose closing brace is in
+    # column 0, so stopping at the first one dropped what follows it (forward smash's EFFECT_OFF_KIND of
+    # mouth_water at 23: its crowns lived on in the render; the vfx_trace showed them gone)
+    m = re.search(r'unsafe extern "C" fn effect_%s\b.*?(?=\nunsafe extern|\Z)' % re.escape(move.lower()), text, re.S | re.I)
     if not m:
         m = re.search(r'fn effect_\w*\(.*?\n\}', text, re.S)
     body = m.group(0) if m else text

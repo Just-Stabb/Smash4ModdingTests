@@ -428,3 +428,11 @@ sweep, so each frame's splashes (up to 4) spread round a 9 - 15 unit circle: the
 pieces. It now writes the sweep (start - sweep / 2; 0 for one division: exact). fx_render does both
 engines' circles exactly now; its down-smash render shows the converted water as one body.
 Still different in the render: Ultimate's wave stands taller at frames 24 - 28, its colour denser.
+
+Test 11 (user's clip: forward, down, up smash): down smash is one wave sweeping round him now (no
+separate pieces), up smash two straight columns over the ripple, forward smash a fan of water in front.
+fx_render's "blue splash lingering at the impact point" (frames 28 - 40, test 10's note) was the
+renderer's: it read Ultimate's effect function only up to the first column-0 brace, which the dumps'
+facing split puts mid-function, so forward smash's EFFECT_OFF_KIND of mouth_water (frame 23) was lost
+(the vfx_trace showed its crowns living 10 frames). Fixed; the forward-smash renders now differ in the
+water's colour only (Ultimate a deeper blue, ours paler): next.
