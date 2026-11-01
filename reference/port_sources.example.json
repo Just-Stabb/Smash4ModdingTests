@@ -27,5 +27,6 @@
  "vbn": [
   "/path/to/vbnscan/fighter"
  ],
+ "opensmash": "/path/to/ssbu-recomp",
  "_comment": "Copy to port_sources.json at the repository root (not committed) with this machine's paths: tools/port_sources.py"
 }

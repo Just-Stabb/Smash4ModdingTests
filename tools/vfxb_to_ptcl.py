@@ -1540,7 +1540,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         rest_dir = True
         notes.append('directional mesh at rest: type 4')
     elif is_mesh and pt['billboard_type'] == 3:
-        # eft2's type 3 is the XY polygon: its vertex program (Squirtle's wave1, BNSH variation 141) places
+        # eft2's type 3 is the XY polygon: its vertex program (Squirtle's wave1s, BNSH variations 131 / 141) places
         # the mesh by the emitter's matrix at birth, columns normalised, times its own rotation (X Z Y)
         # and scale, and reads no velocity. eft's own XY polygon is type 1 (its programs: v_inEmtMat x
         # the scaled vertex + v_inWldPos, no v_inWldPosDf / v_inVec). eft's type 4 is not the emitter's

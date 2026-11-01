@@ -17,6 +17,7 @@ list is searched in order:
   ult_sound      Ultimate's sound/ (bank/fighter, bank/fighter_voice, sequence/fighter)
   ult_ui         Ultimate's ui/ folder or ui zip (portraits)
   vbn            folders holding <name>/model/body/c00/model.vbn (vanilla Smash 4 skeletons)
+  opensmash      an OpenSmash-Ultimate (ssbu-recomp) checkout: its shader translator (ult_shader_glsl.py)
 """
 import json
 import os

@@ -465,7 +465,7 @@ def basis(em, vel, cm, lin=None):
     if em.ptype == 4 or (em.ptype == 3 and em.mesh is not None and em.mesh_frame):
         # type 4 at rest: taken as the emitter's frame (Zelda's crystals looked right; the program's own
         # basis is zero then, so the CPU must feed it something: not read). eft2's type 3 (the XY
-        # polygon, Squirtle's waves: its vertex program, variation 141) is the emitter's frame
+        # polygon, Squirtle's waves: its vertex programs, variations 131 / 141) is the emitter's frame
         return frame
     if em.ptype == 3 and s > 1e-4:
         # directional: Y along the motion, turned about it to face the camera (eft's type 3; eft2's

@@ -485,7 +485,7 @@ drawing of these parts that fx_render doesn't model; footage of both games from 
 Test 13 (user's clip on Final Destination, level camera): forward / down smash's waves still stood up
 as separate fanned curtains; Ultimate's (native clip) lie in one low band. fx_render had both sides
 close, so the difference was in a stage it modelled on an assumption. Read from the shaders themselves:
-- Ultimate (ef_pzenigame.eff, WaterSmash wave1, BNSH variation 141, tools/eft_shader_dis.py): world =
+- Ultimate (ef_pzenigame.eff, WaterSmash / WaterCutter wave1, BNSH variations 131 / 141, tools/eft_shader_dis.py): world =
   the emitter's matrix at birth (columns normalised) x the particle's rotation (X Z Y) x scale x
   (vertex + pivot) + position. No velocity input (type 5 directional programs load three more vec3s).
   So eft2's billboard type 3 is the XY polygon (4 the XZ one, already mapped to eft's XZ plate).
