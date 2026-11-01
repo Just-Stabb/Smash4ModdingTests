@@ -316,8 +316,13 @@ def simulate(em, call, frames, seed=1, births_only=False):
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
                                rgb, rgb1, q['lin'], q['born']))
             g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
-            q['v'] = q['v'] * em.air + g * csize
+            # moved by the velocity it had, then air and gravity (vfx_trace of down smash's splash2: born at
+            # z -0.1 with v -1.965, next frame at -2.065 with v -1.965 x 0.96, gravity in it but not yet in
+            # the position); eft's GPU programs give the same places (geometric sum: down smash's splash2 run
+            # through its program lands on the trace's z to 0.001). Air first, as this had it, every particle
+            # fell short by one air step and took its gravity a frame early
             q['p'] = q['p'] + q['v']
+            q['v'] = q['v'] * em.air + g * csize
             q['age'] += 1
             keep.append(q)
         live = keep
@@ -761,9 +766,23 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
         return False
     vs, ps = progs
     e = em.ult['e']
-    born = [q[9] for q in parts if len(q) > 9 and q[9] is not None]
+    live = [q for q in parts if len(q) > 9 and q[9] is not None]
+    born = [q[9] for q in live]
     if not born:
         return True
+    if e['info']['calc_type'] == 0:
+        # eft2's calc type 0 is the CPU's: it moves the particle and rewrites its position / velocity arrays
+        # every frame (the trace's per-frame records move; the vertex programs, e.g. down smash's splash1,
+        # read no velocity at all): the particle's current place and velocity in its birth frame, not the
+        # birth values (fed those, every CPU particle stood where it was born: the spray stayed low)
+        cur = []
+        for q, b in zip(live, born):
+            lin, org = b['m'][:, :3], b['m'][:, 3]
+            c = dict(b)
+            c['pos'] = np.append(np.linalg.solve(lin, q[0] - org), b['pos'][3])
+            c['vec'] = np.append(np.linalg.solve(lin, q[1]), b['vec'][3])
+            cur.append(c)
+        born = cur
     import vfxb_to_ptcl as V
     if em.ult['prim'] is not None:
         pos, _n, col, uv, idx = V.mesh(em.ult['prim'], 0)
@@ -885,6 +904,13 @@ def draw_s4(canvas, em, parts, mnow, time):
     # them by it each frame (the flash ring / lines of sys_smash_flash, following): fed world positions, the
     # emitter's offset counted twice
     local = any(cb == 3 and 4 <= v <= 7 for cb, v, _c in vs.reads)
+    # a GPU program also turns its particle by the emitter matrix at birth (v_inEmtMat0-2, rows with the
+    # translation): it takes the particle's birth position and velocity in the emitter's own space, and
+    # v_inVec.w is a speed factor (1; 0 stops the motion and the gravity): run on down smash's splash1, an
+    # emitter row translated to (0, 6, 7) put a particle at local 0 on (7, 6), a velocity along local Y under
+    # rows turned 90 degrees about X moved it along Z. Fed world values, the call's offset and turn (10 / 180
+    # degrees) counted twice and the spray went up and forward where Ultimate's goes back along the ground
+    local = local or (gpu and 'v_inEmtMat0' in vs.attributes)
     mesh = em.s4['mesh']
     if mesh is not None:
         pos = np.concatenate([np.asarray(mesh[0], np.float32), np.ones((len(mesh[0]), 1), np.float32)], 1)
@@ -914,7 +940,7 @@ def draw_s4(canvas, em, parts, mnow, time):
             # scaleAnim0-2, in the program); the CPU's programs take its current values, v_inWldPos.w the age
             # (tools/latte_exec.py runs of smoke3: the sizes come out as its keys say only so)
             per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age),
-                   'v_inVec': np.append(b['vl' if local else 'v'], 0.0),
+                   'v_inVec': np.append(b['vl' if local else 'v'], 1.0),
                    'v_inScl': (b['scale'][0], b['scale'][1], b['scale'][0], 1) if gpu else (sx, sy, sx, 1),
                    'v_inRandom': np.append(b['random'], float(em.life)), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
                    'v_inEmtMat0': m[0], 'v_inEmtMat1': m[1], 'v_inEmtMat2': m[2],

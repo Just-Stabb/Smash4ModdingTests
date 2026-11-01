@@ -524,3 +524,14 @@ the three eft scale keys fitted to Ultimate's four). port_check E4 catches still
 1 error, 49 warnings; test 15: none). 0 errors.
 Note for other ports: the same branch built Sephiroth's (edge) still sword arcs as type 4 crossed ribbons;
 their next build takes type 1 and needs an in-game look.
+
+### Down smash spray height (no new package)
+
+The Smash 4 spray rose a few units higher than Ultimate's in fx_render. That came from the renderer, not
+the bank. Ultimate's side drew its CPU particles (eft2 calc type 0, all of Squirtle's) where they were
+born. It also stepped them air-first, while Ultimate moves a particle by its velocity first; the
+vfx_trace of the forward smash's splash2 shows it. Separately, the converted GPU programs had been fed
+world values. With all three fixed, the splash emitters' heights agree (docs/fx-render-eft2.md). The
+bank's GPU motion, run on that splash2, lands on Ultimate's traced positions; its gravity integrates
+as a trapezoid, so a particle sits up to 0.3 units lower by the end of its life. eft has no constant
+world velocity that could offset this, so it is left.

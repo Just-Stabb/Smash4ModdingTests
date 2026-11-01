@@ -42,7 +42,7 @@ frame.
 | velocity (all-direction, designated direction, diffusion, vel_random) | data, matches the engine's speeds | outward x all_direction + direction x scale, x (1 - vel_random x U): the engine's birth speeds fall in exactly that range |
 | inherited velocity / scale (INHERIT) | missing | |
 | life, life random | data / missing | life_random not modelled |
-| gravity, world gravity, air resistance | data | integration order (v x air + g, then p += v) not checked |
+| gravity, world gravity, air resistance | data, exact | p += v, then v = v x air + g (vfx_trace, down smash's splash2: born at z -0.1, v -1.965; next frame z -2.065, v -1.965 x 0.96 with gravity in it, not yet in the position). Until the spray-height check fx_render had air first: every particle one air step short, its gravity a frame early |
 | scale curve, scale random | data | only the X random |
 | colour 0 / 1 and alpha over life | data | 8-key tracks read with `vfxb_to_ptcl.track`; evaluator not checked |
 | rotation (init, random, add) | data | is_rotate axes zeroed per particle: exact (0x8B8A0); order taken as eft's Rx Rz Ry (--ult-prot-order) |
@@ -111,8 +111,12 @@ outputs, samplers, constant buffers and a slot table; constant buffer slot k = t
   position at birth, w life x (1 - life_random x U)), sysLocalVecAttr (velocity, w birth time),
   sysScaleAttr (scale x (1 - scale_random x U) on all axes x EASL), sysRandomAttr (4 uniforms),
   sysInitRotateAttr (rotate_init on is_rotate's axes; the random part is the program's), sysEmtMat0-2Attr
-  (the emitter matrix at birth, rows). Every one of Squirtle's 164 emitters is a GPU emitter (calc 0): the
-  arrays hold the particle as born (the engine's birth records, docs/vfx-trace.md).
+  (the emitter matrix at birth, rows). Every one of Squirtle's 164 emitters is calc type 0, the CPU's:
+  eft2 moves the particle and rewrites its position / velocity arrays every frame (the trace's per-frame
+  records move; the programs read no velocity xyz), so the program gets the particle's current place and
+  velocity in its birth frame, life / birth time / scale / random / rotation / matrix as born (the engine's
+  birth records, docs/vfx-trace.md). Fed the birth values, every particle stood where it was born: down
+  smash's spray drew low.
 - c9 sysEmitterStaticUniformBlock: the emitter data after eft2's load-time pass, run from main.bin itself
   (tools/eft2_resolve.py, unicorn: 0x8B480, then the first 0x750 bytes, as the memcpy at 0x8C204 copies
   them). The file alone is not it: e.g. every UV repeat is 0 in the file (1 after the pass, from the
@@ -157,7 +161,14 @@ Inputs:
   alpha and colour sections are fractions of it), v_inScl only the random factor (the base scale and its
   curve are CB2's scaleAnim0-2): found by running smoke3's program, whose size follows its keys only so.
   The CPU's programs take its current values (v_inWldPos.w the age). A program reading the live emitter
-  matrix (CB3 emm: sys_smash_flash's ring and lines, following) takes positions in the emitter's space.
+  matrix (CB3 emm: sys_smash_flash's ring and lines, following) takes positions in the emitter's space;
+  so does a GPU program reading v_inEmtMat0-2 (it applies the birth matrix, translation included, to the
+  particle's birth position and velocity), and its v_inVec.w is a speed factor, 1 (0 stops the motion and
+  the gravity). Fed world values, down smash's spray went up and forward (the call's offset and turn
+  counted twice). Their motion, run on down smash's splash2 against the trace: the same places as eft2's
+  steps (geometric sum: z to 0.001), the gravity a trapezoid (+ 0.5 g x the sum of air^i), so it falls
+  0.02 more after a frame, 0.24 after 16, 0.31 after 24 (of about 8): eft has no constant world velocity
+  to take it back with, and it is left.
   Still fx_render's: the CPU particles' motion and colour curves (eft's CPU calc), emission.
 
 Checked (Squirtle's forward / down smash): the smash ring now plays its flipbook into the crescent, as
@@ -167,8 +178,13 @@ following programs get local positions (world positions put it 8 units off). Dow
 rest, which eft draws as a point (the vertex program run on it: every vertex at the particle): converted as
 type 1 since test 15 it matches Ultimate's (its last frames a little wider: eft's three scale keys for
 Ultimate's four). The Smash 4 sampler honours each slot's wrap mode (ptcl texture word 0x0C: u bits 24-27,
-v 28-31; repeat everywhere before put a scrolled crown's base back over its top as a grey band). Open: the
-spray a few units higher.
+v 28-31; repeat everywhere before put a scrolled crown's base back over its top as a grey band). Down
+smash's spray, a few units higher on the Smash 4 side, was the renderer's three times over, not the bank's:
+the GPU programs fed world values (above), Ultimate's CPU particles drawn where they were born (calc type
+0, above) and its steps in the wrong order (Particles). Now each splash emitter's particle centres agree
+within noise (the highest 15.8 / 16.1 for splash1, 14.8 / 13.2 for splash2, 12.8 / 13.9 for splash3,
+frames 16-36; the side of each square within about 10%: Ultimate's program emits the quad's corners in
+another order, so measure it by its sides).
 
 ## The first trace (Squirtle, user's run, 162 emitter runs)
 
