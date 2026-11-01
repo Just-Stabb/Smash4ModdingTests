@@ -133,9 +133,12 @@ def births(tr, name, set_part):
         if si not in cache:
             cache[si] = {em.name: em for em in F.ult_emitters(eff, si, images, names, prims)}
         em = cache[si].get(r['emitter'])
-        t0 = r['frames'][0]['time']
+        # an 'E' record is written after the frame, its time already advanced: the run's first frame ran at
+        # the first record's time less one step (a particle's birth time is the time it was born at)
+        fr = r['frames']
+        t0 = fr[0]['time'] - (fr[1]['time'] - fr[0]['time'] if len(fr) > 1 else 1.0)
         game = collections.Counter(int(round(b['time'] - t0)) for b in r['births'])
-        n = int(round(r['frames'][-1]['time'] - t0)) + 1
+        n = int(round(fr[-1]['time'] - t0))
         line = [game.get(k, 0) for k in range(n)]
         if em is None:
             print('%-30s %-16s engine %s (not drawn by fx_render)' % (r['set'], r['emitter'], line[:24]))
@@ -143,6 +146,12 @@ def births(tr, name, set_part):
         sim = F.simulate(em, (0, np.eye(4), 1.0, None), range(0, n), births_only=True)
         ours = [sim.get(k, 0) for k in range(n)]
         ok = 'same' if ours == line else 'DIFFERENT'
+        if ok != 'same':
+            # the move's script turned the effect off (EFFECT_OFF_KIND: emission stops, the particles live on),
+            # which fx_render's bare emitter doesn't know: the same up to the engine's last emission, nothing after
+            last = max([k for k, v in enumerate(line) if v] or [-1])
+            if ours[:last + 1] == line[:last + 1] and not any(line[last + 1:]):
+                ok = 'same until the engine stopped emitting after frame %d (turned off by the script?)' % last
         print('%-30s %-16s %s\n    engine %s\n    ours   %s' % (r['set'], r['emitter'], ok, line[:24], ours[:24]))
 
 

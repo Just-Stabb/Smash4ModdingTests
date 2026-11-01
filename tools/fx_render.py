@@ -87,12 +87,37 @@ def three(v0, v1, v2, s1, s2, t):
     return v1 + (v2 - v1) * ((t - s2) / (1 - s2) if s2 < 1 else 0)
 
 
-def shape_point(rng, vt, radius, sweep=None):
+def shape_point(rng, vt, radius, sweep=None, sh=None, number=0):
     """a point of an emitter volume (eft / eft2 share the numbers for these): 0 point, 1 circle,
-    2 circle (even), 3 / 4 filled circle, 5 / 6 sphere, 7 / 8 filled sphere ... the rest as a sphere"""
+    2 circle (even), 3 / 4 filled circle, 5 / 6 sphere, 7 / 8 filled sphere ... the rest as a sphere.
+    sh: an Ultimate emitter's shape (its circles exact, main.bin: below); number: the particle's place in
+    this emission"""
     r = np.asarray(radius, float)
     if vt == 0:
         return np.zeros(3)
+    if sh is not None and vt in (1, 2):
+        # eft2's circles (main.bin 0x90C40 random, 0x90E20 even; the table of shapes at 0x4F48C30): the
+        # angle starts at sweep_start (2 pi x U with sweep_start_random) and runs over sweep_longitude
+        # CENTRED on it (- sweep / 2); the point is (sin a x radius x, 0, cos a x radius z) and the particle
+        # goes out along (sin a, 0, cos a). Even: n = num_divide_circle (less 0 .. n x random % at random:
+        # prim_emit_type 0; one less when the sweep isn't a full turn), particle i of an emission at
+        # sweep x (i mod n) / n (type 1: a random index; 2: a running count); + surface_pos_rand x U(-1, 1)
+        # (Squirtle's water_smash / water_cutter splashes: one division, start 0 -> a = -pi, all born at
+        # (0, 0, -r): the engine's own records, docs/vfx-trace.md)
+        sweep = float(sh['sweep_longitude'])
+        start = 2 * math.pi * rng.uniform() if sh['sweep_start_random'] else float(sh['sweep_start'])
+        if vt == 1:
+            a = start + sweep * rng.uniform() - sweep / 2
+        else:
+            n = max(1, int(sh['num_divide_circle']))
+            mode = int(sh['prim_emit_type'])
+            if mode == 0 and sh['num_divide_circle_random']:
+                n -= int(rng.uniform() * sh['num_divide_circle_random'] / 100 * n)
+            if abs(sweep - 2 * math.pi) > 1e-6 and n > 1:
+                n -= 1
+            i = int(rng.uniform() * n) if mode == 1 else number % n
+            a = start + sweep / n * i - sweep / 2 + float(sh['surface_pos_rand']) * (rng.uniform() - 0.5) * 2
+        return np.array([math.sin(a) * r[0], 0.0, math.cos(a) * r[2]])
     if vt in (1, 2, 3, 4):           # circle in XZ
         a = rng.uniform(0, 2 * math.pi)
         k = 1.0 if vt in (1, 2) else math.sqrt(rng.uniform())
@@ -133,6 +158,7 @@ class Emitter:
     prot_order = 'xzy'        # the particle's own rotation (eft: Rx Rz Ry)
     anims = {}                # key-animation target (ptcl.KEYA_TARGETS) -> (keys [(frame, value)], loop)
     volume = (0, (0, 0, 0))
+    shape = None              # an Ultimate emitter's shape section (shape_point: its circles exactly)
     all_dir = 0.0
     dir_speed = 0.0
     direction = np.array([0.0, 1.0, 0.0])
@@ -206,7 +232,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 if unit > 0:
                     for _ in range(int(carry / unit)):
                         carry -= unit
-                        births.append(cur + (prev - cur) * (carry / s9 if s9 else 0.0))
+                        births.append((cur + (prev - cur) * (carry / s9 if s9 else 0.0), 0))   # one a call
             elif k >= next_emit:
                 # emitted when the gap has run out (the first on the window's first frame: the threshold
                 # starts at 0, main.bin 0x874D8), then every interval + 1 (+ random) frames
@@ -214,13 +240,13 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 carry += (em.rate if em.rate_from_data else a(0, em.rate)) + em.rate * em.rate_random * rng.uniform()
                 while carry >= 1 - 1e-6:
                     carry -= 1
-                    births.append(cur)
+                    births.append((cur, len(births)))     # numbered within the emission
         prev = cur
         if births_only:
             out[f] = len(births)
             continue
-        for org in births:
-            p = shape_point(rng, *em.volume)
+        for org, number in births:
+            p = shape_point(rng, *em.volume, sh=em.shape, number=number)
             d = spread(rng, em.direction / (np.linalg.norm(em.direction) or 1), em.dispersion)
             outward = p / np.linalg.norm(p) if np.linalg.norm(p) > 1e-6 else spread(rng, np.array([0, 1.0, 0]), 180)
             v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
@@ -518,6 +544,7 @@ def ult_emitters(eff, set_index, images, names, prims):
         em.anims = {k: v for k, v in ult_anims(e).items() if k not in ULT_DROP}
         sh = e['shape']
         em.volume = (sh['volume_type'], np.array(sh['volume_radius']) * np.array(sh['volume_form_scale']))
+        em.shape = sh
         em.all_dir, em.dir_speed = float(vel['all_direction']), float(vel['designated_dir_scale'])
         em.direction = np.array(vel['designated_dir'], float)
         em.dispersion = float(vel['diffusion_dir_angle'])

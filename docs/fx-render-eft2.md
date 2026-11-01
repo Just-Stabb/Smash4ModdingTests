@@ -16,8 +16,8 @@ code that uses them hasn't been read; **approx** = a stand-in; **missing** = not
 | emitter matrix (scale, rotation, translation) | exact | R = Rz Ry Rx, T R S; static 0x88320, animated 0x8D0A0 (EAER degrees x pi / 180), composed v . M 0x8D838 |
 | emitter animations EAES / EAER / EAET / EASL / EATR ... | exact | parsed 0x8CB00 (EAES +0x290, EAER +0x298, EAET +0x2A0), applied 0x8DE1C, linear keys 0x933D0, matrix rebuilt every frame 0x8D770 |
 | time emission: first emission, gaps | exact | the threshold starts at 0 (0x874D8): the first particles on the window's first frame; the next gap interval + 1 + (rand x interval_random) >> 32 (0x88750) |
-| time emission: count | exact | carry += rate (animated, EATR; the data's own for volume types 5 / 6) + rate x rate_random / 100 x U (0x8D408); one particle a whole unit |
-| distance emission | exact | 0x8D340, run every frame of the window instead of the rate: see below |
+| time emission: count | exact, matches the engine | carry += rate (animated, EATR; the data's own for volume types 5 / 6) + rate x rate_random / 100 x U (0x8D408); one particle a whole unit |
+| distance emission | exact, matches the engine | 0x8D340, run every frame of the window instead of the rate: see below |
 | the gate byte (emitter set +0x265) | assumed on | copied from the set's creation arguments (0x112C64); Squirtle's diagnostic 8 showed these emitters do emit in Ultimate |
 | runtime emission scales (instance +0x60 / +0x64, set +0x50 / +0x54) | assumed 1 | set by the game |
 | window (start, duration, one_time) | data | |
@@ -36,9 +36,10 @@ frame.
 
 | stage | status | notes |
 |---|---|---|
-| emission shapes (volume types, sweep, latitude, caliber) | approx | `shape_point`: point / sphere / box style spread; sweep, latitude and caliber_ratio not read |
+| emission shapes: circles (types 1, 2) | exact | 0x90C40 / 0x90E20 (shape table 0x4F48C30): angle start + sweep x (i / n) - sweep / 2, point (sin a rx, 0, cos a rz); matches the engine's births |
+| emission shapes: the others | approx | `shape_point`: point / sphere / box style spread; their routines are in the same table |
 | position_random | missing | |
-| velocity (all-direction, designated direction, diffusion, vel_random) | data | the formula hasn't been read from main.bin |
+| velocity (all-direction, designated direction, diffusion, vel_random) | data, matches the engine's speeds | outward x all_direction + direction x scale, x (1 - vel_random x U): the engine's birth speeds fall in exactly that range |
 | inherited velocity / scale (INHERIT) | missing | |
 | life, life random | data / missing | life_random not modelled |
 | gravity, world gravity, air resistance | data | integration order (v x air + g, then p += v) not checked |
@@ -65,6 +66,14 @@ frame.
 docs/vfx-trace.md: an OpenSmash-Ultimate mod records the engine's own emitters and particles (births,
 every frame, its random state), and `tools/vfx_trace.py births` compares fx_render's births with them.
 Each stage above moves to **exact** once it matches the trace, not only the code read.
+
+## The first trace (Squirtle, user's run, 162 emitter runs)
+
+Births a frame matched for every emitter of water_smash(_r), water_cutter(_r) and mouth_water, both facings
+(only differences: where the move's script turned the effect off, which the bare emitter doesn't know).
+water_smash / water_cutter's splashes are born at ONE point, (0, 0, -radius) (even circle, one division),
+not spread round the circle as fx_render had them; eft has no division count we know of, so the
+converted bank still spreads them (next: eft's circle routine in cross_f).
 
 ## Next, in order
 
