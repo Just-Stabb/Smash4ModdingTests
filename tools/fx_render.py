@@ -747,7 +747,8 @@ def s4_emitters(p, set_index, program_cache=None):
 # ------------------------------------------------------------------ the scripts
 EFFECT_MACROS = ('EFFECT', 'EFFECT_FOLLOW', 'EFFECT_FLIP', 'EFFECT_FOLLOW_FLIP', 'EFFECT_FOLLOW_NO_STOP',
                  'EFFECT_FOLLOW_NO_SCALE', 'EFFECT_FOLLOW_ALPHA', 'EFFECT_ALPHA', 'LANDING_EFFECT', 'FOOT_EFFECT',
-                 'EFFECT_FOLLOW_FLIP_ALPHA', 'EFFECT_FLIP_ALPHA', 'EFFECT_FOLLOW_RND', 'EFFECT_FOLLOW_WORK')
+                 'EFFECT_FOLLOW_FLIP_ALPHA', 'EFFECT_FLIP_ALPHA', 'EFFECT_FOLLOW_RND', 'EFFECT_FOLLOW_WORK',
+                 'EFFECT_FLW_POS', 'EFFECT_FLW_POS_NO_STOP', 'EFFECT_FLW_UNSYNC_VIS')
 
 
 def ult_calls(path, move):

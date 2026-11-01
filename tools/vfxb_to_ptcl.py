@@ -1046,6 +1046,39 @@ def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=
     set_uv_anim(em, ts, slot=slot)
 
 
+def one_axis(e, ti, j, orgb, oa, shape):
+    """sampler j over sampler ti's texture ([h, w, 3], [h, w]) when j varies along one axis only (its
+    texture constant along the other) and neither sampler moves, turns or scales along that axis over
+    life, sampler ti's scale there 1 (its texels' coordinate on that axis is the mesh's): exact; else None"""
+    tsi, tsj = e['static']['tex_scroll'][ti], e['static']['tex_scroll'][j]
+    if e['tex_anim'][ti]['uv_channel'] != e['tex_anim'][j]['uv_channel'] or e['tex_anim'][j]['pattern_type'] \
+            or any(abs(float(t.get(k, 0) or 0)) > 1e-6 for t in (tsi, tsj) for k in ('rotation', 'rotation_add')):
+        return None
+    f = np.concatenate([orgb, oa[..., None]], -1)
+    for ax, other in ((1, 0), (0, 1)):              # ax: the axis j varies along (1 = V: rows)
+        if float(np.abs(f - f.mean(axis=ax, keepdims=True)).max()) > 4 / 255:      # constant across its axis
+            continue
+        if any(abs(float(t[k][ax])) > 1e-6 for t in (tsi, tsj) for k in ('scroll_add', 'scale_add')) or \
+                abs(float(tsi['scale'][ax]) - 1) > 1e-6 or abs(float(tsi['scroll'][ax])) > 1e-6 or \
+                REPEAT.get(e['tex_anim'][ti]['repeat'], (1, 1))[ax] != 1:
+            continue
+        h, w = shape
+        n = h if ax == 1 else w
+        c = (np.arange(n, dtype=np.float32) + 0.5) / n
+        quad = np.zeros((n, 2), np.float32)
+        quad[:, ax], quad[:, other] = c, 0.5
+        uv = uv_transform(quad * np.array(REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), np.float32),
+                          tsj['scale'], tsj['scroll'], tsj['rotation'])
+        s = e['sampler'][j]
+        wrap = s['wrap_v'] if ax == 1 else s['wrap_u']
+        sh, sw = f.shape[:2]
+        k = (wrap_uv(uv[:, ax], wrap) * (sh if ax == 1 else sw)).astype(int).clip(0, (sh if ax == 1 else sw) - 1)
+        vals = f[k, 0] if ax == 1 else f[0, k]                  # [n, 4]
+        full = np.repeat(vals[:, None], w, 1) if ax == 1 else np.repeat(vals[None], h, 0)
+        return full[..., :3], full[..., 3]
+    return None
+
+
 def _texblend(x, y, mode):
     """eft2's texture blend: 0 multiply, 1 add, 2 subtract (x - y: tools/eft_pixel.py _blend)"""
     return x + y if mode == 1 else x - y if mode == 2 else x * y
@@ -1071,10 +1104,17 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
             orgb, oa = sampler_inputs(e, j, first_cell(images[s['texture_id']], e['static']['tex_scroll'][j],
                                                       shown_cell(e, j)))
             k = 2 if 2 in (ti, j) else 1        # tex_blend: sampler 2 comes in by tex2's blend
+            line = one_axis(e, ti, j, orgb, oa, rgb.shape[:2]) if not ptn else None
             if same_uv(e, ti, j) and not ptn:
                 # the same UVs as sampler ti all life (Swoosh's whirlwind columns: ef_cmn_wind00 in
                 # both, its red x its alpha): their product texel by texel is exact
                 m_rgb, m_a = resize(orgb, rgb.shape[1], rgb.shape[0]), resize(oa[..., None], a.shape[1], a.shape[0])[..., 0]
+                same.append(j)
+            elif line is not None:
+                # a gradient along one axis that sampler ti neither moves nor scales (Water Gun's crowns:
+                # ef_cmn_grade00 down V, x 2.7, under a texture scrolling along U): exact row by row; as
+                # its mean (0.21) the shot's crowns were a fifth as opaque, a faint line in game
+                m_rgb, m_a = line
                 same.append(j)
             else:
                 m_rgb, m_a = orgb.reshape(-1, 3).mean(0), float(oa.mean())

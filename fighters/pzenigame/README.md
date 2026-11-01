@@ -461,3 +461,21 @@ up smash's columns) face the camera about their motion, where they had been draw
 Still not modelled in fx_render: eft's type 4 meshes' orientation (the converted up-smash columns render
 edge-on; in game they face the camera, test 11's clip). Left: EAA1 (colour 1's alpha animated, 1.5 -> 1
 over 4 frames) on 23 emitters, most of them distortion parts.
+
+## v6 effects test 13 (`build/squirtle_v6_effects_test13.zip`)
+
+Test 12 (user's clip): forward, down and up smash's water now breaks up with crisp edges; Water Gun's
+charge shows a few droplets at the mouth (as Ultimate's mizuteppo_hold: fx_render both sides), but its
+shot was a faint thin line. mizuteppo_shoot's four crowns (type 4 meshes) multiply their alpha by
+sampler 2's red (ef_cmn_grade00, a gradient down V, x 2.7) on UVs of their own; a mesh's other samplers
+came in as their mean (0.21): the burst a fifth as opaque. vfxb_to_ptcl.one_axis: a sampler that varies
+along one axis only, which the main sampler neither scrolls nor scales, is multiplied in row by row
+(exact). fx_render also reads EFFECT_FLW_POS (Water Gun's hold / shot calls had been missing on
+Ultimate's side). The renders of the shot match.
+
+Still open: forward / down smash look more separated in game than Ultimate's single mass of water. The
+native clip (level camera) shows Ultimate's water as a low band, its streaks along the sweep; the Cemu
+camera looks down ~18 degrees, which opens the ring of sheets (fx_render --pitch 18 shows the same on
+both sides). The renders put our bank and Ultimate's close in either view, so what remains is in eft's
+drawing of these parts that fx_render doesn't model; footage of both games from comparable cameras
+(a level stage in Smash 4) is the next check.
