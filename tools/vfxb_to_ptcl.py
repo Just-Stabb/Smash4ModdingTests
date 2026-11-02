@@ -888,6 +888,9 @@ def same_uv(e, i, j):
     # threshold 0 and Waterfall's spikes stood 1.3x as full as Ultimate's
     rnd = any(np.any(np.abs(np.asarray(ts_[n][k], float)) > 1e-6) for n in (i, j)
               for k in ('scroll_random', 'scale_random', 'rotation_random'))
+    # a random flip (inv_rand) likewise: sampler 0's U flip from random x, sampler 1's from random z
+    # (Waterfall's water1 sheets: half their particles have the dissolve mask mirrored over the water)
+    rnd = rnd or any(any(ta[n]['inv_rand']) for n in (i, j))
     return (ta[i]['uv_channel'] == ta[j]['uv_channel'] and ta[i]['repeat'] == ta[j]['repeat']
             and all(np.allclose(ts_[i][k], ts_[j][k]) for k in keys) and not rnd)
 
@@ -960,11 +963,16 @@ def fit_texture(pix, tmax=None):
     if (tw, th) != (w, h):
         pix = resize(pix.astype(np.float32), tw, th)
     # smooth textures (glows, gradients) at half size while that changes them by under 1% (the
-    # bank's size: test 37's 6.0 MB loaded)
+    # bank's size: test 37's 6.0 MB loaded), each channel against its own level: measured over all
+    # channels together, a faint channel's detail passed as nothing (Waterfall's water1 sheets: their
+    # dissolve mask, alpha mean 0.10 beside white rgb, went 256 x 128 -> 32 x 32, blurred to its mean,
+    # and the sheets eroded half away by mid-life; 67% of Ultimate's cover)
     while min(tw, th) > 16:
         half = resize(pix.astype(np.float32), tw // 2, th // 2)
         back = resize(half, tw, th)
-        if float(np.abs(back - pix).mean()) > 0.01 * max(float(pix.mean()), 0.05):
+        err = np.abs(back - pix).reshape(-1, pix.shape[-1]).mean(0)
+        lvl = np.maximum(pix.reshape(-1, pix.shape[-1]).mean(0), 0.05)
+        if (err > 0.01 * lvl).any():
             break
         pix, tw, th = half, tw // 2, th // 2
     return pix
@@ -1124,6 +1132,14 @@ def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=
     em[0x4D7 + SLOT1 * slot], em[0x4D8 + SLOT1 * slot] = 1, 1
     struct.pack_into('>I', em, PTN_MODE + SLOT1 * slot, 0)
     set_uv_anim(em, ts, slot=slot)
+    inv = list(e['tex_anim'][j]['inv_rand']) if j is not None else [0, 0]
+    if j is not None and ti is not None:
+        # eft flips every slot on the particle's one random (measured: slot 1's mask never lay mirrored over slot
+        # 0's water), eft2 each sampler on its own: an axis both flip is left to slot 0, so the two lie mirrored
+        # apart on half the particles as in Ultimate (Waterfall's water1 sheets: mask aligned on all, they
+        # eroded far slower)
+        inv = [0 if a and e['tex_anim'][ti]['inv_rand'][k] else a for k, a in enumerate(inv)]
+    set_inv_rand(em, slot, inv)
 
 
 def one_axis(e, ti, j, orgb, oa, shape):
@@ -1521,6 +1537,30 @@ def fixed_quarter_turn(st):
     return int(round(q)) % 4 or None
 
 
+def gate_uv_anim(e):
+    """e with each sampler's UV parameters as eft2 applies them: a component whose tex_anim switch (scroll /
+    scale / rotate) is off is identity, start, change and random alike (Ultimate's vertex programs leave
+    those UVs alone whatever the values: Waterfall's water1 sheets, switches 000, scroll +0.05 / frame and a
+    random V offset of 1 stored; a common ring's scale 0 with the switch off draws whole). Drawn moving, the
+    sheets' dissolve mask slid off the water and ate it by mid-life (67% of Ultimate's cover)"""
+    ts_all, ta_all = e['static']['tex_scroll'], e['tex_anim']
+    gated = []
+    for ts, ta in zip(ts_all, ta_all):
+        ts = dict(ts)
+        if not ta['scroll']:
+            ts.update(scroll=[0.0, 0.0], scroll_add=[0.0, 0.0], scroll_random=[0.0, 0.0])
+        if not ta['scale']:
+            ts.update(scale=[1.0, 1.0], scale_add=[0.0, 0.0], scale_random=[0.0, 0.0])
+        if not ta['rotate']:
+            ts.update(rotation=0.0, rotation_add=0.0, rotation_random=0.0)
+        gated.append(ts)
+    if gated == list(ts_all):
+        return e
+    e = dict(e)
+    e['static'] = dict(e['static'], tex_scroll=gated)
+    return e
+
+
 def uv_mode(ts):
     """the UV animation bits (1 scroll, 2 scale, 4 rotate) a sampler's eft2 UV parameters need"""
     if ts is None:
@@ -1563,6 +1603,14 @@ def set_flipbook(em, ptn, ts, tp, rep=(1, 1)):
     struct.pack_into('>2f', em, 0x508, rep[0] / nx, rep[1] / ny)
 
 
+def set_inv_rand(em, slot, inv):
+    """eft2's random texture flips (tex_anim inv_rand: U, V; each sampler on its own random component,
+    sampler 0 x, sampler 1 z) -> the slot's inverse-random bytes 0x4DA / 0x4DB (uboFlag 0x400 / 0x800 << 2 x
+    slot; eft_vertex). Never written before: no part flipped (Waterfall's water1 sheets flip water and mask
+    apart, their mask lying mirrored over the water on half the particles)"""
+    em[0x4DA + SLOT1 * slot], em[0x4DB + SLOT1 * slot] = (1 if inv[0] else 0), (1 if inv[1] else 0)
+
+
 def set_uv_anim(em, ts, slot=0):
     """eft2's UV parameters (shift / scale / rotation: initial, random, per frame) -> slot 0's eft
     block: 0x514 scroll a frame, 0x51C scroll init, 0x524 scroll random, 0x52C scale a frame, 0x534 scale init, 0x53C
@@ -1589,6 +1637,7 @@ def set_uv_anim(em, ts, slot=0):
 def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as_child=False):
     """one Ultimate emitter as an eft emitter (bytes; None when skipped). as_child: a child emitter's,
     for child_block to take its drawing from: one texture, the CPU's particles, nothing complex"""
+    e = gate_uv_anim(e)
     pt = e['particle']
     if not e['info']['is_particle_draw']:
         # Ultimate doesn't draw it (eft2's is_particle_draw; none of Hero's 5 has child emitters):
@@ -2076,6 +2125,9 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         set_wrap(em, 0, *((smp['wrap_v'], smp['wrap_u']) if swap_uv else (smp['wrap_u'], smp['wrap_v'])))
     p.set_field(em, 'tex0_uv_scale', [float(v) for v in repeat])
     set_uv_anim(em, ts)
+    if smp:
+        inv = e['tex_anim'][ti]['inv_rand']
+        set_inv_rand(em, 0, (inv[1], inv[0]) if swap_uv else inv)
     if ptn or not flip:
         set_flipbook(em, ptn, e['static']['tex_scroll'][ti] if smp else None, tp, repeat)
     else:
@@ -2162,6 +2214,11 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'alpha_init', a0)
     p.set_field(em, 'alpha_diff21', a1 - a0)
     p.set_field(em, 'alpha_diff32', a2 - a1)
+    # a section of 0 (the ramp from the first frame) divides by 0 in some templates' programs: alpha 0 on
+    # the particle's first frame (Waterfall's water1 sheets, on the two-texture template, drew nothing at
+    # age 0); 1% changes nothing else
+    s1 = max(s1, 1.0)
+    s2 = max(s2, s1)
     p.set_field(em, 'alpha_section1', s1 / 100)
     p.set_field(em, 'alpha_section2', s2 / 100)
 

@@ -646,3 +646,27 @@ drew as a soft white haze over the column.
 - Still open: Waterfall's water1 splash sheets (alpha mode 4, threshold erosion) are fainter / smaller
   than Ultimate's white sheets.
 
+## v6 effects test 21 (`build/squirtle_v6_effects_test21.zip`)
+
+Waterfall's water1 splash sheets (TakinoboriStart, eft2 type 3, dissolve, life 8). Over six seeds the
+sheets covered 78k px on ours against Ultimate's 117k. The scale curve, rotation ranges, bounding boxes,
+threshold keys and alpha fade all matched; by particle age they agreed at ages 0-2 and fell to half by age 4.
+- tex_anim switches: water1's samplers have scroll / scale / rotate switched off, yet store a scroll of
+  +0.05 a frame and a V random of 1. Ultimate's vertex program (run with each random component changed in
+  turn) leaves their UVs alone apart from the random flip. Ours animated them: the mask slid off the water.
+  The converter now treats a switched-off component as identity (gate_uv_anim). Across the moves checked
+  (up / down / side smash, dash, Waterfall) every program's UV behaviour agrees with its switches.
+- Random flips: sampler 0 flips U on random x, sampler 1 on random z (independent). eft's 0x4DA / 0x4DB
+  were never written. Now written; where both slots flip, slot 1's is left to slot 0 (eft flips both on
+  one random), so the mask lies mirrored over the water on half the particles (measured 6161 of 11355).
+- fit_texture now judges each channel at its own level (the mask had shrunk to 32 x 32). Alpha
+  sections are at least 1% (the two-texture template drew nothing on a particle's first frame).
+- Result: the sheets now cover about 141k against Ultimate's 117k (ages 0-2 within a few percent; ages
+  3-5 above). The rest is a one-frame lag in eft's GPU-side programs: this template computes its colour
+  / alpha / threshold at (age - emp0.w) / life, emp0.w being the instance's +0x5C (cross_f 0x04A65B18). The
+  renderer takes it as 1, unverified; if it is the frame step in game too, every GPU-side template's
+  curves run a frame late, and compensating belongs in the converter for all of them.
+- Still open: Waterfall's water1 life-20 streaks (alpha mode 4, directional) cover about 5x Ultimate's.
+- Renderer note: renders run in parallel right after a rebuild race on the shader cache; one of them
+  drew nothing on half the seeds. Warm the cache with one render first.
+
