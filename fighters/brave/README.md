@@ -1270,3 +1270,20 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
   `--no-tone` for the old look), the chroma scaled by the square root of the change (kept as is, his
   hair turned grey; scaled fully, oversaturated). The name plates are unchanged.
 - Changed: `ui/replace/chr/` (46 pictures; the 3 plates are as fix 73's).
+
+## Fix 76 (`build/hero_fix76.zip`): roll-off aerials left to the game, Woosh actionable when it falls
+
+- **Roll-off aerials (user: the executable fixed it):** the MSC's own direction pick for an aerial out of a
+  roll-off (fixes 62-69: `rolloff_aerial`, `rolloff_cstick_update`, `rolloff_stick_dir`) is removed; `func_311`
+  takes the game's aerial kind (`ControlModule(0x10)`) again. The executable's fix for a buffered aerial out of
+  an edge cancel keeps its direction.
+- **Woosh / Swoosh / Kaswoosh (user):** actionable from the script's `ENABLE_CANCEL` (the user's game.bin: air
+  scripts at 11 / 20 / 18), and only once the rise is over and he falls (user: "only after Hero starts falling
+  from Woosh"): `brave_hi_loop`, `CancelModule(0x2713)` with Robin's `func_39` / `func_41` (as his neutral
+  special's `func_2246`), after the ledge and landing checks. A Woosh started on the ground keeps its ground
+  motion, so the ground scripts (`specialhi` / `specialhi2` / `specialhi3`) got the same `ENABLE_CANCEL` at the
+  same frames.
+- Changed: `brave.mscsb`, `script/animcmd/body/game.bin` (the user's, the three ground scripts added to).
+- `port_check brave` over steve_hero_v1 + fixes 58-76: the same 5 errors as up to fix 75 (none new): E4 / E5
+  (type-4 meshes in his effect bank), E7 (effect macros the translator drops: `EFFECT_OFF_KIND_WORK`,
+  `EFFECT_FOLLOW_WORK`, ...), P1, S4: left for a follow-up.

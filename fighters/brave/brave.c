@@ -7395,7 +7395,8 @@ int func_311()
     int var0;
     int var1;
     var0 = 0x68;
-    var1 = rolloff_aerial(ControlModule(0x10));  // Hero: a C-stick flick buffered in a roll-off (fix 62)
+    var1 = ControlModule(0x10);     // the game's aerial kind: the roll-off direction check (rolloff_aerial, fixes 62-69)
+                                    // is gone, the executable now keeps the buffered aerial's direction (user)
     if (var1 == 0x1)
     {
         BattleObject(0xd, 0x2, 0xe);
@@ -38369,110 +38370,8 @@ int rolloff_air_t;
 int rolloff_fast;       // Hero: the roll's speed scaled this roll (brave_roll_mult)
 int rolloff_airborne;   // the first aerial of a roll-off's airtime goes by the stick as it starts (fix 66)
 
-// the main stick now, as rolloff_cstick's codes: X on screen and Y, neutral (5) below 0.3 either way
-int rolloff_stick_dir()
-{
-    float x;
-    float y;
-    x = ControlModuleF(0);      // the game's own stick X (on screen) and Y (as global48 / global32)
-    y = ControlModuleF(0x1);
-    // up / down past 35 degrees from level (y^2 > x^2 tan^2 35); Smash 4's own aerial pick (0x02E71774:
-    // atan2(|y|, |x|) < 50 degrees is a side aerial) is stricter, fix 68's 45 too (user, fix 69: only
-    // a stick held straight up / down gave up / down air)
-    if (y > 0.3f && y * y > x * x * 0.49f)
-    {
-        return 0x3;
-    }
-    if (y < -0.3f && y * y > x * x * 0.49f)
-    {
-        return 0x4;
-    }
-    if (x > 0.3f)
-    {
-        return 0x1;
-    }
-    if (x < -0.3f)
-    {
-        return 0x2;
-    }
-    return 0x5;
-}
-
-void rolloff_cstick_update()
-{
-    float x;
-    float y;
-    if (ControlModule(0x2710, 0))
-    {
-        rolloff_cstick = rolloff_stick_dir();   // attack pressed in the roll: the main stick then
-        return;
-    }
-    x = WorkModuleF(0, 0x0f000261);     // the C-stick: raw X on screen, and Y (fix 63: ControlModuleF(7 / 8)
-    y = WorkModuleF(0, 0x0f000113);     // followed the control stick, user)
-    if (y > 0.5f && y * y > x * x)
-    {
-        rolloff_cstick = 0x3;
-    }
-    else if (y < -0.5f && y * y > x * x)
-    {
-        rolloff_cstick = 0x4;
-    }
-    else if (x * x > 0.25f)
-    {
-        if (x > 0)
-        {
-            rolloff_cstick = 0x1;
-        }
-        else
-        {
-            rolloff_cstick = 0x2;
-        }
-    }
-}
-
-// the aerial kind (ControlModule(0x10): 1 neutral, 2 forward, 3 back, 4 up, 5 down); rolloff_cstick 1 right,
-// 2 left, 3 up, 4 down, 5 neutral
-int rolloff_aerial(int kind)
-{
-    int c;
-    c = rolloff_cstick;
-    rolloff_cstick = 0;
-    if (rolloff_air_t <= 0)
-    {
-        c = 0;      // a press / flick kept from the roll counts only for the slide-off's 8 frames
-    }
-    if (c == 0)
-    {
-        if (rolloff_airborne == 0)
-        {
-            return kind;
-        }
-        // pressed after the slide-off (fix 65, user: fix 64 changed nothing for the control stick): the
-        // game's kind still went by the stick held in the roll; the stick now instead. For the airtime's
-        // first aerial, not only the first 8 frames (fix 66, user: inconsistent facing against his
-        // motion: past the 8 frames the game's kind was back)
-        c = rolloff_stick_dir();
-    }
-    rolloff_airborne = 0;
-    if (c == 0x5)
-    {
-        return 0x1;
-    }
-    if (c == 0x3)
-    {
-        return 0x4;
-    }
-    if (c == 0x4)
-    {
-        return 0x5;
-    }
-    if ((c == 0x1) == (PostureModuleF(0) > 0))  // his facing (fix 68: 0x7 is the model's scale, always > 0:
-                                                // every left / right input read as facing right, user)
-    {
-        return 0x2;
-    }
-    return 0x3;
-}
+// rolloff_stick_dir / rolloff_cstick_update / rolloff_aerial (fixes 62-69: the roll-off aerial's direction from the
+// stick / C-stick) removed: the executable keeps a buffered aerial's direction out of an edge cancel itself (user)
 
 void rolloff_hold_update()
 {
@@ -38540,7 +38439,6 @@ void rolloff_update()
         rolloff_cstick = 0;
         rolloff_fast = 0;
     }
-    rolloff_cstick_update();
     if (rolloff_fast == 0 && MotionModuleF(0x1) >= 6.0f)
     {
         // Hero: the roll's speed (the ACMD's momentum at frame 5, energy 3) x2 under Acceleratle (fix 66,
@@ -40182,6 +40080,13 @@ void brave_hi_loop()
             if (global19 != 0 && global18 == 0)
             {
                 func_16(0x19, 0);
+                return;
+            }
+            // actionable from the script's ENABLE_CANCEL (the user's: Woosh 11, Swoosh 20, Kaswoosh 18, ground and
+            // air scripts) once the rise is over and he falls (user: only after he starts falling), as his neutral
+            // special through func_2246: any action his inputs ask for
+            if (brave_hi_rising == 0 && CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
+            {
                 return;
             }
         }

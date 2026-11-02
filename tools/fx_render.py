@@ -881,6 +881,12 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     info = e['info']
     c10 = np.zeros(48, np.float32)
     c10[0:4], c10[4:8] = info['color0'], info['color1']
+    # the colour Ultimate's engine puts on the call (tools/ultimate_tints.py: the fighter's tint on the attack lines /
+    # arcs, script colours): eft2 multiplies it into c10's colours (ExeFS 0x3563F40 -> 0x8F0A0)
+    t = getattr(em, 'tint', None)
+    if t is not None:
+        c10[0:3] *= t
+        c10[4:7] *= t
     # c10[8] the emitter's time after this frame's step (main.bin 0x8F244: instance +0x44, which the update
     # 0x8DC80 advances at its end, 0x8E44C, after emitting and moving the particles; drawing comes after):
     # time - birth is 1 on a particle's birth frame. c10[11] the step
@@ -1258,22 +1264,40 @@ def with_offs(calls, offs):
 
 
 def s4_calls(effect_bin, move):
-    """the same from the translated effect.bin (Graphic, Bone, X..ZRot, Size; frames from FRAME / WAIT)"""
+    """the same from the translated effect.bin (Graphic / GFXRight, Bone, X..ZRot, Size; frames from FRAME / WAIT),
+    as drawn facing right: a facing check (Float_Var_Compare on LR, var 0xF000003, < 0) is false, so its True block
+    is skipped (offsets in words from the command's own start: True's covers itself, its block and the Else command,
+    Else's itself and its block); other checks
+    are taken as true"""
     f = acmd.ACMDFile.load(effect_bin)
     cmds = f.scripts.get(acmd.crc(move.lower()), [])
     frame, out, offs = 0, [], []
+    pos, skip_to, cond = 0, -1, True
     for c in cmds:
         info = acmd.INFO.get(c.ident) or {}
         name, syn = info.get('name', ''), info.get('syntax', [])
-        if name == 'FRAME':
+        size = info.get('size', 1 + len(c.params))
+        here, pos = pos, pos + size
+        if here < skip_to:
+            continue
+        if name == 'Float_Var_Compare':
+            p = list(c.params)
+            cond = not (len(p) >= 3 and (int(p[0]) & 0xFFFFFFFF) == 0xF000003 and int(p[1]) == 4 and float(p[2]) == 0)
+        elif name == 'True':
+            if not cond:
+                skip_to = here + int(c.params[0])
+            cond = True
+        elif name == 'Else':
+            skip_to = here + int(c.params[0])           # reached only from a taken True block
+        elif name == 'FRAME':
             frame = max(frame, int(c.params[0]))
         elif name == 'WAIT':
             frame += int(c.params[0])
         elif name == 'Terminate_Graphic_Effect':
             offs.append((frame, c.params[0]))
-        elif syn[:2] == ['Graphic', 'Bone'] and 'Size' in syn:
+        elif syn[:1] in (['Graphic'], ['GFXRight']) and 'Bone' in syn and 'Size' in syn:
             g = dict(zip(syn, c.params))
-            out.append((frame, g['Graphic'], g['Bone'], (g.get('X', 0), g.get('Y', 0), g.get('Z', 0)),
+            out.append((frame, g.get('Graphic', g.get('GFXRight')), g['Bone'], (g.get('X', 0), g.get('Y', 0), g.get('Z', 0)),
                         (g.get('XRot', 0), g.get('YRot', 0), g.get('ZRot', 0)), g['Size']))
     return with_offs(out, offs)
 
@@ -1403,6 +1427,10 @@ def main():
         for nm, sname in ultimate_port.common_sets(cfg['effects'].get('common', []), common).items():
             if sname:
                 ult[nm] = ult_emitters(ce, ce.sets.index(sname), cimg, cnames, cprims)
+    import ultimate_tints
+    for nm, t in ultimate_tints.tints(ult_name, a.dump).items():
+        for em in ult.get(nm, []):
+            em.tint = np.array(t, np.float32)
     # Smash 4: id -> emitters
     edir = os.path.join(pkg, 'effect', a.name)
     p = ptcl.Ptcl(open(os.path.join(edir, '%s.010d0000.ptcl' % a.name), 'rb').read())
