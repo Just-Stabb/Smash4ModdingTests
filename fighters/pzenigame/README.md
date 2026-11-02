@@ -735,3 +735,29 @@ or so, at the start of moves.
   - port_check E6 universal-diff is an ERROR (20 on test 23; 0 errors on v6 + test 24).
   - fx_render, which fed the velocity and so drew these right, now warns: on test 23 for up smash's splash1_2
     and the dash's parts1, on test 24 for none.
+
+## v6 effects test 25 (`build/squirtle_v6_effects_test25.zip`): tilts, jabs and aerials
+
+The user's report on test 24: up tilt missing its speed line; forward tilt wrong facing left and without its
+colour; jab 1 / 2 / 3 and up air without their colours; down / back air without their twisting effects.
+- **Colours** (CLAUDE.md now: effect colours must match Ultimate's).
+  - Ultimate's engine tints `sys_attack_line` / `_b` and `sys_attack_arc` / `_b` / `_c` / `_d` with the
+    fighter's `common_effect_0` (fighter_param.prc; his (0.32, 1.6, 0.4) green). The pipeline never passed
+    it: port.json `tint_for` was empty. `tools/ultimate_tints.py` now passes it by default, multiplied into
+    the universal programs' c10 colours (linear) as eft2 does.
+  - Up tilt's speed line takes `LAST_PARTICLE_SET_COLOR(0.4, 1, 0.5)` after every call: baked into the bank.
+- **Script translation.** Effect macros now map to Smash 4's command of the same name (the ACMD ids are crc32
+  of the names), flips with their type:
+  - the up-tilt speed line (`EFFECT_FOLLOW_FLIP_ALPHA`) and the aerials' winds (`EFFECT_FOLLOW_RND`,
+    `_FLIP_ALPHA`) had been dropped;
+  - forward tilt's arc (0, -30, 195) is now `EFFECT_FOLLOW_FLIP` (mirrored facing left);
+  - its whirlwind is `FOOT_EFFECT_FLIP` with its r / l pair.
+- **Colour scale.** 224 universal emitters had eft's colour scale (+0x778) on top of the program's own
+  (c9 word 236), x 1.04 to 3, in tests 22-24. It is now 1.
+- **Checks.**
+  - `port_check`: E6 universal-colour-scale and E7 effect-macros are new. Over v6 + test 25: 0 errors; the
+    warnings are test 24's plus E7's known gaps (FLASH x21, FLASH_FRM x15).
+  - fx_render: the Ultimate side applies the engine colours; the Smash 4 side reads flip commands and
+    follows facing checks.
+  - In fx_render, jab 1's green line, up tilt's speed line and down / back air's winds match Ultimate.
+    Forward tilt's arc isn't drawn on fx_render's Ultimate side (a renderer gap), so it is unchecked there.
