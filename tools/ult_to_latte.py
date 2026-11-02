@@ -37,6 +37,7 @@ ONES = 0xFFFFFFFF
 CLAUSE_SLOTS = 120
 TABLE_ENTRIES = 8           # c9's dynamic table read: 16-byte entries tried
 
+TEX_OPS = {'SAMPLE', 'SAMPLE_L'}
 TRANS_ONLY = {'EXP_IEEE', 'LOG_CLAMPED', 'LOG_IEEE', 'RECIP_CLAMPED', 'RECIP_FF', 'RECIP_IEEE', 'RECIPSQRT_CLAMPED',
               'RECIPSQRT_FF', 'RECIPSQRT_IEEE', 'SQRT_IEEE', 'FLT_TO_INT', 'INT_TO_FLT', 'UINT_TO_FLT', 'SIN', 'COS',
               'MULLO_INT', 'MULLO_UINT', 'FLT_TO_UINT'}
@@ -219,7 +220,7 @@ def L(w):
 
 # ------------------------------------------------------------------ parsing
 _TOK = re.compile(r'(0x[0-9a-fA-F]+u?|\d+\.\d+(?:e[+-]?\d+)?f?|\d+u?)|([A-Za-z_]\w*)|'
-                  r'(<<|>>|<=|>=|==|!=|&&|\|\||[-+*/%&|^~!<>=?:;,(){}\[\].])')
+                  r'(<<|>>|<=|>=|==|!=|&&|\|\||\*=|\+=|-=|[-+*/%&|^~!<>=?:;,(){}\[\].])')
 
 
 def tokenize(s):
@@ -243,7 +244,7 @@ def tokenize(s):
 
 BIN = {'||': 2, '&&': 3, '|': 4, '^': 5, '&': 6, '==': 7, '!=': 7, '<': 8, '<=': 8, '>': 8, '>=': 8,
        '<<': 9, '>>': 9, '+': 10, '-': 10, '*': 11, '/': 11, '%': 11}
-TYPES = ('float', 'uint', 'int', 'bool')
+TYPES = ('float', 'uint', 'int', 'bool', 'vec4', 'vec2')
 
 
 class Parser:
@@ -299,6 +300,10 @@ class Parser:
             self.take()
             self.take(';')
             return ('return',)
+        if v == 'discard':
+            self.take()
+            self.take(';')
+            return ('discard',)
         if v == 'pc' and self.peek(1)[1] == '=':
             self.take()
             self.take('=')
@@ -321,9 +326,13 @@ class Parser:
             self.take(';')
             return ('decl', v, decls)
         lhs = self.unary()
-        self.take('=')
+        op = self.take()[1]
         e = self.expr()
         self.take(';')
+        if op in ('*=', '+=', '-='):
+            e = ('bin', op[0], lhs, e)
+        elif op != '=':
+            raise SyntaxError('assignment %r' % op)
         return ('assign', lhs, e)
 
     def expr(self, prec=0):
@@ -381,16 +390,26 @@ class Parser:
 
 
 def parse_program(glsl):
-    """(inputs {location: name}, outputs [location], buffers used, statements)"""
+    """(stage 'vs' / 'ps', inputs {location: name}, outputs [location], statements). A vertex program's body
+    is its jump dispatcher's cases; a pixel program's is straight-line main() (its register declarations
+    dropped: every register starts 0)"""
     ins, outs = {}, []
-    for m in re.finditer(r'layout\(location = (\d+)\) (in|out) vec4 (\w+);', glsl):
+    for m in re.finditer(r'layout\(location = (\d+)\) (in|out) vec\d (\w+);', glsl):
         if m.group(2) == 'in':
             ins[int(m.group(1))] = m.group(3)
         else:
             outs.append(int(m.group(1)))
-    i = glsl.index('switch (pc) {') + len('switch (pc) {')
-    j = glsl.index('default:', i)
-    return ins, outs, Parser(tokenize(glsl[i:j])).stmts(())
+    stage = 'ps' if re.search(r'\bout vec4 frag0;', glsl) else 'vs'
+    if 'switch (pc) {' in glsl:
+        i = glsl.index('switch (pc) {') + len('switch (pc) {')
+        j = glsl.index('default:', i)
+        body = Parser(tokenize(glsl[i:j])).stmts(())
+    else:
+        i = glsl.index('void main() {') + len('void main() {')
+        j = glsl.rindex('}')
+        body = [st for st in Parser(tokenize(glsl[i:j])).stmts(())
+                if not (st[0] == 'decl' and all(re.fullmatch(r'r\d+|rz|p\d+', n) for n, _e in st[2]))]
+    return stage, ins, outs, body
 
 
 # ------------------------------------------------------------------ eft's particle streams
@@ -425,18 +444,26 @@ def _spec_streams(spec):
 
 # ------------------------------------------------------------------ lowering
 class Lowering:
-    def __init__(self, glsl, consts, attrib_names=None, mode='identity', zratio=1.0, table_entries=TABLE_ENTRIES):
+    def __init__(self, glsl, consts, attrib_names=None, mode='identity', zratio=1.0, table_entries=TABLE_ENTRIES,
+                 samplers=None, encode=None, premultiply=False):
         """consts {buffer: words} the baked buffers; attrib_names {location: Ultimate attribute name} (the
         program's reflection); mode 'identity' (c8 / c10 as constant buffers 1 / 3 word for word, the attributes
         as Ultimate names them) or 'eft' (eft's own blocks and particle streams: EFT_ATTRIBUTES, eft_cb);
-        zratio the emitter's z / x particle scale (eft's streams carry x and y only)"""
+        zratio the emitter's z / x particle scale (eft's streams carry x and y only).
+        Pixel programs: samplers {Ultimate texture unit: eft slot} (default the same); encode None (frag0 as
+        Ultimate writes it, linear), 'display' (rgb clamped and encoded x ^ (1 / 2.2)) or 'linear' (clamped);
+        either then x u_nwHdrRange (CB9 [8]: rgb x .x + .w) as eft's own pixel programs; premultiply rgb x a"""
         self.consts = {k: list(v) for k, v in consts.items()}
         self.cbmap = {8: 1, 10: 3}
         self.mode, self.zratio = mode, zratio
         self.table_entries = table_entries
-        self.ins, self.outs, self.body = parse_program(glsl)
+        self.stage, self.ins, self.outs, self.body = parse_program(glsl)
+        self.samplers = samplers or {}
+        self.encode, self.premultiply = encode, premultiply
         self.attrib_names = {loc: (attrib_names or {}).get(loc, 'in_attr%d' % loc) for loc in self.ins}
-        if mode == 'eft':
+        if self.stage == 'ps':
+            self.hw_attrs = ['in_attr%d' % loc for loc in sorted(self.ins)]
+        elif mode == 'eft':
             need = []
             for loc in sorted(self.ins):
                 for spec in EFT_ATTRIBUTES.get(self.attrib_names[loc], [None] * 4):
@@ -446,7 +473,9 @@ class Lowering:
             self.hw_attrs = need
         else:
             self.hw_attrs = [self.attrib_names[loc] for loc in sorted(self.ins)]
-        self.hw_gpr = {nm: 1 + k for k, nm in enumerate(self.hw_attrs)}
+        # a vertex program's attributes from R1 (R0.x the vertex id), a pixel program's inputs from R0
+        first = 0 if self.stage == 'ps' else 1
+        self.hw_gpr = {nm: first + k for k, nm in enumerate(self.hw_attrs)}
         self.derived = {}
         self.code = []              # (op, dst slot, [Opd])
         self.nvars = 0
@@ -460,9 +489,11 @@ class Lowering:
         self.region_act, self.region_ret = L(ONES), False
         # outputs first, each a whole GPR
         self.vec = {}
-        for name in ['gl_Position'] + ['out_attr%d' % k for k in sorted(self.outs)]:
+        names = ['frag0'] if self.stage == 'ps' else ['gl_Position'] + ['out_attr%d' % k for k in sorted(self.outs)]
+        for name in names:
             self.vec[name] = self.nvars
             self.nvars += 4
+        self.kills = False
 
     # ---- slots: ('h', n) hardware (n = 4 gpr + channel), ('n', i) named, ('t', i) temp
     def var(self, name):
@@ -475,6 +506,12 @@ class Lowering:
         self.ntemp += 1
         self.maxtemp = max(self.maxtemp, self.ntemp)
         return ('t', self.ntemp - 1)
+
+    def temp_vec(self):
+        """four temporaries making one whole GPR (a texture fetch's coordinates and result)"""
+        self.ntemp = (self.ntemp + 3) // 4 * 4 + 4
+        self.maxtemp = max(self.maxtemp, self.ntemp)
+        return self.ntemp - 4
 
     # ---- emission
     def emit(self, op, srcs, dst=None):
@@ -515,6 +552,8 @@ class Lowering:
                 return s[1 - lit.index(0)]
             if ONES in lit:
                 return L(ONES)
+        if op == 'MUL_IEEE' and 0x3F800000 in lit:      # x * 1 = x, exactly
+            return s[1 - lit.index(0x3F800000)]
         if op in ('ADD_INT', 'XOR_INT') and lit[1] == 0:
             return s[0]
         if op == 'ADD_INT' and lit[0] == 0:
@@ -601,7 +640,20 @@ class Lowering:
             if base[0] == 'id' and base[1] in self.vec:
                 c = self.lit(self.ex(idx)[0])
                 return (Opd('reg', ('n', self.vec[base[1]] + c)), 'float')
+            if base[0] == 'id' and base[1] == 'gl_FragCoord':
+                return (self.fragcoord(self.lit(self.ex(idx)[0])), 'float')
+            if base[0] == 'id' and base[1] in self.locals and self.locals[base[1]][1] in ('vec4', 'vec2'):
+                return (self.locals[base[1]][0][self.lit(self.ex(idx)[0])], 'float')
             raise NotImplementedError('index ' + repr(n))
+        if k == 'member':
+            base, c = n[1], 'xyzwrgba'.index(n[2]) % 4
+            if base[0] == 'id' and base[1] == 'gl_FragCoord':
+                return (self.fragcoord(c), 'float')
+            if base[0] == 'id' and base[1] in self.vec:
+                return (Opd('reg', ('n', self.vec[base[1]] + c)), 'float')
+            if base[0] == 'id' and base[1] in self.locals and self.locals[base[1]][1] in ('vec4', 'vec2'):
+                return (self.locals[base[1]][0][c], 'float')
+            raise NotImplementedError('member ' + repr(n))
         if k == 'un':
             o, t = self.ex(n[2])
             if n[1] == '-':
@@ -683,7 +735,46 @@ class Lowering:
             raise NotImplementedError('int ' + op)
         return (self.emit(name, [x, y]), t)
 
+    def fragcoord(self, c):
+        """gl_FragCoord: only its w is read, to take Maxwell's interpolation (attribute x w x 1 / w) back to the
+        perspective-correct value; Latte's interpolators give that value itself, so w is 1 here"""
+        if c != 3:
+            raise NotImplementedError('gl_FragCoord.%s' % CH[c])
+        return L(0x3F800000)
+
+    def sample(self, fn, args):
+        """texture() / textureLod(): one SAMPLE / SAMPLE_L into a whole GPR"""
+        h = args[0]
+        while h[0] == 'call' and h[1] in ('sampler2D', 'uvec2'):
+            h = h[2][0]
+        if not (h[0] == 'index' and h[1] == ('id', 'c2')):
+            raise NotImplementedError('texture handle ' + repr(args[0]))
+        unit = (self.lit(self.ex(h[2])[0]) - 8) // 2       # c2 words 8 + 2u: texture unit u (tools/mx_exec.py)
+        slot = self.samplers.get(unit, unit)
+        uv = args[1]
+        if not (uv[0] == 'call' and uv[1] == 'vec2'):
+            raise NotImplementedError('coordinates ' + repr(uv))
+        u, v = (self.conv(self.ex(a), 'float') for a in uv[2])
+        base = self.temp_vec()
+        self.move(u, ('t', base))
+        self.move(v, ('t', base + 1))
+        op = 'SAMPLE'
+        if fn == 'textureLod':
+            self.move(self.conv(self.ex(args[2]), 'float'), ('t', base + 3))
+            op = 'SAMPLE_L'
+        self.code.append((op, ('t', base), [slot]))
+        return ([Opd('reg', ('t', base + c)) for c in range(4)], 'vec4')
+
     def call(self, fn, args):
+        if fn in ('texture', 'textureLod'):
+            return self.sample(fn, args)
+        if fn == 'textureQueryLod':
+            # (level, level x 256): the textures have one level here (as tools/mx_exec.py's sampler)
+            return ([L(0), L(0)], 'vec2')
+        if fn in ('vec4', 'vec2'):
+            return ([self.conv(self.ex(a), 'float') for a in args], fn)
+        if fn == 'mx_alpha_ok':
+            return (L(ONES), 'bool')        # the alpha test: eft's render state, not the program
         if fn == 'F':
             return (self.ex(args[0])[0], 'float')
         if fn == 'U':
@@ -838,7 +929,7 @@ class Lowering:
         if name == 'pc':
             raise NotImplementedError('pc')
         for ln, (o, t) in list(self.locals.items()):
-            if o.kind == 'reg' and o.v == self.var(name):
+            if isinstance(o, Opd) and o.kind == 'reg' and o.v == self.var(name):
                 self.locals[ln] = (self.emit('MOV', [o]), t)
         slot = self.var(name)
         guard = cond if self.full() else self.emit('AND_INT', [cond, self.act])
@@ -859,12 +950,16 @@ class Lowering:
 
     def store(self, val, slot):
         """val into a named slot (retargeting the operation that just made it, when it made a temporary)"""
-        if val.kind == 'reg' and val.v[0] == 't' and val.plain() and self.code and self.code[-1][1] == val.v:
+        if val.kind == 'reg' and val.v[0] == 't' and val.plain() and self.code and self.code[-1][1] == val.v \
+                and self.code[-1][0] not in TEX_OPS:
             op, _d, s = self.code[-1]
             self.code[-1] = (op, slot, s)
             new = Opd('reg', slot)
             for ln, (o, t) in list(self.locals.items()):
-                if o.kind == 'reg' and o.v == val.v:
+                if isinstance(o, list):
+                    self.locals[ln] = ([Opd('reg', slot, q.neg, q.abs) if q.kind == 'reg' and q.v == val.v else q
+                                        for q in o], t)
+                elif o.kind == 'reg' and o.v == val.v:
                     self.locals[ln] = (Opd('reg', slot, o.neg, o.abs), t)
             self.eqcache = {k: v for k, v in self.eqcache.items() if v.v != val.v}
             return new
@@ -960,6 +1055,15 @@ class Lowering:
             self.jump(s[1], cond)
         elif k == 'return':
             self.ret(cond)
+        elif k == 'discard':
+            # KILLE_INT: the pixel goes where the mask is set; then, as a return, its lanes are done
+            mask = self.emit('AND_INT', [self.act, cond])
+            if not (mask.kind == 'lit' and mask.v == 0):
+                # (latte-asm's grammar lists KILLNE before KILLNE_INT, so the _INT kinds of GT / GE / NE never
+                # parse; KILLE_INT does: killed where the mask is ~0)
+                self.code.append(('KILLE_INT', None, [self.plain(mask), L(ONES)]))
+                self.kills = True
+                self.ret(cond)
         elif k == 'decl':
             for name, e in s[2]:
                 self.local_ast[name] = e
@@ -970,10 +1074,16 @@ class Lowering:
                 t = self.locals[lhs[1]][1]
                 self.locals[lhs[1]] = (self.conv(self.ex(s[2]), t), t)
                 self.local_ast[lhs[1]] = s[2]
-            elif lhs[0] == 'id':
+            elif lhs[0] == 'id' and lhs[1] not in self.vec:
                 name = lhs[1]
                 t = 'bool' if re.fullmatch(r'p\d+|cz|cs|ccf|cov', name) else 'uint'
                 self.write(name, self.conv(self.ex(s[2]), t), cond)
+            elif lhs[0] == 'id' and lhs[1] in self.vec:
+                vals, t = self.ex(s[2])
+                if t != 'vec4':
+                    raise NotImplementedError('%s = %s' % (lhs[1], t))
+                for c, val in enumerate(vals):
+                    self.write_out(lhs[1], c, val, cond)
             elif lhs[0] == 'index' and lhs[1][0] == 'id' and lhs[1][1] in self.vec:
                 c = self.lit(self.ex(lhs[2])[0])
                 self.write_out(lhs[1][1], c, self.conv(self.ex(s[2]), 'float'), cond)
@@ -985,7 +1095,8 @@ class Lowering:
             raise NotImplementedError(k)
 
     def run(self):
-        # every register / predicate the program reads starts 0 (the GLSL's initialisers); outputs (0, 0, 0, 1)
+        # every register / predicate the program reads starts 0 (the GLSL's initialisers); outputs (0, 0, 0, 1),
+        # a pixel program's frag0 0
         names = sorted(set(re.findall(r'\b(r\d+|p\d+|cz|cs|ccf|cov)\b', repr(self.body))) - {'rz'})
         for n in names:
             self.var(n)
@@ -995,12 +1106,32 @@ class Lowering:
             self.ntemp = 0
             self.locals, self.local_ast, self.eqcache = {}, {}, {}
             self.stmt(s, L(ONES))
+        if self.stage == 'ps' and self.encode:
+            self.epilogue()
         return self
+
+    def epilogue(self):
+        """frag0 as Smash 4's framebuffer takes it (every lane: a pixel that left early keeps its frag0)"""
+        self.ntemp = 0
+        self.locals, self.local_ast, self.eqcache = {}, {}, {}
+        base = self.vec['frag0']
+        a = Opd('reg', ('n', base + 3))
+        for c in range(3):
+            slot = ('n', base + c)
+            x = self.emit('MIN_DX10', [self.emit('MAX_DX10', [Opd('reg', slot), L(0)]), L(0x3F800000)])
+            if self.encode == 'display':
+                # x ^ (1 / 2.2) (as tools/vfxb_to_ptcl.py's display()); log2(0) = -inf -> 0
+                x = self.emit('EXP_IEEE', [self.emit('MUL_IEEE', [self.emit('LOG_IEEE', [x]), L(u32(1 / 2.2))])])
+            if self.premultiply:
+                x = self.emit('MUL_IEEE', [x, a])
+            # u_nwHdrRange (userUniformBlock, CB9 floats 32 - 35): rgb x .x + .w, as eft's own programs
+            self.emit('MULADD_IEEE', [x, Opd('kc', (9, 32)), Opd('kc', (9, 35))], dst=slot)
 
     # ---- text
     def text(self, cbnames=None):
+        ps = self.stage == 'ps'
         nin = len(self.hw_attrs)
-        named0 = 4 * (1 + nin)                   # first named slot (whole GPRs after the inputs)
+        named0 = 4 * (nin + (0 if ps else 1))     # first named slot (whole GPRs after the inputs)
         temp0 = named0 + ((self.nvars + 3) // 4) * 4
         ngpr = (temp0 + self.maxtemp + 3) // 4
 
@@ -1009,7 +1140,18 @@ class Lowering:
             n = i if kind == 'h' else named0 + i if kind == 'n' else temp0 + i
             return 'R%d.%s' % (n // 4, CH[n % 4]), n % 4
 
-        banks = {cb: k for k, cb in enumerate(sorted(set(self.cbmap.values())))}
+        groups = []
+        # initial values: outputs (0, 0, 0, 1) (frag0 0), registers 0
+        for name, base in self.vec.items():
+            for c in range(4):
+                groups.append(('MOV', ('n', base + c), [L(0x3F800000 if c == 3 and name != 'frag0' else 0)]))
+        for n in self.init_names:
+            groups.append(('MOV', ('n', self.vars[n]), [L(0)]))
+        groups += self.code
+        used = sorted({s.v[0] for op, _d, srcs in groups if op not in TEX_OPS for s in srcs if s.kind == 'kc'})
+        if len(used) > 2:
+            raise NotImplementedError('constant buffers %s: more than a clause locks' % used)
+        banks = {cb: k for k, cb in enumerate(used)}
 
         def src(o):
             if o.kind == 'lit':
@@ -1025,53 +1167,80 @@ class Lowering:
                 t = '-' + t
             return t
 
-        groups = []
-        # initial values: outputs (0, 0, 0, 1), registers 0
-        for name, base in self.vec.items():
-            for c in range(4):
-                groups.append(('MOV', ('n', base + c), [L(0x3F800000 if c == 3 else 0)]))
-        for n in self.init_names:
-            groups.append(('MOV', ('n', self.vars[n]), [L(0)]))
-        groups += self.code
-        lines, cf = [], []
         hdr = ['; $MODE = "UniformBlock"']
-        for k, nm in enumerate(self.hw_attrs):
-            hdr += ['; $ATTRIB_VARS[%d].name = "%s"' % (k, nm), '; $ATTRIB_VARS[%d].type = "vec4"' % k,
-                    '; $ATTRIB_VARS[%d].location = %d' % (k, k)]
-        # eft's own names and sizes (a vanilla program's header): the CPU binds the blocks by name
-        blocks = cbnames or {1: ('viewUniformBlock', 352), 3: ('emitterDynamicUniformBlock', 192)}
-        for k, (cb, (nm, size)) in enumerate(sorted(blocks.items())):
+        # eft's own names and sizes (vanilla programs' headers): the CPU binds blocks and samplers by name
+        names = {1: ('viewUniformBlock', 352), 3: ('emitterDynamicUniformBlock', 192), 9: ('userUniformBlock', 256)}
+        names.update(cbnames or {})
+        for k, cb in enumerate(used):
+            nm, size = names[cb]
             hdr += ['; $UNIFORM_BLOCKS[%d].name = "%s"' % (k, nm), '; $UNIFORM_BLOCKS[%d].offset = %d' % (k, cb),
                     '; $UNIFORM_BLOCKS[%d].size = %d' % (k, size)]
-        params = sorted(self.outs)
-        hdr += ['; $NUM_SPI_VS_OUT_ID = %d' % max(1, (len(params) + 3) // 4)]
-        for k, loc in enumerate(params):
-            hdr.append('; $SPI_VS_OUT_ID[%d].SEMANTIC_%d = %d' % (k // 4, k % 4, loc))
-        hdr += ['; $SPI_VS_OUT_CONFIG.VS_EXPORT_COUNT = %d' % max(0, len(params) - 1)]
-        cf.append('CALL_FS NO_BARRIER')
+        if ps:
+            hdr += ['; $NUM_SPI_PS_INPUT_CNTL = %d' % nin]
+            for k, loc in enumerate(sorted(self.ins)):
+                hdr += ['; $SPI_PS_INPUT_CNTL[%d].SEMANTIC = %d' % (k, loc),
+                        '; $SPI_PS_INPUT_CNTL[%d].DEFAULT_VAL = 1' % k]
+            slots = sorted({srcs[0] for op, _d, srcs in groups if op in TEX_OPS})
+            for k, t in enumerate(slots):
+                hdr += ['; $SAMPLER_VARS[%d].name = "textureSampler%d"' % (k, t),
+                        '; $SAMPLER_VARS[%d].type = "SAMPLER2D"' % k, '; $SAMPLER_VARS[%d].location = %d' % (k, t)]
+            if self.kills:
+                hdr.append('; $DB_SHADER_CONTROL.KILL_ENABLE = true')
+        else:
+            for k, nm in enumerate(self.hw_attrs):
+                hdr += ['; $ATTRIB_VARS[%d].name = "%s"' % (k, nm), '; $ATTRIB_VARS[%d].type = "vec4"' % k,
+                        '; $ATTRIB_VARS[%d].location = %d' % (k, k)]
+            params = sorted(self.outs)
+            hdr += ['; $NUM_SPI_VS_OUT_ID = %d' % max(1, (len(params) + 3) // 4)]
+            for k, loc in enumerate(params):
+                hdr.append('; $SPI_VS_OUT_ID[%d].SEMANTIC_%d = %d' % (k // 4, k % 4, loc))
+            hdr += ['; $SPI_VS_OUT_CONFIG.VS_EXPORT_COUNT = %d' % max(0, len(params) - 1)]
+        cf = [] if ps else ['CALL_FS NO_BARRIER']
         kc = ' '.join('KCACHE%d(CB%d:0-31)' % (k, cb) for cb, k in sorted(banks.items(), key=lambda x: x[1]))
-        clause, slots, gno = [], 0, 0
+        clause, kind, slots_used, gno = [], None, 0, 0
+
+        def flush():
+            if clause:
+                cf.append((kind, list(clause)))
+            clause.clear()
+
         for op, dst, srcs in groups:
+            if op in TEX_OPS:
+                if kind != 'TEX':
+                    flush()
+                    kind = 'TEX'
+                r = sl(dst)[0].split('.')[0]
+                coord = '%s.xy0w' % r if op == 'SAMPLE_L' else '%s.xy0x' % r
+                clause.append('  %d      %s %s.xyzw, %s, t%d, s%d' % (gno, op, r, coord, srcs[0], srcs[0]))
+                gno += 1
+                continue
             nlit = len({s.v for s in srcs if s.kind == 'lit'})
             need = 1 + (nlit + 1) // 2
-            if slots + need > CLAUSE_SLOTS:
-                cf.append(('ALU', clause))
-                clause, slots = [], 0
-            d, ch = sl(dst)
-            unit = 't' if op in TRANS_ONLY else CH[ch]
+            if kind != 'ALU' or slots_used + need > CLAUSE_SLOTS:
+                flush()
+                kind, slots_used = 'ALU', 0
+            if dst is None:
+                d, unit = '____', 'x'
+            else:
+                d, ch = sl(dst)
+                unit = 't' if op in TRANS_ONLY else CH[ch]
             clause.append('  %d %s: %s %s, %s' % (gno, unit, op, d, ', '.join(src(s) for s in srcs)))
             gno += 1
-            slots += need
-        if clause:
-            cf.append(('ALU', clause))
-        pos = sl(('n', self.vec['gl_Position']))[0].split('.')[0]
-        cf.append('EXP_DONE: POS0, %s.xyzw' % pos)
-        for k, loc in enumerate(params):
-            r = sl(('n', self.vec['out_attr%d' % loc]))[0].split('.')[0]
-            cf.append('%s: PARAM%d, %s.xyzw NO_BARRIER' % ('EXP_DONE' if k == len(params) - 1 else 'EXP', k, r))
+            slots_used += need
+        flush()
+        if ps:
+            r = sl(('n', self.vec['frag0']))[0].split('.')[0]
+            cf.append('EXP_DONE: PIX0, %s.xyzw' % r)
+        else:
+            pos = sl(('n', self.vec['gl_Position']))[0].split('.')[0]
+            cf.append('EXP_DONE: POS0, %s.xyzw' % pos)
+            for k, loc in enumerate(params):
+                r = sl(('n', self.vec['out_attr%d' % loc]))[0].split('.')[0]
+                cf.append('%s: PARAM%d, %s.xyzw NO_BARRIER' % ('EXP_DONE' if k == len(params) - 1 else 'EXP', k, r))
+        lines = []
         for k, c in enumerate(cf):
             if isinstance(c, tuple):
-                lines.append('%02d ALU: %s' % (k, kc))
+                lines.append('%02d ALU: %s' % (k, kc) if c[0] == 'ALU' else '%02d TEX: VALID_PIX' % k)
                 lines += c[1]
             else:
                 lines.append('%02d %s' % (k, c))
@@ -1080,16 +1249,58 @@ class Lowering:
         return '\n'.join(hdr) + '\n\n' + '\n'.join(lines) + '\n'
 
 
-def lower(glsl, consts, attrib_names=None, mode='identity', zratio=1.0):
-    """latte-asm source of a translated Ultimate vertex program; consts {buffer: words} for the baked buffers"""
-    return Lowering(glsl, consts, attrib_names, mode, zratio).run().text()
+def lower(glsl, consts, attrib_names=None, mode='identity', zratio=1.0, **kw):
+    """latte-asm source of a translated Ultimate vertex or pixel program; consts {buffer: words} the baked
+    buffers"""
+    return Lowering(glsl, consts, attrib_names, mode, zratio, **kw).run().text()
 
 
-def assemble(text):
+def _gsh_blocks(b):
+    """[(type, data offset, size)] of a GX2 shader file"""
+    out, o = [], struct.unpack_from('>I', b, 4)[0]
+    while o + 32 <= len(b) and b[o:o + 4] == b'BLK{':
+        hs, typ, size = struct.unpack_from('>I', b, o + 4)[0], struct.unpack_from('>I', b, o + 16)[0], \
+            struct.unpack_from('>I', b, o + 20)[0]
+        out.append((typ, o + hs, size))
+        o += hs + size
+    return out
+
+
+def ps_header(b):
+    """a GX2 pixel shader file's header: {'inputs' [semantic], 'blocks' [(name, buffer, size)], 'samplers'
+    [(name, type, location)], 'db_shader_control'} (GX2PixelShader: 41 register words, size, data, mode, then
+    (count, pointer) pairs: uniform blocks at word 44, sampler vars at 52)"""
+    for typ, o, _s in _gsh_blocks(b):
+        if typ != 6:
+            continue
+        w = struct.unpack_from('>54I', b, o)
+        P = lambda v: o + (v & 0xFFFFF)
+        cs = lambda q: b[q:b.index(b'\0', q)].decode('latin1')
+
+        def table(n, ptr, size, fields):
+            return [(cs(P(struct.unpack_from('>I', b, P(ptr) + size * i)[0])),) +
+                    struct.unpack_from('>%dI' % fields, b, P(ptr) + size * i + 4) for i in range(n)]
+        return {'inputs': [w[5 + i] & 0xFF for i in range(w[4])], 'blocks': table(w[44], w[45], 12, 2),
+                'samplers': table(w[52], w[53], 12, 2), 'db_shader_control': w[39]}
+    return None
+
+
+def vs_semantics(b):
+    """a GX2 vertex shader file's PARAM semantics, in export order (SPI_VS_OUT_ID: four a word from word 4)"""
+    for typ, o, _s in _gsh_blocks(b):
+        if typ == 3:
+            w = struct.unpack_from('>14I', b, o)
+            sems = [(w[4 + k // 4] >> (8 * (k % 4))) & 0xFF for k in range(40)]
+            return [x for x in sems if x != 0xFF]
+    return None
+
+
+def assemble(text, stage='vs'):
+    """a GX2 shader file (.gsh) of latte-asm source: a vertex ('vs') or pixel ('ps') program"""
     with tempfile.TemporaryDirectory() as d:
-        src, out = os.path.join(d, 'a.vsh'), os.path.join(d, 'a.gsh')
+        src, out = os.path.join(d, 'a.' + stage[0] + 'sh'), os.path.join(d, 'a.gsh')
         open(src, 'w').write(text)
-        r = subprocess.run([ASM, 'assemble', '--vsh', src, out], capture_output=True, text=True)
+        r = subprocess.run([ASM, 'assemble', '--' + stage[0] + 'sh', src, out], capture_output=True, text=True)
         if r.returncode or not os.path.exists(out) or r.stdout.strip() or r.stderr.strip():
             raise RuntimeError('latte-asm: ' + (r.stdout + r.stderr).strip()[:2000])
         return open(out, 'rb').read()

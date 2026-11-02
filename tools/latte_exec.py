@@ -7,6 +7,10 @@ turned into C++, compiled once (build/latte_exec/) and called from numpy.
   vs.blocks       {name: constant buffer}  (viewUniformBlock 1, emitterStaticUniformBlock 2, ...)
   vs.params       {PARAM n: GX2 semantic} (SPI_VS_OUT_ID)
   pos, params = vs.run(attrs [n, len(attributes), 4], cbs {buffer: float32 vec4 array}, vertex_ids)
+  ps = PixelProgram(gx2_pixel_file)       # a pixel program (tools/ult_to_latte.py's, as latte-asm writes it)
+  rgba_kept = ps.run(inputs [n, ninputs, 4], cbs, textures {slot: (rgba [h, w, 4], wrap_u, wrap_v)})
+                                          # [n, 5]: PIX0 and 1 kept / 0 killed (KILL*); SAMPLE / SAMPLE_L
+                                          # bilinear, as tools/mx_exec.py's sampler (one level: no LOD)
 
 One vertex at a time, the program's own control flow: R600 predication as a single lane (an active flag,
 a stack of saved flags): ALU_PUSH_BEFORE saves the flag and runs its clause, PRED_SET* with
@@ -23,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
@@ -207,8 +212,13 @@ def _alu_clause(info, lines):
             if base in ('DOT4', 'DOT4_IEEE'):
                 e, isf = 'd4', True
             else:
+                mk = re.fullmatch(r'KILL(E|NE|GT|GE)(_INT|_UINT)?', base)
                 m = re.fullmatch(r'PRED_SET(E|NE|GT|GE)(_INT|_UINT)?', base)
-                if m:
+                if mk:
+                    f = {'_INT': 'i', '_UINT': 'u'}.get(mk.group(2), 'f')
+                    body.append('if (%s.%s %s %s.%s) killed = true;' % (srcs[0], f, CMP[mk.group(1)], srcs[1], f))
+                    e, isf = 'Wu(0)', False
+                elif m:
                     f = {'_INT': 'i', '_UINT': 'u'}.get(m.group(2), 'f')
                     cond = '(%s.%s %s %s.%s)' % (srcs[0], f, CMP[m.group(1)], srcs[1], f)
                     body.append('bool pc_%s = %s;' % (slot, cond))
@@ -236,8 +246,30 @@ def _alu_clause(info, lines):
     return '\n'.join(out), pred
 
 
-def translate(text):
-    """C++ source of a vertex program (latte-dis text)"""
+SAMPLER = r'''
+struct Tex { int w, h; const float *rgba; int wrap_u, wrap_v; };
+static Tex g_tex[16];
+static inline int wrapi(int i, int n, int mode) {
+  if (mode == 1) { int p = 2 * n; i = ((i % p) + p) % p; return i < n ? i : p - 1 - i; }
+  if (mode == 2) return i < 0 ? 0 : i >= n ? n - 1 : i;
+  return ((i % n) + n) % n; }
+/* bilinear, the same as tools/mx_exec.py's texture(): a pixel program and Ultimate's sample alike */
+static void sample(int u, float s, float t, W *o) {
+  if (u < 0 || u >= 16 || !g_tex[u].rgba) { for (int c = 0; c < 4; c++) o[c] = Wf(1.0f); return; }
+  const Tex &T = g_tex[u];
+  float x = s * T.w - 0.5f, y = t * T.h - 0.5f; int x0 = (int)std::floor(x), y0 = (int)std::floor(y);
+  float fx = x - x0, fy = y - y0; float acc[4] = {0, 0, 0, 0};
+  for (int k = 0; k < 4; k++) {
+    int xi = wrapi(x0 + (k & 1), T.w, T.wrap_u), yi = wrapi(y0 + (k >> 1), T.h, T.wrap_v);
+    float wgt = ((k & 1) ? fx : 1 - fx) * ((k >> 1) ? fy : 1 - fy);
+    const float *p = T.rgba + 4 * (yi * T.w + xi);
+    for (int c = 0; c < 4; c++) acc[c] += wgt * p[c]; }
+  for (int c = 0; c < 4; c++) o[c] = Wf(acc[c]); }
+'''
+
+
+def translate(text, stage='vs'):
+    """C++ source of a vertex ('vs') or pixel ('ps') program (latte-dis text)"""
     cfs = _parse(text)
     code = []
     for idx, kind, info, lines in cfs:
@@ -262,6 +294,17 @@ def translate(text):
         elif kind == 'TEX':
             code.append('if (active) {')
             for line in lines:
+                ms = re.match(r'\s*\d+\s+(SAMPLE|SAMPLE_L|SAMPLE_LZ)\s+R(\d+)\.([xyzw01_]{4}),\s+R(\d+)\.([xyzw01_]{4}),\s+t(\d+),\s+s\d+', line)
+                if ms:
+                    _op, d, dsel, sr, ssel, t = ms.groups()
+                    code.append('{ W tv[4]; sample(%s, R[%s][%d].f, R[%s][%d].f, tv);' % (t, sr, CH.index(ssel[0]), sr, CH.index(ssel[1])))
+                    for i, c in enumerate(dsel):
+                        if c in CH:
+                            code.append('  R[%s][%d] = tv[%d];' % (d, i, CH.index(c)))
+                        elif c in '01':
+                            code.append('  R[%s][%d] = Wf(%s.0f);' % (d, i, c))
+                    code.append('}')
+                    continue
                 m = re.match(r'\s*\d+\s+FETCH\s+R(\d+)\.([xyzw01_]{4}),\s+R(\d+)\.([xyzw]),\s+b(\d+).*OFFSET\((\d+)\)', line)
                 if not m:
                     if line.strip():
@@ -285,9 +328,15 @@ def translate(text):
         elif kind == 'POP':
             code.append('sp -= %d; active = stk[sp];' % popn)
         elif kind in ('EXP', 'EXP_DONE'):
-            m = re.match(r'(POS|PARAM)(\d+),\s+R(\d+)\.([xyzw01_]{4})', info)
+            m = re.match(r'(POS|PARAM|PIX)(\d+),\s+R(\d+)\.([xyzw01_]{4})', info)
             if not m:
                 raise NotImplementedError(info)
+            if m.group(1) == 'PIX':
+                if m.group(2) == '0':
+                    for i, c in enumerate(m.group(4)):
+                        if c in CH:
+                            code.append('pix[%d] = R[%s][%d].f;' % (i, m.group(3), CH.index(c)))
+                continue
             dst = 'pos' if m.group(1) == 'POS' else 'par + 4 * %d' % int(m.group(2))
             if m.group(1) == 'POS' and m.group(2) != '0':
                 continue
@@ -299,6 +348,26 @@ def translate(text):
             raise NotImplementedError('CF ' + kind)
     labels = {int(x) for x in re.findall(r'goto cf(\d+)', '\n'.join(code))}
     body = '\n'.join(c if not re.fullmatch(r'cf(\d+):', c) or int(c[2:-1]) in labels else '' for c in code)
+    if stage == 'ps':
+        return HEAD + SAMPLER + r'''
+extern "C" void ps_run(int n, int na, const float *in, const W *const *cb, const float *const *tex, const int *texinfo,
+                       float *out) {
+  static W R[128][4];
+  for (int u = 0; u < 16; u++) { g_tex[u].rgba = tex[u]; g_tex[u].w = texinfo[4 * u]; g_tex[u].h = texinfo[4 * u + 1];
+    g_tex[u].wrap_u = texinfo[4 * u + 2]; g_tex[u].wrap_v = texinfo[4 * u + 3]; }
+  for (int i = 0; i < n; i++) {
+    memset(R, 0, sizeof R);
+    for (int k = 0; k < na; k++) for (int c = 0; c < 4; c++) R[k][c] = Wf(in[((size_t)i * na + k) * 4 + c]);
+    bool active = true, stk[64]; int sp = 0; (void)stk; (void)sp;
+    bool killed = false;
+    W pv[4] = {}, ps = {}; (void)pv; (void)ps;
+    float pix[4] = {0, 0, 0, 0};
+%s
+    for (int c = 0; c < 4; c++) out[5 * i + c] = pix[c];
+    out[5 * i + 4] = killed ? 0.0f : 1.0f;
+  }
+}
+''' % body
     return HEAD + r'''
 static const W zero4[4] = {};
 extern "C" void vs_run(int n, int na, const float *attr, const W *const *cb, const int *vid, float *outpos, float *outpar) {
@@ -308,6 +377,7 @@ extern "C" void vs_run(int n, int na, const float *attr, const W *const *cb, con
     R[0][0] = Wi(vid[i]);
     for (int k = 0; k < na; k++) for (int c = 0; c < 4; c++) R[k + 1][c] = Wf(attr[((size_t)i * na + k) * 4 + c]);
     bool active = true, stk[64]; int sp = 0; (void)stk; (void)sp;
+    bool killed = false; (void)killed;
     W pv[4] = {}, ps = {}; (void)pv; (void)ps;
     float *pos = outpos + 4 * (size_t)i, *par = outpar + (size_t)i * %d * 4;
 %s
@@ -366,3 +436,60 @@ class VertexProgram:
         f(ctypes.c_int(n), ctypes.c_int(attrs.shape[1] if attrs.ndim == 3 else 0), attrs.ctypes.data_as(ctypes.c_void_p),
           arr, vids.ctypes.data_as(ctypes.c_void_p), pos.ctypes.data_as(ctypes.c_void_p), par.ctypes.data_as(ctypes.c_void_p))
         return pos, par
+
+
+class PixelProgram:
+    """a pixel program (a GX2 pixel shader file, as latte-asm writes it) run per pixel on given inputs:
+    run(inputs [n, ninputs, 4] in input-GPR order, cbs {buffer: words}, textures {slot: (rgba [h, w, 4] float32,
+    wrap_u, wrap_v)}) -> [n, 5] (PIX0 rgba, 1 kept / 0 killed)"""
+
+    def __init__(self, gsh):
+        b = bytes(gsh)
+        self.text = ''
+        for t, _h, o, s in eft_vertex.gsh_blocks(b, 0):
+            if t == 7:
+                dis = os.path.join(HERE, 'latte_dis', 'latte-dis')
+                with tempfile.NamedTemporaryFile(suffix='.gsh', delete=False) as f:
+                    f.write(b)
+                try:
+                    self.text = subprocess.run([dis, f.name, str(o), str(s)], capture_output=True, text=True).stdout
+                finally:
+                    os.unlink(f.name)
+        src = translate(self.text, 'ps')
+        key = hashlib.sha1(src.encode()).hexdigest()[:20]
+        so = os.path.join(CACHE, 'ps_%s.so' % key)
+        if not os.path.exists(so):
+            os.makedirs(CACHE, exist_ok=True)
+            cpp = so[:-3] + '.cpp'
+            open(cpp, 'w').write(src)
+            r = subprocess.run(['g++', '-O1', '-w', '-shared', '-fPIC', '-o', so, cpp], capture_output=True, text=True)
+            if r.returncode:
+                raise RuntimeError('compiling %s: %s' % (cpp, r.stderr[:2000]))
+            os.unlink(cpp)
+        self.lib = ctypes.CDLL(so)
+
+    def run(self, inputs, cbs, textures):
+        inputs = np.ascontiguousarray(inputs, np.float32)
+        n = len(inputs)
+        keep = []
+        arr = (ctypes.c_void_p * NCB)()
+        for k in range(NCB):
+            a = np.zeros(CB_VEC4 * 4, np.uint32)
+            if k in cbs:
+                v = np.ascontiguousarray(cbs[k]).view(np.uint32).ravel()
+                a[:min(len(v), len(a))] = v[:len(a)]
+            keep.append(a)
+            arr[k] = a.ctypes.data
+        texp = (ctypes.c_void_p * 16)()
+        info = np.zeros(64, np.int32)
+        for u, (img, wu, wv) in textures.items():
+            img = np.ascontiguousarray(img, np.float32)
+            keep.append(img)
+            texp[u] = img.ctypes.data
+            info[4 * u:4 * u + 4] = (img.shape[1], img.shape[0], wu, wv)
+        out = np.zeros((n, 5), np.float32)
+        f = self.lib.ps_run
+        f.restype = None
+        f(ctypes.c_int(n), ctypes.c_int(inputs.shape[1]), inputs.ctypes.data_as(ctypes.c_void_p), arr, texp,
+          info.ctypes.data_as(ctypes.c_void_p), out.ctypes.data_as(ctypes.c_void_p))
+        return out

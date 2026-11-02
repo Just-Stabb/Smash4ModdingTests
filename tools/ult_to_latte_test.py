@@ -151,6 +151,71 @@ def test_program(prog, e, n, seed, keep=None, tag='', mode='identity'):
     return bad, nops, (p_u, p_l, o_u, o_l), low
 
 
+def test_pixel(prog, e, n, seed, keep=None, tag='', mode='identity'):
+    """a pixel program both ways: random inputs (UV-like ranges), random 16 x 16 textures on every unit it
+    samples (each wrap mode in turn), the emitter's baked buffers; equal when both keep or discard a pixel
+    and the kept ones' rgba agree"""
+    rng = np.random.default_rng(seed)
+    cbs = blocks(rng, e, 30.0)
+    consts = {k: [int(x) for x in np.asarray(v).view(np.uint32)] for k, v in cbs.items() if k not in (8, 10)}
+    consts[1] = [int(x) for x in np.frombuffer(prog.cdata or b'\0\0\0\0', np.uint32)]
+    eft = mode == 'eft'
+    # eft mode: frag0 clamped, display-encoded, premultiplied, x a random u_nwHdrRange (CB9 floats 32 - 35)
+    low = ult_to_latte.Lowering(prog.glsl, consts, encode='display' if eft else None, premultiply=eft).run()
+    text = low.text()
+    if keep:
+        open(os.path.join(keep, '%s.psh' % tag), 'w').write(text)
+    cb9 = np.zeros(64, np.float32)
+    cb9[32:36] = rng.uniform(0.5, 2, 4)
+    gsh = ult_to_latte.assemble(text, 'ps')
+    ps = latte_exec.PixelProgram(gsh)
+    h = ult_to_latte.ps_header(gsh)
+    want_smp = sorted({srcs[0] for op, _d, srcs in low.code if op in ult_to_latte.TEX_OPS})
+    locs = sorted(low.ins)
+    ins = np.zeros((n, 8, 4), np.float32)
+    ins[:, locs] = rng.uniform(-0.5, 1.5, (n, len(locs), 4))
+    tex = {}
+    for k, unit in enumerate(sorted(prog.samplers.values())):
+        tex[unit] = (rng.uniform(0, 1, (16, 16, 4)).astype(np.float32), k % 3, (k + 1) % 3)
+    o_u = prog.eval(ins, cbs, tex)
+    if eft:
+        rgb = np.clip(o_u[:, :3], 0, 1) ** np.float32(1 / 2.2) * o_u[:, 3:4]
+        o_u[:, :3] = rgb * cb9[32] + cb9[35]
+    o_l = ps.run(ins[:, locs], {1: cbs[8], 3: cbs[10], 9: cb9}, tex)
+    bad = []
+    if h['inputs'] != sorted(low.ins):
+        bad.append('header inputs %s' % h['inputs'])
+    if [(nm, loc) for nm, _t, loc in h['samplers']] != [('textureSampler%d' % t, t) for t in want_smp]:
+        bad.append('header samplers %s' % h['samplers'])
+    if bool(h['db_shader_control'] & 0x40) != low.kills:
+        bad.append('header KILL_ENABLE')
+    if eft and ('userUniformBlock', 9, 256) not in h['blocks']:
+        bad.append('header blocks %s' % h['blocks'])
+    if not (o_u[:, 4] == o_l[:, 4]).all():
+        bad.append('discard (%d pixels)' % int((o_u[:, 4] != o_l[:, 4]).sum()))
+    kept = (o_u[:, 4] == 1) & (o_l[:, 4] == 1)
+    if not close(o_u[kept, :4], o_l[kept, :4]).all():
+        bad.append('frag0')
+    return bad, len(low.code), (o_u, o_l), low
+
+
+def test_pair(eff, e, idx):
+    """the vertex and pixel programs of one emitter as eft will get them: every pixel input has a vertex output of
+    its semantic"""
+    rng = np.random.default_rng(0)
+    cbs = blocks(rng, e, 30.0)
+    consts = {k: [int(x) for x in np.asarray(v).view(np.uint32)] for k, v in cbs.items() if k not in (8, 10)}
+    vp, pp = mx_exec.Program(eff.vfxb, idx, 'vs'), mx_exec.Program(eff.vfxb, idx, 'ps')
+    names = {slot: name for name, slot in vp.inputs.items()}
+    cv, cp = dict(consts), dict(consts)
+    cv[1] = [int(x) for x in np.frombuffer(vp.cdata or b'\0\0\0\0', np.uint32)]
+    cp[1] = [int(x) for x in np.frombuffer(pp.cdata or b'\0\0\0\0', np.uint32)]
+    vs = ult_to_latte.assemble(ult_to_latte.lower(vp.glsl, cv, names, 'eft'), 'vs')
+    ps = ult_to_latte.assemble(ult_to_latte.lower(pp.glsl, cp, encode='display'), 'ps')
+    missing = set(ult_to_latte.ps_header(ps)['inputs']) - set(ult_to_latte.vs_semantics(vs))
+    return ['pixel inputs without a vertex output: %s' % sorted(missing)] if missing else [], len(vs) + len(ps)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
@@ -159,6 +224,7 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--keep', default='')
     ap.add_argument('--mode', default='identity', choices=('identity', 'eft'))
+    ap.add_argument('--stage', default='vs', choices=('vs', 'ps', 'pair'))
     a = ap.parse_args()
     import port_sources
     cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
@@ -171,14 +237,24 @@ def main():
             continue
         seen[idx] = True
         try:
-            prog = mx_exec.Program(eff.vfxb, idx, 'vs')
-            bad, nops, _r, _low = test_program(prog, e, a.n, a.seed, a.keep or None, 'vs_%d' % idx, a.mode)
+            if a.stage == 'pair':
+                bad, nops = test_pair(eff, e, idx)
+                sizes.append(nops)
+                if bad:
+                    fails.append(idx)
+                    print('pair %d %s: %s' % (idx, e['name'], ', '.join(bad)), flush=True)
+                continue
+            prog = mx_exec.Program(eff.vfxb, idx, a.stage)
+            if a.stage == 'ps':
+                bad, nops, _r, _low = test_pixel(prog, e, a.n, a.seed, a.keep or None, 'ps_%d' % idx, a.mode)
+            else:
+                bad, nops, _r, _low = test_program(prog, e, a.n, a.seed, a.keep or None, 'vs_%d' % idx, a.mode)
         except Exception as ex:  # noqa: BLE001
             bad, nops = ['error: %s' % str(ex).splitlines()[0][:200]], 0
         sizes.append(nops)
         if bad:
             fails.append(idx)
-            print('vs %d %s: %s' % (idx, e['name'], ', '.join(bad)), flush=True)
+            print('%s %d %s: %s' % (a.stage, idx, e['name'], ', '.join(bad)), flush=True)
     print('%d programs, %d pass, %d fail; Latte operations median %d, max %d'
           % (len(seen), len(seen) - len(fails), len(fails), int(np.median(sizes)) if sizes else 0, max(sizes or [0])))
     return 1 if fails else 0

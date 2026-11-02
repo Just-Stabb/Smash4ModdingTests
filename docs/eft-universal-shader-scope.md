@@ -1,6 +1,6 @@
 # Scope: one shader path for Ultimate effects on Smash 4 ("universal shader pair")
 
-Status: phases 0 and 1 done (vertex programs lowered and tested); phase 2 (pixel programs) next. Squirtle test 21
+Status: phases 0 - 2 done (vertex and pixel programs lowered and tested); phase 3 (converter integration) next. Squirtle test 21
 is still the converter's state in game: nothing from this path is in a package yet.
 
 ## The idea
@@ -192,6 +192,59 @@ Still open, for phase 3:
 - The z / x scale ratio per emitter.
 - Which eft colour stream sysVertexColor0Attr is (eft has v_inColor0 / 1).
 - The plugin attributes.
+
+## Phase 2 results (pixel lowering)
+
+The same tool and test cover pixel programs: `tools/ult_to_latte_test.py NAME --stage ps [--mode identity|eft]`,
+and `--stage pair` for the vertex / pixel linkage.
+
+**Squirtle: all 165 pixel programs pass.** Identity mode was run with 256 and 1024 random pixels. Each run uses
+random inputs in UV-like ranges and random 16 x 16 textures on every unit, cycling the wrap modes. A pixel passes
+when both sides keep or discard it and the kept ones' rgba agree. About half the pixels are discarded on the
+dissolving parts, and a perturbed c16 word fails the test. eft mode checks the output stage against the same
+transform applied in numpy. The assembled header is checked too: input semantics, sampler names and slots,
+`userUniformBlock`, KILL_ENABLE. **All 165 vertex / pixel pairs link:** every pixel input has a vertex output of
+its semantic. Size: pixel median 65 operations, max 106; an emitter's assembled pair is 13 KB median, 24 KB max
+(about 2.2 MB for Squirtle before deduplication; the scope guessed 1.2 MB).
+
+`tools/latte_exec.py` runs pixel programs now (`PixelProgram`): TEX clauses (SAMPLE / SAMPLE_L with the same
+bilinear sampler and wrap modes as `mx_exec`), KILL*, the PIX0 export.
+
+How it lowers:
+
+- **Structure.** A pixel program is straight-line `main()`: its register declarations are dropped and the
+  early `{ frag0 = ...; return; }` goes through the same return machinery as the vertex programs.
+- **Inputs.** They are in R0.. in location order, and their semantic is the location. The vertex side exports
+  PARAMn with that same semantic, so any pair links.
+- **gl_FragCoord.** Only its w is read, to take Maxwell's interpolation back to the perspective-correct value
+  (attribute x w x 1 / w). Latte's interpolators give that value directly, so w folds to 1, and so do the
+  multiplies by 1 it leaves.
+- **Textures.** A `texture()` / `textureLod()` call goes through c2's handle words (8 + 2u: unit u) to an eft
+  sampler slot, and becomes one SAMPLE / SAMPLE_L into a whole GPR, in its own TEX clause.
+  `textureQueryLod` (3 programs: the level clamped to 2 for `textureLod`) is 0: our textures have one level.
+  The samplers are named `textureSampler0-2` at locations 0 - 2, as eft's.
+- **discard** is KILLE_INT on the mask (killed where it is ~0), then the lanes are done as on a return.
+  latte-asm's grammar lists `KILLNE` before `KILLNE_INT`, so the _INT kinds of GT / GE / NE never parse.
+  The header gets `DB_SHADER_CONTROL.KILL_ENABLE`.
+- **Alpha test.** `mx_alpha_ok`, Ultimate's alpha test through a uniform, is not lowered: on Smash 4 it is
+  the emitter's render state.
+- **Output (eft mode).** Smash 4's framebuffer isn't linear, so frag0's rgb is clamped to 0 - 1 and then:
+  - display-encoded (x ^ (1 / 2.2), the converter's `display()`), or left linear (additive parts, as now);
+  - optionally x alpha (premultiplied templates);
+  - x u_nwHdrRange (`userUniformBlock`, CB9 floats 32 - 35: rgb x .x + .w), as eft's own pixel programs do.
+- **sRGB textures need no code.** eft's texture table has sRGB formats: eft codes 4 / 6 / 8 = GX2 0x431 /
+  0x432 / 0x433, and 355 vanilla effect textures use them. So Ultimate's sRGB textures keep an sRGB format, and
+  the sampler decodes them before filtering, as Switch's does. The program then sees exactly what Ultimate's
+  sees.
+
+For phase 3:
+
+- c16 (Ultimate's per-effect block: colour / alpha multipliers, 1539 reads) is baked to fx_render's defaults;
+  in game the script's colour and alpha should drive it.
+- c8 is read only by the 9 refraction programs (shader_type 1, not drawn); they would need eft's view block
+  bound to the pixel stage.
+- The converter has to write sRGB textures with the sRGB format codes, choose encode / premultiply per
+  emitter, and put the pair into the ptcl's shader table with key records.
 
 ## Unknowns to settle first (phase 0, as scoped)
 
