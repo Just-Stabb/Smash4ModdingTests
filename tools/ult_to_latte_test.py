@@ -22,6 +22,7 @@ sys.path.insert(0, HERE)
 import eft2_resolve  # noqa: E402
 import latte_exec  # noqa: E402
 import mx_exec  # noqa: E402
+import ult_shader  # noqa: E402
 import ult_to_latte  # noqa: E402
 import vfxb  # noqa: E402
 
@@ -30,6 +31,14 @@ import vfxb  # noqa: E402
 # differed by ~5e-4 relative, where the random view matrices cancel (z ~ 9e5); unfused they agree.
 mx_exec.SHIM = mx_exec.SHIM.replace('return std::fmaf(a, b, c);', 'volatile float p = a * b; return p + c;')
 assert 'volatile float p' in mx_exec.SHIM
+
+
+def all_emitters_of(eff, si):
+    def walk(es):
+        for e in es:
+            yield e
+            yield from walk(e.get('children', []))
+    yield from walk(eff.emitters(si))
 
 
 def all_emitters(eff):
@@ -62,9 +71,27 @@ def particles(rng, prog, n, time):
     return A
 
 
+def camera(rng):
+    """c8 as a camera makes it: an orthonormal view (turn + translation), a perspective projection, their
+    product, the billboard rows (the view's turn transposed), the eye; random 4 x 4s (phase 1's first runs)
+    are near singular and blow rounding up"""
+    c8 = np.zeros(80, np.float32)
+    q, _r = np.linalg.qr(rng.normal(size=(3, 3)))
+    view = np.eye(4)
+    view[:3, :3], view[:3, 3] = q, rng.uniform(-5, 5, 3) + (0, 0, -60)
+    f, near, far = 1 / np.tan(np.radians(rng.uniform(20, 40))), 1.0, 10000.0
+    proj = np.array([[f, 0, 0, 0], [0, f * 1.7, 0, 0], [0, 0, -(far + near) / (far - near), -2 * far * near / (far - near)],
+                     [0, 0, -1, 0]])
+    c8[0:16], c8[16:32], c8[32:48] = view.ravel(), proj.ravel(), (proj @ view).ravel()
+    c8[48:60] = np.c_[q.T, np.zeros(3)].ravel()
+    eye = -q.T @ view[:3, 3]
+    c8[64:67], c8[68:71] = q[2], eye
+    c8[72:76] = (near, far, near * far, far - near)
+    return c8
+
+
 def blocks(rng, e, time):
-    c8 = rng.uniform(-1, 1, 80).astype(np.float32)
-    c8[72:76] = (1.0, 10000.0, 10000.0, 9999.0)
+    c8 = camera(rng)
     c10 = rng.uniform(-1, 1, 48).astype(np.float32)
     c10[0:8] = rng.uniform(0, 1, 8)
     c10[8:12] = (time, 0, 0, 1.0)
@@ -86,24 +113,60 @@ def close(a, b):
     return ok
 
 
-def eft_inputs(prog, A, cbs, zratio):
-    """eft's streams and blocks for the same particles (the inverse of ult_to_latte.EFT_ATTRIBUTES / eft_cb);
-    Ultimate's side made consistent with what eft can carry (scale z = x x zratio, no plugin attributes)"""
+QUAD = np.array([[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]], np.float32)   # Ultimate's, vertex ids 0 - 3
+
+
+def frame(rng, n=None):
+    """3 x 4 rows (a turn x a scale 0.5 - 2, a translation): emitter matrices that invert well"""
+    shape = (n,) if n else ()
+    q, _r = np.linalg.qr(rng.normal(size=shape + (3, 3)))
+    m = q * rng.uniform(0.5, 2, shape + (1, 3))
+    return np.concatenate([m, rng.uniform(-10, 10, shape + (3, 1))], -1).astype(np.float32)
+
+
+def eft_inputs(prog, A, cbs, zratio, low, quad):
+    """eft's streams and blocks for the same particles (the inverse of ult_to_latte.EFT_ATTRIBUTES / eft_cb):
+    world places / velocities = the program's matrix (sysEmtMat or c10's) x local (+ translation); a quad's
+    corners as eft's (w 0) with Ultimate's texture coordinates and vertex ids from them. Ultimate's side made
+    consistent with what eft can carry (scale z = x x zratio, no plugin attributes)"""
     slot = prog.inputs
+    n = len(A)
     time = float(cbs[10][8])
-    g = lambda nm: A[:, slot[nm]] if nm in slot else np.zeros((len(A), 4), np.float32)
+    g = lambda nm: A[:, slot[nm]] if nm in slot else np.zeros((n, 4), np.float32)
     for nm in slot:
         if nm.startswith('sysEmitterPlugin'):
             A[:, slot[nm]] = 0
     if 'sysScaleAttr' in slot:
         A[:, slot['sysScaleAttr'], 2] = A[:, slot['sysScaleAttr'], 0] * np.float32(zratio)
+    corner = QUAD[np.arange(n) % 4]
+    if quad:
+        if 'sysNormalAttr' in slot:
+            A[:, slot['sysNormalAttr']] = (0, 0, 1, 0)
+        if 'sysPosAttr' in slot:
+            A[:, slot['sysPosAttr']] = np.c_[corner, np.zeros(n), np.ones(n)]
+        if 'sysTexCoordAttr' in slot:
+            uv = np.c_[corner[:, 0] + 0.5, 0.5 - corner[:, 1]]
+            A[:, slot['sysTexCoordAttr']] = np.c_[uv, uv]
+    elif 'sysPosAttr' in slot:
+        A[:, slot['sysPosAttr'], 3] = 1.0
+    if low.mat == 'attr':
+        M = np.stack([g('sysEmtMat%dAttr' % r) for r in range(3)], 1)                   # [n, 3, 4]
+    elif low.mat == 'c10':
+        M = np.broadcast_to(cbs[10][16:28].reshape(3, 4), (n, 3, 4))
+    else:
+        M = np.broadcast_to(np.c_[np.eye(3), np.zeros(3)].astype(np.float32), (n, 3, 4))
+    world = lambda v, t: np.einsum('nij,nj->ni', M[:, :, :3], v[:, :3]) + (M[:, :, 3] if t else 0)
     pos, vec, rnd, scl = g('sysLocalPosAttr'), g('sysLocalVecAttr'), g('sysRandomAttr'), g('sysScaleAttr')
-    st = {'v_inPos': g('sysPosAttr'), 'v_inTexCoord': g('sysTexCoordAttr'), 'v_inColor': g('sysVertexColor0Attr'),
-          'v_inWldPos': np.c_[pos[:, :3], np.float32(time) - vec[:, 3]],
-          'v_inVec': np.c_[vec[:, :3], rnd[:, 3]],
+    diff = g('sysLocalDiffAttr')
+    st = {'v_inPos': np.c_[corner, np.zeros((n, 2))] if quad else g('sysPosAttr'),
+          'v_inTexCoord': g('sysTexCoordAttr'), 'v_inColor': g('sysVertexColor0Attr'),
+          'v_inNormal': g('sysNormalAttr'),
+          'v_inColor0': g('sysColor0Attr'), 'v_inColor1': g('sysColor1Attr'),
+          'v_inWldPos': np.c_[world(pos, True), np.float32(time) - vec[:, 3]],
+          'v_inVec': np.c_[world(vec, False), rnd[:, 3]],
           'v_inRandom': np.c_[rnd[:, :3], pos[:, 3]],
-          'v_inScl': np.c_[scl[:, :2], np.zeros(len(A)), scl[:, 3]],
-          'v_inRot': g('sysInitRotateAttr'), 'v_inWldPosDf': g('sysLocalDiffAttr'),
+          'v_inScl': np.c_[scl[:, :2], np.zeros(n), scl[:, 3]],
+          'v_inRot': g('sysInitRotateAttr'), 'v_inWldPosDf': np.c_[world(diff, False), diff[:, 3]],
           'v_inEmtMat0': g('sysEmtMat0Attr'), 'v_inEmtMat1': g('sysEmtMat1Attr'), 'v_inEmtMat2': g('sysEmtMat2Attr')}
     c8 = cbs[8].copy()
     c8[74], c8[75] = c8[72] * c8[73], c8[73] - c8[72]
@@ -111,7 +174,11 @@ def eft_inputs(prog, A, cbs, zratio):
     cb1 = np.zeros(88, np.float32)
     cb1[:72] = c8[:72]
     cb1[80:82] = c8[72:74]
-    return st, {1: cb1, 3: cbs[10]}
+    return {k: v.astype(np.float32) for k, v in st.items()}, {1: cb1, 3: cbs[10]}
+
+
+def is_mesh(e):
+    return e['particle']['primitive_id'] != 0xFFFFFFFFFFFFFFFF
 
 
 def test_program(prog, e, n, seed, keep=None, tag='', mode='identity'):
@@ -119,15 +186,21 @@ def test_program(prog, e, n, seed, keep=None, tag='', mode='identity'):
     time = 30.0
     A = particles(rng, prog, n, time)
     cbs = blocks(rng, e, time)
+    if 'sysEmtMat0Attr' in prog.inputs:
+        F = frame(rng, n)
+        for r in range(3):
+            A[:, prog.inputs['sysEmtMat%dAttr' % r]] = F[:, r]
+    cbs[10][16:28] = frame(rng).ravel()
     zratio = float(rng.uniform(0.5, 2))
-    if mode == 'eft':
-        streams, s4cbs = eft_inputs(prog, A, cbs, zratio)
-    else:
-        s4cbs = {1: cbs[8], 3: cbs[10]}
+    quad = mode == 'eft' and not is_mesh(e)
     consts = {k: [int(x) for x in np.asarray(v).view(np.uint32)] for k, v in cbs.items() if k not in (8, 10)}
     consts[1] = [int(x) for x in np.frombuffer(prog.cdata or b'\0\0\0\0', np.uint32)]
     names = {slot: name for name, slot in prog.inputs.items()}
-    low = ult_to_latte.Lowering(prog.glsl, consts, names, mode, zratio).run()
+    low = ult_to_latte.Lowering(prog.glsl, consts, names, mode, zratio, quad=quad).run()
+    if mode == 'eft':
+        streams, s4cbs = eft_inputs(prog, A, cbs, zratio, low, quad)
+    else:
+        s4cbs = {1: cbs[8], 3: cbs[10]}
     text = low.text()
     if keep:
         open(os.path.join(keep, '%s.vsh' % tag), 'w').write(text)
@@ -157,11 +230,18 @@ def test_pixel(prog, e, n, seed, keep=None, tag='', mode='identity'):
     and the kept ones' rgba agree"""
     rng = np.random.default_rng(seed)
     cbs = blocks(rng, e, 30.0)
+    if mode == 'eft':
+        # c10 as a converted emitter's (ult_to_latte eft_cb with colours: alpha / call scale 1, the unmapped words 0)
+        c10 = cbs[10].copy()
+        c10[9:11], c10[12:16], c10[28:32], c10[44:] = 0, 1, 0, 0
+        cbs[10] = c10
     consts = {k: [int(x) for x in np.asarray(v).view(np.uint32)] for k, v in cbs.items() if k not in (8, 10)}
     consts[1] = [int(x) for x in np.frombuffer(prog.cdata or b'\0\0\0\0', np.uint32)]
     eft = mode == 'eft'
     # eft mode: frag0 clamped, display-encoded, premultiplied, x a random u_nwHdrRange (CB9 floats 32 - 35)
-    low = ult_to_latte.Lowering(prog.glsl, consts, encode='display' if eft else None, premultiply=eft).run()
+    smap = ult_shader.sampler_map(prog.samplers)
+    low = ult_to_latte.Lowering(prog.glsl, consts, mode=mode, encode='display' if eft else None, premultiply=eft,
+                                samplers=smap, colours=[1.0] * 8 if eft else None).run()
     text = low.text()
     if keep:
         open(os.path.join(keep, '%s.psh' % tag), 'w').write(text)
@@ -176,12 +256,20 @@ def test_pixel(prog, e, n, seed, keep=None, tag='', mode='identity'):
     ins[:, locs] = rng.uniform(-0.5, 1.5, (n, len(locs), 4))
     tex = {}
     for k, unit in enumerate(sorted(prog.samplers.values())):
-        tex[unit] = (rng.uniform(0, 1, (16, 16, 4)).astype(np.float32), k % 3, (k + 1) % 3)
+        if smap.get(unit) == 'far':
+            tex[unit] = (np.ones((1, 1, 4), np.float32), 0, 0)        # the depth texture as the lowering reads it
+        else:
+            tex[unit] = (rng.uniform(0, 1, (16, 16, 4)).astype(np.float32), k % 3, (k + 1) % 3)
     o_u = prog.eval(ins, cbs, tex)
     if eft:
         rgb = np.clip(o_u[:, :3], 0, 1) ** np.float32(1 / 2.2) * o_u[:, 3:4]
         o_u[:, :3] = rgb * cb9[32] + cb9[35]
-    o_l = ps.run(ins[:, locs], {1: cbs[8], 3: cbs[10], 9: cb9}, tex)
+    tex_l = {smap[u]: t for u, t in tex.items() if smap.get(u) != 'far'}
+    cb1 = cbs[8]
+    if eft:
+        cb1 = np.zeros(88, np.float32)               # eft's view block: vp (near, far) at 80 (eft_cb)
+        cb1[:72], cb1[80:82] = cbs[8][:72], cbs[8][72:74]
+    o_l = ps.run(ins[:, locs], {1: cb1, 3: cbs[10], 9: cb9}, tex_l)
     bad = []
     if h['inputs'] != sorted(low.ins):
         bad.append('header inputs %s' % h['inputs'])
@@ -211,7 +299,8 @@ def test_pair(eff, e, idx):
     cv[1] = [int(x) for x in np.frombuffer(vp.cdata or b'\0\0\0\0', np.uint32)]
     cp[1] = [int(x) for x in np.frombuffer(pp.cdata or b'\0\0\0\0', np.uint32)]
     vs = ult_to_latte.assemble(ult_to_latte.lower(vp.glsl, cv, names, 'eft'), 'vs')
-    ps = ult_to_latte.assemble(ult_to_latte.lower(pp.glsl, cp, encode='display'), 'ps')
+    ps = ult_to_latte.assemble(ult_to_latte.lower(pp.glsl, cp, encode='display',
+                                                  samplers=ult_shader.sampler_map(pp.samplers)), 'ps')
     missing = set(ult_to_latte.ps_header(ps)['inputs']) - set(ult_to_latte.vs_semantics(vs))
     return ['pixel inputs without a vertex output: %s' % sorted(missing)] if missing else [], len(vs) + len(ps)
 
@@ -225,16 +314,28 @@ def main():
     ap.add_argument('--keep', default='')
     ap.add_argument('--mode', default='identity', choices=('identity', 'eft'))
     ap.add_argument('--stage', default='vs', choices=('vs', 'ps', 'pair'))
+    ap.add_argument('--common', action='store_true', help="the common sets (ef_common.eff) his scripts use instead")
     a = ap.parse_args()
     import port_sources
     cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
-    eff = vfxb.Eff(port_sources.load().eff(cfg['ult']))
+    src = port_sources.load()
+    eff = vfxb.Eff(src.eff(cfg['ult']))
     only = {int(x) for x in a.only.split(',') if x}
+    emitters = list(all_emitters(eff))
+    if a.common:
+        # the common sets his scripts call (ef_common.eff): their programs instead
+        import ultimate_port
+        path = src.find('ult_effects', 'system/common/ef_common.eff') or src.get('ef_common')
+        eff = vfxb.Eff(path)
+        wanted = {v for v in ultimate_port.common_sets(cfg['effects'].get('common', []), path).values() if v}
+        emitters = [e for si, nm in enumerate(eff.sets) if nm in wanted for e in all_emitters_of(eff, si)]
     seen, fails, sizes = {}, [], []
-    for e in all_emitters(eff):
+    for e in emitters:
         idx = e['shader']['shader_index']
         if idx in seen or (only and idx not in only):
             continue
+        if e['combiner']['shader_type'] == 1:
+            continue                    # refraction: the converter keeps its own (Smash 4's distortion pass)
         seen[idx] = True
         try:
             if a.stage == 'pair':

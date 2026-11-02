@@ -119,6 +119,10 @@ TWO_TEXTURES = True     # two-texture templates (a second sampler drawn live: li
 DISSOLVE = True         # Ultimate's dissolve (dissolve_of)
 WRITE_FOLLOW = True     # Ultimate's follow type over the template's
 GRAFT = True            # vertex programs given slot 1's UV animation (tools/eft_vertex.py graft_uv1)
+# the universal shader path (docs/eft-universal-shader-scope.md): each emitter drawn by Ultimate's own vertex and
+# pixel programs lowered to Latte (tools/ult_shader.py), the rest of this converter's work (emission, motion,
+# life on eft's CPU) kept; an emitter whose programs don't lower keeps the shader converted here (the fallback)
+UNIVERSAL = True
 # a shader key's texture bytes (copied to the shader object at +0x47C, cross_f 0x04A5779C): 0x29 the
 # textures past the first (eft looks up textureSampler1 / 2 only for them: 5397 vanilla keys, all
 # matching their pixel samplers), 0x3B / 0x3C slot 0 / 1 a texture array
@@ -2481,6 +2485,76 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     return em
 
 
+_universal = {}
+
+
+def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
+    """the emitter drawn by Ultimate's own programs (UNIVERSAL): the shader tools/ult_shader.py builds under the
+    converted template's key record (its particle mode and streams), Ultimate's textures in the slots its pixel
+    program samples, and eft's CPU side left giving the programs what Ultimate's gives them: the particle's scale
+    as born (eft's scale curve flat: the curve is the program's), its rotation as born (no eft spin: the
+    program turns it), a mesh as Ultimate's (not pre-scaled or turned). False (notes say why) when it doesn't
+    lower: the converted shader stays"""
+    import hashlib
+    import ult_shader
+    if e['combiner']['shader_type'] == 1:
+        return False                        # refraction: Smash 4's distortion pass (the converted one)
+    pt, sc = e['particle'], e['scale']
+    quad = pt['primitive_id'] == NONE64
+    if not quad and pt['primitive_id'] not in prims:
+        return False
+    si_t = struct.unpack_from('>I', em, 0x844)[0]
+    zratio = float(sc['scale'][2]) / float(sc['scale'][0]) if sc['scale'][0] else 1.0
+    sh = e['shader']
+    ult_premult = (sh['custom_shader_index'], sh['custom_shader_flag'] & PREMULT_SHADER[1]) == PREMULT_SHADER
+    premult = eft_pixel.premultiplied(p, si_t) and not ult_premult
+    encode = 'display' if display_space(e) else 'linear'
+    try:
+        binary, info = ult_shader.build(vfxb_bytes, e, quad, zratio, encode, premult)
+        for slot in info['samplers']:
+            if e['sampler'][slot]['texture_id'] not in images:
+                raise RuntimeError('texture %d not decoded' % slot)
+    except Exception as ex:                 # noqa: BLE001 (any program the lowering can't take: the fallback)
+        notes.append('universal shader: not lowered (%s): converted shader kept' % str(ex).splitlines()[0][:100])
+        return False
+    entry = bytearray(p.shader_entry(si_t))
+    entry[KEY_TEXTURES], entry[KEY_ARRAY1] = max(info['samplers'] or [0]), 0
+    key = (id(p), hashlib.md5(binary + bytes(entry)).hexdigest())
+    if key not in _universal:
+        _universal[key] = p.add_shader(bytes(entry), binary)
+    struct.pack_into('>I', em, 0x844, _universal[key])
+    for slot in info['samplers']:
+        smp = e['sampler'][slot]
+        img = np.asarray(images[smp['texture_id']], np.uint8)
+        p.set_texture(em, slot, img, 0x433 if smp['texture_id'] in SRGB_TEXTURES else 0x33, comp_sel=0x00010203)
+        set_wrap(em, slot, smp['wrap_u'], smp['wrap_v'])
+    p.set_field(em, 'scale', [float(sc['scale'][0]), float(sc['scale'][1])])
+    p.set_field(em, 'scale_init_ratio', [1.0, 1.0])
+    p.set_field(em, 'scale_diff21', [0.0, 0.0])
+    p.set_field(em, 'scale_diff32', [0.0, 0.0])
+    # the particle's rotation as Ultimate's sysInitRotateAttr: rotate_init on its is_rotate axes, nothing more (the
+    # random turn and the spin are the program's, from its random values and c9: eft's random on top stood
+    # up smash's flat ring1 up, -2 rad about Z)
+    on = np.array([float(bool(v)) for v in pt['is_rotate'][:3]])
+    p.set_field(em, 'rotation_init', [float(v) for v in np.array(e['static']['rotate_init'][:3], float) * on])
+    p.set_field(em, 'rotation_random', [0.0] * 3)
+    p.set_field(em, 'rotation_velocity', [0.0] * 3)
+    p.set_field(em, 'rotation_velocity_random', [0.0] * 3)
+    if not quad:
+        mkey = ('ult', pt['primitive_id'])
+        if mkey not in prim_index:
+            pos, nrm, col, uv, idx = mesh(prims[pt['primitive_id']], 0)
+            nrm = face_normals(pos, idx).astype(np.float32) if nrm is None else nrm
+            col = np.ones((len(pos), 4), np.float32) if col is None else col
+            prim_index[mkey] = p.add_primitive(pos, nrm, col, uv, idx)
+        struct.pack_into('>i', em, 0x2DC, prim_index[mkey])
+    notes.append('universal shader: Ultimate\'s programs (vertex %d, pixel %d operations; textures %s%s; %s%s)' % (
+        info['vs_ops'], info['ps_ops'], ', '.join(str(s_) for s_ in info['samplers']) or 'none',
+        ' sRGB' if any(e['sampler'][s_]['texture_id'] in SRGB_TEXTURES for s_ in info['samplers']) else '',
+        encode, ', premultiplied' if premult else '') + (', depth fade off (no depth texture)' if info['depth'] else ''))
+    return True
+
+
 def dist_emission(e):
     """[(frame, particles)] eft2's distance emission gives this emitter along its own translation
     animation (EAET), frame by frame from the effect's start, or None (off, or no path of its own: the
@@ -2913,6 +2987,10 @@ def main():
     ap.add_argument('--no-dissolve', action='store_true', help="no dissolve (Ultimate's custom shader 8)")
     ap.add_argument('--keep-follow', action='store_true', help="keep each template's follow type (not Ultimate's)")
     ap.add_argument('--no-graft', action='store_true', help='no vertex program grafts (one-texture templates stay so)')
+    ap.add_argument('--no-universal', action='store_true', help="no universal shader path: every emitter drawn by the "
+                    "shader converted here (the fallback), not Ultimate's own programs lowered (tools/ult_shader.py)")
+    ap.add_argument('--no-universal-for', default='', help='comma-separated EFFECT or EFFECT/EMITTER (Ultimate names): '
+                    'the converted shader for them, not the universal one')
     ap.add_argument('--no-graft-for', default='', help='comma-separated EFFECT or EFFECT/EMITTER (Ultimate names): no '
                     'grafted templates for them (A / B tests)')
     ap.add_argument('--hdr-white-for', default='', help='as --no-graft-for: their HDR colours (past 1) whitened '
@@ -2953,7 +3031,8 @@ def main():
     ap.add_argument('--no-linear', action='store_true', help="Ultimate's linear colours as they are (not "
                     "display-encoded: LINEAR_DISPLAY)")
     a = ap.parse_args()
-    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT, LINEAR_DISPLAY, REFRACTION
+    global EXACT, TWO_TEXTURES, DISSOLVE, WRITE_FOLLOW, GRAFT, LINEAR_DISPLAY, REFRACTION, UNIVERSAL
+    UNIVERSAL = not a.no_universal
     LINEAR_DISPLAY = not a.no_linear
     EXACT = not a.no_exact
     TWO_TEXTURES = not a.no_two
@@ -2973,6 +3052,7 @@ def main():
         ef.entries[i][1:] = [0, 0, 0, 0]    # no emitter set, model or meshes (403 vanilla entries)
     templates = Templates(p, a.templates)
     no_graft = set(v for v in a.no_graft_for.split(',') if v)
+    no_universal = set(v for v in a.no_universal_for.split(',') if v)
     white1 = set(v for v in a.test_white1_for.split(',') if v)
     hdr_white = set(v for v in a.hdr_white_for.split(',') if v)
     upright = set(v for v in a.upright_for.split(',') if v)
@@ -3033,6 +3113,8 @@ def main():
                     notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
                 em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
                 key = '%s/%s' % (name, e['name'])
+                if em is not None and UNIVERSAL and name not in no_universal and key not in no_universal:
+                    universal_shader(p, em, e, eff.vfxb, images, prims, prim_index, notes)
                 if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
                     tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
                 if em is not None and tex_for.get(key) in ('private', 'rgba'):

@@ -1,6 +1,7 @@
 # Scope: one shader path for Ultimate effects on Smash 4 ("universal shader pair")
 
-Status: phases 0 - 2 done (vertex and pixel programs lowered and tested); phase 3 (converter integration) next. Squirtle test 21
+Status: phases 0 - 2 done; phase 3 (converter integration) under way: the converter puts Ultimate's own programs on
+every emitter they lower for (the old path the fallback), fx_render draws them, the render comparison is in progress. Squirtle test 21
 is still the converter's state in game: nothing from this path is in a package yet.
 
 ## The idea
@@ -245,6 +246,74 @@ For phase 3:
   bound to the pixel stage.
 - The converter has to write sRGB textures with the sRGB format codes, choose encode / premultiply per
   emitter, and put the pair into the ptcl's shader table with key records.
+
+## Phase 3 (converter integration): state
+
+**The converter.**
+- `tools/ult_shader.py` builds an emitter's shader:
+  - Ultimate's vertex and pixel programs lowered in eft mode;
+  - put together as one GX2 file (header, vertex blocks 3 / 5, pixel blocks 6 / 7, end), as the ptcl's vanilla
+    binaries are.
+- `vfxb_to_ptcl.universal_shader` runs after the usual conversion. It adds that shader under the converted
+  template's key record, which keeps the template's particle mode and its streams.
+  - The key's texture count is the highest sampled slot.
+  - `UNIVERSAL` is on by default; `--no-universal` turns it off, `--no-universal-for EFFECT[/EMITTER]` per part.
+- An emitter whose programs don't lower keeps the shader converted the old way (the fallback); its notes say
+  why. Refraction parts (shader_type 1) and child emitters keep it too.
+
+**eft's CPU side is set so the programs see what Ultimate's give them:**
+- Scale: the base scale is Ultimate's, and eft's scale curve is flat (the curve is the program's).
+- Rotation: no eft spin; the program turns the particle.
+- Meshes: Ultimate's raw mesh (both UV sets), not pre-scaled or turned.
+- Textures: Ultimate's own textures in the slots the pixel program samples, with their wrap modes. An sRGB
+  texture gets eft's sRGB BC3 format (code 8, GX2 0x433; `ptcl.py` now knows the sRGB formats).
+- Colours: c10's colours are the emitter's colour 0 / 1 x eft's emc0 / emc1. c10[12 - 15] (the call's alpha and
+  scale) are 1, since eft's v_inScl carries the call's scale already. The rest of c10 maps per `eft_cb`.
+
+**The prologue (eft mode) builds Ultimate's particle from eft's:**
+- *Space.* eft's CPU particles are in the world: a vanilla CPU program (shader 10) ignores a translated
+  v_inEmtMat. Ultimate's are in their emitter's space. Position, velocity and last movement are taken back through
+  the inverse of the matrix the program applies: `M^-1 = [b x c | c x a | a x b] / det`, computed once a vertex.
+- *Which matrix.* `ult_shader.probe_matrix` runs Ultimate's program with each candidate's translation moved:
+  sysEmtMat0-2 (72 of Squirtle's), c10's live emitter matrix (87), or none (6, which read c10 but keep world
+  positions; the static guess from what a program reads got these wrong).
+- *Quads.* eft's quad (corners -+0.5, w 0, no UVs, no normal) gives Ultimate's w 1, UV (x + 0.5, 0.5 - y), normal +Z,
+  and its vertex id from the corner (Ultimate's order: 0 (-.5, .5), 1 (.5, .5), 2 (.5, -.5), 3 (-.5, -.5)).
+- *Normals.* Meshes read `v_inNormal` (sysNormalAttr: the arcs' fresnel).
+
+**Depth and framebuffer.** `sysDepthBufferTexture` (soft particles' fade near the scene, in 83 common programs)
+reads as the far plane: eft's pixel stage has no depth texture, so these parts don't fade where they touch the
+scene. `sysFrameBufferTexture` is refraction (kept on the fallback).
+
+**Found by the common sets (ef_common.eff, `--common`: 166 programs Squirtle's scripts call).** Phases 1 - 2 ran on
+Squirtle's own bank only.
+- latte-asm takes absolute values as `|R1|.x` (bars round the value, swizzle after), not `|R1.x|`.
+- sin / cos of big arguments: a plain `fract(x / 2pi)` lost the angle's low bits (an arc program's cos off by
+  2e-3). It is now a Cody-Waite reduction with 2pi in two parts.
+- The test's random 4 x 4 view matrices were near singular (1e-3 off at z 2500). The test now builds a camera:
+  orthonormal view, perspective, their product.
+
+**Found by fx_render.**
+- An eft-mode pixel program read its inputs through the vertex attribute table: all zeros, every pixel discarded.
+  The phase-2 eft test had built its pixel programs in identity mode; it now really runs them in eft mode.
+- fx_render took a universal program reading `v_inVec` for an eft GPU one and fed it birth-time values. Its
+  particles are eft CPU ones: `fx_render.is_universal` (a vertex program without emitterStaticUniformBlock: 1936
+  of 1936 vanilla programs read it) tells them apart. Universal pixel programs run in `latte_exec.PixelProgram`
+  (`fx_render.UniversalPixel`), their sRGB slots decoded before filtering.
+- `fx_render` against Ultimate's own particles fed through eft's stream layout: all 10 of up smash's universal
+  emitters' vertex outputs match Ultimate's program, so the mapping holds. What is left is the eft-side
+  simulation (velocity, spin) and the pixel stage.
+
+**port_check E6** (universal-link, universal-texture): every pixel input has a vertex output; every sampled slot
+holds a texture. E4 / E5 (eft's type-4 programs' framing) skip universal emitters, which frame their meshes with
+Ultimate's program.
+
+**Still open.**
+- c16 and the call's colour / alpha (c10[12], c16) at defaults.
+- c10[13 - 15]: the call's scale assumed in v_inScl.
+- Child emitters on the fallback.
+- Soft-particle fade.
+- Quads drawn by vertex id assume Ultimate's corner order; checked by the renders, not the game.
 
 ## Unknowns to settle first (phase 0, as scoped)
 

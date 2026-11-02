@@ -421,12 +421,19 @@ def _v(name):
 # docs/fx-render-eft2.md): a (stream, component), 'birth' (time - v_inWldPos.w, the age eft keeps), 'scale_z'
 # (v_inScl.x x the emitter's z / x ratio: eft's streams have x and y only), or None (0)
 EFT_ATTRIBUTES = {
-    'sysPosAttr': _v('v_inPos'),
-    'sysTexCoordAttr': _v('v_inTexCoord'),
+    'sysPosAttr': [('v_inPos', 0), ('v_inPos', 1), ('v_inPos', 2), 'one'],      # eft's quad corners have w 0
+    'sysTexCoordAttr': ['tex0', 'tex1', 'tex2', 'tex3'],      # a mesh's v_inTexCoord; a quad's from its corner
     'sysVertexColor0Attr': _v('v_inColor'),
-    'sysLocalPosAttr': [('v_inWldPos', 0), ('v_inWldPos', 1), ('v_inWldPos', 2), ('v_inRandom', 3)],   # w life
-    'sysLocalVecAttr': [('v_inVec', 0), ('v_inVec', 1), ('v_inVec', 2), 'birth'],
-    'sysLocalDiffAttr': _v('v_inWldPosDf'),
+    'sysNormalAttr': ['nrm0', 'nrm1', 'nrm2', 'nrm3'],        # a mesh's v_inNormal; eft's quad has none: +Z
+    # a particle's own colour (Ultimate's CPU keeps it for some, the bubbles' ends): eft's CPU colour streams, its
+    # colour tracks as the converter wrote them
+    'sysColor0Attr': _v('v_inColor0'),
+    'sysColor1Attr': _v('v_inColor1'),
+    # eft's CPU particles are in the world (v_inWldPos, v_inVec, v_inWldPosDf), Ultimate's in their emitter's
+    # space, the program applying the matrix: taken back through its inverse (local())
+    'sysLocalPosAttr': ['lpos0', 'lpos1', 'lpos2', ('v_inRandom', 3)],                    # w life
+    'sysLocalVecAttr': ['lvec0', 'lvec1', 'lvec2', 'birth'],
+    'sysLocalDiffAttr': ['ldiff0', 'ldiff1', 'ldiff2', ('v_inWldPosDf', 3)],
     'sysScaleAttr': [('v_inScl', 0), ('v_inScl', 1), 'scale_z', ('v_inScl', 3)],
     'sysRandomAttr': [('v_inRandom', 0), ('v_inRandom', 1), ('v_inRandom', 2), ('v_inVec', 3)],    # w: eft's
     'sysInitRotateAttr': _v('v_inRot'),                                                             # own random
@@ -436,30 +443,53 @@ EFT_ATTRIBUTES = {
 }
 
 
-def _spec_streams(spec):
+def _spec_streams(spec, quad=False, mat=None):
     if isinstance(spec, tuple):
         return [spec[0]]
+    if spec is None or spec == 'one':
+        return []
+    if spec.startswith('tex'):
+        return ['v_inPos'] if quad else ['v_inTexCoord']
+    if spec.startswith('nrm'):
+        return [] if quad else ['v_inNormal']
+    if spec[:4] in ('lpos', 'lvec', 'ldif'):
+        src = {'lpos': 'v_inWldPos', 'lvec': 'v_inVec', 'ldif': 'v_inWldPosDf'}[spec[:4]]
+        return [src] + (['v_inEmtMat0', 'v_inEmtMat1', 'v_inEmtMat2'] if mat == 'attr' else [])
     return {'birth': ['v_inWldPos'], 'scale_z': ['v_inScl']}.get(spec, [])
 
 
 # ------------------------------------------------------------------ lowering
 class Lowering:
     def __init__(self, glsl, consts, attrib_names=None, mode='identity', zratio=1.0, table_entries=TABLE_ENTRIES,
-                 samplers=None, encode=None, premultiply=False):
+                 samplers=None, encode=None, premultiply=False, quad=False, mat='auto', colours=None):
         """consts {buffer: words} the baked buffers; attrib_names {location: Ultimate attribute name} (the
         program's reflection); mode 'identity' (c8 / c10 as constant buffers 1 / 3 word for word, the attributes
         as Ultimate names them) or 'eft' (eft's own blocks and particle streams: EFT_ATTRIBUTES, eft_cb);
         zratio the emitter's z / x particle scale (eft's streams carry x and y only).
         Pixel programs: samplers {Ultimate texture unit: eft slot} (default the same); encode None (frag0 as
         Ultimate writes it, linear), 'display' (rgb clamped and encoded x ^ (1 / 2.2)) or 'linear' (clamped);
-        either then x u_nwHdrRange (CB9 [8]: rgb x .x + .w) as eft's own pixel programs; premultiply rgb x a"""
+        either then x u_nwHdrRange (CB9 [8]: rgb x .x + .w) as eft's own pixel programs; premultiply rgb x a.
+        quad (eft mode): the particle is eft's quad (corners -+0.5, w 0, no texture coordinates), not a mesh.
+        mat: the matrix the program applies to its particles ('attr' sysEmtMat0-2, 'c10' the live emitter
+        matrix, None; 'auto' guessed from what it reads; tools/ult_shader.py probes it). colours (eft mode): the
+        emitter's colour 0 / 1 (8 floats); given, c10 is eft's for a converted emitter (eft_cb)"""
         self.consts = {k: list(v) for k, v in consts.items()}
         self.cbmap = {8: 1, 10: 3}
         self.mode, self.zratio = mode, zratio
         self.table_entries = table_entries
         self.stage, self.ins, self.outs, self.body = parse_program(glsl)
         self.samplers = samplers or {}
-        self.encode, self.premultiply = encode, premultiply
+        self.encode, self.premultiply, self.quad = encode, premultiply, quad
+        # the matrix this program takes its particles out of their emitter's space with: sysEmtMat0-2 (a CPU
+        # particle's, as born or live) when it reads them, else c10's live emitter matrix (rows 16 - 27)
+        self.colours = colours
+        self.mat = None if mat == 'auto' else mat
+        if mat != 'auto':
+            pass
+        elif any(re.fullmatch(r'sysEmtMat\dAttr', (attrib_names or {}).get(loc, '')) for loc in self.ins):
+            self.mat = 'attr'
+        elif re.search(r'\bc10\[(1[6-9]|2[0-7])u\]', glsl):
+            self.mat = 'c10'
         self.attrib_names = {loc: (attrib_names or {}).get(loc, 'in_attr%d' % loc) for loc in self.ins}
         if self.stage == 'ps':
             self.hw_attrs = ['in_attr%d' % loc for loc in sorted(self.ins)]
@@ -467,9 +497,11 @@ class Lowering:
             need = []
             for loc in sorted(self.ins):
                 for spec in EFT_ATTRIBUTES.get(self.attrib_names[loc], [None] * 4):
-                    for nm in _spec_streams(spec):
+                    for nm in _spec_streams(spec, quad, self.mat):
                         if nm not in need:
                             need.append(nm)
+            if quad and re.search(r'\bgl_VertexID\b', glsl) and 'v_inPos' not in need:
+                need.append('v_inPos')                      # the vertex id from the corner (vertex_id())
             self.hw_attrs = need
         else:
             self.hw_attrs = [self.attrib_names[loc] for loc in sorted(self.ins)]
@@ -628,6 +660,8 @@ class Lowering:
             if name in ('true', 'false'):
                 return (L(ONES if name == 'true' else 0), 'bool')
             if name == 'gl_VertexID':
+                if self.mode == 'eft' and self.quad:
+                    return (self.vertex_id(), 'int')
                 return (Opd('reg', ('h', 0)), 'int')
             return self.read(name)
         if k == 'index':
@@ -751,6 +785,8 @@ class Lowering:
             raise NotImplementedError('texture handle ' + repr(args[0]))
         unit = (self.lit(self.ex(h[2])[0]) - 8) // 2       # c2 words 8 + 2u: texture unit u (tools/mx_exec.py)
         slot = self.samplers.get(unit, unit)
+        if slot == 'far':
+            return ([L(0x3F800000)] * 4, 'vec4')            # a depth texture read as the far plane (1)
         uv = args[1]
         if not (uv[0] == 'call' and uv[1] == 'vec2'):
             raise NotImplementedError('coordinates ' + repr(uv))
@@ -793,9 +829,13 @@ class Lowering:
             return (self.emit(un[fn], [self.conv(self.ex(args[0]), 'float')]), 'float')
         if fn in ('sin', 'cos'):
             x = self.conv(self.ex(args[0]), 'float')
-            # turns, reduced to [-0.5, 0.5): SIN / COS take turns
-            t = self.emit('MULADD_IEEE', [x, L(u32(1 / (2 * math.pi))), L(0x3F000000)])
-            t = self.emit('ADD', [self.emit('FRACT', [t]), L(0xBF000000)])
+            # turns in [-0.5, 0.5] (SIN / COS take turns): k = floor(x / 2pi + 0.5), r = x - k 2pi with 2pi in two
+            # parts (Cody-Waite: 6.28125 exact in a few bits, the rest small), r / 2pi. A single x / 2pi + fract
+            # lost the angle's low bits on big arguments (an arc program's cos of ~1e3 off by 2e-3)
+            k = self.emit('FLOOR', [self.emit('MULADD_IEEE', [x, L(u32(1 / (2 * math.pi))), L(0x3F000000)])])
+            r = self.emit('MULADD_IEEE', [k, L(u32(-6.28125)), x])
+            r = self.emit('MULADD_IEEE', [k, L(u32(-(2 * math.pi - 6.28125))), r])
+            t = self.emit('MUL_IEEE', [r, L(u32(1 / (2 * math.pi)))])
             return (self.emit('SIN' if fn == 'sin' else 'COS', [t]), 'float')
         if fn == 'isnan':
             x = self.conv(self.ex(args[0]), 'float')
@@ -852,8 +892,8 @@ class Lowering:
     def attr(self, loc, c):
         """component c of Ultimate's attribute at location loc"""
         name = self.attrib_names[loc]
-        if self.mode != 'eft':
-            return self.hw(name, c)
+        if self.mode != 'eft' or self.stage == 'ps':
+            return self.hw(name, c)              # (a pixel program's inputs are the vertex program's outputs)
         spec = EFT_ATTRIBUTES.get(name, [None] * 4)[c]
         if spec is None:
             return L(0)
@@ -863,7 +903,68 @@ class Lowering:
             return self.once('birth', lambda: self.emit('ADD', [Opd('kc', (3, 8)), self.hw('v_inWldPos', 3).negated()]))
         if spec == 'scale_z':
             return self.once('scale_z', lambda: self.emit('MUL_IEEE', [self.hw('v_inScl', 0), L(u32(self.zratio))]))
+        if spec == 'one':
+            return L(0x3F800000)
+        if spec.startswith('tex'):
+            k = int(spec[3:])
+            if not self.quad:
+                return self.hw('v_inTexCoord', k)
+            # Ultimate's quad: corner (x, y) has UV (x + 0.5, 0.5 - y), both UV sets
+            if k % 2 == 0:
+                return self.once('qu', lambda: self.emit('ADD', [self.hw('v_inPos', 0), L(0x3F000000)]))
+            return self.once('qv', lambda: self.emit('ADD', [self.hw('v_inPos', 1).negated(), L(0x3F000000)]))
+        if spec.startswith('nrm'):
+            k = int(spec[3:])
+            return L(0x3F800000 if k == 2 else 0) if self.quad else self.hw('v_inNormal', k)
+        if spec[:4] in ('lpos', 'lvec', 'ldif'):
+            return self.local(spec[:4], int(spec[-1]))
         raise NotImplementedError(spec)
+
+    def vertex_id(self):
+        """Ultimate's quad vertex id (its corners 0 (-.5, .5), 1 (.5, .5), 2 (.5, -.5), 3 (-.5, -.5)) of eft's corner"""
+        def make():
+            sx = self.emit('SETGT_DX10', [self.hw('v_inPos', 0), L(0)])
+            sy = self.emit('SETGT_DX10', [self.hw('v_inPos', 1), L(0)])
+            # CNDE_INT c, a, b = c == 0 ? a : b: y below 0 -> 3 / 2, else 0 / 1; x below 0 -> the left one
+            left, right = self.emit('CNDE_INT', [sy, L(3), L(0)]), self.emit('CNDE_INT', [sy, L(2), L(1)])
+            return self.emit('CNDE_INT', [sx, left, right])
+        return self.once('vid', make)
+
+    def matrix_rows(self):
+        """the three rows (xyz, w the translation) of the matrix the program applies"""
+        if self.mat == 'attr':
+            return [[self.hw('v_inEmtMat%d' % r, c) for c in range(4)] for r in range(3)]
+        return [[Opd('kc', (3, 16 + 4 * r + c)) for c in range(4)] for r in range(3)]
+
+    def local(self, kind, c):
+        """component c of a world position ('lpos': less the translation), velocity ('lvec') or last movement
+        ('ldif') in the emitter's space: M^-1 = [b x c | c x a | a x b] / det, M's rows a, b, c"""
+        src = {'lpos': 'v_inWldPos', 'lvec': 'v_inVec', 'ldif': 'v_inWldPosDf'}[kind]
+        if self.mat is None:
+            return self.hw(src, c)
+        R = self.matrix_rows()
+
+        def cross(i, j, k):
+            u, v = R[i], R[j]
+            return self.once('x%d%d%d' % (i, j, k), lambda: self.emit('MULADD_IEEE', [
+                u[(k + 1) % 3], v[(k + 2) % 3], self.emit('MUL_IEEE', [u[(k + 2) % 3], v[(k + 1) % 3]]).negated()]))
+
+        def inv_det():
+            det = self.emit('MUL_IEEE', [R[0][0], cross(1, 2, 0)])
+            det = self.emit('MULADD_IEEE', [R[0][1], cross(1, 2, 1), det])
+            det = self.emit('MULADD_IEEE', [R[0][2], cross(1, 2, 2), det])
+            return self.emit('RECIP_IEEE', [det])
+
+        def make():
+            idet = self.once('idet', inv_det)
+            d = [self.hw(src, k) if kind != 'lpos' else
+                 self.once('d%d' % k, lambda k=k: self.emit('ADD', [self.hw(src, k), R[k][3].negated()])) for k in range(3)]
+            cols = [(1, 2), (2, 0), (0, 1)]          # b x c, c x a, a x b
+            acc = self.emit('MUL_IEEE', [cross(*cols[0], c), d[0]])
+            acc = self.emit('MULADD_IEEE', [cross(*cols[1], c), d[1], acc])
+            acc = self.emit('MULADD_IEEE', [cross(*cols[2], c), d[2], acc])
+            return self.emit('MUL_IEEE', [acc, idet])
+        return self.once('%s%d' % (kind, c), make)
 
     def cbread(self, cb, idx):
         if cb in self.cbmap:
@@ -892,6 +993,18 @@ class Lowering:
             if w == 74:
                 return self.once('nf', lambda: self.emit('MUL_IEEE', [near, far]))
             return self.once('fmn', lambda: self.emit('ADD', [far, near.negated()]))
+        if cb == 10 and self.colours is not None:
+            # a converted emitter's c10 (fx_render's Ultimate side feeds the same): colours 0 / 1 = the
+            # emitter's x eft's emc0 / emc1 (the set's and the call's colours); time 8 and step 11 = emp0.x / w;
+            # alpha 12 and the call's scale 13 - 15 = 1 (eft's v_inScl carries the call's scale already); the
+            # emitter matrix 16 - 27 and its rotation 32 - 43 = emm / emmrt; the rest 0
+            if w < 8:
+                return self.once('col%d' % w, lambda: self.emit('MUL_IEEE', [L(u32(self.colours[w])), Opd('kc', (3, w))]))
+            if w in (8, 11) or 16 <= w < 28 or 32 <= w < 44:
+                return Opd('kc', (3, w))
+            if 12 <= w < 16:
+                return L(0x3F800000)
+            return L(0)
         return Opd('kc', (self.cbmap[cb], w))
 
     def table_read(self, cb, idx, data):
@@ -1162,7 +1275,9 @@ class Lowering:
                 cb, w = o.v
                 t = 'KC%d[%d].%s' % (banks[cb], w // 4, CH[w % 4])
             if o.abs:
-                t = '|%s|' % t
+                # latte-asm's grammar: the bars round the value, the swizzle after (|R1|.x)
+                v, _dot, c = t.rpartition('.')
+                t = '|%s|.%s' % (v, c)
             if o.neg:
                 t = '-' + t
             return t

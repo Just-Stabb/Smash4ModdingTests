@@ -184,6 +184,7 @@ class Emitter:
     air = 1.0
     size = (1.0, 1.0)
     size_random = 0.0
+    size_random_y = None      # Smash 4's Y random when it isn't X's (eft draws its own then)
     size_curve = None         # t -> (sx, sy) multipliers
     alpha_curve = None        # t -> alpha
     colour_curve = None       # t -> rgb
@@ -272,6 +273,10 @@ def simulate(em, call, frames, seed=1, births_only=False):
             v = outward * a(15, em.all_dir) + d * a(16, em.dir_speed)
             v = v * (1 - em.vel_random * rng.uniform())
             sr = 1 - em.size_random * rng.uniform()
+            # eft's Y its own random when the two differ (cross_f 0x04A5D59C: scale_random X (0x7CC) against Y
+            # (0x7D0); equal, one factor for both; else a second draw for Y), as eft2's (main.bin 0x90738)
+            sry = sr if em.size_random_y is None or em.size_random_y == em.size_random else \
+                1 - em.size_random_y * rng.uniform()
             sa = (a(17, 1.0), a(18, 1.0))
             # eft: init + U x random (cross_f 0x04A5DAB4, U 0 - 1); eft2: init + random x (U - 1/2) (its programs)
             rot = em.rot_init + em.rot_rand * (rng.uniform(0, 1, 3) if em.s4 is not None else rng.uniform(-0.5, 0.5, 3))
@@ -288,7 +293,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 mb[:, :3], mb[:, 3] = lin, org
                 born = {'p': lin @ p + org, 'v': lin @ v, 'pl': p.copy(), 'vl': v.copy(), 'birth': float(f - f0),
                         'random': rng.uniform(size=3),
-                        'scale': (sr * sa[0] * csize, sr * sa[1] * csize), 'm': mb, 'rot0': rot.copy(),
+                        'scale': (sr * sa[0] * csize, sry * sa[1] * csize), 'm': mb, 'rot0': rot.copy(),
                         'life': float(max(plife, 1))}
             if em.ult is not None and ULT_SHADERS:
                 # the particle arrays as eft2 fills them at birth (vfx_trace B records: a GPU emitter's
@@ -314,7 +319,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
             # waves, EAER Y 89 -> -120 over 6 frames) lays each new sheet further round
             # 'd': its last frame's movement (eft2's sysLocalDiffAttr, the trace's vec2: position now - a frame
             # ago; on its birth frame the slot holds a stale value, the birth velocity here)
-            live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'rot': rot,
+            live.append({'p': lin @ p + org, 'v': lin @ v, 'age': 0, 'sr': sr, 'sry': sry, 'rot': rot,
                          'sa': sa, 'lin': lin, 'born': born, 'd': lin @ v, 'life': max(plife, 1)})
         keep = []
         for q in live:
@@ -326,7 +331,7 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 rgb = em.colour_curve(t) if em.colour_curve else np.ones(3)
                 rgb1 = em.colour1_curve(t) if em.colour1_curve else None
                 out[f].append((q['p'].copy(), q['v'].copy(), t, (em.size[0] * sx * q['sr'] * q['sa'][0] * csize,
-                                                                    em.size[1] * sy * q['sr'] * q['sa'][1] * csize),
+                                                                    em.size[1] * sy * q['sry'] * q['sa'][1] * csize),
                                q['rot'] + em.rot_add * q['age'], em.alpha_curve(t) if em.alpha_curve else 1.0,
                                rgb, rgb1, q['lin'], q['born'], q['d'].copy()))
             g = em.gravity if em.world_gravity else q['lin'] @ em.gravity / max(np.linalg.norm(q['lin'][:, 1]), 1e-6)
@@ -544,6 +549,41 @@ def _wrap(t, mode):
         t = np.mod(t, 2)
         return np.clip(np.where(t > 1, 2 - t, t), 0, 1 - 1e-6)
     return np.mod(t, 1)
+
+
+def is_universal(binary):
+    """a shader of the universal path (tools/ult_shader.py: Ultimate's programs lowered): its vertex program reads
+    no emitterStaticUniformBlock (CB2), which every vanilla eft program does (1936 of 1936 in 40 banks)"""
+    import eft_vertex
+    h = eft_vertex.vertex_header(bytes(binary))
+    return h is not None and not any(n == 'emitterStaticUniformBlock' for n, _c, _s in h['blocks'])
+
+
+class UniversalPixel:
+    """a universal-path pixel program (tools/ult_to_latte.py's: SAMPLE / KILL / integer ops) run by tools/latte_exec.py's
+    PixelProgram, behind latte_pixel.Program's run(inputs, consts, sample) -> rgba [4, n] (killed pixels alpha 0).
+    textures {slot: (rgba [h, w, 4] float, eft wrap u, v)}: an sRGB slot's texels decoded to linear first (the
+    sampler does that before filtering on the GPU)"""
+    WRAP = {0: 1, 1: 0, 2: 2}                    # eft 0 mirror, 1 repeat, 2 clamp -> latte_exec's
+
+    def __init__(self, binary, textures):
+        import latte_exec
+        import ult_to_latte
+        self.prog = latte_exec.PixelProgram(bytes(binary))
+        self.sems = ult_to_latte.ps_header(bytes(binary))['inputs']
+        self.tex = {k: (np.ascontiguousarray(img, np.float32), self.WRAP.get(wu, 0), self.WRAP.get(wv, 0))
+                    for k, (img, wu, wv) in textures.items()}
+
+    def run(self, inputs, consts, _sample):
+        n = len(next(iter(inputs.values()))[0]) if inputs else 1
+        arr = np.stack([np.asarray(inputs.get(s_, np.ones((4, n))), np.float32).reshape(4, n).T for s_ in self.sems], 1)
+        cb9 = np.zeros(64, np.float32)
+        cb9[32:36] = consts.get(8, HDR_RANGE)
+        out = self.prog.run(arr, {9: cb9}, self.tex)
+        rgba = out[:, :4].T.astype(np.float64)
+        rgba[3] *= out[:, 4]
+        rgba[:3] *= out[:, 4]
+        return rgba
 
 
 def sampler(textures, scales, wraps=None):
@@ -932,7 +972,10 @@ def draw_s4(canvas, em, parts, mnow, time):
         import eft_static
         _s4_static[id(d)] = np.frombuffer(eft_static.build(d), np.float32).copy()
     cb2 = _s4_static[id(d)]
-    gpu = 'v_inVec' in vs.attributes
+    # (a universal-path program reads v_inVec for its velocity, but its particles are eft's CPU ones: the converter
+    # keeps every emitter on the CPU (calc type 0), and the program takes their current values)
+    universal = is_universal(em.s4['p'].shader_binary(em.s4['sh']))
+    gpu = 'v_inVec' in vs.attributes and not universal
     # a program reading the live emitter matrix (CB3 emm) takes its particles in the emitter's own space and turns
     # them by it each frame (the flash ring / lines of sys_smash_flash, following): fed world positions, the
     # emitter's offset counted twice
@@ -975,7 +1018,10 @@ def draw_s4(canvas, em, parts, mnow, time):
             # a CPU particle's v_inWldPos.w is its age after this frame's step (cross_f 0x04A637E4 writes the
             # record after the update 0x04A624E4 & co. add the step, 0x04A65990 -> 0x04A659A4): 1 on its birth frame
             per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age + 1.0),
-                   'v_inVec': np.append(b['vl' if local else 'v'], 1.0),
+                   # (w: a GPU program's speed factor, 1; on a CPU particle eft's own random set at emission, p+0x10,
+                   # which a universal program takes as Ultimate's fourth random: one a particle, uniform)
+                   'v_inVec': np.append(b['vl' if local else 'v'], 1.0 if gpu or not universal else
+                                        float(np.modf(np.sin(np.dot(b['random'][:3], (12.9898, 78.233, 37.719))) * 43758.5453)[0] % 1.0)),
                    'v_inScl': (b['scale'][0], b['scale'][1], b['scale'][0], 1) if gpu else (sx, sy, sx, 1),
                    'v_inRandom': np.append(b['random'], b.get('life', float(em.life))), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
                    'v_inEmtMat0': m[0], 'v_inEmtMat1': m[1], 'v_inEmtMat2': m[2],
@@ -1050,6 +1096,7 @@ def s4_emitters(p, set_index, program_cache=None):
         em.air = f('air_resistance')
         em.size = tuple(f('scale'))
         em.size_random = f('scale_random')[0]
+        em.size_random_y = f('scale_random')[1]
         s0 = np.array(f('scale_init_ratio'))
         s1 = s0 + np.array(f('scale_diff21'))
         s2 = s1 + np.array(f('scale_diff32'))
@@ -1096,12 +1143,25 @@ def s4_emitters(p, set_index, program_cache=None):
             import eft_pixel
             import latte_pixel
             key = bytes(p.shader_binary(sh))
-            if key not in program_cache:
-                try:
-                    program_cache[key] = latte_pixel.Program(key)
-                except NotImplementedError:
-                    program_cache[key] = None
-            em.program = program_cache[key]
+            if is_universal(key):
+                # Ultimate's own pixel program (the universal path): its textures as the GPU samples them
+                utex = {}
+                for k in range(3):
+                    if k < len(texs) and texs[k] is not None:
+                        img = np.array(texs[k], np.float32)
+                        if p.texres(d, k)['native_format'] in (4, 6, 8):      # sRGB: decoded before filtering
+                            c = img[..., :3]
+                            img[..., :3] = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+                        word = struct.unpack_from('>I', bytes(d), ptcl.TEXRES + ptcl.TEXRES_SIZE * k + 0x0C)[0]
+                        utex[k] = (img, (word >> 24) & 0xF, (word >> 28) & 0xF)
+                em.program = UniversalPixel(key, utex)
+            else:
+                if key not in program_cache:
+                    try:
+                        program_cache[key] = latte_pixel.Program(key)
+                    except NotImplementedError:
+                        program_cache[key] = None
+                em.program = program_cache[key]
             em.sample = sampler(texs, [tuple(f('tex0_uv_scale'))] + [(1, 1)] * 2)
             em.consts = {8: HDR_RANGE}
             em.blend_mode = 'premult' if eft_pixel.premultiplied(p, sh) else \

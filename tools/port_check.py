@@ -614,6 +614,41 @@ def check_assets(inst, name, base, rep):
         rep.add('WARN', 'A1 labels', 'sound banks without sound/config/soundlabeltable.bin (Hero fix 71)')
 
 
+def check_universal(p, rep):
+    """E6: the universal shader path's shaders (tools/ult_shader.py: Ultimate's programs lowered; their vertex
+    program reads no emitterStaticUniformBlock, every vanilla one does): a slot the pixel program samples must
+    hold a texture (eft stops on "Texture Binary is None"), and every pixel input needs a vertex output of its
+    semantic (else it reads 0). Returns the universal shader indices"""
+    import eft_vertex
+    import ult_to_latte
+    uni = set()
+    for i in range(p.shader_count()):
+        b = bytes(p.shader_binary(i))
+        h = eft_vertex.vertex_header(b)
+        if h is None or any(nm == 'emitterStaticUniformBlock' for nm, _c, _s in h['blocks']):
+            continue
+        uni.add(i)
+        ph = ult_to_latte.ps_header(b)
+        missing = set(ph['inputs']) - set(ult_to_latte.vs_semantics(b))
+        if missing:
+            rep.add('ERROR', 'E6 universal-link', 'shader %d: pixel inputs %s without a vertex output' % (i, sorted(missing)))
+    no_tex = []
+    for si in range(len(p.sets)):
+        for x in p.sets[si]['emitters']:
+            d = x['data']
+            if d is None or p.field(d, 'shader_index') not in uni:
+                continue
+            ph = ult_to_latte.ps_header(bytes(p.shader_binary(p.field(d, 'shader_index'))))
+            for _nm, _t, slot in ph['samplers']:
+                t = p.texres(d, slot)
+                if not t['size'][0] or not t['native_size']:
+                    no_tex.append('%s/%s slot %d' % (p.set_name(si), p.emitter_name(d), slot))
+    if no_tex:
+        rep.add('ERROR', 'E6 universal-texture', '%d universal-shader emitters sample a slot with no texture ("Texture '
+                'Binary is None"): %s' % (len(no_tex), ', '.join(no_tex[:8])))
+    return uni
+
+
 def check_effects(inst, name, rep):
     """E4: a mesh of eft's particle type 4 aims its Y along the particle's world motion (cross_f's type-4
     vertex programs: X = normalize(emitter Y x motion), Z = X x motion); a particle that never moves has no
@@ -627,12 +662,14 @@ def check_effects(inst, name, rep):
             p = ptcl.Ptcl(inst.get(path))
         except Exception:                     # noqa: BLE001
             continue
+        universal = check_universal(p, rep)
         still, follow = [], []
         for si in range(len(p.sets)):
             for x in p.sets[si]['emitters']:
                 d = x['data']
-                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0:
-                    continue
+                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0 \
+                        or p.field(d, 'shader_index') in universal:
+                    continue          # (a universal shader frames its mesh with Ultimate's own program)
                 speed = abs(p.field(d, 'figure_velocity')) + abs(p.field(d, 'emitter_velocity'))
                 grav = sum(abs(v) for v in p.field(d, 'gravity'))
                 if speed > 1e-4 or grav > 1e-6:
@@ -647,8 +684,9 @@ def check_effects(inst, name, rep):
         for si in range(len(p.sets)):
             for x in p.sets[si]['emitters']:
                 d = x['data']
-                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0:
-                    continue
+                if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0 \
+                        or p.field(d, 'shader_index') in universal:
+                    continue          # (a universal shader frames its mesh with Ultimate's own program)
                 dr, g = p.field(d, 'emit_direction'), p.field(d, 'gravity')
                 if abs(p.field(d, 'figure_velocity')) > 1e-4 or abs(p.field(d, 'emitter_velocity')) < 1e-4 \
                         or abs(dr[0]) > 1e-3 or abs(dr[2]) > 1e-3 or abs(p.field(d, 'dispersion_angle')) > 1e-3 \
