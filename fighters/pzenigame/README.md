@@ -699,3 +699,20 @@ Still approximated:
 
 Bank: 11.5 MB (test 21: 8.6 MB), after dropping the 3.7 MB of converted textures the universal emitters no
 longer use (Ptcl.drop_unused_textures).
+
+## v6 effects test 23 (`build/squirtle_v6_effects_test23.zip`): test 22's frozen parts
+
+In game, test 22 left many parts frozen, many at the stage's origin (the user's clip).
+- **Cause.** 145 universal emitters had kept their GPU template's GPU-calc flags: the emitter's byte 5 bit 0x80
+  and the key's byte 4 bit 0x02, which split vanilla's GPU emitters / programs from the CPU's exactly. With them
+  on, eft moves nothing on the CPU and the particle records hold birth values. Ultimate's programs, written for
+  particles already moved, drew them as they stood.
+- **Fix.** `vfxb_to_ptcl.universal_shader` clears both. The streams eft's CPU writes follow the program's own
+  attributes (cross_f 0x04A57DA4: the shader object's attribute locations +0x578.. set its stream flags +0x5A0),
+  so nothing else changes.
+- **Why the checks missed it.** fx_render took GPU from the program's `v_inVec`, which every universal program
+  reads. It now follows the emitter's flag; on test 22's bank it draws up smash's converted side empty.
+- **Now caught.** port_check E6 universal-gpu is an ERROR: on v6 + test 22 it reports 145 emitters and 109 keys.
+  On v6 + test 23: 0 errors (the 9 warnings are test 22's).
+- **Unchanged.** The scripts (effect.bin) and the .efc are byte for byte test 22's. In fx_render, up smash,
+  down smash, Waterfall and dash draw as before and like Ultimate's.
