@@ -26,12 +26,16 @@ src = src.replace('#include "glsl_compiler.h"\n', '').replace('#include <glslang
 i, j = src.index('      if (options.has("compile")) {'), src.index('      } else if (options.has("assemble")) {')
 src = src[:i] + '      if (options.has("assemble")) {' + src[j + len('      } else if (options.has("assemble")) {'):]
 open('asm_build/main.cpp', 'w').write(src)
+# the grammar's Comment token drops the ';' that the header-comment regexes expect: accept it either way
+g = open(a + '/src/gfd.cpp').read()
+assert g.count('";[[:space:]]*\\\\$') == 2
+open('asm_build/gfd.cpp', 'w').write(g.replace('";[[:space:]]*\\\\$', '";?[[:space:]]*\\\\$'))
 open('asm_build/grammar.h', 'w').write('const char *LatteGrammar = R"(\n' + open(a + '/resources/grammar.txt').read() + ')";\n')
 EOF
 D=decaf/src
 g++ -std=c++17 -O1 -w -DFMT_HEADER_ONLY -DSPDLOG_FMT_EXTERNAL -DSPDLOG_HEADER_ONLY \
   -Ifmt/include -Igsl-lite/include -Icnl/include -Ipeglib -Iexcmd/src -Ispdlog/include -Iasm_build \
   -I$A/src -I$D -I$D/libgfd -I$D/libgpu -I$D/libgpu/src \
-  asm_build/main.cpp ../asm_support.cpp $(ls $A/src/*.cpp | grep -v -e /main.cpp -e glsl_compiler) \
+  asm_build/main.cpp asm_build/gfd.cpp ../asm_support.cpp $(ls $A/src/*.cpp | grep -v -e /main.cpp -e /gfd.cpp -e glsl_compiler) \
   $D/libgfd/src/*.cpp $D/libgpu/src/latte/latte_instructions.cpp -o ../latte-asm
 echo built "$(cd .. && pwd)/latte-asm"

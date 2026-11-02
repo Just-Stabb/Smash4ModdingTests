@@ -1,6 +1,7 @@
 # Scope: one shader path for Ultimate effects on Smash 4 ("universal shader pair")
 
-Status: scoping only, nothing built yet (Squirtle test 21 is the current state of the converter).
+Status: phases 0 and 1 done (vertex programs lowered and tested); phase 2 (pixel programs) next. Squirtle test 21
+is still the converter's state in game: nothing from this path is in a package yet.
 
 ## The idea
 
@@ -123,6 +124,74 @@ differing register. `port_check` gets a check that every emitter's lowered progr
 - c12 = the emitter-plugin block (EP0x), baked like c9.
 - Still to measure in phase 1: whether a particle is moved on its birth frame in both games (the record
   shows the moved place in eft; Ultimate's order looks the same).
+
+## Phase 1 results (vertex lowering)
+
+`tools/ult_to_latte.py` lowers a translated vertex program to latte-asm source and assembles it.
+`tools/ult_to_latte_test.py NAME [--mode identity|eft]` is the differential test.
+
+**Squirtle: all 165 vertex programs pass.** This holds in both modes, on several seeds, with 256 to 1024 random
+particles each, and both the live and the dead-particle paths run. The test compares `gl_Position` and every
+output against `mx_exec` on the same particles, to 1e-4 + 2e-4 relative. Changing one baked word makes it fail,
+so it is not passing trivially.
+
+The reference runs Ultimate's program with an unfused multiply-add. Maxwell's FFMA rounds once; the Latte ALU
+has no fused multiply-add (MULADD_IEEE rounds twice). With the fused reference, 4 programs differed on about 1
+particle in 1000 by ~5e-4 relative. That only happened where the random view matrices cancel (z ~ 9e5); with
+the unfused reference they agree, two of them bit for bit. A real camera doesn't cancel like that, so the game
+shows no difference.
+
+Size: median 727 one-operation groups, max 1541. Most of the gain over the Maxwell statement count comes from
+branches on baked data being decided at build time, and their dead sides never emitted.
+
+How it lowers:
+
+- **Parsing.** The GLSL is parsed into statements (149 distinct shapes over the 165 programs) and expressions
+  are typed (float / int / uint / bool). Every Latte operation on literals is folded with the ALU's own
+  semantics, and a few identities are folded too (x & ~0, x | 0, a select on a literal).
+- **Registers.** One GPR component per Maxwell register, predicate, flag, active mask and output component.
+  Temporaries are per statement. Attributes go in R1.. and the vertex id in R0.x.
+- **Control flow (if-conversion).** A block's active mask is the OR of its incoming jumps. A region opened by a
+  jump closes back to the mask it began with when no lane returned inside it, so the usual if / else diamond
+  costs nothing after the merge. Registers are guarded (CNDE_INT) only inside a region a pending jump skips.
+  Outputs are guarded only once some lane may have left (a return).
+- **Constants.** c9, c1, c12, c13 and c16 are baked. c9's one dynamic read is a select chain over 8 entries:
+  `c9[(X + 0x120 / 0x128) >> 2]`, 16-byte entries, in 27 programs.
+- **Instructions.**
+  - Float operations use the IEEE kinds.
+  - sin / cos are range-reduced into turns.
+  - `~x` is XOR with ~0, because latte-asm's grammar gives NOT_INT two sources.
+  - Clauses hold at most 120 slots, each locking CB1 / CB3 0-31.
+- **Header.** Attribute and block names, outputs as PARAMn with their semantics. latte-asm needed a fix:
+  the grammar's comment token drops the `;` that the header regexes expect, so before the fix it wrote no
+  names at all. `build_asm.sh` now patches that. Attribute type `vec4` gives 11, as vanilla does; block sizes
+  are eft's own (view 352, dynamic 192).
+
+eft mode (`mode='eft'`), the mapping the converter will use:
+
+| Ultimate | eft |
+|---|---|
+| c8 0-71 (view, projection, view-projection, billboard, eye) | CB1 the same words (row-major, as fx_render's validated blocks) |
+| c8 72-75 (near, far, near x far, far - near) | CB1 vp 80 / 81, the products computed once |
+| c10 (colours, time, step, emitter matrices) | CB3 the same words |
+| sysLocalPosAttr xyz / w (life) | v_inWldPos.xyz / v_inRandom.w |
+| sysLocalVecAttr xyz / w (birth) | v_inVec.xyz / emp0.x - v_inWldPos.w (computed once) |
+| sysScaleAttr x y / z | v_inScl.xy / v_inScl.x x the emitter's z / x ratio (baked) |
+| sysRandomAttr xyz / w | v_inRandom.xyz / v_inVec.w (eft's own per-particle random) |
+| sysPosAttr, TexCoord, VertexColor0, InitRotate, LocalDiff, EmtMat0-2 | v_inPos, v_inTexCoord, v_inColor, v_inRot, v_inWldPosDf, v_inEmtMat0-2 |
+| sysEmitterPluginAttr0-4 (6 programs) | none yet (0) |
+
+The eft-mode test builds eft's streams from the same particle by this table's inverse. So it checks the
+mechanism (the prologue code and its header), not the table's truth. Phase 3 checks the truth by rendering
+against Ultimate in fx_render.
+
+Still open, for phase 3:
+
+- c10[12-15] (alpha, scale) against eft's emp1 (set values, cross_f 0x04A65A08).
+- Ultimate's local positions against eft's world `v_inWldPos` for emitters that follow (EmtMat / c10 matrices).
+- The z / x scale ratio per emitter.
+- Which eft colour stream sysVertexColor0Attr is (eft has v_inColor0 / 1).
+- The plugin attributes.
 
 ## Unknowns to settle first (phase 0, as scoped)
 
