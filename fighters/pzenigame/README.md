@@ -716,3 +716,22 @@ In game, test 22 left many parts frozen, many at the stage's origin (the user's 
   On v6 + test 23: 0 errors (the 9 warnings are test 22's).
 - **Unchanged.** The scripts (effect.bin) and the .efc are byte for byte test 22's. In fx_render, up smash,
   down smash, Waterfall and dash draw as before and like Ultimate's.
+
+## v6 effects test 24 (`build/squirtle_v6_effects_test24.zip`): test 23's vertical white lines
+
+The user's report on test 23: effects move and look good, apart from occasional thin vertical white lines in
+different moves. In the clip, textured water streaks run from Squirtle up off the top of the screen for a frame
+or so, at the start of moves.
+- **Cause.** Ultimate's programs read the particle's last movement (sysLocalDiffAttr -> `v_inWldPosDf`) on any
+  particle type. eft works that stream out only under the emitter's +0x308 bit 0x10 (cross_f 0x04A62888 /
+  0x04A62F4C), which vanilla sets on its directional types 3 / 4 and no other (6,108 vanilla CPU emitters). With
+  the bit off, nothing writes the stream, so it holds the particle slot's last occupant's value, and the
+  programs stretched the part along it.
+- **Affected:** 20 emitters on non-directional templates. The common attack / dash / run / turn smokes, up
+  smash's splash1_2, the dash's parts1, Water Gun's water / splashes, Waterfall's end.
+- **Fix.** `universal_shader` sets the bit when the program reads the stream. The bank differs from test 23 in
+  exactly those 20 bytes; effect.bin and the .efc are unchanged.
+- **Checks.**
+  - port_check E6 universal-diff is an ERROR (20 on test 23; 0 errors on v6 + test 24).
+  - fx_render, which fed the velocity and so drew these right, now warns: on test 23 for up smash's splash1_2
+    and the dash's parts1, on test 24 for none.
