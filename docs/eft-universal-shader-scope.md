@@ -1,7 +1,8 @@
 # Scope: one shader path for Ultimate effects on Smash 4 ("universal shader pair")
 
-Status: phases 0 - 2 done; phase 3 (converter integration) under way: the converter puts Ultimate's own programs on
-every emitter they lower for (the old path the fallback), fx_render draws them, the render comparison is in progress. Squirtle test 21
+Status: phases 0 - 3 done. Squirtle builds with Ultimate's own programs on 308 emitters (the old path the fallback),
+port_check is clean, and fx_render draws up smash / down smash / Waterfall like Ultimate. Phase 4 (the in-game test,
+squirtle_v6_effects_test22) is next. Squirtle test 21
 is still the converter's state in game: nothing from this path is in a package yet.
 
 ## The idea
@@ -307,6 +308,21 @@ Squirtle's own bank only.
 **port_check E6** (universal-link, universal-texture): every pixel input has a vertex output; every sampled slot
 holds a texture. E4 / E5 (eft's type-4 programs' framing) skip universal emitters, which frame their meshes with
 Ultimate's program.
+
+**Results.**
+- Squirtle's bank: 308 emitters (255 shaders) universal, 0 fallbacks for lowering. The bank is 11.5 MB:
+  `Ptcl.drop_unused_textures` frees the 3.7 MB of converted textures the universal emitters left behind.
+- port_check: 0 errors over v6 + test 22; E6 found the 255 shaders and catches an emptied slot.
+- Tests (`ult_to_latte_test.py`): Squirtle's 156 programs and the 166 common ones pass vertex / pixel, identity
+  / eft, and pairing.
+- fx_render's eft model had two more gaps:
+  - eft's scale random is per axis when X's and Y's differ (cross_f 0x04A5D59C, as eft2's); fx_render used X's
+    for both, and up smash's wave3_1 drew 26% wide.
+  - A CPU particle's v_inVec.w is eft's own random (p+0x10); fx_render fed 1.
+- With both fixed, up smash's emitters draw within a few % of Ultimate's pixels; the rest is the two sides' own
+  random draws.
+- Also found: up smash's ring1 stood up because eft's random rotation was added to Ultimate's own (the program
+  turns the particle by its random values). The universal path now keeps eft's rotation at rotate_init.
 
 **Still open.**
 - c16 and the call's colour / alpha (c10[12], c16) at defaults.

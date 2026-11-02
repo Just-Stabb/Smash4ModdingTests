@@ -3199,10 +3199,12 @@ def main():
             convert_source(src, *source)
     # the imported templates whose pixel program was replaced leave their shader unused
     unused = p.drop_unused_shaders(base_shaders)
+    # textures the universal shader path (or any later replacement) left behind
+    freed = p.drop_unused_textures()
     out = p.build()
     q = ptcl.Ptcl(out)
     assert q.validate() == [], q.validate()
-    print('%d unused shaders dropped; bank %.2f MB' % (unused, len(out) / 1e6))
+    print('%d unused shaders dropped, %.2f MB of unused textures; bank %.2f MB' % (unused, freed / 1e6, len(out) / 1e6))
     os.makedirs(a.out_dir, exist_ok=True)
     open(os.path.join(a.out_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(a.out_dir, base + '.efc'), 'wb').write(ef.build())

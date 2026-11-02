@@ -670,3 +670,32 @@ threshold keys and alpha fade all matched; by particle age they agreed at ages 0
 - Renderer note: renders run in parallel right after a rebuild race on the shader cache; one of them
   drew nothing on half the seeds. Warm the cache with one render first.
 
+
+## v6 effects test 22 (`build/squirtle_v6_effects_test22.zip`): Ultimate's own shaders
+
+The first build of the universal shader path (docs/eft-universal-shader-scope.md, phases 0-3).
+- **Shaders.** 308 of the bank's emitters (255 shaders) are drawn by Ultimate's own vertex and pixel programs:
+  each emitter's BNSH variation translated (tools/ult_shader_glsl.py), lowered to Latte (tools/ult_to_latte.py),
+  and assembled under the converted template's key record (tools/ult_shader.py,
+  vfxb_to_ptcl.universal_shader).
+- **eft's CPU side** is set to give the programs Ultimate's particle: base scale with a flat eft curve, the
+  initial rotation only, the raw mesh, Ultimate's textures (sRGB ones as eft's sRGB BC3).
+- **Fallback.** Refraction parts, child emitters, and any program that doesn't lower keep test 21's
+  conversion. None failed in this build.
+
+Sources and checks:
+- The programs, their constants (c9 from the emitter, c13 CSDP, c1 immediates) and the matrix each applies
+  (probed by running it) come from ef_pzenigame.eff / ef_common.eff.
+- Every vertex and pixel program passes the differential test against the translated original:
+  - Squirtle's 156 non-refraction programs and the 166 common ones his scripts call;
+  - every stage, in both identity and eft mode, with the vertex / pixel pairs linked.
+- In fx_render, up smash, down smash and Waterfall draw like Ultimate's. Up smash's emitters are within a few %
+  of Ultimate's drawn pixels; what is left is the two sides' own random draws.
+
+Still approximated:
+- The call's colour, alpha and scale (c16, c10[12 - 15]) at their defaults.
+- No soft-particle fade: eft has no depth texture.
+- Display-space blending.
+
+Bank: 11.5 MB (test 21: 8.6 MB), after dropping the 3.7 MB of converted textures the universal emitters no
+longer use (Ptcl.drop_unused_textures).

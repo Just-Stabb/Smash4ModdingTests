@@ -632,6 +632,34 @@ class Ptcl:
         self.dirty_layout = True
         return n - len(keep)
 
+    def drop_unused_textures(self):
+        """the texture table rebuilt with only the textures an emitter's slot (or its child's) points at, each at
+        its format's alignment, the slots' positions updated: the bytes saved. (A converter that replaces an
+        emitter's textures after converting them leaves the first ones behind: the universal shader path put
+        3.8 MB of Squirtle's 7.4 MB out of use)"""
+        refs = []
+        for em in self.shader_users():
+            offs = [TEXRES + TEXRES_SIZE * k for k in range(TEX_SLOTS)] + ([CHILD_TEXRES] if self.has_child(em) else [])
+            for o in offs:
+                fmt, size, pos = struct.unpack_from('>III', em, o + 0x2C)
+                if size:
+                    refs.append((em, o, fmt, size, pos))
+        old = bytes(self.tex)
+        new, placed = bytearray(), {}
+        for _em, _o, fmt, size, pos in sorted(refs, key=lambda r: r[4]):
+            if (pos, size) not in placed:
+                at = align(len(new), GX2_ALIGN.get(EFT_GX2.get(fmt, 0x33), 0x2000))
+                new += bytes(at - len(new)) + old[pos:pos + size]
+                placed[pos, size] = at
+        for em, o, _fmt, size, pos in refs:
+            struct.pack_into('>I', em, o + 0x34, placed[pos, size])
+        saved = len(old) - len(new)
+        if saved:
+            self.tex = new
+            self._tex_added = {}
+            self.dirty_layout = True
+        return saved
+
     def shader_users(self):
         return [x['data'] for s in self.sets for x in s['emitters'] if x['data'] is not None]
 
