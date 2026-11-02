@@ -539,12 +539,30 @@ Ours has items Manifold's lacks:
   `fighter_extras.py narration` appends Ultimate's tone to the main bank as a new label (IDSP as is), grows
   row 0x38 by it, and points the character's 16 ids at it (Squirtle: Ultimate's `poketrainer`, id 0x380056).
   Ultimate's `vc_narration_characall` has 112 calls; its Pokemon Trainer's Pokemon have none of their own.
-- **Victory fanfare.** `sound/config/bgm_fighter.fbb` ('FBB\0', u32 1, u32 count, then count x 5 u32 LE;
-  the BGM id at +0x10) has one entry per fighter kind, 0x00-0x39. `fighter_extras.py fanfare` extends it to
-  the new kinds, each a copy of a vanilla kind of the same series. Not yet confirmed in game that the reader
-  takes the file's count (Squirtle extras 2 is the test).
-- **Crowd chant.** `fighter/%s/sound/snd_vc_%s_ouen.nus3bank` is loaded by the kind's name tables
-  (`0x030BB9DC`; Miis, kinds 0-2, use `snd_vc_Mii_ouen`). A port's cheer bank keeps the base's BINF id
-  (Squirtle: Mario's 6086, row 0x89F = `commonsoundtable.csb` entry 0's cheer row). `audience_ouen_param.bin`
-  has a row for each new kind (add_fighter.py). The user heard no chant for Squirtle (extras 1); not traced
-  further yet: the cheer reader of `audience_ouen_param` (loaded at `0x02E1153C`, object +0x1D0) is next.
+- **Files matched by name.** The executable reads two sound config files into records and finds a fighter's
+  record by its Capitalised name (`0x0275DB38`), but it names the records itself, by record index, from its
+  own tables (the files' 16-byte name fields are never read: `0x02A7BA48` returns 0); records past a table
+  get "" and match nothing. So a new kind's records were never found, whatever the files held (Squirtle
+  extras 2: Mario's fanfare stayed; no KO screams, no chant). `tools/kind_expand.py` (`SOUND_NAME_TABLES`)
+  grows both tables in the cave with the new kinds' Capitalised names (`kind_expand_test.py` runs both parsers
+  and the fanfare lookup on files with a record per kind):
+  | file | parser | lookup | names | a new kind's record |
+  |---|---|---|---|---|
+  | `bgm_fighter.fbb` | `0x02A63954` (`cmplwi r25, 0x3A`) | `0x02A63C50` (kind -> BGM id) | `0x10340BBC`, 58, kind order | its kind |
+  | `commonsoundtable.csb` | `0x02ABA37C` (`cmplwi r28, 0x3E`) | `0x02ABA6BC`, from the fighter setup `0x02761C50` | `0x10340F8C`, 62, voice-bank order | `0x3E + kind - 0x41` |
+- **Victory fanfare.** `sound/config/bgm_fighter.fbb` ('FBB\0', u32 1, u32 count, then count records of a
+  16-byte name and the BGM id, LE) has one record per fighter kind, 0x00-0x39. `fighter_extras.py fanfare`
+  extends it to the new kinds, each a copy of a vanilla kind of the same series.
+- **KO screams and crowd chant.** `sound/config/commonsoundtable.csb` ('CSB\0', u32 1, u16 4 values, u16 62
+  records of a 16-byte name and 4 u32, LE) holds per fighter the voices the game plays for it itself: three
+  (u16 label, u16 soundlabeltable row) (Mario: MissFoot01, MissFoot02, Damage_hoshikie on his voice bank's row
+  0x5E: the KO screams) and (0, the chant bank's row) (Mario: 0x89F, `snd_vc_Mario_ouen` 6086).
+  `fighter_extras.py common` gives every new kind its base's record: a port's voice and chant banks keep the
+  base's bank ids (`ultimate_sound.py` default), so the base's labels name the port's own tones (Squirtle's
+  MissFoot01 is his Ultimate `missfoot01`, `VOICE_ALIASES` for the rest).
+  The chant bank itself, `fighter/%s/sound/snd_vc_%s_ouen.nus3bank`, is loaded by the kind's name tables
+  (`0x030BB9DC`; Miis, kinds 0-2, use `snd_vc_Mii_ouen`); `audience_ouen_param.bin` has a row for each new
+  kind (add_fighter.py).
+- `fightermodelbanktable.mtb` (costume banks: Bowser Jr., Robin...) is matched the same way (13 names,
+  `0x10340CA4`, `0x02A6496C`; looked up with `Name` / `Name_ouen` by the fighter setup) and isn't grown: a
+  port's costume banks load by file name (`ultimate_sound.py`).

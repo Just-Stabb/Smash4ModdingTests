@@ -4,6 +4,7 @@
   python3 tools/fighter_extras.py narration CHARACALL_BANK SOUNDLABELTABLE CALL_VOICE_DB_DIR OUT \\
       --ult-bank ULT_SOUND/bank/narration/vc_narration_characall --ult-tone poketrainer --name Pzenigame --id 64
   python3 tools/fighter_extras.py fanfare BGM_FIGHTER_FBB OUT --set 0x46=0xa [--set KIND=LIKE_KIND ...]
+  python3 tools/fighter_extras.py common COMMONSOUNDTABLE_CSB OUT [--set Pzenigame=Mario ...]
 
 narration: the character select's announcer call is a sound id per character id and costume
 (param/ui/ui_sound_call_voice_db.bin: id, then 16 ids, one a costume). The vanilla roster's live in
@@ -19,7 +20,19 @@ fanfare: sound/config/bgm_fighter.fbb ('FBB\\0', u32 1, u32 count, then count en
 fanfare's BGM id at +0x10) holds one entry per fighter kind, 0x00-0x39; the new kinds (0x41+) had none.
 The file is extended to the highest kind asked, each new entry a copy of LIKE_KIND's (the vanilla fighter
 of the same series: Pokemon -> Pikachu 0xA, Final Fantasy -> Cloud 0x37), kinds in between a copy of
-Mario's (0x3)."""
+Mario's (0x3).
+
+The executable names both files' records from its own tables by record index and matches them by the fighter's
+Capitalised name; records past those tables were unnamed, so a new kind's record was never found (no fanfare,
+KO voices or chant) until tools/kind_expand.py grew the tables (its SOUND_NAME_TABLES): a new kind's fbb record
+is its kind, its csb record 0x3E + kind - 0x41 (kind_expand.sound_record).
+
+common: sound/config/commonsoundtable.csb ('CSB\0', u32 1, u16 4 values, u16 count, then count records of a
+16-byte name (unused) and 4 u32, LE) holds per fighter the voices the game plays for it itself: three
+(u16 label, u16 soundlabeltable row) pairs (Mario: MissFoot01, MissFoot02, Damage_hoshikie, the KO screams),
+then the crowd's chant bank's row (u16 0, u16 row). Every new kind of tools/extra_kinds.json gets a copy of its
+base's record (the port's voice and chant banks keep the base's bank ids, so the base's labels name the port's
+own tones: Squirtle's MissFoot01 is his Ultimate missfoot01); --set CAP=LIKE_CAP takes another fighter's."""
 import argparse
 import os
 import struct
@@ -83,6 +96,42 @@ def fanfare(a):
         'kind 0x%X = 0x%X\'s (0x%X)' % (k, v, rows[k][4]) for k, v in sorted(sets.items()))))
 
 
+def common(a):
+    import kind_expand as K
+    d = open(a.csb, 'rb').read()
+    assert d[:4] == b'CSB\0'
+    nval, n = struct.unpack_from('<HH', d, 8)
+    size = 0x10 + 4 * nval
+    recs = [bytearray(d[0xC + size * i:0xC + size * (i + 1)]) for i in range(n)]
+    img = K.Image(K.RPX)
+    addr, _hi, _lo, _cmp, old = K.SOUND_NAME_TABLES['csb']
+    names = [img.cstr(img.w(addr + 4 * i)) for i in range(old)]
+    cap, kinds = K.load_spec(a.kinds)
+    caps = [img.cstr(img.w(K.TABLES['cap'][0] + 4 * k)) for k in range(K.OLD_N)]
+    like = {r['cap']: caps[r['bkind']] if 'bkind' in r else caps[K.kind_index(
+        [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)], r['base'])] for r in kinds}
+    like.update(dict(s.split('=') for s in a.set or []))
+    top = max(K.sound_record('csb', r['kind']) for r in kinds) + 1
+    none = bytearray(b'\0' * 16 + b'\xff' * (4 * (nval - 1)) + b'\0' * 4)
+    while len(recs) < top:
+        recs.append(bytearray(none))
+    out = []
+    for r in kinds:
+        src = like[r['cap']]
+        i = K.sound_record('csb', r['kind'])
+        recs[i] = bytearray(recs[names.index(src) if src in names else caps.index(src)])
+        v = struct.unpack_from('<%dH' % (2 * nval), recs[i], 0x10)
+        out.append('%s (record %d) = %s\'s: %s' % (r['cap'], i, src, ' '.join('%X/%X' % (v[2 * k], v[2 * k + 1])
+                                                                           for k in range(nval))))
+    blob = d[:8] + struct.pack('<HH', nval, len(recs)) + b''.join(bytes(x) for x in recs)
+    p = os.path.join(a.out, 'sound/config/commonsoundtable.csb')
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    open(p, 'wb').write(blob)
+    print('commonsoundtable.csb: %d -> %d records (label/row x3, 0/chant row)' % (n, len(recs)))
+    for x in out:
+        print('  ' + x)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -101,6 +150,12 @@ def main():
     p.add_argument('out')
     p.add_argument('--set', action='append', required=True, help='KIND=LIKE_KIND')
     p.set_defaults(fn=fanfare)
+    p = sub.add_parser('common')
+    p.add_argument('csb')
+    p.add_argument('out')
+    p.add_argument('--kinds', default=os.path.join(HERE, 'extra_kinds.json'))
+    p.add_argument('--set', action='append', help='CAP=LIKE_CAP (Capitalised names; default: the base)')
+    p.set_defaults(fn=common)
     a = ap.parse_args()
     a.fn(a)
 

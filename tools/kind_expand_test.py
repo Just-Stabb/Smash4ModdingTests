@@ -621,6 +621,75 @@ def main():
         check('kind 0x%X: nothing written (unpatched: %r)' % (k, (ai_run(O, k, 1)[1], ai_run(O, k, 0)[1]) if k == 0x41 else '-'),
               (ai_run(P, k, 1)[1], ai_run(P, k, 0)[1]), ([], []))
 
+    # ------------------------------------------------------------ sound files matched by name
+    print('# sound name tables (bgm_fighter.fbb, commonsoundtable.csb)')
+    for name, (addr, (hi_at, _h), (lo_at, _l), (cmp_at, _c), old) in K.SOUND_NAME_TABLES.items():
+        at = ((pimg.w(hi_at) & 0xFFFF) << 16) + K.sx16(pimg.w(lo_at))
+        n = pimg.w(cmp_at) & 0xFFFF
+        check('%s: reader -> the cave table, bound %d' % (name, n), (at, n), info['sound_tables'][name])
+        got = [pimg.cstr(pimg.w(at + 4 * i)) for i in range(n)]
+        want = [img.cstr(img.w(addr + 4 * i)) for i in range(old)] + [''] * (n - old)
+        for r in kinds:
+            want[K.sound_record(name, r['kind'])] = r['cap']
+        check('%s: the game\'s %d names, then each new kind\'s Capitalised name at its record' % (name, old),
+              got, want)
+        check('%s: the bound covers the last kind of the capacity' % name, K.sound_record(name, cap - 1) < n, True)
+
+    # the parsers and the fanfare lookup run on files with a record for every kind (old count + new kinds)
+    def file_parse(E, fn, data, rec, stubs):
+        buf = E.alloc(len(data))
+        E.mu.mem_write(buf, data)
+        obj = E.alloc(0x10, b'\0')
+        for a, f in stubs.items():
+            E.stub(a, f)
+        E.stub(0x032D8B9C, lambda E_: buf)                  # the resource's data
+        E.stub(0x032D8E08, lambda E_: None)                 # its release
+        ok = E.call(fn, obj, 0x1234)
+        recs = E.w(obj)
+        return ok, [(E.cstr(recs + rec * i) or '') for i in range(E.w(obj + 4))], obj
+
+    def fbb_file(n):
+        return b'FBB\0' + struct.pack('<II', 1, n) + b''.join(b'\0' * 16 + struct.pack('<I', 0x1000 + k)
+                                                            for k in range(n))
+    n_fbb = max(r['kind'] for r in kinds) + 1
+    res = {}
+    for tag, E in (('P', Emu(patched)), ('O', Emu(original))):
+        ok, names_, obj = file_parse(E, 0x02A63954, fbb_file(n_fbb), 0x14, {
+            0x02A63784: lambda E_: None,                                        # clears the old records
+            0x02003E30: lambda E_: E_.alloc(E_.r(4) * E_.r(5), b'\0')})        # new [count] (0x14 each)
+        look = []
+        for k in range(n_fbb):
+            try:
+                look.append(E.call(0x02A63D00, obj, k))
+            except Exception as e:             # the unpatched game's name table ends at 0x40
+                look.append(type(e).__name__)
+        res[tag] = (ok, names_, look)
+    ok, pn, pl = res['P']
+    _ok, on, ol = res['O']
+    check('fbb parsed: names of records 0x00-0x39 = unpatched, 0x3A-0x40 ""', (ok, pn[:0x41]), (1, on[:0x3A] + [''] * 7))
+    check('fbb lookup: kinds 0x00-0x40 = unpatched', pl[:0x41], ol[:0x41])
+    check('fbb lookup: each new kind finds its own record (the unpatched game: none)',
+          [(hex(r['kind']), pl[r['kind']], ol[r['kind']]) for r in kinds],
+          [(hex(r['kind']), 0x1000 + r['kind'], ol[r['kind']]) for r in kinds])
+    check('the unpatched game finds none of them', [v for v in ol[0x41:] if v in range(0x1000, 0x1000 + n_fbb)], [])
+    n_csb = K.sound_record('csb', max(r['kind'] for r in kinds)) + 1
+    csb = b'CSB\0' + struct.pack('<IHH', 1, 4, n_csb) + b''.join(b'\0' * 16 + struct.pack('<4I', i, i, i, i)
+                                                                  for i in range(n_csb))
+    res = {}
+    for tag, E in (('P', Emu(patched)), ('O', Emu(original))):
+        ok, names_, obj = file_parse(E, 0x02ABA37C, csb, 0x38, {
+            0x033745A8: lambda E_: E_.alloc(E_.r(3), b'\0')})                  # malloc(count * 0x38)
+        vals = [E.w(E.w(obj) + 0x38 * i + 0x10) for i in range(E.w(obj + 4))]
+        res[tag] = (ok, names_, vals)
+    ok, pn, pv = res['P']
+    _ok, on, ov = res['O']
+    check('csb parsed: the game\'s 62 names = unpatched', (ok, pn[:0x3E]), (1, on[:0x3E]))
+    check('csb parsed: each new kind\'s record carries its Capitalised name and its own values',
+          [(r['cap'], pn[K.sound_record('csb', r['kind'])], pv[K.sound_record('csb', r['kind'])]) for r in kinds],
+          [(r['cap'], r['cap'], K.sound_record('csb', r['kind'])) for r in kinds])
+    check('csb parsed: the unpatched game names them ""', [on[K.sound_record('csb', r['kind'])] for r in kinds],
+          [''] * len(kinds))
+
     print('FAILS', fails)
     sys.exit(1 if fails else 0)
 

@@ -427,8 +427,9 @@ read off the hitboxes, e.g. with Sm4shCommand's hitbox viewer).
 - **`voiceanim_<Name>.vat`**: u32 2, u32 n, u32 0, then per voice label the hash of the mouth
   animation (`FitMarthBodyMainVoiceS0/S1/S2/L0` in `material_anime_face.pac`), -1 = none.
 - **`commonsoundtable.csb`**: 62 entries in voice-bank order (bank ids 6001 Mario, ...,
-  6016 Marth = entry 15): three voice clips (label, row) and the cheer bank's row (**inferred**:
-  used for common situations such as KO screams).
+  6016 Marth = entry 15): three voice clips (label, row: the KO screams, MissFoot01 / 02 and
+  Damage_hoshikie) and the chant bank's row. Matched by the fighter's name from the executable's own
+  table (`docs/new-fighter-slot.md` "Files matched by name").
 - **`fightermodelbanktable.mtb`**: 13 entries {base bank id, ..., alternative bank ids}, for
   fighters whose costumes have their own voices (Bowser Jr. / Koopalings: 7 alternatives).
 - Also: `soundprioritytable_fighter.spt`, `soundvolumefighternumtable.fnv` (volume by number of

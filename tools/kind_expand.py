@@ -153,6 +153,26 @@ IMMEDIATES = [
     (0x02761528, 'cmplwi r5, 0x41', 'cmplwi r5, %d', 'cap'),    # its twin
 ]
 DESC_SIZE, MINFO_SIZE = 0x38, 0x18
+# sound files whose records are matched by the fighter's Capitalised name (0x0275DB38), the record names taken
+# from a table by record index (the files' own name fields are never read: 0x02A7BA48 returns 0); records past
+# the table get "" and match nothing. New kinds get their names after the old ones (docs/new-fighter-slot.md
+# "Announcer and fanfare"):
+# - bgm_fighter.fbb (victory fanfare, parser 0x02A63954, lookup 0x02A63C50): 58 names, record = kind
+#   (0x00-0x39); the new table has one per kind up to the capacity ("" for 0x3A-0x40 and unused kinds).
+# - commonsoundtable.csb (KO voices + the crowd's chant, parser 0x02ABA37C, lookup 0x02ABA6BC by the fighter
+#   setup 0x02761C50): 62 names in voice-bank order; new kind k is record 0x3E + k - 0x41.
+# (name table, reader lis, its addi, the bound compare, its original, old count, new count)
+SOUND_NAME_TABLES = {
+    'fbb': (0x10340BBC, (0x02A63A20, 'lis r28, 0x1034'), (0x02A63A28, 'addi r28, r28, 0xBBC'),
+            (0x02A63AFC, 'cmplwi r25, %d'), 0x3A),
+    'csb': (0x10340F8C, (0x02ABA418, 'lis r23, 0x1034'), (0x02ABA420, 'addi r23, r23, 0xF8C'),
+            (0x02ABA4C8, 'cmplwi r28, %d'), 0x3E),
+}
+
+
+def sound_record(table, kind):
+    """the record index of a new kind in bgm_fighter.fbb / commonsoundtable.csb"""
+    return kind if table == 'fbb' else SOUND_NAME_TABLES['csb'][4] + kind - OLD_N
 # kinds whose vl load tail (0x02EA8DA4-) stores an extra vector (x1324 / x152C) keyed by the kind
 # itself: a new kind with one of these bases doesn't get it (the base's own slot still has it)
 TAIL_EXTRA_KINDS = (5, 6, 8, 0x17, 0x18, 0x19, 0x1C, 0x20, 0x21, 0x23, 0x26, 0x35)
@@ -780,6 +800,21 @@ hb_done:
             B.asm(o + 8, 'addis r12, r11, 0x%X' % ha(at), 'addis r12, r11, 0x%X' % ha(table))
             B.asm(o + 12, 'lwz r12, %d(r12)' % slo(at), 'addi r12, r12, %d' % slo(table))
             assert img.w(o + 16) == one(o + 16, 'mtctr r12') and img.w(o + 20) == 0x4E800420
+
+    # ---- 8. sound files matched by name: the name tables grown with the new kinds' Capitalised names
+    info['sound_tables'] = {}
+    for name, (addr, (hi_at, hi), (lo_at, lo), (cmp_at, cmp_), old) in SOUND_NAME_TABLES.items():
+        n = sound_record(name, cap - 1) + 1
+        ptrs = [img.w(addr + 4 * i) for i in range(old)] + [sptr['']] * (n - old)
+        for r in kinds:
+            ptrs[sound_record(name, r['kind'])] = sptr[r['cap']]
+        at = B.alloc(4 * n)
+        B.data(at, b''.join(struct.pack('>I', v) for v in ptrs), 'table sound names ' + name)
+        reg = hi.split()[1]
+        B.asm(hi_at, 'lis %s 0x%X' % (reg, ha(at)), hi)
+        B.asm(lo_at, 'addi %s %s %d' % (reg, reg, slo(at)), lo)
+        B.asm(cmp_at, cmp_ % n, cmp_ % old)
+        info['sound_tables'][name] = (at, n)
     info['cave_end'] = B.pc
     return B, info
 

@@ -640,6 +640,51 @@ def check_assets(inst, name, base, rep):
         rep.add('WARN', 'A1 labels', 'sound banks without sound/config/soundlabeltable.bin (Hero fix 71)')
 
 
+def check_sound_tables(inst, name, kind, rep):
+    """A2-A4: the game finds a fighter's records in bgm_fighter.fbb (victory fanfare) and commonsoundtable.csb
+    (KO screams, the crowd's chant) by its Capitalised name, naming the records from the executable's own tables
+    (tools/kind_expand.py SOUND_NAME_TABLES); a new kind needs those tables grown AND its records in the files
+    (tools/fighter_extras.py fanfare / common). Squirtle extras 2: no KO voices, no chant, Mario's fanfare."""
+    import tempfile
+    import kind_expand as K
+    if not inst.glob(r'fighter/%s/sound/.*' % name):
+        return
+    rpx = inst.get('code/cross_f.rpx')
+    if rpx is None:
+        rep.add('INFO', 'A2 sound-names', 'no code/cross_f.rpx in the packages: the executable\'s sound name tables '
+                'aren\'t checked')
+    else:
+        with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+            f.write(rpx)
+            f.flush()
+            img = K.Image(f.name)
+            for tname, (addr, (hi_at, _h), (lo_at, _l), (cmp_at, _c), old) in K.SOUND_NAME_TABLES.items():
+                at = ((img.w(hi_at) & 0xFFFF) << 16) + K.sx16(img.w(lo_at))
+                i = K.sound_record(tname, kind)
+                got = img.cstr(img.w(at + 4 * i)) if at != addr and i < (img.w(cmp_at) & 0xFFFF) else None
+                want = record(name).get('cap') or name.capitalize()
+                if got != want:
+                    rep.add('ERROR', 'A2 sound-names', 'the executable names %s record %d %r, not %r: the game never '
+                            'finds %s\'s %s (kind_expand.py SOUND_NAME_TABLES; Squirtle extras 2)' % (
+                                {'fbb': 'bgm_fighter.fbb', 'csb': 'commonsoundtable.csb'}[tname], i, got, want, name,
+                                {'fbb': 'victory fanfare', 'csb': 'KO voices and crowd chant'}[tname]))
+    csb = inst.get('sound/config/commonsoundtable.csb')
+    i = K.sound_record('csb', kind)
+    ok = False
+    if csb and csb[:4] == b'CSB\0':
+        nval, n = struct.unpack_from('<HH', csb, 8)
+        if i < n:
+            v = struct.unpack_from('<%dH' % (2 * nval), csb, 0xC + (0x10 + 4 * nval) * i + 0x10)
+            ok = any(v[2 * k] != 0xFFFF for k in range(nval - 1))
+    if not ok:
+        rep.add('ERROR', 'A3 common-voices', 'commonsoundtable.csb has no record %d for %s: no KO voices, no crowd chant '
+                '(tools/fighter_extras.py common; Squirtle extras 2)' % (i, name))
+    fbb = inst.get('sound/config/bgm_fighter.fbb')
+    if not fbb or fbb[:4] != b'FBB\0' or struct.unpack_from('<I', fbb, 8)[0] <= kind:
+        rep.add('WARN', 'A4 fanfare', 'bgm_fighter.fbb has no record 0x%X: no victory fanfare (tools/fighter_extras.py '
+                'fanfare)' % kind)
+
+
 def check_universal(p, rep):
     """E6: the universal shader path's shaders (tools/ult_shader.py: Ultimate's programs lowered; their vertex
     program reads no emitterStaticUniformBlock, every vanilla one does): a slot the pixel program samples must
@@ -830,6 +875,7 @@ def main():
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
+    check_sound_tables(inst, a.name, kind, rep)
     check_effects(inst, a.name, rep)
     check_effect_scripts(src, base['ult'], rep)
     n = rep.show()

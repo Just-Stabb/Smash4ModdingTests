@@ -792,3 +792,22 @@ The user, on extras 1: his own victory poses play; the announcer says "Mario"; n
 - **Chant:** his cheer bank is set up as Mario's (same bank id and row, timing row for kind 0x46); why it doesn't
   play is still open (docs/new-fighter-slot.md "Announcer and fanfare").
 - `port_check` over v6 + test 25 + extras 1 + extras 2: 0 errors.
+
+## v6 extras 3 (`build/squirtle_v6_extras3.zip`): KO screams, crowd chant, victory theme
+
+The user: "KO sounds are also missing" (and no chant, from extras 1).
+- **Cause:** the executable reads `commonsoundtable.csb` (KO screams + the chant bank's row) and
+  `bgm_fighter.fbb` (victory theme) into records it names itself, by index, from tables of the vanilla roster
+  (62 / 58 names), then finds a fighter's record by its name. A new kind's record never had a name, so
+  extras 2's fanfare entries were never found, and the csb had no record for Squirtle at all. His voice bank's
+  KO tones are fine (MissFoot01 / 02 and Damage_hoshikie hold his Ultimate `missfoot01` / `02` and
+  `damage_twinkle`); nothing asked for them.
+- **Executable:** `tools/kind_expand.py` grows both name tables with the new kinds' names (`SOUND_NAME_TABLES`:
+  6 instructions and two cave tables); built on `aerial_buffer_fix.zip`'s `cross_f.rpx` (the newest), nothing
+  else changed (195 words). `kind_expand_test.py` runs both parsers and the fanfare lookup on files with a
+  record per kind: the new kinds' records are found (unpatched: none), the vanilla ones as before. 0 failed.
+- **commonsoundtable.csb:** records 62-67 for the new kinds, each its base's (Squirtle record 67 = Mario's:
+  labels 0x12 / 0x13 / 0x0B on row 0x5E, chant row 0x89F; his banks keep Mario's ids). Hero, Sephiroth,
+  Incineroar, Steve and Supamario get their bases' records too (`tools/fighter_extras.py common`).
+- `port_check` (new checks A2 sound-names, A3 common-voices, A4 fanfare): v6 + test 25 + extras 1 + extras 2 +
+  the aerial buffer fix had the 3 errors; with extras 3, 0 errors.

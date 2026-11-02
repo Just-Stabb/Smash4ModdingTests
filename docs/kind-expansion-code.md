@@ -92,8 +92,8 @@ characters (`'A'`), sizes, rule / status ids, stage kinds (`[[0x102F7020]]`), th
 | `0x1012F6BC` / `F700` / `F744` / `F788` | 65 u8 each | `0x02EA9104` / `9120` / `913C` / `9158` (`addis r12, r4, 0x1013; lbz`) | special N / S / Hi / Lw block sizes |
 | `0x100D21D8` | 65 u32 | `0x02AB8CB0` | sound class 0-3; **no bound** |
 | `0x1033BE68` | `{-1, ""}` + 82 `{id, name}` | `0x0293DCCC` (`li r4, 0x53`) | character id → UI name (1.6) |
-| `0x10340BBC` | 58 ptr (kinds 0-0x39) | sound-side parser `0x02A63954` (`cmplwi r25, 0x3A` at `0x02A63AFC`) | name-matched records; optional |
-| `0x10340F8C` | 62 ptr (other order: Mario first, transformations / Miis at `0x30`-`0x36`) | `0x02ABA37C` (`cmplwi r28, 0x3E` at `0x02ABA4C8`) | the same order as `commonsoundtable.csb`'s 62 entries; optional |
+| `0x10340BBC` | 58 ptr (kinds 0-0x39) | `bgm_fighter.fbb` parser `0x02A63954` (`cmplwi r25, 0x3A` at `0x02A63AFC`) | names its records (victory fanfare); grown by kind_expand.py (`SOUND_NAME_TABLES`) |
+| `0x10340F8C` | 62 ptr (other order: Mario first, transformations / Miis at `0x30`-`0x36`) | `commonsoundtable.csb` parser `0x02ABA37C` (`cmplwi r28, 0x3E` at `0x02ABA4C8`) | names its records (KO screams, chant); grown by kind_expand.py |
 | Kirby: `0x1038281C` | 58 ptr | 6 sites `0x02EFD83C`-`0x02EFDF84` (index `fighter+0xB9CC`) | per-kind copy record `{entries, count}` |
 | Kirby: `0x1041A6D0`, `7B8`, `8A0`, `988`, `A70` | 5 x 58 ptr | `0x030C46DC`-`0x030C470C` | copy owner, hat, item, Bayonetta guns |
 
@@ -291,8 +291,8 @@ per-kind values (base cases, table values) and prints the immediates; `--plan -`
 - **Effect IDs**: the `0x3KK` decoder wasn't found; an 8-bit kind fits, but per-kind arrays behind it would
   not show up in this scan if they are heap arrays.
 - **Resource ID collisions** above `0x450` in the fighter resource map: not checked.
-- **Two unidentified name-matched sound parsers** (`0x02A63954`, `0x02ABA37C`): if their files need a row per
-  fighter, new kinds have none (probably silent).
+- ~~Two unidentified name-matched sound parsers~~: `bgm_fighter.fbb` and `commonsoundtable.csb`; new kinds had
+  no fanfare, KO screams or chant (Squirtle extras 2). Grown (`new-fighter-slot.md` "Files matched by name").
 - **Unreviewed compares** (1.10) and the 4 `verify` sites.
 - **Save data / records** by character id (`record_vs_param*`, VS records): untested, as in
   `new-fighter-slot.md`.
