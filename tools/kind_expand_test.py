@@ -689,6 +689,25 @@ def main():
           [(r['cap'], r['cap'], K.sound_record('csb', r['kind'])) for r in kinds])
     check('csb parsed: the unpatched game names them ""', [on[K.sound_record('csb', r['kind'])] for r in kinds],
           [''] * len(kinds))
+    # end to end, as the Dead status gets its KO voice: the fighter setup's lookup by the kind's name (0x02761E40:
+    # 0x0275DB38, 0x02ABA788, 0x02ABA034 into the sound module's +0x5D0), then MSC SoundModule(0x2727, i) =
+    # the module's vt +0x224 0x02762BCC
+    E = Emu(patched)
+    _ok, _n, holder = file_parse(E, 0x02ABA37C, csb, 0x38, {0x033745A8: lambda E_: E_.alloc(E_.r(3), b'\0')})
+    E.stub(0x03374578, lambda E_: E_.alloc(E_.r(3), b'\0'))
+    E.stub(0x0337460C, lambda E_: None)
+    hp = E.alloc(4, b'\0')
+    E.setw(hp, holder)
+
+    def common_voice(k):
+        lst, mod = E.alloc(0x20, b'\0'), E.alloc(0x600, b'\0')
+        E.call(0x02AB9F8C, mod + 0x5D0)
+        E.call(0x02ABA788, hp, lst, E.call(0x0275DB38, k))
+        E.call(0x02ABA034, mod + 0x5D0, lst)
+        return [E.call(0x02762BCC, mod, i) for i in range(4)]
+    check('SoundModule(0x2727, i) for each new kind: its own record\'s values',
+          [common_voice(r['kind']) for r in kinds], [[K.sound_record('csb', r['kind'])] * 4 for r in kinds])
+    check('... and Mario\'s (kind 3): record 0', common_voice(3), [0] * 4)
 
     print('FAILS', fails)
     sys.exit(1 if fails else 0)

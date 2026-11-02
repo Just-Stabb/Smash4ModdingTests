@@ -811,3 +811,13 @@ The user: "KO sounds are also missing" (and no chant, from extras 1).
   Incineroar, Steve and Supamario get their bases' records too (`tools/fighter_extras.py common`).
 - `port_check` (new checks A2 sound-names, A3 common-voices, A4 fanfare): v6 + test 25 + extras 1 + extras 2 +
   the aerial buffer fix had the 3 errors; with extras 3, 0 errors.
+
+## KO diagnostic (`build/squirtle_ko_diagnostic.zip`)
+
+The user, on extras 3: "KO sounds seem to not work." Checked offline, all as intended: the KO voices come from
+the Dead status (MSC `SoundModule(0x2727, 0 / 1)` blast, `(0x2727, 2)` star, then `SoundModule(0x2710, id)`);
+0x2727 is the sound module's vt +0x224 `0x02762BCC`, the csb record found at the fighter setup (`0x02761E40`).
+Emulated end to end (`kind_expand_test.py`), Squirtle now gets Mario's ids 0x5E0012 / 0x5E0013 / 0x5E000B
+(the previous executable: -1); in his bank those labels are tones 18 / 19 / 11, valid IDSP (his Ultimate
+missfoot01 / 02, damage_twinkle). The diagnostic points his record at labels he already says in moves (0x36
+attack01, 0x37 attack02, 0x3D jump01) to tell whether the path runs in game at all.
