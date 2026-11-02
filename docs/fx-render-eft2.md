@@ -214,3 +214,38 @@ Smash 4 footage: a camera difference, not the bank's.
 2. Following types 0 / 2, position_random, life_random.
 3. Texture animation (flipbook cells, UV scroll) and the second texture.
 4. Fields and child emitters.
+
+## Runtime timing and eft's particle streams (universal-shader phase 0)
+
+From both games' code (cross_f.rpx, PowerPC with paired singles; main.bin, ARM64):
+
+- **eft's CPU particle record** (0x04A637E4 writes it each frame, 0xB0 bytes; the particle in r4):
+  - `v_inWldPos` = particle +0x38..+0x40, w = particle +0x00 (its age).
+  - `v_inScl` = (p+0x70 x p+0x9C x data +0x264, p+0x74 x p+0xA0 x data +0x268 + p+0x13C, 0, 0): z and w are 0.
+  - `v_inVec` = p+0x2C..+0x34, w = p+0x10 (a per-particle random value set at emission, not the birth).
+  - `v_inRandom` = p+0x144..+0x14C, w = float(int life) (p+0x0C).
+  - `v_inRot` w 0.
+  - `v_inColor0 / 1`: alpha x p+0x98.
+  - `v_inWldPosDf` = p+0x44..+0x4C, w 1.
+  - Emission (0x04A5C628): age 0, birth = the emitter's time (p+0x04), life at p+0x0C.
+- **eft's frame** (emitter update 0x04A64CE8):
+  1. Emission (birth = time T).
+  2. For each particle (0x04A65480): death check on int(age) >= life, then the update (0x04A624E4 / 0x04A62A90 /
+     0x04A6314C: motion, curves at the age before the step, then age += step), then the record write.
+  3. Time = T + step (0x04A65440; the previous time kept at +0x38).
+  4. Drawing comes after. The step is instance +0x5C (1 at full speed).
+- **emp0** (dynamic block, 0x04A65A08) = (instance +0x30 time, data +0x264, data +0x268, instance +0x5C step).
+  GPU-side programs take age = emp0.x - birth - emp0.w for their curves: 0 on the birth frame, as the CPU's.
+- **Ultimate's frame** (0x8DC80): emission, the particle updates, then time += step (instance +0x44, 0x8E44C).
+  c10 (0x8F200): c10[8] = +0x44 (the time after the step; +0x48 when a data flag at set +0x1700 is set),
+  c10[11] the step. Its programs take age = c10[8] - birth with no step taken off (159 of Squirtle's 165
+  read c10[8], 40 read c10[11], for motion): **1 on the birth frame**.
+- So the converted parts' curves run a frame behind Ultimate's in game: eft shows the birth frame at age 0,
+  Ultimate at age 1. fx_render now feeds both as the games do (c10[8], emp0.x = time after the step; a CPU
+  particle's v_inWldPos.w its age + 1); before, it fed time - birth = 0 to both, which hid the offset and
+  made eft's GPU-side programs look a frame late (test 21's open question: not in game). The universal path
+  avoids it by giving Ultimate's programs time - birth = v_inWldPos.w. The current converter could shift its
+  curves by a frame.
+- **c12** = sysEmitterPluginUniformBlock: the emitter-plugin (EP0x) data, 20 words. fx_render doesn't feed it
+  yet (pieces with EP03, e.g. bullert1 / waveline1, aren't modelled there).
+

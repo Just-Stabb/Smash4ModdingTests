@@ -114,7 +114,17 @@ eft2 lays them out) and to the lowered program (the same values through eft's st
 `gl_Position`, every output and every pixel. Any lowering bug shows up as a named emitter and a first
 differing register. `port_check` gets a check that every emitter's lowered program passed.
 
-## Unknowns to settle first (phase 0)
+## Phase 0 results (settled; details in docs/fx-render-eft2.md, "Runtime timing")
+
+- `emp0.w` is the frame step (1); eft's GPU-side programs subtract it so their curves start at age 0. The age
+  a translated program needs is `v_inWldPos.w` (age after the step) = Ultimate's c10[8] - birth.
+- CPU streams: `v_inRandom.w` = the particle's life (int), `v_inScl.z` = 0 (so the z / x ratio is baked),
+  `v_inVec.w` a random value (not the birth: birth = time - age).
+- c12 = the emitter-plugin block (EP0x), baked like c9.
+- Still to measure in phase 1: whether a particle is moved on its birth frame in both games (the record
+  shows the moved place in eft; Ultimate's order looks the same).
+
+## Unknowns to settle first (phase 0, as scoped)
 
 1. **eft's runtime values:**
    - `emp0.w` = instance +0x5C (cross_f 0x04A65B18). Test 21's open one-frame lag hinges on it.

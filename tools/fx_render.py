@@ -839,7 +839,10 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     info = e['info']
     c10 = np.zeros(48, np.float32)
     c10[0:4], c10[4:8] = info['color0'], info['color1']
-    c10[8], c10[11], c10[12], c10[13:16] = time, 1.0, 1.0, csize
+    # c10[8] the emitter's time after this frame's step (main.bin 0x8F244: instance +0x44, which the update
+    # 0x8DC80 advances at its end, 0x8E44C, after emitting and moving the particles; drawing comes after):
+    # time - birth is 1 on a particle's birth frame. c10[11] the step
+    c10[8], c10[11], c10[12], c10[13:16] = time + 1.0, 1.0, 1.0, csize
     c10[16:28] = mnow[:3, :4].ravel()
     rt = mnow[:3, :4].copy()
     rt[:, :3] /= np.maximum(np.linalg.norm(rt[:, :3], axis=0), 1e-9)
@@ -969,7 +972,9 @@ def draw_s4(canvas, em, parts, mnow, time):
             # fractions of it), v_inScl only the random x EASL factor (x the base scale and its curve, CB2
             # scaleAnim0-2, in the program); the CPU's programs take its current values, v_inWldPos.w the age
             # (tools/latte_exec.py runs of smoke3: the sizes come out as its keys say only so)
-            per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age),
+            # a CPU particle's v_inWldPos.w is its age after this frame's step (cross_f 0x04A637E4 writes the
+            # record after the update 0x04A624E4 & co. add the step, 0x04A65990 -> 0x04A659A4): 1 on its birth frame
+            per = {'v_inWldPos': np.append(b['pl' if local else 'p'], b['birth']) if gpu else np.append(pw, age + 1.0),
                    'v_inVec': np.append(b['vl' if local else 'v'], 1.0),
                    'v_inScl': (b['scale'][0], b['scale'][1], b['scale'][0], 1) if gpu else (sx, sy, sx, 1),
                    'v_inRandom': np.append(b['random'], b.get('life', float(em.life))), 'v_inRot': np.append(b['rot0'] if gpu else rot, 0),
@@ -990,7 +995,11 @@ def draw_s4(canvas, em, parts, mnow, time):
             A[:, :, k, 0] = np.arange(nv)
     cb3 = np.zeros(48, np.float32)
     cb3[0:8] = 1.0                           # emc0 / emc1: the set's and instance's colours (x 1 here)
-    cb3[8:12] = (time, 1.0, 1.0, 1.0)        # emp0: the emitter's time (the GPU programs' age = this - birth)
+    # emp0 (cross_f 0x04A65A08): x the emitter's time after this frame's step (instance +0x30, advanced at the
+    # end of the update 0x04A64CE8 -> 0x04A65440, after emission and the particles), so time - birth is 1 on
+    # a birth frame; w the step (instance +0x5C, the update's own step: 0x04A65984), which the GPU programs
+    # take off for their curves (age 0 on the birth frame, as eft's CPU curves); y / z emitter data +0x264 / +0x268
+    cb3[8:12] = (time + 1.0, 1.0, 1.0, 1.0)
     cb3[12:16] = 1.0
     full = np.eye(4)
     full[:3, :4] = mnow[:3, :4]
