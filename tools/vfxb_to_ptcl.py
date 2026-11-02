@@ -708,7 +708,7 @@ def distortion(e, ti, images, is_mesh):
     moved, a third sampler not (Frizz's grade05 at its own UVs). None when there's nothing to move
     or the map can't be drawn: a mesh's two-texture programs read one UV set"""
     s0 = e['sampler'][0]
-    if e['combiner']['shader_type'] != 2 or ti in (None, 0) or s0['texture_id'] == NONE64 or s0['texture_id'] not in images:
+    if e['combiner']['shader_type'] != 2 or ti in (None, 0, 2) or s0['texture_id'] == NONE64 or s0['texture_id'] not in images:
         return None
     if is_mesh and e['tex_anim'][0]['uv_channel'] != e['tex_anim'][ti]['uv_channel']:
         return None
@@ -721,10 +721,20 @@ def distortion(e, ti, images, is_mesh):
     return sx, sy
 
 
-def main_texture(e, names):
+def main_texture(e, names, images=None):
     smp = [(i, s) for i, s in enumerate(e['sampler']) if s['texture_id'] != NONE64]
     for i, s in smp:
         if not any(h in names.get(s['texture_id'], '') for h in HELPER_TEXTURES) and not is_indirect(e, i, names):
+            s2 = e['sampler'][2]
+            if i == 1 and images is not None and e['shader']['custom_shader_index'] == DISSOLVE_SHADER and \
+                    s['texture_id'] in images and s2['texture_id'] != NONE64 and s2['texture_id'] in images and \
+                    not is_indirect(e, 2, names) and \
+                    float(np.asarray(images[s['texture_id']])[..., :3].min()) > 250:
+                # a dissolve whose sampler 1 (the mask: its alpha) is white in colour, sampler 0 a distortion
+                # map: Ultimate's program (Waterfall's waveline1_2, shader 32) draws colour 1 -> 0 by
+                # sampler 2 x sampler 1 and its alpha from sampler 2's; sampler 2 is the picture. Taken as
+                # sampler 1 with 2 as its mean, the wave lines were soft white blobs (the "whiter, wispy" look)
+                return 2, s2
             return i, s
     drawn = [(i, s) for i, s in smp if not is_indirect(e, i, names)]
     return (drawn or smp)[0] if smp else (None, None)
@@ -815,7 +825,7 @@ def bake_samplers(e, ti, img, ptn, images, names, notes):
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-def sampler_inputs(e, i, img):
+def sampler_inputs(e, i, img, weight=True):
     """sampler i's colour and alpha inputs to eft2's combiner (tex_color_input: 0 rgb, 1 its alpha
     in rgb; tex_alpha_input: 0 alpha, 1 red, 2 one: the sampler leaves the alpha alone (Woosh's
     tornado1_f2, read with the WindowSmash translator: alpha = texture 0's x colour 0's, texture 1's
@@ -824,13 +834,46 @@ def sampler_inputs(e, i, img):
     f = img.astype(np.float32) / 255
     cb = e['combiner']
     rgb = np.repeat(f[..., 3:4], 3, -1) if cb['tex_color_input'][i] == 1 else f[..., :3]
-    if display_space(e) and e['sampler'][i]['texture_id'] not in SRGB_TEXTURES:
+    if display_space(e) and cb['color_process'] == 2:
+        # colour mode 2 (colour 0 x texture + colour 1 x (1 - texture)): the texture is the mix's weight, which
+        # Ultimate takes in linear light (an sRGB texture decoded); the display-encoded keys mixed by that
+        # weight land within 0.03 of Ultimate's mix encoded. Taken as a colour (encoded, or sRGB as stored),
+        # the weight drew every water part's blue towards white: Waterfall's wave lines (sRGB grey 0.64,
+        # linear 0.37) stood pale, 0.59 at their darkest to Ultimate's 0.45
+        if e['sampler'][i]['texture_id'] in SRGB_TEXTURES:
+            rgb = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4).astype(np.float32)
+        if weight:
+            rgb = mix_weight_curve(e, rgb)
+    elif display_space(e) and e['sampler'][i]['texture_id'] not in SRGB_TEXTURES:
         # a linear (UNORM) texture's colour as displayed (LINEAR_DISPLAY); its alpha stays coverage
         rgb = (rgb ** DISPLAY_GAMMA).astype(np.float32)
     if cb['tex_alpha_input'][i] == 2:
         return rgb, np.ones_like(f[..., 0])
     red = cb['tex_alpha_input'][i] == 1 or cb['alpha_process'] in (2, 3)
     return rgb, (f[..., 0] if red else f[..., 3])
+
+
+def mix_weight_curve(e, w):
+    """colour mode 2's weight w (linear, [h, w, 3]) as the display-space mix wants it, channel by channel:
+    Ultimate shows disp(c1 + (c0 - c1) w), the program draws enc(c1) + (enc(c0) - enc(c1)) w'. No one w'
+    is exact for every colour, so each value's w' is the least-squares one over the colour tracks' life,
+    weighted by alpha 0, one curve for the three channels (Waterfall's wave lines: colour 1 (0.00, 0.18, 0.28) -> (0.56, 0.72, 0.82)
+    under a white colour 0; w itself drew the young lines' dark ends half as bright as Ultimate's)"""
+    st, col = e['static'], e['color']
+    cs = float(st['color_scale'] or 1.0)          # the program's colour scale multiplies both
+    c0 = track(st, col, 0)[0] * np.array(e['info']['color0'][:3]) * cs
+    c1 = track(st, col, 1)[0] * np.array(e['info']['color1'][:3]) * cs
+    wt = np.clip(track(st, col, 0)[1], 0, None)[:, None] + 1e-6         # [101, 1]
+    a, d = display(np.clip(c1, 0, None)), display(np.clip(c0, 0, None)) - display(np.clip(c1, 0, None))
+    v = np.linspace(0, 1, 256)
+    num, den = np.zeros(256), np.zeros(256)
+    for ch in range(3):          # one curve for all channels (a dissolve's texture carries one grey weight)
+        target = display(np.clip(c1[:, ch:ch + 1] + (c0[:, ch:ch + 1] - c1[:, ch:ch + 1]) * v[None], 0, None))
+        num += (wt * d[:, ch:ch + 1] * (target - a[:, ch:ch + 1])).sum(0)
+        den += (wt * d[:, ch:ch + 1] ** 2).sum(0)
+    out = np.clip(np.where(den > 1e-6, num / np.maximum(den, 1e-12), v), 0, 1)
+    idx = np.clip(np.round(np.asarray(w, np.float64) * 255), 0, 255).astype(int)
+    return out[idx].astype(np.float32)
 
 
 def same_uv(e, i, j):
@@ -890,7 +933,7 @@ def dissolve_of(e, ti, images, names, ptn):
         return None
     for j, x in enumerate(e['sampler']):
         if x['texture_id'] != NONE64 and x['texture_id'] in images and not is_indirect(e, j, names):
-            rgb, _a = sampler_inputs(e, j, images[x['texture_id']])
+            rgb, _a = sampler_inputs(e, j, images[x['texture_id']], weight=False)
             # grey within compression noise: Squirtle's water lines (BC-compressed linear textures, their
             # channels 5 - 10 / 255 apart once display-encoded) had their dissolves dropped at 2.5 / 255
             if float(np.abs(rgb - rgb[..., :1]).max()) > 12 / 255:
@@ -1069,7 +1112,7 @@ def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=
             pix = fit_texture(np.stack([u, u, u, v], -1))
             notes.append('sampler %d drawn live as texture %d (distortion map, UV mode %d)' % (j, slot, uv_mode(ts)))
         else:
-            rgb, a = sampler_inputs(e, j, cell)
+            rgb, a = sampler_inputs(e, j, cell, weight=False)
             pix = fit_texture(np.concatenate([rgb, a[..., None]], -1))
             cbl, abl = tex_blend(e, ti, j)
             notes.append('sampler %d drawn live as texture %d (colour %s, alpha %s, UV mode %d)' % (
@@ -1142,7 +1185,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
         meaned, same = [], []
         for j, s in others:
             orgb, oa = sampler_inputs(e, j, first_cell(images[s['texture_id']], e['static']['tex_scroll'][j],
-                                                      shown_cell(e, j)))
+                                                      shown_cell(e, j)), weight=False)
             k = 2 if 2 in (ti, j) else 1        # tex_blend: sampler 2 comes in by tex2's blend
             line = one_axis(e, ti, j, orgb, oa, rgb.shape[:2]) if not ptn else None
             if same_uv(e, ti, j) and not ptn:
@@ -1173,7 +1216,7 @@ def exact_texture(e, ti, img, ptn, images, names, notes, is_mesh, live=None, liv
     for j, s in others:
         ts = e['static']['tex_scroll'][j]
         src = first_cell(images[s['texture_id']], ts, shown_cell(e, j))
-        orgb, oa = sampler_inputs(e, j, src)
+        orgb, oa = sampler_inputs(e, j, src, weight=False)
         uv = uv_transform(quad * np.array(REPEAT.get(e['tex_anim'][j]['repeat'], (1, 1)), np.float32),
                           ts['scale'], ts['scroll'], ts['rotation'])
         sh, sw = oa.shape
@@ -1643,7 +1686,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         typ = 4
         notes.append('stripe mesh: type 4')
     blend = {0: 'normal', 1: 'add', 2: 'sub'}.get(e['render']['blend_type'], 'add')
-    ti, smp = main_texture(e, names)
+    ti, smp = main_texture(e, names, images)
     fill = 1.0
     if refract:
         # the distortion map is sampler 0 (an indirect one, which main_texture passes over: Waterfall's
@@ -1791,10 +1834,18 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     two_tpl = lay_t is not None and 'uv1' in lay_t
     dis_in = None       # the colour track carrying the dissolve's threshold
     if dis is not None and lay_t is not None and (not two_tpl if not mask1 else 'uv2' not in lay_t):
-        if lay_t['c1'] is not None and (p.field(em, 'color1_type') == 2 or not dis_moving):
+        c0_ok = c0_flat and (p.field(em, 'color0_type') == 2 or not dis_moving) and (
+            lay_t['c1'] is not None or e['combiner']['color_process'] not in (2, 3))
+        c1_flat = float(np.ptp(track(e['static'], e['color'], 1)[0], 0).max()) <= 0.01
+        if c0_ok and not c1_flat and e['combiner']['color_process'] in (2, 3):
+            # colour 0 constant, colour 1 animated: the threshold takes colour 0's track (its constant goes
+            # in the program), colour 1 keeps its own. Waterfall's wave lines' colour 1 runs dark blue
+            # (0.00, 0.18, 0.28) -> (0.56, 0.72, 0.82); with the threshold in its track it stood at its mean,
+            # the young lines pale
+            dis_in = 0
+        elif lay_t['c1'] is not None and (p.field(em, 'color1_type') == 2 or not dis_moving):
             dis_in = 1
-        elif c0_flat and (p.field(em, 'color0_type') == 2 or not dis_moving) and (
-                lay_t['c1'] is not None or e['combiner']['color_process'] not in (2, 3)):
+        elif c0_ok:
             dis_in = 0
     if dis is not None and dis_in is None:
         notes.append('dissolve not drawn (template: %s)' % (

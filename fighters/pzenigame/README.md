@@ -615,3 +615,34 @@ Up smash's base band (AttackHi4 wave4) and the dash / run-brake ripples (Brake w
   AttackS4 137k vs 151k, Dash 32.1k vs 30.1k, RunBrakeL 14.4k vs 14.7k, SpecialHi 288k vs 264k.
 - Also grafted: down smash's wave2 / wave3 (type 1, the same Z-curve difference). Waterfall's cylinder1 and
   light1 templates can't take the graft (their Z follows X, as before).
+
+## v6 effects test 20 (`build/squirtle_v6_effects_test20.zip`)
+
+Waterfall's whiter, wispy look (test 18's zoomed clip). The renderer showed it too: one piece, waveline1_2,
+drew as a soft white haze over the column.
+- waveline1_2's Ultimate pixel program (shader 32, run with mx_exec) works as follows:
+  - Sampler 0 is a distortion map that bends sampler 1.
+  - Sampler 1 is the dissolve mask; its colour is pure white.
+  - Sampler 2 is the picture: alpha = its alpha, colour = colour 1 + (colour 0 - colour 1) x sampler 2 x sampler 1.
+  - Samplers 1 and 2 take different random scrolls: random z and x (vertex program run with each random
+    component changed in turn).
+- main_texture had taken sampler 1 and averaged sampler 2 in, losing the shape (the blob). A dissolve
+  whose sampler 1 is white now takes sampler 2, with the mask live as texture 1.
+- Colour mode 2 mixes colour 0 / 1 by the texture. Ultimate mixes by the linear value in linear light.
+  Ours mixes display-encoded keys, by a display-encoded (UNORM) or stored-sRGB weight, which pulls
+  towards white. The converter now bakes a weight curve per emitter (mix_weight_curve): least squares
+  against Ultimate's mix over the colour tracks' life, one curve for all channels.
+- A dissolve's threshold now takes colour 0's track when colour 0 is constant and colour 1 animates
+  (about 25 parts). waveline1_2's colour 1 runs dark blue -> pale over its life; it had been held at its mean.
+- Result for waveline1_2's drawn colours (R; renderer, frames 10-30):
+
+  | | Ultimate | Before | Now |
+  |---|---|---|---|
+  | Median | 0.64 | 0.71 (blob) | 0.62 |
+  | Darkest 10% | 0.45 | 0.59 | 0.34 |
+
+  The darkest are darker than Ultimate's because Smash 4 blends alpha in display space, Ultimate in
+  linear light. Coverage per move is unchanged from test 19.
+- Still open: Waterfall's water1 splash sheets (alpha mode 4, threshold erosion) are fainter / smaller
+  than Ultimate's white sheets.
+
