@@ -890,6 +890,23 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
 - Float_Var_Compare / the compare functions (`0x02BEE010`, table `0x10351804`): method 0 `==`,
   1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`.
 
+## Buffered aerials out of ground statuses (edge-cancel bug)
+
+Base-game bug (user): an aerial buffered during landing lag that edge-cancels into Fall always came out as
+neutral air. The aerial is picked by common MSC `func_311` (AttackAir `0x34` main → `func_312` → `func_310`)
+from `ControlModule(0x10)` (1 N, 2 F, 3 B, 4 Hi, 5 Lw; anything else → N): a virtual call (int handler
+`0x02C1C7D0` → vtable `+0x284`, fighters `0x02E74AA4`) returning the control module's `+0x1A8`. The
+command builder `0x02E71774` fills `+0x1A8` on an attack press (`0x02E71B58`: from the stick: neutral
+(`0x02E71458` / `0x02E71514` against common `+0x100` / `+0x104`) → 1, else sideways by stick X x facing → 2 / 3,
+else up / down → 4 / 5), only while it's 0, and only when the situation (StatusModule vtable `+0xDC`) is
+1 or 2 (air), or the status is JumpSquat `0xA`, Pass `0x71` or `0xAE` (jump out of water). It's cleared
+(`0x02E72988`) on a frame the attack buffer byte has run out. So a press in landing lag (ground) was
+buffered with `+0x1A8` = 0, and the aerial it became read neutral.
+
+Fix: `0x02E71B54=0x60000000` (the `bne` past the computation → nop): the kind is stored on every attack
+press. Nothing else reads `+0x1A8` (only `0x02E71B58` and the getter); MSC reads `ControlModule(0x10)` only in
+`func_311`. Part of the standard build from now on (`build/aerial_buffer_fix.zip`: squirtle_v6's RPX + this word).
+
 ## Controls settings and input frames
 
 `tools/smash_button_cave.py` (user docs: `docs/controls.md`).
