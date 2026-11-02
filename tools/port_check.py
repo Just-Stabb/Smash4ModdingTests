@@ -618,10 +618,12 @@ def check_universal(p, rep):
     """E6: the universal shader path's shaders (tools/ult_shader.py: Ultimate's programs lowered; their vertex
     program reads no emitterStaticUniformBlock, every vanilla one does): a slot the pixel program samples must
     hold a texture (eft stops on "Texture Binary is None"), and every pixel input needs a vertex output of its
-    semantic (else it reads 0). Returns the universal shader indices"""
+    semantic (else it reads 0), and the emitter takes CPU particles: eft's GPU-calc flags (emitter byte 5 bit 0x80,
+    key byte 4 bit 0x02) left on from a GPU template move nothing on the CPU, the programs get birth values (parts
+    frozen at the stage's origin: Squirtle's effects test 22). Returns the universal shader indices"""
     import eft_vertex
     import ult_to_latte
-    uni = set()
+    uni, gpu_keys = set(), []
     for i in range(p.shader_count()):
         b = bytes(p.shader_binary(i))
         h = eft_vertex.vertex_header(b)
@@ -632,12 +634,19 @@ def check_universal(p, rep):
         missing = set(ph['inputs']) - set(ult_to_latte.vs_semantics(b))
         if missing:
             rep.add('ERROR', 'E6 universal-link', 'shader %d: pixel inputs %s without a vertex output' % (i, sorted(missing)))
-    no_tex = []
+        if p.shader_entry(i)[4] & 0x02:
+            gpu_keys.append(i)
+    if gpu_keys:
+        rep.add('ERROR', 'E6 universal-gpu', '%d universal shaders\' keys carry eft\'s GPU-calc flag (byte 4 bit 0x02): %s'
+                % (len(gpu_keys), ', '.join(map(str, gpu_keys[:12]))))
+    no_tex, gpu = [], []
     for si in range(len(p.sets)):
         for x in p.sets[si]['emitters']:
             d = x['data']
             if d is None or p.field(d, 'shader_index') not in uni:
                 continue
+            if d[5] & 0x80:
+                gpu.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
             ph = ult_to_latte.ps_header(bytes(p.shader_binary(p.field(d, 'shader_index'))))
             for _nm, _t, slot in ph['samplers']:
                 t = p.texres(d, slot)
@@ -646,6 +655,9 @@ def check_universal(p, rep):
     if no_tex:
         rep.add('ERROR', 'E6 universal-texture', '%d universal-shader emitters sample a slot with no texture ("Texture '
                 'Binary is None"): %s' % (len(no_tex), ', '.join(no_tex[:8])))
+    if gpu:
+        rep.add('ERROR', 'E6 universal-gpu', '%d universal-shader emitters carry eft\'s GPU-calc flag (byte 5 bit 0x80): '
+                'nothing moves them, drawn at birth values (the stage origin): %s' % (len(gpu), ', '.join(gpu[:8])))
     return uni
 
 

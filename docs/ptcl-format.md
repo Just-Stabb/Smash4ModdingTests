@@ -87,7 +87,7 @@ the writer recomputes them.)
 | off | type | name | conf |
 |-----|------|------|------|
 | 0x000 | u32 | type (0 simple, 1 complex) | verified |
-| 0x004 | u32 | flags | corpus |
+| 0x004 | u32 | flags; 0x00800000 (byte 5 bit 0x80) GPU calc: eft moves nothing on the CPU, the particle records hold birth values and the vertex program moves them (every vanilla emitter with a `v_inVec` program, no other; its shader key's byte 4 bit 0x02 the same). The streams the CPU writes follow the program's attributes (cross_f 0x04A57DA4: the shader object's attribute locations +0x578.. -> stream flags +0x5A0) | corpus |
 | 0x008 | u32 | random seed (0xFFFFFFFF random) | guess |
 | 0x00C - 0x037 | | eft's user data, read by the game's user callback 0x034 (the eft runtime keeps the matching callback set at instance +0x170, 0x04A55B60). Callback 1 is an effect light shining on fighters (vanilla: every `pointlight*` and ~90 flares): 0x00C top half the flags (bit 0 set; 0x09 - 0x3D), 0x010 0 (0x10101010 with 0x00C's low half 0x1010 on some), 0x014 - 0x01C colour (0 the particle's), 0x020 radius x the particle's scale (FliesUp flare1: 0.5 x 30). Ultimate's custom action 1 (CADP: u32 flags, colour, radius, a factor) is the same light: the common effects both games have match (FliesUp 0x1B / 0.5 in both; SpecialSpeedUp 15 x 1.3 / 0.5 x 30), Smash 4 without the flag bits from 0x20 up; its factor has no slot here. Callback 2 (34 vanilla emitters, user data 0) is unknown | corpus |
 | 0x038 | u32 | emitter name (name-table offset) | verified |

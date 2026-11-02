@@ -324,6 +324,22 @@ Ultimate's program.
 - Also found: up smash's ring1 stood up because eft's random rotation was added to Ultimate's own (the program
   turns the particle by its random values). The universal path now keeps eft's rotation at rotate_init.
 
+**Found in game (test 22): GPU templates' calc flags.**
+- Many parts froze, many at the stage's origin. 145 universal emitters had kept their template's GPU-calc flags:
+  - the emitter's byte 5 bit 0x80;
+  - the key's byte 4 bit 0x02.
+- Both split vanilla's GPU emitters / programs from the CPU's exactly. With them on, eft moves nothing on the CPU,
+  and the records hold birth values that the programs (written for CPU particles) draw as they stand.
+- fx_render missed it because it took GPU from the program's `v_inVec`, which every universal program reads.
+- The fix (test 23):
+  - `universal_shader` clears both flags.
+  - The CPU's streams follow the program's own attributes. The shader object's attribute locations (+0x578..,
+    -1 when absent) set its stream flags +0x5A0 (cross_f 0x04A57DA4), which the record writer takes. So nothing
+    else needs changing.
+  - fx_render follows the emitter's flag for universal emitters. Run on test 22's bank, it now draws up
+    smash's converted side empty.
+  - port_check E6 universal-gpu is an ERROR (test 22: 145 emitters, 109 keys).
+
 **Still open.**
 - c16 and the call's colour / alpha (c10[12], c16) at defaults.
 - c10[13 - 15]: the call's scale assumed in v_inScl.

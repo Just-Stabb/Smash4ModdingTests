@@ -127,6 +127,9 @@ UNIVERSAL = True
 # textures past the first (eft looks up textureSampler1 / 2 only for them: 5397 vanilla keys, all
 # matching their pixel samplers), 0x3B / 0x3C slot 0 / 1 a texture array
 KEY_TEXTURES, KEY_ARRAY1 = 0x29, 0x3C
+# eft's GPU-calc emitters (particles moved by the vertex program from birth values, not on the CPU): emitter
+# byte 5 bit 0x80 and the shader key's byte 4 bit 0x02, every vanilla GPU emitter / program and no other
+EMITTER_FLAGS, EMITTER_GPU, KEY_FLAGS, KEY_GPU = 0x05, 0x80, 0x04, 0x02
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -2519,6 +2522,14 @@ def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
         return False
     entry = bytearray(p.shader_entry(si_t))
     entry[KEY_TEXTURES], entry[KEY_ARRAY1] = max(info['samplers'] or [0]), 0
+    # the programs take CPU particles (their attributes as eft's CPU writes them, the motion theirs from the
+    # birth values): a GPU template's GPU-calc flags off, the emitter's (byte 5 bit 0x80) and its key's (byte 4
+    # bit 0x02), which split vanilla's GPU emitters / programs from the CPU's exactly. Left on (Squirtle's
+    # effects test 22: 145 of 355 emitters) eft moved nothing on the CPU and the records held birth values:
+    # parts frozen at the stage's origin. The streams the CPU writes follow the program's own attributes
+    # (cross_f 0x04A57DA4: the shader object's attribute locations +0x578.. -> its stream flags +0x5A0)
+    em[EMITTER_FLAGS] &= ~EMITTER_GPU & 0xFF
+    entry[KEY_FLAGS] &= ~KEY_GPU & 0xFF
     key = (id(p), hashlib.md5(binary + bytes(entry)).hexdigest())
     if key not in _universal:
         _universal[key] = p.add_shader(bytes(entry), binary)

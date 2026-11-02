@@ -972,10 +972,12 @@ def draw_s4(canvas, em, parts, mnow, time):
         import eft_static
         _s4_static[id(d)] = np.frombuffer(eft_static.build(d), np.float32).copy()
     cb2 = _s4_static[id(d)]
-    # (a universal-path program reads v_inVec for its velocity, but its particles are eft's CPU ones: the converter
-    # keeps every emitter on the CPU (calc type 0), and the program takes their current values)
+    # GPU or CPU particles as eft decides: the emitter's GPU-calc flag (byte 5 bit 0x80; on, eft moves nothing and
+    # the records hold birth values). A universal-path program reads v_inVec for its velocity but wants CPU
+    # particles' current values; a GPU template's flag left on (Squirtle's effects test 22) froze its parts at
+    # birth, which this renderer missed while it took GPU from the program's v_inVec
     universal = is_universal(em.s4['p'].shader_binary(em.s4['sh']))
-    gpu = 'v_inVec' in vs.attributes and not universal
+    gpu = bool(d[5] & 0x80) if universal else 'v_inVec' in vs.attributes
     # a program reading the live emitter matrix (CB3 emm) takes its particles in the emitter's own space and turns
     # them by it each frame (the flash ring / lines of sys_smash_flash, following): fed world positions, the
     # emitter's offset counted twice
