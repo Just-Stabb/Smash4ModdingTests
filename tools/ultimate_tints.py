@@ -83,7 +83,9 @@ def tint_args(ult, scripts_dir, overrides=None):
     """vfxb_to_ptcl.py --tint-for values (EFFECT=R:G:B, linear); port.json effects.tint_for overrides by name"""
     t = {k: '%g:%g:%g' % v for k, v in tints(ult, scripts_dir).items()}
     t.update(overrides or {})
-    return [x for k, v in sorted(t.items()) for x in ('--tint-for', '%s=%s' % (k, v))]
+    # one comma-separated value: vfxb_to_ptcl's --tint-for is a plain option (repeated, the last one wins: test 25's
+    # first build tinted only the speed line)
+    return ['--tint-for', ','.join('%s=%s' % kv for kv in sorted(t.items()))] if t else []
 
 
 if __name__ == '__main__':
