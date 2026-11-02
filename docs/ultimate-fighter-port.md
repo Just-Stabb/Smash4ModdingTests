@@ -362,6 +362,10 @@ entries with the volume in dB at +12 of the data block; a random container has +
   4-argument form), statuses NONE 0, TOP 1, L 2, R 4, LR 6; `QUAKE` S / M / L -> 3 / 4 / 5;
   `set_have_item_visibility` -> Item_Visibility; the common helpers (`expression_LandingHeavyRumble`...)
   -> vanilla's. `set_attack_reference_joint_id` has no Smash 4 form; erase rumbles have no stop command.
+  Smash 4's rumble kinds are param lists in `param/pad_rumble/rumble_pattern_data{DRC,WIIUPRO,GC,WII}.bin` (one per
+  kind: (op, n) pairs, 1 on / 2 off / 3 brake for n frames, 4 loop n times (8000: for good) ... 5 loop end, 0 end).
+  Kinds 2, 3, 8, 9, 26, 34, 35, 36 never end and 6 runs 1000 frames: the translator plays those as Rumble_Loop
+  (stopped with the status), never as a plain Rumble (Squirtle's up smash, `rbkind_loopattack`, ran on for seconds).
 
 ## Meshes and materials
 

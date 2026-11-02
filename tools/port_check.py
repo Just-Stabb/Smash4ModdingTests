@@ -214,6 +214,13 @@ def check_model(inst, name, rep):
     if not dirs:
         rep.add('INFO', 'model', 'no model/body costume in the packages')
         return {}
+    # M6 the low models: the off-screen magnifier and 8-player Smash draw model/body/lXX; a costume without its lXX
+    # is invisible there (Squirtle v6, user)
+    tags = {d.split('/')[-1] for d in dirs}
+    no_low = sorted(t for t in tags if t.startswith('c') and 'l' + t[1:] not in tags)
+    if no_low:
+        rep.add('ERROR', 'M6 low-models', 'costumes without their low model (model/body/lXX: the magnifier and 8-player '
+                'Smash draw it; copies of cXX do, ultimate_port.py low-models): %s' % ', '.join(no_low))
     joints = {}
     for d in dirs:
         tag = d.split('/')[-1]
@@ -406,6 +413,25 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             if custom:
                 rep.add('INFO', 'S7 base-customs', '%d custom-move slots keep the base\'s (only with custom moves '
                         'equipped: base_customs_cave): %s' % (len(custom), ', '.join(custom[:20])))
+    # S8 a plain Rumble on a Smash 4 kind whose pattern never ends (param/pad_rumble: ultimate_acmd.RUMBLE_ENDLESS): it
+    # runs on for seconds (Squirtle's up smash, test 25: rbkind_loopattack -> Rumble 8). Vanilla plays those kinds as
+    # Rumble_Loop, which the status's end stops; the base's own scripts (unchanged from vanilla) are left alone
+    import ultimate_acmd
+    expr = scripts(inst, body + 'expression.bin') or {}
+    vexpr = {}
+    if vanilla:
+        ve = os.path.join(vanilla, 'fighter', base['base'], 'script/animcmd/body/expression.bin')
+        vexpr = acmd.ACMDFile.load(ve).scripts if os.path.exists(ve) else {}
+    endless = set()
+    for h, cmds in expr.items():
+        if h in vexpr and [str(c) for c in cmds] == [str(c) for c in vexpr[h]]:
+            continue
+        if any(c.name == 'Rumble' and c.params and int(c.params[0]) in ultimate_acmd.RUMBLE_ENDLESS for c in cmds):
+            endless.add('%08X' % h)
+    if endless:
+        rep.add('ERROR', 'S8 rumble-endless', 'plain Rumble on a kind that never stops (%s) in %d expression scripts: '
+                'it rumbles on for seconds; play it as Rumble_Loop: %s' % (', '.join(map(str, ultimate_acmd.RUMBLE_ENDLESS)),
+                                                                           len(endless), ', '.join(sorted(endless)[:8])))
 
 
 # ------------------------------------------------------------------ params

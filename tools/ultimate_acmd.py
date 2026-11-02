@@ -1037,6 +1037,14 @@ class SoundTranslator(Translator):
         return []
 
 
+# Smash 4's rumble kinds (param/pad_rumble/rumble_pattern_data*.bin: a param list per kind of (op, value): 1 on / 2 off
+# / 3 brake for n frames, 4 loop n times (8000: for good) ... 5 loop end, 0 end) whose pattern never ends (an 8000
+# loop: 2, 3, 8, 9, 26, 34, 35, 36) or runs 1000 frames (6), on the Wii U GamePad and Pro controller alike. Vanilla
+# plays them as Rumble_Loop (tied to the status: 1328 times) and almost never as a plain Rumble (27); Smash 4 has no
+# stop command for an Ultimate rbkind_erase
+RUMBLE_ENDLESS = (2, 3, 6, 8, 9, 26, 34, 35, 36)
+
+
 class ExpressionTranslator(Translator):
     """expression_* functions -> Smash 4 expression scripts (rumble, camera quake, slope, item visibility),
     reference/ultimate_sound_map.json: ControlModule::set_rumble -> Rumble (RUMBLE) or Rumble_Loop
@@ -1056,7 +1064,9 @@ class ExpressionTranslator(Translator):
         if k is None:
             self.missing[kind] = self.missing.get(kind, 0) + 1
             return []
-        status = k[0] == 'RUMBLE_STATUS'
+        # a Smash 4 kind whose pattern never ends (or runs 1000 frames) only as Rumble_Loop, which the status's end
+        # stops: as plain Rumble it ran on for seconds (Squirtle's up smash, rbkind_loopattack -> 8, test 25)
+        status = k[0] == 'RUMBLE_STATUS' or int(k[1]) in RUMBLE_ENDLESS
         return [cmd('Rumble_Loop' if status else 'Rumble', k[1], int(float(n)) if status and loop else 0)]
 
     def call(self, name, a, raw):

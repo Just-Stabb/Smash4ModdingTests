@@ -223,6 +223,11 @@ def plan(name, out):
     steps.append(('motions', 'motions + the material_anime pacs (these ship, not the model step\'s)',
                   [py, t('ultimate_fighter.py'), 'motions', os.path.join(U, 'motion/body/c00'), os.path.join(U, 'model/body/c00'),
                    base_dir, fighter, *mb, *joints, *have, *cache] + (['--add', ','.join(add)] if add else [])))
+    # the low models (model/body/l00-l07): the off-screen magnifier and 8-player Smash draw them, not cXX; a port
+    # without them was invisible in the magnifier (Squirtle v6, user). Copies of cXX (docs/params/fighter_files.md:
+    # Hero's are), after the motions step, which adds the face packs to the model folders
+    steps.append(('low-models', 'the low models (l00-l07, magnifier / 8-player Smash): copies of c00-c07',
+                  [py, t('ultimate_port.py'), 'low-models', name, '--out', out]))
     eff = src.eff(ult) or '?EFF/ef_%s.eff' % ult
     e = cfg.get('effects', {})
     ids = os.path.join(ROOT, 'fighters', name, '%s_effects.json' % name)
@@ -379,6 +384,23 @@ def cmd_unpack_body(a):
     print('%s: vanilla effect / sound / expression / motion.mtable / vl (vl.bin), universal-mechanics game.bin' % a.dest)
 
 
+def cmd_low_models(a):
+    """model/body/cXX -> lXX (the whole folder), for each costume the port has"""
+    import shutil
+    cfg = load_cfg(a.name)
+    body = os.path.join(a.out, a.name, 'fighter', a.name, 'model/body')
+    done = []
+    for c in cfg.get('costumes', ['c00']):
+        src_dir = os.path.join(body, c)
+        if not os.path.isdir(src_dir):
+            sys.exit('low-models: no %s (run the model steps first)' % src_dir)
+        dst = os.path.join(body, 'l' + c[1:])
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src_dir, dst)
+        done.append(os.path.basename(dst))
+    print('low models: %s' % ', '.join(done))
+
+
 def cmd_check(a):
     r = subprocess.run([sys.executable, os.path.join(HERE, 'port_check.py'), a.name] + a.pkgs)
     sys.exit(r.returncode)
@@ -422,6 +444,10 @@ def main():
     p.add_argument('name')
     p.add_argument('dest')
     p.set_defaults(fn=cmd_unpack_body)
+    p = sub.add_parser('low-models')
+    p.add_argument('name')
+    p.add_argument('--out', default=os.path.join(ROOT, 'build', 'port'))
+    p.set_defaults(fn=cmd_low_models)
     p = sub.add_parser('check')
     p.add_argument('name')
     p.add_argument('pkgs', nargs='+')

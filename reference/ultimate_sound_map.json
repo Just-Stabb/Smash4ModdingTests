@@ -195,7 +195,7 @@
    "inferred"
   ],
   "rbkind_attack_critical": [
-   "RUMBLE",
+   "RUMBLE_STATUS",
    3,
    "medium"
   ],
@@ -365,7 +365,7 @@
    "high"
   ],
   "rbkind_loopattack": [
-   "RUMBLE",
+   "RUMBLE_STATUS",
    8,
    "low"
   ],

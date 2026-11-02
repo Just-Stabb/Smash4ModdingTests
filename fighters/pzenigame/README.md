@@ -768,3 +768,13 @@ colour; jab 1 / 2 / 3 and up air without their colours; down / back air without 
   script translation are done for Squirtle.
 - Functionality (his specials especially): not finished. Left for later, since the user plans to change
   Squirtle heavily.
+
+## v6 extras 1 (`build/squirtle_v6_extras1.zip`): magnifier, up smash's rumble
+
+- **Magnifier (user: not shown):** the off-screen magnifier and 8-player Smash draw `model/body/l00`-`l07`, which
+  no Squirtle package had. They are copies of v6's `c00`-`c07` (the pipeline's new `low-models` step).
+- **Up smash's rumble (user: too hard, lingers for seconds):** Ultimate starts `rbkind_loopattack` (looping) at
+  frame 19 and erases it at 34. It was translated as a plain `Rumble(8)`; Smash 4's kind 8 loops for good
+  (param/pad_rumble) and there is no stop command. Now `Rumble_Loop(8)`, which stops with the status. It is the
+  only change to expression.bin.
+- `port_check` over v6 + test 25 + extras 1: 0 errors (new: M6 low-models, S8 rumble-endless).
