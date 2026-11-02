@@ -778,3 +778,17 @@ colour; jab 1 / 2 / 3 and up air without their colours; down / back air without 
   (param/pad_rumble) and there is no stop command. Now `Rumble_Loop(8)`, which stops with the status. It is the
   only change to expression.bin.
 - `port_check` over v6 + test 25 + extras 1: 0 errors (new: M6 low-models, S8 rumble-endless).
+
+## v6 extras 2 (`build/squirtle_v6_extras2.zip`): announcer, victory theme
+
+The user, on extras 1: his own victory poses play; the announcer says "Mario"; no crowd chant.
+- **Announcer:** Ultimate has no "Squirtle" call (`vc_narration_characall`: 112 calls, the Pokémon Trainer's
+  Pokémon none of their own), so his call is Ultimate's `poketrainer`, appended to Smash 4's
+  `snd_se_narration_characall.nus3bank` as label 86 (row 0x38 grown to 87). His 16 ids in
+  `ui_sound_call_voice_db.bin` (id 64, Mario's 0x380000 before) are 0x380056. `tools/fighter_extras.py narration`.
+- **Victory theme:** `bgm_fighter.fbb` extended from 58 to 71 kinds: 0x46 Squirtle and 0x43 Incineroar Pikachu's,
+  0x42 Sephiroth Cloud's, 0x41 Supamario Mario's, 0x44 Steve Pit's, 0x45 Hero Robin's (`fighter_extras.py fanfare`).
+  A test: whether the reader takes the file's count is not known yet.
+- **Chant:** his cheer bank is set up as Mario's (same bank id and row, timing row for kind 0x46); why it doesn't
+  play is still open (docs/new-fighter-slot.md "Announcer and fanfare").
+- `port_check` over v6 + test 25 + extras 1 + extras 2: 0 errors.

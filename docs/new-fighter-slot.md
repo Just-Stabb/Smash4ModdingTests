@@ -527,3 +527,24 @@ Ours has items Manifold's lacks:
 | `--vtables` | each specializer's vtable |
 | `--scan` | every jump table bounded by `0x39`-`0x41` |
 | `--plan SLOT:BASE[:name[:Cap]]` | the word patches for Option C's names / switches / size tables, and the caves still to write. **Untested in game.** |
+
+
+## Announcer and fanfare (`tools/fighter_extras.py`)
+
+- **Announcer call.** `param/ui/ui_sound_call_voice_db.bin` gives each character id 16 sound ids, one per
+  costume. The vanilla roster's calls are labels of `sound/se/snd_se_narration_characall.nus3bank` (BINF
+  0x17C5, soundlabeltable row 0x38: ids `0x0038LLLL`, 86 labels). The DLC fighters' come from their own banks,
+  whose paths the executable names one by one (Mewtwo, Lucas, Roy, Ryu, Cloud, Bayonetta, Kamui); there is no
+  `%s` form for other names. `add_fighter.py` gives a new id its base's call.
+  `fighter_extras.py narration` appends Ultimate's tone to the main bank as a new label (IDSP as is), grows
+  row 0x38 by it, and points the character's 16 ids at it (Squirtle: Ultimate's `poketrainer`, id 0x380056).
+  Ultimate's `vc_narration_characall` has 112 calls; its Pokemon Trainer's Pokemon have none of their own.
+- **Victory fanfare.** `sound/config/bgm_fighter.fbb` ('FBB\0', u32 1, u32 count, then count x 5 u32 LE;
+  the BGM id at +0x10) has one entry per fighter kind, 0x00-0x39. `fighter_extras.py fanfare` extends it to
+  the new kinds, each a copy of a vanilla kind of the same series. Not yet confirmed in game that the reader
+  takes the file's count (Squirtle extras 2 is the test).
+- **Crowd chant.** `fighter/%s/sound/snd_vc_%s_ouen.nus3bank` is loaded by the kind's name tables
+  (`0x030BB9DC`; Miis, kinds 0-2, use `snd_vc_Mii_ouen`). A port's cheer bank keeps the base's BINF id
+  (Squirtle: Mario's 6086, row 0x89F = `commonsoundtable.csb` entry 0's cheer row). `audience_ouen_param.bin`
+  has a row for each new kind (add_fighter.py). The user heard no chant for Squirtle (extras 1); not traced
+  further yet: the cheer reader of `audience_ouen_param` (loaded at `0x02E1153C`, object +0x1D0) is next.
