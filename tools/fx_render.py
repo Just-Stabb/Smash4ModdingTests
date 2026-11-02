@@ -956,6 +956,9 @@ def s4_program(em):
     return _s4_programs[b]
 
 
+_stale_warned = set()
+
+
 def draw_s4(canvas, em, parts, mnow, time):
     """one converted emitter's live particles placed by its own vertex program (tools/latte_exec.py) on eft's
     uniform blocks (CB2 built by cross_f's own code: tools/eft_static.py) and drawn by its pixel program"""
@@ -978,6 +981,13 @@ def draw_s4(canvas, em, parts, mnow, time):
     # birth, which this renderer missed while it took GPU from the program's v_inVec
     universal = is_universal(em.s4['p'].shader_binary(em.s4['sh']))
     gpu = bool(d[5] & 0x80) if universal else 'v_inVec' in vs.attributes
+    # eft works out v_inWldPosDf (the last movement) only under the emitter's +0x308 bit 0x10 (its directional types);
+    # without it the stream is whatever the particle slot's last occupant left, which no renderer can know: a
+    # universal program reading it drew white streaks up to the top of the screen in game (Squirtle's test 23)
+    if universal and 'v_inWldPosDf' in vs.attributes and not d[0x30B] & 0x10 and em.name not in _stale_warned:
+        _stale_warned.add(em.name)
+        print('  WARNING %s: reads v_inWldPosDf, which eft leaves stale here (+0x308 bit 0x10 off): drawn with its '
+              'velocity, in game with garbage' % em.name)
     # a program reading the live emitter matrix (CB3 emm) takes its particles in the emitter's own space and turns
     # them by it each frame (the flash ring / lines of sys_smash_flash, following): fed world positions, the
     # emitter's offset counted twice

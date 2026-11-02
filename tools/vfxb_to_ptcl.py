@@ -130,6 +130,9 @@ KEY_TEXTURES, KEY_ARRAY1 = 0x29, 0x3C
 # eft's GPU-calc emitters (particles moved by the vertex program from birth values, not on the CPU): emitter
 # byte 5 bit 0x80 and the shader key's byte 4 bit 0x02, every vanilla GPU emitter / program and no other
 EMITTER_FLAGS, EMITTER_GPU, KEY_FLAGS, KEY_GPU = 0x05, 0x80, 0x04, 0x02
+# eft works out a particle's last movement (v_inWldPosDf) only under the emitter's u32 +0x308 bit 0x10 (copied to the
+# instance's +0x24 at 0x04A5C044): vanilla's directional types 3 / 4, CPU and GPU, all of them and no other
+MOVE_FLAGS, MOVE_DIFF = 0x308, 0x10
 # eft2 vertex transform -> eft particle type (the same numbers: 0 billboard, 1 / 2 plate XY / XZ,
 # 3 directional, 4 directional polygon, 8 Y billboard); 7 (primitive) as a billboard mesh. eft2's
 # 5 / 6 "stripe" types carry no stripe settings (eft2's history ribbons are emitter plugins,
@@ -2530,6 +2533,13 @@ def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
     # (cross_f 0x04A57DA4: the shader object's attribute locations +0x578.. -> its stream flags +0x5A0)
     em[EMITTER_FLAGS] &= ~EMITTER_GPU & 0xFF
     entry[KEY_FLAGS] &= ~KEY_GPU & 0xFF
+    # a program reading the particle's last movement (Ultimate's sysLocalDiffAttr -> v_inWldPosDf) needs eft to
+    # work it out: eft does (p+0x44 = the emitter's turn x the local movement p+0x20, cross_f 0x04A62888 /
+    # 0x04A62F4C) only under the emitter's +0x308 bit 0x10, which vanilla sets on its directional types 3 / 4 and
+    # nowhere else. Off, the stream keeps whatever the particle slot's last occupant left: Squirtle's effects
+    # test 23, white water streaks from the common smokes, up smash's splash1_2 etc. up to the top of the screen
+    if 'v_inWldPosDf' in info['attributes']:
+        em[MOVE_FLAGS + 3] |= MOVE_DIFF
     key = (id(p), hashlib.md5(binary + bytes(entry)).hexdigest())
     if key not in _universal:
         _universal[key] = p.add_shader(bytes(entry), binary)

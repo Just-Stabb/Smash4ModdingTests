@@ -620,10 +620,12 @@ def check_universal(p, rep):
     hold a texture (eft stops on "Texture Binary is None"), and every pixel input needs a vertex output of its
     semantic (else it reads 0), and the emitter takes CPU particles: eft's GPU-calc flags (emitter byte 5 bit 0x80,
     key byte 4 bit 0x02) left on from a GPU template move nothing on the CPU, the programs get birth values (parts
-    frozen at the stage's origin: Squirtle's effects test 22). Returns the universal shader indices"""
+    frozen at the stage's origin: Squirtle's effects test 22); a program reading the last movement (v_inWldPosDf)
+    needs eft to work it out (+0x308 bit 0x10), else it reads a stale slot (test 23's streaks). Returns the
+    universal shader indices"""
     import eft_vertex
     import ult_to_latte
-    uni, gpu_keys = set(), []
+    uni, gpu_keys, reads_diff = set(), [], set()
     for i in range(p.shader_count()):
         b = bytes(p.shader_binary(i))
         h = eft_vertex.vertex_header(b)
@@ -636,10 +638,12 @@ def check_universal(p, rep):
             rep.add('ERROR', 'E6 universal-link', 'shader %d: pixel inputs %s without a vertex output' % (i, sorted(missing)))
         if p.shader_entry(i)[4] & 0x02:
             gpu_keys.append(i)
+        if 'v_inWldPosDf' in str(h['attribs']):
+            reads_diff.add(i)
     if gpu_keys:
         rep.add('ERROR', 'E6 universal-gpu', '%d universal shaders\' keys carry eft\'s GPU-calc flag (byte 4 bit 0x02): %s'
                 % (len(gpu_keys), ', '.join(map(str, gpu_keys[:12]))))
-    no_tex, gpu = [], []
+    no_tex, gpu, no_diff = [], [], []
     for si in range(len(p.sets)):
         for x in p.sets[si]['emitters']:
             d = x['data']
@@ -647,6 +651,8 @@ def check_universal(p, rep):
                 continue
             if d[5] & 0x80:
                 gpu.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
+            if p.field(d, 'shader_index') in reads_diff and not d[0x30B] & 0x10:
+                no_diff.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
             ph = ult_to_latte.ps_header(bytes(p.shader_binary(p.field(d, 'shader_index'))))
             for _nm, _t, slot in ph['samplers']:
                 t = p.texres(d, slot)
@@ -658,6 +664,10 @@ def check_universal(p, rep):
     if gpu:
         rep.add('ERROR', 'E6 universal-gpu', '%d universal-shader emitters carry eft\'s GPU-calc flag (byte 5 bit 0x80): '
                 'nothing moves them, drawn at birth values (the stage origin): %s' % (len(gpu), ', '.join(gpu[:8])))
+    if no_diff:
+        rep.add('ERROR', 'E6 universal-diff', '%d universal-shader emitters read the particle\'s last movement (v_inWldPosDf) '
+                'without eft working it out (+0x308 bit 0x10, vanilla\'s directional types only): the stream holds the '
+                'slot\'s last particle\'s (streaks to the top of the screen, test 23): %s' % (len(no_diff), ', '.join(no_diff[:8])))
     return uni
 
 

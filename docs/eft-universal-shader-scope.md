@@ -340,6 +340,18 @@ Ultimate's program.
     smash's converted side empty.
   - port_check E6 universal-gpu is an ERROR (test 22: 145 emitters, 109 keys).
 
+**Found in game (test 23): the last-movement stream.**
+- Thin white water streaks ran from Squirtle up off the top of the screen for a frame or so, in several moves.
+- Ultimate's programs read the particle's last movement (sysLocalDiffAttr -> `v_inWldPosDf`) on any particle
+  type. eft works it out only under the emitter's +0x308 bit 0x10, which vanilla sets on its directional types
+  3 / 4 and nowhere else (cross_f 0x04A62888 / 0x04A62F4C). Without it, nothing writes p+0x44, and the stream holds
+  the particle slot's last occupant's value. That hit 20 universal emitters: the common smokes, splash1_2, Water
+  Gun, Waterfall's end.
+- The fix (test 24):
+  - `universal_shader` sets the bit when the program reads the stream.
+  - fx_render warns (it feeds the velocity, so it drew them right).
+  - port_check E6 universal-diff is an ERROR.
+
 **Still open.**
 - c16 and the call's colour / alpha (c10[12], c16) at defaults.
 - c10[13 - 15]: the call's scale assumed in v_inScl.
