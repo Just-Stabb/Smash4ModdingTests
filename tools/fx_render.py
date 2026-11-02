@@ -566,20 +566,22 @@ class UniversalPixel:
     sampler does that before filtering on the GPU)"""
     WRAP = {0: 1, 1: 0, 2: 2}                    # eft 0 mirror, 1 repeat, 2 clamp -> latte_exec's
 
-    def __init__(self, binary, textures):
+    def __init__(self, binary, textures, emc=None):
         import latte_exec
         import ult_to_latte
         self.prog = latte_exec.PixelProgram(bytes(binary))
         self.sems = ult_to_latte.ps_header(bytes(binary))['inputs']
         self.tex = {k: (np.ascontiguousarray(img, np.float32), self.WRAP.get(wu, 0), self.WRAP.get(wv, 0))
                     for k, (img, wu, wv) in textures.items()}
+        self.cb3 = np.zeros(48, np.float32)
+        self.cb3[0:8] = 1.0 if emc is None else emc
 
     def run(self, inputs, consts, _sample):
         n = len(next(iter(inputs.values()))[0]) if inputs else 1
         arr = np.stack([np.asarray(inputs.get(s_, np.ones((4, n))), np.float32).reshape(4, n).T for s_ in self.sems], 1)
         cb9 = np.zeros(64, np.float32)
         cb9[32:36] = consts.get(8, HDR_RANGE)
-        out = self.prog.run(arr, {9: cb9}, self.tex)
+        out = self.prog.run(arr, {9: cb9, 3: self.cb3}, self.tex)
         rgba = out[:, :4].T.astype(np.float64)
         rgba[3] *= out[:, 4]
         rgba[:3] *= out[:, 4]
@@ -959,6 +961,15 @@ def s4_program(em):
 _stale_warned = set()
 
 
+def eft_emc(d):
+    """eft's emc0 / emc1 (CB3 0-7, cross_f 0x04A65A08) for a call with the default colours: the emitter's colour
+    scale (+0x778) on rgb, alpha 1. A universal program (its c10 colours = the emitter's x these) applies Ultimate's
+    colour scale itself (c9 word 236, read by 159 of Squirtle's 165 programs), so the converter writes 1 there; fed
+    1 regardless, fx_render hid a second scale in game"""
+    cs = struct.unpack_from('>f', bytes(d), 0x778)[0]
+    return np.array([cs, cs, cs, 1.0, cs, cs, cs, 1.0], np.float32)
+
+
 def draw_s4(canvas, em, parts, mnow, time):
     """one converted emitter's live particles placed by its own vertex program (tools/latte_exec.py) on eft's
     uniform blocks (CB2 built by cross_f's own code: tools/eft_static.py) and drawn by its pixel program"""
@@ -1052,7 +1063,8 @@ def draw_s4(canvas, em, parts, mnow, time):
         elif name == 'v_inIndex':
             A[:, :, k, 0] = np.arange(nv)
     cb3 = np.zeros(48, np.float32)
-    cb3[0:8] = 1.0                           # emc0 / emc1: the set's and instance's colours (x 1 here)
+    # emc0 / emc1: the colour scale x the set's / instance's colours (1 here); a converted program as calibrated (1)
+    cb3[0:8] = eft_emc(d) if universal else 1.0
     # emp0 (cross_f 0x04A65A08): x the emitter's time after this frame's step (instance +0x30, advanced at the
     # end of the update 0x04A64CE8 -> 0x04A65440, after emission and the particles), so time - birth is 1 on
     # a birth frame; w the step (instance +0x5C, the update's own step: 0x04A65984), which the GPU programs
@@ -1166,7 +1178,7 @@ def s4_emitters(p, set_index, program_cache=None):
                             img[..., :3] = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
                         word = struct.unpack_from('>I', bytes(d), ptcl.TEXRES + ptcl.TEXRES_SIZE * k + 0x0C)[0]
                         utex[k] = (img, (word >> 24) & 0xF, (word >> 28) & 0xF)
-                em.program = UniversalPixel(key, utex)
+                em.program = UniversalPixel(key, utex, eft_emc(d))
             else:
                 if key not in program_cache:
                     try:

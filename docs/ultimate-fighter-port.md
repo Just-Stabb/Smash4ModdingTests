@@ -142,9 +142,24 @@ in the turn), so a turned effect on a bone is right facing one way only: `tools/
 moves the turn into a turned copy of the set (`vfxb_to_ptcl.py --variants`) and places it with angles
 0 (fighters/edge/README.md test 49).
 
+**Effect macros by name**: Smash 4's ACMD ids are the crc32 of the same macro names Ultimate's scripts
+use (`EFFECT_FOLLOW_RND` = SALT's `Graphic_Effect5`, `EFFECT` = `Graphic_Effect2`, ...), with the arguments in
+the same order, so any effect macro Smash 4 has is translated as that command (`same_name_syntax`), flips
+included: `EFFECT_FOLLOW_FLIP` / `_FLIP_ALPHA` / `FOOT_EFFECT_FLIP` / `LANDING_EFFECT_FLIP` with their twin
+effect and the flip type by name (EF_FLIP_NONE 0, YZ 1, XZ 2, XY 3: Kirby's DownAttackU in both games). Until
+Squirtle's effects test 25 a `_FLIP` macro became the plain one (turned with the facing but not mirrored: his
+forward tilt's arc at (0, -30, 195) swung the wrong way facing left) and `_FLIP_ALPHA` / `_RND` ones were
+dropped (up tilt's speed line, the aerials' winds). `port_check` E7 lists any effect macro left without a
+translation.
+
 **Last-effect settings**: `LAST_EFFECT_SET_RATE` / `_ALPHA` / `_COLOR` -> Smash 4's commands of the
 same name (rate as is, alpha x 100, colour x 255), left out with the effect they follow when that one
-wasn't converted (they would land on the one before). `EFFECT_DETACH_KIND` -> `EFFECT_DETACH_KIND`
+wasn't converted (they would land on the one before). `LAST_PARTICLE_SET_COLOR` (ExeFS 0x22A5940 ->
+EffectModule vt+0x300: the last effect record's +0x160, not the `set_color` path) -> the command of the same
+name (0-1, as vanilla Smash 4's); when every call of an effect in the fighter's scripts is followed by the same
+colour it is baked into the bank instead and the command dropped (`tools/ultimate_tints.py`: Squirtle's speed
+line, (0.4, 1, 0.5) green). A `LAST_EFFECT_SET_COLOR` after one of the fighter-tinted effects below is divided
+by the tint (Ultimate's replaces it; the bank has it baked in). `EFFECT_DETACH_KIND` -> `EFFECT_DETACH_KIND`
 (neutral air's burst detaches and plays out after the move). Read from Ultimate's executable below.
 Not yet in the scripts: FLASH / BURN_COLOR, `EffectModule::set_disable_render_offset_last` /
 `enable_sync_init_pos_last`.
@@ -166,7 +181,10 @@ Hero / Pikachu / Joker / Banjo / Terry / Piranha Plant (0.4, 0.9, 3.0); Sephirot
 Sora (0.5, 1.0, 3.0); Mario / Luigi / Sonic (3.0, 0.7, 0.2); Kirby / Peach (0.25, 1.3, 2.5); most
 others 1.3 grey. `direction_effect_color` (the port colours) has no reader on this path. Converted:
 `tools/vfxb_to_ptcl.py --tint-for sys_attack_line=R:G:B` (linear; applied to our display-encoded keys
-as m^(1/2.2)). Depth: no game-side layer change; the eft2 `draw_path` bit picks the render pass, and
+as m^(1/2.2); on a universal-path emitter multiplied into the program's c10 colours, linear). Since Squirtle's
+effects test 25 the port pipeline passes it by default (`tools/ultimate_tints.py`, read from fighter_param.prc;
+port.json `effects.tint_for` overrides): his (0.32, 1.6, 0.4) green was missing from his jabs, tilts and
+aerials until then. Depth: no game-side layer change; the eft2 `draw_path` bit picks the render pass, and
 the static camera offset (-5) is a shader push (our bank uses -15 to draw it behind him).
 The file also holds `team_edge_color`, `dead_effect_color`, `shield_effect_color`,
 `color_blend_camera_depth_min / max` and more: check it for any common effect a port uses.

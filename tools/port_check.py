@@ -643,7 +643,7 @@ def check_universal(p, rep):
     if gpu_keys:
         rep.add('ERROR', 'E6 universal-gpu', '%d universal shaders\' keys carry eft\'s GPU-calc flag (byte 4 bit 0x02): %s'
                 % (len(gpu_keys), ', '.join(map(str, gpu_keys[:12]))))
-    no_tex, gpu, no_diff = [], [], []
+    no_tex, gpu, no_diff, scaled = [], [], [], []
     for si in range(len(p.sets)):
         for x in p.sets[si]['emitters']:
             d = x['data']
@@ -651,6 +651,8 @@ def check_universal(p, rep):
                 continue
             if d[5] & 0x80:
                 gpu.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
+            if abs(struct.unpack_from('>f', bytes(d), 0x778)[0] - 1.0) > 1e-6:
+                scaled.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
             if p.field(d, 'shader_index') in reads_diff and not d[0x30B] & 0x10:
                 no_diff.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
             ph = ult_to_latte.ps_header(bytes(p.shader_binary(p.field(d, 'shader_index'))))
@@ -664,11 +666,53 @@ def check_universal(p, rep):
     if gpu:
         rep.add('ERROR', 'E6 universal-gpu', '%d universal-shader emitters carry eft\'s GPU-calc flag (byte 5 bit 0x80): '
                 'nothing moves them, drawn at birth values (the stage origin): %s' % (len(gpu), ', '.join(gpu[:8])))
+    if scaled:
+        rep.add('ERROR', 'E6 universal-colour-scale', '%d universal-shader emitters with eft\'s colour scale (+0x778) '
+                'not 1: their programs apply Ultimate\'s own (c9 word 236), eft\'s emc multiplies it in again (test '
+                '24): %s' % (len(scaled), ', '.join(scaled[:8])))
     if no_diff:
         rep.add('ERROR', 'E6 universal-diff', '%d universal-shader emitters read the particle\'s last movement (v_inWldPosDf) '
                 'without eft working it out (+0x308 bit 0x10, vanilla\'s directional types only): the stream holds the '
                 'slot\'s last particle\'s (streaks to the top of the screen, test 23): %s' % (len(no_diff), ', '.join(no_diff[:8])))
     return uni
+
+
+# Ultimate effect macros the script translator has no form for, known and left out on purpose (the body flash /
+# burn colour overlays: not effects in Smash 4's sense, docs/ultimate-fighter-port.md "Not yet in the scripts")
+EFFECT_MACRO_GAPS = ('FLASH', 'FLASH_FRM', 'FLASH_END', 'COL_NORMAL', 'BURN_COLOR', 'BURN_COLOR_FRAME', 'BURN_COLOR_NORMAL')
+
+
+def check_effect_scripts(src, ult, rep):
+    """E7: every effect macro in the fighter's Ultimate effect scripts has a translation (tools/ultimate_acmd.py:
+    its table, LAST_EFFECT_*, or Smash 4's command of the same name). Until Squirtle's effects test 25 the
+    translator dropped EFFECT_FOLLOW_FLIP_ALPHA and EFFECT_FOLLOW_RND without a word: up tilt's speed line, back
+    / down / neutral air's winds missing in game"""
+    import collections
+    import ultimate_acmd as U
+    dump = src.dump(ult)
+    d = os.path.join(dump, ult) if dump else None
+    if not d or not os.path.isdir(d):
+        rep.add('NOTE', 'E7 effect-macros', 'no script dump for %s: effect macros not checked' % ult)
+        return
+    bad, gaps = collections.Counter(), collections.Counter()
+    for f in sorted(os.listdir(d)):
+        if not f.endswith('.txt'):
+            continue
+        for fn, body in U.functions(open(os.path.join(d, f)).read()).items():
+            if not fn.startswith('effect_'):
+                continue
+            for m in re.findall(r'macros::(\w+)\(', body):
+                if not re.search('EFFECT|AFTER_IMAGE|FLASH|BURN|PARTICLE', m):
+                    continue
+                if m in U.EFFECT_MACROS or m in U.LAST_EFFECT or m in ('EFFECT_OFF_KIND', 'AFTER_IMAGE_OFF',
+                        'EFFECT_DETACH_KIND') or m.startswith('AFTER_IMAGE4_ON') or U.same_name_syntax(m):
+                    continue
+                (gaps if m in EFFECT_MACRO_GAPS else bad)[m] += 1
+    if bad:
+        rep.add('ERROR', 'E7 effect-macros', 'effect macros the script translator drops: %s'
+                % ', '.join('%s x%d' % kv for kv in bad.most_common()))
+    if gaps:
+        rep.add('WARN', 'E7 effect-macros', 'known gaps, left out: %s' % ', '.join('%s x%d' % kv for kv in gaps.most_common()))
 
 
 def check_effects(inst, name, rep):
@@ -761,6 +805,7 @@ def main():
     check_weapons(a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
     check_effects(inst, a.name, rep)
+    check_effect_scripts(src, base['ult'], rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

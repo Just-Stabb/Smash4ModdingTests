@@ -699,7 +699,28 @@ EFFECT_MACROS = {
 # LAST_EFFECT_SET_* -> the Smash 4 command of the same name, its arguments scaled: Ultimate passes
 # rate / alpha / colour as is (app::sv_animcmd -> EffectModule vt+0x338 / +0x348 ...: rate lands in
 # the effect record +0x264, a per-set playback speed), Smash 4's alpha is a percent and its colour 0-255
-LAST_EFFECT = {'LAST_EFFECT_SET_RATE': 1.0, 'LAST_EFFECT_SET_ALPHA': 100.0, 'LAST_EFFECT_SET_COLOR': 255.0}
+LAST_EFFECT = {'LAST_EFFECT_SET_RATE': 1.0, 'LAST_EFFECT_SET_ALPHA': 100.0, 'LAST_EFFECT_SET_COLOR': 255.0,
+               'LAST_PARTICLE_SET_COLOR': 1.0}
+
+# the effect macros Smash 4 has under the same name (its ACMD ids are crc32 of the macro names Ultimate's dumps
+# use: EFFECT_FOLLOW_RND = Graphic_Effect5, EFFECT_FOLLOW_FLIP_ALPHA, FOOT_EFFECT_FLIP...), their arguments in the
+# same order (acmd_info.json's syntax); the flip types by name (vanilla pairs: Kirby's DownAttackU EF_FLIP_YZ ->
+# FlipType 1, EF_FLIP_XY -> 3, on the same effects)
+FLIP_TYPES = {'EF_FLIP_NONE': 0, 'EF_FLIP_YZ': 1, 'EF_FLIP_XZ': 2, 'EF_FLIP_XY': 3}
+_SYNTAX = None
+
+
+def same_name_syntax(macro):
+    """Smash 4's argument names for the effect command of this macro name, or None"""
+    global _SYNTAX
+    if _SYNTAX is None:
+        import zlib
+        info = json.load(open(os.path.join(HERE, 'acmd_info.json')))['commands']
+        _SYNTAX = {'%08X' % k: v for k, v in ((int(h, 16), v) for h, v in info.items())}
+        _SYNTAX['_crc'] = lambda n: '%08X' % zlib.crc32(n.encode())
+    v = _SYNTAX.get(_SYNTAX['_crc'](macro))
+    syn = v and v.get('syntax') or []
+    return (v['name'], syn) if syn[:1] in (['Graphic'], ['GFXRight']) and 'Bone' in syn else None
 
 
 def euler_matrix(rot):
@@ -740,12 +761,17 @@ class EffectTranslator(Translator):
     offset carried into the ancestor's frame through the bind pose (locals: each bone's local
     transform, row vectors) when it's known."""
 
-    def __init__(self, joints, ids, parents, locals_=None):
+    def __init__(self, joints, ids, parents, locals_=None, tints=None, baked=None):
         super().__init__(joints)
         self.ids, self.parents, self.locals = ids, parents, locals_ or {}
         self.missing = {}
         self.last = False
+        self.last_name = None
         self.turned_off = set()
+        # tools/ultimate_tints.py: the fighter's tint on its attack lines / arcs (baked into the bank: a
+        # LAST_EFFECT_SET_COLOR after one replaces it in Ultimate, so it is divided out), and the script colours
+        # baked into the bank (the LAST_PARTICLE_SET_COLOR after their effects dropped)
+        self.tints, self.baked = tints or {}, baked or {}
 
     def bone(self, name):
         return self.bone_at(name, (0.0, 0.0, 0.0))[0]
@@ -815,18 +841,24 @@ class EffectTranslator(Translator):
             if not self.last:
                 return []
             scale = LAST_EFFECT[short]
-            return [cmd(short, *[float(v) * scale for v in a[1:]])]
+            vals = [float(v) for v in a[1:]]
+            if short == 'LAST_PARTICLE_SET_COLOR' and self.last_name in self.baked:
+                return []
+            if short == 'LAST_EFFECT_SET_COLOR' and self.last_name in self.tints:
+                vals = [v / (t or 1.0) for v, t in zip(vals, self.tints[self.last_name])]
+            return [cmd(short, *[v * scale for v in vals])]
         if short == 'EFFECT_DETACH_KIND':
             eid = self.ids.get(a[1])
             if eid is None:
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
                 return []
             return [cmd('EFFECT_DETACH_KIND', eid, int(float(a[2])) & 0xFFFFFFFF)]
-        if short.endswith('_FLIP') and short[:-len('_FLIP')] in EFFECT_MACROS:
-            # the macro with a mirrored twin effect (its second name) and a flip axis (last): Smash 4
-            # turns effects with the facing, so the plain one (Psyche Up's aura was left out)
-            short = short[:-len('_FLIP')]
-            a = a[:2] + a[3:]
+        if short not in EFFECT_MACROS and same_name_syntax(short):
+            # Smash 4's command of the same name, flips included: they mirror the effect when facing left
+            # as Ultimate's do (until Squirtle's effects test 25 a _FLIP macro became the plain one, which
+            # only turns it with the facing: his forward tilt's arc, turned (0, -30, 195), swung the wrong way
+            # facing left; _FLIP_ALPHA / _RND ones were dropped: up tilt's speed line, the aerials' winds)
+            return self.same_name(short, a)
         if short not in EFFECT_MACROS:
             self.skip(short)
             return []
@@ -843,6 +875,7 @@ class EffectTranslator(Translator):
             target = 'External_Graphic'
         eid = self.ids.get(a[1])
         self.last = eid is not None
+        self.last_name = a[1]
         if eid is None:
             if a[1] != 'null':
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
@@ -864,7 +897,59 @@ class EffectTranslator(Translator):
         return [cmd(target, eid, bone, *place, *rest)]
 
 
-def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final'), locals_=None):
+def _same_name(self, short, a):
+    """an Ultimate effect macro -> Smash 4's command of the same name, argument by argument (same_name_syntax)"""
+    target, syn = same_name_syntax(short)
+    if short == 'EFFECT_FOLLOW_NO_STOP_FLIP' and a[1] in self.turned_off:
+        target, syn = same_name_syntax('EFFECT_FOLLOW_FLIP')       # as EFFECT_FOLLOW_NO_STOP (call)
+    args, out, i = a[1:], [], 0
+    if len(args) != len(syn):
+        self.skip(short + ' (arguments)')
+        self.last = False
+        return []
+    self.last, self.last_name = True, args[0]
+    k = 0
+    while k < len(syn):
+        f, v = syn[k], args[k]
+        if f in ('Graphic', 'GFXRight', 'GFXLeft'):
+            eid = self.ids.get(v)
+            if eid is None:
+                if v != 'null':
+                    self.missing[v] = self.missing.get(v, 0) + 1
+                self.last = False
+                return []
+            out.append(eid)
+        elif f == 'Bone':
+            if syn[k + 1:k + 7] != ['X', 'Y', 'Z', 'XRot', 'YRot', 'ZRot']:
+                self.skip(short + ' (layout)')
+                self.last = False
+                return []
+            out += self.place(v, args[k + 1:k + 4], args[k + 4:k + 7])
+            k += 7
+            continue
+        elif f == 'Terminate':
+            out.append(int(bool(v)))
+        elif f == 'FlipType':
+            out.append(FLIP_TYPES.get(v, 0) if isinstance(v, str) else int(v))
+        elif f == 'Alpha':
+            out.append(float(v) * 100.0)
+        elif f in ('Red', 'Green', 'Blue'):
+            out.append(float(v) * 255.0)
+        elif f == 'Size' or f.startswith('Random'):
+            out.append(float(v))
+        else:
+            self.skip(short + ' (' + f + ')')
+            self.last = False
+            return []
+        k += 1
+    return [cmd(target, *out)]
+
+
+EffectTranslator.same_name = _same_name
+
+
+def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final'), locals_=None,
+                      tints=None, baked=None):
     """every effect_* function of the dump -> the effect script of the same Smash 4 name (TRANSLATE's
     for the translated moves), replacing the base's (its own effects, e.g. Zelda's sparkles); not the
     moves still the base's (specials, Final Smash). Returns {Smash 4 name: commands}, {missing name:
@@ -880,7 +965,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
     # facing-left branch, as before. Until Squirtle's effects test 9 it was always the facing-left one: his
     # forward smash wave curled up over him facing right instead of running along the ground
     DYNAMIC_CONDS[LR_TAG] = LR_FACING
-    tr = EffectTranslator(joints, ids, parents, locals_)
+    tr = EffectTranslator(joints, ids, parents, locals_, tints, baked)
     out = {}
     for path in sorted(os.listdir(scripts_dir)):
         if not path.endswith('.txt'):
@@ -894,7 +979,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
                 name = TRANSLATE.get(src, name)
             if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts):
                 continue
-            tr.last = False
+            tr.last, tr.last_name = False, None
             tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
             cmds = tr.script(body)
             # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
@@ -1277,8 +1362,12 @@ def main():
                 ids = {}
                 for path in a.effects[0].split(','):
                     ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
+                import ultimate_tints
+                ult = os.path.basename(os.path.normpath(a.scripts))
                 fx, missing = translate_effects(a.scripts, o, tr.joints, ids, skeleton_parents(a.effects[1]),
-                                                locals_=skeleton_locals(a.effects[1]))
+                                                locals_=skeleton_locals(a.effects[1]),
+                                                tints=ultimate_tints.tints(ult) if ultimate_tints.fighter_tint(ult)
+                                                else {}, baked=ultimate_tints.script_colours(a.scripts))
                 for name, cmds in fx.items():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (

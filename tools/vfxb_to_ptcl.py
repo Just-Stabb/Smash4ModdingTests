@@ -2549,6 +2549,10 @@ def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
         img = np.asarray(images[smp['texture_id']], np.uint8)
         p.set_texture(em, slot, img, 0x433 if smp['texture_id'] in SRGB_TEXTURES else 0x33, comp_sel=0x00010203)
         set_wrap(em, slot, smp['wrap_u'], smp['wrap_v'])
+    # the colour scale is the program's (c9 word 236: 159 of Squirtle's 165 programs): eft's emc0 / emc1 (CB3, the
+    # programs' c10 colours x them) carry the emitter's +0x778 (cross_f 0x04A65A08), so it stays 1, or the scale
+    # lands twice (tests 22-24: x 1.04 to 3 on top of Ultimate's own scale, 224 of Squirtle's emitters)
+    p.set_field(em, 'color_scale', 1.0)
     p.set_field(em, 'scale', [float(sc['scale'][0]), float(sc['scale'][1])])
     p.set_field(em, 'scale_init_ratio', [1.0, 1.0])
     p.set_field(em, 'scale_diff21', [0.0, 0.0])
@@ -3084,6 +3088,10 @@ def main():
         # already (LINEAR_DISPLAY), where a linear x m is x m ** (1 / 2.2)
         return tuple(float(x) ** (1 / 2.2 if LINEAR_DISPLAY else 1.0) for x in v.split(':'))
     tint_for = {k: tint_value(v) for k, v in (x.split('=') for x in a.tint_for.split(',') if x)}
+    # the same tints in linear light, for the universal path (Ultimate's programs take c10's colours linear: eft2
+    # multiplies the call's colour into them, ExeFS 0x3563F40 -> c10 0x8F0A0)
+    tint_lin = {k: (tuple(float(x) for x in v.split(':')) if ':' in v else tuple(int(v[i:i + 2], 16) / 255 for i in (0, 2, 4)))
+                for k, v in (x.split('=') for x in a.tint_for.split(',') if x)}
     cam_for = {k: float(v) for k, v in (x.split('=') for x in a.camera_offset_for.split(',') if x)}
     mean_colour = set(v for v in a.test_mean_colour_for.split(',') if v)
     skip = set(v for v in a.test_skip_for.split(',') if v)
@@ -3135,7 +3143,12 @@ def main():
                 em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
                 key = '%s/%s' % (name, e['name'])
                 if em is not None and UNIVERSAL and name not in no_universal and key not in no_universal:
-                    universal_shader(p, em, e, eff.vfxb, images, prims, prim_index, notes)
+                    lin = tint_lin.get(key) or tint_lin.get(name)
+                    eu = e if lin is None else dict(e, info=dict(e['info'], **{
+                        c: [float(v) * t for v, t in zip(e['info'][c][:3], lin)] + [float(e['info'][c][3])]
+                        for c in ('color0', 'color1')}))
+                    if universal_shader(p, em, eu, eff.vfxb, images, prims, prim_index, notes) and lin is not None:
+                        notes.append('tinted x (%s) in the program (linear, --tint-for)' % ', '.join('%.3f' % v for v in lin))
                 if e['particle']['primitive_id'] != NONE64 and names.get(e['sampler'][0]['texture_id']) in tint_tex:
                     tint[key] = tint_tex[names.get(e['sampler'][0]['texture_id'])]
                 if em is not None and tex_for.get(key) in ('private', 'rgba'):

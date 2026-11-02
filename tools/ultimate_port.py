@@ -235,7 +235,10 @@ def plan(name, out):
     if common_eff and e.get('common'):
         pairs = ['%s=%s' % (k, v) for k, v in sorted(common_sets(e['common'], common_eff).items()) if v]
         extra = ['--extra-eff', common_eff] + pairs if pairs else []
-    tint = [x for k, v in e.get('tint_for', {}).items() for x in ('--tint-for', '%s=%s' % (k, v))]
+    # the colours Ultimate puts on effects at run time (tools/ultimate_tints.py): the fighter's common_effect_0 on
+    # its attack lines / arcs and the script colours every call of an effect sets; port.json tint_for overrides
+    import ultimate_tints
+    tint = ultimate_tints.tint_args(ult, os.path.join(dump, ult), e.get('tint_for'))
     hdr = ['--hdr-white-for', ','.join(e['hdr_white_for'])] if e.get('hdr_white_for') else []
     steps.append(('effects', 'his effect bank: his own sets, Ultimate\'s common ones (variants: after the scripts)',
                   [py, t('vfxb_to_ptcl.py'), eff, base_fx, fx, kind, ids, *e.get('own', []),

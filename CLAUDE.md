@@ -27,3 +27,8 @@
   install as the user will have it (the full package, then every fix package after it, in order): no ERROR
   goes out. A new bug found in game gets a check in `port_check.py` (or a default in the pipeline) and a
   row in the guide's bug catalogue, so the next port can't repeat it.
+- **Ultimate effect colours must match Ultimate's.** When adding an Ultimate character's effects, every effect's
+  colour has to come out as Ultimate draws it: the emitters' own colours AND the colour / alpha the effect
+  scripts set on the call (`LAST_EFFECT_SET_COLOR`, `EFFECT_FOLLOW_COLOR`, `..._ALPHA` etc.), including on
+  effects drawn by Ultimate's own shaders (the universal path). Compare each move's colours with Ultimate's
+  (fx_render, the user's clips) before sending a package.
