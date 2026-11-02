@@ -761,3 +761,10 @@ colour; jab 1 / 2 / 3 and up air without their colours; down / back air without 
     follows facing checks.
   - In fx_render, jab 1's green line, up tilt's speed line and down / back air's winds match Ultimate.
     Forward tilt's arc isn't drawn on fx_render's Ultimate side (a renderer gap), so it is unchecked there.
+
+## Status after effects test 25
+
+- Effects: confirmed correct by the user in game (test 25 on v6): the universal shader path, colours and
+  script translation are done for Squirtle.
+- Functionality (his specials especially): not finished. Left for later, since the user plans to change
+  Squirtle heavily.
