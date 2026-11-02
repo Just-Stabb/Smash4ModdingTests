@@ -687,6 +687,19 @@ def graft_rot(b):
         return None
     a, q, sn, cs = range(n, n + 4)
     clause = _alu(rot_lines(pos, scl, rot, a, q, sn, cs), (CB_STATIC, 32, 47), (CB_STATIC, 0, 15))
+    loc = max(at[3] for at in h['attribs']) + 1
+
+    def header(d):
+        struct.pack_into('>I', d, 4 * NUM_SEMANTIC, n_in + 1)
+        struct.pack_into('>I', d, 4 * (SEMANTIC + n_in), loc)
+        return _append_named(d, VS_ATTRIBS, 16, (ROT_ATTR_TYPE, 0, loc), ROT_ATTR)
+    return _insert_after_call_fs(_edit_blocks(b, VS_HEADER, header), clause, n + 4)
+
+
+def _insert_after_call_fs(b, clause, gprs):
+    """the shader binary b with the ALU clause (_alu) run right after its CALL_FS (the inputs in their
+    GPRs); jumps past it move with it, the clause code moves down when the CF list outgrows the space
+    before it; gprs: the program's GPR count after it"""
     prog = [b[o_:o_ + s] for t_, _h, o_, s in gsh_blocks(b, 0) if t_ == VS_PROGRAM][0]
     cf = _cf(prog)
     code_at = min(w0 & (0x3FFFFF if _is_alu(w1) else 0xFFFFFFFF) for w0, w1 in cf
@@ -712,13 +725,60 @@ def graft_rot(b):
     head = b''.join(struct.pack('<II', *w) for w in out)
     prog2 = head + bytes(8 * base - len(head)) + bytes(code)
     prog2 += bytes(-len(prog2) % 256)
-    loc = max(at[3] for at in h['attribs']) + 1
+    return _replace_vertex_program(b, prog2, gprs)
 
-    def header(d):
-        struct.pack_into('>I', d, 4 * NUM_SEMANTIC, n_in + 1)
-        struct.pack_into('>I', d, 4 * (SEMANTIC + n_in), loc)
-        return _append_named(d, VS_ATTRIBS, 16, (ROT_ATTR_TYPE, 0, loc), ROT_ATTR)
-    return _replace_vertex_program(_edit_blocks(b, VS_HEADER, header), prog2, n + 4)
+
+# ---------------------------------------------------------------- the Z-curve graft
+# eft's particle scale has two axes and its mesh programs scale a vertex's Z by its X (or Y, uboFlag
+# 0x08000000): an eft2 mesh whose scale curve gives Z a course of its own (up smash's base band: Z
+# 0.2 -> 0.96 -> 0.3 while X / Y grow 0.77 -> 1.3) gets v_inPos.z x Z(t) / X(t) first, t the
+# particle's age (v_inWldPos.w on the CPU's particles) over the emitter's life, both 3-key ramps as
+# eft's (v0 -> v1 at s1, held to s2, -> v2 at 1) = v1 + k1 min(t - s1, 0) + k3 max(t - s2, 0)
+
+
+def _lit(v):
+    return '(0x%08X, %.8g)' % (struct.unpack('<I', struct.pack('<f', v))[0], v)
+
+
+def zcurve_lines(pos, age, a, life, zkeys, xkeys):
+    """pos.z x zkeys(t) / xkeys(t) in place (keys: v0, v1, v2, s1, s2 as fractions of the life);
+    age: the GPR whose .w is the age; a: scratch. One operation a group"""
+    P, W, A = ('R%d' % r for r in (pos, age, a))
+    L = ['x: MUL             %s.x, %s.w, %s' % (A, W, _lit(1.0 / max(life, 1e-3))),
+         'x: MAX             %s.x, %s.x, 0.0f' % (A, A),
+         'x: MIN             %s.x, %s.x, 1.0f' % (A, A)]
+    for ch, (v0, v1, v2, s1, s2) in (('z', zkeys), ('w', xkeys)):
+        k1 = (v1 - v0) / s1 if s1 > 1e-6 else 0.0
+        k3 = (v2 - v1) / (1 - s2) if s2 < 1 - 1e-6 else 0.0
+        L += ['y: ADD             %s.y, %s.x, %s' % (A, A, _lit(-s1)),
+              'y: MIN             %s.y, %s.y, 0.0f' % (A, A),
+              '%s: MULADD          %s.%s, %s.y, %s, %s' % (ch, A, ch, A, _lit(k1), _lit(v1)),
+              'y: ADD             %s.y, %s.x, %s' % (A, A, _lit(-s2)),
+              'y: MAX             %s.y, %s.y, 0.0f' % (A, A),
+              '%s: MULADD          %s.%s, %s.y, %s, %s.%s' % (ch, A, ch, A, _lit(k3), A, ch)]
+    L += ['t: RECIP_CLAMPED   %s.y, %s.w' % (A, A),
+          'z: MUL             %s.z, %s.z, %s.y' % (A, A, A),
+          'z: MUL             %s.z, %s.z, %s.z' % (P, P, A)]
+    return L
+
+
+def graft_zcurve(b, life, zkeys, xkeys):
+    """the shader binary b scaling its vertices' Z by zkeys / xkeys over the particle's life (above),
+    else None: needs v_inPos and v_inWldPos, and must not read v_inVec (a GPU particle's .w is its
+    birth); starts with CALL_FS"""
+    h = vertex_header(b)
+    used = used_attributes(b)
+    if h is None or 'v_inPos' not in used or 'v_inWldPos' not in used or 'v_inVec' in used:
+        return None
+    prog = [b[o:o + s] for t, _h, o, s in gsh_blocks(b, 0) if t == VS_PROGRAM][0]
+    cf = _cf(prog)
+    if _is_alu(cf[0][1]) or _op(cf[0][1]) != CF_CALL_FS:
+        return None
+    n = h['regs'][0] & 0xFF
+    if n + 1 > 120:
+        return None
+    clause = _alu(zcurve_lines(used.index('v_inPos') + 1, used.index('v_inWldPos') + 1, n, life, zkeys, xkeys))
+    return _insert_after_call_fs(b, clause, n + 1)
 
 
 if __name__ == '__main__':

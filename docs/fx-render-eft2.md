@@ -109,7 +109,8 @@ Inputs, all by name from each program's reflection (BNSH program +0x78: per stag
 outputs, samplers, constant buffers and a slot table; constant buffer slot k = the shader's c(3 + k)):
 - attributes: sysPosAttr / sysTexCoordAttr (the mesh, or eft2's quad), sysLocalPosAttr (emitter-local
   position at birth, w life x (1 - life_random x U)), sysLocalVecAttr (velocity, w birth time),
-  sysScaleAttr (scale x (1 - scale_random x U) on all axes x EASL), sysRandomAttr (4 uniforms),
+  sysScaleAttr (the 3-axis scale x (1 - scale_random x U) x EASL: main.bin 0x90738, one U when the X and Y
+  randoms are equal, else one an axis with its own random; Z its own, not X's), sysRandomAttr (4 uniforms),
   sysInitRotateAttr (rotate_init on is_rotate's axes; the random part is the program's), sysEmtMat0-2Attr
   (the emitter matrix at birth, rows), sysLocalDiffAttr (the particle's last movement, position now - a
   frame ago: the trace's vec2; the directional types' axis: left 0, up smash's rising columns lay flat).

@@ -595,3 +595,23 @@ the Y spin. eft's programs do the same per slot (both swept in mx_exec / latte_e
 - Random life: Ultimate's curves run on floor(life x (1 - r U)) (thresholds identical for lives
   6.0 - 6.7). eft's life is now ceil(life) - 1, with random frames chosen for the same mean.
 - Result: wave1 covers 38.9k px against Ultimate's 40.5k (three seeds; it was 53.5k).
+
+## v6 effects test 19 (`build/squirtle_v6_effects_test19.zip`)
+
+Up smash's base band (AttackHi4 wave4) and the dash / run-brake ripples (Brake wave1); both are eft2 type-6 meshes.
+- Frame: eft2's type 6 is Y = motion, X = motion x Y, Z = X x motion (its program, run with set inputs). eft's
+  type 4 is the same turned 180 degrees about the motion. The mesh is now turned 180 degrees about its Y
+  (x, z negated). The band hung under the floor, and the test-18 ripples sank under the stage during dash / run.
+- Scale: Ultimate gives a particle all three scale axes (main.bin 0x87CF0 copies EMTR +0x9C0's xyz to the
+  instance; 0x90738 writes each axis x (1 - random x U)). fx_render's Ultimate side had used X for Z, which
+  drew Ultimate's band 1.7x too low; it now feeds xyz. With that, both peak at 5.9 high.
+- Scale curve: wave4's curve has its own Z (0.2 -> 0.96 at 30% -> 0.3) while X / Y grow 0.77 -> 1.3 (the
+  ptcl's curve has two axes, and its type-4 programs scale Z by X, or by Y under uboFlag 0x08000000). The
+  converter grafts Z(t) / X(t) onto v_inPos.z (eft_vertex.graft_zcurve). t = age / the mean eft life (an
+  approximation for each particle's own life). The particles fan out in every horizontal direction, so
+  putting Z's curve on X (tried first) narrowed the pieces heading toward the camera.
+- Result: wave4 covers 18.1k / 18.2k px against Ultimate's 19.4k / 19.1k (two seeds; 28.7k before). Height
+  2.3 / 5.4 at ages 4 / 8 against 2.3 / 5.9. Whole moves: AttackHi4 229k vs 199k, AttackLw4 203k vs 179k,
+  AttackS4 137k vs 151k, Dash 32.1k vs 30.1k, RunBrakeL 14.4k vs 14.7k, SpecialHi 288k vs 264k.
+- Also grafted: down smash's wave2 / wave3 (type 1, the same Z-curve difference). Waterfall's cylinder1 and
+  light1 templates can't take the graft (their Z follows X, as before).

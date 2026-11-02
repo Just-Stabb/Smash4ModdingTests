@@ -299,10 +299,15 @@ def simulate(em, call, frames, seed=1, births_only=False):
                 # matrix at birth (rows, its translation where the particle came from)
                 mb = np.zeros((3, 4))
                 mb[:, :3], mb[:, 3] = lin, org
+                # each axis its own (main.bin 0x90738: the emitter's 3-axis scale, EMTR +0x9C0, copied to the
+                # instance at 0x87CF0, x (1 - random x U); one U for all three when the X and Y randoms are
+                # equal, else one an axis with the axis's own random): Z is the scale's own (up smash's wave4,
+                # scale 1 / 0.5 / 1.7, given X's stood 1.7 times too low)
+                r3 = np.array([sr] * 3) if em.size_rand3[0] == em.size_rand3[1] else \
+                    np.array([sr] + [1 - em.size_rand3[i] * rng.uniform() for i in (1, 2)])
                 born = {'pos': np.append(p, plife),
                         'vec': np.append(v, float(f - f0)),
-                        'scale': np.array([em.size[0] * sr * sa[0], em.size[1] * sr * sa[1],
-                                           em.size[0] * sr * sa[0], 1.0]),
+                        'scale': np.append(np.array(em.size3) * r3 * np.array([sa[0], sa[1], a('EASLz', 1.0)]), 1.0),
                         'random': rng.uniform(size=4), 'rot': np.append(em.rot_init, 0.0), 'm': mb}
             # a non-following particle keeps the emitter's frame at its birth (eft2 follow 1, eft's
             # copies made at emission): an emitter turned by its key animation (Squirtle's down-smash
@@ -655,6 +660,16 @@ def ult_emitters(eff, set_index, images, names, prims):
         sc = e['scale']
         em.size = (float(sc['scale'][0]), float(sc['scale'][1]))
         em.size_random = min(1.0, float(sc['scale_random'][0]) / 100)
+        em.size3 = tuple(float(v) for v in sc['scale'])
+        em.size_rand3 = tuple(min(1.0, float(v) / 100) for v in sc['scale_random'])
+        easl = em.anims.get(17)
+        raw = bytes.fromhex(e['subsections'].get('EASL', ''))
+        if easl is not None and len(raw) >= 12:
+            # EASL's Z (vfxb_to_ptcl.EMITTER_ANIMS takes X / Y only, eft's particle scale has two axes)
+            nk = struct.unpack_from('<I', raw, 4)[0]
+            zb = em.size3[2] or 1.0
+            em.anims['EASLz'] = ([(k[3], k[2] / zb) for k in (struct.unpack_from('<4f', raw, 12 + 16 * i)
+                                                               for i in range(nk))], easl[1])
         curve = V.keys(st['scale_anim'], st['num_scale_keys'], 2)
         em.size_curve = lambda t, c=curve: c[int(round(t * 100))]
         c0, a0 = V.track(st, col, 0)

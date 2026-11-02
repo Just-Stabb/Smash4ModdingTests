@@ -1027,6 +1027,23 @@ def turning_shader(p, si):
     return _two[key]
 
 
+def zcurve_shader(p, si, life, zkeys, xkeys):
+    """shader si scaling its mesh's Z by zkeys / xkeys over the particle's life (eft_vertex.graft_zcurve),
+    added once a curve; None when the graft doesn't take"""
+    key = (id(p), si, 'z', round(life, 3), tuple(round(v, 5) for v in zkeys + xkeys))
+    if key not in _two:
+        b = bytes(p.shader_binary(si))
+        nb = eft_vertex.graft_zcurve(b, life, zkeys, xkeys)
+        if nb is None:
+            _two[key] = None
+        else:
+            old = hashlib.md5(b).hexdigest()
+            if old in eft_pixel.GRAFTED:
+                eft_pixel.GRAFTED[hashlib.md5(nb).hexdigest()] = eft_pixel.GRAFTED[old]
+            _two[key] = p.add_shader(bytes(p.shader_entry(si)), nb)
+    return _two[key]
+
+
 def set_slot1(p, em, e=None, ti=0, j=None, images=None, notes=None, slot=1, raw=False, mask=False):
     """texture 1 (slot: 2) of a two- (three-) texture template: sampler j as Ultimate places it (its
     first cell, repeat, wrap, UV animation in the slot's block); white (x 1: nothing) without one.
@@ -1835,7 +1852,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         fres = fresnel_bake(e, notes)
         if fres is None:
             fres_mean = fresnel_mean(e, prims[pt['primitive_id']], s3, st, notes)
-        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres)
+        # eft2's type 6 frames a mesh as Y = motion, X = motion x Y, Z = X x motion (its program, up smash's wave4);
+        # eft's type 4 as X = emitter Y x motion: the same turned 180 degrees about the motion. Up smash's base
+        # band (wave4, a crown 0 - 3.9 deep, sent outward level) hung under the floor instead of rising from it:
+        # the mesh turned 180 degrees about its own Y here (x, z negated: a turn, no mirror) puts it back
+        flip6 = typ == 4 and pt['billboard_type'] == 6
+        key = (pt['primitive_id'], s3, bake, channel, mesh_rot, rest_dir, fres, flip6)
         if key not in prim_index:
             pos, nrm, col_, uv, idx = mesh(prims[pt['primitive_id']], channel)
             if rest_dir:
@@ -1844,6 +1866,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                 uv = np.concatenate([uv_transform(uv[:, :2] * np.array(bake[0], np.float32), *bake[1:]),
                                      uv[:, 2:]], 1)
             pos = pos * np.array(s3, np.float32)
+            if flip6:
+                pos = pos * np.array([-1, 1, -1], np.float32)
+                nrm = None if nrm is None else nrm * np.array([-1, 1, -1], np.float32)
+                notes.append('type-6 frame: mesh turned 180 degrees about Y')
             if mesh_rot:
                 # as a turning template would (rotation_matrix), the particle's scale first
                 r = rotation_matrix(mesh_rot).astype(np.float32)
@@ -2100,6 +2126,19 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'scale_diff21', xy([float(v) for v in v1 - v0]))
     p.set_field(em, 'scale_diff32', xy([float(v) for v in v2 - v1]))
     p.set_field(em, 'scale_sections', [int(s1), int(s2)])
+    zgraft = None
+    curve3 = keys(st['scale_anim'], st['num_scale_keys'], 3)
+    qx = 1 if quarter in (1, 3) else 0
+    if is_mesh and np.abs(curve3[:, 2] - curve3[:, qx]).max() > 0.02:
+        # eft2 scales a mesh's Z by its scale curve's own Z (its vertex programs read the key's z; main.bin
+        # 0x90738 gives the particle its 3-axis scale); eft's curve has X / Y and its programs scale Z by
+        # the particle's X: Z(t) / X(t) grafted onto v_inPos.z (eft_vertex.graft_zcurve; after the life,
+        # below). Up smash's base band (wave4: Z 0.2 -> 0.96 -> 0.3 while X / Y grow 0.77 -> 1.3) kept
+        # growing taller instead of rising and falling back; the X curve given Z's instead narrowed the
+        # band's pieces heading toward the camera (X is the width across their motion)
+        zk = [float(np.squeeze(v)) for v in three_key(curve3[:, 2])]
+        zgraft = ((zk[0], zk[1], zk[2], zk[3] / 100, zk[4] / 100),
+                  (float(v0[qx] * peak[qx]), float(v1[qx] * peak[qx]), float(v2[qx] * peak[qx]), s1 / 100, s2 / 100))
     if is_mesh and pt['billboard_type'] == 7 and any(abs(float(v)) > 1e-6 for v in st['center'][:2]):
         # a billboard mesh's particle centre: Ultimate adds it after the scale (Kazap's bolt, a mesh
         # hanging 36 down from its origin x 2.1, centre 0 93: from the raised sword's tip, 17 up, to 95);
@@ -2256,6 +2295,15 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     struct.pack_into('>f', em, FADE_ALPHA, fade)
     em[FADE_EMIT] = 1 if info['is_fade_emit'] or not fade else 0
     p.set_field(em, 'ptcl_life_random', 0 if life == FOREVER else life_rand)
+    if zgraft is not None and life != FOREVER and GRAFT and not templates.no_graft and not refract:
+        # the particle's mean life (life - int(U x R)) stands for its own in t = age / life
+        si_z = zcurve_shader(p, struct.unpack_from('>I', em, 0x844)[0],
+                             life - (life_rand - 1) / 2 if life_rand else life, *zgraft)
+        if si_z is not None:
+            struct.pack_into('>I', em, 0x844, si_z)
+            notes.append('vertex program grafted: Z scale curve')
+        else:
+            notes.append('Z scale curve: template not graftable (Z follows X)')
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)
     if child_e is not None:
