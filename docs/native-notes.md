@@ -1543,3 +1543,102 @@ measures (`0x02E71458`, `0x02E71514`) are under the params at `+0x100` / `+0x104
 initialiser `0x02C1D790` with 90 / -90 beside it; the angle is vt `+0x3C` `0x02E73608` = atan2(y, |x|)),
 forward / back by stick X x facing; else up / down by Y's sign. Statuses `1`, `2`, `0xA`, `0x71`,
 `0xAE` keep a kind already set.
+
+## Sephiroth's counter shape (`tools/edge_counter_cave.py`)
+
+Scintilla (down special) blocks a hit with a shield shape, as Smash 4's counters do. Sephiroth (kind
+`0x42`) runs Zelda's native code (specializer vtable `0x10147F34`), which has no counter, so the cave
+adds one for kind `0x42` only. Research: `$S/edgenro/smash4_counter.md` (S = the session scratchpad).
+Test: `tools/edge_counter_cave_test.py` (unicorn, against Marth's own setup). Applied by
+`tools/edge_specials_build.py --rpx`. Not yet run in game.
+
+**How a vanilla counter works:**
+- The shape is group 1 of the fighter's kind-2 ShieldModule `M = [acc+0x72F4]` (group 0 is the guard
+  bubble, built in the common fighter setup `0x02E13048` at `0x02E13430`).
+  - Storage for every fighter (constructor `0x02E52960`): 5 shapes of `0x24` at `+0x4594`, 5 collision
+    objects of `0x174` at `+0x4648`, 5 groups of `0x34` at `+0x4D8C`.
+- Only the kind's own setup builds group 1, from specializer slot 0. Examples: Marth `0x02F1E468`,
+  Link `0x02F0769C`.
+  - The group init is `0x0200C858(M, desc, group)`, which calls `0x02C6F5C0`; the setups inline it.
+  - `desc` = `{shapes, count, u8 x4}`. The 4 bytes go to group `+0x28`, `+0x29`, `+0x2A`, `+0x2C`:
+    - Marth: `0, 0, 0, 1`.
+    - Link's shield: `2, 0, 0, 1`. Its `+0x28` is copied to the collision object `+0x16D` with the LR,
+      so it is probably "front only".
+    - The guard: all 0.
+  - `shape` (`0x20` bytes): `x1 y1 z1 x2 y2 z2 radius`, `u16` joint, `u8` type.
+    - Type 2 is a capsule: `0x02C14634` uses both ends.
+    - Marth writes his vl offset to both ends (a sphere).
+  - Shapes are placed with the joint's world matrix (model vt `+0xDC`, in `0x02C14634`). So the
+    offsets are in the joint's own frame: x sideways, y up, z forward.
+  - Each group starts off. `ShieldModule(0, 2, 0, on, 1)` (vt `+0x6C`, `0x0200BD8C` -> `0x02C6F954`)
+    switches it, and "on" raises `M+0x28` (the groups updated) past it.
+- A hit on the shape sends the shield-hit event `0x02E35794`. That calls specializer **slot 42**
+  (`+0x15C`) with the hit message:
+  - `+8`: the attacker's AttackModule. vt `+0x194(id, part)` gives the hit data; hit data `+0x54` != 0
+    means it can't be countered, and `+0x4F` is used for the side.
+  - `+0xC`: the damage.
+  - `+0x10`: the collision record: `+0x18` the attacker's object id, `+0x1C` its category,
+    `+0x26` hitbox id, `+0x29` part.
+  - `+0x14`: the group hit (1 = the counter).
+  - `+0x18` / `+0x1C`: floats for the side function `0x02C22684`.
+
+  Outside the guard statuses (`0x1B`-`0x1E`), that event does nothing else to the victim: no damage
+  and no hitstop.
+- A body hit sends the damage event `0x02E35EE4`. That calls **slot 43** (`+0x164`); 0 skips the
+  damage, the knockback and the reaction. Marth also queues his counter status there and sets his
+  16-frame hitstop (`0x0200DDB4`).
+- **The record's category** (`+0x1C`) is the attacker AttackModule owner's object id `>> 28`. It is
+  set by `0x02C0EEB4` from `0x02C0800C`: `r7 = id >> 28`.
+  - 0 fighter, 1 weapon, 2 item, 3 stage gimmick. Default 6, with id `0x50000000` = none.
+  - A projectile's AttackModule is the weapon's own, so a projectile reads 1.
+  - Marth / Ike use it for their "item" flag (category 2, or a weapon whose int `0x10000000` is an
+    item).
+
+**What the cave does** (space `0x04B9D000`-`0x04B9E000`; `trail_table_cave.py`'s limit lowered):
+- Kind test: `[fighter+4]`, the fighter table entry's kind.
+  - The same field the object handles read (`0x02BEF604`).
+  - The fighter setup also uses it (`0x02E130D4`, kind × `0x11`).
+- **Setup.** Zelda's slot 0 (`0x02F97824`, `mflr r0`) becomes `b` to the cave. For kind `0x42` the cave
+  calls:
+  - `0x0200C858(M, desc, 1)`, with `desc` `{shape, 1, 0, 0, 0, 1}` and the shape below;
+  - `0x0200BD8C(M, 0, 0, 1)` (off).
+
+  Then it goes back to Zelda's code.
+  - The shape is Ultimate's vl `special_lw_shield_data` (joint `virtualflashshield`, size 6.0,
+    offset1 (0, 2, 8.3), offset2 (0, 20, 8.3)), put on joint 0.
+  - It is shape index 1, after the guard's.
+- **Slot 42.** Zelda's `blr` at `0x02F982F8` becomes `b` to the cave. It acts for kind `0x42`, message
+  `+0x14 == 1`, status `0x155`, flag `0x21000010` off and hit data `+0x54 == 0`. It writes:
+  - float `0x01000006` = message `+0xC`;
+  - float `0x01000007` = the side. This is Marth's: `0x02C22684`, or for hit data `+0x4F == 6` +1.0
+    when he is left of the attacker and -1.0 otherwise. It is the facing that faces the attacker
+    (Marth turns to it).
+  - flag `0x21000010` on;
+  - flag `0x21000011` on when the record's category != 0.
+
+  It doesn't freeze the attacker (Marth's `0x02BEFDBC`) and sets no hitstop.
+- **Slot 43.** Zelda's `li r3, 1` at `0x02F982FC` becomes `b` to the cave. For kind `0x42`, status
+  `0x155` and flag `0x21000010` on, it sets message `+8 |= 1` and returns 0. It queues no status and
+  doesn't turn him. Otherwise it returns 1.
+
+**MSC (his down-special stance 0x155):**
+- `ShieldModule(0, 0x2, 0, 0x1, 0x1)` turns the shape on and `ShieldModule(0, 0x2, 0, 0, 0x1)`
+  turns it off. Ike's pattern (latch flag; off again in the status end).
+- `WorkModule(0x10, 0x21000010)` means a hit landed. Then read `WorkModuleF(0, 0x1000006)` (damage),
+  `WorkModuleF(0, 0x1000007)` (side) and `WorkModule(0x10, 0x21000011)` (not a fighter).
+- `StopModule(2, n)` gives him hitlag.
+- `ShieldModule(0x2716, 0x2, 0, joint, radius, x1, y1, z1, x2, y2, z2, 0x1)` reshapes the shape and
+  switches it on. The radius comes first: handler `0x0200C478`; with 12 arguments the last is the
+  group.
+
+**Risks / unknowns:**
+- A cave-built shield group is unproven in game: Hero's cave-built reflector never reflected. The
+  differences:
+  - Hero's group was built with an empty shape and given its shape at run time (op `0x2717`, which no
+    vanilla script does).
+  - This one has its real shape from the setup and is only switched by op 0, Ike's vanilla path.
+  - The specializer slots that reflector kinds have and Robin's lacks (10 `+0x5C`, 56 `+0x1CC`) only
+    clear flags, so no per-kind reflect hook was found there.
+- Facing: the forward offset follows him only if joint 0's world matrix includes the facing turn.
+- Whether a hit on both the shape and a hurtbox hits the shape first. Slot 43 covers body hits once
+  the flag is on.
