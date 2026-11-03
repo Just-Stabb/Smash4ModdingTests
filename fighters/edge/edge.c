@@ -37700,8 +37700,27 @@ void edge_n_generate()
     edge_n_fired = 0x1;
 }
 
+// the charge's effects (SpecialNStart's EFFECT_FOLLOWs on haver / the body, endless) end with the
+// charge: Ultimate's SpecialN1 / N2 / NCancel scripts never turn them off, its status does (test 59:
+// "the refraction effect never goes away when released"). Ids: edge_effects.json (the plain sets and
+// their turned (90, 0, 90) variants); off as its EFFECT_OFF_KIND(false, true): emission stops, the
+// particles play out
+void edge_n_charge_off()
+{
+    EffectModule(0x2723, 0x3420055, 0, 0x1); // edge_fire1_hold
+    EffectModule(0x2723, 0x3420056, 0, 0x1); // edge_fire2_hold
+    EffectModule(0x2723, 0x3420057, 0, 0x1); // edge_fire2_hold_aura
+    EffectModule(0x2723, 0x3420059, 0, 0x1); // edge_fire2_hold_flash
+    EffectModule(0x2723, 0x342005A, 0, 0x1); // edge_fire3_hold_flash
+    EffectModule(0x2723, 0x3420078, 0, 0x1); // edge_fire1_hold@90,0,90
+    EffectModule(0x2723, 0x3420079, 0, 0x1); // edge_fire2_hold@90,0,90
+    EffectModule(0x2723, 0x342007A, 0, 0x1); // edge_fire2_hold_flash@90,0,90
+    EffectModule(0x2723, 0x342007B, 0, 0x1); // edge_fire3_hold_flash@90,0,90
+}
+
 void edge_n_change(int state)
 {
+    edge_n_charge_off();
     edge_n_state = state;
     MotionModule(0x1, edge_n_motion(edge_n_ground_motion()), 0, 1.0f);
     global20 = 0;

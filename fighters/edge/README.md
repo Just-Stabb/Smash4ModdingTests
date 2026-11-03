@@ -608,3 +608,40 @@ game), 0 fallbacks; 39 of them fade where they meet the scene (soft particles, t
   MB, textures 6.0, meshes 4.2). Squirtle's 11.5 MB loads; this size is untested in game.
 - port_check over the Sephiroth chain: the same errors with and without it (none from the bank).
 - Package: `fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}`.
+
+## Test 60 (`build/sephiroth_test60.zip`): Ultimate's common effects, the Flare charge ends on release
+
+User, test 59 (4 clips): "he still seems to use some of the old fixes for effects, which I don't want for him (jabs,
+dash attack, etc). Flare and its variants look ok when charging (slightly off) and it seems like the refraction effect
+never goes away when released. Throws also seem slightly off." Then: "Neutral air also looks slightly off."
+- The "old fixes": his scripts' `sys_*` effects (dust, smash flashes, the jab / dash / run smokes, landing, jumps,
+  stars...) were Smash 4's common effects standing in. The bank now carries Ultimate's own common sets from
+  `effect/system/common/ef_common.eff` (`vfxb_to_ptcl.py --extra-eff`, named by `ultimate_port.common_sets`, tinted
+  as his scripts tint them: `ultimate_tints.tint_args`), on Ultimate's programs like his own: 26 sets, every
+  `sys_*` name his Ultimate scripts use (22) plus the four Smash 4 common effects the translator maps back to an
+  Ultimate name in his kept scripts (`sys_spin_wind`, `sys_damage_fire`, `sys_whirlwind_l`, `sys_flash`). Built by
+  `tools/edge_fx_build.py` (new: test 59's command plus the common sets; reproduces this bank byte for byte).
+  Smash 4 common calls in his body effect script: 35 -> 11, all in moves still Zelda's (up special's spin wind,
+  down special's flash) or with no Ultimate set (`sys_screw`, `sys_bomb_a`: port_check E3 lists them).
+- `edge_effects.json`: his edge_* ids unchanged; the common sets' ids after them (some sys ids renumbered, the
+  scripts retranslated with them: `edge_specials_build.py`, test 57's game.bin kept). The weapon scripts come out
+  the same.
+- Flare's release: Ultimate's SpecialNStart turns its charge effects on with `EFFECT_FOLLOW` (`edge_fire1_hold`,
+  `edge_fire2_hold`, the body's `edge_fire2_hold_aura`, `edge_fire2_hold_flash`, `edge_fire3_hold_flash`; their
+  distorting fire parts are the "refraction") and only turns them off itself later in the charge; SpecialN1 / N2 /
+  NCancel never do, so Ultimate's status code must. Ours (`edge_n_change`) only swapped the motion: now
+  `edge_n_charge_off` turns them off (plain ids and the (90, 0, 90) variants his scripts call; as
+  `EFFECT_OFF_KIND(false, true)`: emission stops, particles play out) on every change out of the charge. The burst's
+  own refraction parts (`rifrection1`, Smash 4's distortion pass) were checked: one-shot, 30 / 40-frame lives, as
+  Ultimate's. port_check E8 (new) checks every `EffectModule(..., 0xID, ...); // name` id in edge.c against
+  edge_effects.json.
+- `edge.mscsb` from today's `edge.c` (so it also has the cancel-frame check, commit cf6e4a4); msc_stack_check: 0 of
+  2337 scripts with problems.
+- Not done in this test: the "slightly off" Flare charge, throws and neutral air (beyond their common effects, which
+  change here). Their converted values match Ultimate's file; what differs needs a closer look against Ultimate
+  footage (open).
+- port_check over the Sephiroth chain + this: no new errors (the rest are earlier packages' and the base's:
+  models l00-l07, sound tables, Zelda's Nayru's Love meshes E5, game.bin S4 / S5).
+- Bank 24.1 MB (test 59: 18.8 MB, which loaded).
+- Package: `fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}`, `script/animcmd/body/effect.bin`,
+  `script/msc/edge.mscsb`.

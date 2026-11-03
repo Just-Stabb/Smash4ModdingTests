@@ -637,6 +637,32 @@ def check_repo(name, kind, rep):
     readme = os.path.join(ROOT, 'fighters', name, 'README.md')
     if not os.path.exists(readme):
         rep.add('WARN', 'K2 readme', 'no fighters/%s/README.md (sources of every value: CLAUDE.md)' % name)
+    check_msc_effect_ids(name, rep)
+
+
+def msc_effect_id_mismatches(c_text, ids):
+    """(line, name, id in the C, id in the bank) for each `EffectModule(op, 0xID, ...); // name` whose name is in
+    the bank's ids and gives another id"""
+    out = []
+    for m in re.finditer(r'EffectModule\(0x[0-9A-Fa-f]+, (0x[0-9A-Fa-f]+)[^;]*\);\s*//\s*(\S+)', c_text):
+        want = ids.get(m.group(2))
+        if want is not None and int(want, 0) != int(m.group(1), 0):
+            out.append((c_text.count('\n', 0, m.start()) + 1, m.group(2), m.group(1), want))
+    return out
+
+
+def check_msc_effect_ids(name, rep):
+    """E8: an effect id written into the fighter's MSC source (`EffectModule(..., 0xID, ...); // name`: Sephiroth's
+    Flare charge off, test 60) against fighters/NAME/NAME_effects.json: adding effects to the bank renumbers the
+    turned variants (and any common sets), and a stale id turns off nothing (or something else)"""
+    c_path = os.path.join(ROOT, 'fighters', name, name + '.c')
+    j_path = os.path.join(ROOT, 'fighters', name, name + '_effects.json')
+    if not (os.path.exists(c_path) and os.path.exists(j_path)):
+        return
+    bad = msc_effect_id_mismatches(open(c_path, errors='replace').read(), json.load(open(j_path)))
+    if bad:
+        rep.add('ERROR', 'E8 msc-effect-id', '%d effect ids in fighters/%s/%s.c differ from %s_effects.json (rebuild the '
+                'MSC): %s' % (len(bad), name, name, name, ', '.join('line %d %s %s -> %s' % b for b in bad[:6])))
 
 
 def check_shield_damage(inst, name, rep):
