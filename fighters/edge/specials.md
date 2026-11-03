@@ -9,8 +9,13 @@ and four new article kinds after hers.
 
 - Ultimate scripts: `lua2cpp_edge/edge/Special*.txt` (body), `edge_fire/` (Flare: `SpecialN1-3`,
   `BurstS/M/L`), `edge_flare1/` (`Fly`, `Hit`, `End`), `edge_flare2/` (`Fly`, `Try`, `Exp`, `End`),
-  `edge_flash/` (`Attack`). Their statuses are native code in Ultimate (not in the dump): the moves'
-  logic is rebuilt from the scripts, the params and the videos.
+  `edge_flash/` (`Attack`).
+- Ultimate's status code (`lua2cpp_edge.nro`): the user's `lua2cpp_decomp.zip` (ssbu-recomp output for every
+  fighter, `gen_nro_eh_o2/lua2cpp_<name>/`; Drive), read with `tools/recomp_annotate.py` (imports named, the
+  lua const table's reads as CONST[offset], hash40s named; `--status`: the status table) and
+  `tools/recomp_hashes.py` (which function reads which param). The const table's values are filled at run
+  time (not in the dump): constants are named by matching the compiled ACMD functions to the smashline
+  sources. (Before: the moves' logic rebuilt from the scripts, the params and the videos.)
 - Ultimate params: `param/vl.prc` read with `tools/prc.py` (labels: ultimate-research/param-labels
   `ParamLabels.csv`): `param_special_n / s / hi / lw`, `param_fire`, `param_flare1 / flare2`,
   `param_flaredummy`, `param_flash`, `special_lw_shield_data`, `map_collision_*`.
