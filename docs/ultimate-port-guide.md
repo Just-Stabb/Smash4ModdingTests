@@ -132,6 +132,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | NUD bone range 0-N, rigged polygons unflagged: a pillar, invisible, a crash | Incineroar, Sephiroth t19 | `nud.write` [M3, M4] |
 | `model.nud` shipped without `model.nut`: wrong textures | Hero fix 17 | plan ships both [M5] |
 | the model step's material pacs shipped: shields gone | Hero fix 74 | plan ships the motions step's [M7] |
+| MSC globals past index 0x86: the fighter's MSC stopped (no actions, no respawn) | Hero fix 79 / 80 (Zoom 2 U) | reuse a global [C5, WARN: the limit is inferred, not found in the VM] |
 | `main.pac` rebuilt from an older install's: a move T-posed (its animation missing) | Hero fix 79 (forward tilt 2) | every motion-table animation in the installed `main.pac` [M8]; build on the newest one |
 | the base's face keys hide meshes that are the port's face: black / missing face | Squirtle | drive the slots from Ultimate's visibility [F1] |
 | body scripts from vanilla: no roll-off, the user's edits lost | Hero fix 57, Bowser jabs v3 | `unpack-body` (universal mechanics) [S1] |

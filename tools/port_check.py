@@ -543,6 +543,27 @@ def check_vl(inst, name, base, motion_list, rep):
 
 
 # ------------------------------------------------------------------ MSC and sources
+MSC_GLOBALS_PROVEN = 0x86       # Hero fix 79: every spell cast writes global 0x86 (brave_lw_burst) and works
+
+
+def msc_max_global(data):
+    """the highest global variable index an MSC file reads or writes"""
+    import io
+    sys.path.insert(0, os.path.join(HERE, 'mscdec'))
+    from msc import MscFile
+    m = MscFile()
+    m.readFromFile(io.BytesIO(data))
+    hi = 0
+    for sc in m:
+        for c in sc:
+            if c.command in (0x0B, 0x1C, 0x41, 0x14, 0x15, 0x3F, 0x40) or 0x1C <= c.command <= 0x24 \
+                    or 0x41 <= c.command <= 0x45:
+                p = c.parameters
+                if len(p) >= 2 and p[0] == 1:
+                    hi = max(hi, p[1])
+    return hi
+
+
 def check_msc(inst, name, rep):
     import tempfile
     for rel in inst.glob(r'fighter/%s/script/msc/.*\.mscsb' % name):
@@ -553,6 +574,11 @@ def check_msc(inst, name, rep):
         if r.returncode:
             last = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-200:]
             rep.add('ERROR', 'C1 msc-stack', '%s: %s (msclang nested calls: Hero fix 11)' % (rel, last))
+        hi = msc_max_global(inst.get(rel))
+        if hi > MSC_GLOBALS_PROVEN:
+            rep.add('WARN', 'C5 msc-globals', '%s: globals up to index 0x%X, past 0x%X, the most seen working in game: '
+                    'Hero fix 79 / 80\'s Zoom 2 U, the only code past it (0x87-0x8A), stopped his MSC (likely the VM\'s '
+                    'globals end there; not proven): reuse a global' % (rel, hi, MSC_GLOBALS_PROVEN))
     src = os.path.join(ROOT, 'fighters', name)
     for d, _ds, fs in os.walk(src):
         for f in fs:

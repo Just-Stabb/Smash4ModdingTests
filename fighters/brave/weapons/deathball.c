@@ -199,6 +199,7 @@ int sh_tick()
     KineticModule(0xf, 0, 0, 0);
     KineticModule(0x15, 0, -1.0f, -1.0f);
     PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + dbl_vy, PostureModuleF(0x3));
+    GroundModule(0x2715);   // fix 81 (user: it got stuck on platforms): through them, as a fighter's Pass status
     return 0x1;
 }
 

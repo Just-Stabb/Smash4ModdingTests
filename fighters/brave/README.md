@@ -1400,3 +1400,19 @@ Install over fix 79. The user's test of fix 79 (a clip):
 - `port_check` over steve_hero_v1 + fighters_latest + fixes 56-80: the pre-existing 6 errors (A3, E4, E5, E7, P1,
   S4), M8 clear.
 - Changed: `brave.mscsb`, `deathball.mscsb`, `motion/body/main.pac`.
+
+## Fix 81 (`build/hero_fix81.zip`): Zoom 2 U without globals, Whack through platforms
+
+Install over fix 80. User: Zoom 2 U still stopped Hero's MSC; Whack got stuck on platforms.
+
+- **Zoom 2 U**: moving the action check (fix 80) didn't help, so the cause is elsewhere. Fix 79's MSC used
+  globals up to index 0x8A; through fix 78 the highest was 0x85, and fix 79's other changes (including
+  `brave_lw_burst`, now 0x86, written at every cast) worked in game. The only code writing 0x87-0x8A was Zoom
+  2 U's (its target, tracking flag and speed), so the VM's globals most likely end before them (not found in
+  the executable: inferred). Zoom 2 U now has no globals: its target lives in `brave_lw_burst` (only Magic
+  Burst reads it), -1 once he stops tracking, and its speed is energy 3's own (`KineticModuleF(0xa / 0xb, 3)`,
+  read back as `rolloff_update` does). Highest global again 0x86. New `port_check` C5 (WARN): an MSC file's
+  globals past 0x86.
+- **Whack** passes through platforms: `GroundModule(0x2715)` every frame (the fighters' Pass status: through
+  the floor under it).
+- Changed: `brave.mscsb`, `deathball.mscsb`.
