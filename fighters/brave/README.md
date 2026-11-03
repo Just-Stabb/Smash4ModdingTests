@@ -1416,3 +1416,19 @@ Install over fix 80. User: Zoom 2 U still stopped Hero's MSC; Whack got stuck on
 - **Whack** passes through platforms: `GroundModule(0x2715)` every frame (the fighters' Pass status: through
   the floor under it).
 - Changed: `brave.mscsb`, `deathball.mscsb`.
+
+## Fix 82 (`build/hero_fix82.zip`): Zoom 2 U's tracking and clamp
+
+Install over fix 81. User: Zoom 2 U works now; it didn't track behind him consistently and didn't clamp the
+speed in range.
+
+- **Behind him**: fix 81 stopped tracking at once when he was already within 80 of the target (mostly a fighter
+  right behind him): he flew straight ahead. The launch now always aims at the target.
+- **In range**: within 80 of the target the speed part ends: the speed (toward the target) clamped to his max
+  air speed across / max fall speed up and down, into a fall he can act out of (fix 81 flew on past him at 9 a
+  frame). The direction comes from the positions every frame (`brave_z2_aim`), no speed read back and kept
+  (energy 3 may decay under the air-stop kinetic type).
+- **The clamp after acting out**: as before, clamped before the action; now also again on the first 2 frames of
+  whatever he does next (`brave_z2_after` in `brave_frame`, energy 3 only: a double jump or air dodge keeps its own
+  speed), marked by `brave_lw_burst` 0x102 / 0x101 (still no globals of its own: highest 0x86).
+- Changed: `brave.mscsb`.
