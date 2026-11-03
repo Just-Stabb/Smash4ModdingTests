@@ -158,7 +158,8 @@ for dmg, par in ((10.0, 1.0), (4.0, 1.5), (18.0, 1.0)):
     check("crit hitbox %g dmg: damage x2.3" % dmg, round(d, 3), round(sd * 2, 3))
     check("  opponent hitstop = 2x the Strike one", round((d * K + 5) * h, 3), round(2 * (sd * K + 5) * 1.2 * par, 3))
 fighter(mu, kirby, 3, 0x4B490010)
-check("crit bit without Strike: unchanged", run_atk(mu, kirby, 10.0, 1.0), (10.0, 1.0))
+check("crit bit without Strike (Hero's crit, Kirby only sets it with Strike): x2 in hero_buff_cave, no hitstop change",
+      run_atk(mu, kirby, 10.0, 1.0), (20.0, 1.0))
 for dmg in (3.0, 10.0, 14.0, 18.0):
     acc = fighter(mu, kirby, 3, CRIT)
     scaled, mult = run_atk(mu, kirby, dmg, 1.0)          # the crit hitbox's damage / multiplier
@@ -227,6 +228,13 @@ fighter(mu, hero, 3, 0x4B490080)                      # only the damage-taken bi
 check("damage-taken bit alone: hitbox unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (10.0, 60, 76, 0, 0, 1.0))
 fighter(mu, hero, 3, 0x4B490000)
 check("no buff: unchanged", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (10.0, 60, 76, 0, 0, 1.0))
+fighter(mu, hero, 3, 0x4B490010)                      # Hero's critical hit (not a smash attack)
+check("Hero crit hitbox: x2 damage, knockback params kept", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (20.0, 60, 76, 0, 0, 1.0))
+fighter(mu, hero, 3, 0x4B490030)                      # crit + Oomph
+check("Hero crit + Oomph: x3.2 damage, x1.1 knockback", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0)[:3], (32.0, 66, 84))
+fighter(mu, hero, 3, 0x4B490050)                      # crit + Psyche Up
+check("Hero crit + Psyche Up: x2 damage, x1.2 knockback, shield on the doubled damage",
+      run_hero_atk(mu, hero, 10.0, 62, 76, 0, 0)[:5], (20.0, 74, 91, 0, 13))
 fighter(mu, hero, 3, 0x4B490008)                      # Strike Kirby: still his, knockback alone
 check("Strike Kirby through the hero cave: x1.15 / x1.2 only", run_hero_atk(mu, hero, 10.0, 60, 76, 0, 0), (11.5, 60, 76, 0, 0, 1.2))
 fighter(mu, hero, 3, 0x12340020)
@@ -252,6 +260,10 @@ fighter(mu, hero, 3, 0x4B490060)
 check("Oomph + Psyche Up throw: x1.32 knockback", run_hero_throw(mu, hero, 10.0, 100, 0, 50), (16.0, 45, 132, 0, 66))
 fighter(mu, hero, 3, 0x4B490080)
 check("damage-taken bit alone: throw unchanged", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (10.0, 45, 60, 0, 70))
+fighter(mu, hero, 3, 0x4B490010)
+check("Hero crit throw: x2 damage", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (20.0, 45, 60, 0, 70))
+fighter(mu, hero, 3, 0x4B490030)
+check("Hero crit + Oomph throw: x3.2 damage, x1.1 knockback", run_hero_throw(mu, hero, 10.0, 60, 0, 70), (32.0, 45, 66, 0, 77))
 
 
 def run_vic(mu, acc, damage):

@@ -1287,3 +1287,23 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
 - `port_check brave` over steve_hero_v1 + fixes 58-76: the same 5 errors as up to fix 75 (none new): E4 / E5
   (type-4 meshes in his effect bank), E7 (effect macros the translator drops: `EFFECT_OFF_KIND_WORK`,
   `EFFECT_FOLLOW_WORK`, ...), P1, S4: left for a follow-up.
+
+## Fix 77 (`build/hero_fix77.zip`): critical hits on every physical attack, endless rumbles
+
+- **Critical hits (user: "crit on any physical attack including throw releases and jab 3, but excluding
+  pummels and jab 1/2"):** 1 in 8, rolled when the move starts (`brave_crit_update`, `brave_crit_move`):
+  jab 3 (Attack `0x25` with ComboModule 0 = 3), dash attack `0x27`, tilts `0x28`-`0x2A`, smash attacks
+  `0x2B`-`0x33`, aerials `0x34`, throws `0x3E` (not the pummel `0x3B`), getup attack `0x56`, ledge attack
+  `0x75`, trip attack `0x87` (the statuses found from their mains' motions: DownAttackU/D, CliffAttackQuick,
+  SlipAttack; `sv_set_mem` registrations). Smash attacks keep Ultimate's crit hitboxes (int `0x1000009A`);
+  the rest (no crit hitboxes in Ultimate) set the trait marker's bit 0x10, and `tools/hero_buff_cave.py`
+  doubles their hitboxes' and throw's damage (Ultimate's smash crits are x2 damage: 36 / 18, 28 / 14,
+  22 / 11; knockback params unchanged, it grows with the damage). The bit is Strike Kirby's crit too: the
+  cave leaves markers with the Strike bit to `strike_cave.py`. The show (slow, camera, sound) plays when the
+  crit connects, for a throw when it lets go (CatchModule `0x2712` held, then not).
+- **S8 rumble-endless (port_check, since fix 76):** six expression scripts' plain `Rumble(8)` (a kind that
+  never ends) are `Rumble_Loop(8, 0)`, ended with the status.
+- Tests: `strike_test.py` (crit hitbox / throw x2, with Oomph / Psyche Up, Strike Kirby's crit untouched).
+  `port_check` over the install: the pre-existing E4 / E5 / E7 / P1 / S4 remain (as at fix 76), S8 gone.
+- Changed: `brave.mscsb`, `expression.bin` (fix 71's, the six scripts), `code/cross_f.rpx` (the stick-clicks
+  executable + the hero buff cave).

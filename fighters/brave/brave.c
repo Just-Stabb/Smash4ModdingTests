@@ -38917,7 +38917,7 @@ void brave_buff_update()
     }
     // the marker's bits (tools/strike_cave.py, tools/hero_buff_cave.py): 3 Acceleratle's speeds, 0x20
     // Oomph (x1.6 damage, x1.1 knockback) and 0x40 Psyche Up (x1.2 knockback, x1.65 shield damage) on his
-    // physical attacks (not his specials), 0x80 Oomph's x1.2 damage taken, 0x10 a critical smash attack
+    // physical attacks (not his specials), 0x80 Oomph's x1.2 damage taken, 0x10 a critical hit (x2 damage)
     m = 0;
     if (brave_speed_t > 0)
     {
@@ -38934,6 +38934,10 @@ void brave_buff_update()
     if (brave_psyche && brave_special_status() == 0)
     {
         m = m + 0x40;
+    }
+    if (brave_crit_hb)
+    {
+        m = m + 0x10;       // a critical hit on a move without crit hitboxes: x2 damage (brave_crit_update)
     }
     if (m == 0)
     {
@@ -39044,40 +39048,79 @@ void brave_keep_items()
     WorkModule(0x7, 0, 0x10000091);
 }
 
-// Ultimate's lot_critical: each smash attack (statuses 0x2B-0x33, from the windup) is a critical hit 1 time
-// in 8, rolled when it starts; int 0x1000009A is 1 for the whole of it, and his smash scripts take
-// Ultimate's critical hitboxes on it (tools/brave_build.py CRIT_INT)
-int brave_crit_rolled;
+// Critical hits (Ultimate's lot_critical: 1 in 8, rolled when the move starts; user: on any physical attack,
+// not only the smash attacks): a smash attack (statuses 0x2B-0x33, from the windup) takes Ultimate's own crit
+// hitboxes through int 0x1000009A (his smash scripts, tools/brave_build.py CRIT_INT); the others Ultimate has
+// no crit hitboxes for take x2 damage through the trait marker's bit 0x10 (tools/hero_buff_cave.py, on their
+// hitboxes and the throw): jab 3 (Attack 0x25 on its third hit, ComboModule 0 = 3; not jab 1 / 2), dash
+// attack 0x27, tilts 0x28-0x2A, aerials 0x34, throws 0x3E (not the pummel 0x3B), the getup attack 0x56,
+// ledge attack 0x75 and trip attack 0x87 (the statuses whose mains play DownAttackU/D, CliffAttackQuick,
+// SlipAttack). Specials never (Hatchet Man is always critical: brave_crit_show).
+int brave_crit_key;         // the move rolled for (its status; jab 3: 0x25), 0 between moves
 int brave_crit;
+int brave_crit_hb;          // brave_crit on a move without crit hitboxes: the marker's bit 0x10
+
+int brave_crit_move()
+{
+    if (global4 >= 0x2b && global4 <= 0x33)
+    {
+        return 0x2b;        // a smash attack: the windup, the hold and the swing are one move
+    }
+    if (global4 == 0x25)
+    {
+        if (ComboModule(0) >= 0x3)
+        {
+            return 0x25;
+        }
+        return 0;
+    }
+    if (global4 == 0x27 || global4 == 0x28 || global4 == 0x29 || global4 == 0x2a || global4 == 0x34
+        || global4 == 0x3e || global4 == 0x56 || global4 == 0x75 || global4 == 0x87)
+    {
+        return global4;
+    }
+    return 0;
+}
 
 void brave_crit_update()
 {
-    if (global4 < 0x2b || global4 > 0x33)
+    int key;
+    key = brave_crit_move();
+    if (key == 0)
     {
-        brave_crit_rolled = 0;
+        brave_crit_key = 0;
         brave_crit = 0;
     }
-    else if (brave_crit_rolled == 0)
+    else if (key != brave_crit_key)
     {
-        brave_crit_rolled = 0x1;
+        brave_crit_key = key;
         brave_crit = 0;
         if (randi(0, 0x8) == 0)
         {
             brave_crit = 0x1;
         }
     }
-    WorkModule(0x7, brave_crit * 0x3e8, 0x1000009a);   // 1000 (fix 62): Robin's native code counts this int
-                                                        // down a frame at a time (0x02F635F0: ints 0x98-0x9C,
-                                                        // his tomes' recharge), which made 1 read 0 by the hit
+    brave_crit_hb = 0;
+    if (brave_crit && key != 0x2b)
+    {
+        brave_crit_hb = 0x1;
+    }
+    WorkModule(0x7, (brave_crit - brave_crit_hb) * 0x3e8, 0x1000009a);   // the smash scripts' crit: 1000 (fix
+                                                        // 62): Robin's native code counts this int down a frame
+                                                        // at a time (0x02F635F0: ints 0x98-0x9C, his tomes'
+                                                        // recharge), which made 1 read 0 by the hit
 }
 
 // the critical hit's show (Ultimate's param_critical: the game slowed to 1/4 for critical_frame 40, the
 // camera in on him; it plays when the crit hitboxes connect): a smash attack that rolled it (brave_crit) or
 // Hatchet Man (spell 20, always critical). The hit: self's HIT variable (0x0F0000A0, on until the move
-// ends); the slow: SlowModule(0, rate, frames) (ACMD Time_Manipulation_Whole's call); the camera: the ITEM
-// variable's 8 (closeup) / 9 (back) (tools/position_vars_cave.py, ACMD Camera_Closeup / Normal_Camera's calls)
+// ends); a throw: its release (he held the opponent, CatchModule 0x2712, and no more: the throw's damage
+// isn't a hitbox's hit); the slow: SlowModule(0, rate, frames) (ACMD Time_Manipulation_Whole's call); the
+// camera: the ITEM variable's 8 (closeup) / 9 (back) (tools/position_vars_cave.py, ACMD Camera_Closeup /
+// Normal_Camera's calls)
 int brave_crit_shown;
 int brave_crit_cam;
+int brave_crit_held;
 
 void brave_crit_show()
 {
@@ -39091,13 +39134,19 @@ void brave_crit_show()
     {
         brave_crit_shown = 0;
     }
-    else if (brave_crit_shown == 0 && WorkModuleF(0, 0x0f0000a0) >= 0.5f)
+    else if (brave_crit_shown == 0 && (WorkModuleF(0, 0x0f0000a0) >= 0.5f
+             || global4 == 0x3e && brave_crit_held && CatchModule(0x2712) == 0))
     {
         brave_crit_shown = 0x1;
         brave_se(0x7640112);        // se_brave_criticalhit: Ultimate's crit hitboxes' hit sound
         SlowModule(0, 0x4, 0x28);
         brave_item(8.0f);
         brave_crit_cam = 0x28;
+    }
+    brave_crit_held = 0;
+    if (global4 == 0x3e && CatchModule(0x2712))
+    {
+        brave_crit_held = 0x1;
     }
     if (brave_crit_cam > 0)
     {

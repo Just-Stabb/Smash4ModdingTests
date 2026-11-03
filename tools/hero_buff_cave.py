@@ -11,7 +11,13 @@ Hero's MSC (fighters/brave/brave.c brave_buff_update) keeps bits in the trait ma
   knockback x1.1 (Ultimate's special_lw attack_up: attack x1.6, reaction x1.1), throws too;
 - PSYCHE_BIT (0x40), Psyche Up's next physical hit: knockback x1.2 and shield damage x1.65 (a throw:
   knockback x1.2);
-- TAKEN_BIT (0x80), Oomph's downside: the damage he takes x1.2.
+- TAKEN_BIT (0x80), Oomph's downside: the damage he takes x1.2;
+- CRIT_BIT (0x10), a critical hit on a physical attack Ultimate has no crit hitboxes for (brave.c
+  brave_crit_update: 1 in 8 of jab 3, dash attack, tilts, aerials, throws, getup / ledge / trip attacks;
+  not jab 1 / 2, pummels or specials; smash attacks keep Ultimate's own crit hitboxes): damage x2 (Ultimate's
+  smash crits: 36 / 18, 28 / 14, 22 / 11 ...), on hitboxes and on the throw. Knockback params unchanged: it
+  grows with the damage, as the formula has it. The same bit is Strike Kirby's smash crit (strike_cave.py,
+  STRIKE_BIT also set): left to it.
 
 1. Hitboxes (HB_ATK, after strike_cave.py's set_attack hook; r26 = the hitbox's slot, r28 its
    AttackModule): knockback as base, growth and set knockback (+0x2C, +0x24, +0x28, ints) x the percent
@@ -25,8 +31,8 @@ Hero's MSC (fighters/brave/brave.c brave_buff_update) keeps bits in the trait ma
    accessor, r5 = the hit info): the hit info's damage (+0xC) x1.2 when the victim has TAKEN_BIT. Its
    knockback (+0x10) is already worked out by then: only the percent grows.
 
-Hero's critical hits need nothing here: his smash scripts keep both of Ultimate's hitbox sets
-(tools/brave_build.py CRIT_INT).
+Hero's critical smash attacks need nothing here: his smash scripts keep both of Ultimate's hitbox sets
+(tools/brave_build.py CRIT_INT); CRIT_BIT is for the rest.
 """
 import os
 import sys
@@ -44,6 +50,9 @@ THROW_BACK = S.HOOK_THROW + 4
 OOMPH_BIT = 0x20
 PSYCHE_BIT = 0x40
 TAKEN_BIT = 0x80
+CRIT_BIT = 0x10
+CRIT_DAMAGE = 2.0
+assert CRIT_BIT == S.CRIT_BIT                   # one meaning per fighter: Hero (no Strike bit) / Strike Kirby
 OOMPH_DAMAGE = 1.6
 OOMPH_KB = 110                  # percent
 PSYCHE_KB = 120
@@ -71,6 +80,17 @@ hb_atk:                                 # r26 = the hitbox's slot, r28 = its Att
         fmuls f0, f0, f13
         stfs f0, 0x18(r26)
 atk_ps:
+        andi. r0, r11, %(CRIT)d
+        beq atk_ps2
+        andi. r0, r11, %(STRIKE)d          # Strike Kirby's crit (the same bit): strike_cave.py's
+        bne atk_ps2
+        lis r12, consts@ha
+        addi r12, r12, consts@l
+        lfs f0, 0x18(r26)               # a critical hit: damage x2
+        lfs f13, 0x10(r12)
+        fmuls f0, f0, f13
+        stfs f0, 0x18(r26)
+atk_ps2:
         andi. r0, r11, %(PSYCHE)d
         beq atk_kb
         mulli r10, r10, %(PKB)d
@@ -111,6 +131,17 @@ hb_throw:                               # r30 = AttackModule, the throw's attack
         fmuls f0, f0, f13
         stfs f0, 0x78(r1)
 throw_ps:
+        andi. r0, r11, %(CRIT)d
+        beq throw_ps2
+        andi. r0, r11, %(STRIKE)d          # Strike Kirby's crit (the same bit): strike_cave.py's
+        bne throw_ps2
+        lis r12, consts@ha
+        addi r12, r12, consts@l
+        lfs f0, 0x78(r1)                # a critical throw: damage x2
+        lfs f13, 0x10(r12)
+        fmuls f0, f0, f13
+        stfs f0, 0x78(r1)
+throw_ps2:
         andi. r0, r11, %(PSYCHE)d
         beq throw_kb
         mulli r10, r10, %(PKB)d
@@ -141,6 +172,7 @@ consts:
         .float %(TK)r
         .word 0                         # 8: a double's room (fctiwz)
         .word 0
+        .float %(CD)r                   # 0x10: the critical hit's damage
 """
 
 
@@ -166,12 +198,12 @@ def throw_kb_lines():
 def assemble():
     a = Asm(CAVE)
     a.asm(SOURCE % dict(
-        o_atk=S.owner_wm("r28", "atk_out"), m_atk=S.marker("r12", "atk_out", bit=OOMPH_BIT | PSYCHE_BIT),
-        o_throw=S.owner_wm("r30", "throw_out"), m_throw=S.marker("r12", "throw_out", bit=OOMPH_BIT | PSYCHE_BIT),
+        o_atk=S.owner_wm("r28", "atk_out"), m_atk=S.marker("r12", "atk_out", bit=OOMPH_BIT | PSYCHE_BIT | CRIT_BIT),
+        o_throw=S.owner_wm("r30", "throw_out"), m_throw=S.marker("r12", "throw_out", bit=OOMPH_BIT | PSYCHE_BIT | CRIT_BIT),
         c4=S.chk("r4", "vic_out"), c5=S.chk("r5", "vic_out"), m_vic=S.marker("r12", "vic_out", bit=TAKEN_BIT),
         OOMPH=OOMPH_BIT, PSYCHE=PSYCHE_BIT, OKB=OOMPH_KB, PKB=PSYCHE_KB, PSH=PSYCHE_SHIELD, KB=kb_lines(), TKB=throw_kb_lines(),
         ATK_BACK="0x%08X" % ATK_BACK, THROW_BACK="0x%08X" % THROW_BACK, VIC_BACK="0x%08X" % (HOOK_VIC + 4),
-        OD=OOMPH_DAMAGE, TK=TAKEN))
+        OD=OOMPH_DAMAGE, TK=TAKEN, CRIT=CRIT_BIT, STRIKE=S.STRIKE_BIT, CD=CRIT_DAMAGE))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, "hero buff cave too big: %d words" % len(words)
     assert a.labels.get("hb_atk") and CAVE == S.HB_ATK and CAVE + 4 == S.HB_THROW
