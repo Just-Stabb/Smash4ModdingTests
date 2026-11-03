@@ -1,6 +1,6 @@
-# Controls: Smash Attack button and Stick Smash
+# Controls: Smash Attack button, Stick Smash and the stick clicks
 
-Two additions to the Controls menu (Options > Controls > a name):
+Additions to the Controls menu (Options > Controls > a name):
 
 - **Smash Attack on any button.** Every button's popup now also lists *Smash Attack* (it was only
   on the C-stick / right stick). A button set to it works like the C-stick's smash attack, with
@@ -20,7 +20,18 @@ Two additions to the Controls menu (Options > Controls > a name):
   (*Smash Attack* row). Default ON (the game as it was). The Wii Remote layouts keep their Shake to
   Smash row in that place and don't have the option.
 
-Both are saved with the name's controls, like Tap Jump.
+- **Stick clicks** (Pro Controller and GamePad layouts): two new buttons, pressing the **left stick** and
+  pressing the **right stick** in. Their boxes are on the controller picture: the left stick's across from
+  the right stick's (C-stick) box, the right stick's just under it. Each can be set to *Not Set* (the
+  default: nothing), *Attack*, *Special*, *Jump*, *Shield*, *Grab* or *Smash Attack*.
+  - Set to **Attack** or **Special**, a click is always the **neutral** version, whatever direction the
+    control stick is held: a jab (or the dash attack while running, as A), a neutral air, a neutral special.
+    So you can drift or walk forward and still get the neutral move.
+  - The other actions work as the same action on any other button (Smash Attack as the Smash Attack button).
+  - The Classic Controller has no stick clicks: its layout (which shares the Pro / GamePad settings) doesn't
+    show them.
+
+All are saved with the name's controls, like Tap Jump.
 
 (A test build also had a "Stick F-Smash" row, kept in bit 1 of the pad type's Tap Jump byte; it
 was taken out. The Tap Jump readers use bit 0 only and opening a name's controls clears the rest,
@@ -38,6 +49,15 @@ limited, and the stick stays past 0.25, so walking, dashing, jumping and fast fa
 affected. The setting is applied to the inputs themselves (where the game applies Tap Jump and
 A+B), so replays play back as played.
 
+## How the stick clicks work
+
+The Pro Controller and the GamePad report the clicks to the game (as two buttons of the pad state); the
+game's own mapping ignores them. The input wrapper (the one Stick Smash uses) adds the click's action to the
+frame, and on the frame an Attack or Special click is pressed sets that frame's control stick to neutral, so
+the fighter reads a neutral attack, aerial or special; the stick is back the next frame (movement and drift
+carry on). The choices are kept in the name's saved controls: the Pro / GamePad layout's Tap Jump byte had
+seven unused bits (Tap Jump is bit 0), three per click. Names saved before have them clear: *Not Set*.
+
 ## Files
 
 | file | made by |
@@ -45,7 +65,7 @@ A+B), so replays play back as played.
 | `code/cross_f.rpx` | `tools/smash_button_cave.py` (with the rest of the build: `rpx_patch.py`) |
 | `ui/script/app/option/option_view_button.xtal` | `tools/option_button_ui.py` (the Controls screen's script) |
 | `ui/lumen/option_button/option_button.lm` | `tools/option_button_ui.py` (the new row) |
-| `ui/message/menu.msbt` | `tools/option_button_ui.py` (`MmenOption_button_85` = "Stick Smash") |
+| `ui/message/menu.msbt` | `tools/option_button_ui.py` (`MmenOption_button_85` = "Stick Smash"; the click icons `MmenIcon_linecover_55` / `56`) |
 
 ```
 python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/smash_button_cave.py)

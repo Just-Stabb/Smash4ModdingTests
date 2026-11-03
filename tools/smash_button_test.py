@@ -10,7 +10,11 @@
   types with their record bit set, only on the press;
 - the `stick_smash` property (get / set per object), its load from and save to the record's bit,
   and the bind stub (the class's own bind, then the two new members);
-- the Tap Jump getters (bit 0) and load_* clearing the Tap Jump byte's other bits.
+- the Tap Jump getters (bit 0) and load_* clearing the Tap Jump byte's other bits (STANDARD: bits 1-6 kept,
+  the stick clicks' codes);
+- stick clicks (STANDARD): a click's action bits into the frame, an attack / special press zeroing the frame's
+  stick (not while held, not for other actions, not for other pad types); the `stick_l_push` / `stick_r_push`
+  properties (ops, 14 = not set), loaded from / saved to the Tap Jump byte's bits 1-3 / 4-6.
 """
 import os
 import struct
@@ -22,7 +26,7 @@ import smash_button_cave as C  # noqa: E402
 from ppcasm import Asm  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
 from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_5, UC_PPC_REG_6,  # noqa: E402
-                               UC_PPC_REG_27, UC_PPC_REG_29, UC_PPC_REG_31, UC_PPC_REG_LR, UC_PPC_REG_MSR)
+                               UC_PPC_REG_26, UC_PPC_REG_27, UC_PPC_REG_29, UC_PPC_REG_31, UC_PPC_REG_LR, UC_PPC_REG_MSR)
 
 fails = 0
 MEM = 0x7F000000                # test memory (0x10000)
@@ -80,14 +84,22 @@ def main():
     rec_flags = cfg + port * 0x3C + 0x3B
     prev = cfg + 0x1E0 + port * 9 + 2
 
-    def frame_run(typ, flags, bits, x, y, prev_attack):
+    tapb = cfg + port * 0x3C + C.STD_TAP
+    held = a.addr('click_held') + port
+
+    def frame_run(typ, flags, bits, x, y, prev_attack, buttons=0, tap=0, was=0, full=False):
+        mu.mem_write(state, struct.pack('>I', buttons))
+        mu.mem_write(tapb, bytes([tap]))
+        mu.mem_write(held, bytes([was]))
         mu.mem_write(state + 0x7C, struct.pack('>I', typ))
         mu.mem_write(rec_flags, bytes([flags]))
         mu.mem_write(prev, bytes([prev_attack]))
         mu.mem_write(frame, struct.pack('>Hbb', bits, x, y))
         run(a.addr('wrap'), {UC_PPC_REG_3: cfg, UC_PPC_REG_4: port, UC_PPC_REG_5: frame, UC_PPC_REG_6: pad,
-                             UC_PPC_REG_31: 0x31313131})
+                             UC_PPC_REG_31: 0x31313131, UC_PPC_REG_26: 0x26262626, UC_PPC_REG_27: 0x27272727})
         b, fx, fy = struct.unpack('>Hbb', mu.mem_read(frame, 4))
+        if full:
+            return b, fx, fy, mu.mem_read(held, 1)[0], mu.reg_read(UC_PPC_REG_26), mu.reg_read(UC_PPC_REG_27)
         return b, fx, fy, mu.mem_read(prev, 1)[0], mu.reg_read(UC_PPC_REG_31)
     X, Y = C.XMAX, C.YMAX
     check('GC, off, attack press, stick up-right', frame_run(7, 0x04, 0x1, 127, 127, 0), (0x1, X, Y, 1, 0x31313131))
@@ -102,6 +114,32 @@ def main():
     check('CTR (type 9), off', frame_run(9, 0x08, 0x1, -127, 127, 0), (0x1, -X, Y, 1, 0x31313131))
     check('FREE_STYLE (type 4), off', frame_run(4, 0x02, 0x1, 127, 127, 0), (0x1, X, Y, 1, 0x31313131))
     check('REMOTE (type 3): nothing, state kept', frame_run(3, 0x0F, 0x1, 127, 127, 0), (0x1, 127, 127, 0, 0x31313131))
+
+    # stick clicks (STANDARD types 2 / 5 / 6 / 8): L 0x00800000, R 0x10000000; codes in the Tap Jump byte
+    L, R = C.CLICK_BITS
+    K = (0x26262626, 0x27272727)
+
+    def tapv(lc=0, rc=0, tj=1):
+        return tj | lc << 1 | rc << 4
+    check('L attack press: attack + 0x200, stick neutral', frame_run(5, 0, 0, 100, 50, 0, L, tapv(1), 0, True),
+          (0x0201, 0, 0, 1) + K)
+    check('L attack held: the bits, stick kept', frame_run(5, 0, 0, 100, 50, 1, L, tapv(1), 1, True), (0x0201, 100, 50, 1) + K)
+    check('R special press: special + 0x800, stick neutral', frame_run(2, 0, 0, -127, 127, 0, R, tapv(0, 2), 0, True),
+          (0x0802, 0, 0, 2) + K)
+    check('R jump: jump bit, stick kept', frame_run(6, 0, 0, 90, 90, 0, R, tapv(0, 3), 0, True), (0x0004, 90, 90, 2) + K)
+    check('L shield', frame_run(8, 0, 0, 10, 0, 0, L, tapv(4), 0, True)[:3], (0x0008, 10, 0))
+    check('L grab', frame_run(5, 0, 0, 10, 0, 0, L, tapv(5), 0, True)[:3], (0x0018, 10, 0))
+    check('R smash: smash + attack, stick kept (its direction)', frame_run(5, 0, 0, 0, -127, 0, R, tapv(0, 6), 0, True)[:3],
+          (0x0021, 0, -127))
+    check('not set (code 0): nothing', frame_run(5, 0, 0x4, 50, 50, 0, L | R, tapv(0, 0), 0, True), (0x4, 50, 50, 3) + K)
+    check('code 7 (unused): nothing', frame_run(5, 0, 0, 50, 50, 0, L, tapv(7), 0, True)[:3], (0, 50, 50))
+    check('both: L attack held, R special pressed', frame_run(5, 0, 0x8000, 50, 50, 0, L | R, tapv(1, 2), 1, True),
+          (0x8A03, 0, 0, 3) + K)
+    check('clicks released: held cleared', frame_run(5, 0, 0x1, 50, 50, 0, 0, tapv(1, 2), 3, True), (0x1, 50, 50, 0) + K)
+    check('a click with no code: no press recorded for later', frame_run(5, 0, 0, 50, 50, 0, L, tapv(0, 1), 0, True)[3], 1)
+    check('GC (type 7) with the L bit: nothing', frame_run(7, 0, 0x2, 50, 50, 0, L, tapv(1), 0, True), (0x2, 50, 50, 0) + K)
+    check('Stick Smash off + L attack press: neutral', frame_run(5, 0x01, 0, 127, 0, 0, L, tapv(1), 0, True)[:3], (0x0201, 0, 0))
+    check('Stick Smash off + L attack: the attack press recorded', frame_run(5, 0x01, 0, 127, 0, 0, L, tapv(1), 0)[3], 1)
 
     # the limits from the stick scale D ([STICK_SCALE] -> float): stick = byte / D in the game
     SC = MEM + 0x7800
@@ -168,7 +206,8 @@ def main():
             tj = 3 if flags & bit else 2
             mu.mem_write(tap, bytes([tj]))
             run(a.addr('load_' + name), {UC_PPC_REG_3: ACC, UC_PPC_REG_31: P})
-            check('load_%s: Tap Jump byte %d -> bit 0' % (name, tj), mu.mem_read(tap, 1)[0], tj & 1)
+            check('load_%s: Tap Jump byte %d -> %s' % (name, tj, 'bits 0-6' if name == 'standard' else 'bit 0'),
+                  mu.mem_read(tap, 1)[0], tj & (0x7F if name == 'standard' else 1))
             check('load_%s flags 0x%02X: getter result' % (name, flags), mu.reg_read(UC_PPC_REG_3), 7)
             check('load_%s flags 0x%02X: property' % (name, flags), prop('get', P + off), (2 if flags & bit else 3, 0))
         for on, base in ((False, 0x40), (True, 0x4F)):
@@ -178,6 +217,44 @@ def main():
             want = (base & ~bit) | (0 if on else bit)
             check('save_%s %s: flags byte' % (name, 'on' if on else 'off'), mu.mem_read(REC + 0xD, 1)[0], want)
             check('save_%s: setter gets r4' % name, mu.reg_read(UC_PPC_REG_5), 0x55)
+
+    # the click properties: int frames (type 4 at +0, the value at +4; the argument at +0x18 / +0x1C)
+    def cprop(fn, key, arg=None):
+        mu.mem_write(fr, struct.pack('>IIIIIII', 0, 0, 0, 0, 7, key, 4) + struct.pack('>I', arg or 0))
+        run(a.addr(fn), {UC_PPC_REG_3: fr})
+        return struct.unpack('>II', mu.mem_read(fr, 8))
+    Q = MEM + 0x6800
+    check('getl / getr, unknown object: 14 (not set)', (cprop('getl', Q), cprop('getr', Q)), ((4, 14), (4, 14)))
+    check('setl 0 (attack)', cprop('setl', Q, 0), (4, 0))
+    check('setr 5 (smash)', cprop('setr', Q, 5), (4, 5))
+    check('getl / getr', (cprop('getl', Q), cprop('getr', Q)), ((4, 0), (4, 5)))
+    check('stick_smash of the same object still on', prop('get', Q), (3, 0))
+    check('stick_smash set off', prop('set', Q, 2), (2, 0))
+    check('the clicks kept', (cprop('getl', Q), cprop('getr', Q)), ((4, 0), (4, 5)))
+    check('setl 14 (not set)', cprop('setl', Q, 14), (4, 14))
+    check('setl 9 (taunt: not offered) -> not set', (cprop('setl', Q, 9), cprop('getl', Q)), ((4, 9), (4, 14)))
+    check('stick_smash still off, R kept', (prop('get', Q), cprop('getr', Q)), ((2, 0), (4, 5)))
+
+    name, off, word, bit = C.MENU[2][:4]
+    assert name == 'standard'
+    mu.mem_write(ACC, struct.pack('>II', TREC, REC))
+    tap = TREC + C.TAP[name][0]
+    mu.mem_write(REC + 0xD, bytes([0x40]))
+    mu.mem_write(tap, bytes([1 | 1 << 1 | 6 << 4 | 0x80]))
+    run(a.addr('load_standard'), {UC_PPC_REG_3: ACC, UC_PPC_REG_31: P})
+    check('load_standard: L attack, R smash, Tap Jump on (bit 7 cleared)',
+          (cprop('getl', P + off), cprop('getr', P + off), prop('get', P + off), mu.mem_read(tap, 1)[0]),
+          ((4, 0), (4, 5), (3, 0), 0x63))
+    cprop('setl', P + off, 2)
+    cprop('setr', P + off, 14)
+    for tj in (0, 1):
+        mu.mem_write(tap, bytes([tj]))                      # as the Tap Jump setter left it
+        run(a.addr('save_standard'), {UC_PPC_REG_3: ACC, UC_PPC_REG_4: 0x55, UC_PPC_REG_31: P})
+        check('save_standard Tap Jump %d: L jump (code 3), R not set' % tj, mu.mem_read(tap, 1)[0], tj | 3 << 1)
+    prop('set', P + off, 2)
+    mu.mem_write(REC + 0xD, bytes([0x40]))
+    run(a.addr('save_standard'), {UC_PPC_REG_3: ACC, UC_PPC_REG_4: 0x55, UC_PPC_REG_31: P})
+    check('save_standard: stick smash off with clicks set: flags byte', mu.mem_read(REC + 0xD, 1)[0], 0x40 | bit)
 
     # bind stubs: BIND logs (r3, r4, r5) at LOG
     LOG = MEM + 0x9000
@@ -197,7 +274,7 @@ def main():
         mu.mem_write(LOG, b'\0' * 0x40)
         run(a.addr('bind_' + name), {UC_PPC_REG_3: 0x1111, UC_PPC_REG_4: 0x2222, UC_PPC_REG_5: 0x3333,
                                      UC_PPC_REG_31: 0xC1A55})
-        calls = [struct.unpack('>III', mu.mem_read(LOG + 4 + 12 * i, 12)) for i in range(3)]
+        calls = [struct.unpack('>III', mu.mem_read(LOG + 4 + 12 * i, 12)) for i in range(7)]
 
         def s(p):
             return bytes(mu.mem_read(p, 32)).split(b'\0')[0].decode()
@@ -206,6 +283,11 @@ def main():
               (0xC1A55, 'stick_smash', a.addr('get'), C.DESC_TYPES[name][0]))
         check('bind_%s: setter' % name, (calls[2][0], s(calls[2][1]), r32(mu, calls[2][2]), r32(mu, calls[2][2] + 4)),
               (0xC1A55, 'set_stick_smash', a.addr('set'), C.DESC_TYPES[name][1]))
+        want = [(0xC1A55, n, a.addr(f), t) for (g, st_, _sh), (gf, sf) in zip(C.CLICK_PROPS, (('getl', 'setl'), ('getr', 'setr')))
+                for n, f, t in ((g, gf, C.CLICK_DESC[0]), (st_, sf, C.CLICK_DESC[1]))] if name == 'standard' else [(0, '', 0, 0)] * 4
+        check('bind_%s: the stick clicks\' members' % name,
+              [(c[0], s(c[1]) if c[1] else '', r32(mu, c[2]) if c[2] else 0, r32(mu, c[2] + 4) if c[2] else 0) for c in calls[3:]],
+              want)
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

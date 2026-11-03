@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Smash attack button and the "Stick Smash" controls setting. Prints rpx_patch.py arguments.
+"""Smash attack button, the "Stick Smash" controls setting and the stick clicks' actions. Prints rpx_patch.py
+arguments.
 
   python3 tools/rpx_patch.py IN.rpx OUT.rpx ... $(python3 tools/smash_button_cave.py)
 
@@ -45,6 +46,20 @@ within 2 / 4 / 4 frames) is a smash attack.
    its Tap Jump right, and load_parameter_* clears the other bits (the setters write the whole
    byte, so the next save stores it clean).
 
+5. Stick clicks (Pro Controller / GamePad: the STANDARD layout; docs/controls.md "Stick clicks"): the pads give
+   the clicks as bits 0x00800000 (L) / 0x10000000 (R) of the pad state's buttons (GamePad 0x03370A78, Pro
+   Controller 0x033715D4; the Classic Controller has none). Each click has an action code in the STANDARD
+   record's Tap Jump byte (its bit 0 is Tap Jump): bits 1-3 L, 4-6 R; 0 = not set (the default: the bits
+   were clear, 4.), 1-6 = attack, special, jump, shield, grab, smash. In the dispatcher wrapper (2.), for a
+   STANDARD pad, a held click ORs its action's bits into the frame (as the mapping gives a button: attack
+   0x201, special 0x802, jump 4, shield 8, grab 0x18, smash 0x21 as the smash button); on the frame an attack
+   or special click is pressed (not held the frame before: 2 bits a port in the cave, CLICK_HELD) the frame's
+   stick is set to 0, so the fighter takes a neutral attack / neutral special / neutral air whatever the stick
+   held (only that frame: the stick is back the next one). Menu: OptionPadAssignStandard gets int properties
+   `stick_l_push` / `stick_r_push` (an op, 14 = not set) kept in the side table's value bits 8-15 / 16-23 (bit
+   0: stick smash); load_parameter_standard reads them from the Tap Jump byte (keeping bits 1-6),
+   save_parameter_standard writes them back after its Tap Jump setter (which writes the whole byte).
+
 Code in the grown .text at CAVE; the menu hooks (0x021Bxxxx, out of reach of it) go through `b`
 trampolines at TRAMPOLINES (Havok cave).
 """
@@ -88,6 +103,17 @@ TYPE_BITS = {1: 0x08, 9: 0x08,                  # CTR       (A+B bit 0x80)
              2: 0x01, 5: 0x01, 6: 0x01, 8: 0x01,  # STANDARD  (0x10)
              4: 0x02,                           # FREE_STYLE (0x20)
              7: 0x04}                           # GC        (0x40); 3 REMOTE: none
+
+# 5. stick clicks (Pro Controller / GamePad: the STANDARD mapping's pad bits, from VPAD 0x40000 / 0x20000
+# (0x03370A78) and KPAD URCC 0x20000 / 0x10000 (0x033715D4)): L, R
+CLICK_BITS = (0x00800000, 0x10000000)
+STD_TAP = 0x2D                  # the STANDARD record's Tap Jump byte in a port's 0x3C record (+0x21 + 0xC)
+# a click's code (Tap Jump byte bits 1-3 L, 4-6 R): 0 none, 1-6 = PAD_BUTTON_OPE 0-5 + 1; its action bits
+# (as the mapping gives a button: op bits, attack +0x200, special +0x800; smash + attack, as the smash button)
+CLICK_ACTIONS = (0, 0x0201, 0x0802, 0x0004, 0x0008, 0x0018, 0x0021, 0)
+OP_NONE = 14                    # the menu's "Not Set" (option_button_ui.py: op 14 -> txt_14)
+CLICK_DESC = (0x100286C4, 0x100286D4)      # STANDARD's int getter / setter argument types (trigger_l's)
+CLICK_PROPS = (('stick_l_push', 'set_stick_l_push', 8), ('stick_r_push', 'set_stick_r_push', 16))
 
 # per class: Tap Jump byte in the accessor's word 0 record, its getter (see 4.)
 TAP = {'ctr': (0x0C, 0x030C89E0), 'gc': (0x0B, 0x030C83B8), 'standard': (0x0C, 0x030C8838)}
@@ -194,10 +220,10 @@ def build():
     ab%(i)d_g:%(go)s''' % dict(i=i, acc=acc, go=far(getter)))
     # 2. stick smash off: the dispatcher wrapper
     src.append('''
-    wrap:   stwu r1, -0x20(r1)
+    wrap:   stwu r1, -0x30(r1)
             mflr r0
-            stw r0, 0x24(r1)
-            stmw r28, 0x10(r1)
+            stw r0, 0x34(r1)
+            stmw r26, 0x18(r1)
             mr r31, r3                  # config base (records port * 0x3C, mapping state +0x1E0)
             mr r30, r4                  # port
             mr r29, r5                  # the input frame
@@ -208,6 +234,7 @@ def build():
             mtctr r12
             mr r3, r28
             bctrl
+            mr r27, r3                  # the pad state: +0 buttons, +0x7C type
             lwz r3, 0x7C(r3)
             cmplwi r3, 9
             bgt w_done
@@ -216,7 +243,31 @@ def build():
             lbzx r9, r12, r3
             cmpwi r9, 0
             beq w_done
-            mulli r12, r30, 9           # the port's mapping state byte 2: attack held last frame
+            cmpwi r9, 1                 # STANDARD (Pro / GamePad / Classic): the stick clicks (5.)
+            bne w_att
+            mulli r10, r30, 0x3C
+            add r10, r10, r31
+            lbz r8, %(tap)d(r10)          # the record's Tap Jump byte: L code bits 1-3, R code bits 4-6
+            lwz r7, 0(r27)
+            lis r12, click_held@ha
+            addi r12, r12, click_held@l
+            add r12, r12, r30
+            lbz r6, 0(r12)              # last frame's L (1) / R (2) click
+            li r5, 0
+            rlwinm. r0, r7, 0, %(lb)d, %(lb)d
+            beq w_c2
+            ori r5, r5, 1
+            rlwinm r4, r8, 31, 29, 31
+            li r26, 1
+            bl click
+    w_c2:   rlwinm. r0, r7, 0, %(rb)d, %(rb)d
+            beq w_c3
+            ori r5, r5, 2
+            rlwinm r4, r8, 28, 29, 31
+            li r26, 2
+            bl click
+    w_c3:   stb r5, 0(r12)
+    w_att:  mulli r12, r30, 9           # the port's mapping state byte 2: attack held last frame
             add r12, r12, r31
             addi r12, r12, 0x1E2
             lhz r0, 0(r29)
@@ -237,7 +288,8 @@ def build():
             li r7, %(ymax)d               # XMAX / YMAX
             lis r12, %(scale_hi)d
             lwz r12, %(scale_lo)d(r12)''' % dict(dispatch=DISPATCH, xmax=XMAX, ymax=YMAX, scale_hi=ha(STICK_SCALE),
-                                          scale_lo=lo(STICK_SCALE)) + strike_cave.chk('r12', 'w_lim') + '''
+                                          scale_lo=lo(STICK_SCALE), tap=STD_TAP, lb=31 - (CLICK_BITS[0].bit_length() - 1),
+                                          rb=31 - (CLICK_BITS[1].bit_length() - 1)) + strike_cave.chk('r12', 'w_lim') + '''
             lfs f0, 0(r12)
             lis r11, ratios@ha
             addi r11, r11, ratios@l
@@ -278,11 +330,30 @@ def build():
             bge w_y2
             mr r10, r5
     w_y2:   stb r10, 3(r29)
-    w_done: lmw r28, 0x10(r1)
-            lwz r0, 0x24(r1)
+    w_done: lmw r26, 0x18(r1)
+            lwz r0, 0x34(r1)
             mtlr r0
-            addi r1, r1, 0x20
+            addi r1, r1, 0x30
             blr
+    click:  cmpwi r4, 0                 # r4 the click's code: its action's bits into the frame; an
+            beq c_ret                   # attack / special press: the frame's stick to neutral
+            cmplwi r4, 6
+            bgt c_ret
+            lis r10, click_bits@ha
+            addi r10, r10, click_bits@l
+            slwi r11, r4, 1
+            add r10, r10, r11
+            lhz r11, 0(r10)
+            lhz r10, 0(r29)
+            or r10, r10, r11
+            sth r10, 0(r29)
+            cmplwi r4, 2
+            bgt c_ret
+            and. r0, r6, r26
+            bne c_ret                   # held last frame: not a press
+            li r0, 0
+            sth r0, 2(r29)
+    c_ret:  blr
     ratios: .float %(xr)r
             .float %(yr)r
             .float %(dmin)r
@@ -296,6 +367,7 @@ def build():
             bne get_k
             lwz r12, 0x18(r12)
     get_k:''' + find('r11') + '''
+            clrlwi r11, r11, 31         # bit 0 (bits 8-15 / 16-23: the stick clicks' codes)
             xori r11, r11, 1            # stick smash on = the bit clear
             addi r12, r11, 2            # false 2 / true 3
             stw r12, 0(r3)
@@ -313,12 +385,60 @@ def build():
             cmpwi r11, 2
             ble set_v
             li r8, 0
-    set_v:''' + store('r8') + '''
+    set_v:''' + find('r11') + '''
+            rlwinm r11, r11, 0, 0, 30
+            or r8, r8, r11              # the other bits kept''' + store('r8') + '''
+            clrlwi r8, r8, 31
             xori r8, r8, 1
             addi r12, r8, 2
             stw r12, 0(r3)
             li r12, 0
             stw r12, 4(r3)
+            blr
+    getl:   li r7, 8                    # the stick clicks' properties: an op (PAD_BUTTON_OPE), OP_NONE unset
+            b getc
+    getr:   li r7, 16
+    getc:   lwz r11, 0x10(r3)
+            clrlwi r11, r11, 27
+            cmpwi r11, 0x10
+            lwz r12, 0x14(r3)
+            bne getc_k
+            lwz r12, 0x18(r12)
+    getc_k:''' + find('r11') + '''
+            srw r11, r11, r7
+            clrlwi r11, r11, 24
+            addi r11, r11, -1           # code - 1
+            cmpwi r11, 0
+            bge getc_v
+            li r11, %(none)d
+    getc_v: li r12, 4                   # an int
+            stw r12, 0(r3)
+            stw r11, 4(r3)
+            blr
+    setl:   li r7, 8
+            b setc
+    setr:   li r7, 16
+    setc:   lwz r11, 0x10(r3)
+            clrlwi r11, r11, 27
+            cmpwi r11, 0x10
+            lwz r12, 0x14(r3)
+            bne setc_k
+            lwz r12, 0x18(r12)
+    setc_k: lbz r8, 0x1F(r3)            # the argument (an int: +0x1C)
+            addi r8, r8, 1              # code = op + 1; ops past smash (5) / OP_NONE: 0
+            cmplwi r8, 6
+            ble setc_c
+            li r8, 0
+    setc_c:''' % dict(none=OP_NONE) + find('r11') + '''
+            li r6, 0xFF
+            slw r6, r6, r7
+            andc r11, r11, r6
+            slw r8, r8, r7
+            or r8, r8, r11''' + store('r8') + '''
+            lwz r11, 0x1C(r3)
+            li r12, 4
+            stw r12, 0(r3)
+            stw r11, 4(r3)
             blr''')
     for name, off, word, bit, _lc, getter, _sc, setter, _bc in MENU:
         shift = bit.bit_length() - 1
@@ -327,20 +447,33 @@ def build():
             lwz r12, %(w)d(r3)
             lbz r8, 0xD(r12)
             rlwinm r8, r8, %(rot)d, 31, 31
-            lwz r12, 0(r3)              # Tap Jump: bit 0 only (4.)
-            lbz r0, %(tap)d(r12)
-            clrlwi r0, r0, 31
+            lwz r12, 0(r3)              # Tap Jump: bit 0 (4.); STANDARD: the click codes too (5.)
+            lbz r0, %(tap)d(r12)%(clk)s
             stb r0, %(tap)d(r12)
-            addi r12, r31, %(off)d''' % dict(n=name, w=word, rot=(32 - shift) % 32, off=off,
-                                         tap=TAP[name][0]) + store('r8') + far(getter) + '''
+            addi r12, r31, %(off)d''' % dict(n=name, w=word, rot=(32 - shift) % 32, off=off, tap=TAP[name][0], clk='''
+            rlwinm r11, r0, 7, 21, 23   # L code -> bits 8-10
+            or r8, r8, r11
+            rlwinm r11, r0, 12, 13, 15  # R code -> bits 16-18
+            or r8, r8, r11
+            andi. r0, r0, 0x7F''' if name == 'standard' else '''
+            clrlwi r0, r0, 31''') + store('r8') + far(getter) + '''
     save_%(n)s:                             # r3 accessor, r4 the A+B value, r31 data
             addi r12, r31, %(off)d''' % dict(n=name, off=off) + find('r8') + '''
             lwz r12, %(w)d(r3)
             lbz r0, 0xD(r12)
             rlwinm r0, r0, 0, %(mb)d, %(me)d
-            slwi r8, r8, %(sh)d
-            or r0, r0, r8
-            stb r0, 0xD(r12)''' % dict(w=word, sh=shift, mb=(32 - shift) % 32, me=(30 - shift) % 32) + far(setter) + '''
+            clrlwi r7, r8, 31
+            slwi r7, r7, %(sh)d
+            or r0, r0, r7
+            stb r0, 0xD(r12)%(clk)s''' % dict(w=word, sh=shift, mb=(32 - shift) % 32, me=(30 - shift) % 32, clk='''
+            lwz r12, 0(r3)              # after save_parameter_standard's Tap Jump setter (a bool): the
+            lbz r0, %(tap)d(r12)          # click codes into bits 1-3 / 4-6
+            clrlwi r0, r0, 31
+            rlwinm r11, r8, 25, 28, 30
+            or r0, r0, r11
+            rlwinm r11, r8, 20, 25, 27
+            or r0, r0, r11
+            stb r0, %(tap)d(r12)''' % dict(tap=TAP[name][0]) if name == 'standard' else '') + far(setter) + '''
     bind_%(n)s:                             # the class's last member bind, then ours (r31 = class)
             mflr r0
             stwu r1, -0x10(r1)
@@ -357,11 +490,17 @@ def build():
             addi r4, r4, name_set@l
             lis r5, desc_set_%(n)s@ha
             addi r5, r5, desc_set_%(n)s@l
-            bl %(bind)d
+            bl %(bind)d%(clk)s
             lwz r0, 0x14(r1)
             mtlr r0
             addi r1, r1, 0x10
-            blr''' % dict(n=name, bind=BIND))
+            blr''' % dict(n=name, bind=BIND, clk=''.join('''
+            mr r3, r31
+            lis r4, name_%(p)s@ha
+            addi r4, r4, name_%(p)s@l
+            lis r5, desc_%(p)s@ha
+            addi r5, r5, desc_%(p)s@l
+            bl %(bind)d''' % dict(p=p, bind=BIND) for prop in CLICK_PROPS for p in prop[:2]) if name == 'standard' else ''))
     bits = [TYPE_BITS.get(t, 0) for t in range(12)]
     src.append(''.join('''
     desc_get_%(n)s: .word get
@@ -372,6 +511,18 @@ def build():
             .word 0x01010000''' % dict(n=m[0], gt=DESC_TYPES[m[0]][0], st=DESC_TYPES[m[0]][1]) for m in MENU) + '''
     type_bits:''' + ''.join(
         '\n            .word 0x%08X' % int.from_bytes(bytes(bits[i:i + 4]), 'big') for i in range(0, 12, 4)) + '''
+    click_bits:''' + ''.join('\n            .word 0x%04X%04X' % (CLICK_ACTIONS[i], CLICK_ACTIONS[i + 1])
+                               for i in range(0, 8, 2)) + '''
+    click_held: .word 0
+            .word 0''' + ''.join('''
+    desc_%(g)s: .word 0
+            .word %(gt)d
+            .word 0x01000000
+    desc_%(s)s: .word 0
+            .word %(st)d
+            .word 0x01010000
+    name_%(g)s:''' % dict(g=g, s=st_, gt=CLICK_DESC[0], st=CLICK_DESC[1]) + cstr(g) + '''
+    name_%(s)s:''' % dict(s=st_) + cstr(st_) for k, (g, st_, _sh) in enumerate(CLICK_PROPS)) + '''
     side_next: .word 0
     side:''' + '\n            .word 0' * (2 * SIDE_ENTRIES) + '''
     name_get:''' + cstr('stick_smash') + '''
@@ -383,6 +534,9 @@ def build():
     for m in MENU:
         for lab, fn in (('desc_get_', 'get'), ('desc_set_', 'set')):
             words[(a.addr(lab + m[0]) - CAVE) // 4] = a.addr(fn)
+    for k, (g, st_, _sh) in enumerate(CLICK_PROPS):
+        words[(a.addr('desc_' + g) - CAVE) // 4] = a.addr('getl' if k == 0 else 'getr')
+        words[(a.addr('desc_' + st_) - CAVE) // 4] = a.addr('setl' if k == 0 else 'setr')
     assert CAVE + 4 * len(words) <= LIMIT, 'smash button cave too big'
     patches = {CAVE + 4 * i: w for i, w in enumerate(words)}
 

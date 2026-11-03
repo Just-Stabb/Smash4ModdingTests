@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controls menu: "Smash Attack" for every button, and the "Stick Smash" ON / OFF row.
+"""Controls menu: "Smash Attack" for every button, the "Stick Smash" ON / OFF row and the stick clicks' keys.
 
   python3 tools/option_button_ui.py UI_DIR MENU_MSBT OUT_DIR
 
@@ -31,9 +31,24 @@ on the Lumen layout option_button.lm:
   sprite (182, also a frame per row name: each of these sprites' first frame runs
   gotoAndStop(_parent._name), and without the label it played through every icon and crashed the
   menu when the row was selected) gets a frame `sub_11` with the Tap Jump row's stick icon (ICON_FROM).
+- Stick clicks (CLICKS, smash_button_cave.py 5.): key buttons L_PUSH / R_PUSH on the GamePad and Pro Controller
+  pictures. Script: the key names after R_STICK (ids 14 / 15: clips key_group.key_14 / key_15, the pictures'
+  highlight frames key_14 / key_15), their cursor links (L <-> L_PUSH <-> UP down the left side, R_STICK <->
+  R_PUSH <-> X on the right, L_PUSH <-> R_STICK across), popups of 7 (Not Set, attack, special, jump, shield,
+  grab, smash: typ_73), icons btn_42 / btn_43, their values (`stick_l_push` / `stick_r_push`) in the STANDARD
+  value list, setter cases 12 / 13 before the STANDARD switch's lookup, the save prompt's is_diff; op 14 (not
+  set) -> text frame txt_14. The three STANDARD pads share these lists, so CLASSIC has the keys too: hidden
+  (its picture frame gives them colour 120, as its unused keys) and out of its cursor links. Layout: key_14 /
+  key_15 at depths 14 / 15 of key_group (top_mc 14 -> 16: the selected box is swapped to top_mc's depth, so
+  it stays above every box and its popup with it), at (-470, 50) (across from R_STICK's box) and (470, 150)
+  (under it) on typ_1 / typ_2; txt_14 = "Not Set" (MmenOption_button_31, the box's own off text); btn_42 /
+  btn_43 = new icon labels MmenIcon_linecover_55 / 56 (U+E381 / U+E382: the font's sticks; R_STICK's own
+  icon is U+E382); the pictures' key_14 = the R stick's highlight (key_9) mirrored, key_15 = it with the line
+  from the lower box.
 (More rows: add them to ROWS, each after the one before; a fifth toggle row doesn't fit above the
 TRY button at the game's size: ROW_LAYOUT then draws the rows smaller.)
 """
+import math
 import os
 import struct
 import sys
@@ -67,6 +82,30 @@ TOGGLE_AT, TOGGLE_END = 17291, 17911   # state_set: after the SHAKE toggle; the 
 SHAKE_SCOPE = 89
 IS_DIFF_ENDS = (13485, 13769, 14073)   # is_diff: the CTR / GC / DRC.. compare chains' ends
 IS_SUB_END = 16380              # is_sub(index): the Return after its RUMBLE .. BACK compares
+
+# stick clicks (smash_button_cave.py 5.: the STANDARD record's Tap Jump byte, the `stick_l_push` /
+# `stick_r_push` properties): two key buttons on the GamePad and Pro Controller pictures. The three STANDARD
+# pads share one key list (one value list, one setter switch), so CLASSIC gets the keys too, hidden (the
+# Classic Controller has no stick clicks) and out of its cursor table.
+# (key name, btn id: key_group.key_NN / the pictures' key_NN frame, key_mc icon frame btn_N, property,
+#  setter, icon msbt label, icon text)
+CLICKS = (('L_PUSH', 14, 42, 'stick_l_push', 'set_stick_l_push', 'MmenIcon_linecover_55', '\ue381'),
+          ('R_PUSH', 15, 43, 'stick_r_push', 'set_stick_r_push', 'MmenIcon_linecover_56', '\ue382'))
+CLICK_PADS = ('DRC', 'URCC', 'CLASSIC')
+CLICK_SHOWN = {'DRC': 0, 'URCC': 1}            # their key_group frames (typ_1 / typ_2)
+CLICK_POS = ((-470.0, 50.0), (470.0, 150.0))   # L: across from R_STICK's box; R: under it
+OP_NONE = 14                    # "Not Set" (the key box's off text, MmenOption_button_31): op -> txt_14
+CLICK_OPS = [OP_NONE, ('L', 56), ('L', 55), ('L', 54), ('L', 53), ('L', 52), OP_SMASH]   # attack .. smash
+CLICK_WINDOW = 73               # 7 rows, R_STICK's / UP's variant
+OPS_MAP_AT = 490                # after the op -> text frame map (-43)
+ICON_ENDS = {'DRC': 10967, 'URCC': 11066, 'CLASSIC': 11165}   # the icon calls' Goto, per pad
+STD_VALUES_AT = 11876           # the STANDARD value list: after stick_r
+STD_SET_AT, SET_END = 12707, 13168   # the STANDARD setter switch's lookup; the switch's end
+TXT_SPRITE, NOT_SET = 217, 'MmenOption_button_31'   # the action text sprite (txt_N frames)
+KEY_MC, KEY_ICON_FROM = 267, 'btn_30'   # the box icon sprite; R_STICK's icon frame (a text object to copy)
+PICTURES = {'DRC': 199, 'URCC': 334, 'CLASSIC': 360}   # the pads' img_mc (key_N highlight frames)
+KEY_GROUP, TOP_DEPTH = 419, 14  # the boxes' sprite; top_mc's depth
+R_STICK_Y = 50.0                # R_STICK's box y on typ_1 / typ_2
 
 
 def table_end(c, start):
@@ -112,13 +151,40 @@ def patch_xtal(data):
     order = list(zip(['SMASH'] + [r[0] for r in ROWS], [r[0] for r in ROWS]))
 
     def names_(t):
+        for p in CLICK_PADS:
+            i = t[p].index('R_STICK')
+            t[p][i + 1:i + 1] = [k[0] for k in CLICKS]
         for p in ROW_PADS:
             for prev, new in order:
                 t[p].insert(t[p].index(prev) + 1, new)
     names = table(NAMES_AT, names_)
-    table(IDS_AT, lambda t: [t[p].insert(names[p].index(r[0]), None) for p in ROW_PADS for r in ROWS])
+
+    def ids(t):
+        for p in CLICK_PADS:
+            i = t[p].index(9)               # R_STICK
+            t[p][i + 1:i + 1] = [k[1] for k in CLICKS]
+        for p in ROW_PADS:
+            for r in ROWS:
+                t[p].insert(names[p].index(r[0]), None)
+    table(IDS_AT, ids)
 
     def cursor(t):
+        for p in CLICK_PADS:                # [up, down, left, right], in the names' order
+            rows = t[p]
+            keys = [x for x in names[p] if x not in [r[0] for r in ROWS]]
+            i = keys.index('R_STICK') + 1
+            if p in CLICK_SHOWN:
+                lrow, rrow = ['L', 'UP', None, 'R_STICK'], ['R_STICK', 'X', 'L_PUSH', 'TRY']
+                cur = keys[:i] + keys[i + 2:]
+                assert rows[cur.index('L')][1] == 'UP' and rows[cur.index('UP')][0] == 'L', rows
+                assert rows[cur.index('R_STICK')][:3] == ['R', 'X', 'L'] and rows[cur.index('X')][0] == 'R_STICK', rows
+                rows[cur.index('L')][1] = 'L_PUSH'
+                rows[cur.index('UP')][0] = 'L_PUSH'
+                rows[cur.index('R_STICK')][1:3] = ['R_PUSH', 'L_PUSH']
+                rows[cur.index('X')][0] = 'R_PUSH'
+            else:
+                lrow, rrow = [None] * 4, [None] * 4
+            rows[i:i] = [lrow, rrow]
         for p in ROW_PADS:
             rows = t[p]
             cur = [x for x in names[p] if x not in [r[0] for r in ROWS]]
@@ -135,6 +201,9 @@ def patch_xtal(data):
     table(CURSOR_AT, cursor)
 
     def equip(t):
+        for p in CLICK_PADS:
+            for k in CLICKS:
+                t[p][k[0]] = [CLICK_WINDOW, list(CLICK_OPS)]
         for keys in t.values():
             for key, (window, ops) in keys.items():
                 if OP_SMASH not in ops and window // 10 in WINDOWS:
@@ -142,6 +211,9 @@ def patch_xtal(data):
     table(EQUIP_AT, equip)
 
     def clips(t):
+        for p in CLICK_PADS:
+            i = t[p].index(('call', 5, 9))  # R_STICK's key_group.key_09
+            t[p][i + 1:i + 1] = [('call', 5, k[1]) for k in CLICKS]
         for p in ROW_PADS:
             for k, r in enumerate(ROWS):
                 i = t[p].index(('call', 4, 10))
@@ -175,15 +247,18 @@ def patch_xtal(data):
     b.label('f').ins('LoadValue', result=0, value=2)
     edits.append((ROW_CHAIN, ROW_CHAIN, b))
 
-    for end in IS_DIFF_ENDS:
+    click_props = [(c.ident_index(k[3]), c.ident_index(k[4])) for k in CLICKS]
+    for n_end, end in enumerate(IS_DIFF_ENDS):
         expect(c, end, 'ScopeEnd')
         b = xtal.Block()
         b.ins('If', target=0, address_true=('I', end), address_false='cmp0')
-        for k, (prop, _set) in enumerate(props):
+        cmp_props = props + (click_props if n_end == 2 else [])     # 2: DRC / URCC / CLASSIC
+        for k, (prop, _set) in enumerate(cmp_props):
             b.label('cmp%d' % k).ins('Property', result=2, primary=prop, target=-2, stack_base=3)
             b.ins('Property', result=3, primary=prop, target=-1, stack_base=4)
             b.ins('IfEq', lhs=2, rhs=3, stack_base=4)
-            b.ins('If', target=1, address_true='cmp%d' % (k + 1) if k + 1 < len(props) else 'same', address_false='diff')
+            b.ins('If', target=1, address_true='cmp%d' % (k + 1) if k + 1 < len(cmp_props) else 'same',
+                  address_false='diff')
         b.label('diff').ins('LoadValue', result=0, value=3).ins('Goto', address=('I', end))
         b.label('same').ins('LoadValue', result=0, value=2)
         edits.append((end, end, b))
@@ -247,6 +322,53 @@ def patch_xtal(data):
     edits.append((TOGGLE_AT, TOGGLE_AT, b))
     # the SHAKE case's ScopeBegin / the toggle code it copies
     expect(c, 17251, 'ScopeBegin', info_number=SHAKE_SCOPE)
+
+    # stick clicks: op OP_NONE -> text frame txt_14 ("Not Set")
+    expect(c, OPS_MAP_AT, 'MakeMap', result=-42)
+    expect(c, OPS_MAP_AT - 3, 'MapInsert', target=-43)
+    b = xtal.Block()
+    b.ins('LoadInt1Byte', result=0, value=OP_NONE).ins('LoadInt1Byte', result=1, value=OP_NONE)
+    b.ins('MapInsert', target=-43, key=0, value=1)
+    n = next(k for k, e in enumerate(edits) if e[0] == OPS_MAP_AT)     # the names table starts there: prefix it
+    s_, e_, tb = edits[n]
+    b.labels.update({lab: v + len(b.items) for lab, v in tb.labels.items()})
+    b.items += tb.items
+    edits[n] = (s_, e_, b)
+    # their key_mc icons
+    for p, end in ICON_ENDS.items():
+        expect(c, end, 'Goto')
+        expect(c, end - 3, 'Call', target=-1, need_result=0)
+        b = xtal.Block()
+        for k in CLICKS:
+            b.ins('LoadConstant', result=0, value_number=c.const(k[0]))
+            b.ins('LoadInt1Byte', result=1, value=k[2])
+            b.ins('Call', result=0, need_result=0, target=-1, stack_base=0, ordered=2)
+        edits.append((end, end, b))
+    # the STANDARD value list: their values after stick_r's
+    expect(c, STD_VALUES_AT - 5, 'Property', primary=c.ident_index('stick_r'), target=-7)
+    expect(c, STD_VALUES_AT, 'Property', primary=c.ident_index('is_rumble'), target=-7)
+    b = xtal.Block()
+    for prop, _set in click_props:
+        b.ins('Property', result=1, primary=prop, target=-7, stack_base=2).ins('ArrayAppend', target=0, value=1)
+    edits.append((STD_VALUES_AT, STD_VALUES_AT, b))
+    # the STANDARD setter switch (index -3 into the key list, value -2, the pad object -1): indices 12, 13
+    expect(c, STD_SET_AT, 'Copy', result=1, target=-3)
+    expect(c, STD_SET_AT + 2, 'At', result=0, target=0, index=1)
+    expect(c, 12612, 'Once', result=0)             # the switch's map (cached), then the lookup
+    expect(c, 12805, 'SetProperty', primary=c.ident_index('set_stick_r'), target=-1)
+    b = xtal.Block()
+    for k, (_prop, setp) in enumerate(click_props):
+        if k:
+            b.label('c%d' % k)
+        b.ins('LoadInt1Byte', result=2, value=12 + k)
+        b.ins('IfEq', lhs=-3, rhs=2, stack_base=3)
+        b.ins('If', target=1, address_true='s%d' % k,
+              address_false='c%d' % (k + 1) if k + 1 < len(click_props) else ('I', STD_SET_AT))
+    for k, (_prop, setp) in enumerate(click_props):
+        b.label('s%d' % k).ins('Copy', result=0, target=-2)
+        b.ins('SetProperty', primary=setp, target=-1, stack_base=0)
+        b.ins('Goto', address=('T', SET_END))
+    edits.append((STD_SET_AT, STD_SET_AT, b))
 
     c.relocate = c.edit(edits)
     c.edits = [(s, e, b.size) for s, e, b in edits]
@@ -358,6 +480,152 @@ def patch_lm(data):
         hdr[3], hdr[4], hdr[5] = nlabels + 1, nframes + 1, nkeys + 1
         T[i][1] = LM.pack(hdr)
 
+    # ---- stick clicks: frames txt_14 / btn_42.. / key_14.., the boxes key_14 / key_15 (CLICKS)
+    pos_tag, xf_tag = T[lm.ti[LM.T_POSITIONS]], T[lm.ti[LM.T_TRANSFORMS]]
+
+    def new_pos(x, y):
+        return LM.POS_FLAG | LM.append_rows(pos_tag, [(x, y)], 2)[0]
+
+    def new_xf(m):
+        return LM.append_rows(xf_tag, [tuple(m)], 6)[0]
+
+    def matrix(m):
+        """(a, b, c, d, tx, ty) of a placement's matrix word"""
+        pos = LM.table(pos_tag[1], 2)
+        if m == LM.NONE:
+            return (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        if m & LM.POS_FLAG:
+            return (1.0, 0.0, 0.0, 1.0) + tuple(pos[m & 0xFFFF])
+        return tuple(LM.table(xf_tag[1], 6)[m])
+
+    def sprite_frames(cid):
+        i, j = sprite_range(lm, cid)
+        labels = {lm.sy[LM.words(T[k][1])[0]]: LM.words(T[k][1])[1] for k in range(i + 1, j) if T[k][0] == LM.T_LABEL}
+        keys = {LM.words(T[k][1])[0]: k for k in range(i + 1, j) if T[k][0] == LM.T_KEYFRAME}
+        return i, j, labels, keys
+
+    def key_places(cid, label):
+        i, j, labels, keys = sprite_frames(cid)
+        k = keys[labels[label]]
+        return [LM.words(b) for t, b in T[k + 1:k + 1 + LM.words(T[k][1])[1]] if t == LM.T_PLACE]
+
+    def add_frame(cid, label, places):
+        """a new last frame `label` of sprite cid: every depth the sprite uses removed, then places (its
+        keyframe: places)"""
+        nonlocal pid
+        sym = add_symbol(lm, label) if label not in lm.sy else lm.sy.index(label)
+        i, j, labels, keys = sprite_frames(cid)
+        hdr = LM.words(T[i][1])
+        nlabels, nframes, nkeys = hdr[3], hdr[4], hdr[5]
+        frames = [k for k in range(i + 1, j) if T[k][0] == LM.T_FRAME]
+        lab_tags = [k for k in range(i + 1, j) if T[k][0] == LM.T_LABEL]
+        depths = sorted({LM.words(b)[5] >> 16 for t, b in T[i:j] if t == LM.T_PLACE})
+        places = [list(w) for w in places]
+        for w in places:
+            pid += 1
+            w[1] = pid
+            if w[6]:
+                w[6] = nframes << 16
+        removes = [[LM.T_REMOVE, LM.pack([0, d << 16])] for d in depths]
+        new_frame = [[LM.T_FRAME, LM.pack([nframes, len(removes) + len(places)])]] + removes + \
+            [[LM.T_PLACE, LM.pack(w)] for w in places]
+        new_key = [[LM.T_KEYFRAME, LM.pack([nframes, len(places)])]] + [[LM.T_PLACE, LM.pack(w)] for w in places]
+        last_key = max(keys.values())
+        last_key_end = last_key + 1 + LM.words(T[last_key][1])[1]
+        T[last_key_end:last_key_end] = new_key
+        last_frame_end = frames[-1] + 1 + LM.words(T[frames[-1]][1])[1]
+        T[last_frame_end:last_frame_end] = new_frame
+        T[lab_tags[-1] + 1:lab_tags[-1] + 1] = [[LM.T_LABEL, LM.pack([sym, nframes])]]
+        hdr[3], hdr[4], hdr[5] = nlabels + 1, nframes + 1, nkeys + 1
+        T[i][1] = LM.pack(hdr)
+
+    # the action text sprite: txt_14 = "Not Set" (the key box's own off text, MmenOption_button_31), a new
+    # text object (a label's instance name binds its string)
+    w = key_places(TXT_SPRITE, 'txt_13')[0]
+    w[0], w[3] = new_text(w[0]), add_symbol(lm, NOT_SET + '$3')
+    add_frame(TXT_SPRITE, 'txt_%d' % OP_NONE, [w])
+    # the icons: btn_42 / btn_43, each a new text object of a new icon label (msbt)
+    for k in CLICKS:
+        w = key_places(KEY_MC, KEY_ICON_FROM)[0]
+        w[0], w[3] = new_text(w[0]), add_symbol(lm, k[5] + '$0')
+        add_frame(KEY_MC, 'btn_%d' % k[2], [w])
+    # the pictures' highlight frames key_14 / key_15: the R stick's (key_9) mirrored for L, its line from
+    # the box under R_STICK's for R; the Classic picture (no stick clicks): its off frame
+    for pad, cid in PICTURES.items():
+        if pad not in CLICK_SHOWN:
+            for k in CLICKS:
+                add_frame(cid, 'key_%d' % k[1], key_places(cid, 'off'))
+            continue
+        base, line, mark = key_places(cid, 'key_9')
+        a, b_, c_, d_, tx, ty = matrix(line[7])
+        mx, my = matrix(mark[7])[4:]
+        lw, lm_ = list(line), list(mark)
+        lw[7] = new_xf((-a, b_, -c_, d_, -tx, ty))
+        lm_[7] = new_xf((-1.0, 0.0, 0.0, 1.0, -mx, my))
+        add_frame(cid, 'key_%d' % CLICKS[0][1], [list(base), lw, lm_])
+        # the line: a unit shape scaled along (c, d) from (tx, ty) to the stick; R's starts the boxes' gap lower
+        h = math.hypot(mx - tx, my - ty) / math.hypot(c_, d_)
+        sx, sy = tx, ty + (CLICK_POS[1][1] - R_STICK_Y)
+        vx, vy = (mx - sx) / h, (my - sy) / h
+        ux, uy = vx / math.hypot(vx, vy), vy / math.hypot(vx, vy)
+        th = math.hypot(a, b_)
+        lw = list(line)
+        lw[7] = new_xf((uy * th, -ux * th, vx, vy, sx, sy))
+        add_frame(cid, 'key_%d' % CLICKS[1][1], [list(base), lw, list(mark)])
+    # key_group: the boxes key_14 / key_15 at depths 14 / 15 (shown on typ_1 / typ_2, colour 120 = hidden
+    # elsewhere, as the unused key_05), top_mc 14 -> 16 (the selected box is swapped to top_mc's depth: it
+    # stays the highest)
+    i, j = sprite_range(lm, KEY_GROUP)
+    box_syms = [add_symbol(lm, 'key_%02d' % k[1]) for k in CLICKS]
+    box_pids = []
+    for _k in CLICKS:
+        pid += 1
+        box_pids.append(pid)
+    vis = {n: [new_pos(*xy) for xy in CLICK_POS] for n in CLICK_SHOWN.values()}
+    hid = new_pos(0.0, 0.0)
+    out = T[:i + 1]
+    k = i + 1
+    frame_no = None
+    box_char = None
+    while k < j:
+        t, b = T[k]
+        if t in (LM.T_FRAME, LM.T_KEYFRAME):
+            w = LM.words(b)
+            frame_no = w[0]
+            kids = []
+            for kt, kb in T[k + 1:k + 1 + w[1]]:
+                kw = LM.words(kb)
+                if kt in (LM.T_PLACE, LM.T_REMOVE) and kw[5 if kt == LM.T_PLACE else 1] >> 16 == TOP_DEPTH:
+                    n = 5 if kt == LM.T_PLACE else 1
+                    kw[n] = (TOP_DEPTH + 2) << 16 | (kw[n] & 0xFFFF)
+                if kt == LM.T_PLACE and kw[3] != LM.NONE and lm.sy[kw[3]] == 'key_09':
+                    box_char = kw[0]
+                kids.append([kt, LM.pack(kw)])
+            extra = []
+            full = t == LM.T_KEYFRAME or frame_no == 0
+            for n, (sym, bp) in enumerate(zip(box_syms, box_pids)):
+                shown = frame_no in vis
+                mat = vis[frame_no][n] if shown else hid
+                col = [55, 1] if shown else [120, 1]
+                if full:
+                    nw = [box_char, bp, 0, sym, 0x10000, (TOP_DEPTH + n) << 16, 0, mat] + col + [0, 0]
+                else:                       # a move: the matrix and colour
+                    nw = [0, LM.NONE, 0, 0, 0x20000, (TOP_DEPTH + n) << 16, 0, mat] + col + [0, 0]
+                assert box_char is not None
+                extra.append([LM.T_PLACE, LM.pack(nw)])
+            out.append([t, LM.pack([w[0], w[1] + len(extra)])])
+            out += kids + extra
+            k += 1 + w[1]
+        else:
+            out.append([t, bytearray(b)])
+            k += 1
+    hdr = LM.words(out[i][1])
+    assert hdr[6] >> 16 == TOP_DEPTH + 1, hdr
+    hdr[6] = (TOP_DEPTH + 3) << 16
+    out[i][1] = LM.pack(hdr)
+    T[:] = out + T[j:]
+    lm.tags = T
+
     new_root = next_id[0]
     k = next(n for n, (t, b) in enumerate(T) if t == LM.T_SPRITE and LM.words(b)[0] == root)
     w = LM.words(T[k][1])
@@ -438,6 +706,8 @@ def patch_msbt(data):
     m = Msbt(data)
     for r in ROWS:
         m.set(r[4], r[5])
+    for k in CLICKS:
+        m.set(k[5], k[6])
     return m.build()
 
 

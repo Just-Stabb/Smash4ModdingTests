@@ -925,7 +925,13 @@ press. Nothing else reads `+0x1A8` (only `0x02E71B58` and the getter); MSC reads
   `0x030C89E0`: originally `!= 0`, now bit 0; setters +0x14: the whole byte). A test build kept a
   "Stick F-Smash" setting in its bit 1 (taken out; the load hook clears the other bits). Don't put
   more settings in the record: with Stick Smash or that one OFF, exiting the Controls screen (the
-  save) crashed in the user's game (cause not found yet).
+  save) crashed in the user's game (cause not found yet). STANDARD's Tap Jump byte (record 0x2D) now
+  holds the stick clicks' action codes in bits 1-3 / 4-6 (`smash_button_cave.py` 5.; the load hook
+  keeps them for STANDARD).
+- **Pad state buttons** (the mappings' `[state + 0]`): GamePad (`0x03370A78`, from VPAD) and Pro
+  Controller (`0x033715D4`, KPAD URCC) give left 0x1 / right 0x2 / down 0x4 / up 0x8, A 0x10, B 0x20,
+  X 0x80, Y 0x100, L 0x1000, R 0x2000, ZL 0x4000, ZR 0x8000, + 0x10000, - 0x20000, HOME 0x40000, **left
+  stick click 0x00800000, right stick click 0x10000000** (the mappings never read the clicks).
 - **Input frames:** the input manager (`0x030B9A38`, and `0x030BA218`; per-port records at +0xC,
   frames at +0x314, 4 bytes a port) calls `0x030B8F08(records, port, frame, pad, ..)` per port and
   frame; it picks the mapping by the pad state's type (pad +4 vtable +0x1C, then +0x7C): 1 / 9 CTR
