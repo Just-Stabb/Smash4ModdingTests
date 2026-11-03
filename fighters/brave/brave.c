@@ -39049,19 +39049,29 @@ void brave_keep_items()
 }
 
 // Critical hits (Ultimate's lot_critical: 1 in 8, rolled when the move starts; user: on any physical attack,
-// not only the smash attacks): a smash attack (statuses 0x2B-0x33, from the windup) takes Ultimate's own crit
-// hitboxes through int 0x1000009A (his smash scripts, tools/brave_build.py CRIT_INT); the others Ultimate has
-// no crit hitboxes for take x2 damage through the trait marker's bit 0x10 (tools/hero_buff_cave.py, on their
-// hitboxes and the throw): jab 3 (Attack 0x25 on its third hit, ComboModule 0 = 3; not jab 1 / 2), dash
-// attack 0x27, tilts 0x28-0x2A, aerials 0x34, throws 0x3E (not the pummel 0x3B), the getup attack 0x56,
-// ledge attack 0x75 and trip attack 0x87 (the statuses whose mains play DownAttackU/D, CliffAttackQuick,
-// SlipAttack). Specials never (Hatchet Man is always critical: brave_crit_show).
-int brave_crit_key;         // the move rolled for (its status; jab 3: 0x25), 0 between moves
+// not only the smash attacks, fix 77; exceptions and the slash spells, fix 78): a smash attack (statuses
+// 0x2B-0x33, from the windup) takes Ultimate's own crit hitboxes through int 0x1000009A (his smash scripts,
+// tools/brave_build.py CRIT_INT); the others Ultimate has no crit hitboxes for take x2 damage through the trait
+// marker's bit 0x10 (tools/hero_buff_cave.py, on their hitboxes and the throw):
+// - jab 3 (Attack 0x25 on its third hit, ComboModule 0 = 3; not jab 1 / 2);
+// - dash attack 0x27; forward tilt's second hit only (0x28 once brave_s3_second: AttackS3S2); up tilt 0x29
+//   (not down tilt 0x2A);
+// - aerials 0x34 but up air (the aerial's motion, int 0x11000002: AttackAirHi 0x6B); down air's spike only
+//   (AttackAirLw 0x6C: its weak hitboxes come at frame 19, the crit is dropped from frame 17 unless the spike
+//   already connected);
+// - throws 0x3E but down throw (0x11000002: ThrowLw 0x7B); not the pummel 0x3B;
+// - getup attack 0x56, ledge attack 0x75, trip attack 0x87 (the statuses whose mains play DownAttackU/D,
+//   CliffAttackQuick, SlipAttack);
+// - the slash spells (down special 0x155): Flame Slash 17, Kacrackle Slash 18, Metal Slash 19; Hatchet Man (20)
+//   is always critical (brave_crit_show); no other special.
+int brave_crit_key;         // the move rolled for (its status; forward tilt 2: 0x128), 0 between moves
 int brave_crit;
 int brave_crit_hb;          // brave_crit on a move without crit hitboxes: the marker's bit 0x10
+int brave_crit_shown;
 
 int brave_crit_move()
 {
+    int m;
     if (global4 >= 0x2b && global4 <= 0x33)
     {
         return 0x2b;        // a smash attack: the windup, the hold and the swing are one move
@@ -39074,8 +39084,32 @@ int brave_crit_move()
         }
         return 0;
     }
-    if (global4 == 0x27 || global4 == 0x28 || global4 == 0x29 || global4 == 0x2a || global4 == 0x34
-        || global4 == 0x3e || global4 == 0x56 || global4 == 0x75 || global4 == 0x87)
+    if (global4 == 0x28)
+    {
+        if (brave_s3_second)
+        {
+            return 0x128;
+        }
+        return 0;
+    }
+    if (global4 == 0x34 || global4 == 0x3e)
+    {
+        m = WorkModule(0x6, 0x11000002);
+        if (m == 0x6b || m == 0x7b)
+        {
+            return 0;       // up air, down throw
+        }
+        return global4;
+    }
+    if (global4 == 0x155)
+    {
+        if (brave_lw_spell >= 0x11 && brave_lw_spell <= 0x13)
+        {
+            return 0x155;
+        }
+        return 0;
+    }
+    if (global4 == 0x27 || global4 == 0x29 || global4 == 0x56 || global4 == 0x75 || global4 == 0x87)
     {
         return global4;
     }
@@ -39100,6 +39134,12 @@ void brave_crit_update()
             brave_crit = 0x1;
         }
     }
+    // down air: its weak hitboxes (frame 19) don't crit; a spike that already crit keeps its show
+    if (brave_crit && key == 0x34 && WorkModule(0x6, 0x11000002) == 0x6c && MotionModuleF(0x1) >= 17.0f
+        && brave_crit_shown == 0)
+    {
+        brave_crit = 0;
+    }
     brave_crit_hb = 0;
     if (brave_crit && key != 0x2b)
     {
@@ -39118,7 +39158,6 @@ void brave_crit_update()
 // isn't a hitbox's hit); the slow: SlowModule(0, rate, frames) (ACMD Time_Manipulation_Whole's call); the
 // camera: the ITEM variable's 8 (closeup) / 9 (back) (tools/position_vars_cave.py, ACMD Camera_Closeup /
 // Normal_Camera's calls)
-int brave_crit_shown;
 int brave_crit_cam;
 int brave_crit_held;
 

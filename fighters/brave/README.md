@@ -1307,3 +1307,17 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
   `port_check` over the install: the pre-existing E4 / E5 / E7 / P1 / S4 remain (as at fix 76), S8 gone.
 - Changed: `brave.mscsb`, `expression.bin` (fix 71's, the six scripts), `code/cross_f.rpx` (the stick-clicks
   executable + the hero buff cave).
+
+## Fix 78 (`build/hero_fix78.zip`): crit exceptions, slash spells
+
+- **User:** no crits on forward tilt 1, down throw, down tilt, neutral air / down air weak hitboxes and up
+  air; the slash spells can crit. `brave_crit_move`: forward tilt only once `brave_s3_second` (AttackS3S2);
+  up tilt `0x29` kept, down tilt `0x2A` out; aerials and throws by their motion (int `0x11000002`, set by
+  the common aerial / throw code): up air `0x6B` and down throw `0x7B` out; down air (`0x6C`): the crit is
+  dropped from motion frame 17 (his script: the 16% spike at 16, the 10% weak hitboxes at 19) unless the
+  spike already connected. Neutral air has no weak hitboxes (three 9% hitboxes at frames 8-17, the user's
+  game.bin and Ultimate's), so it still crits: asked whether to drop it altogether. Slash spells (down
+  special `0x155`, spells 17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash): 1 in 8, x2 damage (the
+  marker's bit, as the other moves); Hatchet Man (20) stays always critical.
+- `port_check`: the same pre-existing E4 / E5 / E7 / P1 / S4 as fix 77.
+- Changed: `brave.mscsb`.
