@@ -54,6 +54,7 @@
         "0x216": {"anim": "FitZeldaBodyMainD00SpecialAirNStart", "flags": "0x0", "motion": "specialairnstart"},
         "0x217": {"anim": "FitZeldaBodyMainD00SpecialAirN2", "flags": "0x0", "motion": "specialairn2"},
         "0x218": {"anim": "FitZeldaBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel"},
+        "0x232": {"anim": "FitZeldaBodyMainA04LandingFallSpecial", "flags": "0x0", "motion": "specialhi2landing: Ultimate's plays landing_fall_special's animation"},
         "0x236": {"anim": "FitZeldaBodyMainD02SpecialHi1End", "flags": "0x0", "motion": "specialhi1end"},
         "0x237": {"anim": "FitZeldaBodyMainD02SpecialHi2", "flags": "0x0", "motion": "specialhi2"},
         "0x238": {"anim": "FitZeldaBodyMainD02SpecialHi2End", "flags": "0x0", "motion": "specialhi2end"},

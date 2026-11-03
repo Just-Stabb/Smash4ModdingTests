@@ -7,5 +7,15 @@
   "SpecialAirN1": "specialairn",
   "SpecialAirNStart": {"name": "specialairnstart", "slot": "0x216"},
   "SpecialAirN2": {"name": "specialairn2", "slot": "0x217"},
-  "SpecialAirNCancel": {"name": "specialairncancel", "slot": "0x218", "_note": "no script in the dump: empty"}
+  "SpecialAirNCancel": {"name": "specialairncancel", "slot": "0x218", "_note": "no script in the dump: empty"},
+  "SpecialHiStart": "specialhistart",
+  "SpecialAirHiStart": "specialairhistart",
+  "SpecialHi1": "specialhi",
+  "SpecialAirHi1": {"name": "specialairhi", "slot": "0x23D", "_note": "no such script (the rush plays 0x235 in both situations): empty, so Farore's Wind's air hit doesn't stay on it"},
+  "SpecialHi2": {"name": "specialhi2", "slot": "0x237"},
+  "SpecialHi1End": {"name": "specialhi1end", "slot": "0x236"},
+  "SpecialHi2End": {"name": "specialhi2end", "slot": "0x238"},
+  "SpecialAirHi1End": {"name": "specialairhi1end", "slot": "0x23E"},
+  "SpecialAirHi2End": {"name": "specialairhi2end", "slot": "0x23F"},
+  "SpecialHi2Landing": {"name": "specialhi2landing", "slot": "0x232", "_note": "LandingFallSpecial straight out of Octaslash's rush (edge.c edge_hi_landing_init)"}
 }

@@ -56,6 +56,16 @@ SpecialNCancel
 SpecialAirNStart
 SpecialAirN2
 SpecialAirNCancel
+// his up special (Blade Dash / Octaslash, statuses 0x154 / 0x159 / 0x15A): Zelda's Farore's Wind
+// custom-move slots 0x236-0x238 / 0x23E / 0x23F and 0x232 (SpecialHi2Landing, Octaslash's landing:
+// LandingFallSpecial's animation), scripts from Ultimate's (fighters/edge/specials_acmd.json)
+SpecialHi2
+SpecialHi1End
+SpecialHi2End
+SpecialAirHi1End
+SpecialAirHi2End
+SpecialHi2Landing
+SpecialHi2Landing -> body/FitZeldaBodyMainA04LandingFallSpecial.omo
 // the fire article (weapon kind 0x18C, his article 5; motion.mtable): SpecialN1 / 2 / 3 the flight
 // at charge level S / M / L, BurstS / M / L their explosions, FireNone3 / 7 empty slots
 SpecialN1

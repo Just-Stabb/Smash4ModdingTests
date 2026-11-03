@@ -3271,7 +3271,7 @@ void func_116()
     sv_set_mem(0x1, 0x3, 0x58, func_994);
     sv_set_mem(0x1, 0x3, 0xb1, func_220);
     sv_set_mem(0x1, 0x3, 0x10, func_581);
-    sv_set_mem(0x1, 0x3, 0x19, func_586);
+    sv_set_mem(0x1, 0x3, 0x19, edge_hi_landing_init); // func_586 + Sephiroth's Octaslash landing motion
     sv_set_mem(0x1, 0x3, 0x5d, func_858);
     sv_set_mem(0x1, 0x3, 0x60, func_858);
     sv_set_mem(0x1, 0x3, 0x61, func_858);
@@ -36336,9 +36336,9 @@ void func_2244()
     sv_set_mem(0x1, 0, 0x153, func_2261);
     sv_set_mem(0x1, 0x1, 0x153, func_2262);
     sv_set_mem(0x1, 0x2, 0x153, func_2264);
-    sv_set_mem(0x1, 0, 0x154, func_2277);
-    sv_set_mem(0x1, 0x1, 0x154, func_2278);
-    sv_set_mem(0x1, 0x2, 0x154, func_2280);
+    sv_set_mem(0x1, 0, 0x154, edge_hi_start_pre);   // Sephiroth: up special start (was Farore's Wind's
+    sv_set_mem(0x1, 0x1, 0x154, edge_hi_start_main); // func_2277 / 2278 / 2280)
+    sv_set_mem(0x1, 0x2, 0x154, edge_hi_end);
     sv_set_mem(0x1, 0, 0x155, func_2299);
     sv_set_mem(0x1, 0x1, 0x155, func_2300);
     sv_set_mem(0x1, 0x2, 0x155, func_2302);
@@ -36351,12 +36351,12 @@ void func_2244()
     sv_set_mem(0x1, 0, 0x158, func_2267);
     sv_set_mem(0x1, 0x1, 0x158, func_2268);
     sv_set_mem(0x1, 0x2, 0x158, func_2270);
-    sv_set_mem(0x1, 0, 0x159, func_2282);
-    sv_set_mem(0x1, 0x1, 0x159, func_2283);
-    sv_set_mem(0x1, 0x2, 0x159, func_2286);
-    sv_set_mem(0x1, 0, 0x15a, func_2287);
-    sv_set_mem(0x1, 0x1, 0x15a, func_2288);
-    sv_set_mem(0x1, 0x2, 0x15a, func_2290);
+    sv_set_mem(0x1, 0, 0x159, edge_hi_rush_pre);    // Sephiroth: Blade Dash / Octaslash (was the warp,
+    sv_set_mem(0x1, 0x1, 0x159, edge_hi_rush_main); // func_2282 / 2283 / 2286)
+    sv_set_mem(0x1, 0x2, 0x159, edge_hi_end);
+    sv_set_mem(0x1, 0, 0x15a, edge_hi_end_pre);     // Sephiroth: the up special's ground / air end (was
+    sv_set_mem(0x1, 0x1, 0x15a, edge_hi_end_main);  // Farore's Wind's end, func_2287 / 2288 / 2290)
+    sv_set_mem(0x1, 0x2, 0x15a, edge_hi_end);
     sv_set_mem(0x1, 0, 0x15b, func_2303);
     sv_set_mem(0x1, 0x1, 0x15b, func_2304);
     sv_set_mem(0x1, 0x2, 0x15b, func_2307);
@@ -36369,25 +36369,31 @@ void func_2245()
 {
     sv_set_mem(0x1, 0x3, 0x152, edge_n_none);
     sv_set_mem(0x1, 0x3, 0x153, func_2266);
-    sv_set_mem(0x1, 0x3, 0x15a, func_2291);
+    sv_set_mem(0x1, 0x3, 0x154, edge_n_none);       // Sephiroth's up special: set up in its mains
+    sv_set_mem(0x1, 0x3, 0x159, edge_n_none);
+    sv_set_mem(0x1, 0x3, 0x15a, edge_n_none);       // (was func_2291)
 }
 
 void func_2246()
 {
     sv_set_mem(0x1, 0x4, 0x152, edge_n_none);
-    sv_set_mem(0x1, 0x4, 0x15a, func_2293);
+    sv_set_mem(0x1, 0x4, 0x154, edge_hi_exec);      // Sephiroth's up special: Ultimate's exec (status
+    sv_set_mem(0x1, 0x4, 0x159, edge_hi_exec);      // condition 44)
+    sv_set_mem(0x1, 0x4, 0x15a, edge_hi_exec);      // (was func_2293)
 }
 
 void func_2247()
 {
     sv_set_mem(0x1, 0x5, 0x152, func_2259);
-    sv_set_mem(0x1, 0x5, 0x15a, func_2296);
+    sv_set_mem(0x1, 0x5, 0x154, edge_hi_exec_stop); // ... and exec_stop (48): the pitch in hitlag
+    sv_set_mem(0x1, 0x5, 0x159, edge_hi_exec_stop);
+    sv_set_mem(0x1, 0x5, 0x15a, edge_hi_exec_stop); // (was func_2296)
 }
 
 void func_2248()
 {
     sv_set_mem(0x1, 0x6, 0x152, func_2260);
-    sv_set_mem(0x1, 0x6, 0x15a, func_2297);
+    sv_set_mem(0x1, 0x6, 0x15a, edge_n_none);       // (was func_2297)
 }
 
 int func_2249()
@@ -37808,4 +37814,768 @@ void edge_n_main()
 void edge_n_none()
 {
     
+}
+
+// ---- Sephiroth's up special: Blade Dash / Octaslash (fighters/edge/specials.md "Up special"), Ultimate's
+// status code (lua2cpp_edge.nro, the spec's function addresses f_7203e<addr>) in Zelda's three up-special
+// statuses (Smash 4 has no free status numbers: Zelda's table ends at 0x15C, global7 = 0x15D):
+//   0x154 START (Ultimate's FIGHTER_STATUS_KIND_SPECIAL_HI: 09a70 / 17e40 / 19910, exec 03650)
+//   0x159 RUSH, Blade Dash and Octaslash in one (0xe2a4 / 0xe2a8: 0a500 / 175b0, 0acc0 / 15c90), the
+//         charge flag picking the params as Ultimate's P[c] does
+//   0x15A END, the ground end and the air end in one (0xe2ac: 0b360 / 15510; 0xe2b0: 0be60 / 14b30)
+// and Octaslash's landing (Ultimate's LANDING_FALL_SPECIAL init hook 03d40) on LandingFallSpecial 0x19's
+// init (edge_hi_landing_init). The status work Ultimate keeps across them (KEEP_ALL) is in globals here.
+// Params: vl.prc param_special_hi[0] (fighter_param_vl here is Zelda's layout: the values are written in).
+// Motions straight through MotionModule (func_22 / func_23 add Zelda's custom-move offset): 0x231 / 0x239
+// SpecialHiStart / SpecialAirHiStart, 0x235 SpecialHi1 (both situations: Ultimate has no air rush motion),
+// 0x237 SpecialHi2, 0x236 / 0x238 SpecialHi1End / SpecialHi2End, 0x23E / 0x23F SpecialAirHi1End /
+// SpecialAirHi2End, 0x232 SpecialHi2Landing (extra_kinds.json "motions").
+// Kinetic energies: 1 gravity, 2 control, 3 stop (Ultimate's STOP, energy id 3 in its ExeFS hook too).
+int   edge_hi_charged;    // 0xe364 F_CHARGED: Octaslash
+int   edge_hi_decided;    // the direction is decided (the start's 17e40 -> 19910 shift)
+float edge_hi_dir_x;      // 0xe374 / 0xe378: the aim at the decide frame
+float edge_hi_dir_y;
+float edge_hi_rx;         // f_16f20's result: the rush direction (ground-adjusted)
+float edge_hi_ry;
+int   edge_hi_on_ground;
+float edge_hi_rot;        // 0xe368 ROT: the body's pitch on joint "rot" (degrees; negative = nose up)
+float edge_hi_rot_target; // 0xe37c ROT_TARGET
+int   edge_hi_landed;     // 0xe384 LANDED_DURING_RUSH
+int   edge_hi_count;      // 0xe388 RUSH_COUNTER
+int   edge_hi_end_air;    // END: 0 the ground end (0xe2ac), 1 the air end (0xe2b0)
+int   edge_hi_control;    // the air end's control is on (0xe38c ENABLE_CONTROL handled)
+int   edge_hi_cliff;      // the ledge-grab mode set last (func_100), -1 none yet
+float edge_hi_fx_x;       // the aim effect's place / roll (f_18b30), for edge_hi_direction()
+float edge_hi_fx_y;
+float edge_hi_fx_roll;
+
+// P[c](name): the plain or the charged_ value
+float edge_hi_p(float plain, float charged)
+{
+    if (edge_hi_charged)
+    {
+        return charged;
+    }
+    return plain;
+}
+
+float edge_hi_ground_angle() { return 90.0f; } // f_16f20's K (NRO rodata 0x265620, not in the dump):
+                                               // approximate; vanilla Smash 4 Fox's Fire Fox uses 90
+float edge_hi_deg() { return 57.29578f; }      // degrees per radian
+
+// the unsigned angle between two vectors (radians, 0..pi)
+float edge_hi_angle(float ax, float ay, float bx, float by)
+{
+    return MathF(0x1, func_13(ax * by - ay * bx), ax * bx + ay * by);
+}
+
+// f_16f20: the rush direction for an aim (x, y) -> edge_hi_rx / ry / on_ground. On the ground, an aim at
+// least K from the floor normal goes along the floor (its tangent in the facing direction)
+void edge_hi_resolve(float x, float y)
+{
+    float nx;
+    float ny;
+    float lr;
+    float l;
+    edge_hi_on_ground = 0;
+    if (global18 == 0)
+    {
+        nx = GroundModuleF(0x5, 0x8);
+        ny = GroundModuleF(0x6, 0x8);
+        if (nx != 0.0f || ny != 0.0f)
+        {
+            if (edge_hi_angle(nx, ny, x, y) * edge_hi_deg() >= edge_hi_ground_angle())
+            {
+                lr = PostureModuleF(0);
+                x = ny * lr;
+                y = -nx * lr;
+                edge_hi_on_ground = 0x1;
+            }
+        }
+    }
+    l = MathF(0, x * x + y * y);
+    if (l < 0.0001f)
+    {
+        x = 0.0f;
+        y = 1.0f;
+        l = 1.0f;
+    }
+    edge_hi_rx = x / l;
+    edge_hi_ry = y / l;
+}
+
+// ROT for a direction: -sign(y) * angle((lr, 0), d) (09a70's ROT_TARGET, f_16b60 during the rush)
+float edge_hi_pitch_of(float x, float y)
+{
+    float a;
+    a = edge_hi_angle(PostureModuleF(0), 0.0f, x, y) * edge_hi_deg();
+    if (y > 0.0f)
+    {
+        return -a;
+    }
+    return a;
+}
+
+// the body pitch on joint "rot" (Ultimate f_02cf0: ModelModule::set_joint_rotate("rot", (ROT, 0, 0)), every
+// frame and in hitlag). Smash 4's MSC op is the same: ModelModule(0x1, joint, x, y, z, mode) in degrees; joint
+// id 2 = RotN, his "rot" (model.jtb). Mode 1 composes with the animation, as vanilla's common status 0x10E
+// tilts RotN (mode 2 composes the other way: the one to try if the tilt turns about the wrong axis; mode 0
+// replaces the animated rotation, as Pikachu's Quick Attack). The rotation stays until removed
+// (edge_hi_pitch_reset), status changes don't clear it
+void edge_hi_pitch_apply()
+{
+    ModelModule(0x1, 0x2, edge_hi_rot, 0.0f, 0.0f, 0x1);
+}
+
+// the pitch for this frame (start: 0 -> ROT_TARGET between the decide and rot_end frames; rush: along the
+// speed; air end: back to 0 between rotate_back_begin / end), then applied
+void edge_hi_pitch()
+{
+    float f;
+    float b;
+    float e;
+    float t;
+    float vx;
+    float vy;
+    f = MotionModuleF(0x1);
+    if (global4 == 0x154)
+    {
+        edge_hi_rot = 0.0f;
+        if (edge_hi_decided)
+        {
+            b = edge_hi_p(18.0f, 30.0f);   // rot_decide_frame
+            e = edge_hi_p(23.0f, 35.0f);   // rot_end_frame
+            t = (f - b) / (e - b);
+            if (t < 0.0f)
+            {
+                t = 0.0f;
+            }
+            if (t > 1.0f)
+            {
+                t = 1.0f;
+            }
+            edge_hi_rot = edge_hi_rot_target * t;
+        }
+    }
+    else if (global4 == 0x159)
+    {
+        vx = KineticModuleF(0xa, 0x3);
+        vy = KineticModuleF(0xb, 0x3);
+        if (func_13(vx) + func_13(vy) > 0.0001f)
+        {
+            edge_hi_rot = edge_hi_pitch_of(vx, vy);
+        }
+    }
+    else if (global4 == 0x15a && edge_hi_end_air)
+    {
+        b = edge_hi_p(11.0f, 18.0f);       // rotate_back_begin_frame
+        e = edge_hi_p(44.0f, 53.0f);       // rotate_back_end_frame
+        if (f >= b)
+        {
+            t = e - b;
+            if (t <= 0.0f)
+            {
+                t = 1.0f;
+            }
+            t = 1.0f - (f - b) / t;
+            if (t < 0.0f)
+            {
+                t = 0.0f;
+            }
+            if (t > 1.0f)
+            {
+                t = 1.0f;
+            }
+            edge_hi_rot = edge_hi_rot_target * t;
+        }
+    }
+    else
+    {
+        edge_hi_rot = 0.0f;
+    }
+    edge_hi_pitch_apply();
+}
+
+// f_14650: the pitch back to 0 at once (the joint's rotation removed: every way out of the up special)
+void edge_hi_pitch_reset()
+{
+    edge_hi_rot = 0.0f;
+    ModelModule(0x2, 0x2);
+}
+
+// f_18b30: the aim effect, edge_octaslash_direction, at pos + (0, 8 * scale) + v * 14 * scale, rolled
+// -sign(v.x) * angle(up, v), team-coloured (direction_effect_color). TODO: that effect isn't in his bank
+// (edge_effects.json): convert it (vfxb_to_ptcl.py), then follow it here (the place and roll are computed)
+void edge_hi_direction(float x, float y)
+{
+    float s;
+    s = PostureModuleF(0x7);
+    edge_hi_fx_x = PostureModuleF(0x1) + x * 14.0f * s;
+    edge_hi_fx_y = PostureModuleF(0x2) + 8.0f * s + y * 14.0f * s;
+    edge_hi_fx_roll = edge_hi_angle(0.0f, 1.0f, x, y) * edge_hi_deg();
+    if (x > 0.0f)
+    {
+        edge_hi_fx_roll = -edge_hi_fx_roll;
+    }
+}
+
+// the ledge-grab mode (func_100: 0 none, 2 snap from both sides = Ultimate's ALWAYS_BOTH_SIDES, 4 while
+// falling = its ON_DROP_BOTH_SIDES, inferred), set when it changes
+void edge_hi_cliff_mode(int mode)
+{
+    if (edge_hi_cliff != mode)
+    {
+        edge_hi_cliff = mode;
+        func_100(mode);
+    }
+}
+
+// f_147f0: the landing lag of the special fall / landing that follows (landing_fix_frame 27 / 56) in the
+// landing frame float (LandingFallSpecial 0x19 plays its motion over it), the special fall's air speed as is
+void edge_hi_landing_frame()
+{
+    if (global6 == 0x19 || global6 == 0x10)
+    {
+        WorkModule(0, edge_hi_p(27.0f, 56.0f), 0);
+        WorkModule(0, 1.0f, 0x1);
+    }
+}
+
+// Ultimate's EffectModule::kill_kind(edge_octaslash_line) (the rush's line, made by its effect script)
+void edge_hi_line_kill()
+{
+    EffectModule(0x2723, 0x342004B, 0x1, 0x1);
+}
+
+int edge_hi_start_pre()
+{
+    func_69();
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1422, 0, 0x100, 0x1000);
+    return 0;
+}
+
+int edge_hi_rush_pre()
+{
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x422, 0, 0x100, 0);
+    return 0;
+}
+
+int edge_hi_end_pre()
+{
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x422, 0, 0x100, 0);
+    return 0;
+}
+
+// sub_set_special_start_common_kinetic_setting("param_special_hi") and f_13d60 (again when the situation
+// changes): ground x speed x 0.4, brake 0.1; air x speed x 0.4, brake 0.02, y speed x 0.4, fall capped at
+// 0.1 of his, no drift (start_control_* 0); gravity -0.06 (f_188f0, every frame in the loop)
+void edge_hi_start_kinetic()
+{
+    float vx;
+    float vy;
+    vx = KineticModuleF(0, 0xffffffff);
+    vy = KineticModuleF(0x1, 0xffffffff);
+    if (global18 == 0x2)
+    {
+        GroundModule(0x2710, 0x5);
+        KineticModule(0, 0xa);
+        KineticModule(0x11, 0x3, vx * 0.4f, 0.0f);
+        KineticModule(0x10, 0x3, 0.02f, 0.0f);
+        KineticModule(0xb, 0x3);
+        KineticModule(0x11, 0x1, vy * 0.4f);
+        KineticModule(0xf, 0x1, -0.06f);
+        KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019) * 0.1f);
+        KineticModule(0xb, 0x1);
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        KineticModule(0xc, 0x2);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x2);   // ground, stopping at edges (inferred: the common special start's)
+        KineticModule(0, 0x6);
+        KineticModule(0x11, 0x3, vx * 0.4f, 0.0f);
+        KineticModule(0x10, 0x3, 0.1f, 0.0f);
+        KineticModule(0xb, 0x3);
+    }
+}
+
+int edge_hi_start_motion()
+{
+    if (global18 == 0x2)
+    {
+        return 0x239;
+    }
+    return 0x231;
+}
+
+// 17e40 / 19910: the start's frames
+void edge_hi_start_loop()
+{
+    float f;
+    float x;
+    float y;
+    float l;
+    if (StatusModule(0x6) == 0 && (global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0))
+    {
+        edge_hi_start_kinetic();
+        MotionModule(0x3, edge_hi_start_motion());
+    }
+    if (global18 == 0x2)
+    {
+        KineticModule(0xf, 0x1, -0.06f);   // start_gravity
+    }
+    f = MotionModuleF(0x1);
+    if (edge_hi_decided == 0)
+    {
+        x = global48;
+        y = global32;
+        if (func_13(x) + func_13(y) < 0.5f)
+        {
+            x = 0.0f;
+            y = 1.0f;
+        }
+        l = MathF(0, x * x + y * y);
+        x = x / l;
+        y = y / l;
+        edge_hi_direction(x, y);
+        if (f >= edge_hi_p(18.0f, 30.0f))  // rot_decide_frame
+        {
+            edge_hi_dir_x = x;
+            edge_hi_dir_y = y;
+            if (func_13(global48) > 0.125f)
+            {
+                PostureModule(0x5);        // set_stick_lr
+                PostureModule(0x2);        // update_rot_y_lr
+            }
+            edge_hi_resolve(x, y);
+            edge_hi_rot_target = edge_hi_pitch_of(edge_hi_rx, edge_hi_ry);
+            edge_hi_decided = 0x1;
+        }
+    }
+    else
+    {
+        edge_hi_direction(edge_hi_dir_x, edge_hi_dir_y);
+        SlopeModule(0x2710, 0);            // slope(MA_MSC_CMD_SLOPE_SLOPE, 2692): no leg slope (Fox's too)
+        if (edge_hi_charged)
+        {
+            if (MotionModule(0x2712))
+            {
+                func_16(0x159, 0);
+                return;
+            }
+        }
+        else if (f >= 23.0f)               // rot_end_frame
+        {
+            func_16(0x159, 0);
+            return;
+        }
+    }
+    edge_hi_pitch();
+}
+
+// 09a70
+void edge_hi_start_main()
+{
+    edge_hi_charged = 0x1;
+    edge_hi_decided = 0;
+    edge_hi_dir_x = 0.0f;
+    edge_hi_dir_y = 1.0f;
+    edge_hi_rot = 0.0f;
+    edge_hi_rot_target = 0.0f;
+    edge_hi_landed = 0;
+    edge_hi_count = 0;
+    edge_hi_end_air = 0;
+    edge_hi_control = 0;
+    edge_hi_cliff = 0xffffffff;
+    edge_hi_start_kinetic();
+    MotionModule(0x1, edge_hi_start_motion(), 0, 1.0f);
+    global20 = 0;
+    func_78(edge_hi_start_loop);
+}
+
+// 09dd0
+void edge_hi_start_end()
+{
+    edge_hi_rot = edge_hi_rot_target;
+    if (global6 != 0x159)
+    {
+        edge_hi_pitch_reset();
+    }
+}
+
+// f_157d0 + 0a500 / 0acc0: the rush along the decided direction (re-resolved: the situation may have
+// changed since), 13.5 a frame (Octaslash 6.2) on energy 3, no gravity, no drift
+void edge_hi_rush_main()
+{
+    float s;
+    edge_hi_resolve(edge_hi_dir_x, edge_hi_dir_y);
+    if (edge_hi_on_ground)
+    {
+        func_20(0);
+        GroundModule(0x2710, 0x1);         // correct 1204 (GROUND, inferred: he can dash off an edge)
+    }
+    else
+    {
+        func_20(0x2);
+        GroundModule(0x2710, 0x5);
+    }
+    s = edge_hi_p(13.5f, 6.2f);            // rush_speed
+    KineticModule(0, 0xd);                 // as Fox's Fire Fox rush
+    KineticModule(0x11, 0x1, 0.0f);
+    KineticModule(0xf, 0x1, 0.0f);
+    KineticModule(0xc, 0x1);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
+    KineticModule(0xc, 0x2);
+    KineticModule(0x11, 0x3, edge_hi_rx * s, edge_hi_ry * s);
+    KineticModule(0x10, 0x3, 0.0f, 0.0f);
+    KineticModule(0xb, 0x3);
+    edge_hi_count = 0;                     // init 04890 / 04950
+    edge_hi_landed = 0;
+    edge_hi_cliff = 0xffffffff;
+    if (edge_hi_charged)
+    {
+        MotionModule(0x1, 0x237, 0, 1.0f); // SpecialHi2
+        edge_hi_cliff_mode(0);             // game_specialhi2: cliff check NONE at frame 0
+    }
+    else
+    {
+        MotionModule(0x1, 0x235, 0, 1.0f); // SpecialHi1
+        edge_hi_cliff_mode(0x2);           // pre: ALWAYS_BOTH_SIDES (to frame 6: edge_hi_rush_loop)
+    }
+    global20 = 0;
+    edge_hi_pitch();
+    func_78(edge_hi_rush_loop);
+}
+
+// the END status, ground (edge_hi_end_air 0) or air
+void edge_hi_to_end(int air)
+{
+    edge_hi_end_air = air;
+    func_16(0x15a, 0);
+}
+
+// 175b0 / 15c90
+void edge_hi_rush_loop()
+{
+    float f;
+    float vx;
+    float vy;
+    if (func_56())                         // sub_transition_group_check_air_cliff
+    {
+        return;
+    }
+    f = MotionModuleF(0x1);
+    if (edge_hi_charged == 0 && f >= 6.0f)
+    {
+        edge_hi_cliff_mode(0);             // game_specialhi1 frame 6: cliff check NONE
+    }
+    vx = KineticModuleF(0xa, 0x3);
+    vy = KineticModuleF(0xb, 0x3);
+    if (global19 != 0 && global18 == 0)    // landed mid-rush
+    {
+        // f_164c0: within landing_fall_special_angle (25) of straight down -> f_16820 + landing
+        if (func_13(vx) + func_13(vy) > 0.0001f && edge_hi_angle(0.0f, -1.0f, vx, vy) * edge_hi_deg() <= 25.0f)
+        {
+            KineticModule(0x11, 0x3, vx * 0.25f, 0.0f);   // landing_speed_x_mul (both 0.25)
+            func_16(0x19, 0);
+            return;
+        }
+        if (edge_hi_charged == 0)
+        {
+            edge_hi_landed = 0x1;
+            edge_hi_to_end(0);
+            return;
+        }
+        GroundModule(0x2710, 0x1);         // Octaslash keeps rushing along the floor
+    }
+    if ((float)edge_hi_count >= edge_hi_p(7.0f, 15.0f))   // rush_frame
+    {
+        // Ultimate also takes a floor within ground_check_distance (0.01) below as the ground (attach_ground):
+        // here the situation alone
+        if (global18 == 0)
+        {
+            edge_hi_to_end(0);
+        }
+        else
+        {
+            edge_hi_to_end(0x1);
+        }
+        return;
+    }
+    if (f >= 1.0f)                         // rush_xlu_frame: set_passable_check(false)
+    {
+        GroundModule(0x2713, 0);
+    }
+    edge_hi_pitch();
+}
+
+// 0a6c0 / 0ae80
+void edge_hi_rush_end()
+{
+    if (global6 != 0x15a)
+    {
+        edge_hi_line_kill();
+    }
+    if (global6 != 0x15a || edge_hi_end_air == 0)
+    {
+        edge_hi_pitch_reset();
+    }
+    edge_hi_landing_frame();
+}
+
+// the rush's speed each frame (ExeFS 0x9e5100, Ultimate's kinetic hook on energy 3 during the rush): on the
+// ground along the floor's tangent keeping its size; from rush count rush_brake_frame (2, Octaslash 6) a
+// brake of rush_brake (1.72 / 0.47) along the path
+void edge_hi_rush_speed()
+{
+    float vx;
+    float vy;
+    float nx;
+    float ny;
+    float lr;
+    float m;
+    float dx;
+    float dy;
+    float b;
+    vx = KineticModuleF(0xa, 0x3);
+    vy = KineticModuleF(0xb, 0x3);
+    m = MathF(0, vx * vx + vy * vy);
+    if (m < 0.0001f)
+    {
+        KineticModule(0x10, 0x3, 0.0f, 0.0f);
+        return;
+    }
+    dx = vx / m;
+    dy = vy / m;
+    if (global18 == 0)
+    {
+        lr = PostureModuleF(0);
+        nx = GroundModuleF(0x5, 0x8);
+        ny = GroundModuleF(0x6, 0x8);
+        if (nx == 0.0f && ny == 0.0f)
+        {
+            ny = 1.0f;
+        }
+        dx = ny * lr;
+        dy = -nx * lr;
+        KineticModule(0x11, 0x3, dx * m, dy * m);
+    }
+    if ((float)edge_hi_count >= edge_hi_p(2.0f, 6.0f))
+    {
+        b = edge_hi_p(1.72f, 0.47f);
+        KineticModule(0x10, 0x3, func_13(dx) * b, func_13(dy) * b);
+    }
+    else
+    {
+        KineticModule(0x10, 0x3, 0.0f, 0.0f);
+    }
+}
+
+// 0b360: the ground end
+void edge_hi_end_ground_main()
+{
+    float vx;
+    float mul;
+    vx = KineticModuleF(0xa, 0x3);
+    mul = edge_hi_p(0.6f, 0.9f);           // ground_speed_x_mul
+    if (edge_hi_landed)
+    {
+        mul = 0.25f;                       // landing_speed_x_mul
+    }
+    GroundModule(0x2710, 0x1);             // correct GROUND: walking off goes to Fall
+    KineticModule(0, 0x6);
+    KineticModule(0x11, 0x3, vx * mul, 0.0f);
+    KineticModule(0x10, 0x3, edge_hi_p(0.12f, 0.06f), 0.0f);   // landing_brake_x
+    KineticModule(0xb, 0x3);
+    edge_hi_cliff_mode(0);
+    if (edge_hi_charged)
+    {
+        MotionModule(0x1, 0x238, 0, 1.0f); // SpecialHi2End
+    }
+    else
+    {
+        MotionModule(0x1, 0x236, 0, 1.0f); // SpecialHi1End
+    }
+}
+
+// 0be60: the air end
+void edge_hi_end_air_main()
+{
+    float vx;
+    float vy;
+    float mul;
+    edge_hi_rot_target = edge_hi_rot;
+    vx = KineticModuleF(0xa, 0x3);
+    vy = KineticModuleF(0xb, 0x3);
+    mul = edge_hi_p(0.4f, 0.9f);           // rush_end_speed_mul
+    GroundModule(0x2710, 0x5);
+    KineticModule(0, 0xa);
+    KineticModule(0x11, 0x3, vx * mul, 0.0f);
+    KineticModule(0x10, 0x3, 0.02f, 0.0f); // rush_end_brake_x
+    KineticModule(0xb, 0x3);
+    KineticModule(0x11, 0x1, vy * mul);    // the rush's y into gravity (inferred) x the same mul
+    KineticModule(0xf, 0x1, -0.12f);       // rush_end_gravity_accel
+    KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019));
+    KineticModule(0xb, 0x1);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
+    KineticModule(0xc, 0x2);
+    edge_hi_control = 0;
+    edge_hi_cliff_mode(0x4);               // pre: cliff 1728 (ON_DROP_BOTH_SIDES, inferred)
+    if (edge_hi_charged)
+    {
+        MotionModule(0x1, 0x23f, 0, 1.0f); // SpecialAirHi2End
+    }
+    else
+    {
+        MotionModule(0x1, 0x23e, 0, 1.0f); // SpecialAirHi1End
+    }
+}
+
+// 15510 / 14b30
+void edge_hi_end_loop()
+{
+    float f;
+    f = MotionModuleF(0x1);
+    if (edge_hi_end_air == 0)
+    {
+        if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))   // cancel 27 / 56
+        {
+            return;
+        }
+        if (global18 == 0x2)
+        {
+            func_16(0xe, 0);
+            return;
+        }
+        if (MotionModule(0x2712))
+        {
+            func_16(0, 0);
+            return;
+        }
+        return;
+    }
+    if (edge_hi_charged)                   // game_specialairhi2end: NONE at 1, ALWAYS_BOTH_SIDES at 6
+    {
+        if (f >= 6.0f)
+        {
+            edge_hi_cliff_mode(0x2);
+        }
+        else if (f >= 1.0f)
+        {
+            edge_hi_cliff_mode(0);
+        }
+    }
+    if (func_56())
+    {
+        return;
+    }
+    if (global18 == 0)
+    {
+        func_16(0x19, 0);
+        return;
+    }
+    if (MotionModule(0x2712))
+    {
+        func_16(0x10, 0);
+        return;
+    }
+    edge_hi_pitch();
+    // ENABLE_CONTROL (both air ends' game scripts at frame 18): drift with max speed x
+    // control_speed_x_max_mul 0.5 (control_accel_x_mul 0.5 not applied: no Smash 4 op known)
+    if (edge_hi_control == 0 && f >= 18.0f)
+    {
+        edge_hi_control = 0x1;
+        KineticModule(0xe, 0x2, 0, 0.0f, 0.0f, 0, 0, 0);
+        KineticModule(0x6, 0x2, 0.5f);
+        KineticModule(0xb, 0x2);
+    }
+}
+
+void edge_hi_end_main()
+{
+    edge_hi_cliff = 0xffffffff;
+    if (edge_hi_end_air)
+    {
+        edge_hi_end_air_main();
+    }
+    else
+    {
+        edge_hi_end_ground_main();
+    }
+    global20 = 0;
+    func_78(edge_hi_end_loop);
+}
+
+// 0ba00 / 0c700
+void edge_hi_end_end()
+{
+    edge_hi_line_kill();
+    edge_hi_pitch_reset();
+    if (edge_hi_end_air)
+    {
+        edge_hi_landing_frame();
+    }
+}
+
+void edge_hi_end()
+{
+    if (global4 == 0x154)
+    {
+        edge_hi_start_end();
+    }
+    else if (global4 == 0x159)
+    {
+        edge_hi_rush_end();
+    }
+    else
+    {
+        edge_hi_end_end();
+    }
+}
+
+// exec (out of hitlag): 03650 the start's button check (Octaslash = special held until DECIDED_RUSH, the
+// start scripts' frame 18), 038b0 / 03930 the rush counter (+ the ExeFS speed hook)
+void edge_hi_exec()
+{
+    if (global4 == 0x154)
+    {
+        if (MotionModuleF(0x1) < 18.0f && ControlModule(0x2712, 0x1) == 0)
+        {
+            edge_hi_charged = 0;
+        }
+    }
+    else if (global4 == 0x159)
+    {
+        edge_hi_count++;
+        edge_hi_rush_speed();
+    }
+}
+
+// exec_stop (in hitlag): 02ac0 / 02c60 / 02c90 / 02cc0, the pitch applied again
+void edge_hi_exec_stop()
+{
+    if (global4 != 0x15a || edge_hi_end_air)   // the ground end has none (reset as the rush ended)
+    {
+        edge_hi_pitch_apply();
+    }
+}
+
+// LandingFallSpecial 0x19's init: the common one (func_586: LandingFallSpecial over the landing frames),
+// then Ultimate's 03d40: straight out of Octaslash's rush, SpecialHi2Landing (0x232, its landing hit)
+void edge_hi_landing_init()
+{
+    float l;
+    func_586();
+    if (global5 == 0x159 && edge_hi_charged)
+    {
+        l = WorkModuleF(0, 0);
+        if (l <= 0.0f)
+        {
+            l = 56.0f;
+        }
+        MotionModule(0x1, 0x232, 0, (float)MotionModule(0, 0x232) / l);
+    }
 }
