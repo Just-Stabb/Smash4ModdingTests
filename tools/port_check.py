@@ -639,6 +639,24 @@ def check_repo(name, kind, rep):
         rep.add('WARN', 'K2 readme', 'no fighters/%s/README.md (sources of every value: CLAUDE.md)' % name)
 
 
+def check_shield_damage(inst, name, rep):
+    """S9: a hitbox's ShieldDamage (parameter 18) below 0. Ultimate gives magic negative shield damage (Hero's spells:
+    -1 to -13); Smash 4 takes the word unsigned, so 0xFFFFFFFF is a huge one: every hit breaks a shield (Hero, after
+    Supamario fix 90). WARN, not ERROR: the user kept it on Hero's other spells (Woosh's set to 0: brave_build.py
+    no_negative_shield)"""
+    bad = {}
+    for rel in sorted(inst.files):
+        if not (rel.startswith('fighter/%s/script/animcmd/' % name) and rel.endswith('/game.bin')):
+            continue
+        for h, cmds in (scripts(inst, rel) or {}).items():
+            for c in cmds:
+                if 'Hitbox' in c.name and len(c.params) > 18 and c.params[18] >= 1 << 31:
+                    bad.setdefault(rel.split('/animcmd/')[1].rsplit('/', 1)[0], set()).add('%08X' % h)
+    if bad:
+        rep.add('WARN', 'S9 shield-negative', 'negative ShieldDamage (a shield break every hit in Smash 4): ' +
+                '; '.join('%s: %d scripts' % (k, len(v)) for k, v in sorted(bad.items())))
+
+
 def check_weapons(name, rec, rep):
     """W1: a brand-new article copied from a base article with native per-frame code (port_bases.json
     weapon_nop2: Mario's fireball's life / bounce / wall puff) keeps that code unless its record turns
@@ -919,6 +937,7 @@ def main():
     check_msc(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
+    check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)

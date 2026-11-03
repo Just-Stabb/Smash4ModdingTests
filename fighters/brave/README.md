@@ -1471,3 +1471,18 @@ report: it was attack on a stick click (a neutral air), not down air.
   frame the stick is back (a real neutral stick puts it back then, one frame later than before). Fix 84's
   stick-down exception is undone.
 - Changed: `brave.mscsb`.
+
+## Woosh shield damage (`build/hero_woosh_shield.zip`)
+
+User (after Supamario fix 90): "Hero's shield damage values are bugged and all of his spells cause shield breaks.
+I'm fine with this with the exception of Woosh and its variants."
+
+- **Cause:** Ultimate gives Hero's magic negative shield damage (`ATTACK`'s shield_damage: the tornado -1 / -1 /
+  -3, fireball -4 / -10, explosion -5 to -13, flash -11, crash -1 / -2, ...), which `ultimate_acmd.py` wrote as is;
+  Smash 4 reads the Hitbox command's ShieldDamage unsigned, so -1 (0xFFFFFFFF) is a huge one: a shield break every hit.
+- **Woosh / Swoosh / Kaswoosh:** their hitboxes' shield damage 0 (`brave_build.py` `no_negative_shield`, on the
+  tornado article; Smash 4 can't go below the damage's own). Applied to fix 59's `weapon/tornado/game.bin` (the
+  latest shipped): only parameter 18 changes. The other spells keep theirs, as the user chose.
+- `port_check` S9 shield-negative (WARN) lists what's left: the body's 3 scripts, crash, deathball, explosion,
+  fireball, flash. The chain's 5 ERRORs (A3, E4, E5, E7, S4) are the same without this package: checks added after
+  Hero's effects / sounds were built.

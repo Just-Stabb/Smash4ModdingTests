@@ -79,6 +79,19 @@ ARTICLES = {
 }
 # each article's MSC: weapons/thunder_base.c, this, then weapons/<name>.c
 KASWOOSH_SPREAD = 7.0      # half the two whirlwinds' distance (their ellipses' centres, 7.4 out)
+def no_negative_shield(game):
+    """Woosh / Swoosh / Kaswoosh (user, after Supamario fix 90: "all of his spells cause shield breaks. I'm fine
+    with this with the exception of Woosh and its variants"): Ultimate gives Hero's spells negative shield damage
+    (the tornado's -1 / -1 / -3), which Smash 4 takes as a huge one (the Hitbox command's ShieldDamage is
+    unsigned to it: 0xFFFFFFFF, every hit a shield break); 0 here (Smash 4 has no less than the damage's own).
+    The other spells keep theirs (the user's choice; tools/port_check.py S9 warns)"""
+    for sc in game.values():
+        for c in sc:
+            if c.name in HITBOXES and len(c.params) > 18:
+                v = c.params[18] - (1 << 32) if c.params[18] >= (1 << 31) else c.params[18]
+                c.params[18] = max(v, 0)
+
+
 ARTICLE_BASE = {'fireball': None, 'spark': 'placed', 'tornado': 'placed', 'crash': 'placed', 'flash': 'shot',
                 'explosion': 'shot', 'deathball': 'shot', 'sleep': 'shot'}
 # Magic Burst with less MP (weapons/crash.c): Crash1 with each hit's damage x MP / 100 and its size (hitboxes
@@ -207,6 +220,7 @@ def article_scripts(a, name, wdir):
                 if c.name in EFFECTS:
                     c.params[8] = round(c.params[8] * size, 3)
     if name == 'tornado':
+        no_negative_shield(game)
         # the whirlwinds play out after the article goes (Terminate 0), as Ultimate's: their wind is
         # left behind (Swoosh's / Kaswoosh's dissolving tornado3 meshes start at frames 26 / 50, 30 / 36
         # frames long, Woosh's smoke lives 44 frames; the article's 33 / 52 / 24 cut them short). Every
