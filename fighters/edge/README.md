@@ -595,3 +595,16 @@ coat (colour ~0.05) a light grey sheen. Now scaled by Ultimate's reflectance per
 (docs/ultimate-fighter-port.md "Specular and rim"): coat / skirt specular 1 -> 0.1 (c04: 1.8 -> 0.18),
 rim 0.91 -> 0.32. Package: `model/body/c00-c07/model.nud` (textures as test 43's).
 
+
+## Test 59 (`build/sephiroth_test59.zip`): his effects on Ultimate's own programs
+
+User (after Squirtle's effects were finished): "Can you rebuild Sephiroth's effects?" The bank rebuilt with
+today's `vfxb_to_ptcl.py` (test 57's command: `build_edgefx.sh`, his 86 effects + `variants57.json`; `ef_edge.eff`
+fetched again from the user's Drive zip, only that entry): every one of his 425 emitters is drawn by Ultimate's own
+vertex and pixel programs (the universal shader path, docs/eft-universal-shader-scope.md; Squirtle's confirmed in
+game), 0 fallbacks; 39 of them fade where they meet the scene (soft particles, the game's depth texture). Ids and
+.efc unchanged: test 57's effect scripts (body and the fire article's) stay.
+- Bank 18.8 MB (test 57: 9.4): the programs carry the emitter's own constants, so they don't share (shaders 7.1
+  MB, textures 6.0, meshes 4.2). Squirtle's 11.5 MB loads; this size is untested in game.
+- port_check over the Sephiroth chain: the same errors with and without it (none from the bank).
+- Package: `fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}`.
