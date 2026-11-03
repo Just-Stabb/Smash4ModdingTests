@@ -16,7 +16,8 @@ new fighter's article list after the base's normal articles, before its first sp
 the ArticleModule makes instances only for the entries before that one), so its article id = its place
 there and the special entries move up; with that max count. "on_hit": N (a brand-new article) gives it its own singleton (the base's, its first
 vtable copied with the hit-result method +0xAC replaced): its attack connecting (result bits 0x13,
-the ones the default method removes it for) asks for status N instead of removing it (left alone when
+the ones the default method removes it for; "on_hit_bits": B for others, e.g. 0x17 with the shield block
+0x4) asks for status N instead of removing it (left alone when
 the status is N or more already); other results go to the base's method. Its singleton has its own
 copy of the base's vtable 2 too: the base's methods that store the base singleton's +4 (its vtable 2
 part: the fireball's +0x1C puts it in the weapon, which calls it) are copied with the new one's.
@@ -79,6 +80,9 @@ HIT_METHOD = 0xAC              # singleton vtable: hit result (r3 singleton, r4 
 # result bits the on_hit method takes as a hit: the ones the default method (0x0320EE2C) removes the
 # weapon for (test 13: with only 0x3, a beam fired point-blank at an opponent vanished at once)
 HIT_BITS = 0x13
+# "on_hit_bits" (per article) widens that: 0x4 is the blocked-by-shield result, which the default method
+# also removes the weapon for (unless its byte +0x46 is set); Supamario's Kamehameha catches it (0x17,
+# fix 89) so an uncharged / medium beam on a shield reaches its status 3 instead of vanishing
 SWITCHES = (0x0320D934, 0x03210C30, 0x02B651AC, 0x02B6894C, 0x02B6B7A8, 0x02B6FD44, 0x02B73AA4, 0x02B75A88,
             0x02B77FAC, 0x02B7A4DC, 0x02B7D378, 0x02B80CF4, 0x02B83D58)
 INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jumping into 0x02B83D60
@@ -115,6 +119,7 @@ def load_weapons(path, img):
                     r.setdefault('motions', {})[nk] = int(spec['motions'])
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
+                    r.setdefault('on_hit_bits', {})[nk] = K.num(spec.get('on_hit_bits', HIT_BITS))
                     r.setdefault('nop', {})[nk] = [K.num(x) for x in spec.get('nop', [])]
                     r.setdefault('nop2', {})[nk] = [K.num(x) for x in spec.get('nop2', [])]
                 art_base = spec['base']
@@ -555,7 +560,7 @@ def build(spec_path=SPEC, rpx=RPX):
             'cmpwi r3, %d\nbge done\n'
             'lwz r12, 0(r31)\nlwz r12, 0x2C(r12)\nmtctr r12\nmr r3, r31\nli r4, %d\nbctrl\n'  # change to N
             'done:\nlwz r0, 0x1C(r1)\nlwz r31, 0x14(r1)\nmtlr r0\naddi r1, r1, 0x18\nli r3, 0\nblr\n'
-            'base:\nb 0x%X') % (HIT_BITS, status, status, old_hit))
+            'base:\nb 0x%X') % (r.get('on_hit_bits', {}).get(nk, HIT_BITS), status, status, old_hit))
         assert len(hit.words()) <= 32
         nops = r.get('nop', {}).get(nk, [])
         nops2 = r.get('nop2', {}).get(nk, [])

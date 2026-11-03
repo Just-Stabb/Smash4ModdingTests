@@ -22,7 +22,7 @@ PATCHED = ORIGINAL + kind_expand + weapon_expand (and any other caves). Checks:
   remapped;
 - an own singleton (on_hit): the singleton getter returns it for its kind; it is {the vtable copy, the
   base's vtable 2}; the copy is the base's vtable but +0xAC; the hit method asks a fake StatusModule
-  for status N on result bits 0x13 (W.HIT_BITS) below N (none at N or more), returns 0, and leaves
+  for status N on result bits 0x13 (W.HIT_BITS; its "on_hit_bits" if given) below N (none at N or more), returns 0, and leaves
   other results to the base's method.
 """
 import os
@@ -192,15 +192,15 @@ def main():
         E.setw(svt + 0x2C, f_change)
         res = []
         for st, bits in ((0, 1), (2, 2), (0, 3), (status - 1, 0x11), (status, 1), (status + 1, 2), (0, 0x10), (0, 8),
-                         (status, 4)):
+                         (status, 4), (0, 4)):
             cur[0] = st
             del calls[:]
             ret = E.call(fn, o_at, weapon, bits)
             res.append((st, bits, ret, list(calls)))
         want = []
         for st, bits in ((0, 1), (2, 2), (0, 3), (status - 1, 0x11), (status, 1), (status + 1, 2), (0, 0x10), (0, 8),
-                         (status, 4)):
-            if bits & W.HIT_BITS:
+                         (status, 4), (0, 4)):
+            if bits & new[nk][1].get('on_hit_bits', {}).get(nk, W.HIT_BITS):
                 want.append((st, bits, 0, [('status', status)] if st < status else []))
             else:
                 want.append((st, bits, 0x77, [('base', o_at, weapon, bits)]))

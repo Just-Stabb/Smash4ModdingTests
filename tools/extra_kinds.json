@@ -23,6 +23,7 @@
           "base": "fireball",
           "max": 1,
           "on_hit": 3,
+          "on_hit_bits": "0x17",
           "nop2": [
             "0x1C",
             "0x3C"

@@ -94,3 +94,18 @@ final hit, so the opponent needn't be moved far.
   over min(frames flown, linger) x the speed (one block per level and length; the MSC writes (level + 1) x 64 +
   frames into the level variable at the finish), so it hits the opponent wherever the body holds them.
 - Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3, finish); `supamario.mscsb` as fix 85.
+
+## Kamehameha fix 89 (`build/supamario_kame_fix89.zip`)
+
+Install over fix 88. User (clip): it still only multi-hits a shield fully charged.
+
+- **Cause:** native, not the MSC. A weapon's hit result reaches its singleton's hit method (+0xAC) as bits; the
+  base fireball's (0x0320EE2C) removes the weapon on 0x13 and on 0x4 (unless the weapon's byte +0x46 is set),
+  and 0x4 is the shield-block result. The beam's own method (`weapon_expand.py` on_hit) caught only 0x13, so a
+  shield block went to the base method and the beam was removed before its MSC saw it. Fully charged, the hit
+  presumably came in as 0x13 (its damage; its status 3 and the fly-through on the shield ran), hence "only fully charged".
+- **Fix:** `extra_kinds.json` kamehameha `"on_hit_bits": "0x17"` (`weapon_expand.py`'s new per-article option):
+  a shield block asks for status 3 too, which (fix 85-88) flies on, multi-hitting the shield. One word in the
+  RPX: 0x04BB43FC `andi. r0, r5, 0x13` -> `0x17` (`weapon_expand_test.py` checks the method on bit 0x4).
+- Changed: `code/cross_f.rpx` only (fix 79's plus that word); the scripts are fix 88's.
+

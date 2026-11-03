@@ -556,7 +556,8 @@ int func_40(int arg0)
 //              KAME_SEG_EVERY frames. Its range reached, or touching a wall (GroundModule 0x2722, as
 //              the fireball's MSC checks it), it ends where it is.
 //   3          hold: the beam connected (native: weapon_expand's on_hit asks for status 3 instead of
-//              removing it), stays in place KAME_HOLD_n frames (more hits the longer the charge), still
+//              removing it: result bits 0x17, a hit or, fix 89, blocked by a shield, bit 0x4, which the
+//              base fireball's method removes it for: uncharged / medium beams vanished on a shield), stays in place KAME_HOLD_n frames (more hits the longer the charge), still
 //              multi-hitting: its fly motion starts again (test 18: its following head effects ended
 //              with the status change and the MSC's still copies stayed after the beam; the fly ACMD
 //              puts the head back, following, and its head hitbox, which holds the target, hits every
