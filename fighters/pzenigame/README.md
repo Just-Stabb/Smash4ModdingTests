@@ -821,3 +821,16 @@ Emulated end to end (`kind_expand_test.py`), Squirtle now gets Mario's ids 0x5E0
 (the previous executable: -1); in his bank those labels are tones 18 / 19 / 11, valid IDSP (his Ultimate
 missfoot01 / 02, damage_twinkle). The diagnostic points his record at labels he already says in moves (0x36
 attack01, 0x37 attack02, 0x3D jump01) to tell whether the path runs in game at all.
+
+## v6 effects test 26 (`build/squirtle_v6_effects_test26.zip`): soft particles
+
+The universal shader path's open items (docs/eft-universal-shader-scope.md, "Still open"), after the user's
+"continue making Ultimate's effects as accurate as possible":
+- **Soft particles.** Ultimate's depth reads (`sysDepthBufferTexture`) sampled a constant far plane: no fade where a
+  part meets the stage. They now sample t13 / s13 (`depthBufferTexture_CROSS`), the depth texture the game binds for
+  vanilla's 14 soft-particle programs; both games' screen UV and linear depth agree, and c16[20] (the screen u scale)
+  is 1. In his bank this is one part: the Poke Ball's `light1` (`sys_mball`, his entrance). Everything else is
+  byte-identical to test 25 (every emitter record, every other shader, the effect script).
+- **The call's colour / alpha / scale** were checked in cross_f: they already reach the programs (no change).
+- Child emitters: none in his bank (deferred to a bank that has them). Quad corner order: settled.
+- `port_check` over v6 + test 25 + extras 1 - 3 + test 26: 0 errors.
