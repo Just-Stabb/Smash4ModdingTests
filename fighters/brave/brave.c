@@ -38344,7 +38344,6 @@ float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
 float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
 float rolloff_hold_x() { return 0.3f; } // Hero's test: the stick past this, on screen, the roll's way keeps the cap off
-float rolloff_hold_down() { return -0.5f; } // fix 84: the stick down past this keeps it off too (a down air)
 
 // Hero's test of a new roll-off (user): the speed carried off a ledge isn't held to the air speed cap
 // (flag 0x20000044 off) until the stick stops holding the way that speed goes (its screen X, the position
@@ -38391,12 +38390,13 @@ void rolloff_hold_update()
                 rolloff_dir = -1.0f;
             }
         }
-        // fix 84 (user: stick down + attack out of a roll-off lost the speed unless buffered): the stick held
-        // down (a down air, SELF_STICK_Y 0x0F000111) doesn't count as letting go; a buffered one had kept it
-        // only because its input came in the roll
+        // fix 85 (user: attack on a stick click, a neutral air, out of a roll-off lost the speed unless buffered):
+        // a click's attack / special zeroes the stick for its frame (tools/smash_button_cave.py 5.), which isn't
+        // letting go: on a frame attack or special is pressed the stick doesn't put the cap back (the next frame
+        // it's back; a real neutral stick puts it back then). Fix 84's stick-down exception undone (user: not it)
         if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
             || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x()
-               && WorkModuleF(0, 0x0f000111) > rolloff_hold_down())
+               && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
         {
             global64 = 0;
             rolloff_dir = 0;
@@ -40972,7 +40972,7 @@ void brave_z2_fly(float vx, float vy)
 }
 
 // fix 82: the flight's direction from the positions alone each frame (at the target, his feet + 6; no target:
-// straight ahead), 9 a frame; 1 once he is within 80 of the target (the speed part's end), else 0
+// straight ahead), 9 a frame; 1 once he is within 15 of the target (the speed part's end; 80 until fix 85), else 0
 int brave_z2_aim()
 {
     float dx;
@@ -40993,9 +40993,9 @@ int brave_z2_aim()
         return 0x1;
     }
     brave_z2_fly(dx / d * 9.0f, dy / d * 9.0f);
-    if (d <= 80.0f)
+    if (d <= 15.0f)
     {
-        return 0x1;
+        return 0x1;         // fix 85 (user): 15 (was 80)
     }
     return 0;
 }

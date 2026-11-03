@@ -1456,3 +1456,18 @@ speed unless buffered.
   back and cut the speed. A buffered down air kept it because its input came in the roll. Now the stick held down
   (SELF_STICK_Y `0x0F000111` under -0.5, `rolloff_hold_down`) doesn't count as letting go.
 - Changed: `brave.mscsb`.
+
+## Fix 85 (`build/hero_fix85.zip`): Zoom 2 U's range 15, stick-click aerials out of a roll-off
+
+Install over fix 84. User: Zoom 2 U ends within range now, but 80 is too much: 15. Fix 84 misread the roll-off
+report: it was attack on a stick click (a neutral air), not down air.
+
+- **Zoom 2 U**: the speed part ends within 15 of the target (`brave_z2_aim`; at 9 a frame toward him it can't
+  step past 15 unnoticed while he holds still).
+- **Roll-off + stick click**: a stick click's attack / special zeroes the stick on its frame (the neutral move:
+  `tools/smash_button_cave.py` 5.), which `rolloff_hold_update` took for letting go of the roll's way, putting
+  the air speed cap back; a buffered one kept the speed because its input came in the roll. Now on a frame
+  attack or special is pressed (`ControlModule(0x2710, 0 / 1)`) the stick doesn't put the cap back; the next
+  frame the stick is back (a real neutral stick puts it back then, one frame later than before). Fix 84's
+  stick-down exception is undone.
+- Changed: `brave.mscsb`.
