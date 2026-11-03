@@ -35,7 +35,9 @@ import ult_shader_glsl  # noqa: E402
 CACHE = os.path.join(ROOT, 'build', 'mx_exec')
 NCB = 20                 # constant buffers c0 .. c19
 NATTR = 16
-NOUT = 8
+# output locations per vertex: Ultimate programs use up to 8 (0 - 8: Sephiroth's edge_octaslash_charge wind1, program
+# 621); with 8 slots that one wrote past the buffer and the heap broke ("double free or corruption", test 61's bank)
+NOUT = 16
 CB_WORDS = 4096          # every buffer padded to this many words (a read past the data gives 0)
 
 SHIM = r'''
@@ -126,7 +128,10 @@ def _cpp(glsl, stage):
             continue
         m = re.match(r'layout\(location = (\d+)\) (in|out) vec4 (\w+);', s)
         if m:
-            (ins if m.group(2) == 'in' else outs).add((int(m.group(1)), m.group(3)))
+            loc = int(m.group(1))
+            if loc >= (NATTR if m.group(2) == 'in' else NOUT):
+                raise ValueError('%s location %d past the runner\'s %d slots' % (m.group(2), loc, NATTR if m.group(2) == 'in' else NOUT))
+            (ins if m.group(2) == 'in' else outs).add((loc, m.group(3)))
             body.append('static vec4 %s;' % m.group(3))
             continue
         if s.startswith('out gl_PerVertex'):
