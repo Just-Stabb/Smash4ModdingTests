@@ -95,6 +95,13 @@ INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jum
 # 0 too (0x030C3E7C), so the last ones name the copy's weapon kinds.
 KIRBY_COPY_TABLE = 0x1038281C
 KIRBY_RESERVE = 0x10136AE4      # reserve entry i: + 0x10 * i (0-20), {kind 0x10, 0, 0, 0}
+# Kirby's copy resources (his copy hats and motions, fighter/kirby/model|motion/<fighter>...): loaded / released
+# per fighter in the match by its kind, each function returning at once for a kind >= 0x3A (Supamario fix 91,
+# user: Kirby T-posed in Supamario's Kamehameha and had no hat). Each one's `mr rK, r4` (the kind into the
+# register its bound tests) becomes a call to a stub that maps the copied fighter's kind to the one Kirby copies
+# it as. 0x030C5240: the loader, called for the 8 match entries (0x030C077C: entry +0x10 kind, +0x23 costume);
+# 0x030C4694: its per-resource helper; 0x030C5BBC: the release (0x02E14798).
+KIRBY_COPY_RES = ((0x030C46A8, 28), (0x030C5254, 16), (0x030C5BD0, 23))
 MODULE_ROW = 0x02BCB5C0        # mulli r8, r30, 0x70 (r30 = the kind) / addis r30, r8, 0x1034 / lwzu r10, 0x64A8(r30)
 MODULE_TABLE = 0x103464A8      # 389 rows of 0x70 (28 module constructors)
 DESC_COPY_MAX = 0x140          # bytes of a weapon descriptor copied (up to the next descriptor)
@@ -711,6 +718,17 @@ def kirby_copy(B, img, new, info):
             B.put(e, k, 'kirby reserve %d: weapon 0x%X files' % (reserve, k), 0x10)
             reserve -= 1
         info['kirby_copy'][c] = (hdr, at, [o[0] for o in out])
+    # the copied fighters' kinds -> C for Kirby's copy resources
+    maps = sorted({(K.num(new[nk][1]['kind']), c) for c, kinds in adds.items() for nk in kinds})
+    if maps:
+        for hook, reg in KIRBY_COPY_RES:
+            fn = B.alloc(4 * (2 + 3 * len(maps) + 1))
+            text = 'mr r%d, r4\n' % reg
+            for i, (fk, c) in enumerate(maps):
+                text += 'cmplwi r%d, 0x%X\nbne n%d\nli r%d, 0x%X\nn%d:\n' % (reg, fk, i, reg, c, i)
+            B.code(fn, text + 'blr')
+            B.asm(hook, 'bl 0x%X' % fn, 'mr r%d, r4' % reg)
+        info['kirby_copy_res'] = maps
 
 
 def args(B):

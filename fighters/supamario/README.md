@@ -122,3 +122,12 @@ should be able to take Supamario's copy ability.
   `weapon_expand.py` "kirby_copy").
 - Changed: `code/cross_f.rpx` (fix 89's plus Kirby's Mario copy article list, its header and two reserve
   entries), the weapon `game.bin`, Kirby's `kirby.mscsb`, `effect.bin`, `sound.bin`.
+
+## Kirby's Supamario copy fix 91 (`build/supamario_kame_fix91.zip`)
+
+Install over fix 90. User: Kirby T-poses in the Kamehameha and has no hat. Kirby's copy hats and motions load
+for the fighters in the match by kind, and the loader skipped kinds `>= 0x3A`: without a Mario in the match,
+Mario's copy hat and motions (Kirby's fireball throw, which the Kamehameha plays) weren't there. The loader now
+takes Supamario as Mario (`fighters/kirby/specials.md`, "Supamario copy"). Changed: `code/cross_f.rpx` only (fix
+90's plus 18 words). With the throw playing, the charge effects (Supamario's own, on Kirby's hand) show as his.
+

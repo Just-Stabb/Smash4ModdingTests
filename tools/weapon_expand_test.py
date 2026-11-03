@@ -391,6 +391,31 @@ def main():
         res = [pimg.w(W.KIRBY_RESERVE + 0x10 * i) for i in range(21)]
         check('Kirby copy 0x%X: reserve entries name its kinds with instances' % c,
               sorted(r for r in res if r != 0x10), sorted(w[0] for w in want if w[1]))
+    # Kirby's copy resources: each hooked `mr rK, r4` calls a stub leaving the kind in rK, the copied fighters'
+    # mapped (run on unicorn: every kind 0-0x50)
+    if info.get('kirby_copy_res'):
+        maps = dict(info['kirby_copy_res'])
+        from unicorn import Uc, UC_ARCH_PPC, UC_MODE_32, UC_MODE_BIG_ENDIAN
+        from unicorn.ppc_const import UC_PPC_REG_0, UC_PPC_REG_LR
+        for hook, reg in W.KIRBY_COPY_RES:
+            w = pimg.w(hook)
+            off = w & 0x03FFFFFC
+            stub = hook + (off - 0x04000000 if off & 0x02000000 else off)
+            mu = Uc(UC_ARCH_PPC, UC_MODE_32 | UC_MODE_BIG_ENDIAN)
+            base = stub & ~0xFFF
+            mu.mem_map(base, 0x2000)
+            mu.mem_write(stub, b''.join(struct.pack('>I', pimg.w(stub + 4 * i)) for i in range(16)))
+            bad = []
+            for k in range(0x51):
+                mu.reg_write(UC_PPC_REG_0 + 4, k)
+                mu.reg_write(UC_PPC_REG_0 + reg, 0xDEAD)
+                mu.reg_write(UC_PPC_REG_LR, base + 0x1FFC)
+                mu.emu_start(stub, base + 0x1FFC, count=40)
+                if mu.reg_read(UC_PPC_REG_0 + reg) != maps.get(k, k):
+                    bad.append(hex(k))
+            check('Kirby copy resources 0x%08X: bl to a stub, r%d = the kind mapped %s' % (
+                hook, reg, ', '.join('0x%X -> 0x%X' % kv for kv in sorted(maps.items()))),
+                (w >> 26 == 18 and w & 3 == 1, bad), (True, []))
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

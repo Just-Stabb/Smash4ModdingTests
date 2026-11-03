@@ -1165,3 +1165,10 @@ has 0x3A rows, so Supamario (`0x41`) is copied as Mario:
   `0x18B` and `0` (the fireball, whose 5 instances the Mario copy's pool makes), so they're there in a match
   without Mario.
 - Mario's hat and params; the copy's trait is Mario's (Normal, as Supamario's).
+- **Hat and motions (fix 91, user: Kirby T-posed in the Kamehameha and had no hat):** Kirby's copy resources
+  (`fighter/kirby/model/...` hats, `motion/mariobody` ...) load per fighter in the match, by that fighter's kind
+  (`0x030C5240`, called for the 8 match entries from `0x030C077C`; its helper `0x030C4694`; the release
+  `0x030C5BBC`), and each returns at once for a kind `>= 0x3A`: a match with Supamario and no Mario loaded no Mario
+  copy hat or motions, so the copy's motion `0x331` played nothing. `weapon_expand.py` `kirby_copy` now also maps
+  the copied fighter's kind (`0x41`) to the copy's (`3`) in all three (their `mr rK, r4` -> `bl` a stub;
+  `weapon_expand_test.py` runs the stubs on every kind). Supamario's body model is Mario's, so Mario's hat is his.
