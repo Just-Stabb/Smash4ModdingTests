@@ -582,6 +582,8 @@ int kame_phase;
 int kame_total;
 int kame_flown;
 int kame_shielded;      // fix 85: flying on through a shield it met
+int kame_catch;         // fix 86: the fly motion catching up to this frame (0: not)
+float kame_catch_rate;  // its rate once there (0: frozen, the hold; 1: on, flying)
 
 void main()
 {
@@ -782,16 +784,121 @@ int kame_near()
     return r;
 }
 
-// the hold begins: where it hit, the fly motion played from that frame and frozen (the body capsule as long as
-// the beam), fresh body pieces
+// the lingering body capsule's frames (fix 86, user: the whole flight was too much): the head's last
+// KAME_LINGER_n frames
+int kame_linger()
+{
+    if (kame_level == 0x1)
+    {
+        return KAME_LINGER_2;
+    }
+    else if (kame_level == 0x2)
+    {
+        return KAME_LINGER_3;
+    }
+    return KAME_LINGER_1;
+}
+
+// the fly motion again from frame 0 (its head effects and hitboxes back: a status change ends them), run to
+// frame `f` in one game frame (rate f: every command on the way runs, the body capsule ends as long as at f),
+// then at rate `after` (kame_catch_update). Fix 86: fix 85 started it at frame f instead, which most likely ran
+// none of the commands before f (user: on a shield it deleted itself: no head, no hitboxes)
+void kame_play_to(int f, float after)
+{
+    if (f > kame_linger())
+    {
+        f = kame_linger();      // nothing in the script past the capsule's last frame
+    }
+    func_24(kame_level, 0, 1.0f);
+    if (f < 0x1)
+    {
+        MotionModule(0x4, after);
+        kame_catch = 0;
+        return;
+    }
+    MotionModule(0x4, (float)f);
+    kame_catch = f;
+    kame_catch_rate = after;
+}
+
+void kame_catch_update()
+{
+    if (kame_catch > 0 && MotionModuleF(0x1) >= (float)kame_catch - 0.01f)
+    {
+        MotionModule(0x4, kame_catch_rate);
+        kame_catch = 0;
+    }
+}
+
+// fix 86 (user: the multi-hits should force the opponent into the tip of the beam, where the finish hits: held by
+// the lingering body they never got it): every fighter not shielding in the body (behind the head, up to the
+// capsule's length and 8 more, its feet 8 above to 28 below the head) is moved toward the head along the beam,
+// half the way a frame (at most 12, at least 1.5); `snap`: all the way (the finish). Through the slot position
+// variables (docs/position-variables.md: a weapon may write them); Supamario stays behind the start
+void kame_pull(int snap)
+{
+    int s;
+    int n;
+    float x;
+    float y;
+    float f;
+    float dx;
+    float dy;
+    float len;
+    float st;
+    float step;
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    f = PostureModuleF(0);
+    n = kame_flown;
+    if (n > kame_linger())
+    {
+        n = kame_linger();
+    }
+    len = (float)n * kame_speed() + 8.0f;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
+            dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
+            st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
+            if (dx < -1.0f && dx > -len && dy > -8.0f && dy < 28.0f && (st < 27.0f || st > 30.0f))
+            {
+                step = -dx;
+                if (snap == 0)
+                {
+                    step = -dx * 0.5f;
+                    if (step > 12.0f)
+                    {
+                        step = 12.0f;
+                    }
+                    if (step < 1.5f)
+                    {
+                        step = 1.5f;
+                    }
+                    if (step > -dx)
+                    {
+                        step = -dx;
+                    }
+                }
+                WorkModule(0, WorkModuleF(0, 0x0f000020 + 0x4 * s) + step * f, 0x0f000020 + 0x4 * s);
+            }
+        }
+        s += 1;
+    }
+}
+
+// the hold begins: where it hit, the fly motion run to that frame and frozen (the body capsule as long as it was),
+// fresh body pieces
 void kame_hold_begin()
 {
     kame_phase = 0x1;
     kame_flown = kame_frame;
     kame_frame = 0;
     kame_shielded = 0;
-    func_24(kame_level, (float)kame_flown, 1.0f);
-    MotionModule(0x4, 0);
+    kame_play_to(kame_flown, 0);
     // fresh body pieces: theirs last the flight only (KAME_SEG_n's hold, so a beam the game
     // removes at a blast zone leaves its body half as long: user, test 29), these the hold and
     // the finish
@@ -806,6 +913,7 @@ void kame_fly_main()
         kame_phase = 0;
         kame_total = 0;
         kame_shielded = 0;
+        kame_catch = 0;
     }
     if (kame_phase != 0)
     {
@@ -866,6 +974,7 @@ void kame_fly_loop()
     {
         return;
     }
+    kame_catch_update();
     if (kame_shielded && kame_phase == 0 && AttackModule(0x2727))
     {
         // connected again while flying on through a shield: on if it's only shields, else the hold
@@ -912,7 +1021,7 @@ void kame_hold_main()
             // a shield (fix 85): it flies on, its hitboxes back (the fly motion again from its frame: the status
             // change took them), multi-hitting the shield; a later hit on a fighter not shielding holds it
             kame_shielded = 0x1;
-            func_24(kame_level, (float)kame_frame, 1.0f);
+            kame_play_to(kame_frame, 1.0f);
             AttackModule(0x2724);
             kame_move(kame_speed());
             callFunc3(kame_fly_loop);
@@ -930,7 +1039,9 @@ void kame_hold_loop()
     {
         return;
     }
+    kame_catch_update();
     kame_move(KAME_CREEP);      // fix 85: creeping forward
+    kame_pull(0);               // fix 86: into the tip
     kame_frame += 1;
     if (kame_frame >= kame_hold_frames() + 0xa)
     {
@@ -952,6 +1063,7 @@ void kame_finish_main()
     {
         kame_phase = 0x2;
         kame_frame = 0;
+        kame_pull(0x1);         // fix 86: everyone in the body to the tip, where the launcher is
         func_24(0x3, 0, 1.0f);
         MotionModule(0x4, 1.0f);
         kame_dissolve();

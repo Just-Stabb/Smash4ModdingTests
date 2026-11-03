@@ -42,3 +42,22 @@ hitboxes linger until it begins to disappear. Install over fighters_latest (the 
   (`tools/supamario_kame_values.py`, read back from fighters_latest's file: the unchanged source compiles to it
   byte for byte) + `KAME_CREEP`; the weapon game.bin = fighters_latest's with fly1-3 from `fly_game` (its first 4
   capsules checked equal to the installed ones); `supamario.mscsb` = fighters_latest's with that one word 0.
+
+## Kamehameha fix 86 (`build/supamario_kame_fix86.zip`)
+
+Install over fix 85. User: it deleted itself on a shield; the lingering hitbox for the whole flight was too much
+(24 frames, a bit more fully charged); the multi-hits should force the opponent into the tip, where the finish
+hits (held by the lingering body, they never got it).
+
+- **Shield / hold restarts:** fix 85 restarted the fly motion at the frame it had reached; that most likely ran
+  none of the script's earlier commands (the head's effects and its hitboxes at frames 0-1: a status change ends
+  them), so on a shield it flew on with no head and no hitboxes and looked deleted. Now `kame_play_to` plays it
+  from frame 0 at rate f, which reaches frame f in one game frame running every command on the way, then sets
+  the rate wanted (`kame_catch_update`: 0 for the hold, frozen; 1 for flying on through a shield).
+- **Linger:** the body capsule covers the head's last 24 / 24 / 30 frames (`supamario_kame_build.py LINGERS`,
+  `KAME_LINGER_n`): 120 / 132 / 180 units.
+- **Into the tip:** in the hold every fighter not shielding in the body (behind the head, up to the capsule's
+  length + 8) is moved toward the head along the beam, half the way a frame (1.5-12 units: `kame_pull`); at the
+  finish all the way, so the launcher at the head hits them. Through the slot position variables; Supamario stays
+  behind the beam's start.
+- Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3); `supamario.mscsb` as fix 85.

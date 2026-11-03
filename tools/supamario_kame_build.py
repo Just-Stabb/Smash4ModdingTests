@@ -173,7 +173,10 @@ TICK_SDI = 0.0
 # the head back over the ground the head covered in its last LINGER frames (it grows to that from the
 # spawn, so it never reaches behind the start: test 18's grew to 40 units and hit behind Supamario);
 # the head's multi-hit, ID 1 in the same part (one hit log: one hit a tick for both)
-LINGER = 4                        # (tests 21-30; fix 85: the whole flight, fly_game)
+LINGER = 4                        # (tests 21-30; fix 85: the whole flight; fix 86: LINGERS)
+# fix 86 (user: "reduce active frames to 24 frames and slightly longer for fully charged, the full duration was
+# too much"): the body capsule covers the head's last LINGERS[level] frames
+LINGERS = (24, 24, 30)
 BODY_SIZE = (4.0, 4.5, 5.0)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
 # the finish per level (test 20: "charge time doesn't seem to increase ... final hit damage"): one
@@ -354,7 +357,7 @@ def fly_game(lv):
     tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
     g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
                 BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
-    for f in range(1, KAME_LIFE[lv] + 1):
+    for f in range(1, LINGERS[lv] + 1):
         g += [cmd('frame', float(f)),
               hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, Angle=HEAD_ANGLE,
                      KBG=HEAD_KBG, FKB=HEAD_FKB, BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
@@ -592,6 +595,7 @@ def main():
     vals = {'KAME_FINISH': str(finish), 'KAME_DISSOLVE': str(dis_frames),
             'KAME_SEG_EVERY': str(SEG_EVERY), 'KAME_SEG_FIRST': str(SEG_FIRST),
             'KAME_CREEP': fl(KAME_CREEP),
+            **{'KAME_LINGER_%d' % (i + 1): str(LINGERS[i]) for i in range(3)},
             'KAME_MAX': str(max(KAME_LIFE) + KAME_HOLD + finish + 20),
             'KAME_FX_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n)
                                       for n in beam_effects(heads, segs)),
