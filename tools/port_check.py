@@ -629,6 +629,25 @@ def check_weapons(name, rec, rep):
                     '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
 
 
+def check_motions(inst, name, rec, rep):
+    """M8: every animation the record's motion table names ("motions": the executable's kind_expand table) is in
+    the installed motion/body/main.pac, else that move T-poses (Hero fix 79: its main.pac was rebuilt from an
+    older one, fighters_latest's, without fix 17's C01AttackS32: forward tilt 2 T-posed)"""
+    import omo
+    pac = inst.get('fighter/%s/motion/body/main.pac' % name)
+    if pac is None or not rec.get('motions'):
+        return
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix='.pac') as f:
+        f.write(pac)
+        f.flush()
+        have = {n for n, _d in omo.pac_read(f.name)}
+    miss = sorted({m['anim'] for m in rec['motions'].values() if m.get('anim') and m['anim'] + '.omo' not in have})
+    if miss:
+        rep.add('ERROR', 'M8 motion-missing', '%d animations the motion table names aren\'t in main.pac (%s): those '
+                'moves T-pose: %s' % (len(miss), inst.where('fighter/%s/motion/body/main.pac' % name), ', '.join(miss)))
+
+
 def check_assets(inst, name, base, rep):
     ui = (base.get('ui') or {}).get('name') or base.get('cap') or name.capitalize()
     for s in ('chr_00', 'chr_11', 'chr_12', 'chr_13', 'stock_90'):
@@ -874,6 +893,7 @@ def main():
     check_msc(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
+    check_motions(inst, a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_effects(inst, a.name, rep)

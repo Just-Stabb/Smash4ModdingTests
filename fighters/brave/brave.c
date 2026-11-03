@@ -40856,7 +40856,9 @@ int brave_zoom(float f)
 // target (his feet + 6: level with his body) until he is within 80 of him, then goes straight on; he turns to
 // face the way he flies. An action out of the flight (func_41: the air actions the cancel allows) or the
 // flight's end (a fall) keeps the speed clamped to his max air speed across and his max fall speed up and
-// down; meeting the ground ends it with SpecialLw16End
+// down; meeting the ground ends it with SpecialLw16End. Fix 80: the action check (func_41) and the end's fall
+// (func_16) are in brave_lw_loop (brave_lw_cast's 3 / 4), as deep as Robin's own cancel (func_2246): from
+// inside brave_zoom2u (two calls deeper) Hero's MSC stopped in game on the flight's second frame
 int brave_z2_target;
 int brave_z2_track;
 float brave_z2_vx;
@@ -41020,23 +41022,17 @@ int brave_zoom2u(float f)
         }
         if (brave_lw_t >= 0x28)
         {
-            brave_z2_clamp();       // the flight's end: a fall
-            func_16(0xe, 0);
-            return 0x1;
-        }
-        if (CancelModule(0x2713) == 0x1)
-        {
-            brave_z2_clamp();
-            if (func_41())
-            {
-                return 0x1;         // acted out of it
-            }
+            return 0x4;             // the flight's end: brave_lw_loop's fall
         }
         brave_z2_aim();
         brave_z2_move();
         if (MotionModule(0x2712) == 0x1)
         {
             brave_lw_motion(0x280, 0x280);  // the flight's loop
+        }
+        if (CancelModule(0x2713) == 0x1)
+        {
+            return 0x3;             // brave_lw_loop: an action out of it?
         }
         return 0x2;
     }
@@ -41047,10 +41043,13 @@ int brave_zoom2u(float f)
 // knockback resistance and time: tools/position_vars_cave.py's ITEM on a target, code 1), unless he is metal
 // already or it met his shield. Each frame of the cast once it has connected (SELF_HIT 0x0F0000A0): the last
 // fighter hit (target 2: ITEM 0x0F000278 reads 1 while he is metal, status 0x0F0000B2)
+// Fix 80 (the user's, Ultimate's Metal Slash): a fighter already metal when it hits him (the Metal Box, an
+// earlier Metal Slash, Kaclang) is KO'd on the spot (his KO variable: LASTHIT_KO 0x0F00015F, as Whack's).
+// Once a cast (brave_lw_once 0x2): the metal it gives isn't taken for metal the frame after
 void brave_metal_slash()
 {
     float st;
-    if (WorkModuleF(0, 0x0f0000a0) < 0.5f || WorkModuleF(0, 0x0f000278) >= 0.5f)
+    if (WorkModuleF(0, 0x0f0000a0) < 0.5f)
     {
         return;
     }
@@ -41059,7 +41058,18 @@ void brave_metal_slash()
     {
         return;     // GuardOn / Guard / GuardOff / GuardDamage (0x1B-0x1E)
     }
-    WorkModule(0, 1.0f, 0x0f000278);
+    if (brave_lw_once(0x2) == 0)
+    {
+        return;
+    }
+    if (WorkModuleF(0, 0x0f000278) >= 0.5f)
+    {
+        WorkModule(0, 1.0f, 0x0f00015f);
+    }
+    else
+    {
+        WorkModule(0, 1.0f, 0x0f000278);
+    }
 }
 
 // Magic Burst's blast for the MP it took (weapons/crash.c): 81-100 the full one (motion 0), else 20 / 40 / 60 /
@@ -41302,6 +41312,23 @@ void brave_lw_loop()
         r = brave_lw_cast(MotionModuleF(0x1));
         if (r == 0x1)
         {
+            return;
+        }
+        if (r == 0x3)
+        {
+            // Zoom 2 U's flight, an action allowed: the speed clamped, then the air actions; none: on flying
+            brave_z2_clamp();
+            if (func_41())
+            {
+                return;
+            }
+            brave_z2_move();
+            return;
+        }
+        if (r == 0x4)
+        {
+            brave_z2_clamp();       // Zoom 2 U's end: a fall, its speed clamped
+            func_16(0xe, 0);
             return;
         }
         if (r == 0x2)

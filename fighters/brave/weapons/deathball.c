@@ -193,9 +193,12 @@ int sh_tick()
         t = sh_owner;
     }
     dbl_steer(t);
-    KineticModule(0x11, 0, dbl_vx, dbl_vy);
+    // across by its speed; up / down by moving it (fix 80: the Thunder's own code it runs on, the base's
+    // native one, keeps only the speed across: in game it never rose or fell)
+    KineticModule(0x11, 0, dbl_vx, 0);
     KineticModule(0xf, 0, 0, 0);
     KineticModule(0x15, 0, -1.0f, -1.0f);
+    PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2) + dbl_vy, PostureModuleF(0x3));
     return 0x1;
 }
 

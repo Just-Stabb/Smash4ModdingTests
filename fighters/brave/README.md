@@ -1373,3 +1373,30 @@ Install over fix 78. Every value below is the user's (none of it is Ultimate's),
   kind_expand), `brave.mscsb`, the shot articles' MSC (`flash`, `explosion`, `deathball`, `sleep`), body
   `game` / `effect` / `sound` / `expression.bin` and `motion.mtable`, `motion/body/main.pac`, `ui/info/dmg/`, and
   Sm4shCommand's `ModAnimNames.txt`, `Aliases/variables.txt`, `Tooltips/position_variables.txt`.
+
+## Fix 80 (`build/hero_fix80.zip`): Zoom 2 U, Metal Slash's KO, forward tilt, Whack up / down
+
+Install over fix 79. The user's test of fix 79 (a clip):
+
+- **Zoom 2 U stopped Hero's MSC**: he took the sideways pose, drifted slowly with no gravity, couldn't act,
+  the spell's window stayed up and he never respawned after the KO, so his MSC stopped on the flight's
+  second frame (the first one that checks for an action). The compiled code is sound (stack check, its
+  disassembly), so the likely cause is depth: `func_41` (the air actions; an action changes the status inside
+  that call) ran from `brave_zoom2u`, two calls deeper than Robin's own cancel (`brave_lw_loop` -> `func_2246`
+  -> `func_41`). Now `brave_zoom2u` returns 3 (a flight frame where an action is allowed) or 4 (the flight's
+  end) and `brave_lw_loop` does the clamp, `func_41` / the fall (`func_16(0xe)`) itself. Not proven: the
+  root cause wasn't seen.
+- **Metal Slash KOs a metal fighter** (the user's; Ultimate's Metal Slash): the fighter it hits, already
+  metal (Metal Box, an earlier Metal Slash, Kaclang), is KO'd on the spot (LASTHIT_KO `0x0F00015F`, as
+  Whack's); one not metal turns metal. Once a cast, so the metal it gives isn't taken for metal after.
+- **Forward tilt T-posed**: fix 79's `main.pac` was built on fighters_latest's, which hasn't fix 17's
+  `C01AttackS32` (forward tilt 2, motion 0x59; fix 17's package carried the newer `main.pac`, not in the port
+  chain's packages). Rebuilt on fix 17's (the newest: 384 animations) + Zoom 2 U's. New check `port_check` M8
+  (every animation the motion table names is in the installed `main.pac`; it flags fix 79's) and a catalogue
+  row in docs/ultimate-port-guide.md.
+- **Whack never rose or fell**: the Thunder's native code under it (its base kind) keeps only the speed across
+  (as Mario's fireball code did to Squirtle's water); its up / down is now a move of its position each frame
+  (`PostureModule(3)`), across still its speed.
+- `port_check` over steve_hero_v1 + fighters_latest + fixes 56-80: the pre-existing 6 errors (A3, E4, E5, E7, P1,
+  S4), M8 clear.
+- Changed: `brave.mscsb`, `deathball.mscsb`, `motion/body/main.pac`.
