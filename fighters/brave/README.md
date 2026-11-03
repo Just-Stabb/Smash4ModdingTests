@@ -1445,3 +1445,14 @@ Install over fix 82. User: it tracks properly now, but still doesn't end within 
   (across, up / down) and 2 (across) are clamped on its first 3 frames (`brave_z2_after`, `brave_lw_burst`
   0x103-0x101). His gravity is left alone (a double jump keeps its own speed).
 - Changed: `brave.mscsb`.
+
+## Fix 84 (`build/hero_fix84.zip`): down air out of a roll-off keeps the speed
+
+Install over fix 83 (it has fix 83's Zoom 2 U too). User: stick down + attack out of a roll-off didn't keep the
+speed unless buffered.
+
+- Hero's roll-off test (fix 61, `rolloff_hold_update`) puts the air speed cap back once the stick stops holding
+  the roll's way (screen X x the roll's way under 0.3); a down air's stick down has X near 0, so the cap came
+  back and cut the speed. A buffered down air kept it because its input came in the roll. Now the stick held down
+  (SELF_STICK_Y `0x0F000111` under -0.5, `rolloff_hold_down`) doesn't count as letting go.
+- Changed: `brave.mscsb`.

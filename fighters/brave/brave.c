@@ -38344,6 +38344,7 @@ float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
 float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
 float rolloff_hold_x() { return 0.3f; } // Hero's test: the stick past this, on screen, the roll's way keeps the cap off
+float rolloff_hold_down() { return -0.5f; } // fix 84: the stick down past this keeps it off too (a down air)
 
 // Hero's test of a new roll-off (user): the speed carried off a ledge isn't held to the air speed cap
 // (flag 0x20000044 off) until the stick stops holding the way that speed goes (its screen X, the position
@@ -38390,8 +38391,12 @@ void rolloff_hold_update()
                 rolloff_dir = -1.0f;
             }
         }
+        // fix 84 (user: stick down + attack out of a roll-off lost the speed unless buffered): the stick held
+        // down (a down air, SELF_STICK_Y 0x0F000111) doesn't count as letting go; a buffered one had kept it
+        // only because its input came in the roll
         if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
-            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x())
+            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x()
+               && WorkModuleF(0, 0x0f000111) > rolloff_hold_down())
         {
             global64 = 0;
             rolloff_dir = 0;

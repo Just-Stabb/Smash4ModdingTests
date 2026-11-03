@@ -179,7 +179,8 @@ right as-is.
 
 **Test (Hero only, fix 61, user):** the cap stays off until the stick stops holding the roll's way
 (screen X × the roll's way under 0.3), into any air action, and comes back on landing, a ledge or a hit,
-instead of at Fall's end (`rolloff_hold_update`, `fighters/brave/brave.c`). If it plays right it can go
+instead of at Fall's end (`rolloff_hold_update`, `fighters/brave/brave.c`); the stick held down (a down air, Y under
+-0.5) counts as holding (fix 84). If it plays right it can go
 into `tools/universal_mechanics.py` for everyone.
 
 Done: Captain Falcon (2.4, air ×1.0), Kirby (2.1, air ×1.0), Luigi (1.6, air ×1.1, momentum kept into the next air action until grounded: `fighters/luigi/README.md`), Sonic (2.76, air ×1.0, same momentum: `fighters/sonic/README.md`).
