@@ -61,3 +61,17 @@ hits (held by the lingering body, they never got it).
   finish all the way, so the launcher at the head hits them. Through the slot position variables; Supamario stays
   behind the beam's start.
 - Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3); `supamario.mscsb` as fix 85.
+
+## Kamehameha fix 87 (`build/supamario_kame_fix87.zip`)
+
+Install over fix 86. User: on a shield it only flew on at medium / full charge; the pull took Supamario into the
+tip, not the opponent; double the beam's shield damage.
+
+- **The owner:** `kame_find_owner` at the beam's spawn (status 0): the fighter at or behind its start (along its
+  facing, up to 2 ahead) nearest it: Supamario. Left out of `kame_near` (the shield check: he counted as "a
+  fighter not shielding" when near, so the beam held instead of flying on) and `kame_pull`.
+- **Shield check window:** 32 ahead of the head (was 20: a big shield meets the head further out).
+- **Pull:** every frame of the hold all the way to the tip (was half the way), so the finish's launcher hits them.
+- **Shield damage x2:** each hitbox's added shield damage = its damage, rounded (`supamario_kame_build.py
+  shield_add`): ticks +1 / +1 / +2, the finish +7 / +10 / +13.
+- Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3, finish); `supamario.mscsb` as fix 85.

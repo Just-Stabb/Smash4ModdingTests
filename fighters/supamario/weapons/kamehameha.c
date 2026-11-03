@@ -582,6 +582,7 @@ int kame_phase;
 int kame_total;
 int kame_flown;
 int kame_shielded;      // fix 85: flying on through a shield it met
+int kame_owner;         // fix 87: Supamario's slot (the fighter at or behind the spawn point, nearest it)
 int kame_catch;         // fix 86: the fly motion catching up to this frame (0: not)
 float kame_catch_rate;  // its rate once there (0: frozen, the hold; 1: on, flying)
 
@@ -763,7 +764,7 @@ int kame_near()
         {
             dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
             dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
-            if (dx > -10.0f && dx < 20.0f && dy > -8.0f && dy < 28.0f)
+            if (s != kame_owner && dx > -10.0f && dx < 32.0f && dy > -8.0f && dy < 28.0f)
             {
                 st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
                 if (st >= 27.0f && st <= 30.0f)
@@ -864,7 +865,7 @@ void kame_pull(int snap)
             dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
             dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
             st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
-            if (dx < -1.0f && dx > -len && dy > -8.0f && dy < 28.0f && (st < 27.0f || st > 30.0f))
+            if (s != kame_owner && dx < -1.0f && dx > -len && dy > -8.0f && dy < 28.0f && (st < 27.0f || st > 30.0f))
             {
                 step = -dx;
                 if (snap == 0)
@@ -888,6 +889,44 @@ void kame_pull(int snap)
         }
         s += 1;
     }
+}
+
+// fix 87 (user: the pull took Supamario into the tip, not the opponent; at low charge a shield still stopped
+// it): Supamario's slot, left out of kame_near and kame_pull: at the beam's spawn (status 0) the fighter at or
+// behind its start (along its facing, up to 2 ahead) nearest to it (-1: none)
+int kame_find_owner()
+{
+    int s;
+    int best;
+    float x;
+    float y;
+    float f;
+    float dx;
+    float dy;
+    float d;
+    float bd;
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    f = PostureModuleF(0);
+    best = 0xffffffff;
+    bd = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - y;
+            d = dx * dx + dy * dy;
+            if (dx < 2.0f && (best < 0 || d < bd))
+            {
+                best = s;
+                bd = d;
+            }
+        }
+        s += 1;
+    }
+    return best;
 }
 
 // the hold begins: where it hit, the fly motion run to that frame and frozen (the body capsule as long as it was),
@@ -914,6 +953,7 @@ void kame_fly_main()
         kame_total = 0;
         kame_shielded = 0;
         kame_catch = 0;
+        kame_owner = kame_find_owner();
     }
     if (kame_phase != 0)
     {
@@ -1041,7 +1081,7 @@ void kame_hold_loop()
     }
     kame_catch_update();
     kame_move(KAME_CREEP);      // fix 85: creeping forward
-    kame_pull(0);               // fix 86: into the tip
+    kame_pull(0x1);             // fix 86: into the tip (fix 87: all the way every frame, user: the opponent, not the owner)
     kame_frame += 1;
     if (kame_frame >= kame_hold_frames() + 0xa)
     {

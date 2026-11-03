@@ -347,6 +347,12 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
     return '\n'.join(out)
 
 
+def shield_add(damage):
+    """fix 87 (user: double the beam's shield damage): the hitbox's added shield damage (an integer, native-notes
+    "Hero's buffs") as its damage, rounded: its shield damage twice the damage's"""
+    return int(round(damage))
+
+
 def fly_game(lv):
     """fly<lv+1>'s game script. The head (ID 0) multi-hits what it caught (366) while flying and through the
     hold, whose REHIT x HOLD_HITS frames give the charge levels their hits there (test 18). The body (ID 1):
@@ -354,7 +360,7 @@ def fly_game(lv):
     the head back over all the ground it has covered (it grows from the spawn, so it never reaches behind the
     start), every frame of the flight; the hold plays this motion from the frame it hit at, frozen there
     (kamehameha.c kame_hold_begin), so the whole beam stays a hitbox until the finish / dissolve removes it"""
-    tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
+    tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT, ShieldDamage=shield_add(TICK_DAMAGE[lv]))
     g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
                 BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
     for f in range(1, LINGERS[lv] + 1):
@@ -394,7 +400,8 @@ def weapon_scripts(heads, ids, segs):
     # strength by the level
     game['finish'] = [cmd('remove_all_hitboxes')] + by_level([
         [hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0, BKB=f['BKB'],
-                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2, FacingRestrict=FINISH_FACING)] for f in FINISH]) + [
+                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2, FacingRestrict=FINISH_FACING,
+                ShieldDamage=shield_add(f['Damage']))] for f in FINISH]) + [
         cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst
