@@ -1432,3 +1432,16 @@ speed in range.
   whatever he does next (`brave_z2_after` in `brave_frame`, energy 3 only: a double jump or air dodge keeps its own
   speed), marked by `brave_lw_burst` 0x102 / 0x101 (still no globals of its own: highest 0x86).
 - Changed: `brave.mscsb`.
+
+## Fix 83 (`build/hero_fix83.zip`): Zoom 2 U ends within 80
+
+Install over fix 82. User: it tracks properly now, but still doesn't end within 80 of the opponent.
+
+- Not seen why (no clip): the end itself (`func_16(0xe)`, the same call `func_2246` ends every spell with) most
+  likely worked, and the fall took the flight's last speed over (a status's set-up starting from his speed
+  of the frame before the clamp, or putting it in his air control, energy 2, which fix 82's clamp didn't touch),
+  so he flew on past the target. Now: within 80 of the target (or at 40 frames) the speed is clamped and he
+  flies one frame at it in the move (sub 3) before the fall; after the move (the fall or an action) energies 3
+  (across, up / down) and 2 (across) are clamped on its first 3 frames (`brave_z2_after`, `brave_lw_burst`
+  0x103-0x101). His gravity is left alone (a double jump keeps its own speed).
+- Changed: `brave.mscsb`.

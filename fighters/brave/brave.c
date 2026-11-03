@@ -39253,28 +39253,35 @@ void brave_crit_show()
     }
 }
 
-// Zoom 2 U (fix 82): the speed it leaves him (energy 3) clamped again on the first 2 frames of what he does after
-// it (brave_lw_burst 0x102 / 0x101, set by brave_lw_loop), in case the new status took it over first: his max air
-// speed across, max fall speed up / down
+// Zoom 2 U (fix 82, 83): the speed it leaves him clamped again on the first 3 frames of what he does after it
+// (brave_lw_burst 0x103-0x101, set by brave_lw_loop), in case the new status took the flight's speed over: energy
+// 3 across and up / down, energy 2 (his air control, where a fall starts from his speed) across; his gravity
+// left alone (a double jump keeps its own). His max air speed across, max fall speed up / down
+float brave_z2_lim(float v, float m)
+{
+    if (v > m)
+    {
+        return m;
+    }
+    if (v < -m)
+    {
+        return -m;
+    }
+    return v;
+}
+
 void brave_z2_after()
 {
     float mx;
     float my;
-    float x;
-    float y;
-    if (brave_lw_burst < 0x101 || brave_lw_burst > 0x102 || global4 == 0x155)
+    if (brave_lw_burst < 0x101 || brave_lw_burst > 0x103 || global4 == 0x155)
     {
         return;
     }
     mx = WorkModuleF(0, 0x3000016);
     my = WorkModuleF(0, 0x3000019);
-    x = KineticModuleF(0xa, 0x3);
-    y = KineticModuleF(0xb, 0x3);
-    if (x > mx) { x = mx; }
-    if (x < -mx) { x = -mx; }
-    if (y > my) { y = my; }
-    if (y < -my) { y = -my; }
-    KineticModule(0x11, 0x3, x, y);
+    KineticModule(0x11, 0x3, brave_z2_lim(KineticModuleF(0xa, 0x3), mx), brave_z2_lim(KineticModuleF(0xb, 0x3), my));
+    KineticModule(0x11, 0x2, brave_z2_lim(KineticModuleF(0xa, 0x2), mx), KineticModuleF(0xb, 0x2));
     brave_lw_burst -= 1;
     if (brave_lw_burst < 0x101)
     {
@@ -41046,6 +41053,10 @@ int brave_zoom2u(float f)
         }
         return 0x2;
     }
+    if (brave_lw_sub == 0x3)
+    {
+        return 0x4;                 // brave_lw_loop: clamped again, the fall
+    }
     if (brave_lw_sub == 0x1)
     {
         brave_lw_t += 1;
@@ -41058,13 +41069,14 @@ int brave_zoom2u(float f)
             brave_lw_motion(0x23e, 0x23e);
             return 0x2;
         }
-        if (brave_lw_t >= 0x28)
+        if (brave_lw_t >= 0x28 || brave_z2_aim())
         {
-            return 0x4;             // the flight's end: brave_lw_loop's fall
-        }
-        if (brave_z2_aim())
-        {
-            return 0x4;             // within 80 of the target: the speed part ends there, clamped (fix 82)
+            // the flight's end (40 frames) or within 80 of the target (fix 82): the speed clamped now and one
+            // frame flown at it before the fall (fix 83: the fall took the flight's last speed over, user: it
+            // didn't end within 80)
+            brave_z2_clamp(KineticModuleF(0xa, 0x3), KineticModuleF(0xb, 0x3));
+            brave_lw_sub = 0x3;
+            return 0x2;
         }
         if (MotionModule(0x2712) == 0x1)
         {
@@ -41363,14 +41375,14 @@ void brave_lw_loop()
             brave_z2_clamp(vx, vy);
             if (r == 0x4)
             {
-                brave_lw_burst = 0x102;     // brave_z2_after
+                brave_lw_burst = 0x103;     // brave_z2_after
                 func_16(0xe, 0);    // Zoom 2 U's end: a fall, its speed clamped
                 return;
             }
             // Zoom 2 U's flight, an action allowed: the speed clamped, then the air actions; none: on flying
             if (func_41())
             {
-                brave_lw_burst = 0x102;     // brave_z2_after
+                brave_lw_burst = 0x103;     // brave_z2_after
                 return;
             }
             brave_z2_fly(vx, vy);
