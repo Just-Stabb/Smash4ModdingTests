@@ -23,7 +23,9 @@ sys.path.insert(0, HERE)
 import prc  # noqa: E402
 import ultimate_acmd as U  # noqa: E402
 
-FUNC = re.compile(r'void (f_[0-9a-f]+)\(Ctx \*c\)')
+# a function's body is u_<addr> (its f_<addr> wrapper follows it: keying on the wrappers put every
+# function's hashes on the one before it)
+FUNC = re.compile(r'void u_([0-9a-f]+)\(Ctx \*c, uint64_t rp\)')
 MOVZ = re.compile(r'c->x\[(\d+)\] = \(uint64_t\)\((0x[0-9a-f]+)ULL\);')
 MOVK = re.compile(r'c->x\[(\d+)\] = \(uint64_t\)\(\(c->x\[(\d+)\] & ~(0x[0-9a-f]+)ULL\) \| (0x[0-9a-f]+)ULL\);')
 
@@ -51,7 +53,7 @@ def scan(dump):
         for line in open(f, errors='replace'):
             m = FUNC.match(line)
             if m:
-                cur, regs = m.group(1), {}
+                cur, regs = 'f_' + m.group(1), {}
                 out[cur] = []
                 continue
             m = MOVZ.search(line)
