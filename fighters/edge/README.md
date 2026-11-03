@@ -645,3 +645,26 @@ never goes away when released. Throws also seem slightly off." Then: "Neutral ai
 - Bank 24.1 MB (test 59: 18.8 MB, which loaded).
 - Package: `fighter/edge/effect/edge/edge.010d0000.{ptcl,efc}`, `script/animcmd/body/effect.bin`,
   `script/msc/edge.mscsb`.
+
+## Test 61 (`build/sephiroth_test61.zip`): up special, Blade Dash / Octaslash
+
+User: "Can you make Sephiroth's moves function like in Ultimate and port over his MSC? ... You can port all of the
+specials and code." Source: Ultimate's status code, the user's `lua2cpp_decomp.zip` (ssbu-recomp of
+`lua2cpp_edge.nro`), read with `tools/recomp_annotate.py`; the brake and the counter's native parts from the ExeFS.
+- The move: fighters/edge/specials.md "Up special" (Ultimate's functions per behaviour; approximated: the ground
+  aim limit K 90 degrees (NRO rodata not in the dump), the air end's control accel x 0.5 (no Smash 4 op), jostle
+  areas / victim pull, `shield_speed_mul`).
+- Body pitch: Smash 4's MSC has joint rotation (`ModelModule(0x1, joint, x, y, z, mode)`, every fighter's common
+  status 0x10E, Pikachu's Quick Attack): RotN (joint 2) pitched with mode 1, removed on every exit (it persists).
+- Effects: the 15 Octaslash effects his scripts use (`edge_octaslash_*`: arc / arc2 / charge / sword flare / speed
+  line / direction / the 8 afterimages and wing) added (`edge_fx_build.py --add`), 10 turned variants
+  (variants61 = test 57's 20 + 10); the turned variants after them renumbered (the Flare charge-off ids in edge.c
+  moved: port_check E8). Bank 26.9 MB. A converter crash on `edge_octaslash_charge` fixed (mx_exec: 16 output slots).
+- Also in game.bin (translator since ports_dash_fix's): throws' hitboxes before the release NoGrabRelease (port_check
+  S5 gone), jab 2's hitstop (Extra_Special_Hitbox).
+- Executable: fix 91's + the 0x232 motion record (SpecialHi2Landing on the landing animation): 1 word.
+- port_check over the chain: no new errors (fewer: A2, S5 gone; S7 only the final smash); C2 / C4 warn on the up
+  special's code: the scale read is meant (the aim effect's offset) and the rush speed is world X from the
+  world-space stick (global48), both as Ultimate.
+- Package: the bank, body game / effect / expression / sound / motion.mtable, edge.mscsb, code/cross_f.rpx (not the vl
+  file: ports_shapes' is newer).
