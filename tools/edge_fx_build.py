@@ -4,7 +4,7 @@ common sys_* sets (from ef_common.eff, tinted as his scripts tint them), so none
 common effects (the user, test 59: "he still seems to use some of the old fixes for effects (jabs, dash attack, etc)").
 
   python3 tools/edge_fx_build.py EF_EDGE_EFF ZELDA_EFFECT_DIR EF_COMMON_EFF LUA2CPP_EDGE VANILLA_FIGHTER_DIR OUT \
-      [--variants VARIANTS.json] [--ids fighters/edge/edge_effects.json]
+      [--variants VARIANTS.json] [--ids fighters/edge/edge_effects.json] [--add edge_a,edge_b]
 
 EF_EDGE_EFF: Ultimate's fighter/edge/effect/ef_edge.eff; ZELDA_EFFECT_DIR: Smash 4's fighter/zelda/effect/zelda (the
 bank it replaces); EF_COMMON_EFF: Ultimate's effect/system/common/ef_common.eff; LUA2CPP_EDGE: the lua2cpp dump
@@ -47,12 +47,15 @@ def main():
         ap.add_argument(a)
     ap.add_argument('--variants')
     ap.add_argument('--ids', default=os.path.join(HERE, '..', 'fighters', 'edge', 'edge_effects.json'))
+    ap.add_argument('--add', default='', help='edge_* effects not in --ids yet, comma-separated: numbered after his '
+                    'own (the common sets and turned variants after them move: re-run edge_specials_build)')
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     ids = json.load(open(a.ids))
     ids_out = os.path.join(a.out, 'ids.json')
     json.dump(ids, open(ids_out, 'w'), indent=1)
     effs = sorted((k for k in ids if k.startswith('edge_') and '@' not in k), key=lambda k: int(ids[k], 0))
+    effs += [n for n in a.add.split(',') if n and n not in effs]
     sets = ultimate_port.common_sets(sorted(script_sys_names(a.lua2cpp) | set(SMASH4_SYS)), a.ef_common)
     extra = ['%s=%s' % kv for kv in sorted(sets.items()) if kv[1]]
     print('common sets: %d (%s); none: %s' % (len(extra), ', '.join(sorted(k for k, v in sets.items() if v)),
