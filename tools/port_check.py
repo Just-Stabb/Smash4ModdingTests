@@ -791,6 +791,8 @@ def check_universal(p, rep):
                 no_diff.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
             ph = ult_to_latte.ps_header(bytes(p.shader_binary(p.field(d, 'shader_index'))))
             for _nm, _t, slot in ph['samplers']:
+                if slot == 13:
+                    continue                # the game's depth texture (soft particles: ult_shader.DEPTH_SLOT)
                 t = p.texres(d, slot)
                 if not t['size'][0] or not t['native_size']:
                     no_tex.append('%s/%s slot %d' % (p.set_name(si), p.emitter_name(d), slot))

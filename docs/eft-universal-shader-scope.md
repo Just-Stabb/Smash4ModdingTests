@@ -353,11 +353,43 @@ Ultimate's program.
   - port_check E6 universal-diff is an ERROR.
 
 **Still open.**
-- c16 and the call's colour / alpha (c10[12], c16) at defaults.
-- c10[13 - 15]: the call's scale assumed in v_inScl.
-- Child emitters on the fallback.
-- Soft-particle fade.
-- Quads drawn by vertex id assume Ultimate's corner order; checked by the renders, not the game.
+- ~~c16 and the call's colour / alpha (c10[12], c16) at defaults; c10[13 - 15]: the call's scale assumed in
+  v_inScl.~~ Settled (after Supamario fix 91, from cross_f): the call's colour / alpha / scale reach the programs.
+  - ACMD `LAST_EFFECT_SET_COLOR` (handler 0x02BE44B0) -> EffectModule (accessor +0xA0) vt +0x27C on the last
+    handle: the emitter set's colour.
+  - eft's dynamic block (0x04A65A08): emc0 = colour scale (+0x778) x the instance's colour 0 (+0x218.., the
+    emitter's own, copied at creation 0x04A5C098) x the set's colour (`[instance+0x7C]` +0x278..+0x284: set to 1
+    at the set's creation 0x04A55D90); alpha x the instance's fade (+0x58); emc1 likewise from colour 1 (+0x238..).
+    Only when the emitter's byte +0x306 is 0, which it is in every emitter of Squirtle's bank and of 60 vanilla
+    banks (3739). c10's colours 0 - 7 are the emitter's x emc0 / emc1, so the call's colour and alpha are in them;
+    c10[12] = 1 (Ultimate's call alpha, folded into the colours' alpha) and c16 = 1 (Ultimate's per-effect colour /
+    alpha multipliers) don't drop anything as long as Ultimate's programs only multiply by them.
+  - The set's particle scale (+0x264 / +0x268: its particle scale x its matrix's scale, 0x04A4B188) is in v_inScl
+    (and emp0.y / z): c10[13 - 15] = 1 is right. The particle records carry no set colour (0x04A637E4: colour =
+    the particle's, alpha x p+0x98).
+  - Still at defaults: c16's other words (Ultimate's per-effect depth shift, word 18); no script seen sets it.
+- **Soft-particle fade: on (after Supamario fix 91).** The game binds its depth texture at t13 / s13 for effects:
+  vanilla's 14 soft-particle programs sample it, named `depthBufferTexture_CROSS` ("CROSS": Smash 4's codename).
+  eft's own lookup (cross_f 0x04A578E0, an exact compare over the pixel shader's sampler table, 0x04A59E54) wants
+  `depthBufferTexture` and never finds it, so the binding is the game's, by slot. Ultimate's depth programs (145 of
+  its 2188 pixel programs across ef_common, Squirtle and Hero) now sample slot 13 under that name
+  (`ult_shader.DEPTH_SLOT`, `ult_to_latte.SAMPLER_NAMES`), not a constant far plane. Both games agree on the rest:
+  - the screen UV is (x / w, -y / w) x 0.5 + 0.5 (Ultimate's vertex program, and vanilla's clause 06);
+  - linear depth is n f / (f - d (f - n)): Ultimate's c8[72 - 75], vanilla's CB1 words 80 - 83.
+  Ultimate's UV goes through c16 (u = (x / w x c16[20] + c16[21] x c8[71]) x c16[4], v = y / w x c16[5], clamped to
+  floor(c16[4 / 5] x 1920 / 1080) texels): c16[20] is now 1 (it was baked 0, putting every read at u 0). Only the 164
+  screen-space programs read c16[20 - 21]. fx_render has no scene depth: an unbound slot reads 1 (no fade), as before.
+  port_check E6 universal-texture skips slot 13. Tests: the pixel differential test passes Squirtle's 156 and the
+  common 166 programs.
+- **Child emitters: still on the old path (deferred).** Ultimate's children: none in Squirtle's bank, 2 in Hero's
+  (Kacrackle Slash's flash2 / flash3), 12 in ef_common (ice hits, the bomb blast, sleep bubbles, the recovery sparkle,
+  the stat-up auras). eft's child block (ptcl.CHILD) takes its shader from its template (+0x284 / +0x288 / +0x28C;
+  `child_block` doesn't copy the converted emitter's 0x844), has one texture (+0x920) and no mesh index, and how
+  eft builds a child's emc (its colours +0x128..) for the dynamic block isn't traced. To do with a bank that has
+  children (Hero's or Sephiroth's) so it can be checked in game: quad children whose programs sample slot 0 only.
+- **Quad corner order: settled.** Ultimate's programs make both the corner and its UV from the vertex id the
+  prologue gives them, so a wrong id order could only show as a crossed (bow-tie) or mirrored quad, never a subtly
+  wrong one; fx_render's per-pixel matches with Ultimate's own programs (up / down smash, Waterfall) rule both out.
 
 ## Unknowns to settle first (phase 0, as scoped)
 

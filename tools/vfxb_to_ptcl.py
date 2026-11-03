@@ -2576,7 +2576,7 @@ def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
     notes.append('universal shader: Ultimate\'s programs (vertex %d, pixel %d operations; textures %s%s; %s%s)' % (
         info['vs_ops'], info['ps_ops'], ', '.join(str(s_) for s_ in info['samplers']) or 'none',
         ' sRGB' if any(e['sampler'][s_]['texture_id'] in SRGB_TEXTURES for s_ in info['samplers']) else '',
-        encode, ', premultiplied' if premult else '') + (', depth fade off (no depth texture)' if info['depth'] else ''))
+        encode, ', premultiplied' if premult else '') + (', soft-particle depth fade (t13)' if info['depth'] else ''))
     return True
 
 

@@ -273,7 +273,8 @@ def test_pixel(prog, e, n, seed, keep=None, tag='', mode='identity'):
     bad = []
     if h['inputs'] != sorted(low.ins):
         bad.append('header inputs %s' % h['inputs'])
-    if [(nm, loc) for nm, _t, loc in h['samplers']] != [('textureSampler%d' % t, t) for t in want_smp]:
+    if [(nm, loc) for nm, _t, loc in h['samplers']] != [(ult_to_latte.SAMPLER_NAMES.get(t, 'textureSampler%d' % t), t)
+                                                         for t in want_smp]:
         bad.append('header samplers %s' % h['samplers'])
     if bool(h['db_shader_control'] & 0x40) != low.kills:
         bad.append('header KILL_ENABLE')

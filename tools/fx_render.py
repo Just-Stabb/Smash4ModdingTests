@@ -896,7 +896,8 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     rt[:, :3] /= np.maximum(np.linalg.norm(rt[:, :3], axis=0), 1e-9)
     c10[32:44] = rt.ravel()
     c16 = np.zeros(32, np.float32)
-    c16[[0, 4, 5, 6, 8, 10, 18]] = 1.0          # the game's own per-effect block: colour / alpha x 1, no depth shift
+    c16[[0, 4, 5, 6, 8, 10, 18, 20]] = 1.0      # the game's own per-effect block: colour / alpha x 1, no depth shift,
+    #                                             full-screen depth UV (ult_shader.C16)
     csdp = bytes.fromhex(e['subsections'].get('CSDP', ''))
     import eft2_resolve
     cbs = {8: view_block(canvas), 9: np.frombuffer(eft2_resolve.static_block(e), np.uint32), 10: c10, 16: c16,

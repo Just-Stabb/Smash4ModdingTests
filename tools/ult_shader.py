@@ -25,6 +25,12 @@ import ult_to_latte  # noqa: E402
 
 C16 = np.zeros(32, np.float32)
 C16[[0, 4, 5, 6, 8, 10, 18]] = 1.0          # colour / alpha x 1, no depth shift (fx_render's)
+# the screen-space reads (164 of 2188 pixel programs: soft particles' depth, 145): u = (x / w x c16[20] + c16[21] x
+# c8[71]) x c16[4], v = y / w x c16[5], clamped to floor(c16[4 / 5] x 1920 / 1080) texels: the viewport's scale and
+# offset; full screen, no offset (c16[20] 0 put every depth read at u 0)
+C16[20] = 1.0
+DEPTH_SLOT = 13             # Smash 4's depth texture: vanilla soft-particle programs sample t13 / s13
+DEPTH_NAME = 'depthBufferTexture_CROSS'
 GFX2_HEAD = 0x20
 
 
@@ -119,14 +125,17 @@ def combine(vs_gsh, ps_gsh):
 
 def sampler_map(samplers):
     """{texture unit: eft slot} of a pixel program's samplers ({name: unit}): sysTextureSampler0-2 -> slots 0-2;
-    sysDepthBufferTexture (soft particles' fade near the scene) 'far': eft's pixel stage has no depth texture, so
-    it reads as the far plane (no fade); sysFrameBufferTexture (refraction) not lowered"""
+    sysDepthBufferTexture (soft particles' fade near the scene) -> DEPTH_SLOT: the game binds its depth texture there
+    for effects (vanilla's 14 soft-particle programs sample t13 'depthBufferTexture_CROSS': eft's own lookup,
+    cross_f 0x04A578E0, wants 'depthBufferTexture' and never finds it; both games' screen UV is (x / w, -y / w) x 0.5
+    + 0.5 and their linear depth n f / (f - d (f - n)), c8[72 - 75] = CB1 words 80 - 83); sysFrameBufferTexture
+    (refraction) not lowered"""
     out = {}
     for name, unit in samplers.items():
         if name.startswith('sysTextureSampler'):
             out[unit] = int(name[len('sysTextureSampler'):])
         elif name == 'sysDepthBufferTexture':
-            out[unit] = 'far'
+            out[unit] = DEPTH_SLOT
         else:
             raise NotImplementedError('sampler ' + name)
     return out
@@ -154,6 +163,6 @@ def build(vfxb, e, quad, zratio=1.0, encode='display', premultiply=False):
     if missing:
         raise RuntimeError('pixel inputs %s without a vertex output' % sorted(missing))
     used = sorted({srcs[0] for op, _d, srcs in plow.code if op in ult_to_latte.TEX_OPS})
-    return combine(vs, ps), {'samplers': used, 'kills': plow.kills, 'mat': vlow.mat,
-                             'depth': 'far' in samplers.values(), 'vs_ops': len(vlow.code),
+    return combine(vs, ps), {'samplers': [s for s in used if s != DEPTH_SLOT], 'kills': plow.kills, 'mat': vlow.mat,
+                             'depth': DEPTH_SLOT in used, 'vs_ops': len(vlow.code),
                              'ps_ops': len(plow.code), 'attributes': vlow.hw_attrs}

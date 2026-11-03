@@ -38,6 +38,7 @@ CLAUSE_SLOTS = 120
 TABLE_ENTRIES = 8           # c9's dynamic table read: 16-byte entries tried
 
 TEX_OPS = {'SAMPLE', 'SAMPLE_L'}
+SAMPLER_NAMES = {13: 'depthBufferTexture_CROSS'}     # the game's depth texture (vanilla's soft-particle programs)
 TRANS_ONLY = {'EXP_IEEE', 'LOG_CLAMPED', 'LOG_IEEE', 'RECIP_CLAMPED', 'RECIP_FF', 'RECIP_IEEE', 'RECIPSQRT_CLAMPED',
               'RECIPSQRT_FF', 'RECIPSQRT_IEEE', 'SQRT_IEEE', 'FLT_TO_INT', 'INT_TO_FLT', 'UINT_TO_FLT', 'SIN', 'COS',
               'MULLO_INT', 'MULLO_UINT', 'FLT_TO_UINT'}
@@ -1297,7 +1298,8 @@ class Lowering:
                         '; $SPI_PS_INPUT_CNTL[%d].DEFAULT_VAL = 1' % k]
             slots = sorted({srcs[0] for op, _d, srcs in groups if op in TEX_OPS})
             for k, t in enumerate(slots):
-                hdr += ['; $SAMPLER_VARS[%d].name = "textureSampler%d"' % (k, t),
+                nm = SAMPLER_NAMES.get(t, 'textureSampler%d' % t)
+                hdr += ['; $SAMPLER_VARS[%d].name = "%s"' % (k, nm),
                         '; $SAMPLER_VARS[%d].type = "SAMPLER2D"' % k, '; $SAMPLER_VARS[%d].location = %d' % (k, t)]
             if self.kills:
                 hdr.append('; $DB_SHADER_CONTROL.KILL_ENABLE = true')
