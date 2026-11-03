@@ -1496,23 +1496,37 @@ def crossed_ribbon(pos, nrm, col, uv, idx, notes):
             np.concatenate([idx, idx + len(pos)]))
 
 
-def radial_gradient(shape, notes, n=64):
-    """a one-way gradient (Ultimate's ef_cmn_grade00: bright at V 0, gone by V 0.4; the same in every
-    column) read outward from the centre. The flare meshes read it so (their UVs polar: V the radius);
-    on a quad it was a lit square (the pummel's / down throw's pointlight1: test 49's pink diamond)"""
+def radial_gradient_axis(shape):
+    """the axis (1: the gradient runs along V, constant across a row; 0: along U) when SHAPE is a one-way gradient
+    (Ultimate's ef_cmn_grade00: bright at V 0, gone by V 0.4; the same in every column), else None"""
     if shape.shape[0] < 4 or shape.shape[1] < 4:
-        return shape
-    for prof, flat in ((shape.mean(1), shape.std(1).max()), (shape.mean(0), shape.std(0).max())):
-        if flat < 0.02 and prof.max() - prof.min() > 0.5:
-            yy, xx = np.mgrid[0:n, 0:n] + 0.5
-            r = np.clip(np.hypot(xx - n / 2, yy - n / 2) / (n / 2), 0, 1)
-            if prof[0] < prof[-1]:
-                prof = prof[::-1]
-            # to 0 at the rim (grade00's dark end is ~0.1: a faint lit square on a bright piece)
-            prof = np.clip((prof - prof[-1]) / max(float(prof[0] - prof[-1]), 1e-6), 0, 1) * prof[0]
-            notes.append('gradient on a quad: read from the centre')
-            return np.interp(r, np.linspace(0, 1, len(prof)), prof).astype(np.float32)
-    return shape
+        return None
+    for axis in (1, 0):
+        if shape.std(axis).max() < 0.02 and np.ptp(shape.mean(axis)) > 0.5:
+            return axis
+    return None
+
+
+def radial_gradient(shape, notes, n=64, axis=None):
+    """a one-way gradient read outward from the centre. The flare meshes read it so (their UVs polar: V the
+    radius); on a quad it was a lit square (the pummel's / down throw's pointlight1: test 49's pink diamond).
+    AXIS: the gradient's axis (radial_gradient_axis); the channels of one texture are all read along their
+    reference channel's axis, so every one comes out n x n (Scintilla's edge_senkou_hold_attack: the alpha
+    qualified, a colour channel didn't, and the stack of channels of two sizes failed, test 62)"""
+    if axis is None:
+        axis = radial_gradient_axis(shape)
+        if axis is None:
+            return shape
+    prof = shape.mean(axis)
+    yy, xx = np.mgrid[0:n, 0:n] + 0.5
+    r = np.clip(np.hypot(xx - n / 2, yy - n / 2) / (n / 2), 0, 1)
+    if prof[0] < prof[-1]:
+        prof = prof[::-1]
+    # to 0 at the rim (grade00's dark end is ~0.1: a faint lit square on a bright piece)
+    prof = np.clip((prof - prof[-1]) / max(float(prof[0] - prof[-1]), 1e-6), 0, 1) * prof[0]
+    if notes is not None:
+        notes.append('gradient on a quad: read from the centre')
+    return np.interp(r, np.linspace(0, 1, len(prof)), prof).astype(np.float32)
 
 
 def rotation_need(st, is_mesh):
@@ -2080,8 +2094,10 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
                                                    (e.get('_set'), e['name']) in TWO_COLOUR)
         pix = shape[..., None].astype(np.float32)
     if not is_mesh:
-        pix = np.stack([radial_gradient(pix[..., c], notes if c == pix.shape[-1] - 1 else [])
-                        for c in range(pix.shape[-1])], -1)
+        axis = radial_gradient_axis(pix[..., -1])           # the alpha (or the shape) decides for every channel
+        if axis is not None:
+            pix = np.stack([radial_gradient(pix[..., c], notes if c == pix.shape[-1] - 1 else None, axis=axis)
+                            for c in range(pix.shape[-1])], -1)
     if uv_quarter:
         # eft2 samples at R(rotation) (uv - 0.5) + 0.5: the picture turns counter-clockwise as shown
         pix = np.ascontiguousarray(np.rot90(pix, uv_quarter))
