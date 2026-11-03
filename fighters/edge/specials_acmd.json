@@ -17,5 +17,11 @@
   "SpecialHi2End": {"name": "specialhi2end", "slot": "0x238"},
   "SpecialAirHi1End": {"name": "specialairhi1end", "slot": "0x23E"},
   "SpecialAirHi2End": {"name": "specialairhi2end", "slot": "0x23F"},
-  "SpecialHi2Landing": {"name": "specialhi2landing", "slot": "0x232", "_note": "LandingFallSpecial straight out of Octaslash's rush (edge.c edge_hi_landing_init)"}
+  "SpecialHi2Landing": {"name": "specialhi2landing", "slot": "0x232", "_note": "LandingFallSpecial straight out of Octaslash's rush (edge.c edge_hi_landing_init)"},
+  "SpecialLw": "speciallw",
+  "SpecialAirLw": "specialairlw",
+  "SpecialLwHit": {"name": "speciallwhit", "slot": "0x249", "_note": "Zelda's SpecialLwLoop slot (its animation is SpecialLwHit: MOTION_STANDINS); the game script is emptied by edge_specials_build.py (its countered / whiff branches are edge.c's)"},
+  "SpecialAirLwHit": {"name": "specialairlwhit", "slot": "0x24D", "_note": "as SpecialLwHit"},
+  "SpecialLwEnd": {"name": "speciallwend", "slot": "0x251", "_note": "Zelda's SpecialLwAttack slot"},
+  "SpecialAirLwEnd": {"name": "specialairlwend", "slot": "0x255"}
 }

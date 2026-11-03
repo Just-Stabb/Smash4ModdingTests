@@ -43,8 +43,9 @@ Her articles: 0 `dein` (8 motion slots, no model), 1 `dein_s`, 2 `phantom`; kept
 
 ## Plan
 
-- Articles (`tools/extra_kinds.json` `weapons`, all based on `dein`): 3 `fire` 0x18C, 4 `flare1`
-  0x18D, 5 `flare2` 0x18E, 6 `flash` 0x18F. Their files under `fighter/edge/` (`script/msc/<name>/`,
+- Articles (`tools/extra_kinds.json` `weapons`, all based on `dein`): `fire` 0x18C, `flare1` 0x18D,
+  `flare2` 0x18E, `flash` 0x18F, article ids 5-8 (after Zelda's five normal entries: `weapon_expand.py`
+  `article_layout`). Their files under `fighter/edge/` (`script/msc/<name>/`,
   `script/animcmd/weapon/<name>/`).
 - Neutral (status 0x152): charge `SpecialNStart` (charge kind S at 20, M at 32, L at 100; Gigaflare
   fired at 120 by the start motion itself), release -> `SpecialN1` (Flare) / `SpecialN2`
@@ -68,7 +69,8 @@ python3 tools/edge_specials_build.py DUMP/lua2cpp_edge EDGE ZELDA ZELDA_UM fight
     --rpx TEST42/cross_f.rpx --bank FXDIR --motions MOTIONDIR
 ```
 (`tools/edge_specials_build.py`: his body scripts with `specials_acmd.json`, `edge.mscsb`, the fire
-article's MSC and scripts, Zelda's `dein` files as the not-yet-made articles' placeholders, the
+article's and the flash article's MSC and scripts, Zelda's `dein` files as the not-yet-made articles'
+placeholders (flare1 / flare2), the
 executable.) The pieces it takes ready-made:
 - FXDIR: the effect bank, `tools/vfxb_to_ptcl.py` over his `ef_edge.eff` with every `edge_*` name of
   `edge_effects.json` and the turned variants (`effect_variants.py scan` of the body effect.bin:
@@ -162,3 +164,78 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   replaced by LandingFallSpecial's own kinetics; Blade Dash's jostle off (frames 2-6) and Octaslash's
   jostle area / victim pull (`FighterSpecializer_Edge`: angle 368 -> 366); shield_speed_mul (not traced); the
   aim effect (not in the bank: its place and roll are computed, `edge_hi_direction`). Not tested in game.
+
+## Down special
+
+Scintilla, `edge.c` `edge_lw_*` and the `flash` article (`weapons/flash.c`), from Ultimate's status code
+(`lua2cpp_edge.nro`, function by function: the spec `edgenro/spec_down_special.md`; addresses below are
+`f_7203e<addr>`), its ACMD (`SpecialLw*.txt`, `edge_flash/Attack.txt`), `vl.prc` `param_special_lw` /
+`param_flash` (written into the code) and the ExeFS's native counter (FighterEdge: shield hit `0x9e02f0`,
+per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here too: the counter cave
+(`tools/edge_counter_cave.py`, docs/native-notes.md "Sephiroth's counter shape").
+
+- **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, is no longer generated; its files stay):
+  0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
+  (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
+  `0db70` / `11f00`). Slots 0 pre (0x15B / 0x15C: Zelda's `func_2303` / `func_2308`, kinetic and work kept:
+  Ultimate's KEEP_ALL), 1 main, 2 end (`edge_lw_end`); no init / exec. Ultimate's work kept across them is in
+  globals. All three run `f_123d0` (`edge_lw_frame`) every frame.
+- **Motions** (MotionModule straight): 0x241 / 0x245 SpecialLw / SpecialAirLw, 0x249 / 0x24D SpecialLwHit /
+  SpecialAirLwHit, 0x251 / 0x255 SpecialLwEnd / SpecialAirLwEnd: Zelda's SpecialLw / Loop / Attack slots, whose
+  animations are already Ultimate's (`ultimate_fighter.py` MOTION_STANDINS: lwloop = lwhit, lwattack = lwend);
+  no new slots. Ground and air swap keeping the frame when the situation changes.
+- **Scripts:** `specials_acmd.json` (the six; the Hit / End slots renamed `speciallwhit` ... in motion.mtable).
+  Their game scripts hold nothing Smash 4 runs: the MSC does by the motion frame what they do (the shield on,
+  the flags, SET_SPEED_EX, WHOLE_HIT, the flash, FT_MOTION_RATE); `speciallwhit` / `specialairlwhit` are emptied
+  by the build (`EMPTY_GAME`: game_speciallwhit's countered / whiff branches don't survive the dump's braces).
+  SpecialLwInterrupt (an effect script, no motion) is played by the MSC (below). Not translated: FLASH /
+  COL_NORMAL (the stance's body flash), jostle areas, sounds, expressions.
+- **Stance:** the special start's kinetics (ground x x 0.6, brake 0.1; air x x 0.6, brake 0.009, y kept,
+  gravity x 0.8, fall capped at x 0.25 of his, no drift). Frame 7: the shield group on (`ShieldModule(0, 2, 0,
+  1, 1)`, Ike's call: the cave's group 1 = Ultimate's special_lw_shield_data capsule r 6, (0, 2, 8.3)-(0, 20,
+  8.3)) until the stance ends. A hit on it (the cave: status float 0x01000006 = its damage d, flag 0x21000010,
+  0x21000011 a projectile; damage and knockback cancelled): d kept in a global at once; d > shield_max 25 ->
+  0x15C, else 0x15B (Ultimate: shield HP 25 - d, broken below 0; only the first hit counts). Motion end (no
+  hit) -> 0x15B, the whiff.
+- **Stance end** (`0cec0`): the shield group off; into the break: `edge_senkou_shield` stopped; any other exit
+  (grabbed, hit from behind): killed, and `edge_senkou_shield_break2` at top (0, 13, 12) x 0.85
+  (effect_speciallwinterrupt; `EffectModule(0x2710, ..., 1)`: the bone's frame, Z forward). Their ids:
+  `edge_lw_fx_*`, written in from `edge_effects.json` by the build (0 = not in the bank: left out).
+- **Hit / break:** the native per-frame's hitstop on him, `StopModule(2, n)` (hit_stop_frame 20,
+  hit_stop_frame_shoot 10 for a projectile) and `ShakeModule(0, 0, n, 0, 0, 0.15)` (hit_shake_mul), in the
+  0x15B / 0x15C main.
+- **Slash (0x15B):** countered: speed 0, intangible frames 0-11 (`HitModule(0x2710, 2 / 0)`), control X at 26,
+  fall speed at 28; in the air once (not yet at 28) the fall slowed to x 0.2 (speed, accel and cap:
+  shield_speed_y_mul_air). Whiff: motion rate 0.5 on frames 1-5, 1 / 1.15 on 30-50, control at 15, fall at 20.
+  Both: the flash at frame 7; actionable from 52 (func_39 / func_41); end -> Wait / Fall.
+- **Break (0x15C):** speed (-1.4, 0) x facing on the ground, (-0.8, +0.8) in the air at frame 0; control and
+  fall at 18; actionable from 42; end -> Wait / Fall.
+- **Control X / fall speed** (`f_123d0`): in the air, the stop energy off and drift seeded with the x speed,
+  max x 0.6 of his (control_max_speed_x_mul_air_flag_enable); his own gravity back. The rise capped at 1.35
+  (air_invoke_speed_y_limit) every airborne frame.
+- **The flash** (article 8, weapon kind 0x18F, `weapons/flash.c` + `flash_scripts()`): Smash 4's ACMD has no
+  hitbox lerp, so it comes in tiers, one motion slot each (dein has 8): 0 `attacknohit` (the whiff's table,
+  effects x 0.65), 1-5 `attack0`-`attack4` at p = 0, .25, .5, .75, 1 (p = clamp(d / shield_damage_charge_max
+  18, 0, 1), nearest quarter): frame 0 / frame 15 hitboxes id 0 -> id 1 lerped by p (damage, KBG, FKB, BKB,
+  size, hitlag, SDI, shield damage; sound level L from p .5), effects x 1.2 + 0.8 p (exec `31950` scales the
+  latest effect each frame: all but the first puff). The tier goes through Zelda's side special custom slot
+  (int 0x10000049 set around `ArticleModule(0x2710, 8)`; Din's Fire's creation callback 0x02F97C90 copies it,
+  a signed byte, into the weapon's 0x10000005). Static, removed after 17 frames (Ultimate's notify at 16:
+  one frame more so the frame-15 hitbox gets a frame whatever the order).
+- **Flash placement:** the callback spawns a weapon at the owner's joint 0x13 (his head) + (lr x 9, -0.8)
+  (vl 0x06000002 / 3, Zelda's special_s offsets, the same in every slot); Ultimate's is at his position +
+  (lr x offset_x, 10.5), offset_x 16 + 3.5 d / 25 (14.5 on a whiff). The flash sets its position
+  (`PostureModule(0x2714, x, y, z)`, Luma's set_pos) by the difference, his head being at (4.1 forward, 16.27
+  up) on the slash's frame 7 (the converted SpecialLwHit / SpecialAirLwHit, `omo.world`; Ultimate's nuanmb
+  gives the same).
+- **Approximated / not done:** the flash's tier (p to the nearest quarter) and its x (the tier's middle d: at
+  most ~0.6 off); the head's place taken at frame 7 (the pose the callback reads may be frame 6's: 1 unit
+  back) at scale 1; the tier's int 1-5 also picks dein's param block (custom slots past Zelda's 3: flash.c
+  reads no params); hitstop / shake through MSC on the next status's first frame (Ultimate's native code, in
+  the stance's last frame); the attacker's freeze (hit_stop_slow_frame 25, mag 50: not done) and
+  ShieldModule::set_hit_stop_slow; the drift's accel x 0.3; Ultimate's ground correction KEEP (Zelda's 9 here);
+  the break2 effect's turned variant (MSC plays the plain one). Not in his effect bank yet (left out until
+  added): `edge_senkou_start`, `_shield`, `_shield_break`, `_shield_break2`, `_shield_success`, `_success1`-`7`,
+  `_success_end`, `_success_end1`-`6`, `_success_end_l`, `_success_end1_l`-`6_l`, `_hold`, `_hold_attack`,
+  `_hold_end`. The shield call is Ike's (`ShieldModule(0, 2, 0, 1 / 0, 1)`): re-check against the cave's
+  interface notes. Not tested in game.

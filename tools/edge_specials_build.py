@@ -14,16 +14,19 @@ fighter_param_vl_zelda.bin; MODEL: his converted model/body/c00 (the ACMD joint 
 - fighter/edge/script/msc/edge.mscsb from fighters/edge/edge.c;
 - the new articles (tools/extra_kinds.json "weapons", after Zelda's five): fire (Flare / Megaflare /
   Gigaflare): script/msc/fire/fire.mscsb from fighters/edge/weapons/fire.c and
-  script/animcmd/weapon/fire/ (Ultimate's edge_fire scripts: FIRE_MOTIONS); flare1 / flare2 / flash
-  (moves not made yet): Zelda's dein files under their names, so every article has its files;
-- --rpx: code/cross_f.rpx = IN.rpx + tools/kind_expand.py + tools/weapon_expand.py (re-applying
-  them over an executable that has them gives it back, so IN can be the last test's);
+  script/animcmd/weapon/fire/ (Ultimate's edge_fire scripts: FIRE_MOTIONS); flash (Scintilla):
+  fighters/edge/weapons/flash.c and Ultimate's edge_flash Attack in tiers (FLASH_MOTIONS); flare1 /
+  flare2 (moves not made yet): Zelda's dein files under their names, so every article has its files;
+- --rpx: code/cross_f.rpx = IN.rpx + tools/kind_expand.py + tools/weapon_expand.py +
+  tools/edge_counter_cave.py (Scintilla's counter shape; re-applying them over an executable that has
+  them gives it back, so IN can be the last test's);
 - --bank: effect/edge/edge.010d0000.{ptcl,efc} from DIR/zelda.010d0000.* (tools/vfxb_to_ptcl.py);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
 """
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -38,7 +41,14 @@ import ultimate_acmd as U  # noqa: E402
 EDGE = os.path.join(ROOT, 'fighters', 'edge')
 # the fire article's motion slots (dein's 8; fire.c: func_24(level) flies, func_24(4 + level) bursts)
 FIRE_MOTIONS = ('specialn1', 'specialn2', 'specialn3', 'firenone3', 'bursts', 'burstm', 'burstl', 'firenone7')
-PLACEHOLDERS = ('flare1', 'flare2', 'flash')
+PLACEHOLDERS = ('flare1', 'flare2')
+# the flash article's motion slots (flash.c: motion = the tier Sephiroth's edge_lw_generate passes): 0 the whiff,
+# 1-5 a counter at ATTACK_RATIO p = 0, .25, .5, .75, 1 (Smash 4's ACMD has no hitbox lerp: one script a tier)
+FLASH_MOTIONS = ('attacknohit', 'attack0', 'attack1', 'attack2', 'attack3', 'attack4', 'flashnone6', 'flashnone7')
+FLASH_RATIOS = (None, 0.0, 0.25, 0.5, 0.75, 1.0)
+# his down special's game scripts left empty: game_speciallwhit's countered / whiff branches (speed, XLU, the
+# flash, the whiff's motion rates) are edge.c's (edge_lw_hit_*), by the motion frame
+EMPTY_GAME = ('speciallwhit', 'specialairlwhit')
 
 
 def run(*argv):
@@ -48,10 +58,36 @@ def run(*argv):
     return r.stdout
 
 
+def effect_ids():
+    ids = {}
+    for path in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(EDGE, 'edge_effects.json')):
+        ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
+    return ids
+
+
+FX_RE = re.compile(r'(return )(0x[0-9A-Fa-f]+|0)(; \} // fx (\S+))')
+
+
 def compile_msc(src, out_path):
+    """msclang; the effect ids MSC uses (`int f() { return ID; } // fx NAME`) written in from edge_effects.json
+    (0 when not in his bank yet)"""
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    run(os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'), src, '-o', out_path)
+    text = open(src).read()
+    ids = effect_ids()
+    missing = []
+
+    def fx(m):
+        if m.group(4) not in ids:
+            missing.append(m.group(4))
+        return '%s0x%X%s' % (m.group(1), ids.get(m.group(4), 0), m.group(3))
+    text = FX_RE.sub(fx, text)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, os.path.basename(src))
+        with open(path, 'w') as f:
+            f.write(text)
+        run(os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'), path, '-o', out_path)
     assert os.path.getsize(out_path) > 0
+    return '%s: effects not in his bank (left out): %s' % (os.path.basename(src), ', '.join(missing) or '-')
 
 
 def body_scripts(a, fighter, param):
@@ -76,15 +112,17 @@ def body_scripts(a, fighter, param):
                    os.path.join(out, 'effect.bin'))
         for fn in ('sound.bin', 'expression.bin'):
             shutil.copy(os.path.join(tmp, fn), os.path.join(out, fn))
+    game = acmd.ACMDFile.load(os.path.join(out, 'game.bin'))
+    for name in EMPTY_GAME:
+        game.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
+    game.save(os.path.join(out, 'game.bin'))
     return log
 
 
 def fire_scripts(a, wdir):
     """the fire article's game / effect scripts from Ultimate's edge_fire ones (hitboxes and effects
     on its bone 0); sound empty (his sounds aren't converted yet)"""
-    ids = {}
-    for path in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(EDGE, 'edge_effects.json')):
-        ids.update({k: int(v, 0) for k, v in json.load(open(path)).items() if not k.startswith('_')})
+    ids = effect_ids()
     game, effect = {}, {}
     U.EFFECT_CONDS = (U.LR_LEFT,)
     gtr, etr = U.Translator({}), U.EffectTranslator({}, ids, {})
@@ -113,6 +151,101 @@ def fire_scripts(a, wdir):
     return 'fire: %s; left out %s %s' % (', '.join(sorted(game)), gtr.skipped, etr.skipped)
 
 
+def _args(text):
+    """a macro call's arguments (top-level commas)"""
+    out, depth, cur = [], 0, ''
+    for ch in text:
+        if ch in '([':
+            depth += 1
+        elif ch in ')]':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            out.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    out.append(cur.strip())
+    return out
+
+
+def _calls(body, macro):
+    """[(start, end, [args])] of `macros::MACRO(...)` in body"""
+    out = []
+    for m in re.finditer(r'macros::%s\(' % macro, body):
+        i, depth = m.end(), 1
+        while depth:
+            depth += {'(': 1, ')': -1}.get(body[i], 0)
+            i += 1
+        out.append((m.start(), i, _args(body[m.end():i - 1])))
+    return out
+
+
+# ATTACK's arguments (after agent) that the lerp interpolates: damage, KBG, FKB, BKB, size, hitlag, SDI,
+# shield damage (Ultimate's ATK lerp: every numeric field, inferred; the angle, effect and flags are the same in
+# both ids); the sound level: id 1's from p 0.5 (L on the last hit)
+LERP = {4: 'f', 6: 'i', 7: 'i', 8: 'i', 9: 'f', 16: 'f', 17: 'f', 21: 'i'}
+
+
+def flash_attack(a0, a1, p):
+    out = list(a0)
+    for k, kind in LERP.items():
+        v = float(a0[k]) + (float(a1[k]) - float(a0[k])) * p
+        out[k] = str(int(round(v))) if kind == 'i' else '%.3f' % v
+    if p >= 0.5:
+        out[34] = a1[34]
+    out[1] = '0'
+    return 'macros::ATTACK(%s);' % ', '.join(out)
+
+
+def flash_scripts(a, wdir):
+    """the flash article's game / effect scripts: Ultimate's edge_flash Attack per tier (FLASH_MOTIONS). Game: the
+    whiff's hitboxes (FLAG_HIT off) or the counter's id 0 -> id 1 at the tier's p (ATTACK_SET_LERP +
+    ATK_LERP_RATIO); its frame-16 notify (removal) is flash.c's. Effect: the effects scaled as its exec (31950)
+    scales the last one made each frame (EFFECT_ID): every one but the first puff (replaced by edge_senkou_hold
+    in the same frame) at effect_scale_no_hit 0.65 / 1.2 + 0.8 p. Sound empty (none of his converted)"""
+    src = open(os.path.join(a.dump, 'edge_flash', 'Attack.txt')).read()
+    fns = U.functions(src)
+    atk = [c[2] for c in _calls(fns['game_attack'], 'ATTACK')]
+    assert len(atk) == 6, len(atk)     # whiff f0, f15; counter f0 id 0, 1; f15 id 0, 1
+    ids = effect_ids()
+    gtr, etr = U.Translator({}), U.EffectTranslator({}, ids, {})
+    game, effect, missing = {}, {}, set()
+    U.EFFECT_CONDS = (U.LR_LEFT,)
+    ebody = fns['effect_attack']
+    efx = _calls(ebody, 'EFFECT_FOLLOW_RND') + _calls(ebody, 'EFFECT_FOLLOW')
+    first = min(s for s, _e, _a in efx)
+    for name, p in zip(FLASH_MOTIONS, FLASH_RATIOS):
+        if p is None:
+            f0, f15 = ('macros::ATTACK(%s);' % ', '.join(x) for x in atk[:2])
+            scale = 0.65
+        else:
+            f0, f15 = flash_attack(atk[2], atk[3], p), flash_attack(atk[4], atk[5], p)
+            scale = 1.2 + 0.8 * p
+        body = ('if macros::is_excute(agent) {\n%s\n}\nframe(agent.lua_state_agent, 15.0);\n'
+                'if macros::is_excute(agent) {\nAttackModule::clear_all(agent.module_accessor);\n%s\n}\n' % (f0, f15))
+        game[name] = gtr.script(body)
+        text, at = '', 0
+        for s, e, args in sorted(efx):
+            if s != first:
+                args = list(args)
+                args[9] = '%.3f' % (float(args[9]) * scale)
+            text += ebody[at:s] + ebody[s:s + ebody[s:e].index('(') + 1] + ', '.join(args) + ')'
+            at = e
+        text += ebody[at:]
+        etr.last = False
+        effect[name] = etr.script(text)
+        missing |= set(etr.missing)
+    U.EFFECT_CONDS = ()
+    os.makedirs(wdir, exist_ok=True)
+    end = [acmd.Command(acmd.END)]
+    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+        acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in FLASH_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
+    with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
+        f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FLASH_MOTIONS))
+    return 'flash: %s; left out %s %s; effects not in his bank: %s' % (
+        ', '.join(n for n in FLASH_MOTIONS if n in game), gtr.skipped, etr.skipped, ', '.join(sorted(missing)) or '-')
+
+
 def main():
     ap = argparse.ArgumentParser()
     for n in ('dump', 'edge', 'zelda', 'zelda_um', 'vl', 'model', 'out'):
@@ -125,9 +258,11 @@ def main():
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
 
     msc = os.path.join(fighter, 'script/msc')
-    compile_msc(os.path.join(EDGE, 'edge.c'), os.path.join(msc, 'edge.mscsb'))
+    print(compile_msc(os.path.join(EDGE, 'edge.c'), os.path.join(msc, 'edge.mscsb')))
     compile_msc(os.path.join(EDGE, 'weapons/fire.c'), os.path.join(msc, 'fire/fire.mscsb'))
     print(fire_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/fire')))
+    compile_msc(os.path.join(EDGE, 'weapons/flash.c'), os.path.join(msc, 'flash/flash.mscsb'))
+    print(flash_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flash')))
     for name in PLACEHOLDERS:
         os.makedirs(os.path.join(msc, name), exist_ok=True)
         shutil.copy(os.path.join(a.zelda, 'script/msc/dein/dein.mscsb'), os.path.join(msc, name, name + '.mscsb'))
@@ -137,9 +272,12 @@ def main():
     if a.rpx:
         import kind_expand
         import weapon_expand
+        import edge_counter_cave
+        edge_counter_cave.check_base(a.rpx)
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'),
-            *kind_expand.args(kind_expand.build()[0]), *weapon_expand.args(weapon_expand.build()[0]))
+            *kind_expand.args(kind_expand.build()[0]), *weapon_expand.args(weapon_expand.build()[0]),
+            *edge_counter_cave.args())
     if a.bank:
         d = os.path.join(fighter, 'effect/edge')
         os.makedirs(d, exist_ok=True)

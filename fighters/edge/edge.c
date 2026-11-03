@@ -36339,9 +36339,9 @@ void func_2244()
     sv_set_mem(0x1, 0, 0x154, edge_hi_start_pre);   // Sephiroth: up special start (was Farore's Wind's
     sv_set_mem(0x1, 0x1, 0x154, edge_hi_start_main); // func_2277 / 2278 / 2280)
     sv_set_mem(0x1, 0x2, 0x154, edge_hi_end);
-    sv_set_mem(0x1, 0, 0x155, func_2299);
-    sv_set_mem(0x1, 0x1, 0x155, func_2300);
-    sv_set_mem(0x1, 0x2, 0x155, func_2302);
+    sv_set_mem(0x1, 0, 0x155, edge_lw_pre);         // Sephiroth: Scintilla's stance (was Phantom Slash's
+    sv_set_mem(0x1, 0x1, 0x155, edge_lw_main);       // func_2299 / 2300 / 2302)
+    sv_set_mem(0x1, 0x2, 0x155, edge_lw_end);
     sv_set_mem(0x1, 0, 0x156, func_2312);
     sv_set_mem(0x1, 0x1, 0x156, func_2313);
     sv_set_mem(0x1, 0x2, 0x156, func_2316);
@@ -36357,12 +36357,12 @@ void func_2244()
     sv_set_mem(0x1, 0, 0x15a, edge_hi_end_pre);     // Sephiroth: the up special's ground / air end (was
     sv_set_mem(0x1, 0x1, 0x15a, edge_hi_end_main);  // Farore's Wind's end, func_2287 / 2288 / 2290)
     sv_set_mem(0x1, 0x2, 0x15a, edge_hi_end);
-    sv_set_mem(0x1, 0, 0x15b, func_2303);
-    sv_set_mem(0x1, 0x1, 0x15b, func_2304);
-    sv_set_mem(0x1, 0x2, 0x15b, func_2307);
-    sv_set_mem(0x1, 0, 0x15c, func_2308);
-    sv_set_mem(0x1, 0x1, 0x15c, func_2309);
-    sv_set_mem(0x1, 0x2, 0x15c, func_2311);
+    sv_set_mem(0x1, 0, 0x15b, func_2303);            // Sephiroth: Scintilla's slash (Ultimate's
+    sv_set_mem(0x1, 0x1, 0x15b, edge_lw_hit_main);   // SPECIAL_LW_HIT; Zelda's pre kept: kinetic and work
+    sv_set_mem(0x1, 0x2, 0x15b, edge_lw_end);        // kept, as Ultimate's KEEP_ALL) (was func_2304 / 2307)
+    sv_set_mem(0x1, 0, 0x15c, func_2308);            // Sephiroth: the shield broken (SPECIAL_LW_END; was
+    sv_set_mem(0x1, 0x1, 0x15c, edge_lw_break_main); // func_2309 / 2311)
+    sv_set_mem(0x1, 0x2, 0x15c, edge_lw_end);
 }
 
 void func_2245()
@@ -38577,5 +38577,483 @@ void edge_hi_landing_init()
             l = 56.0f;
         }
         MotionModule(0x1, 0x232, 0, (float)MotionModule(0, 0x232) / l);
+    }
+}
+
+// ---- Sephiroth's down special: Scintilla (fighters/edge/specials.md "Down special"), Ultimate's status code
+// (lua2cpp_edge.nro, the spec's function addresses f_7203e<addr>) and its native counter (ExeFS FighterEdge
+// 0x9e02f0 / 0x9e05b0 / 0x9e11f0) in Zelda's three Phantom Slash statuses (her phantom article is no longer
+// generated; its files are kept):
+//   0x155 STANCE (FIGHTER_STATUS_KIND_SPECIAL_LW: pre 0c790, main 0cb70, loop 143b0, end 0cec0)
+//   0x15B HIT, the slash that releases the flash, countered or not (0xe2b4: 0d1f0 / 0d5f0 / 13fb0)
+//   0x15C END, the shield broken (0xe2b8: 0d770 / 0db70 / 11f00)
+// All three run f_123d0 (the air physics: edge_lw_frame) each frame. Ultimate keeps the status work across
+// them (KEEP_ALL): globals here. Params: vl.prc param_special_lw (written in: his vl file is Zelda's layout).
+// The shield is the native cave's (tools/edge_counter_cave.py, docs/native-notes.md): his shield group 1, a
+// capsule r 6 from (0, 2, 8.3) to (0, 20, 8.3) (special_lw_shield_data), switched on here from the stance's
+// frame 7 (game_speciallw's SHIELD_ON) until the stance ends. A hit on it: status float 0x01000006 = its
+// damage d, flag 0x21000010 on, flag 0x21000011 on for a projectile (the cave cancels the hit's damage and
+// knockback; this MSC changes the status: d > shield_max 25 -> END, else HIT).
+// Motions straight through MotionModule (func_22 adds Zelda's custom-move offset): 0x241 / 0x245 SpecialLw /
+// SpecialAirLw, 0x249 / 0x24D SpecialLwHit / SpecialAirLwHit, 0x251 / 0x255 SpecialLwEnd / SpecialAirLwEnd
+// (Zelda's SpecialLw / Loop / Attack slots: ultimate_fighter.py MOTION_STANDINS).
+// Kinetic energies: 1 gravity, 2 control, 3 stop.
+int   edge_lw_shield;     // the shield group is on (frame 7 of the stance until it ends)
+int   edge_lw_countered;  // 0xe3a4 IS_HIT_SHIELD: a hit landed on the shield
+int   edge_lw_proj;       // that hit was a projectile's (hitstop 10, not 20)
+float edge_lw_dmg;        // its damage d (shield_max - the shield's HP, 0x1000007)
+int   edge_lw_control;    // 0xe390 ENABLE_CONTROL_X reached (the game scripts' frame: here the motion's)
+int   edge_lw_fall;       // 0xe398 ENABLE_FALL_SPEED reached
+int   edge_lw_float;      // 0xe3a8: the air counter's slowed fall applied
+int   edge_lw_fired;      // the flash generated
+int   edge_lw_xlu;        // the countered slash's intangibility is on (WHOLE_HIT XLU, frames 0-11)
+float edge_lw_rate;       // the motion rate set (the whiff's FT_MOTION_RATE)
+
+// the effect ids MSC uses (edge_effects.json; tools/edge_specials_build.py writes the id in when it compiles
+// this file; 0: not in his bank yet, the call is left out)
+int edge_lw_fx_shield() { return 0; } // fx edge_senkou_shield
+int edge_lw_fx_break2() { return 0; } // fx edge_senkou_shield_break2
+
+int edge_lw_motion(int ground)
+{
+    if (global18 == 0x2)
+    {
+        return ground + 0x4;
+    }
+    return ground;
+}
+
+int edge_lw_ground_motion()
+{
+    if (global4 == 0x15b)
+    {
+        return 0x249;
+    }
+    if (global4 == 0x15c)
+    {
+        return 0x251;
+    }
+    return 0x241;
+}
+
+// gravity (energy 1): the special start's (air_accel_y x start_accel_y_mul_air 0.8, the fall capped at
+// air_speed_y_stable x start_max_speed_y_mul_air 0.25), x shield_speed_y_mul_air 0.2 once countered in the air
+// (f_123d0 @12de8), his own from ENABLE_FALL_SPEED (@12d18)
+void edge_lw_gravity()
+{
+    float g;
+    float m;
+    g = WorkModuleF(0, 0x3000018);
+    m = WorkModuleF(0, 0x3000019);
+    if (edge_lw_fall == 0)
+    {
+        g = g * 0.8f;
+        m = m * 0.25f;
+        if (edge_lw_float)
+        {
+            g = g * 0.2f;
+            m = m * 0.2f;
+        }
+    }
+    KineticModule(0xf, 0x1, -g);
+    KineticModule(0x14, 0x1, m);
+}
+
+// ENABLE_CONTROL_X in the air (f_123d0 @1248c): the stop energy off, drift (energy 2) seeded with the x speed,
+// max speed x control_max_speed_x_mul_air_flag_enable 0.6 (its accel x 0.3 not applied: no Smash 4 op known)
+void edge_lw_drift(float vx)
+{
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    KineticModule(0xc, 0x3);
+    KineticModule(0xe, 0x2, 0, 0.0f, 0.0f, 0, 0, 0);
+    KineticModule(0x11, 0x2, vx, 0.0f);
+    KineticModule(0x6, 0x2, 0.6f);
+    KineticModule(0xb, 0x2);
+}
+
+// sub_set_special_start_common_kinetic_setting("param_special_lw") (and again when the situation changes,
+// x speed kept: xmul 1): ground x speed x start_speed_x_mul_ground 0.6, brake 0.1; air x speed x 0.6, brake
+// 0.009, y speed kept (x 1.0), no drift (start_control_* 0) unless ENABLE_CONTROL_X, edge_lw_gravity()
+void edge_lw_kinetic(float xmul)
+{
+    float vx;
+    float vy;
+    vx = KineticModuleF(0, 0xffffffff);
+    vy = KineticModuleF(0x1, 0xffffffff);
+    if (global18 == 0x2)
+    {
+        GroundModule(0x2710, 0x5);
+        KineticModule(0, 0xa);
+        if (edge_lw_control)
+        {
+            edge_lw_drift(vx * xmul);
+        }
+        else
+        {
+            KineticModule(0x11, 0x3, vx * xmul, 0.0f);
+            KineticModule(0x10, 0x3, 0.009f, 0.0f);
+            KineticModule(0xb, 0x3);
+            KineticModule(0x11, 0x2, 0.0f, 0.0f);
+            KineticModule(0xc, 0x2);
+        }
+        KineticModule(0x11, 0x1, vy);
+        edge_lw_gravity();
+        KineticModule(0xb, 0x1);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x9);   // Zelda's own down special's ground correction (func_2298)
+        KineticModule(0, 0x6);
+        KineticModule(0x11, 0x3, vx * xmul, 0.0f);
+        KineticModule(0x10, 0x3, 0.1f, 0.0f);
+        KineticModule(0xb, 0x3);
+    }
+}
+
+// f_123d0 and the loops' sub_change_motion_by_situation: each frame of the three statuses. ctrl / fall: the
+// motion frames of the game scripts' ENABLE_CONTROL_X / ENABLE_FALL_SPEED
+void edge_lw_frame(float ctrl, float fall)
+{
+    float f;
+    float vy;
+    int m;
+    if (StatusModule(0x6) == 0 && (global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0))
+    {
+        edge_lw_kinetic(1.0f);
+        m = edge_lw_ground_motion();
+        m = edge_lw_motion(m);
+        MotionModule(0x3, m);
+    }
+    f = MotionModuleF(0x1);
+    if (edge_lw_control == 0 && f >= ctrl)
+    {
+        edge_lw_control = 0x1;
+        if (global18 == 0x2)
+        {
+            vy = KineticModuleF(0, 0xffffffff);
+            edge_lw_drift(vy);
+        }
+    }
+    if (edge_lw_fall == 0 && f >= fall)
+    {
+        edge_lw_fall = 0x1;
+        if (global18 == 0x2)
+        {
+            edge_lw_gravity();
+        }
+    }
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    // countered in the air (not broken): the fall slowed to shield_speed_y_mul_air 0.2, once
+    if (global4 == 0x15b && edge_lw_countered && edge_lw_fall == 0 && edge_lw_float == 0)
+    {
+        edge_lw_float = 0x1;
+        vy = KineticModuleF(0x1, 0xffffffff);
+        KineticModule(0x11, 0x1, vy * 0.2f);
+        edge_lw_gravity();
+    }
+    // the rise capped at air_invoke_speed_y_limit 1.35 (@13658)
+    vy = KineticModuleF(0x1, 0xffffffff);
+    if (vy > 1.35f)
+    {
+        KineticModule(0x11, 0x1, 1.35f);
+    }
+}
+
+void edge_lw_shield_off()
+{
+    if (edge_lw_shield)
+    {
+        ShieldModule(0, 0x2, 0, 0, 0x1);
+        edge_lw_shield = 0;
+    }
+}
+
+// the native per-frame (0x9e05b0) on a blocked hit: hitstop hit_stop_frame 20 (hit_stop_frame_shoot 10 for a
+// projectile) and a shake (hit_shake_mul 0.15)
+void edge_lw_hitstop()
+{
+    int n;
+    n = 0x14;
+    if (edge_lw_proj)
+    {
+        n = 0xa;
+    }
+    StopModule(0x2, n);
+    ShakeModule(0, 0, n, 0, 0, 0.15f);
+}
+
+// the flash (article 8, weapon kind 0x18F, fighters/edge/weapons/flash.c): its tier through Zelda's side
+// special custom slot (int 0x10000049, copied by Din's Fire's creation callback 0x02F97C90 into the weapon's
+// 0x10000005), set while it is generated: 0 the whiff, 1-5 a counter at clamp(d / shield_damage_charge_max 18,
+// 0, 1) = 0, .25, .5, .75, 1 (nearest)
+void edge_lw_generate()
+{
+    int slot;
+    int tier;
+    float p;
+    tier = 0;
+    if (edge_lw_countered)
+    {
+        p = edge_lw_dmg / 18.0f;
+        if (p < 0.0f)
+        {
+            p = 0.0f;
+        }
+        if (p > 1.0f)
+        {
+            p = 1.0f;
+        }
+        tier = 0x1 + (int)(p * 4.0f + 0.5f);
+    }
+    slot = WorkModule(0x6, 0x10000049);
+    WorkModule(0x7, tier, 0x10000049);
+    ArticleModule(0x2710, 0x8);
+    WorkModule(0x7, slot, 0x10000049);
+    edge_lw_fired = 0x1;
+}
+
+int edge_lw_pre()
+{
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1432, 0x1000, 0x400, 0x1000);   // Zelda's func_2299's
+    return 0;
+}
+
+// 143b0: the stance's frames
+void edge_lw_loop()
+{
+    if (WorkModule(0x10, 0x21000010))
+    {
+        // a hit on the shield (the cave's flag): its damage kept at once (the status floats may reset)
+        edge_lw_dmg = WorkModuleF(0, 0x1000006);
+        edge_lw_proj = WorkModule(0x10, 0x21000011);
+        edge_lw_countered = 0x1;
+        edge_lw_shield_off();
+        if (edge_lw_dmg > 25.0f)       // shield_max: broken
+        {
+            func_16(0x15c, 0);
+        }
+        else
+        {
+            func_16(0x15b, 0);
+        }
+        return;
+    }
+    if (MotionModule(0x2712))
+    {
+        func_16(0x15b, 0);             // no hit: the whiff slash
+        return;
+    }
+    if (edge_lw_shield == 0 && MotionModuleF(0x1) >= 7.0f)
+    {
+        ShieldModule(0, 0x2, 0, 0x1, 0x1);   // game_speciallw frame 7: SHIELD_ON
+        edge_lw_shield = 0x1;
+    }
+    edge_lw_frame(1000.0f, 1000.0f);
+}
+
+// 0cb70
+void edge_lw_main()
+{
+    edge_lw_shield = 0;
+    edge_lw_countered = 0;
+    edge_lw_proj = 0;
+    edge_lw_dmg = 0.0f;
+    edge_lw_control = 0;
+    edge_lw_fall = 0;
+    edge_lw_float = 0;
+    edge_lw_fired = 0;
+    edge_lw_xlu = 0;
+    edge_lw_rate = 1.0f;
+    WorkModule(0x2711, 0x21000010);
+    edge_lw_kinetic(0.6f);
+    MotionModule(0x1, edge_lw_motion(0x241), 0, 1.0f);
+    global20 = 0;
+    func_78(edge_lw_loop);
+}
+
+// the whiff's game script: frames 1-5 at FT_MOTION_RATE 2 (half speed), 30-50 at 1.15
+void edge_lw_whiff_rate(float f)
+{
+    float r;
+    r = 1.0f;
+    if (f >= 1.0f && f < 5.0f)
+    {
+        r = 0.5f;
+    }
+    else if (f >= 30.0f && f < 50.0f)
+    {
+        r = 0.8695652f;
+    }
+    if (r != edge_lw_rate)
+    {
+        edge_lw_rate = r;
+        MotionModule(0x4, r);
+    }
+}
+
+// 13fb0: the slash's frames (countered: control at 26, fall at 28; whiff 15 / 20; actionable at 52)
+void edge_lw_hit_loop()
+{
+    float f;
+    f = MotionModuleF(0x1);
+    if (f >= 52.0f && (func_39() != 0 || func_41() != 0))
+    {
+        return;
+    }
+    if (MotionModule(0x2712))
+    {
+        if (global18 == 0)
+        {
+            func_16(0, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);
+        }
+        return;
+    }
+    if (edge_lw_fired == 0 && f >= 7.0f)
+    {
+        edge_lw_generate();            // game_speciallwhit frame 7: generate_article(FLASH)
+    }
+    if (edge_lw_countered)
+    {
+        if (edge_lw_xlu && f >= 12.0f)
+        {
+            HitModule(0x2710, 0);      // frame 12: WHOLE_HIT(NORMAL)
+            edge_lw_xlu = 0;
+        }
+        edge_lw_frame(26.0f, 28.0f);
+    }
+    else
+    {
+        edge_lw_whiff_rate(f);
+        edge_lw_frame(15.0f, 20.0f);
+    }
+}
+
+// 0d5f0 (+ the scripts' frame 0: countered, SET_SPEED_EX(0, 0) and WHOLE_HIT(XLU); the native hitstop)
+void edge_lw_hit_main()
+{
+    WorkModule(0x2711, 0x21000010);
+    edge_lw_control = 0;
+    edge_lw_fall = 0;
+    edge_lw_float = 0;
+    edge_lw_fired = 0;
+    edge_lw_xlu = 0;
+    edge_lw_rate = 1.0f;
+    MotionModule(0x1, edge_lw_motion(0x249), 0, 1.0f);
+    if (edge_lw_countered)
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        if (global18 == 0x2)
+        {
+            KineticModule(0x11, 0x1, 0.0f);
+        }
+        HitModule(0x2710, 0x2);
+        edge_lw_xlu = 0x1;
+        edge_lw_hitstop();
+    }
+    global20 = 0;
+    func_78(edge_lw_hit_loop);
+}
+
+// 11f00: the broken shield's frames (control and fall at 18, actionable at 42)
+void edge_lw_break_loop()
+{
+    float f;
+    f = MotionModuleF(0x1);
+    if (f >= 42.0f && (func_39() != 0 || func_41() != 0))
+    {
+        return;
+    }
+    if (MotionModule(0x2712))
+    {
+        if (global18 == 0)
+        {
+            func_16(0, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);
+        }
+        return;
+    }
+    edge_lw_frame(18.0f, 18.0f);
+}
+
+// 0db70 (+ game_speciallwend frame 0: SET_SPEED_EX(-1.4, 0) on the ground, (-0.8, 0.8) in the air; the
+// native hitstop)
+void edge_lw_break_main()
+{
+    float lr;
+    WorkModule(0x2711, 0x21000010);
+    edge_lw_control = 0;
+    edge_lw_fall = 0;
+    edge_lw_float = 0;
+    edge_lw_xlu = 0;
+    edge_lw_rate = 1.0f;
+    MotionModule(0x1, edge_lw_motion(0x251), 0, 1.0f);
+    lr = PostureModuleF(0);
+    if (global18 == 0x2)
+    {
+        KineticModule(0x11, 0x3, -0.8f * lr, 0.0f);
+        KineticModule(0x11, 0x1, 0.8f);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, -1.4f * lr, 0.0f);
+    }
+    edge_lw_hitstop();
+    global20 = 0;
+    func_78(edge_lw_break_loop);
+}
+
+// 0cec0 (the stance's end; HIT's and END's return 0): into END the shield effect stops; any exit but HIT /
+// END (grabbed, hit from behind...) kills it and plays effect_speciallwinterrupt (edge_senkou_shield_break2 on
+// top at (0, 13, 12) x 0.85). The shield group goes off with the stance. HIT / END: the intangibility and the
+// whiff's rate put back
+void edge_lw_end()
+{
+    int id;
+    if (global4 == 0x155)
+    {
+        edge_lw_shield_off();
+        id = edge_lw_fx_shield();
+        if (global6 == 0x15c)
+        {
+            if (id != 0)
+            {
+                EffectModule(0x2723, id, 0, 0);
+            }
+        }
+        else if (global6 != 0x15b)
+        {
+            if (id != 0)
+            {
+                EffectModule(0x2723, id, 0x1, 0x1);
+            }
+            id = edge_lw_fx_break2();
+            if (id != 0)
+            {
+                EffectModule(0x2710, id, 0, 0, 13.0f, 12.0f, 0, 0, 0, 0.85f, 0, 0, 0, 0, 0, 0, 0x1);
+            }
+        }
+        return;
+    }
+    if (edge_lw_xlu)
+    {
+        HitModule(0x2710, 0);
+        edge_lw_xlu = 0;
+    }
+    if (edge_lw_rate != 1.0f)
+    {
+        MotionModule(0x4, 1.0f);
+        edge_lw_rate = 1.0f;
     }
 }

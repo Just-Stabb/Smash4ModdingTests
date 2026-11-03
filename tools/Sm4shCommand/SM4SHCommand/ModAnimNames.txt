@@ -66,6 +66,18 @@ SpecialAirHi1End
 SpecialAirHi2End
 SpecialHi2Landing
 SpecialHi2Landing -> body/FitZeldaBodyMainA04LandingFallSpecial.omo
+// his down special (Scintilla, statuses 0x155 / 0x15B / 0x15C): Zelda's Phantom Slash slots renamed
+// (motion.mtable 0x249 / 0x24D SpecialLwHit / SpecialAirLwHit, 0x251 / 0x255 SpecialLwEnd / SpecialAirLwEnd),
+// their animations in Zelda's SpecialLwLoop / SpecialLwAttack files; scripts from Ultimate's
+// (fighters/edge/specials_acmd.json)
+SpecialLwHit
+SpecialAirLwHit
+SpecialLwEnd
+SpecialAirLwEnd
+SpecialLwHit -> body/FitZeldaBodyMainD03SpecialLwLoop.omo
+SpecialAirLwHit -> body/FitZeldaBodyMainD03SpecialAirLwLoop.omo
+SpecialLwEnd -> body/FitZeldaBodyMainD03SpecialLwAttack.omo
+SpecialAirLwEnd -> body/FitZeldaBodyMainD03SpecialAirLwAttack.omo
 // the fire article (weapon kind 0x18C, his article 5; motion.mtable): SpecialN1 / 2 / 3 the flight
 // at charge level S / M / L, BurstS / M / L their explosions, FireNone3 / 7 empty slots
 SpecialN1
@@ -75,6 +87,17 @@ BurstM
 BurstL
 FireNone3
 FireNone7
+// the flash article (Scintilla, weapon kind 0x18F, his article 8; motion.mtable): AttackNoHit the whiff's,
+// Attack0-4 a counter's at ATTACK_RATIO 0 / .25 / .5 / .75 / 1 (Ultimate's edge_flash Attack in tiers),
+// FlashNone6 / 7 empty slots
+AttackNoHit
+Attack0
+Attack1
+Attack2
+Attack3
+Attack4
+FlashNone6
+FlashNone7
 
 // ---- Hero (brave)
 // his neutral special (Frizz / Frizzle / Kafrizz, status 0x152): Robin's Thunder shoot's custom-move
