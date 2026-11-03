@@ -581,6 +581,7 @@ int kame_life;
 int kame_phase;
 int kame_total;
 int kame_flown;
+int kame_shielded;      // fix 85: flying on through a shield it met
 
 void main()
 {
@@ -733,12 +734,78 @@ int kame_expired()
     return 0;
 }
 
+// Fix 85 (user): the hold creeps forward (KAME_CREEP a frame) so a moving target stays in it; a shield doesn't
+// stop it: it flies on, multi-hitting the shield (kame_shielded); its body hitbox covers the whole beam until it
+// dissolves (tools/supamario_kame_build.py fly_game: the hold plays the fly motion from the frame it hit at,
+// frozen, kame_hold_begin). A fighter around the head (from 10 behind it to 20 ahead, its feet 8 above to 28
+// below it: Supamario stays behind it): 2 one not shielding, 1 only shielding ones (status 0x1B-0x1E, the slot's
+// STATUS variable, docs/position-variables.md), 0 none
+int kame_near()
+{
+    int s;
+    int r;
+    float x;
+    float y;
+    float f;
+    float dx;
+    float dy;
+    float st;
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    f = PostureModuleF(0);
+    r = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
+            dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
+            if (dx > -10.0f && dx < 20.0f && dy > -8.0f && dy < 28.0f)
+            {
+                st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
+                if (st >= 27.0f && st <= 30.0f)
+                {
+                    if (r == 0)
+                    {
+                        r = 0x1;
+                    }
+                }
+                else
+                {
+                    r = 0x2;
+                }
+            }
+        }
+        s += 1;
+    }
+    return r;
+}
+
+// the hold begins: where it hit, the fly motion played from that frame and frozen (the body capsule as long as
+// the beam), fresh body pieces
+void kame_hold_begin()
+{
+    kame_phase = 0x1;
+    kame_flown = kame_frame;
+    kame_frame = 0;
+    kame_shielded = 0;
+    func_24(kame_level, (float)kame_flown, 1.0f);
+    MotionModule(0x4, 0);
+    // fresh body pieces: theirs last the flight only (KAME_SEG_n's hold, so a beam the game
+    // removes at a blast zone leaves its body half as long: user, test 29), these the hold and
+    // the finish
+    EffectModule(0x2723, kame_seg_id(), 0x1, 0x1);
+    kame_pieces(kame_seg_id());
+}
+
 void kame_fly_main()
 {
     if (global4 == 0)
     {
         kame_phase = 0;
         kame_total = 0;
+        kame_shielded = 0;
     }
     if (kame_phase != 0)
     {
@@ -790,9 +857,28 @@ void kame_end()
 
 void kame_fly_loop()
 {
+    if (kame_phase == 0x1)
+    {
+        kame_hold_loop();       // a hold begun while flying on through a shield
+        return;
+    }
     if (kame_expired())
     {
         return;
+    }
+    if (kame_shielded && kame_phase == 0 && AttackModule(0x2727))
+    {
+        // connected again while flying on through a shield: on if it's only shields, else the hold
+        if (kame_near() == 0x1)
+        {
+            AttackModule(0x2724);
+        }
+        else
+        {
+            kame_hold_begin();
+            kame_move(KAME_CREEP);
+            return;
+        }
     }
     if (kame_phase == 0x3)
     {
@@ -821,17 +907,20 @@ void kame_hold_main()
 {
     if (kame_phase == 0)
     {
-        kame_phase = 0x1;
-        kame_flown = kame_frame;
-        kame_frame = 0;
-        func_24(kame_level, 0, 1.0f);
-        // fresh body pieces: theirs last the flight only (KAME_SEG_n's hold, so a beam the game
-        // removes at a blast zone leaves its body half as long: user, test 29), these the hold and
-        // the finish
-        EffectModule(0x2723, kame_seg_id(), 0x1, 0x1);
-        kame_pieces(kame_seg_id());
+        if (kame_near() == 0x1)
+        {
+            // a shield (fix 85): it flies on, its hitboxes back (the fly motion again from its frame: the status
+            // change took them), multi-hitting the shield; a later hit on a fighter not shielding holds it
+            kame_shielded = 0x1;
+            func_24(kame_level, (float)kame_frame, 1.0f);
+            AttackModule(0x2724);
+            kame_move(kame_speed());
+            callFunc3(kame_fly_loop);
+            return;
+        }
+        kame_hold_begin();
     }
-    kame_move(0);
+    kame_move(KAME_CREEP);
     callFunc3(kame_hold_loop);
 }
 
@@ -841,7 +930,7 @@ void kame_hold_loop()
     {
         return;
     }
-    kame_move(0);
+    kame_move(KAME_CREEP);      // fix 85: creeping forward
     kame_frame += 1;
     if (kame_frame >= kame_hold_frames() + 0xa)
     {

@@ -36319,7 +36319,9 @@ int func_2250()
 {
     func_69();
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
-    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x11192, 0x1000, 0x80, 0x1000);
+    // the Kamehameha (user, fix 85): unaffected by staling. This value is the status's attack log (0x11192, the
+    // fireball's special N; reference/msc-note-sheet "set_fighter_status_data": stale move negation, 0 = off)
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x1000, 0x80, 0x1000);
     return 0;
 }
 

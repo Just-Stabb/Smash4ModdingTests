@@ -120,6 +120,8 @@ DIAG = {'AppealHi': ([p for p in DOWN if p[1] == MODEL_PREFIX + 'Bas'], SND_HEAD
 # ---- the projectile (charge levels 1 / 2 / 3): each a little faster (user, 2026-10-23); lengths as
 # the taunt test's body (240 / 320 / 400 units: TRACE_LENGTH_RATE x ExtrudeDuration)
 KAME_SPEED = (5.0, 5.5, 6.0)
+# fix 85 (user): the hold creeps forward this much a frame ("a very small amount"), so a moving target stays in it
+KAME_CREEP = 0.2
 KAME_LENGTH = (240.0, 320.0, 400.0)
 KAME_LIFE = tuple(int(round(l / v)) for l, v in zip(KAME_LENGTH, KAME_SPEED))   # 48 / 58 / 67 frames
 SEG_EVERY = 2                     # a body piece every 2 frames, KAME_SPEED x 2 long
@@ -171,7 +173,7 @@ TICK_SDI = 0.0
 # the head back over the ground the head covered in its last LINGER frames (it grows to that from the
 # spawn, so it never reaches behind the start: test 18's grew to 40 units and hit behind Supamario);
 # the head's multi-hit, ID 1 in the same part (one hit log: one hit a tick for both)
-LINGER = 4
+LINGER = 4                        # (tests 21-30; fix 85: the whole flight, fly_game)
 BODY_SIZE = (4.0, 4.5, 5.0)
 TICK_DAMAGE = (1.0, 1.3, 1.6)
 # the finish per level (test 20: "charge time doesn't seem to increase ... final hit damage"): one
@@ -342,6 +344,23 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
     return '\n'.join(out)
 
 
+def fly_game(lv):
+    """fly<lv+1>'s game script. The head (ID 0) multi-hits what it caught (366) while flying and through the
+    hold, whose REHIT x HOLD_HITS frames give the charge levels their hits there (test 18). The body (ID 1):
+    user (Supamario fix 85): "make Kamehameha's hitboxes linger until it begins to disappear": a capsule from
+    the head back over all the ground it has covered (it grows from the spawn, so it never reaches behind the
+    start), every frame of the flight; the hold plays this motion from the frame it hit at, frozen there
+    (kamehameha.c kame_hold_begin), so the whole beam stays a hitbox until the finish / dissolve removes it"""
+    tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
+    g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
+                BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
+    for f in range(1, KAME_LIFE[lv] + 1):
+        g += [cmd('frame', float(f)),
+              hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, Angle=HEAD_ANGLE,
+                     KBG=HEAD_KBG, FKB=HEAD_FKB, BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
+    return g
+
+
 def weapon_scripts(heads, ids, segs):
     """the kamehameha's game / effect / sound scripts and motion.mtable. Its effects all have
     Terminate 0 (test 11: the hit's status change may have ended Terminate-1 effects) and end
@@ -350,16 +369,7 @@ def weapon_scripts(heads, ids, segs):
     game, effect, sound = {}, {}, {}
     for lv in range(3):
         name = MOTIONS[lv]
-        tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT)
-        # the head: multi-hits what it caught (366) while flying and through the hold, whose
-        # REHIT x HOLD_HITS frames give the charge levels 4 / 6 / 9 hits there (test 18)
-        g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
-                    BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
-        for f in range(1, LINGER + 1):
-            g += [cmd('frame', float(f)),
-                  hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, Angle=HEAD_ANGLE,
-                         KBG=HEAD_KBG, FKB=HEAD_FKB, BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
-        game[name] = g
+        game[name] = fly_game(lv)
         # frame 1: the head (following) and the start (left at the spawn point, one frame of flight
         # behind). Not at frame 0: a beam starts in status 0 (fly1) and is set to its level's
         # status in the same frame, which plays its motion from 0 again. Terminate 1: they end when
@@ -581,6 +591,7 @@ def main():
     finish = max(KAME_FINISH, dis_frames)
     vals = {'KAME_FINISH': str(finish), 'KAME_DISSOLVE': str(dis_frames),
             'KAME_SEG_EVERY': str(SEG_EVERY), 'KAME_SEG_FIRST': str(SEG_FIRST),
+            'KAME_CREEP': fl(KAME_CREEP),
             'KAME_MAX': str(max(KAME_LIFE) + KAME_HOLD + finish + 20),
             'KAME_FX_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n)
                                       for n in beam_effects(heads, segs)),
