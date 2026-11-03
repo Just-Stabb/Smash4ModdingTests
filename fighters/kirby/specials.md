@@ -1133,3 +1133,35 @@ nair and uair with Kirby's hitboxes; bair from frame 7 (the sword appears) for M
 `marth_sword_play()` binds the slot's game script instead of Kirby's (MSC: only that function differs,
 `msc_fingerprint.py`). Not checked in game: the offsets (if the game scales them with the bone's
 scale, the spheres land twice as far out).
+
+## Added: Supamario copy (the Kamehameha; Supamario fix 90)
+
+User: "make it so Kirby can take Supamario's copy ability". Copies come from the 12th star missile hit
+(`starcopy_cave.py`), which hands over any fighter kind; `copy_grant` refuses kinds `>= 0x3A`, and every copy
+table (hat, params, motions, weapon pools, `0x02F1B8B0`'s special params, about 22 switches on the copy kind)
+has 0x3A rows, so Supamario (`0x41`) is copied as Mario:
+
+- **MSC** (`kirby.c`, "Supamario copy" at the end): `starcopy_update` → `supa_copy_pending()` turns a
+  pending `0x42` (kind + 1) into `4` (Mario) and sets int `0x100000A0` (copy_grant clears `0x83`-`0x9E` only);
+  any other copy clears it. Mario's copy neutral B (`0x19A`) with it is Supamario's Kamehameha (`skame_*`, his
+  `kame_n_*`): no Mario game script (`func_2585` / `func_2586`: its fireball), no staling (`func_2587`), the
+  beam generated as article 5. Kirby's hand is his ACMD bone `0x10` (Mario's `0x11`), effects on it turned
+  (0, 0, 139.8) (Mario's flash (140, 90, 180) on `0x11` = Kirby's (-179.8, 90, 0) on `0x10`, calls turn Z Y X);
+  the start effects 2.92 lower, 0.67 further forward (the throws' frame 16, `LHaveN`).
+- **ACMD** (`tools/kirby_supa_copy_acmd.py`): MarioSpecialN / MarioSpecialAirN effect and sound commands run
+  only while `0x100000A0` is 0 (`Int_Var_Compare` / `True`); while 1, Supamario's release effects at frame 14.
+- **Copy articles (native, traced for this):** Kirby's reserve article entries 0-20 (kind `0x10`, count 0) are
+  never filled. A copy's weapons come from a per-copied-kind header table `0x1038281C` (58 pointers →
+  `{records, count}`, records `{kind, max, spawner, extra}` like an article list; Mario's `0x101355A4` →
+  `0x10135C8C`, 5 records: fireball (max 5, spawner `0x02F1AC88`), mantle, pump, hugeflame, dokan with max 0).
+  `copy_grant` → `0x02EFDB88` builds the copy's pools once per copied kind per match (Kirby's copy object, int
+  array `+0x2B4`: 7 kinds, 16 records each), `0x02EFE138` makes it current (`obj+0xB9CC`); with a copy, an
+  article id below 16 is the record's index (`0x02C03EA0`) and the spawner is read from the record at every
+  generate (`0x02EFE98C`). `weapon_expand.py` `"kirby_copy": 3` on the kamehameha: Mario's list copied to the
+  cave plus `{0x18B, 1, 0x02F1AC88, 0}` (id 5, as in Supamario's own list), the header pointed at it (its
+  ADDR32 `.data` relocation moved to the old list's first record's last word, `0x10135C98`), count 6. Weapon
+  files load per fighter in the match for every kind its article list names (`0x030C3E7C`, count 0 too), and
+  Kirby's copies load none of their own (only Game & Watch / Corrin's): reserve entries 19 / 20 now name
+  `0x18B` and `0` (the fireball, whose 5 instances the Mario copy's pool makes), so they're there in a match
+  without Mario.
+- Mario's hat and params; the copy's trait is Mario's (Normal, as Supamario's).

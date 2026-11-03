@@ -148,6 +148,11 @@ give the six 58-entry tables (`0x1038281C`, `0x1041A6D0`...`0x1041AA70`) rows fo
 set-up switch `0x02EFC944` defaults to no set-up. Kirby's vl file also has a per-kind copy table
 (`0x88` bytes a kind, `[[mgr+0x113C]+0xFC]`): a data / RAM item.
 
+Done instead for Supamario (fix 90): copied as his base (Mario, kind 3) with a marker int and his own
+neutral B in Kirby's MSC, his new weapon added to Mario's copy article list (`weapon_expand.py` "kirby_copy"):
+`fighters/kirby/specials.md`, "Supamario copy". Granting `0x41` itself also needs the ~22 switches on the
+copy kind and the special-param loader `0x02F1B8B0` (reads the old vl array by `copy*4`).
+
 ### 1.8 IDs that encode the kind
 
 - **ACMD effect IDs** `0x3KKnnnn` (kind KK's own effects) and `0x4KKnnnn` (Final Smash): an 8-bit kind

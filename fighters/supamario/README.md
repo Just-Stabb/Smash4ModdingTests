@@ -109,3 +109,16 @@ Install over fix 88. User (clip): it still only multi-hits a shield fully charge
   RPX: 0x04BB43FC `andi. r0, r5, 0x13` -> `0x17` (`weapon_expand_test.py` checks the method on bit 0x4).
 - Changed: `code/cross_f.rpx` only (fix 79's plus that word); the scripts are fix 88's.
 
+
+## Kamehameha fix 90 (`build/supamario_kame_fix90.zip`)
+
+Install over fix 89. User: multi-hits shields at every charge now; shield damage slightly higher again; Kirby
+should be able to take Supamario's copy ability.
+
+- **Shield damage:** `SHIELD_MUL` x2.25 / x2.25 / x1.75 (was 2 / 2 / 1.5). The added shield damage is a whole
+  number a hit: ticks +1 / +2 / +1 (the medium ticks up by 1), finishes +9 / +13 / +10 (were +7 / +10 / +7).
+- **Kirby's copy:** Kirby copies Supamario (12th star missile hit) as Mario's copy with Supamario's Kamehameha
+  as its neutral B: `fighters/kirby/specials.md` "Supamario copy" (Kirby MSC, `kirby_supa_copy_acmd.py`,
+  `weapon_expand.py` "kirby_copy").
+- Changed: `code/cross_f.rpx` (fix 89's plus Kirby's Mario copy article list, its header and two reserve
+  entries), the weapon `game.bin`, Kirby's `kirby.mscsb`, `effect.bin`, `sound.bin`.

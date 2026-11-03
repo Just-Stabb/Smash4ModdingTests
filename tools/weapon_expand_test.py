@@ -375,6 +375,22 @@ def main():
     check('module rows (0x%08X): every kind 0x0-0x%X, a new kind its base\'s' % (W.MODULE_ROW, cap), bad[:4], [])
     check('module row of 0x185 = the fireball\'s (0x%08X), not past the table' % W.MODULE_TABLE, row(E1, 0x185)[0],
           W.MODULE_TABLE)
+    # Kirby's copy lists ("kirby_copy"): the copy's records, then the new kind's {kind, max, the base's spawner, 0};
+    # the reserve entries naming the kinds with instances, from entry 20 down
+    for c, (hdr, at, kinds) in sorted(info.get('kirby_copy', {}).items()):
+        recs, n = img.w(hdr), img.w(hdr + 4)
+        old = [[img.w(recs + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
+        want = list(old)
+        for k in kinds[n:]:
+            bk = new[k][0]
+            want.append([k, new[k][1]['new_articles'][k][1], [o for o in old if o[0] == bk][0][2], 0])
+        got_at, got_n = pimg.w(hdr), pimg.w(hdr + 4)
+        check('Kirby copy 0x%X: header 0x%08X -> the cave list' % (c, hdr), (got_at, got_n), (at, len(want)))
+        check('Kirby copy 0x%X: records' % c, [[pimg.w(got_at + 16 * i + 4 * j) for j in range(4)]
+                                                for i in range(got_n)], want)
+        res = [pimg.w(W.KIRBY_RESERVE + 0x10 * i) for i in range(21)]
+        check('Kirby copy 0x%X: reserve entries name its kinds with instances' % c,
+              sorted(r for r in res if r != 0x10), sorted(w[0] for w in want if w[1]))
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

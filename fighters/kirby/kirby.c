@@ -43274,7 +43274,10 @@ void func_2585(int arg0, int arg1, int arg2)
     var3 = 0x3;
     var4 = func_2584(arg0);
     func_28(var4, arg1, arg2);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
+    if (!supa_copy_motion(arg0)) // the Supamario copy: not Mario's game script (its fireball)
+    {
+        MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var3), var3); // the custom's ACMD (added)
+    }
     MotionAnimcmdModule(0x1, arg1);
 }
 
@@ -43290,7 +43293,10 @@ void func_2586(int arg0)
     var3 = MotionModuleF(0x1);
     var4 = MotionModuleF(0x9);
     func_28(var2, var3, var4);
-    MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
+    if (!supa_copy_motion(arg0)) // the Supamario copy: not Mario's game script (its fireball)
+    {
+        MotionAnimcmdModule(0, 0, copy_custom_motion(arg0, var1), var1); // the custom's ACMD (added)
+    }
     if (MotionModule(0x20))
     {
         var3 += 1.0f;
@@ -43301,9 +43307,15 @@ void func_2586(int arg0)
 // [Copy: Mario 0x19A] pre
 int func_2587()
 {
+    int log;
     func_69();
+    log = 0x11192;
+    if (supa_copy())
+    {
+        log = 0; // the Kamehameha doesn't stale (Supamario's func_2250)
+    }
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
-    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x11192, 0x1000, 0x80, 0x1000);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, log, 0x1000, 0x80, 0x1000);
     return 0;
 }
 
@@ -43358,6 +43370,10 @@ int func_2592()
 // [Copy: Mario 0x19A] main
 void func_2593()
 {
+    if (supa_copy())
+    {
+        skame_init(); // Supamario copy: the Kamehameha (end of the file)
+    }
     func_78(func_2594);
 }
 
@@ -43367,6 +43383,10 @@ void func_2594()
     if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
     {
         func_2595();
+    }
+    if (supa_copy())
+    {
+        skame_loop();
     }
     if (CancelModule(0x2713) == 0x1)
     {
@@ -43977,7 +43997,10 @@ void func_2615()
 // [Copy: Mario 0x19A] end
 void func_2616()
 {
-    
+    if (supa_copy())
+    {
+        skame_end();
+    }
 }
 
 // [unused] nothing that runs references this (leftover from the original fighter script)
@@ -71655,6 +71678,7 @@ void starcopy_update()
     }
     if (WorkModule(0x6, 0x1000009e) > 0)
     {
+        supa_copy_pending(); // Supamario: Mario's copy + int 0x100000A0 (end of the file)
         before = WorkModule(0x6, 0x100000a4);
         BattleObject(0x40a); // patched case (0x02EF94E4) of Kirby's command dispatcher
         if (WorkModule(0x6, 0x1000009e) > 0) // not taken: the 0x40A patch isn't in this cross_f.rpx
@@ -73916,3 +73940,296 @@ void marth_full_charge_fx(int sub)
 
 // roll-off (added after the rest, so the other functions keep their numbers)
 float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
+
+
+// ===================================================================
+// Supamario copy (added, Supamario fix 90; user: "make it so Kirby can take Supamario's copy ability").
+// Supamario (kind 0x41) can't be a copy kind: copy_grant (0x02EFCD8C) refuses kinds >= 0x3A, and the
+// copy tables (hat, params, motions, weapon pools) have 0x3A rows. So a star-missile copy of him grants
+// Mario's copy (kind 3: Mario's hat, params and motions, Supamario's costume value) and sets Kirby's
+// int 0x100000A0 (copy_grant clears 0x83-0x9E only: copy_custom_cave.py) to 1. Mario's copy neutral B
+// (status 0x19A) is then Supamario's Kamehameha instead of the fireball: supamario.c's kame_n_* charge
+// and release (fighters/supamario/README.md) on Kirby's Mario-copy throw (motions 0x331 / 0x332, the
+// same timing as Mario's SpecialN), without Mario's game script (its fireball: func_2585 / func_2586),
+// the beam (weapon kind 0x18B) generated as Kirby's copy article 5 (tools/weapon_expand.py
+// "kirby_copy": Mario's copy list has a 6th record for it). Kirby's effect / sound scripts for the throw
+// (tools/kirby_supa_copy_acmd.py) skip the fireball's flash and sound while 0x100000A0 is 1 and play
+// Supamario's release instead.
+// Values: tools/supamario_kame_build.py (N_*, KAME_LIFE, SND_*, the effect ids of Supamario's .efc).
+// Kirby's hand is his bone 0x10 (his Mario-copy flash's; Mario's is 0x11), the effects on it turned
+// (0, 0, 139.8): Mario's flash (140, 90, 180) on 0x11 is Kirby's (-179.8, 90, 0) on 0x10, calls turn
+// Z Y X. The start effects at Kirby's hands (his throw's frame 16: 2.92 lower and 0.67 further forward
+// than Mario's).
+// ===================================================================
+int skame_charge;
+int skame_state;
+int skame_pose;
+int skame_posed;
+int skame_snd;
+
+int skame_article() { return 0x5; } // the Kamehameha (0x18B): Mario's copy list's 6th record
+
+int supa_copy()
+{
+    return WorkModule(0x6, 0x100000a0) == 0x1 && WorkModule(0x6, 0x100000a4) == 0x3;
+}
+
+int supa_copy_motion(int motion)
+{
+    return supa_copy() && (motion == 0x211 || motion == 0x215);
+}
+
+// a pending star copy (0x1000009E = kind + 1): Supamario's becomes Mario's and sets the marker; any
+// other clears it
+void supa_copy_pending()
+{
+    if (WorkModule(0x6, 0x1000009e) == 0x42)
+    {
+        WorkModule(0x7, 0x4, 0x1000009e);
+        WorkModule(0x7, 0x1, 0x100000a0);
+    }
+    else
+    {
+        WorkModule(0x7, 0, 0x100000a0);
+    }
+}
+
+void skame_init()
+{
+    skame_charge = 0;
+    skame_state = 0;
+    skame_pose = 0;
+    skame_posed = 0;
+    skame_snd = 0;
+    SoundModule(0x2710, 0xCB1008E);
+}
+
+int skame_level()
+{
+    if (skame_charge >= 78)
+    {
+        return 0x2;
+    }
+    if (skame_charge >= 42)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+void skame_fx(int id, float size)
+{
+    EffectModule(0x2717, id, 0x10, 0, 0, 0, 0, 0, 139.8f, size, 0);
+}
+
+void skame_fx_level(int level)
+{
+    EffectModule(0x2723, 0x03410019, 0x1, 0x1);
+    EffectModule(0x2723, 0x0341001A, 0x1, 0x1);
+    if (level == 0x2)
+    {
+        skame_fx(0x03410019, 2.4f);
+        skame_fx(0x0341001A, 2.4f);
+    }
+    else if (level == 0x1)
+    {
+        skame_fx(0x03410019, 1.5f);
+        skame_fx(0x0341001A, 1.5f);
+    }
+    else
+    {
+        skame_fx(0x03410019, 0.75f);
+    }
+}
+
+void skame_start_fx()
+{
+    if (skame_level() == 0x0)
+    {
+        EffectModule(0x2710, 0x0341001B, 0, 0.0f, 3.78f, 14.72f, 0.0f, 180.0f, 0.0f, 1.6f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410017, 0, 0.0f, 3.78f, 13.445f, 0.0f, 180.0f, 0.0f, 1.6f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410018, 0, 0.0f, 3.78f, 13.445f, 0.0f, 180.0f, 0.0f, 1.6f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410022, 0, 0.0f, 3.78f, 14.72f, 0.0f, 180.0f, 0.0f, 0.45f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x0341001C, 0, 0.0f, 3.78f, 12.17f, 0.0f, 180.0f, 0.0f, 1.0f, 0, 0, 0, 0, 0, 0, 1);
+    }
+    else if (skame_level() == 0x1)
+    {
+        EffectModule(0x2710, 0x0341001B, 0, 0.0f, 3.78f, 16.42f, 0.0f, 180.0f, 0.0f, 1.8f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410017, 0, 0.0f, 3.78f, 14.295f, 0.0f, 180.0f, 0.0f, 2.0f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410018, 0, 0.0f, 3.78f, 14.295f, 0.0f, 180.0f, 0.0f, 2.0f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410022, 0, 0.0f, 3.78f, 16.42f, 0.0f, 180.0f, 0.0f, 0.5f, 0, 0, 0, 0, 0, 0, 1);
+    }
+    else if (skame_level() == 0x2)
+    {
+        EffectModule(0x2710, 0x0341001B, 0, 0.0f, 3.78f, 18.12f, 0.0f, 180.0f, 0.0f, 2.2f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410017, 0, 0.0f, 3.78f, 15.145f, 0.0f, 180.0f, 0.0f, 2.0f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410018, 0, 0.0f, 3.78f, 15.145f, 0.0f, 180.0f, 0.0f, 2.0f, 0, 0, 0, 0, 0, 0, 1);
+        EffectModule(0x2710, 0x03410022, 0, 0.0f, 3.78f, 18.12f, 0.0f, 180.0f, 0.0f, 0.6f, 0, 0, 0, 0, 0, 0, 1);
+    }
+}
+
+void skame_start_off()
+{
+    EffectModule(0x2723, 0x0341001B, 0x1, 0x1);
+    EffectModule(0x2723, 0x03410017, 0x1, 0x1);
+    EffectModule(0x2723, 0x03410018, 0x1, 0x1);
+    EffectModule(0x2723, 0x03410022, 0x1, 0x1);
+    EffectModule(0x2723, 0x0341001C, 0x1, 0x1);
+}
+
+void skame_fx_off()
+{
+    EffectModule(0x2723, 0x03410019, 0x1, 0x1);
+    EffectModule(0x2723, 0x0341001A, 0x1, 0x1);
+    EffectModule(0x2723, 0x0341001F, 0x1, 0x1);
+}
+
+void skame_sounds()
+{
+    if (skame_snd == 0 && MotionModuleF(0x1) >= 1.0f)
+    {
+        SoundModule(0x2710, 0xCB1008B);
+        skame_snd = 0x1;
+    }
+    else if (skame_snd == 0x1 && skame_state != 0 && MotionModuleF(0x1) >= 14.0f - 1.0f)
+    {
+        SoundModule(0x2714, 0xCB1008B);
+        SoundModule(0x2710, 0xCB1008C);
+        skame_snd = 0x2;
+    }
+}
+
+// the beam, told its level through the custom slot its spawner reads: the owner's 0x10000048, on
+// Kirby with a copy his 0x1000009F instead (copy_custom_cave.py's fireball spawner cave): both set
+// while it's generated, then put back
+void skame_generate()
+{
+    int slot;
+    int copyslot;
+    slot = WorkModule(0x6, 0x10000048);
+    copyslot = WorkModule(0x6, 0x1000009f);
+    WorkModule(0x7, skame_level(), 0x10000048);
+    WorkModule(0x7, skame_level(), 0x1000009f);
+    ArticleModule(0x2710, skame_article());
+    WorkModule(0x7, slot, 0x10000048);
+    WorkModule(0x7, copyslot, 0x1000009f);
+}
+
+int skame_pose_frames()
+{
+    if (skame_level() == 0x2)
+    {
+        return 67;
+    }
+    else if (skame_level() == 0x1)
+    {
+        return 58;
+    }
+    return 48;
+}
+
+void skame_hold_pose()
+{
+    if (skame_pose == 0)
+    {
+        if (MotionModuleF(0x1) >= 16.0f)
+        {
+            MotionModule(0x4, 0);
+            skame_pose = 0x1;
+        }
+    }
+    if (skame_pose == 0x1)
+    {
+        skame_posed += 0x1;
+        if (skame_posed >= skame_pose_frames())
+        {
+            MotionModule(0x4, 1.0f);
+            skame_start_off();
+            skame_pose = 0x2;
+            if (global18 == 0x2)
+            {
+                KineticModule(0, 0);
+            }
+        }
+    }
+}
+
+void skame_air()
+{
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (skame_state < 0x2)
+    {
+        if (skame_charge == 0x1)
+        {
+            KineticModule(0x11, 0x1, 0);
+        }
+        KineticModule(0xf, 0x1, -0.02f);
+        KineticModule(0x14, 0x1, 0.6f);
+    }
+    else if (skame_pose < 0x2)
+    {
+        KineticModule(0x11, 0x1, 0);
+        KineticModule(0xf, 0x1, 0);
+        KineticModule(0x14, 0x1, 0);
+    }
+    if (skame_state != 0)
+    {
+        KineticModule(0xc, 0x2);
+    }
+}
+
+void skame_loop()
+{
+    skame_sounds();
+    if (skame_state == 0)
+    {
+        if (MotionModuleF(0x1) >= 6.0f)
+        {
+            if (ControlModule(0x2712, 0x1) && skame_charge < 100)
+            {
+                MotionModule(0x4, 0);
+                if (skame_charge == 0)
+                {
+                    skame_fx_level(0);
+                    skame_fx(0x0341001F, 1.0f);
+                }
+                else if (skame_charge == 42 || skame_charge == 78 || skame_charge % 40 == 0)
+                {
+                    skame_fx_level(skame_level());
+                }
+                skame_charge += 0x1;
+            }
+            else
+            {
+                skame_state = 0x1;
+                skame_fx_off();
+                MotionModule(0x4, 1.0f);
+            }
+        }
+    }
+    else if (skame_state == 0x1)
+    {
+        if (MotionModuleF(0x1) >= 14.0f)
+        {
+            skame_generate();
+            skame_start_fx();
+            skame_state = 0x2;
+        }
+    }
+    else
+    {
+        skame_hold_pose();
+    }
+    skame_air();
+}
+
+// the status ends (Supamario's func_2279)
+void skame_end()
+{
+    skame_fx_off();
+    skame_start_off();
+    SoundModule(0x2714, 0xCB1008B);
+}

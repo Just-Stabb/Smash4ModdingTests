@@ -24,7 +24,8 @@ part: the fireball's +0x1C puts it in the weapon, which calls it) are copied wit
 "nop": [...] / "nop2": [...] make those slots of the vtable / vtable 2 copies a `blr` (the
 fireball's vtable 2 +0x1C counts its life down and +0x3C, every frame, removes it at life 0 and on
 touching ground bounces it or, at a wall, plays Mario's puff 0x3030002 and removes it: test 14, the
-beam removed early, at its life or a wall; its MSC does both). "motions": N (a brand-new article) gives its motion info N entries (the base's,
+beam removed early, at its life or a wall; its MSC does both). "kirby_copy": C (a brand-new article): Kirby's copy of fighter
+kind C gets it as one more copy article (kirby_copy() below; fighters/kirby/specials.md "Supamario copy"). "motions": N (a brand-new article) gives its motion info N entries (the base's,
 the last repeated: every one plays the base's animation; its motion.mtable names N scripts).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
@@ -86,6 +87,14 @@ HIT_BITS = 0x13
 SWITCHES = (0x0320D934, 0x03210C30, 0x02B651AC, 0x02B6894C, 0x02B6B7A8, 0x02B6FD44, 0x02B73AA4, 0x02B75A88,
             0x02B77FAC, 0x02B7A4DC, 0x02B7D378, 0x02B80CF4, 0x02B83D58)
 INTO_LAST = ((0x02B83B84, 'r5'), (0x02B83C74, 'r5'))      # cmplwi r5, 0x184 jumping into 0x02B83D60
+# Kirby's copy articles (Supamario fix 90; research: fighters/kirby/specials.md "Supamario copy"): per copied
+# fighter kind a {records, count} header (KIRBY_COPY_TABLE, 58 pointers); copy_grant builds the copy's weapon
+# pools from it (max instances per record) and an article id below 16 on Kirby with a copy is the record's index,
+# its spawner read from the record at every generate. KIRBY_RESERVE: Kirby's own article list's reserve entries
+# (kind 0x10, count 0: no instances); the match's weapon files load for every kind a fighter's list names, count
+# 0 too (0x030C3E7C), so the last ones name the copy's weapon kinds.
+KIRBY_COPY_TABLE = 0x1038281C
+KIRBY_RESERVE = 0x10136AE4      # reserve entry i: + 0x10 * i (0-20), {kind 0x10, 0, 0, 0}
 MODULE_ROW = 0x02BCB5C0        # mulli r8, r30, 0x70 (r30 = the kind) / addis r30, r8, 0x1034 / lwzu r10, 0x64A8(r30)
 MODULE_TABLE = 0x103464A8      # 389 rows of 0x70 (28 module constructors)
 DESC_COPY_MAX = 0x140          # bytes of a weapon descriptor copied (up to the next descriptor)
@@ -117,6 +126,8 @@ def load_weapons(path, img):
                 r['new_articles'][nk] = (art, int(spec.get('max', 1)))
                 if 'motions' in spec:
                     r.setdefault('motions', {})[nk] = int(spec['motions'])
+                if 'kirby_copy' in spec:
+                    r.setdefault('kirby_copy', {})[nk] = int(spec['kirby_copy'])
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
                     r.setdefault('on_hit_bits', {})[nk] = K.num(spec.get('on_hit_bits', HIT_BITS))
@@ -654,14 +665,59 @@ def build(spec_path=SPEC, rpx=RPX):
     assert B.pc - mr <= 4 * 14
     B.asm(MODULE_ROW, 'bl 0x%X' % mr, 'mulli r8, r30, 0x70')
     info['module_row'] = mr
+    kirby_copy(B, img, new, info)
     info['cave_end'] = B.pc
     return B, info
+
+
+def kirby_copy(B, img, new, info):
+    """"kirby_copy": C (a brand-new article): Kirby's copy of fighter kind C gets it as one more article, its id
+    the copied list's length (Supamario's Kamehameha: Mario's copy has 5, so id 5, as in Supamario's own list): the
+    copy's record list copied to the cave with {kind, the article's max, the base kind's record's spawner, 0}
+    after it, the header pointed at it (its ADDR32 relocation moved to the old list's first record's last word,
+    unread once the header moves) and its count + 1; and Kirby's last reserve entries name the copy's weapon kinds
+    with instances (its own and the new one), so their files load in a match without the copied fighter (copy_grant
+    makes the pools at once)"""
+    adds = {}
+    for nk in sorted(new):
+        _bk, r, _art = new[nk]
+        c = r.get('kirby_copy', {}).get(nk)
+        if c is not None:
+            adds.setdefault(c, []).append(nk)
+    info['kirby_copy'] = {}
+    B.extra_relocs = []
+    reserve = 20
+    for c, kinds in sorted(adds.items()):
+        hdr = img.w(KIRBY_COPY_TABLE + 4 * c)
+        recs, n = img.w(hdr), img.w(hdr + 4)
+        old = [[img.w(recs + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
+        assert old[0][3] == 0, 'copy kind 0x%X: its first record\'s last word is used' % c
+        out = [list(o) for o in old]
+        for nk in kinds:
+            bk, r, _art = new[nk]
+            base = [o for o in old if o[0] & 0x7FFFFFFF == bk and o[2]]
+            assert len(base) == 1, 'copy kind 0x%X has no record for weapon 0x%X' % (c, bk)
+            out.append([nk, r['new_articles'][nk][1], base[0][2], 0])
+        B.pc = max([B.pc] + [a + 4 for a in B.words if CAVE <= a < LIMIT])   # past every cave word (the
+        at = B.alloc(16 * len(out), 8)                                         # module-row stub ends past pc)
+        B.data(at, b''.join(struct.pack('>4I', *o) for o in out), 'kirby copy 0x%X articles' % c)
+        B.put(hdr, at, 'kirby copy 0x%X header' % c, recs)
+        B.put(hdr + 4, len(out), 'kirby copy 0x%X count' % c, n)
+        B.inplace.remove(hdr)                 # its ADDR32 (.data) relocation stays in its section: not the
+        B.extra_relocs.append((hdr, recs + 12))  # code dummy reloc_args() would move it to
+        for k in [o[0] & 0x7FFFFFFF for o in out if o[1]]:
+            e = KIRBY_RESERVE + 0x10 * reserve
+            assert reserve > 0 and [img.w(e + 4 * j) for j in range(4)] == [0x10, 0, 0, 0], hex(e)
+            B.put(e, k, 'kirby reserve %d: weapon 0x%X files' % (reserve, k), 0x10)
+            reserve -= 1
+        info['kirby_copy'][c] = (hdr, at, [o[0] for o in out])
 
 
 def args(B):
     out = ['grow:0x%08X' % ((B.pc + 0xFFF) & ~0xFFF)]
     out += ['0x%08X=0x%08X' % (a, w) for a, w in sorted(B.words.items())]
     out += ['reloc:0x%08X-0x%08X=0x%08X' % (a, a + 4, K.RELOC_DUMMY) for a in B.reloc_args()]
+    out += ['reloc:0x%08X-0x%08X=0x%08X' % (a, a + 4, d) for a, d in getattr(B, 'extra_relocs', [])]
     return out
 
 
@@ -679,6 +735,9 @@ def main():
                                   CAVE, info['cave_end']), file=err)
     for fk, at in info['article_lists'].items():
         print('  fighter 0x%X: article list 0x%08X' % (fk, at), file=err)
+    for c, (hdr, at, kinds) in info.get('kirby_copy', {}).items():
+        print('  Kirby copy 0x%X: header 0x%08X -> records 0x%08X (%s)' % (
+            c, hdr, at, ', '.join('0x%X' % k for k in kinds)), file=err)
     for nk, (bk, r, art) in sorted(info['new'].items()):
         d_at, d, size = info['descriptors'][nk]
         g = ', '.join('+0x%X %s' % (off, 'own params 0x%08X' % at if at else "base's (not a getter)")

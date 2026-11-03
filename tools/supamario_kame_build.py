@@ -347,8 +347,10 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
     return '\n'.join(out)
 
 
-# fix 87 (user): the beam's shield damage x2; fix 88 (user: too much fully charged): x1.5 fully charged
-SHIELD_MUL = (2.0, 2.0, 1.5)
+# fix 87 (user): the beam's shield damage x2; fix 88 (user: too much fully charged): x1.5 fully charged; fix 90
+# (user: "slightly higher again"): x2.25 / x2.25 / x1.75 (the added shield damage is a whole number a hit, so a tick
+# of 1.0 / 1.6 keeps +1; the medium ticks get +2, the finishes +9 / +13 / +10 from +7 / +10 / +7)
+SHIELD_MUL = (2.25, 2.25, 1.75)
 
 
 def shield_add(damage, lv):
