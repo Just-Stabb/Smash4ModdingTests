@@ -3,6 +3,7 @@
 
   python3 tools/rpx_patch.py IN.rpx OUT.rpx <other patches> $(python3 tools/kirby_stat_cave.py)
   python3 tools/kirby_stat_cave.py --table     (the profile table's words only)
+  python3 tools/kirby_stat_cave.py --table --accel   (and Hero's Acceleration bit: accel_words)
 
 Every fighter stat ("fighter_param", WorkModule category 3, e.g. 0x03000016 max air speed) is read
 through WorkModuleImpl::get_float (0x0200F628, vtable 0x10003224 +0x44), by the native movement code
@@ -54,6 +55,16 @@ PROFILES = {
                                                 # Ultimate's speed_up_* x2-2.5, one multiplier here)
 }
 TABLE_ENTRIES = 8          # profiles 0-7 (the profile is masked to 3 bits); position_vars_cave.py uses the space after
+# Hero's Acceleration (fighters/brave/brave.c, fix 79): marker bit ACCEL_BIT multiplies Overdrive's stats by
+# Overdrive's own x1.2 on top of the profile (so it stacks with Acceleratle's profile 3: x2.4 on its stats,
+# the falls x1.2). Bits 8-11 are Kirby's trait badge (tools/trait_badge_cave.py), so bit 12. The code sits
+# after the table (ACCEL_CAVE, 16 words up to position_vars_cave.py's CAVE2); the profile's `andi.` branches
+# to it and it goes back after.
+ACCEL_BIT = 0x1000
+ACCEL_STATS = WALK + DASH_RUN + JUMP_H + AIR + FALL
+ACCEL_MULT = 1.2
+ACCEL_CAVE = 0x037EE240
+ACCEL_LIMIT = 0x037EE280
 
 
 def rlwinm(ra, rs, sh, mb, me, rc=0):
@@ -75,6 +86,8 @@ def cmplwi(ra, imm): return d_form(10, 0, ra, imm)
 def andi_(ra, rs, imm): return d_form(28, rs, ra, imm)
 def lis(rt, imm): return d_form(15, rt, 0, imm)
 def addi(rt, ra, imm): return d_form(14, rt, ra, imm)
+def ori(ra, rs, imm): return d_form(24, rs, ra, imm)
+def beq(src, dst): return (16 << 26) | (12 << 21) | (2 << 16) | ((dst - src) & 0xFFFC)
 def lwzx(rt, ra, rb): return x_form(rt, ra, rb, 23)
 def lfsx(ft, ra, rb): return x_form(ft, ra, rb, 535)
 def add(rt, ra, rb): return x_form(rt, ra, rb, 266)
@@ -155,6 +168,27 @@ def words():
     assert max(out) + 4 <= LIMIT, "cave too long"
     for hook in HOOKS:
         out[hook] = b(hook, CAVE)
+    out.update(accel_words())
+    return out
+
+
+def accel_words():
+    """Acceleration's x1.2 (ACCEL_BIT): the branch in place of the profile's `andi.` and the code after the
+    table (r11 the marker, r12 the stat's index, f1 the value)"""
+    at = CAVE + 4 * code(0).index(andi_(11, 11, 0x7))
+    back = at + 8                               # after its beqlr
+    mask = sum(1 << s for s in ACCEL_STATS)
+    k = ACCEL_LIMIT - 8                         # the x1.2 constant
+    t = ACCEL_CAVE
+    prof = t + 4 * 10
+    ws = [andi_(0, 11, ACCEL_BIT), beq(t + 4, prof),
+          lis(10, mask >> 16), ori(10, 10, mask & 0xFFFF), srw(10, 10, 12), andi_(10, 10, 1), beq(t + 24, prof),
+          lis(10, ha(k)), lfs(0, lo(k) - (0x10000 if lo(k) >= 0x8000 else 0), 10), fmuls(1, 1, 0),
+          andi_(11, 11, 0x7), BEQLR, b(t + 48, back)]
+    out = {t + 4 * i: w for i, w in enumerate(ws)}
+    out[k] = struct.unpack('>I', struct.pack('>f', ACCEL_MULT))[0]
+    assert max(out) + 4 <= ACCEL_LIMIT and t + 4 * len(ws) <= k
+    out[at] = b(at, t)
     return out
 
 
@@ -169,6 +203,8 @@ def table_words():
 
 def main():
     w = table_words() if "--table" in sys.argv else words()
+    if "--accel" in sys.argv:
+        w.update(accel_words())
     print(" ".join("0x%08X=0x%08X" % (a, v) for a, v in sorted(w.items())))
 
 

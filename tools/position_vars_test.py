@@ -708,5 +708,41 @@ call(mu, FSET, w0, ITEM, 10.0)
 check_eq('ITEM 10: nothing', [item_log(k) for k in range(7)], [[]] * 7)
 call(mu, FSET, w0, ITEM, 9.0)
 
+# ITEM on a target (0x0F000276 + target): the same codes on that fighter; reads 1 while it's metal
+# (its WorkModule's is_flag, vt +0xE4, on 0x20000012: a stub returning the word at WM + 0x100 for that flag)
+VTW, ISF = 0x10382000, 0x02E18200
+f = Asm(ISF); f.asm("""lis r0, 0x2000
+ ori r0, r0, 0x12
+ cmpw r4, r0
+ bne isf_no
+ lwz r3, 0x100(r3)
+ blr
+isf_no: li r3, 0
+ blr""")
+mu.mem_write(ISF, b''.join(struct.pack('>I', w) for w in f.words()))
+mu.mem_write(VTW + 0xE4, struct.pack('>I', ISF))
+for wm in (w0, w1):
+    mu.mem_write(wm, struct.pack('>I', VTW))
+    mu.mem_write(wm + 0x100, struct.pack('>I', 0))
+TITEM = 0x0F000276
+for k in range(7):
+    item_log(k)                         # the camera call above
+check('target ITEM: slot 2 not metal reads 0', call(mu, FGET, w0, TITEM + 4), 0)
+mu.mem_write(w1 + 0x100, struct.pack('>I', 1))
+check('target ITEM: slot 2 metal reads 1', call(mu, FGET, w0, TITEM + 4), 1)
+check('target ITEM: nearest opponent (slot 2) metal reads 1', call(mu, FGET, w0, TITEM + 1), 1)
+check('target ITEM: self not metal reads 0', call(mu, FGET, w0, TITEM), 0)
+call(mu, FSET, w0, TITEM + 4, 1.0)
+check_eq('target ITEM 1 on slot 2: metal on it (F1, 1, -1), f1 -1', [x[:3] + x[5:6] for x in item_log(0)], [(F1, 1, -1, -1.0)])
+call(mu, FSET, w0, TITEM + 1, 2.0)
+check_eq('target ITEM 2 on the nearest opponent: metal off (F1)', [x[:3] + x[5:6] for x in item_log(0)], [(F1, 0, -1, -1.0)])
+call(mu, FSET, w1, TITEM + 3, 1.0)
+check_eq('target ITEM 1 on slot 1 from slot 2: (F0)', [x[:3] for x in item_log(0)], [(F0, 1, -1)])
+call(mu, FSET, w0, TITEM + 5, 1.0)
+check_eq('target ITEM on an empty slot: nothing', item_log(0), [])
+call(mu, FSET, w0, TITEM + 11, 1.0)
+check_eq('past the targets (0x0F000281): nothing', [item_log(k) for k in range(7)], [[]] * 7)
+check('past the targets reads 0', call(mu, FGET, w0, TITEM + 11), 0)
+
 print('FAILS', fails)
 sys.exit(1 if fails else 0)

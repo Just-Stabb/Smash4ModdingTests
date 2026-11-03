@@ -230,6 +230,11 @@ SpecialAirLw14
 SpecialAirLw15Positive
 SpecialAirLw16Start
 SpecialAirLw21
+// fix 79: Zoom 2 U's flight (the user's spell 23): motion 0x280 (Robin's speciallwend_c2 slot; extra_kinds.json
+// "motions"), Zoom's flight turned head first (tools/brave_zoom2u_anim.py); its scripts SpecialLw16Hi's, the game one
+// with ENABLE_CANCEL first
+SpecialLw23
+SpecialLw23 -> body/FitRefletBodyMainD03SpecialLwSpell9Side.omo
 // the side tilt's second hit (the game's side-tilt combo, fighter_param 265 = 2): motion 0x59, Ultimate's
 // c01attacks32 animation (extra_kinds.json "motions")
 AttackS3S2 -> body/FitRefletBodyMainC01AttackS32.omo

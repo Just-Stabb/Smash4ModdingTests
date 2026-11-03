@@ -1321,3 +1321,55 @@ _01 / _02; `chrn_11`, `chrn_12`, `chrn_40`), each in its old copy's format, size
   marker's bit, as the other moves); Hatchet Man (20) stays always critical.
 - `port_check`: the same pre-existing E4 / E5 / E7 / P1 / S4 as fix 77.
 - Changed: `brave.mscsb`.
+
+## Fix 79 (`build/hero_fix79.zip`): Whack homes, Metal Slash's metal, Acceleration, Zoom 2 U
+
+Install over fix 78. Every value below is the user's (none of it is Ultimate's), except where Ultimate's is named.
+
+- **Whack** (`weapons/deathball.c`, level 0; Thwack unchanged): 620 frames (`sh_life_s`; Ultimate's 120) at
+  Ultimate's 1.3 a frame, homing hard: on its first frame it locks the opponent nearest to it (that fighter for
+  good) and each frame turns a quarter of the way to his middle (his Y + 10) (`dbl_steer`). Reflected, it homes
+  on Hero: the game flips a reflected weapon's facing (docs/native-notes.md "Reflection"), and Whack's own
+  movement never touches its facing, so a facing other than the first means reflected (flipped back by Hero:
+  the first target again); reflected, Hero can be rolled for too. Any hit (its hitbox connecting or meeting a
+  shield: the article's on-hit status) removes it the next frame; a fighter shielding there (status
+  0x1B-0x1E, the slot's STATUS variable) isn't rolled for. `shot.c`'s safety net is now its life + 300 frames.
+- **Metal Slash** (spell 19, `brave_metal_slash`): the fighter it hits turns metal as the Metal Box makes him
+  (the item's own function: the look, weight, knockback resistance and its own time, then off by itself),
+  unless he is metal already or it met his shield. New position variable **ITEM on a target**
+  (`0x0F000276 + target`, `tools/position_vars_cave.py` `inp_item`; docs/position-variables.md): a write puts
+  one of SELF_ITEM's codes on that fighter, a read is 1 while he is metal (his flag `0x20000012`). Hero writes
+  1 to the last fighter hit's (`0x0F000278`) once the cast has connected.
+- **Acceleration** (spell 22, 28 MP): Kirby's Overdrive on Hero for Acceleratle's 600 frames: Overdrive's blue
+  glow (common effect `0x10000C7` on his head, both arms and left leg: joints 0x13 / 0x10 / 0x16 / 0x4, as
+  Kirby's HeadN / LArmJ / RArmJ / LLegJ), x1.2 animations (`0x0F000098`), x1.2 on Overdrive's stats and x1.2
+  rolls (`brave_roll_mult`). It stacks with Acceleratle: the marker's new bit `0x1000` (bits 8-11 are Kirby's
+  trait badge) multiplies Overdrive's stats (walk, dash, run, jump across, air, fall speeds) by 1.2 on top of
+  whatever profile is on (`tools/kirby_stat_cave.py` `ACCEL_BIT`, 13 words after the profile table: Acceleratle
+  + Acceleration x2.4 across, falls x1.2); rolls x2 x 1.2. Cast with Acceleratle's motion and scripts.
+- **Zoom 2 U** (spell 23, Zoom's 8 MP, `brave_zoom2u`): Zoom's start, then Zoom's flight turned on its side:
+  motion 0x280 (Robin's unused `speciallwend_c2` slot; `extra_kinds.json`, `kind_expand.py`'s motion table) plays
+  `FitRefletBodyMainD03SpecialLwSpell9Side` (`tools/brave_zoom2u_anim.py`: Ultimate's d03speciallwspell9hi with
+  RotN turned +90 degrees about X, head first along his facing, moved back 8.75 so his middle stays over his
+  position; the flight line effect follows `rot`, so it turns too), its scripts SpecialLw16Hi's with
+  ENABLE_CANCEL first. The opponent nearest him when he casts it is the target (for good); the flight is Zoom's
+  9 a frame for Zoom's 40 frames, intangible as Zoom, aimed at the target (his feet + 6) every frame until Hero
+  is within 80 of him, then straight on; Hero faces the way he flies. Its speed is on energy 3 (reset / limit off
+  / on as Robin's own launches), his gravity held at 0. Acting out of the flight (allowed from its first frame:
+  the air actions `func_41` checks) or its end (a fall) keeps the speed clamped to his max air speed across and
+  his max fall speed up and down (fighter_param 0x16 / 0x19, buffs included); meeting the ground ends it with
+  SpecialLw16End. Cast from the ground he is lifted 6 first.
+- **Menu**: 23 spells (`brave_menu_art.py` SPELLS + Acceleration 28, Zoom 2 U 8; `trait_badge_cave.py` SPELLS 23:
+  greyed frames at 23 + n); drawn as Acceleratle (weight 16) and Zoom (15). Not in Hocus Pocus's draw.
+- Tests: `position_vars_test.py` (ITEM on a target: reads, writes on the nearest opponent / slots / last hit,
+  empty slots, the range's end), `kirby_stat_test.py` (Acceleration alone, with Acceleratle, other bits),
+  `trait_badge_test.py` (spells 22 / 23, greyed at 23 + n). The new motion table word checked against the
+  executable (one word, 0x04BA70B8).
+- `port_check` over steve_hero_v1 + fighters_latest + fixes 56-79: the same 6 errors as without fix 79 (A3, E4,
+  E5, E7, P1, S4: pre-existing); its C4 warning on `brave_z2_clamp` is the flight's world-X speed (aimed at the
+  target, not along his facing).
+- Not checked in game: all of it (the MSC compiles with no stack problems; the caves are emulator-tested).
+- Changed: `code/cross_f.rpx` (fix 77's + position_vars_cave, trait_badge_cave, kirby_stat_cave `--table --accel`,
+  kind_expand), `brave.mscsb`, the shot articles' MSC (`flash`, `explosion`, `deathball`, `sleep`), body
+  `game` / `effect` / `sound` / `expression.bin` and `motion.mtable`, `motion/body/main.pac`, `ui/info/dmg/`, and
+  Sm4shCommand's `ModAnimNames.txt`, `Aliases/variables.txt`, `Tooltips/position_variables.txt`.

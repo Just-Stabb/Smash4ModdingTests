@@ -38,13 +38,13 @@ object's kind 0x45; the panel slot's kind byte isn't trusted for an added kind),
   0x1000009E = 0x4845xxxx  the window: bit 2 shown, bits 0-1 the cursor's row, bit 3 closing, bit 4
                            blinking off, bit 5 a spell cast (its row's window), bits 8-10 the open /
                            close animation's frame, bits 11-14 the pointer's frame
-  0x1000009F = 0x48xxxxxx  the rows' spells (1-21, 0 none) in bits 0-4, 5-9, 10-14, 15-19; bit 20 + row:
+  0x1000009F = 0x48xxxxxx  the rows' spells (1-SPELLS, 0 none) in bits 0-4, 5-9, 10-14, 15-19; bit 20 + row:
                            greyed (not enough MP)
   0x1000009C = 0x4D50GGBB  the gauge: G his MP (0-100), B the part of it left after the cost in view
 cmdwin_mc: opening frames 1-5 (animation frame 0-4, then 5; open with the cursor's spell greyed: 14),
-closing 6-9 (hidden after), cast 10 + the cursor's row; spell0_mc ... spell3_mc: row K's spell (+ 21
+closing 6-9 (hidden after), cast 10 + the cursor's row; spell0_mc ... spell3_mc: row K's spell (+ SPELLS
 greyed), cmdcur0_mc ... cmdcur3_mc: the pointer on the cursor's row (its frame + 1), cmdmp_mc: the
-cursor's spell's cost (+ 21 greyed), these only when the window is open (opening from
+cursor's spell's cost (+ SPELLS greyed), these only when the window is open (opening from
 its frame 3, not closing); mpgauge_mc / mplabel_mc frame 1, mpblue_mc B + 1, mpgreen_mc G + 1 (when G > B),
 mpnum_mc G + 1. Otherwise (another fighter, no marker, the window shut, a row with no spell) they are
 hidden; the gauge goes by its own int. The names are interned for every slot (no cache: see the badge's
@@ -83,7 +83,7 @@ MENU_INT, SPELL_INT, MP_INT = 0x9E, 0x9F, 0x9C
 MP_MAGIC = 0x4D50
 MENU_MAGIC, SPELL_MAGIC = 0x4845, 0x48
 ROWS = 4
-SPELLS = 21
+SPELLS = 23                     # tools/brave_menu_art.py SPELLS (fix 79: Acceleration 22, Zoom 2 U 23)
 # the window's elements (tools/dmg_brave_menu.py), in the order the routine goes through them
 ELEMENTS = [b'cmdwin_mc'] + [b'spell%d_mc' % k for k in range(4)] + [b'cmdcur%d_mc' % k for k in range(4)] + \
     [b'cmdmp_mc', b'mpgauge_mc', b'mpgreen_mc', b'mpblue_mc', b'mplabel_mc', b'mpnum_mc']
@@ -444,7 +444,7 @@ contents:
         blt apply
         cmpwi r26, 4
         bgt notrow
-        addi r9, r26, -1            # spellK_mc: row K's spell, + 21 greyed (B bit 20 + K)
+        addi r9, r26, -1            # spellK_mc: row K's spell, + SPELLS greyed (B bit 20 + K)
         bl spell
         mr r27, r3
         cmpwi r27, 0
@@ -469,7 +469,7 @@ notrow:
         addi r27, r27, 1
         b apply
 mp:
-        andi. r9, r25, 3            # cmdmp_mc: the cost of the cursor's spell (+ 21 greyed)
+        andi. r9, r25, 3            # cmdmp_mc: the cost of the cursor's spell (+ SPELLS greyed)
         bl spell
         mr. r27, r3
         beq apply
@@ -550,7 +550,7 @@ greyrow:                            # cr0 ne: row r9 greyed (B bit 20 + r9) (use
         srw r3, r24, r0
         andi. r3, r3, 1
         blr
-spell:                              # r3 = row r9's spell (1-21), 0 for none (uses r0)
+spell:                              # r3 = row r9's spell (1-SPELLS), 0 for none (uses r0)
         mulli r0, r9, 5
         srw r3, r24, r0
         andi. r3, r3, 31

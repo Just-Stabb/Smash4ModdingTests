@@ -59,6 +59,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
               inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
               combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
   0x0F000260 + 2*target + n   stick (n 0) / C-stick (n 1) X on screen (+ = right): read; write forces
+  0x0F000276 + target   ITEM: write one of SELF_ITEM's codes to put that item state on the target; read
+              1 while it's metal (flag 0x20000012) (0x0F000276-0x0F000280; inp_item)
 
 Reads with no such fighter (no opponent, empty slot, or called from a non-fighter such as an
 article, for self IDs) give 0 and writes do nothing.
@@ -1297,11 +1299,19 @@ inp_entry:                              # 0x100 + 0x20 * target + q: inputs / st
 inp_entry_raw:                          # 0x260 + 2 * target + n: raw stick / C-stick X (q 0x20 + n)
         addi r3, r3, -0x160
         cmplwi r3, 0x16
-        bge ext_zero
+        bge inp_entry_item
         clrlwi r11, r3, 31
         addi r11, r11, 0x60
         stw r11, 0x14(r1)
         srwi r22, r3, 1
+        b ext_target
+inp_entry_item:                         # 0x276 + target: ITEM (q 0x22)
+        addi r3, r3, -0x16
+        cmplwi r3, 11
+        bge ext_zero
+        li r11, 0x62
+        stw r11, 0x14(r1)
+        mr r22, r3
         b ext_target
 """, False),
 ("""
@@ -1325,6 +1335,8 @@ inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 post
         blt inp_ko
         cmplwi r22, 0x22
         blt inp_raw
+        cmplwi r22, 0x23
+        blt inp_item
         b ext_zero
 inp_raw:                                # q 0x20 / 0x21: stick / C-stick X on screen (+ = right)
         addi r26, r22, -0x20
@@ -1572,6 +1584,26 @@ inp_hit_set:
 inp_inv_set:
 %(SET_INVINCIBLE)s
         b ext_zero
+""", False),
+("""
+inp_item:                               # q 0x22 ITEM: a write puts an item state on the target (SELF_ITEM's
+        cmpwi r29, 0                    # codes, ext_item); a read is 1 while it's metal (flag 0x20000012,
+        bne inp_item_set                # WorkModule vt +0xE4 is_flag)
+        mr r3, r23
+%(CHK_R3)s
+        lwz r12, 0(r3)
+%(CHK_VT)s
+        lwz r12, 0xE4(r12)
+        lis r4, 0x2000
+        ori r4, r4, 0x12
+        mtctr r12
+        bctrl
+        clrlwi r3, r3, 24
+        b ext_ret_int
+inp_item_set:
+        mr r27, r24                     # ext_item works on r27's fighter (accessor), r28 non-zero
+        mr r28, r25
+        b ext_item
 """, False),
 ("""
 inp_ko:                                 # q 0x1F KO: a non-zero write KOs it on the spot (flag 0x20000043,

@@ -214,6 +214,15 @@ F is the fighter object (its module accessor − 0x230). The mushroom refuses wh
 
     SET_FLOAT(Value=1, Variable=0x0F000099)    // metal
 
+### On another fighter
+
+`0x0F000276 + target` (`SELF_ITEM_STATE`, `OPP_ITEM`, `LASTHIT_ITEM`, `SLOT1_ITEM`-`SLOT8_ITEM`: targets as for
+the combat variables, 0 self, 1 nearest opponent, 2 last fighter hit, 3-10 player slots 1-8, so
+`0x0F000276`-`0x0F000280`). A write puts the same codes on that fighter; a read is 1 while it's metal (its flag
+`0x20000012`), else 0. Hero's Metal Slash (fix 79) writes 1 to the last fighter hit's.
+
+    SET_FLOAT(Value=1, Variable=0x0F000278)    // the last fighter hit: metal (the Metal Box's)
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:

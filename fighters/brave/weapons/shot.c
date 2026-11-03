@@ -59,9 +59,9 @@ void sh_burst(int motion, int frames)
 void sh_loop()
 {
     sh_total += 1;
-    if (sh_total > 0x12c)
+    if (sh_total > sh_life + 0x12c)
     {
-        sh_remove();    // a safety net
+        sh_remove();    // a safety net (its life and 300 frames)
         return;
     }
     sh_frame += 1;

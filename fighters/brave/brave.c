@@ -38546,15 +38546,22 @@ float brave_dmg_seen;
 int brave_slot;
 // buffs: frames left (Acceleratle, Oomph, Bounce), Psyche Up until a hit lands, Hocus Pocus's invisibility
 int brave_speed_t;
+int brave_accel_t;      // fix 79: Acceleration's frames left
 
 // the roll's speed under Acceleratle (rolloff_update)
 float brave_roll_mult()
 {
+    float m;
+    m = 1.0f;
     if (brave_speed_t > 0)
     {
-        return 2.0f;
+        m = 2.0f;
     }
-    return 1.0f;
+    if (brave_accel_t > 0)
+    {
+        m = m * 1.2f;       // fix 79: Acceleration, on top of Acceleratle's
+    }
+    return m;
 }
 int brave_attack_t;
 int brave_reflect_t;
@@ -38605,6 +38612,8 @@ int brave_cost(int n)
     else if (n == 0x13) { c = 0x6; }
     else if (n == 0x14) { c = 0xf; }
     else if (n == 0x15) { c = 0xe; }
+    else if (n == 0x16) { c = 0x1c; }     // fix 79: Acceleration 28 (the user's)
+    else if (n == 0x17) { c = 0x8; }      // Zoom 2 U: Zoom's 8
     return c;
 }
 
@@ -38694,8 +38703,38 @@ void brave_glow(int id, int on)
     }
 }
 
+// Acceleration (fix 79): Kirby's Overdrive (fighters/kirby/kirby.c overdrive_update) on Hero: the common blue
+// glow 0x10000C7 on the head, both arms and the left leg (his joints 0x13 head, 0x10 / 0x16 arm L / R, 0x4
+// leg L: Overdrive's HeadN / LArmJ / RArmJ / LLegJ), removed and made again every frame, and every animation
+// x1.2 (the animation rate, 0x0F000098)
+void brave_accel_glow_on(int bone)
+{
+    EffectModule(0x2717, 0x10000c7, bone, 0, 0, 0, 0, 0, 0, 1.0f, 0x1);
+}
+
+void brave_accel_on()
+{
+    WorkModule(0, 1.2f, 0x0f000098);
+    EffectModule(0x2723, 0x10000c7, 0x1, 0x1);
+    brave_accel_glow_on(0x13);
+    brave_accel_glow_on(0x10);
+    brave_accel_glow_on(0x16);
+    brave_accel_glow_on(0x4);
+}
+
+void brave_accel_off()
+{
+    WorkModule(0, 1.0f, 0x0f000098);
+    EffectModule(0x2723, 0x10000c7, 0x1, 0x1);
+    brave_accel_t = 0;
+}
+
 void brave_buffs_off()
 {
+    if (brave_accel_t > 0)
+    {
+        brave_accel_off();
+    }
     brave_speed_t = 0;
     brave_attack_t = 0;
     brave_reflect_t = 0;
@@ -38858,6 +38897,18 @@ void brave_mp_update()
 void brave_buff_update()
 {
     int m;
+    if (brave_accel_t > 0)
+    {
+        brave_accel_t -= 1;
+        if (brave_accel_t == 0)
+        {
+            brave_accel_off();
+        }
+        else
+        {
+            brave_accel_on();
+        }
+    }
     if (brave_speed_t > 0)
     {
         brave_speed_t -= 1;
@@ -38917,11 +38968,16 @@ void brave_buff_update()
     }
     // the marker's bits (tools/strike_cave.py, tools/hero_buff_cave.py): 3 Acceleratle's speeds, 0x20
     // Oomph (x1.6 damage, x1.1 knockback) and 0x40 Psyche Up (x1.2 knockback, x1.65 shield damage) on his
-    // physical attacks (not his specials), 0x80 Oomph's x1.2 damage taken, 0x10 a critical hit (x2 damage)
+    // physical attacks (not his specials), 0x80 Oomph's x1.2 damage taken, 0x10 a critical hit (x2 damage), 0x1000
+    // Acceleration (bits 8-11 are Kirby's trait badge: tools/trait_badge_cave.py)
     m = 0;
     if (brave_speed_t > 0)
     {
         m = m + 0x3;
+    }
+    if (brave_accel_t > 0)
+    {
+        m = m + 0x1000;     // fix 79: Acceleration's x1.2 on Overdrive's stats (kirby_stat_cave.py ACCEL_BIT)
     }
     if (brave_attack_t > 0)
     {
@@ -40253,6 +40309,11 @@ void brave_hi_main()
 // 17 - 20 Flame Slash, Kacrackle Slash, Metal Slash, Hatchet Man (sword moves: their hitboxes are in
 //                  their scripts, Ultimate's SpecialLw17-20)
 // 21 Psyche Up     x1.15 damage until his next hit lands
+// fix 79 (the user's, not Ultimate's; not in Hocus Pocus's draw):
+// 22 Acceleration  28 MP: Kirby's Overdrive on Hero for Acceleratle's 600 frames (its blue glow, x1.2 animations,
+//                  x1.2 speeds: tools/kirby_stat_cave.py ACCEL_BIT, x1.2 rolls), stacking with Acceleratle
+// 23 Zoom 2 U      8 MP: Zoom on its side after the nearest opponent (brave_zoom2u)
+// and Metal Slash (19) turns a fighter it hits metal (brave_metal_slash); Whack: weapons/deathball.c
 int brave_lw_state;
 int brave_lw_frame;
 int brave_lw_cursor;
@@ -40280,6 +40341,8 @@ int brave_lw_weight(int n)
     if (n == 0x10) { return 0xf; }
     if (n == 0x11 || n == 0x12 || n == 0x14) { return 0x12; }
     if (n == 0x13) { return 0x7; }
+    if (n == 0x16) { return 0x10; }         // fix 79: Acceleration as Acceleratle, Zoom 2 U as Zoom
+    if (n == 0x17) { return 0xf; }
     return 0;
 }
 
@@ -40308,6 +40371,8 @@ int brave_lw_spell_motion(int n, int air)
     else if (n == 0x10) { g = 0x23a; a = 0x269; }
     else if (n >= 0x11 && n <= 0x14) { g = 0x27a + n - 0x11; a = g + 0xc; }
     else if (n == 0x15) { g = 0x240; a = 0x26a; }
+    else if (n == 0x16) { g = 0x235; a = 0x264; }     // fix 79: Acceleration casts as Acceleratle
+    else if (n == 0x17) { g = 0x23a; a = 0x269; }     // Zoom 2 U starts as Zoom
     if (air)
     {
         return a;
@@ -40370,7 +40435,7 @@ void brave_lw_draw()
     {
         total = 0;
         n = 0x1;
-        while (n <= 0x15)
+        while (n <= 0x17)
         {
             if ((taken / brave_bit(n)) % 0x2 == 0)
             {
@@ -40383,7 +40448,7 @@ void brave_lw_draw()
         {
             r = randi(0, total);
             n = 0x1;
-            while (n <= 0x15 && pick == 0)
+            while (n <= 0x17 && pick == 0)
             {
                 if ((taken / brave_bit(n)) % 0x2 == 0)
                 {
@@ -40783,6 +40848,220 @@ int brave_zoom(float f)
     return 0;
 }
 
+// Zoom 2 U (fix 79, the user's spell 23): Zoom on its side, after the opponent nearest him when he casts it
+// (that fighter for good). 0 SpecialLw16Start (Zoom's); 1 the flight: motion 0x280 (Zoom's flight turned head
+// first along his facing: tools/brave_zoom2u_anim.py; its scripts Zoom's flight's, its game script lets him act
+// from its first frame, ENABLE_CANCEL), intangible as Zoom, at Zoom's 9 a frame for Zoom's 40 frames, in the
+// air with his gravity held (energy 3 carries it, as Robin's own launches set it). Each frame it aims at the
+// target (his feet + 6: level with his body) until he is within 80 of him, then goes straight on; he turns to
+// face the way he flies. An action out of the flight (func_41: the air actions the cancel allows) or the
+// flight's end (a fall) keeps the speed clamped to his max air speed across and his max fall speed up and
+// down; meeting the ground ends it with SpecialLw16End
+int brave_z2_target;
+int brave_z2_track;
+float brave_z2_vx;
+float brave_z2_vy;
+
+float brave_sqrt(float v)
+{
+    float g;
+    int i;
+    if (v <= 0)
+    {
+        return 0;
+    }
+    g = v;
+    if (g < 1.0f)
+    {
+        g = 1.0f;
+    }
+    i = 0;
+    while (i < 0xc)
+    {
+        g = (g + v / g) * 0.5f;
+        i += 1;
+    }
+    return g;
+}
+
+int brave_z2_nearest()
+{
+    int s;
+    int best;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    best = 0xffffffff;
+    bd = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != brave_slot && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+            d = dx * dx + dy * dy;
+            if (best < 0 || d < bd)
+            {
+                best = s;
+                bd = d;
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
+void brave_z2_aim()
+{
+    float dx;
+    float dy;
+    float d;
+    int t;
+    t = brave_z2_target;
+    if (brave_z2_track == 0 || t < 0 || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
+    {
+        return;
+    }
+    dx = WorkModuleF(0, 0x0f000020 + 0x4 * t) - PostureModuleF(0x1);
+    dy = WorkModuleF(0, 0x0f000021 + 0x4 * t) + 6.0f - PostureModuleF(0x2);
+    d = brave_sqrt(dx * dx + dy * dy);
+    if (d <= 80.0f)
+    {
+        brave_z2_track = 0;     // close enough: straight on from here
+        return;
+    }
+    brave_z2_vx = dx / d * 9.0f;
+    brave_z2_vy = dy / d * 9.0f;
+}
+
+// the flight's speed (energy 3), his gravity held at 0; facing the way he flies
+void brave_z2_move()
+{
+    if (brave_z2_vx * PostureModuleF(0) < 0)
+    {
+        PostureModule(0, -PostureModuleF(0));
+        PostureModule(0x2);
+    }
+    brave_fly(0);
+    KineticModule(0x11, 0x3, brave_z2_vx, brave_z2_vy);
+}
+
+float brave_clampf(float v, float m)
+{
+    if (v > m)
+    {
+        return m;
+    }
+    if (v < -m)
+    {
+        return -m;
+    }
+    return v;
+}
+
+// out of the flight: its speed clamped (his max air speed 0x03000016 across, max fall speed 0x03000019 up and
+// down, his buffs' included), across on energy 3 (which carries into the air statuses, as a roll's off an
+// edge), up / down on his gravity, back to his own fall
+void brave_z2_clamp()
+{
+    KineticModule(0x11, 0x3, brave_clampf(brave_z2_vx, WorkModuleF(0, 0x3000016)), 0);
+    KineticModule(0xf, 0x1, -0.089f);
+    KineticModule(0x14, 0x1, 1.5f);
+    KineticModule(0x11, 0x1, brave_clampf(brave_z2_vy, WorkModuleF(0, 0x3000019)));
+}
+
+int brave_zoom2u(float f)
+{
+    if (brave_lw_sub == 0x1)
+    {
+        WorkModule(0, 2.0f, 0x0f00011b);    // intangible, renewed each frame (Zoom's)
+    }
+    if (brave_lw_sub == 0)
+    {
+        if (brave_lw_once(0x1))
+        {
+            brave_z2_target = brave_z2_nearest();
+            brave_z2_track = brave_z2_target >= 0;
+        }
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_sub = 0x1;
+            brave_lw_t = 0;
+            if (global18 != 0x2)
+            {
+                WorkModule(0x2, 6.0f, 0x0f000005);  // off the ground first
+            }
+            func_20(0x2);
+            KineticModule(0, 0xa);
+            KineticModule(0xe, 0x3, 0x16, 0, 0, 0, 0, 0);
+            KineticModule(0x15, 0x3, -1.0f, -1.0f);
+            KineticModule(0xb, 0x3);
+            brave_z2_vx = 9.0f * PostureModuleF(0);
+            brave_z2_vy = 0;
+            brave_z2_aim();
+            brave_z2_move();
+            brave_lw_motion(0x280, 0x280);
+        }
+        return 0x2;
+    }
+    if (brave_lw_sub == 0x1)
+    {
+        brave_lw_t += 1;
+        if (global18 == 0 && brave_lw_t > 0x2)
+        {
+            brave_lw_sub = 0x2;     // met the ground
+            KineticModule(0x11, 0x3, 0, 0);
+            KineticModule(0xf, 0x1, -0.089f);
+            KineticModule(0x14, 0x1, 1.5f);
+            brave_lw_motion(0x23e, 0x23e);
+            return 0x2;
+        }
+        if (brave_lw_t >= 0x28)
+        {
+            brave_z2_clamp();       // the flight's end: a fall
+            func_16(0xe, 0);
+            return 0x1;
+        }
+        if (CancelModule(0x2713) == 0x1)
+        {
+            brave_z2_clamp();
+            if (func_41())
+            {
+                return 0x1;         // acted out of it
+            }
+        }
+        brave_z2_aim();
+        brave_z2_move();
+        if (MotionModule(0x2712) == 0x1)
+        {
+            brave_lw_motion(0x280, 0x280);  // the flight's loop
+        }
+        return 0x2;
+    }
+    return 0;
+}
+
+// Metal Slash (fix 79, the user's): a fighter it hits turns metal as the Metal Box makes him (its look, weight,
+// knockback resistance and time: tools/position_vars_cave.py's ITEM on a target, code 1), unless he is metal
+// already or it met his shield. Each frame of the cast once it has connected (SELF_HIT 0x0F0000A0): the last
+// fighter hit (target 2: ITEM 0x0F000278 reads 1 while he is metal, status 0x0F0000B2)
+void brave_metal_slash()
+{
+    float st;
+    if (WorkModuleF(0, 0x0f0000a0) < 0.5f || WorkModuleF(0, 0x0f000278) >= 0.5f)
+    {
+        return;
+    }
+    st = WorkModuleF(0, 0x0f0000b2);
+    if (st >= 27.0f && st <= 30.0f)
+    {
+        return;     // GuardOn / Guard / GuardOff / GuardDamage (0x1B-0x1E)
+    }
+    WorkModule(0, 1.0f, 0x0f000278);
+}
+
 // Magic Burst's blast for the MP it took (weapons/crash.c): 81-100 the full one (motion 0), else 20 / 40 / 60 /
 // 80 % of its damage (motions 3-6), the MP rounded up to the next 20
 int brave_burst_motion()
@@ -40913,6 +41192,22 @@ int brave_lw_cast(float f)
     else if (n == 0x10)
     {
         return brave_zoom(f);
+    }
+    else if (n == 0x13)
+    {
+        brave_metal_slash();
+    }
+    else if (n == 0x16)
+    {
+        if (f >= 11.0f && brave_lw_once(0x1))
+        {
+            brave_accel_t = 0x258;  // Acceleratle's 600 (speed_up_frame)
+            brave_accel_on();
+        }
+    }
+    else if (n == 0x17)
+    {
+        return brave_zoom2u(f);
     }
     else if (n == 0x15)
     {
@@ -41059,7 +41354,7 @@ void brave_lw_end()
 {
     brave_menu_close();
     brave_metal(0);         // out of Kaclang early: the Metal Box flag off
-    if (brave_lw_spell == 0x8 || brave_lw_spell == 0xa || brave_lw_spell == 0x10)
+    if (brave_lw_spell == 0x8 || brave_lw_spell == 0xa || brave_lw_spell == 0x10 || brave_lw_spell == 0x17)
     {
         // out of Magic Burst's hover / Kaclang's fall / Zoom's flight early (hit): his own fall again
         KineticModule(0xf, 0x1, -0.089f);

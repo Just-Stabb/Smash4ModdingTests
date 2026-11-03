@@ -188,7 +188,8 @@
         "0x267": {"anim": "FitRefletBodyMainD03SpecialAirLwSpell2", "flags": "0x0", "motion": "specialairlw14"},
         "0x268": {"anim": "FitRefletBodyMainD03SpecialAirLwSpell1", "flags": "0x0", "motion": "specialairlw15positive"},
         "0x269": {"anim": "FitRefletBodyMainD03SpecialAirLwSpell9Start", "flags": "0x0", "motion": "specialairlw16start"},
-        "0x26A": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill4", "flags": "0x0", "motion": "specialairlw21"}
+        "0x26A": {"anim": "FitRefletBodyMainD03SpecialAirLwSkill4", "flags": "0x0", "motion": "specialairlw21"},
+        "0x280": {"anim": "FitRefletBodyMainD03SpecialLwSpell9Side", "flags": "0x0", "motion": "speciallw23 (fix 79: Zoom 2 U, Zoom's flight on its side, tools/brave_zoom2u_anim.py; Robin's speciallwend_c2 slot)"}
       },
       "weapons": {
         "fireball": {"kind": "0x190", "base": "thunder", "max": 3, "on_hit": 1},

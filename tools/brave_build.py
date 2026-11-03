@@ -21,7 +21,7 @@ MODEL: his converted model/body/c00 (the ACMD joint ids). Writes OUT/:
   trait_badge_cave (the damage panel: Kirby's trait badge and Hero's Command Selection menu and MP gauge) /
   brave_reflect_cave (a reflector group for Robin's kind: Bounce) /
   thunder_orb_cave (Robin's native Thunder orb only on his own Thunder, not on Hero's copies) /
-  trail_table_cave / kirby_stat_cave's profile table (Acceleratle's speeds) (re-applying them over an executable that has them gives it back, so IN can be the
+  trail_table_cave / kirby_stat_cave's profile table and Acceleration bit (Acceleratle's / Acceleration's speeds) (re-applying them over an executable that has them gives it back, so IN can be the
   last test's);
 - --menu DIR --menu-layout ARC [--menu-font FONT]: ui/info/dmg/ = DIR (the damage panel with the trait
   badge) + Hero's Command Selection window and MP gauge from Ultimate's (ARC: its info_melee layout.arc;
@@ -294,7 +294,8 @@ def main():
         for g in CAVES:
             argv += run(os.path.join(HERE, g + '.py')).split()
         argv += run(os.path.join(HERE, 'trail_table_cave.py'), a.rpx).split()
-        argv += run(os.path.join(HERE, 'kirby_stat_cave.py'), '--table').split()    # Acceleratle's profile 3
+        # Acceleratle's profile 3; Acceleration's x1.2 bit (fix 79)
+        argv += run(os.path.join(HERE, 'kirby_stat_cave.py'), '--table', '--accel').split()
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'), *argv)
     if a.bank:
         d = os.path.join(fighter, 'effect/brave')

@@ -264,14 +264,18 @@ none:   li r3, 0
     check('Kirby: all hidden', menu_state(0), [F] * 15)
     check('Hero: the trait badge hidden', state(elems[1])[0], F)
     check('an empty slot: untouched', [state(r)[:3] for r in menu_elems(3)], [(T, 1, 0)] * 15)
-    check('pointer on row 0; row 1 none, row 2 spell 30 (none such): hidden; row 3 greyed (21 + 21)',
+    check('pointer on row 0; row 1 none, row 2 spell 30 (none such): hidden; row 3 greyed (21 + SPELLS)',
           hero(OPEN | 0, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15 | 1 << 23),
-          [(T, 5), (T, 5), F, F, (T, 42), (T, 1), F, F, F, (T, 5)] + NOGAUGE)
-    check('the cursor on a greyed spell (row 3: 21): the window greyed (14), its cost greyed (21 + 21)',
+          [(T, 5), (T, 5), F, F, (T, 21 + C.SPELLS), (T, 1), F, F, F, (T, 5)] + NOGAUGE)
+    check('the cursor on a greyed spell (row 3: 21): the window greyed (14), its cost greyed (21 + SPELLS)',
           [hero(OPEN | 3, HS | 5 | 6 << 5 | 7 << 10 | 21 << 15 | 1 << 23)[i] for i in (0, 4, 8, 9)],
-          [(T, 14), (T, 42), (T, 1), (T, 42)])
+          [(T, 14), (T, 21 + C.SPELLS), (T, 1), (T, 21 + C.SPELLS)])
     check('cast (bit 5) on row 2: its row window (12), the spell, no greyed window',
-          [hero(OPEN | 0x20 | 2, HS | 19 << 10 | 1 << 22)[i] for i in (0, 3)], [(T, 12), (T, 40)])
+          [hero(OPEN | 0x20 | 2, HS | 19 << 10 | 1 << 22)[i] for i in (0, 3)], [(T, 12), (T, 19 + C.SPELLS)])
+    check('fix 79: spells 22 / 23 (Acceleration, Zoom 2 U) shown, 23 greyed (23 + SPELLS); 24 (none such) hidden',
+          [hero(OPEN | 1, HS | 22 | 23 << 5 | 24 << 10 | 1 << 21)[i] for i in (1, 2, 3, 9)],
+          [(T, 22), (T, 23 + C.SPELLS), F, (T, 23 + C.SPELLS)])
+    check('SPELLS matches the menu art (brave_menu_art.SPELLS)', C.SPELLS, 23)
     check('cast while closing: the closing frames', hero(HM | 4 | 0x20 | 8 | 1 << 8 | 2)[0], (T, 7))
     check('the pointer on a row with no spell: no pointer, no MP window',
           [hero(OPEN | 1, HS | 5 | 0 << 5 | 30 << 10 | 21 << 15)[i] for i in (5, 6, 9)], [F, F, F])

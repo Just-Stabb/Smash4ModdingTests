@@ -11,7 +11,7 @@ Writes OUT_DIR/ (tools/dmg_brave_menu.py puts them on the panel):
   hold.png                     wnd_hold_00 (wind_01): the cast spell's row alone (view_wnd_hold_0K)
   cursor_<k>.png               arrow_00's 16 textures (p4_info_brave_cursor_*) in the order
                                loop_anim_arrow shows them (15 down to 0, 2 frames each)
-  name_<n>.png / name_<n>_grey.png   the 21 spells' names (SPELLS, Ultimate's command order), white /
+  name_<n>.png / name_<n>_grey.png   the 23 spells' names (SPELLS, Ultimate's command order, then fix 79's two), white /
                                x 107/255 (txt_gray_out), as set_txt_00 (FOT-Rodin, its size 22.08 x 33.12)
   mp_<n>.png / mp_<n>_grey.png the cost window (wnd_cost_00: wind_02) with "MP" and spell n's cost as
                                txt_cost_mp / set_txt_cost_mp place them (bottom aligned); grey as above
@@ -45,7 +45,9 @@ SPELLS = [('Heal', 7), ('Sizz', 8), ('Sizzle', 20), ('Bang', 9), ('Kaboom', 37),
           ('Thwack', 30), ('Magic Burst', None), ('Kamikazee', 1), ('Kaclang', 6), ('Acceleratle', 13),
           ('Oomph', 16), ('Bounce', 14), ('Snooze', 16), ('Hocus Pocus', 4), ('Zoom', 8),
           ('Flame Slash', 12), ('Kacrackle Slash', 11), ('Metal Slash', 6), ('Hatchet Man', 15),
-          ('Psyche Up', 14)]
+          ('Psyche Up', 14),
+          # fix 79 (the user's, not Ultimate's): 22 Acceleration (Overdrive's speed), 23 Zoom 2 U (Zoom sideways)
+          ('Acceleration', 28), ('Zoom 2 U', 8)]
 TEX = 'p4_info_melee_lct_brave_%s^u'
 # p4_info_melee_lct_brave.bflyt's panes (px, y up, from the part's origin)
 WINDOW = (47, -13, 278, 168)                    # wnd_open_00: centre, size
