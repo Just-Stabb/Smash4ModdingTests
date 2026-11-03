@@ -75,3 +75,22 @@ tip, not the opponent; double the beam's shield damage.
 - **Shield damage x2:** each hitbox's added shield damage = its damage, rounded (`supamario_kame_build.py
   shield_add`): ticks +1 / +1 / +2, the finish +7 / +10 / +13.
 - Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3, finish); `supamario.mscsb` as fix 85.
+
+## Kamehameha fix 88 (`build/supamario_kame_fix88.zip`)
+
+Install over fix 87. User: too much shield damage fully charged (x1.5 there); it still only multi-hit fully
+charged; push the opponent into the beam only vertically (no teleport to the tip) and let the body's hits be the
+final hit, so the opponent needn't be moved far.
+
+- **Shield damage:** x2 / x2 / x1.5 by level (`SHIELD_MUL`): ticks +1 / +1 / +1, the finish +7 / +10 / +7.
+- **Shield, every level:** the shield check looked around the head only (10 behind it); the lingering body often
+  meets the shield first (behind the head), which counted as "no shield" and held the beam. `kame_near` now looks
+  along the whole body (min(frames flown, linger) x speed + 10 behind the head), at the first contact and on the
+  later ones while it flies on. (Whether this was the "multi-hits only fully charged" seen: not proven.)
+- **Vertical push:** `kame_push` (replaces `kame_pull`): a fighter in hitstun along the body (not Supamario, not
+  shielding) whose feet aren't within 2 of 7 below the head (a standing fighter's middle at the beam) is put
+  there, its X kept. Every frame of the hold and at the finish.
+- **Finish along the body:** `supamario_kame_build.py finish_game`: the launcher is a capsule from the head back
+  over min(frames flown, linger) x the speed (one block per level and length; the MSC writes (level + 1) x 64 +
+  frames into the level variable at the finish), so it hits the opponent wherever the body holds them.
+- Changed: `kamehameha.mscsb`, the weapon `game.bin` (fly1-3, finish); `supamario.mscsb` as fix 85.

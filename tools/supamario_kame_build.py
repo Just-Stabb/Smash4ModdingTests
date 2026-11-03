@@ -347,10 +347,14 @@ def msc_effects(heads, ids, follows, base=(0.0, 0.0, 0.0)):
     return '\n'.join(out)
 
 
-def shield_add(damage):
-    """fix 87 (user: double the beam's shield damage): the hitbox's added shield damage (an integer, native-notes
-    "Hero's buffs") as its damage, rounded: its shield damage twice the damage's"""
-    return int(round(damage))
+# fix 87 (user): the beam's shield damage x2; fix 88 (user: too much fully charged): x1.5 fully charged
+SHIELD_MUL = (2.0, 2.0, 1.5)
+
+
+def shield_add(damage, lv):
+    """the hitbox's added shield damage (an integer, native-notes "Hero's buffs"): damage x (SHIELD_MUL - 1),
+    rounded half up, so its shield damage is about SHIELD_MUL[lv] x the damage's"""
+    return int(damage * (SHIELD_MUL[lv] - 1.0) + 0.5)
 
 
 def fly_game(lv):
@@ -360,7 +364,7 @@ def fly_game(lv):
     the head back over all the ground it has covered (it grows from the spawn, so it never reaches behind the
     start), every frame of the flight; the hold plays this motion from the frame it hit at, frozen there
     (kamehameha.c kame_hold_begin), so the whole beam stays a hitbox until the finish / dissolve removes it"""
-    tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT, ShieldDamage=shield_add(TICK_DAMAGE[lv]))
+    tick = dict(Damage=TICK_DAMAGE[lv], Rehit=REHIT, ShieldDamage=shield_add(TICK_DAMAGE[lv], lv))
     g = [hitbox('Special_Hitbox', ID=0, Size=HEAD_SIZE[lv], Angle=HEAD_ANGLE, KBG=HEAD_KBG, FKB=HEAD_FKB,
                 BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
     for f in range(1, LINGERS[lv] + 1):
@@ -368,6 +372,23 @@ def fly_game(lv):
               hitbox('Extended_Special_Hitbox', ID=1, Size=BODY_SIZE[lv], Z2=-KAME_SPEED[lv] * f, Angle=HEAD_ANGLE,
                      KBG=HEAD_KBG, FKB=HEAD_FKB, BKB=HEAD_BKB, SDI=TICK_SDI, **tick)]
     return g
+
+
+def finish_game():
+    """the finish's game script. Fix 88 (user: "make the body multihits also usable as a final hit so the opponent's
+    position doesn't have to get set unreasonably far"): the launcher is a capsule along the body as the hold had it
+    (from the head back over min(frames flown, LINGERS) x the speed), not only at the head. The MSC writes (level +
+    1) x 64 + those frames into LEVEL_VAR at the finish's start (kamehameha.c kame_finish_main); one Int_Var_Compare
+    block per value (0 frames: the head alone)"""
+    g = [cmd('remove_all_hitboxes')]
+    for lv, f in enumerate(FINISH):
+        for n in range(LINGERS[lv] + 1):
+            kw = dict(ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0, BKB=f['BKB'], Size=f['Size'],
+                      Hitlag=1.5, SDI=1.0, SFXLevel=2, FacingRestrict=FINISH_FACING,
+                      ShieldDamage=shield_add(f['Damage'], lv))
+            hb = hitbox('Extended_Special_Hitbox', Z2=-KAME_SPEED[lv] * n, **kw) if n else hitbox('Special_Hitbox', **kw)
+            g += [cmd('int_var_compare', LEVEL_VAR, 0, (lv + 1) * 64 + n), cmd('true', 2 + cmd_size([hb])), hb]
+    return g + [cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
 
 
 def weapon_scripts(heads, ids, segs):
@@ -398,11 +419,7 @@ def weapon_scripts(heads, ids, segs):
         sound[name] = []                # the release's sound carries the flight (test 25)
     # the launcher, on the head, where the multi-hit holds the target (bigger than the head's), its
     # strength by the level
-    game['finish'] = [cmd('remove_all_hitboxes')] + by_level([
-        [hitbox('Special_Hitbox', ID=0, Part=1, Damage=f['Damage'], Angle=40, KBG=f['KBG'], FKB=0, BKB=f['BKB'],
-                Size=f['Size'], Hitlag=1.5, SDI=1.0, SFXLevel=2, FacingRestrict=FINISH_FACING,
-                ShieldDamage=shield_add(f['Damage']))] for f in FINISH]) + [
-        cmd('frame', float(FINISH_FRAMES)), cmd('remove_all_hitboxes')]
+    game['finish'] = finish_game()
     # the beam ends at once (user, test 11: "the body should disappear nearly all together"), then
     # the burst
     effect['finish'] = [cmd('terminate_graphic_effect', eid(n), 1, 1) for n in beam_effects(heads, segs)] + [

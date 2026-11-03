@@ -743,7 +743,7 @@ int kame_expired()
 // frozen, kame_hold_begin). A fighter around the head (from 10 behind it to 20 ahead, its feet 8 above to 28
 // below it: Supamario stays behind it): 2 one not shielding, 1 only shielding ones (status 0x1B-0x1E, the slot's
 // STATUS variable, docs/position-variables.md), 0 none
-int kame_near()
+int kame_near(float behind)
 {
     int s;
     int r;
@@ -764,7 +764,7 @@ int kame_near()
         {
             dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
             dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
-            if (s != kame_owner && dx > -10.0f && dx < 32.0f && dy > -8.0f && dy < 28.0f)
+            if (s != kame_owner && dx > -behind && dx < 32.0f && dy > -8.0f && dy < 28.0f)
             {
                 st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
                 if (st >= 27.0f && st <= 30.0f)
@@ -831,60 +831,49 @@ void kame_catch_update()
     }
 }
 
-// fix 86 (user: the multi-hits should force the opponent into the tip of the beam, where the finish hits: held by
-// the lingering body they never got it): every fighter not shielding in the body (behind the head, up to the
-// capsule's length and 8 more, its feet 8 above to 28 below the head) is moved toward the head along the beam,
-// half the way a frame (at most 12, at least 1.5); `snap`: all the way (the finish). Through the slot position
-// variables (docs/position-variables.md: a weapon may write them); Supamario stays behind the start
-void kame_pull(int snap)
+// the body's length behind the head (min(frames flown, the linger) x the speed) + `more`
+float kame_body(int frames, float more)
+{
+    if (frames > kame_linger())
+    {
+        frames = kame_linger();
+    }
+    return (float)frames * kame_speed() + more;
+}
+
+// fix 88 (user: not teleported to the tip but pushed into the beam, only vertically; the finish along the body
+// instead, kamehameha's game finish): every fighter in hitstun (its slot's HITSTUN, 0x0F000058 + 8 x slot) along
+// the body (behind the head up to its length + 8, 10 ahead), not Supamario, not shielding, whose feet aren't
+// KAME_PUSH_Y below the head (where a standing fighter's middle is the beam's) is put there, its X kept (fix 86 /
+// 87 moved them along the beam to the tip)
+void kame_push()
 {
     int s;
-    int n;
     float x;
     float y;
     float f;
     float dx;
-    float dy;
+    float fy;
     float len;
     float st;
-    float step;
     x = PostureModuleF(0x1);
     y = PostureModuleF(0x2);
     f = PostureModuleF(0);
-    n = kame_flown;
-    if (n > kame_linger())
-    {
-        n = kame_linger();
-    }
-    len = (float)n * kame_speed() + 8.0f;
+    len = kame_body(kame_flown, 8.0f);
     s = 0;
     while (s < 0x8)
     {
-        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        if (s != kame_owner && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f000058 + 0x8 * s) > 0)
         {
             dx = (WorkModuleF(0, 0x0f000020 + 0x4 * s) - x) * f;
-            dy = y - WorkModuleF(0, 0x0f000021 + 0x4 * s);
+            fy = WorkModuleF(0, 0x0f000021 + 0x4 * s);
             st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
-            if (s != kame_owner && dx < -1.0f && dx > -len && dy > -8.0f && dy < 28.0f && (st < 27.0f || st > 30.0f))
+            if (dx > -len && dx < 10.0f && fy > y - 40.0f && fy < y + 25.0f && (st < 27.0f || st > 30.0f))
             {
-                step = -dx;
-                if (snap == 0)
+                if (fy < y - 7.0f - 2.0f || fy > y - 7.0f + 2.0f)
                 {
-                    step = -dx * 0.5f;
-                    if (step > 12.0f)
-                    {
-                        step = 12.0f;
-                    }
-                    if (step < 1.5f)
-                    {
-                        step = 1.5f;
-                    }
-                    if (step > -dx)
-                    {
-                        step = -dx;
-                    }
+                    WorkModule(0, y - 7.0f, 0x0f000021 + 0x4 * s);
                 }
-                WorkModule(0, WorkModuleF(0, 0x0f000020 + 0x4 * s) + step * f, 0x0f000020 + 0x4 * s);
             }
         }
         s += 1;
@@ -892,7 +881,7 @@ void kame_pull(int snap)
 }
 
 // fix 87 (user: the pull took Supamario into the tip, not the opponent; at low charge a shield still stopped
-// it): Supamario's slot, left out of kame_near and kame_pull: at the beam's spawn (status 0) the fighter at or
+// it): Supamario's slot, left out of kame_near and the pull (fix 88: kame_push): at the beam's spawn (status 0) the fighter at or
 // behind its start (along its facing, up to 2 ahead) nearest to it (-1: none)
 int kame_find_owner()
 {
@@ -1018,7 +1007,7 @@ void kame_fly_loop()
     if (kame_shielded && kame_phase == 0 && AttackModule(0x2727))
     {
         // connected again while flying on through a shield: on if it's only shields, else the hold
-        if (kame_near() == 0x1)
+        if (kame_near(kame_body(kame_frame, 10.0f)) == 0x1)
         {
             AttackModule(0x2724);
         }
@@ -1056,9 +1045,9 @@ void kame_hold_main()
 {
     if (kame_phase == 0)
     {
-        if (kame_near() == 0x1)
+        if (kame_near(kame_body(kame_frame, 10.0f)) == 0x1)
         {
-            // a shield (fix 85): it flies on, its hitboxes back (the fly motion again from its frame: the status
+            // a shield (fix 85; fix 88: anywhere along the body, which may meet it before the head): it flies on, its hitboxes back (the fly motion again from its frame: the status
             // change took them), multi-hitting the shield; a later hit on a fighter not shielding holds it
             kame_shielded = 0x1;
             kame_play_to(kame_frame, 1.0f);
@@ -1081,7 +1070,7 @@ void kame_hold_loop()
     }
     kame_catch_update();
     kame_move(KAME_CREEP);      // fix 85: creeping forward
-    kame_pull(0x1);             // fix 86: into the tip (fix 87: all the way every frame, user: the opponent, not the owner)
+    kame_push();                // fix 88: into the beam, vertically
     kame_frame += 1;
     if (kame_frame >= kame_hold_frames() + 0xa)
     {
@@ -1103,7 +1092,10 @@ void kame_finish_main()
     {
         kame_phase = 0x2;
         kame_frame = 0;
-        kame_pull(0x1);         // fix 86: everyone in the body to the tip, where the launcher is
+        kame_push();            // fix 88: into the beam, vertically
+        // the launcher along the body (fix 88): its game script picks the capsule by level and length,
+        // (level + 1) x 64 + min(frames flown, the linger) in the level variable
+        WorkModule(0x7, (kame_level + 0x1) * 0x40 + (int)(kame_body(kame_flown, 0) / kame_speed() + 0.5f), 0x10000004);
         func_24(0x3, 0, 1.0f);
         MotionModule(0x4, 1.0f);
         kame_dissolve();
