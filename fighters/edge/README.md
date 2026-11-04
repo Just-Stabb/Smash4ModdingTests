@@ -720,3 +720,20 @@ test 62's files with the patched executable (install over test 60).
   at the start's end (its kill_kind). After the decide frame it stays on the decided direction.
 - port_check over the chain + this: no new errors.
 - Package (install over 62b): `script/msc/edge.mscsb`, `code/cross_f.rpx`.
+
+## Test 64 (`build/sephiroth_test64.zip`): side special, Shadow Flare
+
+- User: "Go ahead with Shadow Flare next". Ultimate's START / HOLD / SHOT on Zelda's Din's Fire statuses, the shot
+  (flare1) and, after it hits a fighter, the orbs on that fighter: specials.md "Side special" (sources, numbers,
+  what is approximated: the orbit's centre / radius, orbs that can't be hit, TRY / EXP BKB, reflection, air drift).
+- The orbs share state per target through the new `SLOTn_SHARED_k` variables (`tools/acmd_ext_cave.py`, emulator
+  test 0 failures). Found on the way: the standard executable's `0x0F0003xx` variables (VAR_, TIMER_, ...) read 0
+  since Hero fix 79 (position_vars_cave re-applied after acmd_ext_cave undid its hook); `edge_specials_build.py
+  --rpx` now applies acmd_ext_cave last (port_check X1 checks it).
+- Effects: the 9 `edge_shadowflare_*` added (bank 29.1 MB; the common sets / variants after them moved 9 ids, the
+  Flare charge-off ids in edge.c with them: E8). flare1: `"on_hit": 1`, max 4 (`tools/extra_kinds.json`).
+- port_check over the chain + this: no new errors.
+- Package (install over 63): the bank, body game / effect / sound, flare1's scripts and MSC, edge.mscsb,
+  code/cross_f.rpx. Not the vl file (ports_shapes' is newer).
+- Untested in game: the hit-target search (in hitstop, nearest), the orbs' hitbox placement by MSC, a weapon's
+  shared-variable writes on a fighter, EffectModule 0x3 / 0x17 on world-placed effects.
