@@ -38617,7 +38617,7 @@ int brave_cost(int n)
     else if (n == 0x13) { c = 0x6; }
     else if (n == 0x14) { c = 0xf; }
     else if (n == 0x15) { c = 0xe; }
-    else if (n == 0x16) { c = 0x1c; }     // fix 79: Acceleration 28 (the user's)
+    else if (n == 0x16) { c = 0x14; }     // Acceleration 20 (the user's; fix 79: 28)
     else if (n == 0x17) { c = 0x8; }      // Zoom 2 U: Zoom's 8
     return c;
 }
@@ -39275,10 +39275,49 @@ float brave_z2_lim(float v, float m)
     return v;
 }
 
+// Zoom 2 U's in-range end (the user's): brave_lw_burst 0x2NT, N frames (5 down to 1) still following target slot T
+// in the fall it ends in, at the flight's 9 a frame clamped as the end clamps it (his max air speed across, max fall
+// speed up / down); anything else he does (an action out of the fall) ends it, then the clamp frames as before
+void brave_z2_track()
+{
+    int t;
+    int n;
+    float dx;
+    float dy;
+    float d;
+    if (global4 == 0x155)
+    {
+        return;                     // the fall not yet in
+    }
+    t = brave_lw_burst & 0xf;
+    n = (brave_lw_burst >> 0x4) & 0xf;
+    brave_lw_burst = 0x103;
+    if (global4 != 0xe || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
+    {
+        return;
+    }
+    dx = WorkModuleF(0, 0x0f000020 + 0x4 * t) - PostureModuleF(0x1);
+    dy = WorkModuleF(0, 0x0f000021 + 0x4 * t) + 6.0f - PostureModuleF(0x2);
+    d = brave_sqrt(dx * dx + dy * dy);
+    if (d > 0.01f)
+    {
+        brave_z2_clamp(dx / d * 9.0f, dy / d * 9.0f);
+    }
+    if (n > 0x1)
+    {
+        brave_lw_burst = 0x200 + ((n - 0x1) << 0x4) + t;
+    }
+}
+
 void brave_z2_after()
 {
     float mx;
     float my;
+    if (brave_lw_burst >= 0x200 && brave_lw_burst < 0x260)
+    {
+        brave_z2_track();
+        return;
+    }
     if (brave_lw_burst < 0x101 || brave_lw_burst > 0x103 || global4 == 0x155)
     {
         return;
@@ -40352,7 +40391,7 @@ void brave_hi_main()
 //                  their scripts, Ultimate's SpecialLw17-20)
 // 21 Psyche Up     x1.15 damage until his next hit lands
 // fix 79 (the user's, not Ultimate's; not in Hocus Pocus's draw):
-// 22 Acceleration  28 MP: Kirby's Overdrive on Hero for Acceleratle's 600 frames (its blue glow, x1.2 animations,
+// 22 Acceleration  20 MP (fix 79: 28): Kirby's Overdrive on Hero for Acceleratle's 600 frames (its blue glow, x1.2 animations,
 //                  x1.2 speeds: tools/kirby_stat_cave.py ACCEL_BIT, x1.2 rolls), stacking with Acceleratle
 // 23 Zoom 2 U      8 MP: Zoom on its side after the nearest opponent (brave_zoom2u)
 // and Metal Slash (19) turns a fighter it hits metal (brave_metal_slash); Whack: weapons/deathball.c
@@ -41030,10 +41069,9 @@ void brave_z2_clamp(float vx, float vy)
 
 int brave_zoom2u(float f)
 {
-    if (brave_lw_sub == 0x1)
-    {
-        WorkModule(0, 2.0f, 0x0f00011b);    // intangible, renewed each frame (Zoom's)
-    }
+    // intangible from its first frame until the move ends (the user's; fix 79-85: the flight only), renewed each
+    // frame (Zoom's)
+    WorkModule(0, 2.0f, 0x0f00011b);
     if (brave_lw_sub == 0)
     {
         if (brave_lw_once(0x1))
@@ -41062,9 +41100,26 @@ int brave_zoom2u(float f)
     {
         return 0x4;                 // brave_lw_loop: clamped again, the fall
     }
+    if (brave_lw_sub == 0x4)
+    {
+        return 0x5;                 // brave_lw_loop: the same, then 5 frames of tracking
+    }
     if (brave_lw_sub == 0x1)
     {
         brave_lw_t += 1;
+        // through platforms (the user's): the floor under him passed each frame (Pass's GroundModule(0x2715)),
+        // and one he still lands on that can be passed (GroundModule(0xd)) put back under him in the air:
+        // only solid ground ends the flight
+        GroundModule(0x2715);
+        if (global18 == 0 && GroundModule(0xd))
+        {
+            GroundModule(0x2715);
+            func_20(0x2);
+            KineticModule(0, 0xa);
+            KineticModule(0xe, 0x3, 0x16, 0, 0, 0, 0, 0);
+            KineticModule(0x15, 0x3, -1.0f, -1.0f);
+            KineticModule(0xb, 0x3);
+        }
         if (global18 == 0 && brave_lw_t > 0x2)
         {
             brave_lw_sub = 0x2;     // met the ground
@@ -41074,13 +41129,20 @@ int brave_zoom2u(float f)
             brave_lw_motion(0x23e, 0x23e);
             return 0x2;
         }
-        if (brave_lw_t >= 0x28 || brave_z2_aim())
+        // the flight's end (40 frames) or within range of the target (fix 82): the speed clamped now and one frame
+        // flown at it before the fall (fix 83: the fall took the flight's last speed over, user: it didn't end
+        // within range). In range, the fall then follows the target 5 more frames at the clamped speed (the
+        // user's: brave_lw_sub 4 -> brave_lw_loop's r 5 -> brave_z2_track); not on the 40-frame end or a cancel
+        if (brave_lw_t >= 0x28)
         {
-            // the flight's end (40 frames) or within 80 of the target (fix 82): the speed clamped now and one
-            // frame flown at it before the fall (fix 83: the fall took the flight's last speed over, user: it
-            // didn't end within 80)
             brave_z2_clamp(KineticModuleF(0xa, 0x3), KineticModuleF(0xb, 0x3));
             brave_lw_sub = 0x3;
+            return 0x2;
+        }
+        if (brave_z2_aim())
+        {
+            brave_z2_clamp(KineticModuleF(0xa, 0x3), KineticModuleF(0xb, 0x3));
+            brave_lw_sub = 0x4;
             return 0x2;
         }
         if (MotionModule(0x2712) == 0x1)
@@ -41373,12 +41435,18 @@ void brave_lw_loop()
         {
             return;
         }
-        if (r == 0x3 || r == 0x4)
+        if (r == 0x3 || r == 0x4 || r == 0x5)
         {
             vx = KineticModuleF(0xa, 0x3);
             vy = KineticModuleF(0xb, 0x3);
             brave_z2_clamp(vx, vy);
-            if (r == 0x4)
+            if (r == 0x5 && brave_lw_burst >= 0 && brave_lw_burst < 0x8)
+            {
+                brave_lw_burst = 0x250 + brave_lw_burst;   // brave_z2_after: 5 frames tracking slot & 0xF
+                func_16(0xe, 0);
+                return;
+            }
+            if (r == 0x4 || r == 0x5)
             {
                 brave_lw_burst = 0x103;     // brave_z2_after
                 func_16(0xe, 0);    // Zoom 2 U's end: a fall, its speed clamped

@@ -1486,3 +1486,27 @@ I'm fine with this with the exception of Woosh and its variants."
 - `port_check` S9 shield-negative (WARN) lists what's left: the body's 3 scripts, crash, deathball, explosion,
   fireball, flash. The chain's 5 ERRORs (A3, E4, E5, E7, S4) are the same without this package: checks added after
   Hero's effects / sounds were built.
+
+## Fix 86 (`build/hero_fix86.zip`): Acceleration 20 MP; Zoom 2 U intangible, through platforms, tracking after
+
+Install over fix 85 (and the Woosh shield-damage package). User: "make Hero's Acceleration cost 20 MP and give Zoom 2 U
+frame 1 invulnerability until the move ends, also make Zoom 2 U's tracking persist for 5 frames after getting close
+enough for the move to put Hero into fall, after the speed is clamped. The tracking persisting should not apply if
+the move is canceled manually. Also make it so Zoom 2 U can pass through platforms."
+- **Acceleration**: 20 MP (`brave_cost`; was 28). The menu's "MP" window shows 20 (`brave_menu_art.py` SPELLS; the
+  damage panel rebuilt as fix 79's: only `img-00134.nut` changes).
+- **Zoom 2 U intangible** from the cast's first frame until the move ends (its start, the flight, the landing end;
+  was the flight only): `WorkModule(0, 2, 0x0F00011B)` renewed each frame, as Zoom's (intangible: attacks pass
+  through, as Zoom's own; `0x0F00011C` would make it invincible instead).
+- **Tracking after the in-range end**: within 15 of the target the speed is clamped as before, then the fall it ends
+  in keeps following the target 5 frames (`brave_z2_track`: the flight's 9 a frame at the target, clamped to his max
+  air speed across / max fall speed up and down). Not on the 40-frame end nor on an action out of the flight (a
+  manual cancel); an action out of the fall during those frames ends it too. `brave_lw_burst` 0x2NT (N frames,
+  target T): no new globals (fix 81).
+- **Through platforms**: each frame of the flight the floor under him is passed (`GroundModule(0x2715)`, Pass's own),
+  and a passable floor he still lands on (`GroundModule(0xd)`) puts him back in the air; only solid ground ends it
+  with SpecialLw16End.
+- `msc_stack_check`: 0 of 2501 scripts with problems. port_check over Hero's chain: the same 6 errors with and
+  without this package; one is X1 (new): his executable's acmd_ext hook was undone, so `0x0F0003xx` variables do
+  nothing there (Hero uses none).
+- Package: `fighter/brave/script/msc/brave.mscsb`, `ui/info/dmg/img-00134.nut`.

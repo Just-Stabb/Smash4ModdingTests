@@ -46,8 +46,8 @@ SPELLS = [('Heal', 7), ('Sizz', 8), ('Sizzle', 20), ('Bang', 9), ('Kaboom', 37),
           ('Oomph', 16), ('Bounce', 14), ('Snooze', 16), ('Hocus Pocus', 4), ('Zoom', 8),
           ('Flame Slash', 12), ('Kacrackle Slash', 11), ('Metal Slash', 6), ('Hatchet Man', 15),
           ('Psyche Up', 14),
-          # fix 79 (the user's, not Ultimate's): 22 Acceleration (Overdrive's speed), 23 Zoom 2 U (Zoom sideways)
-          ('Acceleration', 28), ('Zoom 2 U', 8)]
+          # fix 79 (the user's, not Ultimate's): 22 Acceleration (Overdrive's speed; 20 MP, fix 79: 28), 23 Zoom 2 U (Zoom sideways)
+          ('Acceleration', 20), ('Zoom 2 U', 8)]
 TEX = 'p4_info_melee_lct_brave_%s^u'
 # p4_info_melee_lct_brave.bflyt's panes (px, y up, from the part's origin)
 WINDOW = (47, -13, 278, 168)                    # wnd_open_00: centre, size
