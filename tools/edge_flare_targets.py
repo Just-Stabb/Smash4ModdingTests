@@ -10,14 +10,16 @@ target's joint `edge_flare_node` (`waist` for all but ROB `waist3` and Giga Bows
 PostureModule scale (1 but for size changes: not followed here). These per-fighter values keep the ring
 just outside the fighter's body, so the orbiting orbs (7 damage, rehit 45) don't hit their own target.
 
-Smash 4's MSC can't read another fighter's joints, so the centre is taken from the rest pose: the joint's
-position in the Smash 4 model (VBN_ROOT/fighter/NAME/model/body/c00/model.vbn; --vbn for the ports'
-own models) with the offset in its axes, times the fighter's model size (fighter_param "Character Size
-Multiplier", reference/fighter_param_attributes.csv; a port keeps its base's), as height above and
-distance in front of the fighter's position (flare1.c adds it to the slot position, by its facing).
+The centre follows the joint as Ultimate's does: its bone index in the Smash 4 model
+(VBN_ROOT/fighter/NAME/model/body/c00/model.vbn; --vbn for the ports' own models), whose world position
+flare1.c reads every frame (0x0F000290 + 4 x target: the target's own ModelModuleF(axis, bone),
+docs/position-variables.md), plus the offset turned by the joint's rest-pose axes (the live rotation
+isn't readable), times the fighter's model size (fighter_param "Character Size Multiplier",
+reference/fighter_param_attributes.csv; a port keeps its base's), as up / forward (by its facing).
+The rest-pose centre (joint + offset) is kept for when the joint can't be read.
 
 --write replaces the block between the `flare targets` markers in flare1.c with the table
-(fl_target_shape(kind): fl_rad, fl_up, fl_fwd).
+(fl_target_shape(kind): fl_rad, fl_joint, fl_oup / fl_ofwd, fl_up / fl_fwd).
 """
 import argparse
 import csv
@@ -96,31 +98,38 @@ def table(a):
             out.append((kind, name, None, 'no joint %s' % joint))
             continue
         off = np.array([e['edge_flare_offset_x'], e['edge_flare_offset_y'], e['edge_flare_offset_z'], 1.0])
-        c = joint_world(vbn, joint) @ off * size[size_of]
+        m = joint_world(vbn, joint)
+        c = m @ off * size[size_of]                         # the rest-pose centre
+        d = m[:3, :3] @ off[:3] * size[size_of]              # the offset alone, in model axes
+        bone = [n for n, _p, _h in O.vbn_read(vbn)].index(joint) if joint else -1
         r = float(e['edge_flare_radius'])
         if name == 'koopag':        # Bowser's radius grown with the waist's height (Giga Bowser / Bowser)
-            r *= c[1] / next(v[1] for k, n, v, _s in out if n == 'koopa')
-        out.append((kind, name, (r, float(c[1]), float(c[2])),
+            r *= c[1] / next(v[4] for k, n, v, _s in out if n == 'koopa')
+        out.append((kind, name, (r, bone, float(d[1]), float(d[2]), float(c[1]), float(c[2])),
                     '%s %s' % (ULT_NAME.get(name, name), joint or 'position')))
     return out
 
 
 def c_block(rows):
     lines = [BEGIN,
-             '// fl_rad: Ultimate\'s edge_flare_radius; fl_up / fl_fwd: the ring centre above / in front of the fighter\'s',
-             '// position (its edge_flare_node + offsets on the Smash 4 model\'s rest pose, x its size). Unknown kinds',
-             '// keep 14 / 9 / 0.',
+             '// fl_rad: Ultimate\'s edge_flare_radius; fl_joint: its edge_flare_node\'s bone index in the Smash 4 model,',
+             '// fl_oup / fl_ofwd: its offsets up / forward (rest-pose axes, x its size); fl_up / fl_fwd: the rest-pose',
+             '// centre from its position, if the joint can\'t be read. Unknown kinds keep 14, no joint, 9 / 0.',
              'void fl_target_shape(int k)',
              '{',
              '    fl_rad = 14.0f;',
+             '    fl_joint = -1;',
+             '    fl_oup = 0;',
+             '    fl_ofwd = 0;',
              '    fl_up = 9.0f;',
              '    fl_fwd = 0;']
     for kind, name, v, src in rows:
         if v is None:
             lines.append('    // 0x%X %s: %s' % (kind, name, src))
             continue
-        lines.append('    if (k == 0x%x) { fl_rad = %.2ff; fl_up = %.2ff; fl_fwd = %.2ff; }   // %s (%s)'
-                     % (kind, v[0], v[1], v[2], name, src))
+        lines.append('    if (k == 0x%x) { fl_rad = %.2ff; fl_joint = %s; fl_oup = %.2ff; fl_ofwd = %.2ff; fl_up = %.2ff; '
+                     'fl_fwd = %.2ff; }   // %s (%s)' % ((kind, v[0], '0x%x' % v[1] if v[1] >= 0 else '-1') + v[2:]
+                                                         + (name, src)))
     lines += ['}', END]
     return '\n'.join(lines)
 

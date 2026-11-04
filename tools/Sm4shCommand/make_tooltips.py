@@ -263,6 +263,10 @@ def _position_lines():
         for n, stick in enumerate(("stick", "C-stick")):
             out.append((0x0F000260 + 2 * t + n, "%s %s X raw" % (tn, stick), "Target: %s.\\nRead: %s X on screen, -1 to 1 (positive = right, whichever way it faces).\\nWrite: force it (until STICK_FORCED is written)." % (td, stick)))
     for t, (tn, td) in enumerate(zip(ITEM_TARGETS, ITEM_TDESC)):
+        out.append((0x0F000290 + 4 * t, "%s joint" % tn, "Target: %s.\\nWrite: the bone index (its model.vbn's, as tools/vbn_bones.py lists) the joint X / Y / Z reads use (one for every caller: write it, then read, in the same script). Reads 0." % td))
+        for n, axis in enumerate("XYZ"):
+            out.append((0x0F000291 + 4 * t + n, "%s joint %s" % (tn, axis), "Target: %s.\\nRead: the joint's world %s (its own ModelModuleF(%d, bone)), the bone written to its JOINT variable; 0 if it isn't there. Writes are ignored." % (td, axis, n)))
+    for t, (tn, td) in enumerate(zip(ITEM_TARGETS, ITEM_TDESC)):
         out.append((0x0F000276 + t, "%s item state" % tn, "Target: %s.\\nRead: 1 while it is metal (Metal Box), else 0.\\nWrite a code (SELF_ITEM's): that item's own state on it: 1 metal on, 2 metal off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 the Timer's slow on every other fighter, 8 camera closeup, 9 camera back." % td))
     for slot in range(8):
         for n, axis in enumerate(("X", "Y", "Z", "facing")):
@@ -309,6 +313,9 @@ def alias_lines():
     for t, tn in enumerate(COMBAT_TARGETS):
         out.append(("%s_STICK_X_RAW" % tn, 0x0F000260 + 2 * t, ""))
         out.append(("%s_CSTICK_X_RAW" % tn, 0x0F000261 + 2 * t, ""))
+    for t, tn in enumerate(COMBAT_TARGETS):
+        out.append(("%s_JOINT" % tn, 0x0F000290 + 4 * t, "write the bone index for the joint reads" if t == 0 else ""))
+        out += [("%s_JOINT_%s" % (tn, axis), 0x0F000291 + 4 * t + n, "") for n, axis in enumerate("XYZ")]
     for t, tn in enumerate(COMBAT_TARGETS):
         out.append(("SELF_ITEM_STATE" if t == 0 else "%s_ITEM" % tn, 0x0F000276 + t, "as SELF_ITEM, and reads 1 while metal" if t == 0 else ""))
     out.append(("SELF_ANIM_RATE", 0x0F000098, "animation rate multiplier (1.0 normally)"))

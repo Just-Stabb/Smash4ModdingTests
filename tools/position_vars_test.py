@@ -166,6 +166,15 @@ mo1: lwz r7, 4(r5)
  li r3, 0
  blr""",                                       # MotionModule(7) / (1, motion, frame, rate)
     0x030B2A80: "lwz r12, 4(r3)\n lwz r3, 0xA30(r12)\n blr",          # MotionModuleF(1)
+    0x030B306C: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ lwz r7, 4(r5)
+ stw r7, 0xA90(r12)
+ slwi r6, r6, 2
+ add r12, r12, r6
+ lwz r3, 0xA80(r12)
+ blr""",                                       # ModelModuleF(axis, bone): floats at +0xA80, bone logged at +0xA90
     0x030B50F0: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
@@ -381,6 +390,19 @@ check('kind: nearest opponent (slot 3)', call(mu, FGET2, w0, hid(1, 5)), 0x42)
 check('kind: an empty slot reads 0', call(mu, FGET2, w0, hid(8, 5)), 0)
 check('kind: writes ignored', (call(mu, FSET2, w0, hid(5, 5), 1.0), call(mu, FGET2, w0, hid(5, 5))), (0, 0x42))
 check('q6 still reads 0', call(mu, FGET2, w0, hid(5, 6)), 0)
+def jid(target, n): return 0x0F000290 + 4 * target + n
+for k, v in enumerate((3.5, 12.25, -1.0)):
+    wf(mu, 2, 0xA80 + 4 * k, v)
+call(mu, FSET2, w0, jid(5, 0), 11.0)                                  # bone 0xB (WaistN) for the reads
+check('joint: slot 3 bone 11 x (ModelModuleF(0, 11))', (call(mu, FGET2, w0, jid(5, 1)), ri(mu, 2, 0xA90)), (3.5, 11))
+check('joint: y / z', (call(mu, FGET2, w0, jid(5, 2)), call(mu, FGET2, w0, jid(5, 3))), (12.25, -1.0))
+check('joint: nearest opponent (slot 3) y', call(mu, FGET2, w0, jid(1, 2)), 12.25)
+check('joint: the bone write reads 0', call(mu, FGET2, w0, jid(5, 0)), 0)
+check('joint: an empty slot reads 0', call(mu, FGET2, w0, jid(8, 1)), 0)
+call(mu, FSET2, w0, jid(5, 0), 600.0)
+check('joint: bone 600 (past 0x200): reads 0', call(mu, FGET2, w0, jid(5, 1)), 0)
+check('joint: writes to x ignored', (call(mu, FSET2, w0, jid(5, 1), 9.0), call(mu, FGET2, w0, jid(5, 2))), (0, 0))
+check('past the joints (0x0F0002BC): 0', call(mu, FGET2, w0, 0x0F0002BC), 0)
 check('q5-7 read 0', call(mu, FGET2, w0, hid(1, 6)), 0)
 check('past the block (0xF8) reads 0', call(mu, FGET2, w0, 0x0F0000F8), 0)
 check('combat IDs still work: opp offset Y', call(mu, FGET2, w0, 0x0F00004E), 2)

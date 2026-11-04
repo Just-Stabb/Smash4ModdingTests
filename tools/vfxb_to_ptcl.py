@@ -2763,6 +2763,33 @@ CHILD_FROM_EMITTER = [      # (child offset, emitter offset, size)
 CHILD_INHERIT = ['velocity', 'scale', 'rotation', None, 'color0', 'color1', 'alpha0', 'alpha1', 'draw_path', 'pre_draw']
 
 
+def promote_children(ems):
+    """children eft can't carry (meshes: eft's children are quads; past the first: eft has one) of a parent that is a
+    single still particle at its emitter's origin (point volume, one emission of at most one, no speed, no
+    transform), as emitters of their own: each child then emits where the parent's particle is, from the parent's
+    start + its own (frames, within the parent's life), as Ultimate does (Sephiroth's Scintilla wall,
+    edge_senkou_shield: HexagonFlare01's 7 rows of hexagon meshes; test 72, user: "down special's effects are still
+    wrong", a single column showed)"""
+    out = []
+    for e in ems:
+        out.append(e)
+        kids = e['children']
+        if not kids or not (len(kids) > 1 or any(c['particle']['primitive_id'] != NONE64 for c in kids)):
+            continue
+        em, sh, vel, inf = e['emission'], e['shape'], e['velocity'], e['info']
+        still = (sh['volume_type'] == 0 and em['one_time'] and float(em['rate']) <= 1.0
+                 and abs(vel['all_direction']) < 1e-3 and abs(vel['designated_dir_scale']) < 1e-3
+                 and not any(abs(v) > 1e-4 for v in list(inf['trans']) + list(inf['rotate']))
+                 and all(abs(v - 1) < 1e-4 for v in inf['scale']))
+        if not still:
+            continue
+        e['children'] = []
+        for c in kids:
+            start = int(em['start']) + min(max(0, int(c['emission']['start'])), int(e['particle']['life']))
+            out.append(dict(c, emission=dict(c['emission'], start=start), _promoted_from=e['name']))
+    return out
+
+
 def child_block(p, parent, c, names, images, notes, templates, prims, prim_index):
     """Ultimate child emitter c of parent as (eft child block, inherit bits), or None"""
     cnotes = []
@@ -3134,8 +3161,11 @@ def main():
                 ids[name] = done[src, si_ult]
                 continue
             made, log = [], []
-            for e in eff.emitters(si_ult):
+            for e in promote_children(eff.emitters(si_ult)):
                 notes = []
+                if e.get('_promoted_from'):
+                    notes.append('a child of %s, as an emitter of its own (promote_children), from frame %d' % (
+                        e['_promoted_from'], e['emission']['start']))
                 e['_set'] = eff.sets[si_ult]
                 templates.no_graft = name in no_graft or '%s/%s' % (name, e['name']) in no_graft
                 templates.test_white1 = name in white1 or '%s/%s' % (name, e['name']) in white1

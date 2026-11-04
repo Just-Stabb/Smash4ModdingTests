@@ -584,6 +584,9 @@ float fl_cx;
 float fl_cy;
 float fl_cz;
 float fl_rad;          // the target's orbit radius and ring centre (fl_target_shape)
+int fl_joint;
+float fl_oup;
+float fl_ofwd;
 float fl_up;
 float fl_fwd;
 int fl_clr0;           // hit records to clear (Part 0 / 1) when the orbit script runs next (fl_hitboxes)
@@ -905,88 +908,92 @@ void fl_hit_main()
 // ---- the controller: the target's centre (Ultimate: its fighter_param edge_flare_node, `waist` for 92 of 94
 // fighters, + edge_flare_offset_x/y/z in that joint's axes) and orbit radius edge_flare_radius (x its scale, taken
 // as 1), per fighter kind (the slot's kind, 0x0F0000A0 + 8 x target + 5). Smash 4's MSC can't read another
-// fighter's joint, so the centre is the joint on its model's rest pose, as an offset from its position (test 71:
-// one radius / height for everyone, 14 / 9, put the ring inside Donkey Kong, whose orbs then hit him while orbiting)
+// fighter's joint, so the variable cave reads the target's own ModelModuleF(axis, bone) for it (test 72: the
+// rest-pose centre of test 71 sat 19.5 over a hunched Donkey Kong and the ring dipped into him; test 71: one radius /
+// height for everyone, 14 / 9, put the ring inside him, whose orbs then hit him while orbiting)
 // ---- flare targets (generated: tools/edge_flare_targets.py) ----
-// fl_rad: Ultimate's edge_flare_radius; fl_up / fl_fwd: the ring centre above / in front of the fighter's
-// position (its edge_flare_node + offsets on the Smash 4 model's rest pose, x its size). Unknown kinds
-// keep 14 / 9 / 0.
+// fl_rad: Ultimate's edge_flare_radius; fl_joint: its edge_flare_node's bone index in the Smash 4 model,
+// fl_oup / fl_ofwd: its offsets up / forward (rest-pose axes, x its size); fl_up / fl_fwd: the rest-pose
+// centre from its position, if the joint can't be read. Unknown kinds keep 14, no joint, 9 / 0.
 void fl_target_shape(int k)
 {
     fl_rad = 14.0f;
+    fl_joint = -1;
+    fl_oup = 0;
+    fl_ofwd = 0;
     fl_up = 9.0f;
     fl_fwd = 0;
-    if (k == 0x0) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miifighter (miifighter WaistN)
-    if (k == 0x1) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miiswordsman (miiswordsman WaistN)
-    if (k == 0x2) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miigunner (miigunner WaistN)
-    if (k == 0x3) { fl_rad = 13.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // mario (mario WaistN)
-    if (k == 0x4) { fl_rad = 17.00f; fl_up = 19.48f; fl_fwd = 3.34f; }   // donkey (donkey WaistN)
-    if (k == 0x5) { fl_rad = 14.00f; fl_up = 10.35f; fl_fwd = 0.69f; }   // link (link WaistN)
-    if (k == 0x6) { fl_rad = 15.00f; fl_up = 12.27f; fl_fwd = -1.15f; }   // samus (samus WaistN)
-    if (k == 0x7) { fl_rad = 14.50f; fl_up = 9.21f; fl_fwd = 1.95f; }   // yoshi (yoshi WaistN)
-    if (k == 0x8) { fl_rad = 12.00f; fl_up = 4.42f; fl_fwd = 0.00f; }   // kirby (kirby WaistN)
-    if (k == 0x9) { fl_rad = 13.50f; fl_up = 9.09f; fl_fwd = 0.68f; }   // fox (fox WaistN)
-    if (k == 0xa) { fl_rad = 13.50f; fl_up = 5.38f; fl_fwd = -0.69f; }   // pikachu (pikachu WaistN)
-    if (k == 0xb) { fl_rad = 13.50f; fl_up = 8.97f; fl_fwd = 0.03f; }   // luigi (luigi WaistN)
-    if (k == 0xc) { fl_rad = 14.50f; fl_up = 11.82f; fl_fwd = -0.30f; }   // captain (captain WaistN)
-    if (k == 0xd) { fl_rad = 12.50f; fl_up = 7.00f; fl_fwd = 0.12f; }   // ness (ness WaistN)
-    if (k == 0xe) { fl_rad = 14.00f; fl_up = 9.60f; fl_fwd = -0.50f; }   // peach (peach WaistN)
-    if (k == 0xf) { fl_rad = 17.50f; fl_up = 12.66f; fl_fwd = 0.67f; }   // koopa (koopa WaistN)
-    if (k == 0x10) { fl_rad = 14.00f; fl_up = 9.62f; fl_fwd = -0.66f; }   // zelda (zelda WaistN)
-    if (k == 0x11) { fl_rad = 13.50f; fl_up = 10.30f; fl_fwd = 1.39f; }   // sheik (sheik WaistN)
-    if (k == 0x12) { fl_rad = 14.00f; fl_up = 10.19f; fl_fwd = -0.70f; }   // marth (marth WaistN)
-    if (k == 0x13) { fl_rad = 12.00f; fl_up = 7.91f; fl_fwd = 0.50f; }   // gamewatch (gamewatch WaistN)
-    if (k == 0x14) { fl_rad = 16.00f; fl_up = 12.64f; fl_fwd = -0.58f; }   // ganon (ganon WaistN)
-    if (k == 0x15) { fl_rad = 13.50f; fl_up = 9.05f; fl_fwd = 0.92f; }   // falco (falco WaistN)
-    if (k == 0x16) { fl_rad = 13.50f; fl_up = 6.57f; fl_fwd = 0.14f; }   // wario (wario WaistN)
-    if (k == 0x17) { fl_rad = 13.00f; fl_up = 5.56f; fl_fwd = 0.00f; }   // metaknight (metaknight WaistN)
-    if (k == 0x18) { fl_rad = 14.00f; fl_up = 10.16f; fl_fwd = 0.81f; }   // pit (pit WaistN)
-    if (k == 0x19) { fl_rad = 13.50f; fl_up = 10.53f; fl_fwd = 0.28f; }   // szerosuit (szerosuit WaistN)
-    if (k == 0x1a) { fl_rad = 11.50f; fl_up = 5.03f; fl_fwd = 0.23f; }   // pikmin (pikmin WaistN)
-    if (k == 0x1b) { fl_rad = 13.00f; fl_up = 8.75f; fl_fwd = 1.25f; }   // diddy (diddy WaistN)
-    if (k == 0x1c) { fl_rad = 16.00f; fl_up = 9.61f; fl_fwd = 1.41f; }   // dedede (dedede WaistN)
-    if (k == 0x1d) { fl_rad = 14.50f; fl_up = 11.75f; fl_fwd = 0.27f; }   // ike (ike WaistN)
-    if (k == 0x1e) { fl_rad = 13.50f; fl_up = 9.25f; fl_fwd = 0.06f; }   // lucario (lucario WaistN)
-    if (k == 0x1f) { fl_rad = 15.00f; fl_up = 11.05f; fl_fwd = 0.50f; }   // robot (robot Waist3N)
-    if (k == 0x20) { fl_rad = 12.50f; fl_up = 7.47f; fl_fwd = 0.00f; }   // toonlink (toonlink WaistN)
-    if (k == 0x21) { fl_rad = 16.00f; fl_up = 9.85f; fl_fwd = 2.61f; }   // lizardon (plizardon WaistN)
-    if (k == 0x22) { fl_rad = 13.50f; fl_up = 9.18f; fl_fwd = -0.48f; }   // sonic (sonic WaistN)
-    if (k == 0x23) { fl_rad = 13.50f; fl_up = 5.00f; fl_fwd = 0.00f; }   // purin (purin WaistN)
-    if (k == 0x24) { fl_rad = 13.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // mariod (mariod WaistN)
-    if (k == 0x25) { fl_rad = 14.00f; fl_up = 9.77f; fl_fwd = -0.67f; }   // lucina (lucina WaistN)
-    if (k == 0x26) { fl_rad = 14.00f; fl_up = 10.16f; fl_fwd = 0.81f; }   // pitb (pitb WaistN)
-    if (k == 0x27) { fl_rad = 15.00f; fl_up = 10.93f; fl_fwd = -0.33f; }   // rosetta (rosetta WaistN)
-    if (k == 0x28) { fl_rad = 14.00f; fl_up = 10.16f; fl_fwd = 0.00f; }   // wiifit (wiifit WaistN)
-    if (k == 0x29) { fl_rad = 13.50f; fl_up = 9.57f; fl_fwd = 0.79f; }   // littlemac (littlemac WaistN)
-    if (k == 0x2a) { fl_rad = 13.00f; fl_up = 6.98f; fl_fwd = 0.00f; }   // murabito (murabito WaistN)
-    if (k == 0x2b) { fl_rad = 14.00f; fl_up = 10.59f; fl_fwd = -0.34f; }   // palutena (palutena WaistN)
-    if (k == 0x2c) { fl_rad = 14.00f; fl_up = 10.11f; fl_fwd = 0.13f; }   // reflet (reflet WaistN)
-    if (k == 0x2d) { fl_rad = 13.00f; fl_up = 9.55f; fl_fwd = -1.71f; }   // duckhunt (duckhunt WaistN)
-    if (k == 0x2e) { fl_rad = 14.50f; fl_up = 9.68f; fl_fwd = 0.05f; }   // koopajr (koopajr WaistN)
-    if (k == 0x2f) { fl_rad = 14.00f; fl_up = 10.38f; fl_fwd = 0.42f; }   // shulk (shulk WaistN)
-    if (k == 0x30) { fl_rad = 13.50f; fl_up = 10.94f; fl_fwd = 0.50f; }   // gekkouga (gekkouga WaistN)
-    if (k == 0x31) { fl_rad = 13.50f; fl_up = 7.40f; fl_fwd = 0.00f; }   // pacman (pacman WaistN)
-    if (k == 0x32) { fl_rad = 14.00f; fl_up = 7.69f; fl_fwd = 0.16f; }   // rockman (rockman WaistN)
-    if (k == 0x33) { fl_rad = 15.00f; fl_up = 11.31f; fl_fwd = -0.84f; }   // mewtwo (mewtwo WaistN)
-    if (k == 0x34) { fl_rad = 14.00f; fl_up = 10.70f; fl_fwd = 0.00f; }   // ryu (ryu WaistN)
-    if (k == 0x35) { fl_rad = 12.50f; fl_up = 7.00f; fl_fwd = 0.62f; }   // lucas (lucas WaistN)
-    if (k == 0x36) { fl_rad = 14.00f; fl_up = 10.08f; fl_fwd = -0.69f; }   // roy (roy WaistN)
-    if (k == 0x37) { fl_rad = 14.00f; fl_up = 11.12f; fl_fwd = 0.28f; }   // cloud (cloud WaistN)
-    if (k == 0x38) { fl_rad = 14.50f; fl_up = 11.35f; fl_fwd = -1.14f; }   // bayonetta (bayonetta WaistN)
-    if (k == 0x39) { fl_rad = 14.00f; fl_up = 9.75f; fl_fwd = 0.17f; }   // kamui (kamui WaistN)
-    if (k == 0x3a) { fl_rad = 54.57f; fl_up = 39.47f; fl_fwd = 1.45f; }   // koopag (koopa WaistN)
-    if (k == 0x3b) { fl_rad = 13.50f; fl_up = 6.57f; fl_fwd = 0.14f; }   // warioman (wario WaistN)
-    if (k == 0x3c) { fl_rad = 13.50f; fl_up = 13.29f; fl_fwd = 0.89f; }   // littlemacg (littlemac WaistN)
-    if (k == 0x3d) { fl_rad = 13.50f; fl_up = 9.25f; fl_fwd = 0.06f; }   // lucariom (lucario WaistN)
-    if (k == 0x3e) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemyf (miifighter WaistN)
-    if (k == 0x3f) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemys (miiswordsman WaistN)
-    if (k == 0x40) { fl_rad = 14.00f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemyg (miigunner WaistN)
-    if (k == 0x41) { fl_rad = 13.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // supamario (mario WaistN)
-    if (k == 0x42) { fl_rad = 15.50f; fl_up = 10.64f; fl_fwd = 0.00f; }   // edge (edge WaistN)
-    if (k == 0x43) { fl_rad = 14.50f; fl_up = 8.29f; fl_fwd = 0.40f; }   // gaogaen (gaogaen WaistN)
-    if (k == 0x44) { fl_rad = 13.00f; fl_up = 8.50f; fl_fwd = 0.00f; }   // pickel (pickel WaistN)
-    if (k == 0x45) { fl_rad = 15.00f; fl_up = 10.52f; fl_fwd = 0.00f; }   // brave (brave WaistN)
-    if (k == 0x46) { fl_rad = 11.00f; fl_up = 5.52f; fl_fwd = 0.71f; }   // pzenigame (pzenigame WaistN)
+    if (k == 0x0) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miifighter (miifighter WaistN)
+    if (k == 0x1) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miiswordsman (miiswordsman WaistN)
+    if (k == 0x2) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miigunner (miigunner WaistN)
+    if (k == 0x3) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // mario (mario WaistN)
+    if (k == 0x4) { fl_rad = 17.00f; fl_joint = 0xb; fl_oup = 3.97f; fl_ofwd = 3.04f; fl_up = 19.48f; fl_fwd = 3.34f; }   // donkey (donkey WaistN)
+    if (k == 0x5) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.00f; fl_ofwd = 0.10f; fl_up = 10.35f; fl_fwd = 0.69f; }   // link (link WaistN)
+    if (k == 0x6) { fl_rad = 15.00f; fl_joint = 0xb; fl_oup = -2.46f; fl_ofwd = -0.44f; fl_up = 12.27f; fl_fwd = -1.15f; }   // samus (samus WaistN)
+    if (k == 0x7) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = 2.65f; fl_ofwd = 0.97f; fl_up = 9.21f; fl_fwd = 1.95f; }   // yoshi (yoshi WaistN)
+    if (k == 0x8) { fl_rad = 12.00f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 4.42f; fl_fwd = 0.00f; }   // kirby (kirby WaistN)
+    if (k == 0x9) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 9.09f; fl_fwd = 0.68f; }   // fox (fox WaistN)
+    if (k == 0xa) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 1.91f; fl_ofwd = 0.16f; fl_up = 5.38f; fl_fwd = -0.69f; }   // pikachu (pikachu WaistN)
+    if (k == 0xb) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 1.50f; fl_ofwd = 0.00f; fl_up = 8.97f; fl_fwd = 0.03f; }   // luigi (luigi WaistN)
+    if (k == 0xc) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -2.09f; fl_ofwd = 0.21f; fl_up = 11.82f; fl_fwd = -0.30f; }   // captain (captain WaistN)
+    if (k == 0xd) { fl_rad = 12.50f; fl_joint = 0xb; fl_oup = 2.00f; fl_ofwd = 0.03f; fl_up = 7.00f; fl_fwd = 0.12f; }   // ness (ness WaistN)
+    if (k == 0xe) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.00f; fl_ofwd = -1.00f; fl_up = 9.60f; fl_fwd = -0.50f; }   // peach (peach WaistN)
+    if (k == 0xf) { fl_rad = 17.50f; fl_joint = 0xb; fl_oup = 1.62f; fl_ofwd = -0.26f; fl_up = 12.66f; fl_fwd = 0.67f; }   // koopa (koopa WaistN)
+    if (k == 0x10) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.99f; fl_ofwd = -1.01f; fl_up = 9.62f; fl_fwd = -0.66f; }   // zelda (zelda WaistN)
+    if (k == 0x11) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -1.55f; fl_ofwd = 0.92f; fl_up = 10.30f; fl_fwd = 1.39f; }   // sheik (sheik WaistN)
+    if (k == 0x12) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.93f; fl_ofwd = -0.94f; fl_up = 10.19f; fl_fwd = -0.70f; }   // marth (marth WaistN)
+    if (k == 0x13) { fl_rad = 12.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.91f; fl_fwd = 0.50f; }   // gamewatch (gamewatch WaistN)
+    if (k == 0x14) { fl_rad = 16.00f; fl_joint = 0xb; fl_oup = -1.92f; fl_ofwd = 0.00f; fl_up = 12.64f; fl_fwd = -0.58f; }   // ganon (ganon WaistN)
+    if (k == 0x15) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -1.04f; fl_ofwd = 0.15f; fl_up = 9.05f; fl_fwd = 0.92f; }   // falco (falco WaistN)
+    if (k == 0x16) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 1.48f; fl_ofwd = -0.27f; fl_up = 6.57f; fl_fwd = 0.14f; }   // wario (wario WaistN)
+    if (k == 0x17) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 5.56f; fl_fwd = 0.00f; }   // metaknight (metaknight WaistN)
+    if (k == 0x18) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.49f; fl_ofwd = 0.21f; fl_up = 10.16f; fl_fwd = 0.81f; }   // pit (pit WaistN)
+    if (k == 0x19) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.03f; fl_up = 10.53f; fl_fwd = 0.28f; }   // szerosuit (szerosuit WaistN)
+    if (k == 0x1a) { fl_rad = 11.50f; fl_joint = 0xb; fl_oup = 1.90f; fl_ofwd = -0.00f; fl_up = 5.03f; fl_fwd = 0.23f; }   // pikmin (pikmin WaistN)
+    if (k == 0x1b) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.10f; fl_ofwd = 0.89f; fl_up = 8.75f; fl_fwd = 1.25f; }   // diddy (diddy WaistN)
+    if (k == 0x1c) { fl_rad = 16.00f; fl_joint = 0xb; fl_oup = 2.36f; fl_ofwd = 0.98f; fl_up = 9.61f; fl_fwd = 1.41f; }   // dedede (dedede WaistN)
+    if (k == 0x1d) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.02f; fl_up = 11.75f; fl_fwd = 0.27f; }   // ike (ike WaistN)
+    if (k == 0x1e) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 9.25f; fl_fwd = 0.06f; }   // lucario (lucario WaistN)
+    if (k == 0x1f) { fl_rad = 15.00f; fl_joint = 0x2a; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 11.05f; fl_fwd = 0.50f; }   // robot (robot Waist3N)
+    if (k == 0x20) { fl_rad = 12.50f; fl_joint = 0xb; fl_oup = 1.50f; fl_ofwd = 0.00f; fl_up = 7.47f; fl_fwd = 0.00f; }   // toonlink (toonlink WaistN)
+    if (k == 0x21) { fl_rad = 16.00f; fl_joint = 0xb; fl_oup = 2.48f; fl_ofwd = 1.96f; fl_up = 9.85f; fl_fwd = 2.61f; }   // lizardon (plizardon WaistN)
+    if (k == 0x22) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.97f; fl_ofwd = -0.48f; fl_up = 9.18f; fl_fwd = -0.48f; }   // sonic (sonic WaistN)
+    if (k == 0x23) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 5.00f; fl_fwd = 0.00f; }   // purin (purin WaistN)
+    if (k == 0x24) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // mariod (mariod WaistN)
+    if (k == 0x25) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.85f; fl_ofwd = -0.90f; fl_up = 9.77f; fl_fwd = -0.67f; }   // lucina (lucina WaistN)
+    if (k == 0x26) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.49f; fl_ofwd = 0.21f; fl_up = 10.16f; fl_fwd = 0.81f; }   // pitb (pitb WaistN)
+    if (k == 0x27) { fl_rad = 15.00f; fl_joint = 0xb; fl_oup = -0.96f; fl_ofwd = -0.57f; fl_up = 10.93f; fl_fwd = -0.33f; }   // rosetta (rosetta WaistN)
+    if (k == 0x28) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.44f; fl_ofwd = 0.00f; fl_up = 10.16f; fl_fwd = 0.00f; }   // wiifit (wiifit WaistN)
+    if (k == 0x29) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -1.02f; fl_ofwd = 0.67f; fl_up = 9.57f; fl_fwd = 0.79f; }   // littlemac (littlemac WaistN)
+    if (k == 0x2a) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 2.00f; fl_ofwd = 0.00f; fl_up = 6.98f; fl_fwd = 0.00f; }   // murabito (murabito WaistN)
+    if (k == 0x2b) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.43f; fl_ofwd = -0.95f; fl_up = 10.59f; fl_fwd = -0.34f; }   // palutena (palutena WaistN)
+    if (k == 0x2c) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.49f; fl_ofwd = 0.13f; fl_up = 10.11f; fl_fwd = 0.13f; }   // reflet (reflet WaistN)
+    if (k == 0x2d) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 3.00f; fl_ofwd = -1.00f; fl_up = 9.55f; fl_fwd = -1.71f; }   // duckhunt (duckhunt WaistN)
+    if (k == 0x2e) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -1.46f; fl_ofwd = -0.34f; fl_up = 9.68f; fl_fwd = 0.05f; }   // koopajr (koopajr WaistN)
+    if (k == 0x2f) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.49f; fl_ofwd = 0.14f; fl_up = 10.38f; fl_fwd = 0.42f; }   // shulk (shulk WaistN)
+    if (k == 0x30) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.50f; fl_ofwd = 0.50f; fl_up = 10.94f; fl_fwd = 0.50f; }   // gekkouga (gekkouga WaistN)
+    if (k == 0x31) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -2.00f; fl_ofwd = 0.00f; fl_up = 7.40f; fl_fwd = 0.00f; }   // pacman (pacman WaistN)
+    if (k == 0x32) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 7.69f; fl_fwd = 0.16f; }   // rockman (rockman WaistN)
+    if (k == 0x33) { fl_rad = 15.00f; fl_joint = 0xb; fl_oup = -0.00f; fl_ofwd = -1.00f; fl_up = 11.31f; fl_fwd = -0.84f; }   // mewtwo (mewtwo WaistN)
+    if (k == 0x34) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -2.50f; fl_ofwd = 0.00f; fl_up = 10.70f; fl_fwd = 0.00f; }   // ryu (ryu WaistN)
+    if (k == 0x35) { fl_rad = 12.50f; fl_joint = 0xb; fl_oup = 1.99f; fl_ofwd = 0.53f; fl_up = 7.00f; fl_fwd = 0.62f; }   // lucas (lucas WaistN)
+    if (k == 0x36) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.91f; fl_ofwd = -0.93f; fl_up = 10.08f; fl_fwd = -0.69f; }   // roy (roy WaistN)
+    if (k == 0x37) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.01f; fl_up = 11.12f; fl_fwd = 0.28f; }   // cloud (cloud WaistN)
+    if (k == 0x38) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -2.73f; fl_ofwd = -1.24f; fl_up = 11.35f; fl_fwd = -1.14f; }   // bayonetta (bayonetta WaistN)
+    if (k == 0x39) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = -1.97f; fl_ofwd = 0.17f; fl_up = 9.75f; fl_fwd = 0.17f; }   // kamui (kamui WaistN)
+    if (k == 0x3a) { fl_rad = 54.57f; fl_joint = 0xb; fl_oup = 1.78f; fl_ofwd = 0.24f; fl_up = 39.47f; fl_fwd = 1.45f; }   // koopag (koopa WaistN)
+    if (k == 0x3b) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 1.48f; fl_ofwd = -0.27f; fl_up = 6.57f; fl_fwd = 0.14f; }   // warioman (wario WaistN)
+    if (k == 0x3c) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = -1.02f; fl_ofwd = 0.67f; fl_up = 13.29f; fl_fwd = 0.89f; }   // littlemacg (littlemac WaistN)
+    if (k == 0x3d) { fl_rad = 13.50f; fl_joint = 0xb; fl_oup = 0.00f; fl_ofwd = 0.00f; fl_up = 9.25f; fl_fwd = 0.06f; }   // lucariom (lucario WaistN)
+    if (k == 0x3e) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemyf (miifighter WaistN)
+    if (k == 0x3f) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemys (miiswordsman WaistN)
+    if (k == 0x40) { fl_rad = 14.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.50f; fl_up = 7.74f; fl_fwd = 0.50f; }   // miienemyg (miigunner WaistN)
+    if (k == 0x41) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.00f; fl_ofwd = 0.00f; fl_up = 7.57f; fl_fwd = 0.03f; }   // supamario (mario WaistN)
+    if (k == 0x42) { fl_rad = 15.50f; fl_joint = 0xb; fl_oup = -3.00f; fl_ofwd = 0.00f; fl_up = 10.64f; fl_fwd = 0.00f; }   // edge (edge WaistN)
+    if (k == 0x43) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -0.41f; fl_ofwd = -0.02f; fl_up = 8.29f; fl_fwd = 0.40f; }   // gaogaen (gaogaen WaistN)
+    if (k == 0x44) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.50f; fl_ofwd = 0.00f; fl_up = 8.50f; fl_fwd = 0.00f; }   // pickel (pickel WaistN)
+    if (k == 0x45) { fl_rad = 15.00f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.00f; fl_up = 10.52f; fl_fwd = 0.00f; }   // brave (brave WaistN)
+    if (k == 0x46) { fl_rad = 11.00f; fl_joint = 0xb; fl_oup = 0.45f; fl_ofwd = 0.22f; fl_up = 5.52f; fl_fwd = 0.71f; }   // pzenigame (pzenigame WaistN)
 }
 // ---- end of flare targets ----
 
@@ -1007,8 +1014,23 @@ int fl_target_lost()
 
 void fl_centre()
 {
-    fl_cx = WorkModuleF(0, 0x0f000020 + 0x4 * fl_slot) + fl_fwd * WorkModuleF(0, 0x0f000023 + 0x4 * fl_slot);
+    float lr;
+    float jx;
+    float jy;
+    lr = WorkModuleF(0, 0x0f000023 + 0x4 * fl_slot);
+    fl_cx = WorkModuleF(0, 0x0f000020 + 0x4 * fl_slot) + fl_fwd * lr;
     fl_cy = WorkModuleF(0, 0x0f000021 + 0x4 * fl_slot) + fl_up;
+    if (fl_joint >= 0)                     // the joint where it is now (0x0F000290 + 4 x target: the bone, then
+    {                                      // its x / y), + the offsets
+        WorkModule(0, (float)fl_joint, 0x0f00029c + 0x4 * fl_slot);
+        jx = WorkModuleF(0, 0x0f00029d + 0x4 * fl_slot);
+        jy = WorkModuleF(0, 0x0f00029e + 0x4 * fl_slot);
+        if (jx != 0 || jy != 0)
+        {
+            fl_cx = jx + fl_ofwd * lr;
+            fl_cy = jy + fl_oup;
+        }
+    }
     fl_cz = WorkModuleF(0, 0x0f000022 + 0x4 * fl_slot);
     PostureModule(0x2714, fl_cx, fl_cy, fl_cz);
 }
@@ -1040,7 +1062,7 @@ void fl_place_hb(int i, float rho, int hb)
     {
         EffectModule(0x17, fl_fx(i), fl_cx + dx, fl_cy + dy, fl_cz);
     }
-    if (hb)
+    if (hb && fl_var(i) >= 2.0f)           // only a striking / exploding orb has a hitbox (fl_hitboxes)
     {
         AttackModule(0x1, i, 0, dy, dx * PostureModuleF(0));
     }
@@ -1068,10 +1090,10 @@ void fl_hitboxes()
                 AttackModule(0x271b, i, 3.5f);
             }
         }
-        else if (st != 1.0f || i >= fl_count || fl_phase == 0x2 && fl_var(0x5 + i) > 0)
-        {                                      // (an orb still appearing has none: flare2 PRE has no attack)
-            AttackModule(0x2718, i);
-        }
+        else                                   // orbiting (or appearing, gone, not made): none. Ultimate's
+        {                                      // orbiting orbs (Fly, 7 damage) never hit their own target (user's
+            AttackModule(0x2718, i);           // Ultimate clip: they pass through Donkey Kong's hands, no damage);
+        }                                      // a hitbox can't leave one fighter out, so they hit no one here
         i += 1;
     }
 }

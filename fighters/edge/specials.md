@@ -282,9 +282,14 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   for 92 of 94 fighters) + `edge_flare_offset_x/y/z` in that joint's axes, from `fighter_param.prc`, by the target's
   fighter kind (`SLOTn_KIND`, `docs/position-variables.md`): `fl_target_shape` in flare1.c, written by
   `tools/edge_flare_targets.py`. These keep the ring just outside the body, so the orbiting orbs (7 damage, rehit
-  45) don't hit their own target. Smash 4's MSC can't read another fighter's joints, so the centre is the joint on the
-  model's rest pose (x the model size), as an offset from the fighter's position along its facing: it doesn't
-  follow crouches or animations. The target's scale (size changes) is taken as 1. Giga Bowser (Ultimate: radius 0,
+  45) don't hit their own target. The centre follows the target's joint as it moves (test 72: the variable cave reads
+  its `ModelModuleF(axis, bone)`, `0x0F000290 + 4 x target`), + the offsets turned by the joint's rest-pose axes
+  (its live rotation isn't readable); the rest-pose centre stays as the fallback. The target's scale (size
+  changes) is taken as 1.
+- **Orbiting orbs hit no one (test 72):** in the user's Ultimate clip the orbs pass through Donkey Kong's hands
+  with no damage: Ultimate's orbiting orbs (Fly, 7 damage, rehit 45) never hit the fighter they circle (how is
+  native, not found). A Smash 4 hitbox can't leave one fighter out, so the orbiting orbs have none here: someone
+  else walking into the ring isn't hit (Ultimate: 7 damage). Strikes (TRY) and explosions (EXP) are as before. Giga Bowser (Ultimate: radius 0,
   no joint) gets Bowser's row with the radius grown by his waist height (approximated).
 - **Approximated / not done:** the orbs can't be hit (Ultimate: damage
   takes n down by 0.07 a point) and don't freeze in hitlag; TRY / EXP keep the orbit's BKB 65 (Ultimate's 50; no MSC

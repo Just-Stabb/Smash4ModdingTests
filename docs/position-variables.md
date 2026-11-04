@@ -224,6 +224,18 @@ the combat variables, 0 self, 1 nearest opponent, 2 last fighter hit, 3-10 playe
 
     SET_FLOAT(Value=1, Variable=0x0F000278)    // the last fighter hit: metal (the Metal Box's)
 
+## A joint's position
+
+`0x0F000290 + 4 × target + n` (targets as above, so `0x0F000290`-`0x0F0002BB`; `SELF_JOINT`, `SLOT1_JOINT_X`, ...):
+n = 0 write: the bone index (the fighter's `model.vbn` order, `tools/vbn_bones.py`) the reads use, n = 1 / 2 / 3
+read: that joint's world X / Y / Z on the target, through its own `ModelModuleF(0 / 1 / 2, bone)` (the op Zelda's
+MSC places world effects with). One bone for every caller: write it, then read, in the same script. A bone index of
+0x200 or more, or a target that isn't there, reads 0. Sephiroth's Shadow Flare centres its orb ring on the target's
+waist with it (`fighters/edge/weapons/flare1.c`, as Ultimate's dummy follows `edge_flare_node`).
+
+    SET_FLOAT(Value=11, Variable=0x0F00029C)   // slot 1: bone 0xB (WaistN for most fighters)
+    Float_Var_Compare(Variable=0x0F00029E, Method=5, Value=20)   // its Y above 20?
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:

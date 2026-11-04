@@ -463,6 +463,7 @@ MSC_MOTION_F = 0x030B2A80  # 0x13 MotionModuleF
 MSC_ATTACK = 0x030B50F0    # 0x2E AttackModule
 MSC_WORK_F = 0x030B2B60    # 0x17 WorkModuleF
 MSC_HIT = 0x030B50B8       # 0x2D HitModule
+MSC_MODEL_F = 0x030B306C   # 0x28 ModelModuleF: (0 / 1 / 2, bone) = the joint's world x / y / z (Zelda's own MSC)
 # Input / state variables (0x0F000100 + 0x20 * target + q, docs/position-variables.md "Inputs and
 # state"). The fighters' controller update (0x020035FC, struct = ControlModule + 0x10, pad source
 # [ControlModule + 0xA4]) is hooked where it has read the source, so forced / disabled inputs go
@@ -1220,6 +1221,32 @@ ext_kind_have:                          # the entry again (slot checked every po
         b ext_ret_int
 """, False),
 ("""
+inp_joint:                              # q 0x23: write = the bone index the reads use (one for every caller:
+        addi r22, r22, -0x23            # write it, then read, in the same script); 0x24-0x26 its world x / y / z
+        lis r26, jnt_sel@ha
+        addi r26, r26, jnt_sel@l
+        cmpwi r22, 0
+        bne inp_joint_read
+        cmpwi r29, 0
+        beq ext_zero
+        bl ext_value_int
+        stw r3, 0(r26)
+        b ext_zero
+inp_joint_read:                         # its ModelModuleF(axis, bone): the joint's world position
+        cmpwi r29, 0
+        bne ext_zero
+        addi r22, r22, -1
+        lwz r27, 0(r26)
+        cmplwi r27, 0x200
+        bge ext_zero
+%(JOINT)s
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)
+        b ext_ret
+jnt_sel:
+        .word 0
+""", False),
+("""
 ext_ret_int:                            # f1 = (float) r3
         bl ext_i2f
         b ext_ret
@@ -1338,10 +1365,19 @@ inp_entry_raw:                          # 0x260 + 2 * target + n: raw stick / C-
 inp_entry_item:                         # 0x276 + target: ITEM (q 0x22)
         addi r3, r3, -0x16
         cmplwi r3, 11
-        bge ext_zero
+        bge inp_entry_joint
         li r11, 0x62
         stw r11, 0x14(r1)
         mr r22, r3
+        b ext_target
+inp_entry_joint:                        # 0x290 + 4 * target + n: a joint's position (q 0x23 + n)
+        addi r3, r3, -0x1A
+        cmplwi r3, 44
+        bge ext_zero
+        clrlwi r11, r3, 30
+        addi r11, r11, 0x63
+        stw r11, 0x14(r1)
+        srwi r22, r3, 2
         b ext_target
 """, False),
 ("""
@@ -1367,6 +1403,8 @@ inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 post
         blt inp_raw
         cmplwi r22, 0x23
         blt inp_item
+        cmplwi r22, 0x27
+        blt inp_joint
         b ext_zero
 inp_raw:                                # q 0x20 / 0x21: stick / C-stick X on screen (+ = right)
         addi r26, r22, -0x20
@@ -1883,6 +1921,7 @@ inp_state:                              # per slot: held, tapped, inputs off, st
         MOTION=msc(MSC_MOTION, 7),
         SET_MOTION=msc(MSC_MOTION, 1, "r22", 0, 0x3F800000),
         FRAME=msc(MSC_MOTION_F, 1),
+        JOINT=msc(MSC_MODEL_F, "r22", "r27"),
         AT_HI=hex(MSC_ATTACK >> 16), AT_LO=hex(MSC_ATTACK & 0xFFFF),
         SETI_RESUME="0x%08X" % SET_INT_RESUME,
         CHK_R6_NEXT=chk("r6", "seti_att_next"), CHK_R7_RECNEXT=chk("r7", "seti_rec_next"),

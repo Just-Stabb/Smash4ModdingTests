@@ -859,3 +859,27 @@ orb's new record).
 - `code/cross_f.rpx`: test 70's with the variable cave rebuilt (488 words, all its own), the ACMD cave applied after
   it as before (`Hit_Log_Clear` tests unchanged).
 - port_check F1 (new, WARN): a fighter kind with no row in the table. Over the chain + 70 + this: no new errors.
+
+## Test 72 (`build/sephiroth_test72.zip`): Shadow Flare's orbit on the moving waist, no orbit hits; Scintilla's wall
+
+User, test 71 (clips): side special "acts almost the same as before"; down special's effects still wrong; the up
+special's arrow still cut off.
+- Shadow Flare: Donkey Kong still took the 7% orbit hit 1.2 s after the shot (no strike is due for 4 s). The ring was
+  centred on his T-pose waist (19.5 up); in game he's hunched, his arms on the floor, inside a 17-wide ring. Now
+  the centre is the target's waist joint where it is each frame: a new variable range reads a fighter's joint
+  through its own `ModelModuleF(axis, bone)` (`0x0F000290 + 4 x target`: write the bone, read X / Y / Z;
+  `tools/position_vars_cave.py`, emulator tests), the bone per fighter from `tools/edge_flare_targets.py` (`WaistN`,
+  ROB `Waist3N`), + Ultimate's offsets in the joint's rest-pose axes.
+- And in the user's Ultimate clip the orbiting orbs pass through Donkey Kong's hands with no damage at all: the
+  orbiting orbs never hit their own target there. A Smash 4 hitbox can't leave one fighter out, so orbiting orbs
+  have no hitbox now (someone else walking into the ring isn't hit, approximated); strikes (TRY, 6.5) and explosions
+  (EXP) as before, their offsets set only while they have one.
+- Scintilla: Ultimate's barrier (`edge_senkou_shield`) is a honeycomb wall, 7 rows of 4-5 hexagon meshes, each row a
+  child emitter of HexagonFlare01 (one still particle); the converter drops mesh children and all but one child
+  (eft's children are quads, one each), so only Hexagon08's column showed. `vfxb_to_ptcl.py` `promote_children`: such
+  children become emitters of their own (rows at 9.9 ... -13.8, from frame 3). The bank is test 64's otherwise (every
+  effect id the same, 29.17 MB).
+- The arrow (`edge_octaslash_direction`, one directional quad `tri1`: half a chevron, mirrored across U with the
+  2 x U repeat): one arm of the outer chevron ends in a diagonal cut in game. Not found from the data; asked the user
+  for Ultimate footage of it.
+- port_check over the chain + 70 / 71 / this: no new errors.
