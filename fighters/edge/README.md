@@ -804,3 +804,13 @@ Down B's effects look the same as before."
 User: "Up special's arrow is also still slightly hidden". It was at his own depth, so his coat and sword (nearer the
 camera) covered part of it: now 6 toward the camera. Package (install over 67 / 68): edge.mscsb, flare1.mscsb (test
 68's crash attempt, included).
+
+## Bisect 70 (`build/sephiroth_bisect70.zip`): Shadow Flare's crash on a hit
+
+User, test 69: "Sephiroth side special still crashes when it hits an opponent"; Cemu's log ends on
+`GX2RSetAttributeBuffer(): Offset exceeds buffer size` 32 times a frame (no exception line). That message came before
+from the NU model renderer's vertex streams (Supamario's Kamehameha models; Hero's Whack, a hit effect not loaded in a
+normal match). The shot's own hit (test 64: hit effect 0x13 purple, no crash) isn't it. What starts with the orbs:
+their effects (`edge_shadowflare_bullet`: 8 emitters, sphere meshes, x 5 orbs), their hitboxes (ids 0-4, Parts 0-4),
+the shared variables on the target. Three overlays of `flare1.mscsb` over test 69, one part off each: A no orb
+effects, B no orb hitboxes, C no shared variables.
