@@ -1,10 +1,32 @@
 # Sm4shExplorer: faster builds, "Extract vanilla", "Clean vanilla files" and "Build to Folder"
 
 `sm4shexplorer-faster.patch` (6 commits) applies to https://github.com/thefungus/Sm4shExplorer
-(`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. Built with mono's `xbuild`
-(`/p:Configuration=Release`), then `python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer.exe`;
-the exe is in `build/sm4shexplorer_faster_v6.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and
-plugins are unchanged).
+(`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. The exe is in
+`build/sm4shexplorer_faster_v7.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and plugins are
+unchanged).
+
+**Build (v7 on):** with Microsoft's C# compiler (Roslyn, from the .NET SDK: Ubuntu's `dotnet-sdk-8.0`),
+run by mono's `xbuild` (which still makes the `.resources`), against mono's .NET 4.5 reference
+assemblies; Visual Studio gives the same kind of exe.
+
+    printf '#!/bin/sh\nexec dotnet /usr/lib/dotnet/sdk/8.0.133/Roslyn/bincore/csc.dll "$@"\n' > roslyn/csc
+    chmod +x roslyn/csc
+    xbuild Sm4shFileExplorer/Sm4shFileExplorer.csproj /p:Configuration=Release \
+        /p:CscToolPath=$PWD/roslyn /p:CscToolExe=csc
+    python3 tools/sm4shexplorer/set_laa.py Sm4shFileExplorer/bin/Release/Sm4shFileExplorer.exe
+
+**Why (v7):** v1-v6 were compiled by mono's `mcs`. Chrome refused to download v6 (Safe Browsing) and
+Windows Security flagged it once extracted (user). An `mcs` exe looks like nothing Windows normally
+runs: build time 0 (1970), an extra `.sdata` section, no manifest, no debug directory, checksum 0
+(and v2-v6 had their header edited for large address aware with no checksum written). Unsigned, new
+and odd-looking is what reputation / machine-learning detections flag. The Roslyn exe has a real
+build time, only `.text` / `.rsrc` / `.reloc`, the default Windows manifest and a debug directory;
+`set_laa.py` now also writes the PE checksum. Same code: the same types and assembly references as
+v6 (only the compilers' names for hidden closure classes differ). Not signed: a new unsigned exe
+can still get Chrome's "not commonly downloaded" warning ("Keep") or a SmartScreen prompt until it
+builds reputation; a code-signing certificate is the only full fix. A false positive can be reported
+at https://www.microsoft.com/en-us/wdsi/filesubmission (Defender) and
+https://safebrowsing.google.com/safebrowsing/report_error/ (Chrome).
 
 ## Why builds were slow
 
