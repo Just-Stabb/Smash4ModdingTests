@@ -1492,6 +1492,8 @@ From the MSC handler `0x02C2CEC8` (int ops 3 - 0x35 switch at `0x02C2CF94`, the 
   plus r, g, b in 0 - 255 (divided by 255, vt `+0x27C` on the new handle: `LAST_EFFECT_SET_COLOR`'s);
   `0x2730` / `0x273D` the same after the following request (vt `+0x64`). They return 1, not the handle: read
   it with `0x30`.
+- In game (Sephiroth test 65): `0x17` / `0x18` on a `0x272C` request's handle put the effect off and drifting
+  (the bone request's own frame, inferred); on a `0x3` request they place it in the world (Smash 4's `func_1764`).
 
 ## Manifold cross-reference (other native findings)
 

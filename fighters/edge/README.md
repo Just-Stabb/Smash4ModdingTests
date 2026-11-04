@@ -752,3 +752,20 @@ full and doesn't multihit".
   The whiff's look (the burst gone after ~12 frames in the clip) isn't changed: to compare with Ultimate's.
 - port_check over the chain + this: no new errors.
 - Package (install over 64): code/cross_f.rpx, script/msc/flare1/flare1.mscsb.
+
+## Test 66 (`build/sephiroth_test66.zip`): Shadow Flare's shot, his turn, Scintilla's finisher, the aim arrow
+
+User, test 65: "The main hit for side special doesn't appear now. It also seems to automatically turn him and
+sometimes face the opposite direction. Down special's multihit ender doesn't happen." And (clip): "the arrow on Up
+special doesn't appear correctly and nowhere near the correct location".
+- The shot: with the end status working (test 65) its wall / floor test (`GroundModule(0x2722)`, the Flare's) ended
+  it at once (inferred: 10 above the floor). Now a wall is "moved under half its speed since the last frame".
+- The turn: `global48` is the stick's screen x (the reverse tilts compare it with the facing); the hold's turn
+  compared it alone (turned whenever held left). Now stick x x lr <= -0.2, Ultimate's.
+- The finisher: the multi-hit's Part 0 hit log stays over Remove_All_Hitboxes, so the frame-15 finisher (Part 0)
+  missed whoever the multi-hit had hit. The finisher is Part 1 now (as Supamario's Kamehameha finish).
+- The arrow: moved by handle (0x17 / 0x18) after a 0x272C request (the bone request + colour) it drifted away from
+  him, thin (clip). Now a world request (0x3) as Smash 4's own code does before moving one (func_1764); its team
+  colour is dropped (no MSC op colours a handle): the emitters' own colour.
+- port_check over the chain + this: no new errors.
+- Package (install over 65): flash game.bin, edge.mscsb, flare1.mscsb.

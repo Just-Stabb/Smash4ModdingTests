@@ -227,6 +227,10 @@ def flash_scripts(a, wdir):
         else:
             f0, f15 = flash_attack(atk[2], atk[3], p), flash_attack(atk[4], atk[5], p)
             scale = 1.2 + 0.8 * p
+        # the finisher in Part 1, its own hit log: Smash 4 keeps Part 0's records (the multi-hit's) over
+        # Remove_All_Hitboxes, so the finisher missed whoever the multi-hit had hit (test 65; Ultimate's clear_all
+        # clears them). As Supamario's Kamehameha finish
+        f15 = re.sub(r'^(macros::ATTACK\(agent, \d+, )0,', r'\g<1>1,', f15)
         body = ('if macros::is_excute(agent) {\n%s\n}\nframe(agent.lua_state_agent, 15.0);\n'
                 'if macros::is_excute(agent) {\nAttackModule::clear_all(agent.module_accessor);\n%s\n}\n' % (f0, f15))
         game[name] = gtr.script(body)

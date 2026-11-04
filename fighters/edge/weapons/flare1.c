@@ -720,18 +720,23 @@ int fl_owner_slot(int air, float lr)
 // left to fade). Placed at Ultimate's spawn: his position + (lr x offset_x 10, offset_y 10) (air: offset_x_air 10,
 // offset_y_air 7). Din's callback puts it at his head + (lr x 9, -0.8): his head on SpecialSEnd's frame 8 (the
 // converted motion) is 0.07 forward, 18.63 up (SpecialAirSEnd: -0.10, 18.54), so the difference is added
+// a wall: it moved under half its speed since the last frame (test 65: GroundModule(0x2722), the Flare's floor /
+// wall test, ended it at once 10 above the floor: the shot never got out once the end status worked)
 void fl_fly_loop()
 {
+    float x;
     if (fl_expired())
     {
         return;
     }
+    x = PostureModuleF(0x1);
     fl_life -= 1;
-    if (fl_life <= 0 || fl_life < 0x6 && GroundModule(0x2722))
+    if (fl_life <= 0 || fl_life < 0x6 && func_15(x - fl_cx) < fl_speed * 0.5f)
     {
         fl_to(0x4);
         return;
     }
+    fl_cx = x;
     fl_move(fl_speed * PostureModuleF(0), 0);
 }
 
@@ -780,6 +785,7 @@ void fl_fly_main()
     {
         PostureModule(0x2714, PostureModuleF(0x1) + 0.93f * lr, PostureModuleF(0x2) - 7.83f, PostureModuleF(0x3));
     }
+    fl_cx = PostureModuleF(0x1);
     func_24(0, 0, 1.0f);                       // fly
     AttackModule(0x2728, 1.0f + 2.0f * fl_r);
     fl_move(fl_speed * lr, 0);
