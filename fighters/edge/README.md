@@ -703,3 +703,4 @@ program copy) and his bank (~13.5 MiB with Octaslash's effects, 14.2 with Scinti
 (docs/native-notes.md "Effect heap"). Fix: `tools/effect_heap_patch.py` in the executable (effect heap 60 MiB, the
 16 MiB taken from the 460 MiB resource heap; 2 words). port_check E9 (new) catches a bank over the heap. Package:
 test 62's files with the patched executable (install over test 60).
+- User, test 62b: "He loads now" (the effect heap patch confirmed in game).
