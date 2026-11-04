@@ -1461,6 +1461,21 @@ by its name `0x4f%06x` (`0x032F5640`), so shader 3 is a new record (after 2, ids
 - The random ranges step the battle RNG (instance 0, `0x105759C0`) on every request, even when 0
   (rollback: effects are part of the simulated state).
 
+### EffectModule MSC ops by handle (Sephiroth's aim arrow)
+
+From the MSC handler `0x02C2CEC8` (int ops 3 - 0x35 switch at `0x02C2CF94`, the `0x2710` family at
+`0x02C2F8DC`; the arguments are words after the op):
+- `0x3` (id, x, y, z, rx, ry, rz, size, a, n): a request at a world place (vt `+0x44` `0x02C29D10`, rotation in
+  radians); n >= 0 plays `NN.mta` (n + 1) on the effect's model (`0x0334FF08`): the KO blast passes
+  `FighterUtil(0x8)` (the player / team colour), -1 none. It tints effect *models* only, not particles.
+- `0x17` (handle, x, y, z) world position (vt `+0x11C`), `0x18` (handle, rx, ry, rz) rotation in degrees,
+  `0x19` (handle, sx, sy, sz) scale, `0x6` / `0x8` kill by handle, `0x30` the last request's handle (vt `+0x2FC`:
+  `+0x14`).
+- `0x272C` / `0x273C`: `0x2710`'s request on a bone (id, bone, pos, rot, size, random pos, random rot, flag)
+  plus r, g, b in 0 - 255 (divided by 255, vt `+0x27C` on the new handle: `LAST_EFFECT_SET_COLOR`'s);
+  `0x2730` / `0x273D` the same after the following request (vt `+0x64`). They return 1, not the handle: read
+  it with `0x30`.
+
 ## Manifold cross-reference (other native findings)
 
 Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targets this same RPX

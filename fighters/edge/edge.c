@@ -37848,6 +37848,7 @@ int   edge_hi_cliff;      // the ledge-grab mode set last (func_100), -1 none ye
 float edge_hi_fx_x;       // the aim effect's place / roll (f_18b30), for edge_hi_direction()
 float edge_hi_fx_y;
 float edge_hi_fx_roll;
+int   edge_hi_fx;         // 0xe370: the aim effect's handle (0 none yet; Ultimate's 4016 = none)
 
 // P[c](name): the plain or the charged_ value
 float edge_hi_p(float plain, float charged)
@@ -38003,12 +38004,49 @@ void edge_hi_pitch_reset()
     ModelModule(0x2, 0x2);
 }
 
-// f_18b30: the aim effect, edge_octaslash_direction, at pos + (0, 8 * scale) + v * 14 * scale, rolled
-// -sign(v.x) * angle(up, v), team-coloured (direction_effect_color). TODO: that effect isn't in his bank
-// (edge_effects.json): convert it (vfxb_to_ptcl.py), then follow it here (the place and roll are computed)
+int edge_hi_fx_direction() { return 0x342006E; } // fx edge_octaslash_direction
+
+// effect.prc direction_effect_color[i] (Ultimate's team colours: red, blue, yellow, green, orange, cyan, pink,
+// purple, grey) component c (0 r, 1 g, 2 b), 0 - 255 (EffectModule 0x272C divides by 255)
+float edge_hi_dir_color(int i, int c)
+{
+    float r;
+    float g;
+    float b;
+    r = 0.5f;
+    g = 0.5f;
+    b = 0.5f;
+    if (i == 0) { r = 1.0f; g = 0.056f; b = 0.056f; }
+    if (i == 0x1) { r = 0.056f; g = 0.238f; b = 1.0f; }
+    if (i == 0x2) { r = 1.0f; g = 0.584f; b = 0.04f; }
+    if (i == 0x3) { r = 0.085f; g = 0.627f; b = 0.102f; }
+    if (i == 0x4) { r = 1.0f; g = 0.236f; b = 0.0f; }
+    if (i == 0x5) { r = 0.127f; g = 0.848f; b = 0.944f; }
+    if (i == 0x6) { r = 1.0f; g = 0.429f; b = 0.603f; }
+    if (i == 0x7) { r = 0.345f; g = 0.222f; b = 1.0f; }
+    if (c == 0x1)
+    {
+        return g * 255.0f;
+    }
+    if (c == 0x2)
+    {
+        return b * 255.0f;
+    }
+    return r * 255.0f;
+}
+
+// f_18b30: the aim effect, edge_octaslash_direction (Ultimate: req once, the handle kept in 0xe370, set_pos /
+// set_rot every frame, visible while 0xe36c, which is on for the whole start), at pos + (0, 8 * scale) +
+// v * 14 * scale (direction_effect_offset_y / direction_effect_radius), rolled -sign(v.x) * angle(up, v),
+// coloured direction_effect_color[team colour] through set_rgb_partial_last.
+// Smash 4 (cross_f.rpx, EffectModule's MSC handler 0x02C2CEC8): 0x272C is the request on a bone (0x2710's
+// arguments) plus r, g, b (/ 255, vt +0x27C on the new handle: LAST_EFFECT_SET_COLOR's); 0x30 the last
+// handle (vt +0x2FC: +0x14); 0x17 / 0x18 set a handle's world position / rotation (degrees). The team colour
+// index: FighterUtil(0x8), the one the KO blast takes (inferred: its order matches the table's)
 void edge_hi_direction(float x, float y)
 {
     float s;
+    int t;
     s = PostureModuleF(0x7);
     edge_hi_fx_x = PostureModuleF(0x1) + x * 14.0f * s;
     edge_hi_fx_y = PostureModuleF(0x2) + 8.0f * s + y * 14.0f * s;
@@ -38016,6 +38054,28 @@ void edge_hi_direction(float x, float y)
     if (x > 0.0f)
     {
         edge_hi_fx_roll = -edge_hi_fx_roll;
+    }
+    if (edge_hi_fx == 0 && edge_hi_fx_direction() != 0)
+    {
+        t = FighterUtil(0x8);
+        EffectModule(0x272c, edge_hi_fx_direction(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0,
+                     edge_hi_dir_color(t, 0), edge_hi_dir_color(t, 0x1), edge_hi_dir_color(t, 0x2));
+        edge_hi_fx = EffectModule(0x30);
+    }
+    if (edge_hi_fx != 0)
+    {
+        EffectModule(0x17, edge_hi_fx, edge_hi_fx_x, edge_hi_fx_y, PostureModuleF(0x3));
+        EffectModule(0x18, edge_hi_fx, 0.0f, 0.0f, edge_hi_fx_roll);
+    }
+}
+
+// 09dd0's kill_kind(edge_octaslash_direction, true, true)
+void edge_hi_direction_kill()
+{
+    if (edge_hi_fx != 0)
+    {
+        EffectModule(0x2723, edge_hi_fx_direction(), 0x1, 0x1);
+        edge_hi_fx = 0;
     }
 }
 
@@ -38190,6 +38250,7 @@ void edge_hi_start_main()
     edge_hi_end_air = 0;
     edge_hi_control = 0;
     edge_hi_cliff = 0xffffffff;
+    edge_hi_fx = 0;
     edge_hi_start_kinetic();
     MotionModule(0x1, edge_hi_start_motion(), 0, 1.0f);
     global20 = 0;
@@ -38199,6 +38260,7 @@ void edge_hi_start_main()
 // 09dd0
 void edge_hi_start_end()
 {
+    edge_hi_direction_kill();
     edge_hi_rot = edge_hi_rot_target;
     if (global6 != 0x159)
     {

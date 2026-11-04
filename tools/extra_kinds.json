@@ -59,7 +59,9 @@
         "0x237": {"anim": "FitZeldaBodyMainD02SpecialHi2", "flags": "0x0", "motion": "specialhi2"},
         "0x238": {"anim": "FitZeldaBodyMainD02SpecialHi2End", "flags": "0x0", "motion": "specialhi2end"},
         "0x23E": {"anim": "FitZeldaBodyMainD02SpecialAirHi1End", "flags": "0x0", "motion": "specialairhi1end"},
-        "0x23F": {"anim": "FitZeldaBodyMainD02SpecialAirHi2End", "flags": "0x0", "motion": "specialairhi2end"}
+        "0x23F": {"anim": "FitZeldaBodyMainD02SpecialAirHi2End", "flags": "0x0", "motion": "specialairhi2end"},
+        "0x249": {"flags": "0x0", "motion": "speciallwhit: Scintilla's slash (Zelda's SpecialLwLoop has flag 0x2, loop: it never ended)"},
+        "0x24D": {"flags": "0x0", "motion": "specialairlwhit: as 0x249"}
       },
       "weapons": {
         "fire": {"kind": "0x18C", "base": "dein", "max": 3, "on_hit": 1},

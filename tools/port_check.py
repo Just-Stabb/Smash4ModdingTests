@@ -699,6 +699,39 @@ def check_weapons(name, rec, rep):
                     '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
 
 
+def check_loop_slots(inst, name, rec, base, vanilla, rep):
+    """M9: a fighter slot (0x211 on) whose base motion loops (motion table flag 0x2) and that the port gives another
+    move (its motion.mtable names another script there) without a flag override in the record's "motions": that
+    move's motion never ends, and a status waiting for its end never leaves (Sephiroth test 62b: Scintilla's slash
+    on Zelda's SpecialLwLoop 0x249 looped for good)"""
+    import mtable
+    import tempfile
+    mt = inst.get('fighter/%s/script/animcmd/body/motion.mtable' % name)
+    rpx = inst.get('code/cross_f.rpx') if 'code/cross_f.rpx' in inst.files else None
+    van = os.path.join(vanilla or '', 'fighter', rec['base'], 'script/animcmd/body/motion.mtable')
+    if mt is None or rpx is None or not os.path.exists(van):
+        return
+    port = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
+    orig = mtable.read(van)
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(rpx)
+        f.flush()
+        try:
+            flags = [fl for _h, fl in mtable.motion_table(f.name, base['kind'])['main']]
+        except SystemExit:
+            return
+    over = {int(k, 16): int(v.get('flags', '0x0'), 0) for k, v in (rec.get('motions') or {}).items() if 'flags' in v}
+    bad = []
+    for i in range(0x211, min(len(port), len(orig), len(flags))):
+        fl = over.get(i, flags[i])
+        if fl & 2 and port[i] and port[i] != orig[i]:
+            bad.append('0x%X' % i)
+    if bad:
+        rep.add('WARN', 'M9 loop-slot', '%d slots keep the base\'s looping motion flag (0x2) under another move: a status '
+                'waiting for the motion\'s end never leaves (override "flags" in the record\'s "motions" unless the move '
+                'loops): %s' % (len(bad), ', '.join(bad)))
+
+
 def check_motions(inst, name, rec, rep):
     """M8: every animation the record's motion table names ("motions": the executable's kind_expand table) is in
     the installed motion/body/main.pac, else that move T-poses (Hero fix 79: its main.pac was rebuilt from an
@@ -1038,6 +1071,7 @@ def main():
     check_weapons(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
+    check_loop_slots(inst, a.name, rec, base, vanilla, rep)
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_effects(inst, a.name, rep)
