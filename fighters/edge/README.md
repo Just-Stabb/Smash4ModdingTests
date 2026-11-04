@@ -668,3 +668,27 @@ specials and code." Source: Ultimate's status code, the user's `lua2cpp_decomp.z
   world-space stick (global48), both as Ultimate.
 - Package: the bank, body game / effect / expression / sound / motion.mtable, edge.mscsb, code/cross_f.rpx (not the vl
   file: ports_shapes' is newer).
+
+## Test 62 (`build/sephiroth_test62.zip`): down special, Scintilla
+
+From Ultimate's status code (the user's decomp) and its native parts in the ExeFS (shield HP, hitstop, flash place
+and charge: fighters/edge/specials.md "Down special" for every source and approximation).
+- Statuses 0x155 stance / 0x15B counter or whiff slash / 0x15C shield broken, his MSC only: Zelda's Phantom article
+  is no longer generated, its files untouched (the user keeps it for later).
+- The shield: `tools/edge_counter_cave.py` (executable, kind 0x42 only): shield group 1 a capsule on joint 0 (radius
+  6, (0, 2, 8.3)-(0, 20, 8.3): Ultimate's virtualflashshield), the first hit on it in 0x155 reported (damage, side,
+  projectile) with no damage / knockback; his MSC turns it on at frame 7 and changes status (d > 25: broken;
+  otherwise the counter; hitstop 20, 10 for a projectile). Unicorn self-test 0 failures.
+- The flash (article 8, weapon 0x18F, `weapons/flash.c`): 5 counter tiers by d / 18 + a whiff tier (Smash 4 has no
+  hitbox lerp), Ultimate's hitboxes interpolated per tier, effect scale 1.2 + 0.8 p (whiff 0.65), set at his
+  position + (lr x (16 + 3.5 d / 25) (whiff 14.5), 10.5) (Din's callback spawns weapons at his head: the flash moves
+  itself), 16 frames.
+- Effects: the 29 `edge_senkou_*` effects added (no turned variants needed); the common sets / variants after them
+  renumbered (effect.bin retranslated; the Flare charge-off ids in edge.c follow: E8). Bank 27.7 MB. A converter
+  crash on `edge_senkou_hold_attack` fixed (`radial_gradient`: one axis for all channels).
+- port_check over the chain: no new errors; C4 warns on `edge_lw_drift` (the drift seeded with his own world speed:
+  meant) as on the up special.
+- Package: the bank, body game / effect / expression / sound / motion.mtable, the flash's scripts and MSC,
+  edge.mscsb, code/cross_f.rpx (test 61's + the cave). Not the vl file (ports_shapes' is newer).
+- In game, untested: whether a cave-built shield shape catches hits (Hero's cave-built reflector never did; this one
+  is built at setup as Marth's / Link's), its side when he faces left, the projectile flag.

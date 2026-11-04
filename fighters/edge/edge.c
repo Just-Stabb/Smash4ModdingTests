@@ -37718,10 +37718,10 @@ void edge_n_charge_off()
     EffectModule(0x2723, 0x3420057, 0, 0x1); // edge_fire2_hold_aura
     EffectModule(0x2723, 0x3420059, 0, 0x1); // edge_fire2_hold_flash
     EffectModule(0x2723, 0x342005A, 0, 0x1); // edge_fire3_hold_flash
-    EffectModule(0x2723, 0x3420081, 0, 0x1); // edge_fire1_hold@90,0,90
-    EffectModule(0x2723, 0x3420082, 0, 0x1); // edge_fire2_hold@90,0,90
-    EffectModule(0x2723, 0x3420083, 0, 0x1); // edge_fire2_hold_flash@90,0,90
-    EffectModule(0x2723, 0x3420084, 0, 0x1); // edge_fire3_hold_flash@90,0,90
+    EffectModule(0x2723, 0x342009E, 0, 0x1); // edge_fire1_hold@90,0,90
+    EffectModule(0x2723, 0x342009F, 0, 0x1); // edge_fire2_hold@90,0,90
+    EffectModule(0x2723, 0x34200A0, 0, 0x1); // edge_fire2_hold_flash@90,0,90
+    EffectModule(0x2723, 0x34200A1, 0, 0x1); // edge_fire3_hold_flash@90,0,90
 }
 
 void edge_n_change(int state)
