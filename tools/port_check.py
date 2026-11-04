@@ -741,6 +741,42 @@ def check_weapon_rehit(inst, name, rec, rep):
                     'the base\'s hit method removes it at its first hit ("on_hit": its own status, e.g. 0 to stay)' % art)
 
 
+# hitbox ids / Parts (hit-record groups) a base weapon's AttackModule has: its kind's set-up method fills the module
+# parameters (accessor init 0x02BCBD84 -> per-kind object, vt +0xC; +0xDC ids, +0xEC parts). The module never checks
+# a hitbox's id or Part against them: past the end it writes over other memory and crashes on the hit.
+WEAPON_ATTACK_SLOTS = {'dein': (7, 2)}    # dein: 0x032107B4 (Sephiroth bisect 70: Shadow Flare's orbs on Parts 2-4)
+
+
+def check_weapon_parts(inst, name, rec, rep):
+    """W4: a new article's hitbox with an id or Part its base weapon's AttackModule hasn't got (WEAPON_ATTACK_SLOTS):
+    the hit writes past the module's arrays and the game crashes when it connects (Sephiroth bisect 70)"""
+    import acmd
+    import tempfile
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        slots = WEAPON_ATTACK_SLOTS.get(w.get('base')) if isinstance(w, dict) else None
+        data = inst.get('fighter/%s/script/animcmd/weapon/%s/game.bin' % (name, art)) if slots else None
+        if not data:
+            continue
+        with tempfile.NamedTemporaryFile(suffix='.bin') as f:
+            f.write(data)
+            f.flush()
+            try:
+                scripts = acmd.ACMDFile.load(f.name).scripts
+            except SystemExit:
+                continue
+        bad = set()
+        for s in scripts.values():
+            for c in s:
+                syn = acmd.INFO.get(c.ident, {}).get('syntax') or []
+                if 'Hitbox' in c.name and syn[:2] == ['ID', 'Part'] and len(c.params) > 1:
+                    if not 0 <= c.params[0] < slots[0] or not 0 <= c.params[1] < slots[1]:
+                        bad.add('ID %d Part %d' % (c.params[0], c.params[1]))
+        if bad:
+            rep.add('ERROR', 'W4 weapon-parts', '%s: hitboxes past its base %s\'s AttackModule (ids 0-%d, Parts 0-%d): %s; '
+                    'the hit writes past its arrays and the game crashes when it connects' % (
+                        art, w['base'], slots[0] - 1, slots[1] - 1, ', '.join(sorted(bad))))
+
+
 def check_loop_slots(inst, name, rec, base, vanilla, rep):
     """M9: a fighter slot (0x211 on) whose base motion loops (motion table flag 0x2) and that the port gives another
     move (its motion.mtable names another script there) without a flag override in the record's "motions": that
@@ -1136,6 +1172,7 @@ def main():
     check_weapons(a.name, rec, rep)
     check_weapon_statuses(a.name, rep)
     check_weapon_rehit(inst, a.name, rec, rep)
+    check_weapon_parts(inst, a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)

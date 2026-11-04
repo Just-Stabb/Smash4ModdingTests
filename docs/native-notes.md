@@ -276,6 +276,35 @@ for each hitbox h:
 These records are the "don't hit the same target twice" log, so they're
 still there right after the hit.
 
+**Correction (Sephiroth bisect 70):** the 0x174 entries are per **Part**, not per hitbox. `AM + 0x18` is
+the highest Part in use + 1 and `AM + 0x10` how many there are; a hitbox's 0x84 entry (`[AM + 0x40] + id
+x 0x84`, `AM + 0x3C` of them) holds its Part at `+0x74`, and `set_attack` (`0x02C08848(AM, id, part)`)
+indexes the groups with it **unchecked** (no compare with `AM + 0x10` or `AM + 0x3C`).
+
+### AttackModule sizes (hitbox IDs, Parts)
+
+Set once per object: the module accessor's init (`0x02BF4F08`) passes each module its part of a
+parameter block (AttackModule: vt `+0x1C`, `0x02C079E0`, with block `+0xD4`), and that block is filled
+per object class beforehand:
+
+| class | filled at | hitbox IDs (`+0xDC`) | Parts (`+0xEC`) |
+|---|---|---|---|
+| fighters (module set `0x02E54660`) | `0x02E53FA4` / `0x02E5407C` | 10 | 20 |
+| weapons: the kind's own object (`0x02BCBD84`: `0x03210C30(kind)` -> vt `+0xC`) | dein (kind `0x22`) `0x032107B4` | 7 | 2 |
+| `0x02DA2AA4` (another class) | | 10 | 10 |
+
+So a dein copy has IDs 0-6, Parts 0-1. A hitbox with Part 2+ on one writes its hit record over the
+memory after the groups when it connects (Shadow Flare's orbs, Parts 2-4: the game crashed on the hit,
+with only `GX2RSetAttributeBuffer` errors in Cemu's log). `tools/port_check.py` W4 checks the new
+articles' scripts against `WEAPON_ATTACK_SLOTS`.
+
+Clearing records: `0x02C10660(group, list, 0)` frees a group list's records of the group's current round
+(`+0x16A`, copied to each record's `+0x28` when it's added); `0x02C0ECDC(AM + 8)` does that for every
+group's current list (`+0x130`) and `+0x124`. vt `+0x34` (`0x02C081C8`, object set-up `0x02BF5D88`) runs it
+when `AM + 0x118` is set, else `0x02C0EDE0`, which also zeroes each group's hitbox count (`+0x164`: not safe
+with hitboxes out). No MSC command reaches it (`0x2718` remove and `0x2719` clear-all keep the records), so
+ACMD `Hit_Log_Clear(Part)` (`docs/acmd-extra-commands.md`) was added for it.
+
 ### Step 2 plan (copy on the 12th star hit)
 
 A small code cave (new PPC code in unused space), reached from a spare

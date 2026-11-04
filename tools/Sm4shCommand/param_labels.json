@@ -4811,6 +4811,26 @@
    "confidence": "low"
   }
  },
+ "3B130D3B": {
+  "_command": "Hit_Log_Clear",
+  "_new": true,
+  "_name": "Hit_Log_Clear",
+  "_size": 2,
+  "_desc": "Forgets who this object's hitboxes of Part have hit (-1: every part), so they can hit the same fighter again, as a new attack would. Out-of-range parts do nothing (a weapon has fewer parts than a fighter: Zelda's Din's Fire and its copies 2, fighters 20). New command: needs the patched cross_f.rpx.",
+  "_format": [
+   0
+  ],
+  "0": {
+   "name": "Part",
+   "desc": "The hitboxes' Part (their shared hit record), from 0; -1 = every part.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// a second wave of the same hitboxes (Part 0) that can hit fighters the first one hit",
+   "FRAME(Frames=0x14)",
+   "Hit_Log_Clear(Part=0)"
+  ]
+ },
  "3B31D521": {
   "_command": "unk_3B31D521",
   "0": {
@@ -8193,7 +8213,7 @@
   },
   "43": {
    "name": "HitstunMul",
-   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 or less = x1 (normal).",
+   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 = x1 (normal); a negative value adds that many frames instead (-2: 2 frames more, as Ultimate's set_add_reaction_frame).",
    "confidence": "high"
   },
   "44": {
@@ -12343,7 +12363,7 @@
   },
   "41": {
    "name": "HitstunMul",
-   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 or less = x1 (normal).",
+   "desc": "Multiplies the hitstun this hit gives the opponent (the game's own: knockback x 0.4). 0 = x1 (normal); a negative value adds that many frames instead (-2: 2 frames more, as Ultimate's set_add_reaction_frame).",
    "confidence": "high"
   },
   "42": {

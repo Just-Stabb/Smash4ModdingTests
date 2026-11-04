@@ -555,8 +555,11 @@ int func_40(int arg0)
 // ceil(n) orbs (flare2, each its own object) circling the fighter, then sends them in one after another. Smash 4
 // has no MSC way for a weapon to make other weapons or reach another one, so this one object does all three:
 // status 0 FLY (flare1), 1 HIT (the hit: find the fighter hit), 2 ORBIT / 3 CONVE (the dummy and its orbs).
-// The orbs are effects moved by handle (EffectModule 0x3 / 0x17) and hitboxes 0-4 of this object (Part i: each
-// orb its own hit record, as Ultimate's own objects), placed each frame (AttackModule(0x1, id, x, y, z)).
+// The orbs are effects moved by handle (EffectModule 0x3 / 0x17) and hitboxes 0-4 of this object, placed each
+// frame (AttackModule(0x1, id, x, y, z)). Ultimate's orbs are objects of their own (a hit record each); a dein copy
+// has 2 Parts (hit records; dein's set-up 0x032107B4, Part 2+ crashed on the hit, bisect 70), so orb i is Part
+// i % 2 and an orb that starts, strikes or explodes clears its Part's record (fl_clear: the orbit script's
+// Hit_Log_Clear), as Ultimate's new status does.
 // Per target state (a second shot on the same fighter adds orbs and life, Ultimate's forwarded event) lives on
 // the target: its SLOTn_SHARED_k variables (0x0F000340 + 8 x slot + k, tools/acmd_ext_cave.py): 0 the
 // controller's life, 1 its heartbeat (changes every frame), 2 orbs to add, 3 frames to add.
@@ -580,6 +583,8 @@ float fl_spin;         // its speed
 float fl_cx;
 float fl_cy;
 float fl_cz;
+int fl_clr0;           // hit records to clear (Part 0 / 1) when the orbit script runs next (fl_hitboxes)
+int fl_clr1;
 int fl_fx0;
 int fl_fx1;
 int fl_fx2;
@@ -953,12 +958,14 @@ void fl_place_hb(int i, float rho, int hb)
     }
 }
 
-// the orbs' hitboxes again (ids 0-4 from the orbit script, every hit record cleared): the ones not in play off,
+// the orbs' hitboxes again (ids 0-4 from the orbit script, the Parts asked by fl_clear with new hit records): the
+// ones not in play off,
 // a striking orb's (state 2) TRY damage / angle, an exploding one's (3) EXP size on top
 void fl_hitboxes()
 {
     int i;
     float st;
+    fl_set(0x14, (float)(fl_clr0 + 0x2 * fl_clr1));   // VAR_20: the orbit script's Hit_Log_Clear (1 / 2 / 3)
     func_24(fl_status, 0, 1.0f);
     i = 0;
     while (i < 0x5)
@@ -979,6 +986,27 @@ void fl_hitboxes()
         }
         i += 1;
     }
+}
+
+// orb i's Part (i % 2) gets a new hit record at the next fl_hitboxes
+void fl_clear(int i)
+{
+    if (i == 0x1 || i == 0x3)
+    {
+        fl_clr1 = 0x1;
+    }
+    else
+    {
+        fl_clr0 = 0x1;
+    }
+}
+
+// a frame's clears done: none asked until the next
+void fl_clear_done()
+{
+    fl_clr0 = 0;
+    fl_clr1 = 0;
+    fl_set(0x14, 0);
 }
 
 // Ultimate's ORBIT loop step 4: ceil(n) orbs, the new ones made at the centre (PRE: sliding to their slot over
@@ -1056,6 +1084,7 @@ void fl_orbit_orbs()
                 fl_set(0x5 + i, t);
                 if (t <= 0)
                 {
+                    fl_clear(i);
                     fl_hitboxes();
                 }
                 fl_place_hb(i, fl_var(0xa + i) * (1.0f - fl_appear(t)), t <= 0);
@@ -1092,6 +1121,7 @@ void fl_finish()
 void fl_orbit_loop()
 {
     int ext;
+    fl_clear_done();
     if (fl_expired())
     {
         return;
@@ -1144,6 +1174,7 @@ void fl_orbit_main()
     if (fl_phase == 0x1)
     {
         fl_phase = 0x2;
+        fl_clear_done();
         fl_life = 0xf0;
         fl_pool = 0xd2;
         fl_count = 0;
@@ -1175,7 +1206,7 @@ void fl_orbit_main()
 // 7, 14, R); its radius - v, then v further in (TRY's set_pos); within conve_radius 0.5 (or v): EXP, one frame
 // (6.5 damage, size 3.5), edge_shadowflare_bullet_hit x 1.3, gone. TRY: 6.5 damage, 53 degrees, size 1.5
 // (Ultimate's KBG 75 / BKB 50 against the orbit's 75 / 65: the BKB kept at the orbit's, no MSC op for it).
-// Each strike starts with the hit records cleared (the hitboxes made again), as Ultimate's new status does.
+// Each strike (and its EXP) starts its Part's hit record anew (fl_clear), as Ultimate's new status does.
 float fl_lerp(float a, float b, float t)
 {
     return a + (b - a) * t;
@@ -1189,6 +1220,7 @@ void fl_conve_loop()
     float v;
     float rho;
     float t;
+    fl_clear_done();
     if (fl_expired())
     {
         return;
@@ -1222,6 +1254,7 @@ void fl_conve_loop()
             {
                 fl_set(i, 2.0f);
                 fl_set(0xf + i, -fl_lerp(4.0f, 5.2f, R));
+                fl_clear(i);
                 fl_hitboxes();
                 rho = fl_var(0xa + i);
                 fl_fx_play(i, fl_fx_attack(), fl_cx + rho * MathF(0x4, fl_angle(i)),
@@ -1249,6 +1282,7 @@ void fl_conve_loop()
             {
                 // EXP: one frame at the centre, then gone
                 fl_set(i, 3.0f);
+                fl_clear(i);
                 fl_hitboxes();
                 fl_place(i, 0.5f);
                 fl_fx_play(i, fl_fx_exp(), fl_cx, fl_cy, 1.3f);

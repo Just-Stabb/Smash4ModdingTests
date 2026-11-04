@@ -719,6 +719,54 @@ attack:                         # AttackModule wrapper: log the op and n, count
     go('Hit_Reset', [], exe=0)
     check('Hit_Reset skipped: nothing', r32(pm, B + 0x1028), 0)
 
+    # Hit_Log_Clear: AttackModule (acc +0x50) with 2 groups at +0x14; the game's clears stubbed (log r3 r4 r5)
+    hl = Asm(B + 0x4000)
+    hl.asm("""
+one:                            # 0x02C10660(group, list, r5): log the call (up to 2)
+        lis r11, 0x7D00
+        lwz r12, 0x1040(r11)
+        slwi r10, r12, 4
+        add r10, r10, r11
+        stw r3, 0x1044(r10)
+        stw r4, 0x1048(r10)
+        stw r5, 0x104C(r10)
+        addi r12, r12, 1
+        stw r12, 0x1040(r11)
+        blr
+all:                            # 0x02C0ECDC(AttackModule + 8): log it
+        lis r11, 0x7D00
+        stw r3, 0x1070(r11)
+        blr
+""")
+    for i, w in enumerate(hl.words()):
+        w32(pm, B + 0x4000 + 4 * i, w)
+    for fn, to in ((C.HIT_CLEAR_LIST, hl.addr('one')), (C.HIT_CLEAR_ALL, hl.addr('all'))):
+        for i, wd in enumerate([0x3D800000 | (to >> 16), 0x618C0000 | (to & 0xFFFF), 0x7D8903A6, 0x4E800420]):
+            w32(pm, fn + 4 * i, wd)
+    am, grp = B + 0x5000, B + 0x6000
+    w32(pm, acc + 0x50, am)
+    w32(pm, am + 0x10, 2)
+    w32(pm, am + 0x14, grp)
+    w32(pm, grp + 0x130, grp + 0x124)               # group 0: its current list is the +0x124 one
+    w32(pm, grp + 0x174 + 0x130, grp + 0x174 + 0x12C)   # group 1: another one current
+
+    def hlog(part, exe=1):
+        for k in range(0x1040, 0x1074, 4):
+            w32(pm, B + k, 0)
+        ret, step, _ = go('Hit_Log_Clear', [part], exe=exe)
+        calls = [tuple(r32(pm, B + 0x1044 + 16 * i + 4 * j) for j in range(3)) for i in range(r32(pm, B + 0x1040))]
+        return ret, step, calls, r32(pm, B + 0x1070)
+
+    check('Hit_Log_Clear(0): its current list (+0x124) once, steps 2 words',
+          hlog(0), (2, 8, [(grp, grp + 0x124, 0)], 0))
+    check('Hit_Log_Clear(1): the current list (+0x12C), then +0x124',
+          hlog(1)[2], [(grp + 0x174, grp + 0x174 + 0x12C, 0), (grp + 0x174, grp + 0x174 + 0x124, 0)])
+    check('Hit_Log_Clear(2) with 2 parts: nothing', hlog(2)[2:], ([], 0))
+    check('Hit_Log_Clear(-1): every part (0x02C0ECDC(AttackModule + 8))', hlog(-1)[2:], ([], am + 8))
+    check('Hit_Log_Clear skipped: nothing, steps 2 words', hlog(0, exe=0)[1:], (8, [], 0))
+    w32(pm, acc + 0x50, 0)
+    check('Hit_Log_Clear, no AttackModule: nothing', hlog(0)[2:], ([], 0))
+
 
 def main():
     patched, original = sys.argv[1:3]

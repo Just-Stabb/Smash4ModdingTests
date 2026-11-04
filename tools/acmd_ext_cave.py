@@ -100,6 +100,8 @@ COMPARE = 0x02BEE010             # Float_Var_Compare's compare(r3 method, f1 val
 DBG = 0x04B93900                 # debug counters (zero at load; docs/acmd-extra-commands.md "Debug counters")
 INPUT_BASE = 0x0F000100          # position_vars_cave.py's input / state variables: + 0x20 * target + input
 INPUT_RAW = 0x0F000260           # raw stick X: + 2 * target (+1 C-stick)
+HIT_CLEAR_ALL = 0x02C0ECDC       # (AttackModule + 8): every group's hit records cleared (AttackModule vt +0x34's)
+HIT_CLEAR_LIST = 0x02C10660      # (group, list, 0): that list's records of the group's current round (+0x16A) freed
 KINETIC_FW = 0x030B2A10          # KineticModuleF (vt +0x11C, float result in f1): (0xB, energy) = its Y speed
 OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
 OBJ_ORIG.update({h: 0x9421FFC8 for h in STEP_HOOKS})
@@ -148,6 +150,13 @@ SM4SHCOMMAND_DESC['Input_Set'] = (
 SM4SHCOMMAND_DESC['Hit_Reset'] = (
     'Clears this object\'s "attack has hit" flag (variable SELF_HIT, 0x0F0000A0, reads 0 again until another hitbox '
     'connects), so a later hitbox of the move can be checked on its own. New command: needs the patched cross_f.rpx.')
+SM4SHCOMMAND_DESC['Hit_Log_Clear'] = (
+    'Forgets who this object\'s hitboxes of Part have hit (-1: every part), so they can hit the same fighter again, as a '
+    'new attack would. Out-of-range parts do nothing (a weapon has fewer parts than a fighter: Zelda\'s Din\'s Fire and its '
+    'copies 2, fighters 20). New command: needs the patched cross_f.rpx.')
+HIT_LOG_CLEAR_PARAMS = [
+    ('Part', 0, 'The hitboxes\' Part (their shared hit record), from 0; -1 = every part.'),
+]
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
@@ -160,6 +169,7 @@ COMMANDS = [                     # name, size (words, header included), handler 
     ('Input_Get', 4, 'h_iget', None),
     ('Input_Set', 4, 'h_iset', None),
     ('Hit_Reset', 1, 'h_hreset', None),
+    ('Hit_Log_Clear', 2, 'h_hlclear', None),
 ]
 THREAD_PARAMS = [
     ('Offset', 0, 'Words to the end of the block (Sm4shCommand works it out from the braces, like True).'),
@@ -1766,7 +1776,7 @@ h_hreset:
         stw r0, 0x2C(r1)
         addi r3, r1, 0x40
         addi r4, r1, 0x28
-        bl 0x%(attack)08X
+        bl 0x""" + '%08X' % ATTACK_W + """
 hr_step:
         lwz r3, 8(r31)
         cmpwi r3, -1
@@ -1781,7 +1791,61 @@ hr_ret:
         mtlr r0
         addi r1, r1, 0x60
         blr
-""" % dict(attack=ATTACK_W))
+
+# --- Hit_Log_Clear(Part): the hit records of the hitboxes of Part (-1: all) cleared ------------------------
+# AttackModule (accessor +0x50) +8 is its hit-record set: +0x10 the parts (groups, dein 2 / fighters 20), +0x14
+# the groups (0x174 each); a hitbox's part indexes them unchecked (0x02C08848). One group: 0x02C10660(group, its
+# current list (+0x130), 0) and, if that isn't it, the list at +0x124, as the game's own clear 0x02C0ECDC does
+# for every group (AttackModule vt +0x34's, run on object set-up).
+h_hlclear:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r29, 0x14(r1)
+        mr r31, r5
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq hl_step""" + chk_t('r3', 'r0', 'hl_step') + """
+        lwz r29, 0(r7)
+        lwz r30, 0x50(r3)""" + chk_t('r30', 'r0', 'hl_step') + """
+        cmpwi r29, 0
+        bge hl_part
+        addi r3, r30, 8
+        bl 0x""" + '%08X' % HIT_CLEAR_ALL + """
+        b hl_step
+hl_part:
+        lwz r0, 0x10(r30)
+        cmplw r29, r0
+        bge hl_step
+        mulli r29, r29, 0x174
+        lwz r0, 0x14(r30)
+        add r30, r0, r29
+        lwz r4, 0x130(r30)
+        mr r3, r30
+        li r5, 0
+        bl 0x""" + '%08X' % HIT_CLEAR_LIST + """
+        lwz r0, 0x130(r30)
+        addi r4, r30, 0x124
+        cmplw r0, r4
+        beq hl_step
+        mr r3, r30
+        li r5, 0
+        bl 0x""" + '%08X' % HIT_CLEAR_LIST + """
+hl_step:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne hl_ret
+        lwz r11, 4(r31)
+        addi r11, r11, 8
+        stw r11, 4(r31)
+        li r3, 2
+hl_ret:
+        lmw r29, 0x14(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+""")
 
 
 def hit_code(a):
@@ -2143,6 +2207,10 @@ EXAMPLES = {
         'Direct/Indirect=1, Type=1)',
         'WAIT(Frames=3)',
         'Float_Var_Compare(Variable=0x0F0000A0, Method=0, Value=1)'],
+    'Hit_Log_Clear': [
+        '// a second wave of the same hitboxes (Part 0) that can hit fighters the first one hit',
+        'FRAME(Frames=0x14)',
+        'Hit_Log_Clear(Part=0)'],
     'Thread_Stop': [
         '// stop thread 1 (started by Thread_Start(ID=1)) if it\'s still running',
         'Thread_Stop(ID=1)',
@@ -2160,7 +2228,7 @@ def labels(path):
     for name, size, _label, _base in COMMANDS:
         own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS,
                'Input_Compare': INPUT_CMP_PARAMS, 'Input_Get': INPUT_GET_PARAMS, 'Input_Set': INPUT_SET_PARAMS,
-               'Hit_Reset': []}
+               'Hit_Reset': [], 'Hit_Log_Clear': HIT_LOG_CLEAR_PARAMS}
         if name in own:
             e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
                  '_format': [t for _n, t, _d in own[name]]}

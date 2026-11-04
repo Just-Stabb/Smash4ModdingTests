@@ -263,11 +263,18 @@ def flash_scripts(a, wdir):
         ', '.join(n for n in FLASH_MOTIONS if n in game), gtr.skipped, etr.skipped, ', '.join(sorted(missing)) or '-')
 
 
+FLARE1_CLEAR_VAR = 0x0F000314   # VAR_20 of flare1: hit records to clear when `orbit` runs (flare1.c fl_hitboxes)
+
+
 def flare1_scripts(a, wdir):
     """the flare1 article's scripts: Ultimate's edge_flare1 Fly (its 4 hitboxes, the beam), Hit (the beam left,
     edge_shadowflare_beam_hit), End (the beam left); `orbit`: edge_flare2 Fly's attack (7 damage, 50 degrees, rehit
-    45, fighters) as ids 0-4, Part i each (every orb its own hit record, as Ultimate's own objects), at the bone's
-    origin: flare1.c places them (AttackModule(0x1, ...)) and plays the orbs' effects itself"""
+    45, fighters) as ids 0-4 at the bone's origin: flare1.c places them (AttackModule(0x1, ...)) and plays the orbs'
+    effects itself. Ultimate's orbs are objects of their own (a hit record each); a dein copy has 7 hitbox ids but
+    only 2 Parts (dein's set-up 0x032107B4: Part 2+ wrote past the hit records and crashed on the hit, bisect 70),
+    so orb i is Part i % 2 and `orbit` starts with Hit_Log_Clear on the Parts flare1.c asks for in VAR_20 (1 Part 0,
+    2 Part 1, 3 both): an orb that starts (its appear done), strikes or explodes gets a new record, as Ultimate's
+    new status does"""
     ids = effect_ids()
     gtr, etr = U.Translator({}), U.EffectTranslator({}, ids, {})
     U.EFFECT_CONDS = (U.LR_LEFT,)
@@ -284,9 +291,14 @@ def flare1_scripts(a, wdir):
     orbs = []
     for i in range(5):
         args = list(atk[0][2])
-        args[1] = args[2] = str(i)
+        args[1], args[2] = str(i), str(i % 2)
         orbs.append('macros::ATTACK(%s);' % ', '.join(args))
-    game['orbit'] = gtr.script('if macros::is_excute(agent) {\n%s\n}\n' % '\n'.join(orbs))
+    clear = []
+    for v, part in ((1, 0), (2, 1), (3, -1)):
+        body = [U.cmd('Hit_Log_Clear', part)]
+        clear += [U.cmd('Float_Var_Compare', FLARE1_CLEAR_VAR, 0, float(v)),
+                  U.cmd('True', 2 + sum(acmd.INFO[c.ident]['size'] for c in body))] + body
+    game['orbit'] = clear + gtr.script('if macros::is_excute(agent) {\n%s\n}\n' % '\n'.join(orbs))
     U.EFFECT_CONDS = ()
     os.makedirs(wdir, exist_ok=True)
     stop = [acmd.Command(acmd.END)]

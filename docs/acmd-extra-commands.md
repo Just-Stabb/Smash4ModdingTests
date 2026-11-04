@@ -5,7 +5,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 them won't load properly, so ship the executable with any script that uses them.
 
 Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes
-and Hit_Reset under Hitboxes, the Input commands under Variables & compares and Track_Target under
+and Hit_Reset / Hit_Log_Clear under Hitboxes, the Input commands under Variables & compares and Track_Target under
 Traces & targeting.
 `tools/acmd.py` reads and writes them too.
 
@@ -241,6 +241,30 @@ True(Offset=0){
     // only if the second hitbox connected
 }
 ```
+
+## Hit_Log_Clear
+
+`Hit_Log_Clear(Part)` makes this object forget which fighters its hitboxes of that `Part` have hit, so
+the same hitboxes can hit them again, as a new attack would. `Part=-1` clears every part. Unlike
+`Hit_Reset`, this is the game's "already hit this fighter" record itself: each Part has one, shared
+by the hitboxes with that Part number, and it stays through `Remove_All_Hitboxes` and new hitboxes
+until the move (status) ends.
+
+A Part the object doesn't have does nothing. **Fighters have hitbox IDs 0-9 and Parts 0-19; Zelda's
+Din's Fire and the new articles copied from it (`tools/extra_kinds.json` `"base": "dein"`) only IDs
+0-6 and Parts 0-1.** The game doesn't check a hitbox's ID or Part against these: a hitbox past them
+writes over other memory when it connects, and the game crashes (`tools/port_check.py` W4).
+
+```
+FRAME(Frames=5)
+Special_Hitbox(ID=0, Part=0, ...)       // a multi-hit's first wave
+FRAME(Frames=20)
+Hit_Log_Clear(Part=0)                   // the second wave can hit the same fighters again
+```
+
+It runs the game's own clear (`0x02C10660` on the Part's hit-record lists, as `0x02C0ECDC` does for
+every Part: AttackModule vtable `+0x34`, used when an object is set up). Sephiroth's Shadow Flare orbs
+(`fighters/edge/specials.md`) use it to give each orb strike a new record.
 
 ## Debug counters
 

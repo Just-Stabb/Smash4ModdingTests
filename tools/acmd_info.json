@@ -10236,6 +10236,16 @@
 "name": "Hit_Reset",
 "format": [],
 "syntax": []
+},
+"3B130D3B": {
+"size": 2,
+"name": "Hit_Log_Clear",
+"format": [
+0
+],
+"syntax": [
+"Part"
+]
 }
 }
 }

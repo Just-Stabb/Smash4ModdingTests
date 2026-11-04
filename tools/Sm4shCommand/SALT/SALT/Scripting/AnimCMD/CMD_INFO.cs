@@ -138,7 +138,8 @@ namespace SALT.Moveset.AnimCMD
             {0x43D5B75B,4},
             {0x58FABCF7,4},
             {0xD41CE3F4,5},
-            {0xFE66276F,1}
+            {0xFE66276F,1},
+            {0x3B130D3B,2}
         };
         #endregion
         #region Names
@@ -737,6 +738,7 @@ namespace SALT.Moveset.AnimCMD
             {0x58FABCF7,"Input_Set"},
             {0xD41CE3F4,"Input_Compare"},
             {0xFE66276F,"Hit_Reset"},
+            {0x3B130D3B,"Hit_Log_Clear"},
         };
         #endregion
         #region Params
@@ -1337,6 +1339,7 @@ namespace SALT.Moveset.AnimCMD
             {0x58FABCF7,"0,0,1"},
             {0xD41CE3F4,"0,0,0,1"},
             {0xFE66276F,"NONE"},
+            {0x3B130D3B,"0"},
         };
         #endregion
         #region syntax
@@ -1935,6 +1938,7 @@ namespace SALT.Moveset.AnimCMD
             {0x58FABCF7,"Target,Input,Value"},
             {0xD41CE3F4,"Target,Input,Method,Value"},
             {0xFE66276F,"NONE"},
+            {0x3B130D3B,"Part"},
         };
         #endregion
 
@@ -2535,6 +2539,7 @@ namespace SALT.Moveset.AnimCMD
             {0x58FABCF7,"Forces a fighter's input as if its controller did it: hold or tap a button, tilt a stick, or ignore its controller. Forced inputs last until changed and are cleared when it is KO'd. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xD41CE3F4,"Compares a fighter's input (a button held / pressed, a stick) with Value; True / Else after it run on the result, like Float_Var_Compare. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xFE66276F,"Clears this object's \"attack has hit\" flag (variable SELF_HIT, 0x0F0000A0, reads 0 again until another hitbox connects), so a later hitbox of the move can be checked on its own. New command: needs the patched cross_f.rpx."},
+            {0x3B130D3B,"Forgets who this object's hitboxes of Part have hit (-1: every part), so they can hit the same fighter again, as a new attack would. Out-of-range parts do nothing (a weapon has fewer parts than a fighter: Zelda's Din's Fire and its copies 2, fighters 20). New command: needs the patched cross_f.rpx."},
         };
         #endregion
         /// <summary>

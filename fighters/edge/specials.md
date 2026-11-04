@@ -267,7 +267,9 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   into the dummy and plays the orbs: on its hit (status 1) it finds the fighter hit (in hitstop, nearest: the slot
   variables), then (status 2 ORBIT) sits at that fighter's centre with the orbs as effects moved by handle
   (EffectModule 0x3 / 0x17, `edge_shadowflare_bullet`) and its hitboxes 0-4 (`orbit` script: flare2 Fly's 7 damage,
-  50 degrees, KBG 75, BKB 65, size 1.5, rehit 45, Part i each so every orb has its own hit record) placed each frame
+  50 degrees, KBG 75, BKB 65, size 1.5, rehit 45; Part i % 2: a dein copy has only Parts 0-1, `docs/native-notes.md`
+  "AttackModule sizes", and an orb that starts, strikes or explodes clears its Part's hit record first with
+  `Hit_Log_Clear`, flagged by the MSC in VAR_20, in place of Ultimate's one object and record per orb) placed each frame
   (`AttackModule(0x1, id, x, y, z)`). Orbit: life 240, orbs appear from the centre over 5 frames (no hitbox then:
   flare2 PRE has none), evenly spaced, spinning 2 pi x lerp(0.4, 0.8, n / 5) degrees a frame. A second shot on the
   same fighter: n = min(n + its n, 5), life + min(30 + 150 r, what's left of 210) (Ultimate's forwarded event), via

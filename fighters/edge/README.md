@@ -814,3 +814,25 @@ normal match). The shot's own hit (test 64: hit effect 0x13 purple, no crash) is
 their effects (`edge_shadowflare_bullet`: 8 emitters, sphere meshes, x 5 orbs), their hitboxes (ids 0-4, Parts 0-4),
 the shared variables on the target. Three overlays of `flare1.mscsb` over test 69, one part off each: A no orb
 effects, B no orb hitboxes, C no shared variables.
+
+User: "A and C crash but B does not": the orb hitboxes. Dein's attack set-up (`0x032107B4`, weapon kind 0x22's
+object, vt +0xC) gives every dein copy 7 hitbox IDs and **2 Parts** (hit-record groups); the module indexes the
+groups by a hitbox's Part without a check (`0x02C08848`), so the orbs' Parts 2-4 wrote their hit records past the
+array when they connected (`docs/native-notes.md` "AttackModule sizes").
+
+## Test 70 (`build/sephiroth_test70.zip`): Shadow Flare's orbs on Parts 0-1
+
+- Orb i's hitbox is Part i % 2 (IDs 0-4 stay: 7 there).
+- Ultimate's orbs are objects of their own, a hit record each, and a new status (appear done, TRY, EXP) starts a new
+  one. Smash 4's MSC has no command that clears hit records (`0x2718` / `0x2719` keep them), so a new ACMD command,
+  `Hit_Log_Clear(Part)` (`tools/acmd_ext_cave.py`, `docs/acmd-extra-commands.md`), runs the game's own clear
+  (`0x02C10660` on the Part's lists). The orbit script starts with it on the Parts flare1.c flags in VAR_20 (1 / 2 /
+  3 both) when an orb's appear ends, it strikes or explodes. Still approximated: the 3 orbs on Part 0 (and the 2 on
+  Part 1) share a record while orbiting (rehit 45 per Part, not per orb), and an orb's clear also clears the others
+  on its Part (8 frames apart, so the earlier strike is mostly over).
+- `code/cross_f.rpx`: test 67's with the new command (only the ACMD cave changes: 97 words in
+  `0x04B90004`-`0x04B91FF4`; 2 words of that cave are left). Emulator tests (`tools/acmd_ext_test.py`): Part 0 / 1
+  (both lists), out of range, -1, skipped, no AttackModule.
+- port_check W4 (new, ERROR): a new article's hitbox ID / Part past its base's AttackModule (`WEAPON_ATTACK_SLOTS`:
+  dein 7 / 2); it flags test 69's orbit script.
+- port_check over the chain + this: no new errors (39 -> 38: W4 gone).
