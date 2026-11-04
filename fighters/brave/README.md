@@ -1517,3 +1517,15 @@ Install over fix 86. User: "make it so when Hero acts out of the fall with an at
 homing frames after the in-range end (`brave_z2_track`) go on in an aerial attack (status 0x34) out of the fall as
 in the fall (0xE); a jump, a special or an air dodge still ends them. port_check: the same 6 errors. Package:
 `fighter/brave/script/msc/brave.mscsb`.
+
+## Fix 88 (`build/hero_fix88.zip`): Zoom 2 U's homing 15 frames, the fall intangible, an early aerial homes
+
+Install over fix 87. User: "make the tracking persist for 15 frames instead of 5 and make the fall from Zoom 2 U have 5
+frames of intangibility, also make an aerial canceled early from Zoom 2 U track the nearest opponent with the same
+15 frames if they're within 22 units."
+- The homing after the in-range end: 15 frames (`brave_lw_burst` 0x2F0 + target).
+- The fall it ends in (the in-range or the 40-frame end): intangible its first 5 frames (the game's timed
+  intangibility, `0x0F00011B` = 6 as the fall starts, covering the change's frame).
+- An action out of the flight (`brave_lw_burst` 0x104): if it's an aerial (status 0x34), it homes 15 frames on the
+  nearest opponent within 22 (feet to feet, `brave_z2_near`); otherwise the clamp frames as before.
+- `msc_stack_check`: 0 problems; port_check: the same 6 errors. Package: `fighter/brave/script/msc/brave.mscsb`.

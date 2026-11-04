@@ -39275,7 +39275,27 @@ float brave_z2_lim(float v, float m)
     return v;
 }
 
-// Zoom 2 U's in-range end (the user's): brave_lw_burst 0x2NT, N frames (5 down to 1) still following target slot T
+// fix 88: the nearest opponent's slot if within r of him (feet to feet), else -1
+int brave_z2_near(float r)
+{
+    int s;
+    float dx;
+    float dy;
+    s = brave_z2_nearest();
+    if (s < 0)
+    {
+        return 0xffffffff;
+    }
+    dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+    dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+    if (dx * dx + dy * dy > r * r)
+    {
+        return 0xffffffff;
+    }
+    return s;
+}
+
+// Zoom 2 U's in-range end (the user's): brave_lw_burst 0x2NT, N frames (15 down to 1; fix 87: 5) still following target slot T
 // in the fall it ends in, at the flight's 9 a frame clamped as the end clamps it (his max air speed across, max fall
 // speed up / down), in the fall or an aerial out of it (fix 87, the user's: an attack keeps the homing); anything
 // else he does (a jump, a special, an air dodge) ends it, then the clamp frames as before
@@ -39314,10 +39334,31 @@ void brave_z2_after()
 {
     float mx;
     float my;
-    if (brave_lw_burst >= 0x200 && brave_lw_burst < 0x260)
+    int t;
+    if (brave_lw_burst >= 0x200 && brave_lw_burst < 0x300)
     {
         brave_z2_track();
         return;
+    }
+    if (brave_lw_burst == 0x104)
+    {
+        // an action out of the flight (a manual cancel): an aerial homes 15 frames on the nearest opponent within
+        // 22 (fix 88, the user's); anything else, or none in range: the clamp frames as before
+        if (global4 == 0x155)
+        {
+            return;
+        }
+        brave_lw_burst = 0x103;
+        if (global4 == 0x34)
+        {
+            t = brave_z2_near(22.0f);
+            if (t >= 0)
+            {
+                brave_lw_burst = 0x2f0 + t;
+                brave_z2_track();
+                return;
+            }
+        }
     }
     if (brave_lw_burst < 0x101 || brave_lw_burst > 0x103 || global4 == 0x155)
     {
@@ -41441,9 +41482,15 @@ void brave_lw_loop()
             vx = KineticModuleF(0xa, 0x3);
             vy = KineticModuleF(0xb, 0x3);
             brave_z2_clamp(vx, vy);
+            if (r == 0x4 || r == 0x5)
+            {
+                // the fall it ends in: intangible its first 5 frames (fix 88, the user's: the game's timed
+                // intangibility, 6 to cover this frame's change)
+                WorkModule(0, 6.0f, 0x0f00011b);
+            }
             if (r == 0x5 && brave_lw_burst >= 0 && brave_lw_burst < 0x8)
             {
-                brave_lw_burst = 0x250 + brave_lw_burst;   // brave_z2_after: 5 frames tracking slot & 0xF
+                brave_lw_burst = 0x2f0 + brave_lw_burst;   // brave_z2_after: 15 frames tracking slot & 0xF (fix 88)
                 func_16(0xe, 0);
                 return;
             }
@@ -41453,10 +41500,11 @@ void brave_lw_loop()
                 func_16(0xe, 0);    // Zoom 2 U's end: a fall, its speed clamped
                 return;
             }
-            // Zoom 2 U's flight, an action allowed: the speed clamped, then the air actions; none: on flying
+            // Zoom 2 U's flight, an action allowed: the speed clamped, then the air actions; none: on flying.
+            // An aerial out of it (fix 88): brave_z2_after's 0x104 looks for an opponent within 22 to home on
             if (func_41())
             {
-                brave_lw_burst = 0x103;     // brave_z2_after
+                brave_lw_burst = 0x104;     // brave_z2_after
                 return;
             }
             brave_z2_fly(vx, vy);
