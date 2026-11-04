@@ -769,3 +769,20 @@ special doesn't appear correctly and nowhere near the correct location".
   colour is dropped (no MSC op colours a handle): the emitters' own colour.
 - port_check over the chain + this: no new errors.
 - Package (install over 65): flash game.bin, edge.mscsb, flare1.mscsb.
+
+## Test 67 (`build/sephiroth_test67.zip`): Shadow Flare's shot, Scintilla's finisher and layers
+
+User, test 66: "side special's initial hit still doesn't show up"; "Down special's finishing hit also doesn't land";
+"Up special's arrow is a bit cut off" (shot: now placed along the aim; part of the chevron missing).
+- The shot: no wall test at all now (test 66's "moved under half its speed" likely saw the kinetic's one-frame
+  lag as a stop); it flies its 7 frames (Ultimate's life; past a wall: left out).
+- Scintilla: the flash is a copy of dein, which has no animation; dein's own scripts have no timers, and the
+  flash's never got past frame 0 (inferred: the finisher at 15, every effect after frame 0 missing, the multi-hit
+  at 0 working). Its scripts are frame 0 now (attack*: the multi-hit, edge_senkou_hold, the first hold_attack) and
+  finish* (the frame-15 finisher, Part 1); flash.c counts its frames outside hitlag and plays the rest:
+  edge_senkou_hold_attack at 2 / 4 / 6 / 8 / 10 (Ultimate's offsets, +- 7 at random), edge_senkou_hold_end at 14,
+  the finisher at 15, gone at 17. extra_kinds `"motions": 12`. port_check W4 (new) warns on timed scripts in such
+  articles: the Flare's (fire) bursts have hitboxes at frames 2-26 (to check in game: do its explosions hit?).
+- The arrow: not changed (a directional quad, Ultimate's billboard type 6; to compare with Ultimate's).
+- port_check over the chain + this: no new errors (W4 on fire).
+- Package (install over 66): code/cross_f.rpx (the flash's 12 motions), the flash's scripts and MSC, flare1.mscsb.

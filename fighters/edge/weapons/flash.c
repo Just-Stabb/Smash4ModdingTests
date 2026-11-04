@@ -605,13 +605,63 @@ float flash_offset_x()
     return 14.5f;
 }
 
-// its life: Ultimate's notify at frame 16 removes it; here one frame later, so the frame-15 hitbox gets its
-// frame whichever of the MSC and the script runs first
+// Ultimate's Attack script on its frames. Dein (the base) has no animation, so this article's script frame never
+// passes 0 (test 65 / 66: the multi-hit hit, the frame-15 finisher and every effect after frame 0 never came:
+// "doesn't multihit" / "finishing hit also doesn't land" / effects "not layered or full"). Its scripts keep frame
+// 0 (tools/edge_specials_build.py flash_scripts); the rest is played here on frames counted outside hitlag (the
+// script's own clock stops in hitlag): edge_senkou_hold_attack every 2 frames (frames 2-10, at the script's
+// offsets in its top frame +- 7 at random: EFFECT_FOLLOW_RND), edge_senkou_hold_end at 14, the finisher (its own
+// script, FLASH_MOTIONS 6 + tier) at 15, gone at 17 (Ultimate's notify at 16, a frame later so the finisher gets
+// its frame)
+int flash_fx_attack() { return 0; } // fx edge_senkou_hold_attack
+int flash_fx_end() { return 0; } // fx edge_senkou_hold_end
+
+float flash_scale()
+{
+    if (flash_tier >= 0x1 && flash_tier <= 0x5)
+    {
+        return 1.2f + 0.2f * (float)(flash_tier - 0x1);
+    }
+    return 0.65f;
+}
+
+float flash_rnd()
+{
+    return (MathF(0x6) * 2.0f - 1.0f) * 7.0f;
+}
+
+// an effect at (y up, z forward) in its top frame, randomised, at the tier's scale
+void flash_fx(int id, float y, float z, float r)
+{
+    float lr;
+    if (id == 0)
+    {
+        return;
+    }
+    lr = PostureModuleF(0);
+    EffectModule(0x3, id, PostureModuleF(0x1) + (z + flash_rnd() * r) * lr, PostureModuleF(0x2) + y + flash_rnd() * r,
+                 PostureModuleF(0x3) + flash_rnd() * r, 0, 0, 0, flash_scale(), 0, 0xffffffff);
+}
+
 void flash_loop()
 {
     flash_hold();
+    if (StopModule(0x1))
+    {
+        return;
+    }
     flash_frame += 1;
-    if (flash_frame >= 0x11)
+    if (flash_frame == 0x2) { flash_fx(flash_fx_attack(), -6.0f, 0, 1.0f); }
+    if (flash_frame == 0x4) { flash_fx(flash_fx_attack(), 0, 6.0f, 1.0f); }
+    if (flash_frame == 0x6) { flash_fx(flash_fx_attack(), 0, -6.0f, 1.0f); }
+    if (flash_frame == 0x8) { flash_fx(flash_fx_attack(), -6.0f, 0, 1.0f); }
+    if (flash_frame == 0xa) { flash_fx(flash_fx_attack(), 6.0f, 0, 1.0f); }
+    if (flash_frame == 0xe) { flash_fx(flash_fx_end(), 0, 0, 0); }
+    if (flash_frame == 0xf)
+    {
+        func_24(0x6 + flash_tier, 0, 1.0f);
+    }
+    if (flash_frame >= 0x11 || flash_frame > 0x78)
     {
         BattleObject(0x9);
         return;

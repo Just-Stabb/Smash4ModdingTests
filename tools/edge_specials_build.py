@@ -50,7 +50,10 @@ PLACEHOLDERS = ('flare2',)
 FLARE1_MOTIONS = ('fly', 'hit', 'end', 'orbit', 'flarenone4', 'flarenone5', 'flarenone6', 'flarenone7')
 # the flash article's motion slots (flash.c: motion = the tier Sephiroth's edge_lw_generate passes): 0 the whiff,
 # 1-5 a counter at ATTACK_RATIO p = 0, .25, .5, .75, 1 (Smash 4's ACMD has no hitbox lerp: one script a tier)
-FLASH_MOTIONS = ('attacknohit', 'attack0', 'attack1', 'attack2', 'attack3', 'attack4', 'flashnone6', 'flashnone7')
+# the flash: per tier its frame-0 script and its finisher (flash.c changes to 6 + tier at frame 15: dein has no
+# animation, so the article's script never passes frame 0); extra_kinds.json "motions": 12
+FLASH_MOTIONS = ('attacknohit', 'attack0', 'attack1', 'attack2', 'attack3', 'attack4',
+                 'finishnohit', 'finish0', 'finish1', 'finish2', 'finish3', 'finish4')
 FLASH_RATIOS = (None, 0.0, 0.25, 0.5, 0.75, 1.0)
 # his down special's game scripts left empty: game_speciallwhit's countered / whiff branches (speed, XLU, the
 # flash, the whiff's motion rates) are edge.c's (edge_lw_hit_*), by the motion frame
@@ -204,7 +207,8 @@ def flash_attack(a0, a1, p):
 
 
 def flash_scripts(a, wdir):
-    """the flash article's game / effect scripts: Ultimate's edge_flash Attack per tier (FLASH_MOTIONS). Game: the
+    """the flash article's game / effect scripts: Ultimate's edge_flash Attack per tier (FLASH_MOTIONS), frame 0 in
+    attack*, frame 15's finisher in finish* (flash.c plays the rest: the script never passes frame 0). Game: the
     whiff's hitboxes (FLAG_HIT off) or the counter's id 0 -> id 1 at the tier's p (ATTACK_SET_LERP +
     ATK_LERP_RATIO); its frame-16 notify (removal) is flash.c's. Effect: the effects scaled as its exec (31950)
     scales the last one made each frame (EFFECT_ID): every one but the first puff (replaced by edge_senkou_hold
@@ -231,9 +235,11 @@ def flash_scripts(a, wdir):
         # Remove_All_Hitboxes, so the finisher missed whoever the multi-hit had hit (test 65; Ultimate's clear_all
         # clears them). As Supamario's Kamehameha finish
         f15 = re.sub(r'^(macros::ATTACK\(agent, \d+, )0,', r'\g<1>1,', f15)
-        body = ('if macros::is_excute(agent) {\n%s\n}\nframe(agent.lua_state_agent, 15.0);\n'
-                'if macros::is_excute(agent) {\nAttackModule::clear_all(agent.module_accessor);\n%s\n}\n' % (f0, f15))
-        game[name] = gtr.script(body)
+        game[name] = gtr.script('if macros::is_excute(agent) {\n%s\n}\n' % f0)
+        fin = 'finish' + name[len('attack'):]
+        game[fin] = gtr.script('if macros::is_excute(agent) {\nAttackModule::clear_all(agent.module_accessor);\n%s\n}\n'
+                               % f15)
+        # frame 0's effects only (up to the first wait): flash.c plays the later ones
         text, at = '', 0
         for s, e, args in sorted(efx):
             if s != first:
@@ -242,6 +248,7 @@ def flash_scripts(a, wdir):
             text += ebody[at:s] + ebody[s:s + ebody[s:e].index('(') + 1] + ', '.join(args) + ')'
             at = e
         text += ebody[at:]
+        text = text[:text.index('wait(agent.lua_state_agent')]
         etr.last = False
         effect[name] = etr.script(text)
         missing |= set(etr.missing)

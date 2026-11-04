@@ -88,16 +88,20 @@ BurstL
 FireNone3
 FireNone7
 // the flash article (Scintilla, weapon kind 0x18F, his article 8; motion.mtable): AttackNoHit the whiff's,
-// Attack0-4 a counter's at ATTACK_RATIO 0 / .25 / .5 / .75 / 1 (Ultimate's edge_flash Attack in tiers),
-// FlashNone6 / 7 empty slots
+// Attack0-4 a counter's at ATTACK_RATIO 0 / .25 / .5 / .75 / 1 (Ultimate's edge_flash Attack in tiers, frame 0),
+// FinishNoHit / Finish0-4 their frame-15 finisher (weapons/flash.c changes to it)
 AttackNoHit
 Attack0
 Attack1
 Attack2
 Attack3
 Attack4
-FlashNone6
-FlashNone7
+FinishNoHit
+Finish0
+Finish1
+Finish2
+Finish3
+Finish4
 // the flare1 article (Shadow Flare, weapon kind 0x18D, his article 6; motion.mtable): Fly / Hit / End the shot
 // (Ultimate's edge_flare1), Orbit the orbs' hitboxes after a hit (edge_flare2 Fly's attack as ids 0-4,
 // weapons/flare1.c places them), FlareNone4-7 empty slots
