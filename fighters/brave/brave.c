@@ -39277,7 +39277,8 @@ float brave_z2_lim(float v, float m)
 
 // Zoom 2 U's in-range end (the user's): brave_lw_burst 0x2NT, N frames (5 down to 1) still following target slot T
 // in the fall it ends in, at the flight's 9 a frame clamped as the end clamps it (his max air speed across, max fall
-// speed up / down); anything else he does (an action out of the fall) ends it, then the clamp frames as before
+// speed up / down), in the fall or an aerial out of it (fix 87, the user's: an attack keeps the homing); anything
+// else he does (a jump, a special, an air dodge) ends it, then the clamp frames as before
 void brave_z2_track()
 {
     int t;
@@ -39292,7 +39293,7 @@ void brave_z2_track()
     t = brave_lw_burst & 0xf;
     n = (brave_lw_burst >> 0x4) & 0xf;
     brave_lw_burst = 0x103;
-    if (global4 != 0xe || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
+    if (global4 != 0xe && global4 != 0x34 || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
     {
         return;
     }

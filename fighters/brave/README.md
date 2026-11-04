@@ -1510,3 +1510,10 @@ the move is canceled manually. Also make it so Zoom 2 U can pass through platfor
   without this package; one is X1 (new): his executable's acmd_ext hook was undone, so `0x0F0003xx` variables do
   nothing there (Hero uses none).
 - Package: `fighter/brave/script/msc/brave.mscsb`, `ui/info/dmg/img-00134.nut`.
+
+## Fix 87 (`build/hero_fix87.zip`): Zoom 2 U's homing on into an aerial
+
+Install over fix 86. User: "make it so when Hero acts out of the fall with an attack, the homing persists". The 5
+homing frames after the in-range end (`brave_z2_track`) go on in an aerial attack (status 0x34) out of the fall as
+in the fall (0xE); a jump, a special or an air dodge still ends them. port_check: the same 6 errors. Package:
+`fighter/brave/script/msc/brave.mscsb`.
