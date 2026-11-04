@@ -704,3 +704,19 @@ program copy) and his bank (~13.5 MiB with Octaslash's effects, 14.2 with Scinti
 16 MiB taken from the 460 MiB resource heap; 2 words). port_check E9 (new) catches a bank over the heap. Package:
 test 62's files with the patched executable (install over test 60).
 - User, test 62b: "He loads now" (the effect heap patch confirmed in game).
+
+## Test 63 (`build/sephiroth_test63.zip`): down special's loop, the up special's aim arrow
+
+- User, test 62b: "down special loops infinitely and breaks his MSC immediately". Scintilla's slash plays in Zelda's
+  SpecialLwLoop / SpecialAirLwLoop slots (0x249 / 0x24D), whose motion-table entries carry the loop flag (0x2): the
+  motion never ended, so the counter / whiff status (waiting for `MotionModule(0x2712)`) never left. Fix: flag
+  overrides 0x0 in `tools/extra_kinds.json` (the executable's kind 0x42 motion table: 2 words differ from 62b's).
+  port_check M9 (new) warns on any slot like it.
+- User: "add the arrow effect used in Ultimate to show what direction he's aiming in". `edge_octaslash_direction`
+  in the up special's start, as Ultimate's f_18b30: requested once (Smash 4's EffectModule 0x272C: the bone request
+  plus a colour, read from cross_f.rpx: docs/native-notes.md), then placed every frame at his position + (0, 8 x
+  scale) + aim x 14 x scale and rolled to the aim (0x17 / 0x18 by handle), coloured direction_effect_color
+  (effect.prc) by `FighterUtil(0x8)`, the colour index the KO blast takes (inferred: player / team colour), killed
+  at the start's end (its kill_kind). After the decide frame it stays on the decided direction.
+- port_check over the chain + this: no new errors.
+- Package (install over 62b): `script/msc/edge.mscsb`, `code/cross_f.rpx`.
