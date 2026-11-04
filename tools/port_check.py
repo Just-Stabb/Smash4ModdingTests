@@ -741,39 +741,6 @@ def check_weapon_rehit(inst, name, rec, rep):
                     'the base\'s hit method removes it at its first hit ("on_hit": its own status, e.g. 0 to stay)' % art)
 
 
-def check_weapon_timers(inst, name, rec, vanilla, rep):
-    """W4: a brand-new article copied from a base with no animation (no fighter/BASE/motion/ARTICLE folder: Zelda's
-    dein) whose scripts wait (FRAME / WAIT / timers): its script frame never passes 0, so nothing after the first
-    wait happens (Sephiroth test 66: Scintilla's frame-15 finisher and its later effects never came). Keep such
-    scripts to frame 0 and time the rest from the MSC"""
-    import acmd
-    import tempfile
-    timers = ('FRAME', 'WAIT', 'Synchronous_Timer', 'Asynchronous_Timer')
-    for art, w in sorted(rec.get('weapons', {}).items()):
-        if not isinstance(w, dict) or not vanilla:
-            continue
-        if os.path.isdir(os.path.join(vanilla, 'fighter', rec['base'], 'motion', w.get('base', ''))):
-            continue
-        bad = []
-        for fn in ('game', 'effect'):
-            data = inst.get('fighter/%s/script/animcmd/weapon/%s/%s.bin' % (name, art, fn))
-            if not data:
-                continue
-            with tempfile.NamedTemporaryFile(suffix='.bin') as f:
-                f.write(data)
-                f.flush()
-                try:
-                    scripts = acmd.ACMDFile.load(f.name).scripts
-                except SystemExit:
-                    continue
-            n = sum(1 for s in scripts.values() if any(c.name in timers for c in s))
-            if n:
-                bad.append('%s.bin: %d scripts' % (fn, n))
-        if bad:
-            rep.add('WARN', 'W4 weapon-timers', '%s (copy of %s, no animation): scripts with timers, which never pass frame '
-                    '0: %s' % (art, w.get('base'), ', '.join(bad)))
-
-
 def check_loop_slots(inst, name, rec, base, vanilla, rep):
     """M9: a fighter slot (0x211 on) whose base motion loops (motion table flag 0x2) and that the port gives another
     move (its motion.mtable names another script there) without a flag override in the record's "motions": that
@@ -1169,7 +1136,6 @@ def main():
     check_weapons(a.name, rec, rep)
     check_weapon_statuses(a.name, rep)
     check_weapon_rehit(inst, a.name, rec, rep)
-    check_weapon_timers(inst, a.name, rec, vanilla, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)

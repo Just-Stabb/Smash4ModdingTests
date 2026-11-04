@@ -930,6 +930,13 @@ float fl_angle(int i)
 // facing, y up)
 void fl_place(int i, float rho)
 {
+    fl_place_hb(i, rho, 0x1);
+}
+
+// hb 0: no hitbox to move (an appearing orb's is removed: test 67 crashed when the shot hit, inferred from setting
+// a removed hitbox's offsets)
+void fl_place_hb(int i, float rho, int hb)
+{
     float a;
     float dx;
     float dy;
@@ -940,7 +947,10 @@ void fl_place(int i, float rho)
     {
         EffectModule(0x17, fl_fx(i), fl_cx + dx, fl_cy + dy, fl_cz);
     }
-    AttackModule(0x1, i, 0, dy, dx * PostureModuleF(0));
+    if (hb)
+    {
+        AttackModule(0x1, i, 0, dy, dx * PostureModuleF(0));
+    }
 }
 
 // the orbs' hitboxes again (ids 0-4 from the orbit script, every hit record cleared): the ones not in play off,
@@ -1048,7 +1058,7 @@ void fl_orbit_orbs()
                 {
                     fl_hitboxes();
                 }
-                fl_place(i, fl_var(0xa + i) * (1.0f - fl_appear(t)));
+                fl_place_hb(i, fl_var(0xa + i) * (1.0f - fl_appear(t)), t <= 0);
             }
             else
             {

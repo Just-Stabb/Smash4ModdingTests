@@ -605,14 +605,13 @@ float flash_offset_x()
     return 14.5f;
 }
 
-// Ultimate's Attack script on its frames. Dein (the base) has no animation, so this article's script frame never
-// passes 0 (test 65 / 66: the multi-hit hit, the frame-15 finisher and every effect after frame 0 never came:
-// "doesn't multihit" / "finishing hit also doesn't land" / effects "not layered or full"). Its scripts keep frame
-// 0 (tools/edge_specials_build.py flash_scripts); the rest is played here on frames counted outside hitlag (the
-// script's own clock stops in hitlag): edge_senkou_hold_attack every 2 frames (frames 2-10, at the script's
-// offsets in its top frame +- 7 at random: EFFECT_FOLLOW_RND), edge_senkou_hold_end at 14, the finisher (its own
-// script, FLASH_MOTIONS 6 + tier) at 15, gone at 17 (Ultimate's notify at 16, a frame later so the finisher gets
-// its frame)
+// Ultimate's Attack script on its frames, counted outside hitlag: the script's own clock stops in hitlag, so test
+// 64-66's removal at 17 frames counted (hitlag included) came before the multi-hit's frame-15 finisher ("finishing
+// hit also doesn't land"). Its scripts keep frame 0 (tools/edge_specials_build.py flash_scripts); the rest is played
+// here: edge_senkou_hold_attack every 2 frames (frames 2-10, at the script's offsets in its top frame +- 7 at random:
+// EFFECT_FOLLOW_RND), edge_senkou_hold_end at 14, the finisher (its own script, FLASH_MOTIONS 6 + tier) at 15, gone
+// at 17 (Ultimate's notify at 16, a frame later so the finisher gets its frame). (Test 67 also assumed dein copies'
+// scripts never pass frame 0: wrong, the Flare's timed bursts hit.)
 int flash_fx_attack() { return 0; } // fx edge_senkou_hold_attack
 int flash_fx_end() { return 0; } // fx edge_senkou_hold_end
 

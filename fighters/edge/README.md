@@ -776,13 +776,25 @@ User, test 66: "side special's initial hit still doesn't show up"; "Down special
 "Up special's arrow is a bit cut off" (shot: now placed along the aim; part of the chevron missing).
 - The shot: no wall test at all now (test 66's "moved under half its speed" likely saw the kinetic's one-frame
   lag as a stop); it flies its 7 frames (Ultimate's life; past a wall: left out).
-- Scintilla: the flash is a copy of dein, which has no animation; dein's own scripts have no timers, and the
-  flash's never got past frame 0 (inferred: the finisher at 15, every effect after frame 0 missing, the multi-hit
-  at 0 working). Its scripts are frame 0 now (attack*: the multi-hit, edge_senkou_hold, the first hold_attack) and
+- Scintilla: the flash's removal (17 frames counted in its MSC, hitlag included) came before its script (stopped in
+  each multi-hit's hitlag) reached the frame-15 finisher. (Assumed here: a dein copy's script never passes frame 0;
+  wrong, user: "Flare's explosions do hit"; the port_check W4 added for it is gone again.) Its scripts are frame 0 now (attack*: the multi-hit, edge_senkou_hold, the first hold_attack) and
   finish* (the frame-15 finisher, Part 1); flash.c counts its frames outside hitlag and plays the rest:
   edge_senkou_hold_attack at 2 / 4 / 6 / 8 / 10 (Ultimate's offsets, +- 7 at random), edge_senkou_hold_end at 14,
-  the finisher at 15, gone at 17. extra_kinds `"motions": 12`. port_check W4 (new) warns on timed scripts in such
-  articles: the Flare's (fire) bursts have hitboxes at frames 2-26 (to check in game: do its explosions hit?).
+  the finisher at 15, gone at 17. extra_kinds `"motions": 12`.
 - The arrow: not changed (a directional quad, Ultimate's billboard type 6; to compare with Ultimate's).
 - port_check over the chain + this: no new errors (W4 on fire).
 - Package (install over 66): code/cross_f.rpx (the flash's 12 motions), the flash's scripts and MSC, flare1.mscsb.
+- User, test 67: "Down B works and side B causes a crash specifically if it hits an opponent. Down B's effects look
+  the same as before."
+
+## Test 68 (`build/sephiroth_test68.zip`): Shadow Flare's crash on a hit (attempt)
+
+User, test 67: "Flare's explosions do hit. Down B works and side B causes a crash specifically if it hits an opponent.
+Down B's effects look the same as before."
+- The crash (inferred, no log yet): an appearing orb's hitbox is removed (no attack in flare2's PRE) but its offsets
+  were still set every frame (`AttackModule(0x1, id, ...)` on a removed hitbox). Now only an orb whose hitbox is in
+  play is moved.
+- Scintilla's look: unchanged (Ultimate's layers: the dark sphere, the bright star flare of edge_senkou_hold_end,
+  the effect lights tinting him): to compare offline with fx_render.
+- Package (install over 67): flare1.mscsb.
