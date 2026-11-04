@@ -737,3 +737,18 @@ test 62's files with the patched executable (install over test 60).
   code/cross_f.rpx. Not the vl file (ports_shapes' is newer).
 - Untested in game: the hit-target search (in hitstop, nearest), the orbs' hitbox placement by MSC, a weapon's
   shared-variable writes on a fighter, EffectModule 0x3 / 0x17 on world-placed effects.
+
+## Test 65 (`build/sephiroth_test65.zip`): Shadow Flare's orbs, Scintilla's multi-hit
+
+User, test 64 (clip): "Side special doesn't create the orbs"; "Down special's effects look incorrect, not layered or
+full and doesn't multihit".
+- Orbs: the shot hit (its beam_hit played) but never became the orbs: flare1.c kept fire.c's status count
+  (`global7 = 0x2`) while registering statuses up to 4, and the scaffold refuses a status at or past it. Now 5.
+  The hit fighter is now the nearest one (hitstop counted 4 x nearer) other than Sephiroth, his slot found at the
+  spawn (the shot's spawn point minus his head offset). port_check W2 (new) checks weapon MSC status counts.
+- Scintilla: the flash (a dein copy) kept dein's hit method, which removes the weapon when its attack connects: the
+  multi-hit (rehit 5 from frame 0, the finisher at 15) ended at the first hit, its effects with it. Now
+  `"on_hit": 0` (stay in its status) with the shield bit (`"on_hit_bits": "0x17"`). port_check W3 (new).
+  The whiff's look (the burst gone after ~12 frames in the clip) isn't changed: to compare with Ultimate's.
+- port_check over the chain + this: no new errors.
+- Package (install over 64): code/cross_f.rpx, script/msc/flare1/flare1.mscsb.

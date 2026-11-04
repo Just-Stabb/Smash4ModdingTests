@@ -570,6 +570,7 @@ float fl_r;            // charge ratio: hold / hold_max 27 (main.bin 0x9e1770: f
 float fl_n;            // orbs: max(1, loop_max 3 x r) (work float 3)
 float fl_speed;
 int fl_slot;           // the target's player slot (0 - 7)
+int fl_owner;          // Sephiroth's slot (the fighter at the spawn's origin), never a target
 int fl_tries;
 int fl_count;          // orbs made (ceil(n))
 int fl_pool;           // orbit_life_max 210: frames a later shot can add
@@ -674,6 +675,46 @@ void fl_fx_play(int i, int id, float x, float y, float scale)
     }
 }
 
+// the slot whose position is where Din's callback spawned this from: his head + (lr x 9, -0.8), the head on frame 8
+// at (0.07, 18.63) / air (-0.10, 18.54) (below): his position = here - (lr x 9.07, 17.83) / (lr x 8.90, 17.74)
+int fl_owner_slot(int air, float lr)
+{
+    int s;
+    int best;
+    float x;
+    float y;
+    float dx;
+    float dy;
+    float d;
+    float bd;
+    x = PostureModuleF(0x1) - 9.07f * lr;
+    y = PostureModuleF(0x2) - 17.83f;
+    if (air)
+    {
+        x = PostureModuleF(0x1) - 8.9f * lr;
+        y = PostureModuleF(0x2) - 17.74f;
+    }
+    best = 0xffffffff;
+    bd = 100.0f;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - x;
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - y;
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                bd = d;
+                best = s;
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
 // ---- 0 FLY (260a0 / 26000 / 26c00): straight along his facing at speed_x 5.5 x lerp(1, speed_mul 1.5, r) for
 // life 7 frames, power x lerp(1, power_mul 3, r) (0x33eccf0); a wall / the floor ends it (Ultimate's End: the beam
 // left to fade). Placed at Ultimate's spawn: his position + (lr x offset_x 10, offset_y 10) (air: offset_x_air 10,
@@ -730,6 +771,7 @@ void fl_fly_main()
     fl_life = 0x7;
     fl_fx0 = fl_fx1 = fl_fx2 = fl_fx3 = fl_fx4 = 0;
     lr = PostureModuleF(0);
+    fl_owner = fl_owner_slot(air, lr);
     if (air)
     {
         PostureModule(0x2714, PostureModuleF(0x1) + 1.1f * lr, PostureModuleF(0x2) - 10.74f, PostureModuleF(0x3));
@@ -760,8 +802,8 @@ void fl_end_main()
 }
 
 // ---- 1 HIT (the on_hit method: its attack connected): Hit's effects (the beam left, edge_shadowflare_beam_hit).
-// The fighter hit: the one in hitstop nearest to it (positions and hitstop through the slot variables,
-// docs/position-variables.md), looked for over the next 3 frames. One already circled by a live controller
+// The fighter hit: the nearest one to it (within 30) other than Sephiroth, one in hitstop counted 4 x nearer
+// (positions and hitstop through the slot variables, docs/position-variables.md). One already circled by a live controller
 // (its heartbeat moving) gets this shot's orbs and life (Ultimate's dummy: n = min(n + shot n, P 5), life +=
 // min(int(orbit_life_ext_min 30 + 150 r), the pool)); otherwise this object becomes its controller
 int fl_find()
@@ -781,11 +823,15 @@ int fl_find()
     s = 0;
     while (s < 0x8)
     {
-        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0)
+        if (s != fl_owner && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
         {
             dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - x;
             dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) + 9.0f - y;
             d = dx * dx + dy * dy;
+            if (WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0)
+            {
+                d = d * 0.25f;
+            }
             if (d < bd)
             {
                 bd = d;
@@ -1235,7 +1281,8 @@ void fl_conve_main()
 
 void fl_setup()
 {
-    global7 = 0x2;
+    global7 = 0x5;                             // the status count (dein's func_8: statuses >= it are refused;
+                                               // test 64: 0x2 from fire.c kept the shot from becoming the orbs)
     fl_phase = 0;
     fl_total = 0;
     sv_set_mem(0x1, 0, 0, fl_pre);

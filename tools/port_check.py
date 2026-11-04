@@ -19,6 +19,7 @@ Each finding: ERROR (it broke in game before), WARN (likely wrong, look), INFO. 
 """
 import argparse
 import io
+import glob
 import json
 import os
 import re
@@ -699,6 +700,47 @@ def check_weapons(name, rec, rep):
                     '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
 
 
+def check_weapon_statuses(name, rep):
+    """W2: a weapon MSC (fighters/NAME/weapons/*.c, built on a vanilla weapon's MSC) registering a status at or past
+    its status count (global7, set in its setup): the scaffold's status change refuses it ("g_status_kind_next >=
+    g_status_kind_max") and the weapon stays where it was (Sephiroth test 64: Shadow Flare's shot never became its
+    orbs, global7 2 copied from the Flare's MSC with statuses up to 4)"""
+    for path in sorted(glob.glob(os.path.join(ROOT, 'fighters', name, 'weapons', '*.c'))):
+        text = open(path, errors='replace').read()
+        counts = [int(m, 0) for m in re.findall(r'\n    global7 = (0x[0-9a-fA-F]+|\d+);', text)]
+        regs = [int(m, 0) for m in re.findall(r'sv_set_mem\(0x1, (?:0x)?[0-9a-fA-F]+, (0x[0-9a-fA-F]+|\d+), ', text)]
+        if not counts or not regs:
+            continue
+        if max(regs) >= counts[-1]:
+            rep.add('ERROR', 'W2 weapon-status-max', '%s: statuses up to %d registered, global7 (the status count) %d: '
+                    'the higher ones are refused' % (os.path.relpath(path, ROOT), max(regs), counts[-1]))
+
+
+def check_weapon_rehit(inst, name, rec, rep):
+    """W3: a brand-new article whose hitboxes re-hit (Rehit > 0) without "on_hit" in its record: the base weapon's hit
+    method removes it at its first hit, so its multi-hit (and its following effects) end there (Sephiroth test 64:
+    Scintilla's flash, rehit 5, hit once)"""
+    import acmd
+    hb = ('Special_Hitbox', 'Extended_Special_Hitbox')
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or 'on_hit' in w:
+            continue
+        data = inst.get('fighter/%s/script/animcmd/weapon/%s/game.bin' % (name, art))
+        if not data:
+            continue
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.bin') as f:
+            f.write(data)
+            f.flush()
+            try:
+                scripts = acmd.ACMDFile.load(f.name).scripts
+            except SystemExit:
+                continue
+        if any(c.name in hb and len(c.params) > 31 and c.params[31] for s in scripts.values() for c in s):
+            rep.add('WARN', 'W3 weapon-rehit', '%s: re-hitting hitboxes but no "on_hit" in its extra_kinds.json record: '
+                    'the base\'s hit method removes it at its first hit ("on_hit": its own status, e.g. 0 to stay)' % art)
+
+
 def check_loop_slots(inst, name, rec, base, vanilla, rep):
     """M9: a fighter slot (0x211 on) whose base motion loops (motion table flag 0x2) and that the port gives another
     move (its motion.mtable names another script there) without a flag override in the record's "motions": that
@@ -1092,6 +1134,8 @@ def main():
     check_msc(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
+    check_weapon_statuses(a.name, rep)
+    check_weapon_rehit(inst, a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
