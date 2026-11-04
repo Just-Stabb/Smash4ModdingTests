@@ -38029,12 +38029,13 @@ void edge_hi_direction(float x, float y)
         // 0x3, then 0x17 / 0x18): test 63-65 asked with 0x272C (the bone request + colour) and the arrow drifted
         // off from him, thin. The colour (direction_effect_color by team) has no MSC op on a handle: the
         // emitters' own colour for now
-        edge_hi_fx = EffectModule(0x3, edge_hi_fx_direction(), edge_hi_fx_x, edge_hi_fx_y, PostureModuleF(0x3), 0, 0,
+        edge_hi_fx = EffectModule(0x3, edge_hi_fx_direction(), edge_hi_fx_x, edge_hi_fx_y, PostureModuleF(0x3) + 6.0f, 0, 0,
                                   edge_hi_fx_roll * 0.0174533f, 1.0f, 0, 0xffffffff);
     }
     if (edge_hi_fx != 0)
     {
-        EffectModule(0x17, edge_hi_fx, edge_hi_fx_x, edge_hi_fx_y, PostureModuleF(0x3));
+        // 6 toward the camera: at his own depth his coat and sword hid part of it (test 67, "slightly hidden")
+        EffectModule(0x17, edge_hi_fx, edge_hi_fx_x, edge_hi_fx_y, PostureModuleF(0x3) + 6.0f);
         EffectModule(0x18, edge_hi_fx, 0.0f, 0.0f, edge_hi_fx_roll);
     }
 }

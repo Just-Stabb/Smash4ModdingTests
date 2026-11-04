@@ -798,3 +798,9 @@ Down B's effects look the same as before."
 - Scintilla's look: unchanged (Ultimate's layers: the dark sphere, the bright star flare of edge_senkou_hold_end,
   the effect lights tinting him): to compare offline with fx_render.
 - Package (install over 67): flare1.mscsb.
+
+## Test 69 (`build/sephiroth_test69.zip`): the aim arrow in front of him
+
+User: "Up special's arrow is also still slightly hidden". It was at his own depth, so his coat and sword (nearer the
+camera) covered part of it: now 6 toward the camera. Package (install over 67 / 68): edge.mscsb, flare1.mscsb (test
+68's crash attempt, included).
