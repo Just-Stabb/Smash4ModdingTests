@@ -877,6 +877,77 @@ def check_effect_scripts(src, ult, rep):
         rep.add('WARN', 'E7 effect-macros', 'known gaps, left out: %s' % ', '.join('%s x%d' % kv for kv in gaps.most_common()))
 
 
+def effect_heap_estimate(data):
+    """bytes a ptcl takes in eft's one effect heap at load (eft's loader 0x04A6CD18: a 0x6E8 object and a copy of
+    each program part per shader entry, 4 bytes a shader, 0x34 a set, 0xA00 an emitter; MEMExpHeap blocks: size
+    rounded to 32 + 0x10 header + alignment slack): tools/effect_heap_patch.py"""
+    import ptcl
+
+    def r32(x):
+        return (x + 31) & ~31
+
+    def blk(size, align, hdr=0x10):
+        return r32(size) + hdr + max(0, align // 2 - hdr)
+
+    def parts(b):
+        out, o = {}, struct.unpack_from('>I', b, 4)[0]
+        while o + 0x20 <= len(b) and b[o:o + 4] == b'BLK{':
+            hs, typ, ds = (struct.unpack_from('>I', b, o + k)[0] for k in (4, 0x10, 0x14))
+            out[typ] = out.get(typ, 0) + ds
+            if typ == 1:
+                break
+            o += hs + ds
+        return out
+    p = ptcl.Ptcl(data)
+    n, total = p.shader_count(), 0
+    for i in range(n):
+        b = parts(bytes(p.shader_binary(i)))
+        total += blk(0x6E8, 0x80) + blk(b.get(3, 0), 0x40) + blk(b.get(5, 0), 0x100) + blk(b.get(6, 0), 0x40) + \
+            blk(b.get(7, 0), 0x100) + blk(0x80, 0x100)
+    nsets = len(p.sets)
+    nem = sum(len(s['emitters']) for s in p.sets)
+    return total + blk(4 * n, 0x80) + blk(0x34 * nsets, 0x80) + blk(0xA00 * nem, 0x100) + nsets * blk(0x6C, 0x80)
+
+
+# a fighter bank's effect-heap estimate (MiB) against the vanilla 44 MiB heap, in the user's 1v1 with DK (Sephiroth:
+# test 60 12.90 and a 13.28 bisect bank loaded, test 61's 13.49 crashed at match load): over the max it fails,
+# over the warn it's close (more players / bigger opponents); and one that crowds even the 60 MiB heap
+# (effect_heap_patch.py) in 4-player matches
+HEAP_VANILLA_MAX, HEAP_VANILLA_WARN, HEAP_PATCHED_WARN = 13.3, 12.0, 20.0
+
+
+def check_effect_heap(inst, name, rep):
+    """E9: a bank too big for the one effect heap every bank in a match shares (eft writes through the NULL of the
+    failed allocation: a crash at match load, Sephiroth test 61)"""
+    import tempfile
+    import effect_heap_patch
+    import kind_expand as K
+    patched = None
+    rpx = inst.get('code/cross_f.rpx') if 'code/cross_f.rpx' in inst.files else None
+    if rpx:
+        with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+            f.write(rpx)
+            f.flush()
+            img = K.Image(f.name)
+            patched = all(img.w(a) == w for a, w in effect_heap_patch.patches().items())
+    for path in inst.glob(r'fighter/%s/effect/[^/]+/[^/]+\.ptcl' % re.escape(name)):
+        try:
+            mib = effect_heap_estimate(inst.get(path)) / 2 ** 20
+        except Exception:                     # noqa: BLE001
+            continue
+        if HEAP_VANILLA_WARN < mib <= HEAP_VANILLA_MAX and not patched:
+            rep.add('WARN', 'E9 effect-heap', '%s: ~%.1f MiB of the 44 MiB effect heap every bank shares (~%.1f crashed '
+                    'at load in a 1v1): tools/effect_heap_patch.py for more players / bigger opponents' % (
+                        path, mib, HEAP_VANILLA_MAX))
+        if mib > HEAP_VANILLA_MAX and not patched:
+            rep.add('ERROR', 'E9 effect-heap', '%s: ~%.1f MiB of the 44 MiB effect heap every bank shares (over ~%.1f '
+                    'crashed at load): the executable needs tools/effect_heap_patch.py (%s)' % (
+                        path, mib, HEAP_VANILLA_MAX, 'not in the install' if patched is False else 'no executable'))
+        elif mib > HEAP_PATCHED_WARN:
+            rep.add('WARN', 'E9 effect-heap', '%s: ~%.1f MiB of the 60 MiB effect heap: crowded with several of him or '
+                    'big-bank opponents (fewer shader entries / emitters)' % (path, mib))
+
+
 def check_effects(inst, name, rep):
     """E4: a mesh of eft's particle type 4 aims its Y along the particle's world motion (cross_f's type-4
     vertex programs: X = normalize(emitter Y x motion), Z = X x motion); a particle that never moves has no
@@ -970,6 +1041,7 @@ def main():
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_effects(inst, a.name, rep)
+    check_effect_heap(inst, a.name, rep)
     check_effect_scripts(src, base['ult'], rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)

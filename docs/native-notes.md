@@ -1642,3 +1642,19 @@ Test: `tools/edge_counter_cave_test.py` (unicorn, against Marth's own setup). Ap
 - Facing: the forward offset follows him only if joint 0's world matrix includes the facing turn.
 - Whether a hit on both the shape and a hurtbox hits the shape first. Slot 43 covers body hits once
   the flag is on.
+
+### Effect heap (Sephiroth tests 61 / 62)
+
+Every effect bank in a match (both fighters', final smashes', the stage's, the common and item effects) loads into
+ONE eft heap: a MEMExpHeap (`0x032EF824`) of 44 MiB (size getter `0x02010B08` `lis r3, 0x2C0`; only `0x033FA2E4` /
+`0x033FA39C` call it); the effect manager's `+0x20` (`0x032F1648`), eft::System's pools from the same one
+(`0x032EF86C`). The ptcl files themselves sit in the 460 MiB resource heap (`0x02010AF8` `lis r3, 0x1CC0`).
+eft's loader (`0x032F1388` -> `0x04A55160` -> `0x04A6D6EC` -> `0x04A6CD18`) allocates there per shader entry a
+0x6E8 object (`0x04A6CEA4`) and its own copy of each program part (`0x04A57F88` -> `0x04A594B8` / `0x04A59618` /
+`0x04A59778`, + a fetch shader `0x04A5A108`), `count x 4` pointers, 0x34 a set and 0xA00 an emitter; a failed
+0x6E8 allocation is written through as NULL (+0x47C): the crash at match load. No count limit: bytes. Sephiroth's
+bank 680 shaders (~13.5 MiB) crashed, 670 (~13.3) loaded (1v1 with DK; the user's bisect: P3 = a loading bank + 12
+unused shader copies crashed). `tools/effect_heap_patch.py`: the effect heap 44 -> 60 MiB, the resource heap 460
+-> 444 MiB (MEM_ARENA_2's total `0x02010AE8` 0x34E00000 is the sum of its blocks: an overflow isn't caught, the
+blocks would overlap, so never grow one without shrinking another). `port_check` E9: a bank's estimate
+(`effect_heap_estimate`).

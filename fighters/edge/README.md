@@ -692,3 +692,14 @@ and charge: fighters/edge/specials.md "Down special" for every source and approx
   edge.mscsb, code/cross_f.rpx (test 61's + the cave). Not the vl file (ports_shapes' is newer).
 - In game, untested: whether a cave-built shield shape catches hits (Hero's cave-built reflector never did; this one
   is built at setup as Marth's / Link's), its side when he faces left, the projectile flag.
+
+## Test 62b (`build/sephiroth_test62b.zip`): the crash at load (tests 61 / 62)
+
+User: "Sephiroth crashes when loaded" (tests 61 and 62; test 60 loads). Bisected with the user (overlays over test
+62): the effect bank (test 60's loads with everything else of 62); not its file size (P1: 27.2 MB loads) nor its
+set / emitter counts (P2: 162 / 906 load), but the shader entries (P3: a loading bank + 12 unused shader copies
+crashes). Cause: every bank in a match shares one 44 MiB effect heap, each shader entry costs ~17 KB there (its own
+program copy) and his bank (~13.5 MiB with Octaslash's effects, 14.2 with Scintilla's) ran it out
+(docs/native-notes.md "Effect heap"). Fix: `tools/effect_heap_patch.py` in the executable (effect heap 60 MiB, the
+16 MiB taken from the 460 MiB resource heap; 2 words). port_check E9 (new) catches a bank over the heap. Package:
+test 62's files with the patched executable (install over test 60).

@@ -18,8 +18,9 @@ fighter_param_vl_zelda.bin; MODEL: his converted model/body/c00 (the ACMD joint 
   fighters/edge/weapons/flash.c and Ultimate's edge_flash Attack in tiers (FLASH_MOTIONS); flare1 /
   flare2 (moves not made yet): Zelda's dein files under their names, so every article has its files;
 - --rpx: code/cross_f.rpx = IN.rpx + tools/kind_expand.py + tools/weapon_expand.py +
-  tools/edge_counter_cave.py (Scintilla's counter shape; re-applying them over an executable that has
-  them gives it back, so IN can be the last test's);
+  tools/edge_counter_cave.py (Scintilla's counter shape) + tools/effect_heap_patch.py (the effect heap 44 -> 60
+  MiB: his bank ran it out, test 61 / 62); re-applying them over an executable that has them gives it back, so IN
+  can be the last test's;
 - --bank: effect/edge/edge.010d0000.{ptcl,efc} from DIR/zelda.010d0000.* (tools/vfxb_to_ptcl.py);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
 """
@@ -273,11 +274,13 @@ def main():
         import kind_expand
         import weapon_expand
         import edge_counter_cave
+        import effect_heap_patch
         edge_counter_cave.check_base(a.rpx)
+        effect_heap_patch.check_base(a.rpx)
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'),
             *kind_expand.args(kind_expand.build()[0]), *weapon_expand.args(weapon_expand.build()[0]),
-            *edge_counter_cave.args())
+            *edge_counter_cave.args(), *effect_heap_patch.args())
     if a.bank:
         d = os.path.join(fighter, 'effect/edge')
         os.makedirs(d, exist_ok=True)
