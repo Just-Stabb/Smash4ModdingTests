@@ -17,7 +17,9 @@ code with the new commands.
   the victim / attacker hitstop hooks; untagged hits change nothing (and reset the victim's DI x);
 - objects: user variables / timers / kinetic type / speed through the real get_float / set_float
   (0x0F000300+, via position_vars_cave.py's hooks and the var_entry gate), the per-frame hook counting
-  timers down, the set-up hook forgetting an object, Track_Target steering a weapon (owner skipped,
+  timers down, the set-up hook forgetting an object, the shared variables (0x0F000340 + 8 * slot + k = that
+  slot's fighter's VAR_24 + k, from a weapon and from fighters, through every WorkModule class; empty / not
+  live slots and bad fighter tables read 0 and write nothing), Track_Target steering a weapon (owner skipped,
   instant and 45-degree turns, range) and a fighter (kinetic ops logged by a stub wrapper);
 - the Extra handlers (base handler stubbed: steps over its own size like the real ones): the script
   moves over base + extra words, the extras are recorded for the slot (multipliers <= 0 -> 1.0),
@@ -169,6 +171,72 @@ def fcall(mu, fn, wm, ident, val=0.0):
     return round(struct.unpack('>d', struct.pack('>Q', mu.reg_read(UC_PPC_REG_FPR1)))[0], 4)
 
 
+def shared_tests(pm, me_wm, own_wm, foe_wm, ents):
+    """0x0F000340 + 8*s + k: fighter table entry s's VAR_(24 + k). Entry 0 = own_wm, entry 1 = foe_wm (count
+    2); me_wm (a weapon) is in no entry."""
+    import position_vars_cave as P
+    FGET, FSET = 0x02F1DBE4, 0x02F1DC04
+    V = lambda i: 0x0F000300 + i                          # noqa: E731
+    S = lambda s, k: 0x0F000340 + 8 * s + k               # noqa: E731
+
+    def entries(wm):
+        return sum(1 for k in range(C.OBJ_N) if r32(pm, C.OBJS + C.OBJ_SIZE * k) == wm)
+
+    def objs():
+        return bytes(pm.mem_read(C.OBJS, C.OBJ_N * C.OBJ_SIZE))
+    check('shared: the owner (entry 0) has no state yet', entries(own_wm), 0)
+    check('shared: read with no state -> 0', fcall(pm, FGET, me_wm, S(0, 2)), 0.0)
+    check('shared: a read creates nothing', entries(own_wm), 0)
+    fcall(pm, FSET, me_wm, S(0, 2), 9.0)
+    check('shared: a write creates the slot fighter\'s entry', entries(own_wm), 1)
+    check('shared: weapon writes slot 1 var 2 -> the fighter\'s own VAR_26', fcall(pm, FGET, own_wm, V(26)), 9.0)
+    fcall(pm, FSET, me_wm, S(1, 3), 4.5)
+    check('shared: weapon writes slot 2 var 3 -> the foe\'s own VAR_27', fcall(pm, FGET, foe_wm, V(27)), 4.5)
+    fcall(pm, FSET, foe_wm, V(27), -1.25)
+    check('shared: the foe sets its VAR_27 -> the weapon reads slot 2 var 3', fcall(pm, FGET, me_wm, S(1, 3)), -1.25)
+    check('shared: the foe reads its own slot', fcall(pm, FGET, foe_wm, S(1, 3)), -1.25)
+    fcall(pm, FSET, foe_wm, S(0, 7), 2.0)
+    check('shared: fighter writes another fighter\'s (owner VAR_31)', fcall(pm, FGET, own_wm, V(31)), 2.0)
+    for k in range(8):
+        fcall(pm, FSET, me_wm, S(1, k), k + 0.5)
+    check('shared: k 0-7 = VAR_24-31', [fcall(pm, FGET, foe_wm, V(24 + k)) for k in range(8)],
+          [k + 0.5 for k in range(8)])
+    check('shared: the foe\'s VAR_5 / VAR_23 untouched', (fcall(pm, FGET, foe_wm, V(5)), fcall(pm, FGET, foe_wm, V(23))),
+          (-2.0, 0.0))
+    check('shared: the weapon\'s own VAR_5 / VAR_27 untouched', (fcall(pm, FGET, me_wm, V(5)), fcall(pm, FGET, me_wm, V(27))),
+          (7.5, 0.0))
+    check('shared: get_float of every WorkModule class', [fcall(pm, cls[0], me_wm, S(1, 3)) for cls in P.CLASSES],
+          [3.5] * len(P.CLASSES))
+    for n, cls in enumerate(P.CLASSES):
+        fcall(pm, cls[1], me_wm, S(1, 6), 10.0 + n)
+        check('shared: set_float of WorkModule class %d' % n, fcall(pm, FGET, foe_wm, V(30)), 10.0 + n)
+    fcall(pm, 0x02F1DCF8, me_wm, S(1, 0), 2.0)            # add_float / sub_float (SUB_FLOAT_2): read + write
+    fcall(pm, 0x02F1DD20, me_wm, S(1, 0), 0.25)
+    check('shared: add 2 / sub 0.25 -> the foe\'s VAR_24 0.5 + 1.75', fcall(pm, FGET, foe_wm, V(24)), 2.25)
+    before = objs()
+    check('shared: empty slots 3-8 read 0', [fcall(pm, FGET, me_wm, S(s, 1)) for s in range(2, 8)], [0.0] * 6)
+    for s in range(2, 8):
+        fcall(pm, FSET, me_wm, S(s, 1), 5.0)
+    check('shared: writes to empty slots change nothing', objs() == before, True)
+    pm.mem_write(ents + C.FIGHTER_ENTRY + 0x1E, b'\3')    # the foe's entry not live
+    check('shared: not live -> 0', fcall(pm, FGET, me_wm, S(1, 3)), 0.0)
+    fcall(pm, FSET, me_wm, S(1, 3), 99.0)
+    check('shared: write to a not live slot changes nothing', objs() == before, True)
+    pm.mem_write(ents + C.FIGHTER_ENTRY + 0x1E, b'\4')
+    check('shared: live again: the value kept', fcall(pm, FGET, foe_wm, V(27)), 3.5)
+    tab = r32(pm, C.FIGHTERS)
+    for bad in (0, 0x10384002):                           # no fighter table / a misaligned one
+        w32(pm, C.FIGHTERS, bad)
+        r = fcall(pm, FGET, me_wm, S(1, 3))
+        fcall(pm, FSET, me_wm, S(1, 3), 99.0)
+        check('shared: fighter table 0x%X -> 0, no write' % bad, (r, objs() == before), (0.0, True))
+    w32(pm, C.FIGHTERS, tab)
+    for ident in (0x337, 0x33F, 0x380, 0x3FF):
+        fcall(pm, FSET, me_wm, 0x0F000000 + ident, 5.0)
+        check('ID 0x0F000%03X: reads 0, a write changes nothing' % ident,
+              (fcall(pm, FGET, me_wm, 0x0F000000 + ident), objs() == before), (0.0, True))
+
+
 def obj_tests(pm, om, a):
     from ppcasm import Asm
     for at, w in C.OBJ_ORIG.items():
@@ -288,6 +356,7 @@ wr_l:
     check('kinetic type set (vt +0xEC)', r32(pm, me_km + 0x11C), 9)
     pm.mem_write(me_km + 0x200, struct.pack('>ff', 1.25, -0.5))
     check('speed X / Y', (fcall(pm, FGET, me_wm, V(0x32)), fcall(pm, FGET, me_wm, V(0x33))), (1.25, -0.5))
+    shared_tests(pm, me_wm, own_wm, foe_wm, ents)
 
     # Track_Target on the weapon: energy 0 at km + 0x300, moving right (1, 0)
     h = a.addr('h_track')

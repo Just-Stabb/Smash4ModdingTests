@@ -282,6 +282,35 @@ nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable h
 | `0x0F000331` | `TRACK_FRAMES` | `Track_Target` frames left (-1 = until stopped) | set them; 0 stops tracking |
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
 | `0x0F000334` / `335` / `336` | `TEAM` / `HURT_TEAM` / `ATTACK_TEAM` | the object's team ids (-1 = none) | — |
+| `0x0F000340`–`37F` | `SLOT1_SHARED_0`–`SLOT8_SHARED_7` | `VAR_24`–`VAR_31` of the fighter in that player slot (below) | set it |
+
+### Shared variables (another fighter's)
+
+`SLOTn_SHARED_k` (`0x0F000340 + 8 × (n − 1) + k`, n = 1–8, k = 0–7) is `VAR_(24 + k)` of the fighter
+in player slot n: the very same float that fighter reads and writes as its own `VAR_24`–`VAR_31`
+(`0x0F000318`–`31F`). Any object can use them, fighters and projectiles alike, from ACMD or MSC
+(`WorkModuleF(0, 0x0F000340 + ...)`), so a projectile can keep state on the fighter it hit, and that
+fighter's own scripts see it as its `VAR_24`–`VAR_31`.
+
+- Slots are the fighter table entries, as in the position variables (`docs/position-variables.md`):
+  player slot 1 = `SLOT1_SHARED_*`. Each ID names a fixed slot: which one to use (say, the fighter
+  just hit) is up to the script, nothing here gives a fighter's slot number.
+- An empty slot, or a fighter that isn't live (not loaded in yet), reads 0 and a write there does
+  nothing.
+- A write is what the fighter itself would do with its `VAR_(24 + k)`: it counts as one of the 48
+  objects using variables if that fighter had none yet. The values go when that fighter is set up
+  again (its KO), not when the projectile that wrote them goes.
+- `VAR_24`–`VAR_31` are therefore the variables other objects can see and change: keep a fighter's
+  private state in `VAR_0`–`VAR_23`.
+
+Example: the projectile, on hit, counts the hits on the fighter in slot 2; that fighter's own
+scripts read the count as `VAR_24`.
+
+```
+// in the projectile's script (SUB_FLOAT_2 by VAR_0 = -1 adds 1)
+SET_FLOAT(Value=-1, Variable=VAR_0)
+SUB_FLOAT_2(Variable=SLOT2_SHARED_0, SourceVariable=VAR_0)
+```
 
 Example: the move hits harder if it's used again within 2 seconds (120 frames) of its last use.
 `Method=5` is "greater than" (0 `==`, 1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`).
@@ -320,4 +349,6 @@ to do that.
   WorkModule, reached through the position variables' ID hook.
   - A hook after each object's per-frame ACMD run counts the timers down and steers.
   - The object set-up code clears an object's state when it's set up or reused.
+  - The shared variables find the slot's fighter in the fighter table and use that fighter's entry
+    in the same table.
 - Addresses: `docs/native-notes.md`, "New ACMD commands".

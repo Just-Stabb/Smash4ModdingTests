@@ -521,7 +521,8 @@ def kcall(wrapper, words):
 def obj_code(a):
     """per-object state: user variables / timers / kinetic type / tracking"""
     U = dict(ubase=USER_BASE, u20=USER_BASE + 0x20, u30=USER_BASE + 0x30, u31=USER_BASE + 0x31,
-             u32=USER_BASE + 0x32, u33=USER_BASE + 0x33, u34=USER_BASE + 0x34, u36=USER_BASE + 0x36)
+             u32=USER_BASE + 0x32, u33=USER_BASE + 0x33, u34=USER_BASE + 0x34, u36=USER_BASE + 0x36,
+             u40=USER_BASE + 0x40, fha=ha(FIGHTERS), flo=lo(FIGHTERS), fsize=FIGHTER_ENTRY)
     fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
     a.asm("""
 # --- obj_find(r3 WorkModule, r4 create) -> r3 entry or 0; leaf: r0 r10 r11 r12 -----------------
@@ -687,7 +688,10 @@ ug_back:
 # --- user_entry(r3 WorkModule, r4 ID, r5 write, f1 value) -> f1 ----------------------------------------
 # 0x300+i (i < 32) user variable i; 0x320+i (i < 16) timer i (counts down to 0 each frame);
 # 0x330 kinetic type (write: change it); 0x331 tracking frames left (write: set, 0 stops);
-# 0x332 / 0x333 speed X / Y (read only, all energies). Any other: reads 0.
+# 0x332 / 0x333 speed X / Y (read only, all energies); 0x334-0x336 team ids (read only);
+# 0x340 + 8*s + k (s, k < 8): variable 24 + k of fighter table entry s (player slot s + 1), the same
+# storage as that fighter's own 0x318 + k; any object may use them; an empty / not live entry reads 0
+# and a write there does nothing. Any other: reads 0.
 user_entry:
         stwu r1, -0x40(r1)
         mflr r0
@@ -708,7 +712,7 @@ user_entry:
         cmplwi r30, %(u33)d
         ble ue_speed
         cmplwi r30, %(u36)d
-        bgt ue_zero
+        bgt ue_shared
         cmpwi r29, 0                    # team ids: read only
         bne ue_out
         mr r3, r31
@@ -791,6 +795,28 @@ ue_speed:
 ue_sp_y:
         lfs f1, 0x14(r1)
         b ue_out
+ue_shared:                              # 0x340 + 8*s + k: fighter table entry s's variable 24 + k
+        addi r28, r30, -%(u40)d
+        cmplwi r28, 0x40                # (0x337-0x33F: negative, so unsigned huge)
+        bge ue_zero
+        srwi r27, r28, 3                # s
+        rlwinm r28, r28, 2, 27, 29      # 4 * k
+        addi r28, r28, 0xC0             # vars[24 + k] in the entry (+0x60 + 4 * (24 + k), as ue_var)
+        lis r12, %(fha)d
+        lwz r12, %(flo)d(r12)""" % U + fl('r12', 'ue_zero') + """
+        lwz r12, 0(r12)                 # fighter table: +0 entries, +8 count""" + fl('r12', 'ue_zero') + """
+        lwz r11, 8(r12)
+        cmplw r27, r11
+        bge ue_zero
+        lwz r12, 0(r12)""" + fl('r12', 'ue_zero') + """
+        mulli r11, r27, %(fsize)d
+        add r12, r12, r11
+        lbz r11, 0x1E(r12)              # live when >= 4
+        cmplwi r11, 4
+        blt ue_zero
+        lwz r12, 0xC(r12)               # its accessor""" % U + fl('r12', 'ue_zero') + """
+        lwz r31, 0x28(r12)              # its WorkModule: ue_slot finds / creates that fighter's entry""" + fl('r31', 'ue_zero') + """
+        b ue_slot
 ue_zero:
         lis r12, zero@ha
         lfs f1, zero@l(r12)

@@ -239,3 +239,47 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
   `_success_end`, `_success_end1`-`6`, `_success_end_l`, `_success_end1_l`-`6_l`, `_hold`, `_hold_attack`,
   `_hold_end`. The shield call is Ike's (`ShieldModule(0, 2, 0, 1 / 0, 1)`): re-check against the cave's
   interface notes. Not tested in game.
+
+## Side special: Shadow Flare
+
+From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 08940 / 1ac20, HOLD 08f00 / 035d0 /
+1a4c0, SHOT 09510 / 1a060; flare1 25d10.., flaredummy 2e300.., flare2 272e0..), its ACMD (`SpecialS*.txt`,
+`edge_flare1/`, `edge_flare2/`), `vl.prc` `param_special_s` / `param_flare1` / `param_flaredummy` / `param_flare2`
+(written into the code) and the ExeFS's native parts (main.bin 0x9e1770 the generation, 0x33eccf0 / 0x33ecf80 flare1,
+0x33f00e8 / 0x33f06xx the dummy, 0x33ee1c8 flare2).
+
+- **Fighter** (`edge.c` `edge_s_*`, Zelda's Din's Fire statuses): 0x153 START (SpecialSStart 0x219 / air 0x225) ->
+  motion end -> 0x157 HOLD (SpecialSLoop 0x21D / 0x229, Ultimate's special_s_hold; these slots loop, the hold
+  doesn't wait for them) -> on the special button's release (after its first frame) or at hold_max 27 frames ->
+  0x158 SHOT (SpecialSEnd 0x221 / 0x22D, Ultimate's special_s) -> motion end -> Wait / Fall (no special fall, no
+  landing lag). Leaving the hold with the stick back (x . lr <= -0.2) turns him round. Kinetics:
+  `param_special_s` start_*: ground x speed x 0.5, brake 0.1; air x 0.6, brake 0.008, y x 0.75, gravity and max fall
+  x 0.85; re-applied with the motion swapped (frame kept) on a ground / air change.
+- **The shot** (flare1, article 6, weapon 0x18D, `weapons/flare1.c`, `tools/extra_kinds.json` `"on_hit": 1`, max 4):
+  made on SHOT's frame 8 with the hold's frames (and +32 in the air) through Zelda's side special custom slot
+  (int 0x10000049 -> the weapon's 0x10000005). r = hold / 27; n = max(1, 3 r) orbs; speed 5.5 x (1 + 0.5 r) along
+  his facing, 7 frames, power x (1 + 2 r) (`AttackModule(0x2728)`); placed at his position + (lr x 10, 10) (air 7)
+  (the creation callback puts it at his head + (lr x 9, -0.8): his head on frame 8 of the converted SpecialSEnd /
+  SpecialAirSEnd is (0.07, 18.63) / (-0.10, 18.54), the difference added). Scripts: Ultimate's Fly (4 hitboxes, the
+  beam), Hit (beam left, beam_hit), End (beam left). A wall / the floor or its life's end: End, gone.
+- **The orbs**: Ultimate's hit makes a flaredummy on the fighter hit (one per fighter), which keeps ceil(n) flare2
+  orbs circling it. Smash 4's MSC has no way for a weapon to make or reach other weapons, so the shot itself turns
+  into the dummy and plays the orbs: on its hit (status 1) it finds the fighter hit (in hitstop, nearest: the slot
+  variables), then (status 2 ORBIT) sits at that fighter's centre with the orbs as effects moved by handle
+  (EffectModule 0x3 / 0x17, `edge_shadowflare_bullet`) and its hitboxes 0-4 (`orbit` script: flare2 Fly's 7 damage,
+  50 degrees, KBG 75, BKB 65, size 1.5, rehit 45, Part i each so every orb has its own hit record) placed each frame
+  (`AttackModule(0x1, id, x, y, z)`). Orbit: life 240, orbs appear from the centre over 5 frames (no hitbox then:
+  flare2 PRE has none), evenly spaced, spinning 2 pi x lerp(0.4, 0.8, n / 5) degrees a frame. A second shot on the
+  same fighter: n = min(n + its n, 5), life + min(30 + 150 r, what's left of 210) (Ultimate's forwarded event), via
+  that fighter's `SLOTn_SHARED_k` variables (`tools/acmd_ext_cave.py`: 0 the controller's life, 1 its heartbeat, 2
+  orbs to add, 3 frames to add). Life out (status 3 CONVE): the spin brakes (0.1 a frame to 0.3-0.4), orb i strikes
+  8 i frames later: thrown out at 4-5.2 then in, + 0.45-0.85 a frame up to 7-14 (lerped by R = n / 5), TRY 6.5 damage
+  53 degrees; at the centre EXP: one frame, size 3.5, `edge_shadowflare_bullet_hit` x 1.3; each strike with its hit
+  records cleared. The fighter KO'd / respawning / gone: every orb ends (`edge_shadowflare_bullet_end`).
+- **Approximated / not done:** the orbit's centre (Ultimate: the fighter's `edge_flare_node`, `waist` for 92 of 94
+  fighters; here its position + 9 up) and radius (the per-fighter `edge_flare_radius`: 14, the median, x its scale
+  taken as 1): Smash 4's MSC can't read another fighter's joints or kind; the orbs can't be hit (Ultimate: damage
+  takes n down by 0.07 a point) and don't freeze in hitlag; TRY / EXP keep the orbit's BKB 65 (Ultimate's 50; no MSC
+  op for BKB) and EXP stays fighters-only; reflection (Ultimate: n x 2, life 8) isn't handled beyond the game's own
+  turn; the air drift (Ultimate: control x 0.1 accel, x 0.6 max) is off; the shot's set_base_offset (its hitbox
+  stretched back over the last frame) and disable_tip are left out; sounds (none of his are converted).

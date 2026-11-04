@@ -15,11 +15,13 @@ fighter_param_vl_zelda.bin; MODEL: his converted model/body/c00 (the ACMD joint 
 - the new articles (tools/extra_kinds.json "weapons", after Zelda's five): fire (Flare / Megaflare /
   Gigaflare): script/msc/fire/fire.mscsb from fighters/edge/weapons/fire.c and
   script/animcmd/weapon/fire/ (Ultimate's edge_fire scripts: FIRE_MOTIONS); flash (Scintilla):
-  fighters/edge/weapons/flash.c and Ultimate's edge_flash Attack in tiers (FLASH_MOTIONS); flare1 /
-  flare2 (moves not made yet): Zelda's dein files under their names, so every article has its files;
+  fighters/edge/weapons/flash.c and Ultimate's edge_flash Attack in tiers (FLASH_MOTIONS); flare1 (Shadow
+  Flare: the shot and, after a hit, the orbs): fighters/edge/weapons/flare1.c and Ultimate's edge_flare1 / edge_flare2
+  scripts (FLARE1_MOTIONS); flare2 (unused: flare1 plays the orbs): Zelda's dein files under its name;
 - --rpx: code/cross_f.rpx = IN.rpx + tools/kind_expand.py + tools/weapon_expand.py +
   tools/edge_counter_cave.py (Scintilla's counter shape) + tools/effect_heap_patch.py (the effect heap 44 -> 60
-  MiB: his bank ran it out, test 61 / 62); re-applying them over an executable that has them gives it back, so IN
+  MiB: his bank ran it out, test 61 / 62) + tools/acmd_ext_cave.py last (its var_entry hook; Shadow Flare's shared
+  slot variables); re-applying them over an executable that has them gives it back, so IN
   can be the last test's;
 - --bank: effect/edge/edge.010d0000.{ptcl,efc} from DIR/zelda.010d0000.* (tools/vfxb_to_ptcl.py);
 - --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
@@ -42,7 +44,10 @@ import ultimate_acmd as U  # noqa: E402
 EDGE = os.path.join(ROOT, 'fighters', 'edge')
 # the fire article's motion slots (dein's 8; fire.c: func_24(level) flies, func_24(4 + level) bursts)
 FIRE_MOTIONS = ('specialn1', 'specialn2', 'specialn3', 'firenone3', 'bursts', 'burstm', 'burstl', 'firenone7')
-PLACEHOLDERS = ('flare1', 'flare2')
+PLACEHOLDERS = ('flare2',)
+# flare1 (Shadow Flare, weapons/flare1.c): the shot, its hit / end, the orbs' hitboxes (the object is the flaredummy
+# and its flare2 orbs too after a hit)
+FLARE1_MOTIONS = ('fly', 'hit', 'end', 'orbit', 'flarenone4', 'flarenone5', 'flarenone6', 'flarenone7')
 # the flash article's motion slots (flash.c: motion = the tier Sephiroth's edge_lw_generate passes): 0 the whiff,
 # 1-5 a counter at ATTACK_RATIO p = 0, .25, .5, .75, 1 (Smash 4's ACMD has no hitbox lerp: one script a tier)
 FLASH_MOTIONS = ('attacknohit', 'attack0', 'attack1', 'attack2', 'attack3', 'attack4', 'flashnone6', 'flashnone7')
@@ -247,6 +252,55 @@ def flash_scripts(a, wdir):
         ', '.join(n for n in FLASH_MOTIONS if n in game), gtr.skipped, etr.skipped, ', '.join(sorted(missing)) or '-')
 
 
+def flare1_scripts(a, wdir):
+    """the flare1 article's scripts: Ultimate's edge_flare1 Fly (its 4 hitboxes, the beam), Hit (the beam left,
+    edge_shadowflare_beam_hit), End (the beam left); `orbit`: edge_flare2 Fly's attack (7 damage, 50 degrees, rehit
+    45, fighters) as ids 0-4, Part i each (every orb its own hit record, as Ultimate's own objects), at the bone's
+    origin: flare1.c places them (AttackModule(0x1, ...)) and plays the orbs' effects itself"""
+    ids = effect_ids()
+    gtr, etr = U.Translator({}), U.EffectTranslator({}, ids, {})
+    U.EFFECT_CONDS = (U.LR_LEFT,)
+    src = lambda d, n: U.functions(open(os.path.join(a.dump, d, n + '.txt')).read())  # noqa: E731
+    fly, hit, end = src('edge_flare1', 'Fly'), src('edge_flare1', 'Hit'), src('edge_flare1', 'End')
+    game, effect, missing = {}, {}, set()
+    game['fly'] = gtr.script(fns_body(fly, 'game_fly'))
+    for name, fns in (('fly', fly), ('hit', hit), ('end', end)):
+        etr.last = False
+        effect[name] = etr.script(fns_body(fns, 'effect_' + name))
+        missing |= set(etr.missing)
+    atk = _calls(fns_body(src('edge_flare2', 'Fly'), 'game_fly'), 'ATTACK')
+    assert len(atk) == 1, len(atk)
+    orbs = []
+    for i in range(5):
+        args = list(atk[0][2])
+        args[1] = args[2] = str(i)
+        orbs.append('macros::ATTACK(%s);' % ', '.join(args))
+    game['orbit'] = gtr.script('if macros::is_excute(agent) {\n%s\n}\n' % '\n'.join(orbs))
+    U.EFFECT_CONDS = ()
+    os.makedirs(wdir, exist_ok=True)
+    stop = [acmd.Command(acmd.END)]
+    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+        acmd.ACMDFile({acmd.crc(n): sc.get(n, stop) for n in FLARE1_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
+    with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
+        f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FLARE1_MOTIONS))
+    return 'flare1: %s; left out %s %s; effects not in his bank: %s' % (
+        ', '.join(sorted(set(game) | set(effect))), gtr.skipped, etr.skipped, ', '.join(sorted(missing)) or '-')
+
+
+def acmd_ext_args():
+    """tools/acmd_ext_cave.py's words, last: its hook at 0x04B79000 (position_vars_cave's var_entry) is undone by a
+    later position_vars_cave (Hero fix 79 re-applied it: every 0x0F0003xx variable read 0 since), and flare1.c needs
+    its SLOTn_SHARED_k variables (docs/native-notes.md)"""
+    out = subprocess.run([sys.executable, os.path.join(HERE, 'acmd_ext_cave.py')], capture_output=True, text=True,
+                         check=True).stdout.split()
+    assert any(w.upper().startswith('0X04B79000=') for w in out), 'acmd_ext_cave: no var_entry hook'
+    return out
+
+
+def fns_body(fns, name):
+    return fns[name]
+
+
 def main():
     ap = argparse.ArgumentParser()
     for n in ('dump', 'edge', 'zelda', 'zelda_um', 'vl', 'model', 'out'):
@@ -264,6 +318,8 @@ def main():
     print(fire_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/fire')))
     compile_msc(os.path.join(EDGE, 'weapons/flash.c'), os.path.join(msc, 'flash/flash.mscsb'))
     print(flash_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flash')))
+    print(compile_msc(os.path.join(EDGE, 'weapons/flare1.c'), os.path.join(msc, 'flare1/flare1.mscsb')))
+    print(flare1_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flare1')))
     for name in PLACEHOLDERS:
         os.makedirs(os.path.join(msc, name), exist_ok=True)
         shutil.copy(os.path.join(a.zelda, 'script/msc/dein/dein.mscsb'), os.path.join(msc, name, name + '.mscsb'))
@@ -280,7 +336,7 @@ def main():
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'),
             *kind_expand.args(kind_expand.build()[0]), *weapon_expand.args(weapon_expand.build()[0]),
-            *edge_counter_cave.args(), *effect_heap_patch.args())
+            *edge_counter_cave.args(), *effect_heap_patch.args(), *acmd_ext_args())
     if a.bank:
         d = os.path.join(fighter, 'effect/edge')
         os.makedirs(d, exist_ok=True)

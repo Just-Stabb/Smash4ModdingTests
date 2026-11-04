@@ -1308,6 +1308,23 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
 - **Object set-up:** `0x02BF57B0` resets each module. At `0x02BF5864`, `lwz r3, 0x28(r31)` loads the
   WorkModule before its reset (vt `+0x24`, `0x0200E650`). Weapons are pooled, so this is where a
   reused one starts over.
+- **User variables (`0x0F000300`+):** `position_vars_cave.py`'s `var_entry` (`0x04B79000`, reached
+  from the get / set / add / sub / mul / div float hooks of all five WorkModule classes for category-F
+  indices < `0x400`) has its first instruction replaced by `b user_gate`, which sends indices
+  `>= 0x300` to `user_entry(r3 WorkModule, r4 ID, r5 write, f1)`. The state is a 48-entry table at
+  `0x04B94000` (0x100 bytes each) keyed by the WorkModule: `+0x20` timers, `+0x60` `VAR_0`–`31`.
+  - **Order matters:** `position_vars_cave.py`'s own output writes `var_entry`'s original first word
+    (`0x04B79000=0x548C05BE`), so it must come before `acmd_ext_cave.py`'s in one `rpx_patch.py` call,
+    and re-applying it alone over an executable that has this cave turns every `0x0F0003xx` variable
+    off (reads 0, writes ignored). Sephiroth's test 63 executable had this: re-apply
+    `acmd_ext_cave.py`'s output after it.
+  - **Shared variables** `0x340 + 8s + k` (s, k = 0–7): `ue_shared` takes fighter table entry s
+    (`[[0x1035184C]]`: `+0` entries, `+8` count; entry `+0x76B0 × s`, live when byte `+0x1E >= 4`,
+    `+0xC` accessor, as the position variables' `slot`), and runs the normal variable path with that
+    fighter's WorkModule (accessor `+0x28`) in place of the caller's, at `+0x60 + 4 × (24 + k)`. Every
+    pointer is range-checked (word aligned, `0x10000000`–`0x8FFFFFFF`); a failed check, an index past
+    the count or a not-live entry reads 0 and writes nothing. A write creates the fighter's entry
+    (as its own write would), a read never does. `0x337`–`0x33F` and `0x380`–`0x3FF` read 0.
 - **KineticModule:** accessor `+0x34`.
   - Fields: kinetic type at `+0x11C`, energies at `+0x18` (0x10 each).
   - Methods: set the type with vt `+0xEC`, get an energy with vt `+0x54(id)`, get the speed sum with

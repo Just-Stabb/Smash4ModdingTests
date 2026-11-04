@@ -191,6 +191,11 @@ INPUT_QUANTITIES = (
      ])
 
 
+# ITEM (0x0F000276 + target, tools/position_vars_cave.py inp_item): its own tooltip names
+ITEM_TARGETS = ["Self", "Opponent", "Last hit"] + ["Slot %d" % k for k in range(1, 9)]
+ITEM_TDESC = ["self", "nearest opponent", "last fighter hit"] + ["player slot %d" % k for k in range(1, 9)]
+
+
 def _position_lines():
     out = [
         (0x0F000000, "Self X", "Read: this fighter's X.\\nWrite: set it."),
@@ -242,6 +247,11 @@ def _position_lines():
     for i, (nm, d) in enumerate((("Team", "the object's team (-1 = none)"), ("Hurt team", "the team whose attacks can't hit it (-1 = none); Track_Target skips a fighter whose hurt team is the tracker's attack team"),
                                  ("Attack team", "the team its attacks can't hit (-1 = none; a projectile's is its owner's, or the reflector's after a reflect)"))):
         out.append((0x0F000334 + i, nm, "Read only: %s. Needs tools/acmd_ext_cave.py." % d))
+    for slot in range(8):
+        for k in range(8):
+            out.append((0x0F000340 + 8 * slot + k, "Slot %d shared %d" % (slot + 1, k),
+                        "Read / write: VAR_%d (0x0F%06X) of the fighter in player slot %d (fighter table entry %d): the same float that fighter's own VAR_%d reads and writes. Any object can use it (a projectile too, e.g. to keep state on the fighter it hit).\\nEmpty / not live slot: reads 0, a write does nothing. Needs tools/acmd_ext_cave.py."
+                        % (24 + k, 0x318 + k, slot + 1, slot, 24 + k)))
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(STATE_QUANTITIES):
             out.append((0x0F0000A0 + 8 * t + q, "%s %s" % (tn, qn.lower().replace("_", " ")), "Target: %s.\\n%s" % (td, qd)))
@@ -251,6 +261,8 @@ def _position_lines():
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for n, stick in enumerate(("stick", "C-stick")):
             out.append((0x0F000260 + 2 * t + n, "%s %s X raw" % (tn, stick), "Target: %s.\\nRead: %s X on screen, -1 to 1 (positive = right, whichever way it faces).\\nWrite: force it (until STICK_FORCED is written)." % (td, stick)))
+    for t, (tn, td) in enumerate(zip(ITEM_TARGETS, ITEM_TDESC)):
+        out.append((0x0F000276 + t, "%s item state" % tn, "Target: %s.\\nRead: 1 while it is metal (Metal Box), else 0.\\nWrite a code (SELF_ITEM's): that item's own state on it: 1 metal on, 2 metal off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 the Timer's slow on every other fighter, 8 camera closeup, 9 camera back." % td))
     for slot in range(8):
         for n, axis in enumerate(("X", "Y", "Z", "facing")):
             rw = "Read only (1 right, -1 left)." if axis == "facing" else "Read / write."
@@ -296,6 +308,8 @@ def alias_lines():
     for t, tn in enumerate(COMBAT_TARGETS):
         out.append(("%s_STICK_X_RAW" % tn, 0x0F000260 + 2 * t, ""))
         out.append(("%s_CSTICK_X_RAW" % tn, 0x0F000261 + 2 * t, ""))
+    for t, tn in enumerate(COMBAT_TARGETS):
+        out.append(("SELF_ITEM_STATE" if t == 0 else "%s_ITEM" % tn, 0x0F000276 + t, "as SELF_ITEM, and reads 1 while metal" if t == 0 else ""))
     out.append(("SELF_ANIM_RATE", 0x0F000098, "animation rate multiplier (1.0 normally)"))
     out.append(("SELF_ITEM", 0x0F000099, "write: 1 metal on, 2 off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 Timer on the others, 8 camera closeup, 9 camera back"))
     out += [("VAR_%d" % i, 0x0F000300 + i, "user variable (per object)" if i == 0 else "") for i in range(32)]
@@ -303,6 +317,9 @@ def alias_lines():
     out += [("KINETIC_TYPE", 0x0F000330, "read / set the kinetic type"), ("TRACK_FRAMES", 0x0F000331, "Track_Target frames left; 0 stops"),
             ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, ""),
             ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, "")]
+    out += [("SLOT%d_SHARED_%d" % (slot + 1, k), 0x0F000340 + 8 * slot + k,
+             "VAR_24-VAR_31 of the fighter in that player slot (any object may use them)" if slot == k == 0 else "")
+            for slot in range(8) for k in range(8)]
     return out
 
 

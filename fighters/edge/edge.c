@@ -36334,8 +36334,8 @@ void func_2244()
     sv_set_mem(0x1, 0x1, 0x152, edge_n_main); // Sephiroth: Flare (was Nayru's Love func_2250)
     sv_set_mem(0x1, 0x2, 0x152, edge_n_none);
     sv_set_mem(0x1, 0, 0x153, func_2261);
-    sv_set_mem(0x1, 0x1, 0x153, func_2262);
-    sv_set_mem(0x1, 0x2, 0x153, func_2264);
+    sv_set_mem(0x1, 0x1, 0x153, edge_s_start_main); // Sephiroth: Shadow Flare (was Din's Fire's
+    sv_set_mem(0x1, 0x2, 0x153, edge_n_none);       // func_2262 / 2264)
     sv_set_mem(0x1, 0, 0x154, edge_hi_start_pre);   // Sephiroth: up special start (was Farore's Wind's
     sv_set_mem(0x1, 0x1, 0x154, edge_hi_start_main); // func_2277 / 2278 / 2280)
     sv_set_mem(0x1, 0x2, 0x154, edge_hi_end);
@@ -36346,11 +36346,11 @@ void func_2244()
     sv_set_mem(0x1, 0x1, 0x156, func_2313);
     sv_set_mem(0x1, 0x2, 0x156, func_2316);
     sv_set_mem(0x1, 0, 0x157, func_2272);
-    sv_set_mem(0x1, 0x1, 0x157, func_2273);
-    sv_set_mem(0x1, 0x2, 0x157, func_2275);
+    sv_set_mem(0x1, 0x1, 0x157, edge_s_hold_main);  // Sephiroth: Shadow Flare's hold (was func_2273 /
+    sv_set_mem(0x1, 0x2, 0x157, edge_n_none);       // 2275)
     sv_set_mem(0x1, 0, 0x158, func_2267);
-    sv_set_mem(0x1, 0x1, 0x158, func_2268);
-    sv_set_mem(0x1, 0x2, 0x158, func_2270);
+    sv_set_mem(0x1, 0x1, 0x158, edge_s_shot_main);  // Sephiroth: Shadow Flare's shot (was func_2268 /
+    sv_set_mem(0x1, 0x2, 0x158, edge_n_none);       // 2270)
     sv_set_mem(0x1, 0, 0x159, edge_hi_rush_pre);    // Sephiroth: Blade Dash / Octaslash (was the warp,
     sv_set_mem(0x1, 0x1, 0x159, edge_hi_rush_main); // func_2282 / 2283 / 2286)
     sv_set_mem(0x1, 0x2, 0x159, edge_hi_end);
@@ -36368,7 +36368,7 @@ void func_2244()
 void func_2245()
 {
     sv_set_mem(0x1, 0x3, 0x152, edge_n_none);
-    sv_set_mem(0x1, 0x3, 0x153, func_2266);
+    sv_set_mem(0x1, 0x3, 0x153, edge_n_none);       // Shadow Flare: set up in its main (was func_2266)
     sv_set_mem(0x1, 0x3, 0x154, edge_n_none);       // Sephiroth's up special: set up in its mains
     sv_set_mem(0x1, 0x3, 0x159, edge_n_none);
     sv_set_mem(0x1, 0x3, 0x15a, edge_n_none);       // (was func_2291)
@@ -39118,4 +39118,178 @@ void edge_lw_end()
         MotionModule(0x4, 1.0f);
         edge_lw_rate = 1.0f;
     }
+}
+
+// ---- Sephiroth's side special: Shadow Flare (fighters/edge/specials.md "Side special"), from Ultimate's status
+// code (lua2cpp_edge: START 08940 / 1ac20, HOLD 08f00 / 035d0 / 1a4c0, SHOT 09510 / 1a060), vl.prc
+// param_special_s and the ExeFS's flare1 generation (main.bin 0x9e1770). Zelda's Din's Fire statuses carry it:
+// 0x153 START (SpecialSStart 0x219 / SpecialAirSStart 0x225), 0x157 HOLD (SpecialSLoop 0x21D / 0x229: Ultimate's
+// special_s_hold), 0x158 SHOT (SpecialSEnd 0x221 / 0x22D: Ultimate's special_s). Kinetics: Ultimate's
+// sub_set_special_start_common_kinetic_setting(param_special_s), re-applied on a ground / air change (the motion
+// swapped, its frame kept). The shot: flare1 (article 6, weapon 0x18D, weapons/flare1.c), made on SHOT's frame 8
+// (Ultimate's game_specials generate_article); the hold count and the situation go to it through Zelda's side
+// special custom slot (int 0x10000049, copied by Din's Fire's creation callback into the weapon's 0x10000005).
+int edge_s_hold;      // K[0xe3b0]: the hold's frames (Ultimate's status work int 0x11000005)
+int edge_s_fired;
+
+int edge_s_motion(int ground, int air)
+{
+    if (global18 == 0x2)
+    {
+        return air;
+    }
+    return ground;
+}
+
+// param_special_s start_*: ground x speed x 0.5, brake 0.1; air x speed x 0.6, brake 0.008, y speed x 0.75,
+// gravity and max fall x 0.85 (start_accel_y_mul_air / start_max_speed_y_mul_air: his air_accel_y 0x3000018,
+// air_speed_y_stable 0x3000019). Air control (accel x 0.1, max x 0.6) is left off (approximation: no MSC op
+// for its multipliers is known)
+void edge_s_kinetic()
+{
+    float vx;
+    float vy;
+    vx = KineticModuleF(0, 0xffffffff);
+    vy = KineticModuleF(0x1, 0xffffffff);
+    if (global18 == 0x2)
+    {
+        GroundModule(0x2710, 0x5);
+        KineticModule(0, 0xa);
+        KineticModule(0x11, 0x3, vx * 0.6f, 0.0f);
+        KineticModule(0x10, 0x3, 0.008f, 0.0f);
+        KineticModule(0xb, 0x3);
+        KineticModule(0x11, 0x1, vy * 0.75f);
+        KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018) * 0.85f);
+        KineticModule(0x15, 0x1, WorkModuleF(0, 0x3000019) * 0.85f);
+        KineticModule(0xb, 0x1);
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        KineticModule(0xc, 0x2);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x9);          // Din's Fire's ground correction (Zelda's func_2263)
+        KineticModule(0, 0x6);
+        KineticModule(0x11, 0x3, vx * 0.5f, 0.0f);
+        KineticModule(0x10, 0x3, 0.1f, 0.0f);
+        KineticModule(0xb, 0x3);
+    }
+}
+
+// every loop: on a ground / air change the motion swapped (frame kept) and the kinetics again; the air's gravity
+void edge_s_situation(int ground, int air)
+{
+    if (StatusModule(0x6) == 0 && (global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0))
+    {
+        edge_s_kinetic();
+        MotionModule(0x3, edge_s_motion(ground, air));
+    }
+    if (global18 == 0x2)
+    {
+        KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018) * 0.85f);
+    }
+}
+
+// 1ac20
+void edge_s_start_loop()
+{
+    edge_s_situation(0x219, 0x225);
+    if (MotionModule(0x2712))
+    {
+        func_16(0x157, 0);
+        return;
+    }
+}
+
+// 08940
+void edge_s_start_main()
+{
+    edge_s_hold = 0;
+    edge_s_fired = 0;
+    edge_s_kinetic();
+    MotionModule(0x1, edge_s_motion(0x219, 0x225), 0, 1.0f);
+    global20 = 0;
+    func_78(edge_s_start_loop);
+}
+
+// 1aad0: turned round when leaving the hold with the stick back (stick x . lr <= common turn_stick_x -0.2)
+void edge_s_turn()
+{
+    if (global48 <= -0.2f)
+    {
+        PostureModule(0x2710);              // reverse_lr
+        PostureModule(0x2);                 // update_rot_y_lr
+    }
+}
+
+// 035d0 (exec: the count) + 1a4c0: the shot on the special button's release (after its first frame) or at
+// hold_max 27
+void edge_s_hold_loop()
+{
+    edge_s_situation(0x21d, 0x229);
+    edge_s_hold += 1;
+    if (ControlModule(0x2713, 0x1) && edge_s_hold > 0x1 || edge_s_hold >= 0x1b)
+    {
+        edge_s_turn();
+        func_16(0x158, 0);
+        return;
+    }
+}
+
+// 08f00
+void edge_s_hold_main()
+{
+    edge_s_hold = 0;
+    MotionModule(0x1, edge_s_motion(0x21d, 0x229), 0, 1.0f);
+    global20 = 0;
+    func_78(edge_s_hold_loop);
+}
+
+// game_specials frame 8: generate_article(FLARE1); the hold's frames (0 - 27) + 32 in the air to the weapon
+void edge_s_generate()
+{
+    int slot;
+    int v;
+    v = edge_s_hold;
+    if (v > 0x1b)
+    {
+        v = 0x1b;
+    }
+    if (global18 == 0x2)
+    {
+        v += 0x20;
+    }
+    slot = WorkModule(0x6, 0x10000049);
+    WorkModule(0x7, v, 0x10000049);
+    ArticleModule(0x2710, 0x6);
+    WorkModule(0x7, slot, 0x10000049);
+    edge_s_fired = 0x1;
+}
+
+// 1a060: at the motion's end Wait or Fall (no special fall, no landing lag)
+void edge_s_shot_loop()
+{
+    edge_s_situation(0x221, 0x22d);
+    if (edge_s_fired == 0 && MotionModuleF(0x1) >= 8.0f)
+    {
+        edge_s_generate();
+    }
+    if (MotionModule(0x2712))
+    {
+        if (global18 == 0x2)
+        {
+            func_16(0xe, 0);
+            return;
+        }
+        func_16(0, 0);
+        return;
+    }
+}
+
+// 09510
+void edge_s_shot_main()
+{
+    edge_s_fired = 0;
+    MotionModule(0x1, edge_s_motion(0x221, 0x22d), 0, 1.0f);
+    global20 = 0;
+    func_78(edge_s_shot_loop);
 }

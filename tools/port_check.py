@@ -949,6 +949,29 @@ def effect_heap_estimate(data):
 HEAP_VANILLA_MAX, HEAP_VANILLA_WARN, HEAP_PATCHED_WARN = 13.3, 12.0, 20.0
 
 
+def check_cave_hooks(inst, rep):
+    """X1: tools/acmd_ext_cave.py's code in the executable but its var_entry hook (0x04B79000, position_vars_cave's
+    first word) the original instruction: a later position_vars_cave put it back, and every 0x0F0003xx variable
+    (VAR_ / TIMER_ / KINETIC_TYPE / TRACK_FRAMES / SPEED_ / TEAM, SLOTn_SHARED_k) reads 0 and ignores writes (the
+    standard build since Hero fix 79; found for Sephiroth's Shadow Flare, test 64). Apply acmd_ext_cave last"""
+    import tempfile
+    import kind_expand as K
+    if 'code/cross_f.rpx' not in inst.files:
+        return
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        img = K.Image(f.name)
+        try:
+            cave, hook = img.w(0x04B90000), img.w(0x04B79000)
+        except Exception:                     # noqa: BLE001
+            return
+    if cave != 0 and hook == 0x548C05BE:
+        rep.add('ERROR', 'X1 cave-hook', 'code/cross_f.rpx: acmd_ext_cave.py\'s code is there but its hook at 0x04B79000 '
+                'was undone (position_vars_cave.py applied after it): user / shared variables, timers and the kinetic '
+                'type variable do nothing; re-apply acmd_ext_cave.py last')
+
+
 def check_effect_heap(inst, name, rep):
     """E9: a bank too big for the one effect heap every bank in a match shares (eft writes through the NULL of the
     failed allocation: a crash at match load, Sephiroth test 61)"""
@@ -1076,6 +1099,7 @@ def main():
     check_sound_tables(inst, a.name, kind, rep)
     check_effects(inst, a.name, rep)
     check_effect_heap(inst, a.name, rep)
+    check_cave_hooks(inst, rep)
     check_effect_scripts(src, base['ult'], rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
