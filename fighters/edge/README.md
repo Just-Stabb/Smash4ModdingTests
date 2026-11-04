@@ -836,3 +836,26 @@ array when they connected (`docs/native-notes.md` "AttackModule sizes").
 - port_check W4 (new, ERROR): a new article's hitbox ID / Part past its base's AttackModule (`WEAPON_ATTACK_SLOTS`:
   dein 7 / 2); it flags test 69's orbit script.
 - port_check over the chain + this: no new errors (39 -> 38: W4 gone).
+
+## Test 71 (`build/sephiroth_test71.zip`): Shadow Flare's orbit per fighter
+
+User, test 70 (clip on Donkey Kong): the shot's hit is right (1%, a small stun), but an orb then hits for 7% and
+launches him while orbiting; charged, "the same hitboxes that the orb use multihit many times over but at the
+incorrect timings". The orbiting orbs have Ultimate's edge_flare2 Fly hitbox (7 damage, 50 degrees, rehit 45), but
+Ultimate's ring sits on each fighter's `edge_flare_node` (`waist`) + offsets at `edge_flare_radius`, all per fighter
+in `fighter_param.prc` (Donkey Kong: radius 17, offsets 4 / 3 / 0), just outside the body. The port used 14 around
+his position + 9 for everyone: inside Donkey Kong, so every orbit pass hit him (every 45 frames, and again after each
+orb's new record).
+
+- `tools/edge_flare_targets.py` writes the table into flare1.c (`fl_target_shape`, 71 kinds): radius from Ultimate;
+  centre = the joint on the Smash 4 model's rest pose (`model.vbn`; the ports' own models) with Ultimate's offsets in
+  its axes, x the model size (fighter_param 0x0300002C; a port keeps its base's), as height / forward offset from the
+  fighter's position. Charizard is Ultimate's `plizardon`; Giga Bowser (Ultimate: radius 0) takes Bowser's row with
+  the radius x his waist height / Bowser's (54.6, approximated).
+- The target's kind: new read-only quantity +5 of `0x0F0000A0 + 8 x target` (`SLOTn_KIND`, `tools/position_vars_cave.py`;
+  emulator tests in `tools/position_vars_test.py`). flare1.c reads it when the orbit starts.
+- Still approximated: the centre doesn't follow the target's animation (Ultimate's follows the joint), size changes
+  aren't followed.
+- `code/cross_f.rpx`: test 70's with the variable cave rebuilt (488 words, all its own), the ACMD cave applied after
+  it as before (`Hit_Log_Clear` tests unchanged).
+- port_check F1 (new, WARN): a fighter kind with no row in the table. Over the chain + 70 + this: no new errors.

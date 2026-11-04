@@ -278,9 +278,15 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   8 i frames later: thrown out at 4-5.2 then in, + 0.45-0.85 a frame up to 7-14 (lerped by R = n / 5), TRY 6.5 damage
   53 degrees; at the centre EXP: one frame, size 3.5, `edge_shadowflare_bullet_hit` x 1.3; each strike with its hit
   records cleared. The fighter KO'd / respawning / gone: every orb ends (`edge_shadowflare_bullet_end`).
-- **Approximated / not done:** the orbit's centre (Ultimate: the fighter's `edge_flare_node`, `waist` for 92 of 94
-  fighters; here its position + 9 up) and radius (the per-fighter `edge_flare_radius`: 14, the median, x its scale
-  taken as 1): Smash 4's MSC can't read another fighter's joints or kind; the orbs can't be hit (Ultimate: damage
+- **Orbit per fighter (test 71):** Ultimate's `edge_flare_radius` and its ring centre on `edge_flare_node` (`waist`
+  for 92 of 94 fighters) + `edge_flare_offset_x/y/z` in that joint's axes, from `fighter_param.prc`, by the target's
+  fighter kind (`SLOTn_KIND`, `docs/position-variables.md`): `fl_target_shape` in flare1.c, written by
+  `tools/edge_flare_targets.py`. These keep the ring just outside the body, so the orbiting orbs (7 damage, rehit
+  45) don't hit their own target. Smash 4's MSC can't read another fighter's joints, so the centre is the joint on the
+  model's rest pose (x the model size), as an offset from the fighter's position along its facing: it doesn't
+  follow crouches or animations. The target's scale (size changes) is taken as 1. Giga Bowser (Ultimate: radius 0,
+  no joint) gets Bowser's row with the radius grown by his waist height (approximated).
+- **Approximated / not done:** the orbs can't be hit (Ultimate: damage
   takes n down by 0.07 a point) and don't freeze in hitlag; TRY / EXP keep the orbit's BKB 65 (Ultimate's 50; no MSC
   op for BKB) and EXP stays fighters-only; reflection (Ultimate: n x 2, life 8) isn't handled beyond the game's own
   turn; the air drift (Ultimate: control x 0.1 accel, x 0.6 max) is off; the shot's set_base_offset (its hitbox

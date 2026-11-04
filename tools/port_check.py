@@ -777,6 +777,21 @@ def check_weapon_parts(inst, name, rec, rep):
                         art, w['base'], slots[0] - 1, slots[1] - 1, ', '.join(sorted(bad))))
 
 
+def check_flare_targets(name, rec, rep):
+    """F1: a new fighter missing from Sephiroth's Shadow Flare table (fighters/edge/weapons/flare1.c, written by
+    tools/edge_flare_targets.py from Ultimate's edge_flare_radius / node / offsets): its orbs circle it at the
+    fallback 14 around its position + 9, inside a big fighter, and hit it while circling (Sephiroth test 71:
+    Donkey Kong at 14 / 9 took the orbit hits)"""
+    src = os.path.join(HERE, '..', 'fighters', 'edge', 'weapons', 'flare1.c')
+    if not os.path.exists(src):
+        return
+    kind = int(rec['kind'], 0)
+    if 'if (k == 0x%x)' % kind not in open(src).read():
+        rep.add('WARN', 'F1 flare-targets', 'kind 0x%X (%s) has no row in flare1.c\'s Shadow Flare table: rerun '
+                'tools/edge_flare_targets.py with --vbn %s=<its model.vbn> --write fighters/edge/weapons/flare1.c '
+                '(and rebuild flare1.mscsb)' % (kind, name, name))
+
+
 def check_loop_slots(inst, name, rec, base, vanilla, rep):
     """M9: a fighter slot (0x211 on) whose base motion loops (motion table flag 0x2) and that the port gives another
     move (its motion.mtable names another script there) without a flag override in the record's "motions": that
@@ -1173,6 +1188,7 @@ def main():
     check_weapon_statuses(a.name, rep)
     check_weapon_rehit(inst, a.name, rec, rep)
     check_weapon_parts(inst, a.name, rec, rep)
+    check_flare_targets(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)

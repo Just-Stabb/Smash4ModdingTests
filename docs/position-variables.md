@@ -101,7 +101,8 @@ fighter hit, 3–10 player slots 1–8), so `0x0F0000A0`–`0x0F0000F7`.
 | +2 status | its status kind | change its status (`StatusModule(3, status, 0)`), e.g. `0x59` shield break, `0x5D` dizzy |
 | +3 motion | its motion kind | play that motion from frame 0 at rate 1 (`MotionModule(1, ...)`; motion numbers are per fighter) |
 | +4 motion frame | its motion's current frame | ignored |
-| +5 to +7 | 0 | ignored |
+| +5 kind | its fighter kind (the fighter table's, as the game's `0x02BEF604`: 0x3 Mario, 0x4 Donkey Kong, ... 0x42 Sephiroth; `tools/fighter_param.py` `KINDS`, `tools/extra_kinds.json`), -1 if it isn't a fighter | ignored |
+| +6, +7 | 0 | ignored |
 
 Use **`Float_Var_Compare`** to test them in ACMD (`Int_Var_Compare` reads ints, which these aren't):
 `Method=0` is "equal". Example, Donkey Kong's side special: if it has hit someone by frame 20, a

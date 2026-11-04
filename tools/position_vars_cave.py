@@ -1179,7 +1179,9 @@ ext_motion_set:
         mr r22, r3
 %(SET_MOTION)s
         b ext_zero
-ext_q_frame:                            # q4: the motion's frame (read only); q5-7: 0
+ext_q_frame:                            # q4: the motion's frame (read only); q5: fighter kind; q6-7: 0
+        cmpwi r22, 0xD
+        beq ext_q_kind
         cmpwi r22, 0xC
         bne ext_zero
         cmpwi r29, 0
@@ -1188,6 +1190,34 @@ ext_q_frame:                            # q4: the motion's frame (read only); q5
         stw r3, 0x8(r1)
         lfs f1, 0x8(r1)
         b ext_ret
+""", False),
+("""
+ext_q_kind:                             # q5 (read only): its fighter kind, the fighter table entry's +4 (what
+        cmpwi r29, 0                    # 0x02BEF604 reads), -1 if it isn't in the table
+        bne ext_zero
+        li r26, 0
+ext_kind_loop:
+        mr r3, r26
+        bl slot                         # r12 = that slot's accessor
+        cmpwi r3, 0
+        beq ext_kind_next
+        cmplw r12, r24
+        beq ext_kind_have
+ext_kind_next:
+        addi r26, r26, 1
+        cmpwi r26, %(S)d
+        blt ext_kind_loop
+        li r3, -1
+        b ext_ret_int
+ext_kind_have:                          # the entry again (slot checked every pointer on the way)
+        lis r12, %(FT_HA)s
+        lwz r12, %(FT_LO)s(r12)
+        lwz r12, 0(r12)
+        lwz r12, 0(r12)
+        mulli r11, r26, %(ESZ)s
+        add r12, r12, r11
+        lwz r3, 4(r12)
+        b ext_ret_int
 """, False),
 ("""
 ext_ret_int:                            # f1 = (float) r3
@@ -1844,6 +1874,8 @@ inp_state:                              # per slot: held, tapped, inputs off, st
 """, False),
     ], dict(
         S=SLOTS, SETPOS=SETPOS_CALL,
+        FT_HA=hex(((FIGHTERS + 0x8000) >> 16) & 0xFFFF), ESZ=hex(ENTRY_SIZE),
+        FT_LO=str(FIGHTERS & 0xFFFF if FIGHTERS & 0x8000 == 0 else (FIGHTERS & 0xFFFF) - 0x10000),
         DEALT=msc(MSC_DAMAGE_F, 1),
         IN_STOP=msc(MSC_STOP, 1),
         STATUS=msc(MSC_STATUS, 0),
