@@ -7509,7 +7509,10 @@ void func_319()
     {
         return;
     }
-    func_555();
+    if (edge_sn_free())      // Sephiroth: held forward air, no fast fall while the sword is out
+    {
+        func_555();
+    }
     if (!global3)
     {
         func_341();
@@ -39535,7 +39538,7 @@ float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
 float edge_sn_max() { return 300.0f; }         // the path's length at most
 float edge_sn_back_min() { return 24.0f; }     // back only once the tip is this far past the sword's own reach
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
-float edge_sn_grav() { return 0.7f; }          // gravity x this while extending / retracting
+float edge_sn_grav() { return 0.4f; }          // gravity x this while extending / retracting (user, test 92: 0.4)
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
 float edge_sn_base_x() { return -0.51f; }      // the blade's start at the freeze frame (Ultimate's c05attackairf
 float edge_sn_base_v() { return 13.35f; }      // frame 13, swordl1 x (0.818, 0, 0.048)), along +Z there
@@ -39856,11 +39859,11 @@ void edge_sn_steer()
     float fwd;
     want = edge_sn_cardinal();
     edge_sn_since = edge_sn_since + 1.0f;
-    if (want < 0)
-    {
-        return;
-    }
     cur = edge_sn_d(edge_sn_n);
+    if (want < 0)               // no direction held: on the way it goes (user, test 92; the first run is forward)
+    {
+        want = cur;
+    }
     if (want != cur)
     {
         ok = 0x1;
@@ -39998,6 +40001,17 @@ void edge_sn_gravity(float mul)
     KineticModule(0xf, 0x1, -(WorkModuleF(0, 0x3000018) * mul));
 }
 
+// the aerial loop's fast-fall check (func_555) runs only when this is 1: not while the sword is out (user, test 92:
+// holding down steers it, it mustn't fast fall him too)
+int edge_sn_free()
+{
+    if (edge_sn_state == 0x3 || edge_sn_state == 0x4)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
 // the aerial status's main: the move picked; the hold check starts if it's forward air with the button held
 void edge_sn_init()
 {
@@ -40085,6 +40099,7 @@ void edge_sn_loop()
         edge_sn_begin();
     }
     edge_sn_gravity(edge_sn_grav());
+    WorkModule(0x2711, 0x21000007);             // no fast fall while the sword is out (func_555 skipped: edge_sn_free)
     if (edge_sn_state == 0x3)
     {
         if (held == 0)

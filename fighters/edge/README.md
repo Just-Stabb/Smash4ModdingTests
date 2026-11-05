@@ -1283,3 +1283,18 @@ travelling upstream with the sword movement."
   it every frame (0x17), as Shadow Flare's orbs. The speed lines aren't carried (their angle is the sword joint's).
 - port_check over the chain and tests 70–92: 30 errors, as before. MSC stack check clean.
 - Package (install over 91): `model/snaketip` c00–c07 `model.nud`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 93 (`build/sephiroth_test93.zip`): 0.4x gravity, no direction = keep going, no fast fall in the hold
+
+User: "can you make the gravity 0.4x during the hold, and treat holding with no direction as continuing in the same
+direction (initial direction is forward) and disable fast fall during the hold."
+- `tools/edge_snake_msc.py`: `edge_sn_grav` 0.4 (was 0.7); with no direction held the steering takes the current run's
+  (the first is forward), so the tip keeps going; while extending / retracting the fast-fall flag (0x21000007) is
+  kept off and the aerial loop's fast-fall check (`func_555`, in `func_319`) is skipped (`edge_sn_free`, a new
+  "replace" hook).
+- User, same day: "the opponent doesn't seem to travel back down the same path of the sword once the button is
+  released." The hold code puts each caught fighter at its catch point on the path less the retracted length every
+  frame (`edge_sn_hold_caught`, `edge_sn_point` walking the runs): not changed here; a clip of a catch and release
+  is needed to tell whether the fighter was caught at all (the catch: in hitstun, feet within 22 of the point).
+- port_check over the chain and tests 70–93: 30 errors, as before. MSC stack check clean.
+- Package (install over 92): `script/msc/edge.mscsb`.
