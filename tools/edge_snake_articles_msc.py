@@ -25,7 +25,9 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v
+BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: when his hilt can't be read
+BLADE_BONE = 26                         # EdgeBladeL in his model.vbn, every costume (tools/snake_sword.py 'at')
+BLADE_START = 0.82                      # the blade's body starts this far along it from the hilt (snake_sword pieces)
 RUNS = 12
 
 COMMON = r'''
@@ -36,9 +38,39 @@ int sn_life;            // frames left (a safety net: removed after SN_LIFE what
 float sn_h;             // sn_walk's result: the point along the path, its run's direction
 float sn_v;
 int sn_d;
+float sn_bh;            // the path's start (his hilt, live: sn_base), his model plane; sn_bz its depth
+float sn_bv;
+float sn_bz;
 
-float sn_base_h() { return BASE_Hf; }
-float sn_base_v() { return BASE_Vf; }
+float sn_base_h() { return sn_bh; }
+float sn_base_v() { return sn_bv; }
+
+// the path starts at his hilt as it is (his EdgeBladeL, bone BLADE_BONE, read through the joint variables 0x0F00029C +
+// 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
+// at Ultimate's frame-13 numbers from his position and depth: the pieces weren't in line with his hand. Nothing read
+// (0, 0, 0): those numbers
+void sn_base()
+{
+    float jx;
+    float jy;
+    float jz;
+    float lr;
+    WorkModule(0, BLADE_BONEf, 0x0f00029c + 0x4 * sn_slot);
+    jx = WorkModuleF(0, 0x0f00029d + 0x4 * sn_slot);
+    jy = WorkModuleF(0, 0x0f00029e + 0x4 * sn_slot);
+    jz = WorkModuleF(0, 0x0f00029f + 0x4 * sn_slot);
+    lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
+    if (jx == 0.0f && jy == 0.0f && jz == 0.0f)
+    {
+        sn_bh = BASE_Hf;
+        sn_bv = BASE_Vf;
+        sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
+        return;
+    }
+    sn_bh = (jx - WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot)) * lr + BLADE_STARTf;
+    sn_bv = jy - WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot);
+    sn_bz = jz;
+}
 
 int sn_find_owner()
 {
@@ -185,7 +217,7 @@ void sn_place(float h, float v, int d)
     lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
     PostureModule(0, lr);
     PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot) + lr * h, WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot) + v,
-                  WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot));
+                  sn_bz);
     a = sn_pitch(d);
     if (lr < 0.0f)
     {
@@ -222,6 +254,7 @@ void sn_frame()
     float h;
     float v;
     float len;
+    sn_base();
     before = sn_walk(sn_index - 1, sn_shared(0x6));
     h = sn_h;
     v = sn_v;
@@ -265,6 +298,7 @@ TIP = r'''
 // the point: at the path's drawn end, along its last run (its hitbox and trail: its ACMD)
 void sn_frame()
 {
+    sn_base();
     sn_walk(RUNS, sn_shared(0x6));
     sn_place(sn_h, sn_v, sn_d);
 }
@@ -323,6 +357,8 @@ def generate(base_c, own):
     assert '    global21 = func_40;\n' in text
     text = text.replace('    global21 = func_40;\n', '    global21 = 0;           // motion indices as they are (flare1.c)\n')
     code = (COMMON + own).replace('BASE_Hf', '%.2ff' % BASE_H).replace('BASE_Vf', '%.2ff' % BASE_V)
+    code = code.replace('BLADE_BONEf', '%.1ff' % BLADE_BONE).replace('BLADE_BONE', str(BLADE_BONE))
+    code = code.replace('BLADE_STARTf', '%.2ff' % BLADE_START)
     code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS))
     return text.rstrip('\n') + '\n' + code
 

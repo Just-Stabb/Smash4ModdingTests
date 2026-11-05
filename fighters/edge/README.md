@@ -1212,3 +1212,19 @@ User, test 86: "The sword doesn't appear in any move any more, just the sword tr
   with it hidden (`edge_sn_hid`, the global `edge_sn_released` freed in test 83).
 - port_check over the chain and tests 70–87: 30 errors, as before. MSC stack check clean.
 - Package (install over 86): `script/msc/edge.mscsb`.
+
+## Test 88 (`build/sephiroth_test88.zip`): the extended sword starts at his hilt as it is
+
+User, test 87 (clips): "The sword no longer stretches oddly but isn't aligned correctly."
+- The clips: the pieces are where their MSC puts them now (dein copies), the real blade hidden (joint 1003) and back
+  after the move. The run after a turn up is a vertical line from the end of the forward path. From the hilt a short
+  thin line runs up-right at about 40 degrees, which no piece should; the first run (straight ahead) is hard to see
+  under the trail and a platform edge.
+- Fair's own sword is straight ahead from frame 12 to 22 (Ultimate's c05attackairf, swordl1's X), so the frozen frame
+  13 pose isn't it.
+- The path started at Ultimate's frame-13 numbers (11.06 forward, 13.35 up) from his position, at his depth. Now each
+  article reads his EdgeBladeL (bone 26) every frame through the joint variables (`0x0F00029C + 4 x slot`, as Shadow
+  Flare's ring) and starts the path 0.82 along the blade from it, at the hilt's depth (Ultimate's numbers if the read
+  gives nothing).
+- port_check over the chain and tests 70–88: 30 errors, as before. MSC stack check clean.
+- Package (install over 87): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.

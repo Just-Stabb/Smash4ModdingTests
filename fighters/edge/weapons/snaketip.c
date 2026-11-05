@@ -600,9 +600,39 @@ int sn_life;            // frames left (a safety net: removed after 900 whatever
 float sn_h;             // sn_walk's result: the point along the path, its run's direction
 float sn_v;
 int sn_d;
+float sn_bh;            // the path's start (his hilt, live: sn_base), his model plane; sn_bz its depth
+float sn_bv;
+float sn_bz;
 
-float sn_base_h() { return 11.06f; }
-float sn_base_v() { return 13.35f; }
+float sn_base_h() { return sn_bh; }
+float sn_base_v() { return sn_bv; }
+
+// the path starts at his hilt as it is (his EdgeBladeL, bone 26, read through the joint variables 0x0F00029C +
+// 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
+// at Ultimate's frame-13 numbers from his position and depth: the pieces weren't in line with his hand. Nothing read
+// (0, 0, 0): those numbers
+void sn_base()
+{
+    float jx;
+    float jy;
+    float jz;
+    float lr;
+    WorkModule(0, 26.0f, 0x0f00029c + 0x4 * sn_slot);
+    jx = WorkModuleF(0, 0x0f00029d + 0x4 * sn_slot);
+    jy = WorkModuleF(0, 0x0f00029e + 0x4 * sn_slot);
+    jz = WorkModuleF(0, 0x0f00029f + 0x4 * sn_slot);
+    lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
+    if (jx == 0.0f && jy == 0.0f && jz == 0.0f)
+    {
+        sn_bh = 11.06f;
+        sn_bv = 13.35f;
+        sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
+        return;
+    }
+    sn_bh = (jx - WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot)) * lr + 0.82f;
+    sn_bv = jy - WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot);
+    sn_bz = jz;
+}
 
 int sn_find_owner()
 {
@@ -749,7 +779,7 @@ void sn_place(float h, float v, int d)
     lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
     PostureModule(0, lr);
     PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot) + lr * h, WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot) + v,
-                  WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot));
+                  sn_bz);
     a = sn_pitch(d);
     if (lr < 0.0f)
     {
@@ -779,6 +809,7 @@ void sn_still()
 // the point: at the path's drawn end, along its last run (its hitbox and trail: its ACMD)
 void sn_frame()
 {
+    sn_base();
     sn_walk(12, sn_shared(0x6));
     sn_place(sn_h, sn_v, sn_d);
 }
