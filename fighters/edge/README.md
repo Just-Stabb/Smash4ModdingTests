@@ -934,3 +934,25 @@ where Ultimate's is a bright honeycomb, and no white dissolve before the slash).
   against Ultimate's still to check on the next clip.
 - `port_check` E8 eft-line-volume (a converted emitter left on eft's line volume); over the chain + this: 38
   errors as before, none new.
+
+## Test 75 (`build/sephiroth_test75.zip`): Scintilla's wall along Z; Shadow Flare's beam where the shot is
+
+User, test 74 (clip): "Down specials wall looks more full but stiff and still incorrect. Side special's initial hit
+effect still seems to spawn too low."
+- The wall: test 74 was wrong about the axis. Ultimate places an "XY polygon" mesh by its emitter's matrix alone
+  (vfxb_to_ptcl.py's notes, Squirtle's wave1s), and Scintilla's hexagon mesh lies in its YZ plane (2 tall, 1.73 wide
+  at scale 1), so the rows can only tile along Z, as eft's own line runs (fx_render's model of main.bin's emission
+  draws them so too). Laid along X (test 74), every hexagon stood across its row: the gaps and the stiff look.
+  Now each row is eft's line: radius (0, 0, line_length), line_center at 0x374 (vanilla keeps -1 / 0 / 1 there: a
+  fraction, as eft2's), num_divide_line particles an emission: rows of 4 / 5 hexagons 5 tall x 4.33 wide
+  (x 2.5), 4.6 apart along a row and 3.95 between rows: Ultimate's packed honeycomb. Test 73's only bugs were the
+  length and the count. Same for the dissolve / end rows, Octaslash's line and the beam hit's line2 (51 emitters).
+- The beam (`edge_shadowflare_beam`, a 30-long streak whose particles stay where they're born): Fly's script laid it
+  at frame 0 with EFFECT_FOLLOW on the shot's top joint, and that joint's matrix is the one from before flare1.c
+  moves the shot (Din's creation point, on the floor). So the streak on the floor in tests 72 - 74 was never where
+  the shot was: test 73's "the creation point is ~9 lower" was a wrong reading of it. fl_fly_main now lays the beam
+  itself (EffectModule 0x3, world placed, turned to his facing) at the moved place, his position + (lr x 10, 10)
+  (air 7); Fly's script has no beam now. The shot's hitboxes still take the top joint's matrix on their first
+  frame (the creation point, one frame).
+- `port_check` E8 eft-line-volume now flags a converted line without its own length (eft2's default radius) and
+  test 74's arcs; over the chain + this: 38 errors as before, E8 clean.
