@@ -1054,3 +1054,24 @@ User (Cemu log): the game crashes when Sephiroth loads.
 The held forward air needs its runs drawn without posing many joints of his own model. The candidates are
 articles (one stretched blade piece each, posed by its own posture) or world-placed effects. See
 `fighters/edge/snake_fair.md`.
+
+## Test 81 (`build/sephiroth_test81.zip`): his skeleton back; Shadow Flare's shot at hand height on the ground
+
+User, test 80 (clips): "Sephiroth's bones seem incorrect and the sword doesn't appear in any attacks"; side special
+"still spawns too low, but this time specifically on the ground".
+- **Skeleton:** tests 79 and 80 built his skeleton with `--joints SwordL1,SwordR1` (a stale command) instead of
+  this README's `--have SwordL1,SwordR1`.
+  - With `--have`, LHaveN / RHaveN play the sword bones and the motions animate them. With `--joints`, the swords
+    are bones of their own that no motion moves, and every bone after them shifts.
+  - Test 80 shipped test 58's meshes (built for the `--have` skeleton) on the `--joints` one: the coat's panels
+    rigid, the sword left at its bind.
+  - Rebuilt with `--have`, every costume's `model.nud` is byte for byte test 58's. Test 81 ships that build's
+    `model.vbn`, `model.jtb`, `metal.nud` and `model.nud`.
+  - New check: `port_check` M9 have-bones (a `--have` port's skeleton with bones of their own by those names).
+- **Shadow Flare's shot:** fired on the ground, it sat on the floor; in the air it was at his hand.
+  - Clip: the start flash at his hand, the beam along the floor.
+  - Tests 65 / 66 had already found the grounded shot touching the floor as soon as it spawned.
+  - Fix: its fly status puts it in the air (situation and the air's ground correction). Its spawn height (his
+    position + 10, air + 7, Ultimate's) is held every frame it flies, and its beam is laid at that height.
+  - `weapons/flare1.c` → `flare1.mscsb`.
+- port_check over the chain and tests 70–81: no new errors.

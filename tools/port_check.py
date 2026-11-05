@@ -978,6 +978,38 @@ def check_loop_slots(inst, name, rec, base, vanilla, rep):
                 'loops): %s' % (len(bad), ', '.join(bad)))
 
 
+# the --have bones of ports from before port.json recorded them (ultimate_fighter.py --have LEFT,RIGHT)
+HAVE_BONES = {'edge': 'SwordL1,SwordR1'}
+
+
+def check_have_bones(inst, name, rep):
+    """M9: a --have port's model plays the Ultimate hand bones (Sephiroth's SwordL1 / SwordR1) as LHaveN / RHaveN,
+    and its motions animate those with their tracks. A model.vbn with bones of their own by those names was built
+    with another skeleton (`--joints` instead of `--have`): its meshes' bone indices don't match, and nothing moves
+    the bones. Sephiroth test 80 (user, clip): the coat's panels rigid, the sword never in his hand"""
+    import omo
+    import tempfile
+    have = HAVE_BONES.get(name)
+    cfg = os.path.join(ROOT, 'fighters', name, 'port.json')
+    if os.path.exists(cfg):
+        have = json.load(open(cfg)).get('have') or have
+    if not have:
+        return
+    names = {h.lower() for h in have.split(',')}
+    for rel in inst.glob(r'fighter/%s/model/body/c\d\d/model\.vbn' % name):
+        with tempfile.NamedTemporaryFile(suffix='.vbn', delete=False) as f:
+            f.write(inst.get(rel))
+        try:
+            bones = [b[0] for b in omo.vbn_read(f.name)]
+        finally:
+            os.unlink(f.name)
+        own = sorted(b for b in bones if b.lower() in names)
+        if own:
+            rep.add('ERROR', 'M9 have-bones', '%s (%s): bones of their own named %s, which this port plays as LHaveN / '
+                    'RHaveN (--have %s): the skeleton isn\'t the one its meshes and motions were built for (rebuild with '
+                    '--have, as fighters/%s/README.md)' % (rel, inst.where(rel), ', '.join(own), have, name))
+
+
 def check_motions(inst, name, rec, rep):
     """M8: every animation the record's motion table names ("motions": the executable's kind_expand table) is in
     the installed motion/body/main.pac, else that move T-poses (Hero fix 79: its main.pac was rebuilt from an
@@ -1357,6 +1389,7 @@ def main():
     check_vl(inst, a.name, base, motion_list, rep)
     check_cancel(inst, a.name, base, motion_list, rep)
     check_msc(inst, a.name, rep)
+    check_have_bones(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
     check_weapon_statuses(a.name, rep)
