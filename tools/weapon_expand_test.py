@@ -273,6 +273,11 @@ def main():
                 want = E0.call(fn, 0, k)
             elif k in new:
                 want = E0.call(fn, 0, new[k][0])
+                fs = new[k][1].get('flags_set', {}).get(k, 0)
+                if nm.startswith('bit'):            # "flags_set": that bit on. The accessors aren't one per bit in
+                    sh = (img.w(fn + 12) >> 11) & 0x1F   # order: slwi, addis, lhz, rlwinm r3, r0, SH, 31, 31: bit (32 - SH)
+                    if fs >> ((32 - sh) % 32) & 1:
+                        want = 1
             elif nm == 'u32':
                 want = 0
             elif nm == 'u8':

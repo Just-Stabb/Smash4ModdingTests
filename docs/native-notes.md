@@ -1055,6 +1055,19 @@ callback is its spawner: dein's (`0x02F97C90`) makes it at the owner's joint `0x
 (`0x02F9815C`) and the bow's (`0x02F980BC`) on joint `0x19` / `0x18` in mode 4 (on the hand). Both kinds'
 AttackModule set-up is the same (`0x032107B4`: 7 hitbox IDs, 2 Parts).
 
+## Joint overrides (MSC ModelModule ops 0 / 1 / 7, Sephiroth tests 79 - 86)
+
+The override list (`0x02C64078` scale and its rotate / translate siblings, the resolver `0x02C5B4D8`) is
+MotionModuleImpl's (`0x02C5B000`-`0x02C66000`, accessor `+0x44`): a weapon without a MotionModule takes none. The
+joint is named as ACMD names it:
+- a fighter: below 1000 an entry of model.jtb table 0 (Sephiroth's has 26: IDs 0-25; tests 82-84's 26 was past it
+  and did nothing), from 1000 table 1 (test 79's 1005+ were taken, 15 entries, and overran the list). His
+  EdgeBladeL (bone 26) is table 1's 4th entry: 1003. 0x7EA (test 85) did nothing either.
+- a weapon: 0x7D0 + its jtb entry (Mario's pump `ModelModule(1, 0x7D2, ...)`: entry 2, bone 4 ControlN).
+
+The weapon flag accessors (`0x0320E634` + 0x14 i) aren't one per bit in order: each is `rlwinm r3, r0, SH, 31, 31`,
+bit (32 - SH): `0x0320E670` is 0x10, `0x0320E698` 0x40 (a model), `0x0320E6AC` 0x80.
+
 ## Hitboxes and hitstop (Kirby's Strike trait)
 
 - **Hitbox creation:** every hitbox command (ACMD `Hitbox` `0x02BDB0EC`, `Special_Hitbox`, ...,

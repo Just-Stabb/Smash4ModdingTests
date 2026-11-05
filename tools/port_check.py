@@ -681,9 +681,10 @@ def check_joint_overrides(src, rep):
     """C6: MSC joint overrides (ModelModule 0 scale / 1 rotate / 7 translate) go into the model's override list
     (0x02C64078: one 0x28-byte entry per joint, appended with no capacity check). Vanilla scripts touch a fixed one
     or two joints; Sephiroth test 79 posed 15 every frame from load and the game crashed loading him (its 0.001 hide
-    scale written over a structure's count). Flags a joint op run from a loop (directly or through a helper) and
-    literal table-1 joint IDs (1000 - 1999): ACMD's numbering. ModelModule takes a joint table 0 ID (below 1000) or a
-    bone as 2000 + its index (Sephiroth's blade 0x7EA, the articles' 0x7D2, Mario's pump)"""
+    scale written over a structure's count). Flags a joint op run from a loop (directly or through a helper).
+    The overrides are the MotionModule's (0x02C5B000 - 0x02C66000), by joint ID as ACMD's: a fighter's table 0 below
+    1000, table 1 from 1000 (test 79's 1005+ were accepted: that is how 15 got in); a weapon's jtb entry n as 0x7D0 + n
+    (Mario's pump). Sephiroth's blade is 1003"""
     for d, _ds, fs in os.walk(src):
         for f in fs:
             if not f.endswith('.c') or os.sep + 'weapons' + os.sep in os.path.join(d, f):
@@ -711,12 +712,7 @@ def check_joint_overrides(src, rep):
                                 'crashed loading him); pose at most a couple of joints' % (
                                     os.path.relpath(path, ROOT), n, hit if isinstance(hit, str) else 'ModelModule'))
                         break
-            for m in JOINT_OP.finditer(text):
-                j = m.group(1).strip()
-                if re.fullmatch(r'(0x[0-9a-fA-F]+|\d+)', j) and 1000 <= int(j, 0) < 2000:
-                    rep.add('ERROR', 'C6 joint-overrides', '%s: ModelModule joint op on joint %s: table-1 IDs (1000+) are '
-                            'ACMD\'s; ModelModule names a bone as 2000 + its index (Sephiroth test 85)' % (
-                                os.path.relpath(path, ROOT), j))
+
 
 
 def check_msc(inst, name, rep):

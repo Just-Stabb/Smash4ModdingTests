@@ -1,12 +1,13 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 85.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 86.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
 hitbox and trail never ran; since test 83 they have one (README test 83). Test 84: the trail across the point in
 the screen plane, the articles facing his way (README test 84). Test 85: the pieces' base off HaveN (drawn at his
-feet), the real blade hidden through joint 0x7EA (README test 85).
+feet), the real blade hidden through joint 0x7EA (README test 85; wrong). Test 86: the pieces rebased on dein with a model
+(the light arrow's native code drew them at his feet), the blade on joint 1003 (README test 86).
 
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
@@ -36,15 +37,15 @@ The user's numbers:
 | His model | `tools/snake_sword.py`, `ultimate_fighter.py model --have SwordL1,SwordR1 --snake` | **EdgeBladeL** (bone 26 in every costume) under SwordL1, holding the real blade so it can be hidden |
 | His MSC | `tools/edge_snake_msc.py` writes the `SNAKE FAIR` block of `fighters/edge/edge.c` | Hold check, steering, retract, catching, the articles |
 | His ACMD | `tools/edge_specials_build.py` `snake_fair_scripts` | The tapped move's hits gated, the 11% end hit |
-| Article kinds | `tools/extra_kinds.json`: `snake` 0x199 (up to 12), `snaketip` 0x19A (one, kept on hit) | Copies of Zelda's light arrow (its model), with dein's MotionModule and spawner (`"modules"`, `"spawn_from"`); his articles 9 and 10 |
+| Article kinds | `tools/extra_kinds.json`: `snake` 0x199 (up to 12), `snaketip` 0x19A (one, kept on hit) | Copies of Zelda's dein (as fire / flare / flash, which place themselves) given a model (`"flags_set": "0x40"`); his articles 9 and 10 |
 | Article models | `tools/edge_snake_articles.py` → `model/snake`, `model/snaketip` | A run, and the point |
 | Article MSC | `tools/edge_snake_articles_msc.py` → `fighters/edge/weapons/snake.c`, `snaketip.c` | Each places itself on the path every frame |
 | Article ACMD | `tools/edge_specials_build.py` `snake_article_scripts` | The point's 5% catch and the sword trail |
 
 **His model.** EdgeBladeL is added at bone 26 (right after the 26 standard bones), so its number is the same in
 every costume. The blade's mesh hangs from it; the hilt stays on SwordL1. The MSC hides the blade with ModelModule
-scale on joint 0x7EA (2000 + bone 26: ModelModule's bone addressing; IDs below 1000 are his joint table 0's, whose 26
-entries end at 25) when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
+scale on joint 1003 (his joint table 1's 4th entry, bone 26, in every costume: the overrides are the MotionModule's,
+by joint ID as ACMD's) when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
 pose one or two. `--materials-from` keeps test 58's materials. To keep 136 bones, one bone is folded (UplipL1);
 test 79's 15-bone fold is gone with `segments: 0`.
 
@@ -141,6 +142,6 @@ article finds its owner (the nearest Sephiroth), then every frame:
 - **12 at once.** That a kind takes 12 instances (`extra_kinds` `max: 12`).
 - **Turn signs.** The rotation (−pitch, 90, 0): up is pitch 90, down −90, back 180. If a direction comes out
   mirrored, swap the sign in `sn_pitch` (`tools/edge_snake_articles_msc.py`).
-- **Joint 0x7EA.** That ModelModule's 2000 + bone addressing (which the articles' 0x7D2 stretch uses, and which
-  works) holds on his own model too.
+- **Joint 1003.** That the override takes his table-1 IDs (test 79's 1005+ were taken: 15 of them overran the list).
+- **A model on a dein copy.** That flag 0x40 alone loads and draws it (both its readers are generic code).
 - **The trail on a weapon.** That the sword trail (`Sword_Glow`) draws from a weapon's script.

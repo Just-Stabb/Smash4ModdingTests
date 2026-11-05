@@ -1180,3 +1180,25 @@ location": at his feet.
 - port_check over the chain and tests 70–85: 30 errors, as before; nothing new. The MSCs' stack check: clean.
 - Package (install over 84): `model/snake` and `model/snaketip` c00–c07 (`model.vbn`, `model.jtb`, `model.nud`),
   `script/msc/edge.mscsb`.
+
+## Test 86 (`build/sephiroth_test86.zip`): the held forward air's pieces rebased on dein; the blade on joint 1003
+
+User, test 85 (clip): "The base and blade are still wrong."
+- **The clip:** the same as test 84. A thin line one blade long, horizontal, at his feet (a run, the right length and
+  way, in the wrong place), and the diagonal ribbon from his feet through the tip (the point's trail, sampling both
+  places). The real blade still out.
+- **The pieces:** the articles were drawn at his feet whatever their PostureModule said, so test 85's BaseN changed
+  nothing. Their base, Zelda's light arrow, runs its own native per-kind code (Zelda's Final Smash arrow, made on
+  the bow), which keeps it on its owner. dein's copies (fire, flare1, flare2, flash) are the ones proven to sit where
+  their MSC places them (Shadow Flare's shot and orbs, every frame). snake / snaketip are now dein copies, with flag
+  0x40 (the kind has a model: read only by the generic model set-up and file loader) set by `weapon_expand.py`'s new
+  `"flags_set"`. dein's module row has the MotionModule (the stretch and the scripts), its spawner is free, its
+  AttackModule 7 IDs / 2 Parts.
+- **The blade:** the joint overrides are the MotionModule's, naming joints as ACMD does. His joint table 0 has 26
+  entries (0–25); table 1 from 1000, whose 4th entry is EdgeBladeL (bone 26) in every costume: 1003. Tests 82–84's 26
+  and test 85's 0x7EA named nothing. (Test 79's crash shows table-1 IDs are taken: its 15 went in.) `port_check` C6
+  no longer flags literal IDs, only joint ops from loops.
+- `weapon_expand_test`: 0 failed (its flag accessors now read each one's bit from its rlwinm: they aren't in bit
+  order, 0x0320E698 is 0x40). `kind_expand_test`: 0 failed. port_check over the chain and tests 70–86: 30 errors,
+  as before. MSC stack check clean.
+- Package (install over 85): `code/cross_f.rpx`, `script/msc/edge.mscsb`.

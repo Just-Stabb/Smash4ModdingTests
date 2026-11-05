@@ -31,6 +31,8 @@ the last repeated: every one plays the base's animation; its motion.mtable names
 slots taken from another article of the base fighter: the light arrow has no MotionModule, slot 7, so no ACMD runs on
 it; Sephiroth's snake / snaketip take dein's 5 and 7). "spawn_from": "<article>" makes it with another article's
 spawner (its list entry's callback / extra: the light arrow's makes it on the hand, joint 0x19, mode 4; dein's free).
+"flags_set": B ORs B into its u16 flags (0x1018A970: 0x40 the kind has a model, read by the model set-up 0x02B62F50
+and the file loader 0x030C3C7C; Sephiroth's snake / snaketip are dein's, which has none, with 0x40).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
 - 4 name tables (root / owner / name / folder, 389 pointers, contiguous: can't grow) read by the path
@@ -144,6 +146,8 @@ def load_weapons(path, img):
                                                        [int(s) for s in spec['modules']['slots']])
                 if 'spawn_from' in spec:
                     r.setdefault('spawn_from', {})[nk] = spec['spawn_from']
+                if 'flags_set' in spec:
+                    r.setdefault('flags_set', {})[nk] = K.num(spec['flags_set'])
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
                     r.setdefault('on_hit_bits', {})[nk] = K.num(spec.get('on_hit_bits', HIT_BITS))
@@ -489,6 +493,8 @@ def build(spec_path=SPEC, rpx=RPX):
         for k in range(cap):
             src = k if k < OLD_N else (new[k][0] if k in new else None)
             v = invalid if src is None else {1: img.b, 2: img.h, 4: img.w}[es](addr + es * src)
+            if nm == 'u16' and k in new:        # "flags_set": bits ORed into the base's (0x40: it has a model)
+                v |= new[k][1].get('flags_set', {}).get(k, 0)
             blob += v.to_bytes(es, 'big')
         B.data(at, blob, 'table ' + nm)
         tables[nm] = (addr, at)
