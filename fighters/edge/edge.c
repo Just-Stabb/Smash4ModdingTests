@@ -39125,11 +39125,15 @@ int edge_lw_ph_held()
     return 0;
 }
 
+float edge_lw_ph_near() { return 10.0f; }       // the hitstun tracking only for a fighter this near him (test 108)
+
 void edge_lw_ph_target()
 {
     float lr;
     float x;
     float y;
+    float ox;
+    float oy;
     int code;
     code = edge_lw_ph_held();
     if (code != 0)
@@ -39137,7 +39141,12 @@ void edge_lw_ph_target()
         WorkModule(0, (float)code, 0x0f00031f);
         return;
     }
-    if (WorkModuleF(0, 0x0f000050) > 0.0f)        // LASTHIT_HITSTUN
+    // in hitstun and within 10 of him (test 108, the user: "the tracking for opponents in hitstun (except when being
+    // hit by snake sword) only applies horizontally to opponents within 10 units of Sephiroth"; the Phantom takes x
+    // only from this code)
+    ox = WorkModuleF(0, 0x0f000055);              // LASTHIT_OFFSET_X / _Y: the fighter less him
+    oy = WorkModuleF(0, 0x0f000056);
+    if (WorkModuleF(0, 0x0f000050) > 0.0f && ox * ox + oy * oy <= edge_lw_ph_near() * edge_lw_ph_near())   // LASTHIT_HITSTUN
     {
         lr = PostureModuleF(0);
         x = PostureModuleF(0x1) + lr * WorkModuleF(0, 0x0f000055);   // LASTHIT_OFFSET_X (along his facing)

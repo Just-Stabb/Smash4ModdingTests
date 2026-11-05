@@ -1554,3 +1554,14 @@ them with any part of the attack".
   is forcibly released": it goes by itself 240 frames after full charge (`edge_lw_ph_keep`; test 104: 120).
 - port_check over the chain and tests 70–107: 30 errors, as before. MSC stack checks clean.
 - Package (install over 106): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
+## Test 108 (`build/sephiroth_test108.zip`): the hitstun tracking only near him, and only horizontal
+
+User: "Please make sure the tracking for opponents in hitstun (except when being hit by snake sword) only applies
+horizontally to opponents within 10 units of Sephiroth".
+- `edge_lw_ph_target`: the last fighter hit in hitstun is tracked only if it's within 10 of him (straight distance
+  from his `LASTHIT_OFFSET_X / _Y`, `edge_lw_ph_near`).
+- `weapons/phantom.c` `ph_track`: for that tracking the Phantom takes the fighter's x only and keeps its own height.
+  A fighter held on the sword is still followed up and down as in test 107.
+- port_check over the chain and tests 70–108: 30 errors, as before. MSC stack checks clean.
+- Package (install over 107): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.

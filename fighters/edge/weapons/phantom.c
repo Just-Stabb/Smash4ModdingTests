@@ -911,8 +911,9 @@ void ph_track(int clear)
     ix = c / 0x400;
     iy = c - ix * 0x400;
     x = (float)(ix - 0x200) - PostureModuleF(0) * ph_reach();
-    y = (float)(iy - 0x200);
-    PostureModule(0x2714, x, y, PostureModuleF(0x3));
+    // the fighter in hitstun: x only, its own height kept (test 108, the user: "only applies horizontally"); y is
+    // still in the code (iy) but not used
+    PostureModule(0x2714, x, PostureModuleF(0x2), PostureModuleF(0x3));
 }
 
 // every frame of its attack while following: the held fighter's height (its x kept, its facing kept); let go (his
