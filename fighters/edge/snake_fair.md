@@ -1,10 +1,11 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 83.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 84.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
-hitbox and trail never ran; since test 83 they have one (README test 83).
+hitbox and trail never ran; since test 83 they have one (README test 83). Test 84: the trail across the point in
+the screen plane, the articles facing his way (README test 84).
 
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
@@ -78,8 +79,10 @@ any object reads as `SLOTn_SHARED_k`):
 **Article MSC.** Status 0 of the light arrow is replaced (its motion offset, `func_40`, isn't installed). Each
 article finds its owner (the nearest Sephiroth), then every frame:
 - **A run** walks the path to its own run's start, places itself there (PostureModule 0x2714 from his position and
-  facing), turns along the run (0x2717, (−pitch, 90, 0), as Pit's arrow) and stretches EndN to the run's drawn part
-  (0 when that run isn't drawn).
+  facing), turns along the run (0x2717, (−angle, 90, 0), as Pit's arrow: the world's angle, so 180 − pitch facing
+  left) and stretches EndN to the run's drawn part (0 when that run isn't drawn).
+- Both take his facing (`PostureModule(0, lr)`): a fighter the point hits takes it (none: facing the camera, test 83).
+- Both are placed before their motion starts, so the point's trail begins where the point is.
 - **The point** sits at the path's drawn end, turned along the last drawn run.
 - Both remove themselves when VAR_30 goes below 0, when he's gone, or after 900 frames (a safety net).
 
@@ -90,8 +93,9 @@ article finds its owner (the nearest Sephiroth), then every frame:
   again, after the retract.
 - **The point's game script:** the catch, 5%, angle 361, BKB 20, KBG 0, size 4.5, on its root at the point's middle.
   After a hit, the point clears its hit log (AttackModule 0x2726 / 0x2724), so it can catch the next one.
-- **The point's effect script:** his own sword trail (textures 0x104 / 0x105), its two points across the point, so
-  the ribbon sweeps along the tip's path.
+- **The point's effect script:** his own sword trail (textures 0x104 / 0x105), its two points 1.5 either side of the
+  point along its local Y (across the blade in the screen plane, whichever way it runs), so the ribbon sweeps along
+  the tip's path. Test 83's were across X and Y both: X is depth once turned, a wide diagonal wedge.
 - The run's scripts are empty. Both articles' one motion is the light arrow's (`Move`, 0xEF3E3778).
 
 ## The move, frame by frame

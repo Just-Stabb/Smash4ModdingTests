@@ -1138,3 +1138,25 @@ can you make the holding window start after the initial hitbox of tap forward ai
 - **New check:** `port_check` W5 weapon-motion (a copy of a kind without a MotionModule that has scripts). W4 knows
   the light arrow's AttackModule (7 / 2).
 - Package (install over 82): `code/cross_f.rpx`, `script/msc/edge.mscsb`, `model/snake` / `model/snaketip` c01–c07.
+
+## Test 84 (`build/sephiroth_test84.zip`): the held forward air's trail and facing
+
+User, test 83 (clip): "The sword seems to stretch extremely awkwardly with an active hitbox that seems to turn
+opponents towards the camera after hitting them." "The sword is diagonal somehow rather than a straight line."
+- **The clip:** the articles work now. The extended sword is the thin dark line straight ahead of him, the colour
+  of his blade. The wide white wedge, diagonal from near his body to the tip, is the point's trail (`Sword_Glow`),
+  not the sword. DK, hit, is turned to face the camera.
+- **The trail:** its two points were across the point along local X and Y both (±2.5). Turned (−angle, 90, 0), the
+  article's X is depth: a wide ribbon at a slant, partly facing the camera. Now the points are 1.5 either side along
+  local Y only, across the blade in the screen plane whichever way it runs.
+  - The articles were made at his body (dein's spawner: his joint 0x13) and placed only after their motion, and so
+    their scripts, had started. The trail's first point was at his body. Each now places itself before starting
+    its motion.
+- **The facing:** the articles never set one. A fighter hit takes the attacker's facing, and 0 draws it facing the
+  camera. Each article now takes his (`PostureModule(0, lr)`, every frame).
+- **Facing left:** the turn (0x2717) takes the world's angle (Pit's arrow's: 0 right, 180 left), and the articles
+  used the run's angle relative to his facing, so facing left they'd have extended to the right. Now 180 − angle.
+- **New check:** `port_check` W6 weapon-facing (a weapon MSC that turns itself and never sets its facing).
+- port_check over the chain and tests 70–84: 30 errors, as before; nothing new. The MSCs' stack check: clean.
+- Package (install over 83): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`,
+  `script/animcmd/weapon/snaketip/effect.bin`.

@@ -739,14 +739,23 @@ float sn_pitch(int d)
     return 0.0f;
 }
 
-// put this article at (h, v) of his model plane, turned along d (PostureModule 0x2717 (-pitch, 90, 0): Pit's arrow's)
+// put this article at (h, v) of his model plane, turned along d, facing his way. PostureModule 0x2717 (-angle, 90, 0)
+// takes the world angle (Pit's arrow's: 0 right, 180 left), so facing left the run's angle is 180 - its pitch. Its
+// facing (PostureModule 0) is his: a fighter it hits takes it (0 left them facing the camera, test 83)
 void sn_place(float h, float v, int d)
 {
     float lr;
+    float a;
     lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
+    PostureModule(0, lr);
     PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot) + lr * h, WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot) + v,
                   WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot));
-    PostureModule(0x2717, -sn_pitch(d), 90.0f, 0);
+    a = sn_pitch(d);
+    if (lr < 0.0f)
+    {
+        a = 180.0f - a;
+    }
+    PostureModule(0x2717, -a, 90.0f, 0);
 }
 
 // over: the move ended (VAR_30 below 0), he's gone, or the safety net
@@ -795,11 +804,11 @@ void func_46()
         sn_share(0x7, (float)sn_index);
     }
     sn_still();
-    func_24(0, 0, 1.0f);
     if (sn_over() == 0)
     {
-        sn_frame();
+        sn_frame();         // placed before its motion (and scripts) start: the point's trail begins at the point
     }
+    func_24(0, 0, 1.0f);
     callFunc3(func_47);
 }
 

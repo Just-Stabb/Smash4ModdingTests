@@ -141,6 +141,7 @@ SNAKE_FAIR = True
 SNAKE_VAR = 0x0F000317     # VAR_23: 0 the normal move, 1 held (extending / retracting), 2 the end hit
 SNAKE_SWORD = 0x18         # joint 24, LHaveN (the sword in his hand)
 SNAKE_ARTICLES = ('snake', 'snaketip')
+TRAIL_HALF = 1.5            # the point's trail: half its width
 SNAKE_MOTION = 0xEF3E3778  # the light arrow's one motion (their base kind's), the articles' motion 0
 
 
@@ -210,11 +211,14 @@ def snake_fair_scripts(game, effect):
 def snake_article_scripts(fighter, hit_template, glow_template):
     """the articles' ACMD (script/animcmd/weapon/<article>/: motion.mtable the light arrow's one motion): the run's
     empty; the point's game script its 5% catch (on its root, the middle of the point: tools/edge_snake_articles.py,
-    the point 3.48 long along +Z), its effect script his sword trail's textures (0x104 / 0x105) across the point (X and
-    Y both: whichever way it is turned one of them is across the screen), swept along its path"""
+    the point 3.48 long along +Z), its effect script his sword trail's textures (0x104 / 0x105) across the point (its
+    local Y), swept along its path"""
     tip = _set(hit_template, ID=0, Part=0, Bone=0, Damage=5.0, Angle=361, KBG=0, FKB=0, BKB=20, Size=4.5,
                X=0.0, Y=0.0, Z=1.74, X2=0.0, Y2=0.0, Z2=1.74, Hitlag=1.0, SFXLevel=0)
-    trail = _set(glow_template, Bone1=0, X1=-2.5, Y1=-2.5, Z1=1.74, Bone2=0, X2=2.5, Y2=2.5, Z2=1.74,
+    # the trail's two points across the point along its local Y only: the article is turned (-angle, 90, 0), so its Y
+    # is across the blade in the screen plane whichever way it runs, its X is depth (test 83's X and Y both: a wide
+    # diagonal ribbon, partly facing the camera)
+    trail = _set(glow_template, Bone1=0, X1=0.0, Y1=-TRAIL_HALF, Z1=1.74, Bone2=0, X2=0.0, Y2=TRAIL_HALF, Z2=1.74,
                  Bone3=0, X=0.0, Y=0.0, Z=1.74, BlurLength=8)
     stop = [acmd.Command(acmd.END)]
     for name in SNAKE_ARTICLES:

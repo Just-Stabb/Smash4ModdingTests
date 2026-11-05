@@ -981,6 +981,17 @@ def check_weapon_motion(inst, name, rec, rep):
                         art, w['base'], ' / '.join(used), MOTION_SLOT))
 
 
+def check_weapon_facing(name, rep):
+    """W6: a weapon MSC (fighters/NAME/weapons/*.c) that turns itself (PostureModule 0x2717) and never sets its facing
+    (PostureModule(0, lr)): a fighter it hits takes its facing, and with none it is left facing the camera (Sephiroth
+    test 83: the held forward air's point)"""
+    for path in sorted(glob.glob(os.path.join(ROOT, 'fighters', name, 'weapons', '*.c'))):
+        text = open(path, errors='replace').read()
+        if 'PostureModule(0x2717,' in text and not re.search(r'PostureModule\(0, ', text):
+            rep.add('WARN', 'W6 weapon-facing', '%s: turns itself (PostureModule 0x2717) but never sets its facing '
+                    '(PostureModule(0, lr)): fighters it hits are left facing the camera' % os.path.relpath(path, ROOT))
+
+
 def check_flare_targets(name, rec, rep):
     """F1: a new fighter missing from Sephiroth's Shadow Flare table (fighters/edge/weapons/flare1.c, written by
     tools/edge_flare_targets.py from Ultimate's edge_flare_radius / node / offsets): its orbs circle it at the
@@ -1447,6 +1458,7 @@ def main():
     check_weapon_rehit(inst, a.name, rec, rep)
     check_weapon_parts(inst, a.name, rec, rep)
     check_weapon_motion(inst, a.name, rec, rep)
+    check_weapon_facing(a.name, rep)
     check_flare_targets(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
