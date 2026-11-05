@@ -1033,3 +1033,24 @@ Package:
 
 port_check over the install chain and tests 70–79: 30 errors, 8 fewer than test 78. The ones gone are the old
 skeleton's joint table 0, which the new jtb fixes. No new errors.
+
+## Test 80 (`build/sephiroth_test80.zip`): test 79 crashed loading him; back to test 78's Sephiroth
+
+User (Cemu log): the game crashes when Sephiroth loads.
+- **Cause:** test 79's MSC hid the extending sword's 15 pieces every frame from load, with ModelModule scale on 15
+  joints. Every joint the MSC poses is an entry in the model's joint-override list. The game appends one per new
+  joint (`0x02C64078`) and never checks the list's size.
+  - The extra entries overwrote the heap: the log's vertex-buffer errors, then a hash lookup reading a count of
+    0x3A83126E, the 0.001 hide scale.
+  - Vanilla scripts pose one or two fixed joints.
+- **Test 80:**
+  - Model files: the 136-bone skeleton and joint table (`model.vbn`, `model.jtb`) as before test 79, test 58's own
+    `model.nud`, and the matching `metal.nud`, for every costume.
+  - Test 78's `edge.mscsb`, `game.bin` and `effect.bin`.
+  - `edge.c` restored and the held forward air turned off in the build (`edge_specials_build.py` `SNAKE_FAIR`).
+- **New check:** `port_check` C6 joint-overrides flags joint ops run from a loop and table-1 joint IDs (1000+).
+- port_check over the chain and tests 70–80: no new errors.
+
+The held forward air needs its runs drawn without posing many joints of his own model. The candidates are
+articles (one stretched blade piece each, posed by its own posture) or world-placed effects. See
+`fighters/edge/snake_fair.md`.

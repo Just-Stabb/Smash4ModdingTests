@@ -1,5 +1,9 @@
 # Sephiroth: held forward air (the extending sword)
 
+**Status: off since test 80.** Test 79 (below) crashed the game as he loaded: posing 15 joints of his model from MSC
+overruns the model's joint-override list (fighters/edge/README.md test 80, `port_check` C6). The runs have to be
+drawn another way (articles or effects); the design and the MSC / ACMD below stay for that.
+
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
 end.

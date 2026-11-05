@@ -125,13 +125,17 @@ def body_scripts(a, fighter, param):
     for name in EMPTY_GAME:
         game.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
     effect = acmd.ACMDFile.load(os.path.join(out, 'effect.bin'))
-    log += snake_fair_scripts(game, effect)
+    if SNAKE_FAIR:
+        log += snake_fair_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
     return log
 
 
-# ---- held forward air: the extending sword (fighters/edge/snake_fair.md; MSC tools/edge_snake_msc.py)
+# ---- held forward air: the extending sword (fighters/edge/snake_fair.md; MSC tools/edge_snake_msc.py). Off since
+# test 80: test 79 posed 15 joints of his model from MSC and the game crashed loading him (port_check C6); the
+# runs need another way to be drawn
+SNAKE_FAIR = False
 SNAKE_VAR = 0x0F000317     # VAR_23: 0 the normal move, 1 held (extending / retracting), 2 the end hit
 SNAKE_TIP = 1019           # joint EdgeSnakeTip (tools/edge_snake_msc.py JOINT_TIP)
 SNAKE_SWORD = 0x18         # joint 24, SwordL1 (the sword in his hand)

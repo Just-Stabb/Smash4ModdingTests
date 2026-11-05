@@ -674,6 +674,49 @@ def msc_max_global(data):
     return hi
 
 
+JOINT_OP = re.compile(r'ModelModule\((?:0|0x0|0x1|0x7), *([^,)]+)')
+
+
+def check_joint_overrides(src, rep):
+    """C6: MSC joint overrides (ModelModule 0 scale / 1 rotate / 7 translate) go into the model's override list
+    (0x02C64078: one 0x28-byte entry per joint, appended with no capacity check). Vanilla scripts touch a fixed one
+    or two joints; Sephiroth test 79 posed 15 every frame from load and the game crashed loading him (its 0.001 hide
+    scale written over a structure's count). Flags a joint op run from a loop (directly or through a helper) and
+    literal table-1 joint IDs (1000+): ModelModule's joint is not ACMD's"""
+    for d, _ds, fs in os.walk(src):
+        for f in fs:
+            if not f.endswith('.c') or os.sep + 'weapons' + os.sep in os.path.join(d, f):
+                continue
+            path = os.path.join(d, f)
+            text = open(path, errors='replace').read()
+            funcs = c_functions(text)
+            posers = {n for n, body in funcs.items() if JOINT_OP.search(body)}
+            for n, body in funcs.items():
+                for m in re.finditer(r'\b(?:while|for) *\(', body):
+                    i = body.find('{', m.end())
+                    if i < 0:
+                        continue
+                    depth, j = 0, i
+                    while j < len(body):
+                        depth += {'{': 1, '}': -1}.get(body[j], 0)
+                        if depth == 0:
+                            break
+                        j += 1
+                    loop = body[i:j]
+                    hit = JOINT_OP.search(loop) or next((p for p in posers if re.search(r'\b%s\(' % p, loop)), None)
+                    if hit:
+                        rep.add('ERROR', 'C6 joint-overrides', '%s %s(): ModelModule joint ops from a loop (%s): every joint '
+                                'is an entry in the model\'s override list, which the game never bounds (Sephiroth test 79 '
+                                'crashed loading him); pose at most a couple of joints' % (
+                                    os.path.relpath(path, ROOT), n, hit if isinstance(hit, str) else 'ModelModule'))
+                        break
+            for m in JOINT_OP.finditer(text):
+                j = m.group(1).strip()
+                if re.fullmatch(r'(0x[0-9a-fA-F]+|\d+)', j) and int(j, 0) >= 1000:
+                    rep.add('ERROR', 'C6 joint-overrides', '%s: ModelModule joint op on joint %s: table-1 IDs (1000+) are '
+                            'ACMD\'s, not ModelModule\'s' % (os.path.relpath(path, ROOT), j))
+
+
 def check_msc(inst, name, rep):
     import tempfile
     for rel in inst.glob(r'fighter/%s/script/msc/.*\.mscsb' % name):
@@ -690,6 +733,7 @@ def check_msc(inst, name, rep):
                     'Hero fix 79 / 80\'s Zoom 2 U, the only code past it (0x87-0x8A), stopped his MSC (likely the VM\'s '
                     'globals end there; not proven): reuse a global' % (rel, hi, MSC_GLOBALS_PROVEN))
     src = os.path.join(ROOT, 'fighters', name)
+    check_joint_overrides(src, rep)
     for d, _ds, fs in os.walk(src):
         for f in fs:
             if not f.endswith('.c'):
