@@ -1,11 +1,12 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 84.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 85.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
 hitbox and trail never ran; since test 83 they have one (README test 83). Test 84: the trail across the point in
-the screen plane, the articles facing his way (README test 84).
+the screen plane, the articles facing his way (README test 84). Test 85: the pieces' base off HaveN (drawn at his
+feet), the real blade hidden through joint 0x7EA (README test 85).
 
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
@@ -42,15 +43,18 @@ The user's numbers:
 
 **His model.** EdgeBladeL is added at bone 26 (right after the 26 standard bones), so its number is the same in
 every costume. The blade's mesh hangs from it; the hilt stays on SwordL1. The MSC hides the blade with ModelModule
-scale on joint 26 when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
+scale on joint 0x7EA (2000 + bone 26: ModelModule's bone addressing; IDs below 1000 are his joint table 0's, whose 26
+entries end at 25) when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
 pose one or two. `--materials-from` keeps test 58's materials. To keep 136 bones, one bone is folded (UplipL1);
 test 79's 15-bone fold is gone with `segments: 0`.
 
-**Article models.** Three bones each: TopN (the root), HaveN and EndN, all identity binds, as the light arrow's.
-- **snake** (a run): one ring-to-ring slice of the blade, along +Z. Its near ring is on HaveN and its far ring on
+**Article models.** Four bones each: TopN (the root), HaveN, EndN and BaseN, all children of TopN with identity
+binds. Nothing is on HaveN: the light arrow's kind (flag 0x10, a held weapon) draws HaveN on its owner, so test 84's
+pieces had their base at his feet.
+- **snake** (a run): one ring-to-ring slice of the blade, along +Z. Its near ring is on BaseN and its far ring on
   EndN, both at z = 0 in the bind, so it draws nothing until its MSC moves EndN out to the run's length (ModelModule
   7 on joint 0x7D2: weapons name their joints 0x7D0 + bone, as Mario's pump).
-- **snaketip** (the point): the blade's point on HaveN, its real length (3.48) along +Z.
+- **snaketip** (the point): the blade's point on BaseN, its real length (3.48) along +Z.
 - Both are drawn twice, the second copy turned 90 degrees about the blade, so they look the same width turned any
   way. Their material is the sword's own; its two textures are copied into the article's `model.nut` under ids
   0x40EBF000 + k. `model.sb / .nhb / .mta / .xmb` are the light arrow's.
@@ -137,6 +141,6 @@ article finds its owner (the nearest Sephiroth), then every frame:
 - **12 at once.** That a kind takes 12 instances (`extra_kinds` `max: 12`).
 - **Turn signs.** The rotation (−pitch, 90, 0): up is pitch 90, down −90, back 180. If a direction comes out
   mirrored, swap the sign in `sn_pitch` (`tools/edge_snake_articles_msc.py`).
-- **Joint 26.** That his ModelModule joint is the bone index (the identity resolver). If it is the joint table's
-  instead, joint 26 is ThrowN's: harmless, the real blade just stays visible.
+- **Joint 0x7EA.** That ModelModule's 2000 + bone addressing (which the articles' 0x7D2 stretch uses, and which
+  works) holds on his own model too.
 - **The trail on a weapon.** That the sword trail (`Sword_Glow`) draws from a weapon's script.

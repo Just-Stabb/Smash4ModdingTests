@@ -18,8 +18,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 SEGMENTS = 12          # the path's runs at most: the run articles (tools/extra_kinds.json snake max 12)
-JOINT_BLADE = 26       # EdgeBladeL: his model.vbn's bone 26 in every costume (tools/snake_sword.py 'at'); ModelModule's
-                       # joints are bones (the model's joint resolver, 0x02C5B4D8, is the identity)
+JOINT_BLADE = 0x7EA    # EdgeBladeL: his model.vbn's bone 26 in every costume (tools/snake_sword.py 'at'), as ModelModule
+                       # names a bone: 2000 + its index (the articles' stretch on 0x7D2, Mario's pump). IDs below 1000 are
+                       # his joint table 0's (26 entries: test 82-84's 26 was past it, the blade never hid), 1000+ table 1's
 ART_RUN = 9            # his article list (Zelda's 0 - 4, fire 5, flare1 6, flare2 7, flash 8): snake, snaketip
 ART_TIP = 10
 SLOTS = 8
@@ -648,7 +649,7 @@ def block():
         g, f = indexed(kind, name, n)
         gl.append(g)
         fn.append(f)
-    body = BODY.replace('BLADE', str(JOINT_BLADE)).replace('SEGMENTS', str(SEGMENTS)).replace('SLOTS', str(SLOTS))
+    body = BODY.replace('BLADE', '0x%x' % JOINT_BLADE).replace('SEGMENTS', str(SEGMENTS)).replace('SLOTS', str(SLOTS))
     body = body.replace('ART_RUN', str(ART_RUN)).replace('ART_TIP', str(ART_TIP))
     assert not re.search(r'\b(BLADE|SEGMENTS|SLOTS|ART_RUN|ART_TIP)\b', body), 'placeholder left'
     return '\n'.join([BEGIN, '// Sephiroth: held forward air, the extending sword (fighters/edge/snake_fair.md)', ''.join(gl),

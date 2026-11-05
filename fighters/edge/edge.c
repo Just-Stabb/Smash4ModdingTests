@@ -39763,11 +39763,11 @@ void edge_sn_blade_hide(int hide)
 {
     if (hide)
     {
-        ModelModule(0, 26, edge_sn_hidden(), edge_sn_hidden(), edge_sn_hidden());
+        ModelModule(0, 0x7ea, edge_sn_hidden(), edge_sn_hidden(), edge_sn_hidden());
     }
     else
     {
-        ModelModule(0x2, 26);
+        ModelModule(0x2, 0x7ea);
     }
 }
 

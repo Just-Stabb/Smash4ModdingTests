@@ -1160,3 +1160,23 @@ opponents towards the camera after hitting them." "The sword is diagonal somehow
 - port_check over the chain and tests 70–84: 30 errors, as before; nothing new. The MSCs' stack check: clean.
 - Package (install over 83): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`,
   `script/animcmd/weapon/snaketip/effect.bin`.
+
+## Test 85 (`build/sephiroth_test85.zip`): the held forward air's base at the blade, the real blade hidden
+
+User, test 84 (clip, then a frame): "The sword still looks diagonal and appears very incorrect." "The opponent no longer
+turns towards the camera when hit." "I just found out that the base of the sword is spawning at the incorrect
+location": at his feet.
+- **The diagonal:** each run is one blade slice whose near ring is pinned at its run's start and far ring at its
+  end. In the frames the near ring was at his feet and the far ring out on the path: one straight piece from his feet
+  to the tip, steeper as the tip went up.
+  - The near ring and the whole point were on the article bone named HaveN. The light arrow's kind (flag 0x10) is a
+    held weapon, and the game draws its HaveN on the owner. EndN, a child of TopN, followed the article.
+  - Now the articles have a fourth bone, BaseN (a child of TopN, identity), carrying the near ring and the point.
+    Nothing is on HaveN. EndN keeps index 2, so the stretch on joint 0x7D2 is unchanged.
+- **The real blade never hid** (tests 82–84): ModelModule's joint 26 isn't bone 26. IDs below 1000 are his joint
+  table 0's, which has 26 entries (0–25); 1000+ are table 1's (ACMD's); a bone is 2000 + its index, as the articles'
+  0x7D2 and Mario's pump use. The blade (bone 26) is now 0x7EA. `port_check` C6 flags literal IDs 1000–1999 only.
+- The opponent facing the camera: fixed in test 84 (user).
+- port_check over the chain and tests 70–85: 30 errors, as before; nothing new. The MSCs' stack check: clean.
+- Package (install over 84): `model/snake` and `model/snaketip` c00–c07 (`model.vbn`, `model.jtb`, `model.nud`),
+  `script/msc/edge.mscsb`.

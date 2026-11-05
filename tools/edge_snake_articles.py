@@ -3,12 +3,14 @@
 the two article kinds (tools/extra_kinds.json: `snake` 0x199, `snaketip` 0x19A, both copies of Zelda's light arrow),
 written into OUT/fighter/edge/model/<article>/c00 - c07.
 
-  - snake (a straight run, up to 12 at once): bones TopN (root), HaveN, EndN (both children of TopN, identity binds).
-    One ring-to-ring slice of the blade, its near ring on HaveN and its far ring on EndN, both at z = 0 in the bind
+  - snake (a straight run, up to 12 at once): bones TopN (root), HaveN, EndN, BaseN (all children of TopN, identity
+    binds). One ring-to-ring slice of the blade, its near ring on BaseN and its far ring on EndN, both at z = 0 in the
+    bind. Nothing is on HaveN: the light arrow's kind (flag 0x10, held) draws HaveN on its owner, so test 84's near
+    rings and point (on HaveN) were drawn at Sephiroth's feet; BaseN follows the article
     (nothing on the root, as vanilla weapon models: the light arrow's NUD bone range is 2 - 2):
     it draws nothing until the run's MSC moves EndN out along +Z to the run's length (ModelModule 7 on joint 0x7D2:
     vanilla weapons name their joints 0x7D0 + bone, Mario's pump), then it spans TopN -> EndN.
-  - snaketip (the point, one): the blade's point on HaveN, its real length along +Z.
+  - snaketip (the point, one): the blade's point on BaseN, its real length along +Z.
 
 Both lie along +Z, as weapon models do (Pit's arrow turns with PostureModule(0x2717, -pitch, 90, 0)), drawn twice, the
 second copy turned 90 degrees about the blade, so they look the same width turned any way (tools/snake_sword.py). Their
@@ -34,7 +36,8 @@ import snake_sword  # noqa: E402
 
 SWORD_SLOT = 'skirt_VIS_O_OBJ16'           # his body model's mesh slot holding the sword (ultimate_fighter MESH_SLOTS)
 TEX_IDS = 0x40EBF000                        # the articles' copies of the sword's textures: 0x40EBF000 + k
-BONES = ['TopN', 'HaveN', 'EndN']
+BONES = ['TopN', 'HaveN', 'EndN', 'BaseN']
+BASE = 3                                    # BaseN: the near ring and the point
 END_JOINT = 0x7D2                           # EndN for ModelModule (0x7D0 + bone index)
 ARTICLES = ('snake', 'snaketip')
 WHITE = 0x7F
@@ -115,8 +118,8 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
     run_pos[:, 2] = 0.0
     run_bind = dict(run, pos=run_pos)
     models = {
-        'snake': [nud.Mesh('snake', [polygon(run_bind, np.where(far, 2, 1), mat)], bone=-1, bind=4)],
-        'snaketip': [nud.Mesh('snaketip', [polygon(tip, np.ones(tip['n'], np.int64), mat)], bone=-1, bind=4)],
+        'snake': [nud.Mesh('snake', [polygon(run_bind, np.where(far, 2, BASE), mat)], bone=-1, bind=4)],
+        'snaketip': [nud.Mesh('snaketip', [polygon(tip, np.full(tip['n'], BASE, np.int64), mat)], bone=-1, bind=4)],
     }
     # every colour (c00 - c07): the light arrow's kind takes its model in the owner's colour (its flag 0x10, read by
     # the weapon's model set-up 0x02B62F88), and Sephiroth's costumes are c00 - c07
