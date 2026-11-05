@@ -331,7 +331,9 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   orbs to add, 3 frames to add). Life out (status 3 CONVE): the spin brakes (0.1 a frame to 0.3-0.4), orb i strikes
   8 i frames later: thrown out at 4-5.2 then in, + 0.45-0.85 a frame up to 7-14 (lerped by R = n / 5), TRY 6.5 damage
   53 degrees; at the centre EXP: one frame, size 3.5, `edge_shadowflare_bullet_hit` x 1.3; each strike with its hit
-  records cleared. The fighter KO'd / respawning / gone: every orb ends (`edge_shadowflare_bullet_end`).
+  records cleared. Test 112: a striking orb that reaches the centre while the target is still in hitstop (another
+  orb's hit) waits there and explodes on the first frame after the hitstop. The fighter KO'd / respawning / gone:
+  every orb ends (`edge_shadowflare_bullet_end`).
 - **Orbit per fighter (test 71):** Ultimate's `edge_flare_radius` and its ring centre on `edge_flare_node` (`waist`
   for 92 of 94 fighters) + `edge_flare_offset_x/y/z` in that joint's axes, from `fighter_param.prc`, by the target's
   fighter kind (`SLOTn_KIND`, `docs/position-variables.md`): `fl_target_shape` in flare1.c, written by

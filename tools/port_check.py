@@ -819,9 +819,9 @@ def check_msc_effect_ids(name, rep):
 
 def check_shield_damage(inst, name, rep):
     """S9: a hitbox's ShieldDamage (parameter 18) below 0. Ultimate gives magic negative shield damage (Hero's spells:
-    -1 to -13); Smash 4 takes the word unsigned, so 0xFFFFFFFF is a huge one: every hit breaks a shield (Hero, after
-    Supamario fix 90). WARN, not ERROR: the user kept it on Hero's other spells (Woosh's set to 0: brave_build.py
-    no_negative_shield)"""
+    -1 to -13, Sephiroth's flares and flash); Smash 4 takes the word unsigned, so 0xFFFFFFFF is a huge one: every
+    hit breaks a shield (Hero, after Supamario fix 90). ERROR since the user's rule (CLAUDE.md: never negative in
+    an Ultimate port; ultimate_acmd.py clamps to 0)"""
     bad = {}
     for rel in sorted(inst.files):
         if not (rel.startswith('fighter/%s/script/animcmd/' % name) and rel.endswith('/game.bin')):
@@ -831,7 +831,7 @@ def check_shield_damage(inst, name, rep):
                 if 'Hitbox' in c.name and len(c.params) > 18 and c.params[18] >= 1 << 31:
                     bad.setdefault(rel.split('/animcmd/')[1].rsplit('/', 1)[0], set()).add('%08X' % h)
     if bad:
-        rep.add('WARN', 'S9 shield-negative', 'negative ShieldDamage (a shield break every hit in Smash 4): ' +
+        rep.add('ERROR', 'S9 shield-negative', 'negative ShieldDamage (a shield break every hit in Smash 4): ' +
                 '; '.join('%s: %d scripts' % (k, len(v)) for k, v in sorted(bad.items())))
 
 

@@ -1413,7 +1413,15 @@ void fl_conve_loop()
             }
             fl_set(0xa + i, rho);
             rho = rho - v;
-            if (rho <= 0.5f || rho <= v)
+            if ((rho <= 0.5f || rho <= v) && WorkModuleF(0, 0x0f00005b + 0x8 * fl_slot) > 0)
+            {
+                // at the centre with the target still in hitstop (another orb's hit): it waits there, its one-frame
+                // EXP after the hitstop (test 112, the user: the orbs "don't connect with the opponent, mostly when
+                // there's more than one orb": a strike landing in the hitlag of the one before it was lost)
+                fl_set(0xa + i, 0);
+                fl_place(i, 0.5f);
+            }
+            else if (rho <= 0.5f || rho <= v)
             {
                 // EXP: one frame at the centre, then gone
                 fl_set(i, 3.0f);

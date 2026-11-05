@@ -1610,3 +1610,19 @@ User: "Phantom still doesn't follow a held opponent or move to them at all".
 - port_check over the chain and tests 70–111: 30 errors, as before. MSC stack checks clean.
 - Package (install over 110): `code/cross_f.rpx`, `model/phantom/`, `motion/phantom/`,
   `script/animcmd/weapon/phantom/` (hers, now read from his folder).
+
+## Test 112 (`build/sephiroth_test112.zip`): no negative shield damage (new rule); Shadow Flare's orbs wait out hitstop
+
+User: "New Rule for Ultimate ports, ensure shield damage values aren't negative--it causes an instant shield break
+that way" and "Sometime side special's orbs don't connect with the opponent, mostly when there's more than one orb".
+- **Shield damage:** Ultimate's negative shield damage was written as is; Smash 4 reads it unsigned, so every such
+  hit broke a shield. His package had it in 19 scripts (body 2, Flare 5, Shadow Flare 1, Scintilla's flash 11).
+  `ultimate_acmd.py` now writes 0 at least for every port; `port_check` S9 shield-negative is an ERROR; the rule is
+  in CLAUDE.md and the port guide's catalogue. S9 is gone from his package.
+- **Shadow Flare's orbs:** strikes come 8 frames apart and each orb's EXP lasts one frame; with more than one orb, an
+  EXP could land while the target was still in hitstop from the orb before, and was lost. Now a striking orb that
+  reaches the centre while the target is in hitstop (its slot's hitstop variable) waits there and explodes on the
+  first frame after (`weapons/flare1.c`).
+- port_check over the chain and tests 70–112: 30 errors, as before (55 warnings: S9 gone). MSC stack checks clean.
+- Package (install over 111): `script/animcmd/body/game.bin`, `script/animcmd/weapon/fire|flare1|flash/game.bin`,
+  `script/msc/flare1/flare1.mscsb`.

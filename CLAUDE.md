@@ -31,6 +31,9 @@
   cancel frame: vl group 1 byte 2 (`ultimate_acmd.py` writes it; ship the vl file whenever the build writes it), and every
   status the port writes in MSC tests it in its loop (`CancelModule(0x2713)` or the frame, then `func_39` / `func_41`).
   `port_check` C1 checks both.
+- **Ultimate ports: shield damage is never negative.** Ultimate gives some hitboxes negative shield damage (magic:
+  Hero's spells, Sephiroth's flares); Smash 4 reads it unsigned, so a negative value breaks a shield in one hit. 0 at
+  least (`ultimate_acmd.py` clamps it; anything written by hand too); `port_check` S9 is an ERROR.
 - **Ultimate effect colours must match Ultimate's.** When adding an Ultimate character's effects, every effect's
   colour has to come out as Ultimate draws it: the emitters' own colours AND the colour / alpha the effect
   scripts set on the call (`LAST_EFFECT_SET_COLOR`, `EFFECT_FOLLOW_COLOR`, `..._ALPHA` etc.), including on

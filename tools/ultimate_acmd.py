@@ -644,6 +644,9 @@ class Translator:
         clang, rebound = SETOFF[setoff]
         if not isinstance(shield_dmg, (int, float)) or shield_dmg != shield_dmg:
             shield_dmg = 0              # f32::NAN (Kamikazee's blast): none
+        # never below 0 (the user's rule for Ultimate ports, CLAUDE.md): Smash 4 reads ShieldDamage unsigned, so
+        # Ultimate's negative ones (Hero's spells, Sephiroth's flares / flash) were a shield break every hit
+        shield_dmg = max(shield_dmg, 0)
         common = [int(hid), int(part), self.bone(bone), float(dmg), ANGLE.get(int(angle), int(angle)), int(kbg), int(fkb), int(bkb), float(size),
                   float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
                   rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0), SITUATION[situation],
