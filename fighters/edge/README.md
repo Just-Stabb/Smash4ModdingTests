@@ -1107,3 +1107,34 @@ User: "Go ahead with the article version of forward air". The design and the who
   `snaketip/snaketip.mscsb`.
 - Not proven in game: see snake_fair.md's last section (op 7 on a weapon's joint, the light arrow's copies loading
   their models, 12 at once, the turn signs, the trail on a weapon).
+
+## Test 83 (`build/sephiroth_test83.zip`): the held forward air's articles get a MotionModule; the hold after the clean hit
+
+User, test 82: "When forward air is held, the sword doesn't extend and there is no hitbox." And: "On this next build,
+can you make the holding window start after the initial hitbox of tap forward air?"
+- **Cause:** a weapon kind's modules come from its row of 28 constructors (`0x103464A8`, docs/native-notes.md "Weapon
+  modules"). Zelda's light arrow, the articles' base, has no MotionModule (slot 7, accessor `+0x44`, a null
+  constructor). A weapon's ACMD runs off its motion, so the point's scripts (the 5% catch, the trail) never ran.
+  - The copies also had the arrow's spawner (its article list callback `0x02F9815C`). It makes the arrow on the
+    owner's joint 0x19 in mode 4 (on his hand), where dein's (`0x02F97C90`) makes it free.
+  - Ruled out: the copies' files load (the loader's categories, flags `0x80` / `0x1` / `0x100`: the arrow has none,
+    as dein); the slot-shared path variables (as Shadow Flare's); the arrow's AttackModule (the same set-up as
+    dein's, 7 IDs / 2 Parts: the point's ID 0 Part 0 fits).
+- **Fix** (`tools/weapon_expand.py`, `tools/extra_kinds.json`):
+  - `"modules": {"from": "dein", "slots": [5, 7]}`: snake / snaketip get their own module row in the cave, the
+    arrow's with dein's MotionModule and slot 5 (Mario's fireball has both: a model and ACMD hitboxes). The
+    module set-up's stub returns that row for them.
+  - `"spawn_from": "dein"`: their article list entries take dein's spawner.
+  - Their models ship for every colour (c00–c07): the arrow's kind takes its model in the owner's colour (flag 0x10).
+- **The hold window** (`tools/edge_snake_msc.py`): the tapped move plays first, its clean hit (13–14) and late hit
+  (15–18) included. Attack held from the start through frame 21 (the 6 frames after the clean hit) extends the sword:
+  the motion goes back to frame 13 (sword straight ahead), freezes, and the rest is as before.
+- **Tests:**
+  - `weapon_expand_test`: 0 failed (new: each own module row emulated, the base's with dein's slots 5 / 7). Its
+    article-list expectation now puts new articles before the first special entry, as the build does: the old
+    Hero (0x45) failure was the test's.
+  - `kind_expand_test`: 0 failed.
+  - `port_check` over the chain and tests 70–83: 30 errors, the same as 82; nothing new.
+- **New check:** `port_check` W5 weapon-motion (a copy of a kind without a MotionModule that has scripts). W4 knows
+  the light arrow's AttackModule (7 / 2).
+- Package (install over 82): `code/cross_f.rpx`, `script/msc/edge.mscsb`, `model/snake` / `model/snaketip` c01–c07.

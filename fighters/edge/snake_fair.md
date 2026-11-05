@@ -1,9 +1,10 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: on again in test 82, drawn by articles.** Test 79 posed 15 joints of his own model from MSC and crashed
-the game as he loaded (the model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6).
-Since test 82 the extended sword is 13 articles, each posing itself; his own model only hides its real blade
-(one joint, at the start and end of the move).
+**Status: test 83.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
+sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
+of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
+hitbox and trail never ran; since test 83 they have one (README test 83).
 
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
@@ -33,7 +34,7 @@ The user's numbers:
 | His model | `tools/snake_sword.py`, `ultimate_fighter.py model --have SwordL1,SwordR1 --snake` | **EdgeBladeL** (bone 26 in every costume) under SwordL1, holding the real blade so it can be hidden |
 | His MSC | `tools/edge_snake_msc.py` writes the `SNAKE FAIR` block of `fighters/edge/edge.c` | Hold check, steering, retract, catching, the articles |
 | His ACMD | `tools/edge_specials_build.py` `snake_fair_scripts` | The tapped move's hits gated, the 11% end hit |
-| Article kinds | `tools/extra_kinds.json`: `snake` 0x199 (up to 12), `snaketip` 0x19A (one, kept on hit) | Copies of Zelda's light arrow; his articles 9 and 10 |
+| Article kinds | `tools/extra_kinds.json`: `snake` 0x199 (up to 12), `snaketip` 0x19A (one, kept on hit) | Copies of Zelda's light arrow (its model), with dein's MotionModule and spawner (`"modules"`, `"spawn_from"`); his articles 9 and 10 |
 | Article models | `tools/edge_snake_articles.py` → `model/snake`, `model/snaketip` | A run, and the point |
 | Article MSC | `tools/edge_snake_articles_msc.py` → `fighters/edge/weapons/snake.c`, `snaketip.c` | Each places itself on the path every frame |
 | Article ACMD | `tools/edge_specials_build.py` `snake_article_scripts` | The point's 5% catch and the sword trail |
@@ -56,8 +57,9 @@ test 79's 15-bone fold is gone with `segments: 0`.
 **His MSC.** The block hooks into three places:
 - **Aerial status main (`func_315`), `edge_sn_init`:** starts the hold check if this is fair with attack held.
 - **Aerial status loop (`func_319`), `edge_sn_loop`:**
-  - The hold check, then the freeze at frame 13: the blade hidden, the path published, the 12 runs and the point
-    generated (ArticleModule 0x2710, articles 9 and 10).
+  - The hold check (attack held from the start through frame 21: the tapped move's hits come out first), then the
+    motion back to frame 13, held there: the blade hidden, the path published, the 12 runs and the point generated
+    (ArticleModule 0x2710, articles 9 and 10).
   - Steering, then retracting.
   - Catching (a fighter in hitstun whose feet are within 22 of the tip) and holding the caught fighters.
   - Publishing the path every frame.
@@ -94,11 +96,14 @@ article finds its owner (the nearest Sephiroth), then every frame:
 
 ## The move, frame by frame
 
-1. **Frames 0–6:** forward air starts with attack held. Released before frame 6, it's the normal fair (C-stick
-   fairs always are).
-2. **Frames 6–13:** held. `VAR_23` is 1, which turns off the normal hits and effects.
-3. **Frame 13:** the sword points straight ahead (Ultimate's `c05attackairf` frame 13: swordl1's +X =
-   (0, -0.027, 1)). The motion freezes (`MotionModule(4, 0)`) and the real blade folds away.
+1. **Frames 0–21: the tapped move.** Forward air plays as normal, its clean hit (frames 13–14) and late hit (15–18)
+   included, whatever the button does (the user, after test 82: the hold window starts after the tapped move's
+   initial hitbox). Let go of attack before frame 21 (or a C-stick fair), and it stays the normal fair.
+2. **Frame 21, attack held since the start (frames 15–21 the hold window, 6 frames after the clean hit):**
+   `VAR_23` becomes 1, which turns off the normal hits and effects from here on.
+3. **Back to frame 13:** the motion restarts at frame 13 (`func_22`: the aerial's motion, int `0x11000002`), where
+   the sword points straight ahead (Ultimate's `c05attackairf` frame 13: swordl1's +X = (0, -0.027, 1)), and freezes
+   there (`MotionModule(4, 0)`); the real blade folds away.
    - The path starts as one forward run from the blade's start, (−0.51, 13.35, 11.06) in model space. Its
      length is the blade's body (21.98); the point (3.48) follows it.
 4. **Extending, while attack is held.** The tip moves 3 a frame in the held direction:
@@ -121,8 +126,10 @@ article finds its owner (the nearest Sephiroth), then every frame:
 
 - **Op 7 on a weapon.** That ModelModule op 7 (translate) moves a weapon's joint 0x7D2 (EndN) in TopN's frame. If
   the runs never show, or show one unit long, this is it.
-- **The light arrow's copies.** That copies of the light arrow load their own model and run their ACMD (the earlier
-  copies, fire / flare / flash, have no models).
+- **The copies' modules.** That the light arrow's copies, given dein's MotionModule (slot 7) and slot 5, draw their
+  own model and run their ACMD (the earlier copies, fire / flare / flash, are dein's and have no models).
+- **The rewind.** That restarting the motion at frame 13 leaves the script with nothing to replay (its frame-13 and
+  15 hits are off at `VAR_23` 1) and runs frame 14's end hit when the motion runs again.
 - **12 at once.** That a kind takes 12 instances (`extra_kinds` `max: 12`).
 - **Turn signs.** The rotation (−pitch, 90, 0): up is pitch 90, down −90, back 180. If a direction comes out
   mirrored, swap the sign in `sn_pitch` (`tools/edge_snake_articles_msc.py`).

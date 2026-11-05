@@ -1019,6 +1019,42 @@ MSC handlers: int `+0x2D4` (`0x02C6164C`, ops 0–`0x38`, `0x2710`+), float `+0x
 `tools/position_vars_cave.py` exposes it as float ID `0x0F000098` (self), used by Kirby's
 Overdrive (×1.2 animations).
 
+## Weapon modules: each kind's row (Sephiroth test 82)
+
+The weapon set-up (`0x02BCB42C`, at `0x02BCB5C0`: `mulli r8, r30, 0x70`) calls the 28 constructors of the kind's
+row in `0x103464A8` (`0x70` a row) and hands each result to a setter that stores it in the module accessor; a
+constructor that is `li r3, 0; blr` leaves the kind without that module (the setter puts a shared do-nothing module
+there). The slots with a module for some weapon:
+
+| slot | accessor | module | dein | light arrow | fireball |
+|---|---|---|---|---|---|
+| 0 | `+0x34` | Kinetic | yes | yes | yes |
+| 1 | `+0x4C` | ? | yes | - | - |
+| 2 | `+0x50` | Attack | yes | yes | yes |
+| 3 | `+0x24` | ? | yes | - | - |
+| 4 | `+0xA0` | ? | yes | yes | yes |
+| 5 | `+0x2C` | ? | yes | - | yes |
+| 7 | `+0x44` | **Motion** | yes | **-** | yes |
+| 8 | `+0x1C` | ? | yes | yes | yes |
+| 9 | `+0x7C` | ? | yes | yes | yes |
+| 11 | `+0xA4` | ? | yes | yes | yes |
+| 12 | `+0xA8` | ? | yes | yes | - |
+| 14 | `+0xB4` | ? | yes | yes | - |
+| 26 | `+0xC4` | MotionAnimcmd | yes | yes | yes |
+
+Zelda's light arrow (kind `0x25`) has no MotionModule: its ACMD (empty in vanilla) never runs. A weapon's scripts
+follow its motion, so a copy of it with scripts (Sephiroth's held forward air's point) got no hitbox and no trail.
+`tools/weapon_expand.py` `"modules"` gives a new kind its own row (the base's, some slots another kind's);
+`port_check` W5 flags a copy left without one.
+
+Other per-kind data a copy inherits (`0x1018A970` u16 flags): `0x40` the kind has a model (the model set-up
+`0x02B62F50`, the file loader `0x030C3C7C`); `0x10` the model in the owner's colour (`0x02B62F88`: held / attached
+things, Mario's cape, the bow and arrow); `0x80` / `0x1` / `0x100` the resource request's categories (`0x030C37AC`:
+`0x320E6AC` / `0x320E634` / `0x320E6C0`; none of them: 2, loaded with the fighter). The article list entry's
+callback is its spawner: dein's (`0x02F97C90`) makes it at the owner's joint `0x13`, free; the light arrow's
+(`0x02F9815C`) and the bow's (`0x02F980BC`) on joint `0x19` / `0x18` in mode 4 (on the hand). Both kinds'
+AttackModule set-up is the same (`0x032107B4`: 7 hitbox IDs, 2 Parts).
+
 ## Hitboxes and hitstop (Kirby's Strike trait)
 
 - **Hitbox creation:** every hitbox command (ACMD `Hitbox` `0x02BDB0EC`, `Special_Hitbox`, ...,

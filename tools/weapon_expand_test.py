@@ -353,10 +353,19 @@ def main():
                 own = rr.get('new_articles', {})
         remap = {b: n2 for n2, (b, rr, _a) in new.items() if rr['kind'] == r['kind'] and n2 not in own}
         want = [[(e[0] & 0xC0000000) | remap.get(e[0] & 0x3FFFFFFF, e[0] & 0x3FFFFFFF)] + e[1:] for e in rows0]
-        for n2, (_aname, mx) in sorted(own.items()):          # brand-new articles: the base's row, own kind / max
+        # brand-new articles: the base's row, own kind / max ("spawn_from": that article's callback / extra), before
+        # the base's first special entry (bit 31: Robin's 6), where the ArticleModule still makes instances
+        special = next((i for i, e in enumerate(want) if e[0] & 0x80000000), len(want))
+        added = []
+        for n2, (_aname, mx) in sorted(own.items()):
             b = new[n2][0]
             src = [e for e in rows0 if e[0] & 0x3FFFFFFF == b][0]
-            want.append([(src[0] & 0xC0000000) | n2, mx] + src[2:])
+            e = [(src[0] & 0xC0000000) | n2, mx] + src[2:]
+            sk = new[n2][1].get('spawn_from', {}).get(n2)
+            if sk is not None:
+                e[2:] = [e2 for e2 in rows0 if e2[0] & 0x3FFFFFFF == sk][0][2:]
+            added.append(e)
+        want[special:special] = added
         check('fighter 0x%X: articles %s' % (r['kind'], [hex(e[0]) for e in rows1]), rows1, want)
     # ---- the module set-up's row (0x02BCB5C0 .. the lwzu): r30 = kind -> r30 = its row, r10 = its first
     #      constructor; game kinds as unpatched, new kinds their base's row, unused kinds as unpatched
@@ -368,11 +377,25 @@ def main():
         E.mu.emu_start(W.MODULE_ROW, W.MODULE_ROW + 12, count=40)
         return E.r(30), E.r(10)
     bad = []
+    own_rows = info.get('module_rows', {})
     for k in list(range(0, cap)) + [cap, 0x7FFF]:
+        if k in own_rows:
+            continue
         want = row(E0, new[k][0] if k in new else k)
         if row(E1, k) != want:
             bad.append(hex(k))
     check('module rows (0x%08X): every kind 0x0-0x%X, a new kind its base\'s' % (W.MODULE_ROW, cap), bad[:4], [])
+    # "modules": the kind's own row in the cave: the base's 28 constructors, the named slots another article's
+    for k, (at, _r) in sorted(own_rows.items()):
+        bk = new[k][0]
+        src, slots = new[k][1]['modules'][k]
+        want = [img.w(W.MODULE_TABLE + 0x70 * bk + 4 * j) for j in range(28)]
+        for s in slots:
+            want[s] = img.w(W.MODULE_TABLE + 0x70 * src + 4 * s)
+        got_at, first = row(E1, k)
+        check('module row of 0x%X: its own (0x%08X), first constructor' % (k, at), (got_at, first), (at, want[0]))
+        check('module row of 0x%X: the base 0x%X\'s, slots %s from 0x%X' % (k, bk, slots, src),
+              [pimg.w(at + 4 * j) for j in range(28)], want)
     check('module row of 0x185 = the fireball\'s (0x%08X), not past the table' % W.MODULE_TABLE, row(E1, 0x185)[0],
           W.MODULE_TABLE)
     # Kirby's copy lists ("kirby_copy"): the copy's records, then the new kind's {kind, max, the base's spawner, 0};

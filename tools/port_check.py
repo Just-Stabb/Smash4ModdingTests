@@ -897,7 +897,8 @@ def check_weapon_rehit(inst, name, rec, rep):
 # hitbox ids / Parts (hit-record groups) a base weapon's AttackModule has: its kind's set-up method fills the module
 # parameters (accessor init 0x02BCBD84 -> per-kind object, vt +0xC; +0xDC ids, +0xEC parts). The module never checks
 # a hitbox's id or Part against them: past the end it writes over other memory and crashes on the hit.
-WEAPON_ATTACK_SLOTS = {'dein': (7, 2)}    # dein: 0x032107B4 (Sephiroth bisect 70: Shadow Flare's orbs on Parts 2-4)
+WEAPON_ATTACK_SLOTS = {'dein': (7, 2),    # dein: 0x032107B4 (Sephiroth bisect 70: Shadow Flare's orbs on Parts 2-4)
+                       'lightingbowarrow': (7, 2)}    # its singleton's vt +0xC is the same 0x032107B4
 
 
 def check_weapon_parts(inst, name, rec, rep):
@@ -928,6 +929,56 @@ def check_weapon_parts(inst, name, rec, rep):
             rep.add('ERROR', 'W4 weapon-parts', '%s: hitboxes past its base %s\'s AttackModule (ids 0-%d, Parts 0-%d): %s; '
                     'the hit writes past its arrays and the game crashes when it connects' % (
                         art, w['base'], slots[0] - 1, slots[1] - 1, ', '.join(sorted(bad))))
+
+
+# the weapon module set-up (0x02BCB5C0): a kind's row of 28 constructors (weapon_expand.MODULE_TABLE); slot 7 makes the
+# MotionModule (accessor +0x44), and a kind without one ("li r3, 0; blr") never runs its ACMD (scripts follow the motion)
+MOTION_SLOT = 7
+
+
+def check_weapon_motion(inst, name, rec, rep):
+    """W5: a new article whose base weapon kind has no MotionModule (its module row's slot 7 a null constructor: Zelda's
+    light arrow) and no "modules" giving it one, with commands in its ACMD: its scripts never run, so no hitbox, no
+    effect (Sephiroth test 82: the held forward air's point had no hitbox and no trail)"""
+    import acmd
+    import tempfile
+    rpx = os.path.join(ROOT, 'build', 'cross_f.rpx')
+    if not os.path.exists(rpx):
+        rep.add('NOTE', 'W5 weapon-motion', 'no build/cross_f.rpx: the bases\' module rows not checked')
+        return
+    sys.path.insert(0, HERE)
+    import kind_expand as K
+    import weapon_expand as W
+    img = K.Image(rpx)
+    owner = [img.cstr(img.w(0x10418FF0 + 4 * k)) for k in range(W.OLD_N)]
+    names = [img.cstr(img.w(0x10419604 + 4 * k)) for k in range(W.OLD_N)]
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or MOTION_SLOT in [int(s) for s in w.get('modules', {}).get('slots', [])]:
+            continue
+        kinds = [k for k in range(W.OLD_N) if owner[k] == rec['base'] and names[k] == w['base']]
+        if not kinds:
+            continue
+        ctor = img.w(W.MODULE_TABLE + 0x70 * kinds[0] + 4 * MOTION_SLOT)
+        if img.w(ctor) != 0x38600000:          # li r3, 0: no module
+            continue
+        used = []
+        for fn in ('game', 'effect', 'sound'):
+            data = inst.get('fighter/%s/script/animcmd/weapon/%s/%s.bin' % (name, art, fn))
+            if not data:
+                continue
+            with tempfile.NamedTemporaryFile(suffix='.bin') as f:
+                f.write(data)
+                f.flush()
+                try:
+                    scripts = acmd.ACMDFile.load(f.name).scripts
+                except SystemExit:
+                    continue
+            if any(c.ident != acmd.END for s in scripts.values() for c in s):
+                used.append(fn)
+        if used:
+            rep.add('ERROR', 'W5 weapon-motion', '%s (copy of %s): its base kind has no MotionModule, so its %s scripts '
+                    'never run; give it one (extra_kinds.json "modules": {"from": "dein", "slots": [%d]})' % (
+                        art, w['base'], ' / '.join(used), MOTION_SLOT))
 
 
 def check_flare_targets(name, rec, rep):
@@ -1395,6 +1446,7 @@ def main():
     check_weapon_statuses(a.name, rep)
     check_weapon_rehit(inst, a.name, rec, rep)
     check_weapon_parts(inst, a.name, rec, rep)
+    check_weapon_motion(inst, a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)

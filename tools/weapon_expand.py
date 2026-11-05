@@ -26,7 +26,11 @@ fireball's vtable 2 +0x1C counts its life down and +0x3C, every frame, removes i
 touching ground bounces it or, at a wall, plays Mario's puff 0x3030002 and removes it: test 14, the
 beam removed early, at its life or a wall; its MSC does both). "kirby_copy": C (a brand-new article): Kirby's copy of fighter
 kind C gets it as one more copy article (kirby_copy() below; fighters/kirby/specials.md "Supamario copy"). "motions": N (a brand-new article) gives its motion info N entries (the base's,
-the last repeated: every one plays the base's animation; its motion.mtable names N scripts).
+the last repeated: every one plays the base's animation; its motion.mtable names N scripts). "modules": {"from":
+"<article>", "slots": [s, ...]} (a brand-new article) gives it its own module row (the base's 28 constructors, those
+slots taken from another article of the base fighter: the light arrow has no MotionModule, slot 7, so no ACMD runs on
+it; Sephiroth's snake / snaketip take dein's 5 and 7). "spawn_from": "<article>" makes it with another article's
+spawner (its list entry's callback / extra: the light arrow's makes it on the hand, joint 0x19, mode 4; dein's free).
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
 - 4 name tables (root / owner / name / folder, 389 pointers, contiguous: can't grow) read by the path
@@ -135,6 +139,11 @@ def load_weapons(path, img):
                     r.setdefault('motions', {})[nk] = int(spec['motions'])
                 if 'kirby_copy' in spec:
                     r.setdefault('kirby_copy', {})[nk] = int(spec['kirby_copy'])
+                if 'modules' in spec:
+                    r.setdefault('modules', {})[nk] = (spec['modules']['from'],
+                                                       [int(s) for s in spec['modules']['slots']])
+                if 'spawn_from' in spec:
+                    r.setdefault('spawn_from', {})[nk] = spec['spawn_from']
                 if 'on_hit' in spec:
                     r.setdefault('on_hit', {})[nk] = int(spec['on_hit'])
                     r.setdefault('on_hit_bits', {})[nk] = K.num(spec.get('on_hit_bits', HIT_BITS))
@@ -146,6 +155,13 @@ def load_weapons(path, img):
             base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art_base]
             assert len(base) == 1, '%s has no article %s' % (r['base'], art_base)
             lst.append((nk, base[0], art))
+        # "modules" / "spawn_from" name another article of the base fighter: its kind
+        for key in ('modules', 'spawn_from'):
+            for nk, v in list(r.get(key, {}).items()):
+                nm = v[0] if key == 'modules' else v
+                kk = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == nm]
+                assert len(kk) == 1, '%s has no article %s' % (r['base'], nm)
+                r[key][nk] = (kk[0], v[1]) if key == 'modules' else kk[0]
         if lst:
             out.append((r, lst))
     # every new kind once, together consecutive from 0x185; a fighter's own needn't be (Sephiroth's held forward air
@@ -379,6 +395,12 @@ def article_layout(img, recs):
             e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
             e[0] = (e[0] & 0xC0000000) | nk
             e[1] = mx
+            sk = r.get('spawn_from', {}).get(nk)
+            if sk is not None:              # another article's spawner (callback, extra): where it is made
+                si = [i for i in range(count) if (img.w(entries + ARTICLE * i) & 0x3FFFFFFF) == sk]
+                assert si, 'the base fighter has no article of kind 0x%X' % sk
+                e[2] = img.w(entries + ARTICLE * si[0] + 8)
+                e[3] = img.w(entries + ARTICLE * si[0] + 12)
             added.append(e)
         rows[special:special] = added
         out[r['kind']] = (at, rows)
@@ -670,11 +692,32 @@ def build(spec_path=SPEC, rpx=RPX):
 
     # ---- the module set-up's row (r30 = kind -> r8 = row offset; a new kind uses its base's row).
     #      r10 is free (the next lwzu writes it); the function saved LR at its start.
-    mr = B.alloc(4 * 12)
+    #      "modules": {"from": <article>, "slots": [...]}: the new kind's own row, its base's with those slots'
+    #      constructors from another article's (the light arrow has no MotionModule, slot 7: its copies' ACMD never
+    #      ran, Sephiroth test 82). The stub then returns r8 = that row - MODULE_TABLE: the code after it adds the
+    #      table back (addis r30, r8, 0x1034 / lwzu 0x64A8(r30)) and never reads the kind again
+    rows, rt_words = {}, []
+    for k in range(OLD_N, cap):
+        if k in new and k in new[k][1].get('modules', {}):
+            src, slots = new[k][1]['modules'][k]
+            base_row = [img.w(MODULE_TABLE + 0x70 * new[k][0] + 4 * j) for j in range(28)]
+            for s in slots:
+                base_row[s] = img.w(MODULE_TABLE + 0x70 * src + 4 * s)
+            at = B.alloc(0x70, 8)
+            B.data(at, b''.join(struct.pack('>I', w) for w in base_row), 'module row 0x%X' % k)
+            rows[k] = (at, base_row)
+            rt_words.append((at - MODULE_TABLE) & 0xFFFFFFFF)
+        else:
+            rt_words.append(0)
+    rt = B.alloc(4 * len(rt_words))
+    B.data(rt, b''.join(struct.pack('>I', w) for w in rt_words), 'own module rows')
+    info['module_rows'] = rows
+    mr = B.alloc(4 * 24)
     B.code(mr, ('cmplwi r30, 0x184\nble old\naddi r8, r30, -0x185\ncmplwi r8, %d\nbge old\nslwi r8, r8, 2\n'
-                'lis r10, 0x%X\naddi r10, r10, %d\nlwzx r8, r10, r8\ncmplwi r8, 0x184\nbgt old\nmr r30, r8\n'
-                'old:\nmulli r8, r30, 0x70\nblr') % (cap - OLD_N, ha(bt), K.slo(bt)))
-    assert B.pc - mr <= 4 * 14
+                'lis r10, 0x%X\naddi r10, r10, %d\nlwzx r10, r10, r8\ncmpwi r10, 0\nbeq base\nmr r8, r10\nblr\n'
+                'base:\nlis r10, 0x%X\naddi r10, r10, %d\nlwzx r8, r10, r8\ncmplwi r8, 0x184\nbgt old\nmr r30, r8\n'
+                'old:\nmulli r8, r30, 0x70\nblr') % (cap - OLD_N, ha(rt), K.slo(rt), ha(bt), K.slo(bt)))
+    assert B.pc - mr <= 4 * 24
     B.asm(MODULE_ROW, 'bl 0x%X' % mr, 'mulli r8, r30, 0x70')
     info['module_row'] = mr
     kirby_copy(B, img, new, info)

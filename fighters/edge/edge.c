@@ -39525,8 +39525,10 @@ void edge_sn_ov_set(int k, float v)
 
 // constants (model units; the path lies in the fighter's model plane: h forward (+Z), v up (+Y))
 int   edge_sn_motion() { return 0x69; }        // AttackAirF (func_311)
-float edge_sn_hold() { return 6.0f; }          // held this many frames: the extending version
-float edge_sn_freeze() { return 13.0f; }       // the frame the sword points straight ahead (its hit frame)
+float edge_sn_hold() { return 6.0f; }          // held this many frames after the window opens: the extending version
+float edge_sn_window() { return 15.0f; }       // the hold window opens after the tapped move's clean hit (frames 13 - 14)
+float edge_sn_freeze() { return 13.0f; }       // the frame the sword points straight ahead (its hit frame): the motion
+                                               // goes back to it and holds while the sword is out
 float edge_sn_speed() { return 3.0f; }         // the tip's speed while a direction is held
 float edge_sn_retract() { return 6.0f; }       // the speed back along the path once the button is let go
 float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
@@ -39543,8 +39545,7 @@ float edge_sn_tip() { return 3.48f; }          // its point
 float edge_sn_hidden() { return 0.001f; }      // a hidden piece's scale
 int   edge_sn_var() { return 0x0f000317; }     // VAR_23: 0 the normal move, 1 extending, 2 the end hit (ACMD)
 
-int   edge_sn_state;      // 0 off, 1 checking the hold, 2 held (to the freeze), 3 extending, 4 retracting, 5 end hit
-int   edge_sn_released;   // the button let go between the hold check and the freeze
+int   edge_sn_state;      // 0 off, 1 checking the hold, 3 extending, 4 retracting, 5 end hit
 int   edge_sn_n;          // runs in the path
 float edge_sn_since;      // frames since the last turn
 float edge_sn_total;      // the path's length
@@ -40000,7 +40001,6 @@ void edge_sn_init()
 {
     edge_sn_setvar(0.0f);
     edge_sn_state = 0;
-    edge_sn_released = 0;
     edge_sn_release(0);
     if (MotionModule(0x7) == edge_sn_motion() && WorkModuleF(0, 0x0f000100) == 1.0f)
     {
@@ -40011,6 +40011,9 @@ void edge_sn_init()
 void edge_sn_begin()
 {
     int k;
+    int m;
+    m = WorkModule(0x6, 0x11000002);            // the aerial's motion (func_310): back to the freeze frame, held there
+    func_22(m, edge_sn_freeze(), 1.0f);
     MotionModule(0x4, 0.0f);
     edge_sn_scale = WorkModuleF(0, 0x300002c);
     if (edge_sn_scale <= 0.0f)
@@ -40032,10 +40035,6 @@ void edge_sn_begin()
     edge_sn_publish(edge_sn_total);
     edge_sn_generate();
     edge_sn_state = 0x3;
-    if (edge_sn_released)
-    {
-        edge_sn_state = 0x4;
-    }
 }
 
 void edge_sn_finish()
@@ -40071,27 +40070,13 @@ void edge_sn_loop()
             edge_sn_state = 0;
             return;
         }
-        if (f >= edge_sn_hold())
-        {
-            edge_sn_state = 0x2;
-            edge_sn_setvar(1.0f);
-        }
-        return;
-    }
-    if (edge_sn_state == 0x2)
-    {
-        if (held == 0)
-        {
-            edge_sn_released = 0x1;
-        }
-        if (f >= edge_sn_freeze())
-        {
-            edge_sn_begin();
-        }
-        else
+        // the tapped move plays first (its hits at 13 and 15); held from its start to the end of the window
+        if (f < edge_sn_window() + edge_sn_hold())
         {
             return;
         }
+        edge_sn_setvar(1.0f);
+        edge_sn_begin();
     }
     edge_sn_gravity(edge_sn_grav());
     if (edge_sn_state == 0x3)

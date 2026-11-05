@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sephiroth's held forward air, the extending sword as articles (fighters/edge/snake_fair.md, test 82): the models of
 the two article kinds (tools/extra_kinds.json: `snake` 0x199, `snaketip` 0x19A, both copies of Zelda's light arrow),
-written into OUT/fighter/edge/model/<article>/c00.
+written into OUT/fighter/edge/model/<article>/c00 - c07.
 
   - snake (a straight run, up to 12 at once): bones TopN (root), HaveN, EndN (both children of TopN, identity binds).
     One ring-to-ring slice of the blade, its near ring on HaveN and its far ring on EndN, both at z = 0 in the bind
@@ -38,6 +38,7 @@ BONES = ['TopN', 'HaveN', 'EndN']
 END_JOINT = 0x7D2                           # EndN for ModelModule (0x7D0 + bone index)
 ARTICLES = ('snake', 'snaketip')
 WHITE = 0x7F
+COLOURS = 8                                 # his costumes c00 - c07
 
 
 def vbn(names):
@@ -117,15 +118,18 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
         'snake': [nud.Mesh('snake', [polygon(run_bind, np.where(far, 2, 1), mat)], bone=-1, bind=4)],
         'snaketip': [nud.Mesh('snaketip', [polygon(tip, np.ones(tip['n'], np.int64), mat)], bone=-1, bind=4)],
     }
+    # every colour (c00 - c07): the light arrow's kind takes its model in the owner's colour (its flag 0x10, read by
+    # the weapon's model set-up 0x02B62F88), and Sephiroth's costumes are c00 - c07
     for name, meshes in models.items():
-        d = os.path.join(out_fighter, 'model', name, 'c00')
-        os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))
-        open(os.path.join(d, 'model.vbn'), 'wb').write(vbn(BONES))
-        open(os.path.join(d, 'model.jtb'), 'wb').write(jtb(len(BONES)))
-        open(os.path.join(d, 'model.nut'), 'wb').write(tex)
-        for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
-            shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
+        for c in range(COLOURS):
+            d = os.path.join(out_fighter, 'model', name, 'c%02d' % c)
+            os.makedirs(d, exist_ok=True)
+            open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))
+            open(os.path.join(d, 'model.vbn'), 'wb').write(vbn(BONES))
+            open(os.path.join(d, 'model.jtb'), 'wb').write(jtb(len(BONES)))
+            open(os.path.join(d, 'model.nut'), 'wb').write(tex)
+            for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
+                shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
     return 'snake articles: run %d vertices (far ring %d), point %d vertices %.2f long; %d textures from %s' % (
         run['n'], int(far.sum()), tip['n'], info['tip_len'], len(mat.textures), body_dir)
 
