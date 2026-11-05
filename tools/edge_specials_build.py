@@ -184,30 +184,28 @@ def _join(parts):
 
 
 def snake_fair_scripts(game, effect):
-    """AttackAirF: the normal hits and effects only when not held (VAR_23 0); held, the 11% end hit (fair's angle,
-    knockback growth 40 for combos) on the sword once it is back (frames 14 - 18, the motion running again; fair's own
-    clear at 19), the hit log cleared so it hits whoever the point caught (the point's catch and trail: its article,
-    snake_article_scripts)"""
+    """AttackAirF: the normal hits and effects only when not held (VAR_23 0); held, nothing more since test 103 (tests
+    79 - 102: an 11% end hit on frames 14 - 18 once the sword was back; the user: only up tilt keeps one). The point's
+    catch and trail are its article's (snake_article_scripts); frame 13's hitbox is the template for its catch"""
     crc = acmd.crc('AttackAirF')
     parts = _frames(game.scripts[crc])
     hb13 = next(body for f, body in parts if f == 13.0)
     hits = [c for c in hb13 if c.name == 'Extended_Special_Hitbox']
     assert len(hits) == 4, [c.name for c in hb13]
-    end = [_set(c, Part=0, Damage=11.0, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits
-           if c.params[2] == SNAKE_SWORD]
+    # held: no end hit since test 103 (the user: "I actually think only Up tilt should have the hilt hitbox now";
+    # tests 79 - 102 had an 11% end hit on frames 14 - 18 once the sword was back)
+    end = []
     out = []
     for f, body in parts:
         if f in (13.0, 15.0):
             body = _when(0, body)
-        if f == 14.0:
-            body = body + _when(2, [U.cmd('Remove_All_Hitboxes'), U.cmd('Hit_Log_Clear', -1)] + end)
         out.append((f, body))
     if not any(f == 14.0 for f, _b in out):
         raise SystemExit('AttackAirF: no frame 14')
     game.scripts[crc] = _join(out)
     eout = [(f, _when(0, body) if f == 13.0 else body) for f, body in _frames(effect.scripts[crc])]
     effect.scripts[crc] = _join(eout)
-    return '\nheld forward air: end hit (%d hitboxes); normal hits / effects only when tapped\n' % len(end), hits[0]
+    return '\nheld forward air: no end hit; normal hits / effects only when tapped\n', hits[0]
 
 
 def snake_hi3_scripts(game, effect):
@@ -226,7 +224,9 @@ def snake_hi3_scripts(game, effect):
     hb20 = next(body for f, body in parts if f == 20.0)
     hits = [c for c in hb20 if c.name.endswith('Hitbox')]
     assert len(hits) == 4, [c.name for c in hb20]
-    end = [_set(c, Part=0, Damage=11.0, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits]
+    # angle 42 (test 103, the user: "Please make the up tilt hilt hitbox a 42 degree angle"; tests 98 - 102: up tilt's
+    # own 90 / 91)
+    end = [_set(c, Part=0, Damage=11.0, Angle=42, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits]
     out = []
     for f, body in parts:
         if f in (17.0, 20.0):

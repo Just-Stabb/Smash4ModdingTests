@@ -186,8 +186,11 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
   B is held, its full-charge look at 49 (7 levels of 7 frames, param `0x08000000`). It is sent (the level, frames / 7
   at most 7, in status float `0x1000006`, then `ArticleModule(0x271a, 2)`: her `func_2307`) when B is let go, 60
   frames after full charge (`0x18000001`), or at once when the counter is hit (the hit's damage is read first: the
-  cave writes it in the same float). While it charges the stance holds at frame 30, so the counter stays up. The
-  stance interrupted while it charges: it goes (status 4). Its state in his VAR_16–VAR_18 (`edge_lw_ph_*`).
+  cave writes it in the same float). Since test 103 the charge runs in his per-frame hook (`func_82` ->
+  `edge_lw_ph_tick`), whatever status he's in, so B can be held past the stance (slash, landing lag, hit...): the
+  stance plays out as normal (tests 100–102 held it at frame 30). The level goes in his current status's float
+  `0x1000006` for the call only (its value put back). The stance interrupted before frame 7: it goes (status 4); KO'd
+  while it charges: it goes. Its state in his VAR_16–VAR_18 (`edge_lw_ph_*`).
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /

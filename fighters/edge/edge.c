@@ -1766,6 +1766,7 @@ void func_82()
 {
     if (!global3)
     {
+        edge_lw_ph_tick();             // Sephiroth: Zelda's Phantom charging from down special (test 103)
         if (WorkModule(0x10, 0x21000001))
         {
             if (global50 < 1000000.0f)
@@ -38920,12 +38921,12 @@ int edge_lw_pre()
 // on), a frame of charge each frame B is held, its full-charge look (ArticleModule(0x2715, 2, 8 + slot)) at
 // 7 x 7 frames (param 0x08000000: frames a level, 7 levels), and sent (the level in status float 0x1000006, then
 // ArticleModule(0x271a, 2)) when B is let go, 60 frames after full charge (0x18000001), or at once when the
-// counter is hit. While it charges the stance holds at frame 30 (its pose still from there on), so the counter
-// stays up. Its state is in his VAR_16 - VAR_18 (the MSC's globals are full: port_check C5)
+// counter is hit. Since test 103 the charge runs in his per-frame hook (edge_lw_ph_tick, from func_82) whatever
+// status he's in, so it can be held past the stance (tests 100 - 102 held the stance at frame 30 while it charged).
+// Its state is in his VAR_16 - VAR_18 (the MSC's globals are full: port_check C5)
 int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 charging, 3 sent
 int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
 int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
-float edge_lw_hold_frame() { return 30.0f; }    // the stance holds here while the Phantom charges
 
 float edge_lw_ph()
 {
@@ -38955,6 +38956,7 @@ void edge_lw_ph_start()
 void edge_lw_ph_send()
 {
     float lv;
+    float keep;
     if (edge_lw_ph() != 2.0f)
     {
         return;
@@ -38965,9 +38967,11 @@ void edge_lw_ph_send()
         lv = 7.0f;
     }
     lv = (float)((int)lv);
+    keep = WorkModuleF(0, 0x1000006);  // whatever status he's in (test 103): its float put back after
     WorkModule(0, lv, 0x1000006);
     ArticleModule(0x271a, 0x2);
     BattleObject(0x55, 0x1, 0x1c);
+    WorkModule(0, keep, 0x1000006);
     edge_lw_ph_set(3.0f);
 }
 
@@ -38981,43 +38985,44 @@ void edge_lw_ph_drop()
     edge_lw_ph_set(0.0f);
 }
 
-// the stance's frame: charging from frame 7 while B is held; the stance held at frame 30 meanwhile
+// the stance's frame 7 (the counter on): the Phantom into its charging status
 void edge_lw_ph_frame(float f)
 {
-    float c;
-    float per;
     if (edge_lw_ph() == 1.0f && f >= 7.0f)
     {
         ArticleModule(0x2714, 0x2, 0x1);       // its charging status (func_2302)
         edge_lw_ph_set(2.0f);
     }
-    if (edge_lw_ph() == 2.0f)
+}
+
+// every frame, whatever status he's in (func_82, his per-frame hook global14; outside hitlag): the Phantom charges
+// while B is held and goes when it's let go or 60 frames past full charge, so it can be held after the stance,
+// actionable or not (user, test 103: "make it so Phantom can be held after it begins, even when Sephiroth isn't
+// actionable"; tests 100 - 102 held the stance at frame 30 while it charged). KO'd: it goes
+void edge_lw_ph_tick()
+{
+    float c;
+    float per;
+    if (edge_lw_ph() != 2.0f)
     {
-        per = WorkModuleF(0, 0x8000000);
-        c = WorkModuleF(0, edge_lw_chg_var()) + 1.0f;
-        WorkModule(0, c, edge_lw_chg_var());
-        if (c >= per * 7.0f && WorkModuleF(0, edge_lw_full_var()) == 0)
-        {
-            ArticleModule(0x2715, 0x2, 0x8 + WorkModule(0x6, 0x1000004b));   // full charge (func_2305)
-            WorkModule(0, 1.0f, edge_lw_full_var());
-        }
-        if (WorkModuleF(0, 0x0f000101) != 1.0f || c >= per * 7.0f + (float)WorkModule(0x6, 0x18000001))
-        {
-            edge_lw_ph_send();                 // B let go (SELF_SPECIAL), or held 60 past full charge
-        }
+        return;
     }
-    if (edge_lw_ph() == 2.0f && f >= edge_lw_hold_frame())
+    if (global4 == 0xb1 || global4 == 0xb2)   // Dead / Rebirth
     {
-        if (edge_lw_rate != 0.0f)
-        {
-            MotionModule(0x4, 0.0f);
-            edge_lw_rate = 0.0f;
-        }
+        edge_lw_ph_drop();
+        return;
     }
-    else if (edge_lw_rate == 0.0f)
+    per = WorkModuleF(0, 0x8000000);
+    c = WorkModuleF(0, edge_lw_chg_var()) + 1.0f;
+    WorkModule(0, c, edge_lw_chg_var());
+    if (c >= per * 7.0f && WorkModuleF(0, edge_lw_full_var()) == 0)
     {
-        MotionModule(0x4, 1.0f);
-        edge_lw_rate = 1.0f;
+        ArticleModule(0x2715, 0x2, 0x8 + WorkModule(0x6, 0x1000004b));   // full charge (func_2305)
+        WorkModule(0, 1.0f, edge_lw_full_var());
+    }
+    if (WorkModuleF(0, 0x0f000101) != 1.0f || c >= per * 7.0f + (float)WorkModule(0x6, 0x18000001))
+    {
+        edge_lw_ph_send();                     // B let go (SELF_SPECIAL), or held 60 past full charge
     }
 }
 
@@ -39225,7 +39230,10 @@ void edge_lw_end()
     int id;
     if (global4 == 0x155)
     {
-        edge_lw_ph_drop();             // still charging (interrupted): the Phantom goes; sent: left alone
+        if (edge_lw_ph() == 1.0f)
+        {
+            edge_lw_ph_drop();         // interrupted before it charged (frame 7): it goes; charging: goes on
+        }
         if (edge_lw_rate != 1.0f)
         {
             MotionModule(0x4, 1.0f);
@@ -40468,7 +40476,7 @@ void edge_sn_begin()
 
 void edge_sn_finish()
 {
-    edge_sn_release(0);
+    edge_sn_release(edge_sn_move == 0);         // forward air has no end hit since test 103: its caught drop
     edge_sn_blade_hide(0);
     edge_sn_publish(-1.0f);
     edge_sn_setvar(2.0f);

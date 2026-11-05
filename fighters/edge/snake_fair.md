@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 102** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 103** (held up tilt since test 98; forward air's end hit removed in test 103). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -29,7 +29,7 @@ The user's numbers:
 - From the hold until the end hit is over (frame 19), no gravity and a steady fall of 0.1 a frame (`edge_sn_fall`, test 100: the user's "not accelerate downwards over time", "extremely low" fall speed; tests 93–99: gravity x 0.4, then x 0.1), no fast fall.
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
-- The catch does 5%. The end hit does 11% at fair's angle, with much less knockback growth so it combos.
+- The catch does 5%. Only up tilt has an end hit (test 103, the user's): 11%, angle 42, knockback growth 40. Forward air's caught fighters drop once at the hilt (tests 79–102: an 11% end hit at fair's angle).
 
 ## Held up tilt (test 98)
 

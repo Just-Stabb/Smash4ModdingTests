@@ -1452,3 +1452,23 @@ because the final hit never connects."
   (`edge_sn_pull`), then the move goes on to the end hit as before.
 - port_check over the chain and tests 70–102: 30 errors, as before. MSC stack check clean.
 - Package (install over 101): `script/msc/edge.mscsb`.
+
+## Test 103 (`build/sephiroth_test103.zip`): the Phantom held past the stance; only up tilt has the hilt hit (42 degrees)
+
+User: "Can you make it so Phantom can be held after it begins, even when Sephiroth isn't actionable? Also the hilt
+hitbox isn't connecting. I actually think only Up tilt should have the hilt hitbox now. Please make the up tilt hilt
+hitbox a 42 degree angle."
+- **Phantom:** the charge moved out of the stance into his per-frame hook (`func_82`, run every frame through
+  `global14` whatever the status; `edge_lw_ph_tick`, outside hitlag). From the stance's frame 7 it charges while B is
+  held, through the slash, landing lag, being hit, anything, and goes when B is let go or 60 frames after full charge
+  (a counter hit still sends it at once). The stance no longer holds at frame 30: it plays out as normal. When it's
+  sent outside the stance, his status float `0x1000006` is put back after the call. The stance interrupted before
+  frame 7: it goes; KO'd (Dead / Rebirth) while it charges: it goes.
+- **Hilt hit:** forward air's end hit is gone (`snake_fair_scripts`); its caught fighters drop (hitstun 0) once they
+  reach the hilt (`edge_sn_finish`). Up tilt's end hit (frames 21–22) is now angle 42 (was up tilt's 90 / 91), still
+  11%, KBG 40, frame 20's four hitboxes each 2 bigger.
+- Not found yet: why the hilt hit didn't connect on forward air. If up tilt's doesn't either, a clip of the moment
+  the sword comes back is needed (the end hit runs from the ACMD frame after the frozen one; that the frame runs after
+  the freeze is still unproven in game: snake_fair.md "Not proven").
+- port_check over the chain and tests 70–103: 30 errors, as before. MSC stack check clean.
+- Package (install over 102): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.

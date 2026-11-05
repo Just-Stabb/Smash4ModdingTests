@@ -818,7 +818,7 @@ void edge_sn_begin()
 
 void edge_sn_finish()
 {
-    edge_sn_release(0);
+    edge_sn_release(edge_sn_move == 0);         // forward air has no end hit since test 103: its caught drop
     edge_sn_blade_hide(0);
     edge_sn_publish(-1.0f);
     edge_sn_setvar(2.0f);
