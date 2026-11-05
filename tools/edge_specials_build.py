@@ -126,19 +126,22 @@ def body_scripts(a, fighter, param):
         game.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
     effect = acmd.ACMDFile.load(os.path.join(out, 'effect.bin'))
     if SNAKE_FAIR:
-        log += snake_fair_scripts(game, effect)
+        glow = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Sword_Glow')
+        msg, hit = snake_fair_scripts(game, effect)
+        log += msg + snake_article_scripts(fighter, hit, glow) + '\n'
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
     return log
 
 
-# ---- held forward air: the extending sword (fighters/edge/snake_fair.md; MSC tools/edge_snake_msc.py). Off since
-# test 80: test 79 posed 15 joints of his model from MSC and the game crashed loading him (port_check C6); the
-# runs need another way to be drawn
-SNAKE_FAIR = False
+# ---- held forward air: the extending sword (fighters/edge/snake_fair.md; MSC tools/edge_snake_msc.py). Test 79 drew it
+# with 15 joints of his own model posed from MSC and the game crashed loading him (port_check C6); since test 82 it is
+# drawn by articles: `snake` (a run, up to 12) and `snaketip` (the point, with the catch hitbox and the trail)
+SNAKE_FAIR = True
 SNAKE_VAR = 0x0F000317     # VAR_23: 0 the normal move, 1 held (extending / retracting), 2 the end hit
-SNAKE_TIP = 1019           # joint EdgeSnakeTip (tools/edge_snake_msc.py JOINT_TIP)
-SNAKE_SWORD = 0x18         # joint 24, SwordL1 (the sword in his hand)
+SNAKE_SWORD = 0x18         # joint 24, LHaveN (the sword in his hand)
+SNAKE_ARTICLES = ('snake', 'snaketip')
+SNAKE_MOTION = 0xEF3E3778  # the light arrow's one motion (their base kind's), the articles' motion 0
 
 
 def _set(c, **kv):
@@ -178,48 +181,51 @@ def _join(parts):
 
 
 def snake_fair_scripts(game, effect):
-    """AttackAirF: the normal hits and effects only when not held (VAR_23 0); held, the tip's 5% catch from the
-    freeze frame (13), the 11% end hit (fair's angle, knockback growth 40 for combos) on the sword once it is
-    back (frames 14 - 18, the motion running again; fair's own clear at 19), the hit log cleared so it hits whoever the tip caught; the
-    sword trail on the tip while it moves"""
+    """AttackAirF: the normal hits and effects only when not held (VAR_23 0); held, the 11% end hit (fair's angle,
+    knockback growth 40 for combos) on the sword once it is back (frames 14 - 18, the motion running again; fair's own
+    clear at 19), the hit log cleared so it hits whoever the point caught (the point's catch and trail: its article,
+    snake_article_scripts)"""
     crc = acmd.crc('AttackAirF')
     parts = _frames(game.scripts[crc])
     hb13 = next(body for f, body in parts if f == 13.0)
     hits = [c for c in hb13 if c.name == 'Extended_Special_Hitbox']
     assert len(hits) == 4, [c.name for c in hb13]
-    tip = _set(hits[0], ID=0, Part=0, Bone=SNAKE_TIP, Damage=5.0, Angle=361, KBG=0, FKB=0, BKB=20, Size=4.5,
-               X=0.5, Y=0.0, Z=0.0, X2=0.5, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=0)
     end = [_set(c, Part=0, Damage=11.0, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits
            if c.params[2] == SNAKE_SWORD]
     out = []
     for f, body in parts:
         if f in (13.0, 15.0):
-            body = _when(0, body) + (_when(1, [tip]) if f == 13.0 else [])
+            body = _when(0, body)
         if f == 14.0:
             body = body + _when(2, [U.cmd('Remove_All_Hitboxes'), U.cmd('Hit_Log_Clear', -1)] + end)
         out.append((f, body))
     if not any(f == 14.0 for f, _b in out):
         raise SystemExit('AttackAirF: no frame 14')
     game.scripts[crc] = _join(out)
-
-    # the trail: his sword trail's textures (0x104 / 0x105, as his other swings), its two points across the tip
-    # (bone Y and Z both: a run turned about Y or Z keeps one of them across the screen), so the ribbon is
-    # swept along the tip's path
-    glow = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Sword_Glow')
-    trail = _set(glow, Bone1=SNAKE_TIP, X1=0.5, Y1=-2.5, Z1=-2.5, Bone2=SNAKE_TIP, X2=0.5, Y2=2.5, Z2=2.5,
-                 Bone3=SNAKE_TIP, X=0.5, Y=0.0, Z=0.0, BlurLength=8)
-    eparts = _frames(effect.scripts[crc])
-    eout = []
-    for f, body in eparts:
-        if f == 13.0:
-            body = _when(0, body) + _when(1, [trail])
-        eout.append((f, body))
-    if not any(f == 14.0 for f, _b in eout):
-        eout.append((14.0, []))
-        eout.sort(key=lambda fb: fb[0])
-    eout = [(f, body + (_when(2, [U.cmd('Terminate_Sword_Glow', 1)]) if f == 14.0 else [])) for f, body in eout]
+    eout = [(f, _when(0, body) if f == 13.0 else body) for f, body in _frames(effect.scripts[crc])]
     effect.scripts[crc] = _join(eout)
-    return '\nheld forward air: tip catch, end hit (%d hitboxes), tip trail\n' % len(end)
+    return '\nheld forward air: end hit (%d hitboxes); normal hits / effects only when tapped\n' % len(end), hits[0]
+
+
+def snake_article_scripts(fighter, hit_template, glow_template):
+    """the articles' ACMD (script/animcmd/weapon/<article>/: motion.mtable the light arrow's one motion): the run's
+    empty; the point's game script its 5% catch (on its root, the middle of the point: tools/edge_snake_articles.py,
+    the point 3.48 long along +Z), its effect script his sword trail's textures (0x104 / 0x105) across the point (X and
+    Y both: whichever way it is turned one of them is across the screen), swept along its path"""
+    tip = _set(hit_template, ID=0, Part=0, Bone=0, Damage=5.0, Angle=361, KBG=0, FKB=0, BKB=20, Size=4.5,
+               X=0.0, Y=0.0, Z=1.74, X2=0.0, Y2=0.0, Z2=1.74, Hitlag=1.0, SFXLevel=0)
+    trail = _set(glow_template, Bone1=0, X1=-2.5, Y1=-2.5, Z1=1.74, Bone2=0, X2=2.5, Y2=2.5, Z2=1.74,
+                 Bone3=0, X=0.0, Y=0.0, Z=1.74, BlurLength=8)
+    stop = [acmd.Command(acmd.END)]
+    for name in SNAKE_ARTICLES:
+        d = os.path.join(fighter, 'script/animcmd/weapon', name)
+        os.makedirs(d, exist_ok=True)
+        game = [tip, acmd.Command(acmd.END)] if name == 'snaketip' else stop
+        effect = [trail, acmd.Command(acmd.END)] if name == 'snaketip' else stop
+        for fn, sc in (('game', game), ('effect', effect), ('sound', stop)):
+            acmd.ACMDFile({SNAKE_MOTION: sc}).save(os.path.join(d, fn + '.bin'))
+        open(os.path.join(d, 'motion.mtable'), 'wb').write(SNAKE_MOTION.to_bytes(4, 'big'))
+    return 'held forward air articles: %s (scripts)' % ', '.join(SNAKE_ARTICLES)
 
 
 def fire_scripts(a, wdir):
@@ -430,6 +436,8 @@ def main():
     ap.add_argument('--rpx')
     ap.add_argument('--bank')
     ap.add_argument('--motions')
+    ap.add_argument('--body-model', help='his built body model c00 (model.nud / .nut): the held forward air '
+                    'articles\' models take the sword\'s material from it (tools/edge_snake_articles.py)')
     a = ap.parse_args()
     fighter = os.path.join(a.out, 'fighter/edge')
     print(body_scripts(a, fighter, os.path.join(a.out, 'param/fighter')))
@@ -442,6 +450,13 @@ def main():
     print(flash_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flash')))
     print(compile_msc(os.path.join(EDGE, 'weapons/flare1.c'), os.path.join(msc, 'flare1/flare1.mscsb')))
     print(flare1_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flare1')))
+    if SNAKE_FAIR:                                  # the held forward air's articles: MSC and models
+        import edge_snake_articles
+        for name in SNAKE_ARTICLES:
+            compile_msc(os.path.join(EDGE, 'weapons', name + '.c'), os.path.join(msc, name, name + '.mscsb'))
+        if a.body_model:
+            print(edge_snake_articles.build(os.path.join(a.edge, 'model/body/c00'), a.body_model,
+                                            os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))
     for name in PLACEHOLDERS:
         os.makedirs(os.path.join(msc, name), exist_ok=True)
         shutil.copy(os.path.join(a.zelda, 'script/msc/dein/dein.mscsb'), os.path.join(msc, name, name + '.mscsb'))

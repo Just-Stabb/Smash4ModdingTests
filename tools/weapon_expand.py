@@ -145,11 +145,16 @@ def load_weapons(path, img):
                 art_base = art
             base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art_base]
             assert len(base) == 1, '%s has no article %s' % (r['base'], art_base)
-            assert nk == nxt, 'weapon kinds must be consecutive from 0x185 (%s is 0x%X)' % (art, nk)
-            nxt += 1
             lst.append((nk, base[0], art))
         if lst:
             out.append((r, lst))
+    # every new kind once, together consecutive from 0x185; a fighter's own needn't be (Sephiroth's held forward air
+    # articles 0x199 / 0x19A after Squirtle's 0x198: the kinds already shipped keep their numbers). The tables are
+    # indexed by kind; a fighter's article ids follow its kinds' order
+    allk = sorted(nk for _r, lst in out for nk, _b, _a in lst)
+    assert allk == list(range(OLD_N, OLD_N + len(allk))), \
+        'weapon kinds must be consecutive from 0x185: %s' % ', '.join('0x%X' % k for k in allk)
+    nxt = OLD_N + len(allk)
     assert nxt <= cap, 'weapon capacity 0x%X too small' % cap
     assert cap <= 0x7FFF
     return out, cap

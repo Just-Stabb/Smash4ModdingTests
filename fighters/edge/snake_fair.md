@@ -1,8 +1,9 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: off since test 80.** Test 79 (below) crashed the game as he loaded: posing 15 joints of his model from MSC
-overruns the model's joint-override list (fighters/edge/README.md test 80, `port_check` C6). The runs have to be
-drawn another way (articles or effects); the design and the MSC / ACMD below stay for that.
+**Status: on again in test 82, drawn by articles.** Test 79 posed 15 joints of his own model from MSC and crashed
+the game as he loaded (the model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6).
+Since test 82 the extended sword is 13 articles, each posing itself; his own model only hides its real blade
+(one joint, at the start and end of the move).
 
 The user's design (not Ultimate's): forward air is unchanged when tapped. Held 6 frames or longer, the sword
 "extends" like the game Snake. Its base stays in his hand, its body grows from the base, and its point stays at the
@@ -29,46 +30,67 @@ The user's numbers:
 
 | Part | Where | What |
 |---|---|---|
-| Model | `tools/snake_sword.py`, `ultimate_fighter.py model --snake` | See "Model" below |
-| MSC | `tools/edge_snake_msc.py` writes the `SNAKE FAIR` block of `fighters/edge/edge.c` | See "MSC" below |
-| ACMD | `tools/edge_specials_build.py` `snake_fair_scripts` | See "ACMD" below |
+| His model | `tools/snake_sword.py`, `ultimate_fighter.py model --have SwordL1,SwordR1 --snake` | **EdgeBladeL** (bone 26 in every costume) under SwordL1, holding the real blade so it can be hidden |
+| His MSC | `tools/edge_snake_msc.py` writes the `SNAKE FAIR` block of `fighters/edge/edge.c` | Hold check, steering, retract, catching, the articles |
+| His ACMD | `tools/edge_specials_build.py` `snake_fair_scripts` | The tapped move's hits gated, the 11% end hit |
+| Article kinds | `tools/extra_kinds.json`: `snake` 0x199 (up to 12), `snaketip` 0x19A (one, kept on hit) | Copies of Zelda's light arrow; his articles 9 and 10 |
+| Article models | `tools/edge_snake_articles.py` → `model/snake`, `model/snaketip` | A run, and the point |
+| Article MSC | `tools/edge_snake_articles_msc.py` → `fighters/edge/weapons/snake.c`, `snaketip.c` | Each places itself on the path every frame |
+| Article ACMD | `tools/edge_specials_build.py` `snake_article_scripts` | The point's 5% catch and the sword trail |
 
-**Model.** The bones are added to every costume:
-- **EdgeBladeL** (joint 1005), at SwordL1: the real blade, which is folded away while the extended one is out.
-- **EdgeSnake01–13** (joints 1006–1018), under TransN: one straight run each. Each carries a ring-to-ring
-  slice of the blade, one unit long along +X.
-- **EdgeSnakeTip** (joint 1019): the point, also one unit long.
+**His model.** EdgeBladeL is added at bone 26 (right after the 26 standard bones), so its number is the same in
+every costume. The blade's mesh hangs from it; the hilt stays on SwordL1. The MSC hides the blade with ModelModule
+scale on joint 26 when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
+pose one or two. `--materials-from` keeps test 58's materials. To keep 136 bones, one bone is folded (UplipL1);
+test 79's 15-bone fold is gone with `segments: 0`.
 
-The pieces are drawn twice, crossed, so a run looks the same width turned any way. Every new bone's bind is the
-identity, so the joint ops mean the same whether they replace or add.
+**Article models.** Three bones each: TopN (the root), HaveN and EndN, all identity binds, as the light arrow's.
+- **snake** (a run): one ring-to-ring slice of the blade, along +Z. Its near ring is on HaveN and its far ring on
+  EndN, both at z = 0 in the bind, so it draws nothing until its MSC moves EndN out to the run's length (ModelModule
+  7 on joint 0x7D2: weapons name their joints 0x7D0 + bone, as Mario's pump).
+- **snaketip** (the point): the blade's point on HaveN, its real length (3.48) along +Z.
+- Both are drawn twice, the second copy turned 90 degrees about the blade, so they look the same width turned any
+  way. Their material is the sword's own; its two textures are copied into the article's `model.nut` under ids
+  0x40EBF000 + k. `model.sb / .nhb / .mta / .xmb` are the light arrow's.
 
-To make room in the 136-bone budget, 15 bones were folded: 5 finger tips, the upper-lip bones and the centre of
-the lower lip. The skirt bones are protected. `--materials-from` keeps test 58's materials on every existing
-polygon.
-
-**MSC.** The block hooks into four places:
+**His MSC.** The block hooks into three places:
 - **Aerial status main (`func_315`), `edge_sn_init`:** starts the hold check if this is fair with attack held.
 - **Aerial status loop (`func_319`), `edge_sn_loop`:**
-  - The hold check, then the freeze at frame 13.
+  - The hold check, then the freeze at frame 13: the blade hidden, the path published, the 12 runs and the point
+    generated (ArticleModule 0x2710, articles 9 and 10).
   - Steering, then retracting.
-  - Catching and holding fighters.
-  - Posing the bones every frame.
+  - Catching (a fighter in hitstun whose feet are within 22 of the tip) and holding the caught fighters.
+  - Publishing the path every frame.
   - 0.7x gravity.
-- **Aerial status end (slot 2, was the empty `func_334`), `edge_sn_end`:** landing or any interruption drops
-  the caught fighters and puts the sword back.
-- **Per-frame line (`func_74`), `edge_sn_frame`:** keeps the snake's pieces hidden outside the move.
+- **Aerial status end (slot 2, was the empty `func_334`), `edge_sn_end`:** landing or any interruption drops the
+  caught fighters, shows the blade, and tells the articles to go.
 
-The runs live in this object's `VAR_0`–`VAR_12` (direction × 1000 + length), because the MSC's globals must stay
-under 0x86 (`port_check` C5). The caught fighters are kept per player slot.
+The runs live in his private `VAR_0`–`VAR_11` (direction × 1000 + length), because the MSC's globals must stay
+under 0x86 (`port_check` C5). The articles read his path from his slot-shared variables (`VAR_24`–`VAR_31`, which
+any object reads as `SLOTn_SHARED_k`):
+- **VAR_24–VAR_29:** the runs, two to a variable: run 2i+1 in the low 12 bits, run 2i+2 in the next 12. A run's
+  code is direction × 1024 + length × 2 (0 forward, 1 up, 2 back, 3 down, relative to his facing).
+- **VAR_30:** the length drawn (the path retracts from its end). Below 0: the move is over and the articles go.
+- **VAR_31:** a counter. Each run article, made, takes the next number: run k draws the path's k-th run.
 
-**ACMD.** `VAR_23` is the flag: 0 for the normal move, 1 held, 2 for the end hit.
+**Article MSC.** Status 0 of the light arrow is replaced (its motion offset, `func_40`, isn't installed). Each
+article finds its owner (the nearest Sephiroth), then every frame:
+- **A run** walks the path to its own run's start, places itself there (PostureModule 0x2714 from his position and
+  facing), turns along the run (0x2717, (−pitch, 90, 0), as Pit's arrow) and stretches EndN to the run's drawn part
+  (0 when that run isn't drawn).
+- **The point** sits at the path's drawn end, turned along the last drawn run.
+- Both remove themselves when VAR_30 goes below 0, when he's gone, or after 900 frames (a safety net).
+
+**ACMD.** `VAR_23` (his) is the flag: 0 for the normal move, 1 held, 2 for the end hit.
 - The tapped move's hitboxes (frames 13 and 15) and effects (frame 13) only run at 0.
-- Held, frame 13 brings out the tip catch: 5%, BKB 20, KBG 0, on joint 1019.
-- The 11% end hit is on the sword (joint 24, fair's three blade capsules, each 2 bigger), with fair's 361
-  angle and KBG 40 (fair's: 86). It runs on frames 14–18, after `Hit_Log_Clear(-1)`. Frame 14 only comes once
-  the motion runs again, after the retract.
-- The trail is his own sword trail (textures 0x104 / 0x105). Its two points sit across the tip, so the ribbon
-  sweeps along the tip's path.
+- The 11% end hit is on the sword (joint 24, fair's three blade capsules, each 2 bigger), with fair's 361 angle and
+  KBG 40 (fair's: 86). It runs on frames 14–18, after `Hit_Log_Clear(-1)`. Frame 14 only comes once the motion runs
+  again, after the retract.
+- **The point's game script:** the catch, 5%, angle 361, BKB 20, KBG 0, size 4.5, on its root at the point's middle.
+  After a hit, the point clears its hit log (AttackModule 0x2726 / 0x2724), so it can catch the next one.
+- **The point's effect script:** his own sword trail (textures 0x104 / 0x105), its two points across the point, so
+  the ribbon sweeps along the tip's path.
+- The run's scripts are empty. Both articles' one motion is the light arrow's (`Move`, 0xEF3E3778).
 
 ## The move, frame by frame
 
@@ -97,12 +119,13 @@ under 0x86 (`port_check` C5). The caught fighters are kept per player slot.
 
 ## Not proven in game
 
-- **The joint ops.** That ModelModule ops 0 / 1 / 7 (scale / rotate / translate) take table-1 joint IDs (1005+).
-  They have been seen on table-0 joints (up special's pitch on joint 2).
-- **Op 7.** That op 7 is the joint translation, in the parent's (TransN's) frame.
-- **Turn signs.** The turn signs: forward is Ry −90, back Ry +90, up Rz +90, down Rz −90 (the bone's +X onto the
-  direction). If a direction comes out mirrored, swap the sign in `edge_sn_piece`.
-- **Following moved bones.** That hitboxes and the trail follow bones the MSC moves. The game reads joint
-  matrices for both, so they should.
-- **Folded bones.** That motions still carrying tracks for the folded bones (lips, finger tips) skip them. Bones
-  are matched by name hash, and the shipped motions weren't rebuilt.
+- **Op 7 on a weapon.** That ModelModule op 7 (translate) moves a weapon's joint 0x7D2 (EndN) in TopN's frame. If
+  the runs never show, or show one unit long, this is it.
+- **The light arrow's copies.** That copies of the light arrow load their own model and run their ACMD (the earlier
+  copies, fire / flare / flash, have no models).
+- **12 at once.** That a kind takes 12 instances (`extra_kinds` `max: 12`).
+- **Turn signs.** The rotation (−pitch, 90, 0): up is pitch 90, down −90, back 180. If a direction comes out
+  mirrored, swap the sign in `sn_pitch` (`tools/edge_snake_articles_msc.py`).
+- **Joint 26.** That his ModelModule joint is the bone index (the identity resolver). If it is the joint table's
+  instead, joint 26 is ThrowN's: harmless, the real blade just stays visible.
+- **The trail on a weapon.** That the sword trail (`Sword_Glow`) draws from a weapon's script.

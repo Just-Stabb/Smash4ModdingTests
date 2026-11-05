@@ -67,7 +67,9 @@
         "fire": {"kind": "0x18C", "base": "dein", "max": 3, "on_hit": 1},
         "flare1": {"kind": "0x18D", "base": "dein", "max": 4, "on_hit": 1},
         "flare2": {"kind": "0x18E", "base": "dein", "max": 3},
-        "flash": {"kind": "0x18F", "base": "dein", "max": 1, "on_hit": 0, "on_hit_bits": "0x17", "motions": 12}
+        "flash": {"kind": "0x18F", "base": "dein", "max": 1, "on_hit": 0, "on_hit_bits": "0x17", "motions": 12},
+        "snake": {"kind": "0x199", "base": "lightingbowarrow", "max": 12},
+        "snaketip": {"kind": "0x19A", "base": "lightingbowarrow", "max": 1, "on_hit": 0}
       }
     },
     {

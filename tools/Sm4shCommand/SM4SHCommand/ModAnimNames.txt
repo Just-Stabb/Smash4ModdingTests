@@ -113,6 +113,10 @@ FlareNone4
 FlareNone5
 FlareNone6
 FlareNone7
+// the held forward air's articles (snake: a run of the extended blade, weapon kind 0x199, his article 9; snaketip:
+// its point, 0x19A, article 10; copies of Zelda's light arrow, motion.mtable its one motion): Move (the run's
+// script empty; the point's its 5% catch and the sword trail; tools/edge_specials_build.py snake_article_scripts)
+Move
 
 // ---- Hero (brave)
 // his neutral special (Frizz / Frizzle / Kafrizz, status 0x152): Robin's Thunder shoot's custom-move

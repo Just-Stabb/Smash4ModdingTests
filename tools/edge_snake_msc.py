@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sephiroth's held forward air (the extending "snake" sword): writes its MSC-C block into fighters/edge/edge.c
 (between the SNAKE markers, appended at the end the first time) and hooks it into the aerial status (0x34:
-main func_315, loop func_319, end slot 2) and the per-frame system line (func_74).
+main func_315, loop func_319, end slot 2); since test 82 its sword is drawn by articles (snake / snaketip, tools/edge_snake_articles*.py).
 
   python3 tools/edge_snake_msc.py [fighters/edge/edge.c]
 
@@ -17,10 +17,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-SEGMENTS = 13          # tools/snake_sword.py SPEC['segments']
-JOINT_BLADE = 1005     # model.jtb table 1: SwordL1 1003, SwordR1 1004, then snake_sword.bone_names()
-JOINT_SEG0 = 1006      # EdgeSnake01 .. EdgeSnake13 = 1006 .. 1018
-JOINT_TIP = 1019
+SEGMENTS = 12          # the path's runs at most: the run articles (tools/extra_kinds.json snake max 12)
+JOINT_BLADE = 26       # EdgeBladeL: his model.vbn's bone 26 in every costume (tools/snake_sword.py 'at'); ModelModule's
+                       # joints are bones (the model's joint resolver, 0x02C5B4D8, is the identity)
+ART_RUN = 9            # his article list (Zelda's 0 - 4, fire 5, flare1 6, flare2 7, flash 8): snake, snaketip
+ART_TIP = 10
 SLOTS = 8
 
 BEGIN = '// ==== SNAKE FAIR (tools/edge_snake_msc.py) ===='
@@ -275,100 +276,62 @@ int edge_sn_blocked(float h, float v, int d)
     return 0;
 }
 
-// a piece's bone: placed at (h, v), turned along d, its X stretched to len (ModelModule 7 / 1 / 0)
-void edge_sn_piece(int joint, float h, float v, int d, float len)
+// the blade hidden (one joint override: EdgeBladeL scaled away) or its override removed (ModelModule 2: the entry
+// leaves the model's override list, test 80)
+void edge_sn_blade_hide(int hide)
 {
-    float ry;
-    float rz;
-    ry = 0.0f;
-    rz = 0.0f;
-    if (d == 0)
+    if (hide)
     {
-        ry = -90.0f;
-    }
-    if (d == 2)
-    {
-        ry = 90.0f;
-    }
-    if (d == 1)
-    {
-        rz = 90.0f;
-    }
-    if (d == 3)
-    {
-        rz = -90.0f;
-    }
-    ModelModule(0x7, joint, edge_sn_base_x(), v, h);
-    ModelModule(0x1, joint, 0.0f, ry, rz, 0);
-    ModelModule(0, joint, len, 1.0f, 1.0f);
-}
-
-void edge_sn_hide_piece(int joint)
-{
-    ModelModule(0, joint, edge_sn_hidden(), edge_sn_hidden(), edge_sn_hidden());
-}
-
-// the snake's pieces hidden and the real blade shown (or the other way round)
-void edge_sn_show_blade(int show)
-{
-    int k;
-    if (show)
-    {
-        ModelModule(0, BLADE, 1.0f, 1.0f, 1.0f);
-        k = 0;
-        while (k < SEGMENTS)
-        {
-            edge_sn_hide_piece(SEG0 + k);
-            k = k + 1;
-        }
-        edge_sn_hide_piece(TIP);
+        ModelModule(0, BLADE, edge_sn_hidden(), edge_sn_hidden(), edge_sn_hidden());
     }
     else
     {
-        edge_sn_hide_piece(BLADE);
+        ModelModule(0x2, BLADE);
     }
 }
 
-// the path drawn up to length len: each run its bone, the point at the end
-void edge_sn_pose(float len)
+// the path for the articles (tools/edge_snake_articles_msc.py): his VAR_24 - VAR_29 the runs, two a float (direction
+// x 1024 + length x 2, the odd run in the low 12 bits), VAR_30 the length drawn (below 0: over)
+void edge_sn_publish(float drawn)
+{
+    int i;
+    int a;
+    int b;
+    float la;
+    float lb;
+    i = 0;
+    while (i < SEGMENTS / 2)
+    {
+        la = edge_sn_l(2 * i + 1);
+        lb = edge_sn_l(2 * i + 2);
+        a = edge_sn_d(2 * i + 1) * 1024 + (int)(la * 2.0f + 0.5f);
+        b = edge_sn_d(2 * i + 2) * 1024 + (int)(lb * 2.0f + 0.5f);
+        if (2 * i + 1 > edge_sn_n)
+        {
+            a = 0;
+        }
+        if (2 * i + 2 > edge_sn_n)
+        {
+            b = 0;
+        }
+        WorkModule(0, (float)(a + b * 4096), 0x0f000318 + i);
+        i = i + 1;
+    }
+    WorkModule(0, drawn, 0x0f00031e);
+}
+
+// the articles: SEGMENTS runs (each takes its number from VAR_31) and the point
+void edge_sn_generate()
 {
     int k;
-    int d;
-    float h;
-    float v;
-    float l;
-    float acc;
-    h = edge_sn_base_h();
-    v = edge_sn_base_v();
-    acc = 0.0f;
-    d = 0;
-    k = 1;
-    while (k <= SEGMENTS)
+    WorkModule(0, 0.0f, 0x0f00031f);
+    k = 0;
+    while (k < SEGMENTS)
     {
-        l = 0.0f;
-        if (k <= edge_sn_n)
-        {
-            l = edge_sn_l(k);
-            if (acc + l > len)
-            {
-                l = len - acc;
-            }
-        }
-        if (l > 0.0f)
-        {
-            d = edge_sn_d(k);
-            edge_sn_piece(SEG0 + k - 1, h, v, d, l);
-            h = h + l * edge_sn_dh(d);
-            v = v + l * edge_sn_dv(d);
-            acc = acc + l;
-        }
-        else
-        {
-            edge_sn_hide_piece(SEG0 + k - 1);
-        }
+        ArticleModule(0x2710, ART_RUN);
         k = k + 1;
     }
-    edge_sn_piece(TIP, h, v, d, edge_sn_tip());
+    ArticleModule(0x2710, ART_TIP);
 }
 
 int edge_sn_cardinal()
@@ -471,7 +434,8 @@ int edge_sn_slot_var(int slot, int q)
     return 0x0f000058 + 0x8 * (slot - 1) + q;    // player slot's hitstun (+0) / hitstop (+4) / offset X, Y (+5, +6)
 }
 
-// fighters the tip has just hit: caught where they are, relative to the tip
+// fighters the tip has hit (in hitstun, their feet near the point: its hits are the article's, not his):
+// caught where they are, relative to the tip
 void edge_sn_catch_new()
 {
     int slot;
@@ -481,11 +445,6 @@ void edge_sn_catch_new()
     float tv;
     float dx;
     float dy;
-    if (WorkModuleF(0, 0x0f0000a0) != 1.0f)       // SELF_HIT: the tip has connected since the last check
-    {
-        return;
-    }
-    WorkModule(0, 0.0f, 0x0f0000a0);              // back to 0 (AttackModule 0x2724), for the next one
     edge_sn_point(edge_sn_total - edge_sn_back);
     th = edge_sn_ph + edge_sn_tip() * 0.5f * edge_sn_dh(edge_sn_pd);
     tv = edge_sn_pv + edge_sn_tip() * 0.5f * edge_sn_dv(edge_sn_pd);
@@ -589,7 +548,9 @@ void edge_sn_begin()
     edge_sn_total = edge_sn_blade();
     edge_sn_back = 0.0f;
     edge_sn_since = edge_sn_turn_wait();
-    edge_sn_show_blade(0);
+    edge_sn_blade_hide(0x1);
+    edge_sn_publish(edge_sn_total);
+    edge_sn_generate();
     edge_sn_state = 0x3;
     if (edge_sn_released)
     {
@@ -600,7 +561,8 @@ void edge_sn_begin()
 void edge_sn_finish()
 {
     edge_sn_release(0);
-    edge_sn_show_blade(0x1);
+    edge_sn_blade_hide(0);
+    edge_sn_publish(-1.0f);
     edge_sn_gravity(1.0f);
     edge_sn_setvar(2.0f);
     edge_sn_state = 0x5;
@@ -674,9 +636,9 @@ void edge_sn_loop()
             return;
         }
     }
+    edge_sn_publish(edge_sn_total - edge_sn_back);
     edge_sn_catch_new();
     edge_sn_hold_caught();
-    edge_sn_pose(edge_sn_total - edge_sn_back);
 }
 
 // the aerial status's end (landing, a hit, ...): anyone caught dropped, the sword back
@@ -685,21 +647,12 @@ void edge_sn_end()
     if (edge_sn_state >= 0x3 && edge_sn_state <= 0x4)
     {
         edge_sn_release(0x1);
-        edge_sn_show_blade(0x1);
+        edge_sn_blade_hide(0);
+        edge_sn_publish(-1.0f);
     }
     edge_sn_release(0);
     edge_sn_state = 0;
     edge_sn_setvar(0.0f);
-}
-
-// every frame (func_74): outside the move, the snake's pieces hidden and the real blade shown (they persist,
-// but a respawn resets the model)
-void edge_sn_frame()
-{
-    if (edge_sn_state < 0x3)
-    {
-        edge_sn_show_blade(0x1);
-    }
 }
 '''
 
@@ -710,9 +663,9 @@ def block():
         g, f = indexed(kind, name, n)
         gl.append(g)
         fn.append(f)
-    body = BODY.replace('BLADE', str(JOINT_BLADE)).replace('SEG0', str(JOINT_SEG0)).replace('TIP,', '%d,' % JOINT_TIP)
-    body = body.replace('(TIP)', '(%d)' % JOINT_TIP).replace('SEGMENTS', str(SEGMENTS)).replace('SLOTS', str(SLOTS))
-    assert not re.search(r'\b(BLADE|SEG0|TIP|SEGMENTS|SLOTS)\b', body), 'placeholder left'
+    body = BODY.replace('BLADE', str(JOINT_BLADE)).replace('SEGMENTS', str(SEGMENTS)).replace('SLOTS', str(SLOTS))
+    body = body.replace('ART_RUN', str(ART_RUN)).replace('ART_TIP', str(ART_TIP))
+    assert not re.search(r'\b(BLADE|SEGMENTS|SLOTS|ART_RUN|ART_TIP)\b', body), 'placeholder left'
     return '\n'.join([BEGIN, '// Sephiroth: held forward air, the extending sword (fighters/edge/snake_fair.md)', ''.join(gl),
                       '\n'.join(fn), body, END]) + '\n'
 
@@ -721,7 +674,6 @@ HOOKS = [
     # (function, the line to find in it, what to put before / after)
     ('func_315', '    func_314();\n', 'after', '    edge_sn_init();          // Sephiroth: held forward air\n'),
     ('func_319', '    if (func_318())\n', 'before', '    edge_sn_loop();          // Sephiroth: held forward air\n'),
-    ('func_74', '    func_77();\n', 'after', '    edge_sn_frame();         // Sephiroth: held forward air\n'),
 ]
 
 

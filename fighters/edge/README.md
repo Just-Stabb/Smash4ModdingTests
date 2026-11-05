@@ -1075,3 +1075,35 @@ User, test 80 (clips): "Sephiroth's bones seem incorrect and the sword doesn't a
     position + 10, air + 7, Ultimate's) is held every frame it flies, and its beam is laid at that height.
   - `weapons/flare1.c` → `flare1.mscsb`.
 - port_check over the chain and tests 70–81: no new errors.
+
+## Test 82 (`build/sephiroth_test82.zip`): the held forward air again, its sword drawn by articles
+
+User: "Go ahead with the article version of forward air". The design and the whole build are in
+`fighters/edge/snake_fair.md`; in short:
+- **Two new article kinds**, copies of Zelda's light arrow (`tools/extra_kinds.json`): `snake` 0x199 (a run of the
+  extended blade, up to 12 at once) and `snaketip` 0x19A (the point, kept on hit). They are his articles 9 and 10.
+  Each has its own model (`model/snake`, `model/snaketip`, from `tools/edge_snake_articles.py`), its own MSC
+  (`weapons/snake.c`, `weapons/snaketip.c`, from `tools/edge_snake_articles_msc.py`) and its own scripts.
+- **Each article poses itself.** It reads his path from his slot-shared variables (VAR_24–VAR_31) every frame,
+  places and turns itself with its own posture, and a run stretches its one end joint to its length. His own model
+  poses only one joint: EdgeBladeL (bone 26), to hide the real blade while the extended one is out.
+- **His skeleton:** test 81's (`--have`) plus EdgeBladeL at bone 26 in every costume, UplipL1 folded to keep 136
+  bones; `--materials-from` test 58. Every costume's `model.vbn`, `model.jtb`, `model.nud` and `metal.nud` ship.
+- **His MSC** (`edge.c`, `tools/edge_snake_msc.py`): the joint posing is gone. The move publishes the path and
+  makes the articles, and the catch is the tip's position (a fighter in hitstun within 22 of the tip).
+- **The point's scripts:** the 5% catch and the sword trail, moved from his scripts onto the point.
+- `tools/weapon_expand.py`: new kinds need only be consecutive overall (sorted), not in the file's order.
+- `ModAnimNames.txt`: `Move`, the articles' one motion. Sm4shCommand reads the file from beside its exe, so
+  copying the new file there is enough.
+- Checks:
+  - `kind_expand_test`: no failures.
+  - `weapon_expand_test`: one failure, Hero's (fighter 0x45) article list in a different order than the test
+    expects. The shipped test 72 executable fails it the same way, so it isn't new.
+  - `port_check` over the chain and tests 70–82: 30 errors, the same as test 81. No new errors or warnings; C6
+    (joint overrides) is clean.
+- Package (install over 81): `code/cross_f.rpx`; `model/body/c00`–`c07` (`model.vbn`, `model.jtb`, `model.nud`,
+  `metal.nud`); `model/snake`, `model/snaketip`; `script/animcmd/body` `game.bin` / `effect.bin`;
+  `script/animcmd/weapon/snake`, `snaketip`; `script/msc/edge.mscsb`, `snake/snake.mscsb`,
+  `snaketip/snaketip.mscsb`.
+- Not proven in game: see snake_fair.md's last section (op 7 on a weapon's joint, the light arrow's copies loading
+  their models, 12 at once, the turn signs, the trail on a weapon).
