@@ -1489,3 +1489,24 @@ countering)".
   damage status).
 - port_check over the chain and tests 70–104: 30 errors, as before. MSC stack check clean.
 - Package (install over 103): `script/msc/edge.mscsb`.
+
+## Test 105 (`build/sephiroth_test105.zip`): Phantom release rules; Octaslash's slide only while touching; bigger hilt hit
+
+User: "when down special is pressed again while Phantom is charging or charged Sephiroth cannot use his counter down
+special until after the Phantom is released. Also, please make it so the Phantom cannot be released until near the
+end of Sephiroth's counter down special." / "the hilt hitbox is still not hitting. Maybe the hitbox could be a bit
+bigger" / "Sephiroth is still bouncing off of diagonal stage geometry during held up special" (clip).
+- **No counter while the Phantom charges:** the four down special input checks (`func_43`, `func_58`, `func_675`,
+  `func_1999`) go to the counter (0x155) only when `edge_lw_can_counter()`: not while the Phantom charges. The press
+  just sends it.
+- **Release window:** a down special press sends it only from near the end of the counter move (`edge_lw_ph_open`):
+  never in the stance, from frame 42 of the slash (actionable at 52), 32 of the break (42); outside the move at
+  once. A counter hit still sends it at once (test 99's ask).
+- **Octaslash:** the clip shows the rush going up into a stage's slanted underside, then on up and away from the
+  stage along it: test 101's slide changed the aim for good. Now the aim is slid along a surface only on the frames
+  it touches it (`edge_hi_rush_speed`), and off the surface it goes on the way it was aimed (past the corner, toward
+  the stage).
+- **Hilt hit (up tilt):** each hitbox 6 bigger than up tilt's (was 2), out on frames 21–24 (was 21–22); the caught
+  fighters' hold hitstop is ended as they're let go (`edge_sn_release`), in case hitstop kept the hit off them.
+- port_check over the chain and tests 70–105: 30 errors, as before. MSC stack check clean.
+- Package (install over 104): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.

@@ -673,6 +673,10 @@ void edge_sn_release(int drop)
         {
             WorkModule(0, 0.0f, edge_sn_slot_var(slot, 0));
         }
+        if (edge_sn_s(slot) >= 0.0f)
+        {
+            WorkModule(0, 0.0f, edge_sn_slot_var(slot, 4));   // out of the hold's hitstop, for the end hit (test 105)
+        }
         if (edge_sn_s(slot) >= 0.0f && edge_sn_state == 0x4)
         {
             edge_sn_ground(slot, 5.0f);         // stage collision back (in the air)

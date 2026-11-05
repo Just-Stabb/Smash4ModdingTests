@@ -721,8 +721,11 @@ int func_43()
         {
             if (func_72(global27))
             {
-                func_16(0x155, 0x1);
-                return 0x1;
+                if (edge_lw_can_counter())     // Sephiroth: not while the Phantom charges (test 105)
+                {
+                    func_16(0x155, 0x1);
+                    return 0x1;
+                }
             }
         }
     }
@@ -1251,8 +1254,11 @@ int func_58()
         {
             if (func_72(global27))
             {
-                func_16(0x155, 0x1);
-                return 0x1;
+                if (edge_lw_can_counter())     // Sephiroth: not while the Phantom charges (test 105)
+                {
+                    func_16(0x155, 0x1);
+                    return 0x1;
+                }
             }
         }
     }
@@ -13307,8 +13313,11 @@ void func_675()
             {
                 if (global24 & 0x8000)
                 {
-                    func_16(0x155, 0x1);
-                    return 0x1;
+                    if (edge_lw_can_counter())     // Sephiroth: not while the Phantom charges (test 105)
+                    {
+                        func_16(0x155, 0x1);
+                        return 0x1;
+                    }
                 }
             }
         }
@@ -33614,8 +33623,11 @@ void func_1999()
             {
                 if (func_72(global27))
                 {
-                    func_16(0x155, 0x1);
-                    return;
+                    if (edge_lw_can_counter())     // Sephiroth: not while the Phantom charges (test 105)
+                    {
+                        func_16(0x155, 0x1);
+                        return;
+                    }
                 }
             }
         }
@@ -38412,6 +38424,8 @@ void edge_hi_slide(int side)
 // back the other way
 void edge_hi_rush_speed()
 {
+    float ax;
+    float ay;
     float vx;
     float vy;
     float nx;
@@ -38448,11 +38462,18 @@ void edge_hi_rush_speed()
     }
     else
     {
+        // the aim slid along what it touches this frame only, the aim itself kept: off the surface it goes on the
+        // way it was aimed (test 105, the user's clip: test 101 kept the slid way, so under a stage's slanted side it
+        // went on up and away along it past the corner: the "bounce")
+        ax = edge_hi_rx;
+        ay = edge_hi_ry;
         edge_hi_slide(0x1);
         edge_hi_slide(0x2);
         edge_hi_slide(0x4);
         dx = edge_hi_rx;
         dy = edge_hi_ry;
+        edge_hi_rx = ax;
+        edge_hi_ry = ay;
         KineticModule(0x11, 0x3, dx * m, dy * m);
     }
     if ((float)edge_hi_count >= edge_hi_p(2.0f, 6.0f))
@@ -38929,6 +38950,48 @@ int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 cha
 int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
 int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
 float edge_lw_ph_keep() { return 120.0f; }      // frames it keeps after full charge before it goes by itself
+
+// the down special inputs (func_43, func_58, func_675, func_1999) start the counter only when this is 1: not while
+// the Phantom charges, so that press only sends it (user, test 105: "when down special is pressed again while
+// Phantom is charging or charged Sephiroth cannot use his counter down special until after the Phantom is
+// released")
+int edge_lw_can_counter()
+{
+    if (WorkModuleF(0, 0x0f000310) == 2.0f)   // edge_lw_ph(): charging
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+// a down special press sends it only from near the end of the counter move (user, test 105: "make it so the
+// Phantom cannot be released until near the end of Sephiroth's counter down special"): not in the stance, from
+// frame 42 of the slash (actionable at 52) / 32 of the break (42); outside them at once. A counter hit still sends
+// it at once (test 99)
+int edge_lw_ph_open()
+{
+    if (global4 == 0x155)
+    {
+        return 0;
+    }
+    if (global4 == 0x15b)
+    {
+        if (MotionModuleF(0x1) >= 42.0f)
+        {
+            return 0x1;
+        }
+        return 0;
+    }
+    if (global4 == 0x15c)
+    {
+        if (MotionModuleF(0x1) >= 32.0f)
+        {
+            return 0x1;
+        }
+        return 0;
+    }
+    return 0x1;
+}
 float edge_lw_ph_down() { return -0.5f; }       // stick y at or below this with B pressed: down special again
 
 float edge_lw_ph()
@@ -39050,7 +39113,7 @@ void edge_lw_ph_tick()
     // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
     // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
     // let go), or 120 frames past full charge (test 104; Zelda's param 0x18000001: 60)
-    if ((WorkModuleF(0, 0x0f000109) == 1.0f && WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down())
+    if ((WorkModuleF(0, 0x0f000109) == 1.0f && WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() && edge_lw_ph_open())
         || c >= per * 7.0f + edge_lw_ph_keep())
     {
         edge_lw_ph_send();
@@ -40361,6 +40424,10 @@ void edge_sn_release(int drop)
         if (edge_sn_s(slot) >= 0.0f && drop)
         {
             WorkModule(0, 0.0f, edge_sn_slot_var(slot, 0));
+        }
+        if (edge_sn_s(slot) >= 0.0f)
+        {
+            WorkModule(0, 0.0f, edge_sn_slot_var(slot, 4));   // out of the hold's hitstop, for the end hit (test 105)
         }
         if (edge_sn_s(slot) >= 0.0f && edge_sn_state == 0x4)
         {

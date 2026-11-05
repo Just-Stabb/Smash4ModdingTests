@@ -212,9 +212,9 @@ def snake_hi3_scripts(game, effect):
     """AttackHi3 held (user, test 97: "make held Up tilt work the same way that held forward air does"; MSC
     edge_sn_move 1): the tapped move's hits (frames 17, 20, 23: the pull, the clean and late hits, with frame 20's
     head intangibility and 23's end of it) and its frame 16 / 20 effects only at VAR_23 0; held, the end hit on frames
-    21 - 22 once the sword is back (the motion frozen at 20, the sword straight up, runs again from there): frame 20's
-    four hitboxes (on his root, up the sword) at 11%, up tilt's angles, KBG 40, each 2 bigger, after Hit_Log_Clear(-1);
-    off at 23"""
+    21 - 24 once the sword is back (the motion frozen at 20, the sword straight up, runs again from there): frame 20's
+    four hitboxes (on his root, up the sword) at 11%, angle 42, KBG 40, each 6 bigger, after Hit_Log_Clear(-1); off
+    at 25"""
     crc = acmd.crc('AttackHi3')
     parts = _frames(game.scripts[crc])
     frames = [f for f, _b in parts]
@@ -226,21 +226,25 @@ def snake_hi3_scripts(game, effect):
     assert len(hits) == 4, [c.name for c in hb20]
     # angle 42 (test 103, the user: "Please make the up tilt hilt hitbox a 42 degree angle"; tests 98 - 102: up tilt's
     # own 90 / 91)
-    end = [_set(c, Part=0, Damage=11.0, Angle=42, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits]
+    # each 6 bigger (test 105, the user: "the hilt hitbox is still not hitting. Maybe the hitbox could be a bit bigger";
+    # tests 98 - 104: 2), out on frames 21 - 24 (was 21 - 22)
+    end = [_set(c, Part=0, Damage=11.0, Angle=42, KBG=40, Size=float(c.params[8]) + 6.0, SFXLevel=1) for c in hits]
     out = []
     for f, body in parts:
         if f in (17.0, 20.0):
             body = _when(0, body)
         if f == 23.0:
-            body = _when(0, body) + _when(2, [U.cmd('Remove_All_Hitboxes')])
+            body = _when(0, body)
         out.append((f, body))
         if f == 20.0:
             out.append((21.0, _when(2, [U.cmd('Remove_All_Hitboxes'), U.cmd('Hit_Log_Clear', -1)] + end)))
-    assert 21.0 not in frames
+        if f == 23.0:
+            out.append((25.0, _when(2, [U.cmd('Remove_All_Hitboxes')])))
+    assert 21.0 not in frames and 25.0 not in frames
     game.scripts[crc] = _join(out)
     eout = [(f, _when(0, body) if f in (16.0, 20.0) else body) for f, body in _frames(effect.scripts[crc])]
     effect.scripts[crc] = _join(eout)
-    return 'held up tilt: end hit (%d hitboxes, frames 21 - 22); normal hits / effects only when tapped\n' % len(end)
+    return 'held up tilt: end hit (%d hitboxes, frames 21 - 24); normal hits / effects only when tapped\n' % len(end)
 
 
 def snake_article_scripts(fighter, hit_template, glow_template):

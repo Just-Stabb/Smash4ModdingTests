@@ -145,7 +145,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   caps its y in the air unless a script lifts it, as Zelda's Farore's Wind does (`func_2291`: x limit kept, y -1).
   In the air the rush is kept on its own line each frame, and where it touches a ceiling or a wall
   (`GroundModule(0x2722, 1 / 2 / 4)`) the surface's normal is taken out of its direction, so it slides along slanted
-  stage sides (Ultimate's hook only re-aims on the ground; this is the port's).
+  stage sides (Ultimate's hook only re-aims on the ground; this is the port's). Test 105 (the user's clip: it went
+  on up and away along a stage's slanted underside past the corner): the slide is for the frames it touches only,
+  the aim kept, so off the surface it goes on the way it was aimed.
 - **Ground end:** x x 0.6 (Octaslash 0.9; 0.25 if landed), brake 0.12 (0.06); actionable at the motion's
   cancel frame 27 (56); off an edge -> Fall; end -> Wait.
 - **Air end:** x x 0.4 (0.9), brake 0.02, the rush's y x the same into gravity, gravity 0.12; from frame 18
@@ -195,6 +197,10 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
     status and in hitlag too, so also while he isn't actionable; a down special that starts a new stance sends the
     charging one and makes none), or 120 frames past full charge (was B let go / 60). Hit while it's out (charging,
     or sent and still there: damage statuses 0x45–0x4B, 0x41, 0x57), it goes; a hit the counter takes isn't one.
+  - **Test 105:** while it charges, the down special inputs (`func_43`, `func_58`, `func_675`, `func_1999`) don't
+    start the counter (`edge_lw_can_counter`): the press only sends it. During the counter move a press sends it
+    only from near its end (`edge_lw_ph_open`: not in the stance, from frame 42 of the slash, 32 of the break); a
+    counter hit still sends it at once.
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
