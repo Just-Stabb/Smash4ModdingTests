@@ -990,6 +990,24 @@ def check_weapon_facing(name, rep):
                     '(PostureModule(0, lr)): fighters it hits are left facing the camera' % os.path.relpath(path, ROOT))
 
 
+def check_weapon_owner(inst, name, rec, rep):
+    """W7: a weapon MSC written for an article (fighters/NAME/weapons/X.c, shipped as script/msc/X/X.mscsb; helper
+    files compiled into others' aren't) that isn't one of
+    the fighter's own weapon kinds (extra_kinds.json "weapons"): a weapon's files load by its kind's owner, so the
+    base fighter's own kinds read the base's folder and the script is never used (Sephiroth tests 106-110: Zelda's
+    Phantom, still her kind, read fighter/zelda/; its tracking never ran)"""
+    own = set((rec.get('weapons') or {}).keys())
+    d = os.path.join(ROOT, 'fighters', name, 'weapons')
+    if not os.path.isdir(d):
+        return
+    for f in sorted(os.listdir(d)):
+        if f.endswith('.c') and f[:-2] not in own and \
+                list(inst.glob(r'fighter/%s/script/msc/%s/%s\.mscsb' % (name, f[:-2], f[:-2]))):
+            rep.add('ERROR', 'W7 weapon-owner', 'fighters/%s/weapons/%s: "%s" isn\'t one of %s\'s own weapon kinds '
+                    '(extra_kinds.json "weapons"): the game loads the base\'s scripts for it; give it a kind of its own '
+                    '(a plain "%s": "0x..." entry replaces the base\'s article)' % (name, f, f[:-2], name, f[:-2]))
+
+
 def check_flare_targets(name, rec, rep):
     """F1: a new fighter missing from Sephiroth's Shadow Flare table (fighters/edge/weapons/flare1.c, written by
     tools/edge_flare_targets.py from Ultimate's edge_flare_radius / node / offsets): its orbs circle it at the
@@ -1457,6 +1475,7 @@ def main():
     check_weapon_parts(inst, a.name, rec, rep)
     check_weapon_motion(inst, a.name, rec, rep)
     check_weapon_facing(a.name, rep)
+    check_weapon_owner(inst, a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)

@@ -1590,3 +1590,23 @@ to be used to release the Phantom when Sephiroth is not actionable".
   only (the others stay his specials). The counter move's window (test 105) still applies.
 - port_check over the chain and tests 70–110: 30 errors, as before. MSC stack checks clean.
 - Package (install over 109): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
+## Test 111 (`build/sephiroth_test111.zip`): his own Phantom kind, so its script (the tracking) is the one that runs
+
+User: "Phantom still doesn't follow a held opponent or move to them at all".
+- Cause: a weapon's files (model, motion, ACMD, MSC) load by its weapon kind's owner (the path tables,
+  docs/weapon-expansion.md). His article 2 was still Zelda's own Phantom kind, owned by "zelda", so the game read
+  `fighter/zelda/script/msc/phantom/` and his `script/msc/phantom/phantom.mscsb` (tests 106–110: the tracking) was
+  never used.
+- Fix: a Phantom kind of his own, 0x19B, owned by "edge", a copy of hers (`extra_kinds.json` plain entry
+  `"phantom": "0x19B"`: `weapon_expand.py`'s remap puts it in his article 2 in her kind's place; its native cases
+  go to hers). Her Phantom's model, motion and ACMD are copied into his folder by the build
+  (`edge_specials_build.py`). `weapon_expand_test.py`: 0 failed (his articles: 0x22, 0x23, 0x19B, 0x24, 0x25, ...).
+- `port_check` W7 weapon-owner (new): an error for a `fighters/NAME/weapons/X.c` shipped as `script/msc/X/` that
+  isn't one of the fighter's own weapon kinds; port guide catalogue row added.
+- Not proven in game: that the Phantom's native code works the same under the new kind (Supamario's copies of
+  Mario's weapons do). Its ACMD's effect ids still name Zelda's effect bank (as before), so its effects show only if
+  her bank is loaded.
+- port_check over the chain and tests 70–111: 30 errors, as before. MSC stack checks clean.
+- Package (install over 110): `code/cross_f.rpx`, `model/phantom/`, `motion/phantom/`,
+  `script/animcmd/weapon/phantom/` (hers, now read from his folder).

@@ -507,8 +507,13 @@ def main():
     compile_msc(os.path.join(EDGE, 'weapons/flash.c'), os.path.join(msc, 'flash/flash.mscsb'))
     print(flash_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flash')))
     print(compile_msc(os.path.join(EDGE, 'weapons/flare1.c'), os.path.join(msc, 'flare1/flare1.mscsb')))
-    # Zelda's Phantom (article 2), Sephiroth's: her vanilla script with its tracking (test 106; weapons/phantom.c)
+    # Zelda's Phantom (article 2), Sephiroth's: her vanilla script with its tracking (test 106; weapons/phantom.c). Its
+    # files load by its weapon kind's owner: Zelda's own kind read hers (fighter/zelda/), so since test 111 it's his
+    # own kind 0x19B (extra_kinds.json "phantom": a copy of hers in his article 2), and its model, motion and ACMD
+    # are hers copied into his folder
     compile_msc(os.path.join(EDGE, 'weapons/phantom.c'), os.path.join(msc, 'phantom/phantom.mscsb'))
+    for sub in ('model/phantom', 'motion/phantom', 'script/animcmd/weapon/phantom'):
+        shutil.copytree(os.path.join(a.zelda, sub), os.path.join(fighter, sub), dirs_exist_ok=True)
     print(flare1_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flare1')))
     if SNAKE_FAIR:                                  # the held forward air's articles: MSC and models
         import edge_snake_articles

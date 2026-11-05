@@ -39,7 +39,9 @@ Every special motion has three custom-move variants (`_c2`, `_c3`, `_c4`: 0x212-
 Sephiroth (no custom moves) can use for his extra animations: the kind record's `motions` map names
 their animations (kind_expand's motion table copy, as jab 2 / 3).
 
-Her articles: 0 `dein` (8 motion slots, no model), 1 `dein_s`, 2 `phantom`; kept.
+Her articles: 0 `dein` (8 motion slots, no model), 1 `dein_s`, 2 `phantom`; kept. Since test 111 article 2 is his
+own copy of the Phantom's kind, 0x19B (`extra_kinds.json` `"phantom": "0x19B"`): a weapon's files load by its kind's
+owner, so with her kind his `script/msc/phantom/` (tests 106–110's tracking) was never read, only hers.
 
 ## Plan
 
