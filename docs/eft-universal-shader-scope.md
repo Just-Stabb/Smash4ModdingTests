@@ -387,9 +387,16 @@ Ultimate's program.
   `child_block` doesn't copy the converted emitter's 0x844), has one texture (+0x920) and no mesh index, and how
   eft builds a child's emc (its colours +0x128..) for the dynamic block isn't traced. To do with a bank that has
   children (Hero's or Sephiroth's) so it can be checked in game: quad children whose programs sample slot 0 only.
-- **Quad corner order: settled.** Ultimate's programs make both the corner and its UV from the vertex id the
-  prologue gives them, so a wrong id order could only show as a crossed (bow-tie) or mirrored quad, never a subtly
-  wrong one; fx_render's per-pixel matches with Ultimate's own programs (up / down smash, Waterfall) rule both out.
+- **Quad corner order** (corrected, Sephiroth test 77). Ultimate's programs make both the corner and its UV from the
+  vertex id the prologue gives them. Most of them (348 of Sephiroth's emitters) take it from the id's bits: x from
+  bit 0, y from bit 1, the strip order 0 (-,-) 1 (+,-) 2 (-,+) 3 (+,+), drawn by Ultimate as a strip. eft draws its
+  quad as GX2 QUADS (cross_f 0x04A66B54: mode 0x13; corners (-.5, .5) (-.5, -.5) (.5, -.5) (.5, .5), 0x04A66B9C), the
+  triangles (0, 1, 2) (0, 2, 3), and the lowering gave every program the usual table's id (0 (-,.5) 1 (.5,.5) 2 (.5,-.5)
+  3 (-.5,-.5)): a bit-corner quad folded, one triangle across the other, a wedge from two corners to the middle missing
+  (Sephiroth's aim arrow: "one arm ... ends in a diagonal cut"). fx_render drew both sides with the same cyclic
+  triangles, so its "matches" hid it. Now `ult_to_latte.quad_id_bits` finds such programs and the lowering gives them
+  the id of eft's own corner (x > 0 bit 0, y > 0 bit 1); fx_render draws Ultimate's side of them as a strip;
+  ult_to_latte_test pairs their corners so.
 
 ## Unknowns to settle first (phase 0, as scoped)
 

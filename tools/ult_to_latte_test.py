@@ -114,6 +114,7 @@ def close(a, b):
 
 
 QUAD = np.array([[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]], np.float32)   # Ultimate's, vertex ids 0 - 3
+STRIP = np.array([[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]], np.float32)  # a bit-corner program's
 
 
 def frame(rng, n=None):
@@ -138,7 +139,9 @@ def eft_inputs(prog, A, cbs, zratio, low, quad):
             A[:, slot[nm]] = 0
     if 'sysScaleAttr' in slot:
         A[:, slot['sysScaleAttr'], 2] = A[:, slot['sysScaleAttr'], 0] * np.float32(zratio)
-    corner = QUAD[np.arange(n) % 4]
+    # the corner Ultimate's program makes for id k: its usual table, or the id's bits (x bit 0, y bit 1) for a
+    # program that takes them so (ult_to_latte.quad_id_bits: the lowered one gives it that id back from eft's corner)
+    corner = (STRIP if ult_to_latte.quad_id_bits(prog.glsl) else QUAD)[np.arange(n) % 4]
     if quad:
         if 'sysNormalAttr' in slot:
             A[:, slot['sysNormalAttr']] = (0, 0, 1, 0)
@@ -318,7 +321,10 @@ def main():
     ap.add_argument('--common', action='store_true', help="the common sets (ef_common.eff) his scripts use instead")
     a = ap.parse_args()
     import port_sources
-    cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
+    try:
+        cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
+    except OSError:             # a port from before the framework (Sephiroth): Ultimate's name is its own
+        cfg = {'ult': a.name, 'effects': {}}
     src = port_sources.load()
     eff = vfxb.Eff(src.eff(cfg['ult']))
     only = {int(x) for x in a.only.split(',') if x}

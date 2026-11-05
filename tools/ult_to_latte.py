@@ -460,6 +460,17 @@ def _spec_streams(spec, quad=False, mat=None):
 
 
 # ------------------------------------------------------------------ lowering
+def quad_id_bits(glsl):
+    """a quad program that makes its corner from its vertex id's bits: `r = uint(gl_VertexID)`, bits 0 - 1 of it as
+    predicates p0 / p1, each picking +0.5 or -0.5 (x from bit 0, y from bit 1: the strip order 0 (-,-) 1 (+,-)
+    2 (-,+) 3 (+,+)). Ultimate draws such a quad as a strip; eft draws its own quad as GX2 QUADS (cross_f 0x04A66B54:
+    mode 0x13, corners (-.5, .5) (-.5, -.5) (.5, -.5) (.5, .5) at 0x04A66B9C), the triangles (0, 1, 2) (0, 2, 3)"""
+    m = re.search(r'\b(r\d+) = uint\(gl_VertexID\)', glsl)
+    return bool(m and re.search(r'uint src = %s, msk = 0x0*3u' % m.group(1), glsl)
+                and re.search(r'if \(p0\) \{ r\d+ = 0x3f000000u; \}', glsl)
+                and re.search(r'if \(p1\) \{ r\d+ = 0x3f000000u; \}', glsl))
+
+
 class Lowering:
     def __init__(self, glsl, consts, attrib_names=None, mode='identity', zratio=1.0, table_entries=TABLE_ENTRIES,
                  samplers=None, encode=None, premultiply=False, quad=False, mat='auto', colours=None):
@@ -481,6 +492,10 @@ class Lowering:
         self.stage, self.ins, self.outs, self.body = parse_program(glsl)
         self.samplers = samplers or {}
         self.encode, self.premultiply, self.quad = encode, premultiply, quad
+        # a quad program that takes its corner from the id's bits (bit 0 x, bit 1 y: Sephiroth's aim arrow, eft2 type 6:
+        # `r = uint(gl_VertexID)`, then its bits 0-1 as predicates picking +-0.5), not from Ultimate's usual
+        # 0 (-.5, .5) 1 (.5, .5) 2 (.5, -.5) 3 (-.5, -.5): vertex_id() gives it ids in that order
+        self.id_bits = quad_id_bits(glsl)
         # the matrix this program takes its particles out of their emitter's space with: sysEmtMat0-2 (a CPU
         # particle's, as born or live) when it reads them, else c10's live emitter matrix (rows 16 - 27)
         self.colours = colours
@@ -922,10 +937,18 @@ class Lowering:
         raise NotImplementedError(spec)
 
     def vertex_id(self):
-        """Ultimate's quad vertex id (its corners 0 (-.5, .5), 1 (.5, .5), 2 (.5, -.5), 3 (-.5, -.5)) of eft's corner"""
+        """Ultimate's quad vertex id (its corners 0 (-.5, .5), 1 (.5, .5), 2 (.5, -.5), 3 (-.5, -.5)) of eft's corner; for a
+        program that takes the corner from the id's bits (id_bits: bit 0 x > 0, bit 1 y > 0) the id of that corner, so the
+        corner it makes is eft's (with the usual order such a program's quad folded: one triangle crossed the other, a
+        wedge from two corners to the middle missing; Sephiroth's aim arrow, tests 63 - 76: "one arm ... ends in a
+        diagonal cut")"""
         def make():
             sx = self.emit('SETGT_DX10', [self.hw('v_inPos', 0), L(0)])
             sy = self.emit('SETGT_DX10', [self.hw('v_inPos', 1), L(0)])
+            if self.id_bits:
+                # CNDE_INT c, a, b = c == 0 ? a : b: x > 0 -> bit 0, y > 0 -> bit 1
+                low, high = self.emit('CNDE_INT', [sx, L(0), L(1)]), self.emit('CNDE_INT', [sx, L(2), L(3)])
+                return self.emit('CNDE_INT', [sy, low, high])
             # CNDE_INT c, a, b = c == 0 ? a : b: y below 0 -> 3 / 2, else 0 / 1; x below 0 -> the left one
             left, right = self.emit('CNDE_INT', [sy, L(3), L(0)]), self.emit('CNDE_INT', [sy, L(2), L(1)])
             return self.emit('CNDE_INT', [sx, left, right])

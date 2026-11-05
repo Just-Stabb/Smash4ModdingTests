@@ -860,6 +860,11 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
         pos, uv2, idx = QUAD
         uv = np.concatenate([uv2, uv2], 1).astype(np.float32)
         col = np.ones((4, 4), np.float32)
+        import ult_to_latte
+        if ult_to_latte.quad_id_bits(vs.glsl):
+            # its corners from the id's bits (strip order): Ultimate draws such a quad as a strip; as the cyclic
+            # triangles one crossed the other, a wedge from two corners to the middle missing (Sephiroth's arrow)
+            idx = np.array([0, 1, 2, 2, 1, 3])
     nv = len(pos)
     A = np.zeros((len(born), nv, 16, 4), np.float32)
     slot = vs.inputs
@@ -921,6 +926,12 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
         if img is None:
             continue
         rgba = np.asarray(img, np.float32) / 255
+        if os.environ.get('FX_UV_RAMP'):          # debug: the texture as a UV ramp (r = u, g = v), opaque
+            h, w = rgba.shape[:2]
+            rgba = np.zeros_like(rgba)
+            rgba[..., 0] = (np.arange(w) + 0.5)[None, :] / w
+            rgba[..., 1] = (np.arange(h) + 0.5)[:, None] / h
+            rgba[..., 3] = 1.0
         if smp['texture_id'] in em.ult['srgb']:
             rgba[..., :3] = srgb_to_linear(rgba[..., :3])
         tex[unit] = (rgba, wrap.get(smp['wrap_u'], 0), wrap.get(smp['wrap_v'], 0))
