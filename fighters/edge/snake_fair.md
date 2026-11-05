@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 97.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 98** (held up tilt added). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -29,6 +29,27 @@ The user's numbers:
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
 - The catch does 5%. The end hit does 11% at fair's angle, with much less knockback growth so it combos.
+
+## Held up tilt (test 98)
+
+User, test 97: "please make held Up tilt work the same way that held forward air does", "for up tilt, make the
+default direction up". Everything above applies, with up tilt's own numbers (`edge_sn_move` 1):
+- **Hooks:** up tilt's status (0x29) main `func_278` (`edge_sn_init_hi3`: the hold check starts if attack is held),
+  its loop `func_279` (`edge_sn_loop`, first), and its end slot (was the empty `func_323`; `edge_sn_end`).
+- **Frames** (Ultimate's `c02attackhi3`, the port's ACMD): the pull hit at 17, the clean hit 20–22, the late hit
+  23–32. The hold window opens at 23 (after the clean hit) and the hold is confirmed at 29 (6 frames, as fair's).
+  The motion goes back to frame 20, where the sword points straight up (swordl1's +X = (0, 1, 0) from frame 20 on),
+  and freezes there.
+- **The path** starts at the blade's start in that pose: the hilt 1.14 forward, 26.36 up, the blade 0.82 above it, so
+  (1.14, 27.18). The first run goes up, and with nothing held it keeps the way it goes. "Back" against the first run
+  (down) needs the tip 24 past the sword's own reach upward.
+- **The articles** tell which move it is from his status (hit / status variable q 2 of his slot: 0x29 is up tilt) and
+  take up tilt's base then (`HI3_H` / `HI3_V`, `tools/edge_snake_articles_msc.py`).
+- **No gravity change** (he is on the ground): `edge_sn_gravity` does nothing for up tilt. Fast fall doesn't apply.
+- **ACMD** (`snake_hi3_scripts`): frames 17, 20 (hits and head intangibility) and 23 (late hits, intangibility off)
+  and the frame 16 / 20 effects only at `VAR_23` 0. The end hit at a new frame 21 once the sword is back (`VAR_23` 2):
+  `Hit_Log_Clear(-1)`, then frame 20's four hitboxes up the sword at 11%, up tilt's angles (90 / 91), KBG 40, each 2
+  bigger; removed at 23.
 
 ## Pieces
 

@@ -1356,3 +1356,25 @@ User: "fast falling still seems enabled on held forward air, please disable it".
   if it's past it (`KineticModule(0x11, 1, -max)`).
 - port_check over the chain and tests 70–97: 30 errors, as before. MSC stack check clean.
 - Package (install over 96): `script/msc/edge.mscsb`.
+
+## Test 98 (`build/sephiroth_test98.zip`): held up tilt
+
+User: "please make held Up tilt work the same way that held forward air does", then "for up tilt, make the default
+direction up".
+- Up tilt held through its hold window extends the sword the same way as held forward air (steering, catching,
+  dragging back with no stage collision, the end hit), from its own frozen pose. `fighters/edge/snake_fair.md` "Held
+  up tilt" has the details.
+- From Ultimate's `c02attackhi3` (`ultimate_acmd.BonePose` on swordl1): the sword straight up from motion frame 20,
+  hilt 1.14 forward and 26.36 up there; the blade's start 0.82 above it. Hit frames from the port's AttackHi3 (Ultimate's):
+  pull 17, clean 20–22, late 23–32. The hold window opens at 23, confirmed at 29; the motion goes back to 20.
+- The first run goes up; with nothing held it keeps its way. Down (against the first run) needs the tip 24 past
+  the normal reach, as fair's back.
+- `tools/edge_snake_msc.py`: `edge_sn_move` (0 fair, 1 up tilt; global 0x85) picks the window, freeze frame, base and
+  first direction; gravity left alone for up tilt. Hooks in `func_278` / `func_279`, and `edge_sn_end` as up tilt's
+  end (was the empty `func_323`). The articles read his status to take up tilt's base.
+- `tools/edge_specials_build.py` `snake_hi3_scripts`: up tilt's hits / effects gated to the tapped move; the end hit
+  (frame 20's hitboxes, 11%, KBG 40, +2 size) on frames 21–22 after the sword is back.
+- Approximated: the end hit's numbers follow fair's (the user's for fair), not anything of Ultimate's.
+- port_check over the chain and tests 70–98: 30 errors, as before. MSC stack checks clean (his, snake, snaketip).
+- Package (install over 97): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`,
+  `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.

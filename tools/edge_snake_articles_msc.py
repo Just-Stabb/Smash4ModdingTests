@@ -26,6 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: the blade's start, frozen frame 13
+HI3_H, HI3_V = 1.14, 27.18             # held up tilt's (edge_sn_move 1): c02attackhi3 frame 20, the sword straight up
+HI3_STATUS = 0x29                      # his status in up tilt (AttackHi3)
 RUNS = 12
 FX_EVERY = 6                           # frames between the point's flashes while the sword grows
 TIP_LEN = 3.48                         # the point's length (tools/edge_snake_articles.py)
@@ -49,10 +51,17 @@ float sn_base_v() { return sn_bv; }
 // forward, 13.32 up; the blade's body 0.82 on: BASE_H / BASE_V) from his position, at his depth. Tests 88 - 90 read his
 // hand through the joint variables instead: joint 26 read his root (the sword from his feet), joint 23 (LHaveN) a
 // point at his shoulder behind the hilt (its unanimated place, not the frozen pose): user, test 90's frame
+// Held up tilt (user, test 97) uses the same path from its own frozen pose: his status (hit / status variable q 2
+// of his slot, docs/position-variables.md) tells which
 void sn_base()
 {
     sn_bh = BASE_Hf;
     sn_bv = BASE_Vf;
+    if (WorkModuleF(0, 0x0f0000a0 + 0x8 * (sn_slot + 0x3) + 0x2) == HI3_STATUSf)
+    {
+        sn_bh = HI3_Hf;
+        sn_bv = HI3_Vf;
+    }
     sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
 }
 
@@ -377,6 +386,8 @@ def generate(base_c, own):
     assert '    global21 = func_40;\n' in text
     text = text.replace('    global21 = func_40;\n', '    global21 = 0;           // motion indices as they are (flare1.c)\n')
     code = (COMMON + own).replace('BASE_Hf', '%.2ff' % BASE_H).replace('BASE_Vf', '%.2ff' % BASE_V)
+    code = code.replace('HI3_Hf', '%.2ff' % HI3_H).replace('HI3_Vf', '%.2ff' % HI3_V)
+    code = code.replace('HI3_STATUSf', '%.1ff' % HI3_STATUS)
     code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS)).replace('FX_EVERY', str(FX_EVERY))
     code = code.replace('TIP_LENf', '%.2ff' % TIP_LEN)
     return text.rstrip('\n') + '\n' + code

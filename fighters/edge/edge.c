@@ -2997,7 +2997,7 @@ void func_115()
     sv_set_mem(0x1, 0x2, 0x26, func_339);
     sv_set_mem(0x1, 0x2, 0x27, func_321);
     sv_set_mem(0x1, 0x2, 0x28, func_322);
-    sv_set_mem(0x1, 0x2, 0x29, func_323);
+    sv_set_mem(0x1, 0x2, 0x29, edge_sn_end);  // Sephiroth: held up tilt (was func_323, empty)
     sv_set_mem(0x1, 0x2, 0x2a, func_324);
     sv_set_mem(0x1, 0x2, 0x2b, func_325);
     sv_set_mem(0x1, 0x2, 0x2c, func_326);
@@ -6867,11 +6867,13 @@ void func_278()
         func_274();
     }
     global16 = func_274;
+    edge_sn_init_hi3();      // Sephiroth: held up tilt
     func_78(func_279);
 }
 
 void func_279()
 {
+    edge_sn_loop();          // Sephiroth: held up tilt
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -39529,9 +39531,28 @@ void edge_sn_ov_set(int k, float v)
 // constants (model units; the path lies in the fighter's model plane: h forward (+Z), v up (+Y))
 int   edge_sn_motion() { return 0x69; }        // AttackAirF (func_311)
 float edge_sn_hold() { return 6.0f; }          // held this many frames after the window opens: the extending version
-float edge_sn_window() { return 15.0f; }       // the hold window opens after the tapped move's clean hit (frames 13 - 14)
-float edge_sn_freeze() { return 13.0f; }       // the frame the sword points straight ahead (its hit frame): the motion
-                                               // goes back to it and holds while the sword is out
+// up tilt (status 0x29) works the same way (user, test 97: "make held Up tilt work the same way that held forward
+// air does"; "for up tilt, make the default direction up"): edge_sn_move 1, its numbers from Ultimate's c02attackhi3
+// (the sword straight up from motion frame 20, clean hit 20 - 22, late 23 - 32); on the ground, so no gravity change
+int   edge_sn_move;       // the move held: 0 forward air, 1 up tilt
+
+float edge_sn_window()                          // the hold window opens after the tapped move's clean hit
+{
+    if (edge_sn_move)
+    {
+        return 23.0f;                           // up tilt: clean hit 20 - 22
+    }
+    return 15.0f;                               // forward air: clean hit 13 - 14
+}
+// the frame the sword points straight ahead (its hit frame): the motion goes back to it and holds while the sword is out
+float edge_sn_freeze()
+{
+    if (edge_sn_move)
+    {
+        return 20.0f;                           // up tilt: the sword straight up from frame 20 (c02attackhi3 frame 20:
+    }                                           // swordl1 x (0, 1, 0))
+    return 13.0f;
+}
 float edge_sn_speed() { return 3.0f; }         // the tip's speed while a direction is held
 float edge_sn_retract() { return 6.0f; }       // the speed back along the path once the button is let go
 float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
@@ -39547,8 +39568,26 @@ float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with 
                                                // the sword (game units: whoever's scale), so the hits that follow
                                                // the sword back find it (user, test 94)
 float edge_sn_base_x() { return -0.51f; }      // the blade's start at the freeze frame (Ultimate's c05attackairf
-float edge_sn_base_v() { return 13.35f; }      // frame 13, swordl1 x (0.818, 0, 0.048)), along +Z there
-float edge_sn_base_h() { return 11.06f; }
+float edge_sn_base_v()                          // frame 13, swordl1 x (0.818, 0, 0.048)), along +Z there; up tilt:
+{                                               // c02attackhi3 frame 20, the hilt 1.14 forward, 26.36 up, the blade's
+    if (edge_sn_move)                           // start 0.82 above it
+    {
+        return 27.18f;
+    }
+    return 13.35f;
+}
+float edge_sn_base_h()
+{
+    if (edge_sn_move)
+    {
+        return 1.14f;
+    }
+    return 11.06f;
+}
+int edge_sn_first()                             // the first run's direction (and with nothing held at the start):
+{                                               // forward air forward, up tilt up
+    return edge_sn_move;
+}
 float edge_sn_blade() { return 21.98f; }       // the blade's body (0.82 - 22.80 along the sword)
 float edge_sn_tip() { return 3.48f; }          // its point
 float edge_sn_hidden() { return 0.001f; }      // a hidden piece's scale
@@ -39556,7 +39595,7 @@ int   edge_sn_var() { return 0x0f000317; }     // VAR_23: 0 the normal move, 1 e
 
 int   edge_sn_state;      // 0 off, 1 checking the hold, 3 extending, 4 retracting, 5 end hit (low
                           // gravity), 6 over
-int   edge_sn_hid;        // the blade hidden (1): shown again at the next aerial if a move left it so
+int   edge_sn_hid;        // the blade hidden (1): shown again at the next aerial / up tilt if a move left it so
 int   edge_sn_n;          // runs in the path
 float edge_sn_since;      // frames since the last turn
 float edge_sn_total;      // the path's length
@@ -39867,7 +39906,8 @@ void edge_sn_steer()
     want = edge_sn_cardinal();
     edge_sn_since = edge_sn_since + 1.0f;
     cur = edge_sn_d(edge_sn_n);
-    if (want < 0)               // no direction held: on the way it goes (user, test 92; the first run is forward)
+    if (want < 0)               // no direction held: on the way it goes (user, test 92; the first run is forward,
+                                // up tilt's up)
     {
         want = cur;
     }
@@ -39883,10 +39923,14 @@ void edge_sn_steer()
         {
             ok = 0;
         }
-        if (want == 2)
-        {
+        if (want == edge_sn_first() + 2)        // back on the first run's way (forward air: back; up tilt: down)
+        {                                       // only once the tip is well past the sword's own reach that way
             edge_sn_point(edge_sn_total);
             fwd = edge_sn_ph - edge_sn_base_h();
+            if (edge_sn_move)
+            {
+                fwd = edge_sn_pv - edge_sn_base_v();
+            }
             if (fwd < edge_sn_blade() + edge_sn_back_min())
             {
                 ok = 0;
@@ -40032,6 +40076,10 @@ void edge_sn_release(int drop)
 
 void edge_sn_gravity(float mul)
 {
+    if (edge_sn_move)
+    {
+        return;                                 // up tilt: on the ground
+    }
     KineticModule(0xf, 0x1, -(WorkModuleF(0, 0x3000018) * mul));
 }
 
@@ -40082,7 +40130,7 @@ void edge_sn_550()
 }
 
 // the aerial status's main: the move picked; the hold check starts if it's forward air with the button held
-void edge_sn_init()
+void edge_sn_reset()
 {
     edge_sn_setvar(0.0f);
     edge_sn_state = 0;
@@ -40091,7 +40139,24 @@ void edge_sn_init()
     {
         edge_sn_blade_hide(0);
     }
+}
+
+void edge_sn_init()
+{
+    edge_sn_reset();
+    edge_sn_move = 0;
     if (MotionModule(0x7) == edge_sn_motion() && WorkModuleF(0, 0x0f000100) == 1.0f)
+    {
+        edge_sn_state = 0x1;
+    }
+}
+
+// the up tilt status's main (func_278): the hold check starts if attack is held
+void edge_sn_init_hi3()
+{
+    edge_sn_reset();
+    edge_sn_move = 0x1;
+    if (WorkModuleF(0, 0x0f000100) == 1.0f)
     {
         edge_sn_state = 0x1;
     }
@@ -40102,6 +40167,10 @@ void edge_sn_begin()
     int k;
     int m;
     m = WorkModule(0x6, 0x11000002);            // the aerial's motion (func_310): back to the freeze frame, held there
+    if (edge_sn_move)
+    {
+        m = MotionModule(0x7);                  // up tilt's (func_278: FighterUtil(0x20))
+    }
     func_22(m, edge_sn_freeze(), 1.0f);
     MotionModule(0x4, 0.0f);
     edge_sn_scale = WorkModuleF(0, 0x300002c);
@@ -40110,7 +40179,7 @@ void edge_sn_begin()
         edge_sn_scale = 1.0f;
     }
     edge_sn_n = 1;
-    edge_sn_run_set(1, 0, edge_sn_blade());
+    edge_sn_run_set(1, edge_sn_first(), edge_sn_blade());
     k = 2;
     while (k <= 12)
     {

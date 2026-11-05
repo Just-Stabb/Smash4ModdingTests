@@ -611,10 +611,17 @@ float sn_base_v() { return sn_bv; }
 // forward, 13.32 up; the blade's body 0.82 on: BASE_H / BASE_V) from his position, at his depth. Tests 88 - 90 read his
 // hand through the joint variables instead: joint 26 read his root (the sword from his feet), joint 23 (LHaveN) a
 // point at his shoulder behind the hilt (its unanimated place, not the frozen pose): user, test 90's frame
+// Held up tilt (user, test 97) uses the same path from its own frozen pose: his status (hit / status variable q 2
+// of his slot, docs/position-variables.md) tells which
 void sn_base()
 {
     sn_bh = 11.06f;
     sn_bv = 13.35f;
+    if (WorkModuleF(0, 0x0f0000a0 + 0x8 * (sn_slot + 0x3) + 0x2) == 41.0f)
+    {
+        sn_bh = 1.14f;
+        sn_bv = 27.18f;
+    }
     sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
 }
 

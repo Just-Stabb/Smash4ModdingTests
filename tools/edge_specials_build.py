@@ -129,7 +129,8 @@ def body_scripts(a, fighter, param):
     if SNAKE_FAIR:
         glow = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Sword_Glow')
         msg, hit = snake_fair_scripts(game, effect)
-        log += msg + snake_article_scripts(fighter, hit, glow) + '\n'
+        log += msg + snake_hi3_scripts(game, effect)
+        log += snake_article_scripts(fighter, hit, glow) + '\n'
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
     return log
@@ -207,6 +208,39 @@ def snake_fair_scripts(game, effect):
     eout = [(f, _when(0, body) if f == 13.0 else body) for f, body in _frames(effect.scripts[crc])]
     effect.scripts[crc] = _join(eout)
     return '\nheld forward air: end hit (%d hitboxes); normal hits / effects only when tapped\n' % len(end), hits[0]
+
+
+def snake_hi3_scripts(game, effect):
+    """AttackHi3 held (user, test 97: "make held Up tilt work the same way that held forward air does"; MSC
+    edge_sn_move 1): the tapped move's hits (frames 17, 20, 23: the pull, the clean and late hits, with frame 20's
+    head intangibility and 23's end of it) and its frame 16 / 20 effects only at VAR_23 0; held, the end hit on frames
+    21 - 22 once the sword is back (the motion frozen at 20, the sword straight up, runs again from there): frame 20's
+    four hitboxes (on his root, up the sword) at 11%, up tilt's angles, KBG 40, each 2 bigger, after Hit_Log_Clear(-1);
+    off at 23"""
+    crc = acmd.crc('AttackHi3')
+    parts = _frames(game.scripts[crc])
+    frames = [f for f, _b in parts]
+    for need in (17.0, 20.0, 23.0):
+        if need not in frames:
+            raise SystemExit('AttackHi3: no frame %g' % need)
+    hb20 = next(body for f, body in parts if f == 20.0)
+    hits = [c for c in hb20 if c.name.endswith('Hitbox')]
+    assert len(hits) == 4, [c.name for c in hb20]
+    end = [_set(c, Part=0, Damage=11.0, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits]
+    out = []
+    for f, body in parts:
+        if f in (17.0, 20.0):
+            body = _when(0, body)
+        if f == 23.0:
+            body = _when(0, body) + _when(2, [U.cmd('Remove_All_Hitboxes')])
+        out.append((f, body))
+        if f == 20.0:
+            out.append((21.0, _when(2, [U.cmd('Remove_All_Hitboxes'), U.cmd('Hit_Log_Clear', -1)] + end)))
+    assert 21.0 not in frames
+    game.scripts[crc] = _join(out)
+    eout = [(f, _when(0, body) if f in (16.0, 20.0) else body) for f, body in _frames(effect.scripts[crc])]
+    effect.scripts[crc] = _join(eout)
+    return 'held up tilt: end hit (%d hitboxes, frames 21 - 22); normal hits / effects only when tapped\n' % len(end)
 
 
 def snake_article_scripts(fighter, hit_template, glow_template):
