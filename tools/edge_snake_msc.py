@@ -80,6 +80,7 @@ float edge_sn_down_side() { return 16.0f; }    // up tilt: down only once the ti
 float edge_sn_life() { return 300.0f; }        // the sword goes back by itself after this many frames out, held or
                                                // not: 5 seconds (user, test 98)
 int   edge_sn_timer() { return 0x0f000316; }   // VAR_22: frames since the sword started to extend
+int   edge_sn_hit_var() { return 0x0f000313; } // VAR_19: 1 once this move hit anyone (his hits or the point's catch)
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
 float edge_sn_fall() { return 0.1f; }          // from the hold until the end hit is over: falling at this, steady
                                                // (no gravity), whatever his speed was (user, test 99: "not
@@ -545,6 +546,7 @@ void edge_sn_catch_new()
                 // "the initial hit doesn't forcibly align the opponent inside the sword", so on the way back it
                 // was off the sword and the end hit missed it)
                 edge_sn_s_set(slot, edge_sn_total - edge_sn_back);
+                WorkModule(0, 1.0f, edge_sn_hit_var());
                 edge_sn_oh_set(slot, th - edge_sn_ph);
                 edge_sn_ov_set(slot, tv - edge_sn_pv - edge_sn_centre() / edge_sn_scale);
             }
@@ -756,6 +758,7 @@ void edge_sn_550()
 // the aerial status's main: the move picked; the hold check starts if it's forward air with the button held
 void edge_sn_reset()
 {
+    WorkModule(0, 0.0f, edge_sn_hit_var());
     edge_sn_setvar(0.0f);
     edge_sn_state = 0;
     edge_sn_release(0);
@@ -828,6 +831,32 @@ void edge_sn_finish()
     edge_sn_setvar(2.0f);
     edge_sn_state = 0x5;                        // still low gravity: normal at edge_sn_grav_end
     MotionModule(0x4, 1.0f);
+}
+
+// the held move's side special cancel (user, test 107: "make held up tilt and forward air cancellable into side
+// special after the hilt reaches Sephiroth, specifically if he hit them with any part of the attack"): from the
+// sword back at the hilt (state 5 on), if the move hit anyone (his own hits, SELF_HIT, or the point's catch), the
+// side special input (global24 0x2000, as func_43 reads it; the status's own transition terms left out) goes into
+// side special (0x153). Run first in the aerial / up tilt loops: 1 if it did
+int edge_sn_cancel()
+{
+    if (edge_sn_state == 0)
+    {
+        return 0;
+    }
+    if (WorkModuleF(0, 0x0f0000a0) == 1.0f)    // SELF_HIT: his attack has connected
+    {
+        WorkModule(0, 1.0f, edge_sn_hit_var());
+    }
+    if (edge_sn_state >= 0x5 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && (global24 & 0x2000) != 0)
+    {
+        if (func_72(global25))
+        {
+            func_16(0x153, 0x1);
+            return 0x1;
+        }
+    }
+    return 0;
 }
 
 // the aerial status's loop, every frame
@@ -951,6 +980,11 @@ HOOKS = [
     ('func_278', '    func_78(func_279);\n', 'before', '    edge_sn_init_hi3();      // Sephiroth: held up tilt\n'),
     ('func_279', '    if (CancelModule(0x2713) == 0x1 && func_39() != 0)\n', 'before',
      '    edge_sn_loop();          // Sephiroth: held up tilt\n'),
+    # the side special cancel, first in both loops (after the loop hooks above: found by their lines)
+    ('func_279', '    edge_sn_loop();          // Sephiroth: held up tilt\n', 'before',
+     '    if (edge_sn_cancel())    // Sephiroth: held up tilt, side special cancel\n    {\n        return;\n    }\n'),
+    ('func_319', '    edge_sn_loop();          // Sephiroth: held forward air\n', 'before',
+     '    if (edge_sn_cancel())    // Sephiroth: held forward air, side special cancel\n    {\n        return;\n    }\n'),
     ('func_319', '    func_555();\n', 'replace',
      '    if (edge_sn_free())      // Sephiroth: held forward air, no fast fall while the sword is out\n    {\n'
      '        func_555();\n    }\n'),

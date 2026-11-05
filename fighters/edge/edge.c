@@ -6880,6 +6880,10 @@ void func_278()
 
 void func_279()
 {
+    if (edge_sn_cancel())    // Sephiroth: held up tilt, side special cancel
+    {
+        return;
+    }
     edge_sn_loop();          // Sephiroth: held up tilt
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
@@ -7513,6 +7517,10 @@ int func_318()
 
 void func_319()
 {
+    if (edge_sn_cancel())    // Sephiroth: held forward air, side special cancel
+    {
+        return;
+    }
     edge_sn_loop();          // Sephiroth: held forward air
     if (func_318())
     {
@@ -39078,13 +39086,56 @@ void edge_lw_ph_send()
 // the Phantom's tracking (test 106): if the last fighter he hit (combat target 2) is in hitstun, its place goes in his
 // VAR_31 for the Phantom's attack to take (weapons/phantom.c ph_track: 2^21 + (x + 512) * 1024 + (y + 512), whole
 // units, |x|, |y| up to 511); else 0. VAR_31 is the held sword's run counter only while its articles are made
+// a fighter held on his sword now (the snake block's edge_sn_s, held forward air / up tilt): its place packed with
+// 2^22 (the Phantom follows it up and down, test 107: "make the Phantom track opponents vertically when held by
+// Sephiroth's snake sword"), else 0
+int edge_lw_ph_held()
+{
+    int slot;
+    float x;
+    float y;
+    slot = 1;
+    while (slot <= 0x8)
+    {
+        if (edge_sn_s(slot) >= 0.0f)
+        {
+            x = WorkModuleF(0, 0x0f000020 + 0x4 * (slot - 1));   // POS_SLOTn_X / Y
+            y = WorkModuleF(0, 0x0f000021 + 0x4 * (slot - 1));
+            if (x < -511.0f)
+            {
+                x = -511.0f;
+            }
+            if (x > 511.0f)
+            {
+                x = 511.0f;
+            }
+            if (y < -511.0f)
+            {
+                y = -511.0f;
+            }
+            if (y > 511.0f)
+            {
+                y = 511.0f;
+            }
+            return 0x400000 + (int)(x + 512.5f) * 0x400 + (int)(y + 512.5f);
+        }
+        slot = slot + 1;
+    }
+    return 0;
+}
+
 void edge_lw_ph_target()
 {
     float lr;
     float x;
     float y;
     int code;
-    code = 0;
+    code = edge_lw_ph_held();
+    if (code != 0)
+    {
+        WorkModule(0, (float)code, 0x0f00031f);
+        return;
+    }
     if (WorkModuleF(0, 0x0f000050) > 0.0f)        // LASTHIT_HITSTUN
     {
         lr = PostureModuleF(0);
@@ -39142,6 +39193,7 @@ void edge_lw_ph_tick()
 {
     float c;
     float per;
+    int held;
     // hit while it's out (charging, or sent and still there): it goes (user, test 104: "if Sephiroth is hit while
     // Phantom is out, it should disappear (if he's not in the middle of countering)": a hit his counter takes puts
     // him in no damage status). Damage statuses: 0x45 - 0x4B (Damage ... DamageFlyTop), 0x41 CaptureDamage, 0x57
@@ -39153,6 +39205,21 @@ void edge_lw_ph_tick()
             ArticleModule(0x2714, 0x2, 0x4);
         }
         edge_lw_ph_set(0.0f);
+        return;
+    }
+    if (edge_lw_ph() == 3.0f && ArticleModule(0x2717, 0x2))
+    {
+        // sent and still out: a fighter held on his sword kept up to date for it to follow (test 107); none, his
+        // code (2^22 and up only: VAR_31 is the sword's run counter while its articles are made) taken back
+        held = edge_lw_ph_held();
+        if (held != 0)
+        {
+            WorkModule(0, (float)held, 0x0f00031f);
+        }
+        else if (WorkModuleF(0, 0x0f00031f) >= 4194304.0f)
+        {
+            WorkModule(0, 0.0f, 0x0f00031f);
+        }
         return;
     }
     if (edge_lw_ph() != 2.0f)
@@ -39898,6 +39965,7 @@ float edge_sn_down_side() { return 16.0f; }    // up tilt: down only once the ti
 float edge_sn_life() { return 300.0f; }        // the sword goes back by itself after this many frames out, held or
                                                // not: 5 seconds (user, test 98)
 int   edge_sn_timer() { return 0x0f000316; }   // VAR_22: frames since the sword started to extend
+int   edge_sn_hit_var() { return 0x0f000313; } // VAR_19: 1 once this move hit anyone (his hits or the point's catch)
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
 float edge_sn_fall() { return 0.1f; }          // from the hold until the end hit is over: falling at this, steady
                                                // (no gravity), whatever his speed was (user, test 99: "not
@@ -40363,6 +40431,7 @@ void edge_sn_catch_new()
                 // "the initial hit doesn't forcibly align the opponent inside the sword", so on the way back it
                 // was off the sword and the end hit missed it)
                 edge_sn_s_set(slot, edge_sn_total - edge_sn_back);
+                WorkModule(0, 1.0f, edge_sn_hit_var());
                 edge_sn_oh_set(slot, th - edge_sn_ph);
                 edge_sn_ov_set(slot, tv - edge_sn_pv - edge_sn_centre() / edge_sn_scale);
             }
@@ -40574,6 +40643,7 @@ void edge_sn_550()
 // the aerial status's main: the move picked; the hold check starts if it's forward air with the button held
 void edge_sn_reset()
 {
+    WorkModule(0, 0.0f, edge_sn_hit_var());
     edge_sn_setvar(0.0f);
     edge_sn_state = 0;
     edge_sn_release(0);
@@ -40646,6 +40716,32 @@ void edge_sn_finish()
     edge_sn_setvar(2.0f);
     edge_sn_state = 0x5;                        // still low gravity: normal at edge_sn_grav_end
     MotionModule(0x4, 1.0f);
+}
+
+// the held move's side special cancel (user, test 107: "make held up tilt and forward air cancellable into side
+// special after the hilt reaches Sephiroth, specifically if he hit them with any part of the attack"): from the
+// sword back at the hilt (state 5 on), if the move hit anyone (his own hits, SELF_HIT, or the point's catch), the
+// side special input (global24 0x2000, as func_43 reads it; the status's own transition terms left out) goes into
+// side special (0x153). Run first in the aerial / up tilt loops: 1 if it did
+int edge_sn_cancel()
+{
+    if (edge_sn_state == 0)
+    {
+        return 0;
+    }
+    if (WorkModuleF(0, 0x0f0000a0) == 1.0f)    // SELF_HIT: his attack has connected
+    {
+        WorkModule(0, 1.0f, edge_sn_hit_var());
+    }
+    if (edge_sn_state >= 0x5 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && (global24 & 0x2000) != 0)
+    {
+        if (func_72(global25))
+        {
+            func_16(0x153, 0x1);
+            return 0x1;
+        }
+    }
+    return 0;
 }
 
 // the aerial status's loop, every frame

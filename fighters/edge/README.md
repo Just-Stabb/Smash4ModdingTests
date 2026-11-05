@@ -1534,3 +1534,21 @@ opponent Sephiroth hit is in hitstun?" and "The tracking should not switch facin
   and that its native release doesn't move it back after the MSC places it (hence the second placement).
 - port_check over the chain and tests 70–106: 30 errors, as before. MSC stack checks clean (his, the Phantom's).
 - Package (install over 105): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb` (new).
+
+## Test 107 (`build/sephiroth_test107.zip`): the Phantom follows a fighter held on the sword up and down; side special cancel
+
+User: "Can you make the Phantom track opponents vertically when held by Sephiroth's snake sword?" and "please make
+held up tilt and forward air cancellable into side special after the hilt reaches Sephiroth, specifically if he hit
+them with any part of the attack".
+- **Phantom:** a fighter held on the sword (`edge_sn_s` >= 0) is its target before the last-hit-in-hitstun one: its
+  place goes in his VAR_31 packed with 2^22 as the Phantom is sent and every frame after while it's out
+  (`edge_lw_ph_held`; taken back, 2^22 and up only, when none is held). The Phantom (`weapons/phantom.c`) is now
+  placed at the end of its attack's main, after its own ground set-up (test 106 placed it before, which likely kept
+  it on the ground), put in the air (`StatusModule(2, 2)`, `GroundModule(0x2710, 5)`) for a held fighter, and then
+  follows that fighter's height every frame of its attack (`ph_follow_frame`: x and facing kept) until it's let go.
+- **Side special cancel:** from the sword back at the hilt (state 5 on), if the move hit anyone (his own hits,
+  `SELF_HIT`, or the point catching someone: his VAR_19), the side special input (`global24 & 0x2000`, as `func_43`
+  reads it) goes into side special (`edge_sn_cancel`, run first in the aerial and up tilt loops). Tapped moves are
+  unchanged.
+- port_check over the chain and tests 70–107: 30 errors, as before. MSC stack checks clean.
+- Package (install over 106): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.

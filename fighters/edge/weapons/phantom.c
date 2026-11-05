@@ -21,6 +21,7 @@ int global19;
 float global20;
 int global21;
 int ph_track_again;       // Sephiroth: the tracking done again on its attack's first frame
+int ph_follow;            // Sephiroth: following a fighter held on his sword up and down (test 107)
 
 void func_0()
 {
@@ -653,8 +654,7 @@ void func_54()
     int var3;
     float var4;
     float var5;
-    ph_track(0);                // Sephiroth: to the last fighter he hit, in hitstun (test 106)
-    ph_track_again = 0x1;
+    ph_follow = 0;              // Sephiroth: the tracking is placed at the end of this main (test 107)
     var0 = WorkModule(0x6, 0x10000007);
     var1 = WorkModuleF(0, 0x4);
     var2 = WorkModuleF(0, 0x2000003) * var1;
@@ -703,6 +703,8 @@ void func_54()
     var4 = PostureModuleF(0x1);
     var5 = PostureModuleF(0x2);
     GroundModule(0x1a, var4, var5);
+    ph_track(0);                // Sephiroth: to a fighter held on his sword, or the last he hit in hitstun (tests
+    ph_track_again = 0x1;       // 106 / 107), after its own ground set-up above (test 106's, before it, kept it down)
     callFunc3(func_55);
 }
 
@@ -714,6 +716,7 @@ void func_55()
         ph_track(0x1);
         ph_track_again = 0;
     }
+    ph_follow_frame();          // Sephiroth: up and down with a fighter held on his sword (test 107)
     if (WorkModule(0x10, 0x20000005) == 0 && WorkModuleF(0, 0x2) > 0)
     {
         var0 = (int)MotionModuleF(0x1);
@@ -881,6 +884,21 @@ void ph_track(int clear)
         return;
     }
     v = WorkModuleF(0, 0x0f000347 + 0x8 * slot);
+    if (v >= 4194304.0f)
+    {
+        // a fighter held on his sword (2^22 + the place, kept up to date by him each frame): there, in the air, then
+        // followed up and down (ph_follow_frame)
+        c = (int)v - 0x400000;
+        ix = c / 0x400;
+        iy = c - ix * 0x400;
+        x = (float)(ix - 0x200) - PostureModuleF(0) * ph_reach();
+        y = (float)(iy - 0x200);
+        StatusModule(0x2, 0x2);
+        GroundModule(0x2710, 0x5);
+        PostureModule(0x2714, x, y, PostureModuleF(0x3));
+        ph_follow = 0x1;
+        return;
+    }
     if (v < 2097152.0f)
     {
         return;
@@ -895,5 +913,36 @@ void ph_track(int clear)
     x = (float)(ix - 0x200) - PostureModuleF(0) * ph_reach();
     y = (float)(iy - 0x200);
     PostureModule(0x2714, x, y, PostureModuleF(0x3));
+}
+
+// every frame of its attack while following: the held fighter's height (its x kept, its facing kept); let go (his
+// code gone), it stops
+void ph_follow_frame()
+{
+    int slot;
+    int c;
+    int ix;
+    int iy;
+    float v;
+    if (ph_follow == 0)
+    {
+        return;
+    }
+    slot = ph_find_owner();
+    if (slot < 0)
+    {
+        ph_follow = 0;
+        return;
+    }
+    v = WorkModuleF(0, 0x0f000347 + 0x8 * slot);
+    if (v < 4194304.0f)
+    {
+        ph_follow = 0;
+        return;
+    }
+    c = (int)v - 0x400000;
+    ix = c / 0x400;
+    iy = c - ix * 0x400;
+    PostureModule(0x2714, PostureModuleF(0x1), (float)(iy - 0x200), PostureModuleF(0x3));
 }
 

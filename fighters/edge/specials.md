@@ -212,6 +212,10 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
     Phantom's own script (`weapons/phantom.c`, Zelda's decompiled with `ph_track`) takes it at the start of its
     attack (its main and its first frame) and stands 10 behind that fighter along its own facing (kept), at its
     height, so its slash (hitboxes 14 ahead) meets it.
+  - **Test 107:** a fighter held on his snake sword (held forward air / up tilt) comes first: its place (packed with
+    2^22) is kept up to date in VAR_31 every frame while the Phantom is out (`edge_lw_ph_held`); the Phantom is
+    placed after its own ground set-up (test 106 placed it before, which kept it down), put in the air, and follows
+    that fighter's height every frame of its attack (`ph_follow_frame`; x and facing kept) until it's let go.
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
