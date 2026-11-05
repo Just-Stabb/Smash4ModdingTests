@@ -926,8 +926,9 @@ void ph_track(int clear)
     PostureModule(0x2714, x, PostureModuleF(0x2) + y, PostureModuleF(0x3));
 }
 
-// every frame of its attack while following: the held fighter's height (its x kept, its facing kept); let go (his
-// code gone), it stops
+// every frame of its attack: a fighter held on his sword (his code 2^22 and up, kept up to date each frame) is followed
+// up and down (its x and facing kept), from whenever it's held, not only if it was held when the Phantom was sent
+// (test 110, the user: "Phantom doesn't seem to track held opponents"); let go, it stops
 void ph_follow_frame()
 {
     int slot;
@@ -935,10 +936,6 @@ void ph_follow_frame()
     int ix;
     int iy;
     float v;
-    if (ph_follow == 0)
-    {
-        return;
-    }
     slot = ph_find_owner();
     if (slot < 0)
     {
@@ -950,6 +947,12 @@ void ph_follow_frame()
     {
         ph_follow = 0;
         return;
+    }
+    if (ph_follow == 0)
+    {
+        StatusModule(0x2, 0x2);                // into the air to follow
+        GroundModule(0x2710, 0x5);
+        ph_follow = 0x1;
     }
     c = (int)v - 0x400000;
     ix = c / 0x400;

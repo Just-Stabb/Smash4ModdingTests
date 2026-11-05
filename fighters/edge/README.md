@@ -1575,3 +1575,18 @@ User: "Can you make Phantom's 10 unit tracking 15 units and also adjust its heig
   and down fully.
 - port_check over the chain and tests 70–109: 30 errors, as before. MSC stack checks clean.
 - Package (install over 108): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
+## Test 110 (`build/sephiroth_test110.zip`): the Phantom follows held fighters from whenever they're held; any special releases it while he can't act
+
+User: "Phantom doesn't seem to track held opponents" and "please allow the special button with any or no direction
+to be used to release the Phantom when Sephiroth is not actionable".
+- **Held tracking:** the Phantom only followed a fighter held on the sword if one was held at the moment it was
+  sent; one caught after (the Phantom already out) was never followed. Now `ph_follow_frame` checks every frame of
+  its attack and starts following (into the air, its height to the fighter's) whenever his VAR_31 holds a held
+  fighter (he updates it every frame while the Phantom is out). Also `edge_lw_ph_held` counts a fighter as held only
+  while the sword is out (`edge_sn_out`): the per-slot places start at 0 in a match, which read as "held".
+- **Release:** `edge_lw_free()`: his free statuses (0x0–0x9, 0xB–0xF, 0x11–0x15) or a move past its cancel frame
+  (`CancelModule(0x2713)`). Not free: any special press sends the Phantom (any or no direction); free: down special
+  only (the others stay his specials). The counter move's window (test 105) still applies.
+- port_check over the chain and tests 70–110: 30 errors, as before. MSC stack checks clean.
+- Package (install over 109): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.

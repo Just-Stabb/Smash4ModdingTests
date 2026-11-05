@@ -709,6 +709,17 @@ void edge_sn_float()
     KineticModule(0x11, 0x1, -edge_sn_fall());
 }
 
+// 1 while the sword is out (extending or retracting): its caught fighters' places are live (edge.c's Phantom,
+// edge_lw_ph_held: test 110)
+int edge_sn_out()
+{
+    if (edge_sn_state == 0x3 || edge_sn_state == 0x4)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 // the aerial's fast-fall checks (func_550 -> func_553 in func_316, func_555 in func_319) run only when this is 1: not
 // from the hold to the move's end (user, test 92: holding down steers it, it mustn't fast fall him too; test 96:
 // "fast falling still seems enabled on held forward air")

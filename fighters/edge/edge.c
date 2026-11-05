@@ -39002,6 +39002,23 @@ int edge_lw_can_counter()
     return 0x1;
 }
 
+// he can act (the free statuses: Wait to TurnRunBrake 0x0 - 0x9, the jumps and falls 0xB - 0xF, crouching 0x11 - 0x15;
+// or a move past its cancel frame): the Phantom goes on down special only then; otherwise on any special press, any
+// or no direction (user, test 110: "allow the special button with any or no direction to be used to release the
+// Phantom when Sephiroth is not actionable")
+int edge_lw_free()
+{
+    if (global4 <= 0x9 || global4 >= 0xb && global4 <= 0xf || global4 >= 0x11 && global4 <= 0x15)
+    {
+        return 0x1;
+    }
+    if (CancelModule(0x2713) == 0x1)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 // a down special press sends it only from near the end of the counter move (user, test 105: "make it so the
 // Phantom cannot be released until near the end of Sephiroth's counter down special"): not in the stance, from
 // frame 42 of the slash (actionable at 52) / 32 of the break (42); outside them at once. A counter hit still sends
@@ -39095,6 +39112,10 @@ int edge_lw_ph_held()
     int slot;
     float x;
     float y;
+    if (edge_sn_out() == 0)
+    {
+        return 0;                              // the sword isn't out: its per-slot places aren't live (test 110)
+    }
     slot = 1;
     while (slot <= 0x8)
     {
@@ -39257,7 +39278,8 @@ void edge_lw_ph_tick()
     // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
     // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
     // let go), or 240 frames past full charge (test 107; test 104: 120; Zelda's param 0x18000001: 60)
-    if ((WorkModuleF(0, 0x0f000109) == 1.0f && WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() && edge_lw_ph_open())
+    if ((WorkModuleF(0, 0x0f000109) == 1.0f && (WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() || edge_lw_free() == 0)
+         && edge_lw_ph_open())
         || c >= per * 7.0f + edge_lw_ph_keep())
     {
         edge_lw_ph_send();
@@ -40603,6 +40625,17 @@ void edge_sn_float()
     }
     edge_sn_gravity(0.0f);
     KineticModule(0x11, 0x1, -edge_sn_fall());
+}
+
+// 1 while the sword is out (extending or retracting): its caught fighters' places are live (edge.c's Phantom,
+// edge_lw_ph_held: test 110)
+int edge_sn_out()
+{
+    if (edge_sn_state == 0x3 || edge_sn_state == 0x4)
+    {
+        return 0x1;
+    }
+    return 0;
 }
 
 // the aerial's fast-fall checks (func_550 -> func_553 in func_316, func_555 in func_319) run only when this is 1: not
