@@ -57,8 +57,11 @@ float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
 float edge_sn_max() { return 300.0f; }         // the path's length at most
 float edge_sn_back_min() { return 24.0f; }     // back only once the tip is this far past the sword's own reach
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
-float edge_sn_grav() { return 0.4f; }          // gravity x this while extending / retracting (user, test 92: 0.4)
+float edge_sn_grav() { return 0.1f; }          // gravity x this while extending / retracting (user, test 95: 0.1)
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
+float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with its middle this far above its feet on
+                                               // the sword (game units: whoever's scale), so the hits that follow
+                                               // the sword back find it (user, test 94)
 float edge_sn_base_x() { return -0.51f; }      // the blade's start at the freeze frame (Ultimate's c05attackairf
 float edge_sn_base_v() { return 13.35f; }      // frame 13, swordl1 x (0.818, 0, 0.048)), along +Z there
 float edge_sn_base_h() { return 11.06f; }
@@ -464,9 +467,12 @@ void edge_sn_catch_new()
             dy = oy - tv;
             if ((ox != 0.0f || oy != 0.0f) && dx * dx + dy * dy < edge_sn_catch() * edge_sn_catch())
             {
+                // on the sword: its middle at the point's middle, not where the point found it (user, test 94:
+                // "the initial hit doesn't forcibly align the opponent inside the sword", so on the way back it
+                // was off the sword and the end hit missed it)
                 edge_sn_s_set(slot, edge_sn_total - edge_sn_back);
-                edge_sn_oh_set(slot, ox - edge_sn_ph);
-                edge_sn_ov_set(slot, oy - edge_sn_pv);
+                edge_sn_oh_set(slot, th - edge_sn_ph);
+                edge_sn_ov_set(slot, tv - edge_sn_pv - edge_sn_centre() / edge_sn_scale);
             }
         }
         slot = slot + 1;

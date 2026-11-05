@@ -1310,3 +1310,16 @@ User: "Keep in mind, opponents attached should only travel back from the point o
   (`tools/edge_snake_msc.py` `edge_sn_hold_caught`).
 - port_check over the chain and tests 70–94: 30 errors, as before. MSC stack check clean.
 - Package (install over 93): `script/msc/edge.mscsb`.
+
+## Test 95 (`build/sephiroth_test95.zip`): caught fighters put on the sword; 0.1x gravity in the hold
+
+User: "It works, but only if they aren't hit with the initial hit of forward air. Also please set the gravity to 0.2",
+then "make the gravity 0.1", then: "The hitbox for returning is small and the initial hit doesn't forcibly align the
+opponent inside the sword".
+- The catch kept a fighter where the point found it (its feet's offset from the path), so one caught off the
+  sword's line came back beside the sword and the end hit, on the sword, missed it. Now the caught fighter is put on
+  the sword: its middle (`edge_sn_centre`, 7 above its feet, game units) at the point's middle, and held there along
+  the path (`tools/edge_snake_msc.py` `edge_sn_catch_new`). The 7 is a typical fighter's middle, not read per fighter.
+- `edge_sn_grav` 0.1 (was 0.4).
+- port_check over the chain and tests 70–95: 30 errors, as before. MSC stack check clean.
+- Package (install over 94): `script/msc/edge.mscsb`.

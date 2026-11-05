@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 94.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 95.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -25,7 +25,7 @@ end.
 
 The user's numbers:
 - 3 units a frame, 300 at most.
-- Slightly lower gravity while extending (0.4x since test 93, the user's), no fast fall while the sword is out.
+- Slightly lower gravity while extending (0.1x since test 95, the user's; 0.4x in tests 93–94), no fast fall while the sword is out.
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
 - The catch does 5%. The end hit does 11% at fair's angle, with much less knockback growth so it combos.
@@ -69,9 +69,11 @@ pieces had their base at his feet.
     motion back to frame 13, held there: the blade hidden, the path published, the 12 runs and the point generated
     (ArticleModule 0x2710, articles 9 and 10).
   - Steering, then retracting.
-  - Catching (a fighter in hitstun whose feet are within 22 of the tip) and holding the caught fighters.
+  - Catching (a fighter in hitstun whose feet are within 22 of the tip) and holding the caught fighters. A caught
+    fighter is put on the sword, its middle (7 above its feet) at the point's middle, not left where the point found
+    it (test 95: off the sword, the end hit missed it on the way back).
   - Publishing the path every frame.
-  - 0.4x gravity, and the fast-fall flag (0x21000007) kept off; the aerial loop's fast-fall check (`func_555`) runs
+  - 0.1x gravity, and the fast-fall flag (0x21000007) kept off; the aerial loop's fast-fall check (`func_555`) runs
     only when `edge_sn_free()` (not while extending / retracting).
 - **Aerial status end (slot 2, was the empty `func_334`), `edge_sn_end`:** landing or any interruption drops the
   caught fighters, shows the blade, and tells the articles to go.
