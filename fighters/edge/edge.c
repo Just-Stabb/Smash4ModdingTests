@@ -7464,7 +7464,7 @@ void func_316()
     {
         func_103();
     }
-    func_550();
+    edge_sn_550();           // Sephiroth: held forward air, no fast fall from the hold on
 }
 
 void func_317()
@@ -40035,15 +40035,50 @@ void edge_sn_gravity(float mul)
     KineticModule(0xf, 0x1, -(WorkModuleF(0, 0x3000018) * mul));
 }
 
-// the aerial loop's fast-fall check (func_555) runs only when this is 1: not while the sword is out (user, test 92:
-// holding down steers it, it mustn't fast fall him too)
+// the aerial's fast-fall checks (func_550 -> func_553 in func_316, func_555 in func_319) run only when this is 1: not
+// from the hold to the move's end (user, test 92: holding down steers it, it mustn't fast fall him too; test 96:
+// "fast falling still seems enabled on held forward air")
 int edge_sn_free()
 {
-    if (edge_sn_state == 0x3 || edge_sn_state == 0x4)
+    if (edge_sn_state >= 0x3)
     {
         return 0;
     }
     return 0x1;
+}
+
+// no fast fall: its flag (0x21000001, set by func_553; tests 93 - 96 cleared 0x21000007, which isn't it) off, and
+// one begun before the hold (the tapped move's frames) undone as func_81 does: the fall speed back to the max
+// fall speed (0x3000019) if it is past it
+void edge_sn_no_fastfall()
+{
+    float maxfall;
+    if (WorkModule(0x10, 0x21000001))
+    {
+        WorkModule(0x2711, 0x21000001);
+        maxfall = WorkModuleF(0, 0x3000019);
+        if (KineticModuleF(0x1, 0x1) < -maxfall)
+        {
+            KineticModule(0x11, 0x1, -maxfall);
+        }
+    }
+    WorkModule(0x2711, 0x21000007);
+}
+
+// func_316's func_550 without its fast fall (func_553) while the sword is out
+void edge_sn_550()
+{
+    if (edge_sn_free())
+    {
+        func_550();
+        return;
+    }
+    if (WorkModule(0x1c, 0x1f00000e))
+    {
+        func_105();
+        func_104();
+    }
+    edge_sn_no_fastfall();
 }
 
 // the aerial status's main: the move picked; the hold check starts if it's forward air with the button held
@@ -40106,6 +40141,10 @@ void edge_sn_loop()
 {
     float f;
     int held;
+    if (edge_sn_state >= 0x3)
+    {
+        edge_sn_no_fastfall();                  // and func_553 / func_555 skipped: edge_sn_free
+    }
     if (edge_sn_state == 0x5 && MotionModuleF(0x1) >= edge_sn_grav_end())
     {
         edge_sn_gravity(1.0f);
@@ -40137,7 +40176,6 @@ void edge_sn_loop()
         edge_sn_begin();
     }
     edge_sn_gravity(edge_sn_grav());
-    WorkModule(0x2711, 0x21000007);             // no fast fall while the sword is out (func_555 skipped: edge_sn_free)
     if (edge_sn_state == 0x3)
     {
         if (held == 0)

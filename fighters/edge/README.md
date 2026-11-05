@@ -1343,3 +1343,16 @@ being dragged back towards the sword during the release shouldn't have stage col
 - Tests: position_vars_test and acmd_ext_test on the shipped `cross_f.rpx`: 0 failures. port_check over the chain and
   tests 70–96: 30 errors, as before. MSC stack check clean.
 - Package (install over 95): `code/cross_f.rpx`, `script/msc/edge.mscsb`.
+
+## Test 97 (`build/sephiroth_test97.zip`): no fast fall in held forward air
+
+User: "fast falling still seems enabled on held forward air, please disable it".
+- The fast fall is flag `0x21000001`, set by `func_553` (its check `func_554`: stick flicked down while falling),
+  which the aerial's per-frame `func_316` reaches through `func_550`. Tests 93–96 skipped only `func_555` (in the
+  loop, `func_319`) and kept `0x21000007` off, neither of which is the fast fall.
+- Now, from the hold to the move's end (`edge_sn_free`: states 3–6), `func_316` runs `edge_sn_550` instead (`func_550`'s
+  item / other checks without `func_553`), and the loop keeps `0x21000001` off; a fast fall begun before the hold
+  (the tapped move's frames) is undone as `func_81` does: fall speed back to the max fall speed (param `0x3000019`)
+  if it's past it (`KineticModule(0x11, 1, -max)`).
+- port_check over the chain and tests 70–97: 30 errors, as before. MSC stack check clean.
+- Package (install over 96): `script/msc/edge.mscsb`.

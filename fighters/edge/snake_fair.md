@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 96.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 97.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -73,8 +73,11 @@ pieces had their base at his feet.
     fighter is put on the sword, its middle (7 above its feet) at the point's middle, not left where the point found
     it (test 95: off the sword, the end hit missed it on the way back).
   - Publishing the path every frame.
-  - 0.1x gravity (kept after the sword is back, through the end hit, to motion frame 19: `edge_sn_grav_end`), and the fast-fall flag (0x21000007) kept off; the aerial loop's fast-fall check (`func_555`) runs
-    only when `edge_sn_free()` (not while extending / retracting).
+  - 0.1x gravity (kept after the sword is back, through the end hit, to motion frame 19: `edge_sn_grav_end`).
+  - No fast fall from the hold to the move's end (`edge_sn_free()` 0): its start (`func_553`, through `func_550` in
+    the aerial's `func_316`, and `func_555` in `func_319`) is skipped, its flag `0x21000001` kept off, and one begun
+    before the hold undone (fall speed back to the max fall speed, as `func_81` does). Tests 93–96 cleared
+    `0x21000007` and skipped only `func_555`, which left fast fall working (test 97).
 - **Aerial status end (slot 2, was the empty `func_334`), `edge_sn_end`:** landing or any interruption drops the
   caught fighters, shows the blade, and tells the articles to go.
 
