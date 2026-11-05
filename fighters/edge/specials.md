@@ -174,7 +174,15 @@ Scintilla, `edge.c` `edge_lw_*` and the `flash` article (`weapons/flash.c`), fro
 per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here too: the counter cave
 (`tools/edge_counter_cave.py`, docs/native-notes.md "Sephiroth's counter shape").
 
-- **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, is no longer generated; its files stay):
+- **Zelda's Phantom** (test 100, the user's: "make down special also charge Zelda's Phantom, and force it to activate
+  if the counter is hit"; hold B to charge, as hers): her article 2 is made at the stance's start (none if one is
+  still out), goes to its charging status at the stance's frame 7 (the counter on) and charges a frame each frame
+  B is held, its full-charge look at 49 (7 levels of 7 frames, param `0x08000000`). It is sent (the level, frames / 7
+  at most 7, in status float `0x1000006`, then `ArticleModule(0x271a, 2)`: her `func_2307`) when B is let go, 60
+  frames after full charge (`0x18000001`), or at once when the counter is hit (the hit's damage is read first: the
+  cave writes it in the same float). While it charges the stance holds at frame 30, so the counter stays up. The
+  stance interrupted while it charges: it goes (status 4). Its state in his VAR_16–VAR_18 (`edge_lw_ph_*`).
+- **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
   `0db70` / `11f00`). Slots 0 pre (0x15B / 0x15C: Zelda's `func_2303` / `func_2308`, kinetic and work kept:

@@ -1391,3 +1391,30 @@ retract after 5 seconds have passed."
   global is spent.
 - port_check over the chain and tests 70–99: 30 errors, as before. MSC stack check clean.
 - Package (install over 98): `script/msc/edge.mscsb`.
+
+## Test 100 (`build/sephiroth_test100.zip`): held forward air falls slow and steady; Scintilla charges Zelda's Phantom
+
+User: "Can you make held forward air not accelerate downwards over time and set fall speed to something extremely
+low. Also please make down special also charge Zelda's Phantom, and force it to activate if the counter is hit."
+Asked how the Phantom should charge: "Hold B to charge" (as Zelda's).
+- **Held forward air:** from the hold until the end hit is over (frame 19), no gravity (the gravity energy's accel 0)
+  and the fall speed set to 0.1 a frame every frame (`edge_sn_float`, `KineticModule(0x11, 1, -0.1)` as the game's
+  `func_81` sets it), whatever his speed was when the hold began (rising included). Tests 93–99 scaled gravity
+  (x 0.4, then x 0.1), so he still sped up. `edge_sn_fall` is the number.
+- **Scintilla + Zelda's Phantom** (`edge.c` `edge_lw_ph_*`; Zelda's own code: vanilla zelda.mscsb `func_2300`–`2307`,
+  decompiled):
+  - The stance makes her Phantom (article 2: her files are in his folder) unless one is still out.
+  - From the stance's frame 7 (the counter on) it is in its charging status and charges a frame each frame B is
+    held; the stance holds at frame 30 meanwhile, so the counter stays up as long as B is held.
+  - Full charge at 49 frames (7 levels of 7, his vl `0x08000000` / Zelda's), its full-charge look then; 60 frames
+    later (`0x18000001`) it goes by itself.
+  - Sent (level = frames / 7, at most 7, in status float `0x1000006`, then `ArticleModule(0x271a, 2)`) when B is let
+    go, at that limit, or at once when the counter is hit. Then the stance goes on: the whiff slash after a release,
+    the counter slash / break after a hit, as before.
+  - The stance interrupted (grabbed, hit from behind) before it's sent: the Phantom goes (status 4).
+  - A tap of B: frame 7 sends it at level 0 (Zelda's tap).
+  - Its state is in his VAR_16–VAR_18, not MSC globals (they're full: port_check C5).
+- Not proven in game: that the Phantom's native code works on a Sephiroth (its kind is Zelda's, its owner his);
+  where it stands is its own (native), not moved.
+- port_check over the chain and tests 70–100: 30 errors, as before. MSC stack check clean.
+- Package (install over 99): `script/msc/edge.mscsb`.

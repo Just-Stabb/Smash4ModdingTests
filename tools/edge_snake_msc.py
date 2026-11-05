@@ -81,10 +81,12 @@ float edge_sn_life() { return 300.0f; }        // the sword goes back by itself 
                                                // not: 5 seconds (user, test 98)
 int   edge_sn_timer() { return 0x0f000316; }   // VAR_22: frames since the sword started to extend
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
-float edge_sn_grav() { return 0.1f; }          // gravity x this from the hold until the end hit is over (user,
-                                               // test 95: 0.1; test 96: "until after the sword comes back")
+float edge_sn_fall() { return 0.1f; }          // from the hold until the end hit is over: falling at this, steady
+                                               // (no gravity), whatever his speed was (user, test 99: "not
+                                               // accelerate downwards over time and set fall speed to something
+                                               // extremely low"; tests 95 - 99: gravity x 0.1, still speeding up)
 float edge_sn_grav_end() { return 19.0f; }     // the motion frame the end hit is over at (fair's own clear at 19):
-                                               // normal gravity from there
+                                               // his own gravity from there
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
 float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with its middle this far above its feet on
                                                // the sword (game units: whoever's scale), so the hits that follow
@@ -614,6 +616,18 @@ void edge_sn_gravity(float mul)
     KineticModule(0xf, 0x1, -(WorkModuleF(0, 0x3000018) * mul));
 }
 
+// held forward air: no gravity, the fall speed set to edge_sn_fall every frame (the gravity energy's speed,
+// KineticModule(0x11, 1, v), as func_81 sets it)
+void edge_sn_float()
+{
+    if (edge_sn_move)
+    {
+        return;
+    }
+    edge_sn_gravity(0.0f);
+    KineticModule(0x11, 0x1, -edge_sn_fall());
+}
+
 // the aerial's fast-fall checks (func_550 -> func_553 in func_316, func_555 in func_319) run only when this is 1: not
 // from the hold to the move's end (user, test 92: holding down steers it, it mustn't fast fall him too; test 96:
 // "fast falling still seems enabled on held forward air")
@@ -751,6 +765,10 @@ void edge_sn_loop()
         edge_sn_gravity(1.0f);
         edge_sn_state = 0x6;
     }
+    if (edge_sn_state == 0x5)
+    {
+        edge_sn_float();
+    }
     if (edge_sn_state == 0 || edge_sn_state >= 0x5)
     {
         return;
@@ -776,7 +794,7 @@ void edge_sn_loop()
         edge_sn_setvar(1.0f);
         edge_sn_begin();
     }
-    edge_sn_gravity(edge_sn_grav());
+    edge_sn_float();
     if (edge_sn_state == 0x3)
     {
         WorkModule(0, WorkModuleF(0, edge_sn_timer()) + 1.0f, edge_sn_timer());

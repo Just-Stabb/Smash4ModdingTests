@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 99** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 100** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -26,7 +26,7 @@ end.
 
 The user's numbers:
 - 3 units a frame, 300 at most.
-- Slightly lower gravity while extending (0.1x since test 95, the user's; 0.4x in tests 93–94), from the hold until the end hit is over (frame 19; test 96), no fast fall while the sword is out.
+- From the hold until the end hit is over (frame 19), no gravity and a steady fall of 0.1 a frame (`edge_sn_fall`, test 100: the user's "not accelerate downwards over time", "extremely low" fall speed; tests 93–99: gravity x 0.4, then x 0.1), no fast fall.
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
 - The catch does 5%. The end hit does 11% at fair's angle, with much less knockback growth so it combos.
@@ -96,7 +96,7 @@ pieces had their base at his feet.
     fighter is put on the sword, its middle (7 above its feet) at the point's middle, not left where the point found
     it (test 95: off the sword, the end hit missed it on the way back).
   - Publishing the path every frame.
-  - 0.1x gravity (kept after the sword is back, through the end hit, to motion frame 19: `edge_sn_grav_end`).
+  - No gravity and the fall speed set to 0.1 every frame (`edge_sn_float`: the gravity energy's accel 0, its speed through `KineticModule(0x11, 1, -0.1)` as `func_81` sets it), kept after the sword is back, through the end hit, to motion frame 19 (`edge_sn_grav_end`).
   - No fast fall from the hold to the move's end (`edge_sn_free()` 0): its start (`func_553`, through `func_550` in
     the aerial's `func_316`, and `func_555` in `func_319`) is skipped, its flag `0x21000001` kept off, and one begun
     before the hold undone (fall speed back to the max fall speed, as `func_81` does). Tests 93–96 cleared
@@ -165,7 +165,7 @@ article finds its owner (the nearest Sephiroth), then every frame:
    variable q 6, `GroundModule(0x2710, 0)` on it every frame; 5, air, when it's let go): it goes through the stage and
    floors with the sword (test 96).
 6. **Back to normal length.** The motion runs again and `VAR_23` becomes 2: the end hit on frames 14–18, then the
-   rest of fair as normal. His gravity stays 0.1x until frame 19, then goes back to normal.
+   rest of fair as normal. His slow fall stays until frame 19, then his own gravity takes over.
 7. **Landing at any point:** the status ends with fair's normal landing lag. Caught fighters drop (hitstun 0) and
    the sword returns to normal.
 

@@ -38863,6 +38863,114 @@ int edge_lw_pre()
     return 0;
 }
 
+// ---- Zelda's Phantom with Scintilla (user, test 99: "make down special also charge Zelda's Phantom, and force it
+// to activate if the counter is hit"; asked: hold B to charge, as Zelda's Phantom Slash). Her article 2 (`phantom`,
+// her files in his folder) driven as her own statuses do (vanilla zelda.mscsb func_2300 - 2307): made at the
+// stance's start (none if one is still out: 0x2717), its charging status (1) from the stance's frame 7 (the counter
+// on), a frame of charge each frame B is held, its full-charge look (ArticleModule(0x2715, 2, 8 + slot)) at
+// 7 x 7 frames (param 0x08000000: frames a level, 7 levels), and sent (the level in status float 0x1000006, then
+// ArticleModule(0x271a, 2)) when B is let go, 60 frames after full charge (0x18000001), or at once when the
+// counter is hit. While it charges the stance holds at frame 30 (its pose still from there on), so the counter
+// stays up. Its state is in his VAR_16 - VAR_18 (the MSC's globals are full: port_check C5)
+int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 charging, 3 sent
+int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
+int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
+float edge_lw_hold_frame() { return 30.0f; }    // the stance holds here while the Phantom charges
+
+float edge_lw_ph()
+{
+    return WorkModuleF(0, edge_lw_ph_var());
+}
+
+void edge_lw_ph_set(float v)
+{
+    WorkModule(0, v, edge_lw_ph_var());
+}
+
+void edge_lw_ph_start()
+{
+    edge_lw_ph_set(0.0f);
+    WorkModule(0, 0.0f, edge_lw_chg_var());
+    WorkModule(0, 0.0f, edge_lw_full_var());
+    if (ArticleModule(0x2717, 0x2))
+    {
+        return;                        // one still out (Zelda's flag 0x2100000f): none this time
+    }
+    ArticleModule(0x2710, 0x2);
+    edge_lw_ph_set(1.0f);
+}
+
+// sent at the charge so far (func_2307): level = frames / frames-a-level, whole, at most 7, in status float
+// 0x1000006 (the cave's damage slot: a hit's d is read before this), then ArticleModule(0x271a, 2)
+void edge_lw_ph_send()
+{
+    float lv;
+    if (edge_lw_ph() != 2.0f)
+    {
+        return;
+    }
+    lv = WorkModuleF(0, edge_lw_chg_var()) / WorkModuleF(0, 0x8000000);
+    if (lv > 7.0f)
+    {
+        lv = 7.0f;
+    }
+    lv = (float)((int)lv);
+    WorkModule(0, lv, 0x1000006);
+    ArticleModule(0x271a, 0x2);
+    BattleObject(0x55, 0x1, 0x1c);
+    edge_lw_ph_set(3.0f);
+}
+
+// made but not sent (the stance interrupted): it goes (func_2302 / 2307: status 4)
+void edge_lw_ph_drop()
+{
+    if (edge_lw_ph() == 1.0f || edge_lw_ph() == 2.0f)
+    {
+        ArticleModule(0x2714, 0x2, 0x4);
+    }
+    edge_lw_ph_set(0.0f);
+}
+
+// the stance's frame: charging from frame 7 while B is held; the stance held at frame 30 meanwhile
+void edge_lw_ph_frame(float f)
+{
+    float c;
+    float per;
+    if (edge_lw_ph() == 1.0f && f >= 7.0f)
+    {
+        ArticleModule(0x2714, 0x2, 0x1);       // its charging status (func_2302)
+        edge_lw_ph_set(2.0f);
+    }
+    if (edge_lw_ph() == 2.0f)
+    {
+        per = WorkModuleF(0, 0x8000000);
+        c = WorkModuleF(0, edge_lw_chg_var()) + 1.0f;
+        WorkModule(0, c, edge_lw_chg_var());
+        if (c >= per * 7.0f && WorkModuleF(0, edge_lw_full_var()) == 0)
+        {
+            ArticleModule(0x2715, 0x2, 0x8 + WorkModule(0x6, 0x1000004b));   // full charge (func_2305)
+            WorkModule(0, 1.0f, edge_lw_full_var());
+        }
+        if (WorkModuleF(0, 0x0f000101) != 1.0f || c >= per * 7.0f + (float)WorkModule(0x6, 0x18000001))
+        {
+            edge_lw_ph_send();                 // B let go (SELF_SPECIAL), or held 60 past full charge
+        }
+    }
+    if (edge_lw_ph() == 2.0f && f >= edge_lw_hold_frame())
+    {
+        if (edge_lw_rate != 0.0f)
+        {
+            MotionModule(0x4, 0.0f);
+            edge_lw_rate = 0.0f;
+        }
+    }
+    else if (edge_lw_rate == 0.0f)
+    {
+        MotionModule(0x4, 1.0f);
+        edge_lw_rate = 1.0f;
+    }
+}
+
 // 143b0: the stance's frames
 void edge_lw_loop()
 {
@@ -38873,6 +38981,7 @@ void edge_lw_loop()
         edge_lw_proj = WorkModule(0x10, 0x21000011);
         edge_lw_countered = 0x1;
         edge_lw_shield_off();
+        edge_lw_ph_send();             // the counter hit: the Phantom out at once, charged so far
         if (edge_lw_dmg > 25.0f)       // shield_max: broken
         {
             func_16(0x15c, 0);
@@ -38893,6 +39002,7 @@ void edge_lw_loop()
         ShieldModule(0, 0x2, 0, 0x1, 0x1);   // game_speciallw frame 7: SHIELD_ON
         edge_lw_shield = 0x1;
     }
+    edge_lw_ph_frame(MotionModuleF(0x1));
     edge_lw_frame(1000.0f, 1000.0f);
 }
 
@@ -38912,6 +39022,7 @@ void edge_lw_main()
     WorkModule(0x2711, 0x21000010);
     edge_lw_kinetic(0.6f);
     MotionModule(0x1, edge_lw_motion(0x241), 0, 1.0f);
+    edge_lw_ph_start();
     global20 = 0;
     func_78(edge_lw_loop);
 }
@@ -39064,6 +39175,12 @@ void edge_lw_end()
     int id;
     if (global4 == 0x155)
     {
+        edge_lw_ph_drop();             // still charging (interrupted): the Phantom goes; sent: left alone
+        if (edge_lw_rate != 1.0f)
+        {
+            MotionModule(0x4, 1.0f);
+            edge_lw_rate = 1.0f;
+        }
         edge_lw_shield_off();
         id = edge_lw_fx_shield();
         if (global6 == 0x15c)
@@ -39564,10 +39681,12 @@ float edge_sn_life() { return 300.0f; }        // the sword goes back by itself 
                                                // not: 5 seconds (user, test 98)
 int   edge_sn_timer() { return 0x0f000316; }   // VAR_22: frames since the sword started to extend
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
-float edge_sn_grav() { return 0.1f; }          // gravity x this from the hold until the end hit is over (user,
-                                               // test 95: 0.1; test 96: "until after the sword comes back")
+float edge_sn_fall() { return 0.1f; }          // from the hold until the end hit is over: falling at this, steady
+                                               // (no gravity), whatever his speed was (user, test 99: "not
+                                               // accelerate downwards over time and set fall speed to something
+                                               // extremely low"; tests 95 - 99: gravity x 0.1, still speeding up)
 float edge_sn_grav_end() { return 19.0f; }     // the motion frame the end hit is over at (fair's own clear at 19):
-                                               // normal gravity from there
+                                               // his own gravity from there
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
 float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with its middle this far above its feet on
                                                // the sword (game units: whoever's scale), so the hits that follow
@@ -40097,6 +40216,18 @@ void edge_sn_gravity(float mul)
     KineticModule(0xf, 0x1, -(WorkModuleF(0, 0x3000018) * mul));
 }
 
+// held forward air: no gravity, the fall speed set to edge_sn_fall every frame (the gravity energy's speed,
+// KineticModule(0x11, 1, v), as func_81 sets it)
+void edge_sn_float()
+{
+    if (edge_sn_move)
+    {
+        return;
+    }
+    edge_sn_gravity(0.0f);
+    KineticModule(0x11, 0x1, -edge_sn_fall());
+}
+
 // the aerial's fast-fall checks (func_550 -> func_553 in func_316, func_555 in func_319) run only when this is 1: not
 // from the hold to the move's end (user, test 92: holding down steers it, it mustn't fast fall him too; test 96:
 // "fast falling still seems enabled on held forward air")
@@ -40234,6 +40365,10 @@ void edge_sn_loop()
         edge_sn_gravity(1.0f);
         edge_sn_state = 0x6;
     }
+    if (edge_sn_state == 0x5)
+    {
+        edge_sn_float();
+    }
     if (edge_sn_state == 0 || edge_sn_state >= 0x5)
     {
         return;
@@ -40259,7 +40394,7 @@ void edge_sn_loop()
         edge_sn_setvar(1.0f);
         edge_sn_begin();
     }
-    edge_sn_gravity(edge_sn_grav());
+    edge_sn_float();
     if (edge_sn_state == 0x3)
     {
         WorkModule(0, WorkModuleF(0, edge_sn_timer()) + 1.0f, edge_sn_timer());
