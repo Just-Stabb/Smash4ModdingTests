@@ -1250,6 +1250,23 @@ def check_effects(inst, name, rep):
                         or abs(g[0]) > 1e-6 or abs(g[2]) > 1e-6 or any(abs(v) > 1e-4 for v in p.field(d, 'emitter_rotation')):
                     continue
                 upright.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
+        # E8: a converted emitter on eft's line volume (12 / 13): eft's line runs along Z with the radius's z as its
+        # length and the particles of an emission as its count; eft2's runs along X with its own length and count.
+        # Scintilla's wall rows (edge_senkou_shield) were one hexagon each, stacked in depth (Sephiroth test 73,
+        # user: "fix down special's barrier"); vfxb_to_ptcl.py writes them as arcs of eft's circle
+        own = 'Ptc' + name[:1].upper() + name[1:]
+        lines = []
+        for si in range(len(p.sets)):
+            if not p.set_name(si).startswith(own):
+                continue
+            for x in p.sets[si]['emitters']:
+                d = x['data']
+                if d is not None and p.field(d, 'volume_type') in (12, 13):
+                    lines.append('%s/%s' % (p.set_name(si), p.emitter_name(d)))
+        if lines:
+            rep.add('ERROR', 'E8 eft-line-volume', '%d converted emitters on eft\'s line volume (along Z, one point an '
+                    'emission unless the rate says more; Ultimate\'s lines run along X): reconvert with '
+                    'vfxb_to_ptcl.py (arcs of eft\'s circle): %s' % (len(lines), ', '.join(lines[:8])))
         if upright:
             rep.add('ERROR', 'E5 upright-type4-mesh', '%d type-4 meshes move only along their emitter\'s Y: '
                     'eft\'s X (emitter Y x motion) is zero, drawn as nothing (eft2 type 5: convert as type 3): %s'

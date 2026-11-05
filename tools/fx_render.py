@@ -1404,7 +1404,10 @@ def main():
     ULT_DROP = tuple(int(v) for v in a.ult_drop.split(',') if v)
     import port_sources
     src = port_sources.load()
-    cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
+    try:
+        cfg = json.load(open(os.path.join(ROOT, 'fighters', a.name, 'port.json')))
+    except OSError:             # a port from before the framework (Sephiroth): Ultimate's name is its own
+        cfg = {'ult': a.name, 'effects': {}}
     ult_name = cfg['ult']
     a.first, a.last = (int(v) for v in a.frames.split('-'))
     a.view = tuple(float(v) for v in a.view.split(','))

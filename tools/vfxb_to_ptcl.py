@@ -2321,7 +2321,31 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     vt = sh['volume_type'] if sh['volume_type'] <= 14 else 0
     p.set_field(em, 'volume_type', vt)
     p.set_field(em, 'volume_radius', [float(r * f) for r, f in zip(sh['volume_radius'], sh['volume_form_scale'])])
-    if vt in (1, 2):
+    line = None
+    if vt in (12, 13):
+        # lines: eft2's runs along X (line_length, line_center, num_divide_line points, ends included);
+        # eft's along Z (cross_f 0x04A51B08: (0, 0, t L - (L + c L) / 2), L the radius z, n the particles of an
+        # emission), and the length / count weren't written: Scintilla's wall rows (edge_senkou_shield, 4 - 5
+        # hexagon meshes along X) were one hexagon each, stacked in depth (test 73, user: "fix down special's
+        # barrier"). As an arc of eft's circle instead (0x04A4BF18 / 0x04A4B818: (R sin a, 0, R cos a); an arc's
+        # even points go start + sweep i / (n - 1), both ends): R = LINE_R about a = pi, the emitter moved R
+        # along its Z, so the points run along X from -L / 2 to L / 2 (bowed L^2 / 8R in depth: 0.04 for 18.3)
+        n = max(1, int(sh['num_divide_line'])) if vt == 13 else 1
+        length = float(sh['line_length']) * float(sh['volume_form_scale'][0])
+        a = length / LINE_R
+        vt = 2 if vt == 13 else 1
+        p.set_field(em, 'volume_type', vt)
+        p.set_field(em, 'volume_radius', [LINE_R, 0.0, LINE_R])
+        p.set_field(em, 'volume_sweep_start', math.pi - a / 2 if n > 1 or vt == 1 else math.pi)
+        p.set_field(em, 'volume_sweep_param', a if n > 1 or vt == 1 else 0.0)
+        p.set_field(em, 'volume_sweep_start_random', 0)
+        p.set_field(em, 'volume_surface_random', 0.0)
+        # line_center as eft's own line has it (0x04A51B08: the points shifted by -c L / 2: -1 from the emitter
+        # forward, 1 back to it); eft2's taken the same (inferred: the one use off 0 is edge_shadowflare_beam_hit's -0.5)
+        line = (n, -float(sh['line_center']) * length / 2)
+        notes.append('line of %.1f%s along X: an arc of radius %g (eft\'s lines run along Z)' % (
+            length, ', %d points' % n if vt == 2 else '', LINE_R))
+    if vt in (1, 2) and line is None:
         # circles: eft2 centres the sweep on its start (main.bin 0x90C40 / 0x90E20: start + sweep x i / n -
         # sweep / 2), eft starts at it (cross_f 0x04A4B818 / 0x04A4BF18) and spreads an even circle over the
         # emission's own particles, not a division count; the template's sweep was kept before (Squirtle's
@@ -2373,6 +2397,12 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         p.set_field(em, 'init_velocity_random', 0.0)
         notes.append('upright (--upright-for)')
     p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(info['trans']))
+    if line is not None:
+        # the arc's points sit at z = R cos a ~ -R (above): the emitter moved R along its own Z (its turn and
+        # scale), and by the line's centre along its X
+        m = np.array(p.field(em, 'emitter_matrix'), float).reshape(3, 4)[:, :3]
+        t = np.array(info['trans'], float) + m @ np.array([line[1], 0.0, LINE_R])
+        p.set_emitter_srt(em, tuple(info['scale']), em_rot, tuple(float(v) for v in t))
     if typ in (1, 3) and not is_mesh and (pt['billboard_type'] == 3 or templates.upright):
         # eft2's particle centre (static `center`) as eft's rotBasis (0x4C4, docs/ptcl-format.md: the
         # vertex programs draw S (pos + rotBasis)): sys_attack_line's lines (0, 0.8) grow up from the
@@ -2400,7 +2430,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     p.set_field(em, 'emit_interval', int(ems['interval']))
     # the same random gap in both (eft2 main.bin 0x88750, eft cross_f 0x04A65350: + (rand x it) >> 32)
     p.set_field(em, 'emit_interval_random', max(0, int(ems['interval_random'])))
-    p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)))
+    p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)) * (line[0] if line is not None else 1))
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
     life_rand = 0
     if life != FOREVER and pt['life_random'] > 0:
@@ -2761,6 +2791,9 @@ CHILD_FROM_EMITTER = [      # (child offset, emitter offset, size)
     (0x2A8, 0x86C, 0x10), (0x2B8, 0x868, 4), (0x2F4, 0x8A8, 0x14)]
 # Ultimate's inherit flags (by index) -> ptcl.INHERIT (Duck Hunt's final-smash children agree bit for bit)
 CHILD_INHERIT = ['velocity', 'scale', 'rotation', None, 'color0', 'color1', 'alpha0', 'alpha1', 'draw_path', 'pre_draw']
+
+
+LINE_R = 1000.0       # eft2 lines as arcs of eft's circle (convert_emitter): the radius
 
 
 def promote_children(ems):
