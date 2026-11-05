@@ -1565,3 +1565,13 @@ horizontally to opponents within 10 units of Sephiroth".
   A fighter held on the sword is still followed up and down as in test 107.
 - port_check over the chain and tests 70–108: 30 errors, as before. MSC stack checks clean.
 - Package (install over 107): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
+## Test 109 (`build/sephiroth_test109.zip`): the hitstun tracking within 15, height by at most 8
+
+User: "Can you make Phantom's 10 unit tracking 15 units and also adjust its height to 8 units at most?"
+- `edge_lw_ph_near` 15 (was 10): the last fighter hit, in hitstun, within 15 of him (straight distance) is tracked.
+- `weapons/phantom.c` `ph_track`: for that tracking the Phantom takes the fighter's x and moves toward its height by
+  at most 8 up or down (`ph_lift`; test 108 kept its own height). A fighter held on the sword is still followed up
+  and down fully.
+- port_check over the chain and tests 70–109: 30 errors, as before. MSC stack checks clean.
+- Package (install over 108): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.

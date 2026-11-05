@@ -39125,7 +39125,8 @@ int edge_lw_ph_held()
     return 0;
 }
 
-float edge_lw_ph_near() { return 10.0f; }       // the hitstun tracking only for a fighter this near him (test 108)
+float edge_lw_ph_near() { return 15.0f; }       // the hitstun tracking only for a fighter this near him (test 109: 15;
+                                                // test 108: 10)
 
 void edge_lw_ph_target()
 {

@@ -868,6 +868,7 @@ int ph_find_owner()
 }
 
 float ph_reach() { return 10.0f; }
+float ph_lift() { return 8.0f; }   // the hitstun tracking's height change at most (test 109)
 
 void ph_track(int clear)
 {
@@ -911,9 +912,18 @@ void ph_track(int clear)
     ix = c / 0x400;
     iy = c - ix * 0x400;
     x = (float)(ix - 0x200) - PostureModuleF(0) * ph_reach();
-    // the fighter in hitstun: x only, its own height kept (test 108, the user: "only applies horizontally"); y is
-    // still in the code (iy) but not used
-    PostureModule(0x2714, x, PostureModuleF(0x2), PostureModuleF(0x3));
+    // the fighter in hitstun: its x, and toward its height by at most PH_LIFT (test 109, the user: "adjust its height
+    // to 8 units at most"; test 108 kept its own height)
+    y = (float)(iy - 0x200) - PostureModuleF(0x2);
+    if (y > ph_lift())
+    {
+        y = ph_lift();
+    }
+    if (y < -ph_lift())
+    {
+        y = -ph_lift();
+    }
+    PostureModule(0x2714, x, PostureModuleF(0x2) + y, PostureModuleF(0x3));
 }
 
 // every frame of its attack while following: the held fighter's height (its x kept, its facing kept); let go (his

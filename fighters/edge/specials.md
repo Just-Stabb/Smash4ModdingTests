@@ -219,6 +219,8 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
     Forced out 240 frames after full charge (test 107; was 120).
   - **Test 108:** the hitstun tracking (not the held-on-the-sword one) only for a fighter within 10 of him (straight
     distance, `edge_lw_ph_near`), and only horizontally: the Phantom keeps its own height.
+  - **Test 109:** that range is 15, and the Phantom also moves toward the fighter's height by at most 8
+    (`ph_lift`).
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
