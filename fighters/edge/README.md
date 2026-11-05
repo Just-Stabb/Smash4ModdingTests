@@ -971,3 +971,19 @@ the wrong axis now" (a screenshot: the beam at hand height, but laid back throug
   it by EffectModule 0x3 (radians) and turns it by 0x18 (degrees, as vanilla's own calls); no depth fade on it. Nothing
   in the data shows a cut, so test 76 leaves it as it was; a screenshot of ours (and of Ultimate's) asked for.
   (fx_render's own mirrored half draws as a sliver on both sides: its mirror sampling, not the port's.)
+
+## Test 77 (`build/sephiroth_test77.zip`): the aim arrow whole
+
+User, test 76 (a screenshot and a clip of Ultimate's up special, from their native build): the arrow is a whole double
+chevron along the aim; ours "cut off" since test 63 ("one arm of the outer chevron ends in a diagonal cut").
+- The arrow's program (Ultimate's own, the universal path) makes each corner from the vertex id's bits: x from bit 0,
+  y from bit 1 (`if (p0) r4 = 0.5`, `if (p1) r5 = 0.5` after taking bits 0 - 1 of `uint(gl_VertexID)`), the strip
+  order, and Ultimate draws its quads as strips. eft draws its quad as GX2 QUADS (cross_f 0x04A66B54: mode 0x13, its
+  corners at 0x04A66B9C cyclic), and the lowering gave every program the cyclic table's id: the quad folded, a wedge
+  from two corners to the middle missing. fx_render (its new `--effect` and FX_UV_RAMP texture) showed the fold on
+  both sides, as it drew Ultimate's side with the same cyclic triangles. Now such programs get the id of eft's own
+  corner (`ult_to_latte.quad_id_bits`); both sides draw the whole double chevron.
+- The same program pattern is in 348 of his emitters (attack lines, sword flashes, ...): each was missing that wedge
+  too, a cut end on long thin ones. All are drawn whole now (the bank is the only file in this package).
+- Placement checked against the clip (the training grid, 16.6 px a unit): the arrow's centre at (0.5, 7.5) from his
+  position + 13 along the aim; ours (0, 8) + 14.
