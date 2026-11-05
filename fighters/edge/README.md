@@ -1550,5 +1550,7 @@ them with any part of the attack".
   `SELF_HIT`, or the point catching someone: his VAR_19), the side special input (`global24 & 0x2000`, as `func_43`
   reads it) goes into side special (`edge_sn_cancel`, run first in the aerial and up tilt loops). Tapped moves are
   unchanged.
+- **Forced release at 240:** the user, "make Phantom holdable for up to 240 frames", then "I meant when the Phantom
+  is forcibly released": it goes by itself 240 frames after full charge (`edge_lw_ph_keep`; test 104: 120).
 - port_check over the chain and tests 70–107: 30 errors, as before. MSC stack checks clean.
 - Package (install over 106): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.

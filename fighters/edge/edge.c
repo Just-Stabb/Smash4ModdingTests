@@ -38971,7 +38971,7 @@ int edge_lw_pre()
 // stance's start (none if one is still out: 0x2717), its charging status (1) from the stance's frame 7 (the counter
 // on), a frame of charge each frame B is held, its full-charge look (ArticleModule(0x2715, 2, 8 + slot)) at
 // 7 x 7 frames (param 0x08000000: frames a level, 7 levels), and sent (the level in status float 0x1000006, then
-// ArticleModule(0x271a, 2)) when down special is pressed again (test 104; B let go before), 120 frames after full
+// ArticleModule(0x271a, 2)) when down special is pressed again (test 104; B let go before), 240 frames after full
 // charge (test 104; Zelda's 0x18000001: 60), or at once when the
 // counter is hit. Since test 103 the charge runs in his per-frame hook (edge_lw_ph_tick, from func_82) whatever
 // status he's in, so it can be held past the stance (tests 100 - 102 held the stance at frame 30 while it charged).
@@ -38979,7 +38979,8 @@ int edge_lw_pre()
 int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 charging, 3 sent
 int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
 int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
-float edge_lw_ph_keep() { return 120.0f; }      // frames it keeps after full charge before it goes by itself
+float edge_lw_ph_keep() { return 240.0f; }      // frames after full charge before it's forced out (user, test 107:
+                                                // "when the Phantom is forcibly released": 240; test 104: 120)
 
 // the down special inputs (func_43, func_58, func_675, func_1999) start the counter only when this is 1: not while
 // the Phantom charges, so that press only sends it (user, test 105: "when down special is pressed again while
@@ -39186,7 +39187,7 @@ void edge_lw_ph_frame(float f)
 // every frame, whatever status he's in, actionable or not (func_82, his per-frame hook global14; in hitlag too, the
 // charge counting only outside it: user, test 104, "I want to be able to release Phantom when Sephiroth isn't
 // actionable"): the Phantom charges
-// and goes when down special is pressed again or 120 frames past full charge (test 104), so it can be held after the stance,
+// and goes when down special is pressed again or 240 frames past full charge (test 107), so it can be held after the stance,
 // actionable or not (user, test 103: "make it so Phantom can be held after it begins, even when Sephiroth isn't
 // actionable"; tests 100 - 102 held the stance at frame 30 while it charged). KO'd: it goes
 void edge_lw_ph_tick()
@@ -39245,7 +39246,7 @@ void edge_lw_ph_tick()
     }
     // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
     // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
-    // let go), or 120 frames past full charge (test 104; Zelda's param 0x18000001: 60)
+    // let go), or 240 frames past full charge (test 107; test 104: 120; Zelda's param 0x18000001: 60)
     if ((WorkModuleF(0, 0x0f000109) == 1.0f && WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() && edge_lw_ph_open())
         || c >= per * 7.0f + edge_lw_ph_keep())
     {
