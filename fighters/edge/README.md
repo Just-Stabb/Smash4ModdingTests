@@ -1436,3 +1436,19 @@ diagonal stage geometry, making recovery hard".
 - Not proven in game: the touch normal's sign on walls / ceilings (the slide takes the normal out either way).
 - port_check over the chain and tests 70–101: 30 errors, as before. MSC stack check clean.
 - Package (install over 100): `script/msc/edge.mscsb`.
+
+## Test 102 (`build/sephiroth_test102.zip`): caught fighters can't be KO'd by a blast zone; dragged all the way to the hilt
+
+User: "Can you make it so when an opponent is attached to Sephiroth's held sword, they cannot be KO'd by the blast
+zone. Also please make it so the opponent is dragged to the hilt rather than the closest base piece to the hilt
+because the final hit never connects."
+- **Blast zones:** the place each caught fighter is put every frame is clamped inside the blast zones: 15 inside the
+  left / right / bottom ones, its feet 30 under the top one. The bounds are `StageData(0)` left, `(1)` right, `(2)`
+  top, `(3)` bottom: the game's own Dead status (`func_220`) clamps its KO place to them. Once let go they can be KO'd
+  as usual (by the end hit, say).
+- **To the hilt:** caught fighters were held at least 60% of the way out the blade (`edge_sn_hold_caught`), and the
+  retract stopped when the sword was back at its own length, so they ended near its end. Now, with the sword at its
+  length, the retract goes on pulling them in at its speed (6 a frame, about 4 frames) until all are at the hilt
+  (`edge_sn_pull`), then the move goes on to the end hit as before.
+- port_check over the chain and tests 70–102: 30 errors, as before. MSC stack check clean.
+- Package (install over 101): `script/msc/edge.mscsb`.

@@ -88,6 +88,11 @@ float edge_sn_fall() { return 0.1f; }          // from the hold until the end hi
 float edge_sn_grav_end() { return 19.0f; }     // the motion frame the end hit is over at (fair's own clear at 19):
                                                // his own gravity from there
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
+float edge_sn_bz_side() { return 15.0f; }      // a caught fighter is kept this far inside the side / bottom blast
+float edge_sn_bz_top() { return 30.0f; }       // zones, and its feet this far under the top one (user, test 101:
+                                               // "when an opponent is attached ... they cannot be KO'd by the blast
+                                               // zone"; StageData 0 / 1 / 2 / 3: left / right / top / bottom, as
+                                               // the Dead status (func_220) clamps its KO place to them)
 float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with its middle this far above its feet on
                                                // the sword (game units: whoever's scale), so the hits that follow
                                                // the sword back find it (user, test 94)
@@ -554,6 +559,15 @@ void edge_sn_hold_caught()
 {
     int slot;
     float s;
+    float ox;
+    float oy;
+    float sx;
+    float sy;
+    float lr;
+    float wx;
+    float wy;
+    float lo;
+    float hi;
     slot = 1;
     while (slot <= SLOTS)
     {
@@ -567,13 +581,39 @@ void edge_sn_hold_caught()
             {
                 s = edge_sn_total - edge_sn_back;
             }
-            if (s < edge_sn_blade() * 0.6f)
-            {
-                s = edge_sn_blade() * 0.6f;
-            }
+            // (tests 79 - 101 stopped them 60% of the way out the blade: the end hit missed them; now they come to
+            // the hilt, edge_sn_pull)
             edge_sn_point(s);
-            WorkModule(0, (edge_sn_ph + edge_sn_oh(slot)) * edge_sn_scale, edge_sn_slot_var(slot, 5));
-            WorkModule(0, (edge_sn_pv + edge_sn_ov(slot)) * edge_sn_scale, edge_sn_slot_var(slot, 6));
+            ox = (edge_sn_ph + edge_sn_oh(slot)) * edge_sn_scale;
+            oy = (edge_sn_pv + edge_sn_ov(slot)) * edge_sn_scale;
+            // inside the blast zones whatever the sword does
+            lr = PostureModuleF(0);
+            sx = PostureModuleF(0x1);
+            sy = PostureModuleF(0x2);
+            wx = sx + lr * ox;
+            wy = sy + oy;
+            lo = StageData(0) + edge_sn_bz_side();
+            hi = StageData(0x1) - edge_sn_bz_side();
+            if (wx < lo)
+            {
+                wx = lo;
+            }
+            if (wx > hi)
+            {
+                wx = hi;
+            }
+            lo = StageData(0x3) + edge_sn_bz_side();
+            hi = StageData(0x2) - edge_sn_bz_top();
+            if (wy < lo)
+            {
+                wy = lo;
+            }
+            if (wy > hi)
+            {
+                wy = hi;
+            }
+            WorkModule(0, (wx - sx) * lr, edge_sn_slot_var(slot, 5));
+            WorkModule(0, wy - sy, edge_sn_slot_var(slot, 6));
             WorkModule(0, 2.0f, edge_sn_slot_var(slot, 4));
             WorkModule(0, 20.0f, edge_sn_slot_var(slot, 0));
             if (edge_sn_state == 0x4)
@@ -585,6 +625,41 @@ void edge_sn_hold_caught()
         }
         slot = slot + 1;
     }
+}
+
+// the sword back at its own length: the caught fighters still out on it pulled on toward the hilt, the retract's
+// speed a frame (user, test 101: "make it so the opponent is dragged to the hilt rather than the closest base piece
+// to the hilt because the final hit never connects"). 1 while any was still short of it
+int edge_sn_pull()
+{
+    int slot;
+    int any;
+    float s;
+    any = 0;
+    slot = 1;
+    while (slot <= SLOTS)
+    {
+        s = edge_sn_s(slot);
+        if (s >= 0.0f)
+        {
+            if (s > edge_sn_total - edge_sn_back)
+            {
+                s = edge_sn_total - edge_sn_back;
+            }
+            if (s > 0.0f)
+            {
+                any = 0x1;
+                s = s - edge_sn_retract();
+                if (s < 0.0f)
+                {
+                    s = 0.0f;
+                }
+            }
+            edge_sn_s_set(slot, s);
+        }
+        slot = slot + 1;
+    }
+    return any;
 }
 
 // let go of the caught fighters: drop (landing, interrupted) or leave them in hitstun for the end hit
@@ -813,6 +888,12 @@ void edge_sn_loop()
         if (edge_sn_total - edge_sn_back <= edge_sn_blade())
         {
             edge_sn_back = edge_sn_total - edge_sn_blade();
+            if (edge_sn_pull())
+            {
+                edge_sn_publish(edge_sn_blade());   // the sword at its length, the caught still coming in
+                edge_sn_hold_caught();
+                return;
+            }
             edge_sn_hold_caught();
             edge_sn_finish();
             return;

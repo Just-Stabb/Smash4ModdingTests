@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 100** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 102** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -160,8 +160,12 @@ article finds its owner (the nearest Sephiroth), then every frame:
      frozen.
 5. **Retracting, once attack is let go.** The path shortens from the tip end by 6 a frame. A caught fighter stays
    where it was caught until the shortening end gets back to it, then goes back with the end along the path,
-   gathering on the normal blade (at least 60% of its body out). (Tests 79–93 moved them back by the retracted length
-   at once, sliding along sword still out past them.) While it's dragged back it has no stage collision (hit / status
+   on to the hilt: once the sword is back at its own length, the retract goes on pulling the caught fighters in at
+   the same speed until all are at the hilt, then the end hit comes (test 102; tests 79–101 left them 60% of the way
+   out the blade, where the end hit missed). (Tests 79–93 moved them back by the retracted length at once, sliding
+   along sword still out past them.)
+   - **No blast-zone KO while caught** (test 102): a caught fighter's place is kept 15 inside the side and bottom
+     blast zones and 30 under the top one (`StageData` 0–3, the bounds the Dead status clamps its KO place to). While it's dragged back it has no stage collision (hit / status
    variable q 6, `GroundModule(0x2710, 0)` on it every frame; 5, air, when it's let go): it goes through the stage and
    floors with the sword (test 96).
 6. **Back to normal length.** The motion runs again and `VAR_23` becomes 2: the end hit on frames 14–18, then the
