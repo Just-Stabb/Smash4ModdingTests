@@ -1764,9 +1764,9 @@ void func_81()
 
 void func_82()
 {
+    edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
     if (!global3)
     {
-        edge_lw_ph_tick();             // Sephiroth: Zelda's Phantom charging from down special (test 103)
         if (WorkModule(0x10, 0x21000001))
         {
             if (global50 < 1000000.0f)
@@ -38920,13 +38920,16 @@ int edge_lw_pre()
 // stance's start (none if one is still out: 0x2717), its charging status (1) from the stance's frame 7 (the counter
 // on), a frame of charge each frame B is held, its full-charge look (ArticleModule(0x2715, 2, 8 + slot)) at
 // 7 x 7 frames (param 0x08000000: frames a level, 7 levels), and sent (the level in status float 0x1000006, then
-// ArticleModule(0x271a, 2)) when B is let go, 60 frames after full charge (0x18000001), or at once when the
+// ArticleModule(0x271a, 2)) when down special is pressed again (test 104; B let go before), 120 frames after full
+// charge (test 104; Zelda's 0x18000001: 60), or at once when the
 // counter is hit. Since test 103 the charge runs in his per-frame hook (edge_lw_ph_tick, from func_82) whatever
 // status he's in, so it can be held past the stance (tests 100 - 102 held the stance at frame 30 while it charged).
 // Its state is in his VAR_16 - VAR_18 (the MSC's globals are full: port_check C5)
 int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 charging, 3 sent
 int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
 int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
+float edge_lw_ph_keep() { return 120.0f; }      // frames it keeps after full charge before it goes by itself
+float edge_lw_ph_down() { return -0.5f; }       // stick y at or below this with B pressed: down special again
 
 float edge_lw_ph()
 {
@@ -38940,6 +38943,10 @@ void edge_lw_ph_set(float v)
 
 void edge_lw_ph_start()
 {
+    if (edge_lw_ph() == 2.0f)
+    {
+        edge_lw_ph_send();             // this down special's press sends the one charging (no new one: it's out)
+    }
     edge_lw_ph_set(0.0f);
     WorkModule(0, 0.0f, edge_lw_chg_var());
     WorkModule(0, 0.0f, edge_lw_full_var());
@@ -38985,7 +38992,8 @@ void edge_lw_ph_drop()
     edge_lw_ph_set(0.0f);
 }
 
-// the stance's frame 7 (the counter on): the Phantom into its charging status
+// the stance's frame 7 (the counter on): the Phantom into its charging status (the press that started the stance is
+// long over by then, so it doesn't send it)
 void edge_lw_ph_frame(float f)
 {
     if (edge_lw_ph() == 1.0f && f >= 7.0f)
@@ -38995,14 +39003,29 @@ void edge_lw_ph_frame(float f)
     }
 }
 
-// every frame, whatever status he's in (func_82, his per-frame hook global14; outside hitlag): the Phantom charges
-// while B is held and goes when it's let go or 60 frames past full charge, so it can be held after the stance,
+// every frame, whatever status he's in, actionable or not (func_82, his per-frame hook global14; in hitlag too, the
+// charge counting only outside it: user, test 104, "I want to be able to release Phantom when Sephiroth isn't
+// actionable"): the Phantom charges
+// and goes when down special is pressed again or 120 frames past full charge (test 104), so it can be held after the stance,
 // actionable or not (user, test 103: "make it so Phantom can be held after it begins, even when Sephiroth isn't
 // actionable"; tests 100 - 102 held the stance at frame 30 while it charged). KO'd: it goes
 void edge_lw_ph_tick()
 {
     float c;
     float per;
+    // hit while it's out (charging, or sent and still there): it goes (user, test 104: "if Sephiroth is hit while
+    // Phantom is out, it should disappear (if he's not in the middle of countering)": a hit his counter takes puts
+    // him in no damage status). Damage statuses: 0x45 - 0x4B (Damage ... DamageFlyTop), 0x41 CaptureDamage, 0x57
+    // DownDamage
+    if (edge_lw_ph() >= 1.0f && (global4 >= 0x45 && global4 <= 0x4b || global4 == 0x41 || global4 == 0x57))
+    {
+        if (ArticleModule(0x2717, 0x2))
+        {
+            ArticleModule(0x2714, 0x2, 0x4);
+        }
+        edge_lw_ph_set(0.0f);
+        return;
+    }
     if (edge_lw_ph() != 2.0f)
     {
         return;
@@ -39013,16 +39036,24 @@ void edge_lw_ph_tick()
         return;
     }
     per = WorkModuleF(0, 0x8000000);
-    c = WorkModuleF(0, edge_lw_chg_var()) + 1.0f;
-    WorkModule(0, c, edge_lw_chg_var());
+    c = WorkModuleF(0, edge_lw_chg_var());
+    if (!global3)                              // the charge counts outside hitlag; the press is read in it too
+    {
+        c = c + 1.0f;
+        WorkModule(0, c, edge_lw_chg_var());
+    }
     if (c >= per * 7.0f && WorkModuleF(0, edge_lw_full_var()) == 0)
     {
         ArticleModule(0x2715, 0x2, 0x8 + WorkModule(0x6, 0x1000004b));   // full charge (func_2305)
         WorkModule(0, 1.0f, edge_lw_full_var());
     }
-    if (WorkModuleF(0, 0x0f000101) != 1.0f || c >= per * 7.0f + (float)WorkModule(0x6, 0x18000001))
+    // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
+    // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
+    // let go), or 120 frames past full charge (test 104; Zelda's param 0x18000001: 60)
+    if ((WorkModuleF(0, 0x0f000109) == 1.0f && WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down())
+        || c >= per * 7.0f + edge_lw_ph_keep())
     {
-        edge_lw_ph_send();                     // B let go (SELF_SPECIAL), or held 60 past full charge
+        edge_lw_ph_send();
     }
 }
 

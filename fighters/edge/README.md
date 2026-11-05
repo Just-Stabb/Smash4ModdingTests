@@ -1472,3 +1472,20 @@ hitbox a 42 degree angle."
   the freeze is still unproven in game: snake_fair.md "Not proven").
 - port_check over the chain and tests 70–103: 30 errors, as before. MSC stack check clean.
 - Package (install over 102): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.
+
+## Test 104 (`build/sephiroth_test104.zip`): the Phantom sent by pressing down special again; 120 frames; gone when he's hit
+
+User: "Can you change Phantom's release to being when the down special is pressed again rather than released, and keep
+it for 120 frames after full charge?", "Keep in mind, I want to be able to release Phantom when Sephiroth isn't
+actionable", "Also, if Sephiroth is hit while Phantom is out, it should disappear (if he's not in the middle of
+countering)".
+- **Release:** pressing down special again (B pressed, `SELF_SPECIAL_PRESSED`, with the stick at or below -0.5)
+  sends it, read every frame in his per-frame hook whatever the status, in hitlag too (the charge counts only
+  outside it), so it works while he isn't actionable. If he's actionable, that press also starts a new down special:
+  its start sends the charging Phantom and makes no new one (one is out).
+- **120 frames:** it goes by itself 120 frames after full charge (was Zelda's 60).
+- **Hit:** while it's out (charging, or sent and still there), Sephiroth going into a damage status (0x45–0x4B,
+  0x41 hit while grabbed, 0x57 hit while down) makes it vanish (its status 4). A hit his counter takes doesn't (no
+  damage status).
+- port_check over the chain and tests 70–104: 30 errors, as before. MSC stack check clean.
+- Package (install over 103): `script/msc/edge.mscsb`.

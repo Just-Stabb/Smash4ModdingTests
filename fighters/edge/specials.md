@@ -191,6 +191,10 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
   stance plays out as normal (tests 100–102 held it at frame 30). The level goes in his current status's float
   `0x1000006` for the call only (its value put back). The stance interrupted before frame 7: it goes (status 4); KO'd
   while it charges: it goes. Its state in his VAR_16–VAR_18 (`edge_lw_ph_*`).
+  - **Test 104:** sent when down special is pressed again (B pressed with the stick at or below -0.5, read in any
+    status and in hitlag too, so also while he isn't actionable; a down special that starts a new stance sends the
+    charging one and makes none), or 120 frames past full charge (was B let go / 60). Hit while it's out (charging,
+    or sent and still there: damage statuses 0x45–0x4B, 0x41, 0x57), it goes; a hit the counter takes isn't one.
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /
