@@ -39558,6 +39558,11 @@ float edge_sn_retract() { return 6.0f; }       // the speed back along the path 
 float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
 float edge_sn_max() { return 300.0f; }         // the path's length at most
 float edge_sn_back_min() { return 24.0f; }     // back only once the tip is this far past the sword's own reach
+float edge_sn_down_side() { return 16.0f; }    // up tilt: down only once the tip is this far forward or back of the
+                                               // sword's start (user, test 98)
+float edge_sn_life() { return 300.0f; }        // the sword goes back by itself after this many frames out, held or
+                                               // not: 5 seconds (user, test 98)
+int   edge_sn_timer() { return 0x0f000316; }   // VAR_22: frames since the sword started to extend
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
 float edge_sn_grav() { return 0.1f; }          // gravity x this from the hold until the end hit is over (user,
                                                // test 95: 0.1; test 96: "until after the sword comes back")
@@ -39924,16 +39929,25 @@ void edge_sn_steer()
             ok = 0;
         }
         if (want == edge_sn_first() + 2)        // back on the first run's way (forward air: back; up tilt: down)
-        {                                       // only once the tip is well past the sword's own reach that way
+        {
             edge_sn_point(edge_sn_total);
-            fwd = edge_sn_ph - edge_sn_base_h();
             if (edge_sn_move)
             {
-                fwd = edge_sn_pv - edge_sn_base_v();
+                // up tilt: once the tip is 16 forward or back of where the sword starts (user, test 98: "let up
+                // tilt go down after moving 16 units forward or back"; test 98 had fair's rule, 24 past its reach up)
+                if (edge_sn_abs(edge_sn_ph - edge_sn_base_h()) < edge_sn_down_side())
+                {
+                    ok = 0;
+                }
             }
-            if (fwd < edge_sn_blade() + edge_sn_back_min())
+            else
             {
-                ok = 0;
+                // forward air: once the tip is well past the sword's own reach forward
+                fwd = edge_sn_ph - edge_sn_base_h();
+                if (fwd < edge_sn_blade() + edge_sn_back_min())
+                {
+                    ok = 0;
+                }
             }
         }
         if (ok == 0)
@@ -40189,6 +40203,7 @@ void edge_sn_begin()
     edge_sn_total = edge_sn_blade();
     edge_sn_back = 0.0f;
     edge_sn_since = edge_sn_turn_wait();
+    WorkModule(0, 0.0f, edge_sn_timer());
     edge_sn_blade_hide(0x1);
     edge_sn_publish(edge_sn_total);
     edge_sn_generate();
@@ -40247,9 +40262,10 @@ void edge_sn_loop()
     edge_sn_gravity(edge_sn_grav());
     if (edge_sn_state == 0x3)
     {
-        if (held == 0)
+        WorkModule(0, WorkModuleF(0, edge_sn_timer()) + 1.0f, edge_sn_timer());
+        if (held == 0 || WorkModuleF(0, edge_sn_timer()) >= edge_sn_life())
         {
-            edge_sn_state = 0x4;
+            edge_sn_state = 0x4;                // let go, or out 5 seconds: back
         }
         else
         {

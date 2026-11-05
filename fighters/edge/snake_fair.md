@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 98** (held up tilt added). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 99** (held up tilt since test 98). Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -18,7 +18,8 @@ end.
   - It can turn at most every 8 frames, never straight back on itself, and never across its own body.
   - It can't go back until the tip is 24 units past the sword's normal reach.
   - With no direction held, it keeps going the way it was (the first run is forward; user, test 92).
-- **Release:** letting go of attack sends the sword back along its path to where it started.
+- **Release:** letting go of attack sends the sword back along its path to where it started. After 5 seconds out
+  (300 frames from the hold, his `VAR_22`) it goes back by itself, held or not (test 99, both moves).
 - **Catching:** whoever the tip hits stays stuck where they were hit, relative to the sword. They ride back
   along the path with it, then take a second hit.
 - **Trail:** the sword trail follows the moving tip.
@@ -41,8 +42,9 @@ default direction up". Everything above applies, with up tilt's own numbers (`ed
   The motion goes back to frame 20, where the sword points straight up (swordl1's +X = (0, 1, 0) from frame 20 on),
   and freezes there.
 - **The path** starts at the blade's start in that pose: the hilt 1.14 forward, 26.36 up, the blade 0.82 above it, so
-  (1.14, 27.18). The first run goes up, and with nothing held it keeps the way it goes. "Back" against the first run
-  (down) needs the tip 24 past the sword's own reach upward.
+  (1.14, 27.18). The first run goes up, and with nothing held it keeps the way it goes. Down (against the first run)
+  needs the tip 16 forward or back of the sword's start (`edge_sn_down_side`; test 99, the user's; test 98 had
+  fair's rule, 24 past the reach upward).
 - **The articles** tell which move it is from his status (hit / status variable q 2 of his slot: 0x29 is up tilt) and
   take up tilt's base then (`HI3_H` / `HI3_V`, `tools/edge_snake_articles_msc.py`).
 - **No gravity change** (he is on the ground): `edge_sn_gravity` does nothing for up tilt. Fast fall doesn't apply.

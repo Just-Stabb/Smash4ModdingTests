@@ -1378,3 +1378,16 @@ direction up".
 - port_check over the chain and tests 70–98: 30 errors, as before. MSC stack checks clean (his, snake, snaketip).
 - Package (install over 97): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`,
   `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 99 (`build/sephiroth_test99.zip`): up tilt's down after 16 sideways; the sword back after 5 seconds
+
+User: "Can you let up tilt go down after moving 16 units forward or back and please make both up tilt and forward air
+retract after 5 seconds have passed."
+- Up tilt: down is allowed once the tip is 16 or more forward or back of the sword's start (`edge_sn_down_side`). Test
+  98 had forward air's rule turned upward (24 past the sword's reach up), which a turn back down along the sword
+  could never use.
+- Both moves: the sword starts going back after 300 frames (5 seconds) out, whether attack is still held or not. The
+  count is his `VAR_22` (`0x0F000316`, unused by his other scripts), reset when the sword starts to extend, so no MSC
+  global is spent.
+- port_check over the chain and tests 70–99: 30 errors, as before. MSC stack check clean.
+- Package (install over 98): `script/msc/edge.mscsb`.
