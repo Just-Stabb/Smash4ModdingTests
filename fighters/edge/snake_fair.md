@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 93.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 94.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -130,8 +130,10 @@ article finds its owner (the nearest Sephiroth), then every frame:
      offset from the tip are kept.
    - Each frame, caught fighters are put back there, with hitstop 2 and hitstun 20 refreshed, so they hang
      frozen.
-5. **Retracting, once attack is let go.** The path shortens from the tip end by 6 a frame. Caught fighters move
-   back along it by the same amount, gathering on the normal blade (at least 60% of its body out).
+5. **Retracting, once attack is let go.** The path shortens from the tip end by 6 a frame. A caught fighter stays
+   where it was caught until the shortening end gets back to it, then goes back with the end along the path,
+   gathering on the normal blade (at least 60% of its body out). (Tests 79–93 moved them back by the retracted length
+   at once, sliding along sword still out past them.)
 6. **Back to normal length.** The motion runs again and `VAR_23` becomes 2: the end hit on frames 14–18, then the
    rest of fair as normal.
 7. **Landing at any point:** the status ends with fair's normal landing lag. Caught fighters drop (hitstun 0) and

@@ -1298,3 +1298,15 @@ direction (initial direction is forward) and disable fast fall during the hold."
   is needed to tell whether the fighter was caught at all (the catch: in hitstun, feet within 22 of the point).
 - port_check over the chain and tests 70–93: 30 errors, as before. MSC stack check clean.
 - Package (install over 92): `script/msc/edge.mscsb`.
+
+## Test 94 (`build/sephiroth_test94.zip`): caught fighters wait for the retracting end
+
+User: "Keep in mind, opponents attached should only travel back from the point of the sword that they are on." And:
+"They stay pinned when I keep holding" (the catch works).
+- The sword retracts by shortening from its end; the pieces short of it stay where they are. A caught fighter was
+  moved back by the retracted length at once (`edge_sn_s - edge_sn_back`), so it slid toward the hilt along sword
+  still out past it, out of step with the sword. Now its place is min(where it was caught, the drawn length): it
+  stays put until the end gets back to it, then rides back with the end along the path
+  (`tools/edge_snake_msc.py` `edge_sn_hold_caught`).
+- port_check over the chain and tests 70–94: 30 errors, as before. MSC stack check clean.
+- Package (install over 93): `script/msc/edge.mscsb`.

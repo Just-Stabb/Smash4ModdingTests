@@ -484,7 +484,14 @@ void edge_sn_hold_caught()
     {
         if (edge_sn_s(slot) >= 0.0f)
         {
-            s = edge_sn_s(slot) - edge_sn_back;
+            // where it was caught, until the sword, shortening from its end, gets back to it: then with the end
+            // (user, test 93: "opponents attached should only travel back from the point of the sword that they are
+            // on"; tests 79 - 93 moved them back by the retracted length at once, off the sword still out past them)
+            s = edge_sn_s(slot);
+            if (s > edge_sn_total - edge_sn_back)
+            {
+                s = edge_sn_total - edge_sn_back;
+            }
             if (s < edge_sn_blade() * 0.6f)
             {
                 s = edge_sn_blade() * 0.6f;
