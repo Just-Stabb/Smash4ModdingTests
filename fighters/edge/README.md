@@ -1242,3 +1242,15 @@ Holding up/down makes the sword appear, but at an incorrect placement."
   180 − pitch for facing left is gone).
 - port_check over the chain and tests 70–89: 30 errors, as before. MSC stack check clean.
 - Package (install over 88): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 90 (`build/sephiroth_test90.zip`): the extended sword from his hilt
+
+User, test 89: "The forward sword appears now but still isn't aligned with the hilt" (clip).
+- The clip: the forward sword straight and the right shape, but drawn at his feet, starting a little behind the
+  hilt: his position + 0.82, about 13 below.
+- The articles read his hilt through the joint variables writing "26" (EdgeBladeL's model.vbn index). The value is a
+  joint ID (`ModelModuleF(axis, joint)`, as ACMD's: model.jtb table 0), and his table 0 has 26 entries: 26 read his
+  root. EdgeBladeL sits on his LHaveN (bone 24, playing SwordL1) at identity, and LHaveN is table 0's joint 23 (the
+  table swaps 23 / 24) in every costume: the articles read joint 23. `docs/position-variables.md` corrected.
+- port_check over the chain and tests 70–90: 30 errors, as before. MSC stack check clean.
+- Package (install over 89): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.

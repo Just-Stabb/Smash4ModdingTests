@@ -227,9 +227,11 @@ the combat variables, 0 self, 1 nearest opponent, 2 last fighter hit, 3-10 playe
 ## A joint's position
 
 `0x0F000290 + 4 × target + n` (targets as above, so `0x0F000290`-`0x0F0002BB`; `SELF_JOINT`, `SLOT1_JOINT_X`, ...):
-n = 0 write: the bone index (the fighter's `model.vbn` order, `tools/vbn_bones.py`) the reads use, n = 1 / 2 / 3
-read: that joint's world X / Y / Z on the target, through its own `ModelModuleF(0 / 1 / 2, bone)` (the op Zelda's
-MSC places world effects with). One bone for every caller: write it, then read, in the same script. A bone index of
+n = 0 write: the joint the reads use, n = 1 / 2 / 3 read: that joint's world X / Y / Z on the target, through its own
+`ModelModuleF(0 / 1 / 2, joint)` (the op Zelda's MSC places world effects with). The joint is a `model.jtb` table 0 ID,
+as ACMD names joints, not a `model.vbn` bone index (they often agree for the first bones: WaistN 11; Sephiroth's
+held forward air read "26", past his 26-entry table 0, and got his root, his feet: his left hand LHaveN, bone 24,
+is joint 23). One bone for every caller: write it, then read, in the same script. A bone index of
 0x200 or more, or a target that isn't there, reads 0. Sephiroth's Shadow Flare centres its orb ring on the target's
 waist with it (`fighters/edge/weapons/flare1.c`, as Ultimate's dummy follows `edge_flare_node`).
 

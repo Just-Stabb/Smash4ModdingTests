@@ -26,7 +26,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: when his hilt can't be read
-BLADE_BONE = 26                         # EdgeBladeL in his model.vbn, every costume (tools/snake_sword.py 'at')
+BLADE_BONE = 23                         # his LHaveN (bone 24, playing SwordL1; EdgeBladeL sits on it at identity) as a
+                                        # joint table 0 ID, every costume: the joint variables read ModelModuleF(axis,
+                                        # joint), joint IDs as ACMD's. Test 88-89's 26 was past table 0 (0-25): his root,
+                                        # the sword drawn from his feet
 BLADE_START = 0.82                      # the blade's body starts this far along it from the hilt (snake_sword pieces)
 RUNS = 12
 
@@ -45,8 +48,8 @@ float sn_bz;
 float sn_base_h() { return sn_bh; }
 float sn_base_v() { return sn_bv; }
 
-// the path starts at his hilt as it is (his EdgeBladeL, bone BLADE_BONE, read through the joint variables 0x0F00029C +
-// 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
+// the path starts at his hilt as it is (his LHaveN, joint BLADE_BONE: EdgeBladeL's origin, read through the joint
+// variables 0x0F00029C + 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
 // at Ultimate's frame-13 numbers from his position and depth: the pieces weren't in line with his hand. Nothing read
 // (0, 0, 0): those numbers
 void sn_base()

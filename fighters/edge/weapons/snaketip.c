@@ -607,8 +607,8 @@ float sn_bz;
 float sn_base_h() { return sn_bh; }
 float sn_base_v() { return sn_bv; }
 
-// the path starts at his hilt as it is (his EdgeBladeL, bone 26, read through the joint variables 0x0F00029C +
-// 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
+// the path starts at his hilt as it is (his LHaveN, joint 23: EdgeBladeL's origin, read through the joint
+// variables 0x0F00029C + 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
 // at Ultimate's frame-13 numbers from his position and depth: the pieces weren't in line with his hand. Nothing read
 // (0, 0, 0): those numbers
 void sn_base()
@@ -617,7 +617,7 @@ void sn_base()
     float jy;
     float jz;
     float lr;
-    WorkModule(0, 26.0f, 0x0f00029c + 0x4 * sn_slot);
+    WorkModule(0, 23.0f, 0x0f00029c + 0x4 * sn_slot);
     jx = WorkModuleF(0, 0x0f00029d + 0x4 * sn_slot);
     jy = WorkModuleF(0, 0x0f00029e + 0x4 * sn_slot);
     jz = WorkModuleF(0, 0x0f00029f + 0x4 * sn_slot);
