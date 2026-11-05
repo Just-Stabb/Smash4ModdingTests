@@ -27,6 +27,8 @@ ROOT = os.path.dirname(HERE)
 
 BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: the blade's start, frozen frame 13
 RUNS = 12
+FX_EVERY = 6                           # frames between the point's flashes while the sword grows
+TIP_LEN = 3.48                         # the point's length (tools/edge_snake_articles.py)
 
 COMMON = r'''
 // ---- Sephiroth's held forward air (tools/edge_snake_articles_msc.py)
@@ -273,11 +275,52 @@ void func_47()
 
 TIP = r'''
 // the point: at the path's drawn end, along its last run (its hitbox and trail: its ACMD)
+int sn_fx() { return 0; } // fx edge_sword_flash2
+int sn_fx_h;            // the newest flash's handle (0: none)
+int sn_fx_t;            // frames to the next flash
+float sn_last;          // the drawn length last frame
+
+// fair's flash at the blade's end (edge_sword_flash2, its frame 13) carried out with the point while the sword grows:
+// a new one every FX_EVERY frames at the point's end, the newest moved with it (EffectModule 0x3 / 0x17, as Shadow
+// Flare's orbs). Fair's own played once at the real blade's end and stayed by his hand (user, test 91: "the sword
+// effects aren't travelling upstream with the sword movement")
+void sn_flash(float len)
+{
+    float lr;
+    float x;
+    float y;
+    float z;
+    lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
+    x = PostureModuleF(0x1) + lr * TIP_LENf * sn_dh(sn_d);
+    y = PostureModuleF(0x2) + TIP_LENf * sn_dv(sn_d);
+    z = PostureModuleF(0x3);
+    if (len > sn_last + 0.5f)
+    {
+        if (sn_fx_t <= 0)
+        {
+            sn_fx_h = EffectModule(0x3, sn_fx(), x, y, z, 0, 0, 0, 1.0f, 0, 0xffffffff);
+            sn_fx_t = FX_EVERY;
+        }
+    }
+    if (sn_fx_t > 0)
+    {
+        sn_fx_t -= 1;
+        if (sn_fx_h)
+        {
+            EffectModule(0x17, sn_fx_h, x, y, z);
+        }
+    }
+    sn_last = len;
+}
+
 void sn_frame()
 {
+    float len;
     sn_base();
-    sn_walk(RUNS, sn_shared(0x6));
+    len = sn_shared(0x6);
+    sn_walk(RUNS, len);
     sn_place(sn_h, sn_v, sn_d);
+    sn_flash(len);
 }
 
 void func_46()
@@ -334,7 +377,8 @@ def generate(base_c, own):
     assert '    global21 = func_40;\n' in text
     text = text.replace('    global21 = func_40;\n', '    global21 = 0;           // motion indices as they are (flare1.c)\n')
     code = (COMMON + own).replace('BASE_Hf', '%.2ff' % BASE_H).replace('BASE_Vf', '%.2ff' % BASE_V)
-    code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS))
+    code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS)).replace('FX_EVERY', str(FX_EVERY))
+    code = code.replace('TIP_LENf', '%.2ff' % TIP_LEN)
     return text.rstrip('\n') + '\n' + code
 
 

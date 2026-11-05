@@ -202,9 +202,21 @@ def _turned(q, scale_len=1.0):
     return q
 
 
+def _uncrossed(q):
+    """q without _crossed's turned copy (its second half)"""
+    n = q['n'] // 2
+    idx = q['idx'][:len(q['idx']) // 2]
+    out = dict(q)
+    out.update(n=n, pos=q['pos'][:n], nrm=q['nrm'][:n], tan=None if q['tan'] is None else q['tan'][:n],
+               uvs={k: v[:n] for k, v in q['uvs'].items()}, idx=idx)
+    return out
+
+
 def article_pieces(part, spec=SPEC):
     """(run, tip, info) for the articles: the run one unit long along +Z (its z = 0 end on the root, z = 1 on the
-    end bone), the point its real length along +Z from z = 0"""
+    end bone), the point its real length along +Z from z = 0, drawn once: the articles turn by pitch about their
+    depth axis, so the blade's face stays to the camera, and the point's crossed copy (a curved tip turned 90 degrees)
+    drew a dark X across it (Sephiroth test 91, user: "the tip of the sword looks off")"""
     _h, _b, run, tip, info = pieces(part, spec)
-    return _turned(run), _turned(tip, info['tip_len']), info
+    return _turned(run), _turned(_uncrossed(tip), info['tip_len']), info
 

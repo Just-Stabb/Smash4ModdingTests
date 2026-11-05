@@ -1268,3 +1268,18 @@ but about 4–5 units above the hilt and starting about 7 behind it: his shoulde
 - `docs/position-variables.md` and the port guide note both behaviours.
 - port_check over the chain and tests 70–91: 30 errors, as before. MSC stack check clean.
 - Package (install over 90): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 92 (`build/sephiroth_test92.zip`): the point drawn once; fair's flash carried out with it
+
+User, test 91 (frame): "The sword is aligned now. The tip of the sword looks off. Also, the sword effects aren't
+travelling upstream with the sword movement."
+- **The point:** every piece was drawn twice, the second copy turned 90 degrees about the blade (`snake_sword._crossed`),
+  to look the same width turned any way. The articles turn by pitch about their depth axis, so the blade's face stays
+  to the camera; the point's copy, a curved katana tip on edge, drew a dark X across it. The point is now drawn once
+  (`snake_sword.article_pieces`: 44 vertices, was 88).
+- **The effects:** fair's frame-13 effects (`edge_sword_flash2`, the tip's flash; `edge_attack_speedline`) play once at
+  the real blade's end and stayed by his hand while the sword grew. The point now carries the flash: every 6 frames
+  while the drawn length grows it plays `edge_sword_flash2` at its end (`EffectModule` 0x3) and moves the newest with
+  it every frame (0x17), as Shadow Flare's orbs. The speed lines aren't carried (their angle is the sword joint's).
+- port_check over the chain and tests 70–92: 30 errors, as before. MSC stack check clean.
+- Package (install over 91): `model/snaketip` c00–c07 `model.nud`, `script/msc/snaketip/snaketip.mscsb`.

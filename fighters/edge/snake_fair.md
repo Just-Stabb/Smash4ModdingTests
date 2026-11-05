@@ -56,7 +56,8 @@ pieces had their base at his feet.
 - **snake** (a run): one ring-to-ring slice of the blade, along +Z. Its near ring is on BaseN and its far ring on
   EndN, both at z = 0 in the bind, so it draws nothing until its MSC moves EndN out to the run's length (ModelModule
   7 on joint 0x7D2: weapons name their joints 0x7D0 + bone, as Mario's pump).
-- **snaketip** (the point): the blade's point on BaseN, its real length (3.48) along +Z.
+- **snaketip** (the point): the blade's point on BaseN, its real length (3.48) along +Z, drawn once (its crossed copy
+  drew a dark X across the curved tip; the turn is a pitch about the depth axis, so the blade's face stays to the camera).
 - Both are drawn twice, the second copy turned 90 degrees about the blade, so they look the same width turned any
   way. Their material is the sword's own; its two textures are copied into the article's `model.nut` under ids
   0x40EBF000 + k. `model.sb / .nhb / .mta / .xmb` are the light arrow's.
@@ -92,6 +93,8 @@ article finds its owner (the nearest Sephiroth), then every frame:
 - Both are placed before their motion starts, so the point's trail begins where the point is.
 - **The point** sits at the path's drawn end, turned along the last drawn run.
 - Both remove themselves when VAR_30 goes below 0, when he's gone, or after 900 frames (a safety net).
+- **The point's flash:** while the sword grows, fair's tip flash (`edge_sword_flash2`) every 6 frames at the point's
+  end, the newest moved with it (`EffectModule` 0x3 / 0x17).
 
 **ACMD.** `VAR_23` (his) is the flag: 0 for the normal move, 1 held, 2 for the end hit.
 - The tapped move's hitboxes (frames 13 and 15) and effects (frame 13) only run at 0.
