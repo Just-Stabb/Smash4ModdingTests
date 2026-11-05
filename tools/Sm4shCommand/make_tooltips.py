@@ -164,6 +164,7 @@ STATE_QUANTITIES = [
     ("MOTION", "Read: its motion kind (its own motion list's number).\\nWrite: play that motion from frame 0 (the motion number is per fighter)."),
     ("MOTION_FRAME", "Read: its current motion frame. Writes are ignored."),
     ("KIND", "Read: its fighter kind (0x3 Mario, 0x4 Donkey Kong, ... 0x42 Sephiroth; the fighter table's, as the game's 0x02BEF604), -1 if it isn't a fighter. Writes are ignored."),
+    ("GROUND", "Read: 0.\\nWrite: its stage collision (GroundModule(0x2710, value)): 0 none (it passes through the stage, as a grabbed fighter does), 5 air, 1 / 2 ground (can / can't slide off edges). Its status sets its own when it changes."),
 ]
 
 

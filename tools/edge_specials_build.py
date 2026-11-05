@@ -20,7 +20,8 @@ fighter_param_vl_zelda.bin; MODEL: his converted model/body/c00 (the ACMD joint 
   scripts (FLARE1_MOTIONS); flare2 (unused: flare1 plays the orbs): Zelda's dein files under its name;
 - --rpx: code/cross_f.rpx = IN.rpx + tools/kind_expand.py + tools/weapon_expand.py +
   tools/edge_counter_cave.py (Scintilla's counter shape) + tools/effect_heap_patch.py (the effect heap 44 -> 60
-  MiB: his bank ran it out, test 61 / 62) + tools/acmd_ext_cave.py last (its var_entry hook; Shadow Flare's shared
+  MiB: his bank ran it out, test 61 / 62) + tools/position_vars_cave.py again (its words, not its relocation moves:
+  IN must have it already; test 96's stage-collision write, q 6 of the hit / status variables) + tools/acmd_ext_cave.py last (its var_entry hook; Shadow Flare's shared
   slot variables); re-applying them over an executable that has them gives it back, so IN
   can be the last test's;
 - --bank: effect/edge/edge.010d0000.{ptcl,efc} from DIR/zelda.010d0000.* (tools/vfxb_to_ptcl.py);
@@ -419,6 +420,21 @@ def flare1_scripts(a, wdir):
         ', '.join(sorted(set(game) | set(effect))), gtr.skipped, etr.skipped, ', '.join(sorted(missing)) or '-')
 
 
+def position_vars_args(rpx):
+    """tools/position_vars_cave.py's words again over IN, which has the cave already (its relocation moves are made
+    once: left out), so a change to it reaches the build (test 96: GroundModule on another fighter, q 6 of the hit /
+    status variables); acmd_ext_cave's var_entry hook goes on after it"""
+    import rpx_patch
+    out = subprocess.run([sys.executable, os.path.join(HERE, 'position_vars_cave.py')], capture_output=True,
+                         text=True, check=True).stdout.split()
+    words = [w for w in out if not w.startswith('reloc:')]
+    hook = next(w for w in words if w.upper().startswith('0X02003750='))
+    d, _o, _e, secs = rpx_patch.load(rpx)
+    assert rpx_patch.read_u32(d, secs, 0x02003750) == int(hook.split('=')[1], 0), \
+        '%s: no position_vars_cave (its input hook at 0x02003750)' % rpx
+    return words
+
+
 def acmd_ext_args():
     """tools/acmd_ext_cave.py's words, last: its hook at 0x04B79000 (position_vars_cave's var_entry) is undone by a
     later position_vars_cave (Hero fix 79 re-applied it: every 0x0F0003xx variable read 0 since), and flare1.c needs
@@ -477,7 +493,7 @@ def main():
         os.makedirs(os.path.join(a.out, 'code'), exist_ok=True)
         run(os.path.join(HERE, 'rpx_patch.py'), a.rpx, os.path.join(a.out, 'code/cross_f.rpx'),
             *kind_expand.args(kind_expand.build()[0]), *weapon_expand.args(weapon_expand.build()[0]),
-            *edge_counter_cave.args(), *effect_heap_patch.args(), *acmd_ext_args())
+            *edge_counter_cave.args(), *effect_heap_patch.args(), *position_vars_args(a.rpx), *acmd_ext_args())
     if a.bank:
         d = os.path.join(fighter, 'effect/edge')
         os.makedirs(d, exist_ok=True)

@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 95.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 96.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -25,7 +25,7 @@ end.
 
 The user's numbers:
 - 3 units a frame, 300 at most.
-- Slightly lower gravity while extending (0.1x since test 95, the user's; 0.4x in tests 93–94), no fast fall while the sword is out.
+- Slightly lower gravity while extending (0.1x since test 95, the user's; 0.4x in tests 93–94), from the hold until the end hit is over (frame 19; test 96), no fast fall while the sword is out.
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
 - The catch does 5%. The end hit does 11% at fair's angle, with much less knockback growth so it combos.
@@ -73,7 +73,7 @@ pieces had their base at his feet.
     fighter is put on the sword, its middle (7 above its feet) at the point's middle, not left where the point found
     it (test 95: off the sword, the end hit missed it on the way back).
   - Publishing the path every frame.
-  - 0.1x gravity, and the fast-fall flag (0x21000007) kept off; the aerial loop's fast-fall check (`func_555`) runs
+  - 0.1x gravity (kept after the sword is back, through the end hit, to motion frame 19: `edge_sn_grav_end`), and the fast-fall flag (0x21000007) kept off; the aerial loop's fast-fall check (`func_555`) runs
     only when `edge_sn_free()` (not while extending / retracting).
 - **Aerial status end (slot 2, was the empty `func_334`), `edge_sn_end`:** landing or any interruption drops the
   caught fighters, shows the blade, and tells the articles to go.
@@ -135,9 +135,11 @@ article finds its owner (the nearest Sephiroth), then every frame:
 5. **Retracting, once attack is let go.** The path shortens from the tip end by 6 a frame. A caught fighter stays
    where it was caught until the shortening end gets back to it, then goes back with the end along the path,
    gathering on the normal blade (at least 60% of its body out). (Tests 79–93 moved them back by the retracted length
-   at once, sliding along sword still out past them.)
+   at once, sliding along sword still out past them.) While it's dragged back it has no stage collision (hit / status
+   variable q 6, `GroundModule(0x2710, 0)` on it every frame; 5, air, when it's let go): it goes through the stage and
+   floors with the sword (test 96).
 6. **Back to normal length.** The motion runs again and `VAR_23` becomes 2: the end hit on frames 14–18, then the
-   rest of fair as normal.
+   rest of fair as normal. His gravity stays 0.1x until frame 19, then goes back to normal.
 7. **Landing at any point:** the status ends with fair's normal landing lag. Caught fighters drop (hitstun 0) and
    the sword returns to normal.
 

@@ -102,7 +102,8 @@ fighter hit, 3–10 player slots 1–8), so `0x0F0000A0`–`0x0F0000F7`.
 | +3 motion | its motion kind | play that motion from frame 0 at rate 1 (`MotionModule(1, ...)`; motion numbers are per fighter) |
 | +4 motion frame | its motion's current frame | ignored |
 | +5 kind | its fighter kind (the fighter table's, as the game's `0x02BEF604`: 0x3 Mario, 0x4 Donkey Kong, ... 0x42 Sephiroth; `tools/fighter_param.py` `KINDS`, `tools/extra_kinds.json`), -1 if it isn't a fighter | ignored |
-| +6, +7 | 0 | ignored |
+| +6 `GROUND` | 0 | its stage collision (`GroundModule(0x2710, value)`, as Smash 4's own grab statuses do): **0** none (it passes through the stage and floors, as a grabbed fighter does), **5** air, **1** / **2** ground (can / can't slide off edges). Its status sets its own when it changes, so write it every frame for as long as it should hold, and **5** (or its status's) to end it. Sephiroth's held forward air drags fighters back through the stage with it (`fighters/edge/snake_fair.md`) |
+| +7 | 0 | ignored |
 
 Use **`Float_Var_Compare`** to test them in ACMD (`Int_Var_Compare` reads ints, which these aren't):
 `Method=0` is "equal". Example, Donkey Kong's side special: if it has hit someone by frame 20, a
@@ -275,7 +276,7 @@ Sm4shCommand shows and accepts names for all of these (`tools/Sm4shCommand/SM4SH
 `POS_SELF_X`, `POS_OPP_OFFSET_X`, `POS_SLOT3_Y`, ...; the combat and hit / status / motion
 variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`,
 `HITSTUN_DEALT`, `HITSTUN_MUL`, `HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`,
-`HIT`, `HIT_NOW`, `STATUS`, `MOTION`, `MOTION_FRAME`), e.g. `LASTHIT_HITSTUN_MUL` = `0x0F000052`,
+`HIT`, `HIT_NOW`, `STATUS`, `MOTION`, `MOTION_FRAME`, `KIND`, `GROUND`), e.g. `LASTHIT_HITSTUN_MUL` = `0x0F000052`,
 `OPP_STATUS` = `0x0F0000AA`; `SELF_ANIM_RATE` = `0x0F000098`; and `SELF_ITEM` = `0x0F000099`.
 
     SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)

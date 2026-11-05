@@ -39538,7 +39538,10 @@ float edge_sn_turn_wait() { return 8.0f; }     // frames between turns
 float edge_sn_max() { return 300.0f; }         // the path's length at most
 float edge_sn_back_min() { return 24.0f; }     // back only once the tip is this far past the sword's own reach
 float edge_sn_gap() { return 3.0f; }           // the tip keeps this far off the sword's other runs
-float edge_sn_grav() { return 0.1f; }          // gravity x this while extending / retracting (user, test 95: 0.1)
+float edge_sn_grav() { return 0.1f; }          // gravity x this from the hold until the end hit is over (user,
+                                               // test 95: 0.1; test 96: "until after the sword comes back")
+float edge_sn_grav_end() { return 19.0f; }     // the motion frame the end hit is over at (fair's own clear at 19):
+                                               // normal gravity from there
 float edge_sn_catch() { return 22.0f; }        // a fighter hit, its feet within this of the tip, is caught
 float edge_sn_centre() { return 7.0f; }        // a caught fighter is held with its middle this far above its feet on
                                                // the sword (game units: whoever's scale), so the hits that follow
@@ -39551,7 +39554,8 @@ float edge_sn_tip() { return 3.48f; }          // its point
 float edge_sn_hidden() { return 0.001f; }      // a hidden piece's scale
 int   edge_sn_var() { return 0x0f000317; }     // VAR_23: 0 the normal move, 1 extending, 2 the end hit (ACMD)
 
-int   edge_sn_state;      // 0 off, 1 checking the hold, 3 extending, 4 retracting, 5 end hit
+int   edge_sn_state;      // 0 off, 1 checking the hold, 3 extending, 4 retracting, 5 end hit (low
+                          // gravity), 6 over
 int   edge_sn_hid;        // the blade hidden (1): shown again at the next aerial if a move left it so
 int   edge_sn_n;          // runs in the path
 float edge_sn_since;      // frames since the last turn
@@ -39923,6 +39927,13 @@ int edge_sn_slot_var(int slot, int q)
     return 0x0f000058 + 0x8 * (slot - 1) + q;    // player slot's hitstun (+0) / hitstop (+4) / offset X, Y (+5, +6)
 }
 
+// a player slot's stage collision (docs/position-variables.md, hit / status q 6: GroundModule(0x2710, value) on
+// it): 0 none, as a grabbed fighter; 5 air
+void edge_sn_ground(int slot, float kind)
+{
+    WorkModule(0, kind, 0x0f0000a0 + 0x8 * (slot + 2) + 0x6);
+}
+
 // fighters the tip has hit (in hitstun, their feet near the point: its hits are the article's, not his):
 // caught where they are, relative to the tip
 void edge_sn_catch_new()
@@ -39988,6 +39999,12 @@ void edge_sn_hold_caught()
             WorkModule(0, (edge_sn_pv + edge_sn_ov(slot)) * edge_sn_scale, edge_sn_slot_var(slot, 6));
             WorkModule(0, 2.0f, edge_sn_slot_var(slot, 4));
             WorkModule(0, 20.0f, edge_sn_slot_var(slot, 0));
+            if (edge_sn_state == 0x4)
+            {
+                // dragged back through the stage, not stopped by it (user, test 95: "Opponents being dragged back
+                // towards the sword during the release shouldn't have stage collision")
+                edge_sn_ground(slot, 0.0f);
+            }
         }
         slot = slot + 1;
     }
@@ -40003,6 +40020,10 @@ void edge_sn_release(int drop)
         if (edge_sn_s(slot) >= 0.0f && drop)
         {
             WorkModule(0, 0.0f, edge_sn_slot_var(slot, 0));
+        }
+        if (edge_sn_s(slot) >= 0.0f && edge_sn_state == 0x4)
+        {
+            edge_sn_ground(slot, 5.0f);         // stage collision back (in the air)
         }
         edge_sn_s_set(slot, -1.0f);
         slot = slot + 1;
@@ -40075,9 +40096,8 @@ void edge_sn_finish()
     edge_sn_release(0);
     edge_sn_blade_hide(0);
     edge_sn_publish(-1.0f);
-    edge_sn_gravity(1.0f);
     edge_sn_setvar(2.0f);
-    edge_sn_state = 0x5;
+    edge_sn_state = 0x5;                        // still low gravity: normal at edge_sn_grav_end
     MotionModule(0x4, 1.0f);
 }
 
@@ -40086,7 +40106,12 @@ void edge_sn_loop()
 {
     float f;
     int held;
-    if (edge_sn_state == 0 || edge_sn_state == 0x5)
+    if (edge_sn_state == 0x5 && MotionModuleF(0x1) >= edge_sn_grav_end())
+    {
+        edge_sn_gravity(1.0f);
+        edge_sn_state = 0x6;
+    }
+    if (edge_sn_state == 0 || edge_sn_state >= 0x5)
     {
         return;
     }
@@ -40148,6 +40173,10 @@ void edge_sn_end()
         edge_sn_release(0x1);
         edge_sn_blade_hide(0);
         edge_sn_publish(-1.0f);
+    }
+    if (edge_sn_state >= 0x3 && edge_sn_state <= 0x5)
+    {
+        edge_sn_gravity(1.0f);
     }
     edge_sn_release(0);
     edge_sn_state = 0;

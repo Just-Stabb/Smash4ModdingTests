@@ -1323,3 +1323,23 @@ opponent inside the sword".
 - `edge_sn_grav` 0.1 (was 0.4).
 - port_check over the chain and tests 70–95: 30 errors, as before. MSC stack check clean.
 - Package (install over 94): `script/msc/edge.mscsb`.
+
+## Test 96 (`build/sephiroth_test96.zip`): low gravity through the end hit; dragged fighters pass through the stage
+
+User: "The gravity should apply after the initial hold and until after the sword comes back on the release. Opponents
+being dragged back towards the sword during the release shouldn't have stage collision."
+- Gravity: 0.1x from the hold (frame 21, as before) through the retract, and now on after the sword is back, through
+  the end hit, to motion frame 19 (fair's own hitbox clear; `edge_sn_grav_end`); normal from there. Was: normal again
+  the frame the sword was back. Any end of the move before that (landing, a hit) puts it back to normal.
+- Dragged fighters: while the sword retracts, each caught fighter gets `GroundModule(0x2710, 0)` every frame (no ground
+  correction, as Smash 4's grab statuses set for a held fighter), so the stage doesn't stop it; 5 (air) when it's let
+  go (the sword back, or the move ending). Sephiroth's MSC can't call that on another fighter, so the executable's
+  variable cave got it: hit / status variable q 6 (`0x0F0000A0 + 8 × target + 6`, Sm4shCommand `TARGET_GROUND`;
+  `tools/position_vars_cave.py`, `docs/position-variables.md`), checked in `tools/position_vars_test.py`.
+  `tools/edge_specials_build.py --rpx` now puts position_vars_cave's words on again (its relocation moves are made
+  once), before acmd_ext_cave.
+- Not changed: caught while it extends, they keep stage collision. A fighter let go inside the stage relies on the
+  game pushing it out.
+- Tests: position_vars_test and acmd_ext_test on the shipped `cross_f.rpx`: 0 failures. port_check over the chain and
+  tests 70–96: 30 errors, as before. MSC stack check clean.
+- Package (install over 95): `code/cross_f.rpx`, `script/msc/edge.mscsb`.

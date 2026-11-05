@@ -166,6 +166,16 @@ mo1: lwz r7, 4(r5)
  li r3, 0
  blr""",                                       # MotionModule(7) / (1, motion, frame, rate)
     0x030B2A80: "lwz r12, 4(r3)\n lwz r3, 0xA30(r12)\n blr",          # MotionModuleF(1)
+    0x030B2C78: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ stw r6, 0xAF0(r12)
+ lwz r7, 4(r5)
+ stw r7, 0xAF4(r12)
+ lwz r7, 4(r4)
+ stw r7, 0xAF8(r12)
+ li r3, 0
+ blr""",                                       # GroundModule(op, value): op, value, argument count
     0x030B306C: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
@@ -390,6 +400,14 @@ check('kind: nearest opponent (slot 3)', call(mu, FGET2, w0, hid(1, 5)), 0x42)
 check('kind: an empty slot reads 0', call(mu, FGET2, w0, hid(8, 5)), 0)
 check('kind: writes ignored', (call(mu, FSET2, w0, hid(5, 5), 1.0), call(mu, FGET2, w0, hid(5, 5))), (0, 0x42))
 check('q6 still reads 0', call(mu, FGET2, w0, hid(5, 6)), 0)
+wi(mu, 2, 0xAF0, -1); wi(mu, 2, 0xAF4, -1)
+call(mu, FSET2, w0, hid(1, 6), 0.0)
+check('stage collision (q6) off: GroundModule(0x2710, 0) on the opponent, 2 words',
+      (ri(mu, 2, 0xAF0), ri(mu, 2, 0xAF4), ri(mu, 2, 0xAF8)), (0x2710, 0, 2))
+check('  self untouched', ri(mu, 0, 0xAF0), 0)
+call(mu, FSET2, w0, hid(5, 6), 5.0)
+check('stage collision back (air, 5) on slot 3', (ri(mu, 2, 0xAF0), ri(mu, 2, 0xAF4)), (0x2710, 5))
+check('q6 reads 0', call(mu, FGET2, w0, hid(5, 6)), 0)
 def jid(target, n): return 0x0F000290 + 4 * target + n
 for k, v in enumerate((3.5, 12.25, -1.0)):
     wf(mu, 2, 0xA80 + 4 * k, v)
