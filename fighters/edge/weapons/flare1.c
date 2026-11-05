@@ -597,6 +597,7 @@ int fl_fx2;
 int fl_fx3;
 int fl_fx4;
 
+int fl_fx_beam() { return 0; } // fx edge_shadowflare_beam
 int fl_fx_beam_hit() { return 0; } // fx edge_shadowflare_beam_hit
 int fl_fx_bullet() { return 0; } // fx edge_shadowflare_bullet
 int fl_fx_attack() { return 0; } // fx edge_shadowflare_bullet_attack
@@ -687,9 +688,8 @@ void fl_fx_play(int i, int id, float x, float y, float scale)
 }
 
 // Sephiroth's slot: the nearest fighter of his kind (0x42, the kind variable 0x0F0000BD + 8 x slot) to where Din's
-// callback spawned this. Test 72 took his position from the spawn alone (his head on frame 8 + (lr x 9, -0.8), from the
-// converted motion): in game the callback's point is ~9 lower (the user: "Side Special spawns too low", the beam
-// at his feet in the clip), so the kind is what picks him now and the spawn is placed from his own position
+// callback spawned this; the shot is placed from his own position (test 73 on). (Tests 72 - 74's beam on the floor was
+// the beam effect laid at the callback's point before the move: fl_fly_main lays it now, test 75)
 int fl_owner_slot(int air, float lr)
 {
     int s;
@@ -722,7 +722,7 @@ int fl_owner_slot(int air, float lr)
 // ---- 0 FLY (260a0 / 26000 / 26c00): straight along his facing at speed_x 5.5 x lerp(1, speed_mul 1.5, r) for
 // life 7 frames, power x lerp(1, power_mul 3, r) (0x33eccf0); a wall / the floor ends it (Ultimate's End: the beam
 // left to fade). Placed at Ultimate's spawn: his position + (lr x offset_x 10, offset_y 10) (air: offset_x_air 10,
-// offset_y_air 7), from his own position (fl_owner_slot; test 72 put it ~9 too low). Fly lasts
+// offset_y_air 7), from his own position (fl_owner_slot). Fly lasts
 // its life only (Ultimate also ends it on touching a wall / the floor: left out. Test 65's GroundModule(0x2722)
 // and test 66's "moved under half its speed" both ended it at once, inferred from the user: "the initial hit
 // still doesn't show up")
@@ -791,6 +791,11 @@ void fl_fly_main()
                           WorkModuleF(0, 0x0f000021 + 0x4 * fl_owner) + 10.0f, PostureModuleF(0x3));
         }
     }
+    // Fly's beam (edge_shadowflare_beam: Ultimate's EFFECT_FOLLOW on top at frame 0, a streak whose particles stay
+    // where they're born) laid here, at the moved place, along his facing (the effect's Z): played from Fly's
+    // script it took the top joint's matrix from before the move, Din's creation point on the floor (tests 72 - 74)
+    EffectModule(0x3, fl_fx_beam(), PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0x3), 0,
+                 1.5707964f * lr, 0, 1.0f, 0, 0xffffffff);
     func_24(0, 0, 1.0f);                       // fly
     AttackModule(0x2728, 1.0f + 2.0f * fl_r);
     fl_move(fl_speed * lr, 0);

@@ -286,6 +286,11 @@ def flare1_scripts(a, wdir):
         etr.last = False
         effect[name] = etr.script(fns_body(fns, 'effect_' + name))
         missing |= set(etr.missing)
+    # Fly's beam (edge_shadowflare_beam, EFFECT_FOLLOW on top at frame 0): its particles stay where they're born, and
+    # on frame 0 the top joint is still at Din's creation point (the joint's matrix lags the move flare1.c makes in
+    # FLY's main): the beam lay on the floor (tests 72 - 74, user: "Side special's initial hit effect still seems to
+    # spawn too low"). flare1.c lays it itself at the moved place (fl_fly_main), so Fly's script has none
+    effect['fly'] = [c for c in effect['fly'] if not (c.params and c.params[0] == ids['edge_shadowflare_beam'])]
     atk = _calls(fns_body(src('edge_flare2', 'Fly'), 'game_fly'), 'ATTACK')
     assert len(atk) == 1, len(atk)
     orbs = []
