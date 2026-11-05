@@ -39239,13 +39239,19 @@ void edge_s_generate()
     edge_s_fired = 0x1;
 }
 
-// 1a060: at the motion's end Wait or Fall (no special fall, no landing lag)
+// 1a060: actionable from the motion's cancel frame (CancelModule::is_enable_cancel: Ultimate's motion_list
+// special_s / special_air_s cancel 31, vl group 1 byte 2 of 0x221 / 0x22D), at the motion's end Wait or Fall
+// (no special fall, no landing lag)
 void edge_s_shot_loop()
 {
     edge_s_situation(0x221, 0x22d);
     if (edge_s_fired == 0 && MotionModuleF(0x1) >= 8.0f)
     {
         edge_s_generate();
+    }
+    if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))
+    {
+        return;
     }
     if (MotionModule(0x2712))
     {

@@ -686,34 +686,27 @@ void fl_fx_play(int i, int id, float x, float y, float scale)
     }
 }
 
-// the slot whose position is where Din's callback spawned this from: his head + (lr x 9, -0.8), the head on frame 8
-// at (0.07, 18.63) / air (-0.10, 18.54) (below): his position = here - (lr x 9.07, 17.83) / (lr x 8.90, 17.74)
+// Sephiroth's slot: the nearest fighter of his kind (0x42, the kind variable 0x0F0000BD + 8 x slot) to where Din's
+// callback spawned this. Test 72 took his position from the spawn alone (his head on frame 8 + (lr x 9, -0.8), from the
+// converted motion): in game the callback's point is ~9 lower (the user: "Side Special spawns too low", the beam
+// at his feet in the clip), so the kind is what picks him now and the spawn is placed from his own position
 int fl_owner_slot(int air, float lr)
 {
     int s;
     int best;
-    float x;
-    float y;
     float dx;
     float dy;
     float d;
     float bd;
-    x = PostureModuleF(0x1) - 9.07f * lr;
-    y = PostureModuleF(0x2) - 17.83f;
-    if (air)
-    {
-        x = PostureModuleF(0x1) - 8.9f * lr;
-        y = PostureModuleF(0x2) - 17.74f;
-    }
     best = 0xffffffff;
-    bd = 100.0f;
+    bd = 1000000.0f;
     s = 0;
     while (s < 0x8)
     {
-        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x42)
         {
-            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - x;
-            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - y;
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
             d = dx * dx + dy * dy;
             if (d < bd)
             {
@@ -729,8 +722,7 @@ int fl_owner_slot(int air, float lr)
 // ---- 0 FLY (260a0 / 26000 / 26c00): straight along his facing at speed_x 5.5 x lerp(1, speed_mul 1.5, r) for
 // life 7 frames, power x lerp(1, power_mul 3, r) (0x33eccf0); a wall / the floor ends it (Ultimate's End: the beam
 // left to fade). Placed at Ultimate's spawn: his position + (lr x offset_x 10, offset_y 10) (air: offset_x_air 10,
-// offset_y_air 7). Din's callback puts it at his head + (lr x 9, -0.8): his head on SpecialSEnd's frame 8 (the
-// converted motion) is 0.07 forward, 18.63 up (SpecialAirSEnd: -0.10, 18.54), so the difference is added
+// offset_y_air 7), from his own position (fl_owner_slot; test 72 put it ~9 too low). Fly lasts
 // its life only (Ultimate also ends it on touching a wall / the floor: left out. Test 65's GroundModule(0x2722)
 // and test 66's "moved under half its speed" both ended it at once, inferred from the user: "the initial hit
 // still doesn't show up")
@@ -786,13 +778,18 @@ void fl_fly_main()
     fl_fx0 = fl_fx1 = fl_fx2 = fl_fx3 = fl_fx4 = 0;
     lr = PostureModuleF(0);
     fl_owner = fl_owner_slot(air, lr);
-    if (air)
-    {
-        PostureModule(0x2714, PostureModuleF(0x1) + 1.1f * lr, PostureModuleF(0x2) - 10.74f, PostureModuleF(0x3));
-    }
-    else
-    {
-        PostureModule(0x2714, PostureModuleF(0x1) + 0.93f * lr, PostureModuleF(0x2) - 7.83f, PostureModuleF(0x3));
+    if (fl_owner >= 0)                         // Ultimate's spawn (main.bin 0x9e1770): his position + (lr x
+    {                                          // offset_x 10, offset_y 10), air (offset_x_air 10, offset_y_air 7)
+        if (air)
+        {
+            PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * fl_owner) + 10.0f * lr,
+                          WorkModuleF(0, 0x0f000021 + 0x4 * fl_owner) + 7.0f, PostureModuleF(0x3));
+        }
+        else
+        {
+            PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * fl_owner) + 10.0f * lr,
+                          WorkModuleF(0, 0x0f000021 + 0x4 * fl_owner) + 10.0f, PostureModuleF(0x3));
+        }
     }
     func_24(0, 0, 1.0f);                       // fly
     AttackModule(0x2728, 1.0f + 2.0f * fl_r);

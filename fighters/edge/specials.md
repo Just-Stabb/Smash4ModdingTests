@@ -251,16 +251,16 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
 - **Fighter** (`edge.c` `edge_s_*`, Zelda's Din's Fire statuses): 0x153 START (SpecialSStart 0x219 / air 0x225) ->
   motion end -> 0x157 HOLD (SpecialSLoop 0x21D / 0x229, Ultimate's special_s_hold; these slots loop, the hold
   doesn't wait for them) -> on the special button's release (after its first frame) or at hold_max 27 frames ->
-  0x158 SHOT (SpecialSEnd 0x221 / 0x22D, Ultimate's special_s) -> motion end -> Wait / Fall (no special fall, no
-  landing lag). Leaving the hold with the stick back (x . lr <= -0.2) turns him round. Kinetics:
+  0x158 SHOT (SpecialSEnd 0x221 / 0x22D, Ultimate's special_s) -> actionable from its cancel frame 31 (test 73),
+  motion end -> Wait / Fall (no special fall, no landing lag). Leaving the hold with the stick back (x . lr <= -0.2) turns him round. Kinetics:
   `param_special_s` start_*: ground x speed x 0.5, brake 0.1; air x 0.6, brake 0.008, y x 0.75, gravity and max fall
   x 0.85; re-applied with the motion swapped (frame kept) on a ground / air change.
 - **The shot** (flare1, article 6, weapon 0x18D, `weapons/flare1.c`, `tools/extra_kinds.json` `"on_hit": 1`, max 4):
   made on SHOT's frame 8 with the hold's frames (and +32 in the air) through Zelda's side special custom slot
   (int 0x10000049 -> the weapon's 0x10000005). r = hold / 27; n = max(1, 3 r) orbs; speed 5.5 x (1 + 0.5 r) along
   his facing, 7 frames, power x (1 + 2 r) (`AttackModule(0x2728)`); placed at his position + (lr x 10, 10) (air 7)
-  (the creation callback puts it at his head + (lr x 9, -0.8): his head on frame 8 of the converted SpecialSEnd /
-  SpecialAirSEnd is (0.07, 18.63) / (-0.10, 18.54), the difference added). Scripts: Ultimate's Fly (4 hitboxes, the
+  (from his own slot's position, the slot found by his kind 0x42: test 72 took his position from the creation
+  callback's point, assumed his head, and in game that point is ~9 lower, so the shot flew along the floor). Scripts: Ultimate's Fly (4 hitboxes, the
   beam), Hit (beam left, beam_hit), End (beam left). A wall / the floor or its life's end: End, gone.
 - **The orbs**: Ultimate's hit makes a flaredummy on the fighter hit (one per fighter), which keeps ceil(n) flare2
   orbs circling it. Smash 4's MSC has no way for a weapon to make or reach other weapons, so the shot itself turns

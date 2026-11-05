@@ -27,6 +27,10 @@
   install as the user will have it (the full package, then every fix package after it, in order): no ERROR
   goes out. A new bug found in game gets a check in `port_check.py` (or a default in the pipeline) and a
   row in the guide's bug catalogue, so the next port can't repeat it.
+- **Ultimate ports: the cancel windows must be Ultimate's.** Every move's cancel (IASA) frame is Ultimate's motion_list
+  cancel frame: vl group 1 byte 2 (`ultimate_acmd.py` writes it; ship the vl file whenever the build writes it), and every
+  status the port writes in MSC tests it in its loop (`CancelModule(0x2713)` or the frame, then `func_39` / `func_41`).
+  `port_check` C1 checks both.
 - **Ultimate effect colours must match Ultimate's.** When adding an Ultimate character's effects, every effect's
   colour has to come out as Ultimate draws it: the emitters' own colours AND the colour / alpha the effect
   scripts set on the call (`LAST_EFFECT_SET_COLOR`, `EFFECT_FOLLOW_COLOR`, `..._ALPHA` etc.), including on

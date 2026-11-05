@@ -75,6 +75,8 @@ TRANSLATE = {
     'Dash': 'dash',
 }
 GAME_ONLY = {'dash'}
+# their vl cancel frame (group 1 byte 2) from Ultimate's motion_list, the scripts left as they are
+CANCEL_ONLY = ('appealhil', 'appealhir', 'appeallwl', 'appeallwr', 'appealsl', 'appealsr')
 # Ultimate transition term -> Smash 4 STRANS id (vanilla dash scripts: STRANS_ON(0x1E00000A) at the run frame)
 TERMS = {'FIGHTER_STATUS_TRANSITION_TERM_ID_DASH_TO_RUN': 0x1E00000A}
 # --translate: script name -> motion slot for the run's extra translations
@@ -1247,6 +1249,17 @@ def motion_frames(args, done):
             byte(i, k, v)
         moves[i] = (name, ent[0]['flags'] & 4)
         print('  0x%03X %-16s cancel %2d, intangible %d-%d, move %d' % (i, name, cancel, xs, xe, bool(ent[0]['flags'] & 4)))
+    # motions whose scripts aren't translated but whose cancel frame is the move's (the taunts: Ultimate's
+    # appeal_* cancel 50; Zelda's 80 - 110 stayed on Sephiroth to test 72, port_check C1): byte 2 alone
+    for name in CANCEL_ONLY:
+        h = acmd.crc(name)
+        ent = [e for e in ml if hash40('game_' + name) in (e['game'],) + e['scripts']]
+        if h not in mt or not ent or len(ent[0]['extra']) < 3:
+            continue
+        i = mt.index(h)
+        if byte(i, 2) != ent[0]['extra'][2]:
+            print('  0x%03X %-16s cancel %2d (was %d)' % (i, name, ent[0]['extra'][2], byte(i, 2)))
+            byte(i, 2, ent[0]['extra'][2])
     import ultimate_vl_blend
     ultimate_vl_blend.apply_blends(vf, ml)      # Ultimate's blend into each common motion (byte 1)
     open(args.mtable[1], 'wb').write(struct.pack('>%dI' % len(mt), *mt))

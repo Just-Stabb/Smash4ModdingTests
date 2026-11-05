@@ -543,6 +543,115 @@ def check_vl(inst, name, base, motion_list, rep):
         rep.add('ERROR', 'V1 vl-loop', 'looping in Ultimate but byte 0 = 1 (plays once and holds: Hero fix 63): %s' % ', '.join(wrong))
 
 
+def translate_map(name):
+    """{Smash 4 script name (lower case): Ultimate script name} from the port's --translate map (port.json's
+    specials.acmd, else fighters/NAME/specials_acmd.json); other scripts keep their own name"""
+    path = os.path.join(ROOT, 'fighters', name, 'specials_acmd.json')
+    try:
+        cfg = json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))
+        path = os.path.join(ROOT, 'fighters', name, cfg['specials']['acmd'])
+    except (OSError, KeyError, ValueError):
+        pass
+    out = {}
+    try:
+        for u, v in json.load(open(path)).items():
+            if not u.startswith('_'):
+                out[(v['name'] if isinstance(v, dict) else v).lower()] = u
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def c_functions(text):
+    """{function name: body} of an MSC C source (top-level definitions, braces at column 0)"""
+    out = {}
+    for m in re.finditer(r'^(?:void|int|float)\s+(\w+)\s*\([^;{]*\)\s*\n\{\n(.*?)^\}', text, re.S | re.M):
+        out[m.group(1)] = m.group(2)
+    return out
+
+
+CANCEL_TESTS = ('CancelModule(0x2713)', 'func_39()', 'func_41()')
+# moves (C1 (a)); common motions (damage, downs, dodges, guard) follow Smash 4's own rules for them
+CANCEL_MOVES = ('attack', 'special', 'throw', 'catchattack', 'catchwait', 'appeal', 'cliffattack', 'downattack',
+                'slipattack')
+
+
+def check_cancel(inst, name, base, motion_list, rep):
+    """C1: the cancel windows are Ultimate's (user rule, Sephiroth test 72: "down special and side special have
+    different recovery than in Ultimate"; Shadow Flare's shot played to its end, Ultimate cancels it at 31).
+    (a) every motion the port took from Ultimate has Ultimate's motion_list cancel frame in vl group 1 byte 2;
+    (b) in the port's own MSC source, a status playing such a motion (MotionModule(0x1, ...) with its slot, then
+    func_78(loop)) must test it in its loop or a function the loop calls: CancelModule(0x2713) (the vl byte) or
+    the motion frame, then func_39 / func_41 (Wait / Fall checks) as Zelda's statuses do"""
+    vl = inst.get('param/fighter/fighter_param_vl_%s.bin' % name)
+    mt = inst.get('fighter/%s/script/animcmd/body/motion.mtable' % name)
+    if vl is None or mt is None or not motion_list:
+        return
+    import fighter_param_vl as V
+    import tempfile
+    import ultimate_acmd as UA
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write(vl)
+    try:
+        vf = V.load(f.name, base.get('vl_kind', base['base']))
+    finally:
+        os.unlink(f.name)
+    hashes = list(struct.unpack('>%dI' % (len(mt) // 4), mt))
+    ml = UA.read_motion_list(motion_list)
+    ult_of = translate_map(name)
+    cancel_at = {}                       # slot: Ultimate's cancel frame
+    wrong = []
+    for n in sorted(vocabulary() | set(ult_of)):
+        if not n.startswith(CANCEL_MOVES) or n.startswith('landing') or n in UA.GAME_ONLY or acmd.crc(n) not in hashes:
+            continue
+        i = hashes.index(acmd.crc(n))
+        h = UA.hash40('game_' + ult_of.get(n, n).lower())
+        ent = [e for e in ml if h == e['game'] or h in e['scripts']]
+        if not ent or len(ent[0]['extra']) < 3:
+            continue
+        want = ent[0]['extra'][2]
+        try:
+            (_p, t), = V.find(vf, 'm0[%d].2' % i, '0', {})
+        except Exception:
+            continue
+        if want:
+            cancel_at[i] = (n, want)
+        if t.value != want:
+            wrong.append('0x%X %s %d (Ultimate %d)' % (i, n, t.value, want))
+    if wrong:
+        rep.add('ERROR', 'C1 cancel-window', 'vl byte 2 (the cancel frame) is not Ultimate\'s: %s' % ', '.join(wrong))
+    try:
+        cfg = json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))
+        src = os.path.join(ROOT, 'fighters', name, cfg['specials']['msc'])
+    except (OSError, KeyError, ValueError):
+        src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src) or not cancel_at:
+        return
+    fns = c_functions(open(src, errors='replace').read())
+
+    def tests(fn, depth=0):
+        body = fns.get(fn, '')
+        if any(t in body for t in CANCEL_TESTS):
+            return True
+        return depth < 1 and any(tests(c, depth + 1) for c in set(re.findall(r'\b(\w+)\(', body)) if c in fns and c != fn)
+    missing = []
+    for fn, body in fns.items():
+        loops = re.findall(r'func_78\((\w+)\)', body)
+        if not loops:
+            continue
+        slots = set()
+        for line in body.split('\n'):
+            if 'MotionModule(0x1,' in line:
+                slots.update(int(x, 16) for x in re.findall(r'0x([0-9a-fA-F]{3})\b', line))
+        hit = sorted(s for s in slots if s in cancel_at)
+        if hit and not any(tests(lp) for lp in loops):
+            missing.append('%s -> %s (%s)' % (fn, '/'.join(loops), ', '.join('0x%X %s cancel %d' % (s, cancel_at[s][0],
+                                                                                              cancel_at[s][1]) for s in hit)))
+    if missing:
+        rep.add('ERROR', 'C1 cancel-window', 'a status plays a motion Ultimate cancels but its loop never tests the '
+                'cancel (CancelModule(0x2713) / the frame, then func_39 / func_41): %s' % '; '.join(missing))
+
+
 # ------------------------------------------------------------------ MSC and sources
 MSC_GLOBALS_PROVEN = 0x86       # Hero fix 79: every spell cast writes global 0x86 (brave_lw_burst) and works
 
@@ -1182,6 +1291,7 @@ def main():
     check_scripts(inst, a.name, kind, base, joints, vanilla, rep)
     check_params(inst, a.name, kind, base, vanilla, ult_param, labels, rep)
     check_vl(inst, a.name, base, motion_list, rep)
+    check_cancel(inst, a.name, base, motion_list, rep)
     check_msc(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)

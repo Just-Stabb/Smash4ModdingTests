@@ -883,3 +883,30 @@ special's arrow still cut off.
   2 x U repeat): one arm of the outer chevron ends in a diagonal cut in game. Not found from the data; asked the user
   for Ultimate footage of it.
 - port_check over the chain + 70 / 71 / this: no new errors.
+
+## Test 73 (`build/sephiroth_test73.zip`): Ultimate's cancel windows; Shadow Flare's height and flash
+
+User, test 72 (clips, Ultimate's beside ours): "Side Special spawns too low and produces too much light, down special
+and side special have different recovery than in Ultimate, down special still looks off"; and the rule "when doing an
+Ultimate port, ensure the cancel windows are the same" (CLAUDE.md, `port_check` C1, the guide's bug catalogue).
+- Cancel windows (Ultimate's motion_list cancel frames, `CancelModule::is_enable_cancel` in the status code):
+  - Shadow Flare's shot (`edge_s_shot_loop`) never tested its cancel and played to its end: now actionable from 31
+    (`special_s` / `special_air_s`), as Ultimate's 1a060.
+  - The vl file with Ultimate's cancel frames was built for every test since 58 but left out of the packages: the game
+    kept test 57's, where Blade Dash's end cancelled at 34 (Ultimate 27), Octaslash's at 35 (56), the shot at 40 (31),
+    Scintilla's slash / break at 0 / 47 (52 / 42; their loops test the frame themselves, so those two were right).
+    Shipped now (`param/fighter/fighter_param_vl_edge.bin`).
+  - The taunts kept Zelda's 80 / 100 / 110: Ultimate's 50 (`ultimate_acmd.py` `CANCEL_ONLY`).
+  - Scintilla's whiff: 28 (stance) + 59 (the slash to its cancel at 52: frames 1-5 at half speed, 30-50 at 1 / 1.15)
+    = interruptible at 87, SmashWiki's figure; unchanged.
+- Shadow Flare's shot flew along the floor (Ultimate: from his hand, offset_y 10). It was placed from the point Din's
+  callback spawns it at, taken as his head (18.6 up, from the converted motion); in game that point is ~9 lower. The
+  shot now finds Sephiroth's slot by kind (0x42, `SLOTn_KIND`) and is placed at his position + (lr x 10, 10), air
+  (lr x 10, 7), Ultimate's offsets (main.bin 0x9e1770).
+- The flash at his hand (`edge_shadowflare_start`): same size and place as Ultimate's (both ~9 units across on the
+  clips), but deep violet where Ultimate's is lavender (the disc's mean on white: ours 151 / 76 / 211, Ultimate's
+  186 / 157 / 237: about 0.55 x the coverage). FlareBack2's alpha x 0.55 (`--test-alpha-for`): matched by measurement,
+  not from the data. Why the converted disc is denser (its colour keys black -> purple over a 4-frame life, draw path
+  21) is still open.
+- Still open: Scintilla's barrier is fainter than Ultimate's bright cyan wall and has no white dissolve before the
+  slash (Ultimate frames 8-10); the arrow (footage asked for).
