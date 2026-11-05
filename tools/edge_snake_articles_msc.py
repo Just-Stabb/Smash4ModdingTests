@@ -25,12 +25,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: when his hilt can't be read
-BLADE_BONE = 23                         # his LHaveN (bone 24, playing SwordL1; EdgeBladeL sits on it at identity) as a
-                                        # joint table 0 ID, every costume: the joint variables read ModelModuleF(axis,
-                                        # joint), joint IDs as ACMD's. Test 88-89's 26 was past table 0 (0-25): his root,
-                                        # the sword drawn from his feet
-BLADE_START = 0.82                      # the blade's body starts this far along it from the hilt (snake_sword pieces)
+BASE_H, BASE_V = 11.06, 13.35          # tools/edge_snake_msc.py edge_sn_base_h / _v: the blade's start, frozen frame 13
 RUNS = 12
 
 COMMON = r'''
@@ -41,38 +36,22 @@ int sn_life;            // frames left (a safety net: removed after SN_LIFE what
 float sn_h;             // sn_walk's result: the point along the path, its run's direction
 float sn_v;
 int sn_d;
-float sn_bh;            // the path's start (his hilt, live: sn_base), his model plane; sn_bz its depth
+float sn_bh;            // the path's start (the blade's, frozen frame 13: sn_base), his model plane; sn_bz its depth
 float sn_bv;
 float sn_bz;
 
 float sn_base_h() { return sn_bh; }
 float sn_base_v() { return sn_bv; }
 
-// the path starts at his hilt as it is (his LHaveN, joint BLADE_BONE: EdgeBladeL's origin, read through the joint
-// variables 0x0F00029C + 4 x slot: docs/position-variables.md), BLADE_START further along the blade, at the hilt's depth. Test 87 started it
-// at Ultimate's frame-13 numbers from his position and depth: the pieces weren't in line with his hand. Nothing read
-// (0, 0, 0): those numbers
+// the path starts at the blade's start in the frozen frame-13 pose (Ultimate's c05attackairf frame 13: the hilt 10.25
+// forward, 13.32 up; the blade's body 0.82 on: BASE_H / BASE_V) from his position, at his depth. Tests 88 - 90 read his
+// hand through the joint variables instead: joint 26 read his root (the sword from his feet), joint 23 (LHaveN) a
+// point at his shoulder behind the hilt (its unanimated place, not the frozen pose): user, test 90's frame
 void sn_base()
 {
-    float jx;
-    float jy;
-    float jz;
-    float lr;
-    WorkModule(0, BLADE_BONEf, 0x0f00029c + 0x4 * sn_slot);
-    jx = WorkModuleF(0, 0x0f00029d + 0x4 * sn_slot);
-    jy = WorkModuleF(0, 0x0f00029e + 0x4 * sn_slot);
-    jz = WorkModuleF(0, 0x0f00029f + 0x4 * sn_slot);
-    lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
-    if (jx == 0.0f && jy == 0.0f && jz == 0.0f)
-    {
-        sn_bh = BASE_Hf;
-        sn_bv = BASE_Vf;
-        sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
-        return;
-    }
-    sn_bh = (jx - WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot)) * lr + BLADE_STARTf;
-    sn_bv = jy - WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot);
-    sn_bz = jz;
+    sn_bh = BASE_Hf;
+    sn_bv = BASE_Vf;
+    sn_bz = WorkModuleF(0, 0x0f000022 + 0x4 * sn_slot);
 }
 
 int sn_find_owner()
@@ -355,8 +334,6 @@ def generate(base_c, own):
     assert '    global21 = func_40;\n' in text
     text = text.replace('    global21 = func_40;\n', '    global21 = 0;           // motion indices as they are (flare1.c)\n')
     code = (COMMON + own).replace('BASE_Hf', '%.2ff' % BASE_H).replace('BASE_Vf', '%.2ff' % BASE_V)
-    code = code.replace('BLADE_BONEf', '%.1ff' % BLADE_BONE).replace('BLADE_BONE', str(BLADE_BONE))
-    code = code.replace('BLADE_STARTf', '%.2ff' % BLADE_START)
     code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS))
     return text.rstrip('\n') + '\n' + code
 

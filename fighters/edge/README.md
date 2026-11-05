@@ -1254,3 +1254,17 @@ User, test 89: "The forward sword appears now but still isn't aligned with the h
   table swaps 23 / 24) in every costume: the articles read joint 23. `docs/position-variables.md` corrected.
 - port_check over the chain and tests 70–90: 30 errors, as before. MSC stack check clean.
 - Package (install over 89): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 91 (`build/sephiroth_test91.zip`): the extended sword from the hilt's frozen place
+
+User, test 90 (frame): "The sword is much closer to being aligned but still isn't." The extended sword ran straight,
+but about 4–5 units above the hilt and starting about 7 behind it: his shoulder.
+- The joint read (LHaveN, joint 23) gives the joint's unanimated place, not the frozen fair pose: the rest pose's hand
+  is out at the shoulder. Shadow Flare reads a waist, which barely moves, so it never showed.
+- The path now starts at Ultimate's frozen-frame numbers again (c05attackairf frame 13: hilt 10.25 forward, 13.32 up;
+  the blade's body 0.82 on: 11.06, 13.35) from his position, at his depth. Measured on the user's frame (about 6 px a
+  unit), the hilt is about 13.7 up and 11.7 ahead: those numbers. Tests 82–87 used them too, but never with a visible
+  forward piece in the right place (the light arrow's feet, then the end-on turn).
+- `docs/position-variables.md` and the port guide note both behaviours.
+- port_check over the chain and tests 70–91: 30 errors, as before. MSC stack check clean.
+- Package (install over 90): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
