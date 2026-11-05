@@ -774,9 +774,19 @@ class EffectTranslator(Translator):
         # LAST_EFFECT_SET_COLOR after one replaces it in Ultimate, so it is divided out), and the script colours
         # baked into the bank (the LAST_PARTICLE_SET_COLOR after their effects dropped)
         self.tints, self.baked = tints or {}, baked or {}
+        # the script's Ultimate animation (BonePose and its file), for effects placed in the model's frame
+        self.pose, self.anim = None, None
+        self.unposed = 0
 
     def bone(self, name):
         return self.bone_at(name, (0.0, 0.0, 0.0))[0]
+
+    def joint_bone(self, name):
+        """the bone `name` or its nearest ancestor with a joint id (lower case)"""
+        n = name.lower()
+        while n not in self.joints and n != 'top' and n in self.parents:
+            n = self.parents[n]
+        return n
 
     def bone_chain(self, name):
         """(joint id, bone `name`'s frame in that joint's: 4 x 4, row vectors)"""
@@ -807,6 +817,25 @@ class EffectTranslator(Translator):
         if not np.allclose(m[:3, :3], np.eye(3), atol=1e-5):
             rot = euler_xyz(m[:3, :3].T @ euler_matrix(rot))
         return [jid] + [float(v) for v in p[:3]] + rot
+
+    def model_rot(self, name, rot, fallback):
+        """the angles (degrees) of an effect turned rot in the fighter's frame, in the frame of bone `name`'s
+        joint at this frame of the script's Ultimate animation. EFFECT_FLW_POS follows the bone's position
+        and keeps its angles in the fighter's frame; followed fully (call), the joint's turn at the spawn
+        frame is taken out (its turn while the effect lasts stays: Sephiroth's hand turns 0.1 degrees in
+        forward air's frames 13 - 17, 6 in up tilt's 20 - 25). Until test 78 the angles were taken in the
+        bone's frame: forward air's speed lines (on swordl2, along the blade) stood up instead of lying
+        along his swing. fallback: without the animation"""
+        import numpy as np
+        if self.pose is None or self.anim is None:
+            self.unposed += 1
+            return fallback
+        n = self.joint_bone(name)
+        if n == 'top':
+            return [float(v) for v in rot]
+        m = self.pose.matrix(self.anim, n, int(round(self.frame)))[:3, :3]
+        m = m / np.linalg.norm(m, axis=0)[None, :]
+        return euler_xyz(m.T @ euler_matrix([float(v) for v in rot]))
 
     def trail(self, a):
         """AFTER_IMAGE4_ON(_arg29)(agent, tex1, tex2, blur, bone1, x1, y1, z1, bone2, x2, y2, z2,
@@ -868,7 +897,8 @@ class EffectTranslator(Translator):
         if short.startswith('EFFECT_FLW_POS') and any(abs(float(v)) > 1e-6 for v in a[3:6]):
             # Smash 4's position-only follow adds the offset unturned to the bone's position
             # (cross_f.rpx 0x0334E4B0: effect record +0x144 bit 0x1000), Ultimate turns it with the
-            # bone (down air's flash 22 along the blade sat above his head): follow fully instead
+            # bone (down air's flash 22 along the blade sat above his head): follow fully instead, its angles
+            # (Ultimate's in the fighter's frame) taken into the joint's at the spawn frame (model_rot)
             target = 'External_Graphic' if short == 'EFFECT_FLW_POS' else 'Graphic_Effect4'
         if target == 'Graphic_Effect4' and a[1] in self.turned_off:
             # a NO_STOP effect its own script turns off: the plain follow (killed with the motion
@@ -883,6 +913,8 @@ class EffectTranslator(Translator):
                 self.missing[a[1]] = self.missing.get(a[1], 0) + 1
             return []
         bone, *place = self.place(a[2], a[3:6], a[6:9])
+        if short.startswith('EFFECT_FLW_POS') and target != EFFECT_MACROS[short][0]:
+            place[3:6] = self.model_rot(a[2], a[6:9], place[3:6])
         place.append(float(a[9]))                               # x, y, z, rx, ry, rz, size
         if shape.startswith('full'):
             rest = [float(v) for v in a[10:16]] + [int(bool(a[16]))]
@@ -950,8 +982,66 @@ def _same_name(self, short, a):
 EffectTranslator.same_name = _same_name
 
 
+class BonePose:
+    """an Ultimate skeleton's bones under its animations: model-space transforms (4 x 4, column vectors) at a
+    frame, each bone's animated local transform (its rest one without a track) composed up its chain"""
+
+    def __init__(self, nusktb):
+        import ssbh_data_py as s
+        self.skel = s.skel_data.read_skel(nusktb)
+        self.bones = {b.name.lower(): b for b in self.skel.bones}
+        self.tracks = {}
+
+    def anim(self, path):
+        if path not in self.tracks:
+            import ssbh_data_py as s
+            t = {}
+            for g in s.anim_data.read_anim(path).groups:
+                if g.group_type.name == 'Transform':
+                    for n in g.nodes:
+                        for tr in n.tracks:
+                            t[n.name.lower()] = tr.values
+            self.tracks[path] = t
+        return self.tracks[path]
+
+    def matrix(self, path, bone, frame):
+        import numpy as np
+        tracks = self.anim(path)
+        b, m = self.bones[bone.lower()], np.eye(4)
+        while b is not None:
+            vals = tracks.get(b.name.lower())
+            if vals:
+                v = vals[max(0, min(frame, len(vals) - 1))]
+                x, y, z, w = v.rotation
+                local = np.eye(4)
+                local[:3, :3] = np.array([
+                    [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                    [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                    [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]) * np.array(v.scale)[None, :]
+                local[:3, 3] = v.translation
+            else:
+                local = np.array(b.transform, float).T      # ssbh's rows: translation in the last
+            m = local @ m
+            b = self.skel.bones[b.parent_index] if b.parent_index is not None else None
+        return m
+
+
+def script_anims(motion_list):
+    """{hash40 of a script name (game_ / effect_ / sound_ / expression_...): its motion's first animation file}
+    from Ultimate's motion_list.bin (the animations beside it)"""
+    d = os.path.dirname(motion_list)
+    files = {hash40(f): os.path.join(d, f) for f in os.listdir(d) if f.endswith('.nuanmb')}
+    out = {}
+    for e in read_motion_list(motion_list):
+        path = next((files[h] for h in e['anims'] if h in files), None)
+        if path:
+            for h in (e['game'],) + e['scripts']:
+                out.setdefault(h, path)
+    return out
+
+
 def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final'), locals_=None,
-                      tints=None, baked=None):
+                      tints=None, baked=None, nusktb=None, motion_list=None):
     """every effect_* function of the dump -> the effect script of the same Smash 4 name (TRANSLATE's
     for the translated moves), replacing the base's (its own effects, e.g. Zelda's sparkles); not the
     moves still the base's (specials, Final Smash). Returns {Smash 4 name: commands}, {missing name:
@@ -968,6 +1058,9 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
     # forward smash wave curled up over him facing right instead of running along the ground
     DYNAMIC_CONDS[LR_TAG] = LR_FACING
     tr = EffectTranslator(joints, ids, parents, locals_, tints, baked)
+    anims = {}
+    if nusktb and motion_list:
+        tr.pose, anims = BonePose(nusktb), script_anims(motion_list)
     out = {}
     for path in sorted(os.listdir(scripts_dir)):
         if not path.endswith('.txt'):
@@ -982,6 +1075,7 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts):
                 continue
             tr.last, tr.last_name = False, None
+            tr.anim = anims.get(hash40(fn)) or anims.get(hash40('game_' + fn[len('effect_'):]))
             tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
             cmds = tr.script(body)
             # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
@@ -991,6 +1085,8 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             out[name] = cmds
     EFFECT_CONDS = ()
     DYNAMIC_CONDS.pop(LR_TAG, None)
+    if tr.unposed:
+        print('%d position-following effects without their animation: angles taken in the bone\'s frame' % tr.unposed)
     return out, tr.missing
 
 
@@ -1390,7 +1486,8 @@ def main():
                 fx, missing = translate_effects(a.scripts, o, tr.joints, ids, skeleton_parents(a.effects[1]),
                                                 locals_=skeleton_locals(a.effects[1]),
                                                 tints=ultimate_tints.tints(ult) if ultimate_tints.fighter_tint(ult)
-                                                else {}, baked=ultimate_tints.script_colours(a.scripts))
+                                                else {}, baked=ultimate_tints.script_colours(a.scripts),
+                                                nusktb=a.effects[1], motion_list=a.motion_list)
                 for name, cmds in fx.items():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (
