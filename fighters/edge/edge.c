@@ -38272,6 +38272,10 @@ void edge_hi_rush_main()
     KineticModule(0xc, 0x2);
     KineticModule(0x11, 0x3, edge_hi_rx * s, edge_hi_ry * s);
     KineticModule(0x10, 0x3, 0.0f, 0.0f);
+    // no speed limit on it (-1): Smash 4 caps the stop energy's y in the air unless lifted, as Zelda's Farore's
+    // Wind does in its air end (zelda.mscsb func_2291: KineticModule(0x14, 3, x limit, -1)); test 101, the user:
+    // "Tap up special doesn't go far enough when going upwards"
+    KineticModule(0x14, 0x3, -1.0f, -1.0f);
     KineticModule(0xb, 0x3);
     edge_hi_count = 0;                     // init 04890 / 04950
     edge_hi_landed = 0;
@@ -38367,9 +38371,44 @@ void edge_hi_rush_end()
     edge_hi_landing_frame();
 }
 
+// in the air, touching a wall or ceiling (GroundModule 0x2722: 1 ceiling, 2 / 4 the walls, as vanilla's wall /
+// ceiling bounces read them): the rush's direction (edge_hi_rx / ry) with the surface's normal taken out, so it
+// slides along it (test 101, the user: Octaslash "seems to 'bounce' Sephiroth off of diagonal stage geometry")
+void edge_hi_slide(int side)
+{
+    float nx;
+    float ny;
+    float d;
+    float l;
+    float x;
+    float y;
+    if (GroundModule(0x2722, side) == 0)
+    {
+        return;
+    }
+    nx = GroundModuleF(0x5, side);
+    ny = GroundModuleF(0x6, side);
+    if (nx == 0.0f && ny == 0.0f)
+    {
+        return;
+    }
+    d = edge_hi_rx * nx + edge_hi_ry * ny;
+    x = edge_hi_rx - d * nx;
+    y = edge_hi_ry - d * ny;
+    l = MathF(0, x * x + y * y);
+    if (l < 0.05f)
+    {
+        return;                            // straight into it: the engine stops him there
+    }
+    edge_hi_rx = x / l;
+    edge_hi_ry = y / l;
+}
+
 // the rush's speed each frame (ExeFS 0x9e5100, Ultimate's kinetic hook on energy 3 during the rush): on the
 // ground along the floor's tangent keeping its size; from rush count rush_brake_frame (2, Octaslash 6) a
-// brake of rush_brake (1.72 / 0.47) along the path
+// brake of rush_brake (1.72 / 0.47) along the path. In the air (test 101) the speed is kept on the rush's own
+// line, slid along any wall / ceiling touched (edge_hi_slide): the engine's push off slanted stage sides sent it
+// back the other way
 void edge_hi_rush_speed()
 {
     float vx;
@@ -38402,6 +38441,17 @@ void edge_hi_rush_speed()
         }
         dx = ny * lr;
         dy = -nx * lr;
+        KineticModule(0x11, 0x3, dx * m, dy * m);
+        edge_hi_rx = dx;                   // off the floor, it goes on this way
+        edge_hi_ry = dy;
+    }
+    else
+    {
+        edge_hi_slide(0x1);
+        edge_hi_slide(0x2);
+        edge_hi_slide(0x4);
+        dx = edge_hi_rx;
+        dy = edge_hi_ry;
         KineticModule(0x11, 0x3, dx * m, dy * m);
     }
     if ((float)edge_hi_count >= edge_hi_p(2.0f, 6.0f))

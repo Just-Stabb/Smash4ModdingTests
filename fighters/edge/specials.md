@@ -140,6 +140,12 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   mid-rush within 25 degrees of straight down: x x 0.25, LandingFallSpecial; otherwise Blade Dash -> ground
   end ("landed": x x 0.25), Octaslash keeps sliding. From rush frame 1, `GroundModule(0x2713, 0)` =
   set_passable_check(false). The pitch follows the speed. No intangibility (Ultimate has none).
+- **Rush fixes (test 101, the user: tap up special "doesn't go far enough when going upwards"; Octaslash "bounces"
+  off diagonal stage geometry):** the stop energy's speed limit is lifted (`KineticModule(0x14, 3, -1, -1)`): Smash 4
+  caps its y in the air unless a script lifts it, as Zelda's Farore's Wind does (`func_2291`: x limit kept, y -1).
+  In the air the rush is kept on its own line each frame, and where it touches a ceiling or a wall
+  (`GroundModule(0x2722, 1 / 2 / 4)`) the surface's normal is taken out of its direction, so it slides along slanted
+  stage sides (Ultimate's hook only re-aims on the ground; this is the port's).
 - **Ground end:** x x 0.6 (Octaslash 0.9; 0.25 if landed), brake 0.12 (0.06); actionable at the motion's
   cancel frame 27 (56); off an edge -> Fall; end -> Wait.
 - **Air end:** x x 0.4 (0.9), brake 0.02, the rush's y x the same into gravity, gravity 0.12; from frame 18

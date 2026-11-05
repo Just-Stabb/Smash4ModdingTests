@@ -1418,3 +1418,21 @@ Asked how the Phantom should charge: "Hold B to charge" (as Zelda's).
   where it stands is its own (native), not moved.
 - port_check over the chain and tests 70–100: 30 errors, as before. MSC stack check clean.
 - Package (install over 99): `script/msc/edge.mscsb`.
+
+## Test 101 (`build/sephiroth_test101.zip`): Blade Dash's full height; Octaslash slides along slanted stage sides
+
+User: "Tap up special doesn't go far enough when going upwards, held up special seems to 'bounce' Sephiroth off of
+diagonal stage geometry, making recovery hard".
+- **Height:** the rush is on the stop energy (energy 3), whose speed Smash 4 limits in the air unless a script lifts
+  the limit: Zelda's own Farore's Wind does in its air end (vanilla zelda.mscsb `func_2291`:
+  `KineticModule(0x14, 3, x limit, -1)`). The rush never did, so its y speed was capped and an upward Blade Dash fell
+  short of Ultimate's ~68 units. `edge_hi_rush_main` now sets `KineticModule(0x14, 0x3, -1, -1)` (no limit).
+- **Bounce:** in the air the rush's speed is now set along its own direction every frame, and where it touches a
+  ceiling or a wall (`GroundModule(0x2722, 1 / 2 / 4)`, the flags vanilla's wall / ceiling bounces read) the
+  surface's normal is taken out of that direction (`edge_hi_slide`), so it slides along slanted stage sides instead
+  of being turned back. On the ground it still follows the floor (Ultimate's hook), and its direction there carries
+  on if it leaves the floor. Not Ultimate's code (its hook only re-aims on the ground): the engine's push-out was what
+  turned the rush around here.
+- Not proven in game: the touch normal's sign on walls / ceilings (the slide takes the normal out either way).
+- port_check over the chain and tests 70–101: 30 errors, as before. MSC stack check clean.
+- Package (install over 100): `script/msc/edge.mscsb`.
