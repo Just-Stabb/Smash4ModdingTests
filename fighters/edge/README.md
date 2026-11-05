@@ -897,6 +897,9 @@ Ultimate port, ensure the cancel windows are the same" (CLAUDE.md, `port_check` 
     Scintilla's slash / break at 0 / 47 (52 / 42; their loops test the frame themselves, so those two were right).
     Shipped now (`param/fighter/fighter_param_vl_edge.bin`).
   - The taunts kept Zelda's 80 / 100 / 110: Ultimate's 50 (`ultimate_acmd.py` `CANCEL_ONLY`).
+  - The same vl brings the rest of what the build has written since test 58 (all from Ultimate's motion_list): the
+    blend frames into 13 common motions (byte 1), and no intangibility on the up special's 0x231 / 0x232 / 0x239
+    (Zelda's Farore's Wind frames, bytes 3 / 4 = 34, were still on: Ultimate's Blade Dash has none).
   - Scintilla's whiff: 28 (stance) + 59 (the slash to its cancel at 52: frames 1-5 at half speed, 30-50 at 1 / 1.15)
     = interruptible at 87, SmashWiki's figure; unchanged.
 - Shadow Flare's shot flew along the floor (Ultimate: from his hand, offset_y 10). It was placed from the point Din's
@@ -908,5 +911,6 @@ Ultimate port, ensure the cancel windows are the same" (CLAUDE.md, `port_check` 
   186 / 157 / 237: about 0.55 x the coverage). FlareBack2's alpha x 0.55 (`--test-alpha-for`): matched by measurement,
   not from the data. Why the converted disc is denser (its colour keys black -> purple over a 4-frame life, draw path
   21) is still open.
+- port_check over the chain + 70-72 / this: 38 errors as before (none new), C1 clean.
 - Still open: Scintilla's barrier is fainter than Ultimate's bright cyan wall and has no white dissolve before the
   slash (Ultimate frames 8-10); the arrow (footage asked for).
