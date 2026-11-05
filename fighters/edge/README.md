@@ -987,3 +987,22 @@ chevron along the aim; ours "cut off" since test 63 ("one arm of the outer chevr
   too, a cut end on long thin ones. All are drawn whole now (the bank is the only file in this package).
 - Placement checked against the clip (the training grid, 16.6 px a unit): the arrow's centre at (0.5, 7.5) from his
   position + 13 along the aim; ours (0, 8) + 14.
+
+## Test 78 (`build/sephiroth_test78.zip`): forward air's speed lines lie along the swing; test 77's arrow
+
+User, test 76 (clip): forward air's speed lines "vertical instead of horizontal". Test 77 (the aim arrow whole, above)
+was held back for a check of the quad fix over all his programs and goes out in this one.
+- Ultimate's `EFFECT_FLW_POS(_NO_STOP)` follows the bone's position: the offset turns with the bone, the effect's
+  angles stay in the fighter's frame. Smash 4's position-only follow turns neither, so the translator follows such
+  calls fully (the offset right) but took their angles in the bone's frame: the lines on `swordl2` stood along the
+  blade. `ultimate_acmd.py` now takes the angles into the joint's frame through the joint's turn at the spawn frame in
+  the script's own Ultimate animation (motion_list -> `c05attackairf.nuanmb` etc., `BonePose`). The joint's turn while
+  the effect lasts stays: 0.1 degrees in forward air's frames 13 - 17, 6 in up tilt's 20 - 25.
+- Calls changed: forward air's speed line and sword flash, up tilt's speed line, down air's flash, dash attack's three
+  hand effects (aura, dash, dash2). 7 turned variants added (`variants78.json` = test 72's 30 + 7; ids 0x34200B6 -
+  0x34200BC); the common sys_* sets after them moved 7 ids (body scripts rebuilt; the articles' scripts and edge.c use
+  none of them).
+- Quad fix check (`ult_to_latte_test.py edge --mode eft --stage vs`, all 696 vertex programs, in chunks): 693 pass;
+  567 / 621 abort the test's native executor and 657 (sparks1) differs, the same with the lowering before the fix.
+- Package: the bank (ptcl, efc: bank 29.25 MB, 139 sets) and the body effect.bin. port_check over the install chain
+  and tests 70 - 78: 38 errors, as test 77 (none new).
