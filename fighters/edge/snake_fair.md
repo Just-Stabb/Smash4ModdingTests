@@ -1,6 +1,6 @@
 # Sephiroth: held forward air (the extending sword)
 
-**Status: test 86.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
+**Status: test 87.** Test 79 posed 15 joints of his own model from MSC and crashed the game as he loaded (the
 model's joint-override list overran: fighters/edge/README.md test 80, `port_check` C6). Since test 82 the extended
 sword is 13 articles, each posing itself; his own model only hides its real blade (one joint, at the start and end
 of the move). Test 82's articles had no MotionModule (their base, Zelda's light arrow, has none), so the point's
@@ -45,7 +45,8 @@ The user's numbers:
 **His model.** EdgeBladeL is added at bone 26 (right after the 26 standard bones), so its number is the same in
 every costume. The blade's mesh hangs from it; the hilt stays on SwordL1. The MSC hides the blade with ModelModule
 scale on joint 1003 (his joint table 1's 4th entry, bone 26, in every costume: the overrides are the MotionModule's,
-by joint ID as ACMD's) when the sword extends, and clears that override when it's back. That's one joint; vanilla scripts
+by joint ID as ACMD's) when the sword extends, and scales it back to 1 when it's back (ModelModule 2, the "clear",
+left it hidden: test 86). If a move ends with it hidden, the next aerial shows it (`edge_sn_hid`). That's one joint; vanilla scripts
 pose one or two. `--materials-from` keeps test 58's materials. To keep 136 bones, one bone is folded (UplipL1);
 test 79's 15-bone fold is gone with `segments: 0`.
 

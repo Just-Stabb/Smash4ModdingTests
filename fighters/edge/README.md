@@ -1202,3 +1202,13 @@ User, test 85 (clip): "The base and blade are still wrong."
   order, 0x0320E698 is 0x40). `kind_expand_test`: 0 failed. port_check over the chain and tests 70–86: 30 errors,
   as before. MSC stack check clean.
 - Package (install over 85): `code/cross_f.rpx`, `script/msc/edge.mscsb`.
+
+## Test 87 (`build/sephiroth_test87.zip`): the blade back after the held forward air
+
+User, test 86: "The sword doesn't appear in any move any more, just the sword trace and hilt."
+- The hide on joint 1003 works (tests 82–85's joints named nothing). But the blade was shown again with
+  `ModelModule(2, joint)`, which doesn't undo the override: after one held forward air the blade stayed hidden.
+- Now it is scaled back to 1 (`ModelModule(0, 1003, 1, 1, 1)`), and the next aerial does that too if a move ended
+  with it hidden (`edge_sn_hid`, the global `edge_sn_released` freed in test 83).
+- port_check over the chain and tests 70–87: 30 errors, as before. MSC stack check clean.
+- Package (install over 86): `script/msc/edge.mscsb`.

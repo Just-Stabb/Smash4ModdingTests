@@ -1064,6 +1064,8 @@ joint is named as ACMD names it:
   and did nothing), from 1000 table 1 (test 79's 1005+ were taken, 15 entries, and overran the list). His
   EdgeBladeL (bone 26) is table 1's 4th entry: 1003. 0x7EA (test 85) did nothing either.
 - a weapon: 0x7D0 + its jtb entry (Mario's pump `ModelModule(1, 0x7D2, ...)`: entry 2, bone 4 ControlN).
+- `ModelModule(2, joint)` does not undo an override (Sephiroth test 86: the blade stayed hidden in every move);
+  setting it back (scale 1) does.
 
 The weapon flag accessors (`0x0320E634` + 0x14 i) aren't one per bit in order: each is `rlwinm r3, r0, SH, 31, 31`,
 bit (32 - SH): `0x0320E670` is 0x10, `0x0320E698` 0x40 (a model), `0x0320E6AC` 0x80.

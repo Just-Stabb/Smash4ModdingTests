@@ -39546,6 +39546,7 @@ float edge_sn_hidden() { return 0.001f; }      // a hidden piece's scale
 int   edge_sn_var() { return 0x0f000317; }     // VAR_23: 0 the normal move, 1 extending, 2 the end hit (ACMD)
 
 int   edge_sn_state;      // 0 off, 1 checking the hold, 3 extending, 4 retracting, 5 end hit
+int   edge_sn_hid;        // the blade hidden (1): shown again at the next aerial if a move left it so
 int   edge_sn_n;          // runs in the path
 float edge_sn_since;      // frames since the last turn
 float edge_sn_total;      // the path's length
@@ -39757,8 +39758,8 @@ int edge_sn_blocked(float h, float v, int d)
     return 0;
 }
 
-// the blade hidden (one joint override: EdgeBladeL scaled away) or its override removed (ModelModule 2: the entry
-// leaves the model's override list, test 80)
+// the blade hidden (one joint override: EdgeBladeL scaled away) or shown again (scaled back to 1: ModelModule 2 left
+// it hidden, test 86, the blade gone from every move after a held forward air)
 void edge_sn_blade_hide(int hide)
 {
     if (hide)
@@ -39767,8 +39768,9 @@ void edge_sn_blade_hide(int hide)
     }
     else
     {
-        ModelModule(0x2, 1003);
+        ModelModule(0, 1003, 1.0f, 1.0f, 1.0f);
     }
+    edge_sn_hid = hide;
 }
 
 // the path for the articles (tools/edge_snake_articles_msc.py): his VAR_24 - VAR_29 the runs, two a float (direction
@@ -40002,6 +40004,10 @@ void edge_sn_init()
     edge_sn_setvar(0.0f);
     edge_sn_state = 0;
     edge_sn_release(0);
+    if (edge_sn_hid)
+    {
+        edge_sn_blade_hide(0);
+    }
     if (MotionModule(0x7) == edge_sn_motion() && WorkModuleF(0, 0x0f000100) == 1.0f)
     {
         edge_sn_state = 0x1;
