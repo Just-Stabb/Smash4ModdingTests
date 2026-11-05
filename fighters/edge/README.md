@@ -1006,3 +1006,30 @@ was held back for a check of the quad fix over all his programs and goes out in 
   567 / 621 abort the test's native executor and 657 (sparks1) differs, the same with the lowering before the fix.
 - Package: the bank (ptcl, efc: bank 29.25 MB, 139 sets) and the body effect.bin. port_check over the install chain
   and tests 70 - 78: 38 errors, as test 77 (none new).
+
+## Test 79 (`build/sephiroth_test79.zip`): held forward air, the extending sword
+
+User: forward air as now when tapped. Held 6 frames or longer, the sword extends like Snake, steered in the 4
+cardinal directions:
+- It turns every 8 frames, can't cross itself, and can't go back until it is 24 units forward.
+- It goes back along its path on release.
+- Fighters the tip hits ride along and take a second hit.
+- The sword trail follows the tip.
+
+User's numbers: 3 units a frame, 300 at most, slightly lower gravity, normal landing lag (landing drops them),
+tip-only catch, 5% catch, end hit 11% at fair's angle with less knockback growth.
+
+The design, constants and what isn't proven in game: `fighters/edge/snake_fair.md`.
+- **Model:** 15 new bones (the blade, 13 runs, the point) with their pieces, in every costume. 15 small bones
+  folded for room: finger tips and lips; the skirt kept.
+- **MSC:** the `SNAKE FAIR` block of `edge.c` (`tools/edge_snake_msc.py`), its globals under 0x86.
+- **ACMD:** fair's game and effect scripts (`edge_specials_build.py snake_fair_scripts`).
+
+Package:
+- `model/body/c00-c07/` `model.vbn`, `model.jtb`, `model.nud`, `metal.nud`. The materials are test 58's
+  (`--materials-from`); the textures are unchanged.
+- `script/msc/edge.mscsb`.
+- `script/animcmd/body/game.bin` and `effect.bin`.
+
+port_check over the install chain and tests 70–79: 30 errors, 8 fewer than test 78. The ones gone are the old
+skeleton's joint table 0, which the new jtb fixes. No new errors.

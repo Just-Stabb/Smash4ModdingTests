@@ -731,18 +731,29 @@ def empty_polygon(tmpl):
     return p
 
 
-def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=None, animated=None):
+def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=None, animated=None, snake=None,
+                materials_from=None):
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model.vbn')
     base_nud = nud.read(base + '/model.nud')
     pname, prof = profile_for(m.name for m in base_nud)
     base_jtb = open(base + '/model.jtb', 'rb').read()
+    protect = tuple(joints)
+    if snake is not None:                   # tools/snake_sword.py: room for its bones, never the kept bones it protects
+        import snake_sword
+        kept = needed_bones([src], prof['joints'], joint_bone_budget([src], base_jtb, base_vbn, prof['joints'], max_bones,
+                            OWN_JOINTS or prof.get('own_joints')), animated, protect)
+        protect += tuple(n for n in kept if n.startswith(tuple(snake.get('protect_prefixes', ()))))
+        max_bones = max_bones and max_bones - len(snake_sword.bone_names(snake))
     sk = Skeleton(s.skel_data.read_skel(src + '/model.nusktb'), base_vbn,
                   needed_bones([src], prof['joints'], joint_bone_budget([src], base_jtb, base_vbn, prof['joints'], max_bones, OWN_JOINTS or prof.get('own_joints')),
-                               animated, joints))
+                               animated, protect))
     own = sk.add_joint_bones(base_jtb, base_vbn, prof['joints'], OWN_JOINTS or prof.get('own_joints'))
-    world = sk.world()
     parts = mesh_parts(src)
+    if snake is not None:                   # the extending sword's bones (joint table 1, after `joints`) and pieces
+        added, _info = snake_sword.extend(sk, parts, snake, log)
+        joints = list(joints) + added
+    world = sk.world()
     tmpl = templates(base_nud)
     tex = Textures(src, tex_id)
     # "<article>/<mesh>@<bone>": an article model's mesh held rigidly on a fighter bone (Steve's tools:
@@ -787,6 +798,16 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
                     if mt.flags == 0x9A211067 and t['hash'] == base_ramp:
                         sss = getattr(mt, 'sss', None)
                         t['hash'] = tex.add(('skin ramp', sss), skin_ramp(base_img, sss), 256)
+    if materials_from:
+        # a shipped model.nud's materials over ours, mesh by mesh, polygon by polygon (a later polygon past its count,
+        # e.g. the snake sword's pieces, takes its last one): a rebuild for new geometry keeps the costume's look
+        ref = {m.name: m for m in nud.read(materials_from)}
+        for m in meshes:
+            r = ref.get(m.name)
+            assert r is not None, 'materials_from: no mesh %s' % m.name
+            for j, p in enumerate(m.polygons):
+                p.materials = [r.polygons[min(j, len(r.polygons) - 1)].materials[0].copy()]
+        log('materials: from %s' % materials_from)
     left = sorted(set(parts) - used)
     log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded; joint table bones of their own: %s); meshes: %d slots, '
         '%d Ultimate meshes used, left out: %s' % (pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), ', '.join(own) or '-',
@@ -1620,6 +1641,9 @@ def main():
                                                      '(fighters go up to 138; use 136)')
         q.add_argument('--anim-cache', help='JSON file keeping which bones the motions move')
         q.add_argument('--have', help='LEFT,RIGHT: the Ultimate bones that play LHaveN / RHaveN (set_have)')
+    m.add_argument('--materials-from', help='a shipped model.nud whose materials the meshes keep (mesh by mesh)')
+    m.add_argument('--snake', nargs='?', const='default', help='add the extending sword (tools/snake_sword.py; '
+                   'a JSON spec, default its SPEC): its bones after --joints in joint table 1')
     m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
     a = ap.parse_args()
     joints = [j for j in a.joints.split(',') if j]
@@ -1640,7 +1664,12 @@ def main():
     if a.cmd == 'model':
         global PIXEL_ART
         PIXEL_ART = a.pixel_art
-        build_model(a.src, a.base, a.out, a.tex_id, joints=joints, max_bones=a.max_bones, animated=animated)
+        snake = None
+        if a.snake:
+            import snake_sword
+            snake = snake_sword.SPEC if a.snake == 'default' else dict(snake_sword.SPEC, **json.load(open(a.snake)))
+        build_model(a.src, a.base, a.out, a.tex_id, joints=joints, max_bones=a.max_bones, animated=animated,
+                    snake=snake, materials_from=a.materials_from)
         if a.empty:
             for f in ('model.sb', 'model.nhb'):
                 shutil.copy(os.path.join(a.empty, f), os.path.join(a.out, f))

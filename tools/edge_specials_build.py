@@ -124,8 +124,98 @@ def body_scripts(a, fighter, param):
     game = acmd.ACMDFile.load(os.path.join(out, 'game.bin'))
     for name in EMPTY_GAME:
         game.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
+    effect = acmd.ACMDFile.load(os.path.join(out, 'effect.bin'))
+    log += snake_fair_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
+    effect.save(os.path.join(out, 'effect.bin'))
     return log
+
+
+# ---- held forward air: the extending sword (fighters/edge/snake_fair.md; MSC tools/edge_snake_msc.py)
+SNAKE_VAR = 0x0F000317     # VAR_23: 0 the normal move, 1 held (extending / retracting), 2 the end hit
+SNAKE_TIP = 1019           # joint EdgeSnakeTip (tools/edge_snake_msc.py JOINT_TIP)
+SNAKE_SWORD = 0x18         # joint 24, SwordL1 (the sword in his hand)
+
+
+def _set(c, **kv):
+    """a copy of command c with the named parameters changed"""
+    syn = acmd.INFO[c.ident]['syntax']
+    q = acmd.Command(c.ident, list(c.params))
+    for k, v in kv.items():
+        q.params[syn.index(k)] = v
+    return q
+
+
+def _when(value, body):
+    """Float_Var_Compare(SNAKE_VAR == value) True { body }"""
+    return [U.cmd('Float_Var_Compare', SNAKE_VAR, 0, float(value)), U.cmd('True', 2 + U.words(body))] + body
+
+
+def _frames(cmds):
+    """[(frame, [commands after that FRAME up to the next])], the commands before any FRAME at frame 0"""
+    out, cur, f = [], [], 0.0
+    for c in cmds:
+        if c.name == 'FRAME':
+            out.append((f, cur))
+            f, cur = float(c.params[0]), []
+            continue
+        cur.append(c)
+    out.append((f, cur))
+    return out
+
+
+def _join(parts):
+    cmds = []
+    for i, (f, body) in enumerate(parts):
+        if i:
+            cmds.append(U.cmd('FRAME', f))
+        cmds += body
+    return cmds
+
+
+def snake_fair_scripts(game, effect):
+    """AttackAirF: the normal hits and effects only when not held (VAR_23 0); held, the tip's 5% catch from the
+    freeze frame (13), the 11% end hit (fair's angle, knockback growth 40 for combos) on the sword once it is
+    back (frames 14 - 18, the motion running again; fair's own clear at 19), the hit log cleared so it hits whoever the tip caught; the
+    sword trail on the tip while it moves"""
+    crc = acmd.crc('AttackAirF')
+    parts = _frames(game.scripts[crc])
+    hb13 = next(body for f, body in parts if f == 13.0)
+    hits = [c for c in hb13 if c.name == 'Extended_Special_Hitbox']
+    assert len(hits) == 4, [c.name for c in hb13]
+    tip = _set(hits[0], ID=0, Part=0, Bone=SNAKE_TIP, Damage=5.0, Angle=361, KBG=0, FKB=0, BKB=20, Size=4.5,
+               X=0.5, Y=0.0, Z=0.0, X2=0.5, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=0)
+    end = [_set(c, Part=0, Damage=11.0, KBG=40, Size=float(c.params[8]) + 2.0, SFXLevel=1) for c in hits
+           if c.params[2] == SNAKE_SWORD]
+    out = []
+    for f, body in parts:
+        if f in (13.0, 15.0):
+            body = _when(0, body) + (_when(1, [tip]) if f == 13.0 else [])
+        if f == 14.0:
+            body = body + _when(2, [U.cmd('Remove_All_Hitboxes'), U.cmd('Hit_Log_Clear', -1)] + end)
+        out.append((f, body))
+    if not any(f == 14.0 for f, _b in out):
+        raise SystemExit('AttackAirF: no frame 14')
+    game.scripts[crc] = _join(out)
+
+    # the trail: his sword trail's textures (0x104 / 0x105, as his other swings), its two points across the tip
+    # (bone Y and Z both: a run turned about Y or Z keeps one of them across the screen), so the ribbon is
+    # swept along the tip's path
+    glow = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Sword_Glow')
+    trail = _set(glow, Bone1=SNAKE_TIP, X1=0.5, Y1=-2.5, Z1=-2.5, Bone2=SNAKE_TIP, X2=0.5, Y2=2.5, Z2=2.5,
+                 Bone3=SNAKE_TIP, X=0.5, Y=0.0, Z=0.0, BlurLength=8)
+    eparts = _frames(effect.scripts[crc])
+    eout = []
+    for f, body in eparts:
+        if f == 13.0:
+            body = _when(0, body) + _when(1, [trail])
+        eout.append((f, body))
+    if not any(f == 14.0 for f, _b in eout):
+        eout.append((14.0, []))
+        eout.sort(key=lambda fb: fb[0])
+    eout = [(f, body + (_when(2, [U.cmd('Terminate_Sword_Glow', 1)]) if f == 14.0 else [])) for f, body in eout]
+    effect.scripts[crc] = _join(eout)
+    return '\nheld forward air: tip catch, end hit (%d hitboxes), tip trail\n' % len(end)
 
 
 def fire_scripts(a, wdir):
