@@ -904,6 +904,9 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
            13: np.frombuffer(csdp[:len(csdp) // 4 * 4], np.uint32) if csdp else np.zeros(4, np.uint32)}
     gp, out = vs.run(A.reshape(-1, 16, 4), cbs)
     gp, out = gp.reshape(len(born), nv, 4), out.reshape(len(born), nv, -1, 4)
+    if os.environ.get('FX_DUMP_VS'):
+        np.set_printoptions(precision=3, suppress=True)
+        print('VS', em.name, 'pos', gp[0], 'out', out[0][:, :4])
     # far particles first (as fx_render's own drawing); a particle's triangles in index order
     order = np.argsort(gp[:, :, 2].mean(1))
     tri = idx[:len(idx) // 3 * 3].reshape(-1, 3)
@@ -1312,8 +1315,14 @@ def call_matrix(xyz, rot_deg, size):
 
 # ------------------------------------------------------------------ main
 def render_move(args, move, ult, s4, out_png):
-    ucalls = ult_calls(os.path.join(args.dump, move + '.txt'), move)
-    scalls = s4_calls(args.effect_bin, move)
+    if getattr(args, 'effect', None):
+        # one effect on its own (an effect the status code plays, not a script: Sephiroth's aim arrow), at --call
+        c = [float(v) for v in args.call.split(',')]
+        ucalls = [(0, args.effect, 'top', tuple(c[:3]), tuple(c[3:6]), c[6], None)]
+        scalls = [(0, int(args.effect_id, 0), 0, tuple(c[:3]), tuple(c[3:6]), c[6], None)]
+    else:
+        ucalls = ult_calls(os.path.join(args.dump, move + '.txt'), move)
+        scalls = s4_calls(args.effect_bin, move)
     frames = list(range(args.first, args.last + 1, args.every))
     cols = []
     log = []
@@ -1369,6 +1378,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('name')
     ap.add_argument('moves', nargs='*')
+    ap.add_argument('--effect', help='one effect (its name) drawn on its own at --call, not a move\'s scripts')
+    ap.add_argument('--call', default='0,0,0,0,0,0,1', help='x,y,z,rx,ry,rz,size of --effect\'s call (degrees)')
     ap.add_argument('--out', required=True)
     ap.add_argument('--build', help='the plan\'s build dir (ultimate_port.py --out): its package is drawn')
     ap.add_argument('--frames', default='0-40')
@@ -1448,6 +1459,9 @@ def main():
         if i < len(ef.entries) and ef.entries[i][1]:
             s4[int(v, 0)] = s4_emitters(p, ef.entries[i][1] - 1, None if a.stage == 1 else programs)
     os.makedirs(a.out, exist_ok=True)
+    if a.effect:
+        a.effect_id = ids[a.effect]
+        a.moves = [a.effect]
     for move in a.moves:
         out = os.path.join(a.out, '%s.png' % move.lower())
         for line in render_move(a, move, ult, s4, out):

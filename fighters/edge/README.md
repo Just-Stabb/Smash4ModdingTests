@@ -956,3 +956,18 @@ effect still seems to spawn too low."
   frame (the creation point, one frame).
 - `port_check` E8 eft-line-volume now flags a converted line without its own length (eft2's default radius) and
   test 74's arcs; over the chain + this: 38 errors as before, E8 clean.
+
+## Test 76 (`build/sephiroth_test76.zip`): Shadow Flare's beam travels with the shot
+
+User, test 75: "Down special wall looks right now, fix the up special arrow next, side special seems to be offset into
+the wrong axis now" (a screenshot: the beam at hand height, but laid back through him).
+- Test 75 laid the beam once at the spawn (EffectModule 0x3) and left it there: centred on the spawn, the 30-long streak
+  reached back through him and never moved. Ultimate's is an EFFECT_FOLLOW on the shot (its particles follow the
+  emitter: eft follow type 0), so fl_fly_loop now moves it with the shot every frame (EffectModule 0x17 by handle,
+  `fl_beam`) until the shot hits or ends, then leaves it (Ultimate's EFFECT_DETACH_KIND).
+- The arrow (`edge_octaslash_direction`): fx_render's new `--effect NAME --call x,y,z,rx,ry,rz,size` draws one effect
+  on its own. Ultimate's own vertex program, run on the arrow, gives U 0 - 2 across the quad (the texture is half a
+  double chevron, mirrored at U 1 into the whole), V 0 - 1; the sampler mirrors U (0) and repeats V (1); edge.c places
+  it by EffectModule 0x3 (radians) and turns it by 0x18 (degrees, as vanilla's own calls); no depth fade on it. Nothing
+  in the data shows a cut, so test 76 leaves it as it was; a screenshot of ours (and of Ultimate's) asked for.
+  (fx_render's own mirrored half draws as a sliver on both sides: its mirror sampling, not the port's.)

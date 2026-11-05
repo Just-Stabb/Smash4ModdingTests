@@ -591,6 +591,7 @@ float fl_up;
 float fl_fwd;
 int fl_clr0;           // hit records to clear (Part 0 / 1) when the orbit script runs next (fl_hitboxes)
 int fl_clr1;
+int fl_beam;          // the beam's effect handle while the shot flies (fl_fly_main lays it, the loop moves it)
 int fl_fx0;
 int fl_fx1;
 int fl_fx2;
@@ -739,6 +740,10 @@ void fl_fly_loop()
         return;
     }
     fl_move(fl_speed * PostureModuleF(0), 0);
+    if (fl_beam != 0)                          // Ultimate's beam follows the shot (EFFECT_FOLLOW on top) until Hit / End
+    {                                          // leave it (EFFECT_DETACH_KIND)
+        EffectModule(0x17, fl_beam, PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0x3));
+    }
 }
 
 void fl_fly_main()
@@ -791,11 +796,12 @@ void fl_fly_main()
                           WorkModuleF(0, 0x0f000021 + 0x4 * fl_owner) + 10.0f, PostureModuleF(0x3));
         }
     }
-    // Fly's beam (edge_shadowflare_beam: Ultimate's EFFECT_FOLLOW on top at frame 0, a streak whose particles stay
-    // where they're born) laid here, at the moved place, along his facing (the effect's Z): played from Fly's
-    // script it took the top joint's matrix from before the move, Din's creation point on the floor (tests 72 - 74)
-    EffectModule(0x3, fl_fx_beam(), PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0x3), 0,
-                 1.5707964f * lr, 0, 1.0f, 0, 0xffffffff);
+    // Fly's beam (edge_shadowflare_beam: Ultimate's EFFECT_FOLLOW on top at frame 0) played here, at the moved place,
+    // along his facing (the effect's Z), and moved with the shot by the loop: played from Fly's script it took the top
+    // joint's matrix from before the move, Din's creation point on the floor (tests 72 - 74); laid once and left
+    // there (test 75) it stayed centred on the spawn, back through him (user: "offset into the wrong axis")
+    fl_beam = EffectModule(0x3, fl_fx_beam(), PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0x3), 0,
+                           1.5707964f * lr, 0, 1.0f, 0, 0xffffffff);
     func_24(0, 0, 1.0f);                       // fly
     AttackModule(0x2728, 1.0f + 2.0f * fl_r);
     fl_move(fl_speed * lr, 0);
