@@ -1510,3 +1510,27 @@ bigger" / "Sephiroth is still bouncing off of diagonal stage geometry during hel
   fighters' hold hitstop is ended as they're let go (`edge_sn_release`), in case hitstop kept the hit off them.
 - port_check over the chain and tests 70–105: 30 errors, as before. MSC stack check clean.
 - Package (install over 104): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.
+
+## Test 106 (`build/sephiroth_test106.zip`): Scintilla off while the Phantom is out; Blade Dash's y on the gravity energy; Phantom tracking
+
+User: "Scintilla still isn't disabled while the Phantom is charging/being released, tap Up special still barely
+gives height. Can you make the Phantom have tracking right at the start of its release specifically if the last
+opponent Sephiroth hit is in hitstun?" and "The tracking should not switch facing directions for the Phantom."
+- **Scintilla:** his per-frame hook (`func_82`) runs before the status loop's input checks, so the down special
+  press had already sent the Phantom (state 3) when the counter's check looked for "charging". `edge_lw_can_counter`
+  now also says no while it's sent and still out (`ArticleModule(0x2717, 2)`).
+- **Blade Dash height:** test 101's lifted limit didn't help, so the air rush's y no longer goes through the stop
+  energy: x stays on it, y goes on the gravity energy (gravity 0, fall cap 20), whose speed Smash 4 is seen to move
+  him by (held forward air's fall, Scintilla's break). The speed each frame is Ultimate's schedule (13.5, braked 1.72
+  a frame from count 2; Octaslash 6.2 / 0.47 / 6), not read back from the engine (`edge_hi_rush_m`,
+  `edge_hi_rush_set`). On the ground it's on the stop energy along the floor as before. The landing angle, the body
+  pitch and the air end's carried y read both energies (`edge_hi_vy`).
+- **Phantom tracking:** as it's sent, if the last fighter he hit (`LASTHIT_HITSTUN` > 0) is in hitstun, that
+  fighter's place goes in his VAR_31 (packed: 2^21 + (x + 512) x 1024 + (y + 512)); the Phantom's own script, now
+  his (`fighters/edge/weapons/phantom.c`: Zelda's vanilla phantom.mscsb decompiled, with `ph_track`), reads it as his
+  slot's SLOTn_SHARED_7 in its attack's main and again on its first frame, and stands 10 behind the fighter along
+  its own facing, at the fighter's height (its slash's hitboxes are 14 ahead). Its facing is never changed.
+- Not proven in game: that the Phantom's MSC loads from his folder (`script/msc/phantom/`, as his other articles'),
+  and that its native release doesn't move it back after the MSC places it (hence the second placement).
+- port_check over the chain and tests 70–106: 30 errors, as before. MSC stack checks clean (his, the Phantom's).
+- Package (install over 105): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb` (new).

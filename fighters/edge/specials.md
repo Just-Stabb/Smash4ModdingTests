@@ -148,6 +148,11 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   stage sides (Ultimate's hook only re-aims on the ground; this is the port's). Test 105 (the user's clip: it went
   on up and away along a stage's slanted underside past the corner): the slide is for the frames it touches only,
   the aim kept, so off the surface it goes on the way it was aimed.
+- **Rush speed (test 106, the user: tap up special "still barely gives height" after test 101):** the speed each
+  frame comes from Ultimate's schedule (13.5 / 6.2, less 1.72 / 0.47 a frame from count 2 / 6: `edge_hi_rush_m`), not
+  read back; on the ground it's on the stop energy along the floor as before, in the air x on the stop energy and y
+  on the gravity energy (gravity 0, fall cap 20: `edge_hi_rush_set`), whose speed Smash 4 is seen to move him by
+  (held forward air's fall, Scintilla's break). The rush's y read anywhere is both energies' (`edge_hi_vy`).
 - **Ground end:** x x 0.6 (Octaslash 0.9; 0.25 if landed), brake 0.12 (0.06); actionable at the motion's
   cancel frame 27 (56); off an edge -> Fall; end -> Wait.
 - **Air end:** x x 0.4 (0.9), brake 0.02, the rush's y x the same into gravity, gravity 0.12; from frame 18
@@ -201,6 +206,12 @@ per frame `0x9e05b0`, flash spawn `0x9e11f0`). The shield itself is native here 
     start the counter (`edge_lw_can_counter`): the press only sends it. During the counter move a press sends it
     only from near its end (`edge_lw_ph_open`: not in the stance, from frame 42 of the slash, 32 of the break); a
     counter hit still sends it at once.
+  - **Test 106:** the counter stays off while it's out at all (charging, or sent and still there): his per-frame
+    hook runs before the status loop's input checks, so the press had already sent it when they looked. Tracking:
+    as it's sent, if the last fighter he hit is in hitstun, its place goes in his VAR_31 (`edge_lw_ph_target`); the
+    Phantom's own script (`weapons/phantom.c`, Zelda's decompiled with `ph_track`) takes it at the start of its
+    attack (its main and its first frame) and stands 10 behind that fighter along its own facing (kept), at its
+    height, so its slash (hitboxes 14 ahead) meets it.
 - **Statuses:** Zelda's Phantom Slash ones (her phantom article, 2, made again since test 100; see above):
   0x155 the stance (SPECIAL_LW: pre `0c790`, main `0cb70`, loop `143b0`, end `0cec0`), 0x15B the slash
   (SPECIAL_LW_HIT `0xe2b4`: `0d1f0` / `0d5f0` / `13fb0`), 0x15C the break (SPECIAL_LW_END `0xe2b8`: `0d770` /

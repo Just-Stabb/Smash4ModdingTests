@@ -37880,6 +37880,52 @@ float edge_hi_p(float plain, float charged)
     return plain;
 }
 
+// the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity
+// energy, edge_hi_rush_set)
+float edge_hi_vy()
+{
+    return KineticModuleF(0xb, 0x3) + KineticModuleF(0x1, 0x1);
+}
+
+// the rush's speed on its frame, by Ultimate's numbers (ExeFS 0x9e5100's brake: rush_speed 13.5 / 6.2, less
+// rush_brake 1.72 / 0.47 a frame from count rush_brake_frame 2 / 6), not read back from the engine
+float edge_hi_rush_m()
+{
+    float m;
+    float bf;
+    m = edge_hi_p(13.5f, 6.2f);
+    bf = edge_hi_p(2.0f, 6.0f);
+    if ((float)edge_hi_count >= bf)
+    {
+        m = m - edge_hi_p(1.72f, 0.47f) * ((float)edge_hi_count - bf + 1.0f);
+    }
+    if (m < 0.0f)
+    {
+        m = 0.0f;
+    }
+    return m;
+}
+
+// the rush's velocity (dx, dy) * m: on the ground on the stop energy along the floor, as before; in the air x on the
+// stop energy and y on the gravity energy (gravity 0), which Smash 4 moves him by for sure (test 106, the user: tap
+// up special "still barely gives height" after test 101 lifted the stop energy's limit; the gravity energy's speed
+// is what held forward air's fall and Scintilla's break set, both seen working)
+void edge_hi_rush_set(float dx, float dy, float m)
+{
+    // (dx, dy) is a world direction already: the aim is the raw stick, the floor tangent has the facing in it
+    KineticModule(0x10, 0x3, 0.0f, 0.0f);
+    if (global18 == 0)
+    {
+        KineticModule(0x11, 0x3, dx * m, dy * m);
+        KineticModule(0x11, 0x1, 0.0f);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, dx * m, 0.0f);
+        KineticModule(0x11, 0x1, dy * m);
+    }
+}
+
 float edge_hi_ground_angle() { return 90.0f; } // f_16f20's K (NRO rodata 0x265620, not in the dump):
                                                // approximate; vanilla Smash 4 Fox's Fire Fox uses 90
 float edge_hi_deg() { return 57.29578f; }      // degrees per radian
@@ -37981,7 +38027,7 @@ void edge_hi_pitch()
     else if (global4 == 0x159)
     {
         vx = KineticModuleF(0xa, 0x3);
-        vy = KineticModuleF(0xb, 0x3);
+        vy = edge_hi_vy();
         if (func_13(vx) + func_13(vy) > 0.0001f)
         {
             edge_hi_rot = edge_hi_pitch_of(vx, vy);
@@ -38278,13 +38324,13 @@ void edge_hi_rush_main()
     }
     s = edge_hi_p(13.5f, 6.2f);            // rush_speed
     KineticModule(0, 0xd);                 // as Fox's Fire Fox rush
-    KineticModule(0x11, 0x1, 0.0f);
+    KineticModule(0x11, 0x1, 0.0f);        // the gravity energy carries the air rush's y, gravity 0 (test 106)
     KineticModule(0xf, 0x1, 0.0f);
-    KineticModule(0xc, 0x1);
+    KineticModule(0x14, 0x1, 20.0f);       // its fall cap past any rush speed
+    KineticModule(0xb, 0x1);
     KineticModule(0x11, 0x2, 0.0f, 0.0f);
     KineticModule(0xc, 0x2);
-    KineticModule(0x11, 0x3, edge_hi_rx * s, edge_hi_ry * s);
-    KineticModule(0x10, 0x3, 0.0f, 0.0f);
+    edge_hi_rush_set(edge_hi_rx, edge_hi_ry, s);
     // no speed limit on it (-1): Smash 4 caps the stop energy's y in the air unless lifted, as Zelda's Farore's
     // Wind does in its air end (zelda.mscsb func_2291: KineticModule(0x14, 3, x limit, -1)); test 101, the user:
     // "Tap up special doesn't go far enough when going upwards"
@@ -38331,7 +38377,7 @@ void edge_hi_rush_loop()
         edge_hi_cliff_mode(0);             // game_specialhi1 frame 6: cliff check NONE
     }
     vx = KineticModuleF(0xa, 0x3);
-    vy = KineticModuleF(0xb, 0x3);
+    vy = edge_hi_vy();
     if (global19 != 0 && global18 == 0)    // landed mid-rush
     {
         // f_164c0: within landing_fall_special_angle (25) of straight down -> f_16820 + landing
@@ -38426,25 +38472,11 @@ void edge_hi_rush_speed()
 {
     float ax;
     float ay;
-    float vx;
-    float vy;
     float nx;
     float ny;
     float lr;
-    float m;
     float dx;
     float dy;
-    float b;
-    vx = KineticModuleF(0xa, 0x3);
-    vy = KineticModuleF(0xb, 0x3);
-    m = MathF(0, vx * vx + vy * vy);
-    if (m < 0.0001f)
-    {
-        KineticModule(0x10, 0x3, 0.0f, 0.0f);
-        return;
-    }
-    dx = vx / m;
-    dy = vy / m;
     if (global18 == 0)
     {
         lr = PostureModuleF(0);
@@ -38456,7 +38488,6 @@ void edge_hi_rush_speed()
         }
         dx = ny * lr;
         dy = -nx * lr;
-        KineticModule(0x11, 0x3, dx * m, dy * m);
         edge_hi_rx = dx;                   // off the floor, it goes on this way
         edge_hi_ry = dy;
     }
@@ -38474,17 +38505,8 @@ void edge_hi_rush_speed()
         dy = edge_hi_ry;
         edge_hi_rx = ax;
         edge_hi_ry = ay;
-        KineticModule(0x11, 0x3, dx * m, dy * m);
     }
-    if ((float)edge_hi_count >= edge_hi_p(2.0f, 6.0f))
-    {
-        b = edge_hi_p(1.72f, 0.47f);
-        KineticModule(0x10, 0x3, func_13(dx) * b, func_13(dy) * b);
-    }
-    else
-    {
-        KineticModule(0x10, 0x3, 0.0f, 0.0f);
-    }
+    edge_hi_rush_set(dx, dy, edge_hi_rush_m());
 }
 
 // 0b360: the ground end
@@ -38522,7 +38544,7 @@ void edge_hi_end_air_main()
     float mul;
     edge_hi_rot_target = edge_hi_rot;
     vx = KineticModuleF(0xa, 0x3);
-    vy = KineticModuleF(0xb, 0x3);
+    vy = edge_hi_vy();
     mul = edge_hi_p(0.4f, 0.9f);           // rush_end_speed_mul
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
@@ -38961,6 +38983,13 @@ int edge_lw_can_counter()
     {
         return 0;
     }
+    // sent and still out (test 106, the user: "Scintilla still isn't disabled while the Phantom is charging/being
+    // released": his per-frame hook runs before the status loop's input checks, so the press had already sent it,
+    // state 3, when they ran)
+    if (WorkModuleF(0, 0x0f000310) == 3.0f && ArticleModule(0x2717, 0x2))
+    {
+        return 0;
+    }
     return 0x1;
 }
 
@@ -39037,12 +39066,49 @@ void edge_lw_ph_send()
         lv = 7.0f;
     }
     lv = (float)((int)lv);
+    edge_lw_ph_target();
     keep = WorkModuleF(0, 0x1000006);  // whatever status he's in (test 103): its float put back after
     WorkModule(0, lv, 0x1000006);
     ArticleModule(0x271a, 0x2);
     BattleObject(0x55, 0x1, 0x1c);
     WorkModule(0, keep, 0x1000006);
     edge_lw_ph_set(3.0f);
+}
+
+// the Phantom's tracking (test 106): if the last fighter he hit (combat target 2) is in hitstun, its place goes in his
+// VAR_31 for the Phantom's attack to take (weapons/phantom.c ph_track: 2^21 + (x + 512) * 1024 + (y + 512), whole
+// units, |x|, |y| up to 511); else 0. VAR_31 is the held sword's run counter only while its articles are made
+void edge_lw_ph_target()
+{
+    float lr;
+    float x;
+    float y;
+    int code;
+    code = 0;
+    if (WorkModuleF(0, 0x0f000050) > 0.0f)        // LASTHIT_HITSTUN
+    {
+        lr = PostureModuleF(0);
+        x = PostureModuleF(0x1) + lr * WorkModuleF(0, 0x0f000055);   // LASTHIT_OFFSET_X (along his facing)
+        y = PostureModuleF(0x2) + WorkModuleF(0, 0x0f000056);
+        if (x < -511.0f)
+        {
+            x = -511.0f;
+        }
+        if (x > 511.0f)
+        {
+            x = 511.0f;
+        }
+        if (y < -511.0f)
+        {
+            y = -511.0f;
+        }
+        if (y > 511.0f)
+        {
+            y = 511.0f;
+        }
+        code = 0x200000 + (int)(x + 512.5f) * 0x400 + (int)(y + 512.5f);
+    }
+    WorkModule(0, (float)code, 0x0f00031f);
 }
 
 // made but not sent (the stance interrupted): it goes (func_2302 / 2307: status 4)

@@ -507,6 +507,8 @@ def main():
     compile_msc(os.path.join(EDGE, 'weapons/flash.c'), os.path.join(msc, 'flash/flash.mscsb'))
     print(flash_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flash')))
     print(compile_msc(os.path.join(EDGE, 'weapons/flare1.c'), os.path.join(msc, 'flare1/flare1.mscsb')))
+    # Zelda's Phantom (article 2), Sephiroth's: her vanilla script with its tracking (test 106; weapons/phantom.c)
+    compile_msc(os.path.join(EDGE, 'weapons/phantom.c'), os.path.join(msc, 'phantom/phantom.mscsb'))
     print(flare1_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flare1')))
     if SNAKE_FAIR:                                  # the held forward air's articles: MSC and models
         import edge_snake_articles
