@@ -1228,3 +1228,17 @@ User, test 87 (clips): "The sword no longer stretches oddly but isn't aligned co
   gives nothing).
 - port_check over the chain and tests 70–88: 30 errors, as before. MSC stack check clean.
 - Package (install over 87): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.
+
+## Test 89 (`build/sephiroth_test89.zip`): the forward pieces drawn again
+
+User, test 88 (clip): "The sword still isn't aligned with the hilt, and doesn't appear at all when holding forward.
+Holding up/down makes the sword appear, but at an incorrect placement."
+- Forward / back pieces invisible, up / down ones drawn: the turn was Pit's arrow's (−pitch, 90, 0), and since test
+  84 the articles also have his facing (`PostureModule(0, lr)`), which turns the model lr × 90 about Y itself: 180 in
+  all, a horizontal run pointing into the screen, seen end-on. A vertical one is vertical either way. The up / down
+  pieces looked misplaced because the forward piece joining them to the hilt wasn't drawn (clip 7.9 s: a down run
+  hanging from the end of the forward path).
+- Now (−pitch, 0, 0): the facing turns it his way, so the pitch is relative to his facing either way (test 84's
+  180 − pitch for facing left is gone).
+- port_check over the chain and tests 70–89: 30 errors, as before. MSC stack check clean.
+- Package (install over 88): `script/msc/snake/snake.mscsb`, `script/msc/snaketip/snaketip.mscsb`.

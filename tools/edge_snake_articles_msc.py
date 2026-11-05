@@ -13,7 +13,7 @@ any object reads them as SLOTn_SHARED_k, docs/acmd-extra-commands.md), written b
   VAR_31           the runs' counter: each run, made, takes the next number (run k draws the path's k-th run)
 The path starts at the blade's start at forward air's frame 13 (BASE_H / BASE_V, his model's +Z / +Y from his
 position) and lies in his model plane. A run is placed at its start (PostureModule 0x2714), turned along its direction
-(0x2717: (-pitch, 90, 0) as Pit's arrow) and stretched to its drawn length (ModelModule 7 on joint 0x7D2, its EndN:
+(0x2717: (-pitch, 0, 0), his facing turning it his way) and stretched to its drawn length (ModelModule 7 on joint 0x7D2, its EndN:
 tools/edge_snake_articles.py); the point at the path's drawn end, turned along its last run.
 """
 import os
@@ -207,23 +207,18 @@ float sn_pitch(int d)
     return 0.0f;
 }
 
-// put this article at (h, v) of his model plane, turned along d, facing his way. PostureModule 0x2717 (-angle, 90, 0)
-// takes the world angle (Pit's arrow's: 0 right, 180 left), so facing left the run's angle is 180 - its pitch. Its
-// facing (PostureModule 0) is his: a fighter it hits takes it (0 left them facing the camera, test 83)
+// put this article at (h, v) of his model plane, turned along d, facing his way. Its facing (PostureModule 0, his: a
+// fighter it hits takes it, 0 left them facing the camera, test 83) already turns the model to his side (lr x 90 about
+// Y), so the turn (0x2717) is only the run's pitch about X: (-pitch, 0, 0), relative to his facing either way. Tests
+// 84 - 88 added Pit's arrow's 90 about Y on top: 180, a forward run seen end-on (invisible), up / down ones fine
 void sn_place(float h, float v, int d)
 {
     float lr;
-    float a;
     lr = WorkModuleF(0, 0x0f000023 + 0x4 * sn_slot);
     PostureModule(0, lr);
     PostureModule(0x2714, WorkModuleF(0, 0x0f000020 + 0x4 * sn_slot) + lr * h, WorkModuleF(0, 0x0f000021 + 0x4 * sn_slot) + v,
                   sn_bz);
-    a = sn_pitch(d);
-    if (lr < 0.0f)
-    {
-        a = 180.0f - a;
-    }
-    PostureModule(0x2717, -a, 90.0f, 0);
+    PostureModule(0x2717, -sn_pitch(d), 0, 0);
 }
 
 // over: the move ended (VAR_30 below 0), he's gone, or the safety net

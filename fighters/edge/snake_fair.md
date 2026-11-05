@@ -85,8 +85,9 @@ any object reads as `SLOTn_SHARED_k`):
 **Article MSC.** Status 0 of the light arrow is replaced (its motion offset, `func_40`, isn't installed). Each
 article finds its owner (the nearest Sephiroth), then every frame:
 - **A run** walks the path to its own run's start, places itself there (PostureModule 0x2714 from his position and
-  facing), turns along the run (0x2717, (−angle, 90, 0), as Pit's arrow: the world's angle, so 180 − pitch facing
-  left) and stretches EndN to the run's drawn part (0 when that run isn't drawn).
+  facing), turns along the run (0x2717, (−pitch, 0, 0): its facing, his, already turns it his way, lr × 90 about Y;
+  tests 84–88's Pit's-arrow 90 on top made 180, a forward run seen end-on) and stretches EndN to the run's drawn part
+  (0 when that run isn't drawn).
 - Both take his facing (`PostureModule(0, lr)`): a fighter the point hits takes it (none: facing the camera, test 83).
 - Both are placed before their motion starts, so the point's trail begins where the point is.
 - **The point** sits at the path's drawn end, turned along the last drawn run.
