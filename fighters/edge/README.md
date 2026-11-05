@@ -914,3 +914,23 @@ Ultimate port, ensure the cancel windows are the same" (CLAUDE.md, `port_check` 
 - port_check over the chain + 70-72 / this: 38 errors as before (none new), C1 clean.
 - Still open: Scintilla's barrier is fainter than Ultimate's bright cyan wall and has no white dissolve before the
   slash (Ultimate frames 8-10); the arrow (footage asked for).
+
+## Test 74 (`build/sephiroth_test74.zip`): Scintilla's barrier
+
+User, test 73: "Side B works now, fix down special's barrier next" (test 73's clips: the wall a thin, faint column
+where Ultimate's is a bright honeycomb, and no white dissolve before the slash).
+- Ultimate's wall rows (edge_senkou_shield Hexagon01-07) and the dissolve / end rows (`success1-7`,
+  `success_end*`, `success_end*_l`) are line emitters: eft2 volume 13, 4 or 5 hexagons evenly along X over 13.8 /
+  18.3, both ends (the rows alternate: a honeycomb). eft's line (cross_f 0x04A51B08) runs along Z, its length the
+  radius's z and its count the particles of an emission; the converter wrote neither, so each row was one hexagon
+  and the rows stacked into a column (7 hexagons for Ultimate's 31). Now each line is an arc of eft's even circle
+  (0x04A4BF18: (R sin a, 0, R cos a), an arc's points start + sweep i / (n - 1)): R 1000 about pi, the emitter
+  moved back R along Z, n points an emission. They lie along X to 0.04 units (`vfxb_to_ptcl.py` `LINE_R`).
+  51 emitters: the wall, the dissolve and end rows, Octaslash's `edge_octaslash_line` hitline2_1 (7 along 40) and
+  Shadow Flare's `edge_shadowflare_beam_hit` line2 (5 along 40, line_center -0.5 taken as eft's own: the points
+  shifted by -c L / 2, inferred).
+- The wall's faintness was mostly the count (one hexagon a row); compared on fx_render the wall and the white
+  dissolve (the success rows at the slash's frame 0, gone by 3) now come out as rows of 4 / 5. Its brightness
+  against Ultimate's still to check on the next clip.
+- `port_check` E8 eft-line-volume (a converted emitter left on eft's line volume); over the chain + this: 38
+  errors as before, none new.
