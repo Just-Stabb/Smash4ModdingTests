@@ -1905,3 +1905,19 @@ Blade Dash whose line stopped short of him, "This line should reach all the way 
   sword's return lets go of anyone on it, with no end hit.
 - port_check over the chain, tests 70–115 and 117–128: 30 errors, 55 warnings, as before (7 notes: the new W8 count).
 - Package (install over 127): `code/cross_f.rpx` (the trail's 24), `script/msc/edge.mscsb`, `trail/trail.mscsb`.
+
+## Test 129 (`build/sephiroth_test129.zip`): snake sword side special cancel back to the hilt; Shadow Flare's startup faster
+
+User: "The side B cancel should wait until the frame it hits the hilt. If that is what it was before, set it back to
+that and make side special's startup slightly faster."
+- **Snake sword side special cancel:** back to test 127's: once the sword is back at the hilt (state 5; set after the
+  cancel check in the loop, so it's taken from the frame after). The grab cancel (on the ground) on the same terms,
+  the hilt and the move hit (the user: "The same rules that apply to side special's cancel should apply to grab";
+  test 128 took it from the return, hit or not).
+- **Shadow Flare's startup:** the start (7 frames) and the shot up to its frame 8 (where the flare is made) run at
+  1.25x speed (`edge_s_quick`): the quickest flare about 14 frames in, from about 17. After frame 8 the shot is at
+  normal speed; its cancel frame (31, a motion frame) comes about 1.6 frames sooner. Not Ultimate's timing (the
+  user's change).
+- Not tested in game.
+- port_check over the chain, tests 70–115 and 117–129: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 128): `script/msc/edge.mscsb`.

@@ -434,6 +434,9 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   motion end -> 0x157 HOLD (SpecialSLoop 0x21D / 0x229, Ultimate's special_s_hold; these slots loop, the hold
   doesn't wait for them) -> on the special button's release (after its first frame) or at hold_max 27 frames ->
   0x158 SHOT (SpecialSEnd 0x221 / 0x22D, Ultimate's special_s) -> actionable from its cancel frame 31 (test 73),
+  (test 129, the user: "make side special's startup slightly faster": START (7 frames) and SHOT up to its frame 8, the
+  flare's, at 1.25x speed, `edge_s_quick`, set every frame; the quickest flare about 14 frames in, from about 17;
+  SHOT's cancel frame 31 is its motion's, so it comes 1.6 frames sooner too)
   motion end -> Wait / Fall (no special fall, no landing lag). Leaving the hold with the stick back (x . lr <= -0.2) turns him round. Kinetics:
   `param_special_s` start_*: ground x speed x 0.5, brake 0.1; air x 0.6, brake 0.008, y x 0.75, gravity and max fall
   x 0.85; re-applied with the motion swapped (frame kept) on a ground / air change.
