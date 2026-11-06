@@ -41,12 +41,15 @@ The main executable (code.bin, **not in the dump**): the managers the CROs impor
 
 - Compressed with the 3DS's bottom-up LZ (footer: buffer top/bottom 0x0962D887, extra 0x54172C):
   decompresses exactly to 11,988,992 bytes (0x100000-based: text, rodata, data). CTR-SDK 1.2.7.
-- **Not the build of the RomFS dump's `static.crs`:** the CRS's segments (text 0x100000 + 0x982FE4, rodata
-  0xA83000, data 0xB25000) don't fit it (its code runs past 0xA83000), and only 75 of 5496 exported ARM functions
-  land on a function start, with no common shift. So the code.bin is the update's (bigger: the DLC fighters' code)
-  and the RomFS dump's `static.crs` / `cro.sarc` the base game's (or the other way round). Needed: a matching pair,
-  either the base title's code.bin (00040000000EDF00 ExeFS) or the update title's (0004000E000EDF00) RomFS
-  `static.crs` + `cro.sarc`.
+- It is the **update's** (v1.1.x: the DLC fighters' code). The RomFS dump's `static.crs` / `cro.sarc` are the base
+  game's and don't fit it (only 75 of 5496 exported functions on a function start). The user then sent the
+  update's `static.crs` and `cro.sarc` (189 modules: the base 174 + the DLC fighters and stages): they fit
+  (text 0x100000 + 0xA6110C, rodata 0xB62000, data 0xC13000; `EnemyManager::create_request` at 0x3E3E14,
+  `EnemyGenerator::get_next_enemy_kind` 0x466F14, `FieldSmashManager::get_treasurebox_ejection_data` 0x528BA0,
+  `FsItemAutoSet::lot_all_item` 0x42A144 all start as functions). 6654 named addresses, 212 of them Smash Run /
+  enemy code.
+- `tools/s3ds_unpack.py`: `code` (decompress), `cros` (cro.sarc -> modules), `symbols` (static.crs -> demangled
+  "ADDRESS name" lines; code.bin offset = address - 0x100000), `imports` (a module's names).
 
 ## Wii U leftovers (cross_f.rpx)
 
