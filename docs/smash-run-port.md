@@ -193,13 +193,54 @@ a BC4 shape (alpha from the shape for ETC1 and the other formats without alpha) 
 keys. The `.efc` (3DS EFCC: the Wii U's layout little endian, a u32 version) keeps its entries.
 
 Not converted yet:
-- the effect models (`effect/model/*/normal.bch` + `motion.bch`, 92 models used by 37 enemies: beams, auras,
-  muzzle flashes...): H3D meshes with their vertex data in the .bch (no .mbn); the .efc entries pointing at them
-  are kept without the model (a missing model folder would be loaded);
 - mesh particles (20 emitters: drawn as billboards), key animations (emitter curves), complex emitters' blocks
   (1: fields / child / stripe), colour 1 where the best template has no colour-1 combiner (11);
 - the 3DS combiner 3 and 0x18C / 0x248 / 0x324 (copied where a Wii U field matches, otherwise left).
 - 2 trail textures (`effect/trail/*.tex`).
+
+## Enemy effect models (3DS H3D .bch -> Wii U effect model folders)
+
+`tools/s3ds_effects.py SRC_ROOT all OUT VANILLA_DIR` also runs `tools/s3ds_effect_models.py` on every enemy:
+each `effect/model/NAME/normal.bch` (+ `motion.bch`) becomes `effect/enemy/KIND/model/NAME/` (model.nud / nut /
+vbn / omo / mta / xmb, the layout of the game's own effect models), and the `.efc` keeps every reference to a
+model it converted (renumbered; one 3DS reference, `EfffsPokkuriBulletDelete`, names a folder the 3DS files
+don't have either, and is dropped). 99 models in 62 enemy banks: 281 meshes, 540 materials, 230 textures. Six
+enemies have models and no particles (keronpa, meganta, mettaur, monoeye, popperam, shinigami): their bank is an
+`.efc` and model folders without a `.ptcl`, as the vanilla `miienemys` bank (four more have only an `.efc`). `tools/s3ds_effect_models_test.py
+SRC_ROOT OUT` reads every written folder back (99 models, 0 failures); `tools/s3ds_effect_models_preview.py OUT
+sheet.png` draws them from the written files.
+
+What the conversion does:
+- **Geometry**: the effect models keep their vertex data in the .bch itself (no .mbn). `s3ds_model.Bch._geometry`
+  reads it the way the GPU does, from each object's PICA200 command list: the attribute layout and permutation
+  (regs 0x201-0x205, 0x2BB / 0x2BC), the buffer address / stride / count, the per-attribute scales and the
+  position offset from the vertex shader's float uniforms 6-8, and the index buffers (0x227 / 0x228; the
+  relocation kind sets 16-bit indices). One NUD mesh a non-empty object part, bound to its bone (bind 8: the
+  3DS's rigid skinning keeps the vertices in that bone's space); UV V' = 1 - V as the enemies.
+- **Skeleton / motion**: the .bch bones under a TopN root (unless theirs is one), every bone at the origin in
+  the VBN and its full local transform a frame in the OMO (the motion.bch sampled 0..end, or the bind pose).
+  Several effects squash an axis to 0 or mirror it (negative scale); `s3ds_enemy.split_trs` keeps those exact
+  (a zero axis takes its direction from the others, a negative determinant goes on the smallest axis); the
+  enemy motions use it too.
+- **Materials**: the effect shader 0xB0201100 as the XV2 effect models (`tools/xv2_to_nud.py`): blend from the
+  fragment operations (source alpha / one minus source alpha -> alpha blend, source alpha / one -> additive),
+  alpha test, culling, texture coordinator 0's scale / translate as NU_effScaleUV / NU_effTransUV.
+- **The texture combiner, baked**: the 3DS draws these materials through its 6-stage texture combiner (TEV,
+  regs 0xC0-0xFD in the material's fragment commands), which NUD has no equivalent of: most stages lerp the
+  diffuse colour against a constant colour by the texture and take the alpha from one of the texture's channels
+  (ETC1 has no alpha; drawn as is, those meshes were black squares). `s3ds_model.tev_combine` runs the combiner
+  (every source, operand, the 10 combine modes, scales and the combiner buffer, as Citra's rasterizer) over the
+  texture's texels and the result is the material's texture. Only texture 0 is ever read by these 540 materials,
+  so the bake is exact for a static material (the vertex colour still multiplies after, in the NUD shader).
+- **Colour animation**: a stage's constant is one of the material's 12 colours (found by value: e.g.
+  StarmanBeam's stages use constant0, Popperam's exclamation mark the ambient slot), and the material
+  animations target colours (property 9 diffuse, 8 ambient, 1 constant0; 19 / 21 coordinator 0 scale /
+  translate, 20 its rotation). For an animated material the combiner runs every frame with the animated
+  colours, the most visible frame is baked, and every frame's output (alpha-weighted colour, alpha) over the
+  baked frame's is NU_effColorGain in the MTA. Exact when the output is proportional to the animated colour
+  (fades, the usual case); an approximation for a lerp whose ends animate differently. Visibility animations go
+  to the MTA by mesh name.
+- Not converted: UV rotation tracks, the per-texel shape of a colour animation that isn't a scale.
 
 Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro` BehaviorKuribo, the
 EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy

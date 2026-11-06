@@ -261,6 +261,38 @@ SECTIONS = ['models', 'materials', 'shaders', 'textures', 'luts', 'lights', 'cam
             'material_anims', 'visibility', 'light_anims', 'camera_anims', 'fog_anims', 'scenes']
 
 
+def _pica_full(d, off, words):
+    """PICA200 command buffer -> ({register: value, the byte-lane mask applied}, {float uniform register: [floats
+    in the order written]}): the vertex shader's float uniforms are written through 0x2C0 (register index, bit 31
+    f32 mode) and 0x2C1-0x2C8 (data words), each vec4 w z y x (Ohana3DS pops them off a stack)"""
+    regs, unif = {}, {}
+    cur = 0
+    read = 0
+    p = off
+    while read < words:
+        param, hdr = struct.unpack_from('<II', d, p)
+        p += 8
+        read += 2
+        rid = hdr & 0xFFFF
+        mask = (hdr >> 16) & 0xF
+        extra = (hdr >> 20) & 0x7FF
+        vals = [param] + [struct.unpack_from('<I', d, p + 4 * j)[0] for j in range(extra)]
+        p += 4 * extra
+        read += extra
+        for j, v in enumerate(vals):
+            r = rid + j if hdr & 0x80000000 else rid
+            m = sum(0xFF << (8 * b) for b in range(4) if mask >> b & 1)
+            v = (regs.get(r, 0) & ~m | v & m) & 0xFFFFFFFF
+            regs[r] = v
+            if r == 0x2C0:
+                cur = v & 0xFF
+            elif 0x2C1 <= r <= 0x2C8:
+                unif.setdefault(cur, []).append(struct.unpack('<f', struct.pack('<I', v))[0])
+        while p & 7:
+            p += 4
+    return regs, unif
+
+
 def _pica(d, off, words):
     """PICA200 command buffer -> {register: last value}"""
     regs = {}
@@ -284,6 +316,82 @@ def _pica(d, off, words):
     return regs
 
 
+TEV_STAGES = (0xC0, 0xC8, 0xD0, 0xD8, 0xF0, 0xF8)
+
+
+def _tev_rgb_op(c, op):
+    a = c[..., 3:4]
+    return {0: c[..., :3], 1: 1 - c[..., :3], 2: np.repeat(a, 3, -1), 3: np.repeat(1 - a, 3, -1),
+            4: np.repeat(c[..., 0:1], 3, -1), 5: np.repeat(1 - c[..., 0:1], 3, -1),
+            8: np.repeat(c[..., 1:2], 3, -1), 9: np.repeat(1 - c[..., 1:2], 3, -1),
+            12: np.repeat(c[..., 2:3], 3, -1), 13: np.repeat(1 - c[..., 2:3], 3, -1)}.get(op, c[..., :3])
+
+
+def _tev_a_op(c, op):
+    j = (3, 3, 0, 0, 1, 1, 2, 2)[op]
+    return c[..., j:j + 1] if op % 2 == 0 else 1 - c[..., j:j + 1]
+
+
+def _tev_mix(mode, a, b, c):
+    if mode == 0:
+        return a
+    if mode == 1:
+        return a * b
+    if mode == 2:
+        return a + b
+    if mode == 3:
+        return a + b - 0.5
+    if mode == 4:
+        return a * c + b * (1 - c)
+    if mode == 5:
+        return a - b
+    if mode in (6, 7):
+        d = 4 * ((a[..., :3] - 0.5) * (b[..., :3] - 0.5)).sum(-1, keepdims=True)
+        return np.repeat(d, a.shape[-1], -1)
+    if mode == 8:
+        return a * b + c
+    if mode == 9:
+        return (a + b) * c
+    return a
+
+
+def tev_combine(tev, textures, primary=(1.0, 1.0, 1.0, 1.0), lit=(1.0, 1.0, 1.0, 1.0), lit2=(0.0, 0.0, 0.0, 0.0)):
+    """run a material's PICA200 texture combiner (mat['tev']) over the texels: TEXTURES [3] float RGBA
+    [h, w, 4] (0..1, the same size; None = black), the primary (vertex) colour and the fragment lighting
+    colours taken as constants -> [h, w, 4]. Sources: 0 primary, 1 / 2 fragment primary / secondary, 3-5
+    textures 0-2, 0xD the combiner buffer, 0xE the stage constant, 0xF the previous stage; operands, the 10
+    combine modes and the 1 / 2 / 4 scales as the GPU (3dbrew "GPU/Internal Registers", TEV)."""
+    shape = next(t.shape for t in textures if t is not None)
+    full = lambda c: np.broadcast_to(np.asarray(c, np.float64), shape)    # noqa: E731
+    tex = [full((0, 0, 0, 0)) if t is None else t.astype(np.float64) for t in textures] + [full((0, 0, 0, 0))]
+
+    def rgba(u):
+        return full([(u >> (8 * j) & 0xFF) / 255.0 for j in range(4)])
+    prev = full((0.0, 0.0, 0.0, 0.0))
+    buf, nxt = full((0.0, 0.0, 0.0, 0.0)), rgba(tev.get(0xFD, 0))
+    upd = tev.get(0xE0, 0)
+    for i, r in enumerate(TEV_STAGES):
+        src, opr, comb, const, scale = (tev.get(r + j, 0) for j in range(5))
+        srcs = {0: full(primary), 1: full(lit), 2: full(lit2), 3: tex[0], 4: tex[1], 5: tex[2], 6: tex[3],
+                0xD: buf, 0xE: rgba(const), 0xF: prev}
+        pick = lambda k: srcs.get(k, prev)                     # noqa: E731
+        rs = [_tev_rgb_op(pick((src >> (4 * j)) & 0xF), (opr >> (4 * j)) & 0xF) for j in range(3)]
+        as_ = [_tev_a_op(pick((src >> (16 + 4 * j)) & 0xF), (opr >> (12 + 3 * j)) & 7) for j in range(3)]
+        rgb = _tev_mix(comb & 0xF, *rs) * (1 << min(scale & 3, 2))
+        a = _tev_mix((comb >> 16) & 0xF, *as_)[..., :1] * (1 << min((scale >> 16) & 3, 2))
+        prev = np.clip(np.concatenate([rgb[..., :3], a], -1), 0, 1)
+        # the combiner buffer (as Citra's rasterizer): a stage reads the buffer as it stood before the previous
+        # stage; stages 0-3 write their output into it when their update bit (0xE0 bits 8-11 / 12-15) is set
+        buf = nxt
+        if i < 4 and ((upd >> (8 + i)) & 1 or (upd >> (12 + i)) & 1):
+            nxt = nxt.copy()
+            if (upd >> (8 + i)) & 1:
+                nxt[..., :3] = prev[..., :3]
+            if (upd >> (12 + i)) & 1:
+                nxt[..., 3:] = prev[..., 3:]
+    return prev
+
+
 class Bch:
     def __init__(self, data):
         d = bytearray(data)
@@ -304,7 +412,12 @@ class Bch:
                     0x2B: self.ext, 0x2C: self.ext, 0x2D: self.ext}.get(kind)
             if gadd is not None:
                 at = self.gpu + off * 4
-                struct.pack_into('<I', d, at, struct.unpack_from('<I', d, at)[0] + gadd)
+                v = struct.unpack_from('<I', d, at)[0] + gadd
+                if kind in (0x27, 0x2C):            # an index buffer: bit 31 says 16-bit indices
+                    v = (v & 0x7FFFFFFF) | 0x80000000
+                elif kind in (0x28, 0x2D):          # 8-bit
+                    v &= 0x7FFFFFFF
+                struct.pack_into('<I', d, at, v & 0xFFFFFFFF)
         self.d = bytes(d)
         self.sections = {}
         for k, name in enumerate(SECTIONS):
@@ -382,10 +495,14 @@ class Bch:
                 fsh, fwords = struct.unpack_from('<II', d, params + 0xC8)
                 regs = _pica(d, fsh, fwords) if fsh and fwords else {}
                 b, at = regs.get(0x101, 0), regs.get(0x104, 0)
-                mat['blend'] = dict(on=((mat['fragment_flags'] >> 10) & 3) == 3, src=(b >> 16) & 0xF, dst=(b >> 20) & 0xF)
+                mat['blend'] = dict(on=((mat['fragment_flags'] >> 10) & 3) == 3, src=(b >> 16) & 0xF,
+                                    dst=(b >> 20) & 0xF)
                 mat['alpha_test'] = dict(on=bool(at & 1), func=(at >> 4) & 0xF, ref=(at >> 8) & 0xFF)
                 mat['cull'] = regs.get(0x108, 2) & 0xF
                 mat['depth_write'] = bool(regs.get(0x107, 0x1000) & 0x1000)
+                # the texture combiner (TEV: stages at 0xC0 / 0xC8 / 0xD0 / 0xD8 / 0xF0 / 0xF8, buffer 0xE0 /
+                # 0xFD), as written: tev_combine runs it
+                mat['tev'] = {k: v for k, v in regs.items() if 0xC0 <= k <= 0xFD}
                 mat['colors'] = dict(zip(['emission', 'ambient', 'diffuse', 'specular0', 'specular1',
                                           'constant0', 'constant1', 'constant2', 'constant3', 'constant4',
                                           'constant5', 'blend'], cols))
@@ -410,6 +527,8 @@ class Bch:
             objs.append(dict(material=mid, silhouette=bool(fl & 1), name=names[node] if node < len(names) else
                              'mesh%d' % k, node=node, priority=prio, center=self.f32s(e + 0x20, 3), faces=faces,
                              data=fo))
+        for k, o in enumerate(objs):
+            o['geometry'] = lambda k=k, bones_p=(skel_t, skel_n): self._geometry(obj_t + 0x38 * k)
         m['objects'] = objs
         bones = []
         for k in range(skel_n):
@@ -420,6 +539,79 @@ class Bch:
                               inv=np.array(vals[9:21]).reshape(3, 4), name=self.cstr(self.u32(e + 0x5C))))
         m['bones'] = bones
         return m
+
+    # ---- meshes kept in the .bch (effect models: no .mbn)
+    def _geometry(self, e):
+        """an object's vertices and faces from its PICA200 commands (Ohana3DS BCH.cs): -> dict(attrs={kind:
+        [n, k]} (kinds as the .mbn's: 0 position, 1 normal, 2 colour, 3 / 4 UV 0 / 1, 5 bone index, 6 weight),
+        parts=[(bones, skinning, triangle indices)]), the attribute buffer read whole. Attribute kinds (PICA
+        input permutation 0x2BB / 0x2BC): 0 position, 1 normal, 2 tangent, 3 colour, 4-6 UV 0-2, 7 bone index,
+        8 bone weight; formats 0x201 / 0x202 (2 bits type: s8 u8 s16 f32, 2 bits count - 1); buffer 0 at 0x203,
+        its component order 0x204 / 0x205 low 16 bits, stride 0x205 bits 16-23, count bits 28-31; scales from
+        the float uniforms 6 (position offset) and 7-8 (UV 0-2, weight, position, normal, tangent, colour)"""
+        d = self.d
+        vo, vw, fo, fn = struct.unpack_from('<IIII', d, e + 8)
+        regs, unif = _pica_full(d, vo, vw)
+        u6 = list(reversed(unif.get(6, [0.0] * 4)))[:4]
+        u7 = list(reversed(unif.get(7, []) + unif.get(8, [])))
+        u7 += [1.0] * (8 - len(u7))
+        off = np.array(u6[:3])
+        sc = dict(uv0=u7[0], uv1=u7[1], uv2=u7[2], weight=u7[3], pos=u7[4], nrm=u7[5], tan=u7[6], col=u7[7])
+        perm = regs.get(0x2BB, 0) | regs.get(0x2BC, 0) << 32
+        fmts = regs.get(0x201, 0) | regs.get(0x202, 0) << 32
+        addr = regs.get(0x203, 0)
+        order = regs.get(0x204, 0) | (regs.get(0x205, 0) & 0xFFFF) << 32
+        stride = (regs.get(0x205, 0) >> 16) & 0xFF
+        nattr = regs.get(0x205, 0) >> 28
+        layout, o = [], 0
+        tsize = (1, 1, 2, 4)
+        tcode = ('i1', 'u1', '<i2', '<f4')
+        for a in range(nattr):
+            reg = (order >> (4 * a)) & 0xF
+            kind = (perm >> (4 * reg)) & 0xF
+            f = (fmts >> (4 * reg)) & 0xF
+            typ, cnt = f & 3, (f >> 2) + 1
+            if kind == 8:
+                typ = 1                                 # Ohana3DS: weights are bytes whatever the type says
+            o += -o % tsize[typ]
+            layout.append((kind, typ, cnt, o))
+            o += tsize[typ] * cnt
+        faces = []
+        maxidx = -1
+        for f in range(fn):
+            b = fo + 0x34 * f
+            skin, nn = struct.unpack_from('<HH', d, b)
+            nodes = list(struct.unpack_from('<%dH' % nn, d, b + 4))
+            ho, hw = struct.unpack_from('<II', d, b + 0x2C)
+            fr, _u = _pica_full(d, ho, hw)
+            cfg, n = fr.get(0x227, 0), fr.get(0x228, 0)
+            ia = cfg & 0x7FFFFFFF
+            idx = np.frombuffer(d, '<u2' if cfg >> 31 else 'u1', n, ia).astype(np.int64)
+            maxidx = max(maxidx, int(idx.max()) if n else -1)
+            faces.append((nodes, skin, idx))
+        count = maxidx + 1
+        raw = np.frombuffer(d, np.uint8, count * stride, addr).reshape(count, stride) if count else \
+            np.zeros((0, max(stride, 1)), np.uint8)
+        attrs = {}
+        mbn_kind = {0: 0, 1: 1, 3: 2, 4: 3, 5: 4, 7: 5, 8: 6}
+        for kind, typ, cnt, o in layout:
+            w = tsize[typ] * cnt
+            col = np.ascontiguousarray(raw[:, o:o + w]).view(tcode[typ]).reshape(count, cnt).astype(np.float64)
+            if kind == 0:
+                col = col[:, :3] * sc['pos'] + off[:3]
+            elif kind == 1:
+                col = col[:, :3] * sc['nrm']
+            elif kind == 3:
+                col = col * sc['col']
+                if cnt < 4:
+                    col = np.c_[col, np.ones((count, 4 - cnt))]
+            elif kind in (4, 5, 6):
+                col = col[:, :2] * sc['uv%d' % (kind - 4)]
+            elif kind == 8:
+                col = col * sc['weight']
+            if kind in mbn_kind:
+                attrs[mbn_kind[kind]] = col
+        return dict(attrs=attrs, parts=faces, count=count, layout=layout, scales=sc, offset=off)
 
     # ---- skeletal animations
     def keyframes(self, o):

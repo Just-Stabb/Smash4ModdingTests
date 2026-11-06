@@ -297,13 +297,46 @@ def _track_at(t, f):
     return vals[i]
 
 
+def split_trs(m):
+    """[frames, 4, 4] local matrices (R x diag(scale) + translation) -> (translations, quaternions, scales),
+    exact also for a mirrored (negative) scale and a zero one (the 3DS effects squash axes to 0): a zero
+    column takes its rotation axis from the others, a negative determinant goes on the smallest axis"""
+    m = np.asarray(m, float)
+    t = m[:, :3, 3]
+    sc = np.linalg.norm(m[:, :3, :3], axis=1)
+    rots = np.empty((len(m), 3, 3))
+    for f in range(len(m)):
+        r = m[f, :3, :3].copy()
+        live = sc[f] > 1e-8
+        for j in range(3):
+            r[:, j] = r[:, j] / sc[f, j] if live[j] else 0.0
+        dead = [j for j in range(3) if not live[j]]
+        if len(dead) == 3:
+            r = np.eye(3)
+        elif len(dead) == 2:
+            j = next(j for j in range(3) if live[j])
+            a = np.eye(3)[np.argmin(np.abs(r[:, j]))]
+            k1, k2 = (j + 1) % 3, (j + 2) % 3
+            r[:, k1] = np.cross(r[:, j], a)
+            r[:, k1] /= np.linalg.norm(r[:, k1])
+            r[:, k2] = np.cross(r[:, j], r[:, k1])
+        elif len(dead) == 1:
+            k = dead[0]
+            r[:, k] = np.cross(r[:, (k + 1) % 3], r[:, (k + 2) % 3])
+            r[:, k] /= max(np.linalg.norm(r[:, k]), 1e-12)
+        if np.linalg.det(r) < 0:
+            k = int(np.argmin(sc[f]))
+            r[:, k] = -r[:, k]
+            sc[f, k] = -sc[f, k]
+        rots[f] = r
+    return t, _mat_quat(rots), sc
+
+
 def omo_from(anim, bones):
     frames = int(round(anim['frames'])) + 1          # keys sit on frames 0..end, both ends kept
     o = omo.Omo(b'OMO ' + OMO_HEAD + struct.pack('>HHH', 0, frames, 0) + struct.pack('>III', 0x20, 0x20, 0x20))
     for b, m in zip(bones, anim_locals(anim, bones, frames)):
-        t = m[:, :3, 3]
-        sc = np.linalg.norm(m[:, :3, :3], axis=1)
-        q = _mat_quat(m[:, :3, :3] / sc[:, None, :])
+        t, q, sc = split_trs(m)
         # keep consecutive quaternions in one hemisphere (_node then makes w >= 0 for the xyz encoding)
         _node(o, bone_hash(b['name']), t, q, sc)
     return o.encode(), frames

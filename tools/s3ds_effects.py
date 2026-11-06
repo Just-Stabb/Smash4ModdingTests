@@ -2,7 +2,8 @@
 """Smash 3DS particle effects (.ptcl SPBD v0x33 + .efc EFCC) -> Smash 4 Wii U ones (.ptcl EFTF v0x42 + .efc
 EFCF), for the Smash Run enemies (effect/enemy/KIND/, the path cross_f.rpx builds).
 
-  python3 tools/s3ds_effects.py SRC_ROOT KIND|all OUT VANILLA_DIR [--base FILE.ptcl]     (all: the Smash Run enemies)
+  python3 tools/s3ds_effects.py SRC_ROOT KIND|all OUT VANILLA_DIR [--base FILE.ptcl] [--no-models]
+      (all: the Smash Run enemies; the effect models go next to the .efc, tools/s3ds_effect_models.py)
       SRC_ROOT: a tools/s3ds_unpack.py extract (enemy/KIND/effect/KIND.03030000.ptcl / .efc);
       VANILLA_DIR: vanilla Wii U ptcl files (their emitters are the templates: tools/vfxb_to_ptcl.py's
       Templates, BC4-shape templates only).
@@ -24,7 +25,9 @@ follow type, flipbook, UV animation and rotation needs), then the 3DS fields wri
 shape + a tint (xv2_to_ptcl.shape_texture: the alpha-weighted mean colour into the colour tracks); ETC1 and
 the other formats without alpha take their alpha from the shape (as the 3DS draws them, and Smash 4's BC4
 textures). Not converted: key animations (emitter curves), primitives (mesh particles: skipped), the
-complex blocks, colour 1 where the template's combiner has none, effect models (effect/model/*.bch).
+complex blocks, colour 1 where the template's combiner has none. The effect models (effect/model/NAME/*.bch)
+are converted by tools/s3ds_effect_models.py into effect/enemy/KIND/model/NAME/; the .efc keeps the
+references to the ones converted.
 """
 import argparse
 import glob
@@ -212,16 +215,19 @@ def read_efc(data):
     return entries, names[:m], meshes, names[m:]
 
 
-def write_efc(entries, models=(), meshes=(), mesh_names=(), keep_models=False):
-    """Wii U EFCF (version 7). Without keep_models the entries' effect models (3DS .bch, not converted yet)
-    are dropped: an entry pointing at a model folder that isn't there would have the game load it"""
-    if not keep_models:
-        entries = [[f, s, 0, 0, 0] for f, s, _m, _a, _b in entries]
-        models, meshes, mesh_names = [], [], []
-    out = b'EFCF' + struct.pack('>HHHHHH', 0, 7, len(entries), len(models), len(meshes), 0)
+def write_efc(entries, models=(), meshes=(), mesh_names=(), have=()):
+    """Wii U EFCF (version 7). Effect models are kept only when their folder was converted (names in HAVE:
+    effect/enemy/KIND/model/NAME, tools/s3ds_effect_models.py); an entry pointing at a model that isn't there
+    would have the game load a missing folder, so those references are dropped and the list renumbered"""
+    keep = [m for m in models if m in set(have)]
+    new = {i + 1: keep.index(m) + 1 for i, m in enumerate(models) if m in keep}
+    entries = [[f, s, new.get(m, 0), a if m in new else 0, b if m in new else 0] for f, s, m, a, b in entries]
+    if not keep:
+        meshes, mesh_names = [], []
+    out = b'EFCF' + struct.pack('>HHHHHH', 0, 7, len(entries), len(keep), len(meshes), 0)
     out += b''.join(struct.pack('>IIIHH', *e) for e in entries)
     out += b''.join(struct.pack('>HH', *mm) for mm in meshes)
-    out += b''.join(x.encode('ascii') + b'\0' for x in list(models) + list(mesh_names))
+    out += b''.join(x.encode('ascii') + b'\0' for x in list(keep) + list(mesh_names))
     return out
 
 
@@ -334,8 +340,8 @@ def convert_emitter(p, templates, e, notes):
     return em
 
 
-def convert_file(src_ptcl, src_efc, templates, base_path, log=print):
-    """-> (ptcl bytes, efc bytes)"""
+def convert_file(src_ptcl, src_efc, templates, base_path, log=print, models_have=()):
+    """-> (ptcl bytes, efc bytes, set names); MODELS_HAVE: the effect model folders converted next to it"""
     s3 = read_spbd(open(src_ptcl, 'rb').read())
     p = ptcl.Ptcl(open(base_path, 'rb').read())
     templates.base = p
@@ -360,10 +366,10 @@ def convert_file(src_ptcl, src_efc, templates, base_path, log=print):
     efc_b, dropped = write_efc([]), []
     if src_efc and os.path.exists(src_efc):
         entries, models, meshes, mesh_names = read_efc(open(src_efc, 'rb').read())
-        dropped = sorted({models[e[2] - 1] for e in entries if e[2]})
-        efc_b = write_efc(entries, models, meshes, mesh_names)
+        dropped = sorted({models[e[2] - 1] for e in entries if e[2]} - set(models_have))
+        efc_b = write_efc(entries, models, meshes, mesh_names, models_have)
         if dropped:
-            log('    efc: effect models left out (not converted): %s' % ', '.join(dropped))
+            log('    efc: effect models left out (no converted folder): %s' % ', '.join(dropped))
     return out, efc_b, made
 
 
@@ -386,21 +392,34 @@ def main():
     ap.add_argument('out')
     ap.add_argument('vanilla')
     ap.add_argument('--base', default=None)
+    ap.add_argument('--no-models', action='store_true', help='leave the effect models (and the efc references) out')
     a = ap.parse_args()
     vt.EXACT = vt.TWO_TEXTURES = vt.GRAFT = vt.UNIVERSAL = False
     corpus = sorted(glob.glob(os.path.join(a.vanilla, '**', '*.ptcl'), recursive=True))
     base = a.base or min(corpus, key=os.path.getsize)
     templates = vt.Templates(ptcl.Ptcl(open(base, 'rb').read()), corpus)
     import s3ds_enemy
-    kinds = s3ds_enemy.fs_kinds(a.src) if a.kind == 'all' else [a.kind]     # all: the Smash Run enemies
+    import s3ds_effect_models
+    fs = s3ds_enemy.fs_kinds(a.src)
+    kinds = fs if a.kind == 'all' else [a.kind]     # all: the Smash Run enemies
     for k in kinds:
         f = os.path.join(a.src, 'enemy', k, 'effect', '%s.03030000.ptcl' % k)
-        if not os.path.exists(f):
+        fe = f.replace('.ptcl', '.efc')
+        if not os.path.exists(f) and not os.path.exists(fe):
             continue
         print(k)
-        out, efc_b, made = convert_file(f, f.replace('.ptcl', '.efc'), templates, base)
+        have = [] if a.no_models else s3ds_effect_models.convert_kind(a.src, k, a.out, fs)
         od = os.path.join(a.out, 'effect', 'enemy', k)
         os.makedirs(od, exist_ok=True)
+        if not os.path.exists(f):
+            # a bank of effect models only (no particles): an .efc and its model folders, no .ptcl, as the
+            # vanilla miienemys bank
+            entries, models, meshes, mesh_names = read_efc(open(fe, 'rb').read())
+            open(os.path.join(od, '%s.010d0000.efc' % k), 'wb').write(
+                write_efc(entries, models, meshes, mesh_names, have))
+            print('  models only: %d entries' % len(entries))
+            continue
+        out, efc_b, made = convert_file(f, fe, templates, base, models_have=have)
         open(os.path.join(od, '%s.010d0000.ptcl' % k), 'wb').write(out)
         open(os.path.join(od, '%s.010d0000.efc' % k), 'wb').write(efc_b)
         print('  %d sets, %d bytes' % (len(made), len(out)))
