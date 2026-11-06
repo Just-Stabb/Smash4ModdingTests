@@ -206,7 +206,7 @@ def octaslash_loop_scripts(game, effect):
             loop = []
             for c in body:
                 if c.name.endswith('Hitbox'):
-                    held = _set(c, Damage=0.5, Hitlag=0.0)
+                    held = _set(c, Damage=0.14, Hitlag=0.0)     # test 127: 0.14 (test 126: 0.5)
                     loop += _when(0, [c], OCTA_VAR) + _when(1, [held], OCTA_VAR) + _when(2, [held], OCTA_VAR)
                 else:
                     loop.append(c)
@@ -223,7 +223,20 @@ def octaslash_loop_scripts(game, effect):
             body = _when(0, body, OCTA_VAR)
         eout.append((f, body))
     effect.scripts[crc] = _join(eout) + [acmd.Command(acmd.END)]
-    return ('held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20; its loop hits 0.5%%, '
+    # a shape made in Octaslash ends it (VAR_20 3, edge.c edge_tr_steps): its finisher's hits at angle 366 (toward the
+    # hitbox, on his sword: into the shape; test 127, the user: "the finisher hit angle that sends towards him, inside
+    # the shape"); else as they were
+    for name in ('SpecialHi2End', 'SpecialAirHi2End'):
+        ecrc = acmd.crc(name)
+        out = []
+        for c in game.scripts[ecrc]:
+            if c.name.endswith('Hitbox'):
+                out += (_when(0, [c], OCTA_VAR) + _when(1, [c], OCTA_VAR) + _when(2, [c], OCTA_VAR)
+                        + _when(3, [_set(c, Angle=366)], OCTA_VAR))
+            else:
+                out.append(c)
+        game.scripts[ecrc] = out
+    return ('held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20; its loop hits 0.14%%; the finisher 366 after a shape, '
             'no hitlag while held\n' % n)
 
 

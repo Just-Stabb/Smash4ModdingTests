@@ -1773,6 +1773,7 @@ void func_82()
     edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
     edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
     edge_tr_tick();                    // ... its trail's shapes (test 126)
+    edge_hi_keep_in();                 // ... Octaslash's victims kept in the blast zones (test 127)
     if (!global3)
     {
         if (WorkModule(0x10, 0x21000001))
@@ -5993,6 +5994,7 @@ int func_227()
 
 void func_228()
 {
+    WorkModule(0, 0.0f, 0x0f000315);   // Rebirth: up special's air use back (VAR_21, edge_hi_used_var: test 127)
     func_230();
     func_78(func_229);
 }
@@ -37896,7 +37898,7 @@ float edge_hi_p(float plain, float charged)
 // fighter hit along in front of him (edge_hi_link). Blade Dash (tap) keeps its full aim, lands in 22 frames, and ends
 // in a normal fall. Either is usable once per air time: landing or a ledge grab gives it back, being hit doesn't.
 // No MSC globals left (port_check C5): the state is this object's VARs (tools/acmd_ext_cave.py)
-int   edge_hi_used_var() { return 0x0f000315; }   // VAR_21: 1 once up special was used (cleared on the ground / ledge)
+int   edge_hi_used_var() { return 0x0f000315; }   // VAR_21: 1 once up special was used (cleared on the ground / ledge / respawn)
 int   edge_hi_pass_var() { return 0x0f000314; }   // VAR_20 (ACMD): Octaslash's pass: 0 plain, 1 first pass held, 2 a
                                                   // looped pass (SpecialHi2's first hit and start effects skipped)
 int   edge_hi_timer_var() { return 0x0f00030c; }  // VAR_12: Octaslash's loop frames left
@@ -37935,7 +37937,10 @@ int edge_hi_can()
 // CliffWait 0x72 - 0x74) gives up special back
 void edge_hi_air_tick()
 {
-    if (global18 == 0 && global4 != 0x154 && global4 != 0x159 && global4 != 0x15a || global4 >= 0x72 && global4 <= 0x74)
+    // on the ground, the ledge, or dead / respawning (0xB1 Dead, 0xB2 Rebirth: test 127, "make up special's air count
+    // reset on respawn")
+    if (global18 == 0 && global4 != 0x154 && global4 != 0x159 && global4 != 0x15a || global4 >= 0x72 && global4 <= 0x74
+        || global4 == 0xb1 || global4 == 0xb2)
     {
         WorkModule(0, 0.0f, edge_hi_used_var());
     }
@@ -37961,6 +37966,53 @@ void edge_hi_hit_check()
     if (edge_hi_charged && WorkModuleF(0, 0x0f0000a1) == 1.0f)
     {
         WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
+    }
+}
+
+// Octaslash (the rush and its end, the finisher's flight included): every fighter in hitstun kept inside the blast zones
+// (test 127, the user: "make opponents hit by it unable to be KO'd by the blast zone during the duration of the entire
+// attack, including the ending hit"), as the snake sword keeps those it holds (15 inside the sides / bottom, 30 under
+// the top: StageData 0 - 3)
+void edge_hi_keep_in()
+{
+    int slot;
+    float x;
+    float y;
+    float lo;
+    float hi;
+    if (edge_hi_charged == 0 || global4 != 0x159 && global4 != 0x15a)
+    {
+        return;
+    }
+    slot = 0;
+    while (slot < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * slot) != 0 && WorkModuleF(0, 0x0f000058 + 0x8 * slot) > 0.0f)
+        {
+            x = WorkModuleF(0, 0x0f000020 + 0x4 * slot);
+            y = WorkModuleF(0, 0x0f000021 + 0x4 * slot);
+            lo = StageData(0) + 15.0f;
+            hi = StageData(0x1) - 15.0f;
+            if (x < lo)
+            {
+                WorkModule(0, lo, 0x0f000020 + 0x4 * slot);
+            }
+            if (x > hi)
+            {
+                WorkModule(0, hi, 0x0f000020 + 0x4 * slot);
+            }
+            lo = StageData(0x3) + 15.0f;
+            hi = StageData(0x2) - 30.0f;
+            if (y < lo)
+            {
+                WorkModule(0, lo, 0x0f000021 + 0x4 * slot);
+            }
+            if (y > hi)
+            {
+                WorkModule(0, hi, 0x0f000021 + 0x4 * slot);
+            }
+        }
+        slot = slot + 1;
     }
 }
 
@@ -38095,6 +38147,7 @@ float edge_tr_sum1() { return -1001.5f; }        // the steps (shared 6; tools/e
 float edge_tr_sum2() { return -1002.5f; }
 float edge_tr_sum3() { return -1003.5f; }
 float edge_tr_commit() { return -1004.5f; }
+float edge_tr_scale() { return 1.2f; }           // the shape's fill and hitbox x this (test 127)
 
 float edge_tr_pack(float x, float y)
 {
@@ -38146,11 +38199,24 @@ void edge_tr_point(float p, int n)
     }
 }
 
-// the trail starts here (the rush's main): a new block, its point 0
+// the trail starts here (the rush's main): a new block (Blade Dash 1 - 14 in turn; held Octaslash 15, its trail not
+// staying: test 127, "only make Blade Dash lines persist after use"), its point 0
+int edge_tr_cur_block()
+{
+    if (edge_hi_charged)
+    {
+        return 0xf;
+    }
+    return edge_tr_block;
+}
+
 void edge_tr_begin()
 {
     int i;
-    edge_tr_block = edge_tr_block - (edge_tr_block / 0xf) * 0xf + 1;
+    if (edge_hi_charged == 0)
+    {
+        edge_tr_block = edge_tr_block - (edge_tr_block / 0xe) * 0xe + 1;
+    }
     WorkModule(0, 0.0f, edge_tr_cross_var());
     i = 0x300;
     while (i <= 0x30b)
@@ -38158,8 +38224,24 @@ void edge_tr_begin()
         WorkModule(0, 0.0f, 0x0f000000 + i);   // VAR_0 - VAR_11
         i = i + 1;
     }
-    WorkModule(0, (float)(edge_tr_block * 0x400), edge_tr_floor_var());
-    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_block * 0x400);
+    WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
+    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_cur_block() * 0x400);
+}
+
+// sin by its series (no sin in MSC; trail.c tr_sin the same), x folded into -pi/2 .. pi/2
+float edge_tr_sin(float x)
+{
+    float x2;
+    if (x > 1.5707963f)
+    {
+        x = 3.1415927f - x;
+    }
+    if (x < -1.5707963f)
+    {
+        x = -3.1415927f - x;
+    }
+    x2 = x * x;
+    return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f)));
 }
 
 // a range's mark step: start x 512 + count + 0.5
@@ -38174,6 +38256,7 @@ float edge_tr_mark(int start, int count)
 void edge_tr_steps()
 {
     int q;
+    int i;
     float n;
     float cx;
     float cy;
@@ -38187,13 +38270,24 @@ void edge_tr_steps()
     float a;
     float b;
     q = -(int)WorkModuleF(0, edge_tr_q_var());
+    if (q >= 0xb)
+    {
+        edge_tr_find(q);
+        return;
+    }
     if (q == 1)
     {
-        if (WorkModuleF(0, edge_tr_s1_var()) > 0.0f)
+        // the ranges still to mark (VAR_8 - VAR_10)
+        i = 0x308;
+        while (i <= 0x30a)
         {
-            WorkModule(0, WorkModuleF(0, edge_tr_s1_var()), edge_tr_num_var());
-            WorkModule(0, 0.0f, edge_tr_s1_var());
-            return;
+            if (WorkModuleF(0, 0x0f000000 + i) > 0.0f)
+            {
+                WorkModule(0, WorkModuleF(0, 0x0f000000 + i), edge_tr_num_var());
+                WorkModule(0, 0.0f, 0x0f000000 + i);
+                return;
+            }
+            i = i + 1;
         }
         WorkModule(0, 0.0f, edge_tr_new_var());
         WorkModule(0, 0.0f, edge_tr_cross_var());
@@ -38238,8 +38332,64 @@ void edge_tr_steps()
         {
             t = t + 180.0f;
         }
-        a = MathF(0, 2.0f * l1);
-        b = MathF(0, 2.0f * l2);
+        // the fit kept (VAR_8 the angle in 128ths of 180, VAR_9 / VAR_10 the half axes x 1.2: "at least 1.2x the size of
+        // the shape", test 127) and the points' extents along / across it asked (EXTENT: a triangle's corners reach
+        // further than its spread says)
+        WorkModule(0, (float)(int)(t * 128.0f / 180.0f), edge_tr_s1_var());
+        WorkModule(0, MathF(0, 2.0f * l1) * edge_tr_scale(), edge_tr_s2_var());
+        WorkModule(0, MathF(0, 2.0f * l2) * edge_tr_scale(), edge_tr_s3_var());
+        WorkModule(0, -100000.0f, edge_tr_new_var());
+        WorkModule(0, -100000.0f, edge_tr_cross_var());
+        WorkModule(0, -(float)(0xfa0 + (int)WorkModuleF(0, edge_tr_s1_var())) - 0.5f, edge_tr_num_var());
+        WorkModule(0, -7.0f, edge_tr_q_var());
+        return;
+    }
+    if (q == 7)
+    {
+        // the furthest along (5) / across (4) read; the furthest back asked (EXTENT of minus: 4200 +)
+        WorkModule(0, WorkModuleF(0, edge_tr_new_var()), edge_tr_s4_var());
+        WorkModule(0, WorkModuleF(0, edge_tr_cross_var()), edge_tr_qn_var());
+        WorkModule(0, -100000.0f, edge_tr_new_var());
+        WorkModule(0, -100000.0f, edge_tr_cross_var());
+        WorkModule(0, -(float)(0x1068 + (int)WorkModuleF(0, edge_tr_s1_var())) - 0.5f, edge_tr_num_var());
+        WorkModule(0, -8.0f, edge_tr_q_var());
+        return;
+    }
+    if (q == 8)
+    {
+        // the shape: the middle of its extents, half axes the fit's or 1.2 x the extents (the larger)
+        i = (int)WorkModuleF(0, edge_tr_s1_var());
+        t = (float)i * 0.0245437f;                       // pi / 128
+        vxx = edge_tr_sin(1.5707963f - t);               // the axis (cos, sin)
+        vyy = edge_tr_sin(t);
+        l1 = WorkModuleF(0, edge_tr_s4_var());           // along: max, min
+        l2 = -WorkModuleF(0, edge_tr_new_var());
+        vxy = WorkModuleF(0, edge_tr_qn_var());          // across: max, min
+        d = -WorkModuleF(0, edge_tr_cross_var());
+        cx = (l1 + l2) * 0.5f;
+        cy = (vxy + d) * 0.5f;
+        n = cx;
+        cx = n * vxx - cy * vyy;
+        cy = n * vyy + cy * vxx;
+        a = WorkModuleF(0, edge_tr_s2_var());
+        b = WorkModuleF(0, edge_tr_s3_var());
+        if ((l1 - l2) * 0.5f * edge_tr_scale() > a)
+        {
+            a = (l1 - l2) * 0.5f * edge_tr_scale();
+        }
+        if ((vxy - d) * 0.5f * edge_tr_scale() > b)
+        {
+            b = (vxy - d) * 0.5f * edge_tr_scale();
+        }
+        if (b > a)
+        {
+            n = a;
+            a = b;
+            b = n;
+            i = i + 0x40;
+            i = i - (i / 0x80) * 0x80;
+        }
+        t = (float)i * 180.0f / 128.0f;
         if (a < 3.0f)
         {
             a = 3.0f;
@@ -38257,11 +38407,16 @@ void edge_tr_steps()
             b = a;
         }
         WorkModule(0, edge_tr_pack(cx, cy), edge_tr_new_var());
-        WorkModule(0, (float)((int)(t * 128.0f / 180.0f) * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)),
-                   edge_tr_cross_var());
+        WorkModule(0, (float)(i * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)), edge_tr_cross_var());
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
         ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
         WorkModule(0, -5.0f, edge_tr_q_var());
+        if (global4 == 0x159 && edge_hi_charged)
+        {
+            // a shape made in Octaslash ends it, its finisher pulling in (test 127: "force Sephiroth to end Octaslash
+            // with the finisher hit angle that sends towards him, inside the shape"): VAR_20 3, the rush loop's
+            WorkModule(0, 3.0f, edge_hi_pass_var());
+        }
         return;
     }
     // 5: the trail as it was
@@ -38273,6 +38428,183 @@ void edge_tr_steps()
     WorkModule(0, 0.0f, edge_tr_q_var());
 }
 
+// the trail's end: -1 (it stays: Blade Dash), -2 (held Octaslash's: its articles go)
+float edge_tr_end_code()
+{
+    if (edge_hi_charged)
+    {
+        return -2.0f;
+    }
+    return -1.0f;
+}
+
+// a range between two pieces of one trail (their start numbers): the points between, start x 512 + count + 0.5; 0 none
+float edge_tr_between(int a, int b)
+{
+    int lo;
+    int hi;
+    lo = a;
+    hi = b;
+    if (b < a)
+    {
+        lo = b;
+        hi = a;
+    }
+    if (hi == lo)
+    {
+        return 0.0f;
+    }
+    return edge_tr_mark(lo + 1, hi - lo);
+}
+
+int edge_tr_count(float code)
+{
+    int c;
+    if (code <= 0.0f)
+    {
+        return 0;
+    }
+    c = (int)code;
+    return c - (c / 0x200) * 0x200;
+}
+
+// JQ X Y: asks the articles for a junction of trails X and Y (5 / 4 then X's piece, Y's)
+void edge_tr_jq(int x, int y)
+{
+    WorkModule(0, 0.0f, edge_tr_new_var());
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, -(float)(0xbb8 + x * 0x10 + y) - 0.5f, edge_tr_num_var());
+}
+
+// the old trail candidates in between: Blade Dash blocks from the newest back, i 0 - 5
+int edge_tr_cand(int i)
+{
+    int z;
+    z = edge_tr_block - 1 - i;
+    while (z < 0)
+    {
+        z = z + 0xe;
+    }
+    return z + 1;
+}
+
+// crossing old trail Y (piece q) after old trail X (piece p in VAR_6, own number then n1 in VAR_7): is there a
+// junction X - Y (a shape of three lines) or X - Z - Y (four)? Asked a step a frame (VAR_0 -11 / -12 / -13; VAR_1 q,
+// VAR_2 the candidate Z, VAR_8 / VAR_9 X - Z's pieces), the trail paused (VAR_3 / VAR_4 keep it)
+void edge_tr_find_start(int q, int num)
+{
+    WorkModule(0, WorkModuleF(0, edge_tr_new_var()), edge_tr_sp_var());
+    WorkModule(0, (float)num, edge_tr_sn_var());
+    WorkModule(0, (float)q, edge_tr_floor_var());
+    WorkModule(0, -1.0f, edge_tr_qn_var());
+    WorkModule(0, (float)num, edge_tr_s4_var());   // the number crossed at (VAR_4 is the restore's: the end, if it ends)
+    edge_tr_jq((int)WorkModuleF(0, edge_tr_om_var()) / 0x400, q / 0x400);
+    WorkModule(0, -11.0f, edge_tr_q_var());
+}
+
+// the next candidate Z (not X, Y or this trail) asked X - Z, or none left: no shape, Y kept as the first crossing
+void edge_tr_find_next()
+{
+    int i;
+    int x;
+    int y;
+    int z;
+    x = (int)WorkModuleF(0, edge_tr_om_var()) / 0x400;
+    y = (int)WorkModuleF(0, edge_tr_floor_var()) / 0x400;
+    i = (int)WorkModuleF(0, edge_tr_qn_var()) + 1;
+    while (i < 6)
+    {
+        z = edge_tr_cand(i);
+        if (z != x && z != y && z != (int)WorkModuleF(0, edge_tr_s4_var()) / 0x400)
+        {
+            WorkModule(0, (float)i, edge_tr_qn_var());
+            edge_tr_jq(x, z);
+            WorkModule(0, -12.0f, edge_tr_q_var());
+            return;
+        }
+        i = i + 1;
+    }
+    WorkModule(0, WorkModuleF(0, edge_tr_floor_var()), edge_tr_om_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_s4_var()), edge_tr_on_var());
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
+    WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
+    WorkModule(0, 0.0f, edge_tr_q_var());
+}
+
+// the path's ranges marked from now: this trail's points since the first crossing, then X's, (Z's,) Y's between the
+// pieces crossed and the junctions
+void edge_tr_find_shape(float rx, float rz, float ry)
+{
+    int num;
+    int n1;
+    float r1;
+    int cnt;
+    num = (int)WorkModuleF(0, edge_tr_s4_var());
+    n1 = (int)WorkModuleF(0, edge_tr_on_var());
+    r1 = edge_tr_mark(n1, num - n1);
+    cnt = (num - n1) + edge_tr_count(rx) + edge_tr_count(rz) + edge_tr_count(ry);
+    if (cnt < 3 || num - n1 >= 0x200)
+    {
+        WorkModule(0, 5.0f, edge_tr_qn_var());
+        edge_tr_find_next();               // too small: as nothing found
+        return;
+    }
+    WorkModule(0, (float)cnt, edge_tr_qn_var());
+    WorkModule(0, rx, edge_tr_s1_var());
+    WorkModule(0, rz, edge_tr_s2_var());
+    WorkModule(0, ry, edge_tr_s3_var());
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, r1, edge_tr_num_var());
+    WorkModule(0, -1.0f, edge_tr_q_var());
+    WorkModule(0, 0.0f, edge_tr_om_var());
+}
+
+void edge_tr_find(int q)
+{
+    float j5;
+    float j4;
+    int p;
+    int qy;
+    j5 = WorkModuleF(0, edge_tr_new_var());
+    j4 = WorkModuleF(0, edge_tr_cross_var());
+    p = (int)WorkModuleF(0, edge_tr_om_var());
+    qy = (int)WorkModuleF(0, edge_tr_floor_var());
+    if (q == 0xb)
+    {
+        if (j5 >= 1024.0f)
+        {
+            // X - Y: three lines
+            edge_tr_find_shape(edge_tr_between(p, (int)j5), 0.0f, edge_tr_between((int)j4, qy));
+            return;
+        }
+        edge_tr_find_next();
+        return;
+    }
+    if (q == 0xc)
+    {
+        if (j5 >= 1024.0f)
+        {
+            WorkModule(0, j5, edge_tr_s1_var());   // X - Z: then Z - Y
+            WorkModule(0, j4, edge_tr_s2_var());
+            edge_tr_jq((int)j4 / 0x400, qy / 0x400);
+            WorkModule(0, -13.0f, edge_tr_q_var());
+            return;
+        }
+        edge_tr_find_next();
+        return;
+    }
+    if (j5 >= 1024.0f)
+    {
+        // X - Z - Y: four lines
+        edge_tr_find_shape(edge_tr_between(p, (int)WorkModuleF(0, edge_tr_s1_var())),
+                           edge_tr_between((int)WorkModuleF(0, edge_tr_s2_var()), (int)j5), edge_tr_between((int)j4, qy));
+        return;
+    }
+    edge_tr_find_next();
+}
+
 // a shape found: its ranges marked from this frame (the first now, the second next: VAR_8), the trail kept to go on
 void edge_tr_shape(int s1, int c1, int s2, int c2, int num)
 {
@@ -38280,6 +38612,8 @@ void edge_tr_shape(int s1, int c1, int s2, int c2, int num)
     WorkModule(0, (float)num, edge_tr_sn_var());
     WorkModule(0, (float)(c1 + c2), edge_tr_qn_var());
     WorkModule(0, 0.0f, edge_tr_s1_var());
+    WorkModule(0, 0.0f, edge_tr_s2_var());
+    WorkModule(0, 0.0f, edge_tr_s3_var());
     if (c2 > 0)
     {
         WorkModule(0, edge_tr_mark(s2, c2), edge_tr_s1_var());
@@ -38295,7 +38629,13 @@ void edge_tr_tick()
 {
     float q;
     q = WorkModuleF(0, edge_tr_q_var());
-    if (q <= -1.0f && q >= -5.0f)
+    if (q == -6.0f)
+    {
+        WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());   // the trail's end
+        WorkModule(0, 0.0f, edge_tr_q_var());
+        return;
+    }
+    if (q <= -1.0f && q >= -5.0f || q <= -7.0f && q >= -8.0f || q <= -11.0f && q >= -13.0f)
     {
         edge_tr_steps();
     }
@@ -38323,7 +38663,7 @@ void edge_tr_step(int last)
     {
         if (last)
         {
-            WorkModule(0, -1.0f, edge_tr_sn_var());   // over once the steps are done
+            WorkModule(0, edge_tr_end_code(), edge_tr_sn_var());   // over once the steps are done
         }
         return;                            // the trail waits for the steps
     }
@@ -38355,6 +38695,12 @@ void edge_tr_step(int last)
             // an old trail: the second time across it closes a shape (its own points since the first, the old
             // trail's between the two pieces crossed); the first is kept
             m1 = (int)WorkModuleF(0, edge_tr_om_var());
+            if (m1 > 0 && m1 / 0x400 != m / 0x400)
+            {
+                // another old trail: a shape if the two meet (directly or through a third): edge_tr_find
+                edge_tr_find_start(m, num);
+                return;
+            }
             if (m1 > 0 && m1 / 0x400 == m / 0x400 && m1 != m)
             {
                 lo = m1;
@@ -38388,7 +38734,10 @@ void edge_tr_step(int last)
     }
     if (last)
     {
-        WorkModule(0, -1.0f, edge_tr_num_var());
+        // over next frame (his per-frame hook): the articles take this last point first (test 127: the piece to where
+        // he landed was lost, the end written over it in the same frame)
+        WorkModule(0, -6.0f, edge_tr_q_var());
+        WorkModule(0, edge_tr_end_code(), edge_tr_sn_var());
     }
 }
 
@@ -38905,7 +39254,8 @@ void edge_hi_rush_loop()
     if (global19 != 0 && global18 == 0)    // landed mid-rush
     {
         // f_164c0: within landing_fall_special_angle (25) of straight down -> f_16820 + landing
-        if (func_13(vx) + func_13(vy) > 0.0001f && edge_hi_angle(0.0f, -1.0f, vx, vy) * edge_hi_deg() <= 25.0f)
+        if (func_13(vx) + func_13(vy) > 0.0001f && edge_hi_angle(0.0f, -1.0f, vx, vy) * edge_hi_deg() <= 25.0f
+            && edge_hi_held() == 0)        // held Octaslash goes on along the floor (test 127)
         {
             KineticModule(0x11, 0x3, vx * 0.25f, 0.0f);   // landing_speed_x_mul (both 0.25)
             func_16(0x19, 0);
@@ -38921,6 +39271,19 @@ void edge_hi_rush_loop()
     }
     if (edge_hi_charged)
     {
+        if (WorkModuleF(0, edge_hi_pass_var()) == 3.0f)
+        {
+            // a shape made: the end now, its finisher pulling toward him (SpecialHi2End's hits at angle 366 for VAR_20 3)
+            if (global18 == 0)
+            {
+                edge_hi_to_end(0);
+            }
+            else
+            {
+                edge_hi_to_end(0x1);
+            }
+            return;
+        }
         edge_hi_link();
         if ((float)edge_hi_count >= 15.0f && edge_hi_held() && WorkModuleF(0, edge_hi_timer_var()) > 0.0f
             && WorkModuleF(0, edge_hi_total_var()) < edge_hi_loop_max())
@@ -39045,6 +39408,26 @@ void edge_hi_rush_speed()
         if (nx == 0.0f && ny == 0.0f)
         {
             ny = 1.0f;
+        }
+        if (edge_hi_held())
+        {
+            // held Octaslash on the floor: along it the way the aim goes (its x), the aim kept, so steering up takes
+            // him off it (test 127, the user: on the ground he "can only move forward until leaving the edge": the aim
+            // was set to the floor's way every frame, so the steering never got anywhere)
+            dx = ny;
+            dy = -nx;
+            if (edge_hi_rx * dx + edge_hi_ry * dy < 0.0f)
+            {
+                dx = -dx;
+                dy = -dy;
+            }
+            if (func_13(edge_hi_rx * ny - edge_hi_ry * nx) < 0.1f)
+            {
+                dx = 0.0f;                 // aimed straight into it: still
+                dy = 0.0f;
+            }
+            edge_hi_rush_set(dx, dy, edge_hi_rush_m());
+            return;
         }
         dx = ny * lr;
         dy = -nx * lr;

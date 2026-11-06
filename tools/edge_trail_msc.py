@@ -22,7 +22,16 @@ Sephiroth (edge.c edge_tr_*) talks to the articles through his shared variables 
     SUM1 / SUM2 / SUM3: the marked points' x / y, x^2 / y^2, x y added to 5 / 4 (5) (each point once: a stretch's
     first point is the stretch before's last, counted there);
     COMMIT: 5 the shape's middle: the pieces with a marked end go (the line) and fill (the wedges).
-  An article keeps testing and answering after its trail is over (old lines make shapes too), but takes no points.
+      JQ X Y (-(3000 + X x 16 + Y) - 0.5): a junction between trails (blocks) X and Y: an article of either with one
+    writes X's piece in 5 and Y's in 4 (test 127: shapes of three or four lines).
+      EXTENT (-(4000 + t) - 0.5, t the fitted axis in 128ths of 180 degrees; 4200 + t: of minus): the marked points'
+    furthest along the axis into 5 and across it into 4 (the larger kept): the shape's box, its hitbox at least 1.2 x
+    it.
+  An article keeps testing and answering after its trail is over (old lines make shapes too), but takes no points. A
+  crossing with another trail's piece is kept as a junction (its piece, the other's number: JUNCTIONS at most).
+  -2 ends a trail that doesn't stay (held Octaslash's, test 127): its articles go once their fill is over. A new Blade
+  Dash trail (block 1 - 14; Octaslash's is 15) puts out the trails KEEP or more before it (the user: "delete the oldest
+  line if a new line has been made after the 6th line").
 Its trail's points are taken while their number follows its last and are within its stretch. Removed after LIFE
 frames, or once all its pieces are gone and its fill is over.
 
@@ -36,7 +45,10 @@ EDGE = os.path.join(ROOT, 'fighters', 'edge')
 POINTS = 16
 LIFE = 360          # the user: "persists for 6 seconds"
 SUM1, SUM2, SUM3, COMMIT = -1001.5, -1002.5, -1003.5, -1004.5
-FILL_DELAY, FILL_GROW, FILL_HOLD, FILL_END = 12, 8, 40, 50    # as the fill article's (tools/edge_fill_msc.py)
+FILL_DELAY, FILL_GROW, FILL_HOLD, FILL_END = 12, 8, 40, 50    # the glow; the fill article hits from 4 to FILL_END (edge_fill_msc.py)
+FILL_SCALE = 1.2    # the fill drawn this much bigger than the shape (test 127, the user: "at least 1.2x the size")
+JUNCTIONS = 4
+KEEP = 6
 C_BONE, W_BONE, A_BONE = 2, 3, 3 + POINTS                     # bones: TopN, HaveN, C, W0 - W15, A0 / B0 ... A14 / B14
 
 
@@ -59,6 +71,9 @@ int tr_mark;            // points marked for the shape being asked (bit k: point
 int tr_gone;            // pieces gone (bit k: piece k, points k - k + 1)
 int tr_fill;            // pieces filling the shape (bit k)
 int tr_ft;              // frames since the fill began (-1 none)
+int tr_vanish;          // 1: its trail doesn't stay (held Octaslash's): it goes once its fill is over
+float tr_lr;            // its facing as made (its model's +Z is the world's +X x this: test 127, a line turned the
+                        // wrong way when he faced left; tests 124 - 126 set the facing to 1, which didn't turn it)
 float tr_cx;            // the fill's middle
 float tr_cy;
 float tr_ox;            // its first point (where it stands)
@@ -69,6 +84,7 @@ float tr_sx;            // the newest point seen
 float tr_sy;
 ''' % (POINTS, LIFE)
     head += ''.join('float tr_x%d;\nfloat tr_y%d;\n' % (k, k) for k in range(POINTS))
+    head += ''.join('int tr_jk%d;\nint tr_jn%d;\n' % (k, k) for k in range(JUNCTIONS))
     body = r'''
 int tr_points() { return POINTS_N; }
 
@@ -109,6 +125,88 @@ int tr_has(int mask, int k)
         return 0x1;
     }
     return 0;
+}
+
+// junction j: its piece (-1 none) / the other trail's piece number
+int tr_get_jk(int k)
+{
+GETJK
+    return -1;
+}
+
+int tr_get_jn(int k)
+{
+GETJN
+    return 0;
+}
+
+void tr_set_j(int k, int p, int n)
+{
+SETJ
+}
+
+// a crossing with another trail kept (its piece p, the other's piece number n), once
+void tr_junction(int p, int n)
+{
+    int k;
+    k = 0;
+    while (k < JUNC_N)
+    {
+        if (tr_get_jk(k) == p && tr_get_jn(k) / 0x400 == n / 0x400)
+        {
+            return;
+        }
+        k = k + 1;
+    }
+    k = 0;
+    while (k < JUNC_N)
+    {
+        if (tr_get_jk(k) < 0)
+        {
+            tr_set_j(k, p, n);
+            return;
+        }
+        k = k + 1;
+    }
+}
+
+// JQ X Y: its junctions with the other one's trail: X's piece number in 5, Y's in 4
+void tr_junctions(int x, int y)
+{
+    int b;
+    int k;
+    int o;
+    b = tr_base / 0x400;
+    if (b == x)
+    {
+        o = y;
+    }
+    else if (b == y)
+    {
+        o = x;
+    }
+    else
+    {
+        return;
+    }
+    k = 0;
+    while (k < JUNC_N)
+    {
+        if (tr_get_jk(k) >= 0 && tr_get_jn(k) / 0x400 == o)
+        {
+            if (b == x)
+            {
+                tr_share(0x5, (float)(tr_base + tr_get_jk(k)));
+                tr_share(0x4, (float)tr_get_jn(k));
+            }
+            else
+            {
+                tr_share(0x5, (float)tr_get_jn(k));
+                tr_share(0x4, (float)(tr_base + tr_get_jk(k)));
+            }
+        }
+        k = k + 1;
+    }
 }
 
 int tr_find_owner()
@@ -172,7 +270,7 @@ int tr_cross(float ax, float ay, float bx, float by, float cx, float cy, float d
     d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
     d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
     d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
-    if ((d1 > 0.0f && d2 < 0.0f || d1 < 0.0f && d2 > 0.0f) && (d3 > 0.0f && d4 < 0.0f || d3 < 0.0f && d4 > 0.0f))
+    if ((d1 >= 0.0f && d2 < 0.0f || d1 < 0.0f && d2 >= 0.0f) && (d3 >= 0.0f && d4 < 0.0f || d3 < 0.0f && d4 >= 0.0f))
     {
         return 0x1;
     }
@@ -201,6 +299,10 @@ void tr_test(float x, float y, int num)
                 {
                     tr_share(0x4, -(float)(tr_base + k));
                 }
+                if (same == 0)
+                {
+                    tr_junction(k, num - 1);
+                }
             }
         }
         k = k + 1;
@@ -215,6 +317,61 @@ int tr_counts(int k)
         return 0x1;
     }
     return 0;
+}
+
+// sin by its series (no sin in MSC; edge.c edge_tr_sin the same), x folded into -pi/2 .. pi/2
+float tr_sin(float x)
+{
+    float x2;
+    if (x > 1.5707963f)
+    {
+        x = 3.1415927f - x;
+    }
+    if (x < -1.5707963f)
+    {
+        x = -3.1415927f - x;
+    }
+    x2 = x * x;
+    return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f)));
+}
+
+// EXTENT (-(4000 + t) - 0.5; 4200 + t: of minus): the marked points' furthest along the axis at t x 180 / 128 degrees
+// (into 5) and across it (into 4), the larger kept
+void tr_extent(int c)
+{
+    float sg;
+    float co;
+    float si;
+    float u;
+    float w;
+    int k;
+    sg = 1.0f;
+    if (c >= 200)
+    {
+        c = c - 200;
+        sg = -1.0f;
+    }
+    u = (float)c * 0.0245437f;
+    co = tr_sin(1.5707963f - u);
+    si = tr_sin(u);
+    k = 0;
+    while (k < tr_n)
+    {
+        if (tr_has(tr_mark, k))
+        {
+            u = sg * (tr_get_x(k) * co + tr_get_y(k) * si);
+            w = sg * (tr_get_y(k) * co - tr_get_x(k) * si);
+            if (u > tr_shared(0x5))
+            {
+                tr_share(0x5, u);
+            }
+            if (w > tr_shared(0x4))
+            {
+                tr_share(0x4, w);
+            }
+        }
+        k = k + 1;
+    }
 }
 
 // a step of a shape asked (shared 6 = v): mark, a sum, or the commit
@@ -310,8 +467,12 @@ void tr_take()
         return;
     }
     v = tr_shared(0x6);
-    if (v == -1.0f)
+    if (v == -1.0f || v == -2.0f)
     {
+        if (tr_over_t == 0 && v == -2.0f)
+        {
+            tr_vanish = 0x1;
+        }
         tr_over_t = 0x1;
         return;
     }
@@ -321,12 +482,29 @@ void tr_take()
         {
             tr_answer(v);
         }
+        if (v <= -4000.0f && v >= -4328.0f)
+        {
+            tr_extent((int)(-v) - 4000);
+        }
+        if (v <= -3000.0f && v >= -3256.0f)
+        {
+            num = (int)(-v) - 3000;
+            tr_junctions(num / 0x10, num - (num / 0x10) * 0x10);
+        }
         return;
     }
     num = (int)v;
     if (num < 0x400 || num == tr_seen)
     {
         return;                 // not a trail's (the snake sword's runs share these), or seen
+    }
+    // a new Blade Dash trail KEEP_N or more after this one's: this one goes
+    if (num / 0x400 <= 0xe && tr_base / 0x400 <= 0xe && num / 0x400 != tr_base / 0x400
+        && (num / 0x400 - tr_base / 0x400 + 0xe) - ((num / 0x400 - tr_base / 0x400 + 0xe) / 0xe) * 0xe >= KEEP_N)
+    {
+        tr_vanish = 0x1;
+        tr_over_t = 0x1;
+        tr_gone = tr_bit(tr_points()) - 1;
     }
     tr_unpack(tr_shared(0x5));
     if (num == tr_seen + 1)
@@ -373,7 +551,7 @@ float tr_grow()
 
 void tr_joint(int bone, float x, float y)
 {
-    ModelModule(0x7, 0x7d0 + bone, 0, y - tr_oy, x - tr_ox);
+    ModelModule(0x7, 0x7d0 + bone, 0, y - tr_oy, (x - tr_ox) * tr_lr);
 }
 
 // the joints: the line's pieces still drawn between their points (gone / not yet: both ends on its start), the fill's
@@ -385,7 +563,6 @@ void tr_pose()
     float t;
     float cx;
     float cy;
-    PostureModule(0, 1.0f);
     PostureModule(0x2714, tr_ox, tr_oy, PostureModuleF(0x3));
     k = 0;
     while (k < tr_points() - 1)
@@ -408,7 +585,7 @@ void tr_pose()
     cy = tr_oy;
     if (tr_ft >= 0)
     {
-        t = tr_grow();
+        t = tr_grow() * SCALE_V;
         cx = tr_cx;
         cy = tr_cy;
     }
@@ -440,7 +617,7 @@ int tr_over()
             tr_fill = 0;
         }
     }
-    if (tr_life <= 0 || tr_slot < 0
+    if (tr_life <= 0 || tr_slot < 0 || tr_vanish && tr_ft < 0
         || tr_over_t && tr_ft < 0 && tr_n > 1 && tr_gone == tr_bit(tr_n - 1) - 1)
     {
         BattleObject(0x9);      // its time's up, or all its pieces are gone and its fill is over
@@ -451,6 +628,7 @@ int tr_over()
 
 void func_46()
 {
+    int k;
     tr_slot = tr_find_owner();
     tr_life = LIFE_N;
     tr_n = 0;
@@ -459,6 +637,18 @@ void func_46()
     tr_gone = 0;
     tr_fill = 0;
     tr_ft = -1;
+    tr_vanish = 0;
+    tr_lr = PostureModuleF(0);
+    if (tr_lr == 0.0f)
+    {
+        tr_lr = 1.0f;
+    }
+    k = 0;
+    while (k < JUNC_N)
+    {
+        tr_set_j(k, -1, 0);
+        k = k + 1;
+    }
     tr_ox = PostureModuleF(0x1);
     tr_oy = PostureModuleF(0x2);
     tr_base = 0;
@@ -496,12 +686,15 @@ void func_47()
 '''
     reps = {'POINTS_N': POINTS, 'LIFE_N': LIFE, 'DELAY_N': FILL_DELAY, 'GROW_N': FILL_GROW, 'HOLD_N': FILL_HOLD,
             'END_N': FILL_END, 'A_BONE_N': A_BONE, 'C_BONE_N': C_BONE, 'W_BONE_N': W_BONE,
-            'COMMIT_V': '%.1ff' % COMMIT, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
+            'COMMIT_V': '%.1ff' % COMMIT, 'JUNC_N': JUNCTIONS, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
     for k, v in sorted(reps.items(), key=lambda kv: -len(kv[0])):
         body = body.replace(k, str(v))
     body = (body.replace('GETX', ifchain('        return tr_x#;'))
             .replace('GETY', ifchain('        return tr_y#;'))
-            .replace('SETXY', ifchain('        tr_x# = x;\n        tr_y# = y;')))
+            .replace('SETXY', ifchain('        tr_x# = x;\n        tr_y# = y;'))
+            .replace('GETJK', ifchain('        return tr_jk#;', JUNCTIONS))
+            .replace('GETJN', ifchain('        return tr_jn#;', JUNCTIONS))
+            .replace('SETJ', ifchain('        tr_jk# = p;\n        tr_jn# = n;', JUNCTIONS)))
     return base + head + body
 
 

@@ -1029,6 +1029,22 @@ def check_weapon_facing(name, rep):
                     '(PostureModule(0, lr)): fighters it hits are left facing the camera' % os.path.relpath(path, ROOT))
 
 
+def check_weapon_joint_facing(name, rep):
+    """W9: a weapon MSC that moves its model's joints (ModelModule(0x7, ...)) and sets its facing to a constant
+    (PostureModule(0, 1.0f)): that doesn't turn its model (made facing left, it stays drawn mirrored), so joint offsets
+    meant in world X come out the wrong way (Sephiroth test 127, the user: up special's line "goes the wrong way if the
+    move was turned after the start"); keep the facing it was made with (PostureModuleF(0)) and multiply the X offsets
+    by it"""
+    for path in sorted(glob.glob(os.path.join(ROOT, 'fighters', name, 'weapons', '*.c'))):
+        text = open(path, errors='replace').read()
+        own = text.split("// ---- ", 1)[-1] if "// ---- " in text else text   # its own code, not the base's
+        if 'ModelModule(0x7,' in own and re.search(r'PostureModule\(0, -?[0-9.]+f?\)', own):
+            rep.add('WARN', 'W9 weapon-joint-facing', '%s: moves its joints and sets a constant facing '
+                    '(PostureModule(0, 1.0f)): its model isn\'t turned by it, so world-X joint offsets come out '
+                    'mirrored when made facing left; use its facing as made (PostureModuleF(0)) on the X offsets'
+                    % os.path.relpath(path, ROOT))
+
+
 def check_weapon_owner(inst, name, rec, rep):
     """W7: a weapon MSC written for an article (fighters/NAME/weapons/X.c, shipped as script/msc/X/X.mscsb; helper
     files compiled into others' aren't) that isn't one of
@@ -1514,6 +1530,7 @@ def main():
     check_weapon_parts(inst, a.name, rec, rep)
     check_weapon_motion(inst, a.name, rec, rep)
     check_weapon_facing(a.name, rep)
+    check_weapon_joint_facing(a.name, rep)
     check_weapon_owner(inst, a.name, rec, rep)
     check_weapon_instances(a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)

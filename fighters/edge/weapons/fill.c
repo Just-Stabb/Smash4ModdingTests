@@ -601,6 +601,7 @@ float fi_y;
 float fi_t;             // its long axis' angle (degrees)
 float fi_a;             // its half axes
 float fi_b;
+float fi_lr;            // its facing as made (test 127: setting it to 1 didn't turn its model)
 float fi_px;            // fi_unpack's result
 float fi_py;
 
@@ -696,14 +697,21 @@ void fi_still()
     KineticModule(0xf, 0, 0, 0);
 }
 
-// along the long axis: facing 1 (its +Z the world's +X), pitched up by the angle; the joints spread along +Z
+// along the long axis: its +Z is the world's +X x its facing, pitched up by the angle (from its facing's side: 180 -
+// the angle facing left); the joints spread along +Z
 void fi_pose()
 {
     int k;
     float h;
-    PostureModule(0, 1.0f);
     PostureModule(0x2714, fi_x, fi_y, PostureModuleF(0x3));
-    PostureModule(0x2717, -fi_t, 0, 0);
+    if (fi_lr > 0.0f)
+    {
+        PostureModule(0x2717, -fi_t, 0, 0);
+    }
+    else
+    {
+        PostureModule(0x2717, -(180.0f - fi_t), 0, 0);
+    }
     h = fi_a - fi_b;
     k = 0;
     while (k < 5)
@@ -719,6 +727,8 @@ void func_46()
     int ia;
     fi_slot = fi_find_owner();
     fi_frame = 0;
+    fi_lr = PostureModuleF(0);
+    PostureModule(0, fi_lr);           // its facing set (its own: no turn), so fighters it hits face it (port_check W6)
     fi_x = PostureModuleF(0x1);
     fi_y = PostureModuleF(0x2);
     fi_t = 0.0f;
@@ -747,16 +757,16 @@ void func_46()
 void func_47()
 {
     fi_frame = fi_frame + 1;
-    if (fi_frame >= 12 + 8 + 4 + 2 || fi_slot < 0)
+    if (fi_frame >= 50 + 2 || fi_slot < 0)
     {
         BattleObject(0x9);
         return 0x1;
     }
-    if (fi_frame == 12 + 8)
+    if (fi_frame == 4)
     {
         func_24(0x1, 0, 1.0f);             // the hitbox (the script's frame 0)
     }
-    if (fi_frame == 12 + 8 + 4)
+    if (fi_frame == 50)
     {
         func_24(0, 0, 1.0f);               // hitboxes off
     }

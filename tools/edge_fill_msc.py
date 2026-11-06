@@ -7,10 +7,11 @@ A `fill` article is made by Sephiroth (edge.c edge_tr_*) when a shape closes, at
 (packed: (x + 512) x 2 x 2048 + (y + 512) x 2), shared 4 the ellipse fitted to its points (angle x 65536 + a x 256 + b:
 the angle 0 - 127 for 0 - 180 degrees, the half axes a >= b in half units), read as it's made. The shape itself (its
 glow) is drawn by the trail articles (tools/edge_trail_msc.py). The fill turns along the long axis and puts its joints
-J0 - J4 (0x7D2 - 0x7D6) along it, from -(a - b) to a - b; at frame DELAY + GROW (when the shape has grown in) its
-hitbox motion (edge_specials_build.py fill_scripts: a sphere on each joint, its size by b and its damage / knockback by
-the shape's size, from its own VAR_0 / VAR_1) for HIT frames: "a hitbox slightly larger than the shape formed, the
-damage and knockback scaling with the size of the shape".
+J0 - J4 (0x7D2 - 0x7D6) along it, from -(a - b) to a - b; from frame HIT_START to HIT_END (test 127, the user: "make
+the hitbox ... happen on frame 4, and linger until the effect fades": the trail articles' fill is gone at their
+FILL_END) its hitbox motion (edge_specials_build.py fill_scripts: a sphere on each joint, its size by b and its damage /
+knockback by the shape's size, from its own VAR_0 / VAR_1; one hit a fighter): "a hitbox slightly larger than the shape
+formed, the damage and knockback scaling with the size of the shape".
 
   python3 tools/edge_fill_msc.py
 """
@@ -19,9 +20,8 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 EDGE = os.path.join(ROOT, 'fighters', 'edge')
-DELAY = 12
-GROW = 8
-HIT = 4
+HIT_START = 4
+HIT_END = 50        # tools/edge_trail_msc.py FILL_END: the fill's glow gone
 SPHERES = 5
 SIZE_TIERS = (5.0, 8.0, 12.0, 17.0)       # b up to (tiers 1 - 4; 5 past): edge_specials_build.FILL_SIZES
 DAMAGE_TIERS = (8.0, 13.0, 19.0, 26.0)    # sqrt(a b) up to: edge_specials_build.FILL_DAMAGE
@@ -40,6 +40,7 @@ float fi_y;
 float fi_t;             // its long axis' angle (degrees)
 float fi_a;             // its half axes
 float fi_b;
+float fi_lr;            // its facing as made (test 127: setting it to 1 didn't turn its model)
 float fi_px;            // fi_unpack's result
 float fi_py;
 
@@ -105,14 +106,21 @@ void fi_still()
     KineticModule(0xf, 0, 0, 0);
 }
 
-// along the long axis: facing 1 (its +Z the world's +X), pitched up by the angle; the joints spread along +Z
+// along the long axis: its +Z is the world's +X x its facing, pitched up by the angle (from its facing's side: 180 -
+// the angle facing left); the joints spread along +Z
 void fi_pose()
 {
     int k;
     float h;
-    PostureModule(0, 1.0f);
     PostureModule(0x2714, fi_x, fi_y, PostureModuleF(0x3));
-    PostureModule(0x2717, -fi_t, 0, 0);
+    if (fi_lr > 0.0f)
+    {
+        PostureModule(0x2717, -fi_t, 0, 0);
+    }
+    else
+    {
+        PostureModule(0x2717, -(180.0f - fi_t), 0, 0);
+    }
     h = fi_a - fi_b;
     k = 0;
     while (k < SPHERES_N)
@@ -128,6 +136,8 @@ void func_46()
     int ia;
     fi_slot = fi_find_owner();
     fi_frame = 0;
+    fi_lr = PostureModuleF(0);
+    PostureModule(0, fi_lr);           // its facing set (its own: no turn), so fighters it hits face it (port_check W6)
     fi_x = PostureModuleF(0x1);
     fi_y = PostureModuleF(0x2);
     fi_t = 0.0f;
@@ -156,16 +166,16 @@ void func_46()
 void func_47()
 {
     fi_frame = fi_frame + 1;
-    if (fi_frame >= DELAY_N + GROW_N + HIT_N + 2 || fi_slot < 0)
+    if (fi_frame >= HIT_END_N + 2 || fi_slot < 0)
     {
         BattleObject(0x9);
         return 0x1;
     }
-    if (fi_frame == DELAY_N + GROW_N)
+    if (fi_frame == HIT_START_N)
     {
         func_24(0x1, 0, 1.0f);             // the hitbox (the script's frame 0)
     }
-    if (fi_frame == DELAY_N + GROW_N + HIT_N)
+    if (fi_frame == HIT_END_N)
     {
         func_24(0, 0, 1.0f);               // hitboxes off
     }
@@ -173,7 +183,7 @@ void func_47()
     fi_pose();
 }
 '''
-    for k, v in (('SPHERES_N', SPHERES), ('DELAY_N', DELAY), ('GROW_N', GROW), ('HIT_N', HIT)):
+    for k, v in (('SPHERES_N', SPHERES), ('HIT_START_N', HIT_START), ('HIT_END_N', HIT_END)):
         body = body.replace(k, str(v))
     return base + body.replace('ST\n', st + '\n', 1).replace('DT\n', dt + '\n', 1)
 

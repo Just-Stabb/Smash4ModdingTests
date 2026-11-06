@@ -1831,3 +1831,42 @@ the closed shape was made of" and "please make the held octaslash loop hits do 0
   `script/animcmd/body/game.bin`, `script/animcmd/weapon/fill/`, `script/msc/edge.mscsb`, `trail/trail.mscsb`,
   `fill/fill.mscsb`.
 
+
+## Test 127 (`build/sephiroth_test127.zip`): shapes of 3 or 4 lines; Blade Dash lines stay (6 at most), Octaslash's go; Octaslash 0.14%, no blast-zone KOs, a shape ends it; fixes
+
+User (two clips): "Can you make shapes enclosed by 3 or more lines work? Also only make Blade Dash lines persist after
+use, not held Octaslash's lines. The effect and hitbox should be at least 1.2x the size of the shape. Please reduce held
+Octaslash's multihit damage to 0.14% per hit and make opponents hit by it unable to be KO'd by the blast zone during the
+duration of the entire attack, including the ending hit. Blade Dash's lines should follow where Sephiroth landed if he
+lands during the move ... also please delete the oldest line if a new line has been made after the 6th line. There is a
+bug where the lines don't actually check Sephiroth's facing direction, resulting in a line that goes the wrong way if the
+move was turned after the start. When a shape is complete, please force Sephiroth to end Octaslash with the finisher hit
+angle that sends towards him, inside the shape. There's one other bug, if Octaslash is held on the ground, or while
+going towards the ground, Sephiroth loses control and can only move forward until leaving the edge". Then "Also please
+make up special's air count reset on respawn" and "make the hitbox happen for the shape being formed happen on frame 4,
+and linger until the effect fades".
+- **Shapes of 3 / 4 lines:** a crossing with another trail is kept by the crossed article as a junction; crossing old
+  trail Y after old trail X, Sephiroth asks for a junction X - Y (a triangle) or X - Z - Y through one of the last 6
+  Blade Dash trails (four sides). The crossing test now counts lines meeting exactly at a point (it missed them).
+- **Size:** fill drawn 1.2x the shape; the hitbox's half axes are 1.2x the fitted ellipse's or 1.2x the points'
+  extents along / across it, the larger (two new steps ask the articles for the extents), so a triangle's corners
+  count. **Hitbox from the fill's frame 4 to 50** (the glow's end; was 20 - 23), one hit a fighter.
+- **Lines:** Blade Dash's stay (blocks 1 - 14), a new one puts out those 6 or more before it; held Octaslash's
+  (block 15) go once their fill is over. The landing's last piece is taken (the trail's end is written a frame after
+  its last point). Each article draws with its facing as made (the wrong-way line).
+- **Octaslash:** held loop hits 0.14%; while charged (rush and end) every fighter in hitstun is kept inside the blast
+  zones (15 from the sides / bottom, 30 under the top); a shape made during it ends the rush into the finisher at
+  angle 366 (toward the hitbox). Held on the ground it moves along the floor by the aim (back too) and lifts off when
+  steered up (it only went forward).
+- **Air use** back on Dead / Rebirth.
+- port_check found a new W6 on `fill.c` (it turns itself without setting its facing: fighters it hits face the
+  camera); fixed (it sets its own facing).
+- New check `port_check` W9 weapon-joint-facing (and a guide catalogue row) for the wrong-way line: an article that
+  moves its joints and sets a constant facing (it doesn't turn its model). It flags test 126's trail; clean now.
+- Modelled in `tools/edge_trail_sim.py`: loop, U, ellipse, triangle, rectangle and the landing point, both update orders
+  (it found the junction search losing its number when the trail ended mid-search: fixed, VAR_11 keeps it). Not tested
+  in game. Approximated: shapes of five or more trails aren't found; after the end status, Octaslash's victims can be
+  carried out by the finisher's knockback.
+- port_check over the chain, tests 70–115 and 117–127: 30 errors, 55 warnings, as before.
+- Package (install over 126): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`, `trail/trail.mscsb`,
+  `fill/fill.mscsb`.
