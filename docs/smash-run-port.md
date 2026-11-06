@@ -420,6 +420,25 @@ motion / visibility pac names (taken from the fighters'), the effect IDs.
   EnemyCreateParam 0x3C bytes: +0 kind, +4 variation, +8 f 1.0, +0xC/+0x10/+0x14 position, +0x18 f -1.0, +0x1C u8,
   +0x20 s32 2, +0x24/+0x28/+0x30 f, +0x2C/+0x34 s32, +0x38-0x3B flags (+0x3A cost limit).
 
+## Step 1: the button and enemies on the field
+
+`tools/smashrun_menu.py` (Games & More button) and `tools/smashrun_field_cave.py` (enemies), tests
+`tools/smashrun_menu_test.py` / `tools/smashrun_field_test.py` (0 failures each; Training 0 CPUs and the stage slots
+still pass on the same executable). Not yet run in game.
+- **Button** (docs/games-and-more-menu.md): on the user's own Games & More (a UI mod: btn_08 was an empty shape at
+  x 5000) a copy of the Group button at (1460, 496), "Smash Run" in the titles' style and a star (the 3DS menu's
+  Smash Run icon); the 8th button registered by a cave (0x029ABC68: button 8, result 7, id 115), result 7 posting
+  Training's menu key (0x31) instead of the spare 0x5B. Pick a fighter, the Smash Run Field stage and 0 CPUs.
+- **Enemies on every Smash Run stage** (0x82-0x95): the game's own enemy system as Classic's Master Fortress uses
+  it, category sm, with the four Fortress minions (the Smash Run enemies the Wii U has AI for): Plasma Wisp,
+  Darios, Stalfos, Zima, one every 150 frames beside the player in turn, at most 6 alive. Hooks: 0x02D9E2DC (make
+  the EnemyManager), 0x02D99FF8 (category 2), 0x02D9A568 (request the kinds' resources), 0x02D9B6F8 (spawner,
+  in the manager's per-frame update). Cave 0x04B7D100-0x04B7E000.
+- Open: whether the minions' appear effect / sound load outside the Fortress (0x02DB3574; missing would only mean
+  no effect); whether the manager's update runs during pause; memory on the large field; Classic's counter object
+  0x10352470 (set up only by the Fortress round) left alone. Next: Smash Run's own enemies (generic AI on the
+  converted models, motions and scripts), power-ups, the 5-minute timer and the final battle.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

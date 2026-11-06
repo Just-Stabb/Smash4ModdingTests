@@ -80,7 +80,8 @@ def assemble():
     cave_a:
         cmpwi r0, 3
         beq.far yes_a
-        addi r12, r0, -0x%X
+        mr r12, r0                  # (addi rD, r0, x reads 0, not r0)
+        addi r12, r12, -0x%X
         cmplwi r12, 0x%X
         ble.far yes_a
         b 0x02D9E2FC

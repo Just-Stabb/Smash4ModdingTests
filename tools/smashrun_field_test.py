@@ -86,6 +86,8 @@ class Machine:
         for k, v in regs.items():
             self.uc.reg_write(R[k], v)
         self.uc.reg_write(R[1], STACK)
+        from unicorn.ppc_const import UC_PPC_REG_MSR
+        self.uc.reg_write(UC_PPC_REG_MSR, self.uc.reg_read(UC_PPC_REG_MSR) | 0x2000)    # FP available
         self.uc.emu_start(start, stop, count=5000)
 
 

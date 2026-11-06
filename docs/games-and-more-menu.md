@@ -1,6 +1,7 @@
 # Games & More menu (ui/lumen/other, MenuViewOtherScene)
 
-Found for the Smash Run button (user: put it in the empty space on the right). Not yet in game.
+Found for the Smash Run button (user: put it in the empty space on the right). Built by tools/smashrun_menu.py on
+the user's modded other.lm (docs/smash-run-port.md, "Step 1"); rendered with tools/lm_render.py. Not yet in game.
 
 ## Layout (vanilla other.lm, 1920x1080)
 Root places bg_base_mc_anim, btn_01..btn_07 (character 108) and hit_01..hit_07 (character 111, a 32x32 shape: a
