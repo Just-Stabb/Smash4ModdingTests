@@ -598,9 +598,12 @@ void func_48()
 int tr_slot;            // his player slot (0 - 7), -1: not found
 int tr_life;            // frames left
 int tr_base;            // its first point's number
-int tr_last;            // the number of the last point taken
+int tr_seen;            // the newest point's number seen
 int tr_n;               // points taken
-int tr_done;            // 1: it takes no more
+int tr_stale;           // 1: the trail it belongs to is over: it does nothing more
+int tr_answered;        // the last query answered
+float tr_sx;            // the newest point seen
+float tr_sy;
 float tr_ox;            // its first point (where it stands)
 float tr_oy;
 float tr_px;            // tr_unpack's result
@@ -907,27 +910,121 @@ void tr_unpack(float v)
     tr_py = (float)(c - ix * 0x800) * 0.5f - 512.0f;
 }
 
-// his newest point (shared 5, its number shared 6), if it's new and within this stretch
+// 1 if the pieces (ax, ay) - (bx, by) and (cx, cy) - (dx, dy) cross (properly: not at an end)
+int tr_cross(float ax, float ay, float bx, float by, float cx, float cy, float dx, float dy)
+{
+    float d1;
+    float d2;
+    float d3;
+    float d4;
+    d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+    d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+    d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+    if ((d1 > 0.0f && d2 < 0.0f || d1 < 0.0f && d2 > 0.0f) && (d3 > 0.0f && d4 < 0.0f || d3 < 0.0f && d4 > 0.0f))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// the newest piece (tr_sx, tr_sy) - (x, y), number num - 1 - num, against this stretch's own pieces not next to it: a
+// crossing at piece m (its start's number) is reported in shared 4 as -m, the latest m kept
+void tr_test(float x, float y, int num)
+{
+    int k;
+    int m;
+    float r;
+    k = 0;
+    while (k < tr_n - 1 && tr_base + k + 1 <= num - 2)
+    {
+        if (tr_cross(tr_sx, tr_sy, x, y, tr_get_x(k), tr_get_y(k), tr_get_x(k + 1), tr_get_y(k + 1)))
+        {
+            m = tr_base + k;
+            r = tr_shared(0x4);
+            if (r > -1000.0f || (float)m > -r)
+            {
+                WorkModule(0, -(float)m, 0x0f000340 + 0x8 * tr_slot + 0x4);
+            }
+        }
+        k = k + 1;
+    }
+}
+
+// a query (shared 6 = start x 512 + count + 0.5): its points numbered start .. start + count - 1 added to shared 5 (x)
+// and 4 (y), once
+void tr_answer(float v)
+{
+    int code;
+    int st;
+    int cnt;
+    int k;
+    float sx;
+    float sy;
+    code = (int)v;
+    if (code == tr_answered)
+    {
+        return;
+    }
+    tr_answered = code;
+    st = code / 0x200;
+    cnt = code - st * 0x200;
+    sx = 0.0f;
+    sy = 0.0f;
+    k = 0;
+    while (k < tr_n)
+    {
+        // its first point is the stretch before's last: counted there (but the trail's first)
+        if (tr_base + k >= st && tr_base + k < st + cnt && (k > 0 || tr_base == 1000))
+        {
+            sx = sx + tr_get_x(k);
+            sy = sy + tr_get_y(k);
+        }
+        k = k + 1;
+    }
+    WorkModule(0, tr_shared(0x5) + sx, 0x0f000340 + 0x8 * tr_slot + 0x5);
+    WorkModule(0, tr_shared(0x4) + sy, 0x0f000340 + 0x8 * tr_slot + 0x4);
+}
+
+// every frame: stale once the trail's over; a query answered; a new point tested against its pieces, and taken if it's
+// this stretch's next
 void tr_take()
 {
+    float v;
     int num;
-    if (tr_done || tr_slot < 0)
+    if (tr_stale || tr_slot < 0)
     {
         return;
     }
-    num = (int)tr_shared(0x6);
-    if (num > tr_last && num <= tr_base + tr_points() - 1 && tr_n < tr_points())
+    v = tr_shared(0x6);
+    if (v < 0.0f)
     {
-        tr_unpack(tr_shared(0x5));
+        tr_stale = 0x1;
+        return;
+    }
+    if (v - (float)((int)v) > 0.25f)
+    {
+        tr_answer(v);
+        return;
+    }
+    num = (int)v;
+    if (num <= tr_seen)
+    {
+        return;
+    }
+    tr_unpack(tr_shared(0x5));
+    if (num == tr_seen + 1)
+    {
+        tr_test(tr_px, tr_py, num);
+    }
+    if (num == tr_base + tr_n && tr_n < tr_points())
+    {
         tr_set(tr_n, tr_px, tr_py);
         tr_n = tr_n + 1;
-        tr_last = num;
-        return;
     }
-    if (tr_shared(0x4) < 0.0f || num >= tr_base + tr_points() - 1 || num < tr_base)
-    {
-        tr_done = 0x1;          // the trail's over (or this stretch is full, or a new trail began)
-    }
+    tr_seen = num;
+    tr_sx = tr_px;
+    tr_sy = tr_py;
 }
 
 void tr_still()
@@ -972,7 +1069,8 @@ void func_46()
     tr_slot = tr_find_owner();
     tr_life = 360;
     tr_n = 0;
-    tr_done = 0;
+    tr_stale = 0;
+    tr_answered = 0;
     tr_ox = PostureModuleF(0x1);
     tr_oy = PostureModuleF(0x2);
     tr_base = 0;
@@ -986,7 +1084,9 @@ void func_46()
     }
     tr_set(0, tr_ox, tr_oy);
     tr_n = 1;
-    tr_last = tr_base;
+    tr_seen = tr_base;
+    tr_sx = tr_ox;
+    tr_sy = tr_oy;
     tr_still();
     tr_pose();
     func_24(0, 0, 1.0f);

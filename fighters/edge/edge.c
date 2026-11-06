@@ -38045,22 +38045,42 @@ void edge_hi_link()
     WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
 }
 
-// ---- the up special trail (tests 123 / 124, the user's concept stage 2: "Tap up and hold up special both leave a purple
-// line trail that persists for 6 seconds following Sephiroth's movement until he begins falling"): his middle's path
-// from the attack's start (the rush) to the air end's first falling frame (or the ground end) as points edge_tr_seg()
-// apart (one a frame at most), numbered from 0. `trail` articles (weapons/trail.c, tools/edge_trail_msc.py) draw it,
-// each a stretch of 16 points (15 pieces) from the one before's last, 360 frames: a new one at points 0, 15, 30, ...
-// His shared 4 / 5 / 6 (VAR_28 - VAR_30: free in up special; Shadow Flare's orbs use 0 - 3, the Phantom 7, the snake
-// runs 0 - 6 only while the sword's out): the last point (-1 while no trail is laid), the newest point, its number;
-// points packed (edge_tr_pack). Test 123 made one article per 8-long piece, 40 at most: the game crashed loading him
+// ---- the up special trail (tests 123 - 125, the user's concept stages 2 and 3: "Tap up and hold up special both leave a
+// purple line trail that persists for 6 seconds following Sephiroth's movement until he begins falling. When multiple
+// lines form a closed shape inside, a purple glow effect that scales with the size of the shape appears 12 frames after,
+// fading in and creating a hitbox slightly larger than the shape formed, the damage and knockback scaling with the size
+// of the shape"): his middle's path from the attack's start (the rush) to the air end's first falling frame (or the
+// ground end) as points edge_tr_seg() apart (one a frame at most), numbered from 1000. `trail` articles
+// (weapons/trail.c, tools/edge_trail_msc.py) draw it, each a stretch of 16 points (15 pieces) from the one before's
+// last, 360 frames: a new one at points 1000, 1015, 1030, ... His shared 4 - 6 (VAR_28 - VAR_30: free in up special;
+// Shadow Flare's orbs use 0 - 3, the Phantom 7, the snake runs 0 - 6 only while the sword's out):
+//   5 the newest point (packed, edge_tr_pack), 6 its number (-1 once the trail's over; during a query, start x 512 +
+//   count + 0.5, 5 and 4 then sums), 4 a closed loop: an article's piece m crossed by the newest piece, -m.
+// A loop (test 125): its points m + 1 .. newest - 1 summed by the articles in one frame (the trail paused for it), their
+// mean its middle, its length / 2 pi its radius; a `fill` article there (weapons/fill.c, tools/edge_fill_msc.py), its
+// place and radius handed over in 5 / 4; after it, only a loop closing on a piece from its end counts (a second lap
+// makes its own loop). His VAR_0 - VAR_5 (the snake runs', free in up special) keep the query. Checked in a model of
+// both (tools/edge_trail_sim.py: a held Octaslash circle, either update order)
+// Test 123 made one article per 8-long piece, 40 at most: the game crashed loading him (64 article slots a fighter:
+// docs/native-notes.md "Article instance cap")
 int   edge_tr_art() { return 0xb; }              // article 11 (Zelda's 0 - 4, fire, flare1, flare2, flash, snake,
-                                                 // snaketip, trail: tools/extra_kinds.json, 6 at most)
+                                                 // snaketip, trail, fill: tools/extra_kinds.json, 12 at most)
+int   edge_tr_fill_art() { return 0xc; }         // article 12, fill (3 at most)
 float edge_tr_seg() { return 4.0f; }             // the points' spacing
 int   edge_tr_per() { return 15; }               // pieces an article draws
 float edge_tr_mid() { return 9.0f; }             // his middle above his feet
-int   edge_tr_last_var() { return 0x0f00031c; }  // VAR_28
-int   edge_tr_new_var() { return 0x0f00031d; }   // VAR_29
-int   edge_tr_num_var() { return 0x0f00031e; }   // VAR_30
+int   edge_tr_cross_var() { return 0x0f00031c; } // VAR_28 (shared 4)
+int   edge_tr_new_var() { return 0x0f00031d; }   // VAR_29 (shared 5)
+int   edge_tr_num_var() { return 0x0f00031e; }   // VAR_30 (shared 6)
+int   edge_tr_q_var() { return 0x0f000300; }     // VAR_0: a query's frames to wait (0 none)
+int   edge_tr_floor_var() { return 0x0f000301; } // VAR_1: a loop counts only if it closes on a piece from here (the
+                                                 // last loop's end: a second lap round makes its own loop, not two)
+int   edge_tr_qn_var() { return 0x0f000302; }    // VAR_2: its count
+int   edge_tr_sp_var() { return 0x0f000303; }    // VAR_3: the newest point, kept through it
+int   edge_tr_sn_var() { return 0x0f000304; }    // VAR_4: its number
+int   edge_tr_cool_var() { return 0x0f000305; }  // VAR_5: frames before another loop counts
+float edge_tr_min_r() { return 4.0f; }           // a loop's radius at least / most
+float edge_tr_max_r() { return 40.0f; }
 
 float edge_tr_pack(float x, float y)
 {
@@ -38104,21 +38124,50 @@ void edge_tr_point(float p, int n)
 {
     WorkModule(0, p, edge_tr_new_var());
     WorkModule(0, (float)n, edge_tr_num_var());
-    WorkModule(0, p, edge_tr_last_var());
-    if (n - (n / edge_tr_per()) * edge_tr_per() == 0)
+    if ((n - 1000) - ((n - 1000) / edge_tr_per()) * edge_tr_per() == 0)
     {
         ArticleModule(0x2710, edge_tr_art());
     }
 }
 
-// the trail starts here (the rush's main): point 0
+// the trail starts here (the rush's main): point 1000
 void edge_tr_begin()
 {
-    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), 0);
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, 0.0f, edge_tr_q_var());
+    WorkModule(0, 0.0f, edge_tr_cool_var());
+    WorkModule(0, 0.0f, edge_tr_floor_var());
+    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), 1000);
 }
 
-// every frame it's laid: a point once he's edge_tr_seg() from the last; `last` puts down what's left (from 1 long) and
-// ends the trail
+// the query's answers in: the loop's middle and radius to a fill article, the trail as it was
+void edge_tr_fill()
+{
+    float n;
+    float r;
+    n = WorkModuleF(0, edge_tr_qn_var());
+    r = (n + 1.0f) * edge_tr_seg() / 6.2832f;
+    if (r < edge_tr_min_r())
+    {
+        r = edge_tr_min_r();
+    }
+    if (r > edge_tr_max_r())
+    {
+        r = edge_tr_max_r();
+    }
+    WorkModule(0, edge_tr_pack(WorkModuleF(0, edge_tr_new_var()) / n, WorkModuleF(0, edge_tr_cross_var()) / n),
+               edge_tr_new_var());
+    WorkModule(0, r, edge_tr_cross_var());
+    ArticleModule(0x2710, edge_tr_fill_art());
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
+    WorkModule(0, 10.0f, edge_tr_cool_var());
+    WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_floor_var());
+}
+
+// every frame it's laid: a loop's query sent / answered, else a point once he's edge_tr_seg() from the last; `last`
+// puts down what's left (from 1 long) and ends the trail
 void edge_tr_step(int last)
 {
     float v;
@@ -38127,11 +38176,53 @@ void edge_tr_step(int last)
     float dx;
     float dy;
     float d;
-    v = WorkModuleF(0, edge_tr_last_var());
-    if (v < 0.0f)
+    float c;
+    int num;
+    int m;
+    int cnt;
+    if (WorkModuleF(0, edge_tr_q_var()) > 0.0f)
+    {
+        WorkModule(0, WorkModuleF(0, edge_tr_q_var()) - 1.0f, edge_tr_q_var());
+        if (WorkModuleF(0, edge_tr_q_var()) <= 0.0f)
+        {
+            edge_tr_fill();
+            if (last)
+            {
+                WorkModule(0, -1.0f, edge_tr_num_var());
+            }
+        }
+        return;                            // the trail waits a frame for the answers
+    }
+    if (WorkModuleF(0, edge_tr_num_var()) < 1000.0f)
     {
         return;
     }
+    if (WorkModuleF(0, edge_tr_cool_var()) > 0.0f)
+    {
+        WorkModule(0, WorkModuleF(0, edge_tr_cool_var()) - 1.0f, edge_tr_cool_var());
+    }
+    // a closed loop reported: its points summed next frame
+    c = WorkModuleF(0, edge_tr_cross_var());
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    num = (int)WorkModuleF(0, edge_tr_num_var());
+    if (c <= -1000.0f && -c >= WorkModuleF(0, edge_tr_floor_var()) && WorkModuleF(0, edge_tr_cool_var()) <= 0.0f
+        && last == 0)
+    {
+        m = (int)(-c);
+        cnt = num - 1 - m;
+        if (cnt >= 3 && cnt < 0x200)
+        {
+            WorkModule(0, WorkModuleF(0, edge_tr_new_var()), edge_tr_sp_var());
+            WorkModule(0, (float)num, edge_tr_sn_var());
+            WorkModule(0, (float)cnt, edge_tr_qn_var());
+            WorkModule(0, 0.0f, edge_tr_new_var());
+            WorkModule(0, 0.0f, edge_tr_cross_var());
+            WorkModule(0, (float)((m + 1) * 0x200 + cnt) + 0.5f, edge_tr_num_var());
+            WorkModule(0, 1.0f, edge_tr_q_var());
+            return;
+        }
+    }
+    v = WorkModuleF(0, edge_tr_new_var());
     x = PostureModuleF(0x1);
     y = PostureModuleF(0x2) + edge_tr_mid();
     dx = x - edge_tr_x(v);
@@ -38139,11 +38230,11 @@ void edge_tr_step(int last)
     d = dx * dx + dy * dy;
     if (d >= edge_tr_seg() * edge_tr_seg() || last && d >= 1.0f)
     {
-        edge_tr_point(edge_tr_pack(x, y), (int)WorkModuleF(0, edge_tr_num_var()) + 1);
+        edge_tr_point(edge_tr_pack(x, y), num + 1);
     }
     if (last)
     {
-        WorkModule(0, -1.0f, edge_tr_last_var());
+        WorkModule(0, -1.0f, edge_tr_num_var());
     }
 }
 

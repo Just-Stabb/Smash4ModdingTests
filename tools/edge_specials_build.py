@@ -131,6 +131,7 @@ def body_scripts(a, fighter, param):
         msg, hit = snake_fair_scripts(game, effect)
         log += msg + snake_hi3_scripts(game, effect)
         log += snake_article_scripts(fighter, hit, glow) + '\n'
+        log += fill_scripts(fighter, hit) + '\n'
     log += octaslash_loop_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
@@ -322,6 +323,36 @@ def snake_article_scripts(fighter, hit_template, glow_template):
             acmd.ACMDFile({SNAKE_MOTION: sc}).save(os.path.join(d, fn + '.bin'))
         open(os.path.join(d, 'motion.mtable'), 'wb').write(SNAKE_MOTION.to_bytes(4, 'big'))
     return 'held forward air articles: %s, and trail (scripts)' % ', '.join(SNAKE_ARTICLES)
+
+
+# the closed-shape fill (test 125, weapons/fill.c from tools/edge_fill_msc.py): motion 0 its hitboxes off (6 / 7 too), 1 - 5 its
+# hitbox by the shape's radius (the script's frame 0: a dein copy has no animation, so its script never passes it, as
+# the flash's). Tier: (radius up to, damage, base knockback, knockback growth); the hitbox 1.1 x the radius ("slightly
+# larger than the shape formed"), angle 80, on the article's middle (Bone 0)
+FILL_MOTIONS = ('fillnone', 'fillhit1', 'fillhit2', 'fillhit3', 'fillhit4', 'fillhit5', 'fillnone6', 'fillnone7')
+FILL_TIERS = ((8.0, 6.0, 40, 60), (13.0, 9.0, 45, 70), (19.0, 12.0, 50, 80), (26.0, 15.0, 55, 90), (40.0, 18.0, 60, 100))
+
+
+def fill_scripts(fighter, hit_template):
+    d = os.path.join(fighter, 'script/animcmd/weapon/fill')
+    os.makedirs(d, exist_ok=True)
+    end = acmd.Command(acmd.END)
+    game, stop = {}, {}
+    for i, name in enumerate(FILL_MOTIONS):
+        crc = acmd.crc(name)
+        stop[crc] = [acmd.Command(acmd.END)]
+        if i == 0 or i > len(FILL_TIERS):       # 6 / 7: empty (dein has 8 motion slots, a copy keeps them all)
+            game[crc] = [U.cmd('Remove_All_Hitboxes'), acmd.Command(acmd.END)]
+            continue
+        r, dmg, bkb, kbg = FILL_TIERS[i - 1]
+        hb = _set(hit_template, ID=0, Part=0, Bone=0, Damage=dmg, Angle=80, KBG=kbg, FKB=0, BKB=bkb, Size=round(r * 1.1, 1),
+                  X=0.0, Y=0.0, Z=0.0, X2=0.0, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=1, ShieldDamage=0)
+        game[crc] = [hb, acmd.Command(acmd.END)]
+    acmd.ACMDFile(game).save(os.path.join(d, 'game.bin'))
+    for fn in ('effect', 'sound'):
+        acmd.ACMDFile(dict(stop)).save(os.path.join(d, fn + '.bin'))
+    open(os.path.join(d, 'motion.mtable'), 'wb').write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FILL_MOTIONS))
+    return 'fill: %d motions (hitbox tiers %s)' % (len(FILL_MOTIONS), ', '.join('%g' % t[0] for t in FILL_TIERS))
 
 
 def fire_scripts(a, wdir):
@@ -577,6 +608,10 @@ def main():
         open(os.path.join(EDGE, 'weapons/trail.c'), 'w').write(edge_trail_msc.generate())
         compile_msc(os.path.join(EDGE, 'weapons/trail.c'), os.path.join(msc, 'trail/trail.mscsb'))
         print(edge_snake_articles.build_trail(os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))
+        import edge_fill_msc
+        open(os.path.join(EDGE, 'weapons/fill.c'), 'w').write(edge_fill_msc.generate())
+        compile_msc(os.path.join(EDGE, 'weapons/fill.c'), os.path.join(msc, 'fill/fill.mscsb'))
+        print(edge_snake_articles.build_fill(os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))
         if a.body_model:
             print(edge_snake_articles.build(os.path.join(a.edge, 'model/body/c00'), a.body_model,
                                             os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))

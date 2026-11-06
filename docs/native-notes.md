@@ -1772,3 +1772,17 @@ unused shader copies crashed). `tools/effect_heap_patch.py`: the effect heap 44 
 -> 444 MiB (MEM_ARENA_2's total `0x02010AE8` 0x34E00000 is the sum of its blocks: an overflow isn't caught, the
 blocks would overlap, so never grow one without shrinking another). `port_check` E9: a bank's estimate
 (`effect_heap_estimate`).
+
+## Article instance cap (64 a fighter)
+
+Found from Sephiroth test 123's load crash (Cemu: access violation at `0x02C0337C`, from `0x02C057F4`). A fighter's
+ArticleModule (made by `0x02C01254`, 0x148 bytes) keeps at `+0x120` a holder (0x11C bytes, allocated at
+`0x02C03458`): `+4` the instance count, `+0x10` - `+0x10C` one pointer per pooled instance (64), `+0x110` the
+article list's pooled entry count, `+0x114` the article list `{entries, count}` (set at `0x02C0261C` / `0x02C02824`),
+`+0x118` -1. `+0x124` of the ArticleModule is another pool, 0 unless set (`0x02C01C58`). Instances are counted from the
+list's `max` counts (entries before the first special one, bit 31) and stored from `+0x10` up with no bound check, so
+past 64 they overwrite `+0x110` / `+0x114`; the next lookup by article id (`0x02C05790`: `+0x124` empty, so
+`0x02C03378` reads `[[holder + 0x114] + 4]`) goes through a null. Not memory: a bigger heap doesn't help. Raising it
+would mean a bigger holder and moving its `+0x110` / `+0x114` / `+0x118` everywhere they're read. Per fighter today
+(the base's + the new articles'): Sephiroth 9 + 36, Hero 13 + 18, Squirtle 9 + 6, Supamario 9 + 1. `port_check` W8.
+

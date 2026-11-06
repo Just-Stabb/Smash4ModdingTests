@@ -222,5 +222,81 @@ def build_trail(arrow_dir, out_fighter):
         TRAIL_POINTS, len(names), TRAIL_HALF * 2, TRAIL_RGB)
 
 
+# ---- the closed-shape fill (test 125, fighters/edge/weapons/fill.c from tools/edge_fill_msc.py): a purple disc, bones
+# TopN, HaveN, C (its middle, 0x7D2) and R0 - R15 (the rim, 0x7D3 + k, moved out to the radius by the MSC; all at the
+# origin in the bind, so it draws nothing until then), a fan of triangles C - R_k - R_k+1 in the model's Y / Z plane
+# (the screen: facing 1). The light arrow's glow material (additive) with a radial purple texture (u: middle 0 to rim
+# 1): faint inside, bright at the rim
+FILL_TEX = 0x40EBF101
+FILL_RIM = 16
+
+
+def fill_texture():
+    w, h = 64, 8
+    u = (np.arange(w) + 0.5) / w
+    inner = 0.30 + 0.25 * u
+    rim = np.exp(-((u - 0.93) / 0.06) ** 2)
+    val = np.clip(inner + rim, 0.0, 1.0)
+    val[u > 0.985] *= 0.3                    # soft outer edge
+    img = np.zeros((h, w, 4), np.uint8)
+    for c in range(3):
+        img[:, :, c] = np.clip(TRAIL_RGB[c] * val + 255 * 0.45 * rim, 0, 255).astype(np.uint8)[None, :]
+    img[:, :, 3] = (255 * val).astype(np.uint8)[None, :]
+    return nut.write_ntwu([(FILL_TEX, 0x1A, img)])
+
+
+def fill_bones():
+    return ['TopN', 'HaveN', 'C'] + ['R%d' % k for k in range(FILL_RIM)]
+
+
+def fill_mesh(arrow_dir):
+    mat = nud.read(os.path.join(arrow_dir, 'model.nud'))[0].polygons[1].materials[0].copy()
+    mat.textures = mat.textures[:1]
+    mat.textures[0]['hash'] = FILL_TEX
+    mat.textures[0]['wrap_s'] = 3
+    mat.cull = 0
+    pos, uv, bones, idx = [], [], [], []
+    for k in range(FILL_RIM):
+        v0 = len(pos)
+        for b, u in ((2, 0.0), (3 + k, 1.0), (3 + (k + 1) % FILL_RIM, 1.0)):
+            pos.append([0.0, 0.0, 0.0])
+            uv.append([u, 0.5])
+            bones.append(b)
+        idx += [v0, v0 + 1, v0 + 2]
+    n = len(pos)
+    p = nud.Polygon()
+    p.pos = np.array(pos, float)
+    p.nrm = np.tile([1.0, 0.0, 0.0], (n, 1))
+    p.tan = np.tile([0.0, 1.0, 0.0], (n, 1))
+    p.bit = np.cross(p.nrm, p.tan)
+    b = np.zeros((n, 4), np.int64)
+    b[:, 0] = bones
+    w = np.zeros((n, 4), np.int64)
+    w[:, 0] = 255
+    p.bones, p.weights = b, w
+    p.uvs = [np.array(uv, float)]
+    p.col = np.full((n, 4), WHITE)
+    p.idx = np.array(idx, np.int64)
+    p.materials = [mat]
+    return [nud.Mesh('fill', [p], bone=-1, bind=4)]
+
+
+def build_fill(arrow_dir, out_fighter):
+    meshes = fill_mesh(arrow_dir)
+    tex = fill_texture()
+    names = fill_bones()
+    for c in range(COLOURS):
+        d = os.path.join(out_fighter, 'model', 'fill', 'c%02d' % c)
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))
+        open(os.path.join(d, 'model.vbn'), 'wb').write(vbn(names))
+        open(os.path.join(d, 'model.jtb'), 'wb').write(jtb(len(names)))
+        open(os.path.join(d, 'model.nut'), 'wb').write(tex)
+        for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
+            shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
+    return 'fill article: a disc of %d rim joints (%d bones), the light arrow\'s glow material, purple' % (
+        FILL_RIM, len(names))
+
+
 if __name__ == '__main__':
     print(build(*sys.argv[1:5]))

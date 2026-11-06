@@ -851,23 +851,43 @@ def check_weapons(name, rec, rep):
                     '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
 
 
-# W8: the new articles' instances in all (their "max" counts): Sephiroth's 24 (fire 3, flare1 4, flare2 3, flash 1, snake 12,
-# snaketip 1) load; test 123 added trail with 40 (64 in all) and the game crashed loading him (the article pool not
-# made: its holder +0x120 list read at 0x02C0337C was empty)
-WEAPON_INSTANCES_OK = 30
-WEAPON_INSTANCES_BAD = 64
+# W8: a fighter's article instances in all: the base's own (its list's entries before the first special one) and the new
+# articles' "max" counts. The ArticleModule's holder (0x11C bytes, made at 0x02C03458) keeps one pointer per instance at
+# +0x10 - +0x10C: 64 at most; past that they overwrite its list count (+0x110) and list pointer (+0x114), and the next
+# article lookup (0x02C057EC -> 0x02C0337C) reads through a null (Sephiroth test 123: Zelda's 9 + 64 new = 73)
+ARTICLE_SLOTS = 64
+
+
+def base_instances(base):
+    """the base fighter's pooled article instances (vanilla build/cross_f.rpx), None if it can't be read"""
+    try:
+        import kind_expand as K
+        import weapon_expand as W
+        img = K.Image(os.path.join(ROOT, 'build', 'cross_f.rpx'))
+        fd = W.fighter_descriptor(img, {'desc_from': base})
+        al = img.w(fd + 8)
+        ent, cnt = img.w(al), img.w(al + 4)
+        rows = [(img.w(ent + 16 * i), img.w(ent + 16 * i + 4)) for i in range(cnt)]
+        special = next((i for i, (k, _n) in enumerate(rows) if k & 0x80000000), cnt)
+        return sum(n for _k, n in rows[:special])
+    except Exception:
+        return None
 
 
 def check_weapon_instances(name, rec, rep):
-    """W8: too many new-article instances for one fighter: the ArticleModule's pool (sized from its list's counts) isn't
-    made and the game crashes loading the fighter (Sephiroth test 123: 64 in all)"""
-    total = sum(int(w.get('max', 1)) for w in rec.get('weapons', {}).values() if isinstance(w, dict))
-    if total >= WEAPON_INSTANCES_BAD:
-        rep.add('ERROR', 'W8 weapon-instances', '%d new-article instances in all (extra_kinds.json "max"): Sephiroth '
-                'test 123 crashed loading at 64' % total)
-    elif total > WEAPON_INSTANCES_OK:
-        rep.add('WARN', 'W8 weapon-instances', '%d new-article instances in all (extra_kinds.json "max"): untested past '
-                '%d (64 crashed loading him)' % (total, WEAPON_INSTANCES_OK))
+    """W8: more than 64 article instances for one fighter: the ArticleModule holder's pointer array overflows into its
+    list pointer and the game crashes loading the fighter (Sephiroth test 123)"""
+    new = sum(int(w.get('max', 1)) for w in rec.get('weapons', {}).values() if isinstance(w, dict))
+    base = base_instances(rec.get('base', ''))
+    if base is None:
+        if new > ARTICLE_SLOTS - 16:
+            rep.add('WARN', 'W8 weapon-instances', '%d new-article instances and the base\'s unread: 64 in all at most '
+                    '(the ArticleModule holder\'s slots)' % new)
+        return
+    if base + new > ARTICLE_SLOTS:
+        rep.add('ERROR', 'W8 weapon-instances', '%d article instances in all (%s\'s %d + new %d, extra_kinds.json '
+                '"max"): 64 at most, past that the game crashes loading him (Sephiroth test 123)' % (
+                    base + new, rec.get('base'), base, new))
 
 
 def check_weapon_statuses(name, rep):

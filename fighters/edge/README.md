@@ -1792,3 +1792,21 @@ code looks up one of his articles (id 2) and fell through to the article module'
 - Package (install over 123): `code/cross_f.rpx`, `model/trail/c00 - c07` (model.nud / .vbn / .jtb),
   `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
 
+## Test 125 (`build/sephiroth_test125.zip`): the article cap found; up special concept, stage 3: closed shapes fill and hit
+
+User: "Do you think that Cemu can run the game with an extended memory so that raising the effect limit works?" then
+"I'd like for you to look into it then move on to stage 3."
+- **The limit:** not memory. A fighter's article holder (0x11C bytes) keeps one pointer per article instance in 64 slots
+  (`+0x10` - `+0x10C`); test 123's 73 (Zelda's 9 + 64 new) ran over into its list count / pointer and the next lookup
+  went through a null. 64 a fighter, the base's own included (docs/native-notes.md "Article instance cap"); `port_check`
+  W8 now counts the base's from the executable. Sephiroth: 9 + 39 = 48.
+- **The trail:** 12 articles now (180 pieces, about 720 units at once).
+- **Closed shapes (stage 3):** the trail closing on itself is a shape: its middle and size from its points, and a new
+  `fill` article there: a purple disc that appears 12 frames after, grows in over 8, then a hitbox 1.1 x its size for 4
+  frames (5 tiers: 6 - 18%, more knockback with size), fading away by frame 50. Details: `specials.md` "Up special".
+- Not tested in game. Approximated: the shape is drawn and hit as a circle of its size; a trail crossing an older
+  trail doesn't make a shape yet.
+- port_check over the chain, tests 70–115 and 117–125: 30 errors, as before.
+- Package (install over 124): `code/cross_f.rpx`, `model/fill/c00 - c07`, `script/animcmd/weapon/fill/`,
+  `script/msc/fill/fill.mscsb`, `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
+
