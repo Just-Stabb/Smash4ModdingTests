@@ -93,8 +93,10 @@ Formats (details in the tools' docstrings):
   .bch model's objects in order. Positions are model space; bone indices index the part's list.
 - **H3D (.bch)**, backward compatibility 0x21: section-relative pointers fixed up by the relocation table; models
   (skeleton with Euler bind pose and inverse matrices, materials with texture names / wrap / colours, objects),
-  textures (PICA200 commands: 0x82 size, 0x85 address, 0x8E format; tiled 8x8, rows bottom up; the Goomba's is
-  ETC1), skeletal animations (transform segments: 9 slots, scale / rotation / translation, constant or key
+  textures (PICA200 commands: 0x82 size, 0x85 address, 0x8E format; tiled 8x8; the Goomba's is ETC1. The 3DS's V counts up
+  from the bottom of the texture as stored: (u, v) samples row (1 - v) of the memory-order image, so the NUD gets
+  V' = 1 - V on the unflipped texture. v1 also flipped the image, which put every lookup upside down: the
+  Goomba's face, stem and feet took the wrong parts of its atlas (user, from the preview)), skeletal animations (transform segments: 9 slots, scale / rotation / translation, constant or key
   groups), visibility animations (one bit a frame per object name), material animations.
   In Smash 3DS's key groups the field Ohana3DS reads as the frame offset is 1 / the end frame (every one of the
   Goomba's 576): keys sit on whole frames without it.

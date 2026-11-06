@@ -57,11 +57,11 @@ def decoder_tests():
     c2 = [(c << 3) | (c >> 2) for c in (15, 8, 7)]
     check(tuple(blk[0, 1]) == tuple(max(0, x - 17) for x in c1) and tuple(blk[2, 0]) == tuple(min(255, x + 5) for x in c2),
           'ETC1 differential mode, flip, modifier signs')
-    # rgba8 tile: pixel p at TILE[p]; the 3DS stores rows bottom up
+    # rgba8 tile: pixel p at TILE[p], memory order (first row first)
     data = bytes(b for p in range(64) for b in (255, p, p, p))
     img = sm.decode_texture(data, 8, 8, 0)
-    ok = all(tuple(img[7 - sm.TILE[p] // 8, sm.TILE[p] % 8, :3]) == (p, p, p) for p in range(64))
-    check(ok, 'PICA200 tile order (Z-order), rows bottom up')
+    ok = all(tuple(img[sm.TILE[p] // 8, sm.TILE[p] % 8, :3]) == (p, p, p) for p in range(64))
+    check(ok, 'PICA200 tile order (Z-order), memory order')
 
 
 def model_tests(src, kind, out):

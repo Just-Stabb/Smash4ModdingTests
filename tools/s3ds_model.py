@@ -144,7 +144,9 @@ def _etc1_block(v):
 
 
 def decode_texture(data, w, h, fmt):
-    """PICA200 texture -> RGBA uint8 [h, w, 4], top row first (the 3DS stores rows bottom up)"""
+    """PICA200 texture -> RGBA uint8 [h, w, 4] in memory order (the first row first). The 3DS's V counts up from
+    the bottom: a UV (u, v) samples row (1 - v) * h of this image, as in Ohana3DS (it flips the bitmap for
+    Direct3D and uses V as is) and Smash Forge (V -> 1 - V on the unflipped image)"""
     img = np.zeros((h, w, 4), np.uint8)
     name = FORMATS[fmt]
     if name in ('etc1', 'etc1a4'):
@@ -167,7 +169,7 @@ def decode_texture(data, w, h, fmt):
                         for x in range(4):
                             for y in range(4):
                                 img[ty + by + y, tx + bx + x, 3] = ((a >> (4 * (x * 4 + y))) & 15) * 17
-        return img[::-1].copy()
+        return img
     bpp = BPP[fmt]
     o = 0
     for ty in range(0, h, 8):
@@ -208,7 +210,7 @@ def decode_texture(data, w, h, fmt):
                     c = ((px[0] >> 4) * 17,) * 3 + ((px[0] & 15) * 17,)
                 img[ty + y, tx + x] = c
             o += 64 * bpp // 8
-    return img[::-1].copy()
+    return img
 
 
 # ---------------------------------------------------------------- H3D

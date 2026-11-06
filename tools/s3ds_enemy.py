@@ -160,7 +160,7 @@ def build_model(bch, mbn, tex_id, log=print):
             nrm = a[1][used] if 1 in a else np.tile([0.0, 1.0, 0.0], (len(used), 1))
             p.nrm = nrm / np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-8)
             uv = a[3][used] if 3 in a else np.zeros((len(used), 2))
-            p.uvs = [np.c_[uv[:, 0], 1.0 - uv[:, 1]]]        # the 3DS's V runs bottom up
+            p.uvs = [np.c_[uv[:, 0], 1.0 - uv[:, 1]]]        # the 3DS's V counts up from the bottom
             p.col = np.full((len(used), 4), WHITE)
             p.idx = remap[idx]
             tri = p.idx.reshape(-1, 3)
