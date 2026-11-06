@@ -37,6 +37,17 @@ The main executable (code.bin, **not in the dump**): the managers the CROs impor
 (`EnemyAerialModuleImpl`, `EnemyAiModuleImpl`, ...), records (`RecFieldSmash*`). Needed: the decrypted ExeFS
 (`code.bin`; GodMode9 / a decrypted CIA's `exefs`).
 
+## code.bin (user's dump, 6,478,036 bytes)
+
+- Compressed with the 3DS's bottom-up LZ (footer: buffer top/bottom 0x0962D887, extra 0x54172C):
+  decompresses exactly to 11,988,992 bytes (0x100000-based: text, rodata, data). CTR-SDK 1.2.7.
+- **Not the build of the RomFS dump's `static.crs`:** the CRS's segments (text 0x100000 + 0x982FE4, rodata
+  0xA83000, data 0xB25000) don't fit it (its code runs past 0xA83000), and only 75 of 5496 exported ARM functions
+  land on a function start, with no common shift. So the code.bin is the update's (bigger: the DLC fighters' code)
+  and the RomFS dump's `static.crs` / `cro.sarc` the base game's (or the other way round). Needed: a matching pair,
+  either the base title's code.bin (00040000000EDF00 ExeFS) or the update title's (0004000E000EDF00) RomFS
+  `static.crs` + `cro.sarc`.
+
 ## Wii U leftovers (cross_f.rpx)
 
 - Strings: `FieldSmashScene`, `param/enemy/fs`, `is_ready_fs_result`, `finalenemy`, `create_enemy`.
