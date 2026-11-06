@@ -2090,3 +2090,18 @@ User: "Side special when charged still does not always have each orb connect."
   at its start, so it hits once.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–140: 30 errors, 55 warnings, 7 notes.
 - Package (install over 139): `script/msc/flare1/flare1.mscsb`.
+
+## Test 141 (`build/sephiroth_test141.zip`): shape damage 3 - 25%, tiers for real shape sizes
+
+User (clip): "Can you make shapes minimum damage lower and maximum damage higher with the same amount of knockback
+growth? The size average size of a shape is likely larger than anticipated, the shapes in the clip are medium-large
+but do the current maximum damage", then "The first shape is large, the second is medium-large", "Large should not be
+top tier, there should be a tier above one in the clip", "I have gotten a shape large enough to cover the entire stage
+... but it is extremely hard to do".
+- Damage by sqrt(a b) (the hitbox's half axes, 1.3x the shape): up to 25 / 40 / 60 / 95 / more → 3 / 7 / 12 / 18 /
+  25% (was up to 8 / 13 / 19 / 26 → 6 / 9 / 12 / 15 / 18%, set before the 1.3x sizes, so most shapes did the
+  maximum). BKB 40 - 60 and KBG 60 - 100 by tier as before. Measured from the clip: the medium-large shape (about the
+  stage's width, ~ 55 - 60) is now tier 3 (12%), the large one (~ 85) tier 4 (18%); the top tier is for one covering
+  about the whole stage (the half axes are capped at 127).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–141: 30 errors, 55 warnings, 7 notes.
+- Package (install over 140): `script/animcmd/weapon/fill/game.bin`, `script/msc/fill/fill.mscsb`.

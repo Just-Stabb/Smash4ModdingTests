@@ -24,7 +24,11 @@ HIT_START = 4
 HIT_END = 50        # tools/edge_trail_msc.py FILL_END: the fill's glow gone
 SPHERES = 5
 SIZE_TIERS = (5.0, 8.0, 12.0, 17.0)       # b up to (tiers 1 - 4; 5 past): edge_specials_build.FILL_SIZES
-DAMAGE_TIERS = (8.0, 13.0, 19.0, 26.0)    # sqrt(a b) up to: edge_specials_build.FILL_DAMAGE
+DAMAGE_TIERS = (25.0, 40.0, 60.0, 95.0)   # sqrt(a b) up to: edge_specials_build.FILL_DAMAGE (test 141, the user's clip: a
+                                          # medium-large shape (about stage-wide, sqrt(a b) ~ 55 - 60) and a large one (~ 80
+                                          # - 90) both did the maximum; "Large should not be top tier, there should be a tier
+                                          # above": medium-large tier 3, large 4, bigger 5; 8 / 13 / 19 / 26 before, set
+                                          # before the 1.3x sizes)
 
 
 def generate():

@@ -366,7 +366,10 @@ def snake_article_scripts(fighter, hit_template, glow_template):
 # knockback scaling with the size of the shape". Angle 80, one hit log (one article) so a fighter is hit once
 FILL_MOTIONS = ('fillnone', 'fillhit', 'fillnone2', 'fillnone3', 'fillnone4', 'fillnone5', 'fillnone6', 'fillnone7')
 FILL_SIZES = (6.0, 9.5, 14.0, 19.5, 26.0)                                             # b up to 5 / 8 / 12 / 17 / more
-FILL_DAMAGE = ((6.0, 40, 60), (9.0, 45, 70), (12.0, 50, 80), (15.0, 55, 90), (18.0, 60, 100))   # sqrt(a b) 8 / 13 / ...
+# (damage, BKB, KBG) by sqrt(a b) up to 25 / 40 / 60 / 95 / more (edge_fill_msc DAMAGE_TIERS). Test 141, the user: "make
+# shapes minimum damage lower and maximum damage higher with the same amount of knockback growth": 3 - 25% (6 - 18%
+# before), KBG / BKB as they were
+FILL_DAMAGE = ((3.0, 40, 60), (7.0, 45, 70), (12.0, 50, 80), (18.0, 55, 90), (25.0, 60, 100))
 FILL_VAR_SIZE, FILL_VAR_DAMAGE = 0x0F000300, 0x0F000301
 
 

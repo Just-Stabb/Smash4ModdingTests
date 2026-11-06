@@ -628,19 +628,19 @@ int fi_size_tier(float b)
 
 int fi_damage_tier(float r)
 {
-    if (r <= 8.0f)
+    if (r <= 25.0f)
     {
         return 1;
     }
-    if (r <= 13.0f)
+    if (r <= 40.0f)
     {
         return 2;
     }
-    if (r <= 19.0f)
+    if (r <= 60.0f)
     {
         return 3;
     }
-    if (r <= 26.0f)
+    if (r <= 95.0f)
     {
         return 4;
     }

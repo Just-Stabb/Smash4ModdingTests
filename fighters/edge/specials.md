@@ -271,8 +271,11 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     turned along the long axis (mirrored with his facing), its joints J0 - J4 from -(a - b) to a - b, a sphere on each
     from its frame 4 to 50, when the glow's gone (test 127, the user: "make the hitbox ... happen on frame 4, and linger
     until the effect fades"; tests 125 / 126: frames 20 - 23; one hit log: a fighter is hit once), size by b (up to 5 / 8
-    / 12 / 17 / more: 6, 9.5, 14, 19.5, 26), damage / BKB / KBG by sqrt(a b) (up to 8 / 13 / 19 / 26 / more: 6 / 9 /
-    12 / 15 / 18%, 40 - 60, 60 - 100), angle 80, from its VAR_0 / VAR_1 in its script. No clank (Clang 0, Rebound 0: it doesn't meet
+    / 12 / 17 / more: 6, 9.5, 14, 19.5, 26), damage / BKB / KBG by sqrt(a b) (up to 25 / 40 / 60 / 95 / more: 3 / 7 /
+    12 / 18 / 25%, BKB 40 - 60, KBG 60 - 100; test 141, the user: "make shapes minimum damage lower and maximum damage
+    higher with the same amount of knockback growth", a stage-wide shape (sqrt(a b) ~ 55 - 60) and a larger one (~ 85)
+    both did the maximum, "Large should not be top tier": now 12% / 18%, the top only for one that covers about the
+    whole stage; tests 125 - 140: up to 8 / 13 / 19 / 26 / more, 6 / 9 / 12 / 15 / 18%), angle 80, from its VAR_0 / VAR_1 in its script. No clank (Clang 0, Rebound 0: it doesn't meet
     other hitboxes, so nothing cancels it; test 139, "make shapes always win clank scenarios"), not reflectable or
     absorbable. His VAR_0 - VAR_11 (the snake
     runs', free in up special) keep the steps.
