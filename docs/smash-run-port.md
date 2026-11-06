@@ -359,7 +359,8 @@ its files, ready in the Wii U's formats and places.
   stage-slot build's, which has the stage names); labels the Wii U already has keep its text. The 3DS's control
   codes (button icons, colours) are swapped like the text; any that differ between the two games show wrong.
 - **Params**: 69 typed param files (FF FF header), 2 typed without a header (`camera_param.bin`, ...), 1 LVD
-  (`fs_cp_path.bin`, the CPU paths): `OUT/_dump/*.json` lists their values.
+  (`fs_cp_path.bin`, the CPU paths): `--dump DIR` lists their values as JSON (outside OUT: everything in OUT has an
+  extension the game's resource table has, so Sm4shExplorer adds the whole folder without skipping any).
 - Open: flx frame actions are indices into a per-movie table compiled into the executable (docs/flx2-format.md):
   the fs_* movies' (the 3DS's) aren't in the Wii U's, so a scene playing them needs its own; Lumen scripts that
   set positions (`_x`, `_y`) still count in 3DS pixels.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smash 3DS's Smash Run UI and mode params -> Wii U files (docs/smash-run-port.md, "UI and mode params").
 
-  python3 tools/s3ds_ui.py SRC WIIU_MESSAGES OUT [--melee MELEE.msbt]
+  python3 tools/s3ds_ui.py SRC WIIU_MESSAGES OUT [--melee MELEE.msbt] [--dump DIR]
 
 SRC: the 3DS files extracted with tools/s3ds_unpack.py (ui/info/fs_*, ui/info/pause_field_down, ui/lumen/field_*,
 ui/lumen/result_field1_*, ui/replace/field, ui/replace/mark, ui/message, ui/script/app/field_smash, param/item,
@@ -16,7 +16,8 @@ which already has the Smash Run stage names). OUT gets:
 - ui/message/*.msbt: the Wii U files with the Smash Run texts added (labels the 3DS has and the Wii U doesn't:
   MmenField_*, Mmel_Fsi*, MmelPause_fieldsmash_*, Msma_Field*, ... and every label the movies show).
 - field_smash/, param/item/, param/ui/fs_info_param.bin: the mode params (big-endian already: typed params,
-  LVD paths), copied; _dump/*.json: their values, readable.
+  LVD paths), copied. --dump DIR: their values as JSON, readable (kept out of OUT: OUT holds only files the
+  game's resource table takes, so Sm4shExplorer adds all of it).
 - ui/script/app/field_smash/*.xtal: the menu scripts (the same xtal format on both).
 
 Textures are written RGBA8 (0x1A; the 3DS images are small, so no BC loss), one mip, flipped (the 3DS stores rows
@@ -371,7 +372,7 @@ def param_kind(data):
         return 'raw'
 
 
-def copy_params(src, out):
+def copy_params(src, out, dump_dir=None):
     kinds = {}
     files = sorted(glob.glob(os.path.join(src, 'field_smash', '*.bin')) +
                    glob.glob(os.path.join(src, 'param', 'item', '*fs_*.bin')) +
@@ -382,15 +383,15 @@ def copy_params(src, out):
         os.makedirs(os.path.dirname(os.path.join(out, rel)), exist_ok=True)
         shutil.copyfile(p, os.path.join(out, rel))
         k = kinds[rel] = param_kind(data)
-        if k in ('params', 'values'):
-            dump = os.path.join(out, '_dump', rel[:-4] + '.json')
+        if dump_dir and k in ('params', 'values'):
+            dump = os.path.join(dump_dir, rel[:-4] + '.json')
             os.makedirs(os.path.dirname(dump), exist_ok=True)
             json.dump(flat_values(data[8:] if k == 'params' else data), open(dump, 'w'), indent=0)
     return kinds
 
 
 # ---------------------------------------------------------------- build
-def build(src, wiiu_msg, out, melee=None):
+def build(src, wiiu_msg, out, melee=None, dump=None):
     ids, log = Ids(), []
     ui = os.path.join(src, 'ui')
     for kind in ('info', 'lumen'):
@@ -402,7 +403,7 @@ def build(src, wiiu_msg, out, melee=None):
     log.append('%d replace pictures' % n)
     added = merge_texts(os.path.join(ui, 'message'), wiiu_msg, out, melee)
     log += ['%s.msbt: %d texts added' % (f, len(v)) for f, v in added.items()]
-    kinds = copy_params(src, out)
+    kinds = copy_params(src, out, dump)
     log.append('%d param files (%s)' % (len(kinds), ', '.join('%d %s' % (list(kinds.values()).count(k), k)
                                                              for k in sorted(set(kinds.values())))))
     sd = os.path.join(ui, 'script', 'app', 'field_smash')
@@ -420,8 +421,9 @@ def main():
     ap.add_argument('wiiu_msg')
     ap.add_argument('out')
     ap.add_argument('--melee')
+    ap.add_argument('--dump')
     a = ap.parse_args()
-    log, _added, _kinds = build(a.src, a.wiiu_msg, a.out, a.melee)
+    log, _added, _kinds = build(a.src, a.wiiu_msg, a.out, a.melee, a.dump)
     print('\n'.join(log))
 
 

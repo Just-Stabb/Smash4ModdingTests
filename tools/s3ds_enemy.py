@@ -3,14 +3,15 @@
 cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/enemy/%s/`,
 `sound/se/snd_se_enemy_%s.nus3bank`, `param/enemy/fs`):
 
-  model/enemy/KIND/PART/cNN/model.nud, model.nut, model.vbn [, model.mta, normal.vmt]
+  model/enemy/KIND/PART/cNN/model.nud, model.nut, model.vbn [, model.mta]
       every model part (body, and shots / missiles / hammers / parasols...): the .mbn meshes (one NUD mesh per
       .bch object, named as the object) rigged to the .bch skeleton (bind pose, blended weights kept),
       textures (PICA200 -> RGBA -> GX2 BC1 / BC3, power-of-two) plus a flat normal map, Smash 4's fighter
       body shader (0x9A011063: colour, normal, the game's shared ramp 0x10080000) with the 3DS material's
       blending, alpha test, culling, wrap and UV transform. model.mta: the model's own material animation (UV
-      scrolls) and visibility timeline (the retro sprite enemies' flipbooks). normal.vmt (the 3DS's list of
-      the meshes visibility drives) copied.
+      scrolls) and visibility timeline (the retro sprite enemies' flipbooks). The 3DS's normal.vmt (its list of
+      the meshes visibility drives) is not written: the Wii U has no .vmt (not in its resource table, so
+      Sm4shExplorer skips it; nothing in cross_f.rpx names it) and model.mta carries the visibility.
   motion/enemy/KIND/PART/main.pac
       the motion .bch's skeletal animations (motion/PART/main.bch or main/*.bch), one OMO each (name.omo),
       sampled every frame 0..end (H3D keys, linear / hermite / step, Euler XYZ rotations as quaternions). The
@@ -506,9 +507,6 @@ def convert(src, kind, out, tex_id, log=print):
         os.makedirs(od, exist_ok=True)
         for n, b in (('model.nud', nud_b), ('model.nut', nut_b), ('model.vbn', vbn_b)):
             open(os.path.join(od, n), 'wb').write(b)
-        vmt = os.path.join(d, 'normal.vmt')
-        if os.path.exists(vmt):
-            shutil.copy(vmt, os.path.join(od, 'normal.vmt'))
         manims, vanims = bch.material_animations(), bch.visibility_animations()
         if manims or vanims:
             # the model's own (always running) material / visibility animation: model.mta, as stages' /
