@@ -13,7 +13,7 @@ OUT/ui/lumen/other/*, OUT/ui/message/menu.msbt, OUT/param/ui/ui_button_sequence.
   txt_sel_mc, btn_text_n); the frame / colour / selection-animation pieces stay shared. New shapes: the title
   "Smash Run" (atlas 3, BC5 luminance + alpha, drawn like the movie's titles: black, white outline and offset
   white shadow; Inter Black at the titles' cap height) and a star icon (Smash Run's icon on the 3DS menu; atlas 0,
-  BC4) where the Group icon sits. New characters get ids after the old ones and the root sprite moves to the new
+  BC4) where the Group icon sits; both in atlas space no shape samples and no texel uses. New characters get ids after the old ones and the root sprite moves to the new
   last id (F00C words 3 / 5 keep naming it); F00D's shape / sprite counts follow. The hit shape 4xm_08 is moved
   over the button like the others' 4xm_NN.
 - Native (cave at 0x04B7D000, stage_slot_cave.py's space after its code): the Games & More button list
@@ -47,9 +47,9 @@ FONT = '/usr/share/fonts/opentype/inter/Inter-Black.otf'
 TITLE = 'Smash Run'
 HELP = 'Battle the enemies of Smash Run on its own field!'
 BUTTON_ID, MSBT_N, RESULT = 115, 8, 7
-TITLE_AT = (480, 4)             # atlas 3 (1024x1024): free top right
+TITLE_AT = (420, 812)           # atlas 3 (1024x1024): no shape samples there, no texels
 TITLE_SIZE = (537, 99)          # the Group title's region (main_txt_world)
-STAR_AT, STAR_SIZE = (100, 1120), 120   # atlas 0 (2048x2048): free left middle
+STAR_AT, STAR_SIZE = (1612, 4), 120     # atlas 0 (2048x2048): no shape samples there, no texels
 CAVE = 0x04B7D000
 LIMIT = 0x04B7E000
 LIST_END = 0x02C8C324           # lwz r0, 0x14(r1) (the button list's epilogue)
@@ -367,10 +367,13 @@ def cave_words():
         li r6, %d
         li r7, 1
         li r8, %d
-        bl 0x%08X
+        lis r12, 0x%04X
+        ori r12, r12, 0x%04X
+        mtctr r12
+        bctrl                   # 0x029ABC68 is out of bl range (> 32 MB)
         lwz r0, 0x14(r1)
         b 0x%08X
-    """ % (RESULT, BUTTON_ID, SET_BUTTON, LIST_END + 4))
+    """ % (RESULT, BUTTON_ID, SET_BUTTON >> 16, SET_BUTTON & 0xFFFF, LIST_END + 4))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
     return words
