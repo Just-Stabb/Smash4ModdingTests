@@ -6,14 +6,27 @@ selectable mode on Wii U, up to 4 players in split screen.
 ## The 3DS dump (user's Google Drive, "Smash 4 3DS Dump.zip", title 00040000000EDF00)
 
 RomFS only (no ExeFS):
-- `dt` / `ls` (+ `patch/dt` / `patch/ls`): the data archive. `ls`: u32 version (0x1666F), u32 count (4513), then
-  {crc32, offset, size} chunks of `dt`; a chunk is 0x60 bytes of 0xCC, then zlib streams (files), padded with
-  0xCC. The name index is an "RF" resource table (version 5) in `dt` itself, one per region (crc32s 0x264CD480,
-  0xF9FE97F3, 0x1DCF74F7, 0x351477EE; the patch has its own). Entries are the Wii U's 24 bytes (offset, name |
-  ext << 24, compressed, decompressed, timestamp, flags); the names are shortened with back-references (a
-  control byte and an offset into earlier names, then a suffix: `\x03\x92_param_vl` = a fighter folder's
-  `<name>_param_vl`), which `tools/rf_check.py` (Wii U, plain names) doesn't read yet. Next: decode those and list
-  the Smash Run files (enemies, field parts, stat boosts, powers).
+- `dt` / `ls` (+ `patch/dt` / `patch/ls`, the update's): the data archive, **decoded** (`tools/s3ds_unpack.py list /
+  extract`): 38,158 files, every one found in the dump (400 sampled: all decompress to their size).
+  - `ls`: u32 version (0x1666F), u32 count, {u32 key, u32 dt offset, u32 size}. A `dt` chunk: 0xCC padding, zlib
+    streams.
+  - Keys: CRC-32 with a zero start register (`zlib.crc32(s, 0xFFFFFFFF)`) of `data<region>/<folder>/packed` for a
+    packaged folder or `data<region>/<file>` for a file packaged on its own (region "" or e.g. "(us_en)"); the
+    string is built by code.bin 0x1A2A60 (`%sdata%s/%s/packed`). All 4123 packages of the base table map.
+  - The file tree: the "RF" resource (version 5), the chunk that starts with "RF". As the Wii U's (24-byte
+    entries), but names may be shortened: name field bit 0x800000, then control byte b0 (length - 4 in bits 0-4,
+    distance bits 8-9 in bits 6-7) and b1 (distance bits 0-7): copy that much from that far back in the name
+    table, then the string's own rest (`\x01\x07g/` after `koopa/` = `koopag/`). Extensions: a table at the end of
+    the names (u32 count 47, offsets: .bin, .mtable, .fontdef, .tex, .efc, .ptcl, .bch, .jtb, .mbn, ...).
+- What Smash Run has: `reference/s3ds_smash_run_files.txt` (2,429 files):
+  - `field_smash/`: the mode's params (game, events, challenges, crystal, final battles, powerup bias, the start
+    selection's areas / doors / enemies / treasure boxes, difficulty, camera, `fs_cp_path.bin`).
+  - `stage/field_smash/`: MainField, MiniRoom00-05, Race00 / Race01, Nobore (models, params, `.lvd` collisions),
+    and `stage/final/`.
+  - `enemy/<kind>/` (98 kinds: kuribo, octorock, stalfos, ..., plus the bosses), `param/enemy/fs/enemy_param_vl_*`,
+    the `fs_*` items, the UI.
+  - Formats: models `.mbn` (meshes) + `.bch` (H3D: textures, skeleton, material animations), motions
+    `motion/body/main.bch` (H3D), `.jtb`, `.flp`, sounds `.nus3bank`, ACMD `animcmd/*.bin`.
 - `cro.sarc`: the code modules. Not Nintendo's SARC: "SARC", u32 count (174), "CRC\0", then {hash, offset,
   decompressed size, compressed size} and zlib-compressed CROs (module name at CRO header +0xC0).
 - `static.crs`: the symbol tables of the main executable (code.bin), 6152 exported names, **no code** (its code
@@ -61,7 +74,7 @@ The main executable (code.bin, **not in the dump**): the managers the CROs impor
 
 ## Plan (to refine once code.bin is in)
 
-1. Data: decode the 3DS RF names; extract Smash Run's enemies, field, final-battle stages, UI, params.
+1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params.
 2. Code: map the 3DS symbols onto the Wii U's leftover code (the same `app::` classes; names give the Wii U
    functions through string / structure matches); find what of FieldSmashManager / EnemyGenerator the Wii U
    still has.
