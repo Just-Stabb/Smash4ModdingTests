@@ -21,6 +21,10 @@ import struct
 import sys
 from dataclasses import dataclass, field
 
+# byte order: '>' (Wii U, the default) or '<' (Smash 3DS's movies and texture lists, the same layout little
+# endian); read() / Tlst() detect it, write() / Tlst.write() use the current one (set E[0] = '>' to write a
+# 3DS file as the Wii U's)
+E = ['>']
 NONE16 = 0xFFFF
 NONE32 = 0xFFFFFFFF
 KIND_IMAGE, KIND_SPRITE, KIND_NAMED_SPRITE, KIND_TEXT = 0, 1, 2, 4
@@ -82,10 +86,10 @@ class Transform:
         out = bytes([f])
         for bit, v in ((1, self.x), (2, self.y), (4, self.sx), (8, self.sy)):
             if f & bit:
-                out += struct.pack('>f', v)
+                out += struct.pack(E[0] + 'f', v)
         for bit, v in ((0x10, self.rot), (0x20, self.rot2)):
             if f & bit:
-                out += struct.pack('>H', v)
+                out += struct.pack(E[0] + 'H', v)
         return out
 
     @staticmethod
@@ -95,13 +99,13 @@ class Transform:
         o += 1
         for bit, k in ((1, 'x'), (2, 'y'), (4, 'sx'), (8, 'sy')):
             if f & bit:
-                setattr(t, k, struct.unpack('>f', b[o:o + 4])[0])
+                setattr(t, k, struct.unpack(E[0] + 'f', b[o:o + 4])[0])
                 o += 4
         if not f & 8:
             t.sy = t.sx
         for bit, k in ((0x10, 'rot'), (0x20, 'rot2')):
             if f & bit:
-                setattr(t, k, struct.unpack('>H', b[o:o + 2])[0])
+                setattr(t, k, struct.unpack(E[0] + 'H', b[o:o + 2])[0])
                 o += 2
         if not f & 0x20:
             t.rot2 = t.rot
@@ -366,10 +370,12 @@ class Flx:
 def read(data):
     """parse .flx bytes into a Flx"""
     assert data[:4] == b'flx2', data[:4]
+    # fps: 60 / 30 either way round; a little-endian file reads 0x3C00 / 0x1E00 big-endian
+    E[0] = '<' if struct.unpack('>H', data[8:10])[0] > 0xFF else '>'
     f = Flx()
-    f.bg_color, f.fps, f.width, f.height = struct.unpack('>I3H', data[4:14])
-    counts = struct.unpack('>13H', data[14:40])
-    f.unk_counts = list(struct.unpack('>6H', data[40:52]))
+    f.bg_color, f.fps, f.width, f.height = struct.unpack(E[0] + 'I3H', data[4:14])
+    counts = struct.unpack(E[0] + '13H', data[14:40])
+    f.unk_counts = list(struct.unpack(E[0] + '6H', data[40:52]))
     assert data[52:104] == bytes(52), 'pointer slots not zero'
     o = 104
 
@@ -377,7 +383,7 @@ def read(data):
         nonlocal o
         if not n:
             return b''
-        size = struct.unpack('>I', data[o:o + 4])[0]
+        size = struct.unpack(E[0] + 'I', data[o:o + 4])[0]
         b = data[o + 4:o + 4 + size]
         o += 4 + size
         return b
@@ -390,14 +396,14 @@ def read(data):
         assert table == bytes(4 * n), 'pointer table not zero'
         out = []
         for _ in range(n):
-            size = struct.unpack('>I', data[o:o + 4])[0]
+            size = struct.unpack(E[0] + 'I', data[o:o + 4])[0]
             out.append(data[o + 4:o + 4 + size])
             o += 4 + size
         return out
 
     (n_spr, n_xf, n_col, n_inf, n_txt, n_fmt, n_key, n_pl, n_lst, n_lab, n_fr, n_img, n_str) = counts
     b = section(n_spr)
-    f.sprites = [Sprite(*struct.unpack('>I4H3I', b[24 * i:24 * i + 24])) for i in range(n_spr)]
+    f.sprites = [Sprite(*struct.unpack(E[0] + 'I4H3I', b[24 * i:24 * i + 24])) for i in range(n_spr)]
     b = section(n_xf)
     offs = {}
     p = 0
@@ -408,33 +414,33 @@ def read(data):
     assert b[p:] == bytes(len(b) - p) and len(b) == (p + 3) & ~3, 'transform padding'
     b = section(n_col)
     for i in range(n_col):
-        v = struct.unpack('>4B4h', b[12 * i:12 * i + 12])
+        v = struct.unpack(E[0] + '4B4h', b[12 * i:12 * i + 12])
         f.colors.append(Color(v[:4], v[4:]))
     b = section(n_inf)
     for i in range(n_inf):
-        v = struct.unpack('>I4f', b[20 * i:20 * i + 20])
+        v = struct.unpack(E[0] + 'I4f', b[20 * i:20 * i + 20])
         f.infos.append(Info(None if v[0] == NONE32 else v[0], *v[1:]))
     b = section(n_txt)
-    f.texts = [Text(*struct.unpack('>I2H2I', b[16 * i:16 * i + 16])) for i in range(n_txt)]
+    f.texts = [Text(*struct.unpack(E[0] + 'I2H2I', b[16 * i:16 * i + 16])) for i in range(n_txt)]
     b = section(n_fmt)
     for i in range(n_fmt):
-        t, c, a, b1, b2, b3 = struct.unpack('>2I4B', b[12 * i:12 * i + 12])
+        t, c, a, b1, b2, b3 = struct.unpack(E[0] + '2I4B', b[12 * i:12 * i + 12])
         f.formats.append(Format(t, c >> 8, c & 0xFF, a, b1, b2, b3))
     b = section(n_key)
-    keys = [struct.unpack('>2HI', b[8 * i:8 * i + 8]) for i in range(n_key)]
+    keys = [struct.unpack(E[0] + '2HI', b[8 * i:8 * i + 8]) for i in range(n_key)]
     b = section(n_pl)
     for i in range(n_pl):
-        kind, slot, char, depth, blend, xf, col, inf = struct.unpack('>8H', b[16 * i:16 * i + 16])
+        kind, slot, char, depth, blend, xf, col, inf = struct.unpack(E[0] + '8H', b[16 * i:16 * i + 16])
         f.places.append(Place(kind, slot, char, depth, blend, NONE16 if xf == NONE16 else offs[xf], col, inf))
     lists = blobs(n_lst)
     for i, (act, n, li) in enumerate(keys):
         lst = lists[li]
         assert li == i and len(lst) == (2 * n + 3) & ~3, 'keyframe list'
-        f.keys.append(Key(act, list(struct.unpack('>%dH' % n, lst[:2 * n]))))
+        f.keys.append(Key(act, list(struct.unpack(E[0] + '%dH' % n, lst[:2 * n]))))
     b = section(n_lab)
-    f.labels = [Label(*struct.unpack('>2I', b[8 * i:8 * i + 8])) for i in range(n_lab)]
+    f.labels = [Label(*struct.unpack(E[0] + '2I', b[8 * i:8 * i + 8])) for i in range(n_lab)]
     b = section(n_fr)
-    f.frames = list(struct.unpack('>%dH' % n_fr, b[:2 * n_fr]))
+    f.frames = list(struct.unpack(E[0] + '%dH' % n_fr, b[:2 * n_fr]))
     f.images = [_dec(s.rstrip(b'\0')) for s in blobs(n_img)]
     f.strings = [_dec(s.rstrip(b'\0')) for s in blobs(n_str)]
     assert o == len(data), 'trailing data at 0x%X' % o
@@ -451,35 +457,35 @@ def write(f):
     counts = [len(f.sprites), len(f.transforms), len(f.colors), len(f.infos), len(f.texts),
               len(f.formats), len(f.keys), len(f.places), len(f.keys), len(f.labels), len(f.frames),
               len(f.images), len(f.strings)]
-    out = bytearray(b'flx2' + struct.pack('>I3H', f.bg_color, f.fps, f.width, f.height))
-    out += struct.pack('>13H', *counts) + struct.pack('>6H', *f.unk_counts) + bytes(52)
+    out = bytearray(b'flx2' + struct.pack(E[0] + 'I3H', f.bg_color, f.fps, f.width, f.height))
+    out += struct.pack(E[0] + '13H', *counts) + struct.pack(E[0] + '6H', *f.unk_counts) + bytes(52)
 
     def section(n, body):
         if n:
-            out.extend(struct.pack('>I', len(body)) + body)
+            out.extend(struct.pack(E[0] + 'I', len(body)) + body)
 
     def blobs(items):
         if items:
             section(len(items), bytes(4 * len(items)))
             for b in items:
-                out.extend(struct.pack('>I', len(b)) + b)
+                out.extend(struct.pack(E[0] + 'I', len(b)) + b)
 
-    section(counts[0], b''.join(struct.pack('>I4H3I', s.name, s.nframes, s.nkeys, s.nlabels, s.nslots,
+    section(counts[0], b''.join(struct.pack(E[0] + 'I4H3I', s.name, s.nframes, s.nkeys, s.nlabels, s.nslots,
                                             s.frame0, s.key0, s.label0) for s in f.sprites))
     section(counts[1], _pad4(xf))
-    section(counts[2], b''.join(struct.pack('>4B4h', *(tuple(c.mul) + tuple(c.add))) for c in f.colors))
-    section(counts[3], b''.join(struct.pack('>I4f', NONE32 if i.name is None else i.name, i.x, i.y, i.w, i.h)
+    section(counts[2], b''.join(struct.pack(E[0] + '4B4h', *(tuple(c.mul) + tuple(c.add))) for c in f.colors))
+    section(counts[3], b''.join(struct.pack(E[0] + 'I4f', NONE32 if i.name is None else i.name, i.x, i.y, i.w, i.h)
                                 for i in f.infos))
-    section(counts[4], b''.join(struct.pack('>I2H2I', t.name, t.width, t.height, t.unk, t.fmt) for t in f.texts))
-    section(counts[5], b''.join(struct.pack('>2I4B', m.text, m.color << 8 | m.size, m.align, m.b1, m.b2, m.b3)
+    section(counts[4], b''.join(struct.pack(E[0] + 'I2H2I', t.name, t.width, t.height, t.unk, t.fmt) for t in f.texts))
+    section(counts[5], b''.join(struct.pack(E[0] + '2I4B', m.text, m.color << 8 | m.size, m.align, m.b1, m.b2, m.b3)
                                 for m in f.formats))
-    section(counts[6], b''.join(struct.pack('>2HI', k.action, len(k.places), i) for i, k in enumerate(f.keys)))
-    section(counts[7], b''.join(struct.pack('>8H', p.kind, p.slot, p.char, p.depth, p.blend,
+    section(counts[6], b''.join(struct.pack(E[0] + '2HI', k.action, len(k.places), i) for i, k in enumerate(f.keys)))
+    section(counts[7], b''.join(struct.pack(E[0] + '8H', p.kind, p.slot, p.char, p.depth, p.blend,
                                             NONE16 if p.xform == NONE16 else xf_offs[p.xform], p.color, p.info)
                                 for p in f.places))
-    blobs([_pad4(struct.pack('>%dH' % len(k.places), *k.places)) for k in f.keys])
-    section(counts[9], b''.join(struct.pack('>2I', lb.frame, lb.name) for lb in f.labels))
-    section(counts[10], _pad4(struct.pack('>%dH' % len(f.frames), *f.frames)))
+    blobs([_pad4(struct.pack(E[0] + '%dH' % len(k.places), *k.places)) for k in f.keys])
+    section(counts[9], b''.join(struct.pack(E[0] + '2I', lb.frame, lb.name) for lb in f.labels))
+    section(counts[10], _pad4(struct.pack(E[0] + '%dH' % len(f.frames), *f.frames)))
     blobs([_pad4(_enc(s) + b'\0') for s in f.images])
     blobs([_pad4(_enc(s) + b'\0') for s in f.strings])
     return bytes(out)
@@ -514,15 +520,18 @@ class Tlst:
 
     def _read(self, d):
         assert d[:4] == b'TLST', d[:4]
-        ntex, n, toff, eoff, soff = struct.unpack('>I4H', d[4:16])
+        # header: u16 version, u16 texture count, u16 image count, u16 offsets (slots at 16, images, names): the
+        # slots' offset (16) gives the byte order
+        E[0] = '>' if struct.unpack('>H', d[10:12])[0] == 16 else '<'
+        self.version, ntex, n, toff, eoff, soff = struct.unpack(E[0] + '6H', d[4:16])
         assert toff == 16 and eoff == toff + 4 * ntex and soff == eoff + 32 * n
-        self.slots = list(struct.unpack('>%dI' % ntex, d[toff:eoff]))
+        self.slots = list(struct.unpack(E[0] + '%dI' % ntex, d[toff:eoff]))
 
         def name(o):
             return d[soff + o:d.index(b'\0', soff + o)].decode('ascii')
         end = soff
         for i in range(n):
-            o1, o2, u0, v0, u1, v1, w, h, tex, unk = struct.unpack('>2I4f4H', d[eoff + 32 * i:eoff + 32 * i + 32])
+            o1, o2, u0, v0, u1, v1, w, h, tex, unk = struct.unpack(E[0] + '2I4f4H', d[eoff + 32 * i:eoff + 32 * i + 32])
             self.entries.append(TlstEntry(name(o1), u0, v0, u1, v1, w, h, tex, unk, name(o2)))
             end = max(end, d.index(b'\0', soff + o1) + 1)
         self.tail = d[end:]
@@ -549,10 +558,10 @@ class Tlst:
                     names += nm.encode('ascii') + b'\0'
         n, ntex = len(self.entries), len(self.slots)
         eoff = 16 + 4 * ntex
-        out = bytearray(b'TLST' + struct.pack('>I4H', ntex, n, 16, eoff, eoff + 32 * n))
-        out += struct.pack('>%dI' % ntex, *self.slots)
+        out = bytearray(b'TLST' + struct.pack(E[0] + '6H', self.version, ntex, n, 16, eoff, eoff + 32 * n))
+        out += struct.pack(E[0] + '%dI' % ntex, *self.slots)
         for e in self.entries:
-            out += struct.pack('>2I4f4H', offs[e.name], offs[e.name2 or e.name], e.u0, e.v0, e.u1, e.v1,
+            out += struct.pack(E[0] + '2I4f4H', offs[e.name], offs[e.name2 or e.name], e.u0, e.v0, e.u1, e.v1,
                                e.w, e.h, e.tex, e.unk)
         return bytes(out + names + (self.tail if self.tail is not None else b'\0' * (-len(names) % 4)))
 

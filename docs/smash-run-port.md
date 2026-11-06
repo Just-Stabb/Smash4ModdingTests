@@ -322,6 +322,48 @@ collision of their width sits), and spawns / camera / floors use those placed li
 springs, chests and blocks (placed by the mode's code, at the origin in the files) and the swapped states of
 Area_14 are left out.
 
+## UI and mode params (3DS ui/, param/, field_smash/ -> Wii U files)
+
+`python3 tools/s3ds_ui.py SRC WIIU_MESSAGES OUT [--melee MELEE.msbt]` converts what Smash Run shows and reads;
+`tools/s3ds_ui_test.py SRC WIIU_MESSAGES OUT [--melee M] [--wiiu-lumen DIR]` reads it all back (0 failures: 201
+Wii U .lm round trips, 16 .lm with 2475 actions, 15 .flx, 274 textures, 370 texts, 73 params / scripts). Nothing on
+the Wii U loads these yet: the mode's code (FieldSmashManager, the menus' scenes) is the plan's step 2-4; these are
+its files, ready in the Wii U's formats and places.
+
+| 3DS | Wii U | how |
+|---|---|---|
+| `ui/info/fs_*`, `pause_field_down` (HUD movies, flx2) | `ui/info/NAME/` | byte order (tools/flx.py reads both), root scaled |
+| `ui/lumen/field_*`, `result_field1_*` (menus, Lumen LMB) | `ui/lumen/NAME/` | field table below, root scaled |
+| `texlist.lst` | same | byte order |
+| `img-NNNNN.tex`, `ui/replace/field/*`, `mark_*_fs_item` | `.nut` | PICA decode, flipped, RGBA8, ids 0x2800A000 up |
+| `ui/message/*.msbt` (LE) | `menu / melee / smash / figure / cleargetter.msbt` | the Smash Run labels added to the Wii U files |
+| `field_smash/*.bin`, `param/item/*fs_*`, `param/ui/fs_info_param.bin` | same paths | copied: big-endian already |
+| `ui/script/app/field_smash/*.xtal` | same | copied: the same xtal format |
+
+- **Screen**: the 3DS movies are 400 x 240 (top) / 320 x 240 (bottom); the Wii U's 1920 x 1080. Each root
+  placement gets x4.5 and the centring offset (+60 / +240), so everything keeps its proportions and the paths the
+  game finds instances by (`root/num_1`) stay: an flx sprite's transform, an image's / text's rect (and the text's
+  font size); a Lumen placement's matrix (a new row: rows are shared), a placement without one only when it places
+  a new object. Checked by flx_render (the timer and the pause screen draw as on the 3DS).
+- **Lumen byte order** (no 3DS / Wii U pair of the same file exists but prize2): each tag word of all 234 3DS
+  .lm against all 201 Wii U ones: a word is one 32-bit value, two u16 (place mode / blend, depth, sprite frame
+  counts, colours, graphic fill / vertex count, indices) or four bytes (text flags), whichever makes the 3DS
+  values the Wii U's. Action bytecode (F005) is SWF's little-endian on both (same push types, doubles, branch
+  offsets): only its counts swap. Tags: `s3ds_ui.FIXED / RECORDS`; the Wii U's own menus survive the table both
+  ways byte for byte, and every converted field equals the 3DS's at its width.
+- **Textures**: .tex = 0x80 header (u32 w, u32 h, u8 PICA format, u8 mips, name) + the PICA image, rows bottom
+  first: flipped, the texture lists' UVs (from the top on both) then pick the same pixels (checked: the timer's
+  digits). RGBA8, so no BC loss on the 3DS's small images.
+- **Texts**: 370 labels (MmenField_*, Mmel_Fsi*, MmelField*, MmelPause_fieldsmash_*, Msma_Field*, MfigI_Fs*,
+  MclgPrize_fsi*, ... and every label a movie shows that the Wii U lacks) added to the Wii U files (melee: on the
+  stage-slot build's, which has the stage names); labels the Wii U already has keep its text. The 3DS's control
+  codes (button icons, colours) are swapped like the text; any that differ between the two games show wrong.
+- **Params**: 69 typed param files (FF FF header), 2 typed without a header (`camera_param.bin`, ...), 1 LVD
+  (`fs_cp_path.bin`, the CPU paths): `OUT/_dump/*.json` lists their values.
+- Open: flx frame actions are indices into a per-movie table compiled into the executable (docs/flx2-format.md):
+  the fs_* movies' (the 3DS's) aren't in the Wii U's, so a scene playing them needs its own; Lumen scripts that
+  set positions (`_x`, `_y`) still count in 3DS pixels.
+
 ## UV transforms (3DS coordinators -> Wii U shader UV props)
 
 Both sides read from code, not guessed:
@@ -349,7 +391,7 @@ motion / visibility pac names (taken from the fighters'), the effect IDs.
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
-   their effects and effect models, the stages (above); left: UI, the mode's params.
+   their effects and effect models, the stages (also in their own slots), the UI and the mode's params (above).
 2. Code: map the 3DS symbols onto the Wii U's leftover code (the same `app::` classes; names give the Wii U
    functions through string / structure matches); find what of FieldSmashManager / EnemyGenerator the Wii U
    still has.
