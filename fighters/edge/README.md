@@ -2105,3 +2105,13 @@ top tier, there should be a tier above one in the clip", "I have gotten a shape 
   about the whole stage (the half axes are capped at 127).
 - Not tested in game. port_check over the chain, tests 70–115 and 117–141: 30 errors, 55 warnings, 7 notes.
 - Package (install over 140): `script/animcmd/weapon/fill/game.bin`, `script/msc/fill/fill.mscsb`.
+
+## Test 142 (`build/sephiroth_test142.zip`): shape knockback the same for every size, damage scales
+
+User: "Can you return the bkb and kbg values to what they were before and make damage affected the most?" (BKB / KBG
+hadn't changed: 40 - 60 / 60 - 100 by tier since test 125; asked, the user chose one value for every size, the old top
+tier's.)
+- Every shape's hitbox: BKB 60, KBG 100; damage by size as test 141 (3 / 7 / 12 / 18 / 25%, sqrt(a b) up to 25 / 40 /
+  60 / 95 / more), so size changes damage (and the knockback that comes with it) and nothing else.
+- Not tested in game. port_check over the chain, tests 70–115 and 117–142: 30 errors, 55 warnings, 7 notes.
+- Package (install over 141): `script/animcmd/weapon/fill/game.bin`.
