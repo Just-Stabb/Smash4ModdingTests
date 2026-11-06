@@ -143,10 +143,11 @@ What the other enemies needed beyond the Goomba:
   additive source alpha / one -> 1 / 2), alpha test (greater -> 516 with the 3DS reference), culling, wrap.
   Texture unit 0 is the colour; units 1 / 2 (reflection / specular maps of the 3DS shader) are left out, except
   `*alpha*` masks (mcanimal), folded into the colour's alpha.
-- **UV transform**: Ohana3DS: uv' = uv * scale - translate (V up); NUD (Smash Forge NUD.vert): uv' = s * (uv + t);
-  with the NUD's V' = 1 - V: s = scale, t_u = -translate_u / s, t_v = (1 - s + translate_v) / s (rotation left out).
-  The UV scroll animations (translate / scale of coordinator 0, about 70 tracks) become `NU_colorSamplerUV` frames in
-  MTAs; the colour-constant (combiner) animations (25), rotation (3) and coordinators 1 / 2 (2) are not converted.
+- **UV transform**: see "UV transforms" below (`s3ds_model.nud_sampler_uv`: s = scale, t = (-tu, (1 - sv) / sv +
+  tv)). The UV scroll animations (translate / scale of coordinator 0, about 70 tracks) become `NU_colorSamplerUV`
+  frames in MTAs. A material whose UV rotates (devilcar's tire; mcanimal's and mcgiant's lights outside Smash Run)
+  gets the skinned effect shader instead (no body shader rotates UVs), with NU_effRotUV / ScaleUV / TransUV tracks.
+  The colour-constant (combiner) animations (25) and coordinators 1 / 2 (2) are not converted.
 - **Sprite enemies** (cucco, shiroiobake, and the non-Smash-Run flyingman): flat sprite meshes whose flipbook is
   one long visibility timeline in the model itself (shiroiobake: 400 frames, emerge / jump / damage / tongue...):
   `model.mta`'s visibility.
@@ -240,7 +241,28 @@ What the conversion does:
   baked frame's is NU_effColorGain in the MTA. Exact when the output is proportional to the animated colour
   (fades, the usual case); an approximation for a lerp whose ends animate differently. Visibility animations go
   to the MTA by mesh name.
-- Not converted: UV rotation tracks, the per-texel shape of a colour animation that isn't a scale.
+- UV scale / rotation / translation (static and animated) as "UV transforms" below.
+- Not converted: the per-texel shape of a colour animation that isn't a scale.
+
+## UV transforms (3DS coordinators -> Wii U shader UV props)
+
+Both sides read from code, not guessed:
+- **3DS**: H3D's texture coordinator transform, SPICA's `TextureTransform` (every Smash Run material is the Maya
+  type): rotate about the texture's centre, subtract the translation, then scale: `s3ds_model.tex_transform`.
+  The 3DS samples row (1 - v') of the texture, the NUD's V is 1 - V.
+- **Wii U**: the vertex programs in the game's `shader/texas_cross.nsh` (disassembled with tools/latte_dis; the
+  uniform blocks from the GX2 headers). The effect shader (MC_EFFECT: effScaleUV [1], effRotUV [2],
+  effTransUV [3]): u_r = cos r (u - 1/2) + sin r (v - 1/2) + 1/2, v_r = -sin r (u - 1/2) + cos r (v - 1/2) + 1/2,
+  U = (u_r + t.x) s.x, V = 1 - s.y (1 - (v_r + t.y)) (the angle in radians, as vanilla Ness PK Thunder's MTA
+  animates it between 0 and pi). The body shaders' colorSamplerUV: U = s.x (u + t.x), V = s.y (V' + t.y), no
+  rotation (some variants scroll t x uvScrollCounter instead).
+- Solved (`s3ds_model.nud_eff_uv` / `nud_sampler_uv`, any transform type): effect r = the 3DS rotation, s = its
+  scale, t = (-tu, tv) for Maya; body s = scale, t = (-tu, (1 - sv) / sv + tv). Checked numerically against SPICA's
+  matrix for random transforms of all three types, and on the fighter effects both games ship (Cloud's
+  Climhazzard slash U 0.4 -> -0.4, Dedede's jet hammer (0.042, 0.125) -> (-0.042, 0.125)); the tests run every
+  written mesh's UVs through these shader formulas against the 3DS transform (and every MTA frame).
+- What changed from before: the translation is scaled with the texture (the old mappings, from Ohana3DS's
+  uv * scale - translate and Smash Forge's shader, were right only for scale 1), and rotation is converted.
 
 Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro` BehaviorKuribo, the
 EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy

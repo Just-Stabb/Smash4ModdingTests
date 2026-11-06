@@ -16,9 +16,9 @@ Mapping:
   positions, normals, vertex colours (1.0 -> 127, white without), UV 0 with the 3DS's V turned (V' = 1 - V).
 - materials: the effect shader 0xB0201100 (UV transform + vertex colour) as tools/xv2_to_nud.py; blend from the
   H3D fragment operations (source alpha / one minus source alpha -> 5 / 1, source alpha / one (additive) ->
-  5 / 2, none -> 0 / 0), its alpha test (-> 0x204, the 3DS reference), culling; NU_effScaleUV /
-  NU_effTransUV = its texture coordinator 0 (Ohana3DS: uv * scale - translate, V up; NUD: uv * scale + trans on
-  V' = 1 - V: trans = (-tu, 1 - sv + tv)), NU_materialHash.
+  5 / 2, none -> 0 / 0), its alpha test (-> 0x204, the 3DS reference), culling; NU_effRotUV / NU_effScaleUV /
+  NU_effTransUV = its texture coordinator 0 (s3ds_model.nud_eff_uv: H3D's Maya transform, SPICA's, solved
+  through the effect vertex program's own UV math: rotation r, scale s, translation (-tu, tv)), NU_materialHash.
 - textures: the material's texture combiner (6 PICA200 TEV stages: s3ds_model.tev_combine) baked into its
   texture 0 (the only texture the effect materials read; most stages lerp the diffuse / vertex colour against a
   constant colour by the texture and take the alpha from one of its channels, ETC1 having none), with the
@@ -28,8 +28,8 @@ Mapping:
   RGBA (s3ds_model.decode_texture) -> GX2 BC1 / BC3, power-of-two; ids 0x4F000000 + 0x400 an enemy (its index
   among the Smash Run enemies), then one after the other over its models.
 - model.mta: the normal.bch's material animation (colours -> NU_effColorGain as above, coordinator 0
-  translate / scale -> NU_effTransUV / NU_effScaleUV, a frame each) and visibility animation (mesh states by
-  name); UV rotation and the other colours are left out (counted).
+  translate / scale / rotation -> NU_effTransUV / NU_effScaleUV / NU_effRotUV, a frame each) and visibility
+  animation (mesh states by name); the other colours are left out (counted).
 - model.xmb: the game's effect_near layout (xv2_to_nud.effect_xmb).
 """
 import argparse
@@ -51,17 +51,17 @@ TEX_BASE = 0x4F000000
 WRAP = {0: 3, 1: 3, 2: 1, 3: 2}          # H3D wrap (0 clamp, 1 border, 2 repeat, 3 mirror) -> NUD
 
 
-def eff_uv(scale, trans):
-    """3DS coordinator (scale, translate) -> (NU_effScaleUV, NU_effTransUV) [4] each"""
-    su, sv = scale
-    tu, tv = trans
-    return [su, sv, 0.0, 0.0], [-tu, 1.0 - sv + tv, 0.0, 0.0]
+def eff_uv(scale, rot, trans, ttype=0):
+    """3DS coordinator (scale, rotation, translate) -> (NU_effRotUV, NU_effScaleUV, NU_effTransUV) [4] each
+    (s3ds_model.nud_eff_uv: the effect vertex program's UV transform solved for the 3DS's)"""
+    return sm.nud_eff_uv(scale, rot, trans, ttype)
 
 
 SLOTS = ('emission', 'ambient', 'diffuse', 'specular0', 'specular1', 'constant0', 'constant1', 'constant2',
          'constant3', 'constant4', 'constant5', 'blend')
 COLOR_PROPS = {9: 'diffuse', 8: 'ambient', 1: 'constant0'}      # H3D material animation colour targets
 COLOR_TRACKS = tuple((p, 5) for p in COLOR_PROPS)
+UV_TRACKS = ((19, 2), (20, 0), (21, 2))      # coordinator 0 scale / rotation / translate
 
 
 def _rgba32(c):
@@ -136,13 +136,14 @@ def material_for(mat, tex_id, name, gain=None):
                            unk=0, unk2=0))
     if gain is None:
         gain = [x / 255.0 for x in mat.get('colors', {}).get('diffuse', (255, 255, 255, 255))]
-    co = mat['coords'][0] if 'coords' in mat else dict(scale=(1.0, 1.0), translate=(0.0, 0.0))
+    co = mat['coords'][0] if 'coords' in mat else dict(scale=(1.0, 1.0), rotate=0.0, translate=(0.0, 0.0))
     scale = [s or 1.0 for s in co['scale']]
-    s4, t4 = eff_uv(scale, co['translate'])
+    r4, s4, t4 = eff_uv(scale, co.get('rotate', 0.0), co['translate'], co.get('transform', 0))
     _bits, val = float_hash(name)
-    m.props = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', s4), ('NU_effTransUV', t4),
+    m.props = [('NU_effRotUV', r4), ('NU_effScaleUV', s4), ('NU_effTransUV', t4),
                ('NU_effColorGain', gain), ('NU_materialHash', [val, 0.0, 0.0, 0.0])]
-    return m, dict(gain=gain, scale=scale, trans=list(co['translate']))
+    return m, dict(gain=gain, scale=scale, rot=co.get('rotate', 0.0), trans=list(co['translate']),
+                   ttype=co.get('transform', 0))
 
 
 def anim_tracks(anim):
@@ -162,7 +163,7 @@ def material_mta(anim, materials, statics, folder, frames):
             skipped += len(tracks)
             continue
         st = statics[mname]
-        gains, trans, scales = [], [], []
+        gains, trans, scales, rots = [], [], [], []
         for f in range(frames):
             def comp(key, j, default):
                 t = tracks.get(key)
@@ -171,12 +172,14 @@ def material_mta(anim, materials, statics, folder, frames):
             gains.append(st['gains'][min(f, len(st['gains']) - 1)])
             sc = [comp((19, 2), j, st['scale'][j]) or 1.0 for j in range(2)]
             tr = [comp((21, 2), j, st['trans'][j]) for j in range(2)]
-            s4, t4 = eff_uv(sc, tr)
+            r4, s4, t4 = eff_uv(sc, comp((20, 0), 0, st['rot']), tr, st['ttype'])
             scales.append(s4)
             trans.append(t4)
-        skipped += sum(1 for k in tracks if k not in COLOR_TRACKS + ((19, 2), (21, 2)))
+            rots.append(r4)
+        skipped += sum(1 for k in tracks if k not in COLOR_TRACKS + UV_TRACKS)
         props = []
-        for pname, vals in (('NU_effColorGain', gains), ('NU_effTransUV', trans), ('NU_effScaleUV', scales)):
+        for pname, vals in (('NU_effColorGain', gains), ('NU_effTransUV', trans), ('NU_effScaleUV', scales),
+                            ('NU_effRotUV', rots)):
             if any(not np.allclose(v, vals[0]) for v in vals):
                 props.append(dict(name=pname, values=vals, u2=0))
         if props:
@@ -266,7 +269,7 @@ def convert_model(mdir, folder, out_dir, tex_id, log=print):
                 bits = tr['frames'] or [tr['default']]
                 vis.append((name, [(0, bits[0])] + [(i, v) for i, v in enumerate(bits) if i and v != bits[i - 1]]))
     if skipped:
-        notes.append('%d material tracks not converted (combiner colours / UV rotation)' % skipped)
+        notes.append('%d material tracks not converted (other colours / coordinators)' % skipped)
     d = os.path.join(out_dir, folder)
     os.makedirs(d, exist_ok=True)
     open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))

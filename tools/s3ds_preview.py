@@ -23,7 +23,7 @@ import s3ds_model as sm  # noqa: E402
 
 
 def nud_materials(path):
-    """[(color texture id, alpha_func, ref, src, dst, colorSamplerUV)] a mesh, in mesh order (reads the
+    """[(color texture id, alpha_func, ref, src, dst, props, wrap s, wrap t)] a mesh, in mesh order (reads the
     material header of each mesh's first polygon)"""
     d = open(path, 'rb').read()
     nmesh = struct.unpack('>h', d[0xA:0xC])[0]
@@ -36,10 +36,24 @@ def nud_materials(path):
         q = obj
         mo = struct.unpack('>i', d[q + 16:q + 20])[0]
         m = nud._read_material(d, mo, sbase)
-        uv = dict(m.props).get('NU_colorSamplerUV', [1, 1, 0, 0])
-        out.append((m.textures[0]['hash'], m.alpha_func, m.ref_alpha, m.src, m.dst, uv[:4],
+        out.append((m.textures[0]['hash'], m.alpha_func, m.ref_alpha, m.src, m.dst, dict(m.props),
                     m.textures[0]['wrap_s'], m.textures[0]['wrap_t']))
     return out
+
+
+def nud_uv(uv, props):
+    """a NUD mesh's UVs as its shader transforms them (the texas_cross.nsh vertex programs): effect materials
+    (NU_effRotUV / ScaleUV / TransUV) rotate about the centre, translate, then scale (V about its top edge);
+    body materials (NU_colorSamplerUV) U = s.x (u + t.x), V = s.y (V' + t.y)"""
+    if 'NU_effScaleUV' in props:
+        r = props.get('NU_effRotUV', [0.0])[0]
+        s, t = props['NU_effScaleUV'], props.get('NU_effTransUV', [0.0, 0.0])
+        c, n = np.cos(r), np.sin(r)
+        a, b = uv[:, 0] - 0.5, uv[:, 1] - 0.5
+        ur, vr = c * a + n * b + 0.5, -n * a + c * b + 0.5
+        return np.c_[(ur + t[0]) * s[0], 1 - s[1] * (1 - (vr + t[1]))]
+    s = props.get('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0])
+    return np.c_[s[0] * (uv[:, 0] + s[2]), s[1] * (uv[:, 1] + s[3])]
 
 
 def _wrap(x, mode):
@@ -143,7 +157,7 @@ def enemy_items(src, out, kind, part='body', c='c00', motion=None, frame=0):
         a = me['attrs']
         uv = a[3] if 3 in a else np.zeros((me['count'], 2))
         uvn = np.c_[uv[:, 0], 1.0 - uv[:, 1]]
-        uvn = np.c_[suv[0] * (uvn[:, 0] + suv[2]), suv[1] * (uvn[:, 1] + suv[3])]
+        uvn = nud_uv(uvn, suv)
         P = np.c_[a[0], np.ones(me['count'])]
         for bl, idx in me['parts']:
             bi = a[5].astype(int)

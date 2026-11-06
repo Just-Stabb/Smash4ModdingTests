@@ -316,6 +316,50 @@ def _pica(d, off, words):
     return regs
 
 
+# ---- texture coordinate transforms
+def tex_transform(scale, rot, trans, ttype=0):
+    """an H3D texture coordinator -> its 2 x 3 matrix M: (u', v') = M (u, v, 1), the 3DS UV (V up) in and out;
+    0 Maya (every Smash Run material), 1 SoftImage, 2 3ds Max (SPICA's TextureTransform: Maya rotates about the
+    texture's centre, then subtracts the translation, then scales)"""
+    sx, sy = scale
+    tx, ty = trans
+    ca, sa = np.cos(rot), np.sin(rot)
+    if ttype == 1:
+        ox, oy = sx * (-ca * tx - sa * ty), sy * (sa * tx - ca * ty)
+    elif ttype == 2:
+        ox = sx * ca * (-tx - 0.5) - sx * sa * (ty - 0.5) + 0.5
+        oy = sy * sa * (-tx - 0.5) + sy * ca * (ty - 0.5) + 0.5
+    else:
+        ox, oy = sx * ((0.5 * sa - 0.5 * ca) + 0.5 - tx), sy * ((0.5 * -sa - 0.5 * ca) + 0.5 - ty)
+    return np.array([[sx * ca, -sx * sa, ox], [sy * sa, sy * ca, oy]])
+
+
+def nud_eff_uv(scale, rot, trans, ttype=0):
+    """an H3D texture coordinator -> Smash 4's effect shader UV props (NU_effRotUV, NU_effScaleUV,
+    NU_effTransUV), [4] each, for a NUD whose V is the 3DS's turned (V' = 1 - V). The effect vertex program
+    (shader/texas_cross.nsh, MC_EFFECT: effScaleUV [1], effRotUV [2], effTransUV [3]) does
+        u_r = cos r (u - 1/2) + sin r (v - 1/2) + 1/2,  v_r = -sin r (u - 1/2) + cos r (v - 1/2) + 1/2,
+        U = (u_r + t.x) s.x,  V = 1 - s.y (1 - (v_r + t.y)),
+    so with the 3DS matrix M (tex_transform) and the 3DS sampling V = 1 - v': s = the 3DS scale, r = its
+    rotation, t.x = M[0, 2] / s.x + (cos r - sin r - 1) / 2, t.y = (1 - sin r - cos r) / 2 - M[1, 2] / s.y
+    (Maya: t = (-tu, tv))"""
+    sx, sy = scale
+    m = tex_transform(scale, rot, trans, ttype)
+    c, s = np.cos(rot), np.sin(rot)
+    tx = m[0, 2] / sx + 0.5 * (c - s - 1) if abs(sx) > 1e-12 else 0.0
+    ty = 0.5 * (1 - s - c) - m[1, 2] / sy if abs(sy) > 1e-12 else 0.0
+    return [float(rot), 0.0, 0.0, 0.0], [float(sx), float(sy), 0.0, 0.0], [float(tx), float(ty), 0.0, 0.0]
+
+
+def nud_sampler_uv(scale, trans, ttype=0):
+    """an H3D texture coordinator without rotation -> NU_colorSamplerUV [s.x, s.y, t.x, t.y]: the body vertex
+    programs (texas_cross.nsh) do U = s.x (u + t.x), V = s.y (V' + t.y), so s = the 3DS scale, t.x = M[0, 2] /
+    s.x, t.y = (1 - M[1, 2]) / s.y - 1 (Maya: (-tu, (1 - sv) / sv + tv))"""
+    sx, sy = [x or 1.0 for x in scale]
+    m = tex_transform((sx, sy), 0.0, trans, ttype)
+    return [float(sx), float(sy), float(m[0, 2] / sx), float((1 - m[1, 2]) / sy - 1)]
+
+
 TEV_STAGES = (0xC0, 0xC8, 0xD0, 0xD8, 0xF0, 0xF8)
 
 
@@ -481,7 +525,7 @@ class Bch:
                 for j in range(3):
                     pc = params + 0xC + 0x18 * j
                     pr = self.u32(pc)
-                    coords.append(dict(projection=(pr >> 16) & 0xFF, camera=pr >> 24,
+                    coords.append(dict(projection=(pr >> 16) & 0xFF, camera=pr >> 24, transform=(pr >> 8) & 0xFF,
                                        scale=self.f32s(pc + 4, 2), rotate=self.f32s(pc + 12, 1)[0],
                                        translate=self.f32s(pc + 16, 2)))
                 mat['coords'] = coords

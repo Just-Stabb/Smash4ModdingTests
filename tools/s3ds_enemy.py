@@ -63,6 +63,19 @@ BODY_PROPS = [('NU_colorSamplerUV', [1.0, 1.0, 0.0, 0.0]), ('NU_lightMapColorOff
               ('NU_alphaBlendParams', [0.0, 0.0, 0.0, 0.0]), ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
 
 
+# a material whose UV rotates (no body shader rotates UVs): Smash 4's skinned effect shader (Captain Falcon's
+# EffCaptainFalconPunch "..._eff_skin" mesh), whose vertex program has NU_effRotUV (s3ds_model.nud_eff_uv)
+ROT_FLAGS = 0xB0241100
+ROT_PROPS = [('NU_effRotUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effScaleUV', [1.0, 1.0, 0.0, 0.0]),
+             ('NU_effTransUV', [0.0, 0.0, 0.0, 0.0]), ('NU_effColorGain', [1.0, 1.0, 1.0, 1.0]),
+             ('NU_angleFadeParams', [0.0, 1.0, 0.0, 0.0]), ('NU_materialHash', [0.0, 0.0, 0.0, 0.0])]
+
+
+def rotating_materials(*anims):
+    """names of the materials a material animation rotates the UVs of (H3D property 20: coordinator 0)"""
+    return {md['name'] for a in anims if a for md in a['materials'] if md['property'] == 20}
+
+
 def bone_hash(name):
     return zlib.crc32(name.encode()) & 0xFFFFFFFF
 
@@ -118,11 +131,15 @@ def tangents(pos, nrm, uv, tri):
     return out_t, out_b
 
 
-def body_material(mat, color_id, normal_id, wrap):
+def body_material(mat, color_id, normal_id, wrap, rotating=False):
     """Smash 4's skinned body material for a 3DS material: its blending (H3D fragment operations: source alpha /
     one minus source alpha -> NUD 1 / 1; source alpha / one, additive -> 1 / 2; anything else blended -> 1 / 1),
     alpha test (greater -> 516, greater or equal -> 518, the 3DS reference), culling (back -> 1029, front ->
-    1028, none -> 0) and texture transform (NU_colorSamplerUV, see sampler_uv)"""
+    1028, none -> 0) and texture transform (NU_colorSamplerUV, see sampler_uv). ROTATING (its UV rotates, or is
+    turned): the skinned effect material (ROT_FLAGS, unlit) with the transform as NU_effRotUV / ScaleUV /
+    TransUV"""
+    if rotating or abs(mat.get('coords', [{}])[0].get('rotate', 0.0)) > 1e-6:
+        return rot_material(mat, color_id, wrap)
     bl, at = mat.get('blend', {}), mat.get('alpha_test', {})
     src = dst = 0
     if bl.get('on'):
@@ -144,13 +161,38 @@ def body_material(mat, color_id, normal_id, wrap):
 
 
 def sampler_uv(coord, translate=None, scale=None):
-    """3DS texture coordinator (scale, translate; Ohana3DS: uv' = uv * scale - translate, V up) -> NUD
-    NU_colorSamplerUV (Smash Forge NUD.vert: uv' = s * (uv + t)) for the NUD's V' = 1 - V: s = the 3DS scale,
-    t_u = -t / s, t_v = (1 - s + t) / s. Rotation is left out."""
-    su, sv = scale or coord['scale']
-    tu, tv = translate or coord['translate']
-    su, sv = su or 1.0, sv or 1.0
-    return [su, sv, -tu / su, (1.0 - sv + tv) / sv]
+    """3DS texture coordinator (scale, translate) -> NUD NU_colorSamplerUV for the NUD's V' = 1 - V
+    (s3ds_model.nud_sampler_uv: H3D's Maya transform, SPICA's, translates then scales; the body vertex programs
+    do U = s.x (u + t.x), V = s.y (V' + t.y)): s = the 3DS scale, t = (-tu, (1 - sv) / sv + tv). Rotation
+    can't be expressed: a rotating material is a rot_material."""
+    return sm.nud_sampler_uv(scale or coord['scale'], translate or coord['translate'], coord.get('transform', 0))
+
+
+def eff_uv_flat(coord, scale=None, rot=None, translate=None):
+    """the coordinator (or its animated values) as NU_effRotUV, NU_effScaleUV, NU_effTransUV"""
+    sc = [x or 1.0 for x in (scale or coord['scale'])]
+    return sm.nud_eff_uv(sc, coord.get('rotate', 0.0) if rot is None else rot,
+                         translate or coord['translate'], coord.get('transform', 0))
+
+
+def rot_material(mat, color_id, wrap):
+    """the skinned effect material (ROT_FLAGS) for a 3DS material with a rotating UV: colour texture only,
+    its blending (alpha -> 5 / 1, additive -> 5 / 2), alpha test, culling, the UV transform"""
+    bl, at = mat.get('blend', {}), mat.get('alpha_test', {})
+    src, dst = ((5, 2) if bl['dst'] == 1 else (5, 1)) if bl.get('on') else (0, 0)
+    af = ref = 0
+    if at.get('on') and at['func'] in (6, 7):
+        af, ref = (516 if at['func'] == 6 else 518), at['ref']
+    cull = {0: 0, 1: 1028, 2: 1029}.get(mat.get('cull', 2), 1029)
+    m = nud.Material(ROT_FLAGS, src, dst, af, ref, cull)
+    m.textures.append(dict(hash=color_id, map_mode=0, wrap_s=wrap[0], wrap_t=wrap[1], min_f=3, mag_f=2, mip=6,
+                           unk=0, unk2=0))
+    r4, s4, t4 = eff_uv_flat(mat['coords'][0]) if 'coords' in mat else ([0.0] * 4, [1.0, 1.0, 0.0, 0.0],
+                                                                         [0.0] * 4)
+    _bits, val = float_hash(mat['name'])
+    m.props = [(n, {'NU_effRotUV': r4, 'NU_effScaleUV': s4, 'NU_effTransUV': t4,
+                    'NU_materialHash': [val, 0.0, 0.0, 0.0]}.get(n, list(v))) for n, v in ROT_PROPS]
+    return m
 
 
 # H3D wrap (0 clamp to edge, 1 border, 2 repeat, 3 mirror) -> NUD (1 repeat, 2 mirror, 3 clamp)
@@ -164,7 +206,7 @@ def _resized(img, w, h):
     return np.asarray(Image.fromarray(img, 'RGBA').resize((w, h), Image.BILINEAR))
 
 
-def build_model(bch, mbn, tex_id, log=print):
+def build_model(bch, mbn, tex_id, log=print, rotating=None):
     """-> (model.nud, model.nut, model.vbn, model) bytes. Texture unit 0 is the colour (units 1 / 2 are the 3DS
     shader's reflection / specular maps, left out), except a unit-1 texture named *alpha*: a mask, put into the
     colour's alpha. A material without a texture gets a flat one of its diffuse colour."""
@@ -172,6 +214,9 @@ def build_model(bch, mbn, tex_id, log=print):
     bones = model['bones']
     textures = {k: v for k, v in bch.textures().items() if not k.endswith('#format')}
     assert len(model['objects']) == len(mbn), (len(model['objects']), len(mbn))
+    if rotating is None:
+        rotating = rotating_materials(*bch.material_animations())
+    model['rotating'] = set(rotating)
     ids, images = {}, []
 
     def tex(key, img):
@@ -236,10 +281,13 @@ def build_model(bch, mbn, tex_id, log=print):
             q[:, 0] += 255 - q.sum(1)
             p.weights = q
             p.bones[q == 0] = p.bones[:, :1].repeat(4, 1)[q == 0]
-            p.materials = [body_material(mat, color, flat, wrap)]
+            p.materials = [body_material(mat, color, flat, wrap, mat['name'] in rotating)]
             polys.append(p)
         m = nud.Mesh(obj['name'], polys, -1, 4)
         meshes.append(m)
+        if polys and polys[0].materials[0].flags == ROT_FLAGS:
+            log('  mesh %s: material %s rotates its UV: skinned effect shader 0x%08X' % (
+                obj['name'], mat['name'], ROT_FLAGS))
         log('  mesh %-24s %5d vertices, %5d triangles' % (
             obj['name'], sum(len(p.pos) for p in polys), sum(len(p.idx) // 3 for p in polys)))
     nud_b = nud.write(meshes, top_bone=len(bones) - 1)
@@ -342,11 +390,12 @@ def omo_from(anim, bones):
     return o.encode(), frames
 
 
-def anim_mta(vis=None, mats=None, model=None, mesh_names=()):
+def anim_mta(vis=None, mats=None, model=None, mesh_names=(), rotating=()):
     """a visibility animation and / or a material animation (H3D) -> MTA bytes. Visibility: mesh states by
     name. Material: texture coordinator 0's translate / scale (UV scrolls, the common case) as
-    NU_colorSamplerUV a frame, by the material's NU_materialHash; the other animated properties (combiner
-    constant colours, rotation, coordinators 1 / 2) are counted, not converted."""
+    NU_colorSamplerUV a frame, by the material's NU_materialHash; for a ROTATING material (a rot_material)
+    translate / scale / rotation as NU_effTransUV / ScaleUV / RotUV; the other animated properties (combiner
+    constant colours, coordinators 1 / 2) are counted, not converted."""
     frames = max(1, int(round(max(a['frames'] for a in (vis, mats) if a))))
     vlist = []
     if vis:
@@ -362,7 +411,8 @@ def anim_mta(vis=None, mats=None, model=None, mesh_names=()):
         by_name = {m['name']: m for m in model['materials']}
         for md in mats['materials']:
             mat = by_name.get(md['name'])
-            if mat is None or md['property'] not in (0x13, 0x15):
+            if mat is None or md['property'] not in (0x13, 0x14, 0x15) or \
+                    (md['property'] == 0x14 and md['name'] not in rotating):
                 skipped += 1
                 continue
             entry = next((e for e in mlist if e['name'] == md['name']), None)
@@ -372,7 +422,8 @@ def anim_mta(vis=None, mats=None, model=None, mesh_names=()):
             entry['tracks'][md['property']] = md['components']
         for e in mlist:
             c = model and by_name[e['name']]['coords'][0]
-            vals = []
+            rot = e['name'] in rotating
+            vals, rots, trans = [], [], []
             for f in range(frames):
                 def comp(prop, j, default):
                     t = e['tracks'].get(prop)
@@ -380,8 +431,20 @@ def anim_mta(vis=None, mats=None, model=None, mesh_names=()):
                     return default if v is None else v
                 sc = (comp(0x13, 0, c['scale'][0]), comp(0x13, 1, c['scale'][1]))
                 tr = (comp(0x15, 0, c['translate'][0]), comp(0x15, 1, c['translate'][1]))
-                vals.append(sampler_uv(c, tr, sc))
-            e['props'] = [dict(name='NU_colorSamplerUV', values=vals)]
+                if rot:
+                    r4, s4, t4 = eff_uv_flat(c, sc, comp(0x14, 0, c.get('rotate', 0.0)), tr)
+                    rots.append(r4)
+                    vals.append(s4)
+                    trans.append(t4)
+                else:
+                    vals.append(sampler_uv(c, tr, sc))
+            if rot:
+                e['props'] = [dict(name=n, values=v) for n, v in (('NU_effRotUV', rots), ('NU_effScaleUV', vals),
+                                                                  ('NU_effTransUV', trans))
+                              if any(not np.allclose(x, v[0]) for x in v)]
+            else:
+                e['props'] = [dict(name='NU_colorSamplerUV', values=vals)]
+        mlist = [e for e in mlist if e.get('props')]
     out = mta.write(frames, [dict(name=e['name'], hash=e['hash'], props=e['props']) for e in mlist], vis=vlist)
     return out, skipped
 
@@ -452,7 +515,8 @@ def convert(src, kind, out, tex_id, log=print):
             # fighters' models. The retro sprite enemies (cucco, flyingman, shiroiobake) keep their flipbooks
             # here: one long visibility timeline of sprite meshes
             meshes = [o['name'] for o in model['objects'] if not o['silhouette']]
-            b, skipped = anim_mta(vanims[0] if vanims else None, manims[0] if manims else None, model, meshes)
+            b, skipped = anim_mta(vanims[0] if vanims else None, manims[0] if manims else None, model, meshes,
+                                  model['rotating'])
             open(os.path.join(od, 'model.mta'), 'wb').write(b)
             summary['skipped_mat_props'] += skipped
             log('  model.mta (%s)' % ', '.join('%s %s %d frames' % (k, a[0]['name'], a[0]['frames'])
@@ -473,7 +537,8 @@ def convert(src, kind, out, tex_id, log=print):
                     mats = {a['name']: a for a in ab.material_animations()}
                     for name in sorted(set(vis) | set(mats)):
                         b, skipped = anim_mta(vis.get(name), mats.get(name), model,
-                                              [o['name'] for o in model['objects'] if not o['silhouette']])
+                                              [o['name'] for o in model['objects'] if not o['silhouette']],
+                                              model['rotating'])
                         entries.append((name + '.mta', b))
                         summary['skipped_mat_props'] += skipped
                 if entries:

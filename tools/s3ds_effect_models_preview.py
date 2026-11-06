@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Contact sheet of converted Smash Run effect models (tools/s3ds_effect_models.py), drawn from the written
 folders only: model.nud meshes (bind 8: each in its bone's space) posed by model.omo (omo.world, a frame:
-the middle one by default), textured from model.nut with the material's NU_effScaleUV / NU_effTransUV and
-NU_effColorGain, blended as the material says (additive / alpha / opaque). No lighting, no MTA.
+the middle one by default), textured from model.nut with the material's UV transform (NU_effRotUV / ScaleUV /
+TransUV as the effect vertex program does it: s3ds_preview.nud_uv) and NU_effColorGain, blended as the material
+says (additive / alpha / opaque). No lighting, no MTA.
 
   python3 tools/s3ds_effect_models_preview.py OUT_ROOT SHEET.png [KIND[/NAME]...] [--frame N] [--size 160]
 """
@@ -18,7 +19,7 @@ sys.path.insert(0, HERE)
 import nud  # noqa: E402
 import nut  # noqa: E402
 import omo  # noqa: E402
-from s3ds_preview import render  # noqa: E402
+from s3ds_preview import nud_uv, render  # noqa: E402
 
 
 def items(d, frame=None):
@@ -35,11 +36,10 @@ def items(d, frame=None):
         for p in m.polygons:
             mat = p.materials[0]
             props = dict(mat.props)
-            s4, t4 = props.get('NU_effScaleUV', [1, 1]), props.get('NU_effTransUV', [0, 0])
             gain = np.array(props.get('NU_effColorGain', [1, 1, 1, 1]), float)
             img = images[mat.textures[0]['hash']].astype(np.float64)
             img = np.clip(img * gain[None, None, :], 0, 255).astype(np.uint8)
-            uv = p.uvs[0] * np.array(s4[:2]) + np.array(t4[:2])
+            uv = nud_uv(p.uvs[0], props)
             pos = (bm @ np.c_[p.pos, np.ones(len(p.pos))].T).T[:, :3]
             tri = np.asarray(p.idx).reshape(-1, 3)
             out.append((pos, uv, np.r_[tri, tri[:, ::-1]], img, (mat.alpha_func, mat.ref_alpha, mat.src, mat.dst),

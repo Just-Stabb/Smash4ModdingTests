@@ -30,6 +30,7 @@ import s3ds_effects as sfx  # noqa: E402
 import s3ds_enemy as se  # noqa: E402
 import s3ds_model as sm  # noqa: E402
 import xmb  # noqa: E402
+from s3ds_preview import nud_uv  # noqa: E402
 
 FAILS = []
 
@@ -93,8 +94,15 @@ def model_checks(tag, mdir, d, all_ids):
               '%s: blend / alpha test' % mt)
         props = dict(got.props)
         check(np.allclose(props['NU_effColorGain'], st['gain'], atol=1e-5), '%s: colour gain' % mt)
-        s4, t4 = em.eff_uv(st['scale'], st['trans'])
-        check(np.allclose(props['NU_effScaleUV'], s4) and np.allclose(props['NU_effTransUV'], t4), '%s: UV' % mt)
+        if 3 in a and 'coords' in mat:
+            # end to end: the written UVs through the effect vertex program's transform (s3ds_preview.nud_uv)
+            # sample where the 3DS's coordinator transform (SPICA's) puts the 3DS UVs (V' = 1 - v')
+            co = mat['coords'][0]
+            m3 = sm.tex_transform([x or 1.0 for x in co['scale']], co['rotate'], co['translate'], co['transform'])
+            t3 = (m3 @ np.c_[a[3][used], np.ones(len(used))].T).T
+            got_uv = nud_uv(np.asarray(p.uvs[0], float), props)
+            check(np.allclose(got_uv, np.c_[t3[:, 0], 1 - t3[:, 1]], atol=4e-3, rtol=1e-3),
+                  '%s: UV transform (rotation / scale / translation)' % mt)
         if check(all(t['hash'] in ids for t in got.textures), '%s: texture in the nut' % mt):
             back = decoded[got.textures[0]['hash']]
             if back.shape == img.shape:                     # (not resized to a power of two)
@@ -137,6 +145,12 @@ def model_checks(tag, mdir, d, all_ids):
         check(again == md, '%s: mta re-writes identical' % tag)
         folder = os.path.basename(d)
         for e in r['mats']:
+            rv = next((q['values'] for q in e['props'] if q['name'] == 'NU_effRotUV'), None)
+            tr = tracks.get(e['name'][len(folder) + 1:], {})
+            if (20, 0) in tr:
+                want = [sm.sample(tr[(20, 0)][0], f) for f in range(r['frames'])]
+                check(rv is not None and np.allclose([v[0] for v in rv], want, atol=1e-5),
+                      '%s: %s UV rotation track' % (tag, e['name']))
             gv = next((q['values'] for q in e['props'] if q['name'] == 'NU_effColorGain'), None)
             wg = want_gains.get(e['name'][len(folder) + 1:])
             if gv is not None and check(wg is not None, '%s: mta material %s' % (tag, e['name'])):

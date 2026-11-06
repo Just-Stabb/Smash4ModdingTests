@@ -12,6 +12,10 @@
   (Goomba: 0.064 at worst, the feet turned ~180 degrees: OMO rotation type 5 rebuilds w from 16-bit x y z,
   coarse where w is near 0; most frames are under 0.01).
 - the visibility: every material_anime .bch is an MTA in material_anime.pac whose mesh states are the 3DS bits.
+- the UVs, end to end: every mesh's written UVs through its material's transform as the Wii U vertex programs
+  do it (s3ds_preview.nud_uv: NU_colorSamplerUV, or NU_effRotUV / ScaleUV / TransUV for a material whose UV
+  rotates, which gets the skinned effect shader) sample where the 3DS's coordinator transform (SPICA's) puts the
+  3DS UVs; the model.mta's UV tracks the same a frame against the 3DS's animated scale / rotation / translation.
 - the ACMD: big-endian, every command known, the same scripts and parameters as the 3DS file.
 
   python3 tools/s3ds_enemy_test.py SRC_ROOT [KIND | all]   (SRC_ROOT: a tools/s3ds_unpack.py extract)
@@ -27,10 +31,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import acmd  # noqa: E402
 import mta  # noqa: E402
+import nud  # noqa: E402
 import nut  # noqa: E402
 import omo  # noqa: E402
 import s3ds_enemy as se  # noqa: E402
 import s3ds_model as sm  # noqa: E402
+from s3ds_preview import nud_uv  # noqa: E402
 
 FAILS = []
 
@@ -107,6 +113,73 @@ def model_tests(src, kind, out, part='body', c='c00', quiet=False):
         worst = max(worst, best)
     check(worst < 8, '%s: every colour texture in the NUT (worst mean error %.2f / 255)' % (tag, worst))
     return bch, mbn, model
+
+
+def _coord_t(co, sc=None, rot=None, tr=None):
+    sc = [x or 1.0 for x in (sc or co['scale'])]
+    return sm.tex_transform(sc, co['rotate'] if rot is None else rot, tr or co['translate'], co['transform'])
+
+
+def uv_tests(src, kind, out, bch, mbn, model, part='body', c='c00'):
+    tag = '%s/%s/%s' % (kind, part, c)
+    od = os.path.join(out, 'model', 'enemy', kind, part, c)
+    written = nud.read(os.path.join(od, 'model.nud'))
+    pairs = [(o, mi) for o, mi in zip(model['objects'], sm.match_objects(model['objects'], mbn)) if not o['silhouette']]
+    worst, rot = 0.0, 0
+    for (obj, mi), mesh in zip(pairs, written):
+        mat = model['materials'][obj['material']]
+        a = mbn[mi]['attrs']
+        if 3 not in a or 'coords' not in mat:
+            continue
+        m3 = _coord_t(mat['coords'][0])
+        for p, (_bl, idx) in zip(mesh.polygons, mbn[mi]['parts']):
+            used = np.unique(idx)
+            props = dict(p.materials[0].props)
+            rot += p.materials[0].flags == se.ROT_FLAGS
+            t3 = (m3 @ np.c_[a[3][used], np.ones(len(used))].T).T
+            got = nud_uv(np.asarray(p.uvs[0], float), props)
+            worst = max(worst, float(np.abs(got - np.c_[t3[:, 0], 1 - t3[:, 1]]).max(initial=0)))
+    check(worst < 4e-3 * 8, '%s: UVs through the shader transform = the 3DS transform (worst %.4f; %d rotating '
+          'polygons)' % (tag, worst, rot))
+    # the model's own material animation: every frame's UV transform at three points
+    path = os.path.join(od, 'model.mta')
+    anims = bch.material_animations()
+    if not anims or not os.path.exists(path):
+        return
+    r = mta.read(open(path, 'rb').read())
+    by_mat = {m['name']: m for m in model['materials']}
+    statics = {}
+    for m in written:
+        for p in m.polygons:
+            props = dict(p.materials[0].props)
+            statics.setdefault(struct.unpack('>I', struct.pack('>f', props['NU_materialHash'][0]))[0], props)
+    tracks = {}
+    for md in anims[0]['materials']:
+        tracks.setdefault(md['name'], {})[md['property']] = md['components']
+    pts = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    worst, n = 0.0, 0
+    for e in r['mats']:
+        mat, tr = by_mat.get(e['name']), tracks.get(e['name'], {})
+        if mat is None or e['hash'] not in statics:
+            continue
+        co = mat['coords'][0]
+        for f in range(r['frames']):
+            def comp(prop, j, default):
+                t = tr.get(prop)
+                v = sm.sample(t[j], f) if t and j < len(t) and t[j] is not None else None
+                return default if v is None else v
+            props = dict(statics[e['hash']])
+            for q in e['props']:
+                props[q['name']] = q['values'][min(f, len(q['values']) - 1)]
+            m3 = _coord_t(co, [comp(0x13, j, co['scale'][j]) for j in range(2)], comp(0x14, 0, co['rotate']),
+                          [comp(0x15, j, co['translate'][j]) for j in range(2)])
+            t3 = (m3 @ np.c_[pts, np.ones(3)].T).T
+            # the NUD's UV of a 3DS point is (u, 1 - v)
+            got = nud_uv(np.c_[pts[:, 0], 1 - pts[:, 1]], props)
+            worst = max(worst, float(np.abs(got - np.c_[t3[:, 0], 1 - t3[:, 1]]).max()))
+            n += 1
+    check(worst < 1e-3, '%s: model.mta UV tracks = the 3DS animated transform (%d material frames, worst %.5f)'
+          % (tag, n, worst))
 
 
 def motion_tests(src, kind, out, models, mbns, limit=0.1):
@@ -197,7 +270,8 @@ def enemy_tests(src, kind, out):
     se.convert(src, kind, out, 0x4E000000, log=lambda *a: None)
     models, mbns = {}, {}
     for part, c, _d in se._model_dirs(os.path.join(src, 'enemy', kind)):
-        _bch, mbn, model = model_tests(src, kind, out, part, c)
+        bch, mbn, model = model_tests(src, kind, out, part, c)
+        uv_tests(src, kind, out, bch, mbn, model, part, c)
         if c == 'c00':
             models[part], mbns[part] = model, mbn
     if models:

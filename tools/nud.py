@@ -99,6 +99,8 @@ def read(path):
             p.nv, p.voff, p.vaoff = nv, vert_base + voff, va_base + vaoff
             if vs >> 4 == 0:
                 _read_vertices(d, p)
+            else:
+                _read_rigged_uvs(d, p)
             for to in texoffs:
                 if to:
                     p.materials.append(_read_material(d, to, str_base))
@@ -124,6 +126,20 @@ def _read_vertices(d, p):
     if vt:
         n = a['nrm'].astype(np.float64)
         p.nrm = n[:, 1:4] if vt in (1, 3) else n[:, :3]
+    if ct:
+        p.col = a['col'].astype(np.float64) * (255 if ct == 4 else 1)
+    p.uvs = [a['uv%d' % i].astype(np.float64) for i in range(nuv)]
+
+
+def _read_rigged_uvs(d, p):
+    """a rigged polygon's colours and UVs (its vertex section; positions / weights are in the add section, not
+    read)"""
+    ct, nuv, half = p.uv_size & 0xE, p.uv_size >> 4, not p.uv_size & 1
+    cols = [('col', 'u1', (4,))] if ct == 2 else [('col', '>f2', (4,))] if ct == 4 else []
+    cols += [('uv%d' % i, '>f2' if half else '>f4', (2,)) for i in range(nuv)]
+    if not cols:
+        return
+    a = np.frombuffer(d, np.dtype(cols), p.nv, p.voff)
     if ct:
         p.col = a['col'].astype(np.float64) * (255 if ct == 4 else 1)
     p.uvs = [a['uv%d' % i].astype(np.float64) for i in range(nuv)]
