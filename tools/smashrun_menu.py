@@ -105,24 +105,22 @@ def star_image(size=STAR_SIZE, points=5, inner=0.48, round_px=6):
 
 
 def put_bc5(path, at, lum, alpha):
+    """lum / alpha into the BC5 atlas at `at`: only the blocks under them are re-encoded"""
     d, ts = nut.load(path)
     t = ts[0]
-    img = nut.decode(d, t)
     x, y = at
-    h, w = lum.shape
-    img[y:y + h, x:x + w, 0] = lum
-    img[y:y + h, x:x + w, 1] = alpha
-    return nut.replace(d, t, img), (t.w, t.h)
+    sub = nut.decode(d, t)[y:y + lum.shape[0], x:x + lum.shape[1]].copy()
+    sub[..., 0], sub[..., 1] = lum, alpha
+    return nut.replace_region(d, t, x, y, sub), (t.w, t.h)
 
 
 def put_bc4(path, at, alpha):
     d, ts = nut.load(path)
     t = ts[0]
-    img = nut.decode(d, t)
     x, y = at
-    h, w = alpha.shape
-    img[y:y + h, x:x + w, 0] = alpha
-    return nut.replace(d, t, img), (t.w, t.h)
+    sub = nut.decode(d, t)[y:y + alpha.shape[0], x:x + alpha.shape[1]].copy()
+    sub[..., 0] = alpha
+    return nut.replace_region(d, t, x, y, sub), (t.w, t.h)
 
 
 # ---------------------------------------------------------------- the movie

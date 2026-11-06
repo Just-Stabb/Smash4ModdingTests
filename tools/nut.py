@@ -276,6 +276,47 @@ def encode(img, t):
     return out.tobytes()
 
 
+def encode_blocks(img, fmt):
+    """RGBA [h, w, 4] (h, w multiples of 4 for BC) -> per-element bytes [n, element bytes], row order"""
+    f = fmt & 0x3F
+    if f == 0x1A:
+        return np.ascontiguousarray(img).reshape(-1, 4).astype(np.uint8)
+    blocks, _ew, _eh = _blocks(img)
+    if f == 0x31:
+        return _enc_bc1(blocks[:, :, :3])
+    if f == 0x33:
+        return np.concatenate([_enc_bc4(blocks[:, :, 3]), _enc_bc1(blocks[:, :, :3])], 1)
+    if f == 0x34:
+        return _enc_bc4(blocks[:, :, 0])
+    if f == 0x35:
+        return np.concatenate([_enc_bc4(blocks[:, :, 0]), _enc_bc4(blocks[:, :, 1])], 1)
+    raise NotImplementedError('format 0x%X' % f)
+
+
+def replace_region(d, t, x, y, sub):
+    """the .nut data d with texture t's first mip changed only in the elements (4x4 blocks for BC) covering
+    the rectangle at (x, y) of sub (RGBA): those are re-encoded from the decoded image with sub in it, every
+    other element keeps its bytes"""
+    assert t.levels <= 1, 'mipmapped textures not supported'
+    img = decode(d, t)
+    h, w = sub.shape[:2]
+    img[y:y + h, x:x + w] = sub
+    bs = 4 if _is_bc(t.fmt & 0x3F) else 1
+    x0, y0 = x // bs * bs, y // bs * bs
+    x1, y1 = -(-(x + w) // bs) * bs, -(-(y + h) // bs) * bs
+    lin = encode_blocks(img[y0:y1, x0:x1], t.fmt)
+    bpp = _bpp(t.fmt & 0x3F)
+    ew, eh = (t.w + bs - 1) // bs, (t.h + bs - 1) // bs
+    offs = element_offsets(ew, eh, bpp, t.tile_mode, t.swizzle, t.pitch)
+    offs = offs[y0 // bs:y1 // bs, x0 // bs:x1 // bs].reshape(-1)
+    out = bytearray(d)
+    eb = bpp // 8
+    for k in range(eb):
+        for o, v in zip(offs, lin[:, k]):
+            out[t.data_off + int(o) + k] = int(v)
+    return bytes(out)
+
+
 def replace(d, t, img):
     """the .nut data d with texture t's first mip replaced by img (RGBA [t.h, t.w, 4])"""
     assert t.levels <= 1, 'mipmapped textures not supported'
