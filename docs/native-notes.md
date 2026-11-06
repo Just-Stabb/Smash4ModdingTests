@@ -1784,5 +1784,5 @@ list's `max` counts (entries before the first special one, bit 31) and stored fr
 past 64 they overwrite `+0x110` / `+0x114`; the next lookup by article id (`0x02C05790`: `+0x124` empty, so
 `0x02C03378` reads `[[holder + 0x114] + 4]`) goes through a null. Not memory: a bigger heap doesn't help. Raising it
 would mean a bigger holder and moving its `+0x110` / `+0x114` / `+0x118` everywhere they're read. Per fighter today
-(the base's + the new articles'): Sephiroth 9 + 36, Hero 13 + 18, Squirtle 9 + 6, Supamario 9 + 1. `port_check` W8.
+(the base's + the new articles'): Sephiroth 9 + 39, Hero 13 + 18, Squirtle 9 + 6, Supamario 9 + 1. `port_check` W8.
 
