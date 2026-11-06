@@ -1673,7 +1673,7 @@ itself to be released while an oppenent is attached to the snake sword, and it d
 - port_check over the chain and tests 70–115: 30 errors, as before.
 - Package (install over 114): `script/msc/edge.mscsb`.
 
-## Test 116 (`build/sephiroth_test116.zip`): Phantom held-fighter offset, loop cap, speed 2.2, Blade Dash ends at 23, air use from the attack
+## Test 116 (not sent: folded into 117): Phantom held-fighter offset, loop cap, speed 2.2, Blade Dash ends at 23, air use from the attack
 
 User (clips of the Phantom and tap up special): "When Phantom tracks a held opponent, it spawns inside of them ... The
 distance from the opponent used in this clip is what I'd like the offset to be. Held up special loops indefinitely when
@@ -1691,4 +1691,16 @@ finishes."
 - **Once per air time:** spent as the rush (the attack) begins, not at the start.
 - port_check over the chain and tests 70–116: 30 errors, as before.
 - Package (install over 115): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
+## Test 117 (`build/sephiroth_test117.zip`): test 116's changes + no purple flash left on his hand
+
+User: "When releasing Phantom, Sephiroth permanently has a purple effect on his hand until doing it again." Every
+attack script of the Phantom (Zelda's, copied) starts with `Graphic_Effect4(0x3100016, bone 0x7DA)`: Zelda's purple
+flash on her hand as she sends it, which her release status ends. Sephiroth sends it from any status, so nothing
+ended it. The build now takes it out of the Phantom's effect.bin (17 scripts: `edge_specials_build.py
+phantom_hand_flash`); he has no such hand pose.
+- Test 116 (above) wasn't sent: this package has its changes too.
+- port_check over the chain, tests 70–115 and 117: 30 errors, as before.
+- Package (install over 115): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`,
+  `script/animcmd/weapon/phantom/effect.bin`.
 

@@ -162,6 +162,24 @@ def _when(value, body, var=SNAKE_VAR):
     return [U.cmd('Float_Var_Compare', var, 0, float(value)), U.cmd('True', 2 + U.words(body))] + body
 
 
+PHANTOM_HAND_FLASH = 0x3100016   # Zelda's purple flash on her hand (bone 0x7DA) as the Phantom attacks
+
+
+def phantom_hand_flash(path):
+    """the Phantom's attack effect scripts without Zelda's release flash on her hand (Graphic_Effect4 0x3100016 on
+    bone 0x7DA): vanilla ends it with her release status; Sephiroth sends it from any status (tests 103 on), so it
+    stayed on his hand (test 117, the user: "Sephiroth permanently has a purple effect on his hand")"""
+    eff = acmd.ACMDFile.load(path)
+    n = 0
+    for crc, cmds in eff.scripts.items():
+        keep = [c for c in cmds if not (c.name == 'Graphic_Effect4' and c.params[0] == PHANTOM_HAND_FLASH)]
+        n += len(cmds) - len(keep)
+        eff.scripts[crc] = keep
+    assert n, 'phantom effect.bin: no hand flash found'
+    eff.save(path)
+    return 'phantom: its hand flash taken out of %d scripts' % n
+
+
 # held Octaslash's loop (test 113, edge.c edge_hi_*): VAR_20 0 a plain pass, 1 the first pass held, 2 a looped pass
 # (SpecialHi2 changed to again at frame 4 by the MSC, so the script runs past frames 0 - 3 at once)
 OCTA_VAR = 0x0F000314
@@ -549,6 +567,7 @@ def main():
     compile_msc(os.path.join(EDGE, 'weapons/phantom.c'), os.path.join(msc, 'phantom/phantom.mscsb'))
     for sub in ('model/phantom', 'motion/phantom', 'script/animcmd/weapon/phantom'):
         shutil.copytree(os.path.join(a.zelda, sub), os.path.join(fighter, sub), dirs_exist_ok=True)
+    print(phantom_hand_flash(os.path.join(fighter, 'script/animcmd/weapon/phantom/effect.bin')))
     print(flare1_scripts(a, os.path.join(fighter, 'script/animcmd/weapon/flare1')))
     if SNAKE_FAIR:                                  # the held forward air's articles: MSC and models
         import edge_snake_articles
