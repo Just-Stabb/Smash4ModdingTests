@@ -709,6 +709,34 @@ def main():
           [common_voice(r['kind']) for r in kinds], [[K.sound_record('csb', r['kind'])] * 4 for r in kinds])
     check('... and Mario\'s (kind 3): record 0', common_voice(3), [0] * 4)
 
+    # ------------------------------------------------------------ the save's per-character records
+    print('# save records (0x02A53C54)')
+    hook, recs, n_ui = info['save_records']
+
+    def records(path, count, idx):
+        E = Emu(path)
+        E.stub(0x03374578, lambda E_: E_.alloc(E_.r(3), b'\0'))
+        arr = E.alloc(8, b'\0')
+        E.setw(arr, 0x61000000)
+        E.setw(arr + 4, count)
+        return [E.call(K.SAVE_RECORD_GET, arr, i) for i in idx]
+    rec = lambda i: 0x61000000 + K.SAVE_RECORD_SIZE * i       # noqa: E731
+    first, n = K.FIRST_UI, n_ui
+    idx = list(range(0, first)) + list(range(first, first + n)) + list(range(first + n, K.SAVE_RECORDS + n)) + \
+        [K.SAVE_RECORDS + n, 500]
+    got = records(patched, K.SAVE_RECORDS, idx)
+    want_old = records(original, K.SAVE_RECORDS, list(range(K.SAVE_RECORDS)) + [K.SAVE_RECORDS])
+    check('positions 0-%d: their own records (= unpatched)' % (first - 1), got[:first], want_old[:first])
+    check('the new characters (positions %d-%d): records of their own in the cave' % (first, first + n - 1),
+          got[first:first + n], [recs + K.SAVE_RECORD_SIZE * i for i in range(n)])
+    check('the vanilla entries moved down by %d: their old records (positions %d-%d -> records %d-%d)' % (
+        n, first + n, K.SAVE_RECORDS + n - 1, first, K.SAVE_RECORDS - 1),
+        got[first + n:K.SAVE_RECORDS + n], [rec(i) for i in range(first, K.SAVE_RECORDS)])
+    check('past them: the game\'s null record (as the unpatched game past 81)', got[-2:], [want_old[-1]] * 2)
+    other = records(patched, 40, [10, 39, 40, 60])
+    check('another count (not the 82 character records): as the game', other,
+          records(original, 40, [10, 39, 40, 60]))
+
     print('FAILS', fails)
     sys.exit(1 if fails else 0)
 

@@ -1387,7 +1387,7 @@ HEAP_VANILLA_MAX, HEAP_VANILLA_WARN, HEAP_PATCHED_WARN = 13.3, 12.0, 20.0
 
 
 def check_cave_hooks(inst, rep):
-    """X1: tools/acmd_ext_cave.py's code in the executable but its var_entry hook (0x04B79000, position_vars_cave's
+    """X2 (below): kind_expand.py's save-record map missing. X1: tools/acmd_ext_cave.py's code in the executable but its var_entry hook (0x04B79000, position_vars_cave's
     first word) the original instruction: a later position_vars_cave put it back, and every 0x0F0003xx variable
     (VAR_ / TIMER_ / KINETIC_TYPE / TRACK_FRAMES / SPEED_ / TEAM, SLOTn_SHARED_k) reads 0 and ignores writes (the
     standard build since Hero fix 79; found for Sephiroth's Shadow Flare, test 64). Apply acmd_ext_cave last"""
@@ -1401,8 +1401,14 @@ def check_cave_hooks(inst, rep):
         img = K.Image(f.name)
         try:
             cave, hook = img.w(0x04B90000), img.w(0x04B79000)
+            kinds, rec = img.w(K.CAVE), img.w(K.SAVE_RECORD_HOOK)
         except Exception:                     # noqa: BLE001
             return
+    if kinds != 0 and rec == 0x81830004:
+        rep.add('ERROR', 'X2 save-records', 'code/cross_f.rpx: new fighter kinds (tools/kind_expand.py) without the save '
+                'records\' index map at 0x02A53C60: the single-player modes read a null record for the database '
+                'positions past the save\'s 82 (Classic mode crashed loading, user\'s Cemu log); rebuild with the '
+                'current kind_expand.py')
     if cave != 0 and hook == 0x548C05BE:
         rep.add('ERROR', 'X1 cave-hook', 'code/cross_f.rpx: acmd_ext_cave.py\'s code is there but its hook at 0x04B79000 '
                 'was undone (position_vars_cave.py applied after it): user / shared variables, timers and the kinetic '

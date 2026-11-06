@@ -51,6 +51,8 @@ What it patches (addresses are the game's; docs/kind-expansion*.md have the rese
    0x1012F6BC...) with their getters' bounds, sound class (0x100D21D8), and the character id -> UI
    name table (0x1033BE68, 0x0293DCCC) with {ui id, ui name} for each new kind. New rows = the
    base's values; unused kinds: "" and 0.
+5b. The save's per-character records (one per vanilla ui_character_db position, 0x02A53C54): the new entries'
+   positions get records of their own in the cave (RAM only), the vanilla entries they moved down their own again.
 6. Kind-count immediates: random fighter picks (0x021ED1A0 / B0 / E0, 0x021E6E30: the count),
    kind -> character id (0x0309FE68), sound banks (0x02A79158), AI motion count (0x0275BAC0), AI
    files (0x02DE1DDC), fighter resource holders (0x02AC3F7C, 0x02761528): the capacity; the
@@ -138,6 +140,17 @@ SIZE_GETTERS = ((0x02EA90E0, 'cmplwi r4, %d'), (0x02EA9104, 'cmplwi r4, %d'), (0
 CHR_TABLE, CHR_COUNT = 0x1033BE68, 0x53       # {u32 id, char *name}, the first {-1, set at run time}
 CHR_READER = ((0x0293DCD0, 'lis r3, 0x1034', 'lis r3, {ha}'), (0x0293DCD8, 'addi r3, r3, -0x4198', 'addi r3, r3, {lo}'))
 CHR_COUNT_SITE = 0x0293DCD4                    # li r4, 0x53
+# the save's per-character records (docs/new-fighter-slot.md "Save records"): an array of 0x50-byte records, one per
+# ui_character_db position (82: the vanilla database), got by index through 0x02A53C54 (about 100 callers in the
+# single-player modes, records, Classic). add_fighter.py inserts each new entry at position = its ui id (59-...), so
+# the vanilla entries from 59 on move down N positions and positions past 81 have no record (the getter returns a
+# null record that its callers read: Classic mode crashed at position 82). The hook maps the index: < 59 as it is,
+# the new ids to records of their own (RAM only: the save has no room for them), the moved entries back by N.
+SAVE_RECORD_GET = 0x02A53C54                   # (r3 {records, count}, r4 index) -> a record handle
+SAVE_RECORD_HOOK = 0x02A53C60                  # lwz r12, 4(r3) (the count; then cmplw r4, r12 / bge)
+SAVE_RECORD_MAKE = 0x02A53C7C                  # bl 0x02A532E8 (r3 = r1 + 0xC, r4 = the record)
+SAVE_RECORD_NONE = 0x02A53C94                  # the index past the count: a handle to a null record
+SAVE_RECORDS, SAVE_RECORD_SIZE, FIRST_UI = 82, 0x50, 59
 RANDOM_SELECT, RANDOM_SELECT_COUNT = 0x02FFB644, 0x51   # li r23, 0x51 (database entries scanned)
 # (address, original, new with %d, 'cap' = capacity / 'cap-1' / 'count')
 IMMEDIATES = [
@@ -671,6 +684,56 @@ inc:    lwzx r4, r5, r0
     assert n_sel <= 96, 'the random-select set holds 96 database entries'
     B.asm(RANDOM_SELECT, 'li r23, %d' % n_sel, 'li r23, 0x%X' % RANDOM_SELECT_COUNT)
     info['chr_table'], info['chr_count'] = chr_at, len(rows)
+
+    # ---- 5b. the save's per-character records by database position (SAVE_RECORD_GET above)
+    n_ui = len(uis)
+    assert sorted(r['ui_id'] for r in uis) == list(range(FIRST_UI, FIRST_UI + n_ui)), 'ui ids consecutive from 59'
+    if n_ui:
+        recs = B.alloc(SAVE_RECORD_SIZE * n_ui, 8)
+        B.data(recs, bytes(SAVE_RECORD_SIZE * n_ui), 'data: save records of the new characters (RAM only)')
+        hook = B.alloc(28 * 4)
+        sr = B.code(hook, '''
+        lwz r12, 4(r3)                  # the records' count
+        cmplwi r12, %(old)d
+        bne sr_plain                    # not the 82 character records: as the game
+        cmplwi r4, %(first)d
+        blt sr_plain
+        cmplwi r4, %(end)d
+        bge sr_moved
+        addi r4, r4, -%(first)d         # a new character: its own record
+        mulli r4, r4, %(size)d
+        lis r12, 0x%(rh)X
+        addi r12, r12, %(rl)d
+        add r4, r12, r4
+        b sr_make
+sr_moved:
+        addi r4, r4, -%(n)d             # a vanilla entry moved down by the inserted ones
+sr_plain:                               # the game's own: index < count, else its null-record path
+        cmplw r4, r12
+        bge sr_none
+        mulli r0, r4, %(size)d
+        lwz r12, 0(r3)
+        add r4, r12, r0
+sr_make:
+        addi r3, r1, 0xC
+        lis r12, 0x%(mh)X
+        addi r12, r12, %(ml)d
+        mtctr r12                       # (out of a branch's reach)
+        bctr
+sr_none:
+        lis r12, 0x%(nh)X
+        addi r12, r12, %(nl)d
+        mtctr r12
+        bctr''' % dict(old=SAVE_RECORDS, first=FIRST_UI, end=FIRST_UI + n_ui, n=n_ui, size=SAVE_RECORD_SIZE,
+                        rh=ha(recs), rl=slo(recs), mh=ha(SAVE_RECORD_MAKE), ml=slo(SAVE_RECORD_MAKE),
+                        nh=ha(SAVE_RECORD_NONE), nl=slo(SAVE_RECORD_NONE)))
+        assert len(sr.words()) == 28
+        for i, (txt, orig) in enumerate([('lis r12, 0x%X' % ha(hook), 'lwz r12, 4(r3)'),
+                                         ('addi r12, r12, %d' % slo(hook), 'cmplw r4, r12'),
+                                         ('mtctr r12', None), ('bctr', None)]):
+            B.asm(SAVE_RECORD_HOOK + 4 * i, txt, orig)
+        assert B.img.w(SAVE_RECORD_MAKE) == b_word(SAVE_RECORD_MAKE, 0x02A532E8, True)
+        info['save_records'] = (hook, recs, n_ui)
 
     # ---- 6. immediates
     for a, orig, new, which in IMMEDIATES:

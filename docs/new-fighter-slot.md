@@ -207,6 +207,16 @@ Because a reused slot already has an entry in each of these, nothing needs resiz
 - Kind → character id: `0x0309FE50`, the first entry with `+0x0C` set and the kind, so a new entry at
   index 59 is found before entry 219 (Miienemyf, kind 62).
 
+### Save records
+
+The save holds one 0x50-byte record per vanilla database position (82), reached through
+`0x02A53C54(r3 {records, count}, r4 position)` (the pair from `0x03006B9C`, about 100 callers in the
+single-player modes; e.g. `0x02055D5C` walks every database entry for the most-played fighter). A position past
+the count gives a handle to a null record, which the callers read: Classic mode crashed with new entries
+(test 146). `tools/kind_expand.py` (5b) maps the position: below 59 as it is, the new ids (59 + i) to records of
+their own in the cave (kept in RAM only, so their stats reset at boot: the save has no room for them), the
+vanilla entries the insertions moved down back to their own records (position - N).
+
 ### Names, portraits and text
 
 - **Character id → UI name**: `{u32 id, char *name}` table at `0x1033BE68`, 83 entries including the

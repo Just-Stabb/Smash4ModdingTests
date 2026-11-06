@@ -2149,3 +2149,18 @@ cancelled early."
   before (and can still cancel into anything from frame 43). Guide catalogue row added (no automatic check).
 - Not tested in game. port_check over the chain, tests 70–115 and 117–145: 30 errors, 55 warnings, 7 notes.
 - Package (install over 144): `script/msc/edge.mscsb`.
+
+## Test 146 (`build/sephiroth_test146.zip`): single-player modes no longer crash with the new fighters
+
+User (Cemu log): "Loading some singleplayer modes (ex. Classic mode) since the addition of new fighters has made the
+game crash."
+- The crash (IP `0x02A534C0`, from `0x02055E1C`): a loop over every character database entry reads each one's save
+  record (0x50 bytes by database position). The save has 82, the database's vanilla size; with the new fighters
+  inserted at positions 59-64 the database has 88, and position 82 (0x52 in the log) got a null record.
+- Fix (`tools/kind_expand.py` 5b, for every new fighter): the record getter `0x02A53C54` maps the position. The new
+  fighters get records of their own (in RAM only: the save has no room, so their single-player stats reset when the
+  game starts), and the vanilla entries the new ones moved down read their own records again. Tested in unicorn
+  (`kind_expand_test.py`: every position, the unpatched game's for the others); `port_check` X2 checks for it.
+- Not tested in game; other modes may have more per-character data: send a log if one still crashes. port_check over
+  the chain, tests 70–115 and 117–146: 30 errors, 55 warnings, 7 notes.
+- Package (install over 145): `code/cross_f.rpx`.
