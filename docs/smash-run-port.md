@@ -9,7 +9,8 @@ RomFS only (no ExeFS):
 - `dt` / `ls` (+ `patch/dt` / `patch/ls`, the update's): the data archive, **decoded** (`tools/s3ds_unpack.py list /
   extract`): 38,158 files, every one found in the dump (400 sampled: all decompress to their size).
   - `ls`: u32 version (0x1666F), u32 count, {u32 key, u32 dt offset, u32 size}. A `dt` chunk: 0xCC padding, zlib
-    streams.
+    streams. The update's `patch/ls` (user's second upload) is version 0x2666F with 16-byte entries (a fourth word,
+    0) and its RF has 48 extensions; `s3ds_unpack.py` reads both and looks in `patch/` first: 43,655 files.
   - Keys: CRC-32 with a zero start register (`zlib.crc32(s, 0xFFFFFFFF)`) of `data<region>/<folder>/packed` for a
     packaged folder or `data<region>/<file>` for a file packaged on its own (region "" or e.g. "(us_en)"); the
     string is built by code.bin 0x1A2A60 (`%sdata%s/%s/packed`). All 4123 packages of the base table map.
@@ -71,6 +72,55 @@ The main executable (code.bin, **not in the dump**): the managers the CROs impor
   `model/enemy/*`, `motion/enemy/*`, `animcmd/enemy/*`, `enemy_param.bin`, `param/enemy/{fs,gl,ml}`; kinds cake,
   crazyhand, dogars, flyingman, kamek, magnumkiller, masterhand, metalface, metroid, nabbit, ohganemochi, ridley,
   shinigami, tac, yellowdevil. Smash Run's own enemies (the 3DS's `enemy.cro` behaviours) would be new kinds in it.
+
+## Enemies: the Goomba (`kuribo`), converted end to end
+
+`tools/s3ds_model.py` reads the 3DS formats, `tools/s3ds_enemy.py SRC_ROOT KIND OUT` writes the Wii U files,
+`tools/s3ds_enemy_test.py SRC_ROOT [KIND]` checks them against the 3DS files (12 checks, all pass on the Goomba).
+
+| 3DS (`enemy/kuribo/`) | Wii U (the paths cross_f.rpx builds for enemies) | How |
+|---|---|---|
+| `model/body/c00/normal.mbn` + `normal.bch` | `model/enemy/kuribo/body/c00/model.nud / .nut / .vbn` | meshes rigged to the .bch skeleton, as below |
+| `motion/body/main.bch` (16 skeletal animations) | `motion/enemy/kuribo/body/main.pac` (16 OMOs, `EnmKuriboBodyMain*.omo`) | sampled every frame 0..end |
+| `model/body/c00/material_anime/body/main/*.bch` (10) | `motion/enemy/kuribo/body/material_anime.pac` (10 MTAs) | visibility animations: which face shows |
+| `animcmd/effect.bin` | `animcmd/enemy/kuribo/effect.bin` | byte-swapped to big-endian |
+| `snd_se_enemy_kuribo.nus3bank` | `sound/se/snd_se_enemy_kuribo.nus3bank` | as is (already the Wii U's layout) |
+| `param/enemy/fs/enemy_param_vl_kuribo.bin` | `param/enemy/fs/enemy_param_vl_kuribo.bin` | as is (same typed big-endian format) |
+
+Formats (details in the tools' docstrings):
+- **MBN** (format 4): per mesh, parts {bone list (skeleton indices), u16 triangle list}, then a vertex description
+  {kind, type (f32 / u8 / s8 / s16), scale} and the vertex buffer (attributes aligned to 2). The meshes are the
+  .bch model's objects in order. Positions are model space; bone indices index the part's list.
+- **H3D (.bch)**, backward compatibility 0x21: section-relative pointers fixed up by the relocation table; models
+  (skeleton with Euler bind pose and inverse matrices, materials with texture names / wrap / colours, objects),
+  textures (PICA200 commands: 0x82 size, 0x85 address, 0x8E format; tiled 8x8, rows bottom up; the Goomba's is
+  ETC1), skeletal animations (transform segments: 9 slots, scale / rotation / translation, constant or key
+  groups), visibility animations (one bit a frame per object name), material animations.
+  In Smash 3DS's key groups the field Ohana3DS reads as the frame offset is 1 / the end frame (every one of the
+  Goomba's 576): keys sit on whole frames without it.
+- **Sound**: the 3DS bank is NUS3 with the same chunks (PROP, BINF, GRP, DTON, TONE, JUNK, PACK), little-endian
+  TONE entries and IDSP audio, as the Wii U's (only the sample rate differs: 20 kHz).
+- **Params**: the vl file is the typed big-endian param format the Wii U's `param/enemy/*` files use.
+- **ACMD**: the 3DS's is little-endian; every field is a word, so a byte swap gives the Wii U file (Goto offsets
+  are in words). The Goomba's `effect.bin`: `RunL` (dust effect 0x1000026 on start, 0x1000019 every 10 frames)
+  and one more script (Terminate_Overlays). The effect IDs are the 3DS's common effects: to map onto the Wii
+  U's when the enemy runs.
+
+The Goomba (6 bones: TransN, RotN, HipN, HeadN, LFootJ, RFootJ; 2 meshes, `normal_mh` / `damage_mh`, the damage
+face shown by the Damage* / Down* / Collapses visibility animations, `default` shows the normal one):
+- NUD: Smash 4's skinned fighter body material (0x9A011063, as Zelda's): its 128x128 ETC1 texture (BC1 now, mean
+  error 2 / 255), a flat normal map, the game's shared ramp; mirrored wrap as the 3DS material's. 3DS vertex
+  colours (R / G about 0.3-0.5, B 1, A 0: a 3DS shader input, not a tint) are left out: white.
+- Rigid binding kept (one bone a vertex). Bind pose = the 3DS's (both games R = Rz Ry Rx).
+- OMOs: rotation type 5 rebuilds w from 16-bit x y z, so bones turned ~180 degrees (the feet) lose a little: the
+  mesh skinned with the written OMOs is within 0.064 units of the 3DS keys (12.4-unit-tall model), most frames
+  under 0.01. Re-orienting those bones would remove it but moves the bone axes the scripts' offsets use.
+- Frame counts: keys run 0..end (end 20 -> 21 OMO frames), both ends kept (RunTurnL's turn lands on its last
+  frame).
+
+Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro` BehaviorKuribo, the
+EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy
+motion / visibility pac names (taken from the fighters'), the effect IDs.
 
 ## Plan (to refine once code.bin is in)
 
