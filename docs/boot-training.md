@@ -51,3 +51,22 @@ The shortcut's set-up hook runs before the title (the title showed, so it took t
 nothing refers to the cleared space or the cave's space (scanned: branches, data pointers, lis/addi
 and lis/ori pairs with matching registers). Test 20 sends one executable per change
 (`shortcut_check/A_cleared_space_only`, `B_shortcut_only`) to tell which one freezes.
+
+## Training: no CPUs (No. of CPUs 0-3, default 1)
+
+`tools/training_cpu_patch.py [IN.rpx OUT.rpx]` (one word); test `tools/training_cpu_test.py PATCHED.rpx [ORIGINAL.rpx]`
+(unicorn, the game's own code: patched 0..3 wrapping both ways, default 1; the original 1..3).
+
+The count is not on the character select: Training's (`CharacterSelectTrainingScene`, factory 0x02A6D6AC) always
+has the player and one CPU panel. It is the pause menu's "No. of CPUs" (`MmelTraining_4`), setting +0x118 of the
+training menu object (ctor 0x02688808, made by the battle HUD manager 0x028F87E0 only in menu mode 0xB; settings
++0x110 items, +0x114 speed, +0x118 CPUs, +0x11C CPU behaviour, +0x120 damage, +0x124 camera, +0x128 info).
+- Range: the menu's input handler 0x0268A3C8, case 3 of its jump table 0x0268A4C0: `li r3,1` (minimum,
+  0x0268A504 -> `li r3,0`) / `li r5,4` (limit); left wraps below the minimum to 3, right wraps 4 to the minimum.
+  The other items use minimum 0 (0x0268A484).
+- Default: the settings reset 0x02687D8C (each training battle start, the menu's Reset): 0x02687D9C stores 1. Kept.
+- Readers, all loops up to the count, so 0 is the 2 -> 1 case one step further: the training controller's update
+  0x02FC7C28 (count + 1 cached at +0x1B8: spawns entries 1..count 0x02FC76B0, removes the rest 0x02FC7AFC with the
+  game's remove call 0x02E44770, the damage panel slot hidden), per-CPU behaviour / damage (0x02FC8B14-0x02FC8D10),
+  start-up 0x02FC90C4, the battle (re)start step 0x02FBA350 (removes entry i > count). No training code reads
+  slot 1 directly. Not checked in game yet: the menu's number shows "0"; nothing ends the session with one fighter.
