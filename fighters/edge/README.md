@@ -2136,3 +2136,16 @@ Sephiroth's arm permanently."
   forms are taken out now (`edge_specials_build.py phantom_hand_flash`: 21 commands, none left).
 - Not tested in game. port_check over the chain, tests 70–115 and 117–144: 30 errors, 55 warnings, 7 notes.
 - Package (install over 143): `script/animcmd/weapon/phantom/effect.bin`.
+
+## Test 145 (`build/sephiroth_test145.zip`): down tilt stands him up after its cancel frame
+
+User: "down tilt sometimes forces Sephiroth to continue crouching and then stand. This happens if the move isn't
+cancelled early."
+- Ultimate's down tilt motion is 70 frames and ends crouched (the hip stays low to the last frame), its cancel frame 43
+  (motion_list); the hitbox is out by 23. Zelda's AttackLw3 loop, which he uses, holds the move to the motion's end and
+  then goes to SquatWait, which only then stands him up (SquatRv): 27 frames of crouch, then the stand.
+- Now (`edge.c` func_282): on the ground, from the cancel frame with down not held (the squat stick check, `func_53`)
+  he goes straight into SquatRv (stand up from the crouch); with down held he stays in the move and ends in SquatWait as
+  before (and can still cancel into anything from frame 43). Guide catalogue row added (no automatic check).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–145: 30 errors, 55 warnings, 7 notes.
+- Package (install over 144): `script/msc/edge.mscsb`.

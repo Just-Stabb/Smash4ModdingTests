@@ -6948,9 +6948,27 @@ int func_282()
         func_16(0xe, 0);
         return 0x1;
     }
+    /* Test 145: the down tilt motion ends crouched and holds the crouch long after its cancel frame, then
+       SquatWait stood him up only at the motion's end. Past the cancel frame with down not held he stands
+       up (SquatRv) at once; held, he stays in the move and ends in SquatWait as before. */
+    if (CancelModule(0x2713) == 0x1 && global18 == 0)
+    {
+        if (!func_53())
+        {
+            func_16(0x15, 0);
+            return 0x1;
+        }
+    }
     if (MotionModule(0x2712) == 0x1)
     {
-        func_16(0x12, 0);
+        if (func_53())
+        {
+            func_16(0x12, 0);
+        }
+        else
+        {
+            func_16(0x15, 0);
+        }
         return 0x1;
     }
     return 0;
