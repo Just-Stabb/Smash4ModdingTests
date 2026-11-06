@@ -1738,3 +1738,14 @@ cancel 8 frames earlier".
 - port_check over the chain, tests 70–115 and 117–120: 30 errors, as before.
 - Package (install over 119): `script/msc/edge.mscsb`.
 
+## Test 121 (`build/sephiroth_test121.zip`): only the fighter the Phantom hit is let go, by its own hit
+
+User: "Can you make it so it only releases the opponent hit by the Phantom instead of all of them and get rid of the
+damage limitation?" The Phantom now reports its own hit: from its slash's first frame (11 / 13 / 18 by level, after the
+dash's 0-damage push), its SELF_HIT_NOW puts the fighter hit's place (its LASTHIT offsets) in his VAR_31 as
+-(2^21 + place) (`phantom.c ph_hit_report`). His per-frame Phantom tick reads it and lets go of the fighter held on the
+sword within 8 of that place only (`edge_lw_ph_lets_go`); damage isn't looked at (test 120's sum and its use of
+VAR_15 are gone).
+- port_check over the chain, tests 70–115 and 117–121: 30 errors, as before.
+- Package (install over 120): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+

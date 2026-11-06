@@ -39435,63 +39435,51 @@ void edge_lw_ph_target()
     WorkModule(0, (float)code, 0x0f00031f);
 }
 
-// the fighters held on the sword: their count x 10000 + their damage summed (SLOTn_DAMAGE, the input / state table's
-// +0x17)
-float edge_lw_held_sum()
-{
-    int slot;
-    float n;
-    float d;
-    n = 0.0f;
-    d = 0.0f;
-    slot = 1;
-    while (slot <= 0x8)
-    {
-        if (edge_sn_s(slot) >= 0.0f)
-        {
-            n = n + 1.0f;
-            d = d + WorkModuleF(0, 0x0f000100 + 0x20 * (slot + 0x2) + 0x17);
-        }
-        slot = slot + 1;
-    }
-    return n * 10000.0f + d;
-}
+// the Phantom's slash hit someone (weapons/phantom.c ph_hit_report: -(2^21 + their place) in his VAR_31): the fighter held
+// on the sword there (within edge_lw_ph_hit_r of it) is let go, their stage collision back, so they fly from its hit
+// (test 120, the user: "when Phantom hits a held opponent, they get released"; test 121: only that one, its own hit,
+// not test 120's any damage to any held one)
+float edge_lw_ph_hit_r() { return 8.0f; }
 
-// a fighter held on the sword hit by the Phantom: the sword lets go (test 120, the user: "when Phantom hits a held
-// opponent, they get released"), their stage collision back, so they fly from its hit. Seen as their damage going up
-// while the Phantom attacks (the same ones held as last frame: the count in the sum); every one held lets go (one sum:
-// no MSC globals left). VAR_15 (up special's loop count, a different status) keeps last frame's sum while the sword's out
 void edge_lw_ph_lets_go()
 {
-    float now;
-    float last;
+    float v;
+    int c;
+    int ix;
+    float x;
+    float y;
+    float dx;
+    float dy;
     int slot;
+    v = WorkModuleF(0, 0x0f00031f);
+    if (v > -2097152.0f)
+    {
+        return;
+    }
+    WorkModule(0, 0.0f, 0x0f00031f);
     if (edge_sn_out() == 0)
     {
         return;
     }
-    now = edge_lw_held_sum();
-    last = WorkModuleF(0, 0x0f00030f);
-    WorkModule(0, now, 0x0f00030f);
-    if (edge_lw_ph() != 3.0f || ArticleModule(0x2717, 0x2) == 0 || now < 10000.0f)
-    {
-        return;
-    }
-    if ((int)(now / 10000.0f) != (int)(last / 10000.0f) || now <= last + 0.5f)
-    {
-        return;
-    }
+    c = (int)(-v) - 0x200000;
+    ix = c / 0x400;
+    x = (float)(ix - 0x200);
+    y = (float)(c - ix * 0x400 - 0x200);
     slot = 1;
     while (slot <= 0x8)
     {
         if (edge_sn_s(slot) >= 0.0f)
         {
-            edge_sn_ground(slot, 5.0f);         // stage collision back (air)
-            edge_sn_s_set(slot, -1.0f);
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * (slot - 1)) - x;   // POS_SLOTn_X / Y
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * (slot - 1)) - y;
+            if (dx * dx + dy * dy <= edge_lw_ph_hit_r() * edge_lw_ph_hit_r())
+            {
+                edge_sn_ground(slot, 5.0f);     // stage collision back (air)
+                edge_sn_s_set(slot, -1.0f);
+            }
         }
         slot = slot + 1;
     }
-    WorkModule(0, 0.0f, 0x0f00030f);
 }
 
 // made but not sent (the stance interrupted): it goes (func_2302 / 2307: status 4)

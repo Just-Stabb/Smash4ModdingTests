@@ -718,6 +718,7 @@ void func_55()
         ph_track_again = 0;
     }
     ph_follow_frame();          // Sephiroth: up and down with a fighter held on his sword (test 107)
+    ph_hit_report();            // Sephiroth: whom its slash hit, for his sword to let go of them (test 121)
     if (WorkModule(0x10, 0x20000005) == 0 && WorkModuleF(0, 0x2) > 0)
     {
         var0 = (int)MotionModuleF(0x1);
@@ -948,6 +949,61 @@ float ph_hit_end()
         return 15.0f;
     }
     return 28.0f;
+}
+
+// its slash's first frame (the damaging hitbox; frames 2 on are its dash's 0-damage push): 11 / 13 / 18 by level
+float ph_hit_start()
+{
+    int m;
+    m = MotionModule(0x7);
+    if (m < 0x10 || m >= 0x18 && m < 0x1c)
+    {
+        return 11.0f;
+    }
+    if (m < 0x14 || m >= 0x1c && m < 0x20)
+    {
+        return 13.0f;
+    }
+    return 18.0f;
+}
+
+// its slash connecting (its own SELF_HIT_NOW, from its slash's frame): the fighter hit's place (LASTHIT_OFFSET_X along
+// its facing / _Y, from it) goes to his VAR_31 as -(2^21 + (x + 512) * 1024 + (y + 512)), whole units: his per-frame
+// Phantom tick lets go of the fighter held on his sword there (test 121, the user: "only releases the opponent hit by
+// the Phantom"; test 120 let go of all held when any held one's damage went up)
+void ph_hit_report()
+{
+    int slot;
+    float x;
+    float y;
+    if (MotionModuleF(0x1) < ph_hit_start() || WorkModuleF(0, 0x0f0000a1) != 1.0f)
+    {
+        return;
+    }
+    slot = ph_find_owner();
+    if (slot < 0)
+    {
+        return;
+    }
+    x = PostureModuleF(0x1) + PostureModuleF(0) * WorkModuleF(0, 0x0f000055);
+    y = PostureModuleF(0x2) + WorkModuleF(0, 0x0f000056);
+    if (x < -511.0f)
+    {
+        x = -511.0f;
+    }
+    if (x > 511.0f)
+    {
+        x = 511.0f;
+    }
+    if (y < -511.0f)
+    {
+        y = -511.0f;
+    }
+    if (y > 511.0f)
+    {
+        y = 511.0f;
+    }
+    WorkModule(0, -(float)(0x200000 + (int)(x + 512.5f) * 0x400 + (int)(y + 512.5f)), 0x0f000347 + 0x8 * slot);
 }
 
 void ph_follow_frame()
