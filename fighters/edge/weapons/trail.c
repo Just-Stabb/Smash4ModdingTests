@@ -1142,14 +1142,16 @@ void tr_test(float x, float y, int num)
     k = 0;
     while (k < tr_n - 1)
     {
-        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k + 1 <= num - 2))
+        // its own trail: only pieces that can close a loop (3 points between: test 132; nearer ones, crossed falsely
+        // through the 0.5 units the points are kept to, wrote over a real loop's report the same frame), not longer
+        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k <= num - 4))
         {
             cx = tr_get_x(k);
             cy = tr_get_y(k);
             dx = tr_get_x(k + 1);
             dy = tr_get_y(k + 1);
             l = MathF(0, (dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
-            if (l > 0.01f)
+            if (l > 0.01f && same == 0)
             {
                 l = 3.0f / l;
                 x = (dx - cx) * l;
@@ -1159,7 +1161,7 @@ void tr_test(float x, float y, int num)
                 dx = dx + x;
                 dy = dy + y;
             }
-            if (tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
+            if (same && tr_cross(tr_sx, tr_sy, x, y, cx, cy, dx, dy) || same == 0 && tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
             {
                 if (tr_shared(0x4) > -1000.0f || same)
                 {
@@ -1458,7 +1460,7 @@ void tr_pose()
     cy = tr_oy;
     if (tr_ft >= 0)
     {
-        t = tr_grow() * 1.20f;
+        t = tr_grow() * 1.30f;
         cx = tr_cx;
         cy = tr_cy;
     }

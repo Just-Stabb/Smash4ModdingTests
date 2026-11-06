@@ -38191,7 +38191,7 @@ float edge_tr_sum2() { return -1002.5f; }
 float edge_tr_sum3() { return -1003.5f; }
 float edge_tr_commit() { return -1004.5f; }
 float edge_tr_cancel() { return -1005.5f; }      // a shape not made (test 128: near the blast zones)
-float edge_tr_scale() { return 1.2f; }           // the shape's fill and hitbox x this (test 127)
+float edge_tr_scale() { return 1.3f; }           // the shape's fill and hitbox x this (test 127: 1.2; 1.3 test 132)
 
 float edge_tr_pack(float x, float y)
 {
@@ -38554,10 +38554,10 @@ void edge_tr_steps()
         // not near the blast zones (off screen: test 128, the user: "make shapes not able to be formed off-screen near
         // the bounds of the blast zone"): the shape (its middle +- its long half axis) 50 inside the side / bottom
         // ones and 60 under the top, else CANCEL (the articles drop their marks; no fill, no hitbox)
-        // (test 131: its middle 20 inside the side / bottom ones, 40 under the top; test 128's shape's edge 50 / 60 from
-        // them refused shapes still on screen: the user's clip, an Octaslash loop at the screen's top made nothing)
-        if (cx < StageData(0) + 20.0f || cx > StageData(0x1) - 20.0f || cy < StageData(0x3) + 20.0f
-            || cy > StageData(0x2) - 40.0f)
+        // (test 132: its middle past them, as Octaslash can take him above the top one; tests 128 / 131 refused shapes
+        // whose edge / middle was within 50 - 60 / 20 - 40 of them, still on screen: the user's clips, Octaslash loops
+        // at the screen's top made nothing)
+        if (cx < StageData(0) || cx > StageData(0x1) || cy < StageData(0x3) || cy > StageData(0x2))
         {
             WorkModule(0, edge_tr_cancel(), edge_tr_num_var());
             WorkModule(0, -5.0f, edge_tr_q_var());

@@ -1966,3 +1966,22 @@ be formed and do work." Then "opponents can still be dragged and KO'd by the top
 - Not tested in game.
 - port_check over the chain, tests 70–115 and 117–131: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 130): `script/msc/edge.mscsb`, `trail/trail.mscsb`.
+
+## Test 132 (`build/sephiroth_test132.zip`): Octaslash loops close again; shapes filled solid, 1.3x
+
+User (two clips): "Octaslash still doesn't form shapes properly." and "shapes look part empty, rather than full and
+larger than the lines that it is made of."
+- **Octaslash loops:** two causes found, both mine. Test 131's 3-unit extension of the pieces made the newest piece
+  and ones near it in the same trail cross falsely (the points are kept to 0.5 units), and a report from the same
+  trail writes over another in the same frame, so a real loop's crossing could be lost (in `edge_trail_sim.py`,
+  about 900 false reports in 40 wobbly loops). Now the trail's own pieces are tested as they are, and only those that
+  can close a loop (3 points between). And the "near the blast zones" refusal (tests 128 / 131) refused loops still
+  on screen at its top, where both clips' loops were: now only a shape whose middle is past the blast zones (above
+  the top one, where Octaslash can take him) is refused. Simulated wobbly Octaslash loops close 38 of 40 times in
+  both update orders.
+- **The fill:** near solid inside (72 - 85% of the line's colour, was 30 - 55%: additive, so it looked hollow), and
+  drawn 1.3x the shape (was 1.2); the hitbox's ellipse 1.3x too.
+- Not tested in game.
+- port_check over the chain, tests 70–115 and 117–132: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 131): `model/trail/` and `model/fill/` (c00 - c07 `model.nut`), `script/msc/edge.mscsb`,
+  `trail/trail.mscsb`.

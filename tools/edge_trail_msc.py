@@ -48,7 +48,8 @@ POINTS = 16
 LIFE = 360          # the user: "persists for 6 seconds"
 SUM1, SUM2, SUM3, COMMIT, CANCEL = -1001.5, -1002.5, -1003.5, -1004.5, -1005.5
 FILL_DELAY, FILL_GROW, FILL_HOLD, FILL_END = 12, 8, 40, 50    # the glow; the fill article hits from 4 to FILL_END (edge_fill_msc.py)
-FILL_SCALE = 1.2    # the fill drawn this much bigger than the shape (test 127, the user: "at least 1.2x the size")
+FILL_SCALE = 1.3    # the fill drawn this much bigger than the shape (test 127, the user: "at least 1.2x the size"; 1.3
+                    # since test 132: "rather than full and larger than the lines that it is made of")
 JUNCTIONS = 4
 KEEP = 6
 EXT = 3.0           # the pieces tested taken this much longer at both ends (lines meeting end to end cross: test 131)
@@ -320,14 +321,16 @@ void tr_test(float x, float y, int num)
     k = 0;
     while (k < tr_n - 1)
     {
-        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k + 1 <= num - 2))
+        // its own trail: only pieces that can close a loop (3 points between: test 132; nearer ones, crossed falsely
+        // through the 0.5 units the points are kept to, wrote over a real loop's report the same frame), not longer
+        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k <= num - 4))
         {
             cx = tr_get_x(k);
             cy = tr_get_y(k);
             dx = tr_get_x(k + 1);
             dy = tr_get_y(k + 1);
             l = MathF(0, (dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
-            if (l > 0.01f)
+            if (l > 0.01f && same == 0)
             {
                 l = EXT_N / l;
                 x = (dx - cx) * l;
@@ -337,7 +340,7 @@ void tr_test(float x, float y, int num)
                 dx = dx + x;
                 dy = dy + y;
             }
-            if (tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
+            if (same && tr_cross(tr_sx, tr_sy, x, y, cx, cy, dx, dy) || same == 0 && tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
             {
                 if (tr_shared(0x4) > -1000.0f || same)
                 {

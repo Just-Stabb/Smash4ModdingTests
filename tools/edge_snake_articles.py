@@ -272,7 +272,7 @@ def fill_texture():
 def _fill_img():
     w, h = 64, 8
     u = (np.arange(w) + 0.5) / w
-    inner = 0.30 + 0.25 * u
+    inner = 0.72 + 0.13 * u                  # near solid (test 132, the user: "shapes look part empty"; 0.30 - 0.55)
     rim = np.exp(-((u - 0.93) / 0.06) ** 2)
     val = np.clip(inner + rim, 0.0, 1.0)
     val[u > 0.985] *= 0.3                    # soft outer edge

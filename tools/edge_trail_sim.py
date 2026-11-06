@@ -94,9 +94,10 @@ class World:
             sh = s.w.sh
             same = s.base // 1024 == num // 1024
             for k in range(len(s.pts) - 1):
-                if k in s.gone or (same and not s.base + k + 1 <= num - 2):
+                if k in s.gone or (same and not s.base + k <= num - 4):    # own trail: pieces that can close a loop (132)
                     continue
-                if cross(*ext(s.sp, p), *ext(s.pts[k], s.pts[k + 1])):     # both 3 longer (test 131)
+                if (cross(s.sp, p, s.pts[k], s.pts[k + 1]) if same else
+                        cross(*ext(s.sp, p), *ext(s.pts[k], s.pts[k + 1]))):   # other trails: both 3 longer (test 131)
                     if sh[4] > -1000 or same:
                         sh[4] = -float(s.base + k)
                     if not same and not any(jk == k and jn // 1024 == num // 1024 for jk, jn in s.junctions):
@@ -254,8 +255,8 @@ class World:
             if t < 0:
                 t += 180
             V[8] = float(int(t * 128 / 180))
-            V[9] = math.sqrt(2 * l1) * 1.2
-            V[10] = math.sqrt(2 * l2) * 1.2
+            V[9] = math.sqrt(2 * l1) * 1.3
+            V[10] = math.sqrt(2 * l2) * 1.3
             sh[5] = sh[4] = -100000.0
             sh[6] = -(4000 + V[8]) - 0.5
             V[0] = -7
@@ -272,8 +273,8 @@ class World:
             umax, wmax, umin, wmin = V[11], V[2], -sh[5], -sh[4]
             cu, cw = (umax + umin) / 2, (wmax + wmin) / 2
             cx, cy = cu * co - cw * si, cu * si + cw * co
-            a = max(V[9], (umax - umin) / 2 * 1.2)
-            b = max(V[10], (wmax - wmin) / 2 * 1.2)
+            a = max(V[9], (umax - umin) / 2 * 1.3)
+            b = max(V[10], (wmax - wmin) / 2 * 1.3)
             if b > a:
                 a, b = b, a
                 t7 = (t7 + 64) % 128

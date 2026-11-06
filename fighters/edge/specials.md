@@ -249,11 +249,13 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     middle): every line goes (test 128, the user: "When a shape is formed, all lines aren't cleared for both Blade Dash
     and Octaslash": all of them, the trail being laid too, which goes on from its next point; tests 126 / 127 dropped
     the shape's pieces only) and the articles fill the shape with wedges from its middle to the pieces'
-    points x 1.2 (so its outline is the lines that made it, 1.2 x: test 127, "The effect and hitbox should be at least
-    1.2x the size of the shape"), grown in from frame 12 to 20, held to 40, shrunk away by 50. A
+    points x 1.3 (so its outline is the lines that made it; test 127 1.2 x, "The effect and hitbox should be at least
+    1.2x the size of the shape"; test 132 1.3 x, the user: "shapes look part empty, rather than full and larger than
+    the lines": the fill's texture near solid inside, 72 - 85% of the line's colour, from 30 - 55%), grown in from frame
+    12 to 20, held to 40, shrunk away by 50. A
     `fill` article (kind 0x19D, article 12, 3 at most, 8 motions; `weapons/fill.c` from `tools/edge_fill_msc.py`) at
-    the middle takes the ellipse fitted to the points (the long axis' angle and half axes 1.2 x sqrt(2 l1), sqrt(2 l2)
-    from their spread, or 1.2 x the points' half extents along / across that axis if larger: test 127's EXTENT steps 7
+    the middle takes the ellipse fitted to the points (the long axis' angle and half axes 1.3 x sqrt(2 l1), sqrt(2 l2) (1.2 before test 132)
+    from their spread, or 1.3 x the points' half extents along / across that axis if larger: test 127's EXTENT steps 7
     / 8, so a triangle's corners count; the middle is the extents' middle; packed in 4) and is the shape's hitbox:
     turned along the long axis (mirrored with his facing), its joints J0 - J4 from -(a - b) to a - b, a sphere on each
     from its frame 4 to 50, when the glow's gone (test 127, the user: "make the hitbox ... happen on frame 4, and linger
@@ -269,15 +271,19 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     between, Z between, Y between) are marked and the shape is made as above; not, Y is kept as the first crossing.
     The crossing test counts a point on the other line on one side, so lines meeting at a shared point cross once
     (test 126's strict test missed them: the simulation's triangle met exactly at a corner), and takes both pieces 3
-    longer at each end (test 131: lines meeting end to end, a Blade Dash started where the last one ended, meet).
+    longer at each end (test 131: lines meeting end to end, a Blade Dash started where the last one ended, meet). Its
+    own trail's pieces are tested as they are and only those that can close a loop (3 points between): test 132, the
+    extension made near pieces cross falsely (the points are kept to 0.5) and their report wrote over a real loop's in
+    the same frame (`edge_trail_sim.py`, wobbly loops: about 900 false reports in 40 runs).
     **Octaslash's shape** ends the move (VAR_20 3, above); its trail then ends with -1, not -2 (test 130: its lines are
     gone already, and the glow's articles go as Blade Dash's do once it's over; the user still saw no glow from an
     Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
     forced end, keeps the glow its 50 frames).
     **Not near the blast zones (test 128, the user: "make shapes not able to be formed off-screen near the bounds of
-    the blast zone"):** a shape whose middle is within 20 of the side / bottom blast zones or 40 of the top isn't made
-    (test 131; test 128's shape edge within 50 / 60 refused an Octaslash loop still on screen at its top, so it made
-    no glow, cleared no lines and didn't end the move: the user's clip): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
+    the blast zone"):** a shape whose middle is past the blast zones (StageData 0 - 3; Octaslash can take him above the
+    top one) isn't made (test 132; test 128 refused a shape whose edge came within 50 / 60 of them, test 131 its
+    middle within 20 / 40: both refused Octaslash loops still on screen at its top, the user's clips; the camera's
+    bounds, what "off-screen" means, aren't known to the MSC): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
     Modelled in `tools/edge_trail_sim.py` (a held Octaslash circle: a shape a lap; a U closed by the next up special's
     line: middle (0, 32.5), half axes 36 / 19.1; a tilted ellipse a 40 b 15: 47.5 / 19.8 at 28.1 degrees; a triangle of
     three Blade Dashes (0, 50) (-26.7, 70) (26.7, 70): middle (0, 60), 30 / 12; a 60 x 40 rectangle of four: middle
