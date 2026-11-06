@@ -1655,3 +1655,21 @@ heading back he's pitched past 90 degrees (a loop) rather than turned around.
 - port_check over the chain and tests 70–114: 30 errors, as before.
 - Package (install over 113): `script/msc/edge.mscsb`.
 
+## Test 115 (`build/sephiroth_test115.zip`): Octaslash loops and slows; Phantom release fixes
+
+User (test 114's clip): "Octoslash when held moves far too fast ... the attack doesn't loop either. It does hold the
+animation oddly. Phantom now releases on any special button pressed rather than down special, the special button
+release is only supposed to be when Sephiroth is not actionable (ex. Forward air, Down smash). Phantom doesn't allow
+itself to be released while an oppenent is attached to the snake sword, and it doesn't seem like it tracks either."
+- **Loop:** SpecialHi2's animation ends on frame 14 (Ultimate's `d02specialhi2.nuanmb`); the restart waited for 16,
+  so it never came and the last pose held. Now it plays again from frame 4 the frame after it reaches 14.
+- **Speed:** held, it brakes as Ultimate's (6.2, less 0.47 a frame from frame 6) down to 2.0, then keeps 2.0.
+- **Phantom, any special:** a special started from neutral reads its press on the frame he's already in the
+  special's status, which counted as "not actionable". Now any special sends it only if he couldn't act on that frame
+  and the one before (VAR_13); otherwise down special only, as before.
+- **Phantom, a fighter on the sword:** held forward air / up tilt can sit past the move's cancel frame, which counted
+  as actionable (down special only). Now he counts as not actionable whenever the snake sword is out. The tracking of
+  a held fighter is unchanged: it couldn't be seen while the release didn't work.
+- port_check over the chain and tests 70–115: 30 errors, as before.
+- Package (install over 114): `script/msc/edge.mscsb`.
+

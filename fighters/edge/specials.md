@@ -161,10 +161,13 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   - **Octaslash held:** while the special button stays held the rush turns toward the stick, 8 degrees a frame the
     shorter way round, the full 360 degrees (test 114, the user: "allow a full 360 degrees of movement"; test 113
     kept it to his front; he keeps his facing, so going back his pitch passes 90: a loop; neutral keeps the way),
-    at a constant 6.2 (no brake: `edge_hi_rush_m`); on the ground, turned more than ~20 degrees up, he leaves
+    at 6.2 braking as normal down to 2.0 and kept there while held (`edge_hi_rush_m`, `edge_hi_cruise`; test 115, the
+    user: "moves far too fast" at test 113's steady 6.2); on the ground, turned more than ~20 degrees up, he leaves
     it (`edge_hi_steer`). Past the rush's count 15, still held and with loop time left, SpecialHi2 is played again
-    from frame 4 each time it reaches 16 (`MotionModule(0x1, 0x237, 4, 1)`): frames 4 - 15 are the 2nd hit to the 7th
-    (the one before SpecialHi2End's), so the loop is those. VAR_20 tells the script which pass it is (0 plain, 1
+    from frame 4 (`MotionModule(0x1, 0x237, 4, 1)`) the frame after it has been on frame 14, its last (Ultimate's
+    d02specialhi2.nuanmb final frame 14; VAR_14 the one-frame wait, so frame 14's hit is out first): frames 4 - 14 are
+    the 2nd hit to the 7th (the one before SpecialHi2End's), so the loop is those. Test 113 / 114 waited for frame 16,
+    past the motion's end: it never looped and held the last pose (the user's clip). VAR_20 tells the script which pass it is (0 plain, 1
     the first held, 2 looped): SpecialHi2's 1st hit (frame 2) and start effects (frame 0) are skipped on a looped
     pass, its end flash (frame 15) plays on a plain pass only (`edge_specials_build.py octaslash_loop_scripts`).
     Loop time 60 frames (`edge_hi_loop_frames`; VAR_12), started again by every hit (SELF_HIT_NOW); let go or out

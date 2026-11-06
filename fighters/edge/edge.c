@@ -37901,7 +37901,12 @@ int   edge_hi_pass_var() { return 0x0f000314; }   // VAR_20 (ACMD): Octaslash's 
 int   edge_hi_timer_var() { return 0x0f00030c; }  // VAR_12: Octaslash's loop frames left
 float edge_hi_loop_frames() { return 60.0f; }     // the set duration (frames), again from each hit
 float edge_hi_loop_from() { return 4.0f; }        // SpecialHi2: the 2nd hit's frame (Ultimate game_specialhi2)
-float edge_hi_loop_to() { return 16.0f; }         // ... the 7th (one before SpecialHi2End's) out at 15, next at 16
+float edge_hi_loop_to() { return 14.0f; }         // ... the 7th (one before SpecialHi2End's), the motion's last frame:
+                                                  // played again the frame after (test 115; test 113 waited for 16,
+                                                  // past its end, so it never looped and the pose held)
+int   edge_hi_wrap_var() { return 0x0f00030e; }   // VAR_14: 1 once the loop's pass has been on its last frame a frame
+float edge_hi_cruise() { return 2.0f; }           // held Octaslash's speed once its brake gets there (test 115, the
+                                                  // user: "moves far too fast" at a steady 6.2)
 float edge_hi_turn_c() { return 0.990268f; }      // the steering: 8 degrees a frame (cos / sin)
 float edge_hi_turn_s() { return 0.139173f; }
 float edge_hi_link_d() { return 10.0f; }          // autolink: the fighter hit kept this far along his rush,
@@ -38044,14 +38049,14 @@ float edge_hi_rush_m()
     float m;
     float bf;
     m = edge_hi_p(13.5f, 6.2f);
-    if (edge_hi_held())
-    {
-        return m;                          // held Octaslash: its speed kept (test 113)
-    }
     bf = edge_hi_p(2.0f, 6.0f);
     if ((float)edge_hi_count >= bf)
     {
         m = m - edge_hi_p(1.72f, 0.47f) * ((float)edge_hi_count - bf + 1.0f);
+    }
+    if (edge_hi_held() && m < edge_hi_cruise())
+    {
+        return edge_hi_cruise();           // held Octaslash: the normal brake down to its cruise, then kept (test 115)
     }
     if (m < 0.0f)
     {
@@ -38494,6 +38499,7 @@ void edge_hi_rush_main()
     KineticModule(0xb, 0x3);
     WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
     WorkModule(0, 0.0f, edge_hi_pass_var());
+    WorkModule(0, 0.0f, edge_hi_wrap_var());
     edge_hi_count = 0;                     // init 04890 / 04950
     edge_hi_landed = 0;
     edge_hi_cliff = 0xffffffff;
@@ -38562,8 +38568,16 @@ void edge_hi_rush_loop()
             // past its pass and still held: SpecialHi2 again from the 2nd hit (the script skips the 1st on pass 2)
             if (f >= edge_hi_loop_to())
             {
-                WorkModule(0, 2.0f, edge_hi_pass_var());
-                MotionModule(0x1, 0x237, edge_hi_loop_from(), 1.0f);
+                if (WorkModuleF(0, edge_hi_wrap_var()) == 1.0f)
+                {
+                    WorkModule(0, 0.0f, edge_hi_wrap_var());
+                    WorkModule(0, 2.0f, edge_hi_pass_var());
+                    MotionModule(0x1, 0x237, edge_hi_loop_from(), 1.0f);
+                }
+                else
+                {
+                    WorkModule(0, 1.0f, edge_hi_wrap_var());   // its last hit (frame 14) out for a frame first
+                }
             }
             if (f >= 1.0f)
             {
@@ -39202,6 +39216,12 @@ int edge_lw_can_counter()
 // Phantom when Sephiroth is not actionable")
 int edge_lw_free()
 {
+    if (edge_sn_out())
+    {
+        return 0;                      // the snake sword out (held forward air / up tilt): never (test 115, the user: it
+                                       // couldn't be let go with a fighter on the sword: the held move can sit past
+                                       // its cancel frame)
+    }
     if (global4 <= 0x9 || global4 >= 0xb && global4 <= 0xf || global4 >= 0x11 && global4 <= 0x15)
     {
         return 0x1;
@@ -39420,6 +39440,16 @@ void edge_lw_ph_tick()
     float c;
     float per;
     int held;
+    int any;
+    // any special press sends it only if he couldn't act this frame AND the one before (test 115, the user: "Phantom
+    // now releases on any special button pressed rather than down special": a special started from neutral reads its
+    // press on the frame his status is already the special's). VAR_13: 1 if he could act last frame
+    any = 0;
+    if (edge_lw_free() == 0 && WorkModuleF(0, 0x0f00030d) == 0.0f)
+    {
+        any = 0x1;
+    }
+    WorkModule(0, (float)edge_lw_free(), 0x0f00030d);
     // hit while it's out (charging, or sent and still there): it goes (user, test 104: "if Sephiroth is hit while
     // Phantom is out, it should disappear (if he's not in the middle of countering)": a hit his counter takes puts
     // him in no damage status). Damage statuses: 0x45 - 0x4B (Damage ... DamageFlyTop), 0x41 CaptureDamage, 0x57
@@ -39472,7 +39502,7 @@ void edge_lw_ph_tick()
     // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
     // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
     // let go), or 240 frames past full charge (test 107; test 104: 120; Zelda's param 0x18000001: 60)
-    if ((WorkModuleF(0, 0x0f000109) == 1.0f && (WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() || edge_lw_free() == 0)
+    if ((WorkModuleF(0, 0x0f000109) == 1.0f && (WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() || any)
          && edge_lw_ph_open())
         || c >= per * 7.0f + edge_lw_ph_keep())
     {
