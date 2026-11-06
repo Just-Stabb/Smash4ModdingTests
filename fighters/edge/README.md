@@ -1626,3 +1626,24 @@ that way" and "Sometime side special's orbs don't connect with the opponent, mos
 - port_check over the chain and tests 70–112: 30 errors, as before (55 warnings: S9 gone). MSC stack checks clean.
 - Package (install over 111): `script/animcmd/body/game.bin`, `script/animcmd/weapon/fire|flare1|flash/game.bin`,
   `script/msc/flare1/flare1.mscsb`.
+
+## Test 113 (`build/sephiroth_test113.zip`): up special concept, stage 1: held Octaslash steers and loops, autolink, Blade Dash changes, once per air
+
+User: the up special concept (purple line trails, closed shapes filled with a scaling glow and hitbox; held
+Octaslash "allows 180 degree forward up and down rotating movement at the speed it normally moves at, but looping
+between the 2nd hit and the hit before the final hit for a set duration or until the special button is released",
+the timer reset on a hit; "The hits should aggressively autolink into each other. Tap up special should have no
+aiming restriction, slightly lower landing lag and not put into special fall unlike Octaslash. Both versions of up
+special should only be usable once in the air and reset on landing or grabbing ledge but not when hit."). Staged:
+this test is everything but the trails and the shapes (next: the trail articles; then the shape fill and hitbox).
+- **Held Octaslash:** steers toward the stick 8 degrees a frame through his front only, at a steady 6.2; past its
+  normal 15 frames, while held, SpecialHi2's frames 4 - 15 (hits 2 - 7) loop, for 60 frames, again from every hit;
+  let go -> its final hit and SpecialFall. The script skips the first hit and the start effects on looped passes.
+- **Autolink:** the last fighter hit, in hitstun and near, is pulled each frame to 10 in front along the rush.
+- **Blade Dash:** full aim as before; landing lag 22 (was Ultimate's 27); the air end ends in Fall, not SpecialFall.
+- **Once per air time** for both: back on landing or a ledge grab, not on being hit.
+- Details and constants: `specials.md` "Up special". Not tested in game (the loop's motion restart at frame 4
+  assumes the script runs straight past frames 0 - 3).
+- port_check over the chain and tests 70–113: 30 errors, as before.
+- Package (install over 112): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`.
+

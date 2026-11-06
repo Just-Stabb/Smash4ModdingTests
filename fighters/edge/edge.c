@@ -708,7 +708,7 @@ int func_43()
     {
         if (WorkModule(0x15, 0x1e000064))
         {
-            if (func_72(global26))
+            if (func_72(global26) && edge_hi_can())
             {
                 func_16(0x154, 0x1);
                 return 0x1;
@@ -1241,7 +1241,7 @@ int func_58()
     {
         if (WorkModule(0x15, 0x1e000064))
         {
-            if (func_72(global26))
+            if (func_72(global26) && edge_hi_can())
             {
                 func_16(0x154, 0x1);
                 return 0x1;
@@ -1771,6 +1771,7 @@ void func_81()
 void func_82()
 {
     edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
+    edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
     if (!global3)
     {
         if (WorkModule(0x10, 0x21000001))
@@ -37888,6 +37889,158 @@ float edge_hi_p(float plain, float charged)
     return plain;
 }
 
+// ---- test 113 (the user's up special concept, stage 1): Octaslash steers (180 degrees, forward / up / down) and
+// loops its multi-hit (the 2nd hit to the one before the last: SpecialHi2 frames 4 - 15) while the special button is
+// held, for edge_hi_loop_frames() or until it is let go, the time starting again on every hit; its hits pull the last
+// fighter hit along in front of him (edge_hi_link). Blade Dash (tap) keeps its full aim, lands in 22 frames, and ends
+// in a normal fall. Either is usable once per air time: landing or a ledge grab gives it back, being hit doesn't.
+// No MSC globals left (port_check C5): the state is this object's VARs (tools/acmd_ext_cave.py)
+int   edge_hi_used_var() { return 0x0f000315; }   // VAR_21: 1 once up special was used (cleared on the ground / ledge)
+int   edge_hi_pass_var() { return 0x0f000314; }   // VAR_20 (ACMD): Octaslash's pass: 0 plain, 1 first pass held, 2 a
+                                                  // looped pass (SpecialHi2's first hit and start effects skipped)
+int   edge_hi_timer_var() { return 0x0f00030c; }  // VAR_12: Octaslash's loop frames left
+float edge_hi_loop_frames() { return 60.0f; }     // the set duration (frames), again from each hit
+float edge_hi_loop_from() { return 4.0f; }        // SpecialHi2: the 2nd hit's frame (Ultimate game_specialhi2)
+float edge_hi_loop_to() { return 16.0f; }         // ... the 7th (one before SpecialHi2End's) out at 15, next at 16
+float edge_hi_turn_c() { return 0.990268f; }      // the steering: 8 degrees a frame (cos / sin)
+float edge_hi_turn_s() { return 0.139173f; }
+float edge_hi_link_d() { return 10.0f; }          // autolink: the fighter hit kept this far along his rush,
+float edge_hi_link_h() { return 3.0f; }           // this much higher (feet to feet: his middle less theirs),
+float edge_hi_link_k() { return 0.6f; }           // closing this part of the gap a frame,
+float edge_hi_link_r() { return 30.0f; }          // when within this
+
+// 1 when up special can start: on the ground, or not yet used this time in the air
+int edge_hi_can()
+{
+    if (global18 == 0 || WorkModuleF(0, edge_hi_used_var()) == 0.0f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// func_82 (every frame): landing (on the ground outside up special) or a ledge grab (CliffCatchMove / CliffCatch /
+// CliffWait 0x72 - 0x74) gives up special back
+void edge_hi_air_tick()
+{
+    if (global18 == 0 && global4 != 0x154 && global4 != 0x159 && global4 != 0x15a || global4 >= 0x72 && global4 <= 0x74)
+    {
+        WorkModule(0, 0.0f, edge_hi_used_var());
+    }
+}
+
+// 1 while Octaslash goes on: the special button held
+int edge_hi_held()
+{
+    if (edge_hi_charged && ControlModule(0x2712, 0x1))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// a hit of Octaslash's (SELF_HIT_NOW): its time starts again
+void edge_hi_hit_check()
+{
+    if (edge_hi_charged && WorkModuleF(0, 0x0f0000a1) == 1.0f)
+    {
+        WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
+    }
+}
+
+// held Octaslash: the rush direction (edge_hi_rx / ry) turns toward the stick, 8 degrees a frame, only through his
+// front (forward, up, down: a stick behind him counts as straight up / down); a neutral stick keeps it. On the
+// ground, turning more than about 20 degrees up takes him off it
+void edge_hi_steer()
+{
+    float lr;
+    float sx;
+    float sy;
+    float l;
+    float cx;
+    float cy;
+    float cr;
+    float sg;
+    lr = PostureModuleF(0);
+    sx = global48;
+    sy = global32;
+    l = MathF(0, sx * sx + sy * sy);
+    if (l < 0.25f)
+    {
+        return;
+    }
+    sx = sx / l;
+    sy = sy / l;
+    if (sx * lr < 0.0f)
+    {
+        sx = 0.0f;
+        if (sy >= 0.0f)
+        {
+            sy = 1.0f;
+        }
+        else
+        {
+            sy = -1.0f;
+        }
+    }
+    cx = edge_hi_rx;
+    cy = edge_hi_ry;
+    if (cx * sx + cy * sy >= edge_hi_turn_c())
+    {
+        edge_hi_rx = sx;
+        edge_hi_ry = sy;
+    }
+    else
+    {
+        cr = cx * sy - cy * sx;
+        sg = 1.0f;
+        if (cr < 0.0f)
+        {
+            sg = -1.0f;
+        }
+        if (func_13(cr) < 0.0001f)
+        {
+            // straight back the other way (up to down): through his front
+            sg = 1.0f;
+            if (cy * lr > 0.0f)
+            {
+                sg = -1.0f;
+            }
+        }
+        edge_hi_rx = cx * edge_hi_turn_c() - cy * edge_hi_turn_s() * sg;
+        edge_hi_ry = cx * edge_hi_turn_s() * sg + cy * edge_hi_turn_c();
+    }
+    if (global18 == 0 && edge_hi_ry > 0.35f)
+    {
+        func_20(0x2);
+        GroundModule(0x2710, 0x5);
+    }
+}
+
+// Octaslash's autolink: the last fighter hit (still in hitstun, near) pulled to edge_hi_link_d() along his rush
+// (LASTHIT_OFFSET_X / _Y, docs/position-variables.md: X along his facing)
+void edge_hi_link()
+{
+    float ox;
+    float oy;
+    float tx;
+    float ty;
+    if (WorkModuleF(0, 0x0f0000a0) != 1.0f || WorkModuleF(0, 0x0f000050) <= 0.0f)   // SELF_HIT, LASTHIT_HITSTUN
+    {
+        return;
+    }
+    ox = WorkModuleF(0, 0x0f000055);
+    oy = WorkModuleF(0, 0x0f000056);
+    if (ox * ox + oy * oy > edge_hi_link_r() * edge_hi_link_r())
+    {
+        return;
+    }
+    tx = edge_hi_link_d() * edge_hi_rx * PostureModuleF(0);
+    ty = edge_hi_link_h() + edge_hi_link_d() * edge_hi_ry;
+    WorkModule(0, ox + (tx - ox) * edge_hi_link_k(), 0x0f000055);
+    WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
+}
+
 // the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity
 // energy, edge_hi_rush_set)
 float edge_hi_vy()
@@ -37902,6 +38055,10 @@ float edge_hi_rush_m()
     float m;
     float bf;
     m = edge_hi_p(13.5f, 6.2f);
+    if (edge_hi_held())
+    {
+        return m;                          // held Octaslash: its speed kept (test 113)
+    }
     bf = edge_hi_p(2.0f, 6.0f);
     if ((float)edge_hi_count >= bf)
     {
@@ -38142,7 +38299,7 @@ void edge_hi_landing_frame()
 {
     if (global6 == 0x19 || global6 == 0x10)
     {
-        WorkModule(0, edge_hi_p(27.0f, 56.0f), 0);
+        WorkModule(0, edge_hi_p(22.0f, 56.0f), 0);   // Blade Dash 22 (Ultimate 27; test 113, the user: slightly lower)
         WorkModule(0, 1.0f, 0x1);
     }
 }
@@ -38297,6 +38454,8 @@ void edge_hi_start_main()
     edge_hi_control = 0;
     edge_hi_cliff = 0xffffffff;
     edge_hi_fx = 0;
+    WorkModule(0, 1.0f, edge_hi_used_var());   // once per air time (test 113)
+    WorkModule(0, 0.0f, edge_hi_pass_var());
     edge_hi_start_kinetic();
     MotionModule(0x1, edge_hi_start_motion(), 0, 1.0f);
     global20 = 0;
@@ -38344,6 +38503,8 @@ void edge_hi_rush_main()
     // "Tap up special doesn't go far enough when going upwards"
     KineticModule(0x14, 0x3, -1.0f, -1.0f);
     KineticModule(0xb, 0x3);
+    WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
+    WorkModule(0, 0.0f, edge_hi_pass_var());
     edge_hi_count = 0;                     // init 04890 / 04950
     edge_hi_landed = 0;
     edge_hi_cliff = 0xffffffff;
@@ -38402,6 +38563,30 @@ void edge_hi_rush_loop()
             return;
         }
         GroundModule(0x2710, 0x1);         // Octaslash keeps rushing along the floor
+    }
+    if (edge_hi_charged)
+    {
+        edge_hi_hit_check();
+        edge_hi_link();
+        if ((float)edge_hi_count >= 15.0f && edge_hi_held() && WorkModuleF(0, edge_hi_timer_var()) > 0.0f)
+        {
+            // past its pass and still held: SpecialHi2 again from the 2nd hit (the script skips the 1st on pass 2)
+            if (f >= edge_hi_loop_to())
+            {
+                WorkModule(0, 2.0f, edge_hi_pass_var());
+                MotionModule(0x1, 0x237, edge_hi_loop_from(), 1.0f);
+            }
+            if (f >= 1.0f)
+            {
+                GroundModule(0x2713, 0);
+            }
+            edge_hi_pitch();
+            return;
+        }
+        if (WorkModuleF(0, edge_hi_pass_var()) != 2.0f)
+        {
+            WorkModule(0, (float)edge_hi_held(), edge_hi_pass_var());   // 1: the first pass, held (no end flash)
+        }
     }
     if ((float)edge_hi_count >= edge_hi_p(7.0f, 15.0f))   // rush_frame
     {
@@ -38622,7 +38807,14 @@ void edge_hi_end_loop()
     }
     if (MotionModule(0x2712))
     {
-        func_16(0x10, 0);
+        if (edge_hi_charged)
+        {
+            func_16(0x10, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);               // Blade Dash: a normal fall (test 113; Ultimate: FallSpecial)
+        }
         return;
     }
     edge_hi_pitch();
@@ -38693,6 +38885,15 @@ void edge_hi_exec()
     else if (global4 == 0x159)
     {
         edge_hi_count++;
+        edge_hi_hit_check();
+        if (edge_hi_held())
+        {
+            edge_hi_steer();               // test 113
+        }
+        if (edge_hi_charged && (float)edge_hi_count > 15.0f)
+        {
+            WorkModule(0, WorkModuleF(0, edge_hi_timer_var()) - 1.0f, edge_hi_timer_var());
+        }
         edge_hi_rush_speed();
     }
 }
@@ -38700,6 +38901,10 @@ void edge_hi_exec()
 // exec_stop (in hitlag): 02ac0 / 02c60 / 02c90 / 02cc0, the pitch applied again
 void edge_hi_exec_stop()
 {
+    if (global4 == 0x159)
+    {
+        edge_hi_hit_check();
+    }
     if (global4 != 0x15a || edge_hi_end_air)   // the ground end has none (reset as the rush ended)
     {
         edge_hi_pitch_apply();

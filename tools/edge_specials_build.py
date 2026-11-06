@@ -131,6 +131,7 @@ def body_scripts(a, fighter, param):
         msg, hit = snake_fair_scripts(game, effect)
         log += msg + snake_hi3_scripts(game, effect)
         log += snake_article_scripts(fighter, hit, glow) + '\n'
+    log += octaslash_loop_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
     return log
@@ -156,9 +157,43 @@ def _set(c, **kv):
     return q
 
 
-def _when(value, body):
-    """Float_Var_Compare(SNAKE_VAR == value) True { body }"""
-    return [U.cmd('Float_Var_Compare', SNAKE_VAR, 0, float(value)), U.cmd('True', 2 + U.words(body))] + body
+def _when(value, body, var=SNAKE_VAR):
+    """Float_Var_Compare(var == value) True { body }"""
+    return [U.cmd('Float_Var_Compare', var, 0, float(value)), U.cmd('True', 2 + U.words(body))] + body
+
+
+# held Octaslash's loop (test 113, edge.c edge_hi_*): VAR_20 0 a plain pass, 1 the first pass held, 2 a looped pass
+# (SpecialHi2 changed to again at frame 4 by the MSC, so the script runs past frames 0 - 3 at once)
+OCTA_VAR = 0x0F000314
+
+
+def octaslash_loop_scripts(game, effect):
+    """SpecialHi2: its 1st hit (frame 2) and start effects (frame 0) not on a looped pass (VAR_20 0 / 1 only), the end
+    flash (frame 15) only on a plain pass (0): held, the MSC plays frames 4 - 15 (the 2nd hit to the one before
+    SpecialHi2End's) again and again"""
+    crc = acmd.crc('SpecialHi2')
+    out = []
+    n = 0
+    for f, body in _frames(game.scripts[crc]):
+        if f == 2.0:
+            hits = [c for c in body if c.name.endswith('Hitbox')]
+            rest = [c for c in body if not c.name.endswith('Hitbox')]
+            assert hits and rest[0].name == 'WAIT', [c.name for c in body]
+            n = len(hits)
+            body = _when(0, hits, OCTA_VAR) + _when(1, hits, OCTA_VAR) + rest
+        out.append((f, body))
+    assert n, 'SpecialHi2: no frame 2 hit'
+    game.scripts[crc] = _join(out)
+    eout = []
+    for f, body in _frames(effect.scripts[crc]):
+        body = [c for c in body if c.ident != acmd.END]
+        if f == 0.0 and body:
+            body = _when(0, body, OCTA_VAR) + _when(1, body, OCTA_VAR)
+        elif f == 15.0 and body:
+            body = _when(0, body, OCTA_VAR)
+        eout.append((f, body))
+    effect.scripts[crc] = _join(eout) + [acmd.Command(acmd.END)]
+    return 'held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20\n' % n
 
 
 def _frames(cmds):
