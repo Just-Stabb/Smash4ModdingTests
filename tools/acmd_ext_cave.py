@@ -62,11 +62,15 @@ HIT_STUN = 0x02C25C88            # victim: stfs f28, 0x30(r30) (hitstun = knockb
 HIT_VSTOP = 0x02C25A78           # victim: cmpwi r19, 2, r20 = final hitstop frames; free r0 r3-r12 f0 f12 f13
 HIT_AMUL = 0x02C2645C            # attacker: or. r27, r3, r3 (r3 = hitstop before the rate); r30 hit info
 HIT_AFIX = 0x02C264C4            # attacker: lwz r27, 0x10(r1) (after the rate); r3 / ctr live
+SLOT_SET = 0x02C0874C            # AttackModule vt +0x54 (set a hitbox, 0x02C086A8): after its 0x68-byte copy of
+                                 #   the data into the slot (r26) and vt +0x5C, lwz r10, 0x14(r28): the tag halfword
+                                 #   cleared there (a plain hitbox copied whatever its data buffer held; an Extra one
+                                 #   is tagged after it). (0x02C08730, right after the copy, is strike_cave.py's.)
 DI_STAT = 0x037EE180             # kirby_stat_cave.py's get_float path: bnelr after cmpwi r11, 3 (not a fighter stat)
 DI_ID = 0x11A                    # fighter_param 0x0200011A: max DI angle (read by every fighter's MSC damage code)
 DI_SLOTS = 16
 HIT_ORIG = {HIT_STUN: 0xD39E0030, HIT_VSTOP: 0x2C130002, HIT_AMUL: 0x7C7B1B79, HIT_AFIX: 0x83610010,
-            DI_STAT: 0x4C820020}
+            DI_STAT: 0x4C820020, SLOT_SET: 0x815C0014}
 
 # per-object state (user variables, timers, tracking), keyed by the object's WorkModule
 OBJS = 0x04B94000                # OBJ_N entries of OBJ_SIZE (zero at load)
@@ -214,6 +218,617 @@ TRACK_PARAMS = [
 ]
 
 
+# --- new commands (part 2 of the cave: CODE2) -------------------------------------------------------------------
+CODE2 = 0x04B98900               # free: after THREADS (0x04B98000 + 32 x 0x48 = 0x04B98900), up to GROW
+POSTURE_FW = 0x030B2AF0          # PostureModuleF: 0 facing, 1-3 position x / y / z, 4-6 rotation x / y / z (degrees)
+MOTION_W = 0x030B2A48            # MotionModule: 1 play (kind, frame, rate), 4 rate, 7 current kind, 0x2713 frame
+MOTION_FW = 0x030B2A80           # MotionModuleF: 1 frame, 9 rate
+WORK_W = 0x030B2B28              # WorkModule: (6, id) an int
+LAST_ATTACKER = 0x10000065       # a fighter's int: the player slot (fighter table entry, from 0) that hit it last
+ACC_VAR = 0x0F0002BC             # position_vars_cave.py: + target (0-10) = that target's module accessor's bits
+
+_T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
+      'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
+_V = 'Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).'
+# name, handler label, params (name, type 0 int / 1 float / 3 variable, description), description
+NEW_CMDS = [
+    ('Hit_Check', 'h_hcheck', [
+        ('Target', 0, _T),
+        ('When', 0, '0: since the move started (or the last Hit_Reset), 1: this frame only.'),
+        ('Kinds', 0, 'What it connected with (bits, add them): 2 a hurtbox (a fighter / object was hit), 4 a shield, '
+                     '6 either; 1 another attack (clank), 8 a reflector, 16 an absorber, 32 a search box, 64 other '
+                     '(1, 8-64 as Ultimate\'s collision kinds: unconfirmed). 0 = anything (0x7F, MSC\'s default).')],
+     'Checks whether this object\'s (or another\'s) attack connected, and with what (a hurtbox, a shield, ...); True / '
+     'Else after it run on the result. MSC\'s AttackModule(0x2727 / 0x2726, kinds).'),
+    ('Hit_Get', 'h_hget', [
+        ('Target', 0, _T),
+        ('When', 0, '0: since the move started (or the last Hit_Reset), 1: this frame only.'),
+        ('Variable', 3, _V + ' Gets the kinds connected with, as bits: 2 hurtbox, 4 shield, 1 clank, ... (0 = none).')],
+     'Stores what this object\'s (or another\'s) attack connected with (bits: 2 hurtbox, 4 shield, ...) in a variable.'),
+    ('Rotation_Get', 'h_rget', [
+        ('Target', 0, _T),
+        ('Axis', 0, '0 X, 1 Y, 2 Z: the model\'s rotation in degrees (PostureModuleF(4 / 5 / 6)).'),
+        ('Variable', 3, _V)],
+     'Stores a fighter\'s or article\'s rotation about one axis (degrees) in a variable.'),
+    ('Rotation_Set', 'h_rset', [
+        ('Target', 0, _T),
+        ('X', 1, 'Rotation about X, degrees (relative to its facing: + tilts it forward).'),
+        ('Y', 1, 'Rotation about Y, degrees.'),
+        ('Z', 1, 'Rotation about Z, degrees.')],
+     'Sets a fighter\'s or article\'s rotation (degrees, as MSC PostureModule(4, x, y, z)). A fighter\'s status may set '
+     'its own every frame; an article keeps it.'),
+    ('Position_Get', 'h_pget', [
+        ('Target', 0, _T),
+        ('Axis', 0, '0 X, 1 Y, 2 Z (world position), 3 facing (1 right, -1 left).'),
+        ('Variable', 3, _V)],
+     'Stores a fighter\'s or article\'s world position (one axis) or facing in a variable.'),
+    ('Position_Set', 'h_pset', [
+        ('Target', 0, _T),
+        ('X', 1, 'X (Mode 1: forward along its facing).'),
+        ('Y', 1, 'Y.'),
+        ('Z', 1, 'Z.'),
+        ('Mode', 0, '0: put it at (X, Y, Z) (world); 1: move it by (X forward, Y, Z) from where it is.')],
+     'Moves a fighter or article (MSC PostureModule(3, x, y, z)). A grounded fighter moved up may snap back or fall.'),
+    ('Motion_Get', 'h_mget', [
+        ('Target', 0, _T),
+        ('What', 0, '0 the motion (animation) kind playing, 1 its frame, 2 its rate (speed).'),
+        ('Variable', 3, _V)],
+     'Stores which animation a fighter (or article) plays, its frame or its rate in a variable.'),
+    ('Motion_Set', 'h_mset', [
+        ('Target', 0, _T),
+        ('Motion', 0, 'The motion (animation) kind to play (motion numbers are per fighter). -1: keep the current one '
+                      'and only set its frame / rate.'),
+        ('Frame', 1, 'The frame to start at (Motion -1: jump to it; a negative Frame leaves the frame as it is).'),
+        ('Rate', 1, 'Playback rate (1 = normal). 0 or less: 1 for a new motion; Motion -1: the rate is left as it is.')],
+     'Plays an animation on a fighter (or article) from a frame at a rate, or changes the current one\'s frame / rate '
+     '(MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again.'),
+    ('Last_Hit_Get', 'h_lastget', [
+        ('Which', 0, '0: the last fighter this one hit (its current attack\'s newest hit; once the attack is over, a '
+                     'fighter whose last attacker is this one); 1: the last fighter that hit this one (the game\'s own '
+                     'record, its projectiles included).'),
+        ('Variable', 3, _V + ' Gets its player slot, 1-8; 0 = none.')],
+     'Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it. The same '
+     'fighters are Target 2 / 11 of the other commands.'),
+    ('Target_Slot_Get', 'h_tslot', [
+        ('Target', 0, _T),
+        ('Variable', 3, _V + ' Gets the player slot, 1-8; 0 = none / not a fighter.')],
+     'Stores which player slot (1-8) a target is: the nearest opponent, the last fighter hit, the last attacker, ...'),
+    ('Status_Get', 'h_stget', [('Target', 0, _T), ('Variable', 3, _V)],
+     'Stores a fighter\'s status (action) kind in a variable.'),
+    ('Status_Set', 'h_stset', [('Target', 0, _T),
+                               ('Status', 0, 'The status kind (reference/msc-note-sheet/Actions_Fighters.csv: 0x59 shield '
+                                             'break, 0x5D dizzy, ...). It takes effect on its next frame.')],
+     'Changes a fighter\'s status (StatusModule(3, status, 0)).'),
+    ('Hitstun_Get', 'h_hsget', [('Target', 0, _T),
+                                ('What', 0, '0 hitstun frames left, 1 the hitstun of the last hit it took.'),
+                                ('Variable', 3, _V)],
+     'Stores a fighter\'s hitstun frames left, or the last hit\'s hitstun, in a variable.'),
+    ('Hitstun_Set', 'h_hsset', [('Target', 0, _T), ('Frames', 0, 'Hitstun frames left (only matters in a hit status).')],
+     'Sets a fighter\'s hitstun frames left.'),
+    ('Hitstop_Set', 'h_hpset', [('Target', 0, _T), ('Frames', 0, 'Frames of hitstop (hitlag).'),
+                                ('Shake', 0, '1: it shakes as from a hit, 0: no shake.')],
+     'Puts a fighter in hitstop (hitlag) for some frames.'),
+    ('Damage_Get', 'h_dget', [('Target', 0, _T), ('Variable', 3, _V)], 'Stores a fighter\'s damage % in a variable.'),
+    ('Damage_Set', 'h_dset', [('Target', 0, _T), ('Percent', 1, 'Damage %.')],
+     'Sets a fighter\'s damage % (the counter follows).'),
+    ('Body_State_Set', 'h_bset', [('Target', 0, _T),
+                                  ('State', 0, '0 intangible (HitModule(2, frames)), 1 invincible (HitModule(1, frames)).'),
+                                  ('Frames', 0, 'For how many frames.')],
+     'Makes a fighter intangible or invincible for some frames.'),
+    ('Armor_Set', 'h_aset', [('Target', 0, _T),
+                             ('Type', 0, '0 none, 1 super armor, 2 knockback-based, 3 damage-based.'),
+                             ('Threshold', 1, 'The knockback (2) or damage (3) it withstands.')],
+     'Gives a fighter armor (DamageModule(0xB, type, threshold)).'),
+    ('Item_State_Set', 'h_iset2', [('Target', 0, _T),
+                                   ('Code', 0, '1 metal on, 2 metal off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 the '
+                                               'Timer\'s slow on everyone else, 8 camera close-up, 9 camera back to '
+                                               'normal (docs/position-variables.md "Item states").')],
+     'Puts one of the items\' states on a fighter (the item\'s own function and durations).'),
+    ('Stage_Collision_Set', 'h_gset', [('Target', 0, _T),
+                                       ('Mode', 0, '0 none (passes through the stage), 5 air, 1 / 2 ground (can / '
+                                                   'can\'t slide off edges). Its status sets its own again when it '
+                                                   'changes: set it every frame for as long as it should hold.')],
+     'Sets how a fighter collides with the stage (GroundModule(0x2710, mode)).'),
+    ('Joint_Position_Get', 'h_jget', [('Target', 0, _T),
+                                      ('Joint', 0, 'A model.jtb table 0 joint ID (as ACMD\'s bones).'),
+                                      ('VariableX', 3, 'Gets the joint\'s world X.'), ('VariableY', 3, 'World Y.'),
+                                      ('VariableZ', 3, 'World Z.')],
+     'Stores a joint\'s world position (its unanimated place on the target, ModelModuleF) in three variables.'),
+    ('Animation_Rate_Set', 'h_arset', [('Rate', 1, 'Multiplier on every animation and the ACMD timed to it (1 = '
+                                                   'normal) until set back to 1.')],
+     'Speeds up / slows down everything this fighter does (MotionModule +0xF4, the Mii rate).'),
+]
+SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
+                          for n, _l, _p, d in NEW_CMDS})
+COMMANDS += [(n, 1 + len(p), l, None) for n, l, p, _d in NEW_CMDS]
+NEW_PARAMS = {n: p for n, _l, p, _d in NEW_CMDS}
+# variable-backed commands: (base, stride per target, quantity) of position_vars_cave.py's IDs
+VB = {'status': (0xA0, 8, 2), 'hitstun': (0x40, 8, 0), 'dealt': (0x40, 8, 1), 'stop_shake': (0x40, 8, 3),
+      'stop': (0x40, 8, 4), 'damage': (0x100, 0x20, 0x17), 'intan': (0x100, 0x20, 0x1B), 'invin': (0x100, 0x20, 0x1C),
+      'armor': (0x100, 0x20, 0x1D), 'armor_t': (0x100, 0x20, 0x1E), 'item': (0x276, 1, 0), 'ground': (0xA0, 8, 6),
+      'joint': (0x290, 4, 0)}
+
+
+def newcmd_code(b):
+    """the new commands' handlers and their helpers, in their own Asm (b, at CODE2)"""
+    pro = lambda lab, n, skip=True: """
+%(lab)s:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x28(r1)
+        mr r31, r5                      # script state
+        mr r30, r7                      # parameters
+        mr r29, r3                      # this object's accessor
+        li r28, %(bytes)d""" % dict(lab=lab, bytes=4 * n) + (("""
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq nc_out""") if skip else "") + chk_t('r29', 'r0', 'nc_out')     # noqa: E731
+    size = {n: 1 + len(p) for n, _l, p, _d in NEW_CMDS}
+    S = lambda name: size[name]          # noqa: E731
+
+    def vid(key, treg='r4'):
+        """r4 = position_vars ID of key for target in treg (0 -> nc_out on a bad target)"""
+        base, stride, q = VB[key]
+        return """
+        mr r3, r29
+        mr r4, %(t)s
+        bl nc_tid
+        cmpwi r3, 0
+        blt nc_out
+        mulli r4, r3, %(stride)d
+        addis r4, r4, 0x0F00
+        addi r4, r4, %(bq)d""" % dict(t=treg, stride=stride, bq=base + q)
+
+    def msc_args(*words):
+        """nc_args = words: ints, ('p', k) parameter k, ('r', reg)"""
+        out = ["        lis r12, nc_args@ha", "        addi r12, r12, nc_args@l"]
+        for i, w in enumerate(words):
+            if isinstance(w, tuple) and w[0] == 'p':
+                out.append("        lwz r0, %d(r30)" % (4 * w[1]))
+            elif isinstance(w, tuple) and w[0] == 'r':
+                out.append("        mr r0, %s" % w[1])
+            else:
+                out += ["        lis r0, 0x%X" % ((w >> 16) & 0xFFFF), "        ori r0, r0, 0x%X" % (w & 0xFFFF)]
+            out.append("        stw r0, %d(r12)" % (4 * i))
+        return "\n" + "\n".join(out)
+
+    def call(wrapper, n, acc='r27'):
+        return """
+        mr r3, %s
+        lis r4, 0x%X
+        ori r4, r4, 0x%X
+        li r5, %d
+        bl nc_msc""" % (acc, wrapper >> 16, wrapper & 0xFFFF, n)
+
+    tgt = """
+        mr r3, r29
+        lwz r4, 0(r30)
+        bl nc_target
+        mr. r27, r3
+        beq nc_out"""
+    store = lambda k: """
+        mr r3, r29
+        lwz r4, %d(r30)
+        bl nc_set""" % (4 * k)       # noqa: E731
+    fbits = """
+        stw r3, 0x8(r1)
+        lfs f1, 0x8(r1)"""
+    seti = lambda key, k, treg='r26': ("""
+        lwz r26, 0(r30)""" if treg == 'r26' else "") + vid(key, treg) + """
+        mr r26, r4
+        lwz r3, %d(r30)
+        bl i2f
+        mr r3, r29
+        mr r4, r26
+        bl nc_set""" % (4 * k)        # noqa: E731
+    b.asm("""
+# --- shared epilogue: step over the command (r28 bytes) when running; the handlers' frame (0x40, r26-r31)
+nc_out:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne nc_ret
+        lwz r11, 4(r31)
+        add r11, r11, r28
+        stw r11, 4(r31)
+        li r3, 2
+nc_ret:
+        lmw r26, 0x28(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# --- nc_msc(r3 accessor, r4 MSC module wrapper, r5 word count; words in nc_args) -> r3 (float bits for F) ----
+nc_msc:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        mtctr r4
+        li r0, 0
+        stw r0, 0x10(r1)                # fake MSC context: +4 = the module accessor
+        stw r3, 0x14(r1)
+        lis r12, nc_args@ha
+        addi r12, r12, nc_args@l
+        stw r12, 0x18(r1)
+        stw r5, 0x1C(r1)
+        addi r3, r1, 0x10
+        addi r4, r1, 0x18
+        bctrl
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- nc_tid(r3 accessor, r4 target) -> r3 target 0-10 of position_vars' IDs (11, the last attacker: its slot's
+#     3 + slot), or -1 -------------------------------------------------------------------------------------------
+nc_tid:
+        cmplwi r4, 10
+        bgt nt_last
+        mr r3, r4
+        blr
+nt_last:
+        cmpwi r4, 11
+        bne nt_bad
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)""" + msc_args(6, LAST_ATTACKER) + """
+        lis r4, 0x%(wh)X
+        ori r4, r4, 0x%(wl)X
+        li r5, 2
+        bl nc_msc
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        cmplwi r3, 7
+        bgt nt_bad
+        addi r3, r3, 3
+        blr
+nt_bad:
+        li r3, -1
+        blr
+
+# --- nc_target(r3 accessor, r4 target) -> r3 that target's module accessor, or 0 ------------------------------
+nc_target:
+        cmpwi r4, 0
+        bne ntg_go
+        blr
+ntg_go:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        bl nc_tid
+        cmpwi r3, 0
+        blt ntg_none
+        beq ntg_self
+        lis r4, 0x%(acch)X
+        ori r4, r4, 0x%(accl)X
+        add r4, r4, r3
+        lwz r3, 0x28(r31)               # this object's WorkModule: position_vars_cave.py's ACC""" % dict(
+        wh=WORK_W >> 16, wl=WORK_W & 0xFFFF, acch=ACC_VAR >> 16, accl=ACC_VAR & 0xFFFF) + chk_t('r3', 'r0', 'ntg_none') + \
+        vcall(0x44) + """
+        stfs f1, 0x8(r1)
+        lwz r3, 0x8(r1)""" + chk_t('r3', 'r0', 'ntg_none') + """
+        b ntg_out
+ntg_self:
+        mr r3, r31
+        b ntg_out
+ntg_none:
+        li r3, 0
+ntg_out:
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- nc_get(r3 accessor, r4 ID) -> f1 / nc_set(r3 accessor, r4 ID, f1): its WorkModule's float -------------------
+nc_get:
+        lwz r3, 0x28(r3)""" + chk_t('r3', 'r0', 'ng_zero') + """
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctr
+ng_zero:
+        lis r12, zero@ha
+        lfs f1, zero@l(r12)
+        blr
+nc_set:
+        lwz r3, 0x28(r3)""" + chk_t('r3', 'r0', 'ns_out') + """
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctr
+ns_out:
+        blr
+
+# --- nc_slot(r3 accessor) -> r3 its player slot 1-8 (fighter table entry + 1), 0 = none ---------------------------
+nc_slot:
+        mr r11, r3
+        lis r12, 0x%(fh)X
+        lwz r12, %(fl)d(r12)""" % dict(fh=ha(FIGHTERS), fl=lo(FIGHTERS)) + chk_t('r12', 'r0', 'nsl_none') + """
+        lwz r12, 0(r12)""" + chk_t('r12', 'r0', 'nsl_none') + """
+        lwz r10, 8(r12)                 # count
+        lwz r12, 0(r12)                 # entries""" + chk_t('r12', 'r0', 'nsl_none') + """
+        li r3, 0
+nsl_loop:
+        cmplw r3, r10
+        bge nsl_none
+        cmplwi r3, 8
+        bge nsl_none
+        lbz r0, 0x1E(r12)               # live
+        cmplwi r0, 4
+        blt nsl_next
+        lwz r0, 0xC(r12)
+        cmplw r0, r11
+        bne nsl_next
+        addi r3, r3, 1
+        blr
+nsl_next:
+        addi r3, r3, 1
+        addi r12, r12, %(fe)d
+        b nsl_loop
+nsl_none:
+        li r3, 0
+        blr
+""" % dict(fe=FIGHTER_ENTRY))
+
+    # ---- hits
+    hit_mask = tgt + """
+        lwz r3, 0x50(r27)               # AttackModule""" + chk_t('r3', 'r0', 'nc_out') + """
+        lwz r12, 0(r3)
+        lwz r0, 4(r30)                  # When: 0 since the move started (0x2727's vt +0x2C4), 1 this frame (0x2726's +0x2BC)
+        li r11, 0x2C4
+        cmpwi r0, 0
+        beq hm_vt_%(n)s
+        li r11, 0x2BC
+hm_vt_%(n)s:
+        lwzx r12, r12, r11
+        mtctr r12
+        bctrl                           # -> r3 the kinds connected with (bits)"""
+    b.asm("""
+h_hcheck:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x28(r1)
+        mr r31, r5
+        mr r30, r7
+        mr r29, r3
+        li r28, %d
+        li r26, 0
+        stw r26, 0xC(r31)               # no target / no attack module: False""" % (4 * S('Hit_Check')) +
+          chk_t('r29', 'r0', 'nc_out') + hit_mask % dict(n='c') + """
+        lwz r0, 8(r30)
+        cmpwi r0, 0
+        bne hc_and
+        li r0, 0x7F
+hc_and:
+        and. r0, r3, r0
+        beq hc_set
+        li r26, 1
+hc_set:
+        stw r26, 0xC(r31)               # the compare result True / Else read
+        b nc_out
+""")
+    b.asm(pro('h_hget', S('Hit_Get')) + hit_mask % dict(n='g') + """
+        bl i2f""" + store(2) + """
+        b nc_out
+""")
+    # ---- posture
+    b.asm(pro('h_rget', S('Rotation_Get')) + tgt + """
+        lwz r26, 4(r30)
+        cmplwi r26, 2
+        bgt nc_out
+        addi r26, r26, 4""" + msc_args(('r', 'r26')) + call(POSTURE_FW, 1) + fbits + store(2) + """
+        b nc_out
+""")
+    b.asm(pro('h_rset', S('Rotation_Set')) + tgt + msc_args(4, ('p', 1), ('p', 2), ('p', 3)) + call(POSTURE_W, 4) + """
+        b nc_out
+""")
+    b.asm(pro('h_pget', S('Position_Get')) + tgt + """
+        lwz r26, 4(r30)
+        cmplwi r26, 3
+        bgt nc_out
+        addi r26, r26, 1
+        cmpwi r26, 4
+        bne pg_go
+        li r26, 0                       # 3: facing""" + """
+pg_go:""" + msc_args(('r', 'r26')) + call(POSTURE_FW, 1) + fbits + store(2) + """
+        b nc_out
+""")
+    b.asm(pro('h_pset', S('Position_Set')) + tgt + """
+        lwz r0, 16(r30)
+        cmpwi r0, 1
+        beq ps_rel
+        lwz r0, 4(r30)
+        stw r0, 0x10(r1)
+        lwz r0, 8(r30)
+        stw r0, 0x14(r1)
+        lwz r0, 12(r30)
+        stw r0, 0x18(r1)
+        b ps_go
+ps_rel:""" + msc_args(0) + call(POSTURE_FW, 1) + """
+        stw r3, 0x1C(r1)                # facing""" + msc_args(1) + call(POSTURE_FW, 1) + fbits + """
+        lfs f2, 0x1C(r1)
+        lfs f3, 4(r30)
+        fmadds f1, f2, f3, f1           # x + X x facing
+        stfs f1, 0x10(r1)""" + msc_args(2) + call(POSTURE_FW, 1) + fbits + """
+        lfs f2, 8(r30)
+        fadds f1, f1, f2
+        stfs f1, 0x14(r1)""" + msc_args(3) + call(POSTURE_FW, 1) + fbits + """
+        lfs f2, 12(r30)
+        fadds f1, f1, f2
+        stfs f1, 0x18(r1)
+ps_go:
+        lwz r6, 0x10(r1)
+        lwz r7, 0x14(r1)
+        lwz r8, 0x18(r1)""" + msc_args(3, ('r', 'r6'), ('r', 'r7'), ('r', 'r8')) + call(POSTURE_W, 4) + """
+        b nc_out
+""")
+    # ---- motion
+    b.asm(pro('h_mget', S('Motion_Get')) + tgt + """
+        lwz r26, 4(r30)
+        cmpwi r26, 0
+        bne mg_f""" + msc_args(7) + call(MOTION_W, 1) + """
+        bl i2f
+        b mg_st
+mg_f:
+        cmplwi r26, 2
+        bgt nc_out
+        li r0, 1
+        cmpwi r26, 1
+        beq mg_ff
+        li r0, 9
+mg_ff:
+        mr r26, r0""" + msc_args(('r', 'r26')) + call(MOTION_FW, 1) + fbits + """
+mg_st:""" + store(2) + """
+        b nc_out
+""")
+    b.asm(pro('h_mset', S('Motion_Set')) + tgt + """
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        lwz r0, 4(r30)
+        cmpwi r0, 0
+        blt ms_keep
+        lfs f1, 8(r30)                  # frame (< 0: 0)
+        stfs f1, 0x10(r1)
+        fcmpu cr0, f1, f0
+        bge ms_fr
+        stfs f0, 0x10(r1)
+ms_fr:
+        lfs f1, 12(r30)                 # rate (<= 0: 1)
+        stfs f1, 0x14(r1)
+        fcmpu cr0, f1, f0
+        bgt ms_rt
+        lis r12, one@ha
+        lfs f1, one@l(r12)
+        stfs f1, 0x14(r1)
+ms_rt:
+        lwz r6, 0x10(r1)
+        lwz r7, 0x14(r1)""" + msc_args(1, ('p', 1), ('r', 'r6'), ('r', 'r7')) + call(MOTION_W, 4) + """
+        b nc_out
+ms_keep:
+        lfs f1, 8(r30)
+        fcmpu cr0, f1, f0
+        blt ms_k_rate""" + msc_args(0x2713, ('p', 2)) + call(MOTION_W, 2) + """
+ms_k_rate:
+        lis r12, zero@ha
+        lfs f0, zero@l(r12)
+        lfs f1, 12(r30)
+        fcmpu cr0, f1, f0
+        ble nc_out""" + msc_args(4, ('p', 3)) + call(MOTION_W, 2) + """
+        b nc_out
+""")
+    # ---- who
+    b.asm(pro('h_lastget', S('Last_Hit_Get')) + """
+        li r4, 2
+        lwz r0, 0(r30)
+        cmpwi r0, 0
+        beq lg_go
+        li r4, 11
+lg_go:
+        mr r3, r29
+        bl nc_target
+        cmpwi r3, 0
+        beq lg_zero
+        bl nc_slot
+        b lg_st
+lg_zero:
+        li r3, 0
+lg_st:
+        bl i2f""" + store(1) + """
+        b nc_out
+""")
+    b.asm(pro('h_tslot', S('Target_Slot_Get')) + """
+        mr r3, r29
+        lwz r4, 0(r30)
+        bl nc_target
+        cmpwi r3, 0
+        beq ts2_zero
+        bl nc_slot
+        b ts2_st
+ts2_zero:
+        li r3, 0
+ts2_st:
+        bl i2f""" + store(1) + """
+        b nc_out
+""")
+    # ---- variable-backed
+    getv = lambda key, k: """
+        lwz r26, 0(r30)""" + vid(key, 'r26') + """
+        mr r3, r29
+        bl nc_get""" + store(k)      # noqa: E731
+    b.asm(pro('h_stget', S('Status_Get')) + getv('status', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_stset', S('Status_Set')) + seti('status', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_hsget', S('Hitstun_Get')) + """
+        lwz r0, 4(r30)
+        cmpwi r0, 0
+        bne hsg_dealt""" + getv('hitstun', 2) + """
+        b nc_out
+hsg_dealt:""" + getv('dealt', 2) + "\n        b nc_out\n")
+    b.asm(pro('h_hsset', S('Hitstun_Set')) + seti('hitstun', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_hpset', S('Hitstop_Set')) + """
+        lwz r0, 8(r30)
+        cmpwi r0, 0
+        beq hp_noshake""" + seti('stop_shake', 1) + """
+        b nc_out
+hp_noshake:""" + seti('stop', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_dget', S('Damage_Get')) + getv('damage', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_dset', S('Damage_Set')) + """
+        lwz r26, 0(r30)""" + vid('damage', 'r26') + """
+        lfs f1, 4(r30)
+        mr r3, r29
+        bl nc_set
+        b nc_out
+""")
+    b.asm(pro('h_bset', S('Body_State_Set')) + """
+        lwz r0, 4(r30)
+        cmpwi r0, 0
+        bne bs_inv""" + seti('intan', 2) + """
+        b nc_out
+bs_inv:
+        cmpwi r0, 1
+        bne nc_out""" + seti('invin', 2) + "\n        b nc_out\n")
+    b.asm(pro('h_aset', S('Armor_Set')) + """
+        lwz r26, 0(r30)""" + vid('armor_t', 'r26') + """
+        lfs f1, 8(r30)                  # the threshold first (the type's write reads it)
+        mr r3, r29
+        bl nc_set""" + seti('armor', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_iset2', S('Item_State_Set')) + seti('item', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_gset', S('Stage_Collision_Set')) + seti('ground', 1) + "\n        b nc_out\n")
+    b.asm(pro('h_jget', S('Joint_Position_Get')) + """
+        lwz r26, 0(r30)""" + vid('joint', 'r26') + """
+        mr r26, r4                      # n 0: the joint the reads use; 1-3 its world x / y / z
+        lwz r3, 4(r30)
+        bl i2f
+        mr r3, r29
+        mr r4, r26
+        bl nc_set""" + ''.join("""
+        mr r3, r29
+        addi r4, r26, %d
+        bl nc_get""" % (i + 1) + store(2 + i) for i in range(3)) + "\n        b nc_out\n")
+    b.asm(pro('h_arset', S('Animation_Rate_Set')) + """
+        lfs f1, 0(r30)
+        mr r3, r29
+        lis r4, 0x0F00
+        ori r4, r4, 0x98
+        bl nc_set
+        b nc_out
+""")
+    b.asm("""
+nc_args:
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+""")
+
+
 def ha(v):
     return ((v + 0x8000) >> 16) & 0xFFFF
 
@@ -345,28 +960,19 @@ ext_record:
 """ + chk('r3', 'er_out') + """
         lwz r6, 0x50(r3)                # AttackModule
 """ + chk('r6', 'er_out') + """
-        lwz r7, 0(r4)                   # ID
-        cmplwi r7, 7
-        bgt er_out
+        lwz r7, 0(r4)                   # ID, below the module's own slot count (fighters 10, dein copies 7)
+        lwz r0, 0x3C(r6)
+        cmplw r7, r0
+        bge er_out
         lwz r8, 0x40(r6)                # slots
 """ + chk('r8', 'er_out') + """
         mulli r7, r7, 0x84
         add r8, r8, r7                  # slot (its data)
         lis r9, table@ha
         addi r9, r9, table@l
-        lhz r10, %(tag)d(r8)            # an entry this slot had: reuse it
-        rlwinm r0, r10, 0, 16, 23
-        cmplwi r0, %(TAG)d
-        bne er_new
-        rlwinm r10, r10, 0, 24, 31
-        cmplwi r10, %(entries)d
-        bge er_new
-        mulli r11, r10, %(entry)d
-        add r11, r9, r11
-        lwz r0, 0(r11)
-        cmplw r0, r8
-        beq er_have
-er_new:
+                                        # always a new entry (round robin): a hit of this slot's previous
+                                        # hitbox still being handled keeps its own extras (the slot's entry
+                                        # used to be reused: such a hit read the new hitbox's extras)
         lis r12, next_entry@ha
         lwz r10, next_entry@l(r12)
         addi r0, r10, 1
@@ -377,7 +983,7 @@ er_wrap:
         stw r0, next_entry@l(r12)
         mulli r11, r10, %(entry)d
         add r11, r9, r11
-er_have:                                # r10 = entry number, r11 = entry, r8 = slot
+                                        # r10 = entry number, r11 = entry, r8 = slot
         stw r8, 0(r11)
         lwz r0, 0x20(r8)
         stw r0, 4(r11)
@@ -409,6 +1015,13 @@ er_have:                                # r10 = entry number, r11 = entry, r8 = 
 er_out:
         blr
 """) % dict(tag=TAG_OFF, TAG=TAG, entries=ENTRIES, entry=ENTRY))
+    a.asm('''
+slot_set:                               # every hitbox set: the slot's tag cleared (ext_record tags an Extra one after)
+        li r0, 0
+        sth r0, %d(r26)
+        lwz r10, 0x14(r28)
+        b 0x%08X
+''' % (TAG_OFF, SLOT_SET + 4))
     # ext_find(r3 data) -> r3 entry or 0. Leaf: r0, r11, r12.
     a.asm("""
 ext_find:
@@ -468,6 +1081,11 @@ next_entry:
     obj_code(a)
     thread_code(a)
     input_code(a)
+    b2 = Asm(CODE2)                     # the new commands (their labels resolve with the main part's, below)
+    newcmd_code(b2)
+    b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
+    b2.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
+    a.labels.update(b2.labels)
     if a.pc % 8:
         a.asm('.word 0')
     a.asm("""
@@ -477,9 +1095,8 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
         .word 0x43300000
         .word 0x80000000
 """)
-    a.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
-    a.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
-    a.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
+    b2.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
+    a.labels.update(b2.labels)
     a.labels['table'] = TABLE
     a.labels['di_tab'] = TABLE + ENTRIES * ENTRY
     a.labels['objs'] = OBJS
@@ -488,14 +1105,19 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     a.labels['dbg'] = DBG
     assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= DBG and DBG + 0x100 <= OBJS
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
+    b2.labels.update(a.labels)
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
+    words2 = b2.words()
+    assert THREADS + THREAD_N * THREAD_SIZE <= CODE2 and CODE2 + 4 * len(words2) <= GROW, hex(CODE2 + 4 * len(words2))
+    a.part2 = (CODE2, words2)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
              HIT_STUN: b(HIT_STUN, a.addr('hk_stun')), HIT_VSTOP: b(HIT_VSTOP, a.addr('hk_vstop')),
              HIT_AMUL: b(HIT_AMUL, a.addr('hk_amul')), HIT_AFIX: b(HIT_AFIX, a.addr('hk_afix')),
              DI_STAT: b(DI_STAT, a.addr('di_check')),   # was bnelr: di_check tests cr0
+             SLOT_SET: b(SLOT_SET, a.addr('slot_set')),
              FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
     for k, h in enumerate(STEP_HOOKS):
@@ -2218,6 +2840,51 @@ EXAMPLES = {
         'Thread_Stop(ID=-1)'],
 }
 
+EXAMPLES.update({
+    'Hit_Check': [
+        '// a cancel on hit or on shield (MSC\'s AttackModule(0x2727, 6)), from frame 20',
+        'FRAME(Frames=0x14)',
+        'Hit_Check(Target=0, When=0, Kinds=6)',
+        'True(Offset=0){',
+        '    Input_Set(Target=0, Input=2, Value=2)',
+        '}',
+        '// only when this frame\'s hit was on a shield',
+        'Hit_Check(Target=0, When=1, Kinds=4)'],
+    'Hit_Get': [
+        '// VAR_0 = what the move has connected with (2 hurtbox, 4 shield, 6 both, 0 nothing)',
+        'Hit_Get(Target=0, When=0, Variable=VAR_0)',
+        'Float_Var_Compare(Variable=VAR_0, Method=0, Value=4)'],
+    'Rotation_Get': ['// VAR_0 = this article\'s rotation about Z (degrees)', 'Rotation_Get(Target=0, Axis=2, Variable=VAR_0)'],
+    'Rotation_Set': ['// tilt this projectile 45 degrees (about Z)', 'Rotation_Set(Target=0, X=0, Y=0, Z=45)',
+                     '// the last fighter hit: upright again', 'Rotation_Set(Target=2, X=0, Y=0, Z=0)'],
+    'Position_Get': ['// VAR_0 / VAR_1 = the nearest opponent\'s X / Y',
+                     'Position_Get(Target=1, Axis=0, Variable=VAR_0)', 'Position_Get(Target=1, Axis=1, Variable=VAR_1)'],
+    'Position_Set': ['// move this fighter 10 forward and 5 up', 'Position_Set(Target=0, X=10, Y=5, Z=0, Mode=1)',
+                     '// put player 2 at (0, 30, 0)', 'Position_Set(Target=4, X=0, Y=30, Z=0, Mode=0)'],
+    'Motion_Get': ['// VAR_0 = the animation frame the last fighter hit is on', 'Motion_Get(Target=2, What=1, Variable=VAR_0)'],
+    'Motion_Set': ['// play motion 0x5F from frame 10 at half speed', 'Motion_Set(Target=0, Motion=0x5F, Frame=10, Rate=0.5)',
+                   '// keep the current animation, jump to frame 20', 'Motion_Set(Target=0, Motion=-1, Frame=20, Rate=0)'],
+    'Last_Hit_Get': ['// VAR_0 = the player slot (1-8) this fighter last hit; VAR_1 = the one that last hit it',
+                     'Last_Hit_Get(Which=0, Variable=VAR_0)', 'Last_Hit_Get(Which=1, Variable=VAR_1)'],
+    'Target_Slot_Get': ['// VAR_0 = the nearest opponent\'s player slot (1-8)', 'Target_Slot_Get(Target=1, Variable=VAR_0)'],
+    'Status_Get': ['// VAR_0 = the last fighter hit\'s status', 'Status_Get(Target=2, Variable=VAR_0)'],
+    'Status_Set': ['// the last fighter hit: shield break (0x59)', 'Status_Set(Target=2, Status=0x59)'],
+    'Hitstun_Get': ['// VAR_0 = the hitstun frames the last fighter hit has left', 'Hitstun_Get(Target=2, What=0, Variable=VAR_0)'],
+    'Hitstun_Set': ['// end the last fighter hit\'s hitstun now', 'Hitstun_Set(Target=2, Frames=0)'],
+    'Hitstop_Set': ['// the last fighter hit: 8 frames of hitstop, shaking', 'Hitstop_Set(Target=2, Frames=8, Shake=1)'],
+    'Damage_Get': ['// VAR_0 = this fighter\'s damage %', 'Damage_Get(Target=0, Variable=VAR_0)'],
+    'Damage_Set': ['// the last fighter that hit this one: 0%', 'Damage_Set(Target=11, Percent=0)'],
+    'Body_State_Set': ['// intangible for 10 frames', 'Body_State_Set(Target=0, State=0, Frames=0xA)'],
+    'Armor_Set': ['// armor against knockback below 60, then none', 'Armor_Set(Target=0, Type=2, Threshold=60)',
+                  'WAIT(Frames=0xA)', 'Armor_Set(Target=0, Type=0, Threshold=0)'],
+    'Item_State_Set': ['// the last fighter hit turns metal (the Metal Box\'s)', 'Item_State_Set(Target=2, Code=1)'],
+    'Stage_Collision_Set': ['// the last fighter hit passes through the stage this frame', 'Stage_Collision_Set(Target=2, Mode=0)'],
+    'Joint_Position_Get': ['// VAR_0-2 = player 1\'s joint 11 (WaistN for most fighters)',
+                           'Joint_Position_Get(Target=3, Joint=0xB, VariableX=VAR_0, VariableY=VAR_1, VariableZ=VAR_2)'],
+    'Animation_Rate_Set': ['// everything 1.2x faster, then back', 'Animation_Rate_Set(Rate=1.2)', 'WAIT(Frames=0x3C)',
+                           'Animation_Rate_Set(Rate=1)'],
+})
+
 
 def labels(path):
     """add / update the new commands in tools/Sm4shCommand/param_labels.json (apply_param_labels.py then
@@ -2229,6 +2896,7 @@ def labels(path):
         own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS,
                'Input_Compare': INPUT_CMP_PARAMS, 'Input_Get': INPUT_GET_PARAMS, 'Input_Set': INPUT_SET_PARAMS,
                'Hit_Reset': [], 'Hit_Log_Clear': HIT_LOG_CLEAR_PARAMS}
+        own.update({n: [(pn, 0 if ty == 3 else ty, d) for pn, ty, d in p] for n, p in NEW_PARAMS.items()})
         if name in own:
             e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
                  '_format': [t for _n, t, _d in own[name]]}
@@ -2259,6 +2927,7 @@ def main():
     a, words, hooks = build()
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    out += ['0x%08X=0x%08X' % (a.part2[0] + 4 * i, w) for i, w in enumerate(a.part2[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     print(' '.join(out))
     sys.stderr.write('acmd ext: %d words, %s\n' % (len(words), ', '.join(

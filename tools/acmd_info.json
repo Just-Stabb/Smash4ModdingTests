@@ -10246,6 +10246,318 @@
 "syntax": [
 "Part"
 ]
+},
+"0F4F6EF4": {
+"size": 4,
+"name": "Hitstop_Set",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Frames",
+"Shake"
+]
+},
+"1AA4CD3E": {
+"size": 3,
+"name": "Item_State_Set",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Code"
+]
+},
+"1EC5B53B": {
+"size": 3,
+"name": "Last_Hit_Get",
+"format": [
+0,
+0
+],
+"syntax": [
+"Which",
+"Variable"
+]
+},
+"29F1BB70": {
+"size": 4,
+"name": "Position_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Axis",
+"Variable"
+]
+},
+"32DEB0DC": {
+"size": 6,
+"name": "Position_Set",
+"format": [
+0,
+1,
+1,
+1,
+0
+],
+"syntax": [
+"Target",
+"X",
+"Y",
+"Z",
+"Mode"
+]
+},
+"4BD9E69A": {
+"size": 4,
+"name": "Motion_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"What",
+"Variable"
+]
+},
+"4F6B304E": {
+"size": 3,
+"name": "Status_Set",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Status"
+]
+},
+"50F6ED36": {
+"size": 5,
+"name": "Motion_Set",
+"format": [
+0,
+0,
+1,
+1
+],
+"syntax": [
+"Target",
+"Motion",
+"Frame",
+"Rate"
+]
+},
+"54443BE2": {
+"size": 3,
+"name": "Status_Get",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Variable"
+]
+},
+"6078528B": {
+"size": 4,
+"name": "Hit_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"When",
+"Variable"
+]
+},
+"69FD6D46": {
+"size": 4,
+"name": "Hitstun_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"What",
+"Variable"
+]
+},
+"6C574576": {
+"size": 2,
+"name": "Animation_Rate_Set",
+"format": [
+1
+],
+"syntax": [
+"Rate"
+]
+},
+"72D266EA": {
+"size": 3,
+"name": "Hitstun_Set",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Frames"
+]
+},
+"83D8148C": {
+"size": 4,
+"name": "Body_State_Set",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"State",
+"Frames"
+]
+},
+"87E19722": {
+"size": 5,
+"name": "Rotation_Set",
+"format": [
+0,
+1,
+1,
+1
+],
+"syntax": [
+"Target",
+"X",
+"Y",
+"Z"
+]
+},
+"92753431": {
+"size": 4,
+"name": "Hit_Check",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"When",
+"Kinds"
+]
+},
+"9CCE9C8E": {
+"size": 4,
+"name": "Rotation_Get",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Axis",
+"Variable"
+]
+},
+"AFB9CA75": {
+"size": 3,
+"name": "Damage_Set",
+"format": [
+0,
+1
+],
+"syntax": [
+"Target",
+"Percent"
+]
+},
+"B496C1D9": {
+"size": 3,
+"name": "Damage_Get",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Variable"
+]
+},
+"BE1E63B3": {
+"size": 6,
+"name": "Joint_Position_Get",
+"format": [
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Joint",
+"VariableX",
+"VariableY",
+"VariableZ"
+]
+},
+"BF7A21C8": {
+"size": 3,
+"name": "Stage_Collision_Set",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Mode"
+]
+},
+"E33213D8": {
+"size": 4,
+"name": "Armor_Set",
+"format": [
+0,
+0,
+1
+],
+"syntax": [
+"Target",
+"Type",
+"Threshold"
+]
+},
+"FC5AB6DC": {
+"size": 3,
+"name": "Target_Slot_Get",
+"format": [
+0,
+0
+],
+"syntax": [
+"Target",
+"Variable"
+]
 }
 }
 }

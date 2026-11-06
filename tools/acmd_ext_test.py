@@ -36,7 +36,7 @@ import acmd_ext_cave as C  # noqa: E402
 import rpx_patch as R  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
 from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_5, UC_PPC_REG_6,  # noqa: E402
-                               UC_PPC_REG_19, UC_PPC_REG_20, UC_PPC_REG_27, UC_PPC_REG_FPR1, UC_PPC_REG_FPR28,
+                               UC_PPC_REG_19, UC_PPC_REG_20, UC_PPC_REG_27, UC_PPC_REG_26, UC_PPC_REG_10, UC_PPC_REG_FPR1, UC_PPC_REG_FPR28,
                                UC_PPC_REG_7, UC_PPC_REG_0, UC_PPC_REG_12, UC_PPC_REG_28, UC_PPC_REG_29,
                                UC_PPC_REG_30, UC_PPC_REG_LR, UC_PPC_REG_MSR)
 
@@ -768,6 +768,200 @@ all:                            # 0x02C0ECDC(AttackModule + 8): log it
     check('Hit_Log_Clear, no AttackModule: nothing', hlog(0)[2:], ([], 0))
 
 
+def new_cmd_tests(pm, a):
+    """the new commands (Hit_Check ... Animation_Rate_Set) with stubbed MSC module wrappers (each logs its
+    accessor and words, returns the word at LOG + 0xFF8), a stubbed WorkModule (get: ACC IDs give fake targets'
+    accessors, other IDs (id & 0xFFFF) / 16; set: logs), an AttackModule whose vt +0x2C4 / +0x2BC give 4 / 2 and a
+    fighter table"""
+    from ppcasm import Asm
+    B, LOG, M = 0x7D200000, 0x7D300000, 0x61000000
+    for base, n in ((B, 0x10000), (LOG, 0x10000), (M, 0x100000)):
+        pm.mem_map(base, n)
+    wraps = [C.POSTURE_W, C.POSTURE_FW, C.MOTION_W, C.MOTION_FW, C.WORK_W]
+    st = Asm(B)
+    st.asm(''.join("""
+w%d:
+        li r10, %d
+        b common""" % (i, i) for i in range(len(wraps))) + """
+common:                         # log {wrapper, accessor, n, words[0..3]}; return [LOG + 0xFF8]
+        lis r11, 0x7D30
+        lwz r12, 0xFFC(r11)
+        mulli r9, r12, 0x20
+        add r9, r9, r11
+        stw r10, 0(r9)
+        lwz r0, 4(r3)
+        stw r0, 4(r9)
+        lwz r8, 0(r4)
+        lwz r7, 4(r4)
+        stw r7, 8(r9)
+        lwz r0, 0(r8)
+        stw r0, 0xC(r9)
+        lwz r0, 4(r8)
+        stw r0, 0x10(r9)
+        lwz r0, 8(r8)
+        stw r0, 0x14(r9)
+        lwz r0, 0xC(r8)
+        stw r0, 0x18(r9)
+        addi r12, r12, 1
+        stw r12, 0xFFC(r11)
+        lwz r3, 0xFF8(r11)
+        blr
+get:                            # WorkModule vt +0x44: ACC 0x0F0002BC + t -> M + 0x1000 t (as float bits)
+        clrlwi r4, r4, 16
+        addi r5, r4, -0x2BC
+        cmplwi r5, 11
+        bge get_q
+        slwi r5, r5, 12
+        addis r5, r5, 0x6100
+        lis r11, 0x7D30
+        stw r5, 0xF00(r11)
+        lfs f1, 0xF00(r11)
+        blr
+get_q:                          # (id & 0xFFFF) / 16
+        lis r11, 0x7D30
+        stw r4, 0xF04(r11)
+        lis r0, 0x4330
+        stw r0, 0xF00(r11)
+        lfd f1, 0xF00(r11)
+        lfd f0, 0xF08(r11)
+        fsub f1, f1, f0
+        lfs f0, 0xF10(r11)
+        fmul f1, f1, f0
+        frsp f1, f1
+        blr
+set:                            # vt +0x4C: log {id, f1} at LOG + 0x800 + 8 k
+        lis r11, 0x7D30
+        lwz r12, 0xF14(r11)
+        slwi r9, r12, 3
+        add r9, r9, r11
+        stw r4, 0x800(r9)
+        stfs f1, 0x804(r9)
+        addi r12, r12, 1
+        stw r12, 0xF14(r11)
+        blr
+am_all:
+        li r3, 4
+        blr
+am_now:
+        li r3, 2
+        blr
+""")
+    for i, w in enumerate(st.words()):
+        w32(pm, B + 4 * i, w)
+    pm.mem_write(LOG + 0xF08, struct.pack('>Qf', f2bits(2.0 ** 52), 1 / 16))
+    for k, wrap in enumerate(wraps):
+        to = st.addr('w%d' % k)
+        for i, wd in enumerate([0x3D800000 | (to >> 16), 0x618C0000 | (to & 0xFFFF), 0x7D8903A6, 0x4E800420]):
+            w32(pm, wrap + 4 * i, wd)
+    me, wm, am = M + 0x20000, M + 0x30000, M + 0x40000
+    for acc in [me] + [M + 0x1000 * t for t in range(11)]:
+        w32(pm, acc + 0x28, wm)
+        w32(pm, acc + 0x50, am)
+    w32(pm, wm, wm + 0x100)
+    w32(pm, wm + 0x100 + 0x44, st.addr('get'))
+    w32(pm, wm + 0x100 + 0x4C, st.addr('set'))
+    w32(pm, am, am + 0x100)
+    w32(pm, am + 0x100 + 0x2C4, st.addr('am_all'))
+    w32(pm, am + 0x100 + 0x2BC, st.addr('am_now'))
+    # fighter table: entry 2 (player slot 3) is target 5's accessor
+    tab, ents = M + 0x50000, M + 0x60000
+    w32(pm, C.FIGHTERS, tab)
+    w32(pm, tab, tab + 0x10)
+    w32(pm, tab + 0x10, ents)
+    w32(pm, tab + 0x18, 8)
+    pm.mem_write(ents + 2 * C.FIGHTER_ENTRY + 0x1E, b'\4')
+    w32(pm, ents + 2 * C.FIGHTER_ENTRY + 0xC, M + 0x5000)
+    state, ctx, prm = M + 0x70000, M + 0x71000, M + 0x72000
+    fb = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]       # noqa: E731
+
+    def cmd(name, *params, ret=0):
+        size = dict((c[0], c[1]) for c in C.COMMANDS)[name]
+        assert len(params) == size - 1, name
+        for i, v in enumerate(params):
+            w32(pm, prm + 4 * i, fb(v) if isinstance(v, float) else v)
+        w32(pm, LOG + 0xFFC, 0)
+        w32(pm, LOG + 0xF14, 0)
+        w32(pm, LOG + 0xFF8, ret)
+        w32(pm, state + 4, 0x1000)
+        w32(pm, state + 8, -1)
+        w32(pm, state + 0xC, 0x55)
+        pm.mem_write(ctx + 8, b'\1')
+        label = [c[2] for c in C.COMMANDS if c[0] == name][0]
+        run(pm, a.addr(label), RET, {UC_PPC_REG_3: me, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
+                                     UC_PPC_REG_7: prm})
+        calls = [struct.unpack('>7I', pm.mem_read(LOG + 0x20 * k, 0x1C)) for k in range(r32(pm, LOG + 0xFFC))]
+        sets = [(r32(pm, LOG + 0x800 + 8 * k), round(struct.unpack('>f', pm.mem_read(LOG + 0x804 + 8 * k, 4))[0], 4))
+                for k in range(r32(pm, LOG + 0xF14))]
+        return pm.reg_read(UC_PPC_REG_3), r32(pm, state + 4) - 0x1000, calls, sets, r32(pm, state + 0xC)
+    PW, PF, MW, MF, WK = range(5)
+    r, step, calls, sets, _c = cmd('Rotation_Set', 0, 10.0, 20.0, 30.0)
+    check('Rotation_Set: returns 2, steps 5 words', (r, step), (2, 20))
+    check('Rotation_Set: PostureModule(4, x, y, z) on itself',
+          [c[:7] for c in calls], [(PW, me, 4, 4, fb(10.0), fb(20.0), fb(30.0))])
+    r, step, calls, sets, _c = cmd('Rotation_Get', 3, 1, 0x0F000300, ret=fb(45.0))
+    check('Rotation_Get (slot 1 = target 3): PostureModuleF(5) on that fighter, VAR_0 = 45',
+          ([c[:4] for c in calls], sets), ([(PF, M + 0x3000, 1, 5)], [(0x0F000300, 45.0)]))
+    r, step, calls, sets, _c = cmd('Rotation_Get', 11, 2, 0x0F000301, ret=2)
+    check('Target 11 (last attacker: its int 0x10000065 = 2 -> slot 3 -> target 5)',
+          [c[:4] for c in calls], [(WK, me, 2, 6), (PF, M + 0x5000, 1, 6)])
+    r, step, calls, sets, cond = cmd('Hit_Check', 0, 0, 2)
+    check('Hit_Check(since start, hurtbox) with a shield hit (4): False', cond, 0)
+    check('Hit_Check(since start, shield): True', cmd('Hit_Check', 0, 0, 4)[4], 1)
+    check('Hit_Check(since start, anything (0)): True', cmd('Hit_Check', 0, 0, 0)[4], 1)
+    check('Hit_Check(this frame, hurtbox) with a hurtbox hit (2): True; steps 4 words', cmd('Hit_Check', 0, 1, 2)[4:] +
+          (cmd('Hit_Check', 0, 1, 6)[1],), (1, 16))
+    check('Hit_Check(target 12: none): False', cmd('Hit_Check', 12, 0, 0)[4], 0)
+    check('Hit_Get(since start): VAR_0 = 4 (shield)', cmd('Hit_Get', 0, 0, 0x0F000300)[3], [(0x0F000300, 4.0)])
+    _r, _s, calls, _st, _c = cmd('Motion_Set', 0, 0x50, 5.0, 0.0)
+    check('Motion_Set(0x50, 5, 0): MotionModule(1, 0x50, 5.0, 1.0)', [c[:7] for c in calls],
+          [(MW, me, 4, 1, 0x50, fb(5.0), fb(1.0))])
+    _r, _s, calls, _st, _c = cmd('Motion_Set', 0, -1, 7.0, 2.0)
+    check('Motion_Set(-1, 7, 2): MotionModule(0x2713, 7.0), MotionModule(4, 2.0)', [c[:5] for c in calls],
+          [(MW, me, 2, 0x2713, fb(7.0)), (MW, me, 2, 4, fb(2.0))])
+    _r, _s, calls, _st, _c = cmd('Motion_Set', 0, -1, -1.0, 0.0)
+    check('Motion_Set(-1, -1, 0): nothing', calls, [])
+    _r, _s, calls, sets, _c = cmd('Motion_Get', 0, 0, 0x0F000302, ret=0x59)
+    check('Motion_Get(kind): MotionModule(7) -> 89', ([c[:4] for c in calls], sets), ([(MW, me, 1, 7)], [(0x0F000302, 89.0)]))
+    _r, _s, calls, sets, _c = cmd('Motion_Get', 0, 2, 0x0F000302, ret=fb(1.5))
+    check('Motion_Get(rate): MotionModuleF(9)', ([c[:4] for c in calls], sets), ([(MF, me, 1, 9)], [(0x0F000302, 1.5)]))
+    _r, _s, calls, sets, _c = cmd('Position_Set', 0, 2.0, 3.0, 4.0, 1, ret=fb(-1.0))
+    check('Position_Set(relative): facing -1, at (-1, -1, -1) + (2 fwd, 3, 4) -> PostureModule(3, -3, 2, 3)',
+          calls[-1][:7], (PW, me, 4, 3, fb(-3.0), fb(2.0), fb(3.0)))
+    _r, _s, calls, sets, _c = cmd('Position_Set', 0, 2.0, 3.0, 4.0, 0)
+    check('Position_Set(absolute): PostureModule(3, 2, 3, 4)', [c[:7] for c in calls], [(PW, me, 4, 3, fb(2.0), fb(3.0), fb(4.0))])
+    _r, _s, calls, sets, _c = cmd('Position_Get', 0, 3, 0x0F000300, ret=fb(-1.0))
+    check('Position_Get(facing): PostureModuleF(0)', ([c[:4] for c in calls], sets), ([(PF, me, 1, 0)], [(0x0F000300, -1.0)]))
+    check('Status_Set(slot 1, 0x59): STATUS of target 3 (0x0F0000BA) = 89', cmd('Status_Set', 3, 0x59)[3],
+          [(0x0F0000BA, 89.0)])
+    check('Status_Get(self): 0x0F0000A2 read into VAR_1', cmd('Status_Get', 0, 0x0F000301)[3], [(0x0F000301, 0xA2 / 16)])
+    check('Damage_Get(nearest opponent): 0x0F000137', cmd('Damage_Get', 1, 0x0F000301)[3], [(0x0F000301, 0x137 / 16)])
+    check('Damage_Set(self, 50%)', cmd('Damage_Set', 0, 50.0)[3], [(0x0F000117, 50.0)])
+    check('Hitstun_Get(last fighter hit, dealt): 0x0F000051', cmd('Hitstun_Get', 2, 1, 0x0F000300)[3], [(0x0F000300, 0x51 / 16)])
+    check('Hitstop_Set(self, 8, shake) / (no shake)', (cmd('Hitstop_Set', 0, 8, 1)[3], cmd('Hitstop_Set', 0, 8, 0)[3]),
+          ([(0x0F000043, 8.0)], [(0x0F000044, 8.0)]))
+    check('Body_State_Set(slot 2: intangible / invincible 30)', (cmd('Body_State_Set', 4, 0, 30)[3],
+                                                                 cmd('Body_State_Set', 4, 1, 30)[3]),
+          ([(0x0F00019B, 30.0)], [(0x0F00019C, 30.0)]))
+    check('Armor_Set(self, 2, 40): threshold, then type', cmd('Armor_Set', 0, 2, 40.0)[3],
+          [(0x0F00011E, 40.0), (0x0F00011D, 2.0)])
+    check('Item_State_Set(last fighter hit, metal)', cmd('Item_State_Set', 2, 1)[3], [(0x0F000278, 1.0)])
+    check('Stage_Collision_Set(self, 0)', cmd('Stage_Collision_Set', 0, 0)[3], [(0x0F0000A6, 0.0)])
+    check('Joint_Position_Get(slot 1, joint 11): the joint, then X / Y / Z', cmd('Joint_Position_Get', 3, 11, 0x0F000300,
+                                                                                 0x0F000301, 0x0F000302)[3],
+          [(0x0F00029C, 11.0), (0x0F000300, 0x29D / 16), (0x0F000301, 0x29E / 16), (0x0F000302, 0x29F / 16)])
+    check('Animation_Rate_Set(1.25)', cmd('Animation_Rate_Set', 1.25)[3], [(0x0F000098, 1.25)])
+    check('Last_Hit_Get(1: last attacker, int 2 -> slot 3)', cmd('Last_Hit_Get', 1, 0x0F000300, ret=2)[3], [(0x0F000300, 3.0)])
+    check('Target_Slot_Get(target 5 = table entry 2): 3', cmd('Target_Slot_Get', 5, 0x0F000300)[3], [(0x0F000300, 3.0)])
+    check('Target_Slot_Get(target 6, not in the table): 0', cmd('Target_Slot_Get', 6, 0x0F000300)[3], [(0x0F000300, 0.0)])
+    check('Status_Set(target 11, int 9 = no slot): nothing', cmd('Status_Set', 11, 0x59, ret=9)[3], [])
+    pm.mem_write(ctx + 8, b'\0')
+    w32(pm, state + 4, 0x1000)
+    w32(pm, LOG + 0xFFC, 0)
+    run(pm, a.addr('h_rset'), RET, {UC_PPC_REG_3: me, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
+                                    UC_PPC_REG_7: prm})
+    check('skipped (fast-forward): steps only', (r32(pm, state + 4) - 0x1000, r32(pm, LOG + 0xFFC)), (20, 0))
+
+
 def main():
     patched, original = sys.argv[1:3]
     a, words, hooks = C.build()
@@ -831,7 +1025,8 @@ def main():
             w32(pm, base + 4 * i, wd)
         w32(pm, acc + 0x50, am)
         w32(pm, am + 0x40, slots)
-        pm.mem_write(slots, bytes(range(256)) * 4 + b'\0' * 0x100)
+        w32(pm, am + 0x3C, 10)                                      # slots (fighters: 10)
+        pm.mem_write(slots, bytes(range(256)) * 4 + b'\0' * 0x400)
         sid = 3
         slot = slots + sid * 0x84
         ext = params + 4 * (nbase - 1)
@@ -860,8 +1055,31 @@ def main():
             check('%s: extras (x <= 0 -> 1)' % name, got, (1.5, 1.0, 12, 1.0, 0, 0.5))
             check('%s: tag' % name, struct.unpack('>H', pm.mem_read(slot + C.TAG_OFF, 2))[0], C.TAG | ((e - C.TABLE) // C.ENTRY))
         e2 = find(slot)
+        old_copy = bytes(pm.mem_read(slot, 0x68))                  # a hit of this hitbox still being handled
         go(1, [2.0, 3.0, 0, 1.0, 4, 1.0])
-        check('%s: same slot reuses its entry' % name, find(slot), e2)
+        e3 = find(slot)
+        check('%s: the same ID again: a new entry (the old one kept)' % name, (e3 != 0, e3 != e2), (True, True))
+        pm.mem_write(0x1037F000, old_copy)
+        run(pm, a.addr('find_copy'), RET, {UC_PPC_REG_5: 0x1037F000})
+        e_old = pm.reg_read(UC_PPC_REG_5)
+        check('%s: the earlier hit (its copy) still finds its own extras, not the new ones' % name,
+              (e_old, struct.unpack('>f', pm.mem_read(e_old + 0x14, 4))[0] if e_old else None), (e2, 1.5))
+        w32(pm, params, 9)                                          # ID 9 (fighters have 10): recorded too
+        pm.mem_write(slots + 9 * 0x84 + C.TAG_OFF, b'\0\0')
+        w32(pm, state + 4, 0x1000)
+        w32(pm, state + 8, -1)
+        pm.mem_write(flag + 8, b'\1')
+        run(pm, a.addr(label), RET, {UC_PPC_REG_3: acc, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: flag,
+                                     UC_PPC_REG_7: params})
+        check('%s: ID 9 recorded (IDs up to the module\'s count, not 7)' % name, find(slots + 9 * 0x84) != 0, True)
+        w32(pm, params, 10)
+        pm.mem_write(slots + 10 * 0x84 + C.TAG_OFF, b'\0\0')
+        w32(pm, state + 4, 0x1000)
+        run(pm, a.addr(label), RET, {UC_PPC_REG_3: acc, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: flag,
+                                     UC_PPC_REG_7: params})
+        check('%s: ID 10 (past the count): nothing recorded' % name, struct.unpack('>H', pm.mem_read(
+            slots + 10 * 0x84 + C.TAG_OFF, 2))[0], 0)
+        w32(pm, params, sid)
         check('%s: other slot not found' % name, find(slots + 2 * 0x84), 0)
         w32(pm, slot + 0x24, r32(pm, slot + 0x24) ^ 1)              # a plain hitbox rewrote the slot
         check('%s: not found after the slot changed' % name, find(slot), 0)
@@ -873,6 +1091,13 @@ def main():
         check('%s: jump pending: no step' % name, step, 0)
         check('%s: bad pointer: no crash, nothing' % name, find(0x00001234), 0)
 
+    # every hitbox set (AttackModule vt +0x54, 0x02C086A8) clears the slot's tag after copying the data
+    check('slot set hook: original word', r32(om, C.SLOT_SET), 0x815C0014)
+    pm.mem_write(slot + C.TAG_OFF, struct.pack('>H', C.TAG | 5))
+    w32(pm, 0x10380000 + 0x14, 0x10381000)
+    run(pm, C.SLOT_SET, C.SLOT_SET + 8, {UC_PPC_REG_26: slot, UC_PPC_REG_28: 0x10380000})
+    check('hitbox set: the slot\'s tag cleared, the game\'s load done', (struct.unpack('>H', pm.mem_read(
+        slot + C.TAG_OFF, 2))[0], pm.reg_read(UC_PPC_REG_10)), (0, 0x10381000))
     hit_tests(pm, om, a, slot, acc)
     d = [r32(pm, C.DBG + 4 * i) for i in range(17)]
     check('debug: Extra commands run / tagged, last ID', (d[15] > 0, d[0] > 0, d[16]), (True, True, 3))
@@ -882,6 +1107,7 @@ def main():
     obj_tests(pm, om, a)
     thread_tests(pm, om, a)
     input_tests(pm, a)
+    new_cmd_tests(pm, a)
     print('%d failures' % fails)
     sys.exit(1 if fails else 0)
 

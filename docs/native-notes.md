@@ -1468,6 +1468,27 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     Reset (and free the nested state) with `0x02BEE9B8`.
   - Handlers return 2 to go on, 1 to wait, 0 to end (Script_End `0x02BE5814`).
   - True / Else jump `Offset` words from their own header.
+- **Thread files in Sm4shCommand:** a file's scripts used to be read up to the first `Script_End`
+  (`ACMDFile.ParseEventList`): a thread block's own `Script_End` cut the script there. The game's loader doesn't
+  stop at `Script_End`: it converts the file header's command count (`+0xC`) commands one after another
+  (`0x02BEE2B4`), so the game side always had the whole script.
+- **What an attack connected with:** `0x02C09C0C` sets `AttackModule +0xC4` (this frame) to `OR 1 << kind` over its
+  hit records (record byte `+0x23`; kind 5 is skipped) and ORs it into `+0xC8` (since the start, cleared by
+  `0x2724`). MSC `0x2726` / `0x2727` (cases at `0x02C0BC6C`) call vt `+0x2BC` / `+0x2C4` for them and return
+  `(kinds & mask) != 0`, the mask being the op's second word, else `0x7F`. Ryu's specials cancel on `0x6`, Kirby's
+  star missile checks `0x2`: kind 1 a hurtbox, 2 a shield; the others (0 clank, 3 reflector, 4 absorber, 5 search,
+  6) are Ultimate's numbering, unconfirmed. ACMD `Hit_Check` / `Hit_Get`.
+- **Set hitbox** (AttackModule vt `+0x54` = `0x02C086A8`, every hitbox command and MSC): copies the 0x68-byte data
+  (tag halfword `+0x66` included, whatever the builder's buffer held) into the slot (`r26`), then vt `+0x5C`.
+  `0x02C08730` (after the copy) is `strike_cave.py`'s hook; `acmd_ext_cave.py` clears the Extra tag at `0x02C0874C`.
+  The Extra extras used to be found again by the slot's tag with a record reused per slot: a hit info whose copy
+  was taken before the script re-issued the ID read the new record (the hitstun "on the next hit").
+- **MSC module ops the new commands use** (on any object through its wrapper with a fake context): PostureModule
+  `0x030B2AB8` (3: position x, y, z; 4: rotation x, y, z in degrees), PostureModuleF `0x030B2AF0` (0 facing, 1-3
+  position, 4-6 rotation), MotionModule `0x030B2A48` (1: kind, frame, rate; 4: rate; 7: current kind; 0x2713:
+  frame), MotionModuleF `0x030B2A80` (1 frame, 9 rate), WorkModule `0x030B2B28` (6, `0x10000065`: the slot that
+  last hit a fighter). The targets come from `position_vars_cave.py`'s `0x0F0002BC + target` (the accessor's bits
+  as the float).
 - **A weapon's owner:** LinkModule (accessor `+0x68`) vt `+0x5C(0)` says whether it has a link 0.
   vt `+0x6C(0, 1)` gives that object's ID, which matches the fighter table entry's `+0`.
 - **DI isn't native.** Every fighter's MSC damage code (Kirby `func_885`) turns the launch angle by

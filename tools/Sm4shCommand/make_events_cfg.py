@@ -45,21 +45,22 @@ CATEGORIES = [
     ("Variables & compares", r"^(SET_INT|ADD_INT|INC_INT|SET_FLOAT|ADD_FLOAT|SUB_FLOAT\w*|ON_FLAG|OFF_FLAG|IS_FLAG)$|"
      r"^(?i:int|float)_\w*(?i:compare)|_VAR_COMPARE|COMPARE_VAR|^Input_"),
     ("Item scripts (IT_)", r"^IT_"),
-    ("Hitboxes", r"Hitbox|^Hit_Reset$|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
+    ("Hitboxes", r"Hitbox|^Hit_(Reset|Check|Get)$|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
     ("Grabs & throws", r"Grab_Collision|Throw_(Specifier|Applier)|^FT_CATCH|^CTH_"),
     ("Search boxes, areas & shields", r"^Search_Collision$|^SCH_|^SEARCH_|^SET_SEARCH|AREA|Wind_Effect|^REFLECTOR$|^SHIELD_|^Shield_"),
-    ("Hurtboxes & body", r"^Body_Collision$|Intangibility|Bone_Collision|^Set_Armor$|^COL_PRI$"),
+    ("Hurtboxes & body", r"^Body_Collision$|Intangibility|Bone_Collision|^Set_Armor$|^COL_PRI$|"
+     r"^(Status|Hitstun|Hitstop|Damage|Body_State|Armor|Item_State|Stage_Collision)_"),
     ("Trails & sword glow", r"AFTER_IMAGE|Sword_(Glow|Trace)"),
     ("Lights, flashes & overlays", r"FLASH|Flash|LIGHT|Overlay|Screen_Tint|GOLD_EYE|_CHARGE"),
     ("Effects", r"EFFECT|Graphic|PARTICLE|^EM_"),
     ("Sound", r"(^|_)SE(_|$)|Sound|SOUND|Voice|VOICE|PITCH|VOLUME|BGM|SEQUENCE|^PLAY_|^IS_PLAYING|INHIVIT"),
     ("Camera, quake & rumble", r"CAM|Camera|QUAKE|Rumble|RUMBLE|SCROLL"),
     ("Slowdown", r"Time_Manipulation"),
-    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$|^Track_"),
-    ("Animation, model & visibility", r"^MOT_|Model|Morph|^VIS_|Visibility|SHADOW|MATERIAL|^MII_|^STRANS"),
+    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$|^Track_|^Last_Hit_Get$|^Target_Slot_Get$"),
+    ("Animation, model & visibility", r"^Motion_(Get|Set)$|^Animation_Rate_Set$|^Joint_Position_Get$|^MOT_|Model|Morph|^VIS_|Visibility|SHADOW|MATERIAL|^MII_|^STRANS"),
     ("Articles (projectiles)", r"ARTICLE|Article"),
     ("Items", r"(?i:item)|^Fire_Weapon$|BULLET"),
-    ("Movement & physics", r"Momentum|Movements|SPEED|ENERGY|Kinetic|KINETIC|^SET_AIR$|Direction|^TURN_|ROT$|^STICK_LR|"
+    ("Movement & physics", r"^(Rotation|Position)_(Get|Set)$|Momentum|Movements|SPEED|ENERGY|Kinetic|KINETIC|^SET_AIR$|Direction|^TURN_|ROT$|^STICK_LR|"
      r"^SET_LR$|Ledgegrab|Edge_Slide|GROUND|BOX2D|PASSABLE|RHOMBUS|SLOPE|Slope|POS|^FT_MOTION_ANGLE$"),
 ]
 NOTE_CATEGORIES = [                          # for unk_ commands: words in the research note

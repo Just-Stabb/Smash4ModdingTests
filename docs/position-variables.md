@@ -240,6 +240,12 @@ waist with it (`fighters/edge/weapons/flare1.c`, as Ultimate's dummy follows `ed
     SET_FLOAT(Value=11, Variable=0x0F00029C)   // slot 1: bone 0xB (WaistN for most fighters)
     Float_Var_Compare(Variable=0x0F00029E, Method=5, Value=20)   // its Y above 20?
 
+## Target accessors (internal)
+
+`0x0F0002BC + target` (targets as above, 0-10), read only: the target's module accessor, its bits returned as the
+float. It is how the new ACMD commands (`docs/acmd-extra-commands.md`, "Targets") find another fighter; it's no use
+as a number in a script.
+
 ## Examples
 
 ACMD: grab-style "pull the opponent in front of me" on frame 10:

@@ -60,6 +60,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
               inputs off, situation, damage, jumps, shield, intangibility, armor; targets as for the
               combat variables (0x0F000100-0x0F00025F, see INP_HOOKS and docs/position-variables.md)
   0x0F000260 + 2*target + n   stick (n 0) / C-stick (n 1) X on screen (+ = right): read; write forces
+  0x0F0002BC + target   ACC (read only, internal): the target's module accessor, as the float's bits
+              (tools/acmd_ext_cave.py's target commands)
   0x0F000276 + target   ITEM: write one of SELF_ITEM's codes to put that item state on the target; read
               1 while it's metal (flag 0x20000012) (0x0F000276-0x0F000280; inp_item)
 
@@ -1384,11 +1386,19 @@ inp_entry_item:                         # 0x276 + target: ITEM (q 0x22)
 inp_entry_joint:                        # 0x290 + 4 * target + n: a joint's position (q 0x23 + n)
         addi r3, r3, -0x1A
         cmplwi r3, 44
-        bge ext_zero
+        bge inp_entry_acc
         clrlwi r11, r3, 30
         addi r11, r11, 0x63
         stw r11, 0x14(r1)
         srwi r22, r3, 2
+        b ext_target
+inp_entry_acc:                          # 0x2BC + target (read only): the target's module accessor, its bits as
+        addi r3, r3, -44                # the float (acmd_ext_cave.py's commands act on it; q 0x27)
+        cmplwi r3, 11
+        bge ext_zero
+        li r11, 0x67
+        stw r11, 0x14(r1)
+        mr r22, r3
         b ext_target
 """, False),
 ("""
@@ -1416,7 +1426,12 @@ inp_have:                               # r22 = 0x40 + q; r24 accessor, r25 post
         blt inp_item
         cmplwi r22, 0x27
         blt inp_joint
-        b ext_zero
+        bne ext_zero
+        cmpwi r29, 0                    # q 0x27 ACC: the accessor's bits (a pointer reads as a normal float)
+        bne ext_zero
+        stw r24, 0x8(r1)
+        lfs f1, 0x8(r1)
+        b ext_ret
 inp_raw:                                # q 0x20 / 0x21: stick / C-stick X on screen (+ = right)
         addi r26, r22, -0x20
         slwi r26, r26, 1                # inp_stick's numbering: 0 stick X, 2 C-stick X

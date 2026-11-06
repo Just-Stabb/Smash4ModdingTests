@@ -603,7 +603,11 @@ def position_vars_args(rpx):
     words = [w for w in out if not w.startswith('reloc:')]
     hook = next(w for w in words if w.upper().startswith('0X02003750='))
     d, _o, _e, secs = rpx_patch.load(rpx)
-    assert rpx_patch.read_u32(d, secs, 0x02003750) == int(hook.split('=')[1], 0), \
+    w = rpx_patch.read_u32(d, secs, 0x02003750)
+    to = (0x02003750 + ((w & 0x3FFFFFC) - (0x4000000 if w & 0x2000000 else 0))) & 0xFFFFFFFF
+    # IN has the cave when its input hook is a branch into it (where to moves when the cave's blocks are packed
+    # differently: these words put the new layout in, hook included)
+    assert w >> 26 == 18 and 0x037E0000 <= to < 0x04B80000, \
         '%s: no position_vars_cave (its input hook at 0x02003750)' % rpx
     return words
 

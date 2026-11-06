@@ -223,9 +223,14 @@ namespace SALT.Moveset.AnimCMD
             ACMDCommand c;
 
             VoidPtr addr = (this._workingSource.Address + offset);
+            VoidPtr start = addr;
+            // A Thread_Start block ends with its own Script_End (it stops the thread; the script jumps over it):
+            // read on past the Script_Ends inside such a block, to the script's own (it used to stop at the
+            // first, so a script with a thread lost everything after its block when the file was opened).
+            int blockEnd = 0;
 
             // Loop through Event List.
-            while (Util.GetWordUnsafe(addr, this.Endian) != 0x5766F889)
+            while (Util.GetWordUnsafe(addr, this.Endian) != 0x5766F889 || (int)(addr - start) < blockEnd)
             {
                 // Try to get command definition
                 uint ident = (uint)Util.GetWordUnsafe(addr, this.Endian);
@@ -253,6 +258,12 @@ namespace SALT.Moveset.AnimCMD
                 }
 
                 _list.Add(c);
+                if (ident == ACMDCompiler.ThreadStart && c.Parameters.Count > 0)
+                {
+                    int end = (int)(addr - start) + 4 * Convert.ToInt32(c.Parameters[0]);
+                    if (end > blockEnd)
+                        blockEnd = end;
+                }
                 addr += c.Size;
             }
 

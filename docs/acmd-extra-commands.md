@@ -4,10 +4,25 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes
-and Hit_Reset / Hit_Log_Clear under Hitboxes, the Input commands under Variables & compares and Track_Target under
-Traces & targeting.
-`tools/acmd.py` reads and writes them too.
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes,
+Hit_Reset / Hit_Log_Clear and Hit_Check / Hit_Get under Hitboxes, the Input commands under Variables & compares,
+Track_Target, Last_Hit_Get and Target_Slot_Get under Traces & targeting, Rotation_ / Position_ under Movement &
+physics, Motion_, Animation_Rate_Set and Joint_Position_Get under Animation, and the fighter-state commands
+(Status_, Hitstun_, Hitstop_Set, Damage_, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set) under
+Hurtboxes & body. `tools/acmd.py` reads and writes them too.
+
+| Command | Does |
+|---|---|
+| `Extra_Special_Hitbox` / `Extra_Extended_Special_Hitbox` | hitboxes with hitstun / hitstop / DI extras |
+| `Track_Target` | homing on the nearest fighter |
+| `Thread_Start` / `Thread_Stop` | a block that runs on its own |
+| `Input_Compare` / `Input_Get` / `Input_Set` | a fighter's buttons and sticks |
+| `Hit_Reset` / `Hit_Log_Clear` | the "has hit" flag / who a hitbox has hit |
+| `Hit_Check` / `Hit_Get` | whether an attack connected, and with what (hurtbox, shield, ...) |
+| `Rotation_Get` / `Rotation_Set`, `Position_Get` / `Position_Set` | a fighter's or article's rotation / position |
+| `Motion_Get` / `Motion_Set`, `Animation_Rate_Set` | the animation playing, its frame and rate |
+| `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
+| `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -56,6 +71,13 @@ Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12.0, Angle=361, KBG=100, FKB=
   - It doesn't touch LSI or SDI. SDI is already per hitbox: the SDI parameter.
   - **Not yet checked in game:** that every fighter's damage code reads the DI angle this way.
 - **Projectiles and other articles** work too: their scripts use the same commands.
+- **Each command is its own hitbox's** (fix, Sm4shCommand v1.4.6's executable): an Extra command now always takes a
+  new extras record. Before, the same hitbox ID reused its record, so a hit that was still being handled when the
+  script re-issued that ID (the next frame's hitbox, a multi-hit's next wave) read the new hitbox's extras: the
+  hitstun of one hitbox showed up on the hit before or after it. And a plain hitbox command now clears the slot's
+  tag (`0x02C0874C`, in AttackModule's set-hitbox), so it never keeps an earlier Extra hitbox's extras when its
+  angle and knockback match. Extra hitboxes with IDs 8 and 9 (fighters have 10) get their extras too (only 0-7
+  did).
 
 ## Track_Target
 
@@ -137,6 +159,14 @@ the script goes on past the block.
 
 Sm4shCommand ends the block with a `Script_End` when it compiles, and doesn't show it when it
 decompiles. The script itself jumps over the block, so it never reaches that `Script_End`.
+
+**Fixed in Sm4shCommand v1.4.6** (user: "Threads haven't worked at all"): opening a file read each script only up
+to its first `Script_End`, so a script with a thread came back cut at the thread's block: everything after the
+block was gone (and was then saved that way). It now reads past the `Script_End`s inside thread blocks, to the
+script's own (checked: a script with a thread, saved and reopened, comes back the same, and the next script too).
+The Hitbox Viewer runs threads too: the block starts the frame after `Thread_Start` and runs one frame per game
+frame (its `FRAME` counted from 0), alongside the script, with `Thread_Stop`; it used to run the block inline, so
+a `FRAME` in it held up the whole move.
 `tools/acmd.py` reads each script up to the next one's start, so a block at the very end of a script
 (the thread's `Script_End`, then the script's) keeps both: it used to stop at the first, dropping the
 script's own end, so the jump past the block landed in the next script (the user's Marth,
@@ -266,6 +296,113 @@ It runs the game's own clear (`0x02C10660` on the Part's hit-record lists, as `0
 every Part: AttackModule vtable `+0x34`, used when an object is set up). Sephiroth's Shadow Flare orbs
 (`fighters/edge/specials.md`) use it to give each orb strike a new record.
 
+## Hit_Check / Hit_Get
+
+What an attack has connected with, as MSC's `AttackModule(0x2727 / 0x2726, kinds)` (Ryu's specials cancel on
+`0x6`, "hit or shield"; Kirby's star missile checks `0x2`, "hit").
+
+| Command | Does |
+|---|---|
+| `Hit_Check(Target, When, Kinds)` | `True` / `Else` after it run when the attack connected with any of `Kinds` |
+| `Hit_Get(Target, When, Variable)` | the float variable gets the kinds connected with, as bits (0 = none) |
+
+- **Target:** the targets below ("Targets").
+- **When:** 0 since the move started (or the last `Hit_Reset`), 1 this frame only.
+- **Kinds** (bits; add them): **2** a hurtbox (it hit something), **4** a shield, **6** either. **0** = anything (0x7F,
+  MSC's default). The other bits follow Ultimate's collision kinds and are **not confirmed**: 1 another attack
+  (clank), 8 a reflector, 16 an absorber, 32 a search box, 64 other.
+- The bits are the game's own (`AttackModule +0xC4` this frame, `+0xC8` since the start: `1 << ` each hit record's
+  kind, `0x02C09C0C`), read through the module's own getters (vt `+0x2BC` / `+0x2C4`, what the MSC ops call).
+
+```
+// cancel into a jump on hit or on shield, from frame 20
+FRAME(Frames=0x14)
+Hit_Check(Target=0, When=0, Kinds=6)
+True(Offset=0){
+    Input_Set(Target=0, Input=2, Value=2)
+}
+```
+
+## Targets
+
+The commands below (and `Hit_Check` / `Hit_Get`) take a **Target**:
+
+| Target | Who |
+|---|---|
+| 0 | this object: the fighter, or the article (projectile) whose script it is |
+| 1 | the nearest opponent |
+| 2 | the last fighter this one hit (its current attack's newest hit; once the attack is over, a fighter whose last attacker is this one) |
+| 3-10 | player slots 1-8 |
+| 11 | the last fighter that hit this one (the game's own record, int `0x10000065`, its projectiles included) |
+
+1, 2 and 11 are worked out from a fighter's own script (from an article's, they find nobody: the command does
+nothing / reads 0). A target that isn't there: nothing happens, reads give 0.
+
+## Rotation, position, motion
+
+| Command | Does |
+|---|---|
+| `Rotation_Get(Target, Axis, Variable)` | Axis 0 / 1 / 2: rotation about X / Y / Z in degrees (`PostureModuleF(4 / 5 / 6)`) |
+| `Rotation_Set(Target, X, Y, Z)` | sets it (`PostureModule(4, x, y, z)`, degrees, relative to the facing: +X tilts it forward) |
+| `Position_Get(Target, Axis, Variable)` | Axis 0 / 1 / 2: world X / Y / Z; 3: facing (1 right, -1 left) |
+| `Position_Set(Target, X, Y, Z, Mode)` | Mode 0: put it at (X, Y, Z); 1: move it by X (forward, along its facing), Y, Z (`PostureModule(3, ...)`) |
+| `Motion_Get(Target, What, Variable)` | What 0: the motion (animation) kind playing (`MotionModule(7)`), 1: its frame, 2: its rate |
+| `Motion_Set(Target, Motion, Frame, Rate)` | play `Motion` from `Frame` at `Rate` (rate 0 = 1) (`MotionModule(1, ...)`); Motion -1: keep the animation, jump to `Frame` (if it isn't negative) and set `Rate` (if it is above 0) (`MotionModule(0x2713 / 4)`) |
+| `Animation_Rate_Set(Rate)` | this fighter's animation rate multiplier (`SELF_ANIM_RATE`, docs/position-variables.md) |
+
+- They run the same module ops MSC does, on the target, so articles work too (an article's rotation is kept until
+  changed; a fighter's status may set its own every frame).
+- Motion numbers are per fighter (Sm4shCommand's View > Show Animation IDs). The status keeps running and may play
+  its own motion again.
+- A grounded fighter moved up may snap back or fall, as with MSC's `PostureModule(3, ...)`.
+
+```
+Rotation_Set(Target=0, X=0, Y=0, Z=45)                     // this projectile, tilted 45 degrees
+Motion_Set(Target=0, Motion=0x5F, Frame=10, Rate=0.5)      // motion 0x5F from frame 10, half speed
+Position_Get(Target=1, Axis=1, Variable=VAR_0)             // VAR_0 = the nearest opponent's Y
+```
+
+## Last_Hit_Get / Target_Slot_Get
+
+| Command | Does |
+|---|---|
+| `Last_Hit_Get(Which, Variable)` | Which 0: the player slot (1-8) of the last fighter this one hit; 1: of the last fighter that hit this one. 0 = none |
+| `Target_Slot_Get(Target, Variable)` | the player slot (1-8) of any target (the nearest opponent, ...); 0 = none |
+
+The same fighters are Target 2 and 11 of the other commands, so a move can act on them directly:
+
+```
+Last_Hit_Get(Which=1, Variable=VAR_0)                      // VAR_0 = who hit me last (player 1-8)
+Damage_Set(Target=11, Percent=0)                           // ... and heal them
+```
+
+- "Hit last" is the game's own record for each fighter (the player number it keeps for the hit effects' colour,
+  so projectiles count). **Unconfirmed:** what it holds before the fighter's first hit (slot 1 or none).
+
+## Fighter-state commands
+
+The features that were variables only (docs/position-variables.md) as commands with parameters. Each is the
+variable's own code (the same rules), for any target above.
+
+| Command | The variable it uses |
+|---|---|
+| `Status_Get(Target, Variable)` / `Status_Set(Target, Status)` | `STATUS` (`StatusModule`; the change takes effect on its next frame) |
+| `Hitstun_Get(Target, What, Variable)` | What 0: `HITSTUN` (frames left), 1: `HITSTUN_DEALT` (the last hit's) |
+| `Hitstun_Set(Target, Frames)` | `HITSTUN` |
+| `Hitstop_Set(Target, Frames, Shake)` | `HITSTOP_SHAKE` (Shake 1) / `HITSTOP` (0) |
+| `Damage_Get(Target, Variable)` / `Damage_Set(Target, Percent)` | `DAMAGE` |
+| `Body_State_Set(Target, State, Frames)` | State 0: `INTANGIBLE`, 1: `INVINCIBLE` |
+| `Armor_Set(Target, Type, Threshold)` | `ARMOR_THRESHOLD`, then `ARMOR` (0 none, 1 super armor, 2 knockback-, 3 damage-based) |
+| `Item_State_Set(Target, Code)` | `ITEM` (1 metal on, 2 off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 Timer, 8 / 9 camera) |
+| `Stage_Collision_Set(Target, Mode)` | `GROUND` (0 none, 5 air, 1 / 2 ground) |
+| `Joint_Position_Get(Target, Joint, VariableX, VariableY, VariableZ)` | `JOINT`: the joint, then its world X / Y / Z |
+
+```
+Status_Set(Target=2, Status=0x59)                          // the last fighter hit: shield break
+Hitstop_Set(Target=2, Frames=8, Shake=1)
+Body_State_Set(Target=0, State=0, Frames=0xA)              // intangible for 10 frames
+```
+
 ## Debug counters
 
 Words at `0x04B93900` (Cemu: Debug > Memory, go to the address), all 0 at boot, counting up across
@@ -375,4 +512,7 @@ to do that.
   - The object set-up code clears an object's state when it's set up or reused.
   - The shared variables find the slot's fighter in the fighter table and use that fighter's entry
     in the same table.
+- **The new commands' targets:** `position_vars_cave.py`'s variable `0x0F0002BC + target` (read only) gives the
+  target's module accessor; the commands then run the module's MSC op through its wrapper with that accessor, as
+  the position variables do (`nc_msc`). Their code is the cave's second part (`0x04B98900`).
 - Addresses: `docs/native-notes.md`, "New ACMD commands".

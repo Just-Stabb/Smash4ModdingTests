@@ -420,7 +420,12 @@ check('joint: an empty slot reads 0', call(mu, FGET2, w0, jid(8, 1)), 0)
 call(mu, FSET2, w0, jid(5, 0), 600.0)
 check('joint: bone 600 (past 0x200): reads 0', call(mu, FGET2, w0, jid(5, 1)), 0)
 check('joint: writes to x ignored', (call(mu, FSET2, w0, jid(5, 1), 9.0), call(mu, FGET2, w0, jid(5, 2))), (0, 0))
-check('past the joints (0x0F0002BC): 0', call(mu, FGET2, w0, 0x0F0002BC), 0)
+def accbits(v): return struct.unpack('>I', struct.pack('>f', v))[0]
+check('ACC (0x0F0002BC + target): self / slot 3 / nearest opponent = their accessors',
+      tuple(accbits(call(mu, FGET2, w0, 0x0F0002BC + t)) for t in (0, 5, 1)), (0x10370000, 0x10372000, 0x10372000))
+check('ACC: an empty slot / past the targets (0x0F0002C7) read 0',
+      (call(mu, FGET2, w0, 0x0F0002BC + 10), call(mu, FGET2, w0, 0x0F0002C7)), (0, 0))
+check('ACC: writes ignored', (call(mu, FSET2, w0, 0x0F0002BC, 5.0), accbits(call(mu, FGET2, w0, 0x0F0002BC))), (0, 0x10370000))
 check('q5-7 read 0', call(mu, FGET2, w0, hid(1, 6)), 0)
 check('past the block (0xF8) reads 0', call(mu, FGET2, w0, 0x0F0000F8), 0)
 check('combat IDs still work: opp offset Y', call(mu, FGET2, w0, 0x0F00004E), 2)

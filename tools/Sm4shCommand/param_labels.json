@@ -848,6 +848,37 @@
   "_command": "Graphic_Effect4",
   "_desc_extra": "(Real name: EFFECT_FOLLOW_NO_STOP.)"
  },
+ "0F4F6EF4": {
+  "_command": "Hitstop_Set",
+  "_new": true,
+  "_name": "Hitstop_Set",
+  "_size": 4,
+  "_desc": "Puts a fighter in hitstop (hitlag) for some frames. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Frames",
+   "desc": "Frames of hitstop (hitlag).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Shake",
+   "desc": "1: it shakes as from a hit, 0: no shake.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// the last fighter hit: 8 frames of hitstop, shaking",
+   "Hitstop_Set(Target=2, Frames=8, Shake=1)"
+  ]
+ },
  "0FEF7676": {
   "_command": "unk_0FEF7676",
   "0": {
@@ -2361,6 +2392,31 @@
    "confidence": "high"
   }
  },
+ "1AA4CD3E": {
+  "_command": "Item_State_Set",
+  "_new": true,
+  "_name": "Item_State_Set",
+  "_size": 3,
+  "_desc": "Puts one of the items' states on a fighter (the item's own function and durations). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Code",
+   "desc": "1 metal on, 2 metal off, 3 giant, 4 small, 5 Super Star, 6 flower, 7 the Timer's slow on everyone else, 8 camera close-up, 9 camera back to normal (docs/position-variables.md \"Item states\").",
+   "confidence": "high"
+  },
+  "_example": [
+   "// the last fighter hit turns metal (the Metal Box's)",
+   "Item_State_Set(Target=2, Code=1)"
+  ]
+ },
  "1B26C673": {
   "_command": "unk_1B26C673",
   "0": {
@@ -2851,6 +2907,32 @@
    "evidence": "handler: arr[9] = (p8 ? 0 : 2); parser +0x20 = 3 & ~arr[9] -> filter word hit-status bits",
    "confidence": "medium"
   }
+ },
+ "1EC5B53B": {
+  "_command": "Last_Hit_Get",
+  "_new": true,
+  "_name": "Last_Hit_Get",
+  "_size": 3,
+  "_desc": "Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it. The same fighters are Target 2 / 11 of the other commands. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Which",
+   "desc": "0: the last fighter this one hit (its current attack's newest hit; once the attack is over, a fighter whose last attacker is this one); 1: the last fighter that hit this one (the game's own record, its projectiles included).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable). Gets its player slot, 1-8; 0 = none.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = the player slot (1-8) this fighter last hit; VAR_1 = the one that last hit it",
+   "Last_Hit_Get(Which=0, Variable=VAR_0)",
+   "Last_Hit_Get(Which=1, Variable=VAR_1)"
+  ]
  },
  "2068DF37": {
   "_command": "unk_2068DF37",
@@ -3506,6 +3588,38 @@
    "evidence": "EffectModule vt+0xDC (0x02C2BDA4): if p1 >= 0 end the kind first (stop emitting, light fade p1 frames: 0x0334C6C0 -> 0x032F0310 -> 0x0334F308), then detach (0x0334C82C)",
    "confidence": "medium"
   }
+ },
+ "29F1BB70": {
+  "_command": "Position_Get",
+  "_new": true,
+  "_name": "Position_Get",
+  "_size": 4,
+  "_desc": "Stores a fighter's or article's world position (one axis) or facing in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Axis",
+   "desc": "0 X, 1 Y, 2 Z (world position), 3 facing (1 right, -1 left).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 / VAR_1 = the nearest opponent's X / Y",
+   "Position_Get(Target=1, Axis=0, Variable=VAR_0)",
+   "Position_Get(Target=1, Axis=1, Variable=VAR_1)"
+  ]
  },
  "2AAAE129": {
   "_command": "unk_2AAAE129",
@@ -4395,6 +4509,51 @@
    "evidence": "parser: +0x26 = (arr[10] != 0) when count >= 11",
    "confidence": "low"
   }
+ },
+ "32DEB0DC": {
+  "_command": "Position_Set",
+  "_new": true,
+  "_name": "Position_Set",
+  "_size": 6,
+  "_desc": "Moves a fighter or article (MSC PostureModule(3, x, y, z)). A grounded fighter moved up may snap back or fall. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   1,
+   1,
+   1,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "X",
+   "desc": "X (Mode 1: forward along its facing).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Y",
+   "desc": "Y.",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Z",
+   "desc": "Z.",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "Mode",
+   "desc": "0: put it at (X, Y, Z) (world); 1: move it by (X forward, Y, Z) from where it is.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// move this fighter 10 forward and 5 up",
+   "Position_Set(Target=0, X=10, Y=5, Z=0, Mode=1)",
+   "// put player 2 at (0, 30, 0)",
+   "Position_Set(Target=4, X=0, Y=30, Z=0, Mode=0)"
+  ]
  },
  "332DB456": {
   "_command": "EM_EFFECT_DAMAGE_CENTER",
@@ -6631,6 +6790,37 @@
    "confidence": "low"
   }
  },
+ "4BD9E69A": {
+  "_command": "Motion_Get",
+  "_new": true,
+  "_name": "Motion_Get",
+  "_size": 4,
+  "_desc": "Stores which animation a fighter (or article) plays, its frame or its rate in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "What",
+   "desc": "0 the motion (animation) kind playing, 1 its frame, 2 its rate (speed).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = the animation frame the last fighter hit is on",
+   "Motion_Get(Target=2, What=1, Variable=VAR_0)"
+  ]
+ },
  "4C0DBE48": {
   "_command": "Thread_Start",
   "_new": true,
@@ -6679,6 +6869,31 @@
    "evidence": "kirby / metaknight throwhi",
    "confidence": "low"
   }
+ },
+ "4F6B304E": {
+  "_command": "Status_Set",
+  "_new": true,
+  "_name": "Status_Set",
+  "_size": 3,
+  "_desc": "Changes a fighter's status (StatusModule(3, status, 0)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Status",
+   "desc": "The status kind (reference/msc-note-sheet/Actions_Fighters.csv: 0x59 shield break, 0x5D dizzy, ...). It takes effect on its next frame.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// the last fighter hit: shield break (0x59)",
+   "Status_Set(Target=2, Status=0x59)"
+  ]
  },
  "50118FAF": {
   "_command": "AFTER_IMAGE_ON_WORK",
@@ -6929,6 +7144,45 @@
    1,
    0,
    0
+  ]
+ },
+ "50F6ED36": {
+  "_command": "Motion_Set",
+  "_new": true,
+  "_name": "Motion_Set",
+  "_size": 5,
+  "_desc": "Plays an animation on a fighter (or article) from a frame at a rate, or changes the current one's frame / rate (MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   1,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Motion",
+   "desc": "The motion (animation) kind to play (motion numbers are per fighter). -1: keep the current one and only set its frame / rate.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Frame",
+   "desc": "The frame to start at (Motion -1: jump to it; a negative Frame leaves the frame as it is).",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Rate",
+   "desc": "Playback rate (1 = normal). 0 or less: 1 for a new motion; Motion -1: the rate is left as it is.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// play motion 0x5F from frame 10 at half speed",
+   "Motion_Set(Target=0, Motion=0x5F, Frame=10, Rate=0.5)",
+   "// keep the current animation, jump to frame 20",
+   "Motion_Set(Target=0, Motion=-1, Frame=20, Rate=0)"
   ]
  },
  "5121D3C3": {
@@ -7333,6 +7587,31 @@
   },
   "_name": "ARTICLE_VISIBILITY_3_arg_form",
   "_desc_extra": "(Descriptive name: the real name is unknown; was unk_53F0D3E1.)"
+ },
+ "54443BE2": {
+  "_command": "Status_Get",
+  "_new": true,
+  "_name": "Status_Get",
+  "_size": 3,
+  "_desc": "Stores a fighter's status (action) kind in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = the last fighter hit's status",
+   "Status_Get(Target=2, Variable=VAR_0)"
+  ]
  },
  "548F2D4C": {
   "_command": "Grab_Collision",
@@ -8419,6 +8698,38 @@
   },
   "_name": "SET_TAKEOUT_SE"
  },
+ "6078528B": {
+  "_command": "Hit_Get",
+  "_new": true,
+  "_name": "Hit_Get",
+  "_size": 4,
+  "_desc": "Stores what this object's (or another's) attack connected with (bits: 2 hurtbox, 4 shield, ...) in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "When",
+   "desc": "0: since the move started (or the last Hit_Reset), 1: this frame only.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable). Gets the kinds connected with, as bits: 2 hurtbox, 4 shield, 1 clank, ... (0 = none).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = what the move has connected with (2 hurtbox, 4 shield, 6 both, 0 nothing)",
+   "Hit_Get(Target=0, When=0, Variable=VAR_0)",
+   "Float_Var_Compare(Variable=VAR_0, Method=0, Value=4)"
+  ]
+ },
  "61A23DF6": {
   "_command": "EFFECT_FOLLOW_NO_STOP_FLIP",
   "0": {
@@ -8965,6 +9276,37 @@
   },
   "_name": "SET_PLAY_INHIVIT"
  },
+ "69FD6D46": {
+  "_command": "Hitstun_Get",
+  "_new": true,
+  "_name": "Hitstun_Get",
+  "_size": 4,
+  "_desc": "Stores a fighter's hitstun frames left, or the last hit's hitstun, in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "What",
+   "desc": "0 hitstun frames left, 1 the hitstun of the last hit it took.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = the hitstun frames the last fighter hit has left",
+   "Hitstun_Get(Target=2, What=0, Variable=VAR_0)"
+  ]
+ },
  "6A441545": {
   "_command": "DOWN_EFFECT",
   "0": {
@@ -9124,6 +9466,27 @@
   },
   "_name": "IT_GET_NODE_POS_2D_form",
   "_desc_extra": "(Descriptive name: the real name is unknown; was unk_6BA1B159.)"
+ },
+ "6C574576": {
+  "_command": "Animation_Rate_Set",
+  "_new": true,
+  "_name": "Animation_Rate_Set",
+  "_size": 2,
+  "_desc": "Speeds up / slows down everything this fighter does (MotionModule +0xF4, the Mii rate). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   1
+  ],
+  "0": {
+   "name": "Rate",
+   "desc": "Multiplier on every animation and the ACMD timed to it (1 = normal) until set back to 1.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// everything 1.2x faster, then back",
+   "Animation_Rate_Set(Rate=1.2)",
+   "WAIT(Frames=0x3C)",
+   "Animation_Rate_Set(Rate=1)"
+  ]
  },
  "6CCC7540": {
   "_command": "unk_6CCC7540",
@@ -9942,6 +10305,31 @@
    1,
    0,
    0
+  ]
+ },
+ "72D266EA": {
+  "_command": "Hitstun_Set",
+  "_new": true,
+  "_name": "Hitstun_Set",
+  "_size": 3,
+  "_desc": "Sets a fighter's hitstun frames left. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Frames",
+   "desc": "Hitstun frames left (only matters in a hit status).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// end the last fighter hit's hitstun now",
+   "Hitstun_Set(Target=2, Frames=0)"
   ]
  },
  "73415E57": {
@@ -11233,6 +11621,37 @@
    "confidence": "high"
   }
  },
+ "83D8148C": {
+  "_command": "Body_State_Set",
+  "_new": true,
+  "_name": "Body_State_Set",
+  "_size": 4,
+  "_desc": "Makes a fighter intangible or invincible for some frames. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "State",
+   "desc": "0 intangible (HitModule(2, frames)), 1 invincible (HitModule(1, frames)).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Frames",
+   "desc": "For how many frames.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// intangible for 10 frames",
+   "Body_State_Set(Target=0, State=0, Frames=0xA)"
+  ]
+ },
  "84730CC5": {
   "_command": "MATERIAL_ANIM_SET_FRAME",
   "_note": "MotionModule MSC op 0x1C(frame)",
@@ -11394,6 +11813,45 @@
    "evidence": "ItemModule vtable +0x234 array {9, p0}; all 252 uses in eat / downeat scripts",
    "confidence": "low"
   }
+ },
+ "87E19722": {
+  "_command": "Rotation_Set",
+  "_new": true,
+  "_name": "Rotation_Set",
+  "_size": 5,
+  "_desc": "Sets a fighter's or article's rotation (degrees, as MSC PostureModule(4, x, y, z)). A fighter's status may set its own every frame; an article keeps it. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   1,
+   1,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "X",
+   "desc": "Rotation about X, degrees (relative to its facing: + tilts it forward).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Y",
+   "desc": "Rotation about Y, degrees.",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Z",
+   "desc": "Rotation about Z, degrees.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// tilt this projectile 45 degrees (about Z)",
+   "Rotation_Set(Target=0, X=0, Y=0, Z=45)",
+   "// the last fighter hit: upright again",
+   "Rotation_Set(Target=2, X=0, Y=0, Z=0)"
+  ]
  },
  "887B430A": {
   "_command": "Sword_Trace",
@@ -11804,6 +12262,43 @@
    "evidence": "VisibilityModule (accessor +0xA8) vtable +0xCC array {0x2713, p0}; op 0x2712 = VIS_SET_DEFAULT",
    "confidence": "medium"
   }
+ },
+ "92753431": {
+  "_command": "Hit_Check",
+  "_new": true,
+  "_name": "Hit_Check",
+  "_size": 4,
+  "_desc": "Checks whether this object's (or another's) attack connected, and with what (a hurtbox, a shield, ...); True / Else after it run on the result. MSC's AttackModule(0x2727 / 0x2726, kinds). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "When",
+   "desc": "0: since the move started (or the last Hit_Reset), 1: this frame only.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Kinds",
+   "desc": "What it connected with (bits, add them): 2 a hurtbox (a fighter / object was hit), 4 a shield, 6 either; 1 another attack (clank), 8 a reflector, 16 an absorber, 32 a search box, 64 other (1, 8-64 as Ultimate's collision kinds: unconfirmed). 0 = anything (0x7F, MSC's default).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// a cancel on hit or on shield (MSC's AttackModule(0x2727, 6)), from frame 20",
+   "FRAME(Frames=0x14)",
+   "Hit_Check(Target=0, When=0, Kinds=6)",
+   "True(Offset=0){",
+   "    Input_Set(Target=0, Input=2, Value=2)",
+   "}",
+   "// only when this frame's hit was on a shield",
+   "Hit_Check(Target=0, When=1, Kinds=4)"
+  ]
  },
  "92A88908": {
   "_command": "unk_92A88908",
@@ -12972,6 +13467,37 @@
    "confidence": "medium"
   }
  },
+ "9CCE9C8E": {
+  "_command": "Rotation_Get",
+  "_new": true,
+  "_name": "Rotation_Get",
+  "_size": 4,
+  "_desc": "Stores a fighter's or article's rotation about one axis (degrees) in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Axis",
+   "desc": "0 X, 1 Y, 2 Z: the model's rotation in degrees (PostureModuleF(4 / 5 / 6)).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = this article's rotation about Z (degrees)",
+   "Rotation_Get(Target=0, Axis=2, Variable=VAR_0)"
+  ]
+ },
  "9E3105F2": {
   "_command": "unk_9E3105F2",
   "_note": "EffectModule MSC op 0x2739 (00559051 uses it with 14 args); reads WorkModule get_int; GFX right/left pair like the *_FLIP commands",
@@ -13634,6 +14160,31 @@
    "confidence": "high"
   }
  },
+ "AFB9CA75": {
+  "_command": "Damage_Set",
+  "_new": true,
+  "_name": "Damage_Set",
+  "_size": 3,
+  "_desc": "Sets a fighter's damage % (the counter follows). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Percent",
+   "desc": "Damage %.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// the last fighter that hit this one: 0%",
+   "Damage_Set(Target=11, Percent=0)"
+  ]
+ },
  "AFEA0B23": {
   "_command": "IT_BASE_ROT",
   "_note": "Item kinetic 0x308D274(vec3)",
@@ -13923,6 +14474,31 @@
   },
   "_name": "GENERATE_ARTICLE_ENABLE_2_arg_form",
   "_desc_extra": "(Descriptive name: the real name is unknown; was unk_B459AB04.)"
+ },
+ "B496C1D9": {
+  "_command": "Damage_Get",
+  "_new": true,
+  "_name": "Damage_Get",
+  "_size": 3,
+  "_desc": "Stores a fighter's damage % in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = this fighter's damage %",
+   "Damage_Get(Target=0, Variable=VAR_0)"
+  ]
  },
  "B570C933": {
   "_command": "unk_B570C933",
@@ -14806,6 +15382,49 @@
    "confidence": "low"
   }
  },
+ "BE1E63B3": {
+  "_command": "Joint_Position_Get",
+  "_new": true,
+  "_name": "Joint_Position_Get",
+  "_size": 6,
+  "_desc": "Stores a joint's world position (its unanimated place on the target, ModelModuleF) in three variables. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Joint",
+   "desc": "A model.jtb table 0 joint ID (as ACMD's bones).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "VariableX",
+   "desc": "Gets the joint's world X.",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "VariableY",
+   "desc": "World Y.",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "VariableZ",
+   "desc": "World Z.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0-2 = player 1's joint 11 (WaistN for most fighters)",
+   "Joint_Position_Get(Target=3, Joint=0xB, VariableX=VAR_0, VariableY=VAR_1, VariableZ=VAR_2)"
+  ]
+ },
  "BF72BDCA": {
   "_command": "LAST_EFFECT_SET_ALPHA",
   "0": {
@@ -14817,6 +15436,31 @@
   },
   "_format": [
    1
+  ]
+ },
+ "BF7A21C8": {
+  "_command": "Stage_Collision_Set",
+  "_new": true,
+  "_name": "Stage_Collision_Set",
+  "_size": 3,
+  "_desc": "Sets how a fighter collides with the stage (GroundModule(0x2710, mode)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Mode",
+   "desc": "0 none (passes through the stage), 5 air, 1 / 2 ground (can / can't slide off edges). Its status sets its own again when it changes: set it every frame for as long as it should hold.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// the last fighter hit passes through the stage this frame",
+   "Stage_Collision_Set(Target=2, Mode=0)"
   ]
  },
  "BFC0031F": {
@@ -17709,6 +18353,39 @@
    "confidence": "low"
   }
  },
+ "E33213D8": {
+  "_command": "Armor_Set",
+  "_new": true,
+  "_name": "Armor_Set",
+  "_size": 4,
+  "_desc": "Gives a fighter armor (DamageModule(0xB, type, threshold)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0,
+   1
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Type",
+   "desc": "0 none, 1 super armor, 2 knockback-based, 3 damage-based.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Threshold",
+   "desc": "The knockback (2) or damage (3) it withstands.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// armor against knockback below 60, then none",
+   "Armor_Set(Target=0, Type=2, Threshold=60)",
+   "WAIT(Frames=0xA)",
+   "Armor_Set(Target=0, Type=0, Threshold=0)"
+  ]
+ },
  "E3C26DB5": {
   "_command": "EFFECT_COLOR_WORK",
   "0": {
@@ -20202,6 +20879,31 @@
    0,
    1,
    0
+  ]
+ },
+ "FC5AB6DC": {
+  "_command": "Target_Slot_Get",
+  "_new": true,
+  "_name": "Target_Slot_Get",
+  "_size": 3,
+  "_desc": "Stores which player slot (1-8) a target is: the nearest opponent, the last fighter hit, the last attacker, ... New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter's own script.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Variable",
+   "desc": "Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable). Gets the player slot, 1-8; 0 = none / not a fighter.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// VAR_0 = the nearest opponent's player slot (1-8)",
+   "Target_Slot_Get(Target=1, Variable=VAR_0)"
   ]
  },
  "FD1F7ECF": {

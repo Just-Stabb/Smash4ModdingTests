@@ -2164,3 +2164,20 @@ game crash."
 - Not tested in game; other modes may have more per-character data: send a log if one still crashes. port_check over
   the chain, tests 70–115 and 117–146: 30 errors, 55 warnings, 7 notes.
 - Package (install over 145): `code/cross_f.rpx`.
+
+## Test 147 (`build/sephiroth_test147.zip`): the executable for Sm4shCommand v1.4.6's commands
+
+User: Sm4shCommand requests (threads, hit checks by kind, rotation, the extra hitstun on the wrong hit, the variable
+features as commands, last hit / last attacker). Not a Sephiroth change: the executable every fighter uses
+(`docs/acmd-extra-commands.md`).
+- Extra hitboxes: a new extras record for every command and the slot's tag cleared by every hitbox set
+  (`0x02C0874C`), so the extras stay on their own hitbox's hits; IDs 8 / 9 get theirs.
+- New commands: Hit_Check / Hit_Get (2 hurtbox, 4 shield, ...), Rotation_ / Position_ / Motion_ Get / Set,
+  Last_Hit_Get, Target_Slot_Get, the fighter-state commands; targets through `position_vars_cave.py`'s new
+  `0x0F0002BC + target`.
+- Threads: the game side was fine; Sm4shCommand cut the scripts at their thread blocks (fixed in v1.4.6,
+  `build/Sm4shCommand.zip`).
+- Tested in unicorn (`acmd_ext_test.py` 248 checks, `position_vars_test.py`, `kind_expand_test.py` on this
+  executable); not tested in game. port_check over the chain, tests 70–115 and 117–147: 30 errors, 55 warnings,
+  7 notes (new: X3 extra-tag).
+- Package (install over 146): `code/cross_f.rpx`.

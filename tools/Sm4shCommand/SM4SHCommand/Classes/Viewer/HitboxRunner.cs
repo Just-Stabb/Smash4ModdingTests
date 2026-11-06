@@ -85,7 +85,8 @@ namespace Sm4shCommand.Viewer
             EXTRA_SPECIAL = 0x974EA5BE, EXTRA_EXT_SPECIAL = 0x5C8A67C9,
             EXT_COLLATERAL = 0xED67D5DA, CLEAR = 0x9245E1A8, DELETE = 0xFF379EB6, DEACTIVATE_LAST = 0x7698BB42,
             SIZE = 0x684264C9, DAMAGE = 0xDFA4517A, MOVE = 0x1AFDA8E6, SET_LOOP = 0x0EB375E3, GOTO = 0x38A3EC78,
-            BODY = 0xF0D25BDA, SET_FLOAT = 0x1E3AB92A, ANIM_RATE = 0x0F000098, ARMOR = 0x2A25155D, TRUE = 0xA5BD4F32, ELSE = 0x895B9275, FALSE = 0x870CF021, END = 0x5766F889;
+            BODY = 0xF0D25BDA, SET_FLOAT = 0x1E3AB92A, ANIM_RATE = 0x0F000098, ARMOR = 0x2A25155D, TRUE = 0xA5BD4F32, ELSE = 0x895B9275, FALSE = 0x870CF021, END = 0x5766F889,
+            THREAD_START = 0x4C0DBE48, THREAD_STOP = 0x1B492AD1;
 
         IList<ICommand> script;
         readonly List<IList<ICommand>> subscripts = new List<IList<ICommand>>();
@@ -96,14 +97,80 @@ namespace Sm4shCommand.Viewer
         List<VarWrite> writes = new List<VarWrite>();
         double Speed { get { return frameSpeed * rate; } }   // the move's frame speed x the animation rate variable
         bool incrementFrame;
-        readonly SortedDictionary<int, HitboxData> hitboxes = new SortedDictionary<int, HitboxData>();
+        SortedDictionary<int, HitboxData> hitboxes = new SortedDictionary<int, HitboxData>();
         bool intangible, invincible, armor;
+
+        // Thread_Start(Offset, ID, Flags){ ... } (docs/acmd-extra-commands.md): the block runs on its own, from the
+        // game frame after Thread_Start, one frame per game frame (FRAME counted from 0 there), sharing the
+        // hitboxes, while the script goes on past it. Thread_Stop(ID) / (-1) stops them.
+        class ScriptThread
+        {
+            public int Id, StartFrame;
+            public HitboxRunner Runner;
+            public bool First = true;
+        }
+        readonly List<ScriptThread> threads = new List<ScriptThread>();
+        HitboxRunner root;
+        bool isThread;
+
+        void StartThread(int id, IList<ICommand> block)
+        {
+            var r = root ?? this;
+            r.threads.RemoveAll(x => x.Id == id);
+            var th = new HitboxRunner { ConditionsTrue = ConditionsTrue, UseFrameSpeed = false, GetScript = GetScript };
+            th.isThread = true;
+            th.root = r;
+            th.hitboxes = r.hitboxes;
+            th.script = block;
+            th.frameSpeed = 1; th.rate = 1; th.syncFrames = -1;
+            r.threads.Add(new ScriptThread { Id = id, StartFrame = r.gameFrame, Runner = th });
+        }
+
+        /// <summary>One game frame of every thread started before this frame; ended ones are dropped.</summary>
+        void StepThreads()
+        {
+            foreach (var th in threads.ToArray())
+            {
+                if (th.StartFrame >= gameFrame || !threads.Contains(th))
+                    continue;
+                var r = th.Runner;
+                if (th.First) { r.currentFrame = 0; th.First = false; }
+                else r.currentFrame += 1;
+                r.gameFrame = gameFrame;
+                r.writes = writes;
+                bool i0 = r.intangible, v0 = r.invincible, a0 = r.armor;
+                r.ProcessFrame();
+                if (r.intangible != i0) intangible = r.intangible;
+                if (r.invincible != v0) invincible = r.invincible;
+                if (r.armor != a0) armor = r.armor;
+                if (r.index >= r.script.Count && r.subscripts.Count == 0)
+                    threads.Remove(th);
+            }
+        }
+
+        /// <summary>The block after a Thread_Start at index: its commands up to blockWords words, without the
+        /// Script_End that ends it.</summary>
+        static List<ICommand> ThreadBlock(IList<ICommand> list, int index, int blockWords)
+        {
+            var o = new List<ICommand>();
+            int words = 0;
+            for (int i = index + 1; i < list.Count && words < blockWords; i++)
+            {
+                var c = list[i] as ACMDCommand;
+                int w = c != null ? c.Parameters.Count + 1 : 1;
+                words += w;
+                if (c != null && c.Ident == END && words >= blockWords)
+                    break;
+                o.Add(list[i]);
+            }
+            return o;
+        }
 
         /// <summary>Runs the script for frames game frames (one FrameState each).</summary>
         public List<FrameState> Run(IList<ICommand> commands, int frames)
         {
             script = commands;
-            subscripts.Clear(); states.Clear(); hitboxes.Clear();
+            subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
@@ -136,6 +203,7 @@ namespace Sm4shCommand.Viewer
                     else
                         incrementFrame = true;
                 }
+                StepThreads();
                 var st = new FrameState
                 {
                     GameFrame = game + 1,
@@ -368,6 +436,22 @@ namespace Sm4shCommand.Viewer
                         float val = F(p[0]);
                         writes.Add(new VarWrite { GameFrame = gameFrame, Variable = v, Value = val });
                         if (v == ANIM_RATE && UseFrameSpeed && val > 0) rate = val;
+                    }
+                    break;
+                case THREAD_START:
+                    if (p.Count >= 2)
+                    {
+                        int blockWords = I(p[0]) - (p.Count + 1);
+                        StartThread(I(p[1]), ThreadBlock(Current, index, blockWords));
+                        skipWords = blockWords;       // the script jumps over the block
+                    }
+                    break;
+                case THREAD_STOP:
+                    if (p.Count >= 1)
+                    {
+                        var r = root ?? this;
+                        int id = I(p[0]);
+                        r.threads.RemoveAll(x => id == -1 || x.Id == id);
                     }
                     break;
                 case END:
