@@ -390,6 +390,36 @@ Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro
 EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy
 motion / visibility pac names (taken from the fighters'), the effect IDs.
 
+## What the Wii U executable has of Smash Run (read for "make the mode playable")
+
+- **Enemy kinds**: the full shared table, 97 kinds (names 0x1041A22C, killer = 0; resource folders 0x1041A3B0,
+  capitalised 0x1041A534), all 90 Smash Run kinds included; `enemy_param.bin` and the path builder 0x030BC6BC
+  (model / motion / animcmd / sound / effect) work for every kind.
+- **Behaviours: none for Smash Run kinds.** Enemy object: vtable 0x10120038, ctor 0x02D88CE4 (0x34D8 bytes),
+  activate 0x02D89CC8 (calls the factory; reads `[mgr+0x60+4*kind]+0x70` unchecked). Factory 0x02DB94CC (behaviour
+  module vtable 0x10122340 +0x44): `kind - 0x50`, 17 cases: masterhand 0x02DD0438, crazyhand 0x02DC7414, mastercore
+  0x026B7344, mcfinal 0x026C2E9C, mcblade 0x026BE944, mcanimal 0x026BB3E8, mcgiant 0x026C5F80, mczakoplasmawisp
+  0x026CF4DC, mczakodarios 0x026CBA64, mczakostalfos 0x026D1DFC, mczakozima 0x026D6834, yellowdevil 0x02DDB82C,
+  ridley 0x026E24EC, metalface 0x026D80A0, nabbit 0x026DB864 (subetenoyaminoou / flyingman: none). Base Behavior
+  ctor 0x02DB2DF0 has 12 callers (= these 15). Kinds below 0x50 get no behaviour. The 3DS's 77 enemy_fs.cro
+  behaviours were not linked; the Master Fortress minions (mczako*: Plasma Wisp, Darios, Stalfos, Zima) are the
+  only Smash Run enemies with Wii U AI.
+- **Params**: manager `*(0x102F6C00)` (0x02DC64F4); its set-up 0x02DC66D0(mode) makes the ml accessor (mode 0,
+  ctor 0x026AE888) or sm (mode 2, 0x026B40B8); no fs accessor. They load `param/enemy/{ml,sm}/<kind>.bin` for
+  kinds 0x50-0x60 only (switch 0x026AED18) into mgr+0x60+4*kind.
+- **Leftovers**: 34 Smash Run enemy weapons in the weapon kind table (owners 0x10418968), and code clusters reading
+  Smash Run kinds' param slots (0x03187000-0x031A1000, 0x02AD5000-0x02AE9000), probably their projectiles: dead
+  (null slots). Smash Tour loads models / motions only (cake, dogars, kamek, metroid, tac, shinigami, ...).
+- **Scene**: `FieldSmashScene` is only a name: the battle scene changer 0x03017010 picks it for mode 8, but no
+  factory is registered (0x100CBD90, 0x02A6878C, 0x023A6EF0). No FieldSmashManager / EnemyGenerator.
+- **Spawning** (stages do it): EnemyManager / EnemyResourcePool `*(0x102F98A0)` (ctor 0x02D998CC; 24 slots).
+  Battle load 0x02FB6068 makes it and sets the category (0x02D99FD4: 1 ml, 2 sm, 0 fs); 0x02FB64E0 -> 0x02D9A454
+  requests kinds per stage (0x1C yellowdevil, 8 ridley, 0x13 metalface, 3 nabbit) through 0x02D9A580 / the
+  resource request 0x02DAE314(mgr+0x28, kind). Spawn: `id = 0x02D9BCFC(mgr, &EnemyCreateParam)` (-1 on failure),
+  e.g. Pyrosphere 0x024B4248 (kind 0x5E). Data-driven stage spawner 0x02A8558C (kind, variation, int, x, y).
+  EnemyCreateParam 0x3C bytes: +0 kind, +4 variation, +8 f 1.0, +0xC/+0x10/+0x14 position, +0x18 f -1.0, +0x1C u8,
+  +0x20 s32 2, +0x24/+0x28/+0x30 f, +0x2C/+0x34 s32, +0x38-0x3B flags (+0x3A cost limit).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
