@@ -65,8 +65,9 @@ def _wrap(x, mode):
     return np.clip(x, 0, 1)
 
 
-def render(items, size, yaw):
-    """items: [(positions [n, 3], uvs [n, 2] (NUD), tris, image, (alpha_func, ref, src, dst), wrap)]"""
+def render(items, size, yaw, frame=None):
+    """items: [(positions [n, 3], uvs [n, 2] (NUD), tris, image, (alpha_func, ref, src, dst), wrap)];
+    frame: (centre x, centre y, span) of the view (default: fitted to the items)"""
     allp = np.concatenate([p for p, *_ in items]) if items else np.zeros((1, 3))
     th = np.radians(yaw)
     R = np.array([[np.cos(th), 0, np.sin(th)], [0, 1, 0], [-np.sin(th), 0, np.cos(th)]])
@@ -74,6 +75,8 @@ def render(items, size, yaw):
     lo, hi = q.min(0), q.max(0)
     span = max(hi[0] - lo[0], hi[1] - lo[1], 1e-3) * 1.1
     cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+    if frame is not None:
+        cx, cy, span = frame
     can = np.zeros((size, size, 3), np.float64) + 40
     zb = np.full((size, size), -1e9)
     order = sorted(items, key=lambda it: it[4][2] != 0)          # opaque first

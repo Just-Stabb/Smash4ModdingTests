@@ -52,7 +52,7 @@ import numpy as np
 # ---------------------------------------------------------------- MBN
 def _vertices(buf, desc):
     """a vertex buffer + its description -> ({kind: [n, k] floats}, n)"""
-    widths = {0: 3, 1: 3, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2}
+    widths = {0: 3, 1: 3, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2}      # 7: UV set 2
     tsize = {0: 4, 1: 1, 2: 1, 3: 2}
     tcode = {0: '<f4', 1: 'u1', 2: 'i1', 3: '<i2'}
     layout, stride = [], 0

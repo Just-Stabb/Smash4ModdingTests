@@ -278,12 +278,16 @@ class LVD:
     def read(self, d):
         r = R(d)
         self.head = r.take(10)
-        for name, cls in SECTIONS:
+        self.stop = len(SECTIONS)
+        for k, (name, cls) in enumerate(SECTIONS):
             start = r.o
             r.u8()
             n = r.i32()
             if n and cls is None:
+                # a section without a reader (e.g. 6, the enemy generators: Smash Run's stages): it and
+                # everything after it kept as bytes
                 r.o = start
+                self.stop = k
                 break
             items = []
             for _ in range(n):
@@ -295,7 +299,7 @@ class LVD:
 
     def write(self):
         b = bytearray(self.head)
-        for name, cls in SECTIONS:
+        for name, cls in SECTIONS[:getattr(self, 'stop', len(SECTIONS))]:
             items = getattr(self, name)
             if cls is None:
                 assert not items

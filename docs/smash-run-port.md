@@ -244,6 +244,40 @@ What the conversion does:
 - UV scale / rotation / translation (static and animated) as "UV transforms" below.
 - Not converted: the per-texel shape of a colour animation that isn't a scale.
 
+## Stages (stage/field_smash -> the NewStage01 slot)
+
+`python3 tools/s3ds_stage.py SRC_ROOT all BASE OUT --preview` builds every Smash Run area as a stage for the
+new-stage slot (`docs/stage-expansion.md`): `OUT/AREA/stage/melee/NewStage01`, built on the slot's Battlefield copy
+(BASE) the way Minecraft World is (`docs/minecraft-world.md`: only forms Battlefield's loaded models have, its
+model folders hidden, its midday light held). `tools/s3ds_stage_test.py SRC_ROOT BASE OUT` reads every build back
+(10 builds, 579 meshes, 0 failures). Areas: the rooms MiniRoom00 / 01 / 02 / 03 / 05 (arena sized, MiniRoom01 / 02
+with their crystals), the final battles Race00 / Race01 (side-scrolling courses ~6000 units long) and Nobore (a
+10000-unit climb), and MainField, the whole floating-island labyrinth (41 models, 302 meshes, 185 collisions).
+`MiniRoomCommon` (doors, chests the mode places) and `stage/final/` (the Final Smash cut-in backdrops, not Smash
+Run) aren't areas.
+
+- **Formats**: the 3DS stage `.lvd` is the Wii U's format byte for byte (big-endian, same magic: `lvd.py` reads
+  them; it now writes files with an enemy-generator section, which it keeps as bytes, back identically); the
+  `*_stprm.bin` typed params are the Wii U's layout (one more value at the end); the models are the enemies' .bch +
+  .mbn (a third UV set, MBN attribute 7, added to the reader).
+- **Models**: each model folder (not the broken / cracked crystal pieces or the shadow volumes) is a static
+  `stc_sr_NAME_set` folder: the objects shown by default, unbound, in Battlefield's unlit shader `0xA2001001`
+  (opaque, alpha-tested, alpha or additive blending as the 3DS material), the texture combiner baked into the
+  texture (as the effect models; textures 1 / 2, sphere environment maps and second UV sets on 180 of the 700
+  materials, enter as their average colour), the 3DS fragment lighting baked into the vertex colours, UV scrolls in
+  a `model.mta`. The gimmicks' animations (doors, chests, crystals breaking, moving floors, springs, barrels) need
+  Smash Run's stage code and stay still; the material colour animations are left out.
+- **Collision**: all the area's `.lvd` collisions (the Race's course pieces Test00-04 together) with their bone
+  links dropped; Battlefield's spawn / respawn / camera / blast / item entries filled from the 3DS points (8 spawns:
+  the 3DS ones and more on the floors near them; respawns in Battlefield's pattern; the 3DS camera bounds or the
+  collision's; blast zones at least the camera bounds plus Battlefield's margins: the race's and climb's own are
+  tuned for those modes). MiniRoom00 is walled in (a closed loop facing its inside: no KOs), so it also has a
+  `MiniRoom00_open` build without it.
+- **Camera**: the 3DS stage's stprm camera values (fov 30, distance 50, angles -5 / -22; MainField fov 15,
+  distance 100).
+- As versus stages: the rooms play as normal stages; the race / climb and the field are far larger than the
+  camera's usual range (it frames everyone, so it will be zoomed far out when fighters spread).
+
 ## UV transforms (3DS coordinators -> Wii U shader UV props)
 
 Both sides read from code, not guessed:
@@ -270,7 +304,8 @@ motion / visibility pac names (taken from the fighters'), the effect IDs.
 
 ## Plan (to refine once code.bin is in)
 
-1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params.
+1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
+   their effects and effect models, the stages (above); left: UI, the mode's params.
 2. Code: map the 3DS symbols onto the Wii U's leftover code (the same `app::` classes; names give the Wii U
    functions through string / structure matches); find what of FieldSmashManager / EnemyGenerator the Wii U
    still has.
