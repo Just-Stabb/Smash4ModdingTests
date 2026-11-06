@@ -5,3 +5,9 @@ __pycache__/
 build/
 *.rpx
 port_sources.json
+
+# Sm4shCommand build outputs (xbuild / Visual Studio)
+tools/Sm4shCommand/SALT/SALT/bin/
+tools/Sm4shCommand/SALT/SALT/obj/
+tools/Sm4shCommand/SM4SHCommand/bin/
+tools/Sm4shCommand/SM4SHCommand/obj/
