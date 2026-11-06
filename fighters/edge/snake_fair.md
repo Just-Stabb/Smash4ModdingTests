@@ -35,7 +35,8 @@ The user's numbers:
   back (the user: "The side B cancel should wait until the frame it hits the hilt") and made side special's startup
   faster instead (`specials.md` "Side special").
 - **Grab cancel** (test 128, the user: "allow snakesword's hilt return to be cancelled into grab if on the ground"): on
-  the ground, the grab input (no item held) goes into a grab (0x37 Catch) on side special's terms (test 129, the user:
+  the ground, the grab input (no item held) goes into a standing grab (0x35 Catch; tests 128 / 129 used 0x37, the dash
+  grab: test 130) on side special's terms (test 129, the user:
   "The same rules that apply to side special's cancel should apply to grab"): the sword back at the hilt and the move
   hit (test 128: from the return, hit or not).
 - The catch does 5%. Only up tilt has an end hit (test 103, the user's): 11%, angle 42, knockback growth 40, each hitbox 6 bigger than up tilt's, frames 21–24 (test 105; the caught are taken out of their hold hitstop as they're let go). Forward air's caught fighters drop once at the hilt (tests 79–102: an 11% end hit at fair's angle).

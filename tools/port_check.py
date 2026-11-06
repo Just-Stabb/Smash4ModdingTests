@@ -1053,6 +1053,24 @@ def check_weapon_joint_facing(name, rep):
                     % os.path.relpath(path, ROOT))
 
 
+def check_grab_status(name, rep):
+    """C8: a hand-written MSC function (any not named func_N, the decompiler's) of the fighter's that changes to status
+    0x37: that's the dash grab (CatchDash); the standing grab is 0x35 (Catch, as Wait's own func_46 / the ground
+    statuses' checks: 0x35 0x1E00006D, 0x37 0x1E00006E, 0x39 the pivot grab). Sephiroth tests 128 / 129: the snake
+    sword's grab cancel used 0x37 (the user: "The snakesword cancel does dash grab rather than a normal grab")"""
+    path = os.path.join(ROOT, 'fighters', name, '%s.c' % name)
+    if not os.path.exists(path):
+        return
+    fn = None
+    for i, line in enumerate(open(path, errors='replace'), 1):
+        m = re.match(r'(?:void|int|float)\s+(\w+)\s*\(', line)
+        if m:
+            fn = m.group(1)
+        if fn and not re.match(r'func_\d+$', fn) and re.search(r'func_16\(0x37,', line):
+            rep.add('WARN', 'C8 grab-status', 'fighters/%s/%s.c:%d %s(): status 0x37 is the dash grab (CatchDash); '
+                    'a standing grab is 0x35 (Catch)' % (name, name, i, fn))
+
+
 def check_weapon_owner(inst, name, rec, rep):
     """W7: a weapon MSC written for an article (fighters/NAME/weapons/X.c, shipped as script/msc/X/X.mscsb; helper
     files compiled into others' aren't) that isn't one of
@@ -1539,6 +1557,7 @@ def main():
     check_weapon_motion(inst, a.name, rec, rep)
     check_weapon_facing(a.name, rep)
     check_weapon_joint_facing(a.name, rep)
+    check_grab_status(a.name, rep)
     check_weapon_owner(inst, a.name, rec, rep)
     check_weapon_instances(a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)

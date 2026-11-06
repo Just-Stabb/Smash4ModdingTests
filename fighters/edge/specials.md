@@ -201,8 +201,11 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     should only stop being made once Sephiroth stops moving in the direction the slash is in in the animation", "This
     line should reach all the way to Sephiroth's back"): through the rush, either end (the ground end's slide too)
     and into Fall (20 frames at most, his per-frame hook; any other status ends it: the snake sword shares these
-    variables), ending once his move along the slash (rush direction x facing; his position last frame in VAR_11,
-    0.25 units) is under 0.4 a frame, not in hitlag or a shape's steps (`edge_tr_bd_stop`, `edge_tr_running`, TIMER_8).
+    variables), ending once his move along the slash (the rush direction, world space; his position last frame in
+    VAR_11, 0.25 units) has been under 0.4 a frame for 3 frames running (TIMER_10), not counting hitlag or a shape's
+    steps (`edge_tr_bd_stop`, `edge_tr_running`, TIMER_8). Test 128 multiplied the direction by his facing (it's the
+    world's already) and ended on one still frame: facing left the line ended at once (test 130, the user: "The lines
+    don't appear anymore on Blade Dash").
     Once he's been in the air in a trail, its points on the ground are at his feet + 1, not his middle (TIMER_9,
     `edge_tr_h`): a line he lands on reaches the floor (test 128: "Lines still don't cover all the way to the ground on
     landing"). The end is -1 (Blade Dash: it stays) or -2 (held Octaslash: its articles go once their fill is
@@ -261,7 +264,10 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     between, Z between, Y between) are marked and the shape is made as above; not, Y is kept as the first crossing.
     The crossing test counts a point on the other line on one side, so lines meeting at a shared point cross once
     (test 126's strict test missed them: the simulation's triangle met exactly at a corner).
-    **Octaslash's shape** ends the move (VAR_20 3, above).
+    **Octaslash's shape** ends the move (VAR_20 3, above); its trail then ends with -1, not -2 (test 130: its lines are
+    gone already, and the glow's articles go as Blade Dash's do once it's over; the user still saw no glow from an
+    Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
+    forced end, keeps the glow its 50 frames).
     **Not near the blast zones (test 128, the user: "make shapes not able to be formed off-screen near the bounds of
     the blast zone"):** a shape whose middle +- its long half axis comes within 50 of the side / bottom blast zones or
     60 of the top isn't made: CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
@@ -280,7 +286,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   - **Once per air time:** up special (either) sets VAR_21 as its attack starts (the rush's main; test 116, the
     user: "only used after the attacking portion of either up special begins"; test 113: its start); in the air it can't start again until he
     is on the ground outside up special or grabs a ledge (statuses 0x72 - 0x74): `edge_hi_can` on the two air
-    input checks, `edge_hi_air_tick` from func_82. Being hit doesn't give it back; dying / respawning does (test 127,
+    input checks, `edge_hi_air_tick` from func_82. A Blade Dash along the ground (`edge_hi_on_ground`) doesn't set it,
+    so one that leaves an edge leaves him his air up special (test 130, the user: "make the Blade Dash not consume an
+    air use if it leaves an edge"); Octaslash and an air rush do. Being hit doesn't give it back; dying / respawning does (test 127,
     the user: "make up special's air count reset on respawn": statuses 0xB1 Dead / 0xB2 Rebirth, and the Rebirth
     status' own start, func_228).
 - **Ground end:** x x 0.6 (Octaslash 0.9; 0.25 if landed), brake 0.12 (0.06); actionable at the motion's

@@ -38247,6 +38247,7 @@ void edge_tr_begin()
     WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
     WorkModule(0, 0.0f, 0x0f000328);
     WorkModule(0, 0.0f, 0x0f000329);
+    WorkModule(0, 5.0f, 0x0f00032a);
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
     edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_h()), edge_tr_cur_block() * 0x400);
 }
@@ -38271,8 +38272,10 @@ float edge_tr_sin(float x)
 // stop being made once Sephiroth stops moving in the direction the slash is in in the animation", "This line should
 // reach all the way to Sephiroth's back"): his position last frame in VAR_11 (packed at 0.25: (x + 512) x 4 x 4096 +
 // (y + 512) x 4, exact in a float; VAR_11 is the steps' only while VAR_0 < 0), his move since along the slash
-// (edge_hi_rx x his facing, edge_hi_ry) under 0.4 a frame = stopped. In hitlag (0x0F000043) or while a shape's steps
-// run he isn't. TIMER_8 (0x0F000328): frames the line may go on into Fall after the move (20); TIMER_9: he's been in the
+// (edge_hi_rx / ry: world space, edge_hi_resolve) under 0.4 a frame for 3 frames running (TIMER_10, 0x0F00032A, set to
+// 3 each frame he moves; 5 as the trail starts) = stopped. In hitlag (0x0F000043) or while a shape's steps run he
+// isn't. Test 128 took the direction x his facing (edge_hi_rx is already the world's) and a single still frame as
+// stopped: facing left a Blade Dash's line ended at once (the user: "The lines don't appear anymore on Blade Dash"). TIMER_8 (0x0F000328): frames the line may go on into Fall after the move (20); TIMER_9: he's been in the
 // air in this trail (then on the ground its points are at his feet + 1, not his middle: the line reaches the floor he
 // landed on, test 128: "Lines still don't cover all the way to the ground on landing")
 float edge_tr_pack4(float x, float y)
@@ -38306,8 +38309,13 @@ int edge_tr_bd_stop()
     }
     px = (float)((int)v / 0x1000) * 0.25f - 512.0f;
     py = (float)((int)v - ((int)v / 0x1000) * 0x1000) * 0.25f - 512.0f;
-    d = (x - px) * edge_hi_rx * PostureModuleF(0) + (y - py) * edge_hi_ry;
-    if (d < 0.4f)
+    d = (x - px) * edge_hi_rx + (y - py) * edge_hi_ry;
+    if (d >= 0.4f)
+    {
+        WorkModule(0, 3.0f, 0x0f00032a);
+        return 0;
+    }
+    if (WorkModuleF(0, 0x0f00032a) <= 0.0f)
     {
         return 0x1;
     }
@@ -38543,7 +38551,10 @@ void edge_tr_steps()
 // the trail's end: -1 (it stays: Blade Dash), -2 (held Octaslash's: its articles go)
 float edge_tr_end_code()
 {
-    if (edge_hi_charged)
+    // (test 130: after a shape that ended it, VAR_20 3, -1 too: its lines are gone already, and its glow's articles
+    // then go once it's over as Blade Dash's do, not through the -2 path; the user: Octaslash's shape "effect still
+    // doesn't appear")
+    if (edge_hi_charged && WorkModuleF(0, edge_hi_pass_var()) != 3.0f)
     {
         return -2.0f;
     }
@@ -39338,7 +39349,13 @@ void edge_hi_rush_main()
     WorkModule(0, 0.0f, edge_hi_wrap_var());
     edge_tr_begin();                       // the trail (test 123)
     WorkModule(0, 0.0f, edge_hi_total_var());
-    WorkModule(0, 1.0f, edge_hi_used_var());   // once per air time: used from the attack on (test 116; was the start)
+    if (edge_hi_charged || edge_hi_on_ground == 0)
+    {
+        // once per air time: used from the attack on (test 116; was the start). A Blade Dash along the ground doesn't
+        // use it, so off an edge he has it still (test 130, the user: "make the Blade Dash not consume an air use if
+        // it leaves an edge")
+        WorkModule(0, 1.0f, edge_hi_used_var());
+    }
     edge_hi_count = 0;                     // init 04890 / 04950
     edge_hi_landed = 0;
     edge_hi_cliff = 0xffffffff;
@@ -41986,7 +42003,7 @@ void edge_sn_finish()
 // hilt (state 5 on; test 128 opened it from the return, state 4: test 129, the user: "The side B cancel should wait
 // until the frame it hits the hilt"; side special's startup made faster instead, edge_s_quick). And
 // on the ground the grab input (global24 0x20000000, no item held, as the ground statuses read it) goes into a grab
-// (0x37 Catch) (test 128: "allow snakesword's hilt return to be cancelled into grab if on the ground"), on the same
+// (0x35 Catch, as func_46 / Wait's; test 128 / 129 used 0x37, the dash grab: test 130) (test 128: "allow snakesword's hilt return to be cancelled into grab if on the ground"), on the same
 // terms as side special's (test 129, the user: "The same rules that apply to side special's cancel should apply to
 // grab": the hilt, and the move hit; test 128 took it from the return, hit or not). Run first in the aerial / up
 // tilt loops: 1 if it did
@@ -42011,7 +42028,7 @@ int edge_sn_cancel()
     if (edge_sn_state >= 0x5 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && global18 == 0
         && (global24 & 0x20000000) != 0 && ItemModule(0x4) == 0)
     {
-        func_16(0x37, 0x1);
+        func_16(0x35, 0x1);
         return 0x1;
     }
     return 0;

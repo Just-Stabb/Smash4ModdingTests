@@ -1921,3 +1921,24 @@ that and make side special's startup slightly faster."
 - Not tested in game.
 - port_check over the chain, tests 70–115 and 117–129: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 128): `script/msc/edge.mscsb`.
+
+## Test 130 (`build/sephiroth_test130.zip`): Blade Dash lines back, standing grab from the snake sword, Blade Dash off an edge keeps the air use, Octaslash shape's end changed
+
+User: "The snakesword cancel does dash grab rather than a normal grab. The lines don't appear anymore on Blade Dash, and
+the effect still doesn't appear for forming a shape using Octaslash." Then "Also please make the Blade Dash not consume
+an air use if it leaves an edge".
+- **Grab:** the snake sword's grab cancel goes into the standing grab, 0x35 (Wait's own; 0x37 is the dash grab).
+- **Blade Dash lines:** test 128's "still moving along the slash" check multiplied the rush direction by his facing,
+  but it's world space already: facing left, the line ended on its first frame. Fixed, and a line now ends only
+  after 3 still frames running (a status change's still frame doesn't end it).
+- **Air use:** a Blade Dash along the ground doesn't use up the air up special, so off an edge he still has it. An
+  air Blade Dash, or one aimed off the ground, and Octaslash do.
+- **Octaslash's shape glow:** cause not found. In `edge_trail_sim.py`'s protocol, extended with the articles' fill
+  timeline and the forced end, the glow lasts its 50 frames in both update orders. One suspect taken out: after a
+  shape, Octaslash's trail now ends like Blade Dash's (-1; its lines are gone already), not through the "vanish"
+  path (-2) that only Octaslash used.
+- Not tested in game.
+- New check `port_check` C8 grab-status (and a guide catalogue row): a hand-written MSC function changing to 0x37 (the
+  dash grab). It flags test 129's `edge_sn_cancel`; clean now.
+- port_check over the chain, tests 70–115 and 117–130: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 129): `script/msc/edge.mscsb`.

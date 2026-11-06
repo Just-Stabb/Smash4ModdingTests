@@ -863,7 +863,7 @@ void edge_sn_finish()
 // hilt (state 5 on; test 128 opened it from the return, state 4: test 129, the user: "The side B cancel should wait
 // until the frame it hits the hilt"; side special's startup made faster instead, edge_s_quick). And
 // on the ground the grab input (global24 0x20000000, no item held, as the ground statuses read it) goes into a grab
-// (0x37 Catch) (test 128: "allow snakesword's hilt return to be cancelled into grab if on the ground"), on the same
+// (0x35 Catch, as func_46 / Wait's; test 128 / 129 used 0x37, the dash grab: test 130) (test 128: "allow snakesword's hilt return to be cancelled into grab if on the ground"), on the same
 // terms as side special's (test 129, the user: "The same rules that apply to side special's cancel should apply to
 // grab": the hilt, and the move hit; test 128 took it from the return, hit or not). Run first in the aerial / up
 // tilt loops: 1 if it did
@@ -888,7 +888,7 @@ int edge_sn_cancel()
     if (edge_sn_state >= 0x5 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && global18 == 0
         && (global24 & 0x20000000) != 0 && ItemModule(0x4) == 0)
     {
-        func_16(0x37, 0x1);
+        func_16(0x35, 0x1);
         return 0x1;
     }
     return 0;
