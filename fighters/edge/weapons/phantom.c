@@ -22,6 +22,7 @@ float global20;
 int global21;
 int ph_track_again;       // Sephiroth: the tracking done again on its attack's first frame
 int ph_follow;            // Sephiroth: following a fighter held on his sword up and down (test 107)
+float ph_hx;              // Sephiroth: that fighter's x last frame (its moves since are the Phantom's too: test 118)
 
 void func_0()
 {
@@ -900,6 +901,7 @@ void ph_track(int clear)
         GroundModule(0x2710, 0x5);
         PostureModule(0x2714, x, y, PostureModuleF(0x3));
         ph_follow = 0x1;
+        ph_hx = (float)(ix - 0x200);
         return;
     }
     if (v < 2097152.0f)
@@ -972,15 +974,20 @@ void ph_follow_frame()
         ph_follow = 0;
         return;
     }
+    c = (int)v - 0x400000;
+    ix = c / 0x400;
+    iy = c - ix * 0x400;
     if (ph_follow == 0)
     {
         StatusModule(0x2, 0x2);                // into the air to follow
         GroundModule(0x2710, 0x5);
         ph_follow = 0x1;
+        ph_hx = (float)(ix - 0x200);
     }
-    c = (int)v - 0x400000;
-    ix = c / 0x400;
-    iy = c - ix * 0x400;
-    PostureModule(0x2714, PostureModuleF(0x1), (float)(iy - 0x200), PostureModuleF(0x3));
+    // its x moved by as much as the fighter's since last frame (test 118, the user: "Phantom won't hit an opponent being
+    // retracted by the snake sword": the sword reels them in past it while it dashes; tests 107 - 117 followed y only),
+    // so the gap at its release (ph_held_reach) is the one its slash is made for, as if they stood still
+    PostureModule(0x2714, PostureModuleF(0x1) + (float)(ix - 0x200) - ph_hx, (float)(iy - 0x200), PostureModuleF(0x3));
+    ph_hx = (float)(ix - 0x200);
 }
 

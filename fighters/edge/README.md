@@ -1704,3 +1704,13 @@ phantom_hand_flash`); he has no such hand pose.
 - Package (install over 115): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`,
   `script/animcmd/weapon/phantom/effect.bin`.
 
+## Test 118 (`build/sephiroth_test118.zip`): the Phantom follows a held fighter sideways too
+
+User (clip: held up tilt catches DK, the Phantom sent while the sword reels him in): "Phantom won't hit an opponent
+being retracted by the snake sword." The Phantom was placed 65 behind him at its release but then followed him only up
+and down: the sword pulled him back past it while it dashed, and its slash (frame 11 on, 20 ahead) met nothing. Now
+each frame of its attack (to its last hitbox) it also moves sideways by as much as he did since the last frame
+(`phantom.c ph_follow_frame`, `ph_hx`), so the gap is the one its slash is made for, as if he stood still.
+- port_check over the chain, tests 70–115, 117 and 118: 30 errors, as before.
+- Package (install over 117): `script/msc/phantom/phantom.mscsb`.
+
