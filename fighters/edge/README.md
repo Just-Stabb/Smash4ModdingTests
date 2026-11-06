@@ -1760,3 +1760,20 @@ orbs); only the hold's own fighters are looked at.
 - port_check over the chain, tests 70–115 and 117–122: 30 errors, as before.
 - Package (install over 121): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
 
+## Test 123 (`build/sephiroth_test123.zip`): up special concept, stage 2: the purple line trail
+
+User: "Can we get started on the next part of Up special?" (the concept: "Tap up and hold up special both leave a purple
+line trail that persists for 6 seconds following Sephiroth's movement until he begins falling").
+- From the rush's start (either up special's attack) until he begins to fall in the air end (or the ground end), his
+  path (his middle, feet + 9) is laid down as straight pieces of 8: each a new article `trail` (weapon kind 0x19C, his
+  article 11, up to 40 at once), a thin glowing purple line (the light arrow's additive glow material, a purple
+  texture), staying 360 frames. Details: `specials.md` "Up special".
+- New in the package: the executable (the new weapon kind), `model/trail/c00 - c07`, `script/animcmd/weapon/trail/`,
+  `script/msc/trail/trail.mscsb`, and `edge.mscsb`.
+- Not tested in game: the article's angle (the snake run's placement with any angle), the look (width 1.2, brightness),
+  and 40 at once.
+- Next (stage 3): closed shapes made by the lines, their glow 12 frames after, and the hitbox scaled by their size.
+- port_check over the chain, tests 70–115 and 117–123: 30 errors, as before.
+- Package (install over 122): `code/cross_f.rpx`, `fighter/edge/model/trail/`, `script/animcmd/weapon/trail/`,
+  `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
+

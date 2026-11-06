@@ -313,7 +313,7 @@ def snake_article_scripts(fighter, hit_template, glow_template):
     trail = _set(glow_template, Bone1=0, X1=0.0, Y1=-TRAIL_HALF, Z1=1.74, Bone2=0, X2=0.0, Y2=TRAIL_HALF, Z2=1.74,
                  Bone3=0, X=0.0, Y=0.0, Z=1.74, BlurLength=8)
     stop = [acmd.Command(acmd.END)]
-    for name in SNAKE_ARTICLES:
+    for name in SNAKE_ARTICLES + ('trail',):    # trail: the up special's line pieces (test 123), no scripts
         d = os.path.join(fighter, 'script/animcmd/weapon', name)
         os.makedirs(d, exist_ok=True)
         game = [tip, acmd.Command(acmd.END)] if name == 'snaketip' else stop
@@ -321,7 +321,7 @@ def snake_article_scripts(fighter, hit_template, glow_template):
         for fn, sc in (('game', game), ('effect', effect), ('sound', stop)):
             acmd.ACMDFile({SNAKE_MOTION: sc}).save(os.path.join(d, fn + '.bin'))
         open(os.path.join(d, 'motion.mtable'), 'wb').write(SNAKE_MOTION.to_bytes(4, 'big'))
-    return 'held forward air articles: %s (scripts)' % ', '.join(SNAKE_ARTICLES)
+    return 'held forward air articles: %s, and trail (scripts)' % ', '.join(SNAKE_ARTICLES)
 
 
 def fire_scripts(a, wdir):
@@ -573,6 +573,8 @@ def main():
         import edge_snake_articles
         for name in SNAKE_ARTICLES:
             compile_msc(os.path.join(EDGE, 'weapons', name + '.c'), os.path.join(msc, name, name + '.mscsb'))
+        compile_msc(os.path.join(EDGE, 'weapons/trail.c'), os.path.join(msc, 'trail/trail.mscsb'))
+        print(edge_snake_articles.build_trail(os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))
         if a.body_model:
             print(edge_snake_articles.build(os.path.join(a.edge, 'model/body/c00'), a.body_model,
                                             os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))

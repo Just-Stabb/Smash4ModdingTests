@@ -137,5 +137,81 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
         run['n'], int(far.sum()), tip['n'], info['tip_len'], len(mat.textures), body_dir)
 
 
+# ---- Sephiroth's up special trail (test 123, fighters/edge/weapons/trail.c): one straight piece of a thin glowing purple
+# line, a ribbon twice (crossed about its length, as the snake run) from BaseN (z 0) to EndN (laid at z 0 in the bind,
+# moved out to the piece's length by the MSC). Its material is the light arrow's glow (its second material: additive,
+# blend 1 / 1, one texture), the texture a purple profile across the ribbon made here
+TRAIL_TEX = 0x40EBF100
+TRAIL_HALF = 0.6                            # half the line's width
+TRAIL_RGB = (150, 70, 255)                  # purple
+
+
+def trail_texture():
+    w, h = 32, 8
+    u = (np.arange(w) + 0.5) / w * 2.0 - 1.0              # -1 .. 1 across the line
+    core = np.clip(1.0 - np.abs(u), 0.0, 1.0) ** 1.6
+    hot = np.clip(1.0 - np.abs(u) * 3.0, 0.0, 1.0) ** 2    # a whiter middle
+    img = np.zeros((h, w, 4), np.uint8)
+    for c in range(3):
+        img[:, :, c] = np.clip(TRAIL_RGB[c] * core + 255 * 0.55 * hot, 0, 255).astype(np.uint8)[None, :]
+    img[:, :, 3] = (255 * core).astype(np.uint8)[None, :]
+    return nut.write_ntwu([(TRAIL_TEX, 0x1A, img)])
+
+
+def trail_mesh(arrow_dir):
+    mat = [m for m in nud.read(os.path.join(arrow_dir, 'model.nud'))][0].polygons[1].materials[0].copy()
+    assert mat.src == 1 and mat.dst == 1, (mat.src, mat.dst)
+    mat.textures = mat.textures[:1]
+    mat.textures[0]['hash'] = TRAIL_TEX
+    mat.textures[0]['wrap_s'] = 3
+    mat.cull = 0                             # both sides
+    pos, uv, bones, nrm = [], [], [], []
+    for axis in (0, 1):                      # across along X, then along Y
+        for far in (0, 1):
+            for side in (-1, 1):
+                q = [0.0, 0.0, 0.0]
+                q[axis] = side * TRAIL_HALF
+                pos.append(q)
+                uv.append([(side + 1) * 0.5, float(far)])
+                bones.append(2 if far else BASE)
+                n = [0.0, 0.0, 0.0]
+                n[1 - axis] = 1.0
+                nrm.append(n)
+    idx = []
+    for k in (0, 4):
+        idx += [k, k + 1, k + 2, k + 1, k + 3, k + 2]
+    p = nud.Polygon()
+    p.pos = np.array(pos, float)
+    p.nrm = np.array(nrm, float)
+    p.tan = np.tile([0.0, 0.0, 1.0], (8, 1))
+    p.bit = np.cross(p.nrm, p.tan)
+    b = np.zeros((8, 4), np.int64)
+    b[:, 0] = bones
+    w = np.zeros((8, 4), np.int64)
+    w[:, 0] = 255
+    p.bones, p.weights = b, w
+    p.uvs = [np.array(uv, float)]
+    p.col = np.full((8, 4), WHITE)
+    p.idx = np.array(idx, np.int64)
+    p.materials = [mat]
+    return [nud.Mesh('trail', [p], bone=-1, bind=4)]
+
+
+def build_trail(arrow_dir, out_fighter):
+    meshes = trail_mesh(arrow_dir)
+    tex = trail_texture()
+    for c in range(COLOURS):
+        d = os.path.join(out_fighter, 'model', 'trail', 'c%02d' % c)
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))
+        open(os.path.join(d, 'model.vbn'), 'wb').write(vbn(BONES))
+        open(os.path.join(d, 'model.jtb'), 'wb').write(jtb(len(BONES)))
+        open(os.path.join(d, 'model.nut'), 'wb').write(tex)
+        for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
+            shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
+    return 'trail article: 2 crossed ribbons, %.1f wide, the light arrow\'s glow material, purple %s' % (
+        TRAIL_HALF * 2, TRAIL_RGB)
+
+
 if __name__ == '__main__':
     print(build(*sys.argv[1:5]))

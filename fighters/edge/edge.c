@@ -38045,6 +38045,96 @@ void edge_hi_link()
     WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
 }
 
+// ---- the up special trail (test 123, the user's concept stage 2: "Tap up and hold up special both leave a purple line
+// trail that persists for 6 seconds following Sephiroth's movement until he begins falling"): his middle's path from
+// the attack's start (the rush) to the air end's first falling frame (or the ground end) is laid down as straight pieces
+// of edge_tr_seg(), each a `trail` article (weapons/trail.c, 360 frames). The piece's ends go to its article through
+// his VAR_28 (start; -1 while no trail is being laid) and VAR_29 (end), packed (edge_tr_pack): his shared 4 / 5, free
+// in up special (the snake sword's runs only while it's out; Shadow Flare's orbs use 0 - 3, the Phantom 7)
+int   edge_tr_art() { return 0xb; }              // article 11 (Zelda's 0 - 4, fire, flare1, flare2, flash, snake,
+                                                 // snaketip, trail: tools/extra_kinds.json)
+float edge_tr_seg() { return 8.0f; }             // a piece's length
+float edge_tr_mid() { return 9.0f; }             // his middle above his feet
+int   edge_tr_last_var() { return 0x0f00031c; }  // VAR_28
+int   edge_tr_end_var() { return 0x0f00031d; }   // VAR_29
+
+float edge_tr_pack(float x, float y)
+{
+    int ix;
+    int iy;
+    ix = (int)((x + 512.0f) * 2.0f + 0.5f);
+    iy = (int)((y + 512.0f) * 2.0f + 0.5f);
+    if (ix < 0)
+    {
+        ix = 0;
+    }
+    if (ix > 0x7ff)
+    {
+        ix = 0x7ff;
+    }
+    if (iy < 0)
+    {
+        iy = 0;
+    }
+    if (iy > 0x7ff)
+    {
+        iy = 0x7ff;
+    }
+    return (float)(ix * 0x800 + iy);
+}
+
+float edge_tr_x(float v)
+{
+    return (float)((int)v / 0x800) * 0.5f - 512.0f;
+}
+
+float edge_tr_y(float v)
+{
+    int c;
+    c = (int)v;
+    return (float)(c - (c / 0x800) * 0x800) * 0.5f - 512.0f;
+}
+
+// the trail starts here (the rush's main)
+void edge_tr_begin()
+{
+    WorkModule(0, edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_last_var());
+}
+
+// every frame it's laid: a piece once he's edge_tr_seg() from the last point; `last` puts down what's left (from 1
+// long) and ends the trail
+void edge_tr_step(int last)
+{
+    float v;
+    float x;
+    float y;
+    float dx;
+    float dy;
+    float d;
+    float p;
+    v = WorkModuleF(0, edge_tr_last_var());
+    if (v < 0.0f)
+    {
+        return;
+    }
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2) + edge_tr_mid();
+    dx = x - edge_tr_x(v);
+    dy = y - edge_tr_y(v);
+    d = dx * dx + dy * dy;
+    if (d >= edge_tr_seg() * edge_tr_seg() || last && d >= 1.0f)
+    {
+        p = edge_tr_pack(x, y);
+        WorkModule(0, p, edge_tr_end_var());
+        ArticleModule(0x2710, edge_tr_art());
+        WorkModule(0, p, edge_tr_last_var());
+    }
+    if (last)
+    {
+        WorkModule(0, -1.0f, edge_tr_last_var());
+    }
+}
+
 // the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity
 // energy, edge_hi_rush_set)
 float edge_hi_vy()
@@ -38509,6 +38599,7 @@ void edge_hi_rush_main()
     WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
     WorkModule(0, 0.0f, edge_hi_pass_var());
     WorkModule(0, 0.0f, edge_hi_wrap_var());
+    edge_tr_begin();                       // the trail (test 123)
     WorkModule(0, 0.0f, edge_hi_total_var());
     WorkModule(0, 1.0f, edge_hi_used_var());   // once per air time: used from the attack on (test 116; was the start)
     edge_hi_count = 0;                     // init 04890 / 04950
@@ -38551,6 +38642,7 @@ void edge_hi_rush_loop()
     {
         edge_hi_cliff_mode(0);             // game_specialhi1 frame 6: cliff check NONE
     }
+    edge_tr_step(0);                       // the trail (test 123)
     vx = KineticModuleF(0xa, 0x3);
     vy = edge_hi_vy();
     if (global19 != 0 && global18 == 0)    // landed mid-rush
@@ -38626,6 +38718,10 @@ void edge_hi_rush_loop()
 // 0a6c0 / 0ae80
 void edge_hi_rush_end()
 {
+    if (global6 != 0x15a || edge_hi_end_air == 0)
+    {
+        edge_tr_step(0x1);                 // the trail ends but into the air end (it goes on while he rises)
+    }
     if (global6 != 0x15a)
     {
         edge_hi_line_kill();
@@ -38810,6 +38906,14 @@ void edge_hi_end_loop()
             edge_hi_cliff_mode(0);
         }
     }
+    if (edge_hi_vy() > 0.0f)
+    {
+        edge_tr_step(0);                   // the trail: on while he rises (test 123)
+    }
+    else
+    {
+        edge_tr_step(0x1);                 // ... it ends as he begins to fall
+    }
     if (func_56())
     {
         return;
@@ -38866,6 +38970,7 @@ void edge_hi_end_main()
 // 0ba00 / 0c700
 void edge_hi_end_end()
 {
+    edge_tr_step(0x1);
     edge_hi_line_kill();
     edge_hi_pitch_reset();
     if (edge_hi_end_air)

@@ -175,6 +175,18 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     opponent is hit"); held = ControlModule's held special and SELF_SPECIAL both; let go or out
     of time -> the end (SpecialHi2End's final hit) and SpecialFall as before. Approximated: the restart assumes the
     script runs past frames 0 - 3 at once on a motion change with a start frame.
+  - **The trail (test 123, stage 2):** from the rush's start to the air end's first falling frame (the rush's y
+    speed, `edge_hi_vy`, at 0 or below) or the ground end, his middle's path (feet + 9) is laid down as straight pieces
+    of 8 (`edge_tr_step`, from the rush loop and the air end's loop; what's left from 1 long when it ends). Each piece is
+    a `trail` article (weapon kind 0x19C, a copy of Zelda's dein as the snake runs: `tools/extra_kinds.json`, his
+    article 11, 40 at most; `weapons/trail.c`): placed at its start, facing its x's way, pitched by its angle
+    (`MathF(1, dy, dx)`), EndN moved out to its length, still, removed after 360 frames ("persists for 6 seconds"). Its
+    ends reach it through his VAR_28 (the last point, -1 while no trail is laid) and VAR_29, each point packed as
+    (x + 512) x 2 x 2048 + (y + 512) x 2 (half units): his shared 4 / 5, free in up special (Shadow Flare's orbs read 0 -
+    3, the Phantom 7, the snake runs 0 - 6 only while the sword's out). Model (`tools/edge_snake_articles.py
+    build_trail`): two crossed ribbons 1.2 wide on BaseN / EndN as the snake run, the light arrow's glow material
+    (additive, blend 1 / 1) with a purple profile texture made by the build (150, 70, 255, a whiter middle). Scripts
+    empty (the snake articles' one motion, `Move`). Not done yet: the closed shapes, their glow and hitbox (stage 3).
   - **Autolink:** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
