@@ -38554,10 +38554,12 @@ void edge_tr_steps()
         // not near the blast zones (off screen: test 128, the user: "make shapes not able to be formed off-screen near
         // the bounds of the blast zone"): the shape (its middle +- its long half axis) 50 inside the side / bottom
         // ones and 60 under the top, else CANCEL (the articles drop their marks; no fill, no hitbox)
-        // (test 132: its middle past them, as Octaslash can take him above the top one; tests 128 / 131 refused shapes
-        // whose edge / middle was within 50 - 60 / 20 - 40 of them, still on screen: the user's clips, Octaslash loops
-        // at the screen's top made nothing)
-        if (cx < StageData(0) || cx > StageData(0x1) || cy < StageData(0x3) || cy > StageData(0x2))
+        // (test 133: its middle 60 past the side / bottom ones, 80 past the top. Tests 128 / 131 / 132 refused shapes
+        // within 50 - 60 / 20 - 40 / 0 of StageData 0 - 3, and Octaslash's loops at the screen's top never made a shape
+        // from test 128 on (test 127, with no refusal, made them): StageData 0 - 3 look to be the camera's bounds (the
+        // Dead status puts the KO effect at them, on screen), not the blast zones, so these margins are off screen)
+        if (cx < StageData(0) - 60.0f || cx > StageData(0x1) + 60.0f || cy < StageData(0x3) - 60.0f
+            || cy > StageData(0x2) + 80.0f)
         {
             WorkModule(0, edge_tr_cancel(), edge_tr_num_var());
             WorkModule(0, -5.0f, edge_tr_q_var());

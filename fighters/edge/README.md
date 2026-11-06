@@ -1985,3 +1985,16 @@ larger than the lines that it is made of."
 - port_check over the chain, tests 70–115 and 117–132: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 131): `model/trail/` and `model/fill/` (c00 - c07 `model.nut`), `script/msc/edge.mscsb`,
   `trail/trail.mscsb`.
+
+## Test 133 (`build/sephiroth_test133.zip`): Octaslash shapes no longer refused at the top of the screen
+
+User (clip): "Shape filling looks much better, but Octaslash still doesn't create shapes."
+- Octaslash's loops have made no shape since test 128, the test that added the "no shapes off screen" refusal (test
+  127 made them), and every clip's loop was at the top of the screen. Tests 128 / 131 / 132 kept shapes away from
+  StageData 0 - 3, taken as the blast zones; those look to be the camera's bounds instead (the Dead status puts its
+  KO effect at them, which is on screen), so loops at the screen's top were refused. Now a shape is refused only if
+  its middle is 60 past their sides / bottom or 80 past their top (off screen if they're the camera's bounds; far
+  above the top if they're the blast zones).
+- Not tested in game. If Octaslash still makes no shape, the refusal is ruled out and the cause is elsewhere.
+- port_check over the chain, tests 70–115 and 117–133: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 132): `script/msc/edge.mscsb`.

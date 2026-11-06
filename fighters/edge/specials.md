@@ -280,10 +280,11 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
     forced end, keeps the glow its 50 frames).
     **Not near the blast zones (test 128, the user: "make shapes not able to be formed off-screen near the bounds of
-    the blast zone"):** a shape whose middle is past the blast zones (StageData 0 - 3; Octaslash can take him above the
-    top one) isn't made (test 132; test 128 refused a shape whose edge came within 50 / 60 of them, test 131 its
-    middle within 20 / 40: both refused Octaslash loops still on screen at its top, the user's clips; the camera's
-    bounds, what "off-screen" means, aren't known to the MSC): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
+    the blast zone"):** a shape whose middle is 60 past StageData 0 - 3's sides / bottom or 80 past its top isn't made
+    (test 133). Tests 128 / 131 / 132 refused shapes within 50 - 60 / 20 - 40 / 0 of them, and Octaslash's loops at the
+    screen's top never made a shape from test 128 on (test 127, with no refusal, made them): StageData 0 - 3 look to
+    be the camera's bounds (the Dead status puts its KO effect at them, which is on screen), not the blast zones as
+    tests 102 - 132 took them (unconfirmed: the keep-ins inside them work either way): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
     Modelled in `tools/edge_trail_sim.py` (a held Octaslash circle: a shape a lap; a U closed by the next up special's
     line: middle (0, 32.5), half axes 36 / 19.1; a tilted ellipse a 40 b 15: 47.5 / 19.8 at 28.1 degrees; a triangle of
     three Blade Dashes (0, 50) (-26.7, 70) (26.7, 70): middle (0, 60), 30 / 12; a 60 x 40 rectangle of four: middle
