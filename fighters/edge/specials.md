@@ -272,7 +272,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     from its frame 4 to 50, when the glow's gone (test 127, the user: "make the hitbox ... happen on frame 4, and linger
     until the effect fades"; tests 125 / 126: frames 20 - 23; one hit log: a fighter is hit once), size by b (up to 5 / 8
     / 12 / 17 / more: 6, 9.5, 14, 19.5, 26), damage / BKB / KBG by sqrt(a b) (up to 8 / 13 / 19 / 26 / more: 6 / 9 /
-    12 / 15 / 18%, 40 - 60, 60 - 100), angle 80, from its VAR_0 / VAR_1 in its script. His VAR_0 - VAR_11 (the snake
+    12 / 15 / 18%, 40 - 60, 60 - 100), angle 80, from its VAR_0 / VAR_1 in its script. No clank (Clang 0, Rebound 0: it doesn't meet
+    other hitboxes, so nothing cancels it; test 139, "make shapes always win clank scenarios"), not reflectable or
+    absorbable. His VAR_0 - VAR_11 (the snake
     runs', free in up special) keep the steps.
     **Three or four lines (test 127, "make shapes enclosed by 3 or more lines work"):** a crossing of another trail's
     piece is kept by the crossed article as a junction (its piece, the crossing trail's number then; 4 at most). When

@@ -380,7 +380,11 @@ def fill_scripts(fighter, hit_template):
         for si, size in enumerate(FILL_SIZES):
             boxes = [_set(hit_template, ID=k, Part=0, Bone=0x7D2 + k, Damage=dmg, Angle=80, KBG=kbg, FKB=0, BKB=bkb,
                           Size=size, X=0.0, Y=0.0, Z=0.0, X2=0.0, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=1,
-                          ShieldDamage=0) for k in range(5)]
+                          ShieldDamage=0,
+                          # test 139, the user: "make shapes always win clank scenarios": no clank (Clang 0: it doesn't
+                          # meet other hitboxes, so nothing cancels it), no rebound; it was already neither reflectable
+                          # nor absorbable
+                          Clang=0, Rebound=0, Reflectable=0, Absorbable=0) for k in range(5)]
             inner += _when(si + 1, boxes, FILL_VAR_SIZE)
         hit += _when(di + 1, inner, FILL_VAR_DAMAGE)
     for i, name in enumerate(FILL_MOTIONS):

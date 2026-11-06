@@ -2074,5 +2074,8 @@ User (clip): "occasionally a stray line is left rather than deleted once a shape
   point (Octaslash's forced end and its air end, or the rest of a Blade Dash), a new line nothing cleared. Now the
   trail ends with its shape: the restore step writes its end (-2 Octaslash's, -1 Blade Dash's), so nothing is drawn
   after a shape. Modelled in `edge_trail_sim.py` (every case still forms).
+- **Clanks** (the user: "please make shapes always win clank scenarios if possible"): the shape's hitbox doesn't
+  clank (Clang 0, Rebound 0: it doesn't meet other hitboxes, so nothing cancels it and it always lands); it was
+  already neither reflectable nor absorbable.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–139: 30 errors, 55 warnings, 7 notes.
-- Package (install over 138): `script/msc/edge.mscsb`.
+- Package (install over 138): `script/animcmd/weapon/fill/game.bin`, `script/msc/edge.mscsb`.
