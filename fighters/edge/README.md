@@ -2032,3 +2032,17 @@ lines) work, and the simulation closes the same loops.
   loop shape starts being measured; his % in a clip shows which stage fails if shapes still don't form.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–135: 30 errors, 55 warnings, 7 notes.
 - Package (install over 134): `script/msc/edge.mscsb`, `trail/trail.mscsb`.
+
+## Test 136 (`build/sephiroth_test136.zip`): Octaslash's shape steps: the forced end a frame later, one step a frame
+
+User (clip, test 135's diagnostic): 6% after an Octaslash loop: the self-crossing was reported (+1%) and the loop
+measured (+5%), but nothing was drawn and the lines stayed: the commit didn't reach the articles.
+- Octaslash's shape is the only one that ends a move: tests 127 - 135 set VAR_20 3 in the commit step, and the rush
+  could change status that same frame; the next step (the restore) then overwrote the commit, apparently before the
+  articles read it (the per-frame hook can seem to run again on a status change). Now the commit only marks the end
+  pending (TIMER_12) and the restore step applies it, so the commit stays up a frame; and the hook runs at most one
+  step a frame (TIMER_11 up for a frame after each).
+- **Diagnostic (to be removed):** +1% a self-crossing report, +5% a loop measured, and now +10% the commit sent (16%:
+  the commit went out).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–136: 30 errors, 55 warnings, 7 notes.
+- Package (install over 135): `script/msc/edge.mscsb`.

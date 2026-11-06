@@ -38279,6 +38279,8 @@ void edge_tr_begin()
     WorkModule(0, 0.0f, 0x0f000328);
     WorkModule(0, 0.0f, 0x0f000329);
     WorkModule(0, 5.0f, 0x0f00032a);
+    WorkModule(0, 0.0f, 0x0f00032b);
+    WorkModule(0, 0.0f, 0x0f00032c);
     // point 0 up a frame before point 1 can follow it (VAR_10, 2 frames, his per-frame hook counting it down): test 131,
     // point 1 could be written the frame point 0 was (the rush's main and loop), the old lines' articles never saw point
     // 0, so tested no first piece, and a line started where another ended never met it (the user's clip: "this shape
@@ -38578,15 +38580,27 @@ void edge_tr_steps()
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
         ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
         WorkModule(0, -5.0f, edge_tr_q_var());
+        DamageModule(0x9, 10.0f);          // DIAGNOSTIC (test 136, to be removed): +10% the commit sent
         if (global4 == 0x159 && edge_hi_charged)
         {
             // a shape made in Octaslash ends it, its finisher pulling in (test 127: "force Sephiroth to end Octaslash
-            // with the finisher hit angle that sends towards him, inside the shape"): VAR_20 3, the rush loop's
-            WorkModule(0, 3.0f, edge_hi_pass_var());
+            // with the finisher hit angle that sends towards him, inside the shape"): VAR_20 3, the rush loop's. Test
+            // 136: pending (TIMER_12) until the restore (step 5), a frame on: test 127 - 135 ended the move the frame
+            // the commit went out, and the next step overwrote the commit before the articles read it (the user's
+            // diagnostic: the loop was measured, nothing drawn, the lines kept)
+            WorkModule(0, 9999.0f, 0x0f00032c);
         }
         return;
     }
-    // 5: the trail as it was (VAR_11 his position: edge_tr_bd_stop's)
+    // 5: the trail as it was (VAR_11 his position: edge_tr_bd_stop's); a pending Octaslash end now (TIMER_12, test 136)
+    if (WorkModuleF(0, 0x0f00032c) > 0.0f)
+    {
+        WorkModule(0, 0.0f, 0x0f00032c);
+        if (global4 == 0x159 && edge_hi_charged)
+        {
+            WorkModule(0, 3.0f, edge_hi_pass_var());
+        }
+    }
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
     WorkModule(0, 0.0f, edge_tr_s3_var());             // VAR_10: the sums' till now (edge_tr_step reads it as the wait)
     WorkModule(0, 0.0f, edge_tr_cross_var());
@@ -38818,9 +38832,13 @@ void edge_tr_tick()
     {
         WorkModule(0, WorkModuleF(0, edge_tr_s3_var()) - 1.0f, edge_tr_s3_var());
     }
-    if (q <= -1.0f && q >= -5.0f || q <= -7.0f && q >= -8.0f || q <= -11.0f && q >= -13.0f)
+    // one step a frame at most (TIMER_11 up for a frame after each: test 136, in case this hook runs twice in a frame,
+    // as on a status change, which would skip a step's code before the articles read it)
+    if ((q <= -1.0f && q >= -5.0f || q <= -7.0f && q >= -8.0f || q <= -11.0f && q >= -13.0f)
+        && WorkModuleF(0, 0x0f00032b) <= 0.0f)
     {
         edge_tr_steps();
+        WorkModule(0, 1.0f, 0x0f00032b);
     }
     // Blade Dash's line on into Fall while he still moves the slash's way (test 128), TIMER_8 frames at most; any other
     // status (landing, an aerial: the snake sword shares these variables) ends it
