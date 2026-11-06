@@ -1810,3 +1810,24 @@ User: "Do you think that Cemu can run the game with an extended memory so that r
 - Package (install over 124): `code/cross_f.rpx`, `model/fill/c00 - c07`, `script/animcmd/weapon/fill/`,
   `script/msc/fill/fill.mscsb`, `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
 
+## Test 126 (`build/sephiroth_test126.zip`): shapes of any form from any lines, the lines go; Octaslash 100 frames, 2.4, 0.5% loop hits
+
+User: "Can you extend the duration of held Octaslash to 100 frames and make the movement speed 2.4? The lines should go
+away when forming a shape, and the old lines from the last uses of up special should be usable to create shapes. Also
+please make other shapes possible that aren't circles." Then "I'd like for the formed shape to mirror the lines that
+the closed shape was made of" and "please make the held octaslash loop hits do 0.5 damage per hit and have no hitstop".
+- **Octaslash:** loop time 100 frames (from 60, still again on each hit, 180 at most), held speed 2.4; held, its loop
+  hits (frames 4 - 14) are 0.5% with no hitlag.
+- **Shapes:** drawn by the trail articles themselves: the pieces that closed the shape stop being drawn and the shape
+  fills from its middle out to those pieces' own points, so it is the shape the lines made (any form). An old trail
+  (an earlier up special's, still on screen) counts: crossing it twice closes the shape between. The hitbox (the fill
+  article, now nothing drawn) is a chain of 5 spheres along the ellipse fitted to the shape, size by its width, damage
+  and knockback by its size. Details: `specials.md` "Up special".
+- Modelled in `tools/edge_trail_sim.py` (a loop, an old U closed by a new line, a tilted ellipse), both update orders;
+  it found the shape steps stopping when the trail ended (fixed: they run from his per-frame hook).
+- Not tested in game. Not done: shapes from three or more different trails.
+- port_check over the chain, tests 70–115 and 117–126: 30 errors, as before.
+- Package (install over 125): `model/trail/` and `model/fill/` (c00 - c07: nud / vbn / jtb, trail nut),
+  `script/animcmd/body/game.bin`, `script/animcmd/weapon/fill/`, `script/msc/edge.mscsb`, `trail/trail.mscsb`,
+  `fill/fill.mscsb`.
+

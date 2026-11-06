@@ -200,6 +200,17 @@ def octaslash_loop_scripts(game, effect):
             assert hits and rest[0].name == 'WAIT', [c.name for c in body]
             n = len(hits)
             body = _when(0, hits, OCTA_VAR) + _when(1, hits, OCTA_VAR) + rest
+        if f == 4.0:
+            # held (VAR_20 1 / 2), the loop's hits: 0.5% each, no hitlag (test 126, the user: "make the held octaslash
+            # loop hits do 0.5 damage per hit and have no hitstop"); let go (0), Ultimate's 2.3 and its hitlag
+            loop = []
+            for c in body:
+                if c.name.endswith('Hitbox'):
+                    held = _set(c, Damage=0.5, Hitlag=0.0)
+                    loop += _when(0, [c], OCTA_VAR) + _when(1, [held], OCTA_VAR) + _when(2, [held], OCTA_VAR)
+                else:
+                    loop.append(c)
+            body = loop
         out.append((f, body))
     assert n, 'SpecialHi2: no frame 2 hit'
     game.scripts[crc] = _join(out)
@@ -212,7 +223,8 @@ def octaslash_loop_scripts(game, effect):
             body = _when(0, body, OCTA_VAR)
         eout.append((f, body))
     effect.scripts[crc] = _join(eout) + [acmd.Command(acmd.END)]
-    return 'held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20\n' % n
+    return ('held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20; its loop hits 0.5%%, '
+            'no hitlag while held\n' % n)
 
 
 def _frames(cmds):
@@ -325,34 +337,40 @@ def snake_article_scripts(fighter, hit_template, glow_template):
     return 'held forward air articles: %s, and trail (scripts)' % ', '.join(SNAKE_ARTICLES)
 
 
-# the closed-shape fill (test 125, weapons/fill.c from tools/edge_fill_msc.py): motion 0 its hitboxes off (6 / 7 too), 1 - 5 its
-# hitbox by the shape's radius (the script's frame 0: a dein copy has no animation, so its script never passes it, as
-# the flash's). Tier: (radius up to, damage, base knockback, knockback growth); the hitbox 1.1 x the radius ("slightly
-# larger than the shape formed"), angle 80, on the article's middle (Bone 0)
-FILL_MOTIONS = ('fillnone', 'fillhit1', 'fillhit2', 'fillhit3', 'fillhit4', 'fillhit5', 'fillnone6', 'fillnone7')
-FILL_TIERS = ((8.0, 6.0, 40, 60), (13.0, 9.0, 45, 70), (19.0, 12.0, 50, 80), (26.0, 15.0, 55, 90), (40.0, 18.0, 60, 100))
+# the closed-shape hitbox (tests 125 / 126, weapons/fill.c from tools/edge_fill_msc.py): motion 0 its hitboxes off
+# (2 - 7 too: dein has 8 motion slots, a copy keeps them all), 1 its hitbox (the script's frame 0: a dein copy has no
+# animation, so its script never passes it, as the flash's): a sphere on each of its joints J0 - J4 (0x7D2 - 0x7D6,
+# spread along the shape's long axis), the size by the article's VAR_0 (the shape's half width b's tier) and damage /
+# knockback by VAR_1 (its size sqrt(a b)'s tier): "a hitbox slightly larger than the shape formed, the damage and
+# knockback scaling with the size of the shape". Angle 80, one hit log (one article) so a fighter is hit once
+FILL_MOTIONS = ('fillnone', 'fillhit', 'fillnone2', 'fillnone3', 'fillnone4', 'fillnone5', 'fillnone6', 'fillnone7')
+FILL_SIZES = (6.0, 9.5, 14.0, 19.5, 26.0)                                             # b up to 5 / 8 / 12 / 17 / more
+FILL_DAMAGE = ((6.0, 40, 60), (9.0, 45, 70), (12.0, 50, 80), (15.0, 55, 90), (18.0, 60, 100))   # sqrt(a b) 8 / 13 / ...
+FILL_VAR_SIZE, FILL_VAR_DAMAGE = 0x0F000300, 0x0F000301
 
 
 def fill_scripts(fighter, hit_template):
     d = os.path.join(fighter, 'script/animcmd/weapon/fill')
     os.makedirs(d, exist_ok=True)
-    end = acmd.Command(acmd.END)
     game, stop = {}, {}
+    hit = []
+    for di, (dmg, bkb, kbg) in enumerate(FILL_DAMAGE):
+        inner = []
+        for si, size in enumerate(FILL_SIZES):
+            boxes = [_set(hit_template, ID=k, Part=0, Bone=0x7D2 + k, Damage=dmg, Angle=80, KBG=kbg, FKB=0, BKB=bkb,
+                          Size=size, X=0.0, Y=0.0, Z=0.0, X2=0.0, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=1,
+                          ShieldDamage=0) for k in range(5)]
+            inner += _when(si + 1, boxes, FILL_VAR_SIZE)
+        hit += _when(di + 1, inner, FILL_VAR_DAMAGE)
     for i, name in enumerate(FILL_MOTIONS):
         crc = acmd.crc(name)
         stop[crc] = [acmd.Command(acmd.END)]
-        if i == 0 or i > len(FILL_TIERS):       # 6 / 7: empty (dein has 8 motion slots, a copy keeps them all)
-            game[crc] = [U.cmd('Remove_All_Hitboxes'), acmd.Command(acmd.END)]
-            continue
-        r, dmg, bkb, kbg = FILL_TIERS[i - 1]
-        hb = _set(hit_template, ID=0, Part=0, Bone=0, Damage=dmg, Angle=80, KBG=kbg, FKB=0, BKB=bkb, Size=round(r * 1.1, 1),
-                  X=0.0, Y=0.0, Z=0.0, X2=0.0, Y2=0.0, Z2=0.0, Hitlag=1.0, SFXLevel=1, ShieldDamage=0)
-        game[crc] = [hb, acmd.Command(acmd.END)]
+        game[crc] = (hit if i == 1 else [U.cmd('Remove_All_Hitboxes')]) + [acmd.Command(acmd.END)]
     acmd.ACMDFile(game).save(os.path.join(d, 'game.bin'))
     for fn in ('effect', 'sound'):
         acmd.ACMDFile(dict(stop)).save(os.path.join(d, fn + '.bin'))
     open(os.path.join(d, 'motion.mtable'), 'wb').write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FILL_MOTIONS))
-    return 'fill: %d motions (hitbox tiers %s)' % (len(FILL_MOTIONS), ', '.join('%g' % t[0] for t in FILL_TIERS))
+    return 'fill: %d motions, the hit %d hitboxes (5 sizes x 5 damages x 5 spheres)' % (len(FILL_MOTIONS), 125)
 
 
 def fire_scripts(a, wdir):

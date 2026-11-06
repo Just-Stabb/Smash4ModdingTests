@@ -1,66 +1,57 @@
 #!/usr/bin/env python3
-"""Sephiroth's up special closed-shape fill (fighters/edge/specials.md "Up special", test 125, the user's concept stage
-3): writes fighters/edge/weapons/fill.c = the snake run's base (Zelda's dein, fighters/edge/weapons/snake.c up to its
-own section) + the fill's code.
+"""Sephiroth's up special closed-shape hitbox (fighters/edge/specials.md "Up special", tests 125 / 126, the user's
+concept stage 3): writes fighters/edge/weapons/fill.c = the snake run's base (Zelda's dein, fighters/edge/weapons/snake.c
+up to its own section) + the fill's code.
 
-A `fill` article is made by Sephiroth (edge.c edge_tr_step) when his trail closes a loop, at the loop's middle: his
-shared 5 its place (packed: (x + 512) x 2 x 2048 + (y + 512) x 2), shared 4 its radius, read as it's made. A purple
-disc (tools/edge_snake_articles.py build_fill: a middle joint C and RIM rim joints R0 - R15 the MSC moves out to the
-radius) fades in from frame DELAY ("appears 12 frames after, fading in": grows to the radius over GROW frames), then
-its hitbox (motion 1 - 5 by the radius' tier, edge_specials_build.py fill_scripts: "a hitbox slightly larger than the
-shape formed, the damage and knockback scaling with the size of the shape") for HIT frames, then motion 0 (hitboxes
-off), held, shrinks away, removed.
+A `fill` article is made by Sephiroth (edge.c edge_tr_*) when a shape closes, at its middle: his shared 5 its place
+(packed: (x + 512) x 2 x 2048 + (y + 512) x 2), shared 4 the ellipse fitted to its points (angle x 65536 + a x 256 + b:
+the angle 0 - 127 for 0 - 180 degrees, the half axes a >= b in half units), read as it's made. The shape itself (its
+glow) is drawn by the trail articles (tools/edge_trail_msc.py). The fill turns along the long axis and puts its joints
+J0 - J4 (0x7D2 - 0x7D6) along it, from -(a - b) to a - b; at frame DELAY + GROW (when the shape has grown in) its
+hitbox motion (edge_specials_build.py fill_scripts: a sphere on each joint, its size by b and its damage / knockback by
+the shape's size, from its own VAR_0 / VAR_1) for HIT frames: "a hitbox slightly larger than the shape formed, the
+damage and knockback scaling with the size of the shape".
 
   python3 tools/edge_fill_msc.py
 """
-import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 EDGE = os.path.join(ROOT, 'fighters', 'edge')
-RIM = 16
 DELAY = 12
 GROW = 8
 HIT = 4
-HOLD_END = 40
-END = 50
-TIERS = (8.0, 13.0, 19.0, 26.0)      # radius upper bounds of tiers 1 - 4 (5: past 26); edge_specials_build.FILL_TIERS
+SPHERES = 5
+SIZE_TIERS = (5.0, 8.0, 12.0, 17.0)       # b up to (tiers 1 - 4; 5 past): edge_specials_build.FILL_SIZES
+DAMAGE_TIERS = (8.0, 13.0, 19.0, 26.0)    # sqrt(a b) up to: edge_specials_build.FILL_DAMAGE
 
 
 def generate():
     src = open(os.path.join(EDGE, 'weapons', 'snake.c')).read()
     base = src[:src.index("// ---- Sephiroth's held forward air (tools/edge_snake_articles_msc.py)")]
-    cos = '\n'.join('    if (k == %d)\n    {\n        return %.6ff;\n    }' % (k, math.cos(2 * math.pi * k / RIM))
-                    for k in range(RIM))
-    sin = '\n'.join('    if (k == %d)\n    {\n        return %.6ff;\n    }' % (k, math.sin(2 * math.pi * k / RIM))
-                    for k in range(RIM))
-    tiers = '\n'.join('    if (fi_r < %.1ff)\n    {\n        return %d;\n    }' % (t, i + 1) for i, t in enumerate(TIERS))
-    body = '''// ---- Sephiroth's up special closed-shape fill (tools/edge_fill_msc.py; test 125)
+    st = '\n'.join('    if (b <= %.1ff)\n    {\n        return %d;\n    }' % (t, i + 1) for i, t in enumerate(SIZE_TIERS))
+    dt = '\n'.join('    if (r <= %.1ff)\n    {\n        return %d;\n    }' % (t, i + 1) for i, t in enumerate(DAMAGE_TIERS))
+    body = '''// ---- Sephiroth's up special closed-shape hitbox (tools/edge_fill_msc.py; tests 125 / 126)
 int fi_slot;            // his player slot (0 - 7), -1: not found
 int fi_frame;           // frames since made
-float fi_r;             // the shape's radius
-float fi_x;             // its middle
+float fi_x;             // the shape's middle
 float fi_y;
+float fi_t;             // its long axis' angle (degrees)
+float fi_a;             // its half axes
+float fi_b;
 float fi_px;            // fi_unpack's result
 float fi_py;
 
-float fi_cos(int k)
+int fi_size_tier(float b)
 {
-COS
-    return 1.0f;
+ST
+    return 5;
 }
 
-float fi_sin(int k)
+int fi_damage_tier(float r)
 {
-SIN
-    return 0.0f;
-}
-
-// the hitbox's tier (its motion, 1 - 5) by the radius
-int fi_tier()
-{
-TIERS
+DT
     return 5;
 }
 
@@ -114,55 +105,48 @@ void fi_still()
     KineticModule(0xf, 0, 0, 0);
 }
 
-// the disc's radius now: none before DELAY_N, grown over GROW_N frames, held to HOLD_N, shrunk to END_N
-float fi_vis()
-{
-    if (fi_frame < DELAY_N)
-    {
-        return 0.0f;
-    }
-    if (fi_frame < DELAY_N + GROW_N)
-    {
-        return fi_r * (float)(fi_frame - DELAY_N) / (float)GROW_N;
-    }
-    if (fi_frame < HOLD_N)
-    {
-        return fi_r;
-    }
-    return fi_r * (float)(END_N - fi_frame) / (float)(END_N - HOLD_N);
-}
-
-// the rim joints R_k (0x7D3 + k: C is 0x7D2) at the radius, in the screen plane (the model's Y and Z: facing 1)
+// along the long axis: facing 1 (its +Z the world's +X), pitched up by the angle; the joints spread along +Z
 void fi_pose()
 {
     int k;
-    float r;
+    float h;
     PostureModule(0, 1.0f);
     PostureModule(0x2714, fi_x, fi_y, PostureModuleF(0x3));
-    r = fi_vis();
+    PostureModule(0x2717, -fi_t, 0, 0);
+    h = fi_a - fi_b;
     k = 0;
-    while (k < RIM_N)
+    while (k < SPHERES_N)
     {
-        ModelModule(0x7, 0x7d3 + k, 0, r * fi_sin(k), r * fi_cos(k));
+        ModelModule(0x7, 0x7d2 + k, 0, 0, -h + h * 2.0f * (float)k / (float)(SPHERES_N - 1));
         k = k + 1;
     }
 }
 
 void func_46()
 {
+    int c;
+    int ia;
     fi_slot = fi_find_owner();
     fi_frame = 0;
-    fi_r = 0.0f;
     fi_x = PostureModuleF(0x1);
     fi_y = PostureModuleF(0x2);
+    fi_t = 0.0f;
+    fi_a = 4.0f;
+    fi_b = 4.0f;
     if (fi_slot >= 0)
     {
         fi_unpack(fi_shared(0x5));
         fi_x = fi_px;
         fi_y = fi_py;
-        fi_r = fi_shared(0x4);
+        c = (int)fi_shared(0x4);
+        ia = c / 0x100;
+        fi_b = (float)(c - ia * 0x100) * 0.5f;
+        fi_t = (float)(ia / 0x100) * 180.0f / 128.0f;
+        fi_a = (float)(ia - (ia / 0x100) * 0x100) * 0.5f;
         PostureModule(0x2714, fi_x, fi_y, WorkModuleF(0, 0x0f000022 + 0x4 * fi_slot));
     }
+    WorkModule(0, (float)fi_size_tier(fi_b), 0x0f000300);              // VAR_0: the spheres' size (its script)
+    WorkModule(0, (float)fi_damage_tier(MathF(0, fi_a * fi_b)), 0x0f000301);   // VAR_1: the damage
     fi_still();
     fi_pose();
     func_24(0, 0, 1.0f);
@@ -172,14 +156,14 @@ void func_46()
 void func_47()
 {
     fi_frame = fi_frame + 1;
-    if (fi_frame >= END_N || fi_slot < 0)
+    if (fi_frame >= DELAY_N + GROW_N + HIT_N + 2 || fi_slot < 0)
     {
         BattleObject(0x9);
         return 0x1;
     }
     if (fi_frame == DELAY_N + GROW_N)
     {
-        func_24(fi_tier(), 0, 1.0f);       // the hitbox (its tier's motion: the script's frame 0)
+        func_24(0x1, 0, 1.0f);             // the hitbox (the script's frame 0)
     }
     if (fi_frame == DELAY_N + GROW_N + HIT_N)
     {
@@ -189,10 +173,9 @@ void func_47()
     fi_pose();
 }
 '''
-    body = (body.replace('COS', cos).replace('SIN', sin).replace('TIERS', tiers)
-            .replace('RIM_N', str(RIM)).replace('DELAY_N', str(DELAY)).replace('GROW_N', str(GROW))
-            .replace('HOLD_N', str(HOLD_END)).replace('END_N', str(END)).replace('HIT_N', str(HIT)))
-    return base + body
+    for k, v in (('SPHERES_N', SPHERES), ('DELAY_N', DELAY), ('GROW_N', GROW), ('HIT_N', HIT)):
+        body = body.replace(k, str(v))
+    return base + body.replace('ST\n', st + '\n', 1).replace('DT\n', dt + '\n', 1)
 
 
 if __name__ == '__main__':

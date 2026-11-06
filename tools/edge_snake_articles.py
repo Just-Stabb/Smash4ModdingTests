@@ -151,7 +151,16 @@ TRAIL_RGB = (150, 70, 255)                  # purple
 TRAIL_POINTS = 16
 
 
+def trail_textures():
+    """the line's texture and the fill's, in one .nut (test 126: the trail draws its shapes' fill)"""
+    return nut.write_ntwu([_trail_img(), _fill_img()])
+
+
 def trail_texture():
+    return nut.write_ntwu([_trail_img()])
+
+
+def _trail_img():
     w, h = 32, 8
     u = (np.arange(w) + 0.5) / w * 2.0 - 1.0              # -1 .. 1 across the line
     core = np.clip(1.0 - np.abs(u), 0.0, 1.0) ** 1.6
@@ -160,37 +169,33 @@ def trail_texture():
     for c in range(3):
         img[:, :, c] = np.clip(TRAIL_RGB[c] * core + 255 * 0.55 * hot, 0, 255).astype(np.uint8)[None, :]
     img[:, :, 3] = (255 * core).astype(np.uint8)[None, :]
-    return nut.write_ntwu([(TRAIL_TEX, 0x1A, img)])
+    return (TRAIL_TEX, 0x1A, img)
 
 
 def trail_bones():
-    return ['TopN', 'HaveN'] + ['P%d' % k for k in range(TRAIL_POINTS)]
+    """TopN, HaveN, C (the fill's middle), W0 - W15 (the fill's points), A0 / B0 ... A14 / B14 (the line's pieces' ends,
+    tools/edge_trail_msc.py's bones)"""
+    names = ['TopN', 'HaveN', 'C'] + ['W%d' % k for k in range(TRAIL_POINTS)]
+    for k in range(TRAIL_POINTS - 1):
+        names += ['A%d' % k, 'B%d' % k]
+    return names
 
 
-def trail_mesh(arrow_dir):
+def _glow_material(arrow_dir, tex):
     mat = nud.read(os.path.join(arrow_dir, 'model.nud'))[0].polygons[1].materials[0].copy()
     assert mat.src == 1 and mat.dst == 1, (mat.src, mat.dst)
     mat.textures = mat.textures[:1]
-    mat.textures[0]['hash'] = TRAIL_TEX
+    mat.textures[0]['hash'] = tex
     mat.textures[0]['wrap_s'] = 3
     mat.cull = 0                             # both sides
-    pos, uv, bones, nrm, idx = [], [], [], [], []
-    for k in range(TRAIL_POINTS - 1):
-        for axis in (1, 2):                  # the width along Y, then along Z
-            v0 = len(pos)
-            for j in (k, k + 1):
-                for side in (-1, 1):
-                    q = [0.0, 0.0, 0.0]
-                    q[axis] = side * TRAIL_HALF
-                    pos.append(q)
-                    uv.append([(side + 1) * 0.5, float(j - k)])
-                    bones.append(2 + j)
-                    nrm.append([1.0, 0.0, 0.0])
-            idx += [v0, v0 + 1, v0 + 2, v0 + 1, v0 + 3, v0 + 2]
+    return mat
+
+
+def _polygon(pos, uv, bones, idx, mat):
     n = len(pos)
     p = nud.Polygon()
     p.pos = np.array(pos, float)
-    p.nrm = np.array(nrm, float)
+    p.nrm = np.tile([1.0, 0.0, 0.0], (n, 1))
     p.tan = np.tile([0.0, 1.0, 0.0], (n, 1))
     p.bit = np.cross(p.nrm, p.tan)
     b = np.zeros((n, 4), np.int64)
@@ -202,12 +207,41 @@ def trail_mesh(arrow_dir):
     p.col = np.full((n, 4), WHITE)
     p.idx = np.array(idx, np.int64)
     p.materials = [mat]
-    return [nud.Mesh('trail', [p], bone=-1, bind=4)]
+    return p
+
+
+def trail_mesh(arrow_dir):
+    """the line: piece k two ribbons (width along the model's Y, and Z) between A_k and B_k; the fill: wedges C - W_k -
+    W_k+1 (the fill texture, u 0 at the middle, 1 at the line)"""
+    a_bone = 3 + TRAIL_POINTS
+    pos, uv, bones, idx = [], [], [], []
+    for k in range(TRAIL_POINTS - 1):
+        for axis in (1, 2):
+            v0 = len(pos)
+            for end in (0, 1):
+                for side in (-1, 1):
+                    q = [0.0, 0.0, 0.0]
+                    q[axis] = side * TRAIL_HALF
+                    pos.append(q)
+                    uv.append([(side + 1) * 0.5, float(end)])
+                    bones.append(a_bone + 2 * k + end)
+            idx += [v0, v0 + 1, v0 + 2, v0 + 1, v0 + 3, v0 + 2]
+    line = _polygon(pos, uv, bones, idx, _glow_material(arrow_dir, TRAIL_TEX))
+    pos, uv, bones, idx = [], [], [], []
+    for k in range(TRAIL_POINTS - 1):
+        v0 = len(pos)
+        for b, u in ((2, 0.0), (3 + k, 1.0), (4 + k, 1.0)):
+            pos.append([0.0, 0.0, 0.0])
+            uv.append([u, 0.5])
+            bones.append(b)
+        idx += [v0, v0 + 1, v0 + 2]
+    fill = _polygon(pos, uv, bones, idx, _glow_material(arrow_dir, FILL_TEX))
+    return [nud.Mesh('trail', [line], bone=-1, bind=4), nud.Mesh('trailfill', [fill], bone=-1, bind=4)]
 
 
 def build_trail(arrow_dir, out_fighter):
     meshes = trail_mesh(arrow_dir)
-    tex = trail_texture()
+    tex = trail_textures()
     names = trail_bones()
     for c in range(COLOURS):
         d = os.path.join(out_fighter, 'model', 'trail', 'c%02d' % c)
@@ -232,6 +266,10 @@ FILL_RIM = 16
 
 
 def fill_texture():
+    return nut.write_ntwu([_fill_img()])
+
+
+def _fill_img():
     w, h = 64, 8
     u = (np.arange(w) + 0.5) / w
     inner = 0.30 + 0.25 * u
@@ -242,43 +280,18 @@ def fill_texture():
     for c in range(3):
         img[:, :, c] = np.clip(TRAIL_RGB[c] * val + 255 * 0.45 * rim, 0, 255).astype(np.uint8)[None, :]
     img[:, :, 3] = (255 * val).astype(np.uint8)[None, :]
-    return nut.write_ntwu([(FILL_TEX, 0x1A, img)])
+    return (FILL_TEX, 0x1A, img)
 
 
 def fill_bones():
-    return ['TopN', 'HaveN', 'C'] + ['R%d' % k for k in range(FILL_RIM)]
+    """test 126: the fill is the shape's hitbox only (the trail draws the shape): TopN, HaveN, J0 - J4 (the spheres)"""
+    return ['TopN', 'HaveN'] + ['J%d' % k for k in range(5)]
 
 
 def fill_mesh(arrow_dir):
-    mat = nud.read(os.path.join(arrow_dir, 'model.nud'))[0].polygons[1].materials[0].copy()
-    mat.textures = mat.textures[:1]
-    mat.textures[0]['hash'] = FILL_TEX
-    mat.textures[0]['wrap_s'] = 3
-    mat.cull = 0
-    pos, uv, bones, idx = [], [], [], []
-    for k in range(FILL_RIM):
-        v0 = len(pos)
-        for b, u in ((2, 0.0), (3 + k, 1.0), (3 + (k + 1) % FILL_RIM, 1.0)):
-            pos.append([0.0, 0.0, 0.0])
-            uv.append([u, 0.5])
-            bones.append(b)
-        idx += [v0, v0 + 1, v0 + 2]
-    n = len(pos)
-    p = nud.Polygon()
-    p.pos = np.array(pos, float)
-    p.nrm = np.tile([1.0, 0.0, 0.0], (n, 1))
-    p.tan = np.tile([0.0, 1.0, 0.0], (n, 1))
-    p.bit = np.cross(p.nrm, p.tan)
-    b = np.zeros((n, 4), np.int64)
-    b[:, 0] = bones
-    w = np.zeros((n, 4), np.int64)
-    w[:, 0] = 255
-    p.bones, p.weights = b, w
-    p.uvs = [np.array(uv, float)]
-    p.col = np.full((n, 4), WHITE)
-    p.idx = np.array(idx, np.int64)
-    p.materials = [mat]
-    return [nud.Mesh('fill', [p], bone=-1, bind=4)]
+    """nothing to see: one triangle with no area on J0 (a model it must have)"""
+    return [nud.Mesh('fill', [_polygon([[0.0, 0.0, 0.0]] * 3, [[0.0, 0.5]] * 3, [2, 2, 2], [0, 1, 2],
+                                       _glow_material(arrow_dir, FILL_TEX))], bone=-1, bind=4)]
 
 
 def build_fill(arrow_dir, out_fighter):
@@ -294,8 +307,7 @@ def build_fill(arrow_dir, out_fighter):
         open(os.path.join(d, 'model.nut'), 'wb').write(tex)
         for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
             shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
-    return 'fill article: a disc of %d rim joints (%d bones), the light arrow\'s glow material, purple' % (
-        FILL_RIM, len(names))
+    return 'fill article: the shape\'s hitbox, %d bones (nothing drawn)' % len(names)
 
 
 if __name__ == '__main__':

@@ -593,169 +593,53 @@ void func_48()
     
 }
 
-// ---- Sephiroth's up special closed-shape fill (tools/edge_fill_msc.py; test 125)
+// ---- Sephiroth's up special closed-shape hitbox (tools/edge_fill_msc.py; tests 125 / 126)
 int fi_slot;            // his player slot (0 - 7), -1: not found
 int fi_frame;           // frames since made
-float fi_r;             // the shape's radius
-float fi_x;             // its middle
+float fi_x;             // the shape's middle
 float fi_y;
+float fi_t;             // its long axis' angle (degrees)
+float fi_a;             // its half axes
+float fi_b;
 float fi_px;            // fi_unpack's result
 float fi_py;
 
-float fi_cos(int k)
+int fi_size_tier(float b)
 {
-    if (k == 0)
-    {
-        return 1.000000f;
-    }
-    if (k == 1)
-    {
-        return 0.923880f;
-    }
-    if (k == 2)
-    {
-        return 0.707107f;
-    }
-    if (k == 3)
-    {
-        return 0.382683f;
-    }
-    if (k == 4)
-    {
-        return 0.000000f;
-    }
-    if (k == 5)
-    {
-        return -0.382683f;
-    }
-    if (k == 6)
-    {
-        return -0.707107f;
-    }
-    if (k == 7)
-    {
-        return -0.923880f;
-    }
-    if (k == 8)
-    {
-        return -1.000000f;
-    }
-    if (k == 9)
-    {
-        return -0.923880f;
-    }
-    if (k == 10)
-    {
-        return -0.707107f;
-    }
-    if (k == 11)
-    {
-        return -0.382683f;
-    }
-    if (k == 12)
-    {
-        return -0.000000f;
-    }
-    if (k == 13)
-    {
-        return 0.382683f;
-    }
-    if (k == 14)
-    {
-        return 0.707107f;
-    }
-    if (k == 15)
-    {
-        return 0.923880f;
-    }
-    return 1.0f;
-}
-
-float fi_sin(int k)
-{
-    if (k == 0)
-    {
-        return 0.000000f;
-    }
-    if (k == 1)
-    {
-        return 0.382683f;
-    }
-    if (k == 2)
-    {
-        return 0.707107f;
-    }
-    if (k == 3)
-    {
-        return 0.923880f;
-    }
-    if (k == 4)
-    {
-        return 1.000000f;
-    }
-    if (k == 5)
-    {
-        return 0.923880f;
-    }
-    if (k == 6)
-    {
-        return 0.707107f;
-    }
-    if (k == 7)
-    {
-        return 0.382683f;
-    }
-    if (k == 8)
-    {
-        return 0.000000f;
-    }
-    if (k == 9)
-    {
-        return -0.382683f;
-    }
-    if (k == 10)
-    {
-        return -0.707107f;
-    }
-    if (k == 11)
-    {
-        return -0.923880f;
-    }
-    if (k == 12)
-    {
-        return -1.000000f;
-    }
-    if (k == 13)
-    {
-        return -0.923880f;
-    }
-    if (k == 14)
-    {
-        return -0.707107f;
-    }
-    if (k == 15)
-    {
-        return -0.382683f;
-    }
-    return 0.0f;
-}
-
-// the hitbox's tier (its motion, 1 - 5) by the radius
-int fi_tier()
-{
-    if (fi_r < 8.0f)
+    if (b <= 5.0f)
     {
         return 1;
     }
-    if (fi_r < 13.0f)
+    if (b <= 8.0f)
     {
         return 2;
     }
-    if (fi_r < 19.0f)
+    if (b <= 12.0f)
     {
         return 3;
     }
-    if (fi_r < 26.0f)
+    if (b <= 17.0f)
+    {
+        return 4;
+    }
+    return 5;
+}
+
+int fi_damage_tier(float r)
+{
+    if (r <= 8.0f)
+    {
+        return 1;
+    }
+    if (r <= 13.0f)
+    {
+        return 2;
+    }
+    if (r <= 19.0f)
+    {
+        return 3;
+    }
+    if (r <= 26.0f)
     {
         return 4;
     }
@@ -812,55 +696,48 @@ void fi_still()
     KineticModule(0xf, 0, 0, 0);
 }
 
-// the disc's radius now: none before 12, grown over 8 frames, held to 40, shrunk to 50
-float fi_vis()
-{
-    if (fi_frame < 12)
-    {
-        return 0.0f;
-    }
-    if (fi_frame < 12 + 8)
-    {
-        return fi_r * (float)(fi_frame - 12) / (float)8;
-    }
-    if (fi_frame < 40)
-    {
-        return fi_r;
-    }
-    return fi_r * (float)(50 - fi_frame) / (float)(50 - 40);
-}
-
-// the rim joints R_k (0x7D3 + k: C is 0x7D2) at the radius, in the screen plane (the model's Y and Z: facing 1)
+// along the long axis: facing 1 (its +Z the world's +X), pitched up by the angle; the joints spread along +Z
 void fi_pose()
 {
     int k;
-    float r;
+    float h;
     PostureModule(0, 1.0f);
     PostureModule(0x2714, fi_x, fi_y, PostureModuleF(0x3));
-    r = fi_vis();
+    PostureModule(0x2717, -fi_t, 0, 0);
+    h = fi_a - fi_b;
     k = 0;
-    while (k < 16)
+    while (k < 5)
     {
-        ModelModule(0x7, 0x7d3 + k, 0, r * fi_sin(k), r * fi_cos(k));
+        ModelModule(0x7, 0x7d2 + k, 0, 0, -h + h * 2.0f * (float)k / (float)(5 - 1));
         k = k + 1;
     }
 }
 
 void func_46()
 {
+    int c;
+    int ia;
     fi_slot = fi_find_owner();
     fi_frame = 0;
-    fi_r = 0.0f;
     fi_x = PostureModuleF(0x1);
     fi_y = PostureModuleF(0x2);
+    fi_t = 0.0f;
+    fi_a = 4.0f;
+    fi_b = 4.0f;
     if (fi_slot >= 0)
     {
         fi_unpack(fi_shared(0x5));
         fi_x = fi_px;
         fi_y = fi_py;
-        fi_r = fi_shared(0x4);
+        c = (int)fi_shared(0x4);
+        ia = c / 0x100;
+        fi_b = (float)(c - ia * 0x100) * 0.5f;
+        fi_t = (float)(ia / 0x100) * 180.0f / 128.0f;
+        fi_a = (float)(ia - (ia / 0x100) * 0x100) * 0.5f;
         PostureModule(0x2714, fi_x, fi_y, WorkModuleF(0, 0x0f000022 + 0x4 * fi_slot));
     }
+    WorkModule(0, (float)fi_size_tier(fi_b), 0x0f000300);              // VAR_0: the spheres' size (its script)
+    WorkModule(0, (float)fi_damage_tier(MathF(0, fi_a * fi_b)), 0x0f000301);   // VAR_1: the damage
     fi_still();
     fi_pose();
     func_24(0, 0, 1.0f);
@@ -870,14 +747,14 @@ void func_46()
 void func_47()
 {
     fi_frame = fi_frame + 1;
-    if (fi_frame >= 50 || fi_slot < 0)
+    if (fi_frame >= 12 + 8 + 4 + 2 || fi_slot < 0)
     {
         BattleObject(0x9);
         return 0x1;
     }
     if (fi_frame == 12 + 8)
     {
-        func_24(fi_tier(), 0, 1.0f);       // the hitbox (its tier's motion: the script's frame 0)
+        func_24(0x1, 0, 1.0f);             // the hitbox (the script's frame 0)
     }
     if (fi_frame == 12 + 8 + 4)
     {

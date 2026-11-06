@@ -1772,6 +1772,7 @@ void func_82()
 {
     edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
     edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
+    edge_tr_tick();                    // ... its trail's shapes (test 126)
     if (!global3)
     {
         if (WorkModule(0x10, 0x21000001))
@@ -37899,14 +37900,14 @@ int   edge_hi_used_var() { return 0x0f000315; }   // VAR_21: 1 once up special w
 int   edge_hi_pass_var() { return 0x0f000314; }   // VAR_20 (ACMD): Octaslash's pass: 0 plain, 1 first pass held, 2 a
                                                   // looped pass (SpecialHi2's first hit and start effects skipped)
 int   edge_hi_timer_var() { return 0x0f00030c; }  // VAR_12: Octaslash's loop frames left
-float edge_hi_loop_frames() { return 60.0f; }     // the set duration (frames), again from each hit
+float edge_hi_loop_frames() { return 100.0f; }    // the set duration (frames), again from each hit (test 126: 100)
 float edge_hi_loop_from() { return 4.0f; }        // SpecialHi2: the 2nd hit's frame (Ultimate game_specialhi2)
 float edge_hi_loop_to() { return 14.0f; }         // ... the 7th (one before SpecialHi2End's), the motion's last frame:
                                                   // played again the frame after (test 115; test 113 waited for 16,
                                                   // past its end, so it never looped and the pose held)
 int   edge_hi_wrap_var() { return 0x0f00030e; }   // VAR_14: 1 once the loop's pass has been on its last frame a frame
-float edge_hi_cruise() { return 2.2f; }           // held Octaslash's speed once its brake gets there (test 115, the
-                                                  // user: "moves far too fast" at a steady 6.2; test 116: 2.2)
+float edge_hi_cruise() { return 2.4f; }           // held Octaslash's speed once its brake gets there (test 115, the
+                                                  // user: "moves far too fast" at a steady 6.2; test 116: 2.2; test 126: 2.4)
 int   edge_hi_total_var() { return 0x0f00030f; }  // VAR_15: frames looped in all (in hitlag too)
 float edge_hi_loop_max() { return 180.0f; }       // the loop's most, hits or not (test 116, the user: "Held up special
                                                   // loops indefinitely when an opponent is hit")
@@ -38045,24 +38046,28 @@ void edge_hi_link()
     WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
 }
 
-// ---- the up special trail (tests 123 - 125, the user's concept stages 2 and 3: "Tap up and hold up special both leave a
+// ---- the up special trail (tests 123 - 126, the user's concept stages 2 and 3: "Tap up and hold up special both leave a
 // purple line trail that persists for 6 seconds following Sephiroth's movement until he begins falling. When multiple
 // lines form a closed shape inside, a purple glow effect that scales with the size of the shape appears 12 frames after,
-// fading in and creating a hitbox slightly larger than the shape formed, the damage and knockback scaling with the size
-// of the shape"): his middle's path from the attack's start (the rush) to the air end's first falling frame (or the
-// ground end) as points edge_tr_seg() apart (one a frame at most), numbered from 1000. `trail` articles
-// (weapons/trail.c, tools/edge_trail_msc.py) draw it, each a stretch of 16 points (15 pieces) from the one before's
-// last, 360 frames: a new one at points 1000, 1015, 1030, ... His shared 4 - 6 (VAR_28 - VAR_30: free in up special;
-// Shadow Flare's orbs use 0 - 3, the Phantom 7, the snake runs 0 - 6 only while the sword's out):
-//   5 the newest point (packed, edge_tr_pack), 6 its number (-1 once the trail's over; during a query, start x 512 +
-//   count + 0.5, 5 and 4 then sums), 4 a closed loop: an article's piece m crossed by the newest piece, -m.
-// A loop (test 125): its points m + 1 .. newest - 1 summed by the articles in one frame (the trail paused for it), their
-// mean its middle, its length / 2 pi its radius; a `fill` article there (weapons/fill.c, tools/edge_fill_msc.py), its
-// place and radius handed over in 5 / 4; after it, only a loop closing on a piece from its end counts (a second lap
-// makes its own loop). His VAR_0 - VAR_5 (the snake runs', free in up special) keep the query. Checked in a model of
-// both (tools/edge_trail_sim.py: a held Octaslash circle, either update order)
-// Test 123 made one article per 8-long piece, 40 at most: the game crashed loading him (64 article slots a fighter:
-// docs/native-notes.md "Article instance cap")
+// fading in and creating a hitbox slightly larger than the shape formed"; test 126: "The lines should go away when
+// forming a shape, and the old lines from the last uses of up special should be usable to create shapes. Also please
+// make other shapes possible that aren't circles", "I'd like for the formed shape to mirror the lines that the closed
+// shape was made of"). His middle's path from the attack's start (the rush) to the air end's first falling frame (or the
+// ground end), points edge_tr_seg() apart (one a frame at most), numbered block x 1024 + n (block 1 - 15, a new one each
+// trail: edge_tr_block). `trail` articles (weapons/trail.c, tools/edge_trail_msc.py) draw it, each a stretch of 16
+// points (15 pieces) from the one before's last, 360 frames. His shared 4 - 6 (VAR_28 - VAR_30: free in up special;
+// Shadow Flare's orbs use 0 - 3, the Phantom 7, the snake runs 0 - 6 only while the sword's out): 5 the newest point
+// (packed, edge_tr_pack), 6 its number (-1 once the trail's over), 4 a crossing reported by an article (-m, m the piece
+// crossed). A shape: the trail crossing an earlier piece of itself (a loop: its points m + 1 .. newest - 1), or an old
+// trail twice (its own points between the two crossings and the old trail's between the pieces it crossed). Then, a
+// step a frame with the trail paused (shared 6 the step): the shape's points marked (one or two ranges), their sums
+// (x, y; x^2, y^2; x y) in 5 / 4, and the commit (5 the middle): the articles drop those pieces of line and fill the
+// shape from its middle to them; a `fill` article (weapons/fill.c, tools/edge_fill_msc.py) at the middle takes the
+// ellipse fitted to the points (its long axis' angle, its half axes from the spread: a = sqrt(2 l1), b = sqrt(2 l2))
+// in 4 and is the shape's hitbox. His VAR_0 - VAR_11 (the snake runs', free in up special) keep the steps. The
+// protocol is modelled in tools/edge_trail_sim.py. Test 123 made one article per 8-long piece, 40 at most: the game
+// crashed loading him (64 article slots a fighter: docs/native-notes.md "Article instance cap")
+int   edge_tr_block;                             // the last trail's block (1 - 15; the MSC's last global, 0x86)
 int   edge_tr_art() { return 0xb; }              // article 11 (Zelda's 0 - 4, fire, flare1, flare2, flash, snake,
                                                  // snaketip, trail, fill: tools/extra_kinds.json, 12 at most)
 int   edge_tr_fill_art() { return 0xc; }         // article 12, fill (3 at most)
@@ -38072,15 +38077,24 @@ float edge_tr_mid() { return 9.0f; }             // his middle above his feet
 int   edge_tr_cross_var() { return 0x0f00031c; } // VAR_28 (shared 4)
 int   edge_tr_new_var() { return 0x0f00031d; }   // VAR_29 (shared 5)
 int   edge_tr_num_var() { return 0x0f00031e; }   // VAR_30 (shared 6)
-int   edge_tr_q_var() { return 0x0f000300; }     // VAR_0: a query's frames to wait (0 none)
+int   edge_tr_q_var() { return 0x0f000300; }     // VAR_0: the shape's step, -1 - -5 (0 none; negative: the snake
+                                                 // runs' codes in it are never, so his per-frame hook can't take them)
 int   edge_tr_floor_var() { return 0x0f000301; } // VAR_1: a loop counts only if it closes on a piece from here (the
-                                                 // last loop's end: a second lap round makes its own loop, not two)
-int   edge_tr_qn_var() { return 0x0f000302; }    // VAR_2: its count
-int   edge_tr_sp_var() { return 0x0f000303; }    // VAR_3: the newest point, kept through it
+                                                 // last shape's end: a second lap round makes its own loop, not two)
+int   edge_tr_qn_var() { return 0x0f000302; }    // VAR_2: the shape's points
+int   edge_tr_sp_var() { return 0x0f000303; }    // VAR_3: the newest point, kept through the steps
 int   edge_tr_sn_var() { return 0x0f000304; }    // VAR_4: its number
-int   edge_tr_cool_var() { return 0x0f000305; }  // VAR_5: frames before another loop counts
-float edge_tr_min_r() { return 4.0f; }           // a loop's radius at least / most
-float edge_tr_max_r() { return 40.0f; }
+int   edge_tr_cool_var() { return 0x0f000305; }  // VAR_5: frames before another shape counts
+int   edge_tr_om_var() { return 0x0f000306; }    // VAR_6: an old trail's piece crossed first (0 none)
+int   edge_tr_on_var() { return 0x0f000307; }    // VAR_7: the newest point's number then
+int   edge_tr_s1_var() { return 0x0f000308; }    // VAR_8 - VAR_11: the sums (VAR_8 the second range's mark before)
+int   edge_tr_s2_var() { return 0x0f000309; }
+int   edge_tr_s3_var() { return 0x0f00030a; }
+int   edge_tr_s4_var() { return 0x0f00030b; }
+float edge_tr_sum1() { return -1001.5f; }        // the steps (shared 6; tools/edge_trail_msc.py SUM1 ...)
+float edge_tr_sum2() { return -1002.5f; }
+float edge_tr_sum3() { return -1003.5f; }
+float edge_tr_commit() { return -1004.5f; }
 
 float edge_tr_pack(float x, float y)
 {
@@ -38122,52 +38136,173 @@ float edge_tr_y(float v)
 // a point: the newest, numbered n; a new stretch's article from every edge_tr_per()-th
 void edge_tr_point(float p, int n)
 {
+    int i;
     WorkModule(0, p, edge_tr_new_var());
     WorkModule(0, (float)n, edge_tr_num_var());
-    if ((n - 1000) - ((n - 1000) / edge_tr_per()) * edge_tr_per() == 0)
+    i = n - (n / 0x400) * 0x400;
+    if (i - (i / edge_tr_per()) * edge_tr_per() == 0)
     {
         ArticleModule(0x2710, edge_tr_art());
     }
 }
 
-// the trail starts here (the rush's main): point 1000
+// the trail starts here (the rush's main): a new block, its point 0
 void edge_tr_begin()
 {
+    int i;
+    edge_tr_block = edge_tr_block - (edge_tr_block / 0xf) * 0xf + 1;
     WorkModule(0, 0.0f, edge_tr_cross_var());
-    WorkModule(0, 0.0f, edge_tr_q_var());
-    WorkModule(0, 0.0f, edge_tr_cool_var());
-    WorkModule(0, 0.0f, edge_tr_floor_var());
-    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), 1000);
+    i = 0x300;
+    while (i <= 0x30b)
+    {
+        WorkModule(0, 0.0f, 0x0f000000 + i);   // VAR_0 - VAR_11
+        i = i + 1;
+    }
+    WorkModule(0, (float)(edge_tr_block * 0x400), edge_tr_floor_var());
+    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_block * 0x400);
 }
 
-// the query's answers in: the loop's middle and radius to a fill article, the trail as it was
-void edge_tr_fill()
+// a range's mark step: start x 512 + count + 0.5
+float edge_tr_mark(int start, int count)
 {
+    return (float)(start * 0x200 + count) + 0.5f;
+}
+
+// the shape's steps, one a frame (VAR_0 = -step), from his per-frame hook (edge_tr_tick: they go on after the trail's
+// over): 1 the second range's mark or the first sums, 2 - 4 the sums read and the next asked, the ellipse fitted and
+// the commit, 5 the trail as it was (or over: VAR_4 -1)
+void edge_tr_steps()
+{
+    int q;
     float n;
-    float r;
-    n = WorkModuleF(0, edge_tr_qn_var());
-    r = (n + 1.0f) * edge_tr_seg() / 6.2832f;
-    if (r < edge_tr_min_r())
+    float cx;
+    float cy;
+    float vxx;
+    float vyy;
+    float vxy;
+    float d;
+    float l1;
+    float l2;
+    float t;
+    float a;
+    float b;
+    q = -(int)WorkModuleF(0, edge_tr_q_var());
+    if (q == 1)
     {
-        r = edge_tr_min_r();
+        if (WorkModuleF(0, edge_tr_s1_var()) > 0.0f)
+        {
+            WorkModule(0, WorkModuleF(0, edge_tr_s1_var()), edge_tr_num_var());
+            WorkModule(0, 0.0f, edge_tr_s1_var());
+            return;
+        }
+        WorkModule(0, 0.0f, edge_tr_new_var());
+        WorkModule(0, 0.0f, edge_tr_cross_var());
+        WorkModule(0, edge_tr_sum1(), edge_tr_num_var());
+        WorkModule(0, -2.0f, edge_tr_q_var());
+        return;
     }
-    if (r > edge_tr_max_r())
+    if (q == 2 || q == 3)
     {
-        r = edge_tr_max_r();
+        WorkModule(0, WorkModuleF(0, edge_tr_new_var()), 0x0f000308 + 0x2 * (q - 2));
+        WorkModule(0, WorkModuleF(0, edge_tr_cross_var()), 0x0f000309 + 0x2 * (q - 2));
+        WorkModule(0, 0.0f, edge_tr_new_var());
+        WorkModule(0, 0.0f, edge_tr_cross_var());
+        if (q == 2)
+        {
+            WorkModule(0, edge_tr_sum2(), edge_tr_num_var());
+        }
+        else
+        {
+            WorkModule(0, edge_tr_sum3(), edge_tr_num_var());
+        }
+        WorkModule(0, -(float)(q + 1), edge_tr_q_var());
+        return;
     }
-    WorkModule(0, edge_tr_pack(WorkModuleF(0, edge_tr_new_var()) / n, WorkModuleF(0, edge_tr_cross_var()) / n),
-               edge_tr_new_var());
-    WorkModule(0, r, edge_tr_cross_var());
-    ArticleModule(0x2710, edge_tr_fill_art());
+    if (q == 4)
+    {
+        n = WorkModuleF(0, edge_tr_qn_var());
+        cx = WorkModuleF(0, edge_tr_s1_var()) / n;
+        cy = WorkModuleF(0, edge_tr_s2_var()) / n;
+        vxx = WorkModuleF(0, edge_tr_s3_var()) / n - cx * cx;
+        vyy = WorkModuleF(0, edge_tr_s4_var()) / n - cy * cy;
+        vxy = WorkModuleF(0, edge_tr_new_var()) / n - cx * cy;
+        d = MathF(0, (vxx - vyy) * (vxx - vyy) * 0.25f + vxy * vxy);
+        l1 = (vxx + vyy) * 0.5f + d;
+        l2 = (vxx + vyy) * 0.5f - d;
+        if (l2 < 0.0f)
+        {
+            l2 = 0.0f;
+        }
+        t = MathF(0x1, 2.0f * vxy, vxx - vyy) * 0.5f * 57.29578f;   // the long axis, -90 - 90 degrees
+        if (t < 0.0f)
+        {
+            t = t + 180.0f;
+        }
+        a = MathF(0, 2.0f * l1);
+        b = MathF(0, 2.0f * l2);
+        if (a < 3.0f)
+        {
+            a = 3.0f;
+        }
+        if (a > 127.0f)
+        {
+            a = 127.0f;
+        }
+        if (b < 3.0f)
+        {
+            b = 3.0f;
+        }
+        if (b > a)
+        {
+            b = a;
+        }
+        WorkModule(0, edge_tr_pack(cx, cy), edge_tr_new_var());
+        WorkModule(0, (float)((int)(t * 128.0f / 180.0f) * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)),
+                   edge_tr_cross_var());
+        WorkModule(0, edge_tr_commit(), edge_tr_num_var());
+        ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
+        WorkModule(0, -5.0f, edge_tr_q_var());
+        return;
+    }
+    // 5: the trail as it was
     WorkModule(0, 0.0f, edge_tr_cross_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
-    WorkModule(0, 10.0f, edge_tr_cool_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_floor_var());
+    WorkModule(0, 10.0f, edge_tr_cool_var());
+    WorkModule(0, 0.0f, edge_tr_q_var());
 }
 
-// every frame it's laid: a loop's query sent / answered, else a point once he's edge_tr_seg() from the last; `last`
-// puts down what's left (from 1 long) and ends the trail
+// a shape found: its ranges marked from this frame (the first now, the second next: VAR_8), the trail kept to go on
+void edge_tr_shape(int s1, int c1, int s2, int c2, int num)
+{
+    WorkModule(0, WorkModuleF(0, edge_tr_new_var()), edge_tr_sp_var());
+    WorkModule(0, (float)num, edge_tr_sn_var());
+    WorkModule(0, (float)(c1 + c2), edge_tr_qn_var());
+    WorkModule(0, 0.0f, edge_tr_s1_var());
+    if (c2 > 0)
+    {
+        WorkModule(0, edge_tr_mark(s2, c2), edge_tr_s1_var());
+    }
+    WorkModule(0, 0.0f, edge_tr_cross_var());
+    WorkModule(0, edge_tr_mark(s1, c1), edge_tr_num_var());
+    WorkModule(0, -1.0f, edge_tr_q_var());
+    WorkModule(0, 0.0f, edge_tr_om_var());
+}
+
+// his per-frame hook (func_82): a shape's steps
+void edge_tr_tick()
+{
+    float q;
+    q = WorkModuleF(0, edge_tr_q_var());
+    if (q <= -1.0f && q >= -5.0f)
+    {
+        edge_tr_steps();
+    }
+}
+
+// every frame it's laid: a crossing looked at, else a point once he's edge_tr_seg() from the last;
+// `last` puts down what's left (from 1 long) and ends the trail
 void edge_tr_step(int last)
 {
     float v;
@@ -38179,21 +38314,20 @@ void edge_tr_step(int last)
     float c;
     int num;
     int m;
-    int cnt;
-    if (WorkModuleF(0, edge_tr_q_var()) > 0.0f)
+    int m1;
+    int lo;
+    int hi;
+    int c1;
+    int c2;
+    if (WorkModuleF(0, edge_tr_q_var()) < 0.0f)
     {
-        WorkModule(0, WorkModuleF(0, edge_tr_q_var()) - 1.0f, edge_tr_q_var());
-        if (WorkModuleF(0, edge_tr_q_var()) <= 0.0f)
+        if (last)
         {
-            edge_tr_fill();
-            if (last)
-            {
-                WorkModule(0, -1.0f, edge_tr_num_var());
-            }
+            WorkModule(0, -1.0f, edge_tr_sn_var());   // over once the steps are done
         }
-        return;                            // the trail waits a frame for the answers
+        return;                            // the trail waits for the steps
     }
-    if (WorkModuleF(0, edge_tr_num_var()) < 1000.0f)
+    if (WorkModuleF(0, edge_tr_num_var()) < 1024.0f)
     {
         return;
     }
@@ -38201,25 +38335,45 @@ void edge_tr_step(int last)
     {
         WorkModule(0, WorkModuleF(0, edge_tr_cool_var()) - 1.0f, edge_tr_cool_var());
     }
-    // a closed loop reported: its points summed next frame
     c = WorkModuleF(0, edge_tr_cross_var());
     WorkModule(0, 0.0f, edge_tr_cross_var());
     num = (int)WorkModuleF(0, edge_tr_num_var());
-    if (c <= -1000.0f && -c >= WorkModuleF(0, edge_tr_floor_var()) && WorkModuleF(0, edge_tr_cool_var()) <= 0.0f
-        && last == 0)
+    if (c <= -1024.0f && WorkModuleF(0, edge_tr_cool_var()) <= 0.0f && last == 0)
     {
         m = (int)(-c);
-        cnt = num - 1 - m;
-        if (cnt >= 3 && cnt < 0x200)
+        if (m / 0x400 == num / 0x400)
         {
-            WorkModule(0, WorkModuleF(0, edge_tr_new_var()), edge_tr_sp_var());
-            WorkModule(0, (float)num, edge_tr_sn_var());
-            WorkModule(0, (float)cnt, edge_tr_qn_var());
-            WorkModule(0, 0.0f, edge_tr_new_var());
-            WorkModule(0, 0.0f, edge_tr_cross_var());
-            WorkModule(0, (float)((m + 1) * 0x200 + cnt) + 0.5f, edge_tr_num_var());
-            WorkModule(0, 1.0f, edge_tr_q_var());
-            return;
+            // its own trail: a loop, its points m + 1 .. num - 1
+            if ((float)m >= WorkModuleF(0, edge_tr_floor_var()) && num - 1 - m >= 3 && num - 1 - m < 0x200)
+            {
+                edge_tr_shape(m + 1, num - 1 - m, 0, 0, num);
+                return;
+            }
+        }
+        else
+        {
+            // an old trail: the second time across it closes a shape (its own points since the first, the old
+            // trail's between the two pieces crossed); the first is kept
+            m1 = (int)WorkModuleF(0, edge_tr_om_var());
+            if (m1 > 0 && m1 / 0x400 == m / 0x400 && m1 != m)
+            {
+                lo = m1;
+                hi = m;
+                if (m < m1)
+                {
+                    lo = m;
+                    hi = m1;
+                }
+                c1 = num - (int)WorkModuleF(0, edge_tr_on_var());
+                c2 = hi - lo;
+                if (c1 + c2 >= 3 && c1 < 0x200 && c2 < 0x200)
+                {
+                    edge_tr_shape((int)WorkModuleF(0, edge_tr_on_var()), c1, lo + 1, c2, num);
+                    return;
+                }
+            }
+            WorkModule(0, (float)m, edge_tr_om_var());
+            WorkModule(0, (float)num, edge_tr_on_var());
         }
     }
     v = WorkModuleF(0, edge_tr_new_var());

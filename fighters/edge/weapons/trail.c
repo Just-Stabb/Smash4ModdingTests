@@ -593,21 +593,26 @@ void func_48()
     
 }
 
-// ---- Sephiroth's up special trail (tools/edge_trail_msc.py; test 124): one stretch of the purple line his path leaves
-// during either up special's attack, up to 16 points; still, removed after 360 frames
+// ---- Sephiroth's up special trail (tools/edge_trail_msc.py; tests 124 / 126): one stretch of the purple line his
+// path leaves during either up special's attack, up to 16 points; still, removed after 360 frames
 int tr_slot;            // his player slot (0 - 7), -1: not found
 int tr_life;            // frames left
 int tr_base;            // its first point's number
 int tr_seen;            // the newest point's number seen
 int tr_n;               // points taken
-int tr_stale;           // 1: the trail it belongs to is over: it does nothing more
-int tr_answered;        // the last query answered
-float tr_sx;            // the newest point seen
-float tr_sy;
+int tr_over_t;          // 1: its trail is over (it takes no more points)
+int tr_mark;            // points marked for the shape being asked (bit k: point k)
+int tr_gone;            // pieces gone (bit k: piece k, points k - k + 1)
+int tr_fill;            // pieces filling the shape (bit k)
+int tr_ft;              // frames since the fill began (-1 none)
+float tr_cx;            // the fill's middle
+float tr_cy;
 float tr_ox;            // its first point (where it stands)
 float tr_oy;
 float tr_px;            // tr_unpack's result
 float tr_py;
+float tr_sx;            // the newest point seen
+float tr_sy;
 float tr_x0;
 float tr_y0;
 float tr_x1;
@@ -865,6 +870,28 @@ void tr_set(int k, float x, float y)
     }
 }
 
+// 1 << k
+int tr_bit(int k)
+{
+    int b;
+    b = 1;
+    while (k > 0)
+    {
+        b = b * 2;
+        k = k - 1;
+    }
+    return b;
+}
+
+int tr_has(int mask, int k)
+{
+    if ((mask / tr_bit(k)) - (mask / tr_bit(k + 1)) * 2 != 0)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 int tr_find_owner()
 {
     int s;
@@ -899,6 +926,11 @@ float tr_shared(int k)
     return WorkModuleF(0, 0x0f000340 + 0x8 * tr_slot + k);
 }
 
+void tr_share(int k, float v)
+{
+    WorkModule(0, v, 0x0f000340 + 0x8 * tr_slot + k);
+}
+
 // a point as he packs it (edge.c edge_tr_pack): (x + 512) x 2 whole x 2048 + (y + 512) x 2 whole, half units
 void tr_unpack(float v)
 {
@@ -928,96 +960,161 @@ int tr_cross(float ax, float ay, float bx, float by, float cx, float cy, float d
     return 0;
 }
 
-// the newest piece (tr_sx, tr_sy) - (x, y), number num - 1 - num, against this stretch's own pieces not next to it: a
-// crossing at piece m (its start's number) is reported in shared 4 as -m, the latest m kept
+// the newest piece (tr_sx, tr_sy) - (x, y), numbers num - 1 - num, against this stretch's own pieces still drawn (in
+// its own trail, not the ones next to it): one crossed, m its start's number, reported in shared 4 as -m
 void tr_test(float x, float y, int num)
 {
     int k;
-    int m;
-    float r;
-    k = 0;
-    while (k < tr_n - 1 && tr_base + k + 1 <= num - 2)
+    int same;
+    same = 0;
+    if (tr_base / 0x400 == num / 0x400)
     {
-        if (tr_cross(tr_sx, tr_sy, x, y, tr_get_x(k), tr_get_y(k), tr_get_x(k + 1), tr_get_y(k + 1)))
+        same = 0x1;
+    }
+    k = 0;
+    while (k < tr_n - 1)
+    {
+        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k + 1 <= num - 2))
         {
-            m = tr_base + k;
-            r = tr_shared(0x4);
-            if (r > -1000.0f || (float)m > -r)
+            if (tr_cross(tr_sx, tr_sy, x, y, tr_get_x(k), tr_get_y(k), tr_get_x(k + 1), tr_get_y(k + 1)))
             {
-                WorkModule(0, -(float)m, 0x0f000340 + 0x8 * tr_slot + 0x4);
+                if (tr_shared(0x4) > -1000.0f || same)
+                {
+                    tr_share(0x4, -(float)(tr_base + k));
+                }
             }
         }
         k = k + 1;
     }
 }
 
-// a query (shared 6 = start x 512 + count + 0.5): its points numbered start .. start + count - 1 added to shared 5 (x)
-// and 4 (y), once
+// 1 if point k is counted here (a stretch's first point is the one before's last, counted there; a trail's first, here)
+int tr_counts(int k)
+{
+    if (k > 0 || tr_base - (tr_base / 0x400) * 0x400 == 0)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// a step of a shape asked (shared 6 = v): mark, a sum, or the commit
 void tr_answer(float v)
 {
     int code;
     int st;
     int cnt;
     int k;
-    float sx;
-    float sy;
-    code = (int)v;
-    if (code == tr_answered)
+    float a;
+    float b;
+    float x;
+    float y;
+    if (v > 0.0f)
     {
+        code = (int)v;
+        st = code / 0x200;
+        cnt = code - st * 0x200;
+        k = 0;
+        while (k < tr_n)
+        {
+            if (tr_base + k >= st && tr_base + k < st + cnt)
+            {
+                tr_mark = tr_mark | tr_bit(k);
+            }
+            k = k + 1;
+        }
         return;
     }
-    tr_answered = code;
-    st = code / 0x200;
-    cnt = code - st * 0x200;
-    sx = 0.0f;
-    sy = 0.0f;
+    if (v == -1004.5f)
+    {
+        if (tr_mark != 0)
+        {
+            tr_unpack(tr_shared(0x5));
+            tr_cx = tr_px;
+            tr_cy = tr_py;
+            tr_fill = 0;
+            k = 0;
+            while (k < tr_n - 1)
+            {
+                if (tr_has(tr_mark, k) || tr_has(tr_mark, k + 1))
+                {
+                    if (tr_has(tr_gone, k) == 0)
+                    {
+                        tr_fill = tr_fill | tr_bit(k);
+                    }
+                    tr_gone = tr_gone | tr_bit(k);
+                }
+                k = k + 1;
+            }
+            tr_ft = 0;
+        }
+        tr_mark = 0;
+        return;
+    }
+    a = 0.0f;
+    b = 0.0f;
     k = 0;
     while (k < tr_n)
     {
-        // its first point is the stretch before's last: counted there (but the trail's first)
-        if (tr_base + k >= st && tr_base + k < st + cnt && (k > 0 || tr_base == 1000))
+        if (tr_has(tr_mark, k) && tr_counts(k))
         {
-            sx = sx + tr_get_x(k);
-            sy = sy + tr_get_y(k);
+            x = tr_get_x(k);
+            y = tr_get_y(k);
+            if (v == -1001.5f)
+            {
+                a = a + x;
+                b = b + y;
+            }
+            if (v == -1002.5f)
+            {
+                a = a + x * x;
+                b = b + y * y;
+            }
+            if (v == -1003.5f)
+            {
+                a = a + x * y;
+            }
         }
         k = k + 1;
     }
-    WorkModule(0, tr_shared(0x5) + sx, 0x0f000340 + 0x8 * tr_slot + 0x5);
-    WorkModule(0, tr_shared(0x4) + sy, 0x0f000340 + 0x8 * tr_slot + 0x4);
+    tr_share(0x5, tr_shared(0x5) + a);
+    tr_share(0x4, tr_shared(0x4) + b);
 }
 
-// every frame: stale once the trail's over; a query answered; a new point tested against its pieces, and taken if it's
-// this stretch's next
+// every frame: a shape's step answered; a new point tested against its pieces, and taken if it's its trail's next
 void tr_take()
 {
     float v;
     int num;
-    if (tr_stale || tr_slot < 0)
+    if (tr_slot < 0)
     {
         return;
     }
     v = tr_shared(0x6);
-    if (v < 0.0f)
+    if (v == -1.0f)
     {
-        tr_stale = 0x1;
+        tr_over_t = 0x1;
         return;
     }
-    if (v - (float)((int)v) > 0.25f)
+    if (v < -1000.0f || v - (float)((int)v) > 0.25f)
     {
-        tr_answer(v);
+        if (v <= -1001.0f && v >= -1005.0f || v > 524288.0f)
+        {
+            tr_answer(v);
+        }
         return;
     }
     num = (int)v;
-    if (num <= tr_seen)
+    if (num < 0x400 || num == tr_seen)
     {
-        return;
+        return;                 // not a trail's (the snake sword's runs share these), or seen
     }
     tr_unpack(tr_shared(0x5));
     if (num == tr_seen + 1)
     {
         tr_test(tr_px, tr_py, num);
     }
-    if (num == tr_base + tr_n && tr_n < tr_points())
+    if (tr_over_t == 0 && num == tr_base + tr_n && tr_n < tr_points())
     {
         tr_set(tr_n, tr_px, tr_py);
         tr_n = tr_n + 1;
@@ -1033,22 +1130,81 @@ void tr_still()
     KineticModule(0xf, 0, 0, 0);
 }
 
-// the joints: P_k at point k (the last taken for those past it), relative to the first point
+// the fill's size now (0 - 1): none before 12, grown over 8 frames, held to 40, shrunk to 50
+float tr_grow()
+{
+    if (tr_ft < 12)
+    {
+        return 0.0f;
+    }
+    if (tr_ft < 12 + 8)
+    {
+        return (float)(tr_ft - 12) / (float)8;
+    }
+    if (tr_ft < 40)
+    {
+        return 1.0f;
+    }
+    if (tr_ft < 50)
+    {
+        return (float)(50 - tr_ft) / (float)(50 - 40);
+    }
+    return 0.0f;
+}
+
+void tr_joint(int bone, float x, float y)
+{
+    ModelModule(0x7, 0x7d0 + bone, 0, y - tr_oy, x - tr_ox);
+}
+
+// the joints: the line's pieces still drawn between their points (gone / not yet: both ends on its start), the fill's
+// wedge points from the middle out to their points by tr_grow()
 void tr_pose()
 {
     int k;
     int j;
+    float t;
+    float cx;
+    float cy;
     PostureModule(0, 1.0f);
     PostureModule(0x2714, tr_ox, tr_oy, PostureModuleF(0x3));
     k = 0;
-    while (k < tr_points())
+    while (k < tr_points() - 1)
     {
         j = k;
         if (j > tr_n - 1)
         {
             j = tr_n - 1;
         }
-        ModelModule(0x7, 0x7d2 + k, 0, tr_get_y(j) - tr_oy, tr_get_x(j) - tr_ox);
+        tr_joint(19 + 2 * k, tr_get_x(j), tr_get_y(j));
+        if (k < tr_n - 1 && tr_has(tr_gone, k) == 0)
+        {
+            j = k + 1;
+        }
+        tr_joint(19 + 1 + 2 * k, tr_get_x(j), tr_get_y(j));
+        k = k + 1;
+    }
+    t = 0.0f;
+    cx = tr_ox;
+    cy = tr_oy;
+    if (tr_ft >= 0)
+    {
+        t = tr_grow();
+        cx = tr_cx;
+        cy = tr_cy;
+    }
+    tr_joint(2, cx, cy);
+    k = 0;
+    while (k < tr_points())
+    {
+        if (k < tr_n && t > 0.0f && (tr_has(tr_fill, k) || k > 0 && tr_has(tr_fill, k - 1)))
+        {
+            tr_joint(3 + k, cx + (tr_get_x(k) - cx) * t, cy + (tr_get_y(k) - cy) * t);
+        }
+        else
+        {
+            tr_joint(3 + k, cx, cy);
+        }
         k = k + 1;
     }
 }
@@ -1056,9 +1212,19 @@ void tr_pose()
 int tr_over()
 {
     tr_life -= 1;
-    if (tr_life <= 0 || tr_slot < 0)
+    if (tr_ft >= 0)
     {
-        BattleObject(0x9);
+        tr_ft = tr_ft + 1;
+        if (tr_ft >= 50)
+        {
+            tr_ft = -1;
+            tr_fill = 0;
+        }
+    }
+    if (tr_life <= 0 || tr_slot < 0
+        || tr_over_t && tr_ft < 0 && tr_n > 1 && tr_gone == tr_bit(tr_n - 1) - 1)
+    {
+        BattleObject(0x9);      // its time's up, or all its pieces are gone and its fill is over
         return 0x1;
     }
     return 0;
@@ -1069,8 +1235,11 @@ void func_46()
     tr_slot = tr_find_owner();
     tr_life = 360;
     tr_n = 0;
-    tr_stale = 0;
-    tr_answered = 0;
+    tr_over_t = 0;
+    tr_mark = 0;
+    tr_gone = 0;
+    tr_fill = 0;
+    tr_ft = -1;
     tr_ox = PostureModuleF(0x1);
     tr_oy = PostureModuleF(0x2);
     tr_base = 0;
@@ -1082,6 +1251,8 @@ void func_46()
         tr_oy = tr_py;
         PostureModule(0x2714, tr_ox, tr_oy, WorkModuleF(0, 0x0f000022 + 0x4 * tr_slot));
     }
+    tr_cx = tr_ox;
+    tr_cy = tr_oy;
     tr_set(0, tr_ox, tr_oy);
     tr_n = 1;
     tr_seen = tr_base;
