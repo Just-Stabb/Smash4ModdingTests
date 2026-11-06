@@ -1725,3 +1725,16 @@ takes special's raw press (button 15, 0x800: `edge_lw_special_pressed`).
 - port_check over the chain, tests 70–115 and 117–119: 30 errors, as before.
 - Package (install over 118): `script/msc/edge.mscsb`.
 
+## Test 120 (`build/sephiroth_test120.zip`): the Phantom's hit frees a held fighter; Blade Dash's air end cancels at 15
+
+User: "Can you make it so when Phantom hits a held opponent, they get released?" and "Also please make tap up special
+cancel 8 frames earlier".
+- **Phantom hit frees the held:** while the sword is out and the Phantom attacks, a held fighter's damage going up is
+  its hit: the sword lets go of them (their stage collision back, no longer placed on the sword), so they fly from the
+  Phantom's knockback (`edge_lw_ph_lets_go`, from the Phantom's per-frame tick). It keeps one sum for all held (count x
+  10000 + damage, in VAR_15, up special's loop counter in another status): no MSC globals left for one each, so a hit
+  frees everyone held, and a new catch (the count changes) isn't taken for a hit. The Phantom stops following then.
+- **Blade Dash:** its air end goes to Fall at frame 15 (was 23), its pitch back by then.
+- port_check over the chain, tests 70–115 and 117–120: 30 errors, as before.
+- Package (install over 119): `script/msc/edge.mscsb`.
+

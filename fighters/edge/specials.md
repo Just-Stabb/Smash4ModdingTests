@@ -179,9 +179,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
-    (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 23 (test 116, the
-    user: "cancel right before the point where Sephiroth would begin falling in the animation":
-    d02specialairhi1end's legs and Rot start into the fall at 24 of 48), its pitch back to 0 over 11 - 23.
+    (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 15 (test 120, the user: 8
+    frames earlier than test 116's 23, which was "right before the point where Sephiroth would begin falling in the
+    animation": d02specialairhi1end's legs and Rot start into the fall at 24 of 48), its pitch back to 0 over 11 - 15.
   - **Once per air time:** up special (either) sets VAR_21 as its attack starts (the rush's main; test 116, the
     user: "only used after the attacking portion of either up special begins"; test 113: its start); in the air it can't start again until he
     is on the ground outside up special or grabs a ledge (statuses 0x72 - 0x74): `edge_hi_can` on the two air

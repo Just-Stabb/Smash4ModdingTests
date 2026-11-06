@@ -37910,8 +37910,9 @@ float edge_hi_cruise() { return 2.2f; }           // held Octaslash's speed once
 int   edge_hi_total_var() { return 0x0f00030f; }  // VAR_15: frames looped in all (in hitlag too)
 float edge_hi_loop_max() { return 180.0f; }       // the loop's most, hits or not (test 116, the user: "Held up special
                                                   // loops indefinitely when an opponent is hit")
-float edge_hi_air_cut() { return 23.0f; }         // Blade Dash's air end: Fall here, the frame before its animation starts
-                                                  // into the fall (d02specialairhi1end: legs / Rot move from 24; test 116)
+float edge_hi_air_cut() { return 15.0f; }         // Blade Dash's air end: Fall here (test 120, the user: 8 frames earlier;
+                                                  // test 116: 23, the frame before its animation starts into the fall,
+                                                  // d02specialairhi1end: legs / Rot move from 24)
 float edge_hi_turn_c() { return 0.990268f; }      // the steering: 8 degrees a frame (cos / sin)
 float edge_hi_turn_s() { return 0.139173f; }
 float edge_hi_link_d() { return 10.0f; }          // autolink: the fighter hit kept this far along his rush,
@@ -38204,7 +38205,7 @@ void edge_hi_pitch()
     else if (global4 == 0x15a && edge_hi_end_air)
     {
         b = edge_hi_p(11.0f, 18.0f);       // rotate_back_begin_frame
-        e = edge_hi_p(23.0f, 53.0f);       // rotate_back_end_frame (Blade Dash: 44, back by its Fall at 23 since test 116)
+        e = edge_hi_p(15.0f, 53.0f);       // rotate_back_end_frame (Blade Dash: 44, back by its Fall: 23 in test 116, 15 since 120)
         if (f >= b)
         {
             t = e - b;
@@ -39434,6 +39435,65 @@ void edge_lw_ph_target()
     WorkModule(0, (float)code, 0x0f00031f);
 }
 
+// the fighters held on the sword: their count x 10000 + their damage summed (SLOTn_DAMAGE, the input / state table's
+// +0x17)
+float edge_lw_held_sum()
+{
+    int slot;
+    float n;
+    float d;
+    n = 0.0f;
+    d = 0.0f;
+    slot = 1;
+    while (slot <= 0x8)
+    {
+        if (edge_sn_s(slot) >= 0.0f)
+        {
+            n = n + 1.0f;
+            d = d + WorkModuleF(0, 0x0f000100 + 0x20 * (slot + 0x2) + 0x17);
+        }
+        slot = slot + 1;
+    }
+    return n * 10000.0f + d;
+}
+
+// a fighter held on the sword hit by the Phantom: the sword lets go (test 120, the user: "when Phantom hits a held
+// opponent, they get released"), their stage collision back, so they fly from its hit. Seen as their damage going up
+// while the Phantom attacks (the same ones held as last frame: the count in the sum); every one held lets go (one sum:
+// no MSC globals left). VAR_15 (up special's loop count, a different status) keeps last frame's sum while the sword's out
+void edge_lw_ph_lets_go()
+{
+    float now;
+    float last;
+    int slot;
+    if (edge_sn_out() == 0)
+    {
+        return;
+    }
+    now = edge_lw_held_sum();
+    last = WorkModuleF(0, 0x0f00030f);
+    WorkModule(0, now, 0x0f00030f);
+    if (edge_lw_ph() != 3.0f || ArticleModule(0x2717, 0x2) == 0 || now < 10000.0f)
+    {
+        return;
+    }
+    if ((int)(now / 10000.0f) != (int)(last / 10000.0f) || now <= last + 0.5f)
+    {
+        return;
+    }
+    slot = 1;
+    while (slot <= 0x8)
+    {
+        if (edge_sn_s(slot) >= 0.0f)
+        {
+            edge_sn_ground(slot, 5.0f);         // stage collision back (air)
+            edge_sn_s_set(slot, -1.0f);
+        }
+        slot = slot + 1;
+    }
+    WorkModule(0, 0.0f, 0x0f00030f);
+}
+
 // made but not sent (the stance interrupted): it goes (func_2302 / 2307: status 4)
 void edge_lw_ph_drop()
 {
@@ -39489,6 +39549,7 @@ void edge_lw_ph_tick()
         edge_lw_ph_set(0.0f);
         return;
     }
+    edge_lw_ph_lets_go();
     if (edge_lw_ph() == 3.0f && ArticleModule(0x2717, 0x2))
     {
         // sent and still out: a fighter held on his sword kept up to date for it to follow (test 107); none, his
