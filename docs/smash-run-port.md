@@ -120,6 +120,43 @@ face shown by the Damage* / Down* / Collapses visibility animations, `default` s
 - Frame counts: keys run 0..end (end 20 -> 21 OMO frames), both ends kept (RunTurnL's turn lands on its last
   frame).
 
+## Every Smash Run enemy
+
+`python3 tools/s3ds_enemy.py SRC_ROOT all OUT` converts the 80 Smash Run enemies (those with a
+`param/enemy/fs/enemy_param_vl_*.bin`): 89 models (80 bodies plus bonkers' coconut, bokkuncannon's missile and shot,
+hammerbros' hammer, octorock's rock, peahat's and shotzo's shots, popperam's gravel, waddledee's parasol), 961 OMOs
+in 75 motion pacs, 17 `model.mta`, 3 `material_anime.pac` (25 MTAs), 45 ACMD folders, 79 sound banks (koshinigami
+has none), 80 vl params. `tools/s3ds_enemy_test.py SRC_ROOT all`: 468 checks on all 80, every one passes (models,
+skeletons, textures, every motion folder skinned against the 3DS keys, visibility, ACMD).
+`tools/s3ds_preview.py SRC_ROOT OUT sheet.png [--motion NAME --frame N]` renders a contact sheet from the written
+files.
+
+What the other enemies needed beyond the Goomba:
+- **MBN formats 5 and 6** (69 of the 105 files): every mesh's headers and description first, then from a 32-byte
+  boundary each mesh's vertex buffer and its parts' indices, each block 32-aligned (0xFF padding). Format 4 pads
+  each vertex buffer to 4 (the file may end unpadded).
+- **Mesh order**: the .mbn keeps the meshes in the order the exporter wrote the objects' data, not the object
+  table's (18 models differ: Dekakuribo's objects 0 1 3 2 4, Pokkuri's 1 0...). Matching by order put the eye
+  material on the body; matched by the objects' part-record addresses, every object's bone lists equal its
+  mesh's on all 105 models (asserted).
+- **Materials** (H3D fragment-operation commands): blending (source alpha / one minus source alpha -> NUD 1 / 1;
+  additive source alpha / one -> 1 / 2), alpha test (greater -> 516 with the 3DS reference), culling, wrap.
+  Texture unit 0 is the colour; units 1 / 2 (reflection / specular maps of the 3DS shader) are left out, except
+  `*alpha*` masks (mcanimal), folded into the colour's alpha.
+- **UV transform**: Ohana3DS: uv' = uv * scale - translate (V up); NUD (Smash Forge NUD.vert): uv' = s * (uv + t);
+  with the NUD's V' = 1 - V: s = scale, t_u = -translate_u / s, t_v = (1 - s + translate_v) / s (rotation left out).
+  The UV scroll animations (translate / scale of coordinator 0, about 70 tracks) become `NU_colorSamplerUV` frames in
+  MTAs; the colour-constant (combiner) animations (25), rotation (3) and coordinators 1 / 2 (2) are not converted.
+- **Sprite enemies** (cucco, shiroiobake, and the non-Smash-Run flyingman): flat sprite meshes whose flipbook is
+  one long visibility timeline in the model itself (shiroiobake: 400 frames, emerge / jump / damage / tongue...):
+  `model.mta`'s visibility.
+- **Texture IDs**: 0x4E000000 + 0x1000 an enemy (its index among the 80, sorted) + 0x100 a model part.
+- **Overlap with the Wii U**: cake, dogars, kamek, magnumkiller, metroid, ohganemochi, shinigami and tac are also
+  Wii U enemy kinds (Smash Tour / the Master Fortress); writing them to `model/enemy/<kind>/` would replace the
+  Wii U's own. The package keeps them in a separate folder.
+- Not converted yet: the particle effects (`effect/`: 61 `.ptcl` (SPBD, version 0x33) + `.efc`, 413 effect-model
+  files, 2 trail textures).
+
 Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro` BehaviorKuribo, the
 EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy
 motion / visibility pac names (taken from the fighters'), the effect IDs.

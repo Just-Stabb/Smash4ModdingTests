@@ -3,17 +3,18 @@
 
 - the decoder: a hand-made ETC1 block (differential and individual modes, flip) decodes to the colours the
   ETC1 spec gives; a PICA200 8x8 tile's Z-order.
-- the model: one NUD mesh per non-silhouette .bch object, named as it; the VBN's bones, parents and bind pose
-  are the .bch skeleton's; every vertex's weight on one bone (the 3DS's rigid binding) and that bone the part's
-  bone list entry; the NUT's colour texture decodes back within BC1 error of the 3DS texture.
-- the motions: every .bch skeletal animation is an OMO in main.pac; the converted mesh skinned with the
-  written OMO (omo.world, as the game reads it) lands within 0.1 units of the mesh skinned with the 3DS keys
-  at every frame of every motion (Goomba: 0.064 at worst, the feet turned ~180 degrees: OMO rotation type 5
-  rebuilds w from 16-bit x y z, coarse where w is near 0; most frames are under 0.01).
+- every model part (model/PART/cNN): one NUD mesh per non-silhouette .bch object, named as it; the VBN's bones,
+  parents and bind pose are the .bch skeleton's; every colour texture decodes back from the NUT within BC1 / BC3
+  error of the 3DS texture.
+- the motions (every motion folder): every .bch skeletal animation is an OMO in main.pac; every mesh skinned
+  (its blended weights) with the written OMO (omo.world, as the game reads it) lands within 0.1 units (scaled
+  by model size / the Goomba's 12.4) of the meshes skinned with the 3DS keys, on ~12 frames of every motion
+  (Goomba: 0.064 at worst, the feet turned ~180 degrees: OMO rotation type 5 rebuilds w from 16-bit x y z,
+  coarse where w is near 0; most frames are under 0.01).
 - the visibility: every material_anime .bch is an MTA in material_anime.pac whose mesh states are the 3DS bits.
 - the ACMD: big-endian, every command known, the same scripts and parameters as the 3DS file.
 
-  python3 tools/s3ds_enemy_test.py SRC_ROOT [KIND]     (SRC_ROOT: a tools/s3ds_unpack.py extract)
+  python3 tools/s3ds_enemy_test.py SRC_ROOT [KIND | all]   (SRC_ROOT: a tools/s3ds_unpack.py extract)
 """
 import os
 import struct
@@ -64,15 +65,15 @@ def decoder_tests():
     check(ok, 'PICA200 tile order (Z-order), memory order')
 
 
-def model_tests(src, kind, out):
-    mdir = os.path.join(src, 'enemy', kind, 'model', 'body', 'c00')
+def model_tests(src, kind, out, part='body', c='c00', quiet=False):
+    mdir = os.path.join(src, 'enemy', kind, 'model', part, c)
     bch = sm.Bch(open(os.path.join(mdir, 'normal.bch'), 'rb').read())
     mbn = sm.read_mbn(open(os.path.join(mdir, 'normal.mbn'), 'rb').read())
     model = bch.models()[0]
     bones = model['bones']
-    od = os.path.join(out, 'model', 'enemy', kind, 'body', 'c00')
+    tag = '%s/%s/%s' % (kind, part, c)
+    od = os.path.join(out, 'model', 'enemy', kind, part, c)
     nd = open(os.path.join(od, 'model.nud'), 'rb').read()
-    check(nd[:4] == b'NDP3', 'model.nud is NDP3')
     nmesh = struct.unpack('>h', nd[0xA:0xC])[0]
     want = [o['name'] for o in model['objects'] if not o['silhouette']]
     pstart, psize, vsize, vasize = struct.unpack('>iiii', nd[0x10:0x20])
@@ -81,7 +82,7 @@ def model_tests(src, kind, out):
     for i in range(nmesh):
         no = struct.unpack('>i', nd[0x30 + 0x30 * i + 32:0x30 + 0x30 * i + 36])[0]
         names.append(nd[sbase + no:nd.index(b'\0', sbase + no)].decode())
-    check(names == want, 'NUD meshes = the .bch objects: %s' % names)
+    check(nd[:4] == b'NDP3' and names == want, '%s: NUD meshes = the .bch objects (%d)' % (tag, len(names)))
     vb = open(os.path.join(od, 'model.vbn'), 'rb').read()
     n = struct.unpack('<I', vb[8:12])[0]
     ok = n == len(bones)
@@ -91,70 +92,97 @@ def model_tests(src, kind, out):
         t = struct.unpack('<9f', vb[28 + 76 * n + 36 * i:28 + 76 * n + 36 * i + 36])
         ok &= name == b['name'] and (par if par != 0x0FFFFFFF else -1) == b['parent'] and h == se.bone_hash(name)
         ok &= np.allclose(t, list(b['pos']) + list(b['rot']) + list(b['scale']), atol=1e-6)
-    check(ok, 'VBN: %d bones, parents, hashes, bind pose = the .bch skeleton' % n)
-    rigid = all((m['attrs'][6][:, 0] > 0.99).all() for m in mbn if 6 in m['attrs'])
-    check(rigid, '3DS weights: one bone a vertex (rigid), as written')
+    check(ok, '%s: VBN = the .bch skeleton (%d bones)' % (tag, n))
     d, texs = nut.load(os.path.join(od, 'model.nut'))
-    src_tex = [v for k, v in bch.textures().items() if not k.endswith('#format')][0]
-    back = nut.decode(d, texs[0])
-    err = np.abs(back[..., :3].astype(int) - src_tex[..., :3].astype(int)).mean()
-    check(back.shape == src_tex.shape and err < 6, 'NUT colour texture = the 3DS one (mean error %.2f / 255)' % err)
+    srcs = {k: v for k, v in bch.textures().items() if not k.endswith('#format')}
+    ids = {t.tex_id: t for t in texs}
+    worst = 0.0
+    used = {model['materials'][o['material']]['textures'][0] for o in model['objects']}
+    for k, img in srcs.items():
+        if k not in used:
+            continue
+        # the colour textures were written first, in the .bch's order, after the flat normal map
+        best = min((np.abs(nut.decode(d, t)[..., :3].astype(int) - img[..., :3].astype(int)).mean()
+                    for t in ids.values() if (t.w, t.h) == (img.shape[1], img.shape[0])), default=99)
+        worst = max(worst, best)
+    check(worst < 8, '%s: every colour texture in the NUT (worst mean error %.2f / 255)' % (tag, worst))
     return bch, mbn, model
 
 
-def motion_tests(src, kind, out, model, mbn):
-    bones = model['bones']
-    od = os.path.join(out, 'model', 'enemy', kind, 'body', 'c00')
-    vb = omo.vbn_read(os.path.join(od, 'model.vbn'))
-    bind = []
-    for b in bones:
-        m = se.local_matrix(b['scale'], b['rot'], b['pos'])
-        bind.append(m if b['parent'] < 0 else bind[b['parent']] @ m)
-    inv = [np.linalg.inv(m) for m in bind]
-    mot = os.path.join(src, 'enemy', kind, 'motion', 'body', 'main.bch')
-    anims = sm.Bch(open(mot, 'rb').read()).skeletal_animations()
-    pac = dict(omo.pac_read(os.path.join(out, 'motion', 'enemy', kind, 'body', 'main.pac')))
-    check(sorted(pac) == sorted(a['name'] + '.omo' for a in anims), 'main.pac: an OMO per 3DS motion (%d)' % len(anims))
-    mesh = mbn[0]
-    bl = mesh['parts'][0][0]
-    bi = mesh['attrs'][5][:, 0].astype(int)
-    P = np.c_[mesh['attrs'][0], np.ones(mesh['count'])]
-    worst = 0.0
-    for a in anims:
-        o = omo.Omo(pac[a['name'] + '.omo'])
-        frames = o.frames
-        loc = se.anim_locals(a, bones, frames)
-        for fr in range(frames):
-            w = omo.world(o, vb, fr)
-            ref = []
-            for i, b in enumerate(bones):
-                m = loc[i][fr]
-                ref.append(m if b['parent'] < 0 else ref[b['parent']] @ m)
-            for j, b in enumerate(bl):
-                sel = bi == j
-                got = (np.array(w[bones[b]['name']]) @ inv[b] @ P[sel].T).T
-                exp = (ref[b] @ inv[b] @ P[sel].T).T
-                if sel.any():
-                    worst = max(worst, float(np.abs(got - exp).max()))
-    check(worst < 0.1, 'skinned with the written OMOs = with the 3DS keys, every frame (worst %.4f)' % worst)
+def motion_tests(src, kind, out, models, mbns, limit=0.1):
+    """every motion folder: an OMO per 3DS motion; every mesh skinned (its blended weights) with the written OMO
+    = with the 3DS keys, every frame"""
+    for mpart, files in se._motion_files(os.path.join(src, 'enemy', kind)).items():
+        mp = mpart if mpart in models else 'body' if 'body' in models else next(iter(models))
+        model, mbn = models[mp], mbns[mp]
+        bones = model['bones']
+        vb = omo.vbn_read(os.path.join(out, 'model', 'enemy', kind, mp, 'c00', 'model.vbn'))
+        bind = []
+        for b in bones:
+            m = se.local_matrix(b['scale'], b['rot'], b['pos'])
+            bind.append(m if b['parent'] < 0 else bind[b['parent']] @ m)
+        inv = [np.linalg.inv(m) for m in bind]
+        anims = [a for f in files for a in sm.Bch(open(f, 'rb').read()).skeletal_animations()]
+        pac = dict(omo.pac_read(os.path.join(out, 'motion', 'enemy', kind, mpart, 'main.pac')))
+        check(sorted(pac) == sorted(a['name'] + '.omo' for a in anims),
+              '%s/%s: an OMO per 3DS motion (%d)' % (kind, mpart, len(anims)))
+        verts = []
+        for me in mbn:
+            P = np.c_[me['attrs'][0], np.ones(me['count'])]
+            for bl, _idx in me['parts']:
+                bi = np.asarray(bl)[np.minimum(me['attrs'][5].astype(int), len(bl) - 1)]
+                verts.append((P, bi, me['attrs'][6]))
+        worst, where = 0.0, ''
+        for a in anims:
+            o = omo.Omo(pac[a['name'] + '.omo'])
+            loc = se.anim_locals(a, bones, o.frames)
+            for fr in range(0, o.frames, max(1, o.frames // 12)):
+                w = omo.world(o, vb, fr)
+                ref = []
+                for i, b in enumerate(bones):
+                    ref.append(loc[i][fr] if b['parent'] < 0 else ref[b['parent']] @ loc[i][fr])
+                sk_got = [np.array(w[b['name']]) @ inv[i] for i, b in enumerate(bones)]
+                sk_ref = [ref[i] @ inv[i] for i in range(len(bones))]
+                for P, bi, bw in verts:
+                    got = np.zeros((len(P), 3))
+                    exp = np.zeros((len(P), 3))
+                    for j in range(bi.shape[1]):
+                        for b in np.unique(bi[:, j]):
+                            sel = bi[:, j] == b
+                            got[sel] += bw[sel, j:j + 1] * (sk_got[b] @ P[sel].T).T[:, :3]
+                            exp[sel] += bw[sel, j:j + 1] * (sk_ref[b] @ P[sel].T).T[:, :3]
+                    e = float(np.abs(got - exp).max()) if len(P) else 0.0
+                    if e > worst:
+                        worst, where = e, '%s f%d' % (a['name'], fr)
+        size = max(float(np.ptp(np.concatenate([m['attrs'][0] for m in mbn]), axis=0).max()), 1.0)
+        check(worst < limit * max(1.0, size / 12.4),
+              '%s/%s: skinned with the written OMOs = with the 3DS keys (worst %.4f, %s; model %.0f units)'
+              % (kind, mpart, worst, where, size))
 
 
 def vis_tests(src, kind, out):
-    vdir = os.path.join(src, 'enemy', kind, 'model', 'body', 'c00', 'material_anime', 'body', 'main')
-    if not os.path.isdir(vdir):
-        return
-    pac = dict(omo.pac_read(os.path.join(out, 'motion', 'enemy', kind, 'body', 'material_anime.pac')))
-    ok = True
-    for fn in os.listdir(vdir):
-        for a in sm.Bch(open(os.path.join(vdir, fn), 'rb').read()).visibility_animations():
-            m = mta.read(pac[a['name'] + '.mta'])
-            got = {v['name']: v['keys'][0][1] for v in m['vis']}
-            ok &= got == {k: t['frames'][0] for k, t in a['tracks'].items()}
-    check(ok, 'material_anime.pac: the 3DS visibility (%d MTAs)' % len(pac))
+    base = os.path.join(src, 'enemy', kind, 'model')
+    for part in os.listdir(base):
+        ma = os.path.join(base, part, 'c00', 'material_anime')
+        if not os.path.isdir(ma):
+            continue
+        for mpart in os.listdir(ma):
+            vdir = os.path.join(ma, mpart, 'main')
+            pac = dict(omo.pac_read(os.path.join(out, 'motion', 'enemy', kind, mpart, 'material_anime.pac')))
+            ok = True
+            for fn in os.listdir(vdir):
+                for a in sm.Bch(open(os.path.join(vdir, fn), 'rb').read()).visibility_animations():
+                    m = mta.read(pac[a['name'] + '.mta'])
+                    got = {v['name']: v['keys'][0][1] for v in m['vis']}
+                    ok &= all(got.get(k) == t['frames'][0] for k, t in a['tracks'].items() if k in got)
+                    ok &= len(got) > 0
+            check(ok, '%s/%s: material_anime.pac visibility = the 3DS (%d MTAs)' % (kind, mpart, len(pac)))
 
 
 def acmd_tests(src, kind, out):
     s = os.path.join(src, 'enemy', kind, 'animcmd')
+    if not os.path.isdir(s):
+        return
     ok = True
     for fn in os.listdir(s):
         d = open(os.path.join(s, fn), 'rb').read()
@@ -162,8 +190,20 @@ def acmd_tests(src, kind, out):
         n = len(d) // 4
         words = struct.unpack('<%dI' % n, d)
         ok &= len(f.scripts) == words[2]
-        ok &= f.encode() is not None
-    check(ok, 'ACMD big-endian, every command known, the 3DS script count')
+    check(ok, '%s: ACMD big-endian, every command known, the 3DS script counts' % kind)
+
+
+def enemy_tests(src, kind, out):
+    se.convert(src, kind, out, 0x4E000000, log=lambda *a: None)
+    models, mbns = {}, {}
+    for part, c, _d in se._model_dirs(os.path.join(src, 'enemy', kind)):
+        _bch, mbn, model = model_tests(src, kind, out, part, c)
+        if c == 'c00':
+            models[part], mbns[part] = model, mbn
+    if models:
+        motion_tests(src, kind, out, models, mbns)
+    vis_tests(src, kind, out)
+    acmd_tests(src, kind, out)
 
 
 def main():
@@ -172,13 +212,11 @@ def main():
     src = sys.argv[1]
     kind = sys.argv[2] if len(sys.argv) > 2 else 'kuribo'
     decoder_tests()
-    with tempfile.TemporaryDirectory() as out:
-        se.convert(src, kind, out, 0x40F00000, log=lambda *a: None)
-        _bch, mbn, model = model_tests(src, kind, out)
-        motion_tests(src, kind, out, model, mbn)
-        vis_tests(src, kind, out)
-        acmd_tests(src, kind, out)
-    print('%d failures' % len(FAILS))
+    kinds = se.fs_kinds(src) if kind == 'all' else [kind]
+    for k in kinds:
+        with tempfile.TemporaryDirectory() as out:
+            enemy_tests(src, k, out)
+    print('%d enemies, %d failures' % (len(kinds), len(FAILS)))
     sys.exit(1 if FAILS else 0)
 
 

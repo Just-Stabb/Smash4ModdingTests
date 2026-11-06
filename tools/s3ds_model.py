@@ -34,7 +34,7 @@ H3D (.bch, little-endian), backward-compatibility byte 0x21 (Smash 3DS):
   2 hermite; quantization bits 8-15; key count bits 16-31), f32 value scale, value offset, frame scale, 1 / end
   frame, keys pointer.
 
-MBN (Smash 3DS meshes, little-endian), format 4 (enemies / stages):
+MBN (Smash 3DS meshes, little-endian), formats 4, 5 and 6 (see read_mbn for where 5 / 6 keep the data):
   u16 format, u16 0xFFFF, u32 flags (2: name table), u32 mode, u32 mesh count; per mesh: u32 part count, per part
   {u32 bone count, u32 bones (the model's skeleton indices), u32 index count, u16 indices (triangle list), padded
   to 4}; then its vertex description {u32 attribute count, per attribute {u32 kind (0 position, 1 normal, 2
@@ -50,18 +50,45 @@ import numpy as np
 
 
 # ---------------------------------------------------------------- MBN
+def _vertices(buf, desc):
+    """a vertex buffer + its description -> ({kind: [n, k] floats}, n)"""
+    widths = {0: 3, 1: 3, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2}
+    tsize = {0: 4, 1: 1, 2: 1, 3: 2}
+    tcode = {0: '<f4', 1: 'u1', 2: 'i1', 3: '<i2'}
+    layout, stride = [], 0
+    for kind, typ, scale in desc:
+        stride += stride % 2
+        layout.append((kind, typ, scale, stride))
+        stride += widths[kind] * tsize[typ]
+    stride += stride % 2
+    count = len(buf) // stride
+    assert count * stride == len(buf), (len(buf), stride)
+    raw = np.frombuffer(buf, np.uint8).reshape(count, stride)
+    attrs = {}
+    for kind, typ, scale, off in layout:
+        w = widths[kind] * tsize[typ]
+        col = np.ascontiguousarray(raw[:, off:off + w]).view(tcode[typ]).reshape(count, widths[kind])
+        attrs[kind] = col.astype(np.float64) * scale
+    return attrs, count
+
+
 def read_mbn(d):
-    """-> [mesh dict(parts=[(bones, indices array)], attrs={kind: [n, k] float array}, count=n)]"""
+    """-> [mesh dict(parts=[(bones, indices array)], attrs={kind: [n, k] float array}, count=n)]
+
+    Format 4: each mesh's headers, inline u16 indices (padded to 4), its description and vertex buffer (padded
+    to 4). Formats 5 / 6: every mesh's headers and description first (index counts only), then from a 32-byte
+    boundary each mesh's vertex buffer and its parts' u16 indices, each block from a 32-byte boundary
+    (padding 0xFF)."""
     fmt, _u, flags, mode, nmesh = struct.unpack_from('<HHIII', d, 0)
-    assert fmt == 4 and mode == 0, (fmt, mode)
+    assert fmt in (4, 5, 6) and mode == 0, (fmt, mode)
     o = 0x10
-    meshes = []
 
     def u32():
         nonlocal o
         v = struct.unpack_from('<I', d, o)[0]
         o += 4
         return v
+    heads = []
     for _m in range(nmesh):
         parts = []
         for _p in range(u32()):
@@ -69,35 +96,51 @@ def read_mbn(d):
             n = u32()
             if flags & 2:
                 u32()
-            idx = np.frombuffer(d, '<u2', n, o).astype(np.int64)
-            o += 2 * n
-            o += -o % 4
-            parts.append((bones, idx))
+            idx = None
+            if fmt == 4:
+                idx = np.frombuffer(d, '<u2', n, o).astype(np.int64)
+                o += 2 * n
+                o += -o % 4
+            parts.append([bones, idx, n])
         nd = u32()
         desc = [struct.unpack_from('<IIf', d, o + 12 * k) for k in range(nd)]
-        o += 12 * len(desc)
+        o += 12 * nd
         size = u32()
-        buf, o = d[o:o + size], o + size
-        widths = {0: 3, 1: 3, 2: 4, 3: 2, 4: 2, 5: 2, 6: 2}
-        tsize = {0: 4, 1: 1, 2: 1, 3: 2}
-        tcode = {0: '<f4', 1: 'u1', 2: 'i1', 3: '<i2'}
-        layout, stride = [], 0
-        for kind, typ, scale in desc:
-            stride += stride % 2
-            layout.append((kind, typ, scale, stride))
-            stride += widths[kind] * tsize[typ]
-        stride += stride % 2
-        count = size // stride
-        assert count * stride == size, (size, stride)
-        raw = np.frombuffer(buf, np.uint8).reshape(count, stride)
-        attrs = {}
-        for kind, typ, scale, off in layout:
-            w = widths[kind] * tsize[typ]
-            col = np.ascontiguousarray(raw[:, off:off + w]).view(tcode[typ]).reshape(count, widths[kind])
-            attrs[kind] = col.astype(np.float64) * scale
-        meshes.append(dict(parts=parts, attrs=attrs, count=count, desc=desc))
+        buf = None
+        if fmt == 4:
+            buf, o = d[o:o + size], o + size
+            o = min(o + (-o % 4), len(d))                  # the next mesh starts on 4 (the file may end unpadded)
+        heads.append([parts, desc, size, buf])
+    if fmt != 4:
+        for h in heads:
+            o += -o % 32
+            h[3], o = d[o:o + h[2]], o + h[2]
+            for part in h[0]:
+                o += -o % 32
+                part[1] = np.frombuffer(d, '<u2', part[2], o).astype(np.int64)
+                o += 2 * part[2]
+        o = min(o + (-o % 32), len(d))
     assert o == len(d), (o, len(d))
+    meshes = []
+    for parts, desc, _size, buf in heads:
+        attrs, count = _vertices(buf, desc)
+        for _b, idx, _n in parts:
+            assert idx.max() < count, (idx.max(), count)
+        meshes.append(dict(parts=[(b, i) for b, i, _n in parts], attrs=attrs, count=count, desc=desc))
     return meshes
+
+
+def match_objects(objects, mbn):
+    """the .mbn mesh of each .bch object. The .mbn keeps the meshes in the order the exporter wrote the objects'
+    data (their part records' addresses), not the object table's: the Goomba's are the same, Dekakuribo's
+    objects come 0 1 3 2 4, Pokkuri's 1 0, Shandera's 0 1 4 2 3. Checked on every enemy: each object's part
+    bone lists (kept in the .bch) equal its mesh's."""
+    order = sorted(range(len(objects)), key=lambda k: objects[k]['data'])
+    rank = {k: r for r, k in enumerate(order)}
+    out = [rank[k] for k in range(len(objects))]
+    for o, i in zip(objects, out):
+        assert [tuple(b) for b, _ in mbn[i]['parts']] == [tuple(f) for f in o['faces']], o['name']
+    return out
 
 
 # ---------------------------------------------------------------- textures (PICA200)
@@ -331,6 +374,18 @@ class Bch:
                 mat['coords'] = coords
                 cp = params + 0xC + 0x18 * 3 + 4
                 cols = [tuple(d[cp + 4 * j:cp + 4 * j + 4]) for j in range(12)]
+                # the fragment-operation commands (PICA200 registers): 0x101 blend (equation bits 0-15, RGB
+                # source / destination functions bits 16-19 / 20-23: 0 zero, 1 one, 6 source alpha, 7 one minus
+                # source alpha), 0x104 alpha test (bit 0 on, function bits 4-7: 6 greater, 7 greater or equal,
+                # reference bits 8-15), 0x107 depth (bit 12: write), 0x108 culling (0 none, 1 front, 2 back);
+                # the material's blend mode (fragment flags bits 10-11): 3 blended
+                fsh, fwords = struct.unpack_from('<II', d, params + 0xC8)
+                regs = _pica(d, fsh, fwords) if fsh and fwords else {}
+                b, at = regs.get(0x101, 0), regs.get(0x104, 0)
+                mat['blend'] = dict(on=((mat['fragment_flags'] >> 10) & 3) == 3, src=(b >> 16) & 0xF, dst=(b >> 20) & 0xF)
+                mat['alpha_test'] = dict(on=bool(at & 1), func=(at >> 4) & 0xF, ref=(at >> 8) & 0xFF)
+                mat['cull'] = regs.get(0x108, 2) & 0xF
+                mat['depth_write'] = bool(regs.get(0x107, 0x1000) & 0x1000)
                 mat['colors'] = dict(zip(['emission', 'ambient', 'diffuse', 'specular0', 'specular1',
                                           'constant0', 'constant1', 'constant2', 'constant3', 'constant4',
                                           'constant5', 'blend'], cols))
@@ -347,8 +402,14 @@ class Bch:
         for k in range(obj_n):
             e = obj_t + 0x38 * k
             mid, fl, node, prio = struct.unpack_from('<4H', d, e)
+            fo, fn = struct.unpack_from('<II', d, e + 0x10)
+            faces = []
+            for f in range(fn):                        # per part: u16 skinning, u16 bone count, the bones
+                skin, nn = struct.unpack_from('<HH', d, fo + 0x34 * f)
+                faces.append(struct.unpack_from('<%dH' % nn, d, fo + 0x34 * f + 4))
             objs.append(dict(material=mid, silhouette=bool(fl & 1), name=names[node] if node < len(names) else
-                             'mesh%d' % k, node=node, priority=prio, center=self.f32s(e + 0x20, 3)))
+                             'mesh%d' % k, node=node, priority=prio, center=self.f32s(e + 0x20, 3), faces=faces,
+                             data=fo))
         m['objects'] = objs
         bones = []
         for k in range(skel_n):

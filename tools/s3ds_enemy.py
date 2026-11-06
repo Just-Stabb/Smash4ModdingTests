@@ -1,29 +1,35 @@
 #!/usr/bin/env python3
-"""Smash 3DS Smash Run enemy -> Smash 4 (Wii U) enemy files, in the Wii U's own enemy layout (the paths
-cross_f.rpx builds: `model/enemy/%s/body/c00/`, `motion/enemy/%s/body/`, `animcmd/enemy/%s/`,
+"""Smash 3DS Smash Run enemies -> Smash 4 (Wii U) enemy files, in the Wii U's own enemy layout (the paths
+cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/enemy/%s/`,
 `sound/se/snd_se_enemy_%s.nus3bank`, `param/enemy/fs`):
 
-  model/enemy/KIND/body/c00/model.nud, model.nut, model.vbn
-      the .mbn meshes (one NUD mesh per .bch object, named as the object: the Goomba's normal_mh / damage_mh
-      faces) rigged to the .bch skeleton (bones, bind pose, rigid weights kept), textures (PICA200 -> RGBA ->
-      GX2 BC1 / BC3) plus a flat normal map, Smash 4's fighter body shader (0x9A011063: colour, normal, the
-      game's shared ramp 0x10080000).
-  motion/enemy/KIND/body/main.pac
-      the motion .bch's skeletal animations, one OMO each (name.omo), sampled every frame 0..end (H3D keys,
-      linear / hermite / step, Euler XYZ rotations as quaternions). The bones keep the 3DS axes (scripts'
-      offsets are in them), so a bone turned ~180 degrees (the Goomba's feet) loses a little precision in
-      OMO rotation type 5 (w rebuilt from 16-bit x y z): 0.064 units at worst on the Goomba.
-  motion/enemy/KIND/body/material_anime.pac
-      the material_anime .bch visibility animations, one MTA each (mesh visibility by name), so a motion can
-      show the damage face.
+  model/enemy/KIND/PART/cNN/model.nud, model.nut, model.vbn [, model.mta, normal.vmt]
+      every model part (body, and shots / missiles / hammers / parasols...): the .mbn meshes (one NUD mesh per
+      .bch object, named as the object) rigged to the .bch skeleton (bind pose, blended weights kept),
+      textures (PICA200 -> RGBA -> GX2 BC1 / BC3, power-of-two) plus a flat normal map, Smash 4's fighter
+      body shader (0x9A011063: colour, normal, the game's shared ramp 0x10080000) with the 3DS material's
+      blending, alpha test, culling, wrap and UV transform. model.mta: the model's own material animation (UV
+      scrolls) and visibility timeline (the retro sprite enemies' flipbooks). normal.vmt (the 3DS's list of
+      the meshes visibility drives) copied.
+  motion/enemy/KIND/PART/main.pac
+      the motion .bch's skeletal animations (motion/PART/main.bch or main/*.bch), one OMO each (name.omo),
+      sampled every frame 0..end (H3D keys, linear / hermite / step, Euler XYZ rotations as quaternions). The
+      bones keep the 3DS axes (scripts' offsets are in them), so a bone turned ~180 degrees (the Goomba's feet)
+      loses a little precision in OMO rotation type 5 (w rebuilt from 16-bit x y z): 0.064 units at worst on
+      the Goomba, 0.27 on Mahva (198 units).
+  motion/enemy/KIND/PART/material_anime.pac
+      the material_anime .bch visibility / material animations, one MTA a motion (mesh visibility by name), so
+      a motion can show the damage face.
   animcmd/enemy/KIND/*.bin
       the 3DS ACMD byte-swapped to the Wii U's big-endian (checked: every command one tools/acmd.py knows).
   sound/se/snd_se_enemy_KIND.nus3bank, param/enemy/fs/enemy_param_vl_KIND.bin
       copied: the 3DS bank is already the Wii U's layout (NUS3 chunks, little-endian TONE, IDSP audio) and the
       vl params the same typed big-endian format.
+  Not converted (yet): the enemies' particle effects (effect/: 3DS .ptcl SPBD / .efc, effect models, trails).
 
-  python3 tools/s3ds_enemy.py SRC_ROOT KIND OUT [--tex-id 0x40F00000]
-      SRC_ROOT: a tools/s3ds_unpack.py extract (holds enemy/KIND/ and param/enemy/fs/).
+  python3 tools/s3ds_enemy.py SRC_ROOT KIND|all OUT [--tex-id 0x4E000000]
+      SRC_ROOT: a tools/s3ds_unpack.py extract (holds enemy/ and param/enemy/fs/). "all": every Smash Run
+      enemy (a param/enemy/fs vl file), texture IDs 0x4E000000 + 0x1000 an enemy + 0x100 a model part.
 """
 import argparse
 import os
@@ -112,36 +118,71 @@ def tangents(pos, nrm, uv, tri):
     return out_t, out_b
 
 
-def body_material(name, color_id, normal_id, wrap):
-    m = nud.Material(BODY_FLAGS, 0, 0, 0, 0, 1029)
+def body_material(mat, color_id, normal_id, wrap):
+    """Smash 4's skinned body material for a 3DS material: its blending (H3D fragment operations: source alpha /
+    one minus source alpha -> NUD 1 / 1; source alpha / one, additive -> 1 / 2; anything else blended -> 1 / 1),
+    alpha test (greater -> 516, greater or equal -> 518, the 3DS reference), culling (back -> 1029, front ->
+    1028, none -> 0) and texture transform (NU_colorSamplerUV, see sampler_uv)"""
+    bl, at = mat.get('blend', {}), mat.get('alpha_test', {})
+    src = dst = 0
+    if bl.get('on'):
+        src, dst = (1, 2) if bl['dst'] == 1 else (1, 1)
+    af = ref = 0
+    if at.get('on') and at['func'] in (6, 7):
+        af, ref = (516 if at['func'] == 6 else 518), at['ref']
+    cull = {0: 0, 1: 1028, 2: 1029}.get(mat.get('cull', 2), 1029)
+    m = nud.Material(BODY_FLAGS, src, dst, af, ref, cull)
     for tid in (color_id, normal_id, RAMP):
         m.textures.append(dict(hash=tid, map_mode=0, wrap_s=wrap[0], wrap_t=wrap[1], min_f=3, mag_f=2, mip=6,
                                unk=0, unk2=0))
     m.textures[2]['wrap_s'] = m.textures[2]['wrap_t'] = 3
-    _bits, val = float_hash(name)
-    m.props = [(n, [val, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else list(v)) for n, v in BODY_PROPS]
+    _bits, val = float_hash(mat['name'])
+    uv = sampler_uv(mat['coords'][0]) if 'coords' in mat else [1.0, 1.0, 0.0, 0.0]
+    m.props = [(n, [val, 0.0, 0.0, 0.0] if n == 'NU_materialHash' else uv if n == 'NU_colorSamplerUV' else list(v))
+               for n, v in BODY_PROPS]
     return m
+
+
+def sampler_uv(coord, translate=None, scale=None):
+    """3DS texture coordinator (scale, translate; Ohana3DS: uv' = uv * scale - translate, V up) -> NUD
+    NU_colorSamplerUV (Smash Forge NUD.vert: uv' = s * (uv + t)) for the NUD's V' = 1 - V: s = the 3DS scale,
+    t_u = -t / s, t_v = (1 - s + t) / s. Rotation is left out."""
+    su, sv = scale or coord['scale']
+    tu, tv = translate or coord['translate']
+    su, sv = su or 1.0, sv or 1.0
+    return [su, sv, -tu / su, (1.0 - sv + tv) / sv]
 
 
 # H3D wrap (0 clamp to edge, 1 border, 2 repeat, 3 mirror) -> NUD (1 repeat, 2 mirror, 3 clamp)
 PICA_WRAP = {0: 3, 1: 3, 2: 1, 3: 2}
 
 
+def _resized(img, w, h):
+    from PIL import Image
+    if img.shape[:2] == (h, w):
+        return img
+    return np.asarray(Image.fromarray(img, 'RGBA').resize((w, h), Image.BILINEAR))
+
+
 def build_model(bch, mbn, tex_id, log=print):
-    """-> (model.nud, model.nut, model.vbn) bytes"""
+    """-> (model.nud, model.nut, model.vbn, model) bytes. Texture unit 0 is the colour (units 1 / 2 are the 3DS
+    shader's reflection / specular maps, left out), except a unit-1 texture named *alpha*: a mask, put into the
+    colour's alpha. A material without a texture gets a flat one of its diffuse colour."""
     model = bch.models()[0]
     bones = model['bones']
-    textures = bch.textures()
+    textures = {k: v for k, v in bch.textures().items() if not k.endswith('#format')}
+    assert len(model['objects']) == len(mbn), (len(model['objects']), len(mbn))
     ids, images = {}, []
-    for name, img in textures.items():
-        if name.endswith('#format'):
-            continue
-        ids[name] = tex_id + len(images)
-        images.append((ids[name], img))
-    flat = tex_id + len(images)
-    images.append((flat, np.full((64, 64, 4), (128, 128, 255, 255), np.uint8)))
+
+    def tex(key, img):
+        if key not in ids:
+            ids[key] = tex_id + len(images)
+            images.append((ids[key], img))
+        return ids[key]
+    flat = tex('#flat', np.full((64, 64, 4), (128, 128, 255, 255), np.uint8))
     meshes = []
-    for k, (obj, me) in enumerate(zip(model['objects'], mbn)):
+    for obj, mi in zip(model['objects'], sm.match_objects(model['objects'], mbn)):
+        me = mbn[mi]
         if obj['silhouette']:
             log('  skip silhouette object %s' % obj['name'])
             continue
@@ -149,6 +190,20 @@ def build_model(bch, mbn, tex_id, log=print):
         wrap = (1, 1)
         if 'wrap' in mat:
             wrap = tuple(PICA_WRAP[x & 3] for x in mat['wrap'][0])
+        t0, t1 = mat['textures'][0], mat['textures'][1]
+        if t0 in textures:
+            img = textures[t0]
+            if t1 in textures and 'alpha' in t1.lower():
+                mask = _resized(textures[t1], img.shape[1], img.shape[0])
+                img = img.copy()
+                img[..., 3] = np.minimum(img[..., 3], mask[..., 0])
+                color = tex((t0, t1), img)
+            else:
+                color = tex(t0, img)
+        else:
+            dc = mat.get('colors', {}).get('diffuse', (255, 255, 255, 255))
+            color = tex(('#solid', dc), np.full((8, 8, 4), dc, np.uint8))
+            log('  material %s: no texture %r, its diffuse colour %s' % (mat['name'], t0, dc))
         a = me['attrs']
         polys = []
         for bone_list, idx in me['parts']:
@@ -172,9 +227,8 @@ def build_model(bch, mbn, tex_id, log=print):
             else:
                 bi, bw = np.zeros((n, 1), np.int64), np.ones((n, 1))
             p.bones = np.zeros((n, 4), np.int64)
-            p.weights = np.zeros((n, 4), np.int64)
             for j in range(bi.shape[1]):
-                p.bones[:, j] = np.asarray(bone_list)[bi[:, j]]
+                p.bones[:, j] = np.asarray(bone_list)[np.minimum(bi[:, j], len(bone_list) - 1)]
             w = np.zeros((n, 4))
             w[:, :bw.shape[1]] = bw
             w /= np.maximum(w.sum(1, keepdims=True), 1e-8)
@@ -182,17 +236,22 @@ def build_model(bch, mbn, tex_id, log=print):
             q[:, 0] += 255 - q.sum(1)
             p.weights = q
             p.bones[q == 0] = p.bones[:, :1].repeat(4, 1)[q == 0]
-            tex = mat['textures'][0]
-            p.materials = [body_material(mat['name'], ids[tex], flat, wrap)]
+            p.materials = [body_material(mat, color, flat, wrap)]
             polys.append(p)
         m = nud.Mesh(obj['name'], polys, -1, 4)
         meshes.append(m)
-        log('  mesh %-12s %d vertices, %d triangles, bones %s' % (
-            obj['name'], sum(len(p.pos) for p in polys), sum(len(p.idx) // 3 for p in polys),
-            sorted({bones[b]['name'] for p in polys for b in np.unique(p.bones)})))
+        log('  mesh %-24s %5d vertices, %5d triangles' % (
+            obj['name'], sum(len(p.pos) for p in polys), sum(len(p.idx) // 3 for p in polys)))
     nud_b = nud.write(meshes, top_bone=len(bones) - 1)
-    nut_b = nut.write_ntwu([(i, 0x33 if (img[..., 3] < 250).any() else 0x31, img) for i, img in images])
+    nut_b = nut.write_ntwu([(i, 0x33 if (img[..., 3] < 250).any() else 0x31, _pow2(img)) for i, img in images])
     return nud_b, nut_b, vbn_bytes(bones), model
+
+
+def _pow2(img):
+    """GX2 textures here: power-of-two sides, at least 8"""
+    h, w = img.shape[:2]
+    p = [max(8, 1 << (x - 1).bit_length()) for x in (w, h)]
+    return _resized(img, p[0], p[1]) if (p[0], p[1]) != (w, h) else img
 
 
 # ---------------------------------------------------------------- motions
@@ -250,17 +309,52 @@ def omo_from(anim, bones):
     return o.encode(), frames
 
 
+def anim_mta(vis=None, mats=None, model=None, mesh_names=()):
+    """a visibility animation and / or a material animation (H3D) -> MTA bytes. Visibility: mesh states by
+    name. Material: texture coordinator 0's translate / scale (UV scrolls, the common case) as
+    NU_colorSamplerUV a frame, by the material's NU_materialHash; the other animated properties (combiner
+    constant colours, rotation, coordinators 1 / 2) are counted, not converted."""
+    frames = max(1, int(round(max(a['frames'] for a in (vis, mats) if a))))
+    vlist = []
+    if vis:
+        for name in mesh_names:
+            tr = vis['tracks'].get(name)
+            if tr is None:
+                continue
+            bits = tr['frames'] or [tr['default']]
+            keys = [(0, bits[0])] + [(f, v) for f, v in enumerate(bits) if f and v != bits[f - 1]]
+            vlist.append((name, keys))
+    mlist, skipped = [], 0
+    if mats and model:
+        by_name = {m['name']: m for m in model['materials']}
+        for md in mats['materials']:
+            mat = by_name.get(md['name'])
+            if mat is None or md['property'] not in (0x13, 0x15):
+                skipped += 1
+                continue
+            entry = next((e for e in mlist if e['name'] == md['name']), None)
+            if entry is None:
+                entry = dict(name=md['name'], hash=float_hash(md['name'])[0], tracks={})
+                mlist.append(entry)
+            entry['tracks'][md['property']] = md['components']
+        for e in mlist:
+            c = model and by_name[e['name']]['coords'][0]
+            vals = []
+            for f in range(frames):
+                def comp(prop, j, default):
+                    t = e['tracks'].get(prop)
+                    v = sm.sample(t[j], f) if t and j < len(t) and t[j] is not None else None
+                    return default if v is None else v
+                sc = (comp(0x13, 0, c['scale'][0]), comp(0x13, 1, c['scale'][1]))
+                tr = (comp(0x15, 0, c['translate'][0]), comp(0x15, 1, c['translate'][1]))
+                vals.append(sampler_uv(c, tr, sc))
+            e['props'] = [dict(name='NU_colorSamplerUV', values=vals)]
+    out = mta.write(frames, [dict(name=e['name'], hash=e['hash'], props=e['props']) for e in mlist], vis=vlist)
+    return out, skipped
+
+
 def vis_mta(anim, mesh_names):
-    frames = max(1, int(round(anim['frames'])))
-    vis = []
-    for name in mesh_names:
-        tr = anim['tracks'].get(name)
-        if tr is None:
-            continue
-        bits = tr['frames'] or [tr['default']]
-        keys = [(0, bits[0])] + [(f, v) for f, v in enumerate(bits) if f and v != bits[f - 1]]
-        vis.append((name, keys))
-    return mta.write(frames, [], vis=vis)
+    return anim_mta(vis=anim, mesh_names=mesh_names)[0]
 
 
 # ---------------------------------------------------------------- ACMD
@@ -275,38 +369,102 @@ def acmd_be(d):
 
 
 # ---------------------------------------------------------------- driver
+def _model_dirs(base):
+    """[(part, 'cNN', dir)] of an enemy's models"""
+    out = []
+    mroot = os.path.join(base, 'model')
+    for part in sorted(os.listdir(mroot)) if os.path.isdir(mroot) else []:
+        for c in sorted(os.listdir(os.path.join(mroot, part))):
+            d = os.path.join(mroot, part, c)
+            if os.path.exists(os.path.join(d, 'normal.mbn')):
+                out.append((part, c, d))
+    return out
+
+
+def _motion_files(base):
+    """{part: [motion .bch]}: motion/PART/main.bch, or motion/PART/main/*.bch (one motion a file)"""
+    out = {}
+    mroot = os.path.join(base, 'motion')
+    for part in sorted(os.listdir(mroot)) if os.path.isdir(mroot) else []:
+        one = os.path.join(mroot, part, 'main.bch')
+        many = os.path.join(mroot, part, 'main')
+        if os.path.exists(one):
+            out[part] = [one]
+        elif os.path.isdir(many):
+            out[part] = [os.path.join(many, f) for f in sorted(os.listdir(many)) if f.endswith('.bch')]
+    return out
+
+
 def convert(src, kind, out, tex_id, log=print):
+    """every model part (model/PART/cNN), motion folder, material / visibility animation, ACMD, the sound bank
+    and the vl params of enemy KIND. Returns {part: model} (c00 models) and a summary dict."""
     base = os.path.join(src, 'enemy', kind)
-    mdir = os.path.join(base, 'model', 'body', 'c00')
-    bch = sm.Bch(open(os.path.join(mdir, 'normal.bch'), 'rb').read())
-    mbn = sm.read_mbn(open(os.path.join(mdir, 'normal.mbn'), 'rb').read())
-    log('model %s' % kind)
-    nud_b, nut_b, vbn_b, model = build_model(bch, mbn, tex_id, log)
-    od = os.path.join(out, 'model', 'enemy', kind, 'body', 'c00')
-    os.makedirs(od, exist_ok=True)
-    for n, b in (('model.nud', nud_b), ('model.nut', nut_b), ('model.vbn', vbn_b)):
-        open(os.path.join(od, n), 'wb').write(b)
-    bones = model['bones']
-    md = os.path.join(out, 'motion', 'enemy', kind, 'body')
-    os.makedirs(md, exist_ok=True)
-    mot = os.path.join(base, 'motion', 'body', 'main.bch')
-    entries = []
-    if os.path.exists(mot):
-        for a in sm.Bch(open(mot, 'rb').read()).skeletal_animations():
-            b, frames = omo_from(a, bones)
-            entries.append((a['name'] + '.omo', b))
-            log('  motion %-34s %3d frames' % (a['name'], frames))
-        omo.pac_write(os.path.join(md, 'main.pac'), entries)
-    vdir = os.path.join(mdir, 'material_anime', 'body', 'main')
-    mesh_names = [o['name'] for o in model['objects'] if not o['silhouette']]
-    vis = []
-    if os.path.isdir(vdir):
-        for fn in sorted(os.listdir(vdir)):
-            for a in sm.Bch(open(os.path.join(vdir, fn), 'rb').read()).visibility_animations():
-                vis.append((a['name'] + '.mta', vis_mta(a, mesh_names)))
-        if vis:
-            omo.pac_write(os.path.join(md, 'material_anime.pac'), vis)
-            log('  visibility: %d MTAs (%s)' % (len(vis), ', '.join(n for n, _ in vis)))
+    summary = dict(kind=kind, models=[], motions=0, mtas=0, skipped_mat_props=0, acmd=[], sound=False, params=False)
+    models = {}
+    for pi, (part, c, d) in enumerate(_model_dirs(base)):
+        bch = sm.Bch(open(os.path.join(d, 'normal.bch'), 'rb').read())
+        mbn = sm.read_mbn(open(os.path.join(d, 'normal.mbn'), 'rb').read())
+        log('model %s/%s/%s' % (kind, part, c))
+        nud_b, nut_b, vbn_b, model = build_model(bch, mbn, tex_id + 0x100 * pi, log)
+        od = os.path.join(out, 'model', 'enemy', kind, part, c)
+        os.makedirs(od, exist_ok=True)
+        for n, b in (('model.nud', nud_b), ('model.nut', nut_b), ('model.vbn', vbn_b)):
+            open(os.path.join(od, n), 'wb').write(b)
+        vmt = os.path.join(d, 'normal.vmt')
+        if os.path.exists(vmt):
+            shutil.copy(vmt, os.path.join(od, 'normal.vmt'))
+        manims, vanims = bch.material_animations(), bch.visibility_animations()
+        if manims or vanims:
+            # the model's own (always running) material / visibility animation: model.mta, as stages' /
+            # fighters' models. The retro sprite enemies (cucco, flyingman, shiroiobake) keep their flipbooks
+            # here: one long visibility timeline of sprite meshes
+            meshes = [o['name'] for o in model['objects'] if not o['silhouette']]
+            b, skipped = anim_mta(vanims[0] if vanims else None, manims[0] if manims else None, model, meshes)
+            open(os.path.join(od, 'model.mta'), 'wb').write(b)
+            summary['skipped_mat_props'] += skipped
+            log('  model.mta (%s)' % ', '.join('%s %s %d frames' % (k, a[0]['name'], a[0]['frames'])
+                                                for k, a in (('material', manims), ('visibility', vanims)) if a))
+        if c == 'c00':
+            models[part] = model
+        summary['models'].append('%s/%s: %d meshes, %d bones, %d textures' % (
+            part, c, len(model['objects']), len(model['bones']), len(model['materials'])))
+        # per-motion visibility / material animations: model/PART/cNN/material_anime/MPART/main/*.bch
+        ma = os.path.join(d, 'material_anime')
+        if c == 'c00' and os.path.isdir(ma):
+            for mpart in sorted(os.listdir(ma)):
+                adir = os.path.join(ma, mpart, 'main')
+                entries = []
+                for fn in sorted(os.listdir(adir)) if os.path.isdir(adir) else []:
+                    ab = sm.Bch(open(os.path.join(adir, fn), 'rb').read())
+                    vis = {a['name']: a for a in ab.visibility_animations()}
+                    mats = {a['name']: a for a in ab.material_animations()}
+                    for name in sorted(set(vis) | set(mats)):
+                        b, skipped = anim_mta(vis.get(name), mats.get(name), model,
+                                              [o['name'] for o in model['objects'] if not o['silhouette']])
+                        entries.append((name + '.mta', b))
+                        summary['skipped_mat_props'] += skipped
+                if entries:
+                    md = os.path.join(out, 'motion', 'enemy', kind, mpart)
+                    os.makedirs(md, exist_ok=True)
+                    omo.pac_write(os.path.join(md, 'material_anime.pac'), entries)
+                    summary['mtas'] += len(entries)
+                    log('  %s/material_anime.pac: %d MTAs' % (mpart, len(entries)))
+    for mpart, files in _motion_files(base).items():
+        model = models.get(mpart) or models.get('body') or next(iter(models.values()), None)
+        if model is None:
+            log('  motion %s: no model for its skeleton, skipped' % mpart)
+            continue
+        entries = []
+        for fn in files:
+            for a in sm.Bch(open(fn, 'rb').read()).skeletal_animations():
+                b, frames = omo_from(a, model['bones'])
+                entries.append((a['name'] + '.omo', b))
+        if entries:
+            md = os.path.join(out, 'motion', 'enemy', kind, mpart)
+            os.makedirs(md, exist_ok=True)
+            omo.pac_write(os.path.join(md, 'main.pac'), entries)
+            summary['motions'] += len(entries)
+            log('  motion %s/main.pac: %d OMOs' % (mpart, len(entries)))
     s = os.path.join(base, 'animcmd')
     if os.path.isdir(s):
         dst = os.path.join(out, 'animcmd', 'enemy', kind)
@@ -315,26 +473,52 @@ def convert(src, kind, out, tex_id, log=print):
             b = acmd_be(open(os.path.join(s, fn), 'rb').read())
             open(os.path.join(dst, fn), 'wb').write(b)
             f = acmd.ACMDFile.load(os.path.join(dst, fn))       # every command one the Wii U knows
+            summary['acmd'].append('%s %d' % (fn, len(f.scripts)))
             log('  animcmd %s: %d scripts, %d commands' % (fn, len(f.scripts), sum(map(len, f.scripts.values()))))
     snd = os.path.join(base, 'snd_se_enemy_%s.nus3bank' % kind)
     if os.path.exists(snd):
         os.makedirs(os.path.join(out, 'sound', 'se'), exist_ok=True)
         shutil.copy(snd, os.path.join(out, 'sound', 'se'))
+        summary['sound'] = True
     prm = os.path.join(src, 'param', 'enemy', 'fs', 'enemy_param_vl_%s.bin' % kind)
     if os.path.exists(prm):
         os.makedirs(os.path.join(out, 'param', 'enemy', 'fs'), exist_ok=True)
         shutil.copy(prm, os.path.join(out, 'param', 'enemy', 'fs'))
-    return model
+        summary['params'] = True
+    return models, summary
+
+
+def fs_kinds(src):
+    """the Smash Run enemies: the ones with a param/enemy/fs vl file and an enemy folder"""
+    pd = os.path.join(src, 'param', 'enemy', 'fs')
+    ks = [f[len('enemy_param_vl_'):-4] for f in os.listdir(pd) if f.startswith('enemy_param_vl_')]
+    return sorted(k for k in ks if os.path.isdir(os.path.join(src, 'enemy', k)))
+
+
+def tex_base(kind, kinds):
+    """texture IDs: 0x4E000000 + 0x1000 an enemy (its index among the Smash Run enemies, sorted) + 0x100 a
+    model part"""
+    return 0x4E000000 + 0x1000 * kinds.index(kind)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('src')
-    ap.add_argument('kind')
+    ap.add_argument('kind', help='an enemy, or "all" (every Smash Run enemy: a param/enemy/fs vl file)')
     ap.add_argument('out')
-    ap.add_argument('--tex-id', type=lambda s: int(s, 0), default=0x40F00000)
+    ap.add_argument('--tex-id', type=lambda s: int(s, 0), default=None)
     a = ap.parse_args()
-    convert(a.src, a.kind, a.out, a.tex_id)
+    kinds = fs_kinds(a.src)
+    todo = kinds if a.kind == 'all' else [a.kind]
+    failed = []
+    for k in todo:
+        try:
+            convert(a.src, k, a.out, a.tex_id if a.tex_id is not None else tex_base(k, kinds if k in kinds else [k]))
+        except Exception as e:                          # noqa: BLE001 - report every enemy, then fail
+            failed.append((k, repr(e)))
+            print('FAILED %s: %r' % (k, e))
+    if failed:
+        sys.exit('%d failed: %s' % (len(failed), ', '.join(k for k, _ in failed)))
 
 
 if __name__ == '__main__':
