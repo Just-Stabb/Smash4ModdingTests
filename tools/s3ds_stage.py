@@ -32,6 +32,7 @@ What a build holds:
   Battlefield's.
 """
 import argparse
+import copy
 import glob
 import os
 import shutil
@@ -49,11 +50,17 @@ import nut  # noqa: E402
 import s3ds_effect_models as em  # noqa: E402
 import s3ds_model as sm  # noqa: E402
 from minecraft_world import hide_folder, still_light, stage_params, two_sided  # noqa: E402
+from s3ds_enemy import local_matrix  # noqa: E402
 from xv2_to_nud import float_hash  # noqa: E402
 
 AREAS = ['MiniRoom00', 'MiniRoom01', 'MiniRoom02', 'MiniRoom03', 'MiniRoom05', 'Race00', 'Race01', 'Nobore',
          'MainField']
 SKIP = ('_break', '_crack')
+# models Smash Run's code places with nothing in the files to place them by (MainField's doors, barrels,
+# springs, chests, blocks: at the origin), and the states of one piece it swaps (Area_14_02-05 are copies of
+# _01 in the same place)
+SKIP_MODELS = {'MainField': ('Block', 'Block_break', 'Door', 'Spring', 'Taru', 'TreasureBox', 'Area_14_02',
+                             'Area_14_03', 'Area_14_05')}
 TEX_BASE = 0x2000F000                       # the slot's own texture IDs (Battlefield's are below), as Minecraft's
 XMB_FROM = 'stc_c_Ring_set'                 # Battlefield's island: drawn at every distance
 UNLIT = 0xA2001001
@@ -157,8 +164,9 @@ def stage_material(mat, tex_id, name):
     return m
 
 
-def model_meshes(mdir, label, tex, shared):
-    """one 3DS model folder -> (NUD meshes, MTA material entries, frames, notes)"""
+def model_meshes(mdir, label, tex, shared, offsets=((0.0, 0.0),)):
+    """one 3DS model folder -> (NUD meshes, MTA material entries, frames, notes); OFFSETS: a copy of every mesh
+    at each (placements: Smash Run's code puts these pieces)"""
     bch = sm.Bch(open(os.path.join(mdir, 'normal.bch'), 'rb').read())
     models = bch.models()
     if not models:
@@ -170,6 +178,10 @@ def model_meshes(mdir, label, tex, shared):
     manims = bch.material_animations()
     tracks = em.anim_tracks(manims[0] if manims else None)
     notes, meshes, mats = [], [], {}
+    world = []
+    for b in model['bones']:
+        m = local_matrix(b['scale'], b['rot'], b['pos'])
+        world.append(m if b['parent'] < 0 else world[b['parent']] @ m)
     for obj, mi in zip(model['objects'], sm.match_objects(model['objects'], mbn)):
         if obj['silhouette'] or not (model['visibility'] >> obj['node']) & 1:
             continue
@@ -181,15 +193,27 @@ def model_meshes(mdir, label, tex, shared):
         material, lit = mats[mat['name']]
         me = mbn[mi]
         a = me['attrs']
-        for _bones, idx in me['parts']:
+        for bone_list, idx in me['parts']:
             if not len(idx):
                 continue
             used = np.unique(idx)
             remap = np.full(me['count'], -1, np.int64)
             remap[used] = np.arange(len(used))
             p = nud.Polygon()
-            p.pos = a[0][used].astype(np.float64)
+            pos = a[0][used].astype(np.float64)
             nrm = a[1][used] if 1 in a else np.tile([0.0, 0.0, 1.0], (len(used), 1))
+            if 6 not in a and len(bone_list) and world:
+                # rigid skinning (no weights): the vertices are in their bone's space (the crystals' bones
+                # carry their place in the room), so the bind pose places them
+                bi = a[5][used, 0].astype(np.int64) if 5 in a else np.zeros(len(used), np.int64)
+                bones_of = np.asarray(bone_list)[np.minimum(bi, len(bone_list) - 1)]
+                for b in np.unique(bones_of):
+                    sel = bones_of == b
+                    m = world[b]
+                    pos[sel] = pos[sel] @ m[:3, :3].T + m[:3, 3]
+                    nrm = np.array(nrm, float)
+                    nrm[sel] = nrm[sel] @ np.linalg.inv(m[:3, :3])
+            p.pos = pos
             p.nrm = nrm / np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-8)
             col = a[2][used].astype(np.float64) if 2 in a else np.ones((len(used), 4))
             if lit:
@@ -203,7 +227,14 @@ def model_meshes(mdir, label, tex, shared):
             p.materials = [material.copy()]
             if len(p.pos) >= 0x10000:
                 raise ValueError('%s/%s: %d vertices' % (label, obj['name'], len(p.pos)))
-            meshes.append(nud.Mesh(obj['name'], [p]))
+            base = p.pos
+            for k, (dx, dy) in enumerate(offsets):
+                q = p
+                if k:
+                    q = copy.copy(p)
+                    q.materials = [material.copy()]
+                q.pos = base + np.array([dx, dy, 0.0]) if (dx or dy) else base
+                meshes.append(nud.Mesh(obj['name'] if not k else '%s_%d' % (obj['name'], k), [q]))
     # UV scrolls (coordinator 0's scale / translation) as NU_colorSamplerUV a frame; the rest counted
     entries, frames, skipped = [], int(round(manims[0]['frames'])) if manims else 0, 0
     by_name = {m['name']: m for m in model['materials']}
@@ -234,17 +265,62 @@ def model_meshes(mdir, label, tex, shared):
 def area_models(src, area):
     root = os.path.join(src, 'stage', 'field_smash', area, 'model')
     return [n for n in sorted(os.listdir(root)) if os.path.exists(os.path.join(root, n, 'normal.bch'))
-            and os.path.exists(os.path.join(root, n, 'normal.mbn')) and not any(s in n for s in SKIP)]
+            and os.path.exists(os.path.join(root, n, 'normal.mbn')) and not any(s in n for s in SKIP)
+            and n not in SKIP_MODELS.get(area, ())]
+
+
+def _bounds(mdir):
+    mbn = sm.read_mbn(open(os.path.join(mdir, 'normal.mbn'), 'rb').read())
+    p = np.concatenate([m['attrs'][0] for m in mbn])
+    return p.min(0)[:2], p.max(0)[:2]
+
+
+def placements(src, area, name):
+    """where a model goes: [(dx, dy)] (one copy each), [(0, 0)] for one where it is. Smash Run's code places
+    some pieces: the climb's tower (Nobore: its pieces in one segment's coordinates, the segment's collision
+    five times at start offsets 1300 apart: a copy of every piece at each offset, the floor once at the first),
+    MainField's moving floors (at the origin; a copy where a collision of the same width sits, at its start
+    offset)"""
+    paths = glob.glob(os.path.join(src, 'stage', 'field_smash', area, 'param', '*.lvd'))
+    cols = [c for p in paths for c in lvd.LVD(p).collisions]
+    if area == 'Nobore':
+        starts = sorted({c.start[1] for c in cols if c.use_start and c.start[0] == 0 and c.start[1]})
+        if name.endswith('_FLOOR'):
+            return [(0.0, starts[0])]
+        return [(0.0, y) for y in starts]
+    if 'MovingFloor' in name:
+        lo, hi = _bounds(os.path.join(src, 'stage', 'field_smash', area, 'model', name))
+        w = hi[0] - lo[0]
+        out = []
+        per_start = {}
+        for c in cols:
+            per_start[tuple(c.start[:2])] = per_start.get(tuple(c.start[:2]), 0) + 1
+        for c in cols:
+            # a floor's own offset (one collision at it; a structure's is shared by many)
+            if c.use_start and any(c.start[:2]) and per_start[tuple(c.start[:2])] == 1:
+                xs = [v[0] for v in c.verts]
+                if abs((max(xs) - min(xs)) - w) <= 0.06 * w + 2:
+                    out.append((float(c.start[0]), float(c.start[1])))
+        return sorted(set(out)) or [(0.0, 0.0)]
+    return [(0.0, 0.0)]
 
 
 # ---------------------------------------------------------------- collision
+def placed(c):
+    """a collision's vertices where the game puts them: offset by its start position when use_start is set (the
+    climb's tower is one segment's lines five times, 1300 apart; the race's hazards)"""
+    off = c.start[:2] if c.use_start else (0.0, 0.0)
+    return [(v[0] + off[0], v[1] + off[1]) for v in c.verts]
+
+
 def floors(cols):
     """[(x0, y0, x1, y1)] the floor lines (normal up) of the solid collisions"""
     out = []
     for c in cols:
+        vs = placed(c)
         for i, n in enumerate(c.normals):
-            if n[1] > 0.7 and i + 1 < len(c.verts):
-                (x0, y0), (x1, y1) = c.verts[i][:2], c.verts[i + 1][:2]
+            if n[1] > 0.7 and i + 1 < len(vs):
+                (x0, y0), (x1, y1) = vs[i], vs[i + 1]
                 out.append((min(x0, x1), y0 if x0 <= x1 else y1, max(x0, x1), y1 if x0 <= x1 else y0))
     return out
 
@@ -324,8 +400,8 @@ def area_lvd(src, area, base_lvd, open_room=False):
     base_y = float(min(p[1] for p in pts))
     for e, (dx, dy) in zip(lv.respawns, RESPAWN):
         e.x, e.y = cx + dx, base_y + dy
-    xs = [v[0] for c in cols for v in c.verts]
-    ys = [v[1] for c in cols for v in c.verts]
+    xs = [v[0] for c in cols for v in placed(c)]
+    ys = [v[1] for c in cols for v in placed(c)]
     if main.camera:
         b = main.camera[0]
         cam = (b.left, b.right, b.top, b.bottom)
@@ -357,8 +433,10 @@ def area_lvd(src, area, base_lvd, open_room=False):
 
 
 # ---------------------------------------------------------------- the build
-def build(src, area, base, out, log=print, open_room=False):
-    od = os.path.join(out, area + ('_open' if open_room else ''), 'stage', 'melee', 'NewStage01')
+def build(src, area, base, out, log=print, open_room=False, form='melee'):
+    """BASE: the slot's stage/FORM/NewStage01 (melee: Battlefield's copy; end: its Omega form) -> OUT/AREA[_open]/
+    stage/FORM/NewStage01"""
+    od = os.path.join(out, area + ('_open' if open_room else ''), 'stage', form, 'NewStage01')
     if os.path.exists(od):
         shutil.rmtree(od)
     shutil.copytree(base, od)
@@ -371,7 +449,8 @@ def build(src, area, base, out, log=print, open_room=False):
     summary = dict(models=0, meshes=0, mtas=0)
     for name in area_models(src, area):
         mdir = os.path.join(src, 'stage', 'field_smash', area, 'model', name)
-        meshes, entries, frames, notes = model_meshes(mdir, '%s/%s' % (area, name), tex, shared)
+        meshes, entries, frames, notes = model_meshes(mdir, '%s/%s' % (area, name), tex, shared,
+                                                      placements(src, area, name))
         if not meshes:
             log('  %s: nothing drawn (%s)' % (name, '; '.join(notes)))
             continue
@@ -454,10 +533,11 @@ def preview(od, path, size=900):
     def sc(x, y):
         return ((x - cx) / span + 0.5) * size, (0.5 - (y - cy) / span) * size
     for c in lv.collisions:
-        for i in range(len(c.verts) - 1):
+        vs = placed(c)
+        for i in range(len(vs) - 1):
             n = c.normals[i] if i < len(c.normals) else (0, 1)
             colr = (0, 255, 255) if c.flags[3] else (0, 255, 0) if n[1] > 0.7 else (255, 60, 60)
-            dr.line([sc(*c.verts[i][:2]), sc(*c.verts[i + 1][:2])], fill=colr, width=2)
+            dr.line([sc(*vs[i]), sc(*vs[i + 1])], fill=colr, width=2)
     for pts, colr in ((lv.spawns, (255, 255, 0)), (lv.respawns, (255, 255, 255))):
         for s in pts:
             x, y = sc(s.x, s.y)

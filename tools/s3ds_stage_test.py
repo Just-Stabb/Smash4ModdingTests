@@ -7,7 +7,9 @@ slot's Battlefield copy, reading the written files back with the repo's readers:
   test 518 or none, under 65536 vertices a polygon; textures NTWU, one mip, power-of-two 64-2048, BC1 / BC3, ids
   from 0x2000F001 (one id an image, shared by the folders using it); every Battlefield model folder hidden (all
   its indices 0); no file of the base missing.
-- geometry, end to end: every mesh's positions the 3DS .mbn's; its UVs through the body shader's transform
+- geometry, end to end: every mesh's positions the 3DS .mbn's (a rigid part placed by its bone's bind
+  pose; a copy at each of s3ds_stage.placements: the climb's tower segments, MainField's moving floors); its
+  UVs through the body shader's transform
   (s3ds_preview.nud_uv, NU_colorSamplerUV) where the 3DS's coordinator transform (SPICA's) puts the 3DS UVs.
 - collision: the 3DS .lvds' collisions (vertices, normals, materials, pass-through flags) in order (the open
   build without the enclosing loops), no bone links; 8 spawns, each on a floor line (or the 3DS's own spawn);
@@ -29,6 +31,7 @@ import nud  # noqa: E402
 import nut  # noqa: E402
 import s3ds_model as sm  # noqa: E402
 import s3ds_stage as st  # noqa: E402
+from s3ds_enemy import local_matrix  # noqa: E402
 from s3ds_preview import nud_uv  # noqa: E402
 
 FAILS = []
@@ -64,16 +67,22 @@ def model_checks(src, area, od, all_ids):
         bch = sm.Bch(open(os.path.join(mdir, 'normal.bch'), 'rb').read())
         model = bch.models()[0]
         mbn = sm.read_mbn(open(os.path.join(mdir, 'normal.mbn'), 'rb').read())
+        offsets = st.placements(src, area, name)
+        world = []
+        for b in model['bones']:
+            lm = local_matrix(b['scale'], b['rot'], b['pos'])
+            world.append(lm if b['parent'] < 0 else world[b['parent']] @ lm)
         want = []
         for obj, mi in zip(model['objects'], sm.match_objects(model['objects'], mbn)):
             if obj['silhouette'] or not (model['visibility'] >> obj['node']) & 1:
                 continue
-            for _b, idx in mbn[mi]['parts']:
+            for bl, idx in mbn[mi]['parts']:
                 if len(idx):
-                    want.append((obj, mbn[mi], idx))
+                    for off in offsets:
+                        want.append((obj, mbn[mi], idx, bl, off))
         if not check(len(written) == len(want), '%s: %d meshes != %d parts' % (tag, len(written), len(want))):
             continue
-        for m, (obj, me, idx) in zip(written, want):
+        for m, (obj, me, idx, bl, off) in zip(written, want):
             p = m.polygons[0]
             mat = p.materials[0]
             check(m.bind == 0 and m.bone == -1, '%s/%s: unbound' % (tag, m.name))
@@ -84,8 +93,17 @@ def model_checks(src, area, od, all_ids):
             check(p.nv < 0x10000, '%s/%s: vertices' % (tag, m.name))
             a = me['attrs']
             used = np.unique(idx)
-            # rigged polygons aren't read back (positions in the vertex add section): ours are all unrigged
-            worst_pos = max(worst_pos, float(np.abs(p.pos - a[0][used]).max()))
+            # rigged polygons aren't read back (positions in the vertex add section): ours are all unrigged.
+            # A rigid part (no weights) is in its bone's space: its bind pose places it; then the placement
+            pos = a[0][used].astype(float)
+            if 6 not in a and len(bl) and world:
+                bi = a[5][used, 0].astype(int) if 5 in a else np.zeros(len(used), int)
+                bo = np.asarray(bl)[np.minimum(bi, len(bl) - 1)]
+                for b in np.unique(bo):
+                    sel = bo == b
+                    pos[sel] = pos[sel] @ world[b][:3, :3].T + world[b][:3, 3]
+            pos[:, :2] += off
+            worst_pos = max(worst_pos, float(np.abs(p.pos - pos).max()))
             mat3 = model['materials'][obj['material']]
             if 3 in a and 'coords' in mat3:
                 co = mat3['coords'][0]

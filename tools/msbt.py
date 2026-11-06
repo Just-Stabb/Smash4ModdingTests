@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read / write the game's MSBT text files (ui/message/*.msbt: big-endian, UTF-16, sections LBL1 /
-ATR1 / TXT2).
+ATR1 / TXT2). Little-endian files (Smash 3DS's) are read too: texts are kept big-endian, so build() writes
+the Wii U form (header byte-order mark and encoding fields big-endian).
 
   python3 tools/msbt.py FILE [PATTERN]     list labels (containing PATTERN) and their text
 """
@@ -17,34 +18,44 @@ def _hash(label, groups):
 
 class Msbt:
     def __init__(self, data):
-        assert data[:8] == b'MsgStdBn' and data[8:10] == b'\xfe\xff', 'not a big-endian MSBT'
+        assert data[:8] == b'MsgStdBn' and data[8:10] in (b'\xfe\xff', b'\xff\xfe'), 'not an MSBT'
+        e = '>' if data[8:10] == b'\xfe\xff' else '<'
+        self.endian = e
         self.header = bytearray(data[:0x20])
+        if e == '<':
+            # the Wii U header: BOM fe ff, the u16 / u32 fields big-endian
+            self.header[8:10] = b'\xfe\xff'
+            for o, f in ((0xE, 'H'), (0x12, 'I')):
+                n = struct.calcsize(f)
+                self.header[o:o + n] = struct.pack('>' + f, struct.unpack('<' + f, data[o:o + n])[0])
         self.groups = 0
         self.labels = {}            # label -> text index
         self.texts = []             # raw UTF-16 bytes, without the terminator
         self.atr = None
         o = 0x20
         while o < len(data):
-            mag, size = data[o:o + 4], struct.unpack('>I', data[o + 4:o + 8])[0]
+            mag, size = data[o:o + 4], struct.unpack(e + 'I', data[o + 4:o + 8])[0]
             body = data[o + 16:o + 16 + size]
             if mag == b'LBL1':
-                self.groups = struct.unpack('>I', body[:4])[0]
+                self.groups = struct.unpack(e + 'I', body[:4])[0]
                 for g in range(self.groups):
-                    n, off = struct.unpack('>II', body[4 + 8 * g:12 + 8 * g])
+                    n, off = struct.unpack(e + 'II', body[4 + 8 * g:12 + 8 * g])
                     for _ in range(n):
                         ln = body[off]
                         name = body[off + 1:off + 1 + ln].decode('ascii')
-                        self.labels[name] = struct.unpack('>I', body[off + 1 + ln:off + 5 + ln])[0]
+                        self.labels[name] = struct.unpack(e + 'I', body[off + 1 + ln:off + 5 + ln])[0]
                         off += 5 + ln
             elif mag == b'ATR1':
-                self.atr = body
+                self.atr = body if e == '>' else struct.pack('>II', *struct.unpack('<II', body[:8])) + body[8:]
             elif mag == b'TXT2':
-                n = struct.unpack('>I', body[:4])[0]
-                offs = list(struct.unpack('>%dI' % n, body[4:4 + 4 * n])) + [len(body)]
+                n = struct.unpack(e + 'I', body[:4])[0]
+                offs = list(struct.unpack(e + '%dI' % n, body[4:4 + 4 * n])) + [len(body)]
                 for i in range(n):
                     t = body[offs[i]:offs[i + 1]]
                     if t.endswith(b'\0\0'):
                         t = t[:-2]
+                    if e == '<':        # UTF-16 units (text and control codes alike) to big-endian
+                        t = b''.join(t[k + 1:k + 2] + t[k:k + 1] for k in range(0, len(t) - 1, 2))
                     self.texts.append(t)
             o += 16 + size
             o = (o + 15) & ~15

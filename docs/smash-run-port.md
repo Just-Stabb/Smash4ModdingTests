@@ -278,6 +278,50 @@ Run) aren't areas.
 - As versus stages: the rooms play as normal stages; the race / climb and the field are far larger than the
   camera's usual range (it frames everyone, so it will be zoomed far out when fighters spread).
 
+## The stages in their own slots (no replacement)
+
+`python3 tools/smashrun_slots.py SRC_ROOT BASE_STAGE PARAM_DIR SOUND_DB MSBT UI_DIR LOGO OUT --rpx IN.rpx` makes
+every build above a stage of its own next to NewStage01 (Minecraft World): ten new slots
+(`stage_slot_cave.py`, docs/stage-expansion.md), on page 2 with the DLC stages.
+
+| folder | area | cosmetic | kinds | name |
+|---|---|---|---|---|
+| SR_Room00 | MiniRoom00 | 0x39 | 0x82 / 0x83 | Smash Run Room |
+| SR_Room00Open | MiniRoom00, open | 0x3A | 0x84 / 0x85 | Open Room |
+| SR_Room01 | MiniRoom01 | 0x3B | 0x86 / 0x87 | Crystal Room |
+| SR_Room02 | MiniRoom02 | 0x3C | 0x88 / 0x89 | Crystal Cave |
+| SR_Room03 | MiniRoom03 | 0x3D | 0x8A / 0x8B | Platform Room |
+| SR_Room05 | MiniRoom05 | 0x3E | 0x8C / 0x8D | Long Room |
+| SR_Race00 | Race00 | 0x3F | 0x8E / 0x8F | Run! Course 1 |
+| SR_Race01 | Race01 | 0x40 | 0x90 / 0x91 | Run! Course 2 |
+| SR_Climb | Nobore | 0x41 | 0x92 / 0x93 | Climb! |
+| SR_Field | MainField | 0x42 | 0x94 / 0x95 | Smash Run Field |
+
+("Run!" / "Climb!" are the 3DS's names for the final battles, `menu.msbt` MmenField_st_2_3 / 2_2.)
+- Both forms are the Smash Run stage: `stage/melee/NAME` built on Battlefield's melee copy, `stage/end/NAME`
+  (Omega) on its Omega copy; files renamed (`NAME00.lvd`, `Z_NAME_00.lvd`, `NAME_stprm.bin`). Battlefield's own
+  model folders (hidden in NewStage01's builds) are left out: 10 of a stage's 12 MB, and nothing else in the
+  folder refers to them (the generic stage loads a folder's files by pattern). Untested in game; their hidden
+  copies are kept apart for a stage that wouldn't load without them.
+- Database / songs / texts on the installed files (the user's `ui_stage_db.bin` with NewStage01 at 0x38, the
+  Minecraft music `ui_sound_db.bin`, the newest `melee.msbt`): NewStage01's entry copied (Battlefield's, page 2),
+  Battlefield's song list, `MmelStageN_` the name, `MmelStageG_` "Smash Run".
+- Pictures rendered from the converted stage (its camera bounds, a 600 x 300 window over a long course's
+  start) into the templates' formats: stage_11 preview, stage_10 / stage_12 / stage_30 / stage_13 crops (as
+  Minecraft World's), stagen_10 the name banner, stagel_10 the unmodified Battlefield's "Super Smash Bros." logo.
+- The executable: the last test's (Sephiroth test 147) + `stage_slot_cave.py` with NewStage01 and the ten
+  (`stage_slot_test.py`: kinds 0x80-0x95, names / paths, cosmetic ids 0x38-0x42, no relocation left: 0 failures).
+  Kinds past 0x81 are new ground: any table the game indexes by stage kind past the 128 it has, other than the
+  ones the cave moves, is read past its end (as NewStage01's 0x80 / 0x81 already are, which play).
+
+Placement found on the way (s3ds_stage.py, all builds): a rigidly skinned part (no weights) is in its bone's space
+(the crystals' and the race hazards' bones carry their place: each now lands within 3 units of its collision); a
+collision with `use_start` is translated by its start (the climb's tower: one segment's 31 lines five times,
+1300 apart, so the tower pieces are drawn at each, the floor at the bottom; MainField's moving floors where a
+collision of their width sits), and spawns / camera / floors use those placed lines. MainField's doors, barrels,
+springs, chests and blocks (placed by the mode's code, at the origin in the files) and the swapped states of
+Area_14 are left out.
+
 ## UV transforms (3DS coordinators -> Wii U shader UV props)
 
 Both sides read from code, not guessed:
