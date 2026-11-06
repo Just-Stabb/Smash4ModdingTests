@@ -37985,6 +37985,19 @@ void edge_hi_keep_in()
     float lo;
     float hi;
     float t;
+    // a shape made (TIMER_13, from its commit to his next up special): no one kept in, so a shape's hit can KO (test
+    // 138, the user: "Please allow shapes to KO opponents. Right now, regardless of damage or knockback a shape cannot
+    // KO at all": its hit lands in Octaslash's end, where everyone in hitstun was marked and held inside)
+    if (WorkModuleF(0, 0x0f00032d) > 0.0f)
+    {
+        slot = 0;
+        while (slot < 0x8)
+        {
+            WorkModule(0, 0.0f, 0x0f000320 + slot);
+            slot = slot + 1;
+        }
+        return;
+    }
     on = 0;
     if (edge_hi_charged && (global4 == 0x159 || global4 == 0x15a))
     {
@@ -38281,6 +38294,7 @@ void edge_tr_begin()
     WorkModule(0, 5.0f, 0x0f00032a);
     WorkModule(0, 0.0f, 0x0f00032b);
     WorkModule(0, 0.0f, 0x0f00032c);
+    WorkModule(0, 0.0f, 0x0f00032d);               // the blast-zone keep-in back (test 138)
     // point 0 up a frame before point 1 can follow it (VAR_10, 2 frames, his per-frame hook counting it down): test 131,
     // point 1 could be written the frame point 0 was (the rush's main and loop), the old lines' articles never saw point
     // 0, so tested no first piece, and a line started where another ended never met it (the user's clip: "this shape
@@ -38579,6 +38593,7 @@ void edge_tr_steps()
         WorkModule(0, (float)(i * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)), edge_tr_cross_var());
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
         ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
+        WorkModule(0, 9999.0f, 0x0f00032d);          // and it can KO: edge_hi_keep_in off till the next up special (138)
         WorkModule(0, -5.0f, edge_tr_q_var());
         if (global4 == 0x159 && edge_hi_charged)
         {

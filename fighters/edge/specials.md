@@ -188,6 +188,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     (StageData 0 - 3) by moving it there (`0x0F000020 + 4 x slot`, set slot X / Y; `edge_hi_keep_in` from func_82, and
     right after Octaslash's autolink pull, whose place is clamped the same way: test 131, it dragged them past the top
     after the hook's clamp, the user: "opponents can still be dragged and KO'd by the top blastzone by Octaslash").
+    Once a shape is made the keep-in is off, marks cleared, until his next up special (TIMER_13; test 138, the user:
+    "Please allow shapes to KO opponents. Right now, regardless of damage or knockback a shape cannot KO at all": the
+    shape's hit lands in Octaslash's forced end, where everyone in hitstun was marked and held inside).
     Test 127 kept them in only while he was in 0x159 / 0x15A (the user: it "still allows for KOing in the blast
     zone": the finisher's launch carries them on after the end status) and 15 from the sides. Approximated: a marked
     fighter hit by someone else within those frames is kept in too.

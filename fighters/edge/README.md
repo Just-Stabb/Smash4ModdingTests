@@ -2056,3 +2056,13 @@ measured (+5%), but nothing was drawn and the lines stayed: the commit didn't re
   (harmless; whether they mattered isn't known).
 - port_check over the chain, tests 70–115 and 117–137: 30 errors, 55 warnings, 7 notes.
 - Package (install over 136): `script/msc/edge.mscsb`.
+
+## Test 138 (`build/sephiroth_test138.zip`): shapes can KO
+
+User: "Please allow shapes to KO opponents. Right now, regardless of damage or knockback a shape cannot KO at all."
+- The cause: Octaslash's blast-zone keep-in (test 127 / 128). A shape made in held Octaslash ends it, and the shape's
+  hit lands during that end status, where everyone in hitstun is marked and held inside the bounds (and a mark is
+  renewed while they stay in hitstun). Now, from a shape's commit to his next up special, the keep-in is off and every
+  mark cleared (TIMER_13), so the shape's hit (Blade Dash's too) can KO.
+- Not tested in game. port_check over the chain, tests 70–115 and 117–138: 30 errors, 55 warnings, 7 notes.
+- Package (install over 137): `script/msc/edge.mscsb`.
