@@ -851,6 +851,25 @@ def check_weapons(name, rec, rep):
                     '(extra_kinds.json "nop2"; Squirtle\'s water v5)' % (art, w['base'], ', '.join(miss)))
 
 
+# W8: the new articles' instances in all (their "max" counts): Sephiroth's 24 (fire 3, flare1 4, flare2 3, flash 1, snake 12,
+# snaketip 1) load; test 123 added trail with 40 (64 in all) and the game crashed loading him (the article pool not
+# made: its holder +0x120 list read at 0x02C0337C was empty)
+WEAPON_INSTANCES_OK = 30
+WEAPON_INSTANCES_BAD = 64
+
+
+def check_weapon_instances(name, rec, rep):
+    """W8: too many new-article instances for one fighter: the ArticleModule's pool (sized from its list's counts) isn't
+    made and the game crashes loading the fighter (Sephiroth test 123: 64 in all)"""
+    total = sum(int(w.get('max', 1)) for w in rec.get('weapons', {}).values() if isinstance(w, dict))
+    if total >= WEAPON_INSTANCES_BAD:
+        rep.add('ERROR', 'W8 weapon-instances', '%d new-article instances in all (extra_kinds.json "max"): Sephiroth '
+                'test 123 crashed loading at 64' % total)
+    elif total > WEAPON_INSTANCES_OK:
+        rep.add('WARN', 'W8 weapon-instances', '%d new-article instances in all (extra_kinds.json "max"): untested past '
+                '%d (64 crashed loading him)' % (total, WEAPON_INSTANCES_OK))
+
+
 def check_weapon_statuses(name, rep):
     """W2: a weapon MSC (fighters/NAME/weapons/*.c, built on a vanilla weapon's MSC) registering a status at or past
     its status count (global7, set in its setup): the scaffold's status change refuses it ("g_status_kind_next >=
@@ -1476,6 +1495,7 @@ def main():
     check_weapon_motion(inst, a.name, rec, rep)
     check_weapon_facing(a.name, rep)
     check_weapon_owner(inst, a.name, rec, rep)
+    check_weapon_instances(a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)

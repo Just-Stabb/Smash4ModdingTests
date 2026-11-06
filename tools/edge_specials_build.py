@@ -573,6 +573,8 @@ def main():
         import edge_snake_articles
         for name in SNAKE_ARTICLES:
             compile_msc(os.path.join(EDGE, 'weapons', name + '.c'), os.path.join(msc, name, name + '.mscsb'))
+        import edge_trail_msc
+        open(os.path.join(EDGE, 'weapons/trail.c'), 'w').write(edge_trail_msc.generate())
         compile_msc(os.path.join(EDGE, 'weapons/trail.c'), os.path.join(msc, 'trail/trail.mscsb'))
         print(edge_snake_articles.build_trail(os.path.join(a.zelda, 'model/lightingbowarrow/c00'), fighter))
         if a.body_model:

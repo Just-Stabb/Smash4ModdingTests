@@ -593,20 +593,274 @@ void func_48()
     
 }
 
-// ---- Sephiroth's up special trail (test 123; fighters/edge/specials.md "Up special", the user's concept stage 2): one
-// straight piece of the purple line his path leaves during either up special's attack, from (x0, y0) to (x1, y1) as he
-// handed it (his VAR_28 / VAR_29, packed points, read at its creation), staying where it is 360 frames. The base is the snake run's
-// (Zelda's dein, script/msc/snake): the model a thin glowing purple ribbon along +Z (tools/edge_snake_articles.py
-// build_trail), EndN (joint 0x7D2) moved out to the piece's length
+// ---- Sephiroth's up special trail (tools/edge_trail_msc.py; test 124): one stretch of the purple line his path leaves
+// during either up special's attack, up to 16 points; still, removed after 360 frames
 int tr_slot;            // his player slot (0 - 7), -1: not found
 int tr_life;            // frames left
+int tr_base;            // its first point's number
+int tr_last;            // the number of the last point taken
+int tr_n;               // points taken
+int tr_done;            // 1: it takes no more
+float tr_ox;            // its first point (where it stands)
+float tr_oy;
+float tr_px;            // tr_unpack's result
+float tr_py;
 float tr_x0;
 float tr_y0;
 float tr_x1;
 float tr_y1;
-float tr_z;
+float tr_x2;
+float tr_y2;
+float tr_x3;
+float tr_y3;
+float tr_x4;
+float tr_y4;
+float tr_x5;
+float tr_y5;
+float tr_x6;
+float tr_y6;
+float tr_x7;
+float tr_y7;
+float tr_x8;
+float tr_y8;
+float tr_x9;
+float tr_y9;
+float tr_x10;
+float tr_y10;
+float tr_x11;
+float tr_y11;
+float tr_x12;
+float tr_y12;
+float tr_x13;
+float tr_y13;
+float tr_x14;
+float tr_y14;
+float tr_x15;
+float tr_y15;
 
-int tr_life_frames() { return 360; }    // the user: "persists for 6 seconds"
+int tr_points() { return 16; }
+
+float tr_get_x(int k)
+{
+    if (k == 0)
+    {
+        return tr_x0;
+    }
+    if (k == 1)
+    {
+        return tr_x1;
+    }
+    if (k == 2)
+    {
+        return tr_x2;
+    }
+    if (k == 3)
+    {
+        return tr_x3;
+    }
+    if (k == 4)
+    {
+        return tr_x4;
+    }
+    if (k == 5)
+    {
+        return tr_x5;
+    }
+    if (k == 6)
+    {
+        return tr_x6;
+    }
+    if (k == 7)
+    {
+        return tr_x7;
+    }
+    if (k == 8)
+    {
+        return tr_x8;
+    }
+    if (k == 9)
+    {
+        return tr_x9;
+    }
+    if (k == 10)
+    {
+        return tr_x10;
+    }
+    if (k == 11)
+    {
+        return tr_x11;
+    }
+    if (k == 12)
+    {
+        return tr_x12;
+    }
+    if (k == 13)
+    {
+        return tr_x13;
+    }
+    if (k == 14)
+    {
+        return tr_x14;
+    }
+    if (k == 15)
+    {
+        return tr_x15;
+    }
+    return 0.0f;
+}
+
+float tr_get_y(int k)
+{
+    if (k == 0)
+    {
+        return tr_y0;
+    }
+    if (k == 1)
+    {
+        return tr_y1;
+    }
+    if (k == 2)
+    {
+        return tr_y2;
+    }
+    if (k == 3)
+    {
+        return tr_y3;
+    }
+    if (k == 4)
+    {
+        return tr_y4;
+    }
+    if (k == 5)
+    {
+        return tr_y5;
+    }
+    if (k == 6)
+    {
+        return tr_y6;
+    }
+    if (k == 7)
+    {
+        return tr_y7;
+    }
+    if (k == 8)
+    {
+        return tr_y8;
+    }
+    if (k == 9)
+    {
+        return tr_y9;
+    }
+    if (k == 10)
+    {
+        return tr_y10;
+    }
+    if (k == 11)
+    {
+        return tr_y11;
+    }
+    if (k == 12)
+    {
+        return tr_y12;
+    }
+    if (k == 13)
+    {
+        return tr_y13;
+    }
+    if (k == 14)
+    {
+        return tr_y14;
+    }
+    if (k == 15)
+    {
+        return tr_y15;
+    }
+    return 0.0f;
+}
+
+void tr_set(int k, float x, float y)
+{
+    if (k == 0)
+    {
+        tr_x0 = x;
+        tr_y0 = y;
+    }
+    if (k == 1)
+    {
+        tr_x1 = x;
+        tr_y1 = y;
+    }
+    if (k == 2)
+    {
+        tr_x2 = x;
+        tr_y2 = y;
+    }
+    if (k == 3)
+    {
+        tr_x3 = x;
+        tr_y3 = y;
+    }
+    if (k == 4)
+    {
+        tr_x4 = x;
+        tr_y4 = y;
+    }
+    if (k == 5)
+    {
+        tr_x5 = x;
+        tr_y5 = y;
+    }
+    if (k == 6)
+    {
+        tr_x6 = x;
+        tr_y6 = y;
+    }
+    if (k == 7)
+    {
+        tr_x7 = x;
+        tr_y7 = y;
+    }
+    if (k == 8)
+    {
+        tr_x8 = x;
+        tr_y8 = y;
+    }
+    if (k == 9)
+    {
+        tr_x9 = x;
+        tr_y9 = y;
+    }
+    if (k == 10)
+    {
+        tr_x10 = x;
+        tr_y10 = y;
+    }
+    if (k == 11)
+    {
+        tr_x11 = x;
+        tr_y11 = y;
+    }
+    if (k == 12)
+    {
+        tr_x12 = x;
+        tr_y12 = y;
+    }
+    if (k == 13)
+    {
+        tr_x13 = x;
+        tr_y13 = y;
+    }
+    if (k == 14)
+    {
+        tr_x14 = x;
+        tr_y14 = y;
+    }
+    if (k == 15)
+    {
+        tr_x15 = x;
+        tr_y15 = y;
+    }
+}
 
 int tr_find_owner()
 {
@@ -643,9 +897,6 @@ float tr_shared(int k)
 }
 
 // a point as he packs it (edge.c edge_tr_pack): (x + 512) x 2 whole x 2048 + (y + 512) x 2 whole, half units
-float tr_px;
-float tr_py;
-
 void tr_unpack(float v)
 {
     int c;
@@ -656,32 +907,53 @@ void tr_unpack(float v)
     tr_py = (float)(c - ix * 0x800) * 0.5f - 512.0f;
 }
 
+// his newest point (shared 5, its number shared 6), if it's new and within this stretch
+void tr_take()
+{
+    int num;
+    if (tr_done || tr_slot < 0)
+    {
+        return;
+    }
+    num = (int)tr_shared(0x6);
+    if (num > tr_last && num <= tr_base + tr_points() - 1 && tr_n < tr_points())
+    {
+        tr_unpack(tr_shared(0x5));
+        tr_set(tr_n, tr_px, tr_py);
+        tr_n = tr_n + 1;
+        tr_last = num;
+        return;
+    }
+    if (tr_shared(0x4) < 0.0f || num >= tr_base + tr_points() - 1 || num < tr_base)
+    {
+        tr_done = 0x1;          // the trail's over (or this stretch is full, or a new trail began)
+    }
+}
+
 void tr_still()
 {
     KineticModule(0x11, 0, 0, 0);
     KineticModule(0xf, 0, 0, 0);
 }
 
-// at (x0, y0), along (x0, y0) -> (x1, y1): facing its x's way, pitched up by its angle (the snake run's sn_place: the
-// facing turns the model to that side, 0x2717 the pitch about X), stretched to its length
-void tr_place()
+// the joints: P_k at point k (the last taken for those past it), relative to the first point
+void tr_pose()
 {
-    float dx;
-    float dy;
-    float l;
-    float lr;
-    dx = tr_x1 - tr_x0;
-    dy = tr_y1 - tr_y0;
-    l = MathF(0, dx * dx + dy * dy);
-    lr = 1.0f;
-    if (dx < 0.0f)
+    int k;
+    int j;
+    PostureModule(0, 1.0f);
+    PostureModule(0x2714, tr_ox, tr_oy, PostureModuleF(0x3));
+    k = 0;
+    while (k < tr_points())
     {
-        lr = -1.0f;
+        j = k;
+        if (j > tr_n - 1)
+        {
+            j = tr_n - 1;
+        }
+        ModelModule(0x7, 0x7d2 + k, 0, tr_get_y(j) - tr_oy, tr_get_x(j) - tr_ox);
+        k = k + 1;
     }
-    PostureModule(0, lr);
-    PostureModule(0x2714, tr_x0, tr_y0, tr_z);
-    PostureModule(0x2717, -(MathF(0x1, dy, dx * lr) * 57.29578f), 0, 0);
-    ModelModule(0x7, 0x7d2, 0, 0, l);
 }
 
 int tr_over()
@@ -698,24 +970,25 @@ int tr_over()
 void func_46()
 {
     tr_slot = tr_find_owner();
-    tr_life = tr_life_frames();
-    tr_x0 = PostureModuleF(0x1);
-    tr_y0 = PostureModuleF(0x2);
-    tr_x1 = tr_x0;
-    tr_y1 = tr_y0;
-    tr_z = PostureModuleF(0x3);
+    tr_life = 360;
+    tr_n = 0;
+    tr_done = 0;
+    tr_ox = PostureModuleF(0x1);
+    tr_oy = PostureModuleF(0x2);
+    tr_base = 0;
     if (tr_slot >= 0)
     {
-        tr_unpack(tr_shared(0x4));              // VAR_28 / VAR_29: the piece he made it for
-        tr_x0 = tr_px;
-        tr_y0 = tr_py;
+        tr_base = (int)tr_shared(0x6);
         tr_unpack(tr_shared(0x5));
-        tr_x1 = tr_px;
-        tr_y1 = tr_py;
-        tr_z = WorkModuleF(0, 0x0f000022 + 0x4 * tr_slot);
+        tr_ox = tr_px;
+        tr_oy = tr_py;
+        PostureModule(0x2714, tr_ox, tr_oy, WorkModuleF(0, 0x0f000022 + 0x4 * tr_slot));
     }
+    tr_set(0, tr_ox, tr_oy);
+    tr_n = 1;
+    tr_last = tr_base;
     tr_still();
-    tr_place();
+    tr_pose();
     func_24(0, 0, 1.0f);
     callFunc3(func_47);
 }
@@ -727,5 +1000,6 @@ void func_47()
         return 0x1;
     }
     tr_still();
-    tr_place();
+    tr_take();
+    tr_pose();
 }

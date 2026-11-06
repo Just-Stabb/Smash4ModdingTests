@@ -38045,18 +38045,22 @@ void edge_hi_link()
     WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
 }
 
-// ---- the up special trail (test 123, the user's concept stage 2: "Tap up and hold up special both leave a purple line
-// trail that persists for 6 seconds following Sephiroth's movement until he begins falling"): his middle's path from
-// the attack's start (the rush) to the air end's first falling frame (or the ground end) is laid down as straight pieces
-// of edge_tr_seg(), each a `trail` article (weapons/trail.c, 360 frames). The piece's ends go to its article through
-// his VAR_28 (start; -1 while no trail is being laid) and VAR_29 (end), packed (edge_tr_pack): his shared 4 / 5, free
-// in up special (the snake sword's runs only while it's out; Shadow Flare's orbs use 0 - 3, the Phantom 7)
+// ---- the up special trail (tests 123 / 124, the user's concept stage 2: "Tap up and hold up special both leave a purple
+// line trail that persists for 6 seconds following Sephiroth's movement until he begins falling"): his middle's path
+// from the attack's start (the rush) to the air end's first falling frame (or the ground end) as points edge_tr_seg()
+// apart (one a frame at most), numbered from 0. `trail` articles (weapons/trail.c, tools/edge_trail_msc.py) draw it,
+// each a stretch of 16 points (15 pieces) from the one before's last, 360 frames: a new one at points 0, 15, 30, ...
+// His shared 4 / 5 / 6 (VAR_28 - VAR_30: free in up special; Shadow Flare's orbs use 0 - 3, the Phantom 7, the snake
+// runs 0 - 6 only while the sword's out): the last point (-1 while no trail is laid), the newest point, its number;
+// points packed (edge_tr_pack). Test 123 made one article per 8-long piece, 40 at most: the game crashed loading him
 int   edge_tr_art() { return 0xb; }              // article 11 (Zelda's 0 - 4, fire, flare1, flare2, flash, snake,
-                                                 // snaketip, trail: tools/extra_kinds.json)
-float edge_tr_seg() { return 8.0f; }             // a piece's length
+                                                 // snaketip, trail: tools/extra_kinds.json, 6 at most)
+float edge_tr_seg() { return 4.0f; }             // the points' spacing
+int   edge_tr_per() { return 15; }               // pieces an article draws
 float edge_tr_mid() { return 9.0f; }             // his middle above his feet
 int   edge_tr_last_var() { return 0x0f00031c; }  // VAR_28
-int   edge_tr_end_var() { return 0x0f00031d; }   // VAR_29
+int   edge_tr_new_var() { return 0x0f00031d; }   // VAR_29
+int   edge_tr_num_var() { return 0x0f00031e; }   // VAR_30
 
 float edge_tr_pack(float x, float y)
 {
@@ -38095,14 +38099,26 @@ float edge_tr_y(float v)
     return (float)(c - (c / 0x800) * 0x800) * 0.5f - 512.0f;
 }
 
-// the trail starts here (the rush's main)
-void edge_tr_begin()
+// a point: the newest, numbered n; a new stretch's article from every edge_tr_per()-th
+void edge_tr_point(float p, int n)
 {
-    WorkModule(0, edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_last_var());
+    WorkModule(0, p, edge_tr_new_var());
+    WorkModule(0, (float)n, edge_tr_num_var());
+    WorkModule(0, p, edge_tr_last_var());
+    if (n - (n / edge_tr_per()) * edge_tr_per() == 0)
+    {
+        ArticleModule(0x2710, edge_tr_art());
+    }
 }
 
-// every frame it's laid: a piece once he's edge_tr_seg() from the last point; `last` puts down what's left (from 1
-// long) and ends the trail
+// the trail starts here (the rush's main): point 0
+void edge_tr_begin()
+{
+    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), 0);
+}
+
+// every frame it's laid: a point once he's edge_tr_seg() from the last; `last` puts down what's left (from 1 long) and
+// ends the trail
 void edge_tr_step(int last)
 {
     float v;
@@ -38111,7 +38127,6 @@ void edge_tr_step(int last)
     float dx;
     float dy;
     float d;
-    float p;
     v = WorkModuleF(0, edge_tr_last_var());
     if (v < 0.0f)
     {
@@ -38124,10 +38139,7 @@ void edge_tr_step(int last)
     d = dx * dx + dy * dy;
     if (d >= edge_tr_seg() * edge_tr_seg() || last && d >= 1.0f)
     {
-        p = edge_tr_pack(x, y);
-        WorkModule(0, p, edge_tr_end_var());
-        ArticleModule(0x2710, edge_tr_art());
-        WorkModule(0, p, edge_tr_last_var());
+        edge_tr_point(edge_tr_pack(x, y), (int)WorkModuleF(0, edge_tr_num_var()) + 1);
     }
     if (last)
     {

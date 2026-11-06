@@ -71,7 +71,7 @@
         "snake": {"kind": "0x199", "base": "dein", "max": 12, "flags_set": "0x40"},
         "snaketip": {"kind": "0x19A", "base": "dein", "max": 1, "on_hit": 0, "flags_set": "0x40"},
         "phantom": "0x19B",
-        "trail": {"kind": "0x19C", "base": "dein", "max": 40, "flags_set": "0x40"}
+        "trail": {"kind": "0x19C", "base": "dein", "max": 6, "flags_set": "0x40"}
       }
     },
     {

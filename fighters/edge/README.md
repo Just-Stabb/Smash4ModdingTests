@@ -1777,3 +1777,18 @@ line trail that persists for 6 seconds following Sephiroth's movement until he b
 - Package (install over 122): `code/cross_f.rpx`, `fighter/edge/model/trail/`, `script/animcmd/weapon/trail/`,
   `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
 
+## Test 124 (`build/sephiroth_test124.zip`): the trail without the load crash
+
+User: "The game crashed when Sephiroth loaded." (Cemu log: an access violation at `0x02C0337C`, from `0x02C057F4`.) That
+code looks up one of his articles (id 2) and fell through to the article module's second pool list, whose list pointer
+(`+0x114`) was null: his article pool wasn't made, it being sized from the article list's counts and test 123's
+`trail` asked for 40 instances (64 new-article instances in all; 24 had loaded). Now:
+- `trail` is 6 at most, and each article draws a stretch of 16 points (15 pieces 4 apart) by moving its model's joints
+  P0 - P15 to them (`tools/edge_trail_msc.py` writes `weapons/trail.c`; `build_trail` the 18-bone model): 90 pieces,
+  about 360 units of line, at once.
+- `port_check` W8 weapon-instances (an ERROR at 64 new-article instances, a WARN past 30) and a row in the port guide's
+  bug catalogue.
+- port_check over the chain, tests 70–115 and 117–124: 30 errors, as before (W8 quiet: 30 instances).
+- Package (install over 123): `code/cross_f.rpx`, `model/trail/c00 - c07` (model.nud / .vbn / .jtb),
+  `script/msc/trail/trail.mscsb`, `script/msc/edge.mscsb`.
+
