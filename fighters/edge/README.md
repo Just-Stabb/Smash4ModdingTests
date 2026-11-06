@@ -1998,3 +1998,18 @@ User (clip): "Shape filling looks much better, but Octaslash still doesn't creat
 - Not tested in game. If Octaslash still makes no shape, the refusal is ruled out and the cause is elsewhere.
 - port_check over the chain, tests 70–115 and 117–133: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 132): `script/msc/edge.mscsb`.
+
+## Test 134 (`build/sephiroth_test134.zip`): no shape restriction; held Octaslash's slashes push away instead of multi-hitting
+
+User: "Remove the shape forming restriction and make held Octaslash no longer multihit, just send away from Sephiroth
+with a fixed knockback hitbox that reactivates on the same timing as each slash to send at a 40 degree angle, just
+slightly more enough to send the opponent a bit away so that they can't be chained."
+- **Shapes:** never refused (the "off screen" check from tests 128 - 133 removed).
+- **Held Octaslash's slashes** (frames 4 - 14 of each pass, held): angle 40, fixed knockback 100 (KBG 100, BKB 0):
+  89 knockback at weight 100, about 2.7 units a frame (his cruise is 2.4) and 36 frames of hitstun, by position
+  (away from him on either side), again at each slash (Ultimate's rehit every 2 frames). Still 0.14% each and no
+  hitlag. The autolink that pulled the last fighter hit along with him is off for held Octaslash (it would chain
+  them); let go, Octaslash keeps it. Its first hit and the finisher are as before.
+- Not tested in game. The knockback is set by FKB (`edge_specials_build.py` OCTA_HELD_FKB) if it needs tuning.
+- port_check over the chain, tests 70–115 and 117–134: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 133): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.

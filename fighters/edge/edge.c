@@ -38105,6 +38105,10 @@ void edge_hi_link()
     {
         return;
     }
+    if (edge_hi_charged)
+    {
+        return;                        // held Octaslash sends them away (test 134: its slashes' fixed knockback), not in
+    }
     ox = WorkModuleF(0, 0x0f000055);
     oy = WorkModuleF(0, 0x0f000056);
     if (ox * ox + oy * oy > edge_hi_link_r() * edge_hi_link_r())
@@ -38551,20 +38555,8 @@ void edge_tr_steps()
         {
             b = a;
         }
-        // not near the blast zones (off screen: test 128, the user: "make shapes not able to be formed off-screen near
-        // the bounds of the blast zone"): the shape (its middle +- its long half axis) 50 inside the side / bottom
-        // ones and 60 under the top, else CANCEL (the articles drop their marks; no fill, no hitbox)
-        // (test 133: its middle 60 past the side / bottom ones, 80 past the top. Tests 128 / 131 / 132 refused shapes
-        // within 50 - 60 / 20 - 40 / 0 of StageData 0 - 3, and Octaslash's loops at the screen's top never made a shape
-        // from test 128 on (test 127, with no refusal, made them): StageData 0 - 3 look to be the camera's bounds (the
-        // Dead status puts the KO effect at them, on screen), not the blast zones, so these margins are off screen)
-        if (cx < StageData(0) - 60.0f || cx > StageData(0x1) + 60.0f || cy < StageData(0x3) - 60.0f
-            || cy > StageData(0x2) + 80.0f)
-        {
-            WorkModule(0, edge_tr_cancel(), edge_tr_num_var());
-            WorkModule(0, -5.0f, edge_tr_q_var());
-            return;
-        }
+        // (tests 128 - 133 refused shapes near StageData 0 - 3's bounds; test 134, the user: "Remove the shape forming
+        // restriction": every shape is made. CANCEL stays in the articles, unused)
         WorkModule(0, edge_tr_pack(cx, cy), edge_tr_new_var());
         WorkModule(0, (float)(i * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)), edge_tr_cross_var());
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());

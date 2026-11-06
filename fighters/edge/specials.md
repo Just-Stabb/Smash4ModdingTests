@@ -171,8 +171,14 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     the first held, 2 looped): SpecialHi2's 1st hit (frame 2) and start effects (frame 0) are skipped on a looped
     pass, its end flash (frame 15) plays on a plain pass only, and held (VAR_20 1 / 2) its multi-hits (frames 4 - 14)
     are 0.14% each (test 127, the user: "reduce held Octaslash's multihit damage to 0.14% per hit"; 0.5% in test 126)
-    with no hitlag (test 126: "have no hitstop"; let go, Ultimate's 2.3%) (`edge_specials_build.py
-    octaslash_loop_scripts`). VAR_20 3: a shape was made (below): the rush goes straight to the end, whose finisher
+    with no hitlag (test 126: "have no hitstop"; let go, Ultimate's 2.3%) and, since test 134, no multi-hit: each a
+    fixed knockback away from him at 40 degrees, again at each slash (Ultimate's rehit every 2 frames), FKB 100 / KBG
+    100 / BKB 0 = 89 knockback at weight 100 (2.7 a frame, 36 frames of hitstun: just past his 2.4), facing restriction
+    0 (by position, Ultimate's LR_CHECK_POS: away from him either side) (the user: "make held Octaslash no longer
+    multihit, just send away from Sephiroth with a fixed knockback hitbox that reactivates on the same timing as each
+    slash to send at a 40 degree angle, just slightly more enough to send the opponent a bit away so that they can't
+    be chained"; `edge_specials_build.py octaslash_loop_scripts`, OCTA_HELD_ANGLE / OCTA_HELD_FKB). The autolink
+    (below) is off for it. VAR_20 3: a shape was made (below): the rush goes straight to the end, whose finisher
     is angle 366 (pulled toward the hitbox: "force Sephiroth to end Octaslash with the finisher hit angle that sends
     towards him, inside the shape"; SpecialHi2End / SpecialAirHi2End `_when` 3).
     **Blast zones (test 127, "make opponents hit by it unable to be KO'd by the blast zone during the duration of the
@@ -280,8 +286,8 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
     forced end, keeps the glow its 50 frames).
     **Not near the blast zones (test 128, the user: "make shapes not able to be formed off-screen near the bounds of
-    the blast zone"):** a shape whose middle is 60 past StageData 0 - 3's sides / bottom or 80 past its top isn't made
-    (test 133). Tests 128 / 131 / 132 refused shapes within 50 - 60 / 20 - 40 / 0 of them, and Octaslash's loops at the
+    the blast zone"):** removed in test 134 (the user: "Remove the shape forming restriction"): every shape is made.
+    Test 133 refused a shape whose middle was 60 past StageData 0 - 3's sides / bottom or 80 past its top. Tests 128 / 131 / 132 refused shapes within 50 - 60 / 20 - 40 / 0 of them, and Octaslash's loops at the
     screen's top never made a shape from test 128 on (test 127, with no refusal, made them): StageData 0 - 3 look to
     be the camera's bounds (the Dead status puts its KO effect at them, which is on screen), not the blast zones as
     tests 102 - 132 took them (unconfirmed: the keep-ins inside them work either way): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
@@ -290,7 +296,7 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     three Blade Dashes (0, 50) (-26.7, 70) (26.7, 70): middle (0, 60), 30 / 12; a 60 x 40 rectangle of four: middle
     (0, 40), 39 / 29.2; a Blade Dash's landing point taken), both update orders. Approximated: the hitbox is a chain
     of 5 spheres along the ellipse; a shape of five or more different trails isn't found.
-  - **Autolink:** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
+  - **Autolink (Octaslash let go only since test 134):** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22

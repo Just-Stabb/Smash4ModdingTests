@@ -184,6 +184,7 @@ def phantom_hand_flash(path):
 # held Octaslash's loop (test 113, edge.c edge_hi_*): VAR_20 0 a plain pass, 1 the first pass held, 2 a looped pass
 # (SpecialHi2 changed to again at frame 4 by the MSC, so the script runs past frames 0 - 3 at once)
 OCTA_VAR = 0x0F000314
+OCTA_HELD_ANGLE, OCTA_HELD_FKB = 40, 100   # held Octaslash's slashes (test 134)
 
 
 def octaslash_loop_scripts(game, effect):
@@ -201,12 +202,19 @@ def octaslash_loop_scripts(game, effect):
             n = len(hits)
             body = _when(0, hits, OCTA_VAR) + _when(1, hits, OCTA_VAR) + rest
         if f == 4.0:
-            # held (VAR_20 1 / 2), the loop's hits: 0.5% each, no hitlag (test 126, the user: "make the held octaslash
-            # loop hits do 0.5 damage per hit and have no hitstop"); let go (0), Ultimate's 2.3 and its hitlag
+            # held (VAR_20 1 / 2), the loop's hits: 0.14% each, no hitlag (tests 126 / 127), and since test 134 no
+            # multi-hit: a fixed knockback away from him at 40 degrees, again at each slash (its rehit every 2 frames,
+            # Ultimate's), just past his 2.4 a frame (the user: "make held Octaslash no longer multihit, just send away
+            # from Sephiroth with a fixed knockback hitbox that reactivates on the same timing as each slash to send at a
+            # 40 degree angle, just slightly more enough to send the opponent a bit away so that they can't be
+            # chained"): FKB 100, KBG 100 -> ((1 + 100 / 2) x 1.4 + 18) = 89 knockback at weight 100 (2.7 a frame, 36
+            # frames of hitstun); facing restriction 0, by position (Ultimate's LR_CHECK_POS: away from him either side).
+            # Let go (0), Ultimate's 2.3 and its hitlag
             loop = []
             for c in body:
                 if c.name.endswith('Hitbox'):
-                    held = _set(c, Damage=0.14, Hitlag=0.0)     # test 127: 0.14 (test 126: 0.5)
+                    held = _set(c, Damage=0.14, Hitlag=0.0, Angle=OCTA_HELD_ANGLE, KBG=100, FKB=OCTA_HELD_FKB, BKB=0,
+                                FacingRestrict=0)
                     loop += _when(0, [c], OCTA_VAR) + _when(1, [held], OCTA_VAR) + _when(2, [held], OCTA_VAR)
                 else:
                     loop.append(c)
@@ -236,8 +244,8 @@ def octaslash_loop_scripts(game, effect):
             else:
                 out.append(c)
         game.scripts[ecrc] = out
-    return ('held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20; its loop hits 0.14%%; the finisher 366 after a shape, '
-            'no hitlag while held\n' % n)
+    return ('held Octaslash: SpecialHi2 1st hit (%d hitboxes) and start / end effects gated on VAR_20; its loop hits 0.14%%, '
+            'angle %d FKB %d by position; the finisher 366 after a shape, no hitlag while held\n' % (n, OCTA_HELD_ANGLE, OCTA_HELD_FKB))
 
 
 def _frames(cmds):
