@@ -37905,8 +37905,13 @@ float edge_hi_loop_to() { return 14.0f; }         // ... the 7th (one before Spe
                                                   // played again the frame after (test 115; test 113 waited for 16,
                                                   // past its end, so it never looped and the pose held)
 int   edge_hi_wrap_var() { return 0x0f00030e; }   // VAR_14: 1 once the loop's pass has been on its last frame a frame
-float edge_hi_cruise() { return 2.0f; }           // held Octaslash's speed once its brake gets there (test 115, the
-                                                  // user: "moves far too fast" at a steady 6.2)
+float edge_hi_cruise() { return 2.2f; }           // held Octaslash's speed once its brake gets there (test 115, the
+                                                  // user: "moves far too fast" at a steady 6.2; test 116: 2.2)
+int   edge_hi_total_var() { return 0x0f00030f; }  // VAR_15: frames looped in all (in hitlag too)
+float edge_hi_loop_max() { return 180.0f; }       // the loop's most, hits or not (test 116, the user: "Held up special
+                                                  // loops indefinitely when an opponent is hit")
+float edge_hi_air_cut() { return 23.0f; }         // Blade Dash's air end: Fall here, the frame before its animation starts
+                                                  // into the fall (d02specialairhi1end: legs / Rot move from 24; test 116)
 float edge_hi_turn_c() { return 0.990268f; }      // the steering: 8 degrees a frame (cos / sin)
 float edge_hi_turn_s() { return 0.139173f; }
 float edge_hi_link_d() { return 10.0f; }          // autolink: the fighter hit kept this far along his rush,
@@ -37937,7 +37942,7 @@ void edge_hi_air_tick()
 // 1 while Octaslash goes on: the special button held
 int edge_hi_held()
 {
-    if (edge_hi_charged && ControlModule(0x2712, 0x1))
+    if (edge_hi_charged && ControlModule(0x2712, 0x1) && WorkModuleF(0, 0x0f000101) == 1.0f)   // SELF_SPECIAL too
     {
         return 0x1;
     }
@@ -37947,6 +37952,10 @@ int edge_hi_held()
 // a hit of Octaslash's (SELF_HIT_NOW): its time starts again
 void edge_hi_hit_check()
 {
+    if (edge_hi_charged && (float)edge_hi_count >= 15.0f)
+    {
+        WorkModule(0, WorkModuleF(0, edge_hi_total_var()) + 1.0f, edge_hi_total_var());
+    }
     if (edge_hi_charged && WorkModuleF(0, 0x0f0000a1) == 1.0f)
     {
         WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
@@ -38195,7 +38204,7 @@ void edge_hi_pitch()
     else if (global4 == 0x15a && edge_hi_end_air)
     {
         b = edge_hi_p(11.0f, 18.0f);       // rotate_back_begin_frame
-        e = edge_hi_p(44.0f, 53.0f);       // rotate_back_end_frame
+        e = edge_hi_p(23.0f, 53.0f);       // rotate_back_end_frame (Blade Dash: 44, back by its Fall at 23 since test 116)
         if (f >= b)
         {
             t = e - b;
@@ -38448,7 +38457,6 @@ void edge_hi_start_main()
     edge_hi_control = 0;
     edge_hi_cliff = 0xffffffff;
     edge_hi_fx = 0;
-    WorkModule(0, 1.0f, edge_hi_used_var());   // once per air time (test 113)
     WorkModule(0, 0.0f, edge_hi_pass_var());
     edge_hi_start_kinetic();
     MotionModule(0x1, edge_hi_start_motion(), 0, 1.0f);
@@ -38500,6 +38508,8 @@ void edge_hi_rush_main()
     WorkModule(0, edge_hi_loop_frames(), edge_hi_timer_var());
     WorkModule(0, 0.0f, edge_hi_pass_var());
     WorkModule(0, 0.0f, edge_hi_wrap_var());
+    WorkModule(0, 0.0f, edge_hi_total_var());
+    WorkModule(0, 1.0f, edge_hi_used_var());   // once per air time: used from the attack on (test 116; was the start)
     edge_hi_count = 0;                     // init 04890 / 04950
     edge_hi_landed = 0;
     edge_hi_cliff = 0xffffffff;
@@ -38561,9 +38571,9 @@ void edge_hi_rush_loop()
     }
     if (edge_hi_charged)
     {
-        edge_hi_hit_check();
         edge_hi_link();
-        if ((float)edge_hi_count >= 15.0f && edge_hi_held() && WorkModuleF(0, edge_hi_timer_var()) > 0.0f)
+        if ((float)edge_hi_count >= 15.0f && edge_hi_held() && WorkModuleF(0, edge_hi_timer_var()) > 0.0f
+            && WorkModuleF(0, edge_hi_total_var()) < edge_hi_loop_max())
         {
             // past its pass and still held: SpecialHi2 again from the 2nd hit (the script skips the 1st on pass 2)
             if (f >= edge_hi_loop_to())
@@ -38806,6 +38816,11 @@ void edge_hi_end_loop()
     if (global18 == 0)
     {
         func_16(0x19, 0);
+        return;
+    }
+    if (edge_hi_charged == 0 && f >= edge_hi_air_cut())
+    {
+        func_16(0xe, 0);                   // Blade Dash: Fall the frame before the animation turns to falling (test 116)
         return;
     }
     if (MotionModule(0x2712))

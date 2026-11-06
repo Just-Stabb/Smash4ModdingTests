@@ -161,7 +161,7 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   - **Octaslash held:** while the special button stays held the rush turns toward the stick, 8 degrees a frame the
     shorter way round, the full 360 degrees (test 114, the user: "allow a full 360 degrees of movement"; test 113
     kept it to his front; he keeps his facing, so going back his pitch passes 90: a loop; neutral keeps the way),
-    at 6.2 braking as normal down to 2.0 and kept there while held (`edge_hi_rush_m`, `edge_hi_cruise`; test 115, the
+    at 6.2 braking as normal down to 2.2 (test 116; test 115: 2.0) and kept there while held (`edge_hi_rush_m`, `edge_hi_cruise`; test 115, the
     user: "moves far too fast" at test 113's steady 6.2); on the ground, turned more than ~20 degrees up, he leaves
     it (`edge_hi_steer`). Past the rush's count 15, still held and with loop time left, SpecialHi2 is played again
     from frame 4 (`MotionModule(0x1, 0x237, 4, 1)`) the frame after it has been on frame 14, its last (Ultimate's
@@ -170,15 +170,20 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     past the motion's end: it never looped and held the last pose (the user's clip). VAR_20 tells the script which pass it is (0 plain, 1
     the first held, 2 looped): SpecialHi2's 1st hit (frame 2) and start effects (frame 0) are skipped on a looped
     pass, its end flash (frame 15) plays on a plain pass only (`edge_specials_build.py octaslash_loop_scripts`).
-    Loop time 60 frames (`edge_hi_loop_frames`; VAR_12), started again by every hit (SELF_HIT_NOW); let go or out
+    Loop time 60 frames (`edge_hi_loop_frames`; VAR_12), started again by every hit (SELF_HIT_NOW), and 180 frames
+    of loop at most, hitlag included (VAR_15, `edge_hi_loop_max`; test 116, the user: it "loops indefinitely when an
+    opponent is hit"); held = ControlModule's held special and SELF_SPECIAL both; let go or out
     of time -> the end (SpecialHi2End's final hit) and SpecialFall as before. Approximated: the restart assumes the
     script runs past frames 0 - 3 at once on a motion change with a start frame.
   - **Autolink:** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
-    (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before).
-  - **Once per air time:** up special (either) sets VAR_21 at its start; in the air it can't start again until he
+    (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 23 (test 116, the
+    user: "cancel right before the point where Sephiroth would begin falling in the animation":
+    d02specialairhi1end's legs and Rot start into the fall at 24 of 48), its pitch back to 0 over 11 - 23.
+  - **Once per air time:** up special (either) sets VAR_21 as its attack starts (the rush's main; test 116, the
+    user: "only used after the attacking portion of either up special begins"; test 113: its start); in the air it can't start again until he
     is on the ground outside up special or grabs a ledge (statuses 0x72 - 0x74): `edge_hi_can` on the two air
     input checks, `edge_hi_air_tick` from func_82. Being hit doesn't give it back.
 - **Ground end:** x x 0.6 (Octaslash 0.9; 0.25 if landed), brake 0.12 (0.06); actionable at the motion's

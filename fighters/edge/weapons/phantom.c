@@ -868,6 +868,8 @@ int ph_find_owner()
 }
 
 float ph_reach() { return 10.0f; }
+float ph_held_reach() { return 65.0f; }   // a fighter held on his sword: this far behind it (test 116, the user's clip: his
+                                          // Phantom's place to DK's when it hit him; test 107 - 115: 10, inside them)
 float ph_lift() { return 8.0f; }   // the hitstun tracking's height change at most (test 109)
 
 void ph_track(int clear)
@@ -892,7 +894,7 @@ void ph_track(int clear)
         c = (int)v - 0x400000;
         ix = c / 0x400;
         iy = c - ix * 0x400;
-        x = (float)(ix - 0x200) - PostureModuleF(0) * ph_reach();
+        x = (float)(ix - 0x200) - PostureModuleF(0) * ph_held_reach();
         y = (float)(iy - 0x200);
         StatusModule(0x2, 0x2);
         GroundModule(0x2710, 0x5);
@@ -929,6 +931,23 @@ void ph_track(int clear)
 // every frame of its attack: a fighter held on his sword (his code 2^22 and up, kept up to date each frame) is followed
 // up and down (its x and facing kept), from whenever it's held, not only if it was held when the Phantom was sent
 // (test 110, the user: "Phantom doesn't seem to track held opponents"); let go, it stops
+// its attack's last hitbox frame (Zelda's phantom game.bin: motions 12 - 15 (level up to 2) out by 12, 16 - 19 (up to 6)
+// by 15, 20 - 23 (7) by 28; the air ones 24 - 35 the same by level)
+float ph_hit_end()
+{
+    int m;
+    m = MotionModule(0x7);
+    if (m < 0x10 || m >= 0x18 && m < 0x1c)
+    {
+        return 12.0f;
+    }
+    if (m < 0x14 || m >= 0x1c && m < 0x20)
+    {
+        return 15.0f;
+    }
+    return 28.0f;
+}
+
 void ph_follow_frame()
 {
     int slot;
@@ -936,6 +955,11 @@ void ph_follow_frame()
     int ix;
     int iy;
     float v;
+    if (MotionModuleF(0x1) > ph_hit_end())
+    {
+        ph_follow = 0;                         // its attack over: no more following (test 116, the user: "make Phantom
+        return;                                // stop tracking after the attack finishes")
+    }
     slot = ph_find_owner();
     if (slot < 0)
     {

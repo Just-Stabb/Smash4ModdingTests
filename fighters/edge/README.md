@@ -1673,3 +1673,22 @@ itself to be released while an oppenent is attached to the snake sword, and it d
 - port_check over the chain and tests 70–115: 30 errors, as before.
 - Package (install over 114): `script/msc/edge.mscsb`.
 
+## Test 116 (`build/sephiroth_test116.zip`): Phantom held-fighter offset, loop cap, speed 2.2, Blade Dash ends at 23, air use from the attack
+
+User (clips of the Phantom and tap up special): "When Phantom tracks a held opponent, it spawns inside of them ... The
+distance from the opponent used in this clip is what I'd like the offset to be. Held up special loops indefinitely when
+an opponent is hit. Also please make the speed of the movement 2.2, and make tap up special cancel right before the
+the point where Sephiroth would begin falling in the animation. Also make it so that up special's air use is only used
+after the attacking portion of either up special begins." and "Also please make Phantom stop tracking after the attack
+finishes."
+- **Phantom offset:** a fighter held on the sword: the Phantom is placed 65 behind it (`phantom.c ph_held_reach`; was 10).
+  Measured on the clip: Sephiroth (21.5 tall: head bone 19.0 + head) ~212 px, the Phantom's orb to DK ~650 px.
+- **Phantom stops following** once its attack's last hitbox is out (`ph_hit_end`: frame 12 / 15 / 28 by charge, from
+  Zelda's phantom game.bin).
+- **Octaslash loop:** still started again by each hit, but 180 frames of loop at most (counted in hitlag too); held
+  now needs both ControlModule's held special and SELF_SPECIAL. Speed held: 2.2.
+- **Blade Dash:** the air end goes to Fall at frame 23 (its animation turns into the fall from 24), pitch back by then.
+- **Once per air time:** spent as the rush (the attack) begins, not at the start.
+- port_check over the chain and tests 70–116: 30 errors, as before.
+- Package (install over 115): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
