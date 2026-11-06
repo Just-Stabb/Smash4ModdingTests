@@ -38261,6 +38261,9 @@ int edge_tr_cur_block()
 void edge_tr_begin()
 {
     int i;
+    int b;
+    float h;
+    float p;
     if (edge_hi_charged == 0)
     {
         edge_tr_block = edge_tr_block - (edge_tr_block / 0xe) * 0xe + 1;
@@ -38282,7 +38285,10 @@ void edge_tr_begin()
     // should be able to form a triangle")
     WorkModule(0, 2.0f, edge_tr_s3_var());
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
-    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_h()), edge_tr_cur_block() * 0x400);
+    h = edge_tr_h();                       // locals first (test 135: no nested script calls as arguments)
+    p = edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + h);
+    b = edge_tr_cur_block();
+    edge_tr_point(p, b * 0x400);
 }
 
 // sin by its series (no sin in MSC; trail.c tr_sin the same), x folded into -pi/2 .. pi/2
@@ -38375,6 +38381,16 @@ float edge_tr_h()
         return 1.0f;
     }
     return edge_tr_mid();
+}
+
+// edge_tr_step(edge_tr_bd_stop()) with the stop in a local first (test 135: MSC-C breaks a call passed as another
+// script function's argument when it calls functions itself, docs/MSC-C_Guide.md; tests 128 - 134 passed it so, every
+// frame of every up special: Octaslash's own crossings made no shape from test 128 on)
+void edge_tr_bd_step()
+{
+    int s;
+    s = edge_tr_bd_stop();
+    edge_tr_step(s);
 }
 
 // the trail still being laid (or its last steps): 1
@@ -38723,6 +38739,9 @@ void edge_tr_find(int q)
     float j4;
     int p;
     int qy;
+    float rx;
+    float rz;
+    float ry;
     j5 = WorkModuleF(0, edge_tr_new_var());
     j4 = WorkModuleF(0, edge_tr_cross_var());
     p = (int)WorkModuleF(0, edge_tr_om_var());
@@ -38732,7 +38751,9 @@ void edge_tr_find(int q)
         if (j5 >= 1024.0f)
         {
             // X - Y: three lines
-            edge_tr_find_shape(edge_tr_between(p, (int)j5), 0.0f, edge_tr_between((int)j4, qy));
+            rx = edge_tr_between(p, (int)j5);
+            ry = edge_tr_between((int)j4, qy);
+            edge_tr_find_shape(rx, 0.0f, ry);
             return;
         }
         edge_tr_find_next();
@@ -38754,8 +38775,10 @@ void edge_tr_find(int q)
     if (j5 >= 1024.0f)
     {
         // X - Z - Y: four lines
-        edge_tr_find_shape(edge_tr_between(p, (int)WorkModuleF(0, edge_tr_s1_var())),
-                           edge_tr_between((int)WorkModuleF(0, edge_tr_s2_var()), (int)j5), edge_tr_between((int)j4, qy));
+        rx = edge_tr_between(p, (int)WorkModuleF(0, edge_tr_s1_var()));
+        rz = edge_tr_between((int)WorkModuleF(0, edge_tr_s2_var()), (int)j5);
+        ry = edge_tr_between((int)j4, qy);
+        edge_tr_find_shape(rx, rz, ry);
         return;
     }
     edge_tr_find_next();
@@ -38867,8 +38890,10 @@ void edge_tr_step(int last)
         if (m / 0x400 == num / 0x400)
         {
             // its own trail: a loop, its points m + 1 .. num - 1
+            DamageModule(0x9, 1.0f);       // DIAGNOSTIC (test 135, to be removed): +1% a self-crossing report
             if ((float)m >= WorkModuleF(0, edge_tr_floor_var()) && num - 1 - m >= 3 && num - 1 - m < 0x200)
             {
+                DamageModule(0x9, 5.0f);   // DIAGNOSTIC (test 135): +5% a loop shape measured
                 edge_tr_shape(m + 1, num - 1 - m, 0, 0, num);
                 return;
             }
@@ -38913,7 +38938,8 @@ void edge_tr_step(int last)
     d = dx * dx + dy * dy;
     if (d >= edge_tr_seg() * edge_tr_seg() || last && d >= 1.0f)
     {
-        edge_tr_point(edge_tr_pack(x, y), num + 1);
+        v = edge_tr_pack(x, y);
+        edge_tr_point(v, num + 1);
     }
     if (last)
     {
@@ -39437,7 +39463,7 @@ void edge_hi_rush_loop()
     {
         edge_hi_cliff_mode(0);             // game_specialhi1 frame 6: cliff check NONE
     }
-    edge_tr_step(edge_tr_bd_stop());       // the trail (test 123; Blade Dash's: while he moves the slash's way, test 128)
+    edge_tr_bd_step();       // the trail (test 123; Blade Dash's: while he moves the slash's way, test 128)
     vx = KineticModuleF(0xa, 0x3);
     vy = edge_hi_vy();
     if (global19 != 0 && global18 == 0)    // landed mid-rush
@@ -39711,7 +39737,7 @@ void edge_hi_end_loop()
     {
         if (edge_hi_charged == 0)
         {
-            edge_tr_step(edge_tr_bd_stop());   // Blade Dash's line on through the slide (test 128)
+            edge_tr_bd_step();   // Blade Dash's line on through the slide (test 128)
         }
         if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))   // cancel 27 / 56
         {
@@ -39742,7 +39768,7 @@ void edge_hi_end_loop()
     }
     if (edge_hi_charged == 0)
     {
-        edge_tr_step(edge_tr_bd_stop());   // Blade Dash's: on while he moves the slash's way (test 128)
+        edge_tr_bd_step();   // Blade Dash's: on while he moves the slash's way (test 128)
     }
     else if (edge_hi_vy() > 0.0f)
     {

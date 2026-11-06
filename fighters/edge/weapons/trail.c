@@ -1105,11 +1105,15 @@ int tr_cross(float ax, float ay, float bx, float by, float cx, float cy, float d
 // the newest piece (tr_sx, tr_sy) - (x, y), numbers num - 1 - num, against this stretch's own pieces still drawn (in
 // its own trail, not the ones next to it): one crossed, m its start's number, reported in shared 4 as -m
 // every piece tested is taken 3.0f longer at both ends (test 131, the user's clip: a Blade Dash started where the last
-// one ended, the two lines meeting end to end, never crossing, so the triangle they made with a third wasn't found)
+// one ended, the two lines meeting end to end, never crossing, so the triangle they made with a third wasn't found);
+// its own trail's pieces as they are, and only those that can close a loop (3 points between: test 132). Test 135:
+// plain ifs and its own scratch (test 132's `same && tr_cross(..) || same == 0 && tr_cross(..)` and the parameters
+// reused as scratch: Octaslash's own crossings, the only users of the first half, never made a shape)
 void tr_test(float x, float y, int num)
 {
     int k;
     int same;
+    int hit;
     float ax;
     float ay;
     float bx;
@@ -1118,59 +1122,74 @@ void tr_test(float x, float y, int num)
     float cy;
     float dx;
     float dy;
+    float ex;
+    float ey;
     float l;
-    ax = tr_sx;
-    ay = tr_sy;
-    bx = x;
-    by = y;
-    l = MathF(0, (bx - ax) * (bx - ax) + (by - ay) * (by - ay));
-    if (l > 0.01f)
-    {
-        l = 3.0f / l;
-        dx = (bx - ax) * l;
-        dy = (by - ay) * l;
-        ax = ax - dx;
-        ay = ay - dy;
-        bx = bx + dx;
-        by = by + dy;
-    }
     same = 0;
     if (tr_base / 0x400 == num / 0x400)
     {
         same = 0x1;
     }
+    ax = tr_sx;
+    ay = tr_sy;
+    bx = x;
+    by = y;
+    if (same == 0)
+    {
+        l = MathF(0, (bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+        if (l > 0.01f)
+        {
+            l = 3.0f / l;
+            ex = (bx - ax) * l;
+            ey = (by - ay) * l;
+            ax = ax - ex;
+            ay = ay - ey;
+            bx = bx + ex;
+            by = by + ey;
+        }
+    }
     k = 0;
     while (k < tr_n - 1)
     {
-        // its own trail: only pieces that can close a loop (3 points between: test 132; nearer ones, crossed falsely
-        // through the 0.5 units the points are kept to, wrote over a real loop's report the same frame), not longer
-        if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k <= num - 4))
+        hit = 0;
+        if (tr_has(tr_gone, k) == 0)
         {
             cx = tr_get_x(k);
             cy = tr_get_y(k);
             dx = tr_get_x(k + 1);
             dy = tr_get_y(k + 1);
-            l = MathF(0, (dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
-            if (l > 0.01f && same == 0)
+            if (same)
             {
-                l = 3.0f / l;
-                x = (dx - cx) * l;
-                y = (dy - cy) * l;
-                cx = cx - x;
-                cy = cy - y;
-                dx = dx + x;
-                dy = dy + y;
+                if (tr_base + k <= num - 4)
+                {
+                    hit = tr_cross(ax, ay, bx, by, cx, cy, dx, dy);
+                }
             }
-            if (same && tr_cross(tr_sx, tr_sy, x, y, cx, cy, dx, dy) || same == 0 && tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
+            else
             {
-                if (tr_shared(0x4) > -1000.0f || same)
+                l = MathF(0, (dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
+                if (l > 0.01f)
                 {
-                    tr_share(0x4, -(float)(tr_base + k));
+                    l = 3.0f / l;
+                    ex = (dx - cx) * l;
+                    ey = (dy - cy) * l;
+                    cx = cx - ex;
+                    cy = cy - ey;
+                    dx = dx + ex;
+                    dy = dy + ey;
                 }
-                if (same == 0)
-                {
-                    tr_junction(k, num - 1);
-                }
+                hit = tr_cross(ax, ay, bx, by, cx, cy, dx, dy);
+            }
+        }
+        if (hit)
+        {
+            if (tr_shared(0x4) > -1000.0f || same)
+            {
+                tr_share(0x4, -(float)(tr_base + k));
+            }
+            if (same == 0)
+            {
+                tr_junction(k, num - 1);
             }
         }
         k = k + 1;

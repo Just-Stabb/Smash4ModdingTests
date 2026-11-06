@@ -2013,3 +2013,22 @@ slightly more enough to send the opponent a bit away so that they can't be chain
 - Not tested in game. The knockback is set by FKB (`edge_specials_build.py` OCTA_HELD_FKB) if it needs tuning.
 - port_check over the chain, tests 70–115 and 117–134: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 133): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`.
+
+## Test 135 (`build/sephiroth_test135.zip`): Octaslash's self-crossings, nested-call fix + a diagnostic
+
+User (two clips, one zoomed out): "Even after those changes, Octaslash still doesn't form shapes." The zoomed-out
+clip shows held Octaslash rising, looping, coming back down and flying straight across its own upward line, with no
+shape: its own-trail crossings (the only shapes made from one line) fail in game, while Blade Dash's shapes (other
+lines) work, and the simulation closes the same loops.
+- Suspect: docs/MSC-C_Guide.md's compiler quirk, a call to a function that itself calls functions passed as another
+  script function's argument (normal-looking bytecode, broken in game). Test 128, the test from which Octaslash made
+  no shape, put `edge_tr_step(edge_tr_bd_stop())` (a function with 6 locals) in the rush loop, every frame of every
+  up special, and `edge_tr_point(edge_tr_pack(.. + edge_tr_h()), ..)` in the trail's start. Every nested call on the
+  trail's path is now stored in a local first (`edge_tr_bd_step`; the begin's point; the step's point; the junction
+  search's ranges).
+- The article's crossing test rewritten as plain ifs with its own scratch (test 132's `same && tr_cross(..) ||
+  same == 0 && tr_cross(..)`, whose first half only Octaslash uses, and its parameters reused as scratch).
+- **Diagnostic (to be removed):** Sephiroth takes +1% each time his own line reports crossing itself and +5% when a
+  loop shape starts being measured; his % in a clip shows which stage fails if shapes still don't form.
+- Not tested in game. port_check over the chain, tests 70–115 and 117–135: 30 errors, 55 warnings, 7 notes.
+- Package (install over 134): `script/msc/edge.mscsb`, `trail/trail.mscsb`.
