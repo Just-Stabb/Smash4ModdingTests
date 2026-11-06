@@ -779,11 +779,23 @@ void edge_sn_reset()
     }
 }
 
+// attack held: SELF_ATTACK, or its raw bit (MSC button 14, 0x200), which the A+B smash setting doesn't clear: with it
+// on, B pressed while A is held turns both into smash (0x20) and clears attack's 0x1 until both are let go, so the hold
+// ended (test 119, the user: "pressing special while holding up tilt or forward air ends the hold")
+int edge_sn_attack()
+{
+    if (WorkModuleF(0, 0x0f000100) == 1.0f || ControlModule(0x2712, 0xe))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 void edge_sn_init()
 {
     edge_sn_reset();
     edge_sn_move = 0;
-    if (MotionModule(0x7) == edge_sn_motion() && WorkModuleF(0, 0x0f000100) == 1.0f)
+    if (MotionModule(0x7) == edge_sn_motion() && edge_sn_attack())
     {
         edge_sn_state = 0x1;
     }
@@ -794,7 +806,7 @@ void edge_sn_init_hi3()
 {
     edge_sn_reset();
     edge_sn_move = 0x1;
-    if (WorkModuleF(0, 0x0f000100) == 1.0f)
+    if (edge_sn_attack())
     {
         edge_sn_state = 0x1;
     }
@@ -894,7 +906,7 @@ void edge_sn_loop()
     }
     f = MotionModuleF(0x1);
     held = 0;
-    if (WorkModuleF(0, 0x0f000100) == 1.0f)    // SELF_ATTACK held
+    if (edge_sn_attack())                       // attack held
     {
         held = 0x1;
     }

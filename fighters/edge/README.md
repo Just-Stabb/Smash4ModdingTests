@@ -1714,3 +1714,14 @@ each frame of its attack (to its last hitbox) it also moves sideways by as much 
 - port_check over the chain, tests 70–115, 117 and 118: 30 errors, as before.
 - Package (install over 117): `script/msc/phantom/phantom.mscsb`.
 
+## Test 119 (`build/sephiroth_test119.zip`): special while holding the sword no longer ends the hold
+
+User: "pressing special while holding up tilt or forward air ends the hold, which makes using Phantom without it
+retracting impossible." With the A+B smash control setting on, B pressed while A is held turns both into smash (input
+bit 0x20) and clears attack's bit until both are let go (docs/native-notes.md "Input frames"), so SELF_ATTACK read 0
+and the sword came back; the same press wasn't special either. The hold now also takes attack's raw bit (MSC button
+14, 0x200, which that latch leaves alone: `edge_sn_attack`, tools/edge_snake_msc.py), and the Phantom's release also
+takes special's raw press (button 15, 0x800: `edge_lw_special_pressed`).
+- port_check over the chain, tests 70–115 and 117–119: 30 errors, as before.
+- Package (install over 118): `script/msc/edge.mscsb`.
+

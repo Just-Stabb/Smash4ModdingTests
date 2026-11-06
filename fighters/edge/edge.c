@@ -39276,7 +39276,18 @@ int edge_lw_ph_open()
     }
     return 0x1;
 }
-float edge_lw_ph_down() { return -0.5f; }       // stick y at or below this with B pressed: down special again
+float edge_lw_ph_down() { return -0.5f; }
+
+// special pressed: SELF_SPECIAL_PRESSED, or its raw bit (MSC button 15, 0x800) pressed, which the A+B smash setting
+// doesn't take: with it on, B pressed while A is held (the held sword) gives smash, not special (test 119)
+int edge_lw_special_pressed()
+{
+    if (WorkModuleF(0, 0x0f000109) == 1.0f || ControlModule(0x2710, 0xf))
+    {
+        return 0x1;
+    }
+    return 0;
+}       // stick y at or below this with B pressed: down special again
 
 float edge_lw_ph()
 {
@@ -39517,7 +39528,7 @@ void edge_lw_ph_tick()
     // sent when down special is pressed again (SELF_SPECIAL_PRESSED with the stick down: user, test 104, "change
     // Phantom's release to being when the down special is pressed again rather than released"; tests 100 - 103: B
     // let go), or 240 frames past full charge (test 107; test 104: 120; Zelda's param 0x18000001: 60)
-    if ((WorkModuleF(0, 0x0f000109) == 1.0f && (WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() || any)
+    if ((edge_lw_special_pressed() && (WorkModuleF(0, 0x0f000111) <= edge_lw_ph_down() || any)
          && edge_lw_ph_open())
         || c >= per * 7.0f + edge_lw_ph_keep())
     {
@@ -40936,11 +40947,23 @@ void edge_sn_reset()
     }
 }
 
+// attack held: SELF_ATTACK, or its raw bit (MSC button 14, 0x200), which the A+B smash setting doesn't clear: with it
+// on, B pressed while A is held turns both into smash (0x20) and clears attack's 0x1 until both are let go, so the hold
+// ended (test 119, the user: "pressing special while holding up tilt or forward air ends the hold")
+int edge_sn_attack()
+{
+    if (WorkModuleF(0, 0x0f000100) == 1.0f || ControlModule(0x2712, 0xe))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 void edge_sn_init()
 {
     edge_sn_reset();
     edge_sn_move = 0;
-    if (MotionModule(0x7) == edge_sn_motion() && WorkModuleF(0, 0x0f000100) == 1.0f)
+    if (MotionModule(0x7) == edge_sn_motion() && edge_sn_attack())
     {
         edge_sn_state = 0x1;
     }
@@ -40951,7 +40974,7 @@ void edge_sn_init_hi3()
 {
     edge_sn_reset();
     edge_sn_move = 0x1;
-    if (WorkModuleF(0, 0x0f000100) == 1.0f)
+    if (edge_sn_attack())
     {
         edge_sn_state = 0x1;
     }
@@ -41051,7 +41074,7 @@ void edge_sn_loop()
     }
     f = MotionModuleF(0x1);
     held = 0;
-    if (WorkModuleF(0, 0x0f000100) == 1.0f)    // SELF_ATTACK held
+    if (edge_sn_attack())                       // attack held
     {
         held = 0x1;
     }

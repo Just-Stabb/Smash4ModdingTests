@@ -189,3 +189,7 @@ article finds its owner (the nearest Sephiroth), then every frame:
 - **Joint 1003.** That the override takes his table-1 IDs (test 79's 1005+ were taken: 15 of them overran the list).
 - **A model on a dein copy.** That flag 0x40 alone loads and draws it (both its readers are generic code).
 - **The trail on a weapon.** That the sword trail (`Sword_Glow`) draws from a weapon's script.
+
+- **Test 119:** "attack held" is SELF_ATTACK or attack's raw input bit (MSC button 14, `ControlModule(0x2712, 0xe)`):
+  with the A+B smash setting on, B pressed during the hold made the game clear attack's bit (smash latch), ending it.
+
