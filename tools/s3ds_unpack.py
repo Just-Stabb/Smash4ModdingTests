@@ -21,7 +21,8 @@ Formats:
   +0xD0 named exports {u32 name offset, u32 segment index | offset << 4}; +0xE0 export strings; +0x118 import strings.
   static.crs is the main executable's (code size 0): its exports are code.bin's names.
   The update's code.bin goes with the update's static.crs / cro.sarc (the base game's don't fit it).
-- dt / ls (RomFS root, the update's in patch/): ls = u32 version, u32 count, {u32 key, u32 dt offset, u32 size};
+- dt / ls (RomFS root, the update's in patch/): ls = u32 version, u32 count, {u32 key, u32 dt offset, u32 size}
+  (version 0x2666F, the later updates': a 4th word, 0);
   a dt chunk = 0xCC padding, then zlib streams. Keys are CRC-32 with a zero start (zlib.crc32(s, 0xFFFFFFFF)) of
   "data<region>/<folder>/packed" (a packaged folder, its trailing / dropped) or "data<region>/<file>" (a file
   packaged on its own); region "" or e.g. "(us_en)" (code.bin 0x1A2A60 builds them).
@@ -112,8 +113,24 @@ def _rf_from(dt_path, ls_entries):
 
 
 def load_ls(path):
+    """[(key, dt offset, size)]: version 0x1666F 12-byte entries, 0x2666F (the later updates) 16 (a 4th word, 0)"""
     d = open(path, 'rb').read()
-    return [struct.unpack_from('<III', d, 8 + 12 * j) for j in range(struct.unpack_from('<I', d, 4)[0])]
+    n = struct.unpack_from('<I', d, 4)[0]
+    size = (len(d) - 8) // n
+    assert size in (12, 16), '%s: %d-byte ls entries' % (path, size)
+    return [struct.unpack_from('<III', d, 8 + size * j) for j in range(n)]
+
+
+def _ext_table(names, size):
+    """the extension table at the end of the names: u32 count, offsets (the first 0: no extension), rising"""
+    for i in range(min(size, len(names)) - 12, 0, -4):
+        n = struct.unpack_from('<I', names, i)[0]
+        if not 8 <= n <= 400 or i + 4 + 4 * n > min(size, len(names)):
+            continue
+        offs = struct.unpack_from('<%dI' % n, names, i + 4)
+        if offs[0] == 0 and all(a < b for a, b in zip(offs[1:], offs[2:])) and offs[-1] < i:
+            return i, n
+    raise SystemExit('RF: no extension table')
 
 
 def load_rf(d):
@@ -121,8 +138,7 @@ def load_rf(d):
     ress, clen, names_off = (struct.unpack_from('<I', d, o)[0] for o in (0x10, 0x18, 0x20))
     f = zlib.decompress(d[0x80:0x80 + clen])
     names = f[names_off - 0x80:]
-    i = names.rindex(b'\x00\x00\x00\x00\x27\x00\x00\x00') - 4    # the extension table: count, offsets
-    count = struct.unpack_from('<I', names, i)[0]
+    i, count = _ext_table(names, struct.unpack_from('<I', d, 0x24)[0])
     cs = lambda p: names[p:names.index(b'\0', p)]                    # noqa: E731
     ext = [cs(o + 4).decode() if o else '' for o in struct.unpack_from('<%dI' % count, names, i + 4)]
 
