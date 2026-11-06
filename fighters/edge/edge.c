@@ -37969,48 +37969,67 @@ void edge_hi_hit_check()
     }
 }
 
-// Octaslash (the rush and its end, the finisher's flight included): every fighter in hitstun kept inside the blast zones
-// (test 127, the user: "make opponents hit by it unable to be KO'd by the blast zone during the duration of the entire
-// attack, including the ending hit"), as the snake sword keeps those it holds (15 inside the sides / bottom, 30 under
-// the top: StageData 0 - 3)
+// Octaslash: every fighter in hitstun kept inside the blast zones (test 127, the user: "make opponents hit by it unable
+// to be KO'd by the blast zone during the duration of the entire attack, including the ending hit"). Test 128 (the user:
+// it "still allows for KOing in the blast zone"): test 127 stopped as he left the end status, while the finisher's
+// launch carries them on after it; now a fighter in hitstun while he's in held Octaslash's rush / end is marked (his
+// TIMER_0 - 7, one a player slot: 0x0F000320 + slot, counting down a frame at a time) and kept marked while its hitstun
+// lasts and 40 frames after (the launch's speed left), kept 20 inside the side / bottom blast zones and 30 under the top
+// (StageData 0 - 3) by moving it there (0x0F000020 + 4 x slot: set slot X / Y)
 void edge_hi_keep_in()
 {
     int slot;
+    int on;
     float x;
     float y;
     float lo;
     float hi;
-    if (edge_hi_charged == 0 || global4 != 0x159 && global4 != 0x15a)
+    float t;
+    on = 0;
+    if (edge_hi_charged && (global4 == 0x159 || global4 == 0x15a))
     {
-        return;
+        on = 0x1;
     }
     slot = 0;
     while (slot < 0x8)
     {
-        if (WorkModuleF(0, 0x0f000023 + 0x4 * slot) != 0 && WorkModuleF(0, 0x0f000058 + 0x8 * slot) > 0.0f)
+        t = WorkModuleF(0, 0x0f000320 + slot);
+        x = WorkModuleF(0, 0x0f000020 + 0x4 * slot);
+        y = WorkModuleF(0, 0x0f000021 + 0x4 * slot);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * slot) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2)))
         {
-            x = WorkModuleF(0, 0x0f000020 + 0x4 * slot);
-            y = WorkModuleF(0, 0x0f000021 + 0x4 * slot);
-            lo = StageData(0) + 15.0f;
-            hi = StageData(0x1) - 15.0f;
-            if (x < lo)
+            if (WorkModuleF(0, 0x0f000058 + 0x8 * slot) > 0.0f && (on || t > 0.0f))
             {
-                WorkModule(0, lo, 0x0f000020 + 0x4 * slot);
+                WorkModule(0, 40.0f, 0x0f000320 + slot);
+                t = 40.0f;
             }
-            if (x > hi)
+            if (t > 0.0f)
             {
-                WorkModule(0, hi, 0x0f000020 + 0x4 * slot);
+                lo = StageData(0) + 20.0f;
+                hi = StageData(0x1) - 20.0f;
+                if (x < lo)
+                {
+                    WorkModule(0, lo, 0x0f000020 + 0x4 * slot);
+                }
+                if (x > hi)
+                {
+                    WorkModule(0, hi, 0x0f000020 + 0x4 * slot);
+                }
+                lo = StageData(0x3) + 20.0f;
+                hi = StageData(0x2) - 30.0f;
+                if (y < lo)
+                {
+                    WorkModule(0, lo, 0x0f000021 + 0x4 * slot);
+                }
+                if (y > hi)
+                {
+                    WorkModule(0, hi, 0x0f000021 + 0x4 * slot);
+                }
             }
-            lo = StageData(0x3) + 15.0f;
-            hi = StageData(0x2) - 30.0f;
-            if (y < lo)
-            {
-                WorkModule(0, lo, 0x0f000021 + 0x4 * slot);
-            }
-            if (y > hi)
-            {
-                WorkModule(0, hi, 0x0f000021 + 0x4 * slot);
-            }
+        }
+        else
+        {
+            WorkModule(0, 0.0f, 0x0f000320 + slot);
         }
         slot = slot + 1;
     }
@@ -38121,7 +38140,7 @@ void edge_hi_link()
 // crashed loading him (64 article slots a fighter: docs/native-notes.md "Article instance cap")
 int   edge_tr_block;                             // the last trail's block (1 - 15; the MSC's last global, 0x86)
 int   edge_tr_art() { return 0xb; }              // article 11 (Zelda's 0 - 4, fire, flare1, flare2, flash, snake,
-                                                 // snaketip, trail, fill: tools/extra_kinds.json, 12 at most)
+                                                 // snaketip, trail, fill: tools/extra_kinds.json, 24 at most: test 128)
 int   edge_tr_fill_art() { return 0xc; }         // article 12, fill (3 at most)
 float edge_tr_seg() { return 4.0f; }             // the points' spacing
 int   edge_tr_per() { return 15; }               // pieces an article draws
@@ -38147,6 +38166,7 @@ float edge_tr_sum1() { return -1001.5f; }        // the steps (shared 6; tools/e
 float edge_tr_sum2() { return -1002.5f; }
 float edge_tr_sum3() { return -1003.5f; }
 float edge_tr_commit() { return -1004.5f; }
+float edge_tr_cancel() { return -1005.5f; }      // a shape not made (test 128: near the blast zones)
 float edge_tr_scale() { return 1.2f; }           // the shape's fill and hitbox x this (test 127)
 
 float edge_tr_pack(float x, float y)
@@ -38225,7 +38245,10 @@ void edge_tr_begin()
         i = i + 1;
     }
     WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
-    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_mid()), edge_tr_cur_block() * 0x400);
+    WorkModule(0, 0.0f, 0x0f000328);
+    WorkModule(0, 0.0f, 0x0f000329);
+    WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
+    edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_h()), edge_tr_cur_block() * 0x400);
 }
 
 // sin by its series (no sin in MSC; trail.c tr_sin the same), x folded into -pi/2 .. pi/2
@@ -38242,6 +38265,84 @@ float edge_tr_sin(float x)
     }
     x2 = x * x;
     return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f)));
+}
+
+// test 128: Blade Dash's line goes on while he still moves the slash's way (the user: "Blade Dash lines should only
+// stop being made once Sephiroth stops moving in the direction the slash is in in the animation", "This line should
+// reach all the way to Sephiroth's back"): his position last frame in VAR_11 (packed at 0.25: (x + 512) x 4 x 4096 +
+// (y + 512) x 4, exact in a float; VAR_11 is the steps' only while VAR_0 < 0), his move since along the slash
+// (edge_hi_rx x his facing, edge_hi_ry) under 0.4 a frame = stopped. In hitlag (0x0F000043) or while a shape's steps
+// run he isn't. TIMER_8 (0x0F000328): frames the line may go on into Fall after the move (20); TIMER_9: he's been in the
+// air in this trail (then on the ground its points are at his feet + 1, not his middle: the line reaches the floor he
+// landed on, test 128: "Lines still don't cover all the way to the ground on landing")
+float edge_tr_pack4(float x, float y)
+{
+    return (float)((int)((x + 512.0f) * 4.0f + 0.5f) * 0x1000 + (int)((y + 512.0f) * 4.0f + 0.5f));
+}
+
+int edge_tr_bd_stop()
+{
+    float v;
+    float x;
+    float y;
+    float px;
+    float py;
+    float d;
+    if (edge_hi_charged)
+    {
+        return 0;
+    }
+    if (WorkModuleF(0, edge_tr_q_var()) != 0.0f)
+    {
+        return 0;                          // a shape's steps: VAR_11 theirs
+    }
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    v = WorkModuleF(0, edge_tr_s4_var());
+    WorkModule(0, edge_tr_pack4(x, y), edge_tr_s4_var());
+    if (v <= 0.0f || WorkModuleF(0, 0x0f000043) != 0.0f)
+    {
+        return 0;
+    }
+    px = (float)((int)v / 0x1000) * 0.25f - 512.0f;
+    py = (float)((int)v - ((int)v / 0x1000) * 0x1000) * 0.25f - 512.0f;
+    d = (x - px) * edge_hi_rx * PostureModuleF(0) + (y - py) * edge_hi_ry;
+    if (d < 0.4f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// his middle's height above his feet for the trail now: his feet + 1 on the ground once he's been in the air in it
+float edge_tr_h()
+{
+    if (global18 != 0)
+    {
+        WorkModule(0, 9999.0f, 0x0f000329);
+        return edge_tr_mid();
+    }
+    if (WorkModuleF(0, 0x0f000329) > 0.0f)
+    {
+        return 1.0f;
+    }
+    return edge_tr_mid();
+}
+
+// the trail still being laid (or its last steps): 1
+int edge_tr_running()
+{
+    float q;
+    q = WorkModuleF(0, edge_tr_q_var());
+    if (q == -6.0f)
+    {
+        return 0;
+    }
+    if (q < 0.0f)
+    {
+        return WorkModuleF(0, edge_tr_sn_var()) >= 1024.0f;
+    }
+    return WorkModuleF(0, edge_tr_num_var()) >= 1024.0f;
 }
 
 // a range's mark step: start x 512 + count + 0.5
@@ -38406,6 +38507,16 @@ void edge_tr_steps()
         {
             b = a;
         }
+        // not near the blast zones (off screen: test 128, the user: "make shapes not able to be formed off-screen near
+        // the bounds of the blast zone"): the shape (its middle +- its long half axis) 50 inside the side / bottom
+        // ones and 60 under the top, else CANCEL (the articles drop their marks; no fill, no hitbox)
+        if (cx - a < StageData(0) + 50.0f || cx + a > StageData(0x1) - 50.0f || cy - a < StageData(0x3) + 50.0f
+            || cy + a > StageData(0x2) - 60.0f)
+        {
+            WorkModule(0, edge_tr_cancel(), edge_tr_num_var());
+            WorkModule(0, -5.0f, edge_tr_q_var());
+            return;
+        }
         WorkModule(0, edge_tr_pack(cx, cy), edge_tr_new_var());
         WorkModule(0, (float)(i * 0x10000 + (int)(a * 2.0f) * 0x100 + (int)(b * 2.0f)), edge_tr_cross_var());
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
@@ -38419,7 +38530,8 @@ void edge_tr_steps()
         }
         return;
     }
-    // 5: the trail as it was
+    // 5: the trail as it was (VAR_11 his position: edge_tr_bd_stop's)
+    WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
     WorkModule(0, 0.0f, edge_tr_cross_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
@@ -38639,6 +38751,25 @@ void edge_tr_tick()
     {
         edge_tr_steps();
     }
+    // Blade Dash's line on into Fall while he still moves the slash's way (test 128), TIMER_8 frames at most; any other
+    // status (landing, an aerial: the snake sword shares these variables) ends it
+    if (WorkModuleF(0, 0x0f000328) > 0.0f && global4 != 0x159 && global4 != 0x15a)
+    {
+        if (global4 != 0xe || WorkModuleF(0, 0x0f000328) <= 1.0f || edge_sn_out() || edge_tr_running() == 0)
+        {
+            WorkModule(0, 0.0f, 0x0f000328);
+            edge_tr_step(0x1);
+        }
+        else if (edge_tr_bd_stop())
+        {
+            WorkModule(0, 0.0f, 0x0f000328);
+            edge_tr_step(0x1);
+        }
+        else
+        {
+            edge_tr_step(0);
+        }
+    }
 }
 
 // every frame it's laid: a crossing looked at, else a point once he's edge_tr_seg() from the last;
@@ -38724,7 +38855,7 @@ void edge_tr_step(int last)
     }
     v = WorkModuleF(0, edge_tr_new_var());
     x = PostureModuleF(0x1);
-    y = PostureModuleF(0x2) + edge_tr_mid();
+    y = PostureModuleF(0x2) + edge_tr_h();
     dx = x - edge_tr_x(v);
     dy = y - edge_tr_y(v);
     d = dx * dx + dy * dy;
@@ -39248,7 +39379,7 @@ void edge_hi_rush_loop()
     {
         edge_hi_cliff_mode(0);             // game_specialhi1 frame 6: cliff check NONE
     }
-    edge_tr_step(0);                       // the trail (test 123)
+    edge_tr_step(edge_tr_bd_stop());       // the trail (test 123; Blade Dash's: while he moves the slash's way, test 128)
     vx = KineticModuleF(0xa, 0x3);
     vy = edge_hi_vy();
     if (global19 != 0 && global18 == 0)    // landed mid-rush
@@ -39338,9 +39469,10 @@ void edge_hi_rush_loop()
 // 0a6c0 / 0ae80
 void edge_hi_rush_end()
 {
-    if (global6 != 0x15a || edge_hi_end_air == 0)
+    if (global6 != 0x15a || edge_hi_end_air == 0 && edge_hi_charged)
     {
-        edge_tr_step(0x1);                 // the trail ends but into the air end (it goes on while he rises)
+        edge_tr_step(0x1);                 // the trail ends but into the air end (it goes on while he rises; Blade
+                                           // Dash's into either end: on while he moves the slash's way, test 128)
     }
     if (global6 != 0x15a)
     {
@@ -39519,6 +39651,10 @@ void edge_hi_end_loop()
     f = MotionModuleF(0x1);
     if (edge_hi_end_air == 0)
     {
+        if (edge_hi_charged == 0)
+        {
+            edge_tr_step(edge_tr_bd_stop());   // Blade Dash's line on through the slide (test 128)
+        }
         if (CancelModule(0x2713) == 0x1 && (func_39() != 0 || func_41() != 0))   // cancel 27 / 56
         {
             return;
@@ -39546,7 +39682,11 @@ void edge_hi_end_loop()
             edge_hi_cliff_mode(0);
         }
     }
-    if (edge_hi_vy() > 0.0f)
+    if (edge_hi_charged == 0)
+    {
+        edge_tr_step(edge_tr_bd_stop());   // Blade Dash's: on while he moves the slash's way (test 128)
+    }
+    else if (edge_hi_vy() > 0.0f)
     {
         edge_tr_step(0);                   // the trail: on while he rises (test 123)
     }
@@ -39610,7 +39750,14 @@ void edge_hi_end_main()
 // 0ba00 / 0c700
 void edge_hi_end_end()
 {
-    edge_tr_step(0x1);
+    if (edge_hi_charged == 0 && global6 == 0xe && edge_tr_running())
+    {
+        WorkModule(0, 20.0f, 0x0f000328);  // Blade Dash's line on into Fall (his per-frame hook: test 128)
+    }
+    else
+    {
+        edge_tr_step(0x1);
+    }
     edge_hi_line_kill();
     edge_hi_pitch_reset();
     if (edge_hi_end_air)
@@ -41820,10 +41967,13 @@ void edge_sn_finish()
 }
 
 // the held move's side special cancel (user, test 107: "make held up tilt and forward air cancellable into side
-// special after the hilt reaches Sephiroth, specifically if he hit them with any part of the attack"): from the
-// sword back at the hilt (state 5 on), if the move hit anyone (his own hits, SELF_HIT, or the point's catch), the
-// side special input (global24 0x2000, as func_43 reads it; the status's own transition terms left out) goes into
-// side special (0x153). Run first in the aerial / up tilt loops: 1 if it did
+// special after the hilt reaches Sephiroth, specifically if he hit them with any part of the attack"): if the move hit
+// anyone (his own hits, SELF_HIT, or the point's catch), the side special input (global24 0x2000, as func_43 reads it;
+// the status's own transition terms left out) goes into side special (0x153): from the sword's return (state 4 on;
+// test 128, the user: "make the snakesword side B cancel faster": tests 107 - 127 waited for the hilt, state 5). And
+// on the ground the grab input (global24 0x20000000, no item held, as the ground statuses read it) goes into a grab
+// (0x37 Catch) from the return on (test 128: "allow snakesword's hilt return to be cancelled into grab if on the
+// ground"). Run first in the aerial / up tilt loops: 1 if it did
 int edge_sn_cancel()
 {
     if (edge_sn_state == 0)
@@ -41834,13 +41984,18 @@ int edge_sn_cancel()
     {
         WorkModule(0, 1.0f, edge_sn_hit_var());
     }
-    if (edge_sn_state >= 0x5 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && (global24 & 0x2000) != 0)
+    if (edge_sn_state >= 0x4 && WorkModuleF(0, edge_sn_hit_var()) == 1.0f && (global24 & 0x2000) != 0)
     {
         if (func_72(global25))
         {
             func_16(0x153, 0x1);
             return 0x1;
         }
+    }
+    if (edge_sn_state >= 0x4 && global18 == 0 && (global24 & 0x20000000) != 0 && ItemModule(0x4) == 0)
+    {
+        func_16(0x37, 0x1);
+        return 0x1;
     }
     return 0;
 }

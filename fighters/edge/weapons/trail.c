@@ -1017,7 +1017,7 @@ void tr_junctions(int x, int y)
     k = 0;
     while (k < 4)
     {
-        if (tr_get_jk(k) >= 0 && tr_get_jn(k) / 0x400 == o)
+        if (tr_get_jk(k) >= 0 && tr_get_jn(k) / 0x400 == o && tr_has(tr_gone, tr_get_jk(k)) == 0)
         {
             if (b == x)
             {
@@ -1226,6 +1226,11 @@ void tr_answer(float v)
         }
         return;
     }
+    if (v == -1005.5f)
+    {
+        tr_mark = 0;
+        return;
+    }
     if (v == -1004.5f)
     {
         if (tr_mark != 0)
@@ -1243,12 +1248,14 @@ void tr_answer(float v)
                     {
                         tr_fill = tr_fill | tr_bit(k);
                     }
-                    tr_gone = tr_gone | tr_bit(k);
                 }
                 k = k + 1;
             }
             tr_ft = 0;
         }
+        // every line goes (test 128): all its pieces, the one from its newest point on too (a trail still being laid
+        // starts again from its next point)
+        tr_gone = tr_bit(tr_n) - 1;
         tr_mark = 0;
         return;
     }
@@ -1303,7 +1310,7 @@ void tr_take()
     }
     if (v < -1000.0f || v - (float)((int)v) > 0.25f)
     {
-        if (v <= -1001.0f && v >= -1005.0f || v > 524288.0f)
+        if (v <= -1001.0f && v >= -1006.0f || v > 524288.0f)
         {
             tr_answer(v);
         }
@@ -1443,7 +1450,7 @@ int tr_over()
         }
     }
     if (tr_life <= 0 || tr_slot < 0 || tr_vanish && tr_ft < 0
-        || tr_over_t && tr_ft < 0 && tr_n > 1 && tr_gone == tr_bit(tr_n - 1) - 1)
+        || tr_over_t && tr_ft < 0 && tr_n > 1 && (tr_gone & (tr_bit(tr_n - 1) - 1)) == tr_bit(tr_n - 1) - 1)
     {
         BattleObject(0x9);      // its time's up, or all its pieces are gone and its fill is over
         return 0x1;

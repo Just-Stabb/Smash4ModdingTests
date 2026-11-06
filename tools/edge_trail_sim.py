@@ -11,7 +11,7 @@ test 127); a Blade Dash's last point (the landing) taken. Prints each shape (mid
 import math
 
 SEG, PER, PTS = 4.0, 15, 16
-SUM1, SUM2, SUM3, COMMIT = -1001.5, -1002.5, -1003.5, -1004.5
+SUM1, SUM2, SUM3, COMMIT, CANCEL = -1001.5, -1002.5, -1003.5, -1004.5, -1005.5
 
 
 def pack(x, y):
@@ -114,15 +114,17 @@ class World:
                     sh[5] = max(sh[5], u)
                     sh[4] = max(sh[4], w)
                 return
+            if v == CANCEL:
+                s.mark = set()
+                return
             if v == COMMIT:
                 if s.mark:
                     s.fill = set()
                     for k in range(len(s.pts) - 1):
-                        if k in s.mark or k + 1 in s.mark:
-                            if k not in s.gone:
-                                s.fill.add(k)
-                            s.gone.add(k)
+                        if (k in s.mark or k + 1 in s.mark) and k not in s.gone:
+                            s.fill.add(k)
                     s.centre = unpack(sh[5])
+                s.gone |= set(range(len(s.pts)))       # every line goes (test 128)
                 s.mark = set()
                 return
             a = b = 0.0
@@ -154,7 +156,7 @@ class World:
                     s.dead = True
                 return
             if v < -1000 or v - int(v) > 0.25:
-                if -1005 <= v <= -1001 or v > 524288 or -4328 <= v <= -4000:
+                if -1006 <= v <= -1001 or v > 524288 or -4328 <= v <= -4000:
                     s.answer(v)
                 if -3256 <= v <= -3000:
                     c = int(-v) - 3000
@@ -163,7 +165,7 @@ class World:
                     if b in (x, y):
                         o = y if b == x else x
                         for jk, jn in s.junctions:
-                            if jn // 1024 == o:
+                            if jn // 1024 == o and jk not in s.gone:
                                 if b == x:
                                     sh[5], sh[4] = float(s.base + jk), float(jn)
                                 else:

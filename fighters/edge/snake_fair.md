@@ -29,8 +29,13 @@ The user's numbers:
 - From the hold until the end hit is over (frame 19), no gravity and a steady fall of 0.1 a frame (`edge_sn_fall`, test 100: the user's "not accelerate downwards over time", "extremely low" fall speed; tests 93–99: gravity x 0.4, then x 0.1), no fast fall.
 - Normal landing lag; landing drops anyone caught.
 - Only the tip catches.
-- **Side special cancel** (test 107): once the sword is back at the hilt, if the move hit anyone (his own hits or the
-  point's catch: VAR_19), side special cancels it (`edge_sn_cancel`, first in both loops).
+- **Side special cancel** (test 107): if the move hit anyone (his own hits or the point's catch: VAR_19), side special
+  cancels it (`edge_sn_cancel`, first in both loops): from the sword's return on (state 4, test 128, the user: "make the
+  snakesword side B cancel faster"; tests 107 - 127 once it was back at the hilt, state 5). Cancelled while it's
+  coming back, the fighters on it are let go (`edge_sn_end`), with no end hit.
+- **Grab cancel** (test 128, the user: "allow snakesword's hilt return to be cancelled into grab if on the ground"): on
+  the ground, from the sword's return on (state 4), the grab input (no item held) goes into a grab (0x37 Catch), hit or
+  not.
 - The catch does 5%. Only up tilt has an end hit (test 103, the user's): 11%, angle 42, knockback growth 40, each hitbox 6 bigger than up tilt's, frames 21–24 (test 105; the caught are taken out of their hold hitstop as they're let go). Forward air's caught fighters drop once at the hilt (tests 79–102: an 11% end hit at fair's angle).
 
 ## Held up tilt (test 98)

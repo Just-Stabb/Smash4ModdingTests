@@ -1870,3 +1870,38 @@ and linger until the effect fades".
 - port_check over the chain, tests 70–115 and 117–127: 30 errors, 55 warnings, as before.
 - Package (install over 126): `script/animcmd/body/game.bin`, `script/msc/edge.mscsb`, `trail/trail.mscsb`,
   `fill/fill.mscsb`.
+
+## Test 128 (`build/sephiroth_test128.zip`): Octaslash blast-zone fix, all lines go on a shape, Blade Dash lines to where he stops, no shapes near the blast zones, snake sword cancels
+
+User: "Held octaslash still allows for KOing in the blast zone, now when a shape is formed using Octaslash, sometimes
+the effect doesn't appear. When a shape is formed, all lines aren't cleared for both Blade Dash and Octaslash. Lines
+still don't cover all the way to the ground on landing. Please fix these issues and make shapes not able to be formed
+off-screen near the bounds of the blast zone. Also make the the snakesword side B cancel faster, and allow
+snakesword's hilt return to be cancelled into grab if on the ground." Then "Blade Dash lines should only stop being made
+once Sephiroth stops moving in the direction the slash is in in the animation" and, with a screenshot of a ground
+Blade Dash whose line stopped short of him, "This line should reach all the way to Sephiroth's back".
+- **Blast zones:** test 127 kept fighters in only while he was in Octaslash's rush / end, but the finisher's launch
+  carries them on after it. Now a fighter in hitstun during held Octaslash is marked (his TIMER_0 - 7, one a player
+  slot) and kept 20 inside the side / bottom blast zones and 30 under the top for as long as its hitstun lasts, and
+  40 frames after.
+- **The missing glow:** the trail articles were capped at 12, and the kept Blade Dash lines could hold all of them,
+  so held Octaslash's line and its shape's glow weren't made (an article past its "max" is silently not made). Now
+  24 (60 of the fighter's 64 article instances). `port_check` W8 now shows the count and what's free; guide
+  catalogue row added.
+- **All lines go on a shape** (every line on screen, the one being drawn too: it carries on from its next point);
+  cleared lines can't make later shapes.
+- **Blade Dash's line** goes on while he still moves the slash's way: through the rush, either end (the ground
+  end's slide too, so a ground Blade Dash's line reaches him) and up to 20 frames into Fall. It ends once he moves
+  under 0.4 a frame along the slash (hitlag doesn't count).
+- **Landing:** once he's been in the air during a line, its points on the ground are at his feet + 1 (not his
+  middle), so the line comes down to the floor he lands on.
+- **No shapes near the blast zones:** within 50 of the side / bottom ones or 60 of the top, the shape isn't made
+  (the lines stay).
+- **Snake sword (held up tilt / forward air):** the side special cancel (still only if the move hit) opens as the
+  sword starts coming back (it waited for the hilt); on the ground the grab input cancels into a grab from then on.
+- Modelled in `tools/edge_trail_sim.py` (all cases still make their shapes; every line is gone after one). The
+  Blade Dash motion rules and the blast-zone hold aren't modelled. Not tested in game.
+- Assumed: "all lines" means every line on screen, not only the shape's. The side special cancel during the
+  sword's return lets go of anyone on it, with no end hit.
+- port_check over the chain, tests 70–115 and 117–128: 30 errors, 55 warnings, as before (7 notes: the new W8 count).
+- Package (install over 127): `code/cross_f.rpx` (the trail's 24), `script/msc/edge.mscsb`, `trail/trail.mscsb`.

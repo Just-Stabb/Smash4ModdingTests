@@ -21,7 +21,9 @@ Sephiroth (edge.c edge_tr_*) talks to the articles through his shared variables 
     start x 512 + count + 0.5: mark the points numbered start .. start + count - 1 (one or two of these);
     SUM1 / SUM2 / SUM3: the marked points' x / y, x^2 / y^2, x y added to 5 / 4 (5) (each point once: a stretch's
     first point is the stretch before's last, counted there);
-    COMMIT: 5 the shape's middle: the pieces with a marked end go (the line) and fill (the wedges).
+    COMMIT: 5 the shape's middle: the pieces with a marked end fill (the wedges), and every piece of every line goes
+    (test 128, the user: "When a shape is formed, all lines aren't cleared": all of them now, not only the shape's).
+    CANCEL: the marks dropped (a shape near the blast zones isn't made: test 128).
       JQ X Y (-(3000 + X x 16 + Y) - 0.5): a junction between trails (blocks) X and Y: an article of either with one
     writes X's piece in 5 and Y's in 4 (test 127: shapes of three or four lines).
       EXTENT (-(4000 + t) - 0.5, t the fitted axis in 128ths of 180 degrees; 4200 + t: of minus): the marked points'
@@ -44,7 +46,7 @@ ROOT = os.path.dirname(HERE)
 EDGE = os.path.join(ROOT, 'fighters', 'edge')
 POINTS = 16
 LIFE = 360          # the user: "persists for 6 seconds"
-SUM1, SUM2, SUM3, COMMIT = -1001.5, -1002.5, -1003.5, -1004.5
+SUM1, SUM2, SUM3, COMMIT, CANCEL = -1001.5, -1002.5, -1003.5, -1004.5, -1005.5
 FILL_DELAY, FILL_GROW, FILL_HOLD, FILL_END = 12, 8, 40, 50    # the glow; the fill article hits from 4 to FILL_END (edge_fill_msc.py)
 FILL_SCALE = 1.2    # the fill drawn this much bigger than the shape (test 127, the user: "at least 1.2x the size")
 JUNCTIONS = 4
@@ -192,7 +194,7 @@ void tr_junctions(int x, int y)
     k = 0;
     while (k < JUNC_N)
     {
-        if (tr_get_jk(k) >= 0 && tr_get_jn(k) / 0x400 == o)
+        if (tr_get_jk(k) >= 0 && tr_get_jn(k) / 0x400 == o && tr_has(tr_gone, tr_get_jk(k)) == 0)
         {
             if (b == x)
             {
@@ -401,6 +403,11 @@ void tr_answer(float v)
         }
         return;
     }
+    if (v == CANCEL_V)
+    {
+        tr_mark = 0;
+        return;
+    }
     if (v == COMMIT_V)
     {
         if (tr_mark != 0)
@@ -418,12 +425,14 @@ void tr_answer(float v)
                     {
                         tr_fill = tr_fill | tr_bit(k);
                     }
-                    tr_gone = tr_gone | tr_bit(k);
                 }
                 k = k + 1;
             }
             tr_ft = 0;
         }
+        // every line goes (test 128): all its pieces, the one from its newest point on too (a trail still being laid
+        // starts again from its next point)
+        tr_gone = tr_bit(tr_n) - 1;
         tr_mark = 0;
         return;
     }
@@ -478,7 +487,7 @@ void tr_take()
     }
     if (v < -1000.0f || v - (float)((int)v) > 0.25f)
     {
-        if (v <= -1001.0f && v >= -1005.0f || v > 524288.0f)
+        if (v <= -1001.0f && v >= -1006.0f || v > 524288.0f)
         {
             tr_answer(v);
         }
@@ -618,7 +627,7 @@ int tr_over()
         }
     }
     if (tr_life <= 0 || tr_slot < 0 || tr_vanish && tr_ft < 0
-        || tr_over_t && tr_ft < 0 && tr_n > 1 && tr_gone == tr_bit(tr_n - 1) - 1)
+        || tr_over_t && tr_ft < 0 && tr_n > 1 && (tr_gone & (tr_bit(tr_n - 1) - 1)) == tr_bit(tr_n - 1) - 1)
     {
         BattleObject(0x9);      // its time's up, or all its pieces are gone and its fill is over
         return 0x1;
@@ -686,7 +695,7 @@ void func_47()
 '''
     reps = {'POINTS_N': POINTS, 'LIFE_N': LIFE, 'DELAY_N': FILL_DELAY, 'GROW_N': FILL_GROW, 'HOLD_N': FILL_HOLD,
             'END_N': FILL_END, 'A_BONE_N': A_BONE, 'C_BONE_N': C_BONE, 'W_BONE_N': W_BONE,
-            'COMMIT_V': '%.1ff' % COMMIT, 'JUNC_N': JUNCTIONS, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
+            'COMMIT_V': '%.1ff' % COMMIT, 'CANCEL_V': '%.1ff' % CANCEL, 'JUNC_N': JUNCTIONS, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
     for k, v in sorted(reps.items(), key=lambda kv: -len(kv[0])):
         body = body.replace(k, str(v))
     body = (body.replace('GETX', ifchain('        return tr_x#;'))

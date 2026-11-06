@@ -888,6 +888,14 @@ def check_weapon_instances(name, rec, rep):
         rep.add('ERROR', 'W8 weapon-instances', '%d article instances in all (%s\'s %d + new %d, extra_kinds.json '
                 '"max"): 64 at most, past that the game crashes loading him (Sephiroth test 123)' % (
                     base + new, rec.get('base'), base, new))
+        return
+    # the other side: an article past its own "max" isn't made (no crash, nothing drawn or hit: Sephiroth test 127's
+    # trail, 12, all held by the kept Blade Dash lines, so Octaslash's line and shape glow weren't made); the counts
+    # shown so a "max" set tight can be raised while there's room
+    rep.add('INFO', 'W8 weapon-instances', '%d of 64 article instances (%s\'s %d + new %d: %s); %d free. An article '
+            'past its "max" is silently not made' % (base + new, rec.get('base'), base, new, ', '.join(
+                '%s %s' % (k, w.get('max', 1)) for k, w in rec.get('weapons', {}).items() if isinstance(w, dict)),
+            ARTICLE_SLOTS - base - new))
 
 
 def check_weapon_statuses(name, rep):
