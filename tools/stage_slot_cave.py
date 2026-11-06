@@ -43,7 +43,7 @@ from ppcasm import Asm, ha  # noqa: E402
 
 RPX = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'build', 'cave_fix_s4', 'cross_f.rpx')
 CAVE = 0x04B7C000
-LIMIT = 0x04B7E000
+LIMIT = 0x04B7D000            # 0x04B7D000-0x04B7E000: the Smash Run mode's caves (smashrun_menu.py, ...)
 KIND_TABLE, KIND_COUNT = 0x1011D95C, 0x80
 COSMETIC_TABLE, COSMETIC_COUNT = 0x1033C100, 0x4F
 DEFAULT = ['NewStage01:0x38']
