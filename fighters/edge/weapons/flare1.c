@@ -1111,7 +1111,7 @@ void fl_hitboxes()
             AttackModule(0x2739, i, 0x35);
             if (st == 3.0f)
             {
-                AttackModule(0x271b, i, 3.5f);
+                AttackModule(0x271b, i, 5.0f);         // test 140: 5 (3.5 before)
             }
         }
         else                                   // orbiting (or appearing, gone, not made): none. Ultimate's
@@ -1120,6 +1120,22 @@ void fl_hitboxes()
         }                                      // a hitbox can't leave one fighter out, so they hit no one here
         i += 1;
     }
+}
+
+// 1 while an orb is exploding (state 3: test 140, the next waits for it)
+int fl_exploding()
+{
+    int i;
+    i = 0;
+    while (i < fl_count)
+    {
+        if (fl_var(i) == 3.0f)
+        {
+            return 0x1;
+        }
+        i += 1;
+    }
+    return 0;
 }
 
 // orb i's Part (i % 2) gets a new hit record at the next fl_hitboxes
@@ -1413,18 +1429,22 @@ void fl_conve_loop()
             }
             fl_set(0xa + i, rho);
             rho = rho - v;
-            if ((rho <= 0.5f || rho <= v) && WorkModuleF(0, 0x0f00005b + 0x8 * fl_slot) > 0)
+            if ((rho <= 0.5f || rho <= v) && (WorkModuleF(0, 0x0f00005b + 0x8 * fl_slot) > 0 || fl_exploding()))
             {
-                // at the centre with the target still in hitstop (another orb's hit): it waits there, its one-frame
-                // EXP after the hitstop (test 112, the user: the orbs "don't connect with the opponent, mostly when
-                // there's more than one orb": a strike landing in the hitlag of the one before it was lost)
+                // at the centre with the target still in hitstop (another orb's hit) or another orb exploding: it waits
+                // there, its EXP after (test 112, the user: the orbs "don't connect with the opponent, mostly when
+                // there's more than one orb": a strike landing in the hitlag of the one before it was lost; test 140:
+                // "Side special when charged still does not always have each orb connect": two exploding at once (a
+                // fighter takes one hit a frame from them, and they share 2 Parts) lost one)
                 fl_set(0xa + i, 0);
                 fl_place(i, 0.5f);
             }
             else if (rho <= 0.5f || rho <= v)
             {
-                // EXP: one frame at the centre, then gone
+                // EXP: 3 frames at the centre (test 140; 1 before: a launched fighter could be off the centre that
+                // frame), its hit record new once at its start (one hit), then gone
                 fl_set(i, 3.0f);
+                fl_set(0xf + i, 3.0f);
                 fl_clear(i);
                 fl_hitboxes();
                 fl_place(i, 0.5f);
@@ -1438,8 +1458,17 @@ void fl_conve_loop()
         }
         else if (fl_var(i) == 3.0f)
         {
-            fl_set(i, 4.0f);
-            AttackModule(0x2718, i);
+            live += 1;
+            fl_set(0xf + i, fl_var(0xf + i) - 1.0f);
+            if (fl_var(0xf + i) <= 0)
+            {
+                fl_set(i, 4.0f);
+                AttackModule(0x2718, i);
+            }
+            else
+            {
+                fl_place(i, 0.5f);
+            }
         }
         i += 1;
     }

@@ -2079,3 +2079,14 @@ User (clip): "occasionally a stray line is left rather than deleted once a shape
   already neither reflectable nor absorbable.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–139: 30 errors, 55 warnings, 7 notes.
 - Package (install over 138): `script/animcmd/weapon/fill/game.bin`, `script/msc/edge.mscsb`.
+
+## Test 140 (`build/sephiroth_test140.zip`): charged Shadow Flare's orbs each connect
+
+User: "Side special when charged still does not always have each orb connect."
+- Each orb strikes in and explodes (EXP) at the fighter's centre. Lost hits came from: two orbs exploding at once (a
+  fighter takes one hit a frame from them, and the orbs share the article's 2 Parts), and the one-frame EXP missing a
+  fighter already launched off the centre. Now an orb at the centre waits while the target is in hitstop or another
+  orb is exploding, and EXP lasts 3 frames at the centre (following it), size 5 (was 3.5), its hit record new once
+  at its start, so it hits once.
+- Not tested in game. port_check over the chain, tests 70–115 and 117–140: 30 errors, 55 warnings, 7 notes.
+- Package (install over 139): `script/msc/flare1/flare1.mscsb`.

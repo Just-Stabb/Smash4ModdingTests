@@ -501,7 +501,10 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   8 i frames later: thrown out at 4-5.2 then in, + 0.45-0.85 a frame up to 7-14 (lerped by R = n / 5), TRY 6.5 damage
   53 degrees; at the centre EXP: one frame, size 3.5, `edge_shadowflare_bullet_hit` x 1.3; each strike with its hit
   records cleared. Test 112: a striking orb that reaches the centre while the target is still in hitstop (another
-  orb's hit) waits there and explodes on the first frame after the hitstop. The fighter KO'd / respawning / gone:
+  orb's hit) waits there and explodes on the first frame after the hitstop. Test 140 (the user: "Side special when charged still does not
+  always have each orb connect"): it also waits while another orb is exploding (two at once lost one: a fighter takes
+  one hit a frame from them, and they share 2 Parts), and EXP lasts 3 frames at the centre (1 before: a launched fighter
+  could be off the centre that frame), size 5 (3.5), its hit record new once at its start (one hit). The fighter KO'd / respawning / gone:
   every orb ends (`edge_shadowflare_bullet_end`).
 - **Orbit per fighter (test 71):** Ultimate's `edge_flare_radius` and its ring centre on `edge_flare_node` (`waist`
   for 92 of 94 fighters) + `edge_flare_offset_x/y/z` in that joint's axes, from `fighter_param.prc`, by the target's
