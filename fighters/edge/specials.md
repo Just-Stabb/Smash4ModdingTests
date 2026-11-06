@@ -281,7 +281,10 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     own trail's pieces are tested as they are and only those that can close a loop (3 points between): test 132, the
     extension made near pieces cross falsely (the points are kept to 0.5) and their report wrote over a real loop's in
     the same frame (`edge_trail_sim.py`, wobbly loops: about 900 false reports in 40 runs).
-    **Octaslash's shape** ends the move (VAR_20 3, above); its trail then ends with -1, not -2 (test 130: its lines are
+    **Octaslash's shape** ends the move (VAR_20 3, above), from the restore step a frame after the commit (TIMER_12
+    pending; tests 127 - 135 ended it in the commit's frame and the next step overwrote the commit before the
+    articles read it: Octaslash's shapes measured, nothing drawn, test 136 found with a damage-% diagnostic), and the
+    steps go at most one a frame (TIMER_11); its trail then ends with -1, not -2 (test 130: its lines are
     gone already, and the glow's articles go as Blade Dash's do once it's over; the user still saw no glow from an
     Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
     forced end, keeps the glow its 50 frames).

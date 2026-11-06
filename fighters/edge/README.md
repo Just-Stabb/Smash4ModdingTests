@@ -2046,3 +2046,13 @@ measured (+5%), but nothing was drawn and the lines stayed: the commit didn't re
   the commit went out).
 - Not tested in game. port_check over the chain, tests 70–115 and 117–136: 30 errors, 55 warnings, 7 notes.
 - Package (install over 135): `script/msc/edge.mscsb`.
+- **Result (user, clip):** 16% with the glow: the shape drawn, the lines cleared, the move ended into its finisher.
+  The cause was the forced end in the commit's frame.
+
+## Test 137 (`build/sephiroth_test137.zip`): test 136 without the diagnostic
+
+- Test 136's fix confirmed in game (the user: "16% with a glow"); the damage-% diagnostic taken out. Guide catalogue
+  row added for the status-change overwrite. Tests 135's nested-call flattening and plain-if crossing test stay
+  (harmless; whether they mattered isn't known).
+- port_check over the chain, tests 70–115 and 117–137: 30 errors, 55 warnings, 7 notes.
+- Package (install over 136): `script/msc/edge.mscsb`.

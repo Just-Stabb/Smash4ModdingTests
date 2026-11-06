@@ -38580,7 +38580,6 @@ void edge_tr_steps()
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
         ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
         WorkModule(0, -5.0f, edge_tr_q_var());
-        DamageModule(0x9, 10.0f);          // DIAGNOSTIC (test 136, to be removed): +10% the commit sent
         if (global4 == 0x159 && edge_hi_charged)
         {
             // a shape made in Octaslash ends it, its finisher pulling in (test 127: "force Sephiroth to end Octaslash
@@ -38908,10 +38907,8 @@ void edge_tr_step(int last)
         if (m / 0x400 == num / 0x400)
         {
             // its own trail: a loop, its points m + 1 .. num - 1
-            DamageModule(0x9, 1.0f);       // DIAGNOSTIC (test 135, to be removed): +1% a self-crossing report
             if ((float)m >= WorkModuleF(0, edge_tr_floor_var()) && num - 1 - m >= 3 && num - 1 - m < 0x200)
             {
-                DamageModule(0x9, 5.0f);   // DIAGNOSTIC (test 135): +5% a loop shape measured
                 edge_tr_shape(m + 1, num - 1 - m, 0, 0, num);
                 return;
             }
