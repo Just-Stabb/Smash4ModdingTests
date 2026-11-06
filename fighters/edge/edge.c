@@ -39435,11 +39435,12 @@ void edge_lw_ph_target()
     WorkModule(0, (float)code, 0x0f00031f);
 }
 
-// the Phantom's slash hit someone (weapons/phantom.c ph_hit_report: -(2^21 + their place) in his VAR_31): the fighter held
-// on the sword there (within edge_lw_ph_hit_r of it) is let go, their stage collision back, so they fly from its hit
-// (test 120, the user: "when Phantom hits a held opponent, they get released"; test 121: only that one, its own hit,
-// not test 120's any damage to any held one)
-float edge_lw_ph_hit_r() { return 8.0f; }
+// the Phantom's slash is out (weapons/phantom.c ph_hit_report: -(2^21 + the slash's middle) in his VAR_31): a fighter
+// held on the sword with its middle (feet + 8) within edge_lw_ph_hit_r of it is let go, their stage collision back, so
+// they fly from its hit (test 120, the user: "when Phantom hits a held opponent, they get released"; tests 121 / 122:
+// only that one, not test 120's any damage to any held one; test 122: the slash's place, as the Phantom can't read its
+// own hit)
+float edge_lw_ph_hit_r() { return 14.0f; }
 
 void edge_lw_ph_lets_go()
 {
@@ -39471,7 +39472,7 @@ void edge_lw_ph_lets_go()
         if (edge_sn_s(slot) >= 0.0f)
         {
             dx = WorkModuleF(0, 0x0f000020 + 0x4 * (slot - 1)) - x;   // POS_SLOTn_X / Y
-            dy = WorkModuleF(0, 0x0f000021 + 0x4 * (slot - 1)) - y;
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * (slot - 1)) + 8.0f - y;
             if (dx * dx + dy * dy <= edge_lw_ph_hit_r() * edge_lw_ph_hit_r())
             {
                 edge_sn_ground(slot, 5.0f);     // stage collision back (air)

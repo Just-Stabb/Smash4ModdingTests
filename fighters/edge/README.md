@@ -1749,3 +1749,14 @@ VAR_15 are gone).
 - port_check over the chain, tests 70–115 and 117–121: 30 errors, as before.
 - Package (install over 120): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
 
+## Test 122 (`build/sephiroth_test122.zip`): the held fighter at the Phantom's slash is let go
+
+User: "The Phantom hit doesn't release an opponent." Test 121 relied on the Phantom reading its own hit (SELF_HIT_NOW)
+and the fighter hit's place (LASTHIT offsets); one of those doesn't work on a weapon (not known which). Now, while its
+slash's damaging hitboxes are out (frames 11 - 12 / 13 - 15 / 18 - 28 by level, Zelda's phantom game.bin), the Phantom
+reports the slash's middle (16 ahead, 10 up) each frame; his tick lets go of a held fighter whose middle (feet + 8) is
+within 14 of it (`ph_hit_report`, `edge_lw_ph_lets_go`). Weapon writes to his VAR_31 are proven (Shadow Flare's
+orbs); only the hold's own fighters are looked at.
+- port_check over the chain, tests 70–115 and 117–122: 30 errors, as before.
+- Package (install over 121): `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`.
+
