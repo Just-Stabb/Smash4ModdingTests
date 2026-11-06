@@ -41,6 +41,18 @@ def axes(t7):
     return tsin(math.pi / 2 - th), tsin(th)
 
 
+EXT = 3.0
+
+
+def ext(a, b):
+    (ax, ay), (bx, by) = a, b
+    l = math.hypot(bx - ax, by - ay)
+    if l <= 0.01:
+        return a, b
+    dx, dy = (bx - ax) * EXT / l, (by - ay) * EXT / l
+    return (ax - dx, ay - dy), (bx + dx, by + dy)
+
+
 def cross(a, b, c, d):
     (ax, ay), (bx, by), (cx, cy), (dx, dy) = a, b, c, d
     d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
@@ -84,7 +96,7 @@ class World:
             for k in range(len(s.pts) - 1):
                 if k in s.gone or (same and not s.base + k + 1 <= num - 2):
                     continue
-                if cross(s.sp, p, s.pts[k], s.pts[k + 1]):
+                if cross(*ext(s.sp, p), *ext(s.pts[k], s.pts[k + 1])):     # both 3 longer (test 131)
                     if sh[4] > -1000 or same:
                         sh[4] = -float(s.base + k)
                     if not same and not any(jk == k and jn // 1024 == num // 1024 for jk, jn in s.junctions):
@@ -204,6 +216,7 @@ class World:
         for i in range(12):
             self.V[i] = 0.0
         self.V[1] = float(self.cur() * 1024)
+        self.V[10] = 2.0        # point 0 seen a frame before point 1 (test 131: the old lines tested no first piece)
         self.point(pack(x, y), self.cur() * 1024)
 
     def steps(self):
@@ -276,6 +289,7 @@ class World:
         sh[4] = 0.0
         sh[5] = V[3]
         sh[6] = V[4]
+        V[10] = 0.0
         V[1] = V[4]
         V[5] = 10
         V[0] = 0
@@ -389,6 +403,8 @@ class World:
             return
         if sh[6] < 1024:
             return
+        if V[10] > 0 and not last:
+            return
         if V[5] > 0:
             V[5] -= 1
         c = sh[4]
@@ -426,6 +442,8 @@ class World:
             self.sh[6] = self.V[4]
             self.V[0] = 0
             return
+        if self.V[0] == 0 and self.V[10] > 0:
+            self.V[10] -= 1
         if -5 <= self.V[0] <= -1 or -8 <= self.V[0] <= -7 or -13 <= self.V[0] <= -11:
             self.steps()
 
@@ -523,6 +541,14 @@ if __name__ == '__main__':
         run_path(w, line((-45, 60), (45, 60)), order)       # top across both sides: a square (-30..30, 20..60)
         w.idle(30, order)
         print('four Blade Dashes (a 60 x 40 rectangle, middle (0, 40)):', w.shapes)
+        w = World()
+        run_path(w, line((-60, 9), (40, 9)), order)         # along the ground
+        w.idle(5, order)
+        run_path(w, line((40, 9), (-40, 90)), order)        # from where it ended, up-left: they only touch (test 131's clip)
+        w.idle(5, order)
+        run_path(w, line((30, 100), (-50, 0)), order)       # across the second, down through the first
+        w.idle(30, order)
+        print('triangle on a line\'s end (test 131):', w.shapes)
         w = World()
         run_path(w, line((0, 60), (40, 20)), order)         # a dash into the floor at (40, 20)
         w.idle(5, order)

@@ -51,6 +51,7 @@ FILL_DELAY, FILL_GROW, FILL_HOLD, FILL_END = 12, 8, 40, 50    # the glow; the fi
 FILL_SCALE = 1.2    # the fill drawn this much bigger than the shape (test 127, the user: "at least 1.2x the size")
 JUNCTIONS = 4
 KEEP = 6
+EXT = 3.0           # the pieces tested taken this much longer at both ends (lines meeting end to end cross: test 131)
 C_BONE, W_BONE, A_BONE = 2, 3, 3 + POINTS                     # bones: TopN, HaveN, C, W0 - W15, A0 / B0 ... A14 / B14
 
 
@@ -281,10 +282,36 @@ int tr_cross(float ax, float ay, float bx, float by, float cx, float cy, float d
 
 // the newest piece (tr_sx, tr_sy) - (x, y), numbers num - 1 - num, against this stretch's own pieces still drawn (in
 // its own trail, not the ones next to it): one crossed, m its start's number, reported in shared 4 as -m
+// every piece tested is taken EXT_N longer at both ends (test 131, the user's clip: a Blade Dash started where the last
+// one ended, the two lines meeting end to end, never crossing, so the triangle they made with a third wasn't found)
 void tr_test(float x, float y, int num)
 {
     int k;
     int same;
+    float ax;
+    float ay;
+    float bx;
+    float by;
+    float cx;
+    float cy;
+    float dx;
+    float dy;
+    float l;
+    ax = tr_sx;
+    ay = tr_sy;
+    bx = x;
+    by = y;
+    l = MathF(0, (bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+    if (l > 0.01f)
+    {
+        l = EXT_N / l;
+        dx = (bx - ax) * l;
+        dy = (by - ay) * l;
+        ax = ax - dx;
+        ay = ay - dy;
+        bx = bx + dx;
+        by = by + dy;
+    }
     same = 0;
     if (tr_base / 0x400 == num / 0x400)
     {
@@ -295,7 +322,22 @@ void tr_test(float x, float y, int num)
     {
         if (tr_has(tr_gone, k) == 0 && (same == 0 || tr_base + k + 1 <= num - 2))
         {
-            if (tr_cross(tr_sx, tr_sy, x, y, tr_get_x(k), tr_get_y(k), tr_get_x(k + 1), tr_get_y(k + 1)))
+            cx = tr_get_x(k);
+            cy = tr_get_y(k);
+            dx = tr_get_x(k + 1);
+            dy = tr_get_y(k + 1);
+            l = MathF(0, (dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
+            if (l > 0.01f)
+            {
+                l = EXT_N / l;
+                x = (dx - cx) * l;
+                y = (dy - cy) * l;
+                cx = cx - x;
+                cy = cy - y;
+                dx = dx + x;
+                dy = dy + y;
+            }
+            if (tr_cross(ax, ay, bx, by, cx, cy, dx, dy))
             {
                 if (tr_shared(0x4) > -1000.0f || same)
                 {
@@ -695,7 +737,7 @@ void func_47()
 '''
     reps = {'POINTS_N': POINTS, 'LIFE_N': LIFE, 'DELAY_N': FILL_DELAY, 'GROW_N': FILL_GROW, 'HOLD_N': FILL_HOLD,
             'END_N': FILL_END, 'A_BONE_N': A_BONE, 'C_BONE_N': C_BONE, 'W_BONE_N': W_BONE,
-            'COMMIT_V': '%.1ff' % COMMIT, 'CANCEL_V': '%.1ff' % CANCEL, 'JUNC_N': JUNCTIONS, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
+            'COMMIT_V': '%.1ff' % COMMIT, 'CANCEL_V': '%.1ff' % CANCEL, 'JUNC_N': JUNCTIONS, 'EXT_N': '%.1ff' % EXT, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
     for k, v in sorted(reps.items(), key=lambda kv: -len(kv[0])):
         body = body.replace(k, str(v))
     body = (body.replace('GETX', ifchain('        return tr_x#;'))

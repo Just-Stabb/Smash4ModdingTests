@@ -38113,8 +38113,32 @@ void edge_hi_link()
     }
     tx = edge_hi_link_d() * edge_hi_rx * PostureModuleF(0);
     ty = edge_hi_link_h() + edge_hi_link_d() * edge_hi_ry;
-    WorkModule(0, ox + (tx - ox) * edge_hi_link_k(), 0x0f000055);
-    WorkModule(0, oy + (ty - oy) * edge_hi_link_k(), 0x0f000056);
+    tx = ox + (tx - ox) * edge_hi_link_k();
+    ty = oy + (ty - oy) * edge_hi_link_k();
+    // the place it's pulled to kept inside the blast zones as edge_hi_keep_in's (test 131, the user: "opponents can still
+    // be dragged and KO'd by the top blastzone by Octaslash": the pull, in his status loop, put them past the top after
+    // his per-frame hook's clamp, above it with him); the offset is along his facing (X) and up (Y)
+    ox = PostureModuleF(0x1) + tx * PostureModuleF(0);
+    oy = PostureModuleF(0x2) + ty;
+    if (ox < StageData(0) + 20.0f)
+    {
+        ox = StageData(0) + 20.0f;
+    }
+    if (ox > StageData(0x1) - 20.0f)
+    {
+        ox = StageData(0x1) - 20.0f;
+    }
+    if (oy < StageData(0x3) + 20.0f)
+    {
+        oy = StageData(0x3) + 20.0f;
+    }
+    if (oy > StageData(0x2) - 30.0f)
+    {
+        oy = StageData(0x2) - 30.0f;
+    }
+    WorkModule(0, (ox - PostureModuleF(0x1)) * PostureModuleF(0), 0x0f000055);
+    WorkModule(0, oy - PostureModuleF(0x2), 0x0f000056);
+    edge_hi_keep_in();                 // and every one marked, after the pull (it's in his per-frame hook too)
 }
 
 // ---- the up special trail (tests 123 - 126, the user's concept stages 2 and 3: "Tap up and hold up special both leave a
@@ -38248,6 +38272,11 @@ void edge_tr_begin()
     WorkModule(0, 0.0f, 0x0f000328);
     WorkModule(0, 0.0f, 0x0f000329);
     WorkModule(0, 5.0f, 0x0f00032a);
+    // point 0 up a frame before point 1 can follow it (VAR_10, 2 frames, his per-frame hook counting it down): test 131,
+    // point 1 could be written the frame point 0 was (the rush's main and loop), the old lines' articles never saw point
+    // 0, so tested no first piece, and a line started where another ended never met it (the user's clip: "this shape
+    // should be able to form a triangle")
+    WorkModule(0, 2.0f, edge_tr_s3_var());
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
     edge_tr_point(edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + edge_tr_h()), edge_tr_cur_block() * 0x400);
 }
@@ -38273,7 +38302,7 @@ float edge_tr_sin(float x)
 // reach all the way to Sephiroth's back"): his position last frame in VAR_11 (packed at 0.25: (x + 512) x 4 x 4096 +
 // (y + 512) x 4, exact in a float; VAR_11 is the steps' only while VAR_0 < 0), his move since along the slash
 // (edge_hi_rx / ry: world space, edge_hi_resolve) under 0.4 a frame for 3 frames running (TIMER_10, 0x0F00032A, set to
-// 3 each frame he moves; 5 as the trail starts) = stopped. In hitlag (0x0F000043) or while a shape's steps run he
+// 2 each frame he moves; 5 as the trail starts) = stopped (test 131: and moving more than 20 degrees off it). In hitlag (0x0F000043) or while a shape's steps run he
 // isn't. Test 128 took the direction x his facing (edge_hi_rx is already the world's) and a single still frame as
 // stopped: facing left a Blade Dash's line ended at once (the user: "The lines don't appear anymore on Blade Dash"). TIMER_8 (0x0F000328): frames the line may go on into Fall after the move (20); TIMER_9: he's been in the
 // air in this trail (then on the ground its points are at his feet + 1, not his middle: the line reaches the floor he
@@ -38310,9 +38339,16 @@ int edge_tr_bd_stop()
     px = (float)((int)v / 0x1000) * 0.25f - 512.0f;
     py = (float)((int)v - ((int)v / 0x1000) * 0x1000) * 0.25f - 512.0f;
     d = (x - px) * edge_hi_rx + (y - py) * edge_hi_ry;
-    if (d >= 0.4f)
+    // and on the slash's line: across it under tan 20 of along (test 131, the user: "the line continues to be drawn for
+    // too long, it begins curving": gravity bending his path after the slash)
+    v = (x - px) * edge_hi_ry - (y - py) * edge_hi_rx;
+    if (v < 0.0f)
     {
-        WorkModule(0, 3.0f, 0x0f00032a);
+        v = -v;
+    }
+    if (d >= 0.4f && v <= d * 0.364f)
+    {
+        WorkModule(0, 2.0f, 0x0f00032a);
         return 0;
     }
     if (WorkModuleF(0, 0x0f00032a) <= 0.0f)
@@ -38518,8 +38554,10 @@ void edge_tr_steps()
         // not near the blast zones (off screen: test 128, the user: "make shapes not able to be formed off-screen near
         // the bounds of the blast zone"): the shape (its middle +- its long half axis) 50 inside the side / bottom
         // ones and 60 under the top, else CANCEL (the articles drop their marks; no fill, no hitbox)
-        if (cx - a < StageData(0) + 50.0f || cx + a > StageData(0x1) - 50.0f || cy - a < StageData(0x3) + 50.0f
-            || cy + a > StageData(0x2) - 60.0f)
+        // (test 131: its middle 20 inside the side / bottom ones, 40 under the top; test 128's shape's edge 50 / 60 from
+        // them refused shapes still on screen: the user's clip, an Octaslash loop at the screen's top made nothing)
+        if (cx < StageData(0) + 20.0f || cx > StageData(0x1) - 20.0f || cy < StageData(0x3) + 20.0f
+            || cy > StageData(0x2) - 40.0f)
         {
             WorkModule(0, edge_tr_cancel(), edge_tr_num_var());
             WorkModule(0, -5.0f, edge_tr_q_var());
@@ -38540,6 +38578,7 @@ void edge_tr_steps()
     }
     // 5: the trail as it was (VAR_11 his position: edge_tr_bd_stop's)
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
+    WorkModule(0, 0.0f, edge_tr_s3_var());             // VAR_10: the sums' till now (edge_tr_step reads it as the wait)
     WorkModule(0, 0.0f, edge_tr_cross_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
@@ -38758,6 +38797,10 @@ void edge_tr_tick()
         WorkModule(0, 0.0f, edge_tr_q_var());
         return;
     }
+    if (q == 0.0f && WorkModuleF(0, edge_tr_s3_var()) > 0.0f)
+    {
+        WorkModule(0, WorkModuleF(0, edge_tr_s3_var()) - 1.0f, edge_tr_s3_var());
+    }
     if (q <= -1.0f && q >= -5.0f || q <= -7.0f && q >= -8.0f || q <= -11.0f && q >= -13.0f)
     {
         edge_tr_steps();
@@ -38812,6 +38855,10 @@ void edge_tr_step(int last)
     if (WorkModuleF(0, edge_tr_num_var()) < 1024.0f)
     {
         return;
+    }
+    if (WorkModuleF(0, edge_tr_s3_var()) > 0.0f && last == 0)
+    {
+        return;                            // point 0 not seen yet (edge_tr_begin)
     }
     if (WorkModuleF(0, edge_tr_cool_var()) > 0.0f)
     {

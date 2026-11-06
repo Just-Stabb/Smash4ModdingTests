@@ -1942,3 +1942,27 @@ an air use if it leaves an edge".
   dash grab). It flags test 129's `edge_sn_cancel`; clean now.
 - port_check over the chain, tests 70–115 and 117–130: 30 errors, 55 warnings, 7 notes, as before.
 - Package (install over 129): `script/msc/edge.mscsb`.
+
+## Test 131 (`build/sephiroth_test131.zip`): Octaslash shapes on screen work again, lines meeting end to end close shapes, Blade Dash lines stop when his path curves, no top-blast-zone KOs from the autolink
+
+User (three clips): "Blade Dash is fixed, but the line continues to be drawn for too long, it begins curving.
+Octaslash's lines show up but the shape effect doesn't appear and the lines aren't cleared after forming a shape. Also
+in the last clip, this shape should be able to form a triangle. I don't know why it doesn't work. Other triangles can
+be formed and do work." Then "opponents can still be dragged and KO'd by the top blastzone by Octaslash".
+- **Octaslash's shape:** the clip's loop near the top of the screen was refused as "near the blast zones": test 128
+  refused any shape whose edge came within 50 of the side / bottom blast zones or 60 of the top, which the camera
+  still shows (so: no glow, no lines cleared, the move not ended). Now only a shape whose middle is within 20 of the
+  side / bottom ones or 40 of the top is refused.
+- **The triangle:** its second Blade Dash started exactly where the first ended. Two causes: the lines only touched
+  (now every piece is tested 3 longer at both ends), and a trail's point 1 could replace its point 0 in the same
+  frame, so the old lines never tested its first piece (now point 1 waits until point 0 has been up a frame).
+  Modelled: `edge_trail_sim.py`'s new case, a ground line, one from its end up-left, one across both, forms in both
+  update orders (without the fixes it didn't). Guide catalogue row for the same-frame overwrite.
+- **Blade Dash's line** also ends once his path turns more than 20 degrees off the slash (gravity bending it), after
+  2 frames (was 3).
+- **Top blast zone:** Octaslash's autolink pull, run in his status loop, could place the fighter past the top after
+  his per-frame hook's clamp. Its place is now clamped the same way (20 inside the side / bottom, 30 under the top),
+  and the clamp runs again right after it.
+- Not tested in game.
+- port_check over the chain, tests 70–115 and 117–131: 30 errors, 55 warnings, 7 notes, as before.
+- Package (install over 130): `script/msc/edge.mscsb`, `trail/trail.mscsb`.
