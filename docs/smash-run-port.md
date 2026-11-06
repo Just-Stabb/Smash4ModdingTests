@@ -154,8 +154,52 @@ What the other enemies needed beyond the Goomba:
 - **Overlap with the Wii U**: cake, dogars, kamek, magnumkiller, metroid, ohganemochi, shinigami and tac are also
   Wii U enemy kinds (Smash Tour / the Master Fortress); writing them to `model/enemy/<kind>/` would replace the
   Wii U's own. The package keeps them in a separate folder.
-- Not converted yet: the particle effects (`effect/`: 61 `.ptcl` (SPBD, version 0x33) + `.efc`, 413 effect-model
-  files, 2 trail textures).
+- Particle effects: below.
+
+## Enemy particle effects (3DS SPBD v0x33 -> Wii U EFTF v0x42)
+
+`python3 tools/s3ds_effects.py SRC_ROOT all OUT VANILLA_DIR` writes `effect/enemy/KIND/KIND.010d0000.ptcl / .efc`
+for the 52 Smash Run enemies with effects (238 emitters); `tools/s3ds_effects_test.py SRC_ROOT VANILLA_DIR`: every
+file validates (ptcl.validate), has the 3DS sets / emitters in order, and every emitter's written fields read
+back as the 3DS values (52 files, 238 emitters, 0 failures); `tools/s3ds_effects_preview.py FILE.ptcl sheet.png`
+draws a converted file with fx_render's eft model. VANILLA_DIR: the vanilla Wii U fighter ptcl files (the
+templates).
+
+The 3DS file is the same NintendoWare eft as the Wii U's (a CTR port, little endian): the same header and
+tables, set records, 8-byte emitter-table entries, emitters named at +0x38 with the fields in the same order, but
+2 texture slots of 0x7C bytes, 3 colour keys a track and some settings packed into bytes; a simple emitter is
+0x548 bytes. No layout for this version exists (Switch Toolbox reads only names, textures and colours), so it was
+worked out here (`s3ds_effects.SPBD_FIELDS`, each with its evidence):
+- statistics over the 2,112 emitters of the enemies' and fighters' 3DS files (`effect/fighter/` from the
+  archive): which words are floats / ints / packed bytes, their ranges, the identity matrices, angles in radians;
+- pairing with the Wii U: the fighter effects both games ship (the 117 vanilla Wii U files against the 3DS
+  ones) matched by file, set and emitter name (313 pairs); 147 of them agree on the fields known first (life,
+  rate, scale, speeds, alpha, gravity, volume...), so they are the same emitter, and every other 3DS word / byte
+  was matched against the Wii U emitter's on those (e.g. follow type 0x190 = Wii U 0x310 in 95%, combiner 0x194
+  = 0x314 90%, blend 0x244 = 0x324 99%, particle type 0x328 = 0x4BC 92%, emit start 0x2C8 = 0x44C 88%,
+  interval random 0x2D4 = 0x458 90%);
+- names: emitters named `*add*` are blend 1 (75 of 78), `*alpha*` blend 0 (57 of 59), `*line*` particle type 3.
+Differences from the Wii U worth knowing: alpha sections are integer percent (Wii U: fractions); the UV
+repeat mode is a separate word (0x364: 0 1x1, 1 2x1, 2 1x2, 3 2x2), already part of the UV scale; the texture
+wrap byte (TexRes +0x10) uses the Wii U's codes (0 mirror, 1 repeat, 2 clamp; low nibble U), every 2x2 repeat
+mirrored as on the Wii U; the 3DS's V runs up (V scroll and UV rotation negated); flipbooks are mostly a random
+start cell (0x33D, as Wii U 0x4D9), animated ones flagged at 0x338 with frames a cell at 0x340; volume sweep
+angles are u32s (2^32 a turn). Textures: PICA200 (ETC1 1,273, ETC1A4 653, L4, L8, RGB565...: Switch Toolbox's
+SurfaceFormat numbers at TexRes +0x6C), decoded by `s3ds_model.decode_texture`.
+
+Conversion: each emitter onto a vanilla template (vfxb_to_ptcl.Templates: particle type, blend, follow,
+flipbook, UV animation, rotation; BC4-shape templates), the 3DS fields written over it, the texture folded into
+a BC4 shape (alpha from the shape for ETC1 and the other formats without alpha) and its tint into the colour
+keys. The `.efc` (3DS EFCC: the Wii U's layout little endian, a u32 version) keeps its entries.
+
+Not converted yet:
+- the effect models (`effect/model/*/normal.bch` + `motion.bch`, 92 models used by 37 enemies: beams, auras,
+  muzzle flashes...): H3D meshes with their vertex data in the .bch (no .mbn); the .efc entries pointing at them
+  are kept without the model (a missing model folder would be loaded);
+- mesh particles (20 emitters: drawn as billboards), key animations (emitter curves), complex emitters' blocks
+  (1: fields / child / stripe), colour 1 where the best template has no colour-1 combiner (11);
+- the 3DS combiner 3 and 0x18C / 0x248 / 0x324 (copied where a Wii U field matches, otherwise left).
+- 2 trail textures (`effect/trail/*.tex`).
 
 Not yet: a running Goomba in game needs the enemy itself (Smash Run's `enemy.cro` BehaviorKuribo, the
 EnemyManager side) — the code part of the plan below. Still to check with an enemy loaded: the Wii U's enemy

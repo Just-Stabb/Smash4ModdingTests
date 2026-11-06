@@ -1,0 +1,410 @@
+#!/usr/bin/env python3
+"""Smash 3DS particle effects (.ptcl SPBD v0x33 + .efc EFCC) -> Smash 4 Wii U ones (.ptcl EFTF v0x42 + .efc
+EFCF), for the Smash Run enemies (effect/enemy/KIND/, the path cross_f.rpx builds).
+
+  python3 tools/s3ds_effects.py SRC_ROOT KIND|all OUT VANILLA_DIR [--base FILE.ptcl]     (all: the Smash Run enemies)
+      SRC_ROOT: a tools/s3ds_unpack.py extract (enemy/KIND/effect/KIND.03030000.ptcl / .efc);
+      VANILLA_DIR: vanilla Wii U ptcl files (their emitters are the templates: tools/vfxb_to_ptcl.py's
+      Templates, BC4-shape templates only).
+  python3 tools/s3ds_effects.py dump FILE.ptcl       the 3DS file's sets and emitters, fields read as below
+
+The 3DS format is the same NintendoWare eft as the Wii U's (CTR port, little endian): the same file header
+(+ the same tables), set records (0x1C), emitter tables (8-byte entries here), emitters with the name at
++0x38 and the same field order, but 2 texture slots of 0x7C bytes (not 3 of 0xD8), 3 colour keys (not 8)
+and some fields packed in bytes. The emitter layout (SPBD_FIELDS below) was worked out on the 2,112 3DS
+emitters of the enemies' and fighters' files: from their values, and by pairing the 147 fighter emitters
+both games share unchanged (same names, same life / rate / scale / speeds ...) word by word and byte by
+byte (docs/smash-run-port.md). A simple emitter is 0x548 bytes (plus padding); type 1 (complex) adds a
+header with fields / fluctuation / stripe / child blocks (not converted: the emitter is converted as a
+simple one, listed).
+
+Each emitter is converted onto a vanilla template emitter (vfxb_to_ptcl.Templates: by particle type, blend,
+follow type, flipbook, UV animation and rotation needs), then the 3DS fields written over it; the texture
+(PICA200: ETC1 / ETC1A4 / L / LA / RGB(A)... decoded by tools/s3ds_model.py) folded into the templates' BC4
+shape + a tint (xv2_to_ptcl.shape_texture: the alpha-weighted mean colour into the colour tracks); ETC1 and
+the other formats without alpha take their alpha from the shape (as the 3DS draws them, and Smash 4's BC4
+textures). Not converted: key animations (emitter curves), primitives (mesh particles: skipped), the
+complex blocks, colour 1 where the template's combiner has none, effect models (effect/model/*.bch).
+"""
+import argparse
+import glob
+import math
+import os
+import struct
+import sys
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import ptcl  # noqa: E402
+import s3ds_model as sm  # noqa: E402
+import vfxb_to_ptcl as vt  # noqa: E402
+from xv2_to_ptcl import FOREVER, MAX_EMITTERS, pow2, resize, sanitize, shape_texture  # noqa: E402
+
+SIMPLE = 0x548
+TEX_SLOTS3, TEXRES3 = (0x40, 0xBC), 0x7C
+# 3DS texture formats (TexRes +0x6C; Switch Toolbox's PTCL_3DS SurfaceFormat) -> s3ds_model.FORMATS index
+SURFACE = {18: 13, 19: 12, 20: 6, 21: 10, 22: 11, 23: 7, 24: 8, 25: 9, 26: 5, 27: 2, 28: 4, 29: 0, 30: 1, 31: 3}
+NO_ALPHA = {12, 6, 10, 7, 1, 3}               # ETC1, HILO8, L4, L8, RGB8, RGB565: alpha from the shape
+SHAPE_SEL = vt.SHAPE_SEL
+BC4 = 0x34
+
+# (3DS offset, struct format (little endian), Wii U field name or offset, note). Offsets read off the corpus
+# (see the module doc): the matches with the shared emitters' Wii U fields given as e.g. 0.99 (share of pairs)
+SPBD_FIELDS = [
+    (0x038, 'I', 'name_pos', 'into the name table'),
+    (0x14C, 'i', 'primitive_index', '-1 none (0.95)'),
+    (0x17D, 'B', 0x2F9, 'stop emitting while the set fades (0.97)'),
+    (0x184, '3B', 0x2FC, 'random rotation direction x y z (1.00)'),
+    (0x190, 'I', 'follow', '0 follow, 1 none, 2 position (Wii U 0x310, 0.95)'),
+    (0x194, 'I', 'combiner', 'colour combiner (Wii U 0x314, 0.90): 1 colour 0 x texture, '
+                             '2 colour 1 + (0 - 1) x texture'),
+    (0x1A8, '12f', None, 'emitter matrix (Wii U 0x3A8)'),
+    (0x1D8, '12f', 'emitter_matrix', '(0.95)'),
+    (0x208, '3f', 'emitter_scale', ''),
+    (0x214, '3f', 'emitter_rotation', 'radians (0.94)'),
+    (0x220, '3f', 'emitter_translation', '(0.98)'),
+    (0x244, 'I', 'blend_type', '0 alpha, 1 add, 2 subtract (0.99; names *add* 75 / 78 1, *alpha* 57 / 59 0)'),
+    (0x250, 'I', 'volume_type', 'NintendoWare\'s 0-14 shapes'),
+    (0x254, '3f', 'volume_radius', ''),
+    (0x260, 'I', 'volume_sweep_start', 'u32 angle (2^32 a turn) -> radians'),
+    (0x264, 'I', 'volume_sweep_param', 'u32 angle -> radians'),
+    (0x26C, 'f', 0x360, 'the same distribution as Wii U 0x360 (1 / 0.5 / 0.2)'),
+    (0x270, 'f', 0x364, 'pi (Wii U 0x364, 1.00)'),
+    (0x284, '3f', 0x378, 'shape scale (0.99): what key animations scale'),
+    (0x290, '4f', 0x384, 'emitter colour 0'),
+    (0x2A0, '4f', 0x394, 'emitter colour 1'),
+    (0x2B0, 'f', 0x3A4, 'emitter alpha'),
+    (0x2B4, 'f', 0x494, '(0.97)'),
+    (0x2B8, 'f', 0x498, '(0.97)'),
+    (0x2C4, 'f', 'emit_rate', '(0.82)'),
+    (0x2C8, 'i', 'emit_start', '(0.88)'),
+    (0x2CC, 'i', 'end_frame', '0x7FFFFFFF forever (0.95)'),
+    (0x2D0, 'i', 'emit_interval', ''),
+    (0x2D4, 'i', 'emit_interval_random', '(0.90)'),
+    (0x2D8, 'f', 'figure_velocity', ''),
+    (0x2DC, 'f', 'emitter_velocity', 'directional speed (0.84)'),
+    (0x2E0, 'f', 'init_velocity_random', '(0.92)'),
+    (0x2E4, '3f', 'emit_direction', ''),
+    (0x2F0, 'f', 'dispersion_angle', 'degrees'),
+    (0x2F4, '3f', 'spread_vec', ''),
+    (0x300, 'f', 'air_resistance', '(0.93)'),
+    (0x304, '3f', 'gravity', ''),
+    (0x31C, 'i', 'ptcl_life', '(0.90)'),
+    (0x320, 'i', 'ptcl_life_random', '(0.74)'),
+    (0x324, 'I', 0x4B8, '0 / 1 / 2 (Wii U 0x4B8, 0.95)'),
+    (0x328, 'I', 'particle_type', '0 billboard, 1 / 2 plates, 3 directional, 4 directional polygon, 5 / 6 '
+                                  'stripes, 8 Y billboard (0.92; *line* emitters 3)'),
+    (0x32C, '2f', 0x4C4, 'rotBasis (1.00)'),
+    (0x334, 'f', 'camera_offset', '(0.78)'),
+    # texture slot 0's UV block (slot 1's at 0x3B0, the same layout)
+    (0x338, 'B', None, 'flipbook animated (with frames a cell > 0)'),
+    (0x33B, 'B', 0x4D8, 'cells down'),
+    (0x33C, 'B', 0x4D7, 'cells across'),
+    (0x33D, 'B', 0x4D9, 'random start cells (0.92)'),
+    (0x340, 'h', 0x504, 'frames a cell'),
+    (0x342, 'h', 0x506, 'pattern table entries'),
+    (0x344, '32B', 0x4E0, 'pattern table'),
+    (0x364, 'I', None, 'repeat: 0 1x1, 1 2x1, 2 1x2, 3 2x2 (in the UV scale already; vfxb_to_ptcl.REPEAT)'),
+    (0x368, '2f', 'tex0_uv_scale', 'repeat / cells'),
+    (0x370, 'I', 0x510, 'UV animation mode bits (0.96)'),
+    (0x374, '2f', 0x514, 'UV scroll a frame (V negated: the 3DS\'s V runs up)'),
+    (0x37C, '2f', 0x51C, 'UV scroll initial'),
+    (0x384, '2f', 0x524, 'UV scroll random'),
+    (0x38C, '2f', 0x52C, 'UV scale a frame'),
+    (0x394, '2f', 0x534, 'UV scale initial'),
+    (0x39C, '2f', 0x53C, 'UV scale random'),
+    (0x3A4, 'f', 0x544, 'UV rotation a frame (negated)'),
+    (0x3A8, 'f', 0x548, 'UV rotation initial (negated)'),
+    (0x3AC, 'f', 0x54C, 'UV rotation random'),
+    (0x428, 'I', 'color0_type', '0 constant, 1 random, 2 keys (1.00)'),
+    (0x42C, 'I', 'color1_type', '(0.88)'),
+    (0x430, '12f', None, 'colour 0: 3 keys rgba'),
+    (0x460, '12f', None, 'colour 1: 3 keys rgba'),
+    (0x490, '2i', 'color_section1', 'colour 0 / 1 (% of life)'),
+    (0x498, '2i', 'color_section2', ''),
+    (0x4A0, '2i', 'color_section3', ''),
+    (0x4A8, '2i', 'color_repeat', ''),
+    (0x4B8, 'f', 'color_scale', ''),
+    (0x4BC, 'f', 'alpha_init', ''),
+    (0x4C0, 'f', 'alpha_diff21', '(0.88)'),
+    (0x4C4, 'f', 'alpha_diff32', ''),
+    (0x4C8, 'i', 'alpha_section1', '% of life (Wii U: a fraction)'),
+    (0x4CC, 'i', 'alpha_section2', ''),
+    (0x4D8, '2i', 'scale_sections', '(0.95)'),
+    (0x4E0, 'f', 'scale_random', 'one value (Wii U x and y, 0.95)'),
+    (0x4E4, '2f', 'scale', ''),
+    (0x4EC, '2f', 'scale_init_ratio', ''),
+    (0x4F4, '2f', 'scale_diff21', '(0.93)'),
+    (0x4FC, '2f', 'scale_diff32', '(0.95)'),
+    (0x508, '3f', 'rotation_init', '(0.94)'),
+    (0x514, '3f', 'rotation_random', '(0.99)'),
+    (0x520, '3f', 'rotation_velocity', '(1.00)'),
+    (0x52C, '3f', 'rotation_velocity_random', '(0.98)'),
+    (0x538, 'f', 'rotation_attenuation', '(0.96)'),
+    (0x53C, 'f', 0x82C, 'fade rate'),
+]
+
+
+def field(d, off, fmt):
+    v = struct.unpack_from('<' + fmt, d, off)
+    return v if len(v) > 1 else v[0]
+
+
+# ---------------------------------------------------------------- reading
+def read_spbd(data):
+    """-> dict(sets=[dict(name, emitters=[dict(name, data, textures=[RGBA or None, ...], formats)])])"""
+    d = data
+    assert d[:4] == b'SPBD', d[:4]
+    h = struct.unpack_from('<20I', d, 0)
+    names, tex_pos = h[4], h[5]
+
+    def nm(o):
+        return d[names + o:d.index(b'\0', names + o)].decode('latin1')
+    starts, sets = set(), []
+    for i in range(h[2]):
+        w = struct.unpack_from('<7I', d, 0x48 + 0x1C * i)
+        ems = [struct.unpack_from('<I', d, w[5] + 8 * k)[0] for k in range(w[4])]
+        starts.update(ems)
+        sets.append((nm(w[2]), ems))
+    order = sorted(starts) + [names]
+    out = []
+    for sname, ems in sets:
+        es = []
+        for e in ems:
+            end = order[order.index(e) + 1]
+            em = d[e:end]
+            texs, fmts = [], []
+            for slot in TEX_SLOTS3:
+                w_, h_ = struct.unpack_from('<2H', em, slot)
+                fmt, size, pos = struct.unpack_from('<3I', em, slot + 0x6C)
+                if not (w_ and h_ and size) or fmt not in SURFACE:
+                    texs.append(None)
+                    fmts.append(fmt)
+                    continue
+                f = SURFACE[fmt]
+                raw = d[tex_pos + pos:tex_pos + pos + sm.tex_size(w_, h_, f)]
+                texs.append(sm.decode_texture(raw, w_, h_, f))
+                fmts.append(f)
+            es.append(dict(name=nm(struct.unpack_from('<I', em, 0x38)[0]), data=em, textures=texs, formats=fmts,
+                           wrap=em[TEX_SLOTS3[0] + 0x10], complex=struct.unpack_from('<I', em, 0)[0] == 1))
+        out.append(dict(name=sname, emitters=es))
+    return dict(sets=out)
+
+
+def read_efc(data):
+    """3DS EFCC: 'EFCC', u32 version (6 / 7), u16 entries, u16 models, u16 mesh records, u16 0, then 16-byte
+    entries (u32 flags, u32 set (1-based), u32 model (1-based), u16 first mesh record, u16 count), the mesh
+    records (u16, u16), the model folder names and the mesh names: the Wii U's EFCF (tools/efc.py) little
+    endian, with a u32 version in place of its u16 variant / version"""
+    assert data[:4] == b'EFCC', data[:4]
+    _v, n, m, x = struct.unpack_from('<IHHH', data, 4)
+    entries = [list(struct.unpack_from('<IIIHH', data, 0x10 + 0x10 * i)) for i in range(n)]
+    o = 0x10 + 0x10 * n
+    meshes = [list(struct.unpack_from('<HH', data, o + 4 * i)) for i in range(x)]
+    o += 4 * x
+    names = []
+    for _ in range(m + x):
+        e = data.index(b'\0', o)
+        names.append(data[o:e].decode('ascii'))
+        o = e + 1
+    return entries, names[:m], meshes, names[m:]
+
+
+def write_efc(entries, models=(), meshes=(), mesh_names=(), keep_models=False):
+    """Wii U EFCF (version 7). Without keep_models the entries' effect models (3DS .bch, not converted yet)
+    are dropped: an entry pointing at a model folder that isn't there would have the game load it"""
+    if not keep_models:
+        entries = [[f, s, 0, 0, 0] for f, s, _m, _a, _b in entries]
+        models, meshes, mesh_names = [], [], []
+    out = b'EFCF' + struct.pack('>HHHHHH', 0, 7, len(entries), len(models), len(meshes), 0)
+    out += b''.join(struct.pack('>IIIHH', *e) for e in entries)
+    out += b''.join(struct.pack('>HH', *mm) for mm in meshes)
+    out += b''.join(x.encode('ascii') + b'\0' for x in list(models) + list(mesh_names))
+    return out
+
+
+# ---------------------------------------------------------------- converting
+def u32_angle(v):
+    return v / 2.0 ** 32 * 2 * math.pi
+
+
+def convert_emitter(p, templates, e, notes):
+    d = e['data']
+    g = {}
+    for off, fmt, name, _note in SPBD_FIELDS:
+        g[off] = field(d, off, fmt)
+    typ = g[0x328]
+    typ = {5: 3, 6: 3, 7: 0}.get(typ, typ)
+    blend = g[0x244] if g[0x244] in (0, 1, 2) else 0
+    follow = g[0x190] if g[0x190] in (0, 1, 2) else 1
+    uv_mode = g[0x370] & 7
+    animated_ptn = d[0x338] and g[0x340] > 0
+    ptn = 2 if animated_ptn else 0
+    rot = vt.ROT_NONE
+    if any(abs(x) > 1e-6 for x in g[0x520] + g[0x52C]):
+        rot = vt.ROT_ANIMATED
+    elif any(abs(x) > 1e-6 for x in g[0x508] + g[0x514]):
+        rot = vt.ROT_ANIMATED
+    if g[0x14C] >= 0:
+        notes.append('primitive (mesh particle): drawn as a billboard')
+    if e['complex']:
+        notes.append('complex blocks (fields / child / stripe) not converted')
+    em, _turns, _swapped = templates.get(typ, blend, False, uv_mode, follow, ptn, rot, notes)
+    em = bytearray(em)
+
+    # ---- texture: slot 0, folded into a BC4 shape + tint
+    img = e['textures'][0]
+    if img is None:
+        img = np.full((16, 16, 4), 255, np.uint8)
+        notes.append('no texture: white')
+    rgba = img.astype(np.float32) / 255.0
+    if e['formats'][0] in NO_ALPHA:
+        rgba[..., 3] = rgba[..., :3].max(-1)
+    shape, tint = shape_texture(rgba)
+    h, w = shape.shape
+    tw, th = pow2(w, hi=256), pow2(h, hi=256)
+    if (tw, th) != (w, h):
+        shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
+    r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
+    p.set_texture(em, 0, np.stack([r8, r8, r8, r8], 2), BC4, comp_sel=SHAPE_SEL)
+    wu, wv = e['wrap'] & 0xF, e['wrap'] >> 4
+    samp = struct.unpack_from('>I', em, ptcl.TEXRES + 0x0C)[0] & 0x00FFFFFF
+    struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, samp | (min(wu, 2) << 24) | (min(wv, 2) << 28))
+
+    # ---- named fields
+    for off, fmt, name, _note in SPBD_FIELDS:
+        if not isinstance(name, str) or name in ('name_pos', 'primitive_index', 'follow', 'combiner',
+                                                 'volume_sweep_start', 'volume_sweep_param', 'alpha_section1',
+                                                 'alpha_section2', 'scale_random', 'emitter_matrix',
+                                                 'emitter_scale', 'emitter_rotation', 'emitter_translation',
+                                                 'color0_type', 'color1_type'):
+            continue
+        v = g[off]
+        p.set_field(em, name, list(v) if isinstance(v, tuple) else v)
+    for off, fmt, wo, _note in SPBD_FIELDS:
+        if isinstance(wo, int):
+            v = g[off]
+            vals = v if isinstance(v, tuple) else (v,)
+            for j, x in enumerate(vals):
+                c = fmt[-1]
+                size = {'f': 4, 'I': 4, 'i': 4, 'h': 2, 'B': 1}[c]
+                struct.pack_into('>' + c, em, wo + size * j, x)
+    p.set_field(em, 'volume_sweep_start', u32_angle(g[0x260]))
+    p.set_field(em, 'volume_sweep_param', u32_angle(g[0x264]))
+    p.set_field(em, 'alpha_section1', g[0x4C8] / 100.0)
+    p.set_field(em, 'alpha_section2', g[0x4CC] / 100.0)
+    p.set_field(em, 'scale_random', [g[0x4E0], g[0x4E0]])
+    p.set_emitter_srt(em, g[0x208], g[0x214], g[0x220])
+    struct.pack_into('>I', em, vt.FOLLOW, follow)
+    p.set_field(em, 'start_frame', 0)
+    end = g[0x2CC]
+    p.set_field(em, 'end_frame', FOREVER if end >= FOREVER else max(1, end))
+    p.set_field(em, 'one_time', 0 if end >= FOREVER else 1)
+    p.set_field(em, 'display_side', 0)
+    # the 3DS's V runs up: V scroll and the UV rotation the other way
+    for wo in (0x518, 0x520, 0x528):
+        struct.pack_into('>f', em, wo, -struct.unpack_from('>f', em, wo)[0])
+    for wo in (0x544, 0x548):
+        struct.pack_into('>f', em, wo, -struct.unpack_from('>f', em, wo)[0])
+    # flipbook: the 3DS's random start cells / animated table
+    em[0x4D5] = 1 if animated_ptn else 0
+    struct.pack_into('>I', em, vt.PTN_MODE, ptn)
+    if not animated_ptn:
+        struct.pack_into('>hh', em, 0x504, 0, 0)
+
+    # ---- colours: the 3 keys, x the texture's tint
+    for track, off, toff in ((0, 0x430, 0x428), (1, 0x460, 0x42C)):
+        keys = [tuple(g[off][4 * k:4 * k + 3]) for k in range(3)]
+        keys = [(*(float(c * t) for c, t in zip(k, tint)), 1.0) for k in keys]
+        typ_c = g[toff]
+        if typ_c == 2:
+            p.set_color_keys(em, track, keys, 2)
+        elif typ_c == 1:
+            p.set_color_keys(em, track, keys, 1)
+        else:
+            p.set_color_keys(em, track, keys[:1], 0)
+    if g[0x194] == 2 and p.field(em, 'color1_type') is not None and \
+            struct.unpack_from('>I', em, vt.COLOR_MODE)[0] != 2 and any(g[0x460][:3]):
+        notes.append('colour 1 lost: the template has no colour-1 combiner')
+    if p.field(em, 'keyanim_size'):
+        p.set_field(em, 'keyanim_size', 0)
+    notes += sanitize(p, em)
+    return em
+
+
+def convert_file(src_ptcl, src_efc, templates, base_path, log=print):
+    """-> (ptcl bytes, efc bytes)"""
+    s3 = read_spbd(open(src_ptcl, 'rb').read())
+    p = ptcl.Ptcl(open(base_path, 'rb').read())
+    templates.base = p
+    nbase = len(p.sets)
+    made = []
+    for s in s3['sets']:
+        ems, names = [], []
+        for e in s['emitters'][:MAX_EMITTERS]:
+            notes = []
+            ems.append(convert_emitter(p, templates, e, notes))
+            names.append(e['name'])
+            if notes:
+                log('    %s / %s: %s' % (s['name'], e['name'], '; '.join(sorted(set(notes)))))
+        p.new_set(s['name'], ems, names)
+        made.append(s['name'])
+    p.sets = p.sets[nbase:]
+    p.drop_unused_shaders(0)
+    p.drop_unused_textures()
+    out = p.build()
+    q = ptcl.Ptcl(out)
+    assert q.validate() == [], q.validate()
+    efc_b, dropped = write_efc([]), []
+    if src_efc and os.path.exists(src_efc):
+        entries, models, meshes, mesh_names = read_efc(open(src_efc, 'rb').read())
+        dropped = sorted({models[e[2] - 1] for e in entries if e[2]})
+        efc_b = write_efc(entries, models, meshes, mesh_names)
+        if dropped:
+            log('    efc: effect models left out (not converted): %s' % ', '.join(dropped))
+    return out, efc_b, made
+
+
+def main():
+    if len(sys.argv) > 2 and sys.argv[1] == 'dump':
+        s3 = read_spbd(open(sys.argv[2], 'rb').read())
+        for s in s3['sets']:
+            print(s['name'])
+            for e in s['emitters']:
+                d = e['data']
+                print('   %-24s type %d blend %d follow %d life %d rate %g end %d scale %s tex %s' % (
+                    e['name'], field(d, 0x328, 'I'), field(d, 0x244, 'I'), field(d, 0x190, 'I'),
+                    field(d, 0x31C, 'i'), field(d, 0x2C4, 'f'), field(d, 0x2CC, 'i'),
+                    '%.3gx%.3g' % field(d, 0x4E4, '2f'),
+                    'x'.join(map(str, e['textures'][0].shape[:2])) if e['textures'][0] is not None else '-'))
+        return
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('src')
+    ap.add_argument('kind')
+    ap.add_argument('out')
+    ap.add_argument('vanilla')
+    ap.add_argument('--base', default=None)
+    a = ap.parse_args()
+    vt.EXACT = vt.TWO_TEXTURES = vt.GRAFT = vt.UNIVERSAL = False
+    corpus = sorted(glob.glob(os.path.join(a.vanilla, '**', '*.ptcl'), recursive=True))
+    base = a.base or min(corpus, key=os.path.getsize)
+    templates = vt.Templates(ptcl.Ptcl(open(base, 'rb').read()), corpus)
+    import s3ds_enemy
+    kinds = s3ds_enemy.fs_kinds(a.src) if a.kind == 'all' else [a.kind]     # all: the Smash Run enemies
+    for k in kinds:
+        f = os.path.join(a.src, 'enemy', k, 'effect', '%s.03030000.ptcl' % k)
+        if not os.path.exists(f):
+            continue
+        print(k)
+        out, efc_b, made = convert_file(f, f.replace('.ptcl', '.efc'), templates, base)
+        od = os.path.join(a.out, 'effect', 'enemy', k)
+        os.makedirs(od, exist_ok=True)
+        open(os.path.join(od, '%s.010d0000.ptcl' % k), 'wb').write(out)
+        open(os.path.join(od, '%s.010d0000.efc' % k), 'wb').write(efc_b)
+        print('  %d sets, %d bytes' % (len(made), len(out)))
+
+
+if __name__ == '__main__':
+    main()
