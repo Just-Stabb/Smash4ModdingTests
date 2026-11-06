@@ -173,12 +173,14 @@ def phantom_hand_flash(path):
     eff = acmd.ACMDFile.load(path)
     n = 0
     for crc, cmds in eff.scripts.items():
-        keep = [c for c in cmds if not (c.name == 'Graphic_Effect4' and c.params[0] == PHANTOM_HAND_FLASH)]
+        # both forms: Graphic_Effect4 (test 117) and the following External_Graphic on bone 2010 (0x7DA, the hand; test
+        # 144, the user: "The purple aura stays attached to Sephiroth's arm permanently" after a Phantom release)
+        keep = [c for c in cmds if not (c.name in ('Graphic_Effect4', 'External_Graphic') and c.params[0] == PHANTOM_HAND_FLASH)]
         n += len(cmds) - len(keep)
         eff.scripts[crc] = keep
     assert n, 'phantom effect.bin: no hand flash found'
     eff.save(path)
-    return 'phantom: its hand flash taken out of %d scripts' % n
+    return 'phantom: its hand flash (%d commands) taken out' % n
 
 
 # held Octaslash's loop (test 113, edge.c edge_hi_*): VAR_20 0 a plain pass, 1 the first pass held, 2 a looped pass

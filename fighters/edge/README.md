@@ -2125,3 +2125,14 @@ User: "Can you make Neutral special's charging cancelable into roll?"
   roll input holds shield too); shield alone still cancels as before. In the air: no roll (an air dodge not added).
 - Not tested in game. port_check over the chain, tests 70–115 and 117–143: 30 errors, 55 warnings, 7 notes.
 - Package (install over 142): `script/msc/edge.mscsb`.
+
+## Test 144 (`build/sephiroth_test144.zip`): the Phantom release's purple aura off his arm
+
+User (clip): "The purple effect from releasing Phantom still does not disappear ... The purple aura stays attached to
+Sephiroth's arm permanently."
+- Test 117 took Zelda's release flash (0x3100016) out of the Phantom's effect scripts in its `Graphic_Effect4` form
+  (20 commands), but one script kept it as a following `External_Graphic` on bone 2010 (0x7DA, the hand), which
+  vanilla Zelda's release status ends and nothing ends for Sephiroth (he sends the Phantom from any status). Both
+  forms are taken out now (`edge_specials_build.py phantom_hand_flash`: 21 commands, none left).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–144: 30 errors, 55 warnings, 7 notes.
+- Package (install over 143): `script/animcmd/weapon/phantom/effect.bin`.
