@@ -179,7 +179,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     entire attack, including the ending hit"):** a fighter in hitstun while he's charged in the rush (0x159) or its
     end (0x15A) is marked (his TIMER_0 - 7, one a player slot) and stays marked while its hitstun lasts and 40 frames
     after (the launch's speed left); marked, it's kept 20 inside the side / bottom blast zones and 30 under the top
-    (StageData 0 - 3) by moving it there (`0x0F000020 + 4 x slot`, set slot X / Y; `edge_hi_keep_in` from func_82).
+    (StageData 0 - 3) by moving it there (`0x0F000020 + 4 x slot`, set slot X / Y; `edge_hi_keep_in` from func_82, and
+    right after Octaslash's autolink pull, whose place is clamped the same way: test 131, it dragged them past the top
+    after the hook's clamp, the user: "opponents can still be dragged and KO'd by the top blastzone by Octaslash").
     Test 127 kept them in only while he was in 0x159 / 0x15A (the user: it "still allows for KOing in the blast
     zone": the finisher's launch carries them on after the end status) and 15 from the sides. Approximated: a marked
     fighter hit by someone else within those frames is kept in too.
@@ -202,8 +204,11 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     line should reach all the way to Sephiroth's back"): through the rush, either end (the ground end's slide too)
     and into Fall (20 frames at most, his per-frame hook; any other status ends it: the snake sword shares these
     variables), ending once his move along the slash (the rush direction, world space; his position last frame in
-    VAR_11, 0.25 units) has been under 0.4 a frame for 3 frames running (TIMER_10), not counting hitlag or a shape's
-    steps (`edge_tr_bd_stop`, `edge_tr_running`, TIMER_8). Test 128 multiplied the direction by his facing (it's the
+    VAR_11, 0.25 units) has been under 0.4 a frame, or more than 20 degrees off it (test 131, the user: "the line
+    continues to be drawn for too long, it begins curving"), for 2 frames running (TIMER_10), not counting hitlag or a
+    shape's steps (`edge_tr_bd_stop`, `edge_tr_running`, TIMER_8). A trail's point 1 waits until point 0 has been up a
+    frame (VAR_10, 2 frames): test 131 found point 1 could be written the frame point 0 was, so the old lines' articles
+    never tested its first piece, and a line started where another ended never met it. Test 128 multiplied the direction by his facing (it's the
     world's already) and ended on one still frame: facing left the line ended at once (test 130, the user: "The lines
     don't appear anymore on Blade Dash").
     Once he's been in the air in a trail, its points on the ground are at his feet + 1, not his middle (TIMER_9,
@@ -263,14 +268,16 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     shape), a step a frame (VAR_0 -11 / -12 / -13; `edge_tr_find*`); found, the path's ranges (this trail since X, X
     between, Z between, Y between) are marked and the shape is made as above; not, Y is kept as the first crossing.
     The crossing test counts a point on the other line on one side, so lines meeting at a shared point cross once
-    (test 126's strict test missed them: the simulation's triangle met exactly at a corner).
+    (test 126's strict test missed them: the simulation's triangle met exactly at a corner), and takes both pieces 3
+    longer at each end (test 131: lines meeting end to end, a Blade Dash started where the last one ended, meet).
     **Octaslash's shape** ends the move (VAR_20 3, above); its trail then ends with -1, not -2 (test 130: its lines are
     gone already, and the glow's articles go as Blade Dash's do once it's over; the user still saw no glow from an
     Octaslash shape in test 128, cause not found: the protocol, modelled with the articles' fill timeline and the
     forced end, keeps the glow its 50 frames).
     **Not near the blast zones (test 128, the user: "make shapes not able to be formed off-screen near the bounds of
-    the blast zone"):** a shape whose middle +- its long half axis comes within 50 of the side / bottom blast zones or
-    60 of the top isn't made: CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
+    the blast zone"):** a shape whose middle is within 20 of the side / bottom blast zones or 40 of the top isn't made
+    (test 131; test 128's shape edge within 50 / 60 refused an Octaslash loop still on screen at its top, so it made
+    no glow, cleared no lines and didn't end the move: the user's clip): CANCEL (shared 6 -1005.5) drops the articles' marks; no fill, no hitbox, the lines stay.
     Modelled in `tools/edge_trail_sim.py` (a held Octaslash circle: a shape a lap; a U closed by the next up special's
     line: middle (0, 32.5), half axes 36 / 19.1; a tilted ellipse a 40 b 15: 47.5 / 19.8 at 28.1 degrees; a triangle of
     three Blade Dashes (0, 50) (-26.7, 70) (26.7, 70): middle (0, 60), 30 / 12; a 60 x 40 rectangle of four: middle
