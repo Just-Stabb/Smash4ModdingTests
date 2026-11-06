@@ -267,10 +267,12 @@ def main():
     check(not missing, 'labels the movies show, missing: %s' % missing[:10])
     # params, scripts
     n_par = 0
-    for p in glob.glob(os.path.join(a.out, 'field_smash', '*')) + glob.glob(os.path.join(a.out, 'param', '*', '*')) + \
+    check(sorted(os.listdir(a.out)) == ['param', 'ui'], 'only param/ and ui/ at the top (Sm4shExplorer adds no root folder)')
+    for p in glob.glob(os.path.join(a.out, 'param', '*', '*')) + \
             glob.glob(os.path.join(out_ui, 'script', 'app', 'field_smash', '*')):
         rel = os.path.relpath(p, a.out)
-        check(open(p, 'rb').read() == open(os.path.join(a.src, rel), 'rb').read(), '%s: copy' % rel)
+        src_rel = rel[len('param/'):] if rel.startswith('param/field_smash/') else rel
+        check(open(p, 'rb').read() == open(os.path.join(a.src, src_rel), 'rb').read(), '%s: copy' % rel)
         n_par += 1
     print('%d Wii U .lm round trips, %d .lm (%d actions), %d .flx, %d textures, %d texts added, %d params / scripts, '
           '%d failures' % (n_rt, n_lm, acts, n_flx, len(ids), added, n_par, len(FAILS)))

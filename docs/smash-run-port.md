@@ -337,7 +337,8 @@ its files, ready in the Wii U's formats and places.
 | `texlist.lst` | same | byte order |
 | `img-NNNNN.tex`, `ui/replace/field/*`, `mark_*_fs_item` | `.nut` | PICA decode, flipped, RGBA8, ids 0x2800A000 up |
 | `ui/message/*.msbt` (LE) | `menu / melee / smash / figure / cleargetter.msbt` | the Smash Run labels added to the Wii U files |
-| `field_smash/*.bin`, `param/item/*fs_*`, `param/ui/fs_info_param.bin` | same paths | copied: big-endian already |
+| `field_smash/*.bin` | `param/field_smash/` | copied: big-endian already; under param/: the Wii U has no path for them and Sm4shExplorer adds no folder at data's root |
+| `param/item/*fs_*`, `param/ui/fs_info_param.bin` | same paths | copied |
 | `ui/script/app/field_smash/*.xtal` | same | copied: the same xtal format |
 
 - **Screen**: the 3DS movies are 400 x 240 (top) / 320 x 240 (bottom); the Wii U's 1920 x 1080. Each root

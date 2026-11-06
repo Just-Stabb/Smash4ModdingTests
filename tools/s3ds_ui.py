@@ -15,7 +15,8 @@ which already has the Smash Run stage names). OUT gets:
 - ui/replace/field/..., ui/replace/mark/mark_*/mark_*_fs_item: the replace pictures as .nut.
 - ui/message/*.msbt: the Wii U files with the Smash Run texts added (labels the 3DS has and the Wii U doesn't:
   MmenField_*, Mmel_Fsi*, MmelPause_fieldsmash_*, Msma_Field*, ... and every label the movies show).
-- field_smash/, param/item/, param/ui/fs_info_param.bin: the mode params (big-endian already: typed params,
+- param/field_smash/ (the 3DS's field_smash/: Sm4shExplorer can't add a folder at data's root), param/item/,
+  param/ui/fs_info_param.bin: the mode params (big-endian already: typed params,
   LVD paths), copied. --dump DIR: their values as JSON, readable (kept out of OUT: OUT holds only files the
   game's resource table takes, so Sm4shExplorer adds all of it).
 - ui/script/app/field_smash/*.xtal: the menu scripts (the same xtal format on both).
@@ -372,13 +373,19 @@ def param_kind(data):
         return 'raw'
 
 
+def wiiu_path(rel):
+    """where a 3DS param file goes: field_smash/ (a top-level folder on the 3DS) under param/: the Wii U has no
+    path for it (no 'field_smash' in cross_f.rpx) and Sm4shExplorer can't add a folder at data's root"""
+    return os.path.join('param', rel) if rel.split(os.sep)[0] == 'field_smash' else rel
+
+
 def copy_params(src, out, dump_dir=None):
     kinds = {}
     files = sorted(glob.glob(os.path.join(src, 'field_smash', '*.bin')) +
                    glob.glob(os.path.join(src, 'param', 'item', '*fs_*.bin')) +
                    glob.glob(os.path.join(src, 'param', 'ui', 'fs_*.bin')))
     for p in files:
-        rel = os.path.relpath(p, src)
+        rel = wiiu_path(os.path.relpath(p, src))
         data = open(p, 'rb').read()
         os.makedirs(os.path.dirname(os.path.join(out, rel)), exist_ok=True)
         shutil.copyfile(p, os.path.join(out, rel))
