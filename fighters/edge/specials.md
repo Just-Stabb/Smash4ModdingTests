@@ -158,9 +158,10 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
 - **The user's up special concept (test 113, stage 1 of 3):** "Tap up and hold up special both leave a purple line
   trail ... When multiple lines form a closed shape inside, a purple glow ... appears" (stages 2 / 3: the trail as
   articles, then the closed shapes' fill and hitbox, later tests); this test is the rest:
-  - **Octaslash held:** while the special button stays held the rush turns toward the stick, 8 degrees a frame,
-    only through his front (forward, up, down; a stick behind him counts as straight up / down; neutral keeps the
-    way), at a constant 6.2 (no brake: `edge_hi_rush_m`); on the ground, turned more than ~20 degrees up, he leaves
+  - **Octaslash held:** while the special button stays held the rush turns toward the stick, 8 degrees a frame the
+    shorter way round, the full 360 degrees (test 114, the user: "allow a full 360 degrees of movement"; test 113
+    kept it to his front; he keeps his facing, so going back his pitch passes 90: a loop; neutral keeps the way),
+    at a constant 6.2 (no brake: `edge_hi_rush_m`); on the ground, turned more than ~20 degrees up, he leaves
     it (`edge_hi_steer`). Past the rush's count 15, still held and with loop time left, SpecialHi2 is played again
     from frame 4 each time it reaches 16 (`MotionModule(0x1, 0x237, 4, 1)`): frames 4 - 15 are the 2nd hit to the 7th
     (the one before SpecialHi2End's), so the loop is those. VAR_20 tells the script which pass it is (0 plain, 1
@@ -172,7 +173,7 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   - **Autolink:** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
-  - **Blade Dash (tap):** its aim stays the full circle (Octaslash's steering is the 180-degree one); landing lag 22
+  - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
     (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before).
   - **Once per air time:** up special (either) sets VAR_21 at its start; in the air it can't start again until he
     is on the ground outside up special or grabs a ledge (statuses 0x72 - 0x74): `edge_hi_can` on the two air

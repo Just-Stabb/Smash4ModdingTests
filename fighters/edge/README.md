@@ -1647,3 +1647,11 @@ this test is everything but the trails and the shapes (next: the trail articles;
 - port_check over the chain and tests 70–113: 30 errors, as before.
 - Package (install over 112): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`.
 
+## Test 114 (`build/sephiroth_test114.zip`): held Octaslash steers the full 360 degrees
+
+User (before testing 113): "can you allow a full 360 degrees of movement?" `edge_hi_steer` no longer keeps the turn to
+his front: the rush turns toward any stick direction, 8 degrees a frame the shorter way round. He keeps his facing, so
+heading back he's pitched past 90 degrees (a loop) rather than turned around.
+- port_check over the chain and tests 70–114: 30 errors, as before.
+- Package (install over 113): `script/msc/edge.mscsb`.
+

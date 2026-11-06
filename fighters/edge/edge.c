@@ -37889,7 +37889,7 @@ float edge_hi_p(float plain, float charged)
     return plain;
 }
 
-// ---- test 113 (the user's up special concept, stage 1): Octaslash steers (180 degrees, forward / up / down) and
+// ---- test 113 (the user's up special concept, stage 1): Octaslash steers (360 degrees since test 114) and
 // loops its multi-hit (the 2nd hit to the one before the last: SpecialHi2 frames 4 - 15) while the special button is
 // held, for edge_hi_loop_frames() or until it is let go, the time starting again on every hit; its hits pull the last
 // fighter hit along in front of him (edge_hi_link). Blade Dash (tap) keeps its full aim, lands in 22 frames, and ends
@@ -37948,9 +37948,10 @@ void edge_hi_hit_check()
     }
 }
 
-// held Octaslash: the rush direction (edge_hi_rx / ry) turns toward the stick, 8 degrees a frame, only through his
-// front (forward, up, down: a stick behind him counts as straight up / down); a neutral stick keeps it. On the
-// ground, turning more than about 20 degrees up takes him off it
+// held Octaslash: the rush direction (edge_hi_rx / ry) turns toward the stick, 8 degrees a frame the shorter way
+// round, all the way round (test 114, the user: "allow a full 360 degrees of movement"; test 113 kept it to his
+// front); a neutral stick keeps it. He keeps his facing: going back he's pitched past 90 (a loop). On the ground,
+// turning more than about 20 degrees up takes him off it
 void edge_hi_steer()
 {
     float lr;
@@ -37971,18 +37972,6 @@ void edge_hi_steer()
     }
     sx = sx / l;
     sy = sy / l;
-    if (sx * lr < 0.0f)
-    {
-        sx = 0.0f;
-        if (sy >= 0.0f)
-        {
-            sy = 1.0f;
-        }
-        else
-        {
-            sy = -1.0f;
-        }
-    }
     cx = edge_hi_rx;
     cy = edge_hi_ry;
     if (cx * sx + cy * sy >= edge_hi_turn_c())
@@ -38000,7 +37989,7 @@ void edge_hi_steer()
         }
         if (func_13(cr) < 0.0001f)
         {
-            // straight back the other way (up to down): through his front
+            // straight back the other way: through his front
             sg = 1.0f;
             if (cy * lr > 0.0f)
             {
