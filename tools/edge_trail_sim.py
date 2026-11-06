@@ -283,6 +283,7 @@ class World:
             sh[5] = pack(cx, cy)
             sh[4] = float(t7 * 65536 + int(a * 2) * 256 + int(b * 2))
             sh[6] = COMMIT
+            V[4] = self.end_code()      # the trail ends with its shape (test 139)
             self.shapes.append(dict(mid=(round(cx, 1), round(cy, 1)), angle=round(t7 * 180 / 128, 1), a=round(a, 1),
                                     b=round(b, 1)))
             V[0] = -5

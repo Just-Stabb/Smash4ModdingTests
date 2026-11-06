@@ -2066,3 +2066,13 @@ User: "Please allow shapes to KO opponents. Right now, regardless of damage or k
   mark cleared (TIMER_13), so the shape's hit (Blade Dash's too) can KO.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–138: 30 errors, 55 warnings, 7 notes.
 - Package (install over 137): `script/msc/edge.mscsb`.
+
+## Test 139 (`build/sephiroth_test139.zip`): no stray line after a shape
+
+User (clip): "occasionally a stray line is left rather than deleted once a shape is made."
+- The stray line was the path laid after the shape: the commit clears every line, but the trail went on from its next
+  point (Octaslash's forced end and its air end, or the rest of a Blade Dash), a new line nothing cleared. Now the
+  trail ends with its shape: the restore step writes its end (-2 Octaslash's, -1 Blade Dash's), so nothing is drawn
+  after a shape. Modelled in `edge_trail_sim.py` (every case still forms).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–139: 30 errors, 55 warnings, 7 notes.
+- Package (install over 138): `script/msc/edge.mscsb`.

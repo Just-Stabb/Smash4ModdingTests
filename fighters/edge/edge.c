@@ -38594,6 +38594,10 @@ void edge_tr_steps()
         WorkModule(0, edge_tr_commit(), edge_tr_num_var());
         ArticleModule(0x2710, edge_tr_fill_art());   // the hitbox: it reads 5 / 4 as it's made
         WorkModule(0, 9999.0f, 0x0f00032d);          // and it can KO: edge_hi_keep_in off till the next up special (138)
+        // and the trail that made it ends here: the restore (step 5) writes its end, not its number (test 139, the user:
+        // "occasionally a stray line is left rather than deleted once a shape is made": the path laid after the commit,
+        // through Octaslash's forced end or the rest of a Blade Dash, was a new line the commit hadn't cleared)
+        WorkModule(0, edge_tr_end_code(), edge_tr_sn_var());
         WorkModule(0, -5.0f, edge_tr_q_var());
         if (global4 == 0x159 && edge_hi_charged)
         {

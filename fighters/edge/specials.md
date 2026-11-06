@@ -256,7 +256,9 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     in VAR_0 as -1 - -5, never a snake run's code), the trail paused: the shape's points marked (shared 6 = start x 512
     + count + 0.5, one or two ranges), their sums in 5 / 4 (x, y; x^2, y^2; x y: each point once), and the commit (5 the
     middle): every line goes (test 128, the user: "When a shape is formed, all lines aren't cleared for both Blade Dash
-    and Octaslash": all of them, the trail being laid too, which goes on from its next point; tests 126 / 127 dropped
+    and Octaslash": all of them; since test 139 the trail being laid ends with the shape (its end written at the restore
+    step: "occasionally a stray line is left rather than deleted once a shape is made", the path laid after it, through
+    Octaslash's forced end or the rest of a Blade Dash; tests 128 - 138 carried it on from its next point); tests 126 / 127 dropped
     the shape's pieces only) and the articles fill the shape with wedges from its middle to the pieces'
     points x 1.3 (so its outline is the lines that made it; test 127 1.2 x, "The effect and hitbox should be at least
     1.2x the size of the shape"; test 132 1.3 x, the user: "shapes look part empty, rather than full and larger than
