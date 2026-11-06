@@ -37787,6 +37787,22 @@ void edge_n_loop()
         {
             edge_n_released = 0x1;
         }
+        // the charge cancelled into a roll on the ground (test 143, the user: "make Neutral special's charging
+        // cancelable into roll"): the roll inputs as the shield's own check reads them (func_48: global24 0x2000000
+        // forward, 0x4000000 back), in the window the shield cancel has (frames 20 - 99), before it (a roll's input
+        // holds shield too)
+        if (f >= 20.0f && f < 100.0f && global18 == 0 && (global24 & 0x2000000) != 0)
+        {
+            edge_n_charge_off();
+            func_16(0x20, 0x1);
+            return;
+        }
+        if (f >= 20.0f && f < 100.0f && global18 == 0 && (global24 & 0x4000000) != 0)
+        {
+            edge_n_charge_off();
+            func_16(0x21, 0x1);
+            return;
+        }
         if (f >= 20.0f && f < 100.0f && ControlModule(0x2710, 0x3))
         {
             edge_n_change(0x2);

@@ -2115,3 +2115,13 @@ tier's.)
   60 / 95 / more), so size changes damage (and the knockback that comes with it) and nothing else.
 - Not tested in game. port_check over the chain, tests 70–115 and 117–142: 30 errors, 55 warnings, 7 notes.
 - Package (install over 141): `script/animcmd/weapon/fill/game.bin`.
+
+## Test 143 (`build/sephiroth_test143.zip`): neutral special's charge cancels into a roll
+
+User: "Can you make Neutral special's charging cancelable into roll?"
+- On the ground, from the charge's frame 20 to 99 (the window its shield cancel has), a roll input (shield + left /
+  right, as the shield's own roll check reads it: `func_48`'s global24 0x2000000 forward / 0x4000000 back) goes into
+  a forward / back roll (EscapeF 0x20 / EscapeB 0x21), the charge's effects off. Checked before the shield cancel (a
+  roll input holds shield too); shield alone still cancels as before. In the air: no roll (an air dodge not added).
+- Not tested in game. port_check over the chain, tests 70–115 and 117–143: 30 errors, 55 warnings, 7 notes.
+- Package (install over 142): `script/msc/edge.mscsb`.

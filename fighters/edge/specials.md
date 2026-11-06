@@ -92,7 +92,9 @@ Translator additions for the specials (`tools/ultimate_acmd.py`): `for _ in a..b
 ## Neutral special (test 57)
 
 - `edge.c` (`edge_n_*`, status 0x152's main; its end / other slots empty): SpecialNStart from frame 0;
-  charge level M at 32, L at 100. From frame 20 to 99: shield -> SpecialNCancel; special released
+  charge level M at 32, L at 100. From frame 20 to 99: a roll input on the ground -> EscapeF / EscapeB (test 143, the
+  user: "make Neutral special's charging cancelable into roll"; the shield's own roll inputs, func_48's global24
+  0x2000000 / 0x4000000, checked first), shield -> SpecialNCancel; special released
   (at any time before) -> SpecialN1 (level S) or SpecialN2 (M), which fire at their frame 13. Not
   released by 120: Gigaflare fired by SpecialNStart itself. Air: the same motions + 4, the fall
   slowed (gravity 0.0756, max 1.012: Ultimate's accel_y_mul 0.7 / max_speed_y_mul 0.55 of his)
