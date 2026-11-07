@@ -101,6 +101,15 @@ zima overrides exactly this slot with a nop on both). BehaviorImpl's is a nop; t
 tikibuzz, waddledee (parasol variations: p+0x8C into its parasol timer) and zima (a nop). w_tread => the kind's
 CFG TREAD state (Kuribo 8; the other four 0: nothing, as on the 3DS but Waddle Dee's parasol timer, not ported).
 
+Tread area (fix v7): a fighter can only stomp an enemy whose AreaModule area 0 (the tread area, kind 0xE) is on. The
+Enemy builds its two areas from its param slot's +0x70 table (2 x {on, node, 4 floats}: 0x02D89860, add_area
+0x02BFEA2C) and turns area i off where entry i's word 0 is 0 (0x02D8A24C; 0x02D8FB98 sets area 0 again from entry 0);
+no code enables it (Behavior::enable_tread / disable_tread, 0x026A7614 / 0x026A75FC, are only for the few kinds that
+switch it). S2 gives the walkers mczakozima's slot, whose table has the tread area off (as all four Fortress
+minions'), so nothing could stomp them. The three reads -> area_N: a walker kind gets its own table, its 3DS vl's
+last group (Kuribo {1, 2, 14, 8, 0, 0} on, Waddle Dee {1, 0, 10, 2, 0, 12} on; Shy Guy, Waddle Doo, Churine off, as
+on the 3DS; area 1 (kind 9) theirs too); other kinds read their slot's as before.
+
 Hooks (2a's three stay as they are):
 - F2, the factory 0x02DB94CC after 2a's hook: 0x02DB951C `cmplwi r12, 0x10` -> for the walker kinds
   module+8 = create(module+4, K, variation) then the factory's epilogue 0x02DB96E0; else the instruction and
@@ -123,7 +132,9 @@ Fix v3 (every Smash Run kind < 0x50, 2a's twins included):
 
 Space: 0x04B86800-0x04B88000 (kind_expand.py's old space after smashrun_enemy_cave.py), 0x04B89000-0x04B8A000
 (free between base_effects_cave.py and base_customs_cave.py) and 0x04BB8000-0x04BB8660 (the grown text after
-weapon_expand.py, up to the text region's end 0x04BB8670; grow:0x04BB8660). Code in the first two, data after it.
+weapon_expand.py, up to the text region's end 0x04BB8670; grow:0x04BB8660). Code in the first two and the area hooks
+at the start of the third, data after them. To fit fix v7, state tables start at row 1 (id 0 -> 1 in change_state) and
+P has five words.
 """
 import os
 import struct
@@ -168,6 +179,10 @@ CLEAR_SPEED = 0x026A67E8             # clear_speed_all()
 CHG_BASE = 0x026A3A44                # change_state_base(id, &update, &enter, &exit) (deferred)
 CHG_INT = 0x026A3AD4                 # change_state_interrupt_base (now)
 NOTIFY_DEATH = 0x0269FD6C            # BehaviorImpl::notify_on_death (slot 71: death flag, hit off, attacks cleared)
+# fix v7: the sites reading [param slot]+0x70 (the area table): (site, word, dst, base, the kind's register, kind * 4)
+AREA_SITES = ((0x02D89898, 0x81450070, 10, 5, 0, True),       # the Enemy's area set-up: add_area(2 areas)
+              (0x02D8A24C, 0x834C0070, 26, 12, 0, False),     # activation: area i off where entry i's word 0 == 0
+              (0x02D8FB98, 0x810A0070, 8, 10, 0, True))       # area 0 (tread) on / off again by entry 0
 TREAD_SLOT = 20                      # the 3DS's slot 21 (stepped on): Enemy event 6 -> module 0x02DB98F4 -> it
 COMMON_PMF = 0x102FDBCC              # BehaviorImpl::common_state_func
 BI_VT = 0x1008AEBC
@@ -206,11 +221,11 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 # CFG (per kind)
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
-                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD').split()):
+                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
-CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0..P7
-CFG_SIZE = CF['P'] + 4 * 8
+CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0..P4
+CFG_SIZE = CF['P'] + 4 * 5
 
 
 def P(i):
@@ -241,7 +256,7 @@ DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBou
 # (0x20000004). states: {3DS id: (enter, update)} (labels of this file, or game addresses). search: the vl search
 # groups {type, interval, 5 floats}. attacks: (state, attack). P: the kind's own values (P0..).
 WALKERS = (
-    dict(name='kuribo', kind=0x01,
+    dict(name='kuribo', areas=((1, 2, 14.0, 8.0, 0.0, 0.0), (1, 2, 10.0, 12.0, 0.0, 0.0)), kind=0x01,
          motions=(('Collapses', 1), ('Damage', 1), ('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1),
                   ('DownBound', 1), ('DownBoundEnd', 1), ('DownLoop', 1), ('DownWait', 1), ('Fall', 1),
                   ('Landing', 1), ('RunBrakeL', 1), ('RunHoldL', 1), ('RunL', 5), ('RunTurnL', 1), ('WalkL', 5)),
@@ -258,7 +273,7 @@ WALKERS = (
          search=((2, 100, 100.0, 40.0, 10.0, 10.0, 0.0), (2, 60, 150.0, 60.0, 0.0, 10.0, 0.0)),
          attacks=((5, 'kuribo_bump'), (9, 'bullet')),
          P=(0.6, -0.4, 1.0, 30, 110)),      # walk rate, hop x, run rate, notice frames, run frames
-    dict(name='heiho', kind=0x0B,
+    dict(name='heiho', areas=((0, 0, 1.0, 1.0, 0.0, 0.0), (1, 2, 6.0, 10.0, 0.0, 0.0)), kind=0x0B,
          motions=(('Damage', 1), ('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1),
                   ('DownBoundEnd', 1), ('DownLoop', 1), ('DownWait', 1), ('Fall', 1), ('Landing', 1), ('Run', 1),
                   ('RunBrake', 5), ('RunHold', 1), ('RunTurn', 1), ('Turn', 1), ('Wait', 1), ('Walk', 1)),
@@ -279,7 +294,7 @@ WALKERS = (
          rows={'walk': {0x10: 0.3, 8: 0.3, 0x14: 0.0, 0x20: 0.5, 0x24: 2.5, 0x28: 0.5, 0x2C: 2.5},
                'run': {0x10: 0.8, 8: 0.8, 0x14: 0.0075, 0x20: 0.5, 0x24: 2.5, 0x28: 0.5, 0x2C: 2.5},
                'jump': {0x20: 0.0, 0x28: 0.0, 0x24: 2.0, 0x2C: 2.0, 0x1C: 0.0}}),
-    dict(name='waddledee', kind=0x13,
+    dict(name='waddledee', areas=((1, 0, 10.0, 2.0, 0.0, 12.0), (1, 2, 10.0, 10.0, 0.0, 0.0)), kind=0x13,
          motions=(('Damage', 1), ('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1),
                   ('DownBoundEnd', 1), ('DownLoop', 1), ('DownWait', 1), ('Fall', 1), ('Jump', 0x40),
                   ('Landing', 1), ('ParasolFall', 1), ('Turn', 1), ('Walk', 1)),
@@ -293,7 +308,7 @@ WALKERS = (
          search=((2, 30, 300.0, 100.0, 0.0, 10.0, 0.0),),
          attacks=((7, 'bullet'),),
          P=(1.2, 100, 50, 50)),       # walk rate (+0x84), jump interval / chance %, wall jump chance % (+0x78..)
-    dict(name='waddledoo', kind=0x19,
+    dict(name='waddledoo', areas=((0, 2, 1.0, 1.0, 0.0, 0.0), (1, 2, 8.0, 10.0, 0.0, 0.0)), kind=0x19,
          motions=(('BeamShot', 1), ('BeamShotHold', 1), ('Damage', 1), ('DamageFall', 1), ('DamageFly', 1),
                   ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1), ('DownLoop', 1), ('DownWait', 1),
                   ('Fall', 1), ('Jump', 1), ('Landing', 1), ('Turn', 1), ('Walk', 1)),
@@ -307,7 +322,7 @@ WALKERS = (
          search=((2, 60, 200.0, 200.0, 0.0, 0.0, 0.0), (2, 20, 60.0, 70.0, 30.0, 20.0, 0.0)),
          attacks=((10, 'bullet'),),
          P=()),
-    dict(name='churine', kind=0x1F,
+    dict(name='churine', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (1, 3, 5.0, 10.0, 0.0, 4.0)), kind=0x1F,
          motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
                   ('DownLoop', 1), ('DownWait', 1), ('Jump', 1), ('Landing', 1), ('SleepPowder', 1), ('Turn', 1),
                   ('Walk', 1), ('Fall', 1)),
@@ -374,14 +389,14 @@ def cfg_values(w, D):
     """the kind's CFG words (D: data labels)"""
     n = w['name']
     lm = lambda s: index(w, s) if s else 0  # noqa: E731
-    c = dict(KIND=w['kind'], NST=nstates(w), TAB=D['st_' + n], START=w['start'][0], START01=w['start'][1],
+    c = dict(KIND=w['kind'], NST=nstates(w), TAB=D['st_' + n] - 0x18, START=w['start'][0], START01=w['start'][1],
              R64=w['rets'][0], R65=w['rets'][1], R66=w['rets'][2], R67=w['rets'][3], REMOVE=w['remove'],
              DEADMOT=lm(w['dead']), HASH=D.get('hs_' + n, 0), EN=D['en_' + n], ENN=len(w['energy']),
              KICK=1 if w['kick'] else 0, SET=D['set_' + n], ATK=D['atk_' + n], SRCH=D['sr_' + n],
              FALLMOT=lm(w['fall'][0]), LANDST=w['fall'][1], LANDMOT=lm(w['landing']), TURNMOT=lm(w['turn']),
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
-             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0))
+             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n])
     words = [0] * (CFG_SIZE // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -436,13 +451,14 @@ class Data:
             b.append(('sr_' + n, [word(v) for grp in w['search'] for v in grp], 4))
             b.append(('atk_' + n, [x for st, a in w['attacks'] for x in (st, g(a))] + [0xFFFFFFFF], 4))
             st = []
-            for i in range(nstates(w)):
+            for i in range(1, nstates(w)):         # row 0 is never used (id 0 -> 1)
                 s = w['states'].get(i)
                 if s == 'remove':
                     s = (ZIMA_REMOVE_ENTER, ZIMA_REMOVE_UPDATE)
                 st += [0xFFFF, fn(s[0]), 0xFFFF, fn(s[1]), 0, 0] if s else [0] * 6
             b.append(('st_' + n, st, 4))
-            need = ('st_', 'en_', 'set_', 'atk_', 'sr_') + (('hs_',) if w['hashset'] else ())
+            b.append(('ar_' + n, [word(v) for e in w['areas'] for v in e], 4))
+            need = ('st_', 'en_', 'set_', 'atk_', 'sr_', 'ar_') + (('hs_',) if w['hashset'] else ())
             b.append(('cfg_' + n, cfg_values(w, {p + n: g(p + n) for p in need}), 4))
         return self
 
@@ -899,7 +915,10 @@ def code(D):
         lwz r0, 0x%X(r12)
         lwz r12, 0x%X(r12)
         cmplw r4, r0
-        blt c2_in
+        bge c2_one
+        cmpwi r4, 0
+        bne c2_in
+    c2_one:
         li r4, 1
     c2_in:
         mulli r10, r4, 0x18
@@ -1636,24 +1655,67 @@ def assemble(vt_words):
     D = {}
     for _pass in range(3):
         dd = {k: D.get(k, CAVE) for k in ('consts', 'vt', 'ktab') + tuple(
-            p + w['name'] for w in WALKERS for p in ('set_', 'hs_', 'en_', 'sr_', 'atk_', 'st_', 'cfg_')) +
+            p + w['name'] for w in WALKERS for p in ('set_', 'hs_', 'en_', 'sr_', 'atk_', 'st_', 'cfg_', 'ar_')) +
             tuple('row_heiho_' + r for r in ('walk', 'run', 'jump')) + tuple(ATTACKS)}
         A, B = code(dd)
+        C = area_code(dd)
         labels = dict(A.labels)
         labels.update(B.labels)
-        A.labels.update(B.labels)
-        B.labels.update(labels)
-        ea, eb = A.pc, B.pc
+        labels.update(C.labels)
+        for a in (A, B, C):
+            a.labels.update(labels)
+        ea, eb, ec = A.pc, B.pc, C.pc
         assert ea <= LIMIT and eb <= LIMIT_B, 'walker code too big (0x%X, 0x%X)' % (ea, eb)
         d.build(labels, D)
-        d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), (CAVE_C, LIMIT_C)])
+        d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C)])
         if d.addr == D:
             break
         D = dict(d.addr)
     d.build(labels, D)
-    d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), (CAVE_C, LIMIT_C)])
+    d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C)])
     assert d.addr == D
+    A.area = C
     return A, B, d
+
+
+def area_code(D):
+    """fix v7: the three game sites that read a kind's area table [param slot]+0x70 (2 x {on, node, 4 floats}:
+    area 0 the tread area, kind 0xE; area 1 kind 9) -> the walker kind's own table (its 3DS vl's), else the slot's
+    (r9 / r0 / r12 free at each site; the functions keep LR on the stack)"""
+    C = Asm(CAVE_C)
+    C.asm("""
+    area_tab:
+        lis r12, 0x%04X
+        addi r12, r12, %d
+    at_loop:
+        lwz r0, 0(r12)
+        cmpwi r0, -1
+        beq at_none
+        cmpw r0, r9
+        beq at_found
+        addi r12, r12, 8
+        b at_loop
+    at_found:
+        lwz r12, 4(r12)
+        lwz r9, 0x%X(r12)
+        blr
+    at_none:
+        li r9, 0
+        blr
+    """ % (ha(D['ktab']), sx(D['ktab']), CF['AREA']))
+    for i, (site, word_, dst, base, kind_reg, shifted) in enumerate(AREA_SITES):
+        C.asm("""
+    area_%d:
+        lwz r%d, 0x70(r%d)
+        %s
+        bl area_tab
+        cmpwi r9, 0
+        beq ar%d_out
+        mr r%d, r9
+    ar%d_out:
+        b 0x%08X
+        """ % (i, dst, base, ('srwi r9, r%d, 2' if shifted else 'mr r9, r%d') % kind_reg, i, dst, i, site + 4))
+    return C
 
 
 def read_vt(img):
@@ -1666,7 +1728,7 @@ def patches(img):
     for lo_, hi_ in REGIONS:
         for addr in range(lo_, hi_, 4):
             out[addr] = 0
-    for a in (A, B):
+    for a in (A, B, A.area):
         for i, w in enumerate(a.words()):
             out[a.base + 4 * i] = w
     for base, words in d.chunks:
@@ -1677,6 +1739,8 @@ def patches(img):
     out[SITE_S] = branch(SITE_S, A.addr('cave_s'))
     out[SITE_ROT] = branch(SITE_ROT, A.addr('cave_rot'))
     out[SITE_DEATH] = branch(SITE_DEATH, A.addr('cave_death'))
+    for i, (site, _w, _d, _b, _k, _s) in enumerate(AREA_SITES):
+        out[site] = branch(site, A.addr('area_%d' % i))
     for w, fn in TWIN_FLIP:
         out[w] = fn if KEEP_FLIP else A.addr('twin_flip')
     return out, (A, B), d
@@ -1708,7 +1772,7 @@ def main():
         return
     import rpx_patch
     for site, want in ((SITE_F, WORD_F), (SITE_T, WORD_T), (SITE_S, WORD_S), (SITE_ROT, WORD_ROT),
-                       (SITE_DEATH, WORD_DEATH)):
+                       (SITE_DEATH, WORD_DEATH)) + tuple((s, w) for s, w, _d, _b, _k, _x in AREA_SITES):
         got = img.u32(site)
         assert got == want or (got >> 26 == 18 and in_cave(branch_target(site, got))), \
             '0x%08X holds 0x%08X, expected 0x%08X' % (site, got, want)

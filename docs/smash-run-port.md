@@ -771,6 +771,29 @@ enemies' tread area, which comes from data, were not traced). The README's check
 squashes it (works), bounces without a squash (the reaction is missing: would need debugging), or doesn't bounce
 (no tread area / event: a replacement detection in the walker's update would be needed).
 
+## Fix v7: the walkers' own tread areas (the stomp could never happen)
+
+User result of fix v6: no bounce and no reaction, with a footstool or a plain landing. Cause (static): a fighter can
+only stomp an enemy whose AreaModule area 0, the tread area (area kind 0xE), is on. The Enemy builds its two areas
+from its param slot's table at +0x70 (2 entries {on, node, 4 floats}; 0x02D89860 -> add_area 0x02BFEA2C; entry
+layout +1 kind byte 0xE / 9, +0xC node, +0x10.. floats) and turns area i off where entry i's word 0 is 0
+(0x02D8A24C), 0x02D8FB98 setting area 0 again from entry 0 later. Nothing enables it in code: the 3DS's
+Behavior::enable_tread / disable_tread (Wii U 0x026A7614 / 0x026A75FC) are called only by the few kinds that switch
+it, not by Kuribo. The table is the vl's last group: 3DS Kuribo {1, 2, 14, 8, 0, 0} (on), Waddle Dee
+{1, 0, 10, 2, 0, 12} (on), Shy Guy / Waddle Doo / Churine off. But step 2b's S2 hook gives the walkers mczakozima's
+param slot, whose table has the tread area off ({0, 0, 12, 12, 0, 0}; Stalfos, Plasma Wisp and Darios too: no
+Fortress minion is stompable on the Wii U, so none is a reference for the fighter side).
+
+`tools/smashrun_walker_cave.py`: the three reads (0x02D89898 `lwz r10, 0x70(r5)`, 0x02D8A24C `lwz r26, 0x70(r12)`,
+0x02D8FB98 `lwz r8, 0x70(r10)`) -> caves that return the walker kind's own table (both areas, its 3DS vl's values),
+other kinds their slot's. With the tread area on, the footstool should reach fix v6's slot 20 -> Kuribo state 8.
+Not verified statically: the fighter side (which code tests other objects' tread areas when a fighter jumps / lands,
+and whether it includes enemies); if a footstool on a Goomba still does nothing, the fighter side ignores enemies on
+the Wii U and the walker update has to detect the stomp itself (the design in the fix v7 report). Space: the hooks at
+0x04BB8000 (region C); to fit, the state tables start at row 1 and P has five words. Test: smashrun_walker_test.py
+109 checks (the three sites per kind, the tables, the game's own area set-up 0x02D89860 run for a Goomba: area 0
+kind 0xE, node 2, 14 x 8; for zima's slot: node 0, 12 x 12, then off).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

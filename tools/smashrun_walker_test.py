@@ -362,13 +362,16 @@ def main():
                                                             (W.SITE_DEATH, 'cave_death'))),
           'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
     want = {}
-    for a in (A, B):
+    for a in (A, B, A.area):
         want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
     for base, words in d.chunks:
         want.update({base + 4 * i: x for i, x in enumerate(words)})
     bad = [hex(x) for lo, hi in W.REGIONS for x in range(lo, hi, 4) if img.u32(x) != want.get(x, 0)]
-    check(not bad, 'space %s: the code (A to 0x%08X, B to 0x%08X), the data, zeros after %s'
-          % (', '.join('0x%08X-0x%08X' % r for r in W.REGIONS), A.pc, B.pc, bad[:4]))
+    check(not bad, 'space %s: the code (A to 0x%08X, B to 0x%08X, C to 0x%08X), the data, zeros after %s'
+          % (', '.join('0x%08X-0x%08X' % r for r in W.REGIONS), A.pc, B.pc, A.area.pc, bad[:4]))
+    check(all(img.u32(s_) == W.branch(s_, fn['area_%d' % i]) for i, (s_, _w, _d, _b, _k, _x) in
+              enumerate(W.AREA_SITES)), 'fix v7: the three area-table sites (0x02D89898 0x02D8A24C 0x02D8FB98) '
+          'branch to the cave')
     cave_f_2a = E.assemble(E.build_sets(img))[0].addr('cave_f')
     check(img.u32(E.SITE_F) == W.branch(E.SITE_F, cave_f_2a),
           'step 2a\'s factory hook still in place (0x%08X)' % E.SITE_F)
@@ -585,6 +588,52 @@ def main():
             out[sid] = (k[0] if k else None, a[0] if a else None, mo[0] if mo else None,
                         'bullet' if [c for c in m.calls if c[0] == 'bullet'] else '')
         return out
+
+    # ---- fix v7: the area tables (area 0 = the tread area) per kind, the slot's for the other kinds
+    ZT = HEAP + 0x30000
+    for i, (site, _w, dst, base, kreg, shifted) in enumerate(W.AREA_SITES):
+        got = {}
+        for k in (0x01, 0x0B, 0x13, 0x19, 0x1F, 0x12, 0x5A, 0x30):
+            m = Machine(img)
+            m.uc.reg_write(R[dst], 0)
+            m.run(fn['area_%d' % i], site + 4, {base: ZT - 0x70 + 0x70 * 0 + 0, kreg: k * 4 if shifted else k,
+                                                  31: OBJ})
+            got[k] = m.uc.reg_read(R[dst])
+        m.w32(ZT, 0)
+        exp = {k: (D['ar_' + byname_k['name']] if byname_k else 0) for k, byname_k in
+               ((k, next((w for w in W.WALKERS if w['kind'] == k), None)) for k in got)}
+        exp = {k: (v if v else m.r32(ZT)) for k, v in exp.items()}
+        check(got == exp, 'fix v7: area site 0x%08X: a walker kind gets its own table, others the slot\'s +0x70 %s'
+              % (site, {hex(k): hex(v) for k, v in got.items()}))
+    for w in W.WALKERS:
+        t = [img.u32(D['ar_' + w['name']] + 4 * j) for j in range(12)]
+        check(t == [W.word(v) for e in w['areas'] for v in e], 'fix v7: %s area table %s (tread area %s)'
+              % (w['name'], w['areas'], 'on' if w['areas'][0][0] else 'off, as on the 3DS'))
+    # the game's area set-up 0x02D89860 for a Goomba: the tread area from its table (zima's slot: tread off)
+    EN_OBJ = HEAP + 0x8000
+    for k, want in ((0x01, (0xE, 2, 14.0, 8.0)), (0x5A, (0xE, 0, 12.0, 12.0))):
+        m = Machine(img)
+        m.uc.mem_write(EN_OBJ, bytes(0x3500))
+        m.w32(EN_OBJ + 4, k)
+        m.w32(EN_OBJ + 0x30F0, HEAP + 0x200)
+        m.w32(W.PARAM_MGR, PM)
+        m.w32(PM + 0x60 + 4 * k, HEAP + 0x30100)
+        m.w32(HEAP + 0x30100 + 0x70, HEAP + 0x30200)
+        for j, v in enumerate((0, 0, 12.0, 12.0, 0.0, 0.0, 1, 3, 8.0, 8.0, 0.0, 0.0)):
+            m.uc.mem_write(HEAP + 0x30200 + 4 * j, struct.pack('>f', v) if isinstance(v, float) else
+                           struct.pack('>I', v))
+        sets = []
+
+        def add_area(uc, addr, size, _u, mm=m, out=sets):
+            if addr == 0x02BFEA2C:
+                out.append(mm.r32(mm.uc.reg_read(R[4])))
+                mm.ret()
+        m.uc.hook_add(UC_HOOK_CODE, add_area, begin=0x02BFEA2C, end=0x02BFEA2C)
+        m.call(0x02D89860, {3: EN_OBJ})
+        e0 = EN_OBJ + 0x348C
+        got = (m.uc.mem_read(e0 + 1, 1)[0], m.r32(e0 + 0xC), round(m.rf(e0 + 0x18), 3), round(m.rf(e0 + 0x1C), 3))
+        check(sets == [e0] and got == want, 'fix v7: the game\'s area set-up (0x02D89860) for kind 0x%02X: '
+              'area 0 (kind, node, size) %s' % (k, got))
 
     # ---- Kuribo
     I = lambda n, s: W.index(byname[n], s)  # noqa: E731,E741
