@@ -69,6 +69,16 @@ VOICE_ALIASES = {'jump': 'jump01', 'damage03': 'damage02', 'damage_hoshikie': 'd
                  'win01': 'appeal02_win01', 'win02': 'special_s04_01_win02'}
 
 
+def silent_one_shot(n=4800):
+    """a mono IDSP of n silent samples (0.1 s), not looped"""
+    b = bytearray(ms.silent_idsp(n))
+    b[0x40 + 12:0x40 + 14] = b'\0\0'          # the DSP header's loop flag (is_loop)
+    return bytes(b)
+
+
+SILENT = silent_one_shot()
+
+
 def hash40(name):
     return len(name), zlib.crc32(name.encode())
 
@@ -171,14 +181,20 @@ def bank(data, prefix, bank_name, bank_id, sounds, template, replace=None):
 
 
 def template_tone(data, suffix=None):
+    """a one-shot tone of the bank to copy (its group / flags) for the new ones: the first named ...suffix; else
+    (Zelda's Special_L01 is a loop: Sephiroth) the first one-shot whose name has 'Special_', else any one-shot"""
     _s, tones = ms.tones_of(data)
+    one_shots = []
     for e in tones:
         if len(e) < 0x10:
             continue
         head, name, rest = ms.parse_entry(e)
-        if suffix is None or name.endswith(suffix):
-            if struct.unpack('<I', rest[-0x0C:-0x08])[0] == 0:        # a one-shot (loop flag 0)
-                return head, name, rest
+        if struct.unpack('<I', rest[-0x0C:-0x08])[0] == 0:            # a one-shot (loop flag 0)
+            one_shots.append((head, name, rest))
+    for test in ([lambda n: n.endswith(suffix)] if suffix else []) + [lambda n: 'Special_' in n, lambda n: True]:
+        hit = [t for t in one_shots if test(t[1])]
+        if hit:
+            return hit[0]
     raise SystemExit('no one-shot tone%s to copy' % (' ' + suffix if suffix else ''))
 
 
@@ -273,7 +289,7 @@ def main():
             """the bank with this costume's audio (by name; the main bank's where it has none)"""
             sounds = [(n[len(prefix):] if n.startswith(prefix) else n, audio.get(n) or main_audio[n], vols[n])
                       for n in names]
-            replace, swapped = {}, []
+            replace, swapped, silenced = {}, [], []
             if kind == 'vc':
                 by_rest = {r.lower(): (b, v) for r, b, v in sounds}
                 _s, base_tones = ms.tones_of(data)
@@ -281,17 +297,26 @@ def main():
                 for i, e in enumerate(base_tones):
                     if len(e) < 0x10:
                         continue
-                    rest = ms.parse_entry(e)[1][len(bprefix):].lower()
-                    hit = by_rest.get(VOICE_ALIASES.get(rest, rest))
+                    full = ms.parse_entry(e)[1]
+                    rest = full[len(bprefix):].lower()
+                    # the alias, the same name, else the use's first variant (Zelda's MissFoot02 / Jump02 ->
+                    # Sephiroth's only missfoot01 / jump01: the KO scream and the jump are his)
+                    first_var = re.sub(r'(?<=[a-z_])\d+$', lambda m: '1'.zfill(len(m.group())), rest)
+                    hit = next((by_rest[k] for k in (VOICE_ALIASES.get(rest), rest, first_var) if k in by_rest), None)
                     if hit:
                         replace[i] = hit
                         swapped.append(rest)
+                    elif full.lower().startswith(bprefix.lower()) and re.fullmatch(r'[a-z_]+\d*', rest):
+                        # a use the port has no voice for in Ultimate (Zelda's Passive, HeavyGet, Appeal03):
+                        # silent, as Ultimate plays nothing there (it was the base's voice on the port)
+                        replace[i] = (SILENT, 0.0)
+                        silenced.append(rest)
             blob, first = bank(data, 'snd_%s_%s_' % (kind, a.name), bank_name, bank_id, sounds,
                                template_tone(data, tmpl_suffix), replace)
-            return blob, first, swapped
+            return blob, first, (swapped, silenced)
 
         main_audio = ms.ultimate(ult_path + '.nus3audio')
-        blob, first, swapped = costume_bank(main_audio, 'snd_%s_%s' % (kind, a.name))
+        blob, first, (swapped, silenced) = costume_bank(main_audio, 'snd_%s_%s' % (kind, a.name))
         labels = old_tones + [first + k for k in range(len(names))]
         if a.new_ids:
             table.add_row(row, bank_id, labels)
@@ -320,10 +345,11 @@ def main():
             ids[c.lower()] = ids[v.lower()]
         report.append('%s: BINF %s id %d (row %d) -> id %d, row %d: %d base labels + %d Ultimate tones '
                       '(%d loops; containers -> first variant: %s); base tones given the Ultimate voice: %s; '
-                      'costume banks: %s; %.1f MB' % (
+                      'base tones silent (no such voice in Ultimate): %s; costume banks: %s; %.1f MB' % (
                           os.path.basename(base_path), old_name, old_id, old_row, bank_id, row, len(old_tones),
                           len(names), sum(is_loop(main_audio[n]) for n in names), ', '.join(sorted(first_of)) or '-',
-                          ', '.join(swapped) or '-', ', '.join(written) or '-', len(blob) / 1e6))
+                          ', '.join(swapped) or '-', ', '.join(silenced) or '-', ', '.join(written) or '-',
+                          len(blob) / 1e6))
         if row != old_row:
             moved.append((old_row, len(old_tones), row))
 
