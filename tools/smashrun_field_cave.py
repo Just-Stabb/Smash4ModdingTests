@@ -14,8 +14,8 @@ the game's own enemy system runs as in Classic's Master Fortress. The enemies (E
   (the converted 3DS enemies), driven by their Master Fortress twins' behaviours through
   tools/smashrun_enemy_cave.py (which must be applied too); the resource request also loads mczakoplasmawisp 0x57
   (its weapons / effects).
-- "minions" (`--minions` / `--set minions`, step 1): the four Fortress minions themselves, mczakoplasmawisp 0x57, mczakodarios 0x58,
-  mczakostalfos 0x59, mczakozima 0x5A.
+- "minions" (`--minions` / `--set minions`, step 1): the four Fortress minions themselves, mczakoplasmawisp 0x57,
+  mczakodarios 0x58, mczakostalfos 0x59, mczakozima 0x5A.
 
 - A: the EnemyManager is made for a battle only when 0x02D9E1F4 says so (Classic boss rounds, the Crazy Hand event,
   stage kinds 0x1C / 8 / 0x13 / 3). Its last test, 0x02D9E2DC `cmpwi r0,3` (r0 = the stage kind), -> a cave that

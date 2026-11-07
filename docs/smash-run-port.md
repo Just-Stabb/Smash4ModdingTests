@@ -511,6 +511,99 @@ Space: 0x04B85800-0x04B86800 (code to 0x04B8597C, sets 0x04B85C00-0x04B86174), i
 (0x04B85800-0x04B877C4; no branch, address or data pointer refers to it), cleared to zeros up to 0x04B88000
 (base_effects_cave.py's). Still free: 0x04B86800-0x04B88000.
 
+## Step 2b: a generic walker behaviour for Goomba, Shy Guy, Waddle Dee, Waddle Doo and Churine
+
+`tools/smashrun_walker_cave.py IN.rpx [OUT.rpx]` (test `tools/smashrun_walker_test.py PATCHED.rpx [ENEMY_ROOT]`),
+with `tools/smashrun_field_cave.py`'s new default set "walkers". Not yet run in game. Package smashrun_step2b_v1:
+the user's executable (stage slots + Training 0 CPUs) + smashrun_menu.py's rpx part + the field cave + step 2a +
+this, in one rpx_patch.py call (every tool's hook words checked first), and `smashrun_step2b_data` with every file
+the five kinds use (models with jtb / sb / nhb / xmb, motions, animcmd, fs params, effects, sound banks lower case and
+capitalised). On it: smashrun_walker_test.py (with the kinds' converted pacs / animcmd) 60 checks,
+smashrun_enemy_test.py 26, smashrun_field_test.py 12, training_cpu_test.py, smashrun_menu_test.py's rpx checks,
+stage_slot_test.py (NewStage01 + the ten): 0 failures each. The text section no longer recompresses into its slot
+in the file, so rpx_patch moves it to the end of the file (73.7 MB instead of 56.5 MB; the section headers point
+at it, as for any grown section).
+
+What the 3DS walkers do (enemy_fs.cro, the shared framework read through code.bin's symbols): the AI writes the
+move direction into the AI input (`Behavior::move(AiInput*)`, the Wii U 0x026A66D0: stick x = Behavior +0x10, the
+direction set_lr 0x026A780C syncs with the posture lr); the enemy kinetic module (acc+0x30E8; change_kinetic
+0x02DBE00C) turns the stick into speed with the energy parameters each behaviour's initialize writes at
+`[[[acc+0x3130]+8]+0]+4` (+8..+0x44; mczakostalfos writes the same offsets as the 3DS stalfos). Walk: kinetic 1
+(Kuribo 0xA), ground attach on (GroundModule acc+0x30DC: set_attach_ground 0x02C37C6C, is_touch 0x02C38A24, 8 =
+on the ground, 2 / 4 = wall left / right), the walk loop; off the ground -> fall (kinetic 8); wall (check_wall
+0x026A68E4) or ledge (check_cliff_lr 0x026A6D88 with the posture lr [acc+0x311C]+0x60) -> turn; the Turn motion,
+then reverse_lr (slot 50 0x026A7A20) after it ends; every so often get_nearest_target 0x026A7008 +
+check_turn_to_target 0x026A6984. Death: the framework's notify_on_damage calls change_state_interrupt(slot 67);
+that state plays the Damage pose at rate 0 and calls bullet() 0x02DB5158 (the defeated enemy flies off), then
+removes itself (EnemyManager remove_enemy_by_id). These Wii U addresses come from aligning the 3DS stalfos / zima
+state functions with the Wii U mczako ones (call sequences, 20+ votes for each module call used).
+
+BehaviorImpl, as the Wii U builds it (zima's create 0x026D65EC): Behavior ctor 0x02DB2DF0(this, acc, kind,
+variation) fills up to +0xE0; then +0xE0 vptr, +0xE4 common state 0, +0xE8 PMF common_state_func (0x102FDBCC: {0,
+-1, 0x0269FDFC}), +0xF0 / +0xF8 the state's update / exit PMFs, +0x100 / +0x108 / +0x110 pending update / enter /
+exit, +0x120 1, +0x15C -1, size 0x168. A PMF is {s16 delta, s16 vindex (-1: fn direct, 0: none), fn}. The state
+table rows are {enter, update, exit} (0x18 bytes). Slot 72 change_state(id) passes them to change_state_base
+0x026A3A44 (pending: common_state_func calls the old exit and swaps at the end of the frame, the enter at the start
+of the next), slot 73 to change_state_interrupt_base 0x026A3AD4 (exit, enter now); both reset +0xE8 to
+common_state_func and call set_attack_data(id) (slot 45). Slots 64 / 65 / 66 / 67 give the states the framework
+returns to after damage on the ground / in the air / by default, and the death state. set_motion_label 0x02DB5B08
+only stores the script hashset table at +0xA8 (12 bytes per motion: crc32 of name.init / name / name.exit, lower
+case; the 3DS tables are exactly these); change_motion_state 0x02DB420C(this, index, f1 start frame, f2 rate, r5
+loop, f3) runs the hashset's scripts and MotionModule::change_motion. GHS vtables: slot k's fn at +0xC + 8k
+(BehaviorImpl 0x1008AEBC: 74 slots, 72 / 73 pure).
+
+The cave (0x04B86800-0x04B88000, the rest of the space smashrun_enemy_cave.py clears; code to 0x04B87178, data
+0x04B87180-0x04B87E74):
+- Factory: 0x02DB951C `cmplwi r12, 0x10` (after 2a's hook at 0x02DB9518, which branches out for its kinds) -> for
+  the walker kinds module+8 = create(module+4, K, variation), then the factory's epilogue; any other kind runs the
+  instruction and goes on. create: operator new 0x03374578(0x170), the Behavior ctor, BehaviorImpl's init as zima's,
+  vptr VT, +0x168 the kind's CFG, set_motion_label, set_damage_motion_label 0x02DB5AD8 (the nine indices of the
+  kind's 3DS create: DamageStart, DamageFly, DamageFall, DownBound, DownBound, DownLoop, DownBoundEnd, DownWait,
+  Fall / Jump).
+- VT: BehaviorImpl's 74 slots (dtor, update = the +0xE8 PMF, damage / capture / death kept) + 74 / 75; overrides 12
+  (zima's 0x026D6E18: the gl entry's capture motion, generic), 38 (zima's: 1, flip the model with lr, as every 3DS
+  behaviour), 40 initialize, 41 start, 45 set_attack_data, 64-67 (zima's: 3 / 1 / 1 / 6), 72-75 change_state.
+- States: 1 FALL, 2 LANDING, 3 WALK, 4 TURN, 6 DEAD (update zima's 0x026D7A94), 7 REMOVE (zima's 0x026D7B58 /
+  0x026D7B6C); other ids -> FALL. WALK: stick (lr, 0); off the ground FALL; every 30 frames turn when the nearest
+  target is more than 20 units behind; wall / ledge ahead -> TURN. TURN: kinetic 0, the Turn motion (Goomba:
+  RunTurnL), reverse_lr(1, 1) at its end, WALK.
+- initialize: the kind's energy words (Unicorn runs of each kind's 3DS initialize on its fs vl, variation 0), and
+  the kinetic module's vt+0xFC(0x20000004) for Goomba / Shy Guy as theirs. start: set_rhombus 0x026A65BC, +0x10 =
+  posture lr, +0x14 / +0x18 = 0, face the nearest target, FALL.
+- set_attack_data(state): clear_all 0x02C08324 (acc+0x30C8), then in WALK / TURN the kind's contact attack (a 3DS
+  InnerEnemyAttackParam, 42 words: create_attack_data 0x02DB572C reads +0xC node (u16), +0x10 power, +0x14 angle,
+  +0x18 kbg, +0x1C fkb, +0x20 bkb, +0x24 size, +0x28.. offset; set_attack 0x02C086A8(module, id, part,
+  this+0x1C)). BehaviorImpl's own reads [param slot]+0x30 / +0x34, the aliased twin's list keyed by its state ids,
+  so it is replaced. Goomba: its charge bump (power 1, angle 100, fixed 80, node 4); Shy Guy: its bump (power 1,
+  angle 50, fixed 60, node 0); Waddle Dee / Waddle Doo / Churine have only their "bullet" attack on the 3DS (no
+  contact damage while walking there), so they get Shy Guy's bump (node 0).
+- Tables: 0x02D9A46C `cmpwi r0, 1` (after 2a's) -> on a Smash Run stage motion data set table 0x10352610[K] = K's
+  set. Slots: 0x02D9A618 `lwz r0, 0x5EC(r28)` (after 2a's slot copy) -> on a Smash Run stage slot[K] = slot[0x5A]
+  (mczakozima; the walker reads no tuning from it).
+- Kinds (name table index): Goomba kuribo 0x01, Shy Guy heiho 0x0B, Waddle Dee 0x13, Waddle Doo 0x19, Churine 0x1F:
+  plain ground walkers on the 3DS (walk / turn / fall / landing states with move, check_wall, check_cliff) with the
+  full damage set. Togemet walks along walls (EnemyGroundLineTrace), Togezo has no damage motions: left out.
+
+Motion data sets: the game's layout is {entries*, count, 4 zero words, entries {hash, flags}} (the mczako sets'
+entries start at +0x18; there is no hashset block in the set: step 2a's sets carry 12 x count unused bytes there,
+harmless). K's set is its 3DS motion_data_set_<name> in its own order, hash crc32(stem, 0xFFFFFFFF), flags the 3DS
+word >> 16 (the twins' 0x10000 / 0x50000 / 0x400000 are 1 / 5 / 0x40 on the Wii U). Every entry is an OMO of the
+kind's converted pac, and Goomba's / Shy Guy's / Churine's animcmd scripts (effect.bin, sound.bin, attack.bin) all
+hash into their hashsets (checked).
+
+Field cave set "walkers" (default; `--set smashrun` builds 2a's): Plasma Wisp, Goomba, Darios, Shy Guy, Stalfos,
+Waddle Dee, Zima, Waddle Doo, Churine in turn (placement 1 for the walkers), one every 150 frames, at most 6 alive;
+requests the nine + 0x57. The turn counter now wraps at the set's size.
+
+Not verified (only Unicorn so far): the kinetic energy fields' meaning (copied from each kind's 3DS initialize,
+not understood: walking speed could be off, or 0 if kinetic 1 / 0xA read other fields on the Wii U); whether the
+turn animations (3DS: lr flipped after the Turn motion) look right with the Wii U model flip (slot 38 = 1 calls
+MotionModule 0x02C6108C -> 0x0331910C, flags at model +0x10C and [[model+0x1C]+0xA0]+0xC; whether flipped poses
+read the unconverted model.flp mirror table at model +0x48 / +0x4C was not traced); the contact attacks' node
+indices (joint table indices, the converted model.jtb); the bullet death flight with the kinds' gl entries;
+memory with ten kinds' resources on the field (the request loads model, motion, animcmd, sound, effect per kind);
+that nothing else reads the aliased zima slot in a kind-specific way for these kinds.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
