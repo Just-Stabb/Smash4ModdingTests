@@ -79,6 +79,14 @@ Gordo 0x08 (create 0x1A470, table 0x10F55C), variation 0: start (SMODE 1: set_rh
   Not ported: the per-frame energy-0 write steering it back to its spawn point (it holds it with kinetic -1),
   set_test_coll_stop(1), set_invincible_global(0), variations 1-3 (state 2: moving along a line or path).
 
+Step 2c v2: the White Bear's landing (state 9 enter) also does request_quake(6) (0x026A9648), the 3DS's absolute
+  hit on the first fighter on the ground (b_quake: MSC StatusModule(1) == 0, then the enemy's AttackModule MSC
+  entry vt+0x334 with ops 0x2716 set_abs (ABS_WORDS) and 0x271D hit_absolute(the fighter's object id)) and its two
+  effects (request_effect 0x026A951C / 0x026A94CC); Waddle Doo's leave (start: V7 = CFG LEAVE 600; the walk counts it
+  down -> state 8: Fall at rate 0, the common leave (energy +0x30 / +0x34, kinetic 15, ground off, set_correct(0),
+  effect 0x8000005 following node 0) for 300 frames -> remove); the death / collapse enters set DEFEATED (+0x19C)
+  and the notify_on_remove hook gives the defeat path only to those (a leave is removed plainly).
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -220,6 +228,13 @@ CLEAR_SPEED = 0x026A67E8             # clear_speed_all()
 CHG_BASE = 0x026A3A44                # change_state_base(id, &update, &enter, &exit) (deferred)
 CHG_INT = 0x026A3AD4                 # change_state_interrupt_base (now)
 SET_CORRECT = 0x02C36458             # GroundModule set_correct(kind) (the twins' calls with 0 / 5)
+# v2: Behavior helpers found on the Wii U (each the 3DS function's twin: the same module calls)
+REQ_QUAKE = 0x026A9648               # request_quake(kind): CameraModule (acc+0x30CC) vt+0x1CC (3DS 0x7B0F0C)
+REQ_EFFECT = 0x026A951C              # request_effect(id, &pos, &rot (degrees), scale) (3DS 0x7B12E0)
+REQ_EFFECT0 = 0x026A94CC             # request_effect(id, &pos, scale) (3DS 0x7B1338)
+REQ_FOLLOW = 0x026A9584              # request_follow_effect(id, node, &offset, &rot, scale) -> handle (3DS 0x7B4AEC)
+REMOVE_EFFECT = 0x026A95E4           # remove_effect(handle) (3DS 0x7B0EF0)
+QUAKE_KIND = 6                       # the 3DS bear's request_quake(7); 6 is the largest any Wii U enemy asks for
 NOTIFY_DEATH = 0x0269FD6C            # BehaviorImpl::notify_on_death (slot 71: death flag, hit off, attacks cleared)
 # fix v7: the sites reading [param slot]+0x70 (the area table): (site, word, dst, base, the kind's register, kind * 4)
 AREA_SITES = ((0x02D89898, 0x81450070, 10, 5, 0, True),       # the Enemy's area set-up: add_area(2 areas)
@@ -258,6 +273,7 @@ def V(i):
 
 
 Y0 = 0x190
+DEFEATED = 0x19C                     # v2: set by the death / collapse enters: the removal plays the defeat path
 PREV = 0x1A0                         # fix v8: each fighter slot's (0-3) y last frame (0 = none yet)
 FIGHTERS = 0x1035184C                # [[FIGHTERS]]: +0 entries, +8 count; entry 0x76B0: +0x1E live >= 4, +0xC acc
 FIGHTER_ENTRY = 0x76B0
@@ -273,7 +289,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
                          'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
-                         'SMODE').split()):
+                         'SMODE LEAVE').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
@@ -304,6 +320,13 @@ GORDO_SPIKE = (1, 0, 0, 3, 10, 65, 50, 50, 100, 8, 0.0, 0.0, 0.0, 2, 0.0, 2.0, 1
                0, 0, 0, 0, 60, 0, 0, 0, 0, 1, 0, 0, 0, 0)
 WHITEBEAR_BULLET = (10, 0, 0, 2, 8, 361, 100, 0, 50, 5, 0.0, 0.0, 0.0, 0, 0.0, 2.0, 1.0, 0, 0, 0, 2, 1, 3, 0, 0, 2, 0,
                     9, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+# v2: the White Bear's landing quake as an absolute attack: the AttackModule MSC op 0x2716 (set_abs) words in
+# Throw_Specifier's order (kind, part, damage, angle, kbg, wbkb, bkb, effect, trip, hitlag, sdi, sfx level, sfx type,
+# facing, disable hitlag, no reaction, type) from its vl P6 (InnerEnemyAttackAbsoluteParam {state 9, id 0, part 0,
+# power 10, angle 90, kbg 100, fkb 0, bkb 40, 0, 1.0, 1.0, 1.0, 2, 1, 0, 0, 1, 0}; the 3DS struct's bytes / the
+# three floats mapped by their order: effect 0, hitlag 1.0, sdi 1.0, sound level 2, sound type 1, facing 3 (the
+# Wii U throws' default), no reaction 0, type 0)
+ABS_WORDS = (0x2716, 0, 0, 10.0, 90, 100, 0, 40, 0, 0.0, 1.0, 1.0, 2, 1, 3, 0, 0, 0)
 ATTACKS = {'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
            'churine_bullet': CHURINE_BULLET, 'gordo_spike': GORDO_SPIKE, 'whitebear_bullet': WHITEBEAR_BULLET}
 DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBound', 'DownLoop', 'DownBoundEnd',
@@ -374,12 +397,16 @@ WALKERS = (
          energy={8: 0.3, 0x10: 0.3, 0x20: 0.5, 0x24: 2.4, 0x28: 0.5, 0x2C: 2.4},
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('o_walk_en', 'o_walk_up'),
                  4: ('g_turn_en', 'g_turn_up'), 5: ('g_hop_en', 'g_hop_up'), 6: ('g_dead_en', 'g_dead_up'),
-                 7: 'remove'},                # the 3DS's 10 / 11 (6-9 not ported: no empty rows)
-         start=(1, 1), rets=(3, 1, 1, 6), remove=7, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
+                 7: 'remove', 8: ('o_leave_en', 'o_leave_up')},
+         # the 3DS's 10 / 11 / 9 (dead / remove / leave; 6 hop and 7 / 8 beam not ported)
+         start=(1, 1), rets=(3, 1, 1, 6), remove=7, leave=600,   # start: +0x184 = PS8c f0 600
+         fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
          walkst=3, hop=(1.0, 3, 0), hop_motion=('Jump', 0),
          search=((2, 60, 200.0, 200.0, 0.0, 0.0, 0.0), (2, 20, 60.0, 70.0, 30.0, 20.0, 0.0)),
          attacks=((6, 'bullet'),),
-         P=()),
+         # the leave (state 9, init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85})): frames, the
+         # energy's +0x30 (-0.02) / +0x34 (30), the leave effect's offset y and scale
+         P=(300, -0.02, 30.0, 3.0, 0.85)),
     dict(name='churine', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (1, 3, 5.0, 10.0, 0.0, 4.0)), kind=0x1F,
          motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
                   ('DownLoop', 1), ('DownWait', 1), ('Jump', 1), ('Landing', 1), ('SleepPowder', 1), ('Turn', 1),
@@ -413,7 +440,8 @@ WALKERS = (
          # P0 (0x5C a row): walk frames f7 / f8, QuakeHold rate f9, jump f10, fall E+0x3C f11 / E+0x2C f12, landing
          # rate f13, long-fall frames f14, repeat chance f15 (%%, halved per landing), repeat landing rate f16, quakes
          # f17, search cool-down f18; 0.1 the jump's E+0x3C (a literal)
-         P=(60, 120, 1.5, 1.5, 1.0, 3.0, 1.0, 180, 50, 0.5, 3, 60, 0.1)),
+         P=(60, 120, 1.5, 1.5, 1.0, 3.0, 1.0, 180, 50, 0.5, 3, 60, 0.1,
+            2.5, 8.0)),       # v2: the landing effects' scales (0x7400000: the 3DS's (2.5, 1.7, 1) as 2.5; 0x7400001 8)
     # Gordo (Kirby) 0x08, BehaviorGordo (create 0x1A470, table 0x10F55C): variation 0 (the one the spawner makes)
     dict(name='gordo', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (0, 0, 14.0, 14.0, 0.0, 0.0)), kind=0x08,
          motions=(('Togetoge', 1),), no_damage_labels=True,       # its ctor 0x1A4A8: no hashsets, no damage labels
@@ -495,7 +523,7 @@ def cfg_values(w, D):
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
              HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n],
-             SMODE=w.get('smode', 0))
+             SMODE=w.get('smode', 0), LEAVE=w.get('leave', 0))
     words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -521,6 +549,7 @@ class Data:
         fn = lambda x: x if isinstance(x, int) else cl.get(x, 0)  # noqa: E731
         b = self.blocks = []
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
+        b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
                 3: fn('w_upd'), 41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
@@ -976,6 +1005,8 @@ def code(D):
         stwu r0, 4(r11)
         bdnz s_zero
         lwz r0, 0x%X(r30)
+        stw r0, 0x%X(r31)
+        lwz r0, 0x%X(r30)
         cmpwi r0, 0
         bne s_state
         bl h_near
@@ -992,7 +1023,7 @@ def code(D):
         lwz r4, 0x%X(r30)
     s_go:
         b go
-    """ % ((OBJ_SIZE - 0x16C) // 4, CF['SMODE'], CF['START'], CF['START01']))
+    """ % ((OBJ_SIZE - 0x16C) // 4, CF['LEAVE'], V(7), CF['SMODE'], CF['START'], CF['START01']))
     # ---- slot 20 (3DS 21): stepped on by a fighter (a footstool); the kind's state (CFG TREAD) => now, 0: nothing
     A.asm("""
     w_tread:
@@ -1113,7 +1144,8 @@ def code(D):
         b go""" % (CF['WALKST'], V(8), CF['TURNST'], V(8)))
     en(A, 'g_turn_en', 0, 1, 'TURNMOT', 0)
     st(A, 'g_turn_up', "bl h_end\ncmpwi r3, 0\nbeq epi\nbl h_rev\nlwz r4, 0x%X(r30)\nb goi" % CF['WALKST'])
-    st(A, 'g_dead_en', "lwz r4, 0x%X(r30)\nli r5, 0\nbl h_mot0\nmr r3, r31\nbl 0x%08X" % (CF['DEADMOT'], BULLET))
+    st(A, 'g_dead_en', "li r0, 1\nstw r0, 0x%X(r31)\nlwz r4, 0x%X(r30)\nli r5, 0\nbl h_mot0\nmr r3, r31\nbl 0x%08X"
+       % (DEFEATED, CF['DEADMOT'], BULLET))
     A.asm("h_mot0:")                  # a motion at rate 0
     lfs(A, 'f2', 'consts')
     A.asm("b h_mot")
@@ -1335,8 +1367,8 @@ def code(D):
 
     # collapses (stepped on): kinetic 0, Collapses, ground on, notify_on_death; at its end -> 10 (the 3DS's
     # create_dead_item on frame 1 is left to the removal's defeat path, fix v3, which drops the items)
-    en(A, 'k_col_en', 0, 1, 0, 0, extra="mr r3, r31\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl"
-       % (NOTIFY_DEATH >> 16, NOTIFY_DEATH & 0xFFFF))
+    en(A, 'k_col_en', 0, 1, 0, 0, extra="mr r3, r31\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl\n"
+       "li r0, 1\nstw r0, 0x%X(r31)" % (NOTIFY_DEATH >> 16, NOTIFY_DEATH & 0xFFFF, DEFEATED))
     st(A, 'k_col_up', "bl h_end\ncmpwi r3, 0\nbeq epi\nli r4, 10\nb go")
 
     # ---- Shy Guy (V0 search frames, V1 walk / hold frames, V2 run frames, V3 target, V4 hops / Wait loops,
@@ -1646,6 +1678,14 @@ def code(D):
     en(B, 'o_walk_en', 1, 1, 14, 1)
     st(B, 'o_walk_up', """
         bl h_mv
+        lwz r3, 0x%(V7)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V7)X(r31)
+        cmpwi r3, 0
+        bgt ow_g
+        li r4, 8
+        b go
+    ow_g:
         bl h_gnd
         cmpwi r3, 0
         bne ow_on
@@ -1656,7 +1696,7 @@ def code(D):
         cmpwi r3, 0
         beq ow_look
         li r4, 5
-        b go""")
+        b go""" % dict(V7=V(7)))
     look(B, 'ow', 0, "beq epi\nli r4, 4\nb go")
 
     # ---- Churine: walk / jump (initialize first, as the 3DS's vt+0xA0)
@@ -1717,11 +1757,20 @@ def code(D):
         bge death_go
         cmpwi r4, 0
         bne death_go
+        lwz r12, 0xE0(r3)
+        lis r11, 0x%04X
+        addi r11, r11, %d
+        cmpw r12, r11
+        bne death_conv
+        lwz r12, 0x%X(r3)
+        cmpwi r12, 0
+        beq death_go
+    death_conv:
         li r4, 3
     death_go:
         mflr r0
         b 0x%08X
-    """ % (0xC + 8 * SET_LR_SLOT, SITE_ROT + 4, SITE_DEATH + 4))
+    """ % (0xC + 8 * SET_LR_SLOT, SITE_ROT + 4, ha(D['vt']), sx(D['vt']), DEFEATED, SITE_DEATH + 4))
     # ---- T2: the motion data set table (r0 = category, r31 = mgr; r9-r12 free)
     B.asm("cave_t:")
     F.sr_check(B)
@@ -1931,9 +1980,208 @@ def code_e(D, en, st, far, lfs):
         li r4, 12
         li r5, 0
         bl h_mot
+        mr r3, r31
+        li r4, %(QK)d
+        lis r12, 0x%(RQH)04X
+        ori r12, r12, 0x%(RQL)04X
+        mtctr r12
+        bctrl
+        bl b_quake
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r12, 0(r31)
+        lwz r5, 0x311C(r12)
+        addi r5, r5, 0x10
+        mr r3, r31
+        lis r4, 0x740
+        addi r6, r1, 8
+        lfs f1, 0x%(P13)X(r30)
+        lis r12, 0x%(REH)04X
+        ori r12, r12, 0x%(REL)04X
+        mtctr r12
+        bctrl
+        mr r3, r31
+        lis r4, 0x740
+        ori r4, r4, 1
+        addi r5, r1, 8
+        lfs f1, 0x%(P14)X(r30)
+        lis r12, 0x%(RZH)04X
+        ori r12, r12, 0x%(RZL)04X
+        mtctr r12
+        bctrl
         lwz r3, 0x%(V4)X(r31)
         addi r3, r3, 1
-        stw r3, 0x%(V4)X(r31)""" % dict(P6=P(6), P9=P(9), V4=V(4)))
+        stw r3, 0x%(V4)X(r31)""" % dict(P6=P(6), P9=P(9), V4=V(4), QK=QUAKE_KIND, RQH=REQ_QUAKE >> 16,
+                                        RQL=REQ_QUAKE & 0xFFFF, REH=REQ_EFFECT >> 16, REL=REQ_EFFECT & 0xFFFF,
+                                        RZH=REQ_EFFECT0 >> 16, RZL=REQ_EFFECT0 & 0xFFFF, P13=P(13), P14=P(14)))
+    # ---- Waddle Doo's leave (v2; the 3DS state 9: enter 0x7CEC0 = Fall at rate 0, init_common_leave(P6) code.bin
+    # 0x7B23B4: the leave time, energy +0x30 = -p1 / +0x34 = p2 and kinetic 15 (0x7B4E84), ground off,
+    # set_correct(0), disable_jostle (not ported), the common leave effect 0x8000005 following node 0 at (0, 3, 0)
+    # scale 0.85 (EnemyManager +0x5F8 clear); update 0x7D444 / update_common_leave 0x7B40B0: the time counts
+    # down, at 0 the effect is removed and -> remove (no defeat: DEFEATED stays 0)); V6 the time, V5 the effect
+    st(Ee, 'o_leave_en', """
+        li r4, 10
+        li r5, 0
+        bl h_mot0
+        lwz r0, 0x%(P0)X(r30)
+        stw r0, 0x%(V6)X(r31)
+        bl h_ebase
+        lwz r0, 0x%(P1)X(r30)
+        stw r0, 0x30(r10)
+        lwz r0, 0x%(P2)X(r30)
+        stw r0, 0x34(r10)
+        li r4, 15
+        bl h_kin
+        li r4, 0
+        bl h_att
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        lis r12, 0x%(SCH)04X
+        ori r12, r12, 0x%(SCL)04X
+        mtctr r12
+        bctrl
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        lwz r0, 0x%(P3)X(r30)
+        stw r0, 0xC(r1)
+        mr r3, r31
+        lis r4, 0x800
+        ori r4, r4, 5
+        li r5, 0
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+        lfs f1, 0x%(P4)X(r30)
+        lis r12, 0x%(RFH)04X
+        ori r12, r12, 0x%(RFL)04X
+        mtctr r12
+        bctrl
+        stw r3, 0x%(V5)X(r31)""" % dict(P0=P(0), P1=P(1), P2=P(2), P3=P(3), P4=P(4), V5=V(5), V6=V(6),
+                                        SCH=SET_CORRECT >> 16, SCL=SET_CORRECT & 0xFFFF, RFH=REQ_FOLLOW >> 16,
+                                        RFL=REQ_FOLLOW & 0xFFFF))
+    st(Ee, 'o_leave_up', """
+        lwz r3, 0x%(V6)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V6)X(r31)
+        cmpwi r3, 0
+        bgt epi
+        mr r3, r31
+        lwz r4, 0x%(V5)X(r31)
+        lis r12, 0x%(RMH)04X
+        ori r12, r12, 0x%(RML)04X
+        mtctr r12
+        bctrl
+        li r0, 0
+        stw r0, 0x%(V5)X(r31)
+        li r4, 7
+        b go""" % dict(V5=V(5), V6=V(6), RMH=REMOVE_EFFECT >> 16, RML=REMOVE_EFFECT & 0xFFFF))
+    # the landing's absolute hit (v2; the 3DS 0x7EF04-0x7F01C: set_attack_absolute_data(P6), then for the fighter
+    # entries in order the first on the ground gets hit_attack_absolute(P6 id 0, entry), once): the fighter table
+    # (slots 0-3, live) as the stomp test reads it; on the ground = MSC StatusModule(1) (the situation) == 0; the
+    # enemy's AttackModule (acc+0x30C8, AttackModuleImpl) through its MSC entry vt+0x334 as the ACMD
+    # Throw_Specifier / Throw_Applier handlers (0x02BE6E88 / 0x02BE6FCC) do: op 0x2716 set_abs(kind 0, part 0, the
+    # P6 values: 10.0, 90, 100, 0, 40, ...: ABS_WORDS), then op 0x271D (0x02C0B8E4 -> vt+0x74 hit_absolute(kind 0,
+    # node 0, the fighter's object id = [its accessor + 0], hit group 0, 0))
+    Ee.asm("""
+    b_quake:
+        mflr r0
+        stwu r1, -0xA0(r1)
+        stw r0, 0xA4(r1)
+        stmw r26, 0x88(r1)
+        lis r12, 0x%(FH)04X
+        lwz r12, %(FL)d(r12)
+        cmpwi r12, 0
+        beq q_out
+        lwz r26, 0(r12)
+        cmpwi r26, 0
+        beq q_out
+        lwz r27, 8(r26)
+        li r28, 0
+    q_loop:
+        cmpw r28, r27
+        bge q_out
+        cmpwi r28, 4
+        bge q_out
+        lwz r12, 0(r26)
+        mulli r11, r28, 0x%(ENT)X
+        add r12, r12, r11
+        lbz r11, 0x1E(r12)
+        cmplwi r11, 4
+        blt q_next
+        lwz r29, 0xC(r12)
+        cmpwi r29, 0
+        beq q_next
+        li r0, 0
+        stw r0, 8(r1)
+        stw r29, 0xC(r1)
+        li r0, 1
+        stw r0, 0x10(r1)
+        stw r0, 0x1C(r1)
+        addi r0, r1, 0x10
+        stw r0, 0x18(r1)
+        addi r3, r1, 8
+        addi r4, r1, 0x18
+        lis r12, 0x%(MH)04X
+        ori r12, r12, 0x%(ML)04X
+        mtctr r12
+        bctrl
+        cmpwi r3, 0
+        beq q_hit
+    q_next:
+        addi r28, r28, 1
+        b q_loop
+    q_hit:
+        lwz r30, 0(r31)
+        lwz r30, 0x30C8(r30)
+        cmpwi r30, 0
+        beq q_out
+        lis r11, 0x%(AH)04X
+        addi r11, r11, %(AL)d
+        addi r12, r1, 0x1C
+        li r0, %(NW)d
+        mtctr r0
+    q_copy:
+        lwz r0, 0(r11)
+        stwu r0, 4(r12)
+        addi r11, r11, 4
+        bdnz q_copy
+        li r0, %(NW)d
+        bl q_msc
+        li r0, 0x271D
+        stw r0, 0x20(r1)
+        li r0, 0
+        stw r0, 0x24(r1)
+        stw r0, 0x28(r1)
+        stw r0, 0x30(r1)
+        stw r0, 0x34(r1)
+        lwz r0, 0(r29)
+        stw r0, 0x2C(r1)
+        li r0, 6
+        bl q_msc
+    q_out:
+        lmw r26, 0x88(r1)
+        lwz r0, 0xA4(r1)
+        mtlr r0
+        addi r1, r1, 0xA0
+        blr
+    q_msc:
+        stw r0, 0x1C(r1)
+        addi r0, r1, 0x20
+        stw r0, 0x18(r1)
+        mr r3, r30
+        addi r4, r1, 0x18
+        lwz r12, 0(r30)
+        lwz r12, 0x334(r12)
+        mtctr r12
+        bctr
+    """ % dict(FH=ha(FIGHTERS), FL=sx(FIGHTERS), ENT=FIGHTER_ENTRY, MH=MSC_STATUS >> 16, ML=MSC_STATUS & 0xFFFF,
+               NW=len(ABS_WORDS), AH=ha(D['abs_words']), AL=sx(D['abs_words'])))
     st(Ee, 'b_land_up', """
         bl h_end
         cmpwi r3, 0

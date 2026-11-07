@@ -921,6 +921,98 @@ adds the check: `model/enemy/plasmawisp/body/c00/model.jtb` with a sixth node, 5
 centre). If the laser (and needles) then come out of the wisp, this was the cause; if not, the next suspects are the
 weapons' own effect / model resources (the Wii U's mczakoplasmawisp weapons, loaded with kind 0x57).
 
+## Step 2c v2: the White Bear's quake, Waddle Doo's leave, the laser's effects (log build), despawn rules
+
+User result of step 2c v1: Plasma Wisp's (Lethinium's) laser hits now but still doesn't show; the White Bear's stomp
+had no hit, effect or quake. Package smashrun_step2c_v2: `code/` exe_v14 = exe_v13 + the changes below,
+`code_diag/` exe_v14 + `tools/diag_effect_cave.py` (one match, for the log); no data files. Tests on exe_v14:
+smashrun_walker_test.py 152 checks, smashrun_field_test.py 12, smashrun_enemy_test.py 26, diag_effect_test.py
+(the log build against exe_v14) 12: 0 failures each.
+
+**White Bear's landing** (3DS 0x7EE74, see "Step 2c"), now in the walker's state 9 enter, in the 3DS's order:
+- `request_quake(6)`: the Wii U Behavior helper 0x026A9648 (CameraModule acc+0x30CC, vt+0x1CC: the 3DS's
+  0x7B0F0C, CameraModule vt+0xE4); kind 6 for the 3DS's 7 (6 is the largest any Wii U enemy passes: 0x026C40A4..;
+  7 was not checked to exist on the Wii U).
+- The absolute hit: the 3DS loops over the fighter entries and hits the **first** whose situation is the ground
+  (module +0x24 vt+0x68 == 0, inferred as the situation; it stops after one) with `hit_attack_absolute(P6 id 0,
+  entry)` after `set_attack_absolute_data(P6)` (P6: power 10, angle 90, kbg 100, fkb 0, bkb 40). The Wii U route:
+  the fighter table [[0x1035184C]] (slots 0-3, live >= 4, as the stomp test), the situation by MSC StatusModule(1)
+  (0x030B2B98) == 0, then the enemy's AttackModule (acc+0x30C8, AttackModuleImpl: vtable 0x10103524) through its
+  MSC entry vt+0x334 (0x02C0ACFC) as the ACMD handlers Throw_Specifier 0x02BE6E88 / Throw_Applier 0x02BE6FCC call
+  it: op 0x2716 set_abs (18 words: kind 0, part 0, 10.0, 90, 100, 0, 40, effect 0, trip 0.0, hitlag 1.0, sdi 1.0,
+  sound level 2, sound type 1, facing 3, disable hitlag 0, no reaction 0, type 0), then op 0x271D (0x02C0B8E4 ->
+  vt+0x74: hit_absolute(kind 0, node 0, the fighter's object id = its module accessor +0, hit group 0, 0)). The
+  object id at the accessor's +0: as the Wii U enemies' own remove (0x026D7B58 passes [acc+0]); the 3DS's
+  BattleObjectAccessor::id 0x962090. The bytes / floats of the 3DS struct after bkb are mapped by order (the
+  struct is set_attack_absolute_data's 0x7B50AC layout; sound and facing values inferred); the 3DS's target check
+  (its module +0x5C vt+0x84 == 1 skips it: not mapped) is not ported.
+- The effects: `request_effect(0x7400000, posture, (0, 0, 0), 2.5)` (0x026A951C, the 3DS's 0x7B12E0: the crown
+  splash at its feet; the 3DS scales it (2.5, 1.7, 1) and turns it by the ground angle: uniform 2.5, no turn) and
+  `request_effect(0x7400001, (0, 0, 0), 8)` (0x026A94CC, the 3DS's 0x7B1338: PtcWhitebearCamera, the falling
+  rocks). Its sounds come from its sound.bin (QuakeUp / QuakeLanding, step 2c v1's data).
+- Not ported: set_weak_param(5, 2.0) (no Wii U DamageModule weak-param call found) and the camera test before
+  the jump (is_in_view_area = CameraModule is_clip_in(true), 3DS 0x9EA804; taken as true).
+
+**Waddle Doo's leave** (open since fix v5; 3DS start 0x7CC3C, walk 0x7D4C8, state 9 0x7CEC0 / 0x7D444): the start
+sets a 600-frame timer (PS8c f0), the walk counts it down first and at 0 changes to the leave (the 3DS resets it only
+when the beam fires, not ported, so ours always leaves after 600 walk frames). The leave state (walker state 8):
+Fall at rate 0, `init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85})` (code.bin 0x7B23B4: 300 frames;
+0x7B4E84: energy +0x30 = -0.02, +0x34 = 30, kinetic 15; ground off; set_correct(0); disable_jostle, not ported;
+the common leave effect 0x8000005 following node 0 at (0, 3, 0) x 0.85 through request_follow_effect 0x026A9584);
+`update_common_leave` (0x7B40B0): the time counts down, at 0 the effect is removed (remove_effect 0x026A95E4) ->
+remove.
+
+**Defeat vs leave**: fix v3 turned every behaviour removal of a kind < 0x50 into the defeat path (0x02DB3AB0: the
+defeat effect, the dead-item check). Now the walker kinds set DEFEATED (+0x19C) in their death state and the
+Goomba's collapse, and the notify_on_remove hook converts only those (and 2a's twins, unchanged); a leave takes the
+plain removal (type 0 -> 0x02DB3574, nothing for kinds below 0x57), as the 3DS: a leave is no defeat.
+
+**Plasma Wisp's laser: what draws it, and the log build.** The twin's weapons (weapon kinds 0x145 needle, 0x146
+laser, 0x147 hadoudan: root "enemy", owner mczakoplasmawisp; the Wii U resource table has no weapon model folders
+for them, only `effect/enemy/mczakoplasmawisp/` .efc + .ptcl) draw only effects, all from bank 0x757 (0x700 +
+mczakoplasmawisp), hard-coded in the weapons' code at 0x02AE0000-0x02AE2000: their EffectModule (weapon accessor
++0xA0) vt+0x64 req(0x7570003 ...) at 0x02AE08A4, vt+0x4C req_follow(0x7570004) at 0x02AE0970, 0x7570002 at
+0x02AE111C / 0x02AE11B0 / 0x02AE1368 / 0x02AE13D4, 0x7570001 at 0x02AE1B3C (0x0319A3A8.. is the same code for bank
+0x712, plasmawisp's own kind: dead). The behaviour's charge effects are bank 0x757 too (0x026D00E0..). The effect
+manager (0x032F00A0) finds a bank's slot by `bank >> 8`: category 7, the enemy banks, has 10 slots (26-35:
+[0x101906D4 + 4 * 7], [0x10423B2C + 4 * 7]); a bank takes its slot when it registers (0x032F1388 stores the bank id
+before it checks the resource, so a bank whose files are missing may still hold a slot); an effect of a bank without
+a slot, or without its .efc, or past the .efc's entries, or over the effect budget, is silently not made. The
+Smash Run set now requests 12 enemy kinds plus 0x57 (13 > 10; step 2b's ten, when the laser was first seen missing:
+2a crashed before it fired, the step-1 minions' showed with four kinds). So the leading
+candidates are: bank 0x757 never gets a slot / its files (category 7 full, or registered under another order), or
+the instance is refused (budget, emitter set); the node-5 fix (v1) placed the weapon (its hitbox now shows). The
+log build (`tools/diag_effect_cave.py`, test `tools/diag_effect_test.py`) prints `S4FX reg` (every enemy bank's
+registration: bank, slot, resource), `S4FX req` (every enemy-bank effect request: id, slot, the slot's bank / eft
+resource / .efc / entry count) and `S4FX made` (id, handle), which settles it. Hooks 0x032F13C0, 0x032F011C,
+0x032F0250 (replayed: `mr r21, r3`, `cmplwi r3, 0x29`, `mr r3, r30`), space 0x04BAE000-0x04BAE524 (diag only).
+
+**Despawn rules (3DS, what was read)**:
+- Enemies are created by the EnemyGenerator from the stage's layout (appear ids, regeneration counts:
+  EnemyGenerator::get_remeine_gen_count_from_appear_id 0x46755C, create_child 0x466228, get_next_enemy_kind
+  0x466F14, its unnamed update near 0x467560-0x469000 calling EnemyManager::is_creatable_enemy_cost 0x93EE30, the
+  fighters' center_pos and CameraData::calc); EnemyManager::create_request (0x3E3E14) tests the creation point
+  against the camera's clip bounds (CameraData::get_clip_bounds at 0x3E445C). Not read further: the generator's
+  own regeneration / removal of out-of-view enemies (if any), the per-area limits.
+- Removal is by the behaviours: the death state (bullet(), kinetic flag 8 -> the remove state ->
+  EnemyManager::remove_enemy_by_id), the Goomba's collapse, and the **leave** states: 19 kinds call
+  init_common_leave (bokkun, bokkuncannon, bokkunmage, bonkers, brontoburt, bubble, dogars, dosudosu, flage,
+  furiijio, ghos, ghost, metroid, popperam, shiroiobake, tac, togezo, waddledoo, ...) with their own timers (Waddle
+  Doo 600 walk frames, Ghos 1200 frames; both reset by attacking / being hit).
+- The dead area: code.bin's GroundUtility::check_dead_area (0x42E76C) is called by items, weapons, fighters and the
+  enemy fighters (EnemyFighterModuleImpl), not found for enemies; how a 3DS enemy that falls out of the field is
+  removed was not found.
+- Implemented now: the Waddle Doo's leave and the leave-is-no-defeat removal. Not implemented: an off-screen /
+  distance rule for our spawner (not read on the 3DS; not invented), the dead area. Our spawner keeps its rule (one
+  every 150 frames beside the player, at most 6 of the set alive).
+
+**exe_v14 vs exe_v13, word diff** (relocations equal): text 0x02D9A46C (T2), 0x02D9A618 (S2), 0x02DB40E4 (the
+notify_on_remove hook), 0x02DB4B20 (initialize_after hook), 0x04B7D630-0x04B7DF00 (E), 0x04B85980-0x04B85C00,
+0x04B86220-0x04B86560 (data), 0x04B8691C-0x04B88000 (A), 0x04B89020-0x04B8A000 (B), 0x04BB8004-0x04BB8008 and
+0x04BB8180-0x04BB8660 (C); data 0x1008EC68 / 0x1008F1D4 / 0x1008FFCC (the twins' slot-38 words -> twin_flip, which
+moved): 2756 words, all the walker cave's hooks and regions (the hook words point at moved cave labels). The log
+build adds only 0x032F011C, 0x032F0250, 0x032F13C0 and 0x04BAE000-0x04BAE524.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

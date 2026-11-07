@@ -43,6 +43,8 @@ ATKM, GROUND, EKIN, MOTION, KIN, POSTURE = (HEAP + 0x20000 + 0x100 * i for i in 
 KVT, ARRP, ARR, EN, INPUT, PM, MGR, FLAGS = (HEAP + 0x21000 + 0x100 * i for i in range(8))
 KICK = 0x02000004               # the kinetic vt+0xFC target (a stub address)
 KICK2 = 0x02000008              # vt+0xEC (step 2c: the 3DS's vt+0x74 kick of the White Bear's jumps)
+ATK_MSC = 0x0200000C            # the AttackModule's MSC entry vt+0x334 (step 2c v2: the bear's absolute hit)
+AVT = HEAP + 0x22000
 DONE = 0x02000000               # return address of a run
 CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9C, 0x54: 0x026BE944,
            0x55: 0x026BB3E8, 0x56: 0x026C5F80, 0x57: 0x026CF4DC, 0x58: 0x026CBA64, 0x59: 0x026D1DFC,
@@ -74,7 +76,7 @@ class Machine:
                              if base < 0x05000000 else data)
         uc.mem_map(HEAP, 0x40000)
         uc.mem_map(STACK - 0x10000, 0x20000)
-        uc.mem_write(DONE, struct.pack('>III', 0x48000000, 0x48000000, 0x48000000))      # b . (stop addresses)
+        uc.mem_write(DONE, struct.pack('>IIII', 0x48000000, 0x48000000, 0x48000000, 0x48000000))  # stop addresses
         self.calls = []
         self.ground, self.walls, self.cliff, self.motion_end = True, set(), False, False
         self.target, self.target_x = 0, 0.0
@@ -93,6 +95,9 @@ class Machine:
         w(KIN, KVT)
         w(KVT + 0xFC, KICK)
         w(KVT + 0xEC, KICK2)
+        w(ATKM, AVT)
+        w(AVT + 0x334, ATK_MSC)
+        self.situation = {}             # fighter accessor -> MSC StatusModule(1) (0 ground)
         w(KIN + 8, ARRP)
         w(ARRP, ARR)
         w(ARR + 4, EN)
@@ -159,6 +164,32 @@ class Machine:
             ctx, args = r(3), r(4)
             words = [self.r32(self.r32(args) + 4 * i) for i in range(self.r32(args + 4))]
             c.append(('msc_status', self.r32(ctx + 4), tuple(words)))
+            if words == [1]:
+                self.ret(self.situation.get(self.r32(ctx + 4), 2))
+            else:
+                self.ret()
+        elif addr == ATK_MSC:
+            args = r(4)
+            words = [self.r32(self.r32(args) + 4 * i) for i in range(self.r32(args + 4))]
+            c.append(('atk_msc', r(3), tuple(words)))
+            self.ret(1)
+        elif addr == W.REQ_QUAKE:
+            c.append(('quake', r(3), r(4)))
+            self.ret()
+        elif addr == W.REQ_EFFECT:
+            c.append(('effect', r(3), r(4), tuple(round(self.rf(r(5) + 4 * i), 3) for i in range(3)),
+                      tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)), round(self.fr(1), 3)))
+            self.ret(0x5555)
+        elif addr == W.REQ_EFFECT0:
+            c.append(('effect0', r(3), r(4), tuple(round(self.rf(r(5) + 4 * i), 3) for i in range(3)),
+                      round(self.fr(1), 3)))
+            self.ret(0x5556)
+        elif addr == W.REQ_FOLLOW:
+            c.append(('follow', r(3), r(4), r(5), tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)),
+                      tuple(round(self.rf(r(7) + 4 * i), 3) for i in range(3)), round(self.fr(1), 3)))
+            self.ret(0x7777)
+        elif addr == W.REMOVE_EFFECT:
+            c.append(('remove_effect', r(3), r(4)))
             self.ret()
         elif addr == W.BI_UPDATE:
             c.append(('bi_update', r(3), r(4)))
@@ -501,15 +532,23 @@ def main():
         all(not [c for c in got[k] if c[0] == 'set_lr'] for k in (0x57, 0x60))
     check(ok, 'fix v3: initialize_after calls set_lr(posture lr, 1, 1) for kinds < 0x50 only %s' % got)
     got = {}
-    for k, t in ((0x01, 0), (0x12, 0), (0x01, 5), (0x01, 1), (0x57, 0), (0x01, 3)):
+    for k, t, dead, ours in ((0x01, 0, 1, 1), (0x01, 0, 0, 1), (0x12, 0, 0, 0), (0x01, 5, 1, 1), (0x01, 1, 1, 1),
+                             (0x57, 0, 0, 0), (0x01, 3, 0, 1)):
         m = Machine(img)
         m.walker(cfg[1], kind=k)
+        m.w32(OBJ + W.DEFEATED, dead)
+        if not ours:
+            m.w32(OBJ + 0xE0, 0x1234)           # a twin's own vtable
         m.calls = []
         m.call(W.SITE_DEATH, {3: OBJ, 4: t})
-        got[(k, t)] = [c[0] for c in m.calls if c[0] in ('defeat_fx', 'vanish_fx')]
-    check(got == {(0x01, 0): ['defeat_fx'], (0x12, 0): ['defeat_fx'], (0x01, 5): [], (0x01, 1): [],
-                  (0x57, 0): ['vanish_fx'], (0x01, 3): ['defeat_fx']},
-          'fix v3: notify_on_remove: a kind < 0x50 removed by its behaviour (type 0) takes the defeat effect path '
+        got[(k, t, dead)] = [c[0] for c in m.calls if c[0] in ('defeat_fx', 'vanish_fx')]
+    # (a type-0 removal goes to 0x02DB3574, the minions' vanish path, which does nothing for kinds below 0x57)
+    check(got == {(0x01, 0, 1): ['defeat_fx'], (0x01, 0, 0): ['vanish_fx'], (0x12, 0, 0): ['defeat_fx'],
+                  (0x01, 5, 1): [],
+                  (0x01, 1, 1): [], (0x57, 0, 0): ['vanish_fx'], (0x01, 3, 0): ['defeat_fx']},
+          'fix v3 / step 2c v2: notify_on_remove: a walker kind removed after its death / collapse (DEFEATED set) or a '
+          'twin kind < 0x50 removed by its behaviour (type 0) takes the defeat effect path; a walker that leaves '
+          '(DEFEATED 0) is removed silently; '
           '0x02DB3AB0 (type 3); the minions keep type 0; other types unchanged %s' % got)
 
     # change_state: the kind's table
@@ -594,6 +633,7 @@ def main():
         w = byname[name]
         m = Machine(img)
         m.walker(cfg[w['kind']], state=state, lr=lr, kind=w['kind'], var=var)
+        m.w32(OBJ + W.V(7), w.get('leave', 0))       # as start leaves it (Waddle Doo's leave timer)
         m.target, m.target_x = 0, 300.0
         if setup:
             setup(m)
@@ -948,7 +988,8 @@ def main():
     # ---- Waddle Doo
     got = enters('waddledoo')
     exp = {1: (8, 0, (10, 1.0, 1), ''), 2: (0, 1, (12, 1.0, 0), ''), 3: (1, 1, (14, 1.0, 1), ''),
-           4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet')}
+           4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet'),
+           8: (15, 0, (10, 0.0, 0), '')}
     check(got == exp, 'waddledoo enters as the 3DS\'s: %s' % got)
     wd = world('waddledoo', 3, lr=-1.0)
     m = wd.m
@@ -1114,6 +1155,89 @@ def main():
     check(got == {1: (0xFFFFFFFF, 0, (0, 1.0, 1), '')} and wd.states() == [1] and
           not [c for e in wd.log for c in e[4]], 'gordo: state 1 kinetic -1, ground off, Togetoge loop; its update '
           'changes nothing (home energy not ported) %s' % got)
+
+    # ---- step 2c v2: the White Bear's landing quake (the 3DS 0x7EE74): request_quake, the absolute hit on the first
+    # fighter on the ground (AttackModule MSC 0x2716 set_abs, 0x271D hit_absolute), the effects
+    FT2, TBL2, ENTS2 = HEAP + 0x36000, HEAP + 0x36100, 0x32000000
+    FACC = [HEAP + 0x38000 + 0x100 * i for i in range(4)]
+
+    def landing(sits, count=3, live=(4, 4, 4, 4)):
+        m = Machine(img)
+        m.uc.mem_map(ENTS2, 0x20000)
+        m.walker(cfg[0x40], state=9, kind=0x40, x=10.0)
+        m.wf(POSTURE + 0x14, 5.0)
+        m.wf(POSTURE + 0x18, 0.0)
+        m.w32(W.FIGHTERS, FT2)
+        m.w32(FT2, TBL2)
+        m.w32(TBL2, ENTS2)
+        m.w32(TBL2 + 8, count)
+        for i in range(4):
+            e = ENTS2 + W.FIGHTER_ENTRY * i
+            m.uc.mem_write(e + 0x1E, bytes([live[i]]))
+            m.w32(e + 0xC, FACC[i])
+            m.w32(FACC[i], 0x00010000 * (i + 1) + 0x42)          # the object id at the accessor's +0
+            m.situation[FACC[i]] = sits[i]
+        m.call(rows['whitebear'][9][0], {3: OBJ})
+        return m.calls
+    calls = landing((2, 0, 0, 2))
+    seq = [c[0] for c in calls if c[0] in ('kinetic', 'attach', 'motion', 'quake', 'atk_msc', 'effect', 'effect0')]
+    msc = [c for c in calls if c[0] == 'atk_msc']
+    eff = [c for c in calls if c[0] in ('effect', 'effect0')]
+    sit = [c[1] for c in calls if c[0] == 'msc_status']
+    absw = tuple(W.word(v) for v in W.ABS_WORDS)
+    check(seq == ['kinetic', 'attach', 'motion', 'quake', 'atk_msc', 'atk_msc', 'effect', 'effect0'] and
+          [c for c in calls if c[0] == 'quake'] == [('quake', OBJ, W.QUAKE_KIND)] and sit == FACC[:2] and
+          msc == [('atk_msc', ATKM, absw), ('atk_msc', ATKM, (0x271D, 0, 0, 0x00020042, 0, 0))] and
+          eff == [('effect', OBJ, 0x7400000, (10.0, 5.0, 0.0), (0.0, 0.0, 0.0), 2.5),
+                  ('effect0', OBJ, 0x7400001, (0.0, 0.0, 0.0), 8.0)],
+          'whitebear landing (9): request_quake(%d), the first fighter on the ground (slot 1: slot 0 in the air) '
+          'gets set_abs %s + hit_absolute(object id 0x20042), effects 0x7400000 at its feet (2.5) and 0x7400001 (8)'
+          % (W.QUAKE_KIND, [hex(x) for x in absw]))
+    c1 = landing((2, 2, 2, 2))
+    c2 = landing((0, 0, 0, 0), live=(3, 3, 4, 4), count=2)
+    c3 = landing((2, 2, 2, 0), count=4)
+    c4 = landing((2, 2, 2, 0), count=3)
+    m0 = [c for c in c1 if c[0] == 'atk_msc']
+    m2 = [c for c in c2 if c[0] == 'atk_msc']
+    m3 = [c[2][3] for c in c3 if c[0] == 'atk_msc' and c[2][0] == 0x271D]
+    m4 = [c for c in c4 if c[0] == 'atk_msc']
+    check(not m0 and not m2 and m3 == [0x40042] and not m4 and [c[0] for c in c1 if c[0] in ('effect', 'effect0')]
+          == ['effect', 'effect0'], 'whitebear landing: no hit when nobody is on the ground, when the grounded fighters '
+          'are not live or past the table\'s count; slot 3 when it is the only one; the effects always')
+    # damage: the absolute set_abs words: damage 10, angle 90, kbg 100, wbkb 0, bkb 40 (P6)
+    check(W.ABS_WORDS[:8] == (0x2716, 0, 0, 10.0, 90, 100, 0, 40) and len(W.ABS_WORDS) == 18,
+          'whitebear: set_abs words (op, kind, part, damage 10, angle 90, kbg 100, wbkb 0, bkb 40, ... 18 words)')
+
+    # ---- step 2c v2: Waddle Doo's leave (the 3DS's state 9): 600 walk frames -> leave 8 -> 300 frames -> remove 7
+    m = Machine(img)
+    m.walker(cfg[0x19], state=0, kind=0x19)
+    m.target, m.target_x = 0, -300.0
+    m.call(fn['w_start'], {3: OBJ})
+    ok = m.r32(OBJ + W.V(7)) == 600
+    wd = world('waddledoo', 3, lr=-1.0)
+    wd.m.w32(OBJ + W.V(7), 3)
+    wd.m.found = -1
+    wd.run(4)
+    en = wd.log[-1][5] if wd.cur == 8 else []
+    ok &= wd.states()[:2] == [3, 8]
+    fol = [c for c in en if c[0] == 'follow']
+    mot = [(c[2], c[4], c[5]) for c in en if c[0] == 'motion']
+    ok &= fol == [('follow', OBJ, 0x8000005, 0, (0.0, 3.0, 0.0), (0.0, 0.0, 0.0), 0.85)] and mot == [(10, 0.0, 0)]
+    ok &= [c[2] for c in en if c[0] == 'kinetic'] == [15] and [c[2] for c in en if c[0] == 'attach'] == [0] and \
+        [c[2] for c in en if c[0] == 'set_correct'] == [0] and round(wd.m.rf(EN + 0x30), 3) == -0.02 and \
+        round(wd.m.rf(EN + 0x34), 3) == 30.0 and wd.m.r32(OBJ + W.V(6)) == 299   # 300, one update run
+    wd.run(301)
+    rm = [c for e in wd.log for c in e[4] if c[0] == 'remove_effect']
+    ok &= wd.states()[-1] == 7 and rm == [('remove_effect', OBJ, 0x7777)] and wd.m.r32(OBJ + W.DEFEATED) == 0
+    check(ok, 'waddledoo: start sets the leave timer 600; walking it counts down, at 0 -> leave 8 (Fall at rate 0, '
+          'energy +0x30 -0.02 / +0x34 30, kinetic 15, ground off, set_correct(0), the leave effect 0x8000005 at '
+          'node 0 (0, 3, 0) x 0.85), after 300 frames the effect removed -> remove 7 (not defeated) %s'
+          % wd.states())
+    wd = world('waddledoo', 6)
+    ok = wd.m.r32(OBJ + W.DEFEATED) == 1
+    wd2 = world('kuribo', 8)
+    check(ok and wd2.m.r32(OBJ + W.DEFEATED) == 1, 'v2: the death state and the Goomba\'s collapse set DEFEATED (the '
+          'removal then plays the defeat effect and drops items)')
 
     # T2 / S2
     t1 = [img.u32(W.MOTION_SETS + 4 * k) for k in range(0x61)]
