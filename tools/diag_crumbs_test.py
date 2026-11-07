@@ -43,13 +43,55 @@ def target(e, at):
     return at + off
 
 
+def import_relocs(path):
+    """the RPX's relocations against imported symbols (a .fimport_* section's): [(address, type, symbol value, name)]"""
+    import rpx_patch as R
+    d, _o, _e, secs = R.load(path)
+    shstr = R.section_data(d, secs[struct.unpack('>H', bytes(d[0x32:0x34]))[0]])
+
+    def nm(off, tab):
+        return bytes(tab[off:tab.index(b'\0', off)]).decode('latin1')
+    out = []
+    for s in secs:
+        if s[1] != 4 or secs[s[7]][3] >= 0x10000000:              # SHT_RELA of .text
+            continue
+        symsec = secs[s[6]]
+        syms, strt = R.section_data(d, symsec), R.section_data(d, secs[symsec[6]])
+        data = R.section_data(d, s)
+        for o in range(0, len(data), 12):
+            off, info, add = struct.unpack('>IIi', data[o:o + 12])
+            si = info >> 8
+            n, val, _sz, _inf, _oth, shn = struct.unpack('>IIIBBH', syms[16 * si:16 * si + 16])
+            if shn < len(secs) and nm(secs[shn][0], shstr).startswith('.fimport'):
+                out.append((off, info & 0xFF, (val + add) & 0xFFFFFFFF, nm(n, strt)))
+    return out
+
+
 class M(Emu):
+    """the executable as the loader leaves it for these tests: every ADDR16_HA / LO / ADDR32 relocation against an
+    import filled in with the import's address (its .fimport section entry), a stub there for OSReport. REL24 calls
+    to imports are not resolved (a loader makes them reach a thunk of its own; the crumbs mustn't depend on them)"""
     def __init__(self, path, osreport):
         super().__init__(path)
         self.calls = []
         self.mu.reg_write(UC_PPC_REG_MSR, self.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+        try:
+            self.mu.mem_map(0xC0000000, 0x10000)
+        except Exception:                                        # noqa: BLE001
+            pass
+        self.imports = {}
+        for at, typ, val, name in import_relocs(path):
+            self.imports.setdefault(name, val)
+            w = self.w(at & ~3)
+            if typ == 6:                                         # ADDR16_HA
+                self.mu.mem_write(at, struct.pack('>H', ((val + 0x8000) >> 16) & 0xFFFF))
+            elif typ == 4:                                       # ADDR16_LO
+                self.mu.mem_write(at, struct.pack('>H', val & 0xFFFF))
+            elif typ == 1:                                       # ADDR32
+                self.setw(at, val)
+            del w
         if osreport:
-            self.stub(target(self, D.OSREPORT_SITE), self.osreport)
+            self.stub(self.imports['OSReport'], self.osreport)
 
     def osreport(self, e):
         self.calls.append((self.cstr(self.r(3)), self.cstr(self.r(4))) + tuple(self.r(i) for i in range(5, 9)))
@@ -108,7 +150,11 @@ def main():
     diag, base = sys.argv[1], sys.argv[2]
     E1, E0 = M(diag, True), M(base, False)
     # the call site the stub decodes: a bl in both
-    check('OSReport\'s call site is a bl (REL24 to the import)', E1.w(D.OSREPORT_SITE) >> 26 == 18 and E1.w(D.OSREPORT_SITE) & 1, 1)
+    ha_lo = [(at, typ) for at, typ, _v, nm in import_relocs(diag) if nm == 'OSReport' and typ in (4, 6)]
+    check('the veneer\'s lis / addi are OSReport\'s ADDR16_HA / LO relocations',
+          sorted(ha_lo), [(D.OSREPORT_VENEER + 10, 6), (D.OSREPORT_VENEER + 14, 4)])
+    check('OSReport\'s import address (loader-relocated) stubbed: 0x%08X' % E1.imports['OSReport'],
+          E1.imports['OSReport'] >> 24, 0xC0)
     F = E0.alloc(0x1000, b'\0')                                   # fake structs (the same address in both)
     assert E1.alloc(0x1000, b'\0') == F
     for e in (E0, E1):

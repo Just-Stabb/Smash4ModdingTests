@@ -10,9 +10,12 @@ Each crumb is one OSReport line, `S4DIAG <step> k=<kind> a=<..> b=<..> n=<serial
 lines). Cemu prints OSReport with Debug > Logging > "Coreinit Logging" checked (its log line starts "OSReport:"
 or the text itself, in log.txt).
 
-OSReport is the game's own import (coreinit): its call site OSREPORT_SITE (`bl OSReport`, a REL24 relocation the
-loader resolves) is read at run time and its target called through ctr (the import's address is only known once
-loaded). A vararg call: cr1eq cleared (no float arguments).
+OSReport is reached through the game's own veneer OSREPORT_VENEER (0x0288B4D4: `lis r31 / addi r31` = OSReport's
+address, ADDR16_HA / LO relocations the loader fills in, then `mtctr r31; bctr` with r3-r10 and cr1 untouched;
+called by the game itself, bl from 0x0288B09C and five more), at its fixed .text address through ctr (out of `bl`
+reach). v1 decoded the `bl OSReport` at 0x03374EA4 at run time instead: a REL24 to an import, which Cemu does not
+leave as a plain `bl` to the import's thunk, so it jumped into the middle of other code (0x04185AF4: every match
+crashed at the first crumb, user's Cemu log). A vararg call: cr1eq cleared (no float arguments).
 
 Every hook replaces one word with `b stub`; the stub saves every volatile register (r0, r2-r12, LR, CTR, XER,
 CR, f0-f13, FPSCR) in its own frame, computes the crumb's arguments from the saved registers, calls `crumb` when the
@@ -32,7 +35,8 @@ from ppcasm import Asm  # noqa: E402
 # build, checked against --rpx: zeros), within `b` reach of every hook (the lowest, 0x02BCB5C0, reaches 0x04BCB5C0)
 CAVE = 0x04BAA000
 LIMIT = 0x04BAC000
-OSREPORT_SITE = 0x03374EA4      # bl OSReport (REL24 to coreinit's OSReport)
+OSREPORT_VENEER = 0x0288B4D4    # the game's OSReport veneer (lis/addi r31 = OSReport, relocated; mtctr; bctr)
+VENEER_WORDS = (0x9421FFF0, 0x93E1000C, None, None, 0x7FE903A6, 0x83E1000C, 0x38210010, 0x4E800420)
 STEP_MAX = 24                   # first-frames crumbs in all
 KIND_FIGHTER = 0x41             # new fighter kinds from here
 KIND_WEAPON = 0x185             # new weapon kinds from here
@@ -103,7 +107,6 @@ def word(op):
 MFXER, MTXER, MFCTR = 0x7C0102A6, 0x7C0103A6, 0x7C0902A6
 MFFS0, MTFSF0 = 0xFC00048E, 0xFDFE058E
 CRCLR_CR1EQ = 0x4CC63182
-SRAWI_11_6 = (31 << 26) | (11 << 21) | (11 << 16) | (6 << 11) | (824 << 1)
 
 
 def branch(src, dst, link=False):
@@ -141,13 +144,8 @@ crumb:  mflr r0
         mr r4, r3
         lis r3, fmt@ha
         addi r3, r3, fmt@l
-        lis r12, 0x%(sh)X
-        ori r12, r12, 0x%(sl)X
-        lwz r11, 0(r12)                 # the call site's bl OSReport (resolved by the loader)
-        rlwinm r11, r11, 0, 6, 29
-        slwi r11, r11, 6
-        %(srawi)s
-        add r12, r12, r11
+        lis r12, 0x%(vh)X
+        ori r12, r12, 0x%(vl)X           # the game's OSReport veneer
         mtctr r12
         %(crclr)s
         bctrl
@@ -155,7 +153,7 @@ crumb:  mflr r0
         lwz r0, 4(r1)
         mtlr r0
         blr
-""" % dict(sh=OSREPORT_SITE >> 16, sl=OSREPORT_SITE & 0xFFFF, srawi=word(SRAWI_11_6), crclr=word(CRCLR_CR1EQ)))
+""" % dict(vh=OSREPORT_VENEER >> 16, vl=OSREPORT_VENEER & 0xFFFF, crclr=word(CRCLR_CR1EQ)))
     hooks = {}
     for i, (tag, at, w0, args, _what) in enumerate(STEPS):
         w = orig(at)
@@ -218,6 +216,11 @@ def args(rpx):
     img = K.Image(rpx)
     used = [x for x in range(CAVE, LIMIT, 4) if img.w(x)]
     assert not used, 'the diagnostic cave space is in use in %s (0x%08X)' % (rpx, used[0])
+    vw = [img.w(OSREPORT_VENEER + 4 * i) for i in range(len(VENEER_WORDS))]
+    assert all(w == x for w, x in zip(vw, VENEER_WORDS) if x is not None) and vw[2] >> 16 == 0x3FE0 and \
+        vw[3] >> 16 == 0x3BFF, 'not the OSReport veneer at 0x%08X' % OSREPORT_VENEER
+    rel = img.relocs()
+    assert OSREPORT_VENEER + 8 in rel and OSREPORT_VENEER + 12 in rel, 'the veneer\'s lis / addi aren\'t relocated'
     words, _labels, hooks = build(img.w)
     out = ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (at, w) for at, w in sorted(hooks.items())]
