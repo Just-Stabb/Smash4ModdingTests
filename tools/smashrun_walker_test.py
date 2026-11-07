@@ -7,27 +7,19 @@ ENEMY_ROOT (optional): the installed converted enemies (motion/enemy/<name>/body
 then every set entry must be an OMO of K's pac and every script of K's animcmd files a hash of K's script hashsets.
 
 Runs the cave's code and the game's around it, the framework's calls stubbed (modules are fake objects):
-- the hook words, and 0x04B86800-0x04B88000 holding only the cave's code and data (zeros after);
+- the hook words; the three spaces holding only the cave's code and data (zeros after);
 - the factory 0x02DB94CC: each walker kind -> operator new(OBJ_SIZE), the Behavior ctor (obj, acc, K, variation),
-  module+8 = obj with vptr VT, +0xE4.. BehaviorImpl's init (0 but +0xE8/+0xEC common_state_func, +0x120 1,
-  +0x15C -1), +0x168 its CFG, +0xA8 its hashsets (or 0), +0xB0..+0xD0 its nine damage labels; 2a's kinds and the
-  twins / bosses still call their own create, other kinds none;
-- the vtable: BehaviorImpl's slots but the overrides; change_state (72 / 73 -> 0x026A3A44 / 0x026A3AD4 with the
-  state's {update, enter, exit} PMFs; unknown ids -> FALL);
-- each state's enter: change_kinetic / set_attach_ground / change_motion_state with the kind's indices, rate, loop;
-  bullet() in DEAD;
-- initialize: the kind's kinetic energy words, the kinetic vt+0xFC(0x20000004) for Kuribo / Shy Guy only;
-  start: set_rhombus, +0x10 = posture lr, faces a target behind (reverse_lr(1, 1)), change_state(FALL);
-  set_attack_data: clear_all, then in WALK / TURN the kind's contact attack (create_attack_data, set_attack);
-- a walk in a small world (real check_wall; check_turn_to_target as the game's, ground, cliff stubbed): it
-  walks (AI stick = lr), turns to a target behind it (TURN, the Turn motion, reverse_lr at its end, WALK), walks
-  to it, turns at a wall and at a ledge, falls off the ground and lands (FALL, LANDING, WALK);
-- T2 / S2: on a Smash Run stage the motion data set table points the walker kinds at their sets (2a's four still
-  at theirs), get_motion_data_set returns them, and their param slots = mczakozima's; off them nothing changes;
-- the sets: K's 3DS order, crc32(stem, 0xFFFFFFFF), flags; the hashsets crc32(name(.init / .exit));
-- fix v3: the walker's slot 38 and the twins' (zima / plasmawisp / darios vtable words) return 0 for kinds < 0x50
-  (1 for the minions; --keep-flip: unchanged); initialize_after 0x02DB4AC8 calls set_lr(posture lr, 1, 1) for kinds
-  < 0x50; notify_on_remove 0x02DB40E4 sends a kind < 0x50's type 0 to the defeat path 0x02DB3AB0.
+  module+8 = obj with vptr VT, BehaviorImpl's init, +0x168 its CFG, its hashsets and nine damage labels; 2a's kinds
+  and the twins / bosses still call their own create, other kinds none;
+- the vtable (BehaviorImpl's but the overrides), slots 64-67 the kind's 3DS states, slot 38 0;
+- fix v3 (the twins' slot 38, initialize_after's set_lr, notify_on_remove's type);
+- change_state per kind: its 3DS state table (unknown / empty ids -> 1);
+- initialize (the kind's energy words, the kick), start (face the target, the first state: Waddle Dee 2 for
+  variations 0 / 1), set_attack_data (the kind's attacks only in their states: the contact attack in the Kuribo's
+  5 and the Shy Guy's 9, the bullet attack in each death state, nothing else);
+- each kind's behaviour in a small world (ground / walls / ledges / the target's search / the speed's y / the
+  motion's end stubbed, x moved by the AI stick): the 3DS state sequences of README (Fix v5);
+- T2 / S2, the sets and hashsets.
 """
 import os
 import struct
@@ -48,13 +40,12 @@ FR = {n: getattr(pc, 'UC_PPC_REG_FPR%d' % n) for n in range(32)}
 HEAP, STACK = 0x30000000, 0x31000000
 OBJ, ACC, MOD = HEAP + 0x1000, HEAP + 0x10000, HEAP + 0x200
 ATKM, GROUND, EKIN, MOTION, KIN, POSTURE = (HEAP + 0x20000 + 0x100 * i for i in range(6))
-KVT, ARRP, ARR, EN, INPUT, PM, MGR = (HEAP + 0x21000 + 0x100 * i for i in range(7))
+KVT, ARRP, ARR, EN, INPUT, PM, MGR, FLAGS = (HEAP + 0x21000 + 0x100 * i for i in range(8))
 KICK = 0x02000004               # the kinetic vt+0xFC target (a stub address)
 DONE = 0x02000000               # return address of a run
 CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9C, 0x54: 0x026BE944,
            0x55: 0x026BB3E8, 0x56: 0x026C5F80, 0x57: 0x026CF4DC, 0x58: 0x026CBA64, 0x59: 0x026D1DFC,
            0x5A: 0x026D6834, 0x5B: 0x02DDB82C, 0x5E: 0x026E24EC, 0x5F: 0x026D80A0, 0x60: 0x026DB864}
-GET_TARGET_POS = 0x026A690C
 REVERSE_LR = 0x026A7A20
 SET_LR = 0x026A780C
 FAILS = []
@@ -78,13 +69,15 @@ class Machine:
         uc.mem_map(0x10000000, 0x00800000)
         for base, data in img.mem:
             if 0x02000000 <= base < 0x05000000 or 0x10000000 <= base < 0x10800000:
-                uc.mem_write(base, data)
+                uc.mem_write(base, data[:max(0, min(len(data), 0x05000000 - base))]
+                             if base < 0x05000000 else data)
         uc.mem_map(HEAP, 0x40000)
         uc.mem_map(STACK - 0x10000, 0x20000)
         uc.mem_write(DONE, struct.pack('>II', 0x48000000, 0x48000000))      # b . (stop addresses)
         self.calls = []
         self.ground, self.walls, self.cliff, self.motion_end = True, set(), False, False
         self.target, self.target_x = 0, 0.0
+        self.found, self.vy, self.stopped = -1, 0.0, True
         self.creates = dict((v, k) for k, v in CREATES.items())
         self.vt = VT_ADDR[0]
         uc.hook_add(UC_HOOK_CODE, self.hook)
@@ -101,6 +94,7 @@ class Machine:
         w(KIN + 8, ARRP)
         w(ARRP, ARR)
         w(ARR + 4, EN)
+        w(ARR + 0x14, FLAGS)
 
     def w32(self, a, v):
         self.uc.mem_write(a, struct.pack('>I', v & 0xFFFFFFFF))
@@ -146,6 +140,16 @@ class Machine:
         elif addr == W.SET_ATTACH_GROUND:
             c.append(('attach', r(3), r(4)))
             self.ret()
+        elif addr == W.SET_MOTION_LABEL:
+            self.w32(r(3) + 0xA8, r(5))
+            self.ret()
+        elif addr == W.SET_DAMAGE_LABEL:
+            for i, x in enumerate((r(4), r(5), r(6), r(7), r(8), r(9), r(10))):
+                self.w32(r(3) + 0xB0 + 4 * i, x)
+            sp = r(1)
+            self.w32(r(3) + 0xCC, self.r32(sp + 8))
+            self.w32(r(3) + 0xD0, self.r32(sp + 0xC))
+            self.ret()
         elif addr == W.CHANGE_MOTION:
             c.append(('motion', r(3), r(4), round(self.fr(1), 4), round(self.fr(2), 4), r(5), round(self.fr(3), 4)))
             self.ret()
@@ -171,12 +175,25 @@ class Machine:
                 dx = self.target_x - self.rf(POSTURE + 0x10)
                 lr = self.rf(POSTURE + 0x60)
                 self.ret(int((dx < -self.fr(1) and lr != -1.0) or (dx > self.fr(1) and lr != 1.0)))
-        elif addr == GET_TARGET_POS:
+        elif addr == W.GET_TARGET_POS:
             c.append(('target_pos', r(5)))
             self.wf(r(3), self.target_x)
             self.wf(r(3) + 4, 0.0)
             self.wf(r(3) + 8, 0.0)
             self.ret()
+        elif addr == W.SEARCH:
+            c.append(('search', r(4), r(5), tuple(round(self.fr(i), 3) for i in range(1, 6))))
+            self.ret(self.found)
+        elif addr == W.GET_SPEED:
+            self.wf(r(3), 0.0)
+            self.wf(r(3) + 4, self.vy)
+            self.wf(r(3) + 8, 0.0)
+            self.ret()
+        elif addr == W.CLEAR_SPEED:
+            c.append(('clear_speed', r(3)))
+            self.ret()
+        elif addr == W.IS_STOPPED:
+            self.ret(int(self.stopped))
         elif addr == W.CHECK_CLIFF_LR:
             c.append(('cliff', r(3), self.fr(1)))
             self.ret(int(self.cliff))
@@ -241,16 +258,85 @@ class Machine:
         self.uc.reg_write(UC_PPC_REG_LR, DONE)
         self.run(fn, DONE, regs, fregs)
 
-    def walker(self, cfg, state=0, lr=-1.0, x=0.0):
+    def walker(self, cfg, state=0, lr=-1.0, x=0.0, kind=0, var=0):
         """a walker object (as create leaves it) with the fake modules"""
         self.uc.mem_write(OBJ, bytes(W.OBJ_SIZE))
         self.w32(OBJ, ACC)
         self.w32(OBJ + 4, state)
+        self.w32(OBJ + 8, kind)
+        self.w32(OBJ + 0xC, var)
         self.w32(OBJ + 0x168, cfg)
         self.w32(OBJ + 0xE0, self.vt)
         self.wf(OBJ + 0x10, lr)
         self.wf(POSTURE + 0x10, x)
+        self.wf(POSTURE + 0x14, 0.0)
         self.wf(POSTURE + 0x60, lr)
+
+
+class World:
+    """frames of one walker: the deferred change_state takes effect next frame (enter, then update), the interrupt
+    one at once (its enter now); a one-shot motion ends 5 frames after it starts; x += 2 * the AI stick"""
+
+    def __init__(self, m, w, rows, state, cfg):
+        self.m, self.w, self.rows, self.cfg = m, w, rows, cfg
+        self.cur, self.pending, self.mframes, self.oneshot = state, None, 0, False
+        self.log, self.script, self.i = [], {}, 0
+        self.enter(state)
+
+    def enter(self, s):
+        m = self.m
+        m.calls = []
+        self.cur = s
+        if self.rows[s][0] == W.ZIMA_REMOVE_ENTER:          # the game's remove state: not run here
+            return []
+        m.call(self.rows[s][0], {3: OBJ})
+        self.track(m.calls)
+        return m.calls
+
+    def track(self, calls):
+        for c in calls:
+            if c[0] == 'motion':
+                self.mframes, self.oneshot = 0, not c[5]
+
+    def frame(self):
+        m = self.m
+        if self.i in self.script:
+            self.script[self.i](self)
+        en = []
+        if self.pending is not None:
+            en = self.enter(self.pending)
+            self.pending = None
+        m.motion_end = self.oneshot and self.mframes >= 5
+        self.mframes += 1
+        m.calls = []
+        m.uc.mem_write(INPUT, struct.pack('>ff', 7.0, 7.0))
+        m.call(self.rows[self.cur][1], {3: OBJ, 4: INPUT})
+        calls = list(m.calls)
+        self.track(calls)
+        stick = struct.unpack('>ff', m.uc.mem_read(INPUT, 8))
+        x = m.rf(POSTURE + 0x10) + (2.0 * stick[0] if stick[0] != 7.0 else 0.0)
+        m.wf(POSTURE + 0x10, x)
+        for c in calls:
+            if c[0] == 'chg':
+                self.pending = c[2]
+        ints = [c for c in calls if c[0] == 'chgi']
+        st = self.cur
+        if ints:
+            self.pending = None
+            en = self.enter(ints[-1][2])
+        self.log.append((self.i, st, round(x, 1), stick, calls, en))
+        self.i += 1
+
+    def run(self, n):
+        for _ in range(n):
+            self.frame()
+
+    def states(self, since=0):
+        out = []
+        for e in self.log[since:]:
+            if not out or out[-1] != e[1]:
+                out.append(e[1])
+        return out
 
 
 def main():
@@ -260,21 +346,26 @@ def main():
     img = E.Image(sys.argv[1])
     root = sys.argv[2] if len(sys.argv) > 2 else None
     vt_words = W.read_vt(img)
-    a, words, d = W.assemble(vt_words)
+    A, B, d = W.assemble(vt_words)
     D = d.addr
     VT_ADDR[0] = D['vt']
     cfg = {w['kind']: D['cfg_' + w['name']] for w in W.WALKERS}
-    fn = {k: a.addr(k) for k in a.labels}
+    fn = dict(A.labels)
+    byname = {w['name']: w for w in W.WALKERS}
 
     # hooks and space
-    check(img.u32(W.SITE_F) == W.branch(W.SITE_F, fn['cave_f']) and
-          img.u32(W.SITE_T) == W.branch(W.SITE_T, fn['cave_t']) and
-          img.u32(W.SITE_S) == W.branch(W.SITE_S, fn['cave_s']), 'hooks: F2 / T2 / S2 branch to the cave')
-    want = {W.CAVE + 4 * i: x for i, x in enumerate(words)}
-    want.update({d.base + 4 * i: x for i, x in enumerate(d.words)})
-    bad = [hex(x) for x in range(W.CAVE, W.LIMIT, 4) if img.u32(x) != want.get(x, 0)]
-    check(not bad, 'space 0x%08X-0x%08X: the code (to 0x%08X), its data (0x%08X-0x%08X), zeros after %s'
-          % (W.CAVE, W.LIMIT, W.CAVE + 4 * len(words), d.base, d.base + 4 * len(d.words), bad[:4]))
+    check(all(img.u32(s) == W.branch(s, fn[f]) for s, f in ((W.SITE_F, 'cave_f'), (W.SITE_T, 'cave_t'),
+                                                            (W.SITE_S, 'cave_s'), (W.SITE_ROT, 'cave_rot'),
+                                                            (W.SITE_DEATH, 'cave_death'))),
+          'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
+    want = {}
+    for a in (A, B):
+        want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
+    for base, words in d.chunks:
+        want.update({base + 4 * i: x for i, x in enumerate(words)})
+    bad = [hex(x) for lo, hi in W.REGIONS for x in range(lo, hi, 4) if img.u32(x) != want.get(x, 0)]
+    check(not bad, 'space %s: the code (A to 0x%08X, B to 0x%08X), the data, zeros after %s'
+          % (', '.join('0x%08X-0x%08X' % r for r in W.REGIONS), A.pc, B.pc, bad[:4]))
     cave_f_2a = E.assemble(E.build_sets(img))[0].addr('cave_f')
     check(img.u32(E.SITE_F) == W.branch(E.SITE_F, cave_f_2a),
           'step 2a\'s factory hook still in place (0x%08X)' % E.SITE_F)
@@ -327,24 +418,25 @@ def main():
     slots = {k: vt[(0xC + 8 * k) // 4] for k in range(76)}
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
     over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'],
-            41: fn['w_start'], 45: fn['w_atk'],
-            64: 0x026D7CA0, 65: 0x026D7CA8, 66: 0x026D7CB0, 67: 0x026D7CB8, 72: fn['w_chg'], 73: fn['w_chgi'],
-            74: fn['w_chg'], 75: fn['w_chgi']}
+            41: fn['w_start'], 45: fn['w_atk'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
+            67: fn['w_r67'], 72: fn['w_chg'], 73: fn['w_chgi'], 74: fn['w_chg'], 75: fn['w_chgi']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
     ok &= all(vt[(0x8 + 8 * k) // 4] == 0 for k in range(76))
     check(ok, 'VT: BehaviorImpl\'s 74 slots (dtor 0x%08X, update 0x%08X kept) with 12 38 40 41 45 64-67 72-75 '
           'overridden' % (slots[0], slots[3]))
-    zima_ret = {}
-    for k in (64, 65, 66, 67):
-        m = Machine(img)
-        m.call(slots[k], {3: OBJ})
-        zima_ret[k] = m.uc.reg_read(R[3])
+    for w in W.WALKERS:
+        got = []
+        for k in (64, 65, 66, 67):
+            m = Machine(img)
+            m.walker(cfg[w['kind']])
+            m.call(slots[k], {3: OBJ})
+            got.append(m.uc.reg_read(R[3]))
+        check(tuple(got) == w['rets'], 'VT %s: slots 64-67 (after damage on the ground / in the air / default, '
+              'death) = the 3DS\'s %s' % (w['name'], got))
     m = Machine(img)
     m.call(slots[38], {3: OBJ})
     flip = 1 if W.KEEP_FLIP else 0
-    check(zima_ret == {64: W.ST_WALK, 65: W.ST_FALL, 66: W.ST_FALL, 67: W.ST_DEAD} and m.uc.reg_read(R[3]) == flip,
-          'VT: after damage on the ground WALK, in the air / default FALL, death DEAD; slot 38 (flip the motion '
-          'with lr) %d' % flip)
+    check(m.uc.reg_read(R[3]) == flip, 'VT: slot 38 (flip the motion with lr) %d' % flip)
 
     # fix v3: the twins' slot 38, initialize_after's set_lr, notify_on_remove's type
     res = {}
@@ -367,21 +459,17 @@ def main():
     got = {}
     for k in (0x01, 0x12, 0x57, 0x60):
         m = Machine(img)
-        m.walker(cfg[1], lr=-1.0)
-        m.w32(OBJ + 8, k)
+        m.walker(cfg[1], lr=-1.0, kind=k)
         m.calls = []
         m.call(0x02DB4AC8, {3: OBJ})
         got[k] = [c for c in m.calls if c[0] in ('set_lr', 'flip')]
-    flip_call = [] if not W.KEEP_FLIP else None
     ok = all(got[k][-1:] == [('set_lr', OBJ, -1.0, 1, 1)] for k in (0x01, 0x12)) and \
         all(not [c for c in got[k] if c[0] == 'set_lr'] for k in (0x57, 0x60))
     check(ok, 'fix v3: initialize_after calls set_lr(posture lr, 1, 1) for kinds < 0x50 only %s' % got)
-    del flip_call
     got = {}
     for k, t in ((0x01, 0), (0x12, 0), (0x01, 5), (0x01, 1), (0x57, 0), (0x01, 3)):
         m = Machine(img)
-        m.walker(cfg[1])
-        m.w32(OBJ + 8, k)
+        m.walker(cfg[1], kind=k)
         m.calls = []
         m.call(W.SITE_DEATH, {3: OBJ, 4: t})
         got[(k, t)] = [c[0] for c in m.calls if c[0] in ('defeat_fx', 'vanish_fx')]
@@ -390,49 +478,28 @@ def main():
           'fix v3: notify_on_remove: a kind < 0x50 removed by its behaviour (type 0) takes the defeat effect path '
           '0x02DB3AB0 (type 3); the minions keep type 0; other types unchanged %s' % got)
 
-    # change_state
-    st = {W.ST_FALL: (fn['fall_enter'], fn['fall_update']), W.ST_LANDING: (fn['land_enter'], fn['land_update']),
-          W.ST_WALK: (fn['walk_enter'], fn['walk_update']), W.ST_TURN: (fn['turn_enter'], fn['turn_update']),
-          W.ST_DEAD: (fn['dead_enter'], W.ZIMA_DEAD_UPDATE), W.ST_REMOVE: (W.ZIMA_REMOVE_ENTER, W.ZIMA_REMOVE_UPDATE)}
-    for slot, kind in ((72, 'chg'), (73, 'chgi')):
-        got = {}
-        for sid in (1, 2, 3, 4, 6, 7, 0, 5, 8, 99, -1):
-            m = Machine(img)
-            m.walker(cfg[1])
-            m.call(slots[slot], {3: OBJ, 4: sid})
-            c = [x for x in m.calls if x[0] in ('chg', 'chgi')]
-            got[sid] = c
-        ok = True
-        for sid, c in got.items():
-            eid = sid if sid in st else W.ST_FALL
-            en, up = st[eid]
-            ok &= c == [(kind, OBJ, eid, (0xFFFF, up), (0xFFFF, en), (0, 0))]
-        check(ok, 'change_state slot %d -> 0x%08X(this, id, &update, &enter, &exit) for 1 2 3 4 6 7; 0 5 8 99 -1 -> '
-              'FALL' % (slot, W.CHG_BASE if slot == 72 else W.CHG_INT))
-
-    # enters
+    # change_state: the kind's table
+    rows = {}
     for w in W.WALKERS:
-        k, c0 = w['kind'], cfg[w['kind']]
-        idx = lambda s: W.index(w, s)  # noqa: E731
-        res = {}
-        for name in ('fall_enter', 'land_enter', 'walk_enter', 'turn_enter', 'dead_enter'):
-            m = Machine(img)
-            m.walker(c0)
-            m.w32(OBJ + 0x16C, 77)
-            m.call(fn[name], {3: OBJ})
-            res[name] = [x[2:] if x[0] in ('kinetic', 'attach') else x[1:] for x in m.calls]
-            if name == 'walk_enter':
-                res['counter'] = m.r32(OBJ + 0x16C)
-        rate = round(w['walk_rate'], 4)
-        exp = {'fall_enter': [(8,), (0,), (OBJ, idx(w['fall']), 0.0, 1.0, 1, 0.0)],
-               'land_enter': [(0,), (1,), (OBJ, idx(w['landing']), 0.0, 1.0, 0, 0.0)],
-               'walk_enter': [(w['walk_kinetic'],), (1,), (OBJ, idx(w['walk']), 0.0, rate, 1, 0.0)],
-               'turn_enter': [(0,), (1,), (OBJ, idx(w['turn']), 0.0, 1.0, 0, 0.0)],
-               'dead_enter': [(OBJ, idx(w['dead']), 0.0, 0.0, 0, 0.0), (OBJ,)], 'counter': 0}
-        check(res == exp, 'enters %s: FALL %s, LANDING %s, WALK %s (kinetic 0x%X, rate %s), TURN %s, DEAD %s + bullet'
-              % (w['name'], w['fall'], w['landing'], w['walk'], w['walk_kinetic'], w['walk_rate'], w['turn'],
-                 w['dead']))
-    # a turn with no Turn motion (none of the five; the code path): reverse at once
+        r = {}
+        for sid, s in w['states'].items():
+            if s == 'remove':
+                s = (W.ZIMA_REMOVE_ENTER, W.ZIMA_REMOVE_UPDATE)
+            r[sid] = tuple(x if isinstance(x, int) else fn[x] for x in s)
+        rows[w['name']] = r
+        for slot, kind in ((72, 'chg'), (73, 'chgi')):
+            ok = True
+            for sid in list(range(0, W.nstates(w) + 2)) + [99, -1]:
+                m = Machine(img)
+                m.walker(cfg[w['kind']])
+                m.call(slots[slot], {3: OBJ, 4: sid})
+                c = [x for x in m.calls if x[0] in ('chg', 'chgi')]
+                eid = sid if sid in r else 1
+                en, up = r[eid]
+                ok &= c == [(kind, OBJ, eid, (0xFFFF, up), (0xFFFF, en), (0, 0))]
+            check(ok, 'change_state %s slot %d -> 0x%08X(this, id, &update, &enter, &exit): states %s, others -> 1'
+                  % (w['name'], slot, W.CHG_BASE if slot == 72 else W.CHG_INT, sorted(r)))
+
     # initialize / start / set_attack_data
     for w in W.WALKERS:
         k, c0 = w['kind'], cfg[w['kind']]
@@ -445,110 +512,327 @@ def main():
         check(got == exp and kicks == ([('kick', KIN, 0x20000004)] if w['kick'] else []),
               'initialize %s: kinetic energy %s%s' % (w['name'], {hex(o): v for o, v in got.items()},
                                                       ', vt+0xFC(0x20000004)' if w['kick'] else ''))
-        m = Machine(img)
-        m.walker(c0, lr=-1.0, x=0.0)
-        m.target, m.target_x = 0, 50.0
-        m.wf(OBJ + 0x14, 9.0)
-        m.call(fn['w_start'], {3: OBJ})
-        seq = [x[0] for x in m.calls]
-        chg = [x for x in m.calls if x[0] == 'chg']
-        check(seq[:1] == ['rhombus'] and 'reverse_lr' in seq and chg and chg[-1][2] == W.ST_FALL and
-              m.rf(OBJ + 0x10) == 1.0 and m.rf(OBJ + 0x14) == 0.0 and m.r32(OBJ + 0x16C) == 0,
-              'start %s: set_rhombus, +0x10 = lr, turns to the target behind, change_state(FALL) %s' % (w['name'], seq))
-        atk = d.addr['kuribo_bump'] if w['attack'] is W.KURIBO_BUMP else d.addr['heiho_bump']
-        res = {}
-        for sid in (W.ST_WALK, W.ST_TURN, W.ST_FALL, W.ST_LANDING, W.ST_DEAD):
+        for var in (0, 2):
+            m = Machine(img)
+            m.walker(c0, lr=-1.0, x=0.0, var=var)
+            m.target, m.target_x = 0, 50.0
+            m.wf(OBJ + 0x14, 9.0)
+            m.w32(W.V(3) + OBJ, 5)
+            m.call(fn['w_start'], {3: OBJ})
+            seq = [x[0] for x in m.calls]
+            chg = [x for x in m.calls if x[0] == 'chg']
+            first = w['start'][1] if var <= 1 else w['start'][0]
+            check(seq[:1] == ['rhombus'] and 'reverse_lr' in seq and chg and chg[-1][2] == first and
+                  m.rf(OBJ + 0x10) == 1.0 and m.rf(OBJ + 0x14) == 0.0 and m.r32(OBJ + W.V(3)) == 0,
+                  'start %s (variation %d): set_rhombus, +0x10 = lr, turns to the target behind, change_state(%d)'
+                  % (w['name'], var, first))
+        atks = {}
+        for st, a in w['attacks']:
+            atks.setdefault(st, []).append(D[a])
+        ok = True
+        for sid in range(0, W.nstates(w) + 1):
             m = Machine(img)
             m.walker(c0)
             m.call(fn['w_atk'], {3: OBJ, 4: sid})
-            res[sid] = (m.calls, m.r32(OBJ + 0x84), m.r32(OBJ + 0x88))
-        e = [img.u32(atk + 4 * i) for i in range(42)]
-        on = [('atk_clear', ATKM), ('atk_create', OBJ, atk), ('atk_set', ATKM, e[1], e[2], OBJ + 0x1C)]
-        ok = all(res[s] == (on, e[1], e[2]) for s in (W.ST_WALK, W.ST_TURN))
-        ok &= all(res[s][0] == [('atk_clear', ATKM)] for s in (W.ST_FALL, W.ST_LANDING, W.ST_DEAD))
-        ok &= e == [(struct.unpack('>I', struct.pack('>f', v))[0] if isinstance(v, float) else v & 0xFFFFFFFF)
-                    for v in w['attack']]
-        check(ok, 'set_attack_data %s: clear_all; in WALK / TURN its contact attack (%s, node %d, power %d, angle %d)'
-              % (w['name'], 'own' if w['attack'] is not W.HEIHO_BUMP or k == 0x0B else 'Shy Guy\'s',
-                 w['attack'][3], w['attack'][4], w['attack'][5]))
+            exp = [('atk_clear', ATKM)]
+            for e in atks.get(sid, []):
+                ent = [img.u32(e + 4 * i) for i in range(42)]
+                exp += [('atk_create', OBJ, e), ('atk_set', ATKM, ent[1], ent[2], OBJ + 0x1C)]
+            ok &= m.calls == exp
+        for st, a in w['attacks']:
+            ok &= [img.u32(D[a] + 4 * i) for i in range(42)] == [W.word(v) for v in W.ATTACKS[a]]
+        check(ok, 'set_attack_data %s: clear_all; the 3DS vl attacks only in their states %s'
+              % (w['name'], {st: a for st, a in w['attacks']}))
 
-    # a walk in a small world (Kuribo and Waddle Dee)
-    for w in (W.WALKERS[0], W.WALKERS[2]):
+    def air(wo, n=3):
+        wo.m.vy, wo.m.ground = 1.0, False
+        wo.script[wo.i + n] = lambda w2: (setattr(w2.m, 'vy', -1.0), setattr(w2.m, 'ground', True))
+
+    def world(name, state, lr=-1.0, var=0, setup=None):
+        w = byname[name]
         m = Machine(img)
-        m.walker(cfg[w['kind']], state=W.ST_WALK, lr=-1.0, x=0.0)
+        m.walker(cfg[w['kind']], state=state, lr=lr, kind=w['kind'], var=var)
         m.target, m.target_x = 0, 300.0
-        log = []
-        cur, pending = W.ST_WALK, None
-        m.call(st[W.ST_WALK][0], {3: OBJ})
-        turn_frames = 0
-        script = {}            # frame -> world change
+        if setup:
+            setup(m)
+        return World(m, w, rows[name], state, cfg[w['kind']])
 
-        def frame(i):
-            nonlocal cur, pending, turn_frames
-            if i in script:
-                script[i](m)
-            m.calls = []
-            if pending is not None:
-                m.call(st[pending][0], {3: OBJ})
-                cur, pending = pending, None
-            m.motion_end = cur in (W.ST_TURN, W.ST_LANDING) and turn_frames >= 5     # the one-shot motions end
-            turn_frames = turn_frames + 1 if cur in (W.ST_TURN, W.ST_LANDING) else 0
-            m.uc.mem_write(INPUT, struct.pack('>ff', 7.0, 7.0))
-            m.call(st[cur][1], {3: OBJ, 4: INPUT})
-            stick = struct.unpack('>ff', m.uc.mem_read(INPUT, 8))
-            x = m.rf(POSTURE + 0x10) + 2.0 * stick[0]
-            m.wf(POSTURE + 0x10, x)
-            ch = [c for c in m.calls if c[0] == 'chg']
-            if ch:
-                pending = ch[-1][2]
-            log.append((i, cur, round(x, 1), stick, [c[0] for c in m.calls if c[0] in ('reverse_lr', 'chg')]))
+    def enters(name):
+        """each state's enter: (kinetic, attach, (motion index, rate, loop)) as the 3DS's"""
+        out = {}
+        for sid, (en, _up) in rows[name].items():
+            if en == W.ZIMA_REMOVE_ENTER:
+                continue
+            m = Machine(img)
+            m.walker(cfg[byname[name]['kind']], kind=byname[name]['kind'])
+            m.call(en, {3: OBJ})
+            k = [c[2] for c in m.calls if c[0] == 'kinetic']
+            a = [c[2] for c in m.calls if c[0] == 'attach']
+            mo = [(c[2], c[4], c[5]) for c in m.calls if c[0] == 'motion']
+            out[sid] = (k[0] if k else None, a[0] if a else None, mo[0] if mo else None,
+                        'bullet' if [c for c in m.calls if c[0] == 'bullet'] else '')
+        return out
 
-        for i in range(0, 60):
-            frame(i)
-        states = [s for _i, s, _x, _st, _c in log]
-        xs = [x for _i, _s, x, _st, _c in log]
-        first_turn = states.index(W.ST_TURN) if W.ST_TURN in states else -1
-        walk_after = states.index(W.ST_WALK, first_turn) if first_turn >= 0 else -1
-        revs = [i for i, _s, _x, _st, c in log if 'reverse_lr' in c]
-        check(log[0][3] == (-1.0, 0.0) and xs[5] < 0 and 0 < first_turn <= W.TARGET_INTERVAL + 1 and
-              revs and revs[0] > first_turn and walk_after > revs[0] and log[walk_after][3] == (1.0, 0.0) and
-              xs[-1] > xs[walk_after] and all(st == (0.0, 0.0) for _i, s, _x, st, _c in log if s == W.ST_TURN),
-              '%s walks left (stick %s), turns to the target behind it on frame %d (TURN, reverse_lr at the '
-              'motion\'s end, frame %s), walks right to it (x %s -> %s)' % (w['name'], log[0][3], first_turn,
-                                                                            revs[:1], xs[walk_after], xs[-1]))
-        # a wall ahead (right), then a ledge, then no ground
-        m.target = -1
-        n0 = len(log)
-        script[60] = lambda mm: mm.walls.add(4)
-        script[62] = lambda mm: mm.walls.clear()
-        for i in range(60, 90):
-            frame(i)
-        s2 = [s for _i, s, _x, _st, _c in log[n0:]]
-        wall_turn = s2.index(W.ST_TURN) if W.ST_TURN in s2 else -1
-        st_after = [st for _i, s, _x, st, _c in log[n0 + wall_turn:] if s == W.ST_WALK][:1]
-        check(wall_turn in (1, 2) and st_after == [(-1.0, 0.0)], '%s turns at a wall ahead (TURN on frame +%d), '
-              'walks away %s' % (w['name'], wall_turn, st_after))
-        n0 = len(log)
-        script[90] = lambda mm: setattr(mm, 'cliff', True)
-        script[91] = lambda mm: setattr(mm, 'cliff', False)
-        for i in range(90, 120):
-            frame(i)
-        s3 = [s for _i, s, _x, _st, _c in log[n0:]]
-        cliffs = [c for c in m.calls if c[0] == 'cliff']
-        st_after = [st for _i, s, _x, st, _c in log[n0 + 2:] if s == W.ST_WALK][:1]
-        check(W.ST_TURN in s3[:3] and st_after == [(1.0, 0.0)], '%s turns at a ledge ahead (check_cliff_lr with '
-              'the posture lr), walks away %s' % (w['name'], st_after))
-        del cliffs
-        n0 = len(log)
-        script[120] = lambda mm: setattr(mm, 'ground', False)
-        script[125] = lambda mm: setattr(mm, 'ground', True)
-        for i in range(120, 135):
-            frame(i)
-        s4 = [s for _i, s, _x, _st, _c in log[n0:]]
-        seen = [s for j, s in enumerate(s4) if j == 0 or s != s4[j - 1]]
-        check(seen[:4] == [W.ST_WALK, W.ST_FALL, W.ST_LANDING, W.ST_WALK] or
-              (W.index(w, w['landing']) < 0 and seen[:3] == [W.ST_WALK, W.ST_FALL, W.ST_WALK]),
-              '%s falls off the ground and lands: %s' % (w['name'], seen))
+    # ---- Kuribo
+    I = lambda n, s: W.index(byname[n], s)  # noqa: E731,E741
+    got = enters('kuribo')
+    exp = {1: (8, 0, (I('kuribo', 'Fall'), 1.0, 1), ''), 2: (0, 1, (I('kuribo', 'Landing'), 1.0, 0), ''),
+           3: (0xA, 1, (15, 0.6, 1), ''), 4: (5, 0, (12, 1.0, 1), ''), 5: (0xA, 1, (13, 1.0, 1), ''),
+           6: (2, 1, (11, 1.0, 0), ''), 7: (2, 1, (14, 1.0, 0), ''), 9: (None, None, (1, 0.0, 0), 'bullet')}
+    check(got == exp, 'kuribo enters (kinetic, ground, (motion, rate, loop)) as the 3DS\'s: %s' % got)
+    # walk: the search on its first frame finds a target in front -> notice (no turn); the hop (E+0x20 = -0.4)
+    wd = world('kuribo', 3, lr=-1.0)
+    m = wd.m
+    m.found, m.target_x = 0, -50.0
+    m.wf(EN + 0x20, 9.0)
+    wd.run(1)
+    s0 = wd.log[0]
+    srch = [c for c in s0[4] if c[0] == 'search']
+    ok = srch == [('search', 2, OBJ + 0x10, (10.0, 10.0, 100.0, 40.0, 0.0))] and wd.cur == 4 and \
+        not [c for c in s0[4] if c[0] == 'reverse_lr'] and round(m.rf(EN + 0x20), 4) == -0.4
+    # in the air (rising, then falling), lands (ground on), 30 frames after entering -> run
+    m.found = -1
+    m.vy, m.ground = 1.0, False
+    wd.script[4] = lambda wo: setattr(wo.m, 'vy', -1.0)
+    wd.script[8] = lambda wo: setattr(wo.m, 'ground', True)
+    wd.run(40)
+    st = wd.states()
+    att = [i for i, s, _x, _st, c, _e in wd.log if s == 4 and [x for x in c if x[0] == 'attach' and x[2] == 1]]
+    run_at = [i for i, s, _x, _st, _c, _e in wd.log if s == 5][:1]
+    ok &= st[:3] == [3, 4, 5] and att and att[0] == 8 and run_at == [33]
+    check(ok, 'kuribo: walking, search_target(search 0 {2, 100, ...}) on its first frame finds a target ahead -> '
+          'notice (=> 4, no turn), the hop back (E+0x20 = -0.4, kinetic 5), ground on when it lands (frame %s), '
+          'the run 30 frames after (frame %s) %s' % (att[:1], run_at, st))
+    # run: input (lr, 0); every 60 run frames search 1; a target behind -> run turn -> => 5; 110 frames -> brake
+    n0 = len(wd.log)
+    m.found, m.target_x = 0, 300.0
+    wd.run(60)
+    st = wd.states(n0)
+    srch = [c for e in wd.log[n0:] for c in e[4] if c[0] == 'search']
+    turn_i = [e[0] for e in wd.log[n0:] if e[1] == 7][:1]
+    revs = [e[0] for e in wd.log[n0:] if [c for c in e[4] if c[0] == 'reverse_lr']]
+    ok = st[:3] == [5, 7, 5] and srch and srch[0][1:] == (2, OBJ + 0x10, (0.0, 10.0, 150.0, 60.0, 0.0)) and revs \
+        and m.rf(OBJ + 0x10) == 1.0 and wd.log[n0][3] == (-1.0, 0.0)
+    check(ok, 'kuribo: running (stick (-1, 0)), search_target(search 1 {2, 60, ...}) finds the target behind -> '
+          'run turn 7 (frame %s), reverse_lr at its end (frame %s) => run 5 again %s' % (turn_i, revs[:1], st))
+    m.found = -1
+    n0 = len(wd.log)
+    wd.run(80)
+    st = wd.states(n0)
+    runs = [e for e in wd.log if e[1] == 5]
+    ok = st[-2:] == [6, 3] or st[-3:-1] == [6, 3]
+    brk = [e[0] for e in wd.log[n0:] if e[1] == 6][:1]
+    check(ok and len(runs) >= 100, 'kuribo: after 110 run frames the brake 6 (frame %s), at its end the walk 3 %s'
+          % (brk, st))
+    # walk: a wall ahead -> reverse_lr, walk again; a ledge: variation 0 walks on, variation 1 turns
+    wd = world('kuribo', 3, lr=1.0)
+    m = wd.m
+    m.walls = {4}
+    wd.run(2)
+    ok = bool([c for c in wd.log[0][4] if c[0] == 'reverse_lr']) and \
+        [c for c in wd.log[0][4] if c[0] == 'chg'][-1][2] == 3
+    m.walls = set()
+    wd2 = world('kuribo', 3, lr=1.0, var=0)
+    wd2.m.cliff = True
+    wd2.run(3)
+    wd3 = world('kuribo', 3, lr=1.0, var=1)
+    wd3.m.cliff = True
+    wd3.run(1)
+    ok &= not [c for e in wd2.log for c in e[4] if c[0] == 'reverse_lr'] and \
+        bool([c for c in wd3.log[0][4] if c[0] == 'reverse_lr'])
+    wd4 = world('kuribo', 3, lr=1.0)
+    wd4.m.ground = False
+    wd4.run(2)
+    ok &= wd4.cur == 1
+    check(ok, 'kuribo: a wall ahead -> reverse_lr, walk again; at a ledge variation 0 walks on, variation 1 '
+          'turns; off the ground -> fall 1')
+    # fall -> landing -> walk
+    wd = world('kuribo', 1)
+    wd.m.ground = False
+    wd.script[3] = lambda wo: setattr(wo.m, 'ground', True)
+    wd.run(12)
+    check(wd.states()[:3] == [1, 2, 3], 'kuribo: fall 1, on the ground => landing 2, at its end -> walk 3 %s'
+          % wd.states())
+    # dead: kinetic flag 8 => remove
+    wd = world('kuribo', 9)
+    wd.run(2)
+    wd.m.w32(FLAGS, 8)
+    wd.run(1)
+    check(wd.cur == 10, 'kuribo: dead 9 (Damage, bullet()), kinetic flag 8 => remove 10')
+
+    # ---- Shy Guy
+    got = enters('heiho')
+    exp = {1: (8, 0, (8, 1.0, 1), ''), 2: (0, 1, (9, 1.0, 0), ''), 3: (2, 1, (15, 1.0, 0), ''),
+           4: (1, 1, (16, 1.0, 1), ''), 5: (0, 1, (14, 1.0, 0), ''), 6: (5, 0, (16, 1.0, 1), ''),
+           7: (5, 0, (12, 1.0, 1), ''), 8: (0, 1, (12, 1.0, 1), ''), 9: (3, 1, (10, 1.0, 1), ''),
+           10: (0, 1, (13, 1.0, 0), ''), 12: (2, 1, (11, 1.0, 0), ''), 13: (2, 1, (13, 0.7, 0), ''),
+           14: (21, 0, (8, 1.0, 1), ''), 15: (None, None, (3, 0.0, 0), 'bullet')}
+    check(got == exp, 'heiho enters (kinetic, ground, (motion, rate, loop)) as the 3DS\'s: %s' % got)
+    # walk energy row, kick, the walk timer -> wait (Wait twice) -> walk
+    wd = world('heiho', 4, lr=-1.0)
+    m = wd.m
+    walk_en = {o: round(m.rf(EN + o), 4) for o in (8, 0x10, 0x14, 0x20, 0x24, 0x28, 0x2C)}
+    t = m.r32(OBJ + W.V(1))
+    wd.run(t + 40)
+    st = wd.states()
+    ok = walk_en == {8: 0.3, 0x10: 0.3, 0x14: 0.0, 0x20: 0.5, 0x24: 2.5, 0x28: 0.5, 0x2C: 2.5} and 60 <= t <= 120
+    ok &= st[:3] == [4, 3, 4] or st[:2] == [4, 3]
+    waits = [c for e in wd.log for c in e[4] if c[0] == 'motion' and c[2] == 15]
+    check(ok and len(waits) == 1, 'heiho: walk (energy %s, kick), %d frames -> wait 3 (Wait, again once), -> walk '
+          '4 %s' % (walk_en, t, st))
+    # search -> notice (two hops in place) -> hold -> run (the run row) -> brake -> settle -> walk
+    wd = world('heiho', 4, lr=-1.0)
+    m = wd.m
+    m.found, m.target_x = 0, 50.0
+    wd.run(31)
+    air(wd)
+    wd.run(1)
+    ok = wd.cur == 7 and bool([c for e in wd.log for c in e[4] if c[0] == 'reverse_lr'])
+    srch = [c for e in wd.log for c in e[4] if c[0] == 'search'][:1]
+    ntc = {o: round(m.rf(EN + o), 4) for o in (0x1C, 0x20, 0x24, 0x28, 0x2C)}
+    ok &= ntc == {0x1C: 0.0, 0x20: 0.0, 0x24: 2.0, 0x28: 0.0, 0x2C: 2.0}
+    m.found = -1
+    hops = []
+    for _ in range(14):
+        wd.frame()
+        h = [c for c in wd.log[-1][4] if c[0] == 'kinetic' and c[2] == 5]
+        if h:
+            air(wd)
+        hops += h
+    ok &= wd.cur in (8, 9) and len(hops) == 1
+    n0 = len(wd.log)
+    wd.run(3)
+    run_en = {o: round(m.rf(EN + o), 4) for o in (8, 0x10, 0x14, 0x20, 0x24, 0x28, 0x2C)}
+    ok &= wd.cur == 9 and 60 <= m.r32(OBJ + W.V(2)) <= 80 and \
+        run_en == {8: 0.8, 0x10: 0.8, 0x14: 0.0075, 0x20: 0.5, 0x24: 2.5, 0x28: 0.5, 0x2C: 2.5}
+    check(ok, 'heiho: walking, search_target(search 0) %s finds the target behind: reverse_lr, -> notice 7 '
+          '(set_kinetic_jump(0, 2.0): E %s), a second hop on landing, => hold 8, -> run 9 (the run row %s, 80 '
+          'frames)' % (srch, ntc, run_en))
+    n0 = len(wd.log)
+    wd.run(100)
+    st = wd.states(n0)
+    ok = st[:3] == [9, 12, 14]
+    m.w32(FLAGS, 1)
+    wd.run(3)
+    check(ok and wd.cur == 4, 'heiho: after 80 run frames the brake 12, at its end (stopped) the settle 14 (kinetic '
+          '21), kinetic flag 1 -> walk 4 %s' % wd.states(n0))
+    # run: a target behind -> run turn 13 => run; a wall -> wall run turn 10 => run
+    wd = world('heiho', 9, lr=-1.0)
+    m = wd.m
+    m.found, m.target_x = 0, 50.0
+    wd.run(40)
+    st = wd.states()
+    ok = st[:3] == [9, 13, 9]
+    m.found = -1
+    m.walls = {2, 4}
+    n0 = len(wd.log)
+    wd.run(2)
+    m.walls = set()
+    wd.run(10)
+    ok &= wd.states(n0)[:3] == [9, 10, 9]
+    check(ok, 'heiho: running, the target behind (search 1) -> run turn 13 (RunTurn at 0.7) => run; a wall -> '
+          'wall run turn 10 => run %s %s' % (st, wd.states(n0)))
+    # walk: a wall -> hop 6; landing on the same height => turn 5 => walk; higher, no wall => landing 2
+    for dy, want in ((0.0, [4, 6, 5, 4]), (8.0, [4, 6, 2])):
+        wd = world('heiho', 4, lr=1.0)
+        m = wd.m
+        m.walls = {4}
+        wd.run(1)
+        m.walls = set()
+        air(wd)
+        wd.script[wd.i + 2] = lambda wo, dy=dy: wo.m.wf(POSTURE + 0x14, dy)
+        wd.run(14)
+        check(wd.states()[:len(want)] == want, 'heiho: a wall -> wall hop 6 (kinetic 5, Walk); landed %s => %s %s'
+              % ('on the same height' if not dy else '%g higher' % dy, want[2:], wd.states()))
+
+    # ---- Waddle Dee
+    got = enters('waddledee')
+    exp = {1: (8, 0, (8, 1.0, 1), ''), 2: (8, 0, (11, 1.0, 1), ''), 3: (0, 1, (10, 1.0, 0), ''),
+           4: (1, 1, (13, 1.2, 1), ''), 5: (0, 1, (12, 1.0, 0), ''), 6: (5, 0, (9, 1.0, 0), ''),
+           7: (None, None, (0, 0.0, 0), 'bullet')}
+    check(got == exp, 'waddledee enters as the 3DS\'s (the parasol fall: kinetic 8 with ParasolFall): %s' % got)
+    wd = world('waddledee', 4, lr=-1.0)
+    m = wd.m
+    wd.run(300)
+    jumps = [e[0] for e in wd.log if e[1] == 6]
+    stamp = [e[0] for e in wd.log if e[1] == 4]
+    ok = not [c for e in wd.log for c in e[4] if c[0] == 'search']
+    ok &= all(not [c for c in e[4] if c[0] in ('atk_create',)] for e in wd.log)
+    check(ok and len(stamp) > 250, 'waddledee: walks (no search: it never chases)%s' %
+          (', jumps on frames %s' % jumps[:3] if jumps else ''))
+    for var, want in ((0, [4, 6, 2]), (2, [4, 6, 1])):
+        wd = world('waddledee', 4, lr=-1.0, var=var)
+        m = wd.m
+        m.walls = {2}
+        jumped = False
+        for _ in range(40):
+            wd.frame()
+            if wd.cur == 6 and not jumped:
+                jumped = True
+                m.walls = set()
+                m.vy, m.ground = 1.0, False
+                wd.script[wd.i + 2] = lambda wo: setattr(wo.m, 'vy', -1.0)
+                wd.script[wd.i + 4] = lambda wo: setattr(wo.m, 'ground', True)
+            if wd.cur == 5:
+                m.walls = set()
+        st = wd.states()
+        ok = st[:3] == want or (st[:2] == [4, 5] and 4 in st[2:])
+        check(ok, 'waddledee (variation %d): a wall -> 50 %% jump 6 (else turn 5); from the apex %s; lands 3 -> 4 %s'
+              % (var, 'the parasol fall 2' if var <= 1 else 'the fall 1', st))
+    wd = world('waddledee', 4, lr=-1.0, var=0)
+    wd.m.ground = False
+    wd.run(1)
+    wd3 = world('waddledee', 4, lr=-1.0, var=2)
+    wd3.m.ground = False
+    wd3.run(1)
+    check(wd.pending == 2 and wd3.pending == 1, 'waddledee: off the ground -> 2 (variations 0 / 1) / 1')
+
+    # ---- Waddle Doo
+    got = enters('waddledoo')
+    exp = {1: (8, 0, (10, 1.0, 1), ''), 2: (0, 1, (12, 1.0, 0), ''), 3: (1, 1, (14, 1.0, 1), ''),
+           4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 10: (None, None, (2, 0.0, 0), 'bullet')}
+    check(got == exp, 'waddledoo enters as the 3DS\'s: %s' % got)
+    wd = world('waddledoo', 3, lr=-1.0)
+    m = wd.m
+    m.found, m.target_x = 0, 50.0
+    wd.run(70)
+    st = wd.states()
+    srch = [c for e in wd.log for c in e[4] if c[0] == 'search'][:1]
+    ok = st[:3] == [3, 4, 3] and srch == [('search', 2, OBJ + 0x10, (0.0, 0.0, 200.0, 200.0, 0.0))]
+    check(ok, 'waddledoo: walks, every 60 frames search_target(search 0) finds the target behind -> turn 4 => walk '
+          '%s' % st)
+    wd = world('waddledoo', 3, lr=1.0)
+    m = wd.m
+    m.walls = {4}
+    wd.run(1)
+    m.walls = set()
+    air(wd)
+    wd.run(14)
+    check(wd.states()[:4] == [3, 5, 4, 3], 'waddledoo: a wall -> jump 5; landed on the same height => turn 4 => '
+          'walk %s' % wd.states())
+
+    # ---- Churine
+    got = enters('churine')
+    exp = {1: (8, 0, (12, 1.0, 1), ''), 2: (0, 1, (8, 1.0, 0), ''), 3: (1, 1, (11, 1.0, 1), ''),
+           4: (5, 0, (7, 1.0, 1), ''), 5: (0, 1, (10, 1.0, 0), ''), 8: (None, None, (2, 0.0, 0), 'bullet')}
+    check(got == exp, 'churine enters as the 3DS\'s: %s' % got)
+    wd = world('churine', 3, lr=1.0)
+    m = wd.m
+    m.target = -1
+    m.walls = {4}
+    wd.run(1)
+    m.walls = set()
+    air(wd)
+    wd.script[wd.i + 2] = lambda wo: wo.m.wf(POSTURE + 0x14, 30.0)
+    wd.run(14)
+    st = wd.states()
+    m.cliff = True
+    n0 = len(wd.log)
+    wd.run(2)
+    check(st[:4] == [3, 4, 2, 3] and wd.states(n0)[:2] == [3, 5], 'churine: a wall -> jump 4 (initialize first); '
+          'landed 30 higher, no wall => landing 2 (no look back) -> walk 3; a ledge -> turn 5 %s %s'
+          % (st, wd.states(n0)))
+    # no kind searches for a contact attack in its walk: set_attack_data is per state (above)
 
     # T2 / S2
     t1 = [img.u32(W.MOTION_SETS + 4 * k) for k in range(0x61)]

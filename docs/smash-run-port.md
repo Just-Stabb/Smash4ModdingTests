@@ -695,6 +695,54 @@ list {mode, flags, bone} and the joint remap 0x033117B4 a pair list from the mod
 that. The Goomba's walk plays WalkL at 0.6 (the 3DS walk enter writes 0.6 into the motion module's rate, 3DS +0x50:
 MotionModuleImpl::change_motion stores the rate there).
 
+## Fix v5: the five walkers' own 3DS behaviours (state tables per kind)
+
+User report on fix v4: most 3DS walkers have no hitbox while walking, but the Goomba has one while it runs; asked for
+each enemy as the 3DS has it. The generic walker (one walk / turn / fall machine, Shy Guy's bump on every kind while
+walking or turning) is replaced by each kind's own state table, numbered as its 3DS table, each state written from the
+3DS enter / update (enemy_fs.cro, the tables behind each Behavior's slot 72 / 73), with the same transitions,
+conditions and vl values. `tools/smashrun_walker_cave.py` (docstring: every state per kind), test
+`tools/smashrun_walker_test.py` (92 checks: the factory, vtable, slots 64-67 per kind, change_state per table,
+initialize / start / set_attack_data, each kind's state sequences in a stubbed world). Package smashrun_fix_v5.
+
+How the 3DS walkers work (what was read): every kind's state functions call the shared Behavior API (search_target,
+check_cliff, check_wall, reverse_lr, change_motion_state, change_kinetic, set_kinetic_jump, random_range, ...); the
+tuning comes from the kind's param struct in EnemyParamAccessor (slot [K]: +0xC the vl's first group, +0x20 the
+search groups {type, interval, 5 floats}, +0x34 the attack list, from +0x48 the kind's own group inline). Contact
+damage is Behavior::set_attack_data(state), called by change_state_base: it arms the vl attack entries whose first
+value is the new state. The five vl files list: Kuribo 5 (run) and 9 (death), Shy Guy 9 (run) and 15 (death),
+Waddle Dee 7, Waddle Doo 10, Churine 8 (their deaths). So on the 3DS only the Goomba's and the Shy Guy's runs hurt;
+walking never does; every defeated body carries a "bullet" attack while it flies.
+
+- Kuribo: walk (WalkL at 0.6, the walk animation's movement), every 100 frames a search box ahead ({2, 100, 40, 10,
+  10}); found: face it, a startled hop back (E+0x20 = -0.4, kinetic 5, RunHoldL), 30 frames, then the run (RunL,
+  hitbox on) for 110 frames with a search every 60 (a target behind: the run turn RunTurnL and back to the run),
+  walls turn it, then RunBrakeL and back to walking. Walls reverse the walk at once (no Turn motion); variation 0
+  walks off ledges (variation 1 turns).
+- Shy Guy: walk (60-120 frames) and wait (Wait twice, 50 % turn) alternate, a search every 30 frames; found: face it,
+  two hops in place (set_kinetic_jump(0, 2.0)), then the run (kinetic 3, hitbox on, 80 frames, the run turn when the
+  target is behind), RunBrake, a settle (kinetic 21) and walk; a wall in the walk makes it hop (and turn if it lands at
+  the same height), in the run it turns.
+- Waddle Dee: walks (Walk at 1.2), every 100 frames a 50 % jump, walls 50 % jump / 50 % turn; variations 0 / 1 carry
+  the parasol: they start in the parasol fall and fall back into it from a jump's apex or a ledge. Never chases.
+- Waddle Doo: walks, turns to face a target found behind (search every 60 frames), hops at walls.
+- Churine: walks, hops at walls (turns if it lands at the same height), turns at ledges.
+
+Not ported: Waddle Doo's beam (states 7 / 8: it needs its beam article; no Wii U weapon kind exists for it), its
+random hop and leave timer (their param offsets in its struct were not pinned down), Churine's sleep powder (6 / 7:
+an attack with its own effect data); the Waddle Dee's parasol float (the 3DS embeds an EnemyAerialModule in the
+behaviour: the parasol fall here is the normal fall kinetic with the ParasolFall motion, so it drops faster than on
+the 3DS); sounds; per-state mesh visibility (no Wii U path; the fix v4 NUD baseline stands); ray_check in the hops
+(check_wall stands in); check_cliff_distance_lr in the Kuribo's hop (it hops back even at a ledge); variations 1-3's
+rows (the spawner always makes variation 0). Inferred from the vl order (not from code): Waddle Dee 100 / 50 / 50 /
+1.2, Shy Guy's run-turn rate 0.7 and hop height 1.0; Waddle Doo's hop height is a guess (1.0). set_kinetic_jump's
+second kick (the 3DS's vt+0x74 for its flag) uses the initialize kick (vt+0xFC = 3DS +0x7C).
+
+Space: the code no longer fits 0x04B86800-0x04B88000, so it also uses 0x04B89000-0x04B8A000 (zero and unreferenced
+between base_effects_cave.py and base_customs_cave.py) and 0x04BB8000-0x04BB8660 (grow:0x04BB8660, after
+weapon_expand.py's 0x04BB8000, below the text region's end 0x04BB8670). Calls into 0x026Axxxx go through ctr (beyond a
+branch's reach from the cave).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
