@@ -1850,6 +1850,7 @@ v3 also grows, with the pack, the effect heap (getter 0x02010B08, its calls 0x03
 and the file resource heap (0x02010AF8, its calls 0x033FA278 / 0x033FA284 / 0x033FA330 / 0x033FA33C, two boot
 paths each taking the block and making the heap (0x032D2DAC: nothing in it scales with the size): 444 -> 704 MiB);
 the arena total grows by the sum, the default heap keeps ~463 MiB (>3x the normal ~138). `extended_memory.py` POOLS.
+User result of v3: works, four Sephiroths load.
 
 ## Article instance cap (64 a fighter)
 

@@ -831,6 +831,9 @@ and `S4STOMP hit` (the stomp taken). Shipped with diag_crumbs_cave.py v3 in one 
 User result with exe_diag_v3b (exe_v10 + the logging, fix v8's stomp words unchanged): stomping on a Goomba works.
 (The earlier "no reaction" report was before this build; the stomp diagnostics weren't needed. fix v8 stands.)
 
+User results (after fix v8 / Extended Memory v3): Shy Guy's texture scroll and mirroring look right; Plasma Wisp's
+(Lethinium's) laser is still invisible (open, below the next step).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
