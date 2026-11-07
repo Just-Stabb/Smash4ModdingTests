@@ -4,6 +4,11 @@ Minecraft World 0x38) are picked in their normal form unless the switch was flip
 Prints rpx_patch.py arguments.
 
   python3 tools/rpx_patch.py IN.rpx OUT.rpx ... $(python3 tools/stage_omega_cave.py)
+  python3 tools/rpx_patch.py IN.rpx OUT.rpx $(python3 tools/stage_omega_cave.py --revert)
+
+--revert (user: "please revert the Auto Omega selection change") puts the five hooked words back to the
+game's own (ORIGINAL): the switch starts on the player's remembered form again and the confirm is the
+game's isOmega. The cave code stays in place, unreferenced.
 
 The switch (StageSelectScene +0x160, docs/stage-expansion.md "Normal / Omega"): state +8 is 0 normal,
 1 Omega ("terminate"), 2 My Music; 0x0298C948 is the state shown, 0x0298C984(switch, state, sound)
@@ -123,7 +128,15 @@ def args(patches):
     return ['grow:0x%08X' % GROW] + ['0x%08X=0x%08X' % kv for kv in sorted(patches.items())]
 
 
+def revert_args():
+    return ['0x%08X=0x%08X' % kv for kv in sorted(ORIGINAL.items())]
+
+
 def main():
+    if '--revert' in sys.argv:
+        print(' '.join(revert_args()))
+        sys.stderr.write('stage select: Omega default reverted (the game\'s own form switch)\n')
+        return
     _a, patches = build()
     print(' '.join(args(patches)))
     sys.stderr.write('stage select: Omega by default, new stages (0x%X+) normal unless flipped; cave 0x%08X\n'
