@@ -1,7 +1,7 @@
-From b1e78c462a5886ba1210d0295e12573031ec8020 Mon Sep 17 00:00:00 2001
+From fb5756ce4028e61551580592106dcb1d786f4231 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 11:13:58 +0000
-Subject: [PATCH 1/6] Faster builds (stored data for untouched package files,
+Subject: [PATCH 1/7] Faster builds (stored data for untouched package files,
  compression cache, parallel compression) and Extract vanilla
 
 ---
@@ -690,7 +690,7 @@ index dff654d..9eb4f9e 100644
          #endregion
  
 diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
-index 5bf70d0..3676e8e 100644
+index 91788dc..1c8efa5 100644
 --- a/Sm4shFileExplorer/UI/Main.Designer.cs
 +++ b/Sm4shFileExplorer/UI/Main.Designer.cs
 @@ -57,6 +57,7 @@ private void InitializeComponent()
@@ -701,7 +701,7 @@ index 5bf70d0..3676e8e 100644
              this.removeModToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
              this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
              this.unlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-@@ -306,6 +307,7 @@ private void InitializeComponent()
+@@ -308,6 +309,7 @@ private void InitializeComponent()
              // 
              this.contextMenuTreeView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
              this.extractToolStripMenuItem,
@@ -709,7 +709,7 @@ index 5bf70d0..3676e8e 100644
              this.removeModToolStripMenuItem,
              this.toolStripSeparator1,
              this.unlocalizeToolStripMenuItem,
-@@ -317,7 +319,7 @@ private void InitializeComponent()
+@@ -319,7 +321,7 @@ private void InitializeComponent()
              this.packThisFolderToolStripMenuItem,
              this.doNotPackThisFolderToolStripMenuItem});
              this.contextMenuTreeView.Name = "contextMenuTreeView";
@@ -718,7 +718,7 @@ index 5bf70d0..3676e8e 100644
              this.contextMenuTreeView.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuTreeView_Opening);
              // 
              // extractToolStripMenuItem
-@@ -327,6 +329,14 @@ private void InitializeComponent()
+@@ -329,6 +331,14 @@ private void InitializeComponent()
              this.extractToolStripMenuItem.Text = "Extract";
              this.extractToolStripMenuItem.Click += new System.EventHandler(this.extractToolStripMenuItem_Click);
              // 
@@ -733,7 +733,7 @@ index 5bf70d0..3676e8e 100644
              // removeModToolStripMenuItem
              // 
              this.removeModToolStripMenuItem.Name = "removeModToolStripMenuItem";
-@@ -628,6 +638,7 @@ private void InitializeComponent()
+@@ -637,6 +647,7 @@ private void InitializeComponent()
          private System.Windows.Forms.ToolStripMenuItem menuBuild;
          private System.Windows.Forms.ContextMenuStrip contextMenuTreeView;
          private System.Windows.Forms.ToolStripMenuItem extractToolStripMenuItem;
@@ -742,10 +742,10 @@ index 5bf70d0..3676e8e 100644
          private System.Windows.Forms.Panel oPanelLeft;
          private System.Windows.Forms.Panel oPanelFileInformation;
 diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
-index 9a522af..dc8ff36 100644
+index 7ec7dec..31dbb6b 100644
 --- a/Sm4shFileExplorer/UI/Main.cs
 +++ b/Sm4shFileExplorer/UI/Main.cs
-@@ -211,6 +211,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+@@ -212,6 +212,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
              }
  
              extractToolStripMenuItem.Enabled = true;
@@ -753,7 +753,7 @@ index 9a522af..dc8ff36 100644
              removeModToolStripMenuItem.Enabled = false;
              unlocalizeToolStripMenuItem.Enabled = false;
              removeUnlocalizeToolStripMenuItem.Enabled = false;
-@@ -333,6 +334,13 @@ private void extractToolStripMenuItem_Click(object sender, EventArgs e)
+@@ -334,6 +335,13 @@ private void extractToolStripMenuItem_Click(object sender, EventArgs e)
                  _ProjectManager.ExtractResource(node.Name);
          }
  
@@ -771,10 +771,10 @@ index 9a522af..dc8ff36 100644
 2.43.0
 
 
-From 2b9de497a2a3cd03e727c453174384cdc370999b Mon Sep 17 00:00:00 2001
+From c68602a75a460f8a8cdfb3db0d8099bfbda9e147 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:36:36 +0000
-Subject: [PATCH 2/6] Packing: stream packages to disk, read stored files when
+Subject: [PATCH 2/7] Packing: stream packages to disk, read stored files when
  written, compress in 32 MB batches
 
 ---
@@ -1101,10 +1101,10 @@ index 9eb4f9e..445f418 100644
 2.43.0
 
 
-From f0542a4ae26924d8a26adfaef1f98773a38c2ff5 Mon Sep 17 00:00:00 2001
+From af751674227a1ce4a491eaf6565aec6b35e5bd51 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 20 Oct 2026 17:58:24 +0000
-Subject: [PATCH 3/6] Package cache: unchanged packages are copied from
+Subject: [PATCH 3/7] Package cache: unchanged packages are copied from
  cache/packages instead of being rebuilt
 
 ---
@@ -1335,10 +1335,10 @@ index 445f418..0dd3aa3 100644
 2.43.0
 
 
-From 26656d7ba316786b580e4c802e3cb25131803ea2 Mon Sep 17 00:00:00 2001
+From 25de7c8be0923fac7fe711391a823965f996bbaa Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Wed, 21 Oct 2026 20:54:10 +0000
-Subject: [PATCH 4/6] Clean vanilla files: move workspace files identical to
+Subject: [PATCH 4/7] Clean vanilla files: move workspace files identical to
  the game's own version out of the workspace
 
 Project > Clean vanilla files from workspace... (or right-click a mod folder / file > Clean vanilla
@@ -1590,7 +1590,7 @@ index 0dd3aa3..0abf8dd 100644
  
          #region Unlocalizing Files && Resource Removal
 diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
-index 3676e8e..e899272 100644
+index 1c8efa5..38e5f68 100644
 --- a/Sm4shFileExplorer/UI/Main.Designer.cs
 +++ b/Sm4shFileExplorer/UI/Main.Designer.cs
 @@ -59,6 +59,8 @@ private void InitializeComponent()
@@ -1602,7 +1602,7 @@ index 3676e8e..e899272 100644
              this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
              this.unlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
              this.removeUnlocalizeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-@@ -122,6 +124,7 @@ private void InitializeComponent()
+@@ -123,6 +125,7 @@ private void InitializeComponent()
              this.sendToSDToolStripMenuItem,
              this.toolStripSeparator3,
              this.refreshTreeviewToolStripMenuItem,
@@ -1610,7 +1610,7 @@ index 3676e8e..e899272 100644
              this.menuOptions,
              this.oMenuFileSeparator,
              this.menuExit});
-@@ -166,6 +169,14 @@ private void InitializeComponent()
+@@ -167,6 +170,14 @@ private void InitializeComponent()
              this.refreshTreeviewToolStripMenuItem.Text = "Refresh Treeview";
              this.refreshTreeviewToolStripMenuItem.Click += new System.EventHandler(this.refreshTreeviewToolStripMenuItem_Click);
              // 
@@ -1625,7 +1625,7 @@ index 3676e8e..e899272 100644
              // menuOptions
              // 
              this.menuOptions.Name = "menuOptions";
-@@ -309,6 +320,7 @@ private void InitializeComponent()
+@@ -311,6 +322,7 @@ private void InitializeComponent()
              this.extractToolStripMenuItem,
              this.extractVanillaToolStripMenuItem,
              this.removeModToolStripMenuItem,
@@ -1633,7 +1633,7 @@ index 3676e8e..e899272 100644
              this.toolStripSeparator1,
              this.unlocalizeToolStripMenuItem,
              this.removeUnlocalizeToolStripMenuItem,
-@@ -319,7 +331,7 @@ private void InitializeComponent()
+@@ -321,7 +333,7 @@ private void InitializeComponent()
              this.packThisFolderToolStripMenuItem,
              this.doNotPackThisFolderToolStripMenuItem});
              this.contextMenuTreeView.Name = "contextMenuTreeView";
@@ -1642,7 +1642,7 @@ index 3676e8e..e899272 100644
              this.contextMenuTreeView.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuTreeView_Opening);
              // 
              // extractToolStripMenuItem
-@@ -344,6 +356,14 @@ private void InitializeComponent()
+@@ -346,6 +358,14 @@ private void InitializeComponent()
              this.removeModToolStripMenuItem.Text = "Remove mod files";
              this.removeModToolStripMenuItem.Click += new System.EventHandler(this.removeToolStripMenuItem_Click);
              // 
@@ -1657,7 +1657,7 @@ index 3676e8e..e899272 100644
              // toolStripSeparator1
              // 
              this.toolStripSeparator1.Name = "toolStripSeparator1";
-@@ -651,6 +671,8 @@ private void InitializeComponent()
+@@ -660,6 +680,8 @@ private void InitializeComponent()
          private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
          private System.ComponentModel.BackgroundWorker backgroundWorker;
          private System.Windows.Forms.ToolStripMenuItem removeModToolStripMenuItem;
@@ -1667,10 +1667,10 @@ index 3676e8e..e899272 100644
          private System.Windows.Forms.ToolStripMenuItem unlocalizeToolStripMenuItem;
          private System.Windows.Forms.DataGridViewTextBoxColumn gridViewName;
 diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
-index dc8ff36..22eaa3a 100644
+index 31dbb6b..74b5758 100644
 --- a/Sm4shFileExplorer/UI/Main.cs
 +++ b/Sm4shFileExplorer/UI/Main.cs
-@@ -213,6 +213,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+@@ -214,6 +214,7 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
              extractToolStripMenuItem.Enabled = true;
              extractVanillaToolStripMenuItem.Enabled = _ProjectManager.HasVanillaResource(selNode.Name);
              removeModToolStripMenuItem.Enabled = false;
@@ -1678,7 +1678,7 @@ index dc8ff36..22eaa3a 100644
              unlocalizeToolStripMenuItem.Enabled = false;
              removeUnlocalizeToolStripMenuItem.Enabled = false;
              packThisFolderToolStripMenuItem.Enabled = false;
-@@ -226,12 +227,14 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
+@@ -227,12 +228,14 @@ private void contextMenuTreeView_Opening(object sender, CancelEventArgs e)
                  if (File.Exists(filePath))
                  {
                      removeModToolStripMenuItem.Enabled = true;
@@ -1693,7 +1693,7 @@ index dc8ff36..22eaa3a 100644
  
                      //Can pack
                      if (_ProjectManager.CanBePacked(selNode.Name))
-@@ -354,6 +357,13 @@ private void removeToolStripMenuItem_Click(object sender, EventArgs e)
+@@ -355,6 +358,13 @@ private void removeToolStripMenuItem_Click(object sender, EventArgs e)
              }
          }
  
@@ -1707,7 +1707,7 @@ index dc8ff36..22eaa3a 100644
          private void packThisFolderToolStripMenuItem_Click(object sender, EventArgs e)
          {
              TreeNode node = treeView.SelectedNode;
-@@ -426,6 +436,50 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
+@@ -427,6 +437,50 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
              backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.BuildProject, false));
          }
  
@@ -1758,7 +1758,7 @@ index dc8ff36..22eaa3a 100644
          private void menuOptions_Click(object sender, EventArgs e)
          {
              _Options.ShowDialog(this);
-@@ -567,6 +621,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+@@ -573,6 +627,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
                          }
                      }
                      break;
@@ -1768,7 +1768,7 @@ index dc8ff36..22eaa3a 100644
                  case BackgroundWorkerMode.SendToSD:
                      string workspaceName = GetWorkspaceName((string)bw.Object);
                      if (workspaceName == null)
-@@ -610,9 +667,17 @@ private void backgroundWorker_RunWorkerCompleted(object sender, RunWorkerComplet
+@@ -616,9 +673,17 @@ private void backgroundWorker_RunWorkerCompleted(object sender, RunWorkerComplet
                  case BackgroundWorkerMode.SendToSD:
                      break;
              }
@@ -1804,10 +1804,10 @@ index d3719f2..2c8c3a0 100644
 2.43.0
 
 
-From 9345a19b6075362d40553f864c92cf7966f1a1d3 Mon Sep 17 00:00:00 2001
+From 6634abed1fd0fa4edd7961c039db85f5a24860d6 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 22 Oct 2026 07:51:50 +0000
-Subject: [PATCH 5/6] New files inside a packaged folder go in the package
+Subject: [PATCH 5/7] New files inside a packaged folder go in the package
 
 A file the game doesn't have, in a folder the game reads as one package (e.g. a new character's
 ui/replace/chr/chr_10 icon), kept offset 0, which made it a package of its own: it was written as a
@@ -1852,10 +1852,10 @@ index 0abf8dd..45b1a0c 100644
 2.43.0
 
 
-From a74f0cb8caa9910c925774774052fe9ad75332c3 Mon Sep 17 00:00:00 2001
+From c43748b4428ec2c3df742887133b86ec22553df8 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 22 Oct 2026 23:42:43 +0000
-Subject: [PATCH 6/6] Build to Folder: build into any folder (e.g. a Cemu
+Subject: [PATCH 6/7] Build to Folder: build into any folder (e.g. a Cemu
  graphic pack's content/patch), only content/patch replaced; optional
  rules.txt
 
@@ -1947,7 +1947,7 @@ index 45b1a0c..00162ef 100644
  
              return exportFolder;
 diff --git a/Sm4shFileExplorer/UI/Main.Designer.cs b/Sm4shFileExplorer/UI/Main.Designer.cs
-index e899272..51d4a6a 100644
+index 38e5f68..88b8f98 100644
 --- a/Sm4shFileExplorer/UI/Main.Designer.cs
 +++ b/Sm4shFileExplorer/UI/Main.Designer.cs
 @@ -34,6 +34,8 @@ private void InitializeComponent()
@@ -1959,7 +1959,7 @@ index e899272..51d4a6a 100644
              this.sendToSDToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
              this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
              this.refreshTreeviewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-@@ -121,6 +123,8 @@ private void InitializeComponent()
+@@ -122,6 +124,8 @@ private void InitializeComponent()
              this.menuProject.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
              this.menuBuild,
              this.menuBuildDebug,
@@ -1968,7 +1968,7 @@ index e899272..51d4a6a 100644
              this.sendToSDToolStripMenuItem,
              this.toolStripSeparator3,
              this.refreshTreeviewToolStripMenuItem,
-@@ -150,6 +154,23 @@ private void InitializeComponent()
+@@ -151,6 +155,23 @@ private void InitializeComponent()
              this.menuBuildDebug.Text = "Build (no packaging)";
              this.menuBuildDebug.Click += new System.EventHandler(this.menuBuildDebug_Click);
              // 
@@ -1992,7 +1992,7 @@ index e899272..51d4a6a 100644
              // sendToSDToolStripMenuItem
              // 
              this.sendToSDToolStripMenuItem.Name = "sendToSDToolStripMenuItem";
-@@ -690,6 +711,8 @@ private void InitializeComponent()
+@@ -699,6 +720,8 @@ private void InitializeComponent()
          private System.Windows.Forms.ToolStripMenuItem aboutSm4shExplorerToolStripMenuItem;
          private System.Windows.Forms.ToolStripMenuItem removeUnlocalizeToolStripMenuItem;
          private System.Windows.Forms.ToolStripMenuItem menuBuildDebug;
@@ -2002,10 +2002,10 @@ index e899272..51d4a6a 100644
          private System.Windows.Forms.ToolStripMenuItem refreshTreeviewToolStripMenuItem;
          private System.Windows.Forms.ToolStripMenuItem directoriesToolStripMenuItem;
 diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
-index 22eaa3a..62a9895 100644
+index 74b5758..462e066 100644
 --- a/Sm4shFileExplorer/UI/Main.cs
 +++ b/Sm4shFileExplorer/UI/Main.cs
-@@ -436,6 +436,83 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
+@@ -437,6 +437,83 @@ private void menuBuildDebug_Click(object sender, EventArgs e)
              backgroundWorker.RunWorkerAsync(new BackgroundWorkerInstance(BackgroundWorkerMode.BuildProject, false));
          }
  
@@ -2089,7 +2089,7 @@ index 22eaa3a..62a9895 100644
          private void menuCleanVanilla_Click(object sender, EventArgs e)
          {
              StartFindVanillaCopies(null);
-@@ -522,6 +599,9 @@ private void sendToSDToolStripMenuItem_Click(object sender, EventArgs e)
+@@ -523,6 +600,9 @@ private void sendToSDToolStripMenuItem_Click(object sender, EventArgs e)
  
          private void menuProject_DropDownOpening(object sender, EventArgs e)
          {
@@ -2099,7 +2099,7 @@ index 22eaa3a..62a9895 100644
              if (!Directory.Exists(PathHelper.FolderExport))
                  return;
              sendToSDToolStripMenuItem.DropDownItems.Clear();
-@@ -596,6 +676,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+@@ -602,6 +682,9 @@ private void backgroundWorker_DoWork(object sender, DoWorkEventArgs e)
                  case BackgroundWorkerMode.ProjectLoading:
                      LoadConfig();
                      break;
@@ -2123,6 +2123,106 @@ index 2c8c3a0..663f733 100644
      }
  
      internal class BackgroundWorkerInstance
+-- 
+2.43.0
+
+
+From fc82bda412f48d2b12591a0e6ea19b268b2f2954 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 02:31:13 +0000
+Subject: [PATCH 7/7] Merge dropped folders: on the partitions (data,
+ data(us_en)...) too; a folder named like the target, or a package folder
+ whose folders are all already in the target, is merged into it instead of
+ added as a folder of its own
+
+---
+ Sm4shFileExplorer/Sm4shProject.cs | 50 +++++++++++++++++++++++++++++++
+ Sm4shFileExplorer/UI/Main.cs      |  2 +-
+ 2 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/Sm4shFileExplorer/Sm4shProject.cs b/Sm4shFileExplorer/Sm4shProject.cs
+index 00162ef..a9c7259 100644
+--- a/Sm4shFileExplorer/Sm4shProject.cs
++++ b/Sm4shFileExplorer/Sm4shProject.cs
+@@ -488,8 +488,17 @@ public void AddFileToWorkspace(string inputFile, string absolutePath)
+ 
+             //Copy
+             string baseToExclude = lFiles[0].Substring(0, lFiles[0].LastIndexOf(Path.DirectorySeparatorChar));
++            string mergeReason = Directory.Exists(inputFile) ? MergeReason(inputFile, absolutePath) : null;
++            if (mergeReason != null)
++            {
++                // the folder's contents go straight into the target (merged), not into a new folder of its name
++                baseToExclude = inputFile.TrimEnd(Path.DirectorySeparatorChar);
++                LogHelper.Info(string.Format("Merging the contents of '{0}' into '{1}' ({2}).", inputFile, absolutePath, mergeReason));
++            }
+             foreach (string fileToProcess in lFiles)
+             {
++                if (Directory.Exists(fileToProcess))
++                    continue;   // folders are made as their files are copied
+                 if (!Utils.IsAnAcceptedExtension(fileToProcess) || fileToProcess.EndsWith("packed"))
+                     LogHelper.Warning(string.Format("The file '{0}' has a forbidden extension, skipping...", fileToProcess));
+                 else
+@@ -509,6 +518,47 @@ public void AddFileToWorkspace(string inputFile, string absolutePath)
+             LogHelper.Info("Done!");
+         }
+ 
++        /// <summary>
++        /// Why a dropped folder is merged into the target folder rather than added inside it as a folder of its
++        /// own name, or null: it has the target's own name (data on data, data(us_en) on data(us_en), param on
++        /// param), or it isn't a folder of the target yet and every folder in it already is (a mod package's top
++        /// folder holding ui/, param/, stage/... dropped on data).
++        /// </summary>
++        /// <param name="folder">Dropped folder</param>
++        /// <param name="absolutePath">Target folder (data/path/to/folder/)</param>
++        private string MergeReason(string folder, string absolutePath)
++        {
++            if (!absolutePath.EndsWith("/"))
++                absolutePath += "/";
++            string name = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar));
++            string target = absolutePath.TrimEnd('/');
++            string targetName = target.Substring(target.LastIndexOf('/') + 1);
++            if (string.Equals(name, targetName, StringComparison.OrdinalIgnoreCase))
++                return "same name as the target";
++            if (FolderExists(absolutePath + name + "/"))
++                return null;
++            string[] subDirs = Directory.GetDirectories(folder);
++            if (subDirs.Length > 0 && subDirs.All(d => FolderExists(absolutePath + Path.GetFileName(d) + "/")))
++                return "every folder in it is already in the target";
++            return null;
++        }
++
++        /// <summary>
++        /// A folder of the game (or already added to the workspace) at this absolute path (data/path/to/folder/)
++        /// </summary>
++        private bool FolderExists(string absolutePath)
++        {
++            try
++            {
++                if (GetResource(absolutePath) != null)
++                    return true;
++            }
++            catch (Exception)
++            {
++            }
++            return Directory.Exists(GetWorkspaceFileFromPath(absolutePath));
++        }
++
+         /// <summary>
+         /// Remove a file/folder from the workspace
+         /// </summary>
+diff --git a/Sm4shFileExplorer/UI/Main.cs b/Sm4shFileExplorer/UI/Main.cs
+index 462e066..762e4bf 100644
+--- a/Sm4shFileExplorer/UI/Main.cs
++++ b/Sm4shFileExplorer/UI/Main.cs
+@@ -140,7 +140,7 @@ private void treeView_DragOver(object sender, DragEventArgs e)
+             Point p = treeView.PointToClient(new Point(e.X, e.Y));
+             TreeNode node = treeView.GetNodeAt(p.X, p.Y);
+             treeView.SelectedNode = node;
+-            if (node != null && node.Parent != null && node.SelectedImageKey != UIConstants.ICON_FILE)
++            if (node != null && node.SelectedImageKey != UIConstants.ICON_FILE)     // the partitions (data, data(us_en)...) too
+                 e.Effect = DragDropEffects.Link;
+             else
+                 e.Effect = DragDropEffects.None;
 -- 
 2.43.0
 

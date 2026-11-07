@@ -1,8 +1,8 @@
-# Sm4shExplorer: faster builds, "Extract vanilla", "Clean vanilla files" and "Build to Folder"
+# Sm4shExplorer: faster builds, "Extract vanilla", "Clean vanilla files", "Build to Folder", merging folders
 
-`sm4shexplorer-faster.patch` (6 commits) applies to https://github.com/thefungus/Sm4shExplorer
+`sm4shexplorer-faster.patch` (7 commits) applies to https://github.com/thefungus/Sm4shExplorer
 (`e349175`, the latest commit): `git am sm4shexplorer-faster.patch`. The exe is in
-`build/sm4shexplorer_faster_v7.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and plugins are
+`build/sm4shexplorer_faster_v8.zip` (replaces `Sm4shFileExplorer.exe`; the DLLs and plugins are
 unchanged).
 
 **Build (v7 on):** with Microsoft's C# compiler (Roslyn, from the .NET SDK: Ubuntu's `dotnet-sdk-8.0`),
@@ -27,6 +27,33 @@ can still get Chrome's "not commonly downloaded" warning ("Keep") or a SmartScre
 builds reputation; a code-signing certificate is the only full fix. A false positive can be reported
 at https://www.microsoft.com/en-us/wdsi/filesubmission (Defender) and
 https://safebrowsing.google.com/safebrowsing/report_error/ (Chrome).
+
+## Merging folders (v8)
+
+User: "make Sm4shExplorer able to merge every folder including the data folders, currently you can only merge
+folders below certain hierarchies (ex. data, data(us_en), param)". Before, a folder dropped on the tree always
+became a folder of its own name inside the target (dropping `param` on `param` made `param/param`), and nothing
+could be dropped on the partitions (`data`, `data(us_en)`...: the drag check refused nodes without a parent).
+Now (`Sm4shProject.MergeReason`, `UI/Main.cs treeView_DragOver`):
+- the partitions take drops like any folder;
+- a dropped folder is **merged** (its contents go straight into the target) when it has the target's own name
+  (`data` on `data`, `data(us_en)` on `data(us_en)`, `param` on `param`, `fighter` on `fighter`...), or when it
+  isn't a folder of the target and every folder in it already is (a mod package's top folder holding `ui/`,
+  `param/`, `stage/`... dropped on `data`);
+- anything else is added as before: a new fighter / stage / costume folder is still made inside the target
+  (dropping `edge` on `fighter` gives `fighter/edge`, dropping `ui` on `data` gives `data/ui`, the same place).
+- The log says when it merged and why. Folders themselves no longer log "forbidden extension".
+
+Test: `merge_test.cs` (mono; compiled against the built exe) runs `MergeReason` and the real
+`AddFileToWorkspace` on a fake workspace: 15 checks (the 9 decisions above and 6 copies), 0 failures.
+
+    dotnet /usr/lib/dotnet/sdk/8.0.133/Roslyn/bincore/csc.dll -out:MergeTest.exe -r:Sm4shFileExplorer.exe \
+        -r:/usr/lib/mono/4.5/System.Windows.Forms.dll -r:/usr/lib/mono/4.5/mscorlib.dll -r:/usr/lib/mono/4.5/System.dll \
+        -r:/usr/lib/mono/4.5/System.Core.dll -nostdlib merge_test.cs
+    mono MergeTest.exe EMPTY_DIR        # with Sm4shFileExplorer.exe and its DLLs next to MergeTest.exe
+
+Build note: a fresh checkout needs the NuGet packages Microsoft.WindowsAPICodePack.Core / .Shell 1.1.0 unzipped
+into `packages/` (the project's HintPaths).
 
 ## Why builds were slow
 
