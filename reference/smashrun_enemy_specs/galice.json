@@ -1,0 +1,34 @@
+{
+ "kind": "galice",
+ "kind_index": "0x05",
+ "behavior_class": null,
+ "create": null,
+ "notes": [],
+ "params": {"object_offset":1620,"ctor":"6ff8","reader":"b61c8","members":[{"type":"array","offset":0,"index":0,"elem_size":36,"format":[[4,4],[4,4],[4,1]],"offsets":[0,4,8,12,16,20,24,28,32],"widths":[4,4,4,4,4,4,4,4,4],"values":[[1.2000000476837158,1.0,1.600000023841858,0.05000000074505806,20.0,1.0,30.0,5,3.0]],"names":["f0","f1","f2","f3","f4","f5","f6","f7","f8"]},{"type":"array","offset":20,"index":1,"elem_size":28,"format":[[4,4],[4,3]],"offsets":[0,4,8,12,16,20,24],"widths":[4,4,4,4,4,4,4],"values":[[0,30,30.0,0.0,0.0,0.0,0.0]],"names":["search_type","interval","range_x?","range_y?","offset_x?","offset_y?","f6"]},{"type":"array","offset":40,"index":2,"elem_size":168,"format":[[4,4],[4,4],[4,4],[4,4],[4,4],[4,4],[4,4],[4,4],[4,4],[4,4],[4,2]],"offsets":[0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152,156,160,164],"widths":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],"values":[[9,0,0,2,2,361,100,0,50,3,0.0,0.0,0.0,0,0.0,2.0,1.0,0,0,0,2,1,3,0,2,2,0,9,0,0,0,0,20,0,0,0,0,0,0,0,0,0]],"names":["state","id","part","node","power","angle","kbg","fkb","bkb","size","x","y","z","f13","f14","f15","f16","f17","f18","f19","f20","f21","f22","f23","f24","f25","f26","f27","f28","f29","f30","f31","f32","f33","f34","f35","f36","f37","f38","f39","f40","f41"]},{"type":"array","offset":60,"index":3,"elem_size":48,"format":[[4,4],[4,4],[4,4]],"offsets":[0,4,8,12,16,20,24,28,32,36,40,44],"widths":[4,4,4,4,4,4,4,4,4,4,4,4],"values":[[0.0,0.0,0.0,0.0,0.0,0.0,9.0,2,0,1,0,0],[0.0,0.0,0.0,0.0,0.0,0.0,16.0,2,0,1,0,0]],"names":["f0","f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11"]},{"type":"array","offset":80,"index":4,"elem_size":40,"format":[[4,4],[4,4],[4,2]],"offsets":[0,4,8,12,16,20,24,28,32,36],"widths":[4,4,4,4,4,4,4,4,4,4],"values":[[0.0,22.0,-10.0,24.0,0.0,2,0.0,0.0,0.0,15.0]],"names":["f0","f1","f2","f3","f4","f5","f6","f7","f8","f9"]},{"type":"array","offset":100,"index":5,"elem_size":24,"format":[[4,4],[4,2]],"offsets":[0,4,8,12,16,20],"widths":[4,4,4,4,4,4],"values":[[0,2,14.0,14.0,0.0,0.0],[1,2,7.0,7.0,0.0,0.0]],"names":["f0","f1","f2","f3","f4","f5"]},{"type":"struct","offset":120,"format":[[4,3]],"offsets":[0,4,8],"widths":[4,4,4],"values":[[10.0,9.0,18.0]]}]},
+ "motion_data_set": null,
+ "motions": [
+ ],
+ "meshes": [],
+ "vtable": null,
+ "vtable_slots": {
+ },
+ "state_table": null,
+ "functions": {
+ },
+ "ctor": null,
+ "states": [
+ ],
+ "vtable_functions": {
+ },
+ "helpers": {
+ },
+ "attacks": [
+  {"entry":0,"state":9,"id":0,"part":0,"node":2,"power":2,"angle":361,"kbg":100,"fkb":0,"bkb":50,"size":3,"x":0.0,"y":0.0,"z":0.0,"other":{"f13->AttackData+0x63":0,"f14->AttackData+0x50":0.0,"f15->AttackData+0x54":2.0,"f16->AttackData+0x58":1.0,"f17->AttackData+0x66":0,"f18->AttackData+0x67":0,"f19->AttackData+0x78":0,"f20->AttackData+0x64":2,"f21->AttackData+0x65":1,"f22->AttackData+0x60":3,"f23->AttackData+0x6c":0,"f24->AttackData+0x75":2,"f25->AttackData+0x5e":2,"f26->AttackData+0x61":0,"f27->AttackData+0x62":9,"f28->AttackData+0x68":0,"f29->AttackData+0x69":0,"f30->AttackData+0x6a":0,"f31->AttackData+0x6b":0,"f32->AttackData+0x7c":20,"f33->AttackData+0x6d":0,"f34->AttackData+0x6e":0,"f35->AttackData+0x6f":0,"f36->AttackData+0x70":0,"f37->AttackData+0x71":0,"f38->AttackData+0x72":0,"f39->AttackData+0x73":0,"f40->AttackData+0x74":0,"f41->AttackData+0x77":0},"bone":"HipN"}
+ ],
+ "joints": ["TransN","RotN","HipN","Shell01N","Shell02N","Shell03N","PumpN"],
+ "acmd": {
+  "0x780d84e3": {"attack":{"main":[["FRAME",9.0],["Special_Hitbox",0,0,2,6.0,361,100,100,0,30.0,0.0,0.0,0.0,4,0.0,1.0,1.2,0,0,2,1,28,3,0,0,1,0,9,0,1,0,0,140,0,0,0,0,0,0,0,0,0],["FRAME",58.0],["Remove_Hitbox",0]]},"effect":{"main":[["FRAME",8.0],["External_Graphic",117768194,3,0.0,0.0,0.0,0.0,0.0,0.0,1.3,1]]}}
+ },
+ "articles": {"article_data_set":null,"entries":[],"weapons":{}},
+ "tags": ["stationary","acmd-hitboxes"]
+}
