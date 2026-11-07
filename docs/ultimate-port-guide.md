@@ -60,6 +60,15 @@ Params it never builds (Withdraw's speed_x) are read in the executable's native 
 The slot itself (kind record in `tools/extra_kinds.json`, `add_fighter.py`, the executable caves) is
 docs/kind-expansion.md; run every cave test with `--others` (Hero v4b).
 
+**Texture ids** (`tools/fighter_texture_ids.py`): the game keeps loaded textures by id, so every model the
+port adds (body costumes, low models, articles) numbers its textures in the fighter's own block:
+0x40KK0000, KK = 0x80 + kind (Sephiroth 0x40C2...., Squirtle 0x40C6....), body cNN + 0x400 x NN (lNN the same
+ids when it is a copy of cNN, else + 0x2000 + 0x400 x NN), article a + 0x4800 + 0x800 x a (+ 0x80 a costume with
+its own pictures). `init` registers the fighter (`reference/port_bases.json` `_texture_ids`); a tool that writes
+an article's `model.nut` takes `article_id(name, article)` (registering the article first). A copy of a base's
+model with the base's pictures (Supamario's articles) keeps the base's ids. `port_check` T1 / T2 check it over
+the whole install (other fighters' folders and the base's vanilla models too).
+
 **Delivering:** `port_check.py` over the install as the user will have it: the full package plus every
 fix package after it, in order. No ERROR goes out. A fix package that ships a file ships its partners
 (`model.nud` with `model.nut`; a `game.bin` built on the current one, not vanilla's).
@@ -131,6 +140,8 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | base table-1 joints as stand-ins: the head came off | Hero / Steve fix 9 | own bones (`add_joint_bones`) [M2] |
 | NUD bone range 0-N, rigged polygons unflagged: a pillar, invisible, a crash | Incineroar, Sephiroth t19 | `nud.write` [M3, M4] |
 | `model.nud` shipped without `model.nut`: wrong textures | Hero fix 17 | plan ships both [M5] |
+| every port's `model.nut` numbered `0x40EB0000` + k in every costume: the game keys the textures it has loaded by id, so with two new fighters (or one in two colours) in a match the second drew with the first one's textures | the user: a P1 Steve made a P2 Squirtle wear his (Sephiroth, Hero, Steve, Incineroar, Squirtle; fighters_texid_fix_v1) | each fighter its own block 0x40KK0000 (KK = 0x80 + kind, above vanilla's 0x00 - 0x4F), costume cNN + 0x400 x NN, articles from + 0x4800 (`tools/fighter_texture_ids.py`, registry `reference/port_bases.json` `_texture_ids`, written by `init`); the plan passes `--tex-id` per costume, `ultimate_fighter.py` derives it from the output folder, `edge_snake_articles.py` takes its articles' blocks; `fighter_texture_ids.py rewrite` / `fix-package` re-number an installed fighter [T1 texture-clash / texture-range] |
+| a rebuild's `metal.nud` shipped without its `model.nut`: the metal texture's id (added last) past the shipped .nut's | Sephiroth tests 79 - 82 (`0x40EB0019`, his .nut ending at 0x18): his metal form drew another port's texture | ship `metal.nud` with `model.nut` too; `fighter_texture_ids.py` `repair_metal` [T2 texture-ref] |
 | the model step's material pacs shipped: shields gone | Hero fix 74 | plan ships the motions step's [M7] |
 | MSC globals past index 0x86: the fighter's MSC stopped (no actions, no respawn) | Hero fix 79 / 80 (Zoom 2 U) | reuse a global [C5, WARN: the limit is inferred, not found in the VM] |
 | `main.pac` rebuilt from an older install's: a move T-posed (its animation missing) | Hero fix 79 (forward tilt 2) | every motion-table animation in the installed `main.pac` [M8]; build on the newest one |

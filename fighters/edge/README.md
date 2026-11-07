@@ -2241,3 +2241,12 @@ and the Vault's sound-test names stay Zelda's / as they were.
 - Package: `fighter/edge/sound/` (6), body `sound.bin` / `expression.bin`, `weapon/fire|flash|flare1/sound.bin`,
   `sound/config/soundlabeltable.bin`, `sound/se/snd_se_narration_characall.nus3bank`,
   `param/ui/ui_sound_call_voice_db.bin`, `ui/replace/chr/` (47).
+
+## Texture-id fix v1 (`$S/fighters_texid_fix_v1.zip`, with the other new fighters)
+
+Install over everything. User: with two new fighters in a match one drew with the other's textures (a P1 Steve, a P2
+Squirtle in Steve's). Every port's model.nut used 0x40EB0000 + k in every costume and the game keys loaded textures
+by id. His textures now have their own block, 0x40C20000 + 0x400 per costume (`tools/fighter_texture_ids.py`, registry
+`reference/port_bases.json` `_texture_ids`): body c00-c07 / l00-l07 and the snake, snaketip, trail and fill articles (0x40C24800, 0x40C25000, 0x40C25800, 0x40C26000). His metal.nud (all 8 costumes) named a texture his model.nut didn't have (0x40EB0019, c06 / c07 0x40EB0017: tests 79-82's rebuilt metal.nud with test 41's model.nut): now his own metal texture (0x40C2NN18 / NN16, Zelda's metal picture). Not in it: his low models l00-l07 are still v3's (port_check M1 / M3 / M4 on them): copies of c00-c07 would fix them. Only the ids changed (pixels and every other byte the same:
+`tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
+packages; `port_check` T1 / T2.

@@ -15,7 +15,8 @@ written into OUT/fighter/edge/model/<article>/c00 - c07.
 Both lie along +Z, as weapon models do (Pit's arrow turns with PostureModule(0x2717, -pitch, 90, 0)), drawn twice, the
 second copy turned 90 degrees about the blade, so they look the same width turned any way (tools/snake_sword.py). Their
 material is the sword's own (his body's model.nud, the sword's mesh slot), its two textures copied into the article's
-model.nut under ids of their own (TEX_IDS). model.sb / .nhb / .mta / .xmb are the light arrow's.
+model.nut under ids of their own (each article its block: tools/fighter_texture_ids.py article_id; until
+fighters_texid_fix_v1 0x40EBF000 + k, shared with every port's ids). model.sb / .nhb / .mta / .xmb are the light arrow's.
 
   python3 tools/edge_snake_articles.py ULT_MODEL_DIR BODY_MODEL_DIR ARROW_MODEL_DIR OUT_FIGHTER_DIR
     ULT_MODEL_DIR: Ultimate's fighter/edge/model/body/c00; BODY_MODEL_DIR: his built Smash 4 body c00 (model.nud /
@@ -33,9 +34,12 @@ sys.path.insert(0, HERE)
 import nud  # noqa: E402
 import nut  # noqa: E402
 import snake_sword  # noqa: E402
+import fighter_texture_ids as TX  # noqa: E402
 
 SWORD_SLOT = 'skirt_VIS_O_OBJ16'           # his body model's mesh slot holding the sword (ultimate_fighter MESH_SLOTS)
-TEX_IDS = 0x40EBF000                        # the articles' copies of the sword's textures: 0x40EBF000 + k
+# the articles' texture ids: each article's block in Sephiroth's range (reference/port_bases.json "_texture_ids"), + k
+# for the sword's textures copied in (were 0x40EBF000 + k, F100 / F101: fighters_texid_fix_v1)
+TEX_IDS = {a: TX.article_id('edge', a) for a in ('snake', 'snaketip')}
 BONES = ['TopN', 'HaveN', 'EndN', 'BaseN']
 BASE = 3                                    # BaseN: the near ring and the point
 END_JOINT = 0x7D2                           # EndN for ModelModule (0x7D0 + bone index)
@@ -88,8 +92,8 @@ def sword_material(body_dir):
     return m.polygons[0].materials[0].copy()
 
 
-def textures(body_dir, material):
-    """the material's own textures (his body's .nut) copied under TEX_IDS, the material pointed at them"""
+def textures(body_dir, material, first):
+    """the material's own textures (his body's .nut) copied under FIRST + k, the material pointed at them"""
     _d, texs = nut.load(os.path.join(body_dir, 'model.nut'))
     raw = open(os.path.join(body_dir, 'model.nut'), 'rb').read()
     by_id = {t.tex_id: t for t in texs}
@@ -99,7 +103,7 @@ def textures(body_dir, material):
         if src is None:                     # a common one (0x10080000: the game's own)
             continue
         img = nut.decode(raw, src)
-        new = TEX_IDS + k
+        new = first + k
         k += 1
         t['hash'] = new
         out.append((new, 0x33 if (img[..., 3] < 250).any() else 0x31, img))
@@ -111,15 +115,16 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
     part = U.mesh_parts(ult_dir)[snake_sword.SPEC['meshes'][0]][0]
     run, tip, info = snake_sword.article_pieces(part)
     mat = sword_material(body_dir)
-    tex = textures(body_dir, mat)
+    mats = {a: mat.copy() for a in ARTICLES}
+    texs = {a: textures(body_dir, mats[a], TEX_IDS[a]) for a in ARTICLES}
     # the run: the far ring (z 1) on EndN, laid at z 0 in the bind
     far = run['pos'][:, 2] > 0.5
     run_pos = run['pos'].copy()
     run_pos[:, 2] = 0.0
     run_bind = dict(run, pos=run_pos)
     models = {
-        'snake': [nud.Mesh('snake', [polygon(run_bind, np.where(far, 2, BASE), mat)], bone=-1, bind=4)],
-        'snaketip': [nud.Mesh('snaketip', [polygon(tip, np.full(tip['n'], BASE, np.int64), mat)], bone=-1, bind=4)],
+        'snake': [nud.Mesh('snake', [polygon(run_bind, np.where(far, 2, BASE), mats['snake'])], bone=-1, bind=4)],
+        'snaketip': [nud.Mesh('snaketip', [polygon(tip, np.full(tip['n'], BASE, np.int64), mats['snaketip'])], bone=-1, bind=4)],
     }
     # every colour (c00 - c07): the light arrow's kind takes its model in the owner's colour (its flag 0x10, read by
     # the weapon's model set-up 0x02B62F88), and Sephiroth's costumes are c00 - c07
@@ -130,7 +135,7 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
             open(os.path.join(d, 'model.nud'), 'wb').write(nud.write(meshes))
             open(os.path.join(d, 'model.vbn'), 'wb').write(vbn(BONES))
             open(os.path.join(d, 'model.jtb'), 'wb').write(jtb(len(BONES)))
-            open(os.path.join(d, 'model.nut'), 'wb').write(tex)
+            open(os.path.join(d, 'model.nut'), 'wb').write(texs[name])
             for f in ('model.sb', 'model.nhb', 'model.mta', 'model.xmb'):
                 shutil.copy(os.path.join(arrow_dir, f), os.path.join(d, f))
     return 'snake articles: run %d vertices (far ring %d), point %d vertices %.2f long; %d textures from %s' % (
@@ -145,7 +150,8 @@ def build(ult_dir, body_dir, arrow_dir, out_fighter):
 # Test 123 had one 8-long piece per article, 40 of them: the game crashed loading him (the article pool, holder +0x120
 # list empty at 0x02C0337C: too many instances). The material is the light arrow's glow (its second: additive, blend
 # 1 / 1), the texture a purple profile across the line made here
-TRAIL_TEX = 0x40EBF100
+TRAIL_TEX = TX.article_id('edge', 'trail')      # the line; + 1 the fill's texture in the trail's .nut (were 0x40EBF100 / F101)
+TRAIL_FILL_TEX = TRAIL_TEX + 1
 TRAIL_HALF = 0.6                            # half the line's width
 TRAIL_RGB = (150, 70, 255)                  # purple
 TRAIL_POINTS = 16
@@ -153,7 +159,7 @@ TRAIL_POINTS = 16
 
 def trail_textures():
     """the line's texture and the fill's, in one .nut (test 126: the trail draws its shapes' fill)"""
-    return nut.write_ntwu([_trail_img(), _fill_img()])
+    return nut.write_ntwu([_trail_img(), _fill_img(TRAIL_FILL_TEX)])
 
 
 def trail_texture():
@@ -235,7 +241,7 @@ def trail_mesh(arrow_dir):
             uv.append([u, 0.5])
             bones.append(b)
         idx += [v0, v0 + 1, v0 + 2]
-    fill = _polygon(pos, uv, bones, idx, _glow_material(arrow_dir, FILL_TEX))
+    fill = _polygon(pos, uv, bones, idx, _glow_material(arrow_dir, TRAIL_FILL_TEX))
     return [nud.Mesh('trail', [line], bone=-1, bind=4), nud.Mesh('trailfill', [fill], bone=-1, bind=4)]
 
 
@@ -261,15 +267,15 @@ def build_trail(arrow_dir, out_fighter):
 # origin in the bind, so it draws nothing until then), a fan of triangles C - R_k - R_k+1 in the model's Y / Z plane
 # (the screen: facing 1). The light arrow's glow material (additive) with a radial purple texture (u: middle 0 to rim
 # 1): faint inside, bright at the rim
-FILL_TEX = 0x40EBF101
+FILL_TEX = TX.article_id('edge', 'fill')        # the fill article's (was 0x40EBF101, the trail's too)
 FILL_RIM = 16
 
 
 def fill_texture():
-    return nut.write_ntwu([_fill_img()])
+    return nut.write_ntwu([_fill_img(FILL_TEX)])
 
 
-def _fill_img():
+def _fill_img(tex_id):
     w, h = 64, 8
     u = (np.arange(w) + 0.5) / w
     inner = 0.72 + 0.13 * u                  # near solid (test 132, the user: "shapes look part empty"; 0.30 - 0.55)
@@ -280,7 +286,7 @@ def _fill_img():
     for c in range(3):
         img[:, :, c] = np.clip(TRAIL_RGB[c] * val + 255 * 0.45 * rim, 0, 255).astype(np.uint8)[None, :]
     img[:, :, 3] = (255 * val).astype(np.uint8)[None, :]
-    return (FILL_TEX, 0x1A, img)
+    return (tex_id, 0x1A, img)
 
 
 def fill_bones():

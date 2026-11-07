@@ -834,3 +834,12 @@ The universal shader path's open items (docs/eft-universal-shader-scope.md, "Sti
 - **The call's colour / alpha / scale** were checked in cross_f: they already reach the programs (no change).
 - Child emitters: none in his bank (deferred to a bank that has them). Quad corner order: settled.
 - `port_check` over v6 + test 25 + extras 1 - 3 + test 26: 0 errors.
+
+## Texture-id fix v1 (`$S/fighters_texid_fix_v1.zip`, with the other new fighters)
+
+Install over everything. User: with two new fighters in a match one drew with the other's textures (a P1 Steve, a P2
+Squirtle in Steve's). Every port's model.nut used 0x40EB0000 + k in every costume and the game keys loaded textures
+by id. His textures now have their own block, 0x40C60000 + 0x400 per costume (`tools/fighter_texture_ids.py`, registry
+`reference/port_bases.json` `_texture_ids`): body c00-c07 and l00-l07 (the low models are copies: the same ids). His water article keeps Mario's fireball ids (the same picture). Only the ids changed (pixels and every other byte the same:
+`tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
+packages; `port_check` T1 / T2.

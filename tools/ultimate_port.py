@@ -23,6 +23,9 @@ Rules built in (each one a bug a port shipped with):
 - extra joints go to joint table 1 (--joints), never table 0 (Sephiroth test 20, Squirtle v5);
 - the model folders ship model.nud with model.nut (Hero fix 17) and the motions step's
   material_anime pacs, not the model step's (Hero fix 74);
+- every fighter and costume gets texture ids of its own (tools/fighter_texture_ids.py, registered by init in
+  reference/port_bases.json "_texture_ids"): the game keys loaded textures by id, and the ports' shared 0x40EB0000
+  drew a P2 Squirtle with a P1 Steve's textures (fighters_texid_fix_v1);
 - Ultimate's common effects (sys_*) are converted from ef_common.eff into the port's bank (Squirtle:
   Smash 4's stood in for all of them; Hero's attack line, fix 63-70) and turned effects on bones get
   variants (effect_variants.py: Sephiroth test 49, Squirtle's dash attack);
@@ -160,6 +163,10 @@ def cmd_init(a):
     }
     os.makedirs(os.path.dirname(cfg_path(a.name)), exist_ok=True)
     json.dump(cfg, open(cfg_path(a.name), 'w'), indent=1)
+    import fighter_texture_ids        # its texture-id block (reference/port_bases.json "_texture_ids")
+    tx = fighter_texture_ids.register(a.name, kind=int(a.kind, 0))
+    print('texture ids: %s - 0x%08X (tools/fighter_texture_ids.py scheme %s)' % (
+        tx['base'], int(tx['base'], 0) + 0xFFFF, a.name))
     print('wrote fighters/%s/port.json: %d costumes, joints to add %s, %d own effects, %d common' % (
         a.name, len(costumes), joints or 'none', len(own), len(common)))
     if not trait:
@@ -213,10 +220,12 @@ def plan(name, out):
     cache = ['--anim-cache', os.path.join(work, 'anim_cache.json')]
     steps = [('body', 'the base\'s body scripts with the universal mechanics (roll-off): build/universal_mechanics_all.zip',
               [py, t('ultimate_port.py'), 'unpack-body', name, body])]
+    import fighter_texture_ids
     for c in cfg.get('costumes', ['c00']):
-        steps.append(('model-' + c, 'model %s (table-1 joints, NUD + NUT together)' % c,
+        steps.append(('model-' + c, 'model %s (table-1 joints, NUD + NUT together, its own texture ids)' % c,
                       [py, t('ultimate_fighter.py'), 'model', os.path.join(U, 'model/body', c),
                        os.path.join(base_dir, 'model/body', c), os.path.join(fighter, 'model/body', c),
+                       '--tex-id', '0x%08X' % fighter_texture_ids.body_id(name, c),
                        '--empty', src.get('empty_dir', '?EMPTY'), *mb, *joints, *have,
                        '--motions', os.path.join(U, 'motion/body/c00'), *cache]))
     add = cfg.get('motions', {}).get('add', [])

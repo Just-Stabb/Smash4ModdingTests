@@ -51,5 +51,13 @@
   "traps": [
    "Part pacs koopapt1-3 / lhand / rhand are his own bones: keep them next to the new main.pac."
   ]
+ },
+ "_texture_ids": {
+  "supamario": {"kind": "0x41", "base": "0x40C10000", "articles": []},
+  "edge": {"kind": "0x42", "base": "0x40C20000", "articles": ["snake", "snaketip", "trail", "fill"]},
+  "gaogaen": {"kind": "0x43", "base": "0x40C30000", "articles": []},
+  "pickel": {"kind": "0x44", "base": "0x40C40000", "articles": []},
+  "brave": {"kind": "0x45", "base": "0x40C50000", "articles": []},
+  "pzenigame": {"kind": "0x46", "base": "0x40C60000", "articles": []}
  }
 }

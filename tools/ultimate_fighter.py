@@ -2,7 +2,7 @@
 """An Ultimate fighter's model (SSBH: .nusktb / .numshb / .numatb / .nutexb) as a Smash 4 fighter
 model folder, on the fighter's own skeleton (docs/ultimate-fighter-port.md).
 
-  python3 tools/ultimate_fighter.py model SRC_cNN BASE_cNN OUT_cNN [--tex-id 0x40EB0000] [--empty DIR]
+  python3 tools/ultimate_fighter.py model SRC_cNN BASE_cNN OUT_cNN [--tex-id ID] [--empty DIR]
   python3 tools/ultimate_fighter.py motions SRC_MOTION_DIR SRC_c00 BASE_FIGHTER OUT_FIGHTER
 
 SRC_cNN   Ultimate model/body/cNN (model.nusktb / numshb / numdlb / numatb, the .nutexb)
@@ -69,7 +69,9 @@ def set_have(left, right):
 # the base's joint-table bones that aren't standard -> the Ultimate bone that plays the part
 JOINT_STANDINS = {'Larmor': 'H_ShoulderpadL', 'Rarmor': 'H_ShoulderpadR', 'Bustarmor': 'Bust'}
 
-TEX_ID = 0x40EB0000
+# texture ids: each fighter and costume its own (tools/fighter_texture_ids.py: the game keys loaded textures by id; the
+# old shared 0x40EB0000 made a P2 Squirtle draw with a P1 Steve's textures). None: from OUT (fighter/<name>/model/body/cNN)
+TEX_ID = None
 PIXEL_ART = 0                   # model --pixel-art N: textures smaller than N blown up to it, nearest
 WHITE = 127                     # vertex color 1.0
 
@@ -731,6 +733,18 @@ def empty_polygon(tmpl):
     return p
 
 
+def tex_id_for(out):
+    """the first texture id of the model folder OUT (.../fighter/<name>/model/body/cNN or lNN): the fighter's body
+    costume block (tools/fighter_texture_ids.py; reference/port_bases.json "_texture_ids")"""
+    import re
+    import fighter_texture_ids
+    m = re.search(r'fighter/([^/]+)/model/body/[cl](\d\d)/?$', os.path.abspath(out).replace(os.sep, '/'))
+    if not m:
+        raise SystemExit('%s: not a fighter/<name>/model/body/cNN folder: give --tex-id (tools/fighter_texture_ids.py)'
+                         % out)
+    return fighter_texture_ids.body_id(m.group(1), int(m.group(2)))
+
+
 def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=None, animated=None, snake=None,
                 materials_from=None):
     import ssbh_data_py as s
@@ -755,6 +769,8 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
         joints = list(joints) + added
     world = sk.world()
     tmpl = templates(base_nud)
+    if tex_id is None:
+        tex_id = tex_id_for(out)
     tex = Textures(src, tex_id)
     # "<article>/<mesh>@<bone>": an article model's mesh held rigidly on a fighter bone (Steve's tools:
     # Ultimate links the article's root bone to the hand's, so the mesh's own positions are relative
@@ -1621,7 +1637,8 @@ def main():
     m.add_argument('src')
     m.add_argument('base')
     m.add_argument('out')
-    m.add_argument('--tex-id', type=lambda v: int(v, 0), default=TEX_ID)
+    m.add_argument('--tex-id', type=lambda v: int(v, 0), default=TEX_ID,
+                   help='the first texture id (default: the fighter / costume block of OUT, tools/fighter_texture_ids.py)')
     m.add_argument('--empty', help='a folder with an empty model.sb / model.nhb to use')
     m.add_argument('--pixel-art', type=int, default=0, help='blow textures smaller than this up to it with nearest '
                    'pixels (Steve: 512)')

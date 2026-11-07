@@ -19,3 +19,12 @@ Slot + model + animations on Bowser's moves, built on Sephiroth v1's data:
   fall back to Wait1).
 
 Known: Bowser's up special hides the body (his shell); no fur physics or effects.
+
+## Texture-id fix v1 (`$S/fighters_texid_fix_v1.zip`, with the other new fighters)
+
+Install over everything. User: with two new fighters in a match one drew with the other's textures (a P1 Steve, a P2
+Squirtle in Steve's). Every port's model.nut used 0x40EB0000 + k in every costume and the game keys loaded textures
+by id. His textures now have their own block, 0x40C30000 + 0x400 per costume (`tools/fighter_texture_ids.py`, registry
+`reference/port_bases.json` `_texture_ids`): body c00-c07 (he has no low models: port_check M6). Only the ids changed (pixels and every other byte the same:
+`tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
+packages; `port_check` T1 / T2.

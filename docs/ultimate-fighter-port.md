@@ -383,7 +383,8 @@ Materials: the base's skinned body material (`0x9A011063`: color, normal, ramp `
 or alpha-blended (src / dst 1); Ultimate's skin (the materials with subsurface settings,
 `CustomVector30` / `11`, eyes aside) the base's skin material when it has one (Zelda's `0x9A211067`:
 color, normal, her 32 x 256 skin ramp copied in as the last texture, the ramp; warm rim, specular
-and AO floor). Textures (`0x40EB0000` up, power-of-two, one mip):
+and AO floor). Textures (the costume's own id block: `tools/fighter_texture_ids.py`, e.g. Sephiroth c03
+`0x40C20C00` up; every port used `0x40EB0000` up before fighters_texid_fix_v1; power-of-two, one mip):
 - color: Ultimate's col x `CustomVector8` x `CustomVector13` (colour / diffuse gain: his
   `def_edge_005` 0.588), brightened by emission; cut-out texels get their neighbours' color (BC7
   leaves noise there). No AO in it (only without a normal map);

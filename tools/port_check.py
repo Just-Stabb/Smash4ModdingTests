@@ -284,6 +284,23 @@ def check_model(inst, name, rep):
     return joints
 
 
+def check_texture_ids(inst, name, base, vanilla, src, rep):
+    """T1 / T2 (tools/fighter_texture_ids.py): the game keys the textures it has loaded by id, so an id two models use
+    for different pictures draws whichever loaded first on both (every port's .nut used 0x40EB0000 + k in every
+    costume: a P1 Steve drew a P2 Squirtle with his textures, fighters_texid_fix_v1). Over every fighter model folder in
+    the packages (other fighters' too) and the base's vanilla models; T2: every model.nud / metal.nud texture of a drawn
+    mesh (and texture pattern) in its own folder's model.nut (Sephiroth's metal.nud named a texture his model.nut
+    didn't have)"""
+    import fighter_texture_ids as tx
+    dirs = [d for d in (os.path.join(vanilla, 'fighter', base) if vanilla else None,
+                        src.get('base_fighter_dirs', {}).get(base)) if d and os.path.isdir(d)]
+    files = {k: v[0] for k, v in inst.files.items()}
+    tx.check(files, vanilla=tx.vanilla_digests(dirs), only={name}, report=rep.add)
+    if not dirs:
+        rep.add('INFO', 'T1 texture-vanilla', 'no vanilla %s model folder (port_sources.json vanilla / base_fighter_dirs): '
+                'textures under the base\'s ids not compared with the base\'s' % base)
+
+
 # ------------------------------------------------------------------ the scripts
 def scripts(inst, rel):
     data = inst.get(rel)
@@ -1627,6 +1644,7 @@ def main():
     print('%s (kind 0x%X on %s): %d files from %d packages\n' % (a.name, kind, rec['base'], len(inst.files), len(a.pkgs)))
     rep = Report()
     joints = check_model(inst, a.name, rep)
+    check_texture_ids(inst, a.name, rec['base'], vanilla, src, rep)
     check_scripts(inst, a.name, kind, base, joints, vanilla, rep)
     check_params(inst, a.name, kind, base, vanilla, ult_param, labels, rep)
     check_vl(inst, a.name, base, motion_list, rep)

@@ -1529,3 +1529,12 @@ frames of intangibility, also make an aerial canceled early from Zoom 2 U track 
 - An action out of the flight (`brave_lw_burst` 0x104): if it's an aerial (status 0x34), it homes 15 frames on the
   nearest opponent within 22 (feet to feet, `brave_z2_near`); otherwise the clamp frames as before.
 - `msc_stack_check`: 0 problems; port_check: the same 6 errors. Package: `fighter/brave/script/msc/brave.mscsb`.
+
+## Texture-id fix v1 (`$S/fighters_texid_fix_v1.zip`, with the other new fighters)
+
+Install over everything. User: with two new fighters in a match one drew with the other's textures (a P1 Steve, a P2
+Squirtle in Steve's). Every port's model.nut used 0x40EB0000 + k in every costume and the game keys loaded textures
+by id. His textures now have their own block, 0x40C50000 + 0x400 per costume (`tools/fighter_texture_ids.py`, registry
+`reference/port_bases.json` `_texture_ids`): body c00-c07 and l00-l07 (the low models are copies: the same ids). Only the ids changed (pixels and every other byte the same:
+`tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
+packages; `port_check` T1 / T2.

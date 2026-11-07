@@ -93,7 +93,8 @@ pieces had their base at his feet.
   drew a dark X across the curved tip; the turn is a pitch about the depth axis, so the blade's face stays to the camera).
 - Both are drawn twice, the second copy turned 90 degrees about the blade, so they look the same width turned any
   way. Their material is the sword's own; its two textures are copied into the article's `model.nut` under ids
-  0x40EBF000 + k. `model.sb / .nhb / .mta / .xmb` are the light arrow's.
+  his article blocks (`tools/fighter_texture_ids.py`: snake 0x40C24800 + k, snaketip 0x40C25000 + k; 0x40EBF000 + k
+  before fighters_texid_fix_v1). `model.sb / .nhb / .mta / .xmb` are the light arrow's.
 
 **His MSC.** The block hooks into three places:
 - **Aerial status main (`func_315`), `edge_sn_init`:** starts the hold check if this is fair with attack held.
