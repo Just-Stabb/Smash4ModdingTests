@@ -2,12 +2,16 @@
 """Smash Run step 1: enemies on the Smash Run stages (docs/smash-run-port.md, "Step 1: enemies on the field").
 Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py's), or patches an RPX:
 
-  python3 tools/smashrun_field_cave.py                 the args
-  python3 tools/smashrun_field_cave.py IN.rpx OUT.rpx  IN with them (checks the hook words first)
+  python3 tools/smashrun_field_cave.py [--minions]                 the args
+  python3 tools/smashrun_field_cave.py [--minions] IN.rpx OUT.rpx  IN with them (checks the hook words first)
 
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
-the game's own enemy system runs as in Classic's Master Fortress, with the four Smash Run enemies the Wii U has
-AI for (the Fortress minions): mczakoplasmawisp 0x57, mczakodarios 0x58, mczakostalfos 0x59, mczakozima 0x5A.
+the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
+- "smashrun" (the default, step 2a): Smash Run's own Plasma Wisp 0x12, Darios 0x1D, Stalfos 0x30 and Zima 0x0E (the
+  converted 3DS enemies), driven by their Master Fortress twins' behaviours through tools/smashrun_enemy_cave.py
+  (which must be applied too); the resource request also loads mczakoplasmawisp 0x57 (its weapons / effects).
+- "minions" (`--minions`, step 1): the four Fortress minions themselves, mczakoplasmawisp 0x57, mczakodarios 0x58,
+  mczakostalfos 0x59, mczakozima 0x5A.
 
 - A: the EnemyManager is made for a battle only when 0x02D9E1F4 says so (Classic boss rounds, the Crazy Hand event,
   stage kinds 0x1C / 8 / 0x13 / 3). Its last test, 0x02D9E2DC `cmpwi r0,3` (r0 = the stage kind), -> a cave that
@@ -18,15 +22,16 @@ AI for (the Fortress minions): mczakoplasmawisp 0x57, mczakodarios 0x58, mczakos
   param/enemy/sm/enemy_param_vl_mczako*.bin into the param manager's per-kind slots. (The ml accessor has no case
   for the minions: their slots would stay null and the enemy's activation reads them unchecked.)
 - C: battle load 0x02D9A454's sm path, 0x02D9A568 `bl 0x02DC66D0` (the accessor set-up) -> a cave that makes the
-  same call, then requests the four kinds' resources (0x02DAE314(mgr+0x28, kind): model, motion, animcmd, sound,
-  effect) on the Smash Run stages.
+  same call, then requests the set's kinds' resources (0x02DAE314(mgr+0x28, kind): model, motion, animcmd, sound,
+  effect, and the weapons in the kind's article table 0x10352794) on the Smash Run stages.
 - D: every frame the manager updates (0x02D9B554, sm path), 0x02D9B6F8 `bl 0x02D9B1A8` -> the spawner, which ends
-  in that call: on a Smash Run stage, every INTERVAL frames, while fewer than MAX_ALIVE of the four kinds live
-  (mgr+0x52A + 2 * kind: the manager's per-kind live counts), it spawns the next kind (in turn) beside the player
+  in that call: on a Smash Run stage, every INTERVAL frames, while fewer than MAX_ALIVE of the set's four kinds live
+  (mgr+0x52A + 2 * kind: the manager's per-kind live counts), it spawns the set's next kind (in turn) beside the player
   (fighter manager *(0x102F7024) entry 0: 0x02E46DEC(entry, &handle, entry+0x14E9) and 0x02BEF6E0(&xyz,
   &handle), as the leftover field generator 0x02D98A0C does), DX to the left / right in turn, facing the player,
   through 0x02D9BCFC(mgr, &EnemyCreateParam) (owner none: hostile to every fighter, as on Pyrosphere and in the
-  Fortress). Placement +0x20: 1 (ray-cast down to the ground) for Stalfos / Zima, 2 (as given) for the floaters.
+  Fortress). Placement +0x20 (the set's table): 1 (ray-cast down to the ground) for Stalfos / Zima, 2 (as given)
+  for the floaters.
 
 Space: 0x04B7D100-0x04B7E000 (stage_slot_cave.py's space after its code; smashrun_menu.py has 0x04B7D000-0x04B7D100).
 """
@@ -42,7 +47,14 @@ DATA = 0x04B7DF00               # +0 frame counter, +4 next kind, +8 side, float
 LIMIT = 0x04B7E000
 STAGE_KIND = 0x1047277C
 SR_FIRST, SR_COUNT = 0x82, 0x14
-KINDS = (0x57, 0x58, 0x59, 0x5A)
+# (kind, placement) in spawn order (4: the turn counter wraps with andi 3), and the kinds whose resources load
+ENEMY_SETS = {
+    'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
+    'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
+}
+ENEMIES = 'smashrun'
+SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
+KINDS = tuple(k for k, _m in SPAWNS)
 INTERVAL = 150                  # frames between spawns (2.5 s)
 MAX_ALIVE = 6
 DX, DY = 70.0, 30.0             # spawn offset from the player
@@ -108,23 +120,21 @@ def assemble():
         bl 0x%08X
     """ % ACCESSOR_SETUP)
     sr_check(a)
-    a.asm("""
-        bgt c_done
-        li r30, 0x%X
-    c_loop:
+    a.asm("bgt c_done")
+    for k in REQUESTS:
+        a.asm("""
         addi r3, r31, 0x28
-        mr r4, r30
+        li r4, 0x%X
         bl 0x%08X
-        addi r30, r30, 1
-        cmpwi r30, 0x%X
-        ble c_loop
+        """ % (k, REQUEST))
+    a.asm("""
     c_done:
         lwz r30, 0x18(r1)
         lwz r0, 0x24(r1)
         mtlr r0
         addi r1, r1, 0x20
         blr
-    """ % (KINDS[0], REQUEST, KINDS[-1]))
+    """)
     # D: the spawner (r3 = mgr), ends in the manager's own next step
     a.asm("""
     cave_d:
@@ -184,13 +194,13 @@ def assemble():
         addi r11, r12, 1
         andi. r11, r11, 3
         stw r11, 4(r30)
-        addi r12, r12, 0x%X
+        lis r11, spawn_table@ha
+        addi r11, r11, spawn_table@l
+        slwi r12, r12, 3
+        add r11, r11, r12
+        lwz r12, 0(r11)
         stw r12, 0x20(r1)
-        li r11, 2
-        cmpwi r12, 0x59
-        blt d_mode
-        li r11, 1
-    d_mode:
+        lwz r11, 4(r11)
         stw r11, 0x40(r1)
         lfs f1, 0x10(r30)
         stfs f1, 0x28(r1)
@@ -228,7 +238,11 @@ def assemble():
         mtlr r0
         addi r1, r1, 0x80
         b 0x%08X
-    """ % (KINDS[0], SPAWN, UPDATE_REST))
+    spawn_table:
+    """ % (SPAWN, UPDATE_REST))
+    assert len(SPAWNS) == 4
+    for k, mode in SPAWNS:
+        a.asm(".word 0x%X\n.word %d" % (k, mode))
     words = a.words()
     assert CAVE + 4 * len(words) <= DATA, 'field cave too big'
     return a, words
@@ -255,7 +269,18 @@ def args():
     return out
 
 
+def configure(name):
+    """switch the enemy set ('smashrun' / 'minions') for assemble() / args()"""
+    global ENEMIES, SPAWNS, REQUESTS, KINDS
+    ENEMIES = name
+    SPAWNS, REQUESTS = ENEMY_SETS[name]
+    KINDS = tuple(k for k, _m in SPAWNS)
+
+
 def main():
+    if '--minions' in sys.argv:
+        sys.argv.remove('--minions')
+        configure('minions')
     if len(sys.argv) == 1:
         print(' '.join(args()))
         return
