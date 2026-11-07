@@ -54,32 +54,55 @@ def call(e, at, regs):
 def main():
     new, old = sys.argv[1:3]
     E1, E0 = Emu(new), Emu(old)
-    total0, anim0 = X.lis_value(E0.w(P.ARENA_TOTAL)), X.lis_value(E0.w(P.ANIM_GETTER))
-    check('the base is exe_v11\'s heap sizes (total 0x36600000, animation 46 MiB)', (total0, anim0),
-          (0x36600000, 0x2E00000))
+    total0, bases = X.base_sizes(E0)
+    check('the base is exe_v11\'s heap sizes (total 0x36600000; animation 46, effect 60, resource 444 MiB)',
+          (total0, bases), (0x36600000, {'animation': 0x2E00000, 'effect': 0x3C00000, 'resource': 0x1BC00000}))
     slack0 = total0 - sum(X.lis_value(E0.w(g)) for g in GETTERS)
-    ext_total = total0 + X.ANIM_EXT - anim0
-    for name, free, want_total, want_anim in (('normal MEM2', NORMAL_FREE, total0, anim0),
-                                              ('just below the threshold', X.THRESHOLD - 0x1000, total0, anim0),
-                                              ('at the threshold', X.THRESHOLD, ext_total, X.ANIM_EXT),
-                                              ('the pack\'s MEM2', EXT_FREE, ext_total, X.ANIM_EXT),
-                                              ('normal again (a fresh boot)', NORMAL_FREE, total0, anim0)):
+    ext_total = X.ext_total(total0, bases)
+    exts = {n: e for n, _g, _c, e in X.POOLS}
+    flag = X.build(total0, bases)[1]['flag']
+    for name, free, extended in (('normal MEM2', NORMAL_FREE, False),
+                                 ('just below the threshold', X.THRESHOLD - 0x1000, False),
+                                 ('at the threshold', X.THRESHOLD, True),
+                                 ('the pack\'s MEM2', EXT_FREE, True),
+                                 ('normal again (a fresh boot)', NORMAL_FREE, False)):
         if name.startswith('normal'):
-            E1.setw(X.build(total0, anim0)[1]['flag'], 0)        # a boot starts with the cave's zero
+            E1.setw(flag, 0)                                     # a boot starts with the cave's zero
+        want_total = ext_total if extended else total0
         r1 = call(E1, X.HOOK_TOTAL, {29: free})
         r0 = call(E0, X.HOOK_TOTAL, {29: free})
         check('%s (free 0x%08X): arena total 0x%08X' % (name, free, want_total), r1[3], want_total)
         check('%s: registers but r3 / r11 / r12 as the base leaves them' % name,
               [i for i in range(32) if i not in (3, 11, 12) and r1[i] != r0[i]], [])
-        for at in X.HOOK_ANIM:
-            a1, a0 = call(E1, at, {}), call(E0, at, {})
-            check('%s: animation heap at 0x%08X = 0x%08X' % (name, at, want_anim), a1[3], want_anim)
-            check('%s: 0x%08X, registers but r3 / r11 / r12 as the base' % (name, at),
-                  [i for i in range(32) if i not in (3, 11, 12) and a1[i] != a0[i]], [])
-        blocks = sum(X.lis_value(E0.w(g)) for g in GETTERS) - anim0 + want_anim
+        sizes = {}
+        for pool, _g, calls, ext in X.POOLS:
+            want = ext if extended else bases[pool]
+            sizes[pool] = want
+            for at in calls:
+                a1, a0 = call(E1, at, {}), call(E0, at, {})
+                check('%s: %s heap at 0x%08X = 0x%08X' % (name, pool, at, want), a1[3], want)
+                check('%s: 0x%08X, registers but r3 / r11 / r12 as the base' % (name, at),
+                      [i for i in range(32) if i not in (3, 11, 12) and a1[i] != a0[i]], [])
+        blocks = sum(X.lis_value(E0.w(g)) for g in GETTERS) + sum(sizes[p] - bases[p] for p in sizes)
         check('%s: the arena\'s slack = the base\'s (0x%X)' % (name, slack0), r1[3] - blocks, slack0)
-    check('with the pack, the default heap grows (0x%X -> 0x%X)' % (NORMAL_FREE - total0, EXT_FREE - ext_total),
-          EXT_FREE - ext_total > 4 * (NORMAL_FREE - total0), True)
+    check('pools with the pack: animation 160, effect 128, resource 704 MiB',
+          {p: e >> 20 for p, e in exts.items()}, {'animation': 160, 'effect': 128, 'resource': 704})
+    d0, d1 = NORMAL_FREE - total0, EXT_FREE - ext_total
+    check('with the pack, the default heap grows (0x%X -> 0x%X, >= 3x)' % (d0, d1), d1 >= 3 * d0, True)
+    import kind_expand as K
+    img, found = K.Image(old), []
+    getters = {g for _n, g, _c, _e in X.POOLS}
+    for at in range(0x02000000, 0x04B80000, 4):
+        try:
+            w = img.w(at)
+        except KeyError:                    # gaps between sections
+            continue
+        if w >> 26 == 18 and w & 3 == 1:
+            off = w & 0x3FFFFFC
+            if (at + off - (0x4000000 if off & 0x2000000 else 0)) in getters:
+                found.append(at)
+    check('every getter call is hooked (the base\'s callers of the three getters)',
+          sorted(at for _n, g, calls, _e in X.POOLS for at in calls), found)
     # the 1 GiB cap skipped (the base: ble 0x03374EF4 over the 1 GiB tail allocation; patched: b there)
     check('the 1 GiB cap: base 0x%08X is ble +0x24' % X.CAP_SITE, E0.w(X.CAP_SITE), X.CAP_WORD)
     check('the 1 GiB cap: patched to b +0x24 (the same target, always)', E1.w(X.CAP_SITE), X.CAP_SKIP)

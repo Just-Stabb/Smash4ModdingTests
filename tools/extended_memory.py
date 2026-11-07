@@ -39,15 +39,22 @@ import effect_heap_patch as P  # noqa: E402
 
 MEM2_BASE, MEM2_END = 0x10000000, 0x80000000
 THRESHOLD = 0x50000000           # MEM2 free bytes from which the RAM counts as extended (1.25 GiB; normal ~1007 MiB)
-ANIM_EXT = 0x0A000000            # the animation heap with the pack: 160 MiB (~14,000 bone-instances; 4 Sephiroths
-                                 # ~5,100, 8 ~10,200)
+# the pools that grow with the pack: (name, size getter, its call sites, size with the pack). Every call of a getter
+# is hooked (each pool's block is taken from the arena with one call and the heap made with another: both must agree)
+POOLS = (
+    ('animation', P.ANIM_GETTER, (0x03326310, 0x03326320), 0x0A000000),    # 46 -> 160 MiB (~14,000 bone-instances)
+    ('effect', P.EFFECT_GETTER, (0x033FA2E4, 0x033FA39C), 0x08000000),     # 60 -> 128 MiB (every effect bank's shaders)
+    ('resource', P.RESOURCE_GETTER, (0x033FA278, 0x033FA284, 0x033FA330, 0x033FA33C),   # 444 -> 704 MiB (loaded
+     0x2C000000),                                                          # files: models, textures, motions ...)
+)
+ANIM_EXT = POOLS[0][3]
 CAVE, LIMIT = 0x04BAF000, 0x04BAF100
 HOOK_TOTAL = 0x03374F38
 # the game's own 1 GiB cap: when MEM2's allocatable size is > 0x40000000 it allocates 1 GiB from the heap's tail and
 # never uses it (a dev kit's extra RAM), so the pack's 1.75 GiB left the arena 0x2EF99F84 (< its total: crash at boot,
 # exe_v12 v1, the user's log). The `ble` past it -> `b`: the whole free size is kept.
 CAP_SITE, CAP_WORD, CAP_SKIP = 0x03374ED0, 0x40810024, 0x48000024     # ble 0x03374EF4 -> b 0x03374EF4
-HOOK_ANIM = (0x03326310, 0x03326320)
+HOOK_ANIM = POOLS[0][2]
 TITLE_IDS = ('0005000010144F00', '0005000010145000', '0005000010110E00')   # US, EU, JP
 
 
@@ -62,9 +69,17 @@ def bl(src, dst):
     return (18 << 26) | (off & 0x3FFFFFC) | 1
 
 
-def build(total, anim):
-    """(words, labels): total / anim = the getters' values in the base (exe_v11's)"""
-    assert ANIM_EXT > anim and (ANIM_EXT - anim) & 0xFFFF == 0 and total & 0xFFFF == 0
+def ext_total(total, bases):
+    """the arena's total with the pack: the base's + what every pool grows by"""
+    return total + sum(ext - bases[name] for name, _g, _c, ext in POOLS)
+
+
+def build(total, bases):
+    """(words, labels): total = the arena total getter's value in the base (exe_v11's), bases = {pool: its size}"""
+    grow = ext_total(total, bases) - total
+    assert total & 0xFFFF == 0 and grow & 0xFFFF == 0 and grow < 0x80000000
+    for name, _g, _c, ext in POOLS:
+        assert ext >= bases[name] and ext & 0xFFFF == 0 and bases[name] & 0xFFFF == 0, name
     a = Asm(CAVE)
     a.asm("""
     ext_total:
@@ -78,21 +93,27 @@ def build(total, anim):
         stw r11, flag@l(r12)
     t_out:
         blr
-    ext_anim:
+    """ % dict(T=total >> 16, TH=THRESHOLD >> 16, X=grow >> 16))
+    for name, _g, _c, ext in POOLS:
+        a.asm("""
+    ext_%(n)s:
         lis r12, flag@ha
         lwz r12, flag@l(r12)
         lis r3, 0x%(A)X
         cmpwi r12, 0
-        beq a_out
+        beq %(n)s_out
         lis r3, 0x%(E)X
-    a_out:
+    %(n)s_out:
         blr
-    flag:
-        .word 0
-    """ % dict(T=total >> 16, TH=THRESHOLD >> 16, X=(ANIM_EXT - anim) >> 16, A=anim >> 16, E=ANIM_EXT >> 16))
+        """ % dict(n=name, A=bases[name] >> 16, E=ext >> 16))
+    a.asm("flag:\n.word 0")
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT
     return words, dict(a.labels)
+
+
+def base_sizes(img):
+    return lis_value(img.w(P.ARENA_TOTAL)), {name: lis_value(img.w(g)) for name, g, _c, _e in POOLS}
 
 
 def args(rpx):
@@ -100,15 +121,15 @@ def args(rpx):
     img = K.Image(rpx)
     used = [x for x in range(CAVE, LIMIT, 4) if img.w(x)]
     assert not used, 'extended_memory: cave space in use in %s (0x%08X)' % (rpx, used[0])
-    total, anim = lis_value(img.w(P.ARENA_TOTAL)), lis_value(img.w(P.ANIM_GETTER))
-    for at, getter in [(HOOK_TOTAL, P.ARENA_TOTAL)] + [(x, P.ANIM_GETTER) for x in HOOK_ANIM]:
+    total, bases = base_sizes(img)
+    hooks = [(HOOK_TOTAL, P.ARENA_TOTAL, 'ext_total')] + [(x, g, 'ext_' + n) for n, g, calls, _e in POOLS for x in calls]
+    for at, getter, _l in hooks:
         assert img.w(at) == bl(at, getter), 'extended_memory: 0x%08X is 0x%08X, not bl 0x%08X' % (at, img.w(at), getter)
     assert img.w(CAP_SITE) == CAP_WORD, 'extended_memory: 0x%08X is 0x%08X' % (CAP_SITE, img.w(CAP_SITE))
-    words, labels = build(total, anim)
+    words, labels = build(total, bases)
     out = ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out.append('0x%08X=0x%08X' % (CAP_SITE, CAP_SKIP))
-    out.append('0x%08X=0x%08X' % (HOOK_TOTAL, bl(HOOK_TOTAL, labels['ext_total'])))
-    out += ['0x%08X=0x%08X' % (x, bl(x, labels['ext_anim'])) for x in HOOK_ANIM]
+    out += ['0x%08X=0x%08X' % (at, bl(at, labels[lab])) for at, _g, lab in hooks]
     return out
 
 
@@ -116,7 +137,7 @@ RULES = """[Definition]
 titleIds = %(ids)s
 name = Extended Memory
 path = "Super Smash Bros. for Wii U/Mods/Extended Memory"
-description = Gives the game %(gib)s GiB of emulated RAM instead of 1 GiB (MEM2 0x%(b)08X-0x%(e)08X).|Needs the modded executable (exe_v12 or later): with it, the extra RAM goes to the animation heap (more model-bearing articles: e.g. four Sephiroths) and the general heap.|Without this pack the executable keeps its normal sizes.
+description = Gives the game %(gib)s GiB of emulated RAM instead of 1 GiB (MEM2 0x%(b)08X-0x%(e)08X).|Needs the modded executable (exe_v12 or later): with it, the extra RAM goes to the animation heap (more model-bearing articles: e.g. four Sephiroths), the effect heap, the file (resource) heap and the general heap.|Without this pack the executable keeps its normal sizes.
 version = 6
 
 [RAM]

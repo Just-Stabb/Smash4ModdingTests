@@ -1846,6 +1846,10 @@ applied the mapping, the game printed `freeBytes=788111236` = 0x6EF99F84 - 1 GiB
 `0x03374EC8` -- when MEM2's allocatable size is above 0x40000000 it allocates 1 GiB from the heap's tail and never
 uses it (a dev kit's extra RAM) -- left the arena less than its total. v2 skips it (`0x03374ED0` ble -> b).
 User result of v2: four Sephiroths load with the pack on (confirmed in game).
+v3 also grows, with the pack, the effect heap (getter 0x02010B08, its calls 0x033FA2E4 / 0x033FA39C: 60 -> 128 MiB)
+and the file resource heap (0x02010AF8, its calls 0x033FA278 / 0x033FA284 / 0x033FA330 / 0x033FA33C, two boot
+paths each taking the block and making the heap (0x032D2DAC: nothing in it scales with the size): 444 -> 704 MiB);
+the arena total grows by the sum, the default heap keeps ~463 MiB (>3x the normal ~138). `extended_memory.py` POOLS.
 
 ## Article instance cap (64 a fighter)
 
