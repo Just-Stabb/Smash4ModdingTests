@@ -12,7 +12,9 @@ minus what the loader took (coreinit_Memory.cpp: mmuRange_MEM2.getEnd() - curren
 sees the bigger MEM2 by itself. MEM2_END keeps every address below 0x80000000 (no pointer the game might compare
 signed goes negative): MEM2 1 GiB -> 1.75 GiB.
 
-The game: at boot 0x03374F38 calls the MEM_ARENA_2 total's getter 0x02010AE8 with r29 = MEM2's free bytes (the
+The game: at boot 0x03374EC4 reads MEM2's allocatable size; above 1 GiB it allocates 1 GiB from the tail and
+never uses it (0x03374EC8-0x03374EF0: a dev kit's extra RAM) -- skipped (CAP_SITE), else the pack would leave the
+arena less than without it. Then 0x03374F38 calls the MEM_ARENA_2 total's getter 0x02010AE8 with r29 = MEM2's free bytes (the
 `MEM_ARENA_2 ptr=.., freeBytes=..` OSReport just before); the arena is the top `total` bytes, the default heap the
 rest (tools/effect_heap_patch.py). Later 0x03326310 / 0x03326320 call the animation heap's getter 0x02010B18 (its
 block taken from the arena, the heap made over it). Hooks (each a `bl` re-aimed at the cave):
@@ -41,6 +43,10 @@ ANIM_EXT = 0x0A000000            # the animation heap with the pack: 160 MiB (~1
                                  # ~5,100, 8 ~10,200)
 CAVE, LIMIT = 0x04BAF000, 0x04BAF100
 HOOK_TOTAL = 0x03374F38
+# the game's own 1 GiB cap: when MEM2's allocatable size is > 0x40000000 it allocates 1 GiB from the heap's tail and
+# never uses it (a dev kit's extra RAM), so the pack's 1.75 GiB left the arena 0x2EF99F84 (< its total: crash at boot,
+# exe_v12 v1, the user's log). The `ble` past it -> `b`: the whole free size is kept.
+CAP_SITE, CAP_WORD, CAP_SKIP = 0x03374ED0, 0x40810024, 0x48000024     # ble 0x03374EF4 -> b 0x03374EF4
 HOOK_ANIM = (0x03326310, 0x03326320)
 TITLE_IDS = ('0005000010144F00', '0005000010145000', '0005000010110E00')   # US, EU, JP
 
@@ -97,8 +103,10 @@ def args(rpx):
     total, anim = lis_value(img.w(P.ARENA_TOTAL)), lis_value(img.w(P.ANIM_GETTER))
     for at, getter in [(HOOK_TOTAL, P.ARENA_TOTAL)] + [(x, P.ANIM_GETTER) for x in HOOK_ANIM]:
         assert img.w(at) == bl(at, getter), 'extended_memory: 0x%08X is 0x%08X, not bl 0x%08X' % (at, img.w(at), getter)
+    assert img.w(CAP_SITE) == CAP_WORD, 'extended_memory: 0x%08X is 0x%08X' % (CAP_SITE, img.w(CAP_SITE))
     words, labels = build(total, anim)
     out = ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
+    out.append('0x%08X=0x%08X' % (CAP_SITE, CAP_SKIP))
     out.append('0x%08X=0x%08X' % (HOOK_TOTAL, bl(HOOK_TOTAL, labels['ext_total'])))
     out += ['0x%08X=0x%08X' % (x, bl(x, labels['ext_anim'])) for x in HOOK_ANIM]
     return out

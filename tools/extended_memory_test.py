@@ -80,6 +80,11 @@ def main():
         check('%s: the arena\'s slack = the base\'s (0x%X)' % (name, slack0), r1[3] - blocks, slack0)
     check('with the pack, the default heap grows (0x%X -> 0x%X)' % (NORMAL_FREE - total0, EXT_FREE - ext_total),
           EXT_FREE - ext_total > 4 * (NORMAL_FREE - total0), True)
+    # the 1 GiB cap skipped (the base: ble 0x03374EF4 over the 1 GiB tail allocation; patched: b there)
+    check('the 1 GiB cap: base 0x%08X is ble +0x24' % X.CAP_SITE, E0.w(X.CAP_SITE), X.CAP_WORD)
+    check('the 1 GiB cap: patched to b +0x24 (the same target, always)', E1.w(X.CAP_SITE), X.CAP_SKIP)
+    check('the cap\'s target keeps r29 (0x03374EF4 is past `mr r29, r3`)', (E0.w(0x03374EF0), E0.w(0x03374EF4)),
+          (0x7C7D1B78, 0x7FE3FB78))
     # the pack
     with tempfile.TemporaryDirectory() as d:
         X.write_pack(d)

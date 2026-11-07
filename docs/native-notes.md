@@ -1841,7 +1841,10 @@ arena at a fixed total and gives the rest to the default heap. `tools/extended_m
 0x10000000-0x80000000, 1.75 GiB, every address below 0x80000000) and three hooks: the total's getter call at
 `0x03374F38` and the animation getter's calls `0x03326310` / `0x03326320` -> a cave (0x04BAF000) that, when the free
 bytes are >= 0x50000000, grows the total and the animation heap by the same (46 -> 160 MiB); otherwise exe_v11's
-sizes. Test `tools/extended_memory_test.py` (unicorn, against exe_v11). Not yet run in game.
+sizes. Test `tools/extended_memory_test.py` (unicorn, against exe_v11). v1 crashed at boot (the user's log: Cemu
+applied the mapping, the game printed `freeBytes=788111236` = 0x6EF99F84 - 1 GiB): the game's own cap at
+`0x03374EC8` -- when MEM2's allocatable size is above 0x40000000 it allocates 1 GiB from the heap's tail and never
+uses it (a dev kit's extra RAM) -- left the arena less than its total. v2 skips it (`0x03374ED0` ble -> b).
 
 ## Article instance cap (64 a fighter)
 
