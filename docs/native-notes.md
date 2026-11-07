@@ -1816,6 +1816,12 @@ Sephiroth, 41 model-bearing article instances (phantom 1 x 24 bones, snake 12 x 
 snakes, point and 16 trails). Not confirmed in game (no heap readout): `tools/diag_crumbs_cave.py` v4 logs every
 such assert of 0x0330xxxx - 0x0347xxxx / 0x036Axxxx - 0x036Dxxxx (`S4DIAG trap a=<address>`).
 
+Confirmed in game (exe_diag_v4 = exe_v11 + crumbs, four Sephiroths): with the 46 MiB heap the first three load
+completely; the fourth stops at `S4DIAG trap a=36B356C b=0` during his 11th trail article's set-up: `0x036B355C`
+`bl 0x036C9350` (bones x 64, align 0x40) returned 0, then the assert. So the animation heap is the limit, and 24 MiB
+held about 2250 more bone-instances (~11 KB each, the motion object and its per-bone arrays): four full Sephiroths
+(~5090) need about 56 MiB plus the other users'.
+
 MEM_ARENA_2 (`0x03374F38`): the top `0x02010AE8` bytes (`lis r3, 0x34E0`) of MEM2's free space (Cemu: ~1007 MiB) are a
 bump arena (`0x03374558` set-up, `0x033746FC` take: a block past the end is still handed out, then the arena is marked
 spent), the rest the default heap (`operator new`); the getters' blocks: 2 MiB `0x02010AF0`, resource `0x02010AF8`,
