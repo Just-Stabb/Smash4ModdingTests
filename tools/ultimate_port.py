@@ -297,6 +297,7 @@ def plan(name, out):
                    '--ult-base', bases().get(base, {}).get('ult', base), '--ui-name', cfg['ui_name'],
                    '--s4-base', base.capitalize(), '--out', pkg] + (['--stock-icon'] if p.get('stock_icon', True) else [])
                   + (['--cross', p['cross']] if p.get('cross') else [])
+                  + [x for k, v in sorted((p.get('set_fits') or {}).items()) for x in ('--set-fit', '%s=%s' % (k, v))]
                   + (['--sets', ','.join(p['sets'])] if p.get('sets') else [])))
     steps.append(('check', 'the package against every bug class so far', [py, t('port_check.py'), name, pkg]))
     return steps

@@ -5,7 +5,7 @@ Smash 4 frames the base fighter's.
   python3 tools/ultimate_portraits.py --ult-ui ULT_UI --s4-chr S4_CHR --templates TEMPLATES
           --ult brave --ult-base reflet --ui-name Hero --s4-base Reflet --out OUT
           [--extra-out DIR] [--contact PNG] [--sets chr_00,chr_13,...] [--costumes 1-8] [--fits FITS.json]
-          [--cross SCALE,X,Y] [--stock-whole] [--stock-icon]
+          [--cross SCALE,X,Y] [--set-fit SET=SCALE,X,Y ...] [--stock-whole] [--stock-icon]
           [--name-text TEXT]
 
 ULT_UI     Ultimate's ui folder, or a zip holding it (ui/replace[_patch]/chara/chara_N/chara_N_<name>_CC.bntx)
@@ -1192,6 +1192,10 @@ def main():
                     "the base head's box (where chara_4 isn't the head of chara_3's render)")
     ap.add_argument('--cross', help='SCALE,X,Y: C (the base\'s chara_0 c00 pixel -> its Smash 4 chr_90_01 pixel) '
                     'set by hand instead of matched (Mario: the poses differ; from eyes, nose and cap emblem)')
+    ap.add_argument('--set-fit', action='append', default=[], metavar='SET=SCALE,X,Y',
+                    help='F_set (the base\'s <set>_01 pixel -> its chr_90_01 pixel) set by hand instead of matched, '
+                         'where the set isn\'t a crop of chr_90\'s render (Zelda\'s chr_10: a face turned a little '
+                         'otherwise; matched, it landed on her dress at 0.98); repeatable')
     ap.add_argument('--no-tone', action='store_true', help="Ultimate's art as it is (not brightened as Smash 4's "
                     'renders: TONE_*)')
     a = ap.parse_args()
@@ -1199,6 +1203,10 @@ def main():
 
     log = []
     cache = json.load(open(a.fits)) if a.fits and os.path.exists(a.fits) else {}
+    for sf in a.set_fit:                # by hand (landmarks: eyes, mouth), over any cached match
+        st, v = sf.split('=')
+        sc, bx, by = (float(x) for x in v.split(','))
+        cache['s4/%s_in_%s' % (st, REF_SET)] = [0.0, sc, bx, sc, by]
     ult = UltUI(a.ult_ui)
     tpl = Templates(a.templates)
     sets = [x for x in a.sets.split(',') if x] if a.sets else list(SETS)

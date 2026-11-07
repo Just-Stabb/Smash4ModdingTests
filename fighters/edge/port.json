@@ -208,8 +208,13 @@
   "_jump_scale": "the ports made before the framework keep 0.82 / 0.9 (user: new ports use Ultimate's heights, 1 / 1)"
  },
  "portraits": {
-  "cross": null,
-  "stock_icon": true
+  "cross": "2.35,1190.9,49.8",
+  "stock_icon": true,
+  "set_fits": {
+   "chr_10": "2.53,1084.8,9.7"
+  },
+  "_cross": "by hand from eyes and mouth (Zelda's Ultimate chara_0 c00 -> her Smash 4 chr_90_01): matched, it scored 0.44 and put the face on her chest",
+  "_set_fits": "Zelda's chr_10 isn't a crop of her chr_90 render (turned a little): by hand from eyes and mouth; matched, it landed on her dress (0.98)"
  },
  "specials": {
   "msc": "edge.c",

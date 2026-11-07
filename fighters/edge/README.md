@@ -2181,3 +2181,63 @@ features as commands, last hit / last attacker). Not a Sephiroth change: the exe
   executable); not tested in game. port_check over the chain, tests 70–115 and 117–147: 30 errors, 55 warnings,
   7 notes (new: X3 extra-tag).
 - Package (install over 146): `code/cross_f.rpx`.
+
+## UI and sounds v1 (`$S/sephiroth_ui_sound_v1.zip`, not in build/: disk): his art, sounds, voice, announcer
+
+User: "add Sephiroth's UI and sounds". Through the port framework (`fighters/edge/port.json`, new: he predates it),
+as Hero fix 71 / 73 and Squirtle v3. No gameplay file changes: rebuilt with `--sound`, `edge_specials_build.py`
+gives byte-identical game / effect scripts, MSC and vl file to the installed ones (tests 64-145); only the sound /
+expression scripts differ.
+
+```
+python3 tools/ultimate_sound.py ULT/sound FOLDER/fighter/edge SLT SND --name Edge --ult-name edge --dump DUMP/lua2cpp_edge
+python3 tools/fighter_extras.py narration NARR_BANK SND/sound/config/soundlabeltable.bin PARAM_DIR OUT \
+    --ult-bank ULT/sound/bank/narration/vc_narration_characall_edge --ult-tone edge --name Edge --id 60
+python3 tools/edge_specials_build.py DUMP/lua2cpp_edge ULT/fighter/edge VANILLA/fighter/zelda ZELDA_UM VL_ZELDA MODEL OUT --sound SND
+python3 tools/ultimate_portraits.py --ult-ui ULT_UI --s4-chr CHR --templates CHR --ult edge --ult-base zelda \
+    --ui-name Sephiroth --s4-base Zelda --out OUT --stock-icon --cross 2.35,1190.9,49.8 --set-fit chr_10=2.53,1084.8,9.7
+```
+(FOLDER: v3's `fighter/edge/sound`, Zelda's banks renamed; SLT: Squirtle v6 extras 2's soundlabeltable.bin, the
+newest; NARR_BANK / PARAM_DIR: extras 2's narration bank and ui_sound_call_voice_db.bin; CHR: the user's
+`ui/replace/chr` (their UI zip): Zelda's and his own files and every fighter's name plates.)
+
+Where each value came from (all Ultimate's):
+- **Banks:** `se_edge` (131 tones, 7 loops) after Zelda's in `snd_se_Edge` (BINF 2018, row 18 grown 186 -> 317);
+  `vc_edge` (54) in `snd_vc_Edge` (6014, row 69 40 -> 94); `se_edge_c06` / `_c07` (the second outfit's own) as
+  `snd_se_Edge_c06` / `_c07`; `vc_edge_cNN` are the main one's (none written). Volumes from Ultimate's TONE entries.
+  Zelda's labelled voices the game plays itself are his (alias / same name / the use's first variant: MissFoot02 ->
+  missfoot01, Jump02 -> jump01, Appeal03 -> appeal01); Passive / HeavyGet, which he has no voice for, are silent
+  (`ultimate_sound.py`, new). The KO record (commonsoundtable.csb 63, Zelda's labels) so names his screams.
+- **Chant:** `vc_edge_cheer` in `snd_vc_Edge_ouen` (2.0 s). **Sequences:** `edge.sqb`'s 16 after Zelda's 11 (set 0x13).
+- **Announcer:** `vc_narration_characall_edge` as label 87 of `snd_se_narration_characall` (row 0x38 -> 88), id 60's
+  16 entries 0x00380057 (Zelda's call before).
+- **Scripts:** 178 body sound scripts, 164 expression scripts (`ultimate_acmd.py --sound-ids --expressions`), the
+  fire (Flare flight loop, bursts `PLAY_SE_REMAIN`), flash (Attack's, every tier) and flare1 (Fly) articles'.
+  New in the translator for him: the dump's decompiled tests folded (`fold_tests`: `is_flag(F); if(==)` and
+  `IS_RANDOM` -> Smash 4's `IS_RANDOM(Chance=2)` for the ledge-catch and Flare voices), `--sound-cond`, the
+  trailing-else fix, scripts for the base's motions its sound file lacked (third taunt AppealLw, results waits,
+  teeter, item swings), ledge `...quick` names, the results voice (`WinNA`) merged into `winN`. Common sound
+  `se_common_swing_06` = Smash 4 0x6F (Marth's grabs, same frames: `reference/ultimate_sound_map.json`).
+- **Portraits:** `ui/replace_patch/chara/chara_0-7_edge_CC` (47 files: chr_00 / 11 / 12 / 13 / stock_90 x 8,
+  chr_10, chr_70, chr_90 _01 / _04, chrn_11 / 12 / 40), each in its old file's format, size and texture id;
+  stock icons Ultimate's chara_2. The cross-game fit (Zelda's Ultimate face icon in her Smash 4 chr_90) matched at
+  0.44 onto her chest: set by hand from eyes and mouth (`--cross`); her chr_10 isn't a crop of her chr_90 render
+  (matched onto her dress): set by hand too (`--set-fit`, new). Plates "SEPHIROTH" from S (Ness / Sheik / Shulk),
+  e, p, h, i, r, o, t glyphs of other plates.
+
+Approximated / left out: One-Winged Angel isn't ported (its wing sounds off); Scintilla's counter sounds also on a
+whiff (`FLAG_IS_HIT_SHIELD` taken true; Ultimate's status sets it), its stance voice off (`FLAG_VOICE` false); down
+smash's floor-hit sound always (`IS_HIT_FLOOR` true); forward air's sound set by hand (`sound_fixes`: the dump lost
+its branches, f02 at 9 as his other pairs); Shadow Flare's orb hum / strike (flare1.c plays `orbit` for several
+events); the Kirby copy voice (his copy is still Nayru's Love), Final Smash, item-specific scripts (Ultimate names)
+and the Vault's sound-test names stay Zelda's / as they were.
+
+- `port_check` (new A5 sound-ids: every id his sound scripts play is in the install's soundlabeltable / his banks /
+  soundseq; checked to fire on an older table) over Squirtle v6 extras 2 / 3 (the shared sound files) + the
+  Sephiroth chain v3, tests 30-147 + this: 29 errors, 53 warnings, 2 notes, the same findings as without it (the U1
+  portrait notes gone); the errors are the chain's (v1 / v2 aren't in build/ any more: l00-l07 M1 / M3 / M4, F1, E5,
+  E7, S4).
+- Not tested in game.
+- Package: `fighter/edge/sound/` (6), body `sound.bin` / `expression.bin`, `weapon/fire|flash|flare1/sound.bin`,
+  `sound/config/soundlabeltable.bin`, `sound/se/snd_se_narration_characall.nus3bank`,
+  `param/ui/ui_sound_call_voice_db.bin`, `ui/replace/chr/` (47).

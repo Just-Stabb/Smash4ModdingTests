@@ -75,7 +75,7 @@ fix package after it, in order. No ERROR goes out. A fix package that ships a fi
 | `motions.add` | Ultimate motions the base has no slot for (jab 2 / 3, special phases) |
 | `effects.own` / `common` | from `init` (the scripts' effects); `tint_for`, `hdr_white_for`, `bone_path` as vfxb_to_ptcl.py |
 | `stats.jump_scale` | full / short hop factors (below) |
-| `portraits.cross` / `stock_icon` | ultimate_portraits.py |
+| `portraits.cross` / `set_fits` / `stock_icon` | ultimate_portraits.py (`--cross`, `--set-fit SET=...`: fits set by hand where matching fails; check the contact sheet's fit column) |
 | `specials.msc` / `acmd` / `build` | the fighter's own specials code and build script |
 
 ## Stats
@@ -244,6 +244,13 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | stock icon = the select render shrunk | Squirtle | `--stock-icon` (Ultimate's chara_2; its icons have no eyes: user) |
 | portraits darker than Smash 4's | Hero fix 75 | ultimate_portraits.py tone curve |
 | mirrored UVs black (sampler wrap) | Hero fix 70 | converter (Ultimate's wrap) |
+| a base voice tone with no Ultimate voice of the same name (Zelda's MissFoot02 / Jump02, Hero's win aliases on another fighter) kept the base's voice on the port: a KO scream / jump in Zelda's voice | Sephiroth UI / sound v1 (offline) | `ultimate_sound.py`: alias, same name, the use's first variant (missfoot01), else a silent one-shot (Passive, HeavyGet) |
+| the bank's template tone (`Special_L01`) a loop on the base (Zelda): the sound step stopped | Sephiroth UI / sound v1 | `template_tone` falls back to a `Special_` / any one-shot |
+| the dump's decompiled tests, `is_flag(F); if(operator==(false, B))` and `IS_RANDOM(agent, N); if(...)`: the condition held no flag name, so the sound in it was always dropped (Flare's and the ledge's 50% voices, Scintilla's counter sound) | Sephiroth UI / sound v1 | `ultimate_acmd.fold_tests` (sound scripts): `if [!]is_flag(F)` (with `--sound-cond`) and Smash 4's own `IS_RANDOM(Chance=N) True` |
+| `--cond F` made `!is_flag(F)` true too (the `!` tested after the substring) | Sephiroth UI / sound v1 (both of Scintilla's voice picks played) | `cond_true` tests `!` first |
+| the dump's `if F { X } S; if is_excute { W } else { Z }` (the else is F's): the flag's branch played, the plain one never (One-Winged Angel's landing sound instead of the plain one) | Sephiroth UI / sound v1 | `fix_trailing_flag_else` (sound scripts); forward air's (`frame(0)` in its else) set in `edge_specials_build.sound_fixes` |
+| Ultimate sound scripts with no slot in the base's sound file (third taunt, results waits, teeter), Smash 4 names that differ (ledge `...quick`), the results voice in its own `WinNA` script: left out | Sephiroth UI / sound v1 | `translate_others`: the base's motion table, `SOUND_NAMES`, `SOUND_MERGE` |
+| a later package's `soundlabeltable.bin` without a port's grown rows (or banks shipped without the table): his ids name other / no sounds | (guard) | `port_check` A5 sound-ids |
 
 ## Open
 
