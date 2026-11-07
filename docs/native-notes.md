@@ -1830,6 +1830,19 @@ spent), the rest the default heap (`operator new`); the getters' blocks: 2 MiB `
 (exe_v11): the animation heap 22 -> 46 MiB with the arena's total grown by the same 24 MiB (the default heap gives it:
 ~162 -> ~138 MiB on Cemu), `effect_heap_patch_test.py`; `port_check` W11 weapon-models.
 
+### Extended Memory (graphic pack + exe_v12)
+
+exe_v11 (46 MiB) loads three Sephiroths; the fourth runs it out (above). Cemu's graphic packs (version 6+) can
+move an MMU range's end with `[RAM] mappingN = start-end` (the start must be a range's base; Cemu
+src/Cafe/HW/MMU/MMU.cpp `memory_mapForCurrentTitle`, as BotW's "Extended Memory" pack does), and Cemu's
+OSGetMemBound(MEM2) is that range's end minus the loader's part (coreinit_Memory.cpp), so the game sees the larger
+MEM2 by itself: its MEM_ARENA_2 set-up (`0x03374F38`, r29 = MEM2's free bytes, the `freeBytes=` OSReport) keeps the
+arena at a fixed total and gives the rest to the default heap. `tools/extended_memory.py`: the pack (MEM2
+0x10000000-0x80000000, 1.75 GiB, every address below 0x80000000) and three hooks: the total's getter call at
+`0x03374F38` and the animation getter's calls `0x03326310` / `0x03326320` -> a cave (0x04BAF000) that, when the free
+bytes are >= 0x50000000, grows the total and the animation heap by the same (46 -> 160 MiB); otherwise exe_v11's
+sizes. Test `tools/extended_memory_test.py` (unicorn, against exe_v11). Not yet run in game.
+
 ## Article instance cap (64 a fighter)
 
 Found from Sephiroth test 123's load crash (Cemu: access violation at `0x02C0337C`, from `0x02C057F4`). A fighter's
