@@ -2285,3 +2285,24 @@ loading."
   executable) + this package + the rebuilt executable: 20 errors (21 before: X4 gone), 62 warnings, 3 notes; new
   checks X4 weapon-custom, W10 weapon-custom, E10 weapon-endless-effects.
 - Package: `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`, `script/animcmd/weapon/phantom/effect.bin`.
+
+## Multi-instance bugs v2 (executable only): the Phantom's glow found; two Sephiroths still hang
+
+User (exe_v9 + fighters_fix_multi_v1, clip vs Hero on Smashville): after the Phantom's release a small purple glow
+stays at his hand for good; two Sephiroths still hang while loading (no exception in Cemu's log, last lines GX2R
+warnings; Hero + Hero and Hero + Sephiroth load).
+- **The glow:** Zelda's own native code, not a script. The Phantom's article-list extra (`0x02F97F0C`, his entry 2)
+  plays PtcZeldaPhantomAlarm (`0x3100021`, endless emitters) on the owner's bone 0x11 at the release, its handle in
+  the int array's `+0x20C` (and a sound, `+0x210`); Zelda's specializer +0x13C (`0x02F979EC`) kills both when the
+  Phantom's article event comes, but only for a weapon of kind 0x26 (`0x02F97A40 cmpwi r3, 0x26`). His Phantom is his
+  own kind 0x19B since test 111, so it was never killed. Fixed in `tools/weapon_expand.py` (`kind_compares`, a
+  pipeline default for every copy): that compare (and Mario's `0x02F1A8B0` for Supamario's Finale) goes through a
+  stub that also takes the copies; unicorn-tested (`weapon_expand_test.py`: 0 failed, the base, the copy and other
+  kinds on both executables); `port_check` X5 weapon-kind-compare. v1's MSC / script ends stay (harmless).
+- **Two Sephiroths:** still not found. Since v1, also ruled out: MSC loops in edge.c and his articles (every loop's
+  bound checked: no counter depends on another instance), the weapon model colours (flag 0x200, `0x030C3A40`: none of
+  his), the weapon resource flatten (`0x030C37AC`, a 0x30-entry list per fighter, no sub-article cycles: his copies
+  have none), costume files (c00-c07 identical sets; every model.nud's indices within its vertices). Needed from the
+  user: Cemu's debugger at the hang (Debug > Debugger, pause: the PPC thread's address and call stack).
+- port_check over the chain + fighters_fix_multi_v1 + v9 rebuilt with this weapon_expand: 20 errors (21 on v9: X5
+  gone), 62 warnings.
