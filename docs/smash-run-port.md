@@ -828,6 +828,9 @@ its first test: this, state, CFG, TREAD, death state, the fighter table and its 
 within 14 of the enemy's x and -6..40 above its posture: fighter y / last y / x, enemy y / x, state; floats as bits)
 and `S4STOMP hit` (the stomp taken). Shipped with diag_crumbs_cave.py v3 in one build, exe_diag_v3.
 
+User result with exe_diag_v3b (exe_v10 + the logging, fix v8's stomp words unchanged): stomping on a Goomba works.
+(The earlier "no reaction" report was before this build; the stomp diagnostics weren't needed. fix v8 stands.)
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
