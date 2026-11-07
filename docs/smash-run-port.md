@@ -439,6 +439,78 @@ still pass on the same executable). Not yet run in game.
   0x10352470 (set up only by the Fortress round) left alone. Next: Smash Run's own enemies (generic AI on the
   converted models, motions and scripts), power-ups, the 5-minute timer and the final battle.
 
+## Step 2a: Smash Run's own Stalfos, Zima, Plasma Wisp and Darios with their Fortress twins' AI
+
+`tools/smashrun_enemy_cave.py IN.rpx [OUT.rpx]` (test `tools/smashrun_enemy_test.py PATCHED.rpx [ENEMY_ROOT]`), with
+`tools/smashrun_field_cave.py` now spawning (and requesting) the Smash Run kinds instead of the minions (its
+`ENEMY_SETS`; `--minions` builds step 1's set). Not yet run in game. Package smashrun_step2a_v1: the user's
+executable (stage slots + Training 0 CPUs) + smashrun_menu.py's rpx part + the field cave + this, in one
+rpx_patch.py call (each tool's hook words checked first; smashrun_menu.patch_rpx's free-space check reads the text
+section once per word, minutes), and capitalised copies of the four sound banks. On it: smashrun_enemy_test.py
+(with the installed enemies: every set entry an OMO of K's pac, every stalfos script in its set) 26 checks,
+smashrun_field_test.py 12, training_cpu_test.py, smashrun_menu_test.py's rpx checks, stage_slot_test.py (NewStage01
++ the ten): 0 failures each.
+
+The four Fortress minions are Smash Run enemies under another name, with the same (3DS) behaviours. The converted
+3DS enemies keep their own kinds (index in the name table 0x1041A22C, checked): stalfos 0x30 (twin mczakostalfos
+0x59), zima 0x0E (0x5A), plasmawisp 0x12 (0x57), darios 0x1D (0x58). Each K runs its twin's behaviour on K's own
+files (model, main.pac, animcmd, sound, effects):
+- **Factory** 0x02DB94CC (r30 module, r31 kind, r29 variation): hook 0x02DB9518 `addi r12, r31, -0x50` -> for the
+  four K, `module+8 = twin_create(module+4, K, variation)` (creates 0x026D1DFC / 0x026D6834 / 0x026CF4DC /
+  0x026CBA64, reached with `bctrl`: out of `bl` reach), then the factory's epilogue 0x02DB96E0; other kinds go on
+  to its switch. create passes K to the Behavior ctor 0x02DB2DF0; behaviour code reads params both through the
+  object's kind (`lwz r0, 8(rX)` then `[mgr+0x60+4*kind]`, e.g. 0x026D1E24) and from its twin's slot hard-coded
+  (20 sites in mczakostalfos's code read `[mgr+0x60+4*0x59]`).
+- **Tables** (battle load 0x02D9A454, before its accessor set-up and the field cave's requests): hook 0x02D9A468
+  `lwz r0, 0x5EC(r31)` -> on a Smash Run stage, motion data set table 0x10352610[K] (get_motion_data_set
+  0x02DC6D68, read by the enemy's accessor set-up 0x02DA2A3C at +0x58) -> K's own set, and article table
+  0x10352794[K] (0x02DC6D88: the weapons the request 0x030BF400 loads at 0x030BF588, accessor +0x80) -> the twin's
+  (only mczakoplasmawisp has articles: 4 weapons from 0x102FE844; the other three are the empty default). Both
+  tables are initialised .data written at run time (nothing to relocate).
+- **Param slots**: the sm accessor fills `[*(0x102F6C00) + 0x60 + 4*kind]` (kinds 0x50-0x5A) in 0x02DC67C0, called
+  from the battle's param load 0x02D9A5EC (0x02D9A614), after the battle load's requests: hook 0x02D9A614 `bl
+  0x02DC67C0` -> the call, then on a Smash Run stage slot[K] = slot[twin]. The activation (0x02D89CC8, +0x70) and
+  the accessor set-up (0x02DA2B9C, +0x5C) read slot[K] unchecked. Sharing is the right layout as well as the right
+  values: the Wii U sm vl files are longer than the 3DS fs ones (stalfos 1323 / 1293 bytes, zima 783 / 758,
+  plasmawisp 2288 / 2248, darios 1128 / 1098), and the behaviours were built for the Wii U layout. The accessor
+  frees its own block on teardown (0x026B43E0), never a slot, so the copied pointers are no double free.
+- **Field cave** (smashrun_field_cave.py "smashrun" set): spawns 0x12, 0x1D (placement 2) and 0x30, 0x0E
+  (placement 1) in turn from a (kind, placement) table, and requests 0x12 0x1D 0x30 0x0E plus 0x57
+  (mczakoplasmawisp's own resources, in case its weapons / effects are looked up under the twin).
+
+Motion data sets (K's built from the twin's, at 0x04B85C00): `{entries*, count, 4 zero words, count x 12-byte
+hashsets, entries {hash, flags}}`. Entry hash = `zlib.crc32(stem, 0xFFFFFFFF)` of the OMO's file name in main.pac
+without `.omo`, case kept: every entry of the Wii U mczako sets is `EnmMczako<name>BodyMain<X>`, and 572 entries of
+the fighters' weapon sets in .data hash their pac stems the same way (none with `.omo` or lower case). The twin sets
+are K's 3DS animations with "Mczako" inserted, in the Wii U's own order (stalfos: 38 entries, the 30 animations with
+aliases at 5-10 = Attack1 / Attack2 and 31-32 = Jumpattack / Jumpattacklanding; zima: Damage dropped, Turn added
+against the 3DS set; stalfos's index 26 is `FlinchEnd` on the Wii U, `Flinchend` in K's pac). K's set: the same
+indices, K's stems' hashes, the twin's flags (1; 5 for stalfos FlinchStart; 0x40 for darios DamageStart) and
+hashsets. Every one of the twins' entries has its animation in K's converted pac. Scripts: K's converted
+`animcmd/enemy/stalfos/attack.bin` and `effect.bin` (13 scripts each) all hash into mczakostalfos's hashsets (the
+3DS scripts use the Wii U's names); zima / plasmawisp / darios have no animcmd on the 3DS either (their attacks are
+code and params). The enemy loads `effect.bin`, `sound.bin`, `attack.bin` (0x02DC6A98); missing ones are skipped.
+
+Sound: the bank path uses the capitalised name table 0x1041A534 (`sound/se/snd_se_enemy_%s.nus3bank` -> Stalfos,
+Zima, Plasmawisp, Darios), as every Wii U enemy bank is named (snd_se_enemy_Mczakostalfos...); the converted banks
+were written lower case, so step 2a's package adds capitalised copies (the banks' own names are already
+`snd_se_enemy_Stalfos`...). Their tones are in the twins' order (Stalfos: Attack, JumpAttack, Buckstep, Guard,
+Shrink, Landing = Mczakostalfos's; Plasmawisp's five = Mczakoplasmawisp's; Darios's two = Mczakodarios's).
+
+Params (enemy_param.bin, gl, read by the activation for every kind): the four K have entries of their own, with
+Smash Run's values: HP (+0x14) stalfos 60 / zima 10 / plasmawisp 20 / darios 20 against the twins' 24 / 15 / 10 / 25,
+model scale (+0x1C, the activation's set_scale) stalfos 2.4 against 1.6, darios 0.8 against 0.9, the others equal.
+
+Not verified (no Wii U mczako model / motion / effect files here): whether the behaviours use bone indices (no bone
+name strings, and no hash of any of K's bone names, in the behaviours' code or the vl params: the attack scripts'
+bones are K's own, from the 3DS); whether their effect calls (by index into the kind's own effect file) match the
+converted 3DS effect lists; what the gl entries' other differing fields do (+0x34 is 1 for every 3DS kind, 0 for
+the Wii U ones; not read by the activation).
+
+Space: 0x04B85800-0x04B86800 (code to 0x04B8597C, sets 0x04B85C00-0x04B86174), in kind_expand.py's old stale space
+(0x04B85800-0x04B877C4; no branch, address or data pointer refers to it), cleared to zeros up to 0x04B88000
+(base_effects_cave.py's). Still free: 0x04B86800-0x04B88000.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

@@ -11,8 +11,8 @@ Runs the four hooked sites with the game's code around them, the calls out of th
   0x02DAE314(mgr+0x28, k) for the set's REQUESTS (0x12 0x1D 0x30 0x0E 0x57; minions 0x57-0x5A); off them nothing
   more; r31 and the stack kept.
 - D (0x02D9B6F8, the manager's update): every frame ends in 0x02D9B1A8(mgr); on a Smash Run stage a spawn every
-  INTERVAL frames: the set's kinds in turn (0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), placement 2 2 1 1, DX left / right of the player in turn
-  facing him, y + DY, +8 = 1.0, the rest 0; none while MAX_ALIVE live, none off the Smash Run stages, none
+  INTERVAL frames: the set's kinds in turn (0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), placement
+  2 2 1 1, DX left / right of the player in turn facing him, y + DY, +8 = 1.0, the rest 0; none while MAX_ALIVE live, none off the Smash Run stages, none
   without a player.
 """
 import struct
