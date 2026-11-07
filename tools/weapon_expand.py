@@ -286,9 +286,10 @@ def all_descriptors(img):
     return sorted(out)
 
 
-def copy_getter(img, src, base_fighter, new_vl_off):
+def copy_getter(img, src, base_fighter, new_vl_off, clamp=None):
     """a param getter (`lwz rX, 0x111C + 4 * base(rY)` ... blr) with the vl slot read moved; None if
-    it isn't one"""
+    it isn't one. clamp (default CUSTOM_CLAMP): the custom number (r4) kept within the param vector's
+    entries (clamp_custom)"""
     words, a = [], src
     found = 0
     while True:
@@ -302,7 +303,64 @@ def copy_getter(img, src, base_fighter, new_vl_off):
         assert w >> 26 not in (16, 18, 19) or w == 0x4E800020, 'branch in a getter at 0x%08X' % a
         a += 4
         assert len(words) < 32
-    return words if found == 1 else None
+    if found != 1:
+        return None
+    if CUSTOM_CLAMP if clamp is None else clamp:
+        words = clamp_custom(words, new_vl_off)
+    return words
+
+
+# The custom number a weapon is made with (its init block +0x5C, the owner's custom slot int 0x10000048 /
+# 0x10000049 ...: docs/native-notes.md "Weapon custom number") picks its param block: the getter returns
+# vector data + custom x entry size with no bound. The vl vectors hold 4 entries (custom 0-3); a port's MSC
+# that passes more in the custom number (Hero's Whack / Thwack: level + 4 x his player slot, so 4 / 5 for
+# P2) bound the weapon to whatever followed the vector (the heap block after it): Hero's Whack and Thwack
+# never appeared for P2 and later (user, multi-instance bugs v1). Every getter copy now keeps the custom
+# number within the vector's entries: past its count, custom & 3, and past that 0. The MSC still reads the
+# full number (the weapon's int 0x10000005 is the init block's, not the getter's).
+CUSTOM_CLAMP = True
+VECTOR_COUNT = -4           # a vl vector {element fn, entry size, count, data, flag}: count just before data
+CLAMP_SIGNATURE = 0x7C045840    # cmplw r4, r11: the clamp's compare (port_check X4 looks for it)
+
+
+def clamp_custom(words, slot_off):
+    """a getter copy's words with the custom number (r4) clamped to its vector's count, right after the vl
+    struct is loaded (`lwz rV, slot_off(..)`): `lwz r11, data - 4(rV); cmplw r4, r11; blt ok; clrlwi r4, r4,
+    30; cmplw r4, r11; blt ok; li r4, 0; ok:`. Instructions before that load reading r4 (the index's mulli /
+    slwi in dein's / Mario's pump getters) move after it. Unchanged when the getter reads no vector of the
+    vl struct by the custom (Mario's fireball +0x24: a fixed block)."""
+    def is_slot(w):
+        return w >> 26 == 32 and (w & 0xFFFF) == slot_off
+    i_slot = next(i for i, w in enumerate(words) if is_slot(w))
+    rv = (words[i_slot] >> 21) & 31
+    data = [w for w in words[i_slot + 1:] if w >> 26 == 32 and (w >> 16) & 31 == rv]
+    if not data:
+        return words
+
+    def reads_r4(w):
+        op = w >> 26
+        return (op == 7 and (w >> 16) & 31 == 4) or (op == 21 and (w >> 21) & 31 == 4)
+    if not any(reads_r4(w) for w in words):
+        return words
+    off = data[0] & 0xFFFF
+    assert off >= 4 and not any(((w >> 21) & 31) in (4, 11) for w in words if w >> 26 not in (36, 38)
+                                and not reads_r4(w) and w != 0x4E800020), 'getter writes r4 / r11'
+    from ppcasm import Asm
+    a = Asm(0)
+    a.asm("""
+        lwz r11, %d(r%d)
+        cmplw r4, r11
+        blt ok
+        clrlwi r4, r4, 30
+        cmplw r4, r11
+        blt ok
+        li r4, 0
+ok:
+""" % (off + VECTOR_COUNT, rv))
+    clamp = a.words()
+    early = [w for w in words[:i_slot] if reads_r4(w)]
+    head = [w for w in words[:i_slot] if not reads_r4(w)]
+    return head + [words[i_slot]] + clamp + early + words[i_slot + 1:]
 
 
 def singleton_of(img, kind):

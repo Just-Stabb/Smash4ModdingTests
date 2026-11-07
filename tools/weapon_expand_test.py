@@ -262,6 +262,27 @@ def main():
                     base_res = res
             check('0x%X %s: +0x%X getter copy reads the new fighter\'s vl slot (+0x%X), as the base\'s reads +0x%X'
                   % (nk, art, off, vl_new + 4 * r['kind'], 0x111C + 4 * r['bkind']), res, base_res)
+            # the custom number past the vector's 4 entries (two owners: P1 makes Whack with 0 / 1, P2 with 4 / 5,
+            # P3 8 / 9; Sephiroth's flash up to 5): the copy keeps it within them (custom & 3), the base's read past
+            if off != 0x18:
+                continue
+            got, base_got = [], []
+            for E, fn, slot in ((E0, src, 0x111C + 4 * r['bkind']), (E1, at, vl_new + 4 * r['kind'])):
+                mgr = E.alloc(0x4000, b'\0')
+                E.setw(0x102FF448, mgr)
+                vl = E.alloc(0x400, b'\0')
+                E.setw(mgr + slot, vl)
+                for o in range(0, 0x400, 4):            # every word 4: a vector's count 4, its data at 4
+                    E.setw(vl + o, 4)
+                data = 4
+                for c in (0, 1, 2, 3, 4, 5, 8, 9, 29, 33):
+                    out = E.alloc(0x20, b'\0')
+                    E.call(fn, out, c)
+                    (got if E is E1 else base_got).append((E.w(out) - data, E.w(out + 4)))
+            stride = base_got[1][0] - base_got[0][0]
+            check('0x%X %s: getter copy keeps the custom number within the vector\'s 4 entries (customs 0-5, 8, 9, '
+                  '29, 33; the base\'s reads past them: %s)' % (nk, art, [hex(x[0]) for x in base_got[4:7]]),
+                  got, [((c if c < 4 else c & 3) * stride, base_got[0][1]) for c in (0, 1, 2, 3, 4, 5, 8, 9, 29, 33)])
 
     # ---- static accessors
     acc = [(0x0320E5BC, 'u32'), (0x0320E5FC, 'u8')] + [(0x0320E634 + 0x14 * i, 'bit%d' % i) for i in range(12)]
