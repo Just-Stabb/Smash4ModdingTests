@@ -153,6 +153,14 @@ class Machine:
         elif addr == W.CHANGE_MOTION:
             c.append(('motion', r(3), r(4), round(self.fr(1), 4), round(self.fr(2), 4), r(5), round(self.fr(3), 4)))
             self.ret()
+        elif addr == W.MSC_STATUS:
+            ctx, args = r(3), r(4)
+            words = [self.r32(self.r32(args) + 4 * i) for i in range(self.r32(args + 4))]
+            c.append(('msc_status', self.r32(ctx + 4), tuple(words)))
+            self.ret()
+        elif addr == W.BI_UPDATE:
+            c.append(('bi_update', r(3), r(4)))
+            self.ret()
         elif addr == W.NOTIFY_DEATH:
             c.append(('notify_death', r(3)))
             self.ret()
@@ -362,7 +370,7 @@ def main():
                                                             (W.SITE_DEATH, 'cave_death'))),
           'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
     want = {}
-    for a in (A, B, A.area):
+    for a in (A, B, A.area, A.stomp):
         want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
     for base, words in d.chunks:
         want.update({base + 4 * i: x for i, x in enumerate(words)})
@@ -424,7 +432,7 @@ def main():
     slots = {k: vt[(0xC + 8 * k) // 4] for k in range(76)}
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
     over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'],
-            41: fn['w_start'], 45: fn['w_atk'], 20: fn['w_tread'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
+            3: fn['w_upd'], 41: fn['w_start'], 45: fn['w_atk'], 20: fn['w_tread'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
             67: fn['w_r67'], 72: fn['w_chg'], 73: fn['w_chgi'], 74: fn['w_chg'], 75: fn['w_chgi']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
     ok &= all(vt[(0x8 + 8 * k) // 4] == 0 for k in range(76))
@@ -634,6 +642,57 @@ def main():
         got = (m.uc.mem_read(e0 + 1, 1)[0], m.r32(e0 + 0xC), round(m.rf(e0 + 0x18), 3), round(m.rf(e0 + 0x1C), 3))
         check(sets == [e0] and got == want, 'fix v7: the game\'s area set-up (0x02D89860) for kind 0x%02X: '
               'area 0 (kind, node, size) %s' % (k, got))
+
+    # ---- fix v8: the stomp detected in the walker's update (slot 3)
+    FT, TBL, ENTS, FACC, FPOST = (HEAP + 0x34000 + 0x100 * i for i in range(5))
+
+    def stomp(name, frames, state=3, ex=0.0, ey=0.0, count=1, live=4):
+        """frames: the fighter's (x, y) per frame; -> per frame (chgi states, msc status calls, bi_update calls)"""
+        w = byname[name]
+        m = Machine(img)
+        m.walker(cfg[w['kind']], state=state, kind=w['kind'], x=ex)
+        m.wf(POSTURE + 0x14, ey)
+        m.w32(W.FIGHTERS, FT)
+        m.w32(FT, TBL)
+        m.w32(TBL, ENTS)
+        m.w32(TBL + 8, count)
+        m.uc.mem_write(ENTS + 0x1E, bytes([live]))
+        m.w32(ENTS + 0xC, FACC)
+        m.w32(FACC + 0x18, FPOST)
+        out = []
+        for fx, fy in frames:
+            m.wf(FPOST + 0x10, fx)
+            m.wf(FPOST + 0x14, fy)
+            m.calls = []
+            m.call(fn['w_upd'], {3: OBJ, 4: INPUT})
+            out.append(([c[2] for c in m.calls if c[0] == 'chgi'], [c[1:] for c in m.calls if c[0] == 'msc_status'],
+                        [c[1:] for c in m.calls if c[0] == 'bi_update']))
+        return out
+    fall = [(3.0, 20.0), (3.0, 8.0), (3.0, 5.0), (3.0, 1.0)]
+    got = stomp('kuribo', fall)
+    ok = [g[0] for g in got] == [[], [], [8], []] and got[2][1] == [(FACC, (3, W.STEP_JUMP, 0))] and \
+        all(g[2] == [(OBJ, INPUT)] for g in got) and not got[3][1]
+    check(ok, 'fix v8: a fighter falling onto a walking Goomba (feet from above its tread box top %.2f to inside it, '
+          '|dx| 3 <= %g) -> => collapses 8 and the fighter\'s StatusModule(3, 0x%X StepJump, 0); BehaviorImpl\'s '
+          'update every frame %s' % (W.TREAD_BOX[1] + W.TREAD_BOX[2], W.TREAD_BOX[0], W.STEP_JUMP, got))
+    res = {}
+    res['beside'] = stomp('kuribo', [(9.0, 20.0), (9.0, 5.0)])
+    res['rising'] = stomp('kuribo', [(3.0, 0.0001), (3.0, 2.0), (3.0, 5.0)])
+    res['below'] = stomp('kuribo', [(3.0, 20.0), (3.0, -5.0)])
+    res['first'] = stomp('kuribo', [(3.0, 5.0)])
+    res['in 8'] = stomp('kuribo', fall, state=8)
+    res['dead'] = stomp('kuribo', fall, state=9)
+    res['not live'] = stomp('kuribo', fall, live=3)
+    res['none'] = stomp('kuribo', fall, count=0)
+    res['high'] = stomp('kuribo', [(3.0, 30.0), (3.0, 25.0)], ey=10.0)
+    for n in ('heiho', 'waddledee', 'waddledoo', 'churine'):
+        res[n] = stomp(n, fall)
+    ok = all(not g[0] and not g[1] and g[2] for v in res.values() for g in v)
+    hi = stomp('kuribo', [(-50.0, 40.0), (-53.0, 14.0)], ex=-50.0, ey=10.0)
+    ok &= hi[1][0] == [8]
+    check(ok, 'fix v8: no stomp beside it (|dx| 9), rising through it, landing past its bottom, on the first frame '
+          '(no last y), in 8 / its death state, a fighter not live, no fighters, above it but not reaching its top, '
+          'nor on the other walkers (no TREAD state); one on a Goomba at (-50, 10) %s' % hi[1][0])
 
     # ---- Kuribo
     I = lambda n, s: W.index(byname[n], s)  # noqa: E731,E741
@@ -871,7 +930,7 @@ def main():
     # ---- Waddle Doo
     got = enters('waddledoo')
     exp = {1: (8, 0, (10, 1.0, 1), ''), 2: (0, 1, (12, 1.0, 0), ''), 3: (1, 1, (14, 1.0, 1), ''),
-           4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 10: (None, None, (2, 0.0, 0), 'bullet')}
+           4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet')}
     check(got == exp, 'waddledoo enters as the 3DS\'s: %s' % got)
     wd = world('waddledoo', 3, lr=-1.0)
     m = wd.m
@@ -895,7 +954,7 @@ def main():
     # ---- Churine
     got = enters('churine')
     exp = {1: (8, 0, (12, 1.0, 1), ''), 2: (0, 1, (8, 1.0, 0), ''), 3: (1, 1, (11, 1.0, 1), ''),
-           4: (5, 0, (7, 1.0, 1), ''), 5: (0, 1, (10, 1.0, 0), ''), 8: (None, None, (2, 0.0, 0), 'bullet')}
+           4: (5, 0, (7, 1.0, 1), ''), 5: (0, 1, (10, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet')}
     check(got == exp, 'churine enters as the 3DS\'s: %s' % got)
     wd = world('churine', 3, lr=1.0)
     m = wd.m

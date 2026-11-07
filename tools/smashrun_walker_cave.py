@@ -52,11 +52,12 @@ Waddle Dee 0x13: 1 fall, 2 parasol fall (variations 0 / 1: start here and after 
   7. No contact attack: its vl list has only the bullet (state 7).
 Waddle Doo 0x19: 1 fall, 2 landing (end: the nearest target behind -> 4, else 3), 3 walk (Walk, kinetic 1; a wall
   -> 5; every 60 frames search_target(search 0) behind -> 4), 4 turn (=> 3), 5 jump (kinetic 5, Jump; landed on
-  the same height or a wall ahead => 4, else => 3), 10 dead, 11 remove; 3 / 1 / 1 / 10. No contact attack.
+  the same height or a wall ahead => 4, else => 3), 6 dead, 7 remove (the 3DS's 10 / 11: renumbered in fix v8 to
+  save the empty rows); 3 / 1 / 1 / 6. No contact attack.
 Churine 0x1F: 1 fall, 2 landing (end: unless it came from a hop, the nearest target behind -> 5; else 3), 3 walk
   (initialize again, Walk, kinetic 1; a wall -> 4; a ledge -> 5), 4 jump (initialize, kinetic 5, Jump; landed on
-  the same height (row +0x18: 20) or a wall ahead => 5, else => 2), 5 turn (=> 3), 8 dead, 9 remove; 3 / 1 / 1 /
-  8. No contact attack.
+  the same height (row +0x18: 20) or a wall ahead => 5, else => 2), 5 turn (=> 3), 6 dead, 7 remove (the 3DS's
+  8 / 9); 3 / 1 / 1 / 6. No contact attack.
 
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
@@ -110,6 +111,18 @@ minions'), so nothing could stomp them. The three reads -> area_N: a walker kind
 last group (Kuribo {1, 2, 14, 8, 0, 0} on, Waddle Dee {1, 0, 10, 2, 0, 12} on; Shy Guy, Waddle Doo, Churine off, as
 on the 3DS; area 1 (kind 9) theirs too); other kinds read their slot's as before.
 
+Stomp detection (fix v8; in game the footstool never reached the Goomba even with its tread area on, so the fighter
+side doesn't tread on these enemies -- the area set-up itself is the 3DS's, code.bin 0x756EE0: same kinds 0xE / 9,
+same flags 0 / 40960.0): slot 3 (update) -> w_upd, then BehaviorImpl's update 0x026A4880. For a kind with a TREAD
+state, not in it nor in its death state: each live fighter of slots 0-3 (the fighter table [[0x1035184C]]: entries
+0x76B0 apart, +0x1E live >= 4, +0xC accessor, its PostureModule +0x18: x +0x10, y +0x14) whose y went from at / above
+the tread box's top last frame (this +0x1A0 + 4 * slot; 0 = no last frame yet) to at / below it now, and not below
+its bottom, within its half width -> change_state_interrupt(TREAD) and the fighter's MSC StatusModule(3, 0xB3, 0)
+(change status to StepJump, the footstool jump: tools/position_vars_cave.py's way, ctx {0, accessor}). The box: the
+Goomba's 3DS area 0 (node 2, 14 x 8, offset 0) as half width 7 around the posture x, centre the posture y + 2.53
+(node 2 HipN in the bind pose), half height 4. Approximated: the box is not moved with the animation or the model's
+scale, and the fighter's feet are its posture origin (not its ECB); no jump input is needed (a fall onto it does).
+
 Hooks (2a's three stay as they are):
 - F2, the factory 0x02DB94CC after 2a's hook: 0x02DB951C `cmplwi r12, 0x10` -> for the walker kinds
   module+8 = create(module+4, K, variation) then the factory's epilogue 0x02DB96E0; else the instruction and
@@ -133,7 +146,9 @@ Fix v3 (every Smash Run kind < 0x50, 2a's twins included):
 Space: 0x04B86800-0x04B88000 (kind_expand.py's old space after smashrun_enemy_cave.py), 0x04B89000-0x04B8A000
 (free between base_effects_cave.py and base_customs_cave.py) and 0x04BB8000-0x04BB8660 (the grown text after
 weapon_expand.py, up to the text region's end 0x04BB8670; grow:0x04BB8660). Code in the first two and the area hooks
-at the start of the third, data after them. To fit fix v7, state tables start at row 1 (id 0 -> 1 in change_state) and
+at the start of the third (with the stomp test's body), the stomp hook's frame in the fourth (fix v8: 0x04B84900-
+0x04B84A00, zero and unclaimed between stage_omega_cave.py's LIMIT and boot_training_cave.py's CAVE, no branch, word
+or lis / addi pair in the executable pointing into it), data after them (largest blocks first). To fit fix v7, state tables start at row 1 (id 0 -> 1 in change_state) and
 P has five words.
 """
 import os
@@ -148,7 +163,8 @@ import smashrun_field_cave as F  # noqa: E402
 CAVE, LIMIT = 0x04B86800, 0x04B88000
 CAVE_B, LIMIT_B = 0x04B89000, 0x04B8A000
 CAVE_C, LIMIT_C = 0x04BB8000, 0x04BB8660
-REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C))
+CAVE_D, LIMIT_D = 0x04B84900, 0x04B84A00    # fix v8: free between stage_omega_cave.py and boot_training_cave.py
+REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D))
 GROW = LIMIT_C
 
 # the framework (docs/smash-run-port.md, Step 2b / Fix v5)
@@ -208,7 +224,7 @@ RELOC_DUMMY = 0x037EE73C
 SET_LR_SLOT = 49
 KEEP_FLIP = False    # True: the variant that keeps the motion flip (only the rotation and death fixes)
 
-OBJ_SIZE = 0x1A0                     # BehaviorImpl 0x168, +0x168 CFG*, +0x16C V0..V8, +0x190 Y0
+OBJ_SIZE = 0x1B0                     # BehaviorImpl 0x168, +0x168 CFG*, +0x16C V0..V8, +0x190 Y0, +0x1A0 PREV
 
 
 def V(i):
@@ -216,6 +232,15 @@ def V(i):
 
 
 Y0 = 0x190
+PREV = 0x1A0                         # fix v8: each fighter slot's (0-3) y last frame (0 = none yet)
+FIGHTERS = 0x1035184C                # [[FIGHTERS]]: +0 entries, +8 count; entry 0x76B0: +0x1E live >= 4, +0xC acc
+FIGHTER_ENTRY = 0x76B0
+MSC_STATUS = 0x030B2B98              # MSC StatusModule wrapper (ctx {0, accessor}, args {words*, count})
+STEP_JUMP = 0xB3                     # fighter status StepJump (the footstool jump off an opponent)
+BI_UPDATE = 0x026A4880               # BehaviorImpl::update (slot 3): the state's update PMF
+# the Goomba's tread area (its 3DS area 0: node 2, 14 x 8, offset 0): half width, centre above the posture
+# (node 2 HipN 2.53 in its bind pose), half height
+TREAD_BOX = (7.0, 2.53, 4.0)
 SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, change_state, interrupt
 
 # CFG (per kind)
@@ -305,7 +330,7 @@ WALKERS = (
                  7: ('g_dead_en', 'g_dead_up'), 8: 'remove'},
          start=(1, 2), rets=(4, 1, 1, 7), remove=8, fall=('Fall', 3), landing='Landing', turn='Turn', turnst=5,
          walkst=4, hop=(0.0, 0, 0),
-         search=((2, 30, 300.0, 100.0, 0.0, 10.0, 0.0),),
+         search=(),                   # 3DS {2, 30, 300, 100, 0, 10, 0}: never searches
          attacks=((7, 'bullet'),),
          P=(1.2, 100, 50, 50)),       # walk rate (+0x84), jump interval / chance %, wall jump chance % (+0x78..)
     dict(name='waddledoo', areas=((0, 2, 1.0, 1.0, 0.0, 0.0), (1, 2, 8.0, 10.0, 0.0, 0.0)), kind=0x19,
@@ -315,12 +340,12 @@ WALKERS = (
          dead='Damage', last='Jump', hashset=False, kick=False,
          energy={8: 0.3, 0x10: 0.3, 0x20: 0.5, 0x24: 2.4, 0x28: 0.5, 0x2C: 2.4},
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('o_walk_en', 'o_walk_up'),
-                 4: ('g_turn_en', 'g_turn_up'), 5: ('g_hop_en', 'g_hop_up'), 10: ('g_dead_en', 'g_dead_up'),
-                 11: 'remove'},
-         start=(1, 1), rets=(3, 1, 1, 10), remove=11, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
+                 4: ('g_turn_en', 'g_turn_up'), 5: ('g_hop_en', 'g_hop_up'), 6: ('g_dead_en', 'g_dead_up'),
+                 7: 'remove'},                # the 3DS's 10 / 11 (6-9 not ported: no empty rows)
+         start=(1, 1), rets=(3, 1, 1, 6), remove=7, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
          walkst=3, hop=(1.0, 3, 0), hop_motion=('Jump', 0),
          search=((2, 60, 200.0, 200.0, 0.0, 0.0, 0.0), (2, 20, 60.0, 70.0, 30.0, 20.0, 0.0)),
-         attacks=((10, 'bullet'),),
+         attacks=((6, 'bullet'),),
          P=()),
     dict(name='churine', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (1, 3, 5.0, 10.0, 0.0, 4.0)), kind=0x1F,
          motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
@@ -329,12 +354,12 @@ WALKERS = (
          dead='DamageStart', last='Fall', hashset=True, kick=False,
          energy={8: 0.7, 0x10: 0.1, 0x14: 0.05, 0x20: 0.2, 0x24: 2.5, 0x28: 0.2, 0x2C: 2.5},
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('c_walk_en', 'c_walk_up'),
-                 4: ('c_jump_en', 'g_hop_up'), 5: ('g_turn_en', 'g_turn_up'), 8: ('g_dead_en', 'g_dead_up'),
-                 9: 'remove'},
-         start=(1, 1), rets=(3, 1, 1, 8), remove=9, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=5,
+                 4: ('c_jump_en', 'g_hop_up'), 5: ('g_turn_en', 'g_turn_up'), 6: ('g_dead_en', 'g_dead_up'),
+                 7: 'remove'},                # the 3DS's 8 / 9 (6 / 7 not ported: no empty rows)
+         start=(1, 1), rets=(3, 1, 1, 6), remove=7, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=5,
          walkst=3, hop=(20.0, 2, 1),
-         search=((2, 3, 100.0, 35.0, 5.0, 5.0, 0.0),),
-         attacks=((8, 'churine_bullet'),),
+         search=(),                   # 3DS {2, 3, 100, 35, 5, 5, 0}: only for the powder (not ported)
+         attacks=((6, 'churine_bullet'),),
          P=()),
 )
 KINDS = tuple(w['kind'] for w in WALKERS)
@@ -424,12 +449,12 @@ class Data:
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
-                41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
+                3: fn('w_upd'), 41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
                 67: fn('w_r67'), 72: fn('w_chg'), 73: fn('w_chgi'), 74: fn('w_chg'), 75: fn('w_chgi')}
         for k, f in over.items():
             vt[(0xC + 8 * k) // 4] = f
             vt[(0x8 + 8 * k) // 4] = 0
-        b.append(('vt', vt, 0x10))
+        b.append(('vt', vt, 4))
         ktab = []
         for w in WALKERS:
             ktab += [w['kind'], g('cfg_' + w['name'])]
@@ -466,7 +491,7 @@ class Data:
         """first fit into spans [(lo, hi)]; sets .addr, .chunks [(base, words)]"""
         spans = [list(s) for s in spans]
         self.addr, self.chunks = {}, []
-        for label, words, al in self.blocks:
+        for label, words, al in sorted(self.blocks, key=lambda x: -len(x[1])):     # largest first
             for s in spans:
                 a = (s[0] + al - 1) & ~(al - 1)
                 if a + 4 * len(words) <= s[1]:
@@ -1659,23 +1684,162 @@ def assemble(vt_words):
             tuple('row_heiho_' + r for r in ('walk', 'run', 'jump')) + tuple(ATTACKS)}
         A, B = code(dd)
         C = area_code(dd)
+        Dd = stomp_code()
         labels = dict(A.labels)
-        labels.update(B.labels)
-        labels.update(C.labels)
-        for a in (A, B, C):
+        for a in (B, C, Dd):
+            labels.update(a.labels)
+        for a in (A, B, C, Dd):
             a.labels.update(labels)
-        ea, eb, ec = A.pc, B.pc, C.pc
+        ea, eb, ec, ed = A.pc, B.pc, C.pc, Dd.pc
+        assert ed <= LIMIT_D, 'stomp code too big (0x%X)' % ed
         assert ea <= LIMIT and eb <= LIMIT_B, 'walker code too big (0x%X, 0x%X)' % (ea, eb)
         d.build(labels, D)
-        d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C)])
+        d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
+                 ((ed + 3) & ~3, LIMIT_D)])
         if d.addr == D:
             break
         D = dict(d.addr)
     d.build(labels, D)
-    d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C)])
+    d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
+             ((ed + 3) & ~3, LIMIT_D)])
     assert d.addr == D
     A.area = C
+    A.stomp = Dd
     return A, B, d
+
+
+def stomp_code():
+    """fix v8: slot 3 (update) -> w_upd: for a kind with a TREAD state, not in it nor dying / removed, each live
+    fighter (slots 0-3) whose feet (posture y) went from at / above the tread box's top last frame to at / below it
+    now, not below its bottom, within its half width -> change_state_interrupt(TREAD) and the fighter's
+    StatusModule(3, STEP_JUMP, 0) (MSC's change status, as position_vars_cave.py does it); then BehaviorImpl's update"""
+    Dd = Asm(CAVE_D)
+    Dd.asm("""
+    w_upd:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r24, 0x20(r1)
+        stw r4, 0x40(r1)
+        mr r31, r3
+        lwz r30, 0x168(r3)
+        lwz r29, 0x%(TREAD)X(r30)
+        cmpwi r29, 0
+        beq u_out
+        lwz r0, 4(r31)
+        cmpw r0, r29
+        beq u_out
+        lwz r12, 0x%(R67)X(r30)
+        cmpw r0, r12
+        beq u_out
+        lwz r12, 0(r31)
+        lwz r28, 0x311C(r12)
+        lis r27, tbox@ha
+        addi r27, r27, tbox@l
+        lis r12, 0x%(FH)04X
+        lwz r12, %(FL)d(r12)
+        cmpwi r12, 0
+        beq u_out
+        lwz r26, 0(r12)
+        cmpwi r26, 0
+        beq u_out
+        li r25, -1
+    u_next:
+        addi r25, r25, 1
+        lwz r0, 8(r26)
+        cmpw r25, r0
+        bge u_out
+        cmplwi r25, 4
+        bge u_out
+        b u_body
+    u_out:
+        mr r3, r31
+        lwz r4, 0x40(r1)
+        lmw r24, 0x20(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        lis r12, 0x%(BH)04X
+        ori r12, r12, 0x%(BL)04X
+        mtctr r12
+        bctr
+    tbox:
+        .float %(HW)r
+        .float %(CY)r
+        .float %(HH)r
+    """ % dict(TREAD=CF['TREAD'], R67=CF['R67'], FH=ha(FIGHTERS), FL=sx(FIGHTERS), BH=BI_UPDATE >> 16,
+               BL=BI_UPDATE & 0xFFFF, HW=TREAD_BOX[0], CY=TREAD_BOX[1], HH=TREAD_BOX[2]))
+    return Dd
+
+
+def stomp_body(C):
+    """the per-fighter test (in region C, after the area hooks; r25 slot, r26 the fighter table, r27 tbox, r28 the
+    enemy's posture, r29 its TREAD state, r31 this)"""
+    C.asm("""
+    u_body:
+        lwz r12, 0(r26)
+        mulli r11, r25, 0x%(ENT)X
+        add r12, r12, r11
+        lbz r11, 0x1E(r12)
+        cmplwi r11, 4
+        blt b_next
+        lwz r24, 0xC(r12)
+        lwz r11, 0x18(r24)
+        lfs f1, 0x14(r11)
+        slwi r10, r25, 2
+        add r10, r10, r31
+        lwz r0, 0x%(PREV)X(r10)
+        lfs f2, 0x%(PREV)X(r10)
+        stfs f1, 0x%(PREV)X(r10)
+        cmpwi r0, 0
+        beq b_next
+        lfs f3, 0x14(r28)
+        lfs f4, 4(r27)
+        fadds f3, f3, f4
+        lfs f5, 8(r27)
+        fadds f4, f3, f5
+        fcmpu cr0, f2, f4
+        blt b_next
+        fcmpu cr0, f1, f4
+        bgt b_next
+        fsubs f6, f3, f5
+        fcmpu cr0, f1, f6
+        blt b_next
+        lfs f6, 0x10(r11)
+        lfs f7, 0x10(r28)
+        fsubs f6, f6, f7
+        fabs f6, f6
+        lfs f7, 0(r27)
+        fcmpu cr0, f6, f7
+        bgt b_next
+        mr r3, r31
+        mr r4, r29
+        lwz r12, 0xE0(r3)
+        lwz r12, 0x%(S73)X(r12)
+        mtctr r12
+        bctrl
+        li r0, 3
+        stw r0, 0x10(r1)
+        stw r0, 0x4C(r1)
+        li r0, 0x%(STEP)X
+        stw r0, 0x14(r1)
+        li r0, 0
+        stw r0, 0x18(r1)
+        stw r0, 8(r1)
+        stw r24, 0xC(r1)
+        addi r0, r1, 0x10
+        stw r0, 0x48(r1)
+        addi r3, r1, 8
+        addi r4, r1, 0x48
+        lis r12, 0x%(MH)04X
+        ori r12, r12, 0x%(ML)04X
+        mtctr r12
+        bctrl
+        b u_out
+    b_next:
+        b u_next
+    """ % dict(ENT=FIGHTER_ENTRY, PREV=PREV, S73=SLOT[73], STEP=STEP_JUMP, MH=MSC_STATUS >> 16,
+               ML=MSC_STATUS & 0xFFFF))
 
 
 def area_code(D):
@@ -1715,6 +1879,7 @@ def area_code(D):
     ar%d_out:
         b 0x%08X
         """ % (i, dst, base, ('srwi r9, r%d, 2' if shifted else 'mr r9, r%d') % kind_reg, i, dst, i, site + 4))
+    stomp_body(C)
     return C
 
 
@@ -1728,7 +1893,7 @@ def patches(img):
     for lo_, hi_ in REGIONS:
         for addr in range(lo_, hi_, 4):
             out[addr] = 0
-    for a in (A, B, A.area):
+    for a in (A, B, A.area, A.stomp):
         for i, w in enumerate(a.words()):
             out[a.base + 4 * i] = w
     for base, words in d.chunks:

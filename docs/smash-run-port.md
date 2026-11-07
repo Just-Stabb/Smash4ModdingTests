@@ -794,6 +794,32 @@ the Wii U and the walker update has to detect the stomp itself (the design in th
 109 checks (the three sites per kind, the tables, the game's own area set-up 0x02D89860 run for a Goomba: area 0
 kind 0xE, node 2, 14 x 8; for zima's slot: node 0, 12 x 12, then off).
 
+## Fix v8: the stomp detected by the Goomba itself
+
+User result of fix v7: still no bounce and no reaction, from a footstool or a landing. With the walkers' own tread
+areas the enemy side is the 3DS's (code.bin 0x756EE0 builds the same two areas: kinds 0xE / 9 from the table at
+0xB71C04, entry +4 = 0.0 / 40960.0, as the Wii U's 0x02D89860 does), so the Wii U fighters don't tread on these
+enemies; the fighter-side scan (who tests other objects' tread areas, and its object filter) was not found in a cheap
+look and stays open. Its own detection instead (`tools/smashrun_walker_cave.py`, docstring "Stomp detection"):
+slot 3 (update) -> w_upd before BehaviorImpl's update: for a kind with a TREAD state (Kuribo), each live fighter
+(slots 0-3, the fighter table as tools/position_vars_cave.py reads it) whose feet (posture y) cross the Goomba's
+tread box top this frame from above, within its half width -> collapses (state 8, fix v6) and the fighter's status
+StepJump 0xB3 (the footstool jump; MSC StatusModule(3, 0xB3, 0) as position_vars_cave.py changes a status). The box
+is the 3DS area 0 (node 2, 14 x 8) as half width 7, centre the posture y + 2.53 (node 2 in the bind pose), half height
+4. Approximations: the box doesn't follow the animation or the model's scale; the fighter's feet are its posture
+origin; any fall onto the Goomba stomps (no jump press needed, as a footstool would); StepJump is entered without the
+footstool's own set-up (the stepped object's id): if it misbehaves, an upward speed is the fallback.
+
+Space: the hook's frame and loop at 0x04B84900-0x04B84A00 (256 bytes: zero in the base, between stage_omega_cave.py's
+LIMIT 0x04B84900 and boot_training_cave.py's CAVE 0x04B84A00, claimed by no tool, no branch, data word or lis / addi
+pair in the executable points into it); the per-fighter test after the area hooks in region C. To fit: Waddle Doo's
+and Churine's death / remove states renumbered 10 / 11 and 8 / 9 -> 6 / 7 (no empty table rows), the unused search
+groups dropped (Waddle Dee, Churine), data placed largest first. The build (sr5/build.py) ends with
+`tools/stage_omega_cave.py --revert` (the user's revert of the stage select's Auto Omega: the five game words,
+checked against its ORIGINAL; its cave stays, unreferenced). Test: smashrun_walker_test.py 111 checks (the stomp:
+a fall onto a walking Goomba -> 8 + StepJump, none beside it, rising, past its bottom, on the first frame, in 8 or
+dying, not live, no fighters, above it short of its top, nor on the other four).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
