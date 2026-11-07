@@ -59,6 +59,26 @@ Churine 0x1F: 1 fall, 2 landing (end: unless it came from a hop, the nearest tar
   the same height (row +0x18: 20) or a wall ahead => 5, else => 2), 5 turn (=> 3), 6 dead, 7 remove (the 3DS's
   8 / 9); 3 / 1 / 1 / 6. No contact attack.
 
+Step 2c (docs/smash-run-port.md, "Step 2c"; code in region E):
+White Bear 0x40 (create 0x7F420, table 0x111E8C): 1 fall (Fall loop; on the ground => 2), 2 landing (end: the nearest
+  target behind -> 5, else 3), 3 walk (kinetic 1, Move loop; V1 = random(60, 120); stick (lr, 0); off the ground
+  -> 1; a wall or ledge -> 5; the search counter V0++; a cool-down V2 > 0 counts down and skips the search; when V0
+  passes search 1's interval (60): V0 = 0, search_target(group 1) found -> 6; V1 runs out -> 4), 4 special turn
+  (SpecialTurn; end: reverse_lr => 3), 5 turn (Turn; same), 6 quake hold (QuakeHold at 1.5, V4 = 0; end -> 7: the
+  3DS's is_in_view_area test (CameraModule is_clip_in) is taken as true), 7 quake jump (E+0x20 0, +0x24 / +0x2C
+  1.5, +0x28 0, +0x3C 0.1, the kick vt+0xEC (the 3DS's KineticEnergy vt+0x74), kinetic 5, QuakeUp; V5 frames; speed
+  y <= 0 -> 8), 8 quake fall (E+0x20 / +0x24 the current speed, +0x28 0, +0x2C 3, +0x3C 1, the kick, kinetic 5,
+  QuakeFall; on the ground: V5 < 180 => 9, else => 2), 9 quake landing (kinetic 0, QuakeLanding at 1.0, 0.5 after
+  the first; V4++; end: V4 < 3 and a 50 >> (V4 - 1) %% chance -> 7, else V2 = 60 -> 3), 10 dead (DamageStart,
+  bullet, P2's bullet attack), 11 remove; 3 / 1 / 1 / 10. Not ported: the landing's camera quake, its absolute
+  hit on the first grounded fighter (the bear's only attack: Behavior::hit_attack_absolute with P6, power 10,
+  angle 90, bkb 40), its effects 0x7400000 / 0x7400001, set_weak_param(5, 2.0).
+Gordo 0x08 (create 0x1A470, table 0x10F55C), variation 0: start (SMODE 1: set_rhombus, set_correct(0), set_lr(0, 1,
+  1), no turn to a target), 1 spin (kinetic -1, ground off, Togetoge loop; the contact attack P2 entry 0: power 10,
+  angle 65, kbg 50, fkb 50, bkb 100, size 8, node 3), 3 remove; slots 64-67 0 (never defeated: death state 0).
+  Not ported: the per-frame energy-0 write steering it back to its spawn point (it holds it with kinetic -1),
+  set_test_coll_stop(1), set_invincible_global(0), variations 1-3 (state 2: moving along a line or path).
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -164,7 +184,12 @@ CAVE, LIMIT = 0x04B86800, 0x04B88000
 CAVE_B, LIMIT_B = 0x04B89000, 0x04B8A000
 CAVE_C, LIMIT_C = 0x04BB8000, 0x04BB8660
 CAVE_D, LIMIT_D = 0x04B84900, 0x04B84A00    # fix v8: free between stage_omega_cave.py and boot_training_cave.py
-REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D))
+# step 2c: Smash Run's own unused space (zero and unreferenced in exe_v12, checked): the field cave's tail before its
+# DATA (its code ends 0x04B7D430; F.CODE_LIMIT keeps it below CAVE_E), smashrun_enemy_cave.py's gaps (code to
+# 0x04B8597C, sets to 0x04B8621C) and the old .text end before position_vars_cave.py's 0x04B78000
+CAVE_E, LIMIT_E = 0x04B7D600, 0x04B7DF00    # code, then data
+DATA_F = ((0x04B85980, 0x04B85C00), (0x04B86220, 0x04B86800), (0x04B77E20, 0x04B78000))     # data only
+REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D), (CAVE_E, LIMIT_E)) + DATA_F
 GROW = LIMIT_C
 
 # the framework (docs/smash-run-port.md, Step 2b / Fix v5)
@@ -194,6 +219,7 @@ IS_STOPPED = 0x026A679C              # is_current_stopped(): |speed x| < 0.05
 CLEAR_SPEED = 0x026A67E8             # clear_speed_all()
 CHG_BASE = 0x026A3A44                # change_state_base(id, &update, &enter, &exit) (deferred)
 CHG_INT = 0x026A3AD4                 # change_state_interrupt_base (now)
+SET_CORRECT = 0x02C36458             # GroundModule set_correct(kind) (the twins' calls with 0 / 5)
 NOTIFY_DEATH = 0x0269FD6C            # BehaviorImpl::notify_on_death (slot 71: death flag, hit off, attacks cleared)
 # fix v7: the sites reading [param slot]+0x70 (the area table): (site, word, dst, base, the kind's register, kind * 4)
 AREA_SITES = ((0x02D89898, 0x81450070, 10, 5, 0, True),       # the Enemy's area set-up: add_area(2 areas)
@@ -246,11 +272,12 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 # CFG (per kind)
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
-                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA').split()):
+                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
+                         'SMODE').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
-CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0..P4
-CFG_SIZE = CF['P'] + 4 * 5
+CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
+CFG_SIZE = CF['P'] + 4 * 5          # the walkers' (step 2c kinds have more P words: cfg_size())
 
 
 def P(i):
@@ -271,8 +298,14 @@ HEIHO_BULLET = (15, 0, 0, 2, 2, 361, 100, 0, 50, 2, 0.0, 0.0, 0.0, 0, 0.0, 2.0, 
                 9, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 CHURINE_BULLET = (8, 0, 0, 2, 1, 361, 100, 0, 50, 3, 0.0, 0.0, 0.0, 0, 0.0, 2.0, 1.0, 0, 0, 0, 2, 1, 3, 0, 2, 2, 0,
                   9, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+# step 2c (the vl files' P2 entries, typed as in the files): Gordo's spikes (states 1 and 2: the same entry but for
+# the state word), the White Bear's defeated body (state 10)
+GORDO_SPIKE = (1, 0, 0, 3, 10, 65, 50, 50, 100, 8, 0.0, 0.0, 0.0, 2, 0.0, 2.0, 1.0, 0, 0, 0, 2, 3, 7, 1, 2, 3, 0, 9,
+               0, 0, 0, 0, 60, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+WHITEBEAR_BULLET = (10, 0, 0, 2, 8, 361, 100, 0, 50, 5, 0.0, 0.0, 0.0, 0, 0.0, 2.0, 1.0, 0, 0, 0, 2, 1, 3, 0, 0, 2, 0,
+                    9, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 ATTACKS = {'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
-           'churine_bullet': CHURINE_BULLET}
+           'churine_bullet': CHURINE_BULLET, 'gordo_spike': GORDO_SPIKE, 'whitebear_bullet': WHITEBEAR_BULLET}
 DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBound', 'DownLoop', 'DownBoundEnd',
                  'DownWait')
 
@@ -361,6 +394,38 @@ WALKERS = (
          search=(),                   # 3DS {2, 3, 100, 35, 5, 5, 0}: only for the powder (not ported)
          attacks=((6, 'churine_bullet'),),
          P=()),
+    # ---- step 2c
+    # White Bear (Ice Climber) 0x40, BehaviorWhitebear (enemy_fs.cro create 0x7F420, table 0x111E8C)
+    dict(name='whitebear', areas=((0, 2, 1.0, 1.0, 0.0, 0.0), (1, 3, 12.0, 26.0, 0.0, 5.0)), kind=0x40,
+         motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
+                  ('DownLoop', 1), ('DownWait', 1), ('Fall', 1), ('Landing', 1), ('Move', 1), ('QuakeFall', 1),
+                  ('QuakeHold', 1), ('QuakeLanding', 1), ('QuakeUp', 1), ('SpecialTurn', 1), ('Turn', 1)),
+         dead='DamageStart', last='Fall', hashset=True, kick=False,
+         energy={0x10: 1.0, 8: 0.3, 0x14: 0.0},                 # initialize 0x7E738: P0 f1 / f2 / f3
+         states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('b_walk_en', 'b_walk_up'),
+                 4: ('b_sturn_en', 'g_turn_up'), 5: ('g_turn_en', 'g_turn_up'), 6: ('b_hold_en', 'b_hold_up'),
+                 7: ('b_up_en', 'b_up_up'), 8: ('b_fall_en', 'b_fall_up'), 9: ('b_land_en', 'b_land_up'),
+                 10: ('g_dead_en', 'g_dead_up'), 11: 'remove'},
+         start=(1, 1), rets=(3, 1, 1, 10), remove=11, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=5,
+         walkst=3, hop=(0.0, 0, 0),
+         search=((2, 30, 300.0, 100.0, 0.0, 10.0, 0.0), (2, 60, 180.0, 140.0, 0.0, 10.0, 0.0)),
+         attacks=((10, 'whitebear_bullet'),),
+         # P0 (0x5C a row): walk frames f7 / f8, QuakeHold rate f9, jump f10, fall E+0x3C f11 / E+0x2C f12, landing
+         # rate f13, long-fall frames f14, repeat chance f15 (%%, halved per landing), repeat landing rate f16, quakes
+         # f17, search cool-down f18; 0.1 the jump's E+0x3C (a literal)
+         P=(60, 120, 1.5, 1.5, 1.0, 3.0, 1.0, 180, 50, 0.5, 3, 60, 0.1)),
+    # Gordo (Kirby) 0x08, BehaviorGordo (create 0x1A470, table 0x10F55C): variation 0 (the one the spawner makes)
+    dict(name='gordo', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (0, 0, 14.0, 14.0, 0.0, 0.0)), kind=0x08,
+         motions=(('Togetoge', 1),), no_damage_labels=True,       # its ctor 0x1A4A8: no hashsets, no damage labels
+         dead=None, last=None, hashset=False, kick=True,
+         energy={0x10: 0.0, 8: 0.0, 0x14: 0.0, 0x20: 0.0, 0x24: 0.0, 0x28: 0.0, 0x2C: 0.0, 0x40: 1.0, 0x18: 0.0,
+                 0xC: 100.0},                                   # initialize 0x1A1D8 (variation 0's row: zeros)
+         states={1: ('o_spin_en', 'o_nop'), 3: 'remove'},     # 2: variations 1-3 (moving on a path): not ported
+         start=(1, 1), rets=(0, 0, 0, 0), remove=3, fall=(None, 0), landing=None, turn=None, turnst=0,
+         walkst=0, hop=(0.0, 0, 0), smode=1,
+         search=(),                   # 3DS {2, 30, 300, 100, 0, 10, 0}: never searches
+         attacks=((1, 'gordo_spike'), (2, 'gordo_spike')),
+         P=()),
 )
 KINDS = tuple(w['kind'] for w in WALKERS)
 
@@ -375,10 +440,6 @@ def motion_hash(s):
 
 def index(w, sfx):
     return [m for m, _f in w['motions']].index(sfx) if sfx else -1
-
-
-def damage_labels(w):
-    return [index(w, s) for s in DAMAGE_LABELS] + [index(w, w['last'])]
 
 
 def nstates(w):
@@ -410,6 +471,18 @@ def branch_target(src, word_):
     return src + (off - 0x4000000 if off & 0x2000000 else off)
 
 
+def cfg_size(w):
+    return CF['P'] + 4 * max(5, len(w['P']))
+
+
+def damage_labels(w):
+    """the nine set_damage_motion_label indices (all -1 for a kind whose 3DS create doesn't call it: then the call
+    is skipped)"""
+    if w.get('no_damage_labels'):
+        return [-1] * 9
+    return [index(w, s) for s in DAMAGE_LABELS] + [index(w, w['last'])]
+
+
 def cfg_values(w, D):
     """the kind's CFG words (D: data labels)"""
     n = w['name']
@@ -421,8 +494,9 @@ def cfg_values(w, D):
              FALLMOT=lm(w['fall'][0]), LANDST=w['fall'][1], LANDMOT=lm(w['landing']), TURNMOT=lm(w['turn']),
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
-             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n])
-    words = [0] * (CFG_SIZE // 4)
+             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n],
+             SMODE=w.get('smode', 0))
+    words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
     for i, v in enumerate(damage_labels(w)):
@@ -829,8 +903,11 @@ def code(D):
         li r4, 0
         lwz r5, 0x%X(r31)
         bl 0x%08X
+        lwz r4, 0x%X(r31)
+        cmpwi r4, -1
+        beq c_out
         mr r3, r27
-    """ % (ha(COMMON_PMF), sx(COMMON_PMF), sx(COMMON_PMF + 4), CF['HASH'], SET_MOTION_LABEL))
+    """ % (ha(COMMON_PMF), sx(COMMON_PMF), sx(COMMON_PMF + 4), CF['HASH'], SET_MOTION_LABEL, CF['DMG']))
     for i, r in enumerate(('r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10')):
         A.asm("lwz %s, 0x%X(r31)" % (r, CF['DMG'] + 4 * i))
     A.asm("""
@@ -882,7 +959,9 @@ def code(D):
     # ---- slot 41 start: set_rhombus, +0x10 = posture lr, face the nearest target, the first state
     A.asm("w_start:\nmflr r0\nbl pro")
     far(A, SET_RHOMBUS)
+    A.asm("lwz r0, 0x%X(r30)\ncmpwi r0, 0\nbeq s_lr\nbl h_smode" % CF['SMODE'])
     A.asm("""
+    s_lr:
         lwz r12, 0(r31)
         lwz r12, 0x311C(r12)
         lwz r0, 0x60(r12)
@@ -896,6 +975,9 @@ def code(D):
     s_zero:
         stwu r0, 4(r11)
         bdnz s_zero
+        lwz r0, 0x%X(r30)
+        cmpwi r0, 0
+        bne s_state
         bl h_near
         mr r4, r3
         bl h_tchk
@@ -910,7 +992,7 @@ def code(D):
         lwz r4, 0x%X(r30)
     s_go:
         b go
-    """ % ((OBJ_SIZE - 0x16C) // 4, CF['START'], CF['START01']))
+    """ % ((OBJ_SIZE - 0x16C) // 4, CF['SMODE'], CF['START'], CF['START01']))
     # ---- slot 20 (3DS 21): stepped on by a fighter (a footstool); the kind's state (CFG TREAD) => now, 0: nothing
     A.asm("""
     w_tread:
@@ -1670,41 +1752,246 @@ def code(D):
         lwz r0, 0x5EC(r28)
         b 0x%08X
     """ % (SITE_S + 4))
-    return A, B
+    return A, B, code_e(D, en, st, far, lfs)
+
+
+def code_e(D, en, st, far, lfs):
+    """step 2c (region E): the White Bear's and the Gordo's own states (3DS enemy_fs.cro, addresses in the
+    docstring of each), the start variant (SMODE) and helpers"""
+    import re
+
+    class Near(Asm):
+        """conditional branches to the shared exits (epi / go / goi, in region A: beyond a bc's reach) go
+        through local copies"""
+        def asm(self, text):
+            Asm.asm(self, re.sub(r'\b(b(?:eq|ne|gt|lt|ge|le))(\s+)(epi|go|goi)\b', r'\1\2e_\3', text))
+    Ee = Near(CAVE_E)
+    Ee.asm("e_epi:\nb epi\ne_go:\nb go\ne_goi:\nb goi")
+    # ---- helpers: the start variant 1 (Gordo, start 0x19CB0): set_correct(0), set_lr(0.0, 1, 1) (lr 0: faces the
+    # camera); the kinetic energy's second kick (3DS KineticEnergy vt+0x74 -> Wii U vt+0xEC: Behavior::
+    # set_kinetic_jump's at 0x026A84A4); the current speed into r1+8 (x, y, z)
+    Ee.asm("h_smode:\nmflr r28\nlwz r3, 0(r31)\nlwz r3, 0x30DC(r3)\nli r4, 0")
+    far(Ee, SET_CORRECT)
+    lfs(Ee, 'f1', 'consts')
+    Ee.asm("""
+        mr r3, r31
+        li r4, 1
+        li r5, 1
+        lwz r12, 0xE0(r3)
+        lwz r12, 0x%X(r12)
+        mtctr r12
+        bctrl
+        mtlr r28
+        blr
+    h_kick2:
+        lwz r12, 0(r31)
+        lwz r3, 0x3130(r12)
+        lwz r12, 0(r3)
+        lwz r12, 0xEC(r12)
+        mtctr r12
+        lis r4, 0x2000
+        ori r4, r4, 4
+        bctr
+    o_nop:
+        blr
+    """ % (0xC + 8 * SET_LR_SLOT))
+
+    # ---- Gordo: 1 spin (enter 0x1A180: kinetic -1, ground off, Togetoge loop; the contact attack, P2 entry 0);
+    # update 0x1A3FC -> 0x65D20 (writes energy 0 every frame: a speed of (home - position) x 0.5: not ported, see
+    # the docs); 3 remove (death state 0: the Gordo is not defeated by damage)
+    en(Ee, 'o_spin_en', -1, 0, 0, 1)
+
+    # ---- White Bear (V0 search counter +0x16C, V1 walk timer +0x168, V2 search cool-down +0x178, V4 quakes +0x174,
+    # V5 jump frames +0x170)
+    # 3 walk (enter 0x7E678, update 0x7E950): kinetic 1, Move loop, V1 = random(P0 60, P1 120), V0 = 0
+    en(Ee, 'b_walk_en', 1, 1, 9, 1, extra="lwz r3, 0x%X(r30)\nlwz r4, 0x%X(r30)\nbl h_rand\nstw r3, 0x%X(r31)\n"
+       "li r0, 0\nstw r0, 0x%X(r31)" % (P(0), P(1), V(1), V(0)))
+    st(Ee, 'b_walk_up', """
+        bl h_mv
+        bl h_gnd
+        cmpwi r3, 0
+        bne bw_on
+        li r4, 1
+        b go
+    bw_on:
+        bl h_wall
+        cmpwi r3, 0
+        bne bw_turn
+        bl h_cliff
+        cmpwi r3, 0
+        beq bw_cnt
+    bw_turn:
+        li r4, 5
+        b go
+    bw_cnt:
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V0)X(r31)
+        lwz r3, 0x%(V2)X(r31)
+        cmpwi r3, 0
+        ble bw_srch
+        addi r3, r3, -1
+        stw r3, 0x%(V2)X(r31)
+        cmpwi r3, 0
+        bgt bw_tm
+    bw_srch:
+        li r4, 1
+        bl h_grp
+        lwz r0, 0x%(V0)X(r31)
+        cmpw r3, r0
+        bge bw_tm
+        li r0, 0
+        stw r0, 0x%(V0)X(r31)
+        li r4, 1
+        bl h_srch
+        cmpwi r3, 0
+        blt bw_tm
+        li r4, 6
+        b go
+    bw_tm:
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        bgt epi
+        li r4, 4
+        b go""" % dict(V0=V(0), V1=V(1), V2=V(2)))
+    # 4 special turn (enter 0x7E5C8: kinetic 0, SpecialTurn; update 0x7E8A8 = 5's: at its end reverse_lr => 3)
+    en(Ee, 'b_sturn_en', 0, 1, 14, 0)
+    # 6 quake hold (enter 0x7EB34: kinetic 0, QuakeHold at P0 f9 1.5, V4 = 0; update 0x7F10C: at its end
+    # is_in_view_area -> 7, else -> 3; the camera test is not ported: in view)
+    en(Ee, 'b_hold_en', 0, 1, 11, 0, rate=P(2), extra="li r0, 0\nstw r0, 0x%X(r31)" % V(4))
+    st(Ee, 'b_hold_up', "bl h_end\ncmpwi r3, 0\nbeq epi\nli r4, 7\nb go")
+    # 7 quake jump (enter 0x7ED14: E+0x20 0, +0x24 f10, +0x28 0, +0x2C f10, +0x3C 0.1, the kick, kinetic 5, ground
+    # off, QuakeUp, V5 = 0; update 0x7F1F8: V5++, the speed's y <= 0 -> 8)
+    en(Ee, 'b_up_en', 5, 0, 13, 0, pre="""bl h_ebase
+        li r0, 0
+        stw r0, 0x20(r10)
+        stw r0, 0x28(r10)
+        lwz r0, 0x%X(r30)
+        stw r0, 0x24(r10)
+        stw r0, 0x2C(r10)
+        lwz r0, 0x%X(r30)
+        stw r0, 0x3C(r10)
+        bl h_kick2""" % (P(3), P(12)), extra="li r0, 0\nstw r0, 0x%X(r31)" % V(5))
+    st(Ee, 'b_up_up', """
+        lwz r3, 0x%X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%X(r31)
+        bl h_vy0
+        bgt epi
+        li r4, 8
+        b go""" % (V(5), V(5)))
+    # 8 quake fall (enter 0x7EBB4: E+0x20 / +0x24 = the current speed, +0x28 0, +0x2C f12 3, +0x3C f11 1, the kick,
+    # kinetic 5, ground off, QuakeFall; update 0x7F168: V5++; on the ground: V5 < f14 (180) => 9, else => 2)
+    pre8 = "addi r3, r1, 8\nmr r4, r31\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl\n" \
+           % (GET_SPEED >> 16, GET_SPEED & 0xFFFF)
+    en(Ee, 'b_fall_en', 5, 0, 10, 0, pre=pre8 + """bl h_ebase
+        lwz r0, 8(r1)
+        stw r0, 0x20(r10)
+        lwz r0, 0xC(r1)
+        stw r0, 0x24(r10)
+        li r0, 0
+        stw r0, 0x28(r10)
+        lwz r0, 0x%X(r30)
+        stw r0, 0x2C(r10)
+        lwz r0, 0x%X(r30)
+        stw r0, 0x3C(r10)
+        bl h_kick2""" % (P(5), P(4)))
+    st(Ee, 'b_fall_up', """
+        lwz r3, 0x%X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%X(r31)
+        mr r28, r3
+        bl h_gnd
+        cmpwi r3, 0
+        beq epi
+        lwz r0, 0x%X(r30)
+        li r4, 9
+        cmpw r0, r28
+        bgt bf_go
+        li r4, 2
+    bf_go:
+        b goi""" % (V(5), V(5), P(7)))
+    # 9 quake landing (enter 0x7EE74: kinetic 0, ground on, QuakeLanding at f13 (1.0), f16 (0.5) after the first,
+    # request_quake(7), the absolute quake hit, effects 0x7400000 / 0x7400001: not ported; V4++; update 0x7F244: at
+    # its end, V4 < f17 (3) and success_by_percent(f15 / 2^(V4 - 1)) -> 7 (jump again), else V2 = f18 (60), -> 3;
+    # the percentage as an integer: 50 >> (V4 - 1) is exact for V4 1 / 2, the only ones it is tested with)
+    st(Ee, 'b_land_en', """
+        li r4, 0
+        bl h_kin
+        li r4, 1
+        bl h_att
+        lfs f2, 0x%(P6)X(r30)
+        lwz r0, 0x%(V4)X(r31)
+        cmpwi r0, 0
+        ble bl_rate
+        lfs f2, 0x%(P9)X(r30)
+    bl_rate:
+        li r4, 12
+        li r5, 0
+        bl h_mot
+        lwz r3, 0x%(V4)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V4)X(r31)""" % dict(P6=P(6), P9=P(9), V4=V(4)))
+    st(Ee, 'b_land_up', """
+        bl h_end
+        cmpwi r3, 0
+        beq epi
+        lwz r3, 0x%(V4)X(r31)
+        lwz r0, 0x%(P10)X(r30)
+        cmpw r0, r3
+        ble bl_done
+        addi r5, r3, -1
+        lwz r28, 0x%(P8)X(r30)
+        srw r28, r28, r5
+        li r3, 0
+        li r4, 99
+        bl h_rand
+        cmpw r3, r28
+        bge bl_done
+        li r4, 7
+        b go
+    bl_done:
+        lwz r0, 0x%(P11)X(r30)
+        stw r0, 0x%(V2)X(r31)
+        li r4, 3
+        b go""" % dict(V4=V(4), P10=P(10), P8=P(8), P11=P(11), V2=V(2)))
+    return Ee
 
 
 def assemble(vt_words):
-    """(A, B, Data): the code in regions A and B, the data after it (two passes: the code's size does not depend
-    on the data's addresses)"""
+    """(A, B, Data): the code in regions A, B and E (A.area / A.stomp / A.e: the units of C, D, E), the data after
+    it (passes until the data's addresses settle: the code's size does not depend on them)"""
     d = Data(vt_words)
     D = {}
-    for _pass in range(3):
-        dd = {k: D.get(k, CAVE) for k in ('consts', 'vt', 'ktab') + tuple(
-            p + w['name'] for w in WALKERS for p in ('set_', 'hs_', 'en_', 'sr_', 'atk_', 'st_', 'cfg_', 'ar_')) +
-            tuple('row_heiho_' + r for r in ('walk', 'run', 'jump')) + tuple(ATTACKS)}
-        A, B = code(dd)
+    keys = [lab for lab, _w, _a in Data(vt_words).build({}).blocks]
+    for _pass in range(4):
+        dd = {k: D.get(k, CAVE) for k in keys}
+        A, B, Ee = code(dd)
         C = area_code(dd)
         Dd = stomp_code()
         labels = dict(A.labels)
-        for a in (B, C, Dd):
+        for a in (B, C, Dd, Ee):
             labels.update(a.labels)
-        for a in (A, B, C, Dd):
+        for a in (A, B, C, Dd, Ee):
             a.labels.update(labels)
-        ea, eb, ec, ed = A.pc, B.pc, C.pc, Dd.pc
+        ea, eb, ec, ed, ee = A.pc, B.pc, C.pc, Dd.pc, Ee.pc
         assert ed <= LIMIT_D, 'stomp code too big (0x%X)' % ed
-        assert ea <= LIMIT and eb <= LIMIT_B, 'walker code too big (0x%X, 0x%X)' % (ea, eb)
+        assert ea <= LIMIT and eb <= LIMIT_B and ee <= LIMIT_E, 'walker code too big (0x%X, 0x%X, 0x%X)' % (ea, eb, ee)
+        spans = [((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
+                 ((ed + 3) & ~3, LIMIT_D), ((ee + 0xF) & ~0xF, LIMIT_E)] + list(DATA_F)
         d.build(labels, D)
-        d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
-                 ((ed + 3) & ~3, LIMIT_D)])
+        d.place(spans)
         if d.addr == D:
             break
         D = dict(d.addr)
     d.build(labels, D)
-    d.place([((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
-             ((ed + 3) & ~3, LIMIT_D)])
+    d.place(spans)
     assert d.addr == D
     A.area = C
     A.stomp = Dd
+    A.e = Ee
     return A, B, d
 
 
@@ -1893,7 +2180,7 @@ def patches(img):
     for lo_, hi_ in REGIONS:
         for addr in range(lo_, hi_, 4):
             out[addr] = 0
-    for a in (A, B, A.area, A.stomp):
+    for a in (A, B, A.area, A.stomp, A.e):
         for i, w in enumerate(a.words()):
             out[a.base + 4 * i] = w
     for base, words in d.chunks:

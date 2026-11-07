@@ -834,6 +834,93 @@ User result with exe_diag_v3b (exe_v10 + the logging, fix v8's stomp words uncha
 User results (after fix v8 / Extended Memory v3): Shy Guy's texture scroll and mirroring look right; Plasma Wisp's
 (Lethinium's) laser is still invisible (open, below the next step).
 
+## Step 2c: the White Bear and the Gordo (3DS state code), the fliers' groundwork, Plasma Wisp's laser
+
+`tools/smashrun_walker_cave.py` (two more kinds in its state-table engine, code in a new region E), test
+`tools/smashrun_walker_test.py` (147 checks), `tools/smashrun_field_cave.py` set "step2c" (the default: the walkers'
+set with the two new kinds). Package smashrun_step2c_v1: exe_v13 = exe_v12 (Extended Memory v3) + only these
+regions (word diff below) and `smashrun_step2c_data`. Not yet run in game. Each kind's reading, with the code
+addresses read, is in `reference/smashrun_enemy_specs/hand_read.json` (and its .md "Reading").
+
+**White Bear** (Ice Climber, kind 0x40; enemy_fs.cro 0x7E378-0x7F420). Walks (Move, kinetic 1, the initialize
+energy +0x10 1.0 / +0x08 0.3 / +0x14 0); a wall or a ledge -> Turn; every random(60, 120) frames a SpecialTurn;
+search group 1 (interval 60, box 180 x 140) -> QuakeHold (1.5x) -> the quake jump (QuakeUp: energy +0x24 / +0x2C
+1.5, +0x3C 0.1 and the KineticEnergy kick vt+0x74 -> Wii U vt+0xEC, kinetic 5) -> QuakeFall (the current speed into
++0x20 / +0x24, +0x2C 3, +0x3C 1) -> on the ground QuakeLanding (a fall of 180 frames or more lands in the plain
+Landing instead); at the landing's end 50 % (then 25 %) to jump again, at most 3 quakes, then a 60-frame search
+cool-down. Contact damage: none while alive (its vl attack list has only state 10); the defeated body (state 10:
+DamageStart at rate 0, bullet()) hits with P2 entry 0 (power 8, angle 361, kbg 100, bkb 50, size 5, node 2 HipN).
+Its one attack on the 3DS, the landing quake, is **not ported**: `Behavior::set_attack_absolute_data(P6)` +
+`hit_attack_absolute` (code.bin 0x7B50AC / 0x7B3D28 -> AttackModuleImpl set_absolute / hit_absolute 0x4CBC48) on
+the first fighter-manager entry whose situation module reports the ground (power 10, angle 90, kbg 100, bkb 40), an
+absolute hit with no range test. The Wii U route found: the enemy's AttackModule (acc+0x30C8) is AttackModuleImpl
+(clear_all 0x02C08324, set_abs vtable +0x64 0x02C08A3C, MSC ops 0x2716 set_abs / 0x271D hit_absolute through its
+vt+0x334, as the ACMD Throw_Specifier / Throw_Applier handlers 0x02BE6E88 / 0x02BE6FCC call them); not written,
+because a wrong absolute hit could hang a fighter and nothing here can test it. Also not ported: the camera quake
+(request_quake(7)), the landing effects 0x7400000 (scaled 2.5 x 1.7) / 0x7400001, set_weak_param(5, 2.0), and the
+camera test is_in_view_area (CameraModule is_clip_in(true)) before the jump, taken as true. The fall state (1)
+uses the walkers' generic one (it waits while the speed's y > 0; the bear's lands on the first ground contact).
+
+**Gordo** (Kirby, kind 0x08; 0x19CB0-0x1A4A8), variation 0 (the spawner's): start = set_rhombus, set_correct(0)
+(GroundModule 0x02C36458: the twins' calls with 0 / 5), set_lr(0.0, 1, 1) (lr 0: faces the camera, as the 3DS's),
+no turn to a target; state 1 = kinetic -1 (no movement), ground off, Togetoge loop; 3 = remove. Contact damage: yes
+in states 1 and 2 (always), P2 entries 0 / 1: power 10, angle 65, kbg 50, fkb 50, bkb 100, size 8, node 3 (Thorn1N).
+Never defeated (death state 0, slots 64-66 0; its gl entry: HP 1 with the three flags other enemies set at 0); no
+hashsets and no damage labels (its ctor calls neither; the walker's create now skips set_damage_motion_label when
+the kind has none). Not ported: the per-frame write of energy 0 (helper 0x65D20: type 0x17, speed (home - position)
+x 0.5: kinetic -1 already holds it in place), set_test_coll_stop(1), set_invincible_global(0), variations 1-3
+(state 2: along a line / the layout path).
+
+**Spawner**: set "step2c" spawns Gordo, White Bear, Plasma Wisp, Goomba, Darios, Shy Guy, Gordo, Stalfos, White Bear,
+Waddle Dee, Zima, Waddle Doo, Churine in turn (Gordo placement 2, as given: it floats where it appears; the bear 1),
+requests the twelve kinds + 0x57. Its code now ends below CODE_LIMIT 0x04B7D600.
+
+**Space** (all zero and unreferenced in exe_v12: no branch, data word, lis / D-form pair or relocation into them;
+scratch refcheck): region E 0x04B7D600-0x04B7DF00 (the field cave's tail before its DATA; code to 0x04B7D9E8, then
+data), and data-only spans 0x04B85980-0x04B85C00 / 0x04B86220-0x04B86800 (smashrun_enemy_cave.py's gaps between its
+code, sets and the walker's region A) and 0x04B77E20-0x04B78000 (the original .text end before
+position_vars_cave.py's 0x04B78000). The engine's data blocks are placed largest first across all regions (two
+spans are still empty). **exe_v13 vs exe_v12, word diff** (text; data / rodata sections and relocations equal):
+0x02D9A618 (S2 hook), 0x02D9B6F8 (field hook D), 0x04B7D16C-0x04B7D480 (field cave code), 0x04B7D600-0x04B7DEF8
+(E), 0x04B849C0-0x04B84A00 (D's tail: data), 0x04B85980-0x04B85BA4 (data), 0x04B86918-0x04B87FF4 (A),
+0x04B89020-0x04B8A000 (B), 0x04BB8000-0x04BB8008 and 0x04BB8180-0x04BB8660 (C): 2954 words.
+
+Tests on exe_v13: smashrun_walker_test.py 147 checks (the White Bear's 3DS state sequences: the search on the frame
+its counter passes 60, the quake jump's energy and kick, the fall / landing / repeat chances over 40 and 60 seeded
+runs, the cool-down, special turn, walls / ledges, the long fall; the Gordo's start, state 1 and attacks; every
+existing check), smashrun_field_test.py 12, smashrun_enemy_test.py 26 (its space check leaves the walker's data
+spans to the walker test), s3ds_enemy_test.py whitebear / gordo: 0 failures each.
+
+**The fliers' groundwork** (ghos, tikibuzz, furiijio, propellerheiho: all fly with an EnemyAerialModuleImpl embedded
+in the behaviour, 3DS object +0x168): the Wii U keeps a reduced EnemyAerialModuleImpl for mczakoplasmawisp (embedded
+at +0x168 of its 0x210-byte object): ctor 0x02DB2C44(this, acc) (0x74 bytes; energies 0 / 1 from KineticModule
+get_energy 0x02C4FE9C at +4 / +8), set_mode_homing (mode 2) 0x02DB28E4(f1-f6), set_mode_slip_homing (mode 3)
+0x02DB2A48, a 4-float mode 6 0x02DB2A7C, set_max_speed 0x02DB2BB4, set_current_speed(Vector2&) 0x02DB2BC0,
+set_target_point 0x02DB2BE4, get_distance 0x02DB2C08, update() 0x02DB28C8 -> update(0, 0, true) 0x02DB2524 (mode
+word +0xC: modes 0-4 and 6; the 3DS's 5 is absent, -1 = none does nothing), the target from a fighter id +0x30 when
++0x2C is 0 (0x02DB1EFC = the 3DS's 0x5F593C: set_target(id, offset) is three stores). The energy layout differs
+from the 3DS's by the vtable's place: 3DS offsets below 0x20 are 4 lower on the Wii U (enable byte +0x1C -> +0x18,
+speed +4 -> +0), from 0x20 the same, the vtable at +0x1C (3DS vt+0xC -> Wii U vt+0x1C). GroundModule
+set_passable_check is 0x02C367C4. Missing for parity: Ghos's damage path (slot 69 -> its stun state 2 with
+hit_return_frame; the Wii U notify_on_damage 0x026A3564 does call slot 69 and skips its own reaction when it returns
+non-zero), its common leave (init / update_common_leave), its bounce off walls (GroundCollisionObject
+get_ground_normal) and its hitbox node 3, which its 3-entry jtb lacks; Tiki Buzz's homing_extend / uniform / braking
+modes (not in the Wii U's update). Not ported in this step.
+
+**Plasma Wisp's laser (static finding)**: the twin's article set-up callbacks (article table 0x102FE844: needle
+0x026CF644, large needle 0x026CF7F8, laser 0x026CF9B0, hadoudan 0x026CFB08) place each weapon at a node of the
+owner's model: ModelModule (acc+0x3118) node position 0x0200739C(module, node, &pos, 1) with node **5** for the
+needles and the laser (node 3 for the hadoudan), then add the twin's param offsets (slot[0x57] +0xC0 x lr, +0xC4).
+The 3DS code does the same (enemy_fs.cro 0x895A4: node_global_position(5)). The converted Plasma Wisp's model.jtb
+(the 3DS file) has 5 nodes, 0-4 (bones 0, 1, 2, 4, 3): node 5 is past its end. The node -> bone step is the motion
+module's callback at +0x20 with the jtb (model handle +0xC) (0x02C64588 -> 0x0331915C); for a bone index past the
+skeleton the 3DS's MotionModuleImpl::get_world_matrix (0x501468) returns the identity matrix (the stage origin);
+how the Wii U callback treats a node past the table (bounds check or the next bytes in memory) was not traced. So
+the laser (and the needles) most likely spawn far from the wisp (at the origin or a garbage bone). The step 2c data
+adds the check: `model/enemy/plasmawisp/body/c00/model.jtb` with a sixth node, 5 -> bone 2 (BodyN, the body's
+centre). If the laser (and needles) then come out of the wisp, this was the cause; if not, the next suspects are the
+weapons' own effect / model resources (the Wii U's mczakoplasmawisp weapons, loaded with kind 0x57).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

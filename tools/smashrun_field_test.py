@@ -12,8 +12,8 @@ Runs the four hooked sites with the game's code around them, the calls out of th
   0x02DAE314(mgr+0x28, k) for the set's REQUESTS (walkers: 0x12 0x1D 0x30 0x0E 0x57 0x01 0x0B 0x13 0x19 0x1F;
   smashrun: the first five; minions 0x57-0x5A); off them nothing more; r31 and the stack kept.
 - D (0x02D9B6F8, the manager's update): every frame ends in 0x02D9B1A8(mgr); on a Smash Run stage a spawn every
-  INTERVAL frames: the set's kinds in turn, then the first again (walkers 0x12 0x01 0x1D 0x0B 0x30 0x13 0x0E 0x19
-  0x1F; smashrun 0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), with the set's placements (2 floaters, 1 the
+  INTERVAL frames: the set's kinds in turn, then the first again (step2c 0x08 0x40 0x12 0x01 0x1D 0x0B 0x08 0x30 0x40
+  0x13 0x0E 0x19 0x1F; walkers 0x12 0x01 0x1D 0x0B 0x30 0x13 0x0E 0x19 0x1F; smashrun 0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), with the set's placements (2 floaters, 1 the
   rest), DX left / right of the player in turn facing him, y + DY, +8 = 1.0, the rest 0; none while MAX_ALIVE live,
   none off the Smash Run stages, none without a player.
 """
@@ -177,7 +177,7 @@ def main():
         rest_ok &= mgr == MGR and var == 0 and one == 1.0 and z == 0.0 and p[0x1C:0x20] == bytes(4) and \
             p[0x24:0x3C] == bytes(0x18)
         del v
-    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58) else 1 for k in F.KINDS]
+    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58, 0x08) else 1 for k in F.KINDS]     # floaters: as given
     check(kinds == list(F.KINDS) + [F.KINDS[0]] and modes == [m for _k, m in F.SPAWNS] + [F.SPAWNS[0][1]] and
           modes[:-1] == want_modes,
           'D: kinds %s (then the first again), placement %s' % ([hex(k) for k in kinds], modes))

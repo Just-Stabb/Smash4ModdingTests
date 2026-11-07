@@ -7,7 +7,9 @@ Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py'
 
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
 the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
-- "walkers" (the default, step 2b): step 2a's four and the five walkers of tools/smashrun_walker_cave.py (which must
+- "step2c" (the default): "walkers" plus Gordo 0x08 (placement 2) and the White Bear 0x40 (placement 1), each
+  twice in the 13-entry turn; requests the twelve + 0x57 (docs/smash-run-port.md, "Step 2c").
+- "walkers" (step 2b): step 2a's four and the five walkers of tools/smashrun_walker_cave.py (which must
   be applied too, with smashrun_enemy_cave.py), in turn: Plasma Wisp, Goomba 0x01, Darios, Shy Guy 0x0B, Stalfos,
   Waddle Dee 0x13, Zima, Waddle Doo 0x19, Churine 0x1F (placement 1 for the walkers); requests the nine + 0x57.
 - "smashrun" (`--set smashrun`, step 2a): Smash Run's own Plasma Wisp 0x12, Darios 0x1D, Stalfos 0x30 and Zima 0x0E
@@ -38,7 +40,8 @@ the game's own enemy system runs as in Classic's Master Fortress. The enemies (E
   Fortress). Placement +0x20 (the set's table): 1 (ray-cast down to the ground) for Stalfos / Zima and the
   walkers, 2 (as given) for the floaters.
 
-Space: 0x04B7D100-0x04B7E000 (stage_slot_cave.py's space after its code; smashrun_menu.py has 0x04B7D000-0x04B7D100).
+Space: 0x04B7D100-0x04B7E000 (stage_slot_cave.py's space after its code; smashrun_menu.py has 0x04B7D000-0x04B7D100):
+code to CODE_LIMIT 0x04B7D600 (smashrun_walker_cave.py's region E from there to DATA 0x04B7DF00).
 """
 import os
 import struct
@@ -49,6 +52,7 @@ from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04B7D100
 DATA = 0x04B7DF00               # +0 frame counter, +4 next kind, +8 side, floats from +0x10
+CODE_LIMIT = 0x04B7D600         # step 2c: smashrun_walker_cave.py's region E from here to DATA
 LIMIT = 0x04B7E000
 STAGE_KIND = 0x1047277C
 SR_FIRST, SR_COUNT = 0x82, 0x14
@@ -56,10 +60,14 @@ SR_FIRST, SR_COUNT = 0x82, 0x14
 ENEMY_SETS = {
     'walkers': (((0x12, 2), (0x01, 1), (0x1D, 2), (0x0B, 1), (0x30, 1), (0x13, 1), (0x0E, 1), (0x19, 1), (0x1F, 1)),
                 (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x01, 0x0B, 0x13, 0x19, 0x1F)),
+    # step 2c: the walkers' set with Gordo 0x08 (placement 2: it floats where it appears) and the White Bear 0x40
+    'step2c': (((0x08, 2), (0x40, 1), (0x12, 2), (0x01, 1), (0x1D, 2), (0x0B, 1), (0x08, 2), (0x30, 1), (0x40, 1),
+                (0x13, 1), (0x0E, 1), (0x19, 1), (0x1F, 1)),
+               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }
-ENEMIES = 'walkers'
+ENEMIES = 'step2c'
 SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
 KINDS = tuple(k for k, _m in SPAWNS)
 INTERVAL = 150                  # frames between spawns (2.5 s)
@@ -253,7 +261,7 @@ def assemble():
     for k, mode in SPAWNS:
         a.asm(".word 0x%X\n.word %d" % (k, mode))
     words = a.words()
-    assert CAVE + 4 * len(words) <= DATA, 'field cave too big'
+    assert CAVE + 4 * len(words) <= CODE_LIMIT, 'field cave too big'
     return a, words
 
 

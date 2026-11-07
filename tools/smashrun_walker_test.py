@@ -42,6 +42,7 @@ OBJ, ACC, MOD = HEAP + 0x1000, HEAP + 0x10000, HEAP + 0x200
 ATKM, GROUND, EKIN, MOTION, KIN, POSTURE = (HEAP + 0x20000 + 0x100 * i for i in range(6))
 KVT, ARRP, ARR, EN, INPUT, PM, MGR, FLAGS = (HEAP + 0x21000 + 0x100 * i for i in range(8))
 KICK = 0x02000004               # the kinetic vt+0xFC target (a stub address)
+KICK2 = 0x02000008              # vt+0xEC (step 2c: the 3DS's vt+0x74 kick of the White Bear's jumps)
 DONE = 0x02000000               # return address of a run
 CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9C, 0x54: 0x026BE944,
            0x55: 0x026BB3E8, 0x56: 0x026C5F80, 0x57: 0x026CF4DC, 0x58: 0x026CBA64, 0x59: 0x026D1DFC,
@@ -73,7 +74,7 @@ class Machine:
                              if base < 0x05000000 else data)
         uc.mem_map(HEAP, 0x40000)
         uc.mem_map(STACK - 0x10000, 0x20000)
-        uc.mem_write(DONE, struct.pack('>II', 0x48000000, 0x48000000))      # b . (stop addresses)
+        uc.mem_write(DONE, struct.pack('>III', 0x48000000, 0x48000000, 0x48000000))      # b . (stop addresses)
         self.calls = []
         self.ground, self.walls, self.cliff, self.motion_end = True, set(), False, False
         self.target, self.target_x = 0, 0.0
@@ -91,6 +92,7 @@ class Machine:
         w(ACC + 0x311C, POSTURE)
         w(KIN, KVT)
         w(KVT + 0xFC, KICK)
+        w(KVT + 0xEC, KICK2)
         w(KIN + 8, ARRP)
         w(ARRP, ARR)
         w(ARR + 4, EN)
@@ -213,6 +215,10 @@ class Machine:
             self.ret()
         elif addr == SET_LR:
             c.append(('set_lr', r(3), self.fr(1), r(4), r(5)))
+            self.wf(POSTURE + 0x60, self.fr(1))
+            self.ret()
+        elif addr == W.SET_CORRECT:
+            c.append(('set_correct', r(3), r(4)))
             self.ret()
         elif addr == 0x02C6108C:
             c.append(('flip', r(4)))
@@ -245,6 +251,9 @@ class Machine:
             self.ret()
         elif addr == W.ATK_SET:
             c.append(('atk_set', r(3), r(4), r(5), r(6)))
+            self.ret()
+        elif addr == KICK2:
+            c.append(('kick2', r(3), r(4)))
             self.ret()
         elif addr == KICK:
             c.append(('kick', r(3), r(4)))
@@ -370,13 +379,13 @@ def main():
                                                             (W.SITE_DEATH, 'cave_death'))),
           'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
     want = {}
-    for a in (A, B, A.area, A.stomp):
+    for a in (A, B, A.area, A.stomp, A.e):
         want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
     for base, words in d.chunks:
         want.update({base + 4 * i: x for i, x in enumerate(words)})
     bad = [hex(x) for lo, hi in W.REGIONS for x in range(lo, hi, 4) if img.u32(x) != want.get(x, 0)]
-    check(not bad, 'space %s: the code (A to 0x%08X, B to 0x%08X, C to 0x%08X), the data, zeros after %s'
-          % (', '.join('0x%08X-0x%08X' % r for r in W.REGIONS), A.pc, B.pc, A.area.pc, bad[:4]))
+    check(not bad, 'space %s: the code (A to 0x%08X, B to 0x%08X, C to 0x%08X, E to 0x%08X), the data, zeros '
+          'after %s' % (', '.join('0x%08X-0x%08X' % r for r in W.REGIONS), A.pc, B.pc, A.area.pc, A.e.pc, bad[:4]))
     check(all(img.u32(s_) == W.branch(s_, fn['area_%d' % i]) for i, (s_, _w, _d, _b, _k, _x) in
               enumerate(W.AREA_SITES)), 'fix v7: the three area-table sites (0x02D89898 0x02D8A24C 0x02D8FB98) '
           'branch to the cave')
@@ -409,9 +418,10 @@ def main():
             exp.append(v)
         calls = [c for c in m.calls if c[0] in ('new', 'ctor', 'create')]
         labels = [m.r32(o + 0xB0 + 4 * i) for i in range(9)]
+        want_labels = [0xCCCCCCCC] * 9 if w.get('no_damage_labels') else W.damage_labels(w)    # none: not called
         check(calls == [('new', W.OBJ_SIZE), ('ctor', OBJ, ACC, k, 2)] and m.r32(MOD + 8) == OBJ and
               m.r32(o + 0xE0) == D['vt'] and init == exp and m.r32(o + 0xA8) == D.get('hs_' + w['name'], 0) and
-              labels == W.damage_labels(w) and m.r32(o + 8) == k,
+              labels == want_labels and m.r32(o + 8) == k,
               'F2: %s 0x%02X -> new(0x%X), ctor(acc, K, var), module+8, vptr VT, BehaviorImpl init, CFG, '
               'hashsets 0x%X, damage labels %s' % (w['name'], k, W.OBJ_SIZE, m.r32(o + 0xA8), labels))
     res = {}
@@ -546,6 +556,14 @@ def main():
             seq = [x[0] for x in m.calls]
             chg = [x for x in m.calls if x[0] == 'chg']
             first = w['start'][1] if var <= 1 else w['start'][0]
+            if w.get('smode'):
+                check(seq[:1] == ['rhombus'] and 'reverse_lr' not in seq and 'nearest' not in seq and chg and
+                      chg[-1][2] == first and [c for c in m.calls if c[0] in ('set_correct', 'set_lr')] ==
+                      [('set_correct', GROUND, 0), ('set_lr', OBJ, 0.0, 1, 1)] and m.rf(OBJ + 0x10) == 0.0 and
+                      m.rf(OBJ + 0x14) == 0.0 and m.r32(OBJ + W.V(3)) == 0,
+                      'start %s (variation %d, the 3DS 0x19CB0): set_rhombus, set_correct(0), set_lr(0.0, 1, 1) (faces '
+                      'the camera), +0x10 = 0, no turn to the target, change_state(%d)' % (w['name'], var, first))
+                continue
             check(seq[:1] == ['rhombus'] and 'reverse_lr' in seq and chg and chg[-1][2] == first and
                   m.rf(OBJ + 0x10) == 1.0 and m.rf(OBJ + 0x14) == 0.0 and m.r32(OBJ + W.V(3)) == 0,
                   'start %s (variation %d): set_rhombus, +0x10 = lr, turns to the target behind, change_state(%d)'
@@ -973,6 +991,129 @@ def main():
           'landed 30 higher, no wall => landing 2 (no look back) -> walk 3; a ledge -> turn 5 %s %s'
           % (st, wd.states(n0)))
     # no kind searches for a contact attack in its walk: set_attack_data is per state (above)
+
+    # ---- step 2c: the White Bear (enemy_fs.cro 0x7E378-0x7F318)
+    got = enters('whitebear')
+    exp = {1: (8, 0, (7, 1.0, 1), ''), 2: (0, 1, (8, 1.0, 0), ''), 3: (1, 1, (9, 1.0, 1), ''),
+           4: (0, 1, (14, 1.0, 0), ''), 5: (0, 1, (15, 1.0, 0), ''), 6: (0, 1, (11, 1.5, 0), ''),
+           7: (5, 0, (13, 1.0, 0), ''), 8: (5, 0, (10, 1.0, 0), ''), 9: (0, 1, (12, 1.0, 0), ''),
+           10: (None, None, (2, 0.0, 0), 'bullet')}
+    check(got == exp, 'whitebear enters (kinetic, ground, (motion, rate, loop)) as the 3DS\'s: %s' % got)
+    # walk: input (lr, 0), the walk timer random(60, 120) set; a search with group 1 once the counter passes its
+    # interval (60): found -> quake hold 6 -> (motion end) jump 7 -> (falling) 8 -> (ground) => landing quake 9
+    wd = world('whitebear', 3, lr=-1.0)
+    m = wd.m
+    wd.enter(3)
+    t = m.r32(OBJ + W.V(1))
+    ok = 60 <= t <= 120 and m.r32(OBJ + W.V(0)) == 0
+    m.found = 0
+    wd.run(62)
+    srch = [(e[0], c) for e in wd.log for c in e[4] if c[0] == 'search']
+    ok &= wd.log[0][3] == (-1.0, 0.0) and len(srch) == 1 and srch[0][0] == 60 and \
+        srch[0][1][1:] == (2, OBJ + 0x10, (0.0, 10.0, 180.0, 140.0, 0.0)) and wd.cur == 6
+    check(ok, 'whitebear: walking (stick (-1, 0), walk timer %d in 60..120), search_target(group 1 {2, 60, 180, '
+          '140, 0, 10}) on the frame its counter passes 60 (frame %s) -> quake hold 6' % (t, srch[:1] and srch[0][0]))
+    m.found = -1
+    m.vy = 1.0
+    n0 = len(wd.log)
+    wd.run(7)
+    up = [e for e in wd.log[n0:] if e[1] == 7]
+    en7 = [c for e in wd.log[n0:] for c in e[5] if c[0] == 'kick2']
+    ok = wd.cur == 7 and en7 == [('kick2', KIN, 0x20000004)] and round(m.rf(EN + 0x24), 3) == 1.5 and \
+        round(m.rf(EN + 0x2C), 3) == 1.5 and round(m.rf(EN + 0x3C), 3) == 0.1 and m.rf(EN + 0x20) == 0.0
+    check(ok, 'whitebear: at QuakeHold\'s end (in view: the camera test is not ported) -> quake jump 7: E+0x24 / '
+          '+0x2C = 1.5, +0x3C = 0.1, +0x20 / +0x28 = 0, the kick vt+0xEC(0x20000004), kinetic 5 %s' % en7)
+    m.vy, m.ground = -1.0, False
+    wd.run(3)
+    ok = wd.cur == 8 and round(m.rf(EN + 0x2C), 3) == 3.0 and round(m.rf(EN + 0x3C), 3) == 1.0
+    m.ground = True
+    wd.run(1)
+    ok &= wd.cur == 9 and m.r32(OBJ + W.V(4)) == 1
+    check(ok, 'whitebear: speed y <= 0 -> quake fall 8 (E+0x2C = 3, +0x3C = 1); on the ground (under 180 frames) '
+          '=> quake landing 9 (V4 = 1) %s' % wd.states(n0))
+    # the landing's end: 50 %% -> jump again (7) or the walk (3) with the search cool-down 60; run many to see both
+    outs = {}
+    for seed in range(40):
+        wd2 = world('whitebear', 9)
+        wd2.m.w32(D['consts'] + 8, 0x1234567 + seed * 7919)
+        wd2.m.w32(OBJ + W.V(4), 0)
+        wd2.enter(9)
+        wd2.run(8)
+        nxt = [st for st in wd2.states() if st != 9][:1]
+        outs.setdefault(tuple(nxt), 0)
+        outs[tuple(nxt)] += 1
+        if nxt == [3]:
+            in3 = len([e for e in wd2.log if e[1] == 3])
+            ok3 = wd2.m.r32(OBJ + W.V(2)) + in3 == 60       # 60, less the walk frames since
+    check(set(outs) == {(7,), (3,)} and ok3, 'whitebear: at the landing\'s end, V4 1 < 3: success_by_percent(50) -> '
+          'jump again 7, else the walk 3 with the search cool-down 60 %s' % outs)
+    wd2 = world('whitebear', 9)
+    wd2.m.w32(OBJ + W.V(4), 2)
+    en = wd2.enter(9)
+    rate = [c[4] for c in en if c[0] == 'motion']
+    wd2.run(8)
+    ok = rate == [0.5] and wd2.states()[1:2] == [3]
+    wd2 = world('whitebear', 9)
+    wd2.m.w32(OBJ + W.V(4), 1)
+    outs = set()
+    for seed in range(60):
+        wd2 = world('whitebear', 9)
+        wd2.m.w32(D['consts'] + 8, 0x7654321 + seed * 104729)
+        wd2.m.w32(OBJ + W.V(4), 1)
+        wd2.enter(9)
+        wd2.run(8)
+        outs.add(tuple([st for st in wd2.states() if st != 9][:1]))
+    check(ok and outs == {(7,), (3,)}, 'whitebear: a repeated landing plays QuakeLanding at 0.5; after the third '
+          'quake the walk 3 always; after the second 25 %% %s' % outs)
+    # cool-down: no search for 60 frames after a quake; the walk timer -> special turn 4 -> reverse_lr => 3
+    wd = world('whitebear', 3)
+    m = wd.m
+    m.found = 0
+    wd.enter(3)
+    m.w32(OBJ + W.V(2), 60)
+    m.w32(OBJ + W.V(1), 1000)
+    wd.run(125)
+    srch = [e[0] for e in wd.log for c in e[4] if c[0] == 'search']
+    ok = srch == [60]
+    wd = world('whitebear', 3)
+    wd.enter(3)
+    wd.m.w32(OBJ + W.V(1), 3)
+    wd.run(12)
+    revs = [e[0] for e in wd.log if [c for c in e[4] if c[0] == 'reverse_lr']]
+    ok &= wd.states()[:3] == [3, 4, 3] and bool(revs)
+    check(ok, 'whitebear: the search cool-down (V2 60) skips the searches (first at frame %s); the walk timer runs '
+          'out -> special turn 4, reverse_lr at its end => walk 3 %s' % (srch, wd.states()))
+    wd = world('whitebear', 3, lr=1.0)
+    wd.enter(3)
+    wd.m.walls = {4}
+    wd.run(1)
+    a = wd.states() + [wd.pending]
+    wd = world('whitebear', 3, lr=1.0)
+    wd.enter(3)
+    wd.m.cliff = True
+    wd.run(1)
+    b = [wd.pending]
+    wd = world('whitebear', 3, lr=1.0)
+    wd.enter(3)
+    wd.m.ground = False
+    wd.run(1)
+    c_ = [wd.pending]
+    check(a[-1] == 5 and b == [5] and c_ == [1], 'whitebear: a wall or a ledge ahead -> turn 5; off the ground -> '
+          'fall 1')
+    # a long fall (180 frames or more since the jump) lands in the plain landing 2
+    wd = world('whitebear', 8)
+    wd.m.w32(OBJ + W.V(5), 179)
+    wd.m.ground = True
+    wd.run(1)
+    check(wd.cur == 2, 'whitebear: on the ground after >= 180 frames in the jump => landing 2 (no quake)')
+
+    # ---- step 2c: the Gordo (enemy_fs.cro 0x19CB0-0x1A470): spins in place; its contact attack in state 1 (above)
+    got = enters('gordo')
+    wd = world('gordo', 1)
+    wd.run(20)
+    check(got == {1: (0xFFFFFFFF, 0, (0, 1.0, 1), '')} and wd.states() == [1] and
+          not [c for e in wd.log for c in e[4]], 'gordo: state 1 kinetic -1, ground off, Togetoge loop; its update '
+          'changes nothing (home energy not ported) %s' % got)
 
     # T2 / S2
     t1 = [img.u32(W.MOTION_SETS + 4 * k) for k in range(0x61)]

@@ -113,7 +113,8 @@ def main():
     w = img.u32(W.SITE_F)
     if w >> 26 == 18 and W.CAVE <= W.branch_target(W.SITE_F, w) < W.LIMIT:
         end = W.CAVE            # step 2b's walker cave from here (smashrun_walker_test.py)
-    bad = [hex(x) for x in range(E.CLEAR[0], end, 4) if img.u32(x) != want.get(x, 0)]
+    bad = [hex(x) for x in range(E.CLEAR[0], end, 4) if img.u32(x) != want.get(x, 0) and not W.in_cave(x)]
+    # (step 2c: the walker cave's data in this cave's gaps, W.DATA_F, is smashrun_walker_test.py's to check)
     check(not bad, 'space 0x%08X-0x%08X: the cave, its sets, zeros elsewhere %s' % (E.CLEAR[0], end, bad[:4]))
 
     # F

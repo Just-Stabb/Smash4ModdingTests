@@ -543,7 +543,7 @@ script. Articles: the weapon classes the kind owns.
 | 0x05 | [galice](galice.md) | no behaviour in enemy_fs.cro | 0 | 9:2 | 0x780d84e3 | - | - |  |
 | 0x06 | [galfire](galfire.md) | no behaviour in enemy_fs.cro | 0 | 9:2 | 0x780d84e3 | - | - |  |
 | 0x07 | [peahat](peahat.md) | flyer+shooter | 10 | 6:8 | - | shot | own 0x33c04 |  |
-| 0x08 | [gordo](gordo.md) | stationary | 4 | 1:10, 2:10 | - | - | default |  |
+| 0x08 | [gordo](gordo.md) | stationary | 4 | 1:10, 2:10 | - | - | default | yes |
 | 0x09 | [kihunter](kihunter.md) | flyer+shooter+acmd-hitboxes | 17 | 15:6 | BodyAttack2 | acidbullet | default |  |
 | 0x0A | [monoeye](monoeye.md) | stationary+shooter | 9 | 7:2 | - | shot | default |  |
 | 0x0B | [heiho](heiho.md) | walker | 17 | 9:1, 15:2 | - | - | default | yes |
@@ -599,7 +599,7 @@ script. Articles: the weapon classes the kind owns.
 | 0x3D | [chappy](chappy.md) | walker+acmd-hitboxes+large | 29 | 27:20, 29:0 | HeadAttack, BiteAttack, HipAttack, RunAttack, BiteAttackHold, HipAttackEnd | - | default |  |
 | 0x3E | [metroid](metroid.md) | stationary+links | 10 | 8:6 | - | - | default |  |
 | 0x3F | [totsukotsu](totsukotsu.md) | flyer+shooter+acmd-hitboxes | 9 | 0:12 | Fly | shot | default |  |
-| 0x40 | [whitebear](whitebear.md) | walker | 12 | 10:8 | - | - | default |  |
+| 0x40 | [whitebear](whitebear.md) | walker | 12 | 10:8 | - | - | default | yes |
 | 0x41 | [darknut](darknut.md) | walker+shooter+acmd-hitboxes+large | 25 | 23:10 | Armorwait, Armorattack2, Armorattack3hold2, Armorattack3, Nakedattack2, Armormove, Armorattack1, Armorattack3hold1, Armorattack1hold, Nakedattack1 | sword | default |  |
 | 0x42 | [meganta](meganta.md) | walker+shooter+acmd-hitboxes+large | 23 | 21:15, 23:0 | motion10(Rolling), Rolling | homingbullet | default |  |
 | 0x43 | [orne](orne.md) | flyer | 8 | 0:0 | - | - | none (empty) |  |
@@ -623,9 +623,10 @@ script. Articles: the weapon classes the kind owns.
   every state function and helper decoded (CFG + symbolic values), motion indices named, params resolved by the
   reader's own layout (all 80 vl files parse to the last token), attack lists with bones, articles and weapon
   specializers, ACMD.
-- **Hand-read** (`hand_read.json`): the 5 walkers (kuribo, heiho, waddledee, waddledoo, churine) completely;
+- **Hand-read** (`hand_read.json`): the 5 walkers (kuribo, heiho, waddledee, waddledoo, churine) and step 2c's
+  whitebear and gordo completely (with the code addresses read, "read");
   zima, plasmawisp, darios mostly (Darios's beam entry selection and Plasma Wisp's article / param mapping are
-  partly inferred); stalfos only its attack sources. The other 71 kinds have the generated specs only.
+  partly inferred); stalfos only its attack sources. The other 69 kinds have the generated specs only.
 - **galthunder, galice, galfire** (0x04-0x06): no behaviour, motion data set or article set in enemy_fs.cro (their
   models / motions / attack.bin / params exist, and their animations are all named `EnmGalFire*`). Where (or
   whether) the 3DS creates them is not found (not in enemy_fs.cro or enemy.cro; code.bin's factory imports the
