@@ -125,7 +125,10 @@ def setup(e, regs, mem):
     for a, v in mem.items():
         e.setw(a, v)
     for r, v in regs.items():
-        e.mu.reg_write(REGS[r], v)
+        if r == 'ctr':
+            e.mu.reg_write(UC_PPC_REG_CTR, v)
+        else:
+            e.mu.reg_write(REGS[r], v)
 
 
 def run(e, at, stop):
@@ -159,8 +162,9 @@ def main():
     assert E1.alloc(0x1000, b'\0') == F
     for e in (E0, E1):
         e.mu.mem_map(0, 0x1000)                                  # article-pool's null object: lwz r10, 0x24(0)
-        e.pre = D.LIMIT - 0x800                                  # preludes in the unused tail, b reach of every hook
+        e.pre = D.LIMIT - 0x1000                                 # preludes in the unused tail, b reach of every hook
     obj, acc, fs, req, mod, ent = F + 0x100, F + 0x200, F + 0x300, F + 0x400, F + 0x500, F + 0x600
+    blr = F + 0xF00                                              # a blr for the module inits' bctrl
     # step tag -> [(regs, mem, the crumb expected (kind, a, b) or None)]
     cases = {
         'fighter-setup': [({3: fs, 4: 0x44, 5: 0x42}, {}, (0x42, fs, 0x44)), ({5: 0x10}, {}, None)],
@@ -178,14 +182,31 @@ def main():
                          ({3: 0, 22: ent, 30: 2}, {ent: 0x80000022}, (0x22, 0, 2))],
         'weapon-modules': [({30: 0x199, 31: obj}, {}, (0x199, obj, 0)), ({30: 0x22}, {}, None)],
         'weapon-params': [({3: 0x55, 4: 0x195, 5: 4}, {}, (0x195, 4, 0x55)), ({4: 0xB6}, {}, None)],
+        'art-init24': [({3: obj, 24: 7}, {obj + 4: 0x19C}, (0x19C, 7, obj)), ({3: obj}, {obj + 4: 0x22}, None)],
+        'art-init2c': [({25: ent, 24: 6}, {ent + 4: obj, obj + 4: 0x199}, (0x199, 6, obj)),
+                       ({25: ent}, {ent + 4: obj, obj + 4: 0x23}, None)],
+        'art-init10c': [({25: ent, 31: 0x40}, {ent + 4: obj, obj + 4: 0x19D}, (0x19D, 0x40, obj)),
+                        ({25: ent}, {ent + 4: obj, obj + 4: 0x24}, None)],
+        'art-done': [({25: ent, 24: 1}, {ent + 4: obj, ent + 8: 3, obj + 4: 0x18C}, (0x18C, 1, obj)),
+                     ({25: ent}, {ent + 4: obj, ent + 8: 3, obj + 4: 0x25}, None)],
+        'articles-done': [({29: 0x1234, 30: 0x5678}, {}, (0, 0x1234, 0x5678))],
+        'acmd-cache': [({3: 0x66, 4: 0x19B}, {}, (0x19B, 0x66, 0)), ({4: 0x26}, {}, None)],
+        'module-init': [({30: acc, 'ctr': blr}, {acc: obj, obj: 0x00010002, obj + 4: 0x42}, (0x42, 'off', acc)),
+                        ({30: acc, 'ctr': blr}, {acc: obj, obj: 0x10010002, obj + 4: 0x42}, None),
+                        ({30: acc, 'ctr': blr}, {acc: obj, obj: 0x00010002, obj + 4: 0x10}, None)],
     }
-    tags = [s[0] for s in D.STEPS]
-    for tag, at, _w0, _a, _what in D.STEPS:
-        i = tags.index(tag)
+    for e in (E0, E1):
+        e.setw(blr, 0x4E800020)
+    steps = D.all_steps(E0.w)
+    check('the steps: v2\'s 13, 6 more, a module init each (%d)' % (len(steps) - 19), len(steps) > 19 + 30, True)
+    import re
+    for tag, at, _w0, _a, _what in steps:
         w0 = E0.w(at)
         stop = target(E0, at) if w0 >> 26 == 18 else at + 4
-        link = w0 >> 26 == 18 and w0 & 1
+        link = (w0 >> 26 == 18 and w0 & 1) or w0 == 0x4E800421
         for k, (regs, mem, want) in enumerate(cases.get(tag, [])):
+            if want and want[1] == 'off':
+                want = (want[0], int(re.search(r'li r5, (0x[0-9A-F]+)', _a).group(1), 16), want[2])
             if tag == 'article-pool' and regs.get(3) == 0:
                 pass                                              # lwz r10, 0x24(r3) on 0: map page 0
             res = []
@@ -210,7 +231,7 @@ def main():
             check('%s case %d: OSReport %s' % (tag, k, 'once (tag, kind, a, b)' if want else 'not called'),
                   (got, fmt_ok), (exp, True))
     # the first frames: STEP_MAX crumbs in all, kinds below 0x41 never
-    tag, at = 'frame', [s[1] for s in D.STEPS if s[0] == 'frame'][0]
+    tag, at = 'frame', [s[1] for s in steps if s[0] == 'frame'][0]
     n_calls = []
     for k in range(D.STEP_MAX + 3):
         res = []

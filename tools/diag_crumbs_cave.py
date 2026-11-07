@@ -18,7 +18,7 @@ leave as a plain `bl` to the import's thunk, so it jumped into the middle of oth
 crashed at the first crumb, user's Cemu log). A vararg call: cr1eq cleared (no float arguments).
 
 Every hook replaces one word with `b stub`; the stub saves every volatile register (r0, r2-r12, LR, CTR, XER,
-CR, f0-f13, FPSCR) in its own frame, computes the crumb's arguments from the saved registers, calls `crumb` when the
+CR, f0-f13; not FPSCR since v3: Cemu warned on mtfsf) in its own frame, computes the crumb's arguments from the saved registers, calls `crumb` when the
 kind passes its filter, restores everything, then runs the replaced word (relative branches re-aimed from the stub)
 and goes back. Hooks (in the order a fighter loads; STEPS below, with what a / b hold):
 """
@@ -34,7 +34,7 @@ from ppcasm import Asm  # noqa: E402
 # free grown .text: kind_expand.py's space (0x04BA0000-0x04BB0000) past its last word (0x04BA97B4 in the current
 # build, checked against --rpx: zeros), within `b` reach of every hook (the lowest, 0x02BCB5C0, reaches 0x04BCB5C0)
 CAVE = 0x04BAA000
-LIMIT = 0x04BAC000
+LIMIT = 0x04BAE000
 OSREPORT_VENEER = 0x0288B4D4    # the game's OSReport veneer (lis/addi r31 = OSReport, relocated; mtctr; bctr)
 VENEER_WORDS = (0x9421FFF0, 0x93E1000C, None, None, 0x7FE903A6, 0x83E1000C, 0x38210010, 0x4E800420)
 STEP_MAX = 24                   # first-frames crumbs in all
@@ -45,7 +45,7 @@ KIND_WEAPON = 0x185             # new weapon kinds from here
 FRAME = 0xE0
 def SLOT(n):                     # r0 at 0x10, r2 - r12 at 0x14 + 4 x (n - 2)
     return 0x10 if n == 0 else 0x14 + 4 * (n - 2)
-LR_S, CTR_S, XER_S, CR_S, FPR_S, FPSCR_S = 0x40, 0x44, 0x48, 0x4C, 0x50, 0xC0
+LR_S, CTR_S, XER_S, CR_S, FPR_S, STEP_IDX = 0x40, 0x44, 0x48, 0x4C, 0x50, 0xCC
 
 # (tag, hook address, the word the hook replaces, args: asm leaving r4 = kind, r5 = a, r6 = b, and `skip` taken
 # when the crumb isn't wanted; r3 r7-r12 r0 free; the original r3-r12 are at SLOT(n)(r1), r13-r31 as they were)
@@ -105,7 +105,6 @@ def word(op):
 
 
 MFXER, MTXER, MFCTR = 0x7C0102A6, 0x7C0103A6, 0x7C0902A6
-MFFS0, MTFSF0 = 0xFC00048E, 0xFDFE058E
 CRCLR_CR1EQ = 0x4CC63182
 
 
@@ -122,14 +121,68 @@ def replayed(at, w, here):
         if off & 0x2000000:
             off -= 0x4000000
         return branch(here, at + off, bool(w & 1))
-    assert w >> 26 not in (16, 19), 'conditional branch at 0x%08X' % at
+    assert w >> 26 != 16 and (w >> 26 != 19 or w in (0x4E800421, 0x4E800420)), 'relative branch at 0x%08X' % at
     return w
 
 
+# v3 (the two-Sephiroth hang: the second one's module set-up never returned after its articles were pooled): around
+# each pooled article's set-up (0x02C024B4: the object's vt +0x24 = 0x02B63268, its model / motion / ACMD set-up,
+# vt +0x2C, vt +0x10C), the article set-up's end, the weapon ACMD cache (0x0320D588) and every module init of a
+# kind-0x42 fighter's accessor (0x02BF4F08: one bctrl a module, a = the module's accessor offset)
+ACCESSOR_INIT = 0x02BF4F08
+V3_STEPS = [
+    ('art-init24', 0x02C02504, 0x7C0903A6,              # mtctr r0: before the pooled object's vt +0x24
+     ld('r6', 3) + '\nlwz r4, 4(r6)\ncmplwi r4, %d\nblt skip\nmr r5, r24' % KIND_WEAPON,
+     'a pooled new-kind article\'s set-up (vt +0x24: its model / motion / ACMD) starts: a = left, b = the object'),
+    ('art-init2c', 0x02C0250C, 0x80790004,              # lwz r3, 4(r25): vt +0x24 returned
+     'lwz r6, 4(r25)\nlwz r4, 4(r6)\ncmplwi r4, %d\nblt skip\nmr r5, r24' % KIND_WEAPON,
+     '... its vt +0x24 returned (vt +0x2C next)'),
+    ('art-init10c', 0x02C02524, 0x81390004,             # lwz r9, 4(r25): vt +0x2C returned
+     'lwz r6, 4(r25)\nlwz r4, 4(r6)\ncmplwi r4, %d\nblt skip\nmr r5, r31' % KIND_WEAPON,
+     '... its vt +0x2C returned (vt +0x10C next when a = flags != 0)'),
+    ('art-done', 0x02C0255C, 0x80190008,                # lwz r0, 8(r25): the object done
+     'lwz r6, 4(r25)\nlwz r4, 4(r6)\ncmplwi r4, %d\nblt skip\nmr r5, r24' % KIND_WEAPON,
+     '... the object done'),
+    ('articles-done', 0x02C025F8, 0x83A1031C,           # lwz r29, 0x31c(r1): 0x02C024B4 returned
+     'li r4, 0\nmr r5, r29\nmr r6, r30',
+     'an ArticleModule\'s pooled articles all set up (0x02C0258C): a = the holder (any fighter)'),
+    ('acmd-cache', 0x0320D588, 0x7C0802A6,              # mflr r0 (0x0320D588: r3 cache, r4 weapon kind)
+     ld('r4', 4) + '\ncmplwi r4, %d\nblt skip\n' % KIND_WEAPON + ld('r5', 3) + '\nli r6, 0',
+     'a weapon kind\'s ACMD scripts looked up / loaded (0x0320D588, 128 kinds a match): a = the cache'),
+]
+
+
+def accessor_steps(orig):
+    """('module-init', the bctrl, its word, args): every module init of 0x02BF4F08 (r30 the accessor; logged for a
+    fighter (object id category 0) of kind 0x42); a = the accessor offset of the module"""
+    out, x, last = [], ACCESSOR_INIT, None
+    while True:
+        w = orig(x)
+        if w >> 26 == 32 and (w >> 16) & 31 == 30 and (w >> 21) & 31 == 3:
+            last = w & 0xFFFF
+        if w == 0x4E800421:
+            out.append(('module-init', x, w,
+                        'lwz r7, 0(r30)\nlwz r4, 4(r7)\ncmplwi r4, 0x42\nbne skip\nlwz r8, 0(r7)\nsrwi r8, r8, 28\n'
+                        'cmpwi r8, 0\nbne skip\nli r5, 0x%X\nmr r6, r30' % last,
+                        'a kind-0x42 fighter\'s module init (0x02BF4F08): a = its accessor offset 0x%X' % last))
+        if w == 0x4E800020:
+            return out
+        x += 4
+
+
+def all_steps(orig):
+    return STEPS + V3_STEPS + accessor_steps(orig)
+
+
+RET_S = 0xC8                     # the dispatcher's own return address (in the hook's frame)
+
+
 def build(orig):
-    """(words, labels, hooks {address: word}); orig(address) -> the executable's word"""
+    """(words, labels, hooks {address: word}); orig(address) -> the executable's word. Each hook: a frame, r0 / LR
+    saved, `li r0, N; bl dispatch` (which saves the rest, runs step N's argument snippet, calls crumb when it says
+    so, restores), r0 / LR back, the replaced word, `b` back"""
+    steps = all_steps(orig)
     a = Asm(CAVE)
-    # crumb(r3 tag, r4 kind, r5 a, r6 b): OSReport(fmt, tag, kind, a, b, serial)
     a.asm("""
 crumb:  mflr r0
         stw r0, 4(r1)
@@ -154,60 +207,88 @@ crumb:  mflr r0
         mtlr r0
         blr
 """ % dict(vh=OSREPORT_VENEER >> 16, vl=OSREPORT_VENEER & 0xFFFF, crclr=word(CRCLR_CR1EQ)))
+    save = ['stw r%d, %d(r1)' % (n, SLOT(n)) for n in range(2, 13)]
+    save += ['mflr r12', 'stw r12, %d(r1)' % RET_S]
+    save += [word(MFCTR), 'stw r0, %d(r1)' % CTR_S, word(MFXER), 'stw r0, %d(r1)' % XER_S, 'mfcr r0',
+             'stw r0, %d(r1)' % CR_S]
+    save += ['stfd f%d, %d(r1)' % (n, FPR_S + 8 * n) for n in range(14)]
+    rest = ['lfd f%d, %d(r1)' % (n, FPR_S + 8 * n) for n in range(14)]
+    rest += ['lwz r0, %d(r1)' % CR_S, 'mtcrf 0xFF, r0', 'lwz r0, %d(r1)' % XER_S, word(MTXER),
+             'lwz r0, %d(r1)' % CTR_S, 'mtctr r0']
+    rest += ['lwz r%d, %d(r1)' % (n, SLOT(n)) for n in range(2, 13)]
+    rest += ['lwz r12, %d(r1)' % RET_S, 'mtlr r12', 'lwz r12, %d(r1)' % SLOT(12), 'blr']
+    # dispatch (r0 = step): r0 must be read before the save sequence reuses it
+    a.asm('dispatch:')                                  # (the hook saved r0, r11, LR and the step index)
+    a.asm('\n'.join(save))
+    a.asm("""
+        lwz r11, %d(r1)
+        slwi r11, r11, 2
+        lis r12, snippets@ha
+        addi r12, r12, snippets@l
+        lwzx r12, r12, r11
+        mtctr r12
+        bctrl
+        cmpwi r3, 0
+        beq d_out
+        lis r12, tags@ha
+        addi r12, r12, tags@l
+        lwz r11, %d(r1)
+        slwi r11, r11, 2
+        lwzx r3, r12, r11
+        bl crumb
+d_out:""" % (STEP_IDX, STEP_IDX))
+    a.asm('\n'.join(rest))
     hooks = {}
-    for i, (tag, at, w0, args, _what) in enumerate(STEPS):
+    for i, (tag, at, w0, args, _what) in enumerate(steps):
         w = orig(at)
         if w0 is not None:
             assert w == w0, '%s: 0x%08X is 0x%08X, expected 0x%08X' % (tag, at, w, w0)
         else:
             assert w >> 26 == 18, '%s: 0x%08X is 0x%08X, not a branch' % (tag, at, w)
-        save = ['stwu r1, -0x%X(r1)' % FRAME, 'stw r0, %d(r1)' % SLOT(0)]
-        save += ['stw r%d, %d(r1)' % (n, SLOT(n)) for n in range(2, 13)]
-        save += ['mflr r0', 'stw r0, %d(r1)' % LR_S, word(MFCTR), 'stw r0, %d(r1)' % CTR_S, word(MFXER),
-                 'stw r0, %d(r1)' % XER_S, 'mfcr r0', 'stw r0, %d(r1)' % CR_S]
-        save += ['stfd f%d, %d(r1)' % (n, FPR_S + 8 * n) for n in range(14)]
-        save += [word(MFFS0), 'stfd f0, %d(r1)' % FPSCR_S]
-        rest = ['lfd f0, %d(r1)' % FPSCR_S, word(MTFSF0)]
-        rest += ['lfd f%d, %d(r1)' % (n, FPR_S + 8 * n) for n in range(14)]
-        rest += ['lwz r0, %d(r1)' % CR_S, 'mtcrf 0xFF, r0', 'lwz r0, %d(r1)' % XER_S, word(MTXER),
-                 'lwz r0, %d(r1)' % CTR_S, 'mtctr r0', 'lwz r0, %d(r1)' % LR_S, 'mtlr r0']
-        rest += ['lwz r%d, %d(r1)' % (n, SLOT(n)) for n in range(2, 13)]
-        rest += ['lwz r0, %d(r1)' % SLOT(0), 'addi r1, r1, 0x%X' % FRAME]
-        body = args.replace('skip', 'skip%d' % i).replace('take:', 'take%d:' % i).replace('beq take', 'beq take%d' % i)
         a.asm('hook%d:' % i)
-        a.asm('\n'.join(save))
-        a.asm(body)
-        a.asm('lis r3, tag%d@ha\naddi r3, r3, tag%d@l\nbl crumb' % (i, i))
-        a.asm('skip%d:' % i)
-        a.asm('\n'.join(rest))
+        a.asm('stwu r1, -0x%X(r1)\nstw r0, %d(r1)\nstw r11, %d(r1)\nmflr r0\nstw r0, %d(r1)\nli r0, %d\nstw r0, %d(r1)\n'
+              'bl dispatch\nlwz r0, %d(r1)\nmtlr r0\nlwz r0, %d(r1)\nlwz r11, %d(r1)\naddi r1, r1, 0x%X'
+              % (FRAME, SLOT(0), SLOT(11), LR_S, i, STEP_IDX, LR_S, SLOT(0), SLOT(11), FRAME))
         a.asm('replay%d:\n.word 0\nb 0x%X' % (i, at + 4))
-    a.asm('fmt:')
-    blob = b'S4DIAG %s k=%X a=%X b=%X n=%d\n\0'
-    tags = [(i, t[0].encode() + b'\0') for i, t in enumerate(STEPS)]
-    data = [('fmt', blob)] + [('tag%d' % i, t) for i, t in tags]
-    pos = a.pc - 4 * 0          # fmt label set above at the current pc
-    out = bytearray()
-    labels_extra = {}
-    for name, b in data:
-        while len(out) % 4:
-            out += b'\0'
-        labels_extra[name] = pos + len(out)
-        out += b
-    while len(out) % 4:
-        out += b'\0'
-    labels_extra['serial'] = pos + len(out)
-    out += b'\0' * 4
-    labels_extra['step_n'] = pos + len(out)
-    out += b'\0' * 4
-    for k, v in labels_extra.items():
-        a.labels[k] = v
+    for i, (tag, at, w0, args, _what) in enumerate(steps):
+        body = args.replace('skip', 'skip%d' % i).replace('take:', 'take%d:' % i).replace('beq take', 'beq take%d' % i)
+        a.asm('snip%d:' % i)
+        a.asm(body)
+        a.asm('li r3, 1\nblr\nskip%d:\nli r3, 0\nblr' % i)
+    tbl = a.pc
+    names = {}
+    for i, s_ in enumerate(steps):
+        names.setdefault(s_[0], len(names))
+    # data after the code: the snippet table, the tag table, the format, the tag strings, the counters
+    data_at = tbl + 4 * len(steps)
+    blob = bytearray()
+    tag_off = {}
+    fmt = b'S4DIAG %s k=%X a=%X b=%X n=%d\n\0'
+    tags_at = data_at
+    blob += b'\0' * (4 * len(steps))
+    fmt_at = data_at + len(blob)
+    blob += fmt
+    for t in names:
+        while len(blob) % 4:
+            blob += b'\0'
+        tag_off[t] = data_at + len(blob)
+        blob += t.encode() + b'\0'
+    while len(blob) % 4:
+        blob += b'\0'
+    serial_at = data_at + len(blob)
+    blob += b'\0' * 8
+    for i, s_ in enumerate(steps):
+        struct.pack_into('>I', blob, 4 * i, tag_off[s_[0]])
+    a.labels.update(fmt=fmt_at, tags=tags_at, serial=serial_at, step_n=serial_at + 4, snippets=tbl)
     code = a.words()
-    for i, (tag, at, w0, _args, _w) in enumerate(STEPS):
+    assert len(code) * 4 == tbl - CAVE
+    for i, (tag, at, w0, _args, _w) in enumerate(steps):
         r = a.labels['replay%d' % i]
         code[(r - CAVE) // 4] = replayed(at, orig(at), r)
         hooks[at] = branch(at, a.labels['hook%d' % i])
-    words = code + list(struct.unpack('>%dI' % (len(out) // 4), bytes(out)))
-    assert CAVE + 4 * len(words) <= LIMIT, 'cave full'
+    words = code + [a.labels['snip%d' % i] for i in range(len(steps))] + \
+        list(struct.unpack('>%dI' % (len(blob) // 4), bytes(blob)))
+    assert CAVE + 4 * len(words) <= LIMIT, 'cave full (0x%08X)' % (CAVE + 4 * len(words))
     return words, dict(a.labels), hooks
 
 
@@ -233,7 +314,9 @@ def main():
     ap.add_argument('--steps', action='store_true', help='list the steps')
     a = ap.parse_args()
     if a.steps:
-        for i, s in enumerate(STEPS):
+        import kind_expand as K
+        img = K.Image(a.rpx)
+        for i, s in enumerate(all_steps(img.w)):
             print('%2d %-18s 0x%08X  %s' % (i + 1, s[0], s[1], s[4]))
         return
     print(' '.join(args(a.rpx)))

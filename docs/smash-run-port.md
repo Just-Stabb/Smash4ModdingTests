@@ -820,6 +820,14 @@ checked against its ORIGINAL; its cave stays, unreferenced). Test: smashrun_walk
 a fall onto a walking Goomba -> 8 + StepJump, none beside it, rising, past its bottom, on the first frame, in 8 or
 dying, not live, no fighters, above it short of its top, nor on the other four).
 
+User result of fix v8: still no bounce and no reaction (the Phantom glow fix and stage_db_omega_swap.py's stage
+select confirmed in the same round). The static path (w_upd's tests, the fighter table, the posture reads) matches
+the installed words, so a run-time look: `tools/diag_stomp_cave.py` (temporary, on exe_v10, 0x04BAE000-0x04BAF000;
+test `tools/diag_stomp_test.py`, differential against exe_v10 in unicorn) logs `S4STOMP upd` (every 90th w_upd past
+its first test: this, state, CFG, TREAD, death state, the fighter table and its count), `S4STOMP near` (a fighter
+within 14 of the enemy's x and -6..40 above its posture: fighter y / last y / x, enemy y / x, state; floats as bits)
+and `S4STOMP hit` (the stomp taken). Shipped with diag_crumbs_cave.py v3 in one build, exe_diag_v3.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
