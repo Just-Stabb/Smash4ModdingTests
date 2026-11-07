@@ -1013,6 +1013,10 @@ notify_on_remove hook), 0x02DB4B20 (initialize_after hook), 0x04B7D630-0x04B7DF0
 moved): 2756 words, all the walker cave's hooks and regions (the hook words point at moved cave labels). The log
 build adds only 0x032F011C, 0x032F0250, 0x032F13C0 and 0x04BAE000-0x04BAE524.
 
+User results of step 2c v2: the White Bear works as intended (quake, hit, effects). Plasma Wisp's laser is still
+empty; the user's log had no S4FX lines (no match in it) and showed a new Cemu warning, `GX2RSetAttributeBuffer():
+Offset exceeds buffer size` (~38 a frame, from ~20 s after boot).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
