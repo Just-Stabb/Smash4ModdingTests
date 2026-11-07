@@ -604,6 +604,61 @@ indices (joint table indices, the converted model.jtb); the bullet death flight 
 memory with ten kinds' resources on the field (the request loads model, motion, animcmd, sound, effect per kind);
 that nothing else reads the aliased zima slot in a kind-specific way for these kinds.
 
+## Fix v3: facing, mesh visibility, death effect (and Plasma Wisp's laser, open)
+
+From the user's first Step 2b test (Cemu): the walkers spawn and walk; some enemies face the wrong way (Waddle Dee
+seen from behind, a Goomba side-on / three-quarter), Waddle Dee shows three parasols, Waddle Doo every eye state at
+once, defeated enemies vanish without an effect, and Plasma Wisp's laser no longer shows. Package smashrun_fix_v3:
+the executable (the full chain: base + menu + field + 2a + 2b + these hooks) and per-motion visibility for every
+converted enemy that switches meshes by code. Tests on it: smashrun_walker_test.py 63, s3ds_enemy_vis_test.py
+(29 kinds), smashrun_enemy_test.py 26, smashrun_field_test.py 12, training_cpu_test.py, smashrun_menu_test.py's rpx
+checks, stage_slot_test.py: 0 failures each; the `--keep-flip` variant's walker test too.
+
+**Facing.** The model's rotation is posture +0x64 = lr x 90 (degrees), written only by set_lr 0x026A780C /
+reverse_lr 0x026A7A20 (the same code on the 3DS, Behavior::set_lr 0x7B5778); posture +0x60 is the lr. Both also
+flip the motion (MotionModule 0x02C6108C -> 0x0331910C: model +0x10C, anim +0xC; the bone getter 0x0331915C and the
+joint remap 0x033117B4 then use the mirror data) when the behaviour's slot 38 returns 1. On the 3DS slot 38 returns
+1 for the kinds whose model has a model.flp (FLIP v1, little-endian: u16 bone, pair, param, mode, lr flag, 0 per
+entry; modes 3 TransN / RotN, 1 / 2 / 4 the hip, 7 the paired limbs): 33 of the 34 with one, 41 of the 43 without
+return 0 (stalfos, heiho... do not flip). The converted models have no flp (the Wii U's FLIP is v1.1, big-endian,
+another entry layout: Squirtle's lists only hip entries), so a flipped enemy's skeleton is mirrored without its
+table: the hip's odd bind rotations (Goomba HipN x pi, z pi/2) come out turned. The bind poses and animations are
+fine (the 3DS models face +Z like the Wii U fighters: arms at +-X, eyes at +Z; no root rotation in the walks; jtb
+starts TransN, RotN). Fix: slot 38 = 0 for the Smash Run kinds (the walker's own; the twins' vtable words ->
+twin_flip, 1 only for kinds >= 0x50), and initialize_after sets the rotation from the first frame (set_lr(lr, 1, 1)),
+since nothing else writes it at spawn. Variant `--keep-flip` (code_keepflip/): only the rotation and death fixes, to
+tell in game whether the flip is the cause. A converted Wii U FLIP (to keep the flips) is left for later.
+
+**Visibility** (`tools/s3ds_enemy_vis.py`, test `tools/s3ds_enemy_vis_test.py`). 39 enemies list meshes in a
+normal.vmt that their 3DS code switches (Behavior::set_mesh_visibility(vmt index, bool) -> the GsbDrawModel's vmt
+table, 0x7FB018); none of these meshes has a 3DS visibility animation, and the Wii U (no .vmt) draws them all. The
+tool writes motion/enemy/KIND/body/material_anime.pac, one MTA a motion plus default.mta (the Wii U's material
+animation names: 0x104290E4 "default.*", 0x10429108 "material_anime.pac"; the converter's Goomba pac has the same
+form), constant visibility: the model's own default bit mask, damage / blink / tear / closed-eye meshes hidden, one of
+each alternative set (bonkers' hands, shinigami's faces, darknut's swords), the damage meshes shown and the normal
+ones hidden in Damage* / Down* / Collapses; per the 3DS code: Waddle Dee both arms, no parasol, the normal face
+(0x5D04C; the parasol variations' one parasol follows lr per frame: not done), Waddle Doo the open eyes, no blink, no
+tear. 29 kinds (the Wii U's own kinds and the overlap ones, kamek / shinigami / tac, left out; koshinigami's vmt
+names meshes its model lacks).
+
+**Death effect.** Defeat: notify_on_damage 0x026A3564 -> change_state_interrupt(slot 67) (the death flight:
+bullet()) -> the remove state -> remove_enemy_by_id 0x02D9C0E0 -> 0x02D9A1B0(type 0) -> the Enemy's removal
+0x02D8BE78 -> notify_on_remove 0x02DB40E4(type): 0 / 2 -> 0x02DB3574 (category sm: only kinds 0x57-0x5A with
++0x9C set; the minions' appear / vanish effect 0x0752001E, sound 0x08EB001A), 3 / 4 -> 0x02DB3AB0, the defeat
+effect 0x08000033 scaled by the common param +0x5C x the gl entry's +0x20 (the "scales with their size" effect),
+sound 0x124, the dead-item check. No Wii U caller passes 3 or 4 (the manager's updates pass 1 and 5); the step 1
+minions never died outside the Fortress (their sm HP). Fix: for kinds < 0x50 type 0 becomes 3.
+
+**Plasma Wisp's laser (open).** The twin's code requests its effects from group 0x757 (0x700 + mczakoplasmawisp,
+the Wii U's own effect file the field cave loads with kind 0x57) at joint 3 (the jtb: RHandN) through
+request_follow_effect (0x026A9584 / 0x026A95F8); with sb / nhb the bone getter 0x0331915C walks the helper
+object's list and falls back to the plain matrix, which looks right. What fix v2 changed for the model is sb / nhb
+/ xmb; the decisive experiment: delete data/model/enemy/plasmawisp/body/c00/model.xmb (the body draws black) and see
+whether the laser returns.
+
+Not verified: that the Wii U plays material_anime.pac for enemies (the Goomba's damage face switching on a hit is
+the same mechanism: check it); the defeat path's sound / item drop for the Smash Run kinds' gl entries.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

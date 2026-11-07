@@ -25,8 +25,8 @@ Unknown ids (and 0, 5) go to FALL. Slots 64 / 65 / 66 / 67 (the states the frame
 ground / in the air / by default, and the death state) are zima's 3 / 1 / 1 / 6.
 
 - vtable VT: a copy of BehaviorImpl's 0x1008AEBC (GHS: {delta, fn}, slot k's fn at +0xC + 8k) plus slots 74 / 75;
-  overrides: 12 zima's 0x026D6E18 (the gl entry's capture motion, generic), 38 zima's 0x026D7C98 (1: flip the model
-  with lr, as every 3DS behaviour), 40 initialize (the kind's kinetic energy parameters, below), 41 start
+  overrides: 12 zima's 0x026D6E18 (the gl entry's capture motion, generic), 38 w_noflip (0: no motion flip, fix v3
+  below; --keep-flip: zima's 0x026D7C98, 1), 40 initialize (the kind's kinetic energy parameters, below), 41 start
   (set_rhombus 0x026A65BC, +0x10 = posture lr, face the nearest target, FALL), 45 set_attack_data (below),
   64-67, 72 / 73 change_state(id) / the interrupt one (the state table entry {enter, update, exit} PMFs to
   0x026A3A44 / 0x026A3AD4, BehaviorImpl's change_state_base / change_state_interrupt_base; 74 / 75 the same).
@@ -63,6 +63,24 @@ the mczako sets have nothing else, set_motion_label carries the script hashsets)
 (enemy_fs.cro) in its own order, hash zlib.crc32(stem, 0xFFFFFFFF), flags the 3DS word >> 16 (1, 5, 0x40 as the
 twins' Wii U sets). Script hashsets (Kuribo, Shy Guy, Churine have them on the 3DS): crc32(lower(name) + ".init"),
 crc32(lower(name)), crc32(lower(name) + ".exit") per index (the 3DS tables are exactly these).
+
+Fix v3 (every Smash Run kind < 0x50, 2a's twins included; in-game reports: enemies facing away / askew, defeated
+enemies vanishing without an effect):
+- slot 38 (does set_lr / reverse_lr / initialize_after flip the motion with lr): on the 3DS it returns 1 for the
+  kinds whose model has a model.flp (mirror table: 33 of the 34 kinds with one return 1, 41 of the 43 without
+  return 0); the converted models have none, so the Wii U mirrors their skeletons without it. The walker's slot 38 returns 0,
+  and the twins' (vtable words 0x1008FFCC zima, 0x1008F1D4 plasmawisp, 0x1008EC68 darios, functions `li r3, 1`;
+  stalfos's already returns 0) -> twin_flip: 1 for kinds >= 0x50 (the Fortress minions, unchanged), 0 below; their
+  ADDR32 relocations moved to RELOC_DUMMY 0x037EE73C (kind_expand.py's dead word). `--keep-flip` builds without it.
+- initialize_after 0x02DB4AC8 (every behaviour, after start), 0x02DB4B20 `lwz r10, 0(r31)` -> for kinds < 0x50
+  set_lr(posture lr, 1, 1) (slot 49): the model's rotation (posture +0x64 = lr * 90) from the first frame. Only
+  set_lr / reverse_lr write it, and the behaviours' starts only reverse when the target is behind.
+- notify_on_remove 0x02DB40E4 (slot 27, called by the Enemy's removal 0x02D8BE78 with its type), `mflr r0` -> for
+  kinds < 0x50 type 0 (the behaviour's remove state: remove_enemy_by_id 0x02D9C0E0) becomes 3, the defeat path
+  0x02DB3AB0: effect 0x08000033 scaled by the common param +0x5C x the kind's gl entry +0x20 (its size), sound
+  0x124, the dead item check (0x02DB3944, as notify_on_damage does at 0 HP). Type 0 only reaches 0x02DB3574, which
+  in category sm shows the Fortress minions' vanish effect (kinds 0x57-0x5A with +0x9C set) and nothing else; no
+  Wii U caller passes 3 / 4 (the manager passes 1 and 5).
 
 Space: 0x04B86800-0x04B88000 (the rest of kind_expand.py's old space that smashrun_enemy_cave.py clears; nothing
 refers to it).
@@ -256,7 +274,8 @@ class Data:
         self.align()
         self.at('vt')
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
-        over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else cl('w_noflip'), 40: cl('w_init'), 41: cl('w_start'), 45: cl('w_atk'),
+        over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else cl('w_noflip'), 40: cl('w_init'),
+                41: cl('w_start'), 45: cl('w_atk'),
                 72: cl('w_chg'), 73: cl('w_chgi'), 74: cl('w_chg'), 75: cl('w_chgi')}
         over.update(ZIMA_RET)
         for k, fn in over.items():

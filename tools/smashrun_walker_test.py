@@ -326,7 +326,8 @@ def main():
     vt = [img.u32(D['vt'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     slots = {k: vt[(0xC + 8 * k) // 4] for k in range(76)}
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
-    over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'], 41: fn['w_start'], 45: fn['w_atk'],
+    over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'],
+            41: fn['w_start'], 45: fn['w_atk'],
             64: 0x026D7CA0, 65: 0x026D7CA8, 66: 0x026D7CB0, 67: 0x026D7CB8, 72: fn['w_chg'], 73: fn['w_chgi'],
             74: fn['w_chg'], 75: fn['w_chgi']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
