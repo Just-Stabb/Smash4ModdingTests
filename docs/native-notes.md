@@ -1794,6 +1794,36 @@ unused shader copies crashed). `tools/effect_heap_patch.py`: the effect heap 44 
 blocks would overlap, so never grow one without shrinking another). `port_check` E9: a bank's estimate
 (`effect_heap_estimate`).
 
+## Animation heap (two Sephiroths hang at load, multi-instance bugs v3)
+
+exe_diag_v3b (Cemu OSReport crumbs): the second Sephiroth's 17th trail article (0x19C) entered its set-up (the pooled
+object's vt `+0x24` = `0x02B63268`) and never reached its ACMD lookup (`0x0320D588`), so the hang is in the model /
+motion set-up `0x02B62F14` (kinds with weapon flag 0x40): the model resource (`0x030C4128` -> `0x030BE54C` map, keyed
+`(category << 28) | kind x 0x29 + file`, refcounted at node `+0x10`; category = the costume only for kinds with flag
+0x200, so both Sephiroths share one), `0x02006FCC` (the handle into the ModelModule, accessor `+0x1AA4`, vtable
+`0x100F99F4`, whose vt `+0x29C` returns its `+4`), the motion resource (type 8, `0x030C40A8` / `0x03306AC0`), the
+MotionModule's vt `+0x44` (`0x02C5C044`: `0x0332637C` a 0x340 motion object, `0x0330BE2C` its set-up, `0x0330DE58`
+the bind to the model) and accessor `+0x38` vt `+0x34`. No fixed-count pool or wait loop there: the handles are plain
+copies, the resource map has no cap, and vanilla matches pool more instances of one article than he did (8 Diddys: 80
+of kind 0x31; 8 Villagers 224 articles), so a count cap is ruled out. What can stop it is bytes: the motion objects
+and the per-bone arrays (`0x036B34A0` / `0x036B32C4` bones x 64, `0x036B8040` x 16 and x 0x88, `0x036AA2FC` x 0xA0,
+`0x036B4968` x 0xC ...) come from one heap, `0x036C9350(mutex [0x104470F4], size, align)` -> the allocator at
+`[0x1057DBD8]` (vt `+0x1C`), made at `0x03326328` over a MEM_ARENA_2 block of `0x02010B18` (`lis r3, 0x160`: 22 MiB);
+each of those allocations ends `li r3, 0; twu r31, r31` when it fails (an assert: Cemu's debugger stops the thread on
+`tw`, so the game hangs with no crash log), as do the render side's (`0x033347E4`: a model part's clone). Per
+Sephiroth, 41 model-bearing article instances (phantom 1 x 24 bones, snake 12 x 4, snaketip 1 x 4, trail 24 x 49, fill
+3 x 7: ~1270 bone-instances against his body's 172); the hang came at ~2130 (his full set + the second's phantom,
+snakes, point and 16 trails). Not confirmed in game (no heap readout): `tools/diag_crumbs_cave.py` v4 logs every
+such assert of 0x0330xxxx - 0x0347xxxx / 0x036Axxxx - 0x036Dxxxx (`S4DIAG trap a=<address>`).
+
+MEM_ARENA_2 (`0x03374F38`): the top `0x02010AE8` bytes (`lis r3, 0x34E0`) of MEM2's free space (Cemu: ~1007 MiB) are a
+bump arena (`0x03374558` set-up, `0x033746FC` take: a block past the end is still handed out, then the arena is marked
+spent), the rest the default heap (`operator new`); the getters' blocks: 2 MiB `0x02010AF0`, resource `0x02010AF8`,
+280 MiB `0x02010B00`, effect `0x02010B08`, 3 MiB `0x02010B10`, animation `0x02010B18`, 14 MiB small-block
+`0x02010B20` (`0x03375EF0`, `0x03376098`'s buckets), plus 21 MiB of fixed-size blocks. `tools/effect_heap_patch.py`
+(exe_v11): the animation heap 22 -> 46 MiB with the arena's total grown by the same 24 MiB (the default heap gives it:
+~162 -> ~138 MiB on Cemu), `effect_heap_patch_test.py`; `port_check` W11 weapon-models.
+
 ## Article instance cap (64 a fighter)
 
 Found from Sephiroth test 123's load crash (Cemu: access violation at `0x02C0337C`, from `0x02C057F4`). A fighter's

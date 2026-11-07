@@ -20,7 +20,8 @@ crashed at the first crumb, user's Cemu log). A vararg call: cr1eq cleared (no f
 Every hook replaces one word with `b stub`; the stub saves every volatile register (r0, r2-r12, LR, CTR, XER,
 CR, f0-f13; not FPSCR since v3: Cemu warned on mtfsf) in its own frame, computes the crumb's arguments from the saved registers, calls `crumb` when the
 kind passes its filter, restores everything, then runs the replaced word (relative branches re-aimed from the stub)
-and goes back. Hooks (in the order a fighter loads; STEPS below, with what a / b hold):
+and goes back. Hooks (in the order a fighter loads; STEPS below, with what a / b hold). v4 adds the animation /
+model / render code's allocation-failure asserts (TRAP_STEP: `bl traphook` in place of each `twu r31, r31`).
 """
 import argparse
 import os
@@ -178,6 +179,34 @@ def all_steps(orig):
     return STEPS + V3_STEPS + accessor_steps(orig)
 
 
+# v4 (the hang is inside the 17th trail's model / motion set-up, 0x02B62F14, before its ACMD lookup): every
+# allocation-failure assert there ends `li r3, 0; twu r31, r31`, which Cemu's debugger takes as a breakpoint and
+# parks the thread on (the hang, no crash log). Each `twu r31, r31` of the animation / model / render code
+# (TRAP_RANGES: 0x0330xxxx - 0x0347xxxx, 0x036Axxxx - 0x036Dxxxx) becomes `bl traphook`, which logs
+# `S4DIAG trap k=0 a=<the assert's address> b=<r3>` (unfiltered: an assert never fires in a match that loads) and then
+# runs the same `twu r31, r31` (the game still stops there, as before). The address names the allocation that failed
+# (e.g. 0x036B356C: the animation heap's bones x 64 array, 0x036B34A0)
+TRAP_WORD = 0x7FFFF808
+TRAP_RANGES = ((0x03300000, 0x03480000), (0x036A0000, 0x036E0000))
+TRAP_STEP = ('trap', None, TRAP_WORD,
+             'lwz r5, %d(r1)\naddi r5, r5, -4\nli r4, 0\n' % 0x40 + 'lwz r6, %d(r1)' % (0x14 + 4 * 1),
+             'an allocation-failure assert (`twu r31, r31`) of the animation / model / render code: a = its address, '
+             'b = r3 (0 for a failed allocation)')
+
+
+def trap_sites(orig):
+    out = []
+    for lo, hi in TRAP_RANGES:
+        for x in range(lo, hi, 4):
+            try:
+                w = orig(x)
+            except KeyError:
+                break
+            if w == TRAP_WORD:
+                out.append(x)
+    return out
+
+
 RET_S = 0xC8                     # the dispatcher's own return address (in the hook's frame)
 
 
@@ -185,7 +214,7 @@ def build(orig):
     """(words, labels, hooks {address: word}); orig(address) -> the executable's word. Each hook: a frame, r0 / LR
     saved, `li r0, N; bl dispatch` (which saves the rest, runs step N's argument snippet, calls crumb when it says
     so, restores), r0 / LR back, the replaced word, `b` back"""
-    steps = all_steps(orig)
+    steps = all_steps(orig) + [TRAP_STEP]
     a = Asm(CAVE)
     a.asm("""
 crumb:  mflr r0
@@ -244,6 +273,13 @@ d_out:""" % (STEP_IDX, STEP_IDX))
     a.asm('\n'.join(rest))
     hooks = {}
     for i, (tag, at, w0, args, _what) in enumerate(steps):
+        if at is None:                                  # the traps' hook: reached by `bl` from each assert
+            a.asm('traphook:')
+            a.asm('stwu r1, -0x%X(r1)\nstw r0, %d(r1)\nstw r11, %d(r1)\nmflr r0\nstw r0, %d(r1)\nli r0, %d\n'
+                  'stw r0, %d(r1)\nbl dispatch\nlwz r0, %d(r1)\nmtlr r0\nlwz r0, %d(r1)\nlwz r11, %d(r1)\n'
+                  'addi r1, r1, 0x%X' % (FRAME, SLOT(0), SLOT(11), LR_S, i, STEP_IDX, LR_S, SLOT(0), SLOT(11), FRAME))
+            a.asm('traptw:\n.word 0x%08X\nblr' % TRAP_WORD)
+            continue
         w = orig(at)
         if w0 is not None:
             assert w == w0, '%s: 0x%08X is 0x%08X, expected 0x%08X' % (tag, at, w, w0)
@@ -287,9 +323,14 @@ d_out:""" % (STEP_IDX, STEP_IDX))
     code = a.words()
     assert len(code) * 4 == tbl - CAVE
     for i, (tag, at, w0, _args, _w) in enumerate(steps):
+        if at is None:
+            continue
         r = a.labels['replay%d' % i]
         code[(r - CAVE) // 4] = replayed(at, orig(at), r)
         hooks[at] = branch(at, a.labels['hook%d' % i])
+    for x in trap_sites(orig):
+        assert x not in hooks
+        hooks[x] = branch(x, a.labels['traphook'], link=True)
     words = code + [a.labels['snip%d' % i] for i in range(len(steps))] + \
         list(struct.unpack('>%dI' % (len(blob) // 4), bytes(blob)))
     assert CAVE + 4 * len(words) <= LIMIT, 'cave full (0x%08X)' % (CAVE + 4 * len(words))
@@ -322,6 +363,7 @@ def main():
         img = K.Image(a.rpx)
         for i, s in enumerate(all_steps(img.w)):
             print('%2d %-18s 0x%08X  %s' % (i + 1, s[0], s[1], s[4]))
+        print('   %-18s %d asserts  %s' % ('trap', len(trap_sites(img.w)), TRAP_STEP[4]))
         return
     print(' '.join(args(a.rpx)))
 

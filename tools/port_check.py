@@ -915,6 +915,93 @@ def check_weapon_instances(name, rec, rep):
             ARTICLE_SLOTS - base - new))
 
 
+# W11: the animation heap (22 MiB, one for the match: tools/effect_heap_patch.py's ANIM_GETTER) holds every model
+# instance's motion objects and per-bone arrays; a model-bearing article (weapon flag 0x40: extra_kinds.json
+# "flags_set", or a native copy with a model folder) gets them for every pooled instance as the fighter loads, and a
+# failed allocation is an assert (`twu`): Cemu parks the thread, the match never starts, no crash log. exe_v10 (22 MiB):
+# two Sephiroths hung at the second's 17th trail, i.e. with his own model articles all loaded once (MODEL_FAIL_FULL)
+# plus the second's phantom, snakes, point and 16 trails (MODEL_FAIL_PART) (multi-instance bugs v3).
+ANIM_HEAP_MIB = 22
+MODEL_FAIL_FULL = {'phantom': 1, 'snake': 12, 'snaketip': 1, 'trail': 24, 'fill': 3}
+MODEL_FAIL_PART = {'phantom': 1, 'snake': 12, 'snaketip': 1, 'trail': 16}
+
+
+def vbn_bones(data):
+    """a model.vbn's bone count (' NBV' little-endian / 'VBN ' big-endian), None if it isn't one"""
+    if data[:4] == b' NBV':
+        return struct.unpack('<I', data[8:12])[0]
+    if data[:4] == b'VBN ':
+        return struct.unpack('>I', data[8:12])[0]
+    return None
+
+
+def model_articles(inst, name, rec):
+    """{article: (pooled instances, bones)} for the fighter's new model-bearing articles (bones from the install's
+    model/<article>/c00/model.vbn; None when it isn't there)"""
+    out = {}
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        path = 'fighter/%s/model/%s/c00/model.vbn' % (name, art)
+        if isinstance(w, dict):
+            if not int(w.get('flags_set', '0'), 0) & 0x40:
+                continue
+            n = int(w.get('max', 1))
+        elif path in inst.files:
+            n = 1                                 # a native copy (its own kind number, the base's list entry: 1)
+        else:
+            continue
+        out[art] = (n, vbn_bones(inst.get(path)) if path in inst.files else None)
+    return out
+
+
+def check_weapon_models(inst, name, rec, rep):
+    """W11: model-bearing article instances against the animation heap (exe_v10's 22 MiB: two Sephiroths hung at
+    load; tools/effect_heap_patch.py ANIM_GROW_MIB). Counted in bone-instances (an instance's per-bone arrays are
+    most of its cost: 0x036B34A0 bones x 64, 0x036B8040 x 16 and x 0x88 ...), calibrated on what loaded on exe_v10
+    before the hang; the budget for a bigger heap scales it with the heap (an estimate: the fighters' and stage's own
+    share of the heap is unknown, so it assumes everything grows alike)"""
+    import tempfile
+    import effect_heap_patch
+    import kind_expand as K
+    arts = model_articles(inst, name, rec)
+    if not arts:
+        return
+    unknown = sorted(a for a, (_n, b) in arts.items() if b is None)
+    bones = {a: (b if b is not None else 8) for a, (_n, b) in arts.items()}
+    load = sum(n * bones[a] for a, (n, _b) in arts.items())
+    inst_n = sum(n for n, _b in arts.values())
+    heap = None
+    if 'code/cross_f.rpx' in inst.files:
+        with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+            f.write(inst.get('code/cross_f.rpx'))
+            f.flush()
+            img = K.Image(f.name)
+            heap = (img.w(effect_heap_patch.ANIM_GETTER) & 0xFFFF) / 16.0      # lis r3, N: N x 64 KiB
+    edge = record('edge')
+    e_arts = model_articles(inst, 'edge', edge) if name == 'edge' else {}
+    e_bones = {a: b for a, (_n, b) in e_arts.items() if b is not None}
+    if set(e_bones) >= set(MODEL_FAIL_FULL):
+        fail = sum(MODEL_FAIL_FULL[a] * e_bones[a] + MODEL_FAIL_PART.get(a, 0) * e_bones[a] for a in MODEL_FAIL_FULL)
+    else:
+        fail = 2133                               # Sephiroth's install of multi-instance bugs v3 (49-bone trails)
+    budget = fail * (heap or ANIM_HEAP_MIB) / ANIM_HEAP_MIB
+    what = '%d model-bearing article instances, %d bone-instances (%s)%s' % (
+        inst_n, load, ', '.join('%s %d x %s' % (a, n, b if b is not None else '?') for a, (n, b) in arts.items()),
+        ' (no model.vbn for %s: 8 bones assumed)' % ', '.join(unknown) if unknown else '')
+    heap_s = '%g MiB animation heap' % heap if heap else 'the executable not in the install (22 MiB assumed)'
+    if 2 * load > budget:
+        rep.add('ERROR' if (heap or ANIM_HEAP_MIB) <= ANIM_HEAP_MIB else 'WARN', 'W11 weapon-models',
+                '%s: two of him need ~%d of ~%d bone-instances the %s holds for articles (exe_v10, 22 MiB: two '
+                'Sephiroths hung at load at %d); tools/effect_heap_patch.py ANIM_GROW_MIB or fewer / smaller model '
+                'articles' % (what, 2 * load, budget, heap_s, fail))
+    elif 4 * load > budget:
+        rep.add('WARN', 'W11 weapon-models', '%s: four of him (4-player) need ~%d of ~%d bone-instances in the %s '
+                '(estimate scaled from exe_v10\'s hang at %d on 22 MiB); two fit' % (what, 4 * load, budget, heap_s,
+                                                                                    fail))
+    else:
+        rep.add('INFO', 'W11 weapon-models', '%s: four of him ~%d of ~%d bone-instances (%s)' % (
+            what, 4 * load, budget, heap_s))
+
+
 def check_weapon_statuses(name, rep):
     """W2: a weapon MSC (fighters/NAME/weapons/*.c, built on a vanilla weapon's MSC) registering a status at or past
     its status count (global7, set in its setup): the scaffold's status change refuses it ("g_status_kind_next >=
@@ -1836,6 +1923,7 @@ def main():
     check_grab_status(a.name, rep)
     check_weapon_owner(inst, a.name, rec, rep)
     check_weapon_instances(a.name, rec, rep)
+    check_weapon_models(inst, a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
     check_weapon_custom_clamp(inst, a.name, rec, rep)
     check_weapon_kind_compares(inst, a.name, rep)

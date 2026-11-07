@@ -254,6 +254,28 @@ def main():
         n_calls.append(len(E1.calls))
     check('frame: one crumb a frame for kind 0x42, none for 0x10, %d in all' % D.STEP_MAX,
           (n_calls[1], sum(n_calls), n_calls[-1]), (0, D.STEP_MAX, 0))
+    # v4: every allocation-failure assert in TRAP_RANGES is `bl traphook` in the diagnostic executable and still
+    # `twu r31, r31` in the base; from a few of them (the animation heap's), the hook logs the assert's address and
+    # r3, then reaches its own `twu r31, r31` with every register as at the assert but LR (the bl's)
+    sites = D.trap_sites(E0.w)
+    _words, labels, _hooks = D.build(E0.w)
+    th, tw = labels['traphook'], labels['traptw']
+    check('trap: %d asserts in the ranges, each `bl traphook` in the diagnostic one' % len(sites),
+          (len(sites) > 100, [hex(x) for x in sites if E1.w(x) != D.branch(x, th, link=True)]), (True, []))
+    check('trap: traphook ends in the same assert', E1.w(tw), D.TRAP_WORD)
+    for site in [x for x in (0x036B356C, 0x036B89C4, 0x036AFFE0, 0x036C938C) if x in sites] + sites[:1]:
+        E1.calls = []
+        setup(E1, {3: 0}, {})
+        want = E1.state()
+        run(E1, site, tw)
+        got = E1.state()
+        lr = got.pop('lr')
+        want.pop('lr')
+        diff = {r: (hex(want[r]), hex(got[r])) for r in want if want[r] != got[r]}
+        check('trap 0x%08X: registers as at the assert (LR = the bl\'s 0x%08X)' % (site, lr), (diff, lr),
+              ({}, site + 4))
+        check('trap 0x%08X: OSReport once (trap, 0, the address, r3)' % site,
+              [(c[1], c[2], c[3], c[4]) for c in E1.calls], [('trap', 0, site, 0)])
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

@@ -2306,3 +2306,31 @@ warnings; Hero + Hero and Hero + Sephiroth load).
   user: Cemu's debugger at the hang (Debug > Debugger, pause: the PPC thread's address and call stack).
 - port_check over the chain + fighters_fix_multi_v1 + v9 rebuilt with this weapon_expand: 20 errors (21 on v9: X5
   gone), 62 warnings.
+
+## Multi-instance bugs v3 (`$S/exe_v11.zip`, executable only): the two-Sephiroth hang, most likely the animation heap
+
+User (exe_diag_v3b, Cemu OSReport crumbs): the first Sephiroth's 52 new articles all set up; the second's phantom,
+fire, flares, flash, 12 snakes, point and 16 trails set up, then his 17th trail (0x19C) entered its set-up (vt `+0x24`
+= `0x02B63268`) and never reached its ACMD lookup: the hang is inside the model / motion set-up `0x02B62F14`.
+- **Traced (docs/native-notes.md "Animation heap"):** no fixed-count pool and no wait loop on that path (handles are
+  plain copies, the resource map has no cap; a count cap would also break vanilla 8-player matches, 80 of Diddy's
+  0x31). Its allocations (a 0x340 motion object and per-bone arrays a pooled instance: bones x 64, x 16, x 0x88 ...)
+  come from one 22 MiB heap for the match (`0x036C9350`, getter `0x02010B18`), and each failure there is an assert
+  (`li r3, 0; twu r31, r31`) that Cemu's debugger parks the thread on: a hang with no crash log, as seen. His model
+  articles (weapon flag 0x40): phantom 1 x 24 bones, snake 12 x 4, snaketip 1 x 4, trail 24 x 49, fill 3 x 7 = 41
+  instances, ~1270 bone-instances (his body: 172 bones); the hang came at ~2130 (his full set and the second's
+  phantom, snakes, point and 16 trails). Not confirmed in game (the heap's free bytes weren't read).
+- **Fix (exe_v11 = exe_v10 + 2 words, `tools/effect_heap_patch.py`, a pipeline default via edge_specials_build
+  --rpx):** the animation heap 22 -> 46 MiB (`0x02010B18` `lis r3, 0x2E0`), MEM_ARENA_2's total + 24 MiB with it
+  (`0x02010AE8` `lis r3, 0x3660`), so no other block shrinks; the default heap (MEM2 past the arena) gives the 24 MiB
+  (~162 -> ~138 MiB on Cemu). `tools/effect_heap_patch_test.py` (unicorn): 0 failed (getters, the arena's slack
+  unchanged at 0x1500000, every block taken in either order, the patched blocks overflowing the old total).
+- **Article counts unchanged.** What the trail needs at most in play: 24 is what kept Blade Dash lines (6 at most, a
+  line a few 16-point articles) plus held Octaslash's line need (test 128: 12 were all held by kept lines). If the
+  heap isn't the cause or four of him don't fit, the cheapest cut is the trail (94% of his bone-instances): 16 trails
+  would be ~880 a copy. `port_check` W11 weapon-models: two of him past exe_v10's measured hang (ERROR on a 22 MiB
+  heap); four past the estimate scaled with the heap (WARN: 4 x 1273 = 5092 vs ~4460 on 46 MiB, if everything in the
+  heap grows alike; three fit).
+- **exe_diag_v4** (`$S/exe_diag_v4.zip`, exe_v11 + v3b's crumbs): every allocation assert of the animation / model /
+  render code (258, 0x0330xxxx - 0x0347xxxx and 0x036Axxxx - 0x036Dxxxx) logs `S4DIAG trap k=0 a=<its address>` before
+  stopping as before, so a remaining hang names the allocation (and its heap). `diag_crumbs_test.py`: 0 failed.

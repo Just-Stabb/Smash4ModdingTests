@@ -16,6 +16,17 @@ caught, the blocks would overlap) is unchanged. Only 0x033FA2E4 / 0x033FA39C cal
 nothing else is sized from it. Source: the heap reads (eft's loader 0x04A6CD18 -> 0x04A6CE40 shader count,
 0x6E8-byte shader objects, program copies 0x04A594B8 / 0x04A59618 / 0x04A59778; the manager's heap at
 0x032F1648, created 0x032EF824), docs/native-notes.md "Effect heap".
+
+Since multi-instance bugs v3 (exe_v11), also the animation heap: the 22 MiB heap behind 0x036C9350 (its allocator
+at [0x1057DBD8], made at 0x03326328 from the arena block of getter 0x02010B18 `lis r3, 0x160`, mutex [0x104470F4])
+holds every model instance's motion objects (0x0332637C: 0x340 each) and per-bone arrays (0x036B34A0 / 0x036B32C4
+bones x 64, 0x036B8040 x 16 and x 0x88, 0x036AA2FC x 0xA0 ...); a failed allocation there ends in `li r3, 0; twu r31,
+r31` (an assert: Cemu's debugger parks the thread, the game hangs at load with no crash log). Two Sephiroths (41
+model-bearing article instances each, 24 trails of 49 bones) hung at the second's 31st (exe_diag_v3b: his 17th
+trail's model / motion set-up, 0x02B62F14, never returned). The patch: that getter + ANIM_GROW_MIB, taken from the
+default heap (MEM2 left after MEM_ARENA_2: the arena's total 0x02010AE8 `lis r3, 0x34E0` + the same, read once at
+0x03374F38; Cemu's MEM2 ~1007 MiB, so the default heap goes ~162 -> ~138 MiB), not from another arena block.
+Only 0x03326310 / 0x03326320 call the getter (the block's bump allocation and the heap made over it).
 """
 import argparse
 import os
@@ -25,8 +36,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 EFFECT_GETTER, RESOURCE_GETTER = 0x02010B08, 0x02010AF8
-ORIGINAL = {EFFECT_GETTER: 0x3C6002C0, RESOURCE_GETTER: 0x3C601CC0}        # lis r3, 0x2C0 / lis r3, 0x1CC0
+ANIM_GETTER, ARENA_TOTAL = 0x02010B18, 0x02010AE8
+ORIGINAL = {EFFECT_GETTER: 0x3C6002C0, RESOURCE_GETTER: 0x3C601CC0,        # lis r3, 0x2C0 / lis r3, 0x1CC0
+            ANIM_GETTER: 0x3C600160, ARENA_TOTAL: 0x3C6034E0}               # lis r3, 0x160 / lis r3, 0x34E0
 GROW_MIB = 16
+ANIM_GROW_MIB = 24
 
 
 def patches():
@@ -34,17 +48,27 @@ def patches():
             RESOURCE_GETTER: ORIGINAL[RESOURCE_GETTER] - GROW_MIB * 0x10}       # 0x1CC0 -> 0x1BC0
 
 
+def anim_patches():
+    """the animation heap 22 -> 46 MiB, the MEM_ARENA_2 total grown by the same (the default heap gives it)"""
+    return {ANIM_GETTER: ORIGINAL[ANIM_GETTER] + ANIM_GROW_MIB * 0x10,          # 0x160 -> 0x2E0 (units of 64 KiB)
+            ARENA_TOTAL: ORIGINAL[ARENA_TOTAL] + ANIM_GROW_MIB * 0x10}          # 0x34E0 -> 0x3660
+
+
+def all_patches():
+    return {**patches(), **anim_patches()}
+
+
 def check_base(rpx):
     import kind_expand as K
     img = K.Image(rpx)
-    p = patches()
+    p = all_patches()
     bad = ['0x%08X: 0x%08X' % (a, img.w(a)) for a, w in ORIGINAL.items() if img.w(a) not in (w, p[a])]
     if bad:
         raise SystemExit('effect_heap_patch: unexpected words in %s: %s' % (rpx, ', '.join(bad)))
 
 
 def args():
-    return ['0x%08X=0x%08X' % (a, w) for a, w in sorted(patches().items())]
+    return ['0x%08X=0x%08X' % (a, w) for a, w in sorted(all_patches().items())]
 
 
 def main():
