@@ -153,6 +153,9 @@ class Machine:
         elif addr == W.CHANGE_MOTION:
             c.append(('motion', r(3), r(4), round(self.fr(1), 4), round(self.fr(2), 4), r(5), round(self.fr(3), 4)))
             self.ret()
+        elif addr == W.NOTIFY_DEATH:
+            c.append(('notify_death', r(3)))
+            self.ret()
         elif addr == W.BULLET:
             c.append(('bullet', r(3)))
             self.ret()
@@ -418,12 +421,22 @@ def main():
     slots = {k: vt[(0xC + 8 * k) // 4] for k in range(76)}
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
     over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'],
-            41: fn['w_start'], 45: fn['w_atk'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
+            41: fn['w_start'], 45: fn['w_atk'], 20: fn['w_tread'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
             67: fn['w_r67'], 72: fn['w_chg'], 73: fn['w_chgi'], 74: fn['w_chg'], 75: fn['w_chgi']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
     ok &= all(vt[(0x8 + 8 * k) // 4] == 0 for k in range(76))
     check(ok, 'VT: BehaviorImpl\'s 74 slots (dtor 0x%08X, update 0x%08X kept) with 12 38 40 41 45 64-67 72-75 '
           'overridden' % (slots[0], slots[3]))
+    for w in W.WALKERS:
+        m = Machine(img)
+        m.walker(cfg[w['kind']], state=3, kind=w['kind'])
+        m.call(slots[20], {3: OBJ, 4: 0x11, 5: 0})
+        c = [x for x in m.calls if x[0] in ('chg', 'chgi')]
+        t = w.get('tread', 0)
+        check(c == ([('chgi', OBJ, t, (0xFFFF, fn[w['states'][t][1]]), (0xFFFF, fn[w['states'][t][0]]), (0, 0))]
+                    if t else []) and len(m.calls) == len(c),
+              'VT %s: slot 20 (the 3DS\'s 21, stepped on) %s' % (w['name'], '=> %d (collapses)' % t if t else
+                                                                  'does nothing (BehaviorImpl\'s nop, as on the 3DS)'))
     for w in W.WALKERS:
         got = []
         for k in (64, 65, 66, 67):
@@ -578,7 +591,8 @@ def main():
     got = enters('kuribo')
     exp = {1: (8, 0, (I('kuribo', 'Fall'), 1.0, 1), ''), 2: (0, 1, (I('kuribo', 'Landing'), 1.0, 0), ''),
            3: (0xA, 1, (15, 0.6, 1), ''), 4: (5, 0, (12, 1.0, 1), ''), 5: (0xA, 1, (13, 1.0, 1), ''),
-           6: (2, 1, (11, 1.0, 0), ''), 7: (2, 1, (14, 1.0, 0), ''), 9: (None, None, (1, 0.0, 0), 'bullet')}
+           6: (2, 1, (11, 1.0, 0), ''), 7: (2, 1, (14, 1.0, 0), ''), 8: (0, 1, (0, 1.0, 0), ''),
+           9: (None, None, (1, 0.0, 0), 'bullet')}
     check(got == exp, 'kuribo enters (kinetic, ground, (motion, rate, loop)) as the 3DS\'s: %s' % got)
     # walk: the search on its first frame finds a target in front -> notice (no turn); the hop (E+0x20 = -0.4)
     wd = world('kuribo', 3, lr=-1.0)
@@ -653,6 +667,24 @@ def main():
     wd.run(12)
     check(wd.states()[:3] == [1, 2, 3], 'kuribo: fall 1, on the ground => landing 2, at its end -> walk 3 %s'
           % wd.states())
+    # stomp: stepped on while walking => 8 (Collapses, notify_on_death), at its end -> 10; no attack armed in 8
+    wd = world('kuribo', 3)
+    wd.run(3)
+    m = wd.m
+    m.calls = []
+    m.call(slots[20], {3: OBJ, 4: 0x11})
+    en = [c for c in m.calls if c[0] == 'chgi']
+    wd.enter(8)
+    col = [c[0] for c in m.calls]
+    wd.run(8)
+    atk = []
+    mm = Machine(img)
+    mm.walker(cfg[1])
+    mm.call(fn['w_atk'], {3: OBJ, 4: 8})
+    atk = mm.calls
+    check(en and en[0][2] == 8 and 'notify_death' in col and wd.states() == [3, 8, 10] and
+          atk == [('atk_clear', ATKM)], 'kuribo: stepped on (slot 20) => collapses 8 (kinetic 0, Collapses, '
+          'notify_on_death %s), at its end -> remove 10 %s; no attack in 8' % (col, wd.states()))
     # dead: kinetic flag 8 => remove
     wd = world('kuribo', 9)
     wd.run(2)

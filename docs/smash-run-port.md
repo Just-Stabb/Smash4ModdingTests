@@ -743,6 +743,34 @@ between base_effects_cave.py and base_customs_cave.py) and 0x04BB8000-0x04BB8660
 weapon_expand.py's 0x04BB8000, below the text region's end 0x04BB8670). Calls into 0x026Axxxx go through ctr (beyond a
 branch's reach from the cave).
 
+## Fix v6: the Goomba's stomp (stepped on -> Collapses)
+
+User result of fix v5: the five walkers work as intended; but a Goomba can't be jumped on for its squash. On the 3DS
+a fighter's footstool on an enemy reaches the behaviour's slot 21; BehaviorImpl's is a nop, Kuribo's (0x32944)
+interrupts to state 8: kinetic 0, Collapses, ground on, `BehaviorImpl::notify_on_death` (death flag, hit off,
+attacks cleared: the Goomba dies whatever its HP), play_se 0x28D0004; on state frame p+0x38 (1)
+`create_dead_item(1, 10)` (kill count, item drop); at the motion's end state 10 (remove). The stomped enemy takes no
+damage path and gives none; the fighter's bounce is the fighter's own footstool jump. The enemies' tread is an
+AreaModule area (`Behavior::enable_tread` / `disable_tread`: area 0 on / off; Wii U 0x026A7614 / 0x026A75FC).
+
+The Wii U keeps the receiving path: the Enemy ctor registers an event handler (0x02D8C450, at 0x02D89184); its event
+6 (0x02D8C5D4) calls the behaviour module's 0x02DB98F4, which calls behaviour slot 20 (vt+0xAC), then writes a param
+float (acc+0x315C vt+0x44 with 0x11) and a flag into the event for the sender. Slot 20 is the 3DS's slot 21: the
+3DS (ARM) vtables have two destructors, so up to slot 28 the 3DS slot is the Wii U's + 1 (3DS 13 capture motion /
+Wii U 12, 3DS 28 notify_on_remove / Wii U 27), and zima overrides exactly this slot with its own nop on both
+(Wii U 0x026D7C8C, 3DS 0x14A0C). (The spec table's "Wii U k = 3DS k + 1" is the other way round.)
+
+`tools/smashrun_walker_cave.py`: slot 20 -> w_tread (the kind's CFG TREAD state, interrupt; 0 = nothing), Kuribo's
+state 8 as the 3DS's (notify_on_death 0x0269FD6C, slot 71); create_dead_item is left to the removal's defeat path
+(fix v3: type 3 drops the items), play_se as all sounds not ported. The other four walkers keep the nop, as on the
+3DS (Waddle Dee's slot 21 only sets its parasol timer, not ported). Later kinds with a slot-21 reaction: dekakuribo
+(add_damage(p+0x3C), then 10 / 11 by its HP), patapata (variations 0 / 1 => 9, else 0x13), tikibuzz, waddledee.
+Test: smashrun_walker_test.py 98 checks (slot 20 per kind, the stomp's state sequence). Not run in game; what isn't
+known statically: whether the Wii U fighters send the footstool event to these enemies (the sender side and the
+enemies' tread area, which comes from data, were not traced). The README's check decides it: a footstool on a Goomba
+squashes it (works), bounces without a squash (the reaction is missing: would need debugging), or doesn't bounce
+(no tread area / event: a replacement detection in the walker's update would be needed).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

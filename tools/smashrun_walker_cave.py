@@ -27,6 +27,9 @@ Kuribo (Goomba) 0x01, table 0x10F... (vtable 0xCD308):
               run frames -> 6
   6 brake     RunBrakeL, kinetic 2, ground on; at its end -> 3
   7 run turn  RunTurnL, kinetic 2, ground on; at a ledge clear_speed_all; at its end reverse_lr, => 5
+  8 collapses stepped on (slot 21 on the 3DS, 20 here: below) => 8: kinetic 0, Collapses, ground on,
+              notify_on_death (death flag, hit off, attacks cleared); at its end -> 10 (the 3DS's
+              create_dead_item(1, 10) on frame p+0x38 (1) is the removal's defeat path here, fix v3)
   9 dead      Damage at rate 0, bullet() (the defeated enemy flies off) and the vl "bullet" attack (state 9: a
               flying body hits); kinetic flag 8 => 10
   10 remove   zima's 0x026D7B58 / 0x026D7B6C (EnemyManager remove_enemy_by_id)
@@ -68,7 +71,7 @@ Guy +0x78 = 0.7, +0x90 = 1.0 -- inferred from the vl files' order; the Waddle Do
 
 The framework:
 - vtable VT: a copy of BehaviorImpl's 0x1008AEBC (GHS: {delta, fn}, slot k's fn at +0xC + 8k) plus 74 / 75;
-  overrides: 12 zima's 0x026D6E18 (capture motion), 38 w_noflip (0, fix v3; --keep-flip: zima's `li r3, 1`),
+  overrides: 12 zima's 0x026D6E18 (capture motion), 20 w_tread (stepped on, below), 38 w_noflip (0, fix v3; --keep-flip: zima's `li r3, 1`),
   40 initialize (the kind's 3DS kinetic energy words), 41 start (set_rhombus, +0x10 = posture lr, face the
   nearest target, the kind's first state), 45 set_attack_data (below), 64-67 the kind's states (CFG), 72 / 73
   change_state(id) / the interrupt one (the kind's state table {enter, update, exit} PMFs to 0x026A3A44 /
@@ -88,6 +91,15 @@ The framework:
   Others: get_nearest_target 0x026A7008, check_turn_to_target 0x026A6984, get_fighter_pos 0x026A690C,
   check_wall 0x026A68E4, check_cliff 0x026A6E24, clear_speed_all 0x026A67E8, is_current_stopped 0x026A679C,
   get_current_speed 0x026A678C, random_range (an xorshift in the cave).
+
+Stomp (fix v6): a fighter's footstool on an enemy reaches it as Enemy event 6 (the handler the Enemy ctor registers,
+0x02D8C450 -> 0x02D8C5D4): behaviour module 0x02DB98F4 -> behaviour slot 20 (fn at vt+0xAC), then the event gets a
+param float (acc+0x315C vt+0x44, 0x11) back for the fighter's bounce. Slot 20 is the 3DS's slot 21 (the 3DS vtables
+have two destructors: 3DS k = Wii U k + 1 up to slot 28 -- 13 capture motion / 12, 28 notify_on_remove / 27, and
+zima overrides exactly this slot with a nop on both). BehaviorImpl's is a nop; the 3DS overrides it in kuribo
+(=> 8 collapses), dekakuribo (add_damage(p+0x3C), => 10 / 11), patapata (variations 0 / 1 => 9, else 0x13),
+tikibuzz, waddledee (parasol variations: p+0x8C into its parasol timer) and zima (a nop). w_tread => the kind's
+CFG TREAD state (Kuribo 8; the other four 0: nothing, as on the 3DS but Waddle Dee's parasol timer, not ported).
 
 Hooks (2a's three stay as they are):
 - F2, the factory 0x02DB94CC after 2a's hook: 0x02DB951C `cmplwi r12, 0x10` -> for the walker kinds
@@ -155,6 +167,8 @@ IS_STOPPED = 0x026A679C              # is_current_stopped(): |speed x| < 0.05
 CLEAR_SPEED = 0x026A67E8             # clear_speed_all()
 CHG_BASE = 0x026A3A44                # change_state_base(id, &update, &enter, &exit) (deferred)
 CHG_INT = 0x026A3AD4                 # change_state_interrupt_base (now)
+NOTIFY_DEATH = 0x0269FD6C            # BehaviorImpl::notify_on_death (slot 71: death flag, hit off, attacks cleared)
+TREAD_SLOT = 20                      # the 3DS's slot 21 (stepped on): Enemy event 6 -> module 0x02DB98F4 -> it
 COMMON_PMF = 0x102FDBCC              # BehaviorImpl::common_state_func
 BI_VT = 0x1008AEBC
 ZIMA_CAPTURE_MOTION = 0x026D6E18     # slot 12
@@ -192,7 +206,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 # CFG (per kind)
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
-                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO').split()):
+                         'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0..P7
@@ -236,7 +250,9 @@ WALKERS = (
                  0x40: 1.0, 0x44: 0.8},
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_land_up'), 3: ('k_walk_en', 'k_walk_up'),
                  4: ('k_ntc_en', 'k_ntc_up'), 5: ('k_run_en', 'k_run_up'), 6: ('k_brk_en', 'k_brk_up'),
-                 7: ('k_rt_en', 'k_rt_up'), 9: ('g_dead_en', 'g_dead_up'), 10: 'remove'},
+                 7: ('k_rt_en', 'k_rt_up'), 8: ('k_col_en', 'k_col_up'), 9: ('g_dead_en', 'g_dead_up'),
+                 10: 'remove'},
+         tread=8,
          start=(1, 1), rets=(3, 1, 1, 9), remove=10, fall=('Fall', 2), landing='Landing', turn=None, turnst=0,
          walkst=3, hop=(0.0, 0, 0),
          search=((2, 100, 100.0, 40.0, 10.0, 10.0, 0.0), (2, 60, 150.0, 60.0, 0.0, 10.0, 0.0)),
@@ -365,7 +381,7 @@ def cfg_values(w, D):
              FALLMOT=lm(w['fall'][0]), LANDST=w['fall'][1], LANDMOT=lm(w['landing']), TURNMOT=lm(w['turn']),
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
-             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0)
+             HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0))
     words = [0] * (CFG_SIZE // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -393,7 +409,7 @@ class Data:
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
-                41: fn('w_start'), 45: fn('w_atk'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
+                41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
                 67: fn('w_r67'), 72: fn('w_chg'), 73: fn('w_chgi'), 74: fn('w_chg'), 75: fn('w_chgi')}
         for k, f in over.items():
             vt[(0xC + 8 * k) // 4] = f
@@ -854,6 +870,18 @@ def code(D):
     s_go:
         b go
     """ % ((OBJ_SIZE - 0x16C) // 4, CF['START'], CF['START01']))
+    # ---- slot 20 (3DS 21): stepped on by a fighter (a footstool); the kind's state (CFG TREAD) => now, 0: nothing
+    A.asm("""
+    w_tread:
+        lwz r12, 0x168(r3)
+        lwz r4, 0x%X(r12)
+        cmpwi r4, 0
+        beqlr
+        lwz r12, 0xE0(r3)
+        lwz r12, 0x%X(r12)
+        mtctr r12
+        bctr
+    """ % (CF['TREAD'], SLOT[73]))
     # ---- slots 64-67: the kind's states after damage on the ground / in the air / default, death
     for i, k in enumerate((64, 65, 66, 67)):
         A.asm("w_r%d:\nlwz r12, 0x168(r3)\nlwz r3, 0x%X(r12)\nblr" % (k, CF['R64'] + 4 * i))
@@ -1178,6 +1206,12 @@ def code(D):
         bl h_mv
         li r0, 0
         stw r0, 4(r29)""")
+
+    # collapses (stepped on): kinetic 0, Collapses, ground on, notify_on_death; at its end -> 10 (the 3DS's
+    # create_dead_item on frame 1 is left to the removal's defeat path, fix v3, which drops the items)
+    en(A, 'k_col_en', 0, 1, 0, 0, extra="mr r3, r31\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl"
+       % (NOTIFY_DEATH >> 16, NOTIFY_DEATH & 0xFFFF))
+    st(A, 'k_col_up', "bl h_end\ncmpwi r3, 0\nbeq epi\nli r4, 10\nb go")
 
     # ---- Shy Guy (V0 search frames, V1 walk / hold frames, V2 run frames, V3 target, V4 hops / Wait loops,
     # V5 settle frames)
