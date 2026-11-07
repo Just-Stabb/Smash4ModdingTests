@@ -154,7 +154,9 @@ V3_STEPS = [
 
 def accessor_steps(orig):
     """('module-init', the bctrl, its word, args): every module init of 0x02BF4F08 (r30 the accessor; logged for a
-    fighter (object id category 0) of kind 0x42); a = the accessor offset of the module"""
+    fighter (object id category 0) of kind 0x42); a = the accessor offset of the module. The accessor's first word
+    is read as the object only when it is a heap pointer (0x10000000-0x4FFFFFFF, aligned): 0x02BF4F08 also sets up
+    other objects' accessors at boot, whose first word isn't one (0x50000000: v3 crashed Cemu at boot reading it)"""
     out, x, last = [], ACCESSOR_INIT, None
     while True:
         w = orig(x)
@@ -162,7 +164,9 @@ def accessor_steps(orig):
             last = w & 0xFFFF
         if w == 0x4E800421:
             out.append(('module-init', x, w,
-                        'lwz r7, 0(r30)\nlwz r4, 4(r7)\ncmplwi r4, 0x42\nbne skip\nlwz r8, 0(r7)\nsrwi r8, r8, 28\n'
+                        'lwz r7, 0(r30)\nsrwi r8, r7, 28\ncmplwi r8, 1\nblt skip\ncmplwi r8, 4\nbgt skip\n'
+                        'andi. r8, r7, 3\nbne skip\n'
+                        'lwz r4, 4(r7)\ncmplwi r4, 0x42\nbne skip\nlwz r8, 0(r7)\nsrwi r8, r8, 28\n'
                         'cmpwi r8, 0\nbne skip\nli r5, 0x%X\nmr r6, r30' % last,
                         'a kind-0x42 fighter\'s module init (0x02BF4F08): a = its accessor offset 0x%X' % last))
         if w == 0x4E800020:

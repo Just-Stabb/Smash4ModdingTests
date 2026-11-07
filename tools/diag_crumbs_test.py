@@ -162,9 +162,12 @@ def main():
     assert E1.alloc(0x1000, b'\0') == F
     for e in (E0, E1):
         e.mu.mem_map(0, 0x1000)                                  # article-pool's null object: lwz r10, 0x24(0)
-        e.pre = D.LIMIT - 0x1000                                 # preludes in the unused tail, b reach of every hook
+        e.pre = D.LIMIT - 0x1800                                 # preludes in the unused tail, b reach of every hook
     obj, acc, fs, req, mod, ent = F + 0x100, F + 0x200, F + 0x300, F + 0x400, F + 0x500, F + 0x600
     blr = F + 0xF00                                              # a blr for the module inits' bctrl
+    hobj = 0x30000100                                            # a module-init object in the game's heap range
+    for e in (E0, E1):
+        e.mu.mem_map(0x30000000, 0x1000)
     # step tag -> [(regs, mem, the crumb expected (kind, a, b) or None)]
     cases = {
         'fighter-setup': [({3: fs, 4: 0x44, 5: 0x42}, {}, (0x42, fs, 0x44)), ({5: 0x10}, {}, None)],
@@ -191,9 +194,13 @@ def main():
                      ({25: ent}, {ent + 4: obj, ent + 8: 3, obj + 4: 0x25}, None)],
         'articles-done': [({29: 0x1234, 30: 0x5678}, {}, (0, 0x1234, 0x5678))],
         'acmd-cache': [({3: 0x66, 4: 0x19B}, {}, (0x19B, 0x66, 0)), ({4: 0x26}, {}, None)],
-        'module-init': [({30: acc, 'ctr': blr}, {acc: obj, obj: 0x00010002, obj + 4: 0x42}, (0x42, 'off', acc)),
-                        ({30: acc, 'ctr': blr}, {acc: obj, obj: 0x10010002, obj + 4: 0x42}, None),
-                        ({30: acc, 'ctr': blr}, {acc: obj, obj: 0x00010002, obj + 4: 0x10}, None)],
+        'module-init': [({30: acc, 'ctr': blr}, {acc: hobj, hobj: 0x00010002, hobj + 4: 0x42}, (0x42, 'off', acc)),
+                        ({30: acc, 'ctr': blr}, {acc: hobj, hobj: 0x10010002, hobj + 4: 0x42}, None),
+                        ({30: acc, 'ctr': blr}, {acc: hobj, hobj: 0x00010002, hobj + 4: 0x10}, None),
+                        ({30: acc, 'ctr': blr}, {acc: 0x50000000}, None),     # boot: not a pointer (v3's crash)
+                        ({30: acc, 'ctr': blr}, {acc: 0}, None),
+                        ({30: acc, 'ctr': blr}, {acc: obj}, None),            # outside the game's heap
+                        ({30: acc, 'ctr': blr}, {acc: hobj + 2}, None)],
     }
     for e in (E0, E1):
         e.setw(blr, 0x4E800020)
