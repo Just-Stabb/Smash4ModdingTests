@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unicorn test of tools/smashrun_walker_cave.py in a patched cross_f.rpx:
 
-  python3 tools/smashrun_walker_test.py PATCHED.rpx [ENEMY_ROOT]
+  python3 tools/smashrun_walker_test.py [--keep-flip] PATCHED.rpx [ENEMY_ROOT]
 
 ENEMY_ROOT (optional): the installed converted enemies (motion/enemy/<name>/body/main.pac, animcmd/enemy/<name>/):
 then every set entry must be an OMO of K's pac and every script of K's animcmd files a hash of K's script hashsets.
@@ -24,7 +24,10 @@ Runs the cave's code and the game's around it, the framework's calls stubbed (mo
   to it, turns at a wall and at a ledge, falls off the ground and lands (FALL, LANDING, WALK);
 - T2 / S2: on a Smash Run stage the motion data set table points the walker kinds at their sets (2a's four still
   at theirs), get_motion_data_set returns them, and their param slots = mczakozima's; off them nothing changes;
-- the sets: K's 3DS order, crc32(stem, 0xFFFFFFFF), flags; the hashsets crc32(name(.init / .exit)).
+- the sets: K's 3DS order, crc32(stem, 0xFFFFFFFF), flags; the hashsets crc32(name(.init / .exit));
+- fix v3: the walker's slot 38 and the twins' (zima / plasmawisp / darios vtable words) return 0 for kinds < 0x50
+  (1 for the minions; --keep-flip: unchanged); initialize_after 0x02DB4AC8 calls set_lr(posture lr, 1, 1) for kinds
+  < 0x50; notify_on_remove 0x02DB40E4 sends a kind < 0x50's type 0 to the defeat path 0x02DB3AB0.
 """
 import os
 import struct
@@ -53,6 +56,7 @@ CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9
            0x5A: 0x026D6834, 0x5B: 0x02DDB82C, 0x5E: 0x026E24EC, 0x5F: 0x026D80A0, 0x60: 0x026DB864}
 GET_TARGET_POS = 0x026A690C
 REVERSE_LR = 0x026A7A20
+SET_LR = 0x026A780C
 FAILS = []
 VT_ADDR = [0]
 
@@ -179,6 +183,20 @@ class Machine:
         elif addr == W.SET_RHOMBUS:
             c.append(('rhombus', r(3)))
             self.ret()
+        elif addr == SET_LR:
+            c.append(('set_lr', r(3), self.fr(1), r(4), r(5)))
+            self.ret()
+        elif addr == 0x02C6108C:
+            c.append(('flip', r(4)))
+            self.ret()
+        elif addr in (0x02C367C4, 0x02DB49F8, 0x02DB3518):
+            self.ret()
+        elif addr == 0x02DB3AB0:
+            c.append(('defeat_fx', r(3)))
+            self.ret()
+        elif addr == 0x02DB3574:
+            c.append(('vanish_fx', r(3)))
+            self.ret()
         elif addr == REVERSE_LR:
             c.append(('reverse_lr', r(3), r(4), r(5)))
             lr = -self.rf(POSTURE + 0x60)
@@ -236,6 +254,9 @@ class Machine:
 
 
 def main():
+    if '--keep-flip' in sys.argv:            # the variant built with smashrun_walker_cave.py --keep-flip
+        sys.argv.remove('--keep-flip')
+        W.KEEP_FLIP = True
     img = E.Image(sys.argv[1])
     root = sys.argv[2] if len(sys.argv) > 2 else None
     vt_words = W.read_vt(img)
@@ -305,7 +326,7 @@ def main():
     vt = [img.u32(D['vt'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     slots = {k: vt[(0xC + 8 * k) // 4] for k in range(76)}
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
-    over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE, 40: fn['w_init'], 41: fn['w_start'], 45: fn['w_atk'],
+    over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'], 41: fn['w_start'], 45: fn['w_atk'],
             64: 0x026D7CA0, 65: 0x026D7CA8, 66: 0x026D7CB0, 67: 0x026D7CB8, 72: fn['w_chg'], 73: fn['w_chgi'],
             74: fn['w_chg'], 75: fn['w_chgi']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
@@ -319,8 +340,54 @@ def main():
         zima_ret[k] = m.uc.reg_read(R[3])
     m = Machine(img)
     m.call(slots[38], {3: OBJ})
-    check(zima_ret == {64: W.ST_WALK, 65: W.ST_FALL, 66: W.ST_FALL, 67: W.ST_DEAD} and m.uc.reg_read(R[3]) == 1,
-          'VT: after damage on the ground WALK, in the air / default FALL, death DEAD; flip the model with lr (38)')
+    flip = 1 if W.KEEP_FLIP else 0
+    check(zima_ret == {64: W.ST_WALK, 65: W.ST_FALL, 66: W.ST_FALL, 67: W.ST_DEAD} and m.uc.reg_read(R[3]) == flip,
+          'VT: after damage on the ground WALK, in the air / default FALL, death DEAD; slot 38 (flip the motion '
+          'with lr) %d' % flip)
+
+    # fix v3: the twins' slot 38, initialize_after's set_lr, notify_on_remove's type
+    res = {}
+    for word, orig in W.TWIN_FLIP:
+        f = img.u32(word)
+        for k in (0x12, 0x0E, 0x1D, 0x57, 0x5A, 0x58):
+            m = Machine(img)
+            m.w32(OBJ + 8, k)
+            m.call(f, {3: OBJ})
+            res[(word, k)] = m.uc.reg_read(R[3])
+        res[word] = f
+    if W.KEEP_FLIP:
+        ok = all(res[w] == o for w, o in W.TWIN_FLIP)
+    else:
+        ok = all(res[w] == fn['twin_flip'] for w, _o in W.TWIN_FLIP)
+        ok &= all(res[(w, k)] == (1 if k >= 0x50 else 0) for w, _o in W.TWIN_FLIP for k in (0x12, 0x0E, 0x1D, 0x57,
+                                                                                           0x5A, 0x58))
+    check(ok, 'fix v3: the twins\' slot 38 (zima / plasmawisp / darios vtables) %s'
+          % ('kept (variant)' if W.KEEP_FLIP else '-> 0 for kinds < 0x50, 1 for the Fortress minions'))
+    got = {}
+    for k in (0x01, 0x12, 0x57, 0x60):
+        m = Machine(img)
+        m.walker(cfg[1], lr=-1.0)
+        m.w32(OBJ + 8, k)
+        m.calls = []
+        m.call(0x02DB4AC8, {3: OBJ})
+        got[k] = [c for c in m.calls if c[0] in ('set_lr', 'flip')]
+    flip_call = [] if not W.KEEP_FLIP else None
+    ok = all(got[k][-1:] == [('set_lr', OBJ, -1.0, 1, 1)] for k in (0x01, 0x12)) and \
+        all(not [c for c in got[k] if c[0] == 'set_lr'] for k in (0x57, 0x60))
+    check(ok, 'fix v3: initialize_after calls set_lr(posture lr, 1, 1) for kinds < 0x50 only %s' % got)
+    del flip_call
+    got = {}
+    for k, t in ((0x01, 0), (0x12, 0), (0x01, 5), (0x01, 1), (0x57, 0), (0x01, 3)):
+        m = Machine(img)
+        m.walker(cfg[1])
+        m.w32(OBJ + 8, k)
+        m.calls = []
+        m.call(W.SITE_DEATH, {3: OBJ, 4: t})
+        got[(k, t)] = [c[0] for c in m.calls if c[0] in ('defeat_fx', 'vanish_fx')]
+    check(got == {(0x01, 0): ['defeat_fx'], (0x12, 0): ['defeat_fx'], (0x01, 5): [], (0x01, 1): [],
+                  (0x57, 0): ['vanish_fx'], (0x01, 3): ['defeat_fx']},
+          'fix v3: notify_on_remove: a kind < 0x50 removed by its behaviour (type 0) takes the defeat effect path '
+          '0x02DB3AB0 (type 3); the minions keep type 0; other types unchanged %s' % got)
 
     # change_state
     st = {W.ST_FALL: (fn['fall_enter'], fn['fall_update']), W.ST_LANDING: (fn['land_enter'], fn['land_update']),

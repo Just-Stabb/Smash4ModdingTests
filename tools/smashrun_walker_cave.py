@@ -118,6 +118,16 @@ SITE_F, WORD_F = 0x02DB951C, 0x280C0010      # cmplwi r12, 0x10
 FACTORY_NEXT, FACTORY_END = 0x02DB9520, 0x02DB96E0
 SITE_T, WORD_T = 0x02D9A46C, 0x2C000001      # cmpwi r0, 1
 SITE_S, WORD_S = 0x02D9A618, 0x801C05EC      # lwz r0, 0x5EC(r28)
+# fix v3 (enemy-wide, for the Smash Run kinds < 0x50: 2a's four and the walkers)
+SITE_ROT, WORD_ROT = 0x02DB4B20, 0x815F0000  # initialize_after: lwz r10, 0(r31)
+SITE_DEATH, WORD_DEATH = 0x02DB40E4, 0x7C0802A6   # notify_on_remove: mflr r0
+# slot 38 of the twins' vtables (mczakozima 0x1008FE90, mczakoplasmawisp 0x1008F098, mczakodarios 0x1008EB2C;
+# mczakostalfos's already returns 0): {vtable word, its function (li r3, 1)}; the words carry an ADDR32 relocation,
+# moved to RELOC_DUMMY (kind_expand.py's dead word) so the loader keeps the patched value
+TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x026CF200))
+RELOC_DUMMY = 0x037EE73C
+SET_LR_SLOT = 49
+KEEP_FLIP = False    # True: the variant that keeps the motion flip (only the rotation and death fixes)
 
 ST_FALL, ST_LANDING, ST_WALK, ST_TURN, ST_DEAD, ST_REMOVE = 1, 2, 3, 4, 6, 7
 NSTATES = 8
@@ -246,7 +256,7 @@ class Data:
         self.align()
         self.at('vt')
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
-        over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE, 40: cl('w_init'), 41: cl('w_start'), 45: cl('w_atk'),
+        over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else cl('w_noflip'), 40: cl('w_init'), 41: cl('w_start'), 45: cl('w_atk'),
                 72: cl('w_chg'), 73: cl('w_chgi'), 74: cl('w_chg'), 75: cl('w_chgi')}
         over.update(ZIMA_RET)
         for k, fn in over.items():
@@ -700,6 +710,56 @@ def assemble(vt_words, data_base=None):
     a.asm("mr r3, r31")
     near(BULLET)
     leave('de_out')
+    # ---- fix v3 -----------------------------------------------------------------------------------------------
+    # slot 38 (flip the motion with lr): the 3DS returns 1 exactly for the kinds with a model.flp (mirror table),
+    # which the converted models lack; without it the flipped skeleton is wrong (the enemy faces away / askew).
+    a.asm("""
+    w_noflip:
+        li r3, 0
+        blr
+    twin_flip:
+        lwz r0, 8(r3)
+        li r3, 1
+        cmplwi r0, 0x50
+        bgelr
+        li r3, 0
+        blr
+    """)
+    # initialize_after (every behaviour, after start): for the Smash Run kinds set_lr(posture lr, 1, 1), so the
+    # model's rotation (posture +0x64 = lr * 90) is set from the first frame, not only after a turn
+    a.asm("""
+    cave_rot:
+        lwz r0, 8(r31)
+        cmplwi r0, 0x50
+        bge rot_done
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x60(r12)
+        mr r3, r31
+        li r4, 1
+        li r5, 1
+    """)
+    vcall(0xC + 8 * SET_LR_SLOT)
+    a.asm("""
+    rot_done:
+        lwz r10, 0(r31)
+        b 0x%08X
+    """ % (SITE_ROT + 4))
+    # notify_on_remove(type): a Smash Run kind removed by its behaviour (type 0: its remove state, after its death
+    # flight) gets type 3, the defeat path 0x02DB3AB0 (effect 0x08000033 scaled by the gl entry's +0x20, sound
+    # 0x124); type 0 only shows the Fortress minions' vanish effect (0x02DB3574: kinds 0x57-0x5A, +0x9C set)
+    a.asm("""
+    cave_death:
+        lwz r12, 8(r3)
+        cmplwi r12, 0x50
+        bge death_go
+        cmpwi r4, 0
+        bne death_go
+        li r4, 3
+    death_go:
+        mflr r0
+        b 0x%08X
+    """ % (SITE_DEATH + 4))
     # ---- T2: the motion data set table (r0 = category, r31 = mgr; r9-r12 free)
     a.asm("cave_t:")
     F.sr_check(a)
@@ -732,7 +792,8 @@ def assemble(vt_words, data_base=None):
     """ % (SITE_S + 4))
     words = a.words()
     assert CAVE + 4 * len(words) <= data_base, 'walker code overlaps its data'
-    funcs = {k: a.addr(k) for k in ('w_init', 'w_start', 'w_atk', 'w_chg', 'w_chgi', 'fall_enter', 'fall_update',
+    funcs = {k: a.addr(k) for k in ('w_init', 'w_start', 'w_atk', 'w_chg', 'w_chgi', 'w_noflip', 'fall_enter',
+                                    'fall_update',
                                     'land_enter', 'land_update', 'walk_enter', 'walk_update', 'turn_enter',
                                     'turn_update', 'dead_enter')}
     d.build(funcs)
@@ -756,15 +817,26 @@ def patches(img):
     out[SITE_F] = branch(SITE_F, a.addr('cave_f'))
     out[SITE_T] = branch(SITE_T, a.addr('cave_t'))
     out[SITE_S] = branch(SITE_S, a.addr('cave_s'))
+    out[SITE_ROT] = branch(SITE_ROT, a.addr('cave_rot'))
+    out[SITE_DEATH] = branch(SITE_DEATH, a.addr('cave_death'))
+    for word, fn in TWIN_FLIP:
+        out[word] = fn if KEEP_FLIP else a.addr('twin_flip')
     return out, a, d
 
 
 def args(img):
     out, _a, _d = patches(img)
-    return ['grow:0x%08X' % LIMIT] + ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
+    res = ['grow:0x%08X' % LIMIT] + ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
+    if not KEEP_FLIP:
+        res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _fn in TWIN_FLIP]
+    return res
 
 
 def main():
+    global KEEP_FLIP
+    if '--keep-flip' in sys.argv:
+        sys.argv.remove('--keep-flip')
+        KEEP_FLIP = True
     if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
     import smashrun_enemy_cave as E
@@ -773,7 +845,8 @@ def main():
         print(' '.join(args(img)))
         return
     import rpx_patch
-    for site, want in ((SITE_F, WORD_F), (SITE_T, WORD_T), (SITE_S, WORD_S)):
+    for site, want in ((SITE_F, WORD_F), (SITE_T, WORD_T), (SITE_S, WORD_S), (SITE_ROT, WORD_ROT),
+                       (SITE_DEATH, WORD_DEATH)):
         got = img.u32(site)
         assert got == want or (got >> 26 == 18 and CAVE <= branch_target(site, got) < LIMIT), \
             '0x%08X holds 0x%08X, expected 0x%08X' % (site, got, want)
