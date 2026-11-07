@@ -785,8 +785,78 @@ def build(spec_path=SPEC, rpx=RPX):
     B.asm(MODULE_ROW, 'bl 0x%X' % mr, 'mulli r8, r30, 0x70')
     info['module_row'] = mr
     kirby_copy(B, img, new, info)
+    kind_compares(B, img, new, info)
     info['cave_end'] = B.pc
     return B, info
+
+
+# Inline weapon-kind compares in the game's own fighter code (multi-instance bugs v2): a base fighter's specializer
+# handles an article event by the article's kind (OBJ_CATEGORY == 1, a weapon, then OBJ_KIND == K), so a copy of K
+# (another kind number) is never matched. Zelda's +0x13C (0x02F979EC) kills her Phantom's alarm on her hand
+# (PtcZeldaPhantomAlarm, endless) when the Phantom ends: Sephiroth's Phantom (its own kind 0x19B since test 111)
+# never matched, and the purple glow stayed at his hand after every release (user's clip). Mario's (0x02F1A8B0:
+# the Mario Finale article, kind 4) is the other such site. Every `bl OBJ_KIND; cmpwi / cmplwi r3, K` preceded (12
+# words) by `bl OBJ_CATEGORY; cmp r3, 1` with K a base of new kinds, followed by a conditional branch on cr0, goes
+# through a stub that compares K and each copy (eq if any): the copies take the base's branch.
+OBJ_CATEGORY, OBJ_KIND = 0x02BEF5F4, 0x02BEF604
+KIND_COMPARE_LIMIT = 0x04000000      # the game's own code
+
+
+def _bl_target(a, w):
+    if w >> 26 != 18 or w & 3 != 1:
+        return None
+    off = w & 0x3FFFFFC
+    if off & 0x2000000:
+        off -= 0x4000000
+    return a + off
+
+
+def kind_compare_sites(img, bases):
+    """[(address of the compare, its word, base kind)]: weapon-category-checked compares of an object's kind against
+    one of `bases`, followed by a cr0 branch"""
+    out = []
+    for base, data in img.mem:
+        if base >= KIND_COMPARE_LIMIT:
+            continue
+        n = len(data) // 4
+        W = struct.unpack('>%dI' % n, data[:4 * n])
+        for i in range(n):
+            if _bl_target(base + 4 * i, W[i]) != OBJ_KIND:
+                continue
+            for j in range(1, 4):
+                if i + j + 1 >= n:
+                    break
+                w = W[i + j]
+                if w >> 26 in (10, 11) and (w >> 21) & 7 == 0 and (w >> 16) & 31 == 3:
+                    k = w & 0xFFFF
+                    nxt = W[i + j + 1]
+                    if k in bases and nxt >> 26 == 16 and (nxt >> 18) & 7 == 0 and any(
+                            _bl_target(base + 4 * x, W[x]) == OBJ_CATEGORY and any(
+                                W[y] >> 26 in (10, 11) and (W[y] >> 16) & 31 == 3 and W[y] & 0xFFFF == 1
+                                for y in range(x + 1, min(x + 4, i)))
+                            for x in range(max(0, i - 12), i)):
+                        out.append((base + 4 * (i + j), w, k))
+                    break
+    return out
+
+
+def kind_compares(B, img, new, info):
+    """the stubs for kind_compare_sites (their copies: every new kind whose base is K)"""
+    copies = {}
+    for nk, (bk, _r, _art) in sorted(new.items()):
+        copies.setdefault(bk, []).append(nk)
+    info['kind_compares'] = []
+    for at, w, k in kind_compare_sites(img, set(copies)):
+        op = 'cmplwi' if w >> 26 == 10 else 'cmpwi'
+        lines = ['%s r3, 0x%X' % (op, k)]
+        for c in copies[k]:
+            lines += ['beq.far 0x%X' % (at + 4), '%s r3, 0x%X' % (op, c)]
+        lines.append('b 0x%X' % (at + 4))
+        st = B.alloc(4 * len(lines))
+        B.code(st, '\n'.join(lines))
+        B.put(at, (18 << 26) | ((st - at) & 0x3FFFFFC), 'kind compare 0x%X -> stub (copies %s)' % (
+            k, ', '.join('0x%X' % c for c in copies[k])), orig=w)
+        info['kind_compares'].append((at, k, st, copies[k]))
 
 
 def kirby_copy(B, img, new, info):
@@ -865,6 +935,9 @@ def main():
                                   CAVE, info['cave_end']), file=err)
     for fk, at in info['article_lists'].items():
         print('  fighter 0x%X: article list 0x%08X' % (fk, at), file=err)
+    for at, k, st, cs in info.get('kind_compares', []):
+        print('  kind compare 0x%08X (0x%X) -> 0x%08X: also %s' % (at, k, st, ', '.join('0x%X' % c for c in cs)),
+              file=err)
     for c, (hdr, at, kinds) in info.get('kirby_copy', {}).items():
         print('  Kirby copy 0x%X: header 0x%08X -> records 0x%08X (%s)' % (
             c, hdr, at, ', '.join('0x%X' % k for k in kinds)), file=err)
