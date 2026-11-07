@@ -659,6 +659,42 @@ whether the laser returns.
 Not verified: that the Wii U plays material_anime.pac for enemies (the Goomba's damage face switching on a hit is
 the same mechanism: check it); the defeat path's sound / item drop for the Smash Run kinds' gl entries.
 
+## Fix v4: mesh visibility in the models (facing kept as in v3)
+
+User test of fix v3 (Cemu): the defeat effect plays (star burst + debris); Stalfos faces sideways and animates;
+code_keepflip looks wrong (so the no-flip build stays); the Goomba faces the camera, which a 3DS screenshot shows is
+right for it; but the material_anime.pac files did nothing: Waddle Doo's eye pieces and the Goomba's two faces stayed
+(and the Goomba's converted per-motion face pac never played either). The enemy resource request
+(0x030BC6BC: model/enemy/%s/body/c00/, motion/enemy/%s/body/, effect/, animcmd/, sound) loads the motion folder, but
+nothing shows enemies playing its material_anime.pac.
+
+Package smashrun_fix_v4: the same executable as fix v3's main build (rebuilt, identical: sha1 efd12dab…; tests as
+v3) and `smashrun_fix_v4_data`: model/enemy/KIND/body/c00/model.nud for 18 kinds with their default-hidden meshes
+drawn as nothing (`tools/s3ds_enemy_vis.py S3DS_ENEMY_ROOT --nud CONVERTED_ROOT OUT`: those meshes' polygon indices
+zeroed, nud.hidden's way; the meshes, materials and bones stay). Hidden: the vmt meshes model_states() hides (see
+Fix v3; Waddle Dee's three parasols and damage face, Waddle Doo's blinks and tear, Darios's shoot, Pooka / Shandera /
+Chappy / Ghos / Tikibuzz / Monoeye's damage or other eye states, bonkers' extra hands, darknut's second sword, jugem's
+cloud / pipe / spare arm, bokkuncannon's beam / missile, dafune's shot) and, for the kinds whose converted
+material_anime.pac has a default.mta (kuribo, dekakuribo, keronpa), the meshes it hides (their damage faces).
+Test: `tools/s3ds_enemy_vis_test.py ... NUD_OUT` (same size, hidden meshes' indices all zero, every other mesh's
+indices unchanged; 18 NUDs, 0 failures).
+
+What this can't do: switch meshes by state (the damage faces, blinks, Waddle Dee's parasol, Darios's shot), and the
+3DS material animations (the Goomba's face animation). Both need a Wii U path that plays mesh visibility / material
+animation on an enemy: the motion module's material_anime.pac (not played for enemies, as it turned out), the
+model's model.mta (loaded by the model loader 0x03303140 for every model; whether it plays for enemies is untested:
+Shy Guy's converted model.mta, a UV scroll, would show it), or a mesh-visibility call from the behaviour (the
+fighters' VisibilityModule is MSC module 39; the enemy accessor's modules have no such call found yet).
+
+Facing: kept as in fix v3. The 3DS walkers (and twins) set their yaw only through reverse_lr(1, 1) in their turn and
+start code (posture +0x64 = lr x 90); fix v3's initialize_after set_lr(lr, 1, 1) gives the same yaw from the first
+frame. The Goomba's own model / walk then faces the camera, as on the 3DS. What still differs from the 3DS: the
+kinds that flip on the 3DS (model.flp: kuribo, waddledee, waddledoo, zima, plasmawisp, darios, ...) don't mirror
+when facing right; a converted Wii U FLIP (its parser not yet found: the bone getter 0x0331915C reads a per-bone mode
+list {mode, flags, bone} and the joint remap 0x033117B4 a pair list from the model's helper object) would restore
+that. The Goomba's walk plays WalkL at 0.6 (the 3DS walk enter writes 0.6 into the motion module's rate, 3DS +0x50:
+MotionModuleImpl::change_motion stores the rate there).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

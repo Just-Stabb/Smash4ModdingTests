@@ -5,6 +5,16 @@ MTAs and the fighters' material_anime_*.pac do) plus default.mta.
 
   python3 tools/s3ds_enemy_vis.py S3DS_ENEMY_ROOT MOTION_ROOT OUT_ROOT [KIND ...]     write the pacs
   python3 tools/s3ds_enemy_vis.py S3DS_ENEMY_ROOT --list                              the states, per kind
+  python3 tools/s3ds_enemy_vis.py S3DS_ENEMY_ROOT --nud CONVERTED_ROOT OUT_ROOT [KIND ...]
+        the baseline: model/enemy/KIND/body/c00/model.nud with every mesh hidden by default drawn as nothing
+
+The material_anime.pac files turned out to do nothing in game (Cemu, fix v3: Waddle Doo's eye pieces and the
+Goomba's two faces stayed; the Goomba's converted per-motion face pac never ran either): the Wii U does not play
+motion/enemy/.../material_anime.pac for enemies. The baseline that works without it (--nud): the NUD itself, each
+default-hidden mesh's polygons with their indices zeroed (nud.hidden's way: the mesh, its materials and bones stay,
+nothing is drawn), so an enemy shows only its 3DS default meshes; the damage faces / blinks stay hidden for good.
+Kinds: every vmt kind above, plus the ones whose converted material_anime.pac carries a visibility default
+(default.mta: kuribo, dekakuribo, keronpa: their damage faces).
 
 S3DS_ENEMY_ROOT: the 3DS dump's enemy folders (KIND/model/body/c00/normal.bch + normal.vmt); MOTION_ROOT holds the
 converted motion/enemy/KIND/body/main.pac (the MTAs' names and lengths); OUT_ROOT gets
@@ -113,6 +123,47 @@ def build(kind, main_pac, default, damage):
     return out
 
 
+def hide_meshes(nud_bytes, names):
+    """the NUD with the polygons of the meshes NAMES drawn as nothing (indices zeroed); (bytes, names hidden)"""
+    import struct
+    import zlib
+    d = bytearray(nud_bytes)
+    packed = d[:2] == b'\x78\x9c'
+    if packed:
+        d = bytearray(zlib.decompress(d))
+    assert d[:4] == b'NDP3', d[:4]
+    _, _ver, nmesh, _bs, _be, pstart, psize, vsize, vasize = struct.unpack('>IHhhhiiii', d[4:0x20])
+    str_base = 0x30 + pstart + psize + vsize + vasize
+    done = []
+    for i in range(nmesh):
+        o = 0x30 + i * 0x30
+        name_off, = struct.unpack('>i', d[o + 32:o + 36])
+        name = d[str_base + name_off:d.index(b'\0', str_base + name_off)].decode('latin1')
+        if name not in names:
+            continue
+        npoly, obj = struct.unpack('>hi', d[o + 42:o + 48])
+        for j in range(npoly):
+            q = obj + j * 0x30
+            poff, = struct.unpack('>i', d[q:q + 4])
+            nidx, = struct.unpack('>H', d[q + 32:q + 34])
+            a = 0x30 + pstart + poff
+            d[a:a + 2 * nidx] = bytes(2 * nidx)
+        done.append(name)
+    out = bytes(d)
+    return (zlib.compress(out) if packed else out), done
+
+
+def pac_defaults(conv, kind):
+    """{mesh: 0/1} of the converted material_anime.pac's default.mta (the 3DS default material animation), or {}"""
+    p = os.path.join(conv, 'motion', 'enemy', kind, 'body', 'material_anime.pac')
+    if not os.path.exists(p):
+        return {}
+    for name, data in omo.pac_read(p):
+        if name == 'default.mta':
+            return {v['name']: v['keys'][0][1] for v in mta.read(data)['vis'] if v['keys']}
+    return {}
+
+
 def kinds(root):
     out = []
     for k in sorted(os.listdir(root)):
@@ -129,6 +180,26 @@ def main():
             print('%-12s default %s' % (k, ' '.join('%s%s' % ('+' if d[n] else '-', short(k, n)) for n in vmt)))
             if g != d:
                 print('%-12s damage  %s' % ('', ' '.join('%s%s' % ('+' if g[n] else '-', short(k, n)) for n in vmt)))
+        return
+    if len(sys.argv) >= 5 and sys.argv[2] == '--nud':
+        root, conv, out_root = sys.argv[1], sys.argv[3], sys.argv[4]
+        names = sys.argv[5:] or sorted(set(kinds(root)) | {'kuribo', 'dekakuribo', 'keronpa'})
+        for kind in names:
+            hide = {n for n, v in pac_defaults(conv, kind).items() if not v}
+            if os.path.exists(os.path.join(root, kind, 'model', 'body', 'c00', 'normal.vmt')):
+                _vmt, default, _dmg = model_states(kind, os.path.join(root, kind, 'model', 'body', 'c00'))
+                hide |= {n for n, v in default.items() if not v}
+            src = os.path.join(conv, 'model', 'enemy', kind, 'body', 'c00', 'model.nud')
+            if not hide or not os.path.exists(src):
+                print('%s: %s' % (kind, 'nothing hidden by default' if hide == set() else 'no %s' % src))
+                continue
+            b, done = hide_meshes(open(src, 'rb').read(), hide)
+            d = os.path.join(out_root, 'model', 'enemy', kind, 'body', 'c00')
+            os.makedirs(d, exist_ok=True)
+            open(os.path.join(d, 'model.nud'), 'wb').write(b)
+            print('%s: model.nud, hidden %s%s' % (kind, ' '.join(short(kind, n) for n in sorted(done)),
+                                                 '' if set(done) == hide else ' (not in the NUD: %s)'
+                                                 % sorted(hide - set(done))))
         return
     if len(sys.argv) < 4:
         sys.exit(__doc__)
