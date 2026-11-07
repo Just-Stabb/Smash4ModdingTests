@@ -5,7 +5,8 @@
 
 - other.lm: parses; the root is still the last character and F00C names it; F00D's shape / sprite / text counts
   are the tags'; every placement's character exists; btn_08 is the copied Group button (a sprite with 'in' /
-  'out', its frames placing the same shared pieces as Group's) at the right side, 4xm_08 over it; the copy's
+  'out', its frames placing the same shared pieces as Group's) at the right side, 4xm_08 over it; hit_08 (the
+  cursor's rect, a new depth) spans the right column so every button's rightward ray crosses it; the copy's
   title / icon shapes sample the new atlas regions, the Group button still samples its own; every other
   placement unchanged.
 - textures: the new regions hold the title / star; everything else of each atlas is as before (BC re-encode of
@@ -69,6 +70,36 @@ def movie_checks(src_dir, out_dir):
     check(1000 < m[4] < 1920 and 0 < m[5] < 1080, 'btn_08 on the right (%.0f, %.0f)' % (m[4], m[5]))
     h = mv.matrix(hit[0][7])
     check(abs(h[4] - m[4]) < 1 and abs(h[5] - m[5]) < 1, '4xm_08 over it')
+    # hit_08: the cursor's rect for button 8 (0x0299DB80: centre = the instance's translation, +- _width /
+    # _height / 2), placed wherever 4xm_08 is, on a new depth; every button row's rightward ray crosses it
+    hp = [cl.words(b) for t, b in T[ra:rb] if t == cl.T_PLACE and M.HIT_NAME in sy and
+          cl.words(b)[3] == sy.index(M.HIT_NAME)]
+    rw = cl.words(T[ra][1])
+    depths = {cl.words(b)[5] >> 16 for t, b in T[ra:rb] if t == cl.T_PLACE}
+    check(len(hp) == len(hit) and len({w[0] for w in hp}) == 1 and rw[6] >> 16 == max(depths) + 1,
+          'hit_08 placed with 4xm_08 (%d), on a new depth (%d)' % (len(hp), max(depths)))
+    si, sj = M.sprite_range(new, hp[0][0])
+    shp = next(cl.words(b)[0] for t, b in T[si:sj] if t == cl.T_PLACE)
+    (_a, _f, hv, _i), = mv.shapes[shp]
+    hm = mv.matrix(hp[0][7])
+    bw = cl.table(T[new.ti[0xF004]][1], 4)
+    sw = next(cl.words(b) for t, b in T if t == 0xF022 and cl.words(b)[0] == shp)
+    bx0, by0, bx1, by1 = bw[sw[2]]
+    check((bx0, by0, bx1, by1) == (hv[:, 0].min(), hv[:, 1].min(), hv[:, 0].max(), hv[:, 1].max()),
+          'its shape: geometry = F004 bounds %s' % ((bx0, by0, bx1, by1),))
+    half_w, half_h = (bx1 - bx0) * hm[0] / 2, (by1 - by0) * hm[3] / 2
+    x0, x1, y0, y1 = hm[4] - half_w, hm[4] + half_w, hm[5] - half_h, hm[5] + half_h
+    rows = {}
+    for n in range(1, 8):
+        w = next(cl.words(b) for t, b in T[ra:rb] if t == cl.T_PLACE and cl.words(b)[3] == sy.index('btn_%02d' % n))
+        bm = mv.matrix(w[7])
+        rows[n] = (bm[4], bm[5])
+    check(all(y0 < y < y1 and x < x0 and x + 1600 > x0 for x, y in rows.values()),
+          'every button\'s rightward ray crosses it (rect x %.0f-%.0f, y %.0f-%.0f; buttons %s)' %
+          (x0, x1, y0, y1, sorted(rows.values())))
+    check(abs(hm[5] - rows[4][1]) < 50 and x0 < m[4] < x1,
+          'its centre is in Group\'s row (y %.0f vs %.0f; leftward goes to Group) and holds btn_08' %
+          (hm[5], rows[4][1]))
     # the copy's shapes vs the Group button's
     copy_shapes = set()
 
@@ -100,7 +131,8 @@ def movie_checks(src_dir, out_dir):
     # other placements unchanged: compare the old root's placements except btn_08 / 4xm_08
     oc, oa, ob = su.lm_root(old)
     keep = lambda lm, a, b: [cl.words(x) for t, x in lm.tags[a:b] if t == cl.T_PLACE and  # noqa: E731
-                             cl.words(x)[3] not in (lm.sy.index('btn_08'), lm.sy.index('4xm_08'))]
+                             cl.words(x)[3] not in (lm.sy.index('btn_08'), lm.sy.index('4xm_08')) and
+                             not (M.HIT_NAME in lm.sy and cl.words(x)[3] == lm.sy.index(M.HIT_NAME))]
     check(keep(old, oa, ob) == keep(new, ra, rb), 'every other root placement unchanged')
     # texture regions
     for atlas, at, size in ((3, M.TITLE_AT, M.TITLE_SIZE), (0, M.STAR_AT, (M.STAR_SIZE, M.STAR_SIZE))):

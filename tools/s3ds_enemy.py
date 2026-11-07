@@ -3,7 +3,7 @@
 cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/enemy/%s/`,
 `sound/se/snd_se_enemy_%s.nus3bank`, `param/enemy/fs`):
 
-  model/enemy/KIND/PART/cNN/model.nud, model.nut, model.vbn, model.jtb [, model.mta]
+  model/enemy/KIND/PART/cNN/model.nud, model.nut, model.vbn, model.jtb, model.sb, model.nhb, model.xmb [, model.mta]
       every model part (body, and shots / missiles / hammers / parasols...): the .mbn meshes (one NUD mesh per
       .bch object, named as the object) rigged to the .bch skeleton (bind pose, blended weights kept),
       textures (PICA200 -> RGBA -> GX2 BC1 / BC3, power-of-two) plus a flat normal map, Smash 4's fighter
@@ -15,6 +15,9 @@ cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/
       model.jtb: the 3DS joint table (u16 count, count u16 bone indices) byte-swapped: the Wii U's model loader
       (0x0330466C, file slot 1) reads it big-endian with plain lhz (0x0335E8EC) into the model handle's +0xC;
       without it that pointer is null and the enemies' center_node (0x026A7C70) crashes at the first spawn.
+      model.sb / model.nhb (empty: no swing / helper bones) and model.xmb (a fighter body's: light set 0,
+      shadow, main + normal-map draws) from reference/enemy_model_defaults (its README: without sb / nhb the
+      bone-matrix getter 0x0331915C crashes; without xmb the enemies draw black).
       The 3DS model.flp (mirror table, copied as is by the loader) is not written yet.
   motion/enemy/KIND/PART/main.pac
       the motion .bch's skeletal animations (motion/PART/main.bch or main/*.bch), one OMO each (name.omo),
@@ -91,6 +94,11 @@ def local_matrix(scale, rot, pos):
     m[:3, :3] = euler_mat(*rot) @ np.diag(scale)
     m[:3, 3] = pos
     return m
+
+
+DEFAULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reference',
+                        'enemy_model_defaults')
+DEFAULT_FILES = ('model.sb', 'model.nhb', 'model.xmb')
 
 
 def jtb_bytes(data, nbones):
@@ -526,6 +534,8 @@ def convert(src, kind, out, tex_id, log=print):
         os.makedirs(od, exist_ok=True)
         for n, b in (('model.nud', nud_b), ('model.nut', nut_b), ('model.vbn', vbn_b)):
             open(os.path.join(od, n), 'wb').write(b)
+        for n in DEFAULT_FILES:
+            shutil.copy(os.path.join(DEFAULTS, n), os.path.join(od, n))
         if os.path.exists(os.path.join(d, 'model.jtb')):
             open(os.path.join(od, 'model.jtb'), 'wb').write(
                 jtb_bytes(open(os.path.join(d, 'model.jtb'), 'rb').read(), len(model['bones'])))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Smash Run button in Games & More (docs/games-and-more-menu.md), built on the user's own menu files:
 
-  python3 tools/smashrun_menu.py OTHER_DIR MENU_MSBT BUTTON_SEQ IN.rpx OUT [--x 1460 --y 496]
+  python3 tools/smashrun_menu.py OTHER_DIR MENU_MSBT BUTTON_SEQ IN.rpx|- OUT [--x 1460 --y 496]
 
 OTHER_DIR: the installed ui/lumen/other (other.lm, texlist.lst, img-0000N.nut); MENU_MSBT: the installed
 ui/message/menu.msbt; BUTTON_SEQ: param/ui/ui_button_sequence.bin; IN.rpx: the current executable. Writes
@@ -15,7 +15,8 @@ OUT/ui/lumen/other/*, OUT/ui/message/menu.msbt, OUT/param/ui/ui_button_sequence.
   white shadow; Inter Black at the titles' cap height) and a star icon (Smash Run's icon on the 3DS menu; atlas 0,
   BC4) where the Group icon sits; both in atlas space no shape samples and no texel uses. New characters get ids after the old ones and the root sprite moves to the new
   last id (F00C words 3 / 5 keep naming it); F00D's shape / sprite counts follow. The hit shape 4xm_08 is moved
-  over the button like the others' 4xm_NN.
+  over the button like the others' 4xm_NN. An invisible hit_08 (add_hit) spans the right column so the d-pad
+  reaches the button from every row (the cursor casts rays between the buttons' rects).
 - Native (cave at 0x04B7D000, stage_slot_cave.py's space after its code): the Games & More button list
   (0x02C8C280) gets an 8th entry through 0x029ABC68(this, button 8, enabled 1, result 7, shown 1, id 115) at its
   end (0x02C8C324), and result 7 (a spare case of page 16's switch, 0x0218BA0C) posts menu key 0x31 (Training)
@@ -58,6 +59,9 @@ SET_BUTTON = 0x029ABC68         # (this, button number, enabled, result, shown, 
 KEY_SITE = 0x0218BA10           # li r4, 0x5B (result 7's menu key)
 KEY_WORD = 0x3880005B
 TRAINING_KEY = 0x31
+HIT_NAME = 'hit_08'             # the cursor's rect for button 8 (0x0299DB80 looks up hit_%02d, then btn_%02d)
+HIT_SPRITE = 206                # the user's 4xm_NN sprite (shape 0x33 under an alpha-0 colour)
+HIT_W, HIT_Y = 870.0, (120.0, 1040.0)   # the right column: every row of the menu (y 196 .. 970)
 
 
 # ---------------------------------------------------------------- art
@@ -250,6 +254,10 @@ def edit_movie(lm, atlas_sizes, x, y, icon_box):
             continue
         T[k][1] = cl.pack(w)
     assert n_btn and n_hit, (n_btn, n_hit)
+    # hit_08: the d-pad target (see add_hit)
+    hit_tags, n_new_shapes, n_new_sprites = add_hit(lm, ra, rb, hit8, nxt, x)
+    new_root += 2
+    new_tags += hit_tags
     # the root keeps being the last character
     rw = cl.words(T[ra][1])
     rw[0] = new_root
@@ -260,13 +268,84 @@ def edit_movie(lm, atlas_sizes, x, y, icon_box):
     T[ci][1] = cl.pack(cw)
     di = lm.ti[0xF00D]
     dw = cl.words(T[di][1])
-    dw[0] += 2
-    dw[2] += len(copy)
+    dw[0] += 2 + n_new_shapes
+    dw[2] += len(copy) + n_new_sprites
     T[di][1] = cl.pack(dw)
     # definitions before the root's
     lm.tags[ra:ra] = new_tags
     lm.ti = {t: i for i, (t, _) in reversed(list(enumerate(lm.tags)))}
     return remap, new_root, copy
+
+
+def add_hit(lm, ra, rb, hit8, nxt, x):
+    """the d-pad target of Smash Run: an invisible hit_08 instance over the right column (x +- HIT_W / 2, HIT_Y).
+
+    The cursor (0x0299E77C) casts a 1600-long segment from the current button's rect centre in the pressed
+    direction and takes the nearest rect it crosses (0x0299E1C8 / 0x0299E0A4), wrapping at the screen edge
+    (0x0299E254) up to 3 times. A button's rect (0x0299DB80) is its `hit_%02d` instance's, else its
+    `btn_%02d`'s: matrix translation +- _width / _height * 0.5. The user's menu has no hit_NN (its touch shapes
+    are named 4xm_NN), so the buttons use their btn bounds, and btn_08 (870 x ~200 at y 496) lies between the
+    left column's rows (y 196 396 596 796, the bottom row 970): pressing right from them crossed nothing. hit_08
+    spans every row, and its centre (y 580) is in Group's rect, so left from Smash Run goes to Group.
+    Adds sprite nxt (one frame placing shape nxt + 1, as the 4xm sprite 206 holds its shape) and shape nxt + 1
+    (a 32 x 32 quad, its F004 bounds -16..16 too: _width is unambiguous), placed in the root at a new depth
+    on every frame / keyframe that places 4xm_08, with 4xm_08's colours (alpha 0: drawn invisible). Inserts the
+    root placements in place (ra..rb); returns ([definition tags], new shapes, new sprites)."""
+    T = lm.tags
+    sy = lm.sy
+    # the symbol
+    st = T[0]
+    assert st[0] == cl.T_SYMBOLS
+    s = HIT_NAME.encode()
+    st[1] += struct.pack('>I', len(s)) + s + b'\0' * (((len(s) + 4) & ~3) - len(s))
+    struct.pack_into('>I', st[1], 0, len(sy) + 1)
+    sy.append(HIT_NAME)
+    sym = len(sy) - 1
+    # bounds row, transform row
+    bt = T[lm.ti[0xF004]]
+    bounds_i = cl.append_rows(bt, [(-16.0, -16.0, 16.0, 16.0)], 4)[0]
+    x0, x1 = x - HIT_W / 2, x + HIT_W / 2
+    y0, y1 = HIT_Y
+    xf_i = cl.append_rows(T[lm.ti[cl.T_TRANSFORMS]], [((x1 - x0) / 32, 0.0, 0.0, (y1 - y0) / 32,
+                                                       (x0 + x1) / 2, (y0 + y1) / 2)], 6)[0]
+    # the shape: shape 0x33's (the 4xm sprite's) fill and texture corner, as a 32 x 32 quad
+    spr, shp = nxt, nxt + 1
+    i, j = sprite_range(lm, HIT_SPRITE)
+    child = next(cl.words(b) for t, b in T[i:j] if t == cl.T_PLACE)
+    si, sj = shape_range(lm, child[0])
+    g = T[si + 1][1]
+    atlas, fill = struct.unpack('>IH', g[:6])
+    u, v = struct.unpack('>2f', g[20:28])
+    sw = cl.words(T[si][1])
+    sw[0], sw[2], sw[4] = shp, bounds_i, 1
+    defs = [[0xF022, cl.pack(sw)], [0xF024, rect_graphic(atlas, fill, -16, -16, 16, 16, u, v, u, v)]]
+    for k in range(i, j):
+        t, b = T[k]
+        w = cl.words(b)
+        if k == i:
+            w[0] = spr
+        elif t == cl.T_PLACE:
+            w[0] = shp
+        defs.append([t, cl.pack(w)])
+    # root placements, last first (indices stay valid)
+    rw = cl.words(T[ra][1])
+    depth = rw[6] >> 16
+    pid = max(cl.words(b)[1] for t, b in T if t == cl.T_PLACE and cl.words(b)[1] != cl.NONE) + 1
+    sites = [k for k in range(ra + 1, rb) if T[k][0] == cl.T_PLACE and cl.words(T[k][1])[3] == hit8]
+    for k in reversed(sites):
+        w = cl.words(T[k][1])
+        w[0], w[1], w[3], w[7] = spr, pid, sym, xf_i
+        w[5] = (depth << 16) | (w[5] & 0xFFFF)
+        T.insert(k + 1, [cl.T_PLACE, cl.pack(w)])
+        h = k
+        while T[h][0] not in (cl.T_FRAME, 0xF105):
+            h -= 1
+        hw = cl.words(T[h][1])
+        hw[1] += 1
+        T[h][1] = cl.pack(hw)
+    rw[6] = ((depth + 1) << 16) | (rw[6] & 0xFFFF)
+    T[ra][1] = cl.pack(rw)
+    return defs, 1, 1
 
 
 def title_geom(lm, atlas_sizes):
@@ -436,7 +515,8 @@ def build(other_dir, menu_msbt, button_seq, rpx, out, x, y):
     open(os.path.join(out, 'param', 'ui', 'ui_button_sequence.bin'), 'wb').write(
         edit_button_sequence(open(button_seq, 'rb').read()))
     os.makedirs(os.path.join(out, 'code'), exist_ok=True)
-    patch_rpx(rpx, os.path.join(out, 'code', 'cross_f.rpx'))
+    if rpx != '-':                      # '-': the UI files only (the executable part is unchanged)
+        patch_rpx(rpx, os.path.join(out, 'code', 'cross_f.rpx'))
     return remap, root, copy
 
 
