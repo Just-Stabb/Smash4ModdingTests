@@ -2,15 +2,19 @@
 """Smash Run step 1: enemies on the Smash Run stages (docs/smash-run-port.md, "Step 1: enemies on the field").
 Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py's), or patches an RPX:
 
-  python3 tools/smashrun_field_cave.py [--minions]                 the args
-  python3 tools/smashrun_field_cave.py [--minions] IN.rpx OUT.rpx  IN with them (checks the hook words first)
+  python3 tools/smashrun_field_cave.py [--set NAME | --minions]                 the args
+  python3 tools/smashrun_field_cave.py [--set NAME | --minions] IN.rpx OUT.rpx  IN with them (checks the hook words)
 
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
 the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
-- "smashrun" (the default, step 2a): Smash Run's own Plasma Wisp 0x12, Darios 0x1D, Stalfos 0x30 and Zima 0x0E (the
-  converted 3DS enemies), driven by their Master Fortress twins' behaviours through tools/smashrun_enemy_cave.py
-  (which must be applied too); the resource request also loads mczakoplasmawisp 0x57 (its weapons / effects).
-- "minions" (`--minions`, step 1): the four Fortress minions themselves, mczakoplasmawisp 0x57, mczakodarios 0x58,
+- "walkers" (the default, step 2b): step 2a's four and the five walkers of tools/smashrun_walker_cave.py (which must
+  be applied too, with smashrun_enemy_cave.py), in turn: Plasma Wisp, Goomba 0x01, Darios, Shy Guy 0x0B, Stalfos,
+  Waddle Dee 0x13, Zima, Waddle Doo 0x19, Churine 0x1F (placement 1 for the walkers); requests the nine + 0x57.
+- "smashrun" (`--set smashrun`, step 2a): Smash Run's own Plasma Wisp 0x12, Darios 0x1D, Stalfos 0x30 and Zima 0x0E
+  (the converted 3DS enemies), driven by their Master Fortress twins' behaviours through
+  tools/smashrun_enemy_cave.py (which must be applied too); the resource request also loads mczakoplasmawisp 0x57
+  (its weapons / effects).
+- "minions" (`--minions` / `--set minions`, step 1): the four Fortress minions themselves, mczakoplasmawisp 0x57, mczakodarios 0x58,
   mczakostalfos 0x59, mczakozima 0x5A.
 
 - A: the EnemyManager is made for a battle only when 0x02D9E1F4 says so (Classic boss rounds, the Crazy Hand event,
@@ -25,13 +29,14 @@ the game's own enemy system runs as in Classic's Master Fortress. The enemies (E
   same call, then requests the set's kinds' resources (0x02DAE314(mgr+0x28, kind): model, motion, animcmd, sound,
   effect, and the weapons in the kind's article table 0x10352794) on the Smash Run stages.
 - D: every frame the manager updates (0x02D9B554, sm path), 0x02D9B6F8 `bl 0x02D9B1A8` -> the spawner, which ends
-  in that call: on a Smash Run stage, every INTERVAL frames, while fewer than MAX_ALIVE of the set's four kinds live
-  (mgr+0x52A + 2 * kind: the manager's per-kind live counts), it spawns the set's next kind (in turn) beside the player
+  in that call: on a Smash Run stage, every INTERVAL frames, while fewer than MAX_ALIVE of the set's kinds live
+  (mgr+0x52A + 2 * kind: the manager's per-kind live counts), it spawns the set's next kind (in turn, wrapping
+  after the last) beside the player
   (fighter manager *(0x102F7024) entry 0: 0x02E46DEC(entry, &handle, entry+0x14E9) and 0x02BEF6E0(&xyz,
   &handle), as the leftover field generator 0x02D98A0C does), DX to the left / right in turn, facing the player,
   through 0x02D9BCFC(mgr, &EnemyCreateParam) (owner none: hostile to every fighter, as on Pyrosphere and in the
-  Fortress). Placement +0x20 (the set's table): 1 (ray-cast down to the ground) for Stalfos / Zima, 2 (as given)
-  for the floaters.
+  Fortress). Placement +0x20 (the set's table): 1 (ray-cast down to the ground) for Stalfos / Zima and the
+  walkers, 2 (as given) for the floaters.
 
 Space: 0x04B7D100-0x04B7E000 (stage_slot_cave.py's space after its code; smashrun_menu.py has 0x04B7D000-0x04B7D100).
 """
@@ -49,10 +54,12 @@ STAGE_KIND = 0x1047277C
 SR_FIRST, SR_COUNT = 0x82, 0x14
 # (kind, placement) in spawn order (4: the turn counter wraps with andi 3), and the kinds whose resources load
 ENEMY_SETS = {
+    'walkers': (((0x12, 2), (0x01, 1), (0x1D, 2), (0x0B, 1), (0x30, 1), (0x13, 1), (0x0E, 1), (0x19, 1), (0x1F, 1)),
+                (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x01, 0x0B, 0x13, 0x19, 0x1F)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }
-ENEMIES = 'smashrun'
+ENEMIES = 'walkers'
 SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
 KINDS = tuple(k for k, _m in SPAWNS)
 INTERVAL = 150                  # frames between spawns (2.5 s)
@@ -192,7 +199,10 @@ def assemble():
     a.asm("""
         lwz r12, 4(r30)
         addi r11, r12, 1
-        andi. r11, r11, 3
+        cmplwi r11, %d
+        blt d_turn
+        li r11, 0
+    d_turn:
         stw r11, 4(r30)
         lis r11, spawn_table@ha
         addi r11, r11, spawn_table@l
@@ -239,8 +249,7 @@ def assemble():
         addi r1, r1, 0x80
         b 0x%08X
     spawn_table:
-    """ % (SPAWN, UPDATE_REST))
-    assert len(SPAWNS) == 4
+    """ % (len(SPAWNS), SPAWN, UPDATE_REST))
     for k, mode in SPAWNS:
         a.asm(".word 0x%X\n.word %d" % (k, mode))
     words = a.words()
@@ -270,7 +279,7 @@ def args():
 
 
 def configure(name):
-    """switch the enemy set ('smashrun' / 'minions') for assemble() / args()"""
+    """switch the enemy set ('walkers' / 'smashrun' / 'minions') for assemble() / args()"""
     global ENEMIES, SPAWNS, REQUESTS, KINDS
     ENEMIES = name
     SPAWNS, REQUESTS = ENEMY_SETS[name]
@@ -281,6 +290,10 @@ def main():
     if '--minions' in sys.argv:
         sys.argv.remove('--minions')
         configure('minions')
+    if '--set' in sys.argv:
+        i = sys.argv.index('--set')
+        configure(sys.argv[i + 1])
+        del sys.argv[i:i + 2]
     if len(sys.argv) == 1:
         print(' '.join(args()))
         return

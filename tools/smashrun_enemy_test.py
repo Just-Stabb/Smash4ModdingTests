@@ -20,7 +20,8 @@ Runs the game's code around the hooks, the calls out of them stubbed:
 - S (0x02D9A614): 0x02DC67C0 is called with the caller's r3; on a Smash Run stage then slot[K] = slot[twin] in the
   param manager (*(0x102F6C00) + 0x60), the other slots untouched, r3 = the call's result, stack kept; off them
   or without a manager nothing changes.
-- The hook words, and 0x04B85800-0x04B88000 holding only the cave's code and sets (zeros elsewhere).
+- The hook words, and 0x04B85800-0x04B88000 holding only the cave's code and sets (zeros elsewhere; with
+  tools/smashrun_walker_cave.py applied, 0x04B86800-0x04B88000 is its space, checked by smashrun_walker_test.py).
 """
 import os
 import struct
@@ -33,6 +34,7 @@ from unicorn.ppc_const import UC_PPC_REG_LR, UC_PPC_REG_PC, UC_PPC_REG_MSR
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smashrun_enemy_cave as E  # noqa: E402
 import smashrun_field_cave as F  # noqa: E402
+import smashrun_walker_cave as W  # noqa: E402
 
 R = {n: getattr(__import__('unicorn.ppc_const', fromlist=['x']), 'UC_PPC_REG_%d' % n) for n in range(32)}
 MGR, PM, MOD, ACC, STACK = 0x30000000, 0x30010000, 0x30020000, 0x30030000, 0x31000000
@@ -107,8 +109,12 @@ def main():
     want = {E.CAVE + 4 * i: w for i, w in enumerate(words)}
     for addr, ws, _st in sets.values():
         want.update({addr + 4 * i: w for i, w in enumerate(ws)})
-    bad = [hex(x) for x in range(E.CLEAR[0], E.CLEAR[1], 4) if img.u32(x) != want.get(x, 0)]
-    check(not bad, 'space 0x%08X-0x%08X: the cave, its sets, zeros elsewhere %s' % (E.CLEAR[0], E.CLEAR[1], bad[:4]))
+    end = E.CLEAR[1]
+    w = img.u32(W.SITE_F)
+    if w >> 26 == 18 and W.CAVE <= W.branch_target(W.SITE_F, w) < W.LIMIT:
+        end = W.CAVE            # step 2b's walker cave from here (smashrun_walker_test.py)
+    bad = [hex(x) for x in range(E.CLEAR[0], end, 4) if img.u32(x) != want.get(x, 0)]
+    check(not bad, 'space 0x%08X-0x%08X: the cave, its sets, zeros elsewhere %s' % (E.CLEAR[0], end, bad[:4]))
 
     # F
     res = {}

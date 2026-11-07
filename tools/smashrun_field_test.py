@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """Unicorn test of tools/smashrun_field_cave.py in a patched cross_f.rpx:
 
-  python3 tools/smashrun_field_test.py [--minions] PATCHED.rpx   (--minions: an rpx built with the step-1 set)
+  python3 tools/smashrun_field_test.py [--set NAME | --minions] PATCHED.rpx   (the set the rpx was built with:
+                                                                  walkers (default), smashrun (2a), minions)
 
 Runs the four hooked sites with the game's code around them, the calls out of the caves stubbed:
 - A (0x02D9E2DC, inside "make an EnemyManager?"): stage kinds 3 / 0x82 / 0x94 / 0x95 -> yes (0x02D9E2E4), 0x10 /
   0x81 / 0x96 -> no (0x02D9E2FC).
 - B (0x02D99FF8): category 1 stays 1 off the Smash Run stages; on them mgr+0x5EC and r31 become 2.
 - C (0x02D9A568): the accessor set-up is called with the caller's r3 / r4; on a Smash Run stage then
-  0x02DAE314(mgr+0x28, k) for the set's REQUESTS (0x12 0x1D 0x30 0x0E 0x57; minions 0x57-0x5A); off them nothing
-  more; r31 and the stack kept.
+  0x02DAE314(mgr+0x28, k) for the set's REQUESTS (walkers: 0x12 0x1D 0x30 0x0E 0x57 0x01 0x0B 0x13 0x19 0x1F;
+  smashrun: the first five; minions 0x57-0x5A); off them nothing more; r31 and the stack kept.
 - D (0x02D9B6F8, the manager's update): every frame ends in 0x02D9B1A8(mgr); on a Smash Run stage a spawn every
-  INTERVAL frames: the set's kinds in turn (0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), placement
-  2 2 1 1, DX left / right of the player in turn facing him, y + DY, +8 = 1.0, the rest 0; none while MAX_ALIVE live, none off the Smash Run stages, none
-  without a player.
+  INTERVAL frames: the set's kinds in turn, then the first again (walkers 0x12 0x01 0x1D 0x0B 0x30 0x13 0x0E 0x19
+  0x1F; smashrun 0x12 0x1D 0x30 0x0E; minions 0x57 0x58 0x59 0x5A), with the set's placements (2 floaters, 1 the
+  rest), DX left / right of the player in turn facing him, y + DY, +8 = 1.0, the rest 0; none while MAX_ALIVE live,
+  none off the Smash Run stages, none without a player.
 """
 import struct
 import sys
@@ -105,6 +107,11 @@ def main():
     if '--minions' in sys.argv:
         sys.argv.remove('--minions')
         F.configure('minions')
+    if '--set' in sys.argv:
+        i = sys.argv.index('--set')
+        F.configure(sys.argv[i + 1])
+        del sys.argv[i:i + 2]
+    print('set %s' % F.ENEMIES)
     secs = load(sys.argv[1])
     # A
     res = {}
@@ -142,7 +149,8 @@ def main():
     m.uc.mem_write(FM + 0x24, struct.pack('>I', FE))
     m.uc.mem_write(FE + 0x14E9, b'\x07')
     spawns, rests = [], 0
-    for frame in range(F.INTERVAL * 4):
+    n = len(F.SPAWNS) + 1               # one round, then the first kind again
+    for frame in range(F.INTERVAL * n):
         m.calls = []
         m.run(F.SITE_D, F.SITE_D + 4, {3: MGR, 31: MGR})
         rests += sum(1 for c in m.calls if c == ('rest', MGR))
@@ -151,9 +159,9 @@ def main():
                 spawns.append((frame, c))
         if any(c[0] == 'handle' and c[2] != 7 for c in m.calls):
             check(False, 'D: handle call passes the entry byte +0x14E9')
-    check(rests == F.INTERVAL * 4 and m.uc.reg_read(R[31]) == MGR and m.uc.reg_read(R[1]) == STACK,
+    check(rests == F.INTERVAL * n and m.uc.reg_read(R[31]) == MGR and m.uc.reg_read(R[1]) == STACK,
           'D: every frame ends in 0x02D9B1A8(mgr); r31 / stack kept')
-    check([f for f, _ in spawns] == [F.INTERVAL * i - 1 for i in range(1, 5)], 'D: a spawn every %d frames %s'
+    check([f for f, _ in spawns] == [F.INTERVAL * i - 1 for i in range(1, n + 1)], 'D: a spawn every %d frames %s'
           % (F.INTERVAL, [f for f, _ in spawns]))
     kinds, modes, xs, ys, faces, rest_ok = [], [], [], [], [], True
     for _f, (_t, mgr, p) in spawns:
@@ -169,9 +177,12 @@ def main():
         rest_ok &= mgr == MGR and var == 0 and one == 1.0 and z == 0.0 and p[0x1C:0x20] == bytes(4) and \
             p[0x24:0x3C] == bytes(0x18)
         del v
-    check(kinds == list(F.KINDS) and modes == [m for _k, m in F.SPAWNS] == [2, 2, 1, 1],
-          'D: kinds %s, placement %s' % ([hex(k) for k in kinds], modes))
-    check(xs == [F.DX, -F.DX, F.DX, -F.DX] and ys == [F.DY] * 4 and faces == [-1.0, 1.0, -1.0, 1.0],
+    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58) else 1 for k in F.KINDS]
+    check(kinds == list(F.KINDS) + [F.KINDS[0]] and modes == [m for _k, m in F.SPAWNS] + [F.SPAWNS[0][1]] and
+          modes[:-1] == want_modes,
+          'D: kinds %s (then the first again), placement %s' % ([hex(k) for k in kinds], modes))
+    check(xs == [F.DX if i % 2 == 0 else -F.DX for i in range(n)] and ys == [F.DY] * n and
+          faces == [-1.0 if i % 2 == 0 else 1.0 for i in range(n)],
           'D: x %s from the player, y +%s, facing %s' % (xs, F.DY, faces))
     check(rest_ok, 'D: variation 0, +8 = 1.0, z 0, the rest 0')
     # limits
