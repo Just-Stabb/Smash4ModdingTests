@@ -2250,3 +2250,38 @@ by id. His textures now have their own block, 0x40C20000 + 0x400 per costume (`t
 `reference/port_bases.json` `_texture_ids`): body c00-c07 / l00-l07 and the snake, snaketip, trail and fill articles (0x40C24800, 0x40C25000, 0x40C25800, 0x40C26000). His metal.nud (all 8 costumes) named a texture his model.nut didn't have (0x40EB0019, c06 / c07 0x40EB0017: tests 79-82's rebuilt metal.nud with test 41's model.nut): now his own metal texture (0x40C2NN18 / NN16, Zelda's metal picture). Not in it: his low models l00-l07 are still v3's (port_check M1 / M3 / M4 on them): copies of c00-c07 would fix them. Only the ids changed (pixels and every other byte the same:
 `tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
 packages; `port_check` T1 / T2.
+
+## Multi-instance bugs v1 (`$S/fighters_fix_multi_v1.zip`, with Hero's): the glow left on his hand; two Sephiroths
+
+User: "Sephiroth still keeps the purple phantom release glow on his hand permanently after using down special"
+(screenshot: a purple / blue glow on him); "If there's more than one Sephiroth in a match, the game freezes while
+loading."
+- **The glow.** Tests 117 / 144 took Zelda's release flash (0x3100016) out of the Phantom's scripts. Left: effects
+  that never end by themselves (endless emitters, or particles living 0x7FFFFFFF frames: read from the banks) which a
+  script starts and only the base's own status code ended. Sephiroth sends the Phantom from any status, and other
+  moves of his end differently from Ultimate's / Zelda's, so nothing ended them:
+  - the Phantom's charge glow, Zelda's PtcZeldaPhantomHold (0x3100017: two burst emitters whose particles never die),
+    PtcZeldaPhantomMax (0x3100018) and its attack line PtcZeldaPhantomLine (0x310001E): `weapons/phantom.c`
+    `ph_fx_off` ends them at each status change (start, attack, break, end) and before each removal;
+    `edge_specials_build.py phantom_hand_flash` also ends them at frame 0 of every Phantom script but the charge's
+    (27 scripts);
+  - Flare's charge set on haver (`edge_n_charge_off`: ended only on release / cancel / roll, not when the charge was
+    cut: hit, grabbed, a special pressed to release the Phantom), the grab's hand aura `edge_catch_handaura`
+    (Ultimate's CatchWait starts it; its ThrowF / ThrowHi / CatchCut scripts never end it: lua2cpp_edge) and
+    Scintilla's counter glow `edge_senkou_shield_success1`-`7`: `edge.c edge_fx_sweep` (his per-frame hook) ends each
+    whenever he isn't in its status (0x152; 0x35-0x3B and 0x3E; 0x15B), as Ultimate's EFFECT_OFF_KIND(false, true).
+  Which one the screenshot shows isn't known (not tested in game): all of them are ended now.
+- **Two Sephiroths: not found.** Ruled out statically: the weapon object pool (400 a match, `0x02FF2214`; he
+  pre-creates 9 + 51 = 60 articles, W8), the 64-instance article cap (per fighter), the counter cave (its shape desc is
+  copied by the group init `0x02C6F38C`, 5 shapes per fighter), his effect bank (loaded once per kind, refcounted:
+  `base_effects_cave.py`), the motion table build (`0x02EA9064`, once per kind: descriptor `+0x1C`), the vl load
+  (refcounted, `kind_expand_test.py` loads every kind twice), the low models (`0x030BB518`: only with more than 4
+  players), MSC loops (all bounded). Texture ids shared by every costume were real (fighters_texid_fix_v1) but make
+  swapped textures, not a freeze. Needed: the Cemu log of the freeze, and whether a single Sephiroth in his second
+  colour (c01) loads, and two Heroes (or Hero + Sephiroth). The articles' owner search (the nearest fighter of kind
+  0x42: flare1, snake, snaketip, trail, fill, phantom) can also pick the other Sephiroth when two stand close: a
+  gameplay issue, not a freeze, left as is.
+- port_check over the chain (tests 70-115, 117-147, UI / sound v1, fighters_texid_fix_v1, smashrun_fix_v8's
+  executable) + this package + the rebuilt executable: 20 errors (21 before: X4 gone), 62 warnings, 3 notes; new
+  checks X4 weapon-custom, W10 weapon-custom, E10 weapon-endless-effects.
+- Package: `script/msc/edge.mscsb`, `script/msc/phantom/phantom.mscsb`, `script/animcmd/weapon/phantom/effect.bin`.

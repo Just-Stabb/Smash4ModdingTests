@@ -90,6 +90,54 @@ void sh_loop()
     sh_move(sh_speed);
 }
 
+// Hero's player slot (0 - 7; 8 none): the fighter of his kind (0x45, the kind variable 0x0F0000BD + 8 x slot) nearest
+// to the article, which his spawner makes at his hand. The custom number holds the level only (0 / 1): it also picks
+// the article's native param block (4 entries, custom 0-3: tools/weapon_expand.py CUSTOM_CLAMP), and level + 4 x slot
+// read past it for P2 and later, whose Whack / Thwack never appeared (multi-instance bugs v1)
+// the live fighter nearest to the article (its kind 0x45 only when kind is 1); 8 none
+int sh_nearest(int kind)
+{
+    int s;
+    int best;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    best = 0x8;
+    bd = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            if (kind == 0 || (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x45)
+            {
+                dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+                dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+                d = dx * dx + dy * dy;
+                if (best == 0x8 || d < bd)
+                {
+                    best = s;
+                    bd = d;
+                }
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
+int sh_find_owner()
+{
+    int s;
+    s = sh_nearest(0x1);
+    if (s == 0x8)
+    {
+        s = sh_nearest(0);      // none of his kind found: the fighter whose hand it was made at
+    }
+    return s;
+}
+
 void sh_main()
 {
     int c;
@@ -106,6 +154,10 @@ void sh_main()
     }
     sh_owner = c / 0x4;
     sh_level = c - sh_owner * 0x4;
+    if (sh_owner == 0)
+    {
+        sh_owner = sh_find_owner();    // the level alone in the custom number (Whack / Thwack since multi-instance v1)
+    }
     if (sh_level > 0x1)
     {
         sh_level = 0x1;

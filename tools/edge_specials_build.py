@@ -219,6 +219,11 @@ def _when(value, body, var=SNAKE_VAR):
 
 
 PHANTOM_HAND_FLASH = 0x3100016   # Zelda's purple flash on her hand (bone 0x7DA) as the Phantom attacks
+# the Phantom's effects with endless emitters (vanilla zelda.010d0000.ptcl: one_time 0), PtcZeldaPhantomHold's two
+# burst emitters' particles living 0x7FFFFFFF frames: Hold (its charge), Max (full charge), Line (its attack's)
+PHANTOM_CHARGE = (0x3100017, 0x3100018)
+PHANTOM_ENDLESS = PHANTOM_CHARGE + (0x310001E,)
+EFFECT_STARTS = ('Graphic_Effect', 'Graphic_Effect2', 'Graphic_Effect3', 'Graphic_Effect4', 'External_Graphic')
 
 
 def phantom_hand_flash(path):
@@ -227,15 +232,24 @@ def phantom_hand_flash(path):
     stayed on his hand (test 117, the user: "Sephiroth permanently has a purple effect on his hand")"""
     eff = acmd.ACMDFile.load(path)
     n = 0
+    ended = 0
     for crc, cmds in eff.scripts.items():
         # both forms: Graphic_Effect4 (test 117) and the following External_Graphic on bone 2010 (0x7DA, the hand; test
         # 144, the user: "The purple aura stays attached to Sephiroth's arm permanently" after a Phantom release)
         keep = [c for c in cmds if not (c.name in ('Graphic_Effect4', 'External_Graphic') and c.params[0] == PHANTOM_HAND_FLASH)]
         n += len(cmds) - len(keep)
+        # the endless ones (PHANTOM_ENDLESS) off at the start of every script but the charge's own (those that start
+        # Hold / Max): its attack, break and end, so they never outlive the charge (multi-instance bugs v1, the user:
+        # "still keeps the purple phantom release glow on his hand permanently"; weapons/phantom.c ph_fx_off ends
+        # them at every status change and removal too)
+        starts = {c.params[0] for c in keep if c.name in EFFECT_STARTS and c.params}
+        if not starts & set(PHANTOM_CHARGE):
+            keep = [U.cmd('Terminate_Graphic_Effect', fx, 1, 1) for fx in PHANTOM_ENDLESS] + keep
+            ended += 1
         eff.scripts[crc] = keep
     assert n, 'phantom effect.bin: no hand flash found'
     eff.save(path)
-    return 'phantom: its hand flash (%d commands) taken out' % n
+    return 'phantom: its hand flash (%d commands) taken out; its endless effects ended in %d scripts' % (n, ended)
 
 
 # held Octaslash's loop (test 113, edge.c edge_hi_*): VAR_20 0 a plain pass, 1 the first pass held, 2 a looped pass

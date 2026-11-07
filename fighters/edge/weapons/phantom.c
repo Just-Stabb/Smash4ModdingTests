@@ -600,8 +600,24 @@ int func_45()
     return 0;
 }
 
+// Sephiroth (multi-instance bugs v1, the user: "Sephiroth still keeps the purple phantom release glow on his hand
+// permanently after using down special"): the Phantom's endless effects off, particles and all. Zelda's bank:
+// PtcZeldaPhantomHold (0x3100017, its charge glow: two emitters' particles live 0x7FFFFFFF frames), PtcZeldaPhantomMax
+// (0x3100018, full charge: endless emitters) and PtcZeldaPhantomLine (0x310001E, the attack's line: endless; its
+// script ends it, but not when the attack is cut short). Her own statuses / native code end them as she releases it;
+// Sephiroth sends it from any status (tests 103 on), so nothing did: they stayed where it was charged, at his hand,
+// until the next Phantom reset the pooled instance. Off at every status change (start, attack, break, end) and
+// before every removal; the effect scripts end them too (edge_specials_build.py phantom_effects)
+void ph_fx_off()
+{
+    EffectModule(0x2723, 0x3100017, 0x1, 0x1);
+    EffectModule(0x2723, 0x3100018, 0x1, 0x1);
+    EffectModule(0x2723, 0x310001e, 0x1, 0x1);
+}
+
 void func_46()
 {
+    ph_fx_off();
     VisibilityModule(0x2710, 0);
     HitModule(0x2710, 0x3);
     EffectModule(0x26, 0);
@@ -656,6 +672,7 @@ void func_54()
     float var4;
     float var5;
     ph_follow = 0;              // Sephiroth: the tracking is placed at the end of this main (test 107)
+    ph_fx_off();                // Sephiroth: the charge glow off as it's sent (multi-instance bugs v1)
     var0 = WorkModule(0x6, 0x10000007);
     var1 = WorkModuleF(0, 0x4);
     var2 = WorkModuleF(0, 0x2000003) * var1;
@@ -762,6 +779,7 @@ int func_57()
 
 void func_58()
 {
+    ph_fx_off();
     WorkModule(0x2711, 0x20000005);
     HitModule(0x2710, 0x3);
     func_24(0x24, 0, 1.0f);
@@ -788,6 +806,7 @@ int func_59()
     }
     else if (WorkModule(0x10, 0x20000005) == 0 && WorkModule(0x10, 0x20000006) == 0x1 && MotionModule(0x2712))
     {
+        ph_fx_off();
         BattleObject(0x9);
         return 0x1;
     }
@@ -807,6 +826,7 @@ int func_61()
 
 void func_62()
 {
+    ph_fx_off();
     if (WorkModule(0x10, 0x20000005) == 0)
     {
         BattleObject(0x3e9, 0x6);
@@ -820,6 +840,7 @@ int func_63()
 {
     if (WorkModule(0x10, 0x20000005) == 0 && WorkModule(0x10, 0x20000006) == 0x1)
     {
+        ph_fx_off();
         BattleObject(0x9);
         return 0x1;
     }

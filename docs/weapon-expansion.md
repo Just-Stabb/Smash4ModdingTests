@@ -140,3 +140,24 @@ Two more options for it:
 base's vtable 2}; the copy differs from the base's only at `+0xAC`; the hit method against a fake
 StatusModule (statuses below / at / above N, bits 1 / 2 / 3 / 0x11 / 4 / 8 / 0x10); the motion info
 copies (count, entries).
+
+## The custom number past the param vector (multi-instance bugs v1)
+
+A weapon's custom number (its init block `+0x5C`, copied from the owner's custom slot int `0x10000048` /
+`0x10000049`: docs/native-notes.md "Weapon custom number") also picks its param block: the descriptor's `+0x18`
+getter returns vector data + custom x entry size with no bound (`0x02BCC3BC` copies that block into the weapon,
+`+0x1A5C`). The vl weapon vectors hold 4 entries (custom 0-3; `{element fn, entry size, count, data, flag}`, the count
+at data - 4). Hero's MSC put his player slot in the number (Whack / Thwack: level + 4 x slot): for P2 and later it
+was 4 / 5 and the weapon was bound to the heap after Robin's Thunder vector; only a P1 Hero's Whack / Thwack ever
+appeared (user). Robin's Thunder's native code also indexes a 4-entry table by the number (`0x031DDBA4`: the motion
+names `Bound`, `Bound_C2`-`_C4` at `0x10420928`, a null past them).
+- `weapon_expand.py` `CUSTOM_CLAMP` (default on): every getter copy that indexes a vector by the custom number gets,
+  right after its vl struct load, `lwz r11, data - 4(rV); cmplw r4, r11; blt ok; clrlwi r4, r4, 30; cmplw r4, r11;
+  blt ok; li r4, 0` (7 words; 25 getters, the cave now ends at `0x04BB7E90`, `0x170` bytes before Smash Run's
+  `0x04BB8000`). The MSC still sees the full number (the weapon's int `0x10000005` is the init block's).
+- `weapon_expand_test.py`: every getter copy with customs 0-5, 8, 9, 29, 33 against a count-4 vector: within it
+  (custom & 3); the base's getters read past it (0xB0, 0xDC, 0x160 for the fireball's 4, 5, 8).
+- Hero's Whack / Thwack pass the level only now; the deathball finds his slot itself (shot.c `sh_find_owner`: the
+  fighter of his kind nearest to where it was made, his hand).
+- `port_check` X4 (an unclamped getter in the install's executable: ERROR), W10 (a slot worked into a custom number in
+  the fighter's MSC: WARN).

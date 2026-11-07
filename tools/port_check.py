@@ -1106,6 +1106,149 @@ def check_weapon_owner(inst, name, rec, rep):
                     '(a plain "%s": "0x..." entry replaces the base\'s article)' % (name, f, f[:-2], name, f[:-2]))
 
 
+def check_weapon_custom_clamp(inst, name, rec, rep):
+    """X4: the new weapon kinds' param getters (tools/weapon_expand.py getter copies) without the custom-number clamp:
+    a weapon's custom number (its init block +0x5C, the owner's custom slot) picks its param block as vector data +
+    custom x entry size with no bound, and the vl vectors hold 4 entries (custom 0-3); a port passing more (Hero's
+    Whack / Thwack: level + 4 x his player slot) bound the weapon to what followed the vector: P2's never appeared
+    (multi-instance bugs v1). Read from the install's executable: every getter copy reading this fighter's vl slot
+    and indexing by the custom number (r4) must hold the clamp (weapon_expand.CLAMP_SIGNATURE)"""
+    import tempfile
+    import kind_expand as K
+    import weapon_expand as W
+    if 'code/cross_f.rpx' not in inst.files or not rec.get('weapons'):
+        return
+    fcap, _kinds = K.load_spec(W.SPEC)
+    slot = K.mgr_layout(fcap)[0]['vl'][1] + 4 * int(rec['kind'], 0)
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        img = K.Image(f.name)
+        try:
+            words = [img.w(a) for a in range(W.CAVE, W.LIMIT, 4)]
+        except KeyError:
+            return
+    bad, good = [], 0
+    for i, w in enumerate(words):
+        if w != 0x3D801030 or i + 1 >= len(words) or words[i + 1] != 0x818CF448:     # lis r12 / lwz r12, -0xBB8(r12)
+            continue
+        body = []
+        for x in words[i + 2:i + 26]:
+            body.append(x)
+            if x == 0x4E800020:
+                break
+        if not any(x >> 26 == 32 and (x & 0xFFFF) == slot for x in body):
+            continue
+        reads_r4 = any((x >> 26 == 7 and (x >> 16) & 31 == 4) or (x >> 26 == 21 and (x >> 21) & 31 == 4) for x in body)
+        if not reads_r4:
+            continue
+        if W.CLAMP_SIGNATURE in body:
+            good += 1
+        else:
+            bad.append('0x%08X' % (W.CAVE + 4 * i))
+    if bad:
+        rep.add('ERROR', 'X4 weapon-custom', 'code/cross_f.rpx: %d of %s\'s weapon param getters index their vl vector '
+                'by the custom number with no bound (%s): a custom number past 3 binds the weapon to the memory after '
+                'the vector (Hero\'s Whack / Thwack for P2 and later never appeared); rebuild with the current '
+                'tools/weapon_expand.py (CUSTOM_CLAMP)' % (len(bad), name, ', '.join(bad[:6])))
+
+
+def check_weapon_custom_source(name, rep):
+    """W10: a fighter's MSC putting a player slot into a weapon's custom number (its custom slot int 0x10000048-4B
+    around a generate: level + 4 x slot). The executable keeps the param block within the 4 entries (X4), but the base
+    weapon's native code may index other per-custom tables by it (Robin's Thunder's motion names, 0x031DDBA4: 4
+    entries): keep the custom number 0-3 and find the owner's slot in the article (Hero's shot.c sh_find_owner)"""
+    src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src):
+        return
+    text = open(src).read()
+    gens = set()
+    for m in re.finditer(r'\n\w+ (\w+)\(int (\w+), int (\w+)\)\s*\{(.*?)\n\}', text, re.S):
+        if re.search(r'WorkModule\(0x7, %s, 0x1000004[89ab]\)' % re.escape(m.group(3)), m.group(4)):
+            gens.add(m.group(1))
+    hits = []
+    for g in sorted(gens):
+        for m in re.finditer(r'\b%s\(([^;]*)\);' % re.escape(g), text):
+            if re.search(r'slot', m.group(1)) and re.search(r'[*+]', m.group(1)):     # a slot worked into it (not a
+                                                                                    # saved custom slot put back)
+                hits.append('%d: %s(%s)' % (text.count('\n', 0, m.start()) + 1, g, m.group(1)))
+    for m in re.finditer(r'WorkModule\(0x7, ([^;]*slot[^;]*[*+][^;]*|[^;]*[*+][^;]*slot[^;]*), 0x1000004[89ab]\);', text):
+        hits.append('%d: %s' % (text.count('\n', 0, m.start()) + 1, m.group(0)))
+    if hits:
+        rep.add('WARN', 'W10 weapon-custom', 'fighters/%s/%s.c: a player slot in a weapon\'s custom number (%s): past 3 '
+                'it reads the base weapon\'s per-custom data past its 4 entries (Hero\'s Whack / Thwack for P2, '
+                'multi-instance bugs v1); keep it 0-3 and find the slot in the article' % (name, name, '; '.join(hits[:4])))
+
+
+def check_weapon_endless_effects(inst, name, rec, vanilla, rep):
+    """E10: an article's script starting an effect with endless emitters (one_time 0) or never-dying particles
+    (life 0x7FFFFFFF) that no script of that article ends (Terminate_Graphic_Effect) and its MSC doesn't kill
+    (EffectModule(0x2723, id)): it outlives the move (Sephiroth's Phantom's charge glow, PtcZeldaPhantomHold, left at
+    his hand after a release from any status: tests 117 / 144 / multi-instance bugs v1; its base's own status ended it)"""
+    import tempfile
+    import efc
+    import ptcl
+    kind = int(rec['kind'], 0)
+    banks = {}
+
+    def bank(kk):
+        if kk in banks:
+            return banks[kk]
+        out = None
+        if kk == kind:
+            p = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.ptcl' % (name, name)))
+            e = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.efc' % (name, name)))
+            if p and e:
+                out = (inst.get(p[0]), inst.get(e[0]))
+        elif vanilla:
+            b = rec['base']
+            pp = os.path.join(vanilla, 'fighter', b, 'effect', b, '%s.010d0000' % b)
+            if os.path.exists(pp + '.ptcl'):
+                out = (open(pp + '.ptcl', 'rb').read(), open(pp + '.efc', 'rb').read())
+        if out:
+            pt, ef = ptcl.Ptcl(out[0]), efc.Efc(out[1])
+            out = (pt, ef)
+        banks[kk] = out
+        return out
+
+    def endless(fx):
+        b = bank((fx >> 16) & 0xFF)
+        if not b:
+            return False
+        pt, ef = b
+        i = fx & 0xFFFF
+        if i >= len(ef.entries) or not ef.entries[i][1]:
+            return False
+        ems = [em['data'] for em in pt.sets[ef.entries[i][1] - 1]['emitters'] if em['data']]
+        return any(pt.field(e, 'one_time') == 0 or pt.field(e, 'ptcl_life') == 0x7FFFFFFF for e in ems)
+    starts = ('Graphic_Effect', 'Graphic_Effect2', 'Graphic_Effect3', 'Graphic_Effect4', 'External_Graphic')
+    for path in sorted(inst.glob(r'fighter/%s/script/animcmd/weapon/[^/]+/effect\.bin' % name)):
+        art = path.split('/')[-2]
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(inst.get(path))
+            f.flush()
+            try:
+                scr = acmd.ACMDFile.load(f.name).scripts
+            except Exception:                 # noqa: BLE001
+                continue
+        started, ended = set(), set()
+        for cmds in scr.values():
+            for c in cmds:
+                if c.params and isinstance(c.params[0], int) and c.params[0] >> 24 == 3:
+                    (started if c.name in starts else ended if c.name == 'Terminate_Graphic_Effect' else set()).add(
+                        c.params[0])
+        msc = os.path.join(ROOT, 'fighters', name, 'weapons', art + '.c')
+        killed = set()
+        if os.path.exists(msc):
+            killed = {int(x, 16) for x in re.findall(r'EffectModule\(0x2723, (0x[0-9a-fA-F]+)', open(msc).read())}
+        left = sorted(fx for fx in started - ended - killed if endless(fx))
+        if left:
+            rep.add('WARN', 'E10 weapon-endless-effects', '%s: %s start effects that never end by themselves (%s) and no '
+                    'script of it ends them (Terminate_Graphic_Effect) nor its MSC (EffectModule 0x2723): they outlive '
+                    'the move (Sephiroth\'s Phantom glow left at his hand)' % (
+                        path, art, ', '.join('0x%X' % x for x in left)))
+
+
 def check_flare_targets(name, rec, rep):
     """F1: a new fighter missing from Sephiroth's Shadow Flare table (fighters/edge/weapons/flare1.c, written by
     tools/edge_flare_targets.py from Ultimate's edge_flare_radius / node / offsets): its orbs circle it at the
@@ -1663,6 +1806,9 @@ def main():
     check_weapon_owner(inst, a.name, rec, rep)
     check_weapon_instances(a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
+    check_weapon_custom_clamp(inst, a.name, rec, rep)
+    check_weapon_custom_source(a.name, rep)
+    check_weapon_endless_effects(inst, a.name, rec, vanilla, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)

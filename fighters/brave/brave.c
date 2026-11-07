@@ -41286,7 +41286,10 @@ int brave_lw_cast(float f)
     {
         if (f >= 6.0f && brave_lw_once(0x1))
         {
-            brave_generate(0xb, n - 0x6 + 0x4 * brave_lw_slot());
+            // the level only (multi-instance bugs v1, the user: "Only a P1 Hero can spawn Whack or Thwack"): the
+            // custom number also picks the article's native param block, 4 a vector (custom 0-3), and level + 4 x
+            // slot read past it for P2 and later; the deathball finds Hero's slot itself (shot.c sh_find_owner)
+            brave_generate(0xb, n - 0x6);
         }
     }
     else if (n == 0x8)

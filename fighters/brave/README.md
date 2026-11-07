@@ -1538,3 +1538,24 @@ by id. His textures now have their own block, 0x40C50000 + 0x400 per costume (`t
 `reference/port_bases.json` `_texture_ids`): body c00-c07 and l00-l07 (the low models are copies: the same ids). Only the ids changed (pixels and every other byte the same:
 `tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
 packages; `port_check` T1 / T2.
+
+## Multi-instance bugs v1 (`$S/fighters_fix_multi_v1.zip`, with Sephiroth's): Whack / Thwack for P2 and later
+
+User: "Only a P1 Hero can spawn Whack or Thwack, P2 and later don't spawn the article for either."
+- Cause: `brave_lw_cast` made the deathball with custom number level + 4 x his player slot (`sh_owner` for the KO
+  rolls). The custom number also picks the weapon's native param block: Robin's Thunder getter (its copy for kind
+  0x195) returns vl vector data + custom x 0x30 with no bound, and the vector (Hero's vl m17, Robin's `thunder`) has 4
+  entries (custom 0-3). P1's 0 / 1 were in it; P2's 4 / 5 (P3 8 / 9 ...) bound the weapon to the heap after it
+  (the next block's header, then Arcfire's params as Thunder's speeds / lives). Sizz / Bang / Snooze pass the level
+  only, so only Whack / Thwack broke. Robin's Thunder native code also indexes a 4-entry table by it (`0x031DDBA4`).
+- Fix: (1) the executable (`tools/weapon_expand.py` `CUSTOM_CLAMP`, a pipeline default for every port): each new
+  kind's param getter keeps the custom number within its vector's count (else custom & 3, else 0); unicorn-tested in
+  `weapon_expand_test.py` (every getter, customs 0-5, 8, 9, 29, 33). (2) The MSC: Whack / Thwack pass the level only
+  (`brave.c`); `weapons/shot.c` `sh_find_owner` finds Hero's slot as the fighter of his kind (0x45) nearest to where
+  the article was made (his hand; any fighter if none of his kind), as Sephiroth's articles do.
+- Still slot-encoded (work in game, now within the vector natively by the clamp): Zap's spark (the target's slot),
+  Woosh's tornado, Magic Burst / Kamikazee's crash (8 x slot + tier): `port_check` W10 lists them (WARN).
+- Not tested in game. port_check over fixes 56-88, fighters_texid_fix_v1, smashrun_fix_v8's executable + this
+  package + the rebuilt executable: 8 errors (9 before: X4 gone), 27 warnings (E10 lists his fireball / flash /
+  sleep / deathball glows: they follow the article, removed with it as far as the game shows; W10 the slot customs).
+- Package: `script/msc/brave.mscsb`, `script/msc/deathball/deathball.mscsb`.

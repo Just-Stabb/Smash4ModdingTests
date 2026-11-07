@@ -1770,6 +1770,7 @@ void func_81()
 
 void func_82()
 {
+    edge_fx_sweep();                   // Sephiroth: endless effects outside their statuses off (multi-instance v1)
     edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
     edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
     edge_tr_tick();                    // ... its trail's shapes (test 126)
@@ -40244,6 +40245,43 @@ int edge_lw_pre()
 // counter is hit. Since test 103 the charge runs in his per-frame hook (edge_lw_ph_tick, from func_82) whatever
 // status he's in, so it can be held past the stance (tests 100 - 102 held the stance at frame 30 while it charged).
 // Its state is in his VAR_16 - VAR_18 (the MSC's globals are full: port_check C5)
+// his effects that never end by themselves (edge_effects.json sets with endless emitters, his bank) off whenever
+// he isn't in the status they belong to (multi-instance bugs v1, the user: "Sephiroth still keeps the purple phantom
+// release glow on his hand permanently after using down special"; their screenshot: a purple / blue glow on him).
+// Ultimate's scripts start them and its status code ends them (port_check E10 lists the ones no script ends); here
+// a status left by another way than the script that ends them (hit, grabbed, a release from any status) kept them:
+// - Flare's charge (SpecialNStart's EFFECT_FOLLOWs on haver, edge_n_charge_off): Flare's status (0x152) only; it
+//   ended only on the release / cancel / roll paths, not when the charge was cut (hit, grabbed, the Phantom's
+//   release press);
+// - edge_catch_handaura (haver; and its turned copy): the grab statuses 0x35 - 0x3B and the throw (0x3E): Ultimate's
+//   CatchWait starts it and its ThrowF / ThrowHi / CatchCut scripts never end it (lua2cpp_edge), so a forward /
+//   up throw or a grab break left it on his hand;
+// - Scintilla's counter glow (edge_senkou_shield_success1 - 7): its hit status (0x15B) only (its script ends them at
+//   frame 3).
+// Off as Ultimate's EFFECT_OFF_KIND(false, true): emission stops, the particles play out
+void edge_fx_sweep()
+{
+    if (global4 != 0x152)
+    {
+        edge_n_charge_off();
+    }
+    if ((global4 < 0x35 || global4 > 0x3b) && global4 != 0x3e)
+    {
+        EffectModule(0x2723, 0x3420029, 0, 0x1); // edge_catch_handaura
+        EffectModule(0x2723, 0x3420098, 0, 0x1); // edge_catch_handaura@90,0,90
+    }
+    if (global4 != 0x15b)
+    {
+        EffectModule(0x2723, 0x3420079, 0, 0x1); // edge_senkou_shield_success1
+        EffectModule(0x2723, 0x342007a, 0, 0x1); // edge_senkou_shield_success2
+        EffectModule(0x2723, 0x342007b, 0, 0x1); // edge_senkou_shield_success3
+        EffectModule(0x2723, 0x342007c, 0, 0x1); // edge_senkou_shield_success4
+        EffectModule(0x2723, 0x342007d, 0, 0x1); // edge_senkou_shield_success5
+        EffectModule(0x2723, 0x342007e, 0, 0x1); // edge_senkou_shield_success6
+        EffectModule(0x2723, 0x342007f, 0, 0x1); // edge_senkou_shield_success7
+    }
+}
+
 int edge_lw_ph_var() { return 0x0f000310; }     // VAR_16: 0 none, 1 made, 2 charging, 3 sent
 int edge_lw_chg_var() { return 0x0f000311; }    // VAR_17: frames charged
 int edge_lw_full_var() { return 0x0f000312; }   // VAR_18: 1 once fully charged
