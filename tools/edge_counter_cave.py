@@ -35,6 +35,12 @@ fighter's kind, [fighter + 4]: Zelda and everyone else run the game's code as be
    +8 |= 1 and return 0 (no damage, no knockback: Marth's), without queueing a status (his MSC changes
    status itself); otherwise return 1 (Zelda's stub).
 
+4. Zelda's specializer +0x13C (0x02F979EC), an article's event: for her Phantom (kind 0x26) it kills the Phantom's
+   alarm on her hand (PtcZeldaPhantomAlarm 0x3100021, endless, played by the Phantom's article-list extra 0x02F97F0C on
+   bone 0x11, handle at int-array +0x20C) and its sound (+0x210). Its kind compare (PHANTOM_HOOK, `cmpwi r3, 0x26`)
+   branches to PHANTOM, which also takes his own Phantom kind (extra_kinds.json "phantom", 0x19B since test 111):
+   without it the purple glow stayed at his hand after every Phantom release (multi-instance bugs v2, user's clip).
+
 Space: 0x04B9D000-0x04B9E000 (grown .text: trail_table_cave.py's unused tail, its LIMIT lowered to
 0x04B9D000; copy_custom_cave.py's spawners from 0x04B9E000). Calls go through ctr (the game's code is
 out of `bl` reach from here). The hooks' original words are checked against --rpx when it is given.
@@ -57,7 +63,14 @@ NAME = 'edge'
 SETUP_HOOK = 0x02F97824          # slot 0 (entry 0x10147F40): mflr r0
 SLOT42_HOOK = 0x02F982F8         # slot 42 (entry 0x10148090): blr
 SLOT43_HOOK = 0x02F982FC         # slot 43 (entry 0x10148098): li r3, 1
-ORIGINAL = {SETUP_HOOK: 0x7C0802A6, SLOT42_HOOK: 0x4E800020, SLOT43_HOOK: 0x38600001}
+# Zelda's specializer +0x13C (0x02F979EC: an article event, message +8 == 4, its object +0x10): for her Phantom (a
+# weapon, kind 0x26) it kills the Phantom's alarm on her hand (PtcZeldaPhantomAlarm 0x3100021, endless emitters,
+# played on bone 0x11 by the Phantom's article-list extra 0x02F97F0C, its handle in the specializer's +0x20C) and its
+# sound (+0x210). Sephiroth's Phantom is his own kind (extra_kinds.json "phantom", test 111): that compare failed and
+# the purple glow stayed at his hand after every release (multi-instance bugs v1 / v2, user's clip)
+PHANTOM_HOOK = 0x02F97A40        # cmpwi r3, 0x26 (after 0x02BEF604, the object's kind; bne 0x02F97AD4 follows)
+ZELDA_PHANTOM = 0x26
+ORIGINAL = {SETUP_HOOK: 0x7C0802A6, SLOT42_HOOK: 0x4E800020, SLOT43_HOOK: 0x38600001, PHANTOM_HOOK: 0x2C030026}
 
 # game functions
 GROUP_INIT = 0x0200C858          # ShieldModule: (M, desc, group) -> builds the group's shapes
@@ -101,10 +114,21 @@ def hilo(v):
     return v >> 16, v & 0xFFFF
 
 
-def build(kind_id=None):
+def phantom_kind(spec=SPEC, name=NAME):
+    """his own Phantom weapon kind (extra_kinds.json "weapons" "phantom")"""
+    for k in json.load(open(spec))['kinds']:
+        if k['name'] == name:
+            w = k.get('weapons', {}).get('phantom')
+            return int(w['kind'] if isinstance(w, dict) else w, 0)
+    raise SystemExit('no phantom weapon in %s' % name)
+
+
+def build(kind_id=None, phantom=None):
     """(words, labels): the cave from CAVE"""
     if kind_id is None:
         kind_id = kind()
+    if phantom is None:
+        phantom = phantom_kind()
     a = Asm(CAVE)
     calls = {}
     for n, v in (('init', GROUP_INIT), ('state', GROUP_STATE), ('side', SIDE), ('handle', HANDLE),
@@ -283,7 +307,13 @@ slot43: li r3, 1                        # (spec, fighter, message) -> 0: no dama
         li r3, 0
         blr
 
-""" % p)
+phantom: cmpwi r3, %(zph)d               # Zelda's Phantom (the replaced compare)
+        beq phantom_back
+        cmpwi r3, %(eph)d               # or his: the same eq for 0x02F97A44's bne
+phantom_back:
+        b 0x%(phback)08X
+
+""" % dict(p, zph=ZELDA_PHANTOM, eph=phantom, phback=PHANTOM_HOOK + 4))
     shape_at = a.pc + 4
     a.asm("""
 one:    .float 1.0
@@ -318,7 +348,8 @@ def patches(kind_id=None):
     """{address: word}: the cave and the three hooks"""
     words, labels = build(kind_id)
     out = {CAVE + 4 * i: w for i, w in enumerate(words)}
-    for hook, label in ((SETUP_HOOK, 'setup'), (SLOT42_HOOK, 'slot42'), (SLOT43_HOOK, 'slot43')):
+    for hook, label in ((SETUP_HOOK, 'setup'), (SLOT42_HOOK, 'slot42'), (SLOT43_HOOK, 'slot43'),
+                        (PHANTOM_HOOK, 'phantom')):
         out[hook] = branch(hook, labels[label])
     return out
 
@@ -339,8 +370,10 @@ def check_base(rpx):
     bad = ['0x%08X: 0x%08X' % (a, img.w(a)) for a, w in ORIGINAL.items() if img.w(a) not in (w, p[a])]
     if bad:
         raise SystemExit('edge_counter_cave: unexpected words in %s: %s' % (rpx, ', '.join(bad)))
+    # an earlier build of this cave (its setup hook branching here) may hold other words: they're all rewritten
+    earlier = img.w(SETUP_HOOK) == p[SETUP_HOOK]
     used = [a for a in range(CAVE, LIMIT, 4) if word_or_0(img, a) not in (0, p.get(a, 0))]
-    if used:
+    if used and not earlier:
         raise SystemExit('edge_counter_cave: the cave space is in use in %s (0x%08X)' % (rpx, used[0]))
 
 
@@ -360,8 +393,9 @@ def main():
     k = kind(a.kinds)
     words, labels = build(k)
     print(' '.join(args(k)))
-    sys.stderr.write('edge counter: kind 0x%X, cave 0x%08X-0x%08X (%d words), hooks 0x%08X / 0x%08X / 0x%08X\n'
-                     % (k, CAVE, CAVE + 4 * len(words), len(words), SETUP_HOOK, SLOT42_HOOK, SLOT43_HOOK))
+    sys.stderr.write('edge counter: kind 0x%X, cave 0x%08X-0x%08X (%d words), hooks 0x%08X / 0x%08X / 0x%08X / 0x%08X '
+                     '(his Phantom 0x%X)\n' % (k, CAVE, CAVE + 4 * len(words), len(words), SETUP_HOOK, SLOT42_HOOK,
+                                               SLOT43_HOOK, PHANTOM_HOOK, phantom_kind(a.kinds)))
 
 
 if __name__ == '__main__':

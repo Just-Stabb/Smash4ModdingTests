@@ -361,6 +361,42 @@ def slot43_checks(e, kind):
         check('slot 43, %s: registers kept' % what, kept, True)
 
 
+ARTICLE_EVENT = 0x02F979EC        # Zelda's specializer +0x13C
+EFFECT_KILL = 0x02005ADC          # (EffectModule, handle, 1, 1)
+SOUND_STOP = 0x02C73750           # (sound module, handle, 0)
+OBJ_CATEGORY, OBJ_KIND = 0x02BEF5F4, 0x02BEF604
+
+
+def phantom_checks(e, label, cases):
+    """Zelda's article event (specializer +0x13C) with an article's handle of (category, kind): the Phantom's alarm
+    (int-array +0x20C, an effect handle) and its sound (+0x210) killed or left"""
+    obj = {}
+    e.stub(OBJ_CATEGORY, lambda e: obj['cat'])
+    e.stub(OBJ_KIND, lambda e: obj['kind'])
+    e.stub(EFFECT_KILL, lambda e: e.rec('kill', 3, 4, 5, 6))
+    e.stub(SOUND_STOP, lambda e: e.rec('sound', 3, 4, 5))
+    for (cat, k, mtype), want in cases:
+        fk = e.fighter(C.kind())
+        e.setw(fk['acc'] + 0x72A8, 0xEFEF0000)
+        e.setw(fk['acc'] + 0x72AC, 0x50500000)
+        e.setw(fk['ints'] + 0x20C, 0x1234)
+        e.setw(fk['ints'] + 0x210, 0x5678)
+        f = e.alloc(0x40, b'\0')
+        e.setw(f + 0x28, fk['acc'])
+        msg = e.alloc(0x20, b'\0')
+        e.setw(msg + 8, mtype)
+        e.setw(msg + 0x10, 0x10000123)
+        obj.update(cat=cat, kind=k)
+        r, kept = e.run(ARTICLE_EVENT, 0, f, msg)
+        got = ([c[:5] for c in e.calls if c[0] in ('kill', 'sound')], e.w(fk['ints'] + 0x20C), e.w(fk['ints'] + 0x210))
+        if want:
+            exp = ([('kill', 0xEFEF0000, 0x1234, 1, 1), ('sound', 0x50500000, 0x5678, 0)], 0xFFFFFFFF, 0)
+        else:
+            exp = ([], 0x1234, 0x5678)
+        check('%s: article event (category %d, kind 0x%X, event %d): the alarm %s' % (
+            label, cat, k, mtype, 'killed' if want else 'left'), (got, r, kept), (exp, 1, True))
+
+
 def main():
     a = sys.argv[1:]
     base = a[0] if a else RPX
@@ -381,6 +417,12 @@ def main():
     setup_checks(e, kind)
     slot42_checks(e, kind)
     slot43_checks(e, kind)
+    ph = C.phantom_kind()
+    check('his Phantom kind from extra_kinds.json', ph, 0x19B)
+    phantom_checks(e, 'patched', [((1, 0x26, 4), True), ((1, ph, 4), True), ((1, 0x22, 4), False),
+                                  ((0, 0x26, 4), False), ((0, ph, 4), False), ((1, ph, 3), False)])
+    b = Run(base)
+    phantom_checks(b, 'unpatched (the bug)', [((1, 0x26, 4), True), ((1, ph, 4), False)])
     print('%d failure(s)' % fails)
     sys.exit(1 if fails else 0)
 
