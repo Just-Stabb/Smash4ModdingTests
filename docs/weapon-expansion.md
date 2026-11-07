@@ -161,3 +161,21 @@ names `Bound`, `Bound_C2`-`_C4` at `0x10420928`, a null past them).
   fighter of his kind nearest to where it was made, his hand).
 - `port_check` X4 (an unclamped getter in the install's executable: ERROR), W10 (a slot worked into a custom number in
   the fighter's MSC: WARN).
+
+## Inline kind compares in the base fighter's code (multi-instance bugs v2)
+
+A base fighter's specializer can handle an article event by the article's kind: `bl 0x02BEF5F4` (the object's
+category) `cmp 1` (a weapon), then `bl 0x02BEF604` (its kind) `cmpwi r3, K`. A copy of K has another number and never
+matched. Two in the game (a scan of every `bl 0x02BEF604` followed by a compare with a base kind of a copy, the
+weapon category tested in the 12 words before, a cr0 branch after):
+- Zelda's +0x13C (`0x02F979EC`, compare `0x02F97A40`, kind 0x26 Phantom): kills the Phantom's alarm on her hand
+  (PtcZeldaPhantomAlarm `0x3100021`, endless emitters, played on bone 0x11 by the Phantom's article-list extra
+  `0x02F97F0C`, its handle at int-array `+0x20C`, its sound at `+0x210`) when the Phantom ends. Sephiroth's Phantom
+  (0x19B) never matched: the purple glow stayed at his hand after every release (user's clip).
+- Mario's (`0x02F1A8B0`, kind 4: the Mario Finale article) calls `0x02E165EC` when it ends: Supamario's copy (0x189)
+  never did (not reported; matched now).
+`weapon_expand.py` `kind_compares` (default): each such compare becomes a branch to a stub `cmp K; beq.far back;
+cmp copy; ...; b back` (eq for K and every copy). 2 stubs, 0x28 bytes; the cave ends at `0x04BB7EB8`.
+`weapon_expand_test.py` runs each compare on both executables with K, its copies and others (unpatched: only K).
+`port_check` X5 lists any still plain in an install's executable. Not covered: compares without the weapon-category
+test before them (other fighters' reflect / absorb lists naming 0x22 / 0x26: they treat the copies as other kinds).
