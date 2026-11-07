@@ -1845,6 +1845,7 @@ sizes. Test `tools/extended_memory_test.py` (unicorn, against exe_v11). v1 crash
 applied the mapping, the game printed `freeBytes=788111236` = 0x6EF99F84 - 1 GiB): the game's own cap at
 `0x03374EC8` -- when MEM2's allocatable size is above 0x40000000 it allocates 1 GiB from the heap's tail and never
 uses it (a dev kit's extra RAM) -- left the arena less than its total. v2 skips it (`0x03374ED0` ble -> b).
+User result of v2: four Sephiroths load with the pack on (confirmed in game).
 
 ## Article instance cap (64 a fighter)
 
