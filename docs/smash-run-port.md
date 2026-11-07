@@ -1017,6 +1017,53 @@ User results of step 2c v2: the White Bear works as intended (quake, hit, effect
 empty; the user's log had no S4FX lines (no match in it) and showed a new Cemu warning, `GX2RSetAttributeBuffer():
 Offset exceeds buffer size` (~38 a frame, from ~20 s after boot).
 
+## Step 2d: the twins' effect banks, the laser log, the fliers held back
+
+User results of step 2c v2: the White Bear works as on the 3DS (quake, hit, effects); Plasma Wisp's laser still
+shows nothing. The S4FX log of one match (uploads ed3575f1-log.txt):
+- **Registrations**: six enemy banks, slots 0x1A-0x1F in request order: 0x712, 0x719, 0x71D, 0x71F, 0x740, 0x757.
+  Only kinds with effect files register (no slot for the other six): the 10-slot limit is not reached.
+- **Made**: 0x7570000 (5), 0x7570001 (5), 0x7570006 (1) from bank 0x757, the White Bear's 0x7400000 / 0x7400001.
+  **Never requested**: 0x7570002 / 3 / 4 (the weapons' 0x02AE0D58 / 0x02AE128C (2), 0x02AE050C (3), 0x02AE08F8
+  (4)) nor the behaviour's 0x7570003-5 / 7 / 8 (0x026D05F8, 0x026D01F4.., 0x026D05B0, 0x026D1394, 0x026D15E8).
+- **Darios**: 0x7580000-3 requested with no bank: its twin's code hard-codes bank 0x758 (0x026CC000-0x026CE000,
+  five `lis 0x758`) and nothing requested kind 0x58.
+
+**Fix (exe_v15)**: `smashrun_field_cave.py`'s step2c set also requests 0x58 and 0x59 (mczakodarios's effect bank;
+mczakostalfos's, which holds its sword trail TexStalfosSwordTrace; mczakozima has no effect folder: the resource
+table lists `effect/enemy/mczako{darios,plasmawisp,stalfos}/` only). exe_v15 vs exe_v14: 0x02D9B6F8 (field hook
+D) and 0x04B7D16C-0x04B7D498 (the field cave's code), 161 words; relocations equal. The step 2c v2 claim that the
+category's 10 slots may be the laser's cause is withdrawn.
+
+**The laser (open)**: the twin's four weapon specializers (vtables 0x100DA0DC, 0x100DA37C, 0x100DA620, 0x100DA8CC,
+set by 0x02ADFA24 / 0x02AE034C / 0x02AE0B98 / 0x02AE15EC) request 0x7570001-4 from their slots (0x02AE050C /
+0x02AE08F8 in 0x100DA37C, 0x02AE0D58 / 0x02AE128C in 0x100DA620, 0x02AE17AC in 0x100DA8CC); the log saw only
+0x7570001 (0x100DA8CC's weapon) and the behaviour's 0x7570000 / 0x7570006. So either the Plasma Wisp never entered
+its laser attack in that match, or its laser runs another path. The log build v2 adds `S4FX mot` (every
+change_motion_state of kind 0x12: this, state, motion index in the twin's order, rate; LaserHold = 0xD, Laser =
+0xC, NeedleHold 0xF, Needle 0xE, CannonHold 2, Cannon 1) at 0x02DB420C (`stwu r1, -0x48(r1)` replayed); the
+article callbacks (0x026CF644 / 0x026CF7F8 / 0x026CF9B0 / 0x026CFB08) and the weapon code (0x02AE...) are out of a
+`b`'s reach from the diag space (0x04BAE000: more than 32 MB), so they are not hooked. Test diag_effect_test.py 14
+checks against exe_v15, 0 failures.
+
+**GX2RSetAttributeBuffer warnings**: not from the Smash Run files. They are in the user's Cemu logs since
+2026-10-23 (before the Smash Run work: 16 / 184 / 112 / 896 lines in logs of Oct 23-25), and in the step 2c v2 diag
+log (uploads de4066d2) they start 20 s after boot on the title / menus, with no Smash Run enemy loaded; Cemu logs a
+fixed number of them (38 or 23 a frame for a few frames).
+
+**The fliers (Ghos, Tikibuzz, Furiijio, Propeller Heiho): held back.** What blocks a faithful port:
+- Ghos (enemy_fs.cro 0x109C0-0x1150C, read): its contact hitbox (P2 entry 1: power 3, angle 361, kbg 50, bkb 50,
+  size 8) is on node 3, past its 3-entry jtb (TransN, RotN, HipN): what the 3DS resolves it to is not known (the
+  same open question as Plasma Wisp's node 5); its hit stun (state 2) lasts `hit_return_frame()` (code.bin 0x9EA9B0:
+  the gl entry's +0x154 times a factor), no Wii U equivalent found; its wall bounce (L1120c: GroundCollisionObject
+  get_ground_normal) has no Wii U address yet; its slot 31 (hit by a reflected weapon) and the head turn (slot 55)
+  not mapped. The movement itself maps (embedded aerial module, slip homing mode 3 with its two P7 parameter sets
+  at 96 % / 4 %, set_target to the nearest fighter, update; leave at 1200 frames, reset on damage; slot 69 -> the
+  stun state, which the Wii U notify_on_damage 0x026A3564 calls and honours).
+- Tikibuzz: its dive and Step use set_mode_uniform (3DS mode 5), which the Wii U's reduced update (0x02DB2524:
+  modes 0-4 and 6) lacks, and homing_extend.
+- Furiijio, Propeller Heiho: not read yet (Propeller Heiho carries items: create_item_and_have / Item::fall).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

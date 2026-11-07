@@ -8,7 +8,10 @@ Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py'
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
 the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
 - "step2c" (the default): "walkers" plus Gordo 0x08 (placement 2) and the White Bear 0x40 (placement 1), each
-  twice in the 13-entry turn; requests the twelve + 0x57 (docs/smash-run-port.md, "Step 2c").
+  twice in the 13-entry turn; requests the twelve + 0x57 (docs/smash-run-port.md, "Step 2c") and, since step 2d,
+  0x58 / 0x59 too: the Darios / Stalfos twins' code asks for their own effect banks 0x758 / 0x759 (mczakodarios'
+  effects, mczakostalfos' sword trail), which only a request of those kinds registers (the step 2c v2 log: every
+  0x758xxxx request found no bank). mczakozima has no effect folder.
 - "walkers" (step 2b): step 2a's four and the five walkers of tools/smashrun_walker_cave.py (which must
   be applied too, with smashrun_enemy_cave.py), in turn: Plasma Wisp, Goomba 0x01, Darios, Shy Guy 0x0B, Stalfos,
   Waddle Dee 0x13, Zima, Waddle Doo 0x19, Churine 0x1F (placement 1 for the walkers); requests the nine + 0x57.
@@ -63,7 +66,7 @@ ENEMY_SETS = {
     # step 2c: the walkers' set with Gordo 0x08 (placement 2: it floats where it appears) and the White Bear 0x40
     'step2c': (((0x08, 2), (0x40, 1), (0x12, 2), (0x01, 1), (0x1D, 2), (0x0B, 1), (0x08, 2), (0x30, 1), (0x40, 1),
                 (0x13, 1), (0x0E, 1), (0x19, 1), (0x1F, 1)),
-               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40)),
+               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }

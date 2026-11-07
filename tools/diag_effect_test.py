@@ -84,13 +84,31 @@ def main():
     diff, calls = case('made', {29: 0x3030004, 30: 9}, {})
     check('made 0x3030004 (a fighter\'s): no line', (diff, calls), ({}, []))
 
+    # mot: r3 this (+4 state, +8 kind), r4 index, f2 rate (replayed: stwu r1, -0x48(r1))
+    this = F + 0x40
+    import struct as _s
+    rate = _s.unpack('>Q', _s.pack('>d', 0.9))[0]
+    for kind, want in ((0x12, True), (0x57, False)):
+        res = []
+        for e in (E0, E1):
+            e.calls = []
+            setup(e, {3: this, 4: 13}, {this + 4: 6, this + 8: kind})
+            e.mu.reg_write(FPRS[2], rate)
+            run(e, hook['mot'], hook['mot'] + 4)
+            res.append(e.state())
+        for st in res:
+            st['fpscr'] &= ~0x1F000
+        diff = {r: (hex(res[0][r]), hex(res[1][r])) for r in res[0] if res[0][r] != res[1][r]}
+        exp = [(fmts['mot'], this, 6, 13, 0x3F666666)] if want else []
+        check('mot kind 0x%X: registers kept (r1 from the replayed stwu), %s' % (kind, 'a line' if want else 'no line'),
+              (diff, [c[:5] for c in E1.calls]), ({}, exp))
     for e in (E0, E1):
         e.setw(lines_at, D.B.MAX_LINES)
     diff, calls = case('made', {29: 0x7570004, 30: 0}, {})
     check('at MAX_LINES lines: no more', (diff, calls), ({}, []))
-    check('formats', [fmts[t] for t in ('reg', 'req', 'made')],
+    check('formats', [fmts[t] for t in ('reg', 'req', 'made', 'mot')],
           ['S4FX reg bank=%X slot=%X res=%X\n', 'S4FX req id=%X slot=%X bank=%X eft=%X efc=%X n=%X\n',
-           'S4FX made id=%X h=%X\n'])
+           'S4FX made id=%X h=%X\n', 'S4FX mot this=%X st=%X idx=%X rate=%X\n'])
     print('%d failed' % T.fails)
     sys.exit(1 if T.fails else 0)
 
