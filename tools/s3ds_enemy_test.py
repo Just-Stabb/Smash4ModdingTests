@@ -99,6 +99,13 @@ def model_tests(src, kind, out, part='body', c='c00', quiet=False):
         ok &= name == b['name'] and (par if par != 0x0FFFFFFF else -1) == b['parent'] and h == se.bone_hash(name)
         ok &= np.allclose(t, list(b['pos']) + list(b['rot']) + list(b['scale']), atol=1e-6)
     check(ok, '%s: VBN = the .bch skeleton (%d bones)' % (tag, n))
+    sj = os.path.join(mdir, 'model.jtb')
+    if os.path.exists(sj):
+        a, b = open(sj, 'rb').read(), open(os.path.join(od, 'model.jtb'), 'rb').read()
+        va = struct.unpack('<%dH' % (len(a) // 2), a)
+        vb_ = struct.unpack('>%dH' % (len(b) // 2), b) if len(b) == len(a) else None
+        check(vb_ == va and va[0] * 2 + 2 == len(a) and all(i < n or i == 0xFFFF for i in va[1:]),
+              '%s: model.jtb big-endian, same %d joints, every one a bone' % (tag, va[0]))
     d, texs = nut.load(os.path.join(od, 'model.nut'))
     srcs = {k: v for k, v in bch.textures().items() if not k.endswith('#format')}
     ids = {t.tex_id: t for t in texs}
