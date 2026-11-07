@@ -89,11 +89,11 @@ class Report:
         self.items.append((sev, code, msg))
 
     def show(self):
-        order = {'ERROR': 0, 'WARN': 1, 'INFO': 2}
+        order = {'ERROR': 0, 'WARN': 1, 'INFO': 2, 'NOTE': 2}
         for sev, code, msg in sorted(self.items, key=lambda x: (order[x[0]], x[1])):
             print('%-5s %-22s %s' % (sev, code, msg))
         n = {s: sum(1 for x in self.items if x[0] == s) for s in order}
-        print('\n%d errors, %d warnings, %d notes' % (n['ERROR'], n['WARN'], n['INFO']))
+        print('\n%d errors, %d warnings, %d notes' % (n['ERROR'], n['WARN'], n['INFO'] + n['NOTE']))
         return n
 
 
@@ -1153,6 +1153,37 @@ def check_weapon_custom_clamp(inst, name, rec, rep):
                 'tools/weapon_expand.py (CUSTOM_CLAMP)' % (len(bad), name, ', '.join(bad[:6])))
 
 
+def check_weapon_kind_compares(inst, name, rep):
+    """X5: the base fighter's native code comparing an article's kind with the base kind (weapon category, then
+    `cmpwi r3, K`) where this fighter's copy has another number: never matched. Zelda's article event (0x02F97A40)
+    kills her Phantom's endless alarm on her hand only for kind 0x26: Sephiroth's Phantom (0x19B) left a purple glow
+    at his hand after every release (multi-instance bugs v2). tools/weapon_expand.py kind_compares sends each such
+    compare through a stub that takes the copies too; this lists the ones still plain in the install's executable"""
+    import tempfile
+    import kind_expand as K
+    import weapon_expand as W
+    if 'code/cross_f.rpx' not in inst.files or not os.path.exists(W.RPX):
+        return
+    try:
+        _B, info = W.build()
+    except Exception:                     # noqa: BLE001
+        return
+    mine = {nk: bk for nk, (bk, r, _a) in info['new'].items() if r['name'] == name}
+    if not mine:
+        return
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        img = K.Image(f.name)
+        left = W.kind_compare_sites(img, set(mine.values()))
+    if left:
+        rep.add('ERROR', 'X5 weapon-kind-compare', 'code/cross_f.rpx: the base\'s native code compares an article\'s '
+                'kind with %s, which %s\'s copies (%s) never match (Sephiroth\'s Phantom: Zelda\'s alarm glow left on '
+                'his hand); rebuild with the current tools/weapon_expand.py (kind_compares)' % (
+                    ', '.join('0x%X at 0x%08X' % (k, a) for a, _w, k in left), name,
+                    ', '.join('0x%X' % nk for nk, bk in sorted(mine.items()) if bk in {k for _a, _w, k in left})))
+
+
 def check_weapon_custom_source(name, rep):
     """W10: a fighter's MSC putting a player slot into a weapon's custom number (its custom slot int 0x10000048-4B
     around a generate: level + 4 x slot). The executable keeps the param block within the 4 entries (X4), but the base
@@ -1807,6 +1838,7 @@ def main():
     check_weapon_instances(a.name, rec, rep)
     check_flare_targets(a.name, rec, rep)
     check_weapon_custom_clamp(inst, a.name, rec, rep)
+    check_weapon_kind_compares(inst, a.name, rep)
     check_weapon_custom_source(a.name, rep)
     check_weapon_endless_effects(inst, a.name, rec, vanilla, rep)
     check_shield_damage(inst, a.name, rep)

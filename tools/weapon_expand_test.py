@@ -465,6 +465,22 @@ def main():
             check('Kirby copy resources 0x%08X: bl to a stub, r%d = the kind mapped %s' % (
                 hook, reg, ', '.join('0x%X -> 0x%X' % kv for kv in sorted(maps.items()))),
                 (w >> 26 == 18 and w & 3 == 1, bad), (True, []))
+    # ---- inline kind compares (W.kind_compares): the base's and its copies' kinds take the base's branch
+    from unicorn.ppc_const import UC_PPC_REG_CR
+    for at, k, st, cs in info.get('kind_compares', []):
+        def eq_after(E, r3):
+            E.mu.reg_write(REGS[3], r3)
+            E.mu.reg_write(UC_PPC_REG_CR, 0)
+            E.mu.emu_start(at, at + 4, count=40)
+            return bool(E.mu.reg_read(UC_PPC_REG_CR) >> 29 & 1)          # cr0 eq
+        kinds = [k] + cs + [k + 1, 0x7F, 0x184, max(cs) + 1]
+        got = [eq_after(E1, x) for x in kinds]
+        old = [eq_after(E0, x) for x in kinds]
+        check('kind compare 0x%08X (0x%X): eq for it and its copies %s, not for 0x%X / 0x7F / 0x184 / 0x%X (unpatched: '
+              'only 0x%X)' % (at, k, ', '.join('0x%X' % c for c in cs), k + 1, max(cs) + 1, k),
+              (got, old), ([True] * (1 + len(cs)) + [False] * 4, [True] + [False] * (len(cs) + 4)))
+        check('kind compare 0x%08X: a branch to its stub, the next word a cr0 branch' % at,
+              (E1.w(at) >> 26, W._bl_target(at, E1.w(at) | 1), E0.w(at + 4) >> 26), (18, st, 16))
     print('%d failed' % fails)
     sys.exit(1 if fails else 0)
 

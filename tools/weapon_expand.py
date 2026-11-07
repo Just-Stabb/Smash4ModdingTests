@@ -852,7 +852,7 @@ def kind_compares(B, img, new, info):
         for c in copies[k]:
             lines += ['beq.far 0x%X' % (at + 4), '%s r3, 0x%X' % (op, c)]
         lines.append('b 0x%X' % (at + 4))
-        st = B.alloc(4 * len(lines))
+        st = B.alloc(4 * (len(lines) + len(copies[k])))     # each beq.far is two words
         B.code(st, '\n'.join(lines))
         B.put(at, (18 << 26) | ((st - at) & 0x3FFFFFC), 'kind compare 0x%X -> stub (copies %s)' % (
             k, ', '.join('0x%X' % c for c in copies[k])), orig=w)
