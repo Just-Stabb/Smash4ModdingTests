@@ -342,6 +342,41 @@ def fix_split_flag_branch(out):
     return out
 
 
+def fix_trailing_flag_else(out):
+    """the dump's `if F { X } S; if is_excute { W } else { Z }` where the else is F's and S, W its true branch
+    (Sephiroth's winged landing: `if WINGED { 2: landing03 } 8: winged_landing02 else { landing03 }`) ->
+    `if F { X S if is_excute { W } } else { Z }`. Sound scripts only (SoundTranslator.extra_fixes)"""
+    exc = 'macros::is_excute(agent)'
+
+    def close(i):
+        d = 0
+        for j in range(i + 1, len(out)):
+            k = out[j][0]
+            if k == 'if':
+                d += 1
+            elif k == 'end':
+                if d == 0:
+                    return j
+                d -= 1
+            elif k in ('else', 'elseif') and d == 0:
+                return j
+        return None
+    i = 0
+    while i < len(out):
+        if out[i][0] == 'if' and 'is_flag' in out[i][1]:
+            e1 = close(i)
+            if e1 is not None and out[e1] == ('end',):
+                j = e1 + 1
+                while j < len(out) and out[j][0] in ('call', 'other'):
+                    j += 1
+                if j < len(out) and out[j] == ('if', exc):
+                    c = close(j)
+                    if c is not None and out[c] == ('else',):
+                        out[:] = out[:e1] + out[e1 + 1:c] + [('end',), ('else',)] + out[c + 1:]
+        i += 1
+    return out
+
+
 def _units(seq):
     """statements -> units: a lone statement, or an `if ... end` block (nested blocks inside)"""
     out, i = [], 0
@@ -446,7 +481,11 @@ DYNAMIC_CONDS = {}
 
 
 def dynamic_var(cond):
-    """an int variable (tested != 0) or ('float', variable, method, value) (Float_Var_Compare)"""
+    """an int variable (tested != 0), ('float', variable, method, value) (Float_Var_Compare) or ('random', N)
+    (IS_RANDOM_CHANCE(N): fold_tests' form of Ultimate's IS_RANDOM, Smash 4's IS_RANDOM(Chance=N))"""
+    m = re.fullmatch(r'IS_RANDOM_CHANCE\((\d+)\)', cond.strip())
+    if m:
+        return ('random', int(m.group(1)))
     return next((v for k, v in DYNAMIC_CONDS.items() if k in cond), None)
 
 
@@ -462,10 +501,10 @@ def words(cmds):
 def cond_true(cond):
     if cond == 'macros::is_excute(agent)' or cond in EFFECT_CONDS:
         return True
+    if cond.startswith('!'):            # before the --cond test: `!is_flag(F)` with F taken as true is false
+        return not cond_true(cond[1:].strip())
     if any(c in cond for c in TRUE_CONDS):
         return True
-    if cond.startswith('!'):
-        return not cond_true(cond[1:].strip())
     return False
 
 
@@ -497,6 +536,8 @@ class Translator:
         taken = [False]
         dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
         sts = fix_split_flag_branch(fix_misplaced_else(statements(body)))
+        for fix in getattr(self, 'extra_fixes', ()):
+            sts = fix(sts)
         if LR_TAG in DYNAMIC_CONDS:
             sts = fix_lr_split(sts, 'SO_VAR_FLOAT_LR) < 0')
         for st in sts:
@@ -536,8 +577,12 @@ class Translator:
                         else:
                             body_t, body_e = cmds[at:els], cmds[els:]
                             self.frame = max(self.frame, other)
-                        test = cmd('Float_Var_Compare', *var[1:]) if isinstance(var, tuple) else \
-                            cmd('Int_Var_Compare', var, 1, 0)                 # method 1: !=
+                        if isinstance(var, tuple) and var[0] == 'random':
+                            test = cmd('IS_RANDOM', var[1])
+                        elif isinstance(var, tuple):
+                            test = cmd('Float_Var_Compare', *var[1:])
+                        else:
+                            test = cmd('Int_Var_Compare', var, 1, 0)        # method 1: !=
                         block = [test, cmd('True', 2 + words(body_t) + (2 if body_e else 0))] + body_t
                         if body_e:
                             block += [cmd('Else', 2 + words(body_e))] + body_e
@@ -1109,6 +1154,7 @@ class SoundTranslator(Translator):
         self.loop = False
         self.fail = fail or {}          # --fail-sounds: {condition: sounds of its failed branch}
         self.drop = set()
+        self.extra_fixes = (fix_trailing_flag_else,)
 
     def sid(self, name):
         v = self.ids.get(name.lower()) if isinstance(name, str) else None
@@ -1217,9 +1263,65 @@ def first_voice_region(body):
     return body[:i] if i >= 0 and 'GET_VOICE_REGION' in body[i:] else body
 
 
-def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final')):
+# the dump's decompiled tests (`WorkModule::is_flag(agent.module_accessor, *F); if(...operator==(...)(false, B)){`,
+# Sephiroth's: the flag in the statement before, the `if` only compares) folded into the plain `if [!]is_flag(F) {`
+# form, so --cond / --sound-cond see the flag's name; and `macros::IS_RANDOM(agent, N); if(...(false, true)){`
+# into `if IS_RANDOM_CHANCE(N) {`: Smash 4's own IS_RANDOM(Chance=N) True(...) (Zelda's cliff catch voice)
+_EQ = r'if\(methodlib::L2CValue::operator==\(lib::L2CValueconst&\)const\(false, (true|false)\)\)\{'
+FLAG_TEST_RE = re.compile(r'WorkModule::is_flag\(agent\.module_accessor, \*(\w+)\);(\s*)' + _EQ)
+RANDOM_TEST_RE = re.compile(r'macros::IS_RANDOM\(agent, (\d+)\);(\s*)' + _EQ)
+
+
+def fold_tests(body):
+    body = FLAG_TEST_RE.sub(lambda m: '%sif %sWorkModule::is_flag(boma, *%s) {' % (
+        m.group(2), '' if m.group(3) == 'true' else '!', m.group(1)), body)
+    return RANDOM_TEST_RE.sub(lambda m: m.group(0) if m.group(3) == 'false' else      # (a lost pick: left as is)
+                              '%sif IS_RANDOM_CHANCE(%s) {' % (m.group(2), m.group(1)), body)
+
+
+# Ultimate sound script -> Smash 4's of the same move where the names differ (Smash 4's ledge has quick / slow
+# forms; the base's motion table holds the quick ones: Zelda has no slow climb / escape / jump)
+SOUND_NAMES = {'cliffclimb': 'cliffclimbquick', 'cliffescape': 'cliffescapequick', 'cliffjump1': 'cliffjumpquick1',
+               'cliffjump2': 'cliffjumpquick2'}
+# Ultimate's results voice is a script of its own (WinNA; WinNB the line against one rival: Sephiroth's against
+# Cloud): merged into WinN's sound script, which Smash 4's results play
+SOUND_MERGE = {'win1a': 'win1', 'win2a': 'win2', 'win3a': 'win3'}
+
+
+def merge_flat(a, b):
+    """two scripts of FRAME / WAIT and plain commands as one (each command at its frame); None if either branches"""
+    def timed(sc):
+        t, out = 0, []
+        for c in sc:
+            if c.ident == acmd.END:
+                break
+            if c.name in ('True', 'Else', 'Loop_Rest', 'JUMP', 'Goto', 'Int_Var_Compare', 'Float_Var_Compare',
+                          'IS_RANDOM'):
+                return None
+            if c.name == 'FRAME':
+                t = max(t, int(c.params[0]))
+            elif c.name == 'WAIT':
+                t += int(c.params[0])
+            else:
+                out.append((t, c))
+        return out
+    ta, tb = timed(a), timed(b)
+    if ta is None or tb is None:
+        return None
+    out, t = [], 0
+    for when, c in sorted(ta + tb, key=lambda x: x[0]):
+        if when > t:
+            out.append(cmd('FRAME', when))
+            t = when
+        out.append(c)
+    return out + [acmd.Command(acmd.END)]
+
+
+def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final'), motions=()):
     """every sound_* / expression_* function (kind) of the dump -> the script of the same Smash 4 name, as
-    translate_effects; a looping one (wait_loop_sync_mot) ends Loop_Rest, JUMP(itself) as vanilla's do"""
+    translate_effects; a looping one (wait_loop_sync_mot) ends Loop_Rest, JUMP(itself) as vanilla's do.
+    Sound: also the scripts of the base's motion table that its sound file has none for (motions: their crcs;
+    Zelda has no third taunt / results-wait sounds), SOUND_NAMES' names, SOUND_MERGE's results voices"""
     out = {}
     for path in sorted(os.listdir(scripts_dir)):
         if not path.endswith('.txt'):
@@ -1231,16 +1333,34 @@ def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final'))
             name = fn[len(kind) + 1:]
             if name == src.lower():
                 name = TRANSLATE.get(src, name)
-            if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in base_bin.scripts):
+            if kind == 'sound':
+                name = SOUND_NAMES.get(name, name)
+            known = acmd.crc(name) in base_bin.scripts or (kind == 'sound' and (
+                acmd.crc(name) in motions or name in SOUND_MERGE))
+            if name not in TRANSLATE.values() and (name.startswith(skip) or not known):
                 continue
             tr.loop = False
             tr.has_rumble = 'set_rumble' in body
             tr.drop = set(n for k, v in getattr(tr, 'fail', {}).items() if k in body for n in v)
-            cmds = tr.script(first_voice_region(body) if kind == 'sound' else body)
+            cmds = tr.script(fold_tests(first_voice_region(body)) if kind == 'sound' else body)
             if tr.loop:
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
             out[name] = cmds
+    if kind == 'sound':
+        for src, dst in SOUND_MERGE.items():
+            if src in out:
+                base = out.get(dst) or (base_bin.scripts.get(acmd.crc(dst)) if acmd.crc(dst) in motions else None)
+                merged = merge_flat(base, out[src]) if base is not None else None
+                if merged is not None:
+                    out[dst] = merged
+                del out[src]
     return out
+
+
+def mtable_crcs(path):
+    """the motion crcs of a motion.mtable (big-endian words)"""
+    d = open(path, 'rb').read()
+    return set(struct.unpack('>%dI' % (len(d) // 4), d[:len(d) // 4 * 4]))
 
 
 def skeleton_locals(nusktb):
@@ -1422,6 +1542,9 @@ def main():
                     'this run (e.g. a fighter\'s specials; names starting with "special" are kept), a "slot" '
                     'naming the motion whose motion.mtable entry gets the new name (empty scripts when the dump '
                     'has none for it)')
+    ap.add_argument('--sound-cond', action='append', default=[], help='with --sound-ids: a condition taken as true '
+                    'in the sound scripts only (substring, as --cond; Sephiroth: his down smash\'s floor hit '
+                    'FLAG_IS_HIT_FLOOR, Scintilla\'s counter FLAG_IS_HIT_SHIELD); repeatable')
     ap.add_argument('--cond', action='append', default=[], help='a condition taken as true (substring of the '
                     'dump\'s condition, e.g. MATERIAL_KIND_IRON) for Steve\'s tool material); repeatable')
     ap.add_argument('--dyn-cond', action='append', default=[], metavar='SUBSTRING=VAR',
@@ -1503,7 +1626,10 @@ def main():
                 for path in a.sound_ids.split(','):
                     ids.update({k: v for k, v in json.load(open(path)).items() if not k.startswith('_')})
                 st = SoundTranslator(ids, {k: v.split(',') for k, v in (x.split('=') for x in a.fail_sounds)})
-                sc = translate_others('sound', a.scripts, o, st)
+                TRUE_CONDS[:] = a.cond + a.sound_cond
+                sc = translate_others('sound', a.scripts, o, st,
+                                      motions=mtable_crcs(a.mtable[0]) if a.mtable else ())
+                TRUE_CONDS[:] = a.cond
                 o.scripts.update({acmd.crc(n): c for n, c in sc.items()})
                 print('%d sound scripts translated; sounds without an id (left out): %s; calls left out: %s' % (
                     len(sc), ', '.join('%s x%d' % kv for kv in sorted(st.missing.items(), key=lambda kv: -kv[1])) or '-',

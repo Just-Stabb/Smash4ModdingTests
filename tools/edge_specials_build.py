@@ -2,7 +2,7 @@
 """Sephiroth's specials (fighters/edge/specials.md): his scripts, MSC, new articles and executable.
 
   python3 tools/edge_specials_build.py DUMP EDGE ZELDA ZELDA_UM VL MODEL OUT [--rpx IN.rpx]
-                                       [--bank DIR] [--motions DIR]
+                                       [--bank DIR] [--motions DIR] [--sound DIR]
 
 DUMP: the smashline dump's lua2cpp_edge (edge/, edge_fire/, ...); EDGE: Ultimate's fighter/edge
 (motion/body/c00/motion_list.bin, model/body/c00/model.nusktb); ZELDA: vanilla fighter/zelda;
@@ -25,7 +25,10 @@ fighter_param_vl_zelda.bin; MODEL: his converted model/body/c00 (the ACMD joint 
   slot variables); re-applying them over an executable that has them gives it back, so IN
   can be the last test's;
 - --bank: effect/edge/edge.010d0000.{ptcl,efc} from DIR/zelda.010d0000.* (tools/vfxb_to_ptcl.py);
-- --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add).
+- --motions: motion/body/main.pac from DIR/motion/body (tools/ultimate_fighter.py motions --add);
+- --sound: DIR = tools/ultimate_sound.py's OUT (sound_ids.json): the body's sound / expression scripts translated from
+  Ultimate's (ultimate_acmd.py --sound-ids --expressions, SOUND_CONDS) and the fire / flash / flare1 articles' sound
+  scripts (without it they stay as before: the base's sound / expression scripts, the articles' empty).
 """
 import argparse
 import json
@@ -117,7 +120,7 @@ def body_scripts(a, fighter, param):
                   '--vl', a.vl, os.path.join(param, 'fighter_param_vl_edge.bin'),
                   '--effects', os.path.join(ROOT, 'reference/ultimate_sys_effects.json') + ',' + ids,
                   os.path.join(a.edge, 'model/body/c00/model.nusktb'),
-                  '--translate', os.path.join(EDGE, 'specials_acmd.json'))
+                  '--translate', os.path.join(EDGE, 'specials_acmd.json'), *sound_args(a))
         log += run(os.path.join(HERE, 'effect_variants.py'), 'apply', os.path.join(tmp, 'effect.bin'), ids,
                    os.path.join(out, 'effect.bin'))
         for fn in ('sound.bin', 'expression.bin'):
@@ -135,6 +138,8 @@ def body_scripts(a, fighter, param):
     log += octaslash_loop_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
+    if a.sound:
+        log += sound_fixes(os.path.join(out, 'sound.bin'), sound_ids(a))
     return log
 
 
@@ -147,6 +152,56 @@ SNAKE_SWORD = 0x18         # joint 24, LHaveN (the sword in his hand)
 SNAKE_ARTICLES = ('snake', 'snaketip')
 TRAIL_HALF = 1.5            # the point's trail: half its width
 SNAKE_MOTION = 0xEF3E3778  # the light arrow's one motion (their base kind's), the articles' motion 0
+
+
+# --sound: his sound / expression scripts from Ultimate's (tools/ultimate_sound.py's sound_ids.json, the banks built
+# on his slot's). In the sound scripts the down smash's floor hit and Scintilla's counter are taken as true (Ultimate's
+# status sets them: the smash is grounded, the counter is the move's point; a whiff gets the counter's sounds); his
+# One-Winged Angel flag and Scintilla's FLAG_VOICE as false (the form isn't ported; the stance's own voice off, the
+# counter's on)
+SOUND_CONDS = ('FIGHTER_EDGE_STATUS_ATTACK_LW4_WORK_FLAG_IS_HIT_FLOOR', 'FIGHTER_EDGE_STATUS_SPECIAL_LW_FLAG_IS_HIT_SHIELD')
+
+
+def sound_args(a):
+    if not a.sound:
+        return []
+    out = ['--sound-ids', os.path.join(a.sound, 'sound_ids.json'), '--expressions']
+    for c in SOUND_CONDS:
+        out += ['--sound-cond', c]
+    return out
+
+
+def sound_ids(a):
+    """Ultimate sound name -> Smash 4 id: his banks' (--sound) and the common ones"""
+    smap = json.load(open(os.path.join(ROOT, 'reference/ultimate_sound_map.json')))
+    ids = {k: v for k, (v, _c) in smap['common_se'].items()}
+    ids.update({k: v for k, v in json.load(open(os.path.join(a.sound, 'sound_ids.json'))).items()
+                if not k.startswith('_')})
+    return ids
+
+
+def sound_fixes(path, ids):
+    """forward air: the dump's sound script lost its branches (`if WINGED { 9: f02, winged_landing02 } 12: voice
+    else { 0: f02 }`; Ultimate plays f02 at 9 in both, as his other winged / plain pairs): f01 at 2, f02 at 9, the
+    voice at 12, the plain branch's"""
+    f = acmd.ACMDFile.load(path)
+    f.scripts[acmd.crc('attackairf')] = [
+        U.cmd('FRAME', 2), U.cmd('Sound_Effect', ids['se_edge_attackair_f01']),
+        U.cmd('FRAME', 9), U.cmd('Sound_Effect', ids['se_edge_attackair_f02']),
+        U.cmd('FRAME', 12), U.cmd('Low_Voice_Clip', ids['seq_edge_rnd_attack_hard']), acmd.Command(acmd.END)]
+    f.save(path)
+    return 'attackairf sound: f01 at 2, f02 at 9, the voice at 12 (the dump lost its branches)\n'
+
+
+def article_sound(a, ids, dump_dir, fname, fn):
+    """an article's sound script from Ultimate's (dump_dir/fname's fn); [END] without --sound"""
+    if not a.sound:
+        return [acmd.Command(acmd.END)]
+    st = U.SoundTranslator(ids)
+    body = U.functions(open(os.path.join(a.dump, dump_dir, fname + '.txt')).read())[fn]
+    out = st.script(U.fold_tests(body))
+    assert not st.missing, st.missing
+    return out
 
 
 def _set(c, **kv):
@@ -408,7 +463,7 @@ def fill_scripts(fighter, hit_template):
 
 def fire_scripts(a, wdir):
     """the fire article's game / effect scripts from Ultimate's edge_fire ones (hitboxes and effects
-    on its bone 0); sound empty (his sounds aren't converted yet)"""
+    on its bone 0); sound: Ultimate's edge_fire ones with --sound (the flight's loop, the bursts' PLAY_SE_REMAIN)"""
     ids = effect_ids()
     game, effect = {}, {}
     U.EFFECT_CONDS = (U.LR_LEFT,)
@@ -431,7 +486,14 @@ def fire_scripts(a, wdir):
     assert not etr.missing, etr.missing
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
-    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):          # dein's files
+    sound = {}
+    if a.sound:
+        ids = sound_ids(a)
+        for fname in sorted(os.listdir(src_dir)):
+            name = fname[:-4].lower()
+            if 'sound_' + name in U.functions(open(os.path.join(src_dir, fname)).read()):
+                sound[name] = article_sound(a, ids, 'edge_fire', fname[:-4], 'sound_' + name)
+    for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):          # dein's files
         acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in FIRE_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
         f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FIRE_MOTIONS))
@@ -490,7 +552,7 @@ def flash_scripts(a, wdir):
     whiff's hitboxes (FLAG_HIT off) or the counter's id 0 -> id 1 at the tier's p (ATTACK_SET_LERP +
     ATK_LERP_RATIO); its frame-16 notify (removal) is flash.c's. Effect: the effects scaled as its exec (31950)
     scales the last one made each frame (EFFECT_ID): every one but the first puff (replaced by edge_senkou_hold
-    in the same frame) at effect_scale_no_hit 0.65 / 1.2 + 0.8 p. Sound empty (none of his converted)"""
+    in the same frame) at effect_scale_no_hit 0.65 / 1.2 + 0.8 p. Sound (--sound): Attack's in every tier's attack*"""
     src = open(os.path.join(a.dump, 'edge_flash', 'Attack.txt')).read()
     fns = U.functions(src)
     atk = [c[2] for c in _calls(fns['game_attack'], 'ATTACK')]
@@ -533,7 +595,11 @@ def flash_scripts(a, wdir):
     U.EFFECT_CONDS = ()
     os.makedirs(wdir, exist_ok=True)
     end = [acmd.Command(acmd.END)]
-    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+    sound = {}
+    if a.sound:                     # Attack's frame-0 sound (PLAY_SE_REMAIN) in every tier's frame-0 script
+        snd = article_sound(a, sound_ids(a), 'edge_flash', 'Attack', 'sound_attack')
+        sound = {n: snd for n in FLASH_MOTIONS if n.startswith('attack')}
+    for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         acmd.ACMDFile({acmd.crc(n): sc.get(n, end) for n in FLASH_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
         f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FLASH_MOTIONS))
@@ -585,7 +651,10 @@ def flare1_scripts(a, wdir):
     U.EFFECT_CONDS = ()
     os.makedirs(wdir, exist_ok=True)
     stop = [acmd.Command(acmd.END)]
-    for fn, sc in (('game', game), ('effect', effect), ('sound', {})):
+    sound = {}
+    if a.sound:     # the shot's (edge_flare1 Fly); the orbs' hum / strike (edge_flare2 Fly / Try) left out: flare1.c
+        sound['fly'] = article_sound(a, sound_ids(a), 'edge_flare1', 'Fly', 'sound_fly')   # plays `orbit` for several events
+    for fn, sc in (('game', game), ('effect', effect), ('sound', sound)):
         acmd.ACMDFile({acmd.crc(n): sc.get(n, stop) for n in FLARE1_MOTIONS}).save(os.path.join(wdir, fn + '.bin'))
     with open(os.path.join(wdir, 'motion.mtable'), 'wb') as f:
         f.write(b''.join(acmd.crc(n).to_bytes(4, 'big') for n in FLARE1_MOTIONS))
@@ -633,6 +702,8 @@ def main():
     ap.add_argument('--rpx')
     ap.add_argument('--bank')
     ap.add_argument('--motions')
+    ap.add_argument('--sound', help="tools/ultimate_sound.py's OUT (its sound_ids.json): his sound / expression "
+                    "scripts and the articles' sound scripts from Ultimate's (without: the base's, as before)")
     ap.add_argument('--body-model', help='his built body model c00 (model.nud / .nut): the held forward air '
                     'articles\' models take the sword\'s material from it (tools/edge_snake_articles.py)')
     a = ap.parse_args()

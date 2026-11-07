@@ -1244,6 +1244,78 @@ def check_sound_tables(inst, name, kind, rep):
                 'fanfare)' % kind)
 
 
+# sound commands and which of their parameters are sound ids (Smash 4 id: row << 16 | label of
+# soundlabeltable.bin; 0x80000000 | set << 16 | index: a sequence of the fighter's soundseq_<Name>.sqb)
+SOUND_ID_PARAMS = {'Sound_Effect': (0,), 'Sound_Effect2': (0,), 'Sound_Effect3': (0,), 'Sound_Effect4': (0,),
+                   'Transient_Sound_Effect': (0,), 'Stop_Sound_Effect': (0,), 'Low_Voice_Clip': (0,),
+                   'PLAY_SE_REMAIN': (0,), 'PLAY_SE_NO_3D': (0,), 'SET_PLAY_INHIVIT': (0,), 'PLAY_FLY_VOICE': (0, 1),
+                   'STOP_SE_STATUS': (0,), 'SET_TAKEOUT_SE': (0,)}
+
+
+def check_sound_ids(inst, name, rep):
+    """A5: every sound id the fighter's sound scripts play is in the install's soundlabeltable (its row has the label)
+    and, on one of his banks' rows, names a tone his bank has; a sequence id names one of his soundseq file's. A
+    later package that ships an older soundlabeltable (without his grown rows) or banks without the table would leave
+    his moves silent or playing other sounds (the ids are built against the table: tools/ultimate_sound.py)"""
+    import tempfile
+    import fighter_own_bank as fb
+    import minecraft_sound as ms
+    paths = inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/sound\.bin' % name)
+    table = inst.get('sound/config/soundlabeltable.bin')
+    if not paths or not table:
+        return
+    tab = fb.Table(table)
+    banks = {}                          # row -> (bank file, tone count)
+    for b in inst.glob(r'fighter/%s/sound/snd_.*\.nus3bank' % name):
+        if re.search(r'_c\d\d\.nus3bank$', b):
+            continue
+        data = inst.get(b)
+        try:
+            _n, bid = fb.binf(data)
+            banks[tab.row_of(bid)] = (b, len(ms.tones_of(data)[1]))
+        except Exception:
+            continue
+    seq = {}
+    for q in inst.glob(r'fighter/%s/sound/soundseq_.*\.sqb' % name):
+        d = inst.get(q)
+        if d[:4] == b'SQB\0':
+            sid, count = struct.unpack('<HI', d[6:12])
+            offs = struct.unpack('<%di' % count, d[16:16 + 4 * count])
+            seq[sid] = [o >= 0 for o in offs]
+    bad = []
+    for path in paths:
+        with tempfile.NamedTemporaryFile(suffix='.bin') as f:
+            f.write(inst.get(path))
+            f.flush()
+            try:
+                scripts = acmd.ACMDFile.load(f.name).scripts
+            except SystemExit:
+                continue
+        for crc, sc in scripts.items():
+            for c in sc:
+                for k in SOUND_ID_PARAMS.get(c.name, ()):
+                    if k >= len(c.params):
+                        continue
+                    v = int(c.params[k]) & 0xFFFFFFFF
+                    if v == 0xFFFFFFFF:
+                        continue
+                    if v & 0x80000000:
+                        sid, i = (v >> 16) & 0x7FFF, v & 0xFFFF
+                        ok = sid in seq and i < len(seq[sid]) and seq[sid][i]
+                    else:
+                        row, label = v >> 16, v & 0xFFFF
+                        ok = row < len(tab.rows) and label < len(tab.tones(row))
+                        if ok and row in banks:
+                            tone = tab.tones(row)[label]
+                            ok = 0 <= tone < banks[row][1]
+                    if not ok:
+                        bad.append('%s %08X: %s 0x%X' % (path.split('/animcmd/')[1], crc, c.name, v))
+    if bad:
+        rep.add('ERROR', 'A5 sound-ids', '%d sound ids in his scripts name no sound of the install\'s soundlabeltable / '
+                'banks / soundseq (built against another table? ship the soundlabeltable with the banks): %s' % (
+                    len(bad), ', '.join(bad[:12]) + (' ...' if len(bad) > 12 else '')))
+
+
 def check_universal(p, rep):
     """E6: the universal shader path's shaders (tools/ult_shader.py: Ultimate's programs lowered; their vertex
     program reads no emitterStaticUniformBlock, every vanilla one does): a slot the pixel program samples must
@@ -1578,6 +1650,7 @@ def main():
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)
+    check_sound_ids(inst, a.name, rep)
     check_effects(inst, a.name, rep)
     check_effect_heap(inst, a.name, rep)
     check_cave_hooks(inst, rep)

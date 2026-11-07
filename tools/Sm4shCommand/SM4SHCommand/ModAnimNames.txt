@@ -128,6 +128,12 @@ FillNone4
 FillNone5
 FillNone6
 FillNone7
+// his sounds (Ultimate's sound scripts, tools/edge_specials_build.py --sound): sound.bin scripts for Zelda's
+// motions her sound file had none for (the item swings, the teeter): names AnimNames.txt lacks
+ClubSwing4
+LipStickSwing4
+StarRodSwing4
+OttottoWait
 
 // ---- Hero (brave)
 // his neutral special (Frizz / Frizzle / Kafrizz, status 0x152): Robin's Thunder shoot's custom-move

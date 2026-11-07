@@ -28,7 +28,9 @@ scripts' ids move to the new rows, same labels: tools/brave_build.py --sound).
   --new-ids instead gives the banks their own ids and empty rows (sound_ids.json "_rows": the base's
   scripts' ids must then move rows, tools/brave_build.py does it).
 - Voice: the base's labelled tones the game plays itself (damage, jump, teeter, ledge, appeals, KO,
-  results) take the Ultimate voice of the same use (VOICE_ALIASES, else the same name).
+  results) take the Ultimate voice of the same use (VOICE_ALIASES, else the same name, else the use's first
+  variant: Zelda's MissFoot02 -> Sephiroth's only missfoot01); a use Ultimate has no voice for (Zelda's Passive,
+  HeavyGet) is made silent rather than left the base's voice on the port.
 - Costumes: Ultimate's se_ / vc_<ult>_cNN (Hero: Erdrick, Solo and Eight's voices and swords) as
   snd_se_ / snd_vc_<Name>_cNN, same tone order and bank id; the game loads _cNN by the costume number
   (a kind past 0x39 takes it as is, so c05 - c07 are written too) and falls back to the main file
