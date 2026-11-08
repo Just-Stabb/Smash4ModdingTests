@@ -1315,6 +1315,14 @@ kinetic 16, damage_turn, hit_return_frame, the posture rotated), 8 remove; slots
 set_max_speed, get_height_from_ground, is_in_view_area, success_by_percent and the 3DS item kinds' Wii U
 equivalents. No contact hitbox while it flies (its only P2 entry is the defeated body).
 
+**Enemy effect banks: 86 slots (exe_v18, package effect_slots_v1).** `tools/effect_slots_patch.py` grows the effect
+manager's slot table from 41 to 127 and gives category 7 the new slots 41-126 (was 26-35, 10); the other categories
+keep theirs (docs/native-notes.md, "Effect manager: bank slots"). exe_v18 vs exe_v17, word diff: text 0x032EE0B0 ..
+0x032F1E04 (72 immediates in the manager's methods) and 0x0334C500 (facade), data 0x101906F0 and 0x10423B48: 74 words,
+the tool's exactly; relocations and file info equal. The step-2f advice to remove `effect/enemy/plasmawisp/` and
+`effect/enemy/darios/` is withdrawn. `tools/diag_effect_cave.py`'s `slot >= 0x29` tests assume 41 slots (a log build
+over exe_v18 would print enemy slots 41+ as "none"); update it before using it again.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

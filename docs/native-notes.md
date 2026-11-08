@@ -1794,6 +1794,46 @@ unused shader copies crashed). `tools/effect_heap_patch.py`: the effect heap 44 
 blocks would overlap, so never grow one without shrinking another). `port_check` E9: a bank's estimate
 (`effect_heap_estimate`).
 
+### Effect manager: bank slots (Smash Run's enemy banks, exe_v18)
+
+The effect manager (one object, `[0x10353CA4]`, made by `0x032EE380` from the facade `0x0334C3F4`; methods
+`0x032EE09C`-`0x032F2000`, facade `0x0334C3C8`-`0x0334CC40`) is 0xC490 bytes:
+- `+0x20` the eft heap (`0x032EF824`), `+0x38` the eft System, `+0x44` a sub-object, `+0xB1` "not ready" (set by the
+  constructor, cleared when eft is up at `0x032EF9C0`: requests are refused while set), `+0xB4` the handle serial.
+- `+0xB8` **the slots**: 41 x 0x80 (ctor `0x032F1EAC`, dtor `0x032F1F50`): `+0` bank id (0 free), `+4` eft resource id
+  (= the slot number; -1 without a .ptcl), `+8` the .efc, `+0xC` its entries, `+0x10` / `+0x14` / `+0x18` path objects,
+  `+0x1C` mesh records, `+0x20` the .ptcl data, `+0x24` / `+0x28` / `+0x2C` / `+0x30` models, `+0x6C` names, `+0x74`,
+  `+0x78` refcount, `+0x7C` a "temporary" byte (released when the count reaches 0).
+- `+0x1540` the effect-instance pool, 100 x 0x1C0 (`0x0334CFAC`; `+0` handle, 0 free, `+4` effect id, `+8` owner key,
+  `+0x34` / `+0x38` follow target / bone, `+0x144` flags); `+0xC440` its live count (100, `0x032EE0A0` / `0x032F1D00`);
+  `+0xC444` an OSMutex (every method locks it); `+0xC470` a 0x1C-byte camera block (`0x032EFAE4`).
+- Categories (`bank >> 8`), read only by the slot finder `0x032EFEA0(mgr, bank, create)`: count
+  `[0x101906D4 + 4 * cat]`, first `[0x10423B2C + 4 * cat]`: 1 common 0, 2 1, 3 fighters 2-9, 4 Final Smashes 10-17,
+  5 18-25, 7 enemies 26-35, 9 37-40 (0, 6, 8 none; slot 36 never used). It returns -1 when the bank isn't there (or,
+  creating, the category is full); every caller then tests `cmplwi slot, 0x29`.
+- Slot users: registration `0x032F1388` (stores the bank before loading; `0x04A55160(System, heap, ptcl, slot)`),
+  request `0x032F00A0` (the slot pointer goes to the instance set-up `0x0334D8D8`; instances keep the pointer),
+  efc-flag getters `0x032F1040` / `0x032F10E0` / `0x032F1180`, `0x032EFF5C`, `0x032F05BC`, facade `0x0334C4D8`; the loops
+  over all 41: per-frame release `0x032EE2DC`, unload-all `0x032EEA44`, find-by-bank `0x032F1344`, unregister-by-bank
+  `0x032F1CCC`, the constructor / destructor's array calls. Nothing outside reads the manager past `+0x44` (the other
+  users of `[0x10353CA4]`: `0x02E44D34` / `0x02E4AF68` / `0x03424BE4` call methods, `0x03331xxx` / `0x03446xxx` write
+  `+0x40` / `+0x3C`).
+- Handles are `(pool index << 24) | serial` (`0x032F01E0`): the pool limits them (100), not the slots.
+- eft: the System (`0x04A53F08`, one only) gets its resource count from the manager's config (`0x032EF850` `li r0,
+  0x29` -> config `+0x18`); eft makes `+0x18` + `+0x2C` (0x20, unused) entries at System `+8` (`0x04A5374C`).
+  `0x04A55160` has no bound; `0x04A55BF0` checks the id against System `+0xC`. Ids are words everywhere.
+
+`tools/effect_slots_patch.py` (exe_v18 = exe_v17 + it): 127 slots, category 7 = 41-126 (86; count `0x101906F0` 10 ->
+86, first `0x10423B48` 26 -> 41; 26-35 left unused, every other category's slots unchanged). The slot array grows in
+place: the tail (pool, count, mutex, camera block) moves up by 86 x 0x80 = 0x2B00 and the allocation grows by the
+same. Immediates only (74 words): 15 slot counts / bounds, 37 `0x1540`, 5 `0x1380` (pool loops that pre-increment by
+0x1C0), 3 `-0x3BC0` / 11 `-0x3BBC` after `addis rX, mgr, 1` (the constructor's also sizes the allocation and finds the
+camera block), `ori r0, r0, 0xC470` `0x032EFB88`, the eft config, the two table words. `effect_slots_patch_test.py`
+re-finds the sites in the base (every immediate in the tail's range) and runs the constructor, registration (86 + 1
+enemy banks, the others' slots), request, the getters, the slot and pool loops on both executables (47 checks; a
+reverted pool / count / camera word fails it). Limits that remain: the effect heap's bytes (above) and the 100
+instances.
+
 ## Animation heap (two Sephiroths hang at load, multi-instance bugs v3)
 
 exe_diag_v3b (Cemu OSReport crumbs): the second Sephiroth's 17th trail article (0x19C) entered its set-up (the pooled
