@@ -96,6 +96,14 @@ Step 2e (docs/smash-run-port.md, "Step 2e"; region G, code_f): the fliers (FLIER
   7 landed (quake 3), 8 ready, 9 leave, 10 stomped (slot 20 and the stomp test, box (6, 11.72, 1.5)), 11 gone, 12
   remove. Region G is new code space past the old text region (textregion:0x2BC0000, grow:0x04BC0000).
 
+Step 2f (docs/smash-run-port.md, "Step 2f"; region G): Furiijio 0x1A, a flier with its own object size (FU_SIZE) and
+  vtable (`vtover`: slots 4 update_on_skip, 61 / 62 kinetic 26) and exit PMFs (a state's third entry): 1 fly (homing
+  on the nearest fighter + 25, search every 50 frames after a 150-frame cool-down, 900-frame leave), 2 / 5 charge,
+  3 / 6 aim (BeamN turned with set_node_rotate / placed with set_node_translate), 4 / 7 the ice beam (its own hitbox,
+  P2 entry 0 / 1, freezing, slid out with AttackModule set_offset; three follow effects scaled / moved; 7 sweeps 180
+  degrees), 8 leave, 9 dead, 10 remove. REQ_FOLLOW corrected to 0x026A95F8 (0x026A9584 is REQ_NODE), and the fliers'
+  starts call set_rhombus with the Behavior.
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -246,7 +254,11 @@ SET_CORRECT = 0x02C36458             # GroundModule set_correct(kind) (the twins
 REQ_QUAKE = 0x026A9648               # request_quake(kind): CameraModule (acc+0x30CC) vt+0x1CC (3DS 0x7B0F0C)
 REQ_EFFECT = 0x026A951C              # request_effect(id, &pos, &rot (degrees), scale) (3DS 0x7B12E0)
 REQ_EFFECT0 = 0x026A94CC             # request_effect(id, &pos, scale) (3DS 0x7B1338)
-REQ_FOLLOW = 0x026A9584              # request_follow_effect(id, node, &offset, &rot, scale) -> handle (3DS 0x7B4AEC)
+REQ_FOLLOW = 0x026A95F8              # request_follow_effect(id, node, &offset, &rot, scale) -> handle (3DS 0x7B4AEC:
+#                                      EffectModule req_follow 0x02C2AF98, the 3DS's 14-argument shape; step 2f)
+REQ_NODE = 0x026A9584                # request_effect(id, node, &offset, &rot, scale) (3DS 0x7B1384: EffectModule req
+#                                      on a node, the vtable slot after req(pos), as on the 3DS; not a follow: steps
+#                                      2c-2e called this one as REQ_FOLLOW)
 REMOVE_EFFECT = 0x026A95E4           # remove_effect(handle) (3DS 0x7B0EF0)
 QUAKE_KIND = 6                       # the 3DS bear's request_quake(7); 6 is the largest any Wii U enemy asks for
 NOTIFY_DEATH = 0x0269FD6C            # BehaviorImpl::notify_on_death (slot 71: death flag, hit off, attacks cleared)
@@ -289,6 +301,18 @@ SQRTF = 0x04ADEAB8                   # sqrtf (get_distance 0x02DB2C08 tail-calls
 HIT_FACTOR = 0x02DB4ED4              # the 3DS's 0x9EB4C0 (hit_return_frame's factor: gl +0x158..+0x164, the
 #                                      DamageModule (acc+0x30D4) float +0x6C through 0x026A81F8)
 BI_NOTIFY_DMG = 0x026A3564           # BehaviorImpl::notify_on_damage (slot 10; the 3DS's slot 11)
+# step 2f (Furiijio; docs/smash-run-port.md "Step 2f")
+CENTER_POS = 0x026A7104              # Behavior::center_pos (out, this): ModelModule node_global_position(center_node)
+SET_NODE_ROT = 0x02C64188            # MotionModule set_node_rotate(node, &rad, compose) (3DS 0x501328) -> changed
+SET_NODE_TRANS = 0x02C642C8          # MotionModule set_node_translate(node, &v, global, b) (3DS 0x501954)
+MODEL_NODE_DIRTY = 0xC4              # the ModelModule (acc+0x3118) vt slot both callers make after a change (3DS +0x60)
+ATK_SET_OFFSET = 0x02C09150          # AttackModule set_offset(id, &v) (3DS 0x4CB8B8; entries 0x84, +0x6C on)
+EFF_SET_POS = 0x02C2C0C0             # EffectModule set_pos(handle, &v) (3DS 0x4DAF8C; EffectSystem 0x032F0978)
+EFF_SET_SCALE = 0x02C2C120           # EffectModule set_scale(handle, &v) (3DS 0x4DB438; EffectSystem 0x032F0A48)
+SINF, COSF, ACOSF = 0x04ADEB48, 0x04ADF434, 0x04ADF800      # libm (identified by running them; acosf: calc_angle's)
+FU = 0x230                           # Furiijio's own fields after the flier's (object FU_SIZE)
+FU_C, FU_ROT, FU_E = FU, FU + 0xC, FU + 0x18                 # center offset (3DS +0x218), node angles (+0x224), effects
+FU_SIZE = FU + 0x28
 GL_INDEX, GL_BASE = 0x1E4, 0x34      # gl entry = [[PARAM_MGR] + 0x34] + 0x228 * [[PARAM_MGR] + 0x1E4 + 4 * (8K + var)]
 VT_WORDS = [None]                    # BehaviorImpl's vtable words (read from the input), for code_f
 TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x026CF200))
@@ -377,7 +401,10 @@ GHOS_BODY = tuple(vl_group('ghos', 2)[1])          # state 1 (fly): power 3, ang
 GHOS_BULLET = tuple(vl_group('ghos', 2)[0])        # state 4 (dead): power 3, angle 361, kbg 100, bkb 50, size 8
 TIKI_DIVE = tuple(vl_group('tikibuzz', 2)[0])      # state 5 (dive): power 2, angle 60, kbg 120, fkb 50, size 4, y -1
 TIKI_BULLET = tuple(vl_group('tikibuzz', 2)[1])    # state 2 (dead): power 2, angle 361, kbg 100, bkb 50, size 3
-ATTACKS = {'ghos_body': GHOS_BODY, 'ghos_bullet': GHOS_BULLET, 'tiki_dive': TIKI_DIVE, 'tiki_bullet': TIKI_BULLET, 'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
+FU_BEAM0 = tuple(vl_group('furiijio', 2)[0])     # state 4 (beam): power 4, angle 361, kbg 100, fkb 100, size 2, node 3
+FU_BEAM1 = tuple(vl_group('furiijio', 2)[1])     # state 7 (sweep beam): the same but +0x7C 140 (60 in entry 0)
+FU_BULLET = tuple(vl_group('furiijio', 2)[2])    # state 9 (dead): power 3, angle 361, kbg 100, bkb 50, size 3, node 2
+ATTACKS = {'fu_beam0': FU_BEAM0, 'fu_beam1': FU_BEAM1, 'fu_bullet': FU_BULLET, 'ghos_body': GHOS_BODY, 'ghos_bullet': GHOS_BULLET, 'tiki_dive': TIKI_DIVE, 'tiki_bullet': TIKI_BULLET, 'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
            'churine_bullet': CHURINE_BULLET, 'gordo_spike': GORDO_SPIKE, 'whitebear_bullet': WHITEBEAR_BULLET}
 DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBound', 'DownLoop', 'DownBoundEnd',
                  'DownWait')
@@ -509,6 +536,15 @@ _GS = vl_group('ghos', 'struct')     # P@0x8C: 20, 40, 96.0, 0.6, 0.8, 1200, 30.
 _GP7 = vl_group('ghos', 7)           # the two slip-homing sets
 _GP6 = vl_group('ghos', 6)[0]        # the leave: {100, 0.02, 30, -1, 0, 0, 3, 0, 0.85}
 _TP0 = vl_group('tikibuzz', 0)[0]    # Tiki Buzz's P0 row (variation 0)
+_FS = vl_group('furiijio', 'struct')   # P@0x8C: 900, 2.5, 2, 1, 0.0, 1.0, 1.5, 25, 150, 20.0, 22, 4.5, 60, 34, 1, 1, 4.5, 140
+_FP0 = vl_group('furiijio', 0)[0]      # P0 row, variation 0: set_mode_homing's six floats
+_FP6 = vl_group('furiijio', 6)[0]      # the leave: {200, 0.01, 10, -1, 0, 0, 5, 0, 1}
+DEG2RAD = struct.unpack('>f', bytes.fromhex('3C8EFA35'))[0]   # the 3DS literal (0.0174533)
+# calc_angle's literals (3DS 0x7B01D8: pi / 2, 180, +-1 / pi), the clamp's -1 and the 2D rotation's small-angle
+# test (0x67364: 1e-5)
+FU_CALC = tuple(struct.unpack('>f', bytes.fromhex(h))[0] for h in ('3FC90FDB', '43340000', '3EA2F983', 'BEA2F983',
+                                                                   'BF800000', '3727C5AC'))
+FU_PD4 = 15.0                          # P@0xD4 (the beam hitbox's base offset; the spec's float after the struct)
 FLIERS = (
     # Ghos (Kid Icarus) 0x11, BehaviorGhos (create 0x11560, table 0x10D350; docs/smash-run-port.md "Step 2e")
     dict(name='ghos', kind=0x11, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('ghos', 5)),
@@ -540,6 +576,25 @@ FLIERS = (
          attacks=((5, 'tiki_dive'), (2, 'tiki_bullet')), fstart='f_tiki_start',
          P=tuple(_TP0[:14]) + (int(_TP0[14]),) + tuple(_TP0[15:19]) + (float(_TP0[19]), _TP0[20]) +
            (vl_group('tikibuzz', 'struct')[0], _TP0[3], _TP0[4], _TP0[7], _TP0[8], _TP0[5], _TP0[6], 0.0)),
+    # Furiijio (Kid Icarus) 0x1A, BehaviorFuriijio (create 0x6DC6C, table 0x10D168; docs/smash-run-port.md "Step 2f")
+    dict(name='furiijio', kind=0x1A, flier=True, size=FU_SIZE, areas=tuple(tuple(e) for e in vl_group('furiijio', 5)),
+         motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
+                  ('DownLoop', 1), ('DownWait', 1), ('IceBeamShot', 1), ('IceBeamShotHold', 1), ('Move', 1)),
+         dead='DamageStart', last='Move', hashset=False, kick=False,
+         energy={},                                      # initialize 0x6C404: bx lr
+         states={1: ('fu1_en', 'fu1_up'), 2: ('fu2_en', 'fu2_up'), 3: ('fu3_en', 'fu3_up'),
+                 4: ('fu4_en', 'fu4_up', 'fu_bexit'), 5: ('fu5_en', 'fu5_up'), 6: ('fu6_en', 'fu6_up'),
+                 7: ('fu7_en', 'fu7_up', 'fu_bexit'), 8: ('fu8_en', 'o_leave_up'), 9: ('fu9_en', 'g_dead_up'),
+                 10: 'remove'},
+         start=(1, 1), rets=(1, 1, 1, 9), remove=10, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
+         hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('furiijio', 1)),
+         attacks=((4, 'fu_beam0'), (7, 'fu_beam1'), (9, 'fu_bullet')),
+         fstart='f_fu_start', fdmg='f_fu_dmg', lvp=31,
+         vtover={4: 'f_fu_skip', 61: 'f_fu_kin', 62: 'f_fu_kin'},
+         P=tuple(_FP0[1:7]) + (_FS[0], _FS[1] * 10, _FS[2], _FS[3], _FS[4] * 10, _FS[5] * 10, _FS[6], _FS[7], _FS[8],
+                               _FS[9] * 10, _FS[10], _FS[11], _FS[12], _FS[13], _FS[14], _FS[15], _FS[17],
+                               180.0 / (_FS[17] or 1), FU_PD4, 1.5, 0.05, DEG2RAD, 90.0, 1.0, 0.0) +
+           (_FP6[0], -_FP6[1], _FP6[2], _FP6[6], _FP6[8]) + FU_CALC),
 )
 WALKERS = WALKERS + FLIERS
 KINDS = tuple(w['kind'] for w in WALKERS)
@@ -611,7 +666,7 @@ def cfg_values(w, D, fn=lambda x: 0):
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
              HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n],
              SMODE=w.get('smode', 0), LEAVE=w.get('leave', 0),
-             VT=D['vtf' if w.get('flier') else 'vt'], SIZE=w.get('size', OBJ_SIZE),
+             VT=D['vt_' + n] if w.get('vtover') else D['vtf' if w.get('flier') else 'vt'], SIZE=w.get('size', OBJ_SIZE),
              TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
              TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
              F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0)
@@ -655,6 +710,13 @@ class Data:
             vtf[(0xC + 8 * k) // 4] = fn('f_v%d' % k)
             vtf[(0x8 + 8 * k) // 4] = 0
         b.append(('vtf', vtf, 4))
+        for w in WALKERS:                # step 2f: a kind's own vtable (VTF plus its overrides `vtover`)
+            if w.get('vtover'):
+                vk = list(vtf)
+                for k, f in w['vtover'].items():
+                    vk[(0xC + 8 * k) // 4] = fn(f)
+                    vk[(0x8 + 8 * k) // 4] = 0
+                b.append(('vt_' + w['name'], vk, 4))
         ktab = []
         for w in WALKERS:
             ktab += [w['kind'], g('cfg_' + w['name'])]
@@ -680,12 +742,15 @@ class Data:
                 s = w['states'].get(i)
                 if s == 'remove':
                     s = (ZIMA_REMOVE_ENTER, ZIMA_REMOVE_UPDATE)
-                st += [0xFFFF, fn(s[0]), 0xFFFF, fn(s[1]), 0, 0] if s else [0] * 6
+                st += ([0xFFFF, fn(s[0]), 0xFFFF, fn(s[1])] + ([0xFFFF, fn(s[2])] if len(s) > 2 else [0, 0])
+                       if s else [0] * 6)            # {enter, update, exit} PMFs (step 2f: an exit)
             b.append(('st_' + n, st, 4))
             b.append(('ar_' + n, [word(v) for e in w['areas'] for v in e], 4))
             need = ('st_', 'en_', 'set_', 'atk_', 'sr_', 'ar_') + (('hs_',) if w['hashset'] else ())
             dd = {p + n: g(p + n) for p in need}
             dd.update(vt=g('vt'), vtf=g('vtf'))
+            if w.get('vtover'):
+                dd['vt_' + n] = g('vt_' + n)
             b.append(('cfg_' + n, cfg_values(w, dd, fn), 4))
         return self
 
@@ -2483,7 +2548,7 @@ def code_f(D, vtw):
     # start 0x109C0: the aerial module (its ctor: the 3DS ctor 0x11598's), set_rhombus, set_lr(0, 1, 1) (lr 0: faces
     # the camera), V3 = the nearest fighter, +0x10 = posture lr, +0x14 / +0x18 = 0, V1 = 1200, -> 1, the body effect
     # 0x7110000 following node 0 -> V4 (set_node_visibility(1, 1) / (0, 0) and play_se(0x8A60000) not ported)
-    G.asm("f_ghos_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X" % (AER, AER_CTOR))
+    G.asm("f_ghos_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X\nmr r3, r31" % (AER, AER_CTOR))   # step 2f: set_rhombus(this) (r3 was the aerial module)
     far(SET_RHOMBUS)
     lfs('f1', 'consts')
     G.asm("""
@@ -2789,7 +2854,7 @@ def code_f(D, vtw):
     # row (variation 0), P21 the leave frames (P@0x78 f0: 200)
     def tp(i):
         return P(i)
-    G.asm("f_tiki_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X" % (AER, AER_CTOR))
+    G.asm("f_tiki_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X\nmr r3, r31" % (AER, AER_CTOR))   # step 2f: set_rhombus(this) (r3 was the aerial module)
     far(SET_RHOMBUS)
     G.asm("""
         lwz r12, 0(r31)
@@ -3133,6 +3198,681 @@ def code_f(D, vtw):
         mtlr r0
         blr
     """ % (REQ_EFFECT >> 16, REQ_EFFECT & 0xFFFF))
+    # ---- Furiijio (kind 0x1A; enemy_fs.cro create 0x6DC6C, table 0x10D168; docs/smash-run-port.md "Step 2f").
+    # V0 the search counter (3DS +0x1DC), V1 the search cool-down (+0x1E4), V2 the leave timer (+0x1E8), V3 the target
+    # (+0x1EC), V4 the state frames (+0x1E0), V5 / V6 the common leave, V7 the sweep step (+0x1F0), V8 the beam length
+    # (+0x248); FU_C the centre offset (+0x218), FU_ROT BeamN's angles in degrees (+0x224), FU_E the beam's three
+    # follow effects (+0x254 / +0x258 / +0x25C). The 3DS's node offset +0x230 is (P@0x9C x 10 = 0) rotated: zero.
+    # P0-5 set_mode_homing (P0 row, variation 0), 6 leave frames 900, 7 target offset y 25 (2.5 x 10), 8 / 9 the
+    # beam choice (random(0, 2) < 1: sweep), 10 0 (the node offset), 11 10 (the aim effect's offset), 12 1.5 (its
+    # scale), 13 aim frames 25, 14 cool-down 150, 15 beam length cap 200, 16 charge frames 22, 17 growth 4.5, 18 beam
+    # frames 60, 19 sweep charge 34, 20 / 21 the sweep side (random(0, 1) < 1), 22 sweep frames 140, 23 180 / 140,
+    # 24 P@0xD4 15, 25 1.5, 26 0.05, 27 deg -> rad, 28 90, 29 1, 30 0, 31-35 the leave (P6), 36-41 FU_CALC
+    fp = lambda i: P(i)  # noqa: E731
+    d = dict(AER=AER, V0=V(0), V1=V(1), V2=V(2), V3=V(3), V4=V(4), V7=V(7), V8=V(8), C=FU_C, C4=FU_C + 4,
+             C8=FU_C + 8, R=FU_ROT, R4=FU_ROT + 4, R8=FU_ROT + 8, E=FU_E, E4=FU_E + 4, E8=FU_E + 8,
+             SNR=SET_NODE_ROT, SNT=SET_NODE_TRANS, DIRTY=MODEL_NODE_DIRTY, OFS=ATK_SET_OFFSET, EPOS=EFF_SET_POS,
+             ESC=EFF_SET_SCALE, SQ=SQRTF, SIN=SINF, COS=COSF, ACOS=ACOSF, SS=AER_SET_SPEED, SH=AER_SLIP_HOMING,
+             CK=CHANGE_KINETIC, BUL=BULLET, DEF=DEFEATED, DM=CF['DEADMOT'],
+             **{'P%d' % i: fp(i) for i in range(42)})
+    # fu_node: BeamN (node 3) turned to FU_ROT (set_node_rotate(3, rad, 0); a change -> the ModelModule's vt+0xC4, as
+    # the Wii U's own callers do) and placed at the posture + FU_C (+ the zero offset) in global space
+    # (set_node_translate(3, &v, 1, 0) + vt+0xC4: the 3DS's Behavior::set_node_global_position 0x7B5224). The 3DS's
+    # set_rotation_order_zxy (ModelModule +0x21 = 1) before it in states 3 / 6: no Wii U equivalent found
+    G.asm("""
+    fu_node:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        lfs f0, 0x%(P27)X(r30)
+        lfs f1, 0x%(R)X(r31)
+        fmuls f1, f1, f0
+        stfs f1, 8(r1)
+        lfs f1, 0x%(R4)X(r31)
+        fmuls f1, f1, f0
+        stfs f1, 0xC(r1)
+        lfs f1, 0x%(R8)X(r31)
+        fmuls f1, f1, f0
+        stfs f1, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        li r4, 3
+        addi r5, r1, 8
+        li r6, 0
+        bl 0x%(SNR)08X
+        cmpwi r3, 0
+        beq fu_n1
+        bl fu_dirty
+    fu_n1:
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x10(r12)
+        lfs f0, 0x%(C)X(r31)
+        fadds f1, f1, f0
+        stfs f1, 8(r1)
+        lfs f1, 0x14(r12)
+        lfs f0, 0x%(C4)X(r31)
+        fadds f1, f1, f0
+        stfs f1, 0xC(r1)
+        lfs f1, 0x18(r12)
+        lfs f0, 0x%(C8)X(r31)
+        fadds f1, f1, f0
+        stfs f1, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        li r4, 3
+        addi r5, r1, 8
+        li r6, 1
+        li r7, 0
+        bl 0x%(SNT)08X
+        cmpwi r3, 0
+        beq fu_n2
+        bl fu_dirty
+    fu_n2:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    fu_dirty:
+        lwz r3, 0(r31)
+        lwz r3, 0x3118(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(DIRTY)X(r12)
+        mtctr r12
+        bctr
+    fu_grow:
+        lfs f1, 0x%(V8)X(r31)
+        lfs f0, 0x%(P17)X(r30)
+        fadds f1, f1, f0
+        stfs f1, 0x%(V8)X(r31)
+        lfs f0, 0x%(P15)X(r30)
+        fcmpu cr0, f0, f1
+        bgelr
+        stfs f0, 0x%(V8)X(r31)
+        blr
+    fu_beam:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        lfs f1, 0x%(V8)X(r31)
+        lfs f0, 0x%(P25)X(r30)
+        fmuls f1, f1, f0
+        lfs f0, 0x%(P24)X(r30)
+        fadds f1, f1, f0
+        stfs f1, 8(r1)
+        li r0, 0
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30C8(r3)
+        li r4, 0
+        addi r5, r1, 8
+        bl 0x%(OFS)08X
+        lfs f1, 0x%(V8)X(r31)
+        lfs f0, 0x%(P26)X(r30)
+        fmuls f1, f1, f0
+        stfs f1, 8(r1)
+        lfs f0, 0x%(P29)X(r30)
+        stfs f0, 0xC(r1)
+        stfs f0, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30D8(r3)
+        lwz r4, 0x%(E4)X(r31)
+        addi r5, r1, 8
+        bl 0x%(ESC)08X
+        lwz r0, 0x%(V8)X(r31)
+        stw r0, 8(r1)
+        li r0, 0
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30D8(r3)
+        lwz r4, 0x%(E8)X(r31)
+        addi r5, r1, 8
+        bl 0x%(EPOS)08X
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    fu_clamp:
+        lfs f0, 0x%(P40)X(r30)
+        fcmpu cr0, f1, f0
+        bge fu_cl1
+        fmr f1, f0
+        blr
+    fu_cl1:
+        lfs f0, 0x%(P29)X(r30)
+        fcmpu cr0, f1, f0
+        blelr
+        fmr f1, f0
+        blr
+    fu_calc:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        stfs f1, 8(r1)
+        stfs f2, 0xC(r1)
+        fmuls f0, f1, f1
+        fmuls f3, f2, f2
+        fadds f1, f0, f3
+        lfs f0, 0x%(P30)X(r30)
+        fcmpu cr0, f1, f0
+        beq fu_c1
+        bl 0x%(SQ)08X
+        lfs f0, 0x%(P29)X(r30)
+        fdivs f0, f0, f1
+        lfs f1, 8(r1)
+        fmuls f1, f1, f0
+        stfs f1, 8(r1)
+        lfs f1, 0xC(r1)
+        fmuls f1, f1, f0
+        stfs f1, 0xC(r1)
+    fu_c1:
+        lfs f1, 0xC(r1)
+        bl fu_clamp
+        bl 0x%(ACOS)08X
+        stfs f1, 0x10(r1)
+        lfs f1, 8(r1)
+        bl fu_clamp
+        bl 0x%(ACOS)08X
+        lfs f0, 0x%(P36)X(r30)
+        lfs f2, 0x%(P38)X(r30)
+        fcmpu cr0, f1, f0
+        bge fu_c2
+        lfs f2, 0x%(P39)X(r30)
+    fu_c2:
+        lfs f1, 0x10(r1)
+        lfs f0, 0x%(P37)X(r30)
+        fmuls f1, f1, f0
+        fmuls f1, f1, f2
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    fu_angle:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        addi r3, r1, 8
+        mr r4, r31
+        lwz r5, 0x%(V3)X(r31)
+    """ % d)
+    far(GET_TARGET_POS)
+    G.asm("""
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x10(r12)
+        lfs f2, 0x%(C)X(r31)
+        fadds f0, f0, f2
+        lfs f1, 8(r1)
+        fsubs f1, f1, f0
+        lfs f0, 0x14(r12)
+        lfs f3, 0x%(C4)X(r31)
+        fadds f0, f0, f3
+        lfs f2, 0xC(r1)
+        fsubs f2, f2, f0
+        bl fu_calc
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    fu_tgt:
+        lwz r0, 0x%(V3)X(r31)
+        stw r0, 0x%(T)X(r31)
+        li r0, 0
+        stw r0, 0x%(O)X(r31)
+        stw r0, 0x%(O8)X(r31)
+        stb r0, 0x%(F)X(r31)
+        lwz r0, 0x%(P7)X(r30)
+        stw r0, 0x%(O4)X(r31)
+        blr
+    fu_follow:
+        mflr r0
+        stw r0, 0x1C(r1)
+        mr r3, r31
+        addi r6, r1, 8
+        addi r7, r1, 8
+        lfs f1, 0x%(P29)X(r30)
+        lis r12, 0x%(RFH)04X
+        ori r12, r12, 0x%(RFL)04X
+        mtctr r12
+        bctrl
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % dict(d, T=AER + 0x30, O=AER + 0x40, O4=AER + 0x44, O8=AER + 0x48, F=AER + 0x2C, RFH=REQ_FOLLOW >> 16,
+               RFL=REQ_FOLLOW & 0xFFFF))
+    # start 0x6BE88: the aerial module (the 3DS ctor's), set_rhombus, +0x10 = posture lr, +0x14 / +0x18 = 0, its
+    # fields zero, V2 = 900, V3 = the nearest fighter (turned to it: check_turn_to_target -> reverse_lr(1, 1)), the
+    # aerial target V3 at (0, 25, 0), -> 1
+    G.asm("f_fu_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X\nmr r3, r31" % (AER, AER_CTOR))
+    far(SET_RHOMBUS)
+    G.asm("""
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        stw r0, 0x%(V1)X(r31)
+        stw r0, 0x%(V4)X(r31)
+        stw r0, 0x%(V7)X(r31)
+        stw r0, 0x%(V8)X(r31)
+        li r12, 10
+        mtctr r12
+        addi r12, r31, 0x%(Cm4)X
+    fs_z:
+        stwu r0, 4(r12)
+        bdnz fs_z
+        lwz r0, 0x%(P6)X(r30)
+        stw r0, 0x%(V2)X(r31)
+        bl h_near
+        stw r3, 0x%(V3)X(r31)
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq fs_t
+        bl h_rev
+    fs_t:
+        bl fu_tgt
+        li r4, 1
+        b go
+    """ % dict(d, Cm4=FU_C - 4))
+    # 1 fly (0x6BF78 / 0x6C0E8): set_mode_homing(P0-5) (energy 0's speed 0, then the slip homing setter: mode 2),
+    # passable, ground off, Move (loop), V0 = search_interval(0) (50). Update: no target -> the nearest (none: the
+    # frame ends) and the aerial target at it; the aerial update; V0 / V1 count down; both below 0: V0 = 50,
+    # search_target(0) found -> V3 = it, V2 = 900, random(0, 2) < 1 -> 5 (sweep), else -> 2; otherwise V2 counts down
+    # -> 8 (leave) at 0
+    st('fu1_en', """
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+        lfs f1, 0x%(P0)X(r30)
+        lfs f2, 0x%(P1)X(r30)
+        lfs f3, 0x%(P2)X(r30)
+        lfs f4, 0x%(P3)X(r30)
+        lfs f5, 0x%(P4)X(r30)
+        lfs f6, 0x%(P5)X(r30)
+        addi r3, r31, 0x%(AER)X
+        bl 0x%(SH)08X
+        bl f_pass1
+        li r4, 0
+        bl h_att
+        li r4, 9
+        li r5, 1
+        bl h_mot1
+        li r4, 0
+        bl h_grp
+        stw r3, 0x%(V0)X(r31)""" % d)
+    st('fu1_up', """
+        lwz r3, 0x%(V3)X(r31)
+        cmpwi r3, -1
+        bne fu1_a
+        bl h_near
+        stw r3, 0x%(V3)X(r31)
+        cmpwi r3, -1
+        beq.far epi
+        bl fu_tgt
+    fu1_a:
+        bl f_aupd
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        lwz r4, 0x%(V1)X(r31)
+        addi r4, r4, -1
+        stw r4, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        bge fu1_l
+        cmpwi r4, 0
+        bge fu1_l
+        li r4, 0
+        bl h_grp
+        stw r3, 0x%(V0)X(r31)
+        li r4, 0
+        bl h_srch
+        cmpwi r3, -1
+        beq fu1_l
+        stw r3, 0x%(V3)X(r31)
+        lwz r0, 0x%(P6)X(r30)
+        stw r0, 0x%(V2)X(r31)
+        li r3, 0
+        lwz r4, 0x%(P8)X(r30)
+        lwz r0, 0x%(P9)X(r30)
+        add r4, r4, r0
+        addi r4, r4, -1
+        bl h_rand
+        lwz r0, 0x%(P9)X(r30)
+        cmpw r3, r0
+        li r4, 5
+        blt fu1_go
+        li r4, 2
+    fu1_go:
+        b go
+    fu1_l:
+        lwz r3, 0x%(V2)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V2)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        li r4, 8
+        b go""" % d)
+    # 2 / 5 charge (0x6D0F0 / 0x6D4F0): set_current_speed(0, 0), passable, ground off, IceBeamShotHold (loop),
+    # FU_C = center_pos() - the posture, request_effect(0x71A0000 / 0x71A0001, the posture + FU_C, 1); V4 = 22 / 34
+    # (play_se 0x6A90001 not ported). Update (0x6D924 / 0x6DA4C): V4 below 0 -> 3 / 6
+    G.asm("fu2_en:\nmflr r0\nbl pro\nlis r28, 0x71A\nlwz r0, 0x%(P16)X(r30)\nb fu_chg" % d)
+    G.asm("fu5_en:\nmflr r0\nbl pro\nlis r28, 0x71A\nori r28, r28, 1\nlwz r0, 0x%(P19)X(r30)" % d)
+    G.asm("""
+    fu_chg:
+        stw r0, 0x%(V4)X(r31)
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+        bl f_pass1
+        li r4, 0
+        bl h_att
+        li r4, 8
+        li r5, 1
+        bl h_mot1
+        addi r3, r1, 8
+        mr r4, r31
+    """ % d)
+    far(CENTER_POS)
+    G.asm("""
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 8(r1)
+        lfs f0, 0x10(r12)
+        fsubs f1, f1, f0
+        stfs f1, 0x%(C)X(r31)
+        fadds f1, f0, f1
+        stfs f1, 8(r1)
+        lfs f1, 0xC(r1)
+        lfs f0, 0x14(r12)
+        fsubs f1, f1, f0
+        stfs f1, 0x%(C4)X(r31)
+        fadds f1, f0, f1
+        stfs f1, 0xC(r1)
+        lfs f1, 0x10(r1)
+        lfs f0, 0x18(r12)
+        fsubs f1, f1, f0
+        stfs f1, 0x%(C8)X(r31)
+        fadds f1, f0, f1
+        stfs f1, 0x10(r1)
+        mr r3, r31
+        mr r4, r28
+        addi r5, r1, 8
+        lfs f1, 0x%(P29)X(r30)
+    """ % d)
+    far(REQ_EFFECT0)
+    G.asm("b epi")
+    for k, nxt in ((2, 3), (5, 6)):
+        st('fu%d_up' % k, """
+            lwz r3, 0x%(V4)X(r31)
+            addi r3, r3, -1
+            stw r3, 0x%(V4)X(r31)
+            cmpwi r3, 0
+            bge.far epi
+            li r4, %(N)d
+            b go""" % dict(d, N=nxt))
+    # 3 / 6 aim (0x6D224 / 0x6D624): V8 = 0, a = calc_angle(the target - (the posture + FU_C)) (3DS 0x7B01D8:
+    # normalised, acos(y) x 180 / pi, negated when acos(x) < pi / 2); 3: FU_ROT = (0, a lr, 90); 6: the step V7 =
+    # 180 / 140 x lr, random(0, 1) < 1: V7 negated and FU_ROT y = a lr + 90 lr, else a lr - 90 lr; then fu_node and
+    # request_effect(0x71A0005, node 2, offset (10 sin b, 10 cos b, 0) (b = -FU_ROT y in radians: (10, 0) turned by
+    # 0x67364, its x / y swapped), rot (0, 0, lr FU_ROT y), 1.5); V4 = 25. Update (0x6D948 / 0x6DA70): fu_node; V4
+    # below 0 -> V1 = 150 (the cool-down), -> 4 / 7
+    G.asm("""
+    fu_aimfin:
+        bl fu_node
+        lfs f1, 0x%(R4)X(r31)
+        lfs f0, 0x%(P27)X(r30)
+        fneg f0, f0
+        fmuls f1, f1, f0
+        stfs f1, 0x14(r1)
+        fabs f2, f1
+        lfs f0, 0x%(P41)X(r30)
+        fcmpu cr0, f2, f0
+        bge fu_af1
+        lwz r0, 0x%(P11)X(r30)
+        stw r0, 0xC(r1)
+        li r0, 0
+        stw r0, 8(r1)
+        b fu_af2
+    fu_af1:
+        bl 0x%(COS)08X
+        lfs f0, 0x%(P11)X(r30)
+        fmuls f1, f0, f1
+        stfs f1, 0xC(r1)
+        lfs f1, 0x14(r1)
+        bl 0x%(SIN)08X
+        lfs f0, 0x%(P11)X(r30)
+        fmuls f1, f0, f1
+        stfs f1, 8(r1)
+    fu_af2:
+        li r0, 0
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        lfs f1, 0x%(R4)X(r31)
+        fmuls f1, f0, f1
+        stfs f1, 0x1C(r1)
+        mr r3, r31
+        lis r4, 0x71A
+        ori r4, r4, 5
+        li r5, 2
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+        lfs f1, 0x%(P12)X(r30)
+    """ % d)
+    far(REQ_NODE)
+    G.asm("lwz r0, 0x%(P13)X(r30)\nstw r0, 0x%(V4)X(r31)\nb epi" % d)
+    st('fu3_en', """
+        li r0, 0
+        stw r0, 0x%(V8)X(r31)
+        bl fu_angle
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        fmuls f1, f1, f0
+        stfs f1, 0x%(R4)X(r31)
+        li r0, 0
+        stw r0, 0x%(R)X(r31)
+        lwz r0, 0x%(P28)X(r30)
+        stw r0, 0x%(R8)X(r31)
+        b fu_aimfin""" % d)
+    st('fu6_en', """
+        li r0, 0
+        stw r0, 0x%(V8)X(r31)
+        bl fu_angle
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        fmuls f1, f1, f0
+        stfs f1, 8(r1)
+        stfs f0, 0xC(r1)
+        li r3, 0
+        lwz r4, 0x%(P20)X(r30)
+        lwz r0, 0x%(P21)X(r30)
+        add r4, r4, r0
+        addi r4, r4, -1
+        bl h_rand
+        lfs f0, 0xC(r1)
+        lfs f2, 0x%(P23)X(r30)
+        fmuls f2, f2, f0
+        lfs f3, 0x%(P28)X(r30)
+        fmuls f3, f0, f3
+        lfs f1, 8(r1)
+        lwz r0, 0x%(P21)X(r30)
+        cmpw r3, r0
+        bge fu6_b
+        fneg f2, f2
+        fadds f1, f1, f3
+        b fu6_c
+    fu6_b:
+        fsubs f1, f1, f3
+    fu6_c:
+        stfs f2, 0x%(V7)X(r31)
+        stfs f1, 0x%(R4)X(r31)
+        li r0, 0
+        stw r0, 0x%(R)X(r31)
+        lwz r0, 0x%(P28)X(r30)
+        stw r0, 0x%(R8)X(r31)
+        b fu_aimfin""" % d)
+    for k, nxt in ((3, 4), (6, 7)):
+        st('fu%d_up' % k, """
+            bl fu_node
+            lwz r3, 0x%(V4)X(r31)
+            addi r3, r3, -1
+            stw r3, 0x%(V4)X(r31)
+            cmpwi r3, 0
+            bge.far epi
+            lwz r0, 0x%(P14)X(r30)
+            stw r0, 0x%(V1)X(r31)
+            li r4, %(N)d
+            b go""" % dict(d, N=nxt))
+    # 4 / 7 the beam (enter 0x6C258 / 0x6C980): IceBeamShot (loop), V4 = 60 / 140, fu_node, follow effects
+    # 0x71A0002 on node 2, 0x71A0004 / 0x71A0003 on node 3 (BeamN) -> FU_E (play_se 0x6A90002 not ported); the
+    # contact attack P2 entry 0 / 1 (set_attack_data). Update (0x6CB80 / 0x6CE24): [4: fu_node] V4 below 0 -> 1;
+    # else V8 += 4.5 (at most 200), the hitbox offset (V8 x 1.5 + 15, 0, 0) (AttackModule set_offset(0)), FU_E[1]
+    # scaled (V8 x 0.05, 1, 1), FU_E[2] at (V8, 0, 0); [7: FU_ROT y += V7, fu_node]. Exit (0x6D094 / 0x6D494): the
+    # three effects removed (stop_se not ported)
+    G.asm("fu4_en:\nmflr r0\nbl pro\nlwz r0, 0x%(P18)X(r30)\nb fu_bst\nfu7_en:\nmflr r0\nbl pro\n"
+          "lwz r0, 0x%(P22)X(r30)" % d)
+    G.asm("""
+    fu_bst:
+        stw r0, 0x%(V4)X(r31)
+        li r4, 7
+        li r5, 1
+        bl h_mot1
+        bl fu_node
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lis r4, 0x71A
+        ori r4, r4, 2
+        li r5, 2
+        bl fu_follow
+        stw r3, 0x%(E)X(r31)
+        lis r4, 0x71A
+        ori r4, r4, 4
+        li r5, 3
+        bl fu_follow
+        stw r3, 0x%(E4)X(r31)
+        lis r4, 0x71A
+        ori r4, r4, 3
+        li r5, 3
+        bl fu_follow
+        stw r3, 0x%(E8)X(r31)
+        b epi
+    """ % d)
+    st('fu4_up', """
+        bl fu_node
+        lwz r3, 0x%(V4)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V4)X(r31)
+        cmpwi r3, 0
+        bge fu4_b
+        li r4, 1
+        b go
+    fu4_b:
+        bl fu_grow
+        bl fu_beam""" % d)
+    st('fu7_up', """
+        lwz r3, 0x%(V4)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V4)X(r31)
+        cmpwi r3, 0
+        bge fu7_b
+        li r4, 1
+        b go
+    fu7_b:
+        bl fu_grow
+        bl fu_beam
+        lfs f1, 0x%(R4)X(r31)
+        lfs f0, 0x%(V7)X(r31)
+        fadds f1, f1, f0
+        stfs f1, 0x%(R4)X(r31)
+        bl fu_node""" % d)
+    G.asm("fu_bexit:\nmflr r0\nbl pro\naddi r28, r31, 0x%(E)X\nli r29, 3\nfu_bx:\nmr r3, r31\nlwz r4, 0(r28)" % d)
+    far(REMOVE_EFFECT)
+    G.asm("li r0, 0\nstw r0, 0(r28)\naddi r28, r28, 4\naddi r29, r29, -1\ncmpwi r29, 0\nbne fu_bx\nb epi")
+    # 8 leave (0x6C058 / 0x6C408): IceBeamShot at rate 0, init_common_leave(P6: 200 frames, -0.01, 10, effect
+    # 0x8000005 at (0, 5, 0) x 1) -> f_leave_en; the common leave's end -> 10 (o_leave_up)
+    G.asm("""
+    fu8_en:
+        mflr r0
+        bl pro
+        li r4, 7
+        li r5, 0
+        bl h_mot0
+        mr r3, r31
+        mr r4, r29
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        b f_leave_en
+    """)
+    # 9 dead (0x6C0AC / 0x6CB2C): set_mode_none, DamageStart at rate 0, bullet() (P2 entry 2), defeated; the
+    # kinetic flag 8 -> 10 (g_dead_up)
+    st('fu9_en', """
+        bl f_anone
+        li r0, 1
+        stw r0, 0x%(DEF)X(r31)
+        lwz r4, 0x%(DM)X(r30)
+        li r5, 0
+        bl h_mot0
+        mr r3, r31
+        bl 0x%(BUL)08X""" % d)
+    # slot 10 notify_on_damage (the 3DS's 11, 0x6CB64): V2 = 900, then BehaviorImpl's
+    G.asm("""
+    f_fu_dmg:
+        lwz r12, 0x168(r3)
+        lwz r0, 0x%(P6)X(r12)
+        stw r0, 0x%(V2)X(r3)
+        lis r12, 0x%(BH)04X
+        ori r12, r12, 0x%(BL)04X
+        mtctr r12
+        bctr
+    f_fu_kin:
+        lwz r3, 0(r3)
+        lwz r3, 0x30E8(r3)
+        li r4, 26
+        b 0x%(CK)08X
+    """ % dict(d, BH=BI_NOTIFY_DMG >> 16, BL=BI_NOTIFY_DMG & 0xFFFF))
+    # slot 4 update_on_skip (the 3DS's 5, 0x6C438): BehaviorImpl's, then the per-frame node / beam set-up again
+    # (3 / 6: fu_node; 4: fu_node, fu_beam; 7: fu_beam, fu_node), without the timers or the growth
+    G.asm("f_fu_skip:\nmflr r0\nbl pro\nmr r3, r31")
+    far(orig(4))
+    G.asm("""
+        lwz r0, 4(r31)
+        cmpwi r0, 3
+        beq fsk_n
+        cmpwi r0, 6
+        beq fsk_n
+        cmpwi r0, 4
+        beq fsk_4
+        cmpwi r0, 7
+        bne.far epi
+        bl fu_beam
+    fsk_n:
+        bl fu_node
+        b epi
+    fsk_4:
+        bl fu_node
+        bl fu_beam
+        b epi
+    """)
     return G
 
 

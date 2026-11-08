@@ -155,7 +155,7 @@ research give them.
 | `PostureModulePartialImpl::rot` | 0x009811F0 |  | 47 |
 | `Behavior::set_kinetic_jump` | 0x006462EC |  | 43 |
 | `Behavior::remove_effect` | 0x007B0EF0 |  | 41 |
-| `Behavior::request_follow_effect` | 0x007B4AEC | 0x026A9584 / 0x026A95F8 | 41 |
+| `Behavior::request_follow_effect` | 0x007B4AEC | 0x026A95F8 (0x026A9584 is request_effect(id, node, ...)) | 41 |
 | `Behavior::set_motion_no_restart` | 0x007B4B44 |  | 41 |
 | `Behavior::center_pos` | 0x009EA464 |  | 39 |
 | `EnemyAerialModuleImpl::set_mode_none` | 0x005F58C8 |  | 38 |

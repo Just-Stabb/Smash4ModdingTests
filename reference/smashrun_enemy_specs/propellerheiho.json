@@ -177,5 +177,11 @@
  "acmd": {
  },
  "articles": {"article_data_set":null,"entries":[],"weapons":{}},
- "tags": ["flyer"]
+ "tags": ["flyer"],
+ "hand_read": {
+  "class": "flier (carries an item) - not ported",
+  "summary": "Propeller Heiho (Mario). Read only in part (step 2f): states 1-8 (table: 1 turn 0x99598, 2 fly away 0x99440, 3 dead 0x99624, 4 rise / descend to the target's height 0x9A578, 5 patrol 0x991D4 with a cosine bob, 6 brake 0x9934C, 7 stun 0x99148, 8 remove); its only P2 entry is the defeated body (state 3: power 2, angle 361, kbg 100, bkb 50, size 2, node 2). Carries an item (create_item_and_have / ItemManager::find_item / Item::fall).",
+  "read": "enemy_fs.cro: create 0x9AA38 (object 528), start 0x99010, slots 0 / 1 dtors 0x9AC74 / 0x9AC10, 11 0x9A330, 13 0x9A3A4, 55 0x99E24, 59 0x9A224, 69 0x9AA1C, 71 notify_on_death 0x99DD8, 72-75 0x992E4 / 0x9A9B4 / 0x9932C / 0x9A9FC; 64-66 = 4, 67 = 3. code.bin: Behavior::create_item_and_have 0x7B4104, ItemManager::find_item 0x3CD464, Item::fall 0x74D6E4, Item::warp 0x74E174 / 0x74E30C, Item::is_haved 0x9E6518.",
+  "not_ported": "the whole kind (step 2f ported Furiijio only): its item carry needs the Wii U's item creation / have / drop by kind for an enemy (not mapped yet), and its movement set_mode_normal with update(x, y, bool), set_max_speed, get_height_from_ground, is_in_view_area, success_by_percent, get_lr_to_nearest_target and the stun's posture rotation are not mapped."
+ }
 }

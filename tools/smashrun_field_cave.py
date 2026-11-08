@@ -7,7 +7,9 @@ Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py'
 
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
 the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
-- "step2e" (the default): "step2c" plus the fliers Ghos 0x11 and Tiki Buzz 0x0F (placement 2, three times each in
+- "step2f" (the default): "step2e" plus Furiijio 0x1A (placement 2, three times in the 20-entry turn; docs/smash-run-
+  port.md, "Step 2f"); requests step2e's sixteen + 0x1A.
+- "step2e": "step2c" plus the fliers Ghos 0x11 and Tiki Buzz 0x0F (placement 2, three times each in
   the 17-entry turn; docs/smash-run-port.md, "Step 2e"); requests step2c's fourteen + the two.
 - "step2c": "walkers" plus Gordo 0x08 (placement 2) and the White Bear 0x40 (placement 1), each
   twice in the 13-entry turn; requests the twelve + 0x57 (docs/smash-run-port.md, "Step 2c") and, since step 2d,
@@ -76,10 +78,19 @@ ENEMY_SETS = {
     'step2e': (((0x11, 2), (0x0F, 2), (0x01, 1), (0x40, 1), (0x11, 2), (0x12, 2), (0x0F, 2), (0x0B, 1), (0x08, 2),
                 (0x11, 2), (0x30, 1), (0x0F, 2), (0x13, 1), (0x1D, 2), (0x0E, 1), (0x19, 1), (0x1F, 1)),
                (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F)),
+    # step 2f: step2e's set and Furiijio 0x1A (placement 2, as the other fliers), three times in the 20-entry turn;
+    # requests step2e's sixteen + 0x1A. The banks register in kind order (the step 2d log: 0x712, 0x719, 0x71D,
+    # 0x71F, 0x740, 0x757 for a request list in another order), so 0x71A is the fifth of eleven and the last
+    # (0x759) misses the ten slots unless the unused 0x712 / 0x71D folders are gone (docs/smash-run-port.md,
+    # "Step 2f")
+    'step2f': (((0x11, 2), (0x1A, 2), (0x0F, 2), (0x01, 1), (0x40, 1), (0x11, 2), (0x12, 2), (0x1A, 2), (0x0F, 2),
+                (0x0B, 1), (0x08, 2), (0x11, 2), (0x30, 1), (0x0F, 2), (0x13, 1), (0x1A, 2), (0x1D, 2), (0x0E, 1),
+                (0x19, 1), (0x1F, 1)),
+               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F, 0x1A)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }
-ENEMIES = 'step2e'
+ENEMIES = 'step2f'
 SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
 KINDS = tuple(k for k, _m in SPAWNS)
 INTERVAL = 150                  # frames between spawns (2.5 s)

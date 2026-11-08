@@ -2616,7 +2616,7 @@ WIIU = {   # Wii U addresses of the same framework functions (docs/smash-run-por
     'EnemyKineticModuleImpl::change_kinetic': '0x02DBE00C', 'Behavior::bullet': '0x02DB5158',
     'EnemyManager::remove_enemy_by_id': '0x02D9C0E0', 'Behavior::create_attack_data': '0x02DB572C',
     'AttackModuleImpl::set_attack': '0x02C086A8', 'AttackModuleImpl::clear_all': '0x02C08324',
-    'Behavior::initialize_after': '0x02DB4AC8', 'Behavior::request_follow_effect': '0x026A9584 / 0x026A95F8',
+    'Behavior::initialize_after': '0x02DB4AC8', 'Behavior::request_follow_effect': '0x026A95F8 (0x026A9584 is request_effect(id, node, ...))',
     'MotionModuleImpl::change_motion': '0x02C5D730',
 }
 

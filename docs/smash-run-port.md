@@ -1204,6 +1204,117 @@ words, all Smash Run regions.
   Item::is_haved. The Wii U equivalents (item creation by kind, have / drop) are not found yet; its only P2 entry is
   the defeated body (state 3): no contact damage while it flies.
 
+## Step 2f: Furiijio (3DS state code, its ice beam); Propeller Heiho not yet
+
+Package smashrun_step2f_v1: `code/` exe_v17 = exe_v12 (Extended Memory v3) + Smash Run through step 2f (scratch
+build17.py: `smashrun_field_cave.py`'s default set `step2f` and `smashrun_walker_cave.py`, one rpx_patch call) and
+`smashrun_step2f_data` (Furiijio's model, motions, vl params, sound bank lower case and capitalised, its effect folder
+from smashrun_effects_v2 with the beam's two effect models). Not yet run in game. Tests on exe_v17:
+`tools/smashrun_flier_test.py` 67 checks (36 before; new: `tools/smashrun_furiijio_test.py`'s 27, F2 for furiijio and
+set_rhombus(this) for the three fliers),
+smashrun_walker_test.py 158 (with the enemy root + furiijio's pac), smashrun_field_test.py 12, smashrun_enemy_test.py
+26, s3ds_enemy_test.py furiijio 11: 0 failures. Readings with addresses: `hand_read.json` (furiijio; propellerheiho's
+partial reading), so docs/smash-run-enemies/furiijio.md / propellerheiho.md (regenerated).
+
+**The ice beam is not an article.** Furiijio's article data set is empty; the beam is the behaviour's own hitbox:
+set_attack_data arms P2 entry 0 in state 4 and entry 1 in state 7 (power 4, angle 361, kbg 100, fkb 100, bkb 0,
+size 2, node 3 = BeamN), and each beam frame moves it out along BeamN with AttackModuleImpl::set_offset(0, (length x
+1.5 + P@0xD4 15, 0, 0)) (3DS 0x4CB8B8; the module's entries 0x80 bytes, +0x6C on; Wii U **0x02C09150**, entries 0x84,
++0x6C a word), the length growing 4.5 a frame (P@0xB8) up to 200 (P@0xB0 x 10): 21.75 to 315 units. Offset2 stays
+the Behavior ctor's zero and create_attack_data (3DS 0x7B2A1C, Wii U 0x02DB572C) never writes it, as on both: the
+3DS's shape, whatever it is, is the Wii U's. **The freeze** is the hitbox attribute: vl word 13 (-> create_attack_data
++0x34 -> AttackData +0x43, the 3DS's +0x63 from the Behavior) is 4 in both beam entries (0 in the bullet), Smash 4's
+attribute 4 = freezing; passed through, so the Wii U freezes as the 3DS does. The beam is drawn by three follow
+effects (0x71A0002 on node 2, 0x71A0004 / 0x71A0003 on node 3) that the update scales ((length x 0.05, 1, 1),
+EffectModuleImpl::set_scale 0x4DB438) and moves ((length, 0, 0), set_pos 0x4DAF8C): Wii U EffectModule set_pos
+**0x02C2C0C0** and set_scale **0x02C2C120** (vtable 0x10106104 / 0x10106114: they reach EffectSystem 0x032F0978,
+writing the matrix translation +0x8C / +0x9C / +0xAC, and 0x032F0A48, the scale +0xB0..+0xB8; 0x02C2C0CC between them
+is set_rot, its degrees x 0.0174533).
+
+**Aiming.** BeamN (node 3) is turned with MotionModuleImpl::set_node_rotate(3, angles in rad, 0) (3DS 0x501328; Wii
+U **0x02C64188**: entries 0x28 bytes from +0x30 / count +0x34, node +0x24, flags +0x26, compose 0 -> flag 2) and
+placed with Behavior::set_node_global_position(3, posture + centre offset) (3DS 0x7B5224 = set_node_translate(node,
+v, 1, 0) + ModelModule vt+0x60; Wii U set_node_translate **0x02C642C8** and the ModelModule (acc+0x3118, +0x80 its
+accessor) vt+0xC4, as the Wii U's own callers 0x026A1434 / 0x026BB7B8 do). The angles: (0, a lr, 90), a =
+Behavior::calc_angle(target - (posture + centre)) (3DS 0x7B01D8: normalised, acos(y) x 180 x (acos(x) < pi / 2 ?
+-1 / pi : 1 / pi)) with the game's libm (Wii U sinf **0x04ADEB48**, cosf **0x04ADF434**, acosf **0x04ADF800**,
+identified by running them; acosf is calc_angle's twice-called function at 0x02DBF1D0). The centre offset is
+center_pos() - posture at the charge (3DS 0x9EA464, Wii U **0x026A7104**: node_global_position(center_node()), node
+2 when the model has two or more). The node offset +0x230 is (P@0x9C x 10, 0) rotated: P@0x9C is 0, so zero.
+**Approximated**: set_rotation_order_zxy (3DS 0x7B4D04: ModelModule +0x21 = 1) before the turn in states 3 / 6 has no
+Wii U counterpart found (no code stores a byte into the module at acc+0x3118 after loading it), so the turn uses the
+Wii U's own order: the beam's direction is the first thing to check in game.
+
+**Furiijio** (Kid Icarus, 0x1A; create 0x6DC6C, table 0x10D168), `FLIERS` 'furiijio' (object FU_SIZE 0x258: the
+flier's 0x230 + centre offset, angles, three effect handles; its own vtable `vt_furiijio` = VTF but slots 4 / 61 / 62):
+- start 0x6BE88: the aerial module, set_rhombus, +0x10 = posture lr, leave timer 900, the nearest fighter (turned to
+  it), the aerial target at (0, P@0x90 2.5 x 10, 0), -> 1.
+- 1 fly (0x6BF78 / 0x6C0E8): set_mode_homing(P0 row, variation 0: 0.1, 0.05, 0.015, 0.025, 1.2, 1) = energy 0's speed
+  0 then the slip homing setter 0x02DB28E4 (mode 2), passable, ground off, Move loop, search counter 50. Update: no
+  target -> the nearest (none: the frame ends) with the aerial target; the aerial update; counter and cool-down count
+  down; both below 0: counter 50, search_target(0) (group {2, 50, 120, 100, 0, 0, 0}) found -> its target, leave
+  timer 900, random(0, 2) < 1 -> 5 (sweep), else 2; otherwise the leave timer, 0 -> 8.
+- 2 / 5 charge (0x6D0F0 / 0x6D4F0): speed 0, passable, ground off, IceBeamShotHold loop, the centre offset,
+  request_effect(0x71A0000 / 0x71A0001, centre, 1); 22 / 34 frames -> 3 / 6.
+- 3 / 6 aim (0x6D224 / 0x6D624): length 0, the angles (6: a step 180 / 140 x lr, random(0, 1) < 1 -> step negated and
+  the start a lr + 90 lr, else a lr - 90 lr), node 3 turned and placed, request_effect(0x71A0005, node 2, (10 sin b,
+  10 cos b, 0) (b = -angle in rad: L67364's rotation of (10, 0), x / y swapped), rot (0, 0, lr angle), 1.5) (Wii U
+  0x026A9584); 25 frames (node 3 kept each frame) -> cool-down 150, -> 4 / 7.
+- 4 / 7 beam (0x6C258 / 0x6C980, updates 0x6CB80 / 0x6CE24, exits 0x6D094 / 0x6D494): IceBeamShot loop, 60 / 140
+  frames, the three follow effects; each frame the length, the hitbox offset, the effects (7: then the angle += step,
+  node 3 again: 180 degrees over 140 frames); the end -> 1; the exit removes the effects (exit PMFs: the state table
+  rows now take a third entry).
+- 8 leave (0x6C058): IceBeamShot at rate 0, init_common_leave(P6: 200 frames, -0.01, 10, effect 0x8000005 at (0, 5,
+  0) x 1) -> 10. 9 dead (0x6C0AC): set_mode_none, DamageStart at rate 0, bullet() (P2 entry 2: power 3, angle 361,
+  kbg 100, bkb 50, size 3, node 2 = RotN). 10 remove.
+- Slots: 10 (the 3DS's 11, 0x6CB64) leave timer 900 then BehaviorImpl's; 61 / 62 (0x6D910 / 0x6DC58: the Wii U's
+  BehaviorImpl calls them at vt+0x1F4 / +0x1FC, after the common damage states, as the 3DS's change_common_state /
+  notify_on_capture_cut) change_kinetic(26); 4 (the 3DS's 5, update_on_skip 0x6C438) BehaviorImpl's then node 3 / the
+  beam set again; 69 (0x6DC48) returns 0: the framework's damage reaction (damage_motion_label 2, 1, 0, 3, 3, 5, 4, 6,
+  9) then 64-66 -> 1, 67 -> 9.
+- **Contact damage**: only the beam (4: entry 0; 7: entry 1, the same values with vl word 32 140 instead of 60) and
+  the defeated body (9: entry 2). Nothing while it flies, charges or aims. No explicit attack calls, no ACMD.
+- Not ported: set_rotation_order_zxy (above); play_se / stop_se 0x6A90001-3 and slot 57 (the bound sound); slot 13
+  (zima's capture motion, as every walker); variations 1 / 2; L67364's angle wrap (sin / cos agree to rounding).
+
+**Framework fixes found on the way (they change Ghos / Tiki Buzz / the leaves too):**
+- `REQ_FOLLOW` was 0x026A9584, which is Behavior::request_effect(id, node, off, rot, scale) (3DS 0x7B1384: the
+  EffectModule's req on a node, the vtable slot after req(pos), both games; it does not follow). The follow is
+  **0x026A95F8** (3DS 0x7B4AEC's 14-argument call to req_follow, Wii U 0x02C2AF98). Ghos's body effect, the common
+  leave's effect and Waddle Doo's leave now follow their node as on the 3DS; `REQ_NODE` keeps 0x026A9584.
+- Ghos's and Tiki Buzz's starts called set_rhombus (0x026A65BC, reads +8 kind / +0xC variation) with r3 = the aerial
+  module (its ctor's return): set_rhombus did nothing (kind >= 0x61). Now with the Behavior.
+
+**Effect banks**: the registrations go in kind order, not request order (the step 2d log: 0x712, 0x719, 0x71D, 0x71F,
+0x740, 0x757 for requests 0x12, 0x1D, 0x57, 0x19, 0x1F, 0x40). step2f adds 0x71A: eleven banks with files for ten
+slots; the slot finder (0x032EFEA0) returns -1 when the category is full and the registration (0x032F1388) then
+returns 0 (no overflow), so the last, 0x759 (mczakostalfos's sword trail), would miss out. 0x712 (plasmawisp: its
+twin draws from 0x757) and 0x71D (darios: 0x758) are never requested by the ported code, so the package README asks
+to remove `effect/enemy/plasmawisp/` and `effect/enemy/darios/`: nine banks + 0x71A. Assumed: a kind whose bank
+fails to register still loads its other files.
+
+**Spawner**: `smashrun_field_cave.py` set `step2f` (default): step2e's and Furiijio (placement 2, three times in the
+20-entry turn), at most 6 alive, the fliers' spawn offset (DX 70, DY 30) unchanged; requests step2e's sixteen + 0x1A.
+
+**exe_v17 vs exe_v16, word diff** (scratch diff17.py; data / rodata / bss equal; relocations equal; the file info
+unchanged): text 0x02D9A618, 0x02D9B6F8, 0x04B7D16C, 0x04B7D230-0x04B7D52C (field cave), 0x04B7D630-0x04B7DF00 (E and
+its data), 0x04B849B4-0x04B84A00 (D), 0x04B8691C-0x04B87FC8 (A), 0x04B8940C-0x04B89FFC (B), 0x04BB8004-0x04BB8654 (C),
+0x04BB8770-0x04BBB738 (G: code to 0x04BB9DD4, data after it): 3876 words, all Smash Run regions.
+
+**Propeller Heiho (0x47, not ported).** Read so far: start 0x99010 (set_frame / set_rate_material, set_rhombus,
+nearest + turn, play_se, the item helper 0x5A6F0: a held item (find_item 0x3CD464, its vt+0x144(0)), then
+success_by_percent and random_range(0, 28) choose an item kind, create_item_and_have(kind, variation, position, 1)
+0x7B4104); states 1 turn (0x99598: set_mode_normal(0, 0, 0.1, 0.1, 10, 10), TurnAir, at the end reverse_lr -> 4),
+2 fly away (0x99440: set_mode_normal with P0 f28, set_max_speed(0, f29), set_correct(0), Vertical at f31, 300 frames
+while is_in_view_area -> 8), 3 dead (0x99624: kinetic 23, bullet; P2 entry 0: power 2, angle 361, kbg 100, bkb 50,
+size 2, node 2), 4 height (0x9A578: to the nearest fighter's height, get_height_from_ground), 5 patrol (0x991D4:
+cosine bob of P0 f16 / f17, check_wall, every random(150, 450) frames -> 4 / 6), 6 brake (0x9934C), 7 stun (0x99148:
+kinetic 16, damage_turn, hit_return_frame, the posture rotated), 8 remove; slots 64-66 4, 67 3; slot 59 0x9A224 and
+71 0x99DD8 (the item on death: find_item, node_global_position). Blocked on: the Wii U side of an enemy-held item
+(create by kind, have, drop / fall), the aerial normal mode with update(x, y, bool) (0x02DB2524 takes the stick),
+set_max_speed, get_height_from_ground, is_in_view_area, success_by_percent and the 3DS item kinds' Wii U
+equivalents. No contact hitbox while it flies (its only P2 entry is the defeated body).
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,

@@ -177,7 +177,7 @@ def main():
         rest_ok &= mgr == MGR and var == 0 and one == 1.0 and z == 0.0 and p[0x1C:0x20] == bytes(4) and \
             p[0x24:0x3C] == bytes(0x18)
         del v
-    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58, 0x08, 0x11, 0x0F) else 1 for k in F.KINDS]  # floaters, fliers: as given
+    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58, 0x08, 0x11, 0x0F, 0x1A) else 1 for k in F.KINDS]  # floaters, fliers: as given
     check(kinds == list(F.KINDS) + [F.KINDS[0]] and modes == [m for _k, m in F.SPAWNS] + [F.SPAWNS[0][1]] and
           modes[:-1] == want_modes,
           'D: kinds %s (then the first again), placement %s' % ([hex(k) for k in kinds], modes))

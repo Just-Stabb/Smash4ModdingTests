@@ -26,7 +26,8 @@ from smashrun_walker_test import R, OBJ, ACC, EN, FLAGS, POSTURE, GROUND, check 
 HEAP = T.HEAP
 FEN0, FEN1 = HEAP + 0x24000, HEAP + 0x24100     # the aerial module's energies (fake)
 PMGR, GLTAB = HEAP + 0x25000, HEAP + 0x26000      # the param manager, the gl entries
-ORIG27 = None
+ORIG27 = ORIG4 = None
+MODEL, EFFM, DIRTY = HEAP + 0x24400, HEAP + 0x24600, 0x02000020     # fake ModelModule / EffectModule, vt+0xC4 stub
 EINIT, FVT = 0x02000010, HEAP + 0x24200      # the aerial energy's init (vt+0x1C), its fake vtable
 
 
@@ -34,6 +35,11 @@ class Machine(T.Machine):
     def __init__(self, img):
         T.Machine.__init__(self, img)
         self.touch_any, self.normal, self.factor = False, (0.0, 1.0), 1.0
+        self.target_y, self.center, self.handle = 0.0, (0.0, 0.0, 0.0), 0x7776
+        self.w32(ACC + 0x3118, MODEL)
+        self.w32(MODEL, MODEL + 0x40)
+        self.w32(MODEL + 0x40 + W.MODEL_NODE_DIRTY, DIRTY)
+        self.w32(ACC + 0x30D8, EFFM)
         self.w32(W.PARAM_MGR, PMGR)
         self.w32(PMGR + W.GL_BASE, GLTAB)
         self.w32(PMGR + W.GL_INDEX + 4 * (8 * 0x11), 2)          # ghos, variation 0 -> gl entry 2
@@ -83,14 +89,54 @@ class Machine(T.Machine):
         elif addr == W.BI_NOTIFY_DMG:
             c.append(('bi_damage', r(3)))
             self.ret()
+        elif addr == W.GET_TARGET_POS:
+            c.append(('target_pos', r(5)))
+            for i, v in enumerate((self.target_x, self.target_y, 0.0)):
+                self.wf(r(3) + 4 * i, v)
+            self.ret()
+        elif addr == W.CENTER_POS:
+            c.append(('center_pos', r(4)))
+            for i, v in enumerate(self.center):
+                self.wf(r(3) + 4 * i, v)
+            self.ret()
+        elif addr in (W.SET_NODE_ROT, W.SET_NODE_TRANS):
+            c.append(('node_rot' if addr == W.SET_NODE_ROT else 'node_trans', r(3), r(4),
+                      tuple(round(self.rf(r(5) + 4 * i), 4) for i in range(3)), r(6),
+                      r(7) if addr == W.SET_NODE_TRANS else None))
+            self.ret(1)
+        elif addr == DIRTY:
+            c.append(('dirty', r(3)))
+            self.ret()
+        elif addr in (W.ATK_SET_OFFSET, W.EFF_SET_POS, W.EFF_SET_SCALE):
+            c.append(({W.ATK_SET_OFFSET: 'atk_offset', W.EFF_SET_POS: 'eff_pos', W.EFF_SET_SCALE: 'eff_scale'}[addr],
+                      r(3), r(4), tuple(round(self.rf(r(5) + 4 * i), 4) for i in range(3))))
+            self.ret(1)
+        elif addr in (W.SINF, W.COSF, W.ACOSF):
+            f = {W.SINF: math.sin, W.COSF: math.cos, W.ACOSF: math.acos}[addr]
+            c.append(('libm', addr, self.fr(1)))
+            self.uc.reg_write(T.FR[1], struct.unpack('>Q', struct.pack('>d', f(self.fr(1))))[0])
+            self.ret()
+        elif addr == W.REQ_NODE:
+            c.append(('node_effect', r(3), r(4), r(5), tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)),
+                      tuple(round(self.rf(r(7) + 4 * i), 3) for i in range(3)), round(self.fr(1), 3)))
+            self.ret()
+        elif addr == W.REQ_FOLLOW:
+            self.handle += 1
+            c.append(('follow', r(3), r(4), r(5), tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)),
+                      tuple(round(self.rf(r(7) + 4 * i), 3) for i in range(3)), round(self.fr(1), 3)))
+            self.ret(self.handle)
+        elif addr == ORIG4:
+            c.append(('bi_skip', r(3)))
+            self.ret()
         elif addr == ORIG27:
             c.append(('bi_remove', r(3)))
             self.ret()
         else:
             T.Machine.hook(self, u, addr, size, _)
 
-    def flier(self, cfg, state=0, kind=0x11):
-        self.walker(cfg, state=state, kind=kind, lr=0.0)
+    def flier(self, cfg, state=0, kind=0x11, lr=0.0):
+        self.walker(cfg, state=state, kind=kind, lr=lr)
+        self.uc.mem_write(OBJ + W.FL_SIZE, bytes(W.FU_SIZE - W.FL_SIZE))
         self.w32(OBJ + W.AER, ACC)
         self.w32(OBJ + W.AER + 4, FEN0)
         self.w32(OBJ + W.AER + 8, FEN1)
@@ -290,7 +336,7 @@ def tikibuzz(img, D, fn, c0, slot, w):
 
 
 def main():
-    global ORIG27
+    global ORIG27, ORIG4
     img = E.Image(sys.argv[1])
     vt_words = W.read_vt(img)
     A, B, d = W.assemble(vt_words)
@@ -299,6 +345,7 @@ def main():
     fn = dict(A.labels)
     cfg = {w['name']: D['cfg_' + w['name']] for w in W.FLIERS}
     ORIG27 = vt_words[(0xC + 8 * 27) // 4]
+    ORIG4 = vt_words[(0xC + 8 * 4) // 4]
 
     # the text region and region G
     info = [s for s in img.secs if s[1] == 0x80000004][0]
@@ -319,10 +366,11 @@ def main():
         m.run(0x02DB94CC, 0x02DB96F8, {3: T.MOD, 4: w['kind'], 5: 0, 6: 0})
         new = calls(m, 'new')
         zero = all(m.r32(OBJ + x) == 0 for x in range(0x16C, W.FL_SIZE, 4))
-        check(new == [('new', W.FL_SIZE)] and m.r32(OBJ + 0xE0) == D['vtf'] and m.r32(OBJ + 0x168) == cfg[w['name']]
+        vtk = D['vt_' + w['name']] if w.get('vtover') else D['vtf']
+        check(new == [('new', w['size'])] and m.r32(OBJ + 0xE0) == vtk and m.r32(OBJ + 0x168) == cfg[w['name']]
               and m.r32(T.MOD + 8) == OBJ and zero,
-              'F2: %s 0x%02X -> new(0x%X), vptr VTF, its CFG, the counters and aerial space zero' %
-              (w['name'], w['kind'], W.FL_SIZE))
+              'F2: %s 0x%02X -> new(0x%X), vptr %s, its CFG, the counters and aerial space zero' %
+              (w['name'], w['kind'], w['size'], 'its own vtable' if w.get('vtover') else 'VTF'))
     vt = [img.u32(D['vt'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     vtf = [img.u32(D['vtf'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     diff = [k for k in range(76) if vt[(0xC + 8 * k) // 4] != vtf[(0xC + 8 * k) // 4]]
@@ -501,6 +549,14 @@ def main():
     check(calls(m, 'motion') == [('motion', OBJ, 0, 0.0, 0.0, 0, 0.0)] and calls(m, 'bullet') and
           m.r32(OBJ + W.DEFEATED) == 1, 'ghos 4 (dead, 0x10E84): DamageStart at rate 0, bullet(), defeated')
     tikibuzz(img, D, fn, cfg['tikibuzz'], slot, [x for x in W.FLIERS if x['name'] == 'tikibuzz'][0])
+    for w in W.FLIERS:
+        m = Machine(img)
+        m.flier(cfg[w['name']], kind=w['kind'])
+        m.call(fn[w['fstart']], {3: OBJ})
+        check(calls(m, 'rhombus') == [('rhombus', OBJ)], '%s start: set_rhombus(this) (step 2f: was the aerial '
+              'module)' % w['name'])
+    import smashrun_furiijio_test
+    smashrun_furiijio_test.furiijio(img, D, fn, cfg['furiijio'], vt_words, Machine, calls, run)
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 
