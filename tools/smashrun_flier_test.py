@@ -522,9 +522,45 @@ def main():
               m.uc.mem_read(OBJ + W.AER + 0x2C, 1) == b'\0' and 20 <= m.r32(OBJ + W.V(0)) <= 40)
         if not ok:
             break
-    check(ok and set(picks) == sets and max(picks.values()) > 45,
-          'ghos 1 enter (0x1091C): kinetic 26, slip homing with a P7 set (96 %% / 4 %%: %s), ground off, passable, '
-          'FlyHoming loop, the aerial target = V3, V0 in [20, 40]' % sorted(picks.values()))
+    # step 2g v3: L66BA4's random_choice(100 - 96, 96) -> index 1 (96 %) = the SECOND P7 set (vl group 7 entry 1,
+    # +0x18: max 1.5 a frame, the charge), index 0 (4 %) the first (the slow drift)
+    a1 = W.vl_group('ghos', 7)[1]
+    fast = (round(a1[0], 4), round(a1[3], 4), round(a1[2], 4), round(a1[5], 4), round(a1[1], 4), round(a1[4], 4))
+    check(ok and set(picks) == sets and picks.get(fast, 0) > 45,
+          'ghos 1 enter (0x1091C): kinetic 26, slip homing with a P7 set (96 %% the second set %s, 4 %% the first: '
+          '%s), ground off, passable, FlyHoming loop, the aerial target = V3, V0 in [20, 40]'
+          % (fast, {k: v for k, v in picks.items()}))
+    # step 2g v3: slot 55 (3DS 0x10BA0): in states 1 / 3 with a target, d = (target - posture) normalised, rx = -dy x
+    # P@0xA4 (30), ry = dx x 30 degrees: node 2 set_node_rotate((rx, ry, -ry) in rad, 0) + the model's dirty call, and
+    # the posture rotation (+0x54 > 1: [+0x58] + 0x38) = (rx, ry, 0) with ModelModule +0x20 = 0, MotionModule +0xFC 1 -> 2
+    RT = T.HEAP + 0x3E000
+    g55 = {}
+    for st_, tgt in ((1, 3), (3, 3), (2, 3), (4, 3), (1, -1)):
+        m = Machine(img)
+        m.flier(c0, state=st_)
+        m.w32(OBJ + W.V(3), tgt)
+        m.target_x, m.target_y = 30.0, 40.0
+        for o in (0x10, 0x14, 0x18):
+            m.wf(T.POSTURE + o, 0.0)
+        m.uc.mem_write(RT, bytes(0x60))
+        m.w32(T.POSTURE + 0x54, 2)
+        m.w32(T.POSTURE + 0x58, RT)
+        m.w32(MODEL + 0x20, 7)
+        m.w32(T.MOTION + 0xFC, 1)
+        m.call(fn['f_g55'], {3: OBJ})
+        g55[(st_, tgt)] = ([(c[0],) + tuple(c[2:5]) for c in calls(m, 'node_rot', 'dirty', 'target_pos')],
+                           tuple(round(m.rf(RT + 0x38 + 4 * i), 3) for i in range(3)), m.r32(MODEL + 0x20),
+                           m.r32(T.MOTION + 0xFC))
+    k = W.DEG2RAD
+    want = ([('target_pos', 3), ('node_rot', 2, (round(-24.0 * k, 4), round(18.0 * k, 4), round(-18.0 * k, 4)), 0),
+             ('dirty',)], (-24.0, 18.0, 0.0), 0, 2)
+    idle = ([], (0.0, 0.0, 0.0), 7, 1)
+    want = ([('target_pos',), want[0][1], ('dirty',)],) + want[1:]
+    ok = g55[(1, 3)] == want and g55[(3, 3)] == want
+    ok &= all(g55[x] == idle for x in ((2, 3), (4, 3), (1, -1)))
+    check(ok, 'step 2g v3: ghos slot 55 (0x10BA0): toward a target at (30, 40) in states 1 / 3: node 2 turned (rx, ry, '
+          '-ry) = (-24, 18, -18) degrees, the posture rotation (-24, 18, 0), the model / motion marks; nothing in 2 / 4 '
+          'or without a target %s' % g55)
     # state 1 update: the aerial update; V0 out -> a new set; V1 out -> 3
     m = Machine(img)
     m.flier(c0, state=1)

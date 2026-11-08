@@ -23,6 +23,9 @@ heads (the fighter for Ghos / Tiki Buzz / Furiijio; the fighter's height, then t
 Heiho), and that Ghos's speed carries on through its slip-homing re-picks (the 3DS's slip). Results: exe_v16 (step
 2e, with the step-2e tools) fails 5 (no ground collision, no movement, the re-pick stop); exe_v19 fails 1 (the
 re-pick stop); exe_v20 passes. Other framework calls stay stubbed as in smashrun_flier_test.py (its Machine).
+Step 2g v3 (exe_v21): Ghos's re-pick takes the 3DS's sets the right way round (96 % the fast set: 76.2 -> 30.0 units in
+240 frames, was 57.9); and the spawn facing, through the game's own initialize_after / set_lr / damage_turn /
+reverse_lr: spawned on either side and turned twice by hits, the 3DS-flip kinds keep yaw -90, the others lr x 90.
 """
 import math
 import os
@@ -213,6 +216,66 @@ def dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
+INIT_AFTER = 0x02DB4AC8         # BehaviorImpl::initialize_after (slot 42; fix v3's hook at 0x02DB4B20 calls slot 49)
+LINK_EVENT, EVENT_INDEX = 0x02C55B04, 0x026A9748      # set_lr's link event / the listeners' index (stubbed)
+POSTURE_SETLR = 0x02000078      # the PostureModule's own set_lr (its vt+0x7C, reverse_lr's first call): lr = f1
+
+
+class Facing(Motion):
+    """step 2g v3: the game's own set_lr 0x026A780C, reverse_lr 0x026A7A20, damage_turn 0x02DB4E84 and initialize_after
+    0x02DB4AC8 run as code (their link event / listener calls stubbed; slot 38 is the cave's w_noflip)"""
+    RUN = {W.SET_LR, W.REVERSE_LR, W.DAMAGE_TURN, INIT_AFTER}
+
+    def __init__(self, img):
+        Motion.__init__(self, img)
+        self.w32(POSTURE + 0x78, ACC)
+        self.w32(ACC + 0x24, GMOD)
+        self.uc.mem_write(HEAP + 0x3D000, bytes(0x100))
+        self.w32(ACC + 0x3118, HEAP + 0x3D000)
+        self.w32(HEAP + 0x3D000 + 0x80, ACC)
+        self.w32(ACC + 0x30F0, T.MOTION)
+        self.w32(ACC + 0x30D4, HEAP + 0x3D200)          # the DamageModule: +0x6C +0x2C the hit's lr
+        self.uc.mem_write(HEAP + 0x3D200, bytes(0x100))
+        self.w32(POSTURE, HEAP + 0x3D400)
+        self.w32(HEAP + 0x3D400 + 0x7C, POSTURE_SETLR)
+
+    def hook(self, u, addr, size, _):
+        if addr in self.RUN:
+            self.calls.append(('run', addr))
+            return
+        if addr in (LINK_EVENT, EVENT_INDEX):
+            self.ret(0xFFFFFFFF)
+            return
+        if addr == POSTURE_SETLR:
+            self.wf(POSTURE + 0x60, self.fr(1))
+            self.ret()
+            return
+        Motion.hook(self, u, addr, size, _)
+
+
+def facing(img, D, kinds):
+    """spawn on both sides (posture lr from the spawner, the Enemy's +0x64 1.0, then initialize_after), then two hits
+    from behind (damage_turn -> reverse_lr): the posture yaw (+0x64) after each"""
+    out = {}
+    for w in kinds:
+        vt = D['vt_' + w['name']] if w.get('vtover') else D['vtf' if w.get('flier') else 'vt']
+        for lr in (1.0, -1.0):
+            m = Facing(img)
+            m.flier(D['cfg_' + w['name']], kind=w['kind'], lr=lr) if w.get('flier') else \
+                m.walker(D['cfg_' + w['name']], kind=w['kind'], lr=lr)
+            m.w32(OBJ + 0xE0, vt)
+            m.wf(POSTURE + 0x60, lr)
+            m.wf(POSTURE + 0x64, 1.0)                # the Enemy's posture init (0x02D89EF0)
+            m.call(INIT_AFTER, {3: OBJ})
+            yaws = [(m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64))]
+            for _hit in range(2):
+                m.wf(HEAP + 0x3D200 + 0x6C + 0x2C, -m.rf(POSTURE + 0x60))
+                m.call(W.DAMAGE_TURN, {3: OBJ})
+                yaws.append((m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64)))
+            out[(w['name'], lr)] = yaws
+    return out
+
+
 def main():
     img = E.Image(sys.argv[1])
     vt_words = W.read_vt(img)
@@ -227,6 +290,23 @@ def main():
     check(m.r32(EKM + 0x18) == EKM + 0x124 and m.r32(EKM + 0x28) == EKM + 0x200 and m.r32(EKM + 0x124 + 0x1C) ==
           0x10122F24, 'the EnemyKineticModule (game ctor 0x02DBD288): energy 0 = +0x124 (vtable 0x10122F24), '
           'energy 1 = +0x200')
+
+    # step 2g v3: the spawn facing, through the game's own set_lr / reverse_lr / damage_turn / initialize_after
+    allk = {w['name']: w for w in W.WALKERS}
+    names = [n for n in ('kuribo', 'heiho', 'waddledee', 'churine', 'ghos', 'tikibuzz', 'furiijio', 'propellerheiho')
+             if n in allk]
+    fc = facing(img, D, [allk[n] for n in names])
+    bad = {}
+    for (n, lr), yaws in fc.items():
+        flip = allk[n]['kind'] in W.YAW_FLIP
+        lrs = [lr, -lr, lr]
+        want = [(x, -90.0 if flip else 90.0 * x) for x in lrs]
+        if yaws != want:
+            bad[(n, lr)] = yaws
+    check(not bad, 'step 2g v3: spawned on either side (lr 1 / -1), then turned twice by hits from behind (the game\'s '
+          'initialize_after, set_lr, damage_turn, reverse_lr with the cave\'s slots 49 / 50): the 3DS-flip kinds keep '
+          'yaw -90 (their camera-facing view) through it all, the others lr x 90 (%s); wrong: %s'
+          % (', '.join(names), bad))
 
     start, target = (0.0, 30.0), (70.0, 0.0)
     d0 = dist(start, target)

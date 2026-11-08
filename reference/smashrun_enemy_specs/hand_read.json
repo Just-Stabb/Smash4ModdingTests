@@ -56,7 +56,8 @@
   "kinetics": "initialize (slot 40) writes the AI energy [[[acc+0x30B0]+8]+0]+4: +0x08 = P0.f1 2.0, +0x0C = f2 1.5, +0x10 = f4 0.02, +0x14 = f6 0.001, +0x18 = f3 0.01, +0x20 = f7 -0.4, +0x24 = f8 1.6, +0x2C = f9 5, +0x40 = 1, +0x44 = f13 0.8, then the energy's vslot 31 (0x20000004, 5.0, 1.0). Field meanings unresolved (copy them as is: the Wii U energy has the same layout). Walk and run use the same kinetic (10) and differ in motion rate (0.6 / 1.0).",
   "projectiles": "none",
   "death": "HP 0 -> state 9 (bullet flight, hits) -> 10 remove; stomped -> 8 (Collapses, drops a dead item) -> 10.",
-  "meshes": "no vmt; the face is a material animation (material_anime) on the 3DS."
+  "meshes": "no vmt; the face is a material animation (material_anime) on the 3DS.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "heiho": {
   "class": "walker",
@@ -119,7 +120,8 @@
   "targeting": "search_interval(i) = P1[i].interval, search_target(i) = check_target(P1[i].search_type, this+0x14, range / offset from P1[i]) (code.bin 0x9EA658). Index 0 while waiting / walking, 1 while running.",
   "projectiles": "none",
   "death": "HP 0 -> 15 (bullet flight, hits) -> 16 remove.",
-  "meshes": "no vmt (colour by material animation frame)."
+  "meshes": "no vmt (colour by material animation frame).",
+  "facing": "3DS slot 38 returns 0: no flip; yaw lr x 90 as on the Wii U."
  },
  "waddledee": {
   "class": "walker",
@@ -166,7 +168,8 @@
   "kinetics": "initialize: energy +0x10 = P0[var].f1 0.2, +0x08 = f2 0.2, +0x20 / +0x28 = f3 0.3, +0x24 / +0x2C = f4 2.5, +0x44 = f7 (1 / 0.1), +0x18 = f6 0.0005 (var 0/1) or 0.",
   "projectiles": "article 0 = weapon kind 0xB0-range id from enemy_article_data_set_waddledee: the parasol (dropped, not shot).",
   "death": "HP 0 -> 7 (bullet, damage face) -> 8 remove; the parasol is dropped first (notify_on_death -> L5cf90).",
-  "meshes": "vmt: 0 Cparasol, 1 Larm, 2 Lparasol, 3 Rarm, 4 Rparasol, 5 damage, 6 normal. L5d04c (every state enter): var 2/3 (no parasol): Larm/Rarm on, parasols off, normal face (damage off). var 0/1: Cparasol on while ParasolFall (motion 11) and both arms off; otherwise the parasol in the hand on the side given by lr (Lparasol + Rarm, or Rparasol + Larm) and node scale squash (slots 21 / 55). Death (L5cf18): both arms, no parasol, damage face on, normal off."
+  "meshes": "vmt: 0 Cparasol, 1 Larm, 2 Lparasol, 3 Rarm, 4 Rparasol, 5 damage, 6 normal. L5d04c (every state enter): var 2/3 (no parasol): Larm/Rarm on, parasols off, normal face (damage off). var 0/1: Cparasol on while ParasolFall (motion 11) and both arms off; otherwise the parasol in the hand on the side given by lr (Lparasol + Rarm, or Rparasol + Larm) and node scale squash (slots 21 / 55). Death (L5cf18): both arms, no parasol, damage face on, normal off.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "waddledoo": {
   "class": "walker+shooter",
@@ -218,7 +221,8 @@
   "projectiles": "waddledoo_beam (weapon kind 175 in enemy_article_data_set_waddledoo, max 5 alive (inferred from the entry's second word)).",
   "death": "HP 0 -> 10 (bullet) -> 11; timeout -> 9 (leave) -> 11.",
   "meshes": "vmt: 0 eye_blink1, 1 eye_blink2, 2 eye_normal, 3 tear. Slot 55 (every frame) while walking (state 3) blinks: normal eye, then blink2, blink1 (PS8c.f12 = 4 frames each) at random intervals random_range(PS8c.f10 30, f11 50); tear shown in state 10 (death) and from slots 56/57; otherwise eye_normal on, the rest off.",
-  "leave": "start 0x7CC3C: +0x184 = PS8c f0 600; walk 0x7D4C8: +0x184-- first, <= 0 -> 9 (it is reset to 600 only when the beam fires, state 7). 9 = enter 0x7CEC0: Fall at rate 0, init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85}) (code.bin 0x7B23B4: +0xDC = 300, 0x7B4E84: energy +0x30 = -0.02, +0x34 = 30, kinetic 15; ground off; set_correct(0); disable_jostle; effect -1 -> the common leave effect 0x8000005 following node 0 at (0, 3, 0) x 0.85 unless EnemyManager +0x5F8); update 0x7D444: update_common_leave 0x7B40B0 counts +0xDC down, at 0 removes the effect and returns 0 -> 11 (remove). A leave is not a defeat (no bullet, no notify_on_death)."
+  "leave": "start 0x7CC3C: +0x184 = PS8c f0 600; walk 0x7D4C8: +0x184-- first, <= 0 -> 9 (it is reset to 600 only when the beam fires, state 7). 9 = enter 0x7CEC0: Fall at rate 0, init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85}) (code.bin 0x7B23B4: +0xDC = 300, 0x7B4E84: energy +0x30 = -0.02, +0x34 = 30, kinetic 15; ground off; set_correct(0); disable_jostle; effect -1 -> the common leave effect 0x8000005 following node 0 at (0, 3, 0) x 0.85 unless EnemyManager +0x5F8); update 0x7D444: update_common_leave 0x7B40B0 counts +0xDC down, at 0 removes the effect and returns 0 -> 11 (remove). A leave is not a defeat (no bullet, no notify_on_death).",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "churine": {
   "class": "walker",
@@ -263,7 +267,8 @@
   "kinetics": "initialize: energy +0x10 = P0.f1 0.1, +0x08 = f2 0.7, +0x14 = f3 0.05, +0x20 / +0x28 = f4 0.2, +0x24 / +0x2C = f5 2.5.",
   "projectiles": "none fired by code (effect 0x71F0000 + ACMD hitboxes).",
   "death": "HP 0 -> 8 (bullet) -> 9; the powder effect is removed (slot 69 / state 8 enter).",
-  "meshes": "no vmt."
+  "meshes": "no vmt.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "zima": {
   "class": "crawler",
@@ -318,7 +323,8 @@
   "targeting": "only faces the nearest target on landing.",
   "projectiles": "none",
   "death": "HP 0 -> 6 (bullet) -> 7.",
-  "meshes": "no vmt."
+  "meshes": "no vmt.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "plasmawisp": {
   "class": "flyer+shooter",
@@ -388,7 +394,8 @@
   "targeting": "search_target(0) picks the float target (aerial homing to its position), search_target(1) (P1[1]: interval 5, box (140, 20)) triggers the attacks.",
   "projectiles": "enemy_article_data_set_plasmawisp: 4 articles = plasmawisp_needle, (large needle), plasmawisp_laser, plasmawisp_hadoudan (order by the generate_article indices 0-3; names inferred from the CRO's weapon classes: needle, laser, hadoudan). (inferred) The article entries: two of weapon kind 176 (needle; the second with a different data pointer = the large needle), then the laser and the hadoudan.",
   "death": "HP 0 -> 1 (bullet, effect 0x7120004 at level 2) -> 10.",
-  "meshes": "no vmt."
+  "meshes": "no vmt.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "darios": {
   "class": "stationary turret",
@@ -451,7 +458,8 @@
   "targeting": "an aim angle (this+0x170 / +0x174) turned toward the nearest target; the shot is triggered by search_target(1) in a cone around it.",
   "projectiles": "none (the beam is the enemy's own attack).",
   "death": "HP 0 -> 6 (bullet) -> remove.",
-  "meshes": "vmt: 0 default, 1 shoot: shoot only in state 5 (beam), default otherwise."
+  "meshes": "vmt: 0 default, 1 shoot: shoot only in state 5 (beam), default otherwise.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "stalfos": {
   "class": "walker+melee",
@@ -526,7 +534,8 @@
   "projectiles": "none",
   "death": "HP 0 -> 23 (bullet) -> 24.",
   "meshes": "no vmt.",
-  "wiiu": "The Wii U's mczakostalfos (kind 0x59) runs this behaviour (step 2a): its 38-index motion set = these indices."
+  "wiiu": "The Wii U's mczakostalfos (kind 0x59) runs this behaviour (step 2a): its 38-index motion set = these indices.",
+  "facing": "3DS slot 38 returns 0: no flip; yaw lr x 90 as on the Wii U."
  },
  "whitebear": {
   "class": "walker",
@@ -579,7 +588,8 @@
   "kinetics": "initialize: energy +0x10 = P0.f1 1, +0x08 = P0.f2 0.3, +0x14 = P0.f3 0. Start: set_weak_param(5, P0.f19 2) (a damage weakness, element 5, x2).",
   "projectiles": "none.",
   "death": "HP 0 -> 10 (bullet) -> 11.",
-  "meshes": "no vmt."
+  "meshes": "no vmt.",
+  "facing": "3DS slot 38 returns 0: no flip; yaw lr x 90 as on the Wii U."
  },
  "gordo": {
   "class": "stationary",
@@ -613,14 +623,15 @@
   "kinetics": "initialize (var 0 row: zeros): energy +0x10 / +0x08 / +0x14 / +0x20 / +0x24 / +0x28 / +0x2C = 0, +0x40 = 1, +0x18 = 0, +0x0C = 100, vt+0x7C(0x20000004). Start: set_rhombus, set_correct(0 / 5 by variation), set_test_coll_stop(1), set_lr(0, 1, 1) (faces the camera), home = position, set_invincible_global(0).",
   "projectiles": "none.",
   "death": "none: death_state 0 and slots 64-66 = 0; its gl entry has HP 1 and the three flags (+0x34..+0x3C) other enemies have set at 0 (no damage, inferred).",
-  "meshes": "no vmt."
+  "meshes": "no vmt.",
+  "facing": "3DS slot 38 returns 0: no flip; yaw lr x 90 as on the Wii U."
  },
  "ghos": {
   "class": "flier (homing)",
-  "summary": "Ghos (Kid Icarus). Faces the camera and drifts after the nearest fighter in the aerial module's slip homing (two parameter sets, 96 % / 4 %, re-picked every 20-40 frames), bouncing off walls / floors / ceilings; hit: a stun of hit_return_frame() frames, then flies again; leaves after 1200 frames without hitting or being hit. Its body hurts all the time while it flies.",
+  "summary": "Ghos (Kid Icarus). Faces the camera and drifts after the nearest fighter in the aerial module's slip homing (two parameter sets re-picked every 20-40 frames: 96 % the second, max 1.5 a frame, which charges at the target; 4 % the first, a slow drift), bouncing off walls / floors / ceilings; hit: a stun of hit_return_frame() frames, then flies again; leaves after 1200 frames without hitting or being hit. Its body hurts all the time while it flies.",
   "read": "enemy_fs.cro (update): create 0x11560, ctor 0x11598 (EnemyAerialModuleImpl at +0x168, set_motion_label without hashsets, no set_damage_motion_label), start 0x109C0, states: 1 0x1091C / 0x10E24, 2 0x10AD0 / 0x10EE4, 3 0x10DD0 / 0x10F78, 4 0x10E84 / 0x1105C, 5 remove; helpers L66BA4 (slip-homing pick), L1120C (bounce); slots 11 notify_on_damage 0x11094, 28 notify_on_remove 0x11140, 31 0x113F0, 55 0x10B9C, 69 0x113A4; slots 64-66 = 1, 67 = 4. code.bin: EnemyAerialModuleImpl::set_mode_slip_homing 0x5F5F58, update 0x5F66AC, GroundCollisionObject::get_ground_normal 0x96A538, Behavior::hit_return_frame 0x9EA9B0 (factor 0x9EB4C0, damage 0x9EAAB4), init_common_leave 0x7B23B4, finalize_common_leave 0x7B475C.",
   "states": {
-   "1": "Fly: kinetic 26, L66BA4 (timer = random(P@0x8C 20, P@0x90 40); random_choice(96, 4) -> set_mode_slip_homing(P7 entry 0 / 1: s0 +0, s1 +0xC, s2 +8, s3 +0x14, s4 +4, s5 +0x10)), ground off, passable on, FlyHoming loop, aerial set_target(the start's nearest fighter, 0). Update: aerial update; the timer runs out -> L66BA4; L1120C; the leave timer (P@0xA0 1200) runs out -> 3.",
+   "1": "Fly: kinetic 26, L66BA4 (timer = random(P@0x8C 20, P@0x90 40); random_choice(100 - P@0x94 96 = 4, 96, 0, 0) (0x7B0DC4: weights -> index; index 0 4 %, index 1 96 %) -> set_mode_slip_homing(P7 entry [index] (entry 1 at +0x18 96 %, entry 0 4 %): s0 +0, s1 +0xC, s2 +8, s3 +0x14, s4 +4, s5 +0x10)), ground off, passable on, FlyHoming loop, aerial set_target(the start's nearest fighter, 0). Update: aerial update; the timer runs out -> L66BA4; L1120C; the leave timer (P@0xA0 1200) runs out -> 3.",
    "2": "Stun (slot 69): kinetic 16, ground off, passable on, DamageStart once, frames = hit_return_frame(), mesh 1 off / 0 on, kinetic flag |= 0x80; the frames run out: flag cleared, meshes back, -> 1.",
    "3": "Leave: set_motion_no_restart(FlyHoming), init_common_leave(P6 {100, 0.02, 30, -1, 0, 0, 3, 0, 0.85}); update_common_leave == 0 -> 5.",
    "4": "Dead: DamageStart at rate 0, bullet(), meshes 1 off / 0 on; kinetic flag 8 -> 5.",
@@ -657,13 +668,14 @@
    }
   ],
   "contact": "yes in state 1 (fly: power 3, angle 361, kbg 50, bkb 50, size 8, node 3 HipN); the defeated body (state 4: kbg 100). No explicit attack calls; no ACMD (no hashsets, no animcmd files).",
-  "targeting": "start: the nearest fighter (kept); aerial slip homing toward it; slot 55 turns node 2 and the posture toward it (rx = -dy 30, ry = dx 30 degrees: not ported).",
+  "targeting": "start: the nearest fighter (kept); aerial slip homing toward it; slot 55 (0x10BA0; vtable 0xCB840 + 55 x 4 = 0xCB91C, the only pointer to it: not slot 5) every frame in states other than 0 / 2 / 4 / 5 with a target (+0x1F0 != -1): d = get_target_pos - posture, normalised (x, y by |d|), rx = -dy x P@0xA4 (30.0), ry = dx x 30 (degrees); set_rotation_order_xyz; MotionModule set_node_rotate(2, (rx, ry, -ry) x 0.0174533, 0) (+ ModelModule vt+0x60 on a change); the posture rotation (+0x54 > 1: [+0x58] + 0x3C..+0x44) = (rx, ry, 0), on a change ModelModule +0x20 = 0, MotionModule +0x100 1 -> 2. Wii U (step 2g v3): set_node_rotate 0x02C64188, ModelModule vt+0xC4, the posture rotation at [+0x58] + 0x38 (as the Wii U's 0x02DC3CC4 writes it), ModelModule +0x20 word, MotionModule +0xFC word; set_rotation_order_xyz not mapped (the default order assumed).",
   "kinetics": "slip homing (code.bin 0x5F5F58: mode 2, energy 0 re-initialised with its current speed, params +0x10..+0x24, energy 0 on / 1 off, target point = position); bounce L1120C: on is_touch(0xFF), r = |v|^2 / 0.8^2; r < 0.1 (and r <= 1): nothing; v reflected on get_ground_normal(0xFF) (the sum of the touched lines' normals, normalised), normalised, times 0.6 min(r, 1) -> set_current_speed.",
-  "damage": "slot 11 notify_on_damage: (a weapon / held item / flagged attack per slot 31 restores the HP with init_damage) BehaviorImpl::notify_on_damage, stop_se, the leave timer = 1200. Slot 69 (called by it): a running leave finalised + set_correct(5), => 2, returns 1 (the framework's own reaction skipped). hit_return_frame = int(int(gl +0x154) x f), f = gl +0x160 + (gl +0x164 - gl +0x160) (clamp(d, gl +0x158, gl +0x15C) - gl +0x158) / (gl +0x15C - gl +0x158), d = DamageModule +0x6C; the Wii U gl file's ghos entry (index kind + 1): +0x154 30, +0x158 1, +0x15C 80, +0x160 2, +0x164 1.",
+  "damage": "slot 11 notify_on_damage: (a weapon / held item / flagged attack per slot 31 restores the HP with init_damage) BehaviorImpl::notify_on_damage, stop_se, the leave timer = 1200. Slot 69 (called by it): a running leave finalised + set_correct(5), => 2, returns 1 (the framework's own reaction skipped). hit_return_frame = int(int(gl +0x154) x f), f = gl +0x160 + (gl +0x164 - gl +0x160) (clamp(d, gl +0x158, gl +0x15C) - gl +0x158) / (gl +0x15C - gl +0x158), d = DamageModule +0x6C; the Wii U gl file's ghos entry (index kind + 1): +0x154 30, +0x158 1, +0x15C 80, +0x160 2, +0x164 1. Slot 31 (0x113F0, vtable +0x7C; r1 the hit: [+0x14] the AttackData, [+0x20] the attacker record, its +0x1C category, +0x18 id): category 1 (a weapon: BattleObjectManager::find_battle_object, Behavior::is_weapon_as_fighter(kind) -> immune), category 4 (an item: ItemManager::find_item; held (Item::is_haved) and its kind not 0x12 / 0x24 -> immune), any other (a fighter's own attack) immune when the AttackData +0x4C byte is set (read as the direct-attack flag: unverified); immune: +0x1F4 = 1, module acc+0x3074 +0x5A2 = 0, play_se(15); else +0x1F4 = 0, +0x5A2 = 1. Slot 11 (0x11094) with +0x1F4: DamageModuleImpl::init_damage(+0x1F8) (the damage before the hit: the HP restored), stop_se; else +0x1F8 = damage(0), BehaviorImpl::notify_on_damage; then the leave timer = P@0xA0 1200.",
   "death": "state 4 (bullet); leave state 3 after 1200 frames (reset by being hit).",
   "wiiu": "Wii U: aerial ctor 0x02DB2C44, update 0x02DB28C8, set_mode_slip_homing 0x02DB28E4 (mode 2; the earlier notes called it set_mode_homing), set_current_speed 0x02DB2BC0, get_ground_normal 0x02D64ABC (via GroundModule +0x18, as is_touch 0x02C38A24), the hit_return_frame factor 0x02DB4ED4 (gl +0x158..+0x164, damage float via 0x026A81F8: DamageModule acc+0x30D4 +0x6C), gl entry [[0x102F6C00] + 0x34] + 0x228 [[0x102F6C00] + 0x1E4 + 4 (8 kind + var)]; BehaviorImpl::notify_on_damage 0x026A3564 calls slot 69 (vt+0x234).",
-  "not_ported": "slot 31 (weapons counted as fighters' own, held items other than kinds 0x12 / 0x24 and attacks with the AttackData +0x4C flag: HP restored and +0x5A2 of module acc+0x3074 cleared, play_se(15)); slot 55 / slot 5 (the body / node 2 turned toward the target); set_node_visibility (damage mesh); play_se / stop_se.",
-  "meshes": "0 damage_VIS_O_OBJ, 1 normal_VIS_O_OBJ (not switched: no Wii U path)."
+  "not_ported": "slot 31's immunity (above: the Wii U slot it maps to (30 or 31), its hit record layout, the AttackData flag and DamageModule init_damage are not found yet, so direct hits still hurt it); set_rotation_order_xyz (slot 55); set_node_visibility (damage mesh); play_se / stop_se.",
+  "meshes": "0 damage_VIS_O_OBJ, 1 normal_VIS_O_OBJ (not switched: no Wii U path).",
+  "facing": "3DS slot 38 returns 0: no flip; yaw lr x 90 as on the Wii U."
  },
  "tikibuzz": {
   "class": "flier (dive bomber)",
@@ -679,7 +691,7 @@
    "7": "Landed: ground on, AttackUnguard, set_mode_none, counter 0, request_quake(3); aerial update; counter < f14 (45): +1, else -> 8.",
    "8": "Ready: ground off, FlyReady, set_mode_none; end -> 3.",
    "9": "Leave: ground off, passable on, Fly loop, set_correct(0), set_mode_none, timer P@0x78 200; aerial update; timer out -> 12.",
-   "10": "Stomped (slot 21): ground off, passable on, Step, create_dead_item(1, 10), disable_hit, counter 0, set_mode_uniform((0, -f19 3)), meshes damage 2, effect 0x70F0000 at the position, play_se 0x89C0002; aerial update; counter < f20 (60) and not on the ground: +1, else -> 11.",
+   "10": "Stomped (slot 21): ground off, passable on, Step, create_dead_item(1, 10), disable_hit, counter 0, set_mode_uniform((0, -f19 3)), meshes damage 2, effect 0x70F0000 at the position, play_se 0x89C0002; aerial update; counter < f20 (60) and not on the ground: +1, else -> 11. Wii U stomp (fix v8 detection, step 2g v3): the tread box (area 0: node 3 HipN, 12 x 3 full sizes, as the Goomba's 14 x 8 read: half width 6, centre HipN's bind height 11.72, half height 1.5); the test is relative to the enemy (a rising flier) and swept (a crossing of the box top this frame, down to its height + 4 below it): a fighter falling onto it -> 10 and the fighter's StatusModule(3, 0xB3 StepJump, 0), once (not in 10 / its death state / defeated).",
    "11": "Gone: kinetic 26, ground on, passable on, set_visibility(0), effect 0x70F0001, play_se 0x89C0003; -> 12.",
    "12": "Remove."
   },
@@ -723,7 +735,8 @@
   "kinetics": "setters (code.bin): every one = the mode, energy 0 vt+0xC(0x17, speed, 0, acc) (Wii U vt+0x1C, vptr +0x1C), energy 0 on / 1 off: homing speed 0 (homing_extend = homing + mode 3), slip homing the current speed, none (-1) 0, braking (4) the current speed + params +0x18 / +0x1C, uniform (5) the given speed; the update's mode 5 does nothing (the speed set once).",
   "death": "state 2 (bullet); stomped: 10 -> 11 -> removed (create_dead_item: kill and item drop); leave: 9 after 900 fly frames.",
   "not_ported": "start's GroundCollisionObject +0x141 = 4 / +0x142 = 0 and set_circle_follow_node(2) (the Wii U collision object's layout differs past +0x100; not mapped); the flap rate (MotionModule +0x50); meshes (set_mesh_visibility) and set_visibility(0); play_se.",
-  "meshes": "0 Damage1_VIS_O_OBJ, 1 Damage2_VIS_O_OBJ, 2 Normal_VIS_O_OBJ."
+  "meshes": "0 Damage1_VIS_O_OBJ, 1 Damage2_VIS_O_OBJ, 2 Normal_VIS_O_OBJ.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "furiijio": {
   "class": "flier (homing, beam)",
@@ -792,7 +805,9 @@
   "death": "state 9 (bullet); leave state 8 after 900 frames without a find or a hit.",
   "wiiu": "Wii U: set_node_rotate 0x02C64188 and set_node_translate 0x02C642C8 (MotionModule acc+0x30F0; entries 0x28 bytes, node +0x24, flags +0x26), the ModelModule (acc+0x3118) vt+0xC4 after a change (as the Wii U's callers 0x026A1434 / 0x026BB7B8), AttackModule set_offset 0x02C09150 (entries 0x84, +0x6C on), EffectModule set_pos 0x02C2C0C0 / set_scale 0x02C2C120 (EffectSystem 0x032F0978 / 0x032F0A48), center_pos 0x026A7104, request_effect(id, node, ...) 0x026A9584, request_follow_effect 0x026A95F8 (0x02C2AF98), sinf 0x04ADEB48, cosf 0x04ADF434, acosf 0x04ADF800.",
   "not_ported": "set_rotation_order_zxy (no Wii U code writes such a flag on the ModelModule: the node rotation uses the Wii U's order); play_se / stop_se (0x6A90001-3); slot 57 (the bound sound on DownBoundEnd / DownWait); slot 13 capture motion (zima's, as every walker); variations 1 / 2 (P0 rows 1 / 2: the spawner makes variation 0); L67364's angle wrap before sin / cos (the same up to float rounding).",
-  "meshes": "none listed."
+  "meshes": "none listed.",
+  "effects": "Every effect request in the 3DS code (enemy_fs.cro): 0x6D170 request_effect(0x71A0000, center_pos(), ZERO, 1) in 2 (charge) and 0x6D570 0x71A0001 in 5; 0x6D44C / 0x6D8C4 request_effect(0x71A0005, node 2, offset, rot (0, 0, lr a), 1.5) in 3 / 6 (aim); 0x6C378 / 0x6CAA0 request_follow_effect(0x71A0002, node 2, ZERO, ZERO, 1) -> +0x254, 0x71A0004 node 3 -> +0x258, 0x71A0003 node 3 -> +0x25C in 4 / 7 (beam); each beam frame EffectModuleImpl::set_scale(+0x258, (len x 0.05, 1, 1)) (0x6C510 / 0x6C874 / 0x6CD50 / 0x6CF2C) and set_pos(+0x25C, (len, 0, 0)) (0x6C538 / 0x6C89C / 0x6CD78 / 0x6CF54); the exits 0x6D094 / 0x6D494 remove_effect the three; the common leave's 0x8000005. Sounds 0x6A90001-3 (play_se / stop_se). Bank 0x71A (furiijio.03030000.efc, sets 1-based): 0 / 1 -> set 2 PtcfsFuriijioShootFilling (BG 70, cool_airA, tubu: the charge mist), 2 -> set 1 PtcfsFuriijioFreezBeamRoot (BG 52 x 52 mist, snow 10 x 10 flakes, cool_airA 35: the icy cloud at the body while the beam fires, emitting until removed), 3 -> model EfffsFuriijioFreezBeamTop_B, 4 -> model EfffsFuriijioFreezBeamBody_B, 5 -> set 3 PtcfsFuriijioSign (flare, sign_center). The port makes the same requests with the same ids / nodes / offsets / scales / functions (REQ_FOLLOW 0x026A95F8, REQ_NODE 0x026A9584, REQ_EFFECT 0x026A951C, set_pos 0x02C2C0C0 / set_scale 0x02C2C120 on the same handles) and the converted bank has the three sets (8 emitters) and both models; why the FreezBeamRoot cloud does not show in game (step 2g v2 user screenshot) is not settled statically: a log build (tools/diag_effect_cave.py, now for 127 slots) is the next step.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  },
  "propellerheiho": {
   "class": "flier (carries an item)",
@@ -832,6 +847,7 @@
   "item": "Kinds: 0x21 customizeitem (P@0x24 10 %), 0x1D goldbag (P@0x28 20 % of the rest), 0x0E tabemono (29 variations: random_range(0, 28)); both games' item kind tables match (3DS 0xC2EB28, Wii U 0x104157A0). Held: create_item_and_have(kind, var, posture, 1): created at the posture, have(0x50000000, ...) (no owner: the item's held state), kept by id (+0x208); each frame (slot 59) Item::warp(HipN global position + (0, P@0x1C -10, 0), z 0). Swap (slot 55, states 4 / 5): the old item removed (vt+0x144(0)), a new one, the item's EffectModule req(common 0x100001C, joint 0, offset (-5, 5, 0) / tabemono (0, 5, 5), scale 1), play_se(0x6D20001). Drop: Item::fall(tabemono ? 0 : 1, ZERO): the item leaves the held state and falls as a normal pick-up.",
   "wiiu": "Wii U: Behavior::create_item 0x026A8D78 (r4 kind, r5 var, r6 &pos, r7 (unused), r8 bool: init_normal 0x030519B4 + ItemManager::create_item 0x0305542C); create_item_and_have itself is gone (no caller; the cave does its two item calls); the item's vtable at +0x24 (8-byte entries, the 3DS's slot numbers: 81 +0x28C remove(bool) = +0x3B6E 1, 83 +0x29C id, 95 +0x2FC have(owner, ...): owner 0x50000000 -> the no-owner held state); Item +0 id, +4 kind; ItemManager [0x102F9B30], find_item 0x030563AC; Item::warp 0x0303207C, Item::fall 0x03032D78 (the ItemModule's drop / throw callers; the same get_param(3 / 4 / 5) and sp-float 0x34); ModelModule (acc+0x3118) node_global_position 0x0200739C; aerial update(x, y, brake) 0x02DB2524 (mode 0 at +0xC as a word), set_current_speed 0x02DB2BC0; set_mode_normal / set_max_speed: no Wii U copy (written in the cave from the 3DS code, the Wii U offsets); GroundModule ray_check(from, dir, out, bool) 0x02C39F18 (get_height_from_ground written in the cave); Behavior::is_in_view_area 0x026A96BC (CameraModule acc+0x30CC is_clip_in(1) 0x02C15EB8); success_by_percent 0x026A8618 (the game's Randomizer); damage_turn 0x02DB4E84 (DamageModule +0x6C +0x2C lr); get_lr_to_nearest_target: written in the cave (get_nearest_target 0x026A7008 + get_target_pos 0x026A690C); posture lr +0x60, pos +0x10; the Behavior's move x +0x10 (the 3DS's +0x14).",
   "not_ported": "the tilt (slot 55: posture rot z toward -vx / P15 x P20 30 in 5, else 0, 1 degree a frame; the stun's 5-degree return; slot 13's reset: the posture rotation and set_rotation_order_xyz are not mapped); set_frame_material / set_rate_material(0) at start; play_se / stop_se (0x6D20000 the propeller loop, counted per kind; 0x6D20001 the swap); the swap effect is requested from the Behavior at the item's hold position + the offset (the 3DS: the item's own EffectModule, joint 0); get_lr_to_nearest_target uses get_nearest_target (the 3DS: EnemyAiModule::get_nearest_fighter from the posture); success_by_percent is the Wii U's, random_range the cave's h_rand (same inclusive range).",
-  "meshes": "none listed."
+  "meshes": "none listed.",
+  "facing": "3DS slot 38 (is_flip_model) returns 1: Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C call MotionModuleImpl::set_flip(lr == 1, 1), so lr 1 shows the lr -1 view (yaw -90, camera-facing) mirrored. The Wii U port (no flip table) keeps yaw -90 at lr 1 (step 2g v3, w_yaw after set_lr / reverse_lr): the front faces the camera on both sides as on the 3DS; not mirrored (asymmetric details and the walk cycle show unmirrored at lr 1)."
  }
 }

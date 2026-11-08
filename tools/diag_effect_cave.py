@@ -9,8 +9,9 @@ chain build. Prints rpx_patch.py arguments (docs/smash-run-port.md, "Step 2c v2"
 
 Lines (`S4FX <tag> ...`, hex words):
   reg   a bank's registration (0x032F1388, at 0x032F13C0 after its slot lookup 0x032EFEA0(mgr, bank, 1)): bank, slot
-        (>= 0x29: none free: category 7 has 10 slots, 26-35), the bank's resource handle (0: no files).
-  req   an effect request reaching the bank lookup (0x032F00A0, at 0x032F011C): effect id, slot (>= 0x29: the bank is
+        (>= 0x7F: none free: category 7 has 86 slots, 41-126, since effect_slots_patch.py; 41 / 26-35 before it,
+        --slots 41), the bank's resource handle (0: no files).
+  req   an effect request reaching the bank lookup (0x032F00A0, at 0x032F011C): effect id, slot (>= 0x7F: the bank is
         not registered), and when the slot is valid its words +0 bank, +4 eft resource (the .ptcl), +8 the .efc (0:
         not loaded) and the .efc's entry count (u16 +8, read only when the pointer is word-aligned in
         0x10000000-0x7FFFFFFF: MEM2, Extended Memory's too).
@@ -31,6 +32,14 @@ sys.path.insert(0, HERE)
 import diag_stomp_cave as B  # noqa: E402
 
 B.MAX_LINES = 3000
+# the effect manager's slot count: 127 since tools/effect_slots_patch.py (exe_v18 on: the request's bound test at
+# 0x032F011C is `cmplwi r3, 0x7F`, category 7 = slots 41-126; docs/native-notes.md "Effect manager: bank slots").
+# 0x29 (41) for an executable without it (--slots 41)
+SLOTS = 0x7F
+if '--slots' in sys.argv:
+    i = sys.argv.index('--slots')
+    SLOTS = int(sys.argv[i + 1], 0)
+    del sys.argv[i:i + 2]
 NAMES = {'reg': ('bank', 'slot', 'res'),
          'req': ('id', 'slot', 'bank', 'eft', 'efc', 'n'),
          'made': ('id', 'h'),
@@ -44,7 +53,7 @@ B.HOOKS[:] = [
         %s
         mr r6, r23
     """ % B.ld('r5', 3)),
-    ('req', 0x032F011C, 0x28030029,      # cmplwi r3, 0x29 (r3 slot, r29 id, r28 the manager)
+    ('req', 0x032F011C, 0x28030000 | SLOTS,      # cmplwi r3, SLOTS (r3 slot, r29 id, r28 the manager)
      """
         srwi r11, r29, 24
         cmpwi r11, 7
@@ -55,7 +64,7 @@ B.HOOKS[:] = [
         li r7, -1
         li r8, -1
         li r9, -1
-        cmplwi r5, 0x29
+        cmplwi r5, 0x%X
         bge q_done
         slwi r11, r5, 7
         add r11, r11, r28
@@ -72,7 +81,7 @@ B.HOOKS[:] = [
         bne q_done
         lhz r9, 8(r8)
     q_done:
-    """ % B.ld('r5', 3)),
+    """ % (B.ld('r5', 3), SLOTS)),
     ('made', 0x032F0250, 0x7FC3F378,     # mr r3, r30 (r30 the handle, r29 id)
      """
         srwi r11, r29, 24
@@ -109,7 +118,12 @@ CAVE, LIMIT, HOOKS, build, args = B.CAVE, B.LIMIT, B.HOOKS, B.build, B.args
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--rpx', required=True, help='the executable it goes on: hook words checked')
+    ap.add_argument('--cave', type=lambda v: int(v, 0), default=None,
+                    help='the cave (4 KB, zero in the executable) instead of 0x04BAE000, which exe_v19 on use: e.g. '
+                         '0x04BBE000 (region G\'s free tail, smashrun_walker_cave.py)')
     a = ap.parse_args()
+    if a.cave is not None:
+        B.CAVE, B.LIMIT = a.cave, a.cave + 0x1000
     print(' '.join(args(a.rpx)))
 
 

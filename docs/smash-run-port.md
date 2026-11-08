@@ -1508,3 +1508,83 @@ info unchanged): text 0x04B7D630, 0x04B7DBCC, 0x04B7DCC4-0x04B7DD88, 0x04B7DDDC-
 words), 0x04BB8774, 0x04BB88C8, 0x04BB8950 and 0x04BB89BC-0x04BBCDF0 (G: f_gpick's 7 more words, everything after it
 moved, the fliers' data): 4086 words, all Smash Run regions (the other regions' changes are the moved data addresses).
 The text section moved to the file's end again (rpx_patch), hence 177 MB.
+
+## Step 2g v3: spawn facing, Tiki Buzz's stomp, Ghos's charge and turn (Furiijio's cloud: log build)
+
+Package smashrun_step2g_v3: `code/` exe_v21 = exe_v20 + `smashrun_walker_cave.py` over its own regions and the twins'
+vtable slots 49 / 50 (scratch s2gv3/build21.py: W.args over exe_v20, one rpx_patch call); `code_diag/` exe_v21 +
+`tools/diag_effect_cave.py --cave 0x04BBE000` (the effect-bank / request log, now for 127 slots). No data changes.
+User results on step 2g v2 (exe_v20) behind it: Furiijio / Tiki Buzz (and Goombas, "a few others") sometimes spawn
+facing the wrong way and look right after a hit; landing on Tiki Buzz gives no bounce and its stomp box feels small;
+Furiijio has no icy cloud / sparkles around its body during the beam (3DS screenshot); Ghos always faces the camera,
+never charges and is hurt by direct hits.
+
+**Spawn facing (every 3DS-flip kind).** The 3DS's Behavior::set_lr 0x7B5778 and reverse_lr 0x7B034C call
+MotionModuleImpl::set_flip(lr == 1, 1) when the behaviour's slot 38 (is_flip_model) returns 1: kuribo, waddledee,
+waddledoo, churine, zima, plasmawisp, darios, tikibuzz, furiijio, propellerheiho (the specs' slot-38 returns; heiho,
+stalfos, whitebear, gordo, ghos return 0). Rendered with their motions (tools/s3ds_preview.py --yaw -90 / 90), all ten
+face the camera at yaw -90 (lr -1) and show their backs at yaw +90: the 3DS shows lr 1 as the lr -1 view mirrored.
+Fix v3 dropped the flip (no Wii U flip table for the converted models), so lr 1 showed their backs: the spawner
+alternates sides (lr toward the player), hence "sometimes", and damage_turn's reverse_lr after a hit from behind gave
+lr -1, hence "fixed by a hit". (The spawn path itself was fine: initialize_after runs after start (0x02DB9190: slots
+40, 41, 42) and fix v3's hook set_lr(lr, 1, 1) writes +0x64 = lr x 90.) Fix: the walker vtable's (so VTF's and the
+kinds' own) and the twins' vtables' (0x1008FFCC / 0x1008F1D4 / 0x1008EC68 - 0x13C: words 0x10090024 / 0x1009002C,
+0x1008F22C / 0x1008F234, 0x1008ECC0 / 0x1008ECC8, relocations moved to RELOC_DUMMY as fix v3's) slots 49 / 50 ->
+w_slr / w_rlr: the game's set_lr 0x026A780C / reverse_lr 0x026A7A20, then w_yaw: a YAW_FLIP kind (< 0x50) with lr 1
+whose +0x64 is the 90 just written gets -90, ModelModule +0x20 = 0 and MotionModule +0xFC 1 -> 2 (set_lr's own marks at
+0x026A7930). Approximated: no mirror (asymmetric details and walk cycles unmirrored at lr 1); a converted Wii U FLIP
+would still be the exact fix.
+
+**Tiki Buzz's stomp.** Its 3DS area 0 {1, 3, 12, 3, 0, 0} read as the Goomba's {1, 2, 14, 8} (full sizes: the Goomba
+box 14 wide on a 10-wide model): half width 6, centre HipN's bind height 11.72 (its Fly pose spans y -5..17), half
+height 1.5. The fix v8 test compared the fighter's last-frame y with the box *now* and needed the feet inside the
+box this frame: a 3-unit box under a fall of up to ~3.4 a frame, with the flier rising toward the fighter (its homing
+target is 35 above it), was mostly stepped over. Now PREV keeps the fighter's y minus the box top (relative to the
+enemy), a crossing of the top this frame counts down to the box height + STOMP_SWEEP 4 below it, and a defeated enemy
+(+0x19C, Tiki Buzz's 11 / 12) is skipped; the StepJump call is the Goomba's (MSC StatusModule(3, 0xB3, 0)). Not
+applied: a per-kind bounce height (the Wii U Enemy event 6's param 0x11 is only on the game's own tread path, which
+these enemies never get, fix v8).
+
+**Ghos (3DS enemy_fs.cro).**
+- The charge: L66BA4 is random_choice(100 - P@0x94 96, 96, 0, 0) (0x7B0DC4: weights -> index), so index 1 (96 %) picks
+  the set at +0x18 (P7 entry 1: max 1.5 a frame) and index 0 (4 %) the slow one (max 0.052 / 0.15). Steps 2e-2g v2
+  had them swapped (f_gpick). Motion test: 76.2 -> 30.0 units from the fighter in 240 frames (was 57.9).
+- The turn: slot 55 (0x10BA0; vtable 0xCB840, the only pointer to it is entry 55, so not slot 5) every frame in states
+  other than 0 / 2 / 4 / 5 with a target: d = target - posture normalised, rx = -dy x P@0xA4 30, ry = dx x 30 degrees;
+  node 2 set_node_rotate((rx, ry, -ry) rad, 0) (Wii U 0x02C64188 + ModelModule vt+0xC4) and the posture rotation
+  (+0x54 > 1: [+0x58] + 0x38 on the Wii U, as 0x02DC3CC4 writes it; 3DS +0x3C) = (rx, ry, 0) with the model / motion
+  marks. `f_g55` (vtover 55). Not mapped: set_rotation_order_xyz (the Wii U default assumed).
+- The immunity (slot 31, 0x113F0; not ported): category 1 (a weapon) immune when is_weapon_as_fighter(kind); category
+  4 (an item) immune when held and not kind 0x12 / 0x24; others immune when AttackData +0x4C is set (taken as the
+  direct-attack flag); immune: +0x1F4 = 1, module acc+0x3074 +0x5A2 = 0, play_se(15); slot 11 then restores the HP
+  (DamageModuleImpl::init_damage(+0x1F8)). Open on the Wii U: which slot the hit check is (3DS 31 -> 30 or 31), its
+  hit-record layout, the AttackData flag's offset and init_damage. Direct hits still hurt Ghos.
+
+**Furiijio's effects.** Every request in its 3DS code (hand_read.json `furiijio.effects`): 0x71A0000 / 1 (charge,
+request_effect at the centre), 0x71A0005 (aim, request_effect on node 2, x 1.5), 0x71A0002 node 2 / 0x71A0004 node 3
+/ 0x71A0003 node 3 (beam, request_follow_effect, scale 1; set_scale on 0x71A0004, set_pos on 0x71A0003 each frame),
+removed on the beam's exit; bank 0x71A: 0 / 1 -> PtcfsFuriijioShootFilling, 2 -> PtcfsFuriijioFreezBeamRoot (the
+cloud: BG 52 x 52 mist, snow flakes, cool air; endless emitters), 3 / 4 -> the two beam models, 5 -> PtcfsFuriijioSign.
+The port matches the 3DS call for call (ids, nodes, offsets, scales, follow vs node functions, set_pos / set_scale
+handles) and the converted bank has all three sets (8 emitters) and both models (node 2 = jtb entry 1 = RotN). Not
+settled: why 0x71A0002 doesn't show. `code_diag/` logs the enemy banks' registrations and every enemy request (slot,
+.efc, made / not made); tools/diag_effect_cave.py's slot bound is now 0x7F (`--slots 41` for an older executable)
+and `--cave` moves its cave (0x04BAE000 is used from exe_v19 on).
+
+**Tests** (exe_v21): smashrun_walker_test.py 163 (with S/s2e/root; new: slots 49 / 50, the twins' words, w_yaw for
+every kind both sides, Tiki Buzz's stomp: a fall, a fast fall past its box, a landing while it rises -> 10 +
+StepJump; none beside it, through it and the sweep, or in 10; the Goomba's "past its bottom" case moved below the
+sweep), smashrun_flier_test.py 121 (new: Ghos's 96 % set is the second; slot 55 toward (30, 40): node 2 (-24, 18,
+-18) degrees, posture (-24, 18, 0), nothing in 2 / 4 or without a target), smashrun_flier_motion_test.py 11 (new: the
+spawn facing through the game's own initialize_after / set_lr / damage_turn / reverse_lr: Goomba, Shy Guy, Waddle
+Dee, Churine, Ghos, Tiki Buzz, Furiijio, Propeller Heiho spawned on both sides and turned twice by hits),
+smashrun_field_test.py 12, smashrun_enemy_test.py 26, effect_slots_patch_test.py exe_v21 against exe_v17 47: 0
+failures.
+
+**exe_v21 vs exe_v20, word diff** (scratch s2gv3/diff21.py): text 0x04B7D630, 0x04B7DBCC, 0x04B7DCC0-0x04B7DEFC (E and
+its data), 0x04B84924-0x04B84A00 (D: w_upd), 0x04B8691C-0x04B88000 (A: 41 words), 0x04B89414-0x04B89FFC (B: 360
+words), 0x04BB8004, 0x04BB80A0-0x04BB8660 (C: the stomp body and data), 0x04BB8774, 0x04BB88C8, 0x04BB8950-0x04BB89A4,
+0x04BB89F4-0x04BBD328 (G: f_g55, w_slr / w_rlr / w_yaw, everything after moved, the data); data 0x1008ECC0-0x1008ECCC,
+0x1008F22C-0x1008F238, 0x10090024-0x10090030 (the twins' slots 49 / 50); relocations: those six ADDR32 entries moved
+to 0x037EE73C; file info equal: 5263 words, all Smash Run's. code_diag vs code: the four hook words 0x02DB420C,
+0x032F011C, 0x032F0250, 0x032F13C0 and 0x04BBE000-0x04BBE6B8.

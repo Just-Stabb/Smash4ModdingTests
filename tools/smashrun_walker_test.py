@@ -475,11 +475,38 @@ def main():
     bi = {k: vt_words[(0xC + 8 * k) // 4] for k in range(74)}
     over = {12: W.ZIMA_CAPTURE_MOTION, 38: W.ZIMA_ONE if W.KEEP_FLIP else fn['w_noflip'], 40: fn['w_init'],
             3: fn['w_upd'], 41: fn['w_start'], 45: fn['w_atk'], 20: fn['w_tread'], 64: fn['w_r64'], 65: fn['w_r65'], 66: fn['w_r66'],
-            67: fn['w_r67'], 72: fn['w_chg'], 73: fn['w_chgi'], 74: fn['w_chg'], 75: fn['w_chgi']}
+            67: fn['w_r67'], 72: fn['w_chg'], 73: fn['w_chgi'], 74: fn['w_chg'], 75: fn['w_chgi'],
+            49: fn['w_slr'], 50: fn['w_rlr']}
     ok = vt[:3] == vt_words[:3] and all(slots[k] == over.get(k, bi.get(k)) for k in range(76))
     ok &= all(vt[(0x8 + 8 * k) // 4] == 0 for k in range(76))
-    check(ok, 'VT: BehaviorImpl\'s 74 slots (dtor 0x%08X, update 0x%08X kept) with 12 38 40 41 45 64-67 72-75 '
-          'overridden' % (slots[0], slots[3]))
+    ok &= bi[49] == W.SET_LR and bi[50] == W.REVERSE_LR
+    check(ok, 'VT: BehaviorImpl\'s 74 slots (dtor 0x%08X, update 0x%08X kept) with 12 38 40 41 45 49 50 64-67 72-75 '
+          'overridden (49 / 50 were set_lr 0x%08X / reverse_lr 0x%08X)' % (slots[0], slots[3], bi[49], bi[50]))
+    # step 2g v3: the twins' vtables (2a's zima / plasmawisp / darios) slots 49 / 50 -> the same wrappers
+    got = [(hex(w), img.u32(w) == fn[lab]) for w, _o, lab in W.TWIN_LR]
+    check(all(g for _w, g in got), 'step 2g v3: the twins\' vtable slots 49 / 50 -> w_slr / w_rlr %s' % got)
+    # step 2g v3, w_yaw (after set_lr / reverse_lr): the 3DS-flip kinds keep yaw -90 at lr 1 (their lr -1 view, which
+    # the 3DS mirrors), every other kind lr x 90; the model / motion marks as set_lr's
+    YK = HEAP + 0x3F000
+    res = {}
+    for k in sorted(set(W.YAW_FLIP) | {0x0B, 0x30, 0x40, 0x08, 0x11, 0x5A, 0x57}):
+        for lr in (1.0, -1.0):
+            m = Machine(img)
+            m.w32(YK, ACC)
+            m.w32(YK + 8, k)
+            m.uc.mem_write(ACC + 0x3118, struct.pack('>I', HEAP + 0x3F400))
+            m.uc.mem_write(HEAP + 0x3F400, bytes(0x40))
+            m.w32(HEAP + 0x3F420, 7)
+            m.w32(ACC + 0x30F0, HEAP + 0x3F800)
+            m.w32(HEAP + 0x3F800 + 0xFC, 1)
+            m.wf(POSTURE + 0x60, lr)
+            m.wf(POSTURE + 0x64, lr * 90.0)
+            m.call(fn['w_yaw'], {3: YK})
+            res[(k, lr)] = (m.rf(POSTURE + 0x64), m.r32(HEAP + 0x3F420), m.r32(HEAP + 0x3F800 + 0xFC))
+    ok = all(v == ((-90.0, 0, 2) if (k in W.YAW_FLIP and lr == 1.0) else (lr * 90.0, 7, 1)) for (k, lr), v in res.items())
+    check(ok, 'step 2g v3: w_yaw: lr 1 -> yaw -90 (model +0x20 = 0, motion +0xFC 1 -> 2) for the 3DS-flip kinds %s, '
+          'lr x 90 untouched for lr -1 and the others (Shy Guy, Stalfos, White Bear, Gordo, Ghos, the twins) %s'
+          % ([hex(k) for k in W.YAW_FLIP], {('0x%X' % k, lr): v[0] for (k, lr), v in res.items() if lr == 1.0}))
     for w in GKINDS:
         m = Machine(img)
         m.walker(cfg[w['kind']], state=3, kind=w['kind'])
@@ -719,7 +746,10 @@ def main():
         m.w32(ENTS + 0xC, FACC)
         m.w32(FACC + 0x18, FPOST)
         out = []
-        for fx, fy in frames:
+        for fr in frames:
+            fx, fy = fr[:2]
+            if len(fr) > 2:
+                m.wf(POSTURE + 0x14, fr[2])      # step 2g v3: the enemy's y this frame (a flier moves)
             m.wf(FPOST + 0x10, fx)
             m.wf(FPOST + 0x14, fy)
             m.calls = []
@@ -737,7 +767,7 @@ def main():
     res = {}
     res['beside'] = stomp('kuribo', [(9.0, 20.0), (9.0, 5.0)])
     res['rising'] = stomp('kuribo', [(3.0, 0.0001), (3.0, 2.0), (3.0, 5.0)])
-    res['below'] = stomp('kuribo', [(3.0, 20.0), (3.0, -5.0)])
+    res['below'] = stomp('kuribo', [(3.0, 20.0), (3.0, -10.0)])     # past its bottom + the sweep (step 2g v3)
     res['first'] = stomp('kuribo', [(3.0, 5.0)])
     res['in 8'] = stomp('kuribo', fall, state=8)
     res['dead'] = stomp('kuribo', fall, state=9)
@@ -752,6 +782,27 @@ def main():
     check(ok, 'fix v8: no stomp beside it (|dx| 9), rising through it, landing past its bottom, on the first frame '
           '(no last y), in 8 / its death state, a fighter not live, no fighters, above it but not reaching its top, '
           'nor on the other walkers (no TREAD state); one on a Goomba at (-50, 10) %s' % hi[1][0])
+
+    # ---- step 2g v3: Tiki Buzz's stomp (its tread box (6, 11.72, 1.5): the top 13.22 above its posture) -> 10 and the
+    # fighter's StepJump, as the Goomba's; the test relative to the enemy and swept (a fast fall, a rising flier)
+    tb = byname['tikibuzz']['tbox']
+    top = 50.0 + tb[1] + tb[2]
+    sj = (FACC, (3, W.STEP_JUMP, 0))
+    tk = {}
+    tk['fall'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 1)], ey=50.0)
+    tk['fast'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 5)], ey=50.0)
+    tk['rising'] = stomp('tikibuzz', [(2.0, top + 7, 50.0), (2.0, top + 1, 50.0), (2.0, top + 0.5, 53.0)], ey=50.0)
+    tk['beside'] = stomp('tikibuzz', [(7.0, top + 7), (7.0, top + 1), (7.0, top - 1)], ey=50.0)
+    tk['through'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 10)], ey=50.0)
+    tk['in 10'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 1)], state=10, ey=50.0)
+    hit = lambda v: [g[0] for g in v] == [[], [], [10]] and v[2][1] == [sj] and not v[1][1]  # noqa: E731
+    none = lambda v: all(not g[0] and not g[1] for g in v)  # noqa: E731
+    ok = hit(tk['fall']) and hit(tk['fast']) and hit(tk['rising']) and none(tk['beside']) and none(tk['through']) \
+        and none(tk['in 10'])
+    check(ok, 'step 2g v3: Tiki Buzz stomped (box top %.2f above y 50): a fall into it, a fast fall (5 a frame) past '
+          'its 3-unit box, a landing while it rises 3 -> => 10 and the fighter\'s StatusModule(3, 0x%X StepJump, 0) '
+          'once; none beside it (|dx| 7 > 6), through it and the sweep in one frame, nor in 10 %s'
+          % (top, W.STEP_JUMP, {k: [g[0] for g in v] for k, v in tk.items()}))
 
     # ---- Kuribo
     I = lambda n, s: W.index(byname[n], s)  # noqa: E731,E741

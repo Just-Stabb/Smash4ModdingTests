@@ -174,6 +174,9 @@ its bottom, within its half width -> change_state_interrupt(TREAD) and the fight
 Goomba's 3DS area 0 (node 2, 14 x 8, offset 0) as half width 7 around the posture x, centre the posture y + 2.53
 (node 2 HipN in the bind pose), half height 4. Approximated: the box is not moved with the animation or the model's
 scale, and the fighter's feet are its posture origin (not its ECB); no jump input is needed (a fall onto it does).
+Step 2g v3: the test is relative to the enemy (PREV keeps the fighter's y minus the box top, so a rising / sinking
+flier is handled) and swept (a crossing of the box top this frame counts down to the box's height + STOMP_SWEEP 4 below
+it: a fast fall stepped over Tiki Buzz's 3-unit box); a defeated enemy (+0x19C) is skipped (Tiki Buzz's 11 / 12).
 
 Hooks (2a's three stay as they are):
 - F2, the factory 0x02DB94CC after 2a's hook: 0x02DB951C `cmplwi r12, 0x10` -> for the walker kinds
@@ -194,6 +197,9 @@ Fix v3 (every Smash Run kind < 0x50, 2a's twins included):
   0x037EE73C. `--keep-flip` builds without it.
 - initialize_after 0x02DB4AC8, 0x02DB4B20 `lwz r10, 0(r31)` -> for kinds < 0x50 set_lr(posture lr, 1, 1).
 - notify_on_remove 0x02DB40E4 `mflr r0` -> for kinds < 0x50 type 0 becomes 3 (the defeat effect path 0x02DB3AB0).
+- step 2g v3: slots 49 / 50 (set_lr / reverse_lr) -> w_slr / w_rlr (the game's, then w_yaw) in the cave's vtables and
+  the twins' (TWIN_LR, relocations moved to RELOC_DUMMY): the 3DS-flip kinds (YAW_FLIP) keep yaw -90 at lr 1, their
+  camera-facing lr -1 view, which the 3DS mirrors for lr 1 (lr 1 showed their backs: the "sometimes facing away" spawns).
 
 Space: 0x04B86800-0x04B88000 (kind_expand.py's old space after smashrun_enemy_cave.py), 0x04B89000-0x04B8A000
 (free between base_effects_cave.py and base_customs_cave.py) and 0x04BB8000-0x04BB8660 (the grown text after
@@ -348,6 +354,23 @@ PH_SWAP_FX = 0x100001C               # the item swap's effect (3DS: the item's E
 GL_INDEX, GL_BASE = 0x1E4, 0x34      # gl entry = [[PARAM_MGR] + 0x34] + 0x228 * [[PARAM_MGR] + 0x1E4 + 4 * (8K + var)]
 VT_WORDS = [None]                    # BehaviorImpl's vtable words (read from the input), for code_f
 TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x026CF200))
+# step 2g v3: the kinds whose 3DS behaviour flips the model (slot 38 = is_flip_model returns 1: MotionModuleImpl::set_flip(lr
+# == 1) in Behavior::set_lr 0x7B5778 / reverse_lr 0x7B034C; reference/smashrun_enemy_specs: kuribo, waddledee, waddledoo,
+# churine, zima, plasmawisp, darios, tikibuzz, furiijio, propellerheiho; not heiho, stalfos, whitebear, gordo, ghos).
+# Their models face the camera at lr -1 (yaw -90) and the 3DS shows lr +1 as that view mirrored; without the mirror
+# (no Wii U flip table: fix v3) lr +1's yaw +90 showed their backs. w_yaw keeps yaw -90 for lr +1 (the mirror's front).
+YAW_FLIP = (0x01, 0x13, 0x19, 0x1F, 0x0E, 0x12, 0x1D, 0x0F, 0x1A, 0x47)
+SET_LR, REVERSE_LR = 0x026A780C, 0x026A7A20
+# the twins' vtables (2a's zima / plasmawisp / darios use them): slots 49 / 50 -> w_slr / w_rlr (kinds >= 0x50 unchanged)
+TWIN_LR = tuple((w - 0x13C + 0xC + 8 * k, orig, lab) for w, _f in TWIN_FLIP
+                for k, orig, lab in ((49, SET_LR, 'w_slr'), (50, REVERSE_LR, 'w_rlr')))
+
+
+def yaw_mask():
+    m = [0, 0, 0]
+    for k in YAW_FLIP:
+        m[k >> 5] |= 1 << (k & 31)
+    return m
 RELOC_DUMMY = 0x037EE73C
 SET_LR_SLOT = 49
 KEEP_FLIP = False    # True: the variant that keeps the motion flip (only the rotation and death fixes)
@@ -370,6 +393,10 @@ BI_UPDATE = 0x026A4880               # BehaviorImpl::update (slot 3): the state'
 # the Goomba's tread area (its 3DS area 0: node 2, 14 x 8, offset 0): half width, centre above the posture
 # (node 2 HipN 2.53 in its bind pose), half height
 TREAD_BOX = (7.0, 2.53, 4.0)
+# step 2g v3: the stomp test is relative to the enemy (PREV keeps the fighter's y minus the box top) and swept: a
+# crossing of the box top this frame counts down to the box's height + STOMP_SWEEP below it (a fast fall, 3.4 a
+# frame at most, plus a rising flier, did step over Tiki Buzz's 3-unit box); dying / defeated enemies (+0x19C) skip
+STOMP_SWEEP = 4.0
 SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, change_state, interrupt
 
 # CFG (per kind)
@@ -595,8 +622,9 @@ FLIERS = (
          hop=(0.0, 0, 0), search=((0, 120, 300.0, 0.0, 0.0, 0.0, 0.0),),           # P1 (never searched)
          attacks=((1, 'ghos_body'), (4, 'ghos_bullet')),
          fstart='f_ghos_start', fdmg='f_ghos_dmg', f69='f_ghos_69', f27='f_ghos_rm', lvp=19,
+         vtover={55: 'f_g55'},                           # step 2g v3: the 3DS's slot 55 0x10BA0 (the turn)
          P=(_GS[0], _GS[1], int(_GS[2]), _GS[3], _GS[4], _GS[5], 0.1) + tuple(_GP7[0]) + tuple(_GP7[1]) +
-           (_GP6[0], -_GP6[1], _GP6[2], _GP6[6], _GP6[8], 1.0, 0.0)),
+           (_GP6[0], -_GP6[1], _GP6[2], _GP6[6], _GP6[8], 1.0, 0.0) + (_GS[6], DEG2RAD)),   # P26 P@0xA4 30, P27
     # Tiki Buzz (Kirby) 0x0F, BehaviorTikibuzz (create 0x78630, table 0x10E134)
     dict(name='tikibuzz', kind=0x0F, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('tikibuzz', 5)),
          motions=(('Attack', 1), ('AttackBrake', 1), ('AttackHold', 4), ('AttackUnguard', 1), ('DamageFall', 1),
@@ -753,10 +781,12 @@ class Data:
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
         b.append(('fconsts', [0x43300000, 0x80000000], 8))      # the int -> double bias (f_hitret)
+        b.append(('yawk', [fword(1.0), fword(90.0), fword(-90.0)] + yaw_mask(), 4))    # step 2g v3: w_yaw
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
                 3: fn('w_upd'), 41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
-                67: fn('w_r67'), 72: fn('w_chg'), 73: fn('w_chgi'), 74: fn('w_chg'), 75: fn('w_chgi')}
+                67: fn('w_r67'), 72: fn('w_chg'), 73: fn('w_chgi'), 74: fn('w_chg'), 75: fn('w_chgi'),
+                SET_LR_SLOT: fn('w_slr'), 50: fn('w_rlr')}       # step 2g v3: the 3DS flip's facing (YAW_FLIP)
         for k, f in over.items():
             vt[(0xC + 8 * k) // 4] = f
             vt[(0x8 + 8 * k) // 4] = 0
@@ -2644,8 +2674,11 @@ def code_f(D, vtw):
     lfs('f1', 'consts', 4)
     far(REQ_FOLLOW)
     G.asm("stw r3, 0x%X(r31)\nb epi" % V(4))
-    # L66BA4: V0 = random(P0, P1); random_choice(96, 4) -> set_mode_slip_homing(the P7 set: s0 +0, s1 +0xC, s2 +8,
-    # s3 +0x14, s4 +4, s5 +0x10); called from a state (its frame's +0x1C keeps the return, +0x10 / +0x14 the speed).
+    # L66BA4: V0 = random(P0, P1); random_choice(100 - P2, P2, 0, 0) (3DS 0x7B0DC4: weights -> index: 4 % index 0,
+    # 96 % index 1) -> set_mode_slip_homing(P7 set [index]: s0 +0, s1 +0xC, s2 +8, s3 +0x14, s4 +4, s5 +0x10); called
+    # from a state (its frame's +0x1C keeps the return, +0x10 / +0x14 the speed). Step 2g v3: index 1 (96 %) is the
+    # SECOND set (+0x18: P13-18, max 1.5 a frame: the homing that charges at the target), index 0 (4 %) the slow
+    # drift (P7-12, max 0.052 / 0.15); steps 2e-2g v2 had them swapped (Ghos drifted 96 % of the time).
     # Step 2g v2: the Wii U's 0x02DB28E4 is set_mode_HOMING (energy 0's init with speed 0); the 3DS's slip homing
     # 0x5F5F58 inits it with the current speed (energy +4 / +8), so the speed is kept: saved before, set back with
     # set_current_speed 0x02DB2BC0 after (else every re-pick, each 20-40 frames, stopped Ghos dead)
@@ -2661,10 +2694,10 @@ def code_f(D, vtw):
         li r4, 99
         bl h_rand
         lwz r0, 0x%(P2)X(r30)
-        addi r12, r30, 0x%(P7)X
+        addi r12, r30, 0x%(P13)X
         cmpw r3, r0
         blt gp_set
-        addi r12, r30, 0x%(P13)X
+        addi r12, r30, 0x%(P7)X
     gp_set:
         lfs f1, 0(r12)
         lfs f2, 0xC(r12)
@@ -2687,6 +2720,190 @@ def code_f(D, vtw):
         blr
     """ % dict(P0=P(0), P1=P(1), V0=V(0), P2=P(2), P7=P(7), P13=P(13), AER=AER, SH=AER_SLIP_HOMING, E0=AER + 4,
                SS=AER_SET_SPEED))
+    # step 2g v3, slot 55 (0x10BA0, every frame after the state update; vtable 0xCB840 + 55 x 4 = 0xCB91C): in states
+    # other than 0 / 2 / 4 / 5 with a target (V3, 3DS +0x1F0): d = target - posture, normalised by its length (x, y);
+    # rx = -dy x P26 (P@0xA4 30.0), ry = dx x P26 (degrees); set_rotation_order_xyz (not mapped: the Wii U's default
+    # order assumed); node 2 (RotN) set_node_rotate((rx, ry, -ry) x 0.0174533, 0) (+ ModelModule vt+0xC4 on a
+    # change); the posture's rotation (count +0x54 > 1: [+0x58] + 0x38, the Wii U's layout as 0x02DC3CC4 writes it;
+    # 3DS +0x3C) = (rx, ry, 0), on a change ModelModule +0x20 = 0 and MotionModule +0xFC 1 -> 2 (as 0x02DC3D28)
+    G.asm("""
+    f_g55:
+        mflr r0
+        bl pro
+        lwz r0, 4(r31)
+        cmplwi r0, 5
+        bgt g55_go
+        cmpwi r0, 1
+        beq g55_go
+        cmpwi r0, 3
+        bne g55_out
+    g55_go:
+        lwz r5, 0x%(V3)X(r31)
+        cmpwi r5, -1
+        beq g55_out
+        addi r3, r1, 8
+        mr r4, r31
+    """ % dict(V3=V(3)))
+    far(GET_TARGET_POS)
+    G.asm("""
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f3, 8(r1)
+        lfs f0, 0x10(r12)
+        fsubs f3, f3, f0
+        lfs f4, 0xC(r1)
+        lfs f0, 0x14(r12)
+        fsubs f4, f4, f0
+        lfs f5, 0x10(r1)
+        lfs f0, 0x18(r12)
+        fsubs f5, f5, f0
+        fmuls f2, f3, f3
+        fmadds f2, f4, f4, f2
+        fmadds f2, f5, f5, f2
+        lis r12, 0x%(KH)04X
+        lfs f0, %(KL)d(r12)
+        fcmpu cr0, f2, f0
+        beq g55_n
+        stfs f3, 0x14(r1)
+        stfs f4, 0x18(r1)
+        fmr f1, f2
+        bl 0x%(SQ)08X
+        lis r12, 0x%(KH)04X
+        lfs f0, %(KL4)d(r12)
+        fdivs f0, f0, f1
+        lfs f3, 0x14(r1)
+        fmuls f3, f3, f0
+        lfs f4, 0x18(r1)
+        fmuls f4, f4, f0
+    g55_n:
+        lfs f0, 0x%(P26)X(r30)
+        fmuls f6, f4, f0
+        fneg f6, f6
+        fmuls f7, f3, f0
+        stfs f6, 0x14(r1)
+        stfs f7, 0x18(r1)
+        lfs f0, 0x%(P27)X(r30)
+        fmuls f1, f6, f0
+        stfs f1, 8(r1)
+        fmuls f1, f7, f0
+        stfs f1, 0xC(r1)
+        fneg f1, f1
+        stfs f1, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        li r4, 2
+        addi r5, r1, 8
+        li r6, 0
+        bl 0x%(SNR)08X
+        cmpwi r3, 0
+        beq g55_p
+        bl fu_dirty
+    g55_p:
+        lwz r9, 0(r31)
+        lwz r10, 0x311C(r9)
+        lwz r0, 0x54(r10)
+        cmplwi r0, 1
+        ble g55_out
+        lwz r11, 0x58(r10)
+        addi r11, r11, 0x38
+        lfs f6, 0x14(r1)
+        lfs f7, 0x18(r1)
+        lis r12, 0x%(KH)04X
+        lfs f8, %(KL)d(r12)
+        li r8, 1
+        lfs f0, 0(r11)
+        fcmpu cr0, f0, f6
+        bne g55_s
+        lfs f0, 4(r11)
+        fcmpu cr0, f0, f7
+        bne g55_s
+        lfs f0, 8(r11)
+        fcmpu cr0, f0, f8
+        bne g55_s
+        li r8, 0
+    g55_s:
+        stfs f6, 0(r11)
+        stfs f7, 4(r11)
+        stfs f8, 8(r11)
+        cmpwi r8, 0
+        beq g55_out
+        lwz r11, 0x3118(r9)
+        li r0, 0
+        stw r0, 0x20(r11)
+        lwz r11, 0x30F0(r9)
+        lwz r0, 0xFC(r11)
+        cmpwi r0, 1
+        bne g55_out
+        li r0, 2
+        stw r0, 0xFC(r11)
+    g55_out:
+        b epi
+    """ % dict(KH=ha(D['consts']), KL=sx(D['consts']), KL4=sx(D['consts'] + 4), SQ=SQRTF, P26=P(26), P27=P(27),
+               SNR=SET_NODE_ROT))
+    # step 2g v3: set_lr / reverse_lr (vtable slots 49 / 50) -> the game's, then w_yaw: for a YAW_FLIP kind (< 0x50)
+    # whose posture lr is 1 and rotation (+0x64) the 90 set_lr / reverse_lr just wrote: -90 (the lr -1 view, which the
+    # 3DS mirrors for lr 1), ModelModule +0x20 = 0 and MotionModule +0xFC 1 -> 2 (set_lr's own marks, 0x026A7930)
+    G.asm("""
+    w_slr:
+        lis r12, 0x%(SH)04X
+        ori r12, r12, 0x%(SL)04X
+        b w_lrw
+    w_rlr:
+        lis r12, 0x%(RH)04X
+        ori r12, r12, 0x%(RL)04X
+    w_lrw:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        mtctr r12
+        bctrl
+        mr r3, r31
+        bl w_yaw
+        lwz r0, 0x24(r1)
+        mtlr r0
+        lwz r31, 0x1C(r1)
+        addi r1, r1, 0x20
+        blr
+    w_yaw:
+        lwz r12, 8(r3)
+        cmplwi r12, 0x60
+        bgelr
+        lis r10, 0x%(YH)04X
+        addi r10, r10, %(YL)d
+        srwi r11, r12, 5
+        slwi r11, r11, 2
+        addi r11, r11, 0xC
+        lwzx r11, r10, r11
+        clrlwi r12, r12, 27
+        srw r11, r11, r12
+        andi. r11, r11, 1
+        beqlr
+        lwz r9, 0(r3)
+        lwz r8, 0x311C(r9)
+        lfs f0, 0x60(r8)
+        lfs f2, 0(r10)
+        fcmpu cr0, f0, f2
+        bnelr
+        lfs f0, 0x64(r8)
+        lfs f2, 4(r10)
+        fcmpu cr0, f0, f2
+        bnelr
+        lfs f2, 8(r10)
+        stfs f2, 0x64(r8)
+        lwz r11, 0x3118(r9)
+        li r0, 0
+        stw r0, 0x20(r11)
+        lwz r11, 0x30F0(r9)
+        lwz r0, 0xFC(r11)
+        cmpwi r0, 1
+        bnelr
+        li r0, 2
+        stw r0, 0xFC(r11)
+        blr
+    """ % dict(SH=SET_LR >> 16, SL=SET_LR & 0xFFFF, RH=REVERSE_LR >> 16, RL=REVERSE_LR & 0xFFFF,
+               YH=ha(D['yawk']), YL=sx(D['yawk'])))
     # L1120C, the wall bounce: on any contact (is_touch(0xFF)) v = energy 0's speed, n = get_ground_normal(0xFF);
     # r = |v|^2 / (P4 * P4); r < 0.1 (and r <= 1): nothing; else v reflected on n (v - 2 (n.v) n), normalised,
     # times P3 * min(r, 1) -> set_current_speed
@@ -5101,6 +5318,9 @@ def stomp_code():
         lwz r12, 0x%(R67)X(r30)
         cmpw r0, r12
         beq u_out
+        lwz r12, 0x%(DF)X(r31)
+        cmpwi r12, 0
+        bne u_out
         lwz r12, 0(r31)
         lwz r28, 0x311C(r12)
         addi r27, r30, 0x%(TB)X
@@ -5132,7 +5352,7 @@ def stomp_code():
         mtctr r12
         bctr
     """ % dict(TREAD=CF['TREAD'], R67=CF['R67'], FH=ha(FIGHTERS), FL=sx(FIGHTERS), BH=BI_UPDATE >> 16,
-               BL=BI_UPDATE & 0xFFFF, TB=CF['TB0']))
+               BL=BI_UPDATE & 0xFFFF, TB=CF['TB0'], DF=DEFEATED))
     return Dd
 
 
@@ -5150,6 +5370,12 @@ def stomp_body(C):
         lwz r24, 0xC(r12)
         lwz r11, 0x18(r24)
         lfs f1, 0x14(r11)
+        lfs f3, 0x14(r28)
+        lfs f4, 4(r27)
+        fadds f3, f3, f4
+        lfs f5, 8(r27)
+        fadds f4, f3, f5
+        fsubs f1, f1, f4
         slwi r10, r25, 2
         add r10, r10, r31
         lwz r0, 0x%(PREV)X(r10)
@@ -5157,16 +5383,17 @@ def stomp_body(C):
         stfs f1, 0x%(PREV)X(r10)
         cmpwi r0, 0
         beq b_next
-        lfs f3, 0x14(r28)
-        lfs f4, 4(r27)
-        fadds f3, f3, f4
-        lfs f5, 8(r27)
-        fadds f4, f3, f5
-        fcmpu cr0, f2, f4
+        fsubs f0, f1, f1
+        fcmpu cr0, f2, f0
         blt b_next
-        fcmpu cr0, f1, f4
+        fcmpu cr0, f1, f0
         bgt b_next
-        fsubs f6, f3, f5
+        fadds f6, f5, f5
+        lis r0, 0x%(SWH)04X
+        stw r0, 0x1C(r1)
+        lfs f7, 0x1C(r1)
+        fadds f6, f6, f7
+        fneg f6, f6
         fcmpu cr0, f1, f6
         blt b_next
         lfs f6, 0x10(r11)
@@ -5203,7 +5430,7 @@ def stomp_body(C):
     b_next:
         b u_next
     """ % dict(ENT=FIGHTER_ENTRY, PREV=PREV, S73=SLOT[73], STEP=STEP_JUMP, MH=MSC_STATUS >> 16,
-               ML=MSC_STATUS & 0xFFFF))
+               ML=MSC_STATUS & 0xFFFF, SWH=struct.unpack('>I', struct.pack('>f', STOMP_SWEEP))[0] >> 16))
 
 
 def area_code(D):
@@ -5272,6 +5499,9 @@ def patches(img):
         out[site] = branch(site, A.addr('area_%d' % i))
     for w, fn in TWIN_FLIP:
         out[w] = fn if KEEP_FLIP else A.addr('twin_flip')
+    for w, orig, lab in TWIN_LR:
+        assert img.u32(w) in (orig, A.g.addr(lab)), hex(w)
+        out[w] = A.g.addr(lab)
     return out, (A, B), d
 
 
@@ -5280,6 +5510,7 @@ def args(img):
     res = ['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % GROW] + ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
     if not KEEP_FLIP:
         res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _fn in TWIN_FLIP]
+    res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _o, _l in TWIN_LR]
     return res
 
 
